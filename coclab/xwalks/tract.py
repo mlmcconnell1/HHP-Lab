@@ -95,6 +95,85 @@ def build_coc_tract_crosswalk(
     return crosswalk
 
 
+def add_population_weights(
+    crosswalk: pd.DataFrame,
+    population_data: pd.DataFrame,
+) -> pd.DataFrame:
+    """Add population-weighted shares to an existing tract crosswalk.
+
+    Computes pop_share for each tract within a CoC using:
+    pop_share = (area_share × tract_pop) / Σ(area_share × tract_pop)
+
+    The sum is taken over all tracts intersecting each CoC.
+
+    Parameters
+    ----------
+    crosswalk : pd.DataFrame
+        Tract crosswalk with 'coc_id', 'tract_geoid', 'area_share' columns.
+    population_data : pd.DataFrame
+        Population data with 'GEOID' and 'total_population' columns.
+
+    Returns
+    -------
+    pd.DataFrame
+        Crosswalk with pop_share column populated.
+    """
+    # Merge population data
+    xwalk = crosswalk.copy()
+
+    # Standardize GEOID column name
+    pop_df = population_data.copy()
+    if "GEOID" in pop_df.columns:
+        pop_df = pop_df.rename(columns={"GEOID": "tract_geoid"})
+
+    xwalk = xwalk.merge(
+        pop_df[["tract_geoid", "total_population"]],
+        on="tract_geoid",
+        how="left",
+    )
+
+    # Compute weighted population: area_share × tract_population
+    xwalk["weighted_pop"] = xwalk["area_share"] * xwalk["total_population"].fillna(0)
+
+    # Compute sum of weighted population per CoC
+    coc_totals = xwalk.groupby("coc_id")["weighted_pop"].transform("sum")
+
+    # Compute pop_share = weighted_pop / coc_total
+    # Handle division by zero (CoCs with no population data)
+    xwalk["pop_share"] = xwalk["weighted_pop"] / coc_totals.replace(0, pd.NA)
+
+    # Drop temporary columns
+    xwalk = xwalk.drop(columns=["total_population", "weighted_pop"])
+
+    return xwalk
+
+
+def validate_population_shares(crosswalk: pd.DataFrame) -> pd.DataFrame:
+    """Validate that population shares sum to approximately 1 per CoC.
+
+    Parameters
+    ----------
+    crosswalk : pd.DataFrame
+        Crosswalk with pop_share column.
+
+    Returns
+    -------
+    pd.DataFrame
+        Validation results with coc_id, pop_share_sum, and is_valid columns.
+    """
+    if "pop_share" not in crosswalk.columns:
+        raise ValueError("Crosswalk must have 'pop_share' column")
+
+    # Sum pop_share per CoC
+    sums = crosswalk.groupby("coc_id")["pop_share"].sum().reset_index()
+    sums.columns = ["coc_id", "pop_share_sum"]
+
+    # Check if sum is approximately 1 (within 0.01 tolerance)
+    sums["is_valid"] = (sums["pop_share_sum"] > 0.99) & (sums["pop_share_sum"] < 1.01)
+
+    return sums
+
+
 def save_crosswalk(
     crosswalk: pd.DataFrame,
     boundary_vintage: str,
