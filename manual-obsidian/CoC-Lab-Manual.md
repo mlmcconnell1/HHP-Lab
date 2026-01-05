@@ -13,6 +13,7 @@
 - [[#Python API]]
 - [[#Data Model]]
 - [[#Workflows]]
+- [[#Methodology: ACS Aggregation to CoC Level]]
 - [[#Module Reference]]
 - [[#Development]]
 
@@ -979,6 +980,82 @@ sequenceDiagram
     CLI->>Storage: Save coc_measures__2025__2022.parquet
     CLI-->>User: Measures built (N CoCs)
 ```
+
+---
+
+## Methodology: ACS Aggregation to CoC Level
+
+This section documents how ACS demographic measures are aggregated from census tracts to CoC boundaries.
+
+### Aggregation Algorithm
+
+CoC Lab uses **weighted tract-level aggregation** to produce CoC-level estimates. The algorithm differs by measure type:
+
+#### Count Variables (population, poverty counts)
+
+```
+CoC_estimate = Σ(tract_value × weight)
+```
+
+Where `weight` is either:
+- `area_share`: fraction of tract area falling within the CoC
+- `pop_share`: population-proportional weight (`tract_pop × area_share / total`)
+
+#### Median Variables (income, rent)
+
+```
+CoC_estimate = Σ(tract_median × pop_weight) / Σ(pop_weight)
+```
+
+These are **population-weighted averages** of tract medians—NOT true medians computed from underlying household distributions.
+
+### Why This Approach Is Acceptable
+
+| Justification | Explanation |
+|---------------|-------------|
+| **Standard practice** | Aligns with HUD's own CoC-level reporting and academic research (e.g., Byrne et al., 2012). The Census Bureau does not publish CoC-level tabulations. |
+| **ACS design constraints** | PUMS microdata uses PUMAs (~100k people) that don't nest within CoC boundaries, making true microdata pooling infeasible for most CoCs. |
+| **Large-aggregate convergence** | CoCs typically span dozens to hundreds of tracts. At this scale, weighted aggregation converges toward true values (Central Limit Theorem). |
+| **Explicit diagnostics** | The `coverage_ratio` field quantifies crosswalk completeness, enabling identification of problematic estimates. |
+
+### Known Limitations vs True Pooled Microdata
+
+#### 1. Median Estimates Are Approximate
+
+Averaging tract medians ≠ true population median. Example:
+
+| Tract | Median Income | Population |
+|-------|---------------|------------|
+| A     | $100,000      | 5,000      |
+| B     | $30,000       | 5,000      |
+
+**Weighted average**: $65,000 — but true CoC median depends on the actual income distributions, not just tract medians.
+
+#### 2. MOE Propagation Not Implemented
+
+ACS estimates include margins of error (MOE). Proper aggregated MOEs require variance formulas accounting for covariance. **CoC estimates should be treated as point estimates only.**
+
+#### 3. Ecological Inference Risk
+
+Tract-level rates (e.g., poverty rate) may not reflect within-CoC variation. Using aggregated rates for individual-level inference is subject to **ecological fallacy**.
+
+#### 4. Boundary Mismatch Artifacts
+
+When CoC boundaries cut through tracts, area weighting assumes uniform population distribution—false for mixed urban/rural tracts. Population weighting mitigates but doesn't eliminate this.
+
+#### 5. Temporal Mismatch
+
+ACS 5-year estimates pool data across 5 years (e.g., 2018-2022 for vintage 2022). CoC boundaries may change during that period. This module assumes boundaries are static.
+
+#### 6. Small-CoC Instability
+
+CoCs with few tracts or low populations have estimates more sensitive to individual tract values and crosswalk precision.
+
+### References
+
+- Byrne, T., et al. (2012). "Predicting Homelessness Using ACS Data."
+- HUD Exchange CoC Analysis Tools methodology documentation
+- Census Bureau ACS Handbook, Chapter 12: "Working with ACS Data"
 
 ---
 
