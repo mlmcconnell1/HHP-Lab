@@ -7,6 +7,9 @@ requires-python = ">=3.12"
 dependencies = [
     "pandas>=2.0",
     "pyarrow>=14.0",
+    "geopandas>=0.14",
+    "folium>=0.15",
+    "shapely>=2.0",
 ]
 
 [project.optional-dependencies]
