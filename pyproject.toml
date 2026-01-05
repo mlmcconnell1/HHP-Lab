@@ -1,7 +1,7 @@
 [project]
 name = "coc-pit"
 version = "0.1.0"
-description = "CoC Boundary Infrastructure - Python data + geospatial foundation"
+description = "CoC Lab - Continuum of Care boundary data infrastructure"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
@@ -10,11 +10,14 @@ dependencies = [
     "pyproj>=3.6.0",
     "pyarrow>=15.0.0",
     "pandas>=2.0.0",
+    "numpy>=1.26.0",
+    "httpx>=0.27.0",
 ]
 
 [project.optional-dependencies]
 dev = [
     "pytest>=8.0.0",
+    "pytest-httpx>=0.30.0",
     "ruff>=0.4.0",
 ]
 
@@ -28,3 +31,6 @@ select = ["E", "F", "I", "UP", "B"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["."]
+
+[tool.setuptools.packages.find]
+include = ["coclab*"]
