@@ -11,6 +11,12 @@ import typer
 
 from coclab.cli.build_measures import build_measures
 from coclab.cli.build_xwalks import build_xwalks
+from coclab.cli.compare_vintages import compare_vintages
+from coclab.cli.diagnostics import diagnostics
+from coclab.cli.ingest_census import ingest_census
+from coclab.cli.list_measures import list_measures
+from coclab.cli.list_xwalks import list_xwalks
+from coclab.cli.show_measures import show_measures
 
 app = typer.Typer(
     name="coclab",
@@ -18,9 +24,15 @@ app = typer.Typer(
     no_args_is_help=True,
 )
 
-# Register crosswalk and measures commands
+# Register crosswalk, measures, and diagnostics commands
 app.command("build-xwalks")(build_xwalks)
 app.command("build-measures")(build_measures)
+app.command("compare-vintages")(compare_vintages)
+app.command("diagnostics")(diagnostics)
+app.command("ingest-census")(ingest_census)
+app.command("list-measures")(list_measures)
+app.command("list-xwalks")(list_xwalks)
+app.command("show-measures")(show_measures)
 
 
 @app.command()

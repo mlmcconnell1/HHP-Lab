@@ -253,17 +253,29 @@ The `coclab` command provides access to all core functionality.
 ```mermaid
 flowchart LR
     coclab --> ingest
+    coclab --> ingest-census
     coclab --> list-vintages
     coclab --> show
     coclab --> build-xwalks
     coclab --> build-measures
+    coclab --> diagnostics
+    coclab --> list-xwalks
+    coclab --> list-measures
+    coclab --> show-measures
+    coclab --> compare-vintages
 
     ingest --> |"--source hud_exchange"| HUD_EX[Download annual vintage]
     ingest --> |"--source hud_opendata"| HUD_OD[Fetch current snapshot]
+    ingest-census --> TIGER[Download TIGER geometries]
     list-vintages --> LIST[Display available vintages]
     show --> MAP[Render interactive map]
     build-xwalks --> XWALK[Create tract/county crosswalks]
     build-measures --> MEAS[Aggregate ACS data to CoC]
+    diagnostics --> DIAG[Crosswalk quality checks]
+    list-xwalks --> LXWALK[List crosswalk files]
+    list-measures --> LMEAS[List measure files]
+    show-measures --> SMEAS[Display CoC measures]
+    compare-vintages --> COMP[Diff boundary vintages]
 ```
 
 ### `coclab ingest`
@@ -372,6 +384,127 @@ coclab build-measures --boundary 2025 --acs 2022 --weighting population
 **Output:**
 - `coc_measures__{boundary}__{acs}.parquet`
 - Summary statistics printed to console
+
+### `coclab ingest-census`
+
+Download TIGER census geometries (tracts and/or counties).
+
+```bash
+# Download both tracts and counties for 2023
+coclab ingest-census --year 2023
+
+# Download only tracts
+coclab ingest-census --year 2023 --type tracts
+
+# Force re-download even if files exist
+coclab ingest-census --year 2023 --force
+```
+
+| Option | Description | Default |
+|--------|-------------|---------|
+| `--year`, `-y` | TIGER vintage year | 2023 |
+| `--type`, `-t` | `tracts`, `counties`, or `all` | `all` |
+| `--force` | Re-download even if file exists | False |
+
+### `coclab diagnostics`
+
+Run crosswalk quality diagnostics.
+
+```bash
+# Basic diagnostics
+coclab diagnostics --crosswalk data/curated/xwalks/coc_tract_xwalk__2025__2023.parquet
+
+# Show problem CoCs
+coclab diagnostics -x crosswalk.parquet --show-problems
+
+# Custom thresholds and CSV export
+coclab diagnostics -x crosswalk.parquet --coverage-threshold 0.90 -o diagnostics.csv
+```
+
+| Option | Description | Default |
+|--------|-------------|---------|
+| `--crosswalk`, `-x` | Path to crosswalk parquet file | Required |
+| `--coverage-threshold` | Coverage threshold for flagging | 0.95 |
+| `--max-contribution` | Max tract contribution threshold | 0.8 |
+| `--show-problems` | Show problem CoCs | False |
+| `--output`, `-o` | Save diagnostics to CSV | None |
+
+### `coclab list-xwalks`
+
+List available crosswalk files.
+
+```bash
+# List all crosswalks
+coclab list-xwalks
+
+# List only tract crosswalks
+coclab list-xwalks --type tract
+```
+
+| Option | Description | Default |
+|--------|-------------|---------|
+| `--type`, `-t` | `tract`, `county`, or `all` | `all` |
+| `--dir`, `-d` | Directory to scan | `data/curated/xwalks` |
+
+### `coclab list-measures`
+
+List available CoC measure files.
+
+```bash
+coclab list-measures
+```
+
+| Option | Description | Default |
+|--------|-------------|---------|
+| `--dir`, `-d` | Directory to scan | `data/curated/measures` |
+
+### `coclab show-measures`
+
+Display computed measures for a specific CoC.
+
+```bash
+# Show measures (auto-detect latest files)
+coclab show-measures --coc CO-500
+
+# Specify vintages
+coclab show-measures --coc CO-500 --boundary 2025 --acs 2022
+
+# Output as JSON
+coclab show-measures --coc NY-600 --format json
+```
+
+| Option | Description | Default |
+|--------|-------------|---------|
+| `--coc`, `-c` | CoC identifier | Required |
+| `--boundary`, `-b` | Boundary vintage | Auto-detect |
+| `--acs`, `-a` | ACS vintage year | Auto-detect |
+| `--format`, `-f` | `table`, `json`, or `csv` | `table` |
+
+### `coclab compare-vintages`
+
+Compare CoC boundaries between two vintages.
+
+```bash
+# Basic comparison
+coclab compare-vintages --vintage1 2024 --vintage2 2025
+
+# Show unchanged CoCs too
+coclab compare-vintages -v1 2024 -v2 2025 --show-unchanged
+
+# Save diff to CSV
+coclab compare-vintages -v1 2024 -v2 2025 -o diff_report.csv
+```
+
+| Option | Description | Default |
+|--------|-------------|---------|
+| `--vintage1`, `-v1` | First (older) vintage | Required |
+| `--vintage2`, `-v2` | Second (newer) vintage | Required |
+| `--show-unchanged` | Also list unchanged CoCs | False |
+| `--output`, `-o` | Save diff to CSV | None |
+
+**Output:**
+- Summary counts of added, removed, changed, unchanged CoCs
+- Lists of affected CoC IDs by category
 
 ---
 
