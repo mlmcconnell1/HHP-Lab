@@ -40,11 +40,11 @@ def compute_crosswalk_diagnostics(crosswalk: pd.DataFrame) -> pd.DataFrame:
     grouped = crosswalk.groupby("coc_id")
 
     diagnostics = pd.DataFrame({
-        "coc_id": grouped.ngroups,  # placeholder, will be replaced
         "num_tracts": grouped.size(),
         "max_tract_contribution": grouped["area_share"].max(),
         "coverage_ratio_area": grouped["area_share"].sum(),
-    }).reset_index()
+    })
+    diagnostics = diagnostics.reset_index()
 
     # Compute population coverage if pop_share is available and has values
     if "pop_share" in crosswalk.columns:
