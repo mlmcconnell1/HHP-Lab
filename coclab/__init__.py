@@ -1,1 +1,1 @@
-"""CoC Boundary Infrastructure - Python data + geospatial foundation."""
+"""CoC Lab - Continuum of Care boundary data infrastructure."""
