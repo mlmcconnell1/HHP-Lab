@@ -1354,6 +1354,14 @@ All geometries are stored in **EPSG:4326** (WGS84):
 
 This enables efficient change detection between vintages.
 
+### ACS Vintage Alignment Rule
+
+> **ACS vintage YYYY represents pooled 5-year estimates covering YYYY-4 through YYYY, and is aligned to CoC boundary vintage YYYY+1 unless otherwise specified.**
+
+Example: ACS vintage 2022 (covering 2018–2022) aligns with CoC boundary vintage 2023.
+
+This convention reflects that ACS estimates are released ~1 year after the reference period ends, and CoC boundaries for a given fiscal year are typically finalized during that release window.
+
 ---
 
 *Generated for CoC Lab v0*
