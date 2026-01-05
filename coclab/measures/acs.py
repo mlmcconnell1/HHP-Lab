@@ -79,6 +79,12 @@ Known Limitations vs True Pooled Microdata
    estimates are more sensitive to individual tract values and crosswalk
    precision.
 
+7. **Housing-market representativeness**: Population-weighted tract coverage
+   does not guarantee housing-market representativeness. High-density tracts
+   may have systematically different rental markets, vacancy rates, or housing
+   stock than lower-density tracts. This will be addressed in Phase 3
+   sensitivity analyses.
+
 References
 ----------
 - Byrne, T., et al. (2012). "Predicting Homelessness Using ACS Data."
