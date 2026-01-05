@@ -98,6 +98,8 @@ from typing import Literal
 import httpx
 import pandas as pd
 
+from coclab.provenance import ProvenanceBlock, write_parquet_with_provenance
+
 CENSUS_API = "https://api.census.gov/data/{year}/acs/acs5"
 
 # ACS variable mappings
@@ -402,7 +404,25 @@ def build_coc_measures(
         output_dir.mkdir(parents=True, exist_ok=True)
         filename = f"coc_measures__{boundary_vintage}__{acs_vintage}.parquet"
         output_path = output_dir / filename
-        coc_measures.to_parquet(output_path, index=False)
+
+        # Extract tract_vintage from crosswalk if available
+        tract_vintage = None
+        if "tract_vintage" in crosswalk.columns:
+            tract_vintage = str(crosswalk["tract_vintage"].iloc[0])
+
+        # Build provenance block
+        provenance = ProvenanceBlock(
+            boundary_vintage=boundary_vintage,
+            tract_vintage=tract_vintage,
+            acs_vintage=str(acs_vintage),
+            weighting=weighting,
+            extra={
+                "dataset_type": "coc_measures",
+                "crosswalk_path": str(crosswalk_path),
+            },
+        )
+
+        write_parquet_with_provenance(coc_measures, output_path, provenance)
         print(f"Saved to {output_path}")
 
     return coc_measures

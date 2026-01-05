@@ -5,6 +5,8 @@ from pathlib import Path
 import geopandas as gpd
 import pandas as pd
 
+from coclab.provenance import ProvenanceBlock, write_parquet_with_provenance
+
 
 # ESRI:102003 - USA Contiguous Albers Equal Area Conic
 ALBERS_EQUAL_AREA_CRS = "ESRI:102003"
@@ -179,8 +181,10 @@ def save_crosswalk(
     boundary_vintage: str,
     tract_vintage: str,
     output_dir: Path | str = "data/curated/xwalks",
+    *,
+    has_pop_weights: bool = False,
 ) -> Path:
-    """Save crosswalk to parquet file.
+    """Save crosswalk to parquet file with provenance metadata.
 
     Parameters
     ----------
@@ -192,6 +196,8 @@ def save_crosswalk(
         Version identifier for census tracts.
     output_dir : Path | str
         Output directory for parquet file.
+    has_pop_weights : bool
+        Whether crosswalk includes population weights.
 
     Returns
     -------
@@ -204,6 +210,14 @@ def save_crosswalk(
     filename = f"coc_tract_xwalk__{boundary_vintage}__{tract_vintage}.parquet"
     output_path = output_dir / filename
 
-    crosswalk.to_parquet(output_path, index=False)
+    # Build provenance block
+    provenance = ProvenanceBlock(
+        boundary_vintage=boundary_vintage,
+        tract_vintage=tract_vintage,
+        weighting="area" if not has_pop_weights else "area+population",
+        extra={"dataset_type": "coc_tract_crosswalk"},
+    )
+
+    write_parquet_with_provenance(crosswalk, output_path, provenance)
 
     return output_path

@@ -864,6 +864,55 @@ erDiagram
 | County crosswalks | `data/curated/xwalks/coc_county_xwalk__{boundary}.parquet` | CoC-county mapping |
 | CoC measures | `data/curated/measures/coc_measures__{boundary}__{acs}.parquet` | Aggregated ACS data |
 
+### Dataset Provenance
+
+All CoC Lab Parquet files embed **provenance metadata** in the file schema, enabling full reproducibility without sidecar files.
+
+#### Provenance Block Schema
+
+```json
+{
+  "boundary_vintage": "2025",
+  "tract_vintage": "2023",
+  "acs_vintage": "2022",
+  "weighting": "population",
+  "created_at": "2025-01-05T12:30:00+00:00",
+  "coclab_version": "0.1.0",
+  "extra": {
+    "dataset_type": "coc_measures",
+    "crosswalk_path": "data/curated/xwalks/coc_tract_xwalk__2025__2023.parquet"
+  }
+}
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `boundary_vintage` | string | CoC boundary version used |
+| `tract_vintage` | string | Census tract geometry version |
+| `acs_vintage` | string | ACS 5-year estimate end year |
+| `weighting` | string | Weighting method (`area`, `population`, `area+population`) |
+| `created_at` | ISO 8601 | Timestamp of dataset creation |
+| `coclab_version` | string | CoC Lab version that produced the file |
+| `extra` | object | Extensible metadata (dataset type, source paths, etc.) |
+
+#### Reading Provenance
+
+```python
+from coclab.provenance import read_provenance
+
+provenance = read_provenance("data/curated/measures/coc_measures__2025__2022.parquet")
+print(provenance.boundary_vintage)  # "2025"
+print(provenance.weighting)         # "population"
+print(provenance.to_json())         # Full JSON representation
+```
+
+#### Design Rationale
+
+- **Embedded in Parquet metadata**: Provenance travels with the data file
+- **Extensible**: The `extra` field allows adding fields without schema changes
+- **No sidecar files**: Eliminates file proliferation and sync issues
+- **Read without loading data**: Provenance can be inspected via schema metadata
+
 ---
 
 ## Workflows
@@ -1267,6 +1316,31 @@ Attribution diagnostics and coverage reporting.
 - `max_tract_contribution` - Largest single-tract area share
 - `coverage_ratio_area` - Sum of area_share (ideally ~1.0)
 - `coverage_ratio_pop` - Sum of pop_share (when available)
+
+### provenance.py
+
+Dataset provenance tracking via Parquet metadata.
+
+**Classes:**
+| Class | Purpose |
+|-------|---------|
+| `ProvenanceBlock` | Dataclass holding provenance fields with JSON serialization |
+
+**Functions:**
+| Function | Purpose |
+|----------|---------|
+| `write_parquet_with_provenance()` | Write DataFrame with embedded provenance metadata |
+| `read_provenance()` | Extract provenance from Parquet file without loading data |
+| `has_provenance()` | Check if a Parquet file contains provenance |
+
+**ProvenanceBlock Fields:**
+- `boundary_vintage` - CoC boundary version
+- `tract_vintage` - Census tract version
+- `acs_vintage` - ACS estimate end year
+- `weighting` - Weighting method used
+- `created_at` - ISO 8601 creation timestamp
+- `coclab_version` - CoC Lab version
+- `extra` - Extensible metadata dictionary
 
 ---
 
