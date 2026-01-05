@@ -14,6 +14,7 @@
 - [[#Data Model]]
 - [[#Workflows]]
 - [[#Methodology: ACS Aggregation to CoC Level]]
+- [[#Methodology: Panel Assembly (Phase 3)]]
 - [[#Module Reference]]
 - [[#Development]]
 
@@ -234,12 +235,17 @@ coclab/
     ingest/     # Tract and county downloaders
   xwalks/       # CoC-to-census crosswalk builders
   measures/     # ACS measure aggregation and diagnostics
+  pit/          # PIT count ingestion and QA (Phase 3)
+    ingest/     # HUD Exchange PIT downloaders and parsers
+  panel/        # CoC × year panel assembly (Phase 3)
 data/
   raw/          # Downloaded source files
   curated/      # Processed GeoParquet files
     census/     # TIGER tract/county geometries
     xwalks/     # CoC-tract and CoC-county crosswalks
     measures/   # CoC-level demographic measures
+    pit/        # Canonical PIT count files
+    panels/     # CoC × year analysis panels
 tests/          # Test suite including smoke tests
 ```
 
@@ -255,11 +261,14 @@ The `coclab` command provides access to all core functionality.
 flowchart LR
     coclab --> ingest
     coclab --> ingest-census
+    coclab --> ingest-pit
     coclab --> list-vintages
     coclab --> show
     coclab --> build-xwalks
     coclab --> build-measures
+    coclab --> build-panel
     coclab --> diagnostics
+    coclab --> panel-diagnostics
     coclab --> list-xwalks
     coclab --> list-measures
     coclab --> show-measures
@@ -268,11 +277,14 @@ flowchart LR
     ingest --> |"--source hud_exchange"| HUD_EX[Download annual vintage]
     ingest --> |"--source hud_opendata"| HUD_OD[Fetch current snapshot]
     ingest-census --> TIGER[Download TIGER geometries]
+    ingest-pit --> PIT[Download & parse PIT counts]
     list-vintages --> LIST[Display available vintages]
     show --> MAP[Render interactive map]
     build-xwalks --> XWALK[Create tract/county crosswalks]
     build-measures --> MEAS[Aggregate ACS data to CoC]
+    build-panel --> PANEL[Assemble CoC × year panels]
     diagnostics --> DIAG[Crosswalk quality checks]
+    panel-diagnostics --> PDIAG[Panel quality & sensitivity]
     list-xwalks --> LXWALK[List crosswalk files]
     list-measures --> LMEAS[List measure files]
     show-measures --> SMEAS[Display CoC measures]
@@ -506,6 +518,87 @@ coclab compare-vintages -v1 2024 -v2 2025 -o diff_report.csv
 **Output:**
 - Summary counts of added, removed, changed, unchanged CoCs
 - Lists of affected CoC IDs by category
+
+### `coclab ingest-pit`
+
+Download and parse PIT (Point-in-Time) count data from HUD Exchange.
+
+```bash
+# Ingest PIT data for a specific year
+coclab ingest-pit --year 2024
+
+# Force re-download even if file exists
+coclab ingest-pit --year 2024 --force
+
+# Parse only (skip download if file exists)
+coclab ingest-pit --year 2024 --parse-only
+```
+
+| Option | Description | Default |
+|--------|-------------|---------|
+| `--year`, `-y` | PIT count year to ingest | Required |
+| `--force` | Re-download even if file exists | False |
+| `--parse-only` | Skip download, parse existing file | False |
+
+**Workflow:**
+1. Downloads PIT Excel file from HUD Exchange
+2. Parses to canonical schema (coc_id, pit_total, pit_sheltered, pit_unsheltered)
+3. Writes Parquet with embedded provenance
+4. Registers in PIT registry
+5. Runs QA validation checks
+
+### `coclab build-panel`
+
+Build analysis-ready CoC × year panels combining PIT counts with ACS measures.
+
+```bash
+# Build panel for date range
+coclab build-panel --start 2018 --end 2024
+
+# Specify weighting method
+coclab build-panel --start 2018 --end 2024 --weighting population
+
+# Custom output path
+coclab build-panel --start 2020 --end 2024 --output custom_panel.parquet
+```
+
+| Option | Description | Default |
+|--------|-------------|---------|
+| `--start`, `-s` | Start year (inclusive) | Required |
+| `--end`, `-e` | End year (inclusive) | Required |
+| `--weighting`, `-w` | `area` or `population` | `population` |
+| `--output`, `-o` | Output file path | Auto-generated |
+
+**Output:**
+- Panel Parquet file with embedded provenance
+- Summary statistics (years, CoC count, coverage)
+
+### `coclab panel-diagnostics`
+
+Run diagnostics and sensitivity checks on panel files.
+
+```bash
+# Run diagnostics on a panel
+coclab panel-diagnostics --panel data/curated/panels/coc_panel__2018_2024.parquet
+
+# Export diagnostics to CSV files
+coclab panel-diagnostics --panel panel.parquet --output-dir ./diagnostics/ --format csv
+
+# Print text summary only
+coclab panel-diagnostics --panel panel.parquet --format text
+```
+
+| Option | Description | Default |
+|--------|-------------|---------|
+| `--panel`, `-p` | Path to panel Parquet file | Required |
+| `--output-dir`, `-o` | Directory for CSV exports | None |
+| `--format`, `-f` | `text` or `csv` | `text` |
+
+**Diagnostics Included:**
+- Coverage ratio distribution over time
+- Boundary change flags by CoC/year
+- Missingness summaries per column
+- Panel structure validation
 
 ---
 
@@ -850,6 +943,82 @@ erDiagram
 | `coverage_ratio` | float | Sum of weights (quality indicator) |
 | `source` | string | Always `acs_5yr` |
 
+### PIT Counts Schema (Phase 3)
+
+Canonical PIT (Point-in-Time) count data:
+
+```mermaid
+erDiagram
+    PIT_COUNTS {
+        int pit_year PK "Calendar year of PIT count"
+        string coc_id PK "Normalized CoC ID (ST-NNN)"
+        int pit_total "Total persons experiencing homelessness"
+        int pit_sheltered "Sheltered count (nullable)"
+        int pit_unsheltered "Unsheltered count (nullable)"
+        string data_source "Source identifier"
+        string source_ref "URL or dataset reference"
+        datetime ingested_at "UTC timestamp of ingestion"
+        string notes "Data quirks or caveats (nullable)"
+    }
+```
+
+| Column | Type | Description |
+|--------|------|-------------|
+| `pit_year` | int | Calendar year of PIT count |
+| `coc_id` | string | Normalized CoC ID (e.g., `CO-500`) |
+| `pit_total` | int | Total persons experiencing homelessness |
+| `pit_sheltered` | int | Sheltered count (nullable) |
+| `pit_unsheltered` | int | Unsheltered count (nullable) |
+| `data_source` | string | Source identifier (e.g., `hud_exchange`) |
+| `source_ref` | string | URL or dataset reference |
+| `ingested_at` | datetime | UTC timestamp of ingestion |
+| `notes` | string | Data quirks or caveats (nullable) |
+
+### Panel Schema (Phase 3)
+
+Analysis-ready CoC × year panels combining PIT counts with ACS measures:
+
+```mermaid
+erDiagram
+    COC_PANEL {
+        string coc_id PK "CoC identifier"
+        int year PK "Panel year"
+        int pit_total "Total homeless count"
+        int pit_sheltered "Sheltered count (nullable)"
+        int pit_unsheltered "Unsheltered count (nullable)"
+        string boundary_vintage_used "CoC boundary version"
+        string acs_vintage_used "ACS estimate version"
+        string weighting_method "area or population"
+        float total_population "Weighted population estimate"
+        float adult_population "Population 18+"
+        float population_below_poverty "Below poverty line"
+        float median_household_income "Weighted median income"
+        float median_gross_rent "Weighted median rent"
+        float coverage_ratio "Sum of weights"
+        bool boundary_changed "True if boundary changed from prior year"
+        string source "Data source identifier"
+    }
+```
+
+| Column | Type | Description |
+|--------|------|-------------|
+| `coc_id` | string | CoC identifier (e.g., `CO-500`) |
+| `year` | int | Panel year |
+| `pit_total` | int | Total homeless count from PIT |
+| `pit_sheltered` | int | Sheltered count (nullable) |
+| `pit_unsheltered` | int | Unsheltered count (nullable) |
+| `boundary_vintage_used` | string | CoC boundary version applied |
+| `acs_vintage_used` | string | ACS estimate version applied |
+| `weighting_method` | string | `area` or `population` |
+| `total_population` | float | Weighted population estimate |
+| `adult_population` | float | Population 18 and older |
+| `population_below_poverty` | float | Below 100% federal poverty line |
+| `median_household_income` | float | Population-weighted median |
+| `median_gross_rent` | float | Population-weighted median |
+| `coverage_ratio` | float | Sum of crosswalk weights |
+| `boundary_changed` | bool | True if CoC boundary changed from prior year |
+| `source` | string | Data source identifier |
+
 ### Storage Locations
 
 | File | Path Pattern | Description |
@@ -863,6 +1032,9 @@ erDiagram
 | Tract crosswalks | `data/curated/xwalks/coc_tract_xwalk__{boundary}__{tracts}.parquet` | CoC-tract mapping |
 | County crosswalks | `data/curated/xwalks/coc_county_xwalk__{boundary}.parquet` | CoC-county mapping |
 | CoC measures | `data/curated/measures/coc_measures__{boundary}__{acs}.parquet` | Aggregated ACS data |
+| PIT counts | `data/curated/pit/pit_counts__{year}.parquet` | Canonical PIT data |
+| PIT registry | `data/curated/pit/pit_registry.parquet` | PIT year tracking |
+| CoC panels | `data/curated/panels/coc_panel__{start}_{end}.parquet` | Analysis-ready panels |
 
 ### Dataset Provenance
 
@@ -1112,6 +1284,84 @@ Population-weighted tract coverage does not guarantee housing-market representat
 
 ---
 
+## Methodology: Panel Assembly (Phase 3)
+
+This section documents how CoC × year analysis panels are constructed by joining PIT counts with ACS demographic measures.
+
+### Panel Assembly Algorithm
+
+Panel assembly follows these steps for each year in the requested range:
+
+1. **Load PIT counts** from canonical Parquet files
+2. **Apply alignment policy** to determine boundary and ACS vintages
+3. **Load ACS measures** for the aligned vintage
+4. **Join** PIT and ACS data by CoC ID
+5. **Detect boundary changes** from prior year
+6. **Compute coverage ratio** from crosswalk weights
+
+### Alignment Policies
+
+Alignment policies are **pure functions** that map PIT years to data vintages:
+
+| Policy | Rule | Rationale |
+|--------|------|-----------|
+| Boundary vintage | `f(pit_year) = pit_year` | Use boundaries in effect during PIT count |
+| ACS vintage | `f(pit_year) = pit_year - 1` | ACS released ~1 year after reference period |
+
+**Example:** PIT year 2024 uses:
+- Boundary vintage 2024
+- ACS vintage 2023 (covering 2019-2023)
+
+Policies are recorded in panel provenance metadata for reproducibility.
+
+### Boundary Change Detection
+
+The `boundary_changed` flag indicates whether a CoC's boundary differs from the prior year:
+
+```
+boundary_changed[coc, year] =
+    (boundary_vintage[year] ≠ boundary_vintage[year-1]) OR
+    (geom_hash[coc, year] ≠ geom_hash[coc, year-1])
+```
+
+First year in panel always has `boundary_changed = False`.
+
+### Coverage Ratio Interpretation
+
+The `coverage_ratio` field reflects crosswalk completeness:
+
+| Value | Interpretation |
+|-------|----------------|
+| `1.0` | Perfect coverage—all CoC area mapped to tracts |
+| `0.95-0.99` | Minor boundary/tract misalignment |
+| `< 0.90` | Significant gaps—investigate crosswalk |
+| `> 1.0` | Overlapping tract assignments (rare) |
+
+### Panel Diagnostics
+
+The `panel-diagnostics` command provides:
+
+1. **Coverage summary** - Min/max/mean coverage by year
+2. **Boundary change summary** - CoCs with changes and affected years
+3. **Missingness report** - Missing values per column per year
+4. **Weighting sensitivity** - Compare area vs population weighting effects
+
+### Known Limitations
+
+#### 1. Vintage Alignment Lag
+
+ACS vintage Y-1 means demographic data is 1-2 years old relative to PIT counts. Rapidly changing areas may show measurement lag.
+
+#### 2. Boundary Change Granularity
+
+Boundary changes are detected at annual resolution. Mid-year changes are assigned to the later vintage.
+
+#### 3. Missing Data Handling
+
+CoCs missing from PIT or ACS for a given year are excluded from the panel for that year. Use `missingness_report()` to identify gaps.
+
+---
+
 ## Module Reference
 
 ### cli/main.py
@@ -1341,6 +1591,132 @@ Dataset provenance tracking via Parquet metadata.
 - `created_at` - ISO 8601 creation timestamp
 - `coclab_version` - CoC Lab version
 - `extra` - Extensible metadata dictionary
+
+### pit/ingest/hud_exchange.py (Phase 3)
+
+PIT data download from HUD Exchange.
+
+**Functions:**
+| Function | Purpose |
+|----------|---------|
+| `get_pit_source_url()` | Get download URL for a PIT year |
+| `download_pit_data()` | Download PIT Excel file from HUD Exchange |
+| `list_available_years()` | List years with known PIT data URLs |
+
+**DownloadResult Fields:**
+- `path` - Path to downloaded file
+- `source_url` - Original download URL
+- `downloaded_at` - Timestamp of download
+- `file_size` - Size in bytes
+
+### pit/ingest/parser.py (Phase 3)
+
+PIT data parsing and canonicalization.
+
+**Functions:**
+| Function | Purpose |
+|----------|---------|
+| `normalize_coc_id()` | Normalize CoC ID to ST-NNN format |
+| `parse_pit_file()` | Parse CSV/Excel to canonical schema |
+| `write_pit_parquet()` | Write with embedded provenance |
+| `get_canonical_output_path()` | Generate standard output path |
+
+**CoC ID Normalization:**
+- Handles various formats: `CO-500`, `co-500`, `CO500`, `CO 500`
+- Zero-pads short numbers: `CO-5` → `CO-005`
+- Validates US state/territory codes
+
+### pit/registry.py (Phase 3)
+
+PIT year tracking and version management.
+
+**Functions:**
+| Function | Purpose |
+|----------|---------|
+| `register_pit_year()` | Register a PIT year in the registry |
+| `list_pit_years()` | List all registered PIT years |
+| `get_pit_path()` | Get path for a specific PIT year |
+| `latest_pit_year()` | Get most recent registered year |
+
+### pit/qa.py (Phase 3)
+
+PIT data quality validation.
+
+**Classes:**
+| Class | Purpose |
+|-------|---------|
+| `Severity` | Enum: ERROR, WARNING |
+| `QAIssue` | Individual validation issue |
+| `QAReport` | Collection of issues with pass/fail status |
+
+**Functions:**
+| Function | Purpose |
+|----------|---------|
+| `check_duplicates()` | Find duplicate CoC IDs per year |
+| `check_missing_cocs()` | Compare against boundary vintages |
+| `check_invalid_counts()` | Detect negative/non-integer values |
+| `check_yoy_changes()` | Flag large year-over-year changes |
+| `validate_pit_data()` | Run all validation checks |
+
+### panel/policies.py (Phase 3)
+
+Panel assembly alignment policies.
+
+**Classes:**
+| Class | Purpose |
+|-------|---------|
+| `AlignmentPolicy` | Dataclass defining vintage alignment rules |
+
+**Functions:**
+| Function | Purpose |
+|----------|---------|
+| `default_boundary_vintage()` | PIT year Y → boundary vintage Y |
+| `default_acs_vintage()` | PIT year Y → ACS vintage Y-1 |
+
+**DEFAULT_POLICY:**
+- `boundary_vintage_fn`: Same year as PIT
+- `acs_vintage_fn`: PIT year minus 1 (ACS lag)
+- `weighting_method`: `population`
+
+### panel/assemble.py (Phase 3)
+
+CoC × year panel construction.
+
+**Functions:**
+| Function | Purpose |
+|----------|---------|
+| `build_panel()` | Construct panel for year range |
+| `save_panel()` | Write panel with embedded provenance |
+
+**Panel Assembly Steps:**
+1. Load PIT counts for each year
+2. Apply alignment policy for boundary/ACS vintages
+3. Join ACS measures using crosswalks
+4. Detect boundary changes between years
+5. Compute coverage ratios
+
+### panel/diagnostics.py (Phase 3)
+
+Panel quality and sensitivity analysis.
+
+**Classes:**
+| Class | Purpose |
+|-------|---------|
+| `DiagnosticsReport` | Container for all diagnostic results |
+
+**Functions:**
+| Function | Purpose |
+|----------|---------|
+| `coverage_summary()` | Coverage ratio stats by year |
+| `boundary_change_summary()` | CoCs with boundary changes |
+| `weighting_sensitivity()` | Compare area vs population weighting |
+| `missingness_report()` | Missing data patterns per column |
+| `generate_diagnostics_report()` | Run all diagnostics |
+
+**DiagnosticsReport Methods:**
+- `to_dict()` - JSON-compatible serialization
+- `to_csv(output_dir)` - Export individual CSVs
+- `summary()` - CLI-readable text output
 
 ---
 
