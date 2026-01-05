@@ -1,0 +1,217 @@
+"""Tests for the coclab CLI."""
+
+from pathlib import Path
+from unittest.mock import patch
+
+from typer.testing import CliRunner
+
+from coclab.cli.main import app
+
+runner = CliRunner()
+
+
+class TestIngestCommand:
+    """Tests for the 'ingest' command."""
+
+    def test_ingest_unknown_source(self):
+        """Ingest with unknown source should fail."""
+        result = runner.invoke(app, ["ingest", "--source", "unknown"])
+        assert result.exit_code == 1
+        assert "Unknown source" in result.output
+
+    def test_ingest_hud_exchange_requires_vintage(self):
+        """Ingest hud_exchange without vintage should fail."""
+        result = runner.invoke(app, ["ingest", "--source", "hud_exchange"])
+        assert result.exit_code == 1
+        assert "--vintage is required" in result.output
+
+    @patch("coclab.ingest.hud_exchange_gis.ingest_hud_exchange")
+    def test_ingest_hud_exchange_success(self, mock_ingest):
+        """Ingest hud_exchange with vintage should call ingest_hud_exchange."""
+        mock_ingest.return_value = Path("data/curated/coc_boundaries__2025.parquet")
+
+        result = runner.invoke(
+            app, ["ingest", "--source", "hud_exchange", "--vintage", "2025"]
+        )
+
+        assert result.exit_code == 0
+        assert "Successfully ingested" in result.output
+        mock_ingest.assert_called_once_with("2025")
+
+    @patch("coclab.ingest.hud_exchange_gis.ingest_hud_exchange")
+    def test_ingest_hud_exchange_failure(self, mock_ingest):
+        """Ingest hud_exchange failure should show error."""
+        mock_ingest.side_effect = ValueError("Download failed")
+
+        result = runner.invoke(
+            app, ["ingest", "--source", "hud_exchange", "--vintage", "2025"]
+        )
+
+        assert result.exit_code == 1
+        assert "Error:" in result.output
+
+    @patch("coclab.ingest.hud_opendata_arcgis.ingest_hud_opendata")
+    def test_ingest_hud_opendata_success(self, mock_ingest):
+        """Ingest hud_opendata should call ingest_hud_opendata."""
+        mock_ingest.return_value = Path(
+            "data/curated/coc_boundaries__HUDOpenData_2025-01-04.parquet"
+        )
+
+        result = runner.invoke(app, ["ingest", "--source", "hud_opendata"])
+
+        assert result.exit_code == 0
+        assert "Successfully ingested" in result.output
+        mock_ingest.assert_called_once_with(snapshot_tag="latest")
+
+    @patch("coclab.ingest.hud_opendata_arcgis.ingest_hud_opendata")
+    def test_ingest_hud_opendata_with_snapshot(self, mock_ingest):
+        """Ingest hud_opendata with custom snapshot tag."""
+        mock_ingest.return_value = Path(
+            "data/curated/coc_boundaries__custom_snapshot.parquet"
+        )
+
+        result = runner.invoke(
+            app, ["ingest", "--source", "hud_opendata", "--snapshot", "custom_snapshot"]
+        )
+
+        assert result.exit_code == 0
+        mock_ingest.assert_called_once_with(snapshot_tag="custom_snapshot")
+
+
+class TestListVintagesCommand:
+    """Tests for the 'list-vintages' command."""
+
+    @patch("coclab.registry.registry.list_vintages")
+    def test_list_vintages_empty(self, mock_list):
+        """List vintages when no vintages registered."""
+        mock_list.return_value = []
+
+        result = runner.invoke(app, ["list-vintages"])
+
+        assert result.exit_code == 0
+        assert "No vintages registered" in result.output
+
+    @patch("coclab.registry.registry.list_vintages")
+    def test_list_vintages_with_entries(self, mock_list):
+        """List vintages with registered entries."""
+        from datetime import UTC, datetime
+
+        from coclab.registry.schema import RegistryEntry
+
+        mock_list.return_value = [
+            RegistryEntry(
+                boundary_vintage="2025",
+                source="hud_exchange_gis_tools",
+                ingested_at=datetime(2025, 1, 4, 12, 0, 0, tzinfo=UTC),
+                path=Path("data/curated/coc_boundaries__2025.parquet"),
+                feature_count=450,
+                hash_of_file="abc123",
+            ),
+            RegistryEntry(
+                boundary_vintage="HUDOpenData_2025-01-04",
+                source="hud_opendata_arcgis",
+                ingested_at=datetime(2025, 1, 4, 10, 0, 0, tzinfo=UTC),
+                path=Path("data/curated/coc_boundaries__HUDOpenData_2025-01-04.parquet"),
+                feature_count=448,
+                hash_of_file="def456",
+            ),
+        ]
+
+        result = runner.invoke(app, ["list-vintages"])
+
+        assert result.exit_code == 0
+        assert "2025" in result.output
+        assert "hud_exchange_gis_tools" in result.output
+        assert "HUDOpenData_2025-01-04" in result.output
+        assert "450" in result.output
+
+
+class TestShowCommand:
+    """Tests for the 'show' command."""
+
+    @patch("coclab.viz.map_folium.render_coc_map")
+    def test_show_success(self, mock_render):
+        """Show CoC map successfully."""
+        mock_render.return_value = Path("data/curated/maps/CO-500__2025.html")
+
+        result = runner.invoke(app, ["show", "--coc", "CO-500"])
+
+        assert result.exit_code == 0
+        assert "Map saved to" in result.output
+        mock_render.assert_called_once_with(coc_id="CO-500", vintage=None, out_html=None)
+
+    @patch("coclab.viz.map_folium.render_coc_map")
+    def test_show_with_vintage(self, mock_render):
+        """Show CoC map with specific vintage."""
+        mock_render.return_value = Path("data/curated/maps/CO-500__2024.html")
+
+        result = runner.invoke(app, ["show", "--coc", "CO-500", "--vintage", "2024"])
+
+        assert result.exit_code == 0
+        mock_render.assert_called_once_with(coc_id="CO-500", vintage="2024", out_html=None)
+
+    @patch("coclab.viz.map_folium.render_coc_map")
+    def test_show_with_output_path(self, mock_render):
+        """Show CoC map with custom output path."""
+        custom_path = Path("/tmp/my_map.html")
+        mock_render.return_value = custom_path
+
+        result = runner.invoke(
+            app, ["show", "--coc", "CO-500", "--output", str(custom_path)]
+        )
+
+        assert result.exit_code == 0
+        mock_render.assert_called_once_with(
+            coc_id="CO-500", vintage=None, out_html=custom_path
+        )
+
+    @patch("coclab.viz.map_folium.render_coc_map")
+    def test_show_coc_not_found(self, mock_render):
+        """Show CoC map when CoC not found."""
+        mock_render.side_effect = ValueError("CoC 'XX-999' not found")
+
+        result = runner.invoke(app, ["show", "--coc", "XX-999"])
+
+        assert result.exit_code == 1
+        assert "Error:" in result.output
+
+    @patch("coclab.viz.map_folium.render_coc_map")
+    def test_show_file_not_found(self, mock_render):
+        """Show CoC map when boundary file not found."""
+        mock_render.side_effect = FileNotFoundError("Boundary file not found")
+
+        result = runner.invoke(app, ["show", "--coc", "CO-500"])
+
+        assert result.exit_code == 1
+        assert "Error:" in result.output
+
+
+class TestHelpOutput:
+    """Tests for CLI help output."""
+
+    def test_main_help(self):
+        """Main help should show all commands."""
+        result = runner.invoke(app, ["--help"])
+
+        assert result.exit_code == 0
+        assert "ingest" in result.output
+        assert "list-vintages" in result.output
+        assert "show" in result.output
+
+    def test_ingest_help(self):
+        """Ingest help should show options."""
+        result = runner.invoke(app, ["ingest", "--help"])
+
+        assert result.exit_code == 0
+        assert "--source" in result.output
+        assert "--vintage" in result.output
+        assert "--snapshot" in result.output
+
+    def test_show_help(self):
+        """Show help should show options."""
+        result = runner.invoke(app, ["show", "--help"])
+
+        assert result.exit_code == 0
+        assert "--coc" in result.output
+        assert "--vintage" in result.output
+        assert "--output" in result.output
