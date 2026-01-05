@@ -1085,6 +1085,51 @@ print(provenance.to_json())         # Full JSON representation
 - **No sidecar files**: Eliminates file proliferation and sync issues
 - **Read without loading data**: Provenance can be inspected via schema metadata
 
+#### PIT Provenance Metadata
+
+PIT count Parquet files include additional provenance fields tracking data lineage and any CoC ID transformations:
+
+```json
+{
+  "created_at": "2025-01-05T22:02:41.946985+00:00",
+  "coclab_version": "0.1.0",
+  "extra": {
+    "pit_year": 2024,
+    "row_count": 385,
+    "data_source": "hud_exchange",
+    "source_ref": "https://www.huduser.gov/.../2007-2024-PIT-Counts-by-CoC.xlsb",
+    "ingested_at": "2025-01-05T22:02:41.929693+00:00",
+    "rows_read": 390,
+    "rows_skipped": 5,
+    "cross_state_mappings": {
+      "MO-604a": "MO-604"
+    }
+  }
+}
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `pit_year` | int | PIT count year |
+| `row_count` | int | Number of CoC records in output |
+| `data_source` | string | Source identifier (e.g., `hud_exchange`) |
+| `source_ref` | string | Download URL or file reference |
+| `ingested_at` | ISO 8601 | Timestamp when data was parsed |
+| `rows_read` | int | Total rows read from source file |
+| `rows_skipped` | int | Rows skipped (invalid CoC IDs, missing data) |
+| `cross_state_mappings` | object | CoC IDs with letter suffixes mapped to base IDs |
+
+**Reading PIT Provenance:**
+
+```python
+from coclab.provenance import read_provenance
+
+provenance = read_provenance("data/curated/pit/pit_counts__2024.parquet")
+print(provenance.extra["pit_year"])           # 2024
+print(provenance.extra["source_ref"])         # HUD download URL
+print(provenance.extra["cross_state_mappings"])  # {"MO-604a": "MO-604"}
+```
+
 ---
 
 ## Workflows
@@ -1613,18 +1658,40 @@ PIT data download from HUD Exchange.
 
 PIT data parsing and canonicalization.
 
+**Classes:**
+| Class | Purpose |
+|-------|---------|
+| `PITParseResult` | Result container with DataFrame and parsing metadata |
+
 **Functions:**
 | Function | Purpose |
 |----------|---------|
 | `normalize_coc_id()` | Normalize CoC ID to ST-NNN format |
-| `parse_pit_file()` | Parse CSV/Excel to canonical schema |
+| `parse_pit_file()` | Parse CSV/Excel to canonical schema, returns `PITParseResult` |
 | `write_pit_parquet()` | Write with embedded provenance |
 | `get_canonical_output_path()` | Generate standard output path |
+
+**PITParseResult Fields:**
+- `df` - Parsed DataFrame in canonical schema
+- `cross_state_mappings` - Dict of cross-state CoC ID mappings (e.g., `{"MO-604a": "MO-604"}`)
+- `rows_read` - Total rows read from source file
+- `rows_skipped` - Rows skipped due to invalid CoC IDs or missing data
 
 **CoC ID Normalization:**
 - Handles various formats: `CO-500`, `co-500`, `CO500`, `CO 500`
 - Zero-pads short numbers: `CO-5` → `CO-005`
+- Strips cross-state letter suffixes: `MO-604a` → `MO-604`
+- Rejects strings longer than 7 characters (skips footnotes/non-CoC text)
 - Validates US state/territory codes
+
+**Cross-State CoC Handling:**
+
+Some CoCs span multiple states. HUD identifies these with a letter suffix in PIT files (e.g., `MO-604a` for Kansas City metro spanning MO and KS). The parser:
+1. Detects the letter suffix
+2. Normalizes to the base CoC ID (`MO-604`)
+3. Records the mapping in `PITParseResult.cross_state_mappings`
+4. Logs an info message: `Mapping CoC ID 'MO-604a' -> 'MO-604'`
+5. Embeds the mapping in Parquet provenance metadata
 
 ### pit/registry.py (Phase 3)
 
@@ -1789,9 +1856,19 @@ def _validate_custom(gdf: gpd.GeoDataFrame, result: ValidationResult) -> None:
 CoC identifiers follow the pattern: `{STATE}-{NUMBER}`
 
 - `STATE` - Two-letter state abbreviation
-- `NUMBER` - Three-digit number
+- `NUMBER` - Three-digit number (zero-padded)
 
 Examples: `CO-500`, `NY-600`, `CA-500`
+
+**Cross-State CoCs:**
+
+Some CoCs span multiple states. In HUD PIT data files, these may appear with a letter suffix (e.g., `MO-604a`) indicating combined territory data. CoC Lab normalizes these to the canonical format:
+
+| Raw ID | Normalized | Notes |
+|--------|------------|-------|
+| `MO-604a` | `MO-604` | Kansas City metro (MO + KS) |
+
+The original ID and mapping are preserved in Parquet provenance metadata for traceability.
 
 ### Coordinate Reference System
 
