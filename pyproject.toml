@@ -1,7 +1,30 @@
 [project]
 name = "coc-pit"
 version = "0.1.0"
-description = "Add your description here"
+description = "CoC Boundary Infrastructure - Python data + geospatial foundation"
 readme = "README.md"
 requires-python = ">=3.12"
-dependencies = []
+dependencies = [
+    "geopandas>=1.0.0",
+    "shapely>=2.0.0",
+    "pyproj>=3.6.0",
+    "pyarrow>=15.0.0",
+    "pandas>=2.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0.0",
+    "ruff>=0.4.0",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
