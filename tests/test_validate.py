@@ -1,11 +1,10 @@
 """Tests for boundary validation utilities."""
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import geopandas as gpd
 import pandas as pd
-import pytest
-from shapely.geometry import Point, Polygon
+from shapely.geometry import Polygon
 
 from coclab.geo.validate import (
     MIN_AREA_SQ_DEG,
@@ -30,7 +29,7 @@ def make_valid_gdf(
     if geometries is None:
         # Create simple valid polygons for each coc_id
         geometries = [
-            Polygon([(-105 - i, 39), (-105 - i, 40), (-104 - i, 40), (-104 - i, 39), (-105 - i, 39)])
+            Polygon([(-105 - i, 39), (-105 - i, 40), (-104 - i, 40), (-104 - i, 39)])
             for i in range(n)
         ]
     return gpd.GeoDataFrame(
@@ -41,7 +40,7 @@ def make_valid_gdf(
             "state_abbrev": ["CO"] * n,
             "source": ["hud_exchange_gis_tools"] * n,
             "source_ref": ["https://example.com"] * n,
-            "ingested_at": [datetime.now(timezone.utc)] * n,
+            "ingested_at": [datetime.now(UTC)] * n,
             "geom_hash": ["abc123"] * n,
             "geometry": geometries[: len(coc_ids)],
         },
