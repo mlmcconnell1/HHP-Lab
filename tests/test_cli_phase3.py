@@ -59,13 +59,20 @@ class TestIngestPitCommand:
             file_size=12345,
         )
 
-        # Mock parsed DataFrame
+        # Mock parsed result (PITParseResult with df attribute)
+        from coclab.pit.ingest import PITParseResult
+
         mock_df = pd.DataFrame({
             "coc_id": ["CO-500", "CA-600"],
             "pit_year": [2024, 2024],
             "pit_total": [100, 200],
         })
-        mock_parse.return_value = mock_df
+        mock_parse.return_value = PITParseResult(
+            df=mock_df,
+            cross_state_mappings={},
+            rows_read=2,
+            rows_skipped=0,
+        )
 
         # Mock write output
         mock_write.return_value = Path("data/curated/pit/pit_counts__2024.parquet")

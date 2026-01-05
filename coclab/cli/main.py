@@ -13,13 +13,17 @@ from coclab.cli.build_measures import build_measures
 from coclab.cli.build_panel import build_panel_cmd
 from coclab.cli.build_xwalks import build_xwalks
 from coclab.cli.compare_vintages import compare_vintages
+from coclab.cli.crosscheck_acs_population import crosscheck_acs_population
 from coclab.cli.diagnostics import diagnostics
+from coclab.cli.ingest_acs_population import ingest_acs_population
 from coclab.cli.ingest_census import ingest_census
 from coclab.cli.ingest_pit import ingest_pit
 from coclab.cli.list_measures import list_measures
 from coclab.cli.list_xwalks import list_xwalks
 from coclab.cli.panel_diagnostics import panel_diagnostics
+from coclab.cli.rollup_acs_population import rollup_acs_population
 from coclab.cli.show_measures import show_measures
+from coclab.cli.verify_acs_population import verify_acs_population
 
 app = typer.Typer(
     name="coclab",
@@ -32,13 +36,17 @@ app.command("build-xwalks")(build_xwalks)
 app.command("build-measures")(build_measures)
 app.command("build-panel")(build_panel_cmd)
 app.command("compare-vintages")(compare_vintages)
+app.command("crosscheck-acs-population")(crosscheck_acs_population)
 app.command("diagnostics")(diagnostics)
+app.command("ingest-acs-population")(ingest_acs_population)
 app.command("ingest-census")(ingest_census)
 app.command("ingest-pit")(ingest_pit)
 app.command("list-measures")(list_measures)
 app.command("list-xwalks")(list_xwalks)
 app.command("panel-diagnostics")(panel_diagnostics)
+app.command("rollup-acs-population")(rollup_acs_population)
 app.command("show-measures")(show_measures)
+app.command("verify-acs-population")(verify_acs_population)
 
 
 @app.command()

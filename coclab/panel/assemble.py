@@ -103,22 +103,31 @@ def _load_pit_for_year(
     pit_total as an integer. pit_sheltered and pit_unsheltered may be
     nullable integers (Int64 dtype).
     """
-    pit_dir = pit_dir or DEFAULT_PIT_DIR
-
-    # Try registry first
-    registry_path = get_pit_path(year)
-    if registry_path is not None and Path(registry_path).exists():
-        logger.info(f"Loading PIT {year} from registry: {registry_path}")
-        df = pd.read_parquet(registry_path)
-    else:
-        # Fall back to canonical path
+    # If pit_dir is explicitly provided, use it directly (skip registry)
+    # This supports testing with isolated data directories
+    if pit_dir is not None:
         canonical_path = pit_dir / f"pit_counts__{year}.parquet"
         if canonical_path.exists():
-            logger.info(f"Loading PIT {year} from canonical path: {canonical_path}")
+            logger.info(f"Loading PIT {year} from provided path: {canonical_path}")
             df = pd.read_parquet(canonical_path)
         else:
             logger.warning(f"No PIT data found for year {year}")
             return pd.DataFrame(columns=["coc_id", "pit_total", "pit_sheltered", "pit_unsheltered"])
+    else:
+        # Try registry first
+        registry_path = get_pit_path(year)
+        if registry_path is not None and Path(registry_path).exists():
+            logger.info(f"Loading PIT {year} from registry: {registry_path}")
+            df = pd.read_parquet(registry_path)
+        else:
+            # Fall back to canonical path
+            canonical_path = DEFAULT_PIT_DIR / f"pit_counts__{year}.parquet"
+            if canonical_path.exists():
+                logger.info(f"Loading PIT {year} from canonical path: {canonical_path}")
+                df = pd.read_parquet(canonical_path)
+            else:
+                logger.warning(f"No PIT data found for year {year}")
+                return pd.DataFrame(columns=["coc_id", "pit_total", "pit_sheltered", "pit_unsheltered"])
 
     # Standardize column names and select relevant columns
     if "pit_year" in df.columns:

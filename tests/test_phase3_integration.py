@@ -34,7 +34,7 @@ from coclab.panel import (
     save_panel,
 )
 from coclab.panel.assemble import PANEL_COLUMNS
-from coclab.pit.ingest import normalize_coc_id, parse_pit_file, write_pit_parquet
+from coclab.pit.ingest import PITParseResult, normalize_coc_id, parse_pit_file, write_pit_parquet
 from coclab.pit.qa import validate_pit_data
 from coclab.pit.registry import (
     PitRegistryEntry,
@@ -219,14 +219,14 @@ class TestReproducibility:
 
     def test_pit_parsing_reproducible(self, sample_pit_csv):
         """Parsing the same PIT file twice produces identical results."""
-        df_1 = parse_pit_file(sample_pit_csv, year=2024)
-        df_2 = parse_pit_file(sample_pit_csv, year=2024)
+        result_1 = parse_pit_file(sample_pit_csv, year=2024)
+        result_2 = parse_pit_file(sample_pit_csv, year=2024)
 
         # Compare data columns (ingested_at will differ)
         compare_cols = ["pit_year", "coc_id", "pit_total", "pit_sheltered", "pit_unsheltered"]
         pd.testing.assert_frame_equal(
-            df_1[compare_cols].reset_index(drop=True),
-            df_2[compare_cols].reset_index(drop=True),
+            result_1.df[compare_cols].reset_index(drop=True),
+            result_2.df[compare_cols].reset_index(drop=True),
         )
 
     def test_coc_id_normalization_reproducible(self):
@@ -360,7 +360,8 @@ class TestPITIngestionWorkflow:
 
     def test_pit_file_parsing(self, sample_pit_csv):
         """PIT CSV file is correctly parsed."""
-        df = parse_pit_file(sample_pit_csv, year=2024)
+        result = parse_pit_file(sample_pit_csv, year=2024)
+        df = result.df
 
         assert len(df) == 5
         assert "coc_id" in df.columns
@@ -370,7 +371,8 @@ class TestPITIngestionWorkflow:
 
     def test_pit_parquet_write_and_read(self, sample_pit_csv, tmp_path):
         """PIT data can be written to Parquet with provenance."""
-        df = parse_pit_file(sample_pit_csv, year=2024)
+        result = parse_pit_file(sample_pit_csv, year=2024)
+        df = result.df
         output_path = tmp_path / "pit_counts__2024.parquet"
 
         write_pit_parquet(df, output_path)
@@ -378,13 +380,14 @@ class TestPITIngestionWorkflow:
         # Verify file exists and is readable
         assert output_path.exists()
 
-        result = pd.read_parquet(output_path)
-        assert len(result) == 5
-        assert list(result["coc_id"]) == list(df["coc_id"])
+        loaded = pd.read_parquet(output_path)
+        assert len(loaded) == 5
+        assert list(loaded["coc_id"]) == list(df["coc_id"])
 
     def test_pit_parquet_has_provenance(self, sample_pit_csv, tmp_path):
         """PIT Parquet files have valid provenance metadata."""
-        df = parse_pit_file(sample_pit_csv, year=2024)
+        result = parse_pit_file(sample_pit_csv, year=2024)
+        df = result.df
         output_path = tmp_path / "pit_counts__2024.parquet"
 
         write_pit_parquet(df, output_path)
@@ -397,7 +400,8 @@ class TestPITIngestionWorkflow:
 
     def test_registry_tracking(self, sample_pit_csv, tmp_path):
         """PIT years can be registered and tracked."""
-        df = parse_pit_file(sample_pit_csv, year=2024)
+        result = parse_pit_file(sample_pit_csv, year=2024)
+        df = result.df
         output_path = tmp_path / "pit" / "pit_counts__2024.parquet"
         output_path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -425,7 +429,8 @@ class TestPITIngestionWorkflow:
 
     def test_registry_idempotent(self, sample_pit_csv, tmp_path):
         """Registering the same PIT year twice is idempotent."""
-        df = parse_pit_file(sample_pit_csv, year=2024)
+        result = parse_pit_file(sample_pit_csv, year=2024)
+        df = result.df
         output_path = tmp_path / "pit" / "pit_counts__2024.parquet"
         output_path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -464,7 +469,8 @@ class TestPITIngestionWorkflow:
         pit_dir.mkdir()
 
         # Register 2023
-        df_2023 = parse_pit_file(sample_pit_csv_2023, year=2023)
+        result_2023 = parse_pit_file(sample_pit_csv_2023, year=2023)
+        df_2023 = result_2023.df
         path_2023 = pit_dir / "pit_counts__2023.parquet"
         write_pit_parquet(df_2023, path_2023)
         register_pit_year(
@@ -476,7 +482,8 @@ class TestPITIngestionWorkflow:
         )
 
         # Register 2024
-        df_2024 = parse_pit_file(sample_pit_csv, year=2024)
+        result_2024 = parse_pit_file(sample_pit_csv, year=2024)
+        df_2024 = result_2024.df
         path_2024 = pit_dir / "pit_counts__2024.parquet"
         write_pit_parquet(df_2024, path_2024)
         register_pit_year(
@@ -499,8 +506,8 @@ class TestQAValidation:
 
     def test_qa_passes_valid_data(self, sample_pit_csv):
         """QA passes for valid PIT data."""
-        df = parse_pit_file(sample_pit_csv, year=2024)
-        report = validate_pit_data(df)
+        result = parse_pit_file(sample_pit_csv, year=2024)
+        report = validate_pit_data(result.df)
 
         assert report.passed
         assert len(report.errors) == 0
@@ -539,7 +546,8 @@ class TestQAValidation:
 
     def test_qa_detects_yoy_changes(self, sample_pit_csv, sample_pit_csv_2023):
         """QA detects year-over-year changes beyond threshold."""
-        df_2023 = parse_pit_file(sample_pit_csv_2023, year=2023)
+        result_2023 = parse_pit_file(sample_pit_csv_2023, year=2023)
+        df_2023 = result_2023.df
 
         # Create 2024 with a large change for CO-500
         df_2024 = df_2023.copy()
@@ -554,7 +562,8 @@ class TestQAValidation:
 
     def test_qa_detects_missing_cocs(self, sample_pit_csv, sample_boundary_gdf):
         """QA detects CoCs missing from boundary data."""
-        df = parse_pit_file(sample_pit_csv, year=2024)
+        result = parse_pit_file(sample_pit_csv, year=2024)
+        df = result.df
 
         # Create boundary with fewer CoCs
         cocs_to_keep = ["CO-500", "CA-600"]
@@ -697,7 +706,8 @@ class TestProvenanceIntegrity:
 
     def test_pit_parquet_provenance(self, sample_pit_csv, tmp_path):
         """PIT Parquet files have correct provenance."""
-        df = parse_pit_file(sample_pit_csv, year=2024)
+        result = parse_pit_file(sample_pit_csv, year=2024)
+        df = result.df
         output_path = tmp_path / "pit_counts__2024.parquet"
 
         write_pit_parquet(df, output_path)
@@ -984,8 +994,10 @@ class TestEndToEndWorkflow:
         registry_path = full_test_setup["registry_path"]
 
         # Step 1: Parse PIT files
-        df_2023 = parse_pit_file(sample_pit_csv_2023, year=2023)
-        df_2024 = parse_pit_file(sample_pit_csv, year=2024)
+        result_2023 = parse_pit_file(sample_pit_csv_2023, year=2023)
+        result_2024 = parse_pit_file(sample_pit_csv, year=2024)
+        df_2023 = result_2023.df
+        df_2024 = result_2024.df
 
         # Step 2: Write to Parquet with provenance
         path_2023 = pit_dir / "pit_counts__2023.parquet"
