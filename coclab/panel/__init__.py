@@ -5,6 +5,10 @@ PIT years with boundary vintages and ACS vintages according to explicit
 policies.
 """
 
+from coclab.panel.assemble import (
+    build_panel,
+    save_panel,
+)
 from coclab.panel.policies import (
     AlignmentPolicy,
     DEFAULT_POLICY,
@@ -15,6 +19,8 @@ from coclab.panel.policies import (
 __all__ = [
     "AlignmentPolicy",
     "DEFAULT_POLICY",
+    "build_panel",
     "default_acs_vintage",
     "default_boundary_vintage",
+    "save_panel",
 ]
