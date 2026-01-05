@@ -58,11 +58,13 @@ def ingest_pit(
 
     # Step 1: Download PIT data
     raw_dir = Path("data/raw/pit") / str(year)
-    raw_file = raw_dir / f"2007-{year}-PIT-Counts-by-CoC.xlsx"
+    # Get filename from URL (format changed from .xlsx to .xlsb in 2024)
+    source_url = get_pit_source_url(year)
+    expected_filename = source_url.split("/")[-1]
+    raw_file = raw_dir / expected_filename
 
     if parse_only and raw_file.exists():
         typer.echo(f"Using existing file: {raw_file}")
-        source_url = get_pit_source_url(year)
     else:
         typer.echo("Downloading PIT data from HUD Exchange...")
         try:

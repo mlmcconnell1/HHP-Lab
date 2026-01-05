@@ -196,37 +196,59 @@ def _find_column(df: pd.DataFrame, candidates: list[str]) -> str | None:
     return None
 
 
-def _read_file(file_path: Path, sheet_name: str | int | None = None) -> pd.DataFrame:
-    """Read a PIT data file (CSV or Excel)."""
+def _read_file(
+    file_path: Path, sheet_name: str | int | None = None, year: int | None = None
+) -> pd.DataFrame:
+    """Read a PIT data file (CSV or Excel).
+
+    Parameters
+    ----------
+    file_path : Path
+        Path to the data file.
+    sheet_name : str or int, optional
+        Specific sheet to read.
+    year : int, optional
+        If provided, prefer a sheet named after this year (e.g., "2024").
+        This is needed for new HUD User .xlsb files which have year-named sheets.
+    """
     suffix = file_path.suffix.lower()
 
     if suffix == ".csv":
         return pd.read_csv(file_path)
-    elif suffix in (".xlsx", ".xls"):
-        # HUD Exchange files often have multiple sheets
-        # Try to find the right one
-        if sheet_name is not None:
-            return pd.read_excel(file_path, sheet_name=sheet_name)
+    elif suffix in (".xlsx", ".xls", ".xlsb"):
+        # HUD files often have multiple sheets
+        # .xlsb is Excel Binary format (used by HUD User since 2024)
+        engine = "pyxlsb" if suffix == ".xlsb" else None
 
-        # Try common sheet names
+        if sheet_name is not None:
+            return pd.read_excel(file_path, sheet_name=sheet_name, engine=engine)
+
         try:
-            xl = pd.ExcelFile(file_path)
+            xl = pd.ExcelFile(file_path, engine=engine)
             sheet_names = xl.sheet_names
 
-            # Look for PIT-specific sheets
+            # For new HUD User format, look for year-named sheet first
+            if year is not None:
+                year_str = str(year)
+                if year_str in sheet_names:
+                    logger.info(f"Using year sheet: {year_str}")
+                    return pd.read_excel(file_path, sheet_name=year_str, engine=engine)
+
+            # Look for PIT-specific sheets (but avoid template/chart sheets)
             for name in sheet_names:
                 name_lower = name.lower()
-                if "pit" in name_lower or "count" in name_lower:
+                if ("pit" in name_lower or "count" in name_lower) and \
+                   "template" not in name_lower and "chart" not in name_lower:
                     logger.info(f"Using sheet: {name}")
-                    return pd.read_excel(file_path, sheet_name=name)
+                    return pd.read_excel(file_path, sheet_name=name, engine=engine)
 
             # Fall back to first sheet
             logger.info(f"Using first sheet: {sheet_names[0]}")
-            return pd.read_excel(file_path, sheet_name=0)
+            return pd.read_excel(file_path, sheet_name=0, engine=engine)
 
         except Exception as e:
             logger.warning(f"Error reading Excel file: {e}")
-            return pd.read_excel(file_path, sheet_name=0)
+            return pd.read_excel(file_path, sheet_name=0, engine=engine)
     else:
         raise ValueError(f"Unsupported file format: {suffix}")
 
@@ -267,7 +289,7 @@ def parse_pit_file(
     """
     logger.info(f"Parsing PIT file: {file_path} for year {year}")
 
-    df = _read_file(file_path, sheet_name)
+    df = _read_file(file_path, sheet_name, year=year)
     logger.info(f"Read {len(df)} rows, columns: {list(df.columns)}")
 
     # Normalize column names for matching

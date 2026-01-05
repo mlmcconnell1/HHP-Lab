@@ -29,11 +29,14 @@ logger = logging.getLogger(__name__)
 HUD_EXCHANGE_PIT_BASE = "https://www.hudexchange.info/resource/3031/pit-and-hic-data-since-2007/"
 
 # Known direct download URLs for PIT data by year
-# These are discovered from the HUD Exchange resource page
 # Note: HUD provides cumulative files (2007-YYYY) containing all years
+# As of late 2024, HUD migrated recent data from hudexchange.info to huduser.gov
+# and changed the format from .xlsx to .xlsb (Excel Binary)
 PIT_DATA_URLS: dict[int, str] = {
-    2024: "https://www.hudexchange.info/resources/documents/2007-2024-PIT-Counts-by-CoC.xlsx",
-    2023: "https://www.hudexchange.info/resources/documents/2007-2023-PIT-Counts-by-CoC.xlsx",
+    # New HUD User location (2023+) - .xlsb format
+    2024: "https://www.huduser.gov/portal/sites/default/files/xls/2007-2024-PIT-Counts-by-CoC.xlsb",
+    2023: "https://www.huduser.gov/portal/sites/default/files/xls/2007-2023-PIT-Counts-by-CoC.xlsb",
+    # Legacy HUD Exchange location (archived, may not be available)
     2022: "https://www.hudexchange.info/resources/documents/2007-2022-PIT-Counts-by-CoC.xlsx",
     2021: "https://www.hudexchange.info/resources/documents/2007-2021-PIT-Counts-by-CoC.xlsx",
     2020: "https://www.hudexchange.info/resources/documents/2007-2020-PIT-Counts-by-CoC.xlsx",
@@ -105,8 +108,8 @@ def get_pit_source_url(year: int) -> str:
         return PIT_DATA_URLS[year]
 
     # Try to construct URL for years not in the explicit list
-    # This pattern may work for future years
-    url = f"https://www.hudexchange.info/resources/documents/2007-{year}-PIT-Counts-by-CoC.xlsx"
+    # Use the new HUD User location for recent/future years
+    url = f"https://www.huduser.gov/portal/sites/default/files/xls/2007-{year}-PIT-Counts-by-CoC.xlsb"
     logger.warning(
         f"Year {year} not in known URL list, attempting constructed URL: {url}"
     )

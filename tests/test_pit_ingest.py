@@ -19,19 +19,21 @@ class TestGetPitSourceUrl:
     def test_known_year_2024(self):
         url = get_pit_source_url(2024)
         assert "2024" in url
-        assert "hudexchange.info" in url
-        assert url.endswith(".xlsx")
+        assert "huduser.gov" in url
+        assert url.endswith(".xlsb")
 
     def test_known_year_2023(self):
         url = get_pit_source_url(2023)
         assert "2023" in url
-        assert url.endswith(".xlsx")
+        assert "huduser.gov" in url
+        assert url.endswith(".xlsb")
 
     def test_unknown_year_constructs_url(self):
-        # Future year - should construct a URL
+        # Future year - should construct a URL using new HUD User pattern
         url = get_pit_source_url(2030)
         assert "2030" in url
-        assert url.endswith(".xlsx")
+        assert "huduser.gov" in url
+        assert url.endswith(".xlsb")
 
     def test_invalid_year_too_old(self):
         with pytest.raises(ValueError, match="outside valid PIT data range"):
@@ -70,7 +72,7 @@ class TestDownloadPitData:
         """Test that download creates the output directory."""
         # Mock the HTTP response with minimal Excel-like content
         httpx_mock.add_response(
-            url="https://www.hudexchange.info/resources/documents/2007-2023-PIT-Counts-by-CoC.xlsx",
+            url="https://www.huduser.gov/portal/sites/default/files/xls/2007-2023-PIT-Counts-by-CoC.xlsb",
             content=b"PK\x03\x04",  # ZIP header (Excel files are ZIP archives)
         )
 
@@ -81,12 +83,12 @@ class TestDownloadPitData:
             assert output_dir.exists()
             assert result.path.exists()
             assert isinstance(result, DownloadResult)
-            assert result.source_url.endswith(".xlsx")
+            assert result.source_url.endswith(".xlsb")
 
     def test_download_writes_metadata(self, httpx_mock):
         """Test that download writes metadata file."""
         httpx_mock.add_response(
-            url="https://www.hudexchange.info/resources/documents/2007-2024-PIT-Counts-by-CoC.xlsx",
+            url="https://www.huduser.gov/portal/sites/default/files/xls/2007-2024-PIT-Counts-by-CoC.xlsb",
             content=b"PK\x03\x04test content",
         )
 
