@@ -111,6 +111,10 @@ def normalize_coc_id(raw_id: str, *, validate_state: bool = True) -> str:
     - "CO_500" -> "CO-500" (underscore)
     - "CO-5" -> "CO-005" (short number, padded)
     - " CO-500 " -> "CO-500" (whitespace trimmed)
+    - "MO-604a" -> "MO-604" (letter suffix stripped, e.g., cross-state CoCs)
+
+    Note: Strings longer than 7 characters (after trimming) are rejected early
+    to skip footnotes and other non-CoC text in data files.
 
     Parameters
     ----------
@@ -141,6 +145,8 @@ def normalize_coc_id(raw_id: str, *, validate_state: bool = True) -> str:
     'CO-500'
     >>> normalize_coc_id("CO-5")
     'CO-005'
+    >>> normalize_coc_id("MO-604a")
+    'MO-604'
     """
     if pd.isna(raw_id) or not raw_id:
         raise InvalidCoCIdError("CoC ID cannot be empty or null")
@@ -151,11 +157,20 @@ def normalize_coc_id(raw_id: str, *, validate_state: bool = True) -> str:
     if not cleaned:
         raise InvalidCoCIdError("CoC ID cannot be empty or null")
 
-    # Pattern: two letters, optional separator (dash/space/underscore), 1-3 digits
-    # Supports various formats: CO-500, CO500, CO 500, CO_500, CO-5, CO-05
-    match = re.match(r"^([A-Z]{2})[-\s_]*(\d{1,3})$", cleaned)
+    # Valid CoC IDs are at most 7 chars (e.g., "ST-NNNx" with letter suffix)
+    # Skip longer strings early - they're likely footnotes or other text
+    if len(cleaned) > 7:
+        raise InvalidCoCIdError(
+            f"CoC ID too long ({len(cleaned)} chars): {raw_id[:50]!r}..."
+            if len(raw_id) > 50 else f"CoC ID too long ({len(cleaned)} chars): {raw_id!r}"
+        )
+
+    # Pattern: two letters, optional separator (dash/space/underscore), 1-3 digits,
+    # optional letter suffix (e.g., "a" in MO-604a for cross-state CoCs)
+    # Supports various formats: CO-500, CO500, CO 500, CO_500, CO-5, CO-05, MO-604a
+    match = re.match(r"^([A-Z]{2})[-\s_]*(\d{1,3})([A-Z])?$", cleaned)
     if match:
-        state, number = match.groups()
+        state, number, suffix = match.groups()
 
         # Validate state code if requested
         if validate_state and state not in US_STATE_CODES:
@@ -165,21 +180,16 @@ def normalize_coc_id(raw_id: str, *, validate_state: bool = True) -> str:
             )
 
         # Zero-pad number to 3 digits
-        return f"{state}-{int(number):03d}"
+        normalized = f"{state}-{int(number):03d}"
 
-    # Try to extract state and number from longer strings
-    # e.g., "CO-500 Denver Metro" -> "CO-500"
-    match = re.match(r"^([A-Z]{2})[-\s_]*(\d{1,3})\b", cleaned)
-    if match:
-        state, number = match.groups()
-
-        if validate_state and state not in US_STATE_CODES:
-            raise InvalidCoCIdError(
-                f"Invalid state code '{state}' in CoC ID: {raw_id!r}. "
-                f"Must be a valid US state or territory code."
+        # Log when letter suffix is stripped (e.g., MO-604a -> MO-604)
+        if suffix:
+            logger.info(
+                f"Mapping CoC ID '{raw_id}' -> '{normalized}' "
+                f"(stripped '{suffix}' suffix, cross-state CoC)"
             )
 
-        return f"{state}-{int(number):03d}"
+        return normalized
 
     raise InvalidCoCIdError(
         f"Cannot normalize CoC ID: {raw_id!r}. "

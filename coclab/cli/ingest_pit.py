@@ -1,11 +1,20 @@
 """CLI command for ingesting PIT (Point-in-Time) count data from HUD Exchange."""
 
+import logging
 from pathlib import Path
 from typing import Annotated
 
 import typer
 
 from coclab.pit.ingest import get_canonical_output_path
+
+# Configure logging to show INFO messages from PIT parser
+logging.basicConfig(
+    format="%(message)s",
+    level=logging.WARNING,
+)
+# Show INFO for PIT ingest to see CoC ID mapping messages
+logging.getLogger("coclab.pit.ingest.parser").setLevel(logging.INFO)
 
 
 def ingest_pit(

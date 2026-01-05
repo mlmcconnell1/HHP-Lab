@@ -64,11 +64,6 @@ class TestNormalizeCocId:
         assert normalize_coc_id("CO-5") == "CO-005"
         assert normalize_coc_id("CA-50") == "CA-050"
 
-    def test_coc_id_with_extra_text(self):
-        """Test extraction from ID with trailing text."""
-        assert normalize_coc_id("CO-500 Denver Metro") == "CO-500"
-        assert normalize_coc_id("CA-600 Los Angeles CoC") == "CA-600"
-
     def test_us_territories(self):
         """Test US territory codes are valid."""
         assert normalize_coc_id("DC-500") == "DC-500"  # District of Columbia
@@ -96,6 +91,13 @@ class TestNormalizeCocId:
         with pytest.raises(InvalidCoCIdError, match="Cannot normalize"):
             normalize_coc_id("CO-5000")
 
+    def test_too_long_raises(self):
+        """Test that strings >7 chars are rejected early (footnotes, etc.)."""
+        with pytest.raises(InvalidCoCIdError, match="too long"):
+            normalize_coc_id("CO-500 Denver Metro")
+        with pytest.raises(InvalidCoCIdError, match="too long"):
+            normalize_coc_id("This is a footnote about MO-604")
+
     def test_invalid_state_code_raises(self):
         """Test that invalid state codes raise error."""
         with pytest.raises(InvalidCoCIdError, match="Invalid state code"):
@@ -107,6 +109,23 @@ class TestNormalizeCocId:
         """Test that validation can be skipped."""
         result = normalize_coc_id("XX-500", validate_state=False)
         assert result == "XX-500"
+
+    def test_letter_suffix_stripped(self):
+        """Test that letter suffixes (e.g., MO-604a) are stripped.
+
+        MO-604a represents the Kansas City metro area CoC which spans
+        both Missouri and Kansas. The 'a' suffix in HUD data indicates
+        the combined territory total.
+        """
+        assert normalize_coc_id("MO-604a") == "MO-604"
+        assert normalize_coc_id("MO-604A") == "MO-604"
+        assert normalize_coc_id("mo-604a") == "MO-604"
+
+    def test_letter_suffix_various_separators(self):
+        """Test letter suffix with various separators."""
+        assert normalize_coc_id("MO604a") == "MO-604"
+        assert normalize_coc_id("MO 604a") == "MO-604"
+        assert normalize_coc_id("MO_604a") == "MO-604"
 
 
 class TestParsePitFile:
