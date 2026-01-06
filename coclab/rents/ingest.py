@@ -1,0 +1,455 @@
+"""ZORI (Zillow Observed Rent Index) ingestion and normalization.
+
+Downloads ZORI data from Zillow Economic Research and normalizes to
+canonical long-format schema for downstream aggregation.
+
+Usage
+-----
+    from coclab.rents.ingest import ingest_zori
+
+    # Ingest county-level ZORI data
+    path = ingest_zori(geography="county")
+
+Output Schema
+-------------
+- geo_type (str): "county" or "zip"
+- geo_id (str): county FIPS (5 chars) or ZIP code (5 chars)
+- date (date): month start (e.g., 2024-01-01)
+- zori (float): ZORI value (level)
+- region_name (str, optional): Zillow region name
+- state (str, optional): state name
+- data_source (str): always "Zillow Economic Research"
+- metric (str): always "ZORI"
+- ingested_at (datetime UTC): timestamp of ingestion
+- source_ref (str): download URL
+- raw_sha256 (str): SHA256 hash of raw download
+"""
+
+from __future__ import annotations
+
+import hashlib
+import logging
+from datetime import UTC, date, datetime
+from pathlib import Path
+from typing import Literal
+
+import httpx
+import pandas as pd
+
+from coclab.provenance import ProvenanceBlock, write_parquet_with_provenance
+
+logger = logging.getLogger(__name__)
+
+# Zillow ZORI download URLs by geography
+ZORI_URLS = {
+    "county": "https://files.zillowstatic.com/research/public_csvs/zori/County_zori_uc_sfrcondomfr_sm_month.csv",
+    "zip": "https://files.zillowstatic.com/research/public_csvs/zori/Zip_zori_uc_sfrcondomfr_sm_month.csv",
+}
+
+# Required Zillow attribution
+ZILLOW_ATTRIBUTION = (
+    "The Zillow Economic Research team publishes a variety of real estate metrics "
+    "including median home values and rents, inventory, sale prices and volumes, "
+    "negative equity, home value forecasts and many more. Most datasets are available "
+    "at the neighborhood, ZIP code, city, county, metro, state and national levels, "
+    "and many include data as far back as the late 1990s. All data accessed and "
+    "downloaded from this page is free for public use by consumers, media, analysts, "
+    "academics and policymakers, consistent with our published Terms of Use. "
+    "Proper and clear attribution of all data to Zillow is required."
+)
+
+# Default directories
+DEFAULT_RAW_DIR = Path("data/raw/rents")
+DEFAULT_OUTPUT_DIR = Path("data/curated/rents")
+
+
+def download_zori(
+    geography: Literal["county", "zip"],
+    url: str | None = None,
+    raw_dir: Path | str | None = None,
+    force: bool = False,
+) -> tuple[Path, str]:
+    """Download raw ZORI data from Zillow.
+
+    Parameters
+    ----------
+    geography : str
+        Geography level: "county" or "zip".
+    url : str, optional
+        Override URL for download. If None, uses default URL for geography.
+    raw_dir : Path or str, optional
+        Directory to save raw file. Defaults to 'data/raw/rents'.
+    force : bool
+        Re-download even if cached file exists.
+
+    Returns
+    -------
+    tuple[Path, str]
+        Tuple of (path to downloaded file, SHA256 hash of content).
+
+    Raises
+    ------
+    httpx.HTTPStatusError
+        If download fails.
+    """
+    if url is None:
+        if geography not in ZORI_URLS:
+            raise ValueError(f"Unknown geography: {geography}. Must be 'county' or 'zip'")
+        url = ZORI_URLS[geography]
+
+    if raw_dir is None:
+        raw_dir = DEFAULT_RAW_DIR
+    else:
+        raw_dir = Path(raw_dir)
+    raw_dir.mkdir(parents=True, exist_ok=True)
+
+    # Generate filename with download date
+    download_date = date.today().isoformat()
+    filename = f"zori__{geography}__{download_date}.csv"
+    raw_path = raw_dir / filename
+
+    # Check for cached file (same day)
+    if raw_path.exists() and not force:
+        logger.info(f"Using cached raw file: {raw_path}")
+        content = raw_path.read_bytes()
+        sha256 = hashlib.sha256(content).hexdigest()
+        return raw_path, sha256
+
+    # Download
+    logger.info(f"Downloading ZORI {geography} data from {url}")
+    with httpx.Client(timeout=120.0, follow_redirects=True) as client:
+        response = client.get(url)
+        response.raise_for_status()
+        content = response.content
+
+    # Compute hash and save
+    sha256 = hashlib.sha256(content).hexdigest()
+    raw_path.write_bytes(content)
+    logger.info(f"Saved raw file to {raw_path} (sha256: {sha256[:10]}...)")
+
+    return raw_path, sha256
+
+
+def parse_zori_county(raw_path: Path) -> pd.DataFrame:
+    """Parse Zillow county ZORI CSV to long format.
+
+    Zillow data is in wide format with date columns like "2015-01", "2015-02", etc.
+    This function normalizes to long format.
+
+    Parameters
+    ----------
+    raw_path : Path
+        Path to raw CSV file.
+
+    Returns
+    -------
+    pd.DataFrame
+        Long-format DataFrame with columns:
+        geo_id, date, zori, region_name, state
+    """
+    df = pd.read_csv(raw_path, dtype={"StateCodeFIPS": str, "MunicipalCodeFIPS": str})
+
+    # Identify date columns (format: YYYY-MM-DD or YYYY-MM)
+    id_cols = ["RegionID", "SizeRank", "RegionName", "RegionType", "StateName",
+               "StateCodeFIPS", "MunicipalCodeFIPS", "Metro"]
+    date_cols = [c for c in df.columns if c not in id_cols]
+
+    # Build county FIPS from state + municipal codes
+    # StateCodeFIPS is 2-digit, MunicipalCodeFIPS is 3-digit
+    df["geo_id"] = df["StateCodeFIPS"].str.zfill(2) + df["MunicipalCodeFIPS"].str.zfill(3)
+
+    # Melt to long format
+    long_df = df.melt(
+        id_vars=["geo_id", "RegionName", "StateName"],
+        value_vars=date_cols,
+        var_name="date_str",
+        value_name="zori",
+    )
+
+    # Parse dates - Zillow uses YYYY-MM-DD format
+    long_df["date"] = pd.to_datetime(long_df["date_str"], errors="coerce")
+    long_df = long_df.dropna(subset=["date"])
+
+    # Rename columns
+    long_df = long_df.rename(columns={
+        "RegionName": "region_name",
+        "StateName": "state",
+    })
+
+    # Drop rows with null ZORI
+    long_df = long_df.dropna(subset=["zori"])
+
+    # Select final columns
+    result = long_df[["geo_id", "date", "zori", "region_name", "state"]].copy()
+
+    # Validate geo_id format (should be 5-char county FIPS)
+    invalid_geoids = result[result["geo_id"].str.len() != 5]
+    if len(invalid_geoids) > 0:
+        logger.warning(f"Found {len(invalid_geoids)} rows with invalid geo_id length")
+        result = result[result["geo_id"].str.len() == 5]
+
+    # Sort by geo_id and date
+    result = result.sort_values(["geo_id", "date"]).reset_index(drop=True)
+
+    return result
+
+
+def parse_zori_zip(raw_path: Path) -> pd.DataFrame:
+    """Parse Zillow ZIP ZORI CSV to long format.
+
+    Parameters
+    ----------
+    raw_path : Path
+        Path to raw CSV file.
+
+    Returns
+    -------
+    pd.DataFrame
+        Long-format DataFrame with columns:
+        geo_id, date, zori, region_name, state
+    """
+    df = pd.read_csv(raw_path, dtype={"RegionName": str})
+
+    # Identify date columns
+    id_cols = ["RegionID", "SizeRank", "RegionName", "RegionType", "StateName", "State",
+               "City", "Metro", "CountyName"]
+    date_cols = [c for c in df.columns if c not in id_cols]
+
+    # ZIP code is in RegionName
+    df["geo_id"] = df["RegionName"].str.zfill(5)
+
+    # Melt to long format
+    long_df = df.melt(
+        id_vars=["geo_id", "RegionName", "StateName"],
+        value_vars=date_cols,
+        var_name="date_str",
+        value_name="zori",
+    )
+
+    # Parse dates
+    long_df["date"] = pd.to_datetime(long_df["date_str"], errors="coerce")
+    long_df = long_df.dropna(subset=["date"])
+
+    # Rename columns
+    long_df = long_df.rename(columns={
+        "RegionName": "region_name",
+        "StateName": "state",
+    })
+
+    # Drop rows with null ZORI
+    long_df = long_df.dropna(subset=["zori"])
+
+    # Select final columns
+    result = long_df[["geo_id", "date", "zori", "region_name", "state"]].copy()
+
+    # Validate geo_id format (should be 5-char ZIP)
+    result = result[result["geo_id"].str.len() == 5]
+
+    # Sort by geo_id and date
+    result = result.sort_values(["geo_id", "date"]).reset_index(drop=True)
+
+    return result
+
+
+def _validate_monthly_continuity(df: pd.DataFrame, max_warnings: int = 10) -> None:
+    """Validate that dates are monthly continuous per geo_id.
+
+    Logs warnings for gaps in monthly series. Does not raise errors,
+    as gaps are common in real-world ZORI data.
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        DataFrame with 'geo_id' and 'date' columns.
+    max_warnings : int
+        Maximum number of gap warnings to log.
+    """
+    warning_count = 0
+
+    for geo_id, group in df.groupby("geo_id"):
+        dates = sorted(group["date"].dropna())
+        if len(dates) < 2:
+            continue
+
+        for i in range(1, len(dates)):
+            prev_date = dates[i - 1]
+            curr_date = dates[i]
+
+            # Convert to date objects if needed
+            if hasattr(prev_date, "date"):
+                prev_date = prev_date.date()
+            if hasattr(curr_date, "date"):
+                curr_date = curr_date.date()
+
+            # Calculate expected next month
+            if prev_date.month == 12:
+                expected = date(prev_date.year + 1, 1, 1)
+            else:
+                expected = date(prev_date.year, prev_date.month + 1, 1)
+
+            if curr_date != expected:
+                warning_count += 1
+                if warning_count <= max_warnings:
+                    logger.warning(
+                        f"Gap in ZORI series for {geo_id}: {prev_date} -> {curr_date}"
+                    )
+
+    if warning_count > max_warnings:
+        logger.warning(
+            f"... and {warning_count - max_warnings} more gaps (truncated)"
+        )
+    elif warning_count > 0:
+        logger.info(f"Total gaps found in monthly continuity: {warning_count}")
+
+
+def get_output_path(
+    geography: str,
+    output_dir: Path | str | None = None,
+) -> Path:
+    """Get canonical output path for normalized ZORI data.
+
+    Parameters
+    ----------
+    geography : str
+        Geography level ("county" or "zip").
+    output_dir : Path or str, optional
+        Output directory. Defaults to 'data/curated/rents'.
+
+    Returns
+    -------
+    Path
+        Output path like 'data/curated/rents/zori__county.parquet'.
+    """
+    if output_dir is None:
+        output_dir = DEFAULT_OUTPUT_DIR
+    else:
+        output_dir = Path(output_dir)
+    return output_dir / f"zori__{geography}.parquet"
+
+
+def ingest_zori(
+    geography: Literal["county", "zip"] = "county",
+    url: str | None = None,
+    force: bool = False,
+    output_dir: Path | str | None = None,
+    raw_dir: Path | str | None = None,
+    start: date | str | None = None,
+    end: date | str | None = None,
+) -> Path:
+    """Download and normalize ZORI data to canonical format.
+
+    Parameters
+    ----------
+    geography : str
+        Geography level: "county" (default) or "zip".
+    url : str, optional
+        Override download URL.
+    force : bool
+        Re-download and reprocess even if cached.
+    output_dir : Path or str, optional
+        Output directory for curated parquet. Defaults to 'data/curated/rents'.
+    raw_dir : Path or str, optional
+        Directory for raw downloads. Defaults to 'data/raw/rents'.
+    start : date or str, optional
+        Filter to dates >= start after ingest.
+    end : date or str, optional
+        Filter to dates <= end after ingest.
+
+    Returns
+    -------
+    Path
+        Path to output Parquet file.
+
+    Raises
+    ------
+    httpx.HTTPStatusError
+        If download fails (exit code 3).
+    ValueError
+        If parsing/validation fails (exit code 2).
+    """
+    output_path = get_output_path(geography, output_dir)
+
+    # Check cache
+    if output_path.exists() and not force:
+        logger.info(f"Using cached file: {output_path}")
+        return output_path
+
+    # Download
+    download_url = url or ZORI_URLS.get(geography)
+    raw_path, sha256 = download_zori(geography, url, raw_dir, force)
+
+    # Parse based on geography
+    if geography == "county":
+        df = parse_zori_county(raw_path)
+    elif geography == "zip":
+        df = parse_zori_zip(raw_path)
+    else:
+        raise ValueError(f"Unknown geography: {geography}")
+
+    geo_count = df["geo_id"].nunique()
+    logger.info(f"Parsed {len(df)} ZORI records for {geo_count} {geography} geographies")
+
+    # Add metadata columns
+    ingested_at = datetime.now(UTC)
+    df["geo_type"] = geography
+    df["data_source"] = "Zillow Economic Research"
+    df["metric"] = "ZORI"
+    df["ingested_at"] = ingested_at
+    df["source_ref"] = download_url
+    df["raw_sha256"] = sha256
+
+    # Apply date filters if specified
+    if start is not None:
+        if isinstance(start, str):
+            start = pd.to_datetime(start).date()
+        df = df[df["date"].dt.date >= start]
+    if end is not None:
+        if isinstance(end, str):
+            end = pd.to_datetime(end).date()
+        df = df[df["date"].dt.date <= end]
+
+    # Validate
+    if len(df) == 0:
+        raise ValueError("No ZORI data remaining after filtering")
+
+    # Validate ZORI values are positive
+    invalid_zori = df[df["zori"] <= 0]
+    if len(invalid_zori) > 0:
+        logger.warning(f"Found {len(invalid_zori)} rows with non-positive ZORI values")
+        df = df[df["zori"] > 0]
+
+    # Validate monthly continuity (log warnings for gaps)
+    _validate_monthly_continuity(df)
+
+    # Reorder columns to match schema
+    col_order = [
+        "geo_type", "geo_id", "date", "zori", "region_name", "state",
+        "data_source", "metric", "ingested_at", "source_ref", "raw_sha256",
+    ]
+    df = df[col_order]
+
+    # Build provenance
+    provenance = ProvenanceBlock(
+        extra={
+            "dataset": "zori",
+            "geography": geography,
+            "metric": "ZORI",
+            "source": "Zillow Economic Research",
+            "attribution": ZILLOW_ATTRIBUTION,
+            "download_url": download_url,
+            "downloaded_at": ingested_at.isoformat(),
+            "raw_sha256": sha256,
+            "row_count": len(df),
+            "geo_count": df["geo_id"].nunique(),
+            "date_range": [
+                df["date"].min().isoformat(),
+                df["date"].max().isoformat(),
+            ],
+        },
+    )
+
+    # Write output
+    write_parquet_with_provenance(df, output_path, provenance)
+    logger.info(f"Wrote normalized ZORI data to {output_path}")
+
+    return output_path

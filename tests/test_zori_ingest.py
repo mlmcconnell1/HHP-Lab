@@ -1,0 +1,519 @@
+"""Tests for ZORI ingestion and normalization.
+
+Tests the county-level ZORI data pipeline including:
+- Downloading and caching
+- Wide-to-long format parsing
+- Geo_id validation (5-char county FIPS)
+- Monthly continuity validation
+- Parquet output with provenance
+"""
+
+from __future__ import annotations
+
+from datetime import UTC, date, datetime
+from pathlib import Path
+
+import pandas as pd
+import pytest
+
+from coclab.provenance import read_provenance
+from coclab.rents.ingest import (
+    ZORI_URLS,
+    _validate_monthly_continuity,
+    download_zori,
+    get_output_path,
+    ingest_zori,
+    parse_zori_county,
+)
+
+# Sample Zillow CSV data in wide format (county)
+# fmt: off
+SAMPLE_COUNTY_CSV = (
+    "RegionID,SizeRank,RegionName,RegionType,StateName,"
+    "StateCodeFIPS,MunicipalCodeFIPS,Metro,2023-01-31,2023-02-28,2023-03-31\n"
+    "1234,1,Adams County,county,Colorado,08,001,Denver-Aurora-Lakewood,"
+    "1500.00,1520.00,1540.00\n"
+    "5678,2,Arapahoe County,county,Colorado,08,005,Denver-Aurora-Lakewood,"
+    "1600.00,1620.00,1650.00\n"
+    "9012,3,Autauga County,county,Alabama,01,001,Montgomery,"
+    "900.00,910.00,920.00\n"
+)
+
+# Sample with gaps in date sequence
+SAMPLE_CSV_WITH_GAPS = (
+    "RegionID,SizeRank,RegionName,RegionType,StateName,"
+    "StateCodeFIPS,MunicipalCodeFIPS,Metro,2023-01-31,2023-03-31,2023-05-31\n"
+    "1234,1,Adams County,county,Colorado,08,001,Denver-Aurora-Lakewood,"
+    "1500.00,1540.00,1580.00\n"
+)
+
+# Sample with invalid geo_ids (short FIPS)
+SAMPLE_CSV_INVALID_GEOID = (
+    "RegionID,SizeRank,RegionName,RegionType,StateName,"
+    "StateCodeFIPS,MunicipalCodeFIPS,Metro,2023-01-31\n"
+    "1234,1,Test County,county,Colorado,8,1,Denver,1500.00\n"
+)
+# fmt: on
+
+
+class TestParseZoriCounty:
+    """Tests for parse_zori_county function."""
+
+    def test_parses_wide_to_long_format(self, tmp_path):
+        """Test that wide format is correctly converted to long format."""
+        csv_path = tmp_path / "test.csv"
+        csv_path.write_text(SAMPLE_COUNTY_CSV)
+
+        df = parse_zori_county(csv_path)
+
+        # Should have 3 counties * 3 months = 9 rows
+        assert len(df) == 9
+
+        # Check columns
+        assert set(df.columns) == {"geo_id", "date", "zori", "region_name", "state"}
+
+    def test_geo_id_format_5_chars(self, tmp_path):
+        """Test that geo_id is 5-character county FIPS."""
+        csv_path = tmp_path / "test.csv"
+        csv_path.write_text(SAMPLE_COUNTY_CSV)
+
+        df = parse_zori_county(csv_path)
+
+        # All geo_ids should be exactly 5 characters
+        assert all(len(geo_id) == 5 for geo_id in df["geo_id"])
+
+        # Check specific FIPS codes
+        assert "08001" in df["geo_id"].values  # Adams County, CO
+        assert "08005" in df["geo_id"].values  # Arapahoe County, CO
+        assert "01001" in df["geo_id"].values  # Autauga County, AL
+
+    def test_preserves_leading_zeros(self, tmp_path):
+        """Test that leading zeros are preserved in FIPS codes."""
+        csv_path = tmp_path / "test.csv"
+        csv_path.write_text(SAMPLE_COUNTY_CSV)
+
+        df = parse_zori_county(csv_path)
+
+        # Alabama's FIPS starts with 01
+        al_rows = df[df["state"] == "Alabama"]
+        assert len(al_rows) > 0
+        assert al_rows["geo_id"].iloc[0].startswith("01")
+
+    def test_date_parsing(self, tmp_path):
+        """Test that dates are correctly parsed."""
+        csv_path = tmp_path / "test.csv"
+        csv_path.write_text(SAMPLE_COUNTY_CSV)
+
+        df = parse_zori_county(csv_path)
+
+        # Check that dates are datetime objects
+        assert pd.api.types.is_datetime64_any_dtype(df["date"])
+
+        # Check date values
+        dates = df["date"].dt.date.unique()
+        assert date(2023, 1, 31) in dates
+        assert date(2023, 2, 28) in dates
+        assert date(2023, 3, 31) in dates
+
+    def test_zori_values_numeric(self, tmp_path):
+        """Test that ZORI values are numeric."""
+        csv_path = tmp_path / "test.csv"
+        csv_path.write_text(SAMPLE_COUNTY_CSV)
+
+        df = parse_zori_county(csv_path)
+
+        assert pd.api.types.is_numeric_dtype(df["zori"])
+        assert (df["zori"] > 0).all()
+
+    def test_sorted_by_geo_id_and_date(self, tmp_path):
+        """Test that output is sorted by geo_id and date."""
+        csv_path = tmp_path / "test.csv"
+        csv_path.write_text(SAMPLE_COUNTY_CSV)
+
+        df = parse_zori_county(csv_path)
+
+        # Check sorting
+        assert df["geo_id"].is_monotonic_increasing or df.equals(
+            df.sort_values(["geo_id", "date"]).reset_index(drop=True)
+        )
+
+
+class TestValidateMonthyContinuity:
+    """Tests for _validate_monthly_continuity function."""
+
+    def test_no_warnings_for_continuous_series(self, caplog):
+        """Test that no warnings are logged for continuous monthly data."""
+        df = pd.DataFrame({
+            "geo_id": ["08001"] * 3,
+            "date": pd.to_datetime(["2023-01-01", "2023-02-01", "2023-03-01"]),
+        })
+
+        with caplog.at_level("WARNING"):
+            _validate_monthly_continuity(df)
+
+        # Should not have gap warnings
+        assert "Gap in ZORI series" not in caplog.text
+
+    def test_warns_on_gaps(self, caplog):
+        """Test that gaps in monthly series trigger warnings."""
+        df = pd.DataFrame({
+            "geo_id": ["08001"] * 3,
+            "date": pd.to_datetime(["2023-01-01", "2023-03-01", "2023-04-01"]),  # Feb missing
+        })
+
+        with caplog.at_level("WARNING"):
+            _validate_monthly_continuity(df)
+
+        # Should warn about gap
+        assert "Gap in ZORI series" in caplog.text
+        assert "08001" in caplog.text
+
+    def test_handles_year_boundary(self, caplog):
+        """Test that year boundaries are handled correctly."""
+        df = pd.DataFrame({
+            "geo_id": ["08001"] * 2,
+            "date": pd.to_datetime(["2022-12-01", "2023-01-01"]),
+        })
+
+        with caplog.at_level("WARNING"):
+            _validate_monthly_continuity(df)
+
+        # No gap - December to January is continuous
+        assert "Gap in ZORI series" not in caplog.text
+
+    def test_truncates_many_warnings(self, caplog):
+        """Test that excessive warnings are truncated."""
+        # Create data with many gaps
+        dates = pd.date_range("2020-01", "2023-01", freq="2ME")  # Every other month
+        df = pd.DataFrame({
+            "geo_id": ["08001"] * len(dates),
+            "date": dates,
+        })
+
+        with caplog.at_level("WARNING"):
+            _validate_monthly_continuity(df, max_warnings=5)
+
+        # Should have truncation message
+        assert "truncated" in caplog.text.lower()
+
+
+class TestGetOutputPath:
+    """Tests for get_output_path function."""
+
+    def test_default_path(self):
+        """Test default output path generation."""
+        path = get_output_path("county")
+        assert path == Path("data/curated/rents/zori__county.parquet")
+
+    def test_custom_base_dir(self):
+        """Test output path with custom base directory."""
+        path = get_output_path("county", output_dir="/tmp/test")
+        assert path == Path("/tmp/test/zori__county.parquet")
+
+    def test_zip_geography(self):
+        """Test output path for ZIP geography."""
+        path = get_output_path("zip")
+        assert path == Path("data/curated/rents/zori__zip.parquet")
+
+
+class TestDownloadZori:
+    """Tests for download_zori function."""
+
+    def test_uses_cache_when_exists(self, tmp_path, httpx_mock):
+        """Test that cached file is used when it exists."""
+        # Create a cached file
+        raw_dir = tmp_path / "raw"
+        raw_dir.mkdir()
+
+        today = date.today().isoformat()
+        cached_path = raw_dir / f"zori__county__{today}.csv"
+        cached_path.write_text(SAMPLE_COUNTY_CSV)
+
+        # Call download - should use cache, not make HTTP request
+        path, sha256 = download_zori("county", raw_dir=raw_dir, force=False)
+
+        assert path == cached_path
+        assert len(sha256) == 64  # SHA256 hex string
+
+    def test_downloads_when_forced(self, tmp_path, httpx_mock):
+        """Test that force=True re-downloads even with cache."""
+        raw_dir = tmp_path / "raw"
+        raw_dir.mkdir()
+
+        # Create a cached file
+        today = date.today().isoformat()
+        cached_path = raw_dir / f"zori__county__{today}.csv"
+        cached_path.write_text("old content")
+
+        # Mock the HTTP response
+        httpx_mock.add_response(
+            url=ZORI_URLS["county"],
+            content=SAMPLE_COUNTY_CSV.encode(),
+        )
+
+        # Force download
+        path, sha256 = download_zori("county", raw_dir=raw_dir, force=True)
+
+        # Should have new content
+        assert SAMPLE_COUNTY_CSV in path.read_text()
+
+    def test_custom_url(self, tmp_path, httpx_mock):
+        """Test downloading from custom URL."""
+        raw_dir = tmp_path / "raw"
+        raw_dir.mkdir()
+
+        custom_url = "https://example.com/zori.csv"
+        httpx_mock.add_response(
+            url=custom_url,
+            content=SAMPLE_COUNTY_CSV.encode(),
+        )
+
+        path, sha256 = download_zori("county", url=custom_url, raw_dir=raw_dir, force=True)
+
+        assert path.exists()
+
+    def test_invalid_geography_raises(self, tmp_path):
+        """Test that invalid geography raises ValueError."""
+        with pytest.raises(ValueError, match="Unknown geography"):
+            download_zori("invalid_geo", raw_dir=tmp_path)
+
+
+class TestIngestZori:
+    """Tests for ingest_zori function."""
+
+    def test_end_to_end_ingest(self, tmp_path, httpx_mock):
+        """Test complete ingest pipeline."""
+        raw_dir = tmp_path / "raw"
+        output_dir = tmp_path / "curated"
+
+        httpx_mock.add_response(
+            url=ZORI_URLS["county"],
+            content=SAMPLE_COUNTY_CSV.encode(),
+        )
+
+        output_path = ingest_zori(
+            geography="county",
+            raw_dir=raw_dir,
+            output_dir=output_dir,
+            force=True,
+        )
+
+        assert output_path.exists()
+        assert output_path.suffix == ".parquet"
+
+        # Read and verify output
+        df = pd.read_parquet(output_path)
+
+        # Check schema
+        required_cols = [
+            "geo_type", "geo_id", "date", "zori", "region_name", "state",
+            "data_source", "metric", "ingested_at", "source_ref", "raw_sha256",
+        ]
+        for col in required_cols:
+            assert col in df.columns, f"Missing required column: {col}"
+
+        # Check geo_type is correct
+        assert (df["geo_type"] == "county").all()
+
+        # Check data_source
+        assert (df["data_source"] == "Zillow Economic Research").all()
+
+        # Check metric
+        assert (df["metric"] == "ZORI").all()
+
+    def test_date_filtering(self, tmp_path, httpx_mock):
+        """Test that date filters are applied correctly."""
+        raw_dir = tmp_path / "raw"
+        output_dir = tmp_path / "curated"
+
+        httpx_mock.add_response(
+            url=ZORI_URLS["county"],
+            content=SAMPLE_COUNTY_CSV.encode(),
+        )
+
+        output_path = ingest_zori(
+            geography="county",
+            raw_dir=raw_dir,
+            output_dir=output_dir,
+            force=True,
+            start="2023-02-01",
+            end="2023-02-28",
+        )
+
+        df = pd.read_parquet(output_path)
+
+        # Should only have February data
+        dates = df["date"].dt.date.unique()
+        assert len(dates) == 1
+        assert dates[0].month == 2
+
+    def test_includes_provenance_metadata(self, tmp_path, httpx_mock):
+        """Test that output file includes provenance metadata."""
+        raw_dir = tmp_path / "raw"
+        output_dir = tmp_path / "curated"
+
+        httpx_mock.add_response(
+            url=ZORI_URLS["county"],
+            content=SAMPLE_COUNTY_CSV.encode(),
+        )
+
+        output_path = ingest_zori(
+            geography="county",
+            raw_dir=raw_dir,
+            output_dir=output_dir,
+            force=True,
+        )
+
+        # Read provenance from file
+        provenance = read_provenance(output_path)
+        assert provenance is not None
+
+        # Check provenance fields
+        assert provenance.extra.get("dataset") == "zori"
+        assert provenance.extra.get("geography") == "county"
+        assert provenance.extra.get("metric") == "ZORI"
+        assert provenance.extra.get("source") == "Zillow Economic Research"
+        assert "attribution" in provenance.extra
+        assert "raw_sha256" in provenance.extra
+        assert "row_count" in provenance.extra
+        assert "geo_count" in provenance.extra
+
+    def test_uses_cache_when_exists(self, tmp_path, httpx_mock):
+        """Test that cached output is used when it exists."""
+        output_dir = tmp_path / "curated"
+        output_dir.mkdir(parents=True)
+
+        # Create a cached output file
+        cached_path = output_dir / "zori__county.parquet"
+        df = pd.DataFrame({
+            "geo_type": ["county"],
+            "geo_id": ["08001"],
+            "date": [pd.Timestamp("2023-01-01")],
+            "zori": [1500.0],
+            "region_name": ["Adams County"],
+            "state": ["Colorado"],
+            "data_source": ["cached"],
+            "metric": ["ZORI"],
+            "ingested_at": [datetime.now(UTC)],
+            "source_ref": ["cached"],
+            "raw_sha256": ["cached"],
+        })
+        df.to_parquet(cached_path)
+
+        # Call ingest without force - should use cache
+        result_path = ingest_zori(
+            geography="county",
+            output_dir=output_dir,
+            force=False,
+        )
+
+        assert result_path == cached_path
+
+        # Verify it didn't make HTTP request (httpx_mock would fail if it did)
+
+    def test_force_reprocesses_even_with_cache(self, tmp_path, httpx_mock):
+        """Test that force=True reprocesses even with cache."""
+        raw_dir = tmp_path / "raw"
+        output_dir = tmp_path / "curated"
+        output_dir.mkdir(parents=True)
+
+        # Create a cached output file
+        cached_path = output_dir / "zori__county.parquet"
+        df = pd.DataFrame({
+            "geo_type": ["county"],
+            "geo_id": ["08001"],
+            "date": [pd.Timestamp("2023-01-01")],
+            "zori": [1.0],  # Different value
+            "region_name": ["Old"],
+            "state": ["Old"],
+            "data_source": ["cached"],
+            "metric": ["ZORI"],
+            "ingested_at": [datetime.now(UTC)],
+            "source_ref": ["cached"],
+            "raw_sha256": ["cached"],
+        })
+        df.to_parquet(cached_path)
+
+        httpx_mock.add_response(
+            url=ZORI_URLS["county"],
+            content=SAMPLE_COUNTY_CSV.encode(),
+        )
+
+        # Force reprocess
+        result_path = ingest_zori(
+            geography="county",
+            raw_dir=raw_dir,
+            output_dir=output_dir,
+            force=True,
+        )
+
+        # Verify new data was written
+        result_df = pd.read_parquet(result_path)
+        assert result_df["zori"].max() > 1000  # Should have real values now
+
+
+class TestSchemaValidation:
+    """Tests for output schema validation."""
+
+    def test_geo_id_length_5_chars(self, tmp_path, httpx_mock):
+        """Test that geo_id is exactly 5 characters."""
+        raw_dir = tmp_path / "raw"
+        output_dir = tmp_path / "curated"
+
+        httpx_mock.add_response(
+            url=ZORI_URLS["county"],
+            content=SAMPLE_COUNTY_CSV.encode(),
+        )
+
+        output_path = ingest_zori(
+            geography="county",
+            raw_dir=raw_dir,
+            output_dir=output_dir,
+            force=True,
+        )
+
+        df = pd.read_parquet(output_path)
+        assert all(len(geo_id) == 5 for geo_id in df["geo_id"])
+
+    def test_zori_values_positive(self, tmp_path, httpx_mock):
+        """Test that all ZORI values are positive."""
+        raw_dir = tmp_path / "raw"
+        output_dir = tmp_path / "curated"
+
+        httpx_mock.add_response(
+            url=ZORI_URLS["county"],
+            content=SAMPLE_COUNTY_CSV.encode(),
+        )
+
+        output_path = ingest_zori(
+            geography="county",
+            raw_dir=raw_dir,
+            output_dir=output_dir,
+            force=True,
+        )
+
+        df = pd.read_parquet(output_path)
+        assert (df["zori"] > 0).all()
+
+    def test_ingested_at_is_utc(self, tmp_path, httpx_mock):
+        """Test that ingested_at is a UTC timestamp."""
+        raw_dir = tmp_path / "raw"
+        output_dir = tmp_path / "curated"
+
+        httpx_mock.add_response(
+            url=ZORI_URLS["county"],
+            content=SAMPLE_COUNTY_CSV.encode(),
+        )
+
+        output_path = ingest_zori(
+            geography="county",
+            raw_dir=raw_dir,
+            output_dir=output_dir,
+            force=True,
+        )
+
+        df = pd.read_parquet(output_path)
+
+        # Check that timestamp is timezone-aware
+        ts = df.iloc[0]["ingested_at"]
+        assert ts.tzinfo is not None

@@ -24,6 +24,7 @@ from coclab.cli.panel_diagnostics import panel_diagnostics
 from coclab.cli.rollup_acs_population import rollup_acs_population
 from coclab.cli.show_measures import show_measures
 from coclab.cli.verify_acs_population import verify_acs_population
+from coclab.cli.zori import aggregate_zori, ingest_zori, zori_diagnostics
 
 
 def _check_working_directory() -> None:
@@ -74,6 +75,11 @@ app.command("panel-diagnostics")(panel_diagnostics)
 app.command("rollup-acs-population")(rollup_acs_population)
 app.command("show-measures")(show_measures)
 app.command("verify-acs-population")(verify_acs_population)
+
+# ZORI commands (spec section 3)
+app.command("ingest-zori")(ingest_zori)
+app.command("aggregate-zori")(aggregate_zori)
+app.command("zori-diagnostics")(zori_diagnostics)
 
 
 @app.command()
