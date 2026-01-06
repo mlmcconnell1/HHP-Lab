@@ -397,13 +397,14 @@ def build_coc_population_rollup(
     if not tract_pop_path.exists():
         raise FileNotFoundError(
             f"Tract population file not found: {tract_pop_path}. "
-            f"Run ingest_tract_population('{acs_vintage}', '{tract_vintage}') first."
+            f"Run 'coclab ingest-acs-population --acs {acs_vintage} "
+            f"--tracts {tract_vintage}' first."
         )
     if not xwalk_path.exists():
         raise FileNotFoundError(
             f"Crosswalk file not found: {xwalk_path}. "
-            f"Build crosswalk for boundary_vintage={boundary_vintage}, "
-            f"tract_vintage={tract_vintage} first."
+            f"Run 'coclab build-xwalks --boundary {boundary_vintage} "
+            f"--tracts {tract_vintage}' first."
         )
 
     logger.info(f"Loading tract population from {tract_pop_path}")

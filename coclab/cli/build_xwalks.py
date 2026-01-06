@@ -96,7 +96,7 @@ def build_xwalks(
     if not tract_path.exists():
         typer.echo(
             f"Error: Tract file not found: {tract_path}. "
-            f"Run 'python -m coclab.census.ingest.tiger_tracts {tracts}' first.",
+            f"Run 'coclab ingest-census --year {tracts} --type tracts' first.",
             err=True,
         )
         raise typer.Exit(1)

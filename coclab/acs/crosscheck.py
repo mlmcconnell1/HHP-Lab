@@ -511,13 +511,14 @@ def run_crosscheck(
     if not rollup_path.exists():
         raise FileNotFoundError(
             f"Rollup file not found: {rollup_path}. "
-            f"Run build_coc_population_rollup() first."
+            f"Run 'coclab rollup-acs-population --boundary {boundary_vintage} "
+            f"--acs {acs_vintage} --tracts {tract_vintage}' first."
         )
     if not measures_path.exists():
         raise FileNotFoundError(
             f"Measures file not found: {measures_path}. "
-            f"Build CoC measures for boundary_vintage={boundary_vintage}, "
-            f"acs_vintage={acs_vintage} first."
+            f"Run 'coclab build-measures --boundary {boundary_vintage} "
+            f"--acs {acs_vintage}' first."
         )
 
     # Load data
