@@ -107,7 +107,7 @@ def ingest(
 
         typer.echo(f"Ingesting HUD Exchange CoC boundaries for vintage {vintage}...")
         try:
-            output_path = ingest_hud_exchange(vintage, verbose=True)
+            output_path = ingest_hud_exchange(vintage, show_progress=True)
             typer.echo(f"Successfully ingested to: {output_path}")
         except Exception as e:
             typer.echo(f"Error: {e}", err=True)
