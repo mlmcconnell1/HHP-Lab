@@ -33,9 +33,9 @@ Weighting Methods
 Quality Metrics
 ---------------
 
-- **coverage_ratio**: Sum of area_share for all matched tracts. Should be close
-  to 1.0 if the crosswalk fully covers the CoC. Values significantly below 1.0
-  indicate missing tract coverage.
+- **coverage_ratio**: Fraction of CoC area covered by tracts with population data.
+  Should be close to 1.0 if all tracts have ACS data. Values significantly below 1.0
+  indicate missing tract population data.
 
 - **max_tract_contribution**: Maximum (area_share * tract_pop) from any single
   tract. High values indicate sensitivity to individual tract estimates.
@@ -61,7 +61,7 @@ Output Schema
 - tract_vintage (str): Census tract geography version
 - weighting_method (str): "area" or "population_mass"
 - coc_population (float): aggregated population estimate
-- coverage_ratio (float): sum of area_shares for matched tracts
+- coverage_ratio (float): fraction of CoC area with population data (~1.0)
 - max_tract_contribution (float): maximum single tract contribution
 - tract_count (int): number of contributing tracts
 """
@@ -101,6 +101,7 @@ def rollup_tract_population(
         - coc_id (str): CoC identifier
         - tract_geoid (str): Census tract GEOID
         - area_share (float): fraction of tract within CoC (0-1)
+        - intersection_area (float): area of tract-CoC intersection
     weighting : {"area", "population_mass"}
         Weighting method label. Both use the same area_share formula;
         the label indicates the analyst's interpretation of how population
@@ -152,12 +153,18 @@ def rollup_tract_population(
         )
 
     # Validate required columns in crosswalk
-    xwalk_required = {"coc_id", "tract_geoid", "area_share"}
+    xwalk_required = {"coc_id", "tract_geoid", "area_share", "intersection_area"}
     xwalk_missing = xwalk_required - set(crosswalk_df.columns)
     if xwalk_missing:
         raise ValueError(
             f"crosswalk_df missing required columns: {xwalk_missing}"
         )
+
+    # Compute coc_share: fraction of CoC's total area from each tract
+    # This is used for coverage_ratio (should sum to ~1.0 per CoC)
+    crosswalk_df = crosswalk_df.copy()
+    coc_total_area = crosswalk_df.groupby("coc_id")["intersection_area"].transform("sum")
+    crosswalk_df["coc_share"] = crosswalk_df["intersection_area"] / coc_total_area
 
     # Merge crosswalk with tract population
     merged = crosswalk_df.merge(
@@ -182,8 +189,9 @@ def rollup_tract_population(
         # coc_population = sum(area_share * tract_pop)
         coc_population = group["weighted_pop"].sum()
 
-        # coverage_ratio = sum(area_share) for tracts with population data
-        coverage_ratio = group.loc[has_pop, "area_share"].sum()
+        # coverage_ratio = sum(coc_share) for tracts with population data
+        # coc_share is fraction of CoC area from each tract, so sum should be ~1.0
+        coverage_ratio = group.loc[has_pop, "coc_share"].sum()
 
         # max_tract_contribution = max(area_share * tract_pop)
         max_contribution = group["weighted_pop"].max()
