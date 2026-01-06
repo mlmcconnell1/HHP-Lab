@@ -135,19 +135,27 @@ def _fetch_arcgis_page(
     raise last_error  # type: ignore[misc]
 
 
-def _fetch_all_arcgis_features(client: httpx.Client) -> list[dict[str, Any]]:
+def _fetch_all_arcgis_features(
+    client: httpx.Client,
+    verbose: bool = False,
+) -> list[dict[str, Any]]:
     """Fetch all features from the ArcGIS service with pagination.
 
     Args:
         client: HTTP client for making requests
+        verbose: If True, print progress messages
 
     Returns:
         List of all GeoJSON features
     """
     all_features: list[dict[str, Any]] = []
     offset = 0
+    page_num = 1
 
     while True:
+        if verbose:
+            print(f"  Fetching page {page_num} (offset {offset})...", flush=True)
+
         data = _fetch_arcgis_page(client, offset=offset)
         features = data.get("features", [])
 
@@ -156,11 +164,15 @@ def _fetch_all_arcgis_features(client: httpx.Client) -> list[dict[str, Any]]:
 
         all_features.extend(features)
 
+        if verbose:
+            print(f"  Received {len(features)} features (total: {len(all_features)})")
+
         # Check if we've received fewer than PAGE_SIZE, indicating last page
         if len(features) < ARCGIS_PAGE_SIZE:
             break
 
         offset += ARCGIS_PAGE_SIZE
+        page_num += 1
 
     return all_features
 
@@ -239,13 +251,17 @@ def _map_arcgis_to_canonical_schema(
     return result
 
 
-def fetch_from_arcgis(boundary_vintage: str) -> gpd.GeoDataFrame:
+def fetch_from_arcgis(
+    boundary_vintage: str,
+    verbose: bool = False,
+) -> gpd.GeoDataFrame:
     """Fetch CoC boundaries from HUD ArcGIS FeatureServer.
 
     This is the primary data source for current CoC boundary data.
 
     Args:
         boundary_vintage: Version identifier (e.g., "2025" or "FY2024")
+        verbose: If True, print progress messages
 
     Returns:
         GeoDataFrame with canonical schema
@@ -255,7 +271,7 @@ def fetch_from_arcgis(boundary_vintage: str) -> gpd.GeoDataFrame:
         ValueError: If no features are returned
     """
     with httpx.Client() as client:
-        features = _fetch_all_arcgis_features(client)
+        features = _fetch_all_arcgis_features(client, verbose=verbose)
 
     if not features:
         raise ValueError("No features returned from HUD ArcGIS API")
@@ -428,6 +444,7 @@ def ingest_hud_exchange(
     curated_dir: Path | str | None = None,
     skip_download: bool = False,
     use_legacy_source: bool = False,
+    verbose: bool = False,
 ) -> Path:
     """Ingest CoC boundaries from HUD data sources.
 
@@ -442,6 +459,7 @@ def ingest_hud_exchange(
         curated_dir: Base directory for curated output. Defaults to data/
         skip_download: If True, reads from local files in raw_dir (legacy source)
         use_legacy_source: Force use of HUD Exchange ZIP download instead of ArcGIS
+        verbose: If True, print progress messages
 
     Returns:
         Path to the output GeoParquet file
@@ -463,7 +481,11 @@ def ingest_hud_exchange(
 
     if use_arcgis:
         # Primary path: fetch from ArcGIS FeatureServer
-        gdf = fetch_from_arcgis(boundary_vintage)
+        if verbose:
+            print("Fetching from HUD ArcGIS FeatureServer...")
+        gdf = fetch_from_arcgis(boundary_vintage, verbose=verbose)
+        if verbose:
+            print(f"Fetched {len(gdf)} CoC boundaries.")
     else:
         # Legacy path: download ZIP from HUD Exchange
         if raw_dir is None:
@@ -495,14 +517,20 @@ def ingest_hud_exchange(
         gdf = map_to_canonical_schema(gdf, boundary_vintage, url)
 
     # Normalize boundaries (CRS, fix geometries, compute geom_hash)
+    if verbose:
+        print("Normalizing boundaries...")
     gdf = normalize_boundaries(gdf)
 
     # Validate boundaries
+    if verbose:
+        print("Validating boundaries...")
     validation_result = validate_boundaries(gdf)
     if not validation_result.is_valid:
         raise ValueError(f"Validation failed:\n{validation_result}")
 
     # Write curated GeoParquet
+    if verbose:
+        print("Writing GeoParquet file...")
     output_path = curated_boundary_path(boundary_vintage, base_dir=curated_dir)
     write_geoparquet(gdf, output_path)
 

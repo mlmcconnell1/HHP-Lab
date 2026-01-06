@@ -74,6 +74,14 @@ def ingest(
             help="Snapshot tag for hud_opendata source (default: 'latest')",
         ),
     ] = "latest",
+    force: Annotated[
+        bool,
+        typer.Option(
+            "--force",
+            "-f",
+            help="Force re-ingest even if vintage already exists",
+        ),
+    ] = False,
 ) -> None:
     """Ingest CoC boundary data from HUD sources.
 
@@ -88,11 +96,18 @@ def ingest(
             typer.echo("Error: --vintage is required for hud_exchange source", err=True)
             raise typer.Exit(1)
 
+        from coclab.geo.io import curated_boundary_path
         from coclab.ingest.hud_exchange_gis import ingest_hud_exchange
+
+        output_path = curated_boundary_path(vintage)
+        if output_path.exists() and not force:
+            typer.echo(f"Vintage {vintage} already exists at: {output_path}")
+            typer.echo("Use --force to re-ingest.")
+            raise typer.Exit(0)
 
         typer.echo(f"Ingesting HUD Exchange CoC boundaries for vintage {vintage}...")
         try:
-            output_path = ingest_hud_exchange(vintage)
+            output_path = ingest_hud_exchange(vintage, verbose=True)
             typer.echo(f"Successfully ingested to: {output_path}")
         except Exception as e:
             typer.echo(f"Error: {e}", err=True)
