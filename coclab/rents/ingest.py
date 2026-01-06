@@ -37,6 +37,7 @@ import httpx
 import pandas as pd
 
 from coclab.provenance import ProvenanceBlock, write_parquet_with_provenance
+from coclab.source_registry import check_source_changed, register_source
 
 logger = logging.getLogger(__name__)
 
@@ -126,6 +127,38 @@ def download_zori(
     sha256 = hashlib.sha256(content).hexdigest()
     raw_path.write_bytes(content)
     logger.info(f"Saved raw file to {raw_path} (sha256: {sha256[:10]}...)")
+
+    # Check for upstream changes and register in source registry
+    changed, details = check_source_changed(
+        source_type="zori",
+        source_url=url,
+        current_sha256=sha256,
+    )
+
+    if changed:
+        logger.warning(
+            f"⚠️  UPSTREAM DATA CHANGED: ZORI {geography} data has changed since last download!\n"
+            f"    Previous hash: {details['previous_sha256'][:16]}...\n"
+            f"    Current hash:  {sha256[:16]}...\n"
+            f"    Last ingested: {details['previous_ingested_at']}"
+        )
+    elif details.get("is_new"):
+        logger.info(f"First time tracking ZORI {geography} source in registry")
+
+    # Register this download
+    register_source(
+        source_type="zori",
+        source_url=url,
+        source_name=f"ZORI {geography.title()} Monthly",
+        raw_sha256=sha256,
+        file_size=len(content),
+        local_path=str(raw_path),
+        metadata={
+            "geography": geography,
+            "download_date": download_date,
+            "data_source": "Zillow Economic Research",
+        },
+    )
 
     return raw_path, sha256
 

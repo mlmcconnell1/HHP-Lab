@@ -82,6 +82,62 @@ app.command("aggregate-zori")(aggregate_zori)
 app.command("zori-diagnostics")(zori_diagnostics)
 
 
+@app.command("source-status")
+def source_status(
+    source_type: Annotated[
+        str | None,
+        typer.Option(
+            "--type",
+            "-t",
+            help="Filter to specific source type (zori, boundary, census_tract, etc.)",
+        ),
+    ] = None,
+    check_changes: Annotated[
+        bool,
+        typer.Option(
+            "--check-changes",
+            "-c",
+            help="Highlight sources that have changed over time",
+        ),
+    ] = False,
+) -> None:
+    """Show status of tracked external data sources.
+
+    Displays all registered data source ingestions with their hashes,
+    timestamps, and change detection information.
+
+    Examples:
+
+        coclab source-status
+
+        coclab source-status --type zori
+
+        coclab source-status --check-changes
+    """
+    from coclab.source_registry import (
+        detect_upstream_changes,
+        summarize_registry,
+    )
+
+    if check_changes:
+        changes = detect_upstream_changes()
+        if changes.empty:
+            typer.echo("No upstream changes detected. All sources have consistent hashes.")
+        else:
+            typer.echo("⚠️  UPSTREAM DATA CHANGES DETECTED:\n")
+            for _, row in changes.iterrows():
+                typer.echo(f"  {row['source_type']}: {row['source_url'][:60]}...")
+                typer.echo(f"    Versions seen: {row['hash_count']}")
+                typer.echo(f"    First: {row['first_seen']} (hash: {row['first_hash'][:12]}...)")
+                typer.echo(f"    Last:  {row['last_seen']} (hash: {row['last_hash'][:12]}...)")
+                typer.echo("")
+        return
+
+    # Show full summary
+    summary = summarize_registry()
+    typer.echo(summary)
+
+
 @app.command()
 def ingest(
     source: Annotated[
