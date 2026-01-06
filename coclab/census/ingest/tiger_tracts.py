@@ -1,21 +1,82 @@
 """TIGER/Line tract geometry ingestion."""
-from pathlib import Path
-from datetime import datetime, timezone
+
 import tempfile
 import zipfile
+from datetime import UTC, datetime
+from pathlib import Path
 
-import httpx
+import click
 import geopandas as gpd
+import httpx
+import pandas as pd
 
 TIGER_BASE = "https://www2.census.gov/geo/tiger/TIGER{year}/TRACT/"
 OUTPUT_DIR = Path("data/curated/census")
 
+# State and territory FIPS codes for downloading per-state tract files
+STATE_FIPS_CODES = [
+    "01", "02", "04", "05", "06", "08", "09", "10", "11", "12",
+    "13", "15", "16", "17", "18", "19", "20", "21", "22", "23",
+    "24", "25", "26", "27", "28", "29", "30", "31", "32", "33",
+    "34", "35", "36", "37", "38", "39", "40", "41", "42", "44",
+    "45", "46", "47", "48", "49", "50", "51", "53", "54", "55",
+    "56",  # 50 states + DC
+    "60",  # American Samoa
+    "66",  # Guam
+    "69",  # Northern Mariana Islands
+    "72",  # Puerto Rico
+    "78",  # U.S. Virgin Islands
+]
 
-def download_tiger_tracts(year: int = 2023) -> gpd.GeoDataFrame:
+
+def _download_state_tracts(
+    client: httpx.Client,
+    year: int,
+    state_fips: str,
+    tmpdir: Path,
+) -> gpd.GeoDataFrame | None:
+    """Download tract data for a single state.
+
+    Returns None if the state file doesn't exist (some territories may not have data).
+    """
+    url = f"{TIGER_BASE.format(year=year)}tl_{year}_{state_fips}_tract.zip"
+    zip_path = tmpdir / f"tl_{year}_{state_fips}_tract.zip"
+
+    try:
+        response = client.get(url, follow_redirects=True)
+        response.raise_for_status()
+    except httpx.HTTPStatusError as e:
+        if e.response.status_code == 404:
+            return None  # State file doesn't exist
+        raise
+
+    zip_path.write_bytes(response.content)
+
+    # Extract and read
+    extract_dir = tmpdir / state_fips
+    extract_dir.mkdir(exist_ok=True)
+
+    with zipfile.ZipFile(zip_path, "r") as zf:
+        zf.extractall(extract_dir)
+
+    shp_files = list(extract_dir.glob("*.shp"))
+    if not shp_files:
+        return None
+
+    return gpd.read_file(shp_files[0])
+
+
+def download_tiger_tracts(
+    year: int = 2023,
+    show_progress: bool = False,
+) -> gpd.GeoDataFrame:
     """Download all US census tracts for a given year.
+
+    Downloads per-state tract files and combines them into a single GeoDataFrame.
 
     Args:
         year: TIGER vintage year (default 2023)
+        show_progress: If True, display a progress bar
 
     Returns:
         GeoDataFrame with standardized schema:
@@ -25,41 +86,45 @@ def download_tiger_tracts(year: int = 2023) -> gpd.GeoDataFrame:
         - source: "tiger_line"
         - ingested_at: datetime
     """
-    url = f"{TIGER_BASE.format(year=year)}tl_{year}_us_tract.zip"
+    gdfs = []
 
     with tempfile.TemporaryDirectory() as tmpdir:
         tmppath = Path(tmpdir)
-        zip_path = tmppath / f"tl_{year}_us_tract.zip"
 
-        # Download the zip file
         with httpx.Client(timeout=300.0) as client:
-            response = client.get(url, follow_redirects=True)
-            response.raise_for_status()
-            zip_path.write_bytes(response.content)
+            if show_progress:
+                states = click.progressbar(
+                    STATE_FIPS_CODES,
+                    label="Downloading state tracts",
+                    show_pos=True,
+                )
+            else:
+                states = STATE_FIPS_CODES
 
-        # Extract the zip file
-        with zipfile.ZipFile(zip_path, "r") as zf:
-            zf.extractall(tmppath)
+            with states if show_progress else nullcontext(states) as state_iter:
+                for state_fips in state_iter:
+                    gdf = _download_state_tracts(client, year, state_fips, tmppath)
+                    if gdf is not None:
+                        gdfs.append(gdf)
 
-        # Find the shapefile
-        shp_files = list(tmppath.glob("*.shp"))
-        if not shp_files:
-            raise FileNotFoundError(f"No shapefile found in {url}")
+    if not gdfs:
+        raise ValueError(f"No tract data found for year {year}")
 
-        # Read the shapefile
-        gdf = gpd.read_file(shp_files[0])
+    # Combine all states
+    combined = pd.concat(gdfs, ignore_index=True)
+    combined = gpd.GeoDataFrame(combined, crs=gdfs[0].crs)
 
     # Reproject to EPSG:4326 if needed
-    if gdf.crs and gdf.crs.to_epsg() != 4326:
-        gdf = gdf.to_crs(epsg=4326)
+    if combined.crs and combined.crs.to_epsg() != 4326:
+        combined = combined.to_crs(epsg=4326)
 
     # Standardize schema
-    ingested_at = datetime.now(timezone.utc)
+    ingested_at = datetime.now(UTC)
     result = gpd.GeoDataFrame(
         {
             "geo_vintage": str(year),
-            "geoid": gdf["GEOID"],
-            "geometry": gdf["geometry"],
+            "geoid": combined["GEOID"],
+            "geometry": combined["geometry"],
             "source": "tiger_line",
             "ingested_at": ingested_at,
         },
@@ -67,6 +132,16 @@ def download_tiger_tracts(year: int = 2023) -> gpd.GeoDataFrame:
     )
 
     return result
+
+
+def nullcontext(value):
+    """Simple context manager that returns the value unchanged."""
+    class NullContext:
+        def __enter__(self):
+            return value
+        def __exit__(self, *args):
+            pass
+    return NullContext()
 
 
 def save_tracts(gdf: gpd.GeoDataFrame, year: int = 2023) -> Path:
@@ -85,16 +160,17 @@ def save_tracts(gdf: gpd.GeoDataFrame, year: int = 2023) -> Path:
     return output_path
 
 
-def ingest_tiger_tracts(year: int = 2023) -> Path:
+def ingest_tiger_tracts(year: int = 2023, show_progress: bool = False) -> Path:
     """Download and save TIGER tracts in one step.
 
     Args:
         year: TIGER vintage year (default 2023)
+        show_progress: If True, display a progress bar
 
     Returns:
         Path to saved parquet file
     """
-    gdf = download_tiger_tracts(year)
+    gdf = download_tiger_tracts(year, show_progress=show_progress)
     return save_tracts(gdf, year)
 
 

@@ -77,7 +77,7 @@ def ingest_census(
             try:
                 from coclab.census.ingest import ingest_tiger_tracts
 
-                output_path = ingest_tiger_tracts(year)
+                output_path = ingest_tiger_tracts(year, show_progress=True)
                 typer.echo(f"Saved tracts to: {output_path}")
                 downloaded.append(("tracts", output_path))
             except Exception as e:
