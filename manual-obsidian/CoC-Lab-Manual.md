@@ -14,6 +14,7 @@
 - [[#Data Model]]
 - [[#Workflows]]
 - [[#Methodology: ACS Aggregation to CoC Level]]
+- [[#Methodology: ZORI Aggregation to CoC Level]]
 - [[#Methodology: Panel Assembly (Phase 3)]]
 - [[#Module Reference]]
 - [[#Development]]
@@ -247,6 +248,7 @@ coclab/
   measures/     # ACS measure aggregation and diagnostics
   acs/          # ACS population ingest, rollup, and cross-check
     ingest/     # Tract population fetcher
+  rents/        # ZORI rent data ingestion and aggregation
   pit/          # PIT count ingestion and QA (Phase 3)
     ingest/     # HUD Exchange PIT downloaders and parsers
   panel/        # CoC × year panel assembly (Phase 3)
@@ -256,7 +258,8 @@ data/
     census/     # TIGER tract/county geometries
     xwalks/     # CoC-tract and CoC-county crosswalks
     measures/   # CoC-level demographic measures
-    acs/        # ACS tract population and rollups
+    acs/        # ACS tract population, rollups, and county weights
+    rents/      # ZORI rent data (county and CoC-level)
     pit/        # Canonical PIT count files
     panels/     # CoC × year analysis panels
 tests/          # Test suite including smoke tests
@@ -290,6 +293,9 @@ flowchart LR
     coclab --> list-measures
     coclab --> show-measures
     coclab --> compare-vintages
+    coclab --> ingest-zori
+    coclab --> aggregate-zori
+    coclab --> zori-diagnostics
 
     ingest --> |"--source hud_exchange"| HUD_EX[Download annual vintage]
     ingest --> |"--source hud_opendata"| HUD_OD[Fetch current snapshot]
@@ -304,6 +310,9 @@ flowchart LR
     rollup-acs-population --> ROLLUP[Aggregate tract pop to CoC]
     crosscheck-acs-population --> XCHECK[Validate rollup vs measures]
     verify-acs-population --> VERIFY[Full pipeline: ingest→rollup→check]
+    ingest-zori --> ZORI_ING[Download & normalize ZORI data]
+    aggregate-zori --> ZORI_AGG[Aggregate ZORI to CoC level]
+    zori-diagnostics --> ZORI_DIAG[ZORI coverage diagnostics]
     diagnostics --> DIAG[Crosswalk quality checks]
     panel-diagnostics --> PDIAG[Panel quality & sensitivity]
     list-xwalks --> LXWALK[List crosswalk files]
@@ -731,6 +740,112 @@ coclab verify-acs-population --boundary 2025 --acs 2019-2023 --tracts 2023 --wei
 - `0` - No errors (warnings allowed)
 - `2` - Errors found (threshold exceeded)
 
+### `coclab ingest-zori`
+
+Download and normalize ZORI (Zillow Observed Rent Index) data from Zillow Economic Research.
+
+```bash
+# Ingest county-level ZORI data
+coclab ingest-zori --geography county
+
+# Force re-download even if cached
+coclab ingest-zori --geography county --force
+
+# Filter to specific date range
+coclab ingest-zori --geography county --start 2020-01-01 --end 2024-12-31
+```
+
+| Option | Description | Default |
+|--------|-------------|---------|
+| `--geography`, `-g` | Geography level: `county` or `zip` | `county` |
+| `--url` | Override download URL | Auto-detected |
+| `--force`, `-f` | Re-download and reprocess even if cached | False |
+| `--output-dir`, `-o` | Output directory for curated parquet | `data/curated/rents` |
+| `--raw-dir` | Directory for raw downloads | `data/raw/rents` |
+| `--start` | Filter to dates >= start (YYYY-MM-DD) | None |
+| `--end` | Filter to dates <= end (YYYY-MM-DD) | None |
+
+**Exit Codes:**
+- `0` - Success
+- `2` - Validation/parse error
+- `3` - Download error
+
+**Output:**
+- `data/curated/rents/zori__{geography}.parquet`
+
+### `coclab aggregate-zori`
+
+Aggregate ZORI data from county geography to CoC geography using area-weighted crosswalks and ACS-based demographic weights.
+
+```bash
+# Basic aggregation with renter household weighting
+coclab aggregate-zori --boundary 2025 --counties 2023 --acs 2019-2023
+
+# With yearly output
+coclab aggregate-zori -b 2025 -c 2023 --acs 2019-2023 --to-yearly
+
+# Custom weighting method
+coclab aggregate-zori -b 2025 -c 2023 --acs 2019-2023 -w housing_units
+```
+
+| Option | Description | Default |
+|--------|-------------|---------|
+| `--boundary`, `-b` | CoC boundary vintage (e.g., `2025`) | Required |
+| `--counties`, `-c` | TIGER county vintage year | Required |
+| `--acs` | ACS 5-year vintage for weights (e.g., `2019-2023`) | Required |
+| `--geography`, `-g` | Base geography type | `county` |
+| `--zori-path` | Explicit path to ZORI parquet file | Auto-detected |
+| `--xwalk-path` | Explicit crosswalk path | Inferred |
+| `--weighting`, `-w` | Weighting: `renter_households`, `housing_units`, `population`, `equal` | `renter_households` |
+| `--output-dir`, `-o` | Output directory | `data/curated/rents` |
+| `--to-yearly` | Also emit yearly collapsed file | False |
+| `--yearly-method` | `pit_january`, `calendar_mean`, `calendar_median` | `pit_january` |
+| `--force`, `-f` | Recompute even if output exists | False |
+
+**Prerequisites:**
+```bash
+coclab ingest --source hud_exchange --vintage 2025
+coclab ingest-census --year 2023 --type counties
+coclab build-xwalks --boundary 2025 --counties 2023
+coclab ingest-zori --geography county
+```
+
+**Exit Codes:**
+- `0` - Success
+- `2` - Missing required inputs / mismatched vintages
+- `3` - Failure to compute weights (ACS missing)
+
+**Output:**
+- `data/curated/rents/coc_zori__{geography}__b{boundary}__c{counties}__acs{acs}__w{weighting}.parquet`
+- Optional yearly: `data/curated/rents/coc_zori_yearly__...parquet`
+
+### `coclab zori-diagnostics`
+
+Summarize CoC ZORI coverage, missingness, and quality metrics.
+
+```bash
+# Run diagnostics on CoC ZORI file
+coclab zori-diagnostics --coc-zori data/curated/rents/coc_zori__county__b2025.parquet
+
+# Save diagnostics to file
+coclab zori-diagnostics --coc-zori coc_zori.parquet --output diagnostics.csv
+
+# Custom thresholds
+coclab zori-diagnostics --coc-zori coc_zori.parquet --coverage-threshold 0.85
+```
+
+| Option | Description | Default |
+|--------|-------------|---------|
+| `--coc-zori` | Path to CoC-level ZORI parquet file | Required |
+| `--output`, `-o` | Save diagnostics to CSV or parquet | None |
+| `--coverage-threshold` | Threshold for flagging low coverage | 0.90 |
+| `--dominance-threshold` | Threshold for flagging high dominance | 0.80 |
+
+**Output:**
+- Console summary with coverage statistics
+- Per-CoC diagnostic flags (low coverage, high dominance)
+- Optional CSV/parquet export
+
 ---
 
 ## Python API
@@ -1049,6 +1164,119 @@ exit_code = print_crosscheck_report(
 ) -> int  # 0 = passed, 2 = errors found
 ```
 
+#### ZORI Ingestion Functions
+
+```python
+from coclab.rents import (
+    ingest_zori,
+    build_county_weights,
+    load_county_weights,
+)
+
+# Ingest county-level ZORI data from Zillow
+output_path = ingest_zori(
+    geography: Literal["county", "zip"] = "county",
+    url: str | None = None,      # Override download URL
+    force: bool = False,         # Re-download even if cached
+    output_dir: Path | None = None,
+    raw_dir: Path | None = None,
+    start: date | str | None = None,  # Filter dates >= start
+    end: date | str | None = None,    # Filter dates <= end
+) -> Path
+# Output: data/curated/rents/zori__{geography}.parquet
+
+# Build county weights from ACS data
+weights_df = build_county_weights(
+    acs_vintage: str,     # e.g., "2019-2023"
+    method: str,          # renter_households, housing_units, population
+    force: bool = False,
+    output_dir: Path | None = None,
+) -> pd.DataFrame
+# Output: data/curated/acs/county_weights__{acs}__{method}.parquet
+
+# Load cached county weights
+weights_df = load_county_weights(
+    acs_vintage: str,
+    method: str,
+    base_dir: Path | None = None,
+) -> pd.DataFrame
+```
+
+#### ZORI Aggregation Functions
+
+```python
+from coclab.rents import (
+    aggregate_zori_to_coc,
+    aggregate_monthly,
+    collapse_to_yearly,
+    compute_coc_county_weights,
+)
+
+# Full aggregation pipeline: county ZORI → CoC ZORI
+output_path = aggregate_zori_to_coc(
+    boundary: str,                # CoC boundary vintage
+    counties: str,                # County vintage
+    acs_vintage: str,             # ACS vintage for weights
+    weighting: str = "renter_households",
+    geography: str = "county",
+    zori_path: Path | None = None,
+    xwalk_path: Path | None = None,
+    output_dir: Path | None = None,
+    to_yearly: bool = False,
+    yearly_method: str = "pit_january",
+    force: bool = False,
+) -> Path
+# Output: data/curated/rents/coc_zori__{geography}__b{boundary}__c{counties}__acs{acs}__w{weighting}.parquet
+
+# Aggregate county ZORI to CoC for each month
+coc_zori_df = aggregate_monthly(
+    zori_df: pd.DataFrame,
+    xwalk_df: pd.DataFrame,
+    weights_df: pd.DataFrame,
+    min_coverage: float = 0.0,  # Minimum coverage ratio threshold
+) -> pd.DataFrame
+# Returns: coc_id, date, zori_coc, coverage_ratio, max_geo_contribution, geo_count
+
+# Collapse monthly to yearly
+yearly_df = collapse_to_yearly(
+    monthly_df: pd.DataFrame,
+    method: str = "pit_january",  # pit_january, calendar_mean, calendar_median
+) -> pd.DataFrame
+# Returns: coc_id, year, zori_coc, coverage_ratio, method
+```
+
+#### ZORI Diagnostics Functions
+
+```python
+from coclab.rents import (
+    summarize_coc_zori,
+    compute_coc_diagnostics,
+    identify_problem_cocs,
+    run_zori_diagnostics,
+)
+
+# Generate text summary and diagnostics DataFrame
+summary_text, diagnostics_df = summarize_coc_zori(
+    coc_zori_path_or_df: Path | pd.DataFrame,
+    min_coverage: float = 0.90,
+    dominance_threshold: float = 0.80,
+) -> tuple[str, pd.DataFrame]
+
+# Compute per-CoC diagnostic metrics
+diagnostics_df = compute_coc_diagnostics(
+    coc_zori_df: pd.DataFrame,
+) -> pd.DataFrame
+# Returns: coc_id, months_total, months_covered, coverage_ratio_mean/p10/p50/p90, ...
+
+# Identify CoCs with potential issues
+problems_df = identify_problem_cocs(
+    diagnostics_df: pd.DataFrame,
+    min_coverage: float = 0.90,
+    dominance_threshold: float = 0.80,
+) -> pd.DataFrame
+# Returns CoCs with flag_low_coverage or flag_high_dominance = True
+```
+
 ---
 
 ## Data Model
@@ -1240,6 +1468,103 @@ erDiagram
 | `boundary_changed` | bool | True if CoC boundary changed from prior year |
 | `source` | string | Data source identifier |
 
+### Normalized ZORI Schema
+
+ZORI data from Zillow is normalized to this long-format schema:
+
+```mermaid
+erDiagram
+    ZORI_NORMALIZED {
+        string geo_type "county or zip"
+        string geo_id PK "5-char FIPS or ZIP"
+        date date PK "Month start (YYYY-MM-01)"
+        float zori "ZORI value in dollars"
+        string region_name "Zillow region name"
+        string state "State name"
+        string data_source "Zillow Economic Research"
+        string metric "ZORI"
+        datetime ingested_at "UTC timestamp"
+        string source_ref "Download URL"
+        string raw_sha256 "SHA256 of raw download"
+    }
+```
+
+| Column | Type | Description |
+|--------|------|-------------|
+| `geo_type` | string | Geography type: `county` or `zip` |
+| `geo_id` | string | 5-character FIPS code (county) or ZIP code |
+| `date` | date | Month start date (e.g., `2024-01-01`) |
+| `zori` | float | ZORI value (level) in dollars |
+| `region_name` | string | Zillow's region name |
+| `state` | string | State name |
+| `data_source` | string | Always `Zillow Economic Research` |
+| `metric` | string | Always `ZORI` |
+| `ingested_at` | datetime | UTC timestamp of ingestion |
+| `source_ref` | string | Download URL |
+| `raw_sha256` | string | SHA256 hash of raw download for provenance |
+
+### CoC ZORI Schema
+
+Aggregated ZORI data at CoC level:
+
+```mermaid
+erDiagram
+    COC_ZORI {
+        string coc_id PK "CoC identifier"
+        date date PK "Month start"
+        float zori_coc "Weighted ZORI value"
+        float coverage_ratio "Fraction of CoC with ZORI data"
+        float max_geo_contribution "Max single county contribution"
+        int geo_count "Number of contributing counties"
+        string boundary_vintage "CoC boundary version"
+        string county_vintage "County vintage year"
+        string acs_vintage "ACS vintage for weights"
+        string weighting_method "renter_households, housing_units, etc."
+    }
+```
+
+| Column | Type | Description |
+|--------|------|-------------|
+| `coc_id` | string | CoC identifier (e.g., `CO-500`) |
+| `date` | date | Month start date |
+| `zori_coc` | float | Weighted average ZORI for CoC |
+| `coverage_ratio` | float | Sum of weights for counties with ZORI data |
+| `max_geo_contribution` | float | Largest single county weight |
+| `geo_count` | int | Number of counties contributing to estimate |
+| `boundary_vintage` | string | CoC boundary version used |
+| `county_vintage` | string | TIGER county vintage |
+| `acs_vintage` | string | ACS vintage for demographic weights |
+| `weighting_method` | string | Weighting method used |
+
+### County Weights Schema
+
+ACS-based county weights for ZORI aggregation:
+
+```mermaid
+erDiagram
+    COUNTY_WEIGHTS {
+        string county_fips PK "5-char county FIPS"
+        string acs_vintage "ACS 5-year vintage"
+        string weighting_method "renter_households, etc."
+        int weight_value "Raw count from ACS"
+        string county_name "County name"
+        string data_source "acs_5yr"
+        string source_ref "Census API reference"
+        datetime ingested_at "UTC timestamp"
+    }
+```
+
+| Column | Type | Description |
+|--------|------|-------------|
+| `county_fips` | string | 5-character county FIPS code |
+| `acs_vintage` | string | ACS 5-year estimate vintage |
+| `weighting_method` | string | `renter_households`, `housing_units`, or `population` |
+| `weight_value` | int | Raw count from ACS table |
+| `county_name` | string | County name from Census |
+| `data_source` | string | Always `acs_5yr` |
+| `source_ref` | string | Census API endpoint reference |
+| `ingested_at` | datetime | UTC timestamp of retrieval |
+
 ### Storage Locations
 
 | File | Path Pattern | Description |
@@ -1259,6 +1584,11 @@ erDiagram
 | Tract population | `data/curated/acs/tract_population__{acs}__{tracts}.parquet` | ACS tract population |
 | CoC population rollup | `data/curated/acs/coc_population_rollup__{boundary}__{acs}__{tracts}__{weighting}.parquet` | Aggregated CoC population |
 | Population crosscheck | `data/curated/acs/acs_population_crosscheck__{boundary}__{acs}__{tracts}__{weighting}.parquet` | Validation report |
+| Raw ZORI | `data/raw/rents/zori__{geography}__{date}.csv` | Downloaded Zillow CSV |
+| Normalized ZORI | `data/curated/rents/zori__{geography}.parquet` | Normalized ZORI data |
+| County weights | `data/curated/acs/county_weights__{acs}__{method}.parquet` | ACS county weights |
+| CoC ZORI | `data/curated/rents/coc_zori__{geo}__b{boundary}__c{counties}__acs{acs}__w{weight}.parquet` | Aggregated CoC ZORI |
+| CoC ZORI yearly | `data/curated/rents/coc_zori_yearly__...parquet` | Yearly collapsed ZORI |
 
 ### Dataset Provenance
 
@@ -1550,6 +1880,149 @@ Population-weighted tract coverage does not guarantee housing-market representat
 - Byrne, T., et al. (2012). "Predicting Homelessness Using ACS Data."
 - HUD Exchange CoC Analysis Tools methodology documentation
 - Census Bureau ACS Handbook, Chapter 12: "Working with ACS Data"
+
+---
+
+## Methodology: ZORI Aggregation to CoC Level
+
+This section documents how ZORI (Zillow Observed Rent Index) data is aggregated from county geography to CoC boundaries.
+
+### What is ZORI?
+
+ZORI (Zillow Observed Rent Index) measures typical observed rent across a given region. Key characteristics:
+
+- **Monthly time series** - Published monthly at county and ZIP code levels
+- **Smoothed measure** - Uses repeat-rent methodology to control for composition changes
+- **Covers ~40% of US counties** - Urban/suburban counties with sufficient listings
+- **Published by Zillow Economic Research** - Free for public use with attribution
+
+### Aggregation Pipeline
+
+```mermaid
+flowchart TB
+    subgraph Inputs
+        ZORI[County ZORI\nZillow]
+        XWALK[County-CoC Crosswalk\nArea-weighted]
+        WEIGHTS[County Weights\nACS renter HH]
+    end
+
+    subgraph Compute
+        MERGE[Merge crosswalk + weights]
+        NORM[Normalize weights per CoC]
+        AGG[Weighted average per CoC/month]
+    end
+
+    subgraph Output
+        COC_ZORI[CoC ZORI\nMonthly time series]
+        DIAG[Coverage diagnostics]
+    end
+
+    ZORI --> AGG
+    XWALK --> MERGE
+    WEIGHTS --> MERGE
+    MERGE --> NORM
+    NORM --> AGG
+    AGG --> COC_ZORI
+    AGG --> DIAG
+```
+
+### Weighting Methods
+
+ZORI aggregation supports multiple weighting schemes:
+
+| Method | ACS Variable | Description |
+|--------|--------------|-------------|
+| `renter_households` | B25003_003E | Renter-occupied housing units (recommended) |
+| `housing_units` | B25001_001E | Total housing units |
+| `population` | B01003_001E | Total population |
+| `equal` | N/A | Equal weight per county |
+
+**Recommended:** `renter_households` because ZORI measures rental prices, so weighting by renter population produces more representative estimates.
+
+### Aggregation Algorithm
+
+For each CoC and month:
+
+1. **Load county-CoC crosswalk** with area shares
+2. **Load county weights** (e.g., renter households from ACS)
+3. **Compute combined weights:**
+   ```
+   w[county,coc] = area_share[county,coc] × weight_value[county]
+   ```
+4. **Normalize weights per CoC:**
+   ```
+   w_norm[county,coc] = w[county,coc] / Σ w[county,coc]
+   ```
+5. **Filter to counties with ZORI data** for the given month
+6. **Compute weighted average:**
+   ```
+   zori_coc = Σ (w_norm[county,coc] × zori[county])
+   ```
+7. **Compute coverage ratio:**
+   ```
+   coverage_ratio = Σ w_norm[county,coc] for counties with ZORI data
+   ```
+
+### Coverage Ratio Interpretation
+
+The `coverage_ratio` field indicates what fraction of the CoC (by weight) has ZORI data:
+
+| Value | Interpretation | Recommendation |
+|-------|----------------|----------------|
+| `0.90 - 1.00` | Excellent coverage | Use estimate directly |
+| `0.70 - 0.89` | Good coverage | Use with caution |
+| `0.50 - 0.69` | Moderate coverage | Consider limitations |
+| `< 0.50` | Poor coverage | May not be representative |
+
+Low coverage typically indicates:
+- Rural CoCs with few urban counties
+- Newer ZORI data where historical coverage is sparse
+- CoCs dominated by counties without sufficient Zillow listings
+
+### Known Limitations
+
+#### 1. County-Level Granularity
+
+ZORI is published at county level, not tract level. This means:
+- Within-county rent variation is not captured
+- Urban/rural mix within CoC affects representativeness
+- Small CoCs spanning few counties have less smoothing
+
+#### 2. ZORI Coverage Gaps
+
+Not all counties have ZORI data:
+- ~1,500 of ~3,100 US counties have ZORI (40-50%)
+- Rural counties often lack sufficient Zillow listings
+- Coverage varies over time (expanding)
+
+#### 3. Temporal Alignment
+
+ZORI months represent market conditions at a point in time. When aligning with PIT counts (January), use:
+- `pit_january` method: Use January ZORI value
+- `calendar_mean`: Average over calendar year
+- `calendar_median`: Median over calendar year
+
+#### 4. Weighting Assumptions
+
+County weights assume uniform distribution of characteristics within the county-CoC intersection. This may not hold for:
+- Counties split between urban and rural CoCs
+- Counties with diverse housing markets
+
+### Yearly Collapse Methods
+
+The `collapse_to_yearly()` function supports:
+
+| Method | Description | Use Case |
+|--------|-------------|----------|
+| `pit_january` | January value only | Align with PIT count timing |
+| `calendar_mean` | Mean of 12 months | Annual average |
+| `calendar_median` | Median of 12 months | Robust to outliers |
+
+### Data Attribution
+
+ZORI data requires attribution to Zillow:
+
+> "The Zillow Economic Research team publishes a variety of real estate metrics including median home values and rents... All data accessed and downloaded from this page is free for public use by consumers, media, analysts, academics and policymakers, consistent with our published Terms of Use. Proper and clear attribution of all data to Zillow is required."
 
 ---
 
@@ -1937,6 +2410,88 @@ Dataset provenance tracking via Parquet metadata.
 - `created_at` - ISO 8601 creation timestamp
 - `coclab_version` - CoC Lab version
 - `extra` - Extensible metadata dictionary
+
+### rents/ingest.py
+
+ZORI data download and normalization from Zillow Economic Research.
+
+**Functions:**
+| Function | Purpose |
+|----------|---------|
+| `download_zori()` | Download raw ZORI CSV from Zillow |
+| `parse_zori_county()` | Parse county ZORI to long format |
+| `parse_zori_zip()` | Parse ZIP ZORI to long format |
+| `ingest_zori()` | Full pipeline: download, normalize, save with provenance |
+| `get_output_path()` | Get canonical output path |
+
+**Zillow Download URLs:**
+- County: `https://files.zillowstatic.com/research/public_csvs/zori/County_zori_uc_sfrcondomfr_sm_month.csv`
+- ZIP: `https://files.zillowstatic.com/research/public_csvs/zori/Zip_zori_uc_sfrcondomfr_sm_month.csv`
+
+### rents/weights.py
+
+County-level ACS weight computation for ZORI aggregation.
+
+**Functions:**
+| Function | Purpose |
+|----------|---------|
+| `parse_acs_vintage()` | Parse ACS vintage string to API year |
+| `fetch_state_county_acs()` | Fetch county ACS data for one state |
+| `fetch_county_acs_totals()` | Fetch county ACS data for all states |
+| `build_county_weights()` | Build and cache county weights |
+| `load_county_weights()` | Load cached county weights |
+| `get_county_weights_path()` | Get canonical weights path |
+
+**ACS Variables:**
+| Method | Table | Variable | Description |
+|--------|-------|----------|-------------|
+| `renter_households` | B25003 | B25003_003E | Renter-occupied housing units |
+| `housing_units` | B25001 | B25001_001E | Total housing units |
+| `population` | B01003 | B01003_001E | Total population |
+
+### rents/aggregate.py
+
+ZORI aggregation from county to CoC geography.
+
+**Functions:**
+| Function | Purpose |
+|----------|---------|
+| `load_zori()` | Load normalized ZORI parquet |
+| `load_crosswalk()` | Load county-CoC crosswalk |
+| `load_weights()` | Load county weights |
+| `compute_coc_county_weights()` | Compute combined area × demographic weights |
+| `aggregate_monthly()` | Aggregate county ZORI to CoC per month |
+| `collapse_to_yearly()` | Collapse monthly to yearly values |
+| `aggregate_zori_to_coc()` | Full pipeline: load, aggregate, save |
+| `get_coc_zori_path()` | Get canonical output path |
+| `get_coc_zori_yearly_path()` | Get yearly output path |
+
+**Yearly Collapse Methods:**
+- `pit_january`: Use January value only
+- `calendar_mean`: Average of 12 monthly values
+- `calendar_median`: Median of 12 monthly values
+
+### rents/diagnostics.py
+
+ZORI coverage and quality diagnostics.
+
+**Functions:**
+| Function | Purpose |
+|----------|---------|
+| `compute_coc_diagnostics()` | Per-CoC metrics: coverage, dominance, month counts |
+| `identify_problem_cocs()` | Flag CoCs with low coverage or high dominance |
+| `generate_text_summary()` | CLI-readable text summary |
+| `summarize_coc_zori()` | Combined summary and diagnostics |
+| `run_zori_diagnostics()` | Full diagnostics pipeline |
+
+**Diagnostic Metrics:**
+- `months_total` - Number of months in date range
+- `months_covered` - Months with ZORI data
+- `coverage_ratio_mean` - Mean coverage across months
+- `coverage_ratio_p10/p50/p90` - Coverage percentiles
+- `max_geo_contribution_max` - Maximum single county contribution
+- `flag_low_coverage` - True if coverage < threshold
+- `flag_high_dominance` - True if max contribution > threshold
 
 ### pit/ingest/hud_exchange.py (Phase 3)
 
