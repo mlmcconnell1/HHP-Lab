@@ -581,7 +581,7 @@ coclab ingest-pit --year 2024 --parse-only
 
 ### `coclab build-panel`
 
-Build analysis-ready CoC × year panels combining PIT counts with ACS measures.
+Build analysis-ready CoC × year panels combining PIT counts with ACS measures. Optionally includes ZORI rent data for affordability analysis.
 
 ```bash
 # Build panel for date range
@@ -592,6 +592,15 @@ coclab build-panel --start 2018 --end 2024 --weighting population
 
 # Custom output path
 coclab build-panel --start 2020 --end 2024 --output custom_panel.parquet
+
+# Include ZORI rent data for rent-to-income affordability
+coclab build-panel --start 2018 --end 2024 --include-zori
+
+# Custom ZORI coverage threshold (default 0.90)
+coclab build-panel --start 2018 --end 2024 --include-zori --zori-min-coverage 0.80
+
+# Explicit ZORI data path
+coclab build-panel --start 2018 --end 2024 --include-zori --zori-yearly-path data/curated/rents/coc_zori_yearly.parquet
 ```
 
 | Option | Description | Default |
@@ -600,10 +609,36 @@ coclab build-panel --start 2020 --end 2024 --output custom_panel.parquet
 | `--end`, `-e` | End year (inclusive) | Required |
 | `--weighting`, `-w` | `area` or `population` | `population` |
 | `--output`, `-o` | Output file path | Auto-generated |
+| `--include-zori` | Include ZORI rent data and compute `rent_to_income` | `False` |
+| `--no-include-zori` | Explicitly disable ZORI integration | - |
+| `--zori-yearly-path` | Path to yearly ZORI Parquet file | Auto-discover |
+| `--zori-min-coverage` | Minimum coverage ratio for ZORI eligibility | `0.90` |
+
+**ZORI Integration:**
+
+When `--include-zori` is enabled, the panel includes:
+
+| Column | Description |
+|--------|-------------|
+| `zori_coc` | CoC-level ZORI rent value (yearly) |
+| `zori_coverage_ratio` | Fraction of CoC covered by ZORI data |
+| `zori_is_eligible` | Boolean: meets coverage threshold |
+| `zori_excluded_reason` | Why excluded: `missing`, `zero_coverage`, `low_coverage` |
+| `rent_to_income` | `zori_coc / (median_household_income / 12.0)` |
+| `rent_metric` | Always `ZORI` (provenance) |
+| `rent_alignment` | Temporal alignment method (provenance) |
+| `zori_min_coverage` | Coverage threshold used (provenance) |
+
+**Eligibility Rules:**
+- CoC-year is eligible if `coverage_ratio >= zori_min_coverage`
+- Ineligible rows have `zori_coc = null` and `rent_to_income = null`
+- High dominance generates warnings but does NOT exclude
+- Zero-coverage CoCs are excluded (never imputed)
 
 **Output:**
 - Panel Parquet file with embedded provenance
 - Summary statistics (years, CoC count, coverage)
+- ZORI summary when enabled (eligible count, rent_to_income stats)
 
 ### `coclab panel-diagnostics`
 
@@ -845,6 +880,39 @@ coclab zori-diagnostics --coc-zori coc_zori.parquet --coverage-threshold 0.85
 - Console summary with coverage statistics
 - Per-CoC diagnostic flags (low coverage, high dominance)
 - Optional CSV/parquet export
+
+### `coclab source-status`
+
+Display status of tracked external data sources. The source registry tracks all ingested external data (ZORI, boundaries, census, etc.) with SHA-256 hashes to detect upstream changes.
+
+```bash
+# Show full registry summary
+coclab source-status
+
+# Check for upstream data changes
+coclab source-status --check-changes
+
+# Filter by source type
+coclab source-status --type zori
+```
+
+| Option | Description | Default |
+|--------|-------------|---------|
+| `--type`, `-t` | Filter to source type (`zori`, `boundary`, `census_tract`, etc.) | All |
+| `--check-changes`, `-c` | Highlight sources with multiple different hashes | `False` |
+
+**Source Types Tracked:**
+- `zori` - Zillow ZORI rent data
+- `boundary` - HUD CoC boundaries
+- `census_tract` - TIGER tract geometries
+- `census_county` - TIGER county geometries
+- `acs_tract` - ACS tract-level data
+- `acs_county` - ACS county-level data
+- `pit` - HUD PIT counts
+
+**Change Detection:**
+
+When `--check-changes` is used, the command identifies sources where the upstream data has changed between ingestions (different SHA-256 hashes). This helps detect silent updates to external data sources.
 
 ---
 
