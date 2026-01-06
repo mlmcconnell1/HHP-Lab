@@ -19,13 +19,13 @@ def build_measures(
         ),
     ] = None,
     acs: Annotated[
-        int,
+        str,
         typer.Option(
             "--acs",
             "-a",
-            help="ACS 5-year estimate end year (e.g., 2022 for 2018-2022 estimates).",
+            help="ACS 5-year estimate vintage (e.g., '2019-2023').",
         ),
-    ] = 2022,
+    ] = "2018-2022",
     tracts: Annotated[
         int | None,
         typer.Option(
@@ -66,9 +66,9 @@ def build_measures(
 
     Examples:
 
-        coclab build-measures --boundary 2025 --acs 2022
+        coclab build-measures --boundary 2025 --acs 2019-2023
 
-        coclab build-measures --boundary 2025 --acs 2022 --weighting population
+        coclab build-measures --boundary 2025 --acs 2019-2023 --weighting population
     """
     # Validate weighting option
     if weighting not in ("area", "population"):
@@ -84,8 +84,14 @@ def build_measures(
         "area" if weighting == "area" else "population"
     )
 
-    # Resolve tract vintage (default to ACS year)
-    tract_vintage = tracts or acs
+    # Resolve tract vintage (default to ACS end year)
+    if tracts is not None:
+        tract_vintage = tracts
+    elif "-" in acs:
+        # Extract end year from range like "2019-2023"
+        tract_vintage = int(acs.split("-")[1])
+    else:
+        tract_vintage = int(acs)
 
     # Resolve boundary vintage from registry
     if boundary is None:

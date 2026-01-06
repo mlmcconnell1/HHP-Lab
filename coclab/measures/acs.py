@@ -341,7 +341,7 @@ def aggregate_to_coc(
 
 def build_coc_measures(
     boundary_vintage: str,
-    acs_vintage: int,
+    acs_vintage: str | int,
     crosswalk_path: Path,
     weighting: Literal["area", "population"] = "area",
     output_dir: Path | None = None,
@@ -352,8 +352,9 @@ def build_coc_measures(
     ----------
     boundary_vintage : str
         CoC boundary vintage (e.g., "2024").
-    acs_vintage : int
-        ACS 5-year estimate end year.
+    acs_vintage : str or int
+        ACS 5-year estimate vintage. Can be a range string (e.g., "2019-2023")
+        or end year integer (e.g., 2023).
     crosswalk_path : Path
         Path to tract-CoC crosswalk parquet file.
     weighting : {"area", "population"}
@@ -366,12 +367,20 @@ def build_coc_measures(
     pd.DataFrame
         CoC-level measures.
     """
+    # Normalize acs_vintage to string and extract API year
+    acs_vintage_str = str(acs_vintage)
+    if "-" in acs_vintage_str:
+        # Extract end year from range like "2019-2023"
+        api_year = int(acs_vintage_str.split("-")[1])
+    else:
+        api_year = int(acs_vintage_str)
+
     # Load crosswalk
     crosswalk = pd.read_parquet(crosswalk_path)
 
     # Fetch ACS data for all states
-    print(f"Fetching ACS {acs_vintage} 5-year estimates...")
-    acs_data = fetch_all_states_tract_data(acs_vintage)
+    print(f"Fetching ACS {acs_vintage_str} 5-year estimates...")
+    acs_data = fetch_all_states_tract_data(api_year)
 
     # Aggregate to CoC level
     print(f"Aggregating to CoC level using {weighting} weighting...")
@@ -379,7 +388,7 @@ def build_coc_measures(
 
     # Add vintage columns
     coc_measures["boundary_vintage"] = boundary_vintage
-    coc_measures["acs_vintage"] = acs_vintage
+    coc_measures["acs_vintage"] = acs_vintage_str
 
     # Reorder columns
     col_order = [
@@ -402,7 +411,7 @@ def build_coc_measures(
     if output_dir is not None:
         output_dir = Path(output_dir)
         output_dir.mkdir(parents=True, exist_ok=True)
-        filename = f"coc_measures__{boundary_vintage}__{acs_vintage}.parquet"
+        filename = f"coc_measures__{boundary_vintage}__{acs_vintage_str}.parquet"
         output_path = output_dir / filename
 
         # Extract tract_vintage from crosswalk if available
@@ -414,7 +423,7 @@ def build_coc_measures(
         provenance = ProvenanceBlock(
             boundary_vintage=boundary_vintage,
             tract_vintage=tract_vintage,
-            acs_vintage=str(acs_vintage),
+            acs_vintage=acs_vintage_str,
             weighting=weighting,
             extra={
                 "dataset_type": "coc_measures",
