@@ -53,6 +53,7 @@ def sample_crosswalk():
             "08031001300",
         ],
         "area_share": [1.0, 0.6, 0.4, 1.0, 1.0],
+        "intersection_area": [100.0, 60.0, 40.0, 100.0, 100.0],
         "boundary_vintage": ["2025"] * 5,
         "tract_vintage": ["2023"] * 5,
     })
@@ -77,13 +78,13 @@ class TestRollupTractPopulation:
         """Test that coverage_ratio is computed correctly."""
         result = rollup_tract_population(sample_tract_population, sample_crosswalk)
 
-        # CO-500: 1.0 + 0.6 + 1.0 = 2.6 (sum of area_share for matched tracts)
+        # coverage_ratio = sum(coc_share) for tracts with population data
+        # Since all tracts have population data, coverage_ratio should be 1.0
         co500 = result[result["coc_id"] == "CO-500"].iloc[0]
-        assert co500["coverage_ratio"] == pytest.approx(2.6)
+        assert co500["coverage_ratio"] == pytest.approx(1.0)
 
-        # CO-501: 0.4 + 1.0 = 1.4
         co501 = result[result["coc_id"] == "CO-501"].iloc[0]
-        assert co501["coverage_ratio"] == pytest.approx(1.4)
+        assert co501["coverage_ratio"] == pytest.approx(1.0)
 
     def test_max_tract_contribution_computation(self, sample_tract_population, sample_crosswalk):
         """Test that max_tract_contribution is computed correctly."""
@@ -170,6 +171,7 @@ class TestMissingDataEdgeCases:
             "coc_id": ["CO-500", "CO-500"],
             "tract_geoid": ["08031001000", "08031009999"],  # 009999 not in tract_pop
             "area_share": [1.0, 0.5],
+            "intersection_area": [100.0, 50.0],
         })
 
         result = rollup_tract_population(tract_pop, crosswalk)
@@ -177,8 +179,8 @@ class TestMissingDataEdgeCases:
         # Should only count tract with population data
         co500 = result[result["coc_id"] == "CO-500"].iloc[0]
         assert co500["coc_population"] == pytest.approx(5000.0)
-        # Coverage ratio only includes tracts with population data
-        assert co500["coverage_ratio"] == pytest.approx(1.0)
+        # Coverage ratio = coc_share for tract with data = 100/(100+50) = 0.667
+        assert co500["coverage_ratio"] == pytest.approx(100.0 / 150.0)
         # Only 1 tract with non-zero contribution
         assert co500["tract_count"] == 1
 
@@ -193,6 +195,7 @@ class TestMissingDataEdgeCases:
             "coc_id": ["CO-500", "CO-500"],
             "tract_geoid": ["08031001000", "08031001100"],
             "area_share": [1.0, 0.5],
+            "intersection_area": [100.0, 50.0],
         })
 
         result = rollup_tract_population(tract_pop, crosswalk)
@@ -200,8 +203,8 @@ class TestMissingDataEdgeCases:
         co500 = result[result["coc_id"] == "CO-500"].iloc[0]
         # Only tract 001000 contributes
         assert co500["coc_population"] == pytest.approx(5000.0)
-        # Coverage only for tract with data
-        assert co500["coverage_ratio"] == pytest.approx(1.0)
+        # Coverage = coc_share for tract with data = 100/(100+50) = 0.667
+        assert co500["coverage_ratio"] == pytest.approx(100.0 / 150.0)
 
     def test_tract_with_zero_population(self):
         """Test handling when tract has zero population."""
@@ -214,6 +217,7 @@ class TestMissingDataEdgeCases:
             "coc_id": ["CO-500", "CO-500"],
             "tract_geoid": ["08031001000", "08031001100"],
             "area_share": [1.0, 1.0],
+            "intersection_area": [100.0, 100.0],
         })
 
         result = rollup_tract_population(tract_pop, crosswalk)
@@ -221,7 +225,8 @@ class TestMissingDataEdgeCases:
         co500 = result[result["coc_id"] == "CO-500"].iloc[0]
         assert co500["coc_population"] == pytest.approx(5000.0)
         # Coverage includes both tracts (both have non-NA population)
-        assert co500["coverage_ratio"] == pytest.approx(2.0)
+        # coc_share = 100/200 + 100/200 = 1.0
+        assert co500["coverage_ratio"] == pytest.approx(1.0)
         # Only 1 tract with non-zero contribution
         assert co500["tract_count"] == 1
 
@@ -236,6 +241,7 @@ class TestMissingDataEdgeCases:
             "coc_id": ["CO-500", "CO-501"],
             "tract_geoid": ["08031001000", "08031009999"],  # CO-501 has no matching tract
             "area_share": [1.0, 1.0],
+            "intersection_area": [100.0, 100.0],
         })
 
         result = rollup_tract_population(tract_pop, crosswalk)
@@ -259,6 +265,7 @@ class TestInputValidation:
             "coc_id": ["CO-500"],
             "tract_geoid": ["08031001000"],
             "area_share": [1.0],
+            "intersection_area": [100.0],
         })
 
         with pytest.raises(ValueError, match="tract_geoid"):
@@ -274,6 +281,7 @@ class TestInputValidation:
             "coc_id": ["CO-500"],
             "tract_geoid": ["08031001000"],
             "area_share": [1.0],
+            "intersection_area": [100.0],
         })
 
         with pytest.raises(ValueError, match="total_population"):
@@ -590,6 +598,7 @@ class TestBuildCocPopulationRollup:
                 tract_vintage="2023",
                 acs_dir=tmp_path / "acs",
                 xwalk_dir=xwalk_dir,
+                output_dir=tmp_path,  # Avoid using cached output
             )
 
     def test_missing_crosswalk_file_raises(self, sample_tract_population, tmp_path):
@@ -607,6 +616,7 @@ class TestBuildCocPopulationRollup:
                 tract_vintage="2023",
                 acs_dir=acs_dir,
                 xwalk_dir=tmp_path / "xwalks",
+                output_dir=tmp_path,  # Avoid using cached output
             )
 
 
@@ -624,6 +634,7 @@ class TestAggregationMathematicalProperties:
             "coc_id": ["A", "A", "B"],
             "tract_geoid": ["001", "002", "003"],
             "area_share": [1.0, 1.0, 1.0],
+            "intersection_area": [100.0, 100.0, 100.0],
         })
 
         result = rollup_tract_population(tract_pop, crosswalk)
@@ -644,6 +655,7 @@ class TestAggregationMathematicalProperties:
             "coc_id": ["A", "B"],
             "tract_geoid": ["001", "001"],
             "area_share": [0.7, 0.3],  # Tract split between two CoCs
+            "intersection_area": [70.0, 30.0],
         })
 
         result = rollup_tract_population(tract_pop, crosswalk)
@@ -671,6 +683,7 @@ class TestAggregationMathematicalProperties:
             "coc_id": ["A", "B"],
             "tract_geoid": ["001", "001"],
             "area_share": [1.0, 1.0],  # Same tract fully in both (overlapping)
+            "intersection_area": [100.0, 100.0],
         })
 
         result = rollup_tract_population(tract_pop, crosswalk)
