@@ -114,11 +114,12 @@ class TestFetchAllFeatures:
 
     def test_fetch_all_features_single_page(self, mock_http_client, sample_geojson_response):
         """Test fetching when all features fit in one page."""
-        features = _fetch_all_features(mock_http_client)
+        features, raw_content = _fetch_all_features(mock_http_client)
 
         assert len(features) == 2
         assert features[0]["properties"]["COCNUM"] == "CO-500"
         assert features[1]["properties"]["COCNUM"] == "CO-503"
+        assert isinstance(raw_content, bytes)
 
     def test_fetch_all_features_handles_empty_response(self):
         """Test handling of empty response."""
@@ -128,9 +129,10 @@ class TestFetchAllFeatures:
         response.raise_for_status = MagicMock()
         client.get.return_value = response
 
-        features = _fetch_all_features(client)
+        features, raw_content = _fetch_all_features(client)
 
         assert features == []
+        assert raw_content == b""
 
     def test_fetch_all_features_paginates(self):
         """Test that pagination works correctly."""
@@ -173,10 +175,11 @@ class TestFetchAllFeatures:
 
         client.get.side_effect = [resp1, resp2]
 
-        features = _fetch_all_features(client)
+        features, raw_content = _fetch_all_features(client)
 
         assert len(features) == PAGE_SIZE + 1
         assert client.get.call_count == 2
+        assert isinstance(raw_content, bytes)
 
 
 class TestFeaturesToGeoDataFrame:

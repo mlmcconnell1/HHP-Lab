@@ -38,6 +38,8 @@ totals.
 
 from __future__ import annotations
 
+import hashlib
+import json
 import logging
 import re
 from datetime import UTC, datetime
@@ -48,6 +50,7 @@ import httpx
 import pandas as pd
 
 from coclab.provenance import ProvenanceBlock, write_parquet_with_provenance
+from coclab.source_registry import check_source_changed, register_source
 
 logger = logging.getLogger(__name__)
 
@@ -169,7 +172,7 @@ def fetch_state_county_acs(
     year: int,
     state_fips: str,
     variable: str,
-) -> pd.DataFrame:
+) -> tuple[pd.DataFrame, bytes]:
     """Fetch county-level ACS data for a single state.
 
     Parameters
@@ -183,8 +186,8 @@ def fetch_state_county_acs(
 
     Returns
     -------
-    pd.DataFrame
-        DataFrame with county_fips and value columns.
+    tuple[pd.DataFrame, bytes]
+        Tuple of (DataFrame with county_fips and value columns, raw response content).
 
     Raises
     ------
@@ -202,6 +205,7 @@ def fetch_state_county_acs(
     with httpx.Client(timeout=60.0) as client:
         response = client.get(url, params=params)
         response.raise_for_status()
+        raw_content = response.content
         data = response.json()
 
     # First row is headers
@@ -221,13 +225,13 @@ def fetch_state_county_acs(
     # Census uses negative values for missing data
     df.loc[df["value"] < 0, "value"] = pd.NA
 
-    return df[["county_fips", "value", "NAME"]].copy()
+    return df[["county_fips", "value", "NAME"]].copy(), raw_content
 
 
 def fetch_county_acs_totals(
     acs_vintage: str,
     method: WeightingMethod,
-) -> pd.DataFrame:
+) -> tuple[pd.DataFrame, str, int]:
     """Fetch county-level ACS totals for all US states and territories.
 
     Parameters
@@ -239,8 +243,11 @@ def fetch_county_acs_totals(
 
     Returns
     -------
-    pd.DataFrame
-        DataFrame with columns:
+    tuple[pd.DataFrame, str, int]
+        Tuple of (DataFrame with county weights, SHA-256 hash of combined raw content,
+        total content size in bytes).
+
+        DataFrame columns:
         - county_fips (str): 5-character county FIPS code
         - acs_vintage (str): ACS vintage string
         - weighting_method (str): Method used
@@ -272,10 +279,12 @@ def fetch_county_acs_totals(
     )
 
     dfs = []
+    all_raw_content = []
     for state_fips in STATE_FIPS_CODES:
         try:
-            df = fetch_state_county_acs(year, state_fips, variable)
+            df, raw_content = fetch_state_county_acs(year, state_fips, variable)
             dfs.append(df)
+            all_raw_content.append(raw_content)
             logger.debug(f"Fetched {len(df)} counties for state {state_fips}")
         except httpx.HTTPStatusError as e:
             logger.warning(f"Failed to fetch data for state {state_fips}: {e}")
@@ -286,6 +295,11 @@ def fetch_county_acs_totals(
 
     if not dfs:
         raise ValueError("No county ACS data could be fetched from any state")
+
+    # Compute SHA-256 hash of all raw content combined
+    combined_content = b"".join(all_raw_content)
+    content_sha256 = hashlib.sha256(combined_content).hexdigest()
+    content_size = len(combined_content)
 
     # Combine all states
     result = pd.concat(dfs, ignore_index=True)
@@ -321,7 +335,7 @@ def fetch_county_acs_totals(
     result = result[col_order]
 
     logger.info(f"Fetched {method} data for {len(result)} counties")
-    return result
+    return result, content_sha256, content_size
 
 
 def get_county_weights_path(
@@ -410,12 +424,50 @@ def build_county_weights(
         logger.info(f"Using cached file: {output_path}")
         return pd.read_parquet(output_path)
 
-    # Fetch data
-    df = fetch_county_acs_totals(acs_vintage, method)
+    # Fetch data (now returns sha256 and content size)
+    df, content_sha256, content_size = fetch_county_acs_totals(acs_vintage, method)
 
-    # Build provenance metadata
+    # Build source URL for registry
     year = parse_acs_vintage(acs_vintage)
     var_info = ACS_WEIGHT_VARS[method]
+    source_url = CENSUS_API.format(year=year)
+
+    # Check for upstream changes in the source registry
+    changed, details = check_source_changed(
+        source_type="acs_county",
+        source_url=source_url,
+        current_sha256=content_sha256,
+    )
+
+    if changed:
+        logger.warning(
+            f"UPSTREAM DATA CHANGED: ACS county {method} data for {acs_vintage} has changed!\n"
+            f"    Previous hash: {details['previous_sha256'][:16]}...\n"
+            f"    Current hash:  {content_sha256[:16]}...\n"
+            f"    Last ingested: {details['previous_ingested_at']}"
+        )
+    elif details.get("is_new"):
+        logger.info(f"First time tracking ACS county {method} source in registry")
+
+    # Register this download in the source registry
+    register_source(
+        source_type="acs_county",
+        source_url=source_url,
+        source_name=f"ACS 5-Year County {method.replace('_', ' ').title()} ({acs_vintage})",
+        raw_sha256=content_sha256,
+        file_size=content_size,
+        local_path=str(output_path),
+        metadata={
+            "acs_vintage": acs_vintage,
+            "weighting_method": method,
+            "table": var_info["table"],
+            "variable": var_info["variable"],
+            "api_year": year,
+            "county_count": len(df),
+        },
+    )
+
+    # Build provenance metadata
     provenance = ProvenanceBlock(
         acs_vintage=acs_vintage,
         extra={
@@ -428,6 +480,7 @@ def build_county_weights(
             "retrieved_at": datetime.now(UTC).isoformat(),
             "county_count": len(df),
             "total_weight": int(df["weight_value"].sum()) if len(df) > 0 else 0,
+            "raw_sha256": content_sha256,
         },
     )
 

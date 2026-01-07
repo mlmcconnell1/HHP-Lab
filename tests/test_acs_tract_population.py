@@ -143,13 +143,14 @@ class TestFetchStateTractPopulation:
             json=response_data,
         )
 
-        df = fetch_state_tract_population(2023, "08")
+        df, raw_content = fetch_state_tract_population(2023, "08")
 
         assert len(df) == 1
         assert "tract_geoid" in df.columns
         assert df.iloc[0]["tract_geoid"] == "08031001000"
         assert df.iloc[0]["total_population"] == 5000
         assert df.iloc[0]["moe_total_population"] == 150
+        assert isinstance(raw_content, bytes)
 
     def test_handles_missing_values(self, httpx_mock):
         """Test that negative values (Census missing indicator) are converted to NA."""
@@ -167,7 +168,7 @@ class TestFetchStateTractPopulation:
             json=response_data,
         )
 
-        df = fetch_state_tract_population(2023, "08")
+        df, _ = fetch_state_tract_population(2023, "08")
 
         assert pd.isna(df.iloc[0]["total_population"])
         assert pd.isna(df.iloc[0]["moe_total_population"])
@@ -191,7 +192,7 @@ class TestFetchStateTractPopulation:
             json=response_data,
         )
 
-        df = fetch_state_tract_population(2023, "01")
+        df, _ = fetch_state_tract_population(2023, "01")
 
         geoid = df.iloc[0]["tract_geoid"]
         assert geoid == "01001000100"
@@ -225,7 +226,7 @@ class TestFetchTractPopulation:
             status_code=404,
         )
 
-        df = fetch_tract_population("2019-2023", "2023")
+        df, _, _ = fetch_tract_population("2019-2023", "2023")
 
         # Check required columns exist
         required_cols = [
@@ -273,7 +274,7 @@ class TestFetchTractPopulation:
             status_code=404,
         )
 
-        df = fetch_tract_population("2019-2023", "2023")
+        df, _, _ = fetch_tract_population("2019-2023", "2023")
 
         # All non-NA values should be >= 0
         valid_pops = df["total_population"].dropna()
@@ -300,7 +301,7 @@ class TestFetchTractPopulation:
             status_code=404,
         )
 
-        df = fetch_tract_population("2019-2023", "2023")
+        df, _, _ = fetch_tract_population("2019-2023", "2023")
 
         assert len(df) > 0
 
@@ -493,7 +494,7 @@ class TestSchemaValidation:
             status_code=404,
         )
 
-        df = fetch_tract_population("2019-2023", "2023")
+        df, _, _ = fetch_tract_population("2019-2023", "2023")
 
         # All GEOIDs should be exactly 11 characters
         assert all(len(geoid) == 11 for geoid in df["tract_geoid"])
@@ -519,7 +520,7 @@ class TestSchemaValidation:
             status_code=404,
         )
 
-        df = fetch_tract_population("2019-2023", "2023")
+        df, _, _ = fetch_tract_population("2019-2023", "2023")
 
         assert all(df["data_source"] == "acs_5yr")
 
@@ -544,7 +545,7 @@ class TestSchemaValidation:
             status_code=404,
         )
 
-        df = fetch_tract_population("2019-2023", "2023")
+        df, _, _ = fetch_tract_population("2019-2023", "2023")
 
         # Check that timestamp is timezone-aware
         ts = df.iloc[0]["ingested_at"]

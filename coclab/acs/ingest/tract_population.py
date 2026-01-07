@@ -26,6 +26,8 @@ Output Schema
 
 from __future__ import annotations
 
+import hashlib
+import json
 import logging
 import re
 from datetime import datetime, timezone
@@ -35,6 +37,7 @@ import httpx
 import pandas as pd
 
 from coclab.provenance import ProvenanceBlock, write_parquet_with_provenance
+from coclab.source_registry import check_source_changed, register_source
 
 logger = logging.getLogger(__name__)
 
@@ -136,7 +139,7 @@ def normalize_geoid(state: str, county: str, tract: str) -> str:
     return f"{state_str}{county_str}{tract_str}"
 
 
-def fetch_state_tract_population(year: int, state_fips: str) -> pd.DataFrame:
+def fetch_state_tract_population(year: int, state_fips: str) -> tuple[pd.DataFrame, bytes]:
     """Fetch tract population data for a single state.
 
     Parameters
@@ -148,8 +151,8 @@ def fetch_state_tract_population(year: int, state_fips: str) -> pd.DataFrame:
 
     Returns
     -------
-    pd.DataFrame
-        DataFrame with tract GEOID, total_population, and moe_total_population.
+    tuple[pd.DataFrame, bytes]
+        Tuple of (DataFrame with tract GEOID and population, raw response content).
 
     Raises
     ------
@@ -168,6 +171,7 @@ def fetch_state_tract_population(year: int, state_fips: str) -> pd.DataFrame:
     with httpx.Client(timeout=60.0) as client:
         response = client.get(url, params=params)
         response.raise_for_status()
+        raw_content = response.content
         data = response.json()
 
     # First row is headers
@@ -194,13 +198,13 @@ def fetch_state_tract_population(year: int, state_fips: str) -> pd.DataFrame:
     if "moe_total_population" in df.columns:
         result_cols.append("moe_total_population")
 
-    return df[result_cols].copy()
+    return df[result_cols].copy(), raw_content
 
 
 def fetch_tract_population(
     acs_vintage: str,
     tract_vintage: str,
-) -> pd.DataFrame:
+) -> tuple[pd.DataFrame, str, int]:
     """Fetch tract-level population data for all US states and territories.
 
     Parameters
@@ -212,7 +216,8 @@ def fetch_tract_population(
 
     Returns
     -------
-    pd.DataFrame
+    tuple[pd.DataFrame, str, int]
+        Tuple of (DataFrame, SHA-256 hash, total content size).
         DataFrame with columns:
         - tract_geoid (str): 11-character Census tract GEOID
         - acs_vintage (str): ACS vintage string
@@ -234,10 +239,12 @@ def fetch_tract_population(
     logger.info(f"Fetching ACS {acs_vintage} tract population data (API year: {year})")
 
     dfs = []
+    all_raw_content = []
     for state_fips in STATE_FIPS_CODES:
         try:
-            df = fetch_state_tract_population(year, state_fips)
+            df, raw_content = fetch_state_tract_population(year, state_fips)
             dfs.append(df)
+            all_raw_content.append(raw_content)
             logger.debug(f"Fetched {len(df)} tracts for state {state_fips}")
         except httpx.HTTPStatusError as e:
             logger.warning(f"Failed to fetch data for state {state_fips}: {e}")
@@ -248,6 +255,11 @@ def fetch_tract_population(
 
     if not dfs:
         raise ValueError("No tract population data could be fetched from any state")
+
+    # Compute SHA-256 hash of all raw content combined
+    combined_content = b"".join(all_raw_content)
+    content_sha256 = hashlib.sha256(combined_content).hexdigest()
+    content_size = len(combined_content)
 
     # Combine all states
     result = pd.concat(dfs, ignore_index=True)
@@ -282,7 +294,7 @@ def fetch_tract_population(
     result = result[col_order]
 
     logger.info(f"Fetched population data for {len(result)} tracts")
-    return result
+    return result, content_sha256, content_size
 
 
 def get_output_path(
@@ -350,10 +362,30 @@ def ingest_tract_population(
         return output_path
 
     # Fetch data
-    df = fetch_tract_population(acs_vintage, tract_vintage)
+    df, content_sha256, content_size = fetch_tract_population(acs_vintage, tract_vintage)
+
+    # Build source URL for registry
+    year = parse_acs_vintage(acs_vintage)
+    source_url = f"{CENSUS_API.format(year=year)}?table=B01003"
+
+    # Check for upstream changes
+    changed, details = check_source_changed(
+        source_type="acs_tract",
+        source_url=source_url,
+        current_sha256=content_sha256,
+    )
+
+    if changed:
+        logger.warning(
+            f"UPSTREAM DATA CHANGED: ACS tract population data for {acs_vintage} has changed! "
+            f"Previous hash: {details['previous_sha256'][:16]}... "
+            f"Current hash: {content_sha256[:16]}... "
+            f"Last ingested: {details['previous_ingested_at']}"
+        )
+    elif details.get("is_new"):
+        logger.info(f"First time tracking ACS tract population {acs_vintage} in source registry")
 
     # Build provenance metadata
-    year = parse_acs_vintage(acs_vintage)
     provenance = ProvenanceBlock(
         acs_vintage=acs_vintage,
         tract_vintage=tract_vintage,
@@ -364,11 +396,28 @@ def ingest_tract_population(
             "api_year": year,
             "retrieved_at": datetime.now(timezone.utc).isoformat(),
             "row_count": len(df),
+            "raw_sha256": content_sha256,
         },
     )
 
     # Write with provenance
     write_parquet_with_provenance(df, output_path, provenance)
     logger.info(f"Wrote tract population data to {output_path}")
+
+    # Register this download in source registry
+    register_source(
+        source_type="acs_tract",
+        source_url=source_url,
+        source_name=f"ACS Tract Population {acs_vintage}",
+        raw_sha256=content_sha256,
+        file_size=content_size,
+        local_path=str(output_path),
+        metadata={
+            "acs_vintage": acs_vintage,
+            "tract_vintage": tract_vintage,
+            "table": "B01003",
+            "row_count": len(df),
+        },
+    )
 
     return output_path

@@ -1,5 +1,7 @@
 """TIGER/Line tract geometry ingestion."""
 
+import hashlib
+import logging
 import tempfile
 import zipfile
 from datetime import UTC, datetime
@@ -9,6 +11,10 @@ import click
 import geopandas as gpd
 import httpx
 import pandas as pd
+
+from coclab.source_registry import check_source_changed, register_source
+
+logger = logging.getLogger(__name__)
 
 TIGER_BASE = "https://www2.census.gov/geo/tiger/TIGER{year}/TRACT/"
 OUTPUT_DIR = Path("data/curated/census")
@@ -34,10 +40,11 @@ def _download_state_tracts(
     year: int,
     state_fips: str,
     tmpdir: Path,
-) -> gpd.GeoDataFrame | None:
+) -> tuple[gpd.GeoDataFrame | None, bytes | None]:
     """Download tract data for a single state.
 
-    Returns None if the state file doesn't exist (some territories may not have data).
+    Returns tuple of (GeoDataFrame, raw_content) or (None, None) if the state
+    file doesn't exist (some territories may not have data).
     """
     url = f"{TIGER_BASE.format(year=year)}tl_{year}_{state_fips}_tract.zip"
     zip_path = tmpdir / f"tl_{year}_{state_fips}_tract.zip"
@@ -47,10 +54,11 @@ def _download_state_tracts(
         response.raise_for_status()
     except httpx.HTTPStatusError as e:
         if e.response.status_code == 404:
-            return None  # State file doesn't exist
+            return None, None  # State file doesn't exist
         raise
 
-    zip_path.write_bytes(response.content)
+    raw_content = response.content
+    zip_path.write_bytes(raw_content)
 
     # Extract and read
     extract_dir = tmpdir / state_fips
@@ -61,15 +69,15 @@ def _download_state_tracts(
 
     shp_files = list(extract_dir.glob("*.shp"))
     if not shp_files:
-        return None
+        return None, None
 
-    return gpd.read_file(shp_files[0])
+    return gpd.read_file(shp_files[0]), raw_content
 
 
 def download_tiger_tracts(
     year: int = 2023,
     show_progress: bool = False,
-) -> gpd.GeoDataFrame:
+) -> tuple[gpd.GeoDataFrame, str, int]:
     """Download all US census tracts for a given year.
 
     Downloads per-state tract files and combines them into a single GeoDataFrame.
@@ -79,14 +87,19 @@ def download_tiger_tracts(
         show_progress: If True, display a progress bar
 
     Returns:
-        GeoDataFrame with standardized schema:
-        - geo_vintage: str (e.g. "2023")
-        - geoid: str (tract FIPS code)
-        - geometry: EPSG:4326
-        - source: "tiger_line"
-        - ingested_at: datetime
+        Tuple of (GeoDataFrame, combined_sha256, total_size) where:
+        - GeoDataFrame with standardized schema:
+          - geo_vintage: str (e.g. "2023")
+          - geoid: str (tract FIPS code)
+          - geometry: EPSG:4326
+          - source: "tiger_line"
+          - ingested_at: datetime
+        - combined_sha256: SHA-256 hash of all downloaded content
+        - total_size: Total size in bytes of all downloaded files
     """
     gdfs = []
+    all_content = []  # Collect all raw content for combined hash
+    total_size = 0
 
     with tempfile.TemporaryDirectory() as tmpdir:
         tmppath = Path(tmpdir)
@@ -103,12 +116,21 @@ def download_tiger_tracts(
 
             with states if show_progress else nullcontext(states) as state_iter:
                 for state_fips in state_iter:
-                    gdf = _download_state_tracts(client, year, state_fips, tmppath)
-                    if gdf is not None:
+                    gdf, raw_content = _download_state_tracts(client, year, state_fips, tmppath)
+                    if gdf is not None and raw_content is not None:
                         gdfs.append(gdf)
+                        all_content.append(raw_content)
+                        total_size += len(raw_content)
 
     if not gdfs:
         raise ValueError(f"No tract data found for year {year}")
+
+    # Compute combined SHA-256 hash of all downloaded content
+    # Hash the concatenation of all individual file hashes (sorted by state FIPS)
+    hasher = hashlib.sha256()
+    for content in all_content:
+        hasher.update(content)
+    combined_sha256 = hasher.hexdigest()
 
     # Combine all states
     combined = pd.concat(gdfs, ignore_index=True)
@@ -131,7 +153,7 @@ def download_tiger_tracts(
         crs="EPSG:4326",
     )
 
-    return result
+    return result, combined_sha256, total_size
 
 
 def nullcontext(value):
@@ -170,8 +192,49 @@ def ingest_tiger_tracts(year: int = 2023, show_progress: bool = False) -> Path:
     Returns:
         Path to saved parquet file
     """
-    gdf = download_tiger_tracts(year, show_progress=show_progress)
-    return save_tracts(gdf, year)
+    # Build source URL (base URL for this year's tract data)
+    source_url = TIGER_BASE.format(year=year)
+
+    gdf, combined_sha256, total_size = download_tiger_tracts(year, show_progress=show_progress)
+    output_path = save_tracts(gdf, year)
+
+    # Check for upstream changes
+    changed, details = check_source_changed(
+        source_type="census_tract",
+        source_url=source_url,
+        current_sha256=combined_sha256,
+    )
+
+    if changed:
+        logger.warning(
+            f"UPSTREAM DATA CHANGED: TIGER tract data for {year} has changed since last download! "
+            f"Previous hash: {details['previous_sha256'][:16]}... "
+            f"Current hash: {combined_sha256[:16]}... "
+            f"Last ingested: {details['previous_ingested_at']}"
+        )
+    elif details.get("is_new"):
+        logger.info(f"First time tracking TIGER tracts {year} source in registry")
+
+    # Register this download in source registry
+    register_source(
+        source_type="census_tract",
+        source_url=source_url,
+        source_name=f"TIGER/Line Census Tracts {year}",
+        raw_sha256=combined_sha256,
+        file_size=total_size,
+        local_path=str(output_path),
+        metadata={
+            "year": year,
+            "vintage": str(year),
+            "data_source": "US Census Bureau",
+            "tract_count": len(gdf),
+            "states_downloaded": len(STATE_FIPS_CODES),
+        },
+    )
+
+    logger.info(f"Ingested {len(gdf)} census tracts for {year} to {output_path}")
+
+    return output_path
 
 
 if __name__ == "__main__":

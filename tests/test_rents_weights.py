@@ -149,12 +149,13 @@ class TestFetchStateCountyAcs:
             json=response_data,
         )
 
-        df = fetch_state_county_acs(2023, "08", "B25003_003E")
+        df, raw_content = fetch_state_county_acs(2023, "08", "B25003_003E")
 
         assert len(df) == 1
         assert "county_fips" in df.columns
         assert df.iloc[0]["county_fips"] == "08031"
         assert df.iloc[0]["value"] == 150000
+        assert isinstance(raw_content, bytes)
 
     def test_handles_missing_values(self, httpx_mock):
         """Test that negative values (Census missing indicator) are converted to NA."""
@@ -170,7 +171,7 @@ class TestFetchStateCountyAcs:
             json=response_data,
         )
 
-        df = fetch_state_county_acs(2023, "08", "B25003_003E")
+        df, _ = fetch_state_county_acs(2023, "08", "B25003_003E")
 
         assert pd.isna(df.iloc[0]["value"])
 
@@ -191,7 +192,7 @@ class TestFetchStateCountyAcs:
             json=response_data,
         )
 
-        df = fetch_state_county_acs(2023, "01", "B25003_003E")
+        df, _ = fetch_state_county_acs(2023, "01", "B25003_003E")
 
         fips = df.iloc[0]["county_fips"]
         assert fips == "01001"
@@ -222,7 +223,7 @@ class TestFetchCountyAcsTotals:
             status_code=404,
         )
 
-        df = fetch_county_acs_totals("2019-2023", "renter_households")
+        df, sha256, file_size = fetch_county_acs_totals("2019-2023", "renter_households")
 
         # Check required columns exist
         required_cols = [
@@ -261,7 +262,7 @@ class TestFetchCountyAcsTotals:
             status_code=404,
         )
 
-        df = fetch_county_acs_totals("2019-2023", "housing_units")
+        df, _, _ = fetch_county_acs_totals("2019-2023", "housing_units")
 
         assert df.iloc[0]["weighting_method"] == "housing_units"
         assert "B25001" in df.iloc[0]["source_ref"]
@@ -283,7 +284,7 @@ class TestFetchCountyAcsTotals:
             status_code=404,
         )
 
-        df = fetch_county_acs_totals("2019-2023", "population")
+        df, _, _ = fetch_county_acs_totals("2019-2023", "population")
 
         assert df.iloc[0]["weighting_method"] == "population"
         assert "B01003" in df.iloc[0]["source_ref"]
@@ -310,7 +311,7 @@ class TestFetchCountyAcsTotals:
             status_code=404,
         )
 
-        df = fetch_county_acs_totals("2019-2023", "renter_households")
+        df, _, _ = fetch_county_acs_totals("2019-2023", "renter_households")
 
         # All non-NA values should be >= 0
         valid_weights = df["weight_value"].dropna()
@@ -332,7 +333,7 @@ class TestFetchCountyAcsTotals:
             status_code=404,
         )
 
-        df = fetch_county_acs_totals("2019-2023", "renter_households")
+        df, _, _ = fetch_county_acs_totals("2019-2023", "renter_households")
 
         assert len(df) > 0
 
@@ -534,7 +535,7 @@ class TestSchemaValidation:
             status_code=404,
         )
 
-        df = fetch_county_acs_totals("2019-2023", "renter_households")
+        df, _, _ = fetch_county_acs_totals("2019-2023", "renter_households")
 
         # All county FIPS should be exactly 5 characters
         assert all(len(fips) == 5 for fips in df["county_fips"])
@@ -555,7 +556,7 @@ class TestSchemaValidation:
             status_code=404,
         )
 
-        df = fetch_county_acs_totals("2019-2023", "renter_households")
+        df, _, _ = fetch_county_acs_totals("2019-2023", "renter_households")
 
         assert all(df["data_source"] == "acs_5yr")
 
@@ -575,7 +576,7 @@ class TestSchemaValidation:
             status_code=404,
         )
 
-        df = fetch_county_acs_totals("2019-2023", "renter_households")
+        df, _, _ = fetch_county_acs_totals("2019-2023", "renter_households")
 
         # Check that timestamp is timezone-aware
         ts = df.iloc[0]["ingested_at"]

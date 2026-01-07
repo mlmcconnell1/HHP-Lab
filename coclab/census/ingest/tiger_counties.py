@@ -1,23 +1,30 @@
 """TIGER/Line county geometry ingestion."""
-from pathlib import Path
-from datetime import datetime, timezone
+import hashlib
+import logging
 import tempfile
 import zipfile
+from datetime import datetime, timezone
+from pathlib import Path
 
-import httpx
 import geopandas as gpd
+import httpx
+
+from coclab.source_registry import check_source_changed, register_source
+
+logger = logging.getLogger(__name__)
 
 TIGER_BASE = "https://www2.census.gov/geo/tiger/TIGER{year}/COUNTY/"
 OUTPUT_DIR = Path("data/curated/census")
 
 
-def download_tiger_counties(year: int = 2023) -> gpd.GeoDataFrame:
+def download_tiger_counties(year: int = 2023) -> tuple[gpd.GeoDataFrame, str, int]:
     """Download all US counties for a given year.
 
     Args:
         year: TIGER vintage year (default 2023)
 
     Returns:
+        Tuple of (GeoDataFrame, SHA-256 hash, file size):
         GeoDataFrame with standardized schema:
         - geo_vintage: str (e.g. "2023")
         - geoid: str (county FIPS code)
@@ -35,7 +42,29 @@ def download_tiger_counties(year: int = 2023) -> gpd.GeoDataFrame:
         with httpx.Client(timeout=300.0) as client:
             response = client.get(url, follow_redirects=True)
             response.raise_for_status()
-            zip_path.write_bytes(response.content)
+            raw_content = response.content
+            zip_path.write_bytes(raw_content)
+
+        # Compute SHA-256 hash of raw zip file
+        content_sha256 = hashlib.sha256(raw_content).hexdigest()
+        content_size = len(raw_content)
+
+        # Check for upstream changes
+        changed, details = check_source_changed(
+            source_type="census_county",
+            source_url=url,
+            current_sha256=content_sha256,
+        )
+
+        if changed:
+            logger.warning(
+                f"UPSTREAM DATA CHANGED: TIGER county data for {year} has changed since last download! "
+                f"Previous hash: {details['previous_sha256'][:16]}... "
+                f"Current hash: {content_sha256[:16]}... "
+                f"Last ingested: {details['previous_ingested_at']}"
+            )
+        elif details.get("is_new"):
+            logger.info(f"First time tracking TIGER counties {year} in source registry")
 
         # Extract the zip file
         with zipfile.ZipFile(zip_path, "r") as zf:
@@ -66,7 +95,7 @@ def download_tiger_counties(year: int = 2023) -> gpd.GeoDataFrame:
         crs="EPSG:4326",
     )
 
-    return result
+    return result, content_sha256, content_size
 
 
 def save_counties(gdf: gpd.GeoDataFrame, year: int = 2023) -> Path:
@@ -94,8 +123,25 @@ def ingest_tiger_counties(year: int = 2023) -> Path:
     Returns:
         Path to saved parquet file
     """
-    gdf = download_tiger_counties(year)
-    return save_counties(gdf, year)
+    gdf, content_sha256, content_size = download_tiger_counties(year)
+    output_path = save_counties(gdf, year)
+
+    # Register this download in source registry
+    url = f"{TIGER_BASE.format(year=year)}tl_{year}_us_county.zip"
+    register_source(
+        source_type="census_county",
+        source_url=url,
+        source_name=f"TIGER/Line Counties {year}",
+        raw_sha256=content_sha256,
+        file_size=content_size,
+        local_path=str(output_path),
+        metadata={
+            "year": year,
+            "county_count": len(gdf),
+        },
+    )
+
+    return output_path
 
 
 if __name__ == "__main__":

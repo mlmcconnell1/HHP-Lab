@@ -6,6 +6,9 @@ normalizes them to the canonical schema, and writes to GeoParquet.
 
 from __future__ import annotations
 
+import hashlib
+import json
+import logging
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -16,6 +19,9 @@ from shapely.geometry import shape
 
 from coclab.geo import normalize_boundaries, validate_boundaries
 from coclab.geo.io import curated_boundary_path, write_geoparquet
+from coclab.source_registry import check_source_changed, register_source
+
+logger = logging.getLogger(__name__)
 
 # HUD ArcGIS feature service endpoint
 FEATURE_SERVICE_URL = (
@@ -68,16 +74,17 @@ def _fetch_page(
     return response.json()
 
 
-def _fetch_all_features(client: httpx.Client) -> list[dict[str, Any]]:
+def _fetch_all_features(client: httpx.Client) -> tuple[list[dict[str, Any]], bytes]:
     """Fetch all features from the service with pagination.
 
     Args:
         client: HTTP client for making requests
 
     Returns:
-        List of all GeoJSON features
+        Tuple of (list of all GeoJSON features, combined raw response content)
     """
     all_features = []
+    all_raw_content = []
     offset = 0
 
     while True:
@@ -88,6 +95,8 @@ def _fetch_all_features(client: httpx.Client) -> list[dict[str, Any]]:
             break
 
         all_features.extend(features)
+        # Store serialized JSON for consistent hashing
+        all_raw_content.append(json.dumps(data, sort_keys=True).encode("utf-8"))
 
         # Check if we've received fewer than PAGE_SIZE, indicating last page
         if len(features) < PAGE_SIZE:
@@ -95,7 +104,8 @@ def _fetch_all_features(client: httpx.Client) -> list[dict[str, Any]]:
 
         offset += PAGE_SIZE
 
-    return all_features
+    combined_content = b"".join(all_raw_content)
+    return all_features, combined_content
 
 
 def _features_to_geodataframe(features: list[dict[str, Any]]) -> gpd.GeoDataFrame:
@@ -195,13 +205,34 @@ def ingest_hud_opendata(
     should_close = http_client is None
 
     try:
-        features = _fetch_all_features(client)
+        features, raw_content = _fetch_all_features(client)
     finally:
         if should_close:
             client.close()
 
     if not features:
         raise ValueError("No features returned from HUD Open Data API")
+
+    # Compute SHA-256 hash of raw content for source registry
+    content_sha256 = hashlib.sha256(raw_content).hexdigest()
+    content_size = len(raw_content)
+
+    # Check for upstream changes
+    changed, details = check_source_changed(
+        source_type="boundary",
+        source_url=FEATURE_SERVICE_URL,
+        current_sha256=content_sha256,
+    )
+
+    if changed:
+        logger.warning(
+            f"UPSTREAM DATA CHANGED: HUD OpenData boundaries have changed since last download! "
+            f"Previous hash: {details['previous_sha256'][:16]}... "
+            f"Current hash: {content_sha256[:16]}... "
+            f"Last ingested: {details['previous_ingested_at']}"
+        )
+    elif details.get("is_new"):
+        logger.info("First time tracking HUD OpenData boundaries in source registry")
 
     # Convert to GeoDataFrame
     gdf = _features_to_geodataframe(features)
@@ -221,5 +252,20 @@ def ingest_hud_opendata(
     # Write to curated location
     output_path = curated_boundary_path(boundary_vintage, base_dir=base_dir)
     write_geoparquet(gdf, output_path)
+
+    # Register this download in source registry
+    register_source(
+        source_type="boundary",
+        source_url=FEATURE_SERVICE_URL,
+        source_name=f"HUD OpenData CoC Boundaries {boundary_vintage}",
+        raw_sha256=content_sha256,
+        file_size=content_size,
+        local_path=str(output_path),
+        metadata={
+            "boundary_vintage": boundary_vintage,
+            "feature_count": len(features),
+            "source": "hud_opendata_arcgis",
+        },
+    )
 
     return output_path

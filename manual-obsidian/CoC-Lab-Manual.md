@@ -2063,6 +2063,36 @@ Not all counties have ZORI data:
 - Rural counties often lack sufficient Zillow listings
 - Coverage varies over time (expanding)
 
+**Zero-Coverage CoCs:** Approximately 96 CoCs have zero ZORI coverage. These are primarily:
+- Rural CoCs in states like Montana, Wyoming, and the Dakotas
+- Puerto Rico CoCs (PR has limited Zillow presence)
+- CoCs dominated by counties without sufficient Zillow rental listings
+
+#### ZORI Exclusion Policy for Rent-Affordability Inference
+
+**Design Decision:** CoCs with zero or very low ZORI coverage are EXCLUDED from rent-affordability inference models, NOT imputed. This is intentional.
+
+**Rationale:**
+1. **Avoiding systematic bias** - Imputing rental costs for rural/underserved areas would introduce bias. The rental markets in these areas differ structurally from areas with ZORI data.
+2. **Transparency over completeness** - It's better to acknowledge missing data than to fabricate estimates.
+3. **Model integrity** - The `rent_to_income` predictor is only computed for eligible CoCs to maintain analytical validity.
+
+**Implementation:**
+- The panel assembly marks ineligible rows with `zori_excluded_reason`:
+  - `zero_coverage`: CoC has no ZORI-covered counties
+  - `low_coverage`: Coverage below threshold (default 90%)
+  - `missing`: ZORI data unavailable for that CoC-year
+- `rent_to_income` is NULL for excluded CoCs
+- Analysis should filter to eligible CoCs when using rent-based predictors
+
+**Recommended Practice:**
+When analyzing rent-affordability patterns:
+1. Report the number of excluded CoCs and their characteristics
+2. Consider separate analysis for rural vs. urban CoCs
+3. Acknowledge the urban bias in ZORI-based measures
+
+See `coclab/panel/zori_eligibility.py` for implementation details.
+
 #### 3. Temporal Alignment
 
 ZORI months represent market conditions at a point in time. When aligning with PIT counts (January), use:

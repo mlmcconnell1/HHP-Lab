@@ -13,6 +13,7 @@ different data breakdowns.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import logging
 import re
@@ -22,6 +23,8 @@ from pathlib import Path
 from urllib.parse import urljoin
 
 import httpx
+
+from coclab.source_registry import check_source_changed, register_source
 
 logger = logging.getLogger(__name__)
 
@@ -186,11 +189,32 @@ def download_pit_data(
             logger.error(f"Network error downloading PIT data for year {year}: {e}")
             raise
 
+    # Compute SHA-256 hash of raw content
+    raw_content = response.content
+    content_sha256 = hashlib.sha256(raw_content).hexdigest()
+    file_size = len(raw_content)
+
+    # Check for upstream changes
+    changed, details = check_source_changed(
+        source_type="pit",
+        source_url=url,
+        current_sha256=content_sha256,
+    )
+
+    if changed:
+        logger.warning(
+            f"UPSTREAM DATA CHANGED: PIT data for {year} has changed since last download! "
+            f"Previous hash: {details['previous_sha256'][:16]}... "
+            f"Current hash: {content_sha256[:16]}... "
+            f"Last ingested: {details['previous_ingested_at']}"
+        )
+    elif details.get("is_new"):
+        logger.info(f"First time tracking PIT data for {year} in source registry")
+
     # Write the file
     with open(output_path, "wb") as f:
-        f.write(response.content)
+        f.write(raw_content)
 
-    file_size = len(response.content)
     downloaded_at = datetime.now(UTC)
 
     logger.info(f"Downloaded PIT data to {output_path} ({file_size:,} bytes)")
@@ -203,6 +227,20 @@ def download_pit_data(
         downloaded_at=downloaded_at,
         file_size=file_size,
         year=year,
+    )
+
+    # Register this download in source registry
+    register_source(
+        source_type="pit",
+        source_url=url,
+        source_name=f"HUD PIT Counts 2007-{year}",
+        raw_sha256=content_sha256,
+        file_size=file_size,
+        local_path=str(output_path),
+        metadata={
+            "pit_year": year,
+            "format": "xlsb" if url.endswith(".xlsb") else "xlsx",
+        },
     )
 
     return DownloadResult(
