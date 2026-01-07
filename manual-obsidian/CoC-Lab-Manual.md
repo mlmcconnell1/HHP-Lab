@@ -635,10 +635,28 @@ When `--include-zori` is enabled, the panel includes:
 - High dominance generates warnings but does NOT exclude
 - Zero-coverage CoCs are excluded (never imputed)
 
+### Analytic Universe for Rent-to-Income Measures
+
+Analyses that use the `rent_to_income` variable **must be restricted** to CoC-year observations where `zori_is_eligible == True`.
+
+CoC-years that fail ZORI eligibility criteria (e.g., insufficient coverage of underlying counties) have `rent_to_income` set to null and should not be included in rent-affordability inference. No imputation is performed for ineligible CoCs.
+
 **Output:**
 - Panel Parquet file with embedded provenance
 - Summary statistics (years, CoC count, coverage)
 - ZORI summary when enabled (eligible count, rent_to_income stats)
+
+### Panel Naming with ZORI-Enhanced Outputs
+
+When the `--include-zori` option is enabled in `coclab build-panel`, the resulting panel file includes a `__zori` suffix in its filename. This convention distinguishes panels that include rent-based affordability measures from panels built without rent data.
+
+Example:
+
+```
+data/curated/panels/coc_panel__2018_2024__zori.parquet
+```
+
+This naming convention supports side-by-side comparison of panels built under different analytic assumptions.
 
 ### `coclab panel-diagnostics`
 
@@ -2116,11 +2134,23 @@ The `collapse_to_yearly()` function supports:
 | `calendar_mean` | Mean of 12 months | Annual average |
 | `calendar_median` | Median of 12 months | Robust to outliers |
 
+### Yearly Alignment of ZORI to PIT Counts
+
+Unless otherwise specified, ZORI is collapsed to yearly values using the **January observation** of each calendar year. This choice aligns the rent measure with HUD Point-in-Time (PIT) counts, which are conducted in January.
+
+Alternative yearly collapse methods (e.g., calendar-year mean or median) may be used for sensitivity analysis, but January-aligned ZORI is the default for all standard CoC Lab panels and examples.
+
 ### Data Attribution
 
 ZORI data requires attribution to Zillow:
 
 > "The Zillow Economic Research team publishes a variety of real estate metrics including median home values and rents... All data accessed and downloaded from this page is free for public use by consumers, media, analysts, academics and policymakers, consistent with our published Terms of Use. Proper and clear attribution of all data to Zillow is required."
+
+### Interpretation Notes: ZORI-Based Rent Affordability
+
+- `rent_to_income` reflects **market asking rents** derived from Zillow listings, not observed lease rents.
+- ZORI coverage is systematically lower in rural, tribal, and Puerto Rico CoCs due to limited rental listings; this is a data availability constraint, not a modeling choice.
+- As a result, analyses using `rent_to_income` primarily reflect housing market dynamics in urban and suburban CoCs, which account for the majority of the national homeless population.
 
 ---
 
