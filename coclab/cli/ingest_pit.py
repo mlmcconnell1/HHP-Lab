@@ -71,7 +71,11 @@ def ingest_pit(
     # Step 1: Download PIT data
     raw_dir = Path("data/raw/pit") / str(year)
     # Get filename from URL (format changed from .xlsx to .xlsb in 2024)
-    source_url = get_pit_source_url(year)
+    try:
+        source_url = get_pit_source_url(year)
+    except ValueError as e:
+        typer.echo(f"Error: {e}", err=True)
+        raise typer.Exit(1)
     expected_filename = source_url.split("/")[-1]
     raw_file = raw_dir / expected_filename
 
