@@ -1,14 +1,18 @@
-"""HUD Exchange PIT data source discovery and download.
+"""HUD User PIT data source discovery and download.
 
-This module handles downloading PIT (Point-in-Time) count data from HUD Exchange.
-PIT data is typically provided as Excel files containing CoC-level homeless counts.
+This module handles downloading PIT (Point-in-Time) count data from HUD User.
+PIT data is provided as Excel files containing CoC-level homeless counts.
 
 The main data source is:
-https://www.hudexchange.info/resource/3031/pit-and-hic-data-since-2007/
+https://www.huduser.gov/portal/datasets/ahar/2024-ahar-part-1-pit-estimates-of-homelessness-in-the-us.html
 
-HUD Exchange provides cumulative Excel files that contain PIT counts for all years
+HUD provides cumulative Excel files that contain PIT counts for all years
 from 2007 up to the specified year. Each file contains multiple sheets with
 different data breakdowns.
+
+Note: PIT data files are only directly available for vintage years 2013 and later.
+Earlier years (2007-2012) are included in the 2013+ files but not available as
+separate downloads. The format changed from .xlsx to .xlsb around 2023.
 """
 
 from __future__ import annotations
@@ -28,34 +32,28 @@ from coclab.source_registry import check_source_changed, register_source
 
 logger = logging.getLogger(__name__)
 
-# Base URL for HUD Exchange PIT/HIC data resource page
-HUD_EXCHANGE_PIT_BASE = "https://www.hudexchange.info/resource/3031/pit-and-hic-data-since-2007/"
+# Base URL for HUD User PIT/HIC data
+HUD_USER_PIT_BASE = "https://www.huduser.gov/portal/sites/default/files/xls/"
 
 # Known direct download URLs for PIT data by year
 # Note: HUD provides cumulative files (2007-YYYY) containing all years
-# As of late 2024, HUD migrated recent data from hudexchange.info to huduser.gov
-# and changed the format from .xlsx to .xlsb (Excel Binary)
+# Files are only available for vintage years 2013+. Earlier data (2007-2012) is
+# included in the 2013+ files. Format changed from .xlsx to .xlsb around 2023.
 PIT_DATA_URLS: dict[int, str] = {
-    # New HUD User location (2023+) - .xlsb format
+    # .xlsb format (2023+)
     2024: "https://www.huduser.gov/portal/sites/default/files/xls/2007-2024-PIT-Counts-by-CoC.xlsb",
     2023: "https://www.huduser.gov/portal/sites/default/files/xls/2007-2023-PIT-Counts-by-CoC.xlsb",
-    # Legacy HUD Exchange location (archived, may not be available)
-    2022: "https://www.hudexchange.info/resources/documents/2007-2022-PIT-Counts-by-CoC.xlsx",
-    2021: "https://www.hudexchange.info/resources/documents/2007-2021-PIT-Counts-by-CoC.xlsx",
-    2020: "https://www.hudexchange.info/resources/documents/2007-2020-PIT-Counts-by-CoC.xlsx",
-    2019: "https://www.hudexchange.info/resources/documents/2007-2019-PIT-Counts-by-CoC.xlsx",
-    2018: "https://www.hudexchange.info/resources/documents/2007-2018-PIT-Counts-by-CoC.xlsx",
-    2017: "https://www.hudexchange.info/resources/documents/2007-2017-PIT-Counts-by-CoC.xlsx",
-    2016: "https://www.hudexchange.info/resources/documents/2007-2016-PIT-Counts-by-CoC.xlsx",
-    2015: "https://www.hudexchange.info/resources/documents/2007-2015-PIT-Counts-by-CoC.xlsx",
-    2014: "https://www.hudexchange.info/resources/documents/2007-2014-PIT-Counts-by-CoC.xlsx",
-    2013: "https://www.hudexchange.info/resources/documents/2007-2013-PIT-Counts-by-CoC.xlsx",
-    2012: "https://www.hudexchange.info/resources/documents/2007-2012-PIT-Counts-by-CoC.xlsx",
-    2011: "https://www.hudexchange.info/resources/documents/2007-2011-PIT-Counts-by-CoC.xlsx",
-    2010: "https://www.hudexchange.info/resources/documents/2007-2010-PIT-Counts-by-CoC.xlsx",
-    2009: "https://www.hudexchange.info/resources/documents/2007-2009-PIT-Counts-by-CoC.xlsx",
-    2008: "https://www.hudexchange.info/resources/documents/2007-2008-PIT-Counts-by-CoC.xlsx",
-    2007: "https://www.hudexchange.info/resources/documents/2007-2007-PIT-Counts-by-CoC.xlsx",
+    # .xlsx format (2013-2022)
+    2022: "https://www.huduser.gov/portal/sites/default/files/xls/2007-2022-PIT-Counts-by-CoC.xlsx",
+    2021: "https://www.huduser.gov/portal/sites/default/files/xls/2007-2021-PIT-Counts-by-CoC.xlsx",
+    2020: "https://www.huduser.gov/portal/sites/default/files/xls/2007-2020-PIT-Counts-by-CoC.xlsx",
+    2019: "https://www.huduser.gov/portal/sites/default/files/xls/2007-2019-PIT-Counts-by-CoC.xlsx",
+    2018: "https://www.huduser.gov/portal/sites/default/files/xls/2007-2018-PIT-Counts-by-CoC.xlsx",
+    2017: "https://www.huduser.gov/portal/sites/default/files/xls/2007-2017-PIT-Counts-by-CoC.xlsx",
+    2016: "https://www.huduser.gov/portal/sites/default/files/xls/2007-2016-PIT-Counts-by-CoC.xlsx",
+    2015: "https://www.huduser.gov/portal/sites/default/files/xls/2007-2015-PIT-Counts-by-CoC.xlsx",
+    2014: "https://www.huduser.gov/portal/sites/default/files/xls/2007-2014-PIT-Counts-by-CoC.xlsx",
+    2013: "https://www.huduser.gov/portal/sites/default/files/xls/2007-2013-PIT-Counts-by-CoC.xlsx",
 }
 
 # Default data directory
@@ -64,8 +62,10 @@ DEFAULT_RAW_DIR = Path("data/raw/pit")
 # HTTP timeout for downloads
 DOWNLOAD_TIMEOUT = 120.0
 
-# Valid year range
-MIN_PIT_YEAR = 2007
+# Valid year range for direct file downloads
+# Note: PIT files are only directly available for vintage 2013+.
+# Earlier years (2007-2012) data is included in the 2013+ cumulative files.
+MIN_PIT_YEAR = 2013
 MAX_PIT_YEAR = 2030
 
 
@@ -89,34 +89,58 @@ class DownloadResult:
 def get_pit_source_url(year: int) -> str:
     """Get the download URL for PIT data for a given year.
 
-    HUD Exchange typically provides cumulative Excel files containing all
-    years of data up to the specified year.
+    HUD provides cumulative Excel files containing all years of data up to
+    the specified vintage year. Files are available at huduser.gov.
 
     Args:
-        year: The PIT count year (e.g., 2024).
+        year: The PIT vintage year (e.g., 2024). This is the latest year
+            included in the cumulative file.
 
     Returns:
         The download URL for the PIT data file.
 
     Raises:
-        ValueError: If the year is outside the valid range (2007-2030).
+        ValueError: If the year is before 2013 (files not available) or
+            after 2030.
     """
-    if not MIN_PIT_YEAR <= year <= MAX_PIT_YEAR:
+    if year < MIN_PIT_YEAR:
         raise ValueError(
-            f"Year {year} is outside valid PIT data range "
-            f"({MIN_PIT_YEAR}-{MAX_PIT_YEAR})"
+            f"PIT data files are not directly available for vintage year {year}. "
+            f"Files are only available for years {MIN_PIT_YEAR} and later. "
+            f"To get data for years 2007-2012, use the 2013 vintage file which "
+            f"contains cumulative data from 2007-2013."
+        )
+
+    if year > MAX_PIT_YEAR:
+        raise ValueError(
+            f"Year {year} is outside valid PIT data range (max: {MAX_PIT_YEAR})"
         )
 
     if year in PIT_DATA_URLS:
         return PIT_DATA_URLS[year]
 
-    # Try to construct URL for years not in the explicit list
-    # Use the new HUD User location for recent/future years
-    url = f"https://www.huduser.gov/portal/sites/default/files/xls/2007-{year}-PIT-Counts-by-CoC.xlsb"
+    # For years not in the explicit list (future years), try .xlsb first
+    url = f"{HUD_USER_PIT_BASE}2007-{year}-PIT-Counts-by-CoC.xlsb"
     logger.warning(
         f"Year {year} not in known URL list, attempting constructed URL: {url}"
     )
     return url
+
+
+def _try_download_url(
+    client: httpx.Client,
+    url: str,
+    year: int,
+) -> httpx.Response | None:
+    """Attempt to download from a URL, returning None on 404."""
+    try:
+        response = client.get(url)
+        response.raise_for_status()
+        return response
+    except httpx.HTTPStatusError as e:
+        if e.response.status_code == 404:
+            return None
+        raise
 
 
 def download_pit_data(
@@ -125,13 +149,15 @@ def download_pit_data(
     force: bool = False,
     timeout: float = DOWNLOAD_TIMEOUT,
 ) -> DownloadResult:
-    """Download PIT data for a specified year from HUD Exchange.
+    """Download PIT data for a specified year from HUD User.
 
     Downloads the PIT count data file and saves it to the raw data directory.
     Creates the output directory if it doesn't exist.
 
+    For years not in the known URL list, tries both .xlsb and .xlsx formats.
+
     Args:
-        year: The PIT count year to download (e.g., 2024).
+        year: The PIT vintage year to download (e.g., 2024).
         output_dir: Directory to save the downloaded file.
             Defaults to data/raw/pit/{year}/.
         force: If True, re-download even if file exists. Default False.
@@ -141,7 +167,8 @@ def download_pit_data(
         DownloadResult with path to downloaded file and metadata.
 
     Raises:
-        ValueError: If the year is invalid.
+        ValueError: If the year is invalid (before 2013 or after 2030).
+        FileNotFoundError: If neither .xlsx nor .xlsb file is available.
         httpx.HTTPStatusError: If the download fails with HTTP error.
         httpx.TimeoutException: If the download times out.
         httpx.RequestError: For other network errors.
@@ -173,21 +200,31 @@ def download_pit_data(
     logger.info(f"Downloading PIT data for {year} from {url}")
 
     with httpx.Client(follow_redirects=True, timeout=timeout) as client:
-        try:
-            response = client.get(url)
-            response.raise_for_status()
-        except httpx.HTTPStatusError as e:
-            logger.error(
-                f"HTTP error downloading PIT data for year {year}: "
-                f"{e.response.status_code}"
+        response = _try_download_url(client, url, year)
+
+        # If primary URL failed with 404 and it's not in the known list,
+        # try the alternate format
+        if response is None and year not in PIT_DATA_URLS:
+            # Try alternate format
+            if url.endswith(".xlsb"):
+                alt_url = url.replace(".xlsb", ".xlsx")
+            else:
+                alt_url = url.replace(".xlsx", ".xlsb")
+
+            logger.info(f"Primary URL not found, trying alternate format: {alt_url}")
+            response = _try_download_url(client, alt_url, year)
+
+            if response is not None:
+                url = alt_url
+                filename = url.split("/")[-1]
+                output_path = output_dir / filename
+
+        if response is None:
+            raise FileNotFoundError(
+                f"PIT data file not found for year {year}. "
+                f"Tried URL: {url}. "
+                f"The file may not yet be published by HUD."
             )
-            raise
-        except httpx.TimeoutException:
-            logger.error(f"Timeout downloading PIT data for year {year}")
-            raise
-        except httpx.RequestError as e:
-            logger.error(f"Network error downloading PIT data for year {year}: {e}")
-            raise
 
     # Compute SHA-256 hash of raw content
     raw_content = response.content
@@ -288,53 +325,21 @@ def list_available_years() -> list[int]:
 
 
 def discover_pit_urls(
-    base_url: str = HUD_EXCHANGE_PIT_BASE,
     timeout: float = 30.0,
 ) -> dict[int, str]:
-    """Attempt to discover PIT data URLs from the HUD Exchange page.
+    """Return known PIT data URLs from HUD User.
 
-    This function fetches the HUD Exchange resource page and attempts to
-    extract download URLs for PIT data files.
+    This function returns the known mapping of years to download URLs.
+    URL discovery is not currently supported since HUD User does not provide
+    a standard listing page.
 
     Args:
-        base_url: The HUD Exchange resource page URL.
-        timeout: HTTP timeout in seconds.
+        timeout: Unused, kept for API compatibility.
 
     Returns:
-        Mapping of year to download URL.
-
-    Note:
-        This is a best-effort function that may not find all URLs depending
-        on page structure changes.
+        Mapping of year to download URL for known years (2013+).
     """
-    try:
-        with httpx.Client(follow_redirects=True, timeout=timeout) as client:
-            response = client.get(base_url)
-            response.raise_for_status()
-        content = response.text
-
-        # Look for links to PIT count Excel files
-        # Pattern: 2007-YYYY-PIT-Counts-by-CoC.xlsx
-        pattern = r'href=["\']([^"\']*2007-(\d{4})-PIT-Counts-by-CoC\.xlsx)["\']'
-        matches = re.findall(pattern, content, re.IGNORECASE)
-
-        urls = {}
-        for url_path, year_str in matches:
-            year = int(year_str)
-            # Make absolute URL if relative
-            if url_path.startswith("/"):
-                full_url = urljoin("https://www.hudexchange.info", url_path)
-            elif url_path.startswith("http"):
-                full_url = url_path
-            else:
-                full_url = urljoin(base_url, url_path)
-            urls[year] = full_url
-
-        return urls
-
-    except Exception as e:
-        logger.warning(f"Failed to discover PIT URLs: {e}")
-        return {}
+    return dict(PIT_DATA_URLS)
 
 
 def check_pit_availability(year: int, timeout: float = 10.0) -> bool:

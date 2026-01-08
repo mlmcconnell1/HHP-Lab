@@ -1,4 +1,4 @@
-"""CLI command for ingesting PIT (Point-in-Time) count data from HUD Exchange."""
+"""CLI command for ingesting PIT (Point-in-Time) count data from HUD User."""
 
 import logging
 from pathlib import Path
@@ -41,10 +41,13 @@ def ingest_pit(
         ),
     ] = False,
 ) -> None:
-    """Ingest PIT (Point-in-Time) count data from HUD Exchange.
+    """Ingest PIT (Point-in-Time) count data from HUD User.
 
     Downloads PIT data, parses it into canonical schema, saves as Parquet,
     registers in the PIT registry, and runs QA validation.
+
+    Note: PIT files are only available for vintage years 2013 and later.
+    Earlier years (2007-2012) are included in the 2013+ cumulative files.
 
     Examples:
 
@@ -75,7 +78,7 @@ def ingest_pit(
     if parse_only and raw_file.exists():
         typer.echo(f"Using existing file: {raw_file}")
     else:
-        typer.echo("Downloading PIT data from HUD Exchange...")
+        typer.echo("Downloading PIT data from HUD User...")
         try:
             result = download_pit_data(year, force=force)
             raw_file = result.path
@@ -91,7 +94,7 @@ def ingest_pit(
         parse_result = parse_pit_file(
             file_path=raw_file,
             year=year,
-            source="hud_exchange",
+            source="hud_user",
             source_ref=source_url,
         )
         df = parse_result.df
@@ -121,7 +124,7 @@ def ingest_pit(
     try:
         entry = register_pit_year(
             pit_year=year,
-            source="hud_exchange",
+            source="hud_user",
             path=output_path,
             row_count=len(df),
         )

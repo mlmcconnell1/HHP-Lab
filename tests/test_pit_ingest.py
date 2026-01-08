@@ -1,4 +1,4 @@
-"""Tests for PIT data ingestion from HUD Exchange."""
+"""Tests for PIT data ingestion from HUD User."""
 
 import tempfile
 from pathlib import Path
@@ -36,8 +36,8 @@ class TestGetPitSourceUrl:
         assert url.endswith(".xlsb")
 
     def test_invalid_year_too_old(self):
-        with pytest.raises(ValueError, match="outside valid PIT data range"):
-            get_pit_source_url(2006)
+        with pytest.raises(ValueError, match="not directly available"):
+            get_pit_source_url(2012)  # Files only available for 2013+
 
     def test_invalid_year_too_new(self):
         with pytest.raises(ValueError, match="outside valid PIT data range"):
@@ -114,7 +114,7 @@ class TestDownloadPitData:
         """Test that download returns DownloadResult with correct metadata."""
         content = b"test excel content"
         httpx_mock.add_response(
-            url="https://www.hudexchange.info/resources/documents/2007-2022-PIT-Counts-by-CoC.xlsx",
+            url="https://www.huduser.gov/portal/sites/default/files/xls/2007-2022-PIT-Counts-by-CoC.xlsx",
             content=content,
         )
 
@@ -145,7 +145,7 @@ class TestDownloadPitData:
         """Test that download re-downloads when force=True."""
         new_content = b"new content"
         httpx_mock.add_response(
-            url="https://www.hudexchange.info/resources/documents/2007-2021-PIT-Counts-by-CoC.xlsx",
+            url="https://www.huduser.gov/portal/sites/default/files/xls/2007-2021-PIT-Counts-by-CoC.xlsx",
             content=new_content,
         )
 
@@ -160,13 +160,24 @@ class TestDownloadPitData:
             assert result.file_size == len(new_content)
             assert existing_file.read_bytes() == new_content
 
+    def test_download_handles_404_error(self, httpx_mock):
+        """Test that download raises FileNotFoundError on 404."""
+        httpx_mock.add_response(
+            url="https://www.huduser.gov/portal/sites/default/files/xls/2007-2020-PIT-Counts-by-CoC.xlsx",
+            status_code=404,
+        )
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            with pytest.raises(FileNotFoundError, match="not found"):
+                download_pit_data(2020, output_dir=tmpdir)
+
     def test_download_handles_http_error(self, httpx_mock):
-        """Test that download raises on HTTP error."""
+        """Test that download raises on non-404 HTTP error."""
         import httpx
 
         httpx_mock.add_response(
-            url="https://www.hudexchange.info/resources/documents/2007-2020-PIT-Counts-by-CoC.xlsx",
-            status_code=404,
+            url="https://www.huduser.gov/portal/sites/default/files/xls/2007-2020-PIT-Counts-by-CoC.xlsx",
+            status_code=500,
         )
 
         with tempfile.TemporaryDirectory() as tmpdir:
