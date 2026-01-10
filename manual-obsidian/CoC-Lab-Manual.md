@@ -279,6 +279,7 @@ flowchart LR
     coclab --> ingest
     coclab --> ingest-census
     coclab --> ingest-pit
+    coclab --> ingest-pit-vintage
     coclab --> ingest-acs-population
     coclab --> list-vintages
     coclab --> show
@@ -287,6 +288,7 @@ flowchart LR
     coclab --> build-panel
     coclab --> rollup-acs-population
     coclab --> crosscheck-acs-population
+    coclab --> crosscheck-pit-vintages
     coclab --> verify-acs-population
     coclab --> diagnostics
     coclab --> panel-diagnostics
@@ -304,6 +306,7 @@ flowchart LR
     ingest --> |"--source hud_opendata"| HUD_OD[Fetch current snapshot]
     ingest-census --> TIGER[Download TIGER geometries]
     ingest-pit --> PIT[Download & parse PIT counts]
+    ingest-pit-vintage --> PITVINT[Parse all years from vintage]
     ingest-acs-population --> ACSPOP[Fetch tract population]
     list-vintages --> LIST[Display available vintages]
     show --> MAP[Render interactive map]
@@ -312,6 +315,7 @@ flowchart LR
     build-panel --> PANEL[Assemble CoC × year panels]
     rollup-acs-population --> ROLLUP[Aggregate tract pop to CoC]
     crosscheck-acs-population --> XCHECK[Validate rollup vs measures]
+    crosscheck-pit-vintages --> PITXCHECK[Compare PIT across vintages]
     verify-acs-population --> VERIFY[Full pipeline: ingest→rollup→check]
     ingest-zori --> ZORI_ING[Download & normalize ZORI data]
     aggregate-zori --> ZORI_AGG[Aggregate ZORI to CoC level]
@@ -583,6 +587,73 @@ coclab ingest-pit --year 2024 --parse-only
 3. Writes Parquet with embedded provenance
 4. Registers in PIT registry
 5. Runs QA validation checks
+
+### `coclab ingest-pit-vintage`
+
+Ingest **all years** from a PIT vintage file. Unlike `ingest-pit` which extracts only a single year, this command parses every year tab from the HUD Excel file (e.g., 2007-2024 from the 2024 release).
+
+This is useful for detecting when HUD revises historical PIT data between releases.
+
+```bash
+# Ingest all years from the 2024 vintage
+coclab ingest-pit-vintage --vintage 2024
+
+# Force re-download
+coclab ingest-pit-vintage --vintage 2024 --force
+
+# Parse existing file only
+coclab ingest-pit-vintage --vintage 2024 --parse-only
+```
+
+| Option | Description | Default |
+|--------|-------------|---------|
+| `--vintage`, `-v` | Vintage/release year to ingest | Required |
+| `--force` | Re-download even if file exists | False |
+| `--parse-only` | Skip download, parse existing file | False |
+
+**Output:**
+- `data/curated/pit/pit_vintage__{vintage}.parquet` containing all years
+- Registered in PIT vintage registry
+
+### `coclab crosscheck-pit-vintages`
+
+Compare PIT counts between two vintage releases to detect historical data revisions. This helps identify when HUD has revised historical PIT data between releases (e.g., due to CoC mergers or data corrections).
+
+```bash
+# Compare 2023 and 2024 vintages
+coclab crosscheck-pit-vintages --vintage1 2023 --vintage2 2024
+
+# Filter to a specific year
+coclab crosscheck-pit-vintages -v1 2023 -v2 2024 --year 2020
+
+# Save detailed comparison to CSV
+coclab crosscheck-pit-vintages -v1 2023 -v2 2024 -o comparison.csv
+
+# Show unchanged records too
+coclab crosscheck-pit-vintages -v1 2023 -v2 2024 --show-unchanged
+```
+
+| Option | Description | Default |
+|--------|-------------|---------|
+| `--vintage1`, `-v1` | First (older) vintage to compare | Required |
+| `--vintage2`, `-v2` | Second (newer) vintage to compare | Required |
+| `--year`, `-y` | Filter to specific PIT year | All common years |
+| `--output`, `-o` | Save detailed comparison to CSV | None |
+| `--show-unchanged` | Include unchanged records in output | False |
+
+**Output:**
+- **Tab Totals**: Year-by-year comparison of all-CoC totals for total, sheltered, and unsheltered counts
+- **Summary**: Counts of added, removed, changed, and unchanged CoC-year records
+- **Changed**: CoCs with revised counts (shows delta values)
+- **Added**: CoC-years present in v2 but not v1
+- **Removed**: CoC-years present in v1 but not v2 (often due to mergers)
+
+**Interpreting Results:**
+
+If tab totals match but individual CoCs differ, the changes are likely due to CoC reorganizations (mergers) rather than data corrections. For example, if MA-519 was merged into MA-505:
+- MA-505 will show as "changed" with increased counts
+- MA-519 will show as "removed"
+- Tab totals will remain identical
 
 ### `coclab build-panel`
 
@@ -1725,8 +1796,10 @@ erDiagram
 | Tract crosswalks | `data/curated/xwalks/coc_tract_xwalk__{boundary}__{tracts}.parquet` | CoC-tract mapping |
 | County crosswalks | `data/curated/xwalks/coc_county_xwalk__{boundary}.parquet` | CoC-county mapping |
 | CoC measures | `data/curated/measures/coc_measures__{boundary}__{acs}.parquet` | Aggregated ACS data |
-| PIT counts | `data/curated/pit/pit_counts__{year}.parquet` | Canonical PIT data |
+| PIT counts | `data/curated/pit/pit_counts__{year}.parquet` | Canonical PIT data (single year) |
+| PIT vintages | `data/curated/pit/pit_vintage__{vintage}.parquet` | All years from a vintage release |
 | PIT registry | `data/curated/pit/pit_registry.parquet` | PIT year tracking |
+| PIT vintage registry | `data/curated/pit/pit_vintage_registry.parquet` | PIT vintage tracking |
 | CoC panels | `data/curated/panels/coc_panel__{start}_{end}.parquet` | Analysis-ready panels |
 | Tract population | `data/curated/acs/tract_population__{acs}__{tracts}.parquet` | ACS tract population |
 | CoC population rollup | `data/curated/acs/coc_population_rollup__{boundary}__{acs}__{tracts}__{weighting}.parquet` | Aggregated CoC population |
