@@ -290,7 +290,7 @@ flowchart LR
     coclab --> crosscheck-acs-population
     coclab --> crosscheck-pit-vintages
     coclab --> verify-acs-population
-    coclab --> diagnostics
+    coclab --> xwalk-diagnostics
     coclab --> panel-diagnostics
     coclab --> list-xwalks
     coclab --> list-measures
@@ -320,7 +320,7 @@ flowchart LR
     ingest-zori --> ZORI_ING[Download & normalize ZORI data]
     aggregate-zori --> ZORI_AGG[Aggregate ZORI to CoC level]
     zori-diagnostics --> ZORI_DIAG[ZORI coverage diagnostics]
-    diagnostics --> DIAG[Crosswalk quality checks]
+    xwalk-diagnostics --> DIAG[Crosswalk quality checks]
     panel-diagnostics --> PDIAG[Panel quality & sensitivity]
     list-xwalks --> LXWALK[List crosswalk files]
     list-measures --> LMEAS[List measure files]
@@ -460,19 +460,19 @@ coclab ingest-census --year 2023 --force
 | `--type`, `-t` | `tracts`, `counties`, or `all` | `all` |
 | `--force` | Re-download even if file exists | False |
 
-### `coclab diagnostics`
+### `coclab xwalk-diagnostics`
 
 Run crosswalk quality diagnostics.
 
 ```bash
 # Basic diagnostics
-coclab diagnostics --crosswalk data/curated/xwalks/coc_tract_xwalk__2025__2023.parquet
+coclab xwalk-diagnostics --crosswalk data/curated/xwalks/coc_tract_xwalk__2025__2023.parquet
 
 # Show problem CoCs
-coclab diagnostics -x crosswalk.parquet --show-problems
+coclab xwalk-diagnostics -x crosswalk.parquet --show-problems
 
 # Custom thresholds and CSV export
-coclab diagnostics -x crosswalk.parquet --coverage-threshold 0.90 -o diagnostics.csv
+coclab xwalk-diagnostics -x crosswalk.parquet --coverage-threshold 0.90 -o diagnostics.csv
 ```
 
 | Option | Description | Default |

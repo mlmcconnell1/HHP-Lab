@@ -114,7 +114,7 @@ coclab build-xwalks --boundary 2025 --tracts 2023
 
 ### 3.2 Run crosswalk diagnostics and show problems
 ```bash
-coclab diagnostics --crosswalk data/curated/xwalks/coc_tract_xwalk__2025__2023.parquet --show-problems
+coclab xwalk-diagnostics --crosswalk data/curated/xwalks/coc_tract_xwalk__2025__2023.parquet --show-problems
 ```
 **Pass criteria**
 - Diagnostics summary prints.
@@ -127,7 +127,7 @@ coclab diagnostics --crosswalk data/curated/xwalks/coc_tract_xwalk__2025__2023.p
 
 ### 3.3 Diagnostics threshold stress test
 ```bash
-coclab diagnostics --crosswalk data/curated/xwalks/coc_tract_xwalk__2025__2023.parquet   --coverage-threshold 0.98 --max-contribution 0.20 --show-problems
+coclab xwalk-diagnostics --crosswalk data/curated/xwalks/coc_tract_xwalk__2025__2023.parquet   --coverage-threshold 0.98 --max-contribution 0.20 --show-problems
 ```
 **Pass criteria**
 - Output still coherent and deterministic.
@@ -351,7 +351,7 @@ pytest tests/test_smoke.py -v
 coclab ingest --source hud_exchange --vintage 2025
 coclab ingest-census --year 2023
 coclab build-xwalks --boundary 2025 --tracts 2023
-coclab diagnostics --crosswalk data/curated/xwalks/coc_tract_xwalk__2025__2023.parquet --show-problems
+coclab xwalk-diagnostics --crosswalk data/curated/xwalks/coc_tract_xwalk__2025__2023.parquet --show-problems
 
 # Measures baseline
 coclab build-measures --boundary 2025 --acs 2022
