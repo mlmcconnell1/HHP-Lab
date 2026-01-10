@@ -62,92 +62,12 @@ def main_callback() -> None:
     _check_working_directory()
 
 
-# Register crosswalk, measures, and diagnostics commands
-app.command("build-xwalks")(build_xwalks)
-app.command("build-measures")(build_measures)
-app.command("build-panel")(build_panel_cmd)
-app.command("compare-vintages")(compare_vintages)
-app.command("crosscheck-acs-population")(crosscheck_acs_population)
-app.command("crosscheck-pit-vintages")(crosscheck_pit_vintages)
-app.command("xwalk-diagnostics")(diagnostics)
-app.command("ingest-acs-population")(ingest_acs_population)
-app.command("ingest-census")(ingest_census)
-app.command("ingest-pit")(ingest_pit)
-app.command("ingest-pit-vintage")(ingest_pit_vintage)
-app.command("list-measures")(list_measures)
-app.command("list-xwalks")(list_xwalks)
-app.command("panel-diagnostics")(panel_diagnostics)
-app.command("rollup-acs-population")(rollup_acs_population)
-app.command("show-measures")(show_measures)
-app.command("verify-acs-population")(verify_acs_population)
-
-# ZORI commands (spec section 3)
-app.command("ingest-zori")(ingest_zori)
-app.command("aggregate-zori")(aggregate_zori)
-app.command("zori-diagnostics")(zori_diagnostics)
-
-# Export bundle command
-app.command("export-bundle")(export_bundle)
+# -----------------------------------------------------------------------------
+# Inline command functions (defined here, registered alphabetically below)
+# -----------------------------------------------------------------------------
 
 
-@app.command("source-status")
-def source_status(
-    source_type: Annotated[
-        str | None,
-        typer.Option(
-            "--type",
-            "-t",
-            help="Filter to specific source type (zori, boundary, census_tract, etc.)",
-        ),
-    ] = None,
-    check_changes: Annotated[
-        bool,
-        typer.Option(
-            "--check-changes",
-            "-c",
-            help="Highlight sources that have changed over time",
-        ),
-    ] = False,
-) -> None:
-    """Show status of tracked external data sources.
-
-    Displays all registered data source ingestions with their hashes,
-    timestamps, and change detection information.
-
-    Examples:
-
-        coclab source-status
-
-        coclab source-status --type zori
-
-        coclab source-status --check-changes
-    """
-    from coclab.source_registry import (
-        detect_upstream_changes,
-        summarize_registry,
-    )
-
-    if check_changes:
-        changes = detect_upstream_changes()
-        if changes.empty:
-            typer.echo("No upstream changes detected. All sources have consistent hashes.")
-        else:
-            typer.echo("⚠️  UPSTREAM DATA CHANGES DETECTED:\n")
-            for _, row in changes.iterrows():
-                typer.echo(f"  {row['source_type']}: {row['source_url'][:60]}...")
-                typer.echo(f"    Versions seen: {row['hash_count']}")
-                typer.echo(f"    First: {row['first_seen']} (hash: {row['first_hash'][:12]}...)")
-                typer.echo(f"    Last:  {row['last_seen']} (hash: {row['last_hash'][:12]}...)")
-                typer.echo("")
-        return
-
-    # Show full summary
-    summary = summarize_registry()
-    typer.echo(summary)
-
-
-@app.command("ingest-boundaries")
-def ingest(
+def ingest_boundaries(
     source: Annotated[
         str,
         typer.Option(
@@ -246,7 +166,6 @@ def ingest(
         raise typer.Exit(1)
 
 
-@app.command("list-vintages")
 def list_vintages_cmd() -> None:
     """List all available boundary vintages in the registry."""
     from coclab.registry.registry import list_vintages
@@ -269,7 +188,6 @@ def list_vintages_cmd() -> None:
         )
 
 
-@app.command()
 def show(
     coc: Annotated[
         str,
@@ -318,6 +236,92 @@ def show(
     except ValueError as e:
         typer.echo(f"Error: {e}", err=True)
         raise typer.Exit(1) from e
+
+
+def source_status(
+    source_type: Annotated[
+        str | None,
+        typer.Option(
+            "--type",
+            "-t",
+            help="Filter to specific source type (zori, boundary, census_tract, etc.)",
+        ),
+    ] = None,
+    check_changes: Annotated[
+        bool,
+        typer.Option(
+            "--check-changes",
+            "-c",
+            help="Highlight sources that have changed over time",
+        ),
+    ] = False,
+) -> None:
+    """Show status of tracked external data sources.
+
+    Displays all registered data source ingestions with their hashes,
+    timestamps, and change detection information.
+
+    Examples:
+
+        coclab source-status
+
+        coclab source-status --type zori
+
+        coclab source-status --check-changes
+    """
+    from coclab.source_registry import (
+        detect_upstream_changes,
+        summarize_registry,
+    )
+
+    if check_changes:
+        changes = detect_upstream_changes()
+        if changes.empty:
+            typer.echo("No upstream changes detected. All sources have consistent hashes.")
+        else:
+            typer.echo("⚠️  UPSTREAM DATA CHANGES DETECTED:\n")
+            for _, row in changes.iterrows():
+                typer.echo(f"  {row['source_type']}: {row['source_url'][:60]}...")
+                typer.echo(f"    Versions seen: {row['hash_count']}")
+                typer.echo(f"    First: {row['first_seen']} (hash: {row['first_hash'][:12]}...)")
+                typer.echo(f"    Last:  {row['last_seen']} (hash: {row['last_hash'][:12]}...)")
+                typer.echo("")
+        return
+
+    # Show full summary
+    summary = summarize_registry()
+    typer.echo(summary)
+
+
+# -----------------------------------------------------------------------------
+# Register all commands alphabetically for consistent help output
+# -----------------------------------------------------------------------------
+
+app.command("aggregate-zori")(aggregate_zori)
+app.command("build-measures")(build_measures)
+app.command("build-panel")(build_panel_cmd)
+app.command("build-xwalks")(build_xwalks)
+app.command("compare-vintages")(compare_vintages)
+app.command("crosscheck-acs-population")(crosscheck_acs_population)
+app.command("crosscheck-pit-vintages")(crosscheck_pit_vintages)
+app.command("export-bundle")(export_bundle)
+app.command("ingest-acs-population")(ingest_acs_population)
+app.command("ingest-boundaries")(ingest_boundaries)
+app.command("ingest-census")(ingest_census)
+app.command("ingest-pit")(ingest_pit)
+app.command("ingest-pit-vintage")(ingest_pit_vintage)
+app.command("ingest-zori")(ingest_zori)
+app.command("list-measures")(list_measures)
+app.command("list-vintages")(list_vintages_cmd)
+app.command("list-xwalks")(list_xwalks)
+app.command("panel-diagnostics")(panel_diagnostics)
+app.command("rollup-acs-population")(rollup_acs_population)
+app.command("show")(show)
+app.command("show-measures")(show_measures)
+app.command("source-status")(source_status)
+app.command("verify-acs-population")(verify_acs_population)
+app.command("xwalk-diagnostics")(diagnostics)
+app.command("zori-diagnostics")(zori_diagnostics)
 
 
 if __name__ == "__main__":
