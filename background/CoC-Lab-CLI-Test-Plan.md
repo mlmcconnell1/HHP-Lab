@@ -46,7 +46,7 @@ pytest tests/test_smoke.py -v
 
 ### 1.1 Ingest a boundary vintage from HUD Exchange
 ```bash
-coclab ingest --source hud_exchange --vintage 2025
+coclab ingest-boundaries --source hud_exchange --vintage 2025
 ```
 **Pass criteria**
 - Command completes successfully.
@@ -69,7 +69,7 @@ coclab list-vintages
 ### 1.3 Idempotency check for boundary ingest
 Run the same ingest again:
 ```bash
-coclab ingest --source hud_exchange --vintage 2025
+coclab ingest-boundaries --source hud_exchange --vintage 2025
 ```
 **Pass criteria**
 - Either:
@@ -348,7 +348,7 @@ coclab --help
 pytest tests/test_smoke.py -v
 
 # Foundations
-coclab ingest --source hud_exchange --vintage 2025
+coclab ingest-boundaries --source hud_exchange --vintage 2025
 coclab ingest-census --year 2023
 coclab build-xwalks --boundary 2025 --tracts 2023
 coclab xwalk-diagnostics --crosswalk data/curated/xwalks/coc_tract_xwalk__2025__2023.parquet --show-problems

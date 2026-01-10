@@ -276,7 +276,7 @@ The `coclab` command provides access to all core functionality.
 
 ```mermaid
 flowchart LR
-    coclab --> ingest
+    coclab --> ingest-boundaries
     coclab --> ingest-census
     coclab --> ingest-pit
     coclab --> ingest-pit-vintage
@@ -330,18 +330,18 @@ flowchart LR
     export-bundle --> EXPORT[Create analysis-ready bundle]
 ```
 
-### `coclab ingest`
+### `coclab ingest-boundaries`
 
 Ingest CoC boundary data from HUD sources.
 
 **From HUD Exchange (annual vintages):**
 ```bash
-coclab ingest --source hud_exchange --vintage 2025
+coclab ingest-boundaries --source hud_exchange --vintage 2025
 ```
 
 **From HUD Open Data (current snapshot):**
 ```bash
-coclab ingest --source hud_opendata --snapshot latest
+coclab ingest-boundaries --source hud_opendata --snapshot latest
 ```
 
 | Option       | Description                                    | Default                     |
@@ -933,7 +933,7 @@ coclab aggregate-zori -b 2025 -c 2023 --acs 2019-2023 -w housing_units
 
 **Prerequisites:**
 ```bash
-coclab ingest --source hud_exchange --vintage 2025
+coclab ingest-boundaries --source hud_exchange --vintage 2025
 coclab ingest-census --year 2023 --type counties
 coclab build-xwalks --boundary 2025 --counties 2023
 coclab ingest-zori --geography county
@@ -1920,7 +1920,7 @@ sequenceDiagram
     participant Registry
     participant Storage
 
-    User->>CLI: coclab ingest --source hud_exchange --vintage 2025
+    User->>CLI: coclab ingest-boundaries --source hud_exchange --vintage 2025
     CLI->>Ingester: ingest_hud_exchange("2025")
     Ingester->>Storage: Download to data/raw/
     Ingester->>Ingester: Read shapefile/GDB

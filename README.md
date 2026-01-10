@@ -28,13 +28,13 @@ uv sync --extra dev
 Ingest boundaries from HUD Exchange GIS Tools (annual vintages):
 
 ```bash
-coclab ingest --source hud_exchange --vintage 2025
+coclab ingest-boundaries --source hud_exchange --vintage 2025
 ```
 
 Or from HUD Open Data (current snapshot):
 
 ```bash
-coclab ingest --source hud_opendata --snapshot latest
+coclab ingest-boundaries --source hud_opendata --snapshot latest
 ```
 
 #### 2. List available vintages

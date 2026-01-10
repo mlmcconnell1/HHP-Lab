@@ -240,7 +240,7 @@ def aggregate_zori(
     using area-weighted crosswalks and ACS-based demographic weights.
 
     Prerequisite commands:
-    - coclab ingest --source hud_exchange --vintage <boundary>
+    - coclab ingest-boundaries --source hud_exchange --vintage <boundary>
     - coclab ingest-census --year <counties> --type counties
     - coclab build-xwalks --boundary <boundary> --counties <counties>
     - coclab ingest-zori --geography county
@@ -339,7 +339,7 @@ def aggregate_zori(
         typer.echo(f"Error: Missing input file: {e}", err=True)
         typer.echo("")
         typer.echo("Ensure you have run the prerequisite commands:")
-        typer.echo(f"  coclab ingest --source hud_exchange --vintage {boundary}")
+        typer.echo(f"  coclab ingest-boundaries --source hud_exchange --vintage {boundary}")
         typer.echo(f"  coclab ingest-census --year {counties} --type counties")
         typer.echo(f"  coclab build-xwalks --boundary {boundary} --counties {counties}")
         typer.echo(f"  coclab ingest-zori --geography {geography}")

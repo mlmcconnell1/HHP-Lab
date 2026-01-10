@@ -356,7 +356,7 @@ Add `compare-zori` akin to `compare-vintages`, to compare CoC ZORI under differe
 ### A.1 County-based pipeline (recommended v1)
 ```bash
 # 1) Ensure boundaries + counties + crosswalk exist
-coclab ingest --source hud_exchange --vintage 2025
+coclab ingest-boundaries --source hud_exchange --vintage 2025
 coclab ingest-census --year 2023 --type counties
 coclab build-xwalks --boundary 2025 --tracts 2023 --counties 2023
 

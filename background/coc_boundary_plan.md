@@ -90,7 +90,7 @@ These functions define the integration points:
 - `render_coc_map(coc_id: str, vintage: str | None = None, out_html: Path | None = None) -> Path`
 
 **CLI**
-- `coclab ingest --source hud_exchange --vintage 2025`
+- `coclab ingest-boundaries --source hud_exchange --vintage 2025`
 - `coclab show --coc CO-500 [--vintage 2025]`
 
 ---
@@ -227,8 +227,8 @@ These functions define the integration points:
 **Objective:** Make the system usable without notebooks.
 
 **Commands**
-- `coclab ingest --source hud_exchange --vintage 2025`
-- `coclab ingest --source hud_opendata --snapshot latest`
+- `coclab ingest-boundaries --source hud_exchange --vintage 2025`
+- `coclab ingest-boundaries --source hud_opendata --snapshot latest`
 - `coclab list-vintages`
 - `coclab show --coc CO-500 [--vintage 2025]`
 
@@ -275,7 +275,7 @@ These functions define the integration points:
 
 ## 4) Acceptance criteria (v0)
 
-1. **Ingest**: Running `coclab ingest --source hud_exchange --vintage <YEAR>` creates:
+1. **Ingest**: Running `coclab ingest-boundaries --source hud_exchange --vintage <YEAR>` creates:
    - `data/curated/coc_boundaries/coc_boundaries__<YEAR>.parquet`
    - updates `data/curated/boundary_registry.parquet`
 2. **Map**: Running `coclab show --coc CO-500` produces an HTML file with the boundary polygon rendered.

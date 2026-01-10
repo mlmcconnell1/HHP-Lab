@@ -146,7 +146,7 @@ def source_status(
     typer.echo(summary)
 
 
-@app.command()
+@app.command("ingest-boundaries")
 def ingest(
     source: Annotated[
         str,
@@ -184,9 +184,9 @@ def ingest(
 
     Examples:
 
-        coclab ingest --source hud_exchange --vintage 2025
+        coclab ingest-boundaries --source hud_exchange --vintage 2025
 
-        coclab ingest --source hud_opendata --snapshot latest
+        coclab ingest-boundaries --source hud_opendata --snapshot latest
     """
     if source == "hud_exchange":
         if vintage is None:

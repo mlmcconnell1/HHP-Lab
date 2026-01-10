@@ -93,7 +93,7 @@ def build_xwalks(
     if not boundary_path.exists():
         typer.echo(
             f"Error: Boundary file not found: {boundary_path}. "
-            f"Run 'coclab ingest --source hud_exchange --vintage {boundary}' first.",
+            f"Run 'coclab ingest-boundaries --source hud_exchange --vintage {boundary}' first.",
             err=True,
         )
         raise typer.Exit(1)
