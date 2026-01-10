@@ -172,12 +172,16 @@ def crosscheck_pit_vintages(
 
     # Merge on key
     merged = pd.merge(
-        df1_filtered[["key", "pit_year", "coc_id", "pit_total", "pit_sheltered", "pit_unsheltered"]],
+        df1_filtered[["key", "pit_total", "pit_sheltered", "pit_unsheltered"]],
         df2_filtered[["key", "pit_total", "pit_sheltered", "pit_unsheltered"]],
         on="key",
         how="outer",
         suffixes=("_v1", "_v2"),
     )
+
+    # Extract pit_year and coc_id from key (format: "YEAR_COC_ID")
+    merged["pit_year"] = merged["key"].str.split("_").str[0].astype(int)
+    merged["coc_id"] = merged["key"].str.split("_", n=1).str[1]
 
     # Calculate differences
     merged["total_delta"] = merged["pit_total_v2"] - merged["pit_total_v1"]
