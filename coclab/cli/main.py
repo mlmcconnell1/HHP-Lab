@@ -31,6 +31,7 @@ from coclab.cli.ingest_acs_population import ingest_acs_population
 from coclab.cli.ingest_census import ingest_census
 from coclab.cli.ingest_pit import ingest_pit
 from coclab.cli.ingest_pit_vintage import ingest_pit_vintage
+from coclab.cli.list_census import list_census
 from coclab.cli.list_measures import list_measures
 from coclab.cli.list_xwalks import list_xwalks
 from coclab.cli.panel_diagnostics import panel_diagnostics
@@ -378,6 +379,7 @@ app.command("ingest-census")(ingest_census)
 app.command("ingest-pit")(ingest_pit)
 app.command("ingest-pit-vintage")(ingest_pit_vintage)
 app.command("ingest-zori")(ingest_zori)
+app.command("list-census")(list_census)
 app.command("list-measures")(list_measures)
 app.command("list-vintages")(list_vintages_cmd)
 app.command("list-xwalks")(list_xwalks)

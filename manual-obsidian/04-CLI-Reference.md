@@ -22,6 +22,7 @@ flowchart LR
     coclab --> verify-acs-population
     coclab --> xwalk-diagnostics
     coclab --> panel-diagnostics
+    coclab --> list-census
     coclab --> list-xwalks
     coclab --> list-measures
     coclab --> show-measures
@@ -52,6 +53,7 @@ flowchart LR
     zori-diagnostics --> ZORI_DIAG[ZORI coverage diagnostics]
     xwalk-diagnostics --> DIAG[Crosswalk quality checks]
     panel-diagnostics --> PDIAG[Panel quality & sensitivity]
+    list-census --> LCENSUS[List census geometry files]
     list-xwalks --> LXWALK[List crosswalk files]
     list-measures --> LMEAS[List measure files]
     show-measures --> SMEAS[Display CoC measures]
@@ -538,6 +540,40 @@ coclab ingest-zori --geography county --start 2020-01-01 --end 2024-12-31
 
 **Output:**
 - `data/curated/zori/zori__{geography}.parquet`
+
+## `coclab list-census`
+
+List available TIGER census geometry files (tracts and counties).
+
+```bash
+# List all census geometry files
+coclab list-census
+
+# List only tract files
+coclab list-census --type tracts
+
+# List only county files
+coclab list-census --type counties
+```
+
+| Option | Description | Default |
+|--------|-------------|---------|
+| `--type`, `-t` | Filter by type: `tracts` or `counties` | All |
+| `--dir`, `-d` | Directory to scan | `data/curated/census` |
+
+**Example Output:**
+```
+Available census geometry files:
+
+Type         Year             Rows         Size Modified
+-----------------------------------------------------------------
+counties     2022            3,235     119.7 MB 2025-01-06 07:33
+counties     2023            3,235     119.5 MB 2025-01-05 18:10
+tracts       2022           85,529     619.9 MB 2025-01-06 07:33
+tracts       2023           85,529     620.8 MB 2025-01-05 18:18
+
+Total: 4 census file(s)
+```
 
 ## `coclab list-measures`
 
