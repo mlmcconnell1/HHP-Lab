@@ -41,9 +41,11 @@ def smoke_test_env(tmp_path, monkeypatch):
     raw_dir = tmp_path / "data" / "raw"
     curated_dir = tmp_path / "data" / "curated"
     maps_dir = curated_dir / "maps"
+    boundaries_dir = curated_dir / "coc_boundaries"
     raw_dir.mkdir(parents=True)
     curated_dir.mkdir(parents=True)
     maps_dir.mkdir(parents=True)
+    boundaries_dir.mkdir(parents=True)
 
     return tmp_path
 

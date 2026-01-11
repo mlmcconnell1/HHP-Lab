@@ -683,7 +683,7 @@ class TestIntegration:
         base.mkdir()
 
         # Create panel directory and file
-        panels_dir = base / "data" / "curated" / "panels"
+        panels_dir = base / "data" / "curated" / "panel"
         panels_dir.mkdir(parents=True)
         panel_path = panels_dir / "coc_panel__2020_2024.parquet"
         create_test_panel(panel_path)
@@ -819,7 +819,7 @@ class TestBundleWithZori:
         base.mkdir()
 
         # Create panel with ZORI columns
-        panels_dir = base / "data" / "curated" / "panels"
+        panels_dir = base / "data" / "curated" / "panel"
         panels_dir.mkdir(parents=True)
         panel_path = panels_dir / "coc_panel__2020_2024__zori.parquet"
         create_test_panel(panel_path, include_zori=True)

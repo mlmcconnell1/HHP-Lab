@@ -19,6 +19,10 @@ def temp_data_dir(tmp_path, monkeypatch):
     curated_dir = tmp_path / "data" / "curated"
     curated_dir.mkdir(parents=True)
 
+    # Create coc_boundaries directory for boundary parquet files
+    boundaries_dir = curated_dir / "coc_boundaries"
+    boundaries_dir.mkdir(parents=True)
+
     # Monkeypatch the working directory context
     monkeypatch.chdir(tmp_path)
 

@@ -11,17 +11,17 @@ runner = CliRunner()
 
 
 class TestIngestCommand:
-    """Tests for the 'ingest' command."""
+    """Tests for the 'ingest-boundaries' command."""
 
     def test_ingest_unknown_source(self):
         """Ingest with unknown source should fail."""
-        result = runner.invoke(app, ["ingest", "--source", "unknown"])
+        result = runner.invoke(app, ["ingest-boundaries", "--source", "unknown"])
         assert result.exit_code == 1
         assert "Unknown source" in result.output
 
     def test_ingest_hud_exchange_requires_vintage(self):
         """Ingest hud_exchange without vintage should fail."""
-        result = runner.invoke(app, ["ingest", "--source", "hud_exchange"])
+        result = runner.invoke(app, ["ingest-boundaries", "--source", "hud_exchange"])
         assert result.exit_code == 1
         assert "--vintage is required" in result.output
 
@@ -31,7 +31,7 @@ class TestIngestCommand:
         mock_ingest.return_value = Path("data/curated/coc_boundaries/coc_boundaries__2025.parquet")
 
         result = runner.invoke(
-            app, ["ingest", "--source", "hud_exchange", "--vintage", "2025", "--force"]
+            app, ["ingest-boundaries", "--source", "hud_exchange", "--vintage", "2025", "--force"]
         )
 
         assert result.exit_code == 0
@@ -44,7 +44,7 @@ class TestIngestCommand:
         mock_ingest.side_effect = ValueError("Download failed")
 
         result = runner.invoke(
-            app, ["ingest", "--source", "hud_exchange", "--vintage", "2025", "--force"]
+            app, ["ingest-boundaries", "--source", "hud_exchange", "--vintage", "2025", "--force"]
         )
 
         assert result.exit_code == 1
@@ -57,7 +57,7 @@ class TestIngestCommand:
             "data/curated/coc_boundaries/coc_boundaries__HUDOpenData_2025-01-04.parquet"
         )
 
-        result = runner.invoke(app, ["ingest", "--source", "hud_opendata"])
+        result = runner.invoke(app, ["ingest-boundaries", "--source", "hud_opendata"])
 
         assert result.exit_code == 0
         assert "Successfully ingested" in result.output
@@ -71,7 +71,7 @@ class TestIngestCommand:
         )
 
         result = runner.invoke(
-            app, ["ingest", "--source", "hud_opendata", "--snapshot", "custom_snapshot"]
+            app, ["ingest-boundaries", "--source", "hud_opendata", "--snapshot", "custom_snapshot"]
         )
 
         assert result.exit_code == 0
@@ -194,13 +194,13 @@ class TestHelpOutput:
         result = runner.invoke(app, ["--help"])
 
         assert result.exit_code == 0
-        assert "ingest" in result.output
+        assert "ingest-boundaries" in result.output
         assert "list-boundaries" in result.output
         assert "show" in result.output
 
     def test_ingest_help(self):
         """Ingest help should show options."""
-        result = runner.invoke(app, ["ingest", "--help"])
+        result = runner.invoke(app, ["ingest-boundaries", "--help"])
 
         assert result.exit_code == 0
         assert "--source" in result.output
