@@ -433,6 +433,41 @@ def detect_upstream_changes(
     return pd.DataFrame(results)
 
 
+def delete_by_local_path(
+    local_path: str | Path,
+    registry_path: Path | None = None,
+) -> int:
+    """Delete all source registry entries matching a local path.
+
+    Parameters
+    ----------
+    local_path : str or Path
+        The local_path value to match (exact match).
+    registry_path : Path, optional
+        Path to registry file.
+
+    Returns
+    -------
+    int
+        Number of entries deleted.
+    """
+    df = _load_registry(registry_path)
+
+    if df.empty:
+        return 0
+
+    local_path_str = str(local_path)
+    mask = df["local_path"] == local_path_str
+    count = mask.sum()
+
+    if count > 0:
+        df = df[~mask]
+        _save_registry(df, registry_path)
+        logger.info(f"Deleted {count} source registry entries for path: {local_path_str}")
+
+    return count
+
+
 def summarize_registry(registry_path: Path | None = None) -> str:
     """Generate a text summary of the source registry.
 

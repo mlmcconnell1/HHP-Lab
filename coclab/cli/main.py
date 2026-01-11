@@ -199,7 +199,8 @@ def delete_boundaries(
 ) -> None:
     """Delete a boundary vintage from the registry.
 
-    This removes the registry entry but does not delete the underlying data file.
+    This removes the registry entry and any corresponding source registry entries,
+    but does not delete the underlying data file.
 
     Examples:
 
@@ -208,6 +209,7 @@ def delete_boundaries(
         coclab delete-boundaries 2024 hud_exchange_gis_tools --yes
     """
     from coclab.registry.registry import delete_vintage, list_boundaries
+    from coclab.source_registry import delete_by_local_path
 
     # Check if the entry exists first
     vintages = list_boundaries()
@@ -228,6 +230,10 @@ def delete_boundaries(
 
     if delete_vintage(vintage, source):
         typer.echo(f"Deleted registry entry for vintage '{vintage}' from source '{source}'")
+        # Also clean up source_registry entries that reference the same path
+        source_deleted = delete_by_local_path(str(entry.path))
+        if source_deleted > 0:
+            typer.echo(f"Deleted {source_deleted} source registry entry(s) for path '{entry.path}'")
     else:
         typer.echo("Failed to delete entry", err=True)
         raise typer.Exit(1)
