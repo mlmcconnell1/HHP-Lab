@@ -28,11 +28,11 @@ DEST_PATHS = {
 
 # Categories and which vintage flags they use
 CATEGORY_VINTAGES = {
-    "tract_xwalk": ["boundary_vintage", "tracts_vintage"],
-    "county_xwalk": ["boundary_vintage", "counties_vintage"],
+    "tract_xwalk": ["boundary_vintage", "tract_vintage"],
+    "county_xwalk": ["boundary_vintage", "county_vintage"],
     "boundaries": ["boundary_vintage"],
     "pit": ["years"],
-    "zori": ["boundary_vintage", "counties_vintage", "acs_vintage"],
+    "zori": ["boundary_vintage", "county_vintage", "acs_vintage"],
     "measures": ["boundary_vintage", "acs_vintage"],
 }
 

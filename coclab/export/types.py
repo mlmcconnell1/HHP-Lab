@@ -43,8 +43,8 @@ class BundleConfig:
         default_factory=lambda: {"panel", "manifest", "codebook", "diagnostics"}
     )
     boundary_vintage: str | None = None
-    tracts_vintage: str | None = None
-    counties_vintage: str | None = None
+    tract_vintage: str | None = None
+    county_vintage: str | None = None
     acs_vintage: str | None = None
     years: str | None = None
     copy_mode: Literal["copy", "hardlink", "symlink"] = "copy"

@@ -45,10 +45,10 @@ def generate_readme(manifest: dict, bundle_name: str) -> str:
         lines.append("")
         if params.get("boundary_vintage"):
             lines.append(f"- **Boundary vintage:** {params['boundary_vintage']}")
-        if params.get("tracts_vintage"):
-            lines.append(f"- **Tracts vintage:** {params['tracts_vintage']}")
-        if params.get("counties_vintage"):
-            lines.append(f"- **Counties vintage:** {params['counties_vintage']}")
+        if params.get("tract_vintage"):
+            lines.append(f"- **Tract vintage:** {params['tract_vintage']}")
+        if params.get("county_vintage"):
+            lines.append(f"- **County vintage:** {params['county_vintage']}")
         if params.get("acs_vintage"):
             lines.append(f"- **ACS vintage:** {params['acs_vintage']}")
         if params.get("years"):

@@ -136,18 +136,18 @@ def export_bundle(
             help="Boundary vintage (e.g., 2025)",
         ),
     ] = None,
-    tracts_vintage: Annotated[
+    tract_vintage: Annotated[
         str | None,
         typer.Option(
-            "--tracts-vintage",
-            help="Census tracts vintage (e.g., 2023)",
+            "--tract-vintage",
+            help="Census tract vintage (e.g., 2023)",
         ),
     ] = None,
-    counties_vintage: Annotated[
+    county_vintage: Annotated[
         str | None,
         typer.Option(
-            "--counties-vintage",
-            help="Counties vintage (e.g., 2023)",
+            "--county-vintage",
+            help="County vintage (e.g., 2023)",
         ),
     ] = None,
     acs_vintage: Annotated[
@@ -215,8 +215,8 @@ def export_bundle(
         panel_path=panel,
         include=include_set,
         boundary_vintage=boundary_vintage,
-        tracts_vintage=tracts_vintage,
-        counties_vintage=counties_vintage,
+        tract_vintage=tract_vintage,
+        county_vintage=county_vintage,
         acs_vintage=acs_vintage,
         years=years,
         copy_mode=copy_mode,  # type: ignore[arg-type]
@@ -312,8 +312,8 @@ def export_bundle(
     # Build parameters dict for manifest
     parameters = {
         "boundary_vintage": boundary_vintage,
-        "tracts_vintage": tracts_vintage,
-        "counties_vintage": counties_vintage,
+        "tract_vintage": tract_vintage,
+        "county_vintage": county_vintage,
         "acs_vintage": acs_vintage,
         "years": years,
         "copy_mode": copy_mode,

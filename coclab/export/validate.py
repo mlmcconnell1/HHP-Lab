@@ -162,26 +162,26 @@ def validate_vintage_compatibility(
                     f"config acs_vintage ({config.acs_vintage})"
                 )
 
-    # Check tracts_vintage
-    if config.tracts_vintage:
-        panel_tracts_vintage = metadata.get(b"tracts_vintage")
-        if panel_tracts_vintage:
-            panel_value = panel_tracts_vintage.decode("utf-8")
-            if panel_value != config.tracts_vintage:
+    # Check tract_vintage
+    if config.tract_vintage:
+        panel_tract_vintage = metadata.get(b"tract_vintage")
+        if panel_tract_vintage:
+            panel_value = panel_tract_vintage.decode("utf-8")
+            if panel_value != config.tract_vintage:
                 warnings.append(
-                    f"Panel tracts_vintage ({panel_value}) does not match "
-                    f"config tracts_vintage ({config.tracts_vintage})"
+                    f"Panel tract_vintage ({panel_value}) does not match "
+                    f"config tract_vintage ({config.tract_vintage})"
                 )
 
-    # Check counties_vintage
-    if config.counties_vintage:
-        panel_counties_vintage = metadata.get(b"counties_vintage")
-        if panel_counties_vintage:
-            panel_value = panel_counties_vintage.decode("utf-8")
-            if panel_value != config.counties_vintage:
+    # Check county_vintage
+    if config.county_vintage:
+        panel_county_vintage = metadata.get(b"county_vintage")
+        if panel_county_vintage:
+            panel_value = panel_county_vintage.decode("utf-8")
+            if panel_value != config.county_vintage:
                 warnings.append(
-                    f"Panel counties_vintage ({panel_value}) does not match "
-                    f"config counties_vintage ({config.counties_vintage})"
+                    f"Panel county_vintage ({panel_value}) does not match "
+                    f"config county_vintage ({config.county_vintage})"
                 )
 
     return warnings
