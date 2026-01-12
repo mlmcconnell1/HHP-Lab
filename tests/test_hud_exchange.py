@@ -101,7 +101,7 @@ class TestMapToCanonicalSchema:
         ]
         assert list(result["state_abbrev"]) == ["CO", "CO"]
         assert all(result["boundary_vintage"] == "2024")
-        assert all(result["source"] == "hud_exchange_gis_tools")
+        assert all(result["source"] == "hud_exchange")
         assert all(result["source_ref"] == "https://example.com/data.zip")
         assert all(isinstance(dt, datetime) for dt in result["ingested_at"])
 
@@ -233,7 +233,7 @@ class TestIngestHudExchange:
             assert "geometry" in gdf.columns
 
             # Verify canonical values
-            assert all(gdf["source"] == "hud_exchange_gis_tools")
+            assert all(gdf["source"] == "hud_exchange")
             assert all(gdf["boundary_vintage"] == "2024")
 
     def test_ingest_normalizes_crs(self):

@@ -98,7 +98,7 @@ class TestBuildXwalksCommand:
             mock_list_boundaries.return_value = [
                 RegistryEntry(
                     boundary_vintage="2025",
-                    source="hud_exchange_gis_tools",
+                    source="hud_exchange",
                     ingested_at=datetime(2025, 1, 1, tzinfo=UTC),
                     path=boundary_path,
                     feature_count=1,

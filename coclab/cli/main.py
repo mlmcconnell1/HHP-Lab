@@ -185,7 +185,7 @@ def delete_boundaries(
     source: Annotated[
         str,
         typer.Argument(
-            help="Data source (e.g., 'hud_exchange_gis_tools', 'hud_arcgis_featureserver')"
+            help="Data source (e.g., 'hud_exchange', 'hud_opendata')"
         ),
     ],
     yes: Annotated[
@@ -204,9 +204,9 @@ def delete_boundaries(
 
     Examples:
 
-        coclab delete-boundaries 2024 hud_exchange_gis_tools
+        coclab delete-boundaries 2024 hud_exchange
 
-        coclab delete-boundaries 2024 hud_exchange_gis_tools --yes
+        coclab delete-boundaries 2024 hud_exchange --yes
     """
     from coclab.registry.registry import delete_vintage, list_boundaries
     from coclab.source_registry import delete_by_local_path

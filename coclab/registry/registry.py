@@ -73,7 +73,7 @@ def register_vintage(
 
     Args:
         boundary_vintage: Version identifier (e.g., '2025')
-        source: Origin of the data ('hud_exchange_gis_tools' | 'hud_opendata_arcgis')
+        source: Origin of the data ('hud_exchange' | 'hud_opendata')
         path: Path to the curated GeoParquet file
         feature_count: Number of features in the dataset
         ingested_at: UTC timestamp (defaults to now)
@@ -167,7 +167,7 @@ def delete_vintage(
 
     Args:
         boundary_vintage: Version identifier (e.g., '2024')
-        source: Origin of the data (e.g., 'hud_exchange_gis_tools')
+        source: Origin of the data (e.g., 'hud_exchange')
         registry_path: Custom registry path (uses default if not specified)
 
     Returns:
@@ -196,8 +196,8 @@ def latest_vintage(
     """Get the latest boundary vintage.
 
     Selection policy:
-    - For hud_exchange_gis_tools: prefer highest year number
-    - For hud_opendata_arcgis: prefer most recent ingested_at
+    - For hud_exchange: prefer highest year number
+    - For hud_opendata: prefer most recent ingested_at
     - If source not specified: apply source-specific policy, then pick overall latest
 
     Args:
@@ -220,7 +220,7 @@ def latest_vintage(
             return None
 
     # Apply source-specific selection policy
-    if source == "hud_exchange_gis_tools":
+    if source == "hud_exchange":
         # For HUD Exchange, prefer highest year
         df = df.copy()
         df["_year"] = df["boundary_vintage"].apply(_extract_year)
@@ -230,12 +230,12 @@ def latest_vintage(
         # Fallback to most recent ingested_at
         return df.loc[df["ingested_at"].idxmax(), "boundary_vintage"]
 
-    if source == "hud_opendata_arcgis":
+    if source == "hud_opendata":
         # For OpenData, prefer most recent ingested_at
         return df.loc[df["ingested_at"].idxmax(), "boundary_vintage"]
 
     # No source specified: prefer hud_exchange with highest year, then fallback
-    hud_exchange = df[df["source"] == "hud_exchange_gis_tools"]
+    hud_exchange = df[df["source"] == "hud_exchange"]
     if not hud_exchange.empty:
         hud_exchange = hud_exchange.copy()
         hud_exchange["_year"] = hud_exchange["boundary_vintage"].apply(_extract_year)

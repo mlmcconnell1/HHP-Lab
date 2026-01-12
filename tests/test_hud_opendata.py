@@ -223,7 +223,7 @@ class TestMapToCanonicalSchema:
         assert result.iloc[0]["coc_id"] == "CO-500"
         assert result.iloc[0]["coc_name"] == "Colorado Balance of State CoC"
         assert result.iloc[0]["state_abbrev"] == "CO"
-        assert result.iloc[0]["source"] == "hud_opendata_arcgis"
+        assert result.iloc[0]["source"] == "hud_opendata"
         assert result.iloc[0]["boundary_vintage"] == "HUDOpenData_2025-01-04"
 
 

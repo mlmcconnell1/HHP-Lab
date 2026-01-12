@@ -55,7 +55,7 @@ def sample_boundaries(temp_data_dir):
         "coc_id": ["CO-500", "NY-600"],
         "coc_name": ["Colorado Balance of State CoC", "New York City CoC"],
         "boundary_vintage": ["2025", "2025"],
-        "source": ["hud_exchange_gis_tools", "hud_exchange_gis_tools"],
+        "source": ["hud_exchange", "hud_exchange"],
         "source_ref": ["https://example.com", "https://example.com"],
         "state_abbrev": ["CO", "NY"],
         "ingested_at": [datetime.now(timezone.utc), datetime.now(timezone.utc)],
@@ -71,7 +71,7 @@ def sample_boundaries(temp_data_dir):
     registry_path = temp_data_dir / "data" / "curated" / "boundary_registry.parquet"
     register_vintage(
         boundary_vintage=vintage,
-        source="hud_exchange_gis_tools",
+        source="hud_exchange",
         path=parquet_path,
         feature_count=len(gdf),
         registry_path=registry_path,

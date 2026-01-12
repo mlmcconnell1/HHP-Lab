@@ -11,7 +11,7 @@ class RegistryEntry:
 
     Attributes:
         boundary_vintage: Version identifier (e.g., '2025', 'HUDOpenData_2025-08-19')
-        source: Origin of the data ('hud_exchange_gis_tools' | 'hud_opendata_arcgis')
+        source: Origin of the data ('hud_exchange' | 'hud_opendata')
         ingested_at: UTC timestamp when data was ingested
         path: File path to the curated GeoParquet file
         feature_count: Number of features (CoC boundaries) in the dataset

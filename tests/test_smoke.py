@@ -114,7 +114,7 @@ def fixture_boundaries_gdf():
         ],
         "state_abbrev": ["CO", "NY", "CA", "TX"],
         "boundary_vintage": ["2025", "2025", "2025", "2025"],
-        "source": ["hud_exchange_gis_tools"] * 4,
+        "source": ["hud_exchange"] * 4,
         "source_ref": ["https://www.hudexchange.info/gis-tools"] * 4,
         "ingested_at": [ingested_at] * 4,
     }, geometry=[co_500_poly, ny_600_poly, ca_600_poly, tx_600_poly], crs="EPSG:4326")
@@ -147,7 +147,7 @@ class TestSmokeEndToEnd:
         registry_path = smoke_test_env / "data" / "curated" / "boundary_registry.parquet"
         entry = register_vintage(
             boundary_vintage=vintage,
-            source="hud_exchange_gis_tools",
+            source="hud_exchange",
             path=parquet_path,
             feature_count=len(normalized_gdf),
             registry_path=registry_path,
@@ -190,7 +190,7 @@ class TestSmokeEndToEnd:
         registry_path = smoke_test_env / "data" / "curated" / "boundary_registry.parquet"
         register_vintage(
             boundary_vintage=vintage,
-            source="hud_exchange_gis_tools",
+            source="hud_exchange",
             path=parquet_path,
             feature_count=len(normalized_gdf),
             registry_path=registry_path,
@@ -230,7 +230,7 @@ class TestSmokeCLI:
         registry_path = smoke_test_env / "data" / "curated" / "boundary_registry.parquet"
         register_vintage(
             boundary_vintage=vintage,
-            source="hud_exchange_gis_tools",
+            source="hud_exchange",
             path=parquet_path,
             feature_count=len(normalized_gdf),
             registry_path=registry_path,
@@ -240,7 +240,7 @@ class TestSmokeCLI:
         result = runner.invoke(app, ["list-boundaries"])
         assert result.exit_code == 0
         assert "2025" in result.stdout
-        assert "hud_exchange_gis_tools" in result.stdout
+        assert "hud_exchange" in result.stdout
 
     def test_cli_show_renders_map(self, smoke_test_env, fixture_boundaries_gdf):
         """Test show command renders a map via CLI."""
@@ -253,7 +253,7 @@ class TestSmokeCLI:
         registry_path = smoke_test_env / "data" / "curated" / "boundary_registry.parquet"
         register_vintage(
             boundary_vintage=vintage,
-            source="hud_exchange_gis_tools",
+            source="hud_exchange",
             path=parquet_path,
             feature_count=len(normalized_gdf),
             registry_path=registry_path,
@@ -276,7 +276,7 @@ class TestSmokeCLI:
         registry_path = smoke_test_env / "data" / "curated" / "boundary_registry.parquet"
         register_vintage(
             boundary_vintage=vintage,
-            source="hud_exchange_gis_tools",
+            source="hud_exchange",
             path=parquet_path,
             feature_count=len(normalized_gdf),
             registry_path=registry_path,
@@ -376,7 +376,7 @@ class TestSmokeEdgeCases:
         registry_path = smoke_test_env / "data" / "curated" / "boundary_registry.parquet"
         register_vintage(
             boundary_vintage=vintage,
-            source="hud_exchange_gis_tools",
+            source="hud_exchange",
             path=parquet_path,
             feature_count=len(normalized_gdf),
             registry_path=registry_path,

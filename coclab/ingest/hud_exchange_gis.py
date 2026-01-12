@@ -256,7 +256,7 @@ def _map_arcgis_to_canonical_schema(
             "coc_name": gdf["COCNAME"].astype(str),
             "state_abbrev": state_values,
             "boundary_vintage": boundary_vintage,
-            "source": "hud_arcgis_featureserver",
+            "source": "hud_exchange",
             "source_ref": ARCGIS_SOURCE_REF,
             "ingested_at": datetime.now(UTC),
         },
@@ -458,7 +458,7 @@ def map_to_canonical_schema(
         result["state_abbrev"] = result["coc_id"].apply(_extract_state_from_coc_id)
 
     result["boundary_vintage"] = boundary_vintage
-    result["source"] = "hud_exchange_gis_tools"
+    result["source"] = "hud_exchange"
     result["source_ref"] = source_url
     result["ingested_at"] = datetime.now(UTC)
 
@@ -566,7 +566,7 @@ def ingest_hud_exchange(
     # Register in boundary registry
     from coclab.registry import register_vintage
 
-    source = "hud_arcgis_featureserver" if use_arcgis else "hud_exchange_gis_tools"
+    source = "hud_exchange"
     register_vintage(
         boundary_vintage=boundary_vintage,
         source=source,

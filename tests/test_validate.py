@@ -38,7 +38,7 @@ def make_valid_gdf(
             "coc_id": coc_ids,
             "coc_name": [f"CoC {cid}" for cid in coc_ids],
             "state_abbrev": ["CO"] * n,
-            "source": ["hud_exchange_gis_tools"] * n,
+            "source": ["hud_exchange"] * n,
             "source_ref": ["https://example.com"] * n,
             "ingested_at": [datetime.now(UTC)] * n,
             "geom_hash": ["abc123"] * n,

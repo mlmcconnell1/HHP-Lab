@@ -156,7 +156,7 @@ def _map_to_canonical_schema(
             "coc_id": gdf["COCNUM"].astype(str),
             "coc_name": gdf["COCNAME"].astype(str),
             "state_abbrev": gdf["STUSAB"].astype(str),
-            "source": "hud_opendata_arcgis",
+            "source": "hud_opendata",
             "source_ref": SOURCE_REF,
             "ingested_at": ingested_at,
         },
@@ -264,7 +264,7 @@ def ingest_hud_opendata(
         metadata={
             "boundary_vintage": boundary_vintage,
             "feature_count": len(features),
-            "source": "hud_opendata_arcgis",
+            "source": "hud_opendata",
         },
     )
 

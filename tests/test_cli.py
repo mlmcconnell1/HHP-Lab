@@ -101,7 +101,7 @@ class TestListBoundariesCommand:
         mock_list.return_value = [
             RegistryEntry(
                 boundary_vintage="2025",
-                source="hud_exchange_gis_tools",
+                source="hud_exchange",
                 ingested_at=datetime(2025, 1, 4, 12, 0, 0, tzinfo=UTC),
                 path=Path("data/curated/coc_boundaries/coc_boundaries__2025.parquet"),
                 feature_count=450,
@@ -109,7 +109,7 @@ class TestListBoundariesCommand:
             ),
             RegistryEntry(
                 boundary_vintage="HUDOpenData_2025-01-04",
-                source="hud_opendata_arcgis",
+                source="hud_opendata",
                 ingested_at=datetime(2025, 1, 4, 10, 0, 0, tzinfo=UTC),
                 path=Path("data/curated/coc_boundaries/coc_boundaries__HUDOpenData_2025-01-04.parquet"),
                 feature_count=448,
@@ -121,7 +121,7 @@ class TestListBoundariesCommand:
 
         assert result.exit_code == 0
         assert "2025" in result.output
-        assert "hud_exchange_gis_tools" in result.output
+        assert "hud_exchange" in result.output
         assert "HUDOpenData_2025-01-04" in result.output
         assert "450" in result.output
 

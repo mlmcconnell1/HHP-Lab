@@ -28,7 +28,7 @@ class TestRegistryEntry:
     def test_to_dict(self):
         entry = RegistryEntry(
             boundary_vintage="2025",
-            source="hud_exchange_gis_tools",
+            source="hud_exchange",
             ingested_at=datetime(2025, 1, 1, 12, 0, 0, tzinfo=timezone.utc),
             path=Path("data/curated/coc_boundaries/coc_boundaries__2025.parquet"),
             feature_count=400,
@@ -36,7 +36,7 @@ class TestRegistryEntry:
         )
         d = entry.to_dict()
         assert d["boundary_vintage"] == "2025"
-        assert d["source"] == "hud_exchange_gis_tools"
+        assert d["source"] == "hud_exchange"
         assert d["ingested_at"] == "2025-01-01T12:00:00+00:00"
         assert d["path"] == "data/curated/coc_boundaries/coc_boundaries__2025.parquet"
         assert d["feature_count"] == 400
@@ -45,7 +45,7 @@ class TestRegistryEntry:
     def test_from_dict(self):
         d = {
             "boundary_vintage": "2024",
-            "source": "hud_opendata_arcgis",
+            "source": "hud_opendata",
             "ingested_at": "2024-06-15T10:30:00+00:00",
             "path": "data/curated/coc_boundaries/coc_boundaries__2024.parquet",
             "feature_count": 395,
@@ -53,7 +53,7 @@ class TestRegistryEntry:
         }
         entry = RegistryEntry.from_dict(d)
         assert entry.boundary_vintage == "2024"
-        assert entry.source == "hud_opendata_arcgis"
+        assert entry.source == "hud_opendata"
         assert entry.ingested_at == datetime(2024, 6, 15, 10, 30, 0, tzinfo=timezone.utc)
         assert entry.path == Path("data/curated/coc_boundaries/coc_boundaries__2024.parquet")
         assert entry.feature_count == 395
@@ -66,13 +66,13 @@ class TestRegisterVintage:
     def test_register_new_vintage(self, temp_registry, sample_parquet):
         entry = register_vintage(
             boundary_vintage="2025",
-            source="hud_exchange_gis_tools",
+            source="hud_exchange",
             path=sample_parquet,
             feature_count=400,
             registry_path=temp_registry,
         )
         assert entry.boundary_vintage == "2025"
-        assert entry.source == "hud_exchange_gis_tools"
+        assert entry.source == "hud_exchange"
         assert entry.feature_count == 400
         assert entry.hash_of_file is not None
         assert temp_registry.exists()
@@ -80,14 +80,14 @@ class TestRegisterVintage:
     def test_register_multiple_vintages(self, temp_registry, sample_parquet):
         register_vintage(
             boundary_vintage="2024",
-            source="hud_exchange_gis_tools",
+            source="hud_exchange",
             path=sample_parquet,
             feature_count=390,
             registry_path=temp_registry,
         )
         register_vintage(
             boundary_vintage="2025",
-            source="hud_exchange_gis_tools",
+            source="hud_exchange",
             path=sample_parquet,
             feature_count=400,
             registry_path=temp_registry,
@@ -101,7 +101,7 @@ class TestRegisterVintage:
         ingested_at = datetime(2025, 1, 1, 12, 0, 0, tzinfo=timezone.utc)
         entry1 = register_vintage(
             boundary_vintage="2025",
-            source="hud_exchange_gis_tools",
+            source="hud_exchange",
             path=sample_parquet,
             feature_count=400,
             ingested_at=ingested_at,
@@ -110,7 +110,7 @@ class TestRegisterVintage:
         # Register again with same content
         entry2 = register_vintage(
             boundary_vintage="2025",
-            source="hud_exchange_gis_tools",
+            source="hud_exchange",
             path=sample_parquet,
             feature_count=400,
             ingested_at=datetime(2025, 2, 1, 12, 0, 0, tzinfo=timezone.utc),
@@ -130,7 +130,7 @@ class TestRegisterVintage:
 
         entry1 = register_vintage(
             boundary_vintage="2025",
-            source="hud_exchange_gis_tools",
+            source="hud_exchange",
             path=file1,
             feature_count=400,
             registry_path=temp_registry,
@@ -139,7 +139,7 @@ class TestRegisterVintage:
 
         entry2 = register_vintage(
             boundary_vintage="2025",
-            source="hud_exchange_gis_tools",
+            source="hud_exchange",
             path=file2,
             feature_count=405,
             registry_path=temp_registry,
@@ -163,7 +163,7 @@ class TestListVintages:
     def test_sorted_by_ingested_at_descending(self, temp_registry, sample_parquet):
         register_vintage(
             boundary_vintage="2023",
-            source="hud_exchange_gis_tools",
+            source="hud_exchange",
             path=sample_parquet,
             feature_count=380,
             ingested_at=datetime(2023, 6, 1, tzinfo=timezone.utc),
@@ -171,7 +171,7 @@ class TestListVintages:
         )
         register_vintage(
             boundary_vintage="2025",
-            source="hud_exchange_gis_tools",
+            source="hud_exchange",
             path=sample_parquet,
             feature_count=400,
             ingested_at=datetime(2025, 1, 1, tzinfo=timezone.utc),
@@ -179,7 +179,7 @@ class TestListVintages:
         )
         register_vintage(
             boundary_vintage="2024",
-            source="hud_exchange_gis_tools",
+            source="hud_exchange",
             path=sample_parquet,
             feature_count=390,
             ingested_at=datetime(2024, 6, 1, tzinfo=timezone.utc),
@@ -200,7 +200,7 @@ class TestLatestVintage:
         # Register older year but more recent ingestion
         register_vintage(
             boundary_vintage="2023",
-            source="hud_exchange_gis_tools",
+            source="hud_exchange",
             path=sample_parquet,
             feature_count=380,
             ingested_at=datetime(2025, 6, 1, tzinfo=timezone.utc),
@@ -208,14 +208,14 @@ class TestLatestVintage:
         )
         register_vintage(
             boundary_vintage="2025",
-            source="hud_exchange_gis_tools",
+            source="hud_exchange",
             path=sample_parquet,
             feature_count=400,
             ingested_at=datetime(2025, 1, 1, tzinfo=timezone.utc),
             registry_path=temp_registry,
         )
         result = latest_vintage(
-            source="hud_exchange_gis_tools",
+            source="hud_exchange",
             registry_path=temp_registry,
         )
         assert result == "2025"
@@ -223,7 +223,7 @@ class TestLatestVintage:
     def test_opendata_prefers_recent_ingestion(self, temp_registry, sample_parquet):
         register_vintage(
             boundary_vintage="HUDOpenData_2024-01-15",
-            source="hud_opendata_arcgis",
+            source="hud_opendata",
             path=sample_parquet,
             feature_count=390,
             ingested_at=datetime(2024, 1, 15, tzinfo=timezone.utc),
@@ -231,14 +231,14 @@ class TestLatestVintage:
         )
         register_vintage(
             boundary_vintage="HUDOpenData_2024-06-01",
-            source="hud_opendata_arcgis",
+            source="hud_opendata",
             path=sample_parquet,
             feature_count=395,
             ingested_at=datetime(2024, 6, 1, tzinfo=timezone.utc),
             registry_path=temp_registry,
         )
         result = latest_vintage(
-            source="hud_opendata_arcgis",
+            source="hud_opendata",
             registry_path=temp_registry,
         )
         assert result == "HUDOpenData_2024-06-01"
@@ -246,7 +246,7 @@ class TestLatestVintage:
     def test_no_source_prefers_hud_exchange_year(self, temp_registry, sample_parquet):
         register_vintage(
             boundary_vintage="HUDOpenData_2025-06-01",
-            source="hud_opendata_arcgis",
+            source="hud_opendata",
             path=sample_parquet,
             feature_count=400,
             ingested_at=datetime(2025, 6, 1, tzinfo=timezone.utc),
@@ -254,7 +254,7 @@ class TestLatestVintage:
         )
         register_vintage(
             boundary_vintage="2024",
-            source="hud_exchange_gis_tools",
+            source="hud_exchange",
             path=sample_parquet,
             feature_count=390,
             ingested_at=datetime(2024, 1, 1, tzinfo=timezone.utc),
@@ -262,7 +262,7 @@ class TestLatestVintage:
         )
         register_vintage(
             boundary_vintage="2025",
-            source="hud_exchange_gis_tools",
+            source="hud_exchange",
             path=sample_parquet,
             feature_count=400,
             ingested_at=datetime(2025, 1, 1, tzinfo=timezone.utc),
@@ -275,7 +275,7 @@ class TestLatestVintage:
     def test_fallback_to_ingested_at_when_no_year(self, temp_registry, sample_parquet):
         register_vintage(
             boundary_vintage="snapshot_a",
-            source="hud_exchange_gis_tools",
+            source="hud_exchange",
             path=sample_parquet,
             feature_count=390,
             ingested_at=datetime(2024, 1, 1, tzinfo=timezone.utc),
@@ -283,14 +283,14 @@ class TestLatestVintage:
         )
         register_vintage(
             boundary_vintage="snapshot_b",
-            source="hud_exchange_gis_tools",
+            source="hud_exchange",
             path=sample_parquet,
             feature_count=400,
             ingested_at=datetime(2025, 6, 1, tzinfo=timezone.utc),
             registry_path=temp_registry,
         )
         result = latest_vintage(
-            source="hud_exchange_gis_tools",
+            source="hud_exchange",
             registry_path=temp_registry,
         )
         # Fallback to most recent ingested_at when no year parseable
@@ -299,13 +299,13 @@ class TestLatestVintage:
     def test_source_filter_returns_none_if_not_found(self, temp_registry, sample_parquet):
         register_vintage(
             boundary_vintage="2025",
-            source="hud_exchange_gis_tools",
+            source="hud_exchange",
             path=sample_parquet,
             feature_count=400,
             registry_path=temp_registry,
         )
         result = latest_vintage(
-            source="hud_opendata_arcgis",
+            source="hud_opendata",
             registry_path=temp_registry,
         )
         assert result is None
