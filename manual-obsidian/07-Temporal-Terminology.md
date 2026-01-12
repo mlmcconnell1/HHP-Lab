@@ -21,6 +21,7 @@ Single-letter prefixes identify dataset types:
 | Census county geometry | **C**{year} | C2023 | TIGER county shapes |
 | ACS vintage (end year) | **A**{year} | A2022 | Implies 5-year window ending that year |
 | PIT count year | **P**{year} | P2024 | The January count year |
+| ZORI yearly series | **Z**{year} | Z2024 | Yearly-collapsed ZORI (default: January alignment) |
 | Panel year | **Y**{year} | Y2023 | The "as-of" year for analysis |
 
 ### ACS Collection Windows
@@ -33,6 +34,14 @@ ACS 5-year estimates have an implicit collection window. The vintage year is the
 | A2023 | 2019–2023 | Late 2024 |
 | A2024 | 2020–2024 | Late 2025 |
 
+## ZORI Temporal Conventions
+
+ZORI is published as a **monthly** series. In CoC Lab notation:
+
+- **Z{year}** refers to the **yearly-collapsed** ZORI value for that year.
+- The default collapse method is **January alignment** (`pit_january`) to match PIT timing.
+- If the collapse method matters, annotate it explicitly (e.g., `Z2024[pit_january]`, `Z2024[calendar_mean]`, `Z2024[calendar_median]`).
+
 ## Compound Notation
 
 When describing which vintages were combined in a derived dataset, use `@` for "analyzed using" and `×` for crosswalk joins:
@@ -43,12 +52,14 @@ When describing which vintages were combined in a derived dataset, use `@` for "
 | **A2022@B2025** | ACS 2022 aggregated to 2025 CoC boundaries |
 | **A2022@B2025×T2023** | ACS 2022 aggregated to 2025 CoC boundaries via 2023 tract crosswalk |
 | **P2020@B2025×T2023** | 2020 PIT re-aligned to 2025 boundaries using 2023 tracts |
+| **Z2024@B2025×C2023** | 2024 ZORI aggregated to 2025 CoC boundaries via 2023 county crosswalk |
 
 ### Reading Compound Notation
 
 - The first element is the **source data** being analyzed
 - `@B{year}` specifies the **target CoC boundaries**
 - `×T{year}` or `×C{year}` specifies the **intermediary geometry** used for spatial joins
+- ZORI aggregation uses ACS-based weights; note the weight vintage in prose when needed (e.g., "weights A2023")
 
 ## Temporal Mismatch Terminology
 
