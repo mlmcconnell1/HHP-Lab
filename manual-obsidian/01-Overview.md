@@ -28,9 +28,9 @@ A Continuum of Care (CoC) is a regional or local planning body that coordinates 
 | **HUD PIT Counts** | Point-in-Time counts by CoC | Annual releases |
 | **Zillow ZORI** | County-level observed rent index | Monthly series |
 
-## Choosing a Data Source
+## Choosing a CoC Boundary Source
 
-The two data sources serve different purposes. Choose based on your use case:
+CoC Lab supports two sources for CoC boundary geometries, each serving different purposes. Choose based on your use case:
 
 ### HUD Exchange (`hud_exchange`)
 
