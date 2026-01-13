@@ -286,30 +286,32 @@ erDiagram
 
 ## Storage Locations
 
+Filenames use temporal shorthand notation (see [[07-Temporal-Terminology]]).
+
 | File | Path Pattern | Description |
 |------|--------------|-------------|
-| Boundary data | `data/curated/coc_boundaries/coc_boundaries__{vintage}.parquet` | GeoParquet with boundaries |
+| Boundary data | `data/curated/boundaries/boundaries__B{vintage}.parquet` | GeoParquet with boundaries |
 | Registry | `data/curated/boundary_registry.parquet` | Vintage tracking |
-| Maps | `data/curated/maps/{coc_id}__{vintage}.html` | Generated HTML maps |
+| Maps | `data/curated/maps/{coc_id}__B{vintage}.html` | Generated HTML maps |
 | Raw downloads | `data/raw/hud_exchange/{vintage}/` | Original source files |
-| Census tracts | `data/curated/census/tracts__{year}.parquet` | TIGER tract geometries |
-| Census counties | `data/curated/census/counties__{year}.parquet` | TIGER county geometries |
-| Tract crosswalks | `data/curated/xwalks/coc_tract_xwalk__{boundary}__{tract}.parquet` | CoC-tract mapping |
-| County crosswalks | `data/curated/xwalks/coc_county_xwalk__{boundary}.parquet` | CoC-county mapping |
-| CoC measures | `data/curated/measures/coc_measures__{boundary}__{acs}.parquet` | Aggregated ACS data |
-| PIT counts | `data/curated/pit/pit_counts__{year}.parquet` | Canonical PIT data (single year) |
+| Census tracts | `data/curated/census/tracts__T{year}.parquet` | TIGER tract geometries |
+| Census counties | `data/curated/census/counties__C{year}.parquet` | TIGER county geometries |
+| Tract crosswalks | `data/curated/xwalks/xwalk__B{boundary}xT{tract}.parquet` | CoC-tract mapping |
+| County crosswalks | `data/curated/xwalks/xwalk__B{boundary}xC{county}.parquet` | CoC-county mapping |
+| CoC measures | `data/curated/measures/measures__A{acs}@B{boundary}.parquet` | Aggregated ACS data |
+| PIT counts | `data/curated/pit/pit__P{year}.parquet` | Canonical PIT data (single year) |
 | PIT vintages | `data/curated/pit/pit_vintage__{vintage}.parquet` | All years from a vintage release |
 | PIT registry | `data/curated/pit/pit_registry.parquet` | PIT year tracking |
 | PIT vintage registry | `data/curated/pit/pit_vintage_registry.parquet` | PIT vintage tracking |
-| CoC panels | `data/curated/panels/coc_panel__{start}_{end}.parquet` | Analysis-ready panels |
-| Tract population | `data/curated/acs/tract_population__{acs}__{tract}.parquet` | ACS tract population |
-| CoC population rollup | `data/curated/acs/coc_population_rollup__{boundary}__{acs}__{tract}__{weighting}.parquet` | Aggregated CoC population |
-| Population crosscheck | `data/curated/acs/acs_population_crosscheck__{boundary}__{acs}__{tract}__{weighting}.parquet` | Validation report |
+| CoC panels | `data/curated/panels/panel__Y{start}-{end}@B{boundary}.parquet` | Analysis-ready panels |
+| Tract population | `data/curated/acs/acs_tracts__A{acs}xT{tract}.parquet` | ACS tract population |
+| CoC population rollup | `data/curated/acs/coc_population__A{acs}@B{boundary}xT{tract}__{weighting}.parquet` | Aggregated CoC population |
+| Population crosscheck | `data/curated/acs/crosscheck__A{acs}@B{boundary}xT{tract}__{weighting}.parquet` | Validation report |
 | Raw ZORI | `data/raw/zori/zori__{geography}__{date}.csv` | Downloaded Zillow CSV |
 | Normalized ZORI | `data/curated/zori/zori__{geography}.parquet` | Normalized ZORI data |
-| County weights | `data/curated/acs/county_weights__{acs}__{method}.parquet` | ACS county weights |
-| CoC ZORI | `data/curated/zori/coc_zori__{geo}__b{boundary}__c{counties}__acs{acs}__w{weight}.parquet` | Aggregated CoC ZORI |
-| CoC ZORI yearly | `data/curated/zori/coc_zori_yearly__...parquet` | Yearly collapsed ZORI |
+| County weights | `data/curated/acs/county_weights__A{acs}__{method}.parquet` | ACS county weights |
+| CoC ZORI | `data/curated/zori/zori__A{acs}@B{boundary}xC{county}__{weight}.parquet` | Aggregated CoC ZORI |
+| CoC ZORI yearly | `data/curated/zori/zori_yearly__A{acs}@B{boundary}xC{county}__{weight}.parquet` | Yearly collapsed ZORI |
 
 ## Dataset Provenance
 
@@ -328,7 +330,7 @@ All CoC Lab Parquet files embed **provenance metadata** in the file schema, enab
   "notation": "A2022@B2025×T2023",
   "extra": {
     "dataset_type": "coc_measures",
-    "crosswalk_path": "data/curated/xwalks/coc_tract_xwalk__2025__2023.parquet"
+    "crosswalk_path": "data/curated/xwalks/xwalk__B2025xT2023.parquet"
   }
 }
 ```
@@ -350,7 +352,7 @@ The `notation` field uses the shorthand from [[07-Temporal-Terminology|Temporal 
 ```python
 from coclab.provenance import read_provenance
 
-provenance = read_provenance("data/curated/measures/coc_measures__2025__2022.parquet")
+provenance = read_provenance("data/curated/measures/measures__A2022@B2025.parquet")
 print(provenance.boundary_vintage)  # "2025"
 print(provenance.weighting)         # "population"
 print(provenance.to_json())         # Full JSON representation

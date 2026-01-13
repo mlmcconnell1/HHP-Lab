@@ -130,7 +130,7 @@ coclab build-measures --boundary 2025 --acs 2019-2023 --weighting population
 | `--output-dir`, `-o` | Output directory | `data/curated/measures` |
 
 **Output:**
-- `coc_measures__{boundary}__{acs}.parquet`
+- `measures__A{acs}@B{boundary}.parquet`
 - Summary statistics printed to console
 
 ## `coclab build-panel`
@@ -232,8 +232,8 @@ coclab build-xwalks --boundary 2025 --tracts 2023 --counties 2023
 | `--output-dir`, `-o` | Output directory | `data/curated/xwalks` |
 
 **Output:**
-- `coc_tract_xwalk__{boundary}__{tracts}.parquet`
-- `coc_county_xwalk__{boundary}.parquet`
+- `xwalk__B{boundary}xT{tracts}.parquet`
+- `xwalk__B{boundary}xC{counties}.parquet`
 - Diagnostic summary printed to console
 
 ## `coclab compare-vintages`
@@ -786,7 +786,7 @@ Run crosswalk quality diagnostics.
 
 ```bash
 # Basic diagnostics
-coclab xwalk-diagnostics --crosswalk data/curated/xwalks/coc_tract_xwalk__2025__2023.parquet
+coclab xwalk-diagnostics --crosswalk data/curated/xwalks/xwalk__B2025xT2023.parquet
 
 # Show problem CoCs
 coclab xwalk-diagnostics -x crosswalk.parquet --show-problems

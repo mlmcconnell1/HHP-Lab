@@ -46,7 +46,7 @@ sequenceDiagram
     CLI->>Visualizer: render_coc_map("CO-500")
     Visualizer->>Registry: latest_vintage()
     Registry-->>Visualizer: "2025"
-    Visualizer->>Storage: Read coc_boundaries__2025.parquet
+    Visualizer->>Storage: Read boundaries__B2025.parquet
     Storage-->>Visualizer: GeoDataFrame
     Visualizer->>Visualizer: Filter by coc_id
     Visualizer->>Visualizer: Create Folium map
@@ -88,15 +88,15 @@ sequenceDiagram
     User->>CLI: coclab build-xwalks --boundary 2025 --tracts 2023
     CLI->>Census: ingest_tiger_tracts(2023)
     Census->>Storage: Download TIGER shapefiles
-    Census->>Storage: Save tracts__2023.parquet
+    Census->>Storage: Save tracts__T2023.parquet
     Census-->>CLI: Tract GeoDataFrame
-    CLI->>Storage: Load coc_boundaries__2025.parquet
+    CLI->>Storage: Load boundaries__B2025.parquet
     CLI->>XwalkBuilder: build_coc_tract_crosswalk(...)
     XwalkBuilder->>XwalkBuilder: Reproject to ESRI:102003 (Albers)
     XwalkBuilder->>XwalkBuilder: Compute overlay intersections
     XwalkBuilder->>XwalkBuilder: Calculate area_share per tract
     XwalkBuilder-->>CLI: Crosswalk DataFrame
-    CLI->>Storage: Save coc_tract_xwalk__2025__2023.parquet
+    CLI->>Storage: Save xwalk__B2025xT2023.parquet
     CLI-->>User: Crosswalk built (X tracts, Y CoCs)
 
     Note over User,Storage: Phase 2: Build ACS Measures
@@ -109,7 +109,7 @@ sequenceDiagram
     Measures->>Measures: Weight by area_share or pop_share
     Measures->>Measures: Sum populations, weighted medians
     Measures-->>CLI: CoC-level measures
-    CLI->>Storage: Save coc_measures__2025__2022.parquet
+    CLI->>Storage: Save measures__A2022@B2025.parquet
     CLI-->>User: Measures built (N CoCs)
 ```
 
@@ -239,14 +239,14 @@ coclab export-bundle \
 
 | Phase | Output Location |
 |-------|-----------------|
-| 1a. Boundaries | `data/curated/coc_boundaries/coc_boundaries__YYYY.parquet` |
-| 1b. Census | `data/curated/census/tracts__2023.parquet`, `counties__2023.parquet` |
+| 1a. Boundaries | `data/curated/boundaries/boundaries__B{year}.parquet` |
+| 1b. Census | `data/curated/census/tracts__T2023.parquet`, `counties__C2023.parquet` |
 | 1c. PIT | `data/curated/pit/pit_vintage__2024.parquet` |
 | 1d. ZORI | `data/curated/zori/zori__county.parquet` |
-| 2. Crosswalks | `data/curated/xwalks/coc_tract_xwalk__YYYY__2023.parquet` |
-| 3. Measures | `data/curated/measures/coc_measures__YYYY__XXXX-YYYY.parquet` |
-| 4. CoC ZORI | `data/curated/zori/coc_zori_yearly__*.parquet` |
-| 5. Panel | `data/curated/panels/coc_panel__2015_2024__zori.parquet` |
+| 2. Crosswalks | `data/curated/xwalks/xwalk__B{year}xT2023.parquet` |
+| 3. Measures | `data/curated/measures/measures__A{acs}@B{year}.parquet` |
+| 4. CoC ZORI | `data/curated/zori/zori_yearly__*.parquet` |
+| 5. Panel | `data/curated/panels/panel__Y2015-2024@B{year}.parquet` |
 | 6. Export | `exports/export-1/` (with MANIFEST.json, codebook, etc.) |
 
 ### Alignment Policy Reference

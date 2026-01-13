@@ -107,13 +107,13 @@ COC_PANEL.acs_vintage_used        →  Documents which A was applied
 
 ### In Filenames
 
-The shorthand maps to existing filename conventions:
+The shorthand maps directly to filenames (use `x` instead of `×` for ASCII compatibility):
 
-| Shorthand | Filename Pattern |
-|-----------|------------------|
-| B2025 | `coc_boundaries__2025.parquet` |
-| A2022@B2025×T2023 | `coc_measures__2025__2022.parquet` (boundary__acs) |
-| P2024 | `pit_counts__2024.parquet` |
+| Shorthand | Filename |
+|-----------|----------|
+| B2025 | `boundaries__B2025.parquet` |
+| A2022@B2025×T2023 | `measures__A2022@B2025xT2023.parquet` |
+| P2024 | `pit__P2024.parquet` |
 
 ### In Provenance Metadata
 
