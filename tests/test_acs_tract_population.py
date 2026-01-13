@@ -113,14 +113,14 @@ class TestGetOutputPath:
     """Tests for get_output_path function."""
 
     def test_default_path(self):
-        """Test default output path generation."""
+        """Test default output path generation with new temporal shorthand."""
         path = get_output_path("2019-2023", "2023")
-        assert path == Path("data/curated/acs/tract_population__2019-2023__2023.parquet")
+        assert path == Path("data/curated/acs/acs_tracts__A2023xT2023.parquet")
 
     def test_custom_base_dir(self):
         """Test output path with custom base directory."""
         path = get_output_path("2019-2023", "2023", base_dir="/tmp/test")
-        assert path == Path("/tmp/test/tract_population__2019-2023__2023.parquet")
+        assert path == Path("/tmp/test/acs_tracts__A2023xT2023.parquet")
 
 
 class TestFetchStateTractPopulation:
@@ -353,8 +353,8 @@ class TestIngestTractPopulation:
 
     def test_uses_cache_when_exists(self, tmp_path):
         """Test that cached file is used when it exists."""
-        # Create a dummy cached file
-        cached_path = tmp_path / "tract_population__2019-2023__2023.parquet"
+        # Create a dummy cached file with new temporal shorthand naming
+        cached_path = tmp_path / "acs_tracts__A2023xT2023.parquet"
         cached_path.parent.mkdir(parents=True, exist_ok=True)
 
         # Write a simple DataFrame
@@ -382,8 +382,8 @@ class TestIngestTractPopulation:
     @pytest.mark.httpx_mock(can_send_already_matched_responses=True)
     def test_force_refetch_ignores_cache(self, httpx_mock, tmp_path):
         """Test that force=True refetches even with cache."""
-        # Create a dummy cached file
-        cached_path = tmp_path / "tract_population__2019-2023__2023.parquet"
+        # Create a dummy cached file with new temporal shorthand naming
+        cached_path = tmp_path / "acs_tracts__A2023xT2023.parquet"
         cached_path.parent.mkdir(parents=True, exist_ok=True)
 
         df = pd.DataFrame({

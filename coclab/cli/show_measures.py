@@ -14,9 +14,15 @@ def _find_latest_measures_file(measures_dir: Path) -> Path | None:
 
     Returns the path to the most recently modified measures file,
     or None if no files are found.
+
+    Supports both new temporal shorthand naming (measures__A*.parquet)
+    and legacy naming (coc_measures__*.parquet).
     """
-    pattern = "coc_measures__*.parquet"
-    files = list(measures_dir.glob(pattern))
+    # Collect files from both naming patterns
+    files = []
+    files.extend(measures_dir.glob("measures__A*.parquet"))  # New pattern
+    files.extend(measures_dir.glob("coc_measures__*.parquet"))  # Legacy pattern
+
     if not files:
         return None
     # Sort by modification time, most recent first
@@ -26,17 +32,29 @@ def _find_latest_measures_file(measures_dir: Path) -> Path | None:
 def _parse_measures_filename(filename: str) -> tuple[str | None, str | None]:
     """Parse boundary and acs vintage from measures filename.
 
-    Expected format: coc_measures__{boundary}__{acs}.parquet
+    Supports both new temporal shorthand naming (measures__A{acs}@B{boundary}.parquet)
+    and legacy naming (coc_measures__{boundary}__{acs}.parquet).
 
     Returns:
         Tuple of (boundary_vintage, acs_vintage) or (None, None) if parse fails.
     """
-    # Remove .parquet extension
+    import re
+
+    # New format: measures__A2023@B2025.parquet or measures__A2023@B2025xT2023.parquet
+    if filename.startswith("measures__"):
+        new_pattern = r"^measures__A(\d{4})@B(\d{4})(?:xT\d{4})?\.parquet$"
+        match = re.match(new_pattern, filename)
+        if match:
+            acs_vintage = match.group(1)
+            boundary_vintage = match.group(2)
+            return boundary_vintage, acs_vintage
+
+    # Legacy format: coc_measures__{boundary}__{acs}.parquet
     stem = filename.replace(".parquet", "")
-    # Expected: coc_measures__{boundary}__{acs}
     parts = stem.split("__")
-    if len(parts) >= 3:
+    if len(parts) >= 3 and parts[0] == "coc_measures":
         return parts[1], parts[2]
+
     return None, None
 
 
@@ -47,6 +65,9 @@ def _find_measures_file(
 ) -> Path | None:
     """Find a measures file matching the specified criteria.
 
+    Supports both new temporal shorthand naming (measures__A*.parquet)
+    and legacy naming (coc_measures__*.parquet).
+
     Args:
         measures_dir: Directory containing measures files
         boundary: Boundary vintage to match (or None for any)
@@ -55,8 +76,10 @@ def _find_measures_file(
     Returns:
         Path to the matching file, or None if not found.
     """
-    pattern = "coc_measures__*.parquet"
-    files = list(measures_dir.glob(pattern))
+    # Collect files from both naming patterns
+    files = []
+    files.extend(measures_dir.glob("measures__A*.parquet"))  # New pattern
+    files.extend(measures_dir.glob("coc_measures__*.parquet"))  # Legacy pattern
 
     if not files:
         return None

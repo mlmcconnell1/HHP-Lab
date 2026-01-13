@@ -38,6 +38,7 @@ import pandas as pd
 
 from coclab.provenance import ProvenanceBlock, write_parquet_with_provenance
 from coclab.source_registry import check_source_changed, register_source
+from coclab import naming
 
 logger = logging.getLogger(__name__)
 
@@ -304,6 +305,8 @@ def get_output_path(
 ) -> Path:
     """Get the canonical output path for tract population data.
 
+    Uses temporal shorthand naming: acs_tracts__A{year}xT{tract}.parquet
+
     Parameters
     ----------
     acs_vintage : str
@@ -316,13 +319,13 @@ def get_output_path(
     Returns
     -------
     Path
-        Output path like 'data/curated/acs/tract_population__2019-2023__2023.parquet'.
+        Output path like 'data/curated/acs/acs_tracts__A2023xT2023.parquet'.
     """
     if base_dir is None:
         base_dir = DEFAULT_DATA_DIR
     else:
         base_dir = Path(base_dir)
-    return base_dir / f"tract_population__{acs_vintage}__{tract_vintage}.parquet"
+    return base_dir / naming.acs_tracts_filename(acs_vintage, tract_vintage)
 
 
 def ingest_tract_population(

@@ -66,6 +66,7 @@ from coclab.pit.ingest import parse_pit_file
 from coclab.pit.ingest.hud_exchange import MIN_PIT_YEAR as MIN_PIT_VINTAGE_YEAR
 from coclab.pit.registry import get_pit_path
 from coclab.provenance import ProvenanceBlock, read_provenance, write_parquet_with_provenance
+from coclab import naming
 
 logger = logging.getLogger(__name__)
 
@@ -362,24 +363,27 @@ def _load_acs_measures(
 
     Notes
     -----
-    The file naming convention is:
-    coc_measures__{boundary_vintage}__{acs_vintage}.parquet
-
-    If weighting-specific files exist, they will be preferred:
-    coc_measures__{boundary_vintage}__{acs_vintage}__population.parquet
+    Supports both new temporal shorthand naming (measures__A{acs}@B{boundary}.parquet)
+    and legacy naming (coc_measures__{boundary}__{acs}.parquet). Tries new naming first,
+    then falls back to legacy naming.
     """
     measures_dir = measures_dir or DEFAULT_MEASURES_DIR
 
-    # Try weighting-specific file first
+    # Try new naming first, then legacy
+    new_path = measures_dir / naming.measures_filename(acs_vintage, boundary_vintage)
+
+    # Legacy paths
     weighting_fname = f"coc_measures__{boundary_vintage}__{acs_vintage}__{weighting}.parquet"
-    weighting_path = measures_dir / weighting_fname
-    generic_path = measures_dir / f"coc_measures__{boundary_vintage}__{acs_vintage}.parquet"
+    legacy_weighting_path = measures_dir / weighting_fname
+    legacy_generic_path = measures_dir / f"coc_measures__{boundary_vintage}__{acs_vintage}.parquet"
 
     measures_path = None
-    if weighting_path.exists():
-        measures_path = weighting_path
-    elif generic_path.exists():
-        measures_path = generic_path
+    if new_path.exists():
+        measures_path = new_path
+    elif legacy_weighting_path.exists():
+        measures_path = legacy_weighting_path
+    elif legacy_generic_path.exists():
+        measures_path = legacy_generic_path
 
     if measures_path is None:
         logger.warning(

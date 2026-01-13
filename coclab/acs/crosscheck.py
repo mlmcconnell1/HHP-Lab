@@ -61,6 +61,7 @@ from pathlib import Path
 import pandas as pd
 
 from coclab.provenance import ProvenanceBlock, write_parquet_with_provenance
+from coclab import naming
 
 logger = logging.getLogger(__name__)
 
@@ -373,6 +374,10 @@ def get_measures_path(
 ) -> Path:
     """Get the path to CoC measures file.
 
+    Supports both new temporal shorthand naming (measures__A{acs}@B{boundary}.parquet)
+    and legacy naming (coc_measures__{boundary}__{acs}.parquet). Returns new naming
+    if it exists, otherwise falls back to legacy naming.
+
     Parameters
     ----------
     boundary_vintage : str
@@ -391,7 +396,15 @@ def get_measures_path(
         base_dir = DEFAULT_MEASURES_DIR
     else:
         base_dir = Path(base_dir)
-    return base_dir / f"coc_measures__{boundary_vintage}__{acs_vintage}.parquet"
+
+    # Try new naming first
+    new_path = base_dir / naming.measures_filename(acs_vintage, boundary_vintage)
+    if new_path.exists():
+        return new_path
+
+    # Fall back to legacy naming
+    legacy_path = base_dir / f"coc_measures__{boundary_vintage}__{acs_vintage}.parquet"
+    return legacy_path
 
 
 def get_crosscheck_output_path(

@@ -75,6 +75,7 @@ from typing import Literal
 import pandas as pd
 
 from coclab.provenance import ProvenanceBlock, write_parquet_with_provenance
+from coclab import naming
 
 logger = logging.getLogger(__name__)
 
@@ -229,6 +230,10 @@ def get_tract_population_path(
 ) -> Path:
     """Get the path to cached tract population data.
 
+    Supports both new temporal shorthand naming (acs_tracts__A{year}xT{tract}.parquet)
+    and legacy naming (tract_population__{acs}__{tract}.parquet). Returns new naming
+    if it exists, otherwise falls back to legacy naming.
+
     Parameters
     ----------
     acs_vintage : str
@@ -247,7 +252,15 @@ def get_tract_population_path(
         base_dir = DEFAULT_ACS_DIR
     else:
         base_dir = Path(base_dir)
-    return base_dir / f"tract_population__{acs_vintage}__{tract_vintage}.parquet"
+
+    # Try new naming first
+    new_path = base_dir / naming.acs_tracts_filename(acs_vintage, tract_vintage)
+    if new_path.exists():
+        return new_path
+
+    # Fall back to legacy naming
+    legacy_path = base_dir / f"tract_population__{acs_vintage}__{tract_vintage}.parquet"
+    return legacy_path
 
 
 def get_crosswalk_path(
@@ -256,6 +269,10 @@ def get_crosswalk_path(
     base_dir: Path | str | None = None,
 ) -> Path:
     """Get the path to tract-CoC crosswalk.
+
+    Supports both new temporal shorthand naming (xwalk__B{boundary}xT{tract}.parquet)
+    and legacy naming (coc_tract_xwalk__{boundary}__{tract}.parquet). Returns new naming
+    if it exists, otherwise falls back to legacy naming.
 
     Parameters
     ----------
@@ -275,7 +292,15 @@ def get_crosswalk_path(
         base_dir = DEFAULT_XWALK_DIR
     else:
         base_dir = Path(base_dir)
-    return base_dir / f"coc_tract_xwalk__{boundary_vintage}__{tract_vintage}.parquet"
+
+    # Try new naming first
+    new_path = base_dir / naming.tract_xwalk_filename(boundary_vintage, tract_vintage)
+    if new_path.exists():
+        return new_path
+
+    # Fall back to legacy naming
+    legacy_path = base_dir / f"coc_tract_xwalk__{boundary_vintage}__{tract_vintage}.parquet"
+    return legacy_path
 
 
 def get_output_path(
