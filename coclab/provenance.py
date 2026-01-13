@@ -56,6 +56,9 @@ class ProvenanceBlock:
         Census county vintage (e.g., "2023").
     acs_vintage : str, optional
         ACS 5-year estimate end year (e.g., "2022").
+    notation : str, optional
+        Compound temporal notation (e.g., "A2022@B2025×T2023").
+        Can be auto-generated via generate_notation().
     weighting : str, optional
         Weighting method ("area" or "population").
     created_at : str
@@ -70,6 +73,7 @@ class ProvenanceBlock:
     tract_vintage: str | None = None
     county_vintage: str | None = None
     acs_vintage: str | None = None
+    notation: str | None = None
     weighting: str | None = None
     created_at: str = field(
         default_factory=lambda: datetime.now(timezone.utc).isoformat()
@@ -87,6 +91,42 @@ class ProvenanceBlock:
         """Serialize to JSON string."""
         return json.dumps(self.to_dict(), indent=2)
 
+    def generate_notation(self) -> str | None:
+        """Generate compound temporal notation from vintage fields.
+
+        Builds notation using the conventions from temporal-terminology.md:
+        - Source data prefix: A{year} for ACS
+        - Target boundaries: @B{year}
+        - Intermediary geometry: ×T{year} or ×C{year}
+
+        Returns
+        -------
+        str | None
+            Notation string (e.g., "A2022@B2025×T2023"), or None if
+            insufficient vintage information is available.
+        """
+        parts = []
+
+        # Source data (ACS is the primary aggregated data type)
+        if self.acs_vintage:
+            parts.append(f"A{self.acs_vintage}")
+
+        # Target boundaries
+        if self.boundary_vintage:
+            parts.append(f"@B{self.boundary_vintage}")
+
+        # Intermediary geometry (tract takes precedence over county)
+        if self.tract_vintage:
+            parts.append(f"×T{self.tract_vintage}")
+        elif self.county_vintage:
+            parts.append(f"×C{self.county_vintage}")
+
+        # Need at least source and target for meaningful notation
+        if len(parts) < 2:
+            return None
+
+        return "".join(parts)
+
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> ProvenanceBlock:
         """Create from dictionary."""
@@ -96,6 +136,7 @@ class ProvenanceBlock:
             "tract_vintage",
             "county_vintage",
             "acs_vintage",
+            "notation",
             "weighting",
             "created_at",
             "coclab_version",
