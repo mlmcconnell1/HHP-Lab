@@ -52,6 +52,8 @@ class ProvenanceBlock:
         CoC boundary vintage (e.g., "2025").
     tract_vintage : str, optional
         Census tract vintage (e.g., "2023").
+    county_vintage : str, optional
+        Census county vintage (e.g., "2023").
     acs_vintage : str, optional
         ACS 5-year estimate end year (e.g., "2022").
     weighting : str, optional
@@ -66,6 +68,7 @@ class ProvenanceBlock:
 
     boundary_vintage: str | None = None
     tract_vintage: str | None = None
+    county_vintage: str | None = None
     acs_vintage: str | None = None
     weighting: str | None = None
     created_at: str = field(
@@ -91,6 +94,7 @@ class ProvenanceBlock:
         known_fields = {
             "boundary_vintage",
             "tract_vintage",
+            "county_vintage",
             "acs_vintage",
             "weighting",
             "created_at",
