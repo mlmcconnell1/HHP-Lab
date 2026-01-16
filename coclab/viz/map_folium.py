@@ -33,9 +33,7 @@ def _find_coc_boundary_file(vintage: str) -> Path:
     if legacy_path.exists():
         return legacy_path
 
-    raise FileNotFoundError(
-        f"Boundary file not found: tried {new_path} and {legacy_path}"
-    )
+    raise FileNotFoundError(f"Boundary file not found: tried {new_path} and {legacy_path}")
 
 
 def render_coc_map(
@@ -93,10 +91,10 @@ def render_coc_map(
 
     # Build tooltip content
     tooltip_html = f"""
-    <b>CoC ID:</b> {row['coc_id']}<br>
-    <b>Name:</b> {row.get('coc_name', 'N/A')}<br>
-    <b>Vintage:</b> {row.get('boundary_vintage', vintage)}<br>
-    <b>Source:</b> {row.get('source', 'N/A')}
+    <b>CoC ID:</b> {row["coc_id"]}<br>
+    <b>Name:</b> {row.get("coc_name", "N/A")}<br>
+    <b>Vintage:</b> {row.get("boundary_vintage", vintage)}<br>
+    <b>Source:</b> {row.get("source", "N/A")}
     """
 
     # Add the boundary polygon

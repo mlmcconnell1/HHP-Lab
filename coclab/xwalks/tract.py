@@ -8,7 +8,6 @@ import pandas as pd
 
 from coclab.provenance import ProvenanceBlock, write_parquet_with_provenance
 
-
 # ESRI:102003 - USA Contiguous Albers Equal Area Conic
 ALBERS_EQUAL_AREA_CRS = "ESRI:102003"
 
@@ -103,9 +102,7 @@ def build_coc_tract_crosswalk(
     intersections["intersection_area"] = intersections.geometry.area
 
     # Calculate area share (intersection / tract)
-    intersections["area_share"] = (
-        intersections["intersection_area"] / intersections["tract_area"]
-    )
+    intersections["area_share"] = intersections["intersection_area"] / intersections["tract_area"]
 
     # Build crosswalk DataFrame
     crosswalk = pd.DataFrame(

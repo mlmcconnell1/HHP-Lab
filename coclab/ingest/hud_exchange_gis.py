@@ -31,15 +31,13 @@ ARCGIS_FEATURE_SERVICE_URL = (
 
 # Source reference for ArcGIS data
 ARCGIS_SOURCE_REF = (
-    "https://hudgis-hud.opendata.arcgis.com/datasets"
-    "/HUD::continuum-of-care-coc-grantee-areas"
+    "https://hudgis-hud.opendata.arcgis.com/datasets/HUD::continuum-of-care-coc-grantee-areas"
 )
 
 # URL template for HUD Exchange CoC GIS geodatabase downloads (legacy fallback)
 # Pattern observed from historical files: CoC_GIS_NatlTerrDC_Shapefile_{YEAR}.zip
 HUD_EXCHANGE_GDB_URL_TEMPLATE = (
-    "https://files.hudexchange.info/resources/documents/"
-    "CoC_GIS_NatlTerrDC_Shapefile_{vintage}.zip"
+    "https://files.hudexchange.info/resources/documents/CoC_GIS_NatlTerrDC_Shapefile_{vintage}.zip"
 )
 
 # Pagination settings for ArcGIS API
@@ -92,9 +90,7 @@ def _get_arcgis_feature_count(client: httpx.Client) -> int:
         "returnCountOnly": "true",
         "f": "json",
     }
-    response = client.get(
-        ARCGIS_FEATURE_SERVICE_URL, params=params, timeout=ARCGIS_REQUEST_TIMEOUT
-    )
+    response = client.get(ARCGIS_FEATURE_SERVICE_URL, params=params, timeout=ARCGIS_REQUEST_TIMEOUT)
     response.raise_for_status()
     return response.json().get("count", 0)
 
@@ -296,9 +292,7 @@ def fetch_from_arcgis(
                 label="Fetching CoC boundaries",
                 show_pos=True,
             ) as bar:
-                features = _fetch_all_arcgis_features(
-                    client, progress_callback=bar.update
-                )
+                features = _fetch_all_arcgis_features(client, progress_callback=bar.update)
         else:
             features = _fetch_all_arcgis_features(client)
 
@@ -431,9 +425,7 @@ def map_to_canonical_schema(
     # Find the CoC ID field
     coc_id_field = _find_field(columns, COC_ID_FIELDS)
     if coc_id_field is None:
-        raise ValueError(
-            f"Could not find CoC ID field. Available columns: {columns}"
-        )
+        raise ValueError(f"Could not find CoC ID field. Available columns: {columns}")
 
     # Find the CoC name field
     coc_name_field = _find_field(columns, COC_NAME_FIELDS)

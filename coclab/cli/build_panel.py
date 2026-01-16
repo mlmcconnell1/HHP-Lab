@@ -196,9 +196,7 @@ def build_panel_cmd(
             if zori_yearly_path:
                 typer.echo(f"Specified path does not exist: {zori_yearly_path}")
             else:
-                typer.echo(
-                    "No yearly ZORI file found in default location: data/curated/zori/"
-                )
+                typer.echo("No yearly ZORI file found in default location: data/curated/zori/")
             raise typer.Exit(1)
         typer.echo(f"ZORI yearly data: {resolved_zori_path}")
 
@@ -312,7 +310,9 @@ def build_panel_cmd(
             total_cocs = panel_df["coc_id"].nunique()
             typer.echo(f"  CoCs with any ZORI data: {cocs_with_zori} / {total_cocs}")
         else:
-            typer.echo("  Note: ZORI columns not present (check ZORI data compatibility with panel years)")
+            typer.echo(
+                "  Note: ZORI columns not present (check ZORI data compatibility with panel years)"
+            )
 
         if "zori_is_eligible" in panel_df.columns:
             eligible_count = panel_df["zori_is_eligible"].sum()

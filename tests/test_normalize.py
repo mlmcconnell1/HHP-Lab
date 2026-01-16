@@ -106,10 +106,12 @@ class TestEnsurePolygonType:
 
     def test_multipolygon_unchanged(self):
         """MultiPolygon should be returned as-is."""
-        geom = MultiPolygon([
-            Polygon([(0, 0), (1, 0), (1, 1), (0, 1)]),
-            Polygon([(2, 2), (3, 2), (3, 3), (2, 3)]),
-        ])
+        geom = MultiPolygon(
+            [
+                Polygon([(0, 0), (1, 0), (1, 1), (0, 1)]),
+                Polygon([(2, 2), (3, 2), (3, 3), (2, 3)]),
+            ]
+        )
         result = ensure_polygon_type(geom)
         assert isinstance(result, MultiPolygon)
 
@@ -125,20 +127,24 @@ class TestEnsurePolygonType:
 
     def test_geometry_collection_extracts_polygons(self):
         """GeometryCollection should have polygon components extracted."""
-        gc = GeometryCollection([
-            Point(0, 0),
-            Polygon([(0, 0), (1, 0), (1, 1), (0, 1)]),
-            LineString([(0, 0), (1, 1)]),
-        ])
+        gc = GeometryCollection(
+            [
+                Point(0, 0),
+                Polygon([(0, 0), (1, 0), (1, 1), (0, 1)]),
+                LineString([(0, 0), (1, 1)]),
+            ]
+        )
         result = ensure_polygon_type(gc)
         assert isinstance(result, Polygon)
 
     def test_geometry_collection_multiple_polygons(self):
         """GeometryCollection with multiple polygons should return MultiPolygon."""
-        gc = GeometryCollection([
-            Polygon([(0, 0), (1, 0), (1, 1), (0, 1)]),
-            Polygon([(2, 2), (3, 2), (3, 3), (2, 3)]),
-        ])
+        gc = GeometryCollection(
+            [
+                Polygon([(0, 0), (1, 0), (1, 1), (0, 1)]),
+                Polygon([(2, 2), (3, 2), (3, 3), (2, 3)]),
+            ]
+        )
         result = ensure_polygon_type(gc)
         assert isinstance(result, MultiPolygon)
         assert len(result.geoms) == 2
@@ -193,12 +199,14 @@ class TestComputeGeomHash:
         """Hashing normalizes precision, so minor differences are ignored."""
         geom1 = Polygon([(0.0, 0.0), (1.0, 0.0), (1.0, 1.0), (0.0, 1.0)])
         # Add very small differences (below 1e-6 precision)
-        geom2 = Polygon([
-            (0.0000001, 0.0),
-            (1.0, 0.0000001),
-            (1.0, 1.0),
-            (0.0, 1.0),
-        ])
+        geom2 = Polygon(
+            [
+                (0.0000001, 0.0),
+                (1.0, 0.0000001),
+                (1.0, 1.0),
+                (0.0, 1.0),
+            ]
+        )
 
         hash1 = compute_geom_hash(geom1)
         hash2 = compute_geom_hash(geom2)

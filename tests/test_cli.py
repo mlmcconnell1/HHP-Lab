@@ -111,7 +111,9 @@ class TestListBoundariesCommand:
                 boundary_vintage="HUDOpenData_2025-01-04",
                 source="hud_opendata",
                 ingested_at=datetime(2025, 1, 4, 10, 0, 0, tzinfo=UTC),
-                path=Path("data/curated/coc_boundaries/coc_boundaries__HUDOpenData_2025-01-04.parquet"),
+                path=Path(
+                    "data/curated/coc_boundaries/coc_boundaries__HUDOpenData_2025-01-04.parquet"
+                ),
                 feature_count=448,
                 hash_of_file="def456",
             ),
@@ -156,14 +158,10 @@ class TestShowCommand:
         custom_path = Path("/tmp/my_map.html")
         mock_render.return_value = custom_path
 
-        result = runner.invoke(
-            app, ["show", "--coc", "CO-500", "--output", str(custom_path)]
-        )
+        result = runner.invoke(app, ["show", "--coc", "CO-500", "--output", str(custom_path)])
 
         assert result.exit_code == 0
-        mock_render.assert_called_once_with(
-            coc_id="CO-500", vintage=None, out_html=custom_path
-        )
+        mock_render.assert_called_once_with(coc_id="CO-500", vintage=None, out_html=custom_path)
 
     @patch("coclab.viz.map_folium.render_coc_map")
     def test_show_coc_not_found(self, mock_render):

@@ -67,8 +67,7 @@ def compare_vintages(
     if vintage1 not in vintage_map:
         available = [v.boundary_vintage for v in vintages] if vintages else []
         typer.echo(
-            f"Error: Vintage '{vintage1}' not found in registry. "
-            f"Available: {available}",
+            f"Error: Vintage '{vintage1}' not found in registry. Available: {available}",
             err=True,
         )
         raise typer.Exit(1)
@@ -77,8 +76,7 @@ def compare_vintages(
     if vintage2 not in vintage_map:
         available = [v.boundary_vintage for v in vintages] if vintages else []
         typer.echo(
-            f"Error: Vintage '{vintage2}' not found in registry. "
-            f"Available: {available}",
+            f"Error: Vintage '{vintage2}' not found in registry. Available: {available}",
             err=True,
         )
         raise typer.Exit(1)
@@ -112,7 +110,7 @@ def compare_vintages(
 
     # Validate required columns
     required_cols = {"coc_id", "geom_hash"}
-    for gdf, vintage, path in [(gdf1, vintage1, path1), (gdf2, vintage2, path2)]:
+    for gdf, _vintage, path in [(gdf1, vintage1, path1), (gdf2, vintage2, path2)]:
         missing = required_cols - set(gdf.columns)
         if missing:
             typer.echo(
@@ -122,8 +120,8 @@ def compare_vintages(
             raise typer.Exit(1)
 
     # Create lookup dictionaries: coc_id -> geom_hash
-    v1_hashes = dict(zip(gdf1["coc_id"], gdf1["geom_hash"]))
-    v2_hashes = dict(zip(gdf2["coc_id"], gdf2["geom_hash"]))
+    v1_hashes = dict(zip(gdf1["coc_id"], gdf1["geom_hash"], strict=True))
+    v2_hashes = dict(zip(gdf2["coc_id"], gdf2["geom_hash"], strict=True))
 
     v1_ids = set(v1_hashes.keys())
     v2_ids = set(v2_hashes.keys())
@@ -133,9 +131,7 @@ def compare_vintages(
     removed_ids = sorted(v1_ids - v2_ids)
     common_ids = v1_ids & v2_ids
 
-    changed_ids = sorted(
-        coc_id for coc_id in common_ids if v1_hashes[coc_id] != v2_hashes[coc_id]
-    )
+    changed_ids = sorted(coc_id for coc_id in common_ids if v1_hashes[coc_id] != v2_hashes[coc_id])
     unchanged_ids = sorted(
         coc_id for coc_id in common_ids if v1_hashes[coc_id] == v2_hashes[coc_id]
     )

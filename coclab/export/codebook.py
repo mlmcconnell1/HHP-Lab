@@ -126,10 +126,7 @@ def generate_schema_md(panel_path: Path) -> str:
     if key_cols_present:
         lines.append("## Key Columns")
         lines.append("")
-        lines.append(
-            "The following columns are primary identifiers or key metrics "
-            "for analysis:"
-        )
+        lines.append("The following columns are primary identifiers or key metrics for analysis:")
         lines.append("")
         for col in key_cols_present:
             desc = VARIABLE_DESCRIPTIONS.get(col, (None, None, "No description"))[2]

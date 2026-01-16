@@ -53,6 +53,7 @@ from typing import Literal
 
 import pandas as pd
 
+from coclab import naming
 from coclab.panel.policies import DEFAULT_POLICY, AlignmentPolicy
 from coclab.panel.zori_eligibility import (
     DEFAULT_ZORI_MIN_COVERAGE,
@@ -66,7 +67,6 @@ from coclab.pit.ingest import parse_pit_file
 from coclab.pit.ingest.hud_exchange import MIN_PIT_YEAR as MIN_PIT_VINTAGE_YEAR
 from coclab.pit.registry import get_pit_path
 from coclab.provenance import ProvenanceBlock, read_provenance, write_parquet_with_provenance
-from coclab import naming
 
 logger = logging.getLogger(__name__)
 
@@ -207,9 +207,7 @@ def _load_pit_from_raw_vintage(
         return df
 
     except Exception as e:
-        logger.warning(
-            f"Failed to extract year {year} from vintage file {vintage_file}: {e}"
-        )
+        logger.warning(f"Failed to extract year {year} from vintage file {vintage_file}: {e}")
         return pd.DataFrame(columns=["coc_id", "pit_total", "pit_sheltered", "pit_unsheltered"])
 
 
@@ -390,15 +388,17 @@ def _load_acs_measures(
             f"No ACS measures found for boundary={boundary_vintage}, "
             f"acs={acs_vintage}, weighting={weighting}"
         )
-        return pd.DataFrame(columns=[
-            "coc_id",
-            "total_population",
-            "adult_population",
-            "population_below_poverty",
-            "median_household_income",
-            "median_gross_rent",
-            "coverage_ratio",
-        ]), None
+        return pd.DataFrame(
+            columns=[
+                "coc_id",
+                "total_population",
+                "adult_population",
+                "population_below_poverty",
+                "median_household_income",
+                "median_gross_rent",
+                "coverage_ratio",
+            ]
+        ), None
 
     logger.info(f"Loading ACS measures from: {measures_path}")
     df = pd.read_parquet(measures_path)
@@ -565,16 +565,10 @@ def _compute_rent_to_income(
     # - zori_coc must not be null
     # - median_household_income must not be null
     # - median_household_income must not be zero
-    valid_mask = (
-        zori_coc.notna() &
-        median_household_income.notna() &
-        (median_household_income != 0)
-    )
+    valid_mask = zori_coc.notna() & median_household_income.notna() & (median_household_income != 0)
 
     # Compute only for valid rows
-    result.loc[valid_mask] = (
-        zori_coc.loc[valid_mask] / monthly_income.loc[valid_mask]
-    )
+    result.loc[valid_mask] = zori_coc.loc[valid_mask] / monthly_income.loc[valid_mask]
 
     return result
 
@@ -613,9 +607,8 @@ def _detect_boundary_changes(df: pd.DataFrame) -> pd.Series:
     df["_prior_vintage"] = df.groupby("coc_id")["boundary_vintage_used"].shift(1)
 
     # Boundary changed if vintage differs from prior (and prior exists)
-    boundary_changed = (
-        df["_prior_vintage"].notna() &
-        (df["boundary_vintage_used"] != df["_prior_vintage"])
+    boundary_changed = df["_prior_vintage"].notna() & (
+        df["boundary_vintage_used"] != df["_prior_vintage"]
     )
 
     # Restore original index order
@@ -760,8 +753,7 @@ def build_panel(
         weighting = policy.weighting_method
 
         logger.debug(
-            f"Year {year}: boundary={boundary_vintage}, acs={acs_vintage}, "
-            f"weighting={weighting}"
+            f"Year {year}: boundary={boundary_vintage}, acs={acs_vintage}, weighting={weighting}"
         )
 
         # Load PIT data

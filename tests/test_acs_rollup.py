@@ -21,42 +21,46 @@ from coclab.provenance import read_provenance
 @pytest.fixture
 def sample_tract_population():
     """Sample tract population data for testing."""
-    return pd.DataFrame({
-        "tract_geoid": [
-            "08031001000",  # Full tract in CO-500
-            "08031001100",  # Partial tract in CO-500 and CO-501
-            "08031001200",  # Full tract in CO-501
-            "08031001300",  # Full tract in CO-500
-        ],
-        "total_population": [5000, 3000, 4000, 2000],
-        "acs_vintage": ["2019-2023"] * 4,
-        "tract_vintage": ["2023"] * 4,
-    })
+    return pd.DataFrame(
+        {
+            "tract_geoid": [
+                "08031001000",  # Full tract in CO-500
+                "08031001100",  # Partial tract in CO-500 and CO-501
+                "08031001200",  # Full tract in CO-501
+                "08031001300",  # Full tract in CO-500
+            ],
+            "total_population": [5000, 3000, 4000, 2000],
+            "acs_vintage": ["2019-2023"] * 4,
+            "tract_vintage": ["2023"] * 4,
+        }
+    )
 
 
 @pytest.fixture
 def sample_crosswalk():
     """Sample crosswalk data for testing."""
-    return pd.DataFrame({
-        "coc_id": [
-            "CO-500",  # tract 001000, full
-            "CO-500",  # tract 001100, partial (60%)
-            "CO-501",  # tract 001100, partial (40%)
-            "CO-501",  # tract 001200, full
-            "CO-500",  # tract 001300, full
-        ],
-        "tract_geoid": [
-            "08031001000",
-            "08031001100",
-            "08031001100",
-            "08031001200",
-            "08031001300",
-        ],
-        "area_share": [1.0, 0.6, 0.4, 1.0, 1.0],
-        "intersection_area": [100.0, 60.0, 40.0, 100.0, 100.0],
-        "boundary_vintage": ["2025"] * 5,
-        "tract_vintage": ["2023"] * 5,
-    })
+    return pd.DataFrame(
+        {
+            "coc_id": [
+                "CO-500",  # tract 001000, full
+                "CO-500",  # tract 001100, partial (60%)
+                "CO-501",  # tract 001100, partial (40%)
+                "CO-501",  # tract 001200, full
+                "CO-500",  # tract 001300, full
+            ],
+            "tract_geoid": [
+                "08031001000",
+                "08031001100",
+                "08031001100",
+                "08031001200",
+                "08031001300",
+            ],
+            "area_share": [1.0, 0.6, 0.4, 1.0, 1.0],
+            "intersection_area": [100.0, 60.0, 40.0, 100.0, 100.0],
+            "boundary_vintage": ["2025"] * 5,
+            "tract_vintage": ["2023"] * 5,
+        }
+    )
 
 
 class TestRollupTractPopulation:
@@ -127,9 +131,7 @@ class TestRollupTractPopulation:
     def test_invalid_weighting_raises(self, sample_tract_population, sample_crosswalk):
         """Test that invalid weighting method raises ValueError."""
         with pytest.raises(ValueError, match="weighting must be"):
-            rollup_tract_population(
-                sample_tract_population, sample_crosswalk, weighting="invalid"
-            )
+            rollup_tract_population(sample_tract_population, sample_crosswalk, weighting="invalid")
 
     def test_output_schema(self, sample_tract_population, sample_crosswalk):
         """Test that output has correct schema."""
@@ -162,17 +164,21 @@ class TestMissingDataEdgeCases:
 
     def test_missing_tract_in_crosswalk(self):
         """Test handling when crosswalk has tracts not in population data."""
-        tract_pop = pd.DataFrame({
-            "tract_geoid": ["08031001000"],
-            "total_population": [5000],
-        })
+        tract_pop = pd.DataFrame(
+            {
+                "tract_geoid": ["08031001000"],
+                "total_population": [5000],
+            }
+        )
 
-        crosswalk = pd.DataFrame({
-            "coc_id": ["CO-500", "CO-500"],
-            "tract_geoid": ["08031001000", "08031009999"],  # 009999 not in tract_pop
-            "area_share": [1.0, 0.5],
-            "intersection_area": [100.0, 50.0],
-        })
+        crosswalk = pd.DataFrame(
+            {
+                "coc_id": ["CO-500", "CO-500"],
+                "tract_geoid": ["08031001000", "08031009999"],  # 009999 not in tract_pop
+                "area_share": [1.0, 0.5],
+                "intersection_area": [100.0, 50.0],
+            }
+        )
 
         result = rollup_tract_population(tract_pop, crosswalk)
 
@@ -186,17 +192,21 @@ class TestMissingDataEdgeCases:
 
     def test_tract_with_na_population(self):
         """Test handling when tract has NA population value."""
-        tract_pop = pd.DataFrame({
-            "tract_geoid": ["08031001000", "08031001100"],
-            "total_population": [5000, pd.NA],
-        })
+        tract_pop = pd.DataFrame(
+            {
+                "tract_geoid": ["08031001000", "08031001100"],
+                "total_population": [5000, pd.NA],
+            }
+        )
 
-        crosswalk = pd.DataFrame({
-            "coc_id": ["CO-500", "CO-500"],
-            "tract_geoid": ["08031001000", "08031001100"],
-            "area_share": [1.0, 0.5],
-            "intersection_area": [100.0, 50.0],
-        })
+        crosswalk = pd.DataFrame(
+            {
+                "coc_id": ["CO-500", "CO-500"],
+                "tract_geoid": ["08031001000", "08031001100"],
+                "area_share": [1.0, 0.5],
+                "intersection_area": [100.0, 50.0],
+            }
+        )
 
         result = rollup_tract_population(tract_pop, crosswalk)
 
@@ -208,17 +218,21 @@ class TestMissingDataEdgeCases:
 
     def test_tract_with_zero_population(self):
         """Test handling when tract has zero population."""
-        tract_pop = pd.DataFrame({
-            "tract_geoid": ["08031001000", "08031001100"],
-            "total_population": [5000, 0],
-        })
+        tract_pop = pd.DataFrame(
+            {
+                "tract_geoid": ["08031001000", "08031001100"],
+                "total_population": [5000, 0],
+            }
+        )
 
-        crosswalk = pd.DataFrame({
-            "coc_id": ["CO-500", "CO-500"],
-            "tract_geoid": ["08031001000", "08031001100"],
-            "area_share": [1.0, 1.0],
-            "intersection_area": [100.0, 100.0],
-        })
+        crosswalk = pd.DataFrame(
+            {
+                "coc_id": ["CO-500", "CO-500"],
+                "tract_geoid": ["08031001000", "08031001100"],
+                "area_share": [1.0, 1.0],
+                "intersection_area": [100.0, 100.0],
+            }
+        )
 
         result = rollup_tract_population(tract_pop, crosswalk)
 
@@ -232,17 +246,21 @@ class TestMissingDataEdgeCases:
 
     def test_empty_coc_no_tracts(self):
         """Test that CoC with no matching tracts returns zero population."""
-        tract_pop = pd.DataFrame({
-            "tract_geoid": ["08031001000"],
-            "total_population": [5000],
-        })
+        tract_pop = pd.DataFrame(
+            {
+                "tract_geoid": ["08031001000"],
+                "total_population": [5000],
+            }
+        )
 
-        crosswalk = pd.DataFrame({
-            "coc_id": ["CO-500", "CO-501"],
-            "tract_geoid": ["08031001000", "08031009999"],  # CO-501 has no matching tract
-            "area_share": [1.0, 1.0],
-            "intersection_area": [100.0, 100.0],
-        })
+        crosswalk = pd.DataFrame(
+            {
+                "coc_id": ["CO-500", "CO-501"],
+                "tract_geoid": ["08031001000", "08031009999"],  # CO-501 has no matching tract
+                "area_share": [1.0, 1.0],
+                "intersection_area": [100.0, 100.0],
+            }
+        )
 
         result = rollup_tract_population(tract_pop, crosswalk)
 
@@ -257,62 +275,78 @@ class TestInputValidation:
 
     def test_missing_tract_geoid_column(self):
         """Test that missing tract_geoid column raises error."""
-        tract_pop = pd.DataFrame({
-            "GEOID": ["08031001000"],  # Wrong column name
-            "total_population": [5000],
-        })
-        crosswalk = pd.DataFrame({
-            "coc_id": ["CO-500"],
-            "tract_geoid": ["08031001000"],
-            "area_share": [1.0],
-            "intersection_area": [100.0],
-        })
+        tract_pop = pd.DataFrame(
+            {
+                "GEOID": ["08031001000"],  # Wrong column name
+                "total_population": [5000],
+            }
+        )
+        crosswalk = pd.DataFrame(
+            {
+                "coc_id": ["CO-500"],
+                "tract_geoid": ["08031001000"],
+                "area_share": [1.0],
+                "intersection_area": [100.0],
+            }
+        )
 
         with pytest.raises(ValueError, match="tract_geoid"):
             rollup_tract_population(tract_pop, crosswalk)
 
     def test_missing_total_population_column(self):
         """Test that missing total_population column raises error."""
-        tract_pop = pd.DataFrame({
-            "tract_geoid": ["08031001000"],
-            "population": [5000],  # Wrong column name
-        })
-        crosswalk = pd.DataFrame({
-            "coc_id": ["CO-500"],
-            "tract_geoid": ["08031001000"],
-            "area_share": [1.0],
-            "intersection_area": [100.0],
-        })
+        tract_pop = pd.DataFrame(
+            {
+                "tract_geoid": ["08031001000"],
+                "population": [5000],  # Wrong column name
+            }
+        )
+        crosswalk = pd.DataFrame(
+            {
+                "coc_id": ["CO-500"],
+                "tract_geoid": ["08031001000"],
+                "area_share": [1.0],
+                "intersection_area": [100.0],
+            }
+        )
 
         with pytest.raises(ValueError, match="total_population"):
             rollup_tract_population(tract_pop, crosswalk)
 
     def test_missing_coc_id_column(self):
         """Test that missing coc_id column raises error."""
-        tract_pop = pd.DataFrame({
-            "tract_geoid": ["08031001000"],
-            "total_population": [5000],
-        })
-        crosswalk = pd.DataFrame({
-            "coc_number": ["CO-500"],  # Wrong column name
-            "tract_geoid": ["08031001000"],
-            "area_share": [1.0],
-        })
+        tract_pop = pd.DataFrame(
+            {
+                "tract_geoid": ["08031001000"],
+                "total_population": [5000],
+            }
+        )
+        crosswalk = pd.DataFrame(
+            {
+                "coc_number": ["CO-500"],  # Wrong column name
+                "tract_geoid": ["08031001000"],
+                "area_share": [1.0],
+            }
+        )
 
         with pytest.raises(ValueError, match="coc_id"):
             rollup_tract_population(tract_pop, crosswalk)
 
     def test_missing_area_share_column(self):
         """Test that missing area_share column raises error."""
-        tract_pop = pd.DataFrame({
-            "tract_geoid": ["08031001000"],
-            "total_population": [5000],
-        })
-        crosswalk = pd.DataFrame({
-            "coc_id": ["CO-500"],
-            "tract_geoid": ["08031001000"],
-            "weight": [1.0],  # Wrong column name
-        })
+        tract_pop = pd.DataFrame(
+            {
+                "tract_geoid": ["08031001000"],
+                "total_population": [5000],
+            }
+        )
+        crosswalk = pd.DataFrame(
+            {
+                "coc_id": ["CO-500"],
+                "tract_geoid": ["08031001000"],
+                "weight": [1.0],  # Wrong column name
+            }
+        )
 
         with pytest.raises(ValueError, match="area_share"):
             rollup_tract_population(tract_pop, crosswalk)
@@ -358,9 +392,7 @@ class TestPathHelpers:
     def test_get_output_path_custom(self):
         """Test custom output path."""
         path = get_output_path("2025", "2019-2023", "2023", "area", base_dir="/tmp/out")
-        assert path == Path(
-            "/tmp/out/coc_population_rollup__2025__2019-2023__2023__area.parquet"
-        )
+        assert path == Path("/tmp/out/coc_population_rollup__2025__2019-2023__2023__area.parquet")
 
 
 class TestBuildCocPopulationRollup:
@@ -567,6 +599,7 @@ class TestBuildCocPopulationRollup:
 
         # Wait a tiny bit to ensure different mtime
         import time
+
         time.sleep(0.1)
 
         # Build with force=True
@@ -625,17 +658,21 @@ class TestAggregationMathematicalProperties:
 
     def test_total_population_conservation(self):
         """Test total population is conserved when tracts fully belong to one CoC."""
-        tract_pop = pd.DataFrame({
-            "tract_geoid": ["001", "002", "003"],
-            "total_population": [1000, 2000, 3000],
-        })
+        tract_pop = pd.DataFrame(
+            {
+                "tract_geoid": ["001", "002", "003"],
+                "total_population": [1000, 2000, 3000],
+            }
+        )
 
-        crosswalk = pd.DataFrame({
-            "coc_id": ["A", "A", "B"],
-            "tract_geoid": ["001", "002", "003"],
-            "area_share": [1.0, 1.0, 1.0],
-            "intersection_area": [100.0, 100.0, 100.0],
-        })
+        crosswalk = pd.DataFrame(
+            {
+                "coc_id": ["A", "A", "B"],
+                "tract_geoid": ["001", "002", "003"],
+                "area_share": [1.0, 1.0, 1.0],
+                "intersection_area": [100.0, 100.0, 100.0],
+            }
+        )
 
         result = rollup_tract_population(tract_pop, crosswalk)
 
@@ -646,17 +683,21 @@ class TestAggregationMathematicalProperties:
 
     def test_partial_overlap_reduces_total(self):
         """Test that partial overlap reduces attributed population correctly."""
-        tract_pop = pd.DataFrame({
-            "tract_geoid": ["001"],
-            "total_population": [1000],
-        })
+        tract_pop = pd.DataFrame(
+            {
+                "tract_geoid": ["001"],
+                "total_population": [1000],
+            }
+        )
 
-        crosswalk = pd.DataFrame({
-            "coc_id": ["A", "B"],
-            "tract_geoid": ["001", "001"],
-            "area_share": [0.7, 0.3],  # Tract split between two CoCs
-            "intersection_area": [70.0, 30.0],
-        })
+        crosswalk = pd.DataFrame(
+            {
+                "coc_id": ["A", "B"],
+                "tract_geoid": ["001", "001"],
+                "area_share": [0.7, 0.3],  # Tract split between two CoCs
+                "intersection_area": [70.0, 30.0],
+            }
+        )
 
         result = rollup_tract_population(tract_pop, crosswalk)
 
@@ -673,18 +714,22 @@ class TestAggregationMathematicalProperties:
 
     def test_area_share_greater_than_one_allowed(self):
         """Test that area_share > 1 is allowed (for overlapping boundaries)."""
-        tract_pop = pd.DataFrame({
-            "tract_geoid": ["001"],
-            "total_population": [1000],
-        })
+        tract_pop = pd.DataFrame(
+            {
+                "tract_geoid": ["001"],
+                "total_population": [1000],
+            }
+        )
 
         # In real data, a tract might be counted in multiple overlapping regions
-        crosswalk = pd.DataFrame({
-            "coc_id": ["A", "B"],
-            "tract_geoid": ["001", "001"],
-            "area_share": [1.0, 1.0],  # Same tract fully in both (overlapping)
-            "intersection_area": [100.0, 100.0],
-        })
+        crosswalk = pd.DataFrame(
+            {
+                "coc_id": ["A", "B"],
+                "tract_geoid": ["001", "001"],
+                "area_share": [1.0, 1.0],  # Same tract fully in both (overlapping)
+                "intersection_area": [100.0, 100.0],
+            }
+        )
 
         result = rollup_tract_population(tract_pop, crosswalk)
 

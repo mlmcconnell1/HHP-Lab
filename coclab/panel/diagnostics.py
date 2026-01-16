@@ -74,45 +74,77 @@ def coverage_summary(panel_df: pd.DataFrame) -> pd.DataFrame:
     required_cols = {"year", "coverage_ratio"}
     if panel_df is None or panel_df.empty:
         logger.warning("Empty panel provided to coverage_summary")
-        return pd.DataFrame(columns=[
-            "year", "count", "mean", "std", "min", "q25", "median",
-            "q75", "max", "low_coverage_count"
-        ])
+        return pd.DataFrame(
+            columns=[
+                "year",
+                "count",
+                "mean",
+                "std",
+                "min",
+                "q25",
+                "median",
+                "q75",
+                "max",
+                "low_coverage_count",
+            ]
+        )
 
     if not required_cols.issubset(panel_df.columns):
         missing = required_cols - set(panel_df.columns)
         logger.warning(f"Missing columns for coverage_summary: {missing}")
-        return pd.DataFrame(columns=[
-            "year", "count", "mean", "std", "min", "q25", "median",
-            "q75", "max", "low_coverage_count"
-        ])
+        return pd.DataFrame(
+            columns=[
+                "year",
+                "count",
+                "mean",
+                "std",
+                "min",
+                "q25",
+                "median",
+                "q75",
+                "max",
+                "low_coverage_count",
+            ]
+        )
 
     # Filter to rows with non-null coverage_ratio
     df = panel_df[panel_df["coverage_ratio"].notna()].copy()
 
     if df.empty:
         logger.warning("No non-null coverage_ratio values in panel")
-        return pd.DataFrame(columns=[
-            "year", "count", "mean", "std", "min", "q25", "median",
-            "q75", "max", "low_coverage_count"
-        ])
+        return pd.DataFrame(
+            columns=[
+                "year",
+                "count",
+                "mean",
+                "std",
+                "min",
+                "q25",
+                "median",
+                "q75",
+                "max",
+                "low_coverage_count",
+            ]
+        )
 
     # Compute statistics by year
     results = []
     for year, group in df.groupby("year"):
         coverage = group["coverage_ratio"]
-        results.append({
-            "year": year,
-            "count": len(coverage),
-            "mean": coverage.mean(),
-            "std": coverage.std() if len(coverage) > 1 else 0.0,
-            "min": coverage.min(),
-            "q25": coverage.quantile(0.25),
-            "median": coverage.median(),
-            "q75": coverage.quantile(0.75),
-            "max": coverage.max(),
-            "low_coverage_count": int((coverage < 0.9).sum()),
-        })
+        results.append(
+            {
+                "year": year,
+                "count": len(coverage),
+                "mean": coverage.mean(),
+                "std": coverage.std() if len(coverage) > 1 else 0.0,
+                "min": coverage.min(),
+                "q25": coverage.quantile(0.25),
+                "median": coverage.median(),
+                "q75": coverage.quantile(0.75),
+                "max": coverage.max(),
+                "low_coverage_count": int((coverage < 0.9).sum()),
+            }
+        )
 
     result_df = pd.DataFrame(results)
     result_df = result_df.sort_values("year").reset_index(drop=True)
@@ -155,7 +187,7 @@ def boundary_change_summary(panel_df: pd.DataFrame) -> pd.DataFrame:
         return pd.DataFrame(columns=["coc_id", "change_years", "change_count"])
 
     # Filter to rows where boundary changed
-    changes = panel_df[panel_df["boundary_changed"] == True].copy()
+    changes = panel_df[panel_df["boundary_changed"]].copy()
 
     if changes.empty:
         logger.info("No boundary changes found in panel")
@@ -165,11 +197,13 @@ def boundary_change_summary(panel_df: pd.DataFrame) -> pd.DataFrame:
     results = []
     for coc_id, group in changes.groupby("coc_id"):
         years = sorted(group["year"].unique().tolist())
-        results.append({
-            "coc_id": coc_id,
-            "change_years": years,
-            "change_count": len(years),
-        })
+        results.append(
+            {
+                "coc_id": coc_id,
+                "change_years": years,
+                "change_count": len(years),
+            }
+        )
 
     result_df = pd.DataFrame(results)
     result_df = result_df.sort_values("coc_id").reset_index(drop=True)
@@ -223,17 +257,35 @@ def weighting_sensitivity(
     for name, df in [("area", panel_df_area), ("pop", panel_df_pop)]:
         if df is None or df.empty:
             logger.warning(f"Empty {name} panel provided to weighting_sensitivity")
-            return pd.DataFrame(columns=[
-                "coc_id", "year", "pit_total", "pop_area", "pop_pop",
-                "rate_area", "rate_pop", "rate_diff", "rate_pct_diff"
-            ])
+            return pd.DataFrame(
+                columns=[
+                    "coc_id",
+                    "year",
+                    "pit_total",
+                    "pop_area",
+                    "pop_pop",
+                    "rate_area",
+                    "rate_pop",
+                    "rate_diff",
+                    "rate_pct_diff",
+                ]
+            )
         if not required_cols.issubset(df.columns):
             missing = required_cols - set(df.columns)
             logger.warning(f"Missing columns in {name} panel: {missing}")
-            return pd.DataFrame(columns=[
-                "coc_id", "year", "pit_total", "pop_area", "pop_pop",
-                "rate_area", "rate_pop", "rate_diff", "rate_pct_diff"
-            ])
+            return pd.DataFrame(
+                columns=[
+                    "coc_id",
+                    "year",
+                    "pit_total",
+                    "pop_area",
+                    "pop_pop",
+                    "rate_area",
+                    "rate_pop",
+                    "rate_diff",
+                    "rate_pct_diff",
+                ]
+            )
 
     # Merge on coc_id and year
     df_area = panel_df_area[["coc_id", "year", "pit_total", "total_population"]].copy()
@@ -248,9 +300,7 @@ def weighting_sensitivity(
     if not merged.empty:
         mismatch = merged[merged["pit_total"] != merged["pit_total_pop"]]
         if not mismatch.empty:
-            logger.warning(
-                f"PIT totals differ between panels for {len(mismatch)} CoC/year pairs"
-            )
+            logger.warning(f"PIT totals differ between panels for {len(mismatch)} CoC/year pairs")
 
     # Drop the redundant pit_total column
     merged = merged.drop(columns=["pit_total_pop"])
@@ -301,17 +351,29 @@ def missingness_report(panel_df: pd.DataFrame) -> pd.DataFrame:
     """
     if panel_df is None or panel_df.empty:
         logger.warning("Empty panel provided to missingness_report")
-        return pd.DataFrame(columns=[
-            "column", "year", "missing_count", "total_count",
-            "missing_pct", "complete_pct"
-        ])
+        return pd.DataFrame(
+            columns=[
+                "column",
+                "year",
+                "missing_count",
+                "total_count",
+                "missing_pct",
+                "complete_pct",
+            ]
+        )
 
     if "year" not in panel_df.columns:
         logger.warning("Missing 'year' column in panel")
-        return pd.DataFrame(columns=[
-            "column", "year", "missing_count", "total_count",
-            "missing_pct", "complete_pct"
-        ])
+        return pd.DataFrame(
+            columns=[
+                "column",
+                "year",
+                "missing_count",
+                "total_count",
+                "missing_pct",
+                "complete_pct",
+            ]
+        )
 
     results = []
 
@@ -323,27 +385,31 @@ def missingness_report(panel_df: pd.DataFrame) -> pd.DataFrame:
         total = len(group)
         for col in columns_to_check:
             missing = int(group[col].isna().sum())
-            results.append({
-                "column": col,
-                "year": year,
-                "missing_count": missing,
-                "total_count": total,
-                "missing_pct": (missing / total * 100) if total > 0 else 0.0,
-                "complete_pct": ((total - missing) / total * 100) if total > 0 else 0.0,
-            })
+            results.append(
+                {
+                    "column": col,
+                    "year": year,
+                    "missing_count": missing,
+                    "total_count": total,
+                    "missing_pct": (missing / total * 100) if total > 0 else 0.0,
+                    "complete_pct": ((total - missing) / total * 100) if total > 0 else 0.0,
+                }
+            )
 
     # Overall statistics
     total = len(panel_df)
     for col in columns_to_check:
         missing = int(panel_df[col].isna().sum())
-        results.append({
-            "column": col,
-            "year": "all",
-            "missing_count": missing,
-            "total_count": total,
-            "missing_pct": (missing / total * 100) if total > 0 else 0.0,
-            "complete_pct": ((total - missing) / total * 100) if total > 0 else 0.0,
-        })
+        results.append(
+            {
+                "column": col,
+                "year": "all",
+                "missing_count": missing,
+                "total_count": total,
+                "missing_pct": (missing / total * 100) if total > 0 else 0.0,
+                "complete_pct": ((total - missing) / total * 100) if total > 0 else 0.0,
+            }
+        )
 
     result_df = pd.DataFrame(results)
 
@@ -402,9 +468,7 @@ class DiagnosticsReport:
             "boundary_changes": self.boundary_changes.to_dict(orient="records"),
             "missingness": self.missingness.to_dict(orient="records"),
             "weighting": (
-                self.weighting.to_dict(orient="records")
-                if self.weighting is not None
-                else None
+                self.weighting.to_dict(orient="records") if self.weighting is not None else None
             ),
             "panel_info": self.panel_info,
         }
@@ -545,9 +609,7 @@ class DiagnosticsReport:
             # Find CoC with largest difference
             if max_diff > 0:
                 max_row = self.weighting.loc[self.weighting["rate_pct_diff"].idxmax()]
-                lines.append(
-                    f"  Largest difference: {max_row['coc_id']} in {max_row['year']}"
-                )
+                lines.append(f"  Largest difference: {max_row['coc_id']} in {max_row['year']}")
 
         lines.append("")
         lines.append("=" * 60)
@@ -595,8 +657,12 @@ def generate_diagnostics_report(
     panel_info = {}
     if panel_df is not None and not panel_df.empty:
         panel_info["row_count"] = len(panel_df)
-        panel_info["coc_count"] = int(panel_df["coc_id"].nunique()) if "coc_id" in panel_df.columns else 0
-        panel_info["year_count"] = int(panel_df["year"].nunique()) if "year" in panel_df.columns else 0
+        panel_info["coc_count"] = (
+            int(panel_df["coc_id"].nunique()) if "coc_id" in panel_df.columns else 0
+        )
+        panel_info["year_count"] = (
+            int(panel_df["year"].nunique()) if "year" in panel_df.columns else 0
+        )
         if "year" in panel_df.columns:
             panel_info["year_min"] = int(panel_df["year"].min())
             panel_info["year_max"] = int(panel_df["year"].max())

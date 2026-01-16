@@ -102,9 +102,6 @@ def compute_coc_diagnostics(
     if missing_cols:
         raise ValueError(f"Missing required columns: {missing_cols}")
 
-    # Determine if monthly or yearly data
-    is_monthly = "date" in coc_zori_df.columns
-
     results = []
 
     for coc_id, group in coc_zori_df.groupby("coc_id"):
@@ -136,22 +133,22 @@ def compute_coc_diagnostics(
 
         # Compute flags
         flag_low_coverage = coverage_mean < min_coverage
-        flag_high_dominance = (
-            max_geo_p90 is not None and max_geo_p90 > dominance_threshold
-        )
+        flag_high_dominance = max_geo_p90 is not None and max_geo_p90 > dominance_threshold
 
-        results.append({
-            "coc_id": coc_id,
-            "periods_total": periods_total,
-            "periods_covered": periods_covered,
-            "coverage_ratio_mean": coverage_mean,
-            "coverage_ratio_p10": coverage_p10,
-            "coverage_ratio_p50": coverage_p50,
-            "coverage_ratio_p90": coverage_p90,
-            "max_geo_contribution_p90": max_geo_p90,
-            "flag_low_coverage": flag_low_coverage,
-            "flag_high_dominance": flag_high_dominance,
-        })
+        results.append(
+            {
+                "coc_id": coc_id,
+                "periods_total": periods_total,
+                "periods_covered": periods_covered,
+                "coverage_ratio_mean": coverage_mean,
+                "coverage_ratio_p10": coverage_p10,
+                "coverage_ratio_p50": coverage_p50,
+                "coverage_ratio_p90": coverage_p90,
+                "max_geo_contribution_p90": max_geo_p90,
+                "flag_low_coverage": flag_low_coverage,
+                "flag_high_dominance": flag_high_dominance,
+            }
+        )
 
     result_df = pd.DataFrame(results)
     result_df = result_df.sort_values("coc_id").reset_index(drop=True)
@@ -235,8 +232,7 @@ def generate_text_summary(
     # Count CoCs by coverage level
     full_coverage = (cov_mean >= 0.99).sum()
     lines.append(
-        f"  CoCs with >= 99% coverage:   {full_coverage} "
-        f"({100 * full_coverage / n_cocs:.1f}%)"
+        f"  CoCs with >= 99% coverage:   {full_coverage} ({100 * full_coverage / n_cocs:.1f}%)"
     )
 
     good_coverage = (cov_mean >= min_coverage).sum()
@@ -258,8 +254,12 @@ def generate_text_summary(
     lines.append("-" * 50)
 
     periods_covered = diagnostics_df["periods_covered"]
-    lines.append(f"  Mean {period_label_lower} covered:   {periods_covered.mean():.1f} / {n_periods}")
-    lines.append(f"  Median {period_label_lower} covered: {periods_covered.median():.1f} / {n_periods}")
+    lines.append(
+        f"  Mean {period_label_lower} covered:   {periods_covered.mean():.1f} / {n_periods}"
+    )
+    lines.append(
+        f"  Median {period_label_lower} covered: {periods_covered.median():.1f} / {n_periods}"
+    )
     lines.append(f"  Min {period_label_lower} covered:    {periods_covered.min()} / {n_periods}")
     lines.append(f"  Max {period_label_lower} covered:    {periods_covered.max()} / {n_periods}")
 
@@ -562,9 +562,7 @@ def identify_problem_cocs(
     flagged["issues"] = flagged.apply(build_issues, axis=1)
 
     # Reorder columns to put issues near the front
-    cols = ["coc_id", "issues"] + [
-        c for c in flagged.columns if c not in ["coc_id", "issues"]
-    ]
+    cols = ["coc_id", "issues"] + [c for c in flagged.columns if c not in ["coc_id", "issues"]]
     flagged = flagged[cols]
 
     return flagged.sort_values("coverage_ratio_mean").reset_index(drop=True)

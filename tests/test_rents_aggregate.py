@@ -19,37 +19,45 @@ class TestAggregateMonthly:
     @pytest.fixture
     def sample_xwalk(self):
         """Crosswalk with 3 CoCs: A (2 counties), B (2 counties), C (2 counties)."""
-        return pd.DataFrame({
-            "coc_id": ["A", "A", "B", "B", "C", "C"],
-            "county_fips": ["01001", "01002", "02001", "02002", "03001", "03002"],
-            "area_share": [0.6, 0.4, 0.5, 0.5, 0.7, 0.3],
-        })
+        return pd.DataFrame(
+            {
+                "coc_id": ["A", "A", "B", "B", "C", "C"],
+                "county_fips": ["01001", "01002", "02001", "02002", "03001", "03002"],
+                "area_share": [0.6, 0.4, 0.5, 0.5, 0.7, 0.3],
+            }
+        )
 
     @pytest.fixture
     def sample_weights(self):
         """Equal weights for all counties."""
-        return pd.DataFrame({
-            "county_fips": ["01001", "01002", "02001", "02002", "03001", "03002"],
-            "weight_value": [100, 100, 100, 100, 100, 100],
-        })
+        return pd.DataFrame(
+            {
+                "county_fips": ["01001", "01002", "02001", "02002", "03001", "03002"],
+                "weight_value": [100, 100, 100, 100, 100, 100],
+            }
+        )
 
     @pytest.fixture
     def sample_zori_all_counties(self):
         """ZORI data for all counties."""
-        return pd.DataFrame({
-            "geo_id": ["01001", "01002", "02001", "02002", "03001", "03002"],
-            "date": pd.to_datetime(["2024-01-01"] * 6),
-            "zori": [1000.0, 1200.0, 1500.0, 1600.0, 800.0, 900.0],
-        })
+        return pd.DataFrame(
+            {
+                "geo_id": ["01001", "01002", "02001", "02002", "03001", "03002"],
+                "date": pd.to_datetime(["2024-01-01"] * 6),
+                "zori": [1000.0, 1200.0, 1500.0, 1600.0, 800.0, 900.0],
+            }
+        )
 
     @pytest.fixture
     def sample_zori_partial(self):
         """ZORI data only for CoCs A and B, NOT C (zero coverage for C)."""
-        return pd.DataFrame({
-            "geo_id": ["01001", "01002", "02001", "02002"],
-            "date": pd.to_datetime(["2024-01-01"] * 4),
-            "zori": [1000.0, 1200.0, 1500.0, 1600.0],
-        })
+        return pd.DataFrame(
+            {
+                "geo_id": ["01001", "01002", "02001", "02002"],
+                "date": pd.to_datetime(["2024-01-01"] * 4),
+                "zori": [1000.0, 1200.0, 1500.0, 1600.0],
+            }
+        )
 
     def test_basic_aggregation(self, sample_xwalk, sample_weights, sample_zori_all_counties):
         """Test basic weighted aggregation produces correct ZORI values."""
@@ -113,16 +121,16 @@ class TestAggregateMonthly:
         coc_c = result[result["coc_id"] == "C"]
         assert coc_c["geo_count"].iloc[0] == 0
 
-    def test_partial_coverage_below_threshold_nulls_zori(
-        self, sample_xwalk, sample_weights
-    ):
+    def test_partial_coverage_below_threshold_nulls_zori(self, sample_xwalk, sample_weights):
         """ZORI should be null when coverage is below threshold."""
         # Only one county for CoC A
-        zori_df = pd.DataFrame({
-            "geo_id": ["01001", "02001", "02002"],  # 01002 missing
-            "date": pd.to_datetime(["2024-01-01"] * 3),
-            "zori": [1000.0, 1500.0, 1600.0],
-        })
+        zori_df = pd.DataFrame(
+            {
+                "geo_id": ["01001", "02001", "02002"],  # 01002 missing
+                "date": pd.to_datetime(["2024-01-01"] * 3),
+                "zori": [1000.0, 1500.0, 1600.0],
+            }
+        )
 
         result = aggregate_monthly(zori_df, sample_xwalk, sample_weights, min_coverage=0.90)
 
@@ -134,11 +142,13 @@ class TestAggregateMonthly:
     def test_coverage_ratio_computed_correctly(self, sample_xwalk, sample_weights):
         """Coverage ratio should sum weights of counties with ZORI data."""
         # Create ZORI only for county 01001 (60% of CoC A)
-        zori_df = pd.DataFrame({
-            "geo_id": ["01001"],
-            "date": pd.to_datetime(["2024-01-01"]),
-            "zori": [1000.0],
-        })
+        zori_df = pd.DataFrame(
+            {
+                "geo_id": ["01001"],
+                "date": pd.to_datetime(["2024-01-01"]),
+                "zori": [1000.0],
+            }
+        )
 
         result = aggregate_monthly(zori_df, sample_xwalk, sample_weights, min_coverage=0.0)
 
@@ -148,11 +158,13 @@ class TestAggregateMonthly:
 
     def test_multiple_months(self, sample_xwalk, sample_weights):
         """Test aggregation across multiple months."""
-        zori_df = pd.DataFrame({
-            "geo_id": ["01001", "01002", "01001", "01002"],
-            "date": pd.to_datetime(["2024-01-01", "2024-01-01", "2024-02-01", "2024-02-01"]),
-            "zori": [1000.0, 1200.0, 1050.0, 1250.0],
-        })
+        zori_df = pd.DataFrame(
+            {
+                "geo_id": ["01001", "01002", "01001", "01002"],
+                "date": pd.to_datetime(["2024-01-01", "2024-01-01", "2024-02-01", "2024-02-01"]),
+                "zori": [1000.0, 1200.0, 1050.0, 1250.0],
+            }
+        )
 
         result = aggregate_monthly(zori_df, sample_xwalk, sample_weights, min_coverage=0.0)
 
@@ -188,14 +200,16 @@ class TestCollapseToYearly:
         data = []
         for coc in ["A", "B"]:
             for date in dates:
-                data.append({
-                    "coc_id": coc,
-                    "date": date,
-                    "zori_coc": 1000.0 + (date.month * 10),
-                    "coverage_ratio": 0.95,
-                    "max_geo_contribution": 0.5,
-                    "geo_count": 2,
-                })
+                data.append(
+                    {
+                        "coc_id": coc,
+                        "date": date,
+                        "zori_coc": 1000.0 + (date.month * 10),
+                        "coverage_ratio": 0.95,
+                        "max_geo_contribution": 0.5,
+                        "geo_count": 2,
+                    }
+                )
         return pd.DataFrame(data)
 
     def test_pit_january_selects_january(self, sample_monthly_data):
@@ -243,14 +257,16 @@ class TestCollapseToYearly:
         data = []
         # CoC with zero coverage
         for date in dates:
-            data.append({
-                "coc_id": "ZERO",
-                "date": date,
-                "zori_coc": None,
-                "coverage_ratio": 0.0,
-                "max_geo_contribution": None,
-                "geo_count": 0,
-            })
+            data.append(
+                {
+                    "coc_id": "ZERO",
+                    "date": date,
+                    "zori_coc": None,
+                    "coverage_ratio": 0.0,
+                    "max_geo_contribution": None,
+                    "geo_count": 0,
+                }
+            )
         monthly_df = pd.DataFrame(data)
 
         result = collapse_to_yearly(monthly_df, method="pit_january")

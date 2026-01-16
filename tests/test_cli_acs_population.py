@@ -1,6 +1,5 @@
 """Tests for ACS population CLI commands in the test plan."""
 
-from pathlib import Path
 from unittest.mock import patch
 
 import pandas as pd
@@ -62,8 +61,10 @@ class TestIngestAcsPopulationCommand:
             app,
             [
                 "ingest-acs-population",
-                "--acs", "2019-2023",
-                "--tracts", "2023",
+                "--acs",
+                "2019-2023",
+                "--tracts",
+                "2023",
                 "--force",
             ],
         )
@@ -82,10 +83,14 @@ class TestRollupAcsPopulationCommand:
             app,
             [
                 "rollup-acs-population",
-                "--boundary", "2025",
-                "--acs", "2019-2023",
-                "--tracts", "2023",
-                "--weighting", "invalid",
+                "--boundary",
+                "2025",
+                "--acs",
+                "2019-2023",
+                "--tracts",
+                "2023",
+                "--weighting",
+                "invalid",
             ],
         )
 
@@ -119,9 +124,12 @@ class TestRollupAcsPopulationCommand:
             app,
             [
                 "rollup-acs-population",
-                "--boundary", "2025",
-                "--acs", "2019-2023",
-                "--tracts", "2023",
+                "--boundary",
+                "2025",
+                "--acs",
+                "2019-2023",
+                "--tracts",
+                "2023",
             ],
         )
 
@@ -153,10 +161,14 @@ class TestRollupAcsPopulationCommand:
             app,
             [
                 "rollup-acs-population",
-                "--boundary", "2025",
-                "--acs", "2019-2023",
-                "--tracts", "2023",
-                "--weighting", "area",
+                "--boundary",
+                "2025",
+                "--acs",
+                "2019-2023",
+                "--tracts",
+                "2023",
+                "--weighting",
+                "area",
                 "--force",
             ],
         )
@@ -175,10 +187,14 @@ class TestCrosscheckAcsPopulationCommand:
             app,
             [
                 "crosscheck-acs-population",
-                "--boundary", "2025",
-                "--acs", "2019-2023",
-                "--tracts", "2023",
-                "--weighting", "invalid",
+                "--boundary",
+                "2025",
+                "--acs",
+                "2019-2023",
+                "--tracts",
+                "2023",
+                "--weighting",
+                "invalid",
             ],
         )
 
@@ -200,10 +216,14 @@ class TestCrosscheckAcsPopulationCommand:
             app,
             [
                 "crosscheck-acs-population",
-                "--boundary", "2025",
-                "--acs", "2019-2023",
-                "--tracts", "2023",
-                "--weighting", "area",
+                "--boundary",
+                "2025",
+                "--acs",
+                "2019-2023",
+                "--tracts",
+                "2023",
+                "--weighting",
+                "area",
             ],
         )
 
@@ -221,10 +241,14 @@ class TestVerifyAcsPopulationCommand:
             app,
             [
                 "verify-acs-population",
-                "--boundary", "2025",
-                "--acs", "2019-2023",
-                "--tracts", "2023",
-                "--weighting", "invalid",
+                "--boundary",
+                "2025",
+                "--acs",
+                "2019-2023",
+                "--tracts",
+                "2023",
+                "--weighting",
+                "invalid",
             ],
         )
 
@@ -263,10 +287,14 @@ class TestVerifyAcsPopulationCommand:
             app,
             [
                 "verify-acs-population",
-                "--boundary", "2025",
-                "--acs", "2019-2023",
-                "--tracts", "2023",
-                "--weighting", "area",
+                "--boundary",
+                "2025",
+                "--acs",
+                "2019-2023",
+                "--tracts",
+                "2023",
+                "--weighting",
+                "area",
             ],
         )
 

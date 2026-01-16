@@ -86,9 +86,7 @@ def validate_panel_schema(path: Path, expected_cols: list[str] | None = None) ->
         schema = pq.read_schema(path)
         columns = schema.names
     except Exception as e:
-        raise ExportValidationError(
-            f"Failed to read panel schema from {path}. Error: {e}"
-        ) from e
+        raise ExportValidationError(f"Failed to read panel schema from {path}. Error: {e}") from e
 
     # Determine expected columns
     if expected_cols is not None:
@@ -105,14 +103,11 @@ def validate_panel_schema(path: Path, expected_cols: list[str] | None = None) ->
 
     if missing_cols:
         raise ExportValidationError(
-            f"Panel is missing expected columns: {missing_cols}. "
-            f"Available columns: {columns}"
+            f"Panel is missing expected columns: {missing_cols}. Available columns: {columns}"
         )
 
 
-def validate_vintage_compatibility(
-    panel_path: Path, config: BundleConfig
-) -> list[str]:
+def validate_vintage_compatibility(panel_path: Path, config: BundleConfig) -> list[str]:
     """
     Best-effort check that panel vintages match config.
 
@@ -132,9 +127,7 @@ def validate_vintage_compatibility(
         metadata = parquet_file.schema_arrow.metadata
     except Exception:
         # If we can't read metadata, return a warning but don't fail
-        warnings.append(
-            f"Could not read parquet metadata from {panel_path} for vintage validation"
-        )
+        warnings.append(f"Could not read parquet metadata from {panel_path} for vintage validation")
         return warnings
 
     if metadata is None:
@@ -227,9 +220,7 @@ def validate_selection_plan(plan: SelectionPlan) -> list[str]:
     return errors
 
 
-def run_all_validations(
-    plan: SelectionPlan, config: BundleConfig
-) -> tuple[list[str], list[str]]:
+def run_all_validations(plan: SelectionPlan, config: BundleConfig) -> tuple[list[str], list[str]]:
     """
     Run all validations.
 

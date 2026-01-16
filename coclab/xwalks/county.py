@@ -5,7 +5,6 @@ from pathlib import Path
 import geopandas as gpd
 import pandas as pd
 
-
 # ESRI:102003 - USA Contiguous Albers Equal Area Conic
 ALBERS_EQUAL_AREA_CRS = "ESRI:102003"
 
@@ -64,9 +63,7 @@ def build_coc_county_crosswalk(
     intersections["intersection_area"] = intersections.geometry.area
 
     # Calculate area share (intersection / county)
-    intersections["area_share"] = (
-        intersections["intersection_area"] / intersections["county_area"]
-    )
+    intersections["area_share"] = intersections["intersection_area"] / intersections["county_area"]
 
     # Build crosswalk DataFrame
     crosswalk = pd.DataFrame(

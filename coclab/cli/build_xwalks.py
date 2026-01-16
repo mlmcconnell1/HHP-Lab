@@ -67,8 +67,7 @@ def build_xwalks(
         boundary = latest_vintage()
         if boundary is None:
             typer.echo(
-                "Error: No boundary vintages found in registry. "
-                "Run 'coclab ingest' first.",
+                "Error: No boundary vintages found in registry. Run 'coclab ingest' first.",
                 err=True,
             )
             raise typer.Exit(1)
@@ -145,6 +144,7 @@ def build_xwalks(
         label="Building tract crosswalk",
         show_pos=True,
     ) as progress:
+
         def update_progress(completed: int, total: int) -> None:
             progress.update(completed - progress.pos)
 
@@ -181,8 +181,7 @@ def build_xwalks(
             county_path = legacy_county_path
         else:
             typer.echo(
-                f"Warning: County file not found: {county_path}. "
-                f"Skipping county crosswalk.",
+                f"Warning: County file not found: {county_path}. Skipping county crosswalk.",
                 err=True,
             )
             return

@@ -45,11 +45,13 @@ def compute_crosswalk_diagnostics(crosswalk: pd.DataFrame) -> pd.DataFrame:
     # Group by CoC and compute diagnostics
     grouped = xwalk.groupby("coc_id")
 
-    diagnostics = pd.DataFrame({
-        "num_tracts": grouped.size(),
-        "max_tract_contribution": grouped["coc_area_share"].max(),
-        "coverage_ratio_area": grouped["coc_area_share"].sum(),
-    })
+    diagnostics = pd.DataFrame(
+        {
+            "num_tracts": grouped.size(),
+            "max_tract_contribution": grouped["coc_area_share"].max(),
+            "coverage_ratio_area": grouped["coc_area_share"].sum(),
+        }
+    )
     diagnostics = diagnostics.reset_index()
 
     # Compute population coverage if pop_share is available and has values
@@ -123,11 +125,13 @@ def compute_measure_diagnostics(
     }
 
     area_numeric = [
-        c for c in area_measures.columns
+        c
+        for c in area_measures.columns
         if c not in exclude_cols and pd.api.types.is_numeric_dtype(area_measures[c])
     ]
     pop_numeric = [
-        c for c in pop_measures.columns
+        c
+        for c in pop_measures.columns
         if c not in exclude_cols and pd.api.types.is_numeric_dtype(pop_measures[c])
     ]
 
@@ -159,9 +163,7 @@ def compute_measure_diagnostics(
 
         # Compute percentage difference (relative to population-weighted)
         # Avoid division by zero
-        merged[pct_diff_col] = (
-            merged[delta_col] / merged[pop_col].replace(0, pd.NA) * 100
-        )
+        merged[pct_diff_col] = merged[delta_col] / merged[pop_col].replace(0, pd.NA) * 100
 
         result_cols.extend([area_col, pop_col, delta_col, pct_diff_col])
 
@@ -216,7 +218,10 @@ def summarize_diagnostics(diagnostics: pd.DataFrame) -> str:
 
         # Count CoCs where one tract dominates (>50% contribution)
         high_contrib = (max_contrib > 0.5).sum()
-        lines.append(f"  CoCs with >50% from single tract: {high_contrib} ({100*high_contrib/n_cocs:.1f}%)")
+        lines.append(
+            f"  CoCs with >50% from single tract: {high_contrib} "
+            f"({100 * high_contrib / n_cocs:.1f}%)"
+        )
         lines.append("")
 
     if "coverage_ratio_area" in diagnostics.columns:
@@ -231,7 +236,9 @@ def summarize_diagnostics(diagnostics: pd.DataFrame) -> str:
 
         # Count CoCs with good coverage (0.99 to 1.01)
         good_coverage = ((area_cov >= 0.99) & (area_cov <= 1.01)).sum()
-        lines.append(f"  CoCs with coverage 0.99-1.01: {good_coverage} ({100*good_coverage/n_cocs:.1f}%)")
+        lines.append(
+            f"  CoCs with coverage 0.99-1.01: {good_coverage} ({100 * good_coverage / n_cocs:.1f}%)"
+        )
         lines.append("")
 
     if "coverage_ratio_pop" in diagnostics.columns:
@@ -309,7 +316,7 @@ def identify_problem_cocs(
     """
     issues = []
 
-    for idx, row in diagnostics.iterrows():
+    for _idx, row in diagnostics.iterrows():
         coc_issues = []
 
         # Check area coverage
@@ -317,7 +324,10 @@ def identify_problem_cocs(
             coc_issues.append(f"low_area_coverage ({row['coverage_ratio_area']:.3f})")
 
         # Check if single tract dominates
-        if "max_tract_contribution" in row and row["max_tract_contribution"] > max_contribution_threshold:
+        if (
+            "max_tract_contribution" in row
+            and row["max_tract_contribution"] > max_contribution_threshold
+        ):
             coc_issues.append(f"high_tract_concentration ({row['max_tract_contribution']:.3f})")
 
         # Check population coverage if available
@@ -326,10 +336,12 @@ def identify_problem_cocs(
                 coc_issues.append(f"low_pop_coverage ({row['coverage_ratio_pop']:.3f})")
 
         if coc_issues:
-            issues.append({
-                "coc_id": row["coc_id"],
-                "issues": "; ".join(coc_issues),
-            })
+            issues.append(
+                {
+                    "coc_id": row["coc_id"],
+                    "issues": "; ".join(coc_issues),
+                }
+            )
 
     if not issues:
         return pd.DataFrame(columns=["coc_id", "issues"])

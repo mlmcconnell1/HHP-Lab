@@ -57,14 +57,14 @@ logger = logging.getLogger(__name__)
 
 # Supported source types
 SourceType = Literal[
-    "zori",           # Zillow ZORI rent data
-    "boundary",       # HUD CoC boundaries
-    "census_tract",   # TIGER tract geometries
+    "zori",  # Zillow ZORI rent data
+    "boundary",  # HUD CoC boundaries
+    "census_tract",  # TIGER tract geometries
     "census_county",  # TIGER county geometries
-    "acs_tract",      # ACS tract-level data
-    "acs_county",     # ACS county-level data
-    "pit",            # HUD PIT counts
-    "other",          # Other external sources
+    "acs_tract",  # ACS tract-level data
+    "acs_county",  # ACS county-level data
+    "pit",  # HUD PIT counts
+    "other",  # Other external sources
 ]
 
 # Default registry path
@@ -72,14 +72,14 @@ DEFAULT_REGISTRY_PATH = Path("data/curated/source_registry.parquet")
 
 # Registry columns
 REGISTRY_COLUMNS = [
-    "source_type",      # Type of data source (zori, boundary, etc.)
-    "source_url",       # URL or identifier of the source
-    "source_name",      # Human-readable name (e.g., "ZORI County Monthly")
-    "raw_sha256",       # SHA-256 hash of raw downloaded content
-    "file_size",        # Size in bytes
-    "local_path",       # Path to local raw file
-    "ingested_at",      # UTC timestamp of ingestion
-    "metadata",         # JSON string with additional metadata
+    "source_type",  # Type of data source (zori, boundary, etc.)
+    "source_url",  # URL or identifier of the source
+    "source_name",  # Human-readable name (e.g., "ZORI County Monthly")
+    "raw_sha256",  # SHA-256 hash of raw downloaded content
+    "file_size",  # Size in bytes
+    "local_path",  # Path to local raw file
+    "ingested_at",  # UTC timestamp of ingestion
+    "metadata",  # JSON string with additional metadata
 ]
 
 
@@ -220,8 +220,7 @@ def register_source(
     _save_registry(df, registry_path)
 
     logger.info(
-        f"Registered source: {source_type} from {source_url[:50]}... "
-        f"(sha256: {raw_sha256[:10]}...)"
+        f"Registered source: {source_type} from {source_url[:50]}... (sha256: {raw_sha256[:10]}...)"
     )
 
     return entry
@@ -408,10 +407,17 @@ def detect_upstream_changes(
     df = _load_registry(registry_path)
 
     if df.empty:
-        return pd.DataFrame(columns=[
-            "source_type", "source_url", "hash_count",
-            "first_seen", "last_seen", "first_hash", "last_hash"
-        ])
+        return pd.DataFrame(
+            columns=[
+                "source_type",
+                "source_url",
+                "hash_count",
+                "first_seen",
+                "last_seen",
+                "first_hash",
+                "last_hash",
+            ]
+        )
 
     # Group by source and analyze hash history
     results = []
@@ -420,15 +426,17 @@ def detect_upstream_changes(
         unique_hashes = group["raw_sha256"].nunique()
 
         if unique_hashes > 1:
-            results.append({
-                "source_type": stype,
-                "source_url": surl,
-                "hash_count": unique_hashes,
-                "first_seen": group["ingested_at"].iloc[0],
-                "last_seen": group["ingested_at"].iloc[-1],
-                "first_hash": group["raw_sha256"].iloc[0],
-                "last_hash": group["raw_sha256"].iloc[-1],
-            })
+            results.append(
+                {
+                    "source_type": stype,
+                    "source_url": surl,
+                    "hash_count": unique_hashes,
+                    "first_seen": group["ingested_at"].iloc[0],
+                    "last_seen": group["ingested_at"].iloc[-1],
+                    "first_hash": group["raw_sha256"].iloc[0],
+                    "last_hash": group["raw_sha256"].iloc[-1],
+                }
+            )
 
     return pd.DataFrame(results)
 
@@ -494,11 +502,13 @@ def summarize_registry(registry_path: Path | None = None) -> str:
     ]
 
     # Summary by type
-    type_counts = df.groupby("source_type").agg({
-        "source_url": "nunique",
-        "raw_sha256": "nunique",
-        "ingested_at": ["min", "max", "count"],
-    })
+    type_counts = df.groupby("source_type").agg(
+        {
+            "source_url": "nunique",
+            "raw_sha256": "nunique",
+            "ingested_at": ["min", "max", "count"],
+        }
+    )
 
     lines.append("SOURCES BY TYPE")
     lines.append("-" * 50)

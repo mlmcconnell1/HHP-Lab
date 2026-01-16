@@ -72,8 +72,7 @@ def crosscheck_pit_vintages(
     if vintage1 not in vintage_map:
         available = [str(v.vintage) for v in vintages] if vintages else []
         typer.echo(
-            f"Error: Vintage '{vintage1}' not found in registry. "
-            f"Available: {available}",
+            f"Error: Vintage '{vintage1}' not found in registry. Available: {available}",
             err=True,
         )
         typer.echo(
@@ -86,8 +85,7 @@ def crosscheck_pit_vintages(
     if vintage2 not in vintage_map:
         available = [str(v.vintage) for v in vintages] if vintages else []
         typer.echo(
-            f"Error: Vintage '{vintage2}' not found in registry. "
-            f"Available: {available}",
+            f"Error: Vintage '{vintage2}' not found in registry. Available: {available}",
             err=True,
         )
         typer.echo(
@@ -125,7 +123,7 @@ def crosscheck_pit_vintages(
 
     # Validate required columns
     required_cols = {"pit_year", "coc_id", "pit_total", "pit_sheltered", "pit_unsheltered"}
-    for df, vintage, path in [(df1, vintage1, path1), (df2, vintage2, path2)]:
+    for df, _vintage, path in [(df1, vintage1, path1), (df2, vintage2, path2)]:
         missing = required_cols - set(df.columns)
         if missing:
             typer.echo(
@@ -152,8 +150,7 @@ def crosscheck_pit_vintages(
     if year is not None:
         if year not in common_years:
             typer.echo(
-                f"Error: Year {year} not found in both vintages. "
-                f"Common years: {common_years}",
+                f"Error: Year {year} not found in both vintages. Common years: {common_years}",
                 err=True,
             )
             raise typer.Exit(1)
@@ -197,8 +194,12 @@ def crosscheck_pit_vintages(
         if row["total_delta"] != 0 or row["sheltered_delta"] != 0 or row["unsheltered_delta"] != 0:
             # Check for NaN deltas (when one side has null sheltered/unsheltered)
             total_changed = row["total_delta"] != 0 if not pd.isna(row["total_delta"]) else False
-            sheltered_changed = row["sheltered_delta"] != 0 if not pd.isna(row["sheltered_delta"]) else False
-            unsheltered_changed = row["unsheltered_delta"] != 0 if not pd.isna(row["unsheltered_delta"]) else False
+            sheltered_changed = (
+                row["sheltered_delta"] != 0 if not pd.isna(row["sheltered_delta"]) else False
+            )
+            unsheltered_changed = (
+                row["unsheltered_delta"] != 0 if not pd.isna(row["unsheltered_delta"]) else False
+            )
             if total_changed or sheltered_changed or unsheltered_changed:
                 return "changed"
         return "unchanged"
@@ -245,13 +246,19 @@ def crosscheck_pit_vintages(
     # Merge and calculate deltas
     totals_compare = totals_v1.join(totals_v2, lsuffix="_v1", rsuffix="_v2", how="outer")
     totals_compare["total_delta"] = totals_compare["pit_total_v2"] - totals_compare["pit_total_v1"]
-    totals_compare["sheltered_delta"] = totals_compare["pit_sheltered_v2"] - totals_compare["pit_sheltered_v1"]
-    totals_compare["unsheltered_delta"] = totals_compare["pit_unsheltered_v2"] - totals_compare["pit_unsheltered_v1"]
+    totals_compare["sheltered_delta"] = (
+        totals_compare["pit_sheltered_v2"] - totals_compare["pit_sheltered_v1"]
+    )
+    totals_compare["unsheltered_delta"] = (
+        totals_compare["pit_unsheltered_v2"] - totals_compare["pit_unsheltered_v1"]
+    )
 
     # Display header
-    typer.echo(f"  {'Year':<6} {'Total v1':>10} {'Total v2':>10} {'Delta':>8}  "
-               f"{'Shelt v1':>10} {'Shelt v2':>10} {'Delta':>8}  "
-               f"{'Unshelt v1':>10} {'Unshelt v2':>10} {'Delta':>8}")
+    typer.echo(
+        f"  {'Year':<6} {'Total v1':>10} {'Total v2':>10} {'Delta':>8}  "
+        f"{'Shelt v1':>10} {'Shelt v2':>10} {'Delta':>8}  "
+        f"{'Unshelt v1':>10} {'Unshelt v2':>10} {'Delta':>8}"
+    )
     typer.echo("  " + "-" * 106)
 
     any_tab_differences = False
@@ -267,7 +274,9 @@ def crosscheck_pit_vintages(
 
         unshelt_v1 = int(row["pit_unsheltered_v1"]) if not pd.isna(row["pit_unsheltered_v1"]) else 0
         unshelt_v2 = int(row["pit_unsheltered_v2"]) if not pd.isna(row["pit_unsheltered_v2"]) else 0
-        unshelt_delta = int(row["unsheltered_delta"]) if not pd.isna(row["unsheltered_delta"]) else 0
+        unshelt_delta = (
+            int(row["unsheltered_delta"]) if not pd.isna(row["unsheltered_delta"]) else 0
+        )
 
         # Format deltas with sign
         total_delta_str = f"{total_delta:+d}" if total_delta != 0 else "0"
@@ -279,9 +288,11 @@ def crosscheck_pit_vintages(
         if total_delta != 0 or shelt_delta != 0 or unshelt_delta != 0:
             any_tab_differences = True
 
-        typer.echo(f"{marker}{pit_year:<6} {total_v1:>10,} {total_v2:>10,} {total_delta_str:>8}  "
-                   f"{shelt_v1:>10,} {shelt_v2:>10,} {shelt_delta_str:>8}  "
-                   f"{unshelt_v1:>10,} {unshelt_v2:>10,} {unshelt_delta_str:>8}")
+        typer.echo(
+            f"{marker}{pit_year:<6} {total_v1:>10,} {total_v2:>10,} {total_delta_str:>8}  "
+            f"{shelt_v1:>10,} {shelt_v2:>10,} {shelt_delta_str:>8}  "
+            f"{unshelt_v1:>10,} {unshelt_v2:>10,} {unshelt_delta_str:>8}"
+        )
 
     typer.echo("")
     if any_tab_differences:

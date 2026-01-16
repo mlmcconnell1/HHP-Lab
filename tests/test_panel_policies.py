@@ -7,8 +7,8 @@ import json
 import pytest
 
 from coclab.panel.policies import (
-    AlignmentPolicy,
     DEFAULT_POLICY,
+    AlignmentPolicy,
     default_acs_vintage,
     default_boundary_vintage,
 )

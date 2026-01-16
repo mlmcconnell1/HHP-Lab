@@ -7,7 +7,7 @@ Tests cover:
 - Edge cases and error handling
 """
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 import pandas as pd
@@ -242,17 +242,19 @@ class TestWritePitParquet:
     @pytest.fixture
     def sample_dataframe(self):
         """Create a sample DataFrame for testing."""
-        return pd.DataFrame({
-            "pit_year": [2024, 2024, 2024],
-            "coc_id": ["CO-500", "CA-600", "NY-501"],
-            "pit_total": [1234, 50000, 80000],
-            "pit_sheltered": [800, 35000, 60000],
-            "pit_unsheltered": [434, 15000, 20000],
-            "data_source": ["hud_exchange"] * 3,
-            "source_ref": ["https://example.com"] * 3,
-            "ingested_at": [datetime.now(timezone.utc)] * 3,
-            "notes": [None, None, None],
-        })
+        return pd.DataFrame(
+            {
+                "pit_year": [2024, 2024, 2024],
+                "coc_id": ["CO-500", "CA-600", "NY-501"],
+                "pit_total": [1234, 50000, 80000],
+                "pit_sheltered": [800, 35000, 60000],
+                "pit_unsheltered": [434, 15000, 20000],
+                "data_source": ["hud_exchange"] * 3,
+                "source_ref": ["https://example.com"] * 3,
+                "ingested_at": [datetime.now(UTC)] * 3,
+                "notes": [None, None, None],
+            }
+        )
 
     def test_write_creates_file(self, sample_dataframe, tmp_path):
         """Test that Parquet file is created."""
@@ -290,27 +292,31 @@ class TestWritePitParquet:
 
     def test_write_missing_columns(self, tmp_path):
         """Test error when required columns missing."""
-        df = pd.DataFrame({
-            "coc_id": ["CO-500"],
-            "pit_total": [1234],
-        })
+        df = pd.DataFrame(
+            {
+                "coc_id": ["CO-500"],
+                "pit_total": [1234],
+            }
+        )
         output_path = tmp_path / "pit_counts.parquet"
         with pytest.raises(ValueError, match="Missing required columns"):
             write_pit_parquet(df, output_path)
 
     def test_write_nullable_integers(self, tmp_path):
         """Test handling of nullable integer columns."""
-        df = pd.DataFrame({
-            "pit_year": [2024, 2024],
-            "coc_id": ["CO-500", "CA-600"],
-            "pit_total": [1234, 5000],
-            "pit_sheltered": [800, None],  # One null value
-            "pit_unsheltered": [None, 3000],  # One null value
-            "data_source": ["hud_exchange"] * 2,
-            "source_ref": ["https://example.com"] * 2,
-            "ingested_at": [datetime.now(timezone.utc)] * 2,
-            "notes": [None, None],
-        })
+        df = pd.DataFrame(
+            {
+                "pit_year": [2024, 2024],
+                "coc_id": ["CO-500", "CA-600"],
+                "pit_total": [1234, 5000],
+                "pit_sheltered": [800, None],  # One null value
+                "pit_unsheltered": [None, 3000],  # One null value
+                "data_source": ["hud_exchange"] * 2,
+                "source_ref": ["https://example.com"] * 2,
+                "ingested_at": [datetime.now(UTC)] * 2,
+                "notes": [None, None],
+            }
+        )
         output_path = tmp_path / "pit_counts__2024.parquet"
         write_pit_parquet(df, output_path)
 

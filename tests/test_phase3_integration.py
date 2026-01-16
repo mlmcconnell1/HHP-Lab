@@ -34,7 +34,7 @@ from coclab.panel import (
     save_panel,
 )
 from coclab.panel.assemble import PANEL_COLUMNS
-from coclab.pit.ingest import PITParseResult, normalize_coc_id, parse_pit_file, write_pit_parquet
+from coclab.pit.ingest import normalize_coc_id, parse_pit_file, write_pit_parquet
 from coclab.pit.qa import validate_pit_data
 from coclab.pit.registry import (
     PitRegistryEntry,
@@ -60,13 +60,15 @@ def sample_pit_csv(tmp_path, sample_cocs) -> Path:
     csv_path = tmp_path / "pit_2024.csv"
 
     # HUD Exchange-style format
-    df = pd.DataFrame({
-        "CoC Number": sample_cocs,
-        "CoC Name": [f"CoC for {coc}" for coc in sample_cocs],
-        "Overall Homeless, 2024": [1200, 45000, 75000, 8500, 12000],
-        "Sheltered Total Homeless": [800, 30000, 55000, 6000, 8000],
-        "Unsheltered Homeless": [400, 15000, 20000, 2500, 4000],
-    })
+    df = pd.DataFrame(
+        {
+            "CoC Number": sample_cocs,
+            "CoC Name": [f"CoC for {coc}" for coc in sample_cocs],
+            "Overall Homeless, 2024": [1200, 45000, 75000, 8500, 12000],
+            "Sheltered Total Homeless": [800, 30000, 55000, 6000, 8000],
+            "Unsheltered Homeless": [400, 15000, 20000, 2500, 4000],
+        }
+    )
     df.to_csv(csv_path, index=False)
     return csv_path
 
@@ -76,13 +78,15 @@ def sample_pit_csv_2023(tmp_path, sample_cocs) -> Path:
     """Create a sample PIT CSV file for 2023."""
     csv_path = tmp_path / "pit_2023.csv"
 
-    df = pd.DataFrame({
-        "CoC Number": sample_cocs,
-        "CoC Name": [f"CoC for {coc}" for coc in sample_cocs],
-        "Overall Homeless, 2023": [1100, 43000, 72000, 8000, 11500],
-        "Sheltered Total Homeless": [750, 29000, 53000, 5700, 7700],
-        "Unsheltered Homeless": [350, 14000, 19000, 2300, 3800],
-    })
+    df = pd.DataFrame(
+        {
+            "CoC Number": sample_cocs,
+            "CoC Name": [f"CoC for {coc}" for coc in sample_cocs],
+            "Overall Homeless, 2023": [1100, 43000, 72000, 8000, 11500],
+            "Sheltered Total Homeless": [750, 29000, 53000, 5700, 7700],
+            "Unsheltered Homeless": [350, 14000, 19000, 2300, 3800],
+        }
+    )
     df.to_csv(csv_path, index=False)
     return csv_path
 
@@ -95,12 +99,14 @@ def sample_boundary_gdf(sample_cocs) -> gpd.GeoDataFrame:
         # Create simple polygon for each CoC
         lon_base = -120 + i * 10
         lat_base = 35
-        poly = Polygon([
-            (lon_base, lat_base),
-            (lon_base + 5, lat_base),
-            (lon_base + 5, lat_base + 5),
-            (lon_base, lat_base + 5),
-        ])
+        poly = Polygon(
+            [
+                (lon_base, lat_base),
+                (lon_base + 5, lat_base),
+                (lon_base + 5, lat_base + 5),
+                (lon_base, lat_base + 5),
+            ]
+        )
         geometries.append(poly)
 
     return gpd.GeoDataFrame(
@@ -121,15 +127,17 @@ def sample_acs_measures(tmp_path, sample_cocs) -> Path:
     measures_dir.mkdir()
 
     # Create measures for boundary vintage 2024, ACS vintage 2023
-    df = pd.DataFrame({
-        "coc_id": sample_cocs,
-        "total_population": [700000, 10000000, 8500000, 4500000, 2800000],
-        "adult_population": [550000, 8000000, 6800000, 3600000, 2240000],
-        "population_below_poverty": [70000, 1500000, 1275000, 675000, 420000],
-        "median_household_income": [65000, 75000, 85000, 55000, 78000],
-        "median_gross_rent": [1400, 2100, 2300, 1200, 1800],
-        "coverage_ratio": [0.95, 0.98, 0.99, 0.92, 0.96],
-    })
+    df = pd.DataFrame(
+        {
+            "coc_id": sample_cocs,
+            "total_population": [700000, 10000000, 8500000, 4500000, 2800000],
+            "adult_population": [550000, 8000000, 6800000, 3600000, 2240000],
+            "population_below_poverty": [70000, 1500000, 1275000, 675000, 420000],
+            "median_household_income": [65000, 75000, 85000, 55000, 78000],
+            "median_gross_rent": [1400, 2100, 2300, 1200, 1800],
+            "coverage_ratio": [0.95, 0.98, 0.99, 0.92, 0.96],
+        }
+    )
 
     path = measures_dir / "coc_measures__2024__2023.parquet"
     df.to_parquet(path, index=False)
@@ -150,31 +158,35 @@ def full_test_setup(tmp_path, sample_cocs, sample_acs_measures):
     # Create PIT data for multiple years
     for year in [2022, 2023, 2024]:
         base_total = 1000 + (year - 2022) * 100
-        df = pd.DataFrame({
-            "coc_id": sample_cocs,
-            "pit_total": [base_total + i * 500 for i in range(5)],
-            "pit_sheltered": [int((base_total + i * 500) * 0.7) for i in range(5)],
-            "pit_unsheltered": [int((base_total + i * 500) * 0.3) for i in range(5)],
-            "pit_year": [year] * 5,
-            "data_source": ["hud_exchange"] * 5,
-            "source_ref": [f"https://example.com/pit/{year}"] * 5,
-            "ingested_at": [datetime.now(UTC)] * 5,
-            "notes": [None] * 5,
-        })
+        df = pd.DataFrame(
+            {
+                "coc_id": sample_cocs,
+                "pit_total": [base_total + i * 500 for i in range(5)],
+                "pit_sheltered": [int((base_total + i * 500) * 0.7) for i in range(5)],
+                "pit_unsheltered": [int((base_total + i * 500) * 0.3) for i in range(5)],
+                "pit_year": [year] * 5,
+                "data_source": ["hud_exchange"] * 5,
+                "source_ref": [f"https://example.com/pit/{year}"] * 5,
+                "ingested_at": [datetime.now(UTC)] * 5,
+                "notes": [None] * 5,
+            }
+        )
         df.to_parquet(pit_dir / f"pit_counts__{year}.parquet", index=False)
 
     # Create ACS measures for each boundary/acs vintage combination
     for acs_year in [2021, 2022, 2023]:
         boundary_year = acs_year + 1
-        df = pd.DataFrame({
-            "coc_id": sample_cocs,
-            "total_population": [700000 + i * 1000000 for i in range(5)],
-            "adult_population": [550000 + i * 800000 for i in range(5)],
-            "population_below_poverty": [70000 + i * 100000 for i in range(5)],
-            "median_household_income": [65000 + i * 5000 for i in range(5)],
-            "median_gross_rent": [1400 + i * 200 for i in range(5)],
-            "coverage_ratio": [0.95, 0.98, 0.99, 0.92, 0.96],
-        })
+        df = pd.DataFrame(
+            {
+                "coc_id": sample_cocs,
+                "total_population": [700000 + i * 1000000 for i in range(5)],
+                "adult_population": [550000 + i * 800000 for i in range(5)],
+                "population_below_poverty": [70000 + i * 100000 for i in range(5)],
+                "median_household_income": [65000 + i * 5000 for i in range(5)],
+                "median_gross_rent": [1400 + i * 200 for i in range(5)],
+                "coverage_ratio": [0.95, 0.98, 0.99, 0.92, 0.96],
+            }
+        )
         df.to_parquet(
             sample_acs_measures / f"coc_measures__{boundary_year}__{acs_year}.parquet",
             index=False,
@@ -515,18 +527,22 @@ class TestQAValidation:
     def test_qa_detects_duplicates(self, tmp_path):
         """QA detects duplicate CoC IDs."""
         csv_path = tmp_path / "pit_dup.csv"
-        df = pd.DataFrame({
-            "CoC Number": ["CO-500", "CO-500", "CA-600"],
-            "Overall Homeless, 2024": [1000, 1100, 50000],
-        })
+        df = pd.DataFrame(
+            {
+                "CoC Number": ["CO-500", "CO-500", "CA-600"],
+                "Overall Homeless, 2024": [1000, 1100, 50000],
+            }
+        )
         df.to_csv(csv_path, index=False)
 
         # Note: parse_pit_file drops duplicates, so we create our own dup df
-        dup_df = pd.DataFrame({
-            "pit_year": [2024, 2024, 2024],
-            "coc_id": ["CO-500", "CO-500", "CA-600"],
-            "pit_total": [1000, 1100, 50000],
-        })
+        dup_df = pd.DataFrame(
+            {
+                "pit_year": [2024, 2024, 2024],
+                "coc_id": ["CO-500", "CO-500", "CA-600"],
+                "pit_total": [1000, 1100, 50000],
+            }
+        )
 
         report = validate_pit_data(dup_df)
 
@@ -534,11 +550,13 @@ class TestQAValidation:
 
     def test_qa_detects_invalid_counts(self, tmp_path):
         """QA detects invalid (negative) counts."""
-        df = pd.DataFrame({
-            "pit_year": [2024],
-            "coc_id": ["CO-500"],
-            "pit_total": [-100],
-        })
+        df = pd.DataFrame(
+            {
+                "pit_year": [2024],
+                "coc_id": ["CO-500"],
+                "pit_total": [-100],
+            }
+        )
 
         report = validate_pit_data(df)
 

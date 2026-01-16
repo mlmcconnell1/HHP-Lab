@@ -75,7 +75,7 @@ def ingest_pit(
         source_url = get_pit_source_url(year)
     except ValueError as e:
         typer.echo(f"Error: {e}", err=True)
-        raise typer.Exit(1)
+        raise typer.Exit(1) from e
     expected_filename = source_url.split("/")[-1]
     raw_file = raw_dir / expected_filename
 
@@ -144,7 +144,9 @@ def ingest_pit(
         if qa_report.passed:
             typer.echo("QA passed: no errors found")
         else:
-            typer.echo(f"QA result: {len(qa_report.errors)} error(s), {len(qa_report.warnings)} warning(s)")
+            typer.echo(
+                f"QA result: {len(qa_report.errors)} error(s), {len(qa_report.warnings)} warning(s)"
+            )
 
         # Display issues if any
         if qa_report.issues:

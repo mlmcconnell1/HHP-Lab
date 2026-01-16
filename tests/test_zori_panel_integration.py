@@ -42,7 +42,6 @@ from coclab.panel.zori_eligibility import (
 )
 from coclab.provenance import read_provenance
 
-
 # =============================================================================
 # Unit Tests: rent_to_income Math
 # =============================================================================
@@ -55,11 +54,13 @@ class TestRentToIncomeMath:
         """Test: Income=60,000, ZORI=1,500 -> ratio=0.30."""
         # Formula: rent_to_income = zori / (income / 12)
         # 1500 / (60000 / 12) = 1500 / 5000 = 0.30
-        df = pd.DataFrame({
-            "zori_coc": [1500.0],
-            "median_household_income": [60000.0],
-            "zori_is_eligible": [True],
-        })
+        df = pd.DataFrame(
+            {
+                "zori_coc": [1500.0],
+                "median_household_income": [60000.0],
+                "zori_is_eligible": [True],
+            }
+        )
 
         result = compute_rent_to_income(df)
 
@@ -69,11 +70,13 @@ class TestRentToIncomeMath:
     def test_basic_calculation_income_48000_zori_2000(self):
         """Test: Income=48,000, ZORI=2,000 -> ratio=0.50."""
         # 2000 / (48000 / 12) = 2000 / 4000 = 0.50
-        df = pd.DataFrame({
-            "zori_coc": [2000.0],
-            "median_household_income": [48000.0],
-            "zori_is_eligible": [True],
-        })
+        df = pd.DataFrame(
+            {
+                "zori_coc": [2000.0],
+                "median_household_income": [48000.0],
+                "zori_is_eligible": [True],
+            }
+        )
 
         result = compute_rent_to_income(df)
 
@@ -81,11 +84,13 @@ class TestRentToIncomeMath:
 
     def test_calculation_with_multiple_rows(self):
         """Test calculation across multiple rows with varying values."""
-        df = pd.DataFrame({
-            "zori_coc": [1500.0, 2000.0, 1200.0, 2500.0],
-            "median_household_income": [60000.0, 48000.0, 72000.0, 36000.0],
-            "zori_is_eligible": [True, True, True, True],
-        })
+        df = pd.DataFrame(
+            {
+                "zori_coc": [1500.0, 2000.0, 1200.0, 2500.0],
+                "median_household_income": [60000.0, 48000.0, 72000.0, 36000.0],
+                "zori_is_eligible": [True, True, True, True],
+            }
+        )
 
         result = compute_rent_to_income(df)
 
@@ -99,11 +104,13 @@ class TestRentToIncomeMath:
     def test_high_cost_burden_ratio(self):
         """Test scenario with severe cost burden (ratio > 0.50)."""
         # HUD considers >0.50 as "severely cost-burdened"
-        df = pd.DataFrame({
-            "zori_coc": [2000.0],
-            "median_household_income": [24000.0],  # Monthly: 2000
-            "zori_is_eligible": [True],
-        })
+        df = pd.DataFrame(
+            {
+                "zori_coc": [2000.0],
+                "median_household_income": [24000.0],  # Monthly: 2000
+                "zori_is_eligible": [True],
+            }
+        )
 
         result = compute_rent_to_income(df)
 
@@ -112,11 +119,13 @@ class TestRentToIncomeMath:
 
     def test_moderate_cost_burden_ratio(self):
         """Test scenario with moderate cost burden (ratio ~0.35)."""
-        df = pd.DataFrame({
-            "zori_coc": [1750.0],
-            "median_household_income": [60000.0],
-            "zori_is_eligible": [True],
-        })
+        df = pd.DataFrame(
+            {
+                "zori_coc": [1750.0],
+                "median_household_income": [60000.0],
+                "zori_is_eligible": [True],
+            }
+        )
 
         result = compute_rent_to_income(df)
 
@@ -134,11 +143,13 @@ class TestRentToIncomeNullHandling:
 
     def test_null_zori_returns_null_ratio(self):
         """Test: Null ZORI -> null rent_to_income."""
-        df = pd.DataFrame({
-            "zori_coc": [None],
-            "median_household_income": [60000.0],
-            "zori_is_eligible": [True],
-        })
+        df = pd.DataFrame(
+            {
+                "zori_coc": [None],
+                "median_household_income": [60000.0],
+                "zori_is_eligible": [True],
+            }
+        )
 
         result = compute_rent_to_income(df)
 
@@ -146,11 +157,13 @@ class TestRentToIncomeNullHandling:
 
     def test_null_income_returns_null_ratio(self):
         """Test: Null income -> null rent_to_income."""
-        df = pd.DataFrame({
-            "zori_coc": [1500.0],
-            "median_household_income": [None],
-            "zori_is_eligible": [True],
-        })
+        df = pd.DataFrame(
+            {
+                "zori_coc": [1500.0],
+                "median_household_income": [None],
+                "zori_is_eligible": [True],
+            }
+        )
 
         result = compute_rent_to_income(df)
 
@@ -158,11 +171,13 @@ class TestRentToIncomeNullHandling:
 
     def test_zero_income_returns_null_ratio(self):
         """Test: Zero income -> null rent_to_income (avoid division by zero)."""
-        df = pd.DataFrame({
-            "zori_coc": [1500.0],
-            "median_household_income": [0.0],
-            "zori_is_eligible": [True],
-        })
+        df = pd.DataFrame(
+            {
+                "zori_coc": [1500.0],
+                "median_household_income": [0.0],
+                "zori_is_eligible": [True],
+            }
+        )
 
         result = compute_rent_to_income(df)
 
@@ -170,11 +185,13 @@ class TestRentToIncomeNullHandling:
 
     def test_both_null_returns_null_ratio(self):
         """Test: Both ZORI and income null -> null rent_to_income."""
-        df = pd.DataFrame({
-            "zori_coc": [None],
-            "median_household_income": [None],
-            "zori_is_eligible": [True],
-        })
+        df = pd.DataFrame(
+            {
+                "zori_coc": [None],
+                "median_household_income": [None],
+                "zori_is_eligible": [True],
+            }
+        )
 
         result = compute_rent_to_income(df)
 
@@ -182,11 +199,13 @@ class TestRentToIncomeNullHandling:
 
     def test_ineligible_row_returns_null_ratio(self):
         """Test: Ineligible row -> null rent_to_income even with valid data."""
-        df = pd.DataFrame({
-            "zori_coc": [1500.0],
-            "median_household_income": [60000.0],
-            "zori_is_eligible": [False],
-        })
+        df = pd.DataFrame(
+            {
+                "zori_coc": [1500.0],
+                "median_household_income": [60000.0],
+                "zori_is_eligible": [False],
+            }
+        )
 
         result = compute_rent_to_income(df)
 
@@ -194,11 +213,13 @@ class TestRentToIncomeNullHandling:
 
     def test_mixed_valid_and_null_rows(self):
         """Test calculation with mix of valid and null values."""
-        df = pd.DataFrame({
-            "zori_coc": [1500.0, None, 2000.0, 1200.0, 1800.0],
-            "median_household_income": [60000.0, 50000.0, None, 0.0, 48000.0],
-            "zori_is_eligible": [True, True, True, True, True],
-        })
+        df = pd.DataFrame(
+            {
+                "zori_coc": [1500.0, None, 2000.0, 1200.0, 1800.0],
+                "median_household_income": [60000.0, 50000.0, None, 0.0, 48000.0],
+                "zori_is_eligible": [True, True, True, True, True],
+            }
+        )
 
         result = compute_rent_to_income(df)
 
@@ -215,9 +236,11 @@ class TestRentToIncomeNullHandling:
 
     def test_missing_zori_column_returns_all_null(self):
         """Test: Missing ZORI column in DataFrame -> all null rent_to_income."""
-        df = pd.DataFrame({
-            "median_household_income": [60000.0, 48000.0],
-        })
+        df = pd.DataFrame(
+            {
+                "median_household_income": [60000.0, 48000.0],
+            }
+        )
 
         result = compute_rent_to_income(df)
 
@@ -226,9 +249,11 @@ class TestRentToIncomeNullHandling:
 
     def test_missing_income_column_returns_all_null(self):
         """Test: Missing income column in DataFrame -> all null rent_to_income."""
-        df = pd.DataFrame({
-            "zori_coc": [1500.0, 2000.0],
-        })
+        df = pd.DataFrame(
+            {
+                "zori_coc": [1500.0, 2000.0],
+            }
+        )
 
         result = compute_rent_to_income(df)
 
@@ -322,11 +347,13 @@ class TestApplyZoriEligibility:
 
     def test_eligible_rows_keep_zori_value(self):
         """Test that eligible rows retain their ZORI values."""
-        df = pd.DataFrame({
-            "coc_id": ["CO-500", "CA-600"],
-            "zori_coc": [1500.0, 2000.0],
-            "zori_coverage_ratio": [0.95, 0.92],
-        })
+        df = pd.DataFrame(
+            {
+                "coc_id": ["CO-500", "CA-600"],
+                "zori_coc": [1500.0, 2000.0],
+                "zori_coverage_ratio": [0.95, 0.92],
+            }
+        )
 
         result = apply_zori_eligibility(df, min_coverage=0.90)
 
@@ -337,58 +364,66 @@ class TestApplyZoriEligibility:
 
     def test_ineligible_rows_get_null_zori(self):
         """Test that ineligible rows have ZORI values set to null."""
-        df = pd.DataFrame({
-            "coc_id": ["CO-500", "CA-600"],
-            "zori_coc": [1500.0, 2000.0],
-            "zori_coverage_ratio": [0.95, 0.80],  # CA-600 is below threshold
-        })
+        df = pd.DataFrame(
+            {
+                "coc_id": ["CO-500", "CA-600"],
+                "zori_coc": [1500.0, 2000.0],
+                "zori_coverage_ratio": [0.95, 0.80],  # CA-600 is below threshold
+            }
+        )
 
         result = apply_zori_eligibility(df, min_coverage=0.90)
 
         # CO-500 should be eligible
-        assert result["zori_is_eligible"].iloc[0] == True
+        assert result["zori_is_eligible"].iloc[0]
         assert result["zori_coc"].iloc[0] == 1500.0
         assert pd.isna(result["zori_excluded_reason"].iloc[0])
 
         # CA-600 should be ineligible with null ZORI
-        assert result["zori_is_eligible"].iloc[1] == False
+        assert not result["zori_is_eligible"].iloc[1]
         assert pd.isna(result["zori_coc"].iloc[1])
         assert result["zori_excluded_reason"].iloc[1] == EXCLUDED_LOW_COVERAGE
 
     def test_zero_coverage_gets_correct_reason(self):
         """Test that zero coverage is flagged with 'zero_coverage' reason."""
-        df = pd.DataFrame({
-            "coc_id": ["CO-500"],
-            "zori_coc": [1500.0],
-            "zori_coverage_ratio": [0.0],
-        })
+        df = pd.DataFrame(
+            {
+                "coc_id": ["CO-500"],
+                "zori_coc": [1500.0],
+                "zori_coverage_ratio": [0.0],
+            }
+        )
 
         result = apply_zori_eligibility(df, min_coverage=0.90)
 
-        assert result["zori_is_eligible"].iloc[0] == False
+        assert not result["zori_is_eligible"].iloc[0]
         assert pd.isna(result["zori_coc"].iloc[0])
         assert result["zori_excluded_reason"].iloc[0] == EXCLUDED_ZERO_COVERAGE
 
     def test_missing_columns_handled_gracefully(self):
         """Test that missing ZORI columns result in all ineligible."""
-        df = pd.DataFrame({
-            "coc_id": ["CO-500", "CA-600"],
-            # Missing zori_coc and zori_coverage_ratio columns
-        })
+        df = pd.DataFrame(
+            {
+                "coc_id": ["CO-500", "CA-600"],
+                # Missing zori_coc and zori_coverage_ratio columns
+            }
+        )
 
         result = apply_zori_eligibility(df, min_coverage=0.90)
 
         assert "zori_is_eligible" in result.columns
-        assert result["zori_is_eligible"].all() == False
+        assert not result["zori_is_eligible"].all()
         assert result["zori_excluded_reason"].eq(EXCLUDED_MISSING).all()
 
     def test_adds_required_columns(self):
         """Test that eligibility check adds required columns."""
-        df = pd.DataFrame({
-            "coc_id": ["CO-500"],
-            "zori_coc": [1500.0],
-            "zori_coverage_ratio": [0.95],
-        })
+        df = pd.DataFrame(
+            {
+                "coc_id": ["CO-500"],
+                "zori_coc": [1500.0],
+                "zori_coverage_ratio": [0.95],
+            }
+        )
 
         result = apply_zori_eligibility(df, min_coverage=0.90)
 
@@ -397,12 +432,14 @@ class TestApplyZoriEligibility:
 
     def test_dominance_warning_does_not_exclude(self):
         """Test that high dominance generates warning but doesn't exclude."""
-        df = pd.DataFrame({
-            "coc_id": ["CO-500"],
-            "zori_coc": [1500.0],
-            "zori_coverage_ratio": [0.95],
-            "zori_max_geo_contribution": [0.85],  # High dominance
-        })
+        df = pd.DataFrame(
+            {
+                "coc_id": ["CO-500"],
+                "zori_coc": [1500.0],
+                "zori_coverage_ratio": [0.95],
+                "zori_max_geo_contribution": [0.85],  # High dominance
+            }
+        )
 
         result = apply_zori_eligibility(
             df,
@@ -412,7 +449,7 @@ class TestApplyZoriEligibility:
         )
 
         # Should still be eligible despite high dominance
-        assert result["zori_is_eligible"].iloc[0] == True
+        assert result["zori_is_eligible"].iloc[0]
         assert result["zori_coc"].iloc[0] == 1500.0
 
 
@@ -454,10 +491,12 @@ class TestZoriProvenance:
 
     def test_add_provenance_columns(self):
         """Test adding provenance columns to DataFrame."""
-        df = pd.DataFrame({
-            "coc_id": ["CO-500", "CA-600"],
-            "zori_coc": [1500.0, 2000.0],
-        })
+        df = pd.DataFrame(
+            {
+                "coc_id": ["CO-500", "CA-600"],
+                "zori_coc": [1500.0, 2000.0],
+            }
+        )
         prov = ZoriProvenance(
             rent_alignment="pit_january",
             zori_min_coverage=0.90,
@@ -478,12 +517,14 @@ class TestSummarizeZoriEligibility:
 
     def test_summary_with_eligible_rows(self):
         """Test summary generation with eligible rows."""
-        df = pd.DataFrame({
-            "coc_id": ["CO-500", "CA-600", "NY-501"],
-            "zori_is_eligible": [True, True, False],
-            "zori_excluded_reason": [None, None, EXCLUDED_LOW_COVERAGE],
-            "rent_to_income": [0.30, 0.40, None],
-        })
+        df = pd.DataFrame(
+            {
+                "coc_id": ["CO-500", "CA-600", "NY-501"],
+                "zori_is_eligible": [True, True, False],
+                "zori_excluded_reason": [None, None, EXCLUDED_LOW_COVERAGE],
+                "rent_to_income": [0.30, 0.40, None],
+            }
+        )
 
         summary = summarize_zori_eligibility(df)
 
@@ -497,10 +538,12 @@ class TestSummarizeZoriEligibility:
 
     def test_summary_without_zori_columns(self):
         """Test summary when ZORI columns are not present."""
-        df = pd.DataFrame({
-            "coc_id": ["CO-500", "CA-600"],
-            "pit_total": [1000, 2000],
-        })
+        df = pd.DataFrame(
+            {
+                "coc_id": ["CO-500", "CA-600"],
+                "pit_total": [1000, 2000],
+            }
+        )
 
         summary = summarize_zori_eligibility(df)
 
@@ -529,43 +572,49 @@ class TestPanelAssemblyWithZori:
 
         # Create PIT data for 2023 and 2024
         for year in [2023, 2024]:
-            df_pit = pd.DataFrame({
-                "coc_id": ["CO-500", "CA-600", "NY-501"],
-                "pit_total": [1200 + (year - 2023) * 100, 45000, 75000],
-                "pit_sheltered": [800, 30000, 55000],
-                "pit_unsheltered": [400 + (year - 2023) * 100, 15000, 20000],
-                "pit_year": [year, year, year],
-            })
+            df_pit = pd.DataFrame(
+                {
+                    "coc_id": ["CO-500", "CA-600", "NY-501"],
+                    "pit_total": [1200 + (year - 2023) * 100, 45000, 75000],
+                    "pit_sheltered": [800, 30000, 55000],
+                    "pit_unsheltered": [400 + (year - 2023) * 100, 15000, 20000],
+                    "pit_year": [year, year, year],
+                }
+            )
             df_pit.to_parquet(pit_dir / f"pit_counts__{year}.parquet", index=False)
 
         # Create ACS measures for boundary/acs combinations
         for acs_year in [2022, 2023]:
             boundary_year = acs_year + 1
-            df_acs = pd.DataFrame({
-                "coc_id": ["CO-500", "CA-600", "NY-501"],
-                "total_population": [500000, 10000000, 8000000],
-                "adult_population": [400000, 8000000, 6400000],
-                "population_below_poverty": [50000, 1500000, 1200000],
-                "median_household_income": [60000, 72000, 84000],  # For rent_to_income calc
-                "median_gross_rent": [1200, 1800, 2200],
-                "coverage_ratio": [0.95, 0.98, 0.99],
-                "weighting_method": ["population", "population", "population"],
-            })
+            df_acs = pd.DataFrame(
+                {
+                    "coc_id": ["CO-500", "CA-600", "NY-501"],
+                    "total_population": [500000, 10000000, 8000000],
+                    "adult_population": [400000, 8000000, 6400000],
+                    "population_below_poverty": [50000, 1500000, 1200000],
+                    "median_household_income": [60000, 72000, 84000],  # For rent_to_income calc
+                    "median_gross_rent": [1200, 1800, 2200],
+                    "coverage_ratio": [0.95, 0.98, 0.99],
+                    "weighting_method": ["population", "population", "population"],
+                }
+            )
             df_acs.to_parquet(
                 measures_dir / f"coc_measures__{boundary_year}__{acs_year}.parquet",
                 index=False,
             )
 
         # Create yearly ZORI data
-        df_zori = pd.DataFrame({
-            "coc_id": ["CO-500", "CO-500", "CA-600", "CA-600", "NY-501", "NY-501"],
-            "year": [2023, 2024, 2023, 2024, 2023, 2024],
-            "zori_coc": [1500.0, 1550.0, 2400.0, 2500.0, 2800.0, 2900.0],
-            "coverage_ratio": [0.95, 0.94, 0.98, 0.97, 0.85, 0.80],  # NY-501 low coverage
-            "max_geo_contribution": [0.40, 0.42, 0.35, 0.36, 0.50, 0.52],
-            "method": ["pit_january"] * 6,
-            "geo_count": [5, 5, 10, 10, 3, 3],
-        })
+        df_zori = pd.DataFrame(
+            {
+                "coc_id": ["CO-500", "CO-500", "CA-600", "CA-600", "NY-501", "NY-501"],
+                "year": [2023, 2024, 2023, 2024, 2023, 2024],
+                "zori_coc": [1500.0, 1550.0, 2400.0, 2500.0, 2800.0, 2900.0],
+                "coverage_ratio": [0.95, 0.94, 0.98, 0.97, 0.85, 0.80],  # NY-501 low coverage
+                "max_geo_contribution": [0.40, 0.42, 0.35, 0.36, 0.50, 0.52],
+                "method": ["pit_january"] * 6,
+                "geo_count": [5, 5, 10, 10, 3, 3],
+            }
+        )
         df_zori.to_parquet(
             rents_dir / "coc_zori_yearly__test.parquet",
             index=False,
@@ -618,9 +667,7 @@ class TestPanelAssemblyWithZori:
 
         # Check rent_to_income for CO-500 in 2023
         # ZORI=1500, Income=60000 -> 1500/(60000/12) = 0.30
-        co500_2023 = panel_df[
-            (panel_df["coc_id"] == "CO-500") & (panel_df["year"] == 2023)
-        ].iloc[0]
+        co500_2023 = panel_df[(panel_df["coc_id"] == "CO-500") & (panel_df["year"] == 2023)].iloc[0]
 
         assert co500_2023["rent_to_income"] == pytest.approx(0.30, rel=1e-6)
 
@@ -721,19 +768,15 @@ class TestPanelAssemblyWithZori:
         )
 
         # NY-501 2023 (coverage=0.85) should now be eligible
-        ny501_2023 = panel_df[
-            (panel_df["coc_id"] == "NY-501") & (panel_df["year"] == 2023)
-        ].iloc[0]
+        ny501_2023 = panel_df[(panel_df["coc_id"] == "NY-501") & (panel_df["year"] == 2023)].iloc[0]
 
-        assert ny501_2023["zori_is_eligible"] == True
+        assert ny501_2023["zori_is_eligible"]
         assert ny501_2023["rent_to_income"] is not None
 
         # NY-501 2024 (coverage=0.80) should still be ineligible
-        ny501_2024 = panel_df[
-            (panel_df["coc_id"] == "NY-501") & (panel_df["year"] == 2024)
-        ].iloc[0]
+        ny501_2024 = panel_df[(panel_df["coc_id"] == "NY-501") & (panel_df["year"] == 2024)].iloc[0]
 
-        assert ny501_2024["zori_is_eligible"] == False
+        assert not ny501_2024["zori_is_eligible"]
 
     def test_save_panel_with_zori_includes_provenance(self, panel_data_dirs):
         """Test that saved panel includes ZORI provenance metadata."""
@@ -787,28 +830,32 @@ class TestPanelAssemblyWithoutZori:
 
         # Create PIT data
         for year in [2023, 2024]:
-            df_pit = pd.DataFrame({
-                "coc_id": ["CO-500", "CA-600", "NY-501", "TX-500"],
-                "pit_total": [1200 + (year - 2023) * 100, 45000, 75000, 3000],
-                "pit_sheltered": [800, 30000, 55000, 2000],
-                "pit_unsheltered": [400, 15000, 20000, 1000],
-                "pit_year": [year] * 4,
-            })
+            df_pit = pd.DataFrame(
+                {
+                    "coc_id": ["CO-500", "CA-600", "NY-501", "TX-500"],
+                    "pit_total": [1200 + (year - 2023) * 100, 45000, 75000, 3000],
+                    "pit_sheltered": [800, 30000, 55000, 2000],
+                    "pit_unsheltered": [400, 15000, 20000, 1000],
+                    "pit_year": [year] * 4,
+                }
+            )
             df_pit.to_parquet(pit_dir / f"pit_counts__{year}.parquet", index=False)
 
         # Create ACS measures
         for acs_year in [2022, 2023]:
             boundary_year = acs_year + 1
-            df_acs = pd.DataFrame({
-                "coc_id": ["CO-500", "CA-600", "NY-501", "TX-500"],
-                "total_population": [500000, 10000000, 8000000, 2000000],
-                "adult_population": [400000, 8000000, 6400000, 1600000],
-                "population_below_poverty": [50000, 1500000, 1200000, 300000],
-                "median_household_income": [60000, 72000, 84000, 55000],
-                "median_gross_rent": [1200, 1800, 2200, 1000],
-                "coverage_ratio": [0.95, 0.98, 0.99, 0.90],
-                "weighting_method": ["population"] * 4,
-            })
+            df_acs = pd.DataFrame(
+                {
+                    "coc_id": ["CO-500", "CA-600", "NY-501", "TX-500"],
+                    "total_population": [500000, 10000000, 8000000, 2000000],
+                    "adult_population": [400000, 8000000, 6400000, 1600000],
+                    "population_below_poverty": [50000, 1500000, 1200000, 300000],
+                    "median_household_income": [60000, 72000, 84000, 55000],
+                    "median_gross_rent": [1200, 1800, 2200, 1000],
+                    "coverage_ratio": [0.95, 0.98, 0.99, 0.90],
+                    "weighting_method": ["population"] * 4,
+                }
+            )
             df_acs.to_parquet(
                 measures_dir / f"coc_measures__{boundary_year}__{acs_year}.parquet",
                 index=False,
@@ -906,7 +953,7 @@ class TestPanelAssemblyWithoutZori:
 
         # First year for each CoC should be False
         first_year_rows = panel_df[panel_df["year"] == 2023]
-        assert (first_year_rows["boundary_changed"] == False).all()
+        assert not first_year_rows["boundary_changed"].all()
 
     def test_baseline_panel_save_and_reload(self, baseline_data_dirs):
         """Test that baseline panel can be saved and reloaded correctly."""

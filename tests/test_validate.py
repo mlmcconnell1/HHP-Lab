@@ -191,13 +191,15 @@ class TestValidateAnomalies:
 
     def test_tiny_polygon_warned(self):
         # Create a very small polygon (smaller than MIN_AREA_SQ_DEG)
-        tiny = Polygon([
-            (-105, 39),
-            (-105, 39.0001),
-            (-104.9999, 39.0001),
-            (-104.9999, 39),
-            (-105, 39),
-        ])
+        tiny = Polygon(
+            [
+                (-105, 39),
+                (-105, 39.0001),
+                (-104.9999, 39.0001),
+                (-104.9999, 39),
+                (-105, 39),
+            ]
+        )
         assert tiny.area < MIN_AREA_SQ_DEG
         gdf = make_valid_gdf(coc_ids=["CO-500"], geometries=[tiny])
         result = validate_boundaries(gdf)

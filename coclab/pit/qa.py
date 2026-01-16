@@ -233,7 +233,10 @@ def check_duplicates(df: pd.DataFrame) -> list[QAIssue]:
                 check_name="duplicates",
                 coc_id=None,
                 year=None,
-                message=f"Missing required columns for duplicate check: {required_cols - set(df.columns)}",
+                message=(
+                    "Missing required columns for duplicate check: "
+                    f"{required_cols - set(df.columns)}"
+                ),
             )
         )
         return issues
@@ -262,7 +265,7 @@ def check_duplicates(df: pd.DataFrame) -> list[QAIssue]:
 def check_missing_cocs(
     df: pd.DataFrame,
     boundary_vintage: str,
-    boundary_gdf: "gpd.GeoDataFrame | None" = None,
+    boundary_gdf: gpd.GeoDataFrame | None = None,
     data_dir: Path | str | None = None,
 ) -> list[QAIssue]:
     """Check for CoCs that exist in boundaries but are missing from PIT data.
@@ -370,7 +373,9 @@ def check_missing_cocs(
                 check_name="missing_cocs",
                 coc_id=coc_id,
                 year=pit_year,
-                message=f"CoC exists in boundary vintage '{boundary_vintage}' but missing from PIT data",
+                message=(
+                    f"CoC exists in boundary vintage '{boundary_vintage}' but missing from PIT data"
+                ),
                 details={"boundary_vintage": boundary_vintage},
             )
         )
@@ -548,7 +553,10 @@ def check_yoy_changes(
                     check_name="yoy_changes",
                     coc_id=None,
                     year=None,
-                    message=f"Missing required columns in {name} data: {required_cols - set(df.columns)}",
+                    message=(
+                        f"Missing required columns in {name} data: "
+                        f"{required_cols - set(df.columns)}"
+                    ),
                 )
             )
             return issues
@@ -618,7 +626,9 @@ def check_yoy_changes(
                     check_name="yoy_changes",
                     coc_id=coc_id,
                     year=current_year,
-                    message=f"{abs(change_pct):.1f}% {direction} from {prev_total} to {current_total}",
+                    message=(
+                        f"{abs(change_pct):.1f}% {direction} from {prev_total} to {current_total}"
+                    ),
                     details={
                         "previous_total": int(prev_total),
                         "current_total": int(current_total),
@@ -637,7 +647,7 @@ def validate_pit_data(
     *,
     df_previous: pd.DataFrame | None = None,
     boundary_vintage: str | None = None,
-    boundary_gdf: "gpd.GeoDataFrame | None" = None,
+    boundary_gdf: gpd.GeoDataFrame | None = None,
     data_dir: Path | str | None = None,
     yoy_threshold: float = 0.5,
 ) -> QAReport:
@@ -692,11 +702,7 @@ def validate_pit_data(
 
     if df_previous is not None:
         logger.debug("Running year-over-year change check...")
-        report.extend(
-            check_yoy_changes(df, df_previous, threshold=yoy_threshold)
-        )
+        report.extend(check_yoy_changes(df, df_previous, threshold=yoy_threshold))
 
-    logger.info(
-        f"QA complete: {len(report.errors)} error(s), {len(report.warnings)} warning(s)"
-    )
+    logger.info(f"QA complete: {len(report.errors)} error(s), {len(report.warnings)} warning(s)")
     return report

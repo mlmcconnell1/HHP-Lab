@@ -77,9 +77,7 @@ class TestMapToCanonicalSchema:
         )
 
     def test_maps_standard_fields(self, sample_gdf):
-        result = map_to_canonical_schema(
-            sample_gdf, "2024", "https://example.com/data.zip"
-        )
+        result = map_to_canonical_schema(sample_gdf, "2024", "https://example.com/data.zip")
 
         assert "coc_id" in result.columns
         assert "coc_name" in result.columns
@@ -90,9 +88,7 @@ class TestMapToCanonicalSchema:
         assert "ingested_at" in result.columns
 
     def test_sets_correct_values(self, sample_gdf):
-        result = map_to_canonical_schema(
-            sample_gdf, "2024", "https://example.com/data.zip"
-        )
+        result = map_to_canonical_schema(sample_gdf, "2024", "https://example.com/data.zip")
 
         assert list(result["coc_id"]) == ["CO-500", "CO-503"]
         assert list(result["coc_name"]) == [

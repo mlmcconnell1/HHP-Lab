@@ -20,11 +20,9 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
-import re
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
-from urllib.parse import urljoin
 
 import httpx
 
@@ -112,18 +110,14 @@ def get_pit_source_url(year: int) -> str:
         )
 
     if year > MAX_PIT_YEAR:
-        raise ValueError(
-            f"Year {year} is outside valid PIT data range (max: {MAX_PIT_YEAR})"
-        )
+        raise ValueError(f"Year {year} is outside valid PIT data range (max: {MAX_PIT_YEAR})")
 
     if year in PIT_DATA_URLS:
         return PIT_DATA_URLS[year]
 
     # For years not in the explicit list (future years), try .xlsb first
     url = f"{HUD_USER_PIT_BASE}2007-{year}-PIT-Counts-by-CoC.xlsb"
-    logger.warning(
-        f"Year {year} not in known URL list, attempting constructed URL: {url}"
-    )
+    logger.warning(f"Year {year} not in known URL list, attempting constructed URL: {url}")
     return url
 
 

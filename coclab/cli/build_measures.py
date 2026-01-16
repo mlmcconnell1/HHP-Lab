@@ -73,8 +73,7 @@ def build_measures(
     # Validate weighting option
     if weighting not in ("area", "population"):
         typer.echo(
-            f"Error: Invalid weighting method '{weighting}'. "
-            "Use 'area' or 'population'.",
+            f"Error: Invalid weighting method '{weighting}'. Use 'area' or 'population'.",
             err=True,
         )
         raise typer.Exit(1)
@@ -98,8 +97,7 @@ def build_measures(
         boundary = latest_vintage()
         if boundary is None:
             typer.echo(
-                "Error: No boundary vintages found in registry. "
-                "Run 'coclab ingest' first.",
+                "Error: No boundary vintages found in registry. Run 'coclab ingest' first.",
                 err=True,
             )
             raise typer.Exit(1)
@@ -123,7 +121,7 @@ def build_measures(
             )
             raise typer.Exit(1)
 
-    typer.echo(f"Building CoC measures:")
+    typer.echo("Building CoC measures:")
     typer.echo(f"  Boundary vintage: {boundary}")
     typer.echo(f"  ACS vintage: {acs} (5-year estimates)")
     typer.echo(f"  Crosswalk: {xwalk_path}")

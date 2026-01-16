@@ -30,7 +30,7 @@ from __future__ import annotations
 
 import json
 from dataclasses import asdict, dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -75,9 +75,7 @@ class ProvenanceBlock:
     acs_vintage: str | None = None
     notation: str | None = None
     weighting: str | None = None
-    created_at: str = field(
-        default_factory=lambda: datetime.now(timezone.utc).isoformat()
-    )
+    created_at: str = field(default_factory=lambda: datetime.now(UTC).isoformat())
     coclab_version: str = "0.1.0"
     extra: dict[str, Any] = field(default_factory=dict)
 

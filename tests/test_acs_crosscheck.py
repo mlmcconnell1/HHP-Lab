@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-from pathlib import Path
-from io import StringIO
 import sys
+from io import StringIO
+from pathlib import Path
 
 import pandas as pd
 import pytest
@@ -25,26 +25,30 @@ from coclab.provenance import read_provenance
 @pytest.fixture
 def sample_rollup():
     """Sample rollup data for testing."""
-    return pd.DataFrame({
-        "coc_id": ["CO-500", "CO-501", "CO-502", "CO-503", "CO-504"],
-        "coc_population": [100000.0, 50000.0, 75000.0, 25000.0, 10000.0],
-        "coverage_ratio": [1.0, 0.98, 0.90, 1.05, 0.80],
-        "boundary_vintage": ["2025"] * 5,
-        "acs_vintage": ["2019-2023"] * 5,
-        "tract_vintage": ["2023"] * 5,
-        "weighting_method": ["area"] * 5,
-    })
+    return pd.DataFrame(
+        {
+            "coc_id": ["CO-500", "CO-501", "CO-502", "CO-503", "CO-504"],
+            "coc_population": [100000.0, 50000.0, 75000.0, 25000.0, 10000.0],
+            "coverage_ratio": [1.0, 0.98, 0.90, 1.05, 0.80],
+            "boundary_vintage": ["2025"] * 5,
+            "acs_vintage": ["2019-2023"] * 5,
+            "tract_vintage": ["2023"] * 5,
+            "weighting_method": ["area"] * 5,
+        }
+    )
 
 
 @pytest.fixture
 def sample_measures():
     """Sample measures data for testing."""
-    return pd.DataFrame({
-        "coc_id": ["CO-500", "CO-501", "CO-502", "CO-503", "CO-505"],
-        "total_population": [99000.0, 51000.0, 70000.0, 24000.0, 30000.0],
-        "boundary_vintage": ["2025"] * 5,
-        "acs_vintage": ["2019-2023"] * 5,
-    })
+    return pd.DataFrame(
+        {
+            "coc_id": ["CO-500", "CO-501", "CO-502", "CO-503", "CO-505"],
+            "total_population": [99000.0, 51000.0, 70000.0, 24000.0, 30000.0],
+            "boundary_vintage": ["2025"] * 5,
+            "acs_vintage": ["2019-2023"] * 5,
+        }
+    )
 
 
 class TestCrosscheckPopulation:
@@ -86,15 +90,19 @@ class TestCrosscheckPopulation:
 
     def test_warning_threshold(self):
         """Test that warning threshold is applied correctly."""
-        rollup = pd.DataFrame({
-            "coc_id": ["A", "B"],
-            "coc_population": [101.5, 100.0],  # 1.5% and 0% delta
-            "coverage_ratio": [1.0, 1.0],
-        })
-        measures = pd.DataFrame({
-            "coc_id": ["A", "B"],
-            "total_population": [100.0, 100.0],
-        })
+        rollup = pd.DataFrame(
+            {
+                "coc_id": ["A", "B"],
+                "coc_population": [101.5, 100.0],  # 1.5% and 0% delta
+                "coverage_ratio": [1.0, 1.0],
+            }
+        )
+        measures = pd.DataFrame(
+            {
+                "coc_id": ["A", "B"],
+                "total_population": [100.0, 100.0],
+            }
+        )
 
         result = crosscheck_population(rollup, measures, warn_pct=0.01, error_pct=0.05)
 
@@ -109,15 +117,19 @@ class TestCrosscheckPopulation:
 
     def test_error_threshold(self):
         """Test that error threshold is applied correctly."""
-        rollup = pd.DataFrame({
-            "coc_id": ["A", "B"],
-            "coc_population": [106.0, 103.0],  # 6% and 3% delta
-            "coverage_ratio": [1.0, 1.0],
-        })
-        measures = pd.DataFrame({
-            "coc_id": ["A", "B"],
-            "total_population": [100.0, 100.0],
-        })
+        rollup = pd.DataFrame(
+            {
+                "coc_id": ["A", "B"],
+                "coc_population": [106.0, 103.0],  # 6% and 3% delta
+                "coverage_ratio": [1.0, 1.0],
+            }
+        )
+        measures = pd.DataFrame(
+            {
+                "coc_id": ["A", "B"],
+                "total_population": [100.0, 100.0],
+            }
+        )
 
         result = crosscheck_population(rollup, measures, warn_pct=0.01, error_pct=0.05)
 
@@ -132,15 +144,19 @@ class TestCrosscheckPopulation:
 
     def test_coverage_ratio_high_error(self):
         """Test that coverage_ratio > 1.01 triggers error."""
-        rollup = pd.DataFrame({
-            "coc_id": ["A"],
-            "coc_population": [100.0],
-            "coverage_ratio": [1.05],  # > 1.01 threshold
-        })
-        measures = pd.DataFrame({
-            "coc_id": ["A"],
-            "total_population": [100.0],
-        })
+        rollup = pd.DataFrame(
+            {
+                "coc_id": ["A"],
+                "coc_population": [100.0],
+                "coverage_ratio": [1.05],  # > 1.01 threshold
+            }
+        )
+        measures = pd.DataFrame(
+            {
+                "coc_id": ["A"],
+                "total_population": [100.0],
+            }
+        )
 
         result = crosscheck_population(rollup, measures)
 
@@ -151,15 +167,19 @@ class TestCrosscheckPopulation:
 
     def test_coverage_ratio_low_warning(self):
         """Test that coverage_ratio < min_coverage triggers warning."""
-        rollup = pd.DataFrame({
-            "coc_id": ["A"],
-            "coc_population": [100.0],
-            "coverage_ratio": [0.90],  # < 0.95 default min_coverage
-        })
-        measures = pd.DataFrame({
-            "coc_id": ["A"],
-            "total_population": [100.0],
-        })
+        rollup = pd.DataFrame(
+            {
+                "coc_id": ["A"],
+                "coc_population": [100.0],
+                "coverage_ratio": [0.90],  # < 0.95 default min_coverage
+            }
+        )
+        measures = pd.DataFrame(
+            {
+                "coc_id": ["A"],
+                "total_population": [100.0],
+            }
+        )
 
         result = crosscheck_population(rollup, measures, min_coverage=0.95)
 
@@ -171,8 +191,7 @@ class TestCrosscheckPopulation:
     def test_error_count_and_warning_count(self, sample_rollup, sample_measures):
         """Test that error_count and warning_count are computed correctly."""
         result = crosscheck_population(
-            sample_rollup, sample_measures,
-            warn_pct=0.01, error_pct=0.05, min_coverage=0.95
+            sample_rollup, sample_measures, warn_pct=0.01, error_pct=0.05, min_coverage=0.95
         )
 
         # Count should match status values in report_df
@@ -184,26 +203,32 @@ class TestCrosscheckPopulation:
 
     def test_passed_property(self):
         """Test that passed property reflects error count."""
-        rollup = pd.DataFrame({
-            "coc_id": ["A"],
-            "coc_population": [100.0],
-            "coverage_ratio": [1.0],
-        })
-        measures = pd.DataFrame({
-            "coc_id": ["A"],
-            "total_population": [100.0],
-        })
+        rollup = pd.DataFrame(
+            {
+                "coc_id": ["A"],
+                "coc_population": [100.0],
+                "coverage_ratio": [1.0],
+            }
+        )
+        measures = pd.DataFrame(
+            {
+                "coc_id": ["A"],
+                "total_population": [100.0],
+            }
+        )
 
         # No errors - should pass
         result = crosscheck_population(rollup, measures)
         assert result.passed is True
 
         # Add error condition
-        rollup_bad = pd.DataFrame({
-            "coc_id": ["A"],
-            "coc_population": [200.0],  # 100% delta > 5% threshold
-            "coverage_ratio": [1.0],
-        })
+        rollup_bad = pd.DataFrame(
+            {
+                "coc_id": ["A"],
+                "coc_population": [200.0],  # 100% delta > 5% threshold
+                "coverage_ratio": [1.0],
+            }
+        )
         result_bad = crosscheck_population(rollup_bad, measures)
         assert result_bad.passed is False
 
@@ -239,15 +264,19 @@ class TestEdgeCases:
 
     def test_measures_population_zero(self):
         """Test handling when measures population is zero."""
-        rollup = pd.DataFrame({
-            "coc_id": ["A"],
-            "coc_population": [100.0],
-            "coverage_ratio": [1.0],
-        })
-        measures = pd.DataFrame({
-            "coc_id": ["A"],
-            "total_population": [0.0],
-        })
+        rollup = pd.DataFrame(
+            {
+                "coc_id": ["A"],
+                "coc_population": [100.0],
+                "coverage_ratio": [1.0],
+            }
+        )
+        measures = pd.DataFrame(
+            {
+                "coc_id": ["A"],
+                "total_population": [0.0],
+            }
+        )
 
         result = crosscheck_population(rollup, measures)
 
@@ -258,28 +287,36 @@ class TestEdgeCases:
 
     def test_missing_rollup_column_raises(self):
         """Test that missing coc_population column raises ValueError."""
-        rollup = pd.DataFrame({
-            "coc_id": ["A"],
-            "population": [100.0],  # Wrong column name
-        })
-        measures = pd.DataFrame({
-            "coc_id": ["A"],
-            "total_population": [100.0],
-        })
+        rollup = pd.DataFrame(
+            {
+                "coc_id": ["A"],
+                "population": [100.0],  # Wrong column name
+            }
+        )
+        measures = pd.DataFrame(
+            {
+                "coc_id": ["A"],
+                "total_population": [100.0],
+            }
+        )
 
         with pytest.raises(ValueError, match="coc_population"):
             crosscheck_population(rollup, measures)
 
     def test_missing_measures_column_raises(self):
         """Test that missing total_population column raises ValueError."""
-        rollup = pd.DataFrame({
-            "coc_id": ["A"],
-            "coc_population": [100.0],
-        })
-        measures = pd.DataFrame({
-            "coc_id": ["A"],
-            "population": [100.0],  # Wrong column name
-        })
+        rollup = pd.DataFrame(
+            {
+                "coc_id": ["A"],
+                "coc_population": [100.0],
+            }
+        )
+        measures = pd.DataFrame(
+            {
+                "coc_id": ["A"],
+                "population": [100.0],  # Wrong column name
+            }
+        )
 
         with pytest.raises(ValueError, match="total_population"):
             crosscheck_population(rollup, measures)
@@ -298,15 +335,19 @@ class TestEdgeCases:
 
     def test_no_overlap_between_datasets(self):
         """Test when rollup and measures have completely different CoCs."""
-        rollup = pd.DataFrame({
-            "coc_id": ["A", "B"],
-            "coc_population": [100.0, 200.0],
-            "coverage_ratio": [1.0, 1.0],
-        })
-        measures = pd.DataFrame({
-            "coc_id": ["C", "D"],
-            "total_population": [150.0, 250.0],
-        })
+        rollup = pd.DataFrame(
+            {
+                "coc_id": ["A", "B"],
+                "coc_population": [100.0, 200.0],
+                "coverage_ratio": [1.0, 1.0],
+            }
+        )
+        measures = pd.DataFrame(
+            {
+                "coc_id": ["C", "D"],
+                "total_population": [150.0, 250.0],
+            }
+        )
 
         result = crosscheck_population(rollup, measures)
 
@@ -318,15 +359,19 @@ class TestEdgeCases:
 
     def test_negative_delta(self):
         """Test that negative deltas are handled correctly."""
-        rollup = pd.DataFrame({
-            "coc_id": ["A"],
-            "coc_population": [90.0],  # Less than measures
-            "coverage_ratio": [1.0],
-        })
-        measures = pd.DataFrame({
-            "coc_id": ["A"],
-            "total_population": [100.0],
-        })
+        rollup = pd.DataFrame(
+            {
+                "coc_id": ["A"],
+                "coc_population": [90.0],  # Less than measures
+                "coverage_ratio": [1.0],
+            }
+        )
+        measures = pd.DataFrame(
+            {
+                "coc_id": ["A"],
+                "total_population": [100.0],
+            }
+        )
 
         result = crosscheck_population(rollup, measures, warn_pct=0.05, error_pct=0.15)
 
@@ -338,15 +383,19 @@ class TestEdgeCases:
 
     def test_missing_coverage_ratio_column(self):
         """Test handling when coverage_ratio is missing from rollup."""
-        rollup = pd.DataFrame({
-            "coc_id": ["A"],
-            "coc_population": [100.0],
-            # No coverage_ratio column
-        })
-        measures = pd.DataFrame({
-            "coc_id": ["A"],
-            "total_population": [100.0],
-        })
+        rollup = pd.DataFrame(
+            {
+                "coc_id": ["A"],
+                "coc_population": [100.0],
+                # No coverage_ratio column
+            }
+        )
+        measures = pd.DataFrame(
+            {
+                "coc_id": ["A"],
+                "total_population": [100.0],
+            }
+        )
 
         # Should not raise, coverage_ratio should be NA
         result = crosscheck_population(rollup, measures)
@@ -371,9 +420,7 @@ class TestPathHelpers:
     def test_get_rollup_path_custom(self):
         """Test custom rollup path."""
         path = get_rollup_path("2025", "2019-2023", "2023", "area", base_dir="/tmp/acs")
-        expected = Path(
-            "/tmp/acs/coc_population_rollup__2025__2019-2023__2023__area.parquet"
-        )
+        expected = Path("/tmp/acs/coc_population_rollup__2025__2019-2023__2023__area.parquet")
         assert path == expected
 
     def test_get_measures_path_default(self):
@@ -423,7 +470,7 @@ class TestRunCrosscheck:
         sample_measures.to_parquet(measures_path)
 
         # Run crosscheck
-        result = run_crosscheck(
+        run_crosscheck(
             boundary_vintage="2025",
             acs_vintage="2019-2023",
             tract_vintage="2023",
@@ -584,15 +631,19 @@ class TestPrintCrosscheckReport:
     def test_returns_zero_on_pass(self, sample_rollup, sample_measures):
         """Test that print_crosscheck_report returns 0 when no errors."""
         # Create perfect match
-        rollup = pd.DataFrame({
-            "coc_id": ["A"],
-            "coc_population": [100.0],
-            "coverage_ratio": [1.0],
-        })
-        measures = pd.DataFrame({
-            "coc_id": ["A"],
-            "total_population": [100.0],
-        })
+        rollup = pd.DataFrame(
+            {
+                "coc_id": ["A"],
+                "coc_population": [100.0],
+                "coverage_ratio": [1.0],
+            }
+        )
+        measures = pd.DataFrame(
+            {
+                "coc_id": ["A"],
+                "total_population": [100.0],
+            }
+        )
 
         result = crosscheck_population(rollup, measures)
 
@@ -609,15 +660,19 @@ class TestPrintCrosscheckReport:
     def test_returns_two_on_error(self):
         """Test that print_crosscheck_report returns 2 when errors found."""
         # Create error condition
-        rollup = pd.DataFrame({
-            "coc_id": ["A"],
-            "coc_population": [200.0],  # 100% delta > 5% threshold
-            "coverage_ratio": [1.0],
-        })
-        measures = pd.DataFrame({
-            "coc_id": ["A"],
-            "total_population": [100.0],
-        })
+        rollup = pd.DataFrame(
+            {
+                "coc_id": ["A"],
+                "coc_population": [200.0],  # 100% delta > 5% threshold
+                "coverage_ratio": [1.0],
+            }
+        )
+        measures = pd.DataFrame(
+            {
+                "coc_id": ["A"],
+                "total_population": [100.0],
+            }
+        )
 
         result = crosscheck_population(rollup, measures)
 
@@ -713,15 +768,19 @@ class TestThresholdClassification:
 
     def test_classification_ok(self):
         """Test that values within thresholds are classified as OK."""
-        rollup = pd.DataFrame({
-            "coc_id": ["A"],
-            "coc_population": [100.5],  # 0.5% delta
-            "coverage_ratio": [0.98],   # Above 0.95 min_coverage
-        })
-        measures = pd.DataFrame({
-            "coc_id": ["A"],
-            "total_population": [100.0],
-        })
+        rollup = pd.DataFrame(
+            {
+                "coc_id": ["A"],
+                "coc_population": [100.5],  # 0.5% delta
+                "coverage_ratio": [0.98],  # Above 0.95 min_coverage
+            }
+        )
+        measures = pd.DataFrame(
+            {
+                "coc_id": ["A"],
+                "total_population": [100.0],
+            }
+        )
 
         result = crosscheck_population(
             rollup, measures, warn_pct=0.01, error_pct=0.05, min_coverage=0.95
@@ -732,34 +791,40 @@ class TestThresholdClassification:
 
     def test_classification_warning_from_delta(self):
         """Test warning classification from delta threshold."""
-        rollup = pd.DataFrame({
-            "coc_id": ["A"],
-            "coc_population": [102.0],  # 2% delta
-            "coverage_ratio": [1.0],
-        })
-        measures = pd.DataFrame({
-            "coc_id": ["A"],
-            "total_population": [100.0],
-        })
-
-        result = crosscheck_population(
-            rollup, measures, warn_pct=0.01, error_pct=0.05
+        rollup = pd.DataFrame(
+            {
+                "coc_id": ["A"],
+                "coc_population": [102.0],  # 2% delta
+                "coverage_ratio": [1.0],
+            }
         )
+        measures = pd.DataFrame(
+            {
+                "coc_id": ["A"],
+                "total_population": [100.0],
+            }
+        )
+
+        result = crosscheck_population(rollup, measures, warn_pct=0.01, error_pct=0.05)
 
         row = result.report_df.iloc[0]
         assert row["status"] == "warning"
 
     def test_classification_warning_from_coverage(self):
         """Test warning classification from low coverage."""
-        rollup = pd.DataFrame({
-            "coc_id": ["A"],
-            "coc_population": [100.0],  # 0% delta
-            "coverage_ratio": [0.90],   # Below 0.95
-        })
-        measures = pd.DataFrame({
-            "coc_id": ["A"],
-            "total_population": [100.0],
-        })
+        rollup = pd.DataFrame(
+            {
+                "coc_id": ["A"],
+                "coc_population": [100.0],  # 0% delta
+                "coverage_ratio": [0.90],  # Below 0.95
+            }
+        )
+        measures = pd.DataFrame(
+            {
+                "coc_id": ["A"],
+                "total_population": [100.0],
+            }
+        )
 
         result = crosscheck_population(
             rollup, measures, warn_pct=0.01, error_pct=0.05, min_coverage=0.95
@@ -771,34 +836,40 @@ class TestThresholdClassification:
 
     def test_classification_error_from_delta(self):
         """Test error classification from delta threshold."""
-        rollup = pd.DataFrame({
-            "coc_id": ["A"],
-            "coc_population": [110.0],  # 10% delta
-            "coverage_ratio": [1.0],
-        })
-        measures = pd.DataFrame({
-            "coc_id": ["A"],
-            "total_population": [100.0],
-        })
-
-        result = crosscheck_population(
-            rollup, measures, warn_pct=0.01, error_pct=0.05
+        rollup = pd.DataFrame(
+            {
+                "coc_id": ["A"],
+                "coc_population": [110.0],  # 10% delta
+                "coverage_ratio": [1.0],
+            }
         )
+        measures = pd.DataFrame(
+            {
+                "coc_id": ["A"],
+                "total_population": [100.0],
+            }
+        )
+
+        result = crosscheck_population(rollup, measures, warn_pct=0.01, error_pct=0.05)
 
         row = result.report_df.iloc[0]
         assert row["status"] == "error"
 
     def test_classification_error_from_high_coverage(self):
         """Test error classification from high coverage ratio."""
-        rollup = pd.DataFrame({
-            "coc_id": ["A"],
-            "coc_population": [100.0],
-            "coverage_ratio": [1.10],  # > 1.01
-        })
-        measures = pd.DataFrame({
-            "coc_id": ["A"],
-            "total_population": [100.0],
-        })
+        rollup = pd.DataFrame(
+            {
+                "coc_id": ["A"],
+                "coc_population": [100.0],
+                "coverage_ratio": [1.10],  # > 1.01
+            }
+        )
+        measures = pd.DataFrame(
+            {
+                "coc_id": ["A"],
+                "total_population": [100.0],
+            }
+        )
 
         result = crosscheck_population(rollup, measures)
 
@@ -808,15 +879,19 @@ class TestThresholdClassification:
 
     def test_error_takes_precedence_over_warning(self):
         """Test that error status takes precedence over warning."""
-        rollup = pd.DataFrame({
-            "coc_id": ["A"],
-            "coc_population": [110.0],  # 10% delta -> error
-            "coverage_ratio": [0.90],   # Low coverage -> warning
-        })
-        measures = pd.DataFrame({
-            "coc_id": ["A"],
-            "total_population": [100.0],
-        })
+        rollup = pd.DataFrame(
+            {
+                "coc_id": ["A"],
+                "coc_population": [110.0],  # 10% delta -> error
+                "coverage_ratio": [0.90],  # Low coverage -> warning
+            }
+        )
+        measures = pd.DataFrame(
+            {
+                "coc_id": ["A"],
+                "total_population": [100.0],
+            }
+        )
 
         result = crosscheck_population(
             rollup, measures, warn_pct=0.01, error_pct=0.05, min_coverage=0.95

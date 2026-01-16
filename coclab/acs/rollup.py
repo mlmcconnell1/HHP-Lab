@@ -74,8 +74,8 @@ from typing import Literal
 
 import pandas as pd
 
-from coclab.provenance import ProvenanceBlock, write_parquet_with_provenance
 from coclab import naming
+from coclab.provenance import ProvenanceBlock, write_parquet_with_provenance
 
 logger = logging.getLogger(__name__)
 
@@ -141,25 +141,19 @@ def rollup_tract_population(
     """
     # Validate weighting parameter
     if weighting not in ("area", "population_mass"):
-        raise ValueError(
-            f"weighting must be 'area' or 'population_mass', got {weighting!r}"
-        )
+        raise ValueError(f"weighting must be 'area' or 'population_mass', got {weighting!r}")
 
     # Validate required columns in tract population data
     tract_required = {"tract_geoid", "total_population"}
     tract_missing = tract_required - set(tract_pop_df.columns)
     if tract_missing:
-        raise ValueError(
-            f"tract_pop_df missing required columns: {tract_missing}"
-        )
+        raise ValueError(f"tract_pop_df missing required columns: {tract_missing}")
 
     # Validate required columns in crosswalk
     xwalk_required = {"coc_id", "tract_geoid", "area_share", "intersection_area"}
     xwalk_missing = xwalk_required - set(crosswalk_df.columns)
     if xwalk_missing:
-        raise ValueError(
-            f"crosswalk_df missing required columns: {xwalk_missing}"
-        )
+        raise ValueError(f"crosswalk_df missing required columns: {xwalk_missing}")
 
     # Compute coc_share: fraction of CoC's total area from each tract
     # This is used for coverage_ratio (should sum to ~1.0 per CoC)
@@ -200,14 +194,16 @@ def rollup_tract_population(
         # tract_count = number of tracts with non-zero contribution
         tract_count = (group["weighted_pop"] > 0).sum()
 
-        results.append({
-            "coc_id": coc_id,
-            "weighting_method": weighting,
-            "coc_population": coc_population,
-            "coverage_ratio": coverage_ratio,
-            "max_tract_contribution": max_contribution,
-            "tract_count": int(tract_count),
-        })
+        results.append(
+            {
+                "coc_id": coc_id,
+                "weighting_method": weighting,
+                "coc_population": coc_population,
+                "coverage_ratio": coverage_ratio,
+                "max_tract_contribution": max_contribution,
+                "tract_count": int(tract_count),
+            }
+        )
 
     result_df = pd.DataFrame(results)
 

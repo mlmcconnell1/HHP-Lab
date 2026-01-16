@@ -147,9 +147,7 @@ def normalize_boundaries(gdf: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
 
     # Step 2 & 3: Fix geometries and ensure polygon type
     result = result.copy()
-    result["geometry"] = result["geometry"].apply(
-        lambda g: ensure_polygon_type(fix_geometry(g))
-    )
+    result["geometry"] = result["geometry"].apply(lambda g: ensure_polygon_type(fix_geometry(g)))
 
     # Filter out rows where geometry became None
     valid_mask = result["geometry"].notna() & ~result["geometry"].is_empty

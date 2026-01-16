@@ -1,7 +1,6 @@
 """CLI command for displaying CoC-level ACS measures."""
 
 import json
-import sys
 from pathlib import Path
 from typing import Annotated
 
@@ -179,8 +178,7 @@ def show_measures(
     # Validate output format
     if output_format not in ("table", "json", "csv"):
         typer.echo(
-            f"Error: Invalid format '{output_format}'. "
-            "Use 'table', 'json', or 'csv'.",
+            f"Error: Invalid format '{output_format}'. Use 'table', 'json', or 'csv'.",
             err=True,
         )
         raise typer.Exit(1)
@@ -202,8 +200,7 @@ def show_measures(
         # Provide a helpful error message
         if boundary is not None and acs is not None:
             typer.echo(
-                f"Error: No measures file found for boundary '{boundary}' "
-                f"and ACS year '{acs}'.",
+                f"Error: No measures file found for boundary '{boundary}' and ACS year '{acs}'.",
                 err=True,
             )
         elif boundary is not None:
@@ -259,7 +256,9 @@ def show_measures(
         if state_prefix:
             similar = [c for c in available_cocs if c.upper().startswith(state_prefix)]
             if similar:
-                typer.echo(f"Available CoCs in {state_prefix}: {', '.join(sorted(similar)[:5])}", err=True)
+                typer.echo(
+                    f"Available CoCs in {state_prefix}: {', '.join(sorted(similar)[:5])}", err=True
+                )
         raise typer.Exit(1)
 
     # Get the single row

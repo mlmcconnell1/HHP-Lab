@@ -60,8 +60,8 @@ from pathlib import Path
 
 import pandas as pd
 
-from coclab.provenance import ProvenanceBlock, write_parquet_with_provenance
 from coclab import naming
+from coclab.provenance import ProvenanceBlock, write_parquet_with_provenance
 
 logger = logging.getLogger(__name__)
 
@@ -213,10 +213,12 @@ def crosscheck_population(
     )
 
     # Rename columns for clarity
-    merged = merged.rename(columns={
-        "coc_population": "rollup_population",
-        "total_population": "measures_population",
-    })
+    merged = merged.rename(
+        columns={
+            "coc_population": "rollup_population",
+            "total_population": "measures_population",
+        }
+    )
 
     # Compute delta and pct_delta
     merged["delta"] = merged["rollup_population"] - merged["measures_population"]
@@ -245,7 +247,6 @@ def crosscheck_population(
         measures_pop = merged.loc[idx, "measures_population"]
         pct_delta = merged.loc[idx, "pct_delta"]
         coverage = merged.loc[idx, "coverage_ratio"]
-        coc_id = merged.loc[idx, "coc_id"]
 
         # Check for missing data
         if pd.isna(rollup_pop):
@@ -305,22 +306,25 @@ def crosscheck_population(
 
     # Compute summary statistics
     valid_deltas = merged.loc[
-        merged["rollup_population"].notna() & merged["measures_population"].notna(),
-        "pct_delta"
+        merged["rollup_population"].notna() & merged["measures_population"].notna(), "pct_delta"
     ]
     valid_deltas = valid_deltas[valid_deltas != float("inf")]
 
     result.summary = {
         "total_cocs_rollup": len(rollup_cocs),
         "total_cocs_measures": len(measures_cocs),
-        "matched_cocs": len(merged) - len(result.missing_in_rollup) - len(result.missing_in_measures),
+        "matched_cocs": len(merged)
+        - len(result.missing_in_rollup)
+        - len(result.missing_in_measures),
         "missing_in_rollup": len(result.missing_in_rollup),
         "missing_in_measures": len(result.missing_in_measures),
         "error_count": error_count,
         "warning_count": warning_count,
         "ok_count": len(merged) - error_count - warning_count,
         "mean_abs_pct_delta": float(valid_deltas.abs().mean()) if len(valid_deltas) > 0 else None,
-        "median_abs_pct_delta": float(valid_deltas.abs().median()) if len(valid_deltas) > 0 else None,
+        "median_abs_pct_delta": float(valid_deltas.abs().median())
+        if len(valid_deltas) > 0
+        else None,
         "max_abs_pct_delta": float(valid_deltas.abs().max()) if len(valid_deltas) > 0 else None,
         "total_rollup_population": float(merged["rollup_population"].sum()),
         "total_measures_population": float(merged["measures_population"].sum()),
@@ -515,9 +519,7 @@ def run_crosscheck(
     output_dir = Path(output_dir) if output_dir else DEFAULT_ACS_DIR
 
     # Get input paths
-    rollup_path = get_rollup_path(
-        boundary_vintage, acs_vintage, tract_vintage, weighting, acs_dir
-    )
+    rollup_path = get_rollup_path(boundary_vintage, acs_vintage, tract_vintage, weighting, acs_dir)
     measures_path = get_measures_path(boundary_vintage, acs_vintage, measures_dir)
 
     # Validate inputs exist
@@ -552,8 +554,7 @@ def run_crosscheck(
     )
 
     logger.info(
-        f"Crosscheck complete: {result.error_count} errors, "
-        f"{result.warning_count} warnings"
+        f"Crosscheck complete: {result.error_count} errors, {result.warning_count} warnings"
     )
 
     # Save report if requested
@@ -614,23 +615,23 @@ def print_crosscheck_report(
 
     # Summary
     summary = result.summary
-    print(f"\nSummary:")
+    print("\nSummary:")
     print(f"  CoCs in rollup:   {summary.get('total_cocs_rollup', 'N/A')}")
     print(f"  CoCs in measures: {summary.get('total_cocs_measures', 'N/A')}")
     print(f"  Matched CoCs:     {summary.get('matched_cocs', 'N/A')}")
     print(f"  Missing in rollup:   {summary.get('missing_in_rollup', 0)}")
     print(f"  Missing in measures: {summary.get('missing_in_measures', 0)}")
 
-    print(f"\nValidation Results:")
+    print("\nValidation Results:")
     print(f"  Errors:   {result.error_count}")
     print(f"  Warnings: {result.warning_count}")
     print(f"  OK:       {summary.get('ok_count', 0)}")
 
     # Delta statistics
-    print(f"\nDelta Statistics (matched CoCs):")
-    mean_pct = summary.get('mean_abs_pct_delta')
-    median_pct = summary.get('median_abs_pct_delta')
-    max_pct = summary.get('max_abs_pct_delta')
+    print("\nDelta Statistics (matched CoCs):")
+    mean_pct = summary.get("mean_abs_pct_delta")
+    median_pct = summary.get("median_abs_pct_delta")
+    max_pct = summary.get("max_abs_pct_delta")
     if mean_pct is not None:
         print(f"  Mean |pct_delta|:   {mean_pct:.2%}")
         print(f"  Median |pct_delta|: {median_pct:.2%}")
@@ -639,11 +640,11 @@ def print_crosscheck_report(
         print("  No valid deltas to compute")
 
     # Total population comparison
-    total_rollup = summary.get('total_rollup_population', 0)
-    total_measures = summary.get('total_measures_population', 0)
+    total_rollup = summary.get("total_rollup_population", 0)
+    total_measures = summary.get("total_measures_population", 0)
     if total_measures > 0:
         total_pct_diff = (total_rollup - total_measures) / total_measures
-        print(f"\nTotal Population:")
+        print("\nTotal Population:")
         print(f"  Rollup total:   {total_rollup:,.0f}")
         print(f"  Measures total: {total_measures:,.0f}")
         print(f"  Difference:     {total_rollup - total_measures:+,.0f} ({total_pct_diff:+.2%})")
@@ -668,9 +669,9 @@ def print_crosscheck_report(
 
     # Filter to rows with valid pct_delta for sorting
     valid_df = df[
-        df["rollup_population"].notna() &
-        df["measures_population"].notna() &
-        (df["pct_delta"] != float("inf"))
+        df["rollup_population"].notna()
+        & df["measures_population"].notna()
+        & (df["pct_delta"] != float("inf"))
     ].copy()
 
     if len(valid_df) > 0:
@@ -679,14 +680,22 @@ def print_crosscheck_report(
 
         print(f"\nTop {min(top_n, len(worst))} Worst Deltas (by |pct_delta|):")
         print("-" * 70)
-        print(f"{'CoC ID':<12} {'Rollup':>12} {'Measures':>12} {'Delta':>10} {'Pct':>8} {'Status':<8}")
+        print(
+            f"{'CoC ID':<12} {'Rollup':>12} {'Measures':>12} {'Delta':>10} {'Pct':>8} {'Status':<8}"
+        )
         print("-" * 70)
 
         for _, row in worst.iterrows():
-            pct_str = f"{row['pct_delta']:+.1%}" if pd.notna(row['pct_delta']) else "N/A"
-            delta_str = f"{row['delta']:+,.0f}" if pd.notna(row['delta']) else "N/A"
-            rollup_str = f"{row['rollup_population']:,.0f}" if pd.notna(row['rollup_population']) else "N/A"
-            measures_str = f"{row['measures_population']:,.0f}" if pd.notna(row['measures_population']) else "N/A"
+            pct_str = f"{row['pct_delta']:+.1%}" if pd.notna(row["pct_delta"]) else "N/A"
+            delta_str = f"{row['delta']:+,.0f}" if pd.notna(row["delta"]) else "N/A"
+            rollup_str = (
+                f"{row['rollup_population']:,.0f}" if pd.notna(row["rollup_population"]) else "N/A"
+            )
+            measures_str = (
+                f"{row['measures_population']:,.0f}"
+                if pd.notna(row["measures_population"])
+                else "N/A"
+            )
             print(
                 f"{row['coc_id']:<12} {rollup_str:>12} {measures_str:>12} "
                 f"{delta_str:>10} {pct_str:>8} {row['status']:<8}"

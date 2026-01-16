@@ -194,9 +194,9 @@ def fetch_acs_tract_data(year: int, state_fips: str) -> pd.DataFrame:
 
     # Calculate derived measures for poverty
     if "below_50pct_poverty" in df.columns and "50_to_99pct_poverty" in df.columns:
-        df["population_below_poverty"] = (
-            df["below_50pct_poverty"].fillna(0) + df["50_to_99pct_poverty"].fillna(0)
-        )
+        df["population_below_poverty"] = df["below_50pct_poverty"].fillna(0) + df[
+            "50_to_99pct_poverty"
+        ].fillna(0)
 
     # Select final columns
     keep_cols = [
@@ -233,12 +233,58 @@ def fetch_all_states_tract_data(year: int, show_progress: bool = False) -> pd.Da
 
     # State FIPS codes (50 states + DC + territories)
     state_fips_codes = [
-        "01", "02", "04", "05", "06", "08", "09", "10", "11", "12",
-        "13", "15", "16", "17", "18", "19", "20", "21", "22", "23",
-        "24", "25", "26", "27", "28", "29", "30", "31", "32", "33",
-        "34", "35", "36", "37", "38", "39", "40", "41", "42", "44",
-        "45", "46", "47", "48", "49", "50", "51", "53", "54", "55",
-        "56", "72",  # Puerto Rico
+        "01",
+        "02",
+        "04",
+        "05",
+        "06",
+        "08",
+        "09",
+        "10",
+        "11",
+        "12",
+        "13",
+        "15",
+        "16",
+        "17",
+        "18",
+        "19",
+        "20",
+        "21",
+        "22",
+        "23",
+        "24",
+        "25",
+        "26",
+        "27",
+        "28",
+        "29",
+        "30",
+        "31",
+        "32",
+        "33",
+        "34",
+        "35",
+        "36",
+        "37",
+        "38",
+        "39",
+        "40",
+        "41",
+        "42",
+        "44",
+        "45",
+        "46",
+        "47",
+        "48",
+        "49",
+        "50",
+        "51",
+        "53",
+        "54",
+        "55",
+        "56",
+        "72",  # Puerto Rico
     ]
 
     dfs = []

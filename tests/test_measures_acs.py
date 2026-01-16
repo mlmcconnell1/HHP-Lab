@@ -57,24 +57,26 @@ class TestFetchACSTractData:
     def test_parses_response_correctly(self, httpx_mock):
         """Test that Census API response is parsed into correct DataFrame structure."""
         # Create mock response with one tract
-        response_data = make_census_response([
-            {
-                "NAME": "Census Tract 1, Test County, Colorado",
-                "county": "001",
-                "tract": "000100",
-                "B01003_001E": "1000",  # total_population
-                "B19013_001E": "50000",  # median_household_income
-                "B25064_001E": "1200",  # median_gross_rent
-                "C17002_001E": "950",  # poverty_universe
-                "C17002_002E": "50",  # below_50pct_poverty
-                "C17002_003E": "75",  # 50_to_99pct_poverty
-                # Add a few adult vars
-                "B01001_007E": "100",  # Male 18-19
-                "B01001_008E": "150",  # Male 20
-                "B01001_031E": "100",  # Female 18-19
-                "B01001_032E": "140",  # Female 20
-            }
-        ])
+        response_data = make_census_response(
+            [
+                {
+                    "NAME": "Census Tract 1, Test County, Colorado",
+                    "county": "001",
+                    "tract": "000100",
+                    "B01003_001E": "1000",  # total_population
+                    "B19013_001E": "50000",  # median_household_income
+                    "B25064_001E": "1200",  # median_gross_rent
+                    "C17002_001E": "950",  # poverty_universe
+                    "C17002_002E": "50",  # below_50pct_poverty
+                    "C17002_003E": "75",  # 50_to_99pct_poverty
+                    # Add a few adult vars
+                    "B01001_007E": "100",  # Male 18-19
+                    "B01001_008E": "150",  # Male 20
+                    "B01001_031E": "100",  # Female 18-19
+                    "B01001_032E": "140",  # Female 20
+                }
+            ]
+        )
 
         httpx_mock.add_response(
             url=re.compile(r"https://api\.census\.gov/data/2022/acs/acs5.*"),
@@ -93,18 +95,20 @@ class TestFetchACSTractData:
 
     def test_handles_missing_values(self, httpx_mock):
         """Test that negative values (Census missing indicator) are converted to NA."""
-        response_data = make_census_response([
-            {
-                "county": "001",
-                "tract": "000100",
-                "B01003_001E": "1000",
-                "B19013_001E": "-666666666",  # Missing value indicator
-                "B25064_001E": "1200",
-                "C17002_001E": "950",
-                "C17002_002E": "50",
-                "C17002_003E": "75",
-            }
-        ])
+        response_data = make_census_response(
+            [
+                {
+                    "county": "001",
+                    "tract": "000100",
+                    "B01003_001E": "1000",
+                    "B19013_001E": "-666666666",  # Missing value indicator
+                    "B25064_001E": "1200",
+                    "C17002_001E": "950",
+                    "C17002_002E": "50",
+                    "C17002_003E": "75",
+                }
+            ]
+        )
 
         httpx_mock.add_response(
             url=re.compile(r"https://api\.census\.gov/data/2022/acs/acs5.*"),
@@ -155,22 +159,26 @@ class TestAggregateToCoC:
     def test_area_weighted_aggregation(self):
         """Test aggregation with area weighting."""
         # Create mock ACS data
-        acs_data = pd.DataFrame({
-            "GEOID": ["08001000100", "08001000200", "08001000300"],
-            "total_population": [1000, 2000, 3000],
-            "adult_population": [800, 1600, 2400],
-            "population_below_poverty": [100, 200, 300],
-            "median_household_income": [50000, 60000, 70000],
-            "median_gross_rent": [1000, 1200, 1400],
-        })
+        acs_data = pd.DataFrame(
+            {
+                "GEOID": ["08001000100", "08001000200", "08001000300"],
+                "total_population": [1000, 2000, 3000],
+                "adult_population": [800, 1600, 2400],
+                "population_below_poverty": [100, 200, 300],
+                "median_household_income": [50000, 60000, 70000],
+                "median_gross_rent": [1000, 1200, 1400],
+            }
+        )
 
         # Create crosswalk - two tracts in CO-500, one in CO-501
-        crosswalk = pd.DataFrame({
-            "tract_geoid": ["08001000100", "08001000200", "08001000300"],
-            "coc_id": ["CO-500", "CO-500", "CO-501"],
-            "area_share": [0.8, 0.5, 1.0],  # tract 1: 80% in CO-500, tract 2: 50% in CO-500
-            "pop_share": [0.8, 0.5, 1.0],
-        })
+        crosswalk = pd.DataFrame(
+            {
+                "tract_geoid": ["08001000100", "08001000200", "08001000300"],
+                "coc_id": ["CO-500", "CO-500", "CO-501"],
+                "area_share": [0.8, 0.5, 1.0],  # tract 1: 80% in CO-500, tract 2: 50% in CO-500
+                "pop_share": [0.8, 0.5, 1.0],
+            }
+        )
 
         result = aggregate_to_coc(acs_data, crosswalk, weighting="area")
 
@@ -189,21 +197,25 @@ class TestAggregateToCoC:
 
     def test_population_weighted_aggregation(self):
         """Test aggregation with population weighting."""
-        acs_data = pd.DataFrame({
-            "GEOID": ["08001000100", "08001000200"],
-            "total_population": [1000, 2000],
-            "adult_population": [800, 1600],
-            "population_below_poverty": [100, 200],
-            "median_household_income": [50000, 60000],
-            "median_gross_rent": [1000, 1200],
-        })
+        acs_data = pd.DataFrame(
+            {
+                "GEOID": ["08001000100", "08001000200"],
+                "total_population": [1000, 2000],
+                "adult_population": [800, 1600],
+                "population_below_poverty": [100, 200],
+                "median_household_income": [50000, 60000],
+                "median_gross_rent": [1000, 1200],
+            }
+        )
 
-        crosswalk = pd.DataFrame({
-            "tract_geoid": ["08001000100", "08001000200"],
-            "coc_id": ["CO-500", "CO-500"],
-            "area_share": [1.0, 1.0],
-            "pop_share": [0.4, 0.6],
-        })
+        crosswalk = pd.DataFrame(
+            {
+                "tract_geoid": ["08001000100", "08001000200"],
+                "coc_id": ["CO-500", "CO-500"],
+                "area_share": [1.0, 1.0],
+                "pop_share": [0.4, 0.6],
+            }
+        )
 
         result = aggregate_to_coc(acs_data, crosswalk, weighting="population")
 
@@ -215,22 +227,26 @@ class TestAggregateToCoC:
 
     def test_coverage_ratio_calculation(self):
         """Test that coverage_ratio correctly computes area-weighted coverage."""
-        acs_data = pd.DataFrame({
-            "GEOID": ["08001000100", "08001000200"],
-            "total_population": [1000, pd.NA],  # Second tract has no data
-            "adult_population": [800, pd.NA],
-            "population_below_poverty": [100, pd.NA],
-            "median_household_income": [50000, pd.NA],
-            "median_gross_rent": [1000, pd.NA],
-        })
+        acs_data = pd.DataFrame(
+            {
+                "GEOID": ["08001000100", "08001000200"],
+                "total_population": [1000, pd.NA],  # Second tract has no data
+                "adult_population": [800, pd.NA],
+                "population_below_poverty": [100, pd.NA],
+                "median_household_income": [50000, pd.NA],
+                "median_gross_rent": [1000, pd.NA],
+            }
+        )
 
-        crosswalk = pd.DataFrame({
-            "tract_geoid": ["08001000100", "08001000200"],
-            "coc_id": ["CO-500", "CO-500"],
-            "area_share": [0.6, 0.4],
-            "pop_share": [0.6, 0.4],
-            "intersection_area": [600.0, 400.0],  # Areas in arbitrary units
-        })
+        crosswalk = pd.DataFrame(
+            {
+                "tract_geoid": ["08001000100", "08001000200"],
+                "coc_id": ["CO-500", "CO-500"],
+                "area_share": [0.6, 0.4],
+                "pop_share": [0.6, 0.4],
+                "intersection_area": [600.0, 400.0],  # Areas in arbitrary units
+            }
+        )
 
         result = aggregate_to_coc(acs_data, crosswalk, weighting="area")
 
@@ -241,37 +257,45 @@ class TestAggregateToCoC:
 
     def test_missing_weight_column_raises(self):
         """Test that missing weight column raises ValueError."""
-        acs_data = pd.DataFrame({
-            "GEOID": ["08001000100"],
-            "total_population": [1000],
-        })
+        acs_data = pd.DataFrame(
+            {
+                "GEOID": ["08001000100"],
+                "total_population": [1000],
+            }
+        )
 
-        crosswalk = pd.DataFrame({
-            "tract_geoid": ["08001000100"],
-            "coc_id": ["CO-500"],
-            # Missing area_share column
-        })
+        crosswalk = pd.DataFrame(
+            {
+                "tract_geoid": ["08001000100"],
+                "coc_id": ["CO-500"],
+                # Missing area_share column
+            }
+        )
 
         with pytest.raises(ValueError, match="missing required column"):
             aggregate_to_coc(acs_data, crosswalk, weighting="area")
 
     def test_adds_metadata_columns(self):
         """Test that result includes source metadata."""
-        acs_data = pd.DataFrame({
-            "GEOID": ["08001000100"],
-            "total_population": [1000],
-            "adult_population": [800],
-            "population_below_poverty": [100],
-            "median_household_income": [50000],
-            "median_gross_rent": [1000],
-        })
+        acs_data = pd.DataFrame(
+            {
+                "GEOID": ["08001000100"],
+                "total_population": [1000],
+                "adult_population": [800],
+                "population_below_poverty": [100],
+                "median_household_income": [50000],
+                "median_gross_rent": [1000],
+            }
+        )
 
-        crosswalk = pd.DataFrame({
-            "tract_geoid": ["08001000100"],
-            "coc_id": ["CO-500"],
-            "area_share": [1.0],
-            "pop_share": [1.0],
-        })
+        crosswalk = pd.DataFrame(
+            {
+                "tract_geoid": ["08001000100"],
+                "coc_id": ["CO-500"],
+                "area_share": [1.0],
+                "pop_share": [1.0],
+            }
+        )
 
         result = aggregate_to_coc(acs_data, crosswalk, weighting="area")
 
@@ -285,21 +309,25 @@ class TestACSSchemaMeasures:
 
     def test_output_schema_columns(self):
         """Test that aggregate output has all required schema columns."""
-        acs_data = pd.DataFrame({
-            "GEOID": ["08001000100"],
-            "total_population": [1000],
-            "adult_population": [800],
-            "population_below_poverty": [100],
-            "median_household_income": [50000],
-            "median_gross_rent": [1000],
-        })
+        acs_data = pd.DataFrame(
+            {
+                "GEOID": ["08001000100"],
+                "total_population": [1000],
+                "adult_population": [800],
+                "population_below_poverty": [100],
+                "median_household_income": [50000],
+                "median_gross_rent": [1000],
+            }
+        )
 
-        crosswalk = pd.DataFrame({
-            "tract_geoid": ["08001000100"],
-            "coc_id": ["CO-500"],
-            "area_share": [1.0],
-            "pop_share": [1.0],
-        })
+        crosswalk = pd.DataFrame(
+            {
+                "tract_geoid": ["08001000100"],
+                "coc_id": ["CO-500"],
+                "area_share": [1.0],
+                "pop_share": [1.0],
+            }
+        )
 
         result = aggregate_to_coc(acs_data, crosswalk, weighting="area")
 

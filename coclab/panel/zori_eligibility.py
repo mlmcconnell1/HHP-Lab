@@ -171,9 +171,7 @@ class ZoriProvenance:
         kwargs = {
             "rent_metric": data.get("rent_metric", "ZORI"),
             "rent_alignment": data.get("rent_alignment", "pit_january"),
-            "zori_min_coverage": data.get(
-                "zori_min_coverage", DEFAULT_ZORI_MIN_COVERAGE
-            ),
+            "zori_min_coverage": data.get("zori_min_coverage", DEFAULT_ZORI_MIN_COVERAGE),
             "zori_source": data.get("zori_source", "Zillow Economic Research"),
             "boundary_vintage": boundary,
             "acs_vintage": acs,
@@ -343,9 +341,7 @@ def apply_zori_eligibility(
     )
 
     # Log breakdown by exclusion reason
-    reason_counts = (
-        result[~result["zori_is_eligible"]]["zori_excluded_reason"].value_counts()
-    )
+    reason_counts = result[~result["zori_is_eligible"]]["zori_excluded_reason"].value_counts()
     if len(reason_counts) > 0:
         for reason, count in reason_counts.items():
             logger.info(f"  Excluded ({reason}): {count}")
@@ -397,9 +393,7 @@ def compute_rent_to_income(
         return result
 
     if income_col not in result.columns:
-        logger.warning(
-            f"Income column '{income_col}' not found; rent_to_income will be null"
-        )
+        logger.warning(f"Income column '{income_col}' not found; rent_to_income will be null")
         result["rent_to_income"] = None
         return result
 
@@ -408,9 +402,7 @@ def compute_rent_to_income(
     result["rent_to_income"] = None
 
     # Only compute for eligible rows with valid data
-    eligible_mask = (
-        result.get(eligibility_col, True) if eligibility_col in result.columns else True
-    )
+    eligible_mask = result.get(eligibility_col, True) if eligibility_col in result.columns else True
     if isinstance(eligible_mask, bool):
         eligible_mask = pd.Series([eligible_mask] * len(result))
 
@@ -420,9 +412,9 @@ def compute_rent_to_income(
     compute_mask = eligible_mask & zori_valid & income_valid
 
     if compute_mask.any():
-        result.loc[compute_mask, "rent_to_income"] = result.loc[
-            compute_mask, zori_col
-        ] / (result.loc[compute_mask, income_col] / 12.0)
+        result.loc[compute_mask, "rent_to_income"] = result.loc[compute_mask, zori_col] / (
+            result.loc[compute_mask, income_col] / 12.0
+        )
 
     # Log summary
     computed_count = compute_mask.sum()

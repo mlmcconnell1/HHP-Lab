@@ -344,9 +344,7 @@ def tract_xwalk_path(
         base_dir = Path("data")
     else:
         base_dir = Path(base_dir)
-    return base_dir / "curated" / "xwalks" / tract_xwalk_filename(
-        boundary_vintage, tract_vintage
-    )
+    return base_dir / "curated" / "xwalks" / tract_xwalk_filename(boundary_vintage, tract_vintage)
 
 
 def county_xwalk_path(
@@ -368,9 +366,7 @@ def county_xwalk_path(
         base_dir = Path("data")
     else:
         base_dir = Path(base_dir)
-    return base_dir / "curated" / "xwalks" / county_xwalk_filename(
-        boundary_vintage, county_vintage
-    )
+    return base_dir / "curated" / "xwalks" / county_xwalk_filename(boundary_vintage, county_vintage)
 
 
 def measures_path(
@@ -394,8 +390,11 @@ def measures_path(
         base_dir = Path("data")
     else:
         base_dir = Path(base_dir)
-    return base_dir / "curated" / "measures" / measures_filename(
-        acs_vintage, boundary_vintage, tract_vintage
+    return (
+        base_dir
+        / "curated"
+        / "measures"
+        / measures_filename(acs_vintage, boundary_vintage, tract_vintage)
     )
 
 
@@ -420,9 +419,7 @@ def panel_path(
         base_dir = Path("data")
     else:
         base_dir = Path(base_dir)
-    return base_dir / "curated" / "panel" / panel_filename(
-        start_year, end_year, boundary_vintage
-    )
+    return base_dir / "curated" / "panel" / panel_filename(start_year, end_year, boundary_vintage)
 
 
 # =============================================================================

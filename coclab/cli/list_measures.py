@@ -135,14 +135,16 @@ def list_measures(
             row_count = "error"
             weighting = "error"
 
-        rows.append({
-            "boundary_vintage": boundary_vintage,
-            "acs_vintage": acs_vintage,
-            "cocs": row_count,
-            "weighting": weighting,
-            "size": file_size,
-            "modified": modified,
-        })
+        rows.append(
+            {
+                "boundary_vintage": boundary_vintage,
+                "acs_vintage": acs_vintage,
+                "cocs": row_count,
+                "weighting": weighting,
+                "size": file_size,
+                "modified": modified,
+            }
+        )
 
     # Display table header
     typer.echo("Available CoC Measure Files:\n")

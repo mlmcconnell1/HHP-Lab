@@ -1,6 +1,5 @@
 """CLI command for listing available crosswalk files."""
 
-import os
 import re
 from datetime import datetime
 from pathlib import Path
@@ -190,9 +189,7 @@ def list_xwalks(
         return
 
     # Sort by type, then boundary vintage, then census vintage
-    crosswalks.sort(
-        key=lambda x: (x["type"], x["boundary_vintage"], x["census_vintage"])
-    )
+    crosswalks.sort(key=lambda x: (x["type"], x["boundary_vintage"], x["census_vintage"]))
 
     # Display table header
     typer.echo("\nAvailable crosswalk files:\n")

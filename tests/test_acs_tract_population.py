@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import re
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -11,13 +11,13 @@ import pandas as pd
 import pytest
 
 from coclab.acs.ingest.tract_population import (
+    POPULATION_VARS,
+    fetch_state_tract_population,
     fetch_tract_population,
+    get_output_path,
     ingest_tract_population,
     normalize_geoid,
     parse_acs_vintage,
-    get_output_path,
-    fetch_state_tract_population,
-    POPULATION_VARS,
 )
 from coclab.provenance import read_provenance
 
@@ -128,15 +128,17 @@ class TestFetchStateTractPopulation:
 
     def test_parses_response_correctly(self, httpx_mock):
         """Test that Census API response is parsed into correct DataFrame structure."""
-        response_data = make_census_response([
-            {
-                "NAME": "Census Tract 1, Test County, Colorado",
-                "county": "031",
-                "tract": "001000",
-                "B01003_001E": "5000",  # total_population
-                "B01003_001M": "150",  # margin of error
-            }
-        ])
+        response_data = make_census_response(
+            [
+                {
+                    "NAME": "Census Tract 1, Test County, Colorado",
+                    "county": "031",
+                    "tract": "001000",
+                    "B01003_001E": "5000",  # total_population
+                    "B01003_001M": "150",  # margin of error
+                }
+            ]
+        )
 
         httpx_mock.add_response(
             url=re.compile(r"https://api\.census\.gov/data/2023/acs/acs5.*"),
@@ -154,14 +156,16 @@ class TestFetchStateTractPopulation:
 
     def test_handles_missing_values(self, httpx_mock):
         """Test that negative values (Census missing indicator) are converted to NA."""
-        response_data = make_census_response([
-            {
-                "county": "001",
-                "tract": "000100",
-                "B01003_001E": "-666666666",  # Missing value indicator
-                "B01003_001M": "-666666666",  # Missing MOE
-            }
-        ])
+        response_data = make_census_response(
+            [
+                {
+                    "county": "001",
+                    "tract": "000100",
+                    "B01003_001E": "-666666666",  # Missing value indicator
+                    "B01003_001M": "-666666666",  # Missing MOE
+                }
+            ]
+        )
 
         httpx_mock.add_response(
             url=re.compile(r"https://api\.census\.gov/data/2023/acs/acs5.*"),
@@ -207,14 +211,16 @@ class TestFetchTractPopulation:
     def test_returns_correct_schema(self, httpx_mock):
         """Test that returned DataFrame has the correct schema."""
         # Mock responses for a single state
-        response_data = make_census_response([
-            {
-                "county": "031",
-                "tract": "001000",
-                "B01003_001E": "5000",
-                "B01003_001M": "150",
-            }
-        ])
+        response_data = make_census_response(
+            [
+                {
+                    "county": "031",
+                    "tract": "001000",
+                    "B01003_001E": "5000",
+                    "B01003_001M": "150",
+                }
+            ]
+        )
 
         # Mock all state requests - return data for state 08, 404 for others
         httpx_mock.add_response(
@@ -250,20 +256,22 @@ class TestFetchTractPopulation:
     @pytest.mark.httpx_mock(can_send_already_matched_responses=True)
     def test_population_values_non_negative(self, httpx_mock):
         """Test that population values are non-negative (or NA)."""
-        response_data = make_census_response([
-            {
-                "county": "031",
-                "tract": "001000",
-                "B01003_001E": "5000",
-                "B01003_001M": "150",
-            },
-            {
-                "county": "031",
-                "tract": "001100",
-                "B01003_001E": "0",  # Zero population is valid
-                "B01003_001M": "0",
-            },
-        ])
+        response_data = make_census_response(
+            [
+                {
+                    "county": "031",
+                    "tract": "001000",
+                    "B01003_001E": "5000",
+                    "B01003_001M": "150",
+                },
+                {
+                    "county": "031",
+                    "tract": "001100",
+                    "B01003_001E": "0",  # Zero population is valid
+                    "B01003_001M": "0",
+                },
+            ]
+        )
 
         httpx_mock.add_response(
             url=re.compile(r"https://api\.census\.gov/data/2023/acs/acs5.*state%3A08.*"),
@@ -283,14 +291,16 @@ class TestFetchTractPopulation:
     @pytest.mark.httpx_mock(can_send_already_matched_responses=True)
     def test_returns_non_empty_dataset(self, httpx_mock):
         """Test that the dataset is non-empty when API returns data."""
-        response_data = make_census_response([
-            {
-                "county": "031",
-                "tract": "001000",
-                "B01003_001E": "5000",
-                "B01003_001M": "150",
-            }
-        ])
+        response_data = make_census_response(
+            [
+                {
+                    "county": "031",
+                    "tract": "001000",
+                    "B01003_001E": "5000",
+                    "B01003_001M": "150",
+                }
+            ]
+        )
 
         httpx_mock.add_response(
             url=re.compile(r"https://api\.census\.gov/data/2023/acs/acs5.*state%3A08.*"),
@@ -324,14 +334,16 @@ class TestIngestTractPopulation:
     @pytest.mark.httpx_mock(can_send_already_matched_responses=True)
     def test_creates_output_file(self, httpx_mock, tmp_path):
         """Test that ingest creates the output Parquet file."""
-        response_data = make_census_response([
-            {
-                "county": "031",
-                "tract": "001000",
-                "B01003_001E": "5000",
-                "B01003_001M": "150",
-            }
-        ])
+        response_data = make_census_response(
+            [
+                {
+                    "county": "031",
+                    "tract": "001000",
+                    "B01003_001E": "5000",
+                    "B01003_001M": "150",
+                }
+            ]
+        )
 
         httpx_mock.add_response(
             url=re.compile(r"https://api\.census\.gov/data/2023/acs/acs5.*state%3A08.*"),
@@ -358,15 +370,17 @@ class TestIngestTractPopulation:
         cached_path.parent.mkdir(parents=True, exist_ok=True)
 
         # Write a simple DataFrame
-        df = pd.DataFrame({
-            "tract_geoid": ["08031001000"],
-            "acs_vintage": ["2019-2023"],
-            "tract_vintage": ["2023"],
-            "total_population": [5000],
-            "data_source": ["acs_5yr"],
-            "source_ref": ["cached"],
-            "ingested_at": [datetime.now(timezone.utc)],
-        })
+        df = pd.DataFrame(
+            {
+                "tract_geoid": ["08031001000"],
+                "acs_vintage": ["2019-2023"],
+                "tract_vintage": ["2023"],
+                "total_population": [5000],
+                "data_source": ["acs_5yr"],
+                "source_ref": ["cached"],
+                "ingested_at": [datetime.now(UTC)],
+            }
+        )
         df.to_parquet(cached_path)
 
         # Call ingest without force - should use cache
@@ -386,26 +400,30 @@ class TestIngestTractPopulation:
         cached_path = tmp_path / "acs_tracts__A2023xT2023.parquet"
         cached_path.parent.mkdir(parents=True, exist_ok=True)
 
-        df = pd.DataFrame({
-            "tract_geoid": ["08031001000"],
-            "acs_vintage": ["2019-2023"],
-            "tract_vintage": ["2023"],
-            "total_population": [5000],
-            "data_source": ["acs_5yr"],
-            "source_ref": ["cached"],
-            "ingested_at": [datetime.now(timezone.utc)],
-        })
+        df = pd.DataFrame(
+            {
+                "tract_geoid": ["08031001000"],
+                "acs_vintage": ["2019-2023"],
+                "tract_vintage": ["2023"],
+                "total_population": [5000],
+                "data_source": ["acs_5yr"],
+                "source_ref": ["cached"],
+                "ingested_at": [datetime.now(UTC)],
+            }
+        )
         df.to_parquet(cached_path)
 
         # Setup mock for refetch
-        response_data = make_census_response([
-            {
-                "county": "031",
-                "tract": "001000",
-                "B01003_001E": "6000",  # Different value
-                "B01003_001M": "200",
-            }
-        ])
+        response_data = make_census_response(
+            [
+                {
+                    "county": "031",
+                    "tract": "001000",
+                    "B01003_001E": "6000",  # Different value
+                    "B01003_001M": "200",
+                }
+            ]
+        )
 
         httpx_mock.add_response(
             url=re.compile(r"https://api\.census\.gov/data/2023/acs/acs5.*state%3A08.*"),
@@ -431,14 +449,16 @@ class TestIngestTractPopulation:
     @pytest.mark.httpx_mock(can_send_already_matched_responses=True)
     def test_includes_provenance_metadata(self, httpx_mock, tmp_path):
         """Test that output file includes provenance metadata."""
-        response_data = make_census_response([
-            {
-                "county": "031",
-                "tract": "001000",
-                "B01003_001E": "5000",
-                "B01003_001M": "150",
-            }
-        ])
+        response_data = make_census_response(
+            [
+                {
+                    "county": "031",
+                    "tract": "001000",
+                    "B01003_001E": "5000",
+                    "B01003_001M": "150",
+                }
+            ]
+        )
 
         httpx_mock.add_response(
             url=re.compile(r"https://api\.census\.gov/data/2023/acs/acs5.*state%3A08.*"),
@@ -470,20 +490,22 @@ class TestSchemaValidation:
     @pytest.mark.httpx_mock(can_send_already_matched_responses=True)
     def test_tract_geoid_length(self, httpx_mock):
         """Test that tract_geoid is exactly 11 characters."""
-        response_data = make_census_response([
-            {
-                "county": "031",
-                "tract": "001000",
-                "B01003_001E": "5000",
-                "B01003_001M": "150",
-            },
-            {
-                "county": "001",
-                "tract": "000100",
-                "B01003_001E": "3000",
-                "B01003_001M": "100",
-            },
-        ])
+        response_data = make_census_response(
+            [
+                {
+                    "county": "031",
+                    "tract": "001000",
+                    "B01003_001E": "5000",
+                    "B01003_001M": "150",
+                },
+                {
+                    "county": "001",
+                    "tract": "000100",
+                    "B01003_001E": "3000",
+                    "B01003_001M": "100",
+                },
+            ]
+        )
 
         httpx_mock.add_response(
             url=re.compile(r"https://api\.census\.gov/data/2023/acs/acs5.*state%3A08.*"),
@@ -502,14 +524,16 @@ class TestSchemaValidation:
     @pytest.mark.httpx_mock(can_send_already_matched_responses=True)
     def test_data_source_is_acs_5yr(self, httpx_mock):
         """Test that data_source is always 'acs_5yr'."""
-        response_data = make_census_response([
-            {
-                "county": "031",
-                "tract": "001000",
-                "B01003_001E": "5000",
-                "B01003_001M": "150",
-            }
-        ])
+        response_data = make_census_response(
+            [
+                {
+                    "county": "031",
+                    "tract": "001000",
+                    "B01003_001E": "5000",
+                    "B01003_001M": "150",
+                }
+            ]
+        )
 
         httpx_mock.add_response(
             url=re.compile(r"https://api\.census\.gov/data/2023/acs/acs5.*state%3A08.*"),
@@ -527,14 +551,16 @@ class TestSchemaValidation:
     @pytest.mark.httpx_mock(can_send_already_matched_responses=True)
     def test_ingested_at_is_utc(self, httpx_mock):
         """Test that ingested_at is a UTC timestamp."""
-        response_data = make_census_response([
-            {
-                "county": "031",
-                "tract": "001000",
-                "B01003_001E": "5000",
-                "B01003_001M": "150",
-            }
-        ])
+        response_data = make_census_response(
+            [
+                {
+                    "county": "031",
+                    "tract": "001000",
+                    "B01003_001E": "5000",
+                    "B01003_001M": "150",
+                }
+            ]
+        )
 
         httpx_mock.add_response(
             url=re.compile(r"https://api\.census\.gov/data/2023/acs/acs5.*state%3A08.*"),
@@ -550,4 +576,4 @@ class TestSchemaValidation:
         # Check that timestamp is timezone-aware
         ts = df.iloc[0]["ingested_at"]
         assert ts.tzinfo is not None
-        assert ts.tzinfo == timezone.utc
+        assert ts.tzinfo == UTC

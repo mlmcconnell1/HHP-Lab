@@ -307,6 +307,7 @@ class PitVintageRegistryEntry:
         years = data["years_included"]
         if isinstance(years, str):
             import json
+
             years = json.loads(years)
         return cls(
             vintage=int(data["vintage"]),
@@ -337,6 +338,7 @@ def _load_vintage_registry(registry_path: Path) -> pd.DataFrame:
 def _prepare_vintage_for_save(df: pd.DataFrame) -> pd.DataFrame:
     """Prepare vintage DataFrame for saving to Parquet with consistent types."""
     import json
+
     df = df.copy()
     df["ingested_at"] = pd.to_datetime(df["ingested_at"], utc=True)
     df["path"] = df["path"].astype(str)
@@ -408,6 +410,7 @@ def register_pit_vintage(
 
     if mask.any():
         import json
+
         existing = df.loc[mask].iloc[0]
         if existing["hash_of_file"] == hash_of_file:
             return PitVintageRegistryEntry.from_dict(existing.to_dict())

@@ -175,8 +175,7 @@ def list_census(
         modified_str = census["modified"].strftime("%Y-%m-%d %H:%M")
 
         typer.echo(
-            f"{census['type']:<12} {census['year']:<8} "
-            f"{row_str:>12} {size_str:>12} {modified_str}"
+            f"{census['type']:<12} {census['year']:<8} {row_str:>12} {size_str:>12} {modified_str}"
         )
 
     typer.echo(f"\nTotal: {len(census_files)} census file(s)")

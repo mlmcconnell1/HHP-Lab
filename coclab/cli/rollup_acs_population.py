@@ -71,8 +71,7 @@ def rollup_acs_population(
     # Validate weighting option
     if weighting not in ("area", "population_mass"):
         typer.echo(
-            f"Error: Invalid weighting method '{weighting}'. "
-            "Use 'area' or 'population_mass'.",
+            f"Error: Invalid weighting method '{weighting}'. Use 'area' or 'population_mass'.",
             err=True,
         )
         raise typer.Exit(1)

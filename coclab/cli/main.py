@@ -5,15 +5,6 @@ computing measures, and visualizing boundaries.
 """
 
 import warnings
-
-# Suppress known PyArrow warnings on macOS (sysctlbyname failures in sandboxed environments)
-# These are harmless warnings about CPU cache detection that don't affect functionality.
-warnings.filterwarnings(
-    "ignore",
-    message=".*sysctlbyname failed.*",
-    category=UserWarning,
-)
-
 from pathlib import Path
 from typing import Annotated
 
@@ -39,6 +30,14 @@ from coclab.cli.rollup_acs_population import rollup_acs_population
 from coclab.cli.show_measures import show_measures
 from coclab.cli.verify_acs_population import verify_acs_population
 from coclab.cli.zori import aggregate_zori, ingest_zori, zori_diagnostics
+
+# Suppress known PyArrow warnings on macOS (sysctlbyname failures in sandboxed environments)
+# These are harmless warnings about CPU cache detection that don't affect functionality.
+warnings.filterwarnings(
+    "ignore",
+    message=".*sysctlbyname failed.*",
+    category=UserWarning,
+)
 
 
 def _check_working_directory() -> None:
@@ -184,9 +183,7 @@ def delete_boundaries(
     ],
     source: Annotated[
         str,
-        typer.Argument(
-            help="Data source (e.g., 'hud_exchange', 'hud_opendata')"
-        ),
+        typer.Argument(help="Data source (e.g., 'hud_exchange', 'hud_opendata')"),
     ],
     yes: Annotated[
         bool,

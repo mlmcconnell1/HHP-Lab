@@ -30,7 +30,7 @@ from __future__ import annotations
 import logging
 import re
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -62,6 +62,7 @@ class PITParseResult:
     cross_state_mappings: dict[str, str] = field(default_factory=dict)
     rows_read: int = 0
     rows_skipped: int = 0
+
 
 # Standard column names in canonical schema
 CANONICAL_COLUMNS = [
@@ -101,15 +102,67 @@ COLUMN_MAPPINGS = {
 }
 
 # US State and Territory codes for CoC ID validation
-US_STATE_CODES = frozenset({
-    "AL", "AK", "AZ", "AR", "CA", "CO", "CT", "DE", "FL", "GA",
-    "HI", "ID", "IL", "IN", "IA", "KS", "KY", "LA", "ME", "MD",
-    "MA", "MI", "MN", "MS", "MO", "MT", "NE", "NV", "NH", "NJ",
-    "NM", "NY", "NC", "ND", "OH", "OK", "OR", "PA", "RI", "SC",
-    "SD", "TN", "TX", "UT", "VT", "VA", "WA", "WV", "WI", "WY",
-    # US Territories
-    "AS", "DC", "GU", "MP", "PR", "VI",
-})
+US_STATE_CODES = frozenset(
+    {
+        "AL",
+        "AK",
+        "AZ",
+        "AR",
+        "CA",
+        "CO",
+        "CT",
+        "DE",
+        "FL",
+        "GA",
+        "HI",
+        "ID",
+        "IL",
+        "IN",
+        "IA",
+        "KS",
+        "KY",
+        "LA",
+        "ME",
+        "MD",
+        "MA",
+        "MI",
+        "MN",
+        "MS",
+        "MO",
+        "MT",
+        "NE",
+        "NV",
+        "NH",
+        "NJ",
+        "NM",
+        "NY",
+        "NC",
+        "ND",
+        "OH",
+        "OK",
+        "OR",
+        "PA",
+        "RI",
+        "SC",
+        "SD",
+        "TN",
+        "TX",
+        "UT",
+        "VT",
+        "VA",
+        "WA",
+        "WV",
+        "WI",
+        "WY",
+        # US Territories
+        "AS",
+        "DC",
+        "GU",
+        "MP",
+        "PR",
+        "VI",
+    }
+)
 
 
 class PITParseError(Exception):
@@ -186,7 +239,8 @@ def normalize_coc_id(raw_id: str, *, validate_state: bool = True) -> str:
     if len(cleaned) > 7:
         raise InvalidCoCIdError(
             f"CoC ID too long ({len(cleaned)} chars): {raw_id[:50]!r}..."
-            if len(raw_id) > 50 else f"CoC ID too long ({len(cleaned)} chars): {raw_id!r}"
+            if len(raw_id) > 50
+            else f"CoC ID too long ({len(cleaned)} chars): {raw_id!r}"
         )
 
     # Pattern: two letters, optional separator (dash/space/underscore), 1-3 digits,
@@ -216,8 +270,7 @@ def normalize_coc_id(raw_id: str, *, validate_state: bool = True) -> str:
         return normalized
 
     raise InvalidCoCIdError(
-        f"Cannot normalize CoC ID: {raw_id!r}. "
-        f"Expected format like 'ST-NNN' (e.g., 'CO-500')"
+        f"Cannot normalize CoC ID: {raw_id!r}. Expected format like 'ST-NNN' (e.g., 'CO-500')"
     )
 
 
@@ -271,8 +324,11 @@ def _read_file(
             # Look for PIT-specific sheets (but avoid template/chart sheets)
             for name in sheet_names:
                 name_lower = name.lower()
-                if ("pit" in name_lower or "count" in name_lower) and \
-                   "template" not in name_lower and "chart" not in name_lower:
+                if (
+                    ("pit" in name_lower or "count" in name_lower)
+                    and "template" not in name_lower
+                    and "chart" not in name_lower
+                ):
                     logger.info(f"Using sheet: {name}")
                     return pd.read_excel(file_path, sheet_name=name, engine=engine)
 
@@ -336,9 +392,6 @@ def parse_pit_file(
     if not coc_col:
         raise ValueError(f"Cannot find CoC ID column. Available: {list(df.columns)}")
 
-    # Look for year-specific columns or filter by year column
-    year_str = str(year)
-
     # Check if there's a year column to filter on
     year_col = _find_column(df, ["year", "pit_year", "count_year"])
 
@@ -377,8 +430,7 @@ def parse_pit_file(
 
     if not total_col:
         raise ValueError(
-            f"Cannot find total homeless column for year {year}. "
-            f"Available: {list(df.columns)}"
+            f"Cannot find total homeless column for year {year}. Available: {list(df.columns)}"
         )
 
     # Filter by year if year column exists
@@ -391,7 +443,7 @@ def parse_pit_file(
     result_rows = []
     cross_state_mappings: dict[str, str] = {}
     rows_skipped = 0
-    ingested_at = datetime.now(timezone.utc)
+    ingested_at = datetime.now(UTC)
 
     # Pattern to detect cross-state CoC IDs with letter suffix (e.g., MO-604a)
     cross_state_pattern = re.compile(r"^([A-Z]{2})[-\s_]*(\d{1,3})([A-Z])$", re.IGNORECASE)
@@ -540,14 +592,16 @@ def write_pit_parquet(
 
     # Create provenance metadata
     pit_year = int(df["pit_year"].iloc[0]) if len(df) > 0 else None
-    ingested_at = df["ingested_at"].iloc[0] if len(df) > 0 else datetime.now(timezone.utc)
+    ingested_at = df["ingested_at"].iloc[0] if len(df) > 0 else datetime.now(UTC)
 
     extra: dict[str, Any] = {
         "pit_year": pit_year,
         "row_count": len(df),
         "data_source": df["data_source"].iloc[0] if len(df) > 0 else None,
         "source_ref": df["source_ref"].iloc[0] if len(df) > 0 else None,
-        "ingested_at": ingested_at.isoformat() if hasattr(ingested_at, "isoformat") else str(ingested_at),
+        "ingested_at": ingested_at.isoformat()
+        if hasattr(ingested_at, "isoformat")
+        else str(ingested_at),
     }
 
     # Add parse statistics if provided

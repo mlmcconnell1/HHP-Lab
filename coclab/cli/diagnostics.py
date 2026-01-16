@@ -61,7 +61,8 @@ def diagnostics(
 
         coclab xwalk-diagnostics --crosswalk data/curated/xwalks/coc_tract_xwalk__2025__2023.parquet
 
-        coclab xwalk-diagnostics -x data/curated/xwalks/coc_tract_xwalk__2025__2023.parquet --show-problems
+        coclab xwalk-diagnostics -x data/curated/xwalks/coc_tract_xwalk__2025__2023.parquet \
+            --show-problems
 
         coclab xwalk-diagnostics -x crosswalk.parquet --coverage-threshold 0.90 -o diagnostics.csv
     """
@@ -105,7 +106,9 @@ def diagnostics(
         typer.echo("=" * 60)
         typer.echo("PROBLEM CoCs")
         typer.echo("=" * 60)
-        typer.echo(f"Thresholds: coverage < {coverage_threshold}, max_contribution > {max_contribution}")
+        typer.echo(
+            f"Thresholds: coverage < {coverage_threshold}, max_contribution > {max_contribution}"
+        )
         typer.echo("")
 
         problem_df = identify_problem_cocs(

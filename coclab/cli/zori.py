@@ -294,9 +294,7 @@ def aggregate_zori(
     )
 
     # Check for existing output
-    output_path = get_coc_zori_path(
-        geography, boundary, counties, acs, weighting, output_dir
-    )
+    output_path = get_coc_zori_path(geography, boundary, counties, acs, weighting, output_dir)
     if output_path.exists() and not force:
         typer.echo(f"CoC ZORI output already exists at: {output_path}")
         typer.echo("Use --force to recompute.")

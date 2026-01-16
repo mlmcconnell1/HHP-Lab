@@ -31,8 +31,7 @@ FEATURE_SERVICE_URL = (
 
 # Source reference for metadata
 SOURCE_REF = (
-    "https://hudgis-hud.opendata.arcgis.com/datasets"
-    "/HUD::continuum-of-care-coc-grantee-areas"
+    "https://hudgis-hud.opendata.arcgis.com/datasets/HUD::continuum-of-care-coc-grantee-areas"
 )
 
 # Maximum records per request (API limit is 1000)

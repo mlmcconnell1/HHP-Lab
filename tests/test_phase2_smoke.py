@@ -4,25 +4,23 @@ These tests validate the crosswalk and measures modules work correctly
 with synthetic data that has known intersection properties.
 """
 
+import geopandas as gpd
 import numpy as np
 import pandas as pd
 import pytest
-import geopandas as gpd
 from shapely.geometry import box
-from unittest.mock import patch
 
-from coclab.xwalks.tract import (
-    build_coc_tract_crosswalk,
-    add_population_weights,
-    validate_population_shares,
-)
-from coclab.xwalks.county import build_coc_county_crosswalk
+from coclab.measures.acs import aggregate_to_coc
 from coclab.measures.diagnostics import (
     compute_crosswalk_diagnostics,
     summarize_diagnostics,
 )
-from coclab.measures.acs import aggregate_to_coc
-
+from coclab.xwalks.county import build_coc_county_crosswalk
+from coclab.xwalks.tract import (
+    add_population_weights,
+    build_coc_tract_crosswalk,
+    validate_population_shares,
+)
 
 # =============================================================================
 # Fixtures: Synthetic GeoDataFrames with known geometry properties
@@ -140,17 +138,13 @@ def acs_tract_data() -> pd.DataFrame:
 @pytest.fixture
 def simple_crosswalk(simple_coc_gdf, simple_tract_gdf) -> pd.DataFrame:
     """Pre-built crosswalk from simple fixtures."""
-    return build_coc_tract_crosswalk(
-        simple_coc_gdf, simple_tract_gdf, "2024", "2020"
-    )
+    return build_coc_tract_crosswalk(simple_coc_gdf, simple_tract_gdf, "2024", "2020")
 
 
 @pytest.fixture
 def multi_crosswalk(multi_coc_gdf, multi_tract_gdf) -> pd.DataFrame:
     """Pre-built crosswalk from multi-CoC fixtures."""
-    return build_coc_tract_crosswalk(
-        multi_coc_gdf, multi_tract_gdf, "2024", "2020"
-    )
+    return build_coc_tract_crosswalk(multi_coc_gdf, multi_tract_gdf, "2024", "2020")
 
 
 @pytest.fixture
@@ -172,12 +166,8 @@ def test_tract_crosswalk_reproducibility(simple_coc_gdf, simple_tract_gdf):
     times should produce byte-identical results.
     """
     # Build crosswalk twice with identical inputs
-    xwalk1 = build_coc_tract_crosswalk(
-        simple_coc_gdf, simple_tract_gdf, "2024", "2020"
-    )
-    xwalk2 = build_coc_tract_crosswalk(
-        simple_coc_gdf, simple_tract_gdf, "2024", "2020"
-    )
+    xwalk1 = build_coc_tract_crosswalk(simple_coc_gdf, simple_tract_gdf, "2024", "2020")
+    xwalk2 = build_coc_tract_crosswalk(simple_coc_gdf, simple_tract_gdf, "2024", "2020")
 
     # Verify structure is identical
     assert list(xwalk1.columns) == list(xwalk2.columns)
@@ -192,12 +182,8 @@ def test_tract_crosswalk_reproducibility_multi_coc(multi_coc_gdf, multi_tract_gd
 
     More complex scenario with multiple overlapping geometries.
     """
-    xwalk1 = build_coc_tract_crosswalk(
-        multi_coc_gdf, multi_tract_gdf, "2024", "2020"
-    )
-    xwalk2 = build_coc_tract_crosswalk(
-        multi_coc_gdf, multi_tract_gdf, "2024", "2020"
-    )
+    xwalk1 = build_coc_tract_crosswalk(multi_coc_gdf, multi_tract_gdf, "2024", "2020")
+    xwalk2 = build_coc_tract_crosswalk(multi_coc_gdf, multi_tract_gdf, "2024", "2020")
 
     pd.testing.assert_frame_equal(xwalk1, xwalk2)
 
@@ -219,8 +205,7 @@ def test_population_shares_sum_to_one(crosswalk_with_pop):
 
     # All CoCs should be valid (sum between 0.99 and 1.01)
     assert validation["is_valid"].all(), (
-        f"Some CoCs have invalid pop_share sums: "
-        f"{validation[~validation['is_valid']]}"
+        f"Some CoCs have invalid pop_share sums: {validation[~validation['is_valid']]}"
     )
 
     # Check actual sums are very close to 1.0
@@ -239,17 +224,13 @@ def test_population_shares_sum_to_one_simple(simple_crosswalk, population_data):
     the basic mechanics of population weighting.
     """
     # Filter population data to match simple crosswalk
-    pop_data = population_data[
-        population_data["GEOID"].isin(["01001000100", "01001000200"])
-    ]
+    pop_data = population_data[population_data["GEOID"].isin(["01001000100", "01001000200"])]
 
     xwalk_with_pop = add_population_weights(simple_crosswalk, pop_data)
 
     # Single CoC, pop_share should sum to 1.0
     pop_share_sum = xwalk_with_pop["pop_share"].sum()
-    assert abs(pop_share_sum - 1.0) < 0.001, (
-        f"pop_share sum is {pop_share_sum}, expected ~1.0"
-    )
+    assert abs(pop_share_sum - 1.0) < 0.001, f"pop_share sum is {pop_share_sum}, expected ~1.0"
 
 
 # =============================================================================
@@ -272,9 +253,7 @@ def test_area_shares_valid(simple_crosswalk):
     )
 
     # All values must be <= 1
-    assert (area_shares <= 1).all(), (
-        f"Found area_share values > 1: {area_shares[area_shares > 1]}"
-    )
+    assert (area_shares <= 1).all(), f"Found area_share values > 1: {area_shares[area_shares > 1]}"
 
 
 def test_area_shares_valid_multi_coc(multi_crosswalk):
@@ -305,15 +284,11 @@ def test_area_shares_known_values(simple_crosswalk):
 
     # Tract 1 should be fully inside CoC (area_share ~ 1.0)
     tract1_share = xwalk.loc["01001000100", "area_share"]
-    assert abs(tract1_share - 1.0) < 0.02, (
-        f"Tract 1 area_share is {tract1_share}, expected ~1.0"
-    )
+    assert abs(tract1_share - 1.0) < 0.02, f"Tract 1 area_share is {tract1_share}, expected ~1.0"
 
     # Tract 2 should be ~50% inside CoC (area_share ~ 0.5)
     tract2_share = xwalk.loc["01001000200", "area_share"]
-    assert abs(tract2_share - 0.5) < 0.02, (
-        f"Tract 2 area_share is {tract2_share}, expected ~0.5"
-    )
+    assert abs(tract2_share - 0.5) < 0.02, f"Tract 2 area_share is {tract2_share}, expected ~0.5"
 
 
 # =============================================================================
@@ -340,8 +315,7 @@ def test_crosswalk_diagnostics_schema(multi_crosswalk):
 
     for col in expected_cols:
         assert col in diagnostics.columns, (
-            f"Missing expected column: {col}. "
-            f"Found columns: {list(diagnostics.columns)}"
+            f"Missing expected column: {col}. Found columns: {list(diagnostics.columns)}"
         )
 
 
@@ -421,8 +395,7 @@ def test_coc_measures_schema(multi_crosswalk, acs_tract_data):
 
     for col in expected_cols:
         assert col in measures.columns, (
-            f"Missing expected column: {col}. "
-            f"Found columns: {list(measures.columns)}"
+            f"Missing expected column: {col}. Found columns: {list(measures.columns)}"
         )
 
 
@@ -431,9 +404,7 @@ def test_coc_measures_types(multi_crosswalk, acs_tract_data):
     measures = aggregate_to_coc(acs_tract_data, multi_crosswalk, weighting="area")
 
     # coc_id should be string
-    assert measures["coc_id"].dtype == object or pd.api.types.is_string_dtype(
-        measures["coc_id"]
-    )
+    assert measures["coc_id"].dtype == object or pd.api.types.is_string_dtype(measures["coc_id"])
 
     # Population columns should be numeric
     assert pd.api.types.is_numeric_dtype(measures["total_population"])
@@ -472,16 +443,12 @@ def test_coc_measures_values(multi_crosswalk, acs_tract_data):
 def test_coc_measures_weighting_methods(multi_crosswalk, acs_tract_data, population_data):
     """Verify both area and population weighting methods work."""
     # Area weighting
-    area_measures = aggregate_to_coc(
-        acs_tract_data, multi_crosswalk, weighting="area"
-    )
+    area_measures = aggregate_to_coc(acs_tract_data, multi_crosswalk, weighting="area")
     assert area_measures["weighting_method"].iloc[0] == "area"
 
     # Population weighting (requires pop_share in crosswalk)
     xwalk_with_pop = add_population_weights(multi_crosswalk, population_data)
-    pop_measures = aggregate_to_coc(
-        acs_tract_data, xwalk_with_pop, weighting="population"
-    )
+    pop_measures = aggregate_to_coc(acs_tract_data, xwalk_with_pop, weighting="population")
     assert pop_measures["weighting_method"].iloc[0] == "population"
 
 

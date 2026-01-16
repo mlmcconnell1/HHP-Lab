@@ -183,8 +183,16 @@ def parse_zori_county(raw_path: Path) -> pd.DataFrame:
     df = pd.read_csv(raw_path, dtype={"StateCodeFIPS": str, "MunicipalCodeFIPS": str})
 
     # Identify date columns (format: YYYY-MM-DD or YYYY-MM)
-    id_cols = ["RegionID", "SizeRank", "RegionName", "RegionType", "StateName",
-               "StateCodeFIPS", "MunicipalCodeFIPS", "Metro"]
+    id_cols = [
+        "RegionID",
+        "SizeRank",
+        "RegionName",
+        "RegionType",
+        "StateName",
+        "StateCodeFIPS",
+        "MunicipalCodeFIPS",
+        "Metro",
+    ]
     date_cols = [c for c in df.columns if c not in id_cols]
 
     # Build county FIPS from state + municipal codes
@@ -204,10 +212,12 @@ def parse_zori_county(raw_path: Path) -> pd.DataFrame:
     long_df = long_df.dropna(subset=["date"])
 
     # Rename columns
-    long_df = long_df.rename(columns={
-        "RegionName": "region_name",
-        "StateName": "state",
-    })
+    long_df = long_df.rename(
+        columns={
+            "RegionName": "region_name",
+            "StateName": "state",
+        }
+    )
 
     # Drop rows with null ZORI
     long_df = long_df.dropna(subset=["zori"])
@@ -244,8 +254,17 @@ def parse_zori_zip(raw_path: Path) -> pd.DataFrame:
     df = pd.read_csv(raw_path, dtype={"RegionName": str})
 
     # Identify date columns
-    id_cols = ["RegionID", "SizeRank", "RegionName", "RegionType", "StateName", "State",
-               "City", "Metro", "CountyName"]
+    id_cols = [
+        "RegionID",
+        "SizeRank",
+        "RegionName",
+        "RegionType",
+        "StateName",
+        "State",
+        "City",
+        "Metro",
+        "CountyName",
+    ]
     date_cols = [c for c in df.columns if c not in id_cols]
 
     # ZIP code is in RegionName
@@ -264,10 +283,12 @@ def parse_zori_zip(raw_path: Path) -> pd.DataFrame:
     long_df = long_df.dropna(subset=["date"])
 
     # Rename columns
-    long_df = long_df.rename(columns={
-        "RegionName": "region_name",
-        "StateName": "state",
-    })
+    long_df = long_df.rename(
+        columns={
+            "RegionName": "region_name",
+            "StateName": "state",
+        }
+    )
 
     # Drop rows with null ZORI
     long_df = long_df.dropna(subset=["zori"])
@@ -331,9 +352,7 @@ def _validate_monthly_continuity(df: pd.DataFrame, max_warnings: int = 10) -> No
                     )
 
     if warning_count > max_warnings:
-        logger.warning(
-            f"... and {warning_count - max_warnings} more gaps (truncated)"
-        )
+        logger.warning(f"... and {warning_count - max_warnings} more gaps (truncated)")
     elif warning_count > 0:
         logger.info(f"Total gaps found in monthly continuity: {warning_count}")
 
@@ -459,8 +478,17 @@ def ingest_zori(
 
     # Reorder columns to match schema
     col_order = [
-        "geo_type", "geo_id", "date", "zori", "region_name", "state",
-        "data_source", "metric", "ingested_at", "source_ref", "raw_sha256",
+        "geo_type",
+        "geo_id",
+        "date",
+        "zori",
+        "region_name",
+        "state",
+        "data_source",
+        "metric",
+        "ingested_at",
+        "source_ref",
+        "raw_sha256",
     ]
     df = df[col_order]
 

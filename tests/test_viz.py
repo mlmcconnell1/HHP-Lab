@@ -1,8 +1,6 @@
 """Tests for visualization module."""
 
-import tempfile
-from datetime import datetime, timezone
-from pathlib import Path
+from datetime import UTC, datetime
 
 import geopandas as gpd
 import pytest
@@ -34,37 +32,47 @@ def sample_boundaries(temp_data_dir):
     """Create a sample GeoParquet file with test boundaries."""
     # Create sample polygons (simple squares)
     # CO-500: around Denver area
-    co_500_poly = Polygon([
-        (-105.0, 39.5),
-        (-104.5, 39.5),
-        (-104.5, 40.0),
-        (-105.0, 40.0),
-        (-105.0, 39.5),
-    ])
+    co_500_poly = Polygon(
+        [
+            (-105.0, 39.5),
+            (-104.5, 39.5),
+            (-104.5, 40.0),
+            (-105.0, 40.0),
+            (-105.0, 39.5),
+        ]
+    )
 
     # NY-600: around NYC area
-    ny_600_poly = Polygon([
-        (-74.5, 40.5),
-        (-73.5, 40.5),
-        (-73.5, 41.0),
-        (-74.5, 41.0),
-        (-74.5, 40.5),
-    ])
+    ny_600_poly = Polygon(
+        [
+            (-74.5, 40.5),
+            (-73.5, 40.5),
+            (-73.5, 41.0),
+            (-74.5, 41.0),
+            (-74.5, 40.5),
+        ]
+    )
 
-    gdf = gpd.GeoDataFrame({
-        "coc_id": ["CO-500", "NY-600"],
-        "coc_name": ["Colorado Balance of State CoC", "New York City CoC"],
-        "boundary_vintage": ["2025", "2025"],
-        "source": ["hud_exchange", "hud_exchange"],
-        "source_ref": ["https://example.com", "https://example.com"],
-        "state_abbrev": ["CO", "NY"],
-        "ingested_at": [datetime.now(timezone.utc), datetime.now(timezone.utc)],
-        "geom_hash": ["abc123", "def456"],
-    }, geometry=[co_500_poly, ny_600_poly], crs="EPSG:4326")
+    gdf = gpd.GeoDataFrame(
+        {
+            "coc_id": ["CO-500", "NY-600"],
+            "coc_name": ["Colorado Balance of State CoC", "New York City CoC"],
+            "boundary_vintage": ["2025", "2025"],
+            "source": ["hud_exchange", "hud_exchange"],
+            "source_ref": ["https://example.com", "https://example.com"],
+            "state_abbrev": ["CO", "NY"],
+            "ingested_at": [datetime.now(UTC), datetime.now(UTC)],
+            "geom_hash": ["abc123", "def456"],
+        },
+        geometry=[co_500_poly, ny_600_poly],
+        crs="EPSG:4326",
+    )
 
     # Save as GeoParquet
     vintage = "2025"
-    parquet_path = temp_data_dir / "data" / "curated" / "coc_boundaries" / f"coc_boundaries__{vintage}.parquet"
+    parquet_path = (
+        temp_data_dir / "data" / "curated" / "coc_boundaries" / f"coc_boundaries__{vintage}.parquet"
+    )
     gdf.to_parquet(parquet_path)
 
     # Register the vintage

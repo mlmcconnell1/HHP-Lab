@@ -8,8 +8,7 @@ This module tests the complete workflow:
 These tests can run offline using fixture data.
 """
 
-from datetime import datetime, timezone
-from pathlib import Path
+from datetime import UTC, datetime
 
 import geopandas as gpd
 import pytest
@@ -58,66 +57,82 @@ def fixture_boundaries_gdf():
     downloading and normalizing real HUD data.
     """
     # CO-500: Colorado Balance of State CoC (simplified polygon)
-    co_500_poly = Polygon([
-        (-109.0, 37.0),
-        (-102.0, 37.0),
-        (-102.0, 41.0),
-        (-109.0, 41.0),
-        (-109.0, 37.0),
-    ])
+    co_500_poly = Polygon(
+        [
+            (-109.0, 37.0),
+            (-102.0, 37.0),
+            (-102.0, 41.0),
+            (-109.0, 41.0),
+            (-109.0, 37.0),
+        ]
+    )
 
     # NY-600: New York City CoC (multi-borough simplified)
-    ny_600_poly = MultiPolygon([
-        Polygon([
-            (-74.3, 40.5),
-            (-73.7, 40.5),
-            (-73.7, 40.9),
-            (-74.3, 40.9),
-            (-74.3, 40.5),
-        ]),
-        Polygon([
-            (-73.9, 40.8),
-            (-73.7, 40.8),
-            (-73.7, 41.0),
-            (-73.9, 41.0),
-            (-73.9, 40.8),
-        ]),
-    ])
+    ny_600_poly = MultiPolygon(
+        [
+            Polygon(
+                [
+                    (-74.3, 40.5),
+                    (-73.7, 40.5),
+                    (-73.7, 40.9),
+                    (-74.3, 40.9),
+                    (-74.3, 40.5),
+                ]
+            ),
+            Polygon(
+                [
+                    (-73.9, 40.8),
+                    (-73.7, 40.8),
+                    (-73.7, 41.0),
+                    (-73.9, 41.0),
+                    (-73.9, 40.8),
+                ]
+            ),
+        ]
+    )
 
     # CA-600: Los Angeles City & County CoC
-    ca_600_poly = Polygon([
-        (-118.7, 33.7),
-        (-117.6, 33.7),
-        (-117.6, 34.8),
-        (-118.7, 34.8),
-        (-118.7, 33.7),
-    ])
+    ca_600_poly = Polygon(
+        [
+            (-118.7, 33.7),
+            (-117.6, 33.7),
+            (-117.6, 34.8),
+            (-118.7, 34.8),
+            (-118.7, 33.7),
+        ]
+    )
 
     # TX-600: Arlington/Fort Worth CoC
-    tx_600_poly = Polygon([
-        (-97.5, 32.5),
-        (-97.0, 32.5),
-        (-97.0, 33.0),
-        (-97.5, 33.0),
-        (-97.5, 32.5),
-    ])
+    tx_600_poly = Polygon(
+        [
+            (-97.5, 32.5),
+            (-97.0, 32.5),
+            (-97.0, 33.0),
+            (-97.5, 33.0),
+            (-97.5, 32.5),
+        ]
+    )
 
-    ingested_at = datetime.now(timezone.utc)
+    ingested_at = datetime.now(UTC)
 
-    gdf = gpd.GeoDataFrame({
-        "coc_id": ["CO-500", "NY-600", "CA-600", "TX-600"],
-        "coc_name": [
-            "Colorado Balance of State CoC",
-            "New York City CoC",
-            "Los Angeles City & County CoC",
-            "Arlington/Fort Worth CoC",
-        ],
-        "state_abbrev": ["CO", "NY", "CA", "TX"],
-        "boundary_vintage": ["2025", "2025", "2025", "2025"],
-        "source": ["hud_exchange"] * 4,
-        "source_ref": ["https://www.hudexchange.info/gis-tools"] * 4,
-        "ingested_at": [ingested_at] * 4,
-    }, geometry=[co_500_poly, ny_600_poly, ca_600_poly, tx_600_poly], crs="EPSG:4326")
+    gdf = gpd.GeoDataFrame(
+        {
+            "coc_id": ["CO-500", "NY-600", "CA-600", "TX-600"],
+            "coc_name": [
+                "Colorado Balance of State CoC",
+                "New York City CoC",
+                "Los Angeles City & County CoC",
+                "Arlington/Fort Worth CoC",
+            ],
+            "state_abbrev": ["CO", "NY", "CA", "TX"],
+            "boundary_vintage": ["2025", "2025", "2025", "2025"],
+            "source": ["hud_exchange"] * 4,
+            "source_ref": ["https://www.hudexchange.info/gis-tools"] * 4,
+            "ingested_at": [ingested_at] * 4,
+        },
+        geometry=[co_500_poly, ny_600_poly, ca_600_poly, tx_600_poly],
+        crs="EPSG:4326",
+    )
 
     return gdf
 
@@ -125,9 +140,7 @@ def fixture_boundaries_gdf():
 class TestSmokeEndToEnd:
     """End-to-end smoke tests for the complete pipeline."""
 
-    def test_smoke_ingest_normalize_register_render(
-        self, smoke_test_env, fixture_boundaries_gdf
-    ):
+    def test_smoke_ingest_normalize_register_render(self, smoke_test_env, fixture_boundaries_gdf):
         """Test complete pipeline: ingest -> normalize -> register -> render."""
         # Step 1: Normalize boundaries (simulates what ingest does after download)
         normalized_gdf = normalize_boundaries(fixture_boundaries_gdf)
@@ -138,7 +151,13 @@ class TestSmokeEndToEnd:
 
         # Step 2: Save as GeoParquet (simulates end of ingest)
         vintage = "2025"
-        parquet_path = smoke_test_env / "data" / "curated" / "coc_boundaries" / f"coc_boundaries__{vintage}.parquet"
+        parquet_path = (
+            smoke_test_env
+            / "data"
+            / "curated"
+            / "coc_boundaries"
+            / f"coc_boundaries__{vintage}.parquet"
+        )
         normalized_gdf.to_parquet(parquet_path)
 
         assert parquet_path.exists()
@@ -176,14 +195,18 @@ class TestSmokeEndToEnd:
         assert "CO-500" in content
         assert "Colorado Balance of State CoC" in content
 
-    def test_smoke_multiple_cocs_can_be_rendered(
-        self, smoke_test_env, fixture_boundaries_gdf
-    ):
+    def test_smoke_multiple_cocs_can_be_rendered(self, smoke_test_env, fixture_boundaries_gdf):
         """Test that multiple CoCs can be rendered from the same vintage."""
         # Setup: normalize and save
         normalized_gdf = normalize_boundaries(fixture_boundaries_gdf)
         vintage = "2025"
-        parquet_path = smoke_test_env / "data" / "curated" / "coc_boundaries" / f"coc_boundaries__{vintage}.parquet"
+        parquet_path = (
+            smoke_test_env
+            / "data"
+            / "curated"
+            / "coc_boundaries"
+            / f"coc_boundaries__{vintage}.parquet"
+        )
         normalized_gdf.to_parquet(parquet_path)
 
         # Register
@@ -224,7 +247,13 @@ class TestSmokeCLI:
         # Setup
         normalized_gdf = normalize_boundaries(fixture_boundaries_gdf)
         vintage = "2025"
-        parquet_path = smoke_test_env / "data" / "curated" / "coc_boundaries" / f"coc_boundaries__{vintage}.parquet"
+        parquet_path = (
+            smoke_test_env
+            / "data"
+            / "curated"
+            / "coc_boundaries"
+            / f"coc_boundaries__{vintage}.parquet"
+        )
         normalized_gdf.to_parquet(parquet_path)
 
         registry_path = smoke_test_env / "data" / "curated" / "boundary_registry.parquet"
@@ -247,7 +276,13 @@ class TestSmokeCLI:
         # Setup
         normalized_gdf = normalize_boundaries(fixture_boundaries_gdf)
         vintage = "2025"
-        parquet_path = smoke_test_env / "data" / "curated" / "coc_boundaries" / f"coc_boundaries__{vintage}.parquet"
+        parquet_path = (
+            smoke_test_env
+            / "data"
+            / "curated"
+            / "coc_boundaries"
+            / f"coc_boundaries__{vintage}.parquet"
+        )
         normalized_gdf.to_parquet(parquet_path)
 
         registry_path = smoke_test_env / "data" / "curated" / "boundary_registry.parquet"
@@ -270,7 +305,13 @@ class TestSmokeCLI:
         # Setup
         normalized_gdf = normalize_boundaries(fixture_boundaries_gdf)
         vintage = "2025"
-        parquet_path = smoke_test_env / "data" / "curated" / "coc_boundaries" / f"coc_boundaries__{vintage}.parquet"
+        parquet_path = (
+            smoke_test_env
+            / "data"
+            / "curated"
+            / "coc_boundaries"
+            / f"coc_boundaries__{vintage}.parquet"
+        )
         normalized_gdf.to_parquet(parquet_path)
 
         registry_path = smoke_test_env / "data" / "curated" / "boundary_registry.parquet"
@@ -310,9 +351,7 @@ class TestSmokeDataIntegrity:
             hash2 = gdf2.loc[gdf2["coc_id"] == coc_id, "geom_hash"].iloc[0]
             assert hash1 == hash2, f"Hash mismatch for {coc_id}"
 
-    def test_roundtrip_parquet_preserves_data(
-        self, smoke_test_env, fixture_boundaries_gdf
-    ):
+    def test_roundtrip_parquet_preserves_data(self, smoke_test_env, fixture_boundaries_gdf):
         """Test that data survives GeoParquet round-trip."""
         # Normalize and save
         original_gdf = normalize_boundaries(fixture_boundaries_gdf)
@@ -331,17 +370,11 @@ class TestSmokeDataIntegrity:
 
         # Verify geometries preserved
         for coc_id in original_gdf["coc_id"]:
-            orig_geom = original_gdf.loc[
-                original_gdf["coc_id"] == coc_id, "geometry"
-            ].iloc[0]
-            loaded_geom = loaded_gdf.loc[
-                loaded_gdf["coc_id"] == coc_id, "geometry"
-            ].iloc[0]
+            orig_geom = original_gdf.loc[original_gdf["coc_id"] == coc_id, "geometry"].iloc[0]
+            loaded_geom = loaded_gdf.loc[loaded_gdf["coc_id"] == coc_id, "geometry"].iloc[0]
             assert orig_geom.equals(loaded_geom), f"Geometry mismatch for {coc_id}"
 
-    def test_crs_preserved_through_pipeline(
-        self, smoke_test_env, fixture_boundaries_gdf
-    ):
+    def test_crs_preserved_through_pipeline(self, smoke_test_env, fixture_boundaries_gdf):
         """Test that CRS (EPSG:4326) is preserved through the pipeline."""
         # Normalize
         normalized_gdf = normalize_boundaries(fixture_boundaries_gdf)
@@ -370,7 +403,13 @@ class TestSmokeEdgeCases:
         # Setup with vintage 2025
         normalized_gdf = normalize_boundaries(fixture_boundaries_gdf)
         vintage = "2025"
-        parquet_path = smoke_test_env / "data" / "curated" / "coc_boundaries" / f"coc_boundaries__{vintage}.parquet"
+        parquet_path = (
+            smoke_test_env
+            / "data"
+            / "curated"
+            / "coc_boundaries"
+            / f"coc_boundaries__{vintage}.parquet"
+        )
         normalized_gdf.to_parquet(parquet_path)
 
         registry_path = smoke_test_env / "data" / "curated" / "boundary_registry.parquet"

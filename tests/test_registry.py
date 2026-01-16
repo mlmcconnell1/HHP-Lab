@@ -1,6 +1,6 @@
 """Tests for the boundary registry module."""
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
@@ -29,7 +29,7 @@ class TestRegistryEntry:
         entry = RegistryEntry(
             boundary_vintage="2025",
             source="hud_exchange",
-            ingested_at=datetime(2025, 1, 1, 12, 0, 0, tzinfo=timezone.utc),
+            ingested_at=datetime(2025, 1, 1, 12, 0, 0, tzinfo=UTC),
             path=Path("data/curated/coc_boundaries/coc_boundaries__2025.parquet"),
             feature_count=400,
             hash_of_file="abc123",
@@ -54,7 +54,7 @@ class TestRegistryEntry:
         entry = RegistryEntry.from_dict(d)
         assert entry.boundary_vintage == "2024"
         assert entry.source == "hud_opendata"
-        assert entry.ingested_at == datetime(2024, 6, 15, 10, 30, 0, tzinfo=timezone.utc)
+        assert entry.ingested_at == datetime(2024, 6, 15, 10, 30, 0, tzinfo=UTC)
         assert entry.path == Path("data/curated/coc_boundaries/coc_boundaries__2024.parquet")
         assert entry.feature_count == 395
         assert entry.hash_of_file == "def456"
@@ -98,8 +98,8 @@ class TestRegisterVintage:
         assert vintages == {"2024", "2025"}
 
     def test_idempotent_same_hash(self, temp_registry, sample_parquet):
-        ingested_at = datetime(2025, 1, 1, 12, 0, 0, tzinfo=timezone.utc)
-        entry1 = register_vintage(
+        ingested_at = datetime(2025, 1, 1, 12, 0, 0, tzinfo=UTC)
+        register_vintage(
             boundary_vintage="2025",
             source="hud_exchange",
             path=sample_parquet,
@@ -108,12 +108,12 @@ class TestRegisterVintage:
             registry_path=temp_registry,
         )
         # Register again with same content
-        entry2 = register_vintage(
+        register_vintage(
             boundary_vintage="2025",
             source="hud_exchange",
             path=sample_parquet,
             feature_count=400,
-            ingested_at=datetime(2025, 2, 1, 12, 0, 0, tzinfo=timezone.utc),
+            ingested_at=datetime(2025, 2, 1, 12, 0, 0, tzinfo=UTC),
             registry_path=temp_registry,
         )
         entries = list_boundaries(registry_path=temp_registry)
@@ -166,7 +166,7 @@ class TestListVintages:
             source="hud_exchange",
             path=sample_parquet,
             feature_count=380,
-            ingested_at=datetime(2023, 6, 1, tzinfo=timezone.utc),
+            ingested_at=datetime(2023, 6, 1, tzinfo=UTC),
             registry_path=temp_registry,
         )
         register_vintage(
@@ -174,7 +174,7 @@ class TestListVintages:
             source="hud_exchange",
             path=sample_parquet,
             feature_count=400,
-            ingested_at=datetime(2025, 1, 1, tzinfo=timezone.utc),
+            ingested_at=datetime(2025, 1, 1, tzinfo=UTC),
             registry_path=temp_registry,
         )
         register_vintage(
@@ -182,7 +182,7 @@ class TestListVintages:
             source="hud_exchange",
             path=sample_parquet,
             feature_count=390,
-            ingested_at=datetime(2024, 6, 1, tzinfo=timezone.utc),
+            ingested_at=datetime(2024, 6, 1, tzinfo=UTC),
             registry_path=temp_registry,
         )
         entries = list_boundaries(registry_path=temp_registry)
@@ -203,7 +203,7 @@ class TestLatestVintage:
             source="hud_exchange",
             path=sample_parquet,
             feature_count=380,
-            ingested_at=datetime(2025, 6, 1, tzinfo=timezone.utc),
+            ingested_at=datetime(2025, 6, 1, tzinfo=UTC),
             registry_path=temp_registry,
         )
         register_vintage(
@@ -211,7 +211,7 @@ class TestLatestVintage:
             source="hud_exchange",
             path=sample_parquet,
             feature_count=400,
-            ingested_at=datetime(2025, 1, 1, tzinfo=timezone.utc),
+            ingested_at=datetime(2025, 1, 1, tzinfo=UTC),
             registry_path=temp_registry,
         )
         result = latest_vintage(
@@ -226,7 +226,7 @@ class TestLatestVintage:
             source="hud_opendata",
             path=sample_parquet,
             feature_count=390,
-            ingested_at=datetime(2024, 1, 15, tzinfo=timezone.utc),
+            ingested_at=datetime(2024, 1, 15, tzinfo=UTC),
             registry_path=temp_registry,
         )
         register_vintage(
@@ -234,7 +234,7 @@ class TestLatestVintage:
             source="hud_opendata",
             path=sample_parquet,
             feature_count=395,
-            ingested_at=datetime(2024, 6, 1, tzinfo=timezone.utc),
+            ingested_at=datetime(2024, 6, 1, tzinfo=UTC),
             registry_path=temp_registry,
         )
         result = latest_vintage(
@@ -249,7 +249,7 @@ class TestLatestVintage:
             source="hud_opendata",
             path=sample_parquet,
             feature_count=400,
-            ingested_at=datetime(2025, 6, 1, tzinfo=timezone.utc),
+            ingested_at=datetime(2025, 6, 1, tzinfo=UTC),
             registry_path=temp_registry,
         )
         register_vintage(
@@ -257,7 +257,7 @@ class TestLatestVintage:
             source="hud_exchange",
             path=sample_parquet,
             feature_count=390,
-            ingested_at=datetime(2024, 1, 1, tzinfo=timezone.utc),
+            ingested_at=datetime(2024, 1, 1, tzinfo=UTC),
             registry_path=temp_registry,
         )
         register_vintage(
@@ -265,7 +265,7 @@ class TestLatestVintage:
             source="hud_exchange",
             path=sample_parquet,
             feature_count=400,
-            ingested_at=datetime(2025, 1, 1, tzinfo=timezone.utc),
+            ingested_at=datetime(2025, 1, 1, tzinfo=UTC),
             registry_path=temp_registry,
         )
         result = latest_vintage(registry_path=temp_registry)
@@ -278,7 +278,7 @@ class TestLatestVintage:
             source="hud_exchange",
             path=sample_parquet,
             feature_count=390,
-            ingested_at=datetime(2024, 1, 1, tzinfo=timezone.utc),
+            ingested_at=datetime(2024, 1, 1, tzinfo=UTC),
             registry_path=temp_registry,
         )
         register_vintage(
@@ -286,7 +286,7 @@ class TestLatestVintage:
             source="hud_exchange",
             path=sample_parquet,
             feature_count=400,
-            ingested_at=datetime(2025, 6, 1, tzinfo=timezone.utc),
+            ingested_at=datetime(2025, 6, 1, tzinfo=UTC),
             registry_path=temp_registry,
         )
         result = latest_vintage(

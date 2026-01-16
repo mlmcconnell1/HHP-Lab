@@ -143,10 +143,12 @@ class TestValidateMonthyContinuity:
 
     def test_no_warnings_for_continuous_series(self, caplog):
         """Test that no warnings are logged for continuous monthly data."""
-        df = pd.DataFrame({
-            "geo_id": ["08001"] * 3,
-            "date": pd.to_datetime(["2023-01-01", "2023-02-01", "2023-03-01"]),
-        })
+        df = pd.DataFrame(
+            {
+                "geo_id": ["08001"] * 3,
+                "date": pd.to_datetime(["2023-01-01", "2023-02-01", "2023-03-01"]),
+            }
+        )
 
         with caplog.at_level("WARNING"):
             _validate_monthly_continuity(df)
@@ -156,10 +158,12 @@ class TestValidateMonthyContinuity:
 
     def test_warns_on_gaps(self, caplog):
         """Test that gaps in monthly series trigger warnings."""
-        df = pd.DataFrame({
-            "geo_id": ["08001"] * 3,
-            "date": pd.to_datetime(["2023-01-01", "2023-03-01", "2023-04-01"]),  # Feb missing
-        })
+        df = pd.DataFrame(
+            {
+                "geo_id": ["08001"] * 3,
+                "date": pd.to_datetime(["2023-01-01", "2023-03-01", "2023-04-01"]),  # Feb missing
+            }
+        )
 
         with caplog.at_level("WARNING"):
             _validate_monthly_continuity(df)
@@ -170,10 +174,12 @@ class TestValidateMonthyContinuity:
 
     def test_handles_year_boundary(self, caplog):
         """Test that year boundaries are handled correctly."""
-        df = pd.DataFrame({
-            "geo_id": ["08001"] * 2,
-            "date": pd.to_datetime(["2022-12-01", "2023-01-01"]),
-        })
+        df = pd.DataFrame(
+            {
+                "geo_id": ["08001"] * 2,
+                "date": pd.to_datetime(["2022-12-01", "2023-01-01"]),
+            }
+        )
 
         with caplog.at_level("WARNING"):
             _validate_monthly_continuity(df)
@@ -185,10 +191,12 @@ class TestValidateMonthyContinuity:
         """Test that excessive warnings are truncated."""
         # Create data with many gaps
         dates = pd.date_range("2020-01", "2023-01", freq="2ME")  # Every other month
-        df = pd.DataFrame({
-            "geo_id": ["08001"] * len(dates),
-            "date": dates,
-        })
+        df = pd.DataFrame(
+            {
+                "geo_id": ["08001"] * len(dates),
+                "date": dates,
+            }
+        )
 
         with caplog.at_level("WARNING"):
             _validate_monthly_continuity(df, max_warnings=5)
@@ -306,8 +314,17 @@ class TestIngestZori:
 
         # Check schema
         required_cols = [
-            "geo_type", "geo_id", "date", "zori", "region_name", "state",
-            "data_source", "metric", "ingested_at", "source_ref", "raw_sha256",
+            "geo_type",
+            "geo_id",
+            "date",
+            "zori",
+            "region_name",
+            "state",
+            "data_source",
+            "metric",
+            "ingested_at",
+            "source_ref",
+            "raw_sha256",
         ]
         for col in required_cols:
             assert col in df.columns, f"Missing required column: {col}"
@@ -385,19 +402,21 @@ class TestIngestZori:
 
         # Create a cached output file
         cached_path = output_dir / "zori__county.parquet"
-        df = pd.DataFrame({
-            "geo_type": ["county"],
-            "geo_id": ["08001"],
-            "date": [pd.Timestamp("2023-01-01")],
-            "zori": [1500.0],
-            "region_name": ["Adams County"],
-            "state": ["Colorado"],
-            "data_source": ["cached"],
-            "metric": ["ZORI"],
-            "ingested_at": [datetime.now(UTC)],
-            "source_ref": ["cached"],
-            "raw_sha256": ["cached"],
-        })
+        df = pd.DataFrame(
+            {
+                "geo_type": ["county"],
+                "geo_id": ["08001"],
+                "date": [pd.Timestamp("2023-01-01")],
+                "zori": [1500.0],
+                "region_name": ["Adams County"],
+                "state": ["Colorado"],
+                "data_source": ["cached"],
+                "metric": ["ZORI"],
+                "ingested_at": [datetime.now(UTC)],
+                "source_ref": ["cached"],
+                "raw_sha256": ["cached"],
+            }
+        )
         df.to_parquet(cached_path)
 
         # Call ingest without force - should use cache
@@ -419,19 +438,21 @@ class TestIngestZori:
 
         # Create a cached output file
         cached_path = output_dir / "zori__county.parquet"
-        df = pd.DataFrame({
-            "geo_type": ["county"],
-            "geo_id": ["08001"],
-            "date": [pd.Timestamp("2023-01-01")],
-            "zori": [1.0],  # Different value
-            "region_name": ["Old"],
-            "state": ["Old"],
-            "data_source": ["cached"],
-            "metric": ["ZORI"],
-            "ingested_at": [datetime.now(UTC)],
-            "source_ref": ["cached"],
-            "raw_sha256": ["cached"],
-        })
+        df = pd.DataFrame(
+            {
+                "geo_type": ["county"],
+                "geo_id": ["08001"],
+                "date": [pd.Timestamp("2023-01-01")],
+                "zori": [1.0],  # Different value
+                "region_name": ["Old"],
+                "state": ["Old"],
+                "data_source": ["cached"],
+                "metric": ["ZORI"],
+                "ingested_at": [datetime.now(UTC)],
+                "source_ref": ["cached"],
+                "raw_sha256": ["cached"],
+            }
+        )
         df.to_parquet(cached_path)
 
         httpx_mock.add_response(

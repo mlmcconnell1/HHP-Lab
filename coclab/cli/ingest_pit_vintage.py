@@ -75,7 +75,7 @@ def ingest_pit_vintage(
         source_url = get_pit_source_url(vintage)
     except ValueError as e:
         typer.echo(f"Error: {e}", err=True)
-        raise typer.Exit(1)
+        raise typer.Exit(1) from e
     expected_filename = source_url.split("/")[-1]
     raw_file = raw_dir / expected_filename
 
@@ -102,9 +102,7 @@ def ingest_pit_vintage(
             source_ref=source_url,
         )
         df = parse_result.df
-        typer.echo(
-            f"Parsed {len(df)} total records across {len(parse_result.years_parsed)} years"
-        )
+        typer.echo(f"Parsed {len(df)} total records across {len(parse_result.years_parsed)} years")
         typer.echo(f"  Years: {parse_result.years_parsed[0]}-{parse_result.years_parsed[-1]}")
     except Exception as e:
         typer.echo(f"Error parsing PIT vintage file: {e}", err=True)

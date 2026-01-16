@@ -359,10 +359,12 @@ def aggregate_monthly(
     logger.info(f"Aggregating {len(all_dates)} months for {len(all_cocs)} CoCs")
 
     # Create full CoC x date grid
-    coc_date_grid = pd.DataFrame({
-        "coc_id": list(all_cocs) * len(all_dates),
-        "date": [d for d in all_dates for _ in range(len(all_cocs))],
-    })
+    coc_date_grid = pd.DataFrame(
+        {
+            "coc_id": list(all_cocs) * len(all_dates),
+            "date": [d for d in all_dates for _ in range(len(all_cocs))],
+        }
+    )
     # Sort for consistent ordering
     coc_date_grid = coc_date_grid.sort_values(["coc_id", "date"]).reset_index(drop=True)
 
@@ -400,14 +402,16 @@ def aggregate_monthly(
         if coverage_ratio < min_coverage:
             zori_coc = None
 
-        results.append({
-            "coc_id": coc_id,
-            "date": date_val,
-            "zori_coc": zori_coc,
-            "coverage_ratio": coverage_ratio,
-            "max_geo_contribution": max_contribution,
-            "geo_count": geo_count,
-        })
+        results.append(
+            {
+                "coc_id": coc_id,
+                "date": date_val,
+                "zori_coc": zori_coc,
+                "coverage_ratio": coverage_ratio,
+                "max_geo_contribution": max_contribution,
+                "geo_count": geo_count,
+            }
+        )
 
     result_df = pd.DataFrame(results)
 
@@ -430,7 +434,7 @@ def aggregate_monthly(
     total_count = len(full_result)
     logger.info(
         f"Aggregation complete: {valid_count}/{total_count} CoC-months "
-        f"({100*valid_count/total_count:.1f}%) have valid ZORI "
+        f"({100 * valid_count / total_count:.1f}%) have valid ZORI "
         f"(coverage >= {min_coverage})"
     )
 
@@ -471,9 +475,11 @@ def collapse_to_yearly(
     if method == "pit_january":
         # Filter to January only
         january = df[df["date"].dt.month == 1].copy()
-        result = january.drop(columns=["date"]).rename(columns={
-            "zori_coc": "zori_coc",
-        })
+        result = january.drop(columns=["date"]).rename(
+            columns={
+                "zori_coc": "zori_coc",
+            }
+        )
 
     elif method == "calendar_mean":
         # Group by CoC and year, compute mean
@@ -595,7 +601,8 @@ def get_coc_zori_yearly_path(
         c2023__acs2019-2023__wrenter_households__mpit_january.parquet'
 
     Note:
-        New format uses temporal shorthand: zori_yearly__A2023@B2025xC2023__wrenter__mpit_january.parquet
+        New format uses temporal shorthand:
+        zori_yearly__A2023@B2025xC2023__wrenter__mpit_january.parquet
     """
     from coclab.naming import zori_yearly_filename as _zori_yearly_filename
 
@@ -684,8 +691,7 @@ def aggregate_zori_to_coc(
     # Validate geography
     if geography != "county":
         raise ValueError(
-            f"Unsupported geography: {geography}. "
-            f"Only 'county' is currently supported."
+            f"Unsupported geography: {geography}. Only 'county' is currently supported."
         )
 
     # Determine output paths

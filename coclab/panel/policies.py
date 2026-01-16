@@ -39,8 +39,9 @@ Usage
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Callable, Literal
+from typing import Literal
 
 
 def default_boundary_vintage(pit_year: int) -> str:
@@ -190,8 +191,7 @@ def _resolve_func(name: str) -> Callable[[int], str]:
         return known_funcs[simple_name]
 
     raise ValueError(
-        f"Unknown function name: {name!r}. "
-        f"Known functions: {list(known_funcs.keys())}"
+        f"Unknown function name: {name!r}. Known functions: {list(known_funcs.keys())}"
     )
 
 

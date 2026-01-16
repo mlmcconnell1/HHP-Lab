@@ -120,9 +120,7 @@ class TestBuildXwalksCommand:
             )
             mock_summarize.return_value = "DIAGNOSTICS SUMMARY"
 
-            result = runner.invoke(
-                app, ["build-xwalks", "--boundary", "2025", "--tracts", "2023"]
-            )
+            result = runner.invoke(app, ["build-xwalks", "--boundary", "2025", "--tracts", "2023"])
 
         assert result.exit_code == 0
         assert "Saved tract crosswalk" in result.output
@@ -138,9 +136,7 @@ class TestDiagnosticsCommand:
         """Should fail if crosswalk file is missing."""
         crosswalk_path = tmp_path / "missing.parquet"
 
-        result = runner.invoke(
-            app, ["xwalk-diagnostics", "--crosswalk", str(crosswalk_path)]
-        )
+        result = runner.invoke(app, ["xwalk-diagnostics", "--crosswalk", str(crosswalk_path)])
 
         assert result.exit_code == 1
         assert "Crosswalk file not found" in result.output
@@ -198,9 +194,7 @@ class TestBuildMeasuresCommand:
 
     def test_build_measures_invalid_weighting(self):
         """Invalid weighting should fail."""
-        result = runner.invoke(
-            app, ["build-measures", "--weighting", "invalid"]
-        )
+        result = runner.invoke(app, ["build-measures", "--weighting", "invalid"])
 
         assert result.exit_code == 1
         assert "Invalid weighting method" in result.output
@@ -216,8 +210,10 @@ class TestBuildMeasuresCommand:
             app,
             [
                 "build-measures",
-                "--acs", "2019-2023",
-                "--xwalk-dir", str(xwalk_dir),
+                "--acs",
+                "2019-2023",
+                "--xwalk-dir",
+                str(xwalk_dir),
             ],
         )
 
@@ -239,16 +235,16 @@ class TestBuildMeasuresCommand:
         xwalk_path = xwalk_dir / "coc_tract_xwalk__2025__2023.parquet"
         xwalk_path.touch()
 
-        mock_build.return_value = pd.DataFrame(
-            {"coc_id": ["CO-500"], "total_population": [1000]}
-        )
+        mock_build.return_value = pd.DataFrame({"coc_id": ["CO-500"], "total_population": [1000]})
 
         result = runner.invoke(
             app,
             [
                 "build-measures",
-                "--acs", "2019-2023",
-                "--xwalk-dir", str(xwalk_dir),
+                "--acs",
+                "2019-2023",
+                "--xwalk-dir",
+                str(xwalk_dir),
             ],
         )
 

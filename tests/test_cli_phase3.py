@@ -4,7 +4,6 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pandas as pd
-import pytest
 from typer.testing import CliRunner
 
 from coclab.cli.main import app
@@ -62,11 +61,13 @@ class TestIngestPitCommand:
         # Mock parsed result (PITParseResult with df attribute)
         from coclab.pit.ingest import PITParseResult
 
-        mock_df = pd.DataFrame({
-            "coc_id": ["CO-500", "CA-600"],
-            "pit_year": [2024, 2024],
-            "pit_total": [100, 200],
-        })
+        mock_df = pd.DataFrame(
+            {
+                "coc_id": ["CO-500", "CA-600"],
+                "pit_year": [2024, 2024],
+                "pit_total": [100, 200],
+            }
+        )
         mock_parse.return_value = PITParseResult(
             df=mock_df,
             cross_state_mappings={},
@@ -161,9 +162,7 @@ class TestBuildPanelCommand:
 
     def test_build_panel_invalid_year_range(self):
         """Should fail if start > end."""
-        result = runner.invoke(
-            app, ["build-panel", "--start", "2024", "--end", "2020"]
-        )
+        result = runner.invoke(app, ["build-panel", "--start", "2024", "--end", "2020"])
 
         assert result.exit_code == 1
         assert "Start year" in result.output
@@ -173,19 +172,19 @@ class TestBuildPanelCommand:
     def test_build_panel_success(self, mock_save, mock_build):
         """Panel build should succeed."""
         # Mock panel DataFrame
-        mock_df = pd.DataFrame({
-            "coc_id": ["CO-500", "CO-500", "CA-600", "CA-600"],
-            "year": [2020, 2021, 2020, 2021],
-            "pit_total": [100, 110, 200, 210],
-            "coverage_ratio": [0.95, 0.92, 0.88, 0.90],
-            "boundary_changed": [False, True, False, False],
-        })
+        mock_df = pd.DataFrame(
+            {
+                "coc_id": ["CO-500", "CO-500", "CA-600", "CA-600"],
+                "year": [2020, 2021, 2020, 2021],
+                "pit_total": [100, 110, 200, 210],
+                "coverage_ratio": [0.95, 0.92, 0.88, 0.90],
+                "boundary_changed": [False, True, False, False],
+            }
+        )
         mock_build.return_value = mock_df
         mock_save.return_value = Path("data/curated/panel/coc_panel__2020_2021.parquet")
 
-        result = runner.invoke(
-            app, ["build-panel", "--start", "2020", "--end", "2021"]
-        )
+        result = runner.invoke(app, ["build-panel", "--start", "2020", "--end", "2021"])
 
         assert result.exit_code == 0
         assert "Building panel for 2020-2021" in result.output
@@ -197,9 +196,7 @@ class TestBuildPanelCommand:
         """Should warn if panel is empty."""
         mock_build.return_value = pd.DataFrame()
 
-        result = runner.invoke(
-            app, ["build-panel", "--start", "2020", "--end", "2021"]
-        )
+        result = runner.invoke(app, ["build-panel", "--start", "2020", "--end", "2021"])
 
         assert result.exit_code == 1
         assert "Panel is empty" in result.output
@@ -208,13 +205,15 @@ class TestBuildPanelCommand:
     @patch("coclab.provenance.write_parquet_with_provenance")
     def test_build_panel_custom_output(self, mock_write, mock_build, tmp_path):
         """Panel build with custom output path."""
-        mock_df = pd.DataFrame({
-            "coc_id": ["CO-500"],
-            "year": [2020],
-            "pit_total": [100],
-            "coverage_ratio": [0.95],
-            "boundary_changed": [False],
-        })
+        mock_df = pd.DataFrame(
+            {
+                "coc_id": ["CO-500"],
+                "year": [2020],
+                "pit_total": [100],
+                "coverage_ratio": [0.95],
+                "boundary_changed": [False],
+            }
+        )
         mock_build.return_value = mock_df
 
         output_file = tmp_path / "custom_panel.parquet"
@@ -223,9 +222,12 @@ class TestBuildPanelCommand:
             app,
             [
                 "build-panel",
-                "--start", "2020",
-                "--end", "2020",
-                "--output", str(output_file),
+                "--start",
+                "2020",
+                "--end",
+                "2020",
+                "--output",
+                str(output_file),
             ],
         )
 
@@ -292,20 +294,24 @@ class TestPanelDiagnosticsCommand:
         panel_file.touch()
 
         # Mock loaded DataFrame
-        mock_df = pd.DataFrame({
-            "coc_id": ["CO-500", "CA-600"],
-            "year": [2020, 2020],
-            "pit_total": [100, 200],
-        })
+        mock_df = pd.DataFrame(
+            {
+                "coc_id": ["CO-500", "CA-600"],
+                "year": [2020, 2020],
+                "pit_total": [100, 200],
+            }
+        )
         mock_read.return_value = mock_df
 
         # Mock diagnostics report
         mock_report = DiagnosticsReport(
-            coverage=pd.DataFrame({
-                "year": [2020],
-                "mean": [0.95],
-                "low_coverage_count": [0],
-            }),
+            coverage=pd.DataFrame(
+                {
+                    "year": [2020],
+                    "mean": [0.95],
+                    "low_coverage_count": [0],
+                }
+            ),
             boundary_changes=pd.DataFrame(),
             missingness=pd.DataFrame(),
             panel_info={"row_count": 2, "coc_count": 2, "year_count": 1},
@@ -337,11 +343,13 @@ class TestPanelDiagnosticsCommand:
         panel_file.touch()
 
         # Mock loaded DataFrame
-        mock_df = pd.DataFrame({
-            "coc_id": ["CO-500"],
-            "year": [2020],
-            "pit_total": [100],
-        })
+        mock_df = pd.DataFrame(
+            {
+                "coc_id": ["CO-500"],
+                "year": [2020],
+                "pit_total": [100],
+            }
+        )
         mock_read.return_value = mock_df
 
         # Mock diagnostics report with to_csv returning paths
@@ -359,9 +367,12 @@ class TestPanelDiagnosticsCommand:
             app,
             [
                 "panel-diagnostics",
-                "--panel", str(panel_file),
-                "--format", "csv",
-                "--output-dir", str(output_dir),
+                "--panel",
+                str(panel_file),
+                "--format",
+                "csv",
+                "--output-dir",
+                str(output_dir),
             ],
         )
 

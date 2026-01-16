@@ -12,7 +12,6 @@ Comprehensive tests covering:
 from __future__ import annotations
 
 import json
-import os
 from pathlib import Path
 
 import pyarrow as pa
@@ -35,7 +34,6 @@ from coclab.export.validate import (
     validate_panel_schema,
     validate_selection_plan,
 )
-
 
 # ============================================================================
 # Test Fixtures
@@ -187,9 +185,7 @@ class TestCopyModes:
         assert result.bytes is not None
         assert result.bytes > 0
 
-    def test_hardlink_mode_creates_hardlink(
-        self, tmp_path: Path, sample_artifact: ArtifactRecord
-    ):
+    def test_hardlink_mode_creates_hardlink(self, tmp_path: Path, sample_artifact: ArtifactRecord):
         """Test that hardlink mode creates a hardlink."""
         bundle_root = tmp_path / "bundle"
         bundle_root.mkdir()
@@ -209,9 +205,7 @@ class TestCopyModes:
         # Verify link count increased
         assert dest_stat.st_nlink >= 2
 
-    def test_symlink_mode_creates_symlink(
-        self, tmp_path: Path, sample_artifact: ArtifactRecord
-    ):
+    def test_symlink_mode_creates_symlink(self, tmp_path: Path, sample_artifact: ArtifactRecord):
         """Test that symlink mode creates a symbolic link."""
         bundle_root = tmp_path / "bundle"
         bundle_root.mkdir()
@@ -226,9 +220,7 @@ class TestCopyModes:
         # Verify symlink resolves to original file
         assert dest_path.resolve() == sample_artifact.source_path.resolve()
 
-    def test_invalid_copy_mode_raises(
-        self, tmp_path: Path, sample_artifact: ArtifactRecord
-    ):
+    def test_invalid_copy_mode_raises(self, tmp_path: Path, sample_artifact: ArtifactRecord):
         """Test that invalid copy mode raises ValueError."""
         bundle_root = tmp_path / "bundle"
         bundle_root.mkdir()
@@ -240,9 +232,7 @@ class TestCopyModes:
 class TestCopyArtifacts:
     """Tests for copy_artifacts function."""
 
-    def test_copies_all_artifacts(
-        self, tmp_path: Path, sample_selection_plan: SelectionPlan
-    ):
+    def test_copies_all_artifacts(self, tmp_path: Path, sample_selection_plan: SelectionPlan):
         """Test that all artifacts are copied."""
         bundle_root = tmp_path / "bundle"
         bundle_root.mkdir()
@@ -298,9 +288,7 @@ class TestComputeSha256:
 
         result = compute_sha256(test_file)
 
-        # Known SHA-256 hash of "hello world\n"
-        expected_hash = "a948904f2f0f479b8f8564cbf12dac6b0c4e16b59a7a59b9e6c8c33b0e6b8e0f"
-        # Actually compute the expected hash
+        # Compute the expected hash
         import hashlib
 
         expected = hashlib.sha256(test_content).hexdigest()
@@ -578,10 +566,12 @@ class TestValidatePanelSchema:
         panel_path = tmp_path / "panel.parquet"
 
         # Create panel without coc_id column
-        table = pa.table({
-            "year": [2024, 2024],
-            "pit_total": [100, 200],
-        })
+        table = pa.table(
+            {
+                "year": [2024, 2024],
+                "pit_total": [100, 200],
+            }
+        )
         pq.write_table(table, panel_path)
 
         with pytest.raises(ExportValidationError, match="missing expected columns"):
@@ -591,10 +581,12 @@ class TestValidatePanelSchema:
         """Test can specify custom expected columns."""
         panel_path = tmp_path / "panel.parquet"
 
-        table = pa.table({
-            "custom_id": ["A", "B"],
-            "value": [1, 2],
-        })
+        table = pa.table(
+            {
+                "custom_id": ["A", "B"],
+                "value": [1, 2],
+            }
+        )
         pq.write_table(table, panel_path)
 
         # Should not raise with custom columns
@@ -659,9 +651,7 @@ class TestValidateSelectionPlan:
         assert len(errors) > 0
         assert any("does not exist" in e for e in errors)
 
-    def test_passes_for_valid_plan(
-        self, tmp_path: Path, sample_selection_plan: SelectionPlan
-    ):
+    def test_passes_for_valid_plan(self, tmp_path: Path, sample_selection_plan: SelectionPlan):
         """Test passes for valid selection plan."""
         errors = validate_selection_plan(sample_selection_plan)
 
@@ -756,9 +746,7 @@ class TestIntegration:
         assert artifact["bytes"] is not None
         assert artifact["rows"] == 3
 
-    def test_manifest_hashes_match_actual_files(
-        self, curated_structure: Path, tmp_path: Path
-    ):
+    def test_manifest_hashes_match_actual_files(self, curated_structure: Path, tmp_path: Path):
         """Test that manifest hashes match actual file content."""
         config = BundleConfig(
             name="hash_test",
@@ -788,9 +776,7 @@ class TestIntegration:
 
             assert verify_file_hash(artifact_path, expected_hash)
 
-    def test_second_export_gets_next_number(
-        self, curated_structure: Path, tmp_path: Path
-    ):
+    def test_second_export_gets_next_number(self, curated_structure: Path, tmp_path: Path):
         """Test that subsequent exports get incrementing numbers."""
         exports_dir = tmp_path / "exports"
 
@@ -856,7 +842,5 @@ class TestBundleWithZori:
 
         # Check for Zillow attribution
         assert len(manifest["sources"]) > 0
-        zillow_sources = [
-            s for s in manifest["sources"] if "Zillow" in s.get("name", "")
-        ]
+        zillow_sources = [s for s in manifest["sources"] if "Zillow" in s.get("name", "")]
         assert len(zillow_sources) == 1

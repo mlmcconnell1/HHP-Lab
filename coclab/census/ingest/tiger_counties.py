@@ -1,9 +1,10 @@
 """TIGER/Line county geometry ingestion."""
+
 import hashlib
 import logging
 import tempfile
 import zipfile
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 import geopandas as gpd
@@ -58,10 +59,12 @@ def download_tiger_counties(year: int = 2023) -> tuple[gpd.GeoDataFrame, str, in
 
         if changed:
             logger.warning(
-                f"UPSTREAM DATA CHANGED: TIGER county data for {year} has changed since last download! "
-                f"Previous hash: {details['previous_sha256'][:16]}... "
-                f"Current hash: {content_sha256[:16]}... "
-                f"Last ingested: {details['previous_ingested_at']}"
+                "UPSTREAM DATA CHANGED: TIGER county data for %s has changed since last download! "
+                "Previous hash: %s... Current hash: %s... Last ingested: %s",
+                year,
+                details["previous_sha256"][:16],
+                content_sha256[:16],
+                details["previous_ingested_at"],
             )
         elif details.get("is_new"):
             logger.info(f"First time tracking TIGER counties {year} in source registry")
@@ -83,7 +86,7 @@ def download_tiger_counties(year: int = 2023) -> tuple[gpd.GeoDataFrame, str, in
         gdf = gdf.to_crs(epsg=4326)
 
     # Standardize schema
-    ingested_at = datetime.now(timezone.utc)
+    ingested_at = datetime.now(UTC)
     result = gpd.GeoDataFrame(
         {
             "geo_vintage": str(year),

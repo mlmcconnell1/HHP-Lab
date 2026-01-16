@@ -9,11 +9,10 @@ Tests cover:
 - Full validation pipeline
 """
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import geopandas as gpd
 import pandas as pd
-import pytest
 from shapely.geometry import Polygon
 
 from coclab.pit.qa import (
@@ -47,7 +46,7 @@ def make_pit_df(
         "pit_total": totals[:n] if len(totals) >= n else totals + [1000] * (n - len(totals)),
         "data_source": ["hud_exchange"] * n,
         "source_ref": ["https://example.com"] * n,
-        "ingested_at": [datetime.now(timezone.utc)] * n,
+        "ingested_at": [datetime.now(UTC)] * n,
     }
     if include_sheltered:
         data["pit_sheltered"] = [int(t * 0.7) for t in data["pit_total"]]
@@ -62,8 +61,7 @@ def make_boundary_gdf(coc_ids: list[str] | None = None) -> gpd.GeoDataFrame:
 
     n = len(coc_ids)
     geometries = [
-        Polygon([(-105 - i, 39), (-105 - i, 40), (-104 - i, 40), (-104 - i, 39)])
-        for i in range(n)
+        Polygon([(-105 - i, 39), (-105 - i, 40), (-104 - i, 40), (-104 - i, 39)]) for i in range(n)
     ]
     return gpd.GeoDataFrame(
         {
@@ -348,10 +346,12 @@ class TestCheckInvalidCounts:
         assert "Non-numeric" in issues[0].message
 
     def test_no_count_columns(self):
-        df = pd.DataFrame({
-            "coc_id": ["CO-500"],
-            "pit_year": [2024],
-        })
+        df = pd.DataFrame(
+            {
+                "coc_id": ["CO-500"],
+                "pit_year": [2024],
+            }
+        )
         issues = check_invalid_counts(df)
         assert len(issues) == 1
         assert "No count columns" in issues[0].message
@@ -506,7 +506,9 @@ class TestValidatePitData:
     def test_all_checks_run(self):
         """Test that all checks can run together without conflict."""
         df_prev = make_pit_df(coc_ids=["CO-500", "CA-600"], totals=[1000, 50000], year=2023)
-        df_curr = make_pit_df(coc_ids=["CO-500", "CA-600", "NY-501"], totals=[1100, 52000, 30000], year=2024)
+        df_curr = make_pit_df(
+            coc_ids=["CO-500", "CA-600", "NY-501"], totals=[1100, 52000, 30000], year=2024
+        )
         boundary_gdf = make_boundary_gdf(coc_ids=["CO-500", "CA-600"])
 
         report = validate_pit_data(

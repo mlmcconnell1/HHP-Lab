@@ -11,8 +11,6 @@ Tests cover:
 
 from __future__ import annotations
 
-from pathlib import Path
-
 import pandas as pd
 import pytest
 
@@ -32,11 +30,13 @@ class TestCoverageSummary:
     @pytest.fixture
     def sample_panel(self):
         """Create a sample panel with coverage ratios."""
-        return pd.DataFrame({
-            "coc_id": ["CO-500", "CA-600", "NY-501", "CO-500", "CA-600", "NY-501"],
-            "year": [2023, 2023, 2023, 2024, 2024, 2024],
-            "coverage_ratio": [0.95, 0.88, 0.99, 0.92, 0.85, 0.98],
-        })
+        return pd.DataFrame(
+            {
+                "coc_id": ["CO-500", "CA-600", "NY-501", "CO-500", "CA-600", "NY-501"],
+                "year": [2023, 2023, 2023, 2024, 2024, 2024],
+                "coverage_ratio": [0.95, 0.88, 0.99, 0.92, 0.85, 0.98],
+            }
+        )
 
     def test_basic_summary(self, sample_panel):
         """Test basic coverage summary computation."""
@@ -98,20 +98,24 @@ class TestCoverageSummary:
 
     def test_all_null_coverage(self):
         """Test handling when all coverage values are null."""
-        df = pd.DataFrame({
-            "year": [2023, 2024],
-            "coverage_ratio": [None, None],
-        })
+        df = pd.DataFrame(
+            {
+                "year": [2023, 2024],
+                "coverage_ratio": [None, None],
+            }
+        )
         result = coverage_summary(df)
 
         assert result.empty
 
     def test_single_year(self):
         """Test summary with single year."""
-        df = pd.DataFrame({
-            "year": [2024, 2024, 2024],
-            "coverage_ratio": [0.95, 0.96, 0.97],
-        })
+        df = pd.DataFrame(
+            {
+                "year": [2024, 2024, 2024],
+                "coverage_ratio": [0.95, 0.96, 0.97],
+            }
+        )
         result = coverage_summary(df)
 
         assert len(result) == 1
@@ -120,20 +124,24 @@ class TestCoverageSummary:
 
     def test_single_observation_per_year(self):
         """Test that std is 0 for single observation years."""
-        df = pd.DataFrame({
-            "year": [2023],
-            "coverage_ratio": [0.95],
-        })
+        df = pd.DataFrame(
+            {
+                "year": [2023],
+                "coverage_ratio": [0.95],
+            }
+        )
         result = coverage_summary(df)
 
         assert result["std"].iloc[0] == 0.0
 
     def test_sorted_by_year(self):
         """Test that result is sorted by year."""
-        df = pd.DataFrame({
-            "year": [2024, 2022, 2023],
-            "coverage_ratio": [0.95, 0.96, 0.97],
-        })
+        df = pd.DataFrame(
+            {
+                "year": [2024, 2022, 2023],
+                "coverage_ratio": [0.95, 0.96, 0.97],
+            }
+        )
         result = coverage_summary(df)
 
         assert list(result["year"]) == [2022, 2023, 2024]
@@ -145,11 +153,13 @@ class TestBoundaryChangeSummary:
     @pytest.fixture
     def sample_panel_with_changes(self):
         """Create a panel with boundary changes."""
-        return pd.DataFrame({
-            "coc_id": ["CO-500", "CO-500", "CO-500", "CA-600", "CA-600", "CA-600"],
-            "year": [2022, 2023, 2024, 2022, 2023, 2024],
-            "boundary_changed": [False, True, True, False, False, True],
-        })
+        return pd.DataFrame(
+            {
+                "coc_id": ["CO-500", "CO-500", "CO-500", "CA-600", "CA-600", "CA-600"],
+                "year": [2022, 2023, 2024, 2022, 2023, 2024],
+                "boundary_changed": [False, True, True, False, False, True],
+            }
+        )
 
     def test_detects_changes(self, sample_panel_with_changes):
         """Test that boundary changes are detected."""
@@ -172,11 +182,13 @@ class TestBoundaryChangeSummary:
 
     def test_no_changes(self):
         """Test handling when no boundary changes exist."""
-        df = pd.DataFrame({
-            "coc_id": ["CO-500", "CO-500"],
-            "year": [2023, 2024],
-            "boundary_changed": [False, False],
-        })
+        df = pd.DataFrame(
+            {
+                "coc_id": ["CO-500", "CO-500"],
+                "year": [2023, 2024],
+                "boundary_changed": [False, False],
+            }
+        )
         result = boundary_change_summary(df)
 
         assert result.empty
@@ -204,11 +216,13 @@ class TestBoundaryChangeSummary:
 
     def test_sorted_by_coc_id(self):
         """Test that result is sorted by coc_id."""
-        df = pd.DataFrame({
-            "coc_id": ["NY-501", "CA-600", "CO-500"],
-            "year": [2024, 2024, 2024],
-            "boundary_changed": [True, True, True],
-        })
+        df = pd.DataFrame(
+            {
+                "coc_id": ["NY-501", "CA-600", "CO-500"],
+                "year": [2024, 2024, 2024],
+                "boundary_changed": [True, True, True],
+            }
+        )
         result = boundary_change_summary(df)
 
         assert list(result["coc_id"]) == ["CA-600", "CO-500", "NY-501"]
@@ -220,24 +234,28 @@ class TestWeightingSensitivity:
     @pytest.fixture
     def panel_area(self):
         """Create a panel with area weighting."""
-        return pd.DataFrame({
-            "coc_id": ["CO-500", "CA-600"],
-            "year": [2024, 2024],
-            "pit_total": [1200, 45000],
-            "total_population": [500000, 9000000],
-            "weighting_method": ["area", "area"],
-        })
+        return pd.DataFrame(
+            {
+                "coc_id": ["CO-500", "CA-600"],
+                "year": [2024, 2024],
+                "pit_total": [1200, 45000],
+                "total_population": [500000, 9000000],
+                "weighting_method": ["area", "area"],
+            }
+        )
 
     @pytest.fixture
     def panel_pop(self):
         """Create a panel with population weighting."""
-        return pd.DataFrame({
-            "coc_id": ["CO-500", "CA-600"],
-            "year": [2024, 2024],
-            "pit_total": [1200, 45000],
-            "total_population": [480000, 10000000],
-            "weighting_method": ["population", "population"],
-        })
+        return pd.DataFrame(
+            {
+                "coc_id": ["CO-500", "CA-600"],
+                "year": [2024, 2024],
+                "pit_total": [1200, 45000],
+                "total_population": [480000, 10000000],
+                "weighting_method": ["population", "population"],
+            }
+        )
 
     def test_basic_comparison(self, panel_area, panel_pop):
         """Test basic weighting sensitivity computation."""
@@ -276,12 +294,14 @@ class TestWeightingSensitivity:
     def test_empty_panel(self):
         """Test handling of empty panels."""
         empty_df = pd.DataFrame()
-        other_df = pd.DataFrame({
-            "coc_id": ["CO-500"],
-            "year": [2024],
-            "pit_total": [1200],
-            "total_population": [500000],
-        })
+        other_df = pd.DataFrame(
+            {
+                "coc_id": ["CO-500"],
+                "year": [2024],
+                "pit_total": [1200],
+                "total_population": [500000],
+            }
+        )
 
         result = weighting_sensitivity(empty_df, other_df)
         assert result.empty
@@ -291,12 +311,14 @@ class TestWeightingSensitivity:
 
     def test_none_panel(self):
         """Test handling of None input."""
-        df = pd.DataFrame({
-            "coc_id": ["CO-500"],
-            "year": [2024],
-            "pit_total": [1200],
-            "total_population": [500000],
-        })
+        df = pd.DataFrame(
+            {
+                "coc_id": ["CO-500"],
+                "year": [2024],
+                "pit_total": [1200],
+                "total_population": [500000],
+            }
+        )
 
         result = weighting_sensitivity(None, df)
         assert result.empty
@@ -307,12 +329,14 @@ class TestWeightingSensitivity:
     def test_missing_columns(self):
         """Test handling of missing required columns."""
         df1 = pd.DataFrame({"coc_id": ["CO-500"], "year": [2024]})
-        df2 = pd.DataFrame({
-            "coc_id": ["CO-500"],
-            "year": [2024],
-            "pit_total": [1200],
-            "total_population": [500000],
-        })
+        df2 = pd.DataFrame(
+            {
+                "coc_id": ["CO-500"],
+                "year": [2024],
+                "pit_total": [1200],
+                "total_population": [500000],
+            }
+        )
 
         result = weighting_sensitivity(df1, df2)
         assert result.empty
@@ -320,24 +344,33 @@ class TestWeightingSensitivity:
     def test_sorted_by_coc_year(self, panel_area, panel_pop):
         """Test that result is sorted by coc_id and year."""
         # Create multi-year panels
-        area = pd.DataFrame({
-            "coc_id": ["NY-501", "CO-500", "NY-501", "CO-500"],
-            "year": [2024, 2023, 2023, 2024],
-            "pit_total": [1000, 1200, 1100, 1300],
-            "total_population": [5000000, 500000, 5100000, 510000],
-        })
-        pop = pd.DataFrame({
-            "coc_id": ["NY-501", "CO-500", "NY-501", "CO-500"],
-            "year": [2024, 2023, 2023, 2024],
-            "pit_total": [1000, 1200, 1100, 1300],
-            "total_population": [5200000, 480000, 5000000, 490000],
-        })
+        area = pd.DataFrame(
+            {
+                "coc_id": ["NY-501", "CO-500", "NY-501", "CO-500"],
+                "year": [2024, 2023, 2023, 2024],
+                "pit_total": [1000, 1200, 1100, 1300],
+                "total_population": [5000000, 500000, 5100000, 510000],
+            }
+        )
+        pop = pd.DataFrame(
+            {
+                "coc_id": ["NY-501", "CO-500", "NY-501", "CO-500"],
+                "year": [2024, 2023, 2023, 2024],
+                "pit_total": [1000, 1200, 1100, 1300],
+                "total_population": [5200000, 480000, 5000000, 490000],
+            }
+        )
 
         result = weighting_sensitivity(area, pop)
 
         # Should be sorted by coc_id, then year
-        expected_order = [("CO-500", 2023), ("CO-500", 2024), ("NY-501", 2023), ("NY-501", 2024)]
-        actual_order = list(zip(result["coc_id"], result["year"]))
+        expected_order = [
+            ("CO-500", 2023),
+            ("CO-500", 2024),
+            ("NY-501", 2023),
+            ("NY-501", 2024),
+        ]
+        actual_order = list(zip(result["coc_id"], result["year"], strict=True))
         assert actual_order == expected_order
 
 
@@ -347,13 +380,15 @@ class TestMissingnessReport:
     @pytest.fixture
     def sample_panel(self):
         """Create a panel with some missing values."""
-        return pd.DataFrame({
-            "coc_id": ["CO-500", "CA-600", "NY-501", "CO-500", "CA-600", "NY-501"],
-            "year": [2023, 2023, 2023, 2024, 2024, 2024],
-            "pit_total": [1200, 45000, 75000, 1300, 48000, None],
-            "total_population": [500000, None, 8000000, 510000, 10000000, 8100000],
-            "coverage_ratio": [0.95, 0.98, 0.99, None, None, 0.98],
-        })
+        return pd.DataFrame(
+            {
+                "coc_id": ["CO-500", "CA-600", "NY-501", "CO-500", "CA-600", "NY-501"],
+                "year": [2023, 2023, 2023, 2024, 2024, 2024],
+                "pit_total": [1200, 45000, 75000, 1300, 48000, None],
+                "total_population": [500000, None, 8000000, 510000, 10000000, 8100000],
+                "coverage_ratio": [0.95, 0.98, 0.99, None, None, 0.98],
+            }
+        )
 
     def test_basic_report(self, sample_panel):
         """Test basic missingness report generation."""
@@ -422,10 +457,12 @@ class TestMissingnessReport:
 
     def test_no_missing_values(self):
         """Test handling when no values are missing."""
-        df = pd.DataFrame({
-            "year": [2023, 2024],
-            "pit_total": [1200, 1300],
-        })
+        df = pd.DataFrame(
+            {
+                "year": [2023, 2024],
+                "pit_total": [1200, 1300],
+            }
+        )
         result = missingness_report(df)
 
         # All entries should have 0 missing
@@ -458,33 +495,39 @@ class TestDiagnosticsReport:
     @pytest.fixture
     def sample_report(self):
         """Create a sample diagnostics report."""
-        coverage = pd.DataFrame({
-            "year": [2023, 2024],
-            "count": [100, 105],
-            "mean": [0.94, 0.95],
-            "std": [0.05, 0.04],
-            "min": [0.75, 0.78],
-            "q25": [0.92, 0.93],
-            "median": [0.95, 0.96],
-            "q75": [0.97, 0.98],
-            "max": [0.99, 0.99],
-            "low_coverage_count": [5, 3],
-        })
+        coverage = pd.DataFrame(
+            {
+                "year": [2023, 2024],
+                "count": [100, 105],
+                "mean": [0.94, 0.95],
+                "std": [0.05, 0.04],
+                "min": [0.75, 0.78],
+                "q25": [0.92, 0.93],
+                "median": [0.95, 0.96],
+                "q75": [0.97, 0.98],
+                "max": [0.99, 0.99],
+                "low_coverage_count": [5, 3],
+            }
+        )
 
-        boundary_changes = pd.DataFrame({
-            "coc_id": ["CO-500", "CA-600"],
-            "change_years": [[2023, 2024], [2024]],
-            "change_count": [2, 1],
-        })
+        boundary_changes = pd.DataFrame(
+            {
+                "coc_id": ["CO-500", "CA-600"],
+                "change_years": [[2023, 2024], [2024]],
+                "change_count": [2, 1],
+            }
+        )
 
-        missingness = pd.DataFrame({
-            "column": ["pit_total", "pit_total", "coverage_ratio", "coverage_ratio"],
-            "year": [2023, "all", 2023, "all"],
-            "missing_count": [0, 0, 2, 5],
-            "total_count": [100, 205, 100, 205],
-            "missing_pct": [0.0, 0.0, 2.0, 2.4],
-            "complete_pct": [100.0, 100.0, 98.0, 97.6],
-        })
+        missingness = pd.DataFrame(
+            {
+                "column": ["pit_total", "pit_total", "coverage_ratio", "coverage_ratio"],
+                "year": [2023, "all", 2023, "all"],
+                "missing_count": [0, 0, 2, 5],
+                "total_count": [100, 205, 100, 205],
+                "missing_pct": [0.0, 0.0, 2.0, 2.4],
+                "complete_pct": [100.0, 100.0, 98.0, 97.6],
+            }
+        )
 
         panel_info = {
             "row_count": 205,
@@ -543,17 +586,19 @@ class TestDiagnosticsReport:
 
     def test_to_csv_with_weighting(self, sample_report, tmp_path):
         """Test CSV export when weighting sensitivity is present."""
-        sample_report.weighting = pd.DataFrame({
-            "coc_id": ["CO-500"],
-            "year": [2024],
-            "pit_total": [1200],
-            "pop_area": [500000],
-            "pop_pop": [480000],
-            "rate_area": [24.0],
-            "rate_pop": [25.0],
-            "rate_diff": [1.0],
-            "rate_pct_diff": [4.08],
-        })
+        sample_report.weighting = pd.DataFrame(
+            {
+                "coc_id": ["CO-500"],
+                "year": [2024],
+                "pit_total": [1200],
+                "pop_area": [500000],
+                "pop_pop": [480000],
+                "rate_area": [24.0],
+                "rate_pop": [25.0],
+                "rate_diff": [1.0],
+                "rate_pct_diff": [4.08],
+            }
+        )
 
         paths = sample_report.to_csv(tmp_path)
 
@@ -595,11 +640,13 @@ class TestDiagnosticsReport:
 
     def test_summary_with_weighting(self, sample_report):
         """Test summary includes weighting info when present."""
-        sample_report.weighting = pd.DataFrame({
-            "coc_id": ["CO-500", "CA-600"],
-            "year": [2024, 2024],
-            "rate_pct_diff": [4.08, 2.5],
-        })
+        sample_report.weighting = pd.DataFrame(
+            {
+                "coc_id": ["CO-500", "CA-600"],
+                "year": [2024, 2024],
+                "rate_pct_diff": [4.08, 2.5],
+            }
+        )
 
         result = sample_report.summary()
 
@@ -613,24 +660,26 @@ class TestGenerateDiagnosticsReport:
     @pytest.fixture
     def sample_panel(self):
         """Create a comprehensive sample panel."""
-        return pd.DataFrame({
-            "coc_id": ["CO-500", "CA-600", "NY-501"] * 3,
-            "year": [2022] * 3 + [2023] * 3 + [2024] * 3,
-            "pit_total": [1200, 45000, 75000, 1250, 46000, 76000, 1300, 48000, 78000],
-            "pit_sheltered": [800, 30000, 55000, 820, 31000, 56000, 850, 32000, 58000],
-            "pit_unsheltered": [400, 15000, 20000, 430, 15000, 20000, 450, 16000, 20000],
-            "boundary_vintage_used": ["2022"] * 3 + ["2023"] * 3 + ["2024"] * 3,
-            "acs_vintage_used": ["2021"] * 3 + ["2022"] * 3 + ["2023"] * 3,
-            "weighting_method": ["population"] * 9,
-            "total_population": [500000, 10000000, 8000000] * 3,
-            "adult_population": [400000, 8000000, 6400000] * 3,
-            "population_below_poverty": [50000, 1500000, 1200000] * 3,
-            "median_household_income": [65000, 75000, 85000] * 3,
-            "median_gross_rent": [1200, 1800, 2200] * 3,
-            "coverage_ratio": [0.95, 0.98, 0.99, 0.92, 0.85, 0.98, 0.96, 0.97, None],
-            "boundary_changed": [False] * 3 + [True] * 3 + [True] * 3,
-            "source": ["coclab_panel"] * 9,
-        })
+        return pd.DataFrame(
+            {
+                "coc_id": ["CO-500", "CA-600", "NY-501"] * 3,
+                "year": [2022] * 3 + [2023] * 3 + [2024] * 3,
+                "pit_total": [1200, 45000, 75000, 1250, 46000, 76000, 1300, 48000, 78000],
+                "pit_sheltered": [800, 30000, 55000, 820, 31000, 56000, 850, 32000, 58000],
+                "pit_unsheltered": [400, 15000, 20000, 430, 15000, 20000, 450, 16000, 20000],
+                "boundary_vintage_used": ["2022"] * 3 + ["2023"] * 3 + ["2024"] * 3,
+                "acs_vintage_used": ["2021"] * 3 + ["2022"] * 3 + ["2023"] * 3,
+                "weighting_method": ["population"] * 9,
+                "total_population": [500000, 10000000, 8000000] * 3,
+                "adult_population": [400000, 8000000, 6400000] * 3,
+                "population_below_poverty": [50000, 1500000, 1200000] * 3,
+                "median_household_income": [65000, 75000, 85000] * 3,
+                "median_gross_rent": [1200, 1800, 2200] * 3,
+                "coverage_ratio": [0.95, 0.98, 0.99, 0.92, 0.85, 0.98, 0.96, 0.97, None],
+                "boundary_changed": [False] * 3 + [True] * 3 + [True] * 3,
+                "source": ["coclab_panel"] * 9,
+            }
+        )
 
     def test_generates_all_diagnostics(self, sample_panel):
         """Test that all diagnostics are generated."""
@@ -699,14 +748,16 @@ class TestEdgeCases:
 
     def test_single_coc_single_year(self):
         """Test diagnostics with minimal panel (1 CoC, 1 year)."""
-        df = pd.DataFrame({
-            "coc_id": ["CO-500"],
-            "year": [2024],
-            "pit_total": [1200],
-            "total_population": [500000],
-            "coverage_ratio": [0.95],
-            "boundary_changed": [False],
-        })
+        df = pd.DataFrame(
+            {
+                "coc_id": ["CO-500"],
+                "year": [2024],
+                "pit_total": [1200],
+                "total_population": [500000],
+                "coverage_ratio": [0.95],
+                "boundary_changed": [False],
+            }
+        )
 
         report = generate_diagnostics_report(df)
 
@@ -716,14 +767,16 @@ class TestEdgeCases:
 
     def test_all_missing_optional_columns(self):
         """Test diagnostics when optional columns are all null."""
-        df = pd.DataFrame({
-            "coc_id": ["CO-500", "CA-600"],
-            "year": [2024, 2024],
-            "pit_total": [1200, 45000],
-            "total_population": [None, None],
-            "coverage_ratio": [None, None],
-            "boundary_changed": [False, False],
-        })
+        df = pd.DataFrame(
+            {
+                "coc_id": ["CO-500", "CA-600"],
+                "year": [2024, 2024],
+                "pit_total": [1200, 45000],
+                "total_population": [None, None],
+                "coverage_ratio": [None, None],
+                "boundary_changed": [False, False],
+            }
+        )
 
         report = generate_diagnostics_report(df)
 
@@ -738,14 +791,16 @@ class TestEdgeCases:
     def test_large_number_of_cocs(self):
         """Test diagnostics with many CoCs."""
         n_cocs = 500
-        df = pd.DataFrame({
-            "coc_id": [f"ST-{i:03d}" for i in range(n_cocs)],
-            "year": [2024] * n_cocs,
-            "pit_total": list(range(100, 100 + n_cocs)),
-            "total_population": [500000 + i * 10000 for i in range(n_cocs)],
-            "coverage_ratio": [0.9 + (i % 10) * 0.01 for i in range(n_cocs)],
-            "boundary_changed": [i % 5 == 0 for i in range(n_cocs)],
-        })
+        df = pd.DataFrame(
+            {
+                "coc_id": [f"ST-{i:03d}" for i in range(n_cocs)],
+                "year": [2024] * n_cocs,
+                "pit_total": list(range(100, 100 + n_cocs)),
+                "total_population": [500000 + i * 10000 for i in range(n_cocs)],
+                "coverage_ratio": [0.9 + (i % 10) * 0.01 for i in range(n_cocs)],
+                "boundary_changed": [i % 5 == 0 for i in range(n_cocs)],
+            }
+        )
 
         report = generate_diagnostics_report(df)
 
@@ -755,14 +810,16 @@ class TestEdgeCases:
     def test_many_years(self):
         """Test diagnostics with many years."""
         years = list(range(2010, 2025))
-        df = pd.DataFrame({
-            "coc_id": ["CO-500"] * len(years),
-            "year": years,
-            "pit_total": [1000 + i * 50 for i in range(len(years))],
-            "total_population": [500000] * len(years),
-            "coverage_ratio": [0.9 + i * 0.005 for i in range(len(years))],
-            "boundary_changed": [i % 3 == 0 for i in range(len(years))],
-        })
+        df = pd.DataFrame(
+            {
+                "coc_id": ["CO-500"] * len(years),
+                "year": years,
+                "pit_total": [1000 + i * 50 for i in range(len(years))],
+                "total_population": [500000] * len(years),
+                "coverage_ratio": [0.9 + i * 0.005 for i in range(len(years))],
+                "boundary_changed": [i % 3 == 0 for i in range(len(years))],
+            }
+        )
 
         report = generate_diagnostics_report(df)
 
@@ -771,14 +828,16 @@ class TestEdgeCases:
 
     def test_mixed_types_in_columns(self):
         """Test that functions handle mixed types gracefully."""
-        df = pd.DataFrame({
-            "coc_id": ["CO-500", "CA-600"],
-            "year": [2024, 2024],
-            "pit_total": [1200, 45000],
-            "total_population": [500000.0, 10000000.0],  # Floats
-            "coverage_ratio": [0.95, 0.98],
-            "boundary_changed": [False, True],
-        })
+        df = pd.DataFrame(
+            {
+                "coc_id": ["CO-500", "CA-600"],
+                "year": [2024, 2024],
+                "pit_total": [1200, 45000],
+                "total_population": [500000.0, 10000000.0],  # Floats
+                "coverage_ratio": [0.95, 0.98],
+                "boundary_changed": [False, True],
+            }
+        )
 
         # Should not raise
         report = generate_diagnostics_report(df)
@@ -797,24 +856,28 @@ class TestIntegration:
         rows = []
         for i, year in enumerate(years):
             for j, coc in enumerate(cocs):
-                rows.append({
-                    "coc_id": coc,
-                    "year": year,
-                    "pit_total": 1000 + i * 100 + j * 500,
-                    "pit_sheltered": 700 + i * 50 + j * 300,
-                    "pit_unsheltered": 300 + i * 50 + j * 200,
-                    "boundary_vintage_used": str(year),
-                    "acs_vintage_used": str(year - 1),
-                    "weighting_method": "population",
-                    "total_population": 500000 + j * 1000000,
-                    "adult_population": 400000 + j * 800000,
-                    "population_below_poverty": 50000 + j * 100000 if (i + j) % 3 != 0 else None,
-                    "median_household_income": 60000 + j * 5000,
-                    "median_gross_rent": 1000 + j * 200,
-                    "coverage_ratio": 0.90 + (i + j) % 10 * 0.01,
-                    "boundary_changed": i > 0 and (i + j) % 2 == 0,
-                    "source": "coclab_panel",
-                })
+                rows.append(
+                    {
+                        "coc_id": coc,
+                        "year": year,
+                        "pit_total": 1000 + i * 100 + j * 500,
+                        "pit_sheltered": 700 + i * 50 + j * 300,
+                        "pit_unsheltered": 300 + i * 50 + j * 200,
+                        "boundary_vintage_used": str(year),
+                        "acs_vintage_used": str(year - 1),
+                        "weighting_method": "population",
+                        "total_population": 500000 + j * 1000000,
+                        "adult_population": 400000 + j * 800000,
+                        "population_below_poverty": 50000 + j * 100000
+                        if (i + j) % 3 != 0
+                        else None,
+                        "median_household_income": 60000 + j * 5000,
+                        "median_gross_rent": 1000 + j * 200,
+                        "coverage_ratio": 0.90 + (i + j) % 10 * 0.01,
+                        "boundary_changed": i > 0 and (i + j) % 2 == 0,
+                        "source": "coclab_panel",
+                    }
+                )
 
         return pd.DataFrame(rows)
 

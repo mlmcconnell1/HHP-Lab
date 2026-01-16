@@ -11,9 +11,6 @@ Tests cover:
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
-from pathlib import Path
-
 import pandas as pd
 import pytest
 
@@ -26,7 +23,7 @@ from coclab.panel.assemble import (
     build_panel,
     save_panel,
 )
-from coclab.panel.policies import AlignmentPolicy, DEFAULT_POLICY
+from coclab.panel.policies import DEFAULT_POLICY, AlignmentPolicy
 from coclab.provenance import read_provenance
 
 
@@ -40,23 +37,27 @@ class TestLoadPitForYear:
         pit_dir.mkdir()
 
         # Create 2023 PIT data
-        df_2023 = pd.DataFrame({
-            "coc_id": ["CO-500", "CA-600", "NY-501"],
-            "pit_total": [1200, 45000, 75000],
-            "pit_sheltered": [800, 30000, 55000],
-            "pit_unsheltered": [400, 15000, 20000],
-            "pit_year": [2023, 2023, 2023],
-        })
+        df_2023 = pd.DataFrame(
+            {
+                "coc_id": ["CO-500", "CA-600", "NY-501"],
+                "pit_total": [1200, 45000, 75000],
+                "pit_sheltered": [800, 30000, 55000],
+                "pit_unsheltered": [400, 15000, 20000],
+                "pit_year": [2023, 2023, 2023],
+            }
+        )
         df_2023.to_parquet(pit_dir / "pit_counts__2023.parquet", index=False)
 
         # Create 2024 PIT data
-        df_2024 = pd.DataFrame({
-            "coc_id": ["CO-500", "CA-600", "NY-501"],
-            "pit_total": [1300, 48000, 78000],
-            "pit_sheltered": [850, 32000, 58000],
-            "pit_unsheltered": [450, 16000, 20000],
-            "pit_year": [2024, 2024, 2024],
-        })
+        df_2024 = pd.DataFrame(
+            {
+                "coc_id": ["CO-500", "CA-600", "NY-501"],
+                "pit_total": [1300, 48000, 78000],
+                "pit_sheltered": [850, 32000, 58000],
+                "pit_unsheltered": [450, 16000, 20000],
+                "pit_year": [2024, 2024, 2024],
+            }
+        )
         df_2024.to_parquet(pit_dir / "pit_counts__2024.parquet", index=False)
 
         return pit_dir
@@ -109,16 +110,18 @@ class TestLoadAcsMeasures:
         measures_dir.mkdir()
 
         # Create measures for boundary vintage 2024, ACS vintage 2023
-        df = pd.DataFrame({
-            "coc_id": ["CO-500", "CA-600", "NY-501"],
-            "total_population": [500000, 10000000, 8000000],
-            "adult_population": [400000, 8000000, 6400000],
-            "population_below_poverty": [50000, 1500000, 1200000],
-            "median_household_income": [65000, 75000, 85000],
-            "median_gross_rent": [1200, 1800, 2200],
-            "coverage_ratio": [0.95, 0.98, 0.99],
-            "weighting_method": ["population", "population", "population"],
-        })
+        df = pd.DataFrame(
+            {
+                "coc_id": ["CO-500", "CA-600", "NY-501"],
+                "total_population": [500000, 10000000, 8000000],
+                "adult_population": [400000, 8000000, 6400000],
+                "population_below_poverty": [50000, 1500000, 1200000],
+                "median_household_income": [65000, 75000, 85000],
+                "median_gross_rent": [1200, 1800, 2200],
+                "coverage_ratio": [0.95, 0.98, 0.99],
+                "weighting_method": ["population", "population", "population"],
+            }
+        )
         df.to_parquet(
             measures_dir / "coc_measures__2024__2023.parquet",
             index=False,
@@ -191,11 +194,13 @@ class TestDetectBoundaryChanges:
 
     def test_no_changes_same_vintage(self):
         """Test detection when boundary vintage is constant."""
-        df = pd.DataFrame({
-            "coc_id": ["CO-500", "CO-500", "CO-500"],
-            "year": [2022, 2023, 2024],
-            "boundary_vintage_used": ["2022", "2023", "2024"],
-        })
+        df = pd.DataFrame(
+            {
+                "coc_id": ["CO-500", "CO-500", "CO-500"],
+                "year": [2022, 2023, 2024],
+                "boundary_vintage_used": ["2022", "2023", "2024"],
+            }
+        )
 
         result = _detect_boundary_changes(df)
 
@@ -206,11 +211,13 @@ class TestDetectBoundaryChanges:
 
     def test_first_year_is_false(self):
         """Test that first year for each CoC is False."""
-        df = pd.DataFrame({
-            "coc_id": ["CO-500", "CO-500"],
-            "year": [2023, 2024],
-            "boundary_vintage_used": ["2023", "2024"],
-        })
+        df = pd.DataFrame(
+            {
+                "coc_id": ["CO-500", "CO-500"],
+                "year": [2023, 2024],
+                "boundary_vintage_used": ["2023", "2024"],
+            }
+        )
 
         result = _detect_boundary_changes(df)
 
@@ -218,11 +225,13 @@ class TestDetectBoundaryChanges:
 
     def test_detects_change_when_vintage_differs(self):
         """Test detection when vintage changes."""
-        df = pd.DataFrame({
-            "coc_id": ["CO-500", "CO-500", "CO-500"],
-            "year": [2022, 2023, 2024],
-            "boundary_vintage_used": ["2022", "2022", "2024"],  # 2023 uses 2022 vintage
-        })
+        df = pd.DataFrame(
+            {
+                "coc_id": ["CO-500", "CO-500", "CO-500"],
+                "year": [2022, 2023, 2024],
+                "boundary_vintage_used": ["2022", "2022", "2024"],  # 2023 uses 2022 vintage
+            }
+        )
 
         result = _detect_boundary_changes(df)
 
@@ -232,11 +241,13 @@ class TestDetectBoundaryChanges:
 
     def test_multiple_cocs_independent(self):
         """Test that boundary change detection is independent per CoC."""
-        df = pd.DataFrame({
-            "coc_id": ["CA-600", "CA-600", "CO-500", "CO-500"],
-            "year": [2023, 2024, 2023, 2024],
-            "boundary_vintage_used": ["2023", "2023", "2023", "2024"],
-        })
+        df = pd.DataFrame(
+            {
+                "coc_id": ["CA-600", "CA-600", "CO-500", "CO-500"],
+                "year": [2023, 2024, 2023, 2024],
+                "boundary_vintage_used": ["2023", "2023", "2023", "2024"],
+            }
+        )
 
         result = _detect_boundary_changes(df)
 
@@ -285,28 +296,32 @@ class TestBuildPanel:
 
         # Create PIT data for 2023 and 2024
         for year in [2023, 2024]:
-            df_pit = pd.DataFrame({
-                "coc_id": ["CO-500", "CA-600"],
-                "pit_total": [1200 + (year - 2023) * 100, 45000 + (year - 2023) * 3000],
-                "pit_sheltered": [800, 30000],
-                "pit_unsheltered": [400 + (year - 2023) * 100, 15000 + (year - 2023) * 3000],
-                "pit_year": [year, year],
-            })
+            df_pit = pd.DataFrame(
+                {
+                    "coc_id": ["CO-500", "CA-600"],
+                    "pit_total": [1200 + (year - 2023) * 100, 45000 + (year - 2023) * 3000],
+                    "pit_sheltered": [800, 30000],
+                    "pit_unsheltered": [400 + (year - 2023) * 100, 15000 + (year - 2023) * 3000],
+                    "pit_year": [year, year],
+                }
+            )
             df_pit.to_parquet(pit_dir / f"pit_counts__{year}.parquet", index=False)
 
         # Create ACS measures for 2022 and 2023 vintages
         for acs_year in [2022, 2023]:
             boundary_year = acs_year + 1  # boundary vintage = acs + 1 per default policy
-            df_acs = pd.DataFrame({
-                "coc_id": ["CO-500", "CA-600"],
-                "total_population": [500000, 10000000],
-                "adult_population": [400000, 8000000],
-                "population_below_poverty": [50000, 1500000],
-                "median_household_income": [65000, 75000],
-                "median_gross_rent": [1200, 1800],
-                "coverage_ratio": [0.95, 0.98],
-                "weighting_method": ["population", "population"],
-            })
+            df_acs = pd.DataFrame(
+                {
+                    "coc_id": ["CO-500", "CA-600"],
+                    "total_population": [500000, 10000000],
+                    "adult_population": [400000, 8000000],
+                    "population_below_poverty": [50000, 1500000],
+                    "median_household_income": [65000, 75000],
+                    "median_gross_rent": [1200, 1800],
+                    "coverage_ratio": [0.95, 0.98],
+                    "weighting_method": ["population", "population"],
+                }
+            )
             df_acs.to_parquet(
                 measures_dir / f"coc_measures__{boundary_year}__{acs_year}.parquet",
                 index=False,
@@ -469,25 +484,27 @@ class TestSavePanel:
     @pytest.fixture
     def sample_panel(self):
         """Create a sample panel DataFrame."""
-        return pd.DataFrame({
-            "coc_id": ["CO-500", "CO-500", "CA-600", "CA-600"],
-            "year": [2023, 2024, 2023, 2024],
-            "pit_total": [1200, 1300, 45000, 48000],
-            "pit_sheltered": [800, 850, 30000, 32000],
-            "pit_unsheltered": [400, 450, 15000, 16000],
-            "boundary_vintage_used": ["2023", "2024", "2023", "2024"],
-            "acs_vintage_used": ["2022", "2023", "2022", "2023"],
-            "alignment_type": ["period_faithful"] * 4,
-            "weighting_method": ["population"] * 4,
-            "total_population": [500000, 505000, 10000000, 10100000],
-            "adult_population": [400000, 404000, 8000000, 8080000],
-            "population_below_poverty": [50000, 51000, 1500000, 1515000],
-            "median_household_income": [65000, 66000, 75000, 76000],
-            "median_gross_rent": [1200, 1250, 1800, 1850],
-            "coverage_ratio": [0.95, 0.95, 0.98, 0.98],
-            "boundary_changed": [False, True, False, True],
-            "source": ["coclab_panel"] * 4,
-        })
+        return pd.DataFrame(
+            {
+                "coc_id": ["CO-500", "CO-500", "CA-600", "CA-600"],
+                "year": [2023, 2024, 2023, 2024],
+                "pit_total": [1200, 1300, 45000, 48000],
+                "pit_sheltered": [800, 850, 30000, 32000],
+                "pit_unsheltered": [400, 450, 15000, 16000],
+                "boundary_vintage_used": ["2023", "2024", "2023", "2024"],
+                "acs_vintage_used": ["2022", "2023", "2022", "2023"],
+                "alignment_type": ["period_faithful"] * 4,
+                "weighting_method": ["population"] * 4,
+                "total_population": [500000, 505000, 10000000, 10100000],
+                "adult_population": [400000, 404000, 8000000, 8080000],
+                "population_below_poverty": [50000, 51000, 1500000, 1515000],
+                "median_household_income": [65000, 66000, 75000, 76000],
+                "median_gross_rent": [1200, 1250, 1800, 1850],
+                "coverage_ratio": [0.95, 0.95, 0.98, 0.98],
+                "boundary_changed": [False, True, False, True],
+                "source": ["coclab_panel"] * 4,
+            }
+        )
 
     def test_save_creates_file(self, sample_panel, tmp_path):
         """Test that Parquet file is created with temporal shorthand naming."""
@@ -598,28 +615,32 @@ class TestIntegration:
         # Create comprehensive PIT data
         cocs = ["CO-500", "CA-600", "NY-501", "TX-500"]
         for year in range(2020, 2025):
-            df_pit = pd.DataFrame({
-                "coc_id": cocs,
-                "pit_total": [1000 + i * 100 + (year - 2020) * 50 for i in range(4)],
-                "pit_sheltered": [700 + i * 50 for i in range(4)],
-                "pit_unsheltered": [300 + i * 50 + (year - 2020) * 50 for i in range(4)],
-                "pit_year": [year] * 4,
-            })
+            df_pit = pd.DataFrame(
+                {
+                    "coc_id": cocs,
+                    "pit_total": [1000 + i * 100 + (year - 2020) * 50 for i in range(4)],
+                    "pit_sheltered": [700 + i * 50 for i in range(4)],
+                    "pit_unsheltered": [300 + i * 50 + (year - 2020) * 50 for i in range(4)],
+                    "pit_year": [year] * 4,
+                }
+            )
             df_pit.to_parquet(pit_dir / f"pit_counts__{year}.parquet", index=False)
 
         # Create ACS measures
         for acs_year in range(2019, 2024):
             boundary_year = acs_year + 1
-            df_acs = pd.DataFrame({
-                "coc_id": cocs,
-                "total_population": [500000 + i * 1000000 for i in range(4)],
-                "adult_population": [400000 + i * 800000 for i in range(4)],
-                "population_below_poverty": [50000 + i * 100000 for i in range(4)],
-                "median_household_income": [60000 + i * 5000 for i in range(4)],
-                "median_gross_rent": [1000 + i * 200 for i in range(4)],
-                "coverage_ratio": [0.95, 0.98, 0.99, 0.92],
-                "weighting_method": ["population"] * 4,
-            })
+            df_acs = pd.DataFrame(
+                {
+                    "coc_id": cocs,
+                    "total_population": [500000 + i * 1000000 for i in range(4)],
+                    "adult_population": [400000 + i * 800000 for i in range(4)],
+                    "population_below_poverty": [50000 + i * 100000 for i in range(4)],
+                    "median_household_income": [60000 + i * 5000 for i in range(4)],
+                    "median_gross_rent": [1000 + i * 200 for i in range(4)],
+                    "coverage_ratio": [0.95, 0.98, 0.99, 0.92],
+                    "weighting_method": ["population"] * 4,
+                }
+            )
             df_acs.to_parquet(
                 measures_dir / f"coc_measures__{boundary_year}__{acs_year}.parquet",
                 index=False,

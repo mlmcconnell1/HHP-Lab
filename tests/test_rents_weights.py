@@ -136,13 +136,15 @@ class TestFetchStateCountyAcs:
 
     def test_parses_response_correctly(self, httpx_mock):
         """Test that Census API response is parsed into correct DataFrame structure."""
-        response_data = make_census_county_response([
-            {
-                "NAME": "Denver County, Colorado",
-                "county": "031",
-                "B25003_003E": "150000",
-            }
-        ])
+        response_data = make_census_county_response(
+            [
+                {
+                    "NAME": "Denver County, Colorado",
+                    "county": "031",
+                    "B25003_003E": "150000",
+                }
+            ]
+        )
 
         httpx_mock.add_response(
             url=re.compile(r"https://api\.census\.gov/data/2023/acs/acs5.*"),
@@ -159,12 +161,14 @@ class TestFetchStateCountyAcs:
 
     def test_handles_missing_values(self, httpx_mock):
         """Test that negative values (Census missing indicator) are converted to NA."""
-        response_data = make_census_county_response([
-            {
-                "county": "001",
-                "B25003_003E": "-666666666",  # Missing value indicator
-            }
-        ])
+        response_data = make_census_county_response(
+            [
+                {
+                    "county": "001",
+                    "B25003_003E": "-666666666",  # Missing value indicator
+                }
+            ]
+        )
 
         httpx_mock.add_response(
             url=re.compile(r"https://api\.census\.gov/data/2023/acs/acs5.*"),
@@ -206,13 +210,15 @@ class TestFetchCountyAcsTotals:
     @pytest.mark.httpx_mock(can_send_already_matched_responses=True)
     def test_returns_correct_schema_renter_households(self, httpx_mock):
         """Test that returned DataFrame has the correct schema for renter_households."""
-        response_data = make_census_county_response([
-            {
-                "NAME": "Denver County, Colorado",
-                "county": "031",
-                "B25003_003E": "150000",
-            }
-        ])
+        response_data = make_census_county_response(
+            [
+                {
+                    "NAME": "Denver County, Colorado",
+                    "county": "031",
+                    "B25003_003E": "150000",
+                }
+            ]
+        )
 
         httpx_mock.add_response(
             url=re.compile(r"https://api\.census\.gov/data/2023/acs/acs5.*state%3A08.*"),
@@ -297,10 +303,12 @@ class TestFetchCountyAcsTotals:
     @pytest.mark.httpx_mock(can_send_already_matched_responses=True)
     def test_weight_values_non_negative(self, httpx_mock):
         """Test that weight values are non-negative (or NA)."""
-        response_data = make_census_county_response([
-            {"county": "031", "B25003_003E": "150000"},
-            {"county": "001", "B25003_003E": "0"},  # Zero is valid
-        ])
+        response_data = make_census_county_response(
+            [
+                {"county": "031", "B25003_003E": "150000"},
+                {"county": "001", "B25003_003E": "0"},  # Zero is valid
+            ]
+        )
 
         httpx_mock.add_response(
             url=re.compile(r"https://api\.census\.gov/data/2023/acs/acs5.*state%3A08.*"),
@@ -320,9 +328,7 @@ class TestFetchCountyAcsTotals:
     @pytest.mark.httpx_mock(can_send_already_matched_responses=True)
     def test_returns_non_empty_dataset(self, httpx_mock):
         """Test that the dataset is non-empty when API returns data."""
-        response_data = make_census_county_response([
-            {"county": "031", "B25003_003E": "150000"}
-        ])
+        response_data = make_census_county_response([{"county": "031", "B25003_003E": "150000"}])
 
         httpx_mock.add_response(
             url=re.compile(r"https://api\.census\.gov/data/2023/acs/acs5.*state%3A08.*"),
@@ -355,9 +361,7 @@ class TestBuildCountyWeights:
     @pytest.mark.httpx_mock(can_send_already_matched_responses=True)
     def test_creates_output_file(self, httpx_mock, tmp_path):
         """Test that build creates the output Parquet file."""
-        response_data = make_census_county_response([
-            {"county": "031", "B25003_003E": "150000"}
-        ])
+        response_data = make_census_county_response([{"county": "031", "B25003_003E": "150000"}])
 
         httpx_mock.add_response(
             url=re.compile(r"https://api\.census\.gov/data/2023/acs/acs5.*state%3A08.*"),
@@ -385,16 +389,18 @@ class TestBuildCountyWeights:
         cached_path.parent.mkdir(parents=True, exist_ok=True)
 
         # Write a simple DataFrame
-        df = pd.DataFrame({
-            "county_fips": ["08031"],
-            "acs_vintage": ["2019-2023"],
-            "weighting_method": ["renter_households"],
-            "weight_value": [150000],
-            "county_name": ["Denver County, Colorado"],
-            "data_source": ["acs_5yr"],
-            "source_ref": ["cached"],
-            "ingested_at": [datetime.now(UTC)],
-        })
+        df = pd.DataFrame(
+            {
+                "county_fips": ["08031"],
+                "acs_vintage": ["2019-2023"],
+                "weighting_method": ["renter_households"],
+                "weight_value": [150000],
+                "county_name": ["Denver County, Colorado"],
+                "data_source": ["acs_5yr"],
+                "source_ref": ["cached"],
+                "ingested_at": [datetime.now(UTC)],
+            }
+        )
         df.to_parquet(cached_path)
 
         # Call build without force - should use cache
@@ -414,22 +420,26 @@ class TestBuildCountyWeights:
         cached_path = tmp_path / "county_weights__2019-2023__renter_households.parquet"
         cached_path.parent.mkdir(parents=True, exist_ok=True)
 
-        df = pd.DataFrame({
-            "county_fips": ["08031"],
-            "acs_vintage": ["2019-2023"],
-            "weighting_method": ["renter_households"],
-            "weight_value": [150000],
-            "county_name": ["Denver County, Colorado"],
-            "data_source": ["acs_5yr"],
-            "source_ref": ["cached"],
-            "ingested_at": [datetime.now(UTC)],
-        })
+        df = pd.DataFrame(
+            {
+                "county_fips": ["08031"],
+                "acs_vintage": ["2019-2023"],
+                "weighting_method": ["renter_households"],
+                "weight_value": [150000],
+                "county_name": ["Denver County, Colorado"],
+                "data_source": ["acs_5yr"],
+                "source_ref": ["cached"],
+                "ingested_at": [datetime.now(UTC)],
+            }
+        )
         df.to_parquet(cached_path)
 
         # Setup mock for refetch
-        response_data = make_census_county_response([
-            {"county": "031", "B25003_003E": "160000"}  # Different value
-        ])
+        response_data = make_census_county_response(
+            [
+                {"county": "031", "B25003_003E": "160000"}  # Different value
+            ]
+        )
 
         httpx_mock.add_response(
             url=re.compile(r"https://api\.census\.gov/data/2023/acs/acs5.*state%3A08.*"),
@@ -454,9 +464,7 @@ class TestBuildCountyWeights:
     @pytest.mark.httpx_mock(can_send_already_matched_responses=True)
     def test_includes_provenance_metadata(self, httpx_mock, tmp_path):
         """Test that output file includes provenance metadata."""
-        response_data = make_census_county_response([
-            {"county": "031", "B25003_003E": "150000"}
-        ])
+        response_data = make_census_county_response([{"county": "031", "B25003_003E": "150000"}])
 
         httpx_mock.add_response(
             url=re.compile(r"https://api\.census\.gov/data/2023/acs/acs5.*state%3A08.*"),
@@ -491,16 +499,18 @@ class TestLoadCountyWeights:
         """Test loading an existing weights file."""
         # Create a weights file
         weights_path = tmp_path / "county_weights__2019-2023__renter_households.parquet"
-        df = pd.DataFrame({
-            "county_fips": ["08031"],
-            "acs_vintage": ["2019-2023"],
-            "weighting_method": ["renter_households"],
-            "weight_value": [150000],
-            "county_name": ["Denver County"],
-            "data_source": ["acs_5yr"],
-            "source_ref": ["test"],
-            "ingested_at": [datetime.now(UTC)],
-        })
+        df = pd.DataFrame(
+            {
+                "county_fips": ["08031"],
+                "acs_vintage": ["2019-2023"],
+                "weighting_method": ["renter_households"],
+                "weight_value": [150000],
+                "county_name": ["Denver County"],
+                "data_source": ["acs_5yr"],
+                "source_ref": ["test"],
+                "ingested_at": [datetime.now(UTC)],
+            }
+        )
         df.to_parquet(weights_path)
 
         # Load it
@@ -521,10 +531,12 @@ class TestSchemaValidation:
     @pytest.mark.httpx_mock(can_send_already_matched_responses=True)
     def test_county_fips_length(self, httpx_mock):
         """Test that county_fips is exactly 5 characters."""
-        response_data = make_census_county_response([
-            {"county": "031", "B25003_003E": "150000"},
-            {"county": "001", "B25003_003E": "50000"},
-        ])
+        response_data = make_census_county_response(
+            [
+                {"county": "031", "B25003_003E": "150000"},
+                {"county": "001", "B25003_003E": "50000"},
+            ]
+        )
 
         httpx_mock.add_response(
             url=re.compile(r"https://api\.census\.gov/data/2023/acs/acs5.*state%3A08.*"),
@@ -543,9 +555,7 @@ class TestSchemaValidation:
     @pytest.mark.httpx_mock(can_send_already_matched_responses=True)
     def test_data_source_is_acs_5yr(self, httpx_mock):
         """Test that data_source is always 'acs_5yr'."""
-        response_data = make_census_county_response([
-            {"county": "031", "B25003_003E": "150000"}
-        ])
+        response_data = make_census_county_response([{"county": "031", "B25003_003E": "150000"}])
 
         httpx_mock.add_response(
             url=re.compile(r"https://api\.census\.gov/data/2023/acs/acs5.*state%3A08.*"),
@@ -563,9 +573,7 @@ class TestSchemaValidation:
     @pytest.mark.httpx_mock(can_send_already_matched_responses=True)
     def test_ingested_at_is_utc(self, httpx_mock):
         """Test that ingested_at is a UTC timestamp."""
-        response_data = make_census_county_response([
-            {"county": "031", "B25003_003E": "150000"}
-        ])
+        response_data = make_census_county_response([{"county": "031", "B25003_003E": "150000"}])
 
         httpx_mock.add_response(
             url=re.compile(r"https://api\.census\.gov/data/2023/acs/acs5.*state%3A08.*"),

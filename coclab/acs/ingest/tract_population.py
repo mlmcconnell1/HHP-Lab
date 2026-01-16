@@ -27,18 +27,17 @@ Output Schema
 from __future__ import annotations
 
 import hashlib
-import json
 import logging
 import re
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 import httpx
 import pandas as pd
 
+from coclab import naming
 from coclab.provenance import ProvenanceBlock, write_parquet_with_provenance
 from coclab.source_registry import check_source_changed, register_source
-from coclab import naming
 
 logger = logging.getLogger(__name__)
 
@@ -53,12 +52,58 @@ POPULATION_VARS = {
 
 # US State and territory FIPS codes
 STATE_FIPS_CODES = [
-    "01", "02", "04", "05", "06", "08", "09", "10", "11", "12",
-    "13", "15", "16", "17", "18", "19", "20", "21", "22", "23",
-    "24", "25", "26", "27", "28", "29", "30", "31", "32", "33",
-    "34", "35", "36", "37", "38", "39", "40", "41", "42", "44",
-    "45", "46", "47", "48", "49", "50", "51", "53", "54", "55",
-    "56", "72",  # Puerto Rico
+    "01",
+    "02",
+    "04",
+    "05",
+    "06",
+    "08",
+    "09",
+    "10",
+    "11",
+    "12",
+    "13",
+    "15",
+    "16",
+    "17",
+    "18",
+    "19",
+    "20",
+    "21",
+    "22",
+    "23",
+    "24",
+    "25",
+    "26",
+    "27",
+    "28",
+    "29",
+    "30",
+    "31",
+    "32",
+    "33",
+    "34",
+    "35",
+    "36",
+    "37",
+    "38",
+    "39",
+    "40",
+    "41",
+    "42",
+    "44",
+    "45",
+    "46",
+    "47",
+    "48",
+    "49",
+    "50",
+    "51",
+    "53",
+    "54",
+    "55",
+    "56",
+    "72",  # Puerto Rico
 ]
 
 # Default data directory
@@ -109,11 +154,11 @@ def parse_acs_vintage(acs_vintage: str) -> int:
     # Handle single year format
     try:
         return int(acs_vintage)
-    except ValueError:
+    except ValueError as e:
         raise ValueError(
             f"Invalid ACS vintage format: {acs_vintage!r}. "
             f"Expected format like '2019-2023' or '2023'"
-        )
+        ) from e
 
 
 def normalize_geoid(state: str, county: str, tract: str) -> str:
@@ -183,8 +228,7 @@ def fetch_state_tract_population(year: int, state_fips: str) -> tuple[pd.DataFra
 
     # Build GEOID from state, county, tract
     df["tract_geoid"] = df.apply(
-        lambda row: normalize_geoid(row["state"], row["county"], row["tract"]),
-        axis=1
+        lambda row: normalize_geoid(row["state"], row["county"], row["tract"]), axis=1
     )
 
     # Convert numeric columns
@@ -235,7 +279,7 @@ def fetch_tract_population(
         If no tract data could be fetched from any state.
     """
     year = parse_acs_vintage(acs_vintage)
-    ingested_at = datetime.now(timezone.utc)
+    ingested_at = datetime.now(UTC)
 
     logger.info(f"Fetching ACS {acs_vintage} tract population data (API year: {year})")
 
@@ -397,7 +441,7 @@ def ingest_tract_population(
             "table": "B01003",
             "variables": ["B01003_001E", "B01003_001M"],
             "api_year": year,
-            "retrieved_at": datetime.now(timezone.utc).isoformat(),
+            "retrieved_at": datetime.now(UTC).isoformat(),
             "row_count": len(df),
             "raw_sha256": content_sha256,
         },

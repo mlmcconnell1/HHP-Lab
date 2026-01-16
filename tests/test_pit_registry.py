@@ -1,6 +1,6 @@
 """Tests for the PIT registry module."""
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
@@ -35,7 +35,7 @@ class TestPitRegistryEntry:
         entry = PitRegistryEntry(
             pit_year=2023,
             source="hud_exchange",
-            ingested_at=datetime(2025, 1, 1, 12, 0, 0, tzinfo=timezone.utc),
+            ingested_at=datetime(2025, 1, 1, 12, 0, 0, tzinfo=UTC),
             path=Path("data/curated/pit/pit__2023.parquet"),
             row_count=400,
             hash_of_file="abc123",
@@ -102,7 +102,7 @@ class TestRegisterPitYear:
         assert years == {2022, 2023}
 
     def test_idempotent_same_hash(self, temp_registry, sample_parquet):
-        ingested_at = datetime(2025, 1, 1, 12, 0, 0, tzinfo=timezone.utc)
+        ingested_at = datetime(2025, 1, 1, 12, 0, 0, tzinfo=UTC)
         register_pit_year(
             pit_year=2023,
             source="hud_exchange",
@@ -117,7 +117,7 @@ class TestRegisterPitYear:
             source="hud_exchange",
             path=sample_parquet,
             row_count=400,
-            ingested_at=datetime(2025, 2, 1, 12, 0, 0, tzinfo=timezone.utc),
+            ingested_at=datetime(2025, 2, 1, 12, 0, 0, tzinfo=UTC),
             registry_path=temp_registry,
         )
         entries = list_pit_years(registry_path=temp_registry)
