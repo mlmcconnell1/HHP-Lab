@@ -30,7 +30,7 @@ def get_coclab_info() -> dict:
     """
     # Get coclab version from package metadata
     try:
-        coclab_version = version("coc-pit")
+        coclab_version = version("coc-lab")
     except PackageNotFoundError:
         coclab_version = "unknown"
 

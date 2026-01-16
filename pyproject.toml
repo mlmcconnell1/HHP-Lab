@@ -1,5 +1,5 @@
 [project]
-name = "coc-pit"
+name = "coc-lab"
 version = "0.1.0"
 description = "CoC Lab - Continuum of Care boundary data infrastructure"
 readme = "README.md"

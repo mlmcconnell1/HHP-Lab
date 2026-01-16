@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-CoC-PIT (Continuum of Care - Point In Time) is a Python-based data infrastructure project for managing HUD Continuum of Care boundary geometries with versioning, validation, and visualization.
+CoC Lab (Continuum of Care - Point In Time) is a Python-based data infrastructure project for managing HUD Continuum of Care boundary geometries with versioning, validation, and visualization.
 
 ## Agent Instructions
 
