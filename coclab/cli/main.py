@@ -258,6 +258,33 @@ def list_boundaries_cmd() -> None:
         )
 
 
+def check_boundaries() -> None:
+    """Check boundary registry health for issues.
+
+    Scans all registry entries for:
+    - Paths in temporary directories (may disappear after process exit)
+    - Missing boundary files
+    - Empty or invalid paths
+
+    Examples:
+
+        coclab check-boundaries
+    """
+    from coclab.registry import check_registry_health
+
+    typer.echo("Checking boundary registry health...\n")
+    report = check_registry_health()
+    typer.echo(str(report))
+
+    if not report.is_healthy:
+        typer.echo(
+            "\nTo fix issues, use 'coclab delete-boundaries <vintage> <source>' "
+            "and re-ingest the boundaries.",
+            err=True,
+        )
+        raise typer.Exit(1)
+
+
 def show(
     coc: Annotated[
         str,
@@ -371,6 +398,7 @@ app.command("aggregate-zori")(aggregate_zori)
 app.command("build-measures")(build_measures)
 app.command("build-panel")(build_panel_cmd)
 app.command("build-xwalks")(build_xwalks)
+app.command("check-boundaries")(check_boundaries)
 app.command("compare-vintages")(compare_vintages)
 app.command("crosscheck-acs-population")(crosscheck_acs_population)
 app.command("crosscheck-pit-vintages")(crosscheck_pit_vintages)

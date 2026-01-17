@@ -2,6 +2,8 @@
 
 import hashlib
 import re
+import tempfile
+from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 
@@ -11,6 +13,73 @@ from coclab.registry.schema import REGISTRY_COLUMNS, RegistryEntry
 
 # Default registry location
 DEFAULT_REGISTRY_PATH = Path("data/curated/boundary_registry.parquet")
+
+# Known temp directory patterns (platform-specific)
+TEMP_DIR_PATTERNS = (
+    "/var/folders/",  # macOS temp directories
+    "/tmp/",
+    "/temp/",
+    tempfile.gettempdir(),  # System-specific temp dir
+)
+
+
+def _is_temp_path(path: Path | str) -> bool:
+    """Check if a path appears to be in a temporary directory.
+
+    Args:
+        path: Path to check
+
+    Returns:
+        True if the path looks like a temp directory path
+    """
+    path_str = str(path).lower()
+
+    for pattern in TEMP_DIR_PATTERNS:
+        if pattern.lower() in path_str:
+            return True
+
+    # Also check for common temp patterns (e.g., tmpXXXXXX)
+    if re.search(r"/tmp[a-z0-9_-]+/", path_str, re.IGNORECASE):
+        return True
+
+    return False
+
+
+@dataclass
+class RegistryHealthIssue:
+    """A single health issue found in the registry."""
+
+    vintage: str
+    source: str
+    issue_type: str
+    message: str
+    path: str | None = None
+
+
+@dataclass
+class RegistryHealthReport:
+    """Report of all health issues found in the registry."""
+
+    issues: list[RegistryHealthIssue]
+
+    @property
+    def is_healthy(self) -> bool:
+        """Return True if no issues were found."""
+        return len(self.issues) == 0
+
+    def __str__(self) -> str:
+        if self.is_healthy:
+            return "Registry is healthy: no issues found."
+
+        lines = [f"Registry health check found {len(self.issues)} issue(s):", ""]
+        for issue in self.issues:
+            lines.append(f"  [{issue.issue_type}] {issue.vintage} ({issue.source})")
+            lines.append(f"    {issue.message}")
+            if issue.path:
+                lines.append(f"    Path: {issue.path}")
+            lines.append("")
+
+        return "\n".join(lines)
 
 
 def _get_registry_path(registry_path: Path | None = None) -> Path:
@@ -64,6 +133,8 @@ def register_vintage(
     ingested_at: datetime | None = None,
     hash_of_file: str | None = None,
     registry_path: Path | None = None,
+    *,
+    _allow_temp_path: bool = False,
 ) -> RegistryEntry:
     """Register a new boundary vintage in the registry.
 
@@ -79,10 +150,22 @@ def register_vintage(
         ingested_at: UTC timestamp (defaults to now)
         hash_of_file: SHA-256 of file (computed if not provided)
         registry_path: Custom registry path (uses default if not specified)
+        _allow_temp_path: Internal flag to allow temp paths (for testing only).
+            Do not use in production code.
 
     Returns:
         The registered RegistryEntry
+
+    Raises:
+        ValueError: If the path appears to be in a temporary directory
     """
+    # Validate that path is not in a temp directory
+    if not _allow_temp_path and _is_temp_path(path):
+        raise ValueError(
+            f"Cannot register boundary with temporary directory path: {path}. "
+            f"Boundary files must be in a permanent location before registration."
+        )
+
     reg_path = _get_registry_path(registry_path)
     df = _load_registry(reg_path)
 
@@ -245,3 +328,77 @@ def latest_vintage(
 
     # Fallback to most recent ingested_at across all sources
     return df.loc[df["ingested_at"].idxmax(), "boundary_vintage"]
+
+
+def check_registry_health(
+    registry_path: Path | None = None,
+    *,
+    _skip_temp_check: bool = False,
+) -> RegistryHealthReport:
+    """Check the boundary registry for common issues.
+
+    Scans all registry entries for:
+    - Paths in temporary directories
+    - Missing boundary files
+    - Empty or invalid paths
+
+    Args:
+        registry_path: Custom registry path (uses default if not specified)
+        _skip_temp_check: Internal flag to skip temp path checks (for testing only).
+
+    Returns:
+        RegistryHealthReport containing any issues found
+    """
+    reg_path = _get_registry_path(registry_path)
+    df = _load_registry(reg_path)
+
+    issues: list[RegistryHealthIssue] = []
+
+    if df.empty:
+        return RegistryHealthReport(issues=issues)
+
+    for _, row in df.iterrows():
+        vintage = row["boundary_vintage"]
+        source = row["source"]
+        path_str = str(row["path"])
+
+        # Check for empty path
+        if not path_str or path_str == "":
+            issues.append(
+                RegistryHealthIssue(
+                    vintage=vintage,
+                    source=source,
+                    issue_type="EMPTY_PATH",
+                    message="Registry entry has an empty path",
+                    path=path_str,
+                )
+            )
+            continue
+
+        # Check for temp directory path
+        if not _skip_temp_check and _is_temp_path(path_str):
+            issues.append(
+                RegistryHealthIssue(
+                    vintage=vintage,
+                    source=source,
+                    issue_type="TEMP_PATH",
+                    message="Path points to a temporary directory that may not exist",
+                    path=path_str,
+                )
+            )
+            continue
+
+        # Check if file exists
+        path = Path(path_str)
+        if not path.exists():
+            issues.append(
+                RegistryHealthIssue(
+                    vintage=vintage,
+                    source=source,
+                    issue_type="MISSING_FILE",
+                    message="Boundary file does not exist",
+                    path=path_str,
+                )
+            )
+
+    return RegistryHealthReport(issues=issues)

@@ -423,17 +423,30 @@ class TestPathHelpers:
         expected = Path("/tmp/acs/coc_population_rollup__2025__2019-2023__2023__area.parquet")
         assert path == expected
 
-    def test_get_measures_path_default(self):
-        """Test default measures path."""
-        path = get_measures_path("2025", "2019-2023")
-        expected = Path("data/curated/measures/coc_measures__2025__2019-2023.parquet")
+    def test_get_measures_path_fallback_to_legacy(self, tmp_path):
+        """Test that measures path falls back to legacy naming when no files exist."""
+        # Using tmp_path ensures no existing files interfere
+        path = get_measures_path("2025", "2019-2023", base_dir=tmp_path)
+        expected = tmp_path / "coc_measures__2025__2019-2023.parquet"
         assert path == expected
 
-    def test_get_measures_path_custom(self):
-        """Test custom measures path."""
-        path = get_measures_path("2025", "2019-2023", base_dir="/tmp/measures")
-        expected = Path("/tmp/measures/coc_measures__2025__2019-2023.parquet")
-        assert path == expected
+    def test_get_measures_path_prefers_new_naming(self, tmp_path):
+        """Test that measures path prefers new naming when file exists."""
+        # Create a file with new naming
+        new_file = tmp_path / "measures__A2023@B2025.parquet"
+        new_file.write_bytes(b"test")
+
+        path = get_measures_path("2025", "2019-2023", base_dir=tmp_path)
+        assert path == new_file
+
+    def test_get_measures_path_finds_tract_suffix(self, tmp_path):
+        """Test that measures path finds files with tract suffix."""
+        # Create a file with tract suffix
+        tract_file = tmp_path / "measures__A2023@B2025xT2023.parquet"
+        tract_file.write_bytes(b"test")
+
+        path = get_measures_path("2025", "2019-2023", base_dir=tmp_path)
+        assert path == tract_file
 
     def test_get_crosscheck_output_path_default(self):
         """Test default crosscheck output path."""

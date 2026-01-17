@@ -367,8 +367,16 @@ def _load_acs_measures(
     """
     measures_dir = measures_dir or DEFAULT_MEASURES_DIR
 
-    # Try new naming first, then legacy
-    new_path = measures_dir / naming.measures_filename(acs_vintage, boundary_vintage)
+    # Try new naming conventions in order:
+    # 1. Without tract: measures__A{acs}@B{boundary}.parquet
+    # 2. With tract: measures__A{acs}@B{boundary}xT*.parquet (glob pattern)
+    # 3. Legacy formats
+    new_path_no_tract = measures_dir / naming.measures_filename(acs_vintage, boundary_vintage)
+
+    # Also check for files with tract suffix using glob
+    acs_year = naming._normalize_acs_vintage(acs_vintage)
+    tract_pattern = f"measures__A{acs_year}@B{boundary_vintage}xT*.parquet"
+    tract_matches = list(measures_dir.glob(tract_pattern))
 
     # Legacy paths
     weighting_fname = f"coc_measures__{boundary_vintage}__{acs_vintage}__{weighting}.parquet"
@@ -376,8 +384,16 @@ def _load_acs_measures(
     legacy_generic_path = measures_dir / f"coc_measures__{boundary_vintage}__{acs_vintage}.parquet"
 
     measures_path = None
-    if new_path.exists():
-        measures_path = new_path
+    if new_path_no_tract.exists():
+        measures_path = new_path_no_tract
+    elif tract_matches:
+        # Use the first match (there should typically be only one)
+        measures_path = tract_matches[0]
+        if len(tract_matches) > 1:
+            logger.warning(
+                f"Multiple measures files found for boundary={boundary_vintage}, "
+                f"acs={acs_vintage}. Using: {measures_path.name}"
+            )
     elif legacy_weighting_path.exists():
         measures_path = legacy_weighting_path
     elif legacy_generic_path.exists():

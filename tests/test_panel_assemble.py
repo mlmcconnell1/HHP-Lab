@@ -188,6 +188,46 @@ class TestLoadAcsMeasures:
         )
         assert result["coc_id"].dtype == object
 
+    def test_load_measures_with_tract_suffix(self, tmp_path):
+        """Test that measures files with tract suffix are discovered.
+
+        Addresses CoC-PIT-716: Standardize measures file naming convention.
+        Files written as measures__A2023@B2025xT2023.parquet should be
+        found even when caller doesn't specify tract vintage.
+        """
+        measures_dir = tmp_path / "measures"
+        measures_dir.mkdir(parents=True)
+
+        # Create a measures file with tract suffix (as the writer produces)
+        df = pd.DataFrame(
+            {
+                "coc_id": ["CO-500", "CA-600"],
+                "total_population": [500000, 10000000],
+                "adult_population": [400000, 8000000],
+                "population_below_poverty": [50000, 1500000],
+                "median_household_income": [65000, 75000],
+                "median_gross_rent": [1200, 1800],
+                "coverage_ratio": [0.95, 0.98],
+            }
+        )
+        # Save with tract suffix (the new canonical format)
+        df.to_parquet(
+            measures_dir / "measures__A2023@B2025xT2023.parquet",
+            index=False,
+        )
+
+        # Load without specifying tract - should still find the file
+        result, tract_vintage = _load_acs_measures(
+            boundary_vintage="2025",
+            acs_vintage="2023",
+            weighting="population",
+            measures_dir=measures_dir,
+        )
+
+        assert len(result) == 2
+        assert "coc_id" in result.columns
+        assert set(result["coc_id"]) == {"CO-500", "CA-600"}
+
 
 class TestDetectBoundaryChanges:
     """Tests for _detect_boundary_changes function."""

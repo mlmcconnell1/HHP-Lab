@@ -83,6 +83,7 @@ def sample_boundaries(temp_data_dir):
         path=parquet_path,
         feature_count=len(gdf),
         registry_path=registry_path,
+        _allow_temp_path=True,
     )
 
     return {"vintage": vintage, "parquet_path": parquet_path, "gdf": gdf}

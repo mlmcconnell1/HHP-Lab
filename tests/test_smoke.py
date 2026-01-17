@@ -170,6 +170,7 @@ class TestSmokeEndToEnd:
             path=parquet_path,
             feature_count=len(normalized_gdf),
             registry_path=registry_path,
+            _allow_temp_path=True,
         )
 
         assert entry.boundary_vintage == vintage
@@ -217,6 +218,7 @@ class TestSmokeEndToEnd:
             path=parquet_path,
             feature_count=len(normalized_gdf),
             registry_path=registry_path,
+            _allow_temp_path=True,
         )
 
         # Render multiple CoCs
@@ -263,6 +265,7 @@ class TestSmokeCLI:
             path=parquet_path,
             feature_count=len(normalized_gdf),
             registry_path=registry_path,
+            _allow_temp_path=True,
         )
 
         # Test
@@ -292,6 +295,7 @@ class TestSmokeCLI:
             path=parquet_path,
             feature_count=len(normalized_gdf),
             registry_path=registry_path,
+            _allow_temp_path=True,
         )
 
         # Test show command
@@ -321,6 +325,7 @@ class TestSmokeCLI:
             path=parquet_path,
             feature_count=len(normalized_gdf),
             registry_path=registry_path,
+            _allow_temp_path=True,
         )
 
         # Test with invalid CoC
@@ -419,6 +424,7 @@ class TestSmokeEdgeCases:
             path=parquet_path,
             feature_count=len(normalized_gdf),
             registry_path=registry_path,
+            _allow_temp_path=True,
         )
 
         # Try to render with nonexistent vintage

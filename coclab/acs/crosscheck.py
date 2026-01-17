@@ -401,10 +401,17 @@ def get_measures_path(
     else:
         base_dir = Path(base_dir)
 
-    # Try new naming first
-    new_path = base_dir / naming.measures_filename(acs_vintage, boundary_vintage)
-    if new_path.exists():
-        return new_path
+    # Try new naming without tract suffix first
+    new_path_no_tract = base_dir / naming.measures_filename(acs_vintage, boundary_vintage)
+    if new_path_no_tract.exists():
+        return new_path_no_tract
+
+    # Try new naming with tract suffix (glob pattern)
+    acs_year = naming._normalize_acs_vintage(acs_vintage)
+    tract_pattern = f"measures__A{acs_year}@B{boundary_vintage}xT*.parquet"
+    tract_matches = list(base_dir.glob(tract_pattern))
+    if tract_matches:
+        return tract_matches[0]
 
     # Fall back to legacy naming
     legacy_path = base_dir / f"coc_measures__{boundary_vintage}__{acs_vintage}.parquet"

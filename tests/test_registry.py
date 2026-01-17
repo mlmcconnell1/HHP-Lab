@@ -1,11 +1,19 @@
 """Tests for the boundary registry module."""
 
+import tempfile
 from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
 
-from coclab.registry import RegistryEntry, latest_vintage, list_boundaries, register_vintage
+from coclab.registry import (
+    RegistryEntry,
+    check_registry_health,
+    latest_vintage,
+    list_boundaries,
+    register_vintage,
+)
+from coclab.registry.registry import _is_temp_path
 
 
 @pytest.fixture
@@ -70,6 +78,7 @@ class TestRegisterVintage:
             path=sample_parquet,
             feature_count=400,
             registry_path=temp_registry,
+            _allow_temp_path=True,
         )
         assert entry.boundary_vintage == "2025"
         assert entry.source == "hud_exchange"
@@ -84,6 +93,7 @@ class TestRegisterVintage:
             path=sample_parquet,
             feature_count=390,
             registry_path=temp_registry,
+            _allow_temp_path=True,
         )
         register_vintage(
             boundary_vintage="2025",
@@ -91,6 +101,7 @@ class TestRegisterVintage:
             path=sample_parquet,
             feature_count=400,
             registry_path=temp_registry,
+            _allow_temp_path=True,
         )
         entries = list_boundaries(registry_path=temp_registry)
         assert len(entries) == 2
@@ -106,6 +117,7 @@ class TestRegisterVintage:
             feature_count=400,
             ingested_at=ingested_at,
             registry_path=temp_registry,
+            _allow_temp_path=True,
         )
         # Register again with same content
         register_vintage(
@@ -115,6 +127,7 @@ class TestRegisterVintage:
             feature_count=400,
             ingested_at=datetime(2025, 2, 1, 12, 0, 0, tzinfo=UTC),
             registry_path=temp_registry,
+            _allow_temp_path=True,
         )
         entries = list_boundaries(registry_path=temp_registry)
         assert len(entries) == 1
@@ -134,6 +147,7 @@ class TestRegisterVintage:
             path=file1,
             feature_count=400,
             registry_path=temp_registry,
+            _allow_temp_path=True,
         )
         hash1 = entry1.hash_of_file
 
@@ -143,6 +157,7 @@ class TestRegisterVintage:
             path=file2,
             feature_count=405,
             registry_path=temp_registry,
+            _allow_temp_path=True,
         )
         hash2 = entry2.hash_of_file
 
@@ -168,6 +183,7 @@ class TestListVintages:
             feature_count=380,
             ingested_at=datetime(2023, 6, 1, tzinfo=UTC),
             registry_path=temp_registry,
+            _allow_temp_path=True,
         )
         register_vintage(
             boundary_vintage="2025",
@@ -176,6 +192,7 @@ class TestListVintages:
             feature_count=400,
             ingested_at=datetime(2025, 1, 1, tzinfo=UTC),
             registry_path=temp_registry,
+            _allow_temp_path=True,
         )
         register_vintage(
             boundary_vintage="2024",
@@ -184,6 +201,7 @@ class TestListVintages:
             feature_count=390,
             ingested_at=datetime(2024, 6, 1, tzinfo=UTC),
             registry_path=temp_registry,
+            _allow_temp_path=True,
         )
         entries = list_boundaries(registry_path=temp_registry)
         assert [e.boundary_vintage for e in entries] == ["2025", "2024", "2023"]
@@ -205,6 +223,7 @@ class TestLatestVintage:
             feature_count=380,
             ingested_at=datetime(2025, 6, 1, tzinfo=UTC),
             registry_path=temp_registry,
+            _allow_temp_path=True,
         )
         register_vintage(
             boundary_vintage="2025",
@@ -213,6 +232,7 @@ class TestLatestVintage:
             feature_count=400,
             ingested_at=datetime(2025, 1, 1, tzinfo=UTC),
             registry_path=temp_registry,
+            _allow_temp_path=True,
         )
         result = latest_vintage(
             source="hud_exchange",
@@ -228,6 +248,7 @@ class TestLatestVintage:
             feature_count=390,
             ingested_at=datetime(2024, 1, 15, tzinfo=UTC),
             registry_path=temp_registry,
+            _allow_temp_path=True,
         )
         register_vintage(
             boundary_vintage="HUDOpenData_2024-06-01",
@@ -236,6 +257,7 @@ class TestLatestVintage:
             feature_count=395,
             ingested_at=datetime(2024, 6, 1, tzinfo=UTC),
             registry_path=temp_registry,
+            _allow_temp_path=True,
         )
         result = latest_vintage(
             source="hud_opendata",
@@ -251,6 +273,7 @@ class TestLatestVintage:
             feature_count=400,
             ingested_at=datetime(2025, 6, 1, tzinfo=UTC),
             registry_path=temp_registry,
+            _allow_temp_path=True,
         )
         register_vintage(
             boundary_vintage="2024",
@@ -259,6 +282,7 @@ class TestLatestVintage:
             feature_count=390,
             ingested_at=datetime(2024, 1, 1, tzinfo=UTC),
             registry_path=temp_registry,
+            _allow_temp_path=True,
         )
         register_vintage(
             boundary_vintage="2025",
@@ -267,6 +291,7 @@ class TestLatestVintage:
             feature_count=400,
             ingested_at=datetime(2025, 1, 1, tzinfo=UTC),
             registry_path=temp_registry,
+            _allow_temp_path=True,
         )
         result = latest_vintage(registry_path=temp_registry)
         # Should prefer hud_exchange with highest year
@@ -280,6 +305,7 @@ class TestLatestVintage:
             feature_count=390,
             ingested_at=datetime(2024, 1, 1, tzinfo=UTC),
             registry_path=temp_registry,
+            _allow_temp_path=True,
         )
         register_vintage(
             boundary_vintage="snapshot_b",
@@ -288,6 +314,7 @@ class TestLatestVintage:
             feature_count=400,
             ingested_at=datetime(2025, 6, 1, tzinfo=UTC),
             registry_path=temp_registry,
+            _allow_temp_path=True,
         )
         result = latest_vintage(
             source="hud_exchange",
@@ -303,9 +330,137 @@ class TestLatestVintage:
             path=sample_parquet,
             feature_count=400,
             registry_path=temp_registry,
+            _allow_temp_path=True,
         )
         result = latest_vintage(
             source="hud_opendata",
             registry_path=temp_registry,
         )
         assert result is None
+
+
+class TestTempPathValidation:
+    """Tests for temp directory path validation."""
+
+    def test_is_temp_path_var_folders(self):
+        """Test detection of macOS temp directories."""
+        assert _is_temp_path("/var/folders/ab/cd123/T/tmpXXXXX/file.parquet")
+        assert _is_temp_path("/var/folders/zz/zzxyz/file.parquet")
+
+    def test_is_temp_path_tmp(self):
+        """Test detection of /tmp paths."""
+        assert _is_temp_path("/tmp/tmpXXXXX/file.parquet")
+        assert _is_temp_path("/tmp/myfile.parquet")
+
+    def test_is_temp_path_temp(self):
+        """Test detection of /temp paths."""
+        assert _is_temp_path("/temp/file.parquet")
+        # Windows paths with forward slashes are detected
+        assert _is_temp_path("C:/temp/file.parquet")
+
+    def test_is_temp_path_system_tempdir(self):
+        """Test detection of system temp directory."""
+        system_temp = tempfile.gettempdir()
+        assert _is_temp_path(f"{system_temp}/file.parquet")
+
+    def test_is_temp_path_normal_paths(self):
+        """Test that normal paths are not flagged as temp."""
+        assert not _is_temp_path("/Users/matt/data/file.parquet")
+        assert not _is_temp_path("data/curated/coc_boundaries/boundaries__2025.parquet")
+        assert not _is_temp_path("/home/user/project/data/file.parquet")
+
+    def test_register_vintage_rejects_temp_path(self, temp_registry):
+        """Test that register_vintage raises error for temp paths."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            temp_file = Path(tmpdir) / "boundaries.parquet"
+            temp_file.write_bytes(b"fake content")
+
+            with pytest.raises(ValueError, match="temporary directory"):
+                register_vintage(
+                    boundary_vintage="2025",
+                    source="hud_exchange",
+                    path=temp_file,
+                    feature_count=400,
+                    registry_path=temp_registry,
+                )
+
+
+class TestRegistryHealthCheck:
+    """Tests for registry health check functionality."""
+
+    def test_empty_registry_is_healthy(self, temp_registry):
+        """Test that an empty registry is considered healthy."""
+        report = check_registry_health(registry_path=temp_registry)
+        assert report.is_healthy
+        assert len(report.issues) == 0
+
+    def test_healthy_registry(self, temp_registry, sample_parquet):
+        """Test that a properly configured registry is healthy."""
+        register_vintage(
+            boundary_vintage="2025",
+            source="hud_exchange",
+            path=sample_parquet,
+            feature_count=400,
+            registry_path=temp_registry,
+            _allow_temp_path=True,
+        )
+        # Skip temp check since test fixtures use temp directories
+        report = check_registry_health(registry_path=temp_registry, _skip_temp_check=True)
+        assert report.is_healthy
+        assert len(report.issues) == 0
+
+    def test_detects_missing_files(self, temp_registry, tmp_path):
+        """Test detection of missing boundary files."""
+        # Create a file, register it, then delete it
+        temp_file = tmp_path / "boundaries.parquet"
+        temp_file.write_bytes(b"fake content")
+
+        register_vintage(
+            boundary_vintage="2025",
+            source="hud_exchange",
+            path=temp_file,
+            feature_count=400,
+            registry_path=temp_registry,
+            _allow_temp_path=True,
+        )
+
+        # Delete the file
+        temp_file.unlink()
+
+        # Skip temp check to test MISSING_FILE detection
+        report = check_registry_health(registry_path=temp_registry, _skip_temp_check=True)
+        assert not report.is_healthy
+        assert len(report.issues) == 1
+        assert report.issues[0].issue_type == "MISSING_FILE"
+        assert report.issues[0].vintage == "2025"
+
+    def test_report_string_representation(self, temp_registry, tmp_path):
+        """Test the string representation of the health report."""
+        # Create a file, register it, then delete it
+        temp_file = tmp_path / "boundaries.parquet"
+        temp_file.write_bytes(b"fake content")
+
+        register_vintage(
+            boundary_vintage="2025",
+            source="hud_exchange",
+            path=temp_file,
+            feature_count=400,
+            registry_path=temp_registry,
+            _allow_temp_path=True,
+        )
+
+        temp_file.unlink()
+
+        # Skip temp check to test MISSING_FILE string representation
+        report = check_registry_health(registry_path=temp_registry, _skip_temp_check=True)
+        report_str = str(report)
+
+        assert "MISSING_FILE" in report_str
+        assert "2025" in report_str
+        assert "hud_exchange" in report_str
+
+    def test_healthy_report_string(self, temp_registry):
+        """Test string representation of healthy report."""
+        report = check_registry_health(registry_path=temp_registry)
+        assert "healthy" in str(report).lower()
+        assert "no issues" in str(report).lower()
