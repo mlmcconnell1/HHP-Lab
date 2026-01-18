@@ -396,13 +396,13 @@ class TestIntegrationWithRealRelationshipFile:
         if not self._relationship_file_available():
             pytest.skip("Tract relationship file not available")
 
-        # Create sample data with known 2010 tract GEOIDs
+        # Create sample data with real 2010 tract GEOIDs from Denver
         df = pd.DataFrame(
             {
                 "tract_geoid": [
-                    "08031000100",  # Denver tract
-                    "08031000200",
-                    "08031000300",
+                    "08031000102",  # Denver 2010 tracts
+                    "08031000201",
+                    "08031000202",
                 ],
                 "total_population": [5000, 3000, 4000],
             }
