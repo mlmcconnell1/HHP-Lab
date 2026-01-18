@@ -18,6 +18,13 @@ from coclab.acs.rollup import (
     build_coc_population_rollup,
     rollup_tract_population,
 )
+from coclab.acs.translate import (
+    TranslationStats,
+    get_source_tract_vintage,
+    needs_translation,
+    translate_acs_to_target_vintage,
+    translate_tracts_2010_to_2020,
+)
 
 __all__ = [
     "fetch_tract_population",
@@ -28,4 +35,10 @@ __all__ = [
     "crosscheck_population",
     "run_crosscheck",
     "print_crosscheck_report",
+    # Translation
+    "TranslationStats",
+    "get_source_tract_vintage",
+    "needs_translation",
+    "translate_acs_to_target_vintage",
+    "translate_tracts_2010_to_2020",
 ]
