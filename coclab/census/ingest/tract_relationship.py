@@ -24,6 +24,31 @@ from coclab.source_registry import check_source_changed, register_source
 
 logger = logging.getLogger(__name__)
 
+
+class TractRelationshipNotFoundError(FileNotFoundError):
+    """Raised when the tract relationship file is required but not found.
+
+    This error provides a helpful message directing users to run the
+    ingest-tract-relationship command.
+    """
+
+    def __init__(self, path: Path | None = None):
+        self.path = path
+        message = (
+            "Tract relationship file (2010↔2020) not found.\n"
+            "This file is required for translating ACS data between "
+            "2010 and 2020 tract geographies.\n\n"
+            "To download it, run:\n"
+            "  coclab ingest-tract-relationship"
+        )
+        if path:
+            message = (
+                f"Tract relationship file not found: {path}\n\n"
+                + message[message.find("This file") :]
+            )
+        super().__init__(message)
+
+
 # Census Bureau relationship file URL
 RELATIONSHIP_URL = (
     "https://www2.census.gov/geo/docs/maps-data/data/rel2020/tract/tab20_tract20_tract10_natl.txt"
@@ -192,6 +217,39 @@ def ingest_tract_relationship(force: bool = False) -> Path:
     logger.info(f"Ingested tract relationship file to {output_path}")
 
     return output_path
+
+
+def get_tract_relationship_path() -> Path:
+    """Get the path to the tract relationship file.
+
+    Returns:
+        Path to the tract relationship parquet file.
+
+    Raises:
+        TractRelationshipNotFoundError: If the file does not exist.
+    """
+    path = OUTPUT_DIR / tract_relationship_filename(2010, 2020)
+    if not path.exists():
+        raise TractRelationshipNotFoundError(path)
+    return path
+
+
+def load_tract_relationship() -> pd.DataFrame:
+    """Load the tract relationship file.
+
+    Returns:
+        DataFrame with columns:
+        - tract_geoid_2010: 11-char GEOID
+        - tract_geoid_2020: 11-char GEOID
+        - area_2010_to_2020_weight: fraction of 2010 tract in this 2020 tract
+        - area_2020_to_2010_weight: fraction of 2020 tract in this 2010 tract
+
+    Raises:
+        TractRelationshipNotFoundError: If the file does not exist.
+    """
+    path = get_tract_relationship_path()
+    logger.info(f"Loading tract relationship file from {path}")
+    return pd.read_parquet(path)
 
 
 if __name__ == "__main__":

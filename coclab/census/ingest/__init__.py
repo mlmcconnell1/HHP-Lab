@@ -10,8 +10,11 @@ from coclab.census.ingest.tiger_tracts import (
     save_tracts,
 )
 from coclab.census.ingest.tract_relationship import (
+    TractRelationshipNotFoundError,
     download_tract_relationship,
+    get_tract_relationship_path,
     ingest_tract_relationship,
+    load_tract_relationship,
     save_tract_relationship,
 )
 
@@ -25,4 +28,7 @@ __all__ = [
     "download_tract_relationship",
     "ingest_tract_relationship",
     "save_tract_relationship",
+    "get_tract_relationship_path",
+    "load_tract_relationship",
+    "TractRelationshipNotFoundError",
 ]
