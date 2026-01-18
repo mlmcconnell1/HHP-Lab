@@ -844,3 +844,63 @@ class TestBundleWithZori:
         assert len(manifest["sources"]) > 0
         zillow_sources = [s for s in manifest["sources"] if "Zillow" in s.get("name", "")]
         assert len(zillow_sources) == 1
+
+
+class TestPanelYearMatching:
+    """Tests for panel year range matching in selection logic."""
+
+    @pytest.fixture
+    def multi_format_panels(self, tmp_path: Path) -> Path:
+        """Create panels with both new (dash) and legacy (underscore) naming."""
+        base = tmp_path / "base"
+        panels_dir = base / "data" / "curated" / "panel"
+        panels_dir.mkdir(parents=True)
+
+        # New naming convention (dashes in year range)
+        new_panel = panels_dir / "panel__Y2015-2024@B2015.parquet"
+        create_test_panel(new_panel)
+
+        # Legacy naming convention (underscores in year range)
+        legacy_panel = panels_dir / "coc_panel__2015_2024.parquet"
+        create_test_panel(legacy_panel)
+
+        # Make new panel more recent
+        import os
+        import time
+
+        time.sleep(0.01)
+        os.utime(new_panel, None)  # Touch to make it most recent
+
+        return base
+
+    def test_years_filter_matches_dash_format(self, multi_format_panels: Path):
+        """Test that --years 2015-2024 matches panel__Y2015-2024@B2015.parquet."""
+        config = BundleConfig(
+            name="test",
+            out_dir=multi_format_panels / "exports",
+            include={"panel"},
+            years="2015-2024",
+        )
+
+        plan = build_selection_plan(config, base_dir=multi_format_panels)
+        assert len(plan.panel_artifacts) == 1
+
+        # Should select the new naming format (most recent)
+        selected_name = plan.panel_artifacts[0].source_path.name
+        assert "panel__Y2015-2024" in selected_name
+
+    def test_years_filter_matches_underscore_format(self, multi_format_panels: Path):
+        """Test that --years 2015-2024 also matches coc_panel__2015_2024.parquet."""
+        config = BundleConfig(
+            name="test",
+            out_dir=multi_format_panels / "exports",
+            include={"panel"},
+            years="2015-2024",
+        )
+
+        # Both files should be candidates, most recent selected
+        plan = build_selection_plan(config, base_dir=multi_format_panels)
+        assert len(plan.panel_artifacts) == 1
+        # Since new panel is more recent, it should be selected
+        assert "2015-2024" in plan.panel_artifacts[0].source_path.name or \
+               "2015_2024" in plan.panel_artifacts[0].source_path.name

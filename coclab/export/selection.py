@@ -199,8 +199,14 @@ def select_panel(
 
     # Filter by years if specified
     if config.years:
-        # Try to match year range in filename, e.g., coc_panel__2011_2024__zori.parquet
-        year_candidates = [f for f in candidates if config.years.replace("-", "_") in f.name]
+        # Match year range in filename - check both dash and underscore formats
+        # New naming: panel__Y2015-2024@B2015.parquet (uses dashes)
+        # Legacy naming: coc_panel__2015_2024.parquet (uses underscores)
+        years_dash = config.years  # e.g., "2015-2024"
+        years_underscore = config.years.replace("-", "_")  # e.g., "2015_2024"
+        year_candidates = [
+            f for f in candidates if years_dash in f.name or years_underscore in f.name
+        ]
         if year_candidates:
             candidates = year_candidates
 
