@@ -15,7 +15,7 @@ flowchart LR
     coclab --> list-boundaries
     coclab --> show
     coclab --> build-xwalks
-    coclab --> build-measures
+    coclab --> aggregate-measures
     coclab --> build-panel
     coclab --> rollup-acs-population
     coclab --> crosscheck-acs-population
@@ -45,7 +45,7 @@ flowchart LR
     list-boundaries --> LIST[List boundary vintages]
     show --> MAP[Render interactive map]
     build-xwalks --> XWALK[Create tract/county crosswalks]
-    build-measures --> MEAS[Build demographic measures from ACS]
+    aggregate-measures --> MEAS[Aggregate demographic measures from ACS]
     build-panel --> PANEL[Assemble CoC × year panels]
     rollup-acs-population --> ROLLUP[Aggregate tract pop to CoC]
     crosscheck-acs-population --> XCHECK[Validate rollup vs measures]
@@ -65,6 +65,43 @@ flowchart LR
     source-status --> SRCSTAT[Display source registry status]
     export-bundle --> EXPORT[Create analysis-ready bundle]
 ```
+
+## `coclab aggregate-measures`
+
+Aggregate CoC-level demographic measures from ACS 5-year estimates. Fetches tract-level data from the Census API and aggregates to CoC level using tract crosswalks.
+
+**Measures produced:**
+
+| Column | ACS Table | Description |
+|--------|-----------|-------------|
+| `total_population` | B01003 | Total population |
+| `adult_population` | B01001 | Population 18+ (derived from age groups) |
+| `median_household_income` | B19013 | Median household income ($) |
+| `median_gross_rent` | B25064 | Median gross rent ($) |
+| `population_below_poverty` | C17002 | Population below 100% poverty level |
+| `poverty_universe` | C17002 | Population for whom poverty is determined |
+| `coverage_ratio` | — | Fraction of CoC area with valid tract data |
+
+```bash
+# Aggregate measures with area weighting
+coclab aggregate-measures --boundary 2025 --acs 2019-2023
+
+# Use population weighting instead
+coclab aggregate-measures --boundary 2025 --acs 2019-2023 --weighting population
+```
+
+| Option | Description | Default |
+|--------|-------------|---------|
+| `--boundary`, `-b` | CoC boundary vintage | Latest |
+| `--acs`, `-a` | ACS 5-year estimate vintage (e.g., `2019-2023`) | `2018-2022` |
+| `--tracts`, `-t` | Tract vintage for crosswalk | Same as ACS end year |
+| `--weighting`, `-w` | `area` or `population` | `area` |
+| `--xwalk-dir` | Directory containing crosswalk files | `data/curated/xwalks` |
+| `--output-dir`, `-o` | Output directory | `data/curated/measures` |
+
+**Output:**
+- `measures__A{acs}@B{boundary}.parquet`
+- Summary statistics printed to console
 
 ## `coclab aggregate-zori`
 
@@ -111,43 +148,6 @@ coclab ingest-zori --geography county
 **Output:**
 - `data/curated/zori/coc_zori__{geography}__b{boundary}__c{counties}__acs{acs}__w{weighting}.parquet`
 - Optional yearly: `data/curated/zori/coc_zori_yearly__...parquet`
-
-## `coclab build-measures`
-
-Build CoC-level demographic measures from ACS 5-year estimates. Fetches tract-level data from the Census API and aggregates to CoC level using tract crosswalks.
-
-**Measures produced:**
-
-| Column | ACS Table | Description |
-|--------|-----------|-------------|
-| `total_population` | B01003 | Total population |
-| `adult_population` | B01001 | Population 18+ (derived from age groups) |
-| `median_household_income` | B19013 | Median household income ($) |
-| `median_gross_rent` | B25064 | Median gross rent ($) |
-| `population_below_poverty` | C17002 | Population below 100% poverty level |
-| `poverty_universe` | C17002 | Population for whom poverty is determined |
-| `coverage_ratio` | — | Fraction of CoC area with valid tract data |
-
-```bash
-# Build measures with area weighting
-coclab build-measures --boundary 2025 --acs 2019-2023
-
-# Use population weighting instead
-coclab build-measures --boundary 2025 --acs 2019-2023 --weighting population
-```
-
-| Option | Description | Default |
-|--------|-------------|---------|
-| `--boundary`, `-b` | CoC boundary vintage | Latest |
-| `--acs`, `-a` | ACS 5-year estimate vintage (e.g., `2019-2023`) | `2018-2022` |
-| `--tracts`, `-t` | Tract vintage for crosswalk | Same as ACS end year |
-| `--weighting`, `-w` | `area` or `population` | `area` |
-| `--xwalk-dir` | Directory containing crosswalk files | `data/curated/xwalks` |
-| `--output-dir`, `-o` | Output directory | `data/curated/measures` |
-
-**Output:**
-- `measures__A{acs}@B{boundary}.parquet`
-- Summary statistics printed to console
 
 ## `coclab build-panel`
 

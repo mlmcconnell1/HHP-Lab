@@ -398,8 +398,8 @@ def source_status(
 # Register all commands alphabetically for consistent help output
 # -----------------------------------------------------------------------------
 
+app.command("aggregate-measures")(build_measures)
 app.command("aggregate-zori")(aggregate_zori)
-app.command("build-measures")(build_measures)
 app.command("build-panel")(build_panel_cmd)
 app.command("build-xwalks")(build_xwalks)
 app.command("check-boundaries")(check_boundaries)
