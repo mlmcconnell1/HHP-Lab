@@ -101,6 +101,73 @@ import pandas as pd
 
 from coclab.provenance import ProvenanceBlock, write_parquet_with_provenance
 
+
+def _maybe_remap_ct_planning_regions(
+    acs_data: pd.DataFrame,
+    crosswalk: pd.DataFrame,
+    acs_vintage: str,
+) -> pd.DataFrame:
+    """Attempt to remap CT planning-region GEOIDs to legacy county GEOIDs."""
+    import warnings
+
+    if "GEOID" not in acs_data.columns:
+        return acs_data
+
+    ct_in_acs = acs_data["GEOID"].astype(str).str.startswith("09").any()
+    ct_in_xwalk = (
+        crosswalk["tract_geoid"].astype(str).str.startswith("09").any()
+        if "tract_geoid" in crosswalk.columns
+        else crosswalk["GEOID"].astype(str).str.startswith("09").any()
+    )
+    if not ct_in_acs or not ct_in_xwalk:
+        return acs_data
+
+    # Only attempt remap for ACS vintages that use planning regions (2022+).
+    acs_end_year = int(acs_vintage.split("-")[1] if "-" in acs_vintage else acs_vintage)
+    if acs_end_year < 2022:
+        return acs_data
+
+    try:
+        from coclab.geo.ct_planning_regions import (
+            build_ct_tract_planning_region_map,
+            remap_ct_planning_region_geoids,
+        )
+    except Exception as exc:  # pragma: no cover - import errors should surface in runtime
+        warnings.warn(
+            f"Unable to load CT planning-region helpers ({exc}); skipping CT remap.",
+            UserWarning,
+            stacklevel=2,
+        )
+        return acs_data
+
+    tract_vintage = None
+    if "tract_vintage" in crosswalk.columns:
+        tract_vintage = str(crosswalk["tract_vintage"].iloc[0])
+
+    if tract_vintage is None:
+        return acs_data
+
+    try:
+        mapping = build_ct_tract_planning_region_map(tract_vintage)
+    except (FileNotFoundError, ValueError) as exc:
+        warnings.warn(
+            "CT planning-region GEOID remap skipped. "
+            f"{exc}",
+            UserWarning,
+            stacklevel=2,
+        )
+        return acs_data
+
+    remapped = remap_ct_planning_region_geoids(acs_data, mapping)
+    if not remapped.equals(acs_data):
+        warnings.warn(
+            "Applied CT planning-region GEOID remap to align ACS tracts with legacy "
+            "county-coded crosswalks.",
+            UserWarning,
+            stacklevel=2,
+        )
+    return remapped
+
 CENSUS_API = "https://api.census.gov/data/{year}/acs/acs5"
 
 # ACS variable mappings
@@ -574,6 +641,7 @@ def build_coc_measures(
     if not show_progress:
         print(f"Fetching ACS {acs_vintage_str} 5-year estimates...")
     acs_data = fetch_all_states_tract_data(api_year, show_progress=show_progress)
+    acs_data = _maybe_remap_ct_planning_regions(acs_data, crosswalk, acs_vintage_str)
 
     # Aggregate to CoC level
     print(f"Aggregating to CoC level using {weighting} weighting...")

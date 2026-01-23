@@ -73,6 +73,15 @@ from coclab.rents.weights import (
     build_county_weights,
     get_county_weights_path,
 )
+from coclab.geo.ct_planning_regions import (
+    CT_LEGACY_COUNTY_VINTAGE,
+    CT_PLANNING_REGION_VINTAGE,
+    build_ct_county_planning_region_crosswalk,
+    is_ct_legacy_county_fips,
+    is_ct_planning_region_fips,
+    translate_weights_planning_to_legacy,
+    translate_zori_legacy_to_planning,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -85,6 +94,49 @@ DEFAULT_MIN_COVERAGE = 0.90
 
 # Yearly collapse methods
 YearlyMethod = Literal["pit_january", "calendar_mean", "calendar_median"]
+
+
+def _align_ct_geographies(
+    zori_df: pd.DataFrame,
+    xwalk_df: pd.DataFrame,
+    weights_df: pd.DataFrame,
+    county_vintage: str | int,
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """Align CT planning-region vs legacy county codes for ZORI aggregation."""
+    ct_xwalk_legacy = xwalk_df["county_fips"].apply(is_ct_legacy_county_fips).any()
+    ct_xwalk_planning = xwalk_df["county_fips"].apply(is_ct_planning_region_fips).any()
+    ct_weights_planning = weights_df["county_fips"].apply(is_ct_planning_region_fips).any()
+    ct_zori_legacy = zori_df["geo_id"].apply(is_ct_legacy_county_fips).any()
+
+    if ct_xwalk_legacy and ct_weights_planning:
+        try:
+            crosswalk = build_ct_county_planning_region_crosswalk(
+                legacy_county_vintage=county_vintage,
+                planning_region_vintage=CT_PLANNING_REGION_VINTAGE,
+            )
+            weights_df = translate_weights_planning_to_legacy(weights_df, crosswalk)
+            logger.info("Translated CT planning-region ACS weights to legacy counties")
+        except (FileNotFoundError, ValueError) as exc:
+            logger.warning(
+                "CT county-weight translation skipped (planning->legacy). %s",
+                exc,
+            )
+
+    if ct_xwalk_planning and ct_zori_legacy:
+        try:
+            crosswalk = build_ct_county_planning_region_crosswalk(
+                legacy_county_vintage=CT_LEGACY_COUNTY_VINTAGE,
+                planning_region_vintage=county_vintage,
+            )
+            zori_df = translate_zori_legacy_to_planning(zori_df, crosswalk)
+            logger.info("Translated CT legacy ZORI counties to planning regions")
+        except (FileNotFoundError, ValueError) as exc:
+            logger.warning(
+                "CT ZORI translation skipped (legacy->planning). %s",
+                exc,
+            )
+
+    return zori_df, weights_df
 
 
 # =============================================================================
@@ -713,6 +765,8 @@ def aggregate_zori_to_coc(
     zori_df = load_zori(geography, zori_path, output_dir)
     xwalk_df = load_crosswalk(boundary, xwalk_path, xwalk_dir)
     weights_df = load_weights(acs_vintage, weighting, weights_dir)
+
+    zori_df, weights_df = _align_ct_geographies(zori_df, xwalk_df, weights_df, counties)
 
     # Get provenance from source files for lineage tracking
     zori_source_path = Path(zori_path) if zori_path else get_zori_output_path(geography, output_dir)

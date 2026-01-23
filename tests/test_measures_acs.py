@@ -490,3 +490,29 @@ class TestGEOIDValidation:
 
         # Verify correct results
         assert result.iloc[0]["total_population"] == 3000
+
+
+class TestCtPlanningRegionRemap:
+    """Tests for CT planning region GEOID remapping."""
+
+    def test_remaps_ct_planning_region_geoids(self):
+        from coclab.geo.ct_planning_regions import remap_ct_planning_region_geoids
+
+        acs_data = pd.DataFrame(
+            {
+                "GEOID": ["09110000100", "08001000100"],
+                "total_population": [1000, 2000],
+            }
+        )
+
+        mapping = pd.DataFrame(
+            {
+                "planning_geoid": ["09110000100"],
+                "legacy_geoid": ["09001000100"],
+            }
+        )
+
+        result = remap_ct_planning_region_geoids(acs_data, mapping)
+
+        assert result.loc[0, "GEOID"] == "09001000100"
+        assert result.loc[1, "GEOID"] == "08001000100"
