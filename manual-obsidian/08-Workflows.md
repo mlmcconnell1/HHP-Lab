@@ -100,7 +100,7 @@ sequenceDiagram
     CLI-->>User: Crosswalk built (X tracts, Y CoCs)
 
     Note over User,Storage: Phase 2: Build ACS Measures
-    User->>CLI: coclab build-measures --boundary 2025 --acs 2022
+    User->>CLI: coclab aggregate-measures --boundary 2025 --acs 2022
     CLI->>Storage: Load crosswalk
     CLI->>ACS: fetch_all_states_tract_data(2022)
     ACS->>ACS: Census API for each state
@@ -167,34 +167,34 @@ The default alignment policy maps PIT year Y → ACS vintage Y-1. Build measures
 
 ```bash
 # PIT 2015 → boundary 2015, ACS 2014 (2010-2014 estimates)
-coclab build-measures --boundary 2015 --acs 2010-2014 --tracts 2023
+coclab aggregate-measures --boundary 2015 --acs 2010-2014 --tracts 2023
 
 # PIT 2016 → boundary 2016, ACS 2015 (2011-2015 estimates)
-coclab build-measures --boundary 2016 --acs 2011-2015 --tracts 2023
+coclab aggregate-measures --boundary 2016 --acs 2011-2015 --tracts 2023
 
 # PIT 2017 → boundary 2017, ACS 2016 (2012-2016 estimates)
-coclab build-measures --boundary 2017 --acs 2012-2016 --tracts 2023
+coclab aggregate-measures --boundary 2017 --acs 2012-2016 --tracts 2023
 
 # PIT 2018 → boundary 2018, ACS 2017 (2013-2017 estimates)
-coclab build-measures --boundary 2018 --acs 2013-2017 --tracts 2023
+coclab aggregate-measures --boundary 2018 --acs 2013-2017 --tracts 2023
 
 # PIT 2019 → boundary 2019, ACS 2018 (2014-2018 estimates)
-coclab build-measures --boundary 2019 --acs 2014-2018 --tracts 2023
+coclab aggregate-measures --boundary 2019 --acs 2014-2018 --tracts 2023
 
 # PIT 2020 → boundary 2020, ACS 2019 (2015-2019 estimates)
-coclab build-measures --boundary 2020 --acs 2015-2019 --tracts 2023
+coclab aggregate-measures --boundary 2020 --acs 2015-2019 --tracts 2023
 
 # PIT 2021 → boundary 2021, ACS 2020 (2016-2020 estimates)
-coclab build-measures --boundary 2021 --acs 2016-2020 --tracts 2023
+coclab aggregate-measures --boundary 2021 --acs 2016-2020 --tracts 2023
 
 # PIT 2022 → boundary 2022, ACS 2021 (2017-2021 estimates)
-coclab build-measures --boundary 2022 --acs 2017-2021 --tracts 2023
+coclab aggregate-measures --boundary 2022 --acs 2017-2021 --tracts 2023
 
 # PIT 2023 → boundary 2023, ACS 2022 (2018-2022 estimates)
-coclab build-measures --boundary 2023 --acs 2018-2022 --tracts 2023
+coclab aggregate-measures --boundary 2023 --acs 2018-2022 --tracts 2023
 
 # PIT 2024 → boundary 2024, ACS 2023 (2019-2023 estimates)
-coclab build-measures --boundary 2024 --acs 2019-2023 --tracts 2023
+coclab aggregate-measures --boundary 2024 --acs 2019-2023 --tracts 2023
 ```
 
 ### Phase 4: Aggregate ZORI to CoC Level

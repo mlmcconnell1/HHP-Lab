@@ -67,7 +67,7 @@ The `coverage_ratio` field reflects crosswalk completeness:
 
 ## Panel Diagnostics
 
-The `panel-diagnostics` command provides:
+The `diagnostics-panel` command provides:
 
 1. **Coverage summary** - Min/max/mean coverage by year
 2. **Boundary change summary** - CoCs with changes and affected years
