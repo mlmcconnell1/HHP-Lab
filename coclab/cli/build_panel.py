@@ -28,8 +28,9 @@ def _resolve_zori_yearly_path(explicit_path: Path | None) -> Path | None:
     Notes
     -----
     If explicit_path is provided, validates it exists.
-    Otherwise, searches for coc_zori_yearly__*.parquet files in
-    the default rents directory and returns the most recent one.
+    Otherwise, searches for yearly ZORI files in the default rents directory,
+    trying new naming first (zori_yearly__A*.parquet), then legacy
+    (coc_zori_yearly__*.parquet), and returns the most recent one.
     """
     if explicit_path is not None:
         if explicit_path.exists():
@@ -41,8 +42,13 @@ def _resolve_zori_yearly_path(explicit_path: Path | None) -> Path | None:
     if not rents_dir.exists():
         return None
 
-    # Find all yearly ZORI files (pattern: coc_zori_yearly__*.parquet)
-    yearly_files = list(rents_dir.glob("coc_zori_yearly__*.parquet"))
+    # Try new naming convention first: zori_yearly__A*.parquet
+    yearly_files = list(rents_dir.glob("zori_yearly__A*.parquet"))
+
+    # Fall back to legacy naming: coc_zori_yearly__*.parquet
+    if not yearly_files:
+        yearly_files = list(rents_dir.glob("coc_zori_yearly__*.parquet"))
+
     if not yearly_files:
         return None
 
