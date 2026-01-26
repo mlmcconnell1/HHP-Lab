@@ -8,6 +8,7 @@ The `coclab` command provides access to all core functionality.
 flowchart LR
     coclab --> ingest
     coclab --> list
+    coclab --> validate
     ingest --> boundaries
     ingest --> census
     ingest --> nhgis
@@ -16,16 +17,12 @@ flowchart LR
     ingest --> acs-population
     ingest --> tract-relationship
     ingest --> zori
-    coclab --> validate-boundaries
     coclab --> delete-boundaries
     coclab --> show
     coclab --> build-xwalks
     coclab --> aggregate-measures
     coclab --> build-panel
     coclab --> rollup-acs-population
-    coclab --> validate-acs-population
-    coclab --> validate-pit-vintages
-    coclab --> validate-population
     coclab --> verify-acs-population
     coclab --> diagnostics-panel
     coclab --> diagnostics-xwalk
@@ -50,6 +47,10 @@ flowchart LR
     list --> measures
     list --> xwalks
     boundaries --> LIST[List boundary vintages]
+    validate --> validate-boundaries
+    validate --> validate-acs-population
+    validate --> validate-pit-vintages
+    validate --> validate-population
     validate-boundaries --> BOUNDCHK[Validate boundary registry health]
     delete-boundaries --> BOUNDDEL[Remove boundary registry entry]
     show --> MAP[Render interactive map]
@@ -81,6 +82,9 @@ Legacy `ingest-*` commands remain as deprecated passthroughs for backward compat
 
 **List grouping:** The canonical form is `coclab list <subcommand>` (e.g., `coclab list boundaries`).
 Legacy `list-*` commands remain as deprecated passthroughs for backward compatibility.
+
+**Validate grouping:** The canonical form is `coclab validate <subcommand>` (e.g., `coclab validate boundaries`).
+Legacy `validate-*` commands remain as deprecated passthroughs for backward compatibility.
 
 ## `coclab aggregate-measures`
 
@@ -248,12 +252,12 @@ data/curated/panel/panel__Y2018-2024@B2025.parquet
 The filename does not change when `--include-zori` is enabled; the presence of ZORI
 columns in the data indicates rent integration.
 
-## `coclab validate-boundaries`
+## `coclab validate boundaries`
 
 Validate the boundary registry for missing files, invalid paths, or temporary-directory entries.
 
 ```bash
-coclab validate-boundaries
+coclab validate boundaries
 ```
 
 Returns a health report. Exits with code `1` if problems are detected.
@@ -325,16 +329,16 @@ coclab compare-vintages -v1 2024 -v2 2025 -o diff_report.csv
 - Summary counts of added, removed, changed, unchanged CoCs
 - Lists of affected CoC IDs by category
 
-## `coclab validate-acs-population`
+## `coclab validate acs-population`
 
 Validate population rollup against existing CoC measures (`total_population` from `coc_measures`).
 
 ```bash
 # Basic validation
-coclab validate-acs-population --boundary 2025 --acs 2019-2023 --tracts 2023 --weighting area
+coclab validate acs-population --boundary 2025 --acs 2019-2023 --tracts 2023 --weighting area
 
 # With custom thresholds
-coclab validate-acs-population --boundary 2025 --acs 2019-2023 --tracts 2023 --weighting area \
+coclab validate acs-population --boundary 2025 --acs 2019-2023 --tracts 2023 --weighting area \
     --warn-pct 0.02 --error-pct 0.10 --min-coverage 0.90
 ```
 
@@ -356,22 +360,22 @@ coclab validate-acs-population --boundary 2025 --acs 2019-2023 --tracts 2023 --w
 - Console report with top 25 worst deltas
 - `data/curated/acs/acs_population_crosscheck__{boundary}__{acs}__{tracts}__{weighting}.parquet`
 
-## `coclab validate-population`
+## `coclab validate population`
 
 Validate population totals from crosswalk aggregation against ACS national totals. Ensures that CoC-aggregated population approximately equals the national ACS total, helping identify crosswalk coverage issues, double-counting, or data quality problems.
 
 ```bash
 # Basic validation (auto-detects latest vintages)
-coclab validate-population
+coclab validate population
 
 # Specify vintages
-coclab validate-population --boundary 2025 --acs 2019-2023
+coclab validate population --boundary 2025 --acs 2019-2023
 
 # Show state-level breakdown
-coclab validate-population --by-state
+coclab validate population --by-state
 
 # Adjust warning threshold
-coclab validate-population --warn-threshold 0.10
+coclab validate population --warn-threshold 0.10
 ```
 
 | Option | Description | Default |
@@ -415,22 +419,22 @@ POPULATION CROSSWALK VALIDATION
    Tracts with sum < 0.99 (partial coverage):  4,696
 ```
 
-## `coclab validate-pit-vintages`
+## `coclab validate pit-vintages`
 
 Compare PIT counts between two vintage releases to detect historical data revisions. This helps identify when HUD has revised historical PIT data between releases (e.g., due to CoC mergers or data corrections).
 
 ```bash
 # Compare 2023 and 2024 vintages
-coclab validate-pit-vintages --vintage1 2023 --vintage2 2024
+coclab validate pit-vintages --vintage1 2023 --vintage2 2024
 
 # Filter to a specific year
-coclab validate-pit-vintages -v1 2023 -v2 2024 --year 2020
+coclab validate pit-vintages -v1 2023 -v2 2024 --year 2020
 
 # Save detailed comparison to CSV
-coclab validate-pit-vintages -v1 2023 -v2 2024 -o comparison.csv
+coclab validate pit-vintages -v1 2023 -v2 2024 -o comparison.csv
 
 # Show unchanged records too
-coclab validate-pit-vintages -v1 2023 -v2 2024 --show-unchanged
+coclab validate pit-vintages -v1 2023 -v2 2024 --show-unchanged
 ```
 
 | Option | Description | Default |

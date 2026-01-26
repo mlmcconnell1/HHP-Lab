@@ -1,4 +1,4 @@
-"""Tests for the Phase 3 CLI commands (ingest-pit, build-panel, diagnostics-panel)."""
+"""Tests for the Phase 3 CLI commands (ingest pit, build-panel, diagnostics-panel)."""
 
 from pathlib import Path
 from unittest.mock import MagicMock, patch
@@ -12,11 +12,11 @@ runner = CliRunner()
 
 
 class TestIngestPitCommand:
-    """Tests for the 'ingest-pit' command."""
+    """Tests for the 'ingest pit' command."""
 
     def test_ingest_pit_help(self):
         """Help should show options."""
-        result = runner.invoke(app, ["ingest-pit", "--help"])
+        result = runner.invoke(app, ["ingest", "pit", "--help"])
 
         assert result.exit_code == 0
         assert "--year" in result.output
@@ -34,7 +34,7 @@ class TestIngestPitCommand:
 
     def test_ingest_pit_requires_year(self):
         """Should fail without --year option."""
-        result = runner.invoke(app, ["ingest-pit"])
+        result = runner.invoke(app, ["ingest", "pit"])
 
         # Typer shows error for missing required option
         assert result.exit_code != 0
@@ -100,7 +100,7 @@ class TestIngestPitCommand:
         # Mock QA report
         mock_validate.return_value = QAReport()
 
-        result = runner.invoke(app, ["ingest-pit", "--year", "2024"])
+        result = runner.invoke(app, ["ingest", "pit", "--year", "2024"])
 
         assert result.exit_code == 0
         assert "Ingesting PIT data for year 2024" in result.output
@@ -112,7 +112,7 @@ class TestIngestPitCommand:
         """Should handle download failure gracefully."""
         mock_download.side_effect = Exception("Network error")
 
-        result = runner.invoke(app, ["ingest-pit", "--year", "2024"])
+        result = runner.invoke(app, ["ingest", "pit", "--year", "2024"])
 
         assert result.exit_code == 1
         assert "Error downloading PIT data" in result.output
@@ -133,7 +133,7 @@ class TestIngestPitCommand:
         )
         mock_parse.side_effect = ValueError("Cannot find CoC ID column")
 
-        result = runner.invoke(app, ["ingest-pit", "--year", "2024"])
+        result = runner.invoke(app, ["ingest", "pit", "--year", "2024"])
 
         assert result.exit_code == 1
         assert "Error parsing PIT file" in result.output
@@ -398,16 +398,16 @@ class TestPhase3HelpOutput:
         result = runner.invoke(app, ["--help"])
 
         assert result.exit_code == 0
-        assert "ingest-pit" in result.output
+        assert "ingest" in result.output
         assert "build-panel" in result.output
         assert "diagnostics-panel" in result.output
 
     def test_ingest_pit_help_shows_examples(self):
-        """Ingest-pit help should show examples."""
-        result = runner.invoke(app, ["ingest-pit", "--help"])
+        """Ingest pit help should show examples."""
+        result = runner.invoke(app, ["ingest", "pit", "--help"])
 
         assert result.exit_code == 0
-        assert "coclab ingest-pit --year 2024" in result.output
+        assert "coclab ingest pit --year 2024" in result.output
 
     def test_build_panel_help_shows_examples(self):
         """Build-panel help should show examples."""

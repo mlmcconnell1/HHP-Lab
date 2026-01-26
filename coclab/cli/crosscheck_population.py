@@ -77,13 +77,13 @@ def _run_population_validation(
 
     Examples:
 
-        coclab validate-population
+        coclab validate population
 
-        coclab validate-population --boundary 2025 --acs 2019-2023
+        coclab validate population --boundary 2025 --acs 2019-2023
 
-        coclab validate-population --by-state
+        coclab validate population --by-state
 
-        coclab validate-population --warn-threshold 0.10
+        coclab validate population --warn-threshold 0.10
     """
     import pandas as pd
 
@@ -410,10 +410,10 @@ def crosscheck_population(
         ),
     ] = 0.05,
 ) -> None:
-    """Deprecated: use validate-population."""
+    """Deprecated: use validate population."""
     typer.echo(
         "Warning: 'coclab crosscheck-population' is deprecated; "
-        "use 'coclab validate-population' instead.",
+        "use 'coclab validate population' instead.",
         err=True,
     )
     validate_population(

@@ -58,11 +58,11 @@ def _run_pit_vintages_validation(
 
     Examples:
 
-        coclab validate-pit-vintages --vintage1 2023 --vintage2 2024
+        coclab validate pit-vintages --vintage1 2023 --vintage2 2024
 
-        coclab validate-pit-vintages -v1 2023 -v2 2024 --year 2020
+        coclab validate pit-vintages -v1 2023 -v2 2024 --year 2020
 
-        coclab validate-pit-vintages -v1 2023 -v2 2024 -o comparison.csv
+        coclab validate pit-vintages -v1 2023 -v2 2024 -o comparison.csv
     """
     # Look up vintage paths in registry
     vintages = list_pit_vintages()
@@ -76,7 +76,7 @@ def _run_pit_vintages_validation(
             err=True,
         )
         typer.echo(
-            "\nHint: Run 'coclab ingest-pit-vintage --vintage <year>' to ingest a vintage.",
+            "\nHint: Run 'coclab ingest pit-vintage --vintage <year>' to ingest a vintage.",
             err=True,
         )
         raise typer.Exit(1)
@@ -89,7 +89,7 @@ def _run_pit_vintages_validation(
             err=True,
         )
         typer.echo(
-            "\nHint: Run 'coclab ingest-pit-vintage --vintage <year>' to ingest a vintage.",
+            "\nHint: Run 'coclab ingest pit-vintage --vintage <year>' to ingest a vintage.",
             err=True,
         )
         raise typer.Exit(1)
@@ -517,10 +517,10 @@ def crosscheck_pit_vintages(
         ),
     ] = None,
 ) -> None:
-    """Deprecated: use validate-pit-vintages."""
+    """Deprecated: use validate pit-vintages."""
     typer.echo(
         "Warning: 'coclab crosscheck-pit-vintages' is deprecated; "
-        "use 'coclab validate-pit-vintages' instead.",
+        "use 'coclab validate pit-vintages' instead.",
         err=True,
     )
     validate_pit_vintages(

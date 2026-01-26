@@ -53,11 +53,11 @@ def ingest_pit_vintage(
 
     Examples:
 
-        coclab ingest-pit-vintage --vintage 2024
+        coclab ingest pit-vintage --vintage 2024
 
-        coclab ingest-pit-vintage --vintage 2024 --force
+        coclab ingest pit-vintage --vintage 2024 --force
 
-        coclab ingest-pit-vintage --vintage 2024 --parse-only
+        coclab ingest pit-vintage --vintage 2024 --parse-only
     """
     from coclab.pit.ingest import (
         download_pit_data,

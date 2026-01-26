@@ -220,11 +220,13 @@ class TestHelpOutput:
         assert result.exit_code == 0
         assert "ingest" in result.output  # Nested subcommand group
         assert "list" in result.output
+        assert "validate" in result.output
         assert "show" in result.output
         # Deprecated aliases should be hidden from help
         assert "ingest-boundaries" not in result.output
         assert "check-boundaries" not in result.output
         assert "list-boundaries" not in result.output
+        assert "validate-population" not in result.output
 
     def test_ingest_help(self):
         """Ingest help should show subcommands."""
@@ -264,9 +266,19 @@ class TestHelpOutput:
         assert "--vintage" in result.output
         assert "--output" in result.output
 
+    def test_validate_help(self):
+        """Validate help should show subcommands."""
+        result = runner.invoke(app, ["validate", "--help"])
+
+        assert result.exit_code == 0
+        assert "boundaries" in result.output
+        assert "acs-population" in result.output
+        assert "pit-vintages" in result.output
+        assert "population" in result.output
+
     def test_validate_population_help(self):
-        """Validate-population help should show options."""
-        result = runner.invoke(app, ["validate-population", "--help"])
+        """Validate population help should show options."""
+        result = runner.invoke(app, ["validate", "population", "--help"])
 
         assert result.exit_code == 0
         assert "--boundary" in result.output
@@ -276,10 +288,10 @@ class TestHelpOutput:
 
 
 class TestValidatePopulation:
-    """Tests for the 'validate-population' command."""
+    """Tests for the 'validate population' command."""
 
     def test_validate_population_runs(self, tmp_path):
-        """Test that validate-population runs with test data."""
+        """Test that validate population runs with test data."""
         import pandas as pd
 
         # Create test crosswalk
@@ -311,7 +323,8 @@ class TestValidatePopulation:
         result = runner.invoke(
             app,
             [
-                "validate-population",
+                "validate",
+                "population",
                 "--xwalk-dir",
                 str(xwalk_dir),
                 "--acs-dir",
@@ -325,14 +338,15 @@ class TestValidatePopulation:
         assert "COC-AGGREGATED TOTAL" in result.output
 
     def test_validate_population_missing_files(self, tmp_path):
-        """Test that validate-population fails gracefully with missing files."""
+        """Test that validate population fails gracefully with missing files."""
         empty_dir = tmp_path / "empty"
         empty_dir.mkdir()
 
         result = runner.invoke(
             app,
             [
-                "validate-population",
+                "validate",
+                "population",
                 "--xwalk-dir",
                 str(empty_dir),
             ],

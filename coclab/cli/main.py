@@ -86,6 +86,11 @@ list_app = typer.Typer(
     help="List available datasets and artifacts",
     no_args_is_help=True,
 )
+validate_app = typer.Typer(
+    name="validate",
+    help="Validate datasets and registries",
+    no_args_is_help=True,
+)
 
 
 @app.callback()
@@ -739,7 +744,7 @@ def check_boundaries() -> None:
 
     Examples:
 
-        coclab validate-boundaries
+        coclab validate boundaries
     """
     from coclab.registry import check_registry_health
 
@@ -761,11 +766,22 @@ def validate_boundaries() -> None:
     check_boundaries()
 
 
+@wraps(validate_boundaries)
+def validate_boundaries_deprecated() -> None:
+    """Deprecated: use `coclab validate boundaries`."""
+    typer.echo(
+        "Warning: 'coclab validate-boundaries' is deprecated; "
+        "use 'coclab validate boundaries' instead.",
+        err=True,
+    )
+    validate_boundaries()
+
+
 def check_boundaries_deprecated() -> None:
-    """Deprecated: use validate-boundaries."""
+    """Deprecated: use validate boundaries."""
     typer.echo(
         "Warning: 'coclab check-boundaries' is deprecated; "
-        "use 'coclab validate-boundaries' instead.",
+        "use 'coclab validate boundaries' instead.",
         err=True,
     )
     check_boundaries()
@@ -876,6 +892,210 @@ def source_status(
     typer.echo(summary)
 
 
+@wraps(validate_acs_population)
+def validate_acs_population_deprecated(
+    boundary: Annotated[
+        str,
+        typer.Option(
+            "--boundary",
+            "-b",
+            help="CoC boundary vintage (e.g., '2025').",
+        ),
+    ],
+    acs: Annotated[
+        str,
+        typer.Option(
+            "--acs",
+            "-a",
+            help="ACS 5-year estimate vintage (e.g., '2019-2023').",
+        ),
+    ],
+    tracts: Annotated[
+        str,
+        typer.Option(
+            "--tracts",
+            "-t",
+            help="Census tract vintage (e.g., '2023').",
+        ),
+    ],
+    weighting: Annotated[
+        str,
+        typer.Option(
+            "--weighting",
+            "-w",
+            help="Weighting method: 'area' or 'population_mass'.",
+        ),
+    ] = "area",
+    warn_pct: Annotated[
+        float,
+        typer.Option(
+            "--warn-pct",
+            help="Warning threshold for percent delta (default: 0.01 = 1%).",
+        ),
+    ] = 0.01,
+    error_pct: Annotated[
+        float,
+        typer.Option(
+            "--error-pct",
+            help="Error threshold for percent delta (default: 0.05 = 5%).",
+        ),
+    ] = 0.05,
+    min_coverage: Annotated[
+        float,
+        typer.Option(
+            "--min-coverage",
+            help="Minimum coverage ratio threshold (default: 0.95).",
+        ),
+    ] = 0.95,
+) -> None:
+    """Deprecated: use `coclab validate acs-population`."""
+    typer.echo(
+        "Warning: 'coclab validate-acs-population' is deprecated; "
+        "use 'coclab validate acs-population' instead.",
+        err=True,
+    )
+    validate_acs_population(
+        boundary=boundary,
+        acs=acs,
+        tracts=tracts,
+        weighting=weighting,
+        warn_pct=warn_pct,
+        error_pct=error_pct,
+        min_coverage=min_coverage,
+    )
+
+
+@wraps(validate_pit_vintages)
+def validate_pit_vintages_deprecated(
+    vintage1: Annotated[
+        str,
+        typer.Option(
+            "--vintage1",
+            "-v1",
+            help="First (older) PIT vintage to compare.",
+        ),
+    ],
+    vintage2: Annotated[
+        str,
+        typer.Option(
+            "--vintage2",
+            "-v2",
+            help="Second (newer) PIT vintage to compare.",
+        ),
+    ],
+    output: Annotated[
+        Path | None,
+        typer.Option(
+            "--output",
+            "-o",
+            help="Optional: save detailed comparison to CSV.",
+        ),
+    ] = None,
+    show_unchanged: Annotated[
+        bool,
+        typer.Option(
+            "--show-unchanged",
+            help="Also show CoC-years with no changes.",
+        ),
+    ] = False,
+    year: Annotated[
+        int | None,
+        typer.Option(
+            "--year",
+            "-y",
+            help="Filter to a specific PIT year (e.g., 2020).",
+        ),
+    ] = None,
+) -> None:
+    """Deprecated: use `coclab validate pit-vintages`."""
+    typer.echo(
+        "Warning: 'coclab validate-pit-vintages' is deprecated; "
+        "use 'coclab validate pit-vintages' instead.",
+        err=True,
+    )
+    validate_pit_vintages(
+        vintage1=vintage1,
+        vintage2=vintage2,
+        output=output,
+        show_unchanged=show_unchanged,
+        year=year,
+    )
+
+
+@wraps(validate_population)
+def validate_population_deprecated(
+    boundary: Annotated[
+        str | None,
+        typer.Option(
+            "--boundary",
+            "-b",
+            help="CoC boundary vintage (e.g., '2025'). Uses latest if not specified.",
+        ),
+    ] = None,
+    acs: Annotated[
+        str | None,
+        typer.Option(
+            "--acs",
+            "-a",
+            help="ACS 5-year estimate vintage (e.g., '2019-2023'). Uses latest if not specified.",
+        ),
+    ] = None,
+    tracts: Annotated[
+        str | None,
+        typer.Option(
+            "--tracts",
+            "-t",
+            help="Census tract vintage (e.g., '2023'). Defaults to ACS year.",
+        ),
+    ] = None,
+    xwalk_dir: Annotated[
+        Path,
+        typer.Option(
+            "--xwalk-dir",
+            help="Directory containing crosswalk files.",
+        ),
+    ] = Path("data/curated/xwalks"),
+    acs_dir: Annotated[
+        Path,
+        typer.Option(
+            "--acs-dir",
+            help="Directory containing ACS tract population files.",
+        ),
+    ] = Path("data/curated/acs"),
+    by_state: Annotated[
+        bool,
+        typer.Option(
+            "--by-state",
+            "-s",
+            help="Show detailed state-level comparison.",
+        ),
+    ] = False,
+    warn_threshold: Annotated[
+        float,
+        typer.Option(
+            "--warn-threshold",
+            "-w",
+            help="Warning threshold for CoC/ACS ratio deviation from 1.0 (default: 0.05 = 5%).",
+        ),
+    ] = 0.05,
+) -> None:
+    """Deprecated: use `coclab validate population`."""
+    typer.echo(
+        "Warning: 'coclab validate-population' is deprecated; "
+        "use 'coclab validate population' instead.",
+        err=True,
+    )
+    validate_population(
+        boundary=boundary,
+        acs=acs,
+        tracts=tracts,
+        xwalk_dir=xwalk_dir,
+        acs_dir=acs_dir,
+        by_state=by_state,
+        warn_threshold=warn_threshold,
+    )
+
+
 # -----------------------------------------------------------------------------
 # Register all commands alphabetically for consistent help output
 # -----------------------------------------------------------------------------
@@ -896,6 +1116,7 @@ app.command("diagnostics-zori")(zori_diagnostics)
 app.command("export-bundle")(export_bundle)
 app.add_typer(ingest_app, name="ingest")
 app.add_typer(list_app, name="list")
+app.add_typer(validate_app, name="validate")
 app.command("ingest-acs-population", hidden=True)(ingest_acs_population_deprecated)
 app.command("ingest-boundaries", hidden=True)(ingest_boundaries_deprecated)
 app.command("ingest-census", hidden=True)(ingest_census_deprecated)
@@ -913,10 +1134,10 @@ app.command("rollup-acs-population")(rollup_acs_population)
 app.command("show")(show)
 app.command("show-measures")(show_measures)
 app.command("source-status")(source_status)
-app.command("validate-acs-population")(validate_acs_population)
-app.command("validate-boundaries")(validate_boundaries)
-app.command("validate-pit-vintages")(validate_pit_vintages)
-app.command("validate-population")(validate_population)
+app.command("validate-acs-population", hidden=True)(validate_acs_population_deprecated)
+app.command("validate-boundaries", hidden=True)(validate_boundaries_deprecated)
+app.command("validate-pit-vintages", hidden=True)(validate_pit_vintages_deprecated)
+app.command("validate-population", hidden=True)(validate_population_deprecated)
 app.command("verify-acs-population")(verify_acs_population)
 
 ingest_app.command("acs-population")(ingest_acs_population)
@@ -931,6 +1152,10 @@ list_app.command("boundaries")(list_boundaries_cmd)
 list_app.command("census")(list_census)
 list_app.command("measures")(list_measures)
 list_app.command("xwalks")(list_xwalks)
+validate_app.command("acs-population")(validate_acs_population)
+validate_app.command("boundaries")(validate_boundaries)
+validate_app.command("pit-vintages")(validate_pit_vintages)
+validate_app.command("population")(validate_population)
 
 
 if __name__ == "__main__":

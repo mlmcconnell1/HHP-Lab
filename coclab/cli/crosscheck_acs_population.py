@@ -72,10 +72,10 @@ def _run_acs_population_validation(
 
     Examples:
 
-        coclab validate-acs-population --boundary 2025 --acs 2019-2023 \\
+        coclab validate acs-population --boundary 2025 --acs 2019-2023 \\
             --tracts 2023 --weighting area
 
-        coclab validate-acs-population --boundary 2025 --acs 2019-2023 \\
+        coclab validate acs-population --boundary 2025 --acs 2019-2023 \\
             --tracts 2023 --weighting area --warn-pct 0.02
     """
     from coclab.acs.crosscheck import (
@@ -258,10 +258,10 @@ def crosscheck_acs_population(
         ),
     ] = 0.95,
 ) -> None:
-    """Deprecated: use validate-acs-population."""
+    """Deprecated: use validate acs-population."""
     typer.echo(
         "Warning: 'coclab crosscheck-acs-population' is deprecated; "
-        "use 'coclab validate-acs-population' instead.",
+        "use 'coclab validate acs-population' instead.",
         err=True,
     )
     validate_acs_population(
