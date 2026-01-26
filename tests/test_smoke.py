@@ -239,13 +239,13 @@ class TestSmokeCLI:
     """Smoke tests for CLI commands."""
 
     def test_cli_list_boundaries_empty(self, smoke_test_env):
-        """Test list-boundaries command with empty registry."""
-        result = runner.invoke(app, ["list-boundaries"])
+        """Test list boundaries command with empty registry."""
+        result = runner.invoke(app, ["list", "boundaries"])
         assert result.exit_code == 0
         assert "No vintages registered" in result.stdout
 
     def test_cli_list_boundaries_with_data(self, smoke_test_env, fixture_boundaries_gdf):
-        """Test list-boundaries command shows registered vintages."""
+        """Test list boundaries command shows registered vintages."""
         # Setup
         normalized_gdf = normalize_boundaries(fixture_boundaries_gdf)
         vintage = "2025"
@@ -269,7 +269,7 @@ class TestSmokeCLI:
         )
 
         # Test
-        result = runner.invoke(app, ["list-boundaries"])
+        result = runner.invoke(app, ["list", "boundaries"])
         assert result.exit_code == 0
         assert "2025" in result.stdout
         assert "hud_exchange" in result.stdout

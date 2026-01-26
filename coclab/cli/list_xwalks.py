@@ -108,11 +108,11 @@ def list_xwalks(
 
     Examples:
 
-        coclab list-xwalks
+        coclab list xwalks
 
-        coclab list-xwalks --type tract
+        coclab list xwalks --type tract
 
-        coclab list-xwalks --dir /path/to/xwalks
+        coclab list xwalks --dir /path/to/xwalks
     """
     # Validate type option
     valid_types = ("all", "tract", "county")

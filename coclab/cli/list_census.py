@@ -81,13 +81,13 @@ def list_census(
 
     Examples:
 
-        coclab list-census
+        coclab list census
 
-        coclab list-census --type tracts
+        coclab list census --type tracts
 
-        coclab list-census --type counties
+        coclab list census --type counties
 
-        coclab list-census --dir /path/to/census
+        coclab list census --dir /path/to/census
     """
     # Validate type option
     valid_types = ("tracts", "counties")

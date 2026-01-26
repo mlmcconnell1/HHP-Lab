@@ -8,7 +8,7 @@ The CLI module uses [Typer](https://typer.tiangolo.com/) for command-line parsin
 
 **Commands:**
 - `ingest` - Trigger data ingestion
-- `list-boundaries` - Display registry contents
+- `list` - List datasets and artifacts
 - `show` - Generate interactive maps
 
 ## ingest/hud_exchange_gis.py

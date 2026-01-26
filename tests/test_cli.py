@@ -105,14 +105,14 @@ class TestNestedIngestCommand:
 
 
 class TestListBoundariesCommand:
-    """Tests for the 'list-boundaries' command."""
+    """Tests for the 'list boundaries' command."""
 
     @patch("coclab.registry.registry.list_boundaries")
     def test_list_boundaries_empty(self, mock_list):
         """List boundaries when no vintages registered."""
         mock_list.return_value = []
 
-        result = runner.invoke(app, ["list-boundaries"])
+        result = runner.invoke(app, ["list", "boundaries"])
 
         assert result.exit_code == 0
         assert "No vintages registered" in result.output
@@ -145,7 +145,7 @@ class TestListBoundariesCommand:
             ),
         ]
 
-        result = runner.invoke(app, ["list-boundaries"])
+        result = runner.invoke(app, ["list", "boundaries"])
 
         assert result.exit_code == 0
         assert "2025" in result.output
@@ -219,11 +219,12 @@ class TestHelpOutput:
 
         assert result.exit_code == 0
         assert "ingest" in result.output  # Nested subcommand group
-        assert "list-boundaries" in result.output
+        assert "list" in result.output
         assert "show" in result.output
         # Deprecated aliases should be hidden from help
         assert "ingest-boundaries" not in result.output
         assert "check-boundaries" not in result.output
+        assert "list-boundaries" not in result.output
 
     def test_ingest_help(self):
         """Ingest help should show subcommands."""
@@ -234,6 +235,16 @@ class TestHelpOutput:
         assert "census" in result.output
         assert "pit" in result.output
         assert "zori" in result.output
+
+    def test_list_help(self):
+        """List help should show subcommands."""
+        result = runner.invoke(app, ["list", "--help"])
+
+        assert result.exit_code == 0
+        assert "boundaries" in result.output
+        assert "census" in result.output
+        assert "measures" in result.output
+        assert "xwalks" in result.output
 
     def test_ingest_boundaries_help(self):
         """Ingest boundaries help should show options."""

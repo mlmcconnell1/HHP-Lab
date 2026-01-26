@@ -83,9 +83,9 @@ def list_measures(
 
     Examples:
 
-        coclab list-measures
+        coclab list measures
 
-        coclab list-measures --dir /path/to/measures
+        coclab list measures --dir /path/to/measures
     """
     measures_dir = Path(dir)
 

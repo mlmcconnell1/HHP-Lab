@@ -7,6 +7,7 @@ The `coclab` command provides access to all core functionality.
 ```mermaid
 flowchart LR
     coclab --> ingest
+    coclab --> list
     ingest --> boundaries
     ingest --> census
     ingest --> nhgis
@@ -15,7 +16,6 @@ flowchart LR
     ingest --> acs-population
     ingest --> tract-relationship
     ingest --> zori
-    coclab --> list-boundaries
     coclab --> validate-boundaries
     coclab --> delete-boundaries
     coclab --> show
@@ -30,9 +30,6 @@ flowchart LR
     coclab --> diagnostics-panel
     coclab --> diagnostics-xwalk
     coclab --> diagnostics-zori
-    coclab --> list-census
-    coclab --> list-xwalks
-    coclab --> list-measures
     coclab --> show-measures
     coclab --> compare-vintages
     coclab --> aggregate-zori
@@ -48,7 +45,11 @@ flowchart LR
     pit-vintage --> PITVINT[Parse all years from vintage]
     acs-population --> ACSPOP[Fetch tract population]
     tract-relationship --> TRACTREL[Download 2010↔2020 tract relationship]
-    list-boundaries --> LIST[List boundary vintages]
+    list --> boundaries
+    list --> census
+    list --> measures
+    list --> xwalks
+    boundaries --> LIST[List boundary vintages]
     validate-boundaries --> BOUNDCHK[Validate boundary registry health]
     delete-boundaries --> BOUNDDEL[Remove boundary registry entry]
     show --> MAP[Render interactive map]
@@ -65,9 +66,9 @@ flowchart LR
     diagnostics-panel --> PDIAG[Panel quality & sensitivity]
     diagnostics-xwalk --> DIAG[Crosswalk quality checks]
     diagnostics-zori --> ZORI_DIAG[ZORI coverage diagnostics]
-    list-census --> LCENSUS[List census geometry files]
-    list-xwalks --> LXWALK[List crosswalk files]
-    list-measures --> LMEAS[List measure files]
+    census --> LCENSUS[List census geometry files]
+    xwalks --> LXWALK[List crosswalk files]
+    measures --> LMEAS[List measure files]
     show-measures --> SMEAS[Display CoC measures]
     compare-vintages --> COMP[Diff boundary vintages]
     source-status --> SRCSTAT[Display source registry status]
@@ -77,6 +78,9 @@ flowchart LR
 
 **Ingest grouping:** The canonical form is `coclab ingest <subcommand>` (e.g., `coclab ingest boundaries`).
 Legacy `ingest-*` commands remain as deprecated passthroughs for backward compatibility.
+
+**List grouping:** The canonical form is `coclab list <subcommand>` (e.g., `coclab list boundaries`).
+Legacy `list-*` commands remain as deprecated passthroughs for backward compatibility.
 
 ## `coclab aggregate-measures`
 
@@ -802,12 +806,12 @@ coclab ingest zori --geography county --start 2020-01-01 --end 2024-12-31
 **Output:**
 - `data/curated/zori/zori__{geography}.parquet`
 
-## `coclab list-boundaries`
+## `coclab list boundaries`
 
 List all available boundary vintages in the registry.
 
 ```bash
-coclab list-boundaries
+coclab list boundaries
 ```
 
 **Example Output:**
@@ -820,19 +824,19 @@ Vintage                        Source                    Features   Ingested At
 HUDOpenData_2025-01-10         hud_opendata_arcgis       402        2025-01-10 09:15
 ```
 
-## `coclab list-census`
+## `coclab list census`
 
 List available TIGER census geometry files (tracts and counties).
 
 ```bash
 # List all census geometry files
-coclab list-census
+coclab list census
 
 # List only tract files
-coclab list-census --type tracts
+coclab list census --type tracts
 
 # List only county files
-coclab list-census --type counties
+coclab list census --type counties
 ```
 
 | Option | Description | Default |
@@ -854,28 +858,28 @@ tracts       2023           85,529     620.8 MB 2025-01-05 18:18
 Total: 4 census file(s)
 ```
 
-## `coclab list-measures`
+## `coclab list measures`
 
 List available CoC measure files.
 
 ```bash
-coclab list-measures
+coclab list measures
 ```
 
 | Option | Description | Default |
 |--------|-------------|---------|
 | `--dir`, `-d` | Directory to scan | `data/curated/measures` |
 
-## `coclab list-xwalks`
+## `coclab list xwalks`
 
 List available crosswalk files.
 
 ```bash
 # List all crosswalks
-coclab list-xwalks
+coclab list xwalks
 
 # List only tract crosswalks
-coclab list-xwalks --type tract
+coclab list xwalks --type tract
 ```
 
 | Option | Description | Default |

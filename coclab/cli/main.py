@@ -81,6 +81,11 @@ ingest_app = typer.Typer(
     help="Ingest raw and curated datasets",
     no_args_is_help=True,
 )
+list_app = typer.Typer(
+    name="list",
+    help="List available datasets and artifacts",
+    no_args_is_help=True,
+)
 
 
 @app.callback()
@@ -637,6 +642,93 @@ def list_boundaries_cmd() -> None:
         )
 
 
+@wraps(list_boundaries_cmd)
+def list_boundaries_deprecated() -> None:
+    """Deprecated: use `coclab list boundaries`."""
+    typer.echo(
+        "Warning: 'coclab list-boundaries' is deprecated; "
+        "use 'coclab list boundaries' instead.",
+        err=True,
+    )
+    list_boundaries_cmd()
+
+
+@wraps(list_census)
+def list_census_deprecated(
+    census_type: Annotated[
+        str | None,
+        typer.Option(
+            "--type",
+            "-t",
+            help="Filter by census type: 'counties' or 'tracts'.",
+        ),
+    ] = None,
+    directory: Annotated[
+        Path,
+        typer.Option(
+            "--dir",
+            "-d",
+            help="Directory to scan for census files.",
+        ),
+    ] = Path("data/curated/census"),
+) -> None:
+    """Deprecated: use `coclab list census`."""
+    typer.echo(
+        "Warning: 'coclab list-census' is deprecated; "
+        "use 'coclab list census' instead.",
+        err=True,
+    )
+    list_census(census_type=census_type, directory=directory)
+
+
+@wraps(list_measures)
+def list_measures_deprecated(
+    dir: Annotated[
+        Path,
+        typer.Option(
+            "--dir",
+            "-d",
+            help="Directory to scan for measure files.",
+        ),
+    ] = Path("data/curated/measures"),
+) -> None:
+    """Deprecated: use `coclab list measures`."""
+    typer.echo(
+        "Warning: 'coclab list-measures' is deprecated; "
+        "use 'coclab list measures' instead.",
+        err=True,
+    )
+    list_measures(dir=dir)
+
+
+@wraps(list_xwalks)
+def list_xwalks_deprecated(
+    xwalk_type: Annotated[
+        str,
+        typer.Option(
+            "--type",
+            "-t",
+            help="Filter by crosswalk type: 'tract', 'county', or 'all'.",
+        ),
+    ] = "all",
+    directory: Annotated[
+        Path,
+        typer.Option(
+            "--dir",
+            "-d",
+            help="Directory to scan for crosswalk files.",
+        ),
+    ] = Path("data/curated/xwalks"),
+) -> None:
+    """Deprecated: use `coclab list xwalks`."""
+    typer.echo(
+        "Warning: 'coclab list-xwalks' is deprecated; "
+        "use 'coclab list xwalks' instead.",
+        err=True,
+    )
+    list_xwalks(xwalk_type=xwalk_type, directory=directory)
+
+
 def check_boundaries() -> None:
     """Validate boundary registry health for issues.
 
@@ -803,6 +895,7 @@ app.command("diagnostics-xwalk")(diagnostics)
 app.command("diagnostics-zori")(zori_diagnostics)
 app.command("export-bundle")(export_bundle)
 app.add_typer(ingest_app, name="ingest")
+app.add_typer(list_app, name="list")
 app.command("ingest-acs-population", hidden=True)(ingest_acs_population_deprecated)
 app.command("ingest-boundaries", hidden=True)(ingest_boundaries_deprecated)
 app.command("ingest-census", hidden=True)(ingest_census_deprecated)
@@ -811,10 +904,10 @@ app.command("ingest-pit", hidden=True)(ingest_pit_deprecated)
 app.command("ingest-pit-vintage", hidden=True)(ingest_pit_vintage_deprecated)
 app.command("ingest-tract-relationship", hidden=True)(ingest_tract_relationship_deprecated)
 app.command("ingest-zori", hidden=True)(ingest_zori_deprecated)
-app.command("list-boundaries")(list_boundaries_cmd)
-app.command("list-census")(list_census)
-app.command("list-measures")(list_measures)
-app.command("list-xwalks")(list_xwalks)
+app.command("list-boundaries", hidden=True)(list_boundaries_deprecated)
+app.command("list-census", hidden=True)(list_census_deprecated)
+app.command("list-measures", hidden=True)(list_measures_deprecated)
+app.command("list-xwalks", hidden=True)(list_xwalks_deprecated)
 app.command("registry-rebuild")(registry_rebuild)
 app.command("rollup-acs-population")(rollup_acs_population)
 app.command("show")(show)
@@ -834,6 +927,10 @@ ingest_app.command("pit")(ingest_pit)
 ingest_app.command("pit-vintage")(ingest_pit_vintage)
 ingest_app.command("tract-relationship")(ingest_tract_relationship)
 ingest_app.command("zori")(ingest_zori)
+list_app.command("boundaries")(list_boundaries_cmd)
+list_app.command("census")(list_census)
+list_app.command("measures")(list_measures)
+list_app.command("xwalks")(list_xwalks)
 
 
 if __name__ == "__main__":
