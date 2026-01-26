@@ -12,7 +12,10 @@ flowchart LR
     coclab --> ingest-pit
     coclab --> ingest-pit-vintage
     coclab --> ingest-acs-population
+    coclab --> ingest-tract-relationship
     coclab --> list-boundaries
+    coclab --> check-boundaries
+    coclab --> delete-boundaries
     coclab --> show
     coclab --> build-xwalks
     coclab --> aggregate-measures
@@ -34,6 +37,7 @@ flowchart LR
     coclab --> aggregate-zori
     coclab --> source-status
     coclab --> export-bundle
+    coclab --> registry-rebuild
 
     ingest --> |"--source hud_exchange"| HUD_EX[Download annual vintage]
     ingest --> |"--source hud_opendata"| HUD_OD[Fetch current snapshot]
@@ -42,7 +46,10 @@ flowchart LR
     ingest-pit --> PIT[Download & parse PIT counts]
     ingest-pit-vintage --> PITVINT[Parse all years from vintage]
     ingest-acs-population --> ACSPOP[Fetch tract population]
+    ingest-tract-relationship --> TRACTREL[Download 2010↔2020 tract relationship]
     list-boundaries --> LIST[List boundary vintages]
+    check-boundaries --> BOUNDCHK[Check boundary registry health]
+    delete-boundaries --> BOUNDDEL[Remove boundary registry entry]
     show --> MAP[Render interactive map]
     build-xwalks --> XWALK[Create tract/county crosswalks]
     aggregate-measures --> MEAS[Aggregate demographic measures from ACS]
@@ -64,6 +71,7 @@ flowchart LR
     compare-vintages --> COMP[Diff boundary vintages]
     source-status --> SRCSTAT[Display source registry status]
     export-bundle --> EXPORT[Create analysis-ready bundle]
+    registry-rebuild --> REGREBUILD[Rebuild source registry from local files]
 ```
 
 ## `coclab aggregate-measures`
@@ -146,8 +154,11 @@ coclab ingest-zori --geography county
 - `3` - Failure to compute weights (ACS missing)
 
 **Output:**
-- `data/curated/zori/coc_zori__{geography}__b{boundary}__c{counties}__acs{acs}__w{weighting}.parquet`
-- Optional yearly: `data/curated/zori/coc_zori_yearly__...parquet`
+- `data/curated/zori/zori__A{acs_end}@B{boundary}xC{counties}__w{weight_abbrev}.parquet`
+- Optional yearly: `data/curated/zori/zori_yearly__A{acs_end}@B{boundary}xC{counties}__w{weight_abbrev}__m{method}.parquet`
+
+Note: Filenames use temporal shorthand (end year of ACS vintage) and abbreviated weighting
+names; legacy `coc_zori__...` names may still exist in older runs.
 
 ## `coclab build-panel`
 
@@ -170,7 +181,7 @@ coclab build-panel --start 2018 --end 2024 --include-zori
 coclab build-panel --start 2018 --end 2024 --include-zori --zori-min-coverage 0.80
 
 # Explicit ZORI data path
-coclab build-panel --start 2018 --end 2024 --include-zori --zori-yearly-path data/curated/zori/coc_zori_yearly.parquet
+coclab build-panel --start 2018 --end 2024 --include-zori --zori-yearly-path data/curated/zori/zori_yearly__A2023@B2025xC2023__wrenter__mpit_january.parquet
 ```
 
 | Option | Description | Default |
@@ -216,17 +227,45 @@ CoC-years that fail ZORI eligibility criteria (e.g., insufficient coverage of un
 - Summary statistics (years, CoC count, coverage)
 - ZORI summary when enabled (eligible count, rent_to_income stats)
 
-### Panel Naming with ZORI-Enhanced Outputs
+### Panel naming
 
-When the `--include-zori` option is enabled in `coclab build-panel`, the resulting panel file includes a `__zori` suffix in its filename. This convention distinguishes panels that include rent-based affordability measures from panels built without rent data.
+By default, panels are written to `data/curated/panel/` using the boundary vintage:
 
 Example:
 
 ```
-data/curated/panels/coc_panel__2018_2024__zori.parquet
+data/curated/panel/panel__Y2018-2024@B2025.parquet
 ```
 
-This naming convention supports side-by-side comparison of panels built under different analytic assumptions.
+The filename does not change when `--include-zori` is enabled; the presence of ZORI
+columns in the data indicates rent integration.
+
+## `coclab check-boundaries`
+
+Check the boundary registry for missing files, invalid paths, or temporary-directory entries.
+
+```bash
+coclab check-boundaries
+```
+
+Returns a health report. Exits with code `1` if problems are detected.
+
+## `coclab delete-boundaries`
+
+Remove a boundary vintage entry from the registry (does not delete the data file).
+
+```bash
+coclab delete-boundaries 2024 hud_exchange
+
+# Skip confirmation
+coclab delete-boundaries 2024 hud_exchange --yes
+```
+
+| Option | Description | Default |
+|--------|-------------|---------|
+| `vintage` | Boundary vintage year | Required |
+| `source` | Source name (`hud_exchange`, `hud_opendata`) | Required |
+| `--yes`, `-y` | Skip confirmation | False |
 
 ## `coclab build-xwalks`
 
@@ -563,6 +602,23 @@ coclab ingest-acs-population --acs 2019-2023 --tracts 2023 --force
 - `data/curated/acs/tract_population__{acs}__{tracts}.parquet`
 - Contains: tract_geoid, acs_vintage, tract_vintage, total_population, moe_total_population, data_source, source_ref, ingested_at
 
+## `coclab ingest-tract-relationship`
+
+Download the Census Bureau tract-to-tract relationship file (2010↔2020). This
+file is required to translate ACS data from 2010 tract geography to 2020 tract
+geography.
+
+```bash
+coclab ingest-tract-relationship
+
+# Force a re-download even if cached
+coclab ingest-tract-relationship --force
+```
+
+| Option | Description | Default |
+|--------|-------------|---------|
+| `--force`, `-f` | Re-download even if file exists | False |
+
 ## `coclab ingest-boundaries`
 
 Ingest CoC boundary data from HUD sources.
@@ -822,6 +878,24 @@ coclab list-xwalks --type tract
 |--------|-------------|---------|
 | `--type`, `-t` | `tract`, `county`, or `all` | `all` |
 | `--dir`, `-d` | Directory to scan | `data/curated/xwalks` |
+
+## `coclab registry-rebuild`
+
+Rebuild the source registry by checking local files for missing entries or hash
+mismatches. This is useful if files were moved or updated outside the normal
+ingest commands.
+
+```bash
+coclab registry-rebuild
+
+# Preview changes without writing
+coclab registry-rebuild --dry-run
+```
+
+| Option | Description | Default |
+|--------|-------------|---------|
+| `--dry-run`, `-n` | Preview changes without modifying registry | False |
+| `--registry`, `-r` | Path to source registry file | `data/curated/source_registry.parquet` |
 
 ## `coclab rollup-acs-population`
 
