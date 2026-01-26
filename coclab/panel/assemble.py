@@ -427,8 +427,24 @@ def _load_acs_measures(
 
     # Filter by weighting method if column exists and file has multiple methods
     if "weighting_method" in df.columns:
-        if weighting in df["weighting_method"].values:
-            df = df[df["weighting_method"] == weighting].copy()
+        df_weighted = df[df["weighting_method"] == weighting].copy()
+        if df_weighted.empty:
+            logger.warning(
+                f"ACS measures file has no rows for weighting={weighting}; "
+                "returning empty dataset to avoid mixing weightings"
+            )
+            return pd.DataFrame(
+                columns=[
+                    "coc_id",
+                    "total_population",
+                    "adult_population",
+                    "population_below_poverty",
+                    "median_household_income",
+                    "median_gross_rent",
+                    "coverage_ratio",
+                ]
+            ), None
+        df = df_weighted
 
     # Select relevant columns
     result_cols = ["coc_id"]

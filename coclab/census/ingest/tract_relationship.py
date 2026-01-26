@@ -11,6 +11,7 @@ Documentation:
 """
 
 import hashlib
+import io
 import logging
 from datetime import UTC, datetime
 from pathlib import Path
@@ -86,7 +87,7 @@ def download_tract_relationship() -> tuple[pd.DataFrame, str, int]:
     # Parse pipe-delimited file
     # The file has a header row with column names
     df = pd.read_csv(
-        RELATIONSHIP_URL,
+        io.BytesIO(raw_content),
         sep="|",
         dtype=str,
         encoding="utf-8",
