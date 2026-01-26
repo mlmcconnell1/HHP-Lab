@@ -218,13 +218,26 @@ class TestHelpOutput:
         result = runner.invoke(app, ["--help"])
 
         assert result.exit_code == 0
-        assert "ingest-boundaries" in result.output
+        assert "ingest" in result.output  # Nested subcommand group
         assert "list-boundaries" in result.output
         assert "show" in result.output
+        # Deprecated aliases should be hidden from help
+        assert "ingest-boundaries" not in result.output
+        assert "check-boundaries" not in result.output
 
     def test_ingest_help(self):
-        """Ingest help should show options."""
-        result = runner.invoke(app, ["ingest-boundaries", "--help"])
+        """Ingest help should show subcommands."""
+        result = runner.invoke(app, ["ingest", "--help"])
+
+        assert result.exit_code == 0
+        assert "boundaries" in result.output
+        assert "census" in result.output
+        assert "pit" in result.output
+        assert "zori" in result.output
+
+    def test_ingest_boundaries_help(self):
+        """Ingest boundaries help should show options."""
+        result = runner.invoke(app, ["ingest", "boundaries", "--help"])
 
         assert result.exit_code == 0
         assert "--source" in result.output
