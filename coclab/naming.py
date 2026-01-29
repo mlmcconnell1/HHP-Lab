@@ -268,28 +268,6 @@ def county_weights_filename(acs_vintage: str, weighting: str) -> str:
     return f"county_weights__A{acs_year}__w{weight_abbrev}.parquet"
 
 
-def rollup_filename(
-    boundary_vintage: str,
-    acs_vintage: str,
-    tract_vintage: str | int,
-    weighting: str,
-) -> str:
-    """Generate filename for CoC population rollup dataset.
-
-    Args:
-        boundary_vintage: CoC boundary vintage (e.g., "2025")
-        acs_vintage: ACS vintage (e.g., "2019-2023" or "2023")
-        tract_vintage: Tract geometry vintage (e.g., "2020")
-        weighting: Weighting method (e.g., "area" or "population_mass")
-
-    Returns:
-        Filename like 'rollup__A2023@B2025xT2020__warea.parquet'
-    """
-    acs_year = _normalize_acs_vintage(acs_vintage)
-    weight_abbrev = _abbreviate_weighting(weighting)
-    return f"rollup__A{acs_year}@B{boundary_vintage}xT{tract_vintage}__w{weight_abbrev}.parquet"
-
-
 # =============================================================================
 # Path helpers (combine filename with directory)
 # =============================================================================
@@ -480,37 +458,6 @@ def county_weights_path(
     else:
         base_dir = Path(base_dir)
     return base_dir / "curated" / "acs" / county_weights_filename(acs_vintage, weighting)
-
-
-def rollup_path(
-    boundary_vintage: str,
-    acs_vintage: str,
-    tract_vintage: str | int,
-    weighting: str,
-    base_dir: Path | str | None = None,
-) -> Path:
-    """Get canonical path for CoC population rollup file.
-
-    Args:
-        boundary_vintage: CoC boundary vintage (e.g., "2025")
-        acs_vintage: ACS vintage (e.g., "2019-2023" or "2023")
-        tract_vintage: Tract geometry vintage (e.g., "2020")
-        weighting: Weighting method (e.g., "area" or "population_mass")
-        base_dir: Base data directory (defaults to "data")
-
-    Returns:
-        Path like data/curated/acs/rollup__A2023@B2025xT2020__warea.parquet
-    """
-    if base_dir is None:
-        base_dir = Path("data")
-    else:
-        base_dir = Path(base_dir)
-    return (
-        base_dir
-        / "curated"
-        / "acs"
-        / rollup_filename(boundary_vintage, acs_vintage, tract_vintage, weighting)
-    )
 
 
 # =============================================================================

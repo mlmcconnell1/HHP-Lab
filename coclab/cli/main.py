@@ -15,7 +15,6 @@ from coclab.cli.build_measures import build_measures
 from coclab.cli.build_panel import DEFAULT_ZORI_MIN_COVERAGE, build_panel_cmd
 from coclab.cli.build_xwalks import build_xwalks
 from coclab.cli.compare_vintages import compare_vintages
-from coclab.cli.crosscheck_acs_population import crosscheck_acs_population, validate_acs_population
 from coclab.cli.crosscheck_pit_vintages import crosscheck_pit_vintages, validate_pit_vintages
 from coclab.cli.crosscheck_population import crosscheck_population, validate_population
 from coclab.cli.diagnostics import diagnostics
@@ -31,11 +30,14 @@ from coclab.cli.list_measures import list_measures
 from coclab.cli.list_xwalks import list_xwalks
 from coclab.cli.panel_diagnostics import panel_diagnostics
 from coclab.cli.registry_rebuild import registry_rebuild
-from coclab.cli.rollup_acs_population import rollup_acs_population
 from coclab.cli.show_measures import show_measures
-from coclab.cli.verify_acs_population import verify_acs_population
-from coclab.cli.zori import DEFAULT_OUTPUT_DIR, DEFAULT_RAW_DIR
-from coclab.cli.zori import aggregate_zori, ingest_zori, zori_diagnostics
+from coclab.cli.zori import (
+    DEFAULT_OUTPUT_DIR,
+    DEFAULT_RAW_DIR,
+    aggregate_zori,
+    ingest_zori,
+    zori_diagnostics,
+)
 
 # Suppress known PyArrow warnings on macOS (sysctlbyname failures in sandboxed environments)
 # These are harmless warnings about CPU cache detection that don't affect functionality.
@@ -902,79 +904,6 @@ def source_status(
     typer.echo(summary)
 
 
-@wraps(validate_acs_population)
-def validate_acs_population_deprecated(
-    boundary: Annotated[
-        str,
-        typer.Option(
-            "--boundary",
-            "-b",
-            help="CoC boundary vintage (e.g., '2025').",
-        ),
-    ],
-    acs: Annotated[
-        str,
-        typer.Option(
-            "--acs",
-            "-a",
-            help="ACS 5-year estimate vintage (e.g., '2019-2023').",
-        ),
-    ],
-    tracts: Annotated[
-        str,
-        typer.Option(
-            "--tracts",
-            "-t",
-            help="Census tract vintage (e.g., '2023').",
-        ),
-    ],
-    weighting: Annotated[
-        str,
-        typer.Option(
-            "--weighting",
-            "-w",
-            help="Weighting method: 'area' or 'population_mass'.",
-        ),
-    ] = "area",
-    warn_pct: Annotated[
-        float,
-        typer.Option(
-            "--warn-pct",
-            help="Warning threshold for percent delta (default: 0.01 = 1%).",
-        ),
-    ] = 0.01,
-    error_pct: Annotated[
-        float,
-        typer.Option(
-            "--error-pct",
-            help="Error threshold for percent delta (default: 0.05 = 5%).",
-        ),
-    ] = 0.05,
-    min_coverage: Annotated[
-        float,
-        typer.Option(
-            "--min-coverage",
-            help="Minimum coverage ratio threshold (default: 0.95).",
-        ),
-    ] = 0.95,
-) -> None:
-    """Deprecated: use `coclab validate acs-population`."""
-    typer.echo(
-        "Warning: 'coclab validate-acs-population' is deprecated; "
-        "use 'coclab validate acs-population' instead.",
-        err=True,
-    )
-    validate_acs_population(
-        boundary=boundary,
-        acs=acs,
-        tracts=tracts,
-        weighting=weighting,
-        warn_pct=warn_pct,
-        error_pct=error_pct,
-        min_coverage=min_coverage,
-    )
-
-
 @wraps(validate_pit_vintages)
 def validate_pit_vintages_deprecated(
     vintage1: Annotated[
@@ -1695,7 +1624,6 @@ app.command("build-panel", hidden=True)(build_panel_deprecated)
 app.command("build-xwalks", hidden=True)(build_xwalks_deprecated)
 app.command("check-boundaries", hidden=True)(check_boundaries_deprecated)
 app.command("compare-vintages")(compare_vintages)
-app.command("crosscheck-acs-population", hidden=True)(crosscheck_acs_population)
 app.command("crosscheck-pit-vintages", hidden=True)(crosscheck_pit_vintages)
 app.command("crosscheck-population", hidden=True)(crosscheck_population)
 app.command("delete-boundaries")(delete_boundaries)
@@ -1721,15 +1649,12 @@ app.command("list-census", hidden=True)(list_census_deprecated)
 app.command("list-measures", hidden=True)(list_measures_deprecated)
 app.command("list-xwalks", hidden=True)(list_xwalks_deprecated)
 app.command("registry-rebuild")(registry_rebuild)
-app.command("rollup-acs-population")(rollup_acs_population)
 app.command("show")(show)
 app.command("show-measures")(show_measures)
 app.command("source-status")(source_status)
-app.command("validate-acs-population", hidden=True)(validate_acs_population_deprecated)
 app.command("validate-boundaries", hidden=True)(validate_boundaries_deprecated)
 app.command("validate-pit-vintages", hidden=True)(validate_pit_vintages_deprecated)
 app.command("validate-population", hidden=True)(validate_population_deprecated)
-app.command("verify-acs-population")(verify_acs_population)
 
 ingest_app.command("acs-population")(ingest_acs_population)
 ingest_app.command("boundaries")(ingest_boundaries)
@@ -1743,7 +1668,6 @@ list_app.command("boundaries")(list_boundaries_cmd)
 list_app.command("census")(list_census)
 list_app.command("measures")(list_measures)
 list_app.command("xwalks")(list_xwalks)
-validate_app.command("acs-population")(validate_acs_population)
 validate_app.command("boundaries")(validate_boundaries)
 validate_app.command("pit-vintages")(validate_pit_vintages)
 validate_app.command("population")(validate_population)

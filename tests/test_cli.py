@@ -289,7 +289,6 @@ class TestHelpOutput:
 
         assert result.exit_code == 0
         assert "boundaries" in result.output
-        assert "acs-population" in result.output
         assert "pit-vintages" in result.output
         assert "population" in result.output
 
