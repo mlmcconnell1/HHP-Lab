@@ -273,7 +273,7 @@ coclab rollup-acs-population --boundary 2025 --acs 2019-2023 --tracts 2023 --wei
 
 ### 6.1 Compare vintages for boundary drift
 ```bash
-coclab compare-vintages -v1 2024 -v2 2025
+coclab show vintage-diffs -v1 2024 -v2 2025
 ```
 **Pass criteria**
 - Output categorizes CoCs into added/removed/changed/unchanged.

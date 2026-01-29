@@ -169,11 +169,11 @@ def show_measures(
 
     Examples:
 
-        coclab show-measures --coc CO-500
+        coclab show measures --coc CO-500
 
-        coclab show-measures --coc CO-500 --boundary 2025 --acs 2022
+        coclab show measures --coc CO-500 --boundary 2025 --acs 2022
 
-        coclab show-measures --coc NY-600 --format json
+        coclab show measures --coc NY-600 --format json
     """
     # Validate output format
     if output_format not in ("table", "json", "csv"):

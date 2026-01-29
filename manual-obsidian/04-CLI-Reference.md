@@ -11,6 +11,7 @@ flowchart LR
     coclab --> validate
     coclab --> diagnostics
     coclab --> build
+    coclab --> show
     ingest --> boundaries
     ingest --> census
     ingest --> nhgis
@@ -20,12 +21,8 @@ flowchart LR
     ingest --> tract-relationship
     ingest --> zori
     coclab --> delete-boundaries
-    coclab --> show
     coclab --> rollup-acs-population
     coclab --> verify-acs-population
-    coclab --> show-measures
-    coclab --> compare-vintages
-    coclab --> source-status
     coclab --> registry-rebuild
 
     boundaries --> |"--source hud_exchange"| HUD_EX[Download annual vintage]
@@ -36,11 +33,11 @@ flowchart LR
     pit-vintage --> PITVINT[Parse all years from vintage]
     acs-population --> ACSPOP[Fetch tract population]
     tract-relationship --> TRACTREL[Download 2010↔2020 tract relationship]
-    list --> boundaries
-    list --> census
-    list --> measures
-    list --> xwalks
-    boundaries --> LIST[List boundary vintages]
+    list --> list-boundaries[boundaries]
+    list --> list-census[census]
+    list --> list-measures[measures]
+    list --> list-xwalks[xwalks]
+    list-boundaries --> LIST[List boundary vintages]
     validate --> validate-boundaries
     validate --> validate-acs-population
     validate --> validate-pit-vintages
@@ -48,34 +45,37 @@ flowchart LR
     diagnostics --> diagnostics-panel
     diagnostics --> diagnostics-xwalk
     diagnostics --> diagnostics-zori
-    build --> measures
-    build --> zori
-    build --> panel
-    build --> xwalks
-    build --> export
+    build --> build-measures[measures]
+    build --> build-zori[zori]
+    build --> build-panel[panel]
+    build --> build-xwalks[xwalks]
+    build --> build-export[export]
+    show --> show-vintage-diffs[vintage-diffs]
+    show --> show-map[map]
+    show --> show-measures[measures]
+    show --> show-sources[sources]
     validate-boundaries --> BOUNDCHK[Validate boundary registry health]
     delete-boundaries --> BOUNDDEL[Remove boundary registry entry]
-    show --> MAP[Render interactive map]
-    xwalks --> XWALK[Create tract/county crosswalks]
-    measures --> MEAS[Aggregate demographic measures from ACS]
-    panel --> PANEL[Assemble CoC × year panels]
+    show-map --> MAP[Render interactive map]
+    build-xwalks --> XWALK[Create tract/county crosswalks]
+    build-measures --> MEAS[Aggregate demographic measures from ACS]
+    build-panel --> PANEL[Assemble CoC × year panels]
     rollup-acs-population --> ROLLUP[Aggregate tract pop to CoC]
     validate-acs-population --> XCHECK[Validate rollup vs measures]
     validate-pit-vintages --> PITXCHECK[Validate PIT across vintages]
     validate-population --> POPCHECK[Validate CoC pop vs national]
     verify-acs-population --> VERIFY[Full pipeline: ingest→rollup→validate]
-    zori --> ZORI_ING[Download & normalize ZORI data]
-    zori --> ZORI_AGG[Aggregate ZORI to CoC level]
+    build-zori --> ZORI_AGG[Aggregate ZORI to CoC level]
     diagnostics-panel --> PDIAG[Panel quality & sensitivity]
     diagnostics-xwalk --> DIAG[Crosswalk quality checks]
     diagnostics-zori --> ZORI_DIAG[ZORI coverage diagnostics]
-    census --> LCENSUS[List census geometry files]
-    xwalks --> LXWALK[List crosswalk files]
-    measures --> LMEAS[List measure files]
+    list-census --> LCENSUS[List census geometry files]
+    list-xwalks --> LXWALK[List crosswalk files]
+    list-measures --> LMEAS[List measure files]
     show-measures --> SMEAS[Display CoC measures]
-    compare-vintages --> COMP[Diff boundary vintages]
-    source-status --> SRCSTAT[Display source registry status]
-    export --> EXPORT[Create analysis-ready bundle]
+    show-vintage-diffs --> COMP[Diff boundary vintages]
+    show-sources --> SRCSTAT[Display source registry status]
+    build-export --> EXPORT[Create analysis-ready bundle]
     registry-rebuild --> REGREBUILD[Rebuild source registry from local files]
 ```
 
@@ -93,6 +93,9 @@ Legacy `diagnostics-*` commands remain as deprecated passthroughs for backward c
 
 **Build grouping:** The canonical form is `coclab build <subcommand>` (e.g., `coclab build panel`).
 Legacy build/aggregate/export commands remain as deprecated passthroughs for backward compatibility.
+
+**Show grouping:** The canonical form is `coclab show <subcommand>` (e.g., `coclab show map`).
+Legacy commands (`show`, `show-measures`, `compare-vintages`, `source-status`) remain as deprecated passthroughs for backward compatibility.
 
 ## `coclab build measures`
 
@@ -311,19 +314,19 @@ coclab build xwalks --boundary 2025 --tracts 2023 --counties 2023
 - `xwalk__B{boundary}xC{counties}.parquet`
 - Diagnostic summary printed to console
 
-## `coclab compare-vintages`
+## `coclab show vintage-diffs`
 
 Compare CoC boundaries between two vintages.
 
 ```bash
 # Basic comparison
-coclab compare-vintages --vintage1 2024 --vintage2 2025
+coclab show vintage-diffs --vintage1 2024 --vintage2 2025
 
 # Show unchanged CoCs too
-coclab compare-vintages -v1 2024 -v2 2025 --show-unchanged
+coclab show vintage-diffs -v1 2024 -v2 2025 --show-unchanged
 
 # Save diff to CSV
-coclab compare-vintages -v1 2024 -v2 2025 -o diff_report.csv
+coclab show vintage-diffs -v1 2024 -v2 2025 -o diff_report.csv
 ```
 
 | Option | Description | Default |
@@ -944,19 +947,19 @@ coclab rollup-acs-population --boundary 2025 --acs 2019-2023 --tracts 2023 --wei
 - `data/curated/acs/coc_population_rollup__{boundary}__{acs}__{tracts}__{weighting}.parquet`
 - Contains: coc_id, boundary_vintage, acs_vintage, tract_vintage, weighting_method, coc_population, coverage_ratio, max_tract_contribution, tract_count
 
-## `coclab show`
+## `coclab show map`
 
 Render an interactive map for a specific CoC boundary.
 
 ```bash
 # Show using latest vintage
-coclab show --coc CO-500
+coclab show map --coc CO-500
 
 # Specify a vintage
-coclab show --coc CO-500 --vintage 2025
+coclab show map --coc CO-500 --vintage 2025
 
 # Custom output path
-coclab show --coc NY-600 --output my_map.html
+coclab show map --coc NY-600 --output my_map.html
 ```
 
 | Option | Description | Default |
@@ -965,19 +968,19 @@ coclab show --coc NY-600 --output my_map.html
 | `--vintage` | Boundary vintage to use | Latest |
 | `--output` | Output HTML file path | Auto-generated |
 
-## `coclab show-measures`
+## `coclab show measures`
 
 Display computed measures for a specific CoC.
 
 ```bash
 # Show measures (auto-detect latest files)
-coclab show-measures --coc CO-500
+coclab show measures --coc CO-500
 
 # Specify vintages
-coclab show-measures --coc CO-500 --boundary 2025 --acs 2022
+coclab show measures --coc CO-500 --boundary 2025 --acs 2022
 
 # Output as JSON
-coclab show-measures --coc NY-600 --format json
+coclab show measures --coc NY-600 --format json
 ```
 
 | Option | Description | Default |
@@ -987,19 +990,19 @@ coclab show-measures --coc NY-600 --format json
 | `--acs`, `-a` | ACS vintage year | Auto-detect |
 | `--format`, `-f` | `table`, `json`, or `csv` | `table` |
 
-## `coclab source-status`
+## `coclab show sources`
 
 Display status of tracked external data sources. The source registry tracks all ingested external data (ZORI, boundaries, census, etc.) with SHA-256 hashes to detect upstream changes.
 
 ```bash
 # Show full registry summary
-coclab source-status
+coclab show sources
 
 # Check for upstream data changes
-coclab source-status --check-changes
+coclab show sources --check-changes
 
 # Filter by source type
-coclab source-status --type zori
+coclab show sources --type zori
 ```
 
 | Option | Description | Default |

@@ -42,7 +42,7 @@ sequenceDiagram
     participant Visualizer
     participant Browser
 
-    User->>CLI: coclab show --coc CO-500
+    User->>CLI: coclab show map --coc CO-500
     CLI->>Visualizer: render_coc_map("CO-500")
     Visualizer->>Registry: latest_vintage()
     Registry-->>Visualizer: "2025"

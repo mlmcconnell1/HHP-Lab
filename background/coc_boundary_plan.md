@@ -91,7 +91,7 @@ These functions define the integration points:
 
 **CLI**
 - `coclab ingest-boundaries --source hud_exchange --vintage 2025`
-- `coclab show --coc CO-500 [--vintage 2025]`
+- `coclab show map --coc CO-500 [--vintage 2025]`
 
 ---
 
@@ -230,7 +230,7 @@ These functions define the integration points:
 - `coclab ingest-boundaries --source hud_exchange --vintage 2025`
 - `coclab ingest-boundaries --source hud_opendata --snapshot latest`
 - `coclab list-vintages`
-- `coclab show --coc CO-500 [--vintage 2025]`
+- `coclab show map --coc CO-500 [--vintage 2025]`
 
 **Deliverables**
 - `coclab/cli/main.py`
@@ -278,7 +278,7 @@ These functions define the integration points:
 1. **Ingest**: Running `coclab ingest-boundaries --source hud_exchange --vintage <YEAR>` creates:
    - `data/curated/coc_boundaries/coc_boundaries__<YEAR>.parquet`
    - updates `data/curated/boundary_registry.parquet`
-2. **Map**: Running `coclab show --coc CO-500` produces an HTML file with the boundary polygon rendered.
+2. **Map**: Running `coclab show map --coc CO-500` produces an HTML file with the boundary polygon rendered.
 3. **Versioning**: Multiple vintages can coexist; `latest_vintage()` selects a default consistently.
 4. **Validation**: Invalid geometries are fixed or flagged; duplicates and missing IDs are flagged.
 

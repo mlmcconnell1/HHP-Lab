@@ -103,6 +103,11 @@ build_app = typer.Typer(
     help="Build datasets and bundles",
     no_args_is_help=True,
 )
+show_app = typer.Typer(
+    name="show",
+    help="Display and visualize data",
+    no_args_is_help=True,
+)
 
 
 @app.callback()
@@ -829,9 +834,9 @@ def show(
 
     Examples:
 
-        coclab show --coc CO-500
+        coclab show map --coc CO-500
 
-        coclab show --coc CO-500 --vintage 2025
+        coclab show map --coc CO-500 --vintage 2025
     """
     from coclab.viz.map_folium import render_coc_map
 
@@ -874,11 +879,11 @@ def source_status(
 
     Examples:
 
-        coclab source-status
+        coclab show sources
 
-        coclab source-status --type zori
+        coclab show sources --type zori
 
-        coclab source-status --check-changes
+        coclab show sources --check-changes
     """
     from coclab.source_registry import (
         detect_upstream_changes,
@@ -1615,6 +1620,166 @@ def export_bundle_deprecated(
 
 
 # -----------------------------------------------------------------------------
+# Deprecated wrappers for show subcommand migration
+# -----------------------------------------------------------------------------
+
+
+@wraps(compare_vintages)
+def compare_vintages_deprecated(
+    vintage1: Annotated[
+        str,
+        typer.Option(
+            "--vintage1",
+            "-v1",
+            help="First (older) boundary vintage to compare.",
+        ),
+    ],
+    vintage2: Annotated[
+        str,
+        typer.Option(
+            "--vintage2",
+            "-v2",
+            help="Second (newer) boundary vintage to compare.",
+        ),
+    ],
+    show_unchanged: Annotated[
+        bool,
+        typer.Option(
+            "--show-unchanged",
+            help="Also list unchanged CoCs.",
+        ),
+    ] = False,
+    output: Annotated[
+        Path | None,
+        typer.Option(
+            "--output",
+            "-o",
+            help="Save diff to CSV file.",
+        ),
+    ] = None,
+) -> None:
+    """Deprecated: use `coclab show vintage-diffs`."""
+    typer.echo(
+        "Warning: 'coclab compare-vintages' is deprecated; "
+        "use 'coclab show vintage-diffs' instead.",
+        err=True,
+    )
+    compare_vintages(
+        vintage1=vintage1,
+        vintage2=vintage2,
+        show_unchanged=show_unchanged,
+        output=output,
+    )
+
+
+@wraps(show)
+def show_deprecated(
+    coc: Annotated[
+        str,
+        typer.Option(
+            "--coc",
+            "-c",
+            help="CoC identifier (e.g., 'CO-500')",
+        ),
+    ],
+    vintage: Annotated[
+        str | None,
+        typer.Option(
+            "--vintage",
+            "-v",
+            help="Boundary vintage to use. If not specified, uses the latest.",
+        ),
+    ] = None,
+    output: Annotated[
+        Path | None,
+        typer.Option(
+            "--output",
+            "-o",
+            help="Output path for the HTML map file",
+        ),
+    ] = None,
+) -> None:
+    """Deprecated: use `coclab show map`."""
+    typer.echo(
+        "Warning: 'coclab show' is deprecated; use 'coclab show map' instead.",
+        err=True,
+    )
+    show(coc=coc, vintage=vintage, output=output)
+
+
+@wraps(show_measures)
+def show_measures_deprecated(
+    coc: Annotated[
+        str,
+        typer.Option(
+            "--coc",
+            "-c",
+            help="CoC identifier (e.g., 'CO-500')",
+        ),
+    ],
+    boundary: Annotated[
+        str | None,
+        typer.Option(
+            "--boundary",
+            "-b",
+            help="Boundary vintage (e.g., '2025'). Uses latest if not specified.",
+        ),
+    ] = None,
+    acs: Annotated[
+        str | None,
+        typer.Option(
+            "--acs",
+            "-a",
+            help="ACS vintage year (e.g., '2022'). Uses latest if not specified.",
+        ),
+    ] = None,
+    format_: Annotated[
+        str,
+        typer.Option(
+            "--format",
+            "-f",
+            help="Output format: 'table', 'json', or 'csv'.",
+        ),
+    ] = "table",
+) -> None:
+    """Deprecated: use `coclab show measures`."""
+    typer.echo(
+        "Warning: 'coclab show-measures' is deprecated; "
+        "use 'coclab show measures' instead.",
+        err=True,
+    )
+    show_measures(coc=coc, boundary=boundary, acs=acs, format_=format_)
+
+
+@wraps(source_status)
+def source_status_deprecated(
+    source_type: Annotated[
+        str | None,
+        typer.Option(
+            "--type",
+            "-t",
+            help="Filter to specific source type (zori, boundary, census_tract, etc.)",
+        ),
+    ] = None,
+    check_changes: Annotated[
+        bool,
+        typer.Option(
+            "--check-changes",
+            "-c",
+            help="Highlight sources that have changed over time",
+        ),
+    ] = False,
+) -> None:
+    """Deprecated: use `coclab show sources`."""
+    typer.echo(
+        "Warning: 'coclab source-status' is deprecated; "
+        "use 'coclab show sources' instead.",
+        err=True,
+    )
+    source_status(source_type=source_type, check_changes=check_changes)
+
+
+# -----------------------------------------------------------------------------
 # Register all commands alphabetically for consistent help output
 # -----------------------------------------------------------------------------
 
@@ -1623,7 +1788,7 @@ app.command("aggregate-zori", hidden=True)(aggregate_zori_deprecated)
 app.command("build-panel", hidden=True)(build_panel_deprecated)
 app.command("build-xwalks", hidden=True)(build_xwalks_deprecated)
 app.command("check-boundaries", hidden=True)(check_boundaries_deprecated)
-app.command("compare-vintages")(compare_vintages)
+app.command("compare-vintages", hidden=True)(compare_vintages_deprecated)
 app.command("crosscheck-pit-vintages", hidden=True)(crosscheck_pit_vintages)
 app.command("crosscheck-population", hidden=True)(crosscheck_population)
 app.command("delete-boundaries")(delete_boundaries)
@@ -1636,6 +1801,7 @@ app.add_typer(list_app, name="list")
 app.add_typer(validate_app, name="validate")
 app.add_typer(diagnostics_app, name="diagnostics")
 app.add_typer(build_app, name="build")
+app.add_typer(show_app, name="show")
 app.command("ingest-acs-population", hidden=True)(ingest_acs_population_deprecated)
 app.command("ingest-boundaries", hidden=True)(ingest_boundaries_deprecated)
 app.command("ingest-census", hidden=True)(ingest_census_deprecated)
@@ -1649,9 +1815,9 @@ app.command("list-census", hidden=True)(list_census_deprecated)
 app.command("list-measures", hidden=True)(list_measures_deprecated)
 app.command("list-xwalks", hidden=True)(list_xwalks_deprecated)
 app.command("registry-rebuild")(registry_rebuild)
-app.command("show")(show)
-app.command("show-measures")(show_measures)
-app.command("source-status")(source_status)
+app.command("show", hidden=True)(show_deprecated)
+app.command("show-measures", hidden=True)(show_measures_deprecated)
+app.command("source-status", hidden=True)(source_status_deprecated)
 app.command("validate-boundaries", hidden=True)(validate_boundaries_deprecated)
 app.command("validate-pit-vintages", hidden=True)(validate_pit_vintages_deprecated)
 app.command("validate-population", hidden=True)(validate_population_deprecated)
@@ -1679,6 +1845,10 @@ build_app.command("zori")(aggregate_zori)
 build_app.command("panel")(build_panel_cmd)
 build_app.command("xwalks")(build_xwalks)
 build_app.command("export")(export_bundle)
+show_app.command("vintage-diffs")(compare_vintages)
+show_app.command("map")(show)
+show_app.command("measures")(show_measures)
+show_app.command("sources")(source_status)
 
 
 if __name__ == "__main__":
