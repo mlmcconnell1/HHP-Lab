@@ -12,6 +12,9 @@ The ArcGIS FeatureServer is now the most reliable source for current data.
 
 from __future__ import annotations
 
+import hashlib
+import json
+import logging
 import zipfile
 from datetime import UTC, datetime
 from pathlib import Path
@@ -20,8 +23,12 @@ from typing import TYPE_CHECKING, Any
 import httpx
 from shapely.geometry import shape
 
+from coclab.source_registry import check_source_changed, register_source
+
 if TYPE_CHECKING:
     import geopandas as gpd
+
+logger = logging.getLogger(__name__)
 
 # HUD ArcGIS feature service endpoint (primary source)
 ARCGIS_FEATURE_SERVICE_URL = (
@@ -155,7 +162,7 @@ def _fetch_arcgis_page(
 def _fetch_all_arcgis_features(
     client: httpx.Client,
     progress_callback: Any | None = None,
-) -> list[dict[str, Any]]:
+) -> tuple[list[dict[str, Any]], bytes]:
     """Fetch all features from the ArcGIS service with pagination.
 
     Args:
@@ -163,9 +170,10 @@ def _fetch_all_arcgis_features(
         progress_callback: Optional callback(count) called after each page fetch
 
     Returns:
-        List of all GeoJSON features
+        Tuple of (list of all GeoJSON features, combined raw response content)
     """
     all_features: list[dict[str, Any]] = []
+    all_raw_content: list[bytes] = []
     offset = 0
 
     while True:
@@ -176,6 +184,7 @@ def _fetch_all_arcgis_features(
             break
 
         all_features.extend(features)
+        all_raw_content.append(json.dumps(data, sort_keys=True).encode("utf-8"))
 
         if progress_callback:
             progress_callback(len(features))
@@ -186,7 +195,8 @@ def _fetch_all_arcgis_features(
 
         offset += ARCGIS_PAGE_SIZE
 
-    return all_features
+    combined_content = b"".join(all_raw_content)
+    return all_features, combined_content
 
 
 def _arcgis_features_to_geodataframe(
@@ -266,7 +276,7 @@ def _map_arcgis_to_canonical_schema(
 def fetch_from_arcgis(
     boundary_vintage: str,
     show_progress: bool = False,
-) -> gpd.GeoDataFrame:
+) -> tuple[gpd.GeoDataFrame, bytes]:
     """Fetch CoC boundaries from HUD ArcGIS FeatureServer.
 
     This is the primary data source for current CoC boundary data.
@@ -276,7 +286,7 @@ def fetch_from_arcgis(
         show_progress: If True, display a progress bar
 
     Returns:
-        GeoDataFrame with canonical schema
+        Tuple of (GeoDataFrame with canonical schema, raw response content)
 
     Raises:
         httpx.HTTPStatusError: If API request fails
@@ -292,15 +302,65 @@ def fetch_from_arcgis(
                 label="Fetching CoC boundaries",
                 show_pos=True,
             ) as bar:
-                features = _fetch_all_arcgis_features(client, progress_callback=bar.update)
+                features, raw_content = _fetch_all_arcgis_features(
+                    client, progress_callback=bar.update
+                )
         else:
-            features = _fetch_all_arcgis_features(client)
+            features, raw_content = _fetch_all_arcgis_features(client)
 
     if not features:
         raise ValueError("No features returned from HUD ArcGIS API")
 
     gdf = _arcgis_features_to_geodataframe(features)
-    return _map_arcgis_to_canonical_schema(gdf, boundary_vintage)
+    return _map_arcgis_to_canonical_schema(gdf, boundary_vintage), raw_content
+
+
+def _hash_file(path: Path) -> tuple[str, int]:
+    """Hash a file by content. Returns (sha256, size)."""
+    hasher = hashlib.sha256()
+    size = 0
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            hasher.update(chunk)
+            size += len(chunk)
+    return hasher.hexdigest(), size
+
+
+def _hash_directory(path: Path) -> tuple[str, int]:
+    """Hash a directory by hashing all files in sorted path order."""
+    hasher = hashlib.sha256()
+    size = 0
+    for file_path in sorted(p for p in path.rglob("*") if p.is_file()):
+        hasher.update(str(file_path.relative_to(path)).encode("utf-8"))
+        file_hash, file_size = _hash_file(file_path)
+        hasher.update(file_hash.encode("utf-8"))
+        size += file_size
+    return hasher.hexdigest(), size
+
+
+def _hash_shapefile(path: Path) -> tuple[str, int]:
+    """Hash a shapefile by including sibling component files."""
+    stem = path.stem
+    components = [".shp", ".shx", ".dbf", ".prj", ".cpg"]
+    files = [path.with_suffix(ext) for ext in components]
+    hasher = hashlib.sha256()
+    size = 0
+    for file_path in files:
+        if file_path.exists():
+            hasher.update(file_path.name.encode("utf-8"))
+            file_hash, file_size = _hash_file(file_path)
+            hasher.update(file_hash.encode("utf-8"))
+            size += file_size
+    return hasher.hexdigest(), size
+
+
+def _hash_local_path(path: Path) -> tuple[str, int]:
+    """Hash a local path (file, shapefile, or directory)."""
+    if path.is_dir():
+        return _hash_directory(path)
+    if path.suffix.lower() == ".shp":
+        return _hash_shapefile(path)
+    return _hash_file(path)
 
 
 # =============================================================================
@@ -502,9 +562,16 @@ def ingest_hud_exchange(
     # Determine which source to use
     use_arcgis = not use_legacy_source and url is None and not skip_download
 
+    source_url: str | None = None
+    content_sha256: str | None = None
+    content_size: int | None = None
+
     if use_arcgis:
         # Primary path: fetch from ArcGIS FeatureServer
-        gdf = fetch_from_arcgis(boundary_vintage, show_progress=show_progress)
+        gdf, raw_content = fetch_from_arcgis(boundary_vintage, show_progress=show_progress)
+        source_url = ARCGIS_FEATURE_SERVICE_URL
+        content_sha256 = hashlib.sha256(raw_content).hexdigest()
+        content_size = len(raw_content)
         if show_progress:
             click.echo(f"Fetched {len(gdf)} CoC boundaries.")
     else:
@@ -516,6 +583,7 @@ def ingest_hud_exchange(
 
         if url is None:
             url = HUD_EXCHANGE_GDB_URL_TEMPLATE.format(vintage=boundary_vintage)
+        source_url = url
 
         if not skip_download:
             data_path = download_hud_exchange_gdb(
@@ -523,6 +591,9 @@ def ingest_hud_exchange(
                 output_dir=raw_dir,
                 url=url,
             )
+            zip_path = raw_dir / f"CoC_GIS_{boundary_vintage}.zip"
+            if zip_path.exists():
+                content_sha256, content_size = _hash_file(zip_path)
         else:
             # Find existing data in raw_dir
             gdb_dirs = list(raw_dir.glob("*.gdb"))
@@ -536,6 +607,9 @@ def ingest_hud_exchange(
 
         gdf = read_coc_boundaries(data_path)
         gdf = map_to_canonical_schema(gdf, boundary_vintage, url)
+
+        if content_sha256 is None or content_size is None:
+            content_sha256, content_size = _hash_local_path(Path(data_path))
 
     # Normalize boundaries (CRS, fix geometries, compute geom_hash)
     if show_progress:
@@ -564,6 +638,40 @@ def ingest_hud_exchange(
         source=source,
         path=output_path,
         feature_count=len(gdf),
+    )
+
+    # Register in source registry
+    if source_url is None or content_sha256 is None or content_size is None:
+        raise ValueError("Source registry metadata missing for HUD Exchange ingest.")
+
+    changed, details = check_source_changed(
+        source_type="boundary",
+        source_url=source_url,
+        current_sha256=content_sha256,
+    )
+
+    if changed:
+        logger.warning(
+            "UPSTREAM DATA CHANGED: HUD Exchange boundaries have changed since last download! "
+            f"Previous hash: {details['previous_sha256'][:16]}... "
+            f"Current hash: {content_sha256[:16]}... "
+            f"Last ingested: {details['previous_ingested_at']}"
+        )
+    elif details.get("is_new"):
+        logger.info("First time tracking HUD Exchange boundaries in source registry")
+
+    register_source(
+        source_type="boundary",
+        source_url=source_url,
+        source_name=f"HUD Exchange CoC Boundaries {boundary_vintage}",
+        raw_sha256=content_sha256,
+        file_size=content_size,
+        local_path=str(output_path),
+        metadata={
+            "boundary_vintage": boundary_vintage,
+            "feature_count": len(gdf),
+            "source": source,
+        },
     )
 
     return output_path

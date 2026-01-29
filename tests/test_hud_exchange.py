@@ -202,6 +202,14 @@ class TestIngestHudExchange:
             "coclab.registry.register_vintage",
             lambda **kwargs: None,
         )
+        monkeypatch.setattr(
+            "coclab.ingest.hud_exchange_gis.check_source_changed",
+            lambda **kwargs: (False, {"is_new": True, "previous_sha256": None}),
+        )
+        monkeypatch.setattr(
+            "coclab.ingest.hud_exchange_gis.register_source",
+            lambda **kwargs: None,
+        )
 
     def test_ingest_with_skip_download(self):
         """Test ingestion with pre-downloaded data."""
