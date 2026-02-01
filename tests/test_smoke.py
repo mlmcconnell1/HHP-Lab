@@ -299,7 +299,7 @@ class TestSmokeCLI:
         )
 
         # Test show command
-        result = runner.invoke(app, ["show", "--coc", "CO-500", "--vintage", "2025"])
+        result = runner.invoke(app, ["show", "map", "--coc", "CO-500", "--vintage", "2025"])
         assert result.exit_code == 0
         assert "Map saved to" in result.stdout
         assert "CO-500" in result.stdout
@@ -329,7 +329,7 @@ class TestSmokeCLI:
         )
 
         # Test with invalid CoC
-        result = runner.invoke(app, ["show", "--coc", "INVALID-999", "--vintage", "2025"])
+        result = runner.invoke(app, ["show", "map", "--coc", "INVALID-999", "--vintage", "2025"])
         assert result.exit_code == 1
         # Error message may be in stdout or stderr (result.output combines both)
         output = result.output.lower() if result.output else ""

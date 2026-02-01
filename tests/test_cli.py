@@ -162,7 +162,7 @@ class TestShowCommand:
         """Show CoC map successfully."""
         mock_render.return_value = Path("data/curated/maps/CO-500__2025.html")
 
-        result = runner.invoke(app, ["show", "--coc", "CO-500"])
+        result = runner.invoke(app, ["show", "map", "--coc", "CO-500"])
 
         assert result.exit_code == 0
         assert "Map saved to" in result.output
@@ -173,7 +173,7 @@ class TestShowCommand:
         """Show CoC map with specific vintage."""
         mock_render.return_value = Path("data/curated/maps/CO-500__2024.html")
 
-        result = runner.invoke(app, ["show", "--coc", "CO-500", "--vintage", "2024"])
+        result = runner.invoke(app, ["show", "map", "--coc", "CO-500", "--vintage", "2024"])
 
         assert result.exit_code == 0
         mock_render.assert_called_once_with(coc_id="CO-500", vintage="2024", out_html=None)
@@ -184,7 +184,7 @@ class TestShowCommand:
         custom_path = Path("/tmp/my_map.html")
         mock_render.return_value = custom_path
 
-        result = runner.invoke(app, ["show", "--coc", "CO-500", "--output", str(custom_path)])
+        result = runner.invoke(app, ["show", "map", "--coc", "CO-500", "--output", str(custom_path)])
 
         assert result.exit_code == 0
         mock_render.assert_called_once_with(coc_id="CO-500", vintage=None, out_html=custom_path)
@@ -194,7 +194,7 @@ class TestShowCommand:
         """Show CoC map when CoC not found."""
         mock_render.side_effect = ValueError("CoC 'XX-999' not found")
 
-        result = runner.invoke(app, ["show", "--coc", "XX-999"])
+        result = runner.invoke(app, ["show", "map", "--coc", "XX-999"])
 
         assert result.exit_code == 1
         assert "Error:" in result.output
@@ -204,7 +204,7 @@ class TestShowCommand:
         """Show CoC map when boundary file not found."""
         mock_render.side_effect = FileNotFoundError("Boundary file not found")
 
-        result = runner.invoke(app, ["show", "--coc", "CO-500"])
+        result = runner.invoke(app, ["show", "map", "--coc", "CO-500"])
 
         assert result.exit_code == 1
         assert "Error:" in result.output
@@ -275,8 +275,18 @@ class TestHelpOutput:
         assert "--snapshot" in result.output
 
     def test_show_help(self):
-        """Show help should show options."""
+        """Show help should show subcommands."""
         result = runner.invoke(app, ["show", "--help"])
+
+        assert result.exit_code == 0
+        assert "map" in result.output
+        assert "measures" in result.output
+        assert "sources" in result.output
+        assert "vintage-diffs" in result.output
+
+    def test_show_map_help(self):
+        """Show map help should show options."""
+        result = runner.invoke(app, ["show", "map", "--help"])
 
         assert result.exit_code == 0
         assert "--coc" in result.output
