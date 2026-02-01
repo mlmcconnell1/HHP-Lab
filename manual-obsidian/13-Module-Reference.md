@@ -13,6 +13,7 @@ The CLI module uses [Typer](https://typer.tiangolo.com/) for command-line parsin
 - `diagnostics` - Run diagnostics reports
 - `build` - Build datasets and bundles
 - `show` - Generate interactive maps
+- `registry` - Manage boundary and source registries
 
 ## ingest/hud_exchange_gis.py
 
