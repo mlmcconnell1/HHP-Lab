@@ -18,14 +18,14 @@ Usage
 -----
     from coclab.pep.ingest import ingest_pep_county
 
-    # Ingest vintage 2020 data (covers 2010-2020)
-    path = ingest_pep_county(vintage=2020)
+    # Ingest best-available PEP county estimates (postcensal for now)
+    path = ingest_pep_county()
 
-    # Ingest vintage 2024 data (covers 2020-2024)
-    path = ingest_pep_county(vintage=2024)
+    # Ingest postcensal vintage 2024 data (covers 2020-2024)
+    path = ingest_pep_county(series="postcensal", vintage=2024)
 
-    # Ingest both and create combined file
-    path = ingest_pep_county(vintage="all")
+    # Request intercensal (errors until available)
+    path = ingest_pep_county(series="intercensal-2010-2020")
 """
 
 from __future__ import annotations
@@ -39,12 +39,12 @@ from typing import Literal
 import httpx
 import pandas as pd
 
-from coclab.provenance import ProvenanceBlock, write_parquet_with_provenance
+from coclab.provenance import ProvenanceBlock, read_provenance, write_parquet_with_provenance
 from coclab.source_registry import check_source_changed, register_source
 
 logger = logging.getLogger(__name__)
 
-# Census Bureau PEP download URLs by vintage
+# Census Bureau PEP download URLs by vintage (postcensal)
 # Vintage 2020 = estimates through July 1, 2020 (released 2021)
 # Vintage 2024 = estimates through July 1, 2024 (released 2025)
 PEP_URLS = {
@@ -66,6 +66,53 @@ VINTAGE_YEARS = {
     2020: list(range(2010, 2021)),  # 2010-2020
     2024: list(range(2020, 2025)),  # 2020-2024
 }
+
+# Intercensal series metadata (not yet available as a combined county CSV)
+INTERCENSAL_SERIES = "intercensal-2010-2020"
+POSTCENSAL_SERIES = "postcensal"
+ALL_SERIES = "all"
+AUTO_SERIES = "auto"
+INTERCENSAL_YEAR_RANGE = (2010, 2020)
+INTERCENSAL_YEARS = list(range(2010, 2021))
+INTERCENSAL_URLS: dict[int, str] = {}
+
+
+def _postcensal_year_range(vintage: int) -> tuple[int, int] | None:
+    years = VINTAGE_YEARS.get(vintage)
+    if not years:
+        return None
+    return min(years), max(years)
+
+
+def _format_postcensal_ranges() -> str:
+    parts = []
+    for vintage in sorted(PEP_URLS.keys()):
+        year_range = _postcensal_year_range(vintage)
+        if year_range:
+            parts.append(f"{vintage} ({year_range[0]}-{year_range[1]})")
+        else:
+            parts.append(str(vintage))
+    return ", ".join(parts)
+
+
+def _intercensal_available() -> bool:
+    return bool(INTERCENSAL_URLS)
+
+
+def _intercensal_url() -> str | None:
+    if not INTERCENSAL_URLS:
+        return None
+    latest_key = sorted(INTERCENSAL_URLS.keys())[-1]
+    return INTERCENSAL_URLS[latest_key]
+
+
+def _validate_postcensal_vintage(vintage: int) -> None:
+    if vintage not in PEP_URLS:
+        available = _format_postcensal_ranges()
+        raise ValueError(
+            f"Postcensal vintage {vintage} is not available. "
+            f"Available postcensal vintages: {available}."
+        )
 
 
 def download_pep(
@@ -162,6 +209,72 @@ def download_pep(
         local_path=str(raw_path),
         metadata={
             "vintage": vintage,
+            "download_date": download_date,
+            "data_source": "U.S. Census Bureau",
+            "program": "Population Estimates Program",
+        },
+    )
+
+    return raw_path, sha256
+
+
+def download_pep_intercensal(
+    url: str,
+    raw_dir: Path | str | None = None,
+    force: bool = False,
+) -> tuple[Path, str]:
+    """Download raw intercensal PEP county data from Census Bureau."""
+    if raw_dir is None:
+        raw_dir = DEFAULT_RAW_DIR
+    else:
+        raw_dir = Path(raw_dir)
+    raw_dir.mkdir(parents=True, exist_ok=True)
+
+    download_date = date.today().isoformat()
+    filename = f"pep_county__intercensal_2010_2020__{download_date}.csv"
+    raw_path = raw_dir / filename
+
+    if raw_path.exists() and not force:
+        logger.info(f"Using cached raw file: {raw_path}")
+        content = raw_path.read_bytes()
+        sha256 = hashlib.sha256(content).hexdigest()
+        return raw_path, sha256
+
+    logger.info("Downloading intercensal PEP county data from %s", url)
+    with httpx.Client(timeout=120.0, follow_redirects=True) as client:
+        response = client.get(url)
+        response.raise_for_status()
+        content = response.content
+
+    sha256 = hashlib.sha256(content).hexdigest()
+    raw_path.write_bytes(content)
+    logger.info(f"Saved raw file to {raw_path} (sha256: {sha256[:10]}...)")
+
+    changed, details = check_source_changed(
+        source_type="pep_county",
+        source_url=url,
+        current_sha256=sha256,
+    )
+
+    if changed:
+        logger.warning(
+            "UPSTREAM DATA CHANGED: Intercensal PEP county data has changed since last download!\n"
+            f"    Previous hash: {details['previous_sha256'][:16]}...\n"
+            f"    Current hash:  {sha256[:16]}...\n"
+            f"    Last ingested: {details['previous_ingested_at']}"
+        )
+    elif details.get("is_new"):
+        logger.info("First time tracking intercensal PEP county source in registry")
+
+    register_source(
+        source_type="pep_county",
+        source_url=url,
+        source_name="PEP County Population Intercensal 2010-2020",
+        raw_sha256=sha256,
+        file_size=len(content),
+        local_path=str(raw_path),
+        metadata={
+            "series": "intercensal_2010_2020",
             "download_date": download_date,
             "data_source": "U.S. Census Bureau",
             "program": "Population Estimates Program",
@@ -285,7 +398,7 @@ def get_output_path(
     Parameters
     ----------
     vintage : int or str
-        Data vintage (2020, 2024, or "combined").
+        Data vintage (2020, 2024), "combined", or "intercensal-2010-2020".
     output_dir : Path or str, optional
         Output directory. Defaults to 'data/curated/pep'.
 
@@ -301,31 +414,39 @@ def get_output_path(
 
     if vintage == "combined":
         return output_dir / "pep_county__combined.parquet"
+    if vintage == INTERCENSAL_SERIES:
+        return output_dir / "pep_county__intercensal_2010_2020.parquet"
     return output_dir / f"pep_county__v{vintage}.parquet"
 
 
 def ingest_pep_county(
-    vintage: int | Literal["all"] = 2024,
+    series: Literal["auto", "postcensal", "intercensal-2010-2020", "all"] = AUTO_SERIES,
+    vintage: int | None = None,
     url: str | None = None,
     force: bool = False,
     output_dir: Path | str | None = None,
     raw_dir: Path | str | None = None,
+    prefer_postcensal_2020: bool = False,
 ) -> Path:
     """Download and normalize PEP county population estimates.
 
     Parameters
     ----------
-    vintage : int or "all"
-        Data vintage year (2020 or 2024), or "all" to ingest both
-        and create a combined file.
+    series : {"auto", "postcensal", "intercensal-2010-2020", "all"}
+        Which series to ingest. "auto" uses intercensal if available,
+        otherwise falls back to postcensal.
+    vintage : int, optional
+        Postcensal vintage year (required for postcensal or all; defaults to latest).
     url : str, optional
-        Override download URL (only used for single vintage).
+        Override download URL (postcensal only).
     force : bool
         Re-download and reprocess even if cached.
     output_dir : Path or str, optional
         Output directory for curated parquet. Defaults to 'data/curated/pep'.
     raw_dir : Path or str, optional
         Directory for raw downloads. Defaults to 'data/raw/pep'.
+    prefer_postcensal_2020 : bool
+        When combining intercensal + postcensal, use postcensal for 2020.
 
     Returns
     -------
@@ -337,11 +458,105 @@ def ingest_pep_county(
     httpx.HTTPStatusError
         If download fails.
     ValueError
-        If parsing/validation fails.
+        If parsing/validation fails or requested series is unavailable.
     """
-    if vintage == "all":
-        # Ingest both vintages and combine
-        return _ingest_combined(force, output_dir, raw_dir)
+    if series not in {AUTO_SERIES, POSTCENSAL_SERIES, INTERCENSAL_SERIES, ALL_SERIES}:
+        raise ValueError(
+            f"Unknown series '{series}'. "
+            f"Expected one of: {AUTO_SERIES}, {POSTCENSAL_SERIES}, "
+            f"{INTERCENSAL_SERIES}, {ALL_SERIES}."
+        )
+
+    if series == INTERCENSAL_SERIES:
+        if not _intercensal_available():
+            available = _format_postcensal_ranges()
+            raise ValueError(
+                "Intercensal PEP county estimates are not available yet for ingestion. "
+                f"Available postcensal vintages: {available}."
+            )
+        intercensal_url = _intercensal_url()
+        if intercensal_url is None:
+            raise ValueError("Intercensal PEP URL is not configured.")
+        output_path = get_output_path(INTERCENSAL_SERIES, output_dir)
+
+        if output_path.exists() and not force:
+            logger.info(f"Using cached file: {output_path}")
+            return output_path
+
+        raw_path, sha256 = download_pep_intercensal(intercensal_url, raw_dir, force)
+        df = parse_pep_county(raw_path, vintage=INTERCENSAL_YEAR_RANGE[1])
+
+        ingested_at = datetime.now(UTC)
+        df["vintage"] = INTERCENSAL_YEAR_RANGE[1]
+        df["estimate_type"] = "intercensal"
+        df["data_source"] = "census_pep"
+        df["source_url"] = intercensal_url
+        df["raw_sha256"] = sha256
+        df["ingested_at"] = ingested_at
+
+        col_order = [
+            "county_fips",
+            "state_fips",
+            "county_name",
+            "state_name",
+            "year",
+            "reference_date",
+            "population",
+            "estimate_type",
+            "vintage",
+            "data_source",
+            "source_url",
+            "raw_sha256",
+            "ingested_at",
+        ]
+        col_order = [c for c in col_order if c in df.columns]
+        df = df[col_order]
+
+        provenance = ProvenanceBlock(
+            extra={
+                "dataset": "pep_county_population",
+                "series": "intercensal_2010_2020",
+                "source": "U.S. Census Bureau",
+                "program": "Population Estimates Program",
+                "attribution": CENSUS_ATTRIBUTION,
+                "download_url": intercensal_url,
+                "downloaded_at": ingested_at.isoformat(),
+                "raw_sha256": sha256,
+                "row_count": len(df),
+                "county_count": df["county_fips"].nunique(),
+                "year_range": [int(df["year"].min()), int(df["year"].max())],
+                "reference_date_convention": "july_1",
+                "population_universe": "resident_population",
+            },
+        )
+
+        write_parquet_with_provenance(df, output_path, provenance)
+        logger.info(f"Wrote intercensal PEP data to {output_path}")
+        return output_path
+
+    if series in {ALL_SERIES, AUTO_SERIES} and _intercensal_available():
+        if vintage is None:
+            vintage = max(PEP_URLS.keys())
+        _validate_postcensal_vintage(vintage)
+        return _ingest_combined(
+            vintage=vintage,
+            force=force,
+            output_dir=output_dir,
+            raw_dir=raw_dir,
+            prefer_postcensal_2020=prefer_postcensal_2020,
+        )
+
+    if series in {ALL_SERIES, AUTO_SERIES} and not _intercensal_available():
+        logger.warning(
+            "Intercensal PEP county estimates are not available; "
+            "falling back to postcensal."
+        )
+        series = POSTCENSAL_SERIES
+
+    if series == POSTCENSAL_SERIES:
+        if vintage is None:
+            vintage = max(PEP_URLS.keys())
+        _validate_postcensal_vintage(vintage)
 
     output_path = get_output_path(vintage, output_dir)
 
@@ -353,8 +568,7 @@ def ingest_pep_county(
     # Download
     download_url = url or PEP_URLS.get(vintage)
     if download_url is None:
-        supported = ", ".join(str(v) for v in sorted(PEP_URLS.keys()))
-        raise ValueError(f"Unknown vintage: {vintage}. Supported: {supported}")
+        _validate_postcensal_vintage(vintage)
 
     raw_path, sha256 = download_pep(vintage, url, raw_dir, force)
 
@@ -407,6 +621,7 @@ def ingest_pep_county(
     provenance = ProvenanceBlock(
         extra={
             "dataset": "pep_county_population",
+            "series": "postcensal",
             "vintage": vintage,
             "source": "U.S. Census Bureau",
             "program": "Population Estimates Program",
@@ -429,31 +644,30 @@ def ingest_pep_county(
     return output_path
 
 
+def _combine_intercensal_postcensal(
+    intercensal_df: pd.DataFrame,
+    postcensal_df: pd.DataFrame,
+    prefer_postcensal_2020: bool,
+) -> pd.DataFrame:
+    if prefer_postcensal_2020:
+        intercensal_keep = intercensal_df[intercensal_df["year"] < 2020].copy()
+        postcensal_keep = postcensal_df[postcensal_df["year"] >= 2020].copy()
+    else:
+        intercensal_keep = intercensal_df[intercensal_df["year"] <= 2020].copy()
+        postcensal_keep = postcensal_df[postcensal_df["year"] >= 2021].copy()
+
+    df = pd.concat([intercensal_keep, postcensal_keep], ignore_index=True)
+    return df.sort_values(["county_fips", "year"]).reset_index(drop=True)
+
+
 def _ingest_combined(
+    vintage: int,
     force: bool = False,
     output_dir: Path | str | None = None,
     raw_dir: Path | str | None = None,
+    prefer_postcensal_2020: bool = False,
 ) -> Path:
-    """Ingest both vintages and create a combined file.
-
-    The combined file uses:
-    - Vintage 2020 data for years 2010-2019
-    - Vintage 2024 data for years 2020-2024 (more recent estimates)
-
-    Parameters
-    ----------
-    force : bool
-        Re-download and reprocess even if cached.
-    output_dir : Path or str, optional
-        Output directory for curated parquet.
-    raw_dir : Path or str, optional
-        Directory for raw downloads.
-
-    Returns
-    -------
-    Path
-        Path to combined output Parquet file.
-    """
+    """Ingest intercensal + postcensal and create a combined file."""
     output_path = get_output_path("combined", output_dir)
 
     # Check cache
@@ -461,42 +675,50 @@ def _ingest_combined(
         logger.info(f"Using cached combined file: {output_path}")
         return output_path
 
-    # Ingest both vintages
-    logger.info("Ingesting vintage 2020 data...")
-    path_2020 = ingest_pep_county(vintage=2020, force=force, output_dir=output_dir, raw_dir=raw_dir)
-
-    logger.info("Ingesting vintage 2024 data...")
-    path_2024 = ingest_pep_county(vintage=2024, force=force, output_dir=output_dir, raw_dir=raw_dir)
-
-    # Load both
-    df_2020 = pd.read_parquet(path_2020)
-    df_2024 = pd.read_parquet(path_2024)
-
-    # Use vintage 2020 for years 2010-2019, vintage 2024 for 2020+
-    df_old = df_2020[df_2020["year"] < 2020].copy()
-    df_new = df_2024[df_2024["year"] >= 2020].copy()
-
-    logger.info(
-        f"Combining: {len(df_old)} rows from vintage 2020 (years 2010-2019), "
-        f"{len(df_new)} rows from vintage 2024 (years 2020-2024)"
+    # Ingest intercensal + postcensal
+    logger.info("Ingesting intercensal data...")
+    path_intercensal = ingest_pep_county(
+        series=INTERCENSAL_SERIES,
+        force=force,
+        output_dir=output_dir,
+        raw_dir=raw_dir,
     )
 
+    logger.info(f"Ingesting postcensal data (vintage {vintage})...")
+    path_postcensal = ingest_pep_county(
+        series=POSTCENSAL_SERIES,
+        vintage=vintage,
+        force=force,
+        output_dir=output_dir,
+        raw_dir=raw_dir,
+    )
+
+    # Load both
+    df_intercensal = pd.read_parquet(path_intercensal)
+    df_postcensal = pd.read_parquet(path_postcensal)
+
     # Combine
-    df = pd.concat([df_old, df_new], ignore_index=True)
-    df = df.sort_values(["county_fips", "year"]).reset_index(drop=True)
+    df = _combine_intercensal_postcensal(
+        df_intercensal, df_postcensal, prefer_postcensal_2020
+    )
 
     # Build provenance
     ingested_at = datetime.now(UTC)
+    intercensal_provenance = read_provenance(path_intercensal)
+    postcensal_provenance = read_provenance(path_postcensal)
     provenance = ProvenanceBlock(
         extra={
             "dataset": "pep_county_population_combined",
             "source": "U.S. Census Bureau",
             "program": "Population Estimates Program",
             "attribution": CENSUS_ATTRIBUTION,
-            "vintages_used": {
-                "2010-2019": 2020,
-                "2020-2024": 2024,
+            "series_used": {
+                "intercensal": INTERCENSAL_YEAR_RANGE,
+                "postcensal_vintage": vintage,
+                "prefer_postcensal_2020": prefer_postcensal_2020,
             },
+            "intercensal_source": intercensal_provenance.to_dict(),
+            "postcensal_source": postcensal_provenance.to_dict(),
             "created_at": ingested_at.isoformat(),
             "row_count": len(df),
             "county_count": df["county_fips"].nunique(),

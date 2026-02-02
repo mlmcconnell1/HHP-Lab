@@ -3,6 +3,7 @@
 **Goal:** Add `coclab` CLI subcommands to (1) ingest Census Bureau Population Estimates Program (PEP) county-level annual population estimates and (2) aggregate to CoC geography using existing crosswalks.
 
 This spec covers **intercensal (2010-2020)** and **postcensal (2020+)** county population estimates from the Census Bureau.
+Ingest should default to the best-available series (postcensal for now) and track hashes so future intercensal releases can be detected and compared against current postcensal values.
 
 ---
 
@@ -94,6 +95,7 @@ For convenience, a merged file spanning both intercensal and postcensal:
 - Uses intercensal for 2010-2019
 - Uses postcensal for 2020+ (avoiding overlap at 2020)
 - Clearly marks `estimate_type` for each row
+- If intercensal is unavailable, merged output should fall back to postcensal only
 
 ### 3.3 CoC-Level Aggregated Schema
 File: `data/curated/pep/coc_pep_population__b{boundary}__c{counties}__w{weighting}__{start_year}_{end_year}.parquet`
@@ -120,6 +122,7 @@ File: `data/curated/pep/coc_pep_population__b{boundary}__c{counties}__w{weightin
 **Purpose:** Download and normalize PEP county population estimates.
 
 ```bash
+coclab ingest pep --series auto
 coclab ingest pep --series intercensal-2010-2020
 coclab ingest pep --series postcensal --vintage 2024
 coclab ingest pep --series all --vintage 2024  # Both series
@@ -128,8 +131,9 @@ coclab ingest pep --series all --vintage 2024  # Both series
 **Options:**
 | Option | Required | Default | Description |
 |--------|----------|---------|-------------|
-| `--series` | Yes | - | `intercensal-2010-2020`, `postcensal`, or `all` |
+| `--series` | No | `auto` | `auto`, `intercensal-2010-2020`, `postcensal`, or `all` |
 | `--vintage` | If postcensal | latest | Postcensal vintage year (e.g., 2024) |
+| `--prefer-postcensal-2020` | No | False | For `--series all/auto`, use postcensal for 2020 |
 | `--force` | No | False | Re-download even if cached |
 | `--output-dir` | No | `data/curated/pep` | Output directory |
 | `--raw-dir` | No | `data/raw/pep` | Raw file cache directory |
@@ -137,6 +141,9 @@ coclab ingest pep --series all --vintage 2024  # Both series
 **Outputs:**
 - Raw CSV: `data/raw/pep/pep_county__{series}__{download_date}.csv`
 - Curated: `data/curated/pep/pep_county_population__{series}.parquet`
+
+**Notes:**
+- Ingest tracks SHA-256 hashes for each source file so future intercensal releases can be detected and compared against current postcensal values.
 
 **Exit codes:**
 - `0`: Success
@@ -198,7 +205,8 @@ Where:
 
 ### 5.4 Handling Series Overlap
 The year 2020 appears in both intercensal and postcensal series:
-- **Default behavior:** Use intercensal for 2020 (as it's the "official" bridged value)
+- **Default behavior:** Use intercensal for 2020 (as it's the "official" bridged value) when available
+- If intercensal is not available, fall back to postcensal for all years
 - Optionally allow user to prefer postcensal for 2020 via flag
 
 ### 5.5 Geographic Vintage Alignment

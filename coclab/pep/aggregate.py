@@ -177,7 +177,7 @@ def aggregate_pep_to_coc(
     xwalk_path: Path | str | None = None,
     start_year: int | None = None,
     end_year: int | None = None,
-    min_coverage: float = 0.90,
+    min_coverage: float = 0.95,
     output_dir: Path | str | None = None,
     force: bool = False,
 ) -> Path:
@@ -200,7 +200,7 @@ def aggregate_pep_to_coc(
     end_year : int, optional
         Last year to include. Defaults to latest in data.
     min_coverage : float
-        Minimum coverage ratio to include a CoC-year. Default 0.90.
+        Minimum coverage ratio to include a CoC-year. Default 0.95.
     output_dir : Path or str, optional
         Output directory.
     force : bool
@@ -323,11 +323,13 @@ def aggregate_pep_to_coc(
             covered_weight = coc_with_pop[weight_col].sum()
             coverage_ratio = covered_weight / total_weight if total_weight > 0 else 0.0
 
-            # Weighted population (normalize weights to sum to 1 for covered counties)
+            # Weighted population (no renormalization for missing counties)
             if covered_weight > 0:
-                coc_with_pop["norm_weight"] = coc_with_pop[weight_col] / covered_weight
-                population = (coc_with_pop["norm_weight"] * coc_with_pop["population"]).sum()
-                max_contribution = coc_with_pop["norm_weight"].max()
+                weighted_pop = coc_with_pop[weight_col] * coc_with_pop["population"]
+                population = weighted_pop.sum()
+                max_contribution = (
+                    (weighted_pop / population).max() if population and population > 0 else 0.0
+                )
             else:
                 population = None
                 max_contribution = 0.0

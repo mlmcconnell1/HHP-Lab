@@ -11,14 +11,16 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 from pathlib import Path
-
 import pandas as pd
 import pytest
 
 from coclab.pep.ingest import (
+    INTERCENSAL_SERIES,
     PEP_URLS,
+    POSTCENSAL_SERIES,
     VINTAGE_YEARS,
     get_output_path,
+    ingest_pep_county,
     parse_pep_county,
 )
 
@@ -194,6 +196,18 @@ class TestPepUrls:
 
         assert 2024 in VINTAGE_YEARS
         assert VINTAGE_YEARS[2024] == list(range(2020, 2025))
+
+
+class TestSeriesValidation:
+    """Tests for series validation and availability."""
+
+    def test_intercensal_unavailable_raises(self):
+        with pytest.raises(ValueError):
+            ingest_pep_county(series=INTERCENSAL_SERIES)
+
+    def test_postcensal_invalid_vintage_raises(self):
+        with pytest.raises(ValueError):
+            ingest_pep_county(series=POSTCENSAL_SERIES, vintage=1999)
 
 
 class TestIntegration:

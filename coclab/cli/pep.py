@@ -19,14 +19,22 @@ DEFAULT_RAW_DIR = Path("data/raw/pep")
 
 
 def ingest_pep(
-    vintage: Annotated[
+    series: Annotated[
         str,
+        typer.Option(
+            "--series",
+            "-s",
+            help="Series to ingest: 'auto', 'postcensal', 'intercensal-2010-2020', or 'all'.",
+        ),
+    ] = "auto",
+    vintage: Annotated[
+        str | None,
         typer.Option(
             "--vintage",
             "-v",
-            help="Data vintage: '2020' (2010-2020), '2024' (2020-2024), or 'all' for both.",
+            help="Postcensal vintage year (required for postcensal or all). Defaults to latest.",
         ),
-    ] = "all",
+    ] = None,
     url: Annotated[
         str | None,
         typer.Option(
@@ -57,15 +65,23 @@ def ingest_pep(
             help="Directory for raw downloads.",
         ),
     ] = DEFAULT_RAW_DIR,
+    prefer_postcensal_2020: Annotated[
+        bool,
+        typer.Option(
+            "--prefer-postcensal-2020",
+            help="When combining series, use postcensal values for 2020.",
+        ),
+    ] = False,
 ) -> None:
     """Download and normalize PEP county population estimates from Census Bureau.
 
     Ingests Census Bureau Population Estimates Program (PEP) county-level
     annual population estimates. Supports multiple vintages:
 
-    - Vintage 2020: Covers 2010-2020 (released 2021, before intercensal revision)
-    - Vintage 2024: Covers 2020-2024 (current estimates)
-    - "all": Ingests both and creates a combined file (2010-2024)
+    - auto: Best available (intercensal if available, else postcensal)
+    - postcensal: Current estimates (use --vintage for specific release)
+    - intercensal-2010-2020: Bridged intercensal series (not yet available)
+    - all: Combine intercensal + postcensal (falls back to postcensal if unavailable)
 
     Population estimates are as of July 1 of each year.
 
@@ -76,34 +92,66 @@ def ingest_pep(
 
     Examples:
 
-        coclab ingest pep --vintage all
+        coclab ingest pep --series auto
 
-        coclab ingest pep --vintage 2024 --force
+        coclab ingest pep --series postcensal --vintage 2024
 
-        coclab ingest pep --vintage 2020
+        coclab ingest pep --series intercensal-2010-2020
     """
-    from coclab.pep.ingest import get_output_path, ingest_pep_county
-
-    # Parse vintage
-    if vintage == "all":
-        parsed_vintage = "all"
-    else:
-        try:
-            parsed_vintage = int(vintage)
-        except ValueError:
-            typer.echo(
-                f"Error: Invalid vintage '{vintage}'. Must be a year (2020, 2024) or 'all'.",
-                err=True,
-            )
-            raise typer.Exit(2)
-
-    if url and parsed_vintage == "all":
-        typer.echo("Warning: --url is ignored when vintage='all'", err=True)
-
-    output_path = get_output_path(
-        "combined" if parsed_vintage == "all" else parsed_vintage,
-        output_dir
+    from coclab.pep.ingest import (
+        ALL_SERIES,
+        INTERCENSAL_SERIES,
+        AUTO_SERIES,
+        POSTCENSAL_SERIES,
+        PEP_URLS,
+        get_output_path,
+        ingest_pep_county,
     )
+
+    if series not in {AUTO_SERIES, POSTCENSAL_SERIES, INTERCENSAL_SERIES, ALL_SERIES}:
+        typer.echo(
+            f"Error: Invalid series '{series}'. "
+            f"Expected one of: {AUTO_SERIES}, {POSTCENSAL_SERIES}, "
+            f"{INTERCENSAL_SERIES}, {ALL_SERIES}.",
+            err=True,
+        )
+        raise typer.Exit(2)
+
+    parsed_vintage: int | None = None
+    if series in {POSTCENSAL_SERIES, ALL_SERIES, AUTO_SERIES}:
+        if vintage is None:
+            parsed_vintage = max(PEP_URLS.keys())
+        else:
+            try:
+                parsed_vintage = int(vintage)
+            except ValueError:
+                typer.echo(
+                    f"Error: Invalid vintage '{vintage}'. Must be a year (e.g., 2024).",
+                    err=True,
+                )
+                raise typer.Exit(2)
+
+    if series == INTERCENSAL_SERIES and vintage is not None:
+        typer.echo("Warning: --vintage is ignored for intercensal ingest.", err=True)
+
+    if url and series != POSTCENSAL_SERIES:
+        typer.echo("Warning: --url is only used for postcensal ingest.", err=True)
+    if prefer_postcensal_2020 and series not in {ALL_SERIES, AUTO_SERIES}:
+        typer.echo(
+            "Warning: --prefer-postcensal-2020 is only used when --series all or auto.",
+            err=True,
+        )
+
+    if series == ALL_SERIES:
+        output_path = get_output_path("combined", output_dir)
+    elif series == POSTCENSAL_SERIES:
+        output_path = get_output_path(parsed_vintage, output_dir)
+    elif series == AUTO_SERIES:
+        combined_path = get_output_path("combined", output_dir)
+        postcensal_path = get_output_path(parsed_vintage, output_dir)
+        output_path = combined_path if combined_path.exists() else postcensal_path
+    else:
+        output_path = output_dir / "pep_county__intercensal_2010_2020.parquet"
 
     # Check for existing output
     if output_path.exists() and not force:
@@ -111,15 +159,20 @@ def ingest_pep(
         typer.echo("Use --force to re-download and reprocess.")
         raise typer.Exit(0)
 
-    typer.echo(f"Ingesting PEP county population estimates (vintage: {vintage})...")
+    typer.echo(
+        "Ingesting PEP county population estimates "
+        f"(series: {series}, vintage: {parsed_vintage or 'n/a'})..."
+    )
 
     try:
         result_path = ingest_pep_county(
+            series=series,
             vintage=parsed_vintage,
             url=url,
             force=force,
             output_dir=output_dir,
             raw_dir=raw_dir,
+            prefer_postcensal_2020=prefer_postcensal_2020,
         )
 
         # Report results
@@ -203,9 +256,9 @@ def build_pep_coc(
         float,
         typer.Option(
             "--min-coverage",
-            help="Minimum coverage ratio for valid CoC-year. Default 0.90.",
+            help="Minimum coverage ratio for valid CoC-year. Default 0.95.",
         ),
-    ] = 0.90,
+    ] = 0.95,
     output_dir: Annotated[
         Path,
         typer.Option(

@@ -14,6 +14,7 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
+from coclab.pep.aggregate import aggregate_pep_to_coc
 
 class TestAggregationIntegration:
     """Integration tests using actual CoC-aggregated data (if available)."""
@@ -190,3 +191,37 @@ class TestAggregationUnit:
         expected = (60000 + 30000 + 10000) / 3
 
         assert equal_weighted_pop == pytest.approx(expected)
+
+    def test_missing_county_does_not_renormalize(self, tmp_path):
+        """Missing counties should reduce population rather than renormalize."""
+        pep = pd.DataFrame({
+            "county_fips": ["01001"],
+            "year": [2020],
+            "population": [100000],
+        })
+        pep_path = tmp_path / "pep.parquet"
+        pep.to_parquet(pep_path, index=False)
+
+        xwalk = pd.DataFrame({
+            "coc_id": ["COC-001", "COC-001"],
+            "county_fips": ["01001", "01003"],
+            "area_share": [0.6, 0.4],
+        })
+        xwalk_path = tmp_path / "xwalk.parquet"
+        xwalk.to_parquet(xwalk_path, index=False)
+
+        result_path = aggregate_pep_to_coc(
+            boundary_vintage="2024",
+            county_vintage="2024",
+            pep_path=pep_path,
+            xwalk_path=xwalk_path,
+            min_coverage=0.0,
+            output_dir=tmp_path,
+            force=True,
+        )
+
+        df = pd.read_parquet(result_path)
+        row = df[df["coc_id"] == "COC-001"].iloc[0]
+
+        assert row["coverage_ratio"] == pytest.approx(0.6)
+        assert row["population"] == pytest.approx(60000)
