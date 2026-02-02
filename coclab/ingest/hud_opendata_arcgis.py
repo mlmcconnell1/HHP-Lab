@@ -20,19 +20,15 @@ from shapely.geometry import shape
 from coclab.geo import normalize_boundaries, validate_boundaries
 from coclab.geo.io import curated_boundary_path, write_geoparquet
 from coclab.source_registry import check_source_changed, register_source
+from coclab.sources import HUD_ARCGIS_COC_FEATURE_SERVICE, HUD_ARCGIS_COC_SOURCE_REF
 
 logger = logging.getLogger(__name__)
 
 # HUD ArcGIS feature service endpoint
-FEATURE_SERVICE_URL = (
-    "https://services.arcgis.com/VTyQ9soqVukalItT/ArcGIS/rest/services"
-    "/Continuum_of_Care_Grantee_Areas/FeatureServer/0/query"
-)
+FEATURE_SERVICE_URL = HUD_ARCGIS_COC_FEATURE_SERVICE
 
 # Source reference for metadata
-SOURCE_REF = (
-    "https://hudgis-hud.opendata.arcgis.com/datasets/HUD::continuum-of-care-coc-grantee-areas"
-)
+SOURCE_REF = HUD_ARCGIS_COC_SOURCE_REF
 
 # Maximum records per request (API limit is 1000)
 PAGE_SIZE = 1000

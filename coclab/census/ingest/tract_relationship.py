@@ -20,6 +20,7 @@ import httpx
 import pandas as pd
 
 from coclab.naming import tract_relationship_filename
+from coclab.sources import CENSUS_TRACT_RELATIONSHIP_URL
 from coclab.provenance import ProvenanceBlock, write_parquet_with_provenance
 from coclab.source_registry import check_source_changed, register_source
 
@@ -51,9 +52,7 @@ class TractRelationshipNotFoundError(FileNotFoundError):
 
 
 # Census Bureau relationship file URL
-RELATIONSHIP_URL = (
-    "https://www2.census.gov/geo/docs/maps-data/data/rel2020/tract/tab20_tract20_tract10_natl.txt"
-)
+RELATIONSHIP_URL = CENSUS_TRACT_RELATIONSHIP_URL
 
 # Output directory
 OUTPUT_DIR = Path("data/curated/census")

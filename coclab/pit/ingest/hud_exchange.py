@@ -27,11 +27,12 @@ from pathlib import Path
 import httpx
 
 from coclab.source_registry import check_source_changed, register_source
+from coclab.sources import HUD_USER_PIT_BASE as HUD_USER_PIT_BASE_URL
 
 logger = logging.getLogger(__name__)
 
 # Base URL for HUD User PIT/HIC data
-HUD_USER_PIT_BASE = "https://www.huduser.gov/portal/sites/default/files/xls/"
+HUD_USER_PIT_BASE = HUD_USER_PIT_BASE_URL
 
 # Known direct download URLs for PIT data by year
 # Note: HUD provides cumulative files (2007-YYYY) containing all years

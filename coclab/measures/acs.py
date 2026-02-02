@@ -168,7 +168,9 @@ def _maybe_remap_ct_planning_regions(
         )
     return remapped
 
-CENSUS_API = "https://api.census.gov/data/{year}/acs/acs5"
+from coclab.sources import CENSUS_API_ACS5
+
+CENSUS_API = CENSUS_API_ACS5
 
 # ACS variable mappings
 # B01003_001E: Total population

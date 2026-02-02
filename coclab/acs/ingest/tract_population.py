@@ -37,12 +37,13 @@ import pandas as pd
 
 from coclab import naming
 from coclab.provenance import ProvenanceBlock, write_parquet_with_provenance
+from coclab.sources import CENSUS_API_ACS5
 from coclab.source_registry import check_source_changed, register_source
 
 logger = logging.getLogger(__name__)
 
 # Census Bureau API endpoint for ACS 5-year estimates
-CENSUS_API = "https://api.census.gov/data/{year}/acs/acs5"
+CENSUS_API = CENSUS_API_ACS5
 
 # ACS variables for total population
 POPULATION_VARS = {

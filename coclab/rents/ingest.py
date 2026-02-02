@@ -37,14 +37,15 @@ import httpx
 import pandas as pd
 
 from coclab.provenance import ProvenanceBlock, write_parquet_with_provenance
+from coclab.sources import ZILLOW_ZORI_COUNTY, ZILLOW_ZORI_ZIP
 from coclab.source_registry import check_source_changed, register_source
 
 logger = logging.getLogger(__name__)
 
 # Zillow ZORI download URLs by geography
 ZORI_URLS = {
-    "county": "https://files.zillowstatic.com/research/public_csvs/zori/County_zori_uc_sfrcondomfr_sm_month.csv",
-    "zip": "https://files.zillowstatic.com/research/public_csvs/zori/Zip_zori_uc_sfrcondomfr_sm_month.csv",
+    "county": ZILLOW_ZORI_COUNTY,
+    "zip": ZILLOW_ZORI_ZIP,
 }
 
 # Required Zillow attribution

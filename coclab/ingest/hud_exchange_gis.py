@@ -24,6 +24,11 @@ import httpx
 from shapely.geometry import shape
 
 from coclab.source_registry import check_source_changed, register_source
+from coclab.sources import (
+    HUD_ARCGIS_COC_FEATURE_SERVICE,
+    HUD_ARCGIS_COC_SOURCE_REF,
+    HUD_EXCHANGE_COC_GDB_TEMPLATE,
+)
 
 if TYPE_CHECKING:
     import geopandas as gpd
@@ -31,21 +36,14 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 # HUD ArcGIS feature service endpoint (primary source)
-ARCGIS_FEATURE_SERVICE_URL = (
-    "https://services.arcgis.com/VTyQ9soqVukalItT/ArcGIS/rest/services"
-    "/Continuum_of_Care_Grantee_Areas/FeatureServer/0/query"
-)
+ARCGIS_FEATURE_SERVICE_URL = HUD_ARCGIS_COC_FEATURE_SERVICE
 
 # Source reference for ArcGIS data
-ARCGIS_SOURCE_REF = (
-    "https://hudgis-hud.opendata.arcgis.com/datasets/HUD::continuum-of-care-coc-grantee-areas"
-)
+ARCGIS_SOURCE_REF = HUD_ARCGIS_COC_SOURCE_REF
 
 # URL template for HUD Exchange CoC GIS geodatabase downloads (legacy fallback)
 # Pattern observed from historical files: CoC_GIS_NatlTerrDC_Shapefile_{YEAR}.zip
-HUD_EXCHANGE_GDB_URL_TEMPLATE = (
-    "https://files.hudexchange.info/resources/documents/CoC_GIS_NatlTerrDC_Shapefile_{vintage}.zip"
-)
+HUD_EXCHANGE_GDB_URL_TEMPLATE = HUD_EXCHANGE_COC_GDB_TEMPLATE
 
 # Pagination settings for ArcGIS API
 # Smaller page size for more frequent progress updates

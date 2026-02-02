@@ -11,10 +11,11 @@ import geopandas as gpd
 import httpx
 
 from coclab.source_registry import check_source_changed, register_source
+from coclab.sources import CENSUS_TIGER_BASE
 
 logger = logging.getLogger(__name__)
 
-TIGER_BASE = "https://www2.census.gov/geo/tiger/TIGER{year}/COUNTY/"
+TIGER_BASE = CENSUS_TIGER_BASE
 OUTPUT_DIR = Path("data/curated/census")
 
 
@@ -35,9 +36,9 @@ def download_tiger_counties(year: int = 2023) -> tuple[gpd.GeoDataFrame, str, in
     """
     # 2010 has a different URL structure: extra /2010/ subdirectory and county10 suffix
     if year == 2010:
-        url = f"{TIGER_BASE.format(year=year)}2010/tl_2010_us_county10.zip"
+        url = f"{TIGER_BASE.format(year=year, layer='COUNTY')}2010/tl_2010_us_county10.zip"
     else:
-        url = f"{TIGER_BASE.format(year=year)}tl_{year}_us_county.zip"
+        url = f"{TIGER_BASE.format(year=year, layer='COUNTY')}tl_{year}_us_county.zip"
 
     with tempfile.TemporaryDirectory() as tmpdir:
         tmppath = Path(tmpdir)
@@ -138,9 +139,9 @@ def ingest_tiger_counties(year: int = 2023) -> Path:
     # Register this download in source registry
     # 2010 has a different URL structure
     if year == 2010:
-        url = f"{TIGER_BASE.format(year=year)}2010/tl_2010_us_county10.zip"
+        url = f"{TIGER_BASE.format(year=year, layer='COUNTY')}2010/tl_2010_us_county10.zip"
     else:
-        url = f"{TIGER_BASE.format(year=year)}tl_{year}_us_county.zip"
+        url = f"{TIGER_BASE.format(year=year, layer='COUNTY')}tl_{year}_us_county.zip"
     register_source(
         source_type="census_county",
         source_url=url,

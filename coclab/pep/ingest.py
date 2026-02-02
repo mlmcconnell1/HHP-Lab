@@ -41,6 +41,7 @@ import pandas as pd
 
 from coclab.provenance import ProvenanceBlock, read_provenance, write_parquet_with_provenance
 from coclab.source_registry import check_source_changed, register_source
+from coclab.sources import CENSUS_PEP_DATASETS_BASE
 
 logger = logging.getLogger(__name__)
 
@@ -48,8 +49,8 @@ logger = logging.getLogger(__name__)
 # Vintage 2020 = estimates through July 1, 2020 (released 2021)
 # Vintage 2024 = estimates through July 1, 2024 (released 2025)
 PEP_URLS = {
-    2020: "https://www2.census.gov/programs-surveys/popest/datasets/2010-2020/counties/totals/co-est2020-alldata.csv",
-    2024: "https://www2.census.gov/programs-surveys/popest/datasets/2020-2024/counties/totals/co-est2024-alldata.csv",
+    2020: f"{CENSUS_PEP_DATASETS_BASE}/2010-2020/counties/totals/co-est2020-alldata.csv",
+    2024: f"{CENSUS_PEP_DATASETS_BASE}/2020-2024/counties/totals/co-est2024-alldata.csv",
 }
 
 # Census Bureau attribution (public domain, but cite source)

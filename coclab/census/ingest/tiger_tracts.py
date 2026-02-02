@@ -13,10 +13,11 @@ import httpx
 import pandas as pd
 
 from coclab.source_registry import check_source_changed, register_source
+from coclab.sources import CENSUS_TIGER_BASE
 
 logger = logging.getLogger(__name__)
 
-TIGER_BASE = "https://www2.census.gov/geo/tiger/TIGER{year}/TRACT/"
+TIGER_BASE = CENSUS_TIGER_BASE
 OUTPUT_DIR = Path("data/curated/census")
 
 # State and territory FIPS codes for downloading per-state tract files
@@ -91,7 +92,7 @@ def _download_state_tracts(
     Returns tuple of (GeoDataFrame, raw_content) or (None, None) if the state
     file doesn't exist (some territories may not have data).
     """
-    url = f"{TIGER_BASE.format(year=year)}tl_{year}_{state_fips}_tract.zip"
+    url = f"{TIGER_BASE.format(year=year, layer='TRACT')}tl_{year}_{state_fips}_tract.zip"
     zip_path = tmpdir / f"tl_{year}_{state_fips}_tract.zip"
 
     try:
@@ -243,7 +244,7 @@ def ingest_tiger_tracts(year: int = 2023, show_progress: bool = False) -> Path:
         Path to saved parquet file
     """
     # Build source URL (base URL for this year's tract data)
-    source_url = TIGER_BASE.format(year=year)
+    source_url = TIGER_BASE.format(year=year, layer="TRACT")
 
     gdf, combined_sha256, total_size = download_tiger_tracts(year, show_progress=show_progress)
     output_path = save_tracts(gdf, year)
