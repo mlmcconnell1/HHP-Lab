@@ -7,6 +7,7 @@ import click
 import geopandas as gpd
 import typer
 
+from coclab.builds import build_curated_dir, require_build_dir, resolve_build_dir
 from coclab.measures.diagnostics import compute_crosswalk_diagnostics, summarize_diagnostics
 from coclab.registry.registry import latest_vintage, list_boundaries
 from coclab.xwalks.county import build_coc_county_crosswalk, save_county_crosswalk
@@ -21,6 +22,7 @@ if TYPE_CHECKING:
     import pandas as pd
 
 XwalkType = Literal["tracts", "counties", "all"]
+DEFAULT_OUTPUT_DIR = Path("data/curated/xwalks")
 
 
 def build_xwalks(
@@ -55,6 +57,13 @@ def build_xwalks(
             help="Which crosswalks to build: 'tracts', 'counties', or 'all'.",
         ),
     ] = "all",
+    build: Annotated[
+        str | None,
+        typer.Option(
+            "--build",
+            help="Named build directory for outputs and build-local artifacts.",
+        ),
+    ] = None,
     output_dir: Annotated[
         Path,
         typer.Option(
@@ -62,7 +71,7 @@ def build_xwalks(
             "-o",
             help="Output directory for crosswalk files.",
         ),
-    ] = Path("data/curated/xwalks"),
+    ] = DEFAULT_OUTPUT_DIR,
     population_weights: Annotated[
         bool,
         typer.Option(
@@ -101,6 +110,9 @@ def build_xwalks(
 
         # Build only tract crosswalk
         coclab build xwalks --boundary 2025 --type tracts --tracts 2023
+
+        # Build crosswalks inside a named build directory
+        coclab build xwalks --build demo --boundary 2025 --tracts 2023
     """
     # Determine what to build
     build_tracts = xwalk_type in ("tracts", "all")
@@ -151,6 +163,19 @@ def build_xwalks(
             err=True,
         )
         raise typer.Exit(1) from e
+
+    if build is not None:
+        try:
+            build_dir = require_build_dir(build)
+        except FileNotFoundError:
+            build_path = resolve_build_dir(build)
+            typer.echo(f"Error: Build '{build}' not found at {build_path}", err=True)
+            typer.echo("Run: coclab build create --name <build>", err=True)
+            raise typer.Exit(2)
+
+        build_curated = build_curated_dir(build_dir)
+        if output_dir == DEFAULT_OUTPUT_DIR:
+            output_dir = build_curated / "xwalks"
 
     # Build tract crosswalk if requested
     if build_tracts:

@@ -5,14 +5,18 @@ from typing import Annotated
 
 import typer
 
+from coclab.builds import build_curated_dir, require_build_dir, resolve_build_dir
 # Default ZORI coverage threshold
 DEFAULT_ZORI_MIN_COVERAGE = 0.90
 
 # Default ZORI rents directory
 DEFAULT_RENTS_DIR = Path("data/curated/zori")
+DEFAULT_PANEL_DIR = Path("data/curated/panel")
 
 
-def _resolve_zori_yearly_path(explicit_path: Path | None) -> Path | None:
+def _resolve_zori_yearly_path(
+    explicit_path: Path | None, base_dir: Path | None = None
+) -> Path | None:
     """Resolve the path to yearly ZORI data.
 
     Parameters
@@ -38,7 +42,7 @@ def _resolve_zori_yearly_path(explicit_path: Path | None) -> Path | None:
         return None
 
     # Search for yearly ZORI files in default location
-    rents_dir = DEFAULT_RENTS_DIR
+    rents_dir = (base_dir / "data" / "curated" / "zori") if base_dir else DEFAULT_RENTS_DIR
     if not rents_dir.exists():
         return None
 
@@ -88,6 +92,13 @@ def build_panel_cmd(
             "--output",
             "-o",
             help="Custom output path for the panel Parquet file.",
+        ),
+    ] = None,
+    build: Annotated[
+        str | None,
+        typer.Option(
+            "--build",
+            help="Named build directory for outputs and build-local artifacts.",
         ),
     ] = None,
     include_zori: Annotated[
@@ -152,6 +163,8 @@ def build_panel_cmd(
 
         coclab build panel --start 2018 --end 2024 --include-zori \\
             --zori-yearly-path data/curated/zori/coc_zori_yearly.parquet
+
+        coclab build panel --build demo --start 2018 --end 2024
     """
     from coclab.panel import AlignmentPolicy, build_panel, save_panel
     from coclab.panel.policies import default_acs_vintage, default_boundary_vintage
@@ -184,8 +197,21 @@ def build_panel_cmd(
 
     # Validate ZORI data availability if --include-zori is set
     resolved_zori_path: Path | None = None
+    build_dir: Path | None = None
+    build_curated: Path | None = None
+    if build is not None:
+        try:
+            build_dir = require_build_dir(build)
+        except FileNotFoundError:
+            build_path = resolve_build_dir(build)
+            typer.echo(f"Error: Build '{build}' not found at {build_path}", err=True)
+            typer.echo("Run: coclab build create --name <build>", err=True)
+            raise typer.Exit(2)
+        build_curated = build_curated_dir(build_dir)
     if include_zori:
-        resolved_zori_path = _resolve_zori_yearly_path(zori_yearly_path)
+        resolved_zori_path = _resolve_zori_yearly_path(
+            zori_yearly_path, base_dir=build_dir
+        )
         if resolved_zori_path is None:
             typer.echo(
                 "Error: --include-zori was specified but no ZORI yearly data is available.",
@@ -202,7 +228,12 @@ def build_panel_cmd(
             if zori_yearly_path:
                 typer.echo(f"Specified path does not exist: {zori_yearly_path}")
             else:
-                typer.echo("No yearly ZORI file found in default location: data/curated/zori/")
+                if build_dir is not None:
+                    typer.echo(
+                        f"No yearly ZORI file found in build location: {build_dir / 'data' / 'curated' / 'zori'}/"
+                    )
+                else:
+                    typer.echo("No yearly ZORI file found in default location: data/curated/zori/")
             raise typer.Exit(1)
         typer.echo(f"ZORI yearly data: {resolved_zori_path}")
 
@@ -264,6 +295,7 @@ def build_panel_cmd(
                 df=panel_df,
                 start_year=start,
                 end_year=end,
+                output_dir=(build_curated / "panel") if build_curated else DEFAULT_PANEL_DIR,
                 policy=policy,
             )
         typer.echo(f"Saved panel to: {output_path}")

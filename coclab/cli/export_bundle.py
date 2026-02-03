@@ -13,6 +13,7 @@ from typing import Annotated
 
 import typer
 
+from coclab.builds import require_build_dir, resolve_build_dir
 from coclab.export.codebook import write_codebook
 from coclab.export.copy import copy_artifacts, create_bundle_structure
 from coclab.export.manifest import build_manifest, write_manifest
@@ -121,6 +122,13 @@ def export_bundle(
             help="Explicit panel parquet path (inferred from curated if omitted)",
         ),
     ] = None,
+    build: Annotated[
+        str | None,
+        typer.Option(
+            "--build",
+            help="Named build directory to source panels and artifacts from.",
+        ),
+    ] = None,
     include: Annotated[
         str,
         typer.Option(
@@ -205,9 +213,21 @@ def export_bundle(
         coclab build export --name replication --include panel,manifest,codebook,inputs
 
         coclab build export --name full_export --boundary-vintage 2025 --years 2011-2024
+
+        coclab build export --name demo --build demo
     """
     # Parse include options
     include_set = _parse_include(include)
+
+    base_dir = Path(".")
+    if build is not None:
+        try:
+            base_dir = require_build_dir(build)
+        except FileNotFoundError:
+            build_path = resolve_build_dir(build)
+            typer.echo(f"Error: Build '{build}' not found at {build_path}", err=True)
+            typer.echo("Run: coclab build create --name <build>", err=True)
+            raise typer.Exit(EXIT_VALIDATION_FAILURE)
 
     # Build configuration
     config = BundleConfig(
@@ -250,7 +270,7 @@ def export_bundle(
     # Build selection plan
     typer.echo("Selecting artifacts...")
     try:
-        selection_plan = build_selection_plan(config, base_dir=Path("."))
+        selection_plan = build_selection_plan(config, base_dir=base_dir)
     except FileNotFoundError as e:
         typer.echo(f"Error: {e}", err=True)
         # Clean up empty bundle directory

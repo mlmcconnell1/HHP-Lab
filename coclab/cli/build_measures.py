@@ -5,8 +5,12 @@ from typing import Annotated, Literal
 
 import typer
 
+from coclab.builds import build_curated_dir, require_build_dir, resolve_build_dir
 from coclab.measures.acs import build_coc_measures
 from coclab.registry.registry import latest_vintage
+
+DEFAULT_XWALK_DIR = Path("data/curated/xwalks")
+DEFAULT_OUTPUT_DIR = Path("data/curated/measures")
 
 
 def build_measures(
@@ -42,13 +46,20 @@ def build_measures(
             help="Weighting method: 'area' or 'population'.",
         ),
     ] = "area",
+    build: Annotated[
+        str | None,
+        typer.Option(
+            "--build",
+            help="Named build directory for outputs and build-local artifacts.",
+        ),
+    ] = None,
     xwalk_dir: Annotated[
         Path,
         typer.Option(
             "--xwalk-dir",
             help="Directory containing crosswalk files.",
         ),
-    ] = Path("data/curated/xwalks"),
+    ] = DEFAULT_XWALK_DIR,
     output_dir: Annotated[
         Path,
         typer.Option(
@@ -56,7 +67,7 @@ def build_measures(
             "-o",
             help="Output directory for measure files.",
         ),
-    ] = Path("data/curated/measures"),
+    ] = DEFAULT_OUTPUT_DIR,
 ) -> None:
     """Build CoC-level demographic measures from ACS 5-year estimates.
 
@@ -76,6 +87,8 @@ def build_measures(
         coclab build measures --boundary 2025 --acs 2019-2023
 
         coclab build measures --boundary 2025 --acs 2019-2023 --weighting population
+
+        coclab build measures --build demo --boundary 2025 --acs 2019-2023
     """
     # Validate weighting option
     if weighting not in ("area", "population"):
@@ -112,6 +125,21 @@ def build_measures(
 
     # Find crosswalk file (try new naming, then legacy)
     from coclab.naming import tract_xwalk_filename
+
+    if build is not None:
+        try:
+            build_dir = require_build_dir(build)
+        except FileNotFoundError:
+            build_path = resolve_build_dir(build)
+            typer.echo(f"Error: Build '{build}' not found at {build_path}", err=True)
+            typer.echo("Run: coclab build create --name <build>", err=True)
+            raise typer.Exit(2)
+
+        build_curated = build_curated_dir(build_dir)
+        if xwalk_dir == DEFAULT_XWALK_DIR:
+            xwalk_dir = build_curated / "xwalks"
+        if output_dir == DEFAULT_OUTPUT_DIR:
+            output_dir = build_curated / "measures"
 
     xwalk_path = xwalk_dir / tract_xwalk_filename(boundary, tract_vintage)
     legacy_xwalk_path = xwalk_dir / f"coc_tract_xwalk__{boundary}__{tract_vintage}.parquet"

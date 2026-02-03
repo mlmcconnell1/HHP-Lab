@@ -13,9 +13,12 @@ from typing import Annotated, Literal
 import httpx
 import typer
 
+from coclab.builds import build_curated_dir, require_build_dir, resolve_build_dir
+
 # Default directories
 DEFAULT_OUTPUT_DIR = Path("data/curated/pep")
 DEFAULT_RAW_DIR = Path("data/raw/pep")
+DEFAULT_XWALK_DIR = Path("data/curated/xwalks")
 
 
 def ingest_pep(
@@ -285,6 +288,13 @@ def build_pep(
             help="Weighting method: 'area_share' (default) or 'equal'.",
         ),
     ] = "area_share",
+    build: Annotated[
+        str | None,
+        typer.Option(
+            "--build",
+            help="Named build directory for outputs and build-local artifacts.",
+        ),
+    ] = None,
     pep_path: Annotated[
         Path | None,
         typer.Option(
@@ -359,6 +369,8 @@ def build_pep(
         coclab build pep --boundary 2024 --counties 2024 --weighting equal
 
         coclab build pep --boundary 2024 --counties 2024 --start-year 2015 --end-year 2024
+
+        coclab build pep --build demo --boundary 2024 --counties 2024
     """
     from coclab.pep.aggregate import aggregate_pep_to_coc, get_output_path
 
@@ -376,8 +388,31 @@ def build_pep(
         raise typer.Exit(2)
 
     # Check if crosswalk exists
-    xwalk_dir = Path("data/curated/xwalks")
+    xwalk_dir = DEFAULT_XWALK_DIR
+    if build is not None:
+        try:
+            build_dir = require_build_dir(build)
+        except FileNotFoundError:
+            build_path = resolve_build_dir(build)
+            typer.echo(f"Error: Build '{build}' not found at {build_path}", err=True)
+            typer.echo("Run: coclab build create --name <build>", err=True)
+            raise typer.Exit(2)
+
+        build_curated = build_curated_dir(build_dir)
+        if output_dir == DEFAULT_OUTPUT_DIR:
+            output_dir = build_curated / "pep"
+        if xwalk_path is None:
+            xwalk_dir = build_curated / "xwalks"
+
     expected_xwalk = xwalk_dir / f"xwalk__B{boundary}xC{counties}.parquet"
+    if xwalk_path is None and build is not None:
+        xwalk_path = expected_xwalk
+
+    if xwalk_path is not None and not xwalk_path.exists():
+        typer.echo(f"Error: Crosswalk not found: {xwalk_path}", err=True)
+        typer.echo(f"Run: coclab build xwalks --boundary {boundary} --counties {counties}", err=True)
+        raise typer.Exit(2)
+
     if xwalk_path is None and not expected_xwalk.exists():
         typer.echo(f"Error: Crosswalk not found: {expected_xwalk}", err=True)
         typer.echo(f"Run: coclab build xwalks --boundary {boundary} --counties {counties}", err=True)
