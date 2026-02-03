@@ -13,6 +13,16 @@ CoC Lab is a Python-based data and geospatial infrastructure for working with **
 - **Assemble panels** combining PIT, ACS, and optional rent measures
 - **Export bundles** with provenance and diagnostics
 
+## Hub-and-Spoke Design (Current)
+
+CoC Lab is intentionally organized around a **CoC-centric hub**. The stable unit of analysis is the CoC boundary vintage (`B{year}`), and most external sources are brought **into** that hub through crosswalks:
+
+- **Hub:** CoC boundaries (target geography for analysis) and **PIT counts** (already CoC-keyed).
+- **Spokes:** Tract- and county-native datasets (ACS, ZORI, PEP) aggregated to CoC via tract/county crosswalks.
+- **Crosswalk direction:** County/tract → CoC (area- or population-weighted). This supports consistent CoC × year panels.
+
+If you need a county-level hub (e.g., to estimate CoC/PIT values by county), that is a **different modeling choice** and would require additional allocation logic and crosswalk fields. The current implementation favors reproducible CoC-level analysis.
+
 ## What is a Continuum of Care?
 
 A Continuum of Care (CoC) is a regional or local planning body that coordinates housing and services funding for homeless families and individuals. HUD assigns each CoC a unique identifier (e.g., `CO-500` for Colorado Balance of State CoC).
