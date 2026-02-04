@@ -6,6 +6,7 @@ from typing import Annotated
 import typer
 
 from coclab.builds import build_curated_dir, require_build_dir, resolve_build_dir
+
 # Default ZORI coverage threshold
 DEFAULT_ZORI_MIN_COVERAGE = 0.90
 

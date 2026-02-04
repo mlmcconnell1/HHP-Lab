@@ -9,8 +9,8 @@ Tests the county-level PEP data pipeline including:
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
 from pathlib import Path
+
 import pandas as pd
 import pytest
 

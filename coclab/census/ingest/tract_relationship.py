@@ -20,9 +20,9 @@ import httpx
 import pandas as pd
 
 from coclab.naming import tract_relationship_filename
-from coclab.sources import CENSUS_TRACT_RELATIONSHIP_URL
 from coclab.provenance import ProvenanceBlock, write_parquet_with_provenance
 from coclab.source_registry import check_source_changed, register_source
+from coclab.sources import CENSUS_TRACT_RELATIONSHIP_URL
 
 logger = logging.getLogger(__name__)
 

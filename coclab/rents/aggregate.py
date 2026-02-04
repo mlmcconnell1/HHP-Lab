@@ -57,6 +57,16 @@ from typing import Literal
 
 import pandas as pd
 
+from coclab.geo.ct_planning_regions import (
+    CT_LEGACY_COUNTY_VINTAGE,
+    CT_PLANNING_REGION_VINTAGE,
+    build_ct_county_planning_region_crosswalk,
+    is_ct_legacy_county_fips,
+    is_ct_planning_region_fips,
+    translate_weights_planning_to_legacy,
+    translate_zori_legacy_to_planning,
+)
+from coclab.naming import county_xwalk_path
 from coclab.provenance import (
     ProvenanceBlock,
     read_provenance,
@@ -73,16 +83,6 @@ from coclab.rents.weights import (
     build_county_weights,
     get_county_weights_path,
 )
-from coclab.geo.ct_planning_regions import (
-    CT_LEGACY_COUNTY_VINTAGE,
-    CT_PLANNING_REGION_VINTAGE,
-    build_ct_county_planning_region_crosswalk,
-    is_ct_legacy_county_fips,
-    is_ct_planning_region_fips,
-    translate_weights_planning_to_legacy,
-    translate_zori_legacy_to_planning,
-)
-from coclab.naming import county_xwalk_path
 
 logger = logging.getLogger(__name__)
 

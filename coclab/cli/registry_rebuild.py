@@ -11,7 +11,6 @@ import typer
 from coclab.source_registry import (
     DEFAULT_REGISTRY_PATH,
     REGISTRY_COLUMNS,
-    SourceRegistryEntry,
 )
 
 logger = logging.getLogger(__name__)

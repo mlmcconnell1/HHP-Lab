@@ -8,7 +8,7 @@ These commands implement the PEP ingest spec (see background/coclab_pep_county_s
 """
 
 from pathlib import Path
-from typing import Annotated, Literal
+from typing import Annotated
 
 import httpx
 import typer
@@ -119,10 +119,10 @@ def ingest_pep(
     """
     from coclab.pep.ingest import (
         ALL_SERIES,
-        INTERCENSAL_SERIES,
         AUTO_SERIES,
-        POSTCENSAL_SERIES,
+        INTERCENSAL_SERIES,
         PEP_URLS,
+        POSTCENSAL_SERIES,
         _intercensal_available,
         get_output_path,
         ingest_pep_county,
@@ -372,10 +372,10 @@ def build_pep(
 
         coclab build pep --build demo --boundary 2024 --counties 2024
     """
-    from coclab.pep.aggregate import aggregate_pep_to_coc, get_output_path
-
     # Determine output path for cache check
     import pandas as pd
+
+    from coclab.pep.aggregate import aggregate_pep_to_coc
     from coclab.pep.ingest import DEFAULT_OUTPUT_DIR as PEP_DIR
 
     # Check if PEP data exists

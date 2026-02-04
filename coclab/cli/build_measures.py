@@ -69,7 +69,7 @@ def build_measures(
         ),
     ] = DEFAULT_OUTPUT_DIR,
 ) -> None:
-    """Build CoC-level demographic measures from ACS 5-year estimates.
+    """Aggregate CoC-level demographic measures from ACS 5-year estimates.
 
     Fetches tract-level data from the Census API and aggregates to CoC
     level using tract crosswalks. Produces a measures file containing:

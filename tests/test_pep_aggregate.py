@@ -16,6 +16,7 @@ import pytest
 
 from coclab.pep.aggregate import aggregate_pep_to_coc
 
+
 class TestAggregationIntegration:
     """Integration tests using actual CoC-aggregated data (if available)."""
 

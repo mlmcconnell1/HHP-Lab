@@ -37,8 +37,8 @@ import httpx
 import pandas as pd
 
 from coclab.provenance import ProvenanceBlock, write_parquet_with_provenance
-from coclab.sources import ZILLOW_ZORI_COUNTY, ZILLOW_ZORI_ZIP
 from coclab.source_registry import check_source_changed, register_source
+from coclab.sources import ZILLOW_ZORI_COUNTY, ZILLOW_ZORI_ZIP
 
 logger = logging.getLogger(__name__)
 
