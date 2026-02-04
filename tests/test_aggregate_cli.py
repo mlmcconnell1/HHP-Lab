@@ -225,36 +225,46 @@ def test_aggregate_acs_as_reported_requires_vintage():
 # ---------------------------------------------------------------------------
 
 
-def test_aggregate_pit_collects_data(tmp_path):
-    """PIT aggregate should collect and write PIT files for build years."""
-    import pandas as pd
-
-    # Create build
-    build_dir = tmp_path / "builds" / "test_build"
+def _create_build_at(tmp_path, name="test_build", years=None):
+    """Create a build directory with manifest at a given tmp_path root."""
+    if years is None:
+        years = [2020, 2021]
+    build_dir = tmp_path / "builds" / name
     (build_dir / "data" / "curated").mkdir(parents=True)
     (build_dir / "data" / "raw").mkdir(parents=True)
     (build_dir / "base").mkdir(parents=True)
     manifest = {
         "schema_version": 1,
         "build": {
-            "name": "test_build",
+            "name": name,
             "created_at": "2026-01-01T00:00:00Z",
-            "years": [2020, 2021],
+            "years": years,
         },
         "base_assets": [
             {
-                "asset_type": "coc_boundary", "year": y,
+                "asset_type": "coc_boundary",
+                "year": y,
                 "source": "test",
                 "relative_path": f"base/coc_boundary/{y}/coc__B{y}.parquet",
                 "sha256": "a" * 64,
             }
-            for y in [2020, 2021]
+            for y in years
         ],
         "aggregate_runs": [],
     }
     (build_dir / "manifest.json").write_text(json.dumps(manifest) + "\n")
+    return build_dir
 
-    # Create stub PIT data
+
+def test_aggregate_pit_collects_data(tmp_path):
+    """PIT aggregate should collect and write PIT files for build years."""
+    import os
+
+    import pandas as pd
+
+    _create_build_at(tmp_path, years=[2020, 2021])
+
+    # Create stub PIT individual year files
     pit_dir = tmp_path / "data" / "curated" / "pit"
     pit_dir.mkdir(parents=True)
     for year in [2020, 2021]:
@@ -265,23 +275,101 @@ def test_aggregate_pit_collects_data(tmp_path):
         })
         df.to_parquet(pit_dir / f"pit__P{year}.parquet", index=False)
 
-    # Run aggregate pit (need to change working directory so naming.pit_path resolves)
-    import os
     old_cwd = os.getcwd()
     try:
         os.chdir(tmp_path)
-        runner.invoke(
+        result = runner.invoke(
             app,
-            [
-                "aggregate", "pit",
-                "--build", "test_build",
-                "--builds-dir", str(tmp_path / "builds"),
-            ],
+            ["aggregate", "pit", "--build", "test_build"],
             catch_exceptions=False,
         )
     finally:
         os.chdir(old_cwd)
 
-    # pit command doesn't have --builds-dir, so this may fail; test with default
-    # In the meantime, just verify the command structure is correct
-    assert True  # structural validation passes via other tests
+    assert result.exit_code == 0
+    assert "Wrote PIT aggregate" in result.output
+
+
+def test_aggregate_pit_falls_back_to_vintage(tmp_path):
+    """PIT aggregate should discover vintage files when individual years are missing."""
+    import os
+
+    import pandas as pd
+
+    _create_build_at(tmp_path, years=[2019, 2020, 2021])
+
+    # Create NO individual year files — only a vintage file
+    pit_dir = tmp_path / "data" / "curated" / "pit"
+    pit_dir.mkdir(parents=True)
+
+    rows = []
+    for year in range(2015, 2025):
+        for i in range(3):
+            rows.append({
+                "coc_id": f"XX-{i:03d}",
+                "pit_year": year,
+                "total_homeless": 100 * (i + 1),
+            })
+    vintage_df = pd.DataFrame(rows)
+    vintage_df.to_parquet(pit_dir / "pit_vintage__P2024.parquet", index=False)
+
+    old_cwd = os.getcwd()
+    try:
+        os.chdir(tmp_path)
+        result = runner.invoke(
+            app,
+            ["aggregate", "pit", "--build", "test_build"],
+            catch_exceptions=False,
+        )
+    finally:
+        os.chdir(old_cwd)
+
+    assert result.exit_code == 0
+    assert "Using vintage P2024" in result.output
+    assert "Wrote PIT aggregate" in result.output
+
+    # Verify the output contains exactly the requested years
+    out_dir = tmp_path / "builds" / "test_build" / "data" / "curated" / "pit"
+    out_files = list(out_dir.glob("pit__P*.parquet"))
+    assert len(out_files) == 1
+    result_df = pd.read_parquet(out_files[0])
+    assert sorted(result_df["pit_year"].unique()) == [2019, 2020, 2021]
+
+
+def test_aggregate_pit_vintage_partial_coverage(tmp_path):
+    """Vintage file covers some years; missing years still reported."""
+    import os
+
+    import pandas as pd
+
+    _create_build_at(tmp_path, years=[2020, 2021, 2025])
+
+    pit_dir = tmp_path / "data" / "curated" / "pit"
+    pit_dir.mkdir(parents=True)
+
+    # Vintage only has 2020 and 2021, not 2025
+    rows = []
+    for year in [2020, 2021]:
+        for i in range(3):
+            rows.append({
+                "coc_id": f"XX-{i:03d}",
+                "pit_year": year,
+                "total_homeless": 100 * (i + 1),
+            })
+    vintage_df = pd.DataFrame(rows)
+    vintage_df.to_parquet(pit_dir / "pit_vintage__P2021.parquet", index=False)
+
+    old_cwd = os.getcwd()
+    try:
+        os.chdir(tmp_path)
+        result = runner.invoke(
+            app,
+            ["aggregate", "pit", "--build", "test_build"],
+            catch_exceptions=False,
+        )
+    finally:
+        os.chdir(old_cwd)
+
+    assert result.exit_code == 0
+    assert "Using vintage P2021" in result.output
+    assert "PIT data missing for years: [2025]" in result.output

@@ -308,11 +308,12 @@ def aggregate_pit(
 
     import pandas as pd
 
-    from coclab.naming import pit_path
+    from coclab.naming import discover_pit_vintages, pit_path, pit_vintage_path
 
     collected: list[pd.DataFrame] = []
     missing: list[int] = []
 
+    # --- Pass 1: try individual year files ---
     for year in parsed_years:
         src = pit_path(year)
         if not Path(src).exists():
@@ -320,11 +321,42 @@ def aggregate_pit(
             continue
         df = pd.read_parquet(src)
         if align == "to_calendar_year":
-            # PIT January count maps to the same calendar year
             df = df.copy()
             if "calendar_year" not in df.columns:
                 df["calendar_year"] = year
         collected.append(df)
+
+    # --- Pass 2: fall back to vintage files for any missing years ---
+    if missing:
+        vintages = discover_pit_vintages()
+        still_missing = set(missing)
+
+        for vintage in vintages:
+            if not still_missing:
+                break
+            vpath = pit_vintage_path(vintage)
+            if not vpath.exists():
+                continue
+            vdf = pd.read_parquet(vpath)
+            if "pit_year" not in vdf.columns:
+                continue
+            available = set(vdf["pit_year"].unique()) & still_missing
+            if not available:
+                continue
+
+            typer.echo(
+                f"  Using vintage P{vintage} for years: "
+                f"{sorted(available)}"
+            )
+
+            for year in sorted(available):
+                ydf = vdf[vdf["pit_year"] == year].copy()
+                if align == "to_calendar_year" and "calendar_year" not in ydf.columns:
+                    ydf["calendar_year"] = year
+                collected.append(ydf)
+                still_missing.discard(year)
+
+        missing = sorted(still_missing)
 
     if missing:
         typer.echo(

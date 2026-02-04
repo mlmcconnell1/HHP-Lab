@@ -374,6 +374,56 @@ def pit_path(pit_year: str | int, base_dir: Path | str | None = None) -> Path:
     return base_dir / "curated" / "pit" / pit_filename(pit_year)
 
 
+def pit_vintage_path(vintage: str | int, base_dir: Path | str | None = None) -> Path:
+    """Get canonical path for PIT vintage file.
+
+    Args:
+        vintage: PIT release vintage year (e.g., 2024)
+        base_dir: Base data directory (defaults to "data")
+
+    Returns:
+        Path like data/curated/pit/pit_vintage__P2024.parquet
+    """
+    if base_dir is None:
+        base_dir = Path("data")
+    else:
+        base_dir = Path(base_dir)
+    return base_dir / "curated" / "pit" / pit_vintage_filename(vintage)
+
+
+def discover_pit_vintages(base_dir: Path | str | None = None) -> list[int]:
+    """Discover available PIT vintage files, sorted descending by year.
+
+    Scans the curated PIT directory for files matching
+    ``pit_vintage__P{year}.parquet`` and returns the vintage years
+    found, with the latest vintage first.
+
+    Args:
+        base_dir: Base data directory (defaults to "data")
+
+    Returns:
+        List of vintage years (ints) sorted descending, e.g. [2024, 2023].
+        Empty list if no vintage files are found.
+    """
+    if base_dir is None:
+        base_dir = Path("data")
+    else:
+        base_dir = Path(base_dir)
+
+    pit_dir = base_dir / "curated" / "pit"
+    if not pit_dir.is_dir():
+        return []
+
+    vintages: list[int] = []
+    for p in pit_dir.glob("pit_vintage__P*.parquet"):
+        stem = p.stem  # e.g. "pit_vintage__P2024"
+        suffix = stem.removeprefix("pit_vintage__P")
+        if suffix.isdigit():
+            vintages.append(int(suffix))
+
+    return sorted(vintages, reverse=True)
+
+
 def tract_xwalk_path(
     boundary_vintage: str,
     tract_vintage: str | int,
