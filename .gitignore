@@ -1,6 +1,7 @@
 # Data files (downloaded/generated)
 data/
 exports/
+builds/
 
 # Python-generated files
 __pycache__/
