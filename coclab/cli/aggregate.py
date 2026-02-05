@@ -443,7 +443,7 @@ def aggregate_acs(
         typer.Option(
             "--tracts",
             "-t",
-            help="Census tract vintage for crosswalk. Defaults to ACS end year.",
+            help="Census tract vintage for crosswalk. Defaults to most recent decennial <= ACS end year.",
         ),
     ] = None,
 ) -> None:
@@ -509,13 +509,11 @@ def aggregate_acs(
     def decennial_floor(year: int) -> int:
         return year - (year % 10)
 
+    from coclab.acs.translate import default_tract_vintage_for_acs
+
     for vintage in unique_vintages:
         # Resolve tract vintage from ACS end year
-        if "-" in vintage:
-            acs_end_year = int(vintage.split("-")[1])
-        else:
-            acs_end_year = int(vintage)
-        tract_vintage = tracts if tracts is not None else acs_end_year
+        tract_vintage = tracts if tracts is not None else default_tract_vintage_for_acs(vintage)
 
         # Find crosswalk
         xwalk_dir = curated_dir / "xwalks"

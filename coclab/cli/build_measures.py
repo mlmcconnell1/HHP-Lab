@@ -35,7 +35,7 @@ def build_measures(
         typer.Option(
             "--tracts",
             "-t",
-            help="Census tract vintage for crosswalk. Defaults to same as ACS year.",
+            help="Census tract vintage for crosswalk. Defaults to most recent decennial <= ACS end year.",
         ),
     ] = None,
     weighting: Annotated[
@@ -103,14 +103,13 @@ def build_measures(
         "area" if weighting == "area" else "population"
     )
 
-    # Resolve tract vintage (default to ACS end year)
+    # Resolve tract vintage (default to ACS decennial)
     if tracts is not None:
         tract_vintage = tracts
-    elif "-" in acs:
-        # Extract end year from range like "2019-2023"
-        tract_vintage = int(acs.split("-")[1])
     else:
-        tract_vintage = int(acs)
+        from coclab.acs.translate import default_tract_vintage_for_acs
+
+        tract_vintage = default_tract_vintage_for_acs(acs)
 
     # Resolve boundary vintage from registry
     if boundary is None:

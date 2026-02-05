@@ -5,9 +5,10 @@ geography using the Census Bureau tract relationship file.
 
 Background
 ----------
-ACS 5-year estimates use different tract geographies based on vintage:
-- ACS 2010-2019 (end years 2011-2019): Uses 2010 census tract geography
-- ACS 2020+ (end years 2020+): Uses 2020 census tract geography
+ACS 5-year estimates use tract geographies aligned to the most recent
+decennial census at or before the ACS end year:
+- ACS ending 2010-2019: Uses 2010 census tract geography
+- ACS ending 2020-2029: Uses 2020 census tract geography
 
 The tract relationship file provides the mapping between 2010 and 2020 tracts,
 including area-based weights for proportional allocation when tracts split
@@ -34,10 +35,20 @@ from coclab.census.ingest.tract_relationship import load_tract_relationship
 logger = logging.getLogger(__name__)
 
 
-# ACS end year threshold for tract geography transition
-# ACS 2019 (end year 2019) uses 2010 geography
-# ACS 2020 (end year 2020) uses 2020 geography
-TRACT_GEOGRAPHY_TRANSITION_YEAR = 2020
+def _parse_acs_end_year(acs_vintage: str) -> int:
+    """Parse the ACS end year from a vintage string."""
+    if "-" in acs_vintage:
+        return int(acs_vintage.split("-")[1])
+    return int(acs_vintage)
+
+
+def default_tract_vintage_for_acs(acs_vintage: str) -> int:
+    """Return the default tract vintage for an ACS vintage.
+
+    The default is the most recent decennial census year at or before the ACS end year.
+    """
+    end_year = _parse_acs_end_year(acs_vintage)
+    return end_year - (end_year % 10)
 
 
 def get_source_tract_vintage(acs_vintage: str) -> int:
@@ -51,7 +62,7 @@ def get_source_tract_vintage(acs_vintage: str) -> int:
     Returns
     -------
     int
-        The census tract vintage year (2010 or 2020).
+        The census tract vintage year (decennial, e.g., 2010 or 2020).
 
     Examples
     --------
@@ -59,19 +70,12 @@ def get_source_tract_vintage(acs_vintage: str) -> int:
     2010
     >>> get_source_tract_vintage("2019-2023")
     2020
+    >>> get_source_tract_vintage("2026-2030")
+    2030
     >>> get_source_tract_vintage("2019")
     2010
     """
-    # Parse end year from vintage string
-    if "-" in acs_vintage:
-        end_year = int(acs_vintage.split("-")[1])
-    else:
-        end_year = int(acs_vintage)
-
-    if end_year < TRACT_GEOGRAPHY_TRANSITION_YEAR:
-        return 2010
-    else:
-        return 2020
+    return default_tract_vintage_for_acs(acs_vintage)
 
 
 def needs_translation(acs_vintage: str, target_tract_vintage: int | str) -> bool:

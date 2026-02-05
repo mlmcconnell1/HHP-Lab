@@ -72,6 +72,13 @@ def build_xwalks(
             help="Output directory for crosswalk files.",
         ),
     ] = DEFAULT_OUTPUT_DIR,
+    force: Annotated[
+        bool,
+        typer.Option(
+            "--force",
+            help="Overwrite existing crosswalk files if they already exist.",
+        ),
+    ] = False,
     population_weights: Annotated[
         bool,
         typer.Option(
@@ -176,6 +183,31 @@ def build_xwalks(
         build_curated = build_curated_dir(build_dir)
         if output_dir == DEFAULT_OUTPUT_DIR:
             output_dir = build_curated / "xwalks"
+
+    output_dir = Path(output_dir)
+
+    # Guard against overwriting existing crosswalks unless --force is provided
+    from coclab.naming import county_xwalk_filename, tract_xwalk_filename
+
+    existing_outputs: list[Path] = []
+    if build_tracts:
+        tract_output = output_dir / tract_xwalk_filename(boundary, tracts)
+        if tract_output.exists():
+            existing_outputs.append(tract_output)
+    if build_counties:
+        county_output = output_dir / county_xwalk_filename(boundary, county_vintage)
+        if county_output.exists():
+            existing_outputs.append(county_output)
+
+    if existing_outputs and not force:
+        paths = "\n".join(f"  - {path}" for path in existing_outputs)
+        typer.echo(
+            "Error: Crosswalk already exists:\n"
+            f"{paths}\n"
+            "Use --force to regenerate the crosswalk.",
+            err=True,
+        )
+        raise typer.Exit(1)
 
     # Build tract crosswalk if requested
     if build_tracts:

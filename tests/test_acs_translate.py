@@ -7,6 +7,7 @@ import pytest
 
 from coclab.acs.translate import (
     TranslationStats,
+    default_tract_vintage_for_acs,
     get_source_tract_vintage,
     needs_translation,
     translate_acs_to_target_vintage,
@@ -37,6 +38,24 @@ class TestGetSourceTractVintage:
         assert get_source_tract_vintage("2019") == 2010
         assert get_source_tract_vintage("2020") == 2020
         assert get_source_tract_vintage("2023") == 2020
+        assert get_source_tract_vintage("2030") == 2030
+
+
+class TestDefaultTractVintageForAcs:
+    """Tests for default tract vintage mapping from ACS end years."""
+
+    @pytest.mark.parametrize(
+        ("acs_vintage", "expected"),
+        [
+            ("2007-2010", 2010),
+            ("2016-2019", 2010),
+            ("2017-2020", 2020),
+            ("2021-2024", 2020),
+            ("2026-2030", 2030),
+        ],
+    )
+    def test_defaults_to_most_recent_decennial(self, acs_vintage, expected):
+        assert default_tract_vintage_for_acs(acs_vintage) == expected
 
 
 class TestNeedsTranslation:
