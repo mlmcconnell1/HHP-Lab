@@ -159,7 +159,8 @@ def load_zori(
     zori_path : Path or str, optional
         Explicit path to ZORI parquet file. If None, uses default path.
     output_dir : Path or str, optional
-        Base directory for ZORI data. Defaults to 'data/curated/zori'.
+        Base directory for ZORI data. Checks this directory first, then
+        falls back to global 'data/curated/zori' if not found.
 
     Returns
     -------
@@ -169,12 +170,19 @@ def load_zori(
     Raises
     ------
     FileNotFoundError
-        If ZORI file does not exist.
+        If ZORI file does not exist in either location.
     """
     if zori_path is not None:
         path = Path(zori_path)
     else:
         path = get_zori_output_path(geography, output_dir)
+
+    # Fall back to global curated directory if build-local path doesn't exist
+    if not path.exists() and output_dir is not None:
+        global_path = get_zori_output_path(geography, DEFAULT_OUTPUT_DIR)
+        if global_path.exists():
+            logger.info(f"ZORI not found at {path}, using global {global_path}")
+            path = global_path
 
     if not path.exists():
         raise FileNotFoundError(
