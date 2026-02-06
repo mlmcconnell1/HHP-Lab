@@ -6,11 +6,13 @@ The `coclab` command provides access to all core functionality.
 
 ```mermaid
 flowchart LR
+    coclab --> agents
     coclab --> ingest
     coclab --> list
     coclab --> validate
     coclab --> diagnostics
     coclab --> build
+    coclab --> aggregate
     coclab --> show
     coclab --> registry
     ingest --> boundaries
@@ -45,6 +47,7 @@ flowchart LR
     diagnostics --> diagnostics-xwalk
     diagnostics --> diagnostics-zori
     build --> build-create[create]
+    build --> build-list[list]
     build --> build-measures[measures]
     build --> build-zori[zori]
     build --> build-panel[panel]
@@ -68,6 +71,7 @@ flowchart LR
     validate-pit-vintages --> PITXCHECK[Validate PIT across vintages]
     validate-population --> POPCHECK[Validate CoC pop vs national]
     build-create --> CREATE[Create build scaffold with pinned assets]
+    build-list --> BLIST[List available builds]
     build-zori --> ZORI_AGG[Aggregate ZORI to CoC level]
     aggregate-acs --> ACS_AGG[Aggregate ACS measures to CoC]
     aggregate-zori --> ZORI_AGG2[Aggregate ZORI to CoC]
@@ -101,11 +105,63 @@ Legacy `diagnostics-*` commands remain as deprecated passthroughs for backward c
 **Build grouping:** The canonical form is `coclab build <subcommand>` (e.g., `coclab build panel`).
 Legacy build/aggregate/export commands remain as deprecated passthroughs for backward compatibility.
 
+**Aggregate grouping:** The canonical form is `coclab aggregate <subcommand>` (e.g., `coclab aggregate acs`).
+Aggregate commands operate on named builds and write outputs into build-local `data/curated/` folders.
+
 **Show grouping:** The canonical form is `coclab show <subcommand>` (e.g., `coclab show map`).
 Legacy commands (`show`, `show-measures`, `compare-vintages`, `source-status`) remain as deprecated passthroughs for backward compatibility.
 
 **Registry grouping:** The canonical form is `coclab registry <subcommand>` (e.g., `coclab registry rebuild`).
 Legacy commands (`delete-boundaries`, `registry-rebuild`) remain as deprecated passthroughs for backward compatibility.
+
+## `coclab agents`
+
+Display crosswalk alignment rules and dataset-to-vintage matching guidance.
+
+```bash
+coclab agents
+```
+
+**Output:**
+- Printed rules for aligning PIT, ACS, PEP, and ZORI data with boundary vintages
+
+## `coclab build create`
+
+Create a named build scaffold with pinned boundary assets.
+
+```bash
+# Create a build for 2018-2024
+coclab build create --name demo --years 2018-2024
+
+# Use a custom builds root
+coclab build create --name demo --years 2018-2024 --builds-dir /path/to/builds
+```
+
+| Option | Description | Default |
+|--------|-------------|---------|
+| `--name`, `-n` | Build name | Required |
+| `--years` | Year spec (range or list) | Required |
+| `--builds-dir` | Root builds directory | `builds` |
+| `--data-dir` | Root data directory to resolve base assets | `data` |
+
+**Output:**
+- Build directory at `builds/{name}/`
+- `manifest.json` with pinned boundary assets and hashes
+
+## `coclab build list`
+
+List available named builds.
+
+```bash
+coclab build list
+```
+
+| Option | Description | Default |
+|--------|-------------|---------|
+| `--builds-dir` | Root builds directory | `builds` |
+
+**Output:**
+- List of build names found under `builds/`
 
 ## `coclab build measures`
 
@@ -129,19 +185,26 @@ coclab build measures --boundary 2025 --acs 2019-2023
 
 # Use population weighting instead
 coclab build measures --boundary 2025 --acs 2019-2023 --weighting population
+
+# Write outputs inside a named build
+coclab build measures --build demo --boundary 2025 --acs 2019-2023
 ```
 
 | Option | Description | Default |
 |--------|-------------|---------|
 | `--boundary`, `-b` | CoC boundary vintage | Latest |
 | `--acs`, `-a` | ACS 5-year estimate vintage (e.g., `2019-2023`) | `2018-2022` |
-| `--tracts`, `-t` | Tract vintage for crosswalk | Same as ACS end year |
+| `--tracts`, `-t` | Census tract vintage for crosswalk | Most recent decennial ≤ ACS end year |
 | `--weighting`, `-w` | `area` or `population` | `area` |
+| `--build` | Named build directory for build-local outputs | None |
 | `--xwalk-dir` | Directory containing crosswalk files | `data/curated/xwalks` |
 | `--output-dir`, `-o` | Output directory | `data/curated/measures` |
 
+When `--build` is provided, default paths resolve under `builds/{name}/data/curated/`
+for crosswalks and measures unless explicitly overridden.
+
 **Output:**
-- `measures__A{acs}@B{boundary}.parquet`
+- `measures__A{acs_end}@B{boundary}xT{tract}.parquet`
 - Summary statistics printed to console
 
 ## `coclab build zori`
@@ -157,6 +220,9 @@ coclab build zori -b 2025 -c 2023 --acs 2019-2023 --to-yearly
 
 # Custom weighting method
 coclab build zori -b 2025 -c 2023 --acs 2019-2023 -w housing_units
+
+# Write outputs inside a named build
+coclab build zori --build demo --boundary 2025 --counties 2023 --acs 2019-2023
 ```
 
 | Option | Description | Default |
@@ -168,10 +234,14 @@ coclab build zori -b 2025 -c 2023 --acs 2019-2023 -w housing_units
 | `--zori-path` | Explicit path to ZORI parquet file | Auto-detected |
 | `--xwalk-path` | Explicit crosswalk path | Inferred |
 | `--weighting`, `-w` | Weighting: `renter_households`, `housing_units`, `population`, `equal` | `renter_households` |
+| `--build` | Named build directory for build-local outputs | None |
 | `--output-dir`, `-o` | Output directory | `data/curated/zori` |
 | `--to-yearly` | Also emit yearly collapsed file | False |
 | `--yearly-method` | `pit_january`, `calendar_mean`, `calendar_median` | `pit_january` |
 | `--force`, `-f` | Recompute even if output exists | False |
+
+When `--build` is provided, outputs default to `builds/{name}/data/curated/zori`,
+and crosswalks are resolved from the build-local `xwalks/` directory if present.
 
 **Prerequisites:**
 ```bash
@@ -215,6 +285,9 @@ coclab build panel --start 2018 --end 2024 --include-zori --zori-min-coverage 0.
 
 # Explicit ZORI data path
 coclab build panel --start 2018 --end 2024 --include-zori --zori-yearly-path data/curated/zori/zori_yearly__A2023@B2025xC2023__wrenter__mpit_january.parquet
+
+# Write output inside a named build
+coclab build panel --build demo --start 2018 --end 2024
 ```
 
 | Option | Description | Default |
@@ -223,6 +296,7 @@ coclab build panel --start 2018 --end 2024 --include-zori --zori-yearly-path dat
 | `--end`, `-e` | End year (inclusive) | Required |
 | `--weighting`, `-w` | `area` or `population` | `population` |
 | `--output`, `-o` | Output file path | Auto-generated |
+| `--build` | Named build directory for build-local outputs | None |
 | `--include-zori` | Include ZORI rent data and compute `rent_to_income` | `False` |
 | `--no-include-zori` | Explicitly disable ZORI integration | - |
 | `--zori-yearly-path` | Path to yearly ZORI Parquet file | Auto-discover |
@@ -272,6 +346,9 @@ data/curated/panel/panel__Y2018-2024@B2025.parquet
 
 The filename does not change when `--include-zori` is enabled; the presence of ZORI
 columns in the data indicates rent integration.
+
+When `--build` is provided and `--output` is not set, panels are written to
+`builds/{name}/data/curated/panel/`.
 
 ## `coclab validate boundaries`
 
@@ -335,12 +412,23 @@ coclab build xwalks --boundary 2025 --tracts 2023 --counties 2023
 | `--boundary`, `-b` | CoC boundary vintage | Latest |
 | `--tracts`, `-t` | Census tract vintage year | 2023 |
 | `--counties`, `-c` | Census county vintage year | Same as tracts |
+| `--type` | `tracts`, `counties`, or `all` | `all` |
+| `--build` | Named build directory for build-local outputs | None |
 | `--output-dir`, `-o` | Output directory | `data/curated/xwalks` |
+| `--force` | Overwrite existing crosswalks | False |
+| `--population-weights`, `-p` | Add population-weighted `pop_share` to tract crosswalks | False |
+| `--auto-fetch` | Auto-fetch ACS population data when adding pop weights | False |
+
+When `--build` is provided, outputs default to `builds/{name}/data/curated/xwalks`.
 
 **Output:**
 - `xwalk__B{boundary}xT{tracts}.parquet`
 - `xwalk__B{boundary}xC{counties}.parquet`
 - Diagnostic summary printed to console
+
+When `--population-weights` is enabled, tract crosswalks include `pop_share`
+computed from ACS tract population. Use `--auto-fetch` to download missing
+population data automatically.
 
 ## `coclab show vintage-diffs`
 
@@ -473,7 +561,7 @@ Run diagnostics and sensitivity checks on panel files.
 
 ```bash
 # Run diagnostics on a panel
-coclab diagnostics panel --panel data/curated/panels/coc_panel__2018_2024.parquet
+coclab diagnostics panel --panel data/curated/panel/panel__Y2018-2024@B2025.parquet
 
 # Export diagnostics to CSV files
 coclab diagnostics panel --panel panel.parquet --output-dir ./diagnostics/ --format csv
@@ -557,6 +645,9 @@ coclab build pep --boundary 2024 --counties 2024 --weighting equal
 
 # Specify year range
 coclab build pep --boundary 2024 --counties 2024 --start-year 2015 --end-year 2024
+
+# Write outputs inside a named build
+coclab build pep --build demo --boundary 2024 --counties 2024
 ```
 
 | Option | Description | Default |
@@ -564,6 +655,7 @@ coclab build pep --boundary 2024 --counties 2024 --start-year 2015 --end-year 20
 | `--boundary`, `-b` | CoC boundary vintage year | Required |
 | `--counties`, `-c` | TIGER county vintage year for crosswalk | Required |
 | `--weighting`, `-w` | Weighting method: `area_share` or `equal` | `area_share` |
+| `--build` | Named build directory for build-local outputs | None |
 | `--pep-path` | Explicit path to PEP county parquet | Auto-detected |
 | `--xwalk-path` | Explicit crosswalk path | Auto-detected |
 | `--start-year` | First year to include | Earliest in data |
@@ -599,11 +691,14 @@ Export an analysis-ready bundle with MANIFEST.json for downstream analysis repos
 
 ```bash
 # Basic export with default options
-coclab build export --name my_analysis --panel data/curated/panels/coc_panel.parquet
+coclab build export --name my_analysis --panel data/curated/panel/panel__Y2011-2024@B2025.parquet
 
 # Include inputs and use specific vintages
 coclab build export --name replication --include panel,manifest,codebook,inputs \
   --boundary-vintage 2025 --years 2011-2024
+
+# Export from a named build
+coclab build export --name demo --build demo
 
 # Create compressed archive
 coclab build export --name archive --compress
@@ -614,15 +709,19 @@ coclab build export --name archive --compress
 | `--name`, `-n` | Logical bundle name for metadata and documentation | Required |
 | `--out-dir`, `-o` | Output directory where export-N folders are created | `exports` |
 | `--panel`, `-p` | Explicit panel parquet path (inferred from curated if omitted) | Auto-infer |
+| `--build` | Named build directory to source panels and artifacts from | None |
 | `--include`, `-i` | Components to include (comma-separated) | `panel,manifest,codebook,diagnostics` |
 | `--boundary-vintage` | Boundary vintage (e.g., 2025) | None |
-| `--tracts-vintage` | Census tracts vintage (e.g., 2023) | None |
-| `--counties-vintage` | Counties vintage (e.g., 2023) | None |
+| `--tract-vintage` | Census tract vintage (e.g., 2023) | None |
+| `--county-vintage` | County vintage (e.g., 2023) | None |
 | `--acs-vintage` | ACS vintage (e.g., 2019-2023) | None |
 | `--years` | Year range (e.g., 2011-2024) | None |
 | `--copy-mode` | File copy mode: `copy`, `hardlink`, or `symlink` | `copy` |
 | `--compress` | Create .tar.gz archive of the bundle | `False` |
 | `--force`, `-f` | Create bundle even if identical manifest exists | `False` |
+
+When `--build` is provided, panel and artifact discovery is scoped to the
+named build directory.
 
 **Include Components:**
 
@@ -649,6 +748,95 @@ coclab build export --name archive --compress
 | `3` | Filesystem failure (cannot create export directory, copy failure) |
 | `4` | Manifest failure (hashing/metadata extraction failure) |
 
+## `coclab aggregate acs`
+
+Aggregate ACS measures to CoC level for each boundary year in a named build.
+
+```bash
+# Aggregate using build years from the manifest
+coclab aggregate acs --build demo
+
+# Override years and use population weighting
+coclab aggregate acs --build demo --years 2018-2024 --weighting population
+```
+
+| Option | Description | Default |
+|--------|-------------|---------|
+| `--build`, `-b` | Named build to aggregate against | Required |
+| `--align` | `vintage_end_year` or `window_center_year` | `vintage_end_year` |
+| `--years` | Year spec override (e.g., `2018-2024`) | Build years |
+| `--weighting`, `-w` | `area` or `population` | `area` |
+| `--tracts`, `-t` | Census tract vintage override | Auto (decennial) |
+
+**Output:**
+- Files written to `builds/{name}/data/curated/measures/`
+
+## `coclab aggregate zori`
+
+Aggregate ZORI data to CoC level for each boundary year in a named build.
+
+```bash
+# Monthly ZORI aggregation (native)
+coclab aggregate zori --build demo
+
+# Yearly collapse aligned to PIT January
+coclab aggregate zori --build demo --align pit_january
+```
+
+| Option | Description | Default |
+|--------|-------------|---------|
+| `--build`, `-b` | Named build to aggregate against | Required |
+| `--align` | `monthly_native`, `pit_january`, `calendar_year_average` | `monthly_native` |
+| `--years` | Year spec override (e.g., `2018-2024`) | Build years |
+| `--weighting`, `-w` | `renter_households`, `housing_units`, `population`, `equal` | `renter_households` |
+
+**Output:**
+- Files written to `builds/{name}/data/curated/zori/`
+
+## `coclab aggregate pep`
+
+Aggregate PEP county estimates to CoC level for each boundary year in a named build.
+
+```bash
+# Default July 1 alignment
+coclab aggregate pep --build demo
+
+# Align to PIT year with a lag
+coclab aggregate pep --build demo --align lagged --lag-years 1
+```
+
+| Option | Description | Default |
+|--------|-------------|---------|
+| `--build`, `-b` | Named build to aggregate against | Required |
+| `--align` | `as_of_july`, `to_calendar_year`, `to_pit_year`, `lagged` | `as_of_july` |
+| `--years` | Year spec override (e.g., `2018-2024`) | Build years |
+| `--lag-years` | Lag years (required for `lagged`) | None |
+| `--weighting`, `-w` | `area_share` or `equal` | `area_share` |
+| `--min-coverage` | Minimum coverage ratio for valid CoC-year | `0.95` |
+
+**Output:**
+- Files written to `builds/{name}/data/curated/pep/`
+
+## `coclab aggregate pit`
+
+Filter and align PIT data for each boundary year in a named build.
+
+```bash
+coclab aggregate pit --build demo
+
+# Align PIT to calendar year
+coclab aggregate pit --build demo --align to_calendar_year
+```
+
+| Option | Description | Default |
+|--------|-------------|---------|
+| `--build`, `-b` | Named build to aggregate against | Required |
+| `--align` | `point_in_time_jan` or `to_calendar_year` | `point_in_time_jan` |
+| `--years` | Year spec override (e.g., `2018-2024`) | Build years |
+
+**Output:**
+- Files written to `builds/{name}/data/curated/pit/`
+
 ## `coclab ingest acs-population`
 
 Ingest tract-level population data from ACS 5-year estimates (Census API table B01003).
@@ -666,9 +854,13 @@ coclab ingest acs-population --acs 2019-2023 --tracts 2023 --force
 | `--acs`, `-a` | ACS 5-year vintage (e.g., `2019-2023` or `2023`) | Required |
 | `--tracts`, `-t` | Census tract vintage year | Required |
 | `--force` | Re-fetch even if cached file exists | False |
+| `--translate/--no-translate` | Auto-translate 2010→2020 tract GEOIDs when needed | `--translate` |
+
+If translation is required, ensure the tract relationship file is available
+(`coclab ingest tract-relationship`).
 
 **Output:**
-- `data/curated/acs/tract_population__{acs}__{tracts}.parquet`
+- `data/curated/acs/acs_tracts__A{acs_end}xT{tracts}.parquet`
 - Contains: tract_geoid, acs_vintage, tract_vintage, total_population, moe_total_population, data_source, source_ref, ingested_at
 
 ## `coclab ingest tract-relationship`
@@ -732,7 +924,7 @@ coclab ingest census --year 2023 --force
 
 ## `coclab ingest nhgis`
 
-Download census tract shapefiles from NHGIS (National Historical Geographic Information System) via the IPUMS API. This is especially useful for 2010 tracts, which TIGER distributes as 3,000+ county-level files that must be downloaded individually.
+Download census tract and county shapefiles from NHGIS (National Historical Geographic Information System) via the IPUMS API. This is especially useful for 2010 tracts, which TIGER distributes as 3,000+ county-level files that must be downloaded individually.
 
 **Environment Variable:**
 
@@ -741,8 +933,11 @@ Download census tract shapefiles from NHGIS (National Historical Geographic Info
 | `IPUMS_API_KEY` | Required. Your IPUMS API key. Get one at https://account.ipums.org/api_keys |
 
 ```bash
-# Download 2010 and 2020 tracts
+# Download 2010 and 2020 tracts (default)
 coclab ingest nhgis --year 2010 --year 2020
+
+# Download counties only
+coclab ingest nhgis --year 2010 --type counties
 
 # Custom poll interval (check every 5 minutes instead of 2)
 coclab ingest nhgis --year 2010 --poll-interval 5
@@ -757,6 +952,7 @@ coclab ingest nhgis --year 2010 --force
 | Option | Description | Default |
 |--------|-------------|---------|
 | `--year`, `-y` | Census year(s) to download (2010, 2020). Can specify multiple. | Required |
+| `--type`, `-t` | `tracts`, `counties`, or `all` | `all` |
 | `--api-key` | IPUMS API key. Prefer using `IPUMS_API_KEY` env var. | From env |
 | `--poll-interval` | Minutes between status checks while waiting | 2 |
 | `--max-wait` | Maximum minutes to wait for extract completion | 60 |
@@ -773,7 +969,8 @@ coclab ingest nhgis --year 2010 --force
 
 **Output:**
 - `data/curated/census/tracts__T{year}.parquet`
-- Same schema as TIGER tracts: `geo_vintage`, `geoid`, `geometry`, `source`, `ingested_at`
+- `data/curated/census/counties__C{year}.parquet`
+- Same schema as TIGER geometries: `geo_vintage`, `geoid`, `geometry`, `source`, `ingested_at`
 
 **Why NHGIS over TIGER?**
 
@@ -831,7 +1028,7 @@ coclab ingest pit-vintage --vintage 2024 --parse-only
 | `--parse-only` | Skip download, parse existing file | False |
 
 **Output:**
-- `data/curated/pit/pit_vintage__{vintage}.parquet` containing all years
+- `data/curated/pit/pit_vintage__P{vintage}.parquet` containing all years
 - Registered in PIT vintage registry
 
 ## `coclab ingest zori`
@@ -1065,9 +1262,12 @@ coclab show sources --type zori
 - `census_tract` - TIGER tract geometries
 - `census_county` - TIGER county geometries
 - `nhgis_tract` - NHGIS tract geometries
+- `nhgis_county` - NHGIS county geometries
 - `acs_tract` - ACS tract-level data
 - `acs_county` - ACS county-level data
+- `pep_county` - Census PEP county population estimates
 - `pit` - HUD PIT counts
+- `tract_relationship` - Census tract relationship file (2010↔2020)
 
 **Change Detection:**
 

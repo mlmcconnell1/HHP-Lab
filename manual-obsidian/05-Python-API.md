@@ -245,7 +245,7 @@ output_path = ingest_tract_population(
     tract_vintage: str,
     force: bool = False,  # Re-fetch even if cached
 ) -> Path
-# Output: data/curated/acs/tract_population__{acs}__{tracts}.parquet
+# Output: data/curated/acs/acs_tracts__A{acs_end}xT{tracts}.parquet
 ```
 
 ### ACS Population Rollup Functions

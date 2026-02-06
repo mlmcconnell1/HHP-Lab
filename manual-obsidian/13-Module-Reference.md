@@ -98,6 +98,31 @@ Data structures for registry.
 **Classes:**
 - `RegistryEntry` - Dataclass with serialization methods
 
+## builds.py
+
+Named build scaffolds and manifest helpers.
+
+**Functions:**
+| Function | Purpose |
+|----------|---------|
+| `ensure_build_dir()` | Create build scaffold and pin base assets |
+| `require_build_dir()` | Resolve and validate build path |
+| `read_build_manifest()` | Load build manifest metadata |
+| `record_aggregate_run()` | Append aggregate runs to the manifest |
+| `build_curated_dir()` | Resolve build-local curated directory |
+
+## source_registry.py
+
+External source tracking and change detection.
+
+**Functions:**
+| Function | Purpose |
+|----------|---------|
+| `register_source()` | Register a source ingestion with hash |
+| `summarize_registry()` | Produce summary text for CLI |
+| `detect_upstream_changes()` | Find sources with multiple hashes |
+| `get_latest_source()` | Retrieve latest ingestion for a source URL |
+
 ## viz/map_folium.py
 
 Interactive map generation with Folium.
@@ -143,7 +168,7 @@ TIGER/Line county geometry ingestion.
 
 ## nhgis/ingest.py
 
-NHGIS tract shapefile ingestion via ipumspy.
+NHGIS tract and county shapefile ingestion via ipumspy.
 
 **Environment Variable:**
 - `IPUMS_API_KEY` - Required IPUMS API key
@@ -152,6 +177,7 @@ NHGIS tract shapefile ingestion via ipumspy.
 | Function | Purpose |
 |----------|---------|
 | `ingest_nhgis_tracts()` | Full pipeline: submit extract, poll, download, normalize |
+| `ingest_nhgis_counties()` | Full pipeline for county shapefiles |
 | `_create_extract()` | Build NHGIS extract definition for tract shapefiles |
 | `_wait_for_extract()` | Poll API until extract completes |
 | `_download_and_extract()` | Download and unzip completed extract |
@@ -169,6 +195,8 @@ NHGIS tract shapefile ingestion via ipumspy.
 - `geometry` - Polygon/MultiPolygon in EPSG:4326
 - `source` - Always `nhgis`
 - `ingested_at` - UTC timestamp
+
+County outputs use the same schema but with 5-digit county FIPS GEOIDs.
 
 ## xwalks/tract.py
 
@@ -338,6 +366,20 @@ Dataset provenance tracking via Parquet metadata.
 - `coclab_version` - CoC Lab version
 - `extra` - Extensible metadata dictionary
 
+## export/*
+
+Export bundle creation and MANIFEST generation.
+
+**Key Modules and Functions:**
+| Module | Purpose |
+|--------|---------|
+| `export/manifest.py` | Build and write `MANIFEST.json` |
+| `export/selection.py` | Select artifacts for bundles |
+| `export/copy.py` | Copy/link artifacts into bundle structure |
+| `export/validate.py` | Validate bundle inputs and compatibility |
+| `export/readme.py` | Generate bundle README content |
+| `export/codebook.py` | Generate variable codebooks |
+
 ## rents/ingest.py
 
 ZORI data download and normalization from Zillow Economic Research.
@@ -419,6 +461,31 @@ ZORI coverage and quality diagnostics.
 - `max_geo_contribution_max` - Maximum single county contribution
 - `flag_low_coverage` - True if coverage < threshold
 - `flag_high_dominance` - True if max contribution > threshold
+
+## pep/ingest.py
+
+PEP county population ingestion and normalization.
+
+**Functions:**
+| Function | Purpose |
+|----------|---------|
+| `download_pep()` | Download postcensal PEP data |
+| `download_pep_intercensal()` | Download intercensal PEP data (if available) |
+| `parse_pep_county()` | Normalize raw PEP files to canonical schema |
+| `get_output_path()` | Resolve output path for curated PEP data |
+| `ingest_pep_county()` | Full pipeline: download, parse, save with provenance |
+
+## pep/aggregate.py
+
+Aggregate PEP county estimates to CoC geography.
+
+**Functions:**
+| Function | Purpose |
+|----------|---------|
+| `load_pep_county()` | Load curated PEP county data |
+| `load_crosswalk()` | Load county-to-CoC crosswalk |
+| `aggregate_pep_to_coc()` | Aggregate county estimates to CoC level |
+| `get_output_path()` | Resolve CoC-level PEP output path |
 
 ## pit/ingest/hud_exchange.py (Phase 3)
 

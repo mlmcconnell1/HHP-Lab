@@ -58,7 +58,8 @@ The manifest provides machine-readable provenance and file integrity information
   },
   "parameters": {
     "boundary_vintage": "2025",
-    "tracts_vintage": "2023",
+    "tract_vintage": "2023",
+    "county_vintage": "2023",
     "acs_vintage": "2019-2023",
     "years": "2011-2024",
     "copy_mode": "copy"

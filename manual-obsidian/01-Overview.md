@@ -9,6 +9,7 @@ CoC Lab is a Python-based data and geospatial infrastructure for working with **
 - **Visualize** boundaries as interactive maps
 - **Build crosswalks** linking CoCs to census tracts and counties
 - **Compute measures** aggregating ACS demographic data to CoC level
+- **Aggregate population estimates** (PEP) from counties to CoC geography
 - **Aggregate rents** (ZORI) from counties to CoC geography
 - **Assemble panels** combining PIT, ACS, and optional rent measures
 - **Export bundles** with provenance and diagnostics
@@ -35,6 +36,8 @@ A Continuum of Care (CoC) is a regional or local planning body that coordinates 
 | **HUD Open Data (ArcGIS)** | Current CoC Grantee Areas | Live snapshots |
 | **Census TIGER/Line** | Tract and county geometries | Annual vintages |
 | **Census ACS 5-Year** | Demographic estimates used for measures | Annual releases |
+| **Census PEP** | County population estimates | Annual releases |
+| **NHGIS (IPUMS)** | National tract/county shapefiles | Decennial vintages |
 | **HUD PIT Counts** | Point-in-Time counts by CoC | Annual releases |
 | **Zillow ZORI** | County-level observed rent index | Monthly series |
 

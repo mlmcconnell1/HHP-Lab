@@ -23,6 +23,7 @@ flowchart TB
         RAW[(data/raw/)]
         CURATED[(data/curated/)]
         REG[(boundary_registry.parquet)]
+        SRC[(source_registry.parquet)]
     end
 
     subgraph Output["Output Layer"]
@@ -38,6 +39,7 @@ flowchart TB
     NORM --> VAL
     VAL --> CURATED
     CURATED --> REG
+    CURATED --> SRC
     CURATED --> VIZ
     VIZ --> HTML
 ```
@@ -51,22 +53,39 @@ graph LR
         ING[ingest/]
         GEO[geo/]
         REG[registry/]
+        SOURCE[source_registry.py]
         VIZ[viz/]
         CENSUS[census/]
         XWALK[xwalks/]
         MEASURES[measures/]
+        RENTS[rents/]
+        PEP[pep/]
+        PIT[pit/]
+        PANEL[panel/]
+        EXPORT[export/]
+        BUILDS[builds.py]
     end
 
     CLI --> ING
     CLI --> REG
+    CLI --> SOURCE
     CLI --> VIZ
     CLI --> XWALK
     CLI --> MEASURES
+    CLI --> RENTS
+    CLI --> PEP
+    CLI --> PIT
+    CLI --> PANEL
+    CLI --> EXPORT
+    CLI --> BUILDS
     ING --> GEO
     VIZ --> REG
     VIZ --> GEO
     XWALK --> CENSUS
     MEASURES --> XWALK
+    RENTS --> XWALK
+    PANEL --> MEASURES
+    PANEL --> PIT
 ```
 
 ## Directory Layout
@@ -77,6 +96,7 @@ coclab/
   geo/          # Geometry normalization and validation
   ingest/       # Data source ingesters
   registry/     # Vintage tracking and version selection
+  source_registry.py  # Source hash tracking and change detection
   viz/          # Map rendering (Folium)
   census/       # Census geometry ingestion (TIGER/Line)
     ingest/     # Tract and county downloaders
@@ -85,9 +105,14 @@ coclab/
   acs/          # ACS population ingest, rollup, and cross-check
     ingest/     # Tract population fetcher
   rents/        # ZORI rent data ingestion and aggregation
+  pep/          # PEP ingest and aggregation
   pit/          # PIT count ingestion and QA (Phase 3)
     ingest/     # HUD Exchange PIT downloaders and parsers
   panel/        # CoC × year panel assembly (Phase 3)
+  export/       # Bundle export and MANIFEST generation
+  builds.py     # Named build scaffolds and manifests
+  naming.py     # Filename conventions and temporal shorthand
+  provenance.py # Parquet provenance helpers
 data/
   raw/          # Downloaded source files
   curated/      # Processed GeoParquet files
@@ -95,9 +120,13 @@ data/
     xwalks/     # CoC-tract and CoC-county crosswalks
     measures/   # CoC-level demographic measures
     acs/        # ACS tract population, rollups, and county weights
-    rents/      # ZORI rent data (county and CoC-level)
+    zori/       # ZORI rent data (county and CoC-level)
+    pep/        # PEP county and CoC-level data
     pit/        # Canonical PIT count files
-    panels/     # CoC × year analysis panels
+    panel/      # CoC × year analysis panels
+    source_registry.parquet  # Source ingestion registry
+builds/         # Named build scaffolds (each with base/ and data/)
+exports/        # Export bundles (export-1, export-2, ...)
 tests/          # Test suite including smoke tests
 ```
 

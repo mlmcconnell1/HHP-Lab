@@ -333,20 +333,25 @@ Filenames use temporal shorthand notation (see [[07-Temporal-Terminology]]).
 | Census counties | `data/curated/census/counties__C{year}.parquet` | TIGER county geometries |
 | Tract crosswalks | `data/curated/xwalks/xwalk__B{boundary}xT{tract}.parquet` | CoC-tract mapping |
 | County crosswalks | `data/curated/xwalks/xwalk__B{boundary}xC{county}.parquet` | CoC-county mapping |
-| CoC measures | `data/curated/measures/measures__A{acs}@B{boundary}.parquet` | Aggregated ACS data |
+| CoC measures | `data/curated/measures/measures__A{acs_end}@B{boundary}xT{tract}.parquet` | Aggregated ACS data |
 | PIT counts | `data/curated/pit/pit__P{year}.parquet` | Canonical PIT data (single year) |
-| PIT vintages | `data/curated/pit/pit_vintage__{vintage}.parquet` | All years from a vintage release |
+| PIT vintages | `data/curated/pit/pit_vintage__P{vintage}.parquet` | All years from a vintage release |
 | PIT registry | `data/curated/pit/pit_registry.parquet` | PIT year tracking |
 | PIT vintage registry | `data/curated/pit/pit_vintage_registry.parquet` | PIT vintage tracking |
-| CoC panels | `data/curated/panels/panel__Y{start}-{end}@B{boundary}.parquet` | Analysis-ready panels |
+| CoC panels | `data/curated/panel/panel__Y{start}-{end}@B{boundary}.parquet` | Analysis-ready panels |
 | Tract population | `data/curated/acs/acs_tracts__A{acs}xT{tract}.parquet` | ACS tract population |
 | CoC population rollup | `data/curated/acs/coc_population__A{acs}@B{boundary}xT{tract}__{weighting}.parquet` | Aggregated CoC population |
 | Population crosscheck | `data/curated/acs/crosscheck__A{acs}@B{boundary}xT{tract}__{weighting}.parquet` | Validation report |
+| Tract relationship | `data/curated/census/tract_relationship__T2010xT2020.parquet` | 2010↔2020 tract bridge |
+| PEP county | `data/curated/pep/pep_county__v{vintage}.parquet` | PEP county estimates |
+| PEP combined | `data/curated/pep/pep_county__combined.parquet` | Combined PEP series |
+| CoC PEP | `data/curated/pep/coc_pep__B{boundary}xC{county}__w{weight}.parquet` | Aggregated CoC PEP |
 | Raw ZORI | `data/raw/zori/zori__{geography}__{date}.csv` | Downloaded Zillow CSV |
 | Normalized ZORI | `data/curated/zori/zori__{geography}.parquet` | Normalized ZORI data |
 | County weights | `data/curated/acs/county_weights__A{acs}__{method}.parquet` | ACS county weights |
-| CoC ZORI | `data/curated/zori/zori__A{acs}@B{boundary}xC{county}__{weight}.parquet` | Aggregated CoC ZORI |
-| CoC ZORI yearly | `data/curated/zori/zori_yearly__A{acs}@B{boundary}xC{county}__{weight}.parquet` | Yearly collapsed ZORI |
+| CoC ZORI | `data/curated/zori/zori__A{acs}@B{boundary}xC{county}__w{weight}.parquet` | Aggregated CoC ZORI |
+| CoC ZORI yearly | `data/curated/zori/zori_yearly__A{acs}@B{boundary}xC{county}__w{weight}__m{method}.parquet` | Yearly collapsed ZORI |
+| Source registry | `data/curated/source_registry.parquet` | External source tracking |
 
 ## Dataset Provenance
 
