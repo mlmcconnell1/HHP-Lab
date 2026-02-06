@@ -54,9 +54,8 @@ def test_build_create_and_list():
 
         # Verify base asset files are pinned
         for year in years:
-            pinned = list((build_root / "base" / "coc_boundary" / str(year)).iterdir())
-            assert len(pinned) == 1
-            assert pinned[0].name == f"coc__B{year}.parquet"
+            pinned = build_root / "base" / f"coc__B{year}.parquet"
+            assert pinned.exists()
 
         # Each asset should have sha256
         for asset in manifest["base_assets"]:

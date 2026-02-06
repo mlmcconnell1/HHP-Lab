@@ -88,7 +88,7 @@ def populate_base_assets(
     """Discover, copy, and pin boundary assets into a build's ``base/`` tree.
 
     For each year in *years*, the corresponding curated boundary file is
-    resolved, copied into ``builds/<build>/base/coc_boundary/<year>/``,
+    resolved, copied into ``builds/<build>/base/``,
     and its SHA-256 hash is recorded.
 
     Args:
@@ -108,9 +108,8 @@ def populate_base_assets(
     for year in years:
         source_path = _resolve_boundary_source(year, data_dir=data_dir)
 
-        dest_dir = base / "coc_boundary" / str(year)
-        dest_dir.mkdir(parents=True, exist_ok=True)
-        dest_path = dest_dir / source_path.name
+        base.mkdir(parents=True, exist_ok=True)
+        dest_path = base / source_path.name
 
         shutil.copy2(source_path, dest_path)
 

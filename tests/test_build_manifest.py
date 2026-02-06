@@ -70,10 +70,9 @@ class TestEnsureBuildDir:
             "test", builds_dir=tmp_path / "builds", years=[2020], data_dir=tmp_path / "data",
         )
 
-        # File should be copied to base/coc_boundary/2020/
-        pinned = list((build_dir / "base" / "coc_boundary" / "2020").iterdir())
-        assert len(pinned) == 1
-        assert pinned[0].name == "coc__B2020.parquet"
+        # File should be copied to base/
+        pinned = build_dir / "base" / "coc__B2020.parquet"
+        assert pinned.exists()
 
     def test_writes_full_manifest(self, tmp_path):
         _create_boundary_files(tmp_path, [2020, 2021])
@@ -132,7 +131,7 @@ class TestPopulateBaseAssets:
 
         assets = populate_base_assets(build_dir, [2020], data_dir=tmp_path / "data")
 
-        assert assets[0]["relative_path"] == "base/coc_boundary/2020/coc__B2020.parquet"
+        assert assets[0]["relative_path"] == "base/coc__B2020.parquet"
 
     def test_resolves_boundaries_scheme(self, tmp_path):
         """Should resolve boundaries__B naming as fallback."""
@@ -143,7 +142,7 @@ class TestPopulateBaseAssets:
         assets = populate_base_assets(build_dir, [2020], data_dir=tmp_path / "data")
 
         assert assets[0]["asset_type"] == "coc_boundary"
-        assert "boundaries__B2020" in assets[0]["relative_path"]
+        assert assets[0]["relative_path"] == "base/boundaries__B2020.parquet"
 
     def test_resolves_legacy_scheme(self, tmp_path):
         """Should resolve coc_boundaries__ legacy naming as fallback."""
@@ -154,7 +153,7 @@ class TestPopulateBaseAssets:
         assets = populate_base_assets(build_dir, [2020], data_dir=tmp_path / "data")
 
         assert assets[0]["asset_type"] == "coc_boundary"
-        assert "coc_boundaries__2020" in assets[0]["relative_path"]
+        assert assets[0]["relative_path"] == "base/coc_boundaries__2020.parquet"
 
     def test_copied_file_content_matches(self, tmp_path):
         _create_boundary_files(tmp_path, [2020])

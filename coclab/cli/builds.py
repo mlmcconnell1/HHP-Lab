@@ -73,7 +73,7 @@ def create_build(
     typer.echo(f"  Base assets pinned: {len(base_assets)}")
     for asset in base_assets:
         typer.echo(
-            f"    - coc_boundary/{asset['year']}: {asset['sha256'][:12]}..."
+            f"    - B{asset['year']}: {asset['sha256'][:12]}..."
         )
     typer.echo(f"  Manifest: {build_dir / 'manifest.json'}")
 

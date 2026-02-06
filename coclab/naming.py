@@ -85,6 +85,19 @@ def pit_filename(pit_year: str | int) -> str:
     return f"pit__P{pit_year}.parquet"
 
 
+def coc_pit_filename(pit_year: str | int, boundary_vintage: str | int) -> str:
+    """Generate filename for PIT data aligned to a boundary vintage.
+
+    Args:
+        pit_year: PIT count year (e.g., 2024)
+        boundary_vintage: CoC boundary vintage (e.g., 2024)
+
+    Returns:
+        Filename like 'pit__P2024@B2024.parquet'
+    """
+    return f"pit__P{pit_year}@B{boundary_vintage}.parquet"
+
+
 def pit_vintage_filename(vintage: str | int) -> str:
     """Generate filename for PIT vintage file (containing all years from one release).
 
@@ -153,6 +166,7 @@ def measures_filename(
     acs_vintage: str,
     boundary_vintage: str,
     tract_vintage: str | int | None = None,
+    alignment_year: int | None = None,
 ) -> str:
     """Generate filename for CoC measures dataset.
 
@@ -160,6 +174,10 @@ def measures_filename(
         acs_vintage: ACS vintage (e.g., "2019-2023" or "2023")
         boundary_vintage: CoC boundary vintage (e.g., "2025")
         tract_vintage: Optional tract vintage used in crosswalk
+        alignment_year: Optional alignment year for window_center_year mode.
+            When the ACS end year differs from the boundary year, shows
+            which hub year the ACS vintage was aligned to.
+            E.g., ``measures__A2015(2013)@B2013xT2010.parquet``
 
     Returns:
         Filename like 'measures__A2023@B2025.parquet' or
@@ -171,9 +189,13 @@ def measures_filename(
     # Normalize ACS vintage to end year
     acs_year = _normalize_acs_vintage(acs_vintage)
 
+    acs_part = f"A{acs_year}"
+    if alignment_year is not None:
+        acs_part += f"({alignment_year})"
+
     if tract_vintage is not None:
-        return f"measures__A{acs_year}@B{boundary_vintage}xT{tract_vintage}.parquet"
-    return f"measures__A{acs_year}@B{boundary_vintage}.parquet"
+        return f"measures__{acs_part}@B{boundary_vintage}xT{tract_vintage}.parquet"
+    return f"measures__{acs_part}@B{boundary_vintage}.parquet"
 
 
 def panel_filename(

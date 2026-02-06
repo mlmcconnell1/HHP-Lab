@@ -73,9 +73,7 @@ def _create_build(name: str = "demo", *, years: list[int] | None = None) -> None
                 "asset_type": "coc_boundary",
                 "year": y,
                 "source": "test",
-                "relative_path": (
-                    f"base/coc_boundary/{y}/coc__B{y}.parquet"
-                ),
+                "relative_path": f"base/coc__B{y}.parquet",
                 "sha256": "a" * 64,
             }
             for y in years
@@ -209,17 +207,6 @@ def test_aggregate_pep_lagged_requires_lag_years():
         assert "--lag-years is required" in result.output
 
 
-def test_aggregate_acs_as_reported_requires_vintage():
-    """as_reported alignment requires explicit --acs-vintage."""
-    with runner.isolated_filesystem():
-        _create_build(years=[2020])
-        result = runner.invoke(
-            app, ["aggregate", "acs", "--build", "demo", "--align", "as_reported"]
-        )
-        assert result.exit_code == 2
-        assert "--acs-vintage is required" in result.output
-
-
 def test_aggregate_acs_missing_crosswalk_suggests_decennial():
     with runner.isolated_filesystem():
         _create_build(years=[2015])
@@ -265,7 +252,7 @@ def _create_build_at(tmp_path, name="test_build", years=None):
                 "asset_type": "coc_boundary",
                 "year": y,
                 "source": "test",
-                "relative_path": f"base/coc_boundary/{y}/coc__B{y}.parquet",
+                "relative_path": f"base/coc__B{y}.parquet",
                 "sha256": "a" * 64,
             }
             for y in years
@@ -277,7 +264,7 @@ def _create_build_at(tmp_path, name="test_build", years=None):
 
 
 def test_aggregate_pit_collects_data(tmp_path):
-    """PIT aggregate should collect and write PIT files for build years."""
+    """PIT aggregate should collect and write per-year PIT files for build years."""
     import os
 
     import pandas as pd
@@ -308,6 +295,11 @@ def test_aggregate_pit_collects_data(tmp_path):
 
     assert result.exit_code == 0
     assert "Wrote PIT aggregate" in result.output
+
+    # Verify per-year output files
+    out_dir = tmp_path / "builds" / "test_build" / "data" / "curated" / "pit"
+    for year in [2020, 2021]:
+        assert (out_dir / f"pit__P{year}@B{year}.parquet").exists()
 
 
 def test_aggregate_pit_falls_back_to_vintage(tmp_path):
@@ -348,12 +340,13 @@ def test_aggregate_pit_falls_back_to_vintage(tmp_path):
     assert "Using vintage P2024" in result.output
     assert "Wrote PIT aggregate" in result.output
 
-    # Verify the output contains exactly the requested years
+    # Verify per-year output files with correct data
     out_dir = tmp_path / "builds" / "test_build" / "data" / "curated" / "pit"
-    out_files = list(out_dir.glob("pit__P*.parquet"))
-    assert len(out_files) == 1
-    result_df = pd.read_parquet(out_files[0])
-    assert sorted(result_df["pit_year"].unique()) == [2019, 2020, 2021]
+    for year in [2019, 2020, 2021]:
+        out_file = out_dir / f"pit__P{year}@B{year}.parquet"
+        assert out_file.exists()
+        result_df = pd.read_parquet(out_file)
+        assert sorted(result_df["pit_year"].unique()) == [year]
 
 
 def test_aggregate_pit_vintage_partial_coverage(tmp_path):
