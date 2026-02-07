@@ -446,6 +446,93 @@ def discover_pit_vintages(base_dir: Path | str | None = None) -> list[int]:
     return sorted(vintages, reverse=True)
 
 
+# =============================================================================
+# ZORI ingest (single-geography, pre-aggregation)
+# =============================================================================
+
+
+def zori_ingest_filename(geography: str, max_year: int | str) -> str:
+    """Generate filename for ZORI ingest data.
+
+    Args:
+        geography: Geography level ("county" or "zip")
+        max_year: Maximum year in the ZORI series (e.g., 2026)
+
+    Returns:
+        Filename like 'zori__county__Z2026.parquet'
+    """
+    return f"zori__{geography}__Z{max_year}.parquet"
+
+
+def zori_ingest_path(
+    geography: str,
+    max_year: int | str,
+    base_dir: Path | str | None = None,
+) -> Path:
+    """Get canonical path for ZORI ingest file.
+
+    Args:
+        geography: Geography level ("county" or "zip")
+        max_year: Maximum year in the ZORI series
+        base_dir: Base data directory (defaults to "data")
+
+    Returns:
+        Path like data/curated/zori/zori__county__Z2026.parquet
+    """
+    if base_dir is None:
+        base_dir = Path("data")
+    else:
+        base_dir = Path(base_dir)
+    return base_dir / "curated" / "zori" / zori_ingest_filename(geography, max_year)
+
+
+def discover_zori_ingest(
+    geography: str,
+    output_dir: Path | str | None = None,
+) -> Path | None:
+    """Discover the most recent ZORI ingest file for a geography.
+
+    Scans the ZORI output directory for files matching the temporal
+    pattern ``zori__{geography}__Z{year}.parquet``. If multiple Z-year
+    files exist, returns the one with the highest year. Falls back to
+    the legacy name ``zori__{geography}.parquet`` if no temporal file
+    is found.
+
+    Args:
+        geography: Geography level ("county" or "zip")
+        output_dir: ZORI output directory (defaults to "data/curated/zori")
+
+    Returns:
+        Path to the most recent file, or None if no file exists.
+    """
+    if output_dir is None:
+        output_dir = Path("data/curated/zori")
+    else:
+        output_dir = Path(output_dir)
+
+    if not output_dir.is_dir():
+        return None
+
+    # Look for temporal-named files first
+    candidates: list[tuple[int, Path]] = []
+    for p in output_dir.glob(f"zori__{geography}__Z*.parquet"):
+        stem = p.stem  # e.g. "zori__county__Z2026"
+        z_suffix = stem.split("__Z")[-1]
+        if z_suffix.isdigit():
+            candidates.append((int(z_suffix), p))
+
+    if candidates:
+        candidates.sort(reverse=True)
+        return candidates[0][1]
+
+    # Fall back to legacy name
+    legacy = output_dir / f"zori__{geography}.parquet"
+    if legacy.exists():
+        return legacy
+
+    return None
+
+
 def tract_xwalk_path(
     boundary_vintage: str,
     tract_vintage: str | int,

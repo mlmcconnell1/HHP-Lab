@@ -242,7 +242,7 @@ coclab build export \
 | 1a. Boundaries | `data/curated/coc_boundaries/coc__B{year}.parquet` |
 | 1b. Census | `data/curated/census/tracts__T2023.parquet`, `counties__C2023.parquet` |
 | 1c. PIT | `data/curated/pit/pit_vintage__P2024.parquet` |
-| 1d. ZORI | `data/curated/zori/zori__county.parquet` |
+| 1d. ZORI | `data/curated/zori/zori__county__Z{year}.parquet` |
 | 2. Crosswalks | `data/curated/xwalks/xwalk__B{year}xT2023.parquet` |
 | 3. Measures | `data/curated/measures/measures__A{acs}@B{year}.parquet` |
 | 4. CoC ZORI | `data/curated/zori/zori_yearly__*.parquet` |

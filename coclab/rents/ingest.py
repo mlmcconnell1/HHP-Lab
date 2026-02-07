@@ -361,6 +361,7 @@ def _validate_monthly_continuity(df: pd.DataFrame, max_warnings: int = 10) -> No
 def get_output_path(
     geography: str,
     output_dir: Path | str | None = None,
+    max_year: int | str | None = None,
 ) -> Path:
     """Get canonical output path for normalized ZORI data.
 
@@ -370,16 +371,23 @@ def get_output_path(
         Geography level ("county" or "zip").
     output_dir : Path or str, optional
         Output directory. Defaults to 'data/curated/zori'.
+    max_year : int or str, optional
+        Maximum year in the ZORI data. When provided, uses temporal
+        naming like 'zori__county__Z2026.parquet'.
 
     Returns
     -------
     Path
-        Output path like 'data/curated/zori/zori__county.parquet'.
+        Output path like 'data/curated/zori/zori__county__Z2026.parquet'.
     """
     if output_dir is None:
         output_dir = DEFAULT_OUTPUT_DIR
     else:
         output_dir = Path(output_dir)
+    if max_year is not None:
+        from coclab.naming import zori_ingest_filename
+
+        return output_dir / zori_ingest_filename(geography, max_year)
     return output_dir / f"zori__{geography}.parquet"
 
 
@@ -423,12 +431,15 @@ def ingest_zori(
     ValueError
         If parsing/validation fails (exit code 2).
     """
-    output_path = get_output_path(geography, output_dir)
+    from coclab.naming import discover_zori_ingest
 
-    # Check cache
-    if output_path.exists() and not force:
-        logger.info(f"Using cached file: {output_path}")
-        return output_path
+    resolved_output_dir = Path(output_dir) if output_dir is not None else DEFAULT_OUTPUT_DIR
+
+    # Check cache via discovery (max_year unknown until after parse)
+    existing = discover_zori_ingest(geography, resolved_output_dir)
+    if existing is not None and not force:
+        logger.info(f"Using cached file: {existing}")
+        return existing
 
     # Download
     download_url = url or ZORI_URLS.get(geography)
@@ -493,12 +504,18 @@ def ingest_zori(
     ]
     df = df[col_order]
 
+    # Derive max year for temporal filename
+    max_year = int(df["date"].dt.year.max())
+    output_path = get_output_path(geography, output_dir, max_year=max_year)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+
     # Build provenance
     provenance = ProvenanceBlock(
         extra={
             "dataset": "zori",
             "geography": geography,
             "metric": "ZORI",
+            "max_year": max_year,
             "source": "Zillow Economic Research",
             "attribution": ZILLOW_ATTRIBUTION,
             "download_url": download_url,
@@ -516,5 +533,15 @@ def ingest_zori(
     # Write output
     write_parquet_with_provenance(df, output_path, provenance)
     logger.info(f"Wrote normalized ZORI data to {output_path}")
+
+    # Clean up old temporal or legacy files for this geography
+    for old in resolved_output_dir.glob(f"zori__{geography}__Z*.parquet"):
+        if old != output_path:
+            logger.info(f"Removing superseded ZORI file: {old}")
+            old.unlink()
+    legacy = resolved_output_dir / f"zori__{geography}.parquet"
+    if legacy.exists():
+        logger.info(f"Removing legacy ZORI file: {legacy}")
+        legacy.unlink()
 
     return output_path

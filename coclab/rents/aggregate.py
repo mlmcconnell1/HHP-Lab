@@ -72,11 +72,9 @@ from coclab.provenance import (
     read_provenance,
     write_parquet_with_provenance,
 )
+from coclab.naming import discover_zori_ingest
 from coclab.rents.ingest import (
     ZILLOW_ATTRIBUTION,
-)
-from coclab.rents.ingest import (
-    get_output_path as get_zori_output_path,
 )
 from coclab.rents.weights import (
     WeightingMethod,
@@ -175,19 +173,17 @@ def load_zori(
     if zori_path is not None:
         path = Path(zori_path)
     else:
-        path = get_zori_output_path(geography, output_dir)
+        path = discover_zori_ingest(geography, output_dir)
+        # Fall back to global curated directory if build-local path doesn't exist
+        if path is None and output_dir is not None:
+            path = discover_zori_ingest(geography, DEFAULT_OUTPUT_DIR)
+            if path is not None:
+                logger.info(f"ZORI not found in {output_dir}, using global {path}")
 
-    # Fall back to global curated directory if build-local path doesn't exist
-    if not path.exists() and output_dir is not None:
-        global_path = get_zori_output_path(geography, DEFAULT_OUTPUT_DIR)
-        if global_path.exists():
-            logger.info(f"ZORI not found at {path}, using global {global_path}")
-            path = global_path
-
-    if not path.exists():
+    if path is None or not path.exists():
         raise FileNotFoundError(
-            f"ZORI data file not found: {path}. "
-            f"Run 'coclab ingest-zori --geography {geography}' first."
+            f"ZORI data file not found. "
+            f"Run 'coclab ingest zori --geography {geography}' first."
         )
 
     logger.info(f"Loading ZORI data from {path}")
@@ -789,12 +785,15 @@ def aggregate_zori_to_coc(
     if zori_path is not None:
         zori_source_path = Path(zori_path)
     else:
-        zori_source_path = get_zori_output_path(geography, output_dir)
-        if not zori_source_path.exists() and output_dir is not None:
-            global_path = get_zori_output_path(geography, DEFAULT_OUTPUT_DIR)
-            if global_path.exists():
-                logger.info(f"ZORI not found at {zori_source_path}, using global {global_path}")
-                zori_source_path = global_path
+        zori_source_path = discover_zori_ingest(geography, output_dir)
+        if zori_source_path is None and output_dir is not None:
+            zori_source_path = discover_zori_ingest(geography, DEFAULT_OUTPUT_DIR)
+            if zori_source_path is not None:
+                logger.info(f"ZORI not found in {output_dir}, using global {zori_source_path}")
+        if zori_source_path is None:
+            raise FileNotFoundError(
+                f"ZORI data not found. Run 'coclab ingest zori --geography {geography}' first."
+            )
 
     # Load input data using resolved path
     zori_df = load_zori(geography, zori_path=zori_source_path)

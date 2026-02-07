@@ -208,20 +208,61 @@ class TestValidateMonthyContinuity:
 class TestGetOutputPath:
     """Tests for get_output_path function."""
 
-    def test_default_path(self):
-        """Test default output path generation."""
+    def test_default_path_with_max_year(self):
+        """Test output path with temporal Z-year notation."""
+        path = get_output_path("county", max_year=2026)
+        assert path == Path("data/curated/zori/zori__county__Z2026.parquet")
+
+    def test_legacy_path_without_max_year(self):
+        """Test legacy output path when max_year is omitted."""
         path = get_output_path("county")
         assert path == Path("data/curated/zori/zori__county.parquet")
 
     def test_custom_base_dir(self):
         """Test output path with custom base directory."""
-        path = get_output_path("county", output_dir="/tmp/test")
-        assert path == Path("/tmp/test/zori__county.parquet")
+        path = get_output_path("county", output_dir="/tmp/test", max_year=2026)
+        assert path == Path("/tmp/test/zori__county__Z2026.parquet")
 
     def test_zip_geography(self):
         """Test output path for ZIP geography."""
-        path = get_output_path("zip")
-        assert path == Path("data/curated/zori/zori__zip.parquet")
+        path = get_output_path("zip", max_year=2025)
+        assert path == Path("data/curated/zori/zori__zip__Z2025.parquet")
+
+
+class TestDiscoverZoriIngest:
+    """Tests for discover_zori_ingest function."""
+
+    def test_discovers_temporal_file(self, tmp_path):
+        """Test discovery of Z-year named file."""
+        from coclab.naming import discover_zori_ingest
+
+        (tmp_path / "zori__county__Z2026.parquet").touch()
+        result = discover_zori_ingest("county", tmp_path)
+        assert result == tmp_path / "zori__county__Z2026.parquet"
+
+    def test_prefers_highest_year(self, tmp_path):
+        """Test that highest Z-year is preferred."""
+        from coclab.naming import discover_zori_ingest
+
+        (tmp_path / "zori__county__Z2025.parquet").touch()
+        (tmp_path / "zori__county__Z2026.parquet").touch()
+        result = discover_zori_ingest("county", tmp_path)
+        assert result == tmp_path / "zori__county__Z2026.parquet"
+
+    def test_falls_back_to_legacy(self, tmp_path):
+        """Test fallback to legacy name."""
+        from coclab.naming import discover_zori_ingest
+
+        (tmp_path / "zori__county.parquet").touch()
+        result = discover_zori_ingest("county", tmp_path)
+        assert result == tmp_path / "zori__county.parquet"
+
+    def test_returns_none_when_empty(self, tmp_path):
+        """Test None return when no file exists."""
+        from coclab.naming import discover_zori_ingest
+
+        result = discover_zori_ingest("county", tmp_path)
+        assert result is None
 
 
 class TestDownloadZori:
@@ -308,6 +349,7 @@ class TestIngestZori:
 
         assert output_path.exists()
         assert output_path.suffix == ".parquet"
+        assert "Z2023" in output_path.name  # Sample data max year is 2023
 
         # Read and verify output
         df = pd.read_parquet(output_path)
@@ -400,8 +442,8 @@ class TestIngestZori:
         output_dir = tmp_path / "curated"
         output_dir.mkdir(parents=True)
 
-        # Create a cached output file
-        cached_path = output_dir / "zori__county.parquet"
+        # Create a cached output file with temporal name
+        cached_path = output_dir / "zori__county__Z2023.parquet"
         df = pd.DataFrame(
             {
                 "geo_type": ["county"],
@@ -436,8 +478,8 @@ class TestIngestZori:
         output_dir = tmp_path / "curated"
         output_dir.mkdir(parents=True)
 
-        # Create a cached output file
-        cached_path = output_dir / "zori__county.parquet"
+        # Create a cached output file with temporal name
+        cached_path = output_dir / "zori__county__Z2022.parquet"
         df = pd.DataFrame(
             {
                 "geo_type": ["county"],
@@ -468,9 +510,38 @@ class TestIngestZori:
             force=True,
         )
 
-        # Verify new data was written
+        # Verify new data was written with temporal name
         result_df = pd.read_parquet(result_path)
         assert result_df["zori"].max() > 1000  # Should have real values now
+        assert "Z2023" in result_path.name
+
+        # Old file should be cleaned up
+        assert not cached_path.exists()
+
+    def test_reingest_cleans_up_legacy_file(self, tmp_path, httpx_mock):
+        """Test that legacy-named file is cleaned up after re-ingest."""
+        raw_dir = tmp_path / "raw"
+        output_dir = tmp_path / "curated"
+        output_dir.mkdir(parents=True)
+
+        # Create a legacy-named cached file
+        legacy_path = output_dir / "zori__county.parquet"
+        legacy_path.touch()
+
+        httpx_mock.add_response(
+            url=ZORI_URLS["county"],
+            content=SAMPLE_COUNTY_CSV.encode(),
+        )
+
+        result_path = ingest_zori(
+            geography="county",
+            raw_dir=raw_dir,
+            output_dir=output_dir,
+            force=True,
+        )
+
+        assert "Z2023" in result_path.name
+        assert not legacy_path.exists()
 
 
 class TestSchemaValidation:

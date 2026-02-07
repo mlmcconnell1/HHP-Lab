@@ -111,14 +111,13 @@ def ingest_zori(
         )
         raise typer.Exit(2)
 
-    from coclab.rents.ingest import get_output_path
+    from coclab.naming import discover_zori_ingest
     from coclab.rents.ingest import ingest_zori as do_ingest
 
-    output_path = get_output_path(geography, output_dir)
-
-    # Check for existing output
-    if output_path.exists() and not force:
-        typer.echo(f"ZORI {geography} data already exists at: {output_path}")
+    # Check for existing output via discovery
+    existing = discover_zori_ingest(geography, output_dir)
+    if existing is not None and not force:
+        typer.echo(f"ZORI {geography} data already exists at: {existing}")
         typer.echo("Use --force to re-download and reprocess.")
         raise typer.Exit(0)
 
