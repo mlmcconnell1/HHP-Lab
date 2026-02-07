@@ -14,10 +14,10 @@ issue-prefix: "coclab"
 # no-db: false
 
 # Disable daemon for RPC communication (forces direct database access)
-# no-daemon: false
+no-daemon: true
 
 # Disable auto-flush of database to JSONL after mutations
-# no-auto-flush: false
+no-auto-flush: true
 
 # Disable auto-import from JSONL when it's newer than database
 # no-auto-import: false
@@ -43,7 +43,6 @@ issue-prefix: "coclab"
 # Can also use BEADS_SYNC_BRANCH env var for local override.
 # If not set, bd sync will require you to run 'bd config set sync.branch <branch>'.
 sync-branch: "beads-sync"
-
 # Multi-repo configuration (experimental - bd-307)
 # Allows hydrating from multiple repositories and routing writes to the correct JSONL
 # repos:
