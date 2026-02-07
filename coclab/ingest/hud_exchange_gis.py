@@ -23,6 +23,7 @@ from typing import TYPE_CHECKING, Any
 import httpx
 from shapely.geometry import shape
 
+from coclab.raw_snapshot import write_api_snapshot
 from coclab.source_registry import check_source_changed, register_source
 from coclab.sources import (
     HUD_ARCGIS_COC_FEATURE_SERVICE,
@@ -160,7 +161,7 @@ def _fetch_arcgis_page(
 def _fetch_all_arcgis_features(
     client: httpx.Client,
     progress_callback: Any | None = None,
-) -> tuple[list[dict[str, Any]], bytes]:
+) -> tuple[list[dict[str, Any]], list[bytes]]:
     """Fetch all features from the ArcGIS service with pagination.
 
     Args:
@@ -168,7 +169,7 @@ def _fetch_all_arcgis_features(
         progress_callback: Optional callback(count) called after each page fetch
 
     Returns:
-        Tuple of (list of all GeoJSON features, combined raw response content)
+        Tuple of (list of all GeoJSON features, list of raw response page payloads)
     """
     all_features: list[dict[str, Any]] = []
     all_raw_content: list[bytes] = []
@@ -193,8 +194,7 @@ def _fetch_all_arcgis_features(
 
         offset += ARCGIS_PAGE_SIZE
 
-    combined_content = b"".join(all_raw_content)
-    return all_features, combined_content
+    return all_features, all_raw_content
 
 
 def _arcgis_features_to_geodataframe(
@@ -274,7 +274,7 @@ def _map_arcgis_to_canonical_schema(
 def fetch_from_arcgis(
     boundary_vintage: str,
     show_progress: bool = False,
-) -> tuple[gpd.GeoDataFrame, bytes]:
+) -> tuple[gpd.GeoDataFrame, list[bytes]]:
     """Fetch CoC boundaries from HUD ArcGIS FeatureServer.
 
     This is the primary data source for current CoC boundary data.
@@ -284,7 +284,7 @@ def fetch_from_arcgis(
         show_progress: If True, display a progress bar
 
     Returns:
-        Tuple of (GeoDataFrame with canonical schema, raw response content)
+        Tuple of (GeoDataFrame with canonical schema, raw response page payloads)
 
     Raises:
         httpx.HTTPStatusError: If API request fails
@@ -338,7 +338,6 @@ def _hash_directory(path: Path) -> tuple[str, int]:
 
 def _hash_shapefile(path: Path) -> tuple[str, int]:
     """Hash a shapefile by including sibling component files."""
-    stem = path.stem
     components = [".shp", ".shx", ".dbf", ".prj", ".cpg"]
     files = [path.with_suffix(ext) for ext in components]
     hasher = hashlib.sha256()
@@ -566,10 +565,30 @@ def ingest_hud_exchange(
 
     if use_arcgis:
         # Primary path: fetch from ArcGIS FeatureServer
-        gdf, raw_content = fetch_from_arcgis(boundary_vintage, show_progress=show_progress)
+        gdf, raw_pages = fetch_from_arcgis(boundary_vintage, show_progress=show_progress)
         source_url = ARCGIS_FEATURE_SERVICE_URL
-        content_sha256 = hashlib.sha256(raw_content).hexdigest()
-        content_size = len(raw_content)
+
+        # Persist raw API snapshot per retention policy
+        snapshot_id = datetime.now(UTC).strftime("%Y-%m-%d")
+        snap_dir, content_sha256, content_size = write_api_snapshot(
+            raw_pages,
+            "hud_exchange",
+            snapshot_id=snapshot_id,
+            request_metadata={
+                "url": ARCGIS_FEATURE_SERVICE_URL,
+                "params": {
+                    "where": "1=1",
+                    "outFields": "COCNUM,COCNAME,STUSAB,STATE_NAME",
+                    "outSR": "4326",
+                    "f": "geojson",
+                    "resultRecordCount": ARCGIS_PAGE_SIZE,
+                },
+                "page_size": ARCGIS_PAGE_SIZE,
+            },
+            record_count=len(gdf),
+        )
+        raw_local_path = str(snap_dir)
+
         if show_progress:
             click.echo(f"Fetched {len(gdf)} CoC boundaries.")
     else:
@@ -608,6 +627,8 @@ def ingest_hud_exchange(
 
         if content_sha256 is None or content_size is None:
             content_sha256, content_size = _hash_local_path(Path(data_path))
+
+        raw_local_path = str(raw_dir)
 
     # Normalize boundaries (CRS, fix geometries, compute geom_hash)
     if show_progress:
@@ -664,11 +685,12 @@ def ingest_hud_exchange(
         source_name=f"HUD Exchange CoC Boundaries {boundary_vintage}",
         raw_sha256=content_sha256,
         file_size=content_size,
-        local_path=str(output_path),
+        local_path=raw_local_path,
         metadata={
             "boundary_vintage": boundary_vintage,
             "feature_count": len(gdf),
             "source": source,
+            "curated_path": str(output_path),
         },
     )
 
