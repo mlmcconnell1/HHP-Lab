@@ -17,8 +17,10 @@ API-based sources
 from __future__ import annotations
 
 import hashlib
+import io
 import json
 import logging
+import zipfile
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -30,6 +32,37 @@ RAW_DATA_ROOT = Path("data/raw")
 # ---------------------------------------------------------------------------
 # File-based raw snapshots
 # ---------------------------------------------------------------------------
+
+
+def hash_zip_contents(raw_content: bytes) -> str:
+    """Compute a content-stable SHA-256 from a ZIP's decompressed entries.
+
+    Hashes the extracted file contents (in sorted filename order) rather than
+    the ZIP container bytes.  This makes the hash stable across re-compression
+    — different DEFLATE implementations produce different byte streams for the
+    same input data, but the decompressed contents remain identical.
+
+    Each entry contributes its filename (UTF-8 encoded) followed by its
+    decompressed bytes, so file renames are also detected.
+
+    Parameters
+    ----------
+    raw_content : bytes
+        Raw ZIP file bytes.
+
+    Returns
+    -------
+    str
+        Lowercase hex SHA-256 digest.
+    """
+    hasher = hashlib.sha256()
+    with zipfile.ZipFile(io.BytesIO(raw_content)) as zf:
+        for name in sorted(zf.namelist()):
+            info = zf.getinfo(name)
+            if not info.is_dir():
+                hasher.update(name.encode("utf-8"))
+                hasher.update(zf.read(name))
+    return hasher.hexdigest()
 
 
 def persist_file_snapshot(
@@ -73,7 +106,10 @@ def persist_file_snapshot(
     dest_path = dest_dir / filename
     dest_path.write_bytes(raw_content)
 
-    sha256_hex = hashlib.sha256(raw_content).hexdigest()
+    if filename.lower().endswith(".zip"):
+        sha256_hex = hash_zip_contents(raw_content)
+    else:
+        sha256_hex = hashlib.sha256(raw_content).hexdigest()
     byte_size = len(raw_content)
 
     logger.debug(

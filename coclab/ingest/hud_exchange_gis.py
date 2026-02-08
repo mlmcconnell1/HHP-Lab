@@ -610,7 +610,11 @@ def ingest_hud_exchange(
             )
             zip_path = raw_dir / f"CoC_GIS_{boundary_vintage}.zip"
             if zip_path.exists():
-                content_sha256, content_size = _hash_file(zip_path)
+                from coclab.raw_snapshot import hash_zip_contents
+
+                raw_bytes = zip_path.read_bytes()
+                content_sha256 = hash_zip_contents(raw_bytes)
+                content_size = len(raw_bytes)
         else:
             # Find existing data in raw_dir
             gdb_dirs = list(raw_dir.glob("*.gdb"))

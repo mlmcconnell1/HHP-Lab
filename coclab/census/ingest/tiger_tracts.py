@@ -12,7 +12,7 @@ import geopandas as gpd
 import httpx
 import pandas as pd
 
-from coclab.raw_snapshot import persist_file_snapshot
+from coclab.raw_snapshot import hash_zip_contents, persist_file_snapshot
 from coclab.source_registry import check_source_changed, register_source
 from coclab.sources import CENSUS_TIGER_BASE
 
@@ -189,9 +189,11 @@ def download_tiger_tracts(
         raise ValueError(f"No tract data found for year {year}")
 
     # Compute combined SHA-256 hash of all downloaded content
+    # Use hash_zip_contents for each state ZIP so the combined hash is
+    # stable across re-compression by the upstream server.
     hasher = hashlib.sha256()
     for content in all_content:
-        hasher.update(content)
+        hasher.update(hash_zip_contents(content).encode("ascii"))
     combined_sha256 = hasher.hexdigest()
 
     # Combine all states

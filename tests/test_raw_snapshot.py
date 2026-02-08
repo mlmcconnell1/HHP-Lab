@@ -10,7 +10,9 @@ Covers:
 from __future__ import annotations
 
 import hashlib
+import io
 import json
+import zipfile
 from pathlib import Path
 
 import pytest
@@ -18,6 +20,7 @@ import pytest
 from coclab.raw_snapshot import (
     hash_directory,
     hash_file,
+    hash_zip_contents,
     persist_file_snapshot,
     write_api_snapshot,
 )
@@ -34,25 +37,25 @@ class TestPersistFileSnapshot:
         """File lands at <raw_root>/<source_type>/<filename>."""
         content = b"hello raw data"
         path, _, _ = persist_file_snapshot(
-            content, "census", "tract.zip", raw_root=tmp_path,
+            content, "census", "tract.shp", raw_root=tmp_path,
         )
 
-        assert path == tmp_path / "census" / "tract.zip"
+        assert path == tmp_path / "census" / "tract.shp"
         assert path.exists()
         assert path.read_bytes() == content
 
     def test_writes_file_with_subdirs(self, tmp_path: Path):
         """File lands at <raw_root>/<source_type>/<subdirs...>/<filename>."""
-        content = b"zip bytes"
+        content = b"some bytes"
         path, _, _ = persist_file_snapshot(
             content,
             "census",
-            "tl_2023_06_tract.zip",
+            "tl_2023_06_tract.csv",
             subdirs=("2023", "tracts"),
             raw_root=tmp_path,
         )
 
-        assert path == tmp_path / "census" / "2023" / "tracts" / "tl_2023_06_tract.zip"
+        assert path == tmp_path / "census" / "2023" / "tracts" / "tl_2023_06_tract.csv"
         assert path.exists()
         assert path.read_bytes() == content
 
@@ -67,21 +70,49 @@ class TestPersistFileSnapshot:
         assert isinstance(sha256_hex, str)
         assert isinstance(size, int)
 
-    def test_sha256_matches_hashlib(self, tmp_path: Path):
-        """Returned SHA-256 matches hashlib.sha256(content).hexdigest()."""
+    def test_sha256_matches_hashlib_non_zip(self, tmp_path: Path):
+        """Returned SHA-256 matches hashlib.sha256(content) for non-ZIP files."""
         content = b"verify this hash please"
         _, sha256_hex, _ = persist_file_snapshot(
-            content, "census", "test.zip", raw_root=tmp_path,
+            content, "census", "test.csv", raw_root=tmp_path,
         )
 
         expected = hashlib.sha256(content).hexdigest()
         assert sha256_hex == expected
 
+    def test_sha256_uses_zip_content_hash_for_zips(self, tmp_path: Path):
+        """Returned SHA-256 for .zip files hashes extracted contents, not container."""
+        import io
+        import zipfile
+
+        # Create two ZIPs with identical contents but different compression
+        def make_zip(compress_type: int) -> bytes:
+            buf = io.BytesIO()
+            with zipfile.ZipFile(buf, "w", compression=compress_type) as zf:
+                zf.writestr("data.txt", "hello world")
+            return buf.getvalue()
+
+        zip_stored = make_zip(zipfile.ZIP_STORED)
+        zip_deflated = make_zip(zipfile.ZIP_DEFLATED)
+
+        # Raw bytes differ
+        assert zip_stored != zip_deflated
+
+        _, hash1, _ = persist_file_snapshot(
+            zip_stored, "census", "test.zip", raw_root=tmp_path,
+        )
+        _, hash2, _ = persist_file_snapshot(
+            zip_deflated, "census", "test2.zip", raw_root=tmp_path,
+        )
+
+        # Content-stable hashes match
+        assert hash1 == hash2
+
     def test_size_matches_content_length(self, tmp_path: Path):
         """Returned size matches len(content)."""
         content = b"twelve bytes"
         _, _, size = persist_file_snapshot(
-            content, "census", "test.zip", raw_root=tmp_path,
+            content, "census", "test.csv", raw_root=tmp_path,
         )
 
         assert size == len(content)
@@ -91,7 +122,7 @@ class TestPersistFileSnapshot:
         nested_root = tmp_path / "deep" / "nested" / "raw"
         content = b"nested"
         path, _, _ = persist_file_snapshot(
-            content, "census", "f.zip", subdirs=("a", "b"), raw_root=nested_root,
+            content, "census", "f.bin", subdirs=("a", "b"), raw_root=nested_root,
         )
 
         assert path.exists()
@@ -114,7 +145,7 @@ class TestPersistFileSnapshot:
         """Empty byte string is persisted correctly."""
         content = b""
         path, sha256_hex, size = persist_file_snapshot(
-            content, "census", "empty.zip", raw_root=tmp_path,
+            content, "census", "empty.csv", raw_root=tmp_path,
         )
 
         assert path.read_bytes() == b""
@@ -301,6 +332,71 @@ class TestWriteApiSnapshot:
 
         manifest = json.loads((snap_dir / "manifest.json").read_text(encoding="utf-8"))
         assert manifest["record_count"] is None
+
+
+# ---------------------------------------------------------------------------
+# hash_zip_contents
+# ---------------------------------------------------------------------------
+
+
+class TestHashZipContents:
+    """Tests for hash_zip_contents function."""
+
+    def _make_zip(self, files: dict[str, bytes], compress_type: int = zipfile.ZIP_DEFLATED) -> bytes:
+        buf = io.BytesIO()
+        with zipfile.ZipFile(buf, "w", compression=compress_type) as zf:
+            for name, data in files.items():
+                zf.writestr(name, data)
+        return buf.getvalue()
+
+    def test_stable_across_compression_types(self):
+        """Same files produce the same hash regardless of compression."""
+        files = {"a.txt": b"alpha", "b.txt": b"beta"}
+        zip_stored = self._make_zip(files, zipfile.ZIP_STORED)
+        zip_deflated = self._make_zip(files, zipfile.ZIP_DEFLATED)
+
+        assert zip_stored != zip_deflated
+        assert hash_zip_contents(zip_stored) == hash_zip_contents(zip_deflated)
+
+    def test_detects_content_change(self):
+        """Different file contents produce different hashes."""
+        zip1 = self._make_zip({"a.txt": b"version1"})
+        zip2 = self._make_zip({"a.txt": b"version2"})
+
+        assert hash_zip_contents(zip1) != hash_zip_contents(zip2)
+
+    def test_detects_filename_change(self):
+        """Renaming a file changes the hash (same content, different name)."""
+        zip1 = self._make_zip({"old.txt": b"data"})
+        zip2 = self._make_zip({"new.txt": b"data"})
+
+        assert hash_zip_contents(zip1) != hash_zip_contents(zip2)
+
+    def test_ignores_directories(self):
+        """Directory entries in the ZIP don't affect the hash."""
+        files = {"data.txt": b"hello"}
+        zip_flat = self._make_zip(files)
+
+        # Create a ZIP with an explicit directory entry
+        buf = io.BytesIO()
+        with zipfile.ZipFile(buf, "w") as zf:
+            zf.writestr("somedir/", "")  # directory entry
+            zf.writestr("data.txt", b"hello")
+        zip_with_dir = buf.getvalue()
+
+        assert hash_zip_contents(zip_flat) == hash_zip_contents(zip_with_dir)
+
+    def test_sorted_order_is_deterministic(self):
+        """File insertion order doesn't matter — entries are sorted."""
+        zip1 = self._make_zip({"b.txt": b"B", "a.txt": b"A"})
+        # Reverse insertion order
+        buf = io.BytesIO()
+        with zipfile.ZipFile(buf, "w") as zf:
+            zf.writestr("a.txt", b"A")
+            zf.writestr("b.txt", b"B")
+        zip2 = buf.getvalue()
+
+        assert hash_zip_contents(zip1) == hash_zip_contents(zip2)
 
 
 # ---------------------------------------------------------------------------

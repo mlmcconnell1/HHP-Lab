@@ -17,12 +17,18 @@ logger = logging.getLogger(__name__)
 
 
 def _compute_file_hash(filepath: Path) -> str:
-    """Compute SHA-256 hash of a file."""
-    sha256 = hashlib.sha256()
-    with open(filepath, "rb") as f:
-        for chunk in iter(lambda: f.read(8192), b""):
-            sha256.update(chunk)
-    return sha256.hexdigest()
+    """Compute SHA-256 hash of a file.
+
+    For ZIP files, hashes the decompressed contents (via
+    :func:`~coclab.raw_snapshot.hash_zip_contents`) so the hash is
+    stable across re-compression by upstream servers.
+    """
+    content = filepath.read_bytes()
+    if filepath.suffix.lower() == ".zip":
+        from coclab.raw_snapshot import hash_zip_contents
+
+        return hash_zip_contents(content)
+    return hashlib.sha256(content).hexdigest()
 
 
 def _load_registry(registry_path: Path) -> pd.DataFrame:
