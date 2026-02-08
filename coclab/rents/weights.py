@@ -50,12 +50,11 @@ import pandas as pd
 from coclab.provenance import ProvenanceBlock, write_parquet_with_provenance
 from coclab.raw_snapshot import write_api_snapshot
 from coclab.source_registry import check_source_changed, register_source
+from coclab.sources import CENSUS_API_ACS5
 
 logger = logging.getLogger(__name__)
 
 # Census Bureau API endpoint for ACS 5-year estimates
-from coclab.sources import CENSUS_API_ACS5
-
 CENSUS_API = CENSUS_API_ACS5
 
 # ACS variable mappings for weighting

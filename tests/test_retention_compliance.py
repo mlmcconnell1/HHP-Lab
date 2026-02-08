@@ -9,7 +9,6 @@ Verifies that ingest modules comply with the raw-data-retention-policy:
 from __future__ import annotations
 
 import ast
-import textwrap
 from pathlib import Path
 
 import pytest

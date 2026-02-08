@@ -342,7 +342,11 @@ class TestWriteApiSnapshot:
 class TestHashZipContents:
     """Tests for hash_zip_contents function."""
 
-    def _make_zip(self, files: dict[str, bytes], compress_type: int = zipfile.ZIP_DEFLATED) -> bytes:
+    def _make_zip(
+        self,
+        files: dict[str, bytes],
+        compress_type: int = zipfile.ZIP_DEFLATED,
+    ) -> bytes:
         buf = io.BytesIO()
         with zipfile.ZipFile(buf, "w", compression=compress_type) as zf:
             for name, data in files.items():

@@ -106,7 +106,9 @@ def resolve_curated_boundary_path(
             return candidate
 
     tried = ", ".join(str(path) for path in candidates)
-    raise FileNotFoundError(f"Boundary file not found for vintage '{boundary_vintage}'. Tried: {tried}")
+    raise FileNotFoundError(
+        f"Boundary file not found for vintage '{boundary_vintage}'. Tried: {tried}"
+    )
 
 
 def registry_path(base_dir: Path | str | None = None) -> Path:

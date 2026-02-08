@@ -35,7 +35,10 @@ def build_measures(
         typer.Option(
             "--tracts",
             "-t",
-            help="Census tract vintage for crosswalk. Defaults to most recent decennial <= ACS end year.",
+            help=(
+                "Census tract vintage for crosswalk. Defaults to most recent "
+                "decennial <= ACS end year."
+            ),
         ),
     ] = None,
     weighting: Annotated[
@@ -128,11 +131,11 @@ def build_measures(
     if build is not None:
         try:
             build_dir = require_build_dir(build)
-        except FileNotFoundError:
+        except FileNotFoundError as exc:
             build_path = resolve_build_dir(build)
             typer.echo(f"Error: Build '{build}' not found at {build_path}", err=True)
             typer.echo("Run: coclab build create --name <build>", err=True)
-            raise typer.Exit(2)
+            raise typer.Exit(2) from exc
 
         build_curated = build_curated_dir(build_dir)
         if xwalk_dir == DEFAULT_XWALK_DIR:
@@ -150,7 +153,8 @@ def build_measures(
         else:
             typer.echo(
                 f"Error: Crosswalk file not found: {xwalk_path}. "
-                f"Run 'coclab generate xwalks --boundary {boundary} --tracts {tract_vintage}' first.",
+                "Run 'coclab generate xwalks --boundary "
+                f"{boundary} --tracts {tract_vintage}' first.",
                 err=True,
             )
             raise typer.Exit(1)

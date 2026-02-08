@@ -163,7 +163,10 @@ def get_output_path(
     else:
         output_dir = Path(output_dir)
 
-    filename = f"coc_pep__B{boundary_vintage}xC{county_vintage}__w{weighting}__{start_year}_{end_year}.parquet"
+    filename = (
+        f"coc_pep__B{boundary_vintage}xC{county_vintage}"
+        f"__w{weighting}__{start_year}_{end_year}.parquet"
+    )
     return output_dir / filename
 
 
@@ -389,7 +392,11 @@ def aggregate_pep_to_coc(
         xwalk_path if xwalk_path
         else DEFAULT_XWALK_DIR / f"xwalk__B{boundary_vintage}xC{county_vintage}.parquet"
     )
-    xwalk_provenance = read_provenance(xwalk_provenance_path) if Path(xwalk_provenance_path).exists() else None
+    xwalk_provenance = (
+        read_provenance(xwalk_provenance_path)
+        if Path(xwalk_provenance_path).exists()
+        else None
+    )
 
     provenance = ProvenanceBlock(
         boundary_vintage=boundary_vintage,

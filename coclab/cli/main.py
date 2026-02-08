@@ -119,23 +119,30 @@ AGENTS_INFO_TEXT = """# CoC Crosswalk Rules: Geography-to-Year Matching
 
 ## Core Principle
 
-Every dataset must be matched to the correct geographic vintage on both sides of the crosswalk. The rules below govern which vintage to use for each data source.
+Every dataset must be matched to the correct geographic vintage on both sides
+of the crosswalk. The rules below govern which vintage to use for each source.
 
 ## Rules by Data Source
 
 | Data Source | Geography | Crosswalk Rule |
 |---|---|---|
-| **PIT Counts** | CoC | Direct match — data is reported at CoC level for that program year. No crosswalk needed. |
-| **ACS Estimates** | Census Tracts → CoC | Use the tract vintage that the Census Bureau used for that ACS release (2010-vintage tracts for pre-2020 releases; 2020-vintage tracts for 2020+ releases). Match tracts to the CoC boundary for the target year. |
+| **PIT Counts** | CoC | Direct match; no crosswalk needed. |
+| **ACS Estimates** | Census Tracts -> CoC | Use ACS tract vintage, then map to CoC boundary year. |
 | **PEP Estimates** | Counties → CoC | Use the county-to-CoC crosswalk for the PEP estimate year. |
 | **ZORI (Zillow)** | Counties → CoC | Use the county-to-CoC crosswalk for the CoC boundary year. |
-| **CHAS** | Census Tracts → CoC | Follow the ACS rule above, but trace back to the underlying ACS vintage — not the CHAS release year. |
+| **CHAS** | Census Tracts -> CoC | Follow ACS tract-vintage rule, not CHAS release year. |
 
 ## Important Notes
 
-- **CoC boundary reuse:** HUD does not publish new CoC boundaries every year. Track which boundary file is *effective* for a given program year, not when it was published.
-- **ACS decennial transitions:** The tract vintage flips at decennial census boundaries with a lag. Hardcode or look up transition years rather than assuming the last year of the ACS range equals the tract vintage.
-- **Crosswalk weights:** When using areal or population-weighted interpolation (tracts → CoCs), use weights (e.g., decennial block populations) that are temporally consistent with the tract vintage, not the data year.
+- **CoC boundary reuse:** HUD does not publish new CoC boundaries every year.
+  Track which boundary file is *effective* for a given program year, not when
+  it was published.
+- **ACS decennial transitions:** The tract vintage flips at decennial census
+  boundaries with a lag. Hardcode or look up transition years rather than
+  assuming the last year of the ACS range equals the tract vintage.
+- **Crosswalk weights:** When using areal or population-weighted interpolation
+  (tracts -> CoCs), use weights (e.g., decennial block populations) that are
+  temporally consistent with the tract vintage, not the data year.
 """
 
 

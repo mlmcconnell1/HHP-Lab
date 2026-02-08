@@ -66,16 +66,13 @@ from coclab.geo.ct_planning_regions import (
     translate_weights_planning_to_legacy,
     translate_zori_legacy_to_planning,
 )
-from coclab.naming import county_xwalk_path
+from coclab.naming import county_xwalk_path, discover_zori_ingest
 from coclab.provenance import (
     ProvenanceBlock,
     read_provenance,
     write_parquet_with_provenance,
 )
-from coclab.naming import discover_zori_ingest
-from coclab.rents.ingest import (
-    ZILLOW_ATTRIBUTION,
-)
+from coclab.rents.ingest import ZILLOW_ATTRIBUTION
 from coclab.rents.weights import (
     WeightingMethod,
     build_county_weights,

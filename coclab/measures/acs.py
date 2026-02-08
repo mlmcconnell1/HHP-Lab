@@ -100,6 +100,7 @@ import httpx
 import pandas as pd
 
 from coclab.provenance import ProvenanceBlock, write_parquet_with_provenance
+from coclab.sources import CENSUS_API_ACS5
 
 
 def _maybe_remap_ct_planning_regions(
@@ -167,8 +168,6 @@ def _maybe_remap_ct_planning_regions(
             stacklevel=2,
         )
     return remapped
-
-from coclab.sources import CENSUS_API_ACS5
 
 CENSUS_API = CENSUS_API_ACS5
 

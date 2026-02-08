@@ -192,7 +192,8 @@ def download_pep(
 
     if changed:
         logger.warning(
-            f"UPSTREAM DATA CHANGED: PEP county vintage {vintage} has changed since last download!\n"
+            f"UPSTREAM DATA CHANGED: PEP county vintage {vintage} has changed "
+            "since last download!\n"
             f"    Previous hash: {details['previous_sha256'][:16]}...\n"
             f"    Current hash:  {sha256[:16]}...\n"
             f"    Last ingested: {details['previous_ingested_at']}"

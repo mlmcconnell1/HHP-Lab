@@ -145,12 +145,12 @@ def ingest_pep(
         else:
             try:
                 parsed_vintage = int(vintage)
-            except ValueError:
+            except ValueError as exc:
                 typer.echo(
                     f"Error: Invalid vintage '{vintage}'. Must be a year (e.g., 2024).",
                     err=True,
                 )
-                raise typer.Exit(2)
+                raise typer.Exit(2) from exc
 
     if series == INTERCENSAL_SERIES and vintage is not None:
         typer.echo("Warning: --vintage is ignored for intercensal ingest.", err=True)
@@ -257,5 +257,4 @@ def ingest_pep(
     except Exception as e:
         typer.echo(f"Error: {e}", err=True)
         raise typer.Exit(1) from e
-
 

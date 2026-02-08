@@ -199,11 +199,11 @@ def build_panel_cmd(
     # Resolve build directory
     try:
         build_dir = require_build_dir(build)
-    except FileNotFoundError:
+    except FileNotFoundError as exc:
         build_path = resolve_build_dir(build)
         typer.echo(f"Error: Build '{build}' not found at {build_path}", err=True)
         typer.echo("Run: coclab build create --name <build>", err=True)
-        raise typer.Exit(2)
+        raise typer.Exit(2) from exc
     build_curated = build_curated_dir(build_dir)
 
     # Validate ZORI data availability if --include-zori is set
@@ -229,8 +229,9 @@ def build_panel_cmd(
                 typer.echo(f"Specified path does not exist: {zori_yearly_path}")
             else:
                 if build_dir is not None:
+                    build_zori_dir = build_dir / "data" / "curated" / "zori"
                     typer.echo(
-                        f"No yearly ZORI file found in build location: {build_dir / 'data' / 'curated' / 'zori'}/"
+                        f"No yearly ZORI file found in build location: {build_zori_dir}/"
                     )
                 else:
                     typer.echo("No yearly ZORI file found in default location: data/curated/zori/")

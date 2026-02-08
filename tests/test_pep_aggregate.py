@@ -155,8 +155,6 @@ class TestAggregationUnit:
         merged = xwalk.merge(pep, on="county_fips", how="left")
 
         # Coverage ratio should be 0.7 (only 01001 has data)
-        coverage = merged["population"].notna().sum() / len(merged)
-        # Actually it's the weight that matters
         covered_weight = merged[merged["population"].notna()]["area_share"].sum()
         total_weight = merged["area_share"].sum()
         coverage_ratio = covered_weight / total_weight

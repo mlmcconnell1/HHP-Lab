@@ -184,7 +184,10 @@ class TestShowCommand:
         custom_path = Path("/tmp/my_map.html")
         mock_render.return_value = custom_path
 
-        result = runner.invoke(app, ["show", "map", "--coc", "CO-500", "--output", str(custom_path)])
+        result = runner.invoke(
+            app,
+            ["show", "map", "--coc", "CO-500", "--output", str(custom_path)],
+        )
 
         assert result.exit_code == 0
         mock_render.assert_called_once_with(coc_id="CO-500", vintage=None, out_html=custom_path)

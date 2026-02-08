@@ -442,7 +442,10 @@ def aggregate_acs(
         typer.Option(
             "--tracts",
             "-t",
-            help="Census tract vintage for crosswalk. Defaults to most recent decennial <= ACS end year.",
+            help=(
+                "Census tract vintage for crosswalk. Defaults to most recent "
+                "decennial <= ACS end year."
+            ),
         ),
     ] = None,
 ) -> None:
@@ -483,10 +486,8 @@ def aggregate_acs(
         # Derive ACS vintage from alignment mode
         if align == "vintage_end_year":
             acs_vintage = f"{build_year - 4}-{build_year}"
-            alignment_year = None
         else:  # window_center_year
             acs_vintage = f"{build_year - 2}-{build_year + 2}"
-            alignment_year = build_year
 
         tract_vintage = (
             tracts if tracts is not None
@@ -586,7 +587,10 @@ def aggregate_acs_population(
         typer.Option(
             "--tracts",
             "-t",
-            help="Census tract vintage for crosswalk. Defaults to most recent decennial <= ACS end year.",
+            help=(
+                "Census tract vintage for crosswalk. Defaults to most recent "
+                "decennial <= ACS end year."
+            ),
         ),
     ] = None,
 ) -> None:
@@ -698,7 +702,11 @@ def aggregate_acs_population(
                 weighted_pop = (
                     group["total_population"].fillna(0) * group["area_share"].fillna(0)
                 ).sum()
-                total_area = group["intersection_area"].sum() if "intersection_area" in group.columns else 0
+                total_area = (
+                    group["intersection_area"].sum()
+                    if "intersection_area" in group.columns
+                    else 0
+                )
                 has_data = group["total_population"].notna()
                 covered_area = (
                     group.loc[has_data, "intersection_area"].sum()

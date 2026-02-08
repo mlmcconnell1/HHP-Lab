@@ -120,11 +120,11 @@ def build_xwalks(
     # Resolve build directory first (fail fast if missing)
     try:
         build_dir = require_build_dir(build)
-    except FileNotFoundError:
+    except FileNotFoundError as exc:
         build_path = resolve_build_dir(build)
         typer.echo(f"Error: Build '{build}' not found at {build_path}", err=True)
         typer.echo("Run: coclab build create --name <build>", err=True)
-        raise typer.Exit(2)
+        raise typer.Exit(2) from exc
 
     build_curated = build_curated_dir(build_dir)
     output_dir = build_curated / "xwalks"

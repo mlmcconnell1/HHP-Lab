@@ -78,12 +78,11 @@ class TestBuildXwalksCommand:
         mock_list_boundaries,
         tmp_path,
     ):
-        """Generate xwalks should succeed and silently skip counties when missing and not explicitly requested."""
+        """Generate xwalks succeeds and skips missing counties unless requested."""
+        import json
         from datetime import UTC, datetime
 
         from coclab.registry.schema import RegistryEntry
-
-        import json
 
         with runner.isolated_filesystem(temp_dir=tmp_path):
             # Create build directory
@@ -91,7 +90,12 @@ class TestBuildXwalksCommand:
             (build_dir / "data" / "curated" / "xwalks").mkdir(parents=True, exist_ok=True)
             (build_dir / "data" / "raw").mkdir(parents=True, exist_ok=True)
             (build_dir / "base").mkdir(parents=True, exist_ok=True)
-            manifest = {"schema_version": 1, "build": {"name": "test", "years": [2025]}, "base_assets": [], "aggregate_runs": []}
+            manifest = {
+                "schema_version": 1,
+                "build": {"name": "test", "years": [2025]},
+                "base_assets": [],
+                "aggregate_runs": [],
+            }
             (build_dir / "manifest.json").write_text(json.dumps(manifest))
 
             boundary_path = Path("data/curated/coc_boundaries/coc_boundaries__2025.parquet")
@@ -129,7 +133,17 @@ class TestBuildXwalksCommand:
 
             # Without --counties, missing county file should be silently skipped (no warning)
             result = runner.invoke(
-                app, ["generate", "xwalks", "--build", "test", "--boundary", "2025", "--tracts", "2023"]
+                app,
+                [
+                    "generate",
+                    "xwalks",
+                    "--build",
+                    "test",
+                    "--boundary",
+                    "2025",
+                    "--tracts",
+                    "2023",
+                ],
             )
 
         assert result.exit_code == 0
@@ -156,12 +170,11 @@ class TestBuildXwalksCommand:
         mock_list_boundaries,
         tmp_path,
     ):
-        """Generate xwalks should warn when --counties is explicitly specified but file is missing."""
+        """Generate xwalks warns when --counties is explicitly requested and missing."""
+        import json
         from datetime import UTC, datetime
 
         from coclab.registry.schema import RegistryEntry
-
-        import json
 
         with runner.isolated_filesystem(temp_dir=tmp_path):
             # Create build directory
@@ -169,7 +182,12 @@ class TestBuildXwalksCommand:
             (build_dir / "data" / "curated" / "xwalks").mkdir(parents=True, exist_ok=True)
             (build_dir / "data" / "raw").mkdir(parents=True, exist_ok=True)
             (build_dir / "base").mkdir(parents=True, exist_ok=True)
-            manifest = {"schema_version": 1, "build": {"name": "test", "years": [2025]}, "base_assets": [], "aggregate_runs": []}
+            manifest = {
+                "schema_version": 1,
+                "build": {"name": "test", "years": [2025]},
+                "base_assets": [],
+                "aggregate_runs": [],
+            }
             (build_dir / "manifest.json").write_text(json.dumps(manifest))
 
             boundary_path = Path("data/curated/coc_boundaries/coc_boundaries__2025.parquet")

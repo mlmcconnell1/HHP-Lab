@@ -167,7 +167,12 @@ def build_ct_county_planning_region_crosswalk(
     )
 
     overlay["intersection_area"] = overlay.geometry.area
-    overlay = overlay.rename(columns={"GEOID_1": "legacy_county_fips", "GEOID_2": "planning_region_fips"})
+    overlay = overlay.rename(
+        columns={
+            "GEOID_1": "legacy_county_fips",
+            "GEOID_2": "planning_region_fips",
+        }
+    )
 
     overlay["legacy_share"] = overlay["intersection_area"] / overlay["legacy_area"]
     overlay["planning_share"] = overlay["intersection_area"] / overlay["planning_area"]

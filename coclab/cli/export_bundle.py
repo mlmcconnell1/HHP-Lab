@@ -221,11 +221,11 @@ def export_bundle(
 
     try:
         base_dir = require_build_dir(build)
-    except FileNotFoundError:
+    except FileNotFoundError as exc:
         build_path = resolve_build_dir(build)
         typer.echo(f"Error: Build '{build}' not found at {build_path}", err=True)
         typer.echo("Run: coclab build create --name <build>", err=True)
-        raise typer.Exit(EXIT_VALIDATION_FAILURE)
+        raise typer.Exit(EXIT_VALIDATION_FAILURE) from exc
 
     # Build configuration
     config = BundleConfig(
