@@ -58,20 +58,12 @@ def build_xwalks(
         ),
     ] = "all",
     build: Annotated[
-        str | None,
+        str,
         typer.Option(
             "--build",
             help="Named build directory for outputs and build-local artifacts.",
         ),
-    ] = None,
-    output_dir: Annotated[
-        Path,
-        typer.Option(
-            "--output-dir",
-            "-o",
-            help="Output directory for crosswalk files.",
-        ),
-    ] = DEFAULT_OUTPUT_DIR,
+    ] = ...,
     force: Annotated[
         bool,
         typer.Option(
@@ -125,6 +117,18 @@ def build_xwalks(
     build_tracts = xwalk_type in ("tracts", "all")
     build_counties = xwalk_type in ("counties", "all")
 
+    # Resolve build directory first (fail fast if missing)
+    try:
+        build_dir = require_build_dir(build)
+    except FileNotFoundError:
+        build_path = resolve_build_dir(build)
+        typer.echo(f"Error: Build '{build}' not found at {build_path}", err=True)
+        typer.echo("Run: coclab build create --name <build>", err=True)
+        raise typer.Exit(2)
+
+    build_curated = build_curated_dir(build_dir)
+    output_dir = build_curated / "xwalks"
+
     # Resolve county vintage (defaults to tracts vintage if not specified)
     county_vintage = counties if counties is not None else tracts
 
@@ -170,21 +174,6 @@ def build_xwalks(
             err=True,
         )
         raise typer.Exit(1) from e
-
-    if build is not None:
-        try:
-            build_dir = require_build_dir(build)
-        except FileNotFoundError:
-            build_path = resolve_build_dir(build)
-            typer.echo(f"Error: Build '{build}' not found at {build_path}", err=True)
-            typer.echo("Run: coclab build create --name <build>", err=True)
-            raise typer.Exit(2)
-
-        build_curated = build_curated_dir(build_dir)
-        if output_dir == DEFAULT_OUTPUT_DIR:
-            output_dir = build_curated / "xwalks"
-
-    output_dir = Path(output_dir)
 
     # Guard against overwriting existing crosswalks unless --force is provided
     from coclab.naming import county_xwalk_filename, tract_xwalk_filename

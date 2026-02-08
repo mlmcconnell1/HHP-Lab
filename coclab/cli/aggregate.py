@@ -493,8 +493,8 @@ def aggregate_acs(
             else default_tract_vintage_for_acs(acs_vintage)
         )
 
-        # Resolve crosswalk from global xwalks directory
-        xwalk_path = Path("data/curated/xwalks") / tract_xwalk_filename(
+        # Resolve crosswalk from build-scoped xwalks directory
+        xwalk_path = curated_dir / "xwalks" / tract_xwalk_filename(
             boundary_vintage, tract_vintage
         )
 

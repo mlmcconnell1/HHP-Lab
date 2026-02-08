@@ -259,11 +259,12 @@ class TestHelpOutput:
         result = runner.invoke(app, ["build", "--help"])
 
         assert result.exit_code == 0
-        assert "measures" in result.output
-        assert "zori" in result.output
         assert "panel" in result.output
         assert "xwalks" in result.output
         assert "export" in result.output
+        # measures, zori, and pep have been removed from build subcommands
+        # (use 'aggregate acs/zori/pep' instead)
+        assert "measures" not in result.output
 
     def test_ingest_boundaries_help(self):
         """Ingest boundaries help should show options."""

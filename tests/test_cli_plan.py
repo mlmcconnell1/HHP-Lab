@@ -38,8 +38,8 @@ class TestCensusIngestCommand:
     ):
         """Cached files should skip downloads without --force."""
         with runner.isolated_filesystem(temp_dir=tmp_path):
-            tracts_path = Path("data/curated/census/tracts__2023.parquet")
-            counties_path = Path("data/curated/census/counties__2023.parquet")
+            tracts_path = Path("data/curated/census/tracts__T2023.parquet")
+            counties_path = Path("data/curated/census/counties__C2023.parquet")
             tracts_path.parent.mkdir(parents=True, exist_ok=True)
             tracts_path.touch()
             counties_path.touch()
@@ -56,21 +56,11 @@ class TestCensusIngestCommand:
 class TestBuildXwalksCommand:
     """Tests for the build xwalks CLI command."""
 
-    @patch("coclab.cli.build_xwalks.latest_vintage")
-    @patch("coclab.cli.build_xwalks.list_boundaries")
-    def test_build_xwalks_missing_boundary(
-        self,
-        mock_list_boundaries,
-        mock_latest_vintage,
-    ):
-        """Should fail if no boundary vintages are registered."""
-        mock_list_boundaries.return_value = []
-        mock_latest_vintage.return_value = None
-
+    def test_build_xwalks_requires_build_flag(self):
+        """Should fail without --build."""
         result = runner.invoke(app, ["build", "xwalks"])
-
-        assert result.exit_code == 1
-        assert "No boundary vintages found in registry" in result.output
+        # Typer shows error for missing required --build option
+        assert result.exit_code != 0
 
     @patch("coclab.cli.build_xwalks.list_boundaries")
     @patch("coclab.cli.build_xwalks.gpd.read_parquet")
@@ -93,7 +83,17 @@ class TestBuildXwalksCommand:
 
         from coclab.registry.schema import RegistryEntry
 
+        import json
+
         with runner.isolated_filesystem(temp_dir=tmp_path):
+            # Create build directory
+            build_dir = Path("builds/test")
+            (build_dir / "data" / "curated" / "xwalks").mkdir(parents=True, exist_ok=True)
+            (build_dir / "data" / "raw").mkdir(parents=True, exist_ok=True)
+            (build_dir / "base").mkdir(parents=True, exist_ok=True)
+            manifest = {"schema_version": 1, "build": {"name": "test", "years": [2025]}, "base_assets": [], "aggregate_runs": []}
+            (build_dir / "manifest.json").write_text(json.dumps(manifest))
+
             boundary_path = Path("data/curated/coc_boundaries/coc_boundaries__2025.parquet")
             boundary_path.parent.mkdir(parents=True, exist_ok=True)
             boundary_path.touch()
@@ -120,7 +120,7 @@ class TestBuildXwalksCommand:
                 {"coc_id": ["CO-500"], "intersection_area": [1.0]}
             )
             mock_save_crosswalk.return_value = Path(
-                "data/curated/xwalks/coc_tract_xwalk__2025__2023.parquet"
+                "builds/test/data/curated/xwalks/coc_tract_xwalk__2025__2023.parquet"
             )
             mock_diagnostics.return_value = pd.DataFrame(
                 {"coc_id": ["CO-500"], "coverage_ratio_area": [1.0]}
@@ -129,7 +129,7 @@ class TestBuildXwalksCommand:
 
             # Without --counties, missing county file should be silently skipped (no warning)
             result = runner.invoke(
-                app, ["build", "xwalks", "--boundary", "2025", "--tracts", "2023"]
+                app, ["build", "xwalks", "--build", "test", "--boundary", "2025", "--tracts", "2023"]
             )
 
         assert result.exit_code == 0
@@ -161,7 +161,17 @@ class TestBuildXwalksCommand:
 
         from coclab.registry.schema import RegistryEntry
 
+        import json
+
         with runner.isolated_filesystem(temp_dir=tmp_path):
+            # Create build directory
+            build_dir = Path("builds/test")
+            (build_dir / "data" / "curated" / "xwalks").mkdir(parents=True, exist_ok=True)
+            (build_dir / "data" / "raw").mkdir(parents=True, exist_ok=True)
+            (build_dir / "base").mkdir(parents=True, exist_ok=True)
+            manifest = {"schema_version": 1, "build": {"name": "test", "years": [2025]}, "base_assets": [], "aggregate_runs": []}
+            (build_dir / "manifest.json").write_text(json.dumps(manifest))
+
             boundary_path = Path("data/curated/coc_boundaries/coc_boundaries__2025.parquet")
             boundary_path.parent.mkdir(parents=True, exist_ok=True)
             boundary_path.touch()
@@ -188,7 +198,7 @@ class TestBuildXwalksCommand:
                 {"coc_id": ["CO-500"], "intersection_area": [1.0]}
             )
             mock_save_crosswalk.return_value = Path(
-                "data/curated/xwalks/coc_tract_xwalk__2025__2023.parquet"
+                "builds/test/data/curated/xwalks/coc_tract_xwalk__2025__2023.parquet"
             )
             mock_diagnostics.return_value = pd.DataFrame(
                 {"coc_id": ["CO-500"], "coverage_ratio_area": [1.0]}
@@ -198,7 +208,7 @@ class TestBuildXwalksCommand:
             # WITH --counties, missing county file SHOULD produce a warning
             result = runner.invoke(
                 app,
-                ["build", "xwalks", "--boundary", "2025", "--tracts", "2023", "--counties", "2023"],
+                ["build", "xwalks", "--build", "test", "--boundary", "2025", "--tracts", "2023", "--counties", "2023"],
             )
 
         assert result.exit_code == 0
@@ -270,67 +280,10 @@ class TestDiagnosticsCommand:
         assert "CO-500" in result.output
 
 
-class TestBuildMeasuresCommand:
-    """Tests for the build measures CLI command."""
+class TestBuildMeasuresRemoved:
+    """Tests that build measures command has been removed."""
 
-    def test_build_measures_invalid_weighting(self):
-        """Invalid weighting should fail."""
-        result = runner.invoke(app, ["build", "measures", "--weighting", "invalid"])
-
-        assert result.exit_code == 1
-        assert "Invalid weighting method" in result.output
-
-    @patch("coclab.cli.build_measures.latest_vintage")
-    def test_build_measures_missing_crosswalk(self, mock_latest, tmp_path):
-        """Missing crosswalk file should fail."""
-        mock_latest.return_value = "2025"
-        xwalk_dir = tmp_path / "xwalks"
-        xwalk_dir.mkdir(parents=True, exist_ok=True)
-
-        result = runner.invoke(
-            app,
-            [
-                "build",
-                "measures",
-                "--acs",
-                "2019-2023",
-                "--xwalk-dir",
-                str(xwalk_dir),
-            ],
-        )
-
-        assert result.exit_code == 1
-        assert "Crosswalk file not found" in result.output
-
-    @patch("coclab.cli.build_measures.build_coc_measures")
-    @patch("coclab.cli.build_measures.latest_vintage")
-    def test_build_measures_success(
-        self,
-        mock_latest,
-        mock_build,
-        tmp_path,
-    ):
-        """Build-measures should succeed with valid inputs."""
-        mock_latest.return_value = "2025"
-        xwalk_dir = tmp_path / "xwalks"
-        xwalk_dir.mkdir(parents=True, exist_ok=True)
-        xwalk_path = xwalk_dir / "coc_tract_xwalk__2025__2020.parquet"
-        xwalk_path.touch()
-
-        mock_build.return_value = pd.DataFrame({"coc_id": ["CO-500"], "total_population": [1000]})
-
-        result = runner.invoke(
-            app,
-            [
-                "build",
-                "measures",
-                "--acs",
-                "2019-2023",
-                "--xwalk-dir",
-                str(xwalk_dir),
-            ],
-        )
-
-        assert result.exit_code == 0
-        assert "MEASURE SUMMARY" in result.output
-        mock_build.assert_called_once()
+    def test_build_measures_not_registered(self):
+        """build measures should not be a registered subcommand."""
+        result = runner.invoke(app, ["build", "--help"])
+        assert "measures" not in result.output

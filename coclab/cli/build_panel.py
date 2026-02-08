@@ -96,12 +96,12 @@ def build_panel_cmd(
         ),
     ] = None,
     build: Annotated[
-        str | None,
+        str,
         typer.Option(
             "--build",
             help="Named build directory for outputs and build-local artifacts.",
         ),
-    ] = None,
+    ] = ...,
     include_zori: Annotated[
         bool,
         typer.Option(
@@ -196,19 +196,18 @@ def build_panel_cmd(
         )
         raise typer.Exit(1)
 
+    # Resolve build directory
+    try:
+        build_dir = require_build_dir(build)
+    except FileNotFoundError:
+        build_path = resolve_build_dir(build)
+        typer.echo(f"Error: Build '{build}' not found at {build_path}", err=True)
+        typer.echo("Run: coclab build create --name <build>", err=True)
+        raise typer.Exit(2)
+    build_curated = build_curated_dir(build_dir)
+
     # Validate ZORI data availability if --include-zori is set
     resolved_zori_path: Path | None = None
-    build_dir: Path | None = None
-    build_curated: Path | None = None
-    if build is not None:
-        try:
-            build_dir = require_build_dir(build)
-        except FileNotFoundError:
-            build_path = resolve_build_dir(build)
-            typer.echo(f"Error: Build '{build}' not found at {build_path}", err=True)
-            typer.echo("Run: coclab build create --name <build>", err=True)
-            raise typer.Exit(2)
-        build_curated = build_curated_dir(build_dir)
     if include_zori:
         resolved_zori_path = _resolve_zori_yearly_path(
             zori_yearly_path, base_dir=build_dir

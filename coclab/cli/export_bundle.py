@@ -123,12 +123,12 @@ def export_bundle(
         ),
     ] = None,
     build: Annotated[
-        str | None,
+        str,
         typer.Option(
             "--build",
             help="Named build directory to source panels and artifacts from.",
         ),
-    ] = None,
+    ] = ...,
     include: Annotated[
         str,
         typer.Option(
@@ -219,15 +219,13 @@ def export_bundle(
     # Parse include options
     include_set = _parse_include(include)
 
-    base_dir = Path(".")
-    if build is not None:
-        try:
-            base_dir = require_build_dir(build)
-        except FileNotFoundError:
-            build_path = resolve_build_dir(build)
-            typer.echo(f"Error: Build '{build}' not found at {build_path}", err=True)
-            typer.echo("Run: coclab build create --name <build>", err=True)
-            raise typer.Exit(EXIT_VALIDATION_FAILURE)
+    try:
+        base_dir = require_build_dir(build)
+    except FileNotFoundError:
+        build_path = resolve_build_dir(build)
+        typer.echo(f"Error: Build '{build}' not found at {build_path}", err=True)
+        typer.echo("Run: coclab build create --name <build>", err=True)
+        raise typer.Exit(EXIT_VALIDATION_FAILURE)
 
     # Build configuration
     config = BundleConfig(

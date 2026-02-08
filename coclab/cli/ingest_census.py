@@ -5,6 +5,8 @@ from typing import Annotated
 
 import typer
 
+from coclab.naming import county_filename, tract_filename
+
 # Output directory matches the census ingest modules
 OUTPUT_DIR = Path("data/curated/census")
 
@@ -60,9 +62,9 @@ def ingest_census(
     download_tracts = type_ in ("tracts", "all")
     download_counties = type_ in ("counties", "all")
 
-    # Define output paths
-    tracts_path = OUTPUT_DIR / f"tracts__{year}.parquet"
-    counties_path = OUTPUT_DIR / f"counties__{year}.parquet"
+    # Define output paths using canonical naming helpers
+    tracts_path = OUTPUT_DIR / tract_filename(year)
+    counties_path = OUTPUT_DIR / county_filename(year)
 
     # Track what was downloaded
     downloaded = []

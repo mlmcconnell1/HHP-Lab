@@ -101,43 +101,19 @@ def test_export_with_missing_build_errors():
         assert "coclab build create" in result.output
 
 
-def test_build_measures_with_missing_build_errors():
+def test_build_xwalks_with_missing_build_errors():
     with runner.isolated_filesystem():
         result = runner.invoke(
             app,
             [
                 "build",
-                "measures",
+                "xwalks",
                 "--build",
                 "missing",
                 "--boundary",
                 "2025",
-                "--acs",
-                "2019-2023",
-            ],
-        )
-        assert result.exit_code == 2
-        assert "Build 'missing' not found" in result.output
-        assert "coclab build create" in result.output
-
-
-def test_build_pep_with_missing_build_errors():
-    with runner.isolated_filesystem():
-        pep_path = Path("pep.parquet")
-        pep_path.touch()
-        result = runner.invoke(
-            app,
-            [
-                "build",
-                "pep",
-                "--build",
-                "missing",
-                "--boundary",
-                "2024",
-                "--counties",
-                "2024",
-                "--pep-path",
-                str(pep_path),
+                "--tracts",
+                "2023",
             ],
         )
         assert result.exit_code == 2
