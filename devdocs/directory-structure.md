@@ -24,8 +24,10 @@ project-root/
 │   ├── raw/                                         ── written by: ingest ──
 │   │   │
 │   │   ├── hud_exchange/
-│   │   │   └── {vintage}/
-│   │   │       └── CoC_GIS_{vintage}.zip                  boundaries (ZIP)
+│   │   │   └── B{boundary_vintage}_{date}/
+│   │   │       ├── response.ndjson                        ArcGIS API responses
+│   │   │       ├── request.json                           request metadata
+│   │   │       └── manifest.json                          pagination & hash
 │   │   │
 │   │   ├── hud_opendata/
 │   │   │   └── {boundary_vintage}/
@@ -35,15 +37,26 @@ project-root/
 │   │   │
 │   │   ├── pit/
 │   │   │   └── {year}/
-│   │   │       ├── {filename}.xlsx                        PIT spreadsheet
-│   │   │       └── {filename}.xlsx.meta.json              download sidecar
+│   │   │       ├── {filename}.xlsx | {filename}.xlsb      PIT spreadsheet
+│   │   │       └── {filename}.xlsx.meta.json | {filename}.xlsb.meta.json
+│   │   │                                                   download sidecar
 │   │   │
 │   │   ├── census/
+│   │   │   ├── {year}/
+│   │   │   │   ├── tracts/
+│   │   │   │   │   └── tl_{year}_{fips}_tract.zip         per-state TIGER
+│   │   │   │   └── counties/
+│   │   │   │       └── tl_{year}_us_county.zip            national TIGER
+│   │   │   │           (2010 exception: tl_2010_us_county10.zip)
+│   │   │   └── tract_relationship/
+│   │   │       └── tab20_tract20_tract10_natl.txt         Census tract xwalk source
+│   │   │
+│   │   ├── nhgis/
 │   │   │   └── {year}/
 │   │   │       ├── tracts/
-│   │   │       │   └── tl_{year}_{fips}_tract.zip         per-state TIGER
+│   │   │       │   └── {shapefile}.zip                    NHGIS extract ZIP
 │   │   │       └── counties/
-│   │   │           └── tl_{year}_us_county.zip            national TIGER
+│   │   │           └── {shapefile}.zip                    NHGIS extract ZIP
 │   │   │
 │   │   ├── zori/
 │   │   │   └── zori__{geo}__{date}.csv                    Zillow ZORI CSV
@@ -165,18 +178,18 @@ internet ──┤► data/raw/    │           │  data/curated/       │   
 
 | Command                          | Reads from              | Writes to                     |
 |----------------------------------|-------------------------|-------------------------------|
-| `coclab ingest boundaries`       | internet                | `data/raw/hud_*`, `data/curated/coc_boundaries/` |
+| `coclab ingest boundaries`       | internet                | `data/raw/hud_exchange/B{vintage}_{date}/` or `data/raw/hud_opendata/{boundary_vintage}/`, `data/curated/coc_boundaries/` |
 | `coclab ingest pit`              | internet                | `data/raw/pit/`, `data/curated/pit/`              |
 | `coclab ingest pit-vintage`      | internet                | `data/raw/pit/`, `data/curated/pit/`              |
 | `coclab ingest census`           | internet                | `data/raw/census/`, `data/curated/census/`        |
-| `coclab ingest nhgis`            | user-provided ZIP       | `data/curated/census/`                            |
+| `coclab ingest nhgis`            | internet (IPUMS API)    | `data/raw/nhgis/`, `data/curated/census/`         |
 | `coclab ingest tract-relationship`| internet               | `data/raw/census/`, `data/curated/census/`        |
 | `coclab ingest acs-population`   | internet                | `data/raw/acs_tract/`, `data/curated/acs/`        |
 | `coclab ingest zori`             | internet                | `data/raw/zori/`, `data/curated/zori/`            |
 | `coclab ingest pep`              | internet                | `data/raw/pep/`, `data/curated/pep/`              |
 | `coclab build create`            | `data/curated/coc_boundaries/` | `builds/{name}/`                           |
 | `coclab build xwalks`            | `curated/census/`, `curated/coc_boundaries/` | `curated/xwalks/` (or build) |
-| `coclab build measures`          | `curated/xwalks/`, `curated/acs/` | `curated/measures/` (or build)            |
+| `coclab build measures`          | `curated/xwalks/`, internet (Census ACS API) | `curated/measures/` (or build)            |
 | `coclab build zori`              | `curated/zori/`, `curated/xwalks/` | `curated/zori/` (or build)               |
 | `coclab build pep`               | `curated/pep/`, `curated/xwalks/` | `curated/pep/` (or build)                |
 | `coclab build panel`             | `curated/` (multiple)   | `curated/panel/` (or build)                       |
