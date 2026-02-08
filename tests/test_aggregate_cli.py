@@ -18,7 +18,7 @@ runner = CliRunner()
 def test_aggregate_help_shows_subcommands():
     result = runner.invoke(app, ["aggregate", "--help"])
     assert result.exit_code == 0
-    for name in ("acs", "acs-population", "zori", "pep", "pit"):
+    for name in ("acs", "zori", "pep", "pit"):
         assert name in result.output
 
 
@@ -215,9 +215,17 @@ def _create_fake_acs_cache(acs_vintage: str, tract_vintage: str | int) -> None:
 
     cache_path = get_output_path(acs_vintage, str(tract_vintage))
     cache_path.parent.mkdir(parents=True, exist_ok=True)
-    pd.DataFrame({"tract_geoid": ["01001020100"], "total_population": [100]}).to_parquet(
-        cache_path
-    )
+    pd.DataFrame({
+        "tract_geoid": ["01001020100"],
+        "total_population": [100],
+        "adult_population": [80],
+        "median_household_income": [50000.0],
+        "median_gross_rent": [1200.0],
+        "poverty_universe": [95],
+        "below_50pct_poverty": [5],
+        "50_to_99pct_poverty": [10],
+        "population_below_poverty": [15],
+    }).to_parquet(cache_path)
 
 
 def test_aggregate_acs_missing_crosswalk_suggests_decennial():
@@ -402,45 +410,3 @@ def test_aggregate_pit_vintage_partial_coverage(tmp_path):
     assert "Using vintage P2021" in result.output
     assert "PIT data missing for years: [2025]" in result.output
 
-
-# ---------------------------------------------------------------------------
-# ACS-population aggregate (cache-only, no API)
-# ---------------------------------------------------------------------------
-
-
-def test_aggregate_acs_population_help_shows_in_aggregate():
-    result = runner.invoke(app, ["aggregate", "--help"])
-    assert result.exit_code == 0
-    assert "acs-population" in result.output
-
-
-def test_aggregate_acs_population_missing_build():
-    with runner.isolated_filesystem():
-        result = runner.invoke(
-            app, ["aggregate", "acs-population", "--build", "nonexistent"]
-        )
-        assert result.exit_code == 2
-        assert "Build 'nonexistent' not found" in result.output
-
-
-def test_aggregate_acs_population_invalid_align():
-    with runner.isolated_filesystem():
-        _create_build(years=[2020])
-        result = runner.invoke(
-            app,
-            ["aggregate", "acs-population", "--build", "demo", "--align", "bad_mode"],
-        )
-        assert result.exit_code == 2
-        assert "Invalid alignment mode 'bad_mode' for acs-population" in result.output
-
-
-def test_aggregate_acs_population_missing_cache():
-    """Should fail with actionable message when ACS cache is missing."""
-    with runner.isolated_filesystem():
-        _create_build(years=[2020])
-        result = runner.invoke(
-            app, ["aggregate", "acs-population", "--build", "demo"]
-        )
-        assert result.exit_code == 1
-        assert "Cached ACS tract population file not found" in result.output
-        assert "coclab ingest acs" in result.output

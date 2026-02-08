@@ -18,7 +18,7 @@ from coclab.acs.ingest.tract_population import (
     normalize_geoid,
     parse_acs_vintage,
 )
-from coclab.acs.variables import ALL_API_VARS
+from coclab.acs.variables import ALL_API_VARS, TRACT_OUTPUT_COLUMNS
 from coclab.provenance import read_provenance
 
 
@@ -136,6 +136,11 @@ class TestFetchStateTractPopulation:
                     "tract": "001000",
                     "B01003_001E": "5000",  # total_population
                     "B01003_001M": "150",  # margin of error
+                    "B19013_001E": "65000",  # median_household_income
+                    "B25064_001E": "1400",  # median_gross_rent
+                    "C17002_001E": "4800",  # poverty_universe
+                    "C17002_002E": "200",  # below_50pct_poverty
+                    "C17002_003E": "350",  # 50_to_99pct_poverty
                 }
             ]
         )
@@ -152,6 +157,12 @@ class TestFetchStateTractPopulation:
         assert df.iloc[0]["tract_geoid"] == "08031001000"
         assert df.iloc[0]["total_population"] == 5000
         assert df.iloc[0]["moe_total_population"] == 150
+        assert df.iloc[0]["median_household_income"] == 65000
+        assert df.iloc[0]["median_gross_rent"] == 1400
+        assert df.iloc[0]["poverty_universe"] == 4800
+        assert df.iloc[0]["below_50pct_poverty"] == 200
+        assert df.iloc[0]["50_to_99pct_poverty"] == 350
+        assert df.iloc[0]["population_below_poverty"] == 550  # 200 + 350
         assert isinstance(raw_content, bytes)
 
     def test_handles_missing_values(self, httpx_mock):
@@ -163,6 +174,8 @@ class TestFetchStateTractPopulation:
                     "tract": "000100",
                     "B01003_001E": "-666666666",  # Missing value indicator
                     "B01003_001M": "-666666666",  # Missing MOE
+                    "B19013_001E": "-666666666",  # Missing income
+                    "B25064_001E": "-666666666",  # Missing rent
                 }
             ]
         )
@@ -176,6 +189,56 @@ class TestFetchStateTractPopulation:
 
         assert pd.isna(df.iloc[0]["total_population"])
         assert pd.isna(df.iloc[0]["moe_total_population"])
+        assert pd.isna(df.iloc[0]["median_household_income"])
+        assert pd.isna(df.iloc[0]["median_gross_rent"])
+
+    def test_derives_adult_population(self, httpx_mock):
+        """Test that adult population is derived from B01001 age groups."""
+        tract_data = {
+            "county": "031",
+            "tract": "001000",
+            "B01003_001E": "1000",
+            "B01003_001M": "50",
+        }
+        # Male 18+ (007-025): 19 vars at 10 each = 190
+        for i in range(7, 26):
+            tract_data[f"B01001_{i:03d}E"] = "10"
+        # Female 18+ (031-049): 19 vars at 10 each = 190
+        for i in range(31, 50):
+            tract_data[f"B01001_{i:03d}E"] = "10"
+
+        response_data = make_census_response([tract_data])
+        httpx_mock.add_response(
+            url=re.compile(r"https://api\.census\.gov/data/2023/acs/acs5.*"),
+            json=response_data,
+        )
+
+        df, _ = fetch_state_tract_data(2023, "08")
+
+        assert df.iloc[0]["adult_population"] == 380  # 38 vars * 10
+
+    def test_derives_population_below_poverty(self, httpx_mock):
+        """Test that population_below_poverty is derived from poverty components."""
+        response_data = make_census_response(
+            [
+                {
+                    "county": "031",
+                    "tract": "001000",
+                    "B01003_001E": "5000",
+                    "C17002_001E": "4800",
+                    "C17002_002E": "120",  # below 50%
+                    "C17002_003E": "230",  # 50-99%
+                }
+            ]
+        )
+        httpx_mock.add_response(
+            url=re.compile(r"https://api\.census\.gov/data/2023/acs/acs5.*"),
+            json=response_data,
+        )
+
+        df, _ = fetch_state_tract_data(2023, "08")
+
+        assert df.iloc[0]["population_below_poverty"] == 350  # 120 + 230
 
     def test_geoid_leading_zeros_preserved(self, httpx_mock):
         """Test that GEOIDs with leading zeros are correctly formatted."""
@@ -209,8 +272,8 @@ class TestFetchTractPopulation:
 
     @pytest.mark.httpx_mock(can_send_already_matched_responses=True)
     def test_returns_correct_schema(self, httpx_mock):
-        """Test that returned DataFrame has the correct schema."""
-        # Mock responses for a single state
+        """Test that returned DataFrame has all canonical columns."""
+        # Mock response with the full variable set
         response_data = make_census_response(
             [
                 {
@@ -218,6 +281,11 @@ class TestFetchTractPopulation:
                     "tract": "001000",
                     "B01003_001E": "5000",
                     "B01003_001M": "150",
+                    "B19013_001E": "65000",
+                    "B25064_001E": "1400",
+                    "C17002_001E": "4800",
+                    "C17002_002E": "200",
+                    "C17002_003E": "350",
                 }
             ]
         )
@@ -234,24 +302,19 @@ class TestFetchTractPopulation:
 
         df, _, _, _ = fetch_tract_data("2019-2023", "2023")
 
-        # Check required columns exist
-        required_cols = [
-            "tract_geoid",
-            "acs_vintage",
-            "tract_vintage",
-            "total_population",
-            "data_source",
-            "source_ref",
-            "ingested_at",
-        ]
-        for col in required_cols:
-            assert col in df.columns, f"Missing required column: {col}"
+        # Output columns must match the canonical TRACT_OUTPUT_COLUMNS order
+        assert list(df.columns) == TRACT_OUTPUT_COLUMNS
 
-        # Check column values
-        assert df.iloc[0]["acs_vintage"] == "2019-2023"
-        assert df.iloc[0]["tract_vintage"] == "2023"
-        assert df.iloc[0]["data_source"] == "acs_5yr"
-        assert "B01003" in df.iloc[0]["source_ref"]
+        # Spot-check values
+        row = df.iloc[0]
+        assert row["acs_vintage"] == "2019-2023"
+        assert row["tract_vintage"] == "2023"
+        assert row["data_source"] == "acs_5yr"
+        assert row["total_population"] == 5000
+        assert row["median_household_income"] == 65000
+        assert row["median_gross_rent"] == 1400
+        assert row["poverty_universe"] == 4800
+        assert row["population_below_poverty"] == 550  # 200 + 350
 
     @pytest.mark.httpx_mock(can_send_already_matched_responses=True)
     def test_population_values_non_negative(self, httpx_mock):
