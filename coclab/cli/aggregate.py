@@ -511,7 +511,7 @@ def aggregate_acs(
                     err=True,
                 )
             typer.echo(
-                f"Run: coclab build xwalks --boundary {boundary_vintage} "
+                f"Run: coclab generate xwalks --boundary {boundary_vintage} "
                 f"--tracts {tract_vintage}",
                 err=True,
             )
@@ -670,7 +670,7 @@ def aggregate_acs_population(
             )
             typer.echo(f"Error: Crosswalk not found: {xwalk_path}", err=True)
             typer.echo(
-                f"Run: coclab build xwalks --build {build} "
+                f"Run: coclab generate xwalks --build {build} "
                 f"--boundary {boundary_vintage} --tracts {tract_vintage}",
                 err=True,
             )

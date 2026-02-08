@@ -94,6 +94,11 @@ diagnostics_app = typer.Typer(
     help="Run diagnostics on datasets",
     no_args_is_help=True,
 )
+generate_app = typer.Typer(
+    name="generate",
+    help="Generate crosswalks and catalogs",
+    no_args_is_help=True,
+)
 build_app = typer.Typer(
     name="build",
     help="Build datasets and bundles",
@@ -1297,10 +1302,10 @@ def build_panel_deprecated() -> None:
 
 
 def build_xwalks_deprecated() -> None:
-    """Removed: use `coclab build xwalks --build <name>`."""
+    """Removed: use `coclab generate xwalks --build <name>`."""
     typer.echo(
         "Error: 'coclab build-xwalks' has been removed. "
-        "Use 'coclab build xwalks --build <name>' instead.",
+        "Use 'coclab generate xwalks --build <name>' instead.",
         err=True,
     )
     raise typer.Exit(1)
@@ -1497,6 +1502,7 @@ app.add_typer(ingest_app, name="ingest")
 app.add_typer(list_app, name="list")
 app.add_typer(validate_app, name="validate")
 app.add_typer(diagnostics_app, name="diagnostics")
+app.add_typer(generate_app, name="generate")
 app.add_typer(build_app, name="build")
 app.add_typer(aggregate_app, name="aggregate")
 app.add_typer(show_app, name="show")
@@ -1541,10 +1547,10 @@ validate_app.command("population")(validate_population)
 diagnostics_app.command("panel")(panel_diagnostics)
 diagnostics_app.command("xwalk")(diagnostics)
 diagnostics_app.command("zori")(zori_diagnostics)
+generate_app.command("xwalks")(build_xwalks)
+generate_app.command("catalog")(catalog_cmd)
 build_app.command("panel")(build_panel_cmd)
-build_app.command("xwalks")(build_xwalks)
 build_app.command("export")(export_bundle)
-build_app.command("catalog")(catalog_cmd)
 build_app.command("create")(create_build)
 build_app.command("list")(list_builds_cmd)
 show_app.command("vintage-diffs")(compare_vintages)

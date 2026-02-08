@@ -116,7 +116,7 @@ def catalog_cmd(
 
     Examples:
 
-        coclab build catalog
+        coclab generate catalog
     """
     from coclab.builds import scan_boundary_assets, write_base_catalog
 

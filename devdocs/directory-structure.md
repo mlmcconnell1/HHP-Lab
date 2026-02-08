@@ -93,7 +93,7 @@ project-root/
 │       │   └── xwalk__B{b}xC{c}.parquet                  boundary-to-county
 │       │
 │       ├── measures/                                      ── build measures ──
-│       │   └── measures__A{acs}@B{b}.parquet              CoC-level ACS measures
+│       │   └── measures__A{acs}@B{b}xT{t}.parquet         CoC-level ACS measures
 │       │
 │       ├── zori/                                          ── ingest & build ──
 │       │   ├── zori__{geo}__Z{year}.parquet               ingested ZORI (ingest)
@@ -123,7 +123,7 @@ project-root/
 │               │   ├── xwalk__B{b}xT{t}.parquet
 │               │   └── xwalk__B{b}xC{c}.parquet
 │               ├── measures/
-│               │   └── measures__A{acs}@B{b}.parquet
+│               │   └── measures__A{acs}@B{b}xT{t}.parquet
 │               ├── zori/
 │               │   ├── zori__A{a}@B{b}xC{c}__w{wt}.parquet
 │               │   └── zori_yearly__...parquet
@@ -188,7 +188,7 @@ internet ──┤► data/raw/    │           │  data/curated/       │   
 | `coclab ingest zori`             | internet                | `data/raw/zori/`, `data/curated/zori/`            |
 | `coclab ingest pep`              | internet                | `data/raw/pep/`, `data/curated/pep/`              |
 | `coclab build create`            | `data/curated/coc_boundaries/` | `builds/{name}/`                           |
-| `coclab build xwalks`            | `curated/census/`, `curated/coc_boundaries/` | `curated/xwalks/` (or build) |
+| `coclab generate xwalks`         | `curated/census/`, `curated/coc_boundaries/` | `curated/xwalks/` (or build) |
 | `coclab build measures`          | `curated/xwalks/`, internet (Census ACS API) | `curated/measures/` (or build)            |
 | `coclab build zori`              | `curated/zori/`, `curated/xwalks/` | `curated/zori/` (or build)               |
 | `coclab build pep`               | `curated/pep/`, `curated/xwalks/` | `curated/pep/` (or build)                |

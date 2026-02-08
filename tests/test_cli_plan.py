@@ -54,11 +54,11 @@ class TestCensusIngestCommand:
 
 
 class TestBuildXwalksCommand:
-    """Tests for the build xwalks CLI command."""
+    """Tests for the generate xwalks CLI command."""
 
     def test_build_xwalks_requires_build_flag(self):
         """Should fail without --build."""
-        result = runner.invoke(app, ["build", "xwalks"])
+        result = runner.invoke(app, ["generate", "xwalks"])
         # Typer shows error for missing required --build option
         assert result.exit_code != 0
 
@@ -78,7 +78,7 @@ class TestBuildXwalksCommand:
         mock_list_boundaries,
         tmp_path,
     ):
-        """Build xwalks should succeed and silently skip counties when missing and not explicitly requested."""
+        """Generate xwalks should succeed and silently skip counties when missing and not explicitly requested."""
         from datetime import UTC, datetime
 
         from coclab.registry.schema import RegistryEntry
@@ -129,7 +129,7 @@ class TestBuildXwalksCommand:
 
             # Without --counties, missing county file should be silently skipped (no warning)
             result = runner.invoke(
-                app, ["build", "xwalks", "--build", "test", "--boundary", "2025", "--tracts", "2023"]
+                app, ["generate", "xwalks", "--build", "test", "--boundary", "2025", "--tracts", "2023"]
             )
 
         assert result.exit_code == 0
@@ -156,7 +156,7 @@ class TestBuildXwalksCommand:
         mock_list_boundaries,
         tmp_path,
     ):
-        """Build xwalks should warn when --counties is explicitly specified but file is missing."""
+        """Generate xwalks should warn when --counties is explicitly specified but file is missing."""
         from datetime import UTC, datetime
 
         from coclab.registry.schema import RegistryEntry
@@ -208,7 +208,18 @@ class TestBuildXwalksCommand:
             # WITH --counties, missing county file SHOULD produce a warning
             result = runner.invoke(
                 app,
-                ["build", "xwalks", "--build", "test", "--boundary", "2025", "--tracts", "2023", "--counties", "2023"],
+                [
+                    "generate",
+                    "xwalks",
+                    "--build",
+                    "test",
+                    "--boundary",
+                    "2025",
+                    "--tracts",
+                    "2023",
+                    "--counties",
+                    "2023",
+                ],
             )
 
         assert result.exit_code == 0

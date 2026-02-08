@@ -68,7 +68,7 @@ def load_crosswalk(
     if not xwalk_path.exists():
         raise FileNotFoundError(
             f"Crosswalk not found: {xwalk_path}\n"
-            f"Run: coclab build xwalks --boundary {boundary_vintage} --counties {county_vintage}"
+            f"Run: coclab generate xwalks --boundary {boundary_vintage} --counties {county_vintage}"
         )
 
     df = pd.read_parquet(xwalk_path)

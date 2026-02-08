@@ -85,7 +85,7 @@ sequenceDiagram
     participant Storage
 
     Note over User,Storage: Phase 1: Build Crosswalks
-    User->>CLI: coclab build xwalks --boundary 2025 --tracts 2023
+    User->>CLI: coclab generate xwalks --boundary 2025 --tracts 2023
     CLI->>Census: ingest_tiger_tracts(2023)
     Census->>Storage: Download TIGER shapefiles
     Census->>Storage: Save tracts__T2023.parquet
@@ -149,16 +149,16 @@ coclab ingest zori --geography county
 Build crosswalks for each boundary vintage against the 2023 Census geometries:
 
 ```bash
-coclab build xwalks --boundary 2015 --tracts 2023 --counties 2023
-coclab build xwalks --boundary 2016 --tracts 2023 --counties 2023
-coclab build xwalks --boundary 2017 --tracts 2023 --counties 2023
-coclab build xwalks --boundary 2018 --tracts 2023 --counties 2023
-coclab build xwalks --boundary 2019 --tracts 2023 --counties 2023
-coclab build xwalks --boundary 2020 --tracts 2023 --counties 2023
-coclab build xwalks --boundary 2021 --tracts 2023 --counties 2023
-coclab build xwalks --boundary 2022 --tracts 2023 --counties 2023
-coclab build xwalks --boundary 2023 --tracts 2023 --counties 2023
-coclab build xwalks --boundary 2024 --tracts 2023 --counties 2023
+coclab generate xwalks --boundary 2015 --tracts 2023 --counties 2023
+coclab generate xwalks --boundary 2016 --tracts 2023 --counties 2023
+coclab generate xwalks --boundary 2017 --tracts 2023 --counties 2023
+coclab generate xwalks --boundary 2018 --tracts 2023 --counties 2023
+coclab generate xwalks --boundary 2019 --tracts 2023 --counties 2023
+coclab generate xwalks --boundary 2020 --tracts 2023 --counties 2023
+coclab generate xwalks --boundary 2021 --tracts 2023 --counties 2023
+coclab generate xwalks --boundary 2022 --tracts 2023 --counties 2023
+coclab generate xwalks --boundary 2023 --tracts 2023 --counties 2023
+coclab generate xwalks --boundary 2024 --tracts 2023 --counties 2023
 ```
 
 ### Phase 3: Build ACS Measures

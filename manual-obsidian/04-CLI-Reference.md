@@ -247,7 +247,7 @@ and crosswalks are resolved from the build-local `xwalks/` directory if present.
 ```bash
 coclab ingest boundaries --source hud_exchange --vintage 2025
 coclab ingest census --year 2023 --type counties
-coclab build xwalks --boundary 2025 --counties 2023
+coclab generate xwalks --boundary 2025 --counties 2023
 coclab ingest zori --geography county
 ```
 
@@ -395,16 +395,16 @@ coclab registry rebuild --dry-run
 | `--dry-run`, `-n` | Preview changes without modifying registry | False |
 | `--registry`, `-r` | Path to source registry file | `data/curated/source_registry.parquet` |
 
-## `coclab build xwalks`
+## `coclab generate xwalks`
 
 Build area-weighted crosswalks linking CoC boundaries to census tracts and counties.
 
 ```bash
 # Build crosswalks for a specific boundary and tract vintage
-coclab build xwalks --boundary 2025 --tracts 2023
+coclab generate xwalks --boundary 2025 --tracts 2023
 
 # Also build county crosswalk
-coclab build xwalks --boundary 2025 --tracts 2023 --counties 2023
+coclab generate xwalks --boundary 2025 --tracts 2023 --counties 2023
 ```
 
 | Option | Description | Default |
@@ -667,7 +667,7 @@ coclab build pep --build demo --boundary 2024 --counties 2024
 **Prerequisites:**
 ```bash
 coclab ingest census --year 2024 --type counties
-coclab build xwalks --boundary 2024 --counties 2024
+coclab generate xwalks --boundary 2024 --counties 2024
 coclab ingest pep --series auto
 ```
 

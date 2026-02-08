@@ -183,7 +183,7 @@ class TestCountyCrosswalkIntegration:
 
         files = list(xwalk_dir.glob("xwalk__B*xC*.parquet"))
         if not files:
-            pytest.skip("County crosswalks not available - run 'coclab build xwalks' first")
+            pytest.skip("County crosswalks not available - run 'coclab generate xwalks' first")
         return files[0]
 
     def test_real_xwalk_has_expected_columns(self, county_xwalk_path):

@@ -251,7 +251,7 @@ def aggregate_zori(
     Prerequisite commands:
     - coclab ingest boundaries --source hud_exchange --vintage <boundary>
     - coclab ingest census --year <counties> --type counties
-    - coclab build xwalks --boundary <boundary> --counties <counties>
+    - coclab generate xwalks --boundary <boundary> --counties <counties>
     - coclab ingest zori --geography county
 
     Exit codes:
@@ -314,7 +314,7 @@ def aggregate_zori(
 
     if xwalk_path is not None and not Path(xwalk_path).exists():
         typer.echo(f"Error: Crosswalk not found: {xwalk_path}", err=True)
-        typer.echo(f"Run: coclab build xwalks --boundary {boundary} --counties {counties}", err=True)
+        typer.echo(f"Run: coclab generate xwalks --boundary {boundary} --counties {counties}", err=True)
         raise typer.Exit(2)
 
     from coclab.rents.aggregate import (
@@ -370,7 +370,7 @@ def aggregate_zori(
         typer.echo("Ensure you have run the prerequisite commands:")
         typer.echo(f"  coclab ingest boundaries --source hud_exchange --vintage {boundary}")
         typer.echo(f"  coclab ingest census --year {counties} --type counties")
-        typer.echo(f"  coclab build xwalks --boundary {boundary} --counties {counties}")
+        typer.echo(f"  coclab generate xwalks --boundary {boundary} --counties {counties}")
         typer.echo(f"  coclab ingest zori --geography {geography}")
         raise typer.Exit(2) from e
 

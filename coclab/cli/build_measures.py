@@ -150,7 +150,7 @@ def build_measures(
         else:
             typer.echo(
                 f"Error: Crosswalk file not found: {xwalk_path}. "
-                f"Run 'coclab build xwalks --boundary {boundary} --tracts {tract_vintage}' first.",
+                f"Run 'coclab generate xwalks --boundary {boundary} --tracts {tract_vintage}' first.",
                 err=True,
             )
             raise typer.Exit(1)

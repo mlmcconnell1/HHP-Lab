@@ -106,7 +106,7 @@ def test_build_xwalks_with_missing_build_errors():
         result = runner.invoke(
             app,
             [
-                "build",
+                "generate",
                 "xwalks",
                 "--build",
                 "missing",
@@ -142,11 +142,11 @@ def test_build_panel_with_missing_build_errors():
 
 
 def test_build_catalog_and_resolve():
-    """build catalog should scan boundary files and write catalog JSON."""
+    """generate catalog should scan boundary files and write catalog JSON."""
     with runner.isolated_filesystem():
         _create_boundary_files(Path("."), [2020, 2021, 2022])
 
-        result = runner.invoke(app, ["build", "catalog"])
+        result = runner.invoke(app, ["generate", "catalog"])
         assert result.exit_code == 0, result.output
         assert "Cataloged 3 base assets" in result.output
 
@@ -176,15 +176,15 @@ def test_build_catalog_and_resolve():
 
 
 def test_build_catalog_empty():
-    """build catalog should handle missing boundary directory gracefully."""
+    """generate catalog should handle missing boundary directory gracefully."""
     with runner.isolated_filesystem():
-        result = runner.invoke(app, ["build", "catalog"])
+        result = runner.invoke(app, ["generate", "catalog"])
         assert result.exit_code == 0
         assert "No boundary assets found" in result.output
 
 
 def test_build_catalog_help():
-    """build catalog help should show options."""
-    result = runner.invoke(app, ["build", "catalog", "--help"])
+    """generate catalog help should show options."""
+    result = runner.invoke(app, ["generate", "catalog", "--help"])
     assert result.exit_code == 0
     assert "catalog" in result.output.lower()

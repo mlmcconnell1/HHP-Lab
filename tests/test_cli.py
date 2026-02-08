@@ -221,6 +221,7 @@ class TestHelpOutput:
         assert "ingest" in result.output  # Nested subcommand group
         assert "list" in result.output
         assert "validate" in result.output
+        assert "generate" in result.output
         assert "build" in result.output
         assert "show" in result.output
         # Deprecated aliases should be hidden from help
@@ -260,11 +261,22 @@ class TestHelpOutput:
 
         assert result.exit_code == 0
         assert "panel" in result.output
-        assert "xwalks" in result.output
         assert "export" in result.output
+        assert "create" in result.output
+        assert "list" in result.output
+        assert "xwalks" not in result.output
+        assert "catalog" not in result.output
         # measures, zori, and pep have been removed from build subcommands
         # (use 'aggregate acs/zori/pep' instead)
         assert "measures" not in result.output
+
+    def test_generate_help(self):
+        """Generate help should show subcommands."""
+        result = runner.invoke(app, ["generate", "--help"])
+
+        assert result.exit_code == 0
+        assert "xwalks" in result.output
+        assert "catalog" in result.output
 
     def test_ingest_boundaries_help(self):
         """Ingest boundaries help should show options."""
