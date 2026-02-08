@@ -1,4 +1,4 @@
-"""CLI command for ingesting ACS tract population data."""
+"""CLI command for ingesting ACS tract-level data."""
 
 from typing import Annotated
 
@@ -39,10 +39,15 @@ def ingest_acs_population(
         ),
     ] = True,
 ) -> None:
-    """Ingest tract-level population data from ACS 5-year estimates.
+    """Ingest tract-level ACS 5-year estimates.
 
-    Downloads tract population data from the Census Bureau API and saves
-    as a Parquet file with provenance metadata. Uses table B01003 (Total Population).
+    Downloads tract data from the Census Bureau API (tables B01003, B01001,
+    B19013, B25064, C17002) and saves as a Parquet file with provenance
+    metadata.
+
+    Variables fetched: total population, adult population (derived 18+),
+    median household income, median gross rent, poverty universe, poverty
+    counts (below 50% and 50-99%), and margin of error for total population.
 
     For ACS vintages 2010-2019 (which use 2010 census tract geography),
     the --translate option (enabled by default) will automatically convert
@@ -58,12 +63,13 @@ def ingest_acs_population(
     """
     import pandas as pd
 
-    from coclab.acs.ingest.tract_population import ingest_tract_population
+    from coclab.acs.ingest.tract_population import ingest_tract_data
     from coclab.acs.translate import (
         get_source_tract_vintage,
         needs_translation,
         translate_acs_to_target_vintage,
     )
+    from coclab.acs.variables import ACS_TABLES
     from coclab.census.ingest.tract_relationship import TractRelationshipNotFoundError
 
     # Check if cached file exists
@@ -80,8 +86,9 @@ def ingest_acs_population(
     source_tract_vintage = get_source_tract_vintage(acs)
     translation_needed = needs_translation(acs, tracts)
 
-    typer.echo("Ingesting ACS tract population data...")
+    typer.echo("Ingesting ACS tract data...")
     typer.echo(f"  ACS vintage:     {acs}")
+    typer.echo(f"  Tables:          {', '.join(ACS_TABLES)}")
     typer.echo(f"  Source tracts:   {source_tract_vintage} (Census API geography)")
     typer.echo(f"  Target tracts:   {tracts}")
     if translation_needed and translate:
@@ -103,7 +110,7 @@ def ingest_acs_population(
             raise typer.Exit(1) from e
 
     try:
-        path = ingest_tract_population(
+        path = ingest_tract_data(
             acs_vintage=acs,
             tract_vintage=tracts,
             force=force,
@@ -116,7 +123,7 @@ def ingest_acs_population(
     df = pd.read_parquet(path)
 
     # Validate required columns exist
-    required_columns = ["tract_geoid", "total_population"]
+    required_columns = ["tract_geoid", "total_population", "adult_population"]
     missing_columns = [col for col in required_columns if col not in df.columns]
     if missing_columns:
         typer.echo(
@@ -149,8 +156,8 @@ def ingest_acs_population(
                 acs_vintage=acs,
                 tract_vintage=tracts,
                 extra={
-                    "dataset": "tract_population",
-                    "table": "B01003",
+                    "dataset": "acs_tract_data",
+                    "tables": ACS_TABLES,
                     "source_tract_vintage": str(source_tract_vintage),
                     "translated": True,
                     "translation_match_rate": translation_stats.match_rate,
@@ -172,6 +179,12 @@ def ingest_acs_population(
     typer.echo(f"Output file:       {path}")
     typer.echo(f"Total tracts:      {len(df):,}")
     typer.echo(f"Total population:  {df['total_population'].sum():,.0f}")
+    if "adult_population" in df.columns:
+        typer.echo(f"Adult population:  {df['adult_population'].sum():,.0f}")
+    if "median_household_income" in df.columns:
+        typer.echo(f"Median income:     ${df['median_household_income'].median():,.0f}")
+    if "median_gross_rent" in df.columns:
+        typer.echo(f"Median rent:       ${df['median_gross_rent'].median():,.0f}")
 
     # Show translation stats if applicable
     if translation_stats:

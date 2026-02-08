@@ -1,12 +1,15 @@
 """ACS (American Community Survey) data ingestion and management.
 
 This package provides tools for fetching and caching ACS data from the Census Bureau API,
-including tract-level population data needed for CoC analysis.
+including tract-level population, income, rent, poverty, and demographic data needed for
+CoC analysis.
 """
 
 from coclab.acs.ingest.tract_population import (
-    fetch_tract_population,
-    ingest_tract_population,
+    fetch_state_tract_data,
+    fetch_tract_data,
+    get_output_path,
+    ingest_tract_data,
 )
 from coclab.acs.translate import (
     TranslationStats,
@@ -17,8 +20,10 @@ from coclab.acs.translate import (
 )
 
 __all__ = [
-    "fetch_tract_population",
-    "ingest_tract_population",
+    "fetch_state_tract_data",
+    "fetch_tract_data",
+    "get_output_path",
+    "ingest_tract_data",
     # Translation
     "TranslationStats",
     "get_source_tract_vintage",

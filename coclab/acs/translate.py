@@ -30,6 +30,7 @@ from dataclasses import dataclass
 
 import pandas as pd
 
+from coclab.acs.variables import COUNT_COLUMNS, MEDIAN_COLUMNS
 from coclab.census.ingest.tract_relationship import load_tract_relationship
 
 logger = logging.getLogger(__name__)
@@ -255,38 +256,60 @@ def translate_tracts_2010_to_2020(
     # Drop unmatched rows (they have no 2020 mapping)
     translated = merged[matched_mask].copy()
 
-    # Apply area weights to population
-    translated[population_column] = (
-        translated[population_column] * translated["area_2010_to_2020_weight"]
-    )
+    # Classify columns present in the input DataFrame
+    count_cols = [c for c in COUNT_COLUMNS if c in df.columns]
+    median_cols = [c for c in MEDIAN_COLUMNS if c in df.columns]
+    moe_columns = [col for col in df.columns if col.startswith("moe_")]
+
+    # Ensure population_column is area-weighted even if not in COUNT_COLUMNS
+    if population_column not in count_cols and population_column in df.columns:
+        count_cols = [population_column] + count_cols
+
+    # Apply area weights to all count columns
+    for col in count_cols:
+        translated[col] = (
+            translated[col] * translated["area_2010_to_2020_weight"]
+        )
+
+    # Prepare population-weighted median aggregation
+    # Weight = area-weighted population (already weighted in count_cols loop above)
+    translated["__pop_weight"] = translated[population_column].fillna(0)
+    for col in median_cols:
+        translated[f"__{col}_pw"] = (
+            translated[col].fillna(0) * translated["__pop_weight"]
+        )
 
     # Handle margin of error columns with proper error propagation
     # For weighted sums: MOE = sqrt(sum(weight^2 * moe^2))
-    moe_columns = [col for col in df.columns if col.startswith("moe_")]
     for moe_col in moe_columns:
         if moe_col in translated.columns:
-            # Store weighted squared MOE for later aggregation
             translated[f"__{moe_col}_weighted_sq"] = (
                 translated["area_2010_to_2020_weight"] ** 2
                 * translated[moe_col].fillna(0) ** 2
             )
 
-    # Aggregate by 2020 tract GEOID
-    agg_funcs = {
-        population_column: "sum",
-    }
+    # Build aggregation dict
+    agg_funcs: dict[str, str] = {}
 
-    # Add MOE aggregation (sum of squared weighted values, then sqrt)
+    # Count columns: sum of area-weighted values
+    for col in count_cols:
+        agg_funcs[col] = "sum"
+
+    # Median helper columns: sum (for weighted average computation)
+    agg_funcs["__pop_weight"] = "sum"
+    for col in median_cols:
+        agg_funcs[f"__{col}_pw"] = "sum"
+
+    # MOE helper columns: sum of squared weighted values
     for moe_col in moe_columns:
         sq_col = f"__{moe_col}_weighted_sq"
         if sq_col in translated.columns:
             agg_funcs[sq_col] = "sum"
 
     # Preserve metadata columns (take first value since they're the same)
+    all_special = set(count_cols + median_cols + moe_columns + [geoid_column])
     metadata_cols = [
-        col
-        for col in df.columns
-        if col not in [geoid_column, population_column] + moe_columns
+        col for col in df.columns if col not in all_special
     ]
     for col in metadata_cols:
         if col in translated.columns:
@@ -294,6 +317,18 @@ def translate_tracts_2010_to_2020(
 
     # Group by 2020 GEOID and aggregate
     result = translated.groupby("tract_geoid_2020", as_index=False).agg(agg_funcs)
+
+    # Compute final median values: weighted_sum / weight_sum
+    for col in median_cols:
+        pw_col = f"__{col}_pw"
+        if pw_col in result.columns:
+            mask = result["__pop_weight"] > 0
+            result.loc[mask, col] = (
+                result.loc[mask, pw_col] / result.loc[mask, "__pop_weight"]
+            )
+            result.loc[~mask, col] = pd.NA
+            result = result.drop(columns=[pw_col])
+    result = result.drop(columns=["__pop_weight"], errors="ignore")
 
     # Compute final MOE from squared sums
     for moe_col in moe_columns:

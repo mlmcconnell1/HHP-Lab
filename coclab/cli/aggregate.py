@@ -449,11 +449,16 @@ def aggregate_acs(
         ),
     ] = None,
 ) -> None:
-    """Aggregate ACS estimates to CoC level.
+    """Aggregate cached ACS tract data to CoC level.
+
+    Reads pre-ingested ACS tract files from disk and aggregates to CoC
+    level using crosswalks.  No Census API calls are made.  If cached
+    ingest files are missing, the command fails with instructions to
+    run ``coclab ingest acs`` first.
 
     Iterates over build years using each as the boundary vintage (hub).
     For each boundary year, the ACS vintage is derived from the alignment
-    mode and a crosswalk is resolved from the global xwalks directory.
+    mode and a crosswalk is resolved from the build-scoped xwalks directory.
     """
     build_dir = _validate_build(build)
     _validate_align(align, ACS_ALIGN_MODES, "acs")
@@ -473,12 +478,22 @@ def aggregate_acs(
 
     typer.echo(f"Aggregating ACS to CoC (build '{build}', align '{align}')...")
 
+    import pandas as pd
+
+    from coclab.acs.ingest.tract_population import get_output_path
     from coclab.acs.translate import default_tract_vintage_for_acs
-    from coclab.measures.acs import build_coc_measures
-    from coclab.naming import tract_xwalk_filename
+    from coclab.measures.acs import (
+        _maybe_remap_ct_planning_regions,
+        aggregate_to_coc,
+    )
+    from coclab.naming import measures_filename, tract_xwalk_filename
+    from coclab.provenance import ProvenanceBlock, write_parquet_with_provenance
 
     def decennial_floor(year: int) -> int:
         return year - (year % 10)
+
+    all_outputs: list[str] = []
+    materialized: list[int] = []
 
     for build_year in parsed_years:
         boundary_vintage = str(build_year)
@@ -494,17 +509,40 @@ def aggregate_acs(
             else default_tract_vintage_for_acs(acs_vintage)
         )
 
-        # Resolve crosswalk from build-scoped xwalks directory
+        # --- Resolve cached ACS tract data file (NO API) ---
+        acs_cache_path = get_output_path(acs_vintage, str(tract_vintage))
+        if not acs_cache_path.exists():
+            record_aggregate_run(
+                build_dir, dataset="acs", alignment=align,
+                years_requested=parsed_years, status="failed",
+                error=f"ACS cache not found: {acs_cache_path}",
+            )
+            typer.echo(
+                f"Error: Cached ACS tract file not found: {acs_cache_path}",
+                err=True,
+            )
+            typer.echo(
+                f"Run: coclab ingest acs --acs {acs_vintage} --tracts {tract_vintage}",
+                err=True,
+            )
+            raise typer.Exit(1)
+
+        # --- Resolve crosswalk ---
         xwalk_path = curated_dir / "xwalks" / tract_xwalk_filename(
             boundary_vintage, tract_vintage
         )
 
         if not xwalk_path.exists():
+            record_aggregate_run(
+                build_dir, dataset="acs", alignment=align,
+                years_requested=parsed_years, status="failed",
+                error=f"Crosswalk not found: {xwalk_path}",
+            )
             typer.echo(
                 f"Error: Crosswalk not found: {xwalk_path}",
                 err=True,
             )
-            if tract_vintage % 10 != 0:
+            if isinstance(tract_vintage, int) and tract_vintage % 10 != 0:
                 suggested = decennial_floor(tract_vintage)
                 typer.echo(
                     "The requested census tract year wasn't found and isn't on a decennial. "
@@ -522,14 +560,68 @@ def aggregate_acs(
             f"  B{build_year}: ACS {acs_vintage} (tracts {tract_vintage})..."
         )
         try:
-            build_coc_measures(
-                boundary_vintage=boundary_vintage,
-                acs_vintage=acs_vintage,
-                crosswalk_path=xwalk_path,
-                weighting=weighting,
-                output_dir=output_dir,
-                show_progress=True,
+            # Load cached data and crosswalk
+            acs_data = pd.read_parquet(acs_cache_path)
+            crosswalk = pd.read_parquet(xwalk_path)
+
+            # Rename tract_geoid → GEOID for aggregate_to_coc compatibility
+            if "tract_geoid" in acs_data.columns and "GEOID" not in acs_data.columns:
+                acs_data = acs_data.rename(columns={"tract_geoid": "GEOID"})
+
+            # Handle CT planning region GEOID remapping
+            acs_data = _maybe_remap_ct_planning_regions(
+                acs_data, crosswalk, acs_vintage
             )
+
+            # Aggregate to CoC level
+            coc_measures = aggregate_to_coc(acs_data, crosswalk, weighting=weighting)
+
+            # Add vintage columns
+            coc_measures["boundary_vintage"] = boundary_vintage
+            coc_measures["acs_vintage"] = acs_vintage
+
+            # Reorder columns
+            col_order = [
+                "coc_id", "boundary_vintage", "acs_vintage", "weighting_method",
+                "total_population", "adult_population", "population_below_poverty",
+                "median_household_income", "median_gross_rent",
+                "coverage_ratio", "source",
+            ]
+            col_order = [c for c in col_order if c in coc_measures.columns]
+            coc_measures = coc_measures[col_order]
+
+            # Write output
+            output_dir.mkdir(parents=True, exist_ok=True)
+
+            tv_str = str(tract_vintage)
+            if "tract_vintage" in crosswalk.columns:
+                tv_str = str(crosswalk["tract_vintage"].iloc[0])
+
+            filename = measures_filename(acs_vintage, boundary_vintage, tv_str)
+            out_path = output_dir / filename
+
+            provenance = ProvenanceBlock(
+                boundary_vintage=boundary_vintage,
+                tract_vintage=tv_str,
+                acs_vintage=acs_vintage,
+                weighting=weighting,
+                extra={
+                    "dataset_type": "coc_measures",
+                    "source": "cached_ingest",
+                    "crosswalk_path": str(xwalk_path),
+                    "acs_cache_path": str(acs_cache_path),
+                },
+            )
+            write_parquet_with_provenance(coc_measures, out_path, provenance)
+
+            rel = (
+                out_path.relative_to(build_dir).as_posix()
+                if out_path.is_relative_to(build_dir) else str(out_path)
+            )
+            all_outputs.append(rel)
+            materialized.append(build_year)
+            typer.echo(f"    Wrote: {out_path.name}")
+
         except Exception as exc:
             record_aggregate_run(
                 build_dir, dataset="acs", alignment=align,
@@ -543,9 +635,13 @@ def aggregate_acs(
         dataset="acs",
         alignment=align,
         years_requested=parsed_years,
-        years_materialized=parsed_years,
+        years_materialized=materialized,
+        outputs=all_outputs,
     )
-    typer.echo(f"ACS aggregation complete. Output in: {output_dir}")
+    typer.echo(
+        f"ACS aggregation complete ({len(materialized)} years). "
+        f"Output in: {output_dir}"
+    )
 
 
 # ---------------------------------------------------------------------------

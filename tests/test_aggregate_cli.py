@@ -207,9 +207,23 @@ def test_aggregate_pep_lagged_requires_lag_years():
         assert "--lag-years is required" in result.output
 
 
+def _create_fake_acs_cache(acs_vintage: str, tract_vintage: str | int) -> None:
+    """Create a minimal fake ACS cache file so aggregate reaches crosswalk check."""
+    import pandas as pd
+
+    from coclab.acs.ingest.tract_population import get_output_path
+
+    cache_path = get_output_path(acs_vintage, str(tract_vintage))
+    cache_path.parent.mkdir(parents=True, exist_ok=True)
+    pd.DataFrame({"tract_geoid": ["01001020100"], "total_population": [100]}).to_parquet(
+        cache_path
+    )
+
+
 def test_aggregate_acs_missing_crosswalk_suggests_decennial():
     with runner.isolated_filesystem():
         _create_build(years=[2015])
+        _create_fake_acs_cache("2011-2015", 2010)
         result = runner.invoke(app, ["aggregate", "acs", "--build", "demo"])
         assert result.exit_code == 1
         assert "Crosswalk not found" in result.output
@@ -220,6 +234,7 @@ def test_aggregate_acs_missing_crosswalk_suggests_decennial():
 def test_aggregate_acs_missing_crosswalk_no_decennial_hint():
     with runner.isolated_filesystem():
         _create_build(years=[2020])
+        _create_fake_acs_cache("2016-2020", 2020)
         result = runner.invoke(app, ["aggregate", "acs", "--build", "demo"])
         assert result.exit_code == 1
         assert "Crosswalk not found" in result.output

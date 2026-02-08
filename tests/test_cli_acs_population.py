@@ -14,7 +14,7 @@ class TestIngestAcsPopulationCommand:
     """Tests for ingest-acs-population CLI command."""
 
     @patch("coclab.cli.ingest_acs_population.get_output_path")
-    @patch("coclab.acs.ingest.tract_population.ingest_tract_population")
+    @patch("coclab.acs.ingest.tract_population.ingest_tract_data")
     @patch("pandas.read_parquet")
     def test_ingest_acs_population_uses_cache(
         self,
@@ -40,7 +40,7 @@ class TestIngestAcsPopulationCommand:
         mock_ingest.assert_not_called()
 
     @patch("coclab.cli.ingest_acs_population.get_output_path")
-    @patch("coclab.acs.ingest.tract_population.ingest_tract_population")
+    @patch("coclab.acs.ingest.tract_population.ingest_tract_data")
     @patch("pandas.read_parquet")
     def test_ingest_acs_population_success(
         self,
@@ -54,7 +54,13 @@ class TestIngestAcsPopulationCommand:
         mock_get_output_path.return_value = output_path
         mock_ingest.return_value = output_path
         mock_read_parquet.return_value = pd.DataFrame(
-            {"tract_geoid": ["01001020100"], "total_population": [100]}
+            {
+                "tract_geoid": ["01001020100"],
+                "total_population": [100],
+                "adult_population": [80],
+                "median_household_income": [50000.0],
+                "median_gross_rent": [1200.0],
+            }
         )
 
         result = runner.invoke(

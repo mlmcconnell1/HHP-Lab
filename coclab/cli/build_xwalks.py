@@ -348,7 +348,7 @@ def _apply_population_weights(
     """
     import pandas as pd
 
-    from coclab.acs.ingest.tract_population import get_output_path, ingest_tract_population
+    from coclab.acs.ingest.tract_population import get_output_path, ingest_tract_data
 
     # Determine ACS vintage to use (5-year ending in tract_vintage)
     acs_vintage = f"{tract_vintage - 4}-{tract_vintage}"
@@ -369,7 +369,7 @@ def _apply_population_weights(
         pop_df = pd.read_parquet(legacy_pop_path)
     elif auto_fetch:
         typer.echo(f"Fetching ACS population data ({acs_vintage})...")
-        pop_path = ingest_tract_population(
+        pop_path = ingest_tract_data(
             acs_vintage=acs_vintage,
             tract_vintage=str(tract_vintage),
         )

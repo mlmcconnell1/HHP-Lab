@@ -11,14 +11,14 @@ import pandas as pd
 import pytest
 
 from coclab.acs.ingest.tract_population import (
-    POPULATION_VARS,
-    fetch_state_tract_population,
-    fetch_tract_population,
+    fetch_state_tract_data,
+    fetch_tract_data,
     get_output_path,
-    ingest_tract_population,
+    ingest_tract_data,
     normalize_geoid,
     parse_acs_vintage,
 )
+from coclab.acs.variables import ALL_API_VARS
 from coclab.provenance import read_provenance
 
 
@@ -26,7 +26,7 @@ def make_census_response(
     tracts: list[dict[str, Any]],
     state_fips: str = "08",
 ) -> list[list[str]]:
-    """Create a mock Census API response for population data.
+    """Create a mock Census API response for ACS tract data.
 
     Parameters
     ----------
@@ -40,13 +40,13 @@ def make_census_response(
     list[list[str]]
         Census API-style response with header row and data rows.
     """
-    # Build header row
-    headers = ["NAME"] + list(POPULATION_VARS.keys()) + ["state", "county", "tract"]
+    # Build header row with all API variables
+    headers = ["NAME"] + ALL_API_VARS + ["state", "county", "tract"]
 
     rows = [headers]
     for tract in tracts:
         row = [tract.get("NAME", "Census Tract")]
-        for var in POPULATION_VARS.keys():
+        for var in ALL_API_VARS:
             row.append(str(tract.get(var, "0")))
         row.append(state_fips)
         row.append(tract.get("county", "001"))
@@ -124,7 +124,7 @@ class TestGetOutputPath:
 
 
 class TestFetchStateTractPopulation:
-    """Tests for fetch_state_tract_population function."""
+    """Tests for fetch_state_tract_data function."""
 
     def test_parses_response_correctly(self, httpx_mock):
         """Test that Census API response is parsed into correct DataFrame structure."""
@@ -145,7 +145,7 @@ class TestFetchStateTractPopulation:
             json=response_data,
         )
 
-        df, raw_content = fetch_state_tract_population(2023, "08")
+        df, raw_content = fetch_state_tract_data(2023, "08")
 
         assert len(df) == 1
         assert "tract_geoid" in df.columns
@@ -172,7 +172,7 @@ class TestFetchStateTractPopulation:
             json=response_data,
         )
 
-        df, _ = fetch_state_tract_population(2023, "08")
+        df, _ = fetch_state_tract_data(2023, "08")
 
         assert pd.isna(df.iloc[0]["total_population"])
         assert pd.isna(df.iloc[0]["moe_total_population"])
@@ -196,7 +196,7 @@ class TestFetchStateTractPopulation:
             json=response_data,
         )
 
-        df, _ = fetch_state_tract_population(2023, "01")
+        df, _ = fetch_state_tract_data(2023, "01")
 
         geoid = df.iloc[0]["tract_geoid"]
         assert geoid == "01001000100"
@@ -205,7 +205,7 @@ class TestFetchStateTractPopulation:
 
 
 class TestFetchTractPopulation:
-    """Tests for fetch_tract_population function."""
+    """Tests for fetch_tract_data function."""
 
     @pytest.mark.httpx_mock(can_send_already_matched_responses=True)
     def test_returns_correct_schema(self, httpx_mock):
@@ -232,7 +232,7 @@ class TestFetchTractPopulation:
             status_code=404,
         )
 
-        df, _, _, _ = fetch_tract_population("2019-2023", "2023")
+        df, _, _, _ = fetch_tract_data("2019-2023", "2023")
 
         # Check required columns exist
         required_cols = [
@@ -282,7 +282,7 @@ class TestFetchTractPopulation:
             status_code=404,
         )
 
-        df, _, _, _ = fetch_tract_population("2019-2023", "2023")
+        df, _, _, _ = fetch_tract_data("2019-2023", "2023")
 
         # All non-NA values should be >= 0
         valid_pops = df["total_population"].dropna()
@@ -311,7 +311,7 @@ class TestFetchTractPopulation:
             status_code=404,
         )
 
-        df, _, _, _ = fetch_tract_population("2019-2023", "2023")
+        df, _, _, _ = fetch_tract_data("2019-2023", "2023")
 
         assert len(df) > 0
 
@@ -324,12 +324,12 @@ class TestFetchTractPopulation:
             status_code=500,
         )
 
-        with pytest.raises(ValueError, match="No tract population data"):
-            fetch_tract_population("2019-2023", "2023")
+        with pytest.raises(ValueError, match="No ACS tract data"):
+            fetch_tract_data("2019-2023", "2023")
 
 
 class TestIngestTractPopulation:
-    """Tests for ingest_tract_population function."""
+    """Tests for ingest_tract_data function."""
 
     @pytest.mark.httpx_mock(can_send_already_matched_responses=True)
     def test_creates_output_file(self, httpx_mock, tmp_path):
@@ -354,7 +354,7 @@ class TestIngestTractPopulation:
             status_code=404,
         )
 
-        output_path = ingest_tract_population(
+        output_path = ingest_tract_data(
             "2019-2023",
             "2023",
             output_dir=tmp_path,
@@ -384,7 +384,7 @@ class TestIngestTractPopulation:
         df.to_parquet(cached_path)
 
         # Call ingest without force - should use cache
-        result_path = ingest_tract_population(
+        result_path = ingest_tract_data(
             "2019-2023",
             "2023",
             force=False,
@@ -435,7 +435,7 @@ class TestIngestTractPopulation:
         )
 
         # Call ingest with force=True
-        result_path = ingest_tract_population(
+        result_path = ingest_tract_data(
             "2019-2023",
             "2023",
             force=True,
@@ -469,7 +469,7 @@ class TestIngestTractPopulation:
             status_code=404,
         )
 
-        output_path = ingest_tract_population(
+        output_path = ingest_tract_data(
             "2019-2023",
             "2023",
             output_dir=tmp_path,
@@ -480,8 +480,8 @@ class TestIngestTractPopulation:
         assert provenance is not None
         assert provenance.acs_vintage == "2019-2023"
         assert provenance.tract_vintage == "2023"
-        assert provenance.extra.get("dataset") == "tract_population"
-        assert provenance.extra.get("table") == "B01003"
+        assert provenance.extra.get("dataset") == "acs_tract_data"
+        assert "B01003" in provenance.extra.get("tables", [])
 
 
 class TestSchemaValidation:
@@ -516,7 +516,7 @@ class TestSchemaValidation:
             status_code=404,
         )
 
-        df, _, _, _ = fetch_tract_population("2019-2023", "2023")
+        df, _, _, _ = fetch_tract_data("2019-2023", "2023")
 
         # All GEOIDs should be exactly 11 characters
         assert all(len(geoid) == 11 for geoid in df["tract_geoid"])
@@ -544,7 +544,7 @@ class TestSchemaValidation:
             status_code=404,
         )
 
-        df, _, _, _ = fetch_tract_population("2019-2023", "2023")
+        df, _, _, _ = fetch_tract_data("2019-2023", "2023")
 
         assert all(df["data_source"] == "acs_5yr")
 
@@ -571,7 +571,7 @@ class TestSchemaValidation:
             status_code=404,
         )
 
-        df, _, _, _ = fetch_tract_population("2019-2023", "2023")
+        df, _, _, _ = fetch_tract_data("2019-2023", "2023")
 
         # Check that timestamp is timezone-aware
         ts = df.iloc[0]["ingested_at"]
