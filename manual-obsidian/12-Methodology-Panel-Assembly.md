@@ -15,7 +15,7 @@ Panel assembly follows these steps for each year in the requested range:
 
 ## Alignment Policies
 
-Alignment policies are **pure functions** that map PIT years to data vintages. Using [[07-Temporal-Terminology|shorthand notation]]:
+Alignment policies are **pure functions** that map PIT years to data vintages. Using [[08-Temporal-Terminology|shorthand notation]]:
 
 | Policy | Rule | Notation |
 |--------|------|----------|
@@ -90,4 +90,4 @@ CoCs missing from PIT or ACS for a given year are excluded from the panel for th
 
 ---
 
-**Previous:** [[10-Methodology-ZORI-Aggregation]] | **Next:** [[12-Bundle-Layout]]
+**Previous:** [[11-Methodology-ZORI-Aggregation]] | **Next:** [[13-Bundle-Layout]]

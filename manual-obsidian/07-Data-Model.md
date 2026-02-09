@@ -321,7 +321,7 @@ erDiagram
 
 ## Storage Locations
 
-Filenames use temporal shorthand notation (see [[07-Temporal-Terminology]]).
+Filenames use temporal shorthand notation (see [[08-Temporal-Terminology]]).
 
 | File | Path Pattern | Description |
 |------|--------------|-------------|
@@ -375,7 +375,7 @@ All CoC Lab Parquet files embed **provenance metadata** in the file schema, enab
 }
 ```
 
-The `notation` field uses the shorthand from [[07-Temporal-Terminology|Temporal Terminology]]: this example describes ACS 2022 aggregated to 2025 CoC boundaries via 2023 tract crosswalk (A2022@B2025×T2023).
+The `notation` field uses the shorthand from [[08-Temporal-Terminology|Temporal Terminology]]: this example describes ACS 2022 aggregated to 2025 CoC boundaries via 2023 tract crosswalk (A2022@B2025×T2023).
 
 | Field | Type | Description |
 |-------|------|-------------|
@@ -452,4 +452,4 @@ print(provenance.extra["cross_state_mappings"])  # {"MO-604a": "MO-604"}
 
 ---
 
-**Previous:** [[05-Python-API]] | **Next:** [[07-Temporal-Terminology]]
+**Previous:** [[06-Python-API]] | **Next:** [[08-Temporal-Terminology]]

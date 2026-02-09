@@ -1150,4 +1150,4 @@ When `--check-changes` is used, the command identifies sources where the upstrea
 
 ---
 
-**Previous:** [[03-Architecture]] | **Next:** [[05-Python-API]]
+**Previous:** [[03-Architecture]] | **Next:** [[05-Recipe-Format]]

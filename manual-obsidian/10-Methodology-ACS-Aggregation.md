@@ -62,7 +62,7 @@ When CoC boundaries cut through tracts, area weighting assumes uniform populatio
 
 ACS 5-year estimates pool data across 5 years (e.g., A2022 covers 2018-2022). CoC boundaries may change during that period. This module assumes boundaries are static.
 
-This creates an unavoidable **vintage gap**: the latest ACS vintage typically lags 1-2 years behind current boundaries. For example, B2025 boundaries can only be paired with A2023 or earlier. See [[07-Temporal-Terminology|Temporal Terminology]] for detailed discussion of vintage alignment.
+This creates an unavoidable **vintage gap**: the latest ACS vintage typically lags 1-2 years behind current boundaries. For example, B2025 boundaries can only be paired with A2023 or earlier. See [[08-Temporal-Terminology|Temporal Terminology]] for detailed discussion of vintage alignment.
 
 ### 6. Small-CoC Instability
 
@@ -80,4 +80,4 @@ Population-weighted tract coverage does not guarantee housing-market representat
 
 ---
 
-**Previous:** [[08-Workflows]] | **Next:** [[10-Methodology-ZORI-Aggregation]]
+**Previous:** [[09-Workflows]] | **Next:** [[11-Methodology-ZORI-Aggregation]]

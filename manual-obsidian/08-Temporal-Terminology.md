@@ -128,4 +128,4 @@ The shorthand maps directly to filenames (use `x` instead of `×` for ASCII comp
 
 ---
 
-**Previous:** [[06-Data-Model]] | **Next:** [[08-Workflows]]
+**Previous:** [[07-Data-Model]] | **Next:** [[09-Workflows]]

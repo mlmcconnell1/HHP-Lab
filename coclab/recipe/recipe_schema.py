@@ -219,7 +219,7 @@ class JoinStep(BaseModel):
     model_config = ConfigDict(extra="forbid")
     kind: Literal["join"] = "join"
     datasets: List[str] = Field(..., description="Dataset ids to join into a target panel.")
-    on: List[str] = Field(default_factory=lambda: ["geo_id", "year"], description="Join keys.")
+    join_on: List[str] = Field(default_factory=lambda: ["geo_id", "year"], description="Join keys.")
 
 
 StepSpec = Annotated[Union[MaterializeStep, ResampleStep, JoinStep], Field(discriminator="kind")]

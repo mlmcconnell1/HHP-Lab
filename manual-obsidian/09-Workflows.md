@@ -242,7 +242,7 @@ coclab build export \
 
 ### Alignment Policy Reference
 
-The default alignment policy determines vintage matching. See [[07-Temporal-Terminology|Temporal Terminology]] for notation conventions.
+The default alignment policy determines vintage matching. See [[08-Temporal-Terminology|Temporal Terminology]] for notation conventions.
 
 | PIT Year | Boundary | ACS | ACS 5-Year Range | Notation |
 |----------|----------|-----|------------------|----------|
@@ -261,4 +261,4 @@ This is a **period-faithful** alignment: each PIT year is analyzed using boundar
 
 ---
 
-**Previous:** [[07-Temporal-Terminology]] | **Next:** [[09-Methodology-ACS-Aggregation]]
+**Previous:** [[08-Temporal-Terminology]] | **Next:** [[10-Methodology-ACS-Aggregation]]

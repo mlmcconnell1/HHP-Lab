@@ -147,7 +147,7 @@ ZORI months represent market conditions at a point in time. When aligning with P
 - `calendar_mean`: Average over calendar year
 - `calendar_median`: Median over calendar year
 
-See [[07-Temporal-Terminology|Temporal Terminology]] for notation conventions describing data vintage combinations.
+See [[08-Temporal-Terminology|Temporal Terminology]] for notation conventions describing data vintage combinations.
 
 ### 4. Weighting Assumptions
 
@@ -185,4 +185,4 @@ ZORI data requires attribution to Zillow:
 
 ---
 
-**Previous:** [[09-Methodology-ACS-Aggregation]] | **Next:** [[11-Methodology-Panel-Assembly]]
+**Previous:** [[10-Methodology-ACS-Aggregation]] | **Next:** [[12-Methodology-Panel-Assembly]]

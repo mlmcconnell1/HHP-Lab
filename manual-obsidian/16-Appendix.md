@@ -36,11 +36,11 @@ This enables efficient change detection between vintages.
 
 ## Temporal Concepts Reference
 
-For comprehensive documentation of vintage notation, temporal alignment, and mismatch terminology, see [[07-Temporal-Terminology|Temporal Terminology]].
+For comprehensive documentation of vintage notation, temporal alignment, and mismatch terminology, see [[08-Temporal-Terminology|Temporal Terminology]].
 
 ---
 
-**Previous:** [[14-Development]] | **Back to:** [[CoC-Lab-Manual]]
+**Previous:** [[15-Development]] | **Back to:** [[CoC-Lab-Manual]]
 
 ---
 

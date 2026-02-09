@@ -29,4 +29,4 @@ pipelines:
           measures: [pit_total]
       - join:
           datasets: [pit]
-          on: [geo_id, year]
+          join_on: [geo_id, year]

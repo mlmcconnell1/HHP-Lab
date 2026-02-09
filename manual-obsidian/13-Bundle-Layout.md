@@ -127,4 +127,4 @@ All analysis code should reference paths within the bundle. The `MANIFEST.json` 
 
 ---
 
-**Previous:** [[11-Methodology-Panel-Assembly]] | **Next:** [[13-Module-Reference]]
+**Previous:** [[12-Methodology-Panel-Assembly]] | **Next:** [[14-Module-Reference]]
