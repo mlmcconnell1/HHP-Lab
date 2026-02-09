@@ -11,18 +11,18 @@ from coclab.cli.main import app
 runner = CliRunner()
 
 
-class TestCensusIngestCommand:
-    """Tests for the ingest-census CLI command."""
+class TestTigerIngestCommand:
+    """Tests for the ingest tiger CLI command."""
 
-    def test_ingest_census_invalid_type(self):
+    def test_ingest_tiger_invalid_type(self):
         """Invalid type should fail with an error."""
-        result = runner.invoke(app, ["ingest-census", "--type", "invalid"])
+        result = runner.invoke(app, ["ingest", "tiger", "--type", "invalid"])
 
         assert result.exit_code == 1
         assert "Invalid type" in result.output
 
-    def test_ingest_census_invalid_type_nested(self):
-        """Nested ingest census invalid type should fail with an error."""
+    def test_ingest_census_deprecated_alias(self):
+        """Deprecated ingest census alias should still work."""
         result = runner.invoke(app, ["ingest", "census", "--type", "invalid"])
 
         assert result.exit_code == 1
@@ -30,7 +30,7 @@ class TestCensusIngestCommand:
 
     @patch("coclab.census.ingest.ingest_tiger_tracts")
     @patch("coclab.census.ingest.ingest_tiger_counties")
-    def test_ingest_census_cached_skips_downloads(
+    def test_ingest_tiger_cached_skips_downloads(
         self,
         mock_counties,
         mock_tracts,
@@ -44,7 +44,7 @@ class TestCensusIngestCommand:
             tracts_path.touch()
             counties_path.touch()
 
-            result = runner.invoke(app, ["ingest-census", "--year", "2023"])
+            result = runner.invoke(app, ["ingest", "tiger", "--year", "2023"])
 
         assert result.exit_code == 0
         assert "Tracts file already exists" in result.output

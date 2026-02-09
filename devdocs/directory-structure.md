@@ -181,7 +181,7 @@ internet ──┤► data/raw/    │           │  data/curated/       │   
 | `coclab ingest boundaries`       | internet                | `data/raw/hud_exchange/B{vintage}_{date}/` or `data/raw/hud_opendata/{boundary_vintage}/`, `data/curated/coc_boundaries/` |
 | `coclab ingest pit`              | internet                | `data/raw/pit/`, `data/curated/pit/`              |
 | `coclab ingest pit-vintage`      | internet                | `data/raw/pit/`, `data/curated/pit/`              |
-| `coclab ingest census`           | internet                | `data/raw/census/`, `data/curated/census/`        |
+| `coclab ingest tiger`            | internet                | `data/raw/census/`, `data/curated/census/`        |
 | `coclab ingest nhgis`            | internet (IPUMS API)    | `data/raw/nhgis/`, `data/curated/census/`         |
 | `coclab ingest tract-relationship`| internet               | `data/raw/census/`, `data/curated/census/`        |
 | `coclab ingest acs-population`   | internet                | `data/raw/acs_tract/`, `data/curated/acs/`        |

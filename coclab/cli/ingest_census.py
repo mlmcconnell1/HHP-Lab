@@ -1,4 +1,4 @@
-"""CLI command for ingesting TIGER census geometries."""
+"""CLI command for ingesting TIGER geometries."""
 
 from pathlib import Path
 from typing import Annotated
@@ -11,7 +11,7 @@ from coclab.naming import county_filename, tract_filename
 OUTPUT_DIR = Path("data/curated/census")
 
 
-def ingest_census(
+def ingest_tiger(
     year: Annotated[
         int,
         typer.Option(
@@ -43,11 +43,11 @@ def ingest_census(
 
     Examples:
 
-        coclab ingest-census --year 2023
+        coclab ingest tiger --year 2023
 
-        coclab ingest-census --year 2023 --type tracts
+        coclab ingest tiger --year 2023 --type tracts
 
-        coclab ingest-census --year 2023 --type counties --force
+        coclab ingest tiger --year 2023 --type counties --force
     """
     # Validate type option
     valid_types = {"tracts", "counties", "all"}

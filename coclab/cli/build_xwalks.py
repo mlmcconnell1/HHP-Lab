@@ -212,7 +212,7 @@ def build_xwalks(
             else:
                 typer.echo(
                     f"Error: Tract file not found: {tract_path}. "
-                    f"Run 'coclab ingest-census --year {tracts} --type tracts' first.",
+                    f"Run 'coclab ingest tiger --year {tracts} --type tracts' first.",
                     err=True,
                 )
                 raise typer.Exit(1)

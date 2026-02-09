@@ -133,7 +133,7 @@ coclab ingest boundaries --source hud_exchange --vintage 2023
 coclab ingest boundaries --source hud_exchange --vintage 2024
 
 # 1b. Ingest Census geometries (tracts and counties)
-coclab ingest census --year 2023 --type all
+coclab ingest tiger --year 2023 --type all
 
 # 1c. Ingest PIT counts (one vintage contains all historical years)
 coclab ingest pit-vintage --vintage 2024

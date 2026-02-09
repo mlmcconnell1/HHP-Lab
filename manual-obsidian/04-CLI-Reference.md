@@ -17,7 +17,7 @@ flowchart LR
     coclab --> show
     coclab --> registry
     ingest --> boundaries
-    ingest --> census
+    ingest --> tiger
     ingest --> nhgis
     ingest --> pit
     ingest --> pit-vintage
@@ -30,7 +30,7 @@ flowchart LR
 
     boundaries --> |"--source hud_exchange"| HUD_EX[Download annual vintage]
     boundaries --> |"--source hud_opendata"| HUD_OD[Fetch current snapshot]
-    census --> TIGER[Download TIGER geometries]
+    tiger --> TIGER[Download TIGER geometries]
     nhgis --> NHGIS[Download NHGIS tract shapefiles]
     pit --> PIT[Download & parse PIT counts]
     pit-vintage --> PITVINT[Parse all years from vintage]
@@ -776,19 +776,19 @@ coclab ingest boundaries --source hud_opendata --snapshot latest
 | `--snapshot` | Snapshot tag for Open Data                     | `latest`                    |
 | `--force`    | Re-ingest even if vintage already exists       | False                       |
 
-## `coclab ingest census`
+## `coclab ingest tiger`
 
 Download TIGER census geometries (tracts and/or counties).
 
 ```bash
 # Download both tracts and counties for 2023
-coclab ingest census --year 2023
+coclab ingest tiger --year 2023
 
 # Download only tracts
-coclab ingest census --year 2023 --type tracts
+coclab ingest tiger --year 2023 --type tracts
 
 # Force re-download even if files exist
-coclab ingest census --year 2023 --force
+coclab ingest tiger --year 2023 --force
 ```
 
 | Option | Description | Default |

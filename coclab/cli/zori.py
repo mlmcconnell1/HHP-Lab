@@ -250,7 +250,7 @@ def aggregate_zori(
 
     Prerequisite commands:
     - coclab ingest boundaries --source hud_exchange --vintage <boundary>
-    - coclab ingest census --year <counties> --type counties
+    - coclab ingest tiger --year <counties> --type counties
     - coclab generate xwalks --boundary <boundary> --counties <counties>
     - coclab ingest zori --geography county
 
@@ -372,7 +372,7 @@ def aggregate_zori(
         typer.echo("")
         typer.echo("Ensure you have run the prerequisite commands:")
         typer.echo(f"  coclab ingest boundaries --source hud_exchange --vintage {boundary}")
-        typer.echo(f"  coclab ingest census --year {counties} --type counties")
+        typer.echo(f"  coclab ingest tiger --year {counties} --type counties")
         typer.echo(f"  coclab generate xwalks --boundary {boundary} --counties {counties}")
         typer.echo(f"  coclab ingest zori --geography {geography}")
         raise typer.Exit(2) from e

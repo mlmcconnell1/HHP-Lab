@@ -21,7 +21,7 @@ from coclab.cli.crosscheck_population import crosscheck_population, validate_pop
 from coclab.cli.diagnostics import diagnostics
 from coclab.cli.export_bundle import export_bundle
 from coclab.cli.ingest_acs_population import ingest_acs_population
-from coclab.cli.ingest_census import ingest_census
+from coclab.cli.ingest_census import ingest_tiger
 from coclab.cli.ingest_nhgis import ingest_nhgis
 from coclab.cli.ingest_pit import ingest_pit
 from coclab.cli.ingest_pit_vintage import ingest_pit_vintage
@@ -360,7 +360,7 @@ def ingest_acs_population_deprecated(
     )
 
 
-@wraps(ingest_census)
+@wraps(ingest_tiger)
 def ingest_census_deprecated(
     year: Annotated[
         int,
@@ -386,12 +386,12 @@ def ingest_census_deprecated(
         ),
     ] = False,
 ) -> None:
-    """Deprecated: use `coclab ingest census`."""
+    """Deprecated: use `coclab ingest tiger`."""
     typer.echo(
-        "Warning: 'coclab ingest-census' is deprecated; use 'coclab ingest census' instead.",
+        "Warning: 'coclab ingest-census' is deprecated; use 'coclab ingest tiger' instead.",
         err=True,
     )
-    ingest_census(
+    ingest_tiger(
         year=year,
         type_=type_,
         force=force,
@@ -1537,7 +1537,8 @@ app.command("validate-population", hidden=True)(validate_population_deprecated)
 ingest_app.command("acs")(ingest_acs_population)
 ingest_app.command("acs-population", hidden=True)(ingest_acs_population)
 ingest_app.command("boundaries")(ingest_boundaries)
-ingest_app.command("census")(ingest_census)
+ingest_app.command("tiger")(ingest_tiger)
+ingest_app.command("census", hidden=True)(ingest_tiger)
 ingest_app.command("nhgis")(ingest_nhgis)
 ingest_app.command("pit")(ingest_pit)
 ingest_app.command("pit-vintage")(ingest_pit_vintage)
