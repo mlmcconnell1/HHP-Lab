@@ -225,12 +225,39 @@ class JoinStep(BaseModel):
 StepSpec = Annotated[Union[MaterializeStep, ResampleStep, JoinStep], Field(discriminator="kind")]
 
 
+_STEP_KINDS = frozenset({"materialize", "resample", "join"})
+
+
+def _unwrap_step(raw: Any) -> Any:
+    """Rewrite ``{"resample": {...}}`` → ``{"kind": "resample", ...}`` etc."""
+    if not isinstance(raw, dict):
+        return raw
+    # Already in canonical form
+    if "kind" in raw:
+        return raw
+    # Look for a single wrapper key that matches a known step kind
+    keys = set(raw.keys()) & _STEP_KINDS
+    if len(keys) == 1:
+        kind = keys.pop()
+        inner = raw[kind]
+        if isinstance(inner, dict):
+            return {"kind": kind, **inner}
+    return raw
+
+
 class PipelineSpec(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     id: str = Field(..., description="Unique pipeline identifier.")
     target: str = Field(..., description="Target id that this pipeline materializes.")
     steps: List[StepSpec] = Field(..., description="Ordered steps for the pipeline.")
+
+    @model_validator(mode="before")
+    @classmethod
+    def _unwrap_step_shorthands(cls, data: Any) -> Any:
+        if isinstance(data, dict) and "steps" in data:
+            data = {**data, "steps": [_unwrap_step(s) for s in data["steps"]]}
+        return data
 
 
 # -----------------------------
