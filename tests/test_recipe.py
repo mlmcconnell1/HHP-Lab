@@ -115,6 +115,21 @@ class TestLoadRecipeFromDict:
         with pytest.raises(RecipeLoadError, match="schema validation failed"):
             load_recipe(data)
 
+    def test_dataset_path_accepts_relative(self):
+        data = _minimal_recipe()
+        data["datasets"]["acs"]["path"] = "data/curated/measures/coc_measures__2020__2019.parquet"
+        recipe = load_recipe(data)
+        assert (
+            recipe.datasets["acs"].path
+            == "data/curated/measures/coc_measures__2020__2019.parquet"
+        )
+
+    def test_dataset_path_rejects_absolute(self):
+        data = _minimal_recipe()
+        data["datasets"]["acs"]["path"] = "/tmp/acs.parquet"
+        with pytest.raises(RecipeLoadError, match="DatasetSpec.path must be a relative path"):
+            load_recipe(data)
+
 
 class TestLoadRecipeFromFile:
     """Test load_recipe() with YAML file paths."""

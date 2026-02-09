@@ -15,6 +15,7 @@ datasets:
     version: 1
     native_geometry: { type: coc }
     params: { vintage: 2024, align: point_in_time_jan }
+    path: data/curated/pit/pit_vintage__P2024.parquet
 
 transforms: []
 

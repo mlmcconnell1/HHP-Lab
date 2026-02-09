@@ -22,6 +22,7 @@ datasets:
     version: 1
     native_geometry: { type: coc }
     params: { vintage: 2024, align: point_in_time_jan }
+    path: data/curated/pit/pit_vintage__P2024.parquet
 
 transforms: []
 
@@ -125,6 +126,7 @@ Named dataset declarations keyed by a unique string id. The id is used to refere
 | `version` | `int` | Yes | Adapter version (schema evolution control). Must be >= 1. |
 | `native_geometry` | `GeometryRef` | Yes | Native spatial granularity of the dataset. |
 | `params` | `dict` | No | Free-form adapter parameters. Default: `{}`. |
+| `path` | `string` | No | Optional project-relative path to a pre-materialized dataset file. Must be relative (not absolute). |
 | `optional` | `bool` | No | If true, missing dataset does not fail the build. Default: `false`. |
 
 ```yaml
@@ -135,6 +137,7 @@ datasets:
     version: 1
     native_geometry: { type: coc }
     params: { vintage: 2024, align: point_in_time_jan }
+    path: data/curated/pit/pit_vintage__P2024.parquet
 
   acs:
     provider: census
@@ -142,6 +145,7 @@ datasets:
     version: 1
     native_geometry: { type: tract }
     params: { vintage: "2019-2023", measures: [total_population, median_household_income] }
+    path: data/curated/measures/coc_measures__2025__2019-2023.parquet
 ```
 
 Like geometry types, provider/product combinations are an open set validated by runtime dataset adapters.

@@ -14,8 +14,9 @@ Notes:
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Any, Dict, List, Literal, Optional, Union, Annotated
-from pydantic import BaseModel, Field, ConfigDict, model_validator
+from pydantic import BaseModel, Field, ConfigDict, model_validator, field_validator
 
 
 # -----------------------------
@@ -73,6 +74,7 @@ class DatasetSpec(BaseModel):
     Extensible dataset declaration. Adapter resolution is via (provider, product, version).
     native_geometry indicates the dataset's base spatial granularity.
     params is free-form and validated by the dataset adapter.
+    path optionally points to a project-relative on-disk artifact to use for this dataset.
     """
     model_config = ConfigDict(extra="forbid")
 
@@ -81,7 +83,23 @@ class DatasetSpec(BaseModel):
     version: int = Field(..., description="Adapter version for this dataset product (schema evolution control).", ge=1)
     native_geometry: GeometryRef = Field(..., description="Native geometry of the dataset.")
     params: Dict[str, Any] = Field(default_factory=dict, description="Free-form adapter params.")
+    path: Optional[str] = Field(
+        default=None,
+        description="Optional project-relative file path for a pre-materialized dataset artifact.",
+        examples=["data/curated/pit/pit_vintage__P2024.parquet"],
+    )
     optional: bool = Field(default=False, description="If true, missing dataset does not fail the build (policy still applies).")
+
+    @field_validator("path")
+    @classmethod
+    def _validate_path_is_relative(cls, value: Optional[str]) -> Optional[str]:
+        if value is None:
+            return value
+        if not value.strip():
+            raise ValueError("DatasetSpec.path must be a non-empty relative path.")
+        if Path(value).is_absolute():
+            raise ValueError("DatasetSpec.path must be a relative path, not absolute.")
+        return value
 
 
 # -----------------------------
