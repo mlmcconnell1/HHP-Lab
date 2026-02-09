@@ -85,7 +85,7 @@ sequenceDiagram
     participant Storage
 
     Note over User,Storage: Phase 1: Build Crosswalks
-    User->>CLI: coclab generate xwalks --boundary 2025 --tracts 2023
+    User->>CLI: coclab generate xwalks --build demo --boundary 2025 --tracts 2023
     CLI->>Census: ingest_tiger_tracts(2023)
     Census->>Storage: Download TIGER shapefiles
     Census->>Storage: Save tracts__T2023.parquet
@@ -99,17 +99,15 @@ sequenceDiagram
     CLI->>Storage: Save xwalk__B2025xT2023.parquet
     CLI-->>User: Crosswalk built (X tracts, Y CoCs)
 
-    Note over User,Storage: Phase 2: Build ACS Measures
-    User->>CLI: coclab build measures --boundary 2025 --acs 2022
+    Note over User,Storage: Phase 2: Aggregate ACS Measures
+    User->>CLI: coclab aggregate acs --build demo
     CLI->>Storage: Load crosswalk
-    CLI->>ACS: fetch_all_states_tract_data(2022)
-    ACS->>ACS: Census API for each state
-    ACS-->>CLI: Tract-level ACS data
+    CLI->>Storage: Load cached ACS tract data
     CLI->>Measures: aggregate_to_coc(acs_data, crosswalk)
     Measures->>Measures: Weight by area_share or pop_share
     Measures->>Measures: Sum populations, weighted medians
     Measures-->>CLI: CoC-level measures
-    CLI->>Storage: Save measures__A2022@B2025.parquet
+    CLI->>Storage: Save to builds/demo/data/curated/measures/
     CLI-->>User: Measures built (N CoCs)
 ```
 
@@ -142,80 +140,69 @@ coclab ingest pit-vintage --vintage 2024
 
 # 1d. Ingest ZORI rent data
 coclab ingest zori --geography county
+
+# 1e. Ingest ACS tract data for each required vintage
+coclab ingest acs --acs 2010-2014 --tracts 2023
+coclab ingest acs --acs 2011-2015 --tracts 2023
+coclab ingest acs --acs 2012-2016 --tracts 2023
+coclab ingest acs --acs 2013-2017 --tracts 2023
+coclab ingest acs --acs 2014-2018 --tracts 2023
+coclab ingest acs --acs 2015-2019 --tracts 2023
+coclab ingest acs --acs 2016-2020 --tracts 2023
+coclab ingest acs --acs 2017-2021 --tracts 2023
+coclab ingest acs --acs 2018-2022 --tracts 2023
+coclab ingest acs --acs 2019-2023 --tracts 2023
+
+# 1f. Ingest PEP county population estimates
+coclab ingest pep --series auto
 ```
 
-### Phase 2: Build Crosswalks
+### Phase 2: Create Build and Generate Crosswalks
 
-Build crosswalks for each boundary vintage against the 2023 Census geometries:
+Create a named build scaffold, then generate crosswalks for each boundary vintage:
 
 ```bash
-coclab generate xwalks --boundary 2015 --tracts 2023 --counties 2023
-coclab generate xwalks --boundary 2016 --tracts 2023 --counties 2023
-coclab generate xwalks --boundary 2017 --tracts 2023 --counties 2023
-coclab generate xwalks --boundary 2018 --tracts 2023 --counties 2023
-coclab generate xwalks --boundary 2019 --tracts 2023 --counties 2023
-coclab generate xwalks --boundary 2020 --tracts 2023 --counties 2023
-coclab generate xwalks --boundary 2021 --tracts 2023 --counties 2023
-coclab generate xwalks --boundary 2022 --tracts 2023 --counties 2023
-coclab generate xwalks --boundary 2023 --tracts 2023 --counties 2023
-coclab generate xwalks --boundary 2024 --tracts 2023 --counties 2023
+# Create the build
+coclab build create --name panel_2015_2024 --years 2015-2024
+
+# Build crosswalks for each boundary vintage
+coclab generate xwalks --build panel_2015_2024 --boundary 2015 --tracts 2023 --counties 2023
+coclab generate xwalks --build panel_2015_2024 --boundary 2016 --tracts 2023 --counties 2023
+coclab generate xwalks --build panel_2015_2024 --boundary 2017 --tracts 2023 --counties 2023
+coclab generate xwalks --build panel_2015_2024 --boundary 2018 --tracts 2023 --counties 2023
+coclab generate xwalks --build panel_2015_2024 --boundary 2019 --tracts 2023 --counties 2023
+coclab generate xwalks --build panel_2015_2024 --boundary 2020 --tracts 2023 --counties 2023
+coclab generate xwalks --build panel_2015_2024 --boundary 2021 --tracts 2023 --counties 2023
+coclab generate xwalks --build panel_2015_2024 --boundary 2022 --tracts 2023 --counties 2023
+coclab generate xwalks --build panel_2015_2024 --boundary 2023 --tracts 2023 --counties 2023
+coclab generate xwalks --build panel_2015_2024 --boundary 2024 --tracts 2023 --counties 2023
 ```
 
-### Phase 3: Build ACS Measures
+### Phase 3: Aggregate Measures
 
-The default alignment policy maps PIT year Y → ACS vintage Y-1. Build measures for each required (boundary, ACS) pair:
+Aggregate ACS, ZORI, PEP, and PIT data to CoC level using the named build:
 
 ```bash
-# PIT 2015 → boundary 2015, ACS 2014 (2010-2014 estimates)
-coclab build measures --boundary 2015 --acs 2010-2014 --tracts 2023
+# Aggregate ACS measures
+coclab aggregate acs --build panel_2015_2024
 
-# PIT 2016 → boundary 2016, ACS 2015 (2011-2015 estimates)
-coclab build measures --boundary 2016 --acs 2011-2015 --tracts 2023
+# Aggregate ZORI rent indices
+coclab aggregate zori --build panel_2015_2024
 
-# PIT 2017 → boundary 2017, ACS 2016 (2012-2016 estimates)
-coclab build measures --boundary 2017 --acs 2012-2016 --tracts 2023
+# Aggregate PEP population estimates
+coclab aggregate pep --build panel_2015_2024
 
-# PIT 2018 → boundary 2018, ACS 2017 (2013-2017 estimates)
-coclab build measures --boundary 2018 --acs 2013-2017 --tracts 2023
-
-# PIT 2019 → boundary 2019, ACS 2018 (2014-2018 estimates)
-coclab build measures --boundary 2019 --acs 2014-2018 --tracts 2023
-
-# PIT 2020 → boundary 2020, ACS 2019 (2015-2019 estimates)
-coclab build measures --boundary 2020 --acs 2015-2019 --tracts 2023
-
-# PIT 2021 → boundary 2021, ACS 2020 (2016-2020 estimates)
-coclab build measures --boundary 2021 --acs 2016-2020 --tracts 2023
-
-# PIT 2022 → boundary 2022, ACS 2021 (2017-2021 estimates)
-coclab build measures --boundary 2022 --acs 2017-2021 --tracts 2023
-
-# PIT 2023 → boundary 2023, ACS 2022 (2018-2022 estimates)
-coclab build measures --boundary 2023 --acs 2018-2022 --tracts 2023
-
-# PIT 2024 → boundary 2024, ACS 2023 (2019-2023 estimates)
-coclab build measures --boundary 2024 --acs 2019-2023 --tracts 2023
+# Aggregate PIT counts
+coclab aggregate pit --build panel_2015_2024
 ```
 
-### Phase 4: Aggregate ZORI to CoC Level
-
-Aggregate county-level ZORI to CoC geography with yearly collapse:
-
-```bash
-coclab build zori \
-  --boundary 2024 \
-  --counties 2023 \
-  --acs 2019-2023 \
-  --weighting renter_households \
-  --to-yearly
-```
-
-### Phase 5: Build the Panel
+### Phase 4: Build the Panel
 
 Assemble the CoC × year panel with ZORI integration:
 
 ```bash
 coclab build panel \
+  --build panel_2015_2024 \
   --start 2015 \
   --end 2024 \
   --weighting population \
@@ -223,14 +210,14 @@ coclab build panel \
   --zori-min-coverage 0.90
 ```
 
-### Phase 6: Export the Bundle
+### Phase 5: Export the Bundle
 
 Create an analysis-ready export bundle:
 
 ```bash
 coclab build export \
   --name coc_analysis_2015_2024 \
-  --years 2015-2024 \
+  --build panel_2015_2024 \
   --include panel,manifest,codebook,diagnostics \
   --compress
 ```
@@ -242,12 +229,16 @@ coclab build export \
 | 1a. Boundaries | `data/curated/coc_boundaries/coc__B{year}.parquet` |
 | 1b. Census | `data/curated/census/tracts__T2023.parquet`, `counties__C2023.parquet` |
 | 1c. PIT | `data/curated/pit/pit_vintage__P2024.parquet` |
-| 1d. ZORI | `data/curated/zori/zori__county__Z{year}.parquet` |
-| 2. Crosswalks | `data/curated/xwalks/xwalk__B{year}xT2023.parquet` |
-| 3. Measures | `data/curated/measures/measures__A{acs}@B{year}.parquet` |
-| 4. CoC ZORI | `data/curated/zori/zori_yearly__*.parquet` |
-| 5. Panel | `data/curated/panel/panel__Y2015-2024@B{boundary}.parquet` |
-| 6. Export | `exports/export-1/` (with MANIFEST.json, codebook, etc.) |
+| 1d. ZORI | `data/curated/zori/zori__county.parquet` |
+| 1e. ACS | `data/curated/acs/acs_tracts__A{acs_end}xT2023.parquet` |
+| 1f. PEP | `data/curated/pep/pep_county__v{vintage}.parquet` |
+| 2. Crosswalks | `builds/{name}/data/curated/xwalks/xwalk__B{year}xT2023.parquet` |
+| 3. Measures | `builds/{name}/data/curated/measures/` |
+| 3. ZORI | `builds/{name}/data/curated/zori/` |
+| 3. PEP | `builds/{name}/data/curated/pep/` |
+| 3. PIT | `builds/{name}/data/curated/pit/` |
+| 4. Panel | `builds/{name}/data/curated/panel/` |
+| 5. Export | `exports/export-1/` (with MANIFEST.json, codebook, etc.) |
 
 ### Alignment Policy Reference
 
