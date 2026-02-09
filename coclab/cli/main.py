@@ -15,6 +15,7 @@ from coclab.cli.aggregate import aggregate_app
 from coclab.cli.build_panel import build_panel_cmd
 from coclab.cli.build_xwalks import build_xwalks
 from coclab.cli.builds import catalog_cmd, create_build, list_builds_cmd
+from coclab.cli.recipe import recipe_cmd
 from coclab.cli.compare_vintages import compare_vintages
 from coclab.cli.crosscheck_pit_vintages import crosscheck_pit_vintages, validate_pit_vintages
 from coclab.cli.crosscheck_population import crosscheck_population, validate_population
@@ -1561,6 +1562,7 @@ build_app.command("panel")(build_panel_cmd)
 build_app.command("export")(export_bundle)
 build_app.command("create")(create_build)
 build_app.command("list")(list_builds_cmd)
+build_app.command("recipe")(recipe_cmd)
 show_app.command("vintage-diffs")(compare_vintages)
 show_app.command("map")(show)
 show_app.command("measures")(show_measures)
