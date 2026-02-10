@@ -544,3 +544,73 @@ class TestJoinOn:
         recipe = load_recipe(data)
         join_step = recipe.pipelines[0].steps[-1]
         assert join_step.join_on == ["geo_id", "year"]
+
+
+# ===========================================================================
+# DatasetSpec.years tests
+# ===========================================================================
+
+
+class TestDatasetYears:
+
+    def test_years_range_string_accepted(self):
+        data = _minimal_recipe()
+        data["datasets"]["acs"]["years"] = "2020-2022"
+        recipe = load_recipe(data)
+        assert recipe.datasets["acs"].years is not None
+        assert recipe.datasets["acs"].years.range == "2020-2022"
+
+    def test_years_spec_accepted(self):
+        data = _minimal_recipe()
+        data["datasets"]["acs"]["years"] = {"years": [2020, 2021]}
+        recipe = load_recipe(data)
+        assert recipe.datasets["acs"].years.years == [2020, 2021]
+
+    def test_years_defaults_to_none(self):
+        recipe = load_recipe(_minimal_recipe())
+        assert recipe.datasets["acs"].years is None
+
+
+# ===========================================================================
+# YearSpec bare string coercion tests
+# ===========================================================================
+
+
+class TestYearSpecCoercion:
+
+    def test_bare_string_coerced_in_universe(self):
+        data = _minimal_recipe()
+        data["universe"] = "2020-2022"
+        recipe = load_recipe(data)
+        assert recipe.universe.range == "2020-2022"
+
+    def test_bare_string_coerced_in_file_set_segment(self):
+        data = _recipe_with_file_set()
+        # segments already use {"range": ...} — switch to bare strings
+        data["datasets"]["acs"]["file_set"]["segments"][0]["years"] = "2015-2019"
+        data["datasets"]["acs"]["file_set"]["segments"][1]["years"] = "2020-2024"
+        recipe = load_recipe(data)
+        assert recipe.datasets["acs"].file_set.segments[0].years.range == "2015-2019"
+
+
+# ===========================================================================
+# Optional transforms/pipelines tests
+# ===========================================================================
+
+
+class TestOptionalTransformsPipelines:
+
+    def test_missing_transforms_defaults_empty(self):
+        data = _minimal_recipe()
+        del data["transforms"]
+        del data["pipelines"]
+        recipe = load_recipe(data)
+        assert recipe.transforms == []
+        assert recipe.pipelines == []
+
+    def test_empty_transforms_accepted(self):
+        data = _minimal_recipe()
+        data["transforms"] = []
+        data["pipelines"] = []
+        recipe = load_recipe(data)
+        assert recipe.transforms == []

@@ -18,13 +18,10 @@ datasets:
     product: pit
     version: 1
     native_geometry: { type: coc }
+    years: "2015-2024"
     params:
       align: point_in_time_jan
-    file_set:
-      path_template: "coclab/data/curated/pit/pit_vintage__P2024.parquet"
-      segments:
-        - years: "2015-2024"
-          geometry: { type: coc, vintage: { year }, source: hud_exchange }
+    path: coclab/data/curated/pit/pit_vintage__P2024.parquet
 
   acs:
     provider: census

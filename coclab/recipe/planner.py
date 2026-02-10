@@ -94,7 +94,15 @@ def _resolve_dataset_year(
     if ds.file_set is not None:
         return _resolve_via_file_set(dataset_id, year, ds.file_set, ds.native_geometry)
 
-    # No file_set — use the static path and native_geometry
+    # No file_set — check year coverage if declared, then use static path
+    if ds.years is not None:
+        covered = expand_year_spec(ds.years)
+        if year not in covered:
+            raise PlannerError(
+                f"Dataset '{dataset_id}' declares year coverage "
+                f"{ds.years.range or ds.years.years} but year {year} is not covered."
+            )
+
     return ResolvedDatasetYear(
         dataset_id=dataset_id,
         year=year,

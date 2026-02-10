@@ -29,6 +29,7 @@ class YearSpec(BaseModel):
     Exactly one of:
       - range: "2018-2024"
       - years: [2018, 2019, ...]
+    Also accepts a bare string like "2018-2024" as shorthand for {range: "2018-2024"}.
     """
     model_config = ConfigDict(extra="forbid")
 
@@ -42,6 +43,13 @@ class YearSpec(BaseModel):
         description="Explicit list of years.",
         examples=[[2018, 2019, 2020]],
     )
+
+    @model_validator(mode="before")
+    @classmethod
+    def _coerce_bare_string(cls, data: Any) -> Any:
+        if isinstance(data, str):
+            return {"range": data}
+        return data
 
     @model_validator(mode="after")
     def _validate_one_of(self) -> "YearSpec":
@@ -134,6 +142,10 @@ class DatasetSpec(BaseModel):
     product: str = Field(..., description="Dataset product name within provider, e.g. 'pit', 'acs5', 'pep', 'county-returns'.")
     version: int = Field(..., description="Adapter version for this dataset product (schema evolution control).", ge=1)
     native_geometry: GeometryRef = Field(..., description="Native geometry of the dataset.")
+    years: Optional[YearSpec] = Field(
+        default=None,
+        description="Temporal coverage of this dataset. For file_set datasets, coverage is implicit from segments.",
+    )
     params: Dict[str, Any] = Field(default_factory=dict, description="Free-form adapter params.")
     path: Optional[str] = Field(
         default=None,
@@ -383,8 +395,8 @@ class RecipeV1(BaseModel):
 
     targets: List[TargetSpec]
     datasets: Dict[str, DatasetSpec]
-    transforms: List[TransformSpec]
-    pipelines: List[PipelineSpec]
+    transforms: List[TransformSpec] = Field(default_factory=list)
+    pipelines: List[PipelineSpec] = Field(default_factory=list)
     validation: ValidationPolicy = Field(default_factory=ValidationPolicy)
 
     @model_validator(mode="after")

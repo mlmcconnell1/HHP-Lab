@@ -55,6 +55,12 @@ def recipe_cmd(
 
     typer.echo(f"Loaded recipe: {parsed.name} (version {parsed.version})")
 
+    # 1b. Warn about missing transforms/pipelines
+    if not parsed.transforms:
+        typer.echo("  Warning: No transforms defined; no build output will be produced.", err=True)
+    if not parsed.pipelines:
+        typer.echo("  Warning: No pipelines defined; no build output will be produced.", err=True)
+
     # 2. Run adapter registry validation
     diagnostics = validate_recipe_adapters(
         parsed, geometry_registry, dataset_registry,

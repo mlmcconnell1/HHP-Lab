@@ -236,6 +236,25 @@ class TestPlannerErrors:
         with pytest.raises(PlannerError, match="no compatible transform found"):
             resolve_plan(recipe, "main")
 
+    def test_dataset_years_coverage_violation(self):
+        """Year outside declared dataset.years should fail."""
+        data = _segmented_recipe()
+        # PIT declares years 2017-2021 but universe asks for 2017-2021, fine.
+        # Narrow PIT years so 2017 is excluded.
+        data["datasets"]["pit"]["years"] = "2018-2021"
+        recipe = load_recipe(data)
+        with pytest.raises(PlannerError, match="year 2017 is not covered"):
+            resolve_plan(recipe, "main")
+
+    def test_dataset_years_coverage_passes(self):
+        """Dataset with years covering the full universe should resolve OK."""
+        data = _segmented_recipe()
+        data["datasets"]["pit"]["years"] = "2017-2021"
+        recipe = load_recipe(data)
+        plan = resolve_plan(recipe, "main")
+        pit_tasks = [t for t in plan.resample_tasks if t.dataset_id == "pit"]
+        assert len(pit_tasks) == 5
+
     def test_unknown_pipeline_id(self):
         recipe = load_recipe(_segmented_recipe())
         with pytest.raises(PlannerError, match="Pipeline 'nonexistent' not found"):
