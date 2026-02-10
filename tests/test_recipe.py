@@ -15,7 +15,15 @@ from coclab.recipe.adapters import (
     validate_recipe_adapters,
 )
 from coclab.recipe.loader import RecipeLoadError, load_recipe
-from coclab.recipe.recipe_schema import DatasetSpec, GeometryRef, RecipeV1
+from coclab.recipe.recipe_schema import (
+    DatasetSpec,
+    FileSetSegment,
+    FileSetSpec,
+    GeometryRef,
+    RecipeV1,
+    YearSpec,
+    expand_year_spec,
+)
 
 runner = CliRunner()
 
@@ -337,3 +345,202 @@ class TestRecipeCLI:
             "--dry-run",
         ])
         assert "Loaded recipe: test-recipe" in result.output
+
+
+# ===========================================================================
+# expand_year_spec tests
+# ===========================================================================
+
+
+class TestExpandYearSpec:
+
+    def test_from_range_string(self):
+        assert expand_year_spec("2018-2020") == [2018, 2019, 2020]
+
+    def test_from_year_spec_range(self):
+        spec = YearSpec(range="2020-2022")
+        assert expand_year_spec(spec) == [2020, 2021, 2022]
+
+    def test_from_year_spec_years(self):
+        spec = YearSpec(years=[2022, 2020, 2021])
+        assert expand_year_spec(spec) == [2020, 2021, 2022]
+
+    def test_from_list(self):
+        assert expand_year_spec([2023, 2021]) == [2021, 2023]
+
+
+# ===========================================================================
+# FileSet schema tests
+# ===========================================================================
+
+
+def _recipe_with_file_set(**overrides) -> dict:
+    """Build a recipe dict that includes a dataset with file_set."""
+    file_set = {
+        "path_template": "data/acs/acs_{year}.parquet",
+        "segments": [
+            {
+                "years": {"range": "2015-2019"},
+                "geometry": {"type": "tract", "vintage": 2010, "source": "nhgis"},
+            },
+            {
+                "years": {"range": "2020-2024"},
+                "geometry": {"type": "tract", "vintage": 2020, "source": "tiger"},
+            },
+        ],
+    }
+    file_set.update(overrides)
+    return {
+        "version": 1,
+        "name": "fileset-test",
+        "universe": {"range": "2015-2024"},
+        "targets": [
+            {"id": "coc_panel", "geometry": {"type": "coc", "vintage": 2025}},
+        ],
+        "datasets": {
+            "acs": {
+                "provider": "census",
+                "product": "acs",
+                "version": 1,
+                "native_geometry": {"type": "tract"},
+                "file_set": file_set,
+            },
+        },
+        "transforms": [
+            {
+                "id": "coc_to_tract_2010",
+                "type": "crosswalk",
+                "from": {"type": "coc", "vintage": 2025},
+                "to": {"type": "tract", "vintage": 2010},
+                "spec": {"weighting": {"scheme": "area"}},
+            },
+            {
+                "id": "coc_to_tract_2020",
+                "type": "crosswalk",
+                "from": {"type": "coc", "vintage": 2025},
+                "to": {"type": "tract", "vintage": 2020},
+                "spec": {"weighting": {"scheme": "area"}},
+            },
+        ],
+        "pipelines": [
+            {
+                "id": "main",
+                "target": "coc_panel",
+                "steps": [
+                    {
+                        "resample": {
+                            "dataset": "acs",
+                            "to_geometry": {"type": "coc", "vintage": 2025},
+                            "method": "aggregate",
+                            "via": "auto",
+                            "measures": ["total_population"],
+                        },
+                    },
+                    {
+                        "join": {
+                            "datasets": ["acs"],
+                            "join_on": ["geo_id", "year"],
+                        },
+                    },
+                ],
+            },
+        ],
+    }
+
+
+class TestFileSetSchema:
+
+    def test_valid_file_set_parses(self):
+        recipe = load_recipe(_recipe_with_file_set())
+        assert recipe.datasets["acs"].file_set is not None
+        assert len(recipe.datasets["acs"].file_set.segments) == 2
+
+    def test_path_template_missing_year_placeholder(self):
+        data = _recipe_with_file_set()
+        data["datasets"]["acs"]["file_set"]["path_template"] = "data/acs/acs.parquet"
+        with pytest.raises(RecipeLoadError, match="path_template must contain"):
+            load_recipe(data)
+
+    def test_segment_overlap_detected(self):
+        data = _recipe_with_file_set()
+        # Make second segment overlap with first (2019 is in both)
+        data["datasets"]["acs"]["file_set"]["segments"][1]["years"] = {"range": "2019-2024"}
+        with pytest.raises(RecipeLoadError, match="overlap on years.*2019"):
+            load_recipe(data)
+
+    def test_override_outside_segment_rejected(self):
+        data = _recipe_with_file_set()
+        data["datasets"]["acs"]["file_set"]["segments"][0]["overrides"] = {
+            2020: "data/acs/special.parquet",
+        }
+        with pytest.raises(RecipeLoadError, match="override for year 2020.*not in segment"):
+            load_recipe(data)
+
+    def test_segment_geometry_type_mismatch_rejected(self):
+        data = _recipe_with_file_set()
+        # Change one segment's geometry type to something other than tract
+        data["datasets"]["acs"]["file_set"]["segments"][0]["geometry"]["type"] = "county"
+        with pytest.raises(RecipeLoadError, match="geometry type 'county' does not match.*'tract'"):
+            load_recipe(data)
+
+    def test_override_within_segment_accepted(self):
+        data = _recipe_with_file_set()
+        data["datasets"]["acs"]["file_set"]["segments"][0]["overrides"] = {
+            2017: "data/acs/special_2017.parquet",
+        }
+        recipe = load_recipe(data)
+        seg = recipe.datasets["acs"].file_set.segments[0]
+        assert seg.overrides[2017] == "data/acs/special_2017.parquet"
+
+
+# ===========================================================================
+# via:auto schema tests
+# ===========================================================================
+
+
+class TestViaAuto:
+
+    def test_via_auto_accepted_for_aggregate(self):
+        data = _recipe_with_file_set()
+        recipe = load_recipe(data)
+        # The resample step should have via="auto"
+        step = recipe.pipelines[0].steps[0]
+        assert step.via == "auto"
+
+    def test_via_auto_accepted_for_allocate(self):
+        data = _recipe_with_file_set()
+        data["pipelines"][0]["steps"][0]["resample"]["method"] = "allocate"
+        recipe = load_recipe(data)
+        step = recipe.pipelines[0].steps[0]
+        assert step.via == "auto"
+
+    def test_via_auto_not_in_transform_id_check(self):
+        """via='auto' should not be checked against transform ids."""
+        data = _minimal_recipe()
+        data["pipelines"][0]["steps"][1]["via"] = "auto"
+        data["pipelines"][0]["steps"][1]["method"] = "aggregate"
+        recipe = load_recipe(data)
+        assert recipe.pipelines[0].steps[1].via == "auto"
+
+
+# ===========================================================================
+# join_on schema tests
+# ===========================================================================
+
+
+class TestJoinOn:
+
+    def test_join_on_parses(self):
+        data = _recipe_with_file_set()
+        recipe = load_recipe(data)
+        join_step = recipe.pipelines[0].steps[1]
+        assert join_step.join_on == ["geo_id", "year"]
+
+    def test_join_on_default(self):
+        data = _minimal_recipe()
+        data["pipelines"][0]["steps"].append(
+            {"kind": "join", "datasets": ["acs"]}
+        )
+        recipe = load_recipe(data)
+        join_step = recipe.pipelines[0].steps[-1]
+        assert join_step.join_on == ["geo_id", "year"]

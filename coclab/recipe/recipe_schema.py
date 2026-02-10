@@ -50,6 +50,29 @@ class YearSpec(BaseModel):
         return self
 
 
+def expand_year_spec(spec: YearSpec | str | list[int]) -> list[int]:
+    """Expand a YearSpec (or shorthand) to a sorted list of year ints.
+
+    Accepts:
+      - YearSpec model instance
+      - str range like "2018-2024"
+      - explicit list of ints
+    """
+    if isinstance(spec, list):
+        return sorted(spec)
+    if isinstance(spec, str):
+        spec = YearSpec(range=spec)
+    if spec.years is not None:
+        return sorted(spec.years)
+    if spec.range is not None:
+        parts = spec.range.split("-")
+        if len(parts) != 2:
+            raise ValueError(f"Invalid year range format: '{spec.range}'. Expected 'YYYY-YYYY'.")
+        start, end = int(parts[0]), int(parts[1])
+        return list(range(start, end + 1))
+    raise ValueError("YearSpec has neither 'range' nor 'years'.")
+
+
 class GeometryRef(BaseModel):
     """
     Reference to a geometry universe.
@@ -66,6 +89,34 @@ class GeometryRef(BaseModel):
 
 
 # -----------------------------
+# File set (time-banded dataset paths)
+# -----------------------------
+
+class FileSetSegment(BaseModel):
+    """A time-banded segment mapping years to a geometry vintage and optional path overrides."""
+    model_config = ConfigDict(extra="forbid")
+
+    years: YearSpec
+    geometry: GeometryRef
+    overrides: Dict[int, str] = Field(default_factory=dict)
+
+
+class FileSetSpec(BaseModel):
+    """Path template + segments for datasets whose geometry vintage varies by year."""
+    model_config = ConfigDict(extra="forbid")
+
+    path_template: str = Field(..., description="Template with {year} placeholder.")
+    segments: List[FileSetSegment] = Field(..., min_length=1)
+
+    @field_validator("path_template")
+    @classmethod
+    def _validate_path_template(cls, value: str) -> str:
+        if "{year}" not in value:
+            raise ValueError("FileSetSpec.path_template must contain '{year}'.")
+        return value
+
+
+# -----------------------------
 # Datasets (extensible)
 # -----------------------------
 
@@ -75,6 +126,7 @@ class DatasetSpec(BaseModel):
     native_geometry indicates the dataset's base spatial granularity.
     params is free-form and validated by the dataset adapter.
     path optionally points to a project-relative on-disk artifact to use for this dataset.
+    file_set provides time-banded paths and geometry vintages for multi-segment datasets.
     """
     model_config = ConfigDict(extra="forbid")
 
@@ -87,6 +139,10 @@ class DatasetSpec(BaseModel):
         default=None,
         description="Optional project-relative file path for a pre-materialized dataset artifact.",
         examples=["data/curated/pit/pit_vintage__P2024.parquet"],
+    )
+    file_set: Optional[FileSetSpec] = Field(
+        default=None,
+        description="Time-banded file set with per-segment geometry vintages.",
     )
     optional: bool = Field(default=False, description="If true, missing dataset does not fail the build (policy still applies).")
 
@@ -217,7 +273,7 @@ class ResampleStep(BaseModel):
     dataset: str = Field(..., description="Dataset id to resample.")
     to_geometry: GeometryRef = Field(..., description="Destination geometry for this dataset output.")
     method: ResampleMethod = Field(..., description="Resampling method.")
-    via: Optional[str] = Field(default=None, description="Transform id used for allocate/aggregate.")
+    via: Optional[str] = Field(default=None, description="Transform id or 'auto' for allocate/aggregate.")
     measures: List[str] = Field(..., description="List of measure/field names to carry through.")
     aggregation: Optional[AggregationMethod] = Field(
         default=None,
@@ -365,7 +421,7 @@ class RecipeV1(BaseModel):
                 elif isinstance(step, ResampleStep):
                     if step.dataset not in dataset_ids:
                         raise ValueError(f"Pipeline '{p.id}' resample step references unknown dataset '{step.dataset}'.")
-                    if step.via and step.via not in transform_id_set:
+                    if step.via and step.via != "auto" and step.via not in transform_id_set:
                         raise ValueError(f"Pipeline '{p.id}' resample step references unknown transform '{step.via}'.")
 
                 elif isinstance(step, JoinStep):
@@ -373,4 +429,38 @@ class RecipeV1(BaseModel):
                     if missing:
                         raise ValueError(f"Pipeline '{p.id}' join step references unknown datasets: {missing}")
 
+        return self
+
+    @model_validator(mode="after")
+    def _validate_file_sets(self) -> "RecipeV1":
+        """Semantic validation for dataset file_set segments."""
+        for ds_id, ds in self.datasets.items():
+            if ds.file_set is None:
+                continue
+            all_years: set[int] = set()
+            for seg in ds.file_set.segments:
+                seg_years = set(expand_year_spec(seg.years))
+                # Check override keys fall within segment years
+                for override_year in seg.overrides:
+                    if override_year not in seg_years:
+                        raise ValueError(
+                            f"Dataset '{ds_id}' segment years "
+                            f"{seg.years.range or seg.years.years} has override "
+                            f"for year {override_year} (not in segment)."
+                        )
+                # Check segment geometry type matches dataset native_geometry.type
+                if seg.geometry.type != ds.native_geometry.type:
+                    raise ValueError(
+                        f"Dataset '{ds_id}' segment geometry type "
+                        f"'{seg.geometry.type}' does not match "
+                        f"native_geometry type '{ds.native_geometry.type}'."
+                    )
+                # Check for overlapping years across segments
+                overlap = all_years & seg_years
+                if overlap:
+                    raise ValueError(
+                        f"Dataset '{ds_id}' file_set segments overlap "
+                        f"on years: {sorted(overlap)}."
+                    )
+                all_years |= seg_years
         return self
