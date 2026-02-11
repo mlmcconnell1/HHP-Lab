@@ -346,6 +346,54 @@ class TestRecipeCLI:
         ])
         assert "Loaded recipe: test-recipe" in result.output
 
+    def test_missing_static_path_reported(self, tmp_path: Path):
+        import yaml
+
+        data = _minimal_recipe()
+        data["datasets"]["acs"]["path"] = "data/does_not_exist.parquet"
+        recipe_file = tmp_path / "recipe.yaml"
+        recipe_file.write_text(yaml.dump(data), encoding="utf-8")
+        result = runner.invoke(app, [
+            "build", "recipe",
+            "--recipe", str(recipe_file),
+        ])
+        assert "Missing file" in result.output
+        assert "does_not_exist.parquet" in result.output
+
+    def test_missing_file_set_paths_reported(self, tmp_path: Path):
+        import yaml
+
+        data = _recipe_with_file_set()
+        # Narrow universe so we don't get too many missing-file messages
+        data["universe"] = {"range": "2015-2015"}
+        recipe_file = tmp_path / "recipe.yaml"
+        recipe_file.write_text(yaml.dump(data), encoding="utf-8")
+        result = runner.invoke(app, [
+            "build", "recipe",
+            "--recipe", str(recipe_file),
+        ])
+        assert "Missing file" in result.output
+        assert "acs_2015.parquet" in result.output
+
+    def test_existing_path_no_missing_file_error(self, tmp_path: Path):
+        import yaml
+
+        # Create the actual file
+        data_dir = tmp_path / "data" / "curated"
+        data_dir.mkdir(parents=True)
+        parquet = data_dir / "acs.parquet"
+        parquet.write_bytes(b"fake")
+
+        data = _minimal_recipe()
+        data["datasets"]["acs"]["path"] = "data/curated/acs.parquet"
+        recipe_file = tmp_path / "recipe.yaml"
+        recipe_file.write_text(yaml.dump(data), encoding="utf-8")
+        result = runner.invoke(app, [
+            "build", "recipe",
+            "--recipe", str(recipe_file),
+        ])
+        assert "Missing file" not in result.output
+
 
 # ===========================================================================
 # expand_year_spec tests

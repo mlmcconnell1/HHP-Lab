@@ -14,6 +14,41 @@ from coclab.recipe.adapters import (
     validate_recipe_adapters,
 )
 from coclab.recipe.loader import RecipeLoadError, load_recipe
+from coclab.recipe.recipe_schema import RecipeV1, expand_year_spec
+
+
+def _check_dataset_paths(parsed: RecipeV1, recipe_dir: Path) -> list[str]:
+    """Check that all referenced dataset files exist on disk.
+
+    Returns a list of error messages for missing files.
+    """
+    missing: list[str] = []
+
+    for ds_id, ds in parsed.datasets.items():
+        # Static path
+        if ds.path is not None:
+            resolved = recipe_dir / ds.path
+            if not resolved.exists():
+                missing.append(
+                    f"Dataset '{ds_id}' path not found: {ds.path}"
+                )
+
+        # File set: check template-expanded paths and overrides
+        if ds.file_set is not None:
+            for seg in ds.file_set.segments:
+                seg_years = expand_year_spec(seg.years)
+                for year in seg_years:
+                    if year in seg.overrides:
+                        p = seg.overrides[year]
+                    else:
+                        p = ds.file_set.path_template.format(year=year)
+                    resolved = recipe_dir / p
+                    if not resolved.exists():
+                        missing.append(
+                            f"Dataset '{ds_id}' year {year} file not found: {p}"
+                        )
+
+    return missing
 
 
 def recipe_cmd(
@@ -61,6 +96,12 @@ def recipe_cmd(
     if not parsed.pipelines:
         typer.echo("  Warning: No pipelines defined; no build output will be produced.", err=True)
 
+    # 1c. Pre-flight: check that referenced data files exist
+    recipe_dir = Path(recipe).resolve().parent
+    path_errors = _check_dataset_paths(parsed, recipe_dir)
+    for msg in path_errors:
+        typer.echo(f"  Missing file: {msg}", err=True)
+
     # 2. Run adapter registry validation
     diagnostics = validate_recipe_adapters(
         parsed, geometry_registry, dataset_registry,
@@ -72,11 +113,12 @@ def recipe_cmd(
     for w in warnings:
         typer.echo(f"  Warning: {w.message}", err=True)
 
-    if errors:
+    all_errors = path_errors + [e.message for e in errors]
+    if all_errors:
         for e in errors:
             typer.echo(f"  Error: {e.message}", err=True)
         typer.echo(
-            f"\nRecipe validation failed with {len(errors)} error(s).",
+            f"\nRecipe validation failed with {len(all_errors)} error(s).",
             err=True,
         )
         raise typer.Exit(code=1)
