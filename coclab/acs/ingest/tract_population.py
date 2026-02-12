@@ -299,11 +299,11 @@ def fetch_tract_data(
 
     # Persist raw API snapshot
     source_url = CENSUS_API.format(year=year)
-    snapshot_id = f"A{year}_full"
     snap_dir, content_sha256, content_size = write_api_snapshot(
         all_raw_content,
         "acs5_tract",
-        snapshot_id=snapshot_id,
+        year=year,
+        variant="full",
         request_metadata={
             "url": source_url,
             "params": {

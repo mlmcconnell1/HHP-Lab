@@ -4,11 +4,14 @@ Verifies that ingest modules comply with the raw-data-retention-policy:
 1. Raw snapshots are persisted via raw_snapshot utilities.
 2. Source registry local_path references raw artifacts (not curated outputs).
 3. Curated paths are stored in metadata["curated_path"] when distinct.
+4. API ingests use year+variant (not legacy snapshot_id) for year-first layout.
+5. File ingests include a year segment in their subdirs.
 """
 
 from __future__ import annotations
 
 import ast
+import re
 from pathlib import Path
 
 import pytest
@@ -22,6 +25,22 @@ INGEST_MODULES = [
     "coclab/nhgis/ingest.py",
     "coclab/acs/ingest/tract_population.py",
     "coclab/rents/weights.py",
+]
+
+# API ingest modules must use year+variant (not legacy snapshot_id)
+API_INGEST_MODULES = [
+    "coclab/ingest/hud_opendata_arcgis.py",
+    "coclab/ingest/hud_exchange_gis.py",
+    "coclab/acs/ingest/tract_population.py",
+    "coclab/rents/weights.py",
+]
+
+# File ingest modules that use persist_file_snapshot with subdirs
+FILE_INGEST_MODULES = [
+    "coclab/census/ingest/tiger_tracts.py",
+    "coclab/census/ingest/tiger_counties.py",
+    "coclab/census/ingest/tract_relationship.py",
+    "coclab/nhgis/ingest.py",
 ]
 
 
@@ -148,3 +167,67 @@ class TestCuratedPathInMetadata:
             f"{module_path} produces curated output but does not store "
             f"curated_path in register_source metadata"
         )
+
+
+class TestYearFirstApiLayout:
+    """Verify API ingests use year+variant for canonical year-first raw layout."""
+
+    @pytest.mark.parametrize("module_path", API_INGEST_MODULES)
+    def test_uses_year_variant_not_snapshot_id(self, module_path: str):
+        """write_api_snapshot calls should use year= and variant=, not snapshot_id=."""
+        source = _module_source(module_path)
+        # Find write_api_snapshot call blocks and check for year= usage
+        assert "year=" in source and "variant=" in source, (
+            f"{module_path}: write_api_snapshot should use year= and variant= "
+            f"for canonical year-first layout, not legacy snapshot_id="
+        )
+
+    @pytest.mark.parametrize("module_path", API_INGEST_MODULES)
+    def test_no_legacy_snapshot_id(self, module_path: str):
+        """write_api_snapshot calls should not use legacy snapshot_id=."""
+        source = _module_source(module_path)
+        # Check that snapshot_id= is not used in write_api_snapshot calls
+        # (it may still appear in manifest dicts or other contexts)
+        in_call = False
+        paren_depth = 0
+        for line in source.splitlines():
+            stripped = line.strip()
+            if "write_api_snapshot(" in stripped:
+                in_call = True
+                paren_depth = 0
+            if in_call:
+                paren_depth += stripped.count("(") - stripped.count(")")
+                assert "snapshot_id=" not in stripped, (
+                    f"{module_path}: write_api_snapshot should use year=/variant= "
+                    f"instead of legacy snapshot_id=. Line: {stripped}"
+                )
+                if paren_depth <= 0 and ")" in stripped:
+                    in_call = False
+
+
+class TestYearFirstFileLayout:
+    """Verify file ingests include a year segment in their raw paths."""
+
+    @pytest.mark.parametrize("module_path", FILE_INGEST_MODULES)
+    def test_subdirs_include_year(self, module_path: str):
+        """persist_file_snapshot subdirs should include a year-like segment."""
+        source = _module_source(module_path)
+        # Find subdirs=(...) in persist_file_snapshot calls
+        # The year segment should be first in subdirs (e.g., str(year), "2020")
+        subdirs_pattern = re.compile(r'subdirs=\(([^)]+)\)')
+        matches = subdirs_pattern.findall(source)
+        assert matches, (
+            f"{module_path}: no subdirs= found in persist_file_snapshot call"
+        )
+        for match in matches:
+            # The first element should contain a year reference
+            first_arg = match.split(",")[0].strip().strip("'\"")
+            has_year_ref = (
+                "year" in first_arg.lower()
+                or first_arg.isdigit()
+                or first_arg.startswith("str(")
+            )
+            assert has_year_ref, (
+                f"{module_path}: first subdir segment should be a year, "
+                f"got: {first_arg}"
+            )

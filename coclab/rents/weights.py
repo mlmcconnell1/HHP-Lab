@@ -346,11 +346,12 @@ def fetch_county_acs_totals(
 
     # Persist raw API snapshot
     source_url = CENSUS_API.format(year=year)
-    snapshot_id = f"A{year}_{var_info['table']}__{method}"
+    variant = f"{var_info['table']}__{method}"
     snap_dir, content_sha256, content_size = write_api_snapshot(
         all_raw_content,
         "acs5_county",
-        snapshot_id=snapshot_id,
+        year=year,
+        variant=variant,
         request_metadata={
             "url": source_url,
             "params": {"get": f"NAME,{variable}", "for": "county:*", "in": "state:{fips}"},

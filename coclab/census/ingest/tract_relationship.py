@@ -80,9 +80,10 @@ def download_tract_relationship() -> tuple[pd.DataFrame, str, int, Path]:
         raw_content = response.content
 
     # Persist raw snapshot and compute hash
+    # Year is "2020" — this is the 2020-vintage relationship file
     filename = RELATIONSHIP_URL.rsplit("/", 1)[-1]
     raw_path, content_sha256, content_size = persist_file_snapshot(
-        raw_content, "tiger", filename, subdirs=("tract_relationship",)
+        raw_content, "tiger", filename, subdirs=("2020", "tract_relationship")
     )
 
     # Parse pipe-delimited file

@@ -22,8 +22,51 @@ from coclab.raw_snapshot import (
     hash_file,
     hash_zip_contents,
     persist_file_snapshot,
+    raw_dir,
+    raw_path,
     write_api_snapshot,
 )
+
+# ---------------------------------------------------------------------------
+# raw_dir / raw_path
+# ---------------------------------------------------------------------------
+
+
+class TestRawDir:
+    """Tests for raw_dir path builder."""
+
+    def test_without_variant(self):
+        p = raw_dir("zori", 2024)
+        assert p == Path("data/raw/zori/2024")
+
+    def test_with_variant(self):
+        p = raw_dir("acs5_tract", 2023, "full")
+        assert p == Path("data/raw/acs5_tract/2023/full")
+
+    def test_year_as_string(self):
+        p = raw_dir("tiger", "2020", "tracts")
+        assert p == Path("data/raw/tiger/2020/tracts")
+
+    def test_custom_raw_root(self, tmp_path: Path):
+        p = raw_dir("pep", 2024, raw_root=tmp_path)
+        assert p == tmp_path / "pep" / "2024"
+
+
+class TestRawPath:
+    """Tests for raw_path file path builder."""
+
+    def test_without_variant(self):
+        p = raw_path("zori", 2026, "zori__county__2026-02-07.csv")
+        assert p == Path("data/raw/zori/2026/zori__county__2026-02-07.csv")
+
+    def test_with_variant(self):
+        p = raw_path("tiger", 2020, "tab20_tract20_tract10_natl.txt", "tract_relationship")
+        assert p == Path("data/raw/tiger/2020/tract_relationship/tab20_tract20_tract10_natl.txt")
+
+    def test_custom_raw_root(self, tmp_path: Path):
+        p = raw_path("pep", 2024, "pep.csv", raw_root=tmp_path)
+        assert p == tmp_path / "pep" / "2024" / "pep.csv"
+
 
 # ---------------------------------------------------------------------------
 # persist_file_snapshot
@@ -332,6 +375,53 @@ class TestWriteApiSnapshot:
 
         manifest = json.loads((snap_dir / "manifest.json").read_text(encoding="utf-8"))
         assert manifest["record_count"] is None
+
+    # -- year+variant mode --------------------------------------------------
+
+    def test_year_variant_creates_year_first_dir(self, tmp_path: Path):
+        """year+variant produces <root>/<source>/<year>/<variant>/."""
+        payloads = [self._make_payload({"ok": True})]
+        snap_dir, _, _ = write_api_snapshot(
+            payloads, "acs5_tract", year=2023, variant="full", raw_root=tmp_path,
+        )
+
+        assert snap_dir == tmp_path / "acs5_tract" / "2023" / "full"
+        assert (snap_dir / "response.ndjson").exists()
+
+    def test_year_variant_manifest_snapshot_id(self, tmp_path: Path):
+        """manifest.snapshot_id reflects year/variant."""
+        payloads = [self._make_payload({"v": 1})]
+        snap_dir, _, _ = write_api_snapshot(
+            payloads, "hud_exchange", year=2025, variant="2026-02-07",
+            raw_root=tmp_path,
+        )
+
+        manifest = json.loads((snap_dir / "manifest.json").read_text(encoding="utf-8"))
+        assert manifest["snapshot_id"] == "2025/2026-02-07"
+
+    def test_raises_when_both_year_and_snapshot_id(self, tmp_path: Path):
+        """Cannot provide both year and snapshot_id."""
+        with pytest.raises(ValueError, match="not both"):
+            write_api_snapshot(
+                [self._make_payload({"x": 1})], "src",
+                year=2023, variant="full", snapshot_id="legacy",
+                raw_root=tmp_path,
+            )
+
+    def test_raises_when_neither_year_nor_snapshot_id(self, tmp_path: Path):
+        """Must provide either year or snapshot_id."""
+        with pytest.raises(ValueError, match="not both"):
+            write_api_snapshot(
+                [self._make_payload({"x": 1})], "src", raw_root=tmp_path,
+            )
+
+    def test_raises_when_year_without_variant(self, tmp_path: Path):
+        """year without variant is an error."""
+        with pytest.raises(ValueError, match="variant is required"):
+            write_api_snapshot(
+                [self._make_payload({"x": 1})], "src",
+                year=2023, raw_root=tmp_path,
+            )
 
 
 # ---------------------------------------------------------------------------

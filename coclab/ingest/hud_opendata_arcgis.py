@@ -211,13 +211,14 @@ def ingest_hud_opendata(
     if not features:
         raise ValueError("No features returned from HUD Open Data API")
 
-    # Persist raw API snapshot under data/raw/hud_opendata/<boundary_vintage>/
-    snapshot_id = boundary_vintage
+    # Persist raw API snapshot under data/raw/hud_opendata/<year>/<run_id>/
+    run_id = datetime.now(UTC).strftime("%Y-%m-%d")
     raw_pages = [raw_content] if raw_content else []
     snap_dir, content_sha256, content_size = write_api_snapshot(
         raw_pages,
         "hud_opendata",
-        snapshot_id=snapshot_id,
+        year=boundary_vintage,
+        variant=run_id,
         request_metadata={
             "url": FEATURE_SERVICE_URL,
             "params": {

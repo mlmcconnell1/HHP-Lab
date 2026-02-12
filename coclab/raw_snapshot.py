@@ -30,6 +30,69 @@ RAW_DATA_ROOT = Path("data/raw")
 
 
 # ---------------------------------------------------------------------------
+# Canonical path builders
+# ---------------------------------------------------------------------------
+
+
+def raw_dir(
+    ingest_type: str,
+    year: int | str,
+    variant: str | None = None,
+    *,
+    raw_root: Path | None = None,
+) -> Path:
+    """Build a canonical raw directory path.
+
+    Returns ``data/raw/<ingest_type>/<year>/`` or
+    ``data/raw/<ingest_type>/<year>/<variant>/`` when *variant* is given.
+
+    Parameters
+    ----------
+    ingest_type : str
+        Top-level ingest folder (e.g. ``"tiger"``, ``"zori"``).
+    year : int or str
+        Data vintage year (second path segment).
+    variant : str, optional
+        Sub-directory for run-id or variant (third segment).
+    raw_root : Path, optional
+        Override the default ``data/raw`` root.
+    """
+    root = raw_root or RAW_DATA_ROOT
+    d = root / ingest_type / str(year)
+    if variant is not None:
+        d = d / variant
+    return d
+
+
+def raw_path(
+    ingest_type: str,
+    year: int | str,
+    filename: str,
+    variant: str | None = None,
+    *,
+    raw_root: Path | None = None,
+) -> Path:
+    """Build a canonical raw file path.
+
+    Returns ``data/raw/<ingest_type>/<year>/[<variant>/]<filename>``.
+
+    Parameters
+    ----------
+    ingest_type : str
+        Top-level ingest folder (e.g. ``"tiger"``, ``"zori"``).
+    year : int or str
+        Data vintage year (second path segment).
+    filename : str
+        Leaf filename.
+    variant : str, optional
+        Sub-directory for run-id or variant (third segment).
+    raw_root : Path, optional
+        Override the default ``data/raw`` root.
+    """
+    return raw_dir(ingest_type, year, variant, raw_root=raw_root) / filename
+
+
+# ---------------------------------------------------------------------------
 # File-based raw snapshots
 # ---------------------------------------------------------------------------
 
@@ -128,14 +191,16 @@ def write_api_snapshot(
     response_payloads: list[bytes],
     source_type: str,
     *,
-    snapshot_id: str,
+    year: int | str | None = None,
+    variant: str | None = None,
+    snapshot_id: str | None = None,
     request_metadata: dict | None = None,
     record_count: int | None = None,
     raw_root: Path | None = None,
 ) -> tuple[Path, str, int]:
     """Persist a canonical API raw snapshot.
 
-    Writes three files into ``data/raw/<source_type>/<snapshot_id>/``:
+    Writes three files into the snapshot directory:
 
     * **response.ndjson** — one line per response payload (deterministic
       serialisation via ``json.dumps(sort_keys=True)``).
@@ -146,6 +211,17 @@ def write_api_snapshot(
     The SHA-256 hash is computed from the persisted ``response.ndjson`` so
     it always matches what is on disk.
 
+    Path resolution
+    ~~~~~~~~~~~~~~~
+    Preferred: pass ``year`` and ``variant`` to get the canonical year-first
+    layout ``data/raw/<source_type>/<year>/<variant>/``.
+
+    Legacy: pass ``snapshot_id`` for the flat layout
+    ``data/raw/<source_type>/<snapshot_id>/``.
+
+    Exactly one of (``year`` + ``variant``) or ``snapshot_id`` must be
+    provided.
+
     Parameters
     ----------
     response_payloads : list[bytes]
@@ -153,9 +229,12 @@ def write_api_snapshot(
         is expected to be valid JSON bytes.
     source_type : str
         Top-level subdirectory under ``data/raw/`` (e.g. ``"hud_opendata"``).
-    snapshot_id : str
-        Sub-directory name that gives temporal identity to the snapshot
-        (e.g. a date string ``"2026-02-07"`` or ``"A2023"``).
+    year : int or str, optional
+        Data vintage year for year-first layout.
+    variant : str, optional
+        Run-id or variant subdirectory (required with *year*).
+    snapshot_id : str, optional
+        Legacy flat sub-directory name (e.g. ``"2026-02-07"``).
     request_metadata : dict, optional
         Dict with keys like ``url``, ``params``, ``headers`` that describe
         how the data was fetched.
@@ -169,9 +248,31 @@ def write_api_snapshot(
     tuple[Path, str, int]
         ``(snapshot_dir, sha256_hex, ndjson_byte_size)`` where the hash and
         size are derived from the persisted ``response.ndjson``.
+
+    Raises
+    ------
+    ValueError
+        If neither ``year``/``variant`` nor ``snapshot_id`` is provided, or
+        if both are provided.
     """
+    has_year_variant = year is not None
+    has_snapshot_id = snapshot_id is not None
+    if has_year_variant == has_snapshot_id:
+        raise ValueError(
+            "Provide either (year + variant) or snapshot_id, not both/neither."
+        )
+
     root = raw_root or RAW_DATA_ROOT
-    snap_dir = root / source_type / snapshot_id
+
+    if has_year_variant:
+        if variant is None:
+            raise ValueError("variant is required when year is provided.")
+        snap_dir = raw_dir(source_type, year, variant, raw_root=root)
+        effective_snapshot_id = f"{year}/{variant}"
+    else:
+        snap_dir = root / source_type / snapshot_id
+        effective_snapshot_id = snapshot_id
+
     snap_dir.mkdir(parents=True, exist_ok=True)
 
     # ---- response.ndjson ------------------------------------------------
@@ -199,7 +300,7 @@ def write_api_snapshot(
 
     # ---- manifest.json --------------------------------------------------
     manifest = {
-        "snapshot_id": snapshot_id,
+        "snapshot_id": effective_snapshot_id,
         "source_type": source_type,
         "page_count": len(response_payloads),
         "record_count": record_count,

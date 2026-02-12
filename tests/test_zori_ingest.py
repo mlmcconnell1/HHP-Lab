@@ -279,7 +279,7 @@ class TestDownloadZori:
         cached_path.write_text(SAMPLE_COUNTY_CSV)
 
         # Call download - should use cache, not make HTTP request
-        path, sha256 = download_zori("county", raw_dir=raw_dir, force=False)
+        path, sha256 = download_zori("county", raw_dir_override=raw_dir, force=False)
 
         assert path == cached_path
         assert len(sha256) == 64  # SHA256 hex string
@@ -301,7 +301,7 @@ class TestDownloadZori:
         )
 
         # Force download
-        path, sha256 = download_zori("county", raw_dir=raw_dir, force=True)
+        path, sha256 = download_zori("county", raw_dir_override=raw_dir, force=True)
 
         # Should have new content
         assert SAMPLE_COUNTY_CSV in path.read_text()
@@ -317,14 +317,14 @@ class TestDownloadZori:
             content=SAMPLE_COUNTY_CSV.encode(),
         )
 
-        path, sha256 = download_zori("county", url=custom_url, raw_dir=raw_dir, force=True)
+        path, sha256 = download_zori("county", url=custom_url, raw_dir_override=raw_dir, force=True)
 
         assert path.exists()
 
     def test_invalid_geography_raises(self, tmp_path):
         """Test that invalid geography raises ValueError."""
         with pytest.raises(ValueError, match="Unknown geography"):
-            download_zori("invalid_geo", raw_dir=tmp_path)
+            download_zori("invalid_geo", raw_dir_override=tmp_path)
 
 
 class TestIngestZori:

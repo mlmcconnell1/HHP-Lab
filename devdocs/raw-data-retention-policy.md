@@ -98,7 +98,7 @@ Target convention by ingest:
 | `pep/ingest` | File | Downloaded CSV | `data/raw/pep/<vintage_year>/` |
 | `census/ingest/tract_relationship` | File | Downloaded text file | `data/raw/tiger/<year>/tract_relationship/` |
 
-Some ingests are currently in migration toward this target layout.
+All ingests now follow this canonical layout.
 
 `source_registry.local_path` points to the raw artifact in all cases.
 Curated output paths are stored in `metadata["curated_path"]`.

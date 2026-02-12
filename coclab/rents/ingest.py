@@ -37,6 +37,7 @@ import httpx
 import pandas as pd
 
 from coclab.provenance import ProvenanceBlock, write_parquet_with_provenance
+from coclab.raw_snapshot import raw_dir
 from coclab.source_registry import check_source_changed, register_source
 from coclab.sources import ZILLOW_ZORI_COUNTY, ZILLOW_ZORI_ZIP
 
@@ -61,14 +62,13 @@ ZILLOW_ATTRIBUTION = (
 )
 
 # Default directories
-DEFAULT_RAW_DIR = Path("data/raw/zori")
 DEFAULT_OUTPUT_DIR = Path("data/curated/zori")
 
 
 def download_zori(
     geography: Literal["county", "zip"],
     url: str | None = None,
-    raw_dir: Path | str | None = None,
+    raw_dir_override: Path | str | None = None,
     force: bool = False,
 ) -> tuple[Path, str]:
     """Download raw ZORI data from Zillow.
@@ -79,8 +79,9 @@ def download_zori(
         Geography level: "county" or "zip".
     url : str, optional
         Override URL for download. If None, uses default URL for geography.
-    raw_dir : Path or str, optional
-        Directory to save raw file. Defaults to 'data/raw/zori'.
+    raw_dir_override : Path or str, optional
+        Override raw directory. Defaults to canonical
+        ``data/raw/zori/<year>/``.
     force : bool
         Re-download even if cached file exists.
 
@@ -99,16 +100,17 @@ def download_zori(
             raise ValueError(f"Unknown geography: {geography}. Must be 'county' or 'zip'")
         url = ZORI_URLS[geography]
 
-    if raw_dir is None:
-        raw_dir = DEFAULT_RAW_DIR
-    else:
-        raw_dir = Path(raw_dir)
-    raw_dir.mkdir(parents=True, exist_ok=True)
-
     # Generate filename with download date
     download_date = date.today().isoformat()
+    download_year = date.today().year
     filename = f"zori__{geography}__{download_date}.csv"
-    raw_path = raw_dir / filename
+
+    if raw_dir_override is not None:
+        dest = Path(raw_dir_override)
+    else:
+        dest = raw_dir("zori", download_year)
+    dest.mkdir(parents=True, exist_ok=True)
+    raw_path = dest / filename
 
     # Check for cached file (same day)
     if raw_path.exists() and not force:
@@ -413,7 +415,8 @@ def ingest_zori(
     output_dir : Path or str, optional
         Output directory for curated parquet. Defaults to 'data/curated/zori'.
     raw_dir : Path or str, optional
-        Directory for raw downloads. Defaults to 'data/raw/zori'.
+        Override directory for raw downloads. Defaults to
+        ``data/raw/zori/<year>/``.
     start : date or str, optional
         Filter to dates >= start after ingest.
     end : date or str, optional
@@ -443,7 +446,7 @@ def ingest_zori(
 
     # Download
     download_url = url or ZORI_URLS.get(geography)
-    raw_path, sha256 = download_zori(geography, url, raw_dir, force)
+    raw_path, sha256 = download_zori(geography, url, raw_dir_override=raw_dir, force=force)
 
     # Parse based on geography
     if geography == "county":
