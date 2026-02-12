@@ -135,7 +135,21 @@ def _resolve_via_file_set(
         )
 
     seg = matching_segments[0]
-    path = seg.overrides.get(year) or file_set.path_template.format(year=year)
+    if year in seg.overrides:
+        path = seg.overrides[year]
+    else:
+        render_ctx: dict[str, object] = {"year": year}
+        render_ctx.update(seg.constants)
+        render_ctx.update({k: year + offset for k, offset in seg.year_offsets.items()})
+        try:
+            path = file_set.path_template.format(**render_ctx)
+        except KeyError as exc:
+            missing = exc.args[0]
+            raise PlannerError(
+                f"Dataset '{dataset_id}' file_set path_template references "
+                f"missing variable '{missing}' for year {year}. "
+                f"Available variables: {sorted(render_ctx.keys())}"
+            ) from exc
 
     return ResolvedDatasetYear(
         dataset_id=dataset_id,

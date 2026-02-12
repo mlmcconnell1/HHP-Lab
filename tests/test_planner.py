@@ -160,6 +160,38 @@ class TestPlannerResolution:
         for t in pit_tasks:
             assert t.input_path == "data/pit/pit.parquet"
 
+    def test_path_template_supports_segment_constants_and_offsets(self):
+        data = _segmented_recipe()
+        data["datasets"]["acs"]["file_set"]["path_template"] = (
+            "data/curated/measures/measures__A{acs_end}@B{boundary}xT{tract}.parquet"
+        )
+        data["datasets"]["acs"]["file_set"]["segments"][0]["constants"] = {"tract": 2010}
+        data["datasets"]["acs"]["file_set"]["segments"][0]["year_offsets"] = {
+            "acs_end": -1,
+            "boundary": 0,
+        }
+        data["datasets"]["acs"]["file_set"]["segments"][1]["constants"] = {"tract": 2020}
+        data["datasets"]["acs"]["file_set"]["segments"][1]["year_offsets"] = {
+            "acs_end": -1,
+            "boundary": 0,
+        }
+
+        recipe = load_recipe(data)
+        plan = resolve_plan(recipe, "main")
+        acs_tasks = [t for t in plan.resample_tasks if t.dataset_id == "acs"]
+
+        t2018 = next(t for t in acs_tasks if t.year == 2018)
+        assert (
+            t2018.input_path
+            == "data/curated/measures/measures__A2017@B2018xT2010.parquet"
+        )
+
+        t2021 = next(t for t in acs_tasks if t.year == 2021)
+        assert (
+            t2021.input_path
+            == "data/curated/measures/measures__A2020@B2021xT2020.parquet"
+        )
+
 
 # ===========================================================================
 # Planner: via:auto transform selection
@@ -259,6 +291,12 @@ class TestPlannerErrors:
         recipe = load_recipe(_segmented_recipe())
         with pytest.raises(PlannerError, match="Pipeline 'nonexistent' not found"):
             resolve_plan(recipe, "nonexistent")
+
+    def test_missing_template_variable_raises_planner_error(self):
+        recipe = load_recipe(_segmented_recipe())
+        recipe.datasets["acs"].file_set.path_template = "data/acs/acs_{missing_var}.parquet"
+        with pytest.raises(PlannerError, match="missing variable 'missing_var'"):
+            resolve_plan(recipe, "main")
 
 
 # ===========================================================================

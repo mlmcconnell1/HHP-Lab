@@ -125,8 +125,10 @@ Named dataset declarations keyed by a unique string id. The id is used to refere
 | `product` | `string` | Yes | Product name within provider (e.g., `pit`, `acs5`, `pep`). |
 | `version` | `int` | Yes | Adapter version (schema evolution control). Must be >= 1. |
 | `native_geometry` | `GeometryRef` | Yes | Native spatial granularity of the dataset. |
+| `years` | `YearSpec` | No | Optional declared year coverage for static-path datasets. |
 | `params` | `dict` | No | Free-form adapter parameters. Default: `{}`. |
 | `path` | `string` | No | Optional project-relative path to a pre-materialized dataset file. Must be relative (not absolute). |
+| `file_set` | `FileSetSpec` | No | Time-banded path/geometry config for datasets whose source files vary by year. |
 | `optional` | `bool` | No | If true, missing dataset does not fail the build. Default: `false`. |
 
 ```yaml
@@ -149,6 +151,37 @@ datasets:
 ```
 
 Like geometry types, provider/product combinations are an open set validated by runtime dataset adapters.
+
+### FileSetSpec (Compact Vintage Rules)
+
+Use `file_set` when a dataset path or geometry vintage changes by year. This keeps YAML terse while still expressing an explicit vintage set.
+
+```yaml
+datasets:
+  acs:
+    provider: census
+    product: acs
+    version: 1
+    native_geometry: { type: tract }
+    file_set:
+      path_template: "data/curated/acs/acs5_tracts__A{acs_end}xT{tract}.parquet"
+      segments:
+        - years: "2015-2019"
+          geometry: { type: tract, vintage: 2010, source: nhgis }
+          constants: { tract: 2010 }
+          year_offsets: { acs_end: -1 }
+        - years: "2020-2024"
+          geometry: { type: tract, vintage: 2020, source: tiger }
+          constants: { tract: 2020 }
+          year_offsets: { acs_end: -1 }
+```
+
+`file_set.path_template` supports:
+- `{year}`: the analysis year
+- `constants`: segment-level fixed variables
+- `year_offsets`: segment-level derived variables (`value = year + offset`)
+
+Optional `overrides` still let you replace specific years with an explicit path.
 
 ## Transforms
 

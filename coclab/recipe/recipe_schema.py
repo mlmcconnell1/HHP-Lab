@@ -16,6 +16,7 @@ from __future__ import annotations
 
 from pathlib import Path
 from typing import Any, Dict, List, Literal, Optional, Union, Annotated
+from string import Formatter
 from pydantic import BaseModel, Field, ConfigDict, model_validator, field_validator
 
 
@@ -107,20 +108,40 @@ class FileSetSegment(BaseModel):
     years: YearSpec
     geometry: GeometryRef
     overrides: Dict[int, str] = Field(default_factory=dict)
+    constants: Dict[str, Union[str, int]] = Field(
+        default_factory=dict,
+        description=(
+            "Optional constant template variables for path rendering, "
+            "for example {'tract': 2010}."
+        ),
+    )
+    year_offsets: Dict[str, int] = Field(
+        default_factory=dict,
+        description=(
+            "Optional year-derived template variables, where each value is "
+            "added to the analysis year, for example {'acs_end': -1}."
+        ),
+    )
 
 
 class FileSetSpec(BaseModel):
     """Path template + segments for datasets whose geometry vintage varies by year."""
     model_config = ConfigDict(extra="forbid")
 
-    path_template: str = Field(..., description="Template with {year} placeholder.")
+    path_template: str = Field(
+        ...,
+        description=(
+            "Template for dataset paths. Supports {year} and optional segment "
+            "variables from constants/year_offsets."
+        ),
+    )
     segments: List[FileSetSegment] = Field(..., min_length=1)
 
     @field_validator("path_template")
     @classmethod
     def _validate_path_template(cls, value: str) -> str:
-        if "{year}" not in value:
-            raise ValueError("FileSetSpec.path_template must contain '{year}'.")
+        if not value.strip():
+            raise ValueError("FileSetSpec.path_template must be non-empty.")
         return value
 
 
@@ -446,10 +467,20 @@ class RecipeV1(BaseModel):
     @model_validator(mode="after")
     def _validate_file_sets(self) -> "RecipeV1":
         """Semantic validation for dataset file_set segments."""
+        formatter = Formatter()
+
+        def _template_fields(template: str) -> set[str]:
+            fields: set[str] = set()
+            for _literal, field_name, _format_spec, _conversion in formatter.parse(template):
+                if field_name:
+                    fields.add(field_name)
+            return fields
+
         for ds_id, ds in self.datasets.items():
             if ds.file_set is None:
                 continue
             all_years: set[int] = set()
+            template_fields = _template_fields(ds.file_set.path_template)
             for seg in ds.file_set.segments:
                 seg_years = set(expand_year_spec(seg.years))
                 # Check override keys fall within segment years
@@ -467,6 +498,31 @@ class RecipeV1(BaseModel):
                         f"'{seg.geometry.type}' does not match "
                         f"native_geometry type '{ds.native_geometry.type}'."
                     )
+
+                # Check that dynamic variables can be resolved.
+                duplicate_keys = set(seg.constants) & set(seg.year_offsets)
+                if duplicate_keys:
+                    raise ValueError(
+                        f"Dataset '{ds_id}' segment defines keys in both "
+                        f"constants and year_offsets: {sorted(duplicate_keys)}."
+                    )
+
+                non_override_years = sorted(seg_years - set(seg.overrides.keys()))
+                if non_override_years:
+                    sample_year = non_override_years[0]
+                    render_ctx: dict[str, Any] = {"year": sample_year}
+                    render_ctx.update(seg.constants)
+                    render_ctx.update(
+                        {k: sample_year + offset for k, offset in seg.year_offsets.items()}
+                    )
+                    missing = sorted(field for field in template_fields if field not in render_ctx)
+                    if missing:
+                        raise ValueError(
+                            f"Dataset '{ds_id}' file_set.path_template requires "
+                            f"variables {missing} but segment does not provide them "
+                            f"(available: {sorted(render_ctx.keys())})."
+                        )
+
                 # Check for overlapping years across segments
                 overlap = all_years & seg_years
                 if overlap:

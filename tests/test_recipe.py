@@ -598,11 +598,25 @@ class TestFileSetSchema:
         assert recipe.datasets["acs"].file_set is not None
         assert len(recipe.datasets["acs"].file_set.segments) == 2
 
-    def test_path_template_missing_year_placeholder(self):
+    def test_path_template_without_year_placeholder_allowed(self):
         data = _recipe_with_file_set()
-        data["datasets"]["acs"]["file_set"]["path_template"] = "data/acs/acs.parquet"
-        with pytest.raises(RecipeLoadError, match="path_template must contain"):
-            load_recipe(data)
+        data["datasets"]["acs"]["file_set"]["path_template"] = (
+            "data/curated/measures/measures__A{acs_end}@B{boundary}xT{tract}.parquet"
+        )
+        data["datasets"]["acs"]["file_set"]["segments"][0]["constants"] = {"tract": 2010}
+        data["datasets"]["acs"]["file_set"]["segments"][0]["year_offsets"] = {
+            "acs_end": -1,
+            "boundary": 0,
+        }
+        data["datasets"]["acs"]["file_set"]["segments"][1]["constants"] = {"tract": 2020}
+        data["datasets"]["acs"]["file_set"]["segments"][1]["year_offsets"] = {
+            "acs_end": -1,
+            "boundary": 0,
+        }
+        recipe = load_recipe(data)
+        assert recipe.datasets["acs"].file_set.path_template.startswith(
+            "data/curated/measures/measures__A"
+        )
 
     def test_segment_overlap_detected(self):
         data = _recipe_with_file_set()
@@ -634,6 +648,25 @@ class TestFileSetSchema:
         recipe = load_recipe(data)
         seg = recipe.datasets["acs"].file_set.segments[0]
         assert seg.overrides[2017] == "data/acs/special_2017.parquet"
+
+    def test_missing_template_variables_rejected(self):
+        data = _recipe_with_file_set()
+        data["datasets"]["acs"]["file_set"]["path_template"] = (
+            "data/curated/measures/measures__A{acs_end}@B{boundary}xT{tract}.parquet"
+        )
+        data["datasets"]["acs"]["file_set"]["segments"][0]["constants"] = {"tract": 2010}
+        data["datasets"]["acs"]["file_set"]["segments"][0]["year_offsets"] = {"acs_end": -1}
+        data["datasets"]["acs"]["file_set"]["segments"][1]["constants"] = {"tract": 2020}
+        data["datasets"]["acs"]["file_set"]["segments"][1]["year_offsets"] = {"acs_end": -1}
+        with pytest.raises(RecipeLoadError, match="path_template requires variables"):
+            load_recipe(data)
+
+    def test_duplicate_segment_variable_keys_rejected(self):
+        data = _recipe_with_file_set()
+        data["datasets"]["acs"]["file_set"]["segments"][0]["constants"] = {"acs_end": 2018}
+        data["datasets"]["acs"]["file_set"]["segments"][0]["year_offsets"] = {"acs_end": -1}
+        with pytest.raises(RecipeLoadError, match="both constants and year_offsets"):
+            load_recipe(data)
 
 
 # ===========================================================================

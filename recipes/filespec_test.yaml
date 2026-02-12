@@ -31,9 +31,13 @@ datasets:
     params:
       align: vintage_end_year
     file_set:
-      path_template: "data/curated/acs/acs_{year}.parquet"
+      path_template: "data/curated/acs/acs5_tracts__A{acs_end}xT{tract}.parquet"
       segments:
         - years: "2015-2019"
           geometry: { type: tract, vintage: 2010, source: nhgis }
+          constants: { tract: 2010 }
+          year_offsets: { acs_end: -1 }
         - years: "2020-2024"
           geometry: { type: tract, vintage: 2020, source: nhgis }
+          constants: { tract: 2020 }
+          year_offsets: { acs_end: -1 }
