@@ -376,8 +376,10 @@ class TestRecipeCLI:
         assert "Missing file" in result.output
         assert "acs_2015.parquet" in result.output
 
-    def test_existing_path_no_missing_file_error(self, tmp_path: Path):
+    def test_existing_path_no_missing_file_error(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
         import yaml
+
+        monkeypatch.chdir(tmp_path)
 
         # Create the actual file
         data_dir = tmp_path / "data" / "curated"
@@ -790,3 +792,112 @@ class TestOptionalTransformsPipelines:
         data["pipelines"] = []
         recipe = load_recipe(data)
         assert recipe.transforms == []
+
+
+# ===========================================================================
+# vintage_sets schema tests
+# ===========================================================================
+
+
+class TestVintageSetsSchema:
+
+    def test_vintage_sets_defaults_empty(self):
+        """Existing recipes without vintage_sets still parse."""
+        recipe = load_recipe(_minimal_recipe())
+        assert recipe.vintage_sets == {}
+
+    def test_valid_vintage_set_parses(self):
+        data = _minimal_recipe()
+        data["vintage_sets"] = {
+            "acs_measures": {
+                "dimensions": ["analysis_year", "acs_end", "boundary", "tract"],
+                "rules": [
+                    {
+                        "years": "2015-2019",
+                        "constants": {"tract": 2010},
+                        "year_offsets": {"analysis_year": 0, "acs_end": -1, "boundary": 0},
+                    },
+                    {
+                        "years": "2020-2024",
+                        "constants": {"tract": 2020},
+                        "year_offsets": {"analysis_year": 0, "acs_end": -1, "boundary": 0},
+                    },
+                ],
+            }
+        }
+        recipe = load_recipe(data)
+        assert "acs_measures" in recipe.vintage_sets
+        vs = recipe.vintage_sets["acs_measures"]
+        assert vs.dimensions == ["analysis_year", "acs_end", "boundary", "tract"]
+        assert len(vs.rules) == 2
+
+    def test_vintage_set_year_overlap_rejected(self):
+        data = _minimal_recipe()
+        data["vintage_sets"] = {
+            "test": {
+                "dimensions": ["d"],
+                "rules": [
+                    {"years": "2015-2020", "year_offsets": {"d": 0}},
+                    {"years": "2019-2024", "year_offsets": {"d": 0}},
+                ],
+            }
+        }
+        with pytest.raises(RecipeLoadError, match="overlap"):
+            load_recipe(data)
+
+    def test_vintage_set_missing_dimension_rejected(self):
+        data = _minimal_recipe()
+        data["vintage_sets"] = {
+            "test": {
+                "dimensions": ["a", "b", "c"],
+                "rules": [
+                    {"years": "2015-2019", "year_offsets": {"a": 0, "b": -1}},
+                ],
+            }
+        }
+        with pytest.raises(RecipeLoadError, match="dimension"):
+            load_recipe(data)
+
+    def test_vintage_set_duplicate_key_rejected(self):
+        data = _minimal_recipe()
+        data["vintage_sets"] = {
+            "test": {
+                "dimensions": ["d"],
+                "rules": [
+                    {"years": "2015-2019", "constants": {"d": 2010}, "year_offsets": {"d": 0}},
+                ],
+            }
+        }
+        with pytest.raises(RecipeLoadError, match="both constants and year_offsets"):
+            load_recipe(data)
+
+    def test_vintage_set_bare_string_years_coerced(self):
+        data = _minimal_recipe()
+        data["vintage_sets"] = {
+            "test": {
+                "dimensions": ["d"],
+                "rules": [
+                    {"years": "2020-2024", "year_offsets": {"d": 0}},
+                ],
+            }
+        }
+        recipe = load_recipe(data)
+        assert recipe.vintage_sets["test"].rules[0].years.range == "2020-2024"
+
+    def test_multiple_vintage_sets(self):
+        data = _minimal_recipe()
+        data["vintage_sets"] = {
+            "set_a": {
+                "dimensions": ["x"],
+                "rules": [{"years": "2020-2024", "year_offsets": {"x": 0}}],
+            },
+            "set_b": {
+                "dimensions": ["y", "z"],
+                "rules": [
+                    {"years": "2020-2022", "year_offsets": {"y": 0}, "constants": {"z": 1}},
+                    {"years": "2023-2024", "year_offsets": {"y": 0}, "constants": {"z": 2}},
+                ],
+            },
+        }
+        recipe = load_recipe(data)
+        assert len(recipe.vintage_sets) == 2

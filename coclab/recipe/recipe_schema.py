@@ -98,6 +98,40 @@ class GeometryRef(BaseModel):
 
 
 # -----------------------------
+# Vintage sets (named tuple-set declarations)
+# -----------------------------
+
+
+class VintageSetRule(BaseModel):
+    """A rule within a vintage set that maps years to dimension values."""
+    model_config = ConfigDict(extra="forbid")
+
+    years: YearSpec
+    constants: Dict[str, Union[str, int]] = Field(
+        default_factory=dict,
+        description="Fixed dimension values for this rule's year band.",
+    )
+    year_offsets: Dict[str, int] = Field(
+        default_factory=dict,
+        description="Dimension values derived from analysis year (value = year + offset).",
+    )
+
+
+class VintageSetSpec(BaseModel):
+    """A named set of vintage tuples, expanded from compact range rules."""
+    model_config = ConfigDict(extra="forbid")
+
+    dimensions: List[str] = Field(
+        ..., min_length=1,
+        description="Ordered list of dimension names in each tuple.",
+    )
+    rules: List[VintageSetRule] = Field(
+        ..., min_length=1,
+        description="Year-banded rules that expand into tuples.",
+    )
+
+
+# -----------------------------
 # File set (time-banded dataset paths)
 # -----------------------------
 
@@ -419,6 +453,10 @@ class RecipeV1(BaseModel):
     transforms: List[TransformSpec] = Field(default_factory=list)
     pipelines: List[PipelineSpec] = Field(default_factory=list)
     validation: ValidationPolicy = Field(default_factory=ValidationPolicy)
+    vintage_sets: Dict[str, VintageSetSpec] = Field(
+        default_factory=dict,
+        description="Named vintage tuple sets for terse multi-year dataset resolution.",
+    )
 
     @model_validator(mode="after")
     def _validate_references(self) -> "RecipeV1":
@@ -531,4 +569,39 @@ class RecipeV1(BaseModel):
                         f"on years: {sorted(overlap)}."
                     )
                 all_years |= seg_years
+        return self
+
+    @model_validator(mode="after")
+    def _validate_vintage_sets(self) -> "RecipeV1":
+        """Semantic validation for vintage_sets declarations."""
+        for vs_name, vs in self.vintage_sets.items():
+            all_years: set[int] = set()
+            for rule in vs.rules:
+                rule_years = set(expand_year_spec(rule.years))
+                overlap = all_years & rule_years
+                if overlap:
+                    raise ValueError(
+                        f"Vintage set '{vs_name}' rules overlap "
+                        f"on years: {sorted(overlap)}."
+                    )
+                all_years |= rule_years
+
+                # No duplicate keys between constants and year_offsets
+                duplicate_keys = set(rule.constants) & set(rule.year_offsets)
+                if duplicate_keys:
+                    raise ValueError(
+                        f"Vintage set '{vs_name}' rule defines keys in both "
+                        f"constants and year_offsets: {sorted(duplicate_keys)}."
+                    )
+
+                # Every declared dimension must be provided
+                provided = set(rule.constants) | set(rule.year_offsets)
+                missing = [d for d in vs.dimensions if d not in provided]
+                if missing:
+                    raise ValueError(
+                        f"Vintage set '{vs_name}' rule (years "
+                        f"{rule.years.range or rule.years.years}) does not "
+                        f"cover dimension(s): {sorted(missing)}. Each dimension "
+                        f"must appear in constants or year_offsets."
+                    )
         return self

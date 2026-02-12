@@ -12,6 +12,7 @@ from typing import Annotated
 import typer
 
 from coclab.cli.aggregate import aggregate_app
+from coclab.cli.validate_curated import validate_curated_layout_cmd
 from coclab.cli.build_panel import build_panel_cmd
 from coclab.cli.build_xwalks import build_xwalks
 from coclab.cli.builds import catalog_cmd, create_build, list_builds_cmd
@@ -1506,6 +1507,7 @@ list_app.command("xwalks")(list_xwalks)
 validate_app.command("boundaries")(validate_boundaries)
 validate_app.command("pit-vintages")(validate_pit_vintages)
 validate_app.command("population")(validate_population)
+validate_app.command("curated-layout")(validate_curated_layout_cmd)
 diagnostics_app.command("panel")(panel_diagnostics)
 diagnostics_app.command("xwalk")(diagnostics)
 diagnostics_app.command("zori")(zori_diagnostics)

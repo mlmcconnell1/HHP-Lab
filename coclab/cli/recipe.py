@@ -36,14 +36,20 @@ def _missing_file_level(
 
 
 def _check_dataset_paths(
-    parsed: RecipeV1, recipe_dir: Path,
+    parsed: RecipeV1, project_root: Path | None = None,
 ) -> list[ValidationDiagnostic]:
     """Check that all referenced dataset files exist on disk.
 
     Returns diagnostics for missing files.  Level (error/warning) is
     determined by the dataset's ``optional`` flag and the recipe's
     ``missing_dataset`` validation policy.
+
+    Dataset paths in recipes are project-relative, so *project_root*
+    (defaulting to ``Path.cwd()``) is used as the base for resolution.
     """
+    if project_root is None:
+        project_root = Path.cwd()
+
     results: list[ValidationDiagnostic] = []
     policy = parsed.validation.missing_dataset
     policy_extra: dict[str, str] = policy.model_extra or {}
@@ -55,7 +61,7 @@ def _check_dataset_paths(
 
         # Static path
         if ds.path is not None:
-            resolved = recipe_dir / ds.path
+            resolved = project_root / ds.path
             if not resolved.exists():
                 results.append(ValidationDiagnostic(
                     level=level,
@@ -71,7 +77,7 @@ def _check_dataset_paths(
                         p = seg.overrides[year]
                     else:
                         p = ds.file_set.path_template.format(year=year)
-                    resolved = recipe_dir / p
+                    resolved = project_root / p
                     if not resolved.exists():
                         results.append(ValidationDiagnostic(
                             level=level,
@@ -127,8 +133,7 @@ def recipe_cmd(
         typer.echo("  Warning: No pipelines defined; no build output will be produced.", err=True)
 
     # 1c. Pre-flight: check that referenced data files exist
-    recipe_dir = Path(recipe).resolve().parent
-    path_diagnostics = _check_dataset_paths(parsed, recipe_dir)
+    path_diagnostics = _check_dataset_paths(parsed)
     path_warnings = [d for d in path_diagnostics if d.level == "warning"]
     path_errors = [d for d in path_diagnostics if d.level == "error"]
     for d in path_warnings:
