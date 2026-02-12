@@ -15,10 +15,12 @@ import pandas as pd
 import pytest
 
 from coclab.pep.ingest import (
+    INTERCENSAL_YEAR_RANGE,
     INTERCENSAL_SERIES,
     PEP_URLS,
     POSTCENSAL_SERIES,
     VINTAGE_YEARS,
+    download_pep_intercensal,
     get_output_path,
     ingest_pep_county,
     parse_pep_county,
@@ -214,6 +216,27 @@ class TestSeriesValidation:
     def test_postcensal_invalid_vintage_raises(self):
         with pytest.raises(ValueError):
             ingest_pep_county(series=POSTCENSAL_SERIES, vintage=1999)
+
+
+class TestDownloadPepIntercensal:
+    """Tests for download_pep_intercensal helper."""
+
+    def test_defaults_to_canonical_year_dir(self, tmp_path, httpx_mock, monkeypatch):
+        """raw_dir=None should use data/raw/pep/<intercensal_year>/."""
+        import coclab.raw_snapshot as raw_snapshot_mod
+
+        monkeypatch.setattr(raw_snapshot_mod, "RAW_DATA_ROOT", tmp_path / "raw")
+
+        url = "https://example.com/intercensal.csv"
+        content = b"SUMLEV,STATE,COUNTY,POPESTIMATE2020\n50,01,001,58239\n"
+        httpx_mock.add_response(url=url, content=content)
+
+        path, sha256 = download_pep_intercensal(url, raw_dir=None, force=True)
+
+        assert path.exists()
+        assert path.parent == tmp_path / "raw" / "pep" / str(INTERCENSAL_YEAR_RANGE[1])
+        assert path.name.startswith("pep_county__intercensal_2010_2020__")
+        assert len(sha256) == 64
 
 
 class TestIntegration:

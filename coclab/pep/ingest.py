@@ -40,7 +40,7 @@ import httpx
 import pandas as pd
 
 from coclab.provenance import ProvenanceBlock, read_provenance, write_parquet_with_provenance
-from coclab.raw_snapshot import raw_dir
+from coclab.raw_snapshot import raw_dir as canonical_raw_dir
 from coclab.source_registry import check_source_changed, register_source
 from coclab.sources import CENSUS_PEP_DATASETS_BASE
 
@@ -157,7 +157,7 @@ def download_pep(
     if raw_dir_override is not None:
         dest = Path(raw_dir_override)
     else:
-        dest = raw_dir("pep", vintage)
+        dest = canonical_raw_dir("pep", vintage)
     dest.mkdir(parents=True, exist_ok=True)
 
     # Generate filename with download date
@@ -226,16 +226,19 @@ def download_pep_intercensal(
     raw_dir: Path | str | None = None,
     force: bool = False,
 ) -> tuple[Path, str]:
-    """Download raw intercensal PEP county data from Census Bureau."""
+    """Download raw intercensal PEP county data from Census Bureau.
+
+    Defaults to canonical ``data/raw/pep/2020/`` when *raw_dir* is not provided.
+    """
     if raw_dir is None:
-        raw_dir = DEFAULT_RAW_DIR
+        dest = canonical_raw_dir("pep", INTERCENSAL_YEAR_RANGE[1])
     else:
-        raw_dir = Path(raw_dir)
-    raw_dir.mkdir(parents=True, exist_ok=True)
+        dest = Path(raw_dir)
+    dest.mkdir(parents=True, exist_ok=True)
 
     download_date = date.today().isoformat()
     filename = f"pep_county__intercensal_2010_2020__{download_date}.csv"
-    raw_path = raw_dir / filename
+    raw_path = dest / filename
 
     if raw_path.exists() and not force:
         logger.info(f"Using cached raw file: {raw_path}")
