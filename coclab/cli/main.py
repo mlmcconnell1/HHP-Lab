@@ -4,6 +4,7 @@ Provides commands for ingesting CoC boundary data, building crosswalks,
 computing measures, and visualizing boundaries.
 """
 
+import sys
 import warnings
 from functools import wraps
 from pathlib import Path
@@ -68,6 +69,9 @@ def _check_working_directory() -> None:
             f"Missing: {missing_names}",
             err=True,
         )
+        if sys.stdin.isatty():
+            if not typer.confirm("Do you still want to continue?", default=False):
+                raise typer.Exit(0)
 
 
 app = typer.Typer(
