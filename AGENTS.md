@@ -1,16 +1,20 @@
 # Agent Instructions
 
-This project uses **bd** (beads) for issue tracking. Run `bd onboard` to get started.
+This project uses **br** (beads_rust) for issue tracking. Run `br onboard` to get started.
+
+**Note:** `br` is non-invasive and never executes git commands. After `br sync --flush-only`, you must manually run `git add .beads/ && git commit`.
 
 ## Quick Reference
 
 ```bash
-bd create             # Add a new bead to document a bug or other problem
-bd ready              # Find available work
-bd show <id>          # View issue details
-bd update <id> --status in_progress  # Claim work
-bd close <id>         # Complete work
-bd sync               # Sync with git
+br create             # Add a new bead to document a bug or other problem
+br ready              # Find available work
+br show <id>          # View issue details
+br update <id> --status in_progress  # Claim work
+br close <id>         # Complete work
+br sync --flush-only  # Export JSONL (does NOT commit)
+git add .beads/
+git commit -m "sync beads"
 ```
 
 ## Adding Beads (Problem Noticed)
@@ -28,7 +32,9 @@ If you identify a problem in the code, even incidentally while working on someth
 4. **PUSH TO REMOTE** - This is MANDATORY:
    ```bash
    git pull --rebase
-   bd sync
+   br sync --flush-only
+   git add .beads/
+   git commit -m "sync beads"
    git push
    git status  # MUST show "up to date with origin"
    ```
