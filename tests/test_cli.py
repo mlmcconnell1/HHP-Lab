@@ -10,74 +10,6 @@ from coclab.cli.main import app
 runner = CliRunner()
 
 
-class TestIngestCommand:
-    """Tests for the 'ingest-boundaries' command."""
-
-    def test_ingest_unknown_source(self):
-        """Ingest with unknown source should fail."""
-        result = runner.invoke(app, ["ingest-boundaries", "--source", "unknown"])
-        assert result.exit_code == 1
-        assert "Unknown source" in result.output
-
-    def test_ingest_hud_exchange_requires_vintage(self):
-        """Ingest hud_exchange without vintage should fail."""
-        result = runner.invoke(app, ["ingest-boundaries", "--source", "hud_exchange"])
-        assert result.exit_code == 1
-        assert "--vintage is required" in result.output
-
-    @patch("coclab.ingest.hud_exchange_gis.ingest_hud_exchange")
-    def test_ingest_hud_exchange_success(self, mock_ingest):
-        """Ingest hud_exchange with vintage should call ingest_hud_exchange."""
-        mock_ingest.return_value = Path("data/curated/coc_boundaries/coc_boundaries__2025.parquet")
-
-        result = runner.invoke(
-            app, ["ingest-boundaries", "--source", "hud_exchange", "--vintage", "2025", "--force"]
-        )
-
-        assert result.exit_code == 0
-        assert "Successfully ingested" in result.output
-        mock_ingest.assert_called_once_with("2025", show_progress=True)
-
-    @patch("coclab.ingest.hud_exchange_gis.ingest_hud_exchange")
-    def test_ingest_hud_exchange_failure(self, mock_ingest):
-        """Ingest hud_exchange failure should show error."""
-        mock_ingest.side_effect = ValueError("Download failed")
-
-        result = runner.invoke(
-            app, ["ingest-boundaries", "--source", "hud_exchange", "--vintage", "2025", "--force"]
-        )
-
-        assert result.exit_code == 1
-        assert "Error:" in result.output
-
-    @patch("coclab.ingest.hud_opendata_arcgis.ingest_hud_opendata")
-    def test_ingest_hud_opendata_success(self, mock_ingest):
-        """Ingest hud_opendata should call ingest_hud_opendata."""
-        mock_ingest.return_value = Path(
-            "data/curated/coc_boundaries/coc_boundaries__HUDOpenData_2025-01-04.parquet"
-        )
-
-        result = runner.invoke(app, ["ingest-boundaries", "--source", "hud_opendata"])
-
-        assert result.exit_code == 0
-        assert "Successfully ingested" in result.output
-        mock_ingest.assert_called_once_with(snapshot_tag="latest")
-
-    @patch("coclab.ingest.hud_opendata_arcgis.ingest_hud_opendata")
-    def test_ingest_hud_opendata_with_snapshot(self, mock_ingest):
-        """Ingest hud_opendata with custom snapshot tag."""
-        mock_ingest.return_value = Path(
-            "data/curated/coc_boundaries/coc_boundaries__custom_snapshot.parquet"
-        )
-
-        result = runner.invoke(
-            app, ["ingest-boundaries", "--source", "hud_opendata", "--snapshot", "custom_snapshot"]
-        )
-
-        assert result.exit_code == 0
-        mock_ingest.assert_called_once_with(snapshot_tag="custom_snapshot")
-
-
 class TestNestedIngestCommand:
     """Tests for the nested 'ingest boundaries' command."""
 
@@ -227,7 +159,7 @@ class TestHelpOutput:
         assert "generate" in result.output
         assert "build" in result.output
         assert "show" in result.output
-        # Deprecated aliases should be hidden from help
+        # Removed legacy aliases must not appear in help
         assert "ingest-boundaries" not in result.output
         assert "check-boundaries" not in result.output
         assert "list-boundaries" not in result.output
@@ -244,7 +176,7 @@ class TestHelpOutput:
 
         assert result.exit_code == 0
         assert "boundaries" in result.output
-        assert "census" in result.output
+        assert "tiger" in result.output
         assert "pit" in result.output
         assert "zori" in result.output
 
@@ -441,23 +373,6 @@ class TestRegistryDeleteEntry:
         mock_delete.assert_called_once_with("2024", "hud_exchange")
 
 
-class TestRegistryDeleteEntryDeprecated:
-    """Tests for the legacy 'delete-boundaries' alias command."""
-
-    @patch("coclab.registry.registry.delete_vintage")
-    @patch("coclab.registry.registry.list_boundaries")
-    def test_delete_boundaries_alias_runs(self, mock_list, mock_delete):
-        """Legacy alias should execute delete-entry behavior."""
-        mock_list.return_value = []
-
-        result = runner.invoke(
-            app,
-            ["delete-boundaries", "2024", "hud_exchange"],
-        )
-
-        assert "No entry found" in result.output
-
-
 class TestRegistryRebuild:
     """Tests for the 'registry rebuild' command."""
 
@@ -487,14 +402,3 @@ class TestRegistryRebuild:
         assert "empty" in result.output.lower()
 
 
-class TestRegistryRebuildDeprecated:
-    """Tests for the legacy 'registry-rebuild' alias command."""
-
-    def test_registry_rebuild_alias_runs(self, tmp_path):
-        """Legacy alias should execute registry rebuild behavior."""
-        result = runner.invoke(
-            app,
-            ["registry-rebuild", "--registry", str(tmp_path / "nonexistent.parquet")],
-        )
-
-        assert "Registry not found" in result.output

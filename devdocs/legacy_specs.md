@@ -11,12 +11,10 @@ Those standalone files were removed to avoid drift and duplication.
 ## Current Command Mapping
 
 - ZORI ingest: `coclab ingest zori`
-- ZORI aggregation (current code): `coclab build zori`
+- ZORI aggregation: `coclab aggregate zori`
 - PEP ingest: `coclab ingest pep`
-- PEP aggregation (current code): `coclab build pep`
-- Export bundle (current code): `coclab build export`
-
-Deprecated passthrough forms exist for compatibility, but docs should use the grouped forms above.
+- PEP aggregation: `coclab aggregate pep`
+- Export bundle: `coclab build export`
 
 ## Build/Aggregate Spec (Implemented)
 
@@ -28,7 +26,7 @@ The spec in `coclab_build_aggregate_spec.md` is now implemented. The preferred c
 - `coclab aggregate pep --build <build> [--align ...]`
 - `coclab aggregate pit --build <build> [--align ...]`
 
-The old `coclab build measures/zori/pep` commands remain as deprecated passthroughs.
+The old `coclab build measures/zori/pep` commands have been removed. Use `coclab aggregate acs/zori/pep` instead.
 
 ## Dataset-Level Notes Preserved From Legacy Specs
 

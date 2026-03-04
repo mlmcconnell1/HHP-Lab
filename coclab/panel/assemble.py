@@ -433,7 +433,7 @@ def _load_acs_measures(
             raise ValueError(
                 f"ACS measures file {measures_path.name} has no rows for "
                 f"weighting={weighting}; available weightings: {available}. "
-                f"Re-run 'coclab build measures' with --weighting {weighting}, "
+                f"Re-run 'coclab aggregate acs' with --weighting {weighting}, "
                 f"or use --weighting {available[0]} for this panel."
             )
         df = df_weighted
@@ -770,7 +770,7 @@ def build_panel(
         if zori_df is None:
             raise ValueError(
                 "ZORI integration requested but no ZORI yearly data available. "
-                "Run 'coclab build zori --to-yearly' first, or provide "
+                "Run 'coclab aggregate zori --build <BUILD>' first, or provide "
                 "--zori-yearly-path explicitly."
             )
 

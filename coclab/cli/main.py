@@ -212,9 +212,9 @@ def ingest_boundaries(
 
     Examples:
 
-        coclab ingest-boundaries --source hud_exchange --vintage 2025
+        coclab ingest boundaries --source hud_exchange --vintage 2025
 
-        coclab ingest-boundaries --source hud_opendata --snapshot latest
+        coclab ingest boundaries --source hud_opendata --snapshot latest
     """
     if source == "hud_exchange":
         if vintage is None:
@@ -376,7 +376,7 @@ def check_boundaries() -> None:
 
     if not report.is_healthy:
         typer.echo(
-            "\nTo fix issues, use 'coclab delete-boundaries <vintage> <source>' "
+            "\nTo fix issues, use 'coclab registry delete-entry <vintage> <source>' "
             "and re-ingest the boundaries.",
             err=True,
         )
@@ -493,67 +493,12 @@ def source_status(
     typer.echo(summary)
 
 
-def _removed_command(command: str, replacement: str):
-    def _callback() -> None:
-        typer.echo(
-            f"Error: 'coclab {command}' has been removed. Use 'coclab {replacement}' instead.",
-            err=True,
-        )
-        raise typer.Exit(1)
-
-    return _callback
-
-
-ingest_boundaries_deprecated = ingest_boundaries
-ingest_census_deprecated = ingest_tiger
-ingest_nhgis_deprecated = ingest_nhgis
-ingest_pit_deprecated = ingest_pit
-ingest_pit_vintage_deprecated = ingest_pit_vintage
-ingest_tract_relationship_deprecated = ingest_tract_relationship
-ingest_zori_deprecated = ingest_zori
-delete_boundaries_deprecated = delete_boundaries
-registry_rebuild_deprecated = registry_rebuild
-list_boundaries_deprecated = list_boundaries_cmd
-list_census_deprecated = list_census
-list_measures_deprecated = list_measures
-list_xwalks_deprecated = list_xwalks
-validate_boundaries_deprecated = validate_boundaries
-check_boundaries_deprecated = check_boundaries
-validate_pit_vintages_deprecated = validate_pit_vintages
-validate_population_deprecated = validate_population
-diagnostics_panel_deprecated = panel_diagnostics
-diagnostics_xwalk_deprecated = diagnostics
-diagnostics_zori_deprecated = zori_diagnostics
-aggregate_measures_deprecated = _removed_command(
-    "aggregate-measures", "aggregate acs --build <name>"
-)
-aggregate_zori_deprecated = _removed_command("aggregate-zori", "aggregate zori --build <name>")
-build_panel_deprecated = _removed_command("build-panel", "build panel --build <name>")
-build_xwalks_deprecated = _removed_command("build-xwalks", "generate xwalks --build <name>")
-export_bundle_deprecated = _removed_command("export-bundle", "build export --build <name>")
-compare_vintages_deprecated = compare_vintages
-show_deprecated = show
-show_measures_deprecated = show_measures
-source_status_deprecated = source_status
-
-
 # -----------------------------------------------------------------------------
 # Register all commands alphabetically for consistent help output
 # -----------------------------------------------------------------------------
 
-app.command("aggregate-measures", hidden=True)(aggregate_measures_deprecated)
-app.command("aggregate-zori", hidden=True)(aggregate_zori_deprecated)
-app.command("build-panel", hidden=True)(build_panel_deprecated)
-app.command("build-xwalks", hidden=True)(build_xwalks_deprecated)
-app.command("check-boundaries", hidden=True)(check_boundaries_deprecated)
-app.command("compare-vintages", hidden=True)(compare_vintages_deprecated)
 app.command("crosscheck-pit-vintages", hidden=True)(crosscheck_pit_vintages)
 app.command("crosscheck-population", hidden=True)(crosscheck_population)
-app.command("delete-boundaries", hidden=True)(delete_boundaries_deprecated)
-app.command("diagnostics-panel", hidden=True)(diagnostics_panel_deprecated)
-app.command("diagnostics-xwalk", hidden=True)(diagnostics_xwalk_deprecated)
-app.command("diagnostics-zori", hidden=True)(diagnostics_zori_deprecated)
-app.command("export-bundle", hidden=True)(export_bundle_deprecated)
 app.add_typer(ingest_app, name="ingest")
 app.add_typer(list_app, name="list")
 app.add_typer(validate_app, name="validate")
@@ -564,30 +509,10 @@ app.add_typer(aggregate_app, name="aggregate")
 app.add_typer(show_app, name="show")
 app.add_typer(registry_app, name="registry")
 app.add_typer(migrate_app, name="migrate")
-app.command("ingest-boundaries", hidden=True)(ingest_boundaries_deprecated)
-app.command("ingest-census", hidden=True)(ingest_census_deprecated)
-app.command("ingest-nhgis", hidden=True)(ingest_nhgis_deprecated)
-app.command("ingest-pit", hidden=True)(ingest_pit_deprecated)
-app.command("ingest-pit-vintage", hidden=True)(ingest_pit_vintage_deprecated)
-app.command("ingest-tract-relationship", hidden=True)(ingest_tract_relationship_deprecated)
-app.command("ingest-zori", hidden=True)(ingest_zori_deprecated)
-app.command("list-boundaries", hidden=True)(list_boundaries_deprecated)
-app.command("list-census", hidden=True)(list_census_deprecated)
-app.command("list-measures", hidden=True)(list_measures_deprecated)
-app.command("list-xwalks", hidden=True)(list_xwalks_deprecated)
-app.command("registry-rebuild", hidden=True)(registry_rebuild_deprecated)
-app.command("show", hidden=True)(show_deprecated)
-app.command("show-measures", hidden=True)(show_measures_deprecated)
-app.command("source-status", hidden=True)(source_status_deprecated)
-app.command("validate-boundaries", hidden=True)(validate_boundaries_deprecated)
-app.command("validate-pit-vintages", hidden=True)(validate_pit_vintages_deprecated)
-app.command("validate-population", hidden=True)(validate_population_deprecated)
 
 ingest_app.command("acs5-tract")(ingest_acs_population)
-ingest_app.command("acs", hidden=True)(ingest_acs_population)
 ingest_app.command("boundaries")(ingest_boundaries)
 ingest_app.command("tiger")(ingest_tiger)
-ingest_app.command("census", hidden=True)(ingest_tiger)
 ingest_app.command("nhgis")(ingest_nhgis)
 ingest_app.command("pit")(ingest_pit)
 ingest_app.command("pit-vintage")(ingest_pit_vintage)

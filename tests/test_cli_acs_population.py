@@ -81,8 +81,8 @@ class TestIngestAcs5TractCommand:
         mock_ingest.assert_called_once()
 
 
-class TestNestedIngestAcsAlias:
-    """Tests for hidden 'ingest acs' alias."""
+class TestIngestAcs5TractHelp:
+    """Tests for ingest acs5-tract help output."""
 
     def test_ingest_acs5_tract_help(self):
         """Primary ingest acs5-tract help should show options."""
@@ -92,10 +92,3 @@ class TestNestedIngestAcsAlias:
         assert "--acs" in result.output
         assert "--tracts" in result.output
         assert "--translate" in result.output
-
-    def test_ingest_acs_alias_works(self):
-        """Hidden 'ingest acs' alias should still resolve."""
-        result = runner.invoke(app, ["ingest", "acs", "--help"])
-
-        assert result.exit_code == 0
-        assert "--acs" in result.output

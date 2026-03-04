@@ -161,12 +161,9 @@ internet ──┤► data/raw/    │           │  data/curated/       │   
 | `coclab ingest pep`              | internet                | `data/raw/pep/<year>/...`, `data/curated/pep/`              |
 | `coclab build create`            | `data/curated/coc_boundaries/` | `builds/{name}/`                           |
 | `coclab generate xwalks`         | `curated/census/`, `curated/coc_boundaries/` | `curated/xwalks/` (or build) |
-| `coclab build measures`          | `curated/xwalks/`, internet (Census ACS API) | `curated/measures/` (or build)            |
-| `coclab build zori`              | `curated/zori/`, `curated/xwalks/` | `curated/zori/` (or build)               |
-| `coclab build pep`               | `curated/pep/`, `curated/xwalks/` | `curated/pep/` (or build)                |
 | `coclab build panel`             | `curated/` (multiple)   | `curated/panel/` (or build)                       |
-| `coclab aggregate pep`           | `curated/pep/`, `curated/xwalks/` | `builds/{name}/data/curated/pep/`        |
-| `coclab aggregate pit`           | `curated/pit/`, `curated/xwalks/` | `builds/{name}/data/curated/pit/`        |
 | `coclab aggregate acs`           | `curated/xwalks/`, `curated/acs/` | `builds/{name}/data/curated/measures/`   |
 | `coclab aggregate zori`          | `curated/zori/`, `curated/xwalks/` | `builds/{name}/data/curated/zori/`      |
+| `coclab aggregate pep`           | `curated/pep/`, `curated/xwalks/` | `builds/{name}/data/curated/pep/`        |
+| `coclab aggregate pit`           | `curated/pit/`, `curated/xwalks/` | `builds/{name}/data/curated/pit/`        |
 | `coclab export bundle`           | `data/curated/` or `builds/` | `exports/export-{N}/`                        |

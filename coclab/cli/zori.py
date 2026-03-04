@@ -261,13 +261,7 @@ def aggregate_zori(
 
     Examples:
 
-        coclab build zori --boundary 2025 --counties 2023 --acs 2019-2023
-
-        coclab build zori -b 2025 -c 2023 --acs 2019-2023 -w renter_households --to-yearly
-
-        coclab build zori -b 2025 -c 2023 --acs 2019-2023 --force
-
-        coclab build zori --build demo --boundary 2025 --counties 2023 --acs 2019-2023
+        coclab aggregate zori --build demo --boundary 2025 --counties 2023 --acs 2019-2023
     """
     # Validate weighting method
     valid_weightings = {"renter_households", "housing_units", "population", "equal"}

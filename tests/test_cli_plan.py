@@ -21,13 +21,6 @@ class TestTigerIngestCommand:
         assert result.exit_code == 1
         assert "Invalid type" in result.output
 
-    def test_ingest_census_deprecated_alias(self):
-        """Deprecated ingest census alias should still work."""
-        result = runner.invoke(app, ["ingest", "census", "--type", "invalid"])
-
-        assert result.exit_code == 1
-        assert "Invalid type" in result.output
-
     @patch("coclab.census.ingest.ingest_tiger_tracts")
     @patch("coclab.census.ingest.ingest_tiger_counties")
     def test_ingest_tiger_cached_skips_downloads(

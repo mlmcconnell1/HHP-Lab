@@ -30,7 +30,7 @@ class TestAggregationIntegration:
 
         files = list(pep_dir.glob("coc_pep__*.parquet"))
         if not files:
-            pytest.skip("CoC-level PEP data not available - run 'coclab build pep' first")
+            pytest.skip("CoC-level PEP data not available - run 'coclab aggregate pep' first")
         return files[0]
 
     def test_has_expected_columns(self, coc_pep_path):

@@ -209,9 +209,9 @@ Important:
 
 ## 7. Backward Compatibility Plan
 
-1. Keep existing `coclab build acs|zori|pep|panel` command surfaces temporarily as deprecated passthroughs.
-2. Introduce `coclab aggregate ...` as preferred path in docs/help output.
-3. PIT behavior changes to explicit-only: no implicit PIT aggregation.
+1. Legacy `coclab build acs|zori|pep` passthroughs have been removed. Use `coclab aggregate acs|zori|pep` instead.
+2. `coclab build panel` remains for panel assembly.
+3. PIT behavior is explicit-only: no implicit PIT aggregation.
 
 ## 8. Example Workflow
 

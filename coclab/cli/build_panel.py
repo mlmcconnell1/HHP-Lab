@@ -145,8 +145,8 @@ def build_panel_cmd(
     rent_to_income values.
 
     Prerequisites for ZORI integration:
-    - Run 'coclab ingest-zori' to download ZORI data
-    - Run 'coclab build zori --to-yearly' to create yearly CoC-level ZORI
+    - Run 'coclab ingest zori' to download ZORI data
+    - Run 'coclab aggregate zori --build <BUILD>' to create CoC-level ZORI
 
     Examples:
 
@@ -221,8 +221,7 @@ def build_panel_cmd(
             typer.echo("To generate ZORI yearly data, run:")
             typer.echo("  coclab ingest zori --geography county")
             typer.echo(
-                "  coclab build zori --boundary <VINTAGE> --counties <YEAR> "
-                "--acs <ACS_VINTAGE> --to-yearly"
+                "  coclab aggregate zori --build <BUILD>"
             )
             typer.echo("")
             if zori_yearly_path:

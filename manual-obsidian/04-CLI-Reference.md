@@ -21,7 +21,7 @@ flowchart LR
     ingest --> nhgis
     ingest --> pit
     ingest --> pit-vintage
-    ingest --> acs
+    ingest --> acs5-tract
     ingest --> tract-relationship
     ingest --> zori
     ingest --> pep
@@ -34,7 +34,7 @@ flowchart LR
     nhgis --> NHGIS[Download NHGIS tract shapefiles]
     pit --> PIT[Download & parse PIT counts]
     pit-vintage --> PITVINT[Parse all years from vintage]
-    acs --> ACS_INGEST[Ingest ACS tract estimates]
+    acs5-tract --> ACS_INGEST[Ingest ACS tract estimates]
     tract-relationship --> TRACTREL[Download 2010↔2020 tract relationship]
     list --> list-boundaries[boundaries]
     list --> list-census[census]
@@ -90,32 +90,23 @@ flowchart LR
     registry-rebuild --> REGREBUILD[Rebuild source registry from local files]
 ```
 
-**Ingest grouping:** The canonical form is `coclab ingest <subcommand>` (e.g., `coclab ingest boundaries`).
-Legacy `ingest-*` commands remain as deprecated passthroughs for backward compatibility.
+**Ingest:** `coclab ingest <subcommand>` (e.g., `coclab ingest boundaries`).
 
-**List grouping:** The canonical form is `coclab list <subcommand>` (e.g., `coclab list boundaries`).
-Legacy `list-*` commands remain as deprecated passthroughs for backward compatibility.
+**List:** `coclab list <subcommand>` (e.g., `coclab list boundaries`).
 
-**Validate grouping:** The canonical form is `coclab validate <subcommand>` (e.g., `coclab validate boundaries`).
-Legacy `validate-*` commands remain as deprecated passthroughs for backward compatibility.
+**Validate:** `coclab validate <subcommand>` (e.g., `coclab validate boundaries`).
 
-**Diagnostics grouping:** The canonical form is `coclab diagnostics <subcommand>` (e.g., `coclab diagnostics panel`).
-Legacy `diagnostics-*` commands remain as deprecated passthroughs for backward compatibility.
+**Diagnostics:** `coclab diagnostics <subcommand>` (e.g., `coclab diagnostics panel`).
 
-**Generate grouping:** The canonical form is `coclab generate <subcommand>` (e.g., `coclab generate xwalks`).
-Generate commands produce derived artifacts (crosswalks, catalogs) needed by downstream build and aggregate steps.
+**Generate:** `coclab generate <subcommand>` (e.g., `coclab generate xwalks`). Produce derived artifacts (crosswalks, catalogs) needed by downstream build and aggregate steps.
 
-**Build grouping:** The canonical form is `coclab build <subcommand>` (e.g., `coclab build panel`).
-Build commands manage named build scaffolds, assemble panels, and export bundles.
+**Build:** `coclab build <subcommand>` (e.g., `coclab build panel`). Manage named build scaffolds, assemble panels, and export bundles.
 
-**Aggregate grouping:** The canonical form is `coclab aggregate <subcommand>` (e.g., `coclab aggregate acs`).
-Aggregate commands operate on named builds and write outputs into build-local `data/curated/` folders.
+**Aggregate:** `coclab aggregate <subcommand>` (e.g., `coclab aggregate acs`). Operate on named builds and write outputs into build-local `data/curated/` folders.
 
-**Show grouping:** The canonical form is `coclab show <subcommand>` (e.g., `coclab show map`).
-Legacy commands (`show`, `show-measures`, `compare-vintages`, `source-status`) remain as deprecated passthroughs for backward compatibility.
+**Show:** `coclab show <subcommand>` (e.g., `coclab show map`).
 
-**Registry grouping:** The canonical form is `coclab registry <subcommand>` (e.g., `coclab registry rebuild`).
-Legacy commands (`delete-boundaries`, `registry-rebuild`) remain as deprecated passthroughs for backward compatibility.
+**Registry:** `coclab registry <subcommand>` (e.g., `coclab registry rebuild`).
 
 ## `coclab agents`
 
