@@ -442,12 +442,12 @@ class TestRegistryDeleteEntry:
 
 
 class TestRegistryDeleteEntryDeprecated:
-    """Tests for the deprecated 'delete-boundaries' command."""
+    """Tests for the legacy 'delete-boundaries' alias command."""
 
     @patch("coclab.registry.registry.delete_vintage")
     @patch("coclab.registry.registry.list_boundaries")
-    def test_delete_boundaries_shows_deprecation_warning(self, mock_list, mock_delete):
-        """Should show deprecation warning."""
+    def test_delete_boundaries_alias_runs(self, mock_list, mock_delete):
+        """Legacy alias should execute delete-entry behavior."""
         mock_list.return_value = []
 
         result = runner.invoke(
@@ -455,8 +455,7 @@ class TestRegistryDeleteEntryDeprecated:
             ["delete-boundaries", "2024", "hud_exchange"],
         )
 
-        assert "deprecated" in result.output.lower()
-        assert "registry delete-entry" in result.output
+        assert "No entry found" in result.output
 
 
 class TestRegistryRebuild:
@@ -489,14 +488,13 @@ class TestRegistryRebuild:
 
 
 class TestRegistryRebuildDeprecated:
-    """Tests for the deprecated 'registry-rebuild' command."""
+    """Tests for the legacy 'registry-rebuild' alias command."""
 
-    def test_registry_rebuild_shows_deprecation_warning(self, tmp_path):
-        """Should show deprecation warning."""
+    def test_registry_rebuild_alias_runs(self, tmp_path):
+        """Legacy alias should execute registry rebuild behavior."""
         result = runner.invoke(
             app,
             ["registry-rebuild", "--registry", str(tmp_path / "nonexistent.parquet")],
         )
 
-        assert "deprecated" in result.output.lower()
-        assert "registry rebuild" in result.output
+        assert "Registry not found" in result.output
