@@ -237,6 +237,7 @@ def _apply_temporal_filter(
     filt: TemporalFilter,
     year: int,
     dataset_id: str,
+    year_column: str | None = None,
 ) -> pd.DataFrame:
     """Apply a temporal filter to a DataFrame before resampling."""
     col = filt.column
@@ -254,10 +255,23 @@ def _apply_temporal_filter(
             )
         return filtered.drop(columns=[col])
     elif filt.method in ("calendar_mean", "calendar_median"):
-        # Group by all columns except the temporal column and aggregate
+        # Group by identifier columns and preserve year keys when present.
         numeric = set(df.select_dtypes("number").columns)
         group_cols = [c for c in df.columns if c != col and c not in numeric]
-        measure_cols = [c for c in df.select_dtypes("number").columns if c != col]
+        if year_column is not None:
+            if year_column not in df.columns:
+                raise ExecutorError(
+                    f"Temporal filter for '{dataset_id}': declared year column "
+                    f"'{year_column}' not found. Available: {sorted(df.columns)}"
+                )
+            if year_column != col and year_column not in group_cols:
+                group_cols.append(year_column)
+        elif "year" in df.columns and "year" != col and "year" not in group_cols:
+            group_cols.append("year")
+        measure_cols = [
+            c for c in df.select_dtypes("number").columns
+            if c != col and c not in group_cols
+        ]
         if not group_cols:
             raise ExecutorError(
                 f"Temporal filter for '{dataset_id}': no grouping columns found "
@@ -307,25 +321,19 @@ def _resample_aggregate(
             f"Crosswalk columns: {sorted(xwalk.columns)}"
         )
 
-    # Determine weight column (prefer pop_share for weighted_mean if populated)
-    if (
-        task.aggregation == "weighted_mean"
-        and "pop_share" in xwalk.columns
-        and xwalk["pop_share"].notna().any()
-    ):
-        weight_col = "pop_share"
-    else:
-        weight_col = "area_share"
-
-    if weight_col not in xwalk.columns:
+    if "area_share" not in xwalk.columns:
         raise ExecutorError(
-            f"Crosswalk missing weight column '{weight_col}'. "
+            "Crosswalk missing weight column 'area_share'. "
             f"Available: {sorted(xwalk.columns)}"
         )
+    has_pop_share = "pop_share" in xwalk.columns and xwalk["pop_share"].notna().any()
 
     # Merge dataset with crosswalk
+    xwalk_cols = ["coc_id", xwalk_key, "area_share"]
+    if "pop_share" in xwalk.columns:
+        xwalk_cols.append("pop_share")
     merged = df.merge(
-        xwalk[["coc_id", xwalk_key, weight_col]],
+        xwalk[xwalk_cols],
         left_on=geo_col,
         right_on=xwalk_key,
         how="inner",
@@ -349,7 +357,9 @@ def _resample_aggregate(
     # Convert measures to float64 to handle nullable Pandas types (Int64, Float64)
     for m in task.measures:
         merged[m] = pd.to_numeric(merged[m], errors="coerce").astype("float64")
-    merged[weight_col] = merged[weight_col].astype("float64")
+    merged["area_share"] = merged["area_share"].astype("float64")
+    if "pop_share" in merged.columns:
+        merged["pop_share"] = pd.to_numeric(merged["pop_share"], errors="coerce").astype("float64")
 
     # Group measures by aggregation method for efficient dispatch
     agg_groups: dict[str, list[str]] = {}
@@ -362,11 +372,12 @@ def _resample_aggregate(
         if agg == "sum":
             part = merged.copy()
             for m in measures:
-                part[m] = part[m] * part[weight_col]
+                part[m] = part[m] * part["area_share"]
             result_parts.append(part.groupby("coc_id")[measures].sum().reset_index())
         elif agg == "mean":
             result_parts.append(merged.groupby("coc_id")[measures].mean().reset_index())
         elif agg == "weighted_mean":
+            weight_col = "pop_share" if has_pop_share else "area_share"
             rows = []
             for coc_id, group in merged.groupby("coc_id"):
                 w = group[weight_col].values
@@ -556,7 +567,13 @@ def _execute_resample(
     filt = ctx.recipe.filters.get(task.dataset_id)
     if filt is not None and isinstance(filt, TemporalFilter):
         try:
-            df = _apply_temporal_filter(df, filt, task.year, task.dataset_id)
+            df = _apply_temporal_filter(
+                df,
+                filt,
+                task.year,
+                task.dataset_id,
+                year_column=task.year_column,
+            )
         except ExecutorError as exc:
             return StepResult(
                 step_kind="resample",

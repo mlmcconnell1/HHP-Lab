@@ -21,6 +21,7 @@ from coclab.recipe.executor import (
     ExecutorError,
     PipelineResult,
     StepResult,
+    _apply_temporal_filter,
     _execute_materialize,
     _execute_resample,
     _resolve_transform_path,
@@ -34,6 +35,7 @@ from coclab.recipe.recipe_schema import (
     FileSetSpec,
     GeometryRef,
     RecipeV1,
+    TemporalFilter,
     VintageSetRule,
     VintageSetSpec,
     YearSpec,
@@ -1985,12 +1987,12 @@ class TestResampleAggregate:
         assert coc1_pop == pytest.approx(180.0)
         assert coc2_pop == pytest.approx(300.0)
 
-        # --- weighted_mean for income (sum(val*w)/sum(w), w=area_share) ---
-        # COC1 = (50000*0.8 + 60000*0.5) / (0.8+0.5) = 70000/1.3 ≈ 53846.15
+        # --- weighted_mean for income (sum(val*w)/sum(w), w=pop_share) ---
+        # COC1 = (50000*0.6 + 60000*0.4) / (0.6+0.4) = 54000
         # COC2 = 70000*1.0 / 1.0 = 70000
         coc1_income = df[df.geo_id == "COC1"]["income"].iloc[0]
         coc2_income = df[df.geo_id == "COC2"]["income"].iloc[0]
-        assert coc1_income == pytest.approx(70000.0 / 1.3)
+        assert coc1_income == pytest.approx(54000.0)
         assert coc2_income == pytest.approx(70000.0)
 
     def test_measures_list_backward_compat(self, tmp_path: Path):
@@ -2038,6 +2040,59 @@ class TestResampleAggregate:
         # COC1 = 100*0.8 + 200*0.5 = 180, COC2 = 300*1.0 = 300
         coc1 = df[df.geo_id == "COC1"]["pop"].iloc[0]
         assert coc1 == pytest.approx(180.0)
+
+
+# ===========================================================================
+# Temporal filter behavior tests
+# ===========================================================================
+
+
+class TestTemporalFilters:
+
+    def test_calendar_mean_preserves_year_groups(self):
+        """Calendar mean should aggregate within year, not across years."""
+        df = pd.DataFrame({
+            "geo_id": ["A", "A", "A", "A"],
+            "year": [2020, 2020, 2021, 2021],
+            "month": [1, 2, 1, 2],
+            "value": [10.0, 20.0, 30.0, 50.0],
+        })
+
+        out = _apply_temporal_filter(
+            df,
+            filt=TemporalFilter(type="temporal", column="month", method="calendar_mean"),
+            year=2020,
+            dataset_id="demo",
+        )
+
+        assert set(out["year"]) == {2020, 2021}
+        val_2020 = out.loc[out["year"] == 2020, "value"].iloc[0]
+        val_2021 = out.loc[out["year"] == 2021, "value"].iloc[0]
+        assert val_2020 == pytest.approx(15.0)
+        assert val_2021 == pytest.approx(40.0)
+
+    def test_calendar_median_preserves_declared_year_column(self):
+        """Calendar median should keep declared year column as grouping key."""
+        df = pd.DataFrame({
+            "geo_id": ["A", "A", "A", "A"],
+            "pit_year": [2020, 2020, 2021, 2021],
+            "month": [1, 2, 1, 2],
+            "value": [10.0, 30.0, 20.0, 80.0],
+        })
+
+        out = _apply_temporal_filter(
+            df,
+            filt=TemporalFilter(type="temporal", column="month", method="calendar_median"),
+            year=2020,
+            dataset_id="demo",
+            year_column="pit_year",
+        )
+
+        assert set(out["pit_year"]) == {2020, 2021}
+        val_2020 = out.loc[out["pit_year"] == 2020, "value"].iloc[0]
+        val_2021 = out.loc[out["pit_year"] == 2021, "value"].iloc[0]
+        assert val_2020 == pytest.approx(20.0)
+        assert val_2021 == pytest.approx(50.0)
 
 
 # ===========================================================================
