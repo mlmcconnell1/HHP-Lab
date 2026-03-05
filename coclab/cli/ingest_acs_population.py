@@ -35,9 +35,9 @@ def ingest_acs_population(
         bool,
         typer.Option(
             "--translate/--no-translate",
-            help="Auto-translate from 2010 to 2020 tract geography if needed.",
+            help="Reserved for future tract-level longitudinal analysis.",
         ),
-    ] = True,
+    ] = False,
 ) -> None:
     """Ingest tract-level ACS 5-year estimates.
 
@@ -49,18 +49,23 @@ def ingest_acs_population(
     median household income, median gross rent, poverty universe, poverty
     counts (below 50% and 50-99%), and margin of error for total population.
 
-    For ACS vintages 2010-2019 (which use 2010 census tract geography),
-    the --translate option (enabled by default) will automatically convert
-    GEOIDs to 2020 census tract geography using the tract relationship file.
+    The --translate flag is reserved for future tract-level longitudinal
+    analysis.  CoC-level aggregation handles multi-vintage tracts via
+    separate crosswalks.
 
     Examples:
 
-        coclab ingest acs --acs 2019-2023 --tracts 2023
+        coclab ingest acs5-tract --acs 2019-2023 --tracts 2023
 
-        coclab ingest acs --acs 2015-2019 --tracts 2023
-
-        coclab ingest acs --acs 2015-2019 --tracts 2023 --no-translate
+        coclab ingest acs5-tract --acs 2015-2019 --tracts 2023
     """
+    if translate:
+        raise typer.BadParameter(
+            "The --translate flag is reserved for future tract-level longitudinal "
+            "analysis. CoC-level aggregation handles multi-vintage tracts via "
+            "separate crosswalks."
+        )
+
     import pandas as pd
 
     from coclab.acs.ingest.tract_population import ingest_tract_data

@@ -12,6 +12,7 @@ from pathlib import Path
 
 import json
 
+import numpy as np
 import pandas as pd
 import pyarrow as pa
 import pyarrow.parquet as pq
@@ -35,6 +36,7 @@ from coclab.recipe.recipe_schema import (
     GeometryRef,
     RecipeV1,
     RollupTransform,
+    TemporalFilter,
     expand_year_spec,
 )
 
@@ -160,20 +162,59 @@ _XWALK_JOIN_KEYS: dict[str, str] = {
     "county": "county_fips",
 }
 
-# Column names commonly used for geo IDs in input datasets.
-_DATASET_GEO_COLUMNS: list[str] = ["geo_id", "GEOID", "geoid", "coc_id"]
+# Auto-detect candidates for geo-ID and year columns.
+_GEO_CANDIDATES: list[str] = [
+    "geo_id", "GEOID", "geoid", "coc_id", "tract_geoid", "county_fips",
+]
+_YEAR_CANDIDATES: list[str] = ["year", "pit_year"]
 
 
-def _find_geo_column(df: pd.DataFrame) -> str:
-    """Find the geo-ID column in a DataFrame."""
-    for col in _DATASET_GEO_COLUMNS:
-        if col in df.columns:
-            return col
-    raise ExecutorError(
-        f"Cannot find geo-ID column in dataset. "
-        f"Expected one of {_DATASET_GEO_COLUMNS}, "
-        f"got columns: {list(df.columns)}"
-    )
+def _resolve_year_column(
+    df: pd.DataFrame,
+    declared: str | None,
+) -> str | None:
+    """Resolve year column: use declared value, or auto-detect, or None."""
+    if declared is not None:
+        if declared not in df.columns:
+            raise ExecutorError(
+                f"Declared year_column '{declared}' not found in dataset. "
+                f"Available: {sorted(df.columns)}"
+            )
+        return declared
+    matches = [c for c in _YEAR_CANDIDATES if c in df.columns]
+    if len(matches) > 1:
+        raise ExecutorError(
+            f"Ambiguous year column: found {matches}. "
+            f"Declare year_column in the dataset spec to resolve."
+        )
+    return matches[0] if matches else None
+
+
+def _resolve_geo_column(
+    df: pd.DataFrame,
+    declared: str | None,
+) -> str:
+    """Resolve geo-ID column: use declared value or auto-detect."""
+    if declared is not None:
+        if declared not in df.columns:
+            raise ExecutorError(
+                f"Declared geo_column '{declared}' not found in dataset. "
+                f"Available: {sorted(df.columns)}"
+            )
+        return declared
+    matches = [c for c in _GEO_CANDIDATES if c in df.columns]
+    if len(matches) == 0:
+        raise ExecutorError(
+            f"Cannot find geo-ID column in dataset. "
+            f"Expected one of {_GEO_CANDIDATES}, "
+            f"got columns: {sorted(df.columns)}"
+        )
+    if len(matches) > 1:
+        raise ExecutorError(
+            f"Ambiguous geo-ID column: found {matches}. "
+            f"Declare geo_column in the dataset spec to resolve."
+        )
+    return matches[0]
 
 
 def _validate_columns(
@@ -191,12 +232,49 @@ def _validate_columns(
         )
 
 
+def _apply_temporal_filter(
+    df: pd.DataFrame,
+    filt: TemporalFilter,
+    year: int,
+    dataset_id: str,
+) -> pd.DataFrame:
+    """Apply a temporal filter to a DataFrame before resampling."""
+    col = filt.column
+    if col not in df.columns:
+        raise ExecutorError(
+            f"Temporal filter for '{dataset_id}': column '{col}' not found. "
+            f"Available: {sorted(df.columns)}"
+        )
+    if filt.method == "point_in_time":
+        filtered = df[df[col] == filt.month]
+        if filtered.empty:
+            raise ExecutorError(
+                f"Temporal filter for '{dataset_id}' year {year}: "
+                f"no rows where {col}=={filt.month}."
+            )
+        return filtered.drop(columns=[col])
+    elif filt.method in ("calendar_mean", "calendar_median"):
+        # Group by all columns except the temporal column and aggregate
+        numeric = set(df.select_dtypes("number").columns)
+        group_cols = [c for c in df.columns if c != col and c not in numeric]
+        measure_cols = [c for c in df.select_dtypes("number").columns if c != col]
+        if not group_cols:
+            raise ExecutorError(
+                f"Temporal filter for '{dataset_id}': no grouping columns found "
+                f"after excluding temporal column '{col}'."
+            )
+        agg_func = "mean" if filt.method == "calendar_mean" else "median"
+        return df.groupby(group_cols, as_index=False)[measure_cols].agg(agg_func)
+    else:
+        raise ExecutorError(f"Unknown temporal filter method '{filt.method}'.")
+
+
 def _resample_identity(
     df: pd.DataFrame,
     task: ResampleTask,
 ) -> pd.DataFrame:
     """Identity resample: passthrough with column standardisation."""
-    geo_col = _find_geo_column(df)
+    geo_col = _resolve_geo_column(df, task.geo_column)
     _validate_columns(df, task.measures, task.dataset_id, task.year)
 
     cols = [geo_col] + task.measures
@@ -215,7 +293,7 @@ def _resample_aggregate(
     task: ResampleTask,
 ) -> pd.DataFrame:
     """Aggregate resample: many-to-few via crosswalk weights."""
-    geo_col = _find_geo_column(df)
+    geo_col = _resolve_geo_column(df, task.geo_column)
     _validate_columns(df, task.measures, task.dataset_id, task.year)
 
     # Determine join key in crosswalk based on effective geometry type
@@ -229,8 +307,12 @@ def _resample_aggregate(
             f"Crosswalk columns: {sorted(xwalk.columns)}"
         )
 
-    # Determine weight column (prefer pop_share for weighted_mean if available)
-    if task.aggregation == "weighted_mean" and "pop_share" in xwalk.columns:
+    # Determine weight column (prefer pop_share for weighted_mean if populated)
+    if (
+        task.aggregation == "weighted_mean"
+        and "pop_share" in xwalk.columns
+        and xwalk["pop_share"].notna().any()
+    ):
         weight_col = "pop_share"
     else:
         weight_col = "area_share"
@@ -256,34 +338,59 @@ def _resample_aggregate(
             f"({xwalk_key}). Check that geo-ID formats match."
         )
 
-    # Apply aggregation per CoC
-    agg = task.aggregation or "sum"
-    if agg == "sum":
-        # Weighted sum: measure_value * weight, summed per CoC
-        for m in task.measures:
-            merged[m] = merged[m] * merged[weight_col]
-        result = merged.groupby("coc_id")[task.measures].sum().reset_index()
-    elif agg == "mean":
-        result = merged.groupby("coc_id")[task.measures].mean().reset_index()
-    elif agg == "weighted_mean":
-        # Weighted mean: sum(measure * weight) / sum(weight) per CoC
-        rows = []
-        for coc_id, group in merged.groupby("coc_id"):
-            w = group[weight_col].values
-            w_sum = w.sum()
-            row: dict[str, object] = {"coc_id": coc_id}
-            for m in task.measures:
-                if w_sum > 0:
-                    row[m] = (group[m].values * w).sum() / w_sum
-                else:
-                    row[m] = None
-            rows.append(row)
-        result = pd.DataFrame(rows)
+    # Resolve per-measure aggregation methods
+    measure_aggs: dict[str, str] = {}
+    if task.measure_aggregations:
+        measure_aggs = task.measure_aggregations
     else:
-        raise ExecutorError(
-            f"Unsupported aggregation method '{agg}' for "
-            f"dataset '{task.dataset_id}'."
-        )
+        default_agg = task.aggregation or "sum"
+        measure_aggs = {m: default_agg for m in task.measures}
+
+    # Convert measures to float64 to handle nullable Pandas types (Int64, Float64)
+    for m in task.measures:
+        merged[m] = pd.to_numeric(merged[m], errors="coerce").astype("float64")
+    merged[weight_col] = merged[weight_col].astype("float64")
+
+    # Group measures by aggregation method for efficient dispatch
+    agg_groups: dict[str, list[str]] = {}
+    for m, agg in measure_aggs.items():
+        agg_groups.setdefault(agg, []).append(m)
+
+    # Aggregate per CoC, per method
+    result_parts: list[pd.DataFrame] = []
+    for agg, measures in agg_groups.items():
+        if agg == "sum":
+            part = merged.copy()
+            for m in measures:
+                part[m] = part[m] * part[weight_col]
+            result_parts.append(part.groupby("coc_id")[measures].sum().reset_index())
+        elif agg == "mean":
+            result_parts.append(merged.groupby("coc_id")[measures].mean().reset_index())
+        elif agg == "weighted_mean":
+            rows = []
+            for coc_id, group in merged.groupby("coc_id"):
+                w = group[weight_col].values
+                w_sum = w.sum()
+                row: dict[str, object] = {"coc_id": coc_id}
+                for m in measures:
+                    vals = group[m].values
+                    mask = ~np.isnan(vals)
+                    if w_sum > 0 and mask.any():
+                        row[m] = (vals[mask] * w[mask]).sum() / w[mask].sum()
+                    else:
+                        row[m] = None
+                rows.append(row)
+            result_parts.append(pd.DataFrame(rows))
+        else:
+            raise ExecutorError(
+                f"Unsupported aggregation method '{agg}' for "
+                f"dataset '{task.dataset_id}'."
+            )
+
+    # Merge all result parts on coc_id
+    result = result_parts[0]
+    for part in result_parts[1:]:
+        result = result.merge(part, on="coc_id", how="outer")
 
     result = result.rename(columns={"coc_id": "geo_id"})
     result["year"] = task.year
@@ -296,7 +403,7 @@ def _resample_allocate(
     task: ResampleTask,
 ) -> pd.DataFrame:
     """Allocate resample: few-to-many via crosswalk weights."""
-    geo_col = _find_geo_column(df)
+    geo_col = _resolve_geo_column(df, task.geo_column)
     _validate_columns(df, task.measures, task.dataset_id, task.year)
 
     # For allocate, the target geometry is finer-grained.
@@ -444,6 +551,26 @@ def _execute_resample(
                 f"failed to read {task.input_path}: {exc}"
             ),
         )
+
+    # Apply temporal filter if declared for this dataset
+    filt = ctx.recipe.filters.get(task.dataset_id)
+    if filt is not None and isinstance(filt, TemporalFilter):
+        try:
+            df = _apply_temporal_filter(df, filt, task.year, task.dataset_id)
+        except ExecutorError as exc:
+            return StepResult(
+                step_kind="resample",
+                detail=detail,
+                success=False,
+                error=str(exc),
+            )
+
+    # Filter to the target year if the dataset has a year column
+    year_col = _resolve_year_column(df, task.year_column)
+    if year_col is not None:
+        df = df[df[year_col] == task.year].copy()
+        if year_col != "year":
+            df = df.rename(columns={year_col: "year"})
 
     try:
         if task.method == "identity":

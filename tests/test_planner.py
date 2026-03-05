@@ -54,6 +54,7 @@ def _segmented_recipe() -> dict:
                 "product": "pit",
                 "version": 1,
                 "native_geometry": {"type": "coc"},
+                "years": "2015-2024",
                 "path": "data/pit/pit.parquet",
             },
         },

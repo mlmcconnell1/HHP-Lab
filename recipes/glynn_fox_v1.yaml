@@ -20,6 +20,9 @@ datasets:
     product: pit
     version: 1
     native_geometry: { type: coc }
+    years: "2015-2024"
+    year_column: pit_year
+    geo_column: coc_id
     params:
       vintage: 2024
       align: point_in_time_jan
@@ -31,6 +34,9 @@ datasets:
     product: acs5
     version: 1
     native_geometry: { type: tract, vintage: 2020, source: tiger }
+    years: "2015-2024"
+    year_column: year
+    geo_column: geo_id
     params:
       # Use whatever ACS vintage strategy you’ve standardized on in CoC-Lab;
       # this is just a declarative hint to the adapter.
@@ -44,11 +50,14 @@ datasets:
     product: zori
     version: 1
     native_geometry: { type: county }
+    years: "2015-2024"
+    year_column: year
+    geo_column: county_fips
     params:
       align: point_in_time_jan
       # optional: any adapter-specific series selection / smoothing flags
       # series: "smoothed"  # example only
-    path: data/curated/zori/zori__county__Z2025.parquet
+    path: data/curated/zori/zori__county__Z2026.parquet
 
 transforms:
   # Population-weighted tract→CoC crosswalk (used to aggregate ACS to CoC)
@@ -67,7 +76,7 @@ transforms:
   # if not, you’ll need an intermediate county↔tract mapping + rollups.)
   - id: county_to_coc
     type: crosswalk
-    from: { type: county }
+    from: { type: county, vintage: 2020 }
     to: { type: coc, vintage: 2025, source: hud_exchange }
     spec:
       weighting:
@@ -89,14 +98,15 @@ pipelines:
           method: identity
           measures: [pit_total, pit_sheltered, pit_unsheltered]
 
-      # ACS tract → CoC (weighted aggregation)
+      # ACS tract → CoC (weighted aggregation, per-measure)
       - resample:
           dataset: acs_tract
           to_geometry: { type: coc, vintage: 2025, source: hud_exchange }
           method: aggregate
           via: tract_to_coc
-          measures: [total_population, median_household_income]
-          aggregation: weighted_mean
+          measures:
+            total_population: { aggregation: sum }
+            median_household_income: { aggregation: weighted_mean }
 
       # ZORI county → CoC (population-weighted aggregation)
       - resample:
@@ -111,6 +121,14 @@ pipelines:
       - join:
           datasets: [pit, acs_tract, zori_county]
           join_on: [geo_id, year]
+
+filters:
+  # ZORI is monthly; filter to January for point-in-time alignment with PIT counts
+  zori_county:
+    type: temporal
+    column: month
+    method: point_in_time
+    month: 1
 
 validation:
   crosswalk_coverage:

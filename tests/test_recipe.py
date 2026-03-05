@@ -141,6 +141,7 @@ class TestLoadRecipeFromDict:
     def test_dataset_path_accepts_relative(self):
         data = _minimal_recipe()
         data["datasets"]["acs"]["path"] = "data/curated/measures/coc_measures__2020__2019.parquet"
+        data["datasets"]["acs"]["years"] = "2020-2022"
         recipe = load_recipe(data)
         assert (
             recipe.datasets["acs"].path
@@ -366,6 +367,7 @@ class TestRecipeCLI:
 
         data = _minimal_recipe()
         data["datasets"]["acs"]["path"] = "data/does_not_exist.parquet"
+        data["datasets"]["acs"]["years"] = "2020-2022"
         recipe_file = tmp_path / "recipe.yaml"
         recipe_file.write_text(yaml.dump(data), encoding="utf-8")
         result = runner.invoke(app, [
@@ -403,6 +405,7 @@ class TestRecipeCLI:
 
         data = _minimal_recipe()
         data["datasets"]["acs"]["path"] = "data/curated/acs.parquet"
+        data["datasets"]["acs"]["years"] = "2020-2022"
         recipe_file = tmp_path / "recipe.yaml"
         recipe_file.write_text(yaml.dump(data), encoding="utf-8")
         result = runner.invoke(app, [
@@ -416,6 +419,7 @@ class TestRecipeCLI:
 
         data = _minimal_recipe()
         data["datasets"]["acs"]["path"] = "data/missing.parquet"
+        data["datasets"]["acs"]["years"] = "2020-2022"
         data["datasets"]["acs"]["optional"] = True
         recipe_file = tmp_path / "recipe.yaml"
         recipe_file.write_text(yaml.dump(data), encoding="utf-8")
@@ -433,6 +437,7 @@ class TestRecipeCLI:
 
         data = _minimal_recipe()
         data["datasets"]["acs"]["path"] = "data/missing.parquet"
+        data["datasets"]["acs"]["years"] = "2020-2022"
         data["validation"] = {"missing_dataset": {"default": "warn"}}
         recipe_file = tmp_path / "recipe.yaml"
         recipe_file.write_text(yaml.dump(data), encoding="utf-8")
@@ -449,6 +454,7 @@ class TestRecipeCLI:
 
         data = _minimal_recipe()
         data["datasets"]["acs"]["path"] = "data/missing.parquet"
+        data["datasets"]["acs"]["years"] = "2020-2022"
         # Default is fail, but override acs to warn
         data["validation"] = {"missing_dataset": {"default": "fail", "acs": "warn"}}
         recipe_file = tmp_path / "recipe.yaml"
@@ -465,6 +471,7 @@ class TestRecipeCLI:
 
         data = _minimal_recipe()
         data["datasets"]["acs"]["path"] = "data/missing.parquet"
+        data["datasets"]["acs"]["years"] = "2020-2022"
         data["datasets"]["acs"]["optional"] = True
         # Policy explicitly says fail for this dataset
         data["validation"] = {"missing_dataset": {"default": "warn", "acs": "fail"}}
@@ -683,6 +690,41 @@ class TestFileSetSchema:
         data["datasets"]["acs"]["file_set"]["segments"][0]["year_offsets"] = {"acs_end": -1}
         with pytest.raises(RecipeLoadError, match="both constants and year_offsets"):
             load_recipe(data)
+
+
+# ===========================================================================
+# Static-path multi-year validation
+# ===========================================================================
+
+
+class TestStaticPathMultiYear:
+
+    def test_static_path_no_years_multi_year_universe_rejected(self):
+        data = _minimal_recipe()
+        data["datasets"]["acs"]["path"] = "data/acs.parquet"
+        with pytest.raises(RecipeLoadError, match="does not declare.*years"):
+            load_recipe(data)
+
+    def test_static_path_with_years_multi_year_universe_accepted(self):
+        data = _minimal_recipe()
+        data["datasets"]["acs"]["path"] = "data/acs.parquet"
+        data["datasets"]["acs"]["years"] = "2020-2022"
+        recipe = load_recipe(data)
+        assert recipe.datasets["acs"].path == "data/acs.parquet"
+
+    def test_static_path_no_years_single_year_universe_accepted(self):
+        data = _minimal_recipe()
+        data["universe"] = {"years": [2020]}
+        data["datasets"]["acs"]["path"] = "data/acs.parquet"
+        recipe = load_recipe(data)
+        assert recipe.datasets["acs"].path == "data/acs.parquet"
+
+    def test_no_path_no_years_multi_year_universe_accepted(self):
+        """Dataset without path (e.g. dynamically loaded) should not trigger the check."""
+        data = _minimal_recipe()
+        # No path set — should be fine even without years
+        recipe = load_recipe(data)
+        assert recipe.datasets["acs"].path is None
 
 
 # ===========================================================================
@@ -1306,12 +1348,14 @@ def _recipe_with_pipeline() -> dict:
                 "product": "pit",
                 "version": 1,
                 "native_geometry": {"type": "coc"},
+                "years": "2020-2021",
             },
             "acs": {
                 "provider": "census",
                 "product": "acs5",
                 "version": 1,
                 "native_geometry": {"type": "tract", "vintage": 2020},
+                "years": "2020-2021",
             },
         },
         "transforms": [
@@ -1371,21 +1415,21 @@ def _setup_pipeline_fixtures(tmp_path: Path) -> None:
     })
     xwalk.to_parquet(xwalk_dir / "xwalk__B2025xT2020.parquet")
 
-    # PIT dataset (identity passthrough)
+    # PIT dataset (identity passthrough) — includes both universe years
     pit_path = tmp_path / "data" / "pit.parquet"
     pit_path.parent.mkdir(parents=True, exist_ok=True)
     pd.DataFrame({
-        "coc_id": ["COC1", "COC2"],
-        "year": [2020, 2020],
-        "pit_total": [10, 20],
+        "coc_id": ["COC1", "COC2", "COC1", "COC2"],
+        "year": [2020, 2020, 2021, 2021],
+        "pit_total": [10, 20, 11, 21],
     }).to_parquet(pit_path)
 
-    # ACS dataset (aggregate)
+    # ACS dataset (aggregate) — includes both universe years
     acs_path = tmp_path / "data" / "acs.parquet"
     pd.DataFrame({
-        "GEOID": ["T1", "T2"],
-        "year": [2020, 2020],
-        "total_population": [100, 200],
+        "GEOID": ["T1", "T2", "T1", "T2"],
+        "year": [2020, 2020, 2021, 2021],
+        "total_population": [100, 200, 110, 210],
     }).to_parquet(acs_path)
 
 
@@ -1915,6 +1959,214 @@ class TestResampleAggregate:
         )
         result = _execute_resample(task, ctx)
         assert result.success
+
+    def test_per_measure_aggregation_dict(self, tmp_path: Path):
+        """Dict-format measure_aggregations applies different agg per measure."""
+        ctx = self._setup(tmp_path)
+        task = ResampleTask(
+            dataset_id="acs",
+            year=2020,
+            input_path="data/acs.parquet",
+            effective_geometry=GeometryRef(type="tract", vintage=2020),
+            method="aggregate",
+            transform_id="tract_to_coc",
+            to_geometry=GeometryRef(type="coc", vintage=2025),
+            measures=["pop", "income"],
+            measure_aggregations={"pop": "sum", "income": "weighted_mean"},
+        )
+        result = _execute_resample(task, ctx)
+        assert result.success
+        df = ctx.intermediates[("acs", 2020)]
+
+        # --- sum for pop (value * area_share, then sum per CoC) ---
+        # COC1 = 100*0.8 + 200*0.5 = 180, COC2 = 300*1.0 = 300
+        coc1_pop = df[df.geo_id == "COC1"]["pop"].iloc[0]
+        coc2_pop = df[df.geo_id == "COC2"]["pop"].iloc[0]
+        assert coc1_pop == pytest.approx(180.0)
+        assert coc2_pop == pytest.approx(300.0)
+
+        # --- weighted_mean for income (sum(val*w)/sum(w), w=area_share) ---
+        # COC1 = (50000*0.8 + 60000*0.5) / (0.8+0.5) = 70000/1.3 ≈ 53846.15
+        # COC2 = 70000*1.0 / 1.0 = 70000
+        coc1_income = df[df.geo_id == "COC1"]["income"].iloc[0]
+        coc2_income = df[df.geo_id == "COC2"]["income"].iloc[0]
+        assert coc1_income == pytest.approx(70000.0 / 1.3)
+        assert coc2_income == pytest.approx(70000.0)
+
+    def test_measures_list_backward_compat(self, tmp_path: Path):
+        """Old list format (measures: [a, b] + aggregation: sum) still works."""
+        data = _recipe_with_pipeline()
+        # The second resample step already uses the legacy format:
+        #   measures: ["total_population"], aggregation: "sum"
+        # Confirm the schema coerces it and the planner round-trips correctly.
+        recipe = load_recipe(data)
+        resample_steps = [
+            s for pipe in recipe.pipelines
+            for s in pipe.steps
+            if hasattr(s, "kind") and s.kind == "resample"
+        ]
+        # Find the aggregate step (method == aggregate)
+        agg_step = [s for s in resample_steps if s.method == "aggregate"][0]
+        # After coercion, measures should be a dict mapping name → config
+        assert isinstance(agg_step.measures, dict)
+        assert "total_population" in agg_step.measures
+        assert agg_step.measures["total_population"].aggregation == "sum"
+
+        # Now verify end-to-end: execute with the coerced recipe
+        ds_path = tmp_path / "data" / "acs.parquet"
+        _make_dataset_parquet(ds_path, geo_col="GEOID")
+        xwalk_path = tmp_path / "data" / "curated" / "xwalks" / "xwalk__B2025xT2020.parquet"
+        _make_xwalk_parquet(xwalk_path, geo_type="tract")
+
+        ctx = ExecutionContext(project_root=tmp_path, recipe=recipe)
+        ctx.transform_paths["tract_to_coc"] = xwalk_path
+
+        task = ResampleTask(
+            dataset_id="acs",
+            year=2020,
+            input_path="data/acs.parquet",
+            effective_geometry=GeometryRef(type="tract", vintage=2020),
+            method="aggregate",
+            transform_id="tract_to_coc",
+            to_geometry=GeometryRef(type="coc", vintage=2025),
+            measures=["pop"],
+            aggregation="sum",
+        )
+        result = _execute_resample(task, ctx)
+        assert result.success
+        df = ctx.intermediates[("acs", 2020)]
+        # COC1 = 100*0.8 + 200*0.5 = 180, COC2 = 300*1.0 = 300
+        coc1 = df[df.geo_id == "COC1"]["pop"].iloc[0]
+        assert coc1 == pytest.approx(180.0)
+
+
+# ===========================================================================
+# Column resolution safety tests
+# ===========================================================================
+
+
+class TestColumnResolution:
+
+    def test_declared_geo_column_used(self, tmp_path: Path):
+        """When geo_column is declared, the executor uses it."""
+        ds_path = tmp_path / "data" / "ds.parquet"
+        ds_path.parent.mkdir(parents=True)
+        pd.DataFrame({
+            "my_geo": ["T1", "T2"],
+            "year": [2020, 2020],
+            "val": [10, 20],
+        }).to_parquet(ds_path)
+
+        data = _recipe_with_pipeline()
+        data["datasets"]["acs"]["geo_column"] = "my_geo"
+        recipe = load_recipe(data)
+        ctx = ExecutionContext(project_root=tmp_path, recipe=recipe)
+
+        task = ResampleTask(
+            dataset_id="acs",
+            year=2020,
+            input_path="data/ds.parquet",
+            effective_geometry=GeometryRef(type="coc", vintage=2025),
+            method="identity",
+            transform_id=None,
+            to_geometry=GeometryRef(type="coc", vintage=2025),
+            measures=["val"],
+            geo_column="my_geo",
+        )
+        result = _execute_resample(task, ctx)
+        assert result.success
+        df = ctx.intermediates[("acs", 2020)]
+        assert "geo_id" in df.columns
+
+    def test_declared_geo_column_missing_errors(self, tmp_path: Path):
+        """Declared geo_column that doesn't exist in data raises error."""
+        ds_path = tmp_path / "data" / "ds.parquet"
+        ds_path.parent.mkdir(parents=True)
+        pd.DataFrame({
+            "GEOID": ["T1"],
+            "year": [2020],
+            "val": [10],
+        }).to_parquet(ds_path)
+
+        data = _recipe_with_pipeline()
+        recipe = load_recipe(data)
+        ctx = ExecutionContext(project_root=tmp_path, recipe=recipe)
+
+        task = ResampleTask(
+            dataset_id="acs",
+            year=2020,
+            input_path="data/ds.parquet",
+            effective_geometry=GeometryRef(type="coc", vintage=2025),
+            method="identity",
+            transform_id=None,
+            to_geometry=GeometryRef(type="coc", vintage=2025),
+            measures=["val"],
+            geo_column="nonexistent",
+        )
+        result = _execute_resample(task, ctx)
+        assert not result.success
+        assert "nonexistent" in result.error
+
+    def test_declared_year_column_used(self, tmp_path: Path):
+        """When year_column is declared, the executor filters on it."""
+        ds_path = tmp_path / "data" / "ds.parquet"
+        ds_path.parent.mkdir(parents=True)
+        pd.DataFrame({
+            "coc_id": ["COC1", "COC1"],
+            "pit_year": [2020, 2021],
+            "val": [10, 20],
+        }).to_parquet(ds_path)
+
+        data = _recipe_with_pipeline()
+        data["datasets"]["pit"]["year_column"] = "pit_year"
+        recipe = load_recipe(data)
+        ctx = ExecutionContext(project_root=tmp_path, recipe=recipe)
+
+        task = ResampleTask(
+            dataset_id="pit",
+            year=2020,
+            input_path="data/ds.parquet",
+            effective_geometry=GeometryRef(type="coc"),
+            method="identity",
+            transform_id=None,
+            to_geometry=GeometryRef(type="coc", vintage=2025),
+            measures=["val"],
+            year_column="pit_year",
+        )
+        result = _execute_resample(task, ctx)
+        assert result.success
+        df = ctx.intermediates[("pit", 2020)]
+        assert len(df) == 1
+        assert df["val"].iloc[0] == 10
+
+    def test_ambiguous_geo_column_errors(self, tmp_path: Path):
+        """Multiple geo-ID candidate columns without declaration should error."""
+        ds_path = tmp_path / "data" / "ds.parquet"
+        ds_path.parent.mkdir(parents=True)
+        pd.DataFrame({
+            "geo_id": ["T1"],
+            "GEOID": ["T1"],
+            "year": [2020],
+            "val": [10],
+        }).to_parquet(ds_path)
+
+        data = _recipe_with_pipeline()
+        recipe = load_recipe(data)
+        ctx = ExecutionContext(project_root=tmp_path, recipe=recipe)
+
+        task = ResampleTask(
+            dataset_id="acs",
+            year=2020,
+            input_path="data/ds.parquet",
+            effective_geometry=GeometryRef(type="coc", vintage=2025),
+            method="identity",
+            transform_id=None,
+            to_geometry=GeometryRef(type="coc", vintage=2025),
+            measures=["val"],
+        )
+        result = _execute_resample(task, ctx)
+        assert not result.success
+        assert "Ambiguous geo-ID" in result.error
 
 
 # ===========================================================================

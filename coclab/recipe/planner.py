@@ -55,6 +55,9 @@ class ResampleTask:
     to_geometry: GeometryRef
     measures: list[str]
     aggregation: Optional[str] = None
+    measure_aggregations: Optional[dict[str, str]] = None
+    year_column: Optional[str] = None
+    geo_column: Optional[str] = None
 
 
 @dataclass
@@ -278,6 +281,11 @@ def resolve_plan(recipe: RecipeV1, pipeline_id: str) -> ExecutionPlan:
                     else:
                         transform_id = step.via
 
+                ds = recipe.datasets[step.dataset]
+                measure_aggs = {
+                    name: cfg.aggregation
+                    for name, cfg in step.measures.items()
+                }
                 plan.resample_tasks.append(
                     ResampleTask(
                         dataset_id=step.dataset,
@@ -287,8 +295,11 @@ def resolve_plan(recipe: RecipeV1, pipeline_id: str) -> ExecutionPlan:
                         method=step.method,
                         transform_id=transform_id,
                         to_geometry=step.to_geometry,
-                        measures=list(step.measures),
+                        measures=step.measure_names,
                         aggregation=step.aggregation,
+                        measure_aggregations=measure_aggs,
+                        year_column=ds.year_column,
+                        geo_column=ds.geo_column,
                     )
                 )
 

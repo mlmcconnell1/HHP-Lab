@@ -359,6 +359,81 @@ When geometry vintage changes (ACS 2010 vs 2020 tracts), ensure:
 
 ---
 
+## 9) Per-Measure Aggregation (`coclab-3f6i`)
+
+The `measures` field in resample steps now supports a **dict format** mapping measure names to aggregation configs:
+
+```yaml
+measures:
+  total_population: { aggregation: sum }
+  median_household_income: { aggregation: weighted_mean }
+```
+
+The old list format (`measures: [a, b]` + `aggregation: sum`) is still supported via automatic coercion -- when a plain list is provided, each measure inherits the step-level `aggregation` value. Each measure can specify its own aggregation method: `sum`, `mean`, or `weighted_mean`.
+
+### Schema
+
+- `MeasureAggConfig` model in `recipe_schema.py` holds the per-measure `aggregation` field.
+- `ResampleStep` has a `_coerce_measures_list` before-validator that converts the legacy list format into the dict format transparently.
+
+---
+
+## 10) Filters Section (`coclab-6k6w`)
+
+A new top-level `filters:` section, keyed by dataset_id, supports temporal filtering before data enters the pipeline:
+
+```yaml
+filters:
+  zori_county:
+    type: temporal
+    column: month
+    method: point_in_time
+    month: 1
+```
+
+### Supported temporal methods
+
+| Method | Required fields | Behavior |
+|---|---|---|
+| `point_in_time` | `month` | Keep only the row matching the given month |
+| `calendar_mean` | -- | Compute the mean across calendar months |
+| `calendar_median` | -- | Compute the median across calendar months |
+
+### Validation rules
+
+- Filter keys must reference declared datasets.
+- `type` must be `temporal` (only supported type currently).
+
+### Schema
+
+See `TemporalFilter` and `FilterSpec` in `recipe_schema.py`.
+
+---
+
+## 11) Align Parameter Status (`coclab-1cp3`)
+
+The `align` parameter in dataset params (e.g., `params.align: point_in_time_jan`) is validated by dataset adapters but is **not implemented by the executor**. It serves only as a documentation hint.
+
+The new `filters:` section (section 10) is the actual mechanism for temporal alignment. Recipe authors should migrate from `align` in params to explicit `filters:` declarations:
+
+```yaml
+# Before (documentation-only, not enforced):
+datasets:
+  zori_county:
+    params:
+      align: point_in_time_jan
+
+# After (enforced by executor):
+filters:
+  zori_county:
+    type: temporal
+    column: month
+    method: point_in_time
+    month: 1
+```
+
+---
+
 ## Appendix A: Example Transforms for ACS Segments
 
 ```yaml

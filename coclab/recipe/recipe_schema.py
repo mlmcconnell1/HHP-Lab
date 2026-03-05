@@ -211,6 +211,14 @@ class DatasetSpec(BaseModel):
         default=None,
         description="Time-banded file set with per-segment geometry vintages.",
     )
+    year_column: Optional[str] = Field(
+        default=None,
+        description="Column name containing the year dimension. Auto-detected if omitted.",
+    )
+    geo_column: Optional[str] = Field(
+        default=None,
+        description="Column name containing the geo-ID. Auto-detected if omitted.",
+    )
     optional: bool = Field(default=False, description="If true, missing dataset does not fail the build (policy still applies).")
 
     @field_validator("path")
@@ -223,6 +231,40 @@ class DatasetSpec(BaseModel):
         if Path(value).is_absolute():
             raise ValueError("DatasetSpec.path must be a relative path, not absolute.")
         return value
+
+
+# -----------------------------
+# Targets / outputs
+# -----------------------------
+
+# -----------------------------
+# Filters (temporal)
+# -----------------------------
+
+TemporalMethod = Literal["point_in_time", "calendar_mean", "calendar_median"]
+
+
+class TemporalFilter(BaseModel):
+    """Temporal filter applied before geographic resampling."""
+    model_config = ConfigDict(extra="forbid")
+
+    type: Literal["temporal"] = "temporal"
+    column: str = Field(..., description="Column containing the temporal dimension (e.g. 'month', 'date').")
+    method: TemporalMethod = Field(..., description="Temporal aggregation method.")
+    month: Optional[int] = Field(
+        default=None,
+        description="Month for point_in_time filter (1-12).",
+        ge=1, le=12,
+    )
+
+    @model_validator(mode="after")
+    def _validate_point_in_time_requires_month(self) -> "TemporalFilter":
+        if self.method == "point_in_time" and self.month is None:
+            raise ValueError("Temporal filter method 'point_in_time' requires 'month'.")
+        return self
+
+
+FilterSpec = TemporalFilter  # Extensible: Union[TemporalFilter, ...] in future
 
 
 # -----------------------------
@@ -327,12 +369,22 @@ class MaterializeStep(BaseModel):
     transforms: List[str] = Field(..., description="Transform ids to ensure exist/materialized.")
 
 
+class MeasureAggConfig(BaseModel):
+    """Per-measure aggregation configuration."""
+    model_config = ConfigDict(extra="forbid")
+    aggregation: AggregationMethod = Field(..., description="Aggregation method for this measure.")
+
+
 class ResampleStep(BaseModel):
     """
     Resample a dataset to the target geometry.
     - identity: dataset already at to_geometry (via not required)
     - allocate: few -> many, requires crosswalk shares (via required)
     - aggregate: many -> few, via required (crosswalk or rollup)
+
+    ``measures`` accepts either:
+    - a list of strings (uniform aggregation via top-level ``aggregation``)
+    - a dict mapping measure name → MeasureAggConfig (per-measure aggregation)
     """
     model_config = ConfigDict(extra="forbid")
 
@@ -341,11 +393,31 @@ class ResampleStep(BaseModel):
     to_geometry: GeometryRef = Field(..., description="Destination geometry for this dataset output.")
     method: ResampleMethod = Field(..., description="Resampling method.")
     via: Optional[str] = Field(default=None, description="Transform id or 'auto' for allocate/aggregate.")
-    measures: List[str] = Field(..., description="List of measure/field names to carry through.")
+    measures: Dict[str, MeasureAggConfig] = Field(
+        ...,
+        description="Map of measure name → aggregation config.",
+    )
     aggregation: Optional[AggregationMethod] = Field(
         default=None,
-        description="Aggregation method for method=aggregate (compiler may infer per-measure).",
+        description="Deprecated: uniform aggregation method. Use per-measure config instead.",
     )
+
+    @model_validator(mode="before")
+    @classmethod
+    def _coerce_measures_list(cls, data: Any) -> Any:
+        """Support legacy list-of-strings format for measures."""
+        if not isinstance(data, dict):
+            return data
+        measures = data.get("measures")
+        if isinstance(measures, list):
+            agg = data.get("aggregation")
+            config: dict[str, Any] = {}
+            if agg is not None:
+                config = {m: {"aggregation": agg} for m in measures}
+            else:
+                config = {m: {"aggregation": "sum"} for m in measures}
+            data = {**data, "measures": config}
+        return data
 
     @model_validator(mode="after")
     def _validate_via_requirement(self) -> "ResampleStep":
@@ -354,6 +426,11 @@ class ResampleStep(BaseModel):
         if self.method == "identity" and self.via is not None:
             raise ValueError("ResampleStep.method=identity must not set 'via'.")
         return self
+
+    @property
+    def measure_names(self) -> list[str]:
+        """Return ordered list of measure names."""
+        return list(self.measures.keys())
 
 
 class JoinStep(BaseModel):
@@ -450,6 +527,10 @@ class RecipeV1(BaseModel):
 
     targets: List[TargetSpec]
     datasets: Dict[str, DatasetSpec]
+    filters: Dict[str, FilterSpec] = Field(
+        default_factory=dict,
+        description="Temporal filters keyed by dataset_id, applied before resampling.",
+    )
     transforms: List[TransformSpec] = Field(default_factory=list)
     pipelines: List[PipelineSpec] = Field(default_factory=list)
     validation: ValidationPolicy = Field(default_factory=ValidationPolicy)
@@ -604,4 +685,34 @@ class RecipeV1(BaseModel):
                         f"cover dimension(s): {sorted(missing)}. Each dimension "
                         f"must appear in constants or year_offsets."
                     )
+        return self
+
+    @model_validator(mode="after")
+    def _validate_filters(self) -> "RecipeV1":
+        """Validate that filter keys reference declared datasets."""
+        dataset_ids = set(self.datasets.keys())
+        unknown = set(self.filters.keys()) - dataset_ids
+        if unknown:
+            raise ValueError(
+                f"Filters reference unknown dataset(s): {sorted(unknown)}. "
+                f"Available: {sorted(dataset_ids)}"
+            )
+        return self
+
+    @model_validator(mode="after")
+    def _validate_static_path_multi_year(self) -> "RecipeV1":
+        """Error when a static-path dataset spans multiple universe years without years declaration."""
+        universe_years = expand_year_spec(self.universe)
+        if len(universe_years) <= 1:
+            return self
+
+        for ds_id, ds in self.datasets.items():
+            if ds.file_set is None and ds.path is not None and ds.years is None:
+                raise ValueError(
+                    f"Dataset '{ds_id}' uses a static path but does not declare "
+                    f"'years', and the recipe universe spans "
+                    f"{len(universe_years)} years. Add a 'years' declaration to "
+                    f"confirm intentional broadcast, use 'file_set' for "
+                    f"time-banded paths, or narrow the universe to a single year."
+                )
         return self
