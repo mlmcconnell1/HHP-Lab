@@ -491,11 +491,17 @@ def ingest_zori(
     # Validate monthly continuity (log warnings for gaps)
     _validate_monthly_continuity(df)
 
+    # Derive year/month integers from date for recipe consumption
+    df["year"] = df["date"].dt.year.astype("int32")
+    df["month"] = df["date"].dt.month.astype("int32")
+
     # Reorder columns to match schema
     col_order = [
         "geo_type",
         "geo_id",
         "date",
+        "year",
+        "month",
         "zori",
         "region_name",
         "state",

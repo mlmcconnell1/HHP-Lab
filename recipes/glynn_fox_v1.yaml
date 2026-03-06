@@ -35,8 +35,7 @@ datasets:
     version: 1
     native_geometry: { type: tract, vintage: 2020, source: tiger }
     years: "2015-2024"
-    year_column: year
-    geo_column: geo_id
+    geo_column: tract_geoid
     params:
       # Use whatever ACS vintage strategy you’ve standardized on in CoC-Lab;
       # this is just a declarative hint to the adapter.
@@ -52,7 +51,7 @@ datasets:
     native_geometry: { type: county }
     years: "2015-2024"
     year_column: year
-    geo_column: county_fips
+    geo_column: geo_id
     params:
       align: point_in_time_jan
       # optional: any adapter-specific series selection / smoothing flags
