@@ -1,0 +1,3 @@
+coc_id,pit_year,pit_total,pit_sheltered,pit_unsheltered,data_source,source_ref
+CO-500,2024,120,90,30,fixture,offline_smoke
+CO-501,2024,180,140,40,fixture,offline_smoke

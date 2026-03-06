@@ -1,0 +1,3 @@
+coc_id,coc_name,state_abbrev,boundary_vintage,source,source_ref,wkt
+CO-500,Fixture CoC West,CO,2024,fixture,local_fixture,"POLYGON ((-105 39, -104 39, -104 40, -105 40, -105 39))"
+CO-501,Fixture CoC East,CO,2024,fixture,local_fixture,"POLYGON ((-104 39, -103 39, -103 40, -104 40, -104 39))"

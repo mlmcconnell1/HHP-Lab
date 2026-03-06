@@ -9,6 +9,9 @@ pytest
 # Run smoke tests only
 pytest tests/test_smoke.py -v
 
+# Run offline fixture pipeline smoke test
+pytest tests/test_offline_pipeline_fixture.py -v
+
 # Run with coverage
 pytest --cov=coclab
 ```
