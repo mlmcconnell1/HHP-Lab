@@ -32,7 +32,12 @@ from coclab.cli.list_xwalks import list_xwalks
 from coclab.cli.migrate_curated import migrate_curated_cmd
 from coclab.cli.panel_diagnostics import panel_diagnostics
 from coclab.cli.pep import ingest_pep
-from coclab.cli.recipe import recipe_cmd, recipe_export_cmd, recipe_provenance_cmd
+from coclab.cli.recipe import (
+    recipe_cmd,
+    recipe_export_cmd,
+    recipe_plan_cmd,
+    recipe_provenance_cmd,
+)
 from coclab.cli.registry_rebuild import registry_rebuild
 from coclab.cli.show_measures import show_measures
 from coclab.cli.validate_curated import validate_curated_layout_cmd
@@ -537,6 +542,7 @@ build_app.command("export")(export_bundle)
 build_app.command("create")(create_build)
 build_app.command("list")(list_builds_cmd)
 build_app.command("recipe")(recipe_cmd)
+build_app.command("recipe-plan")(recipe_plan_cmd)
 build_app.command("recipe-provenance")(recipe_provenance_cmd)
 build_app.command("recipe-export")(recipe_export_cmd)
 show_app.command("vintage-diffs")(compare_vintages)

@@ -87,6 +87,14 @@ class ExecutionContext:
     cache: RecipeCache = field(default_factory=RecipeCache)
     # Assets consumed during execution (for provenance manifest)
     consumed_assets: list[AssetRecord] = field(default_factory=list)
+    # Suppress progress output (for --json mode)
+    quiet: bool = False
+
+
+def _echo(ctx: ExecutionContext, message: str) -> None:
+    """Print progress message unless quiet mode is active."""
+    if not ctx.quiet:
+        typer.echo(message)
 
 
 # ---------------------------------------------------------------------------
@@ -488,7 +496,7 @@ def _execute_materialize(
     paths in ``ctx.transform_paths`` for subsequent resample steps.
     """
     detail = f"materialize transforms: {task.transform_ids}"
-    typer.echo(f"  [materialize] {detail}")
+    _echo(ctx, f"  [materialize] {detail}")
 
     for tid in task.transform_ids:
         try:
@@ -504,7 +512,7 @@ def _execute_materialize(
             )
 
         if path.exists():
-            typer.echo(f"    reuse: {path.relative_to(ctx.project_root)}")
+            _echo(ctx, f"    reuse: {path.relative_to(ctx.project_root)}")
             ctx.transform_paths[tid] = path
             identity = ctx.cache.file_identity(path)
             ctx.consumed_assets.append(AssetRecord(
@@ -544,7 +552,7 @@ def _execute_resample(
     )
     if task.transform_id:
         detail += f" via={task.transform_id}"
-    typer.echo(f"  [resample] {detail}")
+    _echo(ctx, f"  [resample] {detail}")
 
     # Load input dataset
     if task.input_path is None:
@@ -708,7 +716,7 @@ def _execute_join(
         f"join datasets={task.datasets} year={task.year} "
         f"on={task.join_on}"
     )
-    typer.echo(f"  [join] {detail}")
+    _echo(ctx, f"  [join] {detail}")
 
     frames: list[pd.DataFrame] = []
     for ds_id in task.datasets:
@@ -925,7 +933,7 @@ def _persist_outputs(
         f"{len(panel)} rows → "
         f"{output_file.relative_to(ctx.project_root)}"
     )
-    typer.echo(f"  [persist] {detail}")
+    _echo(ctx, f"  [persist] {detail}")
     return StepResult(step_kind="persist", detail=detail, success=True)
 
 
@@ -940,6 +948,7 @@ def _execute_plan(
     project_root: Path,
     *,
     cache: RecipeCache | None = None,
+    quiet: bool = False,
 ) -> PipelineResult:
     """Execute all tasks in a resolved plan in deterministic order.
 
@@ -950,6 +959,7 @@ def _execute_plan(
         project_root=project_root,
         recipe=recipe,
         cache=cache or RecipeCache(),
+        quiet=quiet,
     )
     result = PipelineResult(pipeline_id=plan.pipeline_id)
 
@@ -989,6 +999,7 @@ def execute_recipe(
     project_root: Path | None = None,
     *,
     cache: RecipeCache | None = None,
+    quiet: bool = False,
 ) -> list[PipelineResult]:
     """Execute all pipelines in a recipe.
 
@@ -1001,6 +1012,8 @@ def execute_recipe(
     cache : RecipeCache | None
         Asset cache.  Pass ``RecipeCache(enabled=False)`` to disable
         caching.  Defaults to an enabled cache.
+    quiet : bool
+        Suppress progress output (for JSON mode).
 
     Returns
     -------
@@ -1020,8 +1033,12 @@ def execute_recipe(
 
     results: list[PipelineResult] = []
 
+    def _log(msg: str) -> None:
+        if not quiet:
+            typer.echo(msg)
+
     for pipeline in recipe.pipelines:
-        typer.echo(f"\nExecuting pipeline '{pipeline.id}'...")
+        _log(f"\nExecuting pipeline '{pipeline.id}'...")
 
         # Resolve the execution plan
         try:
@@ -1036,14 +1053,16 @@ def execute_recipe(
             + len(plan.resample_tasks)
             + len(plan.join_tasks)
         )
-        typer.echo(f"  Resolved {task_count} tasks")
+        _log(f"  Resolved {task_count} tasks")
 
         # Execute the plan
-        result = _execute_plan(plan, recipe, project_root, cache=cache)
+        result = _execute_plan(
+            plan, recipe, project_root, cache=cache, quiet=quiet,
+        )
         results.append(result)
 
         if result.success:
-            typer.echo(
+            _log(
                 f"  Pipeline '{pipeline.id}' completed: "
                 f"{len(result.steps)} steps OK"
             )

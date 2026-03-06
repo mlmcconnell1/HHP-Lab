@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import pandas as pd
@@ -35,7 +36,12 @@ from coclab.recipe.manifest import (
     read_manifest,
     write_manifest,
 )
-from coclab.recipe.planner import MaterializeTask, ResampleTask
+from coclab.recipe.planner import (
+    ExecutionPlan,
+    MaterializeTask,
+    ResampleTask,
+    resolve_plan,
+)
 from coclab.recipe.loader import RecipeLoadError, load_recipe
 from coclab.recipe.recipe_schema import (
     DatasetSpec,
@@ -2648,3 +2654,345 @@ class TestRecipeProvenanceCLI:
         ])
         assert result.exit_code == 0
         assert "executed" in result.output.lower()
+
+
+# ===========================================================================
+# --json output mode tests
+# ===========================================================================
+
+
+def _make_project_root(tmp_path: Path) -> None:
+    """Create marker files so _check_working_directory() doesn't warn."""
+    (tmp_path / "pyproject.toml").write_text("[project]\nname='test'\n")
+    (tmp_path / "coclab").mkdir(exist_ok=True)
+    (tmp_path / "data").mkdir(exist_ok=True)
+
+
+class TestRecipeJsonMode:
+
+    def _write_recipe(self, tmp_path: Path, data: dict) -> Path:
+        import yaml
+
+        recipe_file = tmp_path / "recipe.yaml"
+        recipe_file.write_text(yaml.dump(data), encoding="utf-8")
+        return recipe_file
+
+    def test_json_dry_run(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+        _make_project_root(tmp_path)
+        monkeypatch.chdir(tmp_path)
+        data = _recipe_with_pipeline()
+        rf = self._write_recipe(tmp_path, data)
+        result = runner.invoke(app, [
+            "build", "recipe",
+            "--recipe", str(rf),
+            "--dry-run", "--json",
+        ])
+        assert result.exit_code == 0
+        out = json.loads(result.output)
+        assert out["status"] == "ok"
+        assert out["recipe_name"] == "executor-test"
+        assert out["dry_run"] is True
+        assert "validation" in out
+
+    def test_json_full_execution(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    ):
+        _make_project_root(tmp_path)
+        monkeypatch.chdir(tmp_path)
+        _setup_pipeline_fixtures(tmp_path)
+        data = _recipe_with_pipeline()
+        data["datasets"]["pit"]["path"] = "data/pit.parquet"
+        data["datasets"]["acs"]["path"] = "data/acs.parquet"
+        rf = self._write_recipe(tmp_path, data)
+        result = runner.invoke(app, [
+            "build", "recipe",
+            "--recipe", str(rf),
+            "--json",
+        ])
+        assert result.exit_code == 0
+        out = json.loads(result.output)
+        assert out["status"] == "ok"
+        assert len(out["pipelines"]) == 1
+        pipeline = out["pipelines"][0]
+        assert pipeline["pipeline_id"] == "main"
+        assert pipeline["success"] is True
+        kinds = [s["step_kind"] for s in pipeline["steps"]]
+        assert "materialize" in kinds
+        assert "resample" in kinds
+        assert "join" in kinds
+
+    def test_json_suppresses_progress(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    ):
+        """JSON mode should not include human-readable progress lines."""
+        _make_project_root(tmp_path)
+        monkeypatch.chdir(tmp_path)
+        _setup_pipeline_fixtures(tmp_path)
+        data = _recipe_with_pipeline()
+        data["datasets"]["pit"]["path"] = "data/pit.parquet"
+        data["datasets"]["acs"]["path"] = "data/acs.parquet"
+        rf = self._write_recipe(tmp_path, data)
+        result = runner.invoke(app, [
+            "build", "recipe",
+            "--recipe", str(rf),
+            "--json",
+        ])
+        # Output should be valid JSON (no interleaved echo lines)
+        out = json.loads(result.output)
+        assert isinstance(out, dict)
+
+    def test_json_validation_error(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    ):
+        """Validation errors should produce structured JSON error."""
+        _make_project_root(tmp_path)
+        monkeypatch.chdir(tmp_path)
+        data = _recipe_with_pipeline()
+        # Introduce a missing required dataset path
+        data["datasets"]["pit"]["path"] = "missing.parquet"
+        data["datasets"]["acs"]["path"] = "also_missing.parquet"
+        data["validation"] = {"missing_dataset": {"default": "fail"}}
+        rf = self._write_recipe(tmp_path, data)
+        result = runner.invoke(app, [
+            "build", "recipe",
+            "--recipe", str(rf),
+            "--json",
+        ])
+        assert result.exit_code == 1
+        out = json.loads(result.output)
+        assert out["status"] == "error"
+        assert len(out["validation"]["errors"]) >= 2
+
+    def test_json_provenance(self, tmp_path: Path):
+        m = RecipeManifest(
+            recipe_name="demo",
+            recipe_version=1,
+            pipeline_id="main",
+            assets=[
+                AssetRecord(
+                    role="dataset", path="data/x.parquet",
+                    sha256="a" * 64, size=100, dataset_id="x",
+                ),
+            ],
+        )
+        mf = tmp_path / "test.manifest.json"
+        write_manifest(m, mf)
+        result = runner.invoke(app, [
+            "build", "recipe-provenance",
+            "--manifest", str(mf),
+            "--json",
+        ])
+        assert result.exit_code == 0
+        out = json.loads(result.output)
+        assert out["status"] == "ok"
+        assert out["recipe_name"] == "demo"
+        assert len(out["assets"]) == 1
+
+    def test_json_export(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+        _make_project_root(tmp_path)
+        monkeypatch.chdir(tmp_path)
+        pd.DataFrame({"x": [1]}).to_parquet(
+            tmp_path / "data" / "pit.parquet",
+        )
+        m = RecipeManifest(
+            recipe_name="demo",
+            recipe_version=1,
+            pipeline_id="main",
+            assets=[
+                AssetRecord(
+                    role="dataset", path="data/pit.parquet",
+                    sha256="a" * 64, size=100,
+                ),
+            ],
+        )
+        mf = tmp_path / "test.manifest.json"
+        write_manifest(m, mf)
+        out_dir = tmp_path / "bundle"
+        result = runner.invoke(app, [
+            "build", "recipe-export",
+            "--manifest", str(mf),
+            "--output", str(out_dir),
+            "--json",
+        ])
+        assert result.exit_code == 0
+        out = json.loads(result.output)
+        assert out["status"] == "ok"
+        assert out["assets_copied"] == 1
+
+    def test_json_provenance_missing_manifest(self, tmp_path: Path):
+        result = runner.invoke(app, [
+            "build", "recipe-provenance",
+            "--manifest", str(tmp_path / "nope.json"),
+            "--json",
+        ])
+        assert result.exit_code == 1
+        out = json.loads(result.output)
+        assert out["status"] == "error"
+
+
+# ===========================================================================
+# recipe-plan command tests
+# ===========================================================================
+
+
+class TestRecipePlanCmd:
+
+    def _write_recipe(self, tmp_path: Path, data: dict) -> Path:
+        import yaml
+
+        recipe_file = tmp_path / "recipe.yaml"
+        recipe_file.write_text(yaml.dump(data), encoding="utf-8")
+        return recipe_file
+
+    def test_plan_human_output(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    ):
+        _make_project_root(tmp_path)
+        monkeypatch.chdir(tmp_path)
+        data = _recipe_with_pipeline()
+        rf = self._write_recipe(tmp_path, data)
+        result = runner.invoke(app, [
+            "build", "recipe-plan",
+            "--recipe", str(rf),
+        ])
+        assert result.exit_code == 0
+        assert "Pipeline 'main'" in result.output
+        assert "[materialize]" in result.output
+        assert "[resample]" in result.output
+        assert "[join]" in result.output
+
+    def test_plan_json_output(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    ):
+        _make_project_root(tmp_path)
+        monkeypatch.chdir(tmp_path)
+        data = _recipe_with_pipeline()
+        rf = self._write_recipe(tmp_path, data)
+        result = runner.invoke(app, [
+            "build", "recipe-plan",
+            "--recipe", str(rf),
+            "--json",
+        ])
+        assert result.exit_code == 0
+        out = json.loads(result.output)
+        assert out["status"] == "ok"
+        assert out["recipe_name"] == "executor-test"
+        assert len(out["pipelines"]) == 1
+        plan = out["pipelines"][0]
+        assert plan["pipeline_id"] == "main"
+        assert len(plan["materialize_tasks"]) == 1
+        assert len(plan["resample_tasks"]) == 4  # 2 datasets × 2 years
+        assert len(plan["join_tasks"]) == 2  # 2 years
+        assert plan["task_count"] == 7
+
+    def test_plan_json_shows_resolved_paths(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    ):
+        _make_project_root(tmp_path)
+        monkeypatch.chdir(tmp_path)
+        # Create the dataset file so validation passes
+        pit_path = tmp_path / "data" / "pit.parquet"
+        pd.DataFrame({"coc_id": ["C1"], "year": [2020], "pit_total": [1]}).to_parquet(pit_path)
+        data = _recipe_with_pipeline()
+        data["datasets"]["pit"]["path"] = "data/pit.parquet"
+        rf = self._write_recipe(tmp_path, data)
+        result = runner.invoke(app, [
+            "build", "recipe-plan",
+            "--recipe", str(rf),
+            "--json",
+        ])
+        out = json.loads(result.output)
+        resample_tasks = out["pipelines"][0]["resample_tasks"]
+        pit_tasks = [t for t in resample_tasks if t["dataset_id"] == "pit"]
+        assert pit_tasks[0]["input_path"] == "data/pit.parquet"
+
+    def test_plan_json_shows_geometry(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    ):
+        _make_project_root(tmp_path)
+        monkeypatch.chdir(tmp_path)
+        data = _recipe_with_pipeline()
+        rf = self._write_recipe(tmp_path, data)
+        result = runner.invoke(app, [
+            "build", "recipe-plan",
+            "--recipe", str(rf),
+            "--json",
+        ])
+        out = json.loads(result.output)
+        resample_tasks = out["pipelines"][0]["resample_tasks"]
+        acs_task = next(
+            t for t in resample_tasks if t["dataset_id"] == "acs"
+        )
+        assert acs_task["effective_geometry"]["type"] == "tract"
+        assert acs_task["effective_geometry"]["vintage"] == 2020
+        assert acs_task["to_geometry"]["type"] == "coc"
+
+    def test_plan_json_shows_transform_selection(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    ):
+        _make_project_root(tmp_path)
+        monkeypatch.chdir(tmp_path)
+        data = _recipe_with_pipeline()
+        rf = self._write_recipe(tmp_path, data)
+        result = runner.invoke(app, [
+            "build", "recipe-plan",
+            "--recipe", str(rf),
+            "--json",
+        ])
+        out = json.loads(result.output)
+        resample_tasks = out["pipelines"][0]["resample_tasks"]
+        acs_task = next(
+            t for t in resample_tasks if t["dataset_id"] == "acs"
+        )
+        assert acs_task["transform_id"] == "tract_to_coc"
+
+    def test_plan_planner_error_json(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    ):
+        _make_project_root(tmp_path)
+        monkeypatch.chdir(tmp_path)
+        data = _recipe_with_pipeline()
+        # Add an unresolvable auto transform
+        data["pipelines"][0]["steps"].insert(1, {
+            "resample": {
+                "dataset": "acs",
+                "to_geometry": {"type": "county"},
+                "method": "aggregate",
+                "via": "auto",
+                "measures": ["total_population"],
+            },
+        })
+        rf = self._write_recipe(tmp_path, data)
+        result = runner.invoke(app, [
+            "build", "recipe-plan",
+            "--recipe", str(rf),
+            "--json",
+        ])
+        assert result.exit_code == 1
+        out = json.loads(result.output)
+        assert out["status"] == "error"
+
+
+class TestExecutionPlanToDict:
+
+    def test_plan_to_dict(self):
+        recipe = load_recipe(_recipe_with_pipeline())
+        plan = resolve_plan(recipe, "main")
+        d = plan.to_dict()
+        assert d["pipeline_id"] == "main"
+        assert "materialize_tasks" in d
+        assert "resample_tasks" in d
+        assert "join_tasks" in d
+        assert d["task_count"] == (
+            len(d["materialize_tasks"])
+            + len(d["resample_tasks"])
+            + len(d["join_tasks"])
+        )
+
+    def test_plan_to_dict_geometry_fields(self):
+        recipe = load_recipe(_recipe_with_pipeline())
+        plan = resolve_plan(recipe, "main")
+        d = plan.to_dict()
+        rt = d["resample_tasks"][0]
+        assert "type" in rt["effective_geometry"]
+        assert "type" in rt["to_geometry"]

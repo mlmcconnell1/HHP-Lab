@@ -74,6 +74,15 @@ class MaterializeTask:
     transform_ids: list[str]
 
 
+def _geometry_to_dict(g: GeometryRef) -> dict:
+    d: dict = {"type": g.type}
+    if g.vintage is not None:
+        d["vintage"] = g.vintage
+    if g.source is not None:
+        d["source"] = g.source
+    return d
+
+
 @dataclass
 class ExecutionPlan:
     """The full resolved execution plan for a recipe pipeline."""
@@ -81,6 +90,46 @@ class ExecutionPlan:
     materialize_tasks: list[MaterializeTask] = field(default_factory=list)
     resample_tasks: list[ResampleTask] = field(default_factory=list)
     join_tasks: list[JoinTask] = field(default_factory=list)
+
+    def to_dict(self) -> dict:
+        """Serialize the plan to a JSON-safe dictionary."""
+        return {
+            "pipeline_id": self.pipeline_id,
+            "materialize_tasks": [
+                {"transform_ids": t.transform_ids}
+                for t in self.materialize_tasks
+            ],
+            "resample_tasks": [
+                {
+                    "dataset_id": t.dataset_id,
+                    "year": t.year,
+                    "input_path": t.input_path,
+                    "effective_geometry": _geometry_to_dict(
+                        t.effective_geometry,
+                    ),
+                    "method": t.method,
+                    "transform_id": t.transform_id,
+                    "to_geometry": _geometry_to_dict(t.to_geometry),
+                    "measures": t.measures,
+                    "aggregation": t.aggregation,
+                    "measure_aggregations": t.measure_aggregations,
+                }
+                for t in self.resample_tasks
+            ],
+            "join_tasks": [
+                {
+                    "datasets": t.datasets,
+                    "join_on": t.join_on,
+                    "year": t.year,
+                }
+                for t in self.join_tasks
+            ],
+            "task_count": (
+                len(self.materialize_tasks)
+                + len(self.resample_tasks)
+                + len(self.join_tasks)
+            ),
+        }
 
 
 # ---------------------------------------------------------------------------
