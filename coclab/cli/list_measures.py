@@ -1,5 +1,6 @@
 """CLI command for listing available measure files."""
 
+import json
 from datetime import datetime
 from pathlib import Path
 from typing import Annotated
@@ -73,6 +74,13 @@ def list_measures(
             help="Directory to scan for measure files.",
         ),
     ] = Path("data/curated/measures"),
+    json_output: Annotated[
+        bool,
+        typer.Option(
+            "--json",
+            help="Output machine-readable JSON instead of human text.",
+        ),
+    ] = False,
 ) -> None:
     """List available CoC measure files.
 
@@ -149,6 +157,14 @@ def list_measures(
                 "modified": modified,
             }
         )
+
+    if json_output:
+        typer.echo(json.dumps({
+            "status": "ok",
+            "count": len(rows),
+            "measures": rows,
+        }, indent=2))
+        return
 
     # Display table header
     typer.echo("Available CoC Measure Files:\n")

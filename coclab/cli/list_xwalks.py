@@ -1,5 +1,6 @@
 """CLI command for listing available crosswalk files."""
 
+import json
 import re
 from datetime import datetime
 from pathlib import Path
@@ -99,6 +100,13 @@ def list_xwalks(
             help="Directory to scan for crosswalk files.",
         ),
     ] = Path("data/curated/xwalks"),
+    json_output: Annotated[
+        bool,
+        typer.Option(
+            "--json",
+            help="Output machine-readable JSON instead of human text.",
+        ),
+    ] = False,
 ) -> None:
     """List available crosswalk files.
 
@@ -190,6 +198,26 @@ def list_xwalks(
 
     # Sort by type, then boundary vintage, then census vintage
     crosswalks.sort(key=lambda x: (x["type"], x["boundary_vintage"], x["census_vintage"]))
+
+    if json_output:
+        json_items = [
+            {
+                "type": c["type"],
+                "boundary_vintage": c["boundary_vintage"],
+                "census_vintage": c["census_vintage"],
+                "rows": c["rows"],
+                "bytes": c["size"],
+                "modified_at": c["modified"].isoformat(),
+                "path": str(c["path"]),
+            }
+            for c in crosswalks
+        ]
+        typer.echo(json.dumps({
+            "status": "ok",
+            "count": len(json_items),
+            "crosswalks": json_items,
+        }, indent=2))
+        return
 
     # Display table header
     typer.echo("\nAvailable crosswalk files:\n")

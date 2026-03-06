@@ -1,5 +1,6 @@
 """CLI command for running crosswalk quality diagnostics."""
 
+import json
 from pathlib import Path
 from typing import Annotated
 
@@ -51,6 +52,13 @@ def diagnostics(
             help="Optional: save diagnostics to CSV file.",
         ),
     ] = None,
+    json_output: Annotated[
+        bool,
+        typer.Option(
+            "--json",
+            help="Output machine-readable JSON instead of human text.",
+        ),
+    ] = False,
 ) -> None:
     """Run crosswalk quality diagnostics.
 
@@ -68,27 +76,57 @@ def diagnostics(
     """
     # Validate crosswalk file exists
     if not crosswalk.exists():
-        typer.echo(f"Error: Crosswalk file not found: {crosswalk}", err=True)
+        if json_output:
+            typer.echo(json.dumps({"status": "error", "error": f"Crosswalk file not found: {crosswalk}"}, indent=2))
+        else:
+            typer.echo(f"Error: Crosswalk file not found: {crosswalk}", err=True)
         raise typer.Exit(1)
 
-    typer.echo(f"Loading crosswalk from: {crosswalk}")
+    if not json_output:
+        typer.echo(f"Loading crosswalk from: {crosswalk}")
 
     try:
         xwalk_df = pd.read_parquet(crosswalk)
     except Exception as e:
-        typer.echo(f"Error reading crosswalk file: {e}", err=True)
+        if json_output:
+            typer.echo(json.dumps({"status": "error", "error": str(e)}, indent=2))
+        else:
+            typer.echo(f"Error reading crosswalk file: {e}", err=True)
         raise typer.Exit(1) from e
 
-    typer.echo(f"Loaded {len(xwalk_df)} crosswalk records")
-    typer.echo("")
+    if not json_output:
+        typer.echo(f"Loaded {len(xwalk_df)} crosswalk records")
+        typer.echo("")
 
     # Compute diagnostics
-    typer.echo("Computing diagnostics...")
+    if not json_output:
+        typer.echo("Computing diagnostics...")
     try:
         diag_df = compute_crosswalk_diagnostics(xwalk_df)
     except ValueError as e:
-        typer.echo(f"Error computing diagnostics: {e}", err=True)
+        if json_output:
+            typer.echo(json.dumps({"status": "error", "error": str(e)}, indent=2))
+        else:
+            typer.echo(f"Error computing diagnostics: {e}", err=True)
         raise typer.Exit(1) from e
+
+    if json_output:
+        problem_df = identify_problem_cocs(
+            diag_df,
+            coverage_threshold=coverage_threshold,
+            max_contribution_threshold=max_contribution,
+        )
+        # Convert DataFrames to JSON-safe dicts
+        diag_records = diag_df.to_dict(orient="records")
+        problem_records = problem_df.to_dict(orient="records") if not problem_df.empty else []
+        typer.echo(json.dumps({
+            "status": "ok",
+            "count": len(diag_records),
+            "problem_count": len(problem_records),
+            "diagnostics": diag_records,
+            "problems": problem_records,
+        }, indent=2, default=str))
+        return
 
     # Print summary
     summary = summarize_diagnostics(diag_df)

@@ -1510,6 +1510,47 @@ class TestExecutor:
             execute_recipe(recipe, project_root=tmp_path)
 
 
+class TestTargetOutputsEnforcement:
+    """Regression tests for coclab-xndr: target.outputs enforcement."""
+
+    def test_panel_output_persisted_by_default(self, tmp_path: Path):
+        """Default target outputs=['panel'] should produce a persist step."""
+        _setup_pipeline_fixtures(tmp_path)
+        data = _recipe_with_pipeline()
+        data["datasets"]["pit"]["path"] = "data/pit.parquet"
+        data["datasets"]["acs"]["path"] = "data/acs.parquet"
+        # Default: outputs=["panel"]
+        recipe = load_recipe(data)
+        results = execute_recipe(recipe, project_root=tmp_path)
+        kinds = [s.step_kind for s in results[0].steps]
+        assert "persist" in kinds
+
+    def test_empty_outputs_skips_persist(self, tmp_path: Path):
+        """targets with outputs=[] should not produce a persist step."""
+        _setup_pipeline_fixtures(tmp_path)
+        data = _recipe_with_pipeline()
+        data["datasets"]["pit"]["path"] = "data/pit.parquet"
+        data["datasets"]["acs"]["path"] = "data/acs.parquet"
+        data["targets"][0]["outputs"] = []
+        recipe = load_recipe(data)
+        results = execute_recipe(recipe, project_root=tmp_path)
+        kinds = [s.step_kind for s in results[0].steps]
+        assert "persist" not in kinds
+
+    def test_diagnostics_only_skips_panel_persist(self, tmp_path: Path):
+        """targets with outputs=['diagnostics'] should not persist a panel."""
+        _setup_pipeline_fixtures(tmp_path)
+        data = _recipe_with_pipeline()
+        data["datasets"]["pit"]["path"] = "data/pit.parquet"
+        data["datasets"]["acs"]["path"] = "data/acs.parquet"
+        data["targets"][0]["outputs"] = ["diagnostics"]
+        recipe = load_recipe(data)
+        with pytest.warns(UserWarning, match="not yet implemented"):
+            results = execute_recipe(recipe, project_root=tmp_path)
+        kinds = [s.step_kind for s in results[0].steps]
+        assert "persist" not in kinds
+
+
 class TestPipelineResult:
 
     def test_success_all_ok(self):

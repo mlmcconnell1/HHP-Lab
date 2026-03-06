@@ -248,14 +248,23 @@ def build_panel_cmd(
         weighting_method=weighting,  # type: ignore[arg-type]
     )
 
+    # Resolve build-scoped directories for PIT and measures so that
+    # `build panel` reads aggregate outputs produced by earlier steps.
+    build_pit_dir = build_curated / "pit"
+    build_measures_dir = build_curated / "measures"
+    build_rents_dir = build_curated / "zori"
+
     # Build the panel
     try:
         panel_df = build_panel(
             start_year=start,
             end_year=end,
             policy=policy,
+            pit_dir=build_pit_dir if build_pit_dir.exists() else None,
+            measures_dir=build_measures_dir if build_measures_dir.exists() else None,
             include_zori=include_zori,
             zori_yearly_path=resolved_zori_path,
+            rents_dir=build_rents_dir if build_rents_dir.exists() else None,
             zori_min_coverage=zori_min_coverage,
         )
     except Exception as e:

@@ -984,12 +984,37 @@ def _execute_plan(
         if not step.success:
             return result
 
-    # Phase 4: persist outputs (only if there are join tasks)
+    # Phase 4: persist outputs (only if there are join tasks AND
+    # the target declares "panel" in its outputs list).
     if plan.join_tasks:
-        step = _persist_outputs(plan, ctx)
-        result.steps.append(step)
-        if not step.success:
-            return result
+        # Resolve target to check declared outputs
+        pipeline = next(
+            (p for p in ctx.recipe.pipelines if p.id == plan.pipeline_id),
+            None,
+        )
+        target = None
+        if pipeline is not None:
+            target = next(
+                (t for t in ctx.recipe.targets if t.id == pipeline.target),
+                None,
+            )
+        declared_outputs = target.outputs if target is not None else ["panel"]
+
+        if "panel" in declared_outputs:
+            step = _persist_outputs(plan, ctx)
+            result.steps.append(step)
+            if not step.success:
+                return result
+
+        unsupported = [o for o in declared_outputs if o not in ("panel",)]
+        if unsupported:
+            import warnings as _w
+            _w.warn(
+                f"Pipeline '{plan.pipeline_id}': target outputs "
+                f"{unsupported} are declared but not yet implemented. "
+                f"Only 'panel' output is currently supported.",
+                stacklevel=2,
+            )
 
     return result
 

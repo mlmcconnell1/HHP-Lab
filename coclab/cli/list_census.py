@@ -1,5 +1,6 @@
 """CLI command for listing available census geometry files."""
 
+import json
 import re
 from datetime import datetime
 from pathlib import Path
@@ -72,6 +73,13 @@ def list_census(
             help="Directory to scan for census files.",
         ),
     ] = Path("data/curated/tiger"),
+    json_output: Annotated[
+        bool,
+        typer.Option(
+            "--json",
+            help="Output machine-readable JSON instead of human text.",
+        ),
+    ] = False,
 ) -> None:
     """List available census geometry files.
 
@@ -162,6 +170,25 @@ def list_census(
 
     # Sort by type, then year
     census_files.sort(key=lambda x: (x["type"], x["year"]))
+
+    if json_output:
+        json_items = [
+            {
+                "type": c["type"],
+                "year": c["year"],
+                "rows": c["rows"],
+                "bytes": c["size"],
+                "modified_at": c["modified"].isoformat(),
+                "path": str(c["path"]),
+            }
+            for c in census_files
+        ]
+        typer.echo(json.dumps({
+            "status": "ok",
+            "count": len(json_items),
+            "census_files": json_items,
+        }, indent=2))
+        return
 
     # Display table header
     typer.echo("\nAvailable census geometry files:\n")

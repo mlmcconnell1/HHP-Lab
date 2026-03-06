@@ -1,5 +1,6 @@
 """CLI command for running panel diagnostics."""
 
+import json
 from pathlib import Path
 from typing import Annotated
 
@@ -31,6 +32,13 @@ def panel_diagnostics(
             help="Output format: 'text' (summary only), 'csv' (export CSVs).",
         ),
     ] = "text",
+    json_output: Annotated[
+        bool,
+        typer.Option(
+            "--json",
+            help="Output machine-readable JSON instead of human text.",
+        ),
+    ] = False,
 ) -> None:
     """Run diagnostics on a CoC panel.
 
@@ -66,23 +74,46 @@ def panel_diagnostics(
         typer.echo(f"Error: Panel file not found: {panel}", err=True)
         raise typer.Exit(1)
 
-    typer.echo(f"Loading panel from {panel}...")
+    if not json_output:
+        typer.echo(f"Loading panel from {panel}...")
 
     # Load the panel
     try:
         panel_df = pd.read_parquet(panel)
-        typer.echo(f"Loaded {len(panel_df)} rows")
+        if not json_output:
+            typer.echo(f"Loaded {len(panel_df)} rows")
     except Exception as e:
-        typer.echo(f"Error loading panel: {e}", err=True)
+        if json_output:
+            typer.echo(json.dumps({"status": "error", "error": str(e)}, indent=2))
+        else:
+            typer.echo(f"Error loading panel: {e}", err=True)
         raise typer.Exit(1) from e
 
     # Run diagnostics
-    typer.echo("Running diagnostics...")
+    if not json_output:
+        typer.echo("Running diagnostics...")
     try:
         report = generate_diagnostics_report(panel_df)
     except Exception as e:
-        typer.echo(f"Error generating diagnostics: {e}", err=True)
+        if json_output:
+            typer.echo(json.dumps({"status": "error", "error": str(e)}, indent=2))
+        else:
+            typer.echo(f"Error generating diagnostics: {e}", err=True)
         raise typer.Exit(1) from e
+
+    if json_output:
+        payload: dict = {
+            "status": "ok",
+            "panel_info": report.panel_info or {},
+        }
+        if report.coverage is not None:
+            payload["coverage"] = report.coverage.to_dict(orient="records")
+        if report.missingness is not None:
+            payload["missingness"] = report.missingness.to_dict(orient="records")
+        if report.boundary_changes is not None:
+            payload["boundary_changes"] = report.boundary_changes.to_dict(orient="records")
+        typer.echo(json.dumps(payload, indent=2, default=str))
+        return
 
     # Output based on format
     if format_ == "text":

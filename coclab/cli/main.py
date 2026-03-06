@@ -42,6 +42,7 @@ from coclab.cli.recipe import (
 )
 from coclab.cli.registry_rebuild import registry_rebuild
 from coclab.cli.show_measures import show_measures
+from coclab.cli.status import status_cmd
 from coclab.cli.validate_curated import validate_curated_layout_cmd
 from coclab.cli.zori import (
     ingest_zori,
@@ -539,6 +540,7 @@ def source_status(
 
 app.command("crosscheck-pit-vintages", hidden=True)(crosscheck_pit_vintages)
 app.command("crosscheck-population", hidden=True)(crosscheck_population)
+app.command("status")(status_cmd)
 app.add_typer(ingest_app, name="ingest")
 app.add_typer(list_app, name="list")
 app.add_typer(validate_app, name="validate")

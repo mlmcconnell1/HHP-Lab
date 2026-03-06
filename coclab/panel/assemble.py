@@ -261,15 +261,21 @@ def _load_pit_for_year(
 
     if pit_dir is not None:
         use_fallback = False  # Explicit pit_dir disables fallback
-        # Try new naming first, then legacy
+        # Try new naming first, then build-scoped (@B suffix), then legacy
         canonical_path = pit_dir / pit_filename(year)
         legacy_path = pit_dir / f"pit_counts__{year}.parquet"
         if canonical_path.exists():
             logger.info(f"Loading PIT {year} from provided path: {canonical_path}")
             df = pd.read_parquet(canonical_path)
-        elif legacy_path.exists():
-            logger.info(f"Loading PIT {year} from legacy path: {legacy_path}")
-            df = pd.read_parquet(legacy_path)
+        else:
+            # Try build-scoped naming: pit__P{year}@B{boundary}.parquet
+            scoped_matches = sorted(pit_dir.glob(f"pit__P{year}@B*.parquet"))
+            if scoped_matches:
+                logger.info(f"Loading PIT {year} from build-scoped path: {scoped_matches[0]}")
+                df = pd.read_parquet(scoped_matches[0])
+            elif legacy_path.exists():
+                logger.info(f"Loading PIT {year} from legacy path: {legacy_path}")
+                df = pd.read_parquet(legacy_path)
     else:
         # Only try original vintage for years >= MIN_PIT_VINTAGE_YEAR (2013+)
         if year >= MIN_PIT_VINTAGE_YEAR:
@@ -398,6 +404,21 @@ def _load_acs_measures(
         measures_path = legacy_weighting_path
     elif legacy_generic_path.exists():
         measures_path = legacy_generic_path
+
+    # Fallback: discover any measures file for this boundary vintage
+    # regardless of ACS vintage. This handles the case where aggregate
+    # acs uses a different ACS alignment than the panel policy expects
+    # (e.g., aggregate produces A2024@B2024 but panel asks for A2023@B2024).
+    if measures_path is None:
+        boundary_matches = sorted(
+            measures_dir.glob(f"measures__A*@B{boundary_vintage}*.parquet")
+        )
+        if boundary_matches:
+            measures_path = boundary_matches[0]
+            logger.info(
+                f"Exact ACS vintage '{acs_vintage}' not found for boundary "
+                f"{boundary_vintage}; falling back to {measures_path.name}"
+            )
 
     if measures_path is None:
         logger.warning(
