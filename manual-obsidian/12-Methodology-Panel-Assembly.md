@@ -13,20 +13,22 @@ Both follow the same conceptual model: align heterogeneous inputs to a CoC-year 
 2. Resolve dataset/year paths and effective geometries.
 3. Resample to target geometry (`identity`, `aggregate`, `allocate`).
 4. Join resampled datasets on common keys (typically `geo_id`, `year`).
-5. Persist panel and provenance metadata.
+5. Persist panel/provenance outputs when requested by runtime mode and target outputs.
 
 ## Imperative Panel Characteristics
 
 - Inputs: PIT + ACS, optional yearly ZORI integration
 - Uses policy helpers for boundary and ACS vintage alignment
+- When `--build` is used, now auto-discovers build-scoped PIT and measures outputs produced by aggregate commands
 - Writes panel under build-local `data/curated/panel/` when `--build` is used
 
 ## Recipe Panel Characteristics
 
 - Uses explicit YAML declarations for datasets/transforms/pipelines
 - Planner resolves dataset-year tasks deterministically
-- Executor runs `materialize -> resample -> join -> persist`
-- Current persist target is canonical `data/curated/panel/...`
+- Executor runs `materialize -> resample -> join`, then persists only when the target includes `panel` output (default)
+- Current persisted panel target is canonical `data/curated/panel/...`
+- Non-panel outputs declared in `targets[].outputs` are currently intent-only and emit runtime warnings
 - Writes `*.manifest.json` sidecar listing consumed assets
 
 ## Quality Signals

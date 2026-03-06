@@ -115,9 +115,14 @@ targets:
 
 Target ids must be unique within a recipe.
 
-> **Current runtime note:** target `outputs` is schema-valid and intent-capturing, but
-> persistence behavior is currently driven by executed pipeline steps. In particular,
-> recipe execution persists joined panel output when join tasks exist.
+> **Current runtime note:** `targets[].outputs` now gates persistence behavior.
+> Panel persistence occurs only when:
+> 1. the pipeline has join tasks, and
+> 2. the target outputs include `panel` (default).
+>
+> Declaring currently unsupported outputs (for example `diagnostics`, `export`)
+> is allowed by schema and retained as intent, but runtime emits a warning and
+> does not materialize those output types yet.
 
 ## Datasets
 

@@ -53,7 +53,7 @@ flowchart TB
 
 - Global curated assets live under `data/curated/`
 - Build-scoped artifacts live under `builds/<name>/data/curated/`
-- Recipe outputs currently persist to canonical panel path in `data/curated/panel/`
+- Recipe panel outputs persist to canonical `data/curated/panel/` when target outputs include `panel`
 
 ## Architectural Intent
 

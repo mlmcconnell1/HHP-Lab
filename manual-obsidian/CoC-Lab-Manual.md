@@ -32,6 +32,7 @@
 
 ## Quick Links
 
+- Environment preflight: [[04-CLI-Reference#environment-preflight-agent-safe]]
 - Build scaffold: [[04-CLI-Reference#build-scaffolding]]
 - Recipe execution: [[04-CLI-Reference#recipe-execution-recommended]]
 - Bundle export: [[04-CLI-Reference#bundle-export]]

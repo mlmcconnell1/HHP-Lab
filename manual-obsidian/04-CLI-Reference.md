@@ -5,6 +5,7 @@ This chapter documents the currently supported CLI surface from `coclab/cli/main
 ## Top-Level Groups
 
 - `coclab agents`
+- `coclab status`
 - `coclab ingest ...`
 - `coclab list ...`
 - `coclab validate ...`
@@ -17,6 +18,22 @@ This chapter documents the currently supported CLI surface from `coclab/cli/main
 - `coclab migrate ...`
 
 ## High-Value Commands
+
+### Environment Preflight (Agent-Safe)
+
+```bash
+coclab status
+coclab status --json
+```
+
+`status` performs a one-shot readiness scan across:
+- curated assets under `data/curated/` (boundaries, TIGER, crosswalks, PIT, ACS, measures, ZORI)
+- named builds and build manifests
+- missing-prerequisite checks with actionable hints
+
+Exit behavior:
+- exits `1` when required prerequisites are missing (for example boundaries or census geometry)
+- exits `0` for healthy/partially-ready states without hard errors
 
 ### Build Scaffolding
 
@@ -81,8 +98,17 @@ coclab build recipe --recipe recipes/glynn_fox_v1.yaml
 Current behavior:
 - Runs schema + adapter + dataset-path checks before execution
 - Executes `materialize -> resample -> join -> persist`
-- Persists panel output to canonical `data/curated/panel/...`
+- Persists panel output to canonical `data/curated/panel/...` when the target declares `outputs: [panel]` (default)
 - Writes recipe sidecar manifest: `*.manifest.json`
+
+### Recipe Plan (No Execution)
+
+```bash
+coclab build recipe-plan --recipe recipes/glynn_fox_v1.yaml
+coclab build recipe-plan --recipe recipes/glynn_fox_v1.yaml --json
+```
+
+Use this to resolve and inspect planned tasks (`materialize`, `resample`, `join`) before execution.
 
 ### Recipe Provenance Utilities
 
@@ -102,6 +128,17 @@ Key points:
 - Creates `exports/export-N/`
 - Produces `MANIFEST.json` and README
 
+### Artifact Inventory
+
+```bash
+coclab list artifacts --build demo --json
+```
+
+Key options:
+- `--build` (required)
+- `--include-global / --build-only` to include or exclude global `data/curated` artifacts
+- `--json` for machine-readable inventory (roles, row/column counts where available, schema hash, provenance hints)
+
 ### Core Ingestion Commands
 
 ```bash
@@ -113,10 +150,44 @@ coclab ingest zori --geography county
 coclab ingest pep --series auto
 ```
 
+## JSON and Non-Interactive Modes
+
+### Structured JSON Outputs
+
+`--json` is available on these high-value commands:
+- `coclab status`
+- `coclab build recipe`
+- `coclab build recipe-plan`
+- `coclab build recipe-provenance`
+- `coclab build recipe-export`
+- `coclab list artifacts`
+- `coclab list census`
+- `coclab list measures`
+- `coclab list xwalks`
+- `coclab diagnostics xwalk`
+- `coclab diagnostics panel`
+
+Current caveat: `list census/measures/xwalks --json` emits JSON when matches are found. Empty/missing-directory cases still emit human text and exit `0`.
+
+### Non-Interactive CLI Use
+
+For automation and agents, disable prompts with either:
+- global flag: `coclab --non-interactive ...`
+- environment variable: `COCLAB_NON_INTERACTIVE=1`
+
+Example:
+
+```bash
+COCLAB_NON_INTERACTIVE=1 coclab status --json
+```
+
+In non-interactive mode, destructive actions still require explicit consent flags. Example: `coclab registry delete-entry ...` requires `--yes`.
+
 ## Operational Guidance
 
 - Prefer `builds/<name>` workflow for repeatable analysis runs.
 - Use `build recipe` when you need explicit, auditable pipeline structure.
+- Use `status` + `build recipe-plan --json` as a preflight pair in automation.
 - Use `build export` only after validating expected artifacts exist in the build.
 
 For exact option signatures, use:

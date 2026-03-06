@@ -9,6 +9,10 @@ This chapter is an orientation map of active modules in the current codebase.
 - `coclab/cli/build_xwalks.py`: crosswalk generation into build scope
 - `coclab/cli/aggregate.py`: dataset aggregation commands (`acs`, `zori`, `pep`, `pit`)
 - `coclab/cli/build_panel.py`: imperative panel assembly command
+- `coclab/cli/status.py`: one-shot environment readiness report (`coclab status`)
+- `coclab/cli/list_artifacts.py`: build/global artifact inventory for automation
+- `coclab/cli/list_*.py`: dataset discovery commands with optional JSON output
+- `coclab/cli/diagnostics.py` and `coclab/cli/panel_diagnostics.py`: diagnostics commands with optional JSON output
 - `coclab/cli/recipe.py`: recipe execution/provenance/export commands
 - `coclab/cli/export_bundle.py`: analysis bundle export command
 

@@ -2,12 +2,15 @@
 
 ## Recommended Workflow: Recipe-Driven Build
 
-1. Ingest required global assets (`boundaries`, `tiger`, `acs5-tract`, `pit`, `zori`, `pep`).
-2. Create a named build and pin base assets.
-3. Generate required crosswalks into the build.
-4. Aggregate source datasets into build-local curated folders.
-5. Run a YAML recipe for deterministic panel construction.
-6. Export a bundle for downstream analysis.
+1. Run a preflight readiness check (`coclab status --json` for automation).
+2. Ingest required global assets (`boundaries`, `tiger`, `acs5-tract`, `pit`, `zori`, `pep`).
+3. Create a named build and pin base assets.
+4. Generate required crosswalks into the build.
+5. Aggregate source datasets into build-local curated folders.
+6. Resolve the recipe plan before execution (`coclab build recipe-plan`).
+7. Run a YAML recipe for deterministic panel construction.
+8. Optionally inventory artifacts (`coclab list artifacts --build <name> --json`).
+9. Export a bundle for downstream analysis.
 
 Example command sequence:
 
@@ -32,10 +35,17 @@ coclab aggregate zori --build demo --align pit_january
 coclab aggregate pep --build demo
 coclab aggregate pit --build demo
 
-# 5) Recipe execution
+# 5) Preflight + plan
+coclab status --json
+coclab build recipe-plan --recipe recipes/glynn_fox_v1.yaml --json
+
+# 6) Recipe execution
 coclab build recipe --recipe recipes/glynn_fox_v1.yaml
 
-# 6) Export bundle
+# 7) Artifact inventory (optional)
+coclab list artifacts --build demo --json
+
+# 8) Export bundle
 coclab build export --name demo_bundle --build demo
 ```
 
@@ -54,6 +64,7 @@ Use this path when you want the legacy panel contract; use recipe execution when
 - Pin and record boundary assets via named builds.
 - Keep heavy transformations build-scoped.
 - Treat recipe files as auditable execution plans, not ad-hoc scripts.
+- Use `--non-interactive` (or `COCLAB_NON_INTERACTIVE=1`) for agent automation.
 
 ---
 
