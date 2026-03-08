@@ -43,6 +43,26 @@ Prefer these CoC-Lab runtime features when automating:
   - `coclab build recipe --recipe <file> --dry-run --json`
   - `coclab build recipe-plan --recipe <file> --json`
 
+## Code Style: Human and Agent Readable
+
+All code generated for this project must be easily usable by both humans and AI agents. Apply these principles when writing code, tests, CLI commands, and data pipelines:
+
+### Tests and fixtures
+- **Declarative over implicit.** Define fixture data and expected outcomes as named constants, not as magic numbers buried in logic. An agent (or human) modifying a fixture value should not need to hand-recompute downstream expectations.
+- **Parametrize over loops.** Use `@pytest.mark.parametrize` instead of for-loops inside test bodies. Failures should name the exact case in the test ID (e.g., `test_dtype[year-int64]`), not require reading assertion messages.
+- **Truth tables over prose.** When a fixture has designed-in outcomes (e.g., which rows pass a threshold), document the full truth table in a visible location (module docstring or a constant), not scattered across individual test docstrings.
+- **Allowlists and exceptions at module level.** If something is a known special case (e.g., columns with expected dtype normalization), declare it as a named module-level constant with a comment explaining why — not as a local variable inside a function.
+- **Derive, don't duplicate.** Golden-value tests should compute expectations from the same constants that build the fixtures. Changing a fixture value should automatically update the expected outcome.
+
+### CLI and output
+- **Always provide `--json`.** Every CLI command that produces output should support a `--json` flag emitting structured, machine-parseable JSON. Agents should never need to scrape human-formatted tables or prose to extract results.
+- **Actionable error messages.** Errors should state what went wrong AND what to do about it (e.g., "No ACS measures found — run `coclab aggregate acs` first"). An agent that encounters an error should be able to act on it without searching the codebase.
+- **Deterministic, parseable file names.** Output artifacts should use the canonical naming from `coclab/naming.py` so agents can discover and reference them programmatically without globbing.
+
+### Schemas and data contracts
+- **Canonical column lists as code.** Output schemas (e.g., `PANEL_COLUMNS`, `ZORI_COLUMNS`) must be defined as module-level constants. When a schema changes, update the constant — never add columns silently.
+- **Provenance in every artifact.** Parquet outputs must embed provenance metadata via `write_parquet_with_provenance` so downstream agents can inspect lineage without external tracking.
+
 ## Adding Beads (Problem Noticed)
 
 If you identify a problem in the code, even incidentally while working on something else, add a bead to make sure it is addressed later.
