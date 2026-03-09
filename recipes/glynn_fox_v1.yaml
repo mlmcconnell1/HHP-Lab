@@ -29,19 +29,25 @@ datasets:
     path: data/curated/pit/pit_vintage__P2024.parquet
 
   # ACS5 tract-level measures used for CoC population + income (tract→CoC weighted aggregation)
+  #
+  # Uses file_set to declare the intended ACS vintage mapping per analysis
+  # year.  Currently a single curated file (A2024 × T2020) covers the full
+  # 2015-2024 universe; when year-specific vintages become available the
+  # segments below can be split accordingly.
   acs_tract:
     provider: census
     product: acs5
     version: 1
     native_geometry: { type: tract, vintage: 2020, source: tiger }
-    years: "2015-2024"
     geo_column: tract_geoid
     params:
-      # Use whatever ACS vintage strategy you’ve standardized on in CoC-Lab;
-      # this is just a declarative hint to the adapter.
-      vintage: "2015-2024"
       measures: [total_population, median_household_income]
-    path: data/curated/acs/acs5_tracts__A2024xT2020.parquet
+    file_set:
+      path_template: "data/curated/acs/acs5_tracts__A{acs_vintage}xT{tract}.parquet"
+      segments:
+        - years: "2015-2024"
+          geometry: { type: tract, vintage: 2020, source: tiger }
+          constants: { acs_vintage: 2024, tract: 2020 }
 
   # ZORI at county level (county→CoC population-weighted aggregation)
   zori_county:
