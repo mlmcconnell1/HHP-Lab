@@ -1533,6 +1533,80 @@ class TestExecutor:
         panel = pd.read_parquet(panel_path).sort_values(["geo_id", "year"])
         assert list(panel["total_population"]) == [100.0, 100.0, 200.0, 200.0]
 
+    def test_execute_recipe_allows_yearless_file_set_with_distinct_paths(
+        self, tmp_path: Path,
+    ):
+        """Year-specific files should not require a row-level year column."""
+        _setup_pipeline_fixtures(tmp_path)
+        data = _recipe_with_pipeline()
+        data["datasets"]["pit"]["path"] = "data/pit.parquet"
+        data["datasets"]["acs"].pop("path", None)
+        data["datasets"]["acs"]["file_set"] = {
+            "path_template": "data/acs_{year}.parquet",
+            "segments": [
+                {
+                    "years": {"range": "2020-2021"},
+                    "geometry": {"type": "tract", "vintage": 2020},
+                }
+            ],
+        }
+
+        pd.DataFrame({
+            "GEOID": ["T1", "T2"],
+            "total_population": [100, 200],
+        }).to_parquet(tmp_path / "data" / "acs_2020.parquet")
+        pd.DataFrame({
+            "GEOID": ["T1", "T2"],
+            "total_population": [110, 210],
+        }).to_parquet(tmp_path / "data" / "acs_2021.parquet")
+
+        recipe = load_recipe(data)
+        results = execute_recipe(recipe, project_root=tmp_path)
+        assert results[0].success
+
+        panel_path = (
+            tmp_path
+            / "data"
+            / "curated"
+            / "panel"
+            / "panel__Y2020-2021@B2025.parquet"
+        )
+        panel = pd.read_parquet(panel_path).sort_values(["geo_id", "year"])
+        assert list(panel["total_population"]) == [100.0, 110.0, 200.0, 210.0]
+
+    def test_execute_recipe_rejects_file_set_reusing_same_static_path(
+        self, tmp_path: Path,
+    ):
+        """file_set should still fail when all years resolve to one static file."""
+        _setup_pipeline_fixtures(tmp_path)
+        static_path = tmp_path / "data" / "acs_static.parquet"
+        pd.DataFrame({
+            "GEOID": ["T1", "T2"],
+            "total_population": [100, 200],
+        }).to_parquet(static_path)
+
+        data = _recipe_with_pipeline()
+        data["datasets"]["pit"]["path"] = "data/pit.parquet"
+        data["datasets"]["acs"].pop("path", None)
+        data["datasets"]["acs"]["file_set"] = {
+            "path_template": "data/acs__A{acs_vintage}.parquet",
+            "segments": [
+                {
+                    "years": {"range": "2020-2021"},
+                    "geometry": {"type": "tract", "vintage": 2020},
+                    "constants": {"acs_vintage": 2024},
+                }
+            ],
+        }
+        static_path.rename(tmp_path / "data" / "acs__A2024.parquet")
+
+        recipe = load_recipe(data)
+        with pytest.raises(
+            ExecutorError,
+            match="broadcast a static snapshot across time",
+        ):
+            execute_recipe(recipe, project_root=tmp_path)
+
     def test_execute_recipe_no_pipelines(self, tmp_path: Path):
         data = _minimal_recipe()
         data["pipelines"] = []

@@ -31,6 +31,7 @@ from coclab.recipe.planner import (
     MaterializeTask,
     PlannerError,
     ResampleTask,
+    _resolve_dataset_year,
     resolve_plan,
 )
 from coclab.recipe.recipe_schema import (
@@ -267,6 +268,14 @@ def _reject_implicit_static_broadcast(
     ds = ctx.recipe.datasets[task.dataset_id]
     if bool(ds.params.get("broadcast_static", False)):
         return None
+
+    if ds.file_set is not None:
+        resolved_paths = {
+            _resolve_dataset_year(task.dataset_id, year, ctx.recipe).path
+            for year in universe_years
+        }
+        if len(resolved_paths) > 1:
+            return None
 
     return (
         f"Dataset '{task.dataset_id}' year {task.year}: no year column found "

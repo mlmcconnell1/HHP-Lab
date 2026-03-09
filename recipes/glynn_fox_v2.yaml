@@ -1,0 +1,140 @@
+version: 1
+name: coc_panel_2015_2024_zori_v2
+description: >
+  Build a CoC-year panel for 2015-2024 using PIT totals, ACS5 tract measures,
+  and county-level ZORI. ACS vintages vary by analysis year while tract
+  geography shifts at the decennial boundary: 2015-2019 use 2010 tracts and
+  2020-2024 use 2020 tracts.
+
+universe:
+  range: "2015-2024"
+
+targets:
+  - id: coc_panel
+    geometry: { type: coc, vintage: 2025, source: hud_exchange }
+    outputs: [panel, diagnostics]
+
+datasets:
+  pit:
+    provider: hud
+    product: pit
+    version: 1
+    native_geometry: { type: coc }
+    years: "2015-2024"
+    year_column: pit_year
+    geo_column: coc_id
+    params:
+      vintage: 2024
+      align: point_in_time_jan
+    path: data/curated/pit/pit_vintage__P2024.parquet
+
+  # ACS end year tracks the analysis year, while tract geometry only changes
+  # across decennial eras.
+  acs_tract:
+    provider: census
+    product: acs5
+    version: 1
+    native_geometry: { type: tract, vintage: 2020, source: tiger }
+    geo_column: tract_geoid
+    params:
+      measures: [total_population, median_household_income]
+    file_set:
+      path_template: "data/curated/acs/acs5_tracts__A{year}xT{tract}.parquet"
+      segments:
+        - years: "2015-2019"
+          geometry: { type: tract, vintage: 2010, source: nhgis }
+          constants: { tract: 2010 }
+        - years: "2020-2024"
+          geometry: { type: tract, vintage: 2020, source: tiger }
+          constants: { tract: 2020 }
+
+  zori_county:
+    provider: zillow
+    product: zori
+    version: 1
+    native_geometry: { type: county }
+    years: "2015-2024"
+    year_column: year
+    geo_column: geo_id
+    params:
+      align: point_in_time_jan
+    path: data/curated/zori/zori__county__Z2026.parquet
+
+transforms:
+  - id: tract_to_coc_2010
+    type: crosswalk
+    from: { type: tract, vintage: 2010, source: nhgis }
+    to: { type: coc, vintage: 2025, source: hud_exchange }
+    spec:
+      weighting:
+        scheme: population
+        population_source: acs_tract
+        population_field: total_population
+
+  - id: tract_to_coc_2020
+    type: crosswalk
+    from: { type: tract, vintage: 2020, source: tiger }
+    to: { type: coc, vintage: 2025, source: hud_exchange }
+    spec:
+      weighting:
+        scheme: population
+        population_source: acs_tract
+        population_field: total_population
+
+  - id: county_to_coc
+    type: crosswalk
+    from: { type: county, vintage: 2020 }
+    to: { type: coc, vintage: 2025, source: hud_exchange }
+    spec:
+      weighting:
+        scheme: population
+        population_source: acs_tract
+        population_field: total_population
+
+pipelines:
+  - id: build_coc_panel
+    target: coc_panel
+    steps:
+      - materialize:
+          transforms: [tract_to_coc_2010, tract_to_coc_2020, county_to_coc]
+
+      - resample:
+          dataset: pit
+          to_geometry: { type: coc, vintage: 2025, source: hud_exchange }
+          method: identity
+          measures: [pit_total, pit_sheltered, pit_unsheltered]
+
+      - resample:
+          dataset: acs_tract
+          to_geometry: { type: coc, vintage: 2025, source: hud_exchange }
+          method: aggregate
+          via: auto
+          measures:
+            total_population: { aggregation: sum }
+            median_household_income: { aggregation: weighted_mean }
+
+      - resample:
+          dataset: zori_county
+          to_geometry: { type: coc, vintage: 2025, source: hud_exchange }
+          method: aggregate
+          via: county_to_coc
+          measures: [zori]
+          aggregation: weighted_mean
+
+      - join:
+          datasets: [pit, acs_tract, zori_county]
+          join_on: [geo_id, year]
+
+filters:
+  zori_county:
+    type: temporal
+    column: month
+    method: point_in_time
+    month: 1
+
+validation:
+  crosswalk_coverage:
+    warn_below: 0.95
+    fail_below: 0.90
+  missing_dataset:
+    default: fail
