@@ -171,6 +171,7 @@ class TestBuildPanelCommand:
         assert "--end" in result.output
         assert "--weighting" in result.output
         assert "--output" in result.output
+        assert "--geo-type" in result.output
 
     def test_build_panel_requires_years(self):
         """Should fail without year options."""
@@ -241,9 +242,69 @@ class TestBuildPanelCommand:
             )
 
         assert result.exit_code == 0
-        assert "Building panel for 2020-2021" in result.output
+        assert "Building coc panel for 2020-2021" in result.output
         assert "Panel Summary" in result.output
         assert "Saved panel to" in result.output
+
+    @patch("coclab.panel.build_panel")
+    @patch("coclab.panel.save_panel")
+    def test_build_panel_uses_manifest_geo_defaults(self, mock_save, mock_build, tmp_path):
+        """Metro build reads geo_type and definition_version from manifest."""
+        with runner.isolated_filesystem(temp_dir=tmp_path):
+            build_dir = _create_test_build(Path("."), "metrotest")
+            manifest = json.loads((build_dir / "manifest.json").read_text())
+            manifest["build"]["geo_type"] = "metro"
+            manifest["build"]["definition_version"] = "glynn_fox_v1"
+            (build_dir / "manifest.json").write_text(json.dumps(manifest))
+
+            mock_df = pd.DataFrame(
+                {
+                    "metro_id": ["GF01"],
+                    "geo_type": ["metro"],
+                    "geo_id": ["GF01"],
+                    "year": [2020],
+                    "pit_total": [100],
+                    "coverage_ratio": [0.95],
+                    "boundary_changed": [False],
+                    "definition_version_used": ["glynn_fox_v1"],
+                }
+            )
+            mock_build.return_value = mock_df
+            mock_save.return_value = Path("builds/metrotest/data/curated/panel/panel__metro.parquet")
+
+            result = runner.invoke(
+                app,
+                ["build", "panel", "--build", "metrotest", "--start", "2020", "--end", "2020"],
+            )
+
+        assert result.exit_code == 0
+        kwargs = mock_build.call_args.kwargs
+        assert kwargs["geo_type"] == "metro"
+        assert kwargs["definition_version"] == "glynn_fox_v1"
+        assert "Building metro panel" in result.output
+
+    def test_build_panel_metro_requires_definition_version(self, tmp_path):
+        """Metro panel CLI should fail without a definition version source."""
+        with runner.isolated_filesystem(temp_dir=tmp_path):
+            _create_test_build(Path("."), "test")
+            result = runner.invoke(
+                app,
+                [
+                    "build",
+                    "panel",
+                    "--build",
+                    "test",
+                    "--start",
+                    "2020",
+                    "--end",
+                    "2020",
+                    "--geo-type",
+                    "metro",
+                ],
+            )
+
+        assert result.exit_code == 2
+        assert "definition_version" in result.output
 
     @patch("coclab.panel.build_panel")
     def test_build_panel_empty(self, mock_build, tmp_path):

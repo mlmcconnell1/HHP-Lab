@@ -37,6 +37,8 @@ from typing import Any
 
 import pandas as pd
 
+from coclab.analysis_geo import infer_geo_type, resolve_geo_col
+
 logger = logging.getLogger(__name__)
 
 
@@ -153,7 +155,7 @@ def coverage_summary(panel_df: pd.DataFrame) -> pd.DataFrame:
 
 
 def boundary_change_summary(panel_df: pd.DataFrame) -> pd.DataFrame:
-    """Summarize which CoCs had boundary changes and when.
+    """Summarize which geography units had vintage changes and when.
 
     Identifies CoCs that experienced boundary vintage changes between
     consecutive years, which may affect time-series comparability.
@@ -176,7 +178,8 @@ def boundary_change_summary(panel_df: pd.DataFrame) -> pd.DataFrame:
     If the panel is empty or lacks the required columns, returns an empty
     DataFrame with the expected columns.
     """
-    required_cols = {"coc_id", "year", "boundary_changed"}
+    required_cols = {"year", "boundary_changed"}
+    geo_col = None
     if panel_df is None or panel_df.empty:
         logger.warning("Empty panel provided to boundary_change_summary")
         return pd.DataFrame(columns=["coc_id", "change_years", "change_count"])
@@ -185,28 +188,33 @@ def boundary_change_summary(panel_df: pd.DataFrame) -> pd.DataFrame:
         missing = required_cols - set(panel_df.columns)
         logger.warning(f"Missing columns for boundary_change_summary: {missing}")
         return pd.DataFrame(columns=["coc_id", "change_years", "change_count"])
+    try:
+        geo_col = resolve_geo_col(panel_df)
+    except KeyError:
+        logger.warning("Missing geography identifier column for boundary_change_summary")
+        return pd.DataFrame(columns=["coc_id", "change_years", "change_count"])
 
     # Filter to rows where boundary changed
     changes = panel_df[panel_df["boundary_changed"]].copy()
 
     if changes.empty:
         logger.info("No boundary changes found in panel")
-        return pd.DataFrame(columns=["coc_id", "change_years", "change_count"])
+        return pd.DataFrame(columns=[geo_col, "change_years", "change_count"])
 
     # Group by CoC and collect change years
     results = []
-    for coc_id, group in changes.groupby("coc_id"):
+    for geo_id, group in changes.groupby(geo_col):
         years = sorted(group["year"].dropna().unique().tolist())
         results.append(
             {
-                "coc_id": coc_id,
+                geo_col: geo_id,
                 "change_years": years,
                 "change_count": len(years),
             }
         )
 
     result_df = pd.DataFrame(results)
-    result_df = result_df.sort_values("coc_id").reset_index(drop=True)
+    result_df = result_df.sort_values(geo_col).reset_index(drop=True)
 
     return result_df
 
@@ -252,7 +260,9 @@ def weighting_sensitivity(
     PIT rates are calculated as (pit_total / total_population) * 10000
     to express rates per 10,000 population.
     """
-    required_cols = {"coc_id", "year", "pit_total", "total_population"}
+    required_cols = {"year", "pit_total", "total_population"}
+    geo_col_area = None
+    geo_col_pop = None
 
     for name, df in [("area", panel_df_area), ("pop", panel_df_pop)]:
         if df is None or df.empty:
@@ -275,7 +285,7 @@ def weighting_sensitivity(
             logger.warning(f"Missing columns in {name} panel: {missing}")
             return pd.DataFrame(
                 columns=[
-                    "coc_id",
+                    "geo_id",
                     "year",
                     "pit_total",
                     "pop_area",
@@ -286,21 +296,67 @@ def weighting_sensitivity(
                     "rate_pct_diff",
                 ]
             )
+    try:
+        geo_col_area = resolve_geo_col(panel_df_area)
+        geo_col_pop = resolve_geo_col(panel_df_pop)
+    except KeyError:
+        logger.warning("Missing geography identifier column in weighting_sensitivity input")
+        return pd.DataFrame(
+            columns=[
+                "geo_id",
+                "year",
+                "pit_total",
+                "pop_area",
+                "pop_pop",
+                "rate_area",
+                "rate_pop",
+                "rate_diff",
+                "rate_pct_diff",
+            ]
+        )
 
-    # Merge on coc_id and year
-    df_area = panel_df_area[["coc_id", "year", "pit_total", "total_population"]].copy()
+    if geo_col_area != geo_col_pop:
+        logger.warning(
+            "weighting_sensitivity requires matching geography identifier columns "
+            f"but got {geo_col_area!r} and {geo_col_pop!r}"
+        )
+        return pd.DataFrame(
+            columns=[
+                "geo_id",
+                "year",
+                "pit_total",
+                "pop_area",
+                "pop_pop",
+                "rate_area",
+                "rate_pop",
+                "rate_diff",
+                "rate_pct_diff",
+            ]
+        )
+
+    out_geo_col = geo_col_area
+
+    # Merge on geography identifier and year
+    df_area = panel_df_area[[geo_col_area, "year", "pit_total", "total_population"]].copy()
     df_area = df_area.rename(columns={"total_population": "pop_area"})
 
-    df_pop = panel_df_pop[["coc_id", "year", "pit_total", "total_population"]].copy()
-    df_pop = df_pop.rename(columns={"total_population": "pop_pop", "pit_total": "pit_total_pop"})
+    df_pop = panel_df_pop[[geo_col_pop, "year", "pit_total", "total_population"]].copy()
+    df_pop = df_pop.rename(
+        columns={
+            "total_population": "pop_pop",
+            "pit_total": "pit_total_pop",
+        }
+    )
 
-    merged = df_area.merge(df_pop, on=["coc_id", "year"], how="outer")
+    merged = df_area.merge(df_pop, on=[out_geo_col, "year"], how="outer")
 
     # Verify PIT totals match (they should be the same)
     if not merged.empty:
         mismatch = merged[merged["pit_total"] != merged["pit_total_pop"]]
         if not mismatch.empty:
-            logger.warning(f"PIT totals differ between panels for {len(mismatch)} CoC/year pairs")
+            logger.warning(
+                f"PIT totals differ between panels for {len(mismatch)} geo/year pairs"
+            )
 
     # Drop the redundant pit_total column
     merged = merged.drop(columns=["pit_total_pop"])
@@ -317,7 +373,7 @@ def weighting_sensitivity(
     merged["rate_pct_diff"] = (merged["rate_diff"] / mean_rate * 100).fillna(0)
 
     # Sort and reset index
-    merged = merged.sort_values(["coc_id", "year"]).reset_index(drop=True)
+    merged = merged.sort_values([out_geo_col, "year"]).reset_index(drop=True)
 
     return merged
 
@@ -569,7 +625,7 @@ class DiagnosticsReport:
         else:
             total_cocs = len(self.boundary_changes)
             total_changes = self.boundary_changes["change_count"].sum()
-            lines.append(f"  CoCs with boundary changes: {total_cocs}")
+            lines.append(f"  Geo units with boundary changes: {total_cocs}")
             lines.append(f"  Total boundary change events: {total_changes}")
 
         # Missingness
@@ -609,7 +665,10 @@ class DiagnosticsReport:
             # Find CoC with largest difference
             if max_diff > 0:
                 max_row = self.weighting.loc[self.weighting["rate_pct_diff"].idxmax()]
-                lines.append(f"  Largest difference: {max_row['coc_id']} in {max_row['year']}")
+                weight_geo_col = resolve_geo_col(self.weighting)
+                lines.append(
+                    f"  Largest difference: {max_row[weight_geo_col]} in {max_row['year']}"
+                )
 
         lines.append("")
         lines.append("=" * 60)
@@ -657,9 +716,14 @@ def generate_diagnostics_report(
     panel_info = {}
     if panel_df is not None and not panel_df.empty:
         panel_info["row_count"] = len(panel_df)
-        panel_info["coc_count"] = (
-            int(panel_df["coc_id"].nunique()) if "coc_id" in panel_df.columns else 0
-        )
+        try:
+            geo_col = resolve_geo_col(panel_df)
+            panel_info["geo_count"] = int(panel_df[geo_col].nunique())
+            if "coc_id" in panel_df.columns:
+                panel_info["coc_count"] = int(panel_df["coc_id"].nunique())
+            panel_info["geo_type"] = infer_geo_type(panel_df)
+        except (KeyError, ValueError):
+            panel_info["geo_count"] = 0
         panel_info["year_count"] = (
             int(panel_df["year"].nunique()) if "year" in panel_df.columns else 0
         )

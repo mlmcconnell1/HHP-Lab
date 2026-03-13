@@ -20,7 +20,7 @@ import typer
 
 from coclab.naming import (
     county_xwalk_path,
-    panel_filename,
+    geo_panel_filename,
     tract_xwalk_path,
 )
 from coclab.recipe.cache import RecipeCache
@@ -997,12 +997,34 @@ def _persist_outputs(
     panel = pd.concat(frames, ignore_index=True)
 
     # Determine output path using canonical naming
+    target_geo_type = target.geometry.type
     boundary_vintage = str(target.geometry.vintage or "unknown")
+    definition_version = None
+    if target_geo_type == "metro":
+        definition_version = target.geometry.source or (
+            str(target.geometry.vintage) if target.geometry.vintage is not None else None
+        )
+        if definition_version is None:
+            return StepResult(
+                step_kind="persist",
+                detail="persist outputs",
+                success=False,
+                error=(
+                    "Metro recipe targets must set geometry.source or geometry.vintage "
+                    "to the metro definition version so panel outputs can be named."
+                ),
+            )
     start_year = min(universe_years)
     end_year = max(universe_years)
     output_dir = ctx.project_root / "data" / "curated" / "panel"
     output_dir.mkdir(parents=True, exist_ok=True)
-    output_file = output_dir / panel_filename(start_year, end_year, boundary_vintage)
+    output_file = output_dir / geo_panel_filename(
+        start_year,
+        end_year,
+        geo_type=target_geo_type,
+        boundary_vintage=boundary_vintage if target_geo_type == "coc" else None,
+        definition_version=definition_version,
+    )
 
     # Run conformance checks on the assembled panel
     from coclab.panel.conformance import PanelRequest, run_conformance
@@ -1010,6 +1032,7 @@ def _persist_outputs(
     panel_request = PanelRequest(
         start_year=start_year,
         end_year=end_year,
+        geo_type=target_geo_type,
     )
     conformance_report = run_conformance(panel, panel_request)
     if not ctx.quiet:
@@ -1082,16 +1105,26 @@ def _persist_diagnostics(
         target = next(
             (t for t in ctx.recipe.targets if t.id == pipeline.target), None
         )
+    target_geo_type = target.geometry.type if target is not None else "coc"
     boundary_vintage = str(
         target.geometry.vintage if target is not None else "unknown"
     )
+    definition_version = None
+    if target is not None and target_geo_type == "metro":
+        definition_version = target.geometry.source or (
+            str(target.geometry.vintage) if target.geometry.vintage is not None else None
+        )
     start_year = min(universe_years)
     end_year = max(universe_years)
     output_dir = ctx.project_root / "data" / "curated" / "panel"
     output_dir.mkdir(parents=True, exist_ok=True)
-    panel_stem = panel_filename(start_year, end_year, boundary_vintage).replace(
-        ".parquet", ""
-    )
+    panel_stem = geo_panel_filename(
+        start_year,
+        end_year,
+        geo_type=target_geo_type,
+        boundary_vintage=boundary_vintage if target_geo_type == "coc" else None,
+        definition_version=definition_version,
+    ).replace(".parquet", "")
     diagnostics_file = output_dir / f"{panel_stem}__diagnostics.json"
 
     # Generate diagnostics

@@ -1,4 +1,4 @@
-"""CLI command for building CoC x year panels."""
+"""CLI command for building analysis-geography x year panels."""
 
 from pathlib import Path
 from typing import Annotated
@@ -16,7 +16,10 @@ DEFAULT_PANEL_DIR = Path("data/curated/panel")
 
 
 def _resolve_zori_yearly_path(
-    explicit_path: Path | None, base_dir: Path | None = None
+    explicit_path: Path | None,
+    base_dir: Path | None = None,
+    *,
+    geo_type: str = "coc",
 ) -> Path | None:
     """Resolve the path to yearly ZORI data.
 
@@ -47,12 +50,14 @@ def _resolve_zori_yearly_path(
     if not rents_dir.exists():
         return None
 
-    # Try new naming convention first: zori_yearly__A*.parquet
-    yearly_files = list(rents_dir.glob("zori_yearly__A*.parquet"))
-
-    # Fall back to legacy naming: coc_zori_yearly__*.parquet
-    if not yearly_files:
-        yearly_files = list(rents_dir.glob("coc_zori_yearly__*.parquet"))
+    if geo_type == "metro":
+        yearly_files = list(rents_dir.glob("zori_yearly__metro__*.parquet"))
+        if not yearly_files:
+            yearly_files = list(rents_dir.glob("zori__metro__*.parquet"))
+    else:
+        yearly_files = list(rents_dir.glob("zori_yearly__A*.parquet"))
+        if not yearly_files:
+            yearly_files = list(rents_dir.glob("coc_zori_yearly__*.parquet"))
 
     if not yearly_files:
         return None
@@ -137,12 +142,27 @@ def build_panel_cmd(
             help="Skip all post-build conformance checks.",
         ),
     ] = False,
+    geo_type: Annotated[
+        str | None,
+        typer.Option(
+            "--geo-type",
+            help="Target analysis geography: 'coc' or 'metro'. Defaults to the build manifest or 'coc'.",
+        ),
+    ] = None,
+    definition_version: Annotated[
+        str | None,
+        typer.Option(
+            "--definition-version",
+            help="Synthetic geography definition version required for metro panels.",
+        ),
+    ] = None,
 ) -> None:
-    """Build a CoC x year analysis panel.
+    """Build an analysis-geography x year panel.
 
     Constructs an analysis-ready panel by joining PIT counts with ACS measures
     for each year in the specified range, using alignment policies to determine
-    which boundary and ACS vintages to use.
+    which boundary and ACS vintages to use. CoC remains the default target.
+    Metro builds require a definition version and read metro aggregate outputs.
 
     ZORI Integration (optional):
 
@@ -181,7 +201,10 @@ def build_panel_cmd(
 
         coclab build panel --build demo --start 2018 --end 2024
     """
+    from coclab.analysis_geo import resolve_geo_col
+    from coclab.builds import read_build_manifest
     from coclab.panel import AlignmentPolicy, build_panel, save_panel
+    from coclab.panel.conformance import PanelRequest, run_conformance
     from coclab.panel.policies import default_acs_vintage, default_boundary_vintage
 
     # Validate weighting method
@@ -219,12 +242,32 @@ def build_panel_cmd(
         typer.echo("Run: coclab build create --name <build>", err=True)
         raise typer.Exit(2) from exc
     build_curated = build_curated_dir(build_dir)
+    manifest = read_build_manifest(build_dir)
+    manifest_build = manifest.get("build", {})
+    resolved_geo_type = geo_type or manifest_build.get("geo_type") or "coc"
+    resolved_definition_version = (
+        definition_version or manifest_build.get("definition_version")
+    )
+    if resolved_geo_type not in {"coc", "metro"}:
+        typer.echo(
+            f"Error: Unsupported --geo-type '{resolved_geo_type}'. Use 'coc' or 'metro'.",
+            err=True,
+        )
+        raise typer.Exit(2)
+    if resolved_geo_type == "metro" and not resolved_definition_version:
+        typer.echo(
+            "Error: metro panel builds require --definition-version or a build manifest definition_version.",
+            err=True,
+        )
+        raise typer.Exit(2)
 
     # Validate ZORI data availability if --include-zori is set
     resolved_zori_path: Path | None = None
     if include_zori:
         resolved_zori_path = _resolve_zori_yearly_path(
-            zori_yearly_path, base_dir=build_dir
+            zori_yearly_path,
+            base_dir=build_dir,
+            geo_type=resolved_geo_type,
         )
         if resolved_zori_path is None:
             typer.echo(
@@ -251,7 +294,11 @@ def build_panel_cmd(
             raise typer.Exit(1)
         typer.echo(f"ZORI yearly data: {resolved_zori_path}")
 
-    typer.echo(f"Building panel for {start}-{end} with {weighting} weighting...")
+    typer.echo(
+        f"Building {resolved_geo_type} panel for {start}-{end} with {weighting} weighting..."
+    )
+    if resolved_definition_version is not None:
+        typer.echo(f"  Definition version: {resolved_definition_version}")
     if include_zori:
         typer.echo(f"  ZORI integration enabled (min coverage: {zori_min_coverage:.2f})")
 
@@ -280,6 +327,8 @@ def build_panel_cmd(
             zori_yearly_path=resolved_zori_path,
             rents_dir=build_rents_dir if build_rents_dir.exists() else None,
             zori_min_coverage=zori_min_coverage,
+            geo_type=resolved_geo_type,
+            definition_version=resolved_definition_version,
         )
     except Exception as e:
         typer.echo(f"Error building panel: {e}", err=True)
@@ -288,6 +337,24 @@ def build_panel_cmd(
     if panel_df.empty:
         typer.echo("Warning: Panel is empty. No data found for the specified year range.")
         raise typer.Exit(1)
+
+    conformance_report = None
+    if not skip_conformance:
+        conformance_request = PanelRequest(
+            start_year=start,
+            end_year=end,
+            include_zori=include_zori,
+            weighting_method=weighting,  # type: ignore[arg-type]
+            zori_min_coverage=zori_min_coverage,
+            geo_type=resolved_geo_type,
+            expected_geo_count=int(panel_df[resolve_geo_col(panel_df)].nunique()),
+        )
+        conformance_report = run_conformance(panel_df, conformance_request)
+        typer.echo("")
+        typer.echo(conformance_report.summary())
+        if strict and not conformance_report.passed:
+            typer.echo("Error: conformance checks failed under --strict.", err=True)
+            raise typer.Exit(1)
 
     # Save the panel
     try:
@@ -300,16 +367,23 @@ def build_panel_cmd(
 
             provenance = ProvenanceBlock(
                 weighting=weighting,
+                geo_type=resolved_geo_type,
+                definition_version=resolved_definition_version,
                 extra={
-                    "dataset_type": "coc_panel",
+                    "dataset_type": f"{resolved_geo_type}_panel",
                     "start_year": start,
                     "end_year": end,
                     "row_count": len(panel_df),
-                    "coc_count": int(panel_df["coc_id"].nunique()),
+                    "geo_count": int(panel_df[resolve_geo_col(panel_df)].nunique()),
                     "year_count": int(panel_df["year"].nunique()),
                     "policy": policy.to_dict(),
+                    "geo_type": resolved_geo_type,
                 },
             )
+            if "coc_id" in panel_df.columns:
+                provenance.extra["coc_count"] = int(panel_df["coc_id"].nunique())
+            if conformance_report is not None:
+                provenance.extra["conformance"] = conformance_report.to_dict()
             write_parquet_with_provenance(panel_df, output, provenance)
             output_path = output
         else:
@@ -320,6 +394,9 @@ def build_panel_cmd(
                 end_year=end,
                 output_dir=(build_curated / "panel") if build_curated else DEFAULT_PANEL_DIR,
                 policy=policy,
+                conformance_report=conformance_report,
+                geo_type=resolved_geo_type,
+                definition_version=resolved_definition_version,
             )
         typer.echo(f"Saved panel to: {output_path}")
     except Exception as e:
@@ -330,7 +407,9 @@ def build_panel_cmd(
     typer.echo("")
     typer.echo("Panel Summary:")
     typer.echo(f"  Years: {start} - {end} ({panel_df['year'].nunique()} years)")
-    typer.echo(f"  CoCs: {panel_df['coc_id'].nunique()}")
+    geo_col = resolve_geo_col(panel_df)
+    geo_label = "CoCs" if resolved_geo_type == "coc" else "Metros"
+    typer.echo(f"  {geo_label}: {panel_df[geo_col].nunique()}")
     typer.echo(f"  Total rows: {len(panel_df)}")
     typer.echo(f"  Weighting: {weighting}")
 
@@ -364,12 +443,11 @@ def build_panel_cmd(
         if "zori_coc" in panel_df.columns:
             zori_with_data = panel_df["zori_coc"].notna().sum()
             total_rows = len(panel_df)
-            typer.echo(f"  CoC-years with ZORI data: {zori_with_data} / {total_rows}")
+            typer.echo(f"  {resolved_geo_type}-years with ZORI data: {zori_with_data} / {total_rows}")
 
-            # Count by unique CoCs
-            cocs_with_zori = panel_df.loc[panel_df["zori_coc"].notna(), "coc_id"].nunique()
-            total_cocs = panel_df["coc_id"].nunique()
-            typer.echo(f"  CoCs with any ZORI data: {cocs_with_zori} / {total_cocs}")
+            geos_with_zori = panel_df.loc[panel_df["zori_coc"].notna(), geo_col].nunique()
+            total_geos = panel_df[geo_col].nunique()
+            typer.echo(f"  {geo_label} with any ZORI data: {geos_with_zori} / {total_geos}")
         else:
             typer.echo(
                 "  Note: ZORI columns not present (check ZORI data compatibility with panel years)"

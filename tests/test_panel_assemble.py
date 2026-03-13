@@ -15,6 +15,7 @@ import pandas as pd
 import pytest
 
 from coclab.panel.assemble import (
+    METRO_PANEL_COLUMNS,
     PANEL_COLUMNS,
     _detect_boundary_changes,
     _determine_alignment_type,
@@ -808,3 +809,157 @@ class TestIntegration:
         # Check sorting
         sorted_df = panel_df.sort_values(["coc_id", "year"]).reset_index(drop=True)
         pd.testing.assert_frame_equal(panel_df, sorted_df)
+
+
+class TestMetroPanelAssembly:
+    """Metro-specific tests for build/save panel integration."""
+
+    @pytest.fixture
+    def metro_data_dir(self, tmp_path):
+        pit_dir = tmp_path / "pit"
+        measures_dir = tmp_path / "measures"
+        zori_dir = tmp_path / "zori"
+        panel_dir = tmp_path / "panel"
+        for path in [pit_dir, measures_dir, zori_dir, panel_dir]:
+            path.mkdir()
+
+        pd.DataFrame(
+            {
+                "metro_id": ["GF01", "GF02"],
+                "year": [2020, 2020],
+                "pit_total": [1000, 2000],
+                "pit_sheltered": [700, 1500],
+                "pit_unsheltered": [300, 500],
+            }
+        ).to_parquet(
+            pit_dir / "pit__metro__P2020@Dglynnfoxv1.parquet",
+            index=False,
+        )
+
+        pd.DataFrame(
+            {
+                "metro_id": ["GF01", "GF02"],
+                "total_population": [100000, 200000],
+                "adult_population": [80000, 150000],
+                "population_below_poverty": [10000, 25000],
+                "median_household_income": [70000, 80000],
+                "median_gross_rent": [1800, 2200],
+                "coverage_ratio": [1.0, 1.0],
+                "weighting_method": ["population", "population"],
+            }
+        ).to_parquet(
+            measures_dir / "measures__metro__A2019@Dglynnfoxv1.parquet",
+            index=False,
+        )
+
+        pd.DataFrame(
+            {
+                "metro_id": ["GF01", "GF02"],
+                "year": [2020, 2020],
+                "zori_coc": [1900.0, 2300.0],
+                "coverage_ratio": [0.95, 0.96],
+            }
+        ).to_parquet(
+            zori_dir / "zori_yearly__metro__A2019@Dglynnfoxv1xC2020__wrenter__mpit_january.parquet",
+            index=False,
+        )
+
+        return {
+            "pit_dir": pit_dir,
+            "measures_dir": measures_dir,
+            "zori_dir": zori_dir,
+            "panel_dir": panel_dir,
+        }
+
+    def test_load_metro_pit_for_year(self, metro_data_dir):
+        result = _load_pit_for_year(
+            2020,
+            pit_dir=metro_data_dir["pit_dir"],
+            geo_type="metro",
+            definition_version="glynn_fox_v1",
+        )
+        assert list(result["metro_id"]) == ["GF01", "GF02"]
+        assert int(result["pit_total"].sum()) == 3000
+
+    def test_load_metro_acs_measures(self, metro_data_dir):
+        result, tract_vintage = _load_acs_measures(
+            boundary_vintage=None,
+            acs_vintage="2019",
+            weighting="population",
+            measures_dir=metro_data_dir["measures_dir"],
+            geo_type="metro",
+            definition_version="glynn_fox_v1",
+        )
+        assert tract_vintage is None
+        assert list(result["metro_id"]) == ["GF01", "GF02"]
+        assert list(result["total_population"]) == [100000, 200000]
+
+    def test_build_metro_panel(self, metro_data_dir):
+        policy = AlignmentPolicy(
+            boundary_vintage_func=lambda year: str(year),
+            acs_vintage_func=lambda year: "2019",
+            weighting_method="population",
+        )
+        result = build_panel(
+            2020,
+            2020,
+            policy=policy,
+            pit_dir=metro_data_dir["pit_dir"],
+            measures_dir=metro_data_dir["measures_dir"],
+            geo_type="metro",
+            definition_version="glynn_fox_v1",
+        )
+        assert set(result.columns) == set(METRO_PANEL_COLUMNS)
+        assert (result["geo_type"] == "metro").all()
+        assert list(result["geo_id"]) == ["GF01", "GF02"]
+        assert (result["definition_version_used"] == "glynn_fox_v1").all()
+        assert not result["boundary_changed"].any()
+
+    def test_build_metro_panel_with_zori(self, metro_data_dir):
+        policy = AlignmentPolicy(
+            boundary_vintage_func=lambda year: str(year),
+            acs_vintage_func=lambda year: "2019",
+            weighting_method="population",
+        )
+        result = build_panel(
+            2020,
+            2020,
+            policy=policy,
+            pit_dir=metro_data_dir["pit_dir"],
+            measures_dir=metro_data_dir["measures_dir"],
+            rents_dir=metro_data_dir["zori_dir"],
+            include_zori=True,
+            geo_type="metro",
+            definition_version="glynn_fox_v1",
+        )
+        assert "zori_coc" in result.columns
+        assert result["zori_coc"].notna().all()
+
+    def test_save_metro_panel_uses_geo_aware_filename(self, metro_data_dir):
+        policy = AlignmentPolicy(
+            boundary_vintage_func=lambda year: str(year),
+            acs_vintage_func=lambda year: "2019",
+            weighting_method="population",
+        )
+        panel_df = build_panel(
+            2020,
+            2020,
+            policy=policy,
+            pit_dir=metro_data_dir["pit_dir"],
+            measures_dir=metro_data_dir["measures_dir"],
+            geo_type="metro",
+            definition_version="glynn_fox_v1",
+        )
+        output_path = save_panel(
+            panel_df,
+            2020,
+            2020,
+            output_dir=metro_data_dir["panel_dir"],
+            geo_type="metro",
+            definition_version="glynn_fox_v1",
+        )
+        assert output_path.name == "panel__metro__Y2020-2020@Dglynnfoxv1.parquet"
+        provenance = read_provenance(output_path)
+        assert provenance is not None
+        assert provenance.geo_type == "metro"
+        assert provenance.definition_version == "glynn_fox_v1"

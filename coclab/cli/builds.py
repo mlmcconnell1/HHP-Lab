@@ -44,6 +44,20 @@ def create_build(
             help="Root data directory for resolving base assets (default: data/).",
         ),
     ] = None,
+    geo_type: Annotated[
+        str,
+        typer.Option(
+            "--geo-type",
+            help="Target analysis geography for this build: 'coc' or 'metro'.",
+        ),
+    ] = "coc",
+    definition_version: Annotated[
+        str | None,
+        typer.Option(
+            "--definition-version",
+            help="Synthetic geography definition version required for metro builds.",
+        ),
+    ] = None,
 ) -> None:
     """Create a named build directory scaffold with pinned base assets."""
     try:
@@ -52,12 +66,27 @@ def create_build(
         typer.echo(f"Error: {exc}", err=True)
         raise typer.Exit(code=2) from exc
 
+    if geo_type not in {"coc", "metro"}:
+        typer.echo(
+            f"Error: Unsupported --geo-type '{geo_type}'. Use 'coc' or 'metro'.",
+            err=True,
+        )
+        raise typer.Exit(code=2)
+    if geo_type == "metro" and not definition_version:
+        typer.echo(
+            "Error: --definition-version is required when --geo-type=metro.",
+            err=True,
+        )
+        raise typer.Exit(code=2)
+
     try:
         build_dir, base_assets = ensure_build_dir(
             name,
             builds_dir=builds_dir,
             years=parsed_years,
             data_dir=data_dir,
+            geo_type=geo_type,
+            definition_version=definition_version,
         )
     except FileNotFoundError as exc:
         typer.echo(f"Error: {exc}", err=True)
@@ -69,6 +98,9 @@ def create_build(
 
     typer.echo(f"Created build: {name}")
     typer.echo(f"  Years: {parsed_years}")
+    typer.echo(f"  Geo type: {geo_type}")
+    if definition_version is not None:
+        typer.echo(f"  Definition version: {definition_version}")
     typer.echo(f"  Path: {build_dir}")
     typer.echo(f"  Base assets pinned: {len(base_assets)}")
     for asset in base_assets:

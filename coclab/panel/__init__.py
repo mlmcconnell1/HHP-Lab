@@ -16,6 +16,7 @@ When building panels with `include_zori=True`, the following columns are added:
 """
 
 from coclab.panel.assemble import (
+    METRO_PANEL_COLUMNS,
     PANEL_COLUMNS,
     ZORI_COLUMNS,
     ZORI_PROVENANCE_COLUMNS,
@@ -68,6 +69,7 @@ __all__ = [
     "build_panel",
     "save_panel",
     "PANEL_COLUMNS",
+    "METRO_PANEL_COLUMNS",
     "ZORI_COLUMNS",
     "ZORI_PROVENANCE_COLUMNS",
     # Diagnostics

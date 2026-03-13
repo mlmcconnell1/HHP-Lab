@@ -1,11 +1,13 @@
 """Panel assembly engine for CoC Lab Phase 3.
 
-This module builds analysis-ready CoC x year panels by joining PIT counts
-with ACS measures according to explicit alignment policies.
+This module builds analysis-ready analysis-geography x year panels by joining
+PIT counts with ACS measures according to explicit alignment policies.
 
 Panel Schema (Canonical Columns)
 --------------------------------
-- coc_id: CoC identifier (ST-NNN format)
+- coc panel: uses ``PANEL_COLUMNS`` and preserves ``coc_id`` for compatibility
+- metro panel: uses ``METRO_PANEL_COLUMNS`` with ``metro_id`` plus canonical
+  ``geo_type`` / ``geo_id`` columns
 - year: PIT year
 - pit_total: Total homeless count
 - pit_sheltered: Sheltered count (nullable)
@@ -54,6 +56,14 @@ from typing import TYPE_CHECKING, Literal
 import pandas as pd
 
 from coclab import naming
+from coclab.analysis_geo import (
+    GEO_ID_COL,
+    GEO_TYPE_COL,
+    GEO_TYPE_COC,
+    GEO_TYPE_METRO,
+    ensure_canonical_geo_columns,
+    resolve_geo_col,
+)
 from coclab.panel.policies import DEFAULT_POLICY, AlignmentPolicy
 from coclab.panel.zori_eligibility import (
     DEFAULT_ZORI_MIN_COVERAGE,
@@ -101,6 +111,29 @@ PANEL_COLUMNS = [
     "source",
 ]
 
+METRO_PANEL_COLUMNS = [
+    "metro_id",
+    "geo_type",
+    "geo_id",
+    "year",
+    "pit_total",
+    "pit_sheltered",
+    "pit_unsheltered",
+    "definition_version_used",
+    "acs_vintage_used",
+    "tract_vintage_used",
+    "alignment_type",
+    "weighting_method",
+    "total_population",
+    "adult_population",
+    "population_below_poverty",
+    "median_household_income",
+    "median_gross_rent",
+    "coverage_ratio",
+    "boundary_changed",
+    "source",
+]
+
 # Additional columns added when ZORI is enabled
 ZORI_COLUMNS = [
     "zori_coc",
@@ -119,6 +152,34 @@ ZORI_PROVENANCE_COLUMNS = [
 
 # Default raw PIT directory
 DEFAULT_RAW_PIT_DIR = Path("data/raw/pit")
+
+
+def _panel_geo_id_col(geo_type: str) -> str:
+    """Return the native identifier column for a panel geo type."""
+    if geo_type == GEO_TYPE_METRO:
+        return "metro_id"
+    return "coc_id"
+
+
+def _panel_columns_for_geo_type(geo_type: str) -> list[str]:
+    """Return the canonical ordered panel columns for a geo type."""
+    if geo_type == GEO_TYPE_METRO:
+        return METRO_PANEL_COLUMNS
+    return PANEL_COLUMNS
+
+
+def _panel_dataset_type(geo_type: str) -> str:
+    """Return the provenance dataset type token for a panel."""
+    if geo_type == GEO_TYPE_METRO:
+        return "metro_panel"
+    return "coc_panel"
+
+
+def _align_label(geo_type: str) -> str:
+    """Return the alignment label for a geography family."""
+    if geo_type == GEO_TYPE_METRO:
+        return "definition_fixed"
+    return "boundary_aligned"
 
 
 def _find_latest_raw_vintage_file(
@@ -218,6 +279,9 @@ def _load_pit_for_year(
     year: int,
     pit_dir: Path | None = None,
     raw_pit_dir: Path | None = None,
+    *,
+    geo_type: str = GEO_TYPE_COC,
+    definition_version: str | None = None,
 ) -> pd.DataFrame:
     """Load PIT data for a specific year.
 
@@ -243,7 +307,8 @@ def _load_pit_for_year(
     Returns
     -------
     pd.DataFrame
-        PIT data with columns: coc_id, pit_total, pit_sheltered, pit_unsheltered.
+        PIT data with geography-native ID column, pit_total, pit_sheltered,
+        pit_unsheltered.
         Returns empty DataFrame if no data found.
 
     Notes
@@ -257,6 +322,55 @@ def _load_pit_for_year(
     """
     df = None
     use_fallback = True  # Whether to try raw vintage fallback
+
+    if geo_type == GEO_TYPE_METRO:
+        if definition_version is None:
+            raise ValueError("definition_version is required for geo_type='metro'")
+
+        geo_col = _panel_geo_id_col(geo_type)
+        if pit_dir is None:
+            pit_dir = DEFAULT_PIT_DIR
+
+        exact_path = pit_dir / naming.metro_pit_filename(year, definition_version)
+        candidates: list[Path] = []
+        if exact_path.exists():
+            candidates = [exact_path]
+        else:
+            candidates = sorted(pit_dir.glob(f"pit__metro__P{year}@D*.parquet"))
+
+        if not candidates:
+            logger.warning(
+                f"No metro PIT data found for year {year} and definition {definition_version}"
+            )
+            return pd.DataFrame(
+                columns=[geo_col, "pit_total", "pit_sheltered", "pit_unsheltered"]
+            )
+
+        df = pd.read_parquet(candidates[0])
+        if "pit_year" in df.columns and "year" not in df.columns:
+            df = df.rename(columns={"pit_year": "year"})
+        if "year" in df.columns:
+            df = df[df["year"] == year].copy()
+
+        if geo_col not in df.columns:
+            if GEO_ID_COL in df.columns:
+                df = df.rename(columns={GEO_ID_COL: geo_col})
+            else:
+                raise ValueError(
+                    f"Metro PIT file {candidates[0]} is missing '{geo_col}' column."
+                )
+
+        result_cols = [geo_col, "pit_total"]
+        for col in ["pit_sheltered", "pit_unsheltered"]:
+            if col in df.columns:
+                result_cols.append(col)
+        df = df[result_cols].copy()
+        df[geo_col] = df[geo_col].astype(str)
+        df["pit_total"] = pd.to_numeric(df["pit_total"], errors="raise").astype(int)
+        for col in ["pit_sheltered", "pit_unsheltered"]:
+            if col in df.columns:
+                df[col] = df[col].astype("Int64")
+        return df
 
     # If pit_dir is explicitly provided, use it directly (skip registry and fallback)
     # This supports testing with isolated data directories
@@ -339,17 +453,20 @@ def _load_pit_for_year(
 
 
 def _load_acs_measures(
-    boundary_vintage: str,
+    boundary_vintage: str | None,
     acs_vintage: str,
     weighting: Literal["area", "population"],
     measures_dir: Path | None = None,
+    *,
+    geo_type: str = GEO_TYPE_COC,
+    definition_version: str | None = None,
 ) -> tuple[pd.DataFrame, str | None]:
     """Load ACS measures for a specific vintage combination.
 
     Parameters
     ----------
     boundary_vintage : str
-        CoC boundary vintage (e.g., "2024").
+        CoC boundary vintage (e.g., "2024"). Ignored for metro targets.
     acs_vintage : str
         ACS 5-year estimate end year (e.g., "2023").
     weighting : {"area", "population"}
@@ -362,7 +479,8 @@ def _load_acs_measures(
     -------
     tuple[pd.DataFrame, str | None]
         Tuple of (DataFrame, tract_vintage) where:
-        - DataFrame contains ACS measures with columns: coc_id, total_population,
+        - DataFrame contains ACS measures with geography-native ID column,
+          total_population,
           adult_population, population_below_poverty, median_household_income,
           median_gross_rent, coverage_ratio. Returns empty DataFrame if no data found.
         - tract_vintage is the tract vintage from provenance metadata, or None if
@@ -375,6 +493,82 @@ def _load_acs_measures(
     then falls back to legacy naming.
     """
     measures_dir = measures_dir or DEFAULT_MEASURES_DIR
+    geo_col = _panel_geo_id_col(geo_type)
+
+    if geo_type == GEO_TYPE_METRO:
+        if definition_version is None:
+            raise ValueError("definition_version is required for geo_type='metro'")
+
+        exact_path = measures_dir / naming.metro_measures_filename(
+            acs_vintage,
+            definition_version,
+        )
+        acs_year = naming._normalize_acs_vintage(acs_vintage)
+        tract_pattern = f"measures__metro__A{acs_year}@D*xT*.parquet"
+        tract_matches = list(measures_dir.glob(tract_pattern))
+        measures_path = None
+        if exact_path.exists():
+            measures_path = exact_path
+        elif tract_matches:
+            measures_path = tract_matches[0]
+
+        if measures_path is None:
+            logger.warning(
+                f"No metro ACS measures found for acs={acs_vintage}, "
+                f"definition={definition_version}, weighting={weighting}"
+            )
+            return pd.DataFrame(
+                columns=[
+                    geo_col,
+                    "total_population",
+                    "adult_population",
+                    "population_below_poverty",
+                    "median_household_income",
+                    "median_gross_rent",
+                    "coverage_ratio",
+                ]
+            ), None
+
+        logger.info(f"Loading metro ACS measures from: {measures_path}")
+        df = pd.read_parquet(measures_path)
+        provenance = read_provenance(measures_path)
+        tract_vintage = provenance.tract_vintage if provenance is not None else None
+
+        if geo_col not in df.columns:
+            if GEO_ID_COL in df.columns:
+                df = df.rename(columns={GEO_ID_COL: geo_col})
+            else:
+                raise ValueError(
+                    f"Metro ACS measures file {measures_path.name} is missing "
+                    f"'{geo_col}' column."
+                )
+
+        if "weighting_method" in df.columns:
+            df_weighted = df[df["weighting_method"] == weighting].copy()
+            if df_weighted.empty:
+                available = sorted(df["weighting_method"].unique())
+                raise ValueError(
+                    f"Metro ACS measures file {measures_path.name} has no rows for "
+                    f"weighting={weighting}; available weightings: {available}. "
+                    f"Re-run metro ACS aggregation with weighting {weighting}."
+                )
+            df = df_weighted
+
+        result_cols = [geo_col]
+        for col in [
+            "total_population",
+            "adult_population",
+            "population_below_poverty",
+            "median_household_income",
+            "median_gross_rent",
+            "coverage_ratio",
+        ]:
+            if col in df.columns:
+                result_cols.append(col)
+
+        df = df[result_cols].copy()
+        df[geo_col] = df[geo_col].astype(str)
+        return df, tract_vintage
 
     # Try new naming conventions in order:
     # 1. Without tract: measures__A{acs}@B{boundary}.parquet
@@ -486,6 +680,9 @@ def _load_acs_measures(
 def _load_zori_yearly(
     zori_yearly_path: Path | str | None = None,
     rents_dir: Path | None = None,
+    *,
+    geo_type: str = GEO_TYPE_COC,
+    definition_version: str | None = None,
 ) -> pd.DataFrame | None:
     """Load yearly ZORI data for panel integration.
 
@@ -504,7 +701,8 @@ def _load_zori_yearly(
     Returns
     -------
     pd.DataFrame or None
-        ZORI yearly data with columns: coc_id, year, zori_coc, coverage_ratio.
+        ZORI yearly data with geography-native ID column, year, zori_coc,
+        coverage_ratio.
         Returns None if no data is found.
 
     Notes
@@ -517,6 +715,7 @@ def _load_zori_yearly(
     to avoid collision with the ACS coverage_ratio column.
     """
     rents_dir = rents_dir or DEFAULT_RENTS_DIR
+    geo_col = _panel_geo_id_col(geo_type)
 
     if zori_yearly_path is not None:
         path = Path(zori_yearly_path)
@@ -525,15 +724,17 @@ def _load_zori_yearly(
             return None
         logger.info(f"Loading ZORI yearly from explicit path: {path}")
     else:
-        # Auto-discover: try new naming first, then legacy
-        # New naming: zori_yearly__A*@B*xC*__w*__m*.parquet
-        new_pattern = "zori_yearly__A*.parquet"
-        candidates = sorted(rents_dir.glob(new_pattern), reverse=True)
-
-        if not candidates:
-            # Fall back to legacy naming: coc_zori_yearly__*.parquet
-            legacy_pattern = "coc_zori_yearly__*.parquet"
-            candidates = sorted(rents_dir.glob(legacy_pattern), reverse=True)
+        if geo_type == GEO_TYPE_METRO:
+            if definition_version is None:
+                raise ValueError("definition_version is required for geo_type='metro'")
+            candidates = sorted(rents_dir.glob("zori_yearly__metro__*.parquet"), reverse=True)
+            if not candidates:
+                candidates = sorted(rents_dir.glob("zori__metro__*.parquet"), reverse=True)
+        else:
+            # Auto-discover: try new naming first, then legacy
+            candidates = sorted(rents_dir.glob("zori_yearly__A*.parquet"), reverse=True)
+            if not candidates:
+                candidates = sorted(rents_dir.glob("coc_zori_yearly__*.parquet"), reverse=True)
 
         if not candidates:
             logger.info(f"No yearly ZORI files found in {rents_dir}")
@@ -545,7 +746,7 @@ def _load_zori_yearly(
     df = pd.read_parquet(path)
 
     # Validate required columns
-    required_cols = {"coc_id", "year", "zori_coc", "coverage_ratio"}
+    required_cols = {geo_col, "year", "zori_coc", "coverage_ratio"}
     missing_cols = required_cols - set(df.columns)
     if missing_cols:
         logger.warning(
@@ -561,19 +762,19 @@ def _load_zori_yearly(
     df = df.rename(columns=rename_map)
 
     # Select relevant columns
-    result_cols = ["coc_id", "year", "zori_coc", "zori_coverage_ratio"]
+    result_cols = [geo_col, "year", "zori_coc", "zori_coverage_ratio"]
     # Include optional metadata columns if present
     for col in ["method", "zori_max_geo_contribution", "geo_count"]:
         if col in df.columns:
             result_cols.append(col)
 
     df = df[result_cols].copy()
-    df["coc_id"] = df["coc_id"].astype(str)
+    df[geo_col] = df[geo_col].astype(str)
     df["year"] = df["year"].astype(int)
 
     logger.info(
         f"Loaded ZORI yearly: {len(df)} rows, "
-        f"{df['coc_id'].nunique()} CoCs, "
+        f"{df[geo_col].nunique()} {'metros' if geo_type == GEO_TYPE_METRO else 'CoCs'}, "
         f"{df['year'].nunique()} years"
     )
 
@@ -629,8 +830,13 @@ def _compute_rent_to_income(
     return result
 
 
-def _detect_boundary_changes(df: pd.DataFrame) -> pd.Series:
-    """Detect boundary changes between consecutive years for each CoC.
+def _detect_boundary_changes(
+    df: pd.DataFrame,
+    *,
+    geo_col: str = "coc_id",
+    vintage_col: str = "boundary_vintage_used",
+) -> pd.Series:
+    """Detect vintage changes between consecutive years for each geo unit.
 
     A boundary change is detected when the boundary_vintage_used differs
     from the prior year's boundary_vintage_used for the same CoC.
@@ -638,8 +844,8 @@ def _detect_boundary_changes(df: pd.DataFrame) -> pd.Series:
     Parameters
     ----------
     df : pd.DataFrame
-        Panel DataFrame with coc_id, year, and boundary_vintage_used columns.
-        Must be sorted by coc_id and year.
+        Panel DataFrame with geo identifier, year, and vintage columns.
+        Must be sorted by geo identifier and year.
 
     Returns
     -------
@@ -656,15 +862,18 @@ def _detect_boundary_changes(df: pd.DataFrame) -> pd.Series:
     if df.empty:
         return pd.Series(dtype=bool)
 
-    # Sort by CoC and year
-    df = df.sort_values(["coc_id", "year"]).copy()
+    if geo_col not in df.columns or vintage_col not in df.columns:
+        return pd.Series(False, index=df.index, dtype=bool)
 
-    # Get prior year's boundary vintage for each CoC
-    df["_prior_vintage"] = df.groupby("coc_id")["boundary_vintage_used"].shift(1)
+    # Sort by geography and year
+    df = df.sort_values([geo_col, "year"]).copy()
+
+    # Get prior year's vintage for each geography unit
+    df["_prior_vintage"] = df.groupby(geo_col)[vintage_col].shift(1)
 
     # Boundary changed if vintage differs from prior (and prior exists)
     boundary_changed = df["_prior_vintage"].notna() & (
-        df["boundary_vintage_used"] != df["_prior_vintage"]
+        df[vintage_col] != df["_prior_vintage"]
     )
 
     # Restore original index order
@@ -703,8 +912,11 @@ def build_panel(
     zori_yearly_path: Path | str | None = None,
     rents_dir: Path | None = None,
     zori_min_coverage: float = DEFAULT_ZORI_MIN_COVERAGE,
+    *,
+    geo_type: str = GEO_TYPE_COC,
+    definition_version: str | None = None,
 ) -> pd.DataFrame:
-    """Build analysis-ready CoC x year panel.
+    """Build analysis-ready analysis-geography x year panel.
 
     Joins PIT counts with ACS measures for each year in the range,
     using the specified alignment policy to determine which boundary
@@ -741,12 +953,9 @@ def build_panel(
     Returns
     -------
     pd.DataFrame
-        Panel DataFrame with canonical columns:
-        coc_id, year, pit_total, pit_sheltered, pit_unsheltered,
-        boundary_vintage_used, acs_vintage_used, tract_vintage_used,
-        alignment_type, weighting_method, total_population, adult_population,
-        population_below_poverty, median_household_income, median_gross_rent,
-        coverage_ratio, boundary_changed, source.
+        Panel DataFrame with canonical columns for the requested geography.
+        CoC builds preserve the legacy ``coc_id`` schema. Metro builds use
+        ``metro_id`` plus canonical ``geo_type`` / ``geo_id`` columns.
 
         When include_zori=True, also includes:
         zori_coc, zori_coverage_ratio, zori_is_eligible, zori_excluded_reason,
@@ -776,11 +985,17 @@ def build_panel(
     """
     if start_year > end_year:
         raise ValueError(f"start_year ({start_year}) must be <= end_year ({end_year})")
+    if geo_type not in {GEO_TYPE_COC, GEO_TYPE_METRO}:
+        raise ValueError(f"Unsupported geo_type: {geo_type!r}")
+    if geo_type == GEO_TYPE_METRO and not definition_version:
+        raise ValueError("definition_version is required for geo_type='metro'")
 
     if policy is None:
         policy = DEFAULT_POLICY
 
-    logger.info(f"Building panel for {start_year}-{end_year}")
+    geo_col = _panel_geo_id_col(geo_type)
+    panel_columns = _panel_columns_for_geo_type(geo_type)
+    logger.info(f"Building {geo_type} panel for {start_year}-{end_year}")
     logger.info(f"Policy: weighting={policy.weighting_method}")
 
     # Load ZORI data if requested
@@ -790,6 +1005,8 @@ def build_panel(
         zori_df = _load_zori_yearly(
             zori_yearly_path=zori_yearly_path,
             rents_dir=rents_dir,
+            geo_type=geo_type,
+            definition_version=definition_version,
         )
         if zori_df is None:
             raise ValueError(
@@ -813,7 +1030,12 @@ def build_panel(
         )
 
         # Load PIT data
-        pit_df = _load_pit_for_year(year, pit_dir=pit_dir)
+        pit_df = _load_pit_for_year(
+            year,
+            pit_dir=pit_dir,
+            geo_type=geo_type,
+            definition_version=definition_version,
+        )
 
         if pit_df.empty:
             logger.warning(f"No PIT data for year {year}, skipping")
@@ -821,25 +1043,39 @@ def build_panel(
 
         # Load ACS measures (returns DataFrame and tract_vintage from provenance)
         acs_df, tract_vintage = _load_acs_measures(
-            boundary_vintage=boundary_vintage,
+            boundary_vintage=boundary_vintage if geo_type == GEO_TYPE_COC else None,
             acs_vintage=acs_vintage,
             weighting=weighting,
             measures_dir=measures_dir,
+            geo_type=geo_type,
+            definition_version=definition_version,
         )
 
         # Start with PIT data as anchor
         year_df = pit_df.copy()
         year_df["year"] = year
-        year_df["boundary_vintage_used"] = boundary_vintage
+        if geo_type == GEO_TYPE_COC:
+            year_df["boundary_vintage_used"] = boundary_vintage
+        else:
+            year_df["definition_version_used"] = definition_version
+            year_df = ensure_canonical_geo_columns(
+                year_df,
+                GEO_TYPE_METRO,
+                geo_id_source_col=geo_col,
+            )
         year_df["acs_vintage_used"] = acs_vintage
         year_df["tract_vintage_used"] = tract_vintage
-        year_df["alignment_type"] = _determine_alignment_type(year, boundary_vintage)
+        year_df["alignment_type"] = (
+            _determine_alignment_type(year, boundary_vintage)
+            if geo_type == GEO_TYPE_COC
+            else _align_label(geo_type)
+        )
         year_df["weighting_method"] = weighting
-        year_df["source"] = "coclab_panel"
+        year_df["source"] = "coclab_panel" if geo_type == GEO_TYPE_COC else "metro_panel"
 
         # Left join with ACS measures (PIT is anchor)
         if not acs_df.empty:
-            year_df = year_df.merge(acs_df, on="coc_id", how="left")
+            year_df = year_df.merge(acs_df, on=geo_col, how="left")
             logger.info(
                 f"Year {year}: {len(pit_df)} PIT records, "
                 f"{len(acs_df)} ACS records, "
@@ -861,7 +1097,7 @@ def build_panel(
 
     if not year_dfs:
         logger.warning("No data found for any year in range")
-        return pd.DataFrame(columns=PANEL_COLUMNS)
+        return pd.DataFrame(columns=panel_columns)
 
     # Combine all years
     panel_df = pd.concat(year_dfs, ignore_index=True)
@@ -884,14 +1120,21 @@ def build_panel(
             f"built for the required vintage range with the requested weighting."
         )
 
-    # Sort by CoC and year for boundary change detection
-    panel_df = panel_df.sort_values(["coc_id", "year"]).reset_index(drop=True)
+    # Sort by geography and year for vintage change detection
+    panel_df = panel_df.sort_values([geo_col, "year"]).reset_index(drop=True)
 
-    # Detect boundary changes
-    panel_df["boundary_changed"] = _detect_boundary_changes(panel_df)
+    # Detect geometry-definition changes over time
+    vintage_col = (
+        "boundary_vintage_used" if geo_type == GEO_TYPE_COC else "definition_version_used"
+    )
+    panel_df["boundary_changed"] = _detect_boundary_changes(
+        panel_df,
+        geo_col=geo_col,
+        vintage_col=vintage_col,
+    )
 
     # Ensure all canonical columns exist
-    for col in PANEL_COLUMNS:
+    for col in panel_columns:
         if col not in panel_df.columns:
             panel_df[col] = pd.NA
 
@@ -904,7 +1147,7 @@ def build_panel(
         # Left join with ZORI yearly data
         panel_df = panel_df.merge(
             zori_df,
-            on=["coc_id", "year"],
+            on=[geo_col, "year"],
             how="left",
         )
 
@@ -958,12 +1201,12 @@ def build_panel(
         )
 
         # Add ZORI columns to the ordering
-        all_columns = PANEL_COLUMNS + ZORI_COLUMNS + ZORI_PROVENANCE_COLUMNS
+        all_columns = panel_columns + ZORI_COLUMNS + ZORI_PROVENANCE_COLUMNS
         # Also keep zori_max_geo_contribution if present
         if "zori_max_geo_contribution" in panel_df.columns:
             all_columns.append("zori_max_geo_contribution")
     else:
-        all_columns = PANEL_COLUMNS
+        all_columns = panel_columns
 
     # Ensure all required columns exist
     for col in all_columns:
@@ -975,10 +1218,16 @@ def build_panel(
     panel_df = panel_df[final_columns].copy()
 
     # Final dtype cleanup
-    panel_df["coc_id"] = panel_df["coc_id"].astype(str)
+    panel_df[geo_col] = panel_df[geo_col].astype(str)
+    if geo_type == GEO_TYPE_METRO:
+        panel_df[GEO_ID_COL] = panel_df[GEO_ID_COL].astype(str)
+        panel_df[GEO_TYPE_COL] = panel_df[GEO_TYPE_COL].astype(str)
     panel_df["year"] = panel_df["year"].astype(int)
     panel_df["pit_total"] = panel_df["pit_total"].astype(int)
-    panel_df["boundary_vintage_used"] = panel_df["boundary_vintage_used"].astype(str)
+    if "boundary_vintage_used" in panel_df.columns:
+        panel_df["boundary_vintage_used"] = panel_df["boundary_vintage_used"].astype(str)
+    if "definition_version_used" in panel_df.columns:
+        panel_df["definition_version_used"] = panel_df["definition_version_used"].astype(str)
     panel_df["acs_vintage_used"] = panel_df["acs_vintage_used"].astype(str)
     # tract_vintage_used may be None if provenance not available, use nullable string
     if "tract_vintage_used" in panel_df.columns:
@@ -996,7 +1245,7 @@ def build_panel(
 
     logger.info(
         f"Built panel: {len(panel_df)} rows, "
-        f"{panel_df['coc_id'].nunique()} CoCs, "
+        f"{panel_df[geo_col].nunique()} {'metros' if geo_type == GEO_TYPE_METRO else 'CoCs'}, "
         f"{panel_df['year'].nunique()} years"
     )
 
@@ -1011,6 +1260,9 @@ def save_panel(
     policy: AlignmentPolicy | None = None,
     zori_provenance: ZoriProvenance | None = None,
     conformance_report: ConformanceReport | None = None,
+    *,
+    geo_type: str | None = None,
+    definition_version: str | None = None,
 ) -> Path:
     """Save panel DataFrame to Parquet with embedded provenance.
 
@@ -1036,7 +1288,9 @@ def save_panel(
 
     Notes
     -----
-    Output filename: panel__Y{start}-{end}@B{boundary}.parquet
+    Output filename is geography-aware:
+    - CoC: ``panel__Y{start}-{end}@B{boundary}.parquet``
+    - Metro: ``panel__metro__Y{start}-{end}@D{definition}.parquet``
 
     Provenance metadata includes:
     - Panel date range
@@ -1044,8 +1298,6 @@ def save_panel(
     - Policy settings (if provided)
     - ZORI provenance (if provided)
     """
-    from coclab.naming import panel_filename
-
     output_dir = output_dir or DEFAULT_PANEL_DIR
     output_dir = Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -1054,18 +1306,41 @@ def save_panel(
     boundary_vintage = None
     acs_vintage = None
     weighting = None
+    if geo_type is None:
+        geo_type = GEO_TYPE_METRO if "metro_id" in df.columns else GEO_TYPE_COC
 
     if not df.empty:
-        boundary_vintages = df["boundary_vintage_used"].unique()
-        if len(boundary_vintages) == 1:
-            boundary_vintage = str(boundary_vintages[0])
-        else:
-            # Use the most common boundary vintage if multiple exist
-            boundary_vintage = str(df["boundary_vintage_used"].mode().iloc[0])
+        if geo_type == GEO_TYPE_COC and "boundary_vintage_used" in df.columns:
+            boundary_vintages = df["boundary_vintage_used"].unique()
+            if len(boundary_vintages) == 1:
+                boundary_vintage = str(boundary_vintages[0])
+            else:
+                boundary_vintage = str(df["boundary_vintage_used"].mode().iloc[0])
+        if geo_type == GEO_TYPE_METRO and definition_version is None:
+            if "definition_version_used" in df.columns:
+                versions = df["definition_version_used"].dropna().unique()
+                if len(versions) == 1:
+                    definition_version = str(versions[0])
 
     # Generate filename with temporal shorthand
-    if boundary_vintage:
-        filename = panel_filename(start_year, end_year, boundary_vintage)
+    if geo_type == GEO_TYPE_METRO:
+        if definition_version is None:
+            raise ValueError(
+                "definition_version is required to save a metro panel."
+            )
+        filename = naming.geo_panel_filename(
+            start_year,
+            end_year,
+            geo_type=geo_type,
+            definition_version=definition_version,
+        )
+    elif boundary_vintage:
+        filename = naming.geo_panel_filename(
+            start_year,
+            end_year,
+            geo_type=geo_type,
+            boundary_vintage=boundary_vintage,
+        )
     else:
         # Fallback if no boundary vintage can be determined
         filename = f"panel__Y{start_year}-{end_year}.parquet"
@@ -1073,13 +1348,18 @@ def save_panel(
 
     # Build provenance
     extra = {
-        "dataset_type": "coc_panel",
+        "dataset_type": _panel_dataset_type(geo_type),
         "start_year": start_year,
         "end_year": end_year,
         "row_count": len(df),
-        "coc_count": int(df["coc_id"].nunique()) if not df.empty else 0,
+        "geo_type": geo_type,
+        "geo_count": int(df[resolve_geo_col(df)].nunique()) if not df.empty else 0,
         "year_count": int(df["year"].nunique()) if not df.empty else 0,
     }
+    if geo_type == GEO_TYPE_COC:
+        extra["coc_count"] = int(df["coc_id"].nunique()) if not df.empty else 0
+    if definition_version is not None:
+        extra["definition_version"] = definition_version
 
     if policy is not None:
         extra["policy"] = policy.to_dict()
@@ -1110,6 +1390,8 @@ def save_panel(
         boundary_vintage=boundary_vintage,
         acs_vintage=acs_vintage,
         weighting=weighting,
+        geo_type=geo_type,
+        definition_version=definition_version,
         extra=extra,
     )
 

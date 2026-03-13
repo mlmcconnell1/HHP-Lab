@@ -284,6 +284,8 @@ def ensure_build_dir(
     *,
     years: list[int] | None = None,
     data_dir: Path | None = None,
+    geo_type: str | None = None,
+    definition_version: str | None = None,
 ) -> tuple[Path, list[dict]]:
     """Create a named build directory scaffold and pin base assets.
 
@@ -314,13 +316,26 @@ def ensure_build_dir(
         base_assets = populate_base_assets(
             build_dir, years, data_dir=data_dir,
         )
-        write_build_manifest(build_dir, name, years, base_assets)
+        write_build_manifest(
+            build_dir,
+            name,
+            years,
+            base_assets,
+            geo_type=geo_type,
+            definition_version=definition_version,
+        )
     else:
         manifest = build_manifest_path(build_dir)
         if not manifest.exists():
-            manifest.write_text(
-                json.dumps({"schema_version": 1}, indent=2) + "\n"
-            )
+            manifest_data: dict[str, object] = {"schema_version": 1}
+            if geo_type is not None or definition_version is not None:
+                build_block: dict[str, object] = {"name": name}
+                if geo_type is not None:
+                    build_block["geo_type"] = geo_type
+                if definition_version is not None:
+                    build_block["definition_version"] = definition_version
+                manifest_data["build"] = build_block
+            manifest.write_text(json.dumps(manifest_data, indent=2) + "\n")
 
     return build_dir, base_assets
 
