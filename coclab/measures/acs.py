@@ -289,37 +289,43 @@ def _validate_geoid_overlap(
         warnings.warn(warning_msg, UserWarning, stacklevel=3)
 
 
-def aggregate_to_coc(
+def aggregate_to_geo(
     acs_data: pd.DataFrame,
     crosswalk: pd.DataFrame,
     weighting: Literal["area", "population"] = "area",
+    *,
+    geo_id_col: str = "coc_id",
 ) -> pd.DataFrame:
-    """Aggregate tract-level ACS data to CoC level using crosswalk.
+    """Aggregate tract-level ACS data to analysis geography using crosswalk.
 
     Parameters
     ----------
     acs_data : pd.DataFrame
         Tract-level ACS data with GEOID column.
     crosswalk : pd.DataFrame
-        Tract-to-CoC crosswalk with tract_geoid, coc_id, area_share, pop_share.
+        Tract-to-geo crosswalk with tract_geoid, ``geo_id_col``, area_share,
+        and optionally pop_share.
     weighting : {"area", "population"}
         Weighting method for median value aggregation. For count variables
         (population, poverty counts), area_share is always used to compute
         actual totals. For median variables (income, rent), this parameter
         controls whether medians are weighted by area overlap alone ("area")
         or by population in overlapping areas ("population").
+    geo_id_col : str
+        Name of the geography identifier column in the crosswalk.
+        Defaults to ``"coc_id"`` for backward compatibility.
 
     Returns
     -------
     pd.DataFrame
-        CoC-level aggregated measures.
+        Geography-level aggregated measures with ``geo_id_col`` as identifier.
 
     Notes
     -----
     Count variables (total_population, adult_population, etc.) always use
     area_share weighting to produce actual population totals. Using pop_share
     for counts would produce weighted averages instead of sums, since pop_share
-    is normalized to sum to 1.0 per CoC.
+    is normalized to sum to 1.0 per geography unit.
 
     The weighting parameter only affects median variables, controlling whether
     tract medians are weighted by geographic overlap or by population.
@@ -361,8 +367,8 @@ def aggregate_to_coc(
 
     # Apply weights and aggregate
     results = []
-    for coc_id, group in merged.groupby("coc_id"):
-        row = {"coc_id": coc_id}
+    for geo_id, group in merged.groupby(geo_id_col):
+        row = {geo_id_col: geo_id}
 
         # Weighted sums for population counts - ALWAYS use area_share
         # This computes actual population totals (sum of tract_pop * area_share)
@@ -385,8 +391,7 @@ def aggregate_to_coc(
                 else:
                     row[col] = pd.NA
 
-        # Coverage ratio: fraction of CoC area covered by tracts with ACS data
-        # Computed as sum(intersection_area with data) / sum(intersection_area total)
+        # Coverage ratio: fraction of geo area covered by tracts with ACS data
         if "intersection_area" in group.columns:
             total_area = group["intersection_area"].sum()
             has_data = group["total_population"].notna()
@@ -406,3 +411,16 @@ def aggregate_to_coc(
     result_df["source"] = "acs_5yr"
 
     return result_df
+
+
+def aggregate_to_coc(
+    acs_data: pd.DataFrame,
+    crosswalk: pd.DataFrame,
+    weighting: Literal["area", "population"] = "area",
+) -> pd.DataFrame:
+    """Aggregate tract-level ACS data to CoC level using crosswalk.
+
+    Convenience wrapper around :func:`aggregate_to_geo` with
+    ``geo_id_col="coc_id"``.  See that function for full documentation.
+    """
+    return aggregate_to_geo(acs_data, crosswalk, weighting, geo_id_col="coc_id")

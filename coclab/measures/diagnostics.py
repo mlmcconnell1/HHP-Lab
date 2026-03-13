@@ -1,67 +1,73 @@
-"""Attribution diagnostics and coverage reporting for CoC crosswalks.
+"""Attribution diagnostics and coverage reporting for crosswalks.
 
-Computes per-CoC diagnostics to validate crosswalk quality and compare
-area-weighted vs population-weighted estimates.
+Computes per-geography diagnostics to validate crosswalk quality and compare
+area-weighted vs population-weighted estimates.  All functions accept a
+``geo_id_col`` parameter (default ``"coc_id"``) so they work with any
+analysis geography.
 """
 
 import pandas as pd
 
 
-def compute_crosswalk_diagnostics(crosswalk: pd.DataFrame) -> pd.DataFrame:
+def compute_crosswalk_diagnostics(
+    crosswalk: pd.DataFrame,
+    *,
+    geo_id_col: str = "coc_id",
+) -> pd.DataFrame:
     """Compute diagnostics for a tract crosswalk.
 
-    Analyzes crosswalk quality by computing per-CoC metrics including
+    Analyzes crosswalk quality by computing per-geography metrics including
     tract count, maximum contribution, and coverage ratios.
 
     Parameters
     ----------
     crosswalk : pd.DataFrame
-        Tract-to-CoC crosswalk with columns:
-        - coc_id: CoC identifier
-        - area_share: Area-weighted share of tract in CoC
+        Tract-to-geo crosswalk with columns:
+        - ``geo_id_col``: Geography identifier
+        - area_share: Area-weighted share of tract in geography unit
         - pop_share: Population-weighted share (optional, may be None)
+    geo_id_col : str
+        Name of the geography identifier column.  Defaults to ``"coc_id"``.
 
     Returns
     -------
     pd.DataFrame
-        Diagnostics per CoC with columns:
-        - coc_id: CoC identifier
-        - num_tracts: Number of tracts intersecting this CoC
+        Diagnostics per geography unit with columns:
+        - ``geo_id_col``: Geography identifier
+        - num_tracts: Number of tracts intersecting this unit
         - max_tract_contribution: Maximum single-tract area_share
         - coverage_ratio_area: Sum of area_share (should be ~1)
         - coverage_ratio_pop: Sum of pop_share (when available)
     """
-    if "coc_id" not in crosswalk.columns:
-        raise ValueError("Crosswalk must have 'coc_id' column")
+    if geo_id_col not in crosswalk.columns:
+        raise ValueError(f"Crosswalk must have '{geo_id_col}' column")
     if "intersection_area" not in crosswalk.columns:
         raise ValueError("Crosswalk must have 'intersection_area' column")
 
-    # Compute CoC-normalized area shares
-    # (what fraction of the CoC's total intersected area does each tract represent)
+    # Compute geo-normalized area shares
     xwalk = crosswalk.copy()
-    coc_total_area = xwalk.groupby("coc_id")["intersection_area"].transform("sum")
-    xwalk["coc_area_share"] = xwalk["intersection_area"] / coc_total_area
+    geo_total_area = xwalk.groupby(geo_id_col)["intersection_area"].transform("sum")
+    xwalk["geo_area_share"] = xwalk["intersection_area"] / geo_total_area
 
-    # Group by CoC and compute diagnostics
-    grouped = xwalk.groupby("coc_id")
+    # Group by geography unit and compute diagnostics
+    grouped = xwalk.groupby(geo_id_col)
 
     diagnostics = pd.DataFrame(
         {
             "num_tracts": grouped.size(),
-            "max_tract_contribution": grouped["coc_area_share"].max(),
-            "coverage_ratio_area": grouped["coc_area_share"].sum(),
+            "max_tract_contribution": grouped["geo_area_share"].max(),
+            "coverage_ratio_area": grouped["geo_area_share"].sum(),
         }
     )
     diagnostics = diagnostics.reset_index()
 
     # Compute population coverage if pop_share is available and has values
     if "pop_share" in crosswalk.columns:
-        # Check if pop_share has any non-null values
         has_pop_share = crosswalk["pop_share"].notna().any()
         if has_pop_share:
             pop_coverage = grouped["pop_share"].sum().reset_index()
-            pop_coverage.columns = ["coc_id", "coverage_ratio_pop"]
-            diagnostics = diagnostics.merge(pop_coverage, on="coc_id", how="left")
+            pop_coverage.columns = [geo_id_col, "coverage_ratio_pop"]
+            diagnostics = diagnostics.merge(pop_coverage, on=geo_id_col, how="left")
         else:
             diagnostics["coverage_ratio_pop"] = pd.NA
     else:
@@ -69,7 +75,7 @@ def compute_crosswalk_diagnostics(crosswalk: pd.DataFrame) -> pd.DataFrame:
 
     # Reorder columns for clarity
     col_order = [
-        "coc_id",
+        geo_id_col,
         "num_tracts",
         "max_tract_contribution",
         "coverage_ratio_area",
@@ -77,46 +83,50 @@ def compute_crosswalk_diagnostics(crosswalk: pd.DataFrame) -> pd.DataFrame:
     ]
     diagnostics = diagnostics[col_order]
 
-    return diagnostics.sort_values("coc_id").reset_index(drop=True)
+    return diagnostics.sort_values(geo_id_col).reset_index(drop=True)
 
 
 def compute_measure_diagnostics(
     area_measures: pd.DataFrame,
     pop_measures: pd.DataFrame,
+    *,
+    geo_id_col: str = "coc_id",
 ) -> pd.DataFrame:
     """Compare area vs population weighted measures.
 
     Computes the difference between area-weighted and population-weighted
-    estimates for each CoC and measure, helping identify where weighting
-    method significantly impacts results.
+    estimates for each geography unit and measure, helping identify where
+    weighting method significantly impacts results.
 
     Parameters
     ----------
     area_measures : pd.DataFrame
-        CoC-level measures computed with area weighting.
-        Must have 'coc_id' column.
+        Measures computed with area weighting.
+        Must have ``geo_id_col`` column.
     pop_measures : pd.DataFrame
-        CoC-level measures computed with population weighting.
-        Must have 'coc_id' column.
+        Measures computed with population weighting.
+        Must have ``geo_id_col`` column.
+    geo_id_col : str
+        Name of the geography identifier column.  Defaults to ``"coc_id"``.
 
     Returns
     -------
     pd.DataFrame
-        Diagnostics per CoC with columns:
-        - coc_id: CoC identifier
+        Diagnostics per geography unit with columns:
+        - ``geo_id_col``: Geography identifier
         - {measure}_area: Area-weighted value
         - {measure}_pop: Population-weighted value
         - {measure}_delta: Difference (area - pop)
         - {measure}_pct_diff: Percentage difference
     """
-    if "coc_id" not in area_measures.columns:
-        raise ValueError("area_measures must have 'coc_id' column")
-    if "coc_id" not in pop_measures.columns:
-        raise ValueError("pop_measures must have 'coc_id' column")
+    if geo_id_col not in area_measures.columns:
+        raise ValueError(f"area_measures must have '{geo_id_col}' column")
+    if geo_id_col not in pop_measures.columns:
+        raise ValueError(f"pop_measures must have '{geo_id_col}' column")
 
     # Identify numeric measure columns (exclude metadata)
     exclude_cols = {
-        "coc_id",
+        geo_id_col,
         "boundary_vintage",
         "acs_vintage",
         "weighting_method",
@@ -141,16 +151,16 @@ def compute_measure_diagnostics(
     if not common_measures:
         raise ValueError("No common numeric measures found between area and pop DataFrames")
 
-    # Merge on coc_id
-    merged = area_measures[["coc_id"] + list(common_measures)].merge(
-        pop_measures[["coc_id"] + list(common_measures)],
-        on="coc_id",
+    # Merge on geo_id_col
+    merged = area_measures[[geo_id_col] + list(common_measures)].merge(
+        pop_measures[[geo_id_col] + list(common_measures)],
+        on=geo_id_col,
         suffixes=("_area", "_pop"),
         how="outer",
     )
 
     # Compute deltas for each measure
-    result_cols = ["coc_id"]
+    result_cols = [geo_id_col]
 
     for measure in sorted(common_measures):
         area_col = f"{measure}_area"
@@ -167,7 +177,7 @@ def compute_measure_diagnostics(
 
         result_cols.extend([area_col, pop_col, delta_col, pct_diff_col])
 
-    return merged[result_cols].sort_values("coc_id").reset_index(drop=True)
+    return merged[result_cols].sort_values(geo_id_col).reset_index(drop=True)
 
 
 def summarize_diagnostics(diagnostics: pd.DataFrame) -> str:
@@ -290,14 +300,16 @@ def summarize_diagnostics(diagnostics: pd.DataFrame) -> str:
     return "\n".join(lines)
 
 
-def identify_problem_cocs(
+def identify_problem_geos(
     diagnostics: pd.DataFrame,
     coverage_threshold: float = 0.95,
     max_contribution_threshold: float = 0.8,
+    *,
+    geo_id_col: str = "coc_id",
 ) -> pd.DataFrame:
-    """Identify CoCs with potential attribution problems.
+    """Identify geography units with potential attribution problems.
 
-    Flags CoCs that may have data quality issues based on crosswalk
+    Flags units that may have data quality issues based on crosswalk
     diagnostics.
 
     Parameters
@@ -305,50 +317,70 @@ def identify_problem_cocs(
     diagnostics : pd.DataFrame
         Diagnostics from compute_crosswalk_diagnostics.
     coverage_threshold : float
-        CoCs with coverage below this are flagged. Default 0.95.
+        Units with coverage below this are flagged. Default 0.95.
     max_contribution_threshold : float
-        CoCs with max_tract_contribution above this are flagged. Default 0.8.
+        Units with max_tract_contribution above this are flagged. Default 0.8.
+    geo_id_col : str
+        Name of the geography identifier column.  Defaults to ``"coc_id"``.
 
     Returns
     -------
     pd.DataFrame
-        Subset of diagnostics for flagged CoCs with additional 'issues' column.
+        Subset of diagnostics for flagged units with additional 'issues' column.
     """
     issues = []
 
     for _idx, row in diagnostics.iterrows():
-        coc_issues = []
+        geo_issues = []
 
         # Check area coverage
         if "coverage_ratio_area" in row and row["coverage_ratio_area"] < coverage_threshold:
-            coc_issues.append(f"low_area_coverage ({row['coverage_ratio_area']:.3f})")
+            geo_issues.append(f"low_area_coverage ({row['coverage_ratio_area']:.3f})")
 
         # Check if single tract dominates
         if (
             "max_tract_contribution" in row
             and row["max_tract_contribution"] > max_contribution_threshold
         ):
-            coc_issues.append(f"high_tract_concentration ({row['max_tract_contribution']:.3f})")
+            geo_issues.append(f"high_tract_concentration ({row['max_tract_contribution']:.3f})")
 
         # Check population coverage if available
         if "coverage_ratio_pop" in row and pd.notna(row["coverage_ratio_pop"]):
             if row["coverage_ratio_pop"] < coverage_threshold:
-                coc_issues.append(f"low_pop_coverage ({row['coverage_ratio_pop']:.3f})")
+                geo_issues.append(f"low_pop_coverage ({row['coverage_ratio_pop']:.3f})")
 
-        if coc_issues:
+        if geo_issues:
             issues.append(
                 {
-                    "coc_id": row["coc_id"],
-                    "issues": "; ".join(coc_issues),
+                    geo_id_col: row[geo_id_col],
+                    "issues": "; ".join(geo_issues),
                 }
             )
 
     if not issues:
-        return pd.DataFrame(columns=["coc_id", "issues"])
+        return pd.DataFrame(columns=[geo_id_col, "issues"])
 
-    problem_cocs = pd.DataFrame(issues)
-    problem_cocs = problem_cocs.merge(diagnostics, on="coc_id", how="left")
+    problem_geos = pd.DataFrame(issues)
+    problem_geos = problem_geos.merge(diagnostics, on=geo_id_col, how="left")
 
-    # Reorder to put issues first after coc_id
-    cols = ["coc_id", "issues"] + [c for c in problem_cocs.columns if c not in ["coc_id", "issues"]]
-    return problem_cocs[cols]
+    # Reorder to put issues first after geo_id_col
+    cols = [geo_id_col, "issues"] + [c for c in problem_geos.columns if c not in [geo_id_col, "issues"]]
+    return problem_geos[cols]
+
+
+def identify_problem_cocs(
+    diagnostics: pd.DataFrame,
+    coverage_threshold: float = 0.95,
+    max_contribution_threshold: float = 0.8,
+) -> pd.DataFrame:
+    """Identify CoCs with potential attribution problems.
+
+    Convenience wrapper around :func:`identify_problem_geos` with
+    ``geo_id_col="coc_id"``.  See that function for full documentation.
+    """
+    return identify_problem_geos(
+        diagnostics,
+        coverage_threshold,
+        max_contribution_threshold,
+        geo_id_col="coc_id",
+    )

@@ -177,8 +177,38 @@ _XWALK_JOIN_KEYS: dict[str, str] = {
 
 # Auto-detect candidates for geo-ID and year columns.
 _GEO_CANDIDATES: list[str] = [
-    "geo_id", "GEOID", "geoid", "coc_id", "tract_geoid", "county_fips",
+    "geo_id", "GEOID", "geoid", "coc_id", "metro_id", "tract_geoid", "county_fips",
 ]
+
+# Columns in crosswalks that are NOT the target geography identifier.
+_XWALK_NON_GEO_COLS: set[str] = {
+    "tract_geoid", "county_fips", "area_share", "pop_share",
+    "intersection_area", "tract_area", "county_area", "coc_area", "geo_area",
+    "boundary_vintage", "tract_vintage", "definition_version",
+}
+
+
+def _detect_xwalk_target_col(
+    xwalk: pd.DataFrame,
+    source_key: str,
+) -> str:
+    """Detect the target geography column in a crosswalk.
+
+    Finds the geo-ID column by looking for known candidates that aren't
+    the source join key.  Falls back to ``"coc_id"`` if detection fails.
+    """
+    candidates = [
+        c for c in xwalk.columns
+        if c not in _XWALK_NON_GEO_COLS and c != source_key
+        and c in {"coc_id", "metro_id", "geo_id"}
+    ]
+    if len(candidates) == 1:
+        return candidates[0]
+    # Prefer more specific names
+    for c in ("coc_id", "metro_id", "geo_id"):
+        if c in candidates:
+            return c
+    return "coc_id"  # legacy default
 _YEAR_CANDIDATES: list[str] = ["year", "pit_year"]
 
 
@@ -383,8 +413,11 @@ def _resample_aggregate(
         )
     has_pop_share = "pop_share" in xwalk.columns and xwalk["pop_share"].notna().any()
 
+    # Detect the target geography column in the crosswalk
+    target_col = _detect_xwalk_target_col(xwalk, xwalk_key)
+
     # Merge dataset with crosswalk
-    xwalk_cols = ["coc_id", xwalk_key, "area_share"]
+    xwalk_cols = [target_col, xwalk_key, "area_share"]
     if "pop_share" in xwalk.columns:
         xwalk_cols.append("pop_share")
     merged = df.merge(
@@ -429,23 +462,23 @@ def _resample_aggregate(
     for m, agg in measure_aggs.items():
         agg_groups.setdefault(agg, []).append(m)
 
-    # Aggregate per CoC, per method
+    # Aggregate per geography unit, per method
     result_parts: list[pd.DataFrame] = []
     for agg, measures in agg_groups.items():
         if agg == "sum":
             part = merged.copy()
             for m in measures:
                 part[m] = part[m] * part["area_share"]
-            result_parts.append(part.groupby("coc_id")[measures].sum().reset_index())
+            result_parts.append(part.groupby(target_col)[measures].sum().reset_index())
         elif agg == "mean":
-            result_parts.append(merged.groupby("coc_id")[measures].mean().reset_index())
+            result_parts.append(merged.groupby(target_col)[measures].mean().reset_index())
         elif agg == "weighted_mean":
             weight_col = "pop_share" if has_pop_share else "area_share"
             rows = []
-            for coc_id, group in merged.groupby("coc_id"):
+            for geo_id, group in merged.groupby(target_col):
                 w = group[weight_col].values
                 w_sum = w.sum()
-                row: dict[str, object] = {"coc_id": coc_id}
+                row: dict[str, object] = {target_col: geo_id}
                 for m in measures:
                     vals = group[m].values
                     mask = ~np.isnan(vals)
@@ -461,12 +494,13 @@ def _resample_aggregate(
                 f"dataset '{task.dataset_id}'."
             )
 
-    # Merge all result parts on coc_id
+    # Merge all result parts on target column
     result = result_parts[0]
     for part in result_parts[1:]:
-        result = result.merge(part, on="coc_id", how="outer")
+        result = result.merge(part, on=target_col, how="outer")
 
-    result = result.rename(columns={"coc_id": "geo_id"})
+    if target_col != "geo_id":
+        result = result.rename(columns={target_col: "geo_id"})
     result["year"] = task.year
     return result
 
@@ -481,7 +515,7 @@ def _resample_allocate(
     _validate_columns(df, task.measures, task.dataset_id, task.year)
 
     # For allocate, the target geometry is finer-grained.
-    # The crosswalk connects target (fine) ↔ source (coarse).
+    # The crosswalk connects target (fine) <-> source (coarse).
     target_type = task.to_geometry.type
     target_key = _XWALK_JOIN_KEYS.get(target_type)
     if target_key is None or target_key not in xwalk.columns:
@@ -499,11 +533,14 @@ def _resample_allocate(
             f"Available: {sorted(xwalk.columns)}"
         )
 
+    # Detect the source geography column in the crosswalk
+    source_col = _detect_xwalk_target_col(xwalk, target_key)
+
     # Merge dataset (coarse) with crosswalk
     merged = df.merge(
-        xwalk[["coc_id", target_key, weight_col]],
+        xwalk[[source_col, target_key, weight_col]],
         left_on=geo_col,
-        right_on="coc_id",
+        right_on=source_col,
         how="inner",
     )
 

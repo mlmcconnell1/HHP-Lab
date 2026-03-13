@@ -1,4 +1,10 @@
-"""CoC-County area-weighted crosswalk generation."""
+"""Area-weighted county crosswalk generation.
+
+Provides geometry-neutral crosswalk builders that work with any
+analysis geography (CoC, metro, etc.) via the ``geo_id_col`` parameter.
+The legacy ``build_coc_county_crosswalk`` name is preserved as a
+convenience wrapper.
+"""
 
 from pathlib import Path
 
@@ -9,58 +15,62 @@ import pandas as pd
 ALBERS_EQUAL_AREA_CRS = "ESRI:102003"
 
 
-def build_coc_county_crosswalk(
-    coc_gdf: gpd.GeoDataFrame,
+def build_county_crosswalk(
+    geo_gdf: gpd.GeoDataFrame,
     county_gdf: gpd.GeoDataFrame,
     boundary_vintage: str,
+    *,
+    geo_id_col: str = "coc_id",
 ) -> pd.DataFrame:
-    """Build area-weighted crosswalk between CoC boundaries and counties.
+    """Build area-weighted crosswalk between analysis geometries and counties.
 
     Uses geopandas overlay to compute intersections and calculate:
     area_share = intersection_area / county_area
 
     Parameters
     ----------
-    coc_gdf : gpd.GeoDataFrame
-        CoC boundary geometries with 'coc_id' column.
+    geo_gdf : gpd.GeoDataFrame
+        Analysis geometry boundaries with a ``geo_id_col`` column.
     county_gdf : gpd.GeoDataFrame
         County geometries with 'GEOID' column.
     boundary_vintage : str
-        Version identifier for CoC boundaries (e.g., "2024").
+        Version identifier for analysis boundaries (e.g., "2024").
+    geo_id_col : str
+        Name of the geography identifier column in *geo_gdf*.
+        Defaults to ``"coc_id"`` for backward compatibility.
 
     Returns
     -------
     pd.DataFrame
         Crosswalk with columns:
-        - coc_id
+        - ``geo_id_col`` (e.g., coc_id or metro_id)
         - boundary_vintage
         - county_fips
-        - area_share (intersection_area / county_area, for county→CoC aggregation)
+        - area_share (intersection_area / county_area, for county->geo aggregation)
         - intersection_area (square meters in ESRI:102003)
         - county_area (square meters in ESRI:102003)
-        - coc_area (square meters in ESRI:102003)
+        - geo_area (square meters in ESRI:102003)
     """
     # Ensure required columns exist
-    if "coc_id" not in coc_gdf.columns:
-        raise ValueError("coc_gdf must have 'coc_id' column")
+    if geo_id_col not in geo_gdf.columns:
+        raise ValueError(f"geo_gdf must have '{geo_id_col}' column")
     if "GEOID" not in county_gdf.columns:
         raise ValueError("county_gdf must have 'GEOID' column")
 
     # Reproject to equal-area for accurate area calculation
-    coc_proj = coc_gdf.to_crs(ALBERS_EQUAL_AREA_CRS)
+    geo_proj = geo_gdf.to_crs(ALBERS_EQUAL_AREA_CRS)
     county_proj = county_gdf.to_crs(ALBERS_EQUAL_AREA_CRS)
 
-    # Calculate CoC areas before overlay
-    coc_proj = coc_proj.copy()
-    coc_proj["coc_area"] = coc_proj.geometry.area
+    # Calculate geometry areas before overlay
+    geo_proj = geo_proj.copy()
+    geo_proj["geo_area"] = geo_proj.geometry.area
 
-    # Calculate county areas before overlay
     county_proj = county_proj.copy()
     county_proj["county_area"] = county_proj.geometry.area
 
     # Compute intersection with gpd.overlay()
     intersections = gpd.overlay(
-        coc_proj[["coc_id", "coc_area", "geometry"]],
+        geo_proj[[geo_id_col, "geo_area", "geometry"]],
         county_proj[["GEOID", "county_area", "geometry"]],
         how="intersection",
         keep_geom_type=False,
@@ -69,26 +79,49 @@ def build_coc_county_crosswalk(
     # Calculate intersection areas
     intersections["intersection_area"] = intersections.geometry.area
 
-    # Calculate area share (intersection / county) for county→CoC aggregation
+    # Calculate area share (intersection / county) for county->geo aggregation
     intersections["area_share"] = intersections["intersection_area"] / intersections["county_area"]
 
     # Build crosswalk DataFrame with all area columns
     crosswalk = pd.DataFrame(
         {
-            "coc_id": intersections["coc_id"],
+            geo_id_col: intersections[geo_id_col],
             "boundary_vintage": boundary_vintage,
             "county_fips": intersections["GEOID"],
             "area_share": intersections["area_share"],
             "intersection_area": intersections["intersection_area"],
             "county_area": intersections["county_area"],
-            "coc_area": intersections["coc_area"],
+            "geo_area": intersections["geo_area"],
         }
     )
 
-    # Sort by coc_id and county_fips for consistent output
-    crosswalk = crosswalk.sort_values(["coc_id", "county_fips"]).reset_index(drop=True)
+    # Sort for consistent output
+    crosswalk = crosswalk.sort_values([geo_id_col, "county_fips"]).reset_index(drop=True)
 
     return crosswalk
+
+
+def build_coc_county_crosswalk(
+    coc_gdf: gpd.GeoDataFrame,
+    county_gdf: gpd.GeoDataFrame,
+    boundary_vintage: str,
+) -> pd.DataFrame:
+    """Build area-weighted crosswalk between CoC boundaries and counties.
+
+    Convenience wrapper around :func:`build_county_crosswalk` with
+    ``geo_id_col="coc_id"``.  See that function for full documentation.
+
+    Note: the output column ``geo_area`` is named ``coc_area`` for
+    backward compatibility.
+    """
+    result = build_county_crosswalk(
+        coc_gdf,
+        county_gdf,
+        boundary_vintage,
+        geo_id_col="coc_id",
+    )
+    # Rename geo_area -> coc_area for backward compatibility
+    return result.rename(columns={"geo_area": "coc_area"})
 
 
 def save_county_crosswalk(
@@ -102,7 +135,7 @@ def save_county_crosswalk(
     Parameters
     ----------
     crosswalk : pd.DataFrame
-        Crosswalk DataFrame from build_coc_county_crosswalk.
+        Crosswalk DataFrame from build_county_crosswalk.
     boundary_vintage : str
         Version identifier for CoC boundaries.
     county_vintage : str | int

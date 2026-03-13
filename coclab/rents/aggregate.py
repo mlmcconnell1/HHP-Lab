@@ -314,29 +314,33 @@ def load_weights(
 # =============================================================================
 
 
-def compute_coc_county_weights(
+def compute_geo_county_weights(
     xwalk_df: pd.DataFrame,
     weights_df: pd.DataFrame,
+    *,
+    geo_id_col: str = "coc_id",
 ) -> pd.DataFrame:
-    """Compute CoC-county weights combining crosswalk area shares with ACS weights.
+    """Compute geography-county weights combining crosswalk area shares with ACS weights.
 
-    The combined weight w_ij for county j in CoC i is:
+    The combined weight w_ij for county j in geography unit i is:
         w_ij = area_share_ij * weight_value_j / sum_k(area_share_ik * weight_value_k)
 
-    This produces weights that sum to 1 per CoC.
+    This produces weights that sum to 1 per geography unit.
 
     Parameters
     ----------
     xwalk_df : pd.DataFrame
-        Crosswalk with columns: coc_id, county_fips, area_share
+        Crosswalk with columns: ``geo_id_col``, county_fips, area_share
     weights_df : pd.DataFrame
         County weights with columns: county_fips, weight_value
+    geo_id_col : str
+        Name of the geography identifier column.  Defaults to ``"coc_id"``.
 
     Returns
     -------
     pd.DataFrame
-        Combined weights with columns: coc_id, county_fips, weight
-        where weights sum to 1 per CoC.
+        Combined weights with columns: ``geo_id_col``, county_fips, weight
+        where weights sum to 1 per geography unit.
     """
     # Merge crosswalk with ACS weights
     merged = xwalk_df.merge(
@@ -358,22 +362,34 @@ def compute_coc_county_weights(
     # Compute raw weighted contribution: area_share * weight_value
     merged["raw_weight"] = merged["area_share"] * merged["weight_value"]
 
-    # Normalize to sum to 1 per CoC
-    coc_totals = merged.groupby("coc_id")["raw_weight"].sum().reset_index()
-    coc_totals.columns = ["coc_id", "coc_total_weight"]
+    # Normalize to sum to 1 per geography unit
+    geo_totals = merged.groupby(geo_id_col)["raw_weight"].sum().reset_index()
+    geo_totals.columns = [geo_id_col, "geo_total_weight"]
 
-    merged = merged.merge(coc_totals, on="coc_id")
-    merged["weight"] = merged["raw_weight"] / merged["coc_total_weight"]
+    merged = merged.merge(geo_totals, on=geo_id_col)
+    merged["weight"] = merged["raw_weight"] / merged["geo_total_weight"]
 
     # Select final columns
-    result = merged[["coc_id", "county_fips", "weight", "area_share"]].copy()
+    result = merged[[geo_id_col, "county_fips", "weight", "area_share"]].copy()
 
     logger.info(
-        f"Computed weights for {result['coc_id'].nunique()} CoCs "
+        f"Computed weights for {result[geo_id_col].nunique()} geography units "
         f"covering {result['county_fips'].nunique()} counties"
     )
 
     return result
+
+
+def compute_coc_county_weights(
+    xwalk_df: pd.DataFrame,
+    weights_df: pd.DataFrame,
+) -> pd.DataFrame:
+    """Compute CoC-county weights.
+
+    Convenience wrapper around :func:`compute_geo_county_weights` with
+    ``geo_id_col="coc_id"``.  See that function for full documentation.
+    """
+    return compute_geo_county_weights(xwalk_df, weights_df, geo_id_col="coc_id")
 
 
 # =============================================================================
@@ -386,94 +402,87 @@ def aggregate_monthly(
     xwalk_df: pd.DataFrame,
     weights_df: pd.DataFrame,
     min_coverage: float = DEFAULT_MIN_COVERAGE,
+    *,
+    geo_id_col: str = "coc_id",
 ) -> pd.DataFrame:
-    """Aggregate county ZORI to CoC level for each month.
+    """Aggregate county ZORI to geography level for each month.
 
-    Implements the aggregation formula from spec section 5.2:
+    Implements the aggregation formula:
     - coverage_ratio_it = sum_{j in A_it} w_ij
-    - zori_coc_it = sum_{j in A_it} (w_ij / coverage_ratio_it) * zori_jt
+    - zori_geo_it = sum_{j in A_it} (w_ij / coverage_ratio_it) * zori_jt
 
-    Where A_it is the set of counties with ZORI available for CoC i at month t.
+    Where A_it is the set of counties with ZORI available for geo unit i
+    at month t.
 
     Parameters
     ----------
     zori_df : pd.DataFrame
         ZORI data with columns: geo_id (county FIPS), date, zori
     xwalk_df : pd.DataFrame
-        CoC-county crosswalk with columns: coc_id, county_fips, area_share
+        County crosswalk with columns: ``geo_id_col``, county_fips, area_share
     weights_df : pd.DataFrame
         County weights with columns: county_fips, weight_value
     min_coverage : float
-        Minimum coverage ratio threshold. CoC-months below this threshold
+        Minimum coverage ratio threshold. Geo-months below this threshold
         will have zori_coc set to null. Default 0.90.
+    geo_id_col : str
+        Name of the geography identifier column.  Defaults to ``"coc_id"``.
 
     Returns
     -------
     pd.DataFrame
         Aggregated ZORI with columns:
-        - coc_id, date, zori_coc
+        - ``geo_id_col``, date, zori_coc
         - coverage_ratio, max_geo_contribution, geo_count
     """
-    # Compute combined CoC-county weights
-    coc_weights = compute_coc_county_weights(xwalk_df, weights_df)
+    # Compute combined geo-county weights
+    geo_weights = compute_geo_county_weights(xwalk_df, weights_df, geo_id_col=geo_id_col)
 
     # Rename zori columns for merge
     zori = zori_df[["geo_id", "date", "zori"]].copy()
     zori = zori.rename(columns={"geo_id": "county_fips"})
 
-    # Get unique CoCs and dates
-    all_cocs = coc_weights["coc_id"].unique()
+    # Get unique geos and dates
+    all_geos = geo_weights[geo_id_col].unique()
     all_dates = zori["date"].unique()
 
-    logger.info(f"Aggregating {len(all_dates)} months for {len(all_cocs)} CoCs")
+    logger.info(f"Aggregating {len(all_dates)} months for {len(all_geos)} geography units")
 
-    # Create full CoC x date grid
-    coc_date_grid = pd.DataFrame(
+    # Create full geo x date grid
+    geo_date_grid = pd.DataFrame(
         {
-            "coc_id": list(all_cocs) * len(all_dates),
-            "date": [d for d in all_dates for _ in range(len(all_cocs))],
+            geo_id_col: list(all_geos) * len(all_dates),
+            "date": [d for d in all_dates for _ in range(len(all_geos))],
         }
     )
-    # Sort for consistent ordering
-    coc_date_grid = coc_date_grid.sort_values(["coc_id", "date"]).reset_index(drop=True)
+    geo_date_grid = geo_date_grid.sort_values([geo_id_col, "date"]).reset_index(drop=True)
 
     # Merge weights with ZORI data to get available county-months
-    merged = coc_weights.merge(zori, on="county_fips", how="inner")
+    merged = geo_weights.merge(zori, on="county_fips", how="inner")
 
-    # Group by CoC and date to compute aggregations
+    # Group by geo unit and date to compute aggregations
     results = []
 
-    for (coc_id, date_val), group in merged.groupby(["coc_id", "date"]):
-        # Counties with ZORI available for this CoC-month
+    for (geo_id, date_val), group in merged.groupby([geo_id_col, "date"]):
         available_weights = group["weight"].sum()
-
-        # Coverage ratio is the sum of weights for available counties
         coverage_ratio = available_weights
 
         if coverage_ratio > 0:
-            # Normalize weights within available counties
             normalized_weights = group["weight"] / coverage_ratio
-
-            # Weighted mean ZORI
             zori_coc = (normalized_weights * group["zori"]).sum()
-
-            # Max contribution (dominance metric)
             max_contribution = normalized_weights.max()
-
-            # Count of contributing counties
             geo_count = len(group)
         else:
             zori_coc = None
             max_contribution = None
             geo_count = 0
 
-        # Apply coverage threshold
         if coverage_ratio < min_coverage:
             zori_coc = None
 
         results.append(
             {
-                "coc_id": coc_id,
+                geo_id_col: geo_id,
                 "date": date_val,
                 "zori_coc": zori_coc,
                 "coverage_ratio": coverage_ratio,
@@ -484,25 +493,22 @@ def aggregate_monthly(
 
     result_df = pd.DataFrame(results)
 
-    # Merge with full grid to include CoC-months with zero coverage
-    full_result = coc_date_grid.merge(
+    # Merge with full grid to include geo-months with zero coverage
+    full_result = geo_date_grid.merge(
         result_df,
-        on=["coc_id", "date"],
+        on=[geo_id_col, "date"],
         how="left",
     )
 
-    # Fill missing coverage ratios with 0 (no data available)
     full_result["coverage_ratio"] = full_result["coverage_ratio"].fillna(0.0)
     full_result["geo_count"] = full_result["geo_count"].fillna(0).astype(int)
 
-    # Sort output
-    full_result = full_result.sort_values(["coc_id", "date"]).reset_index(drop=True)
+    full_result = full_result.sort_values([geo_id_col, "date"]).reset_index(drop=True)
 
-    # Log coverage statistics
     valid_count = full_result["zori_coc"].notna().sum()
     total_count = len(full_result)
     logger.info(
-        f"Aggregation complete: {valid_count}/{total_count} CoC-months "
+        f"Aggregation complete: {valid_count}/{total_count} geo-months "
         f"({100 * valid_count / total_count:.1f}%) have valid ZORI "
         f"(coverage >= {min_coverage})"
     )
@@ -518,31 +524,34 @@ def aggregate_monthly(
 def collapse_to_yearly(
     monthly_df: pd.DataFrame,
     method: YearlyMethod = "pit_january",
+    *,
+    geo_id_col: str = "coc_id",
 ) -> pd.DataFrame:
-    """Collapse monthly CoC ZORI to yearly values.
+    """Collapse monthly ZORI to yearly values.
 
     Parameters
     ----------
     monthly_df : pd.DataFrame
-        Monthly CoC ZORI with columns: coc_id, date, zori_coc, coverage_ratio, ...
+        Monthly ZORI with columns: ``geo_id_col``, date, zori_coc,
+        coverage_ratio, ...
     method : str
         Yearly collapse method:
         - "pit_january": Select January value (aligns with PIT count timing)
         - "calendar_mean": Mean of all months in year
         - "calendar_median": Median of all months in year
+    geo_id_col : str
+        Name of the geography identifier column.  Defaults to ``"coc_id"``.
 
     Returns
     -------
     pd.DataFrame
-        Yearly CoC ZORI with columns:
-        - coc_id, year, zori_coc, coverage_ratio, method, ...
+        Yearly ZORI with columns:
+        - ``geo_id_col``, year, zori_coc, coverage_ratio, method, ...
     """
-    # Extract year from date
     df = monthly_df.copy()
     df["year"] = df["date"].dt.year
 
     if method == "pit_january":
-        # Filter to January only
         january = df[df["date"].dt.month == 1].copy()
         result = january.drop(columns=["date"]).rename(
             columns={
@@ -551,25 +560,23 @@ def collapse_to_yearly(
         )
 
     elif method == "calendar_mean":
-        # Group by CoC and year, compute mean
         agg_funcs = {
             "zori_coc": "mean",
             "coverage_ratio": "mean",
             "max_geo_contribution": "mean",
             "geo_count": "mean",
         }
-        result = df.groupby(["coc_id", "year"]).agg(agg_funcs).reset_index()
+        result = df.groupby([geo_id_col, "year"]).agg(agg_funcs).reset_index()
         result["geo_count"] = result["geo_count"].round().astype(int)
 
     elif method == "calendar_median":
-        # Group by CoC and year, compute median
         agg_funcs = {
             "zori_coc": "median",
             "coverage_ratio": "median",
             "max_geo_contribution": "median",
             "geo_count": "median",
         }
-        result = df.groupby(["coc_id", "year"]).agg(agg_funcs).reset_index()
+        result = df.groupby([geo_id_col, "year"]).agg(agg_funcs).reset_index()
         result["geo_count"] = result["geo_count"].round().astype(int)
 
     else:
@@ -579,9 +586,9 @@ def collapse_to_yearly(
         )
 
     result["method"] = method
-    result = result.sort_values(["coc_id", "year"]).reset_index(drop=True)
+    result = result.sort_values([geo_id_col, "year"]).reset_index(drop=True)
 
-    logger.info(f"Collapsed to yearly using '{method}': {len(result)} CoC-year records")
+    logger.info(f"Collapsed to yearly using '{method}': {len(result)} geo-year records")
     return result
 
 
