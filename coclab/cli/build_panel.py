@@ -340,6 +340,16 @@ def build_panel_cmd(
 
     conformance_report = None
     if not skip_conformance:
+        # Derive expected_geo_count from an independent source, not the panel
+        # itself.  For metro panels the definition encodes a fixed count; for
+        # CoC panels we have no single authoritative count so we leave it to
+        # the check to skip.
+        independent_geo_count: int | None = None
+        if resolved_geo_type == "metro":
+            from coclab.metro.definitions import METRO_COUNT
+
+            independent_geo_count = METRO_COUNT
+
         conformance_request = PanelRequest(
             start_year=start,
             end_year=end,
@@ -347,7 +357,7 @@ def build_panel_cmd(
             weighting_method=weighting,  # type: ignore[arg-type]
             zori_min_coverage=zori_min_coverage,
             geo_type=resolved_geo_type,
-            expected_geo_count=int(panel_df[resolve_geo_col(panel_df)].nunique()),
+            expected_geo_count=independent_geo_count,
         )
         conformance_report = run_conformance(panel_df, conformance_request)
         typer.echo("")
@@ -466,26 +476,6 @@ def build_panel_cmd(
                 rti_median = panel_df["rent_to_income"].median()
                 typer.echo(f"  Mean rent_to_income: {rti_mean:.3f}")
                 typer.echo(f"  Median rent_to_income: {rti_median:.3f}")
-
-    # ---- Post-build conformance checks ----
-    if not skip_conformance:
-        import sys
-
-        from coclab.panel.conformance import PanelRequest, run_conformance
-
-        panel_request = PanelRequest(
-            start_year=start,
-            end_year=end,
-            include_zori=include_zori,
-            weighting_method=weighting,
-            zori_min_coverage=zori_min_coverage,
-        )
-        conformance_report = run_conformance(panel_df, panel_request)
-        typer.echo("")
-        print(conformance_report.summary(), file=sys.stderr)
-
-        if conformance_report.errors and strict:
-            sys.exit(1)
 
     typer.echo("")
     typer.echo(f"Output: {output_path}")

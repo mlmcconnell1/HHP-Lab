@@ -90,6 +90,8 @@ def _parquet_meta(path: Path) -> dict[str, object]:
                 "acs_vintage": pdict.get("acs_vintage"),
                 "weighting": pdict.get("weighting"),
                 "notation": pdict.get("notation"),
+                "geo_type": pdict.get("geo_type"),
+                "definition_version": pdict.get("definition_version"),
             }
         else:
             meta["provenance"] = None
@@ -121,6 +123,27 @@ def _scan_scope(root: Path, scope: str) -> list[dict[str, object]]:
     return items
 
 
+def _matches_definition_version(entry: dict[str, object], defn_version: str) -> bool:
+    """Check if an artifact matches the requested definition_version.
+
+    Matches against provenance metadata and, as a fallback, against the
+    ``@D{token}`` segment in the filename.
+    """
+    from coclab.naming import _normalize_definition_version
+
+    norm = _normalize_definition_version(defn_version)
+
+    # Check provenance metadata first
+    prov = entry.get("provenance")
+    if isinstance(prov, dict) and prov.get("definition_version") is not None:
+        prov_defn = prov["definition_version"]
+        return _normalize_definition_version(str(prov_defn)) == norm
+
+    # Fallback: match @D{token} in filename
+    rel = str(entry.get("relative_path", ""))
+    return f"@D{norm}" in rel.lower()
+
+
 def list_artifacts(
     build: Annotated[
         str,
@@ -144,6 +167,20 @@ def list_artifacts(
             help="Emit machine-readable JSON output.",
         ),
     ] = False,
+    definition_version: Annotated[
+        str | None,
+        typer.Option(
+            "--definition-version",
+            help="Filter metro artifacts to this definition version.",
+        ),
+    ] = None,
+    geo_type: Annotated[
+        str | None,
+        typer.Option(
+            "--geo-type",
+            help="Filter artifacts by geo type ('coc' or 'metro').",
+        ),
+    ] = None,
 ) -> None:
     """List build and curated artifacts with lightweight metadata.
 
@@ -163,6 +200,33 @@ def list_artifacts(
 
     if include_global:
         artifacts.extend(_scan_scope(Path("data/curated"), scope="global"))
+
+    # Filter by geo_type when requested
+    if geo_type is not None:
+        is_metro = geo_type == "metro"
+        filtered: list[dict[str, object]] = []
+        for art in artifacts:
+            rel = str(art.get("relative_path", ""))
+            prov = art.get("provenance")
+            prov_geo = prov.get("geo_type") if isinstance(prov, dict) else None
+
+            if prov_geo is not None:
+                if prov_geo == geo_type:
+                    filtered.append(art)
+            elif is_metro:
+                if "__metro__" in rel:
+                    filtered.append(art)
+            else:
+                if "__metro__" not in rel:
+                    filtered.append(art)
+        artifacts = filtered
+
+    # Filter by definition_version when requested
+    if definition_version is not None:
+        artifacts = [
+            art for art in artifacts
+            if _matches_definition_version(art, definition_version)
+        ]
 
     artifacts.sort(key=lambda x: (str(x["scope"]), str(x["role"]), str(x["path"])))
 
