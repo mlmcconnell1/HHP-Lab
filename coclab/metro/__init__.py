@@ -10,6 +10,7 @@ from coclab.metro.definitions import (
     build_county_membership_df,
     build_definitions_df,
 )
+from coclab.metro.pit import aggregate_pit_to_metro
 from coclab.metro.validate import validate_metro_artifacts
 
 __all__ = [
@@ -21,5 +22,6 @@ __all__ = [
     "build_definitions_df",
     "build_coc_membership_df",
     "build_county_membership_df",
+    "aggregate_pit_to_metro",
     "validate_metro_artifacts",
 ]
