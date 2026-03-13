@@ -44,6 +44,20 @@ def _json_error(message: str, *, code: int = 1) -> None:
     raise typer.Exit(code=code)
 
 
+def _format_geometry(ref: object) -> str:
+    """Render a GeometryRef-like object for human CLI output."""
+    geo_type = getattr(ref, "type")
+    vintage = getattr(ref, "vintage", None)
+    source = getattr(ref, "source", None)
+    if vintage is not None and source:
+        return f"{geo_type}@{vintage}[{source}]"
+    if vintage is not None:
+        return f"{geo_type}@{vintage}"
+    if source:
+        return f"{geo_type}@{source}"
+    return str(geo_type)
+
+
 def _missing_file_level(
     ds_id: str,
     optional: bool,
@@ -430,10 +444,12 @@ def recipe_plan_cmd(
 
         for rt in plan.resample_tasks:
             geo = rt.effective_geometry
-            geo_str = f"{geo.type}@{geo.vintage}" if geo.vintage else geo.type
+            geo_str = _format_geometry(geo)
+            to_geo_str = _format_geometry(rt.to_geometry)
             line = (
                 f"  [resample] {rt.dataset_id} year={rt.year} "
-                f"method={rt.method} geometry={geo_str}"
+                f"method={rt.method} geometry={geo_str} "
+                f"to={to_geo_str}"
             )
             if rt.transform_id:
                 line += f" via={rt.transform_id}"

@@ -9,6 +9,11 @@ from coclab.recipe.adapters import (
 from coclab.recipe.recipe_schema import DatasetSpec
 
 
+def _uses_materialized_artifact(spec: DatasetSpec) -> bool:
+    """Whether the recipe points at a concrete on-disk artifact."""
+    return spec.path is not None or spec.file_set is not None
+
+
 def _validate_hud_pit(spec: DatasetSpec) -> list[ValidationDiagnostic]:
     """Validate HUD PIT dataset specification."""
     diags: list[ValidationDiagnostic] = []
@@ -19,12 +24,13 @@ def _validate_hud_pit(spec: DatasetSpec) -> list[ValidationDiagnostic]:
                 f"hud/pit: unsupported version {spec.version}; expected 1.",
             )
         )
-    if spec.native_geometry.type != "coc":
+    if spec.native_geometry.type != "coc" and not _uses_materialized_artifact(spec):
         diags.append(
             ValidationDiagnostic(
                 "error",
                 f"hud/pit: expected native_geometry type 'coc', "
-                f"got '{spec.native_geometry.type}'.",
+                f"got '{spec.native_geometry.type}'. Recipes that point to "
+                "pre-materialized derived artifacts must set path or file_set.",
             )
         )
     known_params = {"vintage", "align"}
@@ -59,12 +65,13 @@ def _validate_census_acs5(spec: DatasetSpec) -> list[ValidationDiagnostic]:
                 f"census/acs5: unsupported version {spec.version}; expected 1.",
             )
         )
-    if spec.native_geometry.type != "tract":
+    if spec.native_geometry.type != "tract" and not _uses_materialized_artifact(spec):
         diags.append(
             ValidationDiagnostic(
                 "error",
                 f"census/acs5: expected native_geometry type 'tract', "
-                f"got '{spec.native_geometry.type}'.",
+                f"got '{spec.native_geometry.type}'. Recipes that point to "
+                "pre-materialized derived artifacts must set path or file_set.",
             )
         )
     return diags
@@ -80,12 +87,13 @@ def _validate_census_acs(spec: DatasetSpec) -> list[ValidationDiagnostic]:
                 f"census/acs: unsupported version {spec.version}; expected 1.",
             )
         )
-    if spec.native_geometry.type != "tract":
+    if spec.native_geometry.type != "tract" and not _uses_materialized_artifact(spec):
         diags.append(
             ValidationDiagnostic(
                 "error",
                 f"census/acs: expected native_geometry type 'tract', "
-                f"got '{spec.native_geometry.type}'.",
+                f"got '{spec.native_geometry.type}'. Recipes that point to "
+                "pre-materialized derived artifacts must set path or file_set.",
             )
         )
     return diags
@@ -101,12 +109,13 @@ def _validate_zillow_zori(spec: DatasetSpec) -> list[ValidationDiagnostic]:
                 f"zillow/zori: unsupported version {spec.version}; expected 1.",
             )
         )
-    if spec.native_geometry.type != "county":
+    if spec.native_geometry.type != "county" and not _uses_materialized_artifact(spec):
         diags.append(
             ValidationDiagnostic(
                 "warning",
                 f"zillow/zori: expected native_geometry type 'county', "
-                f"got '{spec.native_geometry.type}'.",
+                f"got '{spec.native_geometry.type}'. Recipes that point to "
+                "pre-materialized derived artifacts must set path or file_set.",
             )
         )
     known_params = {"align", "series", "vintage"}

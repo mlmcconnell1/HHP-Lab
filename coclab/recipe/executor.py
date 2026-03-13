@@ -941,6 +941,50 @@ def _build_manifest(
     )
 
 
+def _target_geometry_metadata(
+    target_geometry: GeometryRef,
+) -> tuple[str, str | None, str | None]:
+    """Return (geo_type, boundary_vintage, definition_version) for a target."""
+    geo_type = target_geometry.type
+    boundary_vintage = (
+        str(target_geometry.vintage)
+        if target_geometry.vintage is not None
+        else None
+    )
+    definition_version = target_geometry.source if geo_type == "metro" else None
+    return geo_type, boundary_vintage, definition_version
+
+
+def _canonicalize_panel_for_target(
+    panel: pd.DataFrame,
+    target_geometry: GeometryRef,
+) -> pd.DataFrame:
+    """Add target-geometry metadata columns expected by downstream tools."""
+    result = panel.copy()
+    geo_type, boundary_vintage, definition_version = _target_geometry_metadata(
+        target_geometry
+    )
+    if "geo_id" in result.columns:
+        result["geo_type"] = geo_type
+        if geo_type == "coc" and "coc_id" not in result.columns:
+            result["coc_id"] = result["geo_id"]
+        if geo_type == "metro":
+            if "metro_id" not in result.columns:
+                result["metro_id"] = result["geo_id"]
+            if (
+                definition_version is not None
+                and "definition_version_used" not in result.columns
+            ):
+                result["definition_version_used"] = definition_version
+        if (
+            geo_type == "coc"
+            and boundary_vintage is not None
+            and "boundary_vintage_used" not in result.columns
+        ):
+            result["boundary_vintage_used"] = boundary_vintage
+    return result
+
+
 def _persist_outputs(
     plan: ExecutionPlan,
     ctx: ExecutionContext,
@@ -995,23 +1039,21 @@ def _persist_outputs(
         )
 
     panel = pd.concat(frames, ignore_index=True)
+    panel = _canonicalize_panel_for_target(panel, target.geometry)
 
     # Determine output path using canonical naming
-    target_geo_type = target.geometry.type
-    boundary_vintage = str(target.geometry.vintage or "unknown")
-    definition_version = None
+    target_geo_type, boundary_vintage, definition_version = _target_geometry_metadata(
+        target.geometry
+    )
     if target_geo_type == "metro":
-        definition_version = target.geometry.source or (
-            str(target.geometry.vintage) if target.geometry.vintage is not None else None
-        )
         if definition_version is None:
             return StepResult(
                 step_kind="persist",
                 detail="persist outputs",
                 success=False,
                 error=(
-                    "Metro recipe targets must set geometry.source or geometry.vintage "
-                    "to the metro definition version so panel outputs can be named."
+                    "Metro recipe targets must set geometry.source to the "
+                    "metro definition version so panel outputs can be named."
                 ),
             )
     start_year = min(universe_years)
@@ -1043,6 +1085,19 @@ def _persist_outputs(
     # Build provenance and write with metadata
     output_rel = str(output_file.relative_to(ctx.project_root))
     provenance = _build_provenance(ctx.recipe, plan.pipeline_id, ctx)
+    provenance["target_geometry"] = {
+        "type": target_geo_type,
+        **(
+            {"vintage": boundary_vintage}
+            if target_geo_type == "coc" and boundary_vintage is not None
+            else {}
+        ),
+        **(
+            {"source": definition_version}
+            if target_geo_type == "metro" and definition_version is not None
+            else {}
+        ),
+    }
     provenance["conformance"] = conformance_report.to_dict()
     table = pa.Table.from_pandas(panel)
     metadata = table.schema.metadata or {}
@@ -1105,15 +1160,15 @@ def _persist_diagnostics(
         target = next(
             (t for t in ctx.recipe.targets if t.id == pipeline.target), None
         )
-    target_geo_type = target.geometry.type if target is not None else "coc"
-    boundary_vintage = str(
-        target.geometry.vintage if target is not None else "unknown"
-    )
-    definition_version = None
-    if target is not None and target_geo_type == "metro":
-        definition_version = target.geometry.source or (
-            str(target.geometry.vintage) if target.geometry.vintage is not None else None
-        )
+    if target is not None:
+        panel = _canonicalize_panel_for_target(panel, target.geometry)
+        (
+            target_geo_type,
+            boundary_vintage,
+            definition_version,
+        ) = _target_geometry_metadata(target.geometry)
+    else:
+        target_geo_type, boundary_vintage, definition_version = ("coc", None, None)
     start_year = min(universe_years)
     end_year = max(universe_years)
     output_dir = ctx.project_root / "data" / "curated" / "panel"

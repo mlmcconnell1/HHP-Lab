@@ -217,14 +217,14 @@ def _resolve_via_file_set(
 # ---------------------------------------------------------------------------
 
 def _geometry_matches(a: GeometryRef, b: GeometryRef) -> bool:
-    """Check if two geometry refs match on type and vintage.
+    """Check if two geometry refs match on type, vintage, and source.
 
-    Both type and vintage must match exactly.  A None vintage only
-    matches another None vintage — it is *not* treated as a wildcard.
+    Every populated identity field must match exactly. A None field only
+    matches another None value — it is *not* treated as a wildcard.
     """
     if a.type != b.type:
         return False
-    return a.vintage == b.vintage
+    return a.vintage == b.vintage and a.source == b.source
 
 
 def _resolve_auto_transform(

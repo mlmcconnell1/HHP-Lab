@@ -47,8 +47,31 @@ def _validate_county(ref: GeometryRef) -> list[ValidationDiagnostic]:
     return diags
 
 
+def _validate_metro(ref: GeometryRef) -> list[ValidationDiagnostic]:
+    """Validate a metro geometry reference."""
+    diags: list[ValidationDiagnostic] = []
+    if not ref.source:
+        diags.append(
+            ValidationDiagnostic(
+                "error",
+                "Metro geometry must set source to the definition version "
+                "(for example 'glynn_fox_v1').",
+            )
+        )
+    if ref.vintage is not None:
+        diags.append(
+            ValidationDiagnostic(
+                "warning",
+                f"Metro geometry ignores vintage={ref.vintage}; "
+                "use source for the synthetic geography definition version.",
+            )
+        )
+    return diags
+
+
 def register_geometry_defaults(registry: GeometryAdapterRegistry) -> None:
     """Register built-in geometry adapters."""
     registry.register("coc", _validate_coc)
     registry.register("tract", _validate_tract)
     registry.register("county", _validate_county)
+    registry.register("metro", _validate_metro)

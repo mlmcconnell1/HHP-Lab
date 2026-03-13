@@ -15,6 +15,8 @@ from coclab.recipe.adapters import (
     DatasetAdapterRegistry,
     GeometryAdapterRegistry,
     ValidationDiagnostic,
+    dataset_registry,
+    geometry_registry,
     validate_recipe_adapters,
 )
 from coclab.recipe.cache import RecipeCache, _sha256_file
@@ -315,6 +317,18 @@ class TestValidateRecipeAdapters:
         ds_reg.register("census", "acs5", lambda s: [])
         diags = validate_recipe_adapters(recipe, geo_reg, ds_reg)
         assert diags == []
+
+    def test_defaults_accept_metro_target_and_preaggregated_datasets(self):
+        from coclab.recipe.default_adapters import register_defaults
+
+        geometry_registry.reset()
+        dataset_registry.reset()
+        register_defaults()
+
+        recipe = load_recipe(_recipe_with_metro_pipeline())
+        diags = validate_recipe_adapters(recipe, geometry_registry, dataset_registry)
+        errors = [d.message for d in diags if d.level == "error"]
+        assert errors == []
 
 
 # ===========================================================================
@@ -1449,6 +1463,86 @@ def _setup_pipeline_fixtures(tmp_path: Path) -> None:
     }).to_parquet(acs_path)
 
 
+def _recipe_with_metro_pipeline() -> dict:
+    """Build a recipe that joins pre-aggregated metro artifacts."""
+    return {
+        "version": 1,
+        "name": "metro-executor-test",
+        "universe": {"range": "2020-2021"},
+        "targets": [
+            {
+                "id": "metro_panel",
+                "geometry": {"type": "metro", "source": "glynn_fox_v1"},
+            },
+        ],
+        "datasets": {
+            "pit": {
+                "provider": "hud",
+                "product": "pit",
+                "version": 1,
+                "native_geometry": {"type": "metro", "source": "glynn_fox_v1"},
+                "years": "2020-2021",
+                "path": "data/metro_pit.parquet",
+            },
+            "acs": {
+                "provider": "census",
+                "product": "acs5",
+                "version": 1,
+                "native_geometry": {"type": "metro", "source": "glynn_fox_v1"},
+                "years": "2020-2021",
+                "path": "data/metro_acs.parquet",
+            },
+        },
+        "transforms": [],
+        "pipelines": [
+            {
+                "id": "main",
+                "target": "metro_panel",
+                "steps": [
+                    {
+                        "resample": {
+                            "dataset": "pit",
+                            "to_geometry": {"type": "metro", "source": "glynn_fox_v1"},
+                            "method": "identity",
+                            "measures": ["pit_total"],
+                        },
+                    },
+                    {
+                        "resample": {
+                            "dataset": "acs",
+                            "to_geometry": {"type": "metro", "source": "glynn_fox_v1"},
+                            "method": "identity",
+                            "measures": ["total_population"],
+                        },
+                    },
+                    {
+                        "join": {
+                            "datasets": ["pit", "acs"],
+                            "join_on": ["geo_id", "year"],
+                        },
+                    },
+                ],
+            },
+        ],
+    }
+
+
+def _setup_metro_pipeline_fixtures(tmp_path: Path) -> None:
+    """Create metro-native dataset files for _recipe_with_metro_pipeline."""
+    data_dir = tmp_path / "data"
+    data_dir.mkdir(parents=True, exist_ok=True)
+    pd.DataFrame({
+        "metro_id": ["GF01", "GF02", "GF01", "GF02"],
+        "year": [2020, 2020, 2021, 2021],
+        "pit_total": [10, 20, 11, 21],
+    }).to_parquet(data_dir / "metro_pit.parquet")
+    pd.DataFrame({
+        "metro_id": ["GF01", "GF02", "GF01", "GF02"],
+        "year": [2020, 2020, 2021, 2021],
+        "total_population": [100, 200, 110, 210],
+    }).to_parquet(data_dir / "metro_acs.parquet")
+
+
 class TestExecutor:
 
     def test_execute_recipe_returns_results(self, tmp_path: Path):
@@ -1630,6 +1724,25 @@ class TestExecutor:
         recipe = load_recipe(data)
         with pytest.raises(ExecutorError, match="Pipeline 'main'.*planning failed"):
             execute_recipe(recipe, project_root=tmp_path)
+
+    def test_execute_recipe_supports_metro_target(self, tmp_path: Path):
+        _setup_metro_pipeline_fixtures(tmp_path)
+        recipe = load_recipe(_recipe_with_metro_pipeline())
+        results = execute_recipe(recipe, project_root=tmp_path)
+        assert results[0].success
+
+        panel_path = (
+            tmp_path
+            / "data"
+            / "curated"
+            / "panel"
+            / "panel__metro__Y2020-2021@Dglynnfoxv1.parquet"
+        )
+        panel = pd.read_parquet(panel_path).sort_values(["geo_id", "year"])
+        assert list(panel["geo_id"]) == ["GF01", "GF01", "GF02", "GF02"]
+        assert (panel["geo_type"] == "metro").all()
+        assert list(panel["metro_id"]) == ["GF01", "GF01", "GF02", "GF02"]
+        assert (panel["definition_version_used"] == "glynn_fox_v1").all()
 
 
 class TestTargetOutputsEnforcement:
@@ -3029,6 +3142,22 @@ class TestRecipePlanCmd:
         assert "[materialize]" in result.output
         assert "[resample]" in result.output
         assert "[join]" in result.output
+
+    def test_plan_human_output_shows_metro_definition_version(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    ):
+        _make_project_root(tmp_path)
+        monkeypatch.chdir(tmp_path)
+        _setup_metro_pipeline_fixtures(tmp_path)
+        data = _recipe_with_metro_pipeline()
+        rf = self._write_recipe(tmp_path, data)
+        result = runner.invoke(app, [
+            "build", "recipe-plan",
+            "--recipe", str(rf),
+        ])
+        assert result.exit_code == 0
+        assert "geometry=metro@glynn_fox_v1" in result.output
+        assert "to=metro@glynn_fox_v1" in result.output
 
     def test_plan_json_output(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
