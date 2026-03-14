@@ -106,6 +106,36 @@ class TestEnsureBuildDir:
         manifest = json.loads((build_dir / "manifest.json").read_text())
         assert manifest == {"schema_version": 1}
 
+    def test_metro_build_skips_boundary_assets(self, tmp_path):
+        """Metro builds should not require or pin CoC boundary assets."""
+        build_dir, assets = ensure_build_dir(
+            "metro_test",
+            builds_dir=tmp_path / "builds",
+            years=[2020, 2021],
+            geo_type="metro",
+            definition_version="glynn_fox_v1",
+        )
+
+        assert assets == []
+        manifest = json.loads((build_dir / "manifest.json").read_text())
+        assert manifest["build"]["geo_type"] == "metro"
+        assert manifest["build"]["definition_version"] == "glynn_fox_v1"
+        assert manifest["build"]["years"] == [2020, 2021]
+        assert manifest["base_assets"] == []
+
+    def test_coc_build_still_requires_boundary_assets(self, tmp_path):
+        """CoC builds should still require boundary assets."""
+        _create_boundary_files(tmp_path, [2020])
+
+        with pytest.raises(FileNotFoundError, match="2021"):
+            ensure_build_dir(
+                "test",
+                builds_dir=tmp_path / "builds",
+                years=[2020, 2021],
+                data_dir=tmp_path / "data",
+                geo_type="coc",
+            )
+
 
 # ---------------------------------------------------------------------------
 # populate_base_assets

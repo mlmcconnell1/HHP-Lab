@@ -313,9 +313,12 @@ def ensure_build_dir(
     base_assets: list[dict] = []
 
     if years is not None:
-        base_assets = populate_base_assets(
-            build_dir, years, data_dir=data_dir,
-        )
+        # Metro builds are definition-fixed: geometry comes from the metro
+        # definition version, not from yearly CoC boundary files.
+        if geo_type != "metro":
+            base_assets = populate_base_assets(
+                build_dir, years, data_dir=data_dir,
+            )
         write_build_manifest(
             build_dir,
             name,

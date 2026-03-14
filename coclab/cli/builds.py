@@ -102,11 +102,14 @@ def create_build(
     if definition_version is not None:
         typer.echo(f"  Definition version: {definition_version}")
     typer.echo(f"  Path: {build_dir}")
-    typer.echo(f"  Base assets pinned: {len(base_assets)}")
-    for asset in base_assets:
-        typer.echo(
-            f"    - B{asset['year']}: {asset['sha256'][:12]}..."
-        )
+    if geo_type == "metro":
+        typer.echo("  Base assets: skipped (definition-fixed)")
+    else:
+        typer.echo(f"  Base assets pinned: {len(base_assets)}")
+        for asset in base_assets:
+            typer.echo(
+                f"    - B{asset['year']}: {asset['sha256'][:12]}..."
+            )
     typer.echo(f"  Manifest: {build_dir / 'manifest.json'}")
 
 

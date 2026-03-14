@@ -67,6 +67,33 @@ def test_build_create_and_list():
         assert "demo" in list_result.output
 
 
+def test_build_create_metro_no_boundary_files_needed():
+    """Metro build create should succeed without any boundary files."""
+    with runner.isolated_filesystem():
+        result = runner.invoke(
+            app,
+            [
+                "build", "create",
+                "--name", "metro_test",
+                "--years", "2018-2024",
+                "--geo-type", "metro",
+                "--definition-version", "glynn_fox_v1",
+            ],
+        )
+        assert result.exit_code == 0, result.output
+        assert "Created build: metro_test" in result.output
+        assert "definition-fixed" in result.output
+        assert "Geo type: metro" in result.output
+        assert "Definition version: glynn_fox_v1" in result.output
+
+        manifest = json.loads(
+            (Path("builds") / "metro_test" / "manifest.json").read_text()
+        )
+        assert manifest["build"]["geo_type"] == "metro"
+        assert manifest["build"]["definition_version"] == "glynn_fox_v1"
+        assert manifest["base_assets"] == []
+
+
 def test_build_create_missing_boundary_errors():
     """build create should fail if boundary files are missing for requested years."""
     with runner.isolated_filesystem():
