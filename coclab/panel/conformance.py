@@ -7,7 +7,7 @@ assembled panel DataFrames. Individual checks are registered via the
 Registered checks
 -----------------
 - ``check_year_coverage`` (coclab-2jtk): Year range overlap
-- ``check_schema_acs`` (coclab-2jtk): ACS measure column presence
+- ``check_schema_measures`` (coclab-2jtk, coclab-d0qm): Measure column presence
 - ``check_schema_zori`` (coclab-2jtk): ZORI column presence when requested
 - ``check_temporal_variation`` (coclab-1d2j): Suspiciously static values
 - ``check_column_null_rates`` (coclab-1gmj): Per-column null rates
@@ -119,6 +119,10 @@ class PanelRequest:
         Optional hint for how many CoCs should appear.
     null_rate_threshold : float
         Configurable threshold for data completeness checks.
+    measure_columns : list[str] | None
+        Demographic measure columns expected in the panel.  When ``None``
+        (default), falls back to ``ACS_MEASURE_COLUMNS``.  Set explicitly
+        for non-ACS schemas (e.g., PEP-based panels with ``["population"]``).
     """
 
     start_year: int
@@ -130,6 +134,7 @@ class PanelRequest:
     expected_geo_count: int | None = None
     geo_type: str = "coc"
     null_rate_threshold: float = 0.50
+    measure_columns: list[str] | None = None
 
 
 @dataclass
@@ -310,7 +315,23 @@ def run_conformance(
 
 
 # ---------------------------------------------------------------------------
-# Year coverage and schema checks  (coclab-2jtk)
+# Helpers
+# ---------------------------------------------------------------------------
+
+
+def _effective_measure_columns(request: PanelRequest) -> list[str]:
+    """Return the measure columns to validate for *request*.
+
+    When ``request.measure_columns`` is set, those columns are used.
+    Otherwise falls back to the ACS default for backward compatibility.
+    """
+    if request.measure_columns is not None:
+        return request.measure_columns
+    return list(ACS_MEASURE_COLUMNS)
+
+
+# ---------------------------------------------------------------------------
+# Year coverage and schema checks  (coclab-2jtk, coclab-d0qm)
 # ---------------------------------------------------------------------------
 
 
@@ -366,29 +387,41 @@ def check_year_coverage(
 
 
 @register_check
-def check_schema_acs(
+def check_schema_measures(
     panel_df: pd.DataFrame,
     request: PanelRequest,
 ) -> list[ConformanceResult]:
-    """Verify that at least one ACS measure column is present."""
-    present = [c for c in ACS_MEASURE_COLUMNS if c in panel_df.columns]
+    """Verify that at least one expected measure column is present.
+
+    Uses ``request.measure_columns`` when set, otherwise falls back to
+    ``ACS_MEASURE_COLUMNS``.  This allows PEP-based and other non-ACS
+    panels to pass conformance with their own measure columns
+    (e.g., ``["population"]``).
+    """
+    expected = _effective_measure_columns(request)
+    present = [c for c in expected if c in panel_df.columns]
 
     if not present:
         return [
             ConformanceResult(
-                check_name="check_schema_acs",
+                check_name="check_schema_measures",
                 severity="error",
                 message=(
-                    "None of the ACS measure columns are present in the panel schema"
+                    "None of the expected measure columns are present "
+                    "in the panel schema"
                 ),
                 details={
-                    "expected_columns": list(ACS_MEASURE_COLUMNS),
+                    "expected_columns": list(expected),
                     "present_columns": present,
                 },
             )
         ]
 
     return []
+
+
+# Backward-compatible alias (coclab-d0qm).
+check_schema_acs = check_schema_measures
 
 
 @register_check
@@ -534,13 +567,13 @@ def check_temporal_variation(
 def check_column_null_rates(
     df: pd.DataFrame, request: PanelRequest
 ) -> list[ConformanceResult]:
-    """Flag ACS measure columns with high null rates."""
+    """Flag measure columns with high null rates."""
     results: list[ConformanceResult] = []
     total_count = len(df)
     if total_count == 0:
         return results
 
-    for col in ACS_MEASURE_COLUMNS:
+    for col in _effective_measure_columns(request):
         if col not in df.columns:
             continue
 
@@ -586,17 +619,18 @@ def check_column_null_rates(
 def check_per_year_completeness(
     df: pd.DataFrame, request: PanelRequest
 ) -> list[ConformanceResult]:
-    """Flag years where ACS measure columns have a high overall null rate."""
+    """Flag years where measure columns have a high overall null rate."""
     results: list[ConformanceResult] = []
 
     if "year" not in df.columns:
         return results
 
-    present_cols = [c for c in ACS_MEASURE_COLUMNS if c in df.columns]
+    effective = _effective_measure_columns(request)
+    present_cols = [c for c in effective if c in df.columns]
     if not present_cols:
         return results
 
-    total_acs_columns = len(present_cols)
+    total_measure_columns = len(present_cols)
 
     for year in sorted(df["year"].unique()):
         year_df = df.loc[df["year"] == year, present_cols]
@@ -617,14 +651,14 @@ def check_per_year_completeness(
                     severity="warning",
                     message=(
                         f"Year {year}: {null_rate:.0%} null rate across "
-                        f"ACS columns ({len(null_columns)} of "
-                        f"{total_acs_columns} columns affected)"
+                        f"measure columns ({len(null_columns)} of "
+                        f"{total_measure_columns} columns affected)"
                     ),
                     details={
                         "year": int(year),
                         "null_rate": null_rate,
                         "null_columns": null_columns,
-                        "total_acs_columns": total_acs_columns,
+                        "total_measure_columns": total_measure_columns,
                         "threshold": request.null_rate_threshold,
                     },
                 )

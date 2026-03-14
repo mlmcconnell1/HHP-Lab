@@ -8,14 +8,13 @@ import pandas as pd
 import pytest
 
 from coclab.metro.definitions import METRO_COUNT
-
 from coclab.panel.conformance import (
     PanelRequest,
     check_coc_count,
     check_coc_year_gaps,
-    check_column_null_rates,
     check_panel_balance,
     check_pit_exceeds_population,
+    check_schema_measures,
     check_temporal_variation,
     check_year_coverage,
     run_conformance,
@@ -190,6 +189,74 @@ class TestYearGapsWithMetro:
 # ---------------------------------------------------------------------------
 # Full conformance run with metro panel
 # ---------------------------------------------------------------------------
+
+
+class TestSchemaCheckWithPepMetro:
+    """Schema check with PEP-based metro panels (coclab-d0qm)."""
+
+    def test_pep_panel_passes_with_measure_columns(self):
+        """A PEP metro panel with population passes when measure_columns is set."""
+        metros = [f"GF{i:02d}" for i in range(1, 6)]
+        rows = []
+        for m in metros:
+            for year in [2020, 2021]:
+                rows.append({
+                    "metro_id": m,
+                    "year": year,
+                    "pit_total": 1000 + year,
+                    "population": 500000 + year * 100,
+                })
+        df = pd.DataFrame(rows)
+        request = PanelRequest(
+            start_year=2020,
+            end_year=2021,
+            geo_type="metro",
+            measure_columns=["population"],
+        )
+        results = check_schema_measures(df, request)
+        assert len(results) == 0
+
+    def test_pep_panel_errors_without_measure_columns(self):
+        """A PEP metro panel with no ACS columns errors with default settings."""
+        df = pd.DataFrame({
+            "metro_id": ["GF01"],
+            "year": [2020],
+            "pit_total": [1000],
+            "population": [500000],
+        })
+        request = PanelRequest(
+            start_year=2020,
+            end_year=2020,
+            geo_type="metro",
+        )
+        results = check_schema_measures(df, request)
+        assert len(results) == 1
+        assert results[0].severity == "error"
+
+    def test_pep_panel_full_conformance_passes(self):
+        """Full conformance run passes for PEP metro panel."""
+        metros = [f"GF{i:02d}" for i in range(1, 26)]
+        rows = []
+        for m in metros:
+            for year in [2020, 2021, 2022]:
+                rows.append({
+                    "metro_id": m,
+                    "year": year,
+                    "pit_total": 1000 + year,
+                    "population": 500000 + year * 100,
+                })
+        df = pd.DataFrame(rows)
+        request = PanelRequest(
+            start_year=2020,
+            end_year=2022,
+            expected_geo_count=25,
+            geo_type="metro",
+            measure_columns=["population"],
+        )
+        report = run_conformance(df, request)
+        assert report.passed, (
+            f"PEP metro panel failed conformance:\n{report.summary()}"
+        )
 
 
 class TestFullConformanceWithMetro:

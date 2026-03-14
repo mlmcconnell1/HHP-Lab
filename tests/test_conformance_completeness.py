@@ -288,10 +288,10 @@ class TestCheckPerYearCompleteness:
             "year",
             "null_rate",
             "null_columns",
-            "total_acs_columns",
+            "total_measure_columns",
             "threshold",
         }
-        assert d["total_acs_columns"] == len(ACS_MEASURE_COLUMNS)
+        assert d["total_measure_columns"] == len(ACS_MEASURE_COLUMNS)
         assert d["threshold"] == 0.50
         assert isinstance(d["null_columns"], list)
 
@@ -407,3 +407,62 @@ class TestCheckZoriEligibilityRate:
         results = check_zori_eligibility_rate(df, req)
         assert len(results) == 1
         assert results[0].details["eligibility_rate"] == 0.0
+
+
+# ============================================================================
+# PEP measure_columns tests  (coclab-d0qm)
+# ============================================================================
+
+
+class TestPepMeasureColumns:
+    """Verify that custom measure_columns drive completeness checks."""
+
+    def test_null_rate_checks_pep_column(self) -> None:
+        """check_column_null_rates respects measure_columns=["population"]."""
+        n = 10
+        df = pd.DataFrame({
+            "coc_id": [f"XX-{i:03d}" for i in range(n)],
+            "year": [2022] * n,
+            "population": [np.nan] * n,  # 100% null
+        })
+        req = PanelRequest(
+            start_year=2020, end_year=2024,
+            measure_columns=["population"],
+        )
+        results = check_column_null_rates(df, req)
+        assert len(results) == 1
+        assert results[0].check_name == "column_fully_null"
+        assert results[0].details["column"] == "population"
+
+    def test_null_rate_skips_acs_columns_for_pep(self) -> None:
+        """With measure_columns=["population"], ACS columns are not checked."""
+        n = 10
+        df = pd.DataFrame({
+            "coc_id": [f"XX-{i:03d}" for i in range(n)],
+            "year": [2022] * n,
+            "population": list(range(1, n + 1)),
+            # ACS column present but fully null — should NOT be flagged
+            "total_population": [np.nan] * n,
+        })
+        req = PanelRequest(
+            start_year=2020, end_year=2024,
+            measure_columns=["population"],
+        )
+        results = check_column_null_rates(df, req)
+        assert len(results) == 0
+
+    def test_per_year_completeness_pep(self) -> None:
+        """check_per_year_completeness respects measure_columns."""
+        n = 5
+        df = pd.DataFrame({
+            "metro_id": [f"GF{i:02d}" for i in range(1, n + 1)],
+            "year": [2020] * n,
+            "population": [np.nan] * n,
+        })
+        req = PanelRequest(
+            start_year=2020, end_year=2020,
+            measure_columns=["population"],
+        )
+        results = check_per_year_completeness(df, req)
+        assert len(results) == 1
+        assert results[0].details["total_measure_columns"] == 1

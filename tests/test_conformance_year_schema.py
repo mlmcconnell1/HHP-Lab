@@ -1,6 +1,6 @@
 """Year coverage and schema conformance checks for CoC Lab panels.
 
-Tests for coclab-2jtk: check_year_coverage, check_schema_acs, check_schema_zori.
+Tests for coclab-2jtk/coclab-d0qm: check_year_coverage, check_schema_measures, check_schema_zori.
 
 Year coverage truth table
 -------------------------
@@ -12,13 +12,16 @@ zero_overlap         | 2010-2012      | 2020-2024  | 1 error
 single_year          | [2022]         | 2022-2022  | no results
 single_year_missing  | [2023]         | 2022-2022  | 1 error
 
-ACS schema truth table
-----------------------
-Scenario      | Columns in df                     | Expected
---------------|-----------------------------------|-------------
-all_present   | all 5 ACS measure columns         | no results
-some_present  | only total_population             | no results
-none_present  | no ACS columns at all             | 1 error
+Measure schema truth table (coclab-d0qm)
+----------------------------------------
+Scenario               | measure_columns      | Columns in df           | Expected
+-----------------------|----------------------|-------------------------|-------------
+all_present            | None (ACS default)   | all 5 ACS columns       | no results
+some_present           | None (ACS default)   | only total_population   | no results
+none_present           | None (ACS default)   | no ACS columns          | 1 error
+pep_population_present | ["population"]       | population              | no results
+pep_population_missing | ["population"]       | (none)                  | 1 error
+alias_backward_compat  | None (ACS default)   | total_population        | no results (via alias)
 
 ZORI schema truth table
 -----------------------
@@ -42,6 +45,7 @@ from coclab.panel.conformance import (
     ACS_MEASURE_COLUMNS,
     PanelRequest,
     check_schema_acs,
+    check_schema_measures,
     check_schema_zori,
     check_year_coverage,
 )
@@ -174,22 +178,37 @@ def test_check_year_coverage(case_name: str) -> None:
 
 
 # ============================================================================
-# ACS schema tests
+# Measure schema tests  (coclab-d0qm)
 # ============================================================================
 
-ACS_SCHEMA_CASES = {
+MEASURE_SCHEMA_CASES = {
     "all_present": {
         "columns": list(ACS_MEASURE_COLUMNS),
+        "measure_columns": None,
         "expected_count": 0,
         "expected_severity": None,
     },
     "some_present": {
         "columns": ["total_population"],
+        "measure_columns": None,
         "expected_count": 0,
         "expected_severity": None,
     },
     "none_present": {
         "columns": [],
+        "measure_columns": None,
+        "expected_count": 1,
+        "expected_severity": "error",
+    },
+    "pep_population_present": {
+        "columns": ["population"],
+        "measure_columns": ["population"],
+        "expected_count": 0,
+        "expected_severity": None,
+    },
+    "pep_population_missing": {
+        "columns": [],
+        "measure_columns": ["population"],
         "expected_count": 1,
         "expected_severity": "error",
     },
@@ -198,15 +217,15 @@ ACS_SCHEMA_CASES = {
 
 @pytest.mark.parametrize(
     "case_name",
-    list(ACS_SCHEMA_CASES),
-    ids=list(ACS_SCHEMA_CASES),
+    list(MEASURE_SCHEMA_CASES),
+    ids=list(MEASURE_SCHEMA_CASES),
 )
-def test_check_schema_acs(case_name: str) -> None:
-    case = ACS_SCHEMA_CASES[case_name]
+def test_check_schema_measures(case_name: str) -> None:
+    case = MEASURE_SCHEMA_CASES[case_name]
     df = _make_panel([2022], columns=case["columns"])
-    request = _default_request()
+    request = _default_request(measure_columns=case["measure_columns"])
 
-    results = check_schema_acs(df, request)
+    results = check_schema_measures(df, request)
 
     assert len(results) == case["expected_count"]
     if case["expected_count"] == 0:
@@ -214,9 +233,17 @@ def test_check_schema_acs(case_name: str) -> None:
 
     result = results[0]
     assert result.severity == case["expected_severity"]
-    assert result.check_name == "check_schema_acs"
-    assert result.details["expected_columns"] == list(ACS_MEASURE_COLUMNS)
+    assert result.check_name == "check_schema_measures"
     assert result.details["present_columns"] == []
+
+
+def test_check_schema_acs_alias() -> None:
+    """check_schema_acs is a backward-compatible alias for check_schema_measures."""
+    assert check_schema_acs is check_schema_measures
+    df = _make_panel([2022], columns=["total_population"])
+    request = _default_request()
+    results = check_schema_acs(df, request)
+    assert len(results) == 0
 
 
 # ============================================================================

@@ -90,16 +90,22 @@ def _scan_xwalks(curated: Path) -> dict:
 
 
 def _scan_pit(curated: Path) -> dict:
-    """Scan PIT count files."""
+    """Scan PIT count files.
+
+    Matches both base (``pit__P2024.parquet``) and boundary-scoped
+    (``pit__P2024@B2024.parquet``) files but deduplicates by year so
+    the count reflects unique PIT vintages, not file count.
+    """
     import re
 
     pdir = curated / "pit"
-    years: list[int] = []
+    year_set: set[int] = set()
     if pdir.exists():
         for p in sorted(pdir.glob("*.parquet")):
             m = re.match(r"^pit__P(\d{4})(?:@B\d{4})?\.parquet$", p.name)
             if m:
-                years.append(int(m.group(1)))
+                year_set.add(int(m.group(1)))
+    years = sorted(year_set)
     return {"count": len(years), "years": years}
 
 

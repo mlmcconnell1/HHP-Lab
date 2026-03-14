@@ -238,6 +238,46 @@ class TestStatusBuilds:
         assert payload["builds"][0]["healthy"] is False
 
 
+class TestPitDeduplication:
+    """coclab-rhix: PIT scan should deduplicate years across base and boundary-scoped files."""
+
+    def test_pit_count_deduplicates_years(self, tmp_path):
+        """When both pit__P2024.parquet and pit__P2024@B2024.parquet exist, count=1."""
+        import pandas as pd
+
+        data_dir = tmp_path / "data"
+        curated = data_dir / "curated"
+
+        # Boundaries (needed to avoid error exit)
+        bdir = curated / "coc_boundaries"
+        bdir.mkdir(parents=True)
+        pd.DataFrame({"coc_id": ["CO-500"]}).to_parquet(bdir / "coc__B2024.parquet")
+        tdir = curated / "tiger"
+        tdir.mkdir(parents=True)
+        pd.DataFrame({"geoid": ["08001"]}).to_parquet(tdir / "tracts__T2023.parquet")
+
+        # PIT: both base and boundary-scoped for same year
+        pdir = curated / "pit"
+        pdir.mkdir(parents=True)
+        pd.DataFrame({"coc_id": ["CO-500"]}).to_parquet(pdir / "pit__P2024.parquet")
+        pd.DataFrame({"coc_id": ["CO-500"]}).to_parquet(pdir / "pit__P2024@B2024.parquet")
+        pd.DataFrame({"coc_id": ["CO-500"]}).to_parquet(pdir / "pit__P2024@B2025.parquet")
+
+        result = runner.invoke(
+            app,
+            [
+                "status", "--json",
+                "--data-dir", str(data_dir),
+                "--builds-dir", str(tmp_path / "builds"),
+            ],
+        )
+
+        assert result.exit_code == 0
+        payload = json.loads(result.output)
+        assert payload["assets"]["pit"]["count"] == 1
+        assert payload["assets"]["pit"]["years"] == [2024]
+
+
 class TestStatusHelp:
     """Test status command appears in help."""
 

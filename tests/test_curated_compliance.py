@@ -47,6 +47,7 @@ def _build_clean_curated(base: Path) -> None:
         "pep": "pep_county__v2024.parquet",
         "pit": "pit_vintage__P2024.parquet",
         "panel": "panel__Y2015-2024@B2025.parquet",
+        "metro": "metro_definitions__glynn_fox_v1.parquet",
         "maps": "CO-500__2025.html",
     }
     for subdir, filename in canonical_examples.items():
@@ -139,6 +140,18 @@ class TestCanonicalFilenamesAccepted:
             ("pit", "pit_vintage_registry.parquet"),
             ("pit", "pit_registry.parquet"),
             ("panel", "panel__Y2015-2024@B2025.parquet"),
+            ("panel", "panel__metro__Y2011-2016@Dglynnfoxv1.parquet"),
+            ("panel", "panel__Y2015-2024@B2025.manifest.json"),
+            ("panel", "panel__metro__Y2011-2016@Dglynnfoxv1.manifest.json"),
+            ("panel", "panel__metro__Y2011-2016@Dglynnfoxv1__diagnostics.json"),
+            ("measures", "measures__metro__A2023@Dglynnfoxv1xT2020.parquet"),
+            ("pit", "pit__metro__P2024@Dglynnfoxv1.parquet"),
+            ("pep", "pep_county__v2020__y2011-2016.parquet"),
+            ("pep", "pep__metro__Dglynnfoxv1xC2020__wpop__2011_2016.parquet"),
+            ("zori", "zori__metro__A2023@Dglynnfoxv1xC2023__wrenter.parquet"),
+            ("metro", "metro_definitions__glynn_fox_v1.parquet"),
+            ("metro", "metro_coc_membership__glynn_fox_v1.parquet"),
+            ("metro", "metro_county_membership__glynn_fox_v1.parquet"),
             ("maps", "CO-500__2025.html"),
         ],
     )

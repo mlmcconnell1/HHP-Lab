@@ -1387,12 +1387,27 @@ def _persist_outputs(
     )
 
     # Run conformance checks on the assembled panel
-    from coclab.panel.conformance import PanelRequest, run_conformance
+    from coclab.panel.conformance import (
+        ACS_MEASURE_COLUMNS,
+        PanelRequest,
+        run_conformance,
+    )
+
+    # Derive measure_columns from recipe datasets so non-ACS schemas
+    # (e.g. PEP) get correct conformance checking (coclab-d0qm).
+    recipe_products = {ds.product for ds in ctx.recipe.datasets.values()}
+    if recipe_products & {"acs", "acs5"}:
+        measure_columns: list[str] | None = None  # ACS default
+    else:
+        # Non-ACS schema: check whichever known measures are in the panel.
+        known = set(ACS_MEASURE_COLUMNS) | {"population"}
+        measure_columns = [c for c in panel.columns if c in known] or None
 
     panel_request = PanelRequest(
         start_year=start_year,
         end_year=end_year,
         geo_type=target_geo_type,
+        measure_columns=measure_columns,
     )
     conformance_report = run_conformance(panel, panel_request)
     if not ctx.quiet:

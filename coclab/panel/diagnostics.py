@@ -93,7 +93,7 @@ def coverage_summary(panel_df: pd.DataFrame) -> pd.DataFrame:
 
     if not required_cols.issubset(panel_df.columns):
         missing = required_cols - set(panel_df.columns)
-        logger.warning(f"Missing columns for coverage_summary: {missing}")
+        logger.debug(f"Skipping coverage_summary (columns not present: {missing})")
         return pd.DataFrame(
             columns=[
                 "year",

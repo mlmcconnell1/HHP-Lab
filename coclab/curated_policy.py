@@ -38,6 +38,7 @@ CURATED_SUBDIRS: set[str] = {
     "pep",
     "pit",
     "panel",
+    "metro",
     "maps",
 }
 
@@ -63,26 +64,40 @@ CANONICAL_PATTERNS: dict[str, list[re.Pattern[str]]] = {
     ],
     "measures": [
         re.compile(r"^measures__A\d{4}(\(\d{4}\))?@B\d{4}(xT\d{4})?\.parquet$"),
+        re.compile(r"^measures__metro__A\d{4}@D\w+(xT\d{4})?\.parquet$"),
     ],
     "zori": [
         re.compile(r"^zori__A\d{4}@B\d{4}xC\d{4}__w\w+\.parquet$"),
         re.compile(r"^zori_yearly__A\d{4}@B\d{4}xC\d{4}__w\w+__m\w+\.parquet$"),
         re.compile(r"^zori__\w+__Z\d{4}\.parquet$"),  # ingest files
+        re.compile(r"^zori__metro__A\d{4}@D\w+xC\d{4}__w\w+\.parquet$"),
     ],
     "pep": [
         re.compile(r"^pep_county__v\d{4}\.parquet$"),
+        re.compile(r"^pep_county__v\d{4}__y\d{4}-\d{4}\.parquet$"),
         re.compile(r"^pep_county__combined\.parquet$"),
         re.compile(r"^pep_county__intercensal_\d{4}_\d{4}\.parquet$"),
         re.compile(r"^coc_pep__B\d{4}xC\d{4}__w\w+__\d{4}_\d{4}\.parquet$"),
+        re.compile(r"^pep__metro__D\w+xC\d{4}__w\w+__\d{4}_\d{4}\.parquet$"),
     ],
     "pit": [
         re.compile(r"^pit__P\d{4}(@B\d{4})?\.parquet$"),
+        re.compile(r"^pit__metro__P\d{4}@D\w+\.parquet$"),
         re.compile(r"^pit_vintage__P\d{4}\.parquet$"),
         re.compile(r"^pit_vintage_registry\.parquet$"),
         re.compile(r"^pit_registry\.parquet$"),
     ],
     "panel": [
         re.compile(r"^panel__Y\d{4}-\d{4}@B\d{4}\.parquet$"),
+        re.compile(r"^panel__metro__Y\d{4}-\d{4}@D\w+\.parquet$"),
+        # Sidecar files generated alongside panels
+        re.compile(r"^panel__.+\.manifest\.json$"),
+        re.compile(r"^panel__.+__diagnostics\.json$"),
+    ],
+    "metro": [
+        re.compile(r"^metro_definitions__\w+\.parquet$"),
+        re.compile(r"^metro_coc_membership__\w+\.parquet$"),
+        re.compile(r"^metro_county_membership__\w+\.parquet$"),
     ],
     "maps": [
         re.compile(r"^.+\.html$"),
