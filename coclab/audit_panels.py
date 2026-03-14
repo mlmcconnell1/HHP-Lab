@@ -156,10 +156,20 @@ def _beta_parameters(expected_pi: float, variance: float) -> tuple[float, float]
     return alpha, beta
 
 
-def _load_source_panel(project_root: Path, spec: AuditPanelSpec) -> tuple[pd.DataFrame, str]:
+def _load_source_panel(
+    project_root: Path,
+    spec: AuditPanelSpec,
+    *,
+    rebuild_metro_source: bool = False,
+) -> tuple[pd.DataFrame, str]:
     path = project_root / spec.source_panel_path
     if not path.exists() and spec.unit_type == "metro":
-        path = _ensure_metro_source_panel(project_root)
+        path = _ensure_metro_source_panel(
+            project_root,
+            force=rebuild_metro_source,
+        )
+    elif spec.unit_type == "metro" and rebuild_metro_source:
+        path = _ensure_metro_source_panel(project_root, force=True)
     df = pd.read_parquet(path)
     if "population" in df.columns and "total_population" not in df.columns:
         df = df.rename(columns={"population": "total_population"})
@@ -246,9 +256,9 @@ def _build_metro_source_panel(project_root: Path) -> pd.DataFrame:
     return panel.sort_values(["geo_id", "year"]).reset_index(drop=True)
 
 
-def _ensure_metro_source_panel(project_root: Path) -> Path:
+def _ensure_metro_source_panel(project_root: Path, *, force: bool = False) -> Path:
     path = project_root / METRO_SOURCE_PATH
-    if path.exists():
+    if path.exists() and not force:
         return path
     df = _build_metro_source_panel(project_root)
     provenance = ProvenanceBlock(
@@ -580,14 +590,22 @@ def _write_panel_artifacts(
     return manifest
 
 
-def build_audit_panels(project_root: Path | None = None) -> list[dict[str, Any]]:
+def build_audit_panels(
+    project_root: Path | None = None,
+    *,
+    rebuild_metro_source: bool = False,
+) -> list[dict[str, Any]]:
     if project_root is None:
         project_root = _repo_root()
     project_root = Path(project_root)
 
     manifests: list[dict[str, Any]] = []
     for spec in AUDIT_PANEL_SPECS:
-        source_df, source_panel_path = _load_source_panel(project_root, spec)
+        source_df, source_panel_path = _load_source_panel(
+            project_root,
+            spec,
+            rebuild_metro_source=rebuild_metro_source,
+        )
         raw_df, drop_reasons, pre_filter_df = _prepare_raw_panel(source_df, spec=spec)
         raw_validation = _validate_raw_panel(raw_df, spec=spec, drop_reasons=drop_reasons)
         modeling_df = _derive_modeling_ready(raw_df)
@@ -610,4 +628,4 @@ def build_audit_panels(project_root: Path | None = None) -> list[dict[str, Any]]
 
 
 if __name__ == "__main__":
-    print(json.dumps(build_audit_panels(), indent=2))
+    print(json.dumps(build_audit_panels(rebuild_metro_source=True), indent=2))

@@ -44,6 +44,9 @@
     "raw_panel": true,
     "modeling_input": true,
     "validation_report": true,
-    "panel_manifest": true
+    "panel_manifest": true,
+    "metro_definitions__glynn_fox_v1.parquet": true,
+    "metro_coc_membership__glynn_fox_v1.parquet": true,
+    "metro_county_membership__glynn_fox_v1.parquet": true
   }
 }

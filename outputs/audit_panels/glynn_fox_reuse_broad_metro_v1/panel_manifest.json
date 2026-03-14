@@ -11,8 +11,8 @@
   "missing_policy": "drop",
   "balanced_required": true,
   "rent_proxy": "zori_january",
-  "build_timestamp": "2026-03-14T14:30:50.092540+00:00",
-  "git_commit": "62ad24bb7c710483e6783aa059138a00094a0387",
+  "build_timestamp": "2026-03-14T16:03:40.550923+00:00",
+  "git_commit": "e8ef87ddc0d06bb97d4478108ebf9e80b5f91177",
   "n_rows_raw": 250,
   "n_rows_model_ready": 250,
   "n_units_raw": 25,
@@ -27,5 +27,10 @@
     "expected_pi": 0.6,
     "beta_variance": 0.01
   },
-  "n_units_pre_filter": 25
+  "n_units_pre_filter": 25,
+  "metro_reference_artifacts": [
+    "metro_definitions__glynn_fox_v1.parquet",
+    "metro_coc_membership__glynn_fox_v1.parquet",
+    "metro_county_membership__glynn_fox_v1.parquet"
+  ]
 }
