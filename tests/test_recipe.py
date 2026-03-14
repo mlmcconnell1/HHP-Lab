@@ -290,6 +290,21 @@ class TestDatasetAdapterRegistry:
         reg.reset()
         assert reg.registered_products() == []
 
+    def test_defaults_accept_county_pep(self):
+        from coclab.recipe.default_adapters import register_defaults
+
+        geometry_registry.reset()
+        dataset_registry.reset()
+        register_defaults()
+
+        spec = DatasetSpec(
+            provider="census",
+            product="pep",
+            version=1,
+            native_geometry=GeometryRef(type="county", vintage=2020),
+        )
+        assert dataset_registry.validate(spec) == []
+
 
 # ===========================================================================
 # validate_recipe_adapters integration tests
