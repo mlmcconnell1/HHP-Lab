@@ -1,11 +1,13 @@
 """Tests for Glynn-Fox audit panel preparation."""
 
+import json
 from pathlib import Path
 
 import pandas as pd
 
 from coclab.audit_panels import (
     AUDIT_PANEL_SPECS,
+    METRO_DEFINITION_VERSION,
     MODELING_READY_COLUMNS,
     RAW_REQUIRED_COLUMNS,
     _derive_modeling_ready,
@@ -13,6 +15,11 @@ from coclab.audit_panels import (
     _validate_modeling_ready,
     _validate_raw_panel,
     build_audit_panels,
+)
+from coclab.naming import (
+    metro_coc_membership_filename,
+    metro_county_membership_filename,
+    metro_definitions_filename,
 )
 
 
@@ -125,3 +132,78 @@ def test_build_audit_panels_writes_expected_artifacts(tmp_path: Path):
         / "raw_panel.parquet"
     )
     assert raw_df.columns.tolist() == RAW_REQUIRED_COLUMNS
+
+
+def _setup_metro_curated_artifacts(tmp_path: Path) -> None:
+    """Write minimal metro definition parquets so _copy_metro_reference_artifacts finds them."""
+    metro_dir = tmp_path / "data" / "curated" / "metro"
+    metro_dir.mkdir(parents=True, exist_ok=True)
+    v = METRO_DEFINITION_VERSION
+    pd.DataFrame({"metro_id": ["GF01"]}).to_parquet(
+        metro_dir / metro_definitions_filename(v)
+    )
+    pd.DataFrame({"metro_id": ["GF01"], "coc_id": ["NY-600"]}).to_parquet(
+        metro_dir / metro_coc_membership_filename(v)
+    )
+    pd.DataFrame({"metro_id": ["GF01"], "county_fips": ["36061"]}).to_parquet(
+        metro_dir / metro_county_membership_filename(v)
+    )
+
+
+def test_metro_outputs_include_reference_artifacts(tmp_path: Path):
+    """Metro audit outputs must bundle metro definition artifacts."""
+    _setup_metro_curated_artifacts(tmp_path)
+
+    broad = pd.DataFrame({
+        "geo_id": ["GF01", "GF01", "GF02", "GF02"],
+        "year": [2015, 2016, 2015, 2016],
+        "pit_total": [10, 11, 20, 21],
+        "pit_sheltered": [6, 7, 12, 13],
+        "pit_unsheltered": [4, 4, 8, 8],
+        "total_population": [1000, 1010, 2000, 2010],
+        "median_household_income": [60000.0, 60500.0, 70000.0, 70500.0],
+        "zori": [1200.0, 1260.0, 1400.0, 1456.0],
+    })
+    coc = pd.DataFrame({
+        "geo_id": ["C1", "C1", "C2", "C2"],
+        "year": [2015, 2016, 2015, 2016],
+        "pit_total": [5, 6, 7, 8],
+        "pit_sheltered": [3, 4, 4, 5],
+        "pit_unsheltered": [2, 2, 3, 3],
+        "total_population": [500, 505, 700, 710],
+        "median_household_income": [40000.0, 40500.0, 45000.0, 45500.0],
+        "zori": [900.0, 945.0, 950.0, 997.5],
+    })
+
+    broad_path = tmp_path / "data" / "curated" / "panel" / "panel__metro__Y2015-2024@Dglynnfoxv1.parquet"
+    coc_path = tmp_path / "data" / "curated" / "panel" / "panel__Y2015-2024@B2025.parquet"
+    broad_path.parent.mkdir(parents=True, exist_ok=True)
+    broad.to_parquet(broad_path)
+    coc.to_parquet(coc_path)
+
+    manifests = build_audit_panels(tmp_path)
+
+    v = METRO_DEFINITION_VERSION
+    expected_filenames = [
+        metro_definitions_filename(v),
+        metro_coc_membership_filename(v),
+        metro_county_membership_filename(v),
+    ]
+
+    for manifest in manifests:
+        panel_dir = tmp_path / "outputs" / "audit_panels" / manifest["panel_name"]
+        if manifest["unit_type"] == "metro":
+            # Metro outputs must include reference artifacts.
+            assert "metro_reference_artifacts" in manifest
+            assert sorted(manifest["metro_reference_artifacts"]) == sorted(expected_filenames)
+            for fn in expected_filenames:
+                assert (panel_dir / fn).exists()
+            # Validation report should list them in artifacts_present.
+            report = json.loads((panel_dir / "validation_report.json").read_text())
+            for fn in expected_filenames:
+                assert report["artifacts_present"].get(fn) is True
+        else:
+            # CoC outputs must NOT include metro reference artifacts.
+            assert "metro_reference_artifacts" not in manifest
+            for fn in expected_filenames:
+                assert not (panel_dir / fn).exists()

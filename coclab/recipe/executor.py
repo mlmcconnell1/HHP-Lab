@@ -253,10 +253,15 @@ def _resolve_metro_transform_df(
             base_dir=data_root,
         )
         tracts = pd.read_parquet(tract_path(base_ref.vintage, data_root))
-        tract_col = "tract_geoid" if "tract_geoid" in tracts.columns else "GEOID"
-        if tract_col not in tracts.columns:
+        tract_col: str | None = None
+        for candidate in ("tract_geoid", "GEOID", "geoid"):
+            if candidate in tracts.columns:
+                tract_col = candidate
+                break
+        if tract_col is None:
             raise ExecutorError(
                 "Tract geometry artifact is missing a tract identifier column. "
+                f"Expected one of tract_geoid/GEOID/geoid. "
                 f"Available columns: {sorted(tracts.columns)}"
             )
         tract_index = tracts[[tract_col]].copy()

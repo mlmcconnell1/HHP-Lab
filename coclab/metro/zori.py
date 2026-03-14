@@ -134,3 +134,59 @@ def collapse_zori_to_yearly(
         Yearly metro ZORI with ``metro_id``, ``year``, ``zori_coc``, etc.
     """
     return collapse_to_yearly(monthly_df, method, geo_id_col="metro_id")
+
+
+def aggregate_yearly_zori_to_metro(
+    zori_yearly: pd.DataFrame,
+    county_population: pd.DataFrame,
+    *,
+    county_membership_df: pd.DataFrame | None = None,
+) -> pd.DataFrame:
+    """Aggregate yearly county ZORI to metros using per-year population weights.
+
+    Unlike :func:`aggregate_zori_to_metro` (which operates on monthly data with
+    a single weight snapshot), this function applies year-specific population
+    weights — appropriate for multi-year panels where county populations shift
+    over time.
+
+    Parameters
+    ----------
+    zori_yearly : pd.DataFrame
+        Yearly county-level ZORI with columns:
+        - ``county_fips`` (str): 5-digit FIPS code
+        - ``year`` (int): year
+        - ``zori`` (float): ZORI value (e.g., January observation)
+    county_population : pd.DataFrame
+        County population by year with columns:
+        - ``county_fips`` (str): 5-digit FIPS code
+        - ``year`` (int): year
+        - ``population`` (numeric): population count used as weight
+    county_membership_df : pd.DataFrame, optional
+        Metro-county membership override.  Must have ``metro_id`` and
+        ``county_fips`` columns.  If None, uses the built-in membership.
+
+    Returns
+    -------
+    pd.DataFrame
+        Yearly metro ZORI with columns: ``metro_id``, ``year``, ``zori``.
+    """
+    if county_membership_df is not None:
+        membership = county_membership_df[["metro_id", "county_fips"]].copy()
+    else:
+        membership = build_county_membership_df()[["metro_id", "county_fips"]]
+
+    merged = membership.merge(zori_yearly, on="county_fips", how="inner")
+    merged = merged.merge(county_population, on=["county_fips", "year"], how="left")
+
+    # Compute per-metro-year normalised weights.
+    merged["weight"] = merged.groupby(["metro_id", "year"])["population"].transform(
+        lambda s: s / s.sum()
+    )
+    merged["weighted_zori"] = merged["zori"] * merged["weight"]
+
+    result = (
+        merged.groupby(["metro_id", "year"], as_index=False)["weighted_zori"]
+        .sum()
+        .rename(columns={"weighted_zori": "zori"})
+    )
+    return result.sort_values(["metro_id", "year"]).reset_index(drop=True)

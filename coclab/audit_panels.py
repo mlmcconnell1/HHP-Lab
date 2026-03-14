@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import shutil
 import subprocess
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -11,12 +12,16 @@ from typing import Any
 
 import pandas as pd
 
+from coclab import naming
 from coclab.metro.acs import aggregate_acs_to_metro
 from coclab.metro.io import (
     read_metro_coc_membership,
     read_metro_county_membership,
 )
+from coclab.metro.zori import aggregate_yearly_zori_to_metro
 from coclab.provenance import ProvenanceBlock, write_parquet_with_provenance
+
+METRO_DEFINITION_VERSION = "glynn_fox_v1"
 
 RAW_REQUIRED_COLUMNS: list[str] = [
     "geo_id",
@@ -192,7 +197,7 @@ def _build_metro_source_panel(project_root: Path) -> pd.DataFrame:
     county_membership = read_metro_county_membership(base_dir=project_root / "data")
 
     metro_acs_frames: list[pd.DataFrame] = []
-    metro_zori_frames: list[pd.DataFrame] = []
+    county_pop_frames: list[pd.DataFrame] = []
     for year in years:
         acs = pd.read_parquet(_acs_path_for_year(project_root, year)).copy()
         acs_for_metro = acs.rename(columns={"tract_geoid": "GEOID"})
@@ -216,26 +221,25 @@ def _build_metro_source_panel(project_root: Path) -> pd.DataFrame:
             acs.assign(county_fips=acs["tract_geoid"].str[:5])
             .groupby("county_fips", as_index=False)["total_population"]
             .sum()
+            .rename(columns={"total_population": "population"})
         )
-        january_zori = zori[zori["year"] == year][["geo_id", "zori"]].rename(
-            columns={"geo_id": "county_fips"}
-        )
-        metro_zori = county_membership.merge(january_zori, on="county_fips", how="inner")
-        metro_zori = metro_zori.merge(county_pop, on="county_fips", how="left")
-        metro_zori["weight"] = metro_zori.groupby("metro_id")["total_population"].transform(
-            lambda s: s / s.sum()
-        )
-        metro_zori["weighted_zori"] = metro_zori["zori"] * metro_zori["weight"]
-        metro_zori = (
-            metro_zori.groupby("metro_id", as_index=False)["weighted_zori"]
-            .sum()
-            .rename(columns={"weighted_zori": "zori"})
-        )
-        metro_zori["year"] = year
-        metro_zori_frames.append(metro_zori)
+        county_pop["year"] = year
+        county_pop_frames.append(county_pop)
 
     metro_acs_df = pd.concat(metro_acs_frames, ignore_index=True)
-    metro_zori_df = pd.concat(metro_zori_frames, ignore_index=True)
+
+    # Build yearly county ZORI (January) and population tables, then
+    # delegate to the reusable population-weighted aggregator.
+    zori_yearly = (
+        zori[zori["year"].isin(years)][["geo_id", "year", "zori"]]
+        .rename(columns={"geo_id": "county_fips"})
+    )
+    county_pop_df = pd.concat(county_pop_frames, ignore_index=True)
+    metro_zori_df = aggregate_yearly_zori_to_metro(
+        zori_yearly,
+        county_pop_df,
+        county_membership_df=county_membership,
+    )
     panel = metro_pit.merge(metro_acs_df, on=["metro_id", "year"], how="inner")
     panel = panel.merge(metro_zori_df, on=["metro_id", "year"], how="inner")
     panel["geo_id"] = panel["metro_id"]
@@ -453,6 +457,31 @@ def _validate_modeling_ready(
     }
 
 
+def _copy_metro_reference_artifacts(
+    *,
+    project_root: Path,
+    output_dir: Path,
+    definition_version: str = METRO_DEFINITION_VERSION,
+) -> list[str]:
+    """Copy metro definition artifacts into the audit output bundle.
+
+    Returns the list of filenames copied (empty if source files are missing).
+    """
+    data_root = project_root / "data"
+    source_paths = [
+        naming.metro_definitions_path(definition_version, data_root),
+        naming.metro_coc_membership_path(definition_version, data_root),
+        naming.metro_county_membership_path(definition_version, data_root),
+    ]
+    output_dir.mkdir(parents=True, exist_ok=True)
+    copied: list[str] = []
+    for src in source_paths:
+        if src.exists():
+            shutil.copy2(src, output_dir / src.name)
+            copied.append(src.name)
+    return copied
+
+
 def _write_panel_artifacts(
     *,
     project_root: Path,
@@ -487,17 +516,29 @@ def _write_panel_artifacts(
     write_parquet_with_provenance(raw_df, raw_path, provenance)
     write_parquet_with_provenance(modeling_df, modeling_path, provenance)
 
+    # Include metro definition reference artifacts for metro-based outputs.
+    metro_ref_artifacts: list[str] = []
+    if spec.unit_type == "metro":
+        metro_ref_artifacts = _copy_metro_reference_artifacts(
+            project_root=project_root,
+            output_dir=output_dir,
+        )
+
+    artifacts_present: dict[str, bool] = {
+        "raw_panel": raw_path.exists(),
+        "modeling_input": modeling_path.exists(),
+        "validation_report": True,
+        "panel_manifest": True,
+    }
+    for artifact_name in metro_ref_artifacts:
+        artifacts_present[artifact_name] = True
+
     validation_report = {
         "panel_name": spec.panel_name,
         "workload_id": spec.workload_id,
         "raw_validation": raw_validation,
         "modeling_validation": modeling_validation,
-        "artifacts_present": {
-            "raw_panel": raw_path.exists(),
-            "modeling_input": modeling_path.exists(),
-            "validation_report": True,
-            "panel_manifest": True,
-        },
+        "artifacts_present": artifacts_present,
     }
     output_dir.mkdir(parents=True, exist_ok=True)
     validation_path.write_text(json.dumps(validation_report, indent=2), encoding="utf-8")
@@ -533,6 +574,8 @@ def _write_panel_artifacts(
         },
         "n_units_pre_filter": int(pre_filter_df["geo_id"].nunique()),
     }
+    if metro_ref_artifacts:
+        manifest["metro_reference_artifacts"] = metro_ref_artifacts
     manifest_path.write_text(json.dumps(manifest, indent=2), encoding="utf-8")
     return manifest
 

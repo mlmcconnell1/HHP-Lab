@@ -12,7 +12,11 @@ from coclab.metro.definitions import (
     METRO_COUNTY_MEMBERSHIP,
     build_county_membership_df,
 )
-from coclab.metro.zori import aggregate_zori_to_metro, collapse_zori_to_yearly
+from coclab.metro.zori import (
+    aggregate_yearly_zori_to_metro,
+    aggregate_zori_to_metro,
+    collapse_zori_to_yearly,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -342,3 +346,100 @@ class TestTruthTable:
                 f"{metro_id} should have ZORI=1500 (uniform)"
             )
             assert row.iloc[0]["geo_count"] == county_counts[metro_id]
+
+
+# ---------------------------------------------------------------------------
+# Yearly population-weighted aggregation
+# ---------------------------------------------------------------------------
+
+
+class TestYearlyPopulationWeighted:
+    """Tests for aggregate_yearly_zori_to_metro."""
+
+    def test_single_county_passthrough(self):
+        """Single-county metro returns ZORI unchanged."""
+        membership = pd.DataFrame({
+            "metro_id": ["M1"],
+            "county_fips": ["99001"],
+        })
+        zori = pd.DataFrame({
+            "county_fips": ["99001", "99001"],
+            "year": [2020, 2021],
+            "zori": [1000.0, 1100.0],
+        })
+        pop = pd.DataFrame({
+            "county_fips": ["99001", "99001"],
+            "year": [2020, 2021],
+            "population": [50000, 51000],
+        })
+        result = aggregate_yearly_zori_to_metro(
+            zori, pop, county_membership_df=membership,
+        )
+        assert len(result) == 2
+        assert result.loc[result["year"] == 2020, "zori"].iloc[0] == pytest.approx(1000.0)
+        assert result.loc[result["year"] == 2021, "zori"].iloc[0] == pytest.approx(1100.0)
+
+    def test_multi_county_population_weighted(self):
+        """Multi-county metro uses population-weighted mean per year."""
+        membership = pd.DataFrame({
+            "metro_id": ["M1", "M1"],
+            "county_fips": ["99001", "99002"],
+        })
+        zori = pd.DataFrame({
+            "county_fips": ["99001", "99002"],
+            "year": [2020, 2020],
+            "zori": [1000.0, 2000.0],
+        })
+        # County 99001 has 3x the population of 99002.
+        pop = pd.DataFrame({
+            "county_fips": ["99001", "99002"],
+            "year": [2020, 2020],
+            "population": [75000, 25000],
+        })
+        result = aggregate_yearly_zori_to_metro(
+            zori, pop, county_membership_df=membership,
+        )
+        expected = 1000.0 * 0.75 + 2000.0 * 0.25
+        assert result.loc[0, "zori"] == pytest.approx(expected)
+
+    def test_weights_vary_by_year(self):
+        """Year-specific weights produce different results per year."""
+        membership = pd.DataFrame({
+            "metro_id": ["M1", "M1"],
+            "county_fips": ["99001", "99002"],
+        })
+        zori = pd.DataFrame({
+            "county_fips": ["99001", "99002", "99001", "99002"],
+            "year": [2020, 2020, 2021, 2021],
+            "zori": [1000.0, 2000.0, 1000.0, 2000.0],
+        })
+        # Year 2020: equal weight → mean 1500
+        # Year 2021: 99002 has 3x population → mean 1750
+        pop = pd.DataFrame({
+            "county_fips": ["99001", "99002", "99001", "99002"],
+            "year": [2020, 2020, 2021, 2021],
+            "population": [50000, 50000, 25000, 75000],
+        })
+        result = aggregate_yearly_zori_to_metro(
+            zori, pop, county_membership_df=membership,
+        )
+        r2020 = result.loc[result["year"] == 2020, "zori"].iloc[0]
+        r2021 = result.loc[result["year"] == 2021, "zori"].iloc[0]
+        assert r2020 == pytest.approx(1500.0)
+        assert r2021 == pytest.approx(1750.0)
+
+    def test_uses_builtin_membership_by_default(self, all_county_fips):
+        """Without county_membership_df, uses built-in Glynn-Fox membership."""
+        zori = pd.DataFrame({
+            "county_fips": all_county_fips,
+            "year": [2020] * len(all_county_fips),
+            "zori": [1500.0] * len(all_county_fips),
+        })
+        pop = pd.DataFrame({
+            "county_fips": all_county_fips,
+            "year": [2020] * len(all_county_fips),
+            "population": [10000] * len(all_county_fips),
+        })
+        result = aggregate_yearly_zori_to_metro(zori, pop)
+        assert result["metro_id"].nunique() == METRO_COUNT
+        assert result["zori"].tolist() == pytest.approx([1500.0] * METRO_COUNT)

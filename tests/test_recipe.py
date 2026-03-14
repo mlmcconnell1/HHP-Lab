@@ -2058,6 +2058,42 @@ class TestMaterialize:
         assert {"metro_id", "tract_geoid", "area_share"} <= set(xwalk.columns)
         assert set(xwalk["metro_id"]) == {"GF01", "GF02"}
 
+    def test_materialize_tract_to_metro_with_lowercase_geoid(self, tmp_path: Path):
+        """Tract artifacts with lowercase 'geoid' column should work."""
+        _setup_curated_metro_artifacts(tmp_path)
+        tract_dir = tmp_path / "data" / "curated" / "tiger"
+        tract_dir.mkdir(parents=True, exist_ok=True)
+        pd.DataFrame({
+            "geoid": ["36061000100", "06037000100"],
+        }).to_parquet(tract_dir / "tracts__T2020.parquet")
+
+        data = _recipe_with_pipeline()
+        data["targets"] = [{
+            "id": "metro_panel",
+            "geometry": {"type": "metro", "source": "glynn_fox_v1"},
+        }]
+        data["pipelines"][0]["target"] = "metro_panel"
+        data["pipelines"][0]["steps"] = [
+            {"materialize": {"transforms": ["tract_to_metro"]}},
+        ]
+        data["transforms"] = [{
+            "id": "tract_to_metro",
+            "type": "crosswalk",
+            "from": {"type": "tract", "vintage": 2020},
+            "to": {"type": "metro", "source": "glynn_fox_v1"},
+            "spec": {"weighting": {"scheme": "area"}},
+        }]
+        recipe = load_recipe(data)
+        ctx = ExecutionContext(project_root=tmp_path, recipe=recipe)
+
+        task = MaterializeTask(transform_ids=["tract_to_metro"])
+        result = _execute_materialize(task, ctx)
+
+        assert result.success
+        xwalk = pd.read_parquet(ctx.transform_paths["tract_to_metro"])
+        assert {"metro_id", "tract_geoid", "area_share"} <= set(xwalk.columns)
+        assert set(xwalk["metro_id"]) == {"GF01", "GF02"}
+
     def test_materialize_fails_missing_artifact(self, tmp_path: Path):
         ctx = self._make_ctx(tmp_path)
         from coclab.recipe.planner import MaterializeTask
