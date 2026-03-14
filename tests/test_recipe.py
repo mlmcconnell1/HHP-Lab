@@ -1543,6 +1543,13 @@ def _setup_metro_pipeline_fixtures(tmp_path: Path) -> None:
     }).to_parquet(data_dir / "metro_acs.parquet")
 
 
+def _setup_curated_metro_artifacts(tmp_path: Path) -> None:
+    """Write the curated Glynn/Fox metro definition artifacts for tests."""
+    from coclab.metro.io import write_metro_artifacts
+
+    write_metro_artifacts(base_dir=tmp_path / "data")
+
+
 class TestExecutor:
 
     def test_execute_recipe_returns_results(self, tmp_path: Path):
@@ -1913,6 +1920,28 @@ class TestMaterialize:
         path = _resolve_transform_path("county_to_coc", recipe, tmp_path)
         assert "xwalk__B2025xC2023" in str(path)
 
+    def test_resolve_coc_to_metro_crosswalk_path(self, tmp_path: Path):
+        data = _recipe_with_pipeline()
+        data["targets"] = [{
+            "id": "metro_panel",
+            "geometry": {"type": "metro", "source": "glynn_fox_v1"},
+        }]
+        data["pipelines"][0]["target"] = "metro_panel"
+        data["pipelines"][0]["steps"] = [
+            {"materialize": {"transforms": ["coc_to_metro"]}},
+        ]
+        data["transforms"] = [{
+            "id": "coc_to_metro",
+            "type": "crosswalk",
+            "from": {"type": "coc", "vintage": 2025},
+            "to": {"type": "metro", "source": "glynn_fox_v1"},
+            "spec": {"weighting": {"scheme": "area"}},
+        }]
+        recipe = load_recipe(data)
+        path = _resolve_transform_path("coc_to_metro", recipe, tmp_path)
+        assert ".recipe_cache/transforms" in str(path)
+        assert "coc_to_metro__coc_2025__glynn_fox_v1.parquet" in str(path)
+
     def test_unknown_transform_raises(self, tmp_path: Path):
         recipe = load_recipe(_recipe_with_pipeline())
         with pytest.raises(ExecutorError, match="not found in recipe"):
@@ -1948,6 +1977,71 @@ class TestMaterialize:
         result = _execute_materialize(task, ctx)
         assert result.success
         assert "tract_to_coc" in ctx.transform_paths
+
+    def test_materialize_generates_coc_to_metro_artifact(self, tmp_path: Path):
+        _setup_curated_metro_artifacts(tmp_path)
+        data = _recipe_with_pipeline()
+        data["targets"] = [{
+            "id": "metro_panel",
+            "geometry": {"type": "metro", "source": "glynn_fox_v1"},
+        }]
+        data["pipelines"][0]["target"] = "metro_panel"
+        data["pipelines"][0]["steps"] = [
+            {"materialize": {"transforms": ["coc_to_metro"]}},
+        ]
+        data["transforms"] = [{
+            "id": "coc_to_metro",
+            "type": "crosswalk",
+            "from": {"type": "coc", "vintage": 2025},
+            "to": {"type": "metro", "source": "glynn_fox_v1"},
+            "spec": {"weighting": {"scheme": "area"}},
+        }]
+        recipe = load_recipe(data)
+        ctx = ExecutionContext(project_root=tmp_path, recipe=recipe)
+
+        task = MaterializeTask(transform_ids=["coc_to_metro"])
+        result = _execute_materialize(task, ctx)
+
+        assert result.success
+        xwalk_path = ctx.transform_paths["coc_to_metro"]
+        xwalk = pd.read_parquet(xwalk_path)
+        assert {"metro_id", "coc_id", "area_share"} <= set(xwalk.columns)
+        assert (xwalk["area_share"] == 1.0).all()
+
+    def test_materialize_generates_tract_to_metro_artifact(self, tmp_path: Path):
+        _setup_curated_metro_artifacts(tmp_path)
+        tract_dir = tmp_path / "data" / "curated" / "tiger"
+        tract_dir.mkdir(parents=True, exist_ok=True)
+        pd.DataFrame({
+            "GEOID": ["36061000100", "06037000100"],
+        }).to_parquet(tract_dir / "tracts__T2020.parquet")
+
+        data = _recipe_with_pipeline()
+        data["targets"] = [{
+            "id": "metro_panel",
+            "geometry": {"type": "metro", "source": "glynn_fox_v1"},
+        }]
+        data["pipelines"][0]["target"] = "metro_panel"
+        data["pipelines"][0]["steps"] = [
+            {"materialize": {"transforms": ["tract_to_metro"]}},
+        ]
+        data["transforms"] = [{
+            "id": "tract_to_metro",
+            "type": "crosswalk",
+            "from": {"type": "tract", "vintage": 2020},
+            "to": {"type": "metro", "source": "glynn_fox_v1"},
+            "spec": {"weighting": {"scheme": "area"}},
+        }]
+        recipe = load_recipe(data)
+        ctx = ExecutionContext(project_root=tmp_path, recipe=recipe)
+
+        task = MaterializeTask(transform_ids=["tract_to_metro"])
+        result = _execute_materialize(task, ctx)
+
+        assert result.success
+        xwalk = pd.read_parquet(ctx.transform_paths["tract_to_metro"])
+        assert {"metro_id", "tract_geoid", "area_share"} <= set(xwalk.columns)
+        assert set(xwalk["metro_id"]) == {"GF01", "GF02"}
 
     def test_materialize_fails_missing_artifact(self, tmp_path: Path):
         ctx = self._make_ctx(tmp_path)
@@ -2137,6 +2231,140 @@ class TestResampleAggregate:
         # weighted_mean = (50000*0.6 + 60000*0.4) / (0.6+0.4) = 54000
         coc1_income = df[df.geo_id == "COC1"]["income"].iloc[0]
         assert coc1_income == pytest.approx(54000.0)
+
+    def test_aggregate_sum_with_coc_to_metro_crosswalk(self, tmp_path: Path):
+        _setup_curated_metro_artifacts(tmp_path)
+        ds_path = tmp_path / "data" / "pit.parquet"
+        pd.DataFrame({
+            "coc_id": ["NY-600", "CA-600"],
+            "year": [2020, 2020],
+            "pop": [100, 200],
+        }).to_parquet(ds_path)
+
+        data = _recipe_with_pipeline()
+        data["targets"] = [{
+            "id": "metro_panel",
+            "geometry": {"type": "metro", "source": "glynn_fox_v1"},
+        }]
+        data["pipelines"][0]["target"] = "metro_panel"
+        data["pipelines"][0]["steps"] = [
+            {"materialize": {"transforms": ["coc_to_metro"]}},
+        ]
+        data["datasets"]["pit"]["path"] = "data/pit.parquet"
+        data["transforms"] = [{
+            "id": "coc_to_metro",
+            "type": "crosswalk",
+            "from": {"type": "coc", "vintage": 2025},
+            "to": {"type": "metro", "source": "glynn_fox_v1"},
+            "spec": {"weighting": {"scheme": "area"}},
+        }]
+        recipe = load_recipe(data)
+        ctx = ExecutionContext(project_root=tmp_path, recipe=recipe)
+        materialize_result = _execute_materialize(
+            MaterializeTask(transform_ids=["coc_to_metro"]),
+            ctx,
+        )
+        assert materialize_result.success
+
+        task = ResampleTask(
+            dataset_id="pit",
+            year=2020,
+            input_path="data/pit.parquet",
+            effective_geometry=GeometryRef(type="coc", vintage=2025),
+            method="aggregate",
+            transform_id="coc_to_metro",
+            to_geometry=GeometryRef(type="metro", source="glynn_fox_v1"),
+            measures=["pop"],
+            aggregation="sum",
+        )
+        result = _execute_resample(task, ctx)
+
+        assert result.success
+        df = ctx.intermediates[("pit", 2020)].sort_values("geo_id").reset_index(drop=True)
+        assert list(df["geo_id"]) == ["GF01", "GF02"]
+        assert list(df["pop"]) == [100.0, 200.0]
+
+    def test_aggregate_weighted_mean_with_dynamic_metro_pop_share(self, tmp_path: Path):
+        _setup_curated_metro_artifacts(tmp_path)
+        zori_path = tmp_path / "data" / "zori.parquet"
+        pd.DataFrame({
+            "county_fips": ["36061", "06037"],
+            "year": [2020, 2020],
+            "rent": [1000.0, 2000.0],
+        }).to_parquet(zori_path)
+        weights_path = tmp_path / "data" / "county_weights.parquet"
+        pd.DataFrame({
+            "county_fips": ["36061", "06037"],
+            "year": [2020, 2020],
+            "total_population": [1.0, 3.0],
+        }).to_parquet(weights_path)
+
+        data = _recipe_with_pipeline()
+        data["targets"] = [{
+            "id": "metro_panel",
+            "geometry": {"type": "metro", "source": "glynn_fox_v1"},
+        }]
+        data["pipelines"][0]["target"] = "metro_panel"
+        data["pipelines"][0]["steps"] = [
+            {"materialize": {"transforms": ["county_to_metro"]}},
+        ]
+        data["datasets"]["pit"] = {
+            "provider": "zillow",
+            "product": "zori",
+            "version": 1,
+            "native_geometry": {"type": "county", "vintage": 2020},
+            "years": "2020-2021",
+            "path": "data/zori.parquet",
+            "geo_column": "county_fips",
+        }
+        data["datasets"]["weights"] = {
+            "provider": "census",
+            "product": "acs5",
+            "version": 1,
+            "native_geometry": {"type": "county", "vintage": 2020},
+            "years": "2020-2021",
+            "path": "data/county_weights.parquet",
+            "geo_column": "county_fips",
+        }
+        data["transforms"] = [{
+            "id": "county_to_metro",
+            "type": "crosswalk",
+            "from": {"type": "county", "vintage": 2020},
+            "to": {"type": "metro", "source": "glynn_fox_v1"},
+            "spec": {
+                "weighting": {
+                    "scheme": "population",
+                    "population_source": "weights",
+                    "population_field": "total_population",
+                }
+            },
+        }]
+        recipe = load_recipe(data)
+        ctx = ExecutionContext(project_root=tmp_path, recipe=recipe)
+        materialize_result = _execute_materialize(
+            MaterializeTask(transform_ids=["county_to_metro"]),
+            ctx,
+        )
+        assert materialize_result.success
+
+        task = ResampleTask(
+            dataset_id="pit",
+            year=2020,
+            input_path="data/zori.parquet",
+            effective_geometry=GeometryRef(type="county", vintage=2020),
+            method="aggregate",
+            transform_id="county_to_metro",
+            to_geometry=GeometryRef(type="metro", source="glynn_fox_v1"),
+            measures=["rent"],
+            aggregation="weighted_mean",
+            geo_column="county_fips",
+        )
+        result = _execute_resample(task, ctx)
+
+        assert result.success
+        df = ctx.intermediates[("pit", 2020)].sort_values("geo_id").reset_index(drop=True)
+        assert list(df["geo_id"]) == ["GF01", "GF02"]
+        assert list(df["rent"]) == [1000.0, 2000.0]
 
     def test_aggregate_missing_transform_fails(self, tmp_path: Path):
         ds_path = tmp_path / "data" / "acs.parquet"

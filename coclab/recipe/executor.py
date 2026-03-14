@@ -20,9 +20,11 @@ import typer
 
 from coclab.naming import (
     county_xwalk_path,
+    tract_path,
     geo_panel_filename,
     tract_xwalk_path,
 )
+from coclab.provenance import ProvenanceBlock, write_parquet_with_provenance
 from coclab.recipe.cache import RecipeCache
 from coclab.recipe.manifest import AssetRecord, RecipeManifest, write_manifest
 from coclab.recipe.planner import (
@@ -98,6 +100,17 @@ def _echo(ctx: ExecutionContext, message: str) -> None:
         typer.echo(message)
 
 
+def _get_transform(recipe: RecipeV1, transform_id: str):
+    """Return a transform by id or raise an ExecutorError."""
+    for transform in recipe.transforms:
+        if transform.id == transform_id:
+            return transform
+    raise ExecutorError(
+        f"Transform '{transform_id}' referenced in materialize step "
+        "but not found in recipe transforms."
+    )
+
+
 # ---------------------------------------------------------------------------
 # Transform artifact resolution
 # ---------------------------------------------------------------------------
@@ -115,19 +128,19 @@ def _resolve_transform_path(
 
     Raises ExecutorError if the geometry pair is not recognised.
     """
-    transform = None
-    for t in recipe.transforms:
-        if t.id == transform_id:
-            transform = t
-            break
-    if transform is None:
-        raise ExecutorError(
-            f"Transform '{transform_id}' referenced in materialize step "
-            f"but not found in recipe transforms."
-        )
+    transform = _get_transform(recipe, transform_id)
 
     from_ = transform.from_
     to = transform.to
+
+    metro_ref, base_ref = _identify_metro_and_base(from_, to)
+    if metro_ref is not None:
+        return _generated_metro_transform_path(
+            transform_id,
+            metro_ref=metro_ref,
+            base_ref=base_ref,
+            project_root=project_root,
+        )
 
     # Determine which geometry is the CoC boundary and which is the
     # base geography so we can build the right crosswalk filename.
@@ -165,6 +178,152 @@ def _identify_coc_and_base(
     return None, from_
 
 
+def _identify_metro_and_base(
+    from_: GeometryRef, to: GeometryRef,
+) -> tuple[GeometryRef | None, GeometryRef]:
+    """Identify which end of a transform is the metro geometry."""
+    if to.type == "metro":
+        return to, from_
+    if from_.type == "metro":
+        return from_, to
+    return None, from_
+
+
+def _generated_metro_transform_path(
+    transform_id: str,
+    *,
+    metro_ref: GeometryRef,
+    base_ref: GeometryRef,
+    project_root: Path,
+) -> Path:
+    """Return the recipe-cache path for a generated metro transform."""
+    definition = metro_ref.source or "unknown_definition"
+    base_suffix = base_ref.type
+    if base_ref.vintage is not None:
+        base_suffix = f"{base_suffix}_{base_ref.vintage}"
+    filename = f"{transform_id}__{base_suffix}__{definition}.parquet"
+    return project_root / _RECIPE_TRANSFORM_DIR / filename
+
+
+def _resolve_metro_transform_df(
+    *,
+    metro_ref: GeometryRef,
+    base_ref: GeometryRef,
+    project_root: Path,
+) -> pd.DataFrame:
+    """Build a metro crosswalk DataFrame from curated membership artifacts."""
+    if not metro_ref.source:
+        raise ExecutorError(
+            "Metro transforms require geometry.source to identify the "
+            "definition version (for example 'glynn_fox_v1')."
+        )
+
+    from coclab.metro.io import (
+        read_metro_coc_membership,
+        read_metro_county_membership,
+    )
+
+    data_root = project_root / "data"
+    definition_version = metro_ref.source
+
+    if base_ref.type == "coc":
+        xwalk = read_metro_coc_membership(
+            definition_version=definition_version,
+            base_dir=data_root,
+        )
+        xwalk["area_share"] = 1.0
+        return xwalk[["metro_id", "coc_id", "area_share", "definition_version"]]
+
+    if base_ref.type == "county":
+        xwalk = read_metro_county_membership(
+            definition_version=definition_version,
+            base_dir=data_root,
+        )
+        xwalk["area_share"] = 1.0
+        return xwalk[["metro_id", "county_fips", "area_share", "definition_version"]]
+
+    if base_ref.type == "tract":
+        if base_ref.vintage is None:
+            raise ExecutorError(
+                "Metro tract transforms require a tract vintage so the "
+                "executor can load the tract geometry artifact."
+            )
+        county_membership = read_metro_county_membership(
+            definition_version=definition_version,
+            base_dir=data_root,
+        )
+        tracts = pd.read_parquet(tract_path(base_ref.vintage, data_root))
+        tract_col = "tract_geoid" if "tract_geoid" in tracts.columns else "GEOID"
+        if tract_col not in tracts.columns:
+            raise ExecutorError(
+                "Tract geometry artifact is missing a tract identifier column. "
+                f"Available columns: {sorted(tracts.columns)}"
+            )
+        tract_index = tracts[[tract_col]].copy()
+        tract_index["tract_geoid"] = tract_index[tract_col].astype(str)
+        tract_index["county_fips"] = tract_index["tract_geoid"].str[:5]
+        xwalk = county_membership.merge(tract_index, on="county_fips", how="inner")
+        xwalk["area_share"] = 1.0
+        return xwalk[["metro_id", "tract_geoid", "area_share", "definition_version"]]
+
+    raise ExecutorError(
+        f"Metro transforms currently support tract, county, or coc bases; "
+        f"got '{base_ref.type}'."
+    )
+
+
+def _materialize_generated_metro_transform(
+    transform_id: str,
+    recipe: RecipeV1,
+    project_root: Path,
+) -> Path:
+    """Generate and persist a metro transform artifact for recipe execution."""
+    transform = _get_transform(recipe, transform_id)
+
+    metro_ref, base_ref = _identify_metro_and_base(transform.from_, transform.to)
+    if metro_ref is None:
+        raise ExecutorError(
+            f"Transform '{transform_id}' does not target metro geometry."
+        )
+
+    output_path = _generated_metro_transform_path(
+        transform_id,
+        metro_ref=metro_ref,
+        base_ref=base_ref,
+        project_root=project_root,
+    )
+    if output_path.exists():
+        return output_path
+
+    xwalk = _resolve_metro_transform_df(
+        metro_ref=metro_ref,
+        base_ref=base_ref,
+        project_root=project_root,
+    )
+    provenance = ProvenanceBlock(
+        geo_type="metro",
+        definition_version=metro_ref.source,
+        tract_vintage=(
+            str(base_ref.vintage)
+            if base_ref.type == "tract" and base_ref.vintage is not None
+            else None
+        ),
+        county_vintage=(
+            str(base_ref.vintage)
+            if base_ref.type == "county" and base_ref.vintage is not None
+            else None
+        ),
+        extra={
+            "dataset_type": "recipe_transform",
+            "transform_id": transform_id,
+            "from_type": transform.from_.type,
+            "to_type": transform.to.type,
+        },
+    )
+    write_parquet_with_provenance(xwalk, output_path, provenance)
+    return output_path
+
+
 # ---------------------------------------------------------------------------
 # Resample helpers
 # ---------------------------------------------------------------------------
@@ -173,6 +332,8 @@ def _identify_coc_and_base(
 _XWALK_JOIN_KEYS: dict[str, str] = {
     "tract": "tract_geoid",
     "county": "county_fips",
+    "coc": "coc_id",
+    "metro": "metro_id",
 }
 
 # Auto-detect candidates for geo-ID and year columns.
@@ -186,6 +347,8 @@ _XWALK_NON_GEO_COLS: set[str] = {
     "intersection_area", "tract_area", "county_area", "coc_area", "geo_area",
     "boundary_vintage", "tract_vintage", "definition_version",
 }
+
+_RECIPE_TRANSFORM_DIR = Path(".recipe_cache") / "transforms"
 
 
 def _detect_xwalk_target_col(
@@ -366,6 +529,122 @@ def _apply_temporal_filter(
         return df.groupby(group_cols, as_index=False)[measure_cols].agg(agg_func)
     else:
         raise ExecutorError(f"Unknown temporal filter method '{filt.method}'.")
+
+
+def _load_support_dataset_for_year(
+    *,
+    ctx: ExecutionContext,
+    dataset_id: str,
+    year: int,
+) -> pd.DataFrame:
+    """Load an auxiliary dataset and filter it to the requested year."""
+    resolved = _resolve_dataset_year(dataset_id, year, ctx.recipe)
+    if resolved.path is None:
+        raise ExecutorError(
+            f"Dataset '{dataset_id}' year {year}: no input path resolved."
+        )
+
+    input_file = ctx.project_root / resolved.path
+    if not input_file.exists():
+        raise ExecutorError(
+            f"Dataset '{dataset_id}' year {year}: input file not found at "
+            f"{resolved.path}"
+        )
+
+    df = ctx.cache.read_parquet(input_file)
+    identity = ctx.cache.file_identity(input_file)
+    ctx.consumed_assets.append(AssetRecord(
+        role="dataset",
+        path=str(input_file.relative_to(ctx.project_root)),
+        sha256=identity.sha256,
+        size=identity.size,
+        dataset_id=dataset_id,
+    ))
+
+    ds = ctx.recipe.datasets[dataset_id]
+    filt = ctx.recipe.filters.get(dataset_id)
+    if filt is not None and isinstance(filt, TemporalFilter):
+        df = _apply_temporal_filter(
+            df,
+            filt,
+            year,
+            dataset_id,
+            year_column=ds.year_column,
+        )
+
+    year_col = _resolve_year_column(df, ds.year_column)
+    if year_col is not None:
+        df = df[df[year_col] == year].copy()
+        if df.empty:
+            raise ExecutorError(
+                f"Dataset '{dataset_id}' year {year}: no rows after filtering "
+                f"{year_col}=={year}."
+            )
+
+    return df
+
+
+def _attach_dynamic_pop_share(
+    *,
+    xwalk: pd.DataFrame,
+    task: ResampleTask,
+    ctx: ExecutionContext,
+) -> pd.DataFrame:
+    """Populate pop_share from a transform's declared population source."""
+    if task.transform_id is None:
+        return xwalk
+    if "pop_share" in xwalk.columns and xwalk["pop_share"].notna().any():
+        return xwalk
+
+    transform = _get_transform(ctx.recipe, task.transform_id)
+    weighting = getattr(transform.spec, "weighting", None)
+    if weighting is None or weighting.scheme != "population":
+        return xwalk
+    if not weighting.population_source or not weighting.population_field:
+        raise ExecutorError(
+            f"Transform '{task.transform_id}' requires population_source and "
+            "population_field when scheme='population'."
+        )
+
+    source_key = _XWALK_JOIN_KEYS.get(task.effective_geometry.type)
+    if source_key is None or source_key not in xwalk.columns:
+        raise ExecutorError(
+            f"Transform '{task.transform_id}' cannot derive pop_share for "
+            f"geometry type '{task.effective_geometry.type}'."
+        )
+
+    weights_df = _load_support_dataset_for_year(
+        ctx=ctx,
+        dataset_id=weighting.population_source,
+        year=task.year,
+    )
+    weights_geo_col = _resolve_geo_column(
+        weights_df,
+        ctx.recipe.datasets[weighting.population_source].geo_column,
+    )
+    if weighting.population_field not in weights_df.columns:
+        raise ExecutorError(
+            f"Dataset '{weighting.population_source}' year {task.year}: missing "
+            f"population field '{weighting.population_field}'. "
+            f"Available: {sorted(weights_df.columns)}"
+        )
+
+    target_col = _detect_xwalk_target_col(xwalk, source_key)
+    weights = weights_df[[weights_geo_col, weighting.population_field]].copy()
+    weights = weights.rename(columns={weights_geo_col: source_key})
+    weights[weighting.population_field] = pd.to_numeric(
+        weights[weighting.population_field],
+        errors="coerce",
+    )
+
+    enriched = xwalk.merge(weights, on=source_key, how="left")
+    group_sum = enriched.groupby(target_col)[weighting.population_field].transform("sum")
+    enriched["pop_share"] = np.where(
+        group_sum > 0,
+        enriched[weighting.population_field] / group_sum,
+        np.nan,
+    )
+    return enriched.drop(columns=[weighting.population_field])
 
 
 def _resample_identity(
@@ -579,6 +858,12 @@ def _execute_materialize(
     _echo(ctx, f"  [materialize] {detail}")
 
     for tid in task.transform_ids:
+        generation_error: str | None = None
+        transform = None
+        for candidate in ctx.recipe.transforms:
+            if candidate.id == tid:
+                transform = candidate
+                break
         try:
             path = _resolve_transform_path(
                 tid, ctx.recipe, ctx.project_root,
@@ -590,6 +875,21 @@ def _execute_materialize(
                 success=False,
                 error=str(exc),
             )
+
+        metro_ref, _base_ref = (
+            _identify_metro_and_base(transform.from_, transform.to)
+            if transform is not None
+            else (None, None)
+        )
+        if metro_ref is not None and not path.exists():
+            try:
+                path = _materialize_generated_metro_transform(
+                    tid,
+                    ctx.recipe,
+                    ctx.project_root,
+                )
+            except ExecutorError as exc:
+                generation_error = str(exc)
 
         if path.exists():
             _echo(ctx, f"    reuse: {path.relative_to(ctx.project_root)}")
@@ -608,9 +908,15 @@ def _execute_materialize(
                 detail=detail,
                 success=False,
                 error=(
-                    f"Transform '{tid}' artifact not found at "
-                    f"{path.relative_to(ctx.project_root)}. "
-                    f"Run 'coclab generate xwalks' to build it first."
+                    generation_error
+                    if generation_error is not None
+                    else (
+                        f"Transform '{tid}' artifact not found at "
+                        f"{path.relative_to(ctx.project_root)}. "
+                        "Run 'coclab generate xwalks' to build CoC crosswalks "
+                        "first, or ensure the metro definition artifacts exist "
+                        "for metro transforms."
+                    )
                 ),
             )
 
@@ -758,6 +1064,11 @@ def _execute_resample(
                 )
             try:
                 xwalk = ctx.cache.read_parquet(xwalk_path)
+                xwalk = _attach_dynamic_pop_share(
+                    xwalk=xwalk,
+                    task=task,
+                    ctx=ctx,
+                )
             except (FileNotFoundError, OSError, pa.ArrowInvalid) as exc:
                 return StepResult(
                     step_kind="resample",
@@ -768,6 +1079,13 @@ def _execute_resample(
                         f"failed to read crosswalk "
                         f"'{task.transform_id}': {exc}"
                     ),
+                )
+            except ExecutorError as exc:
+                return StepResult(
+                    step_kind="resample",
+                    detail=detail,
+                    success=False,
+                    error=str(exc),
                 )
 
             if task.method == "aggregate":
