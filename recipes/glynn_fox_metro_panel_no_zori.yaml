@@ -1,15 +1,14 @@
 version: 1
-name: glynn_fox_metro_panel_2015_2016_zori
+name: glynn_fox_metro_panel_2011_2016_no_zori
 description: >
   Build a metro-year panel for the 25 Glynn/Fox metros using metro-native
-  recipe transforms. This follows the paper's analysis geography directly and
-  uses PIT counts, county PEP population totals, and January county ZORI
-  aggregated to the Glynn/Fox metro definition. The year range is limited to
-  2015-2016 because the current curated ZORI artifact starts in January 2015,
-  while the original paper's rent series spans 2011-2016.
+  recipe transforms. This matches the paper's full 2011-2016 analysis window
+  for outcomes that only require PIT counts and total population. ZORI is
+  intentionally excluded because the current curated Zillow artifact begins in
+  January 2015 and cannot support the paper's 2011-2014 rent observations.
 
 universe:
-  range: "2015-2016"
+  range: "2011-2016"
 
 targets:
   - id: metro_panel
@@ -22,7 +21,7 @@ datasets:
     product: pit
     version: 1
     native_geometry: { type: coc }
-    years: "2015-2016"
+    years: "2011-2016"
     year_column: pit_year
     geo_column: coc_id
     params:
@@ -35,25 +34,13 @@ datasets:
     product: pep
     version: 1
     native_geometry: { type: county, vintage: 2020, source: tiger }
-    years: "2015-2016"
+    years: "2011-2016"
     year_column: year
     geo_column: county_fips
     params:
       series: postcensal
       vintage: 2020
     path: data/curated/pep/pep_county__v2020__y2011-2016.parquet
-
-  zori_county:
-    provider: zillow
-    product: zori
-    version: 1
-    native_geometry: { type: county, vintage: 2020, source: tiger }
-    years: "2015-2016"
-    year_column: year
-    geo_column: geo_id
-    params:
-      align: point_in_time_jan
-    path: data/curated/zori/zori__county__Z2026.parquet
 
 transforms:
   - id: coc_to_metro
@@ -97,24 +84,9 @@ pipelines:
           measures: [population]
           aggregation: sum
 
-      - resample:
-          dataset: zori_county
-          to_geometry: { type: metro, source: glynn_fox_v1 }
-          method: aggregate
-          via: county_to_metro
-          measures: [zori]
-          aggregation: weighted_mean
-
       - join:
-          datasets: [pit, pep_county, zori_county]
+          datasets: [pit, pep_county]
           join_on: [geo_id, year]
-
-filters:
-  zori_county:
-    type: temporal
-    column: month
-    method: point_in_time
-    month: 1
 
 validation:
   crosswalk_coverage:
