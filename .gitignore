@@ -25,3 +25,7 @@ wheels/
 
 # bv (beads viewer) local config and caches
 .bv/
+
+# Local agent/generated caches
+.recipe_cache/
+.beads-backup/
