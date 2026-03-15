@@ -32,6 +32,8 @@ coclab build export --name my_bundle --build demo
 
 Important implementation detail:
 - `--build` is required in current code.
+- `--name` is also required.
+- `--include` defaults to `panel,manifest,codebook,diagnostics`.
 
 ## Manifest Semantics
 

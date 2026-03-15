@@ -239,6 +239,8 @@ erDiagram
 | `pit_unsheltered` | int | Unsheltered count (nullable) |
 | `boundary_vintage_used` | string | CoC boundary version applied |
 | `acs_vintage_used` | string | ACS estimate version applied |
+| `tract_vintage_used` | string | Tract vintage used for the crosswalk |
+| `alignment_type` | string | Alignment policy label (`period_faithful`, `retrospective`, or `custom`) |
 | `weighting_method` | string | `area` or `population` |
 | `total_population` | float | Weighted population estimate |
 | `adult_population` | float | Population 18 and older |
@@ -248,6 +250,14 @@ erDiagram
 | `coverage_ratio` | float | Fraction of CoC area covered by tracts with data |
 | `boundary_changed` | bool | True if CoC boundary changed from prior year |
 | `source` | string | Data source identifier |
+
+When ZORI is enabled, the panel appends:
+- `zori_coc`
+- `zori_coverage_ratio`
+- `zori_is_eligible`
+- `zori_excluded_reason`
+- `rent_to_income`
+- provenance fields `rent_metric`, `rent_alignment`, `zori_min_coverage`
 
 ## Metro Definition Schemas
 
@@ -345,6 +355,7 @@ When ZORI is enabled, the same ZORI columns as CoC panels are appended (`zori_co
 | Metro measures | `data/curated/measures/measures__metro__A{acs}@D{version}xT{tract}.parquet` | Metro ACS measures |
 | Metro PEP | `data/curated/pep/pep__metro__D{version}xC{county}__w{weight}__{start}_{end}.parquet` | Metro population estimates |
 | Metro ZORI | `data/curated/zori/zori__metro__A{acs}@D{version}xC{county}__w{weight}.parquet` | Metro rent index |
+| Metro ZORI yearly | `data/curated/zori/zori_yearly__metro__A{acs}@D{version}xC{county}__w{weight}__m{method}.parquet` | Metro yearly-collapsed rent index |
 | Metro panels | `data/curated/panel/panel__metro__Y{start}-{end}@D{version}.parquet` | Metro analysis panels |
 
 ## Normalized ZORI Schema
@@ -470,10 +481,10 @@ Filenames use temporal shorthand notation (see [[08-Temporal-Terminology]]).
 | Tract relationship | `data/curated/tiger/tract_relationship__T2010xT2020.parquet` | 2010↔2020 tract bridge |
 | PEP county | `data/curated/pep/pep_county__v{vintage}.parquet` | PEP county estimates |
 | PEP combined | `data/curated/pep/pep_county__combined.parquet` | Combined PEP series |
-| CoC PEP | `data/curated/pep/coc_pep__B{boundary}xC{county}__w{weight}.parquet` | Aggregated CoC PEP |
+| CoC PEP | `data/curated/pep/coc_pep__B{boundary}xC{county}__w{weight}__{start}_{end}.parquet` | Aggregated CoC PEP |
 | Raw ZORI | `data/raw/zori/zori__{geography}__{date}.csv` | Downloaded Zillow CSV |
-| Normalized ZORI | `data/curated/zori/zori__{geography}.parquet` | Normalized ZORI data |
-| County weights | `data/curated/acs/county_weights__A{acs}__{method}.parquet` | ACS county weights |
+| Normalized ZORI | `data/curated/zori/zori__{geography}__Z{max_year}.parquet` | Normalized ZORI data |
+| County weights | `data/curated/acs/county_weights__A{acs}__w{method}.parquet` | ACS county weights |
 | CoC ZORI | `data/curated/zori/zori__A{acs}@B{boundary}xC{county}__w{weight}.parquet` | Aggregated CoC ZORI |
 | CoC ZORI yearly | `data/curated/zori/zori_yearly__A{acs}@B{boundary}xC{county}__w{weight}__m{method}.parquet` | Yearly collapsed ZORI |
 | Source registry | `data/curated/source_registry.parquet` | External source tracking |
@@ -497,20 +508,20 @@ All CoC Lab Parquet files embed **provenance metadata** in the file schema, enab
 ```json
 {
   "boundary_vintage": "2025",
-  "tract_vintage": "2023",
+  "tract_vintage": "2020",
   "acs_vintage": "2022",
   "weighting": "population",
   "created_at": "2025-01-05T12:30:00+00:00",
   "coclab_version": "0.1.0",
-  "notation": "A2022@B2025×T2023",
+  "notation": "A2022@B2025×T2020",
   "extra": {
     "dataset_type": "coc_measures",
-    "crosswalk_path": "data/curated/xwalks/xwalk__B2025xT2023.parquet"
+    "crosswalk_path": "data/curated/xwalks/xwalk__B2025xT2020.parquet"
   }
 }
 ```
 
-The `notation` field uses the shorthand from [[08-Temporal-Terminology|Temporal Terminology]]: this example describes ACS 2022 aggregated to 2025 CoC boundaries via 2023 tract crosswalk (A2022@B2025×T2023).
+The `notation` field uses the shorthand from [[08-Temporal-Terminology|Temporal Terminology]]: this example describes ACS 2022 aggregated to 2025 CoC boundaries via a 2020-era tract crosswalk (`A2022@B2025×T2020`).
 
 | Field | Type | Description |
 |-------|------|-------------|

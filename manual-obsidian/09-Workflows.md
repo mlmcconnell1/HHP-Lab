@@ -30,7 +30,7 @@ coclab build create --name demo --years 2018-2024
 coclab generate xwalks --build demo --boundary 2025 --tracts 2023 --counties 2023
 
 # 4) Aggregates
-coclab aggregate acs --build demo
+coclab aggregate acs --build demo --weighting population
 coclab aggregate zori --build demo --align pit_january
 coclab aggregate pep --build demo
 coclab aggregate pit --build demo
@@ -65,6 +65,7 @@ Use this path when you want the legacy panel contract; use recipe execution when
 - Keep heavy transformations build-scoped.
 - Treat recipe files as auditable execution plans, not ad-hoc scripts.
 - Use `--non-interactive` (or `COCLAB_NON_INTERACTIVE=1`) for agent automation.
+- Use `coclab build recipe --dry-run --json` and `coclab build recipe-plan --json` together as a pre-execution check.
 
 ---
 

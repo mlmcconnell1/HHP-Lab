@@ -39,6 +39,7 @@ Exit behavior:
 
 ```bash
 coclab build create --name demo --years 2018-2024
+coclab build create --name metro-gf --years 2011-2016 --geo-type metro --definition-version glynn_fox_v1
 coclab build list
 ```
 
@@ -47,6 +48,10 @@ coclab build list
 - `builds/<name>/data/raw/`
 - `builds/<name>/base/`
 - `builds/<name>/manifest.json`
+
+Current options also let you pin build metadata:
+- `--geo-type {coc,metro}` to mark the target analysis geography
+- `--definition-version` for metro builds
 
 ### Crosswalk Generation
 
@@ -61,6 +66,7 @@ Important options:
 - `--counties`
 - `--type {tracts,counties,all}`
 - `--population-weights`
+- `--auto-fetch` to fetch tract population inputs when population weights are requested
 
 ### Aggregation Commands
 
@@ -72,6 +78,11 @@ coclab aggregate pit --build demo
 ```
 
 All four require `--build` and write into `builds/<name>/data/curated/<dataset>/`.
+
+Current ACS aggregation details:
+- `aggregate acs` reads cached tract files only; it does not call Census APIs
+- `aggregate acs` supports `--align {vintage_end_year,window_center_year}`
+- `aggregate acs` defaults to `--weighting area`; use `--weighting population` when population-weighted interpolation is intended
 
 ### Imperative Panel Build
 
@@ -96,11 +107,16 @@ coclab build panel --build metro-gf --start 2011 --end 2016 \
 
 Metro builds aggregate PIT counts from member CoCs and derive ACS/PEP/ZORI measures from county membership tables. The `--definition-version` flag is required when `--geo-type` is `metro`.
 
+Current options also include:
+- `--strict` to fail the command on conformance errors
+- `--skip-conformance` to suppress post-build checks
+- `--zori-yearly-path` to point at an explicit yearly ZORI artifact
+
 ### Recipe Execution (Recommended)
 
 ```bash
 # Validate only
-coclab build recipe --recipe recipes/glynn_fox_v1.yaml --dry-run
+coclab build recipe --recipe recipes/glynn_fox_v1.yaml --dry-run --json
 
 # Execute
 coclab build recipe --recipe recipes/glynn_fox_v1.yaml
@@ -111,6 +127,7 @@ Current behavior:
 - Executes `materialize -> resample -> join -> persist`
 - Persists panel output to canonical `data/curated/panel/...` when the target declares `outputs: [panel]` (default)
 - Writes recipe sidecar manifest: `*.manifest.json`
+- Supports `--no-cache` to disable recipe asset caching
 
 ### Recipe Plan (No Execution)
 
@@ -137,7 +154,8 @@ coclab build export --name analysis_demo --build demo
 Key points:
 - `--build` is required in current implementation
 - Creates `exports/export-N/`
-- Produces `MANIFEST.json` and README
+- Produces `MANIFEST.json` and `README.md`
+- Supports `--include`, `--panel`, `--compress`, and vintage filters such as `--boundary-vintage`
 
 ### Artifact Inventory
 
@@ -148,6 +166,8 @@ coclab list artifacts --build demo --json
 Key options:
 - `--build` (required)
 - `--include-global / --build-only` to include or exclude global `data/curated` artifacts
+- `--geo-type {coc,metro}` to filter the inventory
+- `--definition-version` to scope metro inventories
 - `--json` for machine-readable inventory (roles, row/column counts where available, schema hash, provenance hints)
 
 ### Core Ingestion Commands
@@ -160,6 +180,10 @@ coclab ingest pit-vintage --vintage 2024
 coclab ingest zori --geography county
 coclab ingest pep --series auto
 ```
+
+Useful PEP options:
+- `--start` / `--end` to trim the emitted year range
+- `--prefer-postcensal-2020` when combining series
 
 ## JSON and Non-Interactive Modes
 
@@ -178,7 +202,7 @@ coclab ingest pep --series auto
 - `coclab diagnostics xwalk`
 - `coclab diagnostics panel`
 
-Current caveat: `list census/measures/xwalks --json` emits JSON when matches are found. Empty/missing-directory cases still emit human text and exit `0`.
+Current caveat: `list census/measures/xwalks --json` emits JSON when matches are found. Empty or missing-directory cases may still emit human text and exit `0`.
 
 ### Non-Interactive CLI Use
 

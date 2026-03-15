@@ -21,7 +21,7 @@ Single-letter prefixes identify dataset types:
 | Census county geometry | **C**{year} | C2023 | TIGER county shapes |
 | ACS vintage (end year) | **A**{year} | A2022 | Implies 5-year window ending that year |
 | PIT count year | **P**{year} | P2024 | The January count year |
-| ZORI yearly series | **Z**{year} | Z2024 | Yearly-collapsed ZORI (default: January alignment) |
+| ZORI ingest coverage tag | **Z**{year} | Z2026 | Maximum year present in an ingested monthly ZORI file |
 | Panel year | **Y**{year} | Y2023 | The "as-of" year for analysis |
 | Definition version | **D**{version} | Dglynnfoxv1 | Synthetic geography definition (see below) |
 
@@ -39,9 +39,10 @@ ACS 5-year estimates have an implicit collection window. The vintage year is the
 
 ZORI is published as a **monthly** series. In CoC Lab notation:
 
-- **Z{year}** refers to the **yearly-collapsed** ZORI value for that year.
-- The default collapse method is **January alignment** (`pit_january`) to match PIT timing.
-- If the collapse method matters, annotate it explicitly (e.g., `Z2024[pit_january]`, `Z2024[calendar_mean]`, `Z2024[calendar_median]`).
+- `zori__county__Z2026.parquet` means the ingested monthly file contains observations through 2026.
+- Yearly-collapsed CoC and metro outputs do **not** use `Z{year}` in filenames; they are keyed by ACS/crosswalk vintages and include `__m{method}`.
+- The default yearly collapse method is **January alignment** (`pit_january`) to match PIT timing.
+- If the collapse method matters in prose, annotate it explicitly (for example `pit_january`, `calendar_mean`, `calendar_median`).
 
 ### Definition Version Notation
 
@@ -57,7 +58,7 @@ Metro-derived filenames embed `__metro__` as a geography segment and use `D` ins
 |-----------|----------|
 | metro PIT P2024 | `pit__metro__P2024@Dglynnfoxv1.parquet` |
 | metro panel Y2020-2024 | `panel__metro__Y2020-2024@Dglynnfoxv1.parquet` |
-| metro measures A2023 | `measures__metro__A2023@Dglynnfoxv1xT2023.parquet` |
+| metro measures A2023 | `measures__metro__A2023@Dglynnfoxv1xT2020.parquet` |
 
 ## Compound Notation
 
@@ -67,8 +68,8 @@ When describing which vintages were combined in a derived dataset, use `@` for "
 |----------|---------|
 | **P2024@B2025** | 2024 PIT counts analyzed using 2025 boundaries |
 | **A2022@B2025** | ACS 2022 aggregated to 2025 CoC boundaries |
-| **A2022@B2025×T2023** | ACS 2022 aggregated to 2025 CoC boundaries via 2023 tract crosswalk |
-| **P2020@B2025×T2023** | 2020 PIT re-aligned to 2025 boundaries using 2023 tracts |
+| **A2022@B2025×T2020** | ACS 2022 aggregated to 2025 CoC boundaries via 2020-era tracts |
+| **P2020@B2025×T2020** | 2020 PIT re-aligned to 2025 boundaries using 2020-era tract geometry where an intermediary tract join is involved |
 | **Z2024@B2025×C2023** | 2024 ZORI aggregated to 2025 CoC boundaries via 2023 county crosswalk |
 
 ### Metro Compound Notation
@@ -78,7 +79,7 @@ When the target analysis geography is metro, `@D{version}` replaces `@B{year}`:
 | Notation | Meaning |
 |----------|---------|
 | **P2024@Dglynnfoxv1** | 2024 PIT counts aggregated to Glynn/Fox metro definitions |
-| **A2023@Dglynnfoxv1×T2023** | ACS 2023 aggregated to metros via 2023 tract crosswalk |
+| **A2023@Dglynnfoxv1×T2020** | ACS 2023 aggregated to metros via 2020-era tracts |
 | **Z2024@Dglynnfoxv1×C2023** | 2024 ZORI aggregated to metros via 2023 county membership |
 
 ### Reading Compound Notation
@@ -130,7 +131,7 @@ COC_PANEL.acs_vintage_used        →  Documents which A was applied
 
 ### In Documentation
 
-> "The 2018–2024 panel uses retrospective alignment (P{year}@B2025×T2023) to enable consistent time-series analysis. Years with boundary breaks are flagged."
+> "The 2018–2024 panel uses retrospective alignment (A{year-1}@B2025×T2020 for recent ACS vintages) to enable consistent time-series analysis. Years with boundary breaks are flagged."
 
 ### In Filenames
 
@@ -139,7 +140,7 @@ The shorthand maps directly to filenames (use `x` instead of `×` for ASCII comp
 | Shorthand | Filename |
 |-----------|----------|
 | B2025 | `coc__B2025.parquet` |
-| A2022@B2025×T2023 | `measures__A2022@B2025xT2023.parquet` |
+| A2022@B2025×T2020 | `measures__A2022@B2025xT2020.parquet` |
 | P2024 | `pit__P2024.parquet` |
 
 ### In Provenance Metadata
@@ -147,9 +148,9 @@ The shorthand maps directly to filenames (use `x` instead of `×` for ASCII comp
 ```json
 {
   "boundary_vintage": "2025",
-  "tract_vintage": "2023",
+  "tract_vintage": "2020",
   "acs_vintage": "2022",
-  "notation": "A2022@B2025×T2023"
+  "notation": "A2022@B2025×T2020"
 }
 ```
 
