@@ -1,12 +1,13 @@
-"""CLI command group for aggregating datasets to CoC level.
+"""CLI command group for aggregating build-scoped source datasets.
 
-Provides commands for acs, zori, pep, and pit dataset aggregation.
-Each command validates inputs, resolves build-scoped parameters, and
-delegates to the corresponding pipeline module.
+Provides commands for ACS, ZORI, PEP, and PIT aggregation. These
+commands validate inputs, resolve build-scoped parameters, and delegate
+to the corresponding pipeline module.
 
-All commands follow the hub-and-spoke model: the CoC boundary year is the
-hub, and each build year produces one output file with that year's boundary
-as the geographic reference.
+These commands currently materialize CoC-scoped aggregate artifacts. Those
+outputs remain a core input to downstream analysis, including metro-aware
+panel and recipe workflows that resample or join from CoC, county, and tract
+sources.
 """
 
 from __future__ import annotations
@@ -29,7 +30,7 @@ from coclab.year_spec import parse_year_spec
 
 aggregate_app = typer.Typer(
     name="aggregate",
-    help="Aggregate datasets to CoC level.",
+    help="Aggregate source datasets into build-scoped analysis inputs.",
     no_args_is_help=True,
 )
 
@@ -215,10 +216,11 @@ def aggregate_pep(
         ),
     ] = 0.95,
 ) -> None:
-    """Aggregate PEP population estimates to CoC level.
+    """Aggregate PEP population estimates into build-scoped CoC artifacts.
 
     Produces one file per boundary year (hub). County vintage matches
-    boundary year by default.
+    boundary year by default. These CoC outputs can then feed CoC panels
+    directly or metro workflows that resample county-native sources.
     """
     build_dir = _validate_build(build)
     _validate_align(align, PEP_ALIGN_MODES, "pep")
@@ -379,11 +381,11 @@ def aggregate_pit(
         ),
     ] = None,
 ) -> None:
-    """Aggregate PIT counts to CoC level.
+    """Aggregate PIT counts into build-scoped CoC artifacts.
 
     PIT data already contains coc_id, so this command filters and
     aligns PIT count data to the build's year scope.  Produces one
-    output file per boundary year.
+    output file per boundary year for downstream panel assembly.
     """
     build_dir = _validate_build(build)
     _validate_align(align, PIT_ALIGN_MODES, "pit")
@@ -545,7 +547,7 @@ def aggregate_acs(
         ),
     ] = None,
 ) -> None:
-    """Aggregate cached ACS tract data to CoC level.
+    """Aggregate cached ACS tract data into build-scoped CoC artifacts.
 
     Reads pre-ingested ACS tract files from disk and aggregates to CoC
     level using crosswalks.  No Census API calls are made.  If cached
@@ -781,11 +783,12 @@ def aggregate_zori(
         ),
     ] = "renter_households",
 ) -> None:
-    """Aggregate ZORI rent indices to CoC level.
+    """Aggregate ZORI rent indices into build-scoped CoC artifacts.
 
     Iterates over build years using each as the boundary vintage (hub).
     County vintage and ACS vintage for weights are derived from the
-    boundary year.
+    boundary year. Resulting yearly or monthly CoC artifacts can be used
+    directly in CoC panels or as curated inputs to metro workflows.
     """
     build_dir = _validate_build(build)
     _validate_align(align, ZORI_ALIGN_MODES, "zori")
