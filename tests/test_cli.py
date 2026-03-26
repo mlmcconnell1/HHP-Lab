@@ -449,3 +449,23 @@ class TestRetiredCommandRegression:
         result = runner.invoke(app, ["aggregate", "pit"])
         assert result.exit_code == 2
         assert "--years is required" in result.output
+
+    def test_list_group_help_no_artifacts(self):
+        """The 'list' group description must not mention retired 'artifacts'."""
+        result = runner.invoke(app, ["list", "--help"])
+        assert result.exit_code == 0
+        assert "artifacts" not in result.output.lower()
+
+    def test_generate_group_help_no_catalogs(self):
+        """The 'generate' group description must not mention retired 'catalogs'."""
+        result = runner.invoke(app, ["generate", "--help"])
+        assert result.exit_code == 0
+        assert "catalogs" not in result.output.lower()
+
+    def test_main_help_no_stale_terminology(self):
+        """Top-level help must not reference retired concepts."""
+        result = runner.invoke(app, ["--help"])
+        assert result.exit_code == 0
+        output_lower = result.output.lower()
+        for term in ("artifacts", "catalogs"):
+            assert term not in output_lower, f"Stale term '{term}' in main help"

@@ -7,13 +7,13 @@ Its core design choice is deliberate:
 - **Default hub geography:** CoC boundaries by vintage (`B{year}`)
 - **Alternate analysis geography:** Metro areas via researcher-defined membership rules (e.g., Glynn/Fox metros with `D{version}`)
 - **Spoke datasets:** tract- and county-native inputs (ACS, ZORI, PEP) mapped into the target analysis geography via crosswalks or membership tables
-- **Execution style:** explicit build scaffolds and declarative YAML recipes
+- **Execution style:** declarative YAML recipes (optionally scoped to a named build)
 
 ## What CoC Lab Does
 
 - Ingests boundary, census geometry, PIT, ACS, PEP, and ZORI inputs
 - Builds tract↔CoC and county↔CoC crosswalks
-- Aggregates source datasets to CoC or metro geography inside named builds
+- Aggregates source datasets to CoC or metro geography (via `--years` or optionally inside a named build)
 - Assembles geography×year panels (imperative and recipe-driven paths) for CoC or metro targets
 - Writes provenance metadata and recipe manifests for reproducibility
 - Exports analysis bundles with a machine-readable `MANIFEST.json`
@@ -21,7 +21,7 @@ Its core design choice is deliberate:
 ## Philosophy
 
 ### 1. Reproducibility over convenience
-A named build pins base assets (especially boundaries) and records aggregate runs. Recipe execution additionally emits consumed-asset manifests.
+Aggregate commands require explicit `--years` (or derive years from a named build via `--build`). Recipe execution additionally emits consumed-asset manifests.
 
 ### 2. Declarative where possible
 The recipe system separates:
@@ -38,7 +38,7 @@ The project defaults to CoC-level inference but supports metro areas as an alter
 
 - **CLI:** `coclab ...`
 - **Recipe execution:** `coclab build recipe --recipe <file.yaml>`
-- **Named builds:** `builds/<name>/...`
+- **Named builds (optional):** `builds/<name>/...`
 - **Global curated store:** `data/curated/...`
 
 ## Panel Assembly

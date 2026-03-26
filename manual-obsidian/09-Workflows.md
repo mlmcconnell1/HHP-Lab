@@ -24,11 +24,11 @@ coclab ingest pep --series auto
 # 2) Crosswalks
 coclab generate xwalks --boundary 2025 --tracts 2023 --counties 2023
 
-# 3) Aggregates
-coclab aggregate acs --weighting population
-coclab aggregate zori --align pit_january
-coclab aggregate pep
-coclab aggregate pit
+# 3) Aggregates (--years required when --build is not specified)
+coclab aggregate acs --years 2018-2024 --weighting population
+coclab aggregate zori --years 2018-2024 --align pit_january
+coclab aggregate pep --years 2018-2024
+coclab aggregate pit --years 2018-2024
 
 # 4) Preflight + plan
 coclab status --json

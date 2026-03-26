@@ -104,7 +104,7 @@ ingest_app = typer.Typer(
 )
 list_app = typer.Typer(
     name="list",
-    help="List available datasets and artifacts",
+    help="List available datasets",
     no_args_is_help=True,
 )
 validate_app = typer.Typer(
@@ -124,7 +124,7 @@ migrate_app = typer.Typer(
 )
 generate_app = typer.Typer(
     name="generate",
-    help="Generate crosswalks, metro definitions, and catalogs",
+    help="Generate crosswalks and metro definitions",
     no_args_is_help=True,
 )
 build_app = typer.Typer(

@@ -352,8 +352,8 @@ Target commands:
 - `coclab aggregate pep`
 - `coclab aggregate zori`
 - `coclab aggregate pit`
-- `coclab build panel`
-- `coclab list artifacts`
+- `coclab build recipe`
+- `coclab list curated`
 - possibly `coclab generate xwalks`
 
 Recommended CLI direction:

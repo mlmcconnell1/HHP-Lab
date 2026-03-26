@@ -159,11 +159,10 @@ internet ──┤► data/raw/    │           │  data/curated/       │   
 | `coclab ingest acs5-tract`       | internet                | `data/raw/acs5_tract/<year>/<variant>/...`, `data/curated/acs/`       |
 | `coclab ingest zori`             | internet                | `data/raw/zori/<year>/...`, `data/curated/zori/`            |
 | `coclab ingest pep`              | internet                | `data/raw/pep/<year>/...`, `data/curated/pep/`              |
-| `coclab build create`            | `data/curated/coc_boundaries/` | `builds/{name}/`                           |
 | `coclab generate xwalks`         | `curated/census/`, `curated/coc_boundaries/` | `curated/xwalks/` (or build) |
-| `coclab build panel`             | `curated/` (multiple)   | `curated/panel/` (or build)                       |
-| `coclab aggregate acs`           | `curated/xwalks/`, `curated/acs/` | `builds/{name}/data/curated/measures/`   |
-| `coclab aggregate zori`          | `curated/zori/`, `curated/xwalks/` | `builds/{name}/data/curated/zori/`      |
-| `coclab aggregate pep`           | `curated/pep/`, `curated/xwalks/` | `builds/{name}/data/curated/pep/`        |
-| `coclab aggregate pit`           | `curated/pit/`, `curated/xwalks/` | `builds/{name}/data/curated/pit/`        |
-| `coclab export bundle`           | `data/curated/` or `builds/` | `exports/export-{N}/`                        |
+| `coclab aggregate acs`           | `curated/xwalks/`, `curated/acs/` | `data/curated/measures/` (or `builds/{name}/...`) |
+| `coclab aggregate zori`          | `curated/zori/`, `curated/xwalks/` | `data/curated/zori/` (or `builds/{name}/...`) |
+| `coclab aggregate pep`           | `curated/pep/`, `curated/xwalks/` | `data/curated/pep/` (or `builds/{name}/...`) |
+| `coclab aggregate pit`           | `curated/pit/`, `curated/xwalks/` | `data/curated/pit/` (or `builds/{name}/...`) |
+| `coclab build recipe`            | `data/curated/` (multiple) | `data/curated/panel/`                     |
+| `coclab build recipe-export`     | `data/curated/` or `builds/` | `exports/export-{N}/`                     |
