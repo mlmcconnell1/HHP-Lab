@@ -373,3 +373,114 @@ class TestCtPlanningRegionRemap:
 
         assert result.loc[0, "GEOID"] == "09001000100"
         assert result.loc[1, "GEOID"] == "08001000100"
+
+
+class TestUnemploymentAggregation:
+    """Tests for unemployment rate derivation during aggregation."""
+
+    def test_unemployment_rate_derived_from_components(self):
+        """unemployment_rate = sum(unemployed) / sum(labor_force) at CoC level."""
+        acs_data = pd.DataFrame(
+            {
+                "GEOID": ["08001000100", "08001000200"],
+                "total_population": [1000, 2000],
+                "civilian_labor_force": [600, 1200],
+                "unemployed_count": [30, 60],
+                "median_household_income": [50000, 60000],
+                "median_gross_rent": [1000, 1200],
+            }
+        )
+        crosswalk = pd.DataFrame(
+            {
+                "tract_geoid": ["08001000100", "08001000200"],
+                "coc_id": ["CO-500", "CO-500"],
+                "area_share": [1.0, 1.0],
+                "pop_share": [1.0, 1.0],
+            }
+        )
+
+        result = aggregate_to_coc(acs_data, crosswalk, weighting="area")
+
+        co500 = result.iloc[0]
+        assert co500["civilian_labor_force"] == pytest.approx(1800)
+        assert co500["unemployed_count"] == pytest.approx(90)
+        assert co500["unemployment_rate"] == pytest.approx(90 / 1800)
+
+    def test_unemployment_rate_with_partial_area_share(self):
+        """Unemployment components are area-weighted before rate derivation."""
+        acs_data = pd.DataFrame(
+            {
+                "GEOID": ["08001000100", "08001000200"],
+                "total_population": [1000, 2000],
+                "civilian_labor_force": [800, 1600],
+                "unemployed_count": [40, 80],
+                "median_household_income": [50000, 60000],
+                "median_gross_rent": [1000, 1200],
+            }
+        )
+        crosswalk = pd.DataFrame(
+            {
+                "tract_geoid": ["08001000100", "08001000200"],
+                "coc_id": ["CO-500", "CO-500"],
+                "area_share": [0.5, 0.5],
+                "pop_share": [0.5, 0.5],
+            }
+        )
+
+        result = aggregate_to_coc(acs_data, crosswalk, weighting="area")
+
+        co500 = result.iloc[0]
+        # 800*0.5 + 1600*0.5 = 1200
+        assert co500["civilian_labor_force"] == pytest.approx(1200)
+        # 40*0.5 + 80*0.5 = 60
+        assert co500["unemployed_count"] == pytest.approx(60)
+        assert co500["unemployment_rate"] == pytest.approx(60 / 1200)
+
+    def test_unemployment_rate_zero_labor_force_is_null(self):
+        """unemployment_rate is null when labor force is zero."""
+        acs_data = pd.DataFrame(
+            {
+                "GEOID": ["08001000100"],
+                "total_population": [100],
+                "civilian_labor_force": [0],
+                "unemployed_count": [0],
+                "median_household_income": [50000],
+                "median_gross_rent": [1000],
+            }
+        )
+        crosswalk = pd.DataFrame(
+            {
+                "tract_geoid": ["08001000100"],
+                "coc_id": ["CO-500"],
+                "area_share": [1.0],
+                "pop_share": [1.0],
+            }
+        )
+
+        result = aggregate_to_coc(acs_data, crosswalk, weighting="area")
+        assert pd.isna(result.iloc[0]["unemployment_rate"])
+
+    def test_unemployment_columns_in_output(self):
+        """Output includes civilian_labor_force, unemployed_count, and unemployment_rate."""
+        acs_data = pd.DataFrame(
+            {
+                "GEOID": ["08001000100"],
+                "total_population": [1000],
+                "civilian_labor_force": [600],
+                "unemployed_count": [30],
+                "median_household_income": [50000],
+                "median_gross_rent": [1000],
+            }
+        )
+        crosswalk = pd.DataFrame(
+            {
+                "tract_geoid": ["08001000100"],
+                "coc_id": ["CO-500"],
+                "area_share": [1.0],
+                "pop_share": [1.0],
+            }
+        )
+
+        result = aggregate_to_coc(acs_data, crosswalk, weighting="area")
+        for col in ("civilian_labor_force", "unemployed_count", "unemployment_rate"):
+            assert col in result.columns, f"Missing column: {col}"

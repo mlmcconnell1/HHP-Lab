@@ -357,6 +357,8 @@ def aggregate_to_geo(
         "adult_population",
         "population_below_poverty",
         "poverty_universe",
+        "civilian_labor_force",
+        "unemployed_count",
     ]
 
     # Columns to aggregate as weighted average
@@ -405,6 +407,11 @@ def aggregate_to_geo(
         results.append(row)
 
     result_df = pd.DataFrame(results)
+
+    # Derive unemployment_rate from aggregated numerator/denominator
+    if "civilian_labor_force" in result_df.columns and "unemployed_count" in result_df.columns:
+        clf = result_df["civilian_labor_force"]
+        result_df["unemployment_rate"] = result_df["unemployed_count"] / clf.where(clf > 0)
 
     # Add metadata columns
     result_df["weighting_method"] = weighting

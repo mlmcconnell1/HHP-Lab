@@ -240,6 +240,8 @@ def fetch_state_tract_data(year: int, state_fips: str) -> tuple[pd.DataFrame, by
         "below_50pct_poverty",
         "50_to_99pct_poverty",
         "population_below_poverty",
+        "civilian_labor_force",
+        "unemployed_count",
     ]
     keep = [c for c in keep if c in df.columns]
 
@@ -333,6 +335,7 @@ def fetch_tract_data(
     int_cols = [
         "total_population", "adult_population", "poverty_universe",
         "below_50pct_poverty", "50_to_99pct_poverty", "population_below_poverty",
+        "civilian_labor_force", "unemployed_count",
     ]
     for col in int_cols:
         if col in result.columns:

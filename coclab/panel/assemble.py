@@ -106,6 +106,7 @@ PANEL_COLUMNS = [
     "population_below_poverty",
     "median_household_income",
     "median_gross_rent",
+    "unemployment_rate",
     "coverage_ratio",
     "boundary_changed",
     "source",

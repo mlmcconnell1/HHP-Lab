@@ -58,6 +58,7 @@ ACS_MEASURE_COLUMNS: list[str] = [
     "population_below_poverty",
     "median_household_income",
     "median_gross_rent",
+    "unemployment_rate",
 ]
 
 #: ACS 1-year measure columns (metro-native measures from ACS 1-year estimates).

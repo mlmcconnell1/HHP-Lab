@@ -23,6 +23,9 @@ ACS_VARIABLES: dict[str, str] = {
     "C17002_001E": "poverty_universe",
     "C17002_002E": "below_50pct_poverty",
     "C17002_003E": "50_to_99pct_poverty",
+    # B23025 — Employment Status for Population 16+
+    "B23025_003E": "civilian_labor_force",
+    "B23025_005E": "unemployed_count",
 }
 
 # B01001 — Sex by Age (for deriving adult population 18+)
@@ -36,7 +39,7 @@ ADULT_VARS: list[str] = ADULT_MALE_VARS + ADULT_FEMALE_VARS
 ALL_API_VARS: list[str] = list(ACS_VARIABLES.keys()) + ADULT_VARS
 
 # Tables included (for provenance tracking)
-ACS_TABLES: list[str] = ["B01003", "B01001", "B19013", "B25064", "C17002"]
+ACS_TABLES: list[str] = ["B01003", "B01001", "B19013", "B25064", "C17002", "B23025"]
 
 # ---------------------------------------------------------------------------
 # Column classification (for translation and aggregation)
@@ -50,6 +53,8 @@ COUNT_COLUMNS: list[str] = [
     "below_50pct_poverty",
     "50_to_99pct_poverty",
     "population_below_poverty",
+    "civilian_labor_force",
+    "unemployed_count",
 ]
 
 # Median columns: population-weighted average during translation/aggregation
@@ -86,6 +91,8 @@ TRACT_OUTPUT_COLUMNS: list[str] = [
     "below_50pct_poverty",
     "50_to_99pct_poverty",
     "population_below_poverty",
+    "civilian_labor_force",
+    "unemployed_count",
     "data_source",
     "source_ref",
     "ingested_at",

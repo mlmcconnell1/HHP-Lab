@@ -34,11 +34,18 @@ ruff format .
 - `pyproj` - Coordinate transformations
 - `pyarrow` - Parquet I/O
 - `pandas` - Data manipulation
+- `numpy` - Numerical computation
+- `httpx` - HTTP client for Census API calls
 - `folium` - Interactive maps
 - `typer` - CLI framework
+- `openpyxl` - Excel `.xlsx` reading
+- `pyxlsb` - Excel `.xlsb` reading (used for PIT data)
+- `ipumspy` - IPUMS API integration
+- `pydantic` - Schema validation (recipe system)
 
 **Development:**
 - `pytest` - Testing
+- `pytest-httpx` - HTTP mocking for tests
 - `ruff` - Linting and formatting
 
 ## Adding a New Data Source

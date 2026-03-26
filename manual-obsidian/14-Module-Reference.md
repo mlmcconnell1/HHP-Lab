@@ -57,6 +57,18 @@ This chapter is an orientation map of active modules in the current codebase.
   - `coclab/metro/io.py`: read/write curated metro definition artifacts
 - `coclab/export/`: bundle selection/copy/manifest/readme generation
 
+## Utilities and Supporting Modules
+
+- `coclab/geo/`: GeoParquet I/O (`read_geoparquet`, `write_geoparquet`), boundary validation, CRS normalization, geometry hashing, CT planning regions
+- `coclab/viz/`: Folium-based interactive map rendering (`render_coc_map`)
+- `coclab/nhgis/`: NHGIS extraction support for pre-2020 tract data
+- `coclab/source_registry.py`: external source tracking with SHA-256 hashes (`register_source`, `check_source_changed`, `list_sources`)
+- `coclab/year_spec.py`: year-spec parser for ranges/lists used throughout CLI (e.g., `2018-2024`, `2018,2020,2022`)
+- `coclab/raw_snapshot.py`: raw data snapshot retention utilities
+- `coclab/curated_policy.py`: curated layout policy enforcement and validation
+- `coclab/curated_migrate.py`: curated data migration utilities
+- `coclab/audit_panels.py`: metro audit panel utilities
+
 ## Guidance
 
 - Prefer CLI or recipe interfaces for end-to-end workflows.

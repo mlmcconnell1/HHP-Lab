@@ -94,7 +94,13 @@ def read_metro_coc_membership(
 ) -> pd.DataFrame:
     """Read metro-to-CoC membership from the curated parquet file."""
     path = naming.metro_coc_membership_path(definition_version, base_dir)
-    return pd.read_parquet(path)
+    try:
+        return pd.read_parquet(path)
+    except FileNotFoundError:
+        raise FileNotFoundError(
+            f"Metro membership artifact not found at {path}. "
+            f"Run: coclab generate metro --definition-version {definition_version}"
+        ) from None
 
 
 def read_metro_county_membership(

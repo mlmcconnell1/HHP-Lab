@@ -640,3 +640,59 @@ class TestSchemaValidation:
         ts = df.iloc[0]["ingested_at"]
         assert ts.tzinfo is not None
         assert ts.tzinfo == UTC
+
+
+class TestUnemploymentIngest:
+    """Tests for B23025 unemployment variable ingestion."""
+
+    def test_unemployment_columns_parsed(self, httpx_mock):
+        """B23025 variables are included in tract output."""
+        response_data = make_census_response(
+            [
+                {
+                    "county": "031",
+                    "tract": "001000",
+                    "B01003_001E": "5000",
+                    "B23025_003E": "3200",  # civilian_labor_force
+                    "B23025_005E": "160",  # unemployed_count
+                }
+            ]
+        )
+        httpx_mock.add_response(
+            url=re.compile(r"https://api\.census\.gov/data/2023/acs/acs5.*"),
+            json=response_data,
+        )
+
+        df, _ = fetch_state_tract_data(2023, "08")
+
+        assert "civilian_labor_force" in df.columns
+        assert "unemployed_count" in df.columns
+        assert df.iloc[0]["civilian_labor_force"] == 3200
+        assert df.iloc[0]["unemployed_count"] == 160
+
+    def test_unemployment_missing_values_become_na(self, httpx_mock):
+        """Negative Census values for B23025 become NA."""
+        response_data = make_census_response(
+            [
+                {
+                    "county": "001",
+                    "tract": "000100",
+                    "B23025_003E": "-666666666",
+                    "B23025_005E": "-666666666",
+                }
+            ]
+        )
+        httpx_mock.add_response(
+            url=re.compile(r"https://api\.census\.gov/data/2023/acs/acs5.*"),
+            json=response_data,
+        )
+
+        df, _ = fetch_state_tract_data(2023, "08")
+
+        assert pd.isna(df.iloc[0]["civilian_labor_force"])
+        assert pd.isna(df.iloc[0]["unemployed_count"])
+
+    def test_unemployment_in_tract_output_columns(self):
+        """TRACT_OUTPUT_COLUMNS includes unemployment fields."""
+        assert "civilian_labor_force" in TRACT_OUTPUT_COLUMNS
+        assert "unemployed_count" in TRACT_OUTPUT_COLUMNS

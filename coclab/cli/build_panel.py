@@ -191,22 +191,20 @@ def build_panel_cmd(
 
     Examples:
 
-        coclab build panel --start 2018 --end 2024
-
-        coclab build panel --start 2018 --end 2024 --weighting population
-
-        coclab build panel --start 2018 --end 2024 --weighting area
-
-        coclab build panel --start 2020 --end 2024 --output custom_panel.parquet
-
-        coclab build panel --start 2018 --end 2024 --include-zori
-
-        coclab build panel --start 2018 --end 2024 --include-zori --zori-min-coverage 0.85
-
-        coclab build panel --start 2018 --end 2024 --include-zori \\
-            --zori-yearly-path data/curated/zori/coc_zori_yearly.parquet
-
         coclab build panel --build demo --start 2018 --end 2024
+
+        coclab build panel --build demo --start 2018 --end 2024 --weighting population
+
+        coclab build panel --build demo --start 2018 --end 2024 --weighting area
+
+        coclab build panel --build demo --start 2020 --end 2024 --output custom_panel.parquet
+
+        coclab build panel --build demo --start 2018 --end 2024 --include-zori
+
+        coclab build panel --build demo --start 2018 --end 2024 --include-zori --zori-min-coverage 0.85
+
+        coclab build panel --build demo --start 2018 --end 2024 --include-zori \\
+            --zori-yearly-path data/curated/zori/coc_zori_yearly.parquet
     """
     from coclab.analysis_geo import resolve_geo_col
     from coclab.builds import read_build_manifest

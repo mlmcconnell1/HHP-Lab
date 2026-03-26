@@ -528,10 +528,10 @@ class TestPhase3HelpOutput:
 
     def test_build_panel_help_shows_examples(self):
         """Build panel help should show examples."""
-        result = runner.invoke(app, ["build", "panel", "--help"])
+        result = runner.invoke(app, ["build", "panel", "--help"], env={"COLUMNS": "200"})
 
         assert result.exit_code == 0
-        assert "coclab build panel --start" in result.output
+        assert "coclab build panel --build demo --start" in result.output
         assert "--weighting population" in result.output
 
     def test_panel_diagnostics_help_shows_examples(self):

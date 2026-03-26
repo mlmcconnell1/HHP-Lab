@@ -218,6 +218,8 @@ erDiagram
         int pit_unsheltered "Unsheltered count (nullable)"
         string boundary_vintage_used "CoC boundary version"
         string acs_vintage_used "ACS estimate version"
+        string tract_vintage_used "Tract vintage for crosswalk"
+        string alignment_type "period_faithful, retrospective, or custom"
         string weighting_method "area or population"
         float total_population "Weighted population estimate"
         float adult_population "Population 18+"
@@ -509,11 +511,14 @@ All CoC Lab Parquet files embed **provenance metadata** in the file schema, enab
 {
   "boundary_vintage": "2025",
   "tract_vintage": "2020",
+  "county_vintage": "2020",
   "acs_vintage": "2022",
+  "notation": "A2022@B2025×T2020",
   "weighting": "population",
+  "geo_type": "coc",
+  "definition_version": null,
   "created_at": "2025-01-05T12:30:00+00:00",
   "coclab_version": "0.1.0",
-  "notation": "A2022@B2025×T2020",
   "extra": {
     "dataset_type": "coc_measures",
     "crosswalk_path": "data/curated/xwalks/xwalk__B2025xT2020.parquet"
@@ -527,8 +532,12 @@ The `notation` field uses the shorthand from [[08-Temporal-Terminology|Temporal 
 |-------|------|-------------|
 | `boundary_vintage` | string | CoC boundary version used |
 | `tract_vintage` | string | Census tract geometry version |
+| `county_vintage` | string | Census county vintage (nullable) |
 | `acs_vintage` | string | ACS 5-year estimate end year |
+| `notation` | string | Compound temporal notation, e.g. `A2022@B2025×T2020` (nullable) |
 | `weighting` | string | Weighting method (`area`, `population`, `area+population`) |
+| `geo_type` | string | Analysis geography type, e.g. `coc` or `metro` (nullable) |
+| `definition_version` | string | Synthetic geography definition version, e.g. `glynn_fox_v1` (nullable) |
 | `created_at` | ISO 8601 | Timestamp of dataset creation |
 | `coclab_version` | string | CoC Lab version that produced the file |
 | `extra` | object | Extensible metadata (dataset type, source paths, etc.) |
