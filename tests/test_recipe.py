@@ -1886,7 +1886,8 @@ class TestExecutorCLI:
             "--recipe", str(recipe_file),
         ])
         assert result.exit_code == 1
-        assert "Execution error" in result.output
+        # Preflight catches the planner error before execution starts
+        assert "Preflight" in result.output or "blocker" in result.output
 
 
 # ===========================================================================
@@ -3246,7 +3247,7 @@ class TestRecipeJsonMode:
         result = runner.invoke(app, [
             "build", "recipe",
             "--recipe", str(rf),
-            "--dry-run", "--json",
+            "--dry-run", "--json", "--skip-preflight",
         ])
         assert result.exit_code == 0
         out = json.loads(result.output)

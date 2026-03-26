@@ -21,6 +21,7 @@ from coclab.recipe.loader import RecipeLoadError, load_recipe
 from coclab.recipe.manifest import export_bundle as do_export_bundle
 from coclab.recipe.manifest import read_manifest
 from coclab.recipe.planner import PlannerError, resolve_plan
+from coclab.recipe.preflight import PreflightReport, Severity, run_preflight
 from coclab.recipe.recipe_schema import RecipeV1, expand_year_spec
 
 # Common --json flag definition
@@ -212,13 +213,21 @@ def recipe_cmd(
             help="Disable asset caching (re-read every file from disk).",
         ),
     ] = False,
+    skip_preflight: Annotated[
+        bool,
+        typer.Option(
+            "--skip-preflight",
+            help="Skip the preflight readiness check before execution.",
+        ),
+    ] = False,
     use_json: _JSON_OPTION = False,
 ) -> None:
-    """Load, validate, and execute a build recipe.
+    """Load, validate, preflight, and execute a build recipe.
 
-    Parses the recipe YAML, validates it against the versioned schema,
-    then runs runtime adapter validation for geometry and dataset
-    compatibility.
+    Runs a preflight readiness check before execution to catch all
+    missing prerequisites in one pass.  Use --skip-preflight to
+    bypass the check, or run ``coclab build recipe-preflight`` for
+    a standalone analysis.
 
     Examples:
 
@@ -227,6 +236,8 @@ def recipe_cmd(
         coclab build recipe --recipe my_build.yaml --dry-run
 
         coclab build recipe --recipe my_build.yaml --json
+
+        coclab build recipe --recipe my_build.yaml --skip-preflight
     """
     # 0. Ensure built-in adapters are registered
     register_defaults()
@@ -257,7 +268,7 @@ def recipe_cmd(
                 err=True,
             )
 
-    # 2. Validate
+    # 2. Validate (legacy path checks + adapter validation)
     all_warnings, all_errors = _validate_recipe(parsed, use_json=use_json)
 
     if all_errors:
@@ -286,6 +297,47 @@ def recipe_cmd(
             )
         else:
             typer.echo("Recipe validated successfully.")
+
+    # 2b. Preflight readiness check
+    if not skip_preflight:
+        pf_report = run_preflight(parsed)
+        if not use_json:
+            if pf_report.is_ready:
+                typer.echo(
+                    f"Preflight: {len(pf_report.findings)} finding(s), "
+                    "all clear."
+                )
+            else:
+                typer.echo(
+                    f"\nPreflight found {pf_report.blocking_count} "
+                    "blocker(s):",
+                    err=True,
+                )
+                for f in pf_report.blocking_findings():
+                    typer.echo(f"  {f.message}", err=True)
+                    if f.remediation:
+                        typer.echo(
+                            f"    Fix: {f.remediation.hint}", err=True,
+                        )
+                        if f.remediation.command:
+                            typer.echo(
+                                f"    Run: {f.remediation.command}",
+                                err=True,
+                            )
+                typer.echo(
+                    "\nRun 'coclab build recipe-preflight --recipe "
+                    f"{recipe}' for details.",
+                    err=True,
+                )
+
+        if not pf_report.is_ready:
+            if use_json:
+                _json_out({
+                    "status": "blocked",
+                    "recipe_name": parsed.name,
+                    "preflight": pf_report.to_dict(),
+                })
+            raise typer.Exit(code=1)
 
     if dry_run:
         if use_json:
@@ -576,3 +628,131 @@ def recipe_export_cmd(
     typer.echo(f"  {len(m.assets)} asset(s) copied")
     typer.echo(f"  Manifest written to {output / 'manifest.json'}")
     typer.echo(f"Bundle: {output}")
+
+
+def _render_preflight_human(report: PreflightReport) -> None:
+    """Render a preflight report as human-readable text."""
+    typer.echo(
+        f"Recipe: {report.recipe_name} (version {report.recipe_version})"
+    )
+    typer.echo(
+        f"Universe: {min(report.universe_years)}-"
+        f"{max(report.universe_years)} "
+        f"({len(report.universe_years)} years)"
+    )
+
+    for ps in report.pipelines:
+        if ps.plan_error:
+            typer.echo(
+                f"\nPipeline '{ps.pipeline_id}': "
+                f"PLAN ERROR - {ps.plan_error}",
+                err=True,
+            )
+        else:
+            typer.echo(
+                f"\nPipeline '{ps.pipeline_id}': "
+                f"{ps.task_count} tasks resolved"
+            )
+
+    if not report.findings:
+        typer.echo("\nAll prerequisites satisfied. Ready to build.")
+        return
+
+    blockers = [f for f in report.findings if f.is_blocking]
+    warnings = [
+        f for f in report.findings if f.severity == Severity.WARNING
+    ]
+
+    if blockers:
+        typer.echo(f"\nBlockers ({len(blockers)}):", err=True)
+        for f in blockers:
+            typer.echo(f"  ERROR: {f.message}", err=True)
+            if f.remediation:
+                typer.echo(
+                    f"    Fix: {f.remediation.hint}", err=True,
+                )
+                if f.remediation.command:
+                    typer.echo(
+                        f"    Run: {f.remediation.command}", err=True,
+                    )
+
+    if warnings:
+        typer.echo(f"\nWarnings ({len(warnings)}):", err=True)
+        for f in warnings:
+            typer.echo(f"  WARNING: {f.message}", err=True)
+
+    if blockers:
+        typer.echo(
+            f"\nPreflight FAILED: {len(blockers)} blocker(s), "
+            f"{len(warnings)} warning(s).",
+            err=True,
+        )
+    else:
+        typer.echo(
+            f"\nPreflight passed with {len(warnings)} warning(s). "
+            "Ready to build."
+        )
+
+
+def recipe_preflight_cmd(
+    recipe: Annotated[
+        Path,
+        typer.Option(
+            "--recipe",
+            "-r",
+            help="Path to a YAML recipe file.",
+        ),
+    ],
+    use_json: _JSON_OPTION = False,
+    gaps: Annotated[
+        bool,
+        typer.Option(
+            "--gaps",
+            help="Emit only the data-gaps manifest (implies --json).",
+        ),
+    ] = False,
+) -> None:
+    """Check all recipe prerequisites in one pass.
+
+    Resolves execution plans, inspects dataset paths, transform
+    artifacts, and dataset schemas.  Reports all issues at once
+    with actionable fix suggestions rather than failing on the
+    first missing prerequisite.
+
+    Use --json for machine-readable output suitable for automation.
+    Use --gaps for a focused data-gaps manifest.
+
+    Examples:
+
+        coclab build recipe-preflight --recipe my_build.yaml
+
+        coclab build recipe-preflight --recipe my_build.yaml --json
+
+        coclab build recipe-preflight --recipe my_build.yaml --gaps
+    """
+    register_defaults()
+
+    try:
+        parsed = load_recipe(recipe)
+    except RecipeLoadError as exc:
+        if use_json or gaps:
+            _json_error(str(exc), code=2)
+        typer.echo(f"Error: {exc}", err=True)
+        raise typer.Exit(code=2) from exc
+
+    report = run_preflight(parsed)
+
+    if gaps:
+        _json_out({"status": "ok", **report.gaps_manifest()})
+        raise typer.Exit(code=1 if report.blocking_count > 0 else 0)
+
+    if use_json:
+        _json_out({
+            "status": "ok" if report.is_ready else "blocked",
+            **report.to_dict(),
+        })
+        raise typer.Exit(code=1 if not report.is_ready else 0)
+
+    _render_preflight_human(report)
+    if not report.is_ready:
+        raise typer.Exit(code=1)

@@ -36,6 +36,14 @@ from coclab.recipe.planner import (
     _resolve_dataset_year,
     resolve_plan,
 )
+from coclab.recipe.probes import (
+    GEO_CANDIDATES,
+    YEAR_CANDIDATES,
+    probe_geo_column,
+    probe_measures,
+    probe_static_broadcast,
+    probe_year_column,
+)
 from coclab.recipe.recipe_schema import (
     GeometryRef,
     RecipeV1,
@@ -342,9 +350,6 @@ _XWALK_JOIN_KEYS: dict[str, str] = {
 }
 
 # Auto-detect candidates for geo-ID and year columns.
-_GEO_CANDIDATES: list[str] = [
-    "geo_id", "GEOID", "geoid", "coc_id", "metro_id", "tract_geoid", "county_fips",
-]
 
 # Columns in crosswalks that are NOT the target geography identifier.
 _XWALK_NON_GEO_COLS: set[str] = {
@@ -377,28 +382,15 @@ def _detect_xwalk_target_col(
         if c in candidates:
             return c
     return "coc_id"  # legacy default
-_YEAR_CANDIDATES: list[str] = ["year", "pit_year"]
-
-
 def _resolve_year_column(
     df: pd.DataFrame,
     declared: str | None,
 ) -> str | None:
     """Resolve year column: use declared value, or auto-detect, or None."""
-    if declared is not None:
-        if declared not in df.columns:
-            raise ExecutorError(
-                f"Declared year_column '{declared}' not found in dataset. "
-                f"Available: {sorted(df.columns)}"
-            )
-        return declared
-    matches = [c for c in _YEAR_CANDIDATES if c in df.columns]
-    if len(matches) > 1:
-        raise ExecutorError(
-            f"Ambiguous year column: found {matches}. "
-            f"Declare year_column in the dataset spec to resolve."
-        )
-    return matches[0] if matches else None
+    result = probe_year_column(list(df.columns), declared)
+    if not result.ok:
+        raise ExecutorError(result.message)
+    return result.detail["year_column"] if result.detail else None
 
 
 def _resolve_geo_column(
@@ -406,26 +398,10 @@ def _resolve_geo_column(
     declared: str | None,
 ) -> str:
     """Resolve geo-ID column: use declared value or auto-detect."""
-    if declared is not None:
-        if declared not in df.columns:
-            raise ExecutorError(
-                f"Declared geo_column '{declared}' not found in dataset. "
-                f"Available: {sorted(df.columns)}"
-            )
-        return declared
-    matches = [c for c in _GEO_CANDIDATES if c in df.columns]
-    if len(matches) == 0:
-        raise ExecutorError(
-            f"Cannot find geo-ID column in dataset. "
-            f"Expected one of {_GEO_CANDIDATES}, "
-            f"got columns: {sorted(df.columns)}"
-        )
-    if len(matches) > 1:
-        raise ExecutorError(
-            f"Ambiguous geo-ID column: found {matches}. "
-            f"Declare geo_column in the dataset spec to resolve."
-        )
-    return matches[0]
+    result = probe_geo_column(list(df.columns), declared)
+    if not result.ok:
+        raise ExecutorError(result.message)
+    return result.detail["geo_column"]
 
 
 def _validate_columns(
@@ -435,11 +411,10 @@ def _validate_columns(
     year: int,
 ) -> None:
     """Validate that all required measure columns exist."""
-    missing = [m for m in measures if m not in df.columns]
-    if missing:
+    result = probe_measures(list(df.columns), measures, dataset_id)
+    if not result.ok:
         raise ExecutorError(
-            f"Dataset '{dataset_id}' year {year}: missing measure columns "
-            f"{missing}. Available: {sorted(df.columns)}"
+            f"Dataset '{dataset_id}' year {year}: {result.message}"
         )
 
 
@@ -449,13 +424,7 @@ def _reject_implicit_static_broadcast(
     task: ResampleTask,
     year_column: str | None,
 ) -> str | None:
-    """Return an error when a multi-year build would silently broadcast data.
-
-    A dataset without a year column will be reused for every requested year.
-    That is sometimes intentional for static covariates, but it is unsafe as
-    the default because it can hide recipe mistakes. Callers may opt in with
-    ``params.broadcast_static: true`` on the dataset spec.
-    """
+    """Return an error when a multi-year build would silently broadcast data."""
     if year_column is not None:
         return None
 
@@ -463,26 +432,30 @@ def _reject_implicit_static_broadcast(
     if len(universe_years) <= 1:
         return None
 
-    ds = ctx.recipe.datasets[task.dataset_id]
-    if bool(ds.params.get("broadcast_static", False)):
+    ds = ctx.recipe.datasets.get(task.dataset_id)
+    if ds is None:
         return None
 
+    distinct_paths: int | None = None
     if ds.file_set is not None:
         resolved_paths = {
             _resolve_dataset_year(task.dataset_id, year, ctx.recipe).path
             for year in universe_years
         }
-        if len(resolved_paths) > 1:
-            return None
+        distinct_paths = len(resolved_paths)
 
-    return (
-        f"Dataset '{task.dataset_id}' year {task.year}: no year column found "
-        f"after preprocessing, but recipe universe spans {len(universe_years)} "
-        "years. Reusing the same dataset for every year would broadcast a "
-        "static snapshot across time. Add a year_column, switch to file_set "
-        "for year-specific files, or set params.broadcast_static=true if this "
-        "broadcast is intentional."
+    result = probe_static_broadcast(
+        ds,
+        task.dataset_id,
+        year_column_found=year_column is not None,
+        universe_year_count=len(universe_years),
+        distinct_paths=distinct_paths,
     )
+    if not result.ok:
+        return (
+            f"Dataset '{task.dataset_id}' year {task.year}: {result.message}"
+        )
+    return None
 
 
 def _apply_temporal_filter(

@@ -39,6 +39,7 @@ from coclab.cli.recipe import (
     recipe_cmd,
     recipe_export_cmd,
     recipe_plan_cmd,
+    recipe_preflight_cmd,
     recipe_provenance_cmd,
 )
 from coclab.cli.registry_rebuild import registry_rebuild
@@ -603,6 +604,7 @@ build_app.command("recipe")(recipe_cmd)
 build_app.command("recipe-plan")(recipe_plan_cmd)
 build_app.command("recipe-provenance")(recipe_provenance_cmd)
 build_app.command("recipe-export")(recipe_export_cmd)
+build_app.command("recipe-preflight")(recipe_preflight_cmd)
 show_app.command("vintage-diffs")(compare_vintages)
 show_app.command("map")(show)
 show_app.command("measures")(show_measures)
