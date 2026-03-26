@@ -156,6 +156,13 @@ def build_panel_cmd(
             help="Synthetic geography definition version required for metro panels.",
         ),
     ] = None,
+    include_acs1: Annotated[
+        bool,
+        typer.Option(
+            "--include-acs1/--no-include-acs1",
+            help="Include ACS 1-year metro measures (e.g., unemployment_rate_acs1). Metro only.",
+        ),
+    ] = False,
 ) -> None:
     """Build an analysis-geography x year panel.
 
@@ -301,6 +308,15 @@ def build_panel_cmd(
         typer.echo(f"  Definition version: {resolved_definition_version}")
     if include_zori:
         typer.echo(f"  ZORI integration enabled (min coverage: {zori_min_coverage:.2f})")
+    if include_acs1:
+        if resolved_geo_type != "metro":
+            typer.echo(
+                "Warning: --include-acs1 is only supported for metro panels; ignoring.",
+                err=True,
+            )
+            include_acs1 = False
+        else:
+            typer.echo("  ACS 1-year integration enabled")
 
     # Create alignment policy
     policy = AlignmentPolicy(
@@ -314,6 +330,7 @@ def build_panel_cmd(
     build_pit_dir = build_curated / "pit"
     build_measures_dir = build_curated / "measures"
     build_rents_dir = build_curated / "zori"
+    build_acs1_dir = build_curated / "acs"
 
     # Build the panel
     try:
@@ -329,6 +346,8 @@ def build_panel_cmd(
             zori_min_coverage=zori_min_coverage,
             geo_type=resolved_geo_type,
             definition_version=resolved_definition_version,
+            include_acs1=include_acs1,
+            acs1_dir=build_acs1_dir if build_acs1_dir.exists() else None,
         )
     except Exception as e:
         typer.echo(f"Error building panel: {e}", err=True)

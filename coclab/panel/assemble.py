@@ -680,6 +680,71 @@ def _load_acs_measures(
     return df, tract_vintage
 
 
+def _load_acs1_metro_measures(
+    acs1_vintage: str | int,
+    definition_version: str,
+    measures_dir: Path | None = None,
+) -> pd.DataFrame | None:
+    """Load ACS 1-year metro measures for a specific vintage.
+
+    Parameters
+    ----------
+    acs1_vintage : str or int
+        ACS 1-year vintage end year (e.g., "2023" or 2023).
+    definition_version : str
+        Synthetic geography definition version.
+    measures_dir : Path, optional
+        Directory containing curated ACS measure files.
+        Defaults to 'data/curated/acs'.
+
+    Returns
+    -------
+    pd.DataFrame or None
+        DataFrame with metro_id and unemployment_rate_acs1, or None if
+        no ACS1 artifact is found.
+    """
+    if measures_dir is None:
+        measures_dir = Path("data/curated/acs")
+
+    artifact_path = measures_dir / naming.acs1_metro_filename(
+        acs1_vintage, definition_version
+    )
+
+    if not artifact_path.exists():
+        canonical = naming.acs1_metro_path(
+            acs1_vintage,
+            definition_version,
+            base_dir=measures_dir.parent.parent if measures_dir.name == "measures" else None,
+        )
+        if canonical.exists():
+            artifact_path = canonical
+        else:
+            return None
+
+    logger.info(f"Loading ACS1 metro measures from: {artifact_path}")
+    df = pd.read_parquet(artifact_path)
+
+    if "metro_id" not in df.columns:
+        logger.warning(
+            f"ACS1 metro artifact {artifact_path.name} missing 'metro_id' column"
+        )
+        return None
+
+    result_cols = ["metro_id"]
+    if "unemployment_rate_acs1" in df.columns:
+        result_cols.append("unemployment_rate_acs1")
+    else:
+        logger.warning(
+            f"ACS1 metro artifact {artifact_path.name} missing "
+            f"'unemployment_rate_acs1' column"
+        )
+        return None
+
+    df = df[result_cols].copy()
+    df["metro_id"] = df["metro_id"].astype(str)
+    return df
+
+
 def _load_zori_yearly(
     zori_yearly_path: Path | str | None = None,
     rents_dir: Path | None = None,
@@ -918,6 +983,8 @@ def build_panel(
     *,
     geo_type: str = GEO_TYPE_COC,
     definition_version: str | None = None,
+    include_acs1: bool = False,
+    acs1_dir: Path | None = None,
 ) -> pd.DataFrame:
     """Build analysis-ready analysis-geography x year panel.
 
@@ -952,6 +1019,13 @@ def build_panel(
         Minimum coverage ratio for ZORI eligibility. CoC-years with coverage
         below this threshold will have zori_coc and rent_to_income set to null.
         Default is 0.90 (90%).
+    include_acs1 : bool, optional
+        If True and geo_type is 'metro', discover and merge ACS 1-year
+        metro artifacts (e.g., unemployment_rate_acs1) into the panel.
+        Default is False.
+    acs1_dir : Path, optional
+        Directory containing curated ACS 1-year metro artifacts.
+        Defaults to 'data/curated/acs'.
 
     Returns
     -------
@@ -1095,6 +1169,36 @@ def build_panel(
                 "coverage_ratio",
             ]:
                 year_df[col] = pd.NA
+
+        # -----------------------------------------------------------------
+        # ACS 1-year metro integration (when requested)
+        # -----------------------------------------------------------------
+        if include_acs1 and geo_type == GEO_TYPE_METRO and definition_version:
+            acs1_vintage = str(int(acs_vintage))
+            acs1_df = _load_acs1_metro_measures(
+                acs1_vintage=acs1_vintage,
+                definition_version=definition_version,
+                measures_dir=acs1_dir,
+            )
+            if acs1_df is not None and not acs1_df.empty:
+                year_df = year_df.merge(acs1_df, on="metro_id", how="left")
+                year_df["acs1_vintage_used"] = acs1_vintage
+                year_df["acs_products_used"] = "acs5,acs1"
+                logger.info(
+                    f"Year {year}: merged ACS1 data (vintage {acs1_vintage}), "
+                    f"{year_df['unemployment_rate_acs1'].notna().sum()} matched"
+                )
+            else:
+                logger.warning(
+                    f"Year {year}: no ACS1 metro artifact for vintage {acs1_vintage}"
+                )
+                year_df["unemployment_rate_acs1"] = pd.NA
+                year_df["acs1_vintage_used"] = pd.NA
+                year_df["acs_products_used"] = "acs5"
+        elif geo_type == GEO_TYPE_METRO:
+            year_df["unemployment_rate_acs1"] = pd.NA
+            year_df["acs1_vintage_used"] = pd.NA
+            year_df["acs_products_used"] = "acs5"
 
         year_dfs.append(year_df)
 

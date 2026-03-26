@@ -39,6 +39,7 @@ from coclab.panel.policies import (
 )
 from coclab.panel.conformance import (
     ACS_MEASURE_COLUMNS,
+    ACS1_MEASURE_COLUMNS,
     ConformanceReport,
     ConformanceResult,
     PanelRequest,
@@ -81,6 +82,7 @@ __all__ = [
     "weighting_sensitivity",
     # Conformance
     "ACS_MEASURE_COLUMNS",
+    "ACS1_MEASURE_COLUMNS",
     "ConformanceReport",
     "ConformanceResult",
     "PanelRequest",

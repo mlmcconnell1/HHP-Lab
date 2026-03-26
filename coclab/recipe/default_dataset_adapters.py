@@ -109,6 +109,15 @@ def _validate_census_acs1(spec: DatasetSpec) -> list[ValidationDiagnostic]:
                 f"census/acs1: unsupported version {spec.version}; expected 1.",
             )
         )
+    if spec.native_geometry.type != "metro" and not _uses_materialized_artifact(spec):
+        diags.append(
+            ValidationDiagnostic(
+                "error",
+                f"census/acs1: expected native_geometry type 'metro', "
+                f"got '{spec.native_geometry.type}'. Recipes that point to "
+                "pre-materialized derived artifacts must set path or file_set.",
+            )
+        )
     if spec.native_geometry.type == "metro" and not spec.native_geometry.source:
         diags.append(
             ValidationDiagnostic(
@@ -117,7 +126,7 @@ def _validate_census_acs1(spec: DatasetSpec) -> list[ValidationDiagnostic]:
                 "consider setting source for provenance tracking.",
             )
         )
-    known_params = {"vintage", "align"}
+    known_params = {"vintage", "align", "broadcast_static"}
     unknown = set(spec.params.keys()) - known_params
     if unknown:
         diags.append(

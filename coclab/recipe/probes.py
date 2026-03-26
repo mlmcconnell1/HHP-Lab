@@ -29,7 +29,7 @@ GEO_CANDIDATES: list[str] = [
     "geo_id", "GEOID", "geoid", "coc_id", "metro_id",
     "tract_geoid", "county_fips",
 ]
-YEAR_CANDIDATES: list[str] = ["year", "pit_year"]
+YEAR_CANDIDATES: list[str] = ["year", "pit_year", "acs1_vintage"]
 
 
 @dataclass
