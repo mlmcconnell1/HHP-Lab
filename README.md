@@ -50,13 +50,11 @@ The CLI entrypoint is `coclab`.
 Common entry points:
 
 - `coclab status --json`: scan curated assets and named builds
-- `coclab build create`: create a named build scaffold
-- `coclab aggregate {acs|pit|pep|zori}`: produce CoC-scoped aggregate artifacts for a build
-- `coclab build panel`: assemble an analysis geography x year panel
+- `coclab aggregate {acs|pit|pep|zori}`: produce CoC-scoped aggregate artifacts
 - `coclab build recipe --recipe <file> --dry-run --json`: validate and plan recipe-driven builds
-- `coclab list artifacts --build <build> --json`: discover artifacts deterministically
+- `coclab build recipe-plan --recipe <file> --json`: inspect execution plan without running
 - `coclab validate curated-layout`: check naming and layout policy
-- `coclab build export --build <build> --name <name>`: create a portable export bundle
+- `coclab list curated`: discover curated data assets
 
 Automation features:
 
@@ -66,52 +64,25 @@ Automation features:
 
 ## Quick Start
 
-Create a CoC build and assemble a panel:
+Recipe-driven builds are the primary workflow. Plan, validate, then execute:
 
 ```bash
-uv run coclab build create --name demo --years 2020-2024
-uv run coclab aggregate pit --build demo
-uv run coclab aggregate acs --build demo --weighting population
-uv run coclab build panel --build demo --start 2020 --end 2024
+uv run coclab build recipe-plan --recipe recipes/glynn_fox_metro_panel.yaml --json
+uv run coclab build recipe --recipe recipes/glynn_fox_metro_panel.yaml --dry-run --json
+uv run coclab build recipe --recipe recipes/glynn_fox_metro_panel.yaml
 ```
 
-Inspect readiness and artifacts:
+Inspect readiness and curated data:
 
 ```bash
 uv run coclab status --json
-uv run coclab list artifacts --build demo --json
+uv run coclab list curated
 uv run coclab validate curated-layout
 ```
 
 ## Metro Geography Support
 
-Metro support is now a first-class part of the analysis model. The key differences from CoC builds are:
-
-- metro builds use `geo_type=metro`
-- metro outputs are keyed by `geo_id` or `metro_id`, not synthetic `coc_id` values
-- metro builds require a `definition_version`, currently `glynn_fox_v1`
-- metro manifests do not pin CoC boundary base assets the way CoC builds do
-
-Create a metro build scaffold:
-
-```bash
-uv run coclab build create \
-  --name gf-metro \
-  --years 2015-2016 \
-  --geo-type metro \
-  --definition-version glynn_fox_v1
-```
-
-Recipe-driven metro workflows are the most direct way to build metro panels. The repository includes ready-made examples in [recipes/glynn_fox_metro_panel.yaml](recipes/glynn_fox_metro_panel.yaml) and [recipes/glynn_fox_metro_panel_no_zori.yaml](recipes/glynn_fox_metro_panel_no_zori.yaml).
-
-Plan or execute one of those recipes with:
-
-```bash
-uv run coclab build recipe-plan --recipe recipes/glynn_fox_metro_panel.yaml --json
-uv run coclab build recipe --recipe recipes/glynn_fox_metro_panel.yaml --dry-run --json
-```
-
-If metro aggregate artifacts already exist for a build, `coclab build panel` can also assemble a metro panel when the build manifest records `geo_type=metro` and `definition_version=glynn_fox_v1`.
+Metro support is a first-class part of the analysis model. The repository includes ready-made recipe examples in [recipes/glynn_fox_metro_panel.yaml](recipes/glynn_fox_metro_panel.yaml) and [recipes/glynn_fox_metro_panel_no_zori.yaml](recipes/glynn_fox_metro_panel_no_zori.yaml).
 
 ## Project Layout
 

@@ -35,24 +35,6 @@ Exit behavior:
 - exits `1` when required prerequisites are missing (for example boundaries or census geometry)
 - exits `0` for healthy/partially-ready states without hard errors
 
-### Build Scaffolding
-
-```bash
-coclab build create --name demo --years 2018-2024
-coclab build create --name metro-gf --years 2011-2016 --geo-type metro --definition-version glynn_fox_v1
-coclab build list
-```
-
-`build create` initializes:
-- `builds/<name>/data/curated/`
-- `builds/<name>/data/raw/`
-- `builds/<name>/base/`
-- `builds/<name>/manifest.json`
-
-Current options also let you pin build metadata:
-- `--geo-type {coc,metro}` to mark the target analysis geography
-- `--definition-version` for metro builds
-
 ### Crosswalk Generation
 
 ```bash
@@ -84,35 +66,7 @@ Current ACS aggregation details:
 - `aggregate acs` supports `--align {vintage_end_year,window_center_year}`
 - `aggregate acs` defaults to `--weighting area`; use `--weighting population` when population-weighted interpolation is intended
 
-### Imperative Panel Build
-
-```bash
-coclab build panel --build demo --start 2018 --end 2024 --weighting population
-```
-
-Optional ZORI integration:
-
-```bash
-coclab build panel --build demo --start 2018 --end 2024 --include-zori
-```
-
-#### Metro Panel Build
-
-Use `--geo-type metro` with `--definition-version` to build a metro-targeted panel:
-
-```bash
-coclab build panel --build metro-gf --start 2011 --end 2016 \
-    --geo-type metro --definition-version glynn_fox_v1
-```
-
-Metro builds aggregate PIT counts from member CoCs and derive ACS/PEP/ZORI measures from county membership tables. The `--definition-version` flag is required when `--geo-type` is `metro`.
-
-Current options also include:
-- `--strict` to fail the command on conformance errors
-- `--skip-conformance` to suppress post-build checks
-- `--zori-yearly-path` to point at an explicit yearly ZORI artifact
-
-### Recipe Execution (Recommended)
+### Recipe Execution
 
 ```bash
 # Validate only
@@ -145,31 +99,6 @@ coclab build recipe-provenance --manifest data/curated/panel/<file>.manifest.jso
 coclab build recipe-export --manifest data/curated/panel/<file>.manifest.json --output /tmp/bundle
 ```
 
-### Bundle Export
-
-```bash
-coclab build export --name analysis_demo --build demo
-```
-
-Key points:
-- `--build` is required in current implementation
-- Creates `exports/export-N/`
-- Produces `MANIFEST.json` and `README.md`
-- Supports `--include`, `--panel`, `--compress`, and vintage filters such as `--boundary-vintage`
-
-### Artifact Inventory
-
-```bash
-coclab list artifacts --build demo --json
-```
-
-Key options:
-- `--build` (required)
-- `--include-global / --build-only` to include or exclude global `data/curated` artifacts
-- `--geo-type {coc,metro}` to filter the inventory
-- `--definition-version` to scope metro inventories
-- `--json` for machine-readable inventory (roles, row/column counts where available, schema hash, provenance hints)
-
 ### Core Ingestion Commands
 
 ```bash
@@ -195,7 +124,6 @@ Useful PEP options:
 - `coclab build recipe-plan`
 - `coclab build recipe-provenance`
 - `coclab build recipe-export`
-- `coclab list artifacts`
 - `coclab list census`
 - `coclab list measures`
 - `coclab list xwalks`
@@ -220,10 +148,9 @@ In non-interactive mode, destructive actions still require explicit consent flag
 
 ## Operational Guidance
 
-- Prefer `builds/<name>` workflow for repeatable analysis runs.
-- Use `build recipe` when you need explicit, auditable pipeline structure.
+- Use `build recipe` for explicit, auditable pipeline structure.
 - Use `status` + `build recipe-plan --json` as a preflight pair in automation.
-- Use `build export` only after validating expected artifacts exist in the build.
+- Use `build recipe-export` to produce portable bundles from recipe outputs.
 
 For exact option signatures, use:
 

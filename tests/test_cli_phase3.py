@@ -1,6 +1,5 @@
-"""Tests for the Phase 3 CLI commands (ingest pit, build panel, diagnostics panel)."""
+"""Tests for the Phase 3 CLI commands (ingest pit, diagnostics panel)."""
 
-import json
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -10,25 +9,6 @@ from typer.testing import CliRunner
 from coclab.cli.main import app
 
 runner = CliRunner()
-
-
-def _create_test_build(base: Path, name: str) -> Path:
-    """Create a minimal build directory structure for testing.
-
-    Must be called from within an isolated filesystem or after chdir to base.
-    """
-    build_dir = base / "builds" / name
-    (build_dir / "data" / "curated").mkdir(parents=True, exist_ok=True)
-    (build_dir / "data" / "raw").mkdir(parents=True, exist_ok=True)
-    (build_dir / "base").mkdir(parents=True, exist_ok=True)
-    manifest = {
-        "schema_version": 1,
-        "build": {"name": name, "years": [2020, 2021]},
-        "base_assets": [],
-        "aggregate_runs": [],
-    }
-    (build_dir / "manifest.json").write_text(json.dumps(manifest))
-    return build_dir
 
 
 class TestIngestPitCommand:
@@ -157,207 +137,6 @@ class TestIngestPitCommand:
 
         assert result.exit_code == 1
         assert "Error parsing PIT file" in result.output
-
-
-class TestBuildPanelCommand:
-    """Tests for the 'build panel' command."""
-
-    def test_build_panel_help(self):
-        """Help should show options."""
-        result = runner.invoke(app, ["build", "panel", "--help"])
-
-        assert result.exit_code == 0
-        assert "--start" in result.output
-        assert "--end" in result.output
-        assert "--weighting" in result.output
-        assert "--output" in result.output
-        assert "--geo-type" in result.output
-
-    def test_build_panel_requires_years(self):
-        """Should fail without year options."""
-        result = runner.invoke(app, ["build", "panel"])
-
-        # Typer shows error for missing required options
-        assert result.exit_code != 0
-
-    def test_build_panel_requires_build_flag(self):
-        """Should fail without --build."""
-        result = runner.invoke(
-            app,
-            ["build", "panel", "--start", "2020", "--end", "2024"],
-        )
-        # Typer shows error for missing required --build option
-        assert result.exit_code != 0
-
-    def test_build_panel_invalid_weighting(self, tmp_path):
-        """Should fail with invalid weighting method."""
-        with runner.isolated_filesystem(temp_dir=tmp_path):
-            _create_test_build(Path("."), "test")
-            result = runner.invoke(
-                app,
-                [
-                    "build", "panel",
-                    "--build", "test",
-                    "--start", "2020", "--end", "2024",
-                    "--weighting", "invalid",
-                ],
-            )
-
-        assert result.exit_code == 1
-        assert "Invalid weighting method" in result.output
-
-    def test_build_panel_invalid_year_range(self, tmp_path):
-        """Should fail if start > end."""
-        with runner.isolated_filesystem(temp_dir=tmp_path):
-            _create_test_build(Path("."), "test")
-            result = runner.invoke(
-                app,
-                ["build", "panel", "--build", "test", "--start", "2024", "--end", "2020"],
-            )
-
-        assert result.exit_code == 1
-        assert "Start year" in result.output
-
-    @patch("coclab.panel.build_panel")
-    @patch("coclab.panel.save_panel")
-    def test_build_panel_success(self, mock_save, mock_build, tmp_path):
-        """Panel build should succeed."""
-        with runner.isolated_filesystem(temp_dir=tmp_path):
-            _create_test_build(Path("."), "test")
-            mock_df = pd.DataFrame(
-                {
-                    "coc_id": ["CO-500", "CO-500", "CA-600", "CA-600"],
-                    "year": [2020, 2021, 2020, 2021],
-                    "pit_total": [100, 110, 200, 210],
-                    "coverage_ratio": [0.95, 0.92, 0.88, 0.90],
-                    "boundary_changed": [False, True, False, False],
-                }
-            )
-            mock_build.return_value = mock_df
-            mock_save.return_value = Path("builds/test/data/curated/panel/panel.parquet")
-
-            result = runner.invoke(
-                app,
-                ["build", "panel", "--build", "test", "--start", "2020", "--end", "2021"],
-            )
-
-        assert result.exit_code == 0
-        assert "Building coc panel for 2020-2021" in result.output
-        assert "Panel Summary" in result.output
-        assert "Saved panel to" in result.output
-
-    @patch("coclab.panel.build_panel")
-    @patch("coclab.panel.save_panel")
-    def test_build_panel_uses_manifest_geo_defaults(self, mock_save, mock_build, tmp_path):
-        """Metro build reads geo_type and definition_version from manifest."""
-        with runner.isolated_filesystem(temp_dir=tmp_path):
-            build_dir = _create_test_build(Path("."), "metrotest")
-            manifest = json.loads((build_dir / "manifest.json").read_text())
-            manifest["build"]["geo_type"] = "metro"
-            manifest["build"]["definition_version"] = "glynn_fox_v1"
-            (build_dir / "manifest.json").write_text(json.dumps(manifest))
-
-            mock_df = pd.DataFrame(
-                {
-                    "metro_id": ["GF01"],
-                    "geo_type": ["metro"],
-                    "geo_id": ["GF01"],
-                    "year": [2020],
-                    "pit_total": [100],
-                    "coverage_ratio": [0.95],
-                    "boundary_changed": [False],
-                    "definition_version_used": ["glynn_fox_v1"],
-                }
-            )
-            mock_build.return_value = mock_df
-            mock_save.return_value = Path("builds/metrotest/data/curated/panel/panel__metro.parquet")
-
-            result = runner.invoke(
-                app,
-                ["build", "panel", "--build", "metrotest", "--start", "2020", "--end", "2020"],
-            )
-
-        assert result.exit_code == 0
-        kwargs = mock_build.call_args.kwargs
-        assert kwargs["geo_type"] == "metro"
-        assert kwargs["definition_version"] == "glynn_fox_v1"
-        assert "Building metro panel" in result.output
-
-    def test_build_panel_metro_requires_definition_version(self, tmp_path):
-        """Metro panel CLI should fail without a definition version source."""
-        with runner.isolated_filesystem(temp_dir=tmp_path):
-            _create_test_build(Path("."), "test")
-            result = runner.invoke(
-                app,
-                [
-                    "build",
-                    "panel",
-                    "--build",
-                    "test",
-                    "--start",
-                    "2020",
-                    "--end",
-                    "2020",
-                    "--geo-type",
-                    "metro",
-                ],
-            )
-
-        assert result.exit_code == 2
-        assert "definition_version" in result.output
-
-    @patch("coclab.panel.build_panel")
-    def test_build_panel_empty(self, mock_build, tmp_path):
-        """Should warn if panel is empty."""
-        with runner.isolated_filesystem(temp_dir=tmp_path):
-            _create_test_build(Path("."), "test")
-            mock_build.return_value = pd.DataFrame()
-
-            result = runner.invoke(
-                app,
-                ["build", "panel", "--build", "test", "--start", "2020", "--end", "2021"],
-            )
-
-        assert result.exit_code == 1
-        assert "Panel is empty" in result.output
-
-    @patch("coclab.panel.build_panel")
-    @patch("coclab.provenance.write_parquet_with_provenance")
-    def test_build_panel_custom_output(self, mock_write, mock_build, tmp_path):
-        """Panel build with custom output path."""
-        with runner.isolated_filesystem(temp_dir=tmp_path):
-            _create_test_build(Path("."), "test")
-            mock_df = pd.DataFrame(
-                {
-                    "coc_id": ["CO-500"],
-                    "year": [2020],
-                    "pit_total": [100],
-                    "coverage_ratio": [0.95],
-                    "boundary_changed": [False],
-                }
-            )
-            mock_build.return_value = mock_df
-
-            output_file = tmp_path / "custom_panel.parquet"
-
-            result = runner.invoke(
-                app,
-                [
-                    "build",
-                    "panel",
-                    "--build",
-                    "test",
-                    "--start",
-                    "2020",
-                    "--end",
-                    "2020",
-                    "--output",
-                    str(output_file),
-                ],
-            )
-
-        assert result.exit_code == 0
-        mock_write.assert_called_once()
 
 
 class TestPanelDiagnosticsCommand:
@@ -525,14 +304,6 @@ class TestPhase3HelpOutput:
 
         assert result.exit_code == 0
         assert "coclab ingest pit --year 2024" in result.output
-
-    def test_build_panel_help_shows_examples(self):
-        """Build panel help should show examples."""
-        result = runner.invoke(app, ["build", "panel", "--help"], env={"COLUMNS": "200"})
-
-        assert result.exit_code == 0
-        assert "coclab build panel --build demo --start" in result.output
-        assert "--weighting population" in result.output
 
     def test_panel_diagnostics_help_shows_examples(self):
         """Panel-diagnostics help should show examples."""

@@ -1,16 +1,13 @@
-"""Regression tests for build panel interop with aggregate outputs.
+"""Regression tests for panel assemble internals with aggregate outputs.
 
-Tests that `build panel` can consume files produced by `aggregate pit`
-and `aggregate acs` without manual file copying or renaming.
+Tests that panel loader functions can discover build-scoped PIT and
+measures files produced by aggregate commands.
 
-Covers coclab-26oa: build panel does not interoperate cleanly with
-build-scoped aggregate outputs.
+Covers coclab-26oa.
 """
 
-from pathlib import Path
 
 import pandas as pd
-import pytest
 
 from coclab.panel.assemble import _load_acs_measures, _load_pit_for_year
 
@@ -128,15 +125,3 @@ class TestMeasuresBoundaryFallback:
         assert result.empty
 
 
-class TestBuildPanelCmdPassesDirs:
-    """build_panel_cmd passes build-scoped dirs to build_panel."""
-
-    def test_build_panel_help_mentions_build(self):
-        """Verify build flag exists in panel CLI."""
-        from typer.testing import CliRunner
-
-        from coclab.cli.main import app
-
-        runner = CliRunner()
-        result = runner.invoke(app, ["build", "panel", "--help"])
-        assert "--build" in result.output

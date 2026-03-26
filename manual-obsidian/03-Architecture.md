@@ -30,8 +30,8 @@ flowchart TB
     end
 
     subgraph Export[Export]
-        BUNDLE[coclab build export]
-        MANIFEST[MANIFEST.json]
+        BUNDLE[coclab build recipe-export]
+        MANIFEST[.manifest.json sidecar]
     end
 
     Sources --> Ingest

@@ -41,9 +41,9 @@ The project defaults to CoC-level inference but supports metro areas as an alter
 - **Named builds:** `builds/<name>/...`
 - **Global curated store:** `data/curated/...`
 
-## Notes on Legacy vs Current Usage
+## Panel Assembly
 
-CoC Lab still supports an imperative panel path (`build panel`) used by existing tests and workflows. The long-term direction is recipe-driven composition for multi-dataset panel construction.
+CoC Lab uses recipe-driven composition (`build recipe`) for multi-dataset panel construction.
 
 ---
 

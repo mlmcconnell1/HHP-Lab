@@ -30,8 +30,6 @@ Prefer these CoC-Lab runtime features when automating:
 - Use machine-readable output whenever available (`--json`) to avoid parsing human text.
 - Run non-interactively for CI/agents: pass `--non-interactive` or set `COCLAB_NON_INTERACTIVE=1`.
 - Use `coclab agents` for built-in geography/year matching rules and operational guidance.
-- Discover artifacts deterministically with:
-  - `coclab list artifacts --build <build> --json`
 - Preflight environment and prerequisites with:
   - `coclab status --json`
 - Validate curated naming/layout policy before and after writes:

@@ -13,17 +13,14 @@ from typing import Annotated
 import typer
 
 from coclab.cli.aggregate import aggregate_app
-from coclab.cli.build_panel import build_panel_cmd
 from coclab.cli.build_xwalks import build_xwalks
-from coclab.cli.builds import catalog_cmd, create_build, list_builds_cmd
-from coclab.cli.generate_metro import generate_metro
 from coclab.cli.compare_vintages import compare_vintages
-from coclab.cli.crosscheck_pit_vintages import crosscheck_pit_vintages, validate_pit_vintages
-from coclab.cli.crosscheck_population import crosscheck_population, validate_population
+from coclab.cli.crosscheck_pit_vintages import validate_pit_vintages
+from coclab.cli.crosscheck_population import validate_population
 from coclab.cli.diagnostics import diagnostics
-from coclab.cli.export_bundle import export_bundle
-from coclab.cli.ingest_acs_population import ingest_acs_population
+from coclab.cli.generate_metro import generate_metro
 from coclab.cli.ingest_acs1_metro import ingest_acs1_metro
+from coclab.cli.ingest_acs_population import ingest_acs_population
 from coclab.cli.ingest_census import ingest_tiger
 from coclab.cli.ingest_nhgis import ingest_nhgis
 from coclab.cli.ingest_pit import ingest_pit
@@ -31,7 +28,6 @@ from coclab.cli.ingest_pit_vintage import ingest_pit_vintage
 from coclab.cli.ingest_tract_relationship import ingest_tract_relationship
 from coclab.cli.list_census import list_census
 from coclab.cli.list_curated import list_curated
-from coclab.cli.list_artifacts import list_artifacts
 from coclab.cli.list_measures import list_measures
 from coclab.cli.list_xwalks import list_xwalks
 from coclab.cli.migrate_curated import migrate_curated_cmd
@@ -153,7 +149,6 @@ AGENTS_INFO_TEXT = """# CoC-Lab Agent Quick Reference
 
 - Prefer machine-readable JSON output when available:
   - `coclab status --json`
-  - `coclab list artifacts --build <build> --json`
   - `coclab build recipe --recipe <file> --dry-run --json`
   - `coclab build recipe-plan --recipe <file> --json`
 - Run non-interactively for automation:
@@ -560,8 +555,6 @@ def source_status(
 # Register all commands alphabetically for consistent help output
 # -----------------------------------------------------------------------------
 
-app.command("crosscheck-pit-vintages", hidden=True)(crosscheck_pit_vintages)
-app.command("crosscheck-population", hidden=True)(crosscheck_population)
 app.command("status")(status_cmd)
 app.add_typer(ingest_app, name="ingest")
 app.add_typer(list_app, name="list")
@@ -585,7 +578,6 @@ ingest_app.command("tract-relationship")(ingest_tract_relationship)
 ingest_app.command("zori")(ingest_zori)
 ingest_app.command("pep")(ingest_pep)
 list_app.command("boundaries")(list_boundaries_cmd)
-list_app.command("artifacts")(list_artifacts)
 list_app.command("census")(list_census)
 list_app.command("curated")(list_curated)
 list_app.command("measures")(list_measures)
@@ -599,11 +591,6 @@ diagnostics_app.command("xwalk")(diagnostics)
 diagnostics_app.command("zori")(zori_diagnostics)
 generate_app.command("xwalks")(build_xwalks)
 generate_app.command("metro")(generate_metro)
-generate_app.command("catalog")(catalog_cmd)
-build_app.command("panel")(build_panel_cmd)
-build_app.command("export")(export_bundle)
-build_app.command("create")(create_build)
-build_app.command("list")(list_builds_cmd)
 build_app.command("recipe")(recipe_cmd)
 build_app.command("recipe-plan")(recipe_plan_cmd)
 build_app.command("recipe-provenance")(recipe_provenance_cmd)

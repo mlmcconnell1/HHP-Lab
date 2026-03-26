@@ -191,19 +191,13 @@ class TestHelpOutput:
         assert "xwalks" in result.output
 
     def test_build_help(self):
-        """Build help should show subcommands."""
+        """Build help should show recipe subcommands."""
         result = runner.invoke(app, ["build", "--help"])
 
         assert result.exit_code == 0
-        assert "panel" in result.output
-        assert "export" in result.output
-        assert "create" in result.output
-        assert "list" in result.output
-        assert "xwalks" not in result.output
-        assert "catalog" not in result.output
-        # measures, zori, and pep have been removed from build subcommands
-        # (use 'aggregate acs/zori/pep' instead)
-        assert "measures" not in result.output
+        assert "recipe" in result.output
+        assert "recipe-plan" in result.output
+        assert "recipe-export" in result.output
 
     def test_generate_help(self):
         """Generate help should show subcommands."""
@@ -211,7 +205,6 @@ class TestHelpOutput:
 
         assert result.exit_code == 0
         assert "xwalks" in result.output
-        assert "catalog" in result.output
 
     def test_ingest_boundaries_help(self):
         """Ingest boundaries help should show options."""
