@@ -160,8 +160,20 @@ def _resolve_transform_path(
             f"cannot resolve crosswalk path (no 'coc' geometry in pair)."
         )
 
-    boundary_vintage = str(coc_ref.vintage) if coc_ref.vintage else "latest"
-    base_vintage: str | int = base_ref.vintage if base_ref.vintage else "latest"
+    if coc_ref.vintage is None:
+        raise ExecutorError(
+            f"Transform '{transform_id}': CoC geometry has no vintage. "
+            f"Cannot resolve crosswalk path without a concrete boundary vintage. "
+            f"Set vintage on the 'coc' geometry ref (e.g., vintage: 2025)."
+        )
+    if base_ref.vintage is None:
+        raise ExecutorError(
+            f"Transform '{transform_id}': {base_ref.type} geometry has no vintage. "
+            f"Cannot resolve crosswalk path without a concrete {base_ref.type} vintage. "
+            f"Set vintage on the '{base_ref.type}' geometry ref."
+        )
+    boundary_vintage = str(coc_ref.vintage)
+    base_vintage: str | int = base_ref.vintage
 
     if base_ref.type == "tract":
         return project_root / tract_xwalk_path(boundary_vintage, base_vintage)

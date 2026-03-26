@@ -30,6 +30,7 @@ from coclab.cli.ingest_pit import ingest_pit
 from coclab.cli.ingest_pit_vintage import ingest_pit_vintage
 from coclab.cli.ingest_tract_relationship import ingest_tract_relationship
 from coclab.cli.list_census import list_census
+from coclab.cli.list_curated import list_curated
 from coclab.cli.list_artifacts import list_artifacts
 from coclab.cli.list_measures import list_measures
 from coclab.cli.list_xwalks import list_xwalks
@@ -586,6 +587,7 @@ ingest_app.command("pep")(ingest_pep)
 list_app.command("boundaries")(list_boundaries_cmd)
 list_app.command("artifacts")(list_artifacts)
 list_app.command("census")(list_census)
+list_app.command("curated")(list_curated)
 list_app.command("measures")(list_measures)
 list_app.command("xwalks")(list_xwalks)
 validate_app.command("boundaries")(validate_boundaries)

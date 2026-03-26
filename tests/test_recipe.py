@@ -1980,6 +1980,32 @@ class TestMaterialize:
         with pytest.raises(ExecutorError, match="no 'coc' geometry"):
             _resolve_transform_path("zip_to_state", recipe, tmp_path)
 
+    def test_none_coc_vintage_raises(self, tmp_path: Path):
+        data = _recipe_with_pipeline()
+        data["transforms"] = [{
+            "id": "tract_to_coc",
+            "type": "crosswalk",
+            "from": {"type": "tract", "vintage": 2020},
+            "to": {"type": "coc"},  # no vintage
+            "spec": {"weighting": {"scheme": "area"}},
+        }]
+        recipe = load_recipe(data)
+        with pytest.raises(ExecutorError, match="no vintage"):
+            _resolve_transform_path("tract_to_coc", recipe, tmp_path)
+
+    def test_none_base_vintage_raises(self, tmp_path: Path):
+        data = _recipe_with_pipeline()
+        data["transforms"] = [{
+            "id": "tract_to_coc",
+            "type": "crosswalk",
+            "from": {"type": "tract"},  # no vintage
+            "to": {"type": "coc", "vintage": 2025},
+            "spec": {"weighting": {"scheme": "area"}},
+        }]
+        recipe = load_recipe(data)
+        with pytest.raises(ExecutorError, match="no vintage"):
+            _resolve_transform_path("tract_to_coc", recipe, tmp_path)
+
     def test_materialize_reuses_existing_artifact(self, tmp_path: Path):
         ctx = self._make_ctx(tmp_path)
         # Create the expected crosswalk file

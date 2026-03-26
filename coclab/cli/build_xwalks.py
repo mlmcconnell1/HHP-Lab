@@ -58,12 +58,12 @@ def build_xwalks(
         ),
     ] = "all",
     build: Annotated[
-        str,
+        str | None,
         typer.Option(
             "--build",
-            help="Named build directory for outputs and build-local artifacts.",
+            help="Named build directory for outputs. If omitted, writes to data/curated/xwalks/.",
         ),
-    ] = ...,
+    ] = None,
     force: Annotated[
         bool,
         typer.Option(
@@ -117,17 +117,19 @@ def build_xwalks(
     build_tracts = xwalk_type in ("tracts", "all")
     build_counties = xwalk_type in ("counties", "all")
 
-    # Resolve build directory first (fail fast if missing)
-    try:
-        build_dir = require_build_dir(build)
-    except FileNotFoundError as exc:
-        build_path = resolve_build_dir(build)
-        typer.echo(f"Error: Build '{build}' not found at {build_path}", err=True)
-        typer.echo("Run: coclab build create --name <build>", err=True)
-        raise typer.Exit(2) from exc
-
-    build_curated = build_curated_dir(build_dir)
-    output_dir = build_curated / "xwalks"
+    # Resolve output directory: build-local if --build given, else standard curated
+    if build is not None:
+        try:
+            build_dir = require_build_dir(build)
+        except FileNotFoundError as exc:
+            build_path = resolve_build_dir(build)
+            typer.echo(f"Error: Build '{build}' not found at {build_path}", err=True)
+            typer.echo("Run: coclab build create --name <build>", err=True)
+            raise typer.Exit(2) from exc
+        build_curated = build_curated_dir(build_dir)
+        output_dir = build_curated / "xwalks"
+    else:
+        output_dir = DEFAULT_OUTPUT_DIR
 
     # Resolve county vintage (defaults to tracts vintage if not specified)
     county_vintage = counties if counties is not None else tracts
