@@ -142,6 +142,14 @@ def _maybe_remap_ct_planning_regions(
         tract_vintage = str(crosswalk["tract_vintage"].iloc[0])
 
     if tract_vintage is None:
+        import warnings
+
+        warnings.warn(
+            "Crosswalk has no tract_vintage column; skipping CT planning region remap. "
+            "Connecticut GEOIDs may not match between ACS and crosswalk.",
+            UserWarning,
+            stacklevel=2,
+        )
         return acs_data
 
     try:

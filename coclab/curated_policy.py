@@ -66,6 +66,7 @@ CANONICAL_PATTERNS: dict[str, list[re.Pattern[str]]] = {
     "measures": [
         re.compile(r"^measures__A\d{4}(\(\d{4}\))?@B\d{4}(xT\d{4})?\.parquet$"),
         re.compile(r"^measures__metro__A\d{4}@D\w+(xT\d{4})?\.parquet$"),
+        re.compile(r"^measures__metro__acs1__A\d{4}@D\w+\.parquet$"),
     ],
     "zori": [
         re.compile(r"^zori__A\d{4}@B\d{4}xC\d{4}__w\w+\.parquet$"),

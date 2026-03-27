@@ -928,6 +928,10 @@ def metro_definitions_filename(definition_version: str) -> str:
     """Filename for metro definitions table.
 
     Pattern: ``metro_definitions__{version}.parquet``
+
+    Note: definition/membership filenames preserve the raw version string
+    (e.g., ``glynn_fox_v1``) for human readability. Data artifact filenames
+    (PIT, ACS, ZORI, panels) normalize to alphanumeric (``glynnfoxv1``).
     """
     return f"metro_definitions__{definition_version}.parquet"
 
@@ -936,6 +940,8 @@ def metro_coc_membership_filename(definition_version: str) -> str:
     """Filename for metro-to-CoC membership table.
 
     Pattern: ``metro_coc_membership__{version}.parquet``
+
+    See :func:`metro_definitions_filename` for normalization note.
     """
     return f"metro_coc_membership__{definition_version}.parquet"
 
@@ -944,6 +950,8 @@ def metro_county_membership_filename(definition_version: str) -> str:
     """Filename for metro-to-county membership table.
 
     Pattern: ``metro_county_membership__{version}.parquet``
+
+    See :func:`metro_definitions_filename` for normalization note.
     """
     return f"metro_county_membership__{definition_version}.parquet"
 

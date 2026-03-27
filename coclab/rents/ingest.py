@@ -29,6 +29,7 @@ from __future__ import annotations
 
 import hashlib
 import logging
+import re
 from datetime import UTC, date, datetime
 from pathlib import Path
 from typing import Literal
@@ -37,6 +38,9 @@ import httpx
 import pandas as pd
 
 from coclab.provenance import ProvenanceBlock, write_parquet_with_provenance
+
+# Pattern for ZORI date columns (YYYY-MM-DD or YYYY-MM)
+_DATE_COL_RE = re.compile(r"^\d{4}-\d{2}(-\d{2})?$")
 from coclab.raw_snapshot import raw_dir
 from coclab.source_registry import check_source_changed, register_source
 from coclab.sources import ZILLOW_ZORI_COUNTY, ZILLOW_ZORI_ZIP
@@ -185,18 +189,8 @@ def parse_zori_county(raw_path: Path) -> pd.DataFrame:
     """
     df = pd.read_csv(raw_path, dtype={"StateCodeFIPS": str, "MunicipalCodeFIPS": str})
 
-    # Identify date columns (format: YYYY-MM-DD or YYYY-MM)
-    id_cols = [
-        "RegionID",
-        "SizeRank",
-        "RegionName",
-        "RegionType",
-        "StateName",
-        "StateCodeFIPS",
-        "MunicipalCodeFIPS",
-        "Metro",
-    ]
-    date_cols = [c for c in df.columns if c not in id_cols]
+    # Identify date columns by positive pattern match (YYYY-MM-DD or YYYY-MM)
+    date_cols = [c for c in df.columns if _DATE_COL_RE.match(c)]
 
     # Build county FIPS from state + municipal codes
     # StateCodeFIPS is 2-digit, MunicipalCodeFIPS is 3-digit
@@ -256,19 +250,8 @@ def parse_zori_zip(raw_path: Path) -> pd.DataFrame:
     """
     df = pd.read_csv(raw_path, dtype={"RegionName": str})
 
-    # Identify date columns
-    id_cols = [
-        "RegionID",
-        "SizeRank",
-        "RegionName",
-        "RegionType",
-        "StateName",
-        "State",
-        "City",
-        "Metro",
-        "CountyName",
-    ]
-    date_cols = [c for c in df.columns if c not in id_cols]
+    # Identify date columns by positive pattern match (YYYY-MM-DD or YYYY-MM)
+    date_cols = [c for c in df.columns if _date_re.match(c)]
 
     # ZIP code is in RegionName
     df["geo_id"] = df["RegionName"].str.zfill(5)

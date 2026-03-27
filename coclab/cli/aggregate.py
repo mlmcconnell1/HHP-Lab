@@ -571,7 +571,7 @@ def aggregate_acs(
     Reads pre-ingested ACS tract files from disk and aggregates to CoC
     level using crosswalks.  No Census API calls are made.  If cached
     ingest files are missing, the command fails with instructions to
-    run ``coclab ingest acs`` first.
+    run ``coclab ingest acs5-tract`` first.
 
     Iterates over years using each as the boundary vintage (hub).
     For each boundary year, the ACS vintage is derived from the alignment
@@ -642,7 +642,7 @@ def aggregate_acs(
                 err=True,
             )
             typer.echo(
-                f"Run: coclab ingest acs --acs {acs_vintage} --tracts {tract_vintage}",
+                f"Run: coclab ingest acs5-tract --acs {acs_vintage} --tracts {tract_vintage}",
                 err=True,
             )
             raise typer.Exit(1)
