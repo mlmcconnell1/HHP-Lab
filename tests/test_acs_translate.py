@@ -330,6 +330,15 @@ class TestTranslateTracts2010To2020:
         )
 
 
+    def test_pre_2010_acs_to_2020_target_raises(self):
+        """Regression test for coclab-i2fj.5.21: pre-2010 ACS vintages must
+        not silently pass when targeting 2020+ geography."""
+        from coclab.acs.translate import needs_translation
+
+        with pytest.raises(ValueError, match="not supported"):
+            needs_translation("2005-2009", 2023)
+
+
 class TestTranslateAcsToTargetVintage:
     """Tests for translate_acs_to_target_vintage function."""
 

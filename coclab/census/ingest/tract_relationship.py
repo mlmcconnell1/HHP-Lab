@@ -16,6 +16,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 import httpx
+import numpy as np
 import pandas as pd
 
 from coclab.naming import tract_relationship_filename
@@ -126,9 +127,13 @@ def download_tract_relationship() -> tuple[pd.DataFrame, str, int, Path]:
         }
     )
 
-    # Handle division by zero (tracts with zero land area)
-    result["area_2010_to_2020_weight"] = result["area_2010_to_2020_weight"].fillna(0)
-    result["area_2020_to_2010_weight"] = result["area_2020_to_2010_weight"].fillna(0)
+    # Handle division by zero (tracts with zero land area) — catch both inf and NaN
+    result["area_2010_to_2020_weight"] = (
+        result["area_2010_to_2020_weight"].replace([np.inf, -np.inf], 0).fillna(0)
+    )
+    result["area_2020_to_2010_weight"] = (
+        result["area_2020_to_2010_weight"].replace([np.inf, -np.inf], 0).fillna(0)
+    )
 
     # Sort for consistent output
     result = result.sort_values(["tract_geoid_2010", "tract_geoid_2020"]).reset_index(drop=True)

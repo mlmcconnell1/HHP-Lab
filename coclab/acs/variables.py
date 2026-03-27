@@ -35,6 +35,9 @@ ADULT_MALE_VARS: list[str] = [f"B01001_{i:03d}E" for i in range(7, 26)]
 ADULT_FEMALE_VARS: list[str] = [f"B01001_{i:03d}E" for i in range(31, 50)]
 ADULT_VARS: list[str] = ADULT_MALE_VARS + ADULT_FEMALE_VARS
 
+# Legacy alias for backwards compatibility (consumers import measures.ACS_VARS)
+ACS_VARS = ACS_VARIABLES
+
 # All Census API variable codes to request (base + adult age groups)
 ALL_API_VARS: list[str] = list(ACS_VARIABLES.keys()) + ADULT_VARS
 

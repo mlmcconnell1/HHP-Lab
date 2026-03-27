@@ -253,6 +253,13 @@ def _map_arcgis_to_canonical_schema(
     if state_values is None:
         # Extract from CoC ID if state field not available or all null
         state_values = gdf["COCNUM"].apply(_extract_state_from_coc_id)
+    else:
+        # Fill 'nan' string entries (from NaN→astype(str)) using CoC ID fallback
+        nan_mask = state_values == "nan"
+        if nan_mask.any():
+            state_values = state_values.where(
+                ~nan_mask, gdf["COCNUM"].apply(_extract_state_from_coc_id)
+            )
 
     result = gpd.GeoDataFrame(
         {

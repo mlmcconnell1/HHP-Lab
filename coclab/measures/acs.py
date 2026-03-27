@@ -96,6 +96,8 @@ from typing import Literal
 
 import pandas as pd
 
+from coclab.acs.variables import COUNT_COLUMNS, MEDIAN_COLUMNS
+
 
 def _maybe_remap_ct_planning_regions(
     acs_data: pd.DataFrame,
@@ -163,32 +165,9 @@ def _maybe_remap_ct_planning_regions(
         )
     return remapped
 
-# ACS variable mappings
-# B01003_001E: Total population
-# B19013_001E: Median household income
-# B25064_001E: Median gross rent
-# C17002_001E: Poverty universe (for whom poverty determined)
-# C17002_002E: Below 50% poverty
-# C17002_003E: 50-99% poverty
-# B01001_001E: Total population by age (sex by age table)
-# B01001_003E through B01001_025E: Male age groups
-# B01001_027E through B01001_049E: Female age groups
-# Adults (18+) are calculated by summing groups for ages 18+
-ACS_VARS = {
-    "B01003_001E": "total_population",
-    "B19013_001E": "median_household_income",
-    "B25064_001E": "median_gross_rent",
-    "C17002_001E": "poverty_universe",
-    "C17002_002E": "below_50pct_poverty",
-    "C17002_003E": "50_to_99pct_poverty",
-}
-
-# Variables for deriving adult population (18+) from B01001 (Sex by Age)
-# Male 18+: B01001_007E through B01001_025E
-# Female 18+: B01001_031E through B01001_049E
-ADULT_MALE_VARS = [f"B01001_{i:03d}E" for i in range(7, 26)]  # 007 through 025
-ADULT_FEMALE_VARS = [f"B01001_{i:03d}E" for i in range(31, 50)]  # 031 through 049
-ADULT_VARS = ADULT_MALE_VARS + ADULT_FEMALE_VARS
+    # ACS variable mappings and adult-population derivation are defined
+    # canonically in coclab.acs.variables — see that module for Census
+    # variable codes (B01003, B19013, B25064, C17002, B01001).
 
 
 def _validate_geoid_overlap(
@@ -351,21 +330,9 @@ def aggregate_to_geo(
     # Join ACS data with crosswalk
     merged = xwalk.merge(acs_data, on="GEOID", how="left")
 
-    # Columns to aggregate (sum with weighting)
-    sum_cols = [
-        "total_population",
-        "adult_population",
-        "population_below_poverty",
-        "poverty_universe",
-        "civilian_labor_force",
-        "unemployed_count",
-    ]
-
-    # Columns to aggregate as weighted average
-    avg_cols = [
-        "median_household_income",
-        "median_gross_rent",
-    ]
+    # Columns to aggregate — derived from canonical definitions in variables.py
+    sum_cols = [c for c in COUNT_COLUMNS if c in acs_data.columns]
+    avg_cols = [c for c in MEDIAN_COLUMNS if c in acs_data.columns]
 
     # Apply weights and aggregate
     results = []

@@ -1,8 +1,7 @@
 """Measures from ACS and other data sources."""
 
+from coclab.acs.variables import ACS_VARS, ADULT_VARS
 from coclab.measures.acs import (
-    ACS_VARS,
-    ADULT_VARS,
     aggregate_to_coc,
     aggregate_to_geo,
 )

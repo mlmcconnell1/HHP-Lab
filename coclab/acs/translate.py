@@ -107,6 +107,15 @@ def needs_translation(acs_vintage: str, target_tract_vintage: int | str) -> bool
     # Target vintage 2020+ uses 2020 geography
     target_is_2020_based = target_year >= 2020
 
+    # Reject unsupported 2000-era sources when targeting 2020+ geography
+    if source_vintage < 2010 and target_is_2020_based:
+        msg = (
+            f"ACS vintage '{acs_vintage}' uses {source_vintage}-era tracts. "
+            f"Translation to {target_year} geography is not supported. "
+            f"Only 2010→2020 translation is available."
+        )
+        raise ValueError(msg)
+
     # Need translation if source is 2010-based and target is 2020-based
     return source_vintage == 2010 and target_is_2020_based
 
