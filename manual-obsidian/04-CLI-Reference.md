@@ -28,7 +28,7 @@ coclab status --json
 
 `status` performs a one-shot readiness scan across:
 - curated assets under `data/curated/` (boundaries, TIGER, crosswalks, PIT, ACS, measures, ZORI)
-- named builds and build manifests
+- optional named builds and build manifests
 - missing-prerequisite checks with actionable hints
 
 Exit behavior:
@@ -61,6 +61,10 @@ coclab aggregate pit --years 2018-2024
 
 All four write to `data/curated/<dataset>/` by default.  Use `--build <name>` to write to a named build directory instead.  When `--build` is omitted, `--years` is required.
 
+These commands produce standalone CoC aggregate artifacts. They are not a
+prerequisite for recipe execution unless a recipe explicitly points to
+aggregate outputs.
+
 Current ACS aggregation details:
 - `aggregate acs` reads cached tract files only; it does not call Census APIs
 - `aggregate acs` supports `--align {vintage_end_year,window_center_year}`
@@ -69,28 +73,41 @@ Current ACS aggregation details:
 ### Recipe Execution
 
 ```bash
-# Validate only
-coclab build recipe --recipe recipes/glynn_fox_v1.yaml --dry-run --json
+# Default human workflow
+coclab build recipe --recipe recipes/metro25-glynnfox.yaml
 
-# Execute
-coclab build recipe --recipe recipes/glynn_fox_v1.yaml
+# Automation / CI readiness check
+coclab build recipe-preflight --recipe recipes/metro25-glynnfox.yaml --json
+
+# Same command path without execution
+coclab build recipe --recipe recipes/metro25-glynnfox.yaml --dry-run
 ```
 
 Current behavior:
-- Runs schema + adapter + dataset-path checks before execution
+- Runs schema + adapter validation and the same preflight checks used by `recipe-preflight` before execution
 - Executes `materialize -> resample -> join -> persist`
 - Persists panel output to canonical `data/curated/panel/...` when the target declares `outputs: [panel]` (default)
 - Writes recipe sidecar manifest: `*.manifest.json`
 - Supports `--no-cache` to disable recipe asset caching
 
+### Recipe Preflight (No Execution)
+
+```bash
+coclab build recipe-preflight --recipe recipes/metro25-glynnfox.yaml
+coclab build recipe-preflight --recipe recipes/metro25-glynnfox.yaml --json
+```
+
+Use this for a no-execute readiness gate in automation/CI, or when you want a
+complete blocker/warning report without starting the build.
+
 ### Recipe Plan (No Execution)
 
 ```bash
-coclab build recipe-plan --recipe recipes/glynn_fox_v1.yaml
-coclab build recipe-plan --recipe recipes/glynn_fox_v1.yaml --json
+coclab build recipe-plan --recipe recipes/metro25-glynnfox.yaml
+coclab build recipe-plan --recipe recipes/metro25-glynnfox.yaml --json
 ```
 
-Use this to resolve and inspect planned tasks (`materialize`, `resample`, `join`) before execution.
+Use this to resolve and inspect planned tasks (`materialize`, `resample`, `join`) while authoring or debugging a recipe. For a readiness gate, use `recipe-preflight`.
 
 ### Recipe Provenance Utilities
 
@@ -121,6 +138,7 @@ Useful PEP options:
 `--json` is available on these high-value commands:
 - `coclab status`
 - `coclab build recipe`
+- `coclab build recipe-preflight`
 - `coclab build recipe-plan`
 - `coclab build recipe-provenance`
 - `coclab build recipe-export`
@@ -148,8 +166,10 @@ In non-interactive mode, destructive actions still require explicit consent flag
 
 ## Operational Guidance
 
-- Use `build recipe` for explicit, auditable pipeline structure.
-- Use `status` + `build recipe-plan --json` as a preflight pair in automation.
+- Use `build recipe` as the default human entrypoint.
+- Use `status` + `build recipe-preflight --json` before `build recipe --json` in automation.
+- Use `build recipe-plan --json` when you need to inspect the resolved task graph.
+- Use `aggregate` only for standalone CoC artifacts or recipes that explicitly depend on aggregate outputs.
 - Use `build recipe-export` to produce portable bundles from recipe outputs.
 
 For exact option signatures, use:

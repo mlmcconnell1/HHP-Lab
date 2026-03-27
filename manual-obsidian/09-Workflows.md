@@ -2,13 +2,12 @@
 
 ## Recipe-Driven Build
 
-1. Run a preflight readiness check (`coclab status --json` for automation).
+1. Inspect available curated assets if needed (`coclab status --json` for automation).
 2. Ingest required global assets (`boundaries`, `tiger`, `acs5-tract`, `pit`, `zori`, `pep`).
 3. Generate required crosswalks.
-4. Aggregate source datasets into curated folders.
-5. Resolve the recipe plan before execution (`coclab build recipe-plan`).
-6. Run a YAML recipe for deterministic panel construction.
-7. Export a bundle for downstream analysis.
+4. Run `coclab build recipe-preflight` when you want a no-execute readiness gate.
+5. Run a YAML recipe for deterministic panel construction.
+6. Export a bundle for downstream analysis.
 
 Example command sequence:
 
@@ -24,18 +23,15 @@ coclab ingest pep --series auto
 # 2) Crosswalks
 coclab generate xwalks --boundary 2025 --tracts 2023 --counties 2023
 
-# 3) Aggregates (--years required when --build is not specified)
-coclab aggregate acs --years 2018-2024 --weighting population
-coclab aggregate zori --years 2018-2024 --align pit_january
-coclab aggregate pep --years 2018-2024
-coclab aggregate pit --years 2018-2024
-
-# 4) Preflight + plan
+# 3) Automation / CI readiness check
 coclab status --json
-coclab build recipe-plan --recipe recipes/glynn_fox_v1.yaml --json
+coclab build recipe-preflight --recipe recipes/metro25-glynnfox.yaml --json
+
+# 4) Optional: inspect the resolved task graph while authoring/debugging
+coclab build recipe-plan --recipe recipes/metro25-glynnfox.yaml --json
 
 # 5) Recipe execution
-coclab build recipe --recipe recipes/glynn_fox_v1.yaml
+coclab build recipe --recipe recipes/metro25-glynnfox.yaml
 
 # 6) Export bundle
 coclab build recipe-export --manifest data/curated/panel/<file>.manifest.json --output exports/bundle
@@ -44,8 +40,11 @@ coclab build recipe-export --manifest data/curated/panel/<file>.manifest.json --
 ## Workflow Principles
 
 - Treat recipe files as auditable execution plans, not ad-hoc scripts.
+- `coclab build recipe` is the default human entrypoint.
+- `coclab build recipe-preflight --json` is the default no-execute automation/CI gate.
+- `coclab build recipe-plan --json` is for authoring/debugging, not for readiness checking.
+- `coclab aggregate ...` is a parallel path for standalone CoC artifacts, not a default prerequisite for recipe execution.
 - Use `--non-interactive` (or `COCLAB_NON_INTERACTIVE=1`) for agent automation.
-- Use `coclab build recipe --dry-run --json` and `coclab build recipe-plan --json` together as a pre-execution check.
 
 ---
 

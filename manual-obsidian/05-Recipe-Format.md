@@ -43,12 +43,18 @@ pipelines:
 ## Running a Recipe
 
 ```bash
-# Validate and dry-run
-coclab build recipe --recipe recipes/demo.yaml --dry-run
+# No-execute readiness check
+coclab build recipe-preflight --recipe recipes/demo.yaml --json
+
+# Optional: inspect resolved tasks while authoring/debugging
+coclab build recipe-plan --recipe recipes/demo.yaml --json
 
 # Execute
 coclab build recipe --recipe recipes/demo.yaml
 ```
+
+`coclab build recipe` is the normal entrypoint. Use `--dry-run` when you want
+the same validation/preflight path without execution.
 
 ## Top-Level Structure
 

@@ -49,10 +49,11 @@ The CLI entrypoint is `coclab`.
 
 Common entry points:
 
-- `coclab status --json`: scan curated assets and named builds
-- `coclab aggregate {acs|pit|pep|zori}`: produce CoC-scoped aggregate artifacts
-- `coclab build recipe --recipe <file> --dry-run --json`: validate and plan recipe-driven builds
-- `coclab build recipe-plan --recipe <file> --json`: inspect execution plan without running
+- `coclab status --json`: scan curated assets and optional named-build inventories
+- `coclab aggregate {acs|pit|pep|zori}`: produce standalone CoC aggregate artifacts
+- `coclab build recipe --recipe <file>`: run a recipe build (validation + preflight included)
+- `coclab build recipe-preflight --recipe <file> --json`: readiness report without execution
+- `coclab build recipe-plan --recipe <file> --json`: inspect the resolved task graph while authoring/debugging
 - `coclab validate curated-layout`: check naming and layout policy
 - `coclab list curated`: discover curated data assets
 
@@ -64,25 +65,35 @@ Automation features:
 
 ## Quick Start
 
-Recipe-driven builds are the primary workflow. Plan, validate, then execute:
+Recipe-driven builds are the primary workflow.
+
+Human path:
 
 ```bash
-uv run coclab build recipe-plan --recipe recipes/glynn_fox_metro_panel.yaml --json
-uv run coclab build recipe --recipe recipes/glynn_fox_metro_panel.yaml --dry-run --json
-uv run coclab build recipe --recipe recipes/glynn_fox_metro_panel.yaml
+uv run coclab build recipe --recipe recipes/metro25-glynnfox.yaml
 ```
 
-Inspect readiness and curated data:
+Automation / CI path:
 
 ```bash
 uv run coclab status --json
-uv run coclab list curated
-uv run coclab validate curated-layout
+uv run coclab build recipe-preflight --recipe recipes/metro25-glynnfox.yaml --json
+uv run coclab build recipe --recipe recipes/metro25-glynnfox.yaml --json
 ```
+
+Optional task-graph inspection while authoring/debugging:
+
+```bash
+uv run coclab build recipe-plan --recipe recipes/metro25-glynnfox.yaml --json
+```
+
+Most recipe builds consume curated source artifacts directly. Use the
+`aggregate` command group only when you want standalone CoC aggregate
+artifacts or when a specific recipe explicitly points at those outputs.
 
 ## Metro Geography Support
 
-Metro support is a first-class part of the analysis model. The repository includes ready-made recipe examples in [recipes/glynn_fox_metro_panel.yaml](recipes/glynn_fox_metro_panel.yaml) and [recipes/glynn_fox_metro_panel_no_zori.yaml](recipes/glynn_fox_metro_panel_no_zori.yaml).
+Metro support is a first-class part of the analysis model. The repository includes ready-made recipe examples in [recipes/metro25-glynnfox.yaml](recipes/metro25-glynnfox.yaml) and [recipes/metro25-glynnfox-acs1.yaml](recipes/metro25-glynnfox-acs1.yaml).
 
 ## Project Layout
 

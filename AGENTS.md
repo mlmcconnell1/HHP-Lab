@@ -38,8 +38,9 @@ Prefer these CoC-Lab runtime features when automating:
   - `coclab migrate curated-layout`
   - `coclab migrate curated-layout --apply`
 - For recipe workflows, validate/plan before execute:
-  - `coclab build recipe --recipe <file> --dry-run --json`
-  - `coclab build recipe-plan --recipe <file> --json`
+  - `coclab build recipe-preflight --recipe <file> --json`
+  - `coclab build recipe --recipe <file> --json`
+  - Use `coclab build recipe-plan --recipe <file> --json` when you need the resolved task graph while authoring/debugging a recipe
 
 ## Code Style: Human and Agent Readable
 

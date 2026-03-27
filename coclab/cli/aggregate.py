@@ -1,4 +1,4 @@
-"""CLI command group for aggregating source datasets into CoC artifacts.
+"""CLI command group for aggregating source datasets into standalone CoC artifacts.
 
 Provides commands for ACS, ZORI, PEP, and PIT aggregation. These
 commands validate inputs, resolve parameters, and delegate to the
@@ -29,7 +29,7 @@ from coclab.year_spec import parse_year_spec
 
 aggregate_app = typer.Typer(
     name="aggregate",
-    help="Aggregate source datasets into CoC-scoped analysis inputs.",
+    help="Aggregate source datasets into standalone CoC analysis inputs.",
     no_args_is_help=True,
 )
 

@@ -197,7 +197,7 @@ def recipe_cmd(
         typer.Option(
             "--dry-run",
             "-n",
-            help="Validate only; do not execute the build.",
+            help="Validate and preflight only; do not execute the build.",
         ),
     ] = False,
     no_cache: Annotated[
@@ -218,29 +218,30 @@ def recipe_cmd(
 ) -> None:
     """Load, validate, preflight, and execute a build recipe.
 
-    Preflight is the recommended first step: it resolves execution
-    plans, checks all dataset paths, transform artifacts, schemas,
-    and support-dataset requirements in one pass before execution.
-    All readiness failures are reported through the preflight output
-    with actionable remediation hints.
+    This is the normal entrypoint for recipe execution. It loads the
+    recipe, runs validation, runs the readiness preflight, and then
+    executes the pipelines when all prerequisites are satisfied.
 
-    Use ``coclab build recipe-preflight`` for a standalone analysis
-    or ``--gaps`` for a focused data-gaps manifest.
+    Use ``coclab build recipe-preflight`` when you want the readiness
+    report without executing. Use ``coclab build recipe-plan`` when you
+    need to inspect the resolved task graph while authoring or debugging
+    a recipe. Use ``--dry-run`` to run the same validation/preflight
+    path without execution.
 
     Use ``--skip-preflight`` only when you need to bypass the check
     for debugging purposes.
 
     Examples:
 
-        # Recommended: preflight first, then build
-        coclab build recipe-preflight --recipe my_build.yaml
+        # Normal human workflow
         coclab build recipe --recipe my_build.yaml
 
-        # Dry run with preflight
-        coclab build recipe --recipe my_build.yaml --dry-run
-
-        # JSON output for automation
+        # Automation / CI
+        coclab build recipe-preflight --recipe my_build.yaml --json
         coclab build recipe --recipe my_build.yaml --json
+
+        # Inspect resolved tasks while authoring/debugging
+        coclab build recipe-plan --recipe my_build.yaml --json
     """
     # 0. Ensure built-in adapters are registered
     register_defaults()
@@ -424,7 +425,11 @@ def recipe_plan_cmd(
 
     Shows all resolved tasks (materialize, resample, join), input
     paths, effective geometries, transform selections, and task
-    counts.  Useful for verifying prerequisites before a build.
+    counts. Useful while authoring or debugging a recipe.
+
+    This command does not perform the full readiness checks used by
+    ``recipe-preflight``. For a no-execute readiness gate, use
+    ``coclab build recipe-preflight`` instead.
 
     Examples:
 
@@ -721,7 +726,7 @@ def recipe_preflight_cmd(
         ),
     ] = False,
 ) -> None:
-    """Check all recipe prerequisites in one pass (recommended first step).
+    """Check all recipe prerequisites in one pass without executing.
 
     Resolves execution plans, inspects dataset paths, transform
     artifacts, dataset schemas, and support-dataset requirements for
@@ -730,7 +735,7 @@ def recipe_preflight_cmd(
     actionable fix suggestions rather than failing on the first
     missing prerequisite.
 
-    Use --json for machine-readable output suitable for automation.
+    Use --json for machine-readable output suitable for automation or CI.
     Use --gaps for a focused data-gaps manifest with per-gap metadata,
     severity classification, and remediation hints.
 

@@ -156,7 +156,7 @@ def _scan_zori(curated: Path) -> dict:
 
 
 def _scan_builds(builds_dir: Path) -> list[dict]:
-    """Scan named builds and their manifests."""
+    """Scan optional named builds and their manifests."""
     results: list[dict] = []
     for build_path in list_builds(builds_dir):
         entry: dict = {"name": build_path.name, "path": str(build_path)}
@@ -242,9 +242,9 @@ def status_cmd(
 ) -> None:
     """One-shot environment readiness report.
 
-    Scans curated assets, builds, and prerequisites to provide a
-    consolidated view of environment health. Returns non-zero exit
-    code when required prerequisites are missing.
+    Scans curated assets, optional named-build inventories, and common
+    prerequisites to provide a consolidated view of environment health.
+    Returns non-zero exit code when required prerequisites are missing.
 
     Examples:
 
@@ -322,7 +322,7 @@ def status_cmd(
     typer.echo(f"ZORI:       {z['count']} file(s)")
 
     # Builds
-    typer.echo(f"\nBuilds: {len(builds)} named build(s)")
+    typer.echo(f"\nNamed builds (optional): {len(builds)}")
     for bld in builds:
         health_str = "OK" if bld["healthy"] else "UNHEALTHY"
         years_str = f"years={bld['years']}" if bld["years"] else "no years"

@@ -196,6 +196,7 @@ class TestHelpOutput:
 
         assert result.exit_code == 0
         assert "recipe" in result.output
+        assert "recipe-preflight" in result.output
         assert "recipe-plan" in result.output
         assert "recipe-export" in result.output
 
@@ -469,3 +470,25 @@ class TestRetiredCommandRegression:
         output_lower = result.output.lower()
         for term in ("artifacts", "catalogs"):
             assert term not in output_lower, f"Stale term '{term}' in main help"
+
+    def test_recipe_help_marks_recipe_as_default_entrypoint(self):
+        """Recipe help should present build recipe as the normal entrypoint."""
+        result = runner.invoke(app, ["build", "recipe", "--help"])
+        assert result.exit_code == 0
+        assert "normal entrypoint" in result.output
+        assert "recipe-preflight" in result.output
+        assert "recipe-plan" in result.output
+
+    def test_recipe_plan_help_marks_it_as_inspection_only(self):
+        """Recipe-plan help should not present itself as the readiness gate."""
+        result = runner.invoke(app, ["build", "recipe-plan", "--help"])
+        assert result.exit_code == 0
+        assert "authoring or debugging" in result.output
+        assert "recipe-preflight" in result.output
+
+    def test_agents_command_recommends_preflight_then_recipe(self):
+        """Agent guidance should point to preflight + recipe as the default flow."""
+        result = runner.invoke(app, ["agents"])
+        assert result.exit_code == 0
+        assert "build recipe-preflight --recipe <file> --json" in result.output
+        assert "build recipe --recipe <file> --json" in result.output

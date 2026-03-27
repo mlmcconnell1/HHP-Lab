@@ -20,7 +20,7 @@ runner = CliRunner()
 def test_aggregate_help_shows_subcommands():
     result = runner.invoke(app, ["aggregate", "--help"])
     assert result.exit_code == 0
-    assert "CoC-scoped analysis inputs" in result.output
+    assert "standalone CoC analysis inputs" in result.output
     for name in ("acs", "zori", "pep", "pit"):
         assert name in result.output
 

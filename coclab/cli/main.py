@@ -129,7 +129,7 @@ generate_app = typer.Typer(
 )
 build_app = typer.Typer(
     name="build",
-    help="Build datasets and bundles",
+    help="Run recipe builds and bundle utilities",
     no_args_is_help=True,
 )
 show_app = typer.Typer(
@@ -149,8 +149,10 @@ AGENTS_INFO_TEXT = """# CoC-Lab Agent Quick Reference
 
 - Prefer machine-readable JSON output when available:
   - `coclab status --json`
-  - `coclab build recipe --recipe <file> --dry-run --json`
-  - `coclab build recipe-plan --recipe <file> --json`
+  - `coclab build recipe-preflight --recipe <file> --json`
+  - `coclab build recipe --recipe <file> --json`
+- Use `coclab build recipe-plan --recipe <file> --json` when you need the
+  resolved task graph while authoring or debugging a recipe.
 - Run non-interactively for automation:
   - `coclab --non-interactive ...`
   - or set `COCLAB_NON_INTERACTIVE=1`

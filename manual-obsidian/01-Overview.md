@@ -7,21 +7,21 @@ Its core design choice is deliberate:
 - **Default hub geography:** CoC boundaries by vintage (`B{year}`)
 - **Alternate analysis geography:** Metro areas via researcher-defined membership rules (e.g., Glynn/Fox metros with `D{version}`)
 - **Spoke datasets:** tract- and county-native inputs (ACS, ZORI, PEP) mapped into the target analysis geography via crosswalks or membership tables
-- **Execution style:** declarative YAML recipes (optionally scoped to a named build)
+- **Execution style:** declarative YAML recipes over the global curated store; some prep commands optionally support named build directories
 
 ## What CoC Lab Does
 
 - Ingests boundary, census geometry, PIT, ACS, PEP, and ZORI inputs
 - Builds tract↔CoC and county↔CoC crosswalks
-- Aggregates source datasets to CoC or metro geography (via `--years` or optionally inside a named build)
-- Assembles geography×year panels (imperative and recipe-driven paths) for CoC or metro targets
+- Aggregates source datasets into standalone CoC artifacts when needed
+- Assembles geography×year panels with recipe-driven composition for CoC or metro targets
 - Writes provenance metadata and recipe manifests for reproducibility
 - Exports analysis bundles with a machine-readable `MANIFEST.json`
 
 ## Philosophy
 
 ### 1. Reproducibility over convenience
-Aggregate commands require explicit `--years` (or derive years from a named build via `--build`). Recipe execution additionally emits consumed-asset manifests.
+Aggregate commands require explicit `--years` (or derive years from an optional named build via `--build`). Recipe execution consumes curated inputs directly and emits consumed-asset manifests.
 
 ### 2. Declarative where possible
 The recipe system separates:
@@ -38,7 +38,7 @@ The project defaults to CoC-level inference but supports metro areas as an alter
 
 - **CLI:** `coclab ...`
 - **Recipe execution:** `coclab build recipe --recipe <file.yaml>`
-- **Named builds (optional):** `builds/<name>/...`
+- **Optional named builds for prep workflows:** `builds/<name>/...`
 - **Global curated store:** `data/curated/...`
 
 ## Panel Assembly
