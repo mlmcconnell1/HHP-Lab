@@ -369,3 +369,13 @@ class TestExecutorCrosswalkDetection:
             {"coc_id": ["A"], "geo_id": ["A"], "tract_geoid": ["B"], "area_share": [0.5]}
         )
         assert _detect_xwalk_target_col(xwalk, "tract_geoid") == "coc_id"
+
+    def test_raises_when_no_geo_candidate(self):
+        """Regression: no silent fallback to 'coc_id' (coclab-0jfm)."""
+        from coclab.recipe.executor import ExecutorError, _detect_xwalk_target_col
+
+        xwalk = pd.DataFrame(
+            {"county_fips": ["A"], "tract_geoid": ["B"], "area_share": [0.5]}
+        )
+        with pytest.raises(ExecutorError, match="Cannot detect target geography"):
+            _detect_xwalk_target_col(xwalk, "tract_geoid")

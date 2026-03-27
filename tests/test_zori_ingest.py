@@ -24,6 +24,7 @@ from coclab.rents.ingest import (
     get_output_path,
     ingest_zori,
     parse_zori_county,
+    parse_zori_zip,
 )
 
 # Sample Zillow CSV data in wide format (county)
@@ -609,3 +610,19 @@ class TestSchemaValidation:
         # Check that timestamp is timezone-aware
         ts = df.iloc[0]["ingested_at"]
         assert ts.tzinfo is not None
+
+
+class TestParseZoriZip:
+    """Regression: parse_zori_zip must use _DATE_COL_RE, not _date_re (coclab-fs5t)."""
+
+    def test_parse_zori_zip_basic(self, tmp_path):
+        csv_path = tmp_path / "zori_zip.csv"
+        csv_path.write_text(
+            "RegionName,StateName,2015-01-31,2015-02-28\n"
+            "10001,New York,1200.00,1210.00\n"
+            "90210,California,2500.00,2520.00\n"
+        )
+        df = parse_zori_zip(csv_path)
+        assert len(df) == 4
+        assert set(df.columns) == {"geo_id", "date", "zori", "region_name", "state"}
+        assert list(df["geo_id"].unique()) == ["10001", "90210"]

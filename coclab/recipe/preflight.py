@@ -9,6 +9,7 @@ by downstream automation.
 from __future__ import annotations
 
 import enum
+import re
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Optional
@@ -698,19 +699,27 @@ def run_preflight(
                     end = err_str.index("'", start)
                     ds_id_from_err = err_str[start:end]
 
+                # Extract the specific missing year from the error
+                _year_match = re.search(r"year (\d{4})", err_str)
+                missing_years = (
+                    [int(_year_match.group(1))] if _year_match
+                    else universe_years
+                )
+
                 report.findings.append(PreflightFinding(
                     severity=Severity.ERROR,
                     kind=FindingKind.UNCOVERED_YEARS,
                     message=f"Pipeline '{pipeline.id}': {exc}",
                     pipeline_id=pipeline.id,
                     dataset_id=ds_id_from_err,
-                    years=universe_years,
+                    years=missing_years,
                     remediation=Remediation(
                         hint=(
-                            f"Extend dataset year coverage to match "
-                            f"recipe universe "
-                            f"{min(universe_years)}-{max(universe_years)}, "
-                            f"or narrow the recipe universe."
+                            f"Year(s) {missing_years} not covered by "
+                            f"dataset '{ds_id_from_err or '?'}'. "
+                            f"Extend dataset year coverage or narrow "
+                            f"the recipe universe "
+                            f"({min(universe_years)}-{max(universe_years)})."
                         ),
                     ),
                 ))

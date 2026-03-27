@@ -1323,7 +1323,7 @@ class TestGapsManifest:
         assert "uncovered_years" in manifest["gaps_by_kind"]
         gap = manifest["gaps_by_kind"]["uncovered_years"][0]
         assert gap["severity"] == "error"
-        assert gap["years"] == [2020, 2021]
+        assert gap["years"] == [2021]
         assert gap["dataset_id"] == "pit"
         assert "remediation" in gap
         assert "hint" in gap["remediation"]

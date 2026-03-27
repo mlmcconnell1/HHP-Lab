@@ -236,6 +236,41 @@ TX-5,500
             parse_pit_file(csv_path, year=2024)
 
 
+class TestFractionalSubcounts:
+    """Regression: fractional sheltered/unsheltered must skip the row (coclab-jhu4)."""
+
+    def test_fractional_sheltered_skips_row(self, tmp_path):
+        csv_path = tmp_path / "frac_sheltered.csv"
+        csv_path.write_text(
+            "CoC Number,Overall Homeless,Sheltered Total Homeless,Unsheltered Homeless\n"
+            "CO-500,10,6.4,3\n"
+        )
+        result = parse_pit_file(csv_path, year=2024)
+        assert len(result.df) == 0
+        assert result.rows_skipped == 1
+
+    def test_fractional_unsheltered_skips_row(self, tmp_path):
+        csv_path = tmp_path / "frac_unsheltered.csv"
+        csv_path.write_text(
+            "CoC Number,Overall Homeless,Sheltered Total Homeless,Unsheltered Homeless\n"
+            "CO-500,10,6,3.6\n"
+        )
+        result = parse_pit_file(csv_path, year=2024)
+        assert len(result.df) == 0
+        assert result.rows_skipped == 1
+
+    def test_integer_subcounts_kept(self, tmp_path):
+        csv_path = tmp_path / "int_subcounts.csv"
+        csv_path.write_text(
+            "CoC Number,Overall Homeless,Sheltered Total Homeless,Unsheltered Homeless\n"
+            "CO-500,10,6,4\n"
+        )
+        result = parse_pit_file(csv_path, year=2024)
+        assert len(result.df) == 1
+        assert result.df.iloc[0]["pit_sheltered"] == 6
+        assert result.df.iloc[0]["pit_unsheltered"] == 4
+
+
 class TestWritePitParquet:
     """Tests for write_pit_parquet function."""
 

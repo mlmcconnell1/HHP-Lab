@@ -251,7 +251,7 @@ def parse_zori_zip(raw_path: Path) -> pd.DataFrame:
     df = pd.read_csv(raw_path, dtype={"RegionName": str})
 
     # Identify date columns by positive pattern match (YYYY-MM-DD or YYYY-MM)
-    date_cols = [c for c in df.columns if _date_re.match(c)]
+    date_cols = [c for c in df.columns if _DATE_COL_RE.match(c)]
 
     # ZIP code is in RegionName
     df["geo_id"] = df["RegionName"].str.zfill(5)

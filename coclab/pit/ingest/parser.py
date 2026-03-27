@@ -490,8 +490,10 @@ def parse_pit_file(
                 val = float(row[sheltered_col])
                 if val != int(val):
                     logger.warning(
-                        f"{coc_id}: fractional sheltered count {row[sheltered_col]!r}"
+                        f"Skipping {coc_id}: fractional sheltered count {row[sheltered_col]!r}"
                     )
+                    rows_skipped += 1
+                    continue
                 else:
                     pit_sheltered = int(val)
             except (ValueError, TypeError):
@@ -503,8 +505,10 @@ def parse_pit_file(
                 val = float(row[unsheltered_col])
                 if val != int(val):
                     logger.warning(
-                        f"{coc_id}: fractional unsheltered count {row[unsheltered_col]!r}"
+                        f"Skipping {coc_id}: fractional unsheltered count {row[unsheltered_col]!r}"
                     )
+                    rows_skipped += 1
+                    continue
                 else:
                     pit_unsheltered = int(val)
             except (ValueError, TypeError):

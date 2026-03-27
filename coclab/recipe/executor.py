@@ -382,7 +382,8 @@ def _detect_xwalk_target_col(
     """Detect the target geography column in a crosswalk.
 
     Finds the geo-ID column by looking for known candidates that aren't
-    the source join key.  Falls back to ``"coc_id"`` if detection fails.
+    the source join key.  Raises ``ExecutorError`` when no candidate is
+    found, rather than silently returning a default that may not exist.
     """
     candidates = [
         c for c in xwalk.columns
@@ -395,7 +396,11 @@ def _detect_xwalk_target_col(
     for c in ("coc_id", "metro_id", "geo_id"):
         if c in candidates:
             return c
-    return "coc_id"  # legacy default
+    raise ExecutorError(
+        f"Cannot detect target geography column in crosswalk. "
+        f"Columns: {list(xwalk.columns)}, source_key: {source_key!r}. "
+        f"Expected one of: coc_id, metro_id, geo_id."
+    )
 def _resolve_year_column(
     df: pd.DataFrame,
     declared: str | None,
