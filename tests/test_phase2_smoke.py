@@ -502,9 +502,9 @@ def test_empty_intersection():
         {"coc_id": ["XX-500"], "geometry": [box(0, 0, 10, 10)]},
         crs="EPSG:4326",
     )
-    # Tract completely outside CoC
+    # Tract completely outside CoC (valid lat/lon far from CoC)
     tract_gdf = gpd.GeoDataFrame(
-        {"GEOID": ["99999999999"], "geometry": [box(100, 100, 110, 110)]},
+        {"GEOID": ["99999999999"], "geometry": [box(50, 50, 51, 51)]},
         crs="EPSG:4326",
     )
 

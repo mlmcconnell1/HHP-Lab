@@ -62,6 +62,8 @@ SourceType = Literal[
     "census_tract",  # TIGER tract geometries
     "census_county",  # TIGER county geometries
     "nhgis_tract",  # NHGIS tract geometries
+    "nhgis_county",  # NHGIS county geometries
+    "tract_relationship",  # Census tract relationship file (e.g. 2010-2020)
     "acs5_tract",  # ACS 5-year tract-level data
     "acs5_county",  # ACS 5-year county-level data
     "pep_county",  # Census PEP county population estimates

@@ -278,6 +278,34 @@ FilterSpec = TemporalFilter  # Extensible: Union[TemporalFilter, ...] in future
 
 OutputKind = Literal["panel", "diagnostics", "export"]
 
+CohortMethod = Literal["top_n", "bottom_n", "percentile"]
+
+
+class CohortSelector(BaseModel):
+    """Declarative cohort filter that ranks geographies by a measure column
+    at a reference year and keeps only the selected subset."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    rank_by: str = Field(..., description="Measure column to rank geographies on (e.g. 'total_population').")
+    method: CohortMethod = Field(..., description="Selection method: top_n, bottom_n, or percentile.")
+    n: Optional[int] = Field(default=None, ge=1, description="Number of geographies to keep (for top_n / bottom_n).")
+    threshold: Optional[float] = Field(
+        default=None, ge=0.0, le=1.0,
+        description="Percentile threshold (for 'percentile' method). 0.75 keeps the top 25%%.",
+    )
+    reference_year: int = Field(..., description="Year whose values are used for ranking (must be in universe).")
+
+    @model_validator(mode="after")
+    def _validate_method_params(self) -> "CohortSelector":
+        if self.method in ("top_n", "bottom_n"):
+            if self.n is None:
+                raise ValueError(f"CohortSelector method '{self.method}' requires 'n'.")
+        if self.method == "percentile":
+            if self.threshold is None:
+                raise ValueError("CohortSelector method 'percentile' requires 'threshold'.")
+        return self
+
 
 class TargetSpec(BaseModel):
     """
@@ -288,6 +316,7 @@ class TargetSpec(BaseModel):
     id: str = Field(..., description="Unique target identifier.")
     geometry: GeometryRef = Field(..., description="Target geometry for the pipeline.")
     outputs: List[OutputKind] = Field(default_factory=lambda: ["panel"], description="Requested outputs for this target.")
+    cohort: Optional[CohortSelector] = Field(default=None, description="Optional cohort selector to filter to a ranked subset of geographies.")
 
 
 # -----------------------------
@@ -702,6 +731,19 @@ class RecipeV1(BaseModel):
                 f"Filters reference unknown dataset(s): {sorted(unknown)}. "
                 f"Available: {sorted(dataset_ids)}"
             )
+        return self
+
+    @model_validator(mode="after")
+    def _validate_cohort_selectors(self) -> "RecipeV1":
+        """Validate that cohort reference_year falls within the recipe universe."""
+        universe_years = set(expand_year_spec(self.universe))
+        for t in self.targets:
+            if t.cohort is not None and t.cohort.reference_year not in universe_years:
+                raise ValueError(
+                    f"Target '{t.id}' cohort reference_year "
+                    f"{t.cohort.reference_year} is not in the recipe universe "
+                    f"({min(universe_years)}-{max(universe_years)})."
+                )
         return self
 
     @model_validator(mode="after")

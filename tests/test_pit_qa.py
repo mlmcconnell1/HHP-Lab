@@ -315,6 +315,7 @@ class TestCheckInvalidCounts:
 
     def test_non_integer_count(self):
         df = make_pit_df(coc_ids=["CO-500"], totals=[1000])
+        df["pit_total"] = df["pit_total"].astype(float)
         df.loc[0, "pit_total"] = 1000.5
         issues = check_invalid_counts(df)
         assert len(issues) == 1

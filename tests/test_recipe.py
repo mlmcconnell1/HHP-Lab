@@ -3640,3 +3640,164 @@ class TestExecutionPlanToDict:
         rt = d["resample_tasks"][0]
         assert "type" in rt["effective_geometry"]
         assert "type" in rt["to_geometry"]
+
+
+# ===========================================================================
+# Cohort selector tests
+# ===========================================================================
+
+
+class TestCohortSelectorSchema:
+    """Test CohortSelector validation in the recipe schema."""
+
+    def test_target_with_cohort_parses(self):
+        data = _minimal_recipe()
+        data["targets"][0]["cohort"] = {
+            "rank_by": "total_population",
+            "method": "top_n",
+            "n": 50,
+            "reference_year": 2021,
+        }
+        recipe = load_recipe(data)
+        assert recipe.targets[0].cohort is not None
+        assert recipe.targets[0].cohort.method == "top_n"
+        assert recipe.targets[0].cohort.n == 50
+
+    def test_target_without_cohort(self):
+        recipe = load_recipe(_minimal_recipe())
+        assert recipe.targets[0].cohort is None
+
+    def test_cohort_reference_year_outside_universe_rejected(self):
+        data = _minimal_recipe()
+        data["targets"][0]["cohort"] = {
+            "rank_by": "total_population",
+            "method": "top_n",
+            "n": 10,
+            "reference_year": 2000,
+        }
+        with pytest.raises(RecipeLoadError, match="reference_year"):
+            load_recipe(data)
+
+    def test_top_n_requires_n(self):
+        from pydantic import ValidationError
+        from coclab.recipe.recipe_schema import CohortSelector
+
+        with pytest.raises(ValidationError, match="requires 'n'"):
+            CohortSelector(
+                rank_by="total_population",
+                method="top_n",
+                reference_year=2021,
+            )
+
+    def test_percentile_requires_threshold(self):
+        from pydantic import ValidationError
+        from coclab.recipe.recipe_schema import CohortSelector
+
+        with pytest.raises(ValidationError, match="requires 'threshold'"):
+            CohortSelector(
+                rank_by="total_population",
+                method="percentile",
+                reference_year=2021,
+            )
+
+    def test_bottom_n_parses(self):
+        data = _minimal_recipe()
+        data["targets"][0]["cohort"] = {
+            "rank_by": "total_population",
+            "method": "bottom_n",
+            "n": 10,
+            "reference_year": 2021,
+        }
+        recipe = load_recipe(data)
+        assert recipe.targets[0].cohort.method == "bottom_n"
+
+    def test_percentile_parses(self):
+        data = _minimal_recipe()
+        data["targets"][0]["cohort"] = {
+            "rank_by": "total_population",
+            "method": "percentile",
+            "threshold": 0.75,
+            "reference_year": 2021,
+        }
+        recipe = load_recipe(data)
+        assert recipe.targets[0].cohort.threshold == 0.75
+
+
+class TestApplyCohortSelector:
+    """Test the _apply_cohort_selector executor function."""
+
+    def _make_panel(self) -> pd.DataFrame:
+        """Panel with 5 geos across 2 years."""
+        rows = []
+        pops = {"G1": 100, "G2": 500, "G3": 300, "G4": 200, "G5": 400}
+        for year in [2020, 2021]:
+            for geo, pop in pops.items():
+                rows.append({"geo_id": geo, "year": year, "total_population": pop})
+        return pd.DataFrame(rows)
+
+    def test_top_n(self):
+        from coclab.recipe.recipe_schema import CohortSelector
+        from coclab.recipe.executor import _apply_cohort_selector
+
+        panel = self._make_panel()
+        cohort = CohortSelector(
+            rank_by="total_population", method="top_n", n=3, reference_year=2021,
+        )
+        result = _apply_cohort_selector(panel, cohort)
+        selected_geos = set(result["geo_id"].unique())
+        assert selected_geos == {"G2", "G5", "G3"}
+        # All years included for selected geos
+        assert len(result) == 6
+
+    def test_bottom_n(self):
+        from coclab.recipe.recipe_schema import CohortSelector
+        from coclab.recipe.executor import _apply_cohort_selector
+
+        panel = self._make_panel()
+        cohort = CohortSelector(
+            rank_by="total_population", method="bottom_n", n=2, reference_year=2021,
+        )
+        result = _apply_cohort_selector(panel, cohort)
+        selected_geos = set(result["geo_id"].unique())
+        assert selected_geos == {"G1", "G4"}
+        assert len(result) == 4
+
+    def test_percentile(self):
+        from coclab.recipe.recipe_schema import CohortSelector
+        from coclab.recipe.executor import _apply_cohort_selector
+
+        panel = self._make_panel()
+        # 0.5 threshold keeps geos >= median (300): G2=500, G5=400, G3=300
+        cohort = CohortSelector(
+            rank_by="total_population",
+            method="percentile",
+            threshold=0.5,
+            reference_year=2021,
+        )
+        result = _apply_cohort_selector(panel, cohort)
+        selected_geos = set(result["geo_id"].unique())
+        assert "G2" in selected_geos
+        assert "G5" in selected_geos
+        assert "G1" not in selected_geos
+
+    def test_missing_rank_column_raises(self):
+        from coclab.recipe.recipe_schema import CohortSelector
+        from coclab.recipe.executor import _apply_cohort_selector, ExecutorError
+
+        panel = self._make_panel()
+        cohort = CohortSelector(
+            rank_by="nonexistent_col", method="top_n", n=3, reference_year=2021,
+        )
+        with pytest.raises(ExecutorError, match="rank_by column"):
+            _apply_cohort_selector(panel, cohort)
+
+    def test_empty_reference_year_raises(self):
+        from coclab.recipe.recipe_schema import CohortSelector
+        from coclab.recipe.executor import _apply_cohort_selector, ExecutorError
+
+        panel = self._make_panel()
+        cohort = CohortSelector(
+            rank_by="total_population", method="top_n", n=3, reference_year=2099,
+        )
+        with pytest.raises(ExecutorError, match="reference_year"):
+            _apply_cohort_selector(panel, cohort)

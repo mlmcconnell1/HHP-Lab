@@ -108,6 +108,9 @@ def build_tract_crosswalk(
             keep_geom_type=False,
         )
 
+    # Drop empty geometries (non-intersecting pairs) before area calc
+    intersections = intersections[~intersections.geometry.is_empty].copy()
+
     # Calculate intersection areas
     intersections["intersection_area"] = intersections.geometry.area
 

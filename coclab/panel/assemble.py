@@ -53,6 +53,7 @@ import logging
 from pathlib import Path
 from typing import TYPE_CHECKING, Literal
 
+import numpy as np
 import pandas as pd
 
 from coclab import naming
@@ -1160,7 +1161,8 @@ def build_panel(
                 f"{year_df['total_population'].notna().sum()} matched"
             )
         else:
-            # Add empty ACS columns
+            # Add empty ACS columns with explicit float64 dtype to avoid
+            # FutureWarning about concat with all-NA object-dtype columns.
             for col in [
                 "total_population",
                 "adult_population",
@@ -1169,7 +1171,7 @@ def build_panel(
                 "median_gross_rent",
                 "coverage_ratio",
             ]:
-                year_df[col] = pd.NA
+                year_df[col] = np.nan
 
         # -----------------------------------------------------------------
         # ACS 1-year metro integration (when requested)
@@ -1193,11 +1195,11 @@ def build_panel(
                 logger.warning(
                     f"Year {year}: no ACS1 metro artifact for vintage {acs1_vintage}"
                 )
-                year_df["unemployment_rate_acs1"] = pd.NA
+                year_df["unemployment_rate_acs1"] = np.nan
                 year_df["acs1_vintage_used"] = pd.NA
                 year_df["acs_products_used"] = "acs5"
         elif geo_type == GEO_TYPE_METRO:
-            year_df["unemployment_rate_acs1"] = pd.NA
+            year_df["unemployment_rate_acs1"] = np.nan
             year_df["acs1_vintage_used"] = pd.NA
             year_df["acs_products_used"] = "acs5"
 

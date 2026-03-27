@@ -46,6 +46,7 @@ from coclab.recipe.probes import (
     probe_year_column,
 )
 from coclab.recipe.recipe_schema import (
+    CohortSelector,
     GeometryRef,
     RecipeV1,
     TemporalFilter,
@@ -1292,6 +1293,45 @@ def _target_geometry_metadata(
     return geo_type, boundary_vintage, definition_version
 
 
+def _apply_cohort_selector(
+    panel: pd.DataFrame,
+    cohort: "CohortSelector",
+    geo_id_col: str = "geo_id",
+    year_col: str = "year",
+) -> pd.DataFrame:
+    """Filter panel to a ranked subset of geographies.
+
+    Ranks geographies by ``cohort.rank_by`` at ``cohort.reference_year``,
+    then keeps only the selected geo_ids across all years.
+    """
+    ref = panel[panel[year_col] == cohort.reference_year]
+    if ref.empty:
+        raise ExecutorError(
+            f"Cohort selector reference_year {cohort.reference_year} "
+            f"produced no rows in the panel."
+        )
+    if cohort.rank_by not in ref.columns:
+        raise ExecutorError(
+            f"Cohort selector rank_by column '{cohort.rank_by}' "
+            f"not found in panel columns: {sorted(panel.columns.tolist())}"
+        )
+
+    ranked = ref[[geo_id_col, cohort.rank_by]].dropna(subset=[cohort.rank_by])
+    ranked = ranked.sort_values(cohort.rank_by, ascending=False)
+
+    if cohort.method == "top_n":
+        selected = ranked.head(cohort.n)[geo_id_col]
+    elif cohort.method == "bottom_n":
+        selected = ranked.tail(cohort.n)[geo_id_col]
+    elif cohort.method == "percentile":
+        threshold_value = ranked[cohort.rank_by].quantile(cohort.threshold)
+        selected = ranked[ranked[cohort.rank_by] >= threshold_value][geo_id_col]
+    else:
+        raise ExecutorError(f"Unknown cohort method: {cohort.method}")
+
+    return panel[panel[geo_id_col].isin(selected)].reset_index(drop=True)
+
+
 def _canonicalize_panel_for_target(
     panel: pd.DataFrame,
     target_geometry: GeometryRef,
@@ -1377,6 +1417,18 @@ def _persist_outputs(
 
     panel = pd.concat(frames, ignore_index=True)
     panel = _canonicalize_panel_for_target(panel, target.geometry)
+
+    # Apply cohort selector if declared on the target
+    if target.cohort is not None:
+        pre_count = panel["geo_id"].nunique() if "geo_id" in panel.columns else len(panel)
+        panel = _apply_cohort_selector(panel, target.cohort)
+        post_count = panel["geo_id"].nunique() if "geo_id" in panel.columns else len(panel)
+        _echo(
+            ctx,
+            f"  [cohort] {target.cohort.method} rank_by={target.cohort.rank_by} "
+            f"ref_year={target.cohort.reference_year}: "
+            f"{pre_count} → {post_count} geographies",
+        )
 
     # Determine output path using canonical naming
     target_geo_type, boundary_vintage, definition_version = _target_geometry_metadata(
@@ -1514,6 +1566,8 @@ def _persist_diagnostics(
         )
     if target is not None:
         panel = _canonicalize_panel_for_target(panel, target.geometry)
+        if target.cohort is not None:
+            panel = _apply_cohort_selector(panel, target.cohort)
         (
             target_geo_type,
             boundary_vintage,

@@ -375,14 +375,15 @@ def aggregate_to_geo(
         # Weighted sums for population counts - ALWAYS use area_share
         # This computes actual population totals (sum of tract_pop * area_share)
         # Using pop_share here would give weighted averages, not totals
+        area_share = pd.to_numeric(group["area_share"], errors="coerce").fillna(0)
         for col in sum_cols:
             if col in group.columns:
-                weighted = group[col].fillna(0) * group["area_share"].fillna(0)
+                weighted = pd.to_numeric(group[col], errors="coerce").fillna(0) * area_share
                 row[col] = weighted.sum()
 
         # Weighted averages for median values
         # Use the specified weighting method (area or population)
-        pop_weights = group["total_population"].fillna(0) * group[median_weight_col].fillna(0)
+        pop_weights = pd.to_numeric(group["total_population"], errors="coerce").fillna(0) * pd.to_numeric(group[median_weight_col], errors="coerce").fillna(0)
 
         for col in avg_cols:
             if col in group.columns:
