@@ -89,6 +89,8 @@ Current behavior:
 - Persists panel output to canonical `data/curated/panel/...` when the target declares `outputs: [panel]` (default)
 - Writes recipe sidecar manifest: `*.manifest.json`
 - Supports `--no-cache` to disable recipe asset caching
+- Emits explicit Connecticut county-transition notes when county-native recipe
+  inputs need planning-region to legacy-county normalization
 
 ### Recipe Preflight (No Execution)
 
@@ -99,6 +101,12 @@ coclab build recipe-preflight --recipe recipes/metro25-glynnfox.yaml --json
 
 Use this for a no-execute readiness gate in automation/CI, or when you want a
 complete blocker/warning report without starting the build.
+
+Current special-case note:
+
+- When a recipe mixes Connecticut planning-region county IDs with a
+  legacy-county crosswalk, preflight emits `ct_county_alignment` findings
+  instead of treating the build as an unexplained green pass.
 
 ### Recipe Plan (No Execution)
 

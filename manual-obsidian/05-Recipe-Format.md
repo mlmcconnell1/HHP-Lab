@@ -56,6 +56,59 @@ coclab build recipe --recipe recipes/demo.yaml
 `coclab build recipe` is the normal entrypoint. Use `--dry-run` when you want
 the same validation/preflight path without execution.
 
+## Connecticut County-Equivalent Transition
+
+Connecticut changed Census county-equivalent geography from 8 legacy counties
+(`09001`-`09015`) to 9 planning regions (`09110`-`09190`). This matters for
+county-native recipe inputs because CoC-Lab can now combine:
+
+- legacy county crosswalks such as `xwalk__B2025xC2020.parquet`
+- newer county-native datasets whose Connecticut rows already use planning-region
+  FIPS, especially `pep_county__v2024.parquet`
+- county-weighted transforms where the `population_source` dataset can switch to
+  planning-region FIPS even if the main dataset still uses legacy county FIPS
+
+Near-term CoC-Lab policy:
+
+- Do not silently drop or misweight Connecticut rows.
+- If the recipe crosswalk is keyed to legacy counties and the dataset or support
+  weights are keyed to Connecticut planning regions, the runtime applies a
+  Connecticut special-case normalization and translates planning-region rows
+  back to legacy counties before the aggregate join.
+- If that normalization cannot be performed, preflight/build fail explicitly
+  instead of emitting near-zero population values or null weighted measures.
+
+Current runtime diagnostics:
+
+- `coclab build recipe-preflight --json` emits `ct_county_alignment` findings
+  when this special-case path will be used.
+- `coclab build recipe --json` records per-step `notes` when the alignment was
+  actually applied during execution.
+- Human-readable `build recipe` output prints the same alignment note inline
+  during the affected resample step.
+
+Required bridge artifact:
+
+- The current runtime builds the authoritative Connecticut bridge from
+  `data/curated/tiger/counties__C2020.parquet` and
+  `data/curated/tiger/counties__C2023.parquet`.
+- If `counties__C2023.parquet` is missing, the remediation command is:
+
+```bash
+coclab ingest tiger --year 2023 --type counties
+```
+
+Affected situations:
+
+- CoC or metro recipes that aggregate county-native PEP inputs through a
+  legacy-county crosswalk
+- county-weighted ZORI recipe steps whose `population_source` is PEP
+- any other county-native recipe path that mixes Connecticut planning-region
+  dataset rows with a legacy-county crosswalk
+
+This behavior is intentional. It exists to prevent the Connecticut corruption
+fixed in beads `coclab-i6od`, `coclab-vnzm`, `coclab-ybc0`, and `coclab-2kag`.
+
 ## Top-Level Structure
 
 Every recipe is a YAML mapping with these top-level keys:

@@ -10,6 +10,7 @@ import pytest
 from typer.testing import CliRunner
 
 from coclab.cli.main import app
+from coclab.geo.ct_planning_regions import CtPlanningRegionCrosswalk
 from coclab.recipe.adapters import (
     DatasetAdapterRegistry,
     GeometryAdapterRegistry,
@@ -2086,6 +2087,203 @@ def _make_xwalk_parquet(path: Path, geo_type: str = "tract") -> None:
     df.to_parquet(path)
 
 
+CT_RECIPE_ALIGNMENT_MAPPING = pd.DataFrame(
+    {
+        "legacy_county_fips": ["09001", "09001", "09003", "09003"],
+        "planning_region_fips": ["09110", "09120", "09120", "09130"],
+        "legacy_share": [0.80, 0.20, 0.70, 0.30],
+        "planning_share": [1.0, 0.30, 0.70, 1.0],
+    }
+)
+
+CT_RECIPE_ALIGNMENT_EXPECTED_POP = {
+    "AL-500": 400.0,
+    "CT-500": 1000.0,
+}
+
+CT_RECIPE_ALIGNMENT_EXPECTED_RENT = {
+    "AL-500": 900.0,
+    "CT-500": 1410.0,
+}
+
+
+def _make_ct_recipe_alignment_crosswalk() -> CtPlanningRegionCrosswalk:
+    return CtPlanningRegionCrosswalk(
+        mapping=CT_RECIPE_ALIGNMENT_MAPPING.copy(),
+        legacy_vintage=2020,
+        planning_vintage=2023,
+    )
+
+
+def _patch_ct_recipe_alignment(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(
+        "coclab.recipe.executor.build_ct_county_planning_region_crosswalk",
+        lambda **kwargs: _make_ct_recipe_alignment_crosswalk(),
+    )
+    monkeypatch.setattr(
+        "coclab.recipe.preflight.build_ct_county_planning_region_crosswalk",
+        lambda **kwargs: _make_ct_recipe_alignment_crosswalk(),
+    )
+
+
+def _patch_ct_recipe_alignment_failure(
+    monkeypatch: pytest.MonkeyPatch,
+    *,
+    message: str = "missing counties__C2023.parquet",
+) -> None:
+    def _raise(**kwargs):
+        raise FileNotFoundError(message)
+
+    monkeypatch.setattr(
+        "coclab.recipe.executor.build_ct_county_planning_region_crosswalk",
+        _raise,
+    )
+    monkeypatch.setattr(
+        "coclab.recipe.preflight.build_ct_county_planning_region_crosswalk",
+        _raise,
+    )
+
+
+def _setup_ct_alignment_recipe(tmp_path: Path) -> dict:
+    """Create a minimal recipe and fixtures that exercise CT county alignment."""
+    data_dir = tmp_path / "data"
+    data_dir.mkdir(parents=True, exist_ok=True)
+
+    pd.DataFrame(
+        {
+            "county_fips": ["09110", "09120", "09130", "01001"],
+            "year": [2024, 2024, 2024, 2024],
+            "population": [500.0, 300.0, 200.0, 400.0],
+        }
+    ).to_parquet(data_dir / "pep.parquet")
+
+    pd.DataFrame(
+        {
+            "county_fips": ["09001", "09003", "01001"],
+            "year": [2024, 2024, 2024],
+            "rent": [1000.0, 2000.0, 900.0],
+        }
+    ).to_parquet(data_dir / "zori.parquet")
+
+    pd.DataFrame(
+        {
+            "county_fips": ["09110", "09120", "09130", "01001"],
+            "year": [2024, 2024, 2024, 2024],
+            "population": [500.0, 300.0, 200.0, 100.0],
+        }
+    ).to_parquet(data_dir / "weights.parquet")
+
+    xwalk_dir = data_dir / "curated" / "xwalks"
+    xwalk_dir.mkdir(parents=True, exist_ok=True)
+    pd.DataFrame(
+        {
+            "coc_id": ["CT-500", "CT-500", "AL-500"],
+            "county_fips": ["09001", "09003", "01001"],
+            "area_share": [1.0, 1.0, 1.0],
+        }
+    ).to_parquet(xwalk_dir / "xwalk__B2025xC2020.parquet")
+
+    return {
+        "version": 1,
+        "name": "ct-alignment-cli",
+        "universe": {"range": "2024-2024"},
+        "targets": [
+            {"id": "coc_panel", "geometry": {"type": "coc", "vintage": 2025}},
+        ],
+        "datasets": {
+            "pep_county": {
+                "provider": "census",
+                "product": "pep",
+                "version": 1,
+                "native_geometry": {"type": "county", "vintage": 2020},
+                "years": "2024-2024",
+                "path": "data/pep.parquet",
+                "geo_column": "county_fips",
+            },
+            "zori_county": {
+                "provider": "zillow",
+                "product": "zori",
+                "version": 1,
+                "native_geometry": {"type": "county", "vintage": 2020},
+                "years": "2024-2024",
+                "path": "data/zori.parquet",
+                "geo_column": "county_fips",
+            },
+            "weights": {
+                "provider": "census",
+                "product": "pep",
+                "version": 1,
+                "native_geometry": {"type": "county", "vintage": 2020},
+                "years": "2024-2024",
+                "path": "data/weights.parquet",
+                "geo_column": "county_fips",
+            },
+        },
+        "transforms": [
+            {
+                "id": "county_to_coc_area",
+                "type": "crosswalk",
+                "from": {"type": "county", "vintage": 2020},
+                "to": {"type": "coc", "vintage": 2025},
+                "spec": {"weighting": {"scheme": "area"}},
+            },
+            {
+                "id": "county_to_coc_population",
+                "type": "crosswalk",
+                "from": {"type": "county", "vintage": 2020},
+                "to": {"type": "coc", "vintage": 2025},
+                "spec": {
+                    "weighting": {
+                        "scheme": "population",
+                        "population_source": "weights",
+                        "population_field": "population",
+                    }
+                },
+            },
+        ],
+        "pipelines": [
+            {
+                "id": "main",
+                "target": "coc_panel",
+                "steps": [
+                    {
+                        "materialize": {
+                            "transforms": ["county_to_coc_area", "county_to_coc_population"],
+                        }
+                    },
+                    {
+                        "resample": {
+                            "dataset": "pep_county",
+                            "to_geometry": {"type": "coc", "vintage": 2025},
+                            "method": "aggregate",
+                            "via": "county_to_coc_area",
+                            "measures": ["population"],
+                            "aggregation": "sum",
+                        }
+                    },
+                    {
+                        "resample": {
+                            "dataset": "zori_county",
+                            "to_geometry": {"type": "coc", "vintage": 2025},
+                            "method": "aggregate",
+                            "via": "county_to_coc_population",
+                            "measures": {
+                                "rent": {"aggregation": "weighted_mean"},
+                            },
+                        }
+                    },
+                    {
+                        "join": {
+                            "datasets": ["pep_county", "zori_county"],
+                            "join_on": ["geo_id", "year"],
+                        }
+                    },
+                ],
+            }
+        ],
+    }
+
+
 class TestResampleIdentity:
 
     def test_identity_passthrough(self, tmp_path: Path):
@@ -2482,6 +2680,172 @@ class TestResampleAggregate:
         )
         result = _execute_resample(task, ctx)
         assert result.success
+
+    def test_aggregate_sum_translates_ct_planning_source_to_legacy(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ):
+        _patch_ct_recipe_alignment(monkeypatch)
+
+        ds_path = tmp_path / "data" / "pep.parquet"
+        ds_path.parent.mkdir(parents=True, exist_ok=True)
+        pd.DataFrame(
+            {
+                "county_fips": ["09110", "09120", "09130", "01001"],
+                "year": [2024, 2024, 2024, 2024],
+                "population": [500.0, 300.0, 200.0, 400.0],
+            }
+        ).to_parquet(ds_path)
+
+        xwalk_path = tmp_path / "xwalk_county.parquet"
+        pd.DataFrame(
+            {
+                "coc_id": ["CT-500", "CT-500", "AL-500"],
+                "county_fips": ["09001", "09003", "01001"],
+                "area_share": [1.0, 1.0, 1.0],
+            }
+        ).to_parquet(xwalk_path)
+
+        data = _recipe_with_pipeline()
+        data["universe"] = {"range": "2024-2024"}
+        data["datasets"]["pep"] = {
+            "provider": "census",
+            "product": "pep",
+            "version": 1,
+            "native_geometry": {"type": "county", "vintage": 2020},
+            "years": "2024-2024",
+            "path": "data/pep.parquet",
+            "geo_column": "county_fips",
+        }
+        data["transforms"] = [{
+            "id": "county_to_coc",
+            "type": "crosswalk",
+            "from": {"type": "county", "vintage": 2020},
+            "to": {"type": "coc", "vintage": 2025},
+            "spec": {"weighting": {"scheme": "area"}},
+        }]
+        data["pipelines"][0]["steps"] = [
+            {"materialize": {"transforms": ["county_to_coc"]}},
+        ]
+        recipe = load_recipe(data)
+        ctx = ExecutionContext(project_root=tmp_path, recipe=recipe)
+        ctx.transform_paths["county_to_coc"] = xwalk_path
+
+        task = ResampleTask(
+            dataset_id="pep",
+            year=2024,
+            input_path="data/pep.parquet",
+            effective_geometry=GeometryRef(type="county", vintage=2020),
+            method="aggregate",
+            transform_id="county_to_coc",
+            to_geometry=GeometryRef(type="coc", vintage=2025),
+            measures=["population"],
+            measure_aggregations={"population": "sum"},
+            geo_column="county_fips",
+        )
+        result = _execute_resample(task, ctx)
+
+        assert result.success
+        df = ctx.intermediates[("pep", 2024)].sort_values("geo_id").reset_index(drop=True)
+        assert dict(zip(df["geo_id"], df["population"], strict=True)) == pytest.approx(
+            CT_RECIPE_ALIGNMENT_EXPECTED_POP,
+        )
+
+    def test_aggregate_weighted_mean_translates_ct_population_source_to_legacy(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ):
+        _patch_ct_recipe_alignment(monkeypatch)
+
+        zori_path = tmp_path / "data" / "zori.parquet"
+        zori_path.parent.mkdir(parents=True, exist_ok=True)
+        pd.DataFrame(
+            {
+                "county_fips": ["09001", "09003", "01001"],
+                "year": [2024, 2024, 2024],
+                "rent": [1000.0, 2000.0, 900.0],
+            }
+        ).to_parquet(zori_path)
+
+        weights_path = tmp_path / "data" / "weights.parquet"
+        pd.DataFrame(
+            {
+                "county_fips": ["09110", "09120", "09130", "01001"],
+                "year": [2024, 2024, 2024, 2024],
+                "population": [500.0, 300.0, 200.0, 100.0],
+            }
+        ).to_parquet(weights_path)
+
+        xwalk_path = tmp_path / "xwalk_county.parquet"
+        pd.DataFrame(
+            {
+                "coc_id": ["CT-500", "CT-500", "AL-500"],
+                "county_fips": ["09001", "09003", "01001"],
+                "area_share": [1.0, 1.0, 1.0],
+            }
+        ).to_parquet(xwalk_path)
+
+        data = _recipe_with_pipeline()
+        data["universe"] = {"range": "2024-2024"}
+        data["datasets"]["zori"] = {
+            "provider": "zillow",
+            "product": "zori",
+            "version": 1,
+            "native_geometry": {"type": "county", "vintage": 2020},
+            "years": "2024-2024",
+            "path": "data/zori.parquet",
+            "geo_column": "county_fips",
+        }
+        data["datasets"]["weights"] = {
+            "provider": "census",
+            "product": "pep",
+            "version": 1,
+            "native_geometry": {"type": "county", "vintage": 2020},
+            "years": "2024-2024",
+            "path": "data/weights.parquet",
+            "geo_column": "county_fips",
+        }
+        data["transforms"] = [{
+            "id": "county_to_coc",
+            "type": "crosswalk",
+            "from": {"type": "county", "vintage": 2020},
+            "to": {"type": "coc", "vintage": 2025},
+            "spec": {
+                "weighting": {
+                    "scheme": "population",
+                    "population_source": "weights",
+                    "population_field": "population",
+                }
+            },
+        }]
+        data["pipelines"][0]["steps"] = [
+            {"materialize": {"transforms": ["county_to_coc"]}},
+        ]
+        recipe = load_recipe(data)
+        ctx = ExecutionContext(project_root=tmp_path, recipe=recipe)
+        ctx.transform_paths["county_to_coc"] = xwalk_path
+
+        task = ResampleTask(
+            dataset_id="zori",
+            year=2024,
+            input_path="data/zori.parquet",
+            effective_geometry=GeometryRef(type="county", vintage=2020),
+            method="aggregate",
+            transform_id="county_to_coc",
+            to_geometry=GeometryRef(type="coc", vintage=2025),
+            measures=["rent"],
+            measure_aggregations={"rent": "weighted_mean"},
+            geo_column="county_fips",
+        )
+        result = _execute_resample(task, ctx)
+
+        assert result.success
+        df = ctx.intermediates[("zori", 2024)].sort_values("geo_id").reset_index(drop=True)
+        assert dict(zip(df["geo_id"], df["rent"], strict=True)) == pytest.approx(
+            CT_RECIPE_ALIGNMENT_EXPECTED_RENT,
+        )
 
     def test_per_measure_aggregation_dict(self, tmp_path: Path):
         """Dict-format measure_aggregations applies different agg per measure."""
@@ -3975,6 +4339,110 @@ class TestRecipeJsonMode:
         assert out["status"] == "blocked"
         assert "preflight" in out
         assert out["preflight"]["blocking_count"] >= 2
+
+    def test_json_preflight_reports_ct_alignment_warning(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ):
+        _make_project_root(tmp_path)
+        monkeypatch.chdir(tmp_path)
+        _patch_ct_recipe_alignment(monkeypatch)
+        rf = self._write_recipe(tmp_path, _setup_ct_alignment_recipe(tmp_path))
+
+        result = runner.invoke(app, [
+            "build", "recipe-preflight",
+            "--recipe", str(rf),
+            "--json",
+        ])
+
+        assert result.exit_code == 0
+        out = json.loads(result.output)
+        assert out["status"] == "ok"
+        assert out["warning_count"] == 2
+        ct_findings = [
+            f for f in out["findings"]
+            if f["kind"] == "ct_county_alignment"
+        ]
+        assert len(ct_findings) == 2
+        assert any("planning-region dataset 'pep_county'" in f["message"] for f in ct_findings)
+        assert any("population_source 'weights'" in f["message"] for f in ct_findings)
+
+    def test_json_preflight_blocks_when_ct_bridge_missing(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ):
+        _make_project_root(tmp_path)
+        monkeypatch.chdir(tmp_path)
+        _patch_ct_recipe_alignment_failure(monkeypatch)
+        rf = self._write_recipe(tmp_path, _setup_ct_alignment_recipe(tmp_path))
+
+        result = runner.invoke(app, [
+            "build", "recipe-preflight",
+            "--recipe", str(rf),
+            "--json",
+        ])
+
+        assert result.exit_code == 1
+        out = json.loads(result.output)
+        assert out["status"] == "blocked"
+        ct_findings = [
+            f for f in out["findings"]
+            if f["kind"] == "ct_county_alignment"
+        ]
+        assert ct_findings
+        assert all(f["severity"] == "error" for f in ct_findings)
+        assert all(
+            f["remediation"]["command"] == "coclab ingest tiger --year 2023 --type counties"
+            for f in ct_findings
+        )
+
+    def test_json_build_includes_ct_alignment_notes(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ):
+        _make_project_root(tmp_path)
+        monkeypatch.chdir(tmp_path)
+        _patch_ct_recipe_alignment(monkeypatch)
+        rf = self._write_recipe(tmp_path, _setup_ct_alignment_recipe(tmp_path))
+
+        result = runner.invoke(app, [
+            "build", "recipe",
+            "--recipe", str(rf),
+            "--json",
+        ])
+
+        assert result.exit_code == 0
+        out = json.loads(result.output)
+        resample_steps = [
+            step
+            for pipeline in out["pipelines"]
+            for step in pipeline["steps"]
+            if step["step_kind"] == "resample"
+        ]
+        step_notes = [note for step in resample_steps for note in step["notes"]]
+        assert any("planning-region dataset 'pep_county'" in note for note in step_notes)
+        assert any("population_source 'weights'" in note for note in step_notes)
+
+    def test_human_build_prints_ct_alignment_note(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ):
+        _make_project_root(tmp_path)
+        monkeypatch.chdir(tmp_path)
+        _patch_ct_recipe_alignment(monkeypatch)
+        rf = self._write_recipe(tmp_path, _setup_ct_alignment_recipe(tmp_path))
+
+        result = runner.invoke(app, [
+            "build", "recipe",
+            "--recipe", str(rf),
+        ])
+
+        assert result.exit_code == 0
+        assert "Connecticut special-case alignment applied" in result.output
 
     def test_json_provenance(self, tmp_path: Path):
         m = RecipeManifest(

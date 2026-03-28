@@ -301,6 +301,7 @@ def recipe_cmd(
                             "detail": s.detail,
                             "success": s.success,
                             "error": s.error,
+                            "notes": s.notes,
                         }
                         for s in r.steps
                     ],

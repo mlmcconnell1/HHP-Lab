@@ -14,6 +14,17 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Optional
 
+import pandas as pd
+import pyarrow.parquet as pq
+
+from coclab.geo.ct_planning_regions import (
+    CT_LEGACY_COUNTY_VINTAGE,
+    CT_PLANNING_REGION_VINTAGE,
+    build_ct_county_planning_region_crosswalk,
+    is_ct_legacy_county_fips,
+    is_ct_planning_region_fips,
+)
+from coclab.naming import county_path
 from coclab.recipe.adapters import (
     ValidationDiagnostic,
     dataset_registry,
@@ -25,6 +36,7 @@ from coclab.recipe.planner import (
     ExecutionPlan,
     PlannerError,
     ResampleTask,
+    _resolve_dataset_year,
     resolve_plan,
 )
 from coclab.recipe.probes import (
@@ -70,6 +82,7 @@ class FindingKind(str, enum.Enum):
     MISSING_MEASURE = "missing_measure"
     TEMPORAL_FILTER = "temporal_filter"
     MISSING_SUPPORT_DATASET = "missing_support_dataset"
+    CT_COUNTY_ALIGNMENT = "ct_county_alignment"
 
 
 @dataclass
@@ -188,6 +201,7 @@ class PreflightReport:
             FindingKind.MISSING_MEASURE,
             FindingKind.TEMPORAL_FILTER,
             FindingKind.MISSING_SUPPORT_DATASET,
+            FindingKind.CT_COUNTY_ALIGNMENT,
         }
         gaps = [f for f in self.findings if f.kind in gap_kinds]
         by_kind: dict[str, list[dict]] = {}
@@ -606,6 +620,263 @@ def _check_support_datasets(
     return findings
 
 
+def _filter_to_year(
+    df: pd.DataFrame,
+    year_col: str,
+    year: int,
+) -> pd.DataFrame:
+    """Filter a DataFrame to a requested year, tolerating string year values."""
+    series = df[year_col]
+    if pd.api.types.is_numeric_dtype(series):
+        mask = series == year
+    else:
+        coerced = pd.to_numeric(series, errors="coerce")
+        if coerced.notna().any():
+            mask = coerced == year
+        else:
+            mask = series.astype(str) == str(year)
+    return df[mask].copy()
+
+
+def _read_geo_values_for_year(
+    *,
+    path: Path,
+    declared_geo_column: str | None,
+    declared_year_column: str | None,
+    year: int,
+) -> pd.Series | None:
+    """Load the relevant geo-ID column, filtered to the requested year when possible."""
+    try:
+        schema_columns = list(pq.read_schema(path).names)
+    except (FileNotFoundError, OSError, ValueError):
+        return None
+
+    geo_result = probe_geo_column(schema_columns, declared_geo_column)
+    if not geo_result.ok or not geo_result.detail:
+        return None
+    geo_col = geo_result.detail["geo_column"]
+
+    year_result = probe_year_column(schema_columns, declared_year_column)
+    year_col = year_result.detail["year_column"] if year_result.ok and year_result.detail else None
+
+    read_columns = [geo_col]
+    if year_col is not None and year_col not in read_columns:
+        read_columns.append(year_col)
+    try:
+        df = pd.read_parquet(path, columns=read_columns)
+    except (FileNotFoundError, OSError, ValueError):
+        return None
+
+    if year_col is not None and year_col in df.columns:
+        df = _filter_to_year(df, year_col, year)
+    return df[geo_col]
+
+
+def _needs_ct_planning_to_legacy_alignment(
+    *,
+    xwalk_values: pd.Series,
+    source_values: pd.Series | None,
+) -> bool:
+    """Return True when CT planning-region inputs need the legacy-county bridge."""
+    if source_values is None:
+        return False
+
+    xwalk_has_ct_legacy = xwalk_values.dropna().astype(str).map(
+        is_ct_legacy_county_fips,
+    ).any()
+    source_has_ct_planning = source_values.dropna().astype(str).map(
+        is_ct_planning_region_fips,
+    ).any()
+    return bool(xwalk_has_ct_legacy and source_has_ct_planning)
+
+
+def _check_ct_county_alignment(
+    recipe: RecipeV1,
+    project_root: Path,
+    pipeline_tasks: list[tuple[str, ResampleTask]],
+) -> list[PreflightFinding]:
+    """Detect CT legacy/planning mismatches and report the special-case path."""
+    findings: list[PreflightFinding] = []
+    bridge_status: dict[int, str | None] = {}
+    source_events: dict[tuple[str, str, int], set[int]] = {}
+    support_events: dict[tuple[str, str, str, int], set[int]] = {}
+
+    def ensure_bridge_ready(legacy_vintage: int) -> str | None:
+        cached = bridge_status.get(legacy_vintage)
+        if legacy_vintage in bridge_status:
+            return cached
+        try:
+            build_ct_county_planning_region_crosswalk(
+                legacy_county_vintage=legacy_vintage,
+                planning_region_vintage=CT_PLANNING_REGION_VINTAGE,
+            )
+        except (FileNotFoundError, OSError, ValueError) as exc:
+            bridge_status[legacy_vintage] = (
+                "Connecticut county alignment needs the authoritative bridge "
+                f"derived from {county_path(legacy_vintage)} and "
+                f"{county_path(CT_PLANNING_REGION_VINTAGE)}: {exc}"
+            )
+        else:
+            bridge_status[legacy_vintage] = None
+        return bridge_status[legacy_vintage]
+
+    for pipeline_id, task in pipeline_tasks:
+        if task.method != "aggregate" or task.transform_id is None:
+            continue
+        if task.effective_geometry.type != "county":
+            continue
+
+        transform_probe = probe_transform_path(task.transform_id, recipe, project_root)
+        transform_path = (
+            project_root / transform_probe.detail["path"]
+            if transform_probe.ok and transform_probe.detail
+            else None
+        )
+        if transform_path is None or not transform_path.exists():
+            continue
+
+        try:
+            xwalk = pd.read_parquet(transform_path, columns=["county_fips"])
+        except (FileNotFoundError, OSError, ValueError, KeyError):
+            continue
+
+        legacy_vintage = (
+            int(task.effective_geometry.vintage)
+            if task.effective_geometry.vintage is not None
+            else CT_LEGACY_COUNTY_VINTAGE
+        )
+
+        if task.input_path is not None:
+            source_series = _read_geo_values_for_year(
+                path=project_root / task.input_path,
+                declared_geo_column=task.geo_column,
+                declared_year_column=task.year_column,
+                year=task.year,
+            )
+            if _needs_ct_planning_to_legacy_alignment(
+                xwalk_values=xwalk["county_fips"],
+                source_values=source_series,
+            ):
+                bridge_error = ensure_bridge_ready(legacy_vintage)
+                if bridge_error is None:
+                    source_events.setdefault(
+                        (pipeline_id, task.dataset_id, legacy_vintage),
+                        set(),
+                    ).add(task.year)
+                else:
+                    findings.append(PreflightFinding(
+                        severity=Severity.ERROR,
+                        kind=FindingKind.CT_COUNTY_ALIGNMENT,
+                        message=(
+                            f"Pipeline '{pipeline_id}': dataset '{task.dataset_id}' "
+                            "uses Connecticut planning-region county IDs against "
+                            f"legacy county crosswalk '{task.transform_id}' for "
+                            f"year {task.year}. {bridge_error}"
+                        ),
+                        pipeline_id=pipeline_id,
+                        dataset_id=task.dataset_id,
+                        transform_id=task.transform_id,
+                        years=[task.year],
+                        remediation=Remediation(
+                            hint=(
+                                "Materialize the CT planning-region county geometry "
+                                "before running this recipe so the bridge can be built."
+                            ),
+                            command="coclab ingest tiger --year 2023 --type counties",
+                        ),
+                    ))
+
+        transform = next((t for t in recipe.transforms if t.id == task.transform_id), None)
+        reqs = get_weighted_transform_requirements(transform) if transform is not None else None
+        if reqs is None:
+            continue
+
+        population_source, _population_field = reqs
+        resolved = _resolve_dataset_year(population_source, task.year, recipe)
+        if resolved.path is None:
+            continue
+        support_path = project_root / resolved.path
+        if not support_path.exists():
+            continue
+
+        support_ds = recipe.datasets.get(population_source)
+        if support_ds is None:
+            continue
+        support_series = _read_geo_values_for_year(
+            path=support_path,
+            declared_geo_column=support_ds.geo_column,
+            declared_year_column=support_ds.year_column,
+            year=task.year,
+        )
+        if _needs_ct_planning_to_legacy_alignment(
+            xwalk_values=xwalk["county_fips"],
+            source_values=support_series,
+        ):
+            bridge_error = ensure_bridge_ready(legacy_vintage)
+            if bridge_error is None:
+                support_events.setdefault(
+                    (pipeline_id, task.transform_id, population_source, legacy_vintage),
+                    set(),
+                ).add(task.year)
+            else:
+                findings.append(PreflightFinding(
+                    severity=Severity.ERROR,
+                    kind=FindingKind.CT_COUNTY_ALIGNMENT,
+                    message=(
+                        f"Pipeline '{pipeline_id}': population_source "
+                        f"'{population_source}' for transform '{task.transform_id}' "
+                        "uses Connecticut planning-region county IDs against a "
+                        f"legacy county crosswalk for year {task.year}. {bridge_error}"
+                    ),
+                    pipeline_id=pipeline_id,
+                    dataset_id=population_source,
+                    transform_id=task.transform_id,
+                    years=[task.year],
+                    remediation=Remediation(
+                        hint=(
+                            "Materialize the CT planning-region county geometry "
+                            "before running this recipe so the bridge can be built."
+                        ),
+                        command="coclab ingest tiger --year 2023 --type counties",
+                    ),
+                ))
+
+    for (pipeline_id, dataset_id, legacy_vintage), years in sorted(source_events.items()):
+        findings.append(PreflightFinding(
+            severity=Severity.WARNING,
+            kind=FindingKind.CT_COUNTY_ALIGNMENT,
+            message=(
+                f"Pipeline '{pipeline_id}': Connecticut special-case alignment "
+                f"will translate planning-region dataset '{dataset_id}' to "
+                f"legacy counties for years {sorted(years)} using "
+                f"{county_path(legacy_vintage)} and "
+                f"{county_path(CT_PLANNING_REGION_VINTAGE)}."
+            ),
+            pipeline_id=pipeline_id,
+            dataset_id=dataset_id,
+            years=sorted(years),
+        ))
+
+    for (pipeline_id, transform_id, dataset_id, legacy_vintage), years in sorted(support_events.items()):
+        findings.append(PreflightFinding(
+            severity=Severity.WARNING,
+            kind=FindingKind.CT_COUNTY_ALIGNMENT,
+            message=(
+                f"Pipeline '{pipeline_id}': Connecticut special-case alignment "
+                f"will translate planning-region population_source '{dataset_id}' "
+                f"for transform '{transform_id}' to legacy counties for years "
+                f"{sorted(years)} using {county_path(legacy_vintage)} and "
+                f"{county_path(CT_PLANNING_REGION_VINTAGE)}."
+            ),
+            pipeline_id=pipeline_id,
+            dataset_id=dataset_id,
+            transform_id=transform_id,
+            years=sorted(years),
+        ))
+
+    return findings
+
+
 # ---------------------------------------------------------------------------
 # Public entry point
 # ---------------------------------------------------------------------------
@@ -650,6 +921,7 @@ def run_preflight(
     # 2. Resolve plans and collect tasks (before path checks so we
     #    can scope path checking to plan-required dataset-years only)
     all_resample_tasks: list[ResampleTask] = []
+    pipeline_resample_tasks: list[tuple[str, ResampleTask]] = []
     needed_transforms: set[str] = set()
 
     for pipeline in recipe.pipelines:
@@ -672,6 +944,7 @@ def run_preflight(
             for rt in plan.resample_tasks:
                 if rt.transform_id:
                     needed_transforms.add(rt.transform_id)
+                pipeline_resample_tasks.append((pipeline.id, rt))
             all_resample_tasks.extend(plan.resample_tasks)
 
         except PlannerError as exc:
@@ -745,6 +1018,11 @@ def run_preflight(
         _check_support_datasets(
             recipe, project_root, needed_transforms, universe_years,
         ),
+    )
+
+    # 7. Connecticut county-transition detection and bridge readiness
+    report.findings.extend(
+        _check_ct_county_alignment(recipe, project_root, pipeline_resample_tasks),
     )
 
     return report

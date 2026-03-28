@@ -18,10 +18,20 @@ import pyarrow as pa
 import pyarrow.parquet as pq
 import typer
 
+from coclab.geo.ct_planning_regions import (
+    CT_LEGACY_COUNTY_VINTAGE,
+    CT_PLANNING_REGION_VINTAGE,
+    CtPlanningRegionCrosswalk,
+    build_ct_county_planning_region_crosswalk,
+    is_ct_legacy_county_fips,
+    is_ct_planning_region_fips,
+    translate_weights_planning_to_legacy,
+)
 from coclab.naming import (
+    county_path,
     county_xwalk_path,
-    tract_path,
     geo_panel_filename,
+    tract_path,
     tract_xwalk_path,
 )
 from coclab.provenance import ProvenanceBlock, write_parquet_with_provenance
@@ -81,6 +91,7 @@ class StepResult:
     detail: str
     success: bool
     error: str | None = None
+    notes: list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -113,6 +124,10 @@ class ExecutionContext:
     )
     # Asset cache for avoiding redundant reads
     cache: RecipeCache = field(default_factory=RecipeCache)
+    # Cached CT county bridge overlays keyed by (legacy_vintage, planning_vintage)
+    ct_county_alignment_cache: dict[tuple[int, int], CtPlanningRegionCrosswalk] = field(
+        default_factory=dict,
+    )
     # Assets consumed during execution (for provenance manifest)
     consumed_assets: list[AssetRecord] = field(default_factory=list)
     # Suppress progress output (for --json mode)
@@ -127,6 +142,18 @@ def _echo(ctx: ExecutionContext, message: str) -> None:
     """Print progress message unless quiet mode is active."""
     if not ctx.quiet:
         typer.echo(message)
+
+
+def _record_step_note(
+    ctx: ExecutionContext,
+    step_notes: list[str] | None,
+    message: str,
+) -> None:
+    """Attach a human- and machine-visible note to the current step."""
+    if step_notes is None or message in step_notes:
+        return
+    step_notes.append(message)
+    _echo(ctx, f"    note: {message}")
 
 
 def _get_transform(recipe: RecipeV1, transform_id: str):
@@ -442,6 +469,82 @@ def _resolve_geo_column(
     return result.detail["geo_column"]
 
 
+def _needs_ct_planning_to_legacy_alignment(
+    *,
+    xwalk: pd.DataFrame,
+    source_values: pd.Series,
+    source_key: str,
+) -> bool:
+    """Return True when CT planning-region inputs need a legacy-county bridge."""
+    if source_key != "county_fips" or source_key not in xwalk.columns:
+        return False
+
+    xwalk_has_ct_legacy = xwalk[source_key].dropna().astype(str).map(
+        is_ct_legacy_county_fips,
+    ).any()
+    source_has_ct_planning = source_values.dropna().astype(str).map(
+        is_ct_planning_region_fips,
+    ).any()
+    return bool(xwalk_has_ct_legacy and source_has_ct_planning)
+
+
+def _load_ct_county_alignment_crosswalk(
+    *,
+    ctx: ExecutionContext,
+    legacy_vintage: int,
+) -> CtPlanningRegionCrosswalk:
+    """Load and cache the CT planning-region→legacy county bridge."""
+    cache_key = (legacy_vintage, CT_PLANNING_REGION_VINTAGE)
+    cached = ctx.ct_county_alignment_cache.get(cache_key)
+    if cached is not None:
+        return cached
+
+    try:
+        crosswalk = build_ct_county_planning_region_crosswalk(
+            legacy_county_vintage=legacy_vintage,
+            planning_region_vintage=CT_PLANNING_REGION_VINTAGE,
+        )
+    except (FileNotFoundError, ValueError) as exc:
+        legacy_path = county_path(legacy_vintage)
+        planning_path = county_path(CT_PLANNING_REGION_VINTAGE)
+        raise ExecutorError(
+            "Connecticut county alignment is required because the recipe "
+            "crosswalk uses legacy county FIPS while the dataset uses "
+            "planning-region FIPS. Failed to build the authoritative CT "
+            f"county bridge from {legacy_path} and {planning_path}: {exc}"
+        ) from exc
+
+    ctx.ct_county_alignment_cache[cache_key] = crosswalk
+    return crosswalk
+
+
+def _translate_ct_planning_values_to_legacy(
+    *,
+    df: pd.DataFrame,
+    geo_col: str,
+    value_columns: list[str],
+    crosswalk: CtPlanningRegionCrosswalk,
+    year_value: int | None = None,
+) -> pd.DataFrame:
+    """Translate CT planning-region values to legacy counties column by column."""
+    translated_parts: list[pd.DataFrame] = []
+    for value_col in value_columns:
+        translated = translate_weights_planning_to_legacy(
+            df[[geo_col, value_col]].rename(
+                columns={geo_col: "county_fips", value_col: "weight_value"},
+            ),
+            crosswalk,
+        ).rename(columns={"county_fips": geo_col, "weight_value": value_col})
+        translated_parts.append(translated)
+
+    result = translated_parts[0]
+    for part in translated_parts[1:]:
+        result = result.merge(part, on=geo_col, how="outer")
+    if year_value is not None:
+        result["year"] = year_value
+    return result
+
+
 def _filter_to_year(
     df: pd.DataFrame,
     year_col: str,
@@ -640,6 +743,7 @@ def _attach_dynamic_pop_share(
     xwalk: pd.DataFrame,
     task: ResampleTask,
     ctx: ExecutionContext,
+    step_notes: list[str] | None = None,
 ) -> pd.DataFrame:
     """Populate pop_share from a transform's declared population source."""
     if task.transform_id is None:
@@ -678,6 +782,34 @@ def _attach_dynamic_pop_share(
 
     target_col = _detect_xwalk_target_col(xwalk, source_key)
     weights = weights_df[[weights_geo_col, population_field]].copy()
+    if _needs_ct_planning_to_legacy_alignment(
+        xwalk=xwalk,
+        source_values=weights[weights_geo_col],
+        source_key=source_key,
+    ):
+        legacy_vintage = (
+            int(task.effective_geometry.vintage)
+            if task.effective_geometry.vintage is not None
+            else CT_LEGACY_COUNTY_VINTAGE
+        )
+        ct_bridge = _load_ct_county_alignment_crosswalk(
+            ctx=ctx,
+            legacy_vintage=legacy_vintage,
+        )
+        _record_step_note(
+            ctx,
+            step_notes,
+            "Connecticut special-case alignment applied: translated "
+            f"planning-region population_source '{population_source}' to "
+            "legacy counties before deriving pop_share.",
+        )
+        weights = _translate_ct_planning_values_to_legacy(
+            df=weights,
+            geo_col=weights_geo_col,
+            value_columns=[population_field],
+            crosswalk=ct_bridge,
+            year_value=task.year if "year" in weights_df.columns else None,
+        )
     weights = weights.rename(columns={weights_geo_col: source_key})
     weights[population_field] = pd.to_numeric(
         weights[population_field],
@@ -980,6 +1112,7 @@ def _execute_resample(
         f"resample {task.dataset_id} year={task.year} "
         f"method={task.method}"
     )
+    step_notes: list[str] = []
     if task.transform_id:
         detail += f" via={task.transform_id}"
     _echo(ctx, f"  [resample] {detail}")
@@ -1113,6 +1246,7 @@ def _execute_resample(
                     xwalk=xwalk,
                     task=task,
                     ctx=ctx,
+                    step_notes=step_notes,
                 )
             except (FileNotFoundError, OSError, pa.ArrowInvalid) as exc:
                 return StepResult(
@@ -1134,6 +1268,54 @@ def _execute_resample(
                 )
 
             if task.method == "aggregate":
+                if task.effective_geometry.type == "county":
+                    measure_aggs = task.measure_aggregations or {
+                        measure: "sum" for measure in task.measures
+                    }
+                    non_sum_measures = [
+                        measure
+                        for measure in task.measures
+                        if measure_aggs.get(measure, "sum") != "sum"
+                    ]
+                    geo_col = _resolve_geo_column(df, task.geo_column)
+                    if _needs_ct_planning_to_legacy_alignment(
+                        xwalk=xwalk,
+                        source_values=df[geo_col],
+                        source_key="county_fips",
+                    ):
+                        if non_sum_measures:
+                            raise ExecutorError(
+                                f"Resample aggregate for '{task.dataset_id}' "
+                                f"year {task.year}: Connecticut planning-region "
+                                "county inputs require legacy-county alignment, "
+                                "but the current recipe uses non-sum measures "
+                                f"{non_sum_measures}. Add an explicit CT "
+                                "compatibility mapping for those measures."
+                            )
+                        legacy_vintage = (
+                            int(task.effective_geometry.vintage)
+                            if task.effective_geometry.vintage is not None
+                            else CT_LEGACY_COUNTY_VINTAGE
+                        )
+                        ct_bridge = _load_ct_county_alignment_crosswalk(
+                            ctx=ctx,
+                            legacy_vintage=legacy_vintage,
+                        )
+                        _record_step_note(
+                            ctx,
+                            step_notes,
+                            "Connecticut special-case alignment applied: "
+                            f"translated planning-region dataset "
+                            f"'{task.dataset_id}' to legacy counties before "
+                            "aggregate resampling.",
+                        )
+                        df = _translate_ct_planning_values_to_legacy(
+                            df=df[[geo_col, *task.measures]].copy(),
+                            geo_col=geo_col,
+                            value_columns=task.measures,
+                            crosswalk=ct_bridge,
+                            year_value=task.year if "year" in df.columns else None,
+                        )
                 result_df = _resample_aggregate(df, xwalk, task)
             else:
                 result_df = _resample_allocate(df, xwalk, task)
@@ -1150,11 +1332,17 @@ def _execute_resample(
             detail=detail,
             success=False,
             error=str(exc),
+            notes=step_notes,
         )
 
     # Store intermediate
     ctx.intermediates[(task.dataset_id, task.year)] = result_df
-    return StepResult(step_kind="resample", detail=detail, success=True)
+    return StepResult(
+        step_kind="resample",
+        detail=detail,
+        success=True,
+        notes=step_notes,
+    )
 
 
 def _execute_join(
