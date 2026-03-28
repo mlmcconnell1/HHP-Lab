@@ -85,7 +85,10 @@ logger = logging.getLogger(__name__)
 DEFAULT_OUTPUT_DIR = Path("data/curated/zori")
 DEFAULT_XWALK_DIR = Path("data/curated/xwalks")
 
-# Default minimum coverage threshold (per spec section 5.2)
+# Default minimum coverage threshold (per spec section 5.2).
+# ZORI uses a lower threshold than PEP (0.90 vs 0.95) because Zillow
+# county-level rent data has more missing coverage -- many rural counties
+# lack sufficient rental listings for a ZORI estimate.
 DEFAULT_MIN_COVERAGE = 0.90
 
 # Yearly collapse methods
@@ -442,8 +445,11 @@ def aggregate_monthly(
     zori = zori_df[["geo_id", "date", "zori"]].copy()
     zori = zori.rename(columns={"geo_id": "county_fips"})
 
-    # Get unique geos and dates
-    all_geos = geo_weights[geo_id_col].unique()
+    # Build geo set from the full crosswalk, not just geos with surviving weights.
+    # Geos whose counties all lack ACS weights should appear with coverage=0.
+    all_geos_from_xwalk = xwalk_df[geo_id_col].unique()
+    all_geos_from_weights = geo_weights[geo_id_col].unique()
+    all_geos = pd.unique(pd.concat([pd.Series(all_geos_from_xwalk), pd.Series(all_geos_from_weights)]).values)
     all_dates = zori["date"].unique()
 
     logger.info(f"Aggregating {len(all_dates)} months for {len(all_geos)} geography units")

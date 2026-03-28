@@ -14,7 +14,7 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
-from coclab.pep.aggregate import aggregate_pep_to_coc
+from coclab.pep.aggregate import aggregate_pep_counties, aggregate_pep_to_coc
 
 
 class TestAggregationIntegration:
@@ -224,3 +224,46 @@ class TestAggregationUnit:
 
         assert row["coverage_ratio"] == pytest.approx(0.6)
         assert row["population"] == pytest.approx(60000)
+
+    def test_missing_year_in_pep_data(self):
+        """Years absent from PEP data should produce no rows for that year."""
+        xwalk = pd.DataFrame({
+            "coc_id": ["COC-001"],
+            "county_fips": ["01001"],
+            "area_share": [1.0],
+        })
+
+        # PEP data has 2020 and 2022 but NOT 2021
+        pep = pd.DataFrame({
+            "county_fips": ["01001", "01001"],
+            "year": [2020, 2022],
+            "population": [50000, 52000],
+        })
+
+        result = aggregate_pep_counties(pep, xwalk, min_coverage=0.0)
+
+        result_years = sorted(result["year"].unique())
+        assert result_years == [2020, 2022]
+        assert 2021 not in result_years
+
+    def test_one_sided_county_in_crosswalk(self):
+        """County in crosswalk but absent from PEP should lower coverage, not crash."""
+        xwalk = pd.DataFrame({
+            "coc_id": ["COC-001", "COC-001"],
+            "county_fips": ["01001", "99999"],
+            "area_share": [0.5, 0.5],
+        })
+
+        # Only county 01001 has PEP data; 99999 does not exist in PEP
+        pep = pd.DataFrame({
+            "county_fips": ["01001"],
+            "year": [2020],
+            "population": [80000],
+        })
+
+        result = aggregate_pep_counties(pep, xwalk, min_coverage=0.0)
+
+        row = result[result["coc_id"] == "COC-001"].iloc[0]
+        assert row["coverage_ratio"] == pytest.approx(0.5)
+        assert row["population"] == pytest.approx(40000)
+        assert row["county_count"] == 1

@@ -62,6 +62,7 @@ class PITParseResult:
     cross_state_mappings: dict[str, str] = field(default_factory=dict)
     rows_read: int = 0
     rows_skipped: int = 0
+    duplicates_dropped: list[str] = field(default_factory=list)
 
 
 # Standard column names in canonical schema
@@ -530,11 +531,13 @@ def parse_pit_file(
 
     result = pd.DataFrame(result_rows)
 
-    # Check for duplicates
+    # Check for duplicates — preserve info for QA before dropping
     duplicates = result[result.duplicated(subset=["coc_id"], keep=False)]
+    duplicates_dropped: list[str] = []
     if len(duplicates) > 0:
-        dup_cocs = duplicates["coc_id"].unique()
-        logger.warning(f"Found duplicate CoC IDs: {list(dup_cocs)}")
+        dup_cocs = list(duplicates["coc_id"].unique())
+        logger.warning(f"Found duplicate CoC IDs: {dup_cocs}")
+        duplicates_dropped = dup_cocs
         # Keep first occurrence
         result = result.drop_duplicates(subset=["coc_id"], keep="first")
 
@@ -545,6 +548,7 @@ def parse_pit_file(
         cross_state_mappings=cross_state_mappings,
         rows_read=rows_read,
         rows_skipped=rows_skipped,
+        duplicates_dropped=duplicates_dropped,
     )
 
 
@@ -614,11 +618,15 @@ def write_pit_parquet(
             df[col] = df[col].astype("Int64")  # Nullable integer
 
     # Create provenance metadata
-    pit_year = int(df["pit_year"].iloc[0]) if len(df) > 0 else None
     ingested_at = df["ingested_at"].iloc[0] if len(df) > 0 else datetime.now(UTC)
+
+    # Record all pit_years present (not just the first row)
+    years_in_df = sorted(df["pit_year"].unique().tolist()) if len(df) > 0 else []
+    pit_year = years_in_df[0] if len(years_in_df) == 1 else None
 
     extra: dict[str, Any] = {
         "pit_year": pit_year,
+        "years_included": years_in_df,
         "row_count": len(df),
         "data_source": df["data_source"].iloc[0] if len(df) > 0 else None,
         "source_ref": df["source_ref"].iloc[0] if len(df) > 0 else None,
@@ -729,6 +737,7 @@ class PITVintageParseResult:
     df: pd.DataFrame
     vintage: int
     years_parsed: list[int] = field(default_factory=list)
+    years_failed: list[int] = field(default_factory=list)
     cross_state_mappings: dict[str, str] = field(default_factory=dict)
     total_rows_read: int = 0
     total_rows_skipped: int = 0
@@ -794,6 +803,7 @@ def parse_pit_vintage(
     total_rows_read = 0
     total_rows_skipped = 0
     years_parsed: list[int] = []
+    years_failed: list[int] = []
 
     for year in year_sheets:
         try:
@@ -813,21 +823,29 @@ def parse_pit_vintage(
                 logger.info(f"  Year {year}: {len(result.df)} CoCs")
         except Exception as e:
             logger.warning(f"Failed to parse year {year}: {e}")
+            years_failed.append(year)
 
     if not all_results:
         raise ValueError(f"No years could be parsed from {file_path}")
+
+    if years_failed:
+        logger.warning(
+            f"Partial vintage parse: {len(years_failed)} of {len(year_sheets)} "
+            f"year sheets failed: {years_failed}"
+        )
 
     # Combine all years
     combined_df = pd.concat(all_results, ignore_index=True)
     logger.info(
         f"Parsed {len(combined_df)} total records across {len(years_parsed)} years "
-        f"({years_parsed[0]}-{years_parsed[-1]})"
+        f"(parsed: {years_parsed}, failed: {years_failed})"
     )
 
     return PITVintageParseResult(
         df=combined_df,
         vintage=vintage,
         years_parsed=years_parsed,
+        years_failed=years_failed,
         cross_state_mappings=all_cross_state_mappings,
         total_rows_read=total_rows_read,
         total_rows_skipped=total_rows_skipped,

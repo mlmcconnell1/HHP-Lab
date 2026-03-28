@@ -3,6 +3,17 @@
 Connecticut transitioned from county-based FIPS to planning region county
 equivalents starting with the 2022 ACS release. These helpers provide
 concordances to align legacy county GEOIDs with planning region GEOIDs.
+
+Area-only translation note
+--------------------------
+``translate_zori_legacy_to_planning`` and ``translate_weights_planning_to_legacy``
+use pure area-based shares to redistribute values between legacy counties
+and planning regions.  Population-weighted shares would be more precise for
+areas where population density varies significantly (e.g., urban Bridgeport
+vs rural Litchfield County), but require an additional ACS ingest dependency
+that would couple every translation to a specific ACS vintage.  The current
+area-only approach keeps translations vintage-neutral and deterministic,
+which is the preferred trade-off for the CT transition period.
 """
 
 from __future__ import annotations
@@ -167,6 +178,10 @@ def build_ct_county_planning_region_crosswalk(
     )
 
     overlay["intersection_area"] = overlay.geometry.area
+
+    # Filter degenerate intersections (zero-area LineString/Point results)
+    overlay = overlay[overlay["intersection_area"] > 0].copy()
+
     overlay = overlay.rename(
         columns={
             "GEOID_1": "legacy_county_fips",
@@ -217,9 +232,16 @@ def translate_zori_legacy_to_planning(
     )
 
     merged["weighted_zori"] = merged["zori"] * merged["weight"].fillna(0)
+
+    # Preserve metadata columns from the first row of each group
+    meta_cols = [c for c in zori_ct.columns if c not in {"geo_id", "date", "zori"}]
+    agg_dict: dict = {"weighted_zori": "sum"}
+    for col in meta_cols:
+        agg_dict[col] = "first"
+
     grouped = (
-        merged.groupby(["planning_region_fips", "date"], as_index=False)["weighted_zori"]
-        .sum()
+        merged.groupby(["planning_region_fips", "date"], as_index=False)
+        .agg(agg_dict)
         .rename(columns={"planning_region_fips": "geo_id", "weighted_zori": "zori"})
     )
 
@@ -237,7 +259,7 @@ def translate_weights_planning_to_legacy(
         raise ValueError(f"Weights data must include columns: {sorted(required_cols)}")
 
     mapping = crosswalk.mapping.copy()
-    mapping = mapping.rename(columns={"legacy_share": "weight"})
+    mapping = mapping.rename(columns={"planning_share": "weight"})
 
     ct_planning = weights_df[weights_df["county_fips"].apply(is_ct_planning_region_fips)].copy()
     if ct_planning.empty:

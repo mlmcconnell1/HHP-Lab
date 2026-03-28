@@ -484,3 +484,333 @@ class TestUnemploymentAggregation:
         result = aggregate_to_coc(acs_data, crosswalk, weighting="area")
         for col in ("civilian_labor_force", "unemployed_count", "unemployment_rate"):
             assert col in result.columns, f"Missing column: {col}"
+
+
+# ---------------------------------------------------------------------------
+# Fixtures shared by edge-case tests below
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture()
+def _simple_crosswalk():
+    """Two tracts fully inside one CoC, with intersection_area for coverage."""
+    return pd.DataFrame(
+        {
+            "tract_geoid": ["08001000100", "08001000200"],
+            "coc_id": ["CO-500", "CO-500"],
+            "area_share": [1.0, 1.0],
+            "pop_share": [0.5, 0.5],
+            "intersection_area": [500.0, 500.0],
+        }
+    )
+
+
+@pytest.fixture()
+def _three_tract_crosswalk():
+    """Three tracts fully inside one CoC, with intersection_area."""
+    return pd.DataFrame(
+        {
+            "tract_geoid": ["08001000100", "08001000200", "08001000300"],
+            "coc_id": ["CO-500", "CO-500", "CO-500"],
+            "area_share": [1.0, 1.0, 1.0],
+            "pop_share": [0.33, 0.34, 0.33],
+            "intersection_area": [300.0, 400.0, 300.0],
+        }
+    )
+
+
+# ---------------------------------------------------------------------------
+# Bead 5.9 — Null-heavy ACS inputs
+# ---------------------------------------------------------------------------
+
+
+class TestNullHeavyACSInputs:
+    """Edge cases where ACS columns are predominantly NA."""
+
+    def test_coverage_ratio_vs_per_measure_coverage_with_null_median(
+        self, _simple_crosswalk
+    ):
+        """coverage_ratio=100% but coverage_median_household_income is low
+        when median_household_income is NA for most tracts but total_population
+        is present everywhere.
+        """
+        acs_data = pd.DataFrame(
+            {
+                "GEOID": ["08001000100", "08001000200"],
+                "total_population": [1000, 2000],
+                "median_household_income": [pd.NA, 60000],
+                "median_gross_rent": [1000, 1200],
+            }
+        )
+
+        result = aggregate_to_coc(acs_data, _simple_crosswalk)
+
+        row = result.iloc[0]
+        # total_population present for both tracts -> 100% coverage
+        assert row["coverage_ratio"] == 1.0
+        # median_household_income present for only 1 of 2 tracts (area 500/1000)
+        assert row["coverage_median_household_income"] == pytest.approx(0.5)
+
+    @pytest.mark.parametrize(
+        "median_col",
+        ["median_household_income", "median_gross_rent"],
+        ids=["income", "rent"],
+    )
+    def test_all_na_median_returns_pd_na(self, _simple_crosswalk, median_col):
+        """When every tract has NA for a median column the result is pd.NA,
+        not 0 or NaN.
+        """
+        other_median = (
+            "median_gross_rent"
+            if median_col == "median_household_income"
+            else "median_household_income"
+        )
+        acs_data = pd.DataFrame(
+            {
+                "GEOID": ["08001000100", "08001000200"],
+                "total_population": [1000, 2000],
+                median_col: [pd.NA, pd.NA],
+                other_median: [1000, 1200],
+            }
+        )
+
+        result = aggregate_to_coc(acs_data, _simple_crosswalk)
+        assert pd.isna(result.iloc[0][median_col])
+
+    def test_mixed_na_count_vs_median_columns(self, _three_tract_crosswalk):
+        """Count columns fill NA->0 but median columns preserve NA semantics.
+
+        Tract 1: has population, no income, has rent
+        Tract 2: has population, has income, no rent
+        Tract 3: no population, no income, no rent
+        """
+        acs_data = pd.DataFrame(
+            {
+                "GEOID": ["08001000100", "08001000200", "08001000300"],
+                "total_population": [1000, 2000, pd.NA],
+                "median_household_income": [pd.NA, 55000, pd.NA],
+                "median_gross_rent": [1100, pd.NA, pd.NA],
+            }
+        )
+
+        result = aggregate_to_coc(acs_data, _three_tract_crosswalk)
+        row = result.iloc[0]
+
+        # Count: NA tracts contribute 0 -> total = 1000 + 2000 + 0
+        assert row["total_population"] == 3000
+
+        # Median income: only tract 2 valid -> should equal tract 2's value
+        assert row["median_household_income"] == pytest.approx(55000)
+
+        # Median rent: only tract 1 valid -> should equal tract 1's value
+        assert row["median_gross_rent"] == pytest.approx(1100)
+
+        # Per-measure coverage differs from coverage_ratio
+        # coverage_ratio: tracts with total_pop (tracts 1+2 = area 700/1000)
+        assert row["coverage_ratio"] == pytest.approx(0.7)
+        # coverage_median_household_income: only tract 2 (area 400/1000)
+        assert row["coverage_median_household_income"] == pytest.approx(0.4)
+        # coverage_median_gross_rent: only tract 1 (area 300/1000)
+        assert row["coverage_median_gross_rent"] == pytest.approx(0.3)
+
+
+# ---------------------------------------------------------------------------
+# Bead 5.15 — Zero population weight median
+# ---------------------------------------------------------------------------
+
+
+class TestZeroPopulationWeightMedian:
+    """Edge cases where population weights are zero (water-only tracts)."""
+
+    def test_all_zero_pop_with_median_values_returns_na(self, _simple_crosswalk):
+        """When all tracts have zero population, median columns return pd.NA
+        even if median values exist (e.g., water-only tracts with Census noise).
+        """
+        acs_data = pd.DataFrame(
+            {
+                "GEOID": ["08001000100", "08001000200"],
+                "total_population": [0, 0],
+                "median_household_income": [45000, 55000],
+                "median_gross_rent": [900, 1100],
+            }
+        )
+
+        result = aggregate_to_coc(acs_data, _simple_crosswalk)
+        row = result.iloc[0]
+
+        # pop_weights = total_population * area_share = 0 for both tracts
+        # -> valid_mask requires pop_weights > 0 -> no valid rows -> pd.NA
+        assert pd.isna(row["median_household_income"])
+        assert pd.isna(row["median_gross_rent"])
+
+    def test_mix_of_na_median_and_zero_pop_returns_na(self, _three_tract_crosswalk):
+        """When some tracts have NA medians and the rest have zero population,
+        the result is pd.NA (no valid weighted contribution).
+        """
+        acs_data = pd.DataFrame(
+            {
+                "GEOID": ["08001000100", "08001000200", "08001000300"],
+                "total_population": [0, 500, 0],
+                "median_household_income": [50000, pd.NA, 60000],
+                "median_gross_rent": [pd.NA, pd.NA, 1200],
+            }
+        )
+
+        result = aggregate_to_coc(acs_data, _three_tract_crosswalk)
+        row = result.iloc[0]
+
+        # Tract 1: has median income but pop=0 -> weight=0 -> excluded
+        # Tract 2: has pop but NA income -> excluded
+        # Tract 3: has median income but pop=0 -> weight=0 -> excluded
+        assert pd.isna(row["median_household_income"])
+
+        # All tracts either NA rent or zero pop -> pd.NA
+        assert pd.isna(row["median_gross_rent"])
+
+    @pytest.mark.parametrize(
+        "populations,expected_income",
+        [
+            ([0, 2000], 60000),         # Only tract 2 has nonzero pop
+            ([1000, 0], 50000),         # Only tract 1 has nonzero pop
+        ],
+        ids=["only_second_tract", "only_first_tract"],
+    )
+    def test_zero_pop_tracts_excluded_from_median(
+        self, _simple_crosswalk, populations, expected_income
+    ):
+        """Zero-population tracts are excluded from median calculation;
+        the result equals the sole nonzero-pop tract's median.
+        """
+        acs_data = pd.DataFrame(
+            {
+                "GEOID": ["08001000100", "08001000200"],
+                "total_population": populations,
+                "median_household_income": [50000, 60000],
+                "median_gross_rent": [1000, 1200],
+            }
+        )
+
+        result = aggregate_to_coc(acs_data, _simple_crosswalk)
+        assert result.iloc[0]["median_household_income"] == pytest.approx(
+            expected_income
+        )
+
+
+# ---------------------------------------------------------------------------
+# Bead 5.4 — Per-measure coverage columns
+# ---------------------------------------------------------------------------
+
+
+class TestPerMeasureCoverage:
+    """Verify per-measure coverage columns exist and reflect per-column availability."""
+
+    def test_per_measure_coverage_columns_present(self, _simple_crosswalk):
+        """Output contains coverage_median_household_income and
+        coverage_median_gross_rent columns.
+        """
+        acs_data = pd.DataFrame(
+            {
+                "GEOID": ["08001000100", "08001000200"],
+                "total_population": [1000, 2000],
+                "median_household_income": [50000, 60000],
+                "median_gross_rent": [1000, 1200],
+            }
+        )
+
+        result = aggregate_to_coc(acs_data, _simple_crosswalk)
+        assert "coverage_median_household_income" in result.columns
+        assert "coverage_median_gross_rent" in result.columns
+
+    def test_per_measure_coverage_equals_ratio_when_all_present(
+        self, _simple_crosswalk
+    ):
+        """When every tract has data for all columns, per-measure coverage
+        equals coverage_ratio.
+        """
+        acs_data = pd.DataFrame(
+            {
+                "GEOID": ["08001000100", "08001000200"],
+                "total_population": [1000, 2000],
+                "median_household_income": [50000, 60000],
+                "median_gross_rent": [1000, 1200],
+            }
+        )
+
+        result = aggregate_to_coc(acs_data, _simple_crosswalk)
+        row = result.iloc[0]
+        assert row["coverage_median_household_income"] == pytest.approx(
+            row["coverage_ratio"]
+        )
+        assert row["coverage_median_gross_rent"] == pytest.approx(
+            row["coverage_ratio"]
+        )
+
+    def test_per_measure_coverage_differs_from_ratio(self, _three_tract_crosswalk):
+        """Per-measure coverage diverges from coverage_ratio when data
+        availability varies by column.
+
+        Tract 1: pop present, income present, rent NA
+        Tract 2: pop present, income NA,      rent present
+        Tract 3: pop NA,      income NA,      rent NA
+        """
+        acs_data = pd.DataFrame(
+            {
+                "GEOID": ["08001000100", "08001000200", "08001000300"],
+                "total_population": [1000, 2000, pd.NA],
+                "median_household_income": [50000, pd.NA, pd.NA],
+                "median_gross_rent": [pd.NA, 1200, pd.NA],
+            }
+        )
+
+        result = aggregate_to_coc(acs_data, _three_tract_crosswalk)
+        row = result.iloc[0]
+
+        # coverage_ratio based on total_population: tracts 1+2 have data
+        # area: (300+400)/1000 = 0.7
+        assert row["coverage_ratio"] == pytest.approx(0.7)
+
+        # coverage_median_household_income: only tract 1 -> 300/1000 = 0.3
+        assert row["coverage_median_household_income"] == pytest.approx(0.3)
+
+        # coverage_median_gross_rent: only tract 2 -> 400/1000 = 0.4
+        assert row["coverage_median_gross_rent"] == pytest.approx(0.4)
+
+        # All three values are different
+        assert row["coverage_ratio"] != row["coverage_median_household_income"]
+        assert row["coverage_ratio"] != row["coverage_median_gross_rent"]
+        assert (
+            row["coverage_median_household_income"]
+            != row["coverage_median_gross_rent"]
+        )
+
+    def test_per_measure_coverage_without_intersection_area(self):
+        """Without intersection_area, per-measure coverage falls back to
+        fraction of tracts with data.
+        """
+        acs_data = pd.DataFrame(
+            {
+                "GEOID": ["08001000100", "08001000200", "08001000300"],
+                "total_population": [1000, 2000, 3000],
+                "median_household_income": [50000, pd.NA, pd.NA],
+                "median_gross_rent": [1000, 1200, pd.NA],
+            }
+        )
+
+        crosswalk_no_area = pd.DataFrame(
+            {
+                "tract_geoid": ["08001000100", "08001000200", "08001000300"],
+                "coc_id": ["CO-500", "CO-500", "CO-500"],
+                "area_share": [1.0, 1.0, 1.0],
+                "pop_share": [0.33, 0.34, 0.33],
+            }
+        )
+
+        result = aggregate_to_coc(acs_data, crosswalk_no_area)
+        row = result.iloc[0]
+
+        # Fallback: fraction of tracts with total_population -> 3/3
+        assert row["coverage_ratio"] == pytest.approx(1.0)
+        # income present in 1/3 tracts
+        assert row["coverage_median_household_income"] == pytest.approx(1 / 3)
+        # rent present in 2/3 tracts
+        assert row["coverage_median_gross_rent"] == pytest.approx(2 / 3)

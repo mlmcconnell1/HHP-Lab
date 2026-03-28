@@ -55,6 +55,13 @@ def registry_rebuild(
             help="Preview changes without modifying the registry.",
         ),
     ] = False,
+    on_hash_mismatch: Annotated[
+        str,
+        typer.Option(
+            "--on-hash-mismatch",
+            help="Non-interactive policy for hash mismatches: skip, update, remove, error.",
+        ),
+    ] = "prompt",
     registry_path: Annotated[
         Path,
         typer.Option(
@@ -171,22 +178,48 @@ def registry_rebuild(
             to_keep.append(idx)  # Keep in dry-run mode
             continue
 
-        # Prompt user
-        typer.echo("")
-        action = typer.prompt(
-            "           Action: [u]pdate hash, [s]kip, [r]emove entry",
-            default="s",
+        # Determine action from policy or prompt
+        import os
+
+        non_interactive = (
+            on_hash_mismatch != "prompt"
+            or os.environ.get("COCLAB_NON_INTERACTIVE") == "1"
         )
 
-        if action.lower().startswith("u"):
-            to_update.append((idx, current_hash))
-            typer.echo("           -> Will update hash\n")
-        elif action.lower().startswith("r"):
-            to_remove.append(idx)
-            typer.echo("           -> Will remove entry\n")
+        if non_interactive:
+            policy = on_hash_mismatch if on_hash_mismatch != "prompt" else "skip"
+            if policy == "update":
+                to_update.append((idx, current_hash))
+                typer.echo("           -> Updating hash (policy)\n")
+            elif policy == "remove":
+                to_remove.append(idx)
+                typer.echo("           -> Removing entry (policy)\n")
+            elif policy == "error":
+                typer.echo(
+                    "           -> Hash mismatch with --on-hash-mismatch=error",
+                    err=True,
+                )
+                raise typer.Exit(1)
+            else:  # skip
+                to_keep.append(idx)
+                typer.echo("           -> Skipped (policy)\n")
         else:
-            to_keep.append(idx)
-            typer.echo("           -> Skipped\n")
+            # Prompt user
+            typer.echo("")
+            action = typer.prompt(
+                "           Action: [u]pdate hash, [s]kip, [r]emove entry",
+                default="s",
+            )
+
+            if action.lower().startswith("u"):
+                to_update.append((idx, current_hash))
+                typer.echo("           -> Will update hash\n")
+            elif action.lower().startswith("r"):
+                to_remove.append(idx)
+                typer.echo("           -> Will remove entry\n")
+            else:
+                to_keep.append(idx)
+                typer.echo("           -> Skipped\n")
 
     # Summary
     duplicate_count = len(duplicate_entries)

@@ -155,7 +155,9 @@ def _load_registry(registry_path: Path | None = None) -> pd.DataFrame:
 
 
 def _save_registry(df: pd.DataFrame, registry_path: Path | None = None) -> None:
-    """Save the source registry to disk."""
+    """Save the source registry to disk with embedded provenance."""
+    from coclab.provenance import ProvenanceBlock, write_parquet_with_provenance
+
     if registry_path is None:
         registry_path = DEFAULT_REGISTRY_PATH
 
@@ -165,7 +167,13 @@ def _save_registry(df: pd.DataFrame, registry_path: Path | None = None) -> None:
     if "ingested_at" in df.columns:
         df["ingested_at"] = pd.to_datetime(df["ingested_at"], utc=True)
 
-    df.to_parquet(registry_path, index=False)
+    provenance = ProvenanceBlock(
+        extra={
+            "dataset_type": "source_registry",
+            "entry_count": len(df),
+        }
+    )
+    write_parquet_with_provenance(df, registry_path, provenance)
     logger.debug(f"Saved source registry to {registry_path}")
 
 

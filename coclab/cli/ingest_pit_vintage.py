@@ -142,11 +142,35 @@ def ingest_pit_vintage(
         typer.echo(f"Error registering in registry: {e}", err=True)
         raise typer.Exit(1) from e
 
+    # Step 5: Run QA validation (per-year)
+    from coclab.pit.qa import validate_pit_data
+
+    typer.echo("Running QA validation...")
+    try:
+        qa_report = validate_pit_data(df)
+        if qa_report.passed:
+            typer.echo("QA passed: no errors found")
+        else:
+            typer.echo(
+                f"QA result: {len(qa_report.errors)} error(s), {len(qa_report.warnings)} warning(s)"
+            )
+            if qa_report.issues:
+                typer.echo("")
+                typer.echo("QA Issues:")
+                for issue in qa_report.issues[:10]:
+                    typer.echo(f"  {issue}")
+                if len(qa_report.issues) > 10:
+                    typer.echo(f"  ... and {len(qa_report.issues) - 10} more issues")
+    except Exception as e:
+        typer.echo(f"Warning: QA validation failed: {e}", err=True)
+
     # Summary
     typer.echo("")
     typer.echo("PIT vintage ingestion complete:")
     typer.echo(f"  Vintage: {vintage}")
-    typer.echo(f"  Years: {parse_result.years_parsed[0]}-{parse_result.years_parsed[-1]}")
+    typer.echo(f"  Years parsed: {parse_result.years_parsed}")
+    if parse_result.years_failed:
+        typer.echo(f"  Years FAILED: {parse_result.years_failed}")
     typer.echo(f"  Total records: {len(df)}")
     if parse_result.cross_state_mappings:
         typer.echo(f"  Cross-state mappings: {len(parse_result.cross_state_mappings)}")

@@ -626,3 +626,62 @@ class TestParseZoriZip:
         assert len(df) == 4
         assert set(df.columns) == {"geo_id", "date", "zori", "region_name", "state"}
         assert list(df["geo_id"].unique()) == ["10001", "90210"]
+
+    def test_happy_path_geo_id_zero_padded(self, tmp_path):
+        """geo_id is 5-digit zero-padded from RegionName."""
+        csv_path = tmp_path / "zip.csv"
+        csv_path.write_text(
+            "RegionName,StateName,2024-01-31,2024-02-29\n"
+            "501,Massachusetts,1800.00,1810.00\n"
+            "10001,New York,2400.00,2420.00\n"
+        )
+        df = parse_zori_zip(csv_path)
+
+        assert set(df["geo_id"].unique()) == {"00501", "10001"}
+        assert all(len(g) == 5 for g in df["geo_id"])
+
+    def test_happy_path_dates_and_values(self, tmp_path):
+        """Date parsing and ZORI values are correct."""
+        csv_path = tmp_path / "zip.csv"
+        csv_path.write_text(
+            "RegionName,StateName,2024-03-31,2024-04-30\n"
+            "90210,California,2500.50,2510.75\n"
+        )
+        df = parse_zori_zip(csv_path)
+
+        assert len(df) == 2
+        assert pd.api.types.is_datetime64_any_dtype(df["date"])
+
+        row_mar = df[df["date"].dt.month == 3].iloc[0]
+        assert row_mar["zori"] == pytest.approx(2500.50)
+        assert row_mar["date"].day == 31
+
+        row_apr = df[df["date"].dt.month == 4].iloc[0]
+        assert row_apr["zori"] == pytest.approx(2510.75)
+
+    def test_invalid_zip_length_filtered(self, tmp_path):
+        """ZIP codes that don't resolve to 5 digits after zfill are dropped."""
+        csv_path = tmp_path / "zip.csv"
+        csv_path.write_text(
+            "RegionName,StateName,2024-01-31\n"
+            "10001,New York,1500.00\n"
+            "123456,Nowhere,9999.00\n"
+        )
+        df = parse_zori_zip(csv_path)
+
+        # 123456 zero-filled is "123456" (6 chars) -> filtered out
+        assert len(df) == 1
+        assert df.iloc[0]["geo_id"] == "10001"
+
+    def test_all_null_zori_returns_empty(self, tmp_path):
+        """When every ZORI value is null, result is an empty DataFrame."""
+        csv_path = tmp_path / "zip.csv"
+        csv_path.write_text(
+            "RegionName,StateName,2024-01-31,2024-02-29\n"
+            "10001,New York,,\n"
+            "90210,California,,\n"
+        )
+        df = parse_zori_zip(csv_path)
+
+        assert len(df) == 0
+        assert set(df.columns) == {"geo_id", "date", "zori", "region_name", "state"}

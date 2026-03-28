@@ -39,8 +39,9 @@ def write_geoparquet(
     path: Path | str,
     *,
     compression: str = "snappy",
+    provenance: object | None = None,
 ) -> Path:
-    """Write a GeoDataFrame to GeoParquet format.
+    """Write a GeoDataFrame to GeoParquet format with optional provenance.
 
     Creates parent directories if they don't exist.
 
@@ -48,6 +49,7 @@ def write_geoparquet(
         gdf: GeoDataFrame to write
         path: Output path for the GeoParquet file
         compression: Compression algorithm (default: snappy)
+        provenance: Optional ProvenanceBlock to embed in the file metadata
 
     Returns:
         Path to the written file
@@ -55,7 +57,25 @@ def write_geoparquet(
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
 
-    gdf.to_parquet(path, compression=compression)
+    if provenance is not None:
+        from coclab.provenance import PROVENANCE_KEY, ProvenanceBlock
+
+        # Write GeoParquet first, then append provenance to metadata
+        gdf.to_parquet(path, compression=compression)
+        # Re-open and inject provenance into existing GeoParquet metadata
+        import pyarrow.parquet as pq
+
+        table = pq.read_table(path)
+        existing_meta = table.schema.metadata or {}
+        if isinstance(provenance, ProvenanceBlock):
+            new_meta = {
+                **existing_meta,
+                PROVENANCE_KEY: provenance.to_json().encode("utf-8"),
+            }
+            table = table.replace_schema_metadata(new_meta)
+            pq.write_table(table, path, compression=compression)
+    else:
+        gdf.to_parquet(path, compression=compression)
 
     return path
 

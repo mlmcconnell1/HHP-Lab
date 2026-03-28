@@ -418,6 +418,7 @@ def check_schema_measures(
     """
     expected = _effective_measure_columns(request)
     present = [c for c in expected if c in panel_df.columns]
+    missing = [c for c in expected if c not in panel_df.columns]
 
     if not present:
         return [
@@ -431,6 +432,23 @@ def check_schema_measures(
                 details={
                     "expected_columns": list(expected),
                     "present_columns": present,
+                },
+            )
+        ]
+
+    if missing:
+        return [
+            ConformanceResult(
+                check_name="check_schema_measures",
+                severity="warning",
+                message=(
+                    f"Missing {len(missing)} of {len(expected)} expected "
+                    f"measure columns: {missing}"
+                ),
+                details={
+                    "expected_columns": list(expected),
+                    "present_columns": present,
+                    "missing_columns": missing,
                 },
             )
         ]

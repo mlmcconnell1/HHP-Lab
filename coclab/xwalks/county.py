@@ -156,9 +156,16 @@ def save_county_crosswalk(
     output_dir = Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
 
+    from coclab.provenance import ProvenanceBlock, write_parquet_with_provenance
+
     filename = county_xwalk_filename(boundary_vintage, county_vintage)
     output_path = output_dir / filename
 
-    crosswalk.to_parquet(output_path, index=False)
+    provenance = ProvenanceBlock(
+        boundary_vintage=boundary_vintage,
+        county_vintage=str(county_vintage),
+        extra={"dataset_type": "coc_county_crosswalk"},
+    )
+    write_parquet_with_provenance(crosswalk, output_path, provenance)
 
     return output_path

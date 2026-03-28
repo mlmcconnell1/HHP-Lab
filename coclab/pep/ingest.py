@@ -318,10 +318,18 @@ def parse_pep_county(raw_path: Path, vintage: int) -> pd.DataFrame:
         encoding="latin-1",  # Census files often use latin-1
     )
 
+    # Validate minimum required columns before proceeding
+    required_cols = {"STATE", "COUNTY", "SUMLEV"}
+    missing = required_cols - set(df.columns)
+    if missing:
+        raise ValueError(
+            f"PEP CSV is missing required column(s): {sorted(missing)}. "
+            f"Expected at least {sorted(required_cols)} in the header."
+        )
+
     # Filter to county rows only (SUMLEV == 50)
     # SUMLEV 40 = State, SUMLEV 50 = County
-    if "SUMLEV" in df.columns:
-        df = df[df["SUMLEV"] == 50].copy()
+    df = df[df["SUMLEV"] == 50].copy()
 
     # Build 5-digit county FIPS
     df["county_fips"] = df["STATE"].str.zfill(2) + df["COUNTY"].str.zfill(3)
@@ -386,11 +394,18 @@ def parse_pep_county(raw_path: Path, vintage: int) -> pd.DataFrame:
     # Sort and reset index
     long_df = long_df.sort_values(["county_fips", "year"]).reset_index(drop=True)
 
-    # Validate
+    # Validate FIPS length
     invalid_fips = long_df[long_df["county_fips"].str.len() != 5]
     if len(invalid_fips) > 0:
         logger.warning(f"Found {len(invalid_fips)} rows with invalid county_fips length")
         long_df = long_df[long_df["county_fips"].str.len() == 5]
+
+    # Reject state-total rows that slipped through (COUNTY == '000')
+    state_total_mask = long_df["county_fips"].str.endswith("000")
+    if state_total_mask.any():
+        n_bad = state_total_mask.sum()
+        logger.warning(f"Dropping {n_bad} state-total rows with county code '000'")
+        long_df = long_df[~state_total_mask]
 
     return long_df
 

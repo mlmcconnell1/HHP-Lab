@@ -38,6 +38,13 @@ def ingest_acs_population(
             help="Reserved for future tract-level longitudinal analysis.",
         ),
     ] = False,
+    output_json: Annotated[
+        bool,
+        typer.Option(
+            "--json",
+            help="Output structured JSON instead of human-readable text.",
+        ),
+    ] = False,
 ) -> None:
     """Ingest tract-level ACS 5-year estimates.
 
@@ -176,6 +183,33 @@ def ingest_acs_population(
         except TractRelationshipNotFoundError as e:
             typer.echo(f"Error: {e}", err=True)
             raise typer.Exit(1) from e
+
+    if output_json:
+        import json
+
+        result = {
+            "status": "ok",
+            "acs_vintage": acs,
+            "tract_vintage": tracts,
+            "output_path": str(path),
+            "total_tracts": len(df),
+            "total_population": int(df["total_population"].sum()),
+        }
+        if "adult_population" in df.columns:
+            result["adult_population"] = int(df["adult_population"].sum())
+        if "median_household_income" in df.columns:
+            result["median_household_income"] = float(df["median_household_income"].median())
+        if "median_gross_rent" in df.columns:
+            result["median_gross_rent"] = float(df["median_gross_rent"].median())
+        if translation_stats:
+            result["translation"] = {
+                "input_tracts": translation_stats.input_tracts,
+                "output_tracts": translation_stats.output_tracts,
+                "match_rate": translation_stats.match_rate,
+                "population_delta_pct": translation_stats.population_delta_pct,
+            }
+        typer.echo(json.dumps(result, indent=2))
+        return
 
     typer.echo("")
     typer.echo("=" * 60)

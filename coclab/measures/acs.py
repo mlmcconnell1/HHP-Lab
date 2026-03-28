@@ -370,6 +370,7 @@ def aggregate_to_geo(
                     row[col] = pd.NA
 
         # Coverage ratio: fraction of geo area covered by tracts with ACS data
+        # Primary ratio uses total_population availability
         if "intersection_area" in group.columns:
             total_area = group["intersection_area"].sum()
             has_data = group["total_population"].notna()
@@ -379,6 +380,16 @@ def aggregate_to_geo(
             # Fallback: fraction of tracts with data (less accurate)
             has_data = group["total_population"].notna()
             row["coverage_ratio"] = has_data.mean()
+
+        # Per-measure coverage ratios for median columns
+        for col in avg_cols:
+            if col in group.columns:
+                col_has_data = group[col].notna()
+                if "intersection_area" in group.columns and total_area > 0:
+                    col_covered = group.loc[col_has_data, "intersection_area"].sum()
+                    row[f"coverage_{col}"] = col_covered / total_area
+                else:
+                    row[f"coverage_{col}"] = col_has_data.mean()
 
         results.append(row)
 

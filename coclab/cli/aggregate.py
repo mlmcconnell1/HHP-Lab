@@ -565,6 +565,13 @@ def aggregate_acs(
             ),
         ),
     ] = None,
+    output_json: Annotated[
+        bool,
+        typer.Option(
+            "--json",
+            help="Emit a structured JSON summary instead of human-readable text.",
+        ),
+    ] = False,
 ) -> None:
     """Aggregate cached ACS tract data into CoC artifacts.
 
@@ -582,6 +589,11 @@ def aggregate_acs(
     parsed_years = _resolve_years(years, build_dir)
 
     if weighting not in ("area", "population"):
+        if output_json:
+            import json
+
+            typer.echo(json.dumps({"status": "error", "message": f"Invalid weighting '{weighting}'. Use 'area' or 'population'."}))
+            raise typer.Exit(2)
         typer.echo(
             f"Error: Invalid weighting '{weighting}'. Use 'area' or 'population'.",
             err=True,
@@ -614,6 +626,8 @@ def aggregate_acs(
 
     all_outputs: list[str] = []
     materialized: list[int] = []
+    total_row_count = 0
+    total_coc_count = 0
 
     for build_year in parsed_years:
         boundary_vintage = str(build_year)
@@ -637,6 +651,17 @@ def aggregate_acs(
                 years_requested=parsed_years, status="failed",
                 error=f"ACS cache not found: {acs_cache_path}",
             )
+            if output_json:
+                import json
+
+                typer.echo(json.dumps({
+                    "status": "error",
+                    "message": f"Cached ACS tract file not found: {acs_cache_path}",
+                    "boundary_vintage": boundary_vintage,
+                    "acs_vintage": acs_vintage,
+                    "remedy": f"coclab ingest acs5-tract --acs {acs_vintage} --tracts {tract_vintage}",
+                }))
+                raise typer.Exit(1)
             typer.echo(
                 f"Error: Cached ACS tract file not found: {acs_cache_path}",
                 err=True,
@@ -658,6 +683,18 @@ def aggregate_acs(
                 years_requested=parsed_years, status="failed",
                 error=f"Crosswalk not found: {xwalk_path}",
             )
+            if output_json:
+                import json
+
+                typer.echo(json.dumps({
+                    "status": "error",
+                    "message": f"Crosswalk not found: {xwalk_path}",
+                    "boundary_vintage": boundary_vintage,
+                    "acs_vintage": acs_vintage,
+                    "tract_vintage": str(tract_vintage),
+                    "remedy": f"coclab generate xwalks --boundary {boundary_vintage} --tracts {tract_vintage}",
+                }))
+                raise typer.Exit(1)
             typer.echo(
                 f"Error: Crosswalk not found: {xwalk_path}",
                 err=True,
@@ -740,6 +777,9 @@ def aggregate_acs(
             )
             all_outputs.append(rel)
             materialized.append(build_year)
+            total_row_count += len(coc_measures)
+            if "coc_id" in coc_measures.columns:
+                total_coc_count = coc_measures["coc_id"].nunique()
             typer.echo(f"    Wrote: {out_path.name}")
 
         except Exception as exc:
@@ -747,6 +787,16 @@ def aggregate_acs(
                 build_dir, dataset="acs", alignment=align,
                 years_requested=parsed_years, status="failed", error=str(exc),
             )
+            if output_json:
+                import json
+
+                typer.echo(json.dumps({
+                    "status": "error",
+                    "message": f"Error aggregating ACS {acs_vintage}: {exc}",
+                    "boundary_vintage": boundary_vintage,
+                    "acs_vintage": acs_vintage,
+                }))
+                raise typer.Exit(1) from exc
             typer.echo(f"Error aggregating ACS {acs_vintage}: {exc}", err=True)
             raise typer.Exit(1) from exc
 
@@ -758,10 +808,25 @@ def aggregate_acs(
         years_materialized=materialized,
         outputs=all_outputs,
     )
-    typer.echo(
-        f"ACS aggregation complete ({len(materialized)} years). "
-        f"Output in: {output_dir}"
-    )
+    if output_json:
+        import json
+
+        typer.echo(json.dumps({
+            "status": "ok",
+            "alignment": align,
+            "weighting": weighting,
+            "years_requested": parsed_years,
+            "years_materialized": materialized,
+            "output_path": str(output_dir),
+            "coc_count": total_coc_count,
+            "row_count": total_row_count,
+            "outputs": all_outputs,
+        }))
+    else:
+        typer.echo(
+            f"ACS aggregation complete ({len(materialized)} years). "
+            f"Output in: {output_dir}"
+        )
 
 
 # ---------------------------------------------------------------------------

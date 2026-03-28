@@ -3,6 +3,18 @@
 Uses existing CoC-county crosswalks to aggregate county-level
 Population Estimates Program data to Continuum of Care geography.
 
+Weighting strategy
+------------------
+PEP aggregation uses raw ``area_share`` from the crosswalk (uniform
+density assumption).  This differs from ZORI aggregation, which
+combines ``area_share`` with ACS demographic weights.  The rationale:
+PEP is already a population count, so area-based apportionment of
+county totals is the natural choice.  Adding ACS weights would
+circularly weight population by population.  For large counties with
+uneven population distributions this is less precise, but avoids
+introducing ACS vintage coupling into what is otherwise a simple
+population pipeline.
+
 Usage
 -----
     from coclab.pep.aggregate import aggregate_pep_to_coc
@@ -21,15 +33,20 @@ from pathlib import Path
 
 import pandas as pd
 
-from coclab.naming import coc_pep_filename
+from coclab.naming import coc_pep_filename, county_xwalk_path
 from coclab.provenance import ProvenanceBlock, read_provenance, write_parquet_with_provenance
 
 logger = logging.getLogger(__name__)
 
 # Default directories
 DEFAULT_PEP_DIR = Path("data/curated/pep")
-DEFAULT_XWALK_DIR = Path("data/curated/xwalks")
 DEFAULT_OUTPUT_DIR = Path("data/curated/pep")
+
+# PEP uses a higher coverage threshold than ZORI (0.95 vs 0.90) because
+# county-level population estimates have near-complete coverage -- almost
+# every county has a PEP estimate, so missing data is unusual and likely
+# indicates a real problem rather than expected sparsity.
+DEFAULT_MIN_COVERAGE = 0.95
 
 
 def load_crosswalk(
@@ -59,12 +76,12 @@ def load_crosswalk(
         If crosswalk file does not exist.
     """
     if xwalk_dir is None:
-        xwalk_dir = DEFAULT_XWALK_DIR
+        xwalk_path = county_xwalk_path(boundary_vintage, county_vintage)
     else:
-        xwalk_dir = Path(xwalk_dir)
-
-    # Crosswalk filename pattern
-    xwalk_path = xwalk_dir / f"xwalk__B{boundary_vintage}xC{county_vintage}.parquet"
+        # xwalk_dir is like "data/curated/xwalks"; county_xwalk_path expects
+        # the data root, so go up two levels (xwalks -> curated -> data).
+        base_dir = Path(xwalk_dir).parent.parent
+        xwalk_path = county_xwalk_path(boundary_vintage, county_vintage, base_dir)
 
     if not xwalk_path.exists():
         raise FileNotFoundError(
@@ -176,7 +193,7 @@ def aggregate_pep_counties(
     *,
     geo_id_col: str = "coc_id",
     weighting: str = "area_share",
-    min_coverage: float = 0.95,
+    min_coverage: float = DEFAULT_MIN_COVERAGE,
     boundary_vintage: str | None = None,
     county_vintage: str | None = None,
 ) -> pd.DataFrame:
@@ -356,7 +373,7 @@ def aggregate_pep_to_coc(
     xwalk_path: Path | str | None = None,
     start_year: int | None = None,
     end_year: int | None = None,
-    min_coverage: float = 0.95,
+    min_coverage: float = DEFAULT_MIN_COVERAGE,
     output_dir: Path | str | None = None,
     force: bool = False,
 ) -> Path:
@@ -451,7 +468,7 @@ def aggregate_pep_to_coc(
     pep_provenance = read_provenance(pep_path) if pep_path else None
     xwalk_provenance_path = (
         xwalk_path if xwalk_path
-        else DEFAULT_XWALK_DIR / f"xwalk__B{boundary_vintage}xC{county_vintage}.parquet"
+        else county_xwalk_path(boundary_vintage, county_vintage)
     )
     xwalk_provenance = (
         read_provenance(xwalk_provenance_path)

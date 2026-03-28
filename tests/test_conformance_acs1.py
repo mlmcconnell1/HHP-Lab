@@ -146,15 +146,15 @@ def test_schema_acs5_and_acs1_both_present_passes() -> None:
 
 
 def test_schema_acs1_missing_fails() -> None:
-    """Panel missing ACS1 columns fails when acs_products includes "acs1"."""
+    """Panel missing ACS1 columns warns when acs_products includes "acs1"."""
     # Only ACS5 columns present, but both products requested
     df = _make_panel([2022], columns=list(ACS_MEASURE_COLUMNS))
     request = _default_request(acs_products=["acs5", "acs1"])
-    # check_schema_measures checks "at least one expected measure present"
-    # With both products, ACS5 columns ARE present, so it passes.
-    # The check is "at least one" — not "all must be present".
+    # check_schema_measures now reports partially missing columns as a warning
     results = check_schema_measures(df, request)
-    assert len(results) == 0
+    assert len(results) == 1
+    assert results[0].severity == "warning"
+    assert "missing_columns" in results[0].details
 
 
 def test_schema_no_measures_at_all_fails_dual_product() -> None:
@@ -172,19 +172,24 @@ def test_schema_no_measures_at_all_fails_dual_product() -> None:
 
 
 def test_schema_only_acs1_present_passes_dual_product() -> None:
-    """Panel with only ACS1 columns passes dual-product (at least one present)."""
+    """Panel with only ACS1 columns warns about missing ACS5 columns."""
     df = _make_panel([2022], columns=list(ACS1_MEASURE_COLUMNS))
     request = _default_request(acs_products=["acs5", "acs1"])
     results = check_schema_measures(df, request)
-    assert len(results) == 0
+    # Now properly reports missing ACS5 columns as a warning
+    assert len(results) == 1
+    assert results[0].severity == "warning"
+    assert "missing_columns" in results[0].details
 
 
 def test_schema_acs5_only_ignores_acs1_columns() -> None:
-    """Panel without ACS1 columns passes when only acs5 is requested."""
+    """Panel with only one ACS5 column warns about missing ACS5 columns."""
     df = _make_panel([2022], columns=["total_population"])
     request = _default_request(acs_products=["acs5"])
     results = check_schema_measures(df, request)
-    assert len(results) == 0
+    # Only total_population present; other ACS5 columns missing → warning
+    assert len(results) == 1
+    assert results[0].severity == "warning"
 
 
 def test_schema_measure_columns_override_still_works() -> None:

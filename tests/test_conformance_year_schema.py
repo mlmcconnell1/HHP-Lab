@@ -17,7 +17,7 @@ Measure schema truth table (coclab-d0qm)
 Scenario               | measure_columns      | Columns in df           | Expected
 -----------------------|----------------------|-------------------------|-------------
 all_present            | None (ACS default)   | all 5 ACS columns       | no results
-some_present           | None (ACS default)   | only total_population   | no results
+some_present           | None (ACS default)   | only total_population   | 1 warning (missing cols)
 none_present           | None (ACS default)   | no ACS columns          | 1 error
 pep_population_present | ["population"]       | population              | no results
 pep_population_missing | ["population"]       | (none)                  | 1 error
@@ -191,8 +191,8 @@ MEASURE_SCHEMA_CASES = {
     "some_present": {
         "columns": ["total_population"],
         "measure_columns": None,
-        "expected_count": 0,
-        "expected_severity": None,
+        "expected_count": 1,
+        "expected_severity": "warning",
     },
     "none_present": {
         "columns": [],
@@ -234,13 +234,15 @@ def test_check_schema_measures(case_name: str) -> None:
     result = results[0]
     assert result.severity == case["expected_severity"]
     assert result.check_name == "check_schema_measures"
-    assert result.details["present_columns"] == []
+    if case["expected_severity"] == "error":
+        # Error = no columns present at all
+        assert result.details["present_columns"] == []
 
 
 def test_check_schema_acs_alias() -> None:
     """check_schema_acs is a backward-compatible alias for check_schema_measures."""
     assert check_schema_acs is check_schema_measures
-    df = _make_panel([2022], columns=["total_population"])
+    df = _make_panel([2022], columns=list(ACS_MEASURE_COLUMNS))
     request = _default_request()
     results = check_schema_acs(df, request)
     assert len(results) == 0

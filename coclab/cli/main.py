@@ -397,11 +397,32 @@ def delete_boundaries(
         raise typer.Exit(1)
 
 
-def list_boundaries_cmd() -> None:
+def list_boundaries_cmd(
+    json_output: Annotated[
+        bool,
+        typer.Option(
+            "--json",
+            help="Output structured JSON instead of human-readable text.",
+        ),
+    ] = False,
+) -> None:
     """List all available boundary vintages in the registry."""
+    import json
+
     from coclab.registry.registry import list_boundaries
 
     vintages = list_boundaries()
+
+    if json_output:
+        typer.echo(
+            json.dumps(
+                {
+                    "status": "ok",
+                    "vintages": [e.to_dict() for e in vintages],
+                },
+            )
+        )
+        return
 
     if not vintages:
         typer.echo("No vintages registered yet.")
@@ -419,7 +440,7 @@ def list_boundaries_cmd() -> None:
         )
 
 
-def check_boundaries() -> None:
+def check_boundaries(*, json_output: bool = False) -> None:
     """Validate boundary registry health for issues.
 
     Scans all registry entries for:
@@ -431,10 +452,38 @@ def check_boundaries() -> None:
 
         coclab validate boundaries
     """
+    import json
+
     from coclab.registry import check_registry_health
 
-    typer.echo("Checking boundary registry health...\n")
     report = check_registry_health()
+
+    if json_output:
+        if report.is_healthy:
+            typer.echo(json.dumps({"status": "ok", "issues": []}))
+        else:
+            typer.echo(
+                json.dumps(
+                    {
+                        "status": "error",
+                        "message": f"Registry health check found {len(report.issues)} issue(s)",
+                        "issues": [
+                            {
+                                "vintage": i.vintage,
+                                "source": i.source,
+                                "issue_type": i.issue_type,
+                                "message": i.message,
+                                "path": i.path,
+                            }
+                            for i in report.issues
+                        ],
+                    },
+                )
+            )
+            raise typer.Exit(1)
+        return
+
+    typer.echo("Checking boundary registry health...\n")
     typer.echo(str(report))
 
     if not report.is_healthy:
@@ -446,9 +495,17 @@ def check_boundaries() -> None:
         raise typer.Exit(1)
 
 
-def validate_boundaries() -> None:
+def validate_boundaries(
+    json_output: Annotated[
+        bool,
+        typer.Option(
+            "--json",
+            help="Output structured JSON instead of human-readable text.",
+        ),
+    ] = False,
+) -> None:
     """Validate boundary registry health for issues."""
-    check_boundaries()
+    check_boundaries(json_output=json_output)
 
 
 def show(
@@ -518,6 +575,13 @@ def source_status(
             help="Highlight sources that have changed over time",
         ),
     ] = False,
+    json_output: Annotated[
+        bool,
+        typer.Option(
+            "--json",
+            help="Output structured JSON instead of human-readable text.",
+        ),
+    ] = False,
 ) -> None:
     """Show status of tracked external data sources.
 
@@ -532,10 +596,48 @@ def source_status(
 
         coclab show sources --check-changes
     """
+    import json
+
     from coclab.source_registry import (
+        _load_registry,
         detect_upstream_changes,
         summarize_registry,
     )
+
+    if json_output:
+        if check_changes:
+            changes = detect_upstream_changes()
+            if changes.empty:
+                typer.echo(json.dumps({"status": "ok", "changes": []}))
+            else:
+                typer.echo(
+                    json.dumps(
+                        {
+                            "status": "ok",
+                            "changes": json.loads(
+                                changes.to_json(orient="records", date_format="iso")
+                            ),
+                        },
+                    )
+                )
+        else:
+            df = _load_registry()
+            if source_type:
+                df = df[df["source_type"] == source_type]
+            if df.empty:
+                typer.echo(json.dumps({"status": "ok", "sources": []}))
+            else:
+                typer.echo(
+                    json.dumps(
+                        {
+                            "status": "ok",
+                            "sources": json.loads(
+                                df.to_json(orient="records", date_format="iso")
+                            ),
+                        },
+                    )
+                )
+        return
 
     if check_changes:
         changes = detect_upstream_changes()

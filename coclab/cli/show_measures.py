@@ -153,6 +153,13 @@ def show_measures(
             help="ACS vintage year (e.g., 2022). Uses latest if not specified.",
         ),
     ] = None,
+    output_json: Annotated[
+        bool,
+        typer.Option(
+            "--json",
+            help="Output in JSON format (alias for --format json).",
+        ),
+    ] = False,
     output_format: Annotated[
         str,
         typer.Option(
@@ -182,6 +189,10 @@ def show_measures(
 
         coclab show measures --coc NY-600 --format json
     """
+    # --json flag overrides --format
+    if output_json:
+        output_format = "json"
+
     # Validate output format
     if output_format not in ("table", "json", "csv"):
         typer.echo(

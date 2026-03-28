@@ -84,6 +84,21 @@ def build_tract_crosswalk(
 
     n_geos = len(geo_proj)
 
+    # Short-circuit on empty geography input
+    if n_geos == 0:
+        return pd.DataFrame(
+            columns=[
+                geo_id_col,
+                "boundary_vintage",
+                "tract_geoid",
+                "tract_vintage",
+                "area_share",
+                "pop_share",
+                "intersection_area",
+                "tract_area",
+            ]
+        )
+
     # Process in batches if batch_size > 0 and we have a callback
     if batch_size > 0 and progress_callback is not None:
         intersection_results = []

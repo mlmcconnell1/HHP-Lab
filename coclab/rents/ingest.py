@@ -32,6 +32,7 @@ import logging
 import re
 from datetime import UTC, date, datetime
 from pathlib import Path
+from collections.abc import Callable
 from typing import Literal
 
 import httpx
@@ -170,6 +171,78 @@ def download_zori(
     return raw_path, sha256
 
 
+def _parse_zori_long(
+    df: pd.DataFrame,
+    geo_type: str,
+    id_cols: list[str],
+    fips_fn: Callable[[pd.DataFrame], pd.Series],
+) -> pd.DataFrame:
+    """Shared wide-to-long normalization for ZORI data.
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        Raw wide-format DataFrame (already read from CSV).
+    geo_type : str
+        Label used in log messages ("county" or "zip").
+    id_cols : list[str]
+        Columns to preserve through the melt (besides ``geo_id``).
+    fips_fn : Callable[[pd.DataFrame], pd.Series]
+        Function ``(df) -> Series`` that builds the ``geo_id`` column
+        from raw columns.
+
+    Returns
+    -------
+    pd.DataFrame
+        Long-format DataFrame with columns:
+        geo_id, date, zori, region_name, state
+    """
+    # Identify date columns by positive pattern match (YYYY-MM-DD or YYYY-MM)
+    date_cols = [c for c in df.columns if _DATE_COL_RE.match(c)]
+
+    # Build geo_id via caller-supplied function
+    df["geo_id"] = fips_fn(df)
+
+    # Melt to long format
+    long_df = df.melt(
+        id_vars=["geo_id"] + id_cols,
+        value_vars=date_cols,
+        var_name="date_str",
+        value_name="zori",
+    )
+
+    # Parse dates - Zillow uses YYYY-MM-DD format (end-of-month dates)
+    long_df["date"] = pd.to_datetime(long_df["date_str"], format="%Y-%m-%d", errors="coerce")
+    long_df = long_df.dropna(subset=["date"])
+
+    # Rename columns
+    long_df = long_df.rename(
+        columns={
+            "RegionName": "region_name",
+            "StateName": "state",
+        }
+    )
+
+    # Drop rows with null ZORI
+    long_df = long_df.dropna(subset=["zori"])
+
+    # Select final columns
+    result = long_df[["geo_id", "date", "zori", "region_name", "state"]].copy()
+
+    # Validate geo_id format (should be 5 characters)
+    invalid_geoids = result[result["geo_id"].str.len() != 5]
+    if len(invalid_geoids) > 0:
+        logger.warning(
+            f"Found {len(invalid_geoids)} rows with invalid {geo_type} geo_id length"
+        )
+        result = result[result["geo_id"].str.len() == 5]
+
+    # Sort by geo_id and date
+    result = result.sort_values(["geo_id", "date"]).reset_index(drop=True)
+
+    return result
+
+
 def parse_zori_county(raw_path: Path) -> pd.DataFrame:
     """Parse Zillow county ZORI CSV to long format.
 
@@ -188,50 +261,12 @@ def parse_zori_county(raw_path: Path) -> pd.DataFrame:
         geo_id, date, zori, region_name, state
     """
     df = pd.read_csv(raw_path, dtype={"StateCodeFIPS": str, "MunicipalCodeFIPS": str})
-
-    # Identify date columns by positive pattern match (YYYY-MM-DD or YYYY-MM)
-    date_cols = [c for c in df.columns if _DATE_COL_RE.match(c)]
-
-    # Build county FIPS from state + municipal codes
-    # StateCodeFIPS is 2-digit, MunicipalCodeFIPS is 3-digit
-    df["geo_id"] = df["StateCodeFIPS"].str.zfill(2) + df["MunicipalCodeFIPS"].str.zfill(3)
-
-    # Melt to long format
-    long_df = df.melt(
-        id_vars=["geo_id", "RegionName", "StateName"],
-        value_vars=date_cols,
-        var_name="date_str",
-        value_name="zori",
+    return _parse_zori_long(
+        df,
+        geo_type="county",
+        id_cols=["RegionName", "StateName"],
+        fips_fn=lambda d: d["StateCodeFIPS"].str.zfill(2) + d["MunicipalCodeFIPS"].str.zfill(3),
     )
-
-    # Parse dates - Zillow uses YYYY-MM-DD format (end-of-month dates)
-    long_df["date"] = pd.to_datetime(long_df["date_str"], format="%Y-%m-%d", errors="coerce")
-    long_df = long_df.dropna(subset=["date"])
-
-    # Rename columns
-    long_df = long_df.rename(
-        columns={
-            "RegionName": "region_name",
-            "StateName": "state",
-        }
-    )
-
-    # Drop rows with null ZORI
-    long_df = long_df.dropna(subset=["zori"])
-
-    # Select final columns
-    result = long_df[["geo_id", "date", "zori", "region_name", "state"]].copy()
-
-    # Validate geo_id format (should be 5-char county FIPS)
-    invalid_geoids = result[result["geo_id"].str.len() != 5]
-    if len(invalid_geoids) > 0:
-        logger.warning(f"Found {len(invalid_geoids)} rows with invalid geo_id length")
-        result = result[result["geo_id"].str.len() == 5]
-
-    # Sort by geo_id and date
-    result = result.sort_values(["geo_id", "date"]).reset_index(drop=True)
-
-    return result
 
 
 def parse_zori_zip(raw_path: Path) -> pd.DataFrame:
@@ -249,46 +284,12 @@ def parse_zori_zip(raw_path: Path) -> pd.DataFrame:
         geo_id, date, zori, region_name, state
     """
     df = pd.read_csv(raw_path, dtype={"RegionName": str})
-
-    # Identify date columns by positive pattern match (YYYY-MM-DD or YYYY-MM)
-    date_cols = [c for c in df.columns if _DATE_COL_RE.match(c)]
-
-    # ZIP code is in RegionName
-    df["geo_id"] = df["RegionName"].str.zfill(5)
-
-    # Melt to long format
-    long_df = df.melt(
-        id_vars=["geo_id", "RegionName", "StateName"],
-        value_vars=date_cols,
-        var_name="date_str",
-        value_name="zori",
+    return _parse_zori_long(
+        df,
+        geo_type="zip",
+        id_cols=["RegionName", "StateName"],
+        fips_fn=lambda d: d["RegionName"].str.zfill(5),
     )
-
-    # Parse dates - Zillow uses YYYY-MM-DD format (end-of-month dates)
-    long_df["date"] = pd.to_datetime(long_df["date_str"], format="%Y-%m-%d", errors="coerce")
-    long_df = long_df.dropna(subset=["date"])
-
-    # Rename columns
-    long_df = long_df.rename(
-        columns={
-            "RegionName": "region_name",
-            "StateName": "state",
-        }
-    )
-
-    # Drop rows with null ZORI
-    long_df = long_df.dropna(subset=["zori"])
-
-    # Select final columns
-    result = long_df[["geo_id", "date", "zori", "region_name", "state"]].copy()
-
-    # Validate geo_id format (should be 5-char ZIP)
-    result = result[result["geo_id"].str.len() == 5]
-
-    # Sort by geo_id and date
-    result = result.sort_values(["geo_id", "date"]).reset_index(drop=True)
-
-    return result
 
 
 def _validate_monthly_continuity(df: pd.DataFrame, max_warnings: int = 10) -> None:

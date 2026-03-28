@@ -110,10 +110,18 @@ def _prepare_for_save(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def _save_registry(df: pd.DataFrame, registry_path: Path) -> None:
-    """Save registry to disk as Parquet."""
+    """Save registry to disk as Parquet with embedded provenance."""
+    from coclab.provenance import ProvenanceBlock, write_parquet_with_provenance
+
     registry_path.parent.mkdir(parents=True, exist_ok=True)
     df = _prepare_for_save(df)
-    df.to_parquet(registry_path, index=False)
+    provenance = ProvenanceBlock(
+        extra={
+            "dataset_type": "boundary_registry",
+            "entry_count": len(df),
+        }
+    )
+    write_parquet_with_provenance(df, registry_path, provenance)
 
 
 def compute_file_hash(file_path: Path) -> str:
