@@ -26,6 +26,12 @@ HUD_ARCGIS_COC_SOURCE_REF: Final = (
 HUD_EXCHANGE_COC_GDB_TEMPLATE: Final = (
     "https://files.hudexchange.info/resources/documents/CoC_GIS_NatlTerrDC_Shapefile_{vintage}.zip"
 )
+HUD_EXCHANGE_COC_NATIONAL_BOUNDARY_TEMPLATE: Final = (
+    "https://files.hudexchange.info/resources/documents/CoC_GIS_National_Boundary_{vintage}.zip"
+)
+HUD_EXCHANGE_COC_STATE_SHAPEFILE_TEMPLATE: Final = (
+    "https://files.hudexchange.info/reports/published/CoC_GIS_State_Shapefile_{state}_{vintage}.zip"
+)
 HUD_USER_PIT_BASE: Final = "https://www.huduser.gov/portal/sites/default/files/xls/"
 
 # Zillow

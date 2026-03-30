@@ -181,6 +181,85 @@ class TestDownloadHudExchangeGdb:
             assert any(output_dir.iterdir())
 
 
+    def test_fallback_to_national_boundary_url(self, httpx_mock):
+        """When no explicit URL given, tries national boundary URL first."""
+        zip_content = _create_test_shapefile_zip()
+        # National boundary URL succeeds
+        httpx_mock.add_response(
+            url=re.compile(r".*National_Boundary.*"),
+            content=zip_content,
+        )
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            output_dir = Path(tmpdir) / "test_vintage"
+            result = download_hud_exchange_gdb(
+                boundary_vintage="2020",
+                output_dir=output_dir,
+            )
+            assert result.exists()
+
+    def test_fallback_chain_national_fails_legacy_succeeds(self, httpx_mock):
+        """National URL 404 → legacy URL succeeds."""
+        zip_content = _create_test_shapefile_zip()
+        # National boundary URL fails (404)
+        httpx_mock.add_response(
+            url=re.compile(r".*National_Boundary.*"),
+            status_code=404,
+        )
+        # Legacy URL succeeds
+        httpx_mock.add_response(
+            url=re.compile(r".*NatlTerrDC.*"),
+            content=zip_content,
+        )
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            output_dir = Path(tmpdir) / "test_vintage"
+            result = download_hud_exchange_gdb(
+                boundary_vintage="2020",
+                output_dir=output_dir,
+            )
+            assert result.exists()
+
+    def test_all_downloads_fail_raises_runtime_error(self, httpx_mock, monkeypatch):
+        """All URLs fail → RuntimeError with helpful message."""
+        # National boundary URL → 404
+        httpx_mock.add_response(
+            url=re.compile(r".*National_Boundary.*"),
+            status_code=404,
+        )
+        # Legacy URL → 404
+        httpx_mock.add_response(
+            url=re.compile(r".*NatlTerrDC.*"),
+            status_code=404,
+        )
+        # Stub per-state fallback to avoid 55 HTTP requests in test
+        monkeypatch.setattr(
+            "coclab.ingest.hud_exchange_gis._download_per_state_shapefiles",
+            lambda *a, **kw: None,
+        )
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            output_dir = Path(tmpdir) / "test_vintage"
+            with pytest.raises(RuntimeError, match="All HUD Exchange download sources failed"):
+                download_hud_exchange_gdb(
+                    boundary_vintage="2020",
+                    output_dir=output_dir,
+                )
+
+    def test_explicit_url_failure_raises_runtime_error(self, httpx_mock):
+        """Explicit URL failure raises RuntimeError, doesn't try fallbacks."""
+        httpx_mock.add_response(status_code=404)
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            output_dir = Path(tmpdir) / "test_vintage"
+            with pytest.raises(RuntimeError, match="Download from explicit URL failed"):
+                download_hud_exchange_gdb(
+                    boundary_vintage="2020",
+                    output_dir=output_dir,
+                    url="https://example.com/bad.zip",
+                )
+
+
 class TestReadCocBoundaries:
     """Tests for reading CoC boundary data."""
 

@@ -29,6 +29,8 @@ from coclab.sources import (
     HUD_ARCGIS_COC_FEATURE_SERVICE,
     HUD_ARCGIS_COC_SOURCE_REF,
     HUD_EXCHANGE_COC_GDB_TEMPLATE,
+    HUD_EXCHANGE_COC_NATIONAL_BOUNDARY_TEMPLATE,
+    HUD_EXCHANGE_COC_STATE_SHAPEFILE_TEMPLATE,
 )
 
 if TYPE_CHECKING:
@@ -42,9 +44,23 @@ ARCGIS_FEATURE_SERVICE_URL = HUD_ARCGIS_COC_FEATURE_SERVICE
 # Source reference for ArcGIS data
 ARCGIS_SOURCE_REF = HUD_ARCGIS_COC_SOURCE_REF
 
-# URL template for HUD Exchange CoC GIS geodatabase downloads (legacy fallback)
-# Pattern observed from historical files: CoC_GIS_NatlTerrDC_Shapefile_{YEAR}.zip
+# URL templates for HUD Exchange CoC GIS geodatabase downloads (legacy fallback).
+# The national boundary URL is now the primary legacy source; the original
+# NatlTerrDC shapefile template no longer works for any vintage year.
 HUD_EXCHANGE_GDB_URL_TEMPLATE = HUD_EXCHANGE_COC_GDB_TEMPLATE
+HUD_EXCHANGE_NATIONAL_BOUNDARY_TEMPLATE = HUD_EXCHANGE_COC_NATIONAL_BOUNDARY_TEMPLATE
+HUD_EXCHANGE_STATE_SHAPEFILE_TEMPLATE = HUD_EXCHANGE_COC_STATE_SHAPEFILE_TEMPLATE
+
+# State/territory abbreviations used by HUD Exchange per-state shapefiles.
+# Covers all 50 states, DC, and the five populated US territories.
+_HUD_STATE_ABBREVIATIONS = [
+    "AK", "AL", "AR", "AZ", "CA", "CO", "CT", "DC", "DE", "FL",
+    "GA", "GU", "HI", "IA", "ID", "IL", "IN", "KS", "KY", "LA",
+    "MA", "MD", "ME", "MI", "MN", "MO", "MP", "MS", "MT", "NC",
+    "ND", "NE", "NH", "NJ", "NM", "NV", "NY", "OH", "OK", "OR",
+    "PA", "PR", "RI", "SC", "SD", "TN", "TX", "UT", "VA", "VI",
+    "VT", "WA", "WI", "WV", "WY",
+]
 
 # Pagination settings for ArcGIS API
 # Smaller page size for more frequent progress updates
@@ -372,6 +388,107 @@ def _hash_local_path(path: Path) -> tuple[str, int]:
 # =============================================================================
 
 
+def _download_and_extract_zip(
+    url: str,
+    output_dir: Path,
+    zip_name: str,
+) -> Path | None:
+    """Download a ZIP, extract it, and return the path to geo data inside.
+
+    Returns ``None`` if the download fails with an HTTP error (e.g. 404).
+    """
+    zip_path = output_dir / zip_name
+    try:
+        with httpx.Client(follow_redirects=True, timeout=120.0) as client:
+            response = client.get(url)
+            response.raise_for_status()
+            with open(zip_path, "wb") as f:
+                f.write(response.content)
+    except httpx.HTTPStatusError as exc:
+        logger.debug(
+            "Download failed for %s: %s %s",
+            url,
+            exc.response.status_code,
+            exc.response.reason_phrase,
+        )
+        return None
+    except (httpx.TimeoutException, httpx.ConnectError, OSError) as exc:
+        logger.debug("Download failed for %s: %s", url, exc)
+        return None
+
+    with zipfile.ZipFile(zip_path, "r") as zf:
+        zf.extractall(output_dir)
+
+    gdb_dirs = list(output_dir.glob("*.gdb"))
+    if gdb_dirs:
+        return gdb_dirs[0]
+    shp_files = list(output_dir.glob("*.shp"))
+    if shp_files:
+        return shp_files[0]
+    return output_dir
+
+
+def _download_per_state_shapefiles(
+    boundary_vintage: str,
+    output_dir: Path,
+) -> Path | None:
+    """Download per-state shapefiles from HUD Exchange and merge them.
+
+    Returns the path to the merged shapefile directory, or ``None`` if too
+    few states succeed.
+    """
+    import geopandas as gpd
+
+    state_dir = output_dir / "per_state"
+    state_dir.mkdir(parents=True, exist_ok=True)
+
+    gdfs: list[gpd.GeoDataFrame] = []
+    failed: list[str] = []
+
+    for state in _HUD_STATE_ABBREVIATIONS:
+        url = HUD_EXCHANGE_STATE_SHAPEFILE_TEMPLATE.format(
+            state=state,
+            vintage=boundary_vintage,
+        )
+        sub_dir = state_dir / state
+        sub_dir.mkdir(parents=True, exist_ok=True)
+        result = _download_and_extract_zip(
+            url,
+            sub_dir,
+            f"CoC_GIS_{state}_{boundary_vintage}.zip",
+        )
+        if result is None:
+            failed.append(state)
+            continue
+        try:
+            gdf = gpd.read_file(result)
+            gdfs.append(gdf)
+        except Exception:
+            logger.warning("Failed to read shapefile for state %s", state)
+            failed.append(state)
+
+    if not gdfs:
+        logger.warning(
+            "Per-state shapefile download yielded no data for vintage %s",
+            boundary_vintage,
+        )
+        return None
+
+    if failed:
+        logger.info(
+            "Per-state downloads: %d succeeded, %d failed (%s)",
+            len(gdfs),
+            len(failed),
+            ", ".join(failed),
+        )
+
+    merged = gpd.pd.concat(gdfs, ignore_index=True)
+    merged_gdf = gpd.GeoDataFrame(merged, geometry="geometry")
+    merged_path = state_dir / f"merged_{boundary_vintage}.shp"
+    merged_gdf.to_file(merged_path)
+    return merged_path
+
+
 def download_hud_exchange_gdb(
     boundary_vintage: str,
     output_dir: Path | str | None = None,
@@ -379,19 +496,26 @@ def download_hud_exchange_gdb(
 ) -> Path:
     """Download CoC GIS geodatabase/shapefile from HUD Exchange.
 
+    Tries the following sources in order:
+
+    1. Explicit *url* (if provided).
+    2. National boundary ZIP
+       (``CoC_GIS_National_Boundary_{vintage}.zip`` — preferred, most complete).
+    3. Legacy NatlTerrDC shapefile ZIP (original template, now broken for most
+       vintages — kept for backward compatibility).
+    4. Per-state shapefiles downloaded and merged.
+
     Args:
         boundary_vintage: Year of the boundary data (e.g., "2024")
         output_dir: Directory to save the downloaded file. Defaults to
-            data/raw/hud_exchange/{vintage}/
-        url: Override URL for downloading. If not provided, uses the standard
-            HUD Exchange URL template.
+            ``data/raw/hud_exchange/{vintage}/``
+        url: Override URL for downloading. Skips the fallback chain.
 
     Returns:
         Path to the extracted geodatabase/shapefile directory
 
     Raises:
-        httpx.HTTPStatusError: If download fails
-        zipfile.BadZipFile: If downloaded file is not a valid zip
+        RuntimeError: If all download sources fail.
     """
     if output_dir is None:
         output_dir = Path("data/raw/hud_exchange") / boundary_vintage
@@ -400,36 +524,72 @@ def download_hud_exchange_gdb(
 
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    if url is None:
-        url = HUD_EXCHANGE_GDB_URL_TEMPLATE.format(vintage=boundary_vintage)
+    # --- Explicit URL (skip fallback chain) ---
+    if url is not None:
+        result = _download_and_extract_zip(
+            url,
+            output_dir,
+            f"CoC_GIS_{boundary_vintage}.zip",
+        )
+        if result is not None:
+            return result
+        raise RuntimeError(
+            f"Download from explicit URL failed: {url}"
+        )
 
-    zip_path = output_dir / f"CoC_GIS_{boundary_vintage}.zip"
+    # --- Fallback chain ---
+    urls_tried: list[str] = []
 
-    # Download the file
-    with httpx.Client(follow_redirects=True, timeout=120.0) as client:
-        response = client.get(url)
-        response.raise_for_status()
+    # 1. National boundary ZIP (preferred)
+    national_url = HUD_EXCHANGE_NATIONAL_BOUNDARY_TEMPLATE.format(
+        vintage=boundary_vintage,
+    )
+    urls_tried.append(national_url)
+    result = _download_and_extract_zip(
+        national_url,
+        output_dir,
+        f"CoC_GIS_National_Boundary_{boundary_vintage}.zip",
+    )
+    if result is not None:
+        return result
+    logger.info(
+        "National boundary URL unavailable for vintage %s, trying legacy URL",
+        boundary_vintage,
+    )
 
-        with open(zip_path, "wb") as f:
-            f.write(response.content)
+    # 2. Legacy NatlTerrDC shapefile ZIP
+    legacy_url = HUD_EXCHANGE_GDB_URL_TEMPLATE.format(vintage=boundary_vintage)
+    urls_tried.append(legacy_url)
+    result = _download_and_extract_zip(
+        legacy_url,
+        output_dir,
+        f"CoC_GIS_{boundary_vintage}.zip",
+    )
+    if result is not None:
+        return result
+    logger.info(
+        "Legacy shapefile URL unavailable for vintage %s, trying per-state downloads",
+        boundary_vintage,
+    )
 
-    # Extract the zip file
-    with zipfile.ZipFile(zip_path, "r") as zf:
-        zf.extractall(output_dir)
+    # 3. Per-state shapefiles
+    urls_tried.append(
+        HUD_EXCHANGE_STATE_SHAPEFILE_TEMPLATE.format(
+            state="<STATE>", vintage=boundary_vintage,
+        )
+    )
+    result = _download_per_state_shapefiles(boundary_vintage, output_dir)
+    if result is not None:
+        return result
 
-    # Find the extracted .gdb or shapefile directory
-    # The zip typically contains a .gdb folder or .shp files
-    gdb_dirs = list(output_dir.glob("*.gdb"))
-    if gdb_dirs:
-        return gdb_dirs[0]
-
-    # Look for shapefiles instead
-    shp_files = list(output_dir.glob("*.shp"))
-    if shp_files:
-        return shp_files[0]
-
-    # Return the output directory itself if no .gdb found
-    return output_dir
+    raise RuntimeError(
+        f"All HUD Exchange download sources failed for vintage {boundary_vintage}.\n"
+        f"URLs tried:\n"
+        + "\n".join(f"  - {u}" for u in urls_tried)
+        + "\n\nYou can manually download boundary data from:\n"
+        f"  National:   {national_url}\n"
+        f"  Per-state:  {HUD_EXCHANGE_STATE_SHAPEFILE_TEMPLATE.format(state='<ST>', vintage=boundary_vintage)}"
+    )
 
 
 def read_coc_boundaries(path: Path | str) -> gpd.GeoDataFrame:
