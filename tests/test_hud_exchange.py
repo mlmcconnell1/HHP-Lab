@@ -12,6 +12,8 @@ from shapely.geometry import Polygon
 
 from coclab.ingest.hud_exchange_gis import (
     COC_ID_FIELDS,
+    _HUD_STATE_ABBREVIATIONS,
+    _download_per_state_shapefiles,
     _extract_state_from_coc_id,
     _find_field,
     download_hud_exchange_gdb,
@@ -376,6 +378,49 @@ class TestIngestHudExchange:
         assert re.fullmatch(r"\d{8}-\d{6}", rid), (
             f"make_run_id() returned {rid!r}, expected YYYYMMDD-HHMMSS"
         )
+
+
+class TestPerStateFallbackCompleteness:
+    """Regression tests: partial per-state download must fail, not return truncated data."""
+
+    def test_partial_success_below_threshold_returns_none(self, tmp_path, monkeypatch):
+        """If most states fail, _download_per_state_shapefiles returns None."""
+        # Stub the download to succeed only for the first 5 states.
+        succeed_states = set(_HUD_STATE_ABBREVIATIONS[:5])
+
+        def fake_download_and_extract(url, sub_dir, filename):
+            # Parse state from the sub_dir name
+            state = sub_dir.name
+            if state in succeed_states:
+                shp_path = _create_test_shapefile(sub_dir)
+                return shp_path
+            return None
+
+        monkeypatch.setattr(
+            "coclab.ingest.hud_exchange_gis._download_and_extract_zip",
+            fake_download_and_extract,
+        )
+
+        result = _download_per_state_shapefiles("2020", tmp_path)
+        assert result is None, (
+            "Per-state fallback should return None when most states fail"
+        )
+
+    def test_full_success_returns_path(self, tmp_path, monkeypatch):
+        """If all states succeed, _download_per_state_shapefiles returns a path."""
+
+        def fake_download_and_extract(url, sub_dir, filename):
+            shp_path = _create_test_shapefile(sub_dir)
+            return shp_path
+
+        monkeypatch.setattr(
+            "coclab.ingest.hud_exchange_gis._download_and_extract_zip",
+            fake_download_and_extract,
+        )
+
+        result = _download_per_state_shapefiles("2020", tmp_path)
+        assert result is not None
+        assert result.exists()
 
 
 # Helper functions for creating test data

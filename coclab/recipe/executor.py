@@ -740,6 +740,10 @@ def _apply_temporal_filter(
         keep = geo_cols + [yr_col] + measure_cols
         df_curr = df[keep].copy()
 
+        # Coerce year column to int for arithmetic (handles string-typed years).
+        original_yr_dtype = df_curr[yr_col].dtype
+        df_curr[yr_col] = pd.to_numeric(df_curr[yr_col], errors="coerce").astype("Int64")
+
         if target_month < source_month:
             # Target is before source in the calendar year.
             # January(Y) sits between Jul(Y-1) and Jul(Y).
@@ -747,15 +751,12 @@ def _apply_temporal_filter(
             df_prev[yr_col] = df_prev[yr_col] + 1  # align Y-1 row to year Y
         else:
             # Target is after source in the calendar year.
-            # e.g. Oct(Y) sits between Jul(Y) and Jul(Y+1).
-            df_prev = df_curr.rename(columns={yr_col: yr_col})
+            # e.g. Jul(Y) sits between Jan(Y) and Jan(Y+1).
+            # prev = source data at year Y, curr = source data from year Y+1
+            # shifted down so it merges on year Y.
             df_prev = df_curr.copy()
-            df_curr_shifted = df_curr.copy()
-            df_curr_shifted[yr_col] = df_curr_shifted[yr_col] - 1
-            # prev = same year's source, curr = next year's source
-            df_prev, df_curr = df_curr, df_curr_shifted
-            df_prev[yr_col] = df_prev[yr_col]  # year Y has source from Y
-            df_curr[yr_col] = df_curr[yr_col] + 1  # next year's source → year Y
+            df_curr = df_curr.copy()
+            df_curr[yr_col] = df_curr[yr_col] - 1
 
         merged = df_curr.merge(
             df_prev,
@@ -776,7 +777,15 @@ def _apply_temporal_filter(
                 )
         # Drop the _prev helper columns.
         prev_drop = [c for c in merged.columns if c.endswith("_prev")]
-        return merged.drop(columns=prev_drop)
+        result = merged.drop(columns=prev_drop)
+
+        # Restore original year column dtype (e.g. string).
+        if original_yr_dtype == object:
+            result[yr_col] = result[yr_col].astype(str)
+        elif original_yr_dtype != result[yr_col].dtype:
+            result[yr_col] = result[yr_col].astype(original_yr_dtype)
+
+        return result
     else:
         raise ExecutorError(f"Unknown temporal filter method '{filt.method}'.")
 

@@ -3543,6 +3543,67 @@ class TestTemporalFilters:
         assert set(out["year"]) == {2019, 2020}
         assert out.loc[out["year"] == 2020, "value"].iloc[0] == pytest.approx(20.0)
 
+    def test_interpolate_to_month_string_year_column(self):
+        """String-typed year column must not crash arithmetic."""
+        df = pd.DataFrame({
+            "county_fips": ["01001"] * 3,
+            "year": ["2018", "2019", "2020"],
+            "reference_date": pd.to_datetime([
+                "2018-07-01", "2019-07-01", "2020-07-01",
+            ]),
+            "population": [1000.0, 1100.0, 1200.0],
+        })
+
+        out = _apply_temporal_filter(
+            df,
+            filt=TemporalFilter(
+                type="temporal",
+                column="reference_date",
+                method="interpolate_to_month",
+                month=1,
+            ),
+            year=2019,
+            dataset_id="pep",
+            year_column="year",
+        )
+
+        assert out["year"].dtype == object  # preserved as string
+        # jan(2019) = 0.5*jul(2018) + 0.5*jul(2019) = 0.5*1000 + 0.5*1100 = 1050
+        row_2019 = out.loc[out["year"] == "2019"]
+        assert len(row_2019) == 1
+        assert row_2019["population"].iloc[0] == pytest.approx(1050.0)
+
+    def test_interpolate_to_month_string_year_target_after_source(self):
+        """String year column with target_month > source_month."""
+        df = pd.DataFrame({
+            "geo_id": ["A", "A", "A"],
+            "year": ["2019", "2020", "2021"],
+            "reference_date": pd.to_datetime([
+                "2019-01-01", "2020-01-01", "2021-01-01",
+            ]),
+            "value": [100.0, 200.0, 300.0],
+        })
+
+        out = _apply_temporal_filter(
+            df,
+            filt=TemporalFilter(
+                type="temporal",
+                column="reference_date",
+                method="interpolate_to_month",
+                month=7,
+            ),
+            year=2020,
+            dataset_id="demo",
+            year_column="year",
+        )
+
+        assert out["year"].dtype == object  # preserved as string
+        # jul(2020) between jan(2020) and jan(2021): fraction=6/12=0.5
+        # 0.5*200 + 0.5*300 = 250
+        row_2020 = out.loc[out["year"] == "2020"]
+        assert len(row_2020) == 1
+        assert row_2020["value"].iloc[0] == pytest.approx(250.0)
+
     def test_interpolate_to_month_no_year_col_raises(self):
         """Missing year column raises ExecutorError."""
         df = pd.DataFrame({

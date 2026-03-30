@@ -474,13 +474,30 @@ def _download_per_state_shapefiles(
         )
         return None
 
+    total = len(_HUD_STATE_ABBREVIATIONS)
+    success_rate = len(gdfs) / total
+
     if failed:
         logger.info(
-            "Per-state downloads: %d succeeded, %d failed (%s)",
+            "Per-state downloads: %d/%d succeeded, %d failed (%s)",
             len(gdfs),
+            total,
             len(failed),
             ", ".join(failed),
         )
+
+    # Require at least 90% of states to succeed to avoid silent partial data.
+    min_success_rate = 0.9
+    if success_rate < min_success_rate:
+        logger.warning(
+            "Per-state fallback incomplete: only %d/%d states succeeded "
+            "(%.0f%%, threshold %.0f%%). Returning None.",
+            len(gdfs),
+            total,
+            success_rate * 100,
+            min_success_rate * 100,
+        )
+        return None
 
     merged = gpd.pd.concat(gdfs, ignore_index=True)
     merged_gdf = gpd.GeoDataFrame(merged, geometry="geometry")
