@@ -20,9 +20,13 @@ def _load_recipe(path: Path):
 
 
 def test_glynn_fox_zori_recipe_covers_2015_2020():
+    with ZORI_RECIPE_PATH.open(encoding="utf-8") as handle:
+        raw_recipe = yaml.safe_load(handle)
     recipe = _load_recipe(ZORI_RECIPE_PATH)
     plan = resolve_plan(recipe, "build_metro_panel")
 
     assert recipe.name == "glynn_fox_metro_panel_2015_2020_zori"
     assert [task.year for task in plan.join_tasks] == [2015, 2016, 2017, 2018, 2019, 2020]
     assert set(plan.join_tasks[0].datasets) == {"pit", "pep_county", "zori_county"}
+    assert raw_recipe["datasets"]["zori_county"]["path"] == "data/curated/zori/zori__county__Z2026.parquet"
+    assert raw_recipe["transforms"][0]["from"]["vintage"] == 2020

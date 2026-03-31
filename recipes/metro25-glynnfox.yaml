@@ -4,9 +4,11 @@ description: >
   Build a metro-year panel for the 25 Glynn/Fox metros using metro-native
   recipe transforms. This follows the paper's analysis geography directly and
   uses PIT counts, county PEP population totals, and January county ZORI
-  aggregated to the Glynn/Fox metro definition. The year range covers
-  2015-2020, starting when the curated ZORI artifact begins (January 2015)
-  and extending through 2020.
+  aggregated to the Glynn/Fox metro definition. PEP totals are interpolated to
+  January to align with the PIT count timing, and the CoC crosswalk uses 2020
+  boundaries to stay close to the 2015-2020 analysis window. The year range
+  covers 2015-2020, starting when the curated ZORI artifact begins (January
+  2015) and extending through 2020.
 
 universe:
   range: "2015-2020"
@@ -54,12 +56,12 @@ datasets:
     geo_column: geo_id
     params:
       align: point_in_time_jan
-    path: data/curated/zori/zori__county__Z2025.parquet
+    path: data/curated/zori/zori__county__Z2026.parquet
 
 transforms:
   - id: coc_to_metro
     type: crosswalk
-    from: { type: coc, vintage: 2025, source: hud_exchange }
+    from: { type: coc, vintage: 2020, source: hud_exchange }
     to: { type: metro, source: glynn_fox_v1 }
     spec:
       weighting:
