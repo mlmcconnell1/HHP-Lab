@@ -121,6 +121,7 @@ Every recipe is a YAML mapping with these top-level keys:
 | `universe` | `YearSpec` | Yes | Year domain for the build. |
 | `targets` | `list[TargetSpec]` | Yes | Output targets (geometries + output types). |
 | `datasets` | `dict[string, DatasetSpec]` | Yes | Named dataset declarations. |
+| `filters` | `dict[string, FilterSpec]` | No | Temporal filters keyed by dataset id, applied before resampling. |
 | `transforms` | `list[TransformSpec]` | Yes | Spatial transform operators (may be empty). |
 | `pipelines` | `list[PipelineSpec]` | Yes | Ordered step sequences that produce targets. |
 | `validation` | `ValidationPolicy` | No | Override default validation thresholds. |
@@ -164,12 +165,18 @@ Each target declares a geometry and requested output types.
 | `id` | `string` | Yes | Unique target identifier. Referenced by pipelines. |
 | `geometry` | `GeometryRef` | Yes | Target geometry for the pipeline. |
 | `outputs` | `list[string]` | No | Output kinds: `panel`, `diagnostics`, `export`. Default: `[panel]`. |
+| `cohort` | `CohortSelector` | No | Optional cohort filter to keep a ranked subset of geographies. |
 
 ```yaml
 targets:
   - id: coc_panel
     geometry: { type: coc, vintage: 2025, source: hud_exchange }
     outputs: [panel, diagnostics]
+    cohort:
+      rank_by: total_population
+      method: top_n
+      n: 50
+      reference_year: 2024
 ```
 
 Target ids must be unique within a recipe.
@@ -182,6 +189,20 @@ Target ids must be unique within a recipe.
 > Declaring currently unsupported outputs (for example `diagnostics`, `export`)
 > is allowed by schema and retained as intent, but runtime emits a warning and
 > does not materialize those output types yet.
+
+### Cohort Selector
+
+Optional declarative filter that ranks geographies by a measure column at a reference year and keeps only the selected subset.
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `rank_by` | `string` | Yes | Measure column to rank on (e.g., `total_population`). |
+| `method` | `string` | Yes | `top_n`, `bottom_n`, or `percentile`. |
+| `n` | `int` | Conditional | Number of geographies to keep. Required for `top_n`/`bottom_n`. |
+| `threshold` | `float` | Conditional | Percentile cutoff (0.0–1.0). Required for `percentile`. `0.75` keeps the top 25%. |
+| `reference_year` | `int` | Yes | Year whose values are used for ranking. Must be in the universe. |
+
+The cohort filter is applied during output persistence, so all pipeline steps still operate on the full geography set.
 
 ## Datasets
 
@@ -420,6 +441,34 @@ validation:
 | `missing_dataset` | `<dataset_id>` | — | Per-dataset override. |
 | `crosswalk_coverage` | `warn_below` | `0.95` | Coverage ratio warning threshold. |
 | `crosswalk_coverage` | `fail_below` | `0.90` | Coverage ratio failure threshold. |
+
+## Temporal Filters
+
+Temporal filters adjust dataset time alignment before geographic resampling. They are declared as a top-level `filters` mapping keyed by dataset id.
+
+```yaml
+filters:
+  pep:
+    method: interpolate_to_month
+    month: 1
+  zori:
+    method: point_in_time
+    month: 1
+```
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `method` | `string` | Yes | `point_in_time`, `calendar_mean`, `calendar_median`, or `interpolate_to_month`. |
+| `month` | `int` | Conditional | Target month (1–12). Required for `point_in_time` and `interpolate_to_month`. |
+
+**Method semantics:**
+
+| Method | Description |
+|--------|-------------|
+| `point_in_time` | Select the observation closest to the given month. |
+| `calendar_mean` | Mean across all months in each calendar year. |
+| `calendar_median` | Median across all months in each calendar year. |
+| `interpolate_to_month` | Linearly interpolate between adjacent annual observations to estimate the value at the target month. Useful for aligning PEP July estimates to January for PIT comparisons. |
 
 ## Referential Integrity
 

@@ -346,6 +346,28 @@ Analysis-ready metro×year panels combining PIT counts with ACS measures:
 
 When ZORI is enabled, the same ZORI columns as CoC panels are appended (`zori_coc`, `zori_coverage_ratio`, `zori_is_eligible`, `zori_excluded_reason`, `rent_to_income`).
 
+When ACS 1-year data is included (`include_acs1`), metro panels also carry:
+- `unemployment_rate_acs1` — ACS 1-year unemployment rate (metro-native, from CBSA-level B23025)
+- `acs1_vintage_used` — Which ACS1 vintage contributed (nullable when no ACS1 data available)
+- `acs_products_used` — Comma-separated product list: `"acs5"` or `"acs5,acs1"`
+
+## ACS 1-Year Metro Schema
+
+ACS 1-year data is ingested at CBSA geography and mapped to Glynn/Fox metro IDs. Stored under `data/curated/acs/`.
+
+| Column | Type | Description |
+|--------|------|-------------|
+| `metro_id` | string | Metro identifier (e.g., `GF01`) |
+| `geo_type` | string | Always `"metro"` |
+| `geo_id` | string | Same as `metro_id` |
+| `unemployment_rate_acs1` | float | Unemployment rate from ACS 1-year B23025 |
+| `definition_version` | string | Metro definition version |
+| `acs1_vintage` | int | ACS 1-year vintage end year |
+
+Storage: `data/curated/acs/acs1__metro__A{vintage}@D{version}.parquet`
+
+ACS 1-year estimates are only available for geographies with population >= 65,000. All 25 Glynn/Fox metros qualify.
+
 ## Metro Derived Dataset Storage
 
 | File | Path Pattern | Description |
@@ -359,6 +381,7 @@ When ZORI is enabled, the same ZORI columns as CoC panels are appended (`zori_co
 | Metro ZORI | `data/curated/zori/zori__metro__A{acs}@D{version}xC{county}__w{weight}.parquet` | Metro rent index |
 | Metro ZORI yearly | `data/curated/zori/zori_yearly__metro__A{acs}@D{version}xC{county}__w{weight}__m{method}.parquet` | Metro yearly-collapsed rent index |
 | Metro panels | `data/curated/panel/panel__metro__Y{start}-{end}@D{version}.parquet` | Metro analysis panels |
+| Metro ACS1 | `data/curated/acs/acs1__metro__A{vintage}@D{version}.parquet` | Metro-native ACS 1-year unemployment |
 
 ## Normalized ZORI Schema
 

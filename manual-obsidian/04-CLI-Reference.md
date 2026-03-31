@@ -28,7 +28,6 @@ coclab status --json
 
 `status` performs a one-shot readiness scan across:
 - curated assets under `data/curated/` (boundaries, TIGER, crosswalks, PIT, ACS, measures, ZORI)
-- optional named builds and build manifests
 - missing-prerequisite checks with actionable hints
 
 Exit behavior:
@@ -59,7 +58,7 @@ coclab aggregate pep --years 2018-2024
 coclab aggregate pit --years 2018-2024
 ```
 
-All four write to `data/curated/<dataset>/` by default.  Use `--build <name>` to write to a named build directory instead.  When `--build` is omitted, `--years` is required.
+All four write to `data/curated/<dataset>/` by default.  `--build` is optional and writes to a named build directory when provided.  When `--build` is omitted, `--years` is required.
 
 These commands produce standalone CoC aggregate artifacts. They are not a
 prerequisite for recipe execution unless a recipe explicitly points to
@@ -91,6 +90,7 @@ Current behavior:
 - Supports `--no-cache` to disable recipe asset caching
 - Emits explicit Connecticut county-transition notes when county-native recipe
   inputs need planning-region to legacy-county normalization
+- `--json` output includes `artifacts` with resolved output paths (`panel_path`, `manifest_path`, and `diagnostics_path` when declared)
 
 ### Recipe Preflight (No Execution)
 
@@ -130,14 +130,29 @@ coclab build recipe-export --manifest data/curated/panel/<file>.manifest.json --
 coclab ingest boundaries --source hud_exchange --vintage 2025
 coclab ingest tiger --year 2023 --type all
 coclab ingest acs5-tract --acs 2019-2023 --tracts 2023
+coclab ingest acs1-metro --vintage 2023
 coclab ingest pit-vintage --vintage 2024
 coclab ingest zori --geography county
 coclab ingest pep --series auto
 ```
 
+Boundary ingestion uses a multi-source fallback chain: national boundary file first, then legacy NatlTerrDC URL, then per-state shapefiles. This makes historical vintage ingestion more reliable.
+
+ACS1 metro ingestion (`acs1-metro`) fetches ACS 1-year B23025 employment data at CBSA geography, maps CBSAs to Glynn/Fox metro IDs, and computes `unemployment_rate_acs1`. Options: `--vintage`, `--definition-version`, `--api-key`, `--json`.
+
 Useful PEP options:
 - `--start` / `--end` to trim the emitted year range
 - `--prefer-postcensal-2020` when combining series
+
+### Dataset Discovery
+
+```bash
+coclab list curated                       # List all curated files with metadata
+coclab list curated --subdir pit          # Filter by subdirectory
+coclab list curated --json                # JSON output for automation
+```
+
+`list curated` shows Parquet file paths, row counts, column lists, and file sizes. Useful for exploring what curated data is available before building recipes.
 
 ## JSON and Non-Interactive Modes
 
@@ -151,12 +166,16 @@ Useful PEP options:
 - `coclab build recipe-provenance`
 - `coclab build recipe-export`
 - `coclab list census`
+- `coclab list curated`
 - `coclab list measures`
 - `coclab list xwalks`
+- `coclab ingest acs1-metro`
 - `coclab diagnostics xwalk`
 - `coclab diagnostics panel`
 
 Current caveat: `list census/measures/xwalks --json` emits JSON when matches are found. Empty or missing-directory cases may still emit human text and exit `0`.
+
+`build recipe --json` now includes an `artifacts` key with resolved output paths for each pipeline, enabling automation to locate panel, manifest, and diagnostics files without path guessing.
 
 ### Non-Interactive CLI Use
 

@@ -36,17 +36,22 @@ from coclab.panel import (
 from pathlib import Path
 
 from coclab.recipe.loader import load_recipe
-from coclab.recipe.executor import execute_recipe
+from coclab.recipe.executor import execute_recipe, resolve_pipeline_artifacts
 from coclab.recipe.default_adapters import register_defaults
 
 register_defaults()
 recipe = load_recipe(Path("recipes/test.yaml"))
 results = execute_recipe(recipe)
+
+# Resolve output paths for a pipeline
+artifacts = resolve_pipeline_artifacts(recipe, "build_coc_panel")
+# {"panel_path": "data/curated/panel/...", "manifest_path": "..."}
 ```
 
 Notes:
 - Call `register_defaults()` before adapter validation/execution in custom code.
 - `execute_recipe()` runs all pipelines defined in the recipe.
+- `resolve_pipeline_artifacts()` returns canonical output paths for a pipeline's declared outputs (`panel_path`, `manifest_path`, `diagnostics_path`).
 
 ## Build Helpers
 

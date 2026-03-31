@@ -8,18 +8,23 @@ This chapter is an orientation map of active modules in the current codebase.
 - `coclab/cli/build_xwalks.py`: crosswalk generation
 - `coclab/cli/aggregate.py`: dataset aggregation commands (`acs`, `zori`, `pep`, `pit`)
 - `coclab/cli/status.py`: one-shot environment readiness report (`coclab status`)
+- `coclab/cli/list_curated.py`: curated dataset discovery with metadata (row counts, columns, sizes)
 - `coclab/cli/list_*.py`: dataset discovery commands with optional JSON output
+- `coclab/cli/ingest_acs1_metro.py`: ACS 1-year CBSA-level metro unemployment ingestion
 - `coclab/cli/diagnostics.py` and `coclab/cli/panel_diagnostics.py`: diagnostics commands with optional JSON output
 - `coclab/cli/recipe.py`: recipe execution/provenance/export commands
+- `coclab/cli/migrate_curated.py`: curated data migration utilities
 
 ## Recipe System
 
-- `coclab/recipe/recipe_schema.py`: versioned recipe schema models
+- `coclab/recipe/recipe_schema.py`: versioned recipe schema models (including `CohortSelector`, `TemporalFilter`)
 - `coclab/recipe/loader.py`: YAML loading + schema dispatch
 - `coclab/recipe/adapters.py`: semantic validation registries
-- `coclab/recipe/default_*.py`: built-in adapter registration
+- `coclab/recipe/default_*.py`: built-in adapter registration (including `default_dataset_adapters.py`)
 - `coclab/recipe/planner.py`: deterministic task planning
 - `coclab/recipe/executor.py`: runtime execution engine
+- `coclab/recipe/preflight.py`: no-execute readiness validation (plan-scoped path checks, support-dataset probes)
+- `coclab/recipe/probes.py`: dataset probe helpers for preflight validation
 - `coclab/recipe/manifest.py`: consumed-asset manifests and recipe bundle export
 
 ## Analysis Geography
@@ -38,9 +43,9 @@ This chapter is an orientation map of active modules in the current codebase.
 - `coclab/census/ingest/`: TIGER and tract-relationship ingestion
 - `coclab/xwalks/`: tract and county crosswalk construction
 - `coclab/measures/`: ACS aggregation + diagnostics
-- `coclab/acs/`: ACS ingest/translation support
+- `coclab/acs/`: ACS ingest/translation support (including `ingest/metro_acs1.py` for ACS 1-year CBSA data, `variables_acs1.py` for B23025 variable definitions)
 - `coclab/pit/`: PIT ingest, registry, QA
-- `coclab/pep/`: PEP ingest and aggregation
+- `coclab/pep/`: PEP ingest, aggregation, and diagnostics
 - `coclab/rents/`: ZORI ingest, weighting, aggregation, diagnostics
 - `coclab/panel/`: panel diagnostics and assembly internals
 - `coclab/metro/`: metro analysis geography module

@@ -2,8 +2,8 @@
 
 ## Recipe-Driven Build
 
-1. Inspect available curated assets if needed (`coclab status --json` for automation).
-2. Ingest required global assets (`boundaries`, `tiger`, `acs5-tract`, `pit`, `zori`, `pep`).
+1. Inspect available curated assets if needed (`coclab status --json` for automation, `coclab list curated` for browsing).
+2. Ingest required global assets (`boundaries`, `tiger`, `acs5-tract`, `pit`, `zori`, `pep`, and optionally `acs1-metro` for metro unemployment).
 3. Generate required crosswalks.
 4. Run `coclab build recipe-preflight` when you want a no-execute readiness gate.
 5. Run a YAML recipe for deterministic panel construction.
@@ -16,6 +16,7 @@ Example command sequence:
 coclab ingest boundaries --source hud_exchange --vintage 2025
 coclab ingest tiger --year 2023 --type all
 coclab ingest acs5-tract --acs 2019-2023 --tracts 2023
+coclab ingest acs1-metro --vintage 2023          # optional: metro ACS1 unemployment
 coclab ingest pit-vintage --vintage 2024
 coclab ingest zori --geography county
 coclab ingest pep --series auto

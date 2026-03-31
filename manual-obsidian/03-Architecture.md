@@ -17,7 +17,6 @@ flowchart TB
     end
 
     subgraph BuildLayer[Build Layer]
-        BUILD[builds/<name>]
         XWALK[coclab generate xwalks]
         AGG[coclab aggregate {acs,zori,pep,pit}]
     end
@@ -45,16 +44,15 @@ flowchart TB
 - `coclab/cli/`: Typer CLI command groups
 - `coclab/analysis_geo.py`: analysis geography abstraction (`AnalysisGeometryRef`, canonical `geo_type`/`geo_id` columns)
 - `coclab/recipe/`: schema, adapters, planner, executor, recipe manifests
-- `coclab/builds.py`: build scaffolding, base-asset pinning, build manifests
+- `coclab/builds.py`: build directory and manifest helpers
 - `coclab/xwalks/`: tract/county crosswalk generation (geography-neutral via `geo_id_col` parameter)
 - `coclab/measures/`, `coclab/rents/`, `coclab/pep/`, `coclab/pit/`: dataset-specific ingestion and aggregation (generalized to arbitrary target geographies)
 - `coclab/metro/`: metro definition data, PIT/ACS/PEP/ZORI aggregation to metro, validation, I/O
-- `coclab/export/`: artifact selection, copying, bundle `MANIFEST.json`
+- `coclab/acs/ingest/metro_acs1.py`: ACS 1-year CBSA-level unemployment ingestion for metros
 
 ## Storage Model
 
 - Global curated assets live under `data/curated/`
-- Build-scoped artifacts live under `builds/<name>/data/curated/`
 - Recipe panel outputs persist to canonical `data/curated/panel/` when target outputs include `panel`
 
 ## Architectural Intent
