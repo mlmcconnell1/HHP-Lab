@@ -186,7 +186,7 @@ def boundary_change_summary(panel_df: pd.DataFrame) -> pd.DataFrame:
 
     if not required_cols.issubset(panel_df.columns):
         missing = required_cols - set(panel_df.columns)
-        logger.warning(f"Missing columns for boundary_change_summary: {missing}")
+        logger.debug(f"Missing columns for boundary_change_summary: {missing}")
         return pd.DataFrame(columns=["coc_id", "change_years", "change_count"])
     try:
         geo_col = resolve_geo_col(panel_df)

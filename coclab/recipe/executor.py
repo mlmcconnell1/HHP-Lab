@@ -1794,6 +1794,21 @@ def _assemble_panel(
     panel = pd.concat(frames, ignore_index=True)
     panel = _canonicalize_panel_for_target(panel, target.geometry)
 
+    # Compute boundary_changed from vintage metadata (mirrors build_panel logic
+    # in coclab.panel.assemble).  Recipe-built panels bypass build_panel() so
+    # this column must be added here.
+    from coclab.panel.assemble import _detect_boundary_changes
+
+    _bc_geo_type, _, _ = _target_geometry_metadata(target.geometry)
+    _bc_vintage_col = (
+        "boundary_vintage_used" if _bc_geo_type == "coc" else "definition_version_used"
+    )
+    _bc_geo_col = "coc_id" if _bc_geo_type == "coc" else "metro_id"
+    if _bc_vintage_col in panel.columns and _bc_geo_col in panel.columns:
+        panel["boundary_changed"] = _detect_boundary_changes(
+            panel, geo_col=_bc_geo_col, vintage_col=_bc_vintage_col,
+        )
+
     if target.cohort is not None:
         pre_count = panel["geo_id"].nunique() if "geo_id" in panel.columns else len(panel)
         panel = _apply_cohort_selector(panel, target.cohort)
