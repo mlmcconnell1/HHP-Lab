@@ -37,7 +37,13 @@ from coclab.naming import (
 )
 from coclab.provenance import ProvenanceBlock, write_parquet_with_provenance
 from coclab.recipe.cache import RecipeCache
-from coclab.recipe.manifest import AssetRecord, RecipeManifest, write_manifest
+from coclab.recipe.manifest import (
+    ROOT_ASSET_STORE,
+    ROOT_OUTPUT,
+    AssetRecord,
+    RecipeManifest,
+    write_manifest,
+)
 from coclab.recipe.planner import (
     ExecutionPlan,
     JoinTask,
@@ -139,6 +145,38 @@ class ExecutionContext:
     _distinct_paths_cache: dict[str, int | None] = field(
         default_factory=dict,
     )
+
+
+def _classify_path(
+    file_path: Path,
+    ctx: ExecutionContext,
+) -> tuple[str | None, str]:
+    """Classify a file path to its logical root and compute the relative path.
+
+    Returns ``(root, relative_path)`` where *root* is ``"asset_store"``,
+    ``"output"``, or ``None`` (fallback to project-relative).
+    """
+    cfg = ctx.storage_config or load_config(project_root=ctx.project_root)
+    resolved = file_path.resolve()
+
+    # Check output root first (it may be nested inside asset store)
+    try:
+        rel = resolved.relative_to(cfg.output_root.resolve())
+        return ROOT_OUTPUT, str(rel)
+    except ValueError:
+        pass
+
+    try:
+        rel = resolved.relative_to(cfg.asset_store_root.resolve())
+        return ROOT_ASSET_STORE, str(rel)
+    except ValueError:
+        pass
+
+    # Fallback: project-relative
+    try:
+        return None, str(resolved.relative_to(ctx.project_root.resolve()))
+    except ValueError:
+        return None, str(file_path)
 
 
 def _echo(ctx: ExecutionContext, message: str) -> None:
@@ -815,11 +853,13 @@ def _load_support_dataset_for_year(
 
     df = ctx.cache.read_parquet(input_file)
     identity = ctx.cache.file_identity(input_file)
+    root, rel_path = _classify_path(input_file, ctx)
     ctx.consumed_assets.append(AssetRecord(
         role="dataset",
-        path=str(input_file.relative_to(ctx.project_root)),
+        path=rel_path,
         sha256=identity.sha256,
         size=identity.size,
+        root=root,
         dataset_id=dataset_id,
     ))
 
@@ -1179,11 +1219,13 @@ def _execute_materialize(
             _echo(ctx, f"    reuse: {path.relative_to(ctx.project_root)}")
             ctx.transform_paths[tid] = path
             identity = ctx.cache.file_identity(path)
+            xwalk_root, xwalk_rel = _classify_path(path, ctx)
             ctx.consumed_assets.append(AssetRecord(
                 role="crosswalk",
-                path=str(path.relative_to(ctx.project_root)),
+                path=xwalk_rel,
                 sha256=identity.sha256,
                 size=identity.size,
+                root=xwalk_root,
                 transform_id=tid,
             ))
         else:
@@ -1264,11 +1306,13 @@ def _execute_resample(
 
     # Record consumed asset (deduplicated by path later in manifest)
     identity = ctx.cache.file_identity(input_file)
+    ds_root, ds_rel = _classify_path(input_file, ctx)
     ctx.consumed_assets.append(AssetRecord(
         role="dataset",
-        path=str(input_file.relative_to(ctx.project_root)),
+        path=ds_rel,
         sha256=identity.sha256,
         size=identity.size,
+        root=ds_root,
         dataset_id=task.dataset_id,
     ))
 
@@ -1576,7 +1620,7 @@ def _build_manifest(
             for ds_id, ds in recipe.datasets.items()
         },
         transforms={
-            tid: str(path.relative_to(ctx.project_root))
+            tid: _classify_path(path, ctx)[1]
             for tid, path in ctx.transform_paths.items()
         },
         output_path=output_path,

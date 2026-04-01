@@ -530,14 +530,28 @@ def recipe_export_cmd(
             help="Path to a .manifest.json file produced by a recipe build.",
         ),
     ],
-    output: Annotated[
+    destination: Annotated[
         Path,
         typer.Option(
-            "--output",
-            "-o",
+            "--destination",
+            "-d",
             help="Destination directory for the replication bundle.",
         ),
     ],
+    asset_store_root: Annotated[
+        Path | None,
+        typer.Option(
+            "--asset-store-root",
+            help="Override the asset store root directory.",
+        ),
+    ] = None,
+    output_root: Annotated[
+        Path | None,
+        typer.Option(
+            "--output-root",
+            help="Override the output root directory.",
+        ),
+    ] = None,
     use_json: _JSON_OPTION = False,
 ) -> None:
     """Export a replication bundle from a recipe build manifest.
@@ -549,7 +563,7 @@ def recipe_export_cmd(
     Examples:
 
         coclab build recipe-export \\
-            --manifest panel.manifest.json --output /tmp/bundle
+            --manifest panel.manifest.json --destination /tmp/bundle
     """
     if not manifest.exists():
         if use_json:
@@ -559,6 +573,10 @@ def recipe_export_cmd(
 
     m = read_manifest(manifest)
     project_root = Path.cwd()
+    storage_cfg = load_config(
+        asset_store_root=asset_store_root,
+        output_root=output_root,
+    )
 
     if not use_json:
         typer.echo(
@@ -566,7 +584,7 @@ def recipe_export_cmd(
             f"pipeline '{m.pipeline_id}'...",
         )
 
-    do_export_bundle(m, project_root, output)
+    do_export_bundle(m, project_root, destination, storage_config=storage_cfg)
 
     if use_json:
         _json_out({
@@ -574,13 +592,13 @@ def recipe_export_cmd(
             "recipe_name": m.recipe_name,
             "pipeline_id": m.pipeline_id,
             "assets_copied": len(m.assets),
-            "bundle_path": str(output),
+            "bundle_path": str(destination),
         })
         return
 
     typer.echo(f"  {len(m.assets)} asset(s) copied")
-    typer.echo(f"  Manifest written to {output / 'manifest.json'}")
-    typer.echo(f"Bundle: {output}")
+    typer.echo(f"  Manifest written to {destination / 'manifest.json'}")
+    typer.echo(f"Bundle: {destination}")
 
 
 def _render_preflight_human(report: PreflightReport) -> None:

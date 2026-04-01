@@ -4408,7 +4408,7 @@ class TestRecipeProvenanceCLI:
         result = runner.invoke(app, [
             "build", "recipe-export",
             "--manifest", str(mf),
-            "--output", str(out),
+            "--destination", str(out),
         ])
         assert result.exit_code == 0
         assert (out / "manifest.json").exists()
@@ -4721,7 +4721,7 @@ class TestRecipeJsonMode:
         result = runner.invoke(app, [
             "build", "recipe-export",
             "--manifest", str(mf),
-            "--output", str(out_dir),
+            "--destination", str(out_dir),
             "--json",
         ])
         assert result.exit_code == 0
