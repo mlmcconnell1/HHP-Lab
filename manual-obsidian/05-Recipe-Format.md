@@ -2,6 +2,12 @@
 
 Recipes are declarative YAML files that describe a complete build: which datasets to pull, what geometry to target, how to resample and join data, and what outputs to produce. The recipe system separates **structural** validation (schema shape, types, referential integrity) from **semantic** validation (whether adapters exist for referenced geometries and datasets).
 
+Unless stated otherwise, path examples in this chapter assume the built-in
+storage-root defaults:
+
+- `asset_store_root = <project_root>/data`
+- `output_root = <project_root>/data/curated/panel`
+
 ## Minimal Example
 
 ```yaml
@@ -56,6 +62,10 @@ coclab build recipe --recipe recipes/demo.yaml
 `coclab build recipe` is the normal entrypoint. Use `--dry-run` when you want
 the same validation/preflight path without execution.
 
+Use `--asset-store-root` and `--output-root` when you need the canonical asset
+and output locations to resolve somewhere other than the default repo-local
+layout.
+
 ## Connecticut County-Equivalent Transition
 
 Connecticut changed Census county-equivalent geography from 8 legacy counties
@@ -90,8 +100,9 @@ Current runtime diagnostics:
 Required bridge artifact:
 
 - The current runtime builds the authoritative Connecticut bridge from
-  `data/curated/tiger/counties__C2020.parquet` and
-  `data/curated/tiger/counties__C2023.parquet`.
+  `asset_store_root/curated/tiger/counties__C2020.parquet` and
+  `asset_store_root/curated/tiger/counties__C2023.parquet`
+  (`data/curated/...` with built-in defaults).
 - If `counties__C2023.parquet` is missing, the remediation command is:
 
 ```bash
@@ -216,7 +227,7 @@ Named dataset declarations keyed by a unique string id. The id is used to refere
 | `native_geometry` | `GeometryRef` | Yes | Native spatial granularity of the dataset. |
 | `years` | `YearSpec` | No | Optional declared year coverage for static-path datasets. |
 | `params` | `dict` | No | Free-form adapter parameters. Default: `{}`. |
-| `path` | `string` | No | Optional project-relative path to a pre-materialized dataset file. Must be relative (not absolute). |
+| `path` | `string` | No | Optional project-relative path to a pre-materialized dataset file. Must be relative (not absolute). Explicit `path` values are not remapped through storage-root config. |
 | `file_set` | `FileSetSpec` | No | Time-banded path/geometry config for datasets whose source files vary by year. |
 | `optional` | `bool` | No | If true, missing dataset does not fail the build. Default: `false`. |
 

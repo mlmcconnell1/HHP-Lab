@@ -35,6 +35,8 @@ from coclab.panel import (
 ```python
 from pathlib import Path
 
+from coclab.config import StorageConfig, load_config
+from coclab.paths import curated_dir, output_root
 from coclab.recipe.loader import load_recipe
 from coclab.recipe.executor import execute_recipe, resolve_pipeline_artifacts
 from coclab.recipe.default_adapters import register_defaults
@@ -43,15 +45,27 @@ register_defaults()
 recipe = load_recipe(Path("recipes/test.yaml"))
 results = execute_recipe(recipe)
 
-# Resolve output paths for a pipeline
-artifacts = resolve_pipeline_artifacts(recipe, "build_coc_panel")
-# {"panel_path": "data/curated/panel/...", "manifest_path": "..."}
+# Resolve output paths for a pipeline with explicit storage roots
+cfg = load_config(
+    asset_store_root=Path("/srv/coclab-assets"),
+    output_root=Path("/srv/coclab-outputs"),
+)
+artifacts = resolve_pipeline_artifacts(
+    recipe,
+    "build_coc_panel",
+    storage_config=cfg,
+)
+# {"panel_path": "/srv/coclab-outputs/panel__...", "manifest_path": "..."}
 ```
 
 Notes:
 - Call `register_defaults()` before adapter validation/execution in custom code.
 - `execute_recipe()` runs all pipelines defined in the recipe.
 - `resolve_pipeline_artifacts()` returns canonical output paths for a pipeline's declared outputs (`panel_path`, `manifest_path`, `diagnostics_path`).
+- `load_config()` returns a `StorageConfig` resolved from CLI-style overrides,
+  env vars, repo config, user config, and defaults.
+- `curated_dir()` and `output_root()` provide stable path helpers for code that
+  should follow the configured storage-root layout.
 
 ## Build Helpers
 

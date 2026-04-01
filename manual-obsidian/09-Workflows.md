@@ -9,6 +9,14 @@
 5. Run a YAML recipe for deterministic panel construction.
 6. Export a bundle for downstream analysis.
 
+If you are not using the default repo-local layout, set storage roots once via
+CLI flags, environment, or config:
+
+```bash
+export COCLAB_ASSET_STORE_ROOT=/srv/coclab-assets
+export COCLAB_OUTPUT_ROOT=/srv/coclab-outputs
+```
+
 Example command sequence:
 
 ```bash
@@ -35,8 +43,12 @@ coclab build recipe-plan --recipe recipes/metro25-glynnfox.yaml --json
 coclab build recipe --recipe recipes/metro25-glynnfox.yaml
 
 # 6) Export bundle
-coclab build recipe-export --manifest data/curated/panel/<file>.manifest.json --output exports/bundle
+coclab build recipe-export --manifest <manifest_path> --destination exports/bundle
 ```
+
+`<manifest_path>` should come from the `artifacts.manifest_path` field returned
+by `coclab build recipe --json`, especially when `output_root` is outside the
+repository tree.
 
 ## Workflow Principles
 

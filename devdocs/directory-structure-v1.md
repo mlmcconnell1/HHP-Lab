@@ -3,8 +3,15 @@
 Derived from code review of `coclab/naming.py`, `coclab/builds.py`,
 `coclab/raw_snapshot.py`, `coclab/export/copy.py`, and all CLI modules.
 
-All paths are relative to the project root (enforced by `_check_working_directory()`
-in `coclab/cli/main.py`).
+This document shows the built-in default layout. The current runtime resolves
+canonical locations from storage roots:
+
+- `asset_store_root = <project_root>/data` by default
+- `output_root = <project_root>/data/curated/panel` by default
+
+So `data/raw/...` and `data/curated/...` below should be read as
+`asset_store_root/raw/...` and `asset_store_root/curated/...`, while recipe
+panel outputs resolve from `output_root/`.
 
 ## Notation key
 

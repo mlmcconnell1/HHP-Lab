@@ -38,7 +38,13 @@ The project defaults to CoC-level inference but supports metro areas as an alter
 
 - **CLI:** `coclab ...`
 - **Recipe execution:** `coclab build recipe --recipe <file.yaml>`
-- **Global curated store:** `data/curated/...`
+- **Storage roots:** `asset_store_root/curated/...` for reusable assets and
+  `output_root/` for recipe products
+
+By default those roots are:
+
+- `asset_store_root = <project_root>/data`
+- `output_root = <project_root>/data/curated/panel`
 
 ## Panel Assembly
 

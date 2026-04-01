@@ -1,5 +1,10 @@
 # Data Model
 
+Unless stated otherwise, path examples in this chapter show the built-in
+default layout. Replace `data/raw/...`, `data/curated/...`, and
+`data/curated/panel/...` with the configured `asset_store_root` and
+`output_root` when your environment uses custom storage roots.
+
 ## Analysis Geography Model
 
 CoC Lab supports multiple analysis geographies—the unit of observation in derived outputs. The abstraction separates *analysis geography* (what you want to measure) from *source geometry* (how input data is natively organized).

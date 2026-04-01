@@ -62,6 +62,27 @@ Automation features:
 - Most inventory and planning commands support `--json`
 - `coclab --non-interactive ...` and `COCLAB_NON_INTERACTIVE=1` disable prompts
 - `coclab agents` prints the geography/year matching rules used by the project
+- `coclab build recipe` and `coclab build recipe-export` accept
+  `--asset-store-root` and `--output-root` overrides
+
+## Storage Roots
+
+CoC Lab now resolves canonical data locations from configurable storage roots.
+Resolution precedence is:
+
+- CLI flags: `--asset-store-root`, `--output-root`
+- Environment: `COCLAB_ASSET_STORE_ROOT`, `COCLAB_OUTPUT_ROOT`
+- Repo config: `coclab.yaml`
+- User config: `~/.config/coclab/config.yaml`
+- Built-in defaults
+
+Built-in defaults preserve the historical layout:
+
+- `asset_store_root = <project_root>/data`
+- `output_root = <project_root>/data/curated/panel`
+
+Internal curated assets resolve under `asset_store_root/curated/...`. Recipe
+panels and their manifest sidecars resolve under `output_root/`.
 
 ## Quick Start
 
@@ -101,7 +122,7 @@ Metro support is a first-class part of the analysis model. The repository includ
 - `recipes/`: committed example recipes, including Glynn/Fox metro panel builds
 - `tests/`: regression coverage for CLI, aggregation, panel assembly, recipes, and metro logic
 - `manual-obsidian/`: the full project manual
-- `data/`: curated and raw data artifacts used by builds
+- `data/`: default local asset store when built-in storage-root defaults are used
 
 ## Development
 

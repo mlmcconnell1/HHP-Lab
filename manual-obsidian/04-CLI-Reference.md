@@ -27,7 +27,7 @@ coclab status --json
 ```
 
 `status` performs a one-shot readiness scan across:
-- curated assets under `data/curated/` (boundaries, TIGER, crosswalks, PIT, ACS, measures, ZORI)
+- curated assets under the configured data directory (`data/curated/` by default)
 - missing-prerequisite checks with actionable hints
 
 Exit behavior:
@@ -41,7 +41,8 @@ coclab generate xwalks --boundary 2025 --tracts 2023
 ```
 
 Important options:
-- `--build` (optional; writes to named build dir instead of `data/curated/xwalks/`)
+- `--build` (optional; writes to a named build dir instead of the canonical
+  crosswalk location under `asset_store_root/curated/xwalks/`)
 - `--boundary`
 - `--tracts`
 - `--counties`
@@ -58,7 +59,10 @@ coclab aggregate pep --years 2018-2024
 coclab aggregate pit --years 2018-2024
 ```
 
-All four write to `data/curated/<dataset>/` by default.  `--build` is optional and writes to a named build directory when provided.  When `--build` is omitted, `--years` is required.
+All four write to `asset_store_root/curated/<dataset>/` by default
+(`data/curated/<dataset>/` with built-in defaults). `--build` is optional and
+writes to a named build directory when provided. When `--build` is omitted,
+`--years` is required.
 
 These commands produce standalone CoC aggregate artifacts. They are not a
 prerequisite for recipe execution unless a recipe explicitly points to
@@ -85,9 +89,12 @@ coclab build recipe --recipe recipes/metro25-glynnfox.yaml --dry-run
 Current behavior:
 - Runs schema + adapter validation and the same preflight checks used by `recipe-preflight` before execution
 - Executes `materialize -> resample -> join -> persist`
-- Persists panel output to canonical `data/curated/panel/...` when the target declares `outputs: [panel]` (default)
+- Persists panel output under the configured `output_root/` when the target
+  declares `outputs: [panel]` (default). Built-in default:
+  `<project_root>/data/curated/panel/`
 - Writes recipe sidecar manifest: `*.manifest.json`
 - Supports `--no-cache` to disable recipe asset caching
+- Supports `--asset-store-root` and `--output-root` for one-off path overrides
 - Emits explicit Connecticut county-transition notes when county-native recipe
   inputs need planning-region to legacy-county normalization
 - `--json` output includes `artifacts` with resolved output paths (`panel_path`, `manifest_path`, and `diagnostics_path` when declared)
@@ -120,9 +127,32 @@ Use this to resolve and inspect planned tasks (`materialize`, `resample`, `join`
 ### Recipe Provenance Utilities
 
 ```bash
-coclab build recipe-provenance --manifest data/curated/panel/<file>.manifest.json
-coclab build recipe-export --manifest data/curated/panel/<file>.manifest.json --output /tmp/bundle
+coclab build recipe-provenance --manifest <manifest_path>
+coclab build recipe-export --manifest <manifest_path> --destination /tmp/bundle
 ```
+
+`recipe-export` accepts `--asset-store-root` and `--output-root` so manifests
+from non-default storage locations can still be resolved correctly.
+
+### Storage Root Configuration
+
+Canonical paths resolve from two storage roots:
+
+- `asset_store_root`: reusable internal assets (`raw/`, `curated/`)
+- `output_root`: recipe-built outputs and manifest sidecars
+
+Resolution precedence is:
+
+- CLI flags: `--asset-store-root`, `--output-root`
+- Environment: `COCLAB_ASSET_STORE_ROOT`, `COCLAB_OUTPUT_ROOT`
+- Repo config: `coclab.yaml`
+- User config: `~/.config/coclab/config.yaml`
+- Built-in defaults
+
+Built-in defaults:
+
+- `asset_store_root = <project_root>/data`
+- `output_root = <project_root>/data/curated/panel`
 
 ### Core Ingestion Commands
 

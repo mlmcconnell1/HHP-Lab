@@ -12,8 +12,8 @@ flowchart TB
 
     subgraph Ingest[Ingestion]
         INGEST[coclab ingest ...]
-        RAW[data/raw]
-        CURATED[data/curated]
+        RAW[asset_store_root/raw]
+        CURATED[asset_store_root/curated]
     end
 
     subgraph BuildLayer[Build Layer]
@@ -24,7 +24,7 @@ flowchart TB
     subgraph RecipeLayer[Recipe Layer]
         RECIPE[coclab build recipe]
         PLAN[planner + executor]
-        PANEL[data/curated/panel]
+        PANEL[output_root]
         RMAN[.manifest.json sidecar]
     end
 
@@ -52,8 +52,14 @@ flowchart TB
 
 ## Storage Model
 
-- Global curated assets live under `data/curated/`
-- Recipe panel outputs persist to canonical `data/curated/panel/` when target outputs include `panel`
+- Reusable ingests, crosswalks, registries, and aggregate artifacts live under
+  `asset_store_root/curated/`
+- Raw snapshots live under `asset_store_root/raw/`
+- Recipe panel outputs persist under `output_root/` when target outputs include
+  `panel`
+- Built-in defaults preserve the old layout:
+  `asset_store_root = <project_root>/data`,
+  `output_root = <project_root>/data/curated/panel`
 
 ## Architectural Intent
 

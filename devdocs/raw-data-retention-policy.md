@@ -14,6 +14,10 @@ All external ingests MUST persist a local raw snapshot by default.
 
 The current distinction between "file-based source" and "API source" is not sufficient as a retention policy. Reproducibility requirements apply to both.
 
+The runtime now resolves raw snapshot locations from `asset_store_root/raw/`.
+The built-in default remains `<project_root>/data/raw`, so `data/raw/...`
+examples below describe the default layout rather than a hard-coded path.
+
 ## Requirements
 
 1. Every ingest writes a raw snapshot under `data/raw/<source_type>/...` before or alongside curated output generation.
