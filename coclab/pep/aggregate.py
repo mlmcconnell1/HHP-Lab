@@ -421,12 +421,27 @@ def aggregate_pep_to_coc(
     """
     # Load PEP data
     pep_df = load_pep_county(pep_path)
+    available_start = int(pep_df["year"].min())
+    available_end = int(pep_df["year"].max())
 
     # Apply year filters
     if start_year is not None:
         pep_df = pep_df[pep_df["year"] >= start_year]
     if end_year is not None:
         pep_df = pep_df[pep_df["year"] <= end_year]
+
+    if pep_df.empty:
+        requested_range = (
+            f"{start_year}-{end_year}"
+            if start_year is not None and end_year is not None
+            else f"{start_year or available_start}-{end_year or available_end}"
+        )
+        raise ValueError(
+            "No PEP data remains after applying the requested year filter "
+            f"({requested_range}). Available years in the loaded data: "
+            f"{available_start}-{available_end}. "
+            "Ingest an older PEP vintage or adjust --start/--end."
+        )
 
     actual_start = int(pep_df["year"].min())
     actual_end = int(pep_df["year"].max())

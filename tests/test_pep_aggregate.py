@@ -175,7 +175,7 @@ class TestAggregationUnit:
 
         # Each county should have equal weight of 1/3
         for weight in xwalk["equal_weight"]:
-            assert weight == pytest.approx(1/3)
+            assert weight == pytest.approx(1 / 3)
 
         # Create mock PEP data
         pep = pd.DataFrame({
@@ -267,6 +267,34 @@ class TestAggregationUnit:
         assert row["coverage_ratio"] == pytest.approx(0.5)
         assert row["population"] == pytest.approx(40000)
         assert row["county_count"] == 1
+
+    def test_year_filter_without_matching_rows_raises_clear_error(self, tmp_path):
+        """Year filters outside available coverage should fail with guidance."""
+        pep_path = tmp_path / "pep_county__v2024.parquet"
+        pd.DataFrame({
+            "county_fips": ["01001"],
+            "year": [2024],
+            "population": [100000],
+        }).to_parquet(pep_path, index=False)
+
+        xwalk_path = tmp_path / "xwalk.parquet"
+        pd.DataFrame({
+            "coc_id": ["COC-001"],
+            "county_fips": ["01001"],
+            "area_share": [1.0],
+        }).to_parquet(xwalk_path, index=False)
+
+        with pytest.raises(ValueError, match="No PEP data remains after applying the requested year filter"):
+            aggregate_pep_to_coc(
+                boundary_vintage="2024",
+                county_vintage="2024",
+                pep_path=pep_path,
+                xwalk_path=xwalk_path,
+                start_year=2018,
+                end_year=2018,
+                output_dir=tmp_path,
+                force=True,
+            )
 
 
 class TestPepDiagnosticsProvenance:
