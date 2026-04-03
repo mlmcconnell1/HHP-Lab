@@ -29,7 +29,7 @@ def ingest_pep(
         typer.Option(
             "--vintage",
             "-v",
-            help="Postcensal vintage year (required for postcensal or all). Defaults to latest.",
+            help="Postcensal vintage year. Defaults to latest.",
         ),
     ] = None,
     url: Annotated[

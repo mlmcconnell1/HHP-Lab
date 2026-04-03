@@ -99,10 +99,14 @@ def load_pep_county(
 ) -> pd.DataFrame:
     """Load PEP county population data.
 
+    When no explicit path is given, discovers all vintage files
+    (``pep_county__v*.parquet``) and concatenates them.  For overlapping
+    years the latest vintage takes precedence.
+
     Parameters
     ----------
     pep_path : Path or str, optional
-        Explicit path to PEP parquet. If None, looks for combined file.
+        Explicit path to PEP parquet. If None, discovers vintage files.
     pep_dir : Path or str, optional
         Directory containing PEP data. Defaults to 'data/curated/pep'.
 
@@ -114,32 +118,44 @@ def load_pep_county(
     Raises
     ------
     FileNotFoundError
-        If PEP data file does not exist.
+        If no PEP data files exist.
     """
     if pep_path is not None:
         pep_path = Path(pep_path)
+        df = pd.read_parquet(pep_path)
+        logger.info(f"Loaded PEP data from {pep_path}: {len(df)} rows")
+        return df
+
+    if pep_dir is None:
+        pep_dir = curated_dir("pep")
     else:
-        if pep_dir is None:
-            pep_dir = curated_dir("pep")
-        else:
-            pep_dir = Path(pep_dir)
+        pep_dir = Path(pep_dir)
 
-        # Try combined file first, then fall back to latest vintage
-        combined_path = pep_dir / "pep_county__combined.parquet"
-        v2024_path = pep_dir / "pep_county__v2024.parquet"
+    # Discover vintage files, sorted descending so latest vintage wins on overlap
+    vintage_files = sorted(
+        pep_dir.glob("pep_county__v[0-9][0-9][0-9][0-9].parquet"),
+        reverse=True,
+    )
 
-        if combined_path.exists():
-            pep_path = combined_path
-        elif v2024_path.exists():
-            pep_path = v2024_path
-        else:
-            raise FileNotFoundError(
-                f"PEP county data not found in {pep_dir}\n"
-                f"Run: coclab ingest pep --vintage all"
-            )
+    if not vintage_files:
+        raise FileNotFoundError(
+            f"PEP county data not found in {pep_dir}\n"
+            f"Run: coclab ingest pep"
+        )
 
-    df = pd.read_parquet(pep_path)
-    logger.info(f"Loaded PEP data from {pep_path}: {len(df)} rows")
+    frames = [pd.read_parquet(f) for f in vintage_files]
+    logger.info(
+        "Discovered PEP vintage files: %s",
+        ", ".join(f.name for f in vintage_files),
+    )
+
+    if len(frames) == 1:
+        return frames[0]
+
+    # Concatenate and deduplicate; latest vintage takes precedence
+    df = pd.concat(frames, ignore_index=True)
+    df = df.drop_duplicates(subset=["county_fips", "year"], keep="first")
+    logger.info(f"Combined PEP data: {len(df)} rows")
 
     return df
 

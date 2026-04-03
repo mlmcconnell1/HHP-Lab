@@ -81,7 +81,7 @@ def ingest_acs_population(
     typer.echo(f"  Source tracts:   {source_tract_vintage} (Census API geography)")
     typer.echo(f"  Target tracts:   {tracts}")
     if translation_needed:
-        typer.echo("  Translation:     disabled (--no-translate)")
+        typer.echo("  Translation:     needed")
     else:
         typer.echo("  Translation:     not needed")
     typer.echo("")

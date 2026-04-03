@@ -216,7 +216,7 @@ class TestIntegration:
     @pytest.fixture
     def pep_data_path(self):
         """Get path to PEP data if it exists."""
-        path = Path("data/curated/pep/pep_county__combined.parquet")
+        path = Path("data/curated/pep/pep_county__v2024.parquet")
         if not path.exists():
             pytest.skip("PEP data not available - run 'coclab ingest pep' first")
         return path
@@ -236,11 +236,11 @@ class TestIntegration:
         assert required_cols.issubset(set(df.columns))
 
     def test_loaded_data_covers_expected_years(self, pep_data_path):
-        """Test that loaded data covers 2010-2024."""
+        """Test that loaded data covers 2020-2024 (v2024 vintage)."""
         df = pd.read_parquet(pep_data_path)
 
         years = sorted(df["year"].unique())
-        assert min(years) <= 2010
+        assert min(years) <= 2020
         assert max(years) >= 2024
 
     def test_county_count_reasonable(self, pep_data_path):
