@@ -45,7 +45,6 @@ def metro_tract_crosswalk():
             "tract_geoid": ["36061000100", "36061000200", "06037000100", "06037000200", "06037000300"],
             "tract_vintage": "2020",
             "area_share": [0.8, 0.6, 1.0, 0.5, 0.3],
-            "pop_share": [None, None, None, None, None],
             "intersection_area": [8000.0, 6000.0, 10000.0, 5000.0, 3000.0],
             "tract_area": [10000.0, 10000.0, 10000.0, 10000.0, 10000.0],
         }

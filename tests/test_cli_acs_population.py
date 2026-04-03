@@ -91,4 +91,3 @@ class TestIngestAcs5TractHelp:
         assert result.exit_code == 0
         assert "--acs" in result.output
         assert "--tracts" in result.output
-        assert "--translate" in result.output

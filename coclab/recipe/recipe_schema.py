@@ -281,7 +281,7 @@ FilterSpec = TemporalFilter  # Extensible: Union[TemporalFilter, ...] in future
 # Targets / outputs
 # -----------------------------
 
-OutputKind = Literal["panel", "diagnostics", "export"]
+OutputKind = Literal["panel", "diagnostics"]
 
 CohortMethod = Literal["top_n", "bottom_n", "percentile"]
 

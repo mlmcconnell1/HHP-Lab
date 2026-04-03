@@ -2157,18 +2157,6 @@ def _execute_plan(
             if not step.success:
                 return result
 
-        unsupported = [
-            o for o in declared_outputs if o not in ("panel", "diagnostics")
-        ]
-        if unsupported:
-            import warnings as _w
-            _w.warn(
-                f"Pipeline '{plan.pipeline_id}': target outputs "
-                f"{unsupported} are declared but not yet implemented. "
-                f"Only 'panel' and 'diagnostics' outputs are currently supported.",
-                stacklevel=2,
-            )
-
     return result
 
 

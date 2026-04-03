@@ -132,8 +132,6 @@ class TestCanonicalFilenamesAccepted:
             ("zori", "zori_yearly__A2023@B2025xC2023__wrenter__mpit_january.parquet"),
             ("zori", "zori__county__Z2026.parquet"),
             ("pep", "pep_county__v2024.parquet"),
-            ("pep", "pep_county__combined.parquet"),
-            ("pep", "pep_county__intercensal_2010_2020.parquet"),
             ("pep", "coc_pep__B2024xC2024__warea_share__2010_2024.parquet"),
             ("pit", "pit__P2024.parquet"),
             ("pit", "pit__P2024@B2024.parquet"),

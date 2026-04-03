@@ -65,7 +65,6 @@ def build_tract_crosswalk(
         - tract_geoid
         - tract_vintage
         - area_share
-        - pop_share (None for v1)
         - intersection_area
         - tract_area
     """
@@ -94,7 +93,6 @@ def build_tract_crosswalk(
                 "tract_geoid",
                 "tract_vintage",
                 "area_share",
-                "pop_share",
                 "intersection_area",
                 "tract_area",
             ]
@@ -141,7 +139,6 @@ def build_tract_crosswalk(
             "tract_geoid": intersections["GEOID"],
             "tract_vintage": tract_vintage,
             "area_share": intersections["area_share"],
-            "pop_share": None,  # Placeholder for v2 with population weighting
             "intersection_area": intersections["intersection_area"],
             "tract_area": intersections["tract_area"],
         }

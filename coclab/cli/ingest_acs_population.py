@@ -31,13 +31,6 @@ def ingest_acs_population(
             help="Re-ingest even if cached file exists.",
         ),
     ] = False,
-    translate: Annotated[
-        bool,
-        typer.Option(
-            "--translate/--no-translate",
-            help="Reserved for future tract-level longitudinal analysis.",
-        ),
-    ] = False,
     output_json: Annotated[
         bool,
         typer.Option(
@@ -56,23 +49,12 @@ def ingest_acs_population(
     median household income, median gross rent, poverty universe, poverty
     counts (below 50% and 50-99%), and margin of error for total population.
 
-    The --translate flag is reserved for future tract-level longitudinal
-    analysis.  CoC-level aggregation handles multi-vintage tracts via
-    separate crosswalks.
-
     Examples:
 
         coclab ingest acs5-tract --acs 2019-2023 --tracts 2023
 
         coclab ingest acs5-tract --acs 2015-2019 --tracts 2023
     """
-    if translate:
-        raise typer.BadParameter(
-            "The --translate flag is reserved for future tract-level longitudinal "
-            "analysis. CoC-level aggregation handles multi-vintage tracts via "
-            "separate crosswalks."
-        )
-
     import pandas as pd
 
     from coclab.acs.ingest.tract_population import ingest_tract_data

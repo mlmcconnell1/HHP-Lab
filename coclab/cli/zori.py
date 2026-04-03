@@ -178,11 +178,11 @@ def aggregate_zori(
         ),
     ],
     geography: Annotated[
-        str,
+        Literal["county"],
         typer.Option(
             "--geography",
             "-g",
-            help="Base geography type. Currently only 'county' is supported.",
+            help="Base geography type (only 'county' is supported — ZORI is county-level).",
         ),
     ] = "county",
     zori_path: Annotated[
@@ -305,14 +305,6 @@ def aggregate_zori(
             output_dir = build_curated / "zori"
         if xwalk_path is None:
             xwalk_path = (build_curated / "xwalks" / f"xwalk__B{boundary}xC{counties}.parquet")
-
-    # Validate geography
-    if geography != "county":
-        typer.echo(
-            f"Error: Geography '{geography}' not yet supported. Only 'county' is implemented.",
-            err=True,
-        )
-        raise typer.Exit(2)
 
     if xwalk_path is not None and not Path(xwalk_path).exists():
         typer.echo(f"Error: Crosswalk not found: {xwalk_path}", err=True)
