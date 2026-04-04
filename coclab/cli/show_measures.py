@@ -210,7 +210,7 @@ def show_measures(
     if not measures_dir.exists():
         typer.echo(
             f"Error: Measures directory not found: {measures_dir}. "
-            "Run 'coclab aggregate acs --build <name>' to generate measures.",
+            "Run 'coclab build recipe --recipe <file>' to generate measures via a recipe.",
             err=True,
         )
         raise typer.Exit(1)
@@ -238,7 +238,7 @@ def show_measures(
             )
         else:
             typer.echo(
-                "Error: No measures files found. Run 'coclab aggregate acs --build <name>' to generate measures.",
+                "Error: No measures files found. Run 'coclab build recipe --recipe <file>' to generate measures via a recipe.",
                 err=True,
             )
         raise typer.Exit(1)

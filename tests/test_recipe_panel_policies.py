@@ -343,6 +343,174 @@ class TestZoriPanelPolicy:
         assert ineligible["zori_coc"].isna().all()
 
 
+# ---------------------------------------------------------------------------
+# County-native ZORI aggregate-path helpers (coclab-scwk regression)
+# ---------------------------------------------------------------------------
+
+def _zori_county_native_recipe_dict() -> dict:
+    """Recipe where ZORI is aggregated from county-native data as measure ``zori``.
+
+    This mirrors the committed example recipes (e.g.
+    ``coc-base-pit-acs-zori-2016-2021.yaml``) where county-level ZORI is
+    aggregated to the target geography and the measure column is named
+    ``zori`` (not ``zori_coc``).  The executor must canonicalize the
+    column before applying eligibility/provenance logic.
+    """
+    return {
+        "version": 1,
+        "name": "zori-county-aggregate-test",
+        "universe": {"years": [2020]},
+        "targets": [
+            {
+                "id": "coc_panel",
+                "geometry": {"type": "coc", "vintage": 2025, "source": "hud_exchange"},
+                "outputs": ["panel"],
+                "panel_policy": {
+                    "zori": {"min_coverage": 0.80},
+                },
+            },
+        ],
+        "datasets": {
+            "pit": {
+                "provider": "hud",
+                "product": "pit",
+                "version": 1,
+                "native_geometry": {"type": "coc"},
+                "years": {"years": [2020]},
+                "path": "data/pit.parquet",
+            },
+            "zori_county": {
+                "provider": "zillow",
+                "product": "zori",
+                "version": 1,
+                "native_geometry": {"type": "coc"},
+                "years": {"years": [2020]},
+                "path": "data/zori_county.parquet",
+            },
+        },
+        "transforms": [],
+        "pipelines": [
+            {
+                "id": "main",
+                "target": "coc_panel",
+                "steps": [
+                    {
+                        "resample": {
+                            "dataset": "pit",
+                            "to_geometry": {
+                                "type": "coc", "vintage": 2025,
+                                "source": "hud_exchange",
+                            },
+                            "method": "identity",
+                            "measures": ["pit_total", "median_household_income"],
+                        },
+                    },
+                    {
+                        "resample": {
+                            "dataset": "zori_county",
+                            "to_geometry": {
+                                "type": "coc", "vintage": 2025,
+                                "source": "hud_exchange",
+                            },
+                            "method": "identity",
+                            "measures": ["zori", "zori_coverage_ratio"],
+                        },
+                    },
+                    {
+                        "join": {
+                            "datasets": ["pit", "zori_county"],
+                            "join_on": ["geo_id", "year"],
+                        },
+                    },
+                ],
+            },
+        ],
+    }
+
+
+def _setup_zori_county_native_fixtures(tmp_path: Path) -> None:
+    """Create PIT + county-native ZORI fixtures with ``zori`` column name."""
+    data_dir = tmp_path / "data"
+    data_dir.mkdir(parents=True, exist_ok=True)
+
+    pd.DataFrame({
+        "coc_id": ["COC1", "COC2"],
+        "year": [2020, 2020],
+        "pit_total": [100, 200],
+        "median_household_income": [60000.0, 48000.0],
+    }).to_parquet(data_dir / "pit.parquet")
+
+    # Column is "zori" (county-native name), not "zori_coc".
+    pd.DataFrame({
+        "coc_id": ["COC1", "COC2"],
+        "year": [2020, 2020],
+        "zori": [1500.0, 1200.0],
+        "zori_coverage_ratio": [0.95, 0.50],
+    }).to_parquet(data_dir / "zori_county.parquet")
+
+
+class TestZoriCountyNativeAggregatePath:
+    """ZORI policy works when the aggregated measure column is ``zori``
+    (county-native path), not the canonical ``zori_coc``.
+
+    Regression coverage for coclab-scwk.
+    """
+
+    def test_canonical_zori_columns_populated(self, tmp_path: Path):
+        """zori_coc, eligibility, and provenance columns are populated."""
+        _setup_zori_county_native_fixtures(tmp_path)
+        recipe = load_recipe(_zori_county_native_recipe_dict())
+        results = execute_recipe(recipe, project_root=tmp_path)
+
+        assert results[0].success
+        panel = pd.read_parquet(_find_panel_output(tmp_path))
+
+        assert "zori_coc" in panel.columns
+        assert "zori_is_eligible" in panel.columns
+        assert "rent_to_income" in panel.columns
+        assert "rent_metric" in panel.columns
+
+    def test_eligibility_applied_with_county_native_zori(self, tmp_path: Path):
+        """COC1 (0.95) eligible, COC2 (0.50) ineligible at 0.80 threshold."""
+        _setup_zori_county_native_fixtures(tmp_path)
+        recipe = load_recipe(_zori_county_native_recipe_dict())
+        execute_recipe(recipe, project_root=tmp_path)
+
+        panel = pd.read_parquet(_find_panel_output(tmp_path))
+
+        coc1 = panel[panel["coc_id"] == "COC1"]
+        coc2 = panel[panel["coc_id"] == "COC2"]
+
+        assert coc1["zori_is_eligible"].all()
+        assert not coc2["zori_is_eligible"].any()
+
+    def test_no_stray_zori_column(self, tmp_path: Path):
+        """The raw ``zori`` column is renamed to ``zori_coc``; no stray column."""
+        _setup_zori_county_native_fixtures(tmp_path)
+        recipe = load_recipe(_zori_county_native_recipe_dict())
+        execute_recipe(recipe, project_root=tmp_path)
+
+        panel = pd.read_parquet(_find_panel_output(tmp_path))
+        assert "zori" not in panel.columns, (
+            "Stray 'zori' column should not survive; it should be "
+            "canonicalized to 'zori_coc'"
+        )
+
+    def test_rent_to_income_computed(self, tmp_path: Path):
+        """rent_to_income is computed for eligible rows."""
+        _setup_zori_county_native_fixtures(tmp_path)
+        recipe = load_recipe(_zori_county_native_recipe_dict())
+        execute_recipe(recipe, project_root=tmp_path)
+
+        panel = pd.read_parquet(_find_panel_output(tmp_path))
+
+        coc1 = panel[panel["coc_id"] == "COC1"]
+        assert coc1["rent_to_income"].notna().all()
+        row = coc1.iloc[0]
+        expected = row["zori_coc"] / (row["median_household_income"] / 12.0)
+        assert abs(row["rent_to_income"] - expected) < 1e-6
+
+
 # ===========================================================================
 # ACS1 panel policy tests (coclab-gude.3)
 # ===========================================================================
@@ -365,7 +533,7 @@ class TestAcs1PanelPolicy:
         assert (panel["acs_products_used"] == "acs5,acs1").all()
 
     def test_acs1_vintage_used_set(self, tmp_path: Path):
-        """acs1_vintage_used is year - 1 for rows with ACS1 data."""
+        """acs1_vintage_used matches the resolved ACS1 input vintage."""
         _setup_acs1_policy_fixtures(tmp_path)
         recipe = load_recipe(_acs1_policy_recipe_dict())
         execute_recipe(recipe, project_root=tmp_path)
@@ -373,8 +541,8 @@ class TestAcs1PanelPolicy:
         panel = pd.read_parquet(_find_panel_output(tmp_path))
 
         assert "acs1_vintage_used" in panel.columns
-        # PIT year 2023 → ACS1 vintage 2022
-        assert (panel["acs1_vintage_used"] == "2022").all()
+        # ACS1 fixture has acs1_vintage=2023 → acs1_vintage_used="2023"
+        assert (panel["acs1_vintage_used"] == "2023").all()
 
     def test_unemployment_rate_acs1_present(self, tmp_path: Path):
         """unemployment_rate_acs1 is in the output panel."""
@@ -425,6 +593,27 @@ class TestAcs1PanelPolicy:
         assert gf01["acs1_vintage_used"].notna().all()
         assert gf02["acs1_vintage_used"].isna().all()
         assert (panel["acs_products_used"] == "acs5,acs1").all()
+
+    def test_acs1_vintage_matches_input_not_lag(self, tmp_path: Path):
+        """acs1_vintage_used reflects the resolved ACS1 input vintage,
+        not a hard-coded ``year - 1`` lag heuristic.
+
+        Regression coverage for coclab-fib8: the recipe explicitly loads
+        ACS1 vintage 2023 for universe year 2023, so acs1_vintage_used
+        must be "2023", not "2022".
+        """
+        _setup_acs1_policy_fixtures(tmp_path)
+        recipe = load_recipe(_acs1_policy_recipe_dict())
+        execute_recipe(recipe, project_root=tmp_path)
+
+        panel = pd.read_parquet(_find_panel_output(tmp_path))
+
+        # The fixture has acs1_vintage=2023, universe year=2023.
+        # The old heuristic would produce "2022"; the fix derives "2023".
+        assert (panel["acs1_vintage_used"] == "2023").all(), (
+            "acs1_vintage_used should match the resolved ACS1 input "
+            "vintage (2023), not the year-1 lag heuristic (2022)"
+        )
 
 
 # ===========================================================================

@@ -351,7 +351,7 @@ Analysis-ready metro×year panels combining PIT counts with ACS measures:
 
 When ZORI is enabled, the same ZORI columns as CoC panels are appended (`zori_coc`, `zori_coverage_ratio`, `zori_is_eligible`, `zori_excluded_reason`, `rent_to_income`).
 
-When ACS 1-year data is included (`include_acs1`), metro panels also carry:
+When ACS 1-year data is included (`panel_policy.acs1.include: true`), metro panels also carry:
 - `unemployment_rate_acs1` — ACS 1-year unemployment rate (metro-native, from CBSA-level B23025)
 - `acs1_vintage_used` — Which ACS1 vintage contributed (nullable when no ACS1 data available)
 - `acs_products_used` — Comma-separated product list: `"acs5"` or `"acs5,acs1"`

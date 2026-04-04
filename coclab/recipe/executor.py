@@ -1890,6 +1890,12 @@ def _assemble_panel(
     # -----------------------------------------------------------------
     # ZORI eligibility, rent_to_income, and provenance (coclab-gude.2)
     # -----------------------------------------------------------------
+    # Canonicalize recipe-native ZORI measure → canonical panel column.
+    # Recipe aggregation (county→target) produces a column named "zori"
+    # (the recipe measure name); the eligibility logic expects "zori_coc".
+    if include_zori and "zori" in panel.columns and "zori_coc" not in panel.columns:
+        panel = panel.rename(columns={"zori": "zori_coc"})
+
     if include_zori and "zori_coc" in panel.columns:
         from coclab.panel.zori_eligibility import (
             ZoriProvenance,
@@ -1942,7 +1948,11 @@ def _assemble_panel(
             and panel["unemployment_rate_acs1"].notna().any()
         )
         if has_acs1_data:
-            panel["acs1_vintage_used"] = (panel["year"] - 1).astype(str)
+            # The recipe pipeline normalises every dataset's year_column to
+            # the universe year during resample (acs1_vintage → year).  The
+            # panel "year" therefore IS the resolved ACS1 vintage, not a PIT
+            # year that needs a lag offset.
+            panel["acs1_vintage_used"] = panel["year"].astype(str)
             panel["acs_products_used"] = "acs5,acs1"
             # Null out vintage for rows where ACS1 data is missing.
             acs1_missing = panel["unemployment_rate_acs1"].isna()

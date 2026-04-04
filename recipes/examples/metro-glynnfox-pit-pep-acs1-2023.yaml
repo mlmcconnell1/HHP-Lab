@@ -16,6 +16,9 @@ targets:
   - id: metro_panel
     geometry: { type: metro, source: glynn_fox_v1 }
     outputs: [panel]
+    panel_policy:
+      acs1:
+        include: true
 
 # Source datasets.
 datasets:

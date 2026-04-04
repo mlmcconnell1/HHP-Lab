@@ -176,6 +176,7 @@ Each target declares a geometry and requested output types.
 | `id` | `string` | Yes | Unique target identifier. Referenced by pipelines. |
 | `geometry` | `GeometryRef` | Yes | Target geometry for the pipeline. |
 | `outputs` | `list[string]` | No | Output kinds: `panel`, `diagnostics`, `export`. Default: `[panel]`. |
+| `panel_policy` | `PanelPolicy` | No | Declarative panel output and finalization policy (ZORI, ACS1, aliases). |
 | `cohort` | `CohortSelector` | No | Optional cohort filter to keep a ranked subset of geographies. |
 
 ```yaml
@@ -200,6 +201,46 @@ Target ids must be unique within a recipe.
 > Declaring currently unsupported outputs (for example `diagnostics`, `export`)
 > is allowed by schema and retained as intent, but runtime emits a warning and
 > does not materialize those output types yet.
+
+### Panel Policy
+
+Optional declarative policy controlling panel finalization behavior. This is the recipe-native mechanism for ZORI eligibility, ACS 1-year integration, source labeling, and column renaming — replacing the implicit defaults that were previously baked into `build_panel`.
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `source_label` | `string` | No | Override the default source label (e.g. `coclab_panel`). |
+| `zori` | `ZoriPolicy` | No | ZORI eligibility and provenance policy. Null means no ZORI integration. |
+| `acs1` | `Acs1Policy` | No | ACS 1-year merge policy (metro targets only). |
+| `column_aliases` | `dict[str, str]` | No | Column rename mapping for output (e.g. `{total_population: acs_total_population}`). |
+
+**ZoriPolicy fields:**
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `min_coverage` | `float` | `0.90` | Minimum `zori_coverage_ratio` for a geography to be ZORI-eligible. |
+
+When `panel_policy.zori` is present, the executor canonicalizes the aggregated ZORI measure to `zori_coc`, applies eligibility rules, computes `rent_to_income`, and adds provenance columns (`rent_metric`, `rent_alignment`, `zori_min_coverage`).
+
+**Acs1Policy fields:**
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `include` | `bool` | `false` | If true, merge ACS 1-year metro-native measures into the panel. |
+
+When `panel_policy.acs1.include` is true on a metro target, the executor adds `unemployment_rate_acs1`, `acs1_vintage_used`, and sets `acs_products_used` to `"acs5,acs1"`.
+
+```yaml
+targets:
+  - id: metro_panel
+    geometry: { type: metro, source: glynn_fox_v1 }
+    outputs: [panel]
+    panel_policy:
+      acs1:
+        include: true
+      zori:
+        min_coverage: 0.90
+      source_label: coclab_metro_panel
+```
 
 ### Cohort Selector
 
