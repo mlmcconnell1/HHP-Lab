@@ -380,21 +380,15 @@ def _load_pit_for_year(
 
     if pit_dir is not None:
         use_fallback = False  # Explicit pit_dir disables fallback
-        # Try new naming first, then build-scoped (@B suffix), then legacy
+        # Try canonical naming first, then legacy
         canonical_path = pit_dir / pit_filename(year)
         legacy_path = pit_dir / f"pit_counts__{year}.parquet"
         if canonical_path.exists():
             logger.info(f"Loading PIT {year} from provided path: {canonical_path}")
             df = pd.read_parquet(canonical_path)
-        else:
-            # Try build-scoped naming: pit__P{year}@B{boundary}.parquet
-            scoped_matches = sorted(pit_dir.glob(f"pit__P{year}@B*.parquet"))
-            if scoped_matches:
-                logger.info(f"Loading PIT {year} from build-scoped path: {scoped_matches[0]}")
-                df = pd.read_parquet(scoped_matches[0])
-            elif legacy_path.exists():
-                logger.info(f"Loading PIT {year} from legacy path: {legacy_path}")
-                df = pd.read_parquet(legacy_path)
+        elif legacy_path.exists():
+            logger.info(f"Loading PIT {year} from legacy path: {legacy_path}")
+            df = pd.read_parquet(legacy_path)
     else:
         # Only try original vintage for years >= MIN_PIT_VINTAGE_YEAR (2013+)
         if year >= MIN_PIT_VINTAGE_YEAR:

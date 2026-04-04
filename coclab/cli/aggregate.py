@@ -7,6 +7,11 @@ corresponding pipeline module.
 Outputs go to ``data/curated/<dataset>/`` by default.  When ``--build``
 is provided, outputs go to ``builds/<name>/data/curated/<dataset>/``
 and runs are recorded in the build manifest.
+
+.. deprecated::
+    The ``--build`` flag and named build directories are deprecated.
+    Prefer recipe-driven panel assembly via ``coclab build recipe``
+    which produces canonical outputs in ``data/curated/panel/``.
 """
 
 from __future__ import annotations
@@ -55,6 +60,18 @@ def _validate_build(build: str) -> Path:
     Returns the build directory path.
     Raises ``typer.Exit(2)`` with a helpful message when the build is missing.
     """
+    import warnings
+
+    warnings.warn(
+        "The --build flag is deprecated. Prefer recipe-driven panel "
+        "assembly via 'coclab build recipe' for canonical outputs.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
+    typer.echo(
+        "Warning: --build is deprecated. Use 'coclab build recipe' instead.",
+        err=True,
+    )
     try:
         return require_build_dir(build)
     except FileNotFoundError:
@@ -183,7 +200,7 @@ def aggregate_pep(
         typer.Option(
             "--build",
             "-b",
-            help="Named build directory. Omit to write to data/curated/.",
+            help="[Deprecated] Named build directory. Prefer 'coclab build recipe'.",
         ),
     ] = None,
     align: Annotated[
@@ -376,7 +393,7 @@ def aggregate_pit(
         typer.Option(
             "--build",
             "-b",
-            help="Named build directory. Omit to write to data/curated/.",
+            help="[Deprecated] Named build directory. Prefer 'coclab build recipe'.",
         ),
     ] = None,
     align: Annotated[
@@ -524,7 +541,7 @@ def aggregate_acs(
         typer.Option(
             "--build",
             "-b",
-            help="Named build directory. Omit to write to data/curated/.",
+            help="[Deprecated] Named build directory. Prefer 'coclab build recipe'.",
         ),
     ] = None,
     align: Annotated[
@@ -839,7 +856,7 @@ def aggregate_zori(
         typer.Option(
             "--build",
             "-b",
-            help="Named build directory. Omit to write to data/curated/.",
+            help="[Deprecated] Named build directory. Prefer 'coclab build recipe'.",
         ),
     ] = None,
     align: Annotated[
