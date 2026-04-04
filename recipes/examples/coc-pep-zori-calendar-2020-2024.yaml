@@ -16,6 +16,9 @@ targets:
   - id: coc_panel
     geometry: { type: coc, vintage: 2025, source: hud_exchange }
     outputs: [panel]
+    panel_policy:
+      zori:
+        min_coverage: 0.90
 
 # Source datasets.
 datasets:

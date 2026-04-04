@@ -14,6 +14,9 @@ targets:
   - id: metro_panel
     geometry: { type: metro, source: glynn_fox_v1 }
     outputs: [panel, diagnostics]
+    panel_policy:
+      acs1:
+        include: true
 
 datasets:
   pit:

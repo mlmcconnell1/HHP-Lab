@@ -1818,6 +1818,7 @@ class _AssembledPanel:
     target_geo_type: str
     boundary_vintage: str | None
     definition_version: str | None
+    zori_provenance: object | None = None  # ZoriProvenance, when ZORI policy active
 
 
 def _resolve_panel_aliases(target) -> dict[str, str]:
@@ -1883,6 +1884,75 @@ def _assemble_panel(
     source_label = policy.source_label if policy else None
     include_zori = policy is not None and policy.zori is not None
     aliases = _resolve_panel_aliases(target)
+    extra_columns: list[str] | None = None
+    zori_provenance = None
+
+    # -----------------------------------------------------------------
+    # ZORI eligibility, rent_to_income, and provenance (coclab-gude.2)
+    # -----------------------------------------------------------------
+    if include_zori and "zori_coc" in panel.columns:
+        from coclab.panel.zori_eligibility import (
+            ZoriProvenance,
+            add_provenance_columns,
+            apply_zori_eligibility,
+            compute_rent_to_income,
+        )
+
+        zori_policy = policy.zori  # type: ignore[union-attr]
+
+        # Detect rent alignment from resampled data (column injected by
+        # the ZORI resample step when the source has a "method" column).
+        rent_alignment = "pit_january"
+        if "method" in panel.columns:
+            methods = panel["method"].dropna().unique()
+            if len(methods) == 1:
+                rent_alignment = str(methods[0])
+
+        panel = apply_zori_eligibility(
+            panel,
+            min_coverage=zori_policy.min_coverage,
+        )
+        panel = compute_rent_to_income(panel)
+
+        zori_provenance = ZoriProvenance(
+            rent_alignment=rent_alignment,
+            zori_min_coverage=zori_policy.min_coverage,
+        )
+        panel = add_provenance_columns(panel, zori_provenance)
+
+        # Drop temporary columns that leak from resample intermediates.
+        for _tmp in ("method", "geo_count"):
+            if _tmp in panel.columns:
+                panel = panel.drop(columns=[_tmp])
+
+        if "zori_max_geo_contribution" in panel.columns:
+            extra_columns = ["zori_max_geo_contribution"]
+
+    # -----------------------------------------------------------------
+    # ACS 1-year provenance columns (coclab-gude.3)
+    # -----------------------------------------------------------------
+    if (
+        target_geo_type == "metro"
+        and policy is not None
+        and policy.acs1 is not None
+        and policy.acs1.include
+    ):
+        has_acs1_data = (
+            "unemployment_rate_acs1" in panel.columns
+            and panel["unemployment_rate_acs1"].notna().any()
+        )
+        if has_acs1_data:
+            panel["acs1_vintage_used"] = (panel["year"] - 1).astype(str)
+            panel["acs_products_used"] = "acs5,acs1"
+            # Null out vintage for rows where ACS1 data is missing.
+            acs1_missing = panel["unemployment_rate_acs1"].isna()
+            if acs1_missing.any():
+                panel.loc[acs1_missing, "acs1_vintage_used"] = pd.NA
+        else:
+            panel["acs1_vintage_used"] = pd.NA
+            panel["acs_products_used"] = "acs5"
+            if "unemployment_rate_acs1" not in panel.columns:
+                panel["unemployment_rate_acs1"] = np.nan
 
     # Shared finalization: boundary detection, column ordering, dtypes,
     # source labeling, and column aliases.
@@ -1892,6 +1962,7 @@ def _assemble_panel(
         include_zori=include_zori,
         source_label=source_label,
         column_aliases=aliases,
+        extra_columns=extra_columns,
     )
 
     if target.cohort is not None:
@@ -1912,6 +1983,7 @@ def _assemble_panel(
         target_geo_type=target_geo_type,
         boundary_vintage=boundary_vintage,
         definition_version=definition_version,
+        zori_provenance=zori_provenance,
     )
 
 
@@ -1985,11 +2057,31 @@ def _persist_outputs(
         known = set(ACS_MEASURE_COLUMNS) | {"population"}
         measure_columns = [c for c in panel.columns if c in known] or None
 
+    # Resolve panel policy for ACS1 and ZORI conformance awareness.
+    _, persist_target = _resolve_pipeline_target(ctx.recipe, plan.pipeline_id)
+    persist_policy: PanelPolicy | None = getattr(persist_target, "panel_policy", None)
+
+    # ACS1-aware conformance (coclab-gude.3): include acs1 product when
+    # the panel policy requests it and the column is present.
+    acs_products = ["acs5"]
+    if (
+        persist_policy is not None
+        and persist_policy.acs1 is not None
+        and persist_policy.acs1.include
+        and "unemployment_rate_acs1" in panel.columns
+    ):
+        acs_products = ["acs5", "acs1"]
+
+    # ZORI-aware conformance (coclab-gude.2).
+    include_zori = persist_policy is not None and persist_policy.zori is not None
+
     panel_request = PanelRequest(
         start_year=start_year,
         end_year=end_year,
         geo_type=target_geo_type,
         measure_columns=measure_columns,
+        acs_products=acs_products,
+        include_zori=include_zori,
     )
     conformance_report = run_conformance(panel, panel_request)
     if not ctx.quiet:
@@ -2017,6 +2109,16 @@ def _persist_outputs(
         ),
     }
     provenance["conformance"] = conformance_report.to_dict()
+
+    # Embed ZORI provenance and summary (coclab-gude.2).
+    if assembled.zori_provenance is not None:
+        provenance["zori"] = assembled.zori_provenance.to_dict()
+        from coclab.panel.zori_eligibility import summarize_zori_eligibility
+
+        zori_summary = summarize_zori_eligibility(panel)
+        if zori_summary.get("zori_integrated"):
+            provenance["zori_summary"] = zori_summary
+
     table = pa.Table.from_pandas(panel)
     metadata = table.schema.metadata or {}
     metadata[b"coclab_provenance"] = json.dumps(provenance).encode()
