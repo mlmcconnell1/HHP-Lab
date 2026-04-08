@@ -107,44 +107,6 @@ When building non-ACS panels (e.g., PEP-based metro), set `measure_columns` on `
 
 If you identify a problem in the code, even incidentally while working on something else, add a bead to make sure it is addressed later.
 
-## Landing the Plane (Session Completion)
-
-**When ending a work session**, you MUST complete ALL steps below. Work is NOT complete until `git push` succeeds.
-
-**MANDATORY WORKFLOW:**
-
-1. **File issues for remaining work** - Create issues for anything that needs follow-up
-2. **Run quality gates** (if code changed) - Tests, linters, builds
-   - Full test suite command: `uv run --extra dev pytest` (requires dev extras such as `pytest-httpx`)
-3. **Update issue status** - Close finished work, update in-progress items
-4. **PUSH TO REMOTE** - This is MANDATORY:
-   ```bash
-   git pull --rebase
-   # If using br:
-   br sync --flush-only
-   git add .beads/
-   git commit -m "sync beads"
-   # If using bd:
-   # bd sync              # (commits and pushes automatically)
-   git push
-   git status  # MUST show "up to date with origin"
-   ```
-5. **Clean up** - Clear stashes, prune remote branches
-6. **Verify** - All changes committed AND pushed
-7. **Hand off** - Provide context for next session
-
-**CRITICAL RULES:**
-- Work is NOT complete until `git push` succeeds
-- NEVER stop before pushing - that leaves work stranded locally
-- NEVER say "ready to push when you are" - YOU must push
-- If push fails, resolve and retry until it succeeds
-
-## Key Concepts
-
-- **Dependencies**: Issues can block other issues. `ready` shows only unblocked work.
-- **Priority**: P0=critical, P1=high, P2=medium, P3=low, P4=backlog (use numbers, not words)
-- **Types**: task, bug, feature, epic, question, docs
-
 <!-- bv-agent-instructions-v2 -->
 
 ---
@@ -239,3 +201,136 @@ git push                # Push to remote
 ```
 
 <!-- end-bv-agent-instructions -->
+
+<!-- archv-agent-instructions-v1 -->
+
+---
+## Architecture Workflow Integration
+
+  This project uses [arch-viewer](https://github.com/Dicklesworthstone/arch-viewer) (`archv`) as a terminal-first architecture explorer for source repositories. It loads deterministic scaffold data from `.arch/arch.scaffold.jsonl`, overlays AI enrichment from `.arch/
+  arch.enriched.jsonl`, and exposes stable machine-readable outputs for agents.
+
+  ### Using archv as an AI sidecar
+
+  `archv` is the architecture-context tool for this repo. Use it when you need to understand:
+
+  - top-level structure
+  - file and package relationships
+  - dependency edges and reverse dependencies
+  - architectural layers
+  - cycles, hotspots, and graph shape
+  - which tracked nodes still need enrichment
+
+  **Scope boundary:** `archv` helps with repository structure and architecture context. It does not replace source reading, tests, or issue tracking.
+
+  **CRITICAL: Use ONLY `--robot-*` flags in agent workflows.** Bare `archv` launches an interactive TUI and can block your session.
+
+  ### The Workflow: Start With Orientation
+
+  **`archv --robot-summary` is the default entry point.** Run it first to get repo stats, major components, top-level directories, and scaffold freshness status.
+
+  ```bash
+  archv --robot-summary
+  archv --robot-node file:path/to/file.go
+  archv --robot-graph
+  archv --robot-cycles
+  archv --robot-hotspots
+  archv --robot-layers
+  archv --robot-search "query"
+
+  ### Common archv Commands
+
+  # Refresh deterministic architecture facts
+  archv scaffold --repo . --out .arch/arch.scaffold.jsonl
+
+  # Find records still missing enrichment
+  archv enrich pending --summary
+  archv enrich pending --jsonl
+
+  # Prepare context for enrichment work
+  archv enrich request --pending
+  archv enrich request --id file:path/to/file.go
+
+  # Add or import enrichment
+  archv enrich upsert --id file:path/to/file.go --summary "..." --layer domain --confidence 0.90
+  archv enrich import --stdin < generated.enriched.jsonl
+
+  ### Workflow Pattern
+
+  1. Orient: Run archv --robot-summary
+  2. Inspect: Use --robot-node, --robot-graph, --robot-cycles, --robot-hotspots, and --robot-layers
+  3. Refresh facts: If the repo structure changed, regenerate the scaffold with archv scaffold
+  4. Maintain enrichment: Use archv enrich pending, archv enrich request, and archv enrich upsert / archv enrich import
+  5. Verify: Re-run the relevant archv --robot-* commands after updating artifacts
+
+  ### Enrichment Maintenance Requirements
+
+  If you add a new source file, test file, or package, you MUST update the repo's archv artifacts in the same change.
+
+  Minimum required workflow:
+
+  # 1. Refresh scaffold facts
+  archv scaffold --repo . --out .arch/arch.scaffold.jsonl
+
+  # 2. Check what still needs enrichment
+  archv enrich pending --summary
+  archv enrich pending --jsonl
+
+  # 3. Add enrichment for the new or changed nodes
+  archv enrich upsert --id file:path/to/new_file.go --summary "..." --layer ... --confidence ...
+  # or generate/import a batch:
+  archv enrich import --stdin < generated.enriched.jsonl
+
+  Agent expectations:
+
+  - If you add a new production file, add enrichment for it.
+  - If you add a new test file or package and the repo tracks enrichment for those nodes, update that enrichment too.
+  - Do not leave newly introduced tracked nodes in a permanently pending enrichment state without noting it.
+  - Commit the updated .arch/ artifacts alongside the code change.
+
+  ### Best Practices
+
+  - Prefer archv output over guessing architecture from filenames or imports alone.
+  - Treat scaffold data as deterministic facts and enrichment as AI-owned semantic overlay.
+  - Use archv enrich pending to detect coverage gaps instead of assuming tracked artifacts are current.
+  - If adjacent enrichment exists, assume archv will overlay it automatically when loading the scaffold.
+
+<!-- end-archv-agent-instructions -->
+
+## Landing the Plane (Session Completion)
+
+**When ending a work session**, you MUST complete ALL steps below. Work is NOT complete until `git push` succeeds.
+
+**MANDATORY WORKFLOW:**
+
+1. **File issues for remaining work** - Create issues for anything that needs follow-up
+2. **Run quality gates** (if code changed) - Tests, linters, builds
+   - Full test suite command: `uv run --extra dev pytest` (requires dev extras such as `pytest-httpx`)
+3. **Update issue status** - Close finished work, update in-progress items
+4. **PUSH TO REMOTE** - This is MANDATORY:
+   ```bash
+   git pull --rebase
+   # If using br:
+   br sync --flush-only
+   git add .beads/
+   git commit -m "sync beads"
+   # If using bd:
+   # bd sync              # (commits and pushes automatically)
+   git push
+   git status  # MUST show "up to date with origin"
+   ```
+5. **Clean up** - Clear stashes, prune remote branches
+6. **Verify** - All changes committed AND pushed
+7. **Hand off** - Provide context for next session
+
+**CRITICAL RULES:**
+- Work is NOT complete until `git push` succeeds
+- NEVER stop before pushing - that leaves work stranded locally
+- NEVER say "ready to push when you are" - YOU must push
+- If push fails, resolve and retry until it succeeds
+
+## Key Concepts
+
+- **Dependencies**: Issues can block other issues. `ready` shows only unblocked work.
+- **Priority**: P0=critical, P1=high, P2=medium, P3=low, P4=backlog (use numbers, not words)
+- **Types**: task, bug, feature, epic, question, docs
