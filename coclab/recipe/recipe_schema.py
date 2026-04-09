@@ -316,13 +316,38 @@ class Acs1Policy(BaseModel):
     )
 
 
+class LausPolicy(BaseModel):
+    """Declarative BLS LAUS merge policy for metro panels.
+
+    When present, the executor annotates LAUS provenance columns and enables
+    LAUS-aware conformance checks.  LAUS annual-average data must already be
+    loaded as a dataset in the recipe pipeline (provider: bls, product: laus);
+    this policy records the provenance and signals downstream conformance to
+    validate the LAUS columns (labor_force, employed, unemployed,
+    unemployment_rate) instead of treating them as missing.
+
+    LAUS is distinct from ACS1: BLS publishes official labor-force estimates
+    for metro statistical areas, while ACS1 provides survey-based estimates.
+    Do not confuse the BLS unemployment_rate with unemployment_rate_acs1.
+    """
+    model_config = ConfigDict(extra="forbid")
+
+    include: bool = Field(
+        default=False,
+        description=(
+            "If true, treat BLS LAUS metro measures as present and annotate "
+            "laus_vintage_used provenance column in the output panel."
+        ),
+    )
+
+
 class PanelPolicy(BaseModel):
     """Declarative panel output and finalization policy.
 
     Allows recipes to explicitly declare panel-specific semantics that
     were previously implicit in ``build_panel``, including ZORI eligibility
-    thresholds, ACS 1-year merge behavior, source labeling, and column
-    rename aliases.
+    thresholds, ACS 1-year merge behavior, LAUS labor-market merge behavior,
+    source labeling, and column rename aliases.
     """
     model_config = ConfigDict(extra="forbid")
 
@@ -337,6 +362,14 @@ class PanelPolicy(BaseModel):
     acs1: Optional[Acs1Policy] = Field(
         default=None,
         description="ACS 1-year merge policy (metro targets only).",
+    )
+    laus: Optional[LausPolicy] = Field(
+        default=None,
+        description=(
+            "BLS LAUS metro-native labor-market merge policy (metro targets only). "
+            "Declares that the pipeline includes a bls/laus dataset and enables "
+            "LAUS-aware conformance checks."
+        ),
     )
     column_aliases: Dict[str, str] = Field(
         default_factory=dict,

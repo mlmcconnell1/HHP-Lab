@@ -1,0 +1,172 @@
+version: 1
+name: glynn_fox_metro_panel_2023_laus
+description: >
+  Build a metro-year panel for the 25 Glynn/Fox metros including BLS LAUS
+  annual-average labor-market data.  LAUS estimates are published natively at
+  metro (CBSA) geography, so the resample step uses identity (no crosswalk
+  needed).  This recipe extends the base metro25-glynnfox pipeline with the
+  labor_force, employed, unemployed, and unemployment_rate measures from the
+  BLS Local Area Unemployment Statistics (LAUS) program.
+
+  Before running this recipe, ingest LAUS data for the required year(s):
+      coclab ingest laus-metro --year 2023
+
+universe:
+  years: [2023]
+
+targets:
+  - id: metro_panel
+    geometry: { type: metro, source: glynn_fox_v1 }
+    outputs: [panel, diagnostics]
+    panel_policy:
+      laus:
+        include: true
+      column_aliases:
+        total_population: total_population_acs5
+        adult_population: adult_population_acs5
+        population_below_poverty: population_below_poverty_acs5
+        median_household_income: median_household_income_acs5
+        median_gross_rent: median_gross_rent_acs5
+
+datasets:
+  pit:
+    provider: hud
+    product: pit
+    version: 1
+    native_geometry: { type: coc }
+    years:
+      years: [2023]
+    year_column: pit_year
+    geo_column: coc_id
+    params:
+      vintage: 2024
+      align: point_in_time_jan
+    path: data/curated/pit/pit_vintage__P2024.parquet
+
+  pep_county:
+    provider: census
+    product: pep
+    version: 1
+    native_geometry: { type: county, vintage: 2020, source: tiger }
+    years:
+      years: [2023]
+    year_column: year
+    geo_column: county_fips
+    params:
+      series: postcensal
+      vintage: 2024
+    path: data/curated/pep/pep_county__v2024.parquet
+
+  laus_metro:
+    provider: bls
+    product: laus
+    version: 1
+    native_geometry:
+      type: metro
+      source: glynn_fox_v1
+    years:
+      years: [2023]
+    year_column: year
+    geo_column: metro_id
+    path: "data/curated/laus/laus_metro__A2023@Dglynnfoxv1.parquet"
+
+  acs_tract:
+    provider: census
+    product: acs5
+    version: 1
+    native_geometry: { type: tract }
+    geo_column: tract_geoid
+    file_set:
+      path_template: "data/curated/acs/acs5_tracts__A{acs_end}xT{tract}.parquet"
+      segments:
+        - years: "2023-2023"
+          geometry: { type: tract, vintage: 2020 }
+          constants: { tract: 2020 }
+          year_offsets: { acs_end: 0 }
+
+transforms:
+  - id: coc_to_metro
+    type: crosswalk
+    from: { type: coc, vintage: 2025, source: hud_exchange }
+    to: { type: metro, source: glynn_fox_v1 }
+    spec:
+      weighting:
+        scheme: area
+
+  - id: county_to_metro
+    type: crosswalk
+    from: { type: county, vintage: 2020, source: tiger }
+    to: { type: metro, source: glynn_fox_v1 }
+    spec:
+      weighting:
+        scheme: population
+        population_source: pep_county
+        population_field: population
+
+  - id: tract_to_metro_2020
+    type: crosswalk
+    from: { type: tract, vintage: 2020 }
+    to: { type: metro, source: glynn_fox_v1 }
+    spec:
+      weighting:
+        scheme: area
+
+pipelines:
+  - id: build_metro_panel
+    target: metro_panel
+    steps:
+      - materialize:
+          transforms: [coc_to_metro, county_to_metro, tract_to_metro_2020]
+
+      - resample:
+          dataset: pit
+          to_geometry: { type: metro, source: glynn_fox_v1 }
+          method: aggregate
+          via: coc_to_metro
+          measures: [pit_total, pit_sheltered, pit_unsheltered]
+          aggregation: sum
+
+      - resample:
+          dataset: pep_county
+          to_geometry: { type: metro, source: glynn_fox_v1 }
+          method: aggregate
+          via: county_to_metro
+          measures: [population]
+          aggregation: sum
+
+      - resample:
+          dataset: acs_tract
+          to_geometry: { type: metro, source: glynn_fox_v1 }
+          method: aggregate
+          via: tract_to_metro_2020
+          measures:
+            total_population: { aggregation: sum }
+            adult_population: { aggregation: sum }
+            population_below_poverty: { aggregation: sum }
+            median_household_income: { aggregation: weighted_mean }
+            median_gross_rent: { aggregation: weighted_mean }
+
+      - resample:
+          dataset: laus_metro
+          to_geometry: { type: metro, source: glynn_fox_v1 }
+          method: identity
+          measures:
+            labor_force:
+              aggregation: sum
+            employed:
+              aggregation: sum
+            unemployed:
+              aggregation: sum
+            unemployment_rate:
+              aggregation: mean
+
+      - join:
+          datasets: [pit, pep_county, acs_tract, laus_metro]
+          join_on: [geo_id, year]
+
+validation:
+  crosswalk_coverage:
+    warn_below: 0.95
+    fail_below: 0.90
+  missing_dataset:
+    default: fail

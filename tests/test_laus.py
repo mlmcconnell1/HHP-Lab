@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from typing import Any
 from unittest.mock import patch
 
 import pandas as pd
@@ -565,3 +566,329 @@ class TestLausPanelIntegration:
             assert col in METRO_PANEL_COLUMNS, (
                 f"LAUS column '{col}' missing from METRO_PANEL_COLUMNS"
             )
+
+
+# ---------------------------------------------------------------------------
+# CLI tests  (coclab-7isb.5)
+# ---------------------------------------------------------------------------
+
+
+def _make_mock_ingest_fn(tmp_path: Path, year_override: int | None = None) -> Any:
+    """Return a mock for coclab.ingest.bls_laus.ingest_laus_metro that writes a
+    minimal parquet and returns the path."""
+    import pandas as pd
+    from coclab.naming import laus_metro_path
+
+    def _mock_ingest(year: int, definition_version: str = "glynn_fox_v1",
+                     api_key: Any = None, project_root: Path | None = None) -> Path:
+        effective_year = year_override if year_override is not None else year
+        rows = [{"metro_id": f"GF{i:02d}", "year": effective_year,
+                 "labor_force": 1_000_000, "employed": 950_000,
+                 "unemployed": 50_000, "unemployment_rate": 5.0,
+                 "data_source": "bls_laus",
+                 "metro_name": f"Metro {i}"}
+                for i in range(1, 26)]
+        df = pd.DataFrame(rows)
+        df["labor_force"] = df["labor_force"].astype("Int64")
+        df["employed"] = df["employed"].astype("Int64")
+        df["unemployed"] = df["unemployed"].astype("Int64")
+        df["unemployment_rate"] = df["unemployment_rate"].astype("Float64")
+
+        base = project_root / "data" if project_root else tmp_path / "data"
+        out = laus_metro_path(effective_year, definition_version, base_dir=base)
+        out.parent.mkdir(parents=True, exist_ok=True)
+        df.to_parquet(out, index=False)
+        return out
+
+    return _mock_ingest
+
+
+class TestCliLausMetro:
+    """CLI tests for `coclab ingest laus-metro`."""
+
+    def _runner(self):
+        from typer.testing import CliRunner
+        return CliRunner()
+
+    def _app(self):
+        from coclab.cli.main import app
+        return app
+
+    def test_single_year_exits_zero(self, tmp_path):
+        mock_fn = _make_mock_ingest_fn(tmp_path)
+        with patch("coclab.ingest.bls_laus.ingest_laus_metro", mock_fn), \
+             patch("coclab.cli.main._check_working_directory"):
+            result = self._runner().invoke(self._app(), ["ingest", "laus-metro", "--year", "2023"])
+        assert result.exit_code == 0, result.output
+
+    def test_single_year_output_mentions_metros(self, tmp_path):
+        mock_fn = _make_mock_ingest_fn(tmp_path)
+        with patch("coclab.ingest.bls_laus.ingest_laus_metro", mock_fn), \
+             patch("coclab.cli.main._check_working_directory"):
+            result = self._runner().invoke(self._app(), ["ingest", "laus-metro", "--year", "2023"])
+        assert result.exit_code == 0, result.output
+        assert "25" in result.output or "Metro" in result.output
+
+    def test_json_output_flag(self, tmp_path):
+        mock_fn = _make_mock_ingest_fn(tmp_path)
+        with patch("coclab.ingest.bls_laus.ingest_laus_metro", mock_fn), \
+             patch("coclab.cli.main._check_working_directory"):
+            result = self._runner().invoke(self._app(),
+                                           ["ingest", "laus-metro", "--year", "2023", "--json"])
+        assert result.exit_code == 0, result.output
+        data = json.loads(result.output)
+        assert data["status"] == "ok"
+        assert data["year"] == 2023
+        assert data["metros"] == 25
+        assert "output_path" in data
+        assert "unemployment_rate_mean" in data
+
+    def test_year_range_backfill(self, tmp_path):
+        mock_fn = _make_mock_ingest_fn(tmp_path)
+        with patch("coclab.ingest.bls_laus.ingest_laus_metro", mock_fn), \
+             patch("coclab.cli.main._check_working_directory"):
+            result = self._runner().invoke(
+                self._app(),
+                ["ingest", "laus-metro", "--start-year", "2021", "--end-year", "2023"]
+            )
+        assert result.exit_code == 0, result.output
+
+    def test_year_range_json_output(self, tmp_path):
+        mock_fn = _make_mock_ingest_fn(tmp_path)
+        with patch("coclab.ingest.bls_laus.ingest_laus_metro", mock_fn), \
+             patch("coclab.cli.main._check_working_directory"):
+            result = self._runner().invoke(
+                self._app(),
+                ["ingest", "laus-metro", "--start-year", "2021", "--end-year", "2022", "--json"]
+            )
+        assert result.exit_code == 0, result.output
+        data = json.loads(result.output)
+        assert data["status"] == "ok"
+        assert set(data["years_succeeded"]) == {2021, 2022}
+
+    def test_no_year_arg_exits_nonzero(self, tmp_path):
+        with patch("coclab.cli.main._check_working_directory"):
+            result = self._runner().invoke(self._app(), ["ingest", "laus-metro"])
+        assert result.exit_code != 0
+
+    def test_year_and_start_year_conflict_exits_nonzero(self, tmp_path):
+        with patch("coclab.cli.main._check_working_directory"):
+            result = self._runner().invoke(
+                self._app(),
+                ["ingest", "laus-metro", "--year", "2023", "--start-year", "2021"]
+            )
+        assert result.exit_code != 0
+
+    def test_reversed_range_exits_nonzero(self, tmp_path):
+        with patch("coclab.cli.main._check_working_directory"):
+            result = self._runner().invoke(
+                self._app(),
+                ["ingest", "laus-metro", "--start-year", "2023", "--end-year", "2021"]
+            )
+        assert result.exit_code != 0
+
+    def test_ingest_error_exits_nonzero(self, tmp_path):
+        def _failing_ingest(**kwargs):
+            raise ValueError("BLS API down")
+
+        with patch("coclab.ingest.bls_laus.ingest_laus_metro", _failing_ingest), \
+             patch("coclab.cli.main._check_working_directory"):
+            result = self._runner().invoke(
+                self._app(), ["ingest", "laus-metro", "--year", "2023"]
+            )
+        assert result.exit_code != 0
+
+
+# ---------------------------------------------------------------------------
+# Recipe integration tests  (coclab-7isb)
+# ---------------------------------------------------------------------------
+
+
+class TestLausRecipeSchema:
+    """Tests for LausPolicy round-trips through the recipe schema."""
+
+    def test_laus_policy_default(self):
+        from coclab.recipe.recipe_schema import LausPolicy
+        p = LausPolicy()
+        assert p.include is False
+
+    def test_laus_policy_include_true(self):
+        from coclab.recipe.recipe_schema import LausPolicy
+        p = LausPolicy(include=True)
+        assert p.include is True
+
+    def test_laus_policy_forbids_extra_fields(self):
+        from pydantic import ValidationError
+        from coclab.recipe.recipe_schema import LausPolicy
+        with pytest.raises(ValidationError):
+            LausPolicy(include=True, bogus_field=42)
+
+    def test_panel_policy_with_laus(self):
+        from coclab.recipe.recipe_schema import LausPolicy, PanelPolicy
+        policy = PanelPolicy(laus=LausPolicy(include=True))
+        assert policy.laus is not None
+        assert policy.laus.include is True
+
+    def test_panel_policy_laus_none_by_default(self):
+        from coclab.recipe.recipe_schema import PanelPolicy
+        policy = PanelPolicy()
+        assert policy.laus is None
+
+    def test_laus_policy_round_trips_via_recipe_load(self):
+        """LausPolicy is preserved after loading a recipe dict."""
+        from coclab.recipe.loader import load_recipe
+        recipe = load_recipe({
+            "version": 1,
+            "name": "test-laus",
+            "universe": {"years": [2023]},
+            "targets": [{
+                "id": "metro_panel",
+                "geometry": {"type": "metro", "source": "glynn_fox_v1"},
+                "panel_policy": {
+                    "laus": {"include": True},
+                },
+            }],
+            "datasets": {
+                "laus_metro": {
+                    "provider": "bls",
+                    "product": "laus",
+                    "version": 1,
+                    "native_geometry": {"type": "metro", "source": "glynn_fox_v1"},
+                    "path": "data/curated/laus/laus_metro__A2023@Dglynnfoxv1.parquet",
+                },
+            },
+        })
+        target = recipe.targets[0]
+        assert target.panel_policy is not None
+        assert target.panel_policy.laus is not None
+        assert target.panel_policy.laus.include is True
+
+
+class TestValidateBLSLaus:
+    """Tests for the bls/laus dataset adapter validator."""
+
+    def _make_spec(self, **overrides) -> Any:
+        from coclab.recipe.recipe_schema import DatasetSpec, GeometryRef
+        defaults: dict[str, Any] = {
+            "provider": "bls",
+            "product": "laus",
+            "version": 1,
+            "native_geometry": GeometryRef(type="metro", source="glynn_fox_v1"),
+            "path": "data/curated/laus/laus_metro__A2023@Dglynnfoxv1.parquet",
+        }
+        defaults.update(overrides)
+        return DatasetSpec(**defaults)
+
+    def test_valid_spec_no_diagnostics(self):
+        from coclab.recipe.default_dataset_adapters import _validate_bls_laus
+        spec = self._make_spec()
+        diags = _validate_bls_laus(spec)
+        assert diags == []
+
+    def test_wrong_version_is_error(self):
+        from coclab.recipe.default_dataset_adapters import _validate_bls_laus
+        spec = self._make_spec(version=2)
+        diags = _validate_bls_laus(spec)
+        assert any(d.level == "error" and "version" in d.message for d in diags)
+
+    def test_wrong_geometry_type_is_error(self):
+        from coclab.recipe.default_dataset_adapters import _validate_bls_laus
+        from coclab.recipe.recipe_schema import GeometryRef
+        # No path → validator cannot fall back to materialized artifact
+        spec = self._make_spec(native_geometry=GeometryRef(type="county"), path=None)
+        diags = _validate_bls_laus(spec)
+        assert any(d.level == "error" and "metro" in d.message for d in diags)
+
+    def test_no_source_warns(self):
+        from coclab.recipe.default_dataset_adapters import _validate_bls_laus
+        from coclab.recipe.recipe_schema import GeometryRef
+        spec = self._make_spec(native_geometry=GeometryRef(type="metro"))
+        diags = _validate_bls_laus(spec)
+        assert any(d.level == "warning" and "source" in d.message for d in diags)
+
+    def test_no_path_warns(self):
+        from coclab.recipe.default_dataset_adapters import _validate_bls_laus
+        spec = self._make_spec(path=None)
+        diags = _validate_bls_laus(spec)
+        assert any(d.level == "warning" and "path" in d.message.lower() for d in diags)
+
+    def test_unknown_params_warns(self):
+        from coclab.recipe.default_dataset_adapters import _validate_bls_laus
+        spec = self._make_spec(params={"bogus": "value"})
+        diags = _validate_bls_laus(spec)
+        assert any(d.level == "warning" and "unrecognized" in d.message for d in diags)
+
+    def test_bls_laus_registered_in_global_registry(self):
+        """bls/laus must be registered in the default dataset registry."""
+        from coclab.recipe.adapters import dataset_registry
+        from coclab.recipe.default_adapters import register_defaults
+
+        # Force a clean registry with defaults to verify registration
+        local_registry = type(dataset_registry)()
+        from coclab.recipe.default_dataset_adapters import register_dataset_defaults
+        register_dataset_defaults(local_registry)
+
+        # Build a minimal spec
+        from coclab.recipe.recipe_schema import DatasetSpec, GeometryRef
+        spec = DatasetSpec(
+            provider="bls", product="laus", version=1,
+            native_geometry=GeometryRef(type="metro", source="glynn_fox_v1"),
+            path="data/curated/laus/laus_metro__A2023@Dglynnfoxv1.parquet",
+        )
+        diags = local_registry.validate(spec)
+        # Valid spec should produce no errors
+        assert not any(d.level == "error" for d in diags)
+
+    def test_laus_recipe_yaml_loads_cleanly(self):
+        """The example metro25-glynnfox-laus.yaml must load without errors."""
+        import yaml
+        from coclab.recipe.loader import load_recipe
+
+        recipe_path = Path(__file__).parent.parent / "recipes" / "metro25-glynnfox-laus.yaml"
+        assert recipe_path.exists(), f"Example LAUS recipe not found: {recipe_path}"
+
+        with open(recipe_path) as f:
+            recipe_dict = yaml.safe_load(f)
+
+        recipe = load_recipe(recipe_dict)
+        assert recipe.name == "glynn_fox_metro_panel_2023_laus"
+
+        # Verify bls/laus dataset present
+        assert "laus_metro" in recipe.datasets
+        laus_ds = recipe.datasets["laus_metro"]
+        assert laus_ds.provider == "bls"
+        assert laus_ds.product == "laus"
+
+        # Verify panel_policy.laus.include is True
+        target = recipe.targets[0]
+        assert target.panel_policy is not None
+        assert target.panel_policy.laus is not None
+        assert target.panel_policy.laus.include is True
+
+    def test_laus_recipe_validates_no_adapter_errors(self):
+        """The LAUS example recipe should pass adapter validation with no errors."""
+        import yaml
+        from coclab.recipe.adapters import (
+            DatasetAdapterRegistry,
+            GeometryAdapterRegistry,
+            validate_recipe_adapters,
+        )
+        from coclab.recipe.default_dataset_adapters import register_dataset_defaults
+        from coclab.recipe.default_geometry_adapters import register_geometry_defaults
+        from coclab.recipe.loader import load_recipe
+
+        recipe_path = Path(__file__).parent.parent / "recipes" / "metro25-glynnfox-laus.yaml"
+        with open(recipe_path) as f:
+            recipe_dict = yaml.safe_load(f)
+
+        recipe = load_recipe(recipe_dict)
+
+        geo_reg = GeometryAdapterRegistry()
+        register_geometry_defaults(geo_reg)
+
+        ds_reg = DatasetAdapterRegistry()
+        register_dataset_defaults(ds_reg)
+
+        diags = validate_recipe_adapters(recipe, geo_reg, ds_reg)
+        errors = [d for d in diags if d.level == "error"]
+        assert errors == [], f"Unexpected adapter errors: {[e.message for e in errors]}"

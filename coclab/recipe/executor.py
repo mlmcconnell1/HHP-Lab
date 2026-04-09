@@ -1973,6 +1973,31 @@ def _assemble_panel(
             if "unemployment_rate_acs1" not in panel.columns:
                 panel["unemployment_rate_acs1"] = np.nan
 
+    # -----------------------------------------------------------------
+    # BLS LAUS metro provenance columns
+    # -----------------------------------------------------------------
+    if (
+        target_geo_type == "metro"
+        and policy is not None
+        and policy.laus is not None
+        and policy.laus.include
+    ):
+        has_laus_data = (
+            "unemployment_rate" in panel.columns
+            and panel["unemployment_rate"].notna().any()
+        )
+        if has_laus_data:
+            # LAUS is year-aligned: each panel row's year is the LAUS reference year.
+            panel["laus_vintage_used"] = panel["year"].astype(str)
+            laus_missing = panel["unemployment_rate"].isna()
+            if laus_missing.any():
+                panel.loc[laus_missing, "laus_vintage_used"] = pd.NA
+        else:
+            panel["laus_vintage_used"] = pd.NA
+            for col in ["labor_force", "employed", "unemployed", "unemployment_rate"]:
+                if col not in panel.columns:
+                    panel[col] = np.nan
+
     # Shared finalization: boundary detection, column ordering, dtypes,
     # source labeling, and column aliases.
     panel = finalize_panel(
@@ -2098,6 +2123,13 @@ def _persist_outputs(
     ):
         acs_products = ["acs5", "acs1"]
 
+    # LAUS-aware conformance: set include_laus when the policy requests it.
+    include_laus = (
+        persist_policy is not None
+        and persist_policy.laus is not None
+        and persist_policy.laus.include
+    )
+
     # ZORI-aware conformance (coclab-gude.2).
     include_zori = persist_policy is not None and persist_policy.zori is not None
 
@@ -2108,6 +2140,7 @@ def _persist_outputs(
         measure_columns=measure_columns,
         acs_products=acs_products,
         include_zori=include_zori,
+        include_laus=include_laus,
     )
     conformance_report = run_conformance(panel, panel_request)
     if not ctx.quiet:
