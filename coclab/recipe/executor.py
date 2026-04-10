@@ -57,6 +57,12 @@ from coclab.recipe.executor_manifest import (
     _target_geometry_metadata,
     resolve_pipeline_artifacts,
 )
+from coclab.recipe.executor_panel import (
+    canonicalize_panel_for_target as _canonicalize_panel_for_target,
+)
+from coclab.recipe.executor_panel import (
+    resolve_panel_aliases as _resolve_panel_aliases,
+)
 from coclab.recipe.executor_resample import (
     _XWALK_JOIN_KEYS,
     _XWALK_NON_GEO_COLS,
@@ -88,7 +94,6 @@ from coclab.recipe.planner import (
 )
 from coclab.recipe.recipe_schema import (
     CohortSelector,
-    GeometryRef,
     PanelPolicy,
     RecipeV1,
     TemporalFilter,
@@ -115,6 +120,7 @@ __all__ = [
     "_apply_temporal_filter",
     "_attach_dynamic_pop_share",
     "_build_manifest",
+    "_canonicalize_panel_for_target",
     "_build_provenance",
     "_deduplicate_assets",
     "_detect_xwalk_target_col",
@@ -133,6 +139,7 @@ __all__ = [
     "_resample_identity",
     "_resolve_geo_column",
     "_resolve_metro_transform_df",
+    "_resolve_panel_aliases",
     "_resolve_panel_output_file",
     "_resolve_pipeline_target",
     "_resolve_transform_path",
@@ -590,40 +597,6 @@ def _apply_cohort_selector(
     return panel[panel[geo_id_col].isin(selected)].reset_index(drop=True)
 
 
-def _canonicalize_panel_for_target(
-    panel: pd.DataFrame,
-    target_geometry: GeometryRef,
-) -> pd.DataFrame:
-    """Add target-geometry metadata columns expected by downstream tools."""
-    result = panel.copy()
-    geo_type, boundary_vintage, definition_version = _target_geometry_metadata(
-        target_geometry
-    )
-    if "geo_id" in result.columns:
-        result["geo_type"] = geo_type
-        if geo_type == "coc" and "coc_id" not in result.columns:
-            result["coc_id"] = result["geo_id"]
-        if geo_type == "metro":
-            if "metro_id" not in result.columns:
-                result["metro_id"] = result["geo_id"]
-            if "metro_name" not in result.columns or result["metro_name"].isna().any():
-                from coclab.metro.definitions import metro_name_for_id
-
-                result["metro_name"] = result["metro_id"].map(metro_name_for_id)
-            if (
-                definition_version is not None
-                and "definition_version_used" not in result.columns
-            ):
-                result["definition_version_used"] = definition_version
-        if (
-            geo_type == "coc"
-            and boundary_vintage is not None
-            and "boundary_vintage_used" not in result.columns
-        ):
-            result["boundary_vintage_used"] = boundary_vintage
-    return result
-
-
 @dataclass
 class _AssembledPanel:
     """Result of assembling a panel from joined intermediates."""
@@ -635,20 +608,6 @@ class _AssembledPanel:
     boundary_vintage: str | None
     definition_version: str | None
     zori_provenance: object | None = None  # ZoriProvenance, when ZORI policy active
-
-
-def _resolve_panel_aliases(target) -> dict[str, str]:
-    """Return column aliases for a target from its panel_policy.
-
-    Aliases are opt-in: only applied when the target's ``panel_policy``
-    declares explicit ``column_aliases``.  The preferred recipe aliases
-    are available as ``RECIPE_COLUMN_ALIASES`` for recipes that want
-    the new naming convention (coclab-t9rp).
-    """
-    policy: PanelPolicy | None = getattr(target, "panel_policy", None)
-    if policy is not None and policy.column_aliases:
-        return dict(policy.column_aliases)
-    return {}
 
 
 def _assemble_panel(
