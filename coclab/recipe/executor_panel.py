@@ -14,7 +14,7 @@ in coclab-anb0; the step-by-step extraction plan lives in
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 import numpy as np
 import pandas as pd
@@ -29,6 +29,10 @@ from coclab.recipe.executor_core import (
 from coclab.recipe.executor_manifest import (
     _resolve_pipeline_target,
     _target_geometry_metadata,
+)
+from coclab.recipe.executor_panel_policies import (
+    PolicyApplication,
+    ZoriPolicyApplier,
 )
 from coclab.recipe.planner import ExecutionPlan
 from coclab.recipe.recipe_schema import (
@@ -126,9 +130,21 @@ def apply_cohort_selector(
     return panel[panel[geo_id_col].isin(selected)].reset_index(drop=True)
 
 
+# Module-level applier registry.  Ordering matters: ZORI renames/cleans
+# columns that the ACS1 and LAUS appliers (added in step 6) later inspect.
+_ZORI_APPLIER = ZoriPolicyApplier()
+
+
 @dataclass
 class AssembledPanel:
-    """Result of assembling a panel from joined intermediates."""
+    """Result of assembling a panel from joined intermediates.
+
+    ``policy_artifacts`` is keyed by applier name (e.g. ``"zori"``) so
+    ``executor_persistence`` can reach back into a specific applier's
+    result — today only the ZORI applier produces a provenance object.
+    The ``zori_provenance`` property preserves the attribute-style
+    access used by the legacy persistence path.
+    """
 
     panel: pd.DataFrame
     frames: list[pd.DataFrame]
@@ -136,7 +152,13 @@ class AssembledPanel:
     target_geo_type: str
     boundary_vintage: str | None
     definition_version: str | None
-    zori_provenance: object | None = None  # ZoriProvenance, when ZORI policy active
+    policy_artifacts: dict[str, PolicyApplication] = field(default_factory=dict)
+
+    @property
+    def zori_provenance(self) -> object | None:
+        """Backward-compatible accessor used by executor_persistence."""
+        app = self.policy_artifacts.get("zori")
+        return app.provenance if app is not None else None
 
 
 def assemble_panel(
@@ -189,55 +211,21 @@ def assemble_panel(
     source_label = policy.source_label if policy else None
     include_zori = policy is not None and policy.zori is not None
     aliases = resolve_panel_aliases(target)
-    extra_columns: list[str] | None = None
-    zori_provenance = None
+    extras: list[str] = []
+    policy_artifacts: dict[str, PolicyApplication] = {}
 
     # -----------------------------------------------------------------
     # ZORI eligibility, rent_to_income, and provenance (coclab-gude.2)
     # -----------------------------------------------------------------
-    # Canonicalize recipe-native ZORI measure → canonical panel column.
-    # Recipe aggregation (county→target) produces a column named "zori"
-    # (the recipe measure name); the eligibility logic expects "zori_coc".
-    if include_zori and "zori" in panel.columns and "zori_coc" not in panel.columns:
-        panel = panel.rename(columns={"zori": "zori_coc"})
-
-    if include_zori and "zori_coc" in panel.columns:
-        from coclab.panel.zori_eligibility import (
-            ZoriProvenance,
-            add_provenance_columns,
-            apply_zori_eligibility,
-            compute_rent_to_income,
-        )
-
-        zori_policy = policy.zori  # type: ignore[union-attr]
-
-        # Detect rent alignment from resampled data (column injected by
-        # the ZORI resample step when the source has a "method" column).
-        rent_alignment = "pit_january"
-        if "method" in panel.columns:
-            methods = panel["method"].dropna().unique()
-            if len(methods) == 1:
-                rent_alignment = str(methods[0])
-
-        panel = apply_zori_eligibility(
+    if _ZORI_APPLIER.applies_to(target_geo_type=target_geo_type, policy=policy):
+        application = _ZORI_APPLIER.apply(
             panel,
-            min_coverage=zori_policy.min_coverage,
+            policy=policy,  # type: ignore[arg-type]
+            target_geo_type=target_geo_type,
         )
-        panel = compute_rent_to_income(panel)
-
-        zori_provenance = ZoriProvenance(
-            rent_alignment=rent_alignment,
-            zori_min_coverage=zori_policy.min_coverage,
-        )
-        panel = add_provenance_columns(panel, zori_provenance)
-
-        # Drop temporary columns that leak from resample intermediates.
-        for _tmp in ("method", "geo_count"):
-            if _tmp in panel.columns:
-                panel = panel.drop(columns=[_tmp])
-
-        if "zori_max_geo_contribution" in panel.columns:
-            extra_columns = ["zori_max_geo_contribution"]
+        panel = application.panel
+        extras.extend(application.extra_columns)
+        policy_artifacts[_ZORI_APPLIER.name] = application
 
     # -----------------------------------------------------------------
     # ACS 1-year provenance columns (coclab-gude.3)
@@ -302,7 +290,7 @@ def assemble_panel(
         include_zori=include_zori,
         source_label=source_label,
         column_aliases=aliases,
-        extra_columns=extra_columns,
+        extra_columns=extras or None,
     )
 
     if target.cohort is not None:
@@ -323,5 +311,5 @@ def assemble_panel(
         target_geo_type=target_geo_type,
         boundary_vintage=boundary_vintage,
         definition_version=definition_version,
-        zori_provenance=zori_provenance,
+        policy_artifacts=policy_artifacts,
     )
