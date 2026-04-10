@@ -155,6 +155,29 @@ def _scan_zori(curated: Path) -> dict:
     return {"count": len(items), "items": items}
 
 
+def _scan_laus(curated: Path) -> dict:
+    """Scan curated BLS LAUS metro yearly files.
+
+    Matches the canonical naming from coclab.naming.laus_metro_filename
+    (``laus_metro__A<year>@D<definition>.parquet``) and reports unique
+    (year, definition_version) pairs sorted by year then definition.
+    """
+    import re
+
+    ldir = curated / "laus"
+    items: list[dict] = []
+    years_set: set[int] = set()
+    if ldir.exists():
+        for p in sorted(ldir.glob("*.parquet")):
+            m = re.match(r"^laus_metro__A(\d{4})@D(.+)\.parquet$", p.name)
+            if m:
+                year = int(m.group(1))
+                items.append({"year": year, "definition_version": m.group(2)})
+                years_set.add(year)
+    items.sort(key=lambda i: (i["year"], i["definition_version"]))
+    return {"count": len(items), "items": items, "years": sorted(years_set)}
+
+
 def _scan_builds(builds_dir: Path) -> list[dict]:
     """Scan optional named builds and their manifests."""
     results: list[dict] = []
@@ -264,6 +287,7 @@ def status_cmd(
         "measures": _scan_measures(curated),
         "acs": _scan_acs(curated),
         "zori": _scan_zori(curated),
+        "laus": _scan_laus(curated),
     }
 
     builds = _scan_builds(builds_dir)
@@ -320,6 +344,10 @@ def status_cmd(
     # ZORI
     z = assets["zori"]
     typer.echo(f"ZORI:       {z['count']} file(s)")
+
+    # LAUS
+    laus = assets["laus"]
+    typer.echo(f"LAUS:       {laus['count']} file(s)  {_fmt_years(laus['years'])}")
 
     # Builds
     typer.echo(f"\nNamed builds (optional): {len(builds)}")

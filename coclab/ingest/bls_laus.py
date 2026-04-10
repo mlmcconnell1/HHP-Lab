@@ -65,7 +65,7 @@ from coclab.metro.laus import (
     build_laus_series_id,
 )
 from coclab.provenance import ProvenanceBlock, write_parquet_with_provenance
-from coclab.sources import BLS_API_V2, BLS_LAUS_SOURCE_REF
+from coclab.sources import BLS_API_REGISTRATION_URL, BLS_API_V2, BLS_LAUS_SOURCE_REF
 
 logger = logging.getLogger(__name__)
 
@@ -74,6 +74,57 @@ logger = logging.getLogger(__name__)
 # A registration key raises the cap to 50.
 _BLS_ANON_MAX_SERIES_PER_REQUEST: int = 25
 _BLS_KEY_MAX_SERIES_PER_REQUEST: int = 50
+
+# Substrings the BLS API uses in its message[] array when the daily query
+# threshold is hit.  Detected case-insensitively against any message string
+# regardless of the request status field — BLS sometimes returns
+# REQUEST_NOT_PROCESSED, sometimes REQUEST_FAILED, with the same threshold
+# wording in the message body.
+_BLS_QUOTA_MESSAGE_TOKENS: tuple[str, ...] = (
+    "daily threshold",
+    "daily query limit",
+    "threshold for total number of requests",
+    "queries reached",
+    "throttle",
+)
+
+
+class BlsQuotaExhausted(RuntimeError):
+    """Raised when the BLS Public API rejects a request due to its daily query threshold.
+
+    Carries an actionable message telling the caller how to recover: supply a
+    BLS registration key (raising the daily threshold from the anonymous limit)
+    or wait until the threshold resets at midnight US Eastern time.
+    """
+
+
+def _is_bls_quota_response(status: str | None, messages: list[str]) -> bool:
+    """Return True if a BLS API response indicates the daily query threshold was hit."""
+    haystack = " ".join(str(m) for m in messages).lower()
+    if any(token in haystack for token in _BLS_QUOTA_MESSAGE_TOKENS):
+        return True
+    # Some quota responses come back with REQUEST_NOT_PROCESSED and an empty
+    # message array; treat that status as quota-exhausted by default since the
+    # only documented cause for it on this endpoint is throttling.
+    return status == "REQUEST_NOT_PROCESSED"
+
+
+def _bls_quota_message(*, has_api_key: bool) -> str:
+    """Build the actionable message returned with BlsQuotaExhausted."""
+    if has_api_key:
+        key_hint = (
+            "Your registered BLS API key has hit its daily threshold. "
+            "Wait for the threshold to reset (midnight US Eastern time) and retry."
+        )
+    else:
+        key_hint = (
+            "The anonymous BLS API daily threshold has been reached. "
+            "Either register for a free BLS API key at "
+            f"{BLS_API_REGISTRATION_URL} and re-run with --api-key <KEY> "
+            "(or set BLS_API_KEY in the environment), or wait for the "
+            "threshold to reset (midnight US Eastern time) and retry."
+        )
+    return key_hint
 
 
 def _build_metro_series_map(
@@ -137,11 +188,15 @@ def fetch_laus_annual_averages(
     ------
     httpx.HTTPStatusError
         If the BLS API returns a non-2xx response.
+    BlsQuotaExhausted
+        If the BLS API rejects the request because the daily query threshold
+        has been reached.  Carries an actionable message with recovery steps.
     ValueError
-        If the API response cannot be parsed.
+        If the API response cannot be parsed for any other reason.
     """
     if api_key is None:
         api_key = os.environ.get("BLS_API_KEY")
+    has_api_key = bool(api_key)
 
     results: dict[str, float | int] = {}
     batch_size = _BLS_KEY_MAX_SERIES_PER_REQUEST if api_key else _BLS_ANON_MAX_SERIES_PER_REQUEST
@@ -170,9 +225,12 @@ def fetch_laus_annual_averages(
             data = response.json()
 
         if data.get("status") != "REQUEST_SUCCEEDED":
-            msg = data.get("message", [])
+            status = data.get("status")
+            msg = data.get("message", []) or []
+            if _is_bls_quota_response(status, msg):
+                raise BlsQuotaExhausted(_bls_quota_message(has_api_key=has_api_key))
             raise ValueError(
-                f"BLS API request failed (status={data.get('status')!r}): {msg}"
+                f"BLS API request failed (status={status!r}): {msg}"
             )
 
         for series_data in data.get("Results", {}).get("series", []):

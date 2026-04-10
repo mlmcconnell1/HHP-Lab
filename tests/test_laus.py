@@ -26,6 +26,7 @@ import pandas as pd
 import pytest
 
 from coclab.ingest.bls_laus import (
+    BlsQuotaExhausted,
     _build_metro_series_map,
     _chunked,
     fetch_laus_annual_averages,
@@ -315,6 +316,97 @@ class TestFetchLausAnnualAverages:
 
         # 60 series split into 2 registered batches: 50 + 10
         assert mock_post.call_count == 2
+
+
+# ---------------------------------------------------------------------------
+# BLS quota-exhausted detection  (coclab-qh4v)
+# ---------------------------------------------------------------------------
+
+
+#: Documented BLS quota-exhausted response shapes.  When the daily query
+#: threshold is hit BLS may respond with REQUEST_NOT_PROCESSED, REQUEST_FAILED,
+#: or even an empty status; the message wording also varies.  Each entry below
+#: is a (status, message[]) tuple known to indicate quota exhaustion in the
+#: wild — fetch_laus_annual_averages must raise BlsQuotaExhausted for all of
+#: them so the CLI can render an actionable hint.
+BLS_QUOTA_RESPONSE_SHAPES = [
+    pytest.param(
+        "REQUEST_NOT_PROCESSED",
+        ["daily threshold for total number of requests has been reached"],
+        id="not-processed-with-threshold-message",
+    ),
+    pytest.param(
+        "REQUEST_FAILED",
+        ["Daily query limit reached for unregistered users"],
+        id="failed-with-daily-query-limit",
+    ),
+    pytest.param(
+        "REQUEST_NOT_PROCESSED",
+        [],
+        id="not-processed-empty-message",
+    ),
+    pytest.param(
+        "REQUEST_FAILED",
+        ["Throttle: too many queries"],
+        id="failed-throttle",
+    ),
+]
+
+
+class TestBlsQuotaExhausted:
+    @pytest.mark.parametrize("status,message", BLS_QUOTA_RESPONSE_SHAPES)
+    def test_fetch_raises_quota_exhausted(self, status, message):
+        quota_response = {"status": status, "message": message}
+        sid = NY_SERIES_IDS["unemployment_rate"]
+
+        with patch("coclab.ingest.bls_laus.httpx.Client") as mock_client:
+            mock_client.return_value.__enter__.return_value.post.return_value.json.return_value = quota_response
+            mock_client.return_value.__enter__.return_value.post.return_value.raise_for_status.return_value = None
+
+            with pytest.raises(BlsQuotaExhausted) as exc_info:
+                fetch_laus_annual_averages([sid], 2023)
+
+        # Anonymous request — message must point the user at registration.
+        text = str(exc_info.value)
+        assert "BLS API key" in text
+        assert "BLS_API_KEY" in text or "--api-key" in text
+        assert "wait" in text.lower()
+
+    def test_fetch_quota_message_with_api_key_omits_registration_url(self):
+        quota_response = {
+            "status": "REQUEST_NOT_PROCESSED",
+            "message": ["daily threshold for total number of requests has been reached"],
+        }
+        sid = NY_SERIES_IDS["unemployment_rate"]
+
+        with patch("coclab.ingest.bls_laus.httpx.Client") as mock_client:
+            mock_client.return_value.__enter__.return_value.post.return_value.json.return_value = quota_response
+            mock_client.return_value.__enter__.return_value.post.return_value.raise_for_status.return_value = None
+
+            with pytest.raises(BlsQuotaExhausted) as exc_info:
+                fetch_laus_annual_averages([sid], 2023, api_key="present")
+
+        text = str(exc_info.value)
+        # When the user already has a key the actionable advice is "wait
+        # for the threshold to reset" — registering again would not help.
+        assert "wait" in text.lower()
+        assert "reset" in text.lower()
+        # Should not tell a user with a key to "register for" a (new) key
+        assert "register for" not in text.lower()
+        assert "BLS_API_KEY" not in text
+
+    def test_non_quota_failure_still_raises_value_error(self):
+        """Other REQUEST_FAILED responses must keep raising ValueError, not
+        BlsQuotaExhausted, so callers can distinguish quota from real errors."""
+        bad_request = {"status": "REQUEST_FAILED", "message": ["Invalid series id"]}
+        sid = NY_SERIES_IDS["unemployment_rate"]
+
+        with patch("coclab.ingest.bls_laus.httpx.Client") as mock_client:
+            mock_client.return_value.__enter__.return_value.post.return_value.json.return_value = bad_request
+            mock_client.return_value.__enter__.return_value.post.return_value.raise_for_status.return_value = None
+
+            with pytest.raises(ValueError, match="BLS API request failed"):
+                fetch_laus_annual_averages([sid], 2023)
 
 
 # ---------------------------------------------------------------------------
@@ -903,6 +995,129 @@ class TestCliLausMetro:
         assert data["status"] == "error"
         assert data["years_succeeded"] == []
         assert set(data["years_failed"]) == {2021, 2022}
+
+    # ------------------------------------------------------------------
+    # Quota-exhausted CLI behaviour  (coclab-qh4v)
+    # ------------------------------------------------------------------
+
+    def test_quota_exhausted_single_year_text_includes_actionable_hint(self, tmp_path):
+        """Single-year ingest must surface the BlsQuotaExhausted message verbatim
+        so the user immediately sees how to recover (API key or wait)."""
+        from coclab.ingest.bls_laus import BlsQuotaExhausted
+
+        actionable = (
+            "The anonymous BLS API daily threshold has been reached. "
+            "Either register for a free BLS API key at https://example/register "
+            "and re-run with --api-key <KEY> (or set BLS_API_KEY in the environment), "
+            "or wait for the threshold to reset (midnight US Eastern time) and retry."
+        )
+
+        def _quota_ingest(**kwargs):
+            raise BlsQuotaExhausted(actionable)
+
+        with patch("coclab.ingest.bls_laus.ingest_laus_metro", _quota_ingest), \
+             patch("coclab.cli.main._check_working_directory"):
+            result = self._runner().invoke(
+                self._app(), ["ingest", "laus-metro", "--year", "2023"]
+            )
+
+        assert result.exit_code == 1, result.output
+        combined = (result.output or "") + (result.stderr if hasattr(result, "stderr") else "")
+        # Recovery hints must appear (API key OR wait), not just a generic failure
+        assert "BLS quota exhausted" in combined
+        assert "BLS_API_KEY" in combined or "--api-key" in combined
+        assert "wait" in combined.lower()
+
+    def test_quota_exhausted_single_year_json_carries_reason(self, tmp_path):
+        from coclab.ingest.bls_laus import BlsQuotaExhausted
+
+        def _quota_ingest(**kwargs):
+            raise BlsQuotaExhausted(
+                "register for a free BLS API key and re-run with --api-key <KEY>, "
+                "or wait for the threshold to reset"
+            )
+
+        with patch("coclab.ingest.bls_laus.ingest_laus_metro", _quota_ingest), \
+             patch("coclab.cli.main._check_working_directory"):
+            result = self._runner().invoke(
+                self._app(), ["ingest", "laus-metro", "--year", "2023", "--json"]
+            )
+
+        assert result.exit_code == 1, result.output
+        data = json.loads(result.output)
+        assert data["status"] == "error"
+        assert data["reason"] == "bls_quota_exhausted"
+        assert "--api-key" in data["error"] or "BLS_API_KEY" in data["error"]
+        assert "wait" in data["error"].lower()
+
+    def test_quota_exhausted_backfill_short_circuits_remaining_years(self, tmp_path):
+        """When the first year of a backfill hits a quota error, remaining years
+        must NOT be retried (they would all fail with the same condition).  All
+        years should be reported as failed and the JSON payload must carry the
+        bls_quota_exhausted reason."""
+        from coclab.ingest.bls_laus import BlsQuotaExhausted
+
+        call_log: list[int] = []
+
+        def _quota_ingest(year, **kwargs):
+            call_log.append(year)
+            raise BlsQuotaExhausted(
+                "register for a BLS API key and re-run with --api-key <KEY>, "
+                "or wait for the threshold to reset"
+            )
+
+        with patch("coclab.ingest.bls_laus.ingest_laus_metro", _quota_ingest), \
+             patch("coclab.cli.main._check_working_directory"):
+            result = self._runner().invoke(
+                self._app(),
+                ["ingest", "laus-metro", "--start-year", "2015", "--end-year", "2023", "--json"],
+            )
+
+        assert result.exit_code == 1, result.output
+        # Only the first year should have been attempted
+        assert call_log == [2015], f"Backfill kept calling after quota: {call_log}"
+
+        data = json.loads(result.output)
+        assert data["status"] == "error"
+        assert data["reason"] == "bls_quota_exhausted"
+        assert data["years_succeeded"] == []
+        assert set(data["years_failed"]) == set(range(2015, 2024))
+
+    def test_quota_exhausted_backfill_after_partial_success_marks_partial(self, tmp_path):
+        """If some early years succeed and a later year hits the quota, the
+        backfill must report status=partial, mark only the unattempted years
+        as failed, and tag the payload with bls_quota_exhausted."""
+        from coclab.ingest.bls_laus import BlsQuotaExhausted
+
+        mock_fn = _make_mock_ingest_fn(tmp_path)
+        call_log: list[int] = []
+
+        def _mixed_ingest(year, **kwargs):
+            call_log.append(year)
+            if year >= 2017:
+                raise BlsQuotaExhausted(
+                    "register for a BLS API key and re-run with --api-key <KEY>, "
+                    "or wait for the threshold to reset"
+                )
+            return mock_fn(year=year, **kwargs)
+
+        with patch("coclab.ingest.bls_laus.ingest_laus_metro", _mixed_ingest), \
+             patch("coclab.cli.main._check_working_directory"):
+            result = self._runner().invoke(
+                self._app(),
+                ["ingest", "laus-metro", "--start-year", "2015", "--end-year", "2020", "--json"],
+            )
+
+        assert result.exit_code == 1, result.output
+        # 2015 + 2016 succeed; 2017 raises and breaks the loop.
+        assert call_log == [2015, 2016, 2017], f"Unexpected attempts: {call_log}"
+
+        data = json.loads(result.output)
+        assert data["status"] == "partial"
+        assert data["reason"] == "bls_quota_exhausted"
+        assert set(data["years_succeeded"]) == {2015, 2016}
+        # 2017 (the year that hit the quota) plus all later years must be marked failed
+        assert set(data["years_failed"]) == {2017, 2018, 2019, 2020}
 
 
 # ---------------------------------------------------------------------------

@@ -39,6 +39,9 @@ BLS_API_V2: Final = "https://api.bls.gov/publicAPI/v2/timeseries/data/"
 BLS_LAUS_SOURCE_REF: Final = (
     "https://www.bls.gov/lau/home.htm"
 )
+BLS_API_REGISTRATION_URL: Final = (
+    "https://data.bls.gov/registrationEngine/"
+)
 
 # Zillow
 ZILLOW_ZORI_COUNTY: Final = (

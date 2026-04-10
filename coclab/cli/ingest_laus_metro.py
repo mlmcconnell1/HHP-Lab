@@ -79,7 +79,7 @@ def ingest_laus_metro(
     """
     import pandas as pd
 
-    from coclab.ingest.bls_laus import ingest_laus_metro as _ingest
+    from coclab.ingest.bls_laus import BlsQuotaExhausted, ingest_laus_metro as _ingest
 
     # Resolve years to process
     if year is not None and (start_year is not None or end_year is not None):
@@ -112,6 +112,7 @@ def ingest_laus_metro(
 
     results = []
     errors = []
+    quota_exhausted = False
 
     for y in years:
         try:
@@ -124,6 +125,31 @@ def ingest_laus_metro(
             results.append({"year": y, "path": str(path), "metros": len(df), "df": df})
             if not json_output and len(years) > 1:
                 typer.echo(f"  ✓ {y}: {len(df)} metros → {path.name}")
+        except BlsQuotaExhausted as e:
+            # BLS daily threshold hit — there is no point continuing the
+            # remaining years in a backfill loop, since they would all fail
+            # with the same condition.  Record the error for every remaining
+            # year and break out so the user gets a single actionable message.
+            quota_exhausted = True
+            errors.append({"year": y, "error": str(e), "reason": "bls_quota_exhausted"})
+            if not json_output:
+                typer.echo(f"  ✗ {y}: BLS quota exhausted — {e}", err=True)
+            for remaining in years[years.index(y) + 1 :]:
+                errors.append({
+                    "year": remaining,
+                    "error": "skipped: BLS quota already exhausted",
+                    "reason": "bls_quota_exhausted",
+                })
+            if len(years) == 1:
+                if json_output:
+                    typer.echo(json.dumps({
+                        "status": "error",
+                        "year": y,
+                        "error": str(e),
+                        "reason": "bls_quota_exhausted",
+                    }))
+                raise typer.Exit(1) from e
+            break
         except Exception as e:
             errors.append({"year": y, "error": str(e)})
             if not json_output:
@@ -166,20 +192,30 @@ def ingest_laus_metro(
                 status = "partial"
             else:
                 status = "ok"
-            typer.echo(json.dumps({
+            payload: dict = {
                 "status": status,
                 "years_requested": years,
                 "years_succeeded": [r["year"] for r in results],
                 "years_failed": [e["year"] for e in errors],
                 "outputs": [{"year": r["year"], "path": r["path"], "metros": r["metros"]} for r in results],
                 "errors": errors,
-            }, indent=2))
+            }
+            if quota_exhausted:
+                payload["reason"] = "bls_quota_exhausted"
+            typer.echo(json.dumps(payload, indent=2))
         if errors:
             raise typer.Exit(1)
         return
 
     if not results:
         typer.echo("No data was successfully ingested.", err=True)
+        if quota_exhausted:
+            typer.echo(
+                "BLS quota exhausted: register for a BLS API key and re-run "
+                "with --api-key <KEY> (or set BLS_API_KEY), or wait for the "
+                "BLS daily threshold to reset (midnight US Eastern time).",
+                err=True,
+            )
         raise typer.Exit(1)
 
     # Human-readable summary for single-year case
@@ -222,4 +258,11 @@ def ingest_laus_metro(
         typer.echo(f"Backfill complete: {len(results)}/{len(years)} years ingested.")
         if errors:
             typer.echo(f"Failed years: {[e['year'] for e in errors]}", err=True)
+            if quota_exhausted:
+                typer.echo(
+                    "BLS quota exhausted: register for a BLS API key and re-run "
+                    "with --api-key <KEY> (or set BLS_API_KEY), or wait for the "
+                    "BLS daily threshold to reset (midnight US Eastern time).",
+                    err=True,
+                )
             raise typer.Exit(1)
