@@ -66,7 +66,11 @@ class TestRawPath:
     def test_with_variant(self, tmp_path, monkeypatch):
         monkeypatch.chdir(tmp_path)
         p = raw_path("tiger", 2020, "tab20_tract20_tract10_natl.txt", "tract_relationship")
-        assert p == tmp_path / "data" / "raw" / "tiger" / "2020" / "tract_relationship" / "tab20_tract20_tract10_natl.txt"
+        expected = (
+            tmp_path / "data" / "raw" / "tiger" / "2020"
+            / "tract_relationship" / "tab20_tract20_tract10_natl.txt"
+        )
+        assert p == expected
 
     def test_custom_raw_root(self, tmp_path: Path):
         p = raw_path("pep", 2024, "pep.csv", raw_root=tmp_path)

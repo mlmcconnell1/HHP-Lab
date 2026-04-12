@@ -11,11 +11,13 @@ All tests use tmp_path with synthetic directory structures.
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import pytest
 from typer.testing import CliRunner
 
+from coclab.cli.main import app
 from coclab.curated_policy import (
     CANONICAL_PATTERNS,
     CURATED_SUBDIRS,
@@ -386,10 +388,6 @@ class TestPepNaming:
 # ---------------------------------------------------------------------------
 # migrate curated-layout --json tests
 # ---------------------------------------------------------------------------
-
-import json
-
-from coclab.cli.main import app
 
 _runner = CliRunner()
 

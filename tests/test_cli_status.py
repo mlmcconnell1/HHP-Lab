@@ -333,7 +333,8 @@ class TestLausScan:
 
         result = runner.invoke(
             app,
-            ["status", "--json", "--data-dir", str(data_dir), "--builds-dir", str(tmp_path / "builds")],
+            ["status", "--json", "--data-dir", str(data_dir),
+             "--builds-dir", str(tmp_path / "builds")],
         )
 
         payload = json.loads(result.output)
@@ -351,7 +352,8 @@ class TestLausScan:
 
         result = runner.invoke(
             app,
-            ["status", "--json", "--data-dir", str(data_dir), "--builds-dir", str(tmp_path / "builds")],
+            ["status", "--json", "--data-dir", str(data_dir),
+             "--builds-dir", str(tmp_path / "builds")],
         )
 
         payload = json.loads(result.output)
@@ -370,7 +372,8 @@ class TestLausScan:
 
         result = runner.invoke(
             app,
-            ["status", "--json", "--data-dir", str(data_dir), "--builds-dir", str(tmp_path / "builds")],
+            ["status", "--json", "--data-dir", str(data_dir),
+             "--builds-dir", str(tmp_path / "builds")],
         )
 
         payload = json.loads(result.output)
@@ -392,7 +395,8 @@ class TestLausScan:
 
         result = runner.invoke(
             app,
-            ["status", "--json", "--data-dir", str(data_dir), "--builds-dir", str(tmp_path / "builds")],
+            ["status", "--json", "--data-dir", str(data_dir),
+             "--builds-dir", str(tmp_path / "builds")],
         )
 
         payload = json.loads(result.output)

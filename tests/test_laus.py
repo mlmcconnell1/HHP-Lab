@@ -249,8 +249,12 @@ class TestFetchLausAnnualAverages:
         mock_response = _make_bls_response({sid: 4.2})
 
         with patch("coclab.ingest.bls_laus.httpx.Client") as mock_client:
-            mock_client.return_value.__enter__.return_value.post.return_value.json.return_value = mock_response
-            mock_client.return_value.__enter__.return_value.post.return_value.raise_for_status.return_value = None
+            post_rv = (
+                mock_client.return_value.__enter__.return_value
+                .post.return_value
+            )
+            post_rv.json.return_value = mock_response
+            post_rv.raise_for_status.return_value = None
 
             result = fetch_laus_annual_averages([sid], 2023)
 
@@ -273,8 +277,12 @@ class TestFetchLausAnnualAverages:
             },
         }
         with patch("coclab.ingest.bls_laus.httpx.Client") as mock_client:
-            mock_client.return_value.__enter__.return_value.post.return_value.json.return_value = monthly_only_response
-            mock_client.return_value.__enter__.return_value.post.return_value.raise_for_status.return_value = None
+            post_rv = (
+                mock_client.return_value.__enter__.return_value
+                .post.return_value
+            )
+            post_rv.json.return_value = monthly_only_response
+            post_rv.raise_for_status.return_value = None
 
             result = fetch_laus_annual_averages([sid], 2023)
 
@@ -286,8 +294,12 @@ class TestFetchLausAnnualAverages:
             "message": ["Bad request"],
         }
         with patch("coclab.ingest.bls_laus.httpx.Client") as mock_client:
-            mock_client.return_value.__enter__.return_value.post.return_value.json.return_value = failed_response
-            mock_client.return_value.__enter__.return_value.post.return_value.raise_for_status.return_value = None
+            post_rv = (
+                mock_client.return_value.__enter__.return_value
+                .post.return_value
+            )
+            post_rv.json.return_value = failed_response
+            post_rv.raise_for_status.return_value = None
 
             with pytest.raises(ValueError, match="BLS API request failed"):
                 fetch_laus_annual_averages([NY_SERIES_IDS["unemployment_rate"]], 2023)
@@ -366,8 +378,12 @@ class TestBlsQuotaExhausted:
         sid = NY_SERIES_IDS["unemployment_rate"]
 
         with patch("coclab.ingest.bls_laus.httpx.Client") as mock_client:
-            mock_client.return_value.__enter__.return_value.post.return_value.json.return_value = quota_response
-            mock_client.return_value.__enter__.return_value.post.return_value.raise_for_status.return_value = None
+            post_rv = (
+                mock_client.return_value.__enter__.return_value
+                .post.return_value
+            )
+            post_rv.json.return_value = quota_response
+            post_rv.raise_for_status.return_value = None
 
             with pytest.raises(BlsQuotaExhausted) as exc_info:
                 fetch_laus_annual_averages([sid], 2023)
@@ -386,8 +402,12 @@ class TestBlsQuotaExhausted:
         sid = NY_SERIES_IDS["unemployment_rate"]
 
         with patch("coclab.ingest.bls_laus.httpx.Client") as mock_client:
-            mock_client.return_value.__enter__.return_value.post.return_value.json.return_value = quota_response
-            mock_client.return_value.__enter__.return_value.post.return_value.raise_for_status.return_value = None
+            post_rv = (
+                mock_client.return_value.__enter__.return_value
+                .post.return_value
+            )
+            post_rv.json.return_value = quota_response
+            post_rv.raise_for_status.return_value = None
 
             with pytest.raises(BlsQuotaExhausted) as exc_info:
                 fetch_laus_annual_averages([sid], 2023, api_key="present")
@@ -408,8 +428,12 @@ class TestBlsQuotaExhausted:
         sid = NY_SERIES_IDS["unemployment_rate"]
 
         with patch("coclab.ingest.bls_laus.httpx.Client") as mock_client:
-            mock_client.return_value.__enter__.return_value.post.return_value.json.return_value = bad_request
-            mock_client.return_value.__enter__.return_value.post.return_value.raise_for_status.return_value = None
+            post_rv = (
+                mock_client.return_value.__enter__.return_value
+                .post.return_value
+            )
+            post_rv.json.return_value = bad_request
+            post_rv.raise_for_status.return_value = None
 
             with pytest.raises(ValueError, match="BLS API request failed"):
                 fetch_laus_annual_averages([sid], 2023)
@@ -483,7 +507,11 @@ class TestIngestLausMetro:
     def test_output_has_canonical_columns(self, tmp_path):
         path = _mock_ingest(tmp_path, 2022)
         df = pd.read_parquet(path)
-        for col in ["metro_id", "year", "unemployment_rate", "unemployed", "employed", "labor_force"]:
+        expected_cols = [
+            "metro_id", "year", "unemployment_rate",
+            "unemployed", "employed", "labor_force",
+        ]
+        for col in expected_cols:
             assert col in df.columns, f"Missing column: {col}"
 
     def test_unemployment_rate_is_float(self, tmp_path):
@@ -632,7 +660,10 @@ class TestLausNaming:
         assert laus_metro_filename(2023, "glynn_fox_v1") == "laus_metro__A2023@Dglynnfoxv1.parquet"
 
     def test_filename_string_year(self):
-        assert laus_metro_filename("2022", "glynn_fox_v1") == "laus_metro__A2022@Dglynnfoxv1.parquet"
+        assert (
+            laus_metro_filename("2022", "glynn_fox_v1")
+            == "laus_metro__A2022@Dglynnfoxv1.parquet"
+        )
 
     def test_path_default_base(self):
         p = laus_metro_path(2023, "glynn_fox_v1")

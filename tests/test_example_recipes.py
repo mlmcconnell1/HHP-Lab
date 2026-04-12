@@ -92,13 +92,19 @@ AUTO_TRANSFORM_EXPECTATIONS: tuple[tuple[str, str, str, dict[int, str]], ...] = 
         "metro-glynnfox-acs-income-2019-2025.yaml",
         "build_metro_panel",
         "acs_tract",
-        {2019: "tract_to_metro_2010", 2020: "tract_to_metro_2010", 2021: "tract_to_metro_2020", 2025: "tract_to_metro_2020"},
+        {
+            2019: "tract_to_metro_2010", 2020: "tract_to_metro_2010",
+            2021: "tract_to_metro_2020", 2025: "tract_to_metro_2020",
+        },
     ),
     (
         "metro-glynnfox-pit-acs-pep-zori-2016-2024.yaml",
         "build_metro_panel",
         "acs_tract",
-        {2016: "tract_to_metro_2010", 2020: "tract_to_metro_2010", 2021: "tract_to_metro_2020", 2024: "tract_to_metro_2020"},
+        {
+            2016: "tract_to_metro_2010", 2020: "tract_to_metro_2010",
+            2021: "tract_to_metro_2020", 2024: "tract_to_metro_2020",
+        },
     ),
 )
 

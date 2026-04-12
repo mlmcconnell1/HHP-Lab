@@ -39,7 +39,10 @@ def metro_tract_crosswalk():
         {
             "metro_id": ["GF01", "GF01", "GF02", "GF02", "GF02"],
             "boundary_vintage": "glynn_fox_v1",
-            "tract_geoid": ["36061000100", "36061000200", "06037000100", "06037000200", "06037000300"],
+            "tract_geoid": [
+                "36061000100", "36061000200",
+                "06037000100", "06037000200", "06037000300",
+            ],
             "tract_vintage": "2020",
             "area_share": [0.8, 0.6, 1.0, 0.5, 0.3],
             "intersection_area": [8000.0, 6000.0, 10000.0, 5000.0, 3000.0],
@@ -97,7 +100,10 @@ class TestTractCrosswalkGeneralization:
     def test_add_population_weights_with_metro_id(self, metro_tract_crosswalk):
         pop_data = pd.DataFrame(
             {
-                "GEOID": ["36061000100", "36061000200", "06037000100", "06037000200", "06037000300"],
+                "GEOID": [
+                    "36061000100", "36061000200",
+                    "06037000100", "06037000200", "06037000300",
+                ],
                 "total_population": [5000, 3000, 8000, 4000, 2000],
             }
         )
@@ -113,7 +119,10 @@ class TestTractCrosswalkGeneralization:
     def test_validate_population_shares_with_metro_id(self, metro_tract_crosswalk):
         pop_data = pd.DataFrame(
             {
-                "GEOID": ["36061000100", "36061000200", "06037000100", "06037000200", "06037000300"],
+                "GEOID": [
+                    "36061000100", "36061000200",
+                    "06037000100", "06037000200", "06037000300",
+                ],
                 "total_population": [5000, 3000, 8000, 4000, 2000],
             }
         )

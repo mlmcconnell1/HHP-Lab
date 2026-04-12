@@ -657,7 +657,8 @@ class TestRunPreflight:
         assert lag_findings == []
 
     def test_preflight_no_warning_on_prior_year_acs1_vintage_static_path(self, tmp_path: Path):
-        """Static-path ACS1 whose __A{year} vintage is prior year → no TEMPORAL_ALIGNMENT warning."""
+        """Static-path ACS1 whose __A{year} vintage is prior year
+        -> no TEMPORAL_ALIGNMENT warning."""
         data_dir = tmp_path / "data" / "curated" / "acs"
         data_dir.mkdir(parents=True)
         pd.DataFrame({

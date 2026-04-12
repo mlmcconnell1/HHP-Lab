@@ -284,7 +284,8 @@ class TestAggregationUnit:
             "area_share": [1.0],
         }).to_parquet(xwalk_path, index=False)
 
-        with pytest.raises(ValueError, match="No PEP data remains after applying the requested year filter"):
+        msg = "No PEP data remains after applying the requested year filter"
+        with pytest.raises(ValueError, match=msg):
             aggregate_pep_to_coc(
                 boundary_vintage="2024",
                 county_vintage="2024",
