@@ -511,6 +511,394 @@ class TestRunPreflight:
         assert lag_findings[0].severity == Severity.WARNING
         assert "acs_end offset 0" in lag_findings[0].message
 
+    def test_preflight_warns_on_same_year_acs1_vintage_static_path(self, tmp_path: Path):
+        """Warn only when same-year ACS1 is used in a PIT/January-aligned pipeline."""
+        data_dir = tmp_path / "data" / "curated" / "acs"
+        data_dir.mkdir(parents=True)
+        pd.DataFrame({
+            "metro_id": ["M1"],
+            "acs1_vintage": [2023],
+            "unemployment_rate_acs1": [0.05],
+        }).to_parquet(data_dir / "acs1_metro__A2023@Dglynnfoxv1.parquet")
+
+        recipe_data = {
+            "version": 1,
+            "name": "acs1-same-year-warning",
+            "universe": {"years": [2023]},
+            "targets": [
+                {"id": "metro_panel", "geometry": {"type": "metro", "source": "glynn_fox_v1"}},
+            ],
+            "datasets": {
+                "pit": {
+                    "provider": "hud",
+                    "product": "pit",
+                    "version": 1,
+                    "native_geometry": {"type": "metro", "source": "glynn_fox_v1"},
+                    "years": {"years": [2023]},
+                    "path": "data/pit.parquet",
+                    "params": {"align": "point_in_time_jan"},
+                },
+                "acs1_metro": {
+                    "provider": "census",
+                    "product": "acs1",
+                    "version": 1,
+                    "native_geometry": {"type": "metro", "source": "glynn_fox_v1"},
+                    "years": {"years": [2023]},
+                    "year_column": "acs1_vintage",
+                    "geo_column": "metro_id",
+                    "path": "data/curated/acs/acs1_metro__A2023@Dglynnfoxv1.parquet",
+                },
+            },
+            "transforms": [],
+            "pipelines": [
+                {
+                    "id": "main",
+                    "target": "metro_panel",
+                    "steps": [
+                        {
+                            "resample": {
+                                "dataset": "pit",
+                                "to_geometry": {"type": "metro", "source": "glynn_fox_v1"},
+                                "method": "identity",
+                                "measures": ["pit_total"],
+                            },
+                        },
+                        {
+                            "resample": {
+                                "dataset": "acs1_metro",
+                                "to_geometry": {"type": "metro", "source": "glynn_fox_v1"},
+                                "method": "identity",
+                                "measures": ["unemployment_rate_acs1"],
+                            },
+                        },
+                        {
+                            "join": {
+                                "datasets": ["pit", "acs1_metro"],
+                                "join_on": ["geo_id", "year"],
+                            },
+                        },
+                    ],
+                },
+            ],
+        }
+
+        recipe = load_recipe(recipe_data)
+        report = run_preflight(recipe, project_root=tmp_path)
+        lag_findings = [
+            f for f in report.findings
+            if f.kind == FindingKind.TEMPORAL_ALIGNMENT
+        ]
+        assert len(lag_findings) == 1
+        assert lag_findings[0].severity == Severity.WARNING
+        assert "same-year ACS1 vintage" in lag_findings[0].message
+        assert lag_findings[0].pipeline_id == "main"
+        assert "2023" in lag_findings[0].message
+        assert lag_findings[0].dataset_id == "acs1_metro"
+
+    def test_preflight_skips_same_year_acs1_warning_without_january_alignment(self, tmp_path: Path):
+        """Same-year ACS1 outside PIT/January-aligned pipelines should not warn."""
+        data_dir = tmp_path / "data" / "curated" / "acs"
+        data_dir.mkdir(parents=True)
+        pd.DataFrame({
+            "metro_id": ["M1"],
+            "acs1_vintage": [2023],
+            "unemployment_rate_acs1": [0.05],
+        }).to_parquet(data_dir / "acs1_metro__A2023@Dglynnfoxv1.parquet")
+
+        recipe_data = {
+            "version": 1,
+            "name": "acs1-same-year-no-jan-context",
+            "universe": {"years": [2023]},
+            "targets": [
+                {"id": "metro_panel", "geometry": {"type": "metro", "source": "glynn_fox_v1"}},
+            ],
+            "datasets": {
+                "acs1_metro": {
+                    "provider": "census",
+                    "product": "acs1",
+                    "version": 1,
+                    "native_geometry": {"type": "metro", "source": "glynn_fox_v1"},
+                    "years": {"years": [2023]},
+                    "year_column": "acs1_vintage",
+                    "geo_column": "metro_id",
+                    "path": "data/curated/acs/acs1_metro__A2023@Dglynnfoxv1.parquet",
+                },
+            },
+            "transforms": [],
+            "pipelines": [
+                {
+                    "id": "main",
+                    "target": "metro_panel",
+                    "steps": [
+                        {
+                            "resample": {
+                                "dataset": "acs1_metro",
+                                "to_geometry": {"type": "metro", "source": "glynn_fox_v1"},
+                                "method": "identity",
+                                "measures": ["unemployment_rate_acs1"],
+                            },
+                        },
+                        {
+                            "join": {
+                                "datasets": ["acs1_metro"],
+                                "join_on": ["geo_id", "year"],
+                            },
+                        },
+                    ],
+                },
+            ],
+        }
+
+        recipe = load_recipe(recipe_data)
+        report = run_preflight(recipe, project_root=tmp_path)
+        lag_findings = [
+            f for f in report.findings
+            if f.kind == FindingKind.TEMPORAL_ALIGNMENT
+        ]
+        assert lag_findings == []
+
+    def test_preflight_no_warning_on_prior_year_acs1_vintage_static_path(self, tmp_path: Path):
+        """Static-path ACS1 whose __A{year} vintage is prior year → no TEMPORAL_ALIGNMENT warning."""
+        data_dir = tmp_path / "data" / "curated" / "acs"
+        data_dir.mkdir(parents=True)
+        pd.DataFrame({
+            "metro_id": ["M1"],
+            "acs1_vintage": [2022],
+            "unemployment_rate_acs1": [0.05],
+        }).to_parquet(data_dir / "acs1_metro__A2022@Dglynnfoxv1.parquet")
+
+        recipe_data = {
+            "version": 1,
+            "name": "acs1-prior-year-ok",
+            "universe": {"years": [2023]},
+            "targets": [
+                {"id": "metro_panel", "geometry": {"type": "metro", "source": "glynn_fox_v1"}},
+            ],
+            "datasets": {
+                "acs1_metro": {
+                    "provider": "census",
+                    "product": "acs1",
+                    "version": 1,
+                    "native_geometry": {"type": "metro", "source": "glynn_fox_v1"},
+                    "years": {"years": [2023]},
+                    "year_column": "acs1_vintage",
+                    "geo_column": "metro_id",
+                    "path": "data/curated/acs/acs1_metro__A2022@Dglynnfoxv1.parquet",
+                },
+            },
+            "transforms": [],
+            "pipelines": [
+                {
+                    "id": "main",
+                    "target": "metro_panel",
+                    "steps": [
+                        {
+                            "resample": {
+                                "dataset": "acs1_metro",
+                                "to_geometry": {"type": "metro", "source": "glynn_fox_v1"},
+                                "method": "identity",
+                                "measures": ["unemployment_rate_acs1"],
+                            },
+                        },
+                        {
+                            "join": {
+                                "datasets": ["acs1_metro"],
+                                "join_on": ["geo_id", "year"],
+                            },
+                        },
+                    ],
+                },
+            ],
+        }
+
+        recipe = load_recipe(recipe_data)
+        report = run_preflight(recipe, project_root=tmp_path)
+        lag_findings = [
+            f for f in report.findings
+            if f.kind == FindingKind.TEMPORAL_ALIGNMENT
+        ]
+        assert lag_findings == []
+
+    def test_preflight_warns_on_same_year_acs1_file_set(self, tmp_path: Path):
+        """File-set ACS1 with explicit acs1_end offset 0 warns in January-aligned pipelines."""
+        data_dir = tmp_path / "data"
+        data_dir.mkdir(parents=True)
+        pd.DataFrame({
+            "metro_id": ["M1"],
+            "acs1_vintage": [2023],
+            "unemployment_rate_acs1": [0.05],
+        }).to_parquet(data_dir / "acs1_2023.parquet")
+
+        recipe_data = {
+            "version": 1,
+            "name": "acs1-fileset-same-year",
+            "universe": {"years": [2023]},
+            "targets": [
+                {"id": "metro_panel", "geometry": {"type": "metro", "source": "glynn_fox_v1"}},
+            ],
+            "datasets": {
+                "pit": {
+                    "provider": "hud",
+                    "product": "pit",
+                    "version": 1,
+                    "native_geometry": {"type": "metro", "source": "glynn_fox_v1"},
+                    "years": {"years": [2023]},
+                    "path": "data/pit.parquet",
+                    "params": {"align": "point_in_time_jan"},
+                },
+                "acs1_metro": {
+                    "provider": "census",
+                    "product": "acs1",
+                    "version": 1,
+                    "native_geometry": {"type": "metro", "source": "glynn_fox_v1"},
+                    "geo_column": "metro_id",
+                    "file_set": {
+                        "path_template": "data/acs1_{acs1_end}.parquet",
+                        "segments": [
+                            {
+                                "years": {"years": [2023]},
+                                "geometry": {"type": "metro", "source": "glynn_fox_v1"},
+                                "year_offsets": {"acs1_end": 0},
+                            },
+                        ],
+                    },
+                },
+            },
+            "transforms": [],
+            "pipelines": [
+                {
+                    "id": "main",
+                    "target": "metro_panel",
+                    "steps": [
+                        {
+                            "resample": {
+                                "dataset": "pit",
+                                "to_geometry": {"type": "metro", "source": "glynn_fox_v1"},
+                                "method": "identity",
+                                "measures": ["pit_total"],
+                            },
+                        },
+                        {
+                            "resample": {
+                                "dataset": "acs1_metro",
+                                "to_geometry": {"type": "metro", "source": "glynn_fox_v1"},
+                                "method": "identity",
+                                "measures": ["unemployment_rate_acs1"],
+                            },
+                        },
+                        {
+                            "join": {
+                                "datasets": ["pit", "acs1_metro"],
+                                "join_on": ["geo_id", "year"],
+                            },
+                        },
+                    ],
+                },
+            ],
+        }
+
+        recipe = load_recipe(recipe_data)
+        report = run_preflight(recipe, project_root=tmp_path)
+        lag_findings = [
+            f for f in report.findings
+            if f.kind == FindingKind.TEMPORAL_ALIGNMENT
+        ]
+        assert len(lag_findings) == 1
+        assert lag_findings[0].severity == Severity.WARNING
+        assert "same-year ACS1 vintage" in lag_findings[0].message
+        assert lag_findings[0].pipeline_id == "main"
+        assert lag_findings[0].dataset_id == "acs1_metro"
+
+    def test_preflight_warns_on_same_year_acs1_file_set_year_template(self, tmp_path: Path):
+        """Direct {year} file-set templates should also warn for January-aligned recipes."""
+        data_dir = tmp_path / "data"
+        data_dir.mkdir(parents=True)
+        pd.DataFrame({
+            "metro_id": ["M1"],
+            "acs1_vintage": [2023],
+            "unemployment_rate_acs1": [0.05],
+        }).to_parquet(data_dir / "acs1_2023.parquet")
+
+        recipe_data = {
+            "version": 1,
+            "name": "acs1-fileset-year-template",
+            "universe": {"years": [2023]},
+            "targets": [
+                {"id": "metro_panel", "geometry": {"type": "metro", "source": "glynn_fox_v1"}},
+            ],
+            "datasets": {
+                "pit": {
+                    "provider": "hud",
+                    "product": "pit",
+                    "version": 1,
+                    "native_geometry": {"type": "metro", "source": "glynn_fox_v1"},
+                    "years": {"years": [2023]},
+                    "path": "data/pit.parquet",
+                    "params": {"align": "point_in_time_jan"},
+                },
+                "acs1_metro": {
+                    "provider": "census",
+                    "product": "acs1",
+                    "version": 1,
+                    "native_geometry": {"type": "metro", "source": "glynn_fox_v1"},
+                    "year_column": "acs1_vintage",
+                    "geo_column": "metro_id",
+                    "file_set": {
+                        "path_template": "data/acs1_{year}.parquet",
+                        "segments": [
+                            {
+                                "years": {"years": [2023]},
+                                "geometry": {"type": "metro", "source": "glynn_fox_v1"},
+                            },
+                        ],
+                    },
+                },
+            },
+            "transforms": [],
+            "pipelines": [
+                {
+                    "id": "main",
+                    "target": "metro_panel",
+                    "steps": [
+                        {
+                            "resample": {
+                                "dataset": "pit",
+                                "to_geometry": {"type": "metro", "source": "glynn_fox_v1"},
+                                "method": "identity",
+                                "measures": ["pit_total"],
+                            },
+                        },
+                        {
+                            "resample": {
+                                "dataset": "acs1_metro",
+                                "to_geometry": {"type": "metro", "source": "glynn_fox_v1"},
+                                "method": "identity",
+                                "measures": ["unemployment_rate_acs1"],
+                            },
+                        },
+                        {
+                            "join": {
+                                "datasets": ["pit", "acs1_metro"],
+                                "join_on": ["geo_id", "year"],
+                            },
+                        },
+                    ],
+                },
+            ],
+        }
+
+        recipe = load_recipe(recipe_data)
+        report = run_preflight(recipe, project_root=tmp_path)
+        lag_findings = [
+            f for f in report.findings
+            if f.kind == FindingKind.TEMPORAL_ALIGNMENT
+        ]
+        assert len(lag_findings) == 1
+        assert lag_findings[0].severity == Severity.WARNING
+        assert "same-year ACS1 vintage" in lag_findings[0].message
+        assert lag_findings[0].pipeline_id == "main"
+        assert lag_findings[0].years == [2023]
+
     def test_preflight_blocks_bad_interpolate_to_month_source_data(self, tmp_path: Path):
         data_dir = tmp_path / "data"
         data_dir.mkdir(parents=True)

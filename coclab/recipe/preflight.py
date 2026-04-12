@@ -52,7 +52,9 @@ from coclab.recipe.probes import (
     probe_year_column,
 )
 from coclab.recipe.recipe_schema import (
+    JoinStep,
     RecipeV1,
+    ResampleStep,
     TemporalFilter,
     expand_year_spec,
 )
@@ -378,38 +380,235 @@ def _check_temporal_alignment_guidance(
     """Warn on nonstandard recipe lag choices that need review."""
     findings: list[PreflightFinding] = []
     for ds_id, ds in recipe.datasets.items():
-        if not (
-            ds.provider == "census"
-            and ds.product in {"acs", "acs5"}
-            and ds.file_set is not None
-        ):
+        if ds.provider != "census":
             continue
-        for seg in ds.file_set.segments:
-            acs_end_offset = seg.year_offsets.get("acs_end")
-            if acs_end_offset is None or acs_end_offset == -1:
-                continue
-            years = expand_year_spec(seg.years)
-            year_label = seg.years.range or seg.years.years
-            findings.append(PreflightFinding(
-                severity=Severity.WARNING,
-                kind=FindingKind.TEMPORAL_ALIGNMENT,
-                message=(
-                    f"Dataset '{ds_id}' segment {year_label} uses "
-                    f"acs_end offset {acs_end_offset}. CoC-Lab's standard "
-                    "ACS lag for PIT/January-aligned panels is acs_end=-1; "
-                    "review this offset against the ACS temporal guidance "
-                    "before building."
-                ),
-                dataset_id=ds_id,
-                years=years,
-                remediation=Remediation(
-                    hint=(
-                        "Use year_offsets: { acs_end: -1 } for the standard "
-                        "PIT/January-aligned ACS lag, or document why a "
-                        "different offset is intentional."
+
+        # ACS5 lag check: warn on nonstandard acs_end offset.
+        if ds.product in {"acs", "acs5"} and ds.file_set is not None:
+            for seg in ds.file_set.segments:
+                acs_end_offset = seg.year_offsets.get("acs_end")
+                if acs_end_offset is None or acs_end_offset == -1:
+                    continue
+                years = expand_year_spec(seg.years)
+                year_label = seg.years.range or seg.years.years
+                findings.append(PreflightFinding(
+                    severity=Severity.WARNING,
+                    kind=FindingKind.TEMPORAL_ALIGNMENT,
+                    message=(
+                        f"Dataset '{ds_id}' segment {year_label} uses "
+                        f"acs_end offset {acs_end_offset}. CoC-Lab's standard "
+                        "ACS lag for PIT/January-aligned panels is acs_end=-1; "
+                        "review this offset against the ACS temporal guidance "
+                        "before building."
                     ),
+                    dataset_id=ds_id,
+                    years=years,
+                    remediation=Remediation(
+                        hint=(
+                            "Use year_offsets: { acs_end: -1 } for the standard "
+                            "PIT/January-aligned ACS lag, or document why a "
+                            "different offset is intentional."
+                        ),
+                    ),
+                ))
+
+    return findings
+
+
+def _pipeline_dataset_ids(pipeline) -> set[str]:
+    """Return dataset ids referenced by a pipeline."""
+    dataset_ids: set[str] = set()
+    for step in pipeline.steps:
+        if isinstance(step, ResampleStep):
+            dataset_ids.add(step.dataset)
+        elif isinstance(step, JoinStep):
+            dataset_ids.update(step.datasets)
+    return dataset_ids
+
+
+def _dataset_is_january_aligned(recipe: RecipeV1, dataset_id: str) -> bool:
+    """Return True when a dataset is used with January/PIT temporal alignment."""
+    ds = recipe.datasets[dataset_id]
+    filt = recipe.filters.get(dataset_id)
+
+    if ds.provider == "hud" and ds.product == "pit":
+        return ds.params.get("align", "point_in_time_jan") == "point_in_time_jan"
+
+    if ds.params.get("align") == "point_in_time_jan":
+        return True
+
+    if (
+        filt is not None
+        and filt.method in {"point_in_time", "interpolate_to_month"}
+        and filt.month == 1
+    ):
+        return True
+
+    return False
+
+
+def _january_aligned_pipeline_ids(recipe: RecipeV1) -> set[str]:
+    """Return pipeline ids that include January/PIT-aligned inputs."""
+    pipeline_ids: set[str] = set()
+    for pipeline in recipe.pipelines:
+        dataset_ids = _pipeline_dataset_ids(pipeline)
+        if any(_dataset_is_january_aligned(recipe, ds_id) for ds_id in dataset_ids):
+            pipeline_ids.add(pipeline.id)
+    return pipeline_ids
+
+
+def _detect_year_column(path: Path, declared_year_column: str | None) -> str | None:
+    """Resolve the effective year column for a parquet input."""
+    if declared_year_column is not None:
+        return declared_year_column
+
+    schema_probe = probe_dataset_schema(path)
+    if not schema_probe.ok or schema_probe.detail is None:
+        return None
+
+    year_probe = probe_year_column(schema_probe.detail["columns"], None)
+    if not year_probe.ok or year_probe.detail is None:
+        return None
+    return year_probe.detail["year_column"]
+
+
+def _path_contains_same_year_acs1(
+    *,
+    path: Path,
+    analysis_year: int,
+    declared_year_column: str | None,
+) -> bool:
+    """Return True when a parquet input contains rows for the analysis year."""
+    if not path.exists():
+        return False
+
+    year_column = _detect_year_column(path, declared_year_column)
+    if year_column is None:
+        return False
+
+    try:
+        df = pd.read_parquet(path, columns=[year_column])
+    except (FileNotFoundError, OSError, ValueError, KeyError):
+        return False
+
+    if year_column not in df.columns:
+        return False
+
+    years = pd.to_numeric(df[year_column], errors="coerce")
+    return bool((years == analysis_year).any())
+
+
+def _file_set_segment_for_year(ds, year: int):
+    """Return the file_set segment that covers a given analysis year."""
+    if ds.file_set is None:
+        return None
+    for seg in ds.file_set.segments:
+        if year in expand_year_spec(seg.years):
+            return seg
+    return None
+
+
+def _task_uses_same_year_acs1(
+    *,
+    recipe: RecipeV1,
+    task: ResampleTask,
+    project_root: Path,
+) -> bool:
+    """Return True when an ACS1 task resolves to same-year data."""
+    ds = recipe.datasets[task.dataset_id]
+
+    if task.input_path is not None:
+        match = re.search(r"__A(\d{4})", task.input_path)
+        if match and int(match.group(1)) == task.year:
+            return True
+
+        full_path = project_root / task.input_path
+        if _path_contains_same_year_acs1(
+            path=full_path,
+            analysis_year=task.year,
+            declared_year_column=task.year_column,
+        ):
+            return True
+
+    seg = _file_set_segment_for_year(ds, task.year)
+    if seg is None:
+        return False
+
+    acs1_end_offset = seg.year_offsets.get("acs1_end")
+    if acs1_end_offset is None:
+        acs1_end_offset = seg.year_offsets.get("acs_end")
+    if acs1_end_offset == 0:
+        return True
+
+    override_path = seg.overrides.get(task.year)
+    if override_path is not None:
+        match = re.search(r"__A(\d{4})", override_path)
+        if match and int(match.group(1)) == task.year:
+            return True
+
+    template = ds.file_set.path_template
+    if (
+        re.search(r"__A\{year(?::[^}]*)?\}", template)
+        and "{acs1_end}" not in template
+        and "{acs_end}" not in template
+    ):
+        return True
+
+    return False
+
+
+def _check_acs1_temporal_alignment_guidance(
+    recipe: RecipeV1,
+    project_root: Path,
+    pipeline_tasks: list[tuple[str, ResampleTask]],
+) -> list[PreflightFinding]:
+    """Warn when PIT/January-aligned pipelines use same-year ACS1 vintages."""
+    findings: list[PreflightFinding] = []
+    january_pipeline_ids = _january_aligned_pipeline_ids(recipe)
+    same_year_usage: dict[tuple[str, str], set[int]] = {}
+
+    for pipeline_id, task in pipeline_tasks:
+        if pipeline_id not in january_pipeline_ids:
+            continue
+
+        ds = recipe.datasets[task.dataset_id]
+        if ds.provider != "census" or ds.product != "acs1":
+            continue
+
+        if _task_uses_same_year_acs1(
+            recipe=recipe,
+            task=task,
+            project_root=project_root,
+        ):
+            same_year_usage.setdefault((pipeline_id, task.dataset_id), set()).add(
+                task.year,
+            )
+
+    for (pipeline_id, dataset_id), years in sorted(same_year_usage.items()):
+        findings.append(PreflightFinding(
+            severity=Severity.WARNING,
+            kind=FindingKind.TEMPORAL_ALIGNMENT,
+            message=(
+                f"Pipeline '{pipeline_id}': dataset '{dataset_id}' uses "
+                f"same-year ACS1 vintage for analysis year(s) {sorted(years)}. "
+                "ACS1 data for year Y is published in fall of year Y and is "
+                "not available at January-aligned observation dates; use "
+                "prior-year ACS1 vintages or document why same-year ACS1 is "
+                "intentional."
+            ),
+            pipeline_id=pipeline_id,
+            dataset_id=dataset_id,
+            years=sorted(years),
+            remediation=Remediation(
+                hint=(
+                    "For PIT/January-aligned pipelines, use lagged ACS1 "
+                    "vintages (for example year_offsets: { acs1_end: -1 } or "
+                    "a prior-year static artifact path), or document why "
+                    "same-year ACS1 is intentional."
                 ),
-            ))
+            ),
+        ))
+
     return findings
 
 
@@ -1086,6 +1285,14 @@ def run_preflight(
                         ),
                     ),
                 ))
+
+    report.findings.extend(
+        _check_acs1_temporal_alignment_guidance(
+            recipe,
+            project_root,
+            pipeline_resample_tasks,
+        ),
+    )
 
     # 3. Dataset path checks (plan-scoped: only checks paths required
     #    by the resolved execution plan)
