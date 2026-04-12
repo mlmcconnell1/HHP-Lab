@@ -9,12 +9,11 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
-import yaml
 import pytest
+import yaml
 
 from coclab.recipe.loader import load_recipe
 from coclab.recipe.planner import resolve_plan
-
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 EXAMPLES_DIR = REPO_ROOT / "recipes" / "examples"

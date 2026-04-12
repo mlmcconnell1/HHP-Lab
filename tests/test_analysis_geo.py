@@ -8,10 +8,7 @@ import pandas as pd
 import pytest
 
 from coclab.analysis_geo import (
-    COC_ID_COL,
-    GEO_ID_COL,
     GEO_TYPE_COC,
-    GEO_TYPE_COL,
     GEO_TYPE_METRO,
     VALID_GEO_TYPES,
     AnalysisGeometryRef,
@@ -19,7 +16,6 @@ from coclab.analysis_geo import (
     infer_geo_type,
     resolve_geo_col,
 )
-
 
 # ---------------------------------------------------------------------------
 # AnalysisGeometryRef

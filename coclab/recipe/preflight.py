@@ -12,7 +12,6 @@ import enum
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Optional
 
 import pandas as pd
 import pyarrow.parquet as pq
@@ -26,7 +25,6 @@ from coclab.geo.ct_planning_regions import (
 )
 from coclab.naming import county_path
 from coclab.recipe.adapters import (
-    ValidationDiagnostic,
     dataset_registry,
     geometry_registry,
     validate_recipe_adapters,
@@ -58,7 +56,6 @@ from coclab.recipe.recipe_schema import (
     TemporalFilter,
     expand_year_spec,
 )
-
 
 # ---------------------------------------------------------------------------
 # Finding model

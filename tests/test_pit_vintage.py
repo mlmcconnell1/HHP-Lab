@@ -26,7 +26,6 @@ from coclab.pit.registry import (
 )
 from coclab.provenance import PROVENANCE_KEY, ProvenanceBlock
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------

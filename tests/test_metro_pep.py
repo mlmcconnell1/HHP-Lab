@@ -14,7 +14,6 @@ from coclab.metro.definitions import (
 )
 from coclab.metro.pep import aggregate_pep_to_metro
 
-
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
@@ -78,7 +77,7 @@ class TestBasicAggregation:
 
     def test_sorted_output(self, synthetic_pep):
         result = aggregate_pep_to_metro(synthetic_pep)
-        pairs = list(zip(result["metro_id"].tolist(), result["year"].tolist()))
+        pairs = list(zip(result["metro_id"].tolist(), result["year"].tolist(), strict=False))
         assert pairs == sorted(pairs)
 
 

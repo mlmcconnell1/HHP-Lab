@@ -319,13 +319,13 @@ def status_cmd(
 
     # Census
     c = assets["census"]
-    typer.echo(f"\nCensus Geometries:")
+    typer.echo("\nCensus Geometries:")
     typer.echo(f"  Tracts:   {len(c['tracts'])} vintage(s)  {_fmt_years(c['tracts'])}")
     typer.echo(f"  Counties: {len(c['counties'])} vintage(s)  {_fmt_years(c['counties'])}")
 
     # Crosswalks
     x = assets["crosswalks"]
-    typer.echo(f"\nCrosswalks:")
+    typer.echo("\nCrosswalks:")
     typer.echo(f"  Tract:  {len(x['tract'])} file(s)  {', '.join(x['tract']) if x['tract'] else '-'}")
     typer.echo(f"  County: {len(x['county'])} file(s)  {', '.join(x['county']) if x['county'] else '-'}")
 

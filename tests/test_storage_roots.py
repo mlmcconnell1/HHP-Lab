@@ -12,9 +12,6 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import pandas as pd
-import pytest
-
 from coclab.config import StorageConfig, load_config
 from coclab.recipe.manifest import (
     ROOT_ASSET_STORE,
@@ -22,9 +19,7 @@ from coclab.recipe.manifest import (
     AssetRecord,
     RecipeManifest,
     export_bundle,
-    write_manifest,
 )
-
 
 # ---------------------------------------------------------------------------
 # Fixtures

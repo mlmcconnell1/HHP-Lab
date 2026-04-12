@@ -34,21 +34,18 @@ from coclab.ingest.bls_laus import (
 )
 from coclab.metro.definitions import METRO_CBSA_MAPPING, METRO_STATE_FIPS
 from coclab.metro.laus import (
-    BLS_ANNUAL_AVERAGE_PERIOD,
     LAUS_MEASURE_CODES,
-    LAUS_METRO_OUTPUT_COLUMNS,
     build_all_series_ids,
     build_laus_series_id,
 )
 from coclab.naming import laus_metro_filename, laus_metro_path
 from coclab.panel.conformance import (
-    ACS_MEASURE_COLUMNS,
     ACS1_MEASURE_COLUMNS,
+    ACS_MEASURE_COLUMNS,
     LAUS_MEASURE_COLUMNS,
     PanelRequest,
     _effective_measure_columns,
 )
-
 
 # ---------------------------------------------------------------------------
 # Series ID contract tests  (coclab-7isb.1)
@@ -550,7 +547,7 @@ class TestIngestLausMetro:
         partial_metro_ids = sorted(metro_series)[:13]
         partial_values: dict[str, float] = {}
         for mid in partial_metro_ids:
-            for measure, sid in metro_series[mid].items():
+            for _measure, sid in metro_series[mid].items():
                 partial_values[sid] = 4.5
 
         def _partial_fetch(series_ids, year, api_key=None):
@@ -577,9 +574,9 @@ class TestIngestLausMetro:
         # Collect series IDs for every measure except unemployment_rate
         metro_series = _build_metro_series_map()
         rate_measure = "unemployment_rate"
-        rate_code = LAUS_MEASURE_CODES[rate_measure]
+        LAUS_MEASURE_CODES[rate_measure]
         non_rate_values: dict[str, float] = {}
-        for mid, measure_map in metro_series.items():
+        for _mid, measure_map in metro_series.items():
             for measure, sid in measure_map.items():
                 if measure != rate_measure:
                     non_rate_values[sid] = 50000.0
@@ -765,7 +762,7 @@ class TestLausPanelIntegration:
 
         rows = []
         for metro_id, cbsa in METRO_CBSA_MAPPING.items():
-            state_fips = METRO_STATE_FIPS[metro_id]
+            METRO_STATE_FIPS[metro_id]
             rows.append({
                 "metro_id": metro_id,
                 "year": year,
@@ -836,6 +833,7 @@ def _make_mock_ingest_fn(tmp_path: Path, year_override: int | None = None) -> An
     """Return a mock for coclab.ingest.bls_laus.ingest_laus_metro that writes a
     minimal parquet and returns the path."""
     import pandas as pd
+
     from coclab.naming import laus_metro_path
 
     def _mock_ingest(year: int, definition_version: str = "glynn_fox_v1",
@@ -1149,6 +1147,7 @@ class TestLausRecipeSchema:
 
     def test_laus_policy_forbids_extra_fields(self):
         from pydantic import ValidationError
+
         from coclab.recipe.recipe_schema import LausPolicy
         with pytest.raises(ValidationError):
             LausPolicy(include=True, bogus_field=42)
@@ -1251,7 +1250,6 @@ class TestValidateBLSLaus:
     def test_bls_laus_registered_in_global_registry(self):
         """bls/laus must be registered in the default dataset registry."""
         from coclab.recipe.adapters import dataset_registry
-        from coclab.recipe.default_adapters import register_defaults
 
         # Force a clean registry with defaults to verify registration
         local_registry = type(dataset_registry)()
@@ -1272,6 +1270,7 @@ class TestValidateBLSLaus:
     def test_laus_recipe_yaml_loads_cleanly(self):
         """The example metro25-glynnfox-laus.yaml must load without errors."""
         import yaml
+
         from coclab.recipe.loader import load_recipe
 
         recipe_path = Path(__file__).parent.parent / "recipes" / "metro25-glynnfox-laus.yaml"
@@ -1298,6 +1297,7 @@ class TestValidateBLSLaus:
     def test_laus_recipe_plan_resolves_2015_2023_multiyear_inputs(self):
         """The committed LAUS recipe should resolve the full 2015-2023 window."""
         import yaml
+
         from coclab.recipe.loader import load_recipe
         from coclab.recipe.planner import resolve_plan
 
@@ -1343,6 +1343,7 @@ class TestValidateBLSLaus:
         must produce lag-offset paths for representative years in each tract era.
         """
         import yaml
+
         from coclab.recipe.loader import load_recipe
         from coclab.recipe.planner import resolve_plan
 
@@ -1368,6 +1369,7 @@ class TestValidateBLSLaus:
     def test_laus_recipe_validates_no_adapter_errors(self):
         """The LAUS example recipe should pass adapter validation with no errors."""
         import yaml
+
         from coclab.recipe.adapters import (
             DatasetAdapterRegistry,
             GeometryAdapterRegistry,

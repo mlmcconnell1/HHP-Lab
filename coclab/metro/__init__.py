@@ -1,5 +1,6 @@
 """Metro area definitions and utilities for Glynn/Fox analysis geographies."""
 
+from coclab.metro.acs import aggregate_acs_to_metro, build_metro_tract_crosswalk
 from coclab.metro.definitions import (
     DEFINITION_VERSION,
     METRO_COC_MEMBERSHIP,
@@ -10,7 +11,6 @@ from coclab.metro.definitions import (
     build_county_membership_df,
     build_definitions_df,
 )
-from coclab.metro.acs import aggregate_acs_to_metro, build_metro_tract_crosswalk
 from coclab.metro.pep import aggregate_pep_to_metro
 from coclab.metro.pit import aggregate_pit_to_metro
 from coclab.metro.validate import validate_metro_artifacts

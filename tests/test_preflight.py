@@ -6,7 +6,6 @@ import json
 from pathlib import Path
 
 import pandas as pd
-import pytest
 from typer.testing import CliRunner
 
 from coclab.cli.main import app

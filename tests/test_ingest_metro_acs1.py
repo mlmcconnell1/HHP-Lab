@@ -18,9 +18,7 @@ from coclab.acs.variables_acs1 import (
     ACS1_UNAVAILABLE_VINTAGES,
     ACS1_UNEMPLOYMENT_VARIABLES,
 )
-from coclab.metro.definitions import cbsa_to_metro_id
 from coclab.provenance import read_provenance
-
 
 # ---------------------------------------------------------------------------
 # Fixtures and helpers

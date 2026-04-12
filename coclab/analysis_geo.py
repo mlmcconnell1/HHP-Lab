@@ -28,7 +28,6 @@ invent a fake ``coc_id``.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Literal
 
 import pandas as pd
 

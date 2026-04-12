@@ -27,7 +27,6 @@ from coclab.panel.zori_eligibility import (
     get_zori_panel_columns,
 )
 
-
 # ---------------------------------------------------------------------------
 # Helpers: declarative DataFrame builders
 # ---------------------------------------------------------------------------
@@ -530,7 +529,7 @@ class TestSchemaParity:
         # Excluded reasons identical
         coc_reasons = coc_result["zori_excluded_reason"].tolist()
         metro_reasons = metro_result["zori_excluded_reason"].tolist()
-        for c, m in zip(coc_reasons, metro_reasons):
+        for c, m in zip(coc_reasons, metro_reasons, strict=False):
             if pd.isna(c):
                 assert pd.isna(m)
             else:
@@ -539,7 +538,7 @@ class TestSchemaParity:
         # rent_to_income values identical
         for c, m in zip(
             coc_result["rent_to_income"].tolist(),
-            metro_result["rent_to_income"].tolist(),
+            metro_result["rent_to_income"].tolist(), strict=False,
         ):
             if pd.isna(c):
                 assert pd.isna(m)

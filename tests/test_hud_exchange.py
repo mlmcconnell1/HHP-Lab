@@ -11,8 +11,8 @@ import pytest
 from shapely.geometry import Polygon
 
 from coclab.ingest.hud_exchange_gis import (
-    COC_ID_FIELDS,
     _HUD_STATE_ABBREVIATIONS,
+    COC_ID_FIELDS,
     _download_per_state_shapefiles,
     _extract_state_from_coc_id,
     _find_field,

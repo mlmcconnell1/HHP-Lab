@@ -9,7 +9,6 @@ from __future__ import annotations
 from pathlib import Path
 
 import pandas as pd
-import pytest
 import yaml
 
 from coclab.recipe.executor import execute_recipe
@@ -25,7 +24,6 @@ from coclab.recipe.probes import (
     probe_measures,
     probe_year_column,
 )
-
 
 # ---------------------------------------------------------------------------
 # Helpers

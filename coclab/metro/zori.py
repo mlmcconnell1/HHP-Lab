@@ -28,7 +28,6 @@ from coclab.rents.aggregate import (
     YearlyMethod,
     aggregate_monthly,
     collapse_to_yearly,
-    compute_geo_county_weights,
 )
 
 logger = logging.getLogger(__name__)

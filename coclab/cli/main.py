@@ -20,9 +20,9 @@ from coclab.cli.crosscheck_population import validate_population
 from coclab.cli.diagnostics import diagnostics
 from coclab.cli.generate_metro import generate_metro
 from coclab.cli.ingest_acs1_metro import ingest_acs1_metro
-from coclab.cli.ingest_laus_metro import ingest_laus_metro
 from coclab.cli.ingest_acs_population import ingest_acs_population
 from coclab.cli.ingest_census import ingest_tiger
+from coclab.cli.ingest_laus_metro import ingest_laus_metro
 from coclab.cli.ingest_nhgis import ingest_nhgis
 from coclab.cli.ingest_pit import ingest_pit
 from coclab.cli.ingest_pit_vintage import ingest_pit_vintage

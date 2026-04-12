@@ -4,7 +4,6 @@ Covers coclab-265p: Expand and standardize --json output.
 """
 
 import json
-from pathlib import Path
 
 import pandas as pd
 from typer.testing import CliRunner

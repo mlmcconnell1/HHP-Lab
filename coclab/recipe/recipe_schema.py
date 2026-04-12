@@ -15,10 +15,10 @@ Notes:
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any, Dict, List, Literal, Optional, Union, Annotated
 from string import Formatter
-from pydantic import BaseModel, Field, ConfigDict, model_validator, field_validator
+from typing import Annotated, Any, Literal
 
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 # -----------------------------
 # Utility / value objects
@@ -34,12 +34,12 @@ class YearSpec(BaseModel):
     """
     model_config = ConfigDict(extra="forbid")
 
-    range: Optional[str] = Field(
+    range: str | None = Field(
         default=None,
         description="Year range in inclusive form 'YYYY-YYYY'.",
         examples=["2018-2024"],
     )
-    years: Optional[List[int]] = Field(
+    years: list[int] | None = Field(
         default=None,
         description="Explicit list of years.",
         examples=[[2018, 2019, 2020]],
@@ -53,7 +53,7 @@ class YearSpec(BaseModel):
         return data
 
     @model_validator(mode="after")
-    def _validate_one_of(self) -> "YearSpec":
+    def _validate_one_of(self) -> YearSpec:
         if (self.range is None) == (self.years is None):
             raise ValueError("YearSpec must set exactly one of 'range' or 'years'.")
         return self
@@ -98,8 +98,8 @@ class GeometryRef(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     type: str = Field(..., description="Geometry type identifier (open set).", examples=["coc", "county", "state", "zcta"])
-    vintage: Optional[int] = Field(default=None, description="Vintage year for geometry (if applicable).", examples=[2025, 2023, 2020])
-    source: Optional[str] = Field(default=None, description="Geometry source hint (optional).", examples=["hud_exchange", "tiger", "nhgis"])
+    vintage: int | None = Field(default=None, description="Vintage year for geometry (if applicable).", examples=[2025, 2023, 2020])
+    source: str | None = Field(default=None, description="Geometry source hint (optional).", examples=["hud_exchange", "tiger", "nhgis"])
 
 
 # -----------------------------
@@ -112,11 +112,11 @@ class VintageSetRule(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     years: YearSpec
-    constants: Dict[str, Union[str, int]] = Field(
+    constants: dict[str, str | int] = Field(
         default_factory=dict,
         description="Fixed dimension values for this rule's year band.",
     )
-    year_offsets: Dict[str, int] = Field(
+    year_offsets: dict[str, int] = Field(
         default_factory=dict,
         description="Dimension values derived from analysis year (value = year + offset).",
     )
@@ -126,11 +126,11 @@ class VintageSetSpec(BaseModel):
     """A named set of vintage tuples, expanded from compact range rules."""
     model_config = ConfigDict(extra="forbid")
 
-    dimensions: List[str] = Field(
+    dimensions: list[str] = Field(
         ..., min_length=1,
         description="Ordered list of dimension names in each tuple.",
     )
-    rules: List[VintageSetRule] = Field(
+    rules: list[VintageSetRule] = Field(
         ..., min_length=1,
         description="Year-banded rules that expand into tuples.",
     )
@@ -146,15 +146,15 @@ class FileSetSegment(BaseModel):
 
     years: YearSpec
     geometry: GeometryRef
-    overrides: Dict[int, str] = Field(default_factory=dict)
-    constants: Dict[str, Union[str, int]] = Field(
+    overrides: dict[int, str] = Field(default_factory=dict)
+    constants: dict[str, str | int] = Field(
         default_factory=dict,
         description=(
             "Optional constant template variables for path rendering, "
             "for example {'tract': 2010}."
         ),
     )
-    year_offsets: Dict[str, int] = Field(
+    year_offsets: dict[str, int] = Field(
         default_factory=dict,
         description=(
             "Optional year-derived template variables, where each value is "
@@ -174,7 +174,7 @@ class FileSetSpec(BaseModel):
             "variables from constants/year_offsets."
         ),
     )
-    segments: List[FileSetSegment] = Field(..., min_length=1)
+    segments: list[FileSetSegment] = Field(..., min_length=1)
 
     @field_validator("path_template")
     @classmethod
@@ -202,25 +202,25 @@ class DatasetSpec(BaseModel):
     product: str = Field(..., description="Dataset product name within provider, e.g. 'pit', 'acs5', 'pep', 'county-returns'.")
     version: int = Field(..., description="Adapter version for this dataset product (schema evolution control).", ge=1)
     native_geometry: GeometryRef = Field(..., description="Native geometry of the dataset.")
-    years: Optional[YearSpec] = Field(
+    years: YearSpec | None = Field(
         default=None,
         description="Temporal coverage of this dataset. For file_set datasets, coverage is implicit from segments.",
     )
-    params: Dict[str, Any] = Field(default_factory=dict, description="Free-form adapter params.")
-    path: Optional[str] = Field(
+    params: dict[str, Any] = Field(default_factory=dict, description="Free-form adapter params.")
+    path: str | None = Field(
         default=None,
         description="Optional project-relative file path for a pre-materialized dataset artifact.",
         examples=["data/curated/pit/pit_vintage__P2024.parquet"],
     )
-    file_set: Optional[FileSetSpec] = Field(
+    file_set: FileSetSpec | None = Field(
         default=None,
         description="Time-banded file set with per-segment geometry vintages.",
     )
-    year_column: Optional[str] = Field(
+    year_column: str | None = Field(
         default=None,
         description="Column name containing the year dimension. Auto-detected if omitted.",
     )
-    geo_column: Optional[str] = Field(
+    geo_column: str | None = Field(
         default=None,
         description="Column name containing the geo-ID. Auto-detected if omitted.",
     )
@@ -228,7 +228,7 @@ class DatasetSpec(BaseModel):
 
     @field_validator("path")
     @classmethod
-    def _validate_path_is_relative(cls, value: Optional[str]) -> Optional[str]:
+    def _validate_path_is_relative(cls, value: str | None) -> str | None:
         if value is None:
             return value
         if not value.strip():
@@ -261,14 +261,14 @@ class TemporalFilter(BaseModel):
     type: Literal["temporal"] = "temporal"
     column: str = Field(..., description="Column containing the temporal dimension (e.g. 'month', 'date').")
     method: TemporalMethod = Field(..., description="Temporal aggregation method.")
-    month: Optional[int] = Field(
+    month: int | None = Field(
         default=None,
         description="Month for point_in_time filter (1-12).",
         ge=1, le=12,
     )
 
     @model_validator(mode="after")
-    def _validate_method_requires_month(self) -> "TemporalFilter":
+    def _validate_method_requires_month(self) -> TemporalFilter:
         if self.method in ("point_in_time", "interpolate_to_month") and self.month is None:
             raise ValueError(f"Temporal filter method '{self.method}' requires 'month'.")
         return self
@@ -351,19 +351,19 @@ class PanelPolicy(BaseModel):
     """
     model_config = ConfigDict(extra="forbid")
 
-    source_label: Optional[str] = Field(
+    source_label: str | None = Field(
         default=None,
         description="Override the default source label for the panel (e.g. 'coclab_panel').",
     )
-    zori: Optional[ZoriPolicy] = Field(
+    zori: ZoriPolicy | None = Field(
         default=None,
         description="ZORI eligibility and provenance policy. Null means no ZORI integration.",
     )
-    acs1: Optional[Acs1Policy] = Field(
+    acs1: Acs1Policy | None = Field(
         default=None,
         description="ACS 1-year merge policy (metro targets only).",
     )
-    laus: Optional[LausPolicy] = Field(
+    laus: LausPolicy | None = Field(
         default=None,
         description=(
             "BLS LAUS metro-native labor-market merge policy (metro targets only). "
@@ -371,7 +371,7 @@ class PanelPolicy(BaseModel):
             "LAUS-aware conformance checks."
         ),
     )
-    column_aliases: Dict[str, str] = Field(
+    column_aliases: dict[str, str] = Field(
         default_factory=dict,
         description=(
             "Column rename mapping for output. "
@@ -388,15 +388,15 @@ class CohortSelector(BaseModel):
 
     rank_by: str = Field(..., description="Measure column to rank geographies on (e.g. 'total_population').")
     method: CohortMethod = Field(..., description="Selection method: top_n, bottom_n, or percentile.")
-    n: Optional[int] = Field(default=None, ge=1, description="Number of geographies to keep (for top_n / bottom_n).")
-    threshold: Optional[float] = Field(
+    n: int | None = Field(default=None, ge=1, description="Number of geographies to keep (for top_n / bottom_n).")
+    threshold: float | None = Field(
         default=None, ge=0.0, le=1.0,
         description="Percentile threshold (for 'percentile' method). 0.75 keeps the top 25%%.",
     )
     reference_year: int = Field(..., description="Year whose values are used for ranking (must be in universe).")
 
     @model_validator(mode="after")
-    def _validate_method_params(self) -> "CohortSelector":
+    def _validate_method_params(self) -> CohortSelector:
         if self.method in ("top_n", "bottom_n"):
             if self.n is None:
                 raise ValueError(f"CohortSelector method '{self.method}' requires 'n'.")
@@ -414,9 +414,9 @@ class TargetSpec(BaseModel):
 
     id: str = Field(..., description="Unique target identifier.")
     geometry: GeometryRef = Field(..., description="Target geometry for the pipeline.")
-    outputs: List[OutputKind] = Field(default_factory=lambda: ["panel"], description="Requested outputs for this target.")
-    cohort: Optional[CohortSelector] = Field(default=None, description="Optional cohort selector to filter to a ranked subset of geographies.")
-    panel_policy: Optional[PanelPolicy] = Field(default=None, description="Declarative panel output and finalization policy.")
+    outputs: list[OutputKind] = Field(default_factory=lambda: ["panel"], description="Requested outputs for this target.")
+    cohort: CohortSelector | None = Field(default=None, description="Optional cohort selector to filter to a ranked subset of geographies.")
+    panel_policy: PanelPolicy | None = Field(default=None, description="Declarative panel output and finalization policy.")
 
 
 # -----------------------------
@@ -434,12 +434,12 @@ class CrosswalkWeighting(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     scheme: WeightScheme = Field(..., description="Crosswalk share weighting scheme.")
-    population_source: Optional[str] = Field(
+    population_source: str | None = Field(
         default=None,
         description="Dataset id to source population weights from (when scheme=population).",
         examples=["acs"],
     )
-    population_field: Optional[str] = Field(
+    population_field: str | None = Field(
         default=None,
         description="Field in the population dataset used for weights.",
         examples=["total_population"],
@@ -465,7 +465,7 @@ class RollupSpec(BaseModel):
     """
     model_config = ConfigDict(extra="forbid")
     keys: RollupKeys = Field(..., description="Key mapping config.")
-    derive: Dict[str, str] = Field(default_factory=dict, description="Optional derived fields/keys expressions.")
+    derive: dict[str, str] = Field(default_factory=dict, description="Optional derived fields/keys expressions.")
 
 
 class TransformBase(BaseModel):
@@ -486,7 +486,7 @@ class RollupTransform(TransformBase):
     spec: RollupSpec = Field(..., description="Rollup operator spec.")
 
 
-TransformSpec = Annotated[Union[CrosswalkTransform, RollupTransform], Field(discriminator="type")]
+TransformSpec = Annotated[CrosswalkTransform | RollupTransform, Field(discriminator="type")]
 
 
 # -----------------------------
@@ -500,7 +500,7 @@ AggregationMethod = Literal["sum", "mean", "weighted_mean"]
 class MaterializeStep(BaseModel):
     model_config = ConfigDict(extra="forbid")
     kind: Literal["materialize"] = "materialize"
-    transforms: List[str] = Field(..., description="Transform ids to ensure exist/materialized.")
+    transforms: list[str] = Field(..., description="Transform ids to ensure exist/materialized.")
 
 
 class MeasureAggConfig(BaseModel):
@@ -526,12 +526,12 @@ class ResampleStep(BaseModel):
     dataset: str = Field(..., description="Dataset id to resample.")
     to_geometry: GeometryRef = Field(..., description="Destination geometry for this dataset output.")
     method: ResampleMethod = Field(..., description="Resampling method.")
-    via: Optional[str] = Field(default=None, description="Transform id or 'auto' for allocate/aggregate.")
-    measures: Dict[str, MeasureAggConfig] = Field(
+    via: str | None = Field(default=None, description="Transform id or 'auto' for allocate/aggregate.")
+    measures: dict[str, MeasureAggConfig] = Field(
         ...,
         description="Map of measure name → aggregation config.",
     )
-    aggregation: Optional[AggregationMethod] = Field(
+    aggregation: AggregationMethod | None = Field(
         default=None,
         description="Deprecated: uniform aggregation method. Use per-measure config instead.",
     )
@@ -554,7 +554,7 @@ class ResampleStep(BaseModel):
         return data
 
     @model_validator(mode="after")
-    def _validate_via_requirement(self) -> "ResampleStep":
+    def _validate_via_requirement(self) -> ResampleStep:
         if self.method in ("allocate", "aggregate") and not self.via:
             raise ValueError("ResampleStep.method in {allocate,aggregate} requires 'via'.")
         if self.method == "identity" and self.via is not None:
@@ -570,11 +570,11 @@ class ResampleStep(BaseModel):
 class JoinStep(BaseModel):
     model_config = ConfigDict(extra="forbid")
     kind: Literal["join"] = "join"
-    datasets: List[str] = Field(..., description="Dataset ids to join into a target panel.")
-    join_on: List[str] = Field(default_factory=lambda: ["geo_id", "year"], description="Join keys.")
+    datasets: list[str] = Field(..., description="Dataset ids to join into a target panel.")
+    join_on: list[str] = Field(default_factory=lambda: ["geo_id", "year"], description="Join keys.")
 
 
-StepSpec = Annotated[Union[MaterializeStep, ResampleStep, JoinStep], Field(discriminator="kind")]
+StepSpec = Annotated[MaterializeStep | ResampleStep | JoinStep, Field(discriminator="kind")]
 
 
 _STEP_KINDS = frozenset({"materialize", "resample", "join"})
@@ -602,7 +602,7 @@ class PipelineSpec(BaseModel):
 
     id: str = Field(..., description="Unique pipeline identifier.")
     target: str = Field(..., description="Target id that this pipeline materializes.")
-    steps: List[StepSpec] = Field(..., description="Ordered steps for the pipeline.")
+    steps: list[StepSpec] = Field(..., description="Ordered steps for the pipeline.")
 
     @model_validator(mode="before")
     @classmethod
@@ -655,26 +655,26 @@ class RecipeV1(BaseModel):
 
     version: Literal[1] = 1
     name: str
-    description: Optional[str] = None
+    description: str | None = None
 
     universe: YearSpec
 
-    targets: List[TargetSpec]
-    datasets: Dict[str, DatasetSpec]
-    filters: Dict[str, FilterSpec] = Field(
+    targets: list[TargetSpec]
+    datasets: dict[str, DatasetSpec]
+    filters: dict[str, FilterSpec] = Field(
         default_factory=dict,
         description="Temporal filters keyed by dataset_id, applied before resampling.",
     )
-    transforms: List[TransformSpec] = Field(default_factory=list)
-    pipelines: List[PipelineSpec] = Field(default_factory=list)
+    transforms: list[TransformSpec] = Field(default_factory=list)
+    pipelines: list[PipelineSpec] = Field(default_factory=list)
     validation: ValidationPolicy = Field(default_factory=ValidationPolicy)
-    vintage_sets: Dict[str, VintageSetSpec] = Field(
+    vintage_sets: dict[str, VintageSetSpec] = Field(
         default_factory=dict,
         description="Named vintage tuple sets for terse multi-year dataset resolution.",
     )
 
     @model_validator(mode="after")
-    def _validate_references(self) -> "RecipeV1":
+    def _validate_references(self) -> RecipeV1:
         # Ensure unique target ids
         target_ids = [t.id for t in self.targets]
         if len(set(target_ids)) != len(target_ids):
@@ -718,7 +718,7 @@ class RecipeV1(BaseModel):
         return self
 
     @model_validator(mode="after")
-    def _validate_file_sets(self) -> "RecipeV1":
+    def _validate_file_sets(self) -> RecipeV1:
         """Semantic validation for dataset file_set segments."""
         formatter = Formatter()
 
@@ -787,7 +787,7 @@ class RecipeV1(BaseModel):
         return self
 
     @model_validator(mode="after")
-    def _validate_vintage_sets(self) -> "RecipeV1":
+    def _validate_vintage_sets(self) -> RecipeV1:
         """Semantic validation for vintage_sets declarations."""
         for vs_name, vs in self.vintage_sets.items():
             all_years: set[int] = set()
@@ -822,7 +822,7 @@ class RecipeV1(BaseModel):
         return self
 
     @model_validator(mode="after")
-    def _validate_filters(self) -> "RecipeV1":
+    def _validate_filters(self) -> RecipeV1:
         """Validate that filter keys reference declared datasets."""
         dataset_ids = set(self.datasets.keys())
         unknown = set(self.filters.keys()) - dataset_ids
@@ -857,7 +857,7 @@ class RecipeV1(BaseModel):
         return self
 
     @model_validator(mode="after")
-    def _validate_missing_dataset_policy(self) -> "RecipeV1":
+    def _validate_missing_dataset_policy(self) -> RecipeV1:
         """Validate that missing_dataset policy extra keys reference declared datasets."""
         policy_extra = self.validation.missing_dataset.model_extra or {}
         if policy_extra:
@@ -871,7 +871,7 @@ class RecipeV1(BaseModel):
         return self
 
     @model_validator(mode="after")
-    def _validate_cohort_selectors(self) -> "RecipeV1":
+    def _validate_cohort_selectors(self) -> RecipeV1:
         """Validate that cohort reference_year falls within the recipe universe."""
         universe_years = set(expand_year_spec(self.universe))
         for t in self.targets:
@@ -884,7 +884,7 @@ class RecipeV1(BaseModel):
         return self
 
     @model_validator(mode="after")
-    def _validate_static_path_multi_year(self) -> "RecipeV1":
+    def _validate_static_path_multi_year(self) -> RecipeV1:
         """Error when a static-path dataset spans multiple universe years without years declaration."""
         universe_years = expand_year_spec(self.universe)
         if len(universe_years) <= 1:

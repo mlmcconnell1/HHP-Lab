@@ -14,7 +14,6 @@ from coclab.metro.definitions import (
 )
 from coclab.metro.pit import aggregate_pit_to_metro
 
-
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
@@ -83,7 +82,7 @@ class TestBasicAggregation:
         # Should be sorted by metro_id, year
         metro_ids = result["metro_id"].tolist()
         years = result["year"].tolist()
-        pairs = list(zip(metro_ids, years))
+        pairs = list(zip(metro_ids, years, strict=False))
         assert pairs == sorted(pairs)
 
 

@@ -8,7 +8,6 @@ when crosswalk, weights, and ZORI data use different CT vintages.
 import logging
 
 import pandas as pd
-import pytest
 
 from coclab.geo.ct_planning_regions import CT_STATE_FIPS, CtPlanningRegionCrosswalk
 from coclab.rents.aggregate import _align_ct_geographies

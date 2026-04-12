@@ -12,13 +12,11 @@ Truth table for metro definition structure
 - definition_version is consistent across all three tables
 """
 
-import pandas as pd
 import pytest
 
 from coclab.metro.definitions import (
     DEFINITION_VERSION,
     METRO_COC_MEMBERSHIP,
-    METRO_COUNT,
     METRO_COUNTY_MEMBERSHIP,
     METRO_DEFINITIONS,
     build_coc_membership_df,

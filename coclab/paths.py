@@ -37,7 +37,6 @@ from pathlib import Path
 
 from coclab.config import StorageConfig, load_config
 
-
 # ---------------------------------------------------------------------------
 # Asset store helpers
 # ---------------------------------------------------------------------------

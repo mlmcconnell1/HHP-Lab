@@ -18,11 +18,9 @@ from coclab.config import (
     ENV_ASSET_STORE_ROOT,
     ENV_OUTPUT_ROOT,
     REPO_CONFIG_FILENAME,
-    StorageConfig,
     _load_yaml_file,
     load_config,
 )
-
 
 # ---------------------------------------------------------------------------
 # Defaults

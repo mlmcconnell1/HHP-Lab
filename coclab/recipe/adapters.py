@@ -11,8 +11,8 @@ DatasetSpec and return a list of diagnostic strings (empty = valid).
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Callable, List
 
 from coclab.recipe.recipe_schema import DatasetSpec, GeometryRef, RecipeV1
 
@@ -26,8 +26,8 @@ class ValidationDiagnostic:
 
 
 # Type aliases for adapter callables
-GeometryAdapter = Callable[[GeometryRef], List[ValidationDiagnostic]]
-DatasetAdapter = Callable[[DatasetSpec], List[ValidationDiagnostic]]
+GeometryAdapter = Callable[[GeometryRef], list[ValidationDiagnostic]]
+DatasetAdapter = Callable[[DatasetSpec], list[ValidationDiagnostic]]
 
 
 class GeometryAdapterRegistry:
@@ -148,7 +148,7 @@ def validate_recipe_adapters(
         diagnostics.extend(geometry_registry.validate(transform.to))
 
     # Validate dataset specs
-    for dataset_id, dataset_spec in recipe.datasets.items():
+    for _dataset_id, dataset_spec in recipe.datasets.items():
         diagnostics.extend(geometry_registry.validate(dataset_spec.native_geometry))
         diagnostics.extend(dataset_registry.validate(dataset_spec))
 

@@ -49,7 +49,6 @@ from coclab.acs.variables_acs1 import (
     ACS1_VARIABLE_NAMES,
 )
 from coclab.metro.definitions import (
-    METRO_CBSA_MAPPING,
     cbsa_to_metro_id,
     metro_name_for_id,
 )

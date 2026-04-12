@@ -54,7 +54,6 @@ import pytest
 from coclab.panel.conformance import (
     ACS_MEASURE_COLUMNS,
     ZORI_MIN_ELIGIBILITY_RATE,
-    ConformanceResult,
     PanelRequest,
     check_column_null_rates,
     check_per_year_completeness,

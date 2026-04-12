@@ -3,13 +3,11 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Union
 
 import yaml
 from pydantic import ValidationError
 
 from coclab.recipe.recipe_schema import RecipeV1
-
 
 # Map version numbers to model classes. Add RecipeV2 etc. here in the future.
 _VERSION_REGISTRY: dict[int, type] = {
@@ -21,7 +19,7 @@ class RecipeLoadError(Exception):
     """Raised when a recipe file cannot be loaded or validated."""
 
 
-def load_recipe(source: Union[str, Path, dict]) -> RecipeV1:
+def load_recipe(source: str | Path | dict) -> RecipeV1:
     """Load and validate a recipe from a YAML file path or pre-parsed dict.
 
     Parameters
@@ -47,7 +45,7 @@ def load_recipe(source: Union[str, Path, dict]) -> RecipeV1:
     return _validate(data, model_cls)
 
 
-def _read_source(source: Union[str, Path, dict]) -> object:
+def _read_source(source: str | Path | dict) -> object:
     """Read YAML from a file path or return a pre-parsed dict/object."""
     if isinstance(source, dict):
         return source

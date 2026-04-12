@@ -79,7 +79,8 @@ def ingest_laus_metro(
     """
     import pandas as pd
 
-    from coclab.ingest.bls_laus import BlsQuotaExhausted, ingest_laus_metro as _ingest
+    from coclab.ingest.bls_laus import BlsQuotaExhausted
+    from coclab.ingest.bls_laus import ingest_laus_metro as _ingest
 
     # Resolve years to process
     if year is not None and (start_year is not None or end_year is not None):
@@ -107,7 +108,7 @@ def ingest_laus_metro(
             typer.echo("Ingesting BLS LAUS metro labor-market data (backfill)...")
             typer.echo(f"  Years:      {years[0]}-{years[-1]} ({len(years)} years)")
         typer.echo(f"  Definition: {definition_version}")
-        typer.echo(f"  Measures:   unemployment_rate, unemployed, employed, labor_force")
+        typer.echo("  Measures:   unemployment_rate, unemployed, employed, labor_force")
         typer.echo("")
 
     results = []

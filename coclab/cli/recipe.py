@@ -51,7 +51,7 @@ def _json_error(message: str, *, code: int = 1) -> None:
 
 def _format_geometry(ref: object) -> str:
     """Render a GeometryRef-like object for human CLI output."""
-    geo_type = getattr(ref, "type")
+    geo_type = ref.type
     vintage = getattr(ref, "vintage", None)
     source = getattr(ref, "source", None)
     if vintage is not None and source:

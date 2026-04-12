@@ -21,16 +21,14 @@ Beads: coclab-396b
 
 from __future__ import annotations
 
-from typing import Any
-
 import pandas as pd
 import pytest
 
 from coclab.panel.conformance import (
+    _CHECKS,
     ConformanceReport,
     ConformanceResult,
     PanelRequest,
-    _CHECKS,
     register_check,
     run_conformance,
 )

@@ -21,10 +21,10 @@ import pytest
 
 from coclab.panel.assemble import METRO_PANEL_COLUMNS
 from coclab.panel.conformance import (
+    _CHECKS,
     ACS1_MEASURE_COLUMNS,
     ACS_MEASURE_COLUMNS,
     PanelRequest,
-    _CHECKS,
     _effective_measure_columns,
     check_schema_measures,
 )

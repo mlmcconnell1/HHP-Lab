@@ -315,7 +315,7 @@ class TestIngestHudOpendata:
         assert year_dir.is_dir(), f"Expected year dir at {year_dir}"
         # There should be no dir named after the full vintage tag
         bad_dir = raw_root / "hud_opendata" / "HUDOpenData_2025-01-04"
-        assert not bad_dir.exists(), f"Full vintage tag should not be used as year dir"
+        assert not bad_dir.exists(), "Full vintage tag should not be used as year dir"
 
     def test_raw_snapshot_uses_timestamp_run_id(self, mock_http_client, tmp_path):
         """Run-id should be a timestamp, not just a date."""

@@ -20,7 +20,6 @@ import pandas as pd
 from coclab.metro.definitions import (
     DEFINITION_VERSION,
     build_coc_membership_df,
-    build_definitions_df,
 )
 
 

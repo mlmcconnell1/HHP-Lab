@@ -30,9 +30,9 @@ from __future__ import annotations
 import hashlib
 import logging
 import re
+from collections.abc import Callable
 from datetime import UTC, date, datetime
 from pathlib import Path
-from collections.abc import Callable
 from typing import Literal
 
 import httpx

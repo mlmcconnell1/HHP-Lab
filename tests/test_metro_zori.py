@@ -18,7 +18,6 @@ from coclab.metro.zori import (
     collapse_zori_to_yearly,
 )
 
-
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
@@ -93,7 +92,7 @@ class TestBasicAggregation:
         result = aggregate_zori_to_metro(synthetic_zori, county_weights)
         pairs = list(zip(
             result["metro_id"].tolist(),
-            result["date"].tolist(),
+            result["date"].tolist(), strict=False,
         ))
         assert pairs == sorted(pairs)
 

@@ -66,7 +66,7 @@ def ingest_acs1_metro(
         typer.echo("Ingesting ACS 1-year metro unemployment data...")
         typer.echo(f"  Vintage:    {vintage}")
         typer.echo(f"  Definition: {definition_version}")
-        typer.echo(f"  Table:      B23025 (Employment Status)")
+        typer.echo("  Table:      B23025 (Employment Status)")
         typer.echo("")
 
     try:

@@ -18,7 +18,6 @@ from coclab.panel.finalize import COC_PANEL_COLUMNS
 from coclab.recipe.executor import execute_recipe
 from coclab.recipe.loader import load_recipe
 
-
 REPO_ROOT = Path(__file__).resolve().parent.parent
 RECIPE_FIXTURE_DIR = REPO_ROOT / "tests" / "fixtures" / "recipes"
 COC_PANEL_SANITY_RECIPE = RECIPE_FIXTURE_DIR / "coc-panel-sanity.yaml"

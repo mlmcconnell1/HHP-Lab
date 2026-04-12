@@ -24,11 +24,8 @@ from coclab.rents.aggregate import (
 )
 from coclab.xwalks.tract import (
     add_population_weights,
-    build_coc_tract_crosswalk,
-    build_tract_crosswalk,
     validate_population_shares,
 )
-
 
 # ---------------------------------------------------------------------------
 # Fixtures: synthetic crosswalks and data with metro_id

@@ -7,12 +7,12 @@ import pandas as pd
 
 from coclab.audit_panels import (
     AUDIT_PANEL_SPECS,
-    AuditPanelSpec,
     COC_SOURCE_PATH,
     METRO_DEFINITION_VERSION,
     METRO_SOURCE_PATH,
     MODELING_READY_COLUMNS,
     RAW_REQUIRED_COLUMNS,
+    AuditPanelSpec,
     _derive_modeling_ready,
     _prepare_raw_panel,
     _validate_modeling_ready,
@@ -649,7 +649,6 @@ class TestLoadSourcePanelRebuild:
         rebuilt_panel.to_parquet(metro_source_path)
 
         ensure_called = {"count": 0}
-        original_ensure = audit_panels._ensure_metro_source_panel
 
         def tracking_ensure(project_root, *, force=False):
             ensure_called["count"] += 1
@@ -667,6 +666,7 @@ class TestLoadSourcePanelRebuild:
         """When unit_type is coc and source panel is missing, _load_source_panel
         does NOT attempt metro rebuild (it raises FileNotFoundError)."""
         import pytest
+
         from coclab import audit_panels
 
         spec = AuditPanelSpec(
@@ -703,6 +703,7 @@ class TestBuildMetroSourcePanelMissingArtifacts:
         """If the PIT parquet is absent, _build_metro_source_panel raises
         FileNotFoundError (graceful failure at first I/O step)."""
         import pytest
+
         from coclab import audit_panels
 
         # No PIT file written — the very first pd.read_parquet should fail.
@@ -713,6 +714,7 @@ class TestBuildMetroSourcePanelMissingArtifacts:
         """If ZORI parquet is absent (but PIT exists), _build_metro_source_panel
         raises FileNotFoundError."""
         import pytest
+
         from coclab import audit_panels
 
         # Write PIT so the first read succeeds.
@@ -736,6 +738,7 @@ class TestBuildMetroSourcePanelMissingArtifacts:
         """If an ACS vintage file is absent, _build_metro_source_panel raises
         FileNotFoundError during the year loop."""
         import pytest
+
         from coclab import audit_panels
 
         # Write PIT and ZORI so those reads succeed.
@@ -769,6 +772,7 @@ class TestBuildMetroSourcePanelMissingArtifacts:
         """_ensure_metro_source_panel propagates errors from _build_metro_source_panel
         without leaving a partial file behind."""
         import pytest
+
         from coclab import audit_panels
 
         expected_path = tmp_path / audit_panels.METRO_SOURCE_PATH

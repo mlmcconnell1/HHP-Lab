@@ -11,7 +11,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional
 
 import pandas as pd
 import pyarrow.parquet as pq
@@ -19,12 +18,9 @@ import pyarrow.parquet as pq
 from coclab.recipe.recipe_schema import (
     CrosswalkTransform,
     DatasetSpec,
-    GeometryRef,
     RecipeV1,
     TemporalFilter,
-    expand_year_spec,
 )
-
 
 # Auto-detect candidates for geo-ID and year columns.
 GEO_CANDIDATES: list[str] = [
@@ -289,9 +285,9 @@ def probe_transform_path(
         tract_path,
     )
     from coclab.recipe.executor import (
+        ExecutorError,
         _identify_metro_and_base,
         _resolve_transform_path,
-        ExecutorError,
     )
 
     transform = None
@@ -504,7 +500,7 @@ def probe_support_dataset(
         return results
 
     # Resolve paths for each year and check existence + schema
-    from coclab.recipe.planner import _resolve_dataset_year, PlannerError
+    from coclab.recipe.planner import PlannerError, _resolve_dataset_year
 
     checked_paths: set[str] = set()
     missing_years: list[int] = []

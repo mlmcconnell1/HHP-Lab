@@ -10,17 +10,14 @@ and emits structured ResampleTask / JoinTask objects.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Optional
 
 from coclab.recipe.recipe_schema import (
-    CrosswalkTransform,
     FileSetSpec,
     GeometryRef,
     JoinStep,
     MaterializeStep,
     RecipeV1,
     ResampleStep,
-    RollupTransform,
     expand_year_spec,
 )
 
@@ -38,7 +35,7 @@ class ResolvedDatasetYear:
     """Resolution result for a single (dataset_id, year)."""
     dataset_id: str
     year: int
-    path: Optional[str]
+    path: str | None
     effective_geometry: GeometryRef
 
 
@@ -47,15 +44,15 @@ class ResampleTask:
     """A single resample operation for one dataset-year."""
     dataset_id: str
     year: int
-    input_path: Optional[str]
+    input_path: str | None
     effective_geometry: GeometryRef
     method: str
-    transform_id: Optional[str]
+    transform_id: str | None
     to_geometry: GeometryRef
     measures: list[str]
     measure_aggregations: dict[str, str] | None = None
-    year_column: Optional[str] = None
-    geo_column: Optional[str] = None
+    year_column: str | None = None
+    geo_column: str | None = None
 
 
 @dataclass

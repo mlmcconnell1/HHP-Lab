@@ -4,17 +4,8 @@ Covers CBSA mapping data integrity, round-trip lookups, DataFrame builder,
 and ACS1 unemployment variable completeness.
 """
 
-import pandas as pd
 import pytest
 
-from coclab.metro.definitions import (
-    METRO_CBSA_MAPPING,
-    METRO_COUNT,
-    _CBSA_METRO_NAMES,
-    _CBSA_TO_METRO,
-    build_cbsa_mapping_df,
-    cbsa_to_metro_id,
-)
 from coclab.acs.variables_acs1 import (
     ACS1_FIRST_RELIABLE_YEAR,
     ACS1_METRO_OUTPUT_COLUMNS,
@@ -22,6 +13,13 @@ from coclab.acs.variables_acs1 import (
     ACS1_UNEMPLOYMENT_VARIABLES,
     ACS1_VARIABLE_NAMES,
     DERIVED_ACS1_MEASURES,
+)
+from coclab.metro.definitions import (
+    _CBSA_METRO_NAMES,
+    _CBSA_TO_METRO,
+    METRO_CBSA_MAPPING,
+    build_cbsa_mapping_df,
+    cbsa_to_metro_id,
 )
 
 # ---------------------------------------------------------------------------
