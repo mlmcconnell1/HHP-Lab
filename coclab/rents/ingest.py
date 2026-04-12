@@ -40,12 +40,12 @@ import pandas as pd
 
 from coclab.paths import curated_dir
 from coclab.provenance import ProvenanceBlock, write_parquet_with_provenance
-
-# Pattern for ZORI date columns (YYYY-MM-DD or YYYY-MM)
-_DATE_COL_RE = re.compile(r"^\d{4}-\d{2}(-\d{2})?$")
 from coclab.raw_snapshot import raw_dir
 from coclab.source_registry import check_source_changed, register_source
 from coclab.sources import ZILLOW_ZORI_COUNTY, ZILLOW_ZORI_ZIP
+
+# Pattern for ZORI date columns (YYYY-MM-DD or YYYY-MM)
+_DATE_COL_RE = re.compile(r"^\d{4}-\d{2}(-\d{2})?$")
 
 logger = logging.getLogger(__name__)
 

@@ -459,7 +459,9 @@ def aggregate_monthly(
     # Geos whose counties all lack ACS weights should appear with coverage=0.
     all_geos_from_xwalk = xwalk_df[geo_id_col].unique()
     all_geos_from_weights = geo_weights[geo_id_col].unique()
-    all_geos = pd.unique(pd.concat([pd.Series(all_geos_from_xwalk), pd.Series(all_geos_from_weights)]).values)
+    all_geos = pd.unique(
+        pd.concat([pd.Series(all_geos_from_xwalk), pd.Series(all_geos_from_weights)]).values
+    )
     all_dates = zori["date"].unique()
 
     logger.info(f"Aggregating {len(all_dates)} months for {len(all_geos)} geography units")

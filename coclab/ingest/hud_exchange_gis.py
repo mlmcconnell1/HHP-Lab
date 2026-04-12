@@ -606,7 +606,9 @@ def download_hud_exchange_gdb(
         + "\n".join(f"  - {u}" for u in urls_tried)
         + "\n\nYou can manually download boundary data from:\n"
         f"  National:   {national_url}\n"
-        f"  Per-state:  {HUD_EXCHANGE_STATE_SHAPEFILE_TEMPLATE.format(state='<ST>', vintage=boundary_vintage)}"
+        f"  Per-state:  {HUD_EXCHANGE_STATE_SHAPEFILE_TEMPLATE.format(
+            state='<ST>', vintage=boundary_vintage,
+        )}"
     )
 
 

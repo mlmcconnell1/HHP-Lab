@@ -356,7 +356,10 @@ def aggregate_to_geo(
 
         # Weighted averages for median values
         # Use the specified weighting method (area or population)
-        pop_weights = pd.to_numeric(group["total_population"], errors="coerce").fillna(0) * pd.to_numeric(group[median_weight_col], errors="coerce").fillna(0)
+        pop_weights = (
+            pd.to_numeric(group["total_population"], errors="coerce").fillna(0)
+            * pd.to_numeric(group[median_weight_col], errors="coerce").fillna(0)
+        )
 
         for col in avg_cols:
             if col in group.columns:

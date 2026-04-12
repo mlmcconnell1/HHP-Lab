@@ -2,14 +2,20 @@
 coclab recipe schema (v1) - Pydantic v2 models
 
 Goal:
-- Represent a declarative build recipe that can target multiple geometries (CoC, county, state, tract, zcta, etc.)
-- Support extensible datasets (e.g., MIT Election Data and others) via provider/product/version + free-form params
-- Express a small, stable set of transform operators (crosswalk, rollup) and pipeline steps (materialize, resample, join)
+- Represent a declarative build recipe that can target multiple geometries
+  (CoC, county, state, tract, zcta, etc.)
+- Support extensible datasets (e.g., MIT Election Data and others) via
+  provider/product/version + free-form params
+- Express a small, stable set of transform operators (crosswalk, rollup)
+  and pipeline steps (materialize, resample, join)
 
 Notes:
-- Geometry types are strings (open set). Runtime plugin layer should validate whether a geometry adapter exists.
-- Dataset params are free-form. Runtime dataset adapter validates params for a given provider/product/version.
-- This file is the *structural* schema; semantic validation (e.g., allocatability of measures) belongs in a compiler/adapters layer.
+- Geometry types are strings (open set). Runtime plugin layer should
+  validate whether a geometry adapter exists.
+- Dataset params are free-form. Runtime dataset adapter validates params
+  for a given provider/product/version.
+- This file is the *structural* schema; semantic validation
+  (e.g., allocatability of measures) belongs in a compiler/adapters layer.
 """
 
 from __future__ import annotations
@@ -97,9 +103,21 @@ class GeometryRef(BaseModel):
     """
     model_config = ConfigDict(extra="forbid")
 
-    type: str = Field(..., description="Geometry type identifier (open set).", examples=["coc", "county", "state", "zcta"])
-    vintage: int | None = Field(default=None, description="Vintage year for geometry (if applicable).", examples=[2025, 2023, 2020])
-    source: str | None = Field(default=None, description="Geometry source hint (optional).", examples=["hud_exchange", "tiger", "nhgis"])
+    type: str = Field(
+        ...,
+        description="Geometry type identifier (open set).",
+        examples=["coc", "county", "state", "zcta"],
+    )
+    vintage: int | None = Field(
+        default=None,
+        description="Vintage year for geometry (if applicable).",
+        examples=[2025, 2023, 2020],
+    )
+    source: str | None = Field(
+        default=None,
+        description="Geometry source hint (optional).",
+        examples=["hud_exchange", "tiger", "nhgis"],
+    )
 
 
 # -----------------------------
@@ -198,13 +216,32 @@ class DatasetSpec(BaseModel):
     """
     model_config = ConfigDict(extra="forbid")
 
-    provider: str = Field(..., description="Dataset provider namespace, e.g. 'hud', 'census', 'zillow', 'mit-election'.")
-    product: str = Field(..., description="Dataset product name within provider, e.g. 'pit', 'acs5', 'pep', 'county-returns'.")
-    version: int = Field(..., description="Adapter version for this dataset product (schema evolution control).", ge=1)
+    provider: str = Field(
+        ...,
+        description=(
+            "Dataset provider namespace, e.g. 'hud', 'census',"
+            " 'zillow', 'mit-election'."
+        ),
+    )
+    product: str = Field(
+        ...,
+        description=(
+            "Dataset product name within provider, e.g. 'pit',"
+            " 'acs5', 'pep', 'county-returns'."
+        ),
+    )
+    version: int = Field(
+        ...,
+        description="Adapter version for this dataset product (schema evolution control).",
+        ge=1,
+    )
     native_geometry: GeometryRef = Field(..., description="Native geometry of the dataset.")
     years: YearSpec | None = Field(
         default=None,
-        description="Temporal coverage of this dataset. For file_set datasets, coverage is implicit from segments.",
+        description=(
+            "Temporal coverage of this dataset."
+            " For file_set datasets, coverage is implicit from segments."
+        ),
     )
     params: dict[str, Any] = Field(default_factory=dict, description="Free-form adapter params.")
     path: str | None = Field(
@@ -224,7 +261,13 @@ class DatasetSpec(BaseModel):
         default=None,
         description="Column name containing the geo-ID. Auto-detected if omitted.",
     )
-    optional: bool = Field(default=False, description="If true, missing dataset does not fail the build (policy still applies).")
+    optional: bool = Field(
+        default=False,
+        description=(
+            "If true, missing dataset does not fail the build"
+            " (policy still applies)."
+        ),
+    )
 
     @field_validator("path")
     @classmethod
@@ -259,7 +302,10 @@ class TemporalFilter(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     type: Literal["temporal"] = "temporal"
-    column: str = Field(..., description="Column containing the temporal dimension (e.g. 'month', 'date').")
+    column: str = Field(
+        ...,
+        description="Column containing the temporal dimension (e.g. 'month', 'date').",
+    )
     method: TemporalMethod = Field(..., description="Temporal aggregation method.")
     month: int | None = Field(
         default=None,
@@ -386,14 +432,25 @@ class CohortSelector(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    rank_by: str = Field(..., description="Measure column to rank geographies on (e.g. 'total_population').")
-    method: CohortMethod = Field(..., description="Selection method: top_n, bottom_n, or percentile.")
-    n: int | None = Field(default=None, ge=1, description="Number of geographies to keep (for top_n / bottom_n).")
+    rank_by: str = Field(
+        ...,
+        description="Measure column to rank geographies on (e.g. 'total_population').",
+    )
+    method: CohortMethod = Field(
+        ..., description="Selection method: top_n, bottom_n, or percentile.",
+    )
+    n: int | None = Field(
+        default=None, ge=1,
+        description="Number of geographies to keep (for top_n / bottom_n).",
+    )
     threshold: float | None = Field(
         default=None, ge=0.0, le=1.0,
         description="Percentile threshold (for 'percentile' method). 0.75 keeps the top 25%%.",
     )
-    reference_year: int = Field(..., description="Year whose values are used for ranking (must be in universe).")
+    reference_year: int = Field(
+        ...,
+        description="Year whose values are used for ranking (must be in universe).",
+    )
 
     @model_validator(mode="after")
     def _validate_method_params(self) -> CohortSelector:
@@ -414,9 +471,18 @@ class TargetSpec(BaseModel):
 
     id: str = Field(..., description="Unique target identifier.")
     geometry: GeometryRef = Field(..., description="Target geometry for the pipeline.")
-    outputs: list[OutputKind] = Field(default_factory=lambda: ["panel"], description="Requested outputs for this target.")
-    cohort: CohortSelector | None = Field(default=None, description="Optional cohort selector to filter to a ranked subset of geographies.")
-    panel_policy: PanelPolicy | None = Field(default=None, description="Declarative panel output and finalization policy.")
+    outputs: list[OutputKind] = Field(
+        default_factory=lambda: ["panel"],
+        description="Requested outputs for this target.",
+    )
+    cohort: CohortSelector | None = Field(
+        default=None,
+        description="Optional cohort selector to filter to a ranked subset of geographies.",
+    )
+    panel_policy: PanelPolicy | None = Field(
+        default=None,
+        description="Declarative panel output and finalization policy.",
+    )
 
 
 # -----------------------------
@@ -429,7 +495,8 @@ WeightScheme = Literal["area", "population"]
 class CrosswalkWeighting(BaseModel):
     """
     Weighting spec for spatial crosswalk shares.
-    If scheme == 'population', a population source/field may be referenced (optional here; required by adapter).
+    If scheme == 'population', a population source/field may be referenced
+    (optional here; required by adapter).
     """
     model_config = ConfigDict(extra="forbid")
 
@@ -460,12 +527,16 @@ class RollupKeys(BaseModel):
 class RollupSpec(BaseModel):
     """
     Deterministic administrative rollup mapping.
-    derive: optional expression strings to derive the target key from the source key.
-    The expression language is intentionally unspecified here; implement a safe evaluator in compiler layer.
+    derive: optional expression strings to derive the target key from
+    the source key. The expression language is intentionally unspecified
+    here; implement a safe evaluator in compiler layer.
     """
     model_config = ConfigDict(extra="forbid")
     keys: RollupKeys = Field(..., description="Key mapping config.")
-    derive: dict[str, str] = Field(default_factory=dict, description="Optional derived fields/keys expressions.")
+    derive: dict[str, str] = Field(
+        default_factory=dict,
+        description="Optional derived fields/keys expressions.",
+    )
 
 
 class TransformBase(BaseModel):
@@ -524,9 +595,16 @@ class ResampleStep(BaseModel):
 
     kind: Literal["resample"] = "resample"
     dataset: str = Field(..., description="Dataset id to resample.")
-    to_geometry: GeometryRef = Field(..., description="Destination geometry for this dataset output.")
-    method: ResampleMethod = Field(..., description="Resampling method.")
-    via: str | None = Field(default=None, description="Transform id or 'auto' for allocate/aggregate.")
+    to_geometry: GeometryRef = Field(
+        ..., description="Destination geometry for this dataset output.",
+    )
+    method: ResampleMethod = Field(
+        ..., description="Resampling method.",
+    )
+    via: str | None = Field(
+        default=None,
+        description="Transform id or 'auto' for allocate/aggregate.",
+    )
     measures: dict[str, MeasureAggConfig] = Field(
         ...,
         description="Map of measure name → aggregation config.",
@@ -702,18 +780,30 @@ class RecipeV1(BaseModel):
                 if isinstance(step, MaterializeStep):
                     missing = [x for x in step.transforms if x not in transform_id_set]
                     if missing:
-                        raise ValueError(f"Pipeline '{p.id}' materialize step references unknown transforms: {missing}")
+                        raise ValueError(
+                            f"Pipeline '{p.id}' materialize step references"
+                            f" unknown transforms: {missing}"
+                        )
 
                 elif isinstance(step, ResampleStep):
                     if step.dataset not in dataset_ids:
-                        raise ValueError(f"Pipeline '{p.id}' resample step references unknown dataset '{step.dataset}'.")
+                        raise ValueError(
+                            f"Pipeline '{p.id}' resample step references"
+                            f" unknown dataset '{step.dataset}'."
+                        )
                     if step.via and step.via != "auto" and step.via not in transform_id_set:
-                        raise ValueError(f"Pipeline '{p.id}' resample step references unknown transform '{step.via}'.")
+                        raise ValueError(
+                            f"Pipeline '{p.id}' resample step references"
+                            f" unknown transform '{step.via}'."
+                        )
 
                 elif isinstance(step, JoinStep):
                     missing = [d for d in step.datasets if d not in dataset_ids]
                     if missing:
-                        raise ValueError(f"Pipeline '{p.id}' join step references unknown datasets: {missing}")
+                        raise ValueError(
+                            f"Pipeline '{p.id}' join step references"
+                            f" unknown datasets: {missing}"
+                        )
 
         return self
 
@@ -885,7 +975,8 @@ class RecipeV1(BaseModel):
 
     @model_validator(mode="after")
     def _validate_static_path_multi_year(self) -> RecipeV1:
-        """Error when a static-path dataset spans multiple universe years without years declaration."""
+        """Error when a static-path dataset spans multiple universe years
+        without years declaration."""
         universe_years = expand_year_spec(self.universe)
         if len(universe_years) <= 1:
             return self

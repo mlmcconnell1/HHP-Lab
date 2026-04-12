@@ -339,7 +339,10 @@ def ingest_laus_metro(
     # any of its four series, which indicates API truncation or bad series IDs
     # rather than a legitimate data gap.  Writing a partial parquet silently
     # corrupts downstream panels.
-    measure_cols_present = [c for c in ["unemployment_rate", "unemployed", "employed", "labor_force"] if c in df.columns]
+    measure_cols = [
+        "unemployment_rate", "unemployed", "employed", "labor_force",
+    ]
+    measure_cols_present = [c for c in measure_cols if c in df.columns]
     if measure_cols_present:
         all_null_mask = df[measure_cols_present].isna().all(axis=1)
         all_null_metros = df.loc[all_null_mask, "metro_id"].tolist()

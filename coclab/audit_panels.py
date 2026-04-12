@@ -211,7 +211,9 @@ def _build_metro_source_panel(project_root: Path) -> pd.DataFrame:
         .rename(columns={"pit_year": "year"})
     )
 
-    zori = pd.read_parquet(project_root / "data" / "curated" / "zori" / "zori__county__Z2026.parquet")
+    zori = pd.read_parquet(
+        project_root / "data" / "curated" / "zori" / "zori__county__Z2026.parquet"
+    )
     zori = zori[zori["month"] == 1].copy()
     county_membership = read_metro_county_membership(base_dir=project_root / "data")
 
@@ -490,7 +492,10 @@ def _validate_modeling_ready(
     year_counts = modeling_df.groupby("geo_id")["year"].nunique()
     balanced_ok = not year_counts.empty and year_counts.nunique() == 1
     if not balanced_ok:
-        issues.append({"check": "balanced_modeling_panel", "message": "modeling table is not balanced"})
+        issues.append({
+            "check": "balanced_modeling_panel",
+            "message": "modeling table is not balanced",
+        })
     else:
         passed_checks.append("balanced_modeling_panel")
 

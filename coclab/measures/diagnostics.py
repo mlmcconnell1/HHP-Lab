@@ -364,7 +364,10 @@ def identify_problem_geos(
     problem_geos = problem_geos.merge(diagnostics, on=geo_id_col, how="left")
 
     # Reorder to put issues first after geo_id_col
-    cols = [geo_id_col, "issues"] + [c for c in problem_geos.columns if c not in [geo_id_col, "issues"]]
+    keep = {geo_id_col, "issues"}
+    cols = [geo_id_col, "issues"] + [
+        c for c in problem_geos.columns if c not in keep
+    ]
     return problem_geos[cols]
 
 
