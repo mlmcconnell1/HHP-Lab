@@ -180,9 +180,16 @@ def ingest_laus_metro(
             }
             if "unemployment_rate" in df.columns:
                 rates = df["unemployment_rate"].dropna()
-                result["unemployment_rate_mean"] = round(float(rates.mean()), 4) if len(rates) > 0 else None
-                result["unemployment_rate_min"] = round(float(rates.min()), 4) if len(rates) > 0 else None
-                result["unemployment_rate_max"] = round(float(rates.max()), 4) if len(rates) > 0 else None
+                has_rates = len(rates) > 0
+                result["unemployment_rate_mean"] = (
+                    round(float(rates.mean()), 4) if has_rates else None
+                )
+                result["unemployment_rate_min"] = (
+                    round(float(rates.min()), 4) if has_rates else None
+                )
+                result["unemployment_rate_max"] = (
+                    round(float(rates.max()), 4) if has_rates else None
+                )
             if "labor_force" in df.columns:
                 result["labor_force_total"] = int(df["labor_force"].sum())
             typer.echo(json.dumps(result, indent=2))
@@ -198,7 +205,10 @@ def ingest_laus_metro(
                 "years_requested": years,
                 "years_succeeded": [r["year"] for r in results],
                 "years_failed": [e["year"] for e in errors],
-                "outputs": [{"year": r["year"], "path": r["path"], "metros": r["metros"]} for r in results],
+                "outputs": [
+                    {"year": r["year"], "path": r["path"], "metros": r["metros"]}
+                    for r in results
+                ],
                 "errors": errors,
             }
             if quota_exhausted:

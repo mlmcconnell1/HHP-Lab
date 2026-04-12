@@ -326,8 +326,10 @@ def status_cmd(
     # Crosswalks
     x = assets["crosswalks"]
     typer.echo("\nCrosswalks:")
-    typer.echo(f"  Tract:  {len(x['tract'])} file(s)  {', '.join(x['tract']) if x['tract'] else '-'}")
-    typer.echo(f"  County: {len(x['county'])} file(s)  {', '.join(x['county']) if x['county'] else '-'}")
+    tract_list = ", ".join(x["tract"]) if x["tract"] else "-"
+    county_list = ", ".join(x["county"]) if x["county"] else "-"
+    typer.echo(f"  Tract:  {len(x['tract'])} file(s)  {tract_list}")
+    typer.echo(f"  County: {len(x['county'])} file(s)  {county_list}")
 
     # PIT
     p = assets["pit"]

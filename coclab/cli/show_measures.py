@@ -238,7 +238,9 @@ def show_measures(
             )
         else:
             typer.echo(
-                "Error: No measures files found. Run 'coclab build recipe --recipe <file>' to generate measures via a recipe.",
+                "Error: No measures files found."
+                " Run 'coclab build recipe --recipe <file>'"
+                " to generate measures via a recipe.",
                 err=True,
             )
         raise typer.Exit(1)

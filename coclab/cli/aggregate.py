@@ -136,7 +136,9 @@ def _require_boundary_years(build_dir: Path) -> list[int]:
     return boundary_years
 
 
-def _build_lagged_pep_series(pep_df: pd.DataFrame, target_year: int, lag_months: int) -> pd.DataFrame:
+def _build_lagged_pep_series(
+    pep_df: pd.DataFrame, target_year: int, lag_months: int,
+) -> pd.DataFrame:
     """Build a one-year county PEP series with month-based lag interpolation."""
     if lag_months < 0 or lag_months > 12:
         raise ValueError("--lag-months must be between 0 and 12.")
@@ -607,7 +609,8 @@ def aggregate_acs(
         if output_json:
             import json
 
-            typer.echo(json.dumps({"status": "error", "message": f"Invalid weighting '{weighting}'. Use 'area' or 'population'."}))
+            msg = f"Invalid weighting '{weighting}'. Use 'area' or 'population'."
+            typer.echo(json.dumps({"status": "error", "message": msg}))
             raise typer.Exit(2)
         typer.echo(
             f"Error: Invalid weighting '{weighting}'. Use 'area' or 'population'.",
@@ -674,7 +677,11 @@ def aggregate_acs(
                     "message": f"Cached ACS tract file not found: {acs_cache_path}",
                     "boundary_vintage": boundary_vintage,
                     "acs_vintage": acs_vintage,
-                    "remedy": f"coclab ingest acs5-tract --acs {acs_vintage} --tracts {tract_vintage}",
+                    "remedy": (
+                        f"coclab ingest acs5-tract"
+                        f" --acs {acs_vintage}"
+                        f" --tracts {tract_vintage}"
+                    ),
                 }))
                 raise typer.Exit(1)
             typer.echo(
@@ -707,7 +714,11 @@ def aggregate_acs(
                     "boundary_vintage": boundary_vintage,
                     "acs_vintage": acs_vintage,
                     "tract_vintage": str(tract_vintage),
-                    "remedy": f"coclab generate xwalks --boundary {boundary_vintage} --tracts {tract_vintage}",
+                    "remedy": (
+                        f"coclab generate xwalks"
+                        f" --boundary {boundary_vintage}"
+                        f" --tracts {tract_vintage}"
+                    ),
                 }))
                 raise typer.Exit(1)
             typer.echo(

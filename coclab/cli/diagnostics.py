@@ -77,7 +77,10 @@ def diagnostics(
     # Validate crosswalk file exists
     if not crosswalk.exists():
         if json_output:
-            typer.echo(json.dumps({"status": "error", "error": f"Crosswalk file not found: {crosswalk}"}, indent=2))
+            err_msg = f"Crosswalk file not found: {crosswalk}"
+            typer.echo(json.dumps(
+                {"status": "error", "error": err_msg}, indent=2,
+            ))
         else:
             typer.echo(f"Error: Crosswalk file not found: {crosswalk}", err=True)
         raise typer.Exit(1)

@@ -101,9 +101,16 @@ def ingest_acs1_metro(
         }
         if "unemployment_rate_acs1" in df.columns:
             rates = df["unemployment_rate_acs1"].dropna()
-            result["unemployment_rate_mean"] = round(float(rates.mean()), 6) if len(rates) > 0 else None
-            result["unemployment_rate_min"] = round(float(rates.min()), 6) if len(rates) > 0 else None
-            result["unemployment_rate_max"] = round(float(rates.max()), 6) if len(rates) > 0 else None
+            has_rates = len(rates) > 0
+            result["unemployment_rate_mean"] = (
+                round(float(rates.mean()), 6) if has_rates else None
+            )
+            result["unemployment_rate_min"] = (
+                round(float(rates.min()), 6) if has_rates else None
+            )
+            result["unemployment_rate_max"] = (
+                round(float(rates.max()), 6) if has_rates else None
+            )
         typer.echo(json.dumps(result, indent=2))
     else:
         typer.echo("=" * 60)
