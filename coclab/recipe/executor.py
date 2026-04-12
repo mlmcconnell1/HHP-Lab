@@ -349,19 +349,43 @@ def _execute_resample(
             error=static_broadcast_error,
         )
     if year_col is not None:
-        df = _filter_to_year(df, year_col, task.year)
-        if df.empty:
-            return StepResult(
-                step_kind="resample",
-                detail=detail,
-                success=False,
-                error=(
-                    f"Dataset '{task.dataset_id}' year {task.year}: "
-                    f"no rows after filtering {year_col}=={task.year}."
-                ),
-            )
-        if year_col != "year":
-            df = df.rename(columns={year_col: "year"})
+        filtered_df = _filter_to_year(df, year_col, task.year)
+        if filtered_df.empty:
+            ds = ctx.recipe.datasets.get(task.dataset_id)
+            unique_year_values: list[str] = []
+            if ds is not None and ds.provider == "census" and ds.product == "acs1" and year_col == "acs1_vintage":
+                source_years = df[year_col].dropna()
+                if not source_years.empty:
+                    numeric_years = pd.to_numeric(source_years, errors="coerce")
+                    if numeric_years.notna().all():
+                        unique_year_values = [
+                            str(int(value))
+                            for value in sorted(numeric_years.astype("int64").unique())
+                        ]
+                    else:
+                        unique_year_values = sorted(source_years.astype(str).unique().tolist())
+            if len(unique_year_values) == 1:
+                resolved_vintage = unique_year_values[0]
+                df = df.copy()
+                _record_step_note(
+                    ctx,
+                    step_notes,
+                    f"Dataset '{task.dataset_id}' year {task.year}: using lagged "
+                    f"ACS1 vintage {resolved_vintage} from the resolved input file.",
+                )
+            else:
+                return StepResult(
+                    step_kind="resample",
+                    detail=detail,
+                    success=False,
+                    error=(
+                        f"Dataset '{task.dataset_id}' year {task.year}: "
+                        f"no rows after filtering {year_col}=={task.year}."
+                    ),
+                )
+        else:
+            df = filtered_df
+        df = df.copy()
         df["year"] = task.year
 
     try:

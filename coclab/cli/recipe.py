@@ -682,6 +682,16 @@ def recipe_preflight_cmd(
             help="Emit only the data-gaps manifest (implies --json).",
         ),
     ] = False,
+    non_interactive: Annotated[
+        bool,
+        typer.Option(
+            "--non-interactive",
+            help=(
+                "Accept the documented automation flag when invoking "
+                "'coclab build recipe-preflight' directly."
+            ),
+        ),
+    ] = False,
 ) -> None:
     """Check all recipe prerequisites in one pass without executing.
 
@@ -704,6 +714,7 @@ def recipe_preflight_cmd(
 
         coclab build recipe-preflight --recipe my_build.yaml --gaps
     """
+    _ = non_interactive
     register_defaults()
 
     try:

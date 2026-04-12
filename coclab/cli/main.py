@@ -63,11 +63,12 @@ def _is_non_interactive(ctx: typer.Context | None = None) -> bool:
     """Return True when CLI should avoid all interactive prompts."""
     env = os.getenv("COCLAB_NON_INTERACTIVE", "").strip().lower()
     env_true = env in {"1", "true", "yes", "on"}
+    argv_flag = "--non-interactive" in sys.argv[1:]
 
     if ctx is None:
-        return env_true
+        return bool(env_true or argv_flag)
     obj = ctx.obj if isinstance(ctx.obj, dict) else {}
-    return bool(obj.get("non_interactive", False) or env_true)
+    return bool(obj.get("non_interactive", False) or env_true or argv_flag)
 
 
 def _check_working_directory(*, non_interactive: bool = False) -> None:

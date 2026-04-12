@@ -1132,6 +1132,29 @@ class TestPreflightCLI:
         assert out["status"] == "ok"
         assert out["ready"] is True
 
+    def test_json_output_ready_accepts_non_interactive_flag(
+        self,
+        tmp_path: Path,
+        monkeypatch,
+    ):
+        _make_project_root(tmp_path)
+        monkeypatch.chdir(tmp_path)
+        data = _preflight_recipe(with_path=True, identity_only=True)
+        _setup_preflight_fixtures(
+            tmp_path, include_xwalk=False, include_acs=False,
+        )
+        rf = _write_recipe(tmp_path, data)
+        result = runner.invoke(app, [
+            "build", "recipe-preflight",
+            "--recipe", str(rf),
+            "--json",
+            "--non-interactive",
+        ])
+        assert result.exit_code == 0
+        out = json.loads(result.output)
+        assert out["status"] == "ok"
+        assert out["ready"] is True
+
     def test_json_output_blocked(self, tmp_path: Path, monkeypatch):
         _make_project_root(tmp_path)
         monkeypatch.chdir(tmp_path)

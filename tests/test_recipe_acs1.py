@@ -12,6 +12,7 @@ import pandas as pd
 import pytest
 import yaml
 
+from coclab.recipe.executor import execute_recipe
 from coclab.recipe.loader import load_recipe
 from coclab.recipe.planner import resolve_plan
 from coclab.recipe.preflight import (
@@ -107,6 +108,60 @@ def _make_acs1_parquet(path: Path) -> None:
     })
     path.parent.mkdir(parents=True, exist_ok=True)
     df.to_parquet(path)
+
+
+def _setup_committed_recipe_execution_fixtures(tmp_path: Path) -> None:
+    """Create the lagged ACS1 inputs needed to execute the committed recipe."""
+    from coclab.metro.io import write_metro_artifacts
+
+    write_metro_artifacts(base_dir=tmp_path / "data")
+
+    tract_dir = tmp_path / "data" / "curated" / "tiger"
+    tract_dir.mkdir(parents=True, exist_ok=True)
+    pd.DataFrame({
+        "GEOID": ["36061000100", "06037000100"],
+    }).to_parquet(tract_dir / "tracts__T2020.parquet")
+
+    pit_dir = tmp_path / "data" / "curated" / "pit"
+    pit_dir.mkdir(parents=True, exist_ok=True)
+    pd.DataFrame({
+        "coc_id": ["NY-600", "CA-600"],
+        "pit_year": [2023, 2023],
+        "pit_total": [100, 200],
+        "pit_sheltered": [60, 120],
+        "pit_unsheltered": [40, 80],
+    }).to_parquet(pit_dir / "pit_vintage__P2024.parquet")
+
+    pep_dir = tmp_path / "data" / "curated" / "pep"
+    pep_dir.mkdir(parents=True, exist_ok=True)
+    pd.DataFrame({
+        "county_fips": ["36061", "06037"],
+        "year": [2023, 2023],
+        "population": [1600000, 950000],
+    }).to_parquet(pep_dir / "pep_county__v2024.parquet")
+
+    acs_dir = tmp_path / "data" / "curated" / "acs"
+    acs_dir.mkdir(parents=True, exist_ok=True)
+    pd.DataFrame({
+        "tract_geoid": ["36061000100", "06037000100"],
+        "total_population": [500000, 450000],
+        "adult_population": [400000, 350000],
+        "population_below_poverty": [75000, 90000],
+        "median_household_income": [85000.0, 70000.0],
+        "median_gross_rent": [2200.0, 1800.0],
+    }).to_parquet(acs_dir / "acs5_tracts__A2022xT2020.parquet")
+
+    pd.DataFrame({
+        "metro_id": ["GF01", "GF02"],
+        "acs1_vintage": [2022, 2022],
+        "unemployment_rate_acs1": [0.041, 0.052],
+    }).to_parquet(acs_dir / "acs1_metro__A2022@Dglynnfoxv1.parquet")
+
+
+def _find_panel_output(tmp_path: Path) -> Path:
+    matches = list(tmp_path.rglob("panel__*.parquet"))
+    assert matches, f"No panel output found under {tmp_path}"
+    return matches[0]
 
 
 # ===========================================================================
@@ -220,6 +275,24 @@ class TestCommittedACS1Recipe:
 
         assert len(plan.join_tasks) == 1
         assert "acs1_metro" in plan.join_tasks[0].datasets
+
+    def test_execute_recipe_uses_lagged_acs1_vintage(self, tmp_path: Path):
+        """The committed recipe executes with ACS1 vintage 2022 for analysis year 2023."""
+        with ACS1_RECIPE_PATH.open(encoding="utf-8") as f:
+            data = yaml.safe_load(f)
+        recipe = load_recipe(data)
+        _setup_committed_recipe_execution_fixtures(tmp_path)
+
+        results = execute_recipe(recipe, project_root=tmp_path)
+
+        assert len(results) == 1
+        assert results[0].success
+
+        panel = pd.read_parquet(_find_panel_output(tmp_path)).sort_values("metro_id")
+        assert set(panel["year"]) == {2023}
+        assert list(panel["metro_id"]) == ["GF01", "GF02"]
+        assert set(panel["acs1_vintage_used"]) == {"2022"}
+        assert list(panel["unemployment_rate_acs1"]) == [0.041, 0.052]
 
 
 # ===========================================================================

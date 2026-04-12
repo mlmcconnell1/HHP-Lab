@@ -177,10 +177,10 @@ class Acs1PolicyApplier:
     """Add ACS 1-year provenance columns to a metro panel.
 
     Mirrors the ACS1 branch previously inlined in ``assemble_panel``.
-    The recipe pipeline already normalises every dataset's
-    ``year_column`` to the universe year during resample, so the panel
-    ``year`` column is the resolved ACS1 vintage — no PIT lag is
-    required here.
+    The recipe pipeline uses the analysis year for joins, but an
+    identity-resampled ACS1 dataset may also retain ``acs1_vintage`` so
+    the panel can report the actual input vintage when recipes
+    intentionally load a lagged artifact.
     """
 
     name: str = field(default="acs1", init=False)
@@ -210,7 +210,8 @@ class Acs1PolicyApplier:
             and panel["unemployment_rate_acs1"].notna().any()
         )
         if has_acs1_data:
-            panel["acs1_vintage_used"] = panel["year"].astype(str)
+            vintage_source = "acs1_vintage" if "acs1_vintage" in panel.columns else "year"
+            panel["acs1_vintage_used"] = panel[vintage_source].astype("string")
             panel["acs_products_used"] = "acs5,acs1"
             # Null out vintage for rows where ACS1 data is missing.
             acs1_missing = panel["unemployment_rate_acs1"].isna()
@@ -221,6 +222,8 @@ class Acs1PolicyApplier:
             panel["acs_products_used"] = "acs5"
             if "unemployment_rate_acs1" not in panel.columns:
                 panel["unemployment_rate_acs1"] = np.nan
+        if "acs1_vintage" in panel.columns:
+            panel = panel.drop(columns=["acs1_vintage"])
         return PolicyApplication(name=self.name, panel=panel)
 
 

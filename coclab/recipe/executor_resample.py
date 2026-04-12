@@ -175,8 +175,15 @@ def _resample_identity(
     _validate_columns(df, task.measures, task.dataset_id, task.year)
 
     cols = [geo_col] + task.measures
+    if (
+        task.year_column == "acs1_vintage"
+        and task.year_column in df.columns
+        and task.year_column not in cols
+    ):
+        cols.insert(1, task.year_column)
     if "year" in df.columns and "year" not in cols:
-        cols.insert(1, "year")
+        insert_at = 2 if len(cols) > 1 and cols[1] == task.year_column else 1
+        cols.insert(insert_at, "year")
 
     result = df[cols].copy()
     if geo_col != "geo_id":
