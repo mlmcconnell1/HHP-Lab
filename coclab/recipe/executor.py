@@ -39,6 +39,7 @@ from coclab.recipe.executor_inputs import (
     _reject_implicit_static_broadcast,
     _resolve_geo_column,
     _resolve_year_column,
+    _validate_input_dataset_provenance,
     _validate_columns,
 )
 from coclab.recipe.executor_manifest import (
@@ -396,6 +397,12 @@ def _execute_resample(
         )
 
     try:
+        _validate_input_dataset_provenance(
+            ctx=ctx,
+            dataset_id=task.dataset_id,
+            effective_geometry=task.effective_geometry,
+            input_path=task.input_path,
+        )
         df = ctx.cache.read_parquet(input_file)
     except (FileNotFoundError, OSError, pa.ArrowInvalid) as exc:
         return StepResult(
@@ -406,6 +413,13 @@ def _execute_resample(
                 f"Dataset '{task.dataset_id}' year {task.year}: "
                 f"failed to read {task.input_path}: {exc}"
             ),
+        )
+    except ExecutorError as exc:
+        return StepResult(
+            step_kind="resample",
+            detail=detail,
+            success=False,
+            error=str(exc),
         )
 
     # Record consumed asset (deduplicated by path later in manifest)

@@ -39,6 +39,7 @@ from coclab.recipe.planner import (
 )
 from coclab.recipe.probes import (
     get_weighted_transform_requirements,
+    probe_acs5_tract_translation_provenance,
     probe_dataset_schema,
     probe_geo_column,
     probe_interpolate_to_month_data,
@@ -82,6 +83,7 @@ class FindingKind(str, enum.Enum):
     MISSING_MEASURE = "missing_measure"
     TEMPORAL_FILTER = "temporal_filter"
     TEMPORAL_ALIGNMENT = "temporal_alignment"
+    DATASET_PROVENANCE = "dataset_provenance"
     MISSING_SUPPORT_DATASET = "missing_support_dataset"
     CT_COUNTY_ALIGNMENT = "ct_county_alignment"
 
@@ -201,6 +203,7 @@ class PreflightReport:
             FindingKind.STATIC_BROADCAST,
             FindingKind.MISSING_MEASURE,
             FindingKind.TEMPORAL_FILTER,
+            FindingKind.DATASET_PROVENANCE,
             FindingKind.MISSING_SUPPORT_DATASET,
             FindingKind.CT_COUNTY_ALIGNMENT,
         }
@@ -316,6 +319,66 @@ def _check_dataset_paths(
                 years=missing_years,
                 remediation=_dataset_remediation(ds_id, ds, years=missing_years),
             ))
+
+    return findings
+
+
+def _check_dataset_provenance(
+    recipe: RecipeV1,
+    project_root: Path,
+    resample_tasks: list[ResampleTask],
+) -> list[PreflightFinding]:
+    """Block known-stale translated ACS tract caches via provenance checks."""
+    findings: list[PreflightFinding] = []
+    tasks_by_path: dict[tuple[str, str], list[ResampleTask]] = {}
+
+    for task in resample_tasks:
+        if task.input_path is None:
+            continue
+        tasks_by_path.setdefault((task.dataset_id, task.input_path), []).append(task)
+
+    for (dataset_id, input_path), tasks in tasks_by_path.items():
+        ds = recipe.datasets.get(dataset_id)
+        if ds is None:
+            continue
+
+        full_path = project_root / input_path
+        if not full_path.exists():
+            continue
+
+        result = probe_acs5_tract_translation_provenance(
+            dataset_id=dataset_id,
+            dataset_spec=ds,
+            effective_geometry=tasks[0].effective_geometry,
+            path=full_path,
+            path_label=input_path,
+        )
+        if result.ok:
+            continue
+
+        remediation_command = (
+            result.detail.get("remediation_command")
+            if result.detail is not None
+            else None
+        )
+        findings.append(PreflightFinding(
+            severity=Severity.ERROR,
+            kind=FindingKind.DATASET_PROVENANCE,
+            message=result.message or "Dataset provenance validation failed.",
+            dataset_id=dataset_id,
+            years=sorted(task.year for task in tasks),
+            remediation=Remediation(
+                hint=(
+                    "Rebuild the translated ACS tract cache so its provenance "
+                    "records the source and target tract vintages."
+                ),
+                command=(
+                    str(remediation_command)
+                    if remediation_command is not None
+                    else None
+                ),
+            ),
+        ))
 
     return findings
 
@@ -875,9 +938,31 @@ def _check_support_datasets(
             years=universe_years,
         )
         for r in probe_results:
+            finding_kind = FindingKind.MISSING_SUPPORT_DATASET
+            remediation_hint = (
+                f"Ensure dataset '{population_source}' is "
+                f"available with field '{population_field}' "
+                f"for the required years."
+            )
+            remediation_command = (
+                f"coclab ingest {recipe.datasets[population_source].product}"
+                if population_source in recipe.datasets
+                and recipe.datasets[population_source].product
+                else None
+            )
+            if (
+                r.detail is not None
+                and r.detail.get("finding_kind") == FindingKind.DATASET_PROVENANCE.value
+            ):
+                finding_kind = FindingKind.DATASET_PROVENANCE
+                remediation_hint = (
+                    "Rebuild the translated ACS tract cache so its provenance "
+                    "records the source and target tract vintages."
+                )
+                remediation_command = r.detail.get("remediation_command")
             findings.append(PreflightFinding(
                 severity=Severity.ERROR,
-                kind=FindingKind.MISSING_SUPPORT_DATASET,
+                kind=finding_kind,
                 message=r.message,
                 transform_id=tid,
                 dataset_id=population_source,
@@ -886,16 +971,10 @@ def _check_support_datasets(
                     if r.detail else None
                 ),
                 remediation=Remediation(
-                    hint=(
-                        f"Ensure dataset '{population_source}' is "
-                        f"available with field '{population_field}' "
-                        f"for the required years."
-                    ),
+                    hint=remediation_hint,
                     command=(
-                        f"coclab ingest "
-                        f"{recipe.datasets[population_source].product}"
-                        if population_source in recipe.datasets
-                        and recipe.datasets[population_source].product
+                        str(remediation_command)
+                        if remediation_command is not None
                         else None
                     ),
                 ),
@@ -1298,24 +1377,29 @@ def run_preflight(
         _check_dataset_paths(recipe, project_root, all_resample_tasks),
     )
 
-    # 4. Transform artifact checks
+    # 4. Dataset provenance checks for translated ACS tract caches
+    report.findings.extend(
+        _check_dataset_provenance(recipe, project_root, all_resample_tasks),
+    )
+
+    # 5. Transform artifact checks
     report.findings.extend(
         _check_transforms(recipe, project_root, needed_transforms),
     )
 
-    # 5. Dataset schema probes
+    # 6. Dataset schema probes
     report.findings.extend(
         _check_dataset_schemas(recipe, project_root, all_resample_tasks),
     )
 
-    # 6. Support-dataset probes for weighted transforms
+    # 7. Support-dataset probes for weighted transforms
     report.findings.extend(
         _check_support_datasets(
             recipe, project_root, needed_transforms, universe_years,
         ),
     )
 
-    # 7. Connecticut county-transition detection and bridge readiness
+    # 8. Connecticut county-transition detection and bridge readiness
     report.findings.extend(
         _check_ct_county_alignment(recipe, project_root, pipeline_resample_tasks),
     )

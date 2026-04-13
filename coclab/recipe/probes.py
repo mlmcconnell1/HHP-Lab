@@ -11,13 +11,17 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
+import re
 
 import pandas as pd
 import pyarrow.parquet as pq
 
+from coclab.acs.translate import get_source_tract_vintage, needs_translation
+from coclab.provenance import read_provenance
 from coclab.recipe.recipe_schema import (
     CrosswalkTransform,
     DatasetSpec,
+    GeometryRef,
     RecipeV1,
     TemporalFilter,
 )
@@ -28,6 +32,9 @@ GEO_CANDIDATES: list[str] = [
     "tract_geoid", "county_fips",
 ]
 YEAR_CANDIDATES: list[str] = ["year", "pit_year", "acs1_vintage"]
+ACS5_TRACT_CACHE_RE = re.compile(
+    r"(?:^|/)acs5_tracts__A(?P<acs_end>\d{4})xT(?P<tract_vintage>\d{4})\.parquet$",
+)
 
 
 @dataclass
@@ -37,6 +44,122 @@ class ProbeResult:
     ok: bool
     message: str | None = None
     detail: dict | None = None
+
+
+def _acs5_vintage_end_year(value: object) -> int | None:
+    """Return the ACS end year encoded in a vintage string, when parseable."""
+    text = str(value).strip()
+    if not text:
+        return None
+    if "-" in text:
+        end_year = text.split("-")[-1]
+    else:
+        end_year = text
+    if end_year.isdigit() and len(end_year) == 4:
+        return int(end_year)
+    match = re.search(r"(\d{4})$", text)
+    if match is None:
+        return None
+    return int(match.group(1))
+
+
+def _acs5_range_from_end_year(end_year: int) -> str:
+    """Return the canonical five-year ACS range string for an end year."""
+    return f"{end_year - 4}-{end_year}"
+
+
+def probe_acs5_tract_translation_provenance(
+    *,
+    dataset_id: str,
+    dataset_spec: DatasetSpec,
+    effective_geometry: GeometryRef,
+    path: Path,
+    path_label: str | None = None,
+) -> ProbeResult:
+    """Validate provenance for translated ACS5 tract caches.
+
+    The stale-cache bug this probe guards against affected pre-2020 ACS5
+    tract files that were labeled as 2020-vintage targets without actually
+    applying the 2010→2020 tract translation. We only validate the canonical
+    curated ACS5 tract artifacts that require translation.
+    """
+    if dataset_spec.provider != "census" or dataset_spec.product not in {"acs", "acs5"}:
+        return ProbeResult(ok=True)
+    if effective_geometry.type != "tract":
+        return ProbeResult(ok=True)
+
+    match = ACS5_TRACT_CACHE_RE.search(path.as_posix())
+    if match is None:
+        return ProbeResult(ok=True)
+
+    acs_end_year = int(match.group("acs_end"))
+    target_tract_vintage = int(match.group("tract_vintage"))
+    acs_vintage = _acs5_range_from_end_year(acs_end_year)
+    try:
+        translation_required = needs_translation(acs_vintage, target_tract_vintage)
+    except ValueError:
+        return ProbeResult(ok=True)
+    if not translation_required:
+        return ProbeResult(ok=True)
+
+    source_tract_vintage = get_source_tract_vintage(acs_vintage)
+    display_path = path_label or path.as_posix()
+    remediation_command = (
+        f"coclab ingest acs5-tract --acs {acs_vintage} "
+        f"--tracts {target_tract_vintage} --force"
+    )
+
+    provenance = read_provenance(path)
+    if provenance is None:
+        return ProbeResult(
+            ok=False,
+            message=(
+                f"Dataset '{dataset_id}' uses translated ACS tract cache "
+                f"'{display_path}' but the file has no provenance metadata "
+                f"proving {source_tract_vintage}->{target_tract_vintage} translation."
+            ),
+            detail={
+                "acs_vintage": acs_vintage,
+                "dataset_id": dataset_id,
+                "path": display_path,
+                "remediation_command": remediation_command,
+                "source_tract_vintage": source_tract_vintage,
+                "target_tract_vintage": target_tract_vintage,
+            },
+        )
+
+    provenance_acs_end_year = _acs5_vintage_end_year(provenance.acs_vintage)
+    extra = provenance.extra or {}
+    translation_confirmed = (
+        provenance_acs_end_year == acs_end_year
+        and str(provenance.tract_vintage) == str(target_tract_vintage)
+        and extra.get("translation_applied") is True
+        and str(extra.get("source_tract_vintage")) == str(source_tract_vintage)
+        and str(extra.get("target_tract_vintage")) == str(target_tract_vintage)
+    )
+    if translation_confirmed:
+        return ProbeResult(ok=True)
+
+    return ProbeResult(
+        ok=False,
+        message=(
+            f"Dataset '{dataset_id}' uses stale translated ACS tract cache "
+            f"'{display_path}': provenance does not confirm "
+            f"{source_tract_vintage}->{target_tract_vintage} translation for "
+            f"ACS {acs_vintage}."
+        ),
+        detail={
+            "acs_vintage": acs_vintage,
+            "dataset_id": dataset_id,
+            "path": display_path,
+            "provenance_acs_vintage": provenance.acs_vintage,
+            "provenance_tract_vintage": provenance.tract_vintage,
+            "remediation_command": remediation_command,
+            "source_tract_vintage": source_tract_vintage,
+            "target_tract_vintage": target_tract_vintage,
+            "translation_applied": extra.get("translation_applied"),
+        },
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -524,6 +647,23 @@ def probe_support_dataset(
         if not full_path.exists():
             missing_years.append(year)
             continue
+
+        provenance_result = probe_acs5_tract_translation_provenance(
+            dataset_id=population_source,
+            dataset_spec=ds,
+            effective_geometry=resolved.effective_geometry,
+            path=full_path,
+            path_label=path,
+        )
+        if not provenance_result.ok:
+            detail = dict(provenance_result.detail or {})
+            detail.setdefault("finding_kind", "dataset_provenance")
+            detail.setdefault("transform_id", transform_id)
+            results.append(ProbeResult(
+                ok=False,
+                message=provenance_result.message,
+                detail=detail,
+            ))
 
         # Check schema for population_field
         schema_result = probe_dataset_schema(full_path)

@@ -24,6 +24,7 @@ from coclab.recipe.planner import (
     _resolve_dataset_year,
 )
 from coclab.recipe.probes import (
+    probe_acs5_tract_translation_provenance,
     probe_geo_column,
     probe_measures,
     probe_static_broadcast,
@@ -87,6 +88,44 @@ def _validate_columns(
         raise ExecutorError(
             f"Dataset '{dataset_id}' year {year}: {result.message}"
         )
+
+
+def _validate_input_dataset_provenance(
+    *,
+    ctx: ExecutionContext,
+    dataset_id: str,
+    effective_geometry,
+    input_path: str,
+) -> None:
+    """Reject known-stale translated ACS tract caches before reading them."""
+    ds = ctx.recipe.datasets.get(dataset_id)
+    if ds is None:
+        return
+
+    input_file = ctx.project_root / input_path
+    result = probe_acs5_tract_translation_provenance(
+        dataset_id=dataset_id,
+        dataset_spec=ds,
+        effective_geometry=effective_geometry,
+        path=input_file,
+        path_label=input_path,
+    )
+    if result.ok:
+        return
+
+    remediation_command = (
+        result.detail.get("remediation_command")
+        if result.detail is not None
+        else None
+    )
+    remediation = (
+        f" Rebuild it with '{remediation_command}'."
+        if remediation_command is not None
+        else ""
+    )
+    raise ExecutorError(
+        f"{result.message}{remediation}"
+    )
 
 
 def _reject_implicit_static_broadcast(
@@ -322,6 +361,12 @@ def _load_support_dataset_for_year(
             f"{resolved.path}"
         )
 
+    _validate_input_dataset_provenance(
+        ctx=ctx,
+        dataset_id=dataset_id,
+        effective_geometry=resolved.effective_geometry,
+        input_path=resolved.path,
+    )
     df = ctx.cache.read_parquet(input_file)
     identity = ctx.cache.file_identity(input_file)
     root, rel_path = _classify_path(input_file, ctx)

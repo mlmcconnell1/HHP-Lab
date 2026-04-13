@@ -9,6 +9,7 @@ import pandas as pd
 from typer.testing import CliRunner
 
 from coclab.cli.main import app
+from coclab.provenance import ProvenanceBlock, write_parquet_with_provenance
 from coclab.recipe.loader import load_recipe
 from coclab.recipe.preflight import (
     FindingKind,
@@ -28,6 +29,31 @@ from coclab.recipe.probes import (
 from coclab.recipe.recipe_schema import DatasetSpec, GeometryRef, TemporalFilter
 
 runner = CliRunner()
+
+STALE_TRANSLATED_ACS_PATH = "data/curated/acs/acs5_tracts__A2019xT2020.parquet"
+STALE_TRANSLATED_ACS_VINTAGE = "2015-2019"
+STALE_TRANSLATED_ACS_REBUILD = (
+    "coclab ingest acs5-tract --acs 2015-2019 --tracts 2020 --force"
+)
+
+
+def _write_stale_translated_acs_cache(path: Path) -> None:
+    """Write a pre-fix translated ACS cache lacking translation provenance."""
+    write_parquet_with_provenance(
+        pd.DataFrame({
+            "tract_geoid": ["T1"],
+            "year": [2020],
+            "acs_vintage": [STALE_TRANSLATED_ACS_VINTAGE],
+            "tract_vintage": ["2020"],
+            "total_population": [100],
+        }),
+        path,
+        ProvenanceBlock(
+            acs_vintage=STALE_TRANSLATED_ACS_VINTAGE,
+            tract_vintage="2020",
+            extra={"dataset": "acs5_tract_data"},
+        ),
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -363,6 +389,33 @@ class TestRunPreflight:
         ]
         assert len(ds_findings) >= 1
         assert ds_findings[0].dataset_id == "pit"
+
+    def test_blocks_stale_translated_acs_cache(self, tmp_path: Path):
+        data = _preflight_recipe(with_path=True)
+        data["universe"] = {"years": [2020]}
+        data["datasets"]["pit"]["years"] = {"years": [2020]}
+        data["datasets"]["acs"]["years"] = {"years": [2020]}
+        data["datasets"]["acs"]["path"] = STALE_TRANSLATED_ACS_PATH
+        _setup_preflight_fixtures(tmp_path, include_acs=False)
+        stale_path = tmp_path / STALE_TRANSLATED_ACS_PATH
+        stale_path.parent.mkdir(parents=True, exist_ok=True)
+        _write_stale_translated_acs_cache(stale_path)
+
+        recipe = load_recipe(data)
+        report = run_preflight(recipe, project_root=tmp_path)
+
+        provenance_findings = [
+            f for f in report.findings
+            if f.kind == FindingKind.DATASET_PROVENANCE
+        ]
+        assert len(provenance_findings) == 1
+        finding = provenance_findings[0]
+        assert not report.is_ready
+        assert finding.dataset_id == "acs"
+        assert finding.years == [2020]
+        assert STALE_TRANSLATED_ACS_PATH in finding.message
+        assert finding.remediation is not None
+        assert finding.remediation.command == STALE_TRANSLATED_ACS_REBUILD
 
     def test_planner_error_captured(self, tmp_path: Path):
         data = _preflight_recipe(with_path=True, identity_only=True)

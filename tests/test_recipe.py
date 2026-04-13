@@ -11,6 +11,7 @@ from typer.testing import CliRunner
 
 from coclab.cli.main import app
 from coclab.geo.ct_planning_regions import CtPlanningRegionCrosswalk
+from coclab.provenance import ProvenanceBlock, write_parquet_with_provenance
 from coclab.recipe.adapters import (
     DatasetAdapterRegistry,
     GeometryAdapterRegistry,
@@ -59,6 +60,31 @@ from coclab.recipe.recipe_schema import (
 )
 
 runner = CliRunner()
+
+STALE_TRANSLATED_ACS_PATH = "data/curated/acs/acs5_tracts__A2019xT2020.parquet"
+STALE_TRANSLATED_ACS_VINTAGE = "2015-2019"
+STALE_TRANSLATED_ACS_REBUILD = (
+    "coclab ingest acs5-tract --acs 2015-2019 --tracts 2020 --force"
+)
+
+
+def _write_stale_translated_acs_cache(path: Path) -> None:
+    """Write a stale translated ACS tract cache missing translation metadata."""
+    write_parquet_with_provenance(
+        pd.DataFrame({
+            "tract_geoid": ["T1"],
+            "year": [2020],
+            "acs_vintage": [STALE_TRANSLATED_ACS_VINTAGE],
+            "tract_vintage": ["2020"],
+            "total_population": [100],
+        }),
+        path,
+        ProvenanceBlock(
+            acs_vintage=STALE_TRANSLATED_ACS_VINTAGE,
+            tract_vintage="2020",
+            extra={"dataset": "acs5_tract_data"},
+        ),
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -1487,6 +1513,23 @@ class TestExecutor:
         recipe = load_recipe(data)
         results = execute_recipe(recipe, project_root=tmp_path)
         assert len(results[0].steps) == 8
+
+    def test_execute_recipe_rejects_stale_translated_acs_cache(self, tmp_path: Path):
+        _setup_pipeline_fixtures(tmp_path)
+        stale_path = tmp_path / STALE_TRANSLATED_ACS_PATH
+        stale_path.parent.mkdir(parents=True, exist_ok=True)
+        _write_stale_translated_acs_cache(stale_path)
+
+        data = _recipe_with_pipeline()
+        data["datasets"]["pit"]["path"] = "data/pit.parquet"
+        data["datasets"]["acs"]["path"] = STALE_TRANSLATED_ACS_PATH
+        recipe = load_recipe(data)
+
+        with pytest.raises(ExecutorError) as exc_info:
+            execute_recipe(recipe, project_root=tmp_path)
+        message = str(exc_info.value)
+        assert "stale translated ACS tract cache" in message
+        assert STALE_TRANSLATED_ACS_REBUILD in message
 
     def test_execute_recipe_rejects_implicit_static_broadcast(self, tmp_path: Path):
         """A yearless dataset should not be silently reused across many years."""
