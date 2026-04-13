@@ -19,7 +19,11 @@ from coclab.acs.ingest.tract_population import (
     parse_acs_vintage,
 )
 from coclab.acs.variables import ALL_API_VARS, TRACT_OUTPUT_COLUMNS
-from coclab.provenance import read_provenance
+from coclab.provenance import (
+    ProvenanceBlock,
+    read_provenance,
+    write_parquet_with_provenance,
+)
 
 
 def make_census_response(
@@ -380,6 +384,56 @@ class TestFetchTractPopulation:
         assert len(df) > 0
 
     @pytest.mark.httpx_mock(can_send_already_matched_responses=True)
+    def test_translates_pre_2020_acs_when_target_tracts_are_2020(self, httpx_mock, monkeypatch):
+        """A pre-2020 ACS vintage targeting T2020 must run the translation step."""
+        response_data = make_census_response(
+            [
+                {
+                    "county": "031",
+                    "tract": "001000",
+                    "B01003_001E": "5000",
+                    "B01003_001M": "150",
+                }
+            ]
+        )
+
+        httpx_mock.add_response(
+            url=re.compile(r"https://api\.census\.gov/data/2019/acs/acs5.*state%3A08.*"),
+            json=response_data,
+        )
+        httpx_mock.add_response(
+            url=re.compile(r"https://api\.census\.gov/data/2019/acs/acs5.*"),
+            status_code=404,
+        )
+
+        calls: dict[str, str] = {}
+
+        def fake_translate(df, acs_vintage, target_tract_vintage, **kwargs):
+            calls["acs_vintage"] = acs_vintage
+            calls["target_tract_vintage"] = str(target_tract_vintage)
+            translated = df.copy()
+            translated["tract_geoid"] = "99999000100"
+            translated["total_population"] = 5000.4
+            return translated, object()
+
+        monkeypatch.setattr(
+            "coclab.acs.ingest.tract_population.translate_acs_to_target_vintage",
+            fake_translate,
+        )
+
+        df, _, _, _ = fetch_tract_data("2015-2019", "2020")
+
+        assert calls == {
+            "acs_vintage": "2015-2019",
+            "target_tract_vintage": "2020",
+        }
+        assert df.iloc[0]["tract_geoid"] == "99999000100"
+        assert df.iloc[0]["total_population"] == 5000
+        assert str(df["total_population"].dtype) == "Int64"
+        assert df.iloc[0]["acs_vintage"] == "2015-2019"
+        assert df.iloc[0]["tract_vintage"] == "2020"
+
+    @pytest.mark.httpx_mock(can_send_already_matched_responses=True)
     def test_raises_when_no_data_fetched(self, httpx_mock):
         """Test that ValueError is raised when no data can be fetched."""
         # Mock all state requests to fail
@@ -456,6 +510,76 @@ class TestIngestTractPopulation:
         )
 
         assert result_path == cached_path
+
+    @pytest.mark.httpx_mock(can_send_already_matched_responses=True)
+    def test_refreshes_stale_translated_cache_without_force(self, httpx_mock, tmp_path, monkeypatch):
+        """Translated-target caches without translation provenance must be rebuilt."""
+        cached_path = tmp_path / "acs5_tracts__A2019xT2020.parquet"
+        cached_df = pd.DataFrame(
+            {
+                "tract_geoid": ["08031001000"],
+                "acs_vintage": ["2015-2019"],
+                "tract_vintage": ["2020"],
+                "total_population": [5000],
+                "data_source": ["acs_5yr"],
+                "source_ref": ["cached"],
+                "ingested_at": [datetime.now(UTC)],
+            }
+        )
+        write_parquet_with_provenance(
+            cached_df,
+            cached_path,
+            ProvenanceBlock(
+                acs_vintage="2015-2019",
+                tract_vintage="2020",
+                extra={"dataset": "acs5_tract_data"},
+            ),
+        )
+
+        response_data = make_census_response(
+            [
+                {
+                    "county": "031",
+                    "tract": "001000",
+                    "B01003_001E": "6000",
+                    "B01003_001M": "200",
+                }
+            ]
+        )
+
+        httpx_mock.add_response(
+            url=re.compile(r"https://api\.census\.gov/data/2019/acs/acs5.*state%3A08.*"),
+            json=response_data,
+        )
+        httpx_mock.add_response(
+            url=re.compile(r"https://api\.census\.gov/data/2019/acs/acs5.*"),
+            status_code=404,
+        )
+
+        def fake_translate(df, acs_vintage, target_tract_vintage, **kwargs):
+            translated = df.copy()
+            translated["tract_geoid"] = "99999000100"
+            return translated, object()
+
+        monkeypatch.setattr(
+            "coclab.acs.ingest.tract_population.translate_acs_to_target_vintage",
+            fake_translate,
+        )
+
+        result_path = ingest_tract_data(
+            "2015-2019",
+            "2020",
+            force=False,
+            output_dir=tmp_path,
+        )
+
+        result_df = pd.read_parquet(result_path)
+        assert result_df.iloc[0]["tract_geoid"] == "99999000100"
+        provenance = read_provenance(result_path)
+        assert provenance is not None
+        assert provenance.extra["translation_applied"] is True
+        assert provenance.extra["source_tract_vintage"] == 2010
+        assert provenance.extra["target_tract_vintage"] == 2020
 
     @pytest.mark.httpx_mock(can_send_already_matched_responses=True)
     def test_force_refetch_ignores_cache(self, httpx_mock, tmp_path):
@@ -545,6 +669,9 @@ class TestIngestTractPopulation:
         assert provenance.acs_vintage == "2019-2023"
         assert provenance.tract_vintage == "2023"
         assert provenance.extra.get("dataset") == "acs5_tract_data"
+        assert provenance.extra.get("translation_applied") is False
+        assert provenance.extra.get("source_tract_vintage") == 2020
+        assert provenance.extra.get("target_tract_vintage") == 2023
         assert "B01003" in provenance.extra.get("tables", [])
 
 

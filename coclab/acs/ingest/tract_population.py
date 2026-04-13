@@ -44,6 +44,11 @@ import httpx
 import pandas as pd
 
 from coclab import naming
+from coclab.acs.translate import (
+    get_source_tract_vintage,
+    needs_translation,
+    translate_acs_to_target_vintage,
+)
 from coclab.acs.variables import (
     ACS_TABLES,
     ACS_VARIABLES,
@@ -52,7 +57,11 @@ from coclab.acs.variables import (
     TRACT_OUTPUT_COLUMNS,
 )
 from coclab.paths import curated_dir
-from coclab.provenance import ProvenanceBlock, write_parquet_with_provenance
+from coclab.provenance import (
+    ProvenanceBlock,
+    read_provenance,
+    write_parquet_with_provenance,
+)
 from coclab.raw_snapshot import write_api_snapshot
 from coclab.source_registry import check_source_changed, register_source
 from coclab.sources import CENSUS_API_ACS5
@@ -76,6 +85,44 @@ STATE_FIPS_CODES = [
 
 # Source ref string listing all tables fetched
 _TABLES_REF = "+".join(ACS_TABLES)
+
+
+def _translation_metadata(
+    acs_vintage: str,
+    tract_vintage: str,
+) -> dict[str, object]:
+    """Return source/target tract metadata for an ACS ingest request."""
+    source_tract_vintage = get_source_tract_vintage(acs_vintage)
+    translation_required = needs_translation(acs_vintage, tract_vintage)
+    return {
+        "source_tract_vintage": source_tract_vintage,
+        "target_tract_vintage": int(tract_vintage),
+        "translation_applied": translation_required,
+    }
+
+
+def _cached_translation_matches_request(
+    output_path: Path,
+    acs_vintage: str,
+    tract_vintage: str,
+) -> bool:
+    """Return whether an existing cache satisfies this translation request."""
+    translation = _translation_metadata(acs_vintage, tract_vintage)
+    if not translation["translation_applied"]:
+        return True
+
+    provenance = read_provenance(output_path)
+    if provenance is None:
+        return False
+
+    extra = provenance.extra or {}
+    return (
+        provenance.acs_vintage == acs_vintage
+        and str(provenance.tract_vintage) == str(tract_vintage)
+        and extra.get("translation_applied") is True
+        and str(extra.get("source_tract_vintage")) == str(translation["source_tract_vintage"])
+        and str(extra.get("target_tract_vintage")) == str(translation["target_tract_vintage"])
+    )
 
 
 def parse_acs_vintage(acs_vintage: str) -> int:
@@ -285,6 +332,7 @@ def fetch_tract_data(
     """
     year = parse_acs_vintage(acs_vintage)
     ingested_at = datetime.now(UTC)
+    translation = _translation_metadata(acs_vintage, tract_vintage)
 
     logger.info(f"Fetching ACS {acs_vintage} tract data (API year: {year})")
 
@@ -330,6 +378,13 @@ def fetch_tract_data(
     # Combine all states
     result = pd.concat(dfs, ignore_index=True)
 
+    if translation["translation_applied"]:
+        result, _ = translate_acs_to_target_vintage(
+            result,
+            acs_vintage,
+            tract_vintage,
+        )
+
     # Add metadata columns
     result["acs_vintage"] = acs_vintage
     result["tract_vintage"] = tract_vintage
@@ -346,7 +401,9 @@ def fetch_tract_data(
     ]
     for col in int_cols:
         if col in result.columns:
-            result[col] = result[col].astype("Int64")
+            # Translation can yield fractional expected counts after area weighting.
+            # Round back to the canonical nullable-integer schema used by ACS tract files.
+            result[col] = pd.to_numeric(result[col], errors="coerce").round().astype("Int64")
 
     float_cols = [
         "moe_total_population", "median_household_income", "median_gross_rent",
@@ -425,10 +482,19 @@ def ingest_tract_data(
         Path to the output Parquet file.
     """
     output_path = get_output_path(acs_vintage, tract_vintage, output_dir)
+    translation = _translation_metadata(acs_vintage, tract_vintage)
 
     if output_path.exists() and not force:
-        logger.info(f"Using cached file: {output_path}")
-        return output_path
+        if _cached_translation_matches_request(output_path, acs_vintage, tract_vintage):
+            logger.info(f"Using cached file: {output_path}")
+            return output_path
+        logger.info(
+            "Refreshing cached ACS tract file %s because it predates translated "
+            "tract-vintage provenance for %s -> T%s.",
+            output_path,
+            acs_vintage,
+            tract_vintage,
+        )
 
     df, content_sha256, content_size, snap_dir = fetch_tract_data(
         acs_vintage, tract_vintage, raw_root=raw_root,
@@ -464,6 +530,7 @@ def ingest_tract_data(
             "retrieved_at": datetime.now(UTC).isoformat(),
             "row_count": len(df),
             "raw_sha256": content_sha256,
+            **translation,
         },
     )
 
@@ -480,6 +547,7 @@ def ingest_tract_data(
         metadata={
             "acs_vintage": acs_vintage,
             "tract_vintage": tract_vintage,
+            **translation,
             "tables": ACS_TABLES,
             "row_count": len(df),
             "curated_path": str(output_path),
