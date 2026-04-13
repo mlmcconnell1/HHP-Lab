@@ -227,6 +227,7 @@ class TestCommittedACS1Recipe:
             data = yaml.safe_load(f)
         recipe = load_recipe(data)
         assert recipe.name == "glynn_fox_metro_panel_2023_acs1"
+        assert recipe.targets[0].panel_policy.column_aliases["population"] == "pep_population"
 
     def test_plan_resolves(self):
         with ACS1_RECIPE_PATH.open(encoding="utf-8") as f:

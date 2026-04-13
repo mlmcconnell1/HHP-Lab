@@ -30,6 +30,10 @@ def test_glynn_fox_zori_recipe_covers_2015_2020():
     zori_path = raw_recipe["datasets"]["zori_county"]["path"]
     assert zori_path == "data/curated/zori/zori__county__Z2026.parquet"
     assert raw_recipe["transforms"][0]["from"]["vintage"] == 2020
+    assert (
+        recipe.targets[0].panel_policy.column_aliases["population"]
+        == "pep_population"
+    )
 
 
 def test_glynn_fox_zori_recipe_uses_lagged_acs_paths():

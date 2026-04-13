@@ -1324,6 +1324,7 @@ class TestValidateBLSLaus:
         assert target.panel_policy is not None
         assert target.panel_policy.laus is not None
         assert target.panel_policy.laus.include is True
+        assert target.panel_policy.column_aliases["population"] == "pep_population"
 
     def test_laus_recipe_plan_resolves_2015_2023_multiyear_inputs(self):
         """The committed LAUS recipe should resolve the full 2015-2023 window."""

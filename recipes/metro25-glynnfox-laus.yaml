@@ -29,6 +29,7 @@ targets:
         population_below_poverty: population_below_poverty_acs5
         median_household_income: median_household_income_acs5
         median_gross_rent: median_gross_rent_acs5
+        population: pep_population
 
 datasets:
   pit:
