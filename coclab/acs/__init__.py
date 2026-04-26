@@ -11,6 +11,7 @@ from coclab.acs.ingest.tract_population import (
     get_output_path,
     ingest_tract_data,
 )
+from coclab.acs.metro import aggregate_acs_to_metro, build_metro_tract_crosswalk
 from coclab.acs.translate import (
     TranslationStats,
     get_source_tract_vintage,
@@ -24,6 +25,9 @@ __all__ = [
     "fetch_tract_data",
     "get_output_path",
     "ingest_tract_data",
+    # Metro aggregation
+    "aggregate_acs_to_metro",
+    "build_metro_tract_crosswalk",
     # Translation
     "TranslationStats",
     "get_source_tract_vintage",

@@ -13,14 +13,14 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
+from coclab.acs import aggregate_acs_to_metro
 from coclab import naming
-from coclab.metro.acs import aggregate_acs_to_metro
 from coclab.metro.io import (
     read_metro_coc_membership,
     read_metro_county_membership,
 )
-from coclab.metro.zori import aggregate_yearly_zori_to_metro
 from coclab.provenance import ProvenanceBlock, write_parquet_with_provenance
+from coclab.rents import aggregate_yearly_zori_to_metro
 
 METRO_DEFINITION_VERSION = "glynn_fox_v1"
 

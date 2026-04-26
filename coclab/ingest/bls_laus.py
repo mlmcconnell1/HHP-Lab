@@ -53,16 +53,16 @@ import httpx
 import pandas as pd
 
 from coclab import naming
-from coclab.metro.definitions import (
-    METRO_CBSA_MAPPING,
-    METRO_STATE_FIPS,
-    metro_name_for_id,
-)
-from coclab.metro.laus import (
+from coclab.bls.laus import (
     BLS_ANNUAL_AVERAGE_PERIOD,
     LAUS_MEASURE_CODES,
     LAUS_METRO_OUTPUT_COLUMNS,
     build_laus_series_id,
+)
+from coclab.metro.definitions import (
+    METRO_CBSA_MAPPING,
+    METRO_STATE_FIPS,
+    metro_name_for_id,
 )
 from coclab.provenance import ProvenanceBlock, write_parquet_with_provenance
 from coclab.sources import BLS_API_REGISTRATION_URL, BLS_API_V2, BLS_LAUS_SOURCE_REF

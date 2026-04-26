@@ -7,12 +7,12 @@ covering single-CoC, multi-CoC, missing-CoC, and truth-table cases.
 import pandas as pd
 import pytest
 
+from coclab.pit import aggregate_pit_to_metro
 from coclab.metro.definitions import (
     METRO_COC_MEMBERSHIP,
     METRO_COUNT,
     build_coc_membership_df,
 )
-from coclab.metro.pit import aggregate_pit_to_metro
 
 # ---------------------------------------------------------------------------
 # Fixtures

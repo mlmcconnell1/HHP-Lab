@@ -47,6 +47,11 @@ from coclab.rents.diagnostics import (
     summarize_coc_zori,
 )
 from coclab.rents.ingest import ingest_zori
+from coclab.rents.metro import (
+    aggregate_yearly_zori_to_metro,
+    aggregate_zori_to_metro,
+    collapse_zori_to_yearly,
+)
 from coclab.rents.weights import (
     build_county_weights,
     fetch_county_acs_totals,
@@ -66,6 +71,9 @@ __all__ = [
     "aggregate_zori_to_coc",
     "aggregate_monthly",
     "collapse_to_yearly",
+    "aggregate_zori_to_metro",
+    "aggregate_yearly_zori_to_metro",
+    "collapse_zori_to_yearly",
     "compute_coc_county_weights",
     "compute_geo_county_weights",
     "load_zori",

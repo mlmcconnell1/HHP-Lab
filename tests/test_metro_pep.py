@@ -7,12 +7,12 @@ covering single-county, multi-county, missing-county, and truth-table cases.
 import pandas as pd
 import pytest
 
+from coclab.pep import aggregate_pep_to_metro
 from coclab.metro.definitions import (
     METRO_COUNT,
     METRO_COUNTY_MEMBERSHIP,
     build_county_membership_df,
 )
-from coclab.metro.pep import aggregate_pep_to_metro
 
 # ---------------------------------------------------------------------------
 # Fixtures

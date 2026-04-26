@@ -79,8 +79,8 @@ def ingest_laus_metro(
     """
     import pandas as pd
 
-    from coclab.ingest.bls_laus import BlsQuotaExhausted
-    from coclab.ingest.bls_laus import ingest_laus_metro as _ingest
+    from coclab.bls import BlsQuotaExhausted
+    from coclab.bls import ingest_laus_metro as _ingest
 
     # Resolve years to process
     if year is not None and (start_year is not None or end_year is not None):

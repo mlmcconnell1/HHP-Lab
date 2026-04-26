@@ -25,6 +25,11 @@ from unittest.mock import patch
 import pandas as pd
 import pytest
 
+from coclab.bls import (
+    LAUS_MEASURE_CODES,
+    build_all_series_ids,
+    build_laus_series_id,
+)
 from coclab.ingest.bls_laus import (
     BlsQuotaExhausted,
     _build_metro_series_map,
@@ -33,11 +38,6 @@ from coclab.ingest.bls_laus import (
     ingest_laus_metro,
 )
 from coclab.metro.definitions import METRO_CBSA_MAPPING, METRO_STATE_FIPS
-from coclab.metro.laus import (
-    LAUS_MEASURE_CODES,
-    build_all_series_ids,
-    build_laus_series_id,
-)
 from coclab.naming import laus_metro_filename, laus_metro_path
 from coclab.panel.conformance import (
     ACS1_MEASURE_COLUMNS,
@@ -596,8 +596,8 @@ class TestIngestLausMetro:
         measures), but the parquet would be silently written with 25 null rates.
         Expected: ValueError naming the missing measure.
         """
+        from coclab.bls import LAUS_MEASURE_CODES
         from coclab.ingest.bls_laus import _build_metro_series_map
-        from coclab.metro.laus import LAUS_MEASURE_CODES
 
         # Collect series IDs for every measure except unemployment_rate
         metro_series = _build_metro_series_map()

@@ -1,0 +1,7 @@
+{"id":"el:package-bls-c1vv10fcc03v","summary":"BLS source package that exposes LAUS constants and forwards metro LAUS workflows without depending on the shared metro package.","ai":{"architectural_layer":"source","confidence":0.9}}
+{"id":"el:file-init-py-yxdhmpqttp8t","summary":"Public BLS package surface for LAUS helpers plus dynamic access to the metro LAUS ingest workflow.","ai":{"architectural_layer":"source","confidence":0.9}}
+{"id":"el:file-laus-py-r6tt2sm3f6mt","summary":"Defines Glynn-Fox metro LAUS series-ID constants and builders for BLS annual labor-market ingestion.","ai":{"architectural_layer":"source","confidence":0.95}}
+{"id":"el:file-acs-py-cn0dcb5a677x","summary":"Owns ACS-specific aggregation from tract-level ACS inputs into Glynn-Fox metros using shared metro county membership.","ai":{"architectural_layer":"source","confidence":0.95}}
+{"id":"el:file-metro-py-m93kc1dpxh6y","summary":"Owns PEP-specific aggregation from county population estimates into Glynn-Fox metros with county coverage diagnostics.","ai":{"architectural_layer":"source","confidence":0.95}}
+{"id":"el:file-metro-py-fq1dcj6xxr9q","summary":"Owns PIT-specific aggregation from CoC counts into Glynn-Fox metros with member-CoC coverage tracking.","ai":{"architectural_layer":"source","confidence":0.95}}
+{"id":"el:file-metro-py-5j4dqrkw7gcx","summary":"Owns ZORI-specific aggregation from county rent series into Glynn-Fox metros for both monthly and yearly workflows.","ai":{"architectural_layer":"source","confidence":0.95}}

@@ -4,9 +4,11 @@ This package provides modules for:
 - Ingesting PIT data from HUD Exchange and other sources
 - Parsing and canonicalizing PIT counts
 - Registry tracking for PIT vintages
+- Metro aggregation utilities
 - Quality assurance and validation
 """
 
+from coclab.pit.metro import aggregate_pit_to_metro
 from coclab.pit.registry import (
     PitRegistryEntry,
     compute_file_hash,
@@ -17,6 +19,7 @@ from coclab.pit.registry import (
 )
 
 __all__ = [
+    "aggregate_pit_to_metro",
     "PitRegistryEntry",
     "compute_file_hash",
     "get_pit_path",
