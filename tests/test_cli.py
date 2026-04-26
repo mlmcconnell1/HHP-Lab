@@ -13,7 +13,7 @@ runner = CliRunner()
 class TestNestedIngestCommand:
     """Tests for the nested 'ingest boundaries' command."""
 
-    @patch("coclab.ingest.hud_exchange_gis.ingest_hud_exchange")
+    @patch("coclab.hud.ingest_hud_exchange")
     def test_ingest_boundaries_nested_hud_exchange(self, mock_ingest):
         """Nested ingest boundaries should call ingest_hud_exchange."""
         mock_ingest.return_value = Path("data/curated/coc_boundaries/coc_boundaries__2025.parquet")

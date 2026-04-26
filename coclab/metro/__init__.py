@@ -1,4 +1,9 @@
-"""Shared Glynn/Fox metro definitions, IO, and validation utilities."""
+"""Shared Glynn/Fox metro definitions, IO, and validation utilities.
+
+Source-specific metro aggregations live under their owning source packages
+(``coclab.acs``, ``coclab.pep``, ``coclab.pit``, ``coclab.rents``). This
+package is limited to shared geography artifacts and validation helpers.
+"""
 
 from coclab.metro.definitions import (
     DEFINITION_VERSION,

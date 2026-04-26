@@ -7,20 +7,16 @@ import shutil
 import subprocess
 from dataclasses import dataclass
 from datetime import UTC, datetime
+from functools import lru_cache
+from importlib import import_module
 from pathlib import Path
 from typing import Any
 
 import numpy as np
 import pandas as pd
+import coclab.naming as naming
 
-from coclab.acs import aggregate_acs_to_metro
-from coclab import naming
-from coclab.metro.io import (
-    read_metro_coc_membership,
-    read_metro_county_membership,
-)
 from coclab.provenance import ProvenanceBlock, write_parquet_with_provenance
-from coclab.rents import aggregate_yearly_zori_to_metro
 
 METRO_DEFINITION_VERSION = "glynn_fox_v1"
 
@@ -141,6 +137,37 @@ AUDIT_PANEL_SPECS: tuple[AuditPanelSpec, ...] = (
 
 def _repo_root() -> Path:
     return Path(__file__).resolve().parent.parent
+
+
+@lru_cache(maxsize=1)
+def _acs_module() -> Any:
+    return import_module("coclab.acs")
+
+
+@lru_cache(maxsize=1)
+def _metro_io_module() -> Any:
+    return import_module("coclab.metro.io")
+
+
+@lru_cache(maxsize=1)
+def _rents_module() -> Any:
+    return import_module("coclab.rents")
+
+
+def aggregate_acs_to_metro(*args: Any, **kwargs: Any) -> Any:
+    return _acs_module().aggregate_acs_to_metro(*args, **kwargs)
+
+
+def read_metro_coc_membership(*args: Any, **kwargs: Any) -> Any:
+    return _metro_io_module().read_metro_coc_membership(*args, **kwargs)
+
+
+def read_metro_county_membership(*args: Any, **kwargs: Any) -> Any:
+    return _metro_io_module().read_metro_county_membership(*args, **kwargs)
+
+
+def aggregate_yearly_zori_to_metro(*args: Any, **kwargs: Any) -> Any:
+    return _rents_module().aggregate_yearly_zori_to_metro(*args, **kwargs)
 
 
 def _git_commit(project_root: Path) -> str:

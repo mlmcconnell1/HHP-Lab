@@ -1,5 +1,15 @@
-"""NHGIS data ingestion module."""
+"""NHGIS geometry ingest entrypoints."""
 
-from coclab.nhgis.ingest import ingest_nhgis_tracts
+from coclab.nhgis.ingest import (
+    NhgisExtractError,
+    SUPPORTED_YEARS,
+    ingest_nhgis_counties,
+    ingest_nhgis_tracts,
+)
 
-__all__ = ["ingest_nhgis_tracts"]
+__all__ = [
+    "NhgisExtractError",
+    "SUPPORTED_YEARS",
+    "ingest_nhgis_counties",
+    "ingest_nhgis_tracts",
+]

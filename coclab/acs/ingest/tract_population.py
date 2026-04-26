@@ -42,8 +42,8 @@ from pathlib import Path
 
 import httpx
 import pandas as pd
+import coclab.naming as naming
 
-from coclab import naming
 from coclab.acs.translate import (
     get_source_tract_vintage,
     needs_translation,

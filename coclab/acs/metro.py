@@ -1,10 +1,10 @@
 """Metro-level ACS measure aggregation from tract-native inputs.
 
 ACS (American Community Survey) data is available at the census tract
-level.  Metro ACS measures are derived by building a metro-tract crosswalk
-from the metro-county membership table (since tracts nest perfectly within
+level. Metro ACS measures are derived by building a metro-tract crosswalk from
+the metro-county membership table (since tracts nest perfectly within
 counties, every tract in a member county has ``area_share=1.0``), then
-aggregating using :func:`coclab.measures.acs.aggregate_to_geo`.
+aggregating using :func:`coclab.acs.aggregate.aggregate_to_geo`.
 
 For multi-county metros (e.g., NYC with 5 boroughs, Denver with 7 counties),
 all tracts from all member counties contribute.  For single-county metros,
@@ -17,7 +17,7 @@ import logging
 
 import pandas as pd
 
-from coclab.measures.acs import aggregate_to_geo
+from coclab.acs.aggregate import aggregate_to_geo
 from coclab.metro.definitions import (
     DEFINITION_VERSION,
     build_county_membership_df,

@@ -38,8 +38,8 @@ from pathlib import Path
 
 import httpx
 import pandas as pd
+import coclab.naming as naming
 
-from coclab import naming
 from coclab.acs.variables_acs1 import (
     ACS1_FIRST_RELIABLE_YEAR,
     ACS1_METRO_OUTPUT_COLUMNS,

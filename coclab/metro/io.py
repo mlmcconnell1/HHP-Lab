@@ -5,8 +5,8 @@ from __future__ import annotations
 from pathlib import Path
 
 import pandas as pd
+import coclab.naming as naming
 
-from coclab import naming
 from coclab.metro.definitions import (
     DEFINITION_VERSION,
     build_coc_membership_df,

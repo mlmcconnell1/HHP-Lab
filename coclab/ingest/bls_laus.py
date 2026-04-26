@@ -51,8 +51,8 @@ from pathlib import Path
 
 import httpx
 import pandas as pd
+import coclab.naming as naming
 
-from coclab import naming
 from coclab.bls.laus import (
     BLS_ANNUAL_AVERAGE_PERIOD,
     LAUS_MEASURE_CODES,

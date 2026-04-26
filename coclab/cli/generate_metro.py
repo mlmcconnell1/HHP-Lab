@@ -48,7 +48,7 @@ def generate_metro(
     """
     import json as json_mod
 
-    from coclab import naming
+    import coclab.naming as naming
     from coclab.metro.io import write_metro_artifacts
 
     # Check for existing artifacts unless --force

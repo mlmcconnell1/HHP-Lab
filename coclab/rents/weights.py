@@ -429,7 +429,7 @@ def get_county_weights_path(
         Output path like 'data/curated/acs/county_weights__A2023__wrenter.parquet' (new)
         or 'data/curated/acs/county_weights__2019-2023__renter_households.parquet' (legacy).
     """
-    from coclab import naming
+    import coclab.naming as naming
 
     using_default = base_dir is None
     if base_dir is None:

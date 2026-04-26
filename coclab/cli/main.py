@@ -277,7 +277,7 @@ def ingest_boundaries(
             raise typer.Exit(1)
 
         from coclab.geo.io import curated_boundary_path
-        from coclab.ingest.hud_exchange_gis import ingest_hud_exchange
+        from coclab.hud import ingest_hud_exchange
         from coclab.registry.registry import list_boundaries
 
         output_path = curated_boundary_path(vintage)
@@ -311,7 +311,7 @@ def ingest_boundaries(
             raise typer.Exit(1) from e
 
     elif source == "hud_opendata":
-        from coclab.ingest.hud_opendata_arcgis import ingest_hud_opendata
+        from coclab.hud import ingest_hud_opendata
 
         typer.echo(f"Ingesting HUD Open Data CoC boundaries (snapshot: {snapshot})...")
         try:

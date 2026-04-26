@@ -55,8 +55,8 @@ from typing import TYPE_CHECKING, Literal
 
 import numpy as np
 import pandas as pd
+import coclab.naming as naming
 
-from coclab import naming
 from coclab.analysis_geo import (
     GEO_ID_COL,
     GEO_TYPE_COC,
