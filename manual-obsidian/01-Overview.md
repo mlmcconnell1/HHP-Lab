@@ -1,6 +1,6 @@
 # Overview
 
-CoC Lab is a data engineering and reproducibility toolkit for building **analysis-geography-centered datasets** from heterogeneous public sources.
+HHP-Lab is a data engineering and reproducibility toolkit for building **analysis-geography-centered datasets** from heterogeneous public sources.
 
 Its core design choice is deliberate:
 
@@ -9,7 +9,7 @@ Its core design choice is deliberate:
 - **Spoke datasets:** tract- and county-native inputs (ACS, ZORI, PEP) mapped into the target analysis geography via crosswalks or membership tables
 - **Execution style:** declarative YAML recipes over the global curated store
 
-## What CoC Lab Does
+## What HHP-Lab Does
 
 - Ingests boundary, census geometry, PIT, ACS, PEP, and ZORI inputs
 - Builds tract↔CoC and county↔CoC crosswalks
@@ -48,7 +48,7 @@ By default those roots are:
 
 ## Panel Assembly
 
-CoC Lab uses recipe-driven composition (`build recipe`) for multi-dataset panel construction.
+HHP-Lab uses recipe-driven composition (`build recipe`) for multi-dataset panel construction.
 
 ---
 

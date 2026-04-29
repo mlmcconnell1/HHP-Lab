@@ -13,7 +13,7 @@ The same weighting and coverage logic applies to both targets.
 
 ## Aggregation Algorithm
 
-CoC Lab uses **weighted tract-level aggregation** to produce geography-level estimates. The algorithm differs by measure type:
+HHP-Lab uses **weighted tract-level aggregation** to produce geography-level estimates. The algorithm differs by measure type:
 
 ### Count Variables (population, poverty counts)
 

@@ -9,8 +9,8 @@
 
 ```bash
 # Clone the repository
-git clone https://github.com/mlmcconnell1/CoC-Lab.git
-cd CoC-Lab
+git clone https://github.com/mlmcconnell1/HHP-Lab.git
+cd HHP-Lab
 
 # Install with uv (recommended)
 uv sync
@@ -25,7 +25,7 @@ uv sync --extra dev
 ## Verify Installation
 
 ```bash
-# Check CLI is available
+# Check CLI is available (the runtime command rename happens later)
 coclab --help
 
 # Run tests
@@ -34,13 +34,15 @@ pytest tests/test_smoke.py -v
 
 ## Working Directory
 
-The CLI expects to be run from the CoC Lab project root directory. If run from a different directory, you'll see a warning:
+The CLI expects to be run from the HHP-Lab project root directory. If run from a different directory, you'll see a warning:
 
 ```
 Warning: Current directory may not be the CoC Lab project root. Missing: pyproject.toml, coclab, data
 ```
 
-This warning appears when the current directory is missing expected markers (`pyproject.toml`, `coclab/`, `data/`). While commands may still work, file paths assume the project root as the working directory.
+The current runtime warning still says `CoC Lab` and checks for `coclab/`
+because the package/CLI rename is staged separately. While commands may still
+work, file paths assume the project root as the working directory.
 
 ---
 

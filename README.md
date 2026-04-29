@@ -1,6 +1,6 @@
-# CoC Lab
+# HHP-Lab
 
-CoC Lab is a Python toolkit and CLI for building analysis-ready homelessness panels from HUD Continuum of Care data, Census geography and population products, ACS tract measures, and Zillow rent data.
+HHP-Lab is a Python toolkit and CLI for building analysis-ready homelessness panels from HUD Continuum of Care data, Census geography and population products, ACS tract measures, and Zillow rent data.
 
 The project started as CoC boundary infrastructure, but it now supports two analysis geography families:
 
@@ -9,9 +9,9 @@ The project started as CoC boundary infrastructure, but it now supports two anal
 
 The current metro implementation includes the 25 Glynn/Fox metros from *Dynamics of Homelessness in Urban America* via `glynn_fox_v1`.
 
-Full operational documentation lives in [manual-obsidian/CoC-Lab-Manual.md](manual-obsidian/CoC-Lab-Manual.md).
+Full operational documentation lives in [manual-obsidian/HHP-Lab-Manual.md](manual-obsidian/HHP-Lab-Manual.md).
 
-## What CoC Lab Does
+## What HHP-Lab Does
 
 - Ingests curated source data for CoC boundaries, TIGER tracts and counties, ACS, PEP, PIT, and ZORI
 - Builds tract-to-CoC and county-to-CoC crosswalks
@@ -36,14 +36,15 @@ Important temporal rules:
 
 ## Installation
 
-CoC Lab targets Python 3.12+.
+HHP-Lab targets Python 3.12+.
 
 ```bash
 uv sync --extra dev
 uv run coclab --help
 ```
 
-The CLI entrypoint is `coclab`.
+The current CLI entrypoint is still `coclab`. The project/runtime command
+rename is tracked separately from this repository/branding stage.
 
 ## CLI Highlights
 
@@ -67,7 +68,7 @@ Automation features:
 
 ## Storage Roots
 
-CoC Lab now resolves canonical data locations from configurable storage roots.
+HHP-Lab now resolves canonical data locations from configurable storage roots.
 Resolution precedence is:
 
 - CLI flags: `--asset-store-root`, `--output-root`
@@ -160,4 +161,4 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
-At least one dependency used within CoC Lab is subject to its own license terms.
+At least one dependency used within HHP-Lab is subject to its own license terms.

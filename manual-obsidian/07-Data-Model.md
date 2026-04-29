@@ -7,7 +7,7 @@ default layout. Replace `data/raw/...`, `data/curated/...`, and
 
 ## Analysis Geography Model
 
-CoC Lab supports multiple analysis geographies—the unit of observation in derived outputs. The abstraction separates *analysis geography* (what you want to measure) from *source geometry* (how input data is natively organized).
+HHP-Lab supports multiple analysis geographies—the unit of observation in derived outputs. The abstraction separates *analysis geography* (what you want to measure) from *source geometry* (how input data is natively organized).
 
 | Property | CoC | Metro |
 |----------|-----|-------|
@@ -531,7 +531,7 @@ Filenames use temporal shorthand notation (see [[08-Temporal-Terminology]]).
 
 ## Dataset Provenance
 
-All CoC Lab Parquet files embed **provenance metadata** in the file schema, enabling full reproducibility without sidecar files.
+All HHP-Lab Parquet files embed **provenance metadata** in the file schema, enabling full reproducibility without sidecar files.
 
 ### Provenance Block Schema
 
@@ -567,7 +567,7 @@ The `notation` field uses the shorthand from [[08-Temporal-Terminology|Temporal 
 | `geo_type` | string | Analysis geography type, e.g. `coc` or `metro` (nullable) |
 | `definition_version` | string | Synthetic geography definition version, e.g. `glynn_fox_v1` (nullable) |
 | `created_at` | ISO 8601 | Timestamp of dataset creation |
-| `coclab_version` | string | CoC Lab version that produced the file |
+| `coclab_version` | string | Current project version that produced the file |
 | `extra` | object | Extensible metadata (dataset type, source paths, etc.) |
 
 ### Reading Provenance

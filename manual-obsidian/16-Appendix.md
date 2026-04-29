@@ -23,4 +23,4 @@ See [[08-Temporal-Terminology|Temporal Terminology]] for shorthand (`A`, `B`, `C
 
 ---
 
-**Previous:** [[15-Development]] | **Back to:** [[CoC-Lab-Manual]]
+**Previous:** [[15-Development]] | **Back to:** [[HHP-Lab-Manual]]

@@ -70,7 +70,7 @@ layout.
 
 Connecticut changed Census county-equivalent geography from 8 legacy counties
 (`09001`-`09015`) to 9 planning regions (`09110`-`09190`). This matters for
-county-native recipe inputs because CoC-Lab can now combine:
+county-native recipe inputs because HHP-Lab can now combine:
 
 - legacy county crosswalks such as `xwalk__B2025xC2020.parquet`
 - newer county-native datasets whose Connecticut rows already use planning-region
@@ -78,7 +78,7 @@ county-native recipe inputs because CoC-Lab can now combine:
 - county-weighted transforms where the `population_source` dataset can switch to
   planning-region FIPS even if the main dataset still uses legacy county FIPS
 
-Near-term CoC-Lab policy:
+Near-term HHP-Lab policy:
 
 - Do not silently drop or misweight Connecticut rows.
 - If the recipe crosswalk is keyed to legacy counties and the dataset or support

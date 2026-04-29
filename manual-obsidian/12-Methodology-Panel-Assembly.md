@@ -1,6 +1,6 @@
 # Methodology: Panel Assembly
 
-Panel assembly uses `coclab build recipe` to align heterogeneous inputs to a geography×year frame, then join. The target geography is CoC by default but can be metro.
+Panel assembly uses `coclab build recipe` to align heterogeneous inputs to a geography×year frame, then join. The target geography is CoC by default but can be metro in HHP-Lab workflows.
 
 ## Assembly Pattern
 

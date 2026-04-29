@@ -1,4 +1,4 @@
-# CoC Lab Manual
+# HHP-Lab Manual
 
 ## Table of Contents
 

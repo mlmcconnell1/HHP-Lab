@@ -1,6 +1,6 @@
 # Temporal Terminology
 
-This chapter defines shorthand notation and vocabulary for describing the various dates, vintages, and temporal relationships in CoC Lab datasets.
+This chapter defines shorthand notation and vocabulary for describing the various dates, vintages, and temporal relationships in HHP-Lab datasets.
 
 ## Core Temporal Concepts
 
@@ -37,7 +37,7 @@ ACS 5-year estimates have an implicit collection window. The vintage year is the
 
 ## ZORI Temporal Conventions
 
-ZORI is published as a **monthly** series. In CoC Lab notation:
+ZORI is published as a **monthly** series. In HHP-Lab notation:
 
 - `zori__county__Z2026.parquet` means the ingested monthly file contains observations through 2026.
 - Yearly-collapsed CoC and metro outputs do **not** use `Z{year}` in filenames; they are keyed by ACS/crosswalk vintages and include `__m{method}`.

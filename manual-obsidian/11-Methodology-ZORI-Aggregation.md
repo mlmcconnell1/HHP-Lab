@@ -178,7 +178,7 @@ The `collapse_to_yearly()` function supports:
 
 Unless otherwise specified, ZORI is collapsed to yearly values using the **January observation** of each calendar year. This choice aligns the rent measure with HUD Point-in-Time (PIT) counts, which are conducted in January.
 
-Alternative yearly collapse methods (e.g., calendar-year mean or median) may be used for sensitivity analysis, but January-aligned ZORI is the default for all standard CoC Lab panels and examples.
+Alternative yearly collapse methods (e.g., calendar-year mean or median) may be used for sensitivity analysis, but January-aligned ZORI is the default for all standard HHP-Lab panels and examples.
 
 ## Data Attribution
 
