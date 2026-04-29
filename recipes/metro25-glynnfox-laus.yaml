@@ -11,7 +11,7 @@ description: >
   needed).
 
   Before running this recipe, ingest LAUS data for the required year(s):
-      coclab ingest laus-metro --start-year 2015 --end-year 2023
+      hhplab ingest laus-metro --start-year 2015 --end-year 2023
 
 universe:
   range: "2015-2023"

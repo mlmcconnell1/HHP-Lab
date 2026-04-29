@@ -40,30 +40,27 @@ HHP-Lab targets Python 3.12+.
 
 ```bash
 uv sync --extra dev
-uv run coclab --help
+uv run hhplab --help
 ```
-
-The current CLI entrypoint is still `coclab`. The project/runtime command
-rename is tracked separately from this repository/branding stage.
 
 ## CLI Highlights
 
 Common entry points:
 
-- `coclab status --json`: scan curated assets and optional named-build inventories
-- `coclab aggregate {acs|pit|pep|zori}`: produce standalone CoC aggregate artifacts
-- `coclab build recipe --recipe <file>`: run a recipe build (validation + preflight included)
-- `coclab build recipe-preflight --recipe <file> --json`: readiness report without execution
-- `coclab build recipe-plan --recipe <file> --json`: inspect the resolved task graph while authoring/debugging
-- `coclab validate curated-layout`: check naming and layout policy
-- `coclab list curated`: discover curated data assets
+- `hhplab status --json`: scan curated assets and optional named-build inventories
+- `hhplab aggregate {acs|pit|pep|zori}`: produce standalone CoC aggregate artifacts
+- `hhplab build recipe --recipe <file>`: run a recipe build (validation + preflight included)
+- `hhplab build recipe-preflight --recipe <file> --json`: readiness report without execution
+- `hhplab build recipe-plan --recipe <file> --json`: inspect the resolved task graph while authoring/debugging
+- `hhplab validate curated-layout`: check naming and layout policy
+- `hhplab list curated`: discover curated data assets
 
 Automation features:
 
 - Most inventory and planning commands support `--json`
-- `coclab --non-interactive ...` and `COCLAB_NON_INTERACTIVE=1` disable prompts
-- `coclab agents` prints the geography/year matching rules used by the project
-- `coclab build recipe` and `coclab build recipe-export` accept
+- `hhplab --non-interactive ...` and `HHPLAB_NON_INTERACTIVE=1` disable prompts
+- `hhplab agents` prints the geography/year matching rules used by the project
+- `hhplab build recipe` and `hhplab build recipe-export` accept
   `--asset-store-root` and `--output-root` overrides
 
 ## Storage Roots
@@ -72,7 +69,7 @@ HHP-Lab now resolves canonical data locations from configurable storage roots.
 Resolution precedence is:
 
 - CLI flags: `--asset-store-root`, `--output-root`
-- Environment: `COCLAB_ASSET_STORE_ROOT`, `COCLAB_OUTPUT_ROOT`
+- Environment: `HHPLAB_ASSET_STORE_ROOT`, `HHPLAB_OUTPUT_ROOT`
 - Repo config: `hhplab.yaml`
 - User config: `~/.config/hhplab/config.yaml`
 - Built-in defaults
@@ -80,7 +77,7 @@ Resolution precedence is:
 Built-in defaults preserve the historical layout:
 
 - `asset_store_root = <project_root>/data`
-- `output_root = <project_root>/data/curated/panel`
+- `output_root = <project_root>/outputs`
 
 Relative paths are resolved by source:
 
@@ -98,21 +95,21 @@ Recipe-driven builds are the primary workflow.
 Human path:
 
 ```bash
-uv run coclab build recipe --recipe recipes/metro25-glynnfox.yaml
+uv run hhplab build recipe --recipe recipes/metro25-glynnfox.yaml
 ```
 
 Automation / CI path:
 
 ```bash
-uv run coclab status --json
-uv run coclab build recipe-preflight --recipe recipes/metro25-glynnfox.yaml --json
-uv run coclab build recipe --recipe recipes/metro25-glynnfox.yaml --json
+uv run hhplab status --json
+uv run hhplab build recipe-preflight --recipe recipes/metro25-glynnfox.yaml --json
+uv run hhplab build recipe --recipe recipes/metro25-glynnfox.yaml --json
 ```
 
 Optional task-graph inspection while authoring/debugging:
 
 ```bash
-uv run coclab build recipe-plan --recipe recipes/metro25-glynnfox.yaml --json
+uv run hhplab build recipe-plan --recipe recipes/metro25-glynnfox.yaml --json
 ```
 
 Most recipe builds consume curated source artifacts directly. Use the

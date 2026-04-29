@@ -46,9 +46,9 @@ the output downstream.
 ## Suggested Commands
 
 ```bash
-COCLAB_NON_INTERACTIVE=1 coclab build recipe-preflight \
+HHPLAB_NON_INTERACTIVE=1 hhplab build recipe-preflight \
   --recipe recipes/examples/coc-base-pit-acs-zori-2016-2021.yaml --json
 
-COCLAB_NON_INTERACTIVE=1 coclab build recipe \
+HHPLAB_NON_INTERACTIVE=1 hhplab build recipe \
   --recipe recipes/examples/coc-base-pit-acs-zori-2016-2021.yaml --json
 ```
