@@ -19,6 +19,14 @@ Rename the project identity, not the homelessness domain vocabulary.
 This distinction is mandatory. A global `coc -> hhp` replacement would be
 wrong and would corrupt domain meaning across the codebase.
 
+When a file, symbol, artifact, or doc section is specifically about
+Continuums of Care, PIT counts, CoC boundaries, or CoC-native aggregation,
+it should normally keep the `CoC` / `coc` label. The rename applies to the
+project identity, not to source-domain terminology that remains accurate.
+
+If a later stage encounters an ambiguous case, stop and resolve it with the
+user before renaming.
+
 ## Target Contract
 
 | Surface | Current | Target | Decision |
@@ -47,6 +55,9 @@ These identifiers stay as they are unless a later bead explicitly expands
 scope:
 
 - Domain abbreviations such as `coc`, `coc_id`, and `Continuum of Care`
+- CoC-specific dataset and workflow names such as CoC boundaries, CoC PIT,
+  CoC crosswalks, and CoC-native aggregates where `coc` names the geography
+  rather than the project
 - Artifact names whose `coc` token describes geography rather than project
   branding
 - Generic labels such as `metro_panel`
