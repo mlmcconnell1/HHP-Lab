@@ -10,6 +10,7 @@ import pytest
 from hhplab.analysis_geo import (
     GEO_TYPE_COC,
     GEO_TYPE_METRO,
+    GEO_TYPE_MSA,
     VALID_GEO_TYPES,
     AnalysisGeometryRef,
     ensure_canonical_geo_columns,
@@ -39,6 +40,14 @@ class TestAnalysisGeometryRef:
         assert ref.is_metro
         assert not ref.is_coc
 
+    def test_msa_constructor(self):
+        ref = AnalysisGeometryRef.msa("census_msa_2023")
+        assert ref.geo_type == "msa"
+        assert ref.definition_version == "census_msa_2023"
+        assert ref.boundary_vintage is None
+        assert ref.is_msa
+        assert not ref.is_metro
+
     def test_invalid_geo_type_raises(self):
         with pytest.raises(ValueError, match="Unknown geo_type 'county'"):
             AnalysisGeometryRef(geo_type="county")
@@ -53,6 +62,11 @@ class TestAnalysisGeometryRef:
         d = ref.to_dict()
         assert d == {"geo_type": "metro", "definition_version": "glynn_fox_v1"}
 
+    def test_to_dict_msa(self):
+        ref = AnalysisGeometryRef.msa("census_msa_2023")
+        d = ref.to_dict()
+        assert d == {"geo_type": "msa", "definition_version": "census_msa_2023"}
+
     def test_frozen(self):
         ref = AnalysisGeometryRef.coc("2025")
         with pytest.raises(AttributeError):
@@ -61,6 +75,7 @@ class TestAnalysisGeometryRef:
     def test_valid_geo_types_tuple(self):
         assert GEO_TYPE_COC in VALID_GEO_TYPES
         assert GEO_TYPE_METRO in VALID_GEO_TYPES
+        assert GEO_TYPE_MSA in VALID_GEO_TYPES
 
 
 # ---------------------------------------------------------------------------
@@ -86,6 +101,10 @@ class TestResolveGeoCol:
         with pytest.raises(KeyError, match="neither"):
             resolve_geo_col(df)
 
+    def test_msa_id_resolved(self):
+        df = pd.DataFrame({"msa_id": ["35620"]})
+        assert resolve_geo_col(df) == "msa_id"
+
 
 # ---------------------------------------------------------------------------
 # infer_geo_type
@@ -110,6 +129,10 @@ class TestInferGeoType:
         """No geo_type col, no coc_id col, but metro_id → should return 'metro'."""
         df = pd.DataFrame({"metro_id": ["GF01", "GF02"], "year": [2020, 2021]})
         assert infer_geo_type(df) == "metro"
+
+    def test_fallback_to_msa_id_column(self):
+        df = pd.DataFrame({"msa_id": ["35620", "31080"], "year": [2020, 2021]})
+        assert infer_geo_type(df) == "msa"
 
     def test_unsupported_geo_type_value_raises(self):
         """geo_type column contains an unsupported value → ValueError."""

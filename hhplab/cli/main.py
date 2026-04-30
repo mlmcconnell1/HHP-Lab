@@ -19,6 +19,7 @@ from hhplab.cli.crosscheck_pit_vintages import validate_pit_vintages
 from hhplab.cli.crosscheck_population import validate_population
 from hhplab.cli.diagnostics import diagnostics
 from hhplab.cli.generate_metro import generate_metro
+from hhplab.cli.generate_msa import generate_msa
 from hhplab.cli.ingest_acs1_metro import ingest_acs1_metro
 from hhplab.cli.ingest_acs_population import ingest_acs_population
 from hhplab.cli.ingest_census import ingest_tiger
@@ -701,6 +702,7 @@ diagnostics_app.command("xwalk")(diagnostics)
 diagnostics_app.command("zori")(zori_diagnostics)
 generate_app.command("xwalks")(build_xwalks)
 generate_app.command("metro")(generate_metro)
+generate_app.command("msa")(generate_msa)
 build_app.command("recipe")(recipe_cmd)
 build_app.command("recipe-plan")(recipe_plan_cmd)
 build_app.command("recipe-provenance")(recipe_provenance_cmd)

@@ -11,6 +11,10 @@ CENSUS_TIGER_BASE: Final = "https://www2.census.gov/geo/tiger/TIGER{year}/{layer
 CENSUS_TRACT_RELATIONSHIP_URL: Final = (
     "https://www2.census.gov/geo/docs/maps-data/data/rel2020/tract/tab20_tract20_tract10_natl.txt"
 )
+CENSUS_MSA_DELINEATION_FILE_2023: Final = (
+    "https://www2.census.gov/programs-surveys/metro-micro/"
+    "geographies/reference-files/2023/delineation-files/list1_2023.xlsx"
+)
 
 # Census PEP
 CENSUS_PEP_DATASETS_BASE: Final = "https://www2.census.gov/programs-surveys/popest/datasets"

@@ -69,6 +69,7 @@ SourceType = Literal[
     "acs5_tract",  # ACS 5-year tract-level data
     "acs5_county",  # ACS 5-year county-level data
     "pep_county",  # Census PEP county population estimates
+    "census_cbsa",  # Census CBSA/MSA delineation workbook
     "pit",  # HUD PIT counts
     "other",  # Other external sources
 ]

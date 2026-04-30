@@ -1020,6 +1020,62 @@ def metro_county_membership_path(
 
 
 # =============================================================================
+# MSA definition artifact filenames
+# =============================================================================
+
+
+def msa_definitions_filename(definition_version: str) -> str:
+    """Filename for MSA definitions table.
+
+    Pattern: ``msa_definitions__{version}.parquet``.
+    """
+    return f"msa_definitions__{definition_version}.parquet"
+
+
+def msa_county_membership_filename(definition_version: str) -> str:
+    """Filename for MSA-to-county membership table.
+
+    Pattern: ``msa_county_membership__{version}.parquet``.
+    """
+    return f"msa_county_membership__{definition_version}.parquet"
+
+
+# =============================================================================
+# MSA definition artifact paths
+# =============================================================================
+
+
+def msa_definitions_path(
+    definition_version: str,
+    base_dir: Path | str | None = None,
+) -> Path:
+    """Canonical path for MSA definitions file."""
+    if base_dir is None:
+        base_dir = Path("data")
+    else:
+        base_dir = Path(base_dir)
+    return (
+        base_dir / "curated" / "msa"
+        / msa_definitions_filename(definition_version)
+    )
+
+
+def msa_county_membership_path(
+    definition_version: str,
+    base_dir: Path | str | None = None,
+) -> Path:
+    """Canonical path for MSA-to-county membership file."""
+    if base_dir is None:
+        base_dir = Path("data")
+    else:
+        base_dir = Path(base_dir)
+    return (
+        base_dir / "curated" / "msa"
+        / msa_county_membership_filename(definition_version)
+    )
+
+
+# =============================================================================
 # BLS LAUS metro artifact filenames
 # =============================================================================
 

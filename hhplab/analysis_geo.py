@@ -11,6 +11,8 @@ Supported analysis geography types:
 - ``metro``: Synthetic metro areas defined by researcher membership
   rules (e.g., Glynn/Fox metros). These use a ``definition_version``
   rather than a boundary vintage.
+- ``msa``: Census metropolitan statistical areas keyed by 5-digit
+  CBSA/MSA codes and a delineation version.
 
 Future: ``county`` is anticipated but out of scope for this phase.
 
@@ -44,15 +46,19 @@ GEO_ID_COL: str = "geo_id"
 #: Supported analysis geography type values.
 GEO_TYPE_COC: str = "coc"
 GEO_TYPE_METRO: str = "metro"
+GEO_TYPE_MSA: str = "msa"
 
 #: All currently supported geo types (ordered for display).
-VALID_GEO_TYPES: tuple[str, ...] = (GEO_TYPE_COC, GEO_TYPE_METRO)
+VALID_GEO_TYPES: tuple[str, ...] = (GEO_TYPE_COC, GEO_TYPE_METRO, GEO_TYPE_MSA)
 
 #: Legacy column name used in CoC-centered outputs.
 COC_ID_COL: str = "coc_id"
 
 #: Column name used in metro outputs.
 METRO_ID_COL: str = "metro_id"
+
+#: Column name used in MSA outputs.
+MSA_ID_COL: str = "msa_id"
 
 
 # ---------------------------------------------------------------------------
@@ -67,7 +73,7 @@ class AnalysisGeometryRef:
     Attributes
     ----------
     geo_type : str
-        Geography family (``"coc"`` or ``"metro"``).
+        Geography family (``"coc"``, ``"metro"``, or ``"msa"``).
     boundary_vintage : str | None
         For polygonal families (CoC), the boundary vintage year.
     definition_version : str | None
@@ -94,6 +100,10 @@ class AnalysisGeometryRef:
     def is_metro(self) -> bool:
         return self.geo_type == GEO_TYPE_METRO
 
+    @property
+    def is_msa(self) -> bool:
+        return self.geo_type == GEO_TYPE_MSA
+
     def to_dict(self) -> dict[str, str | None]:
         d: dict[str, str | None] = {"geo_type": self.geo_type}
         if self.boundary_vintage is not None:
@@ -118,6 +128,14 @@ class AnalysisGeometryRef:
             definition_version=definition_version,
         )
 
+    @classmethod
+    def msa(cls, definition_version: str) -> AnalysisGeometryRef:
+        """Convenience constructor for an MSA geography."""
+        return cls(
+            geo_type=GEO_TYPE_MSA,
+            definition_version=definition_version,
+        )
+
 
 # ---------------------------------------------------------------------------
 # DataFrame helpers
@@ -128,17 +146,19 @@ def resolve_geo_col(df: pd.DataFrame) -> str:
     """Return the geo-ID column name present in *df*.
 
     Checks for ``coc_id`` first (backward compatibility), then
-    ``metro_id``, then ``geo_id``.
+    ``metro_id``, then ``msa_id``, then ``geo_id``.
     Raises ``KeyError`` if none is found.
     """
     if COC_ID_COL in df.columns:
         return COC_ID_COL
     if METRO_ID_COL in df.columns:
         return METRO_ID_COL
+    if MSA_ID_COL in df.columns:
+        return MSA_ID_COL
     if GEO_ID_COL in df.columns:
         return GEO_ID_COL
     raise KeyError(
-        f"DataFrame has neither '{COC_ID_COL}', '{METRO_ID_COL}', "
+        f"DataFrame has neither '{COC_ID_COL}', '{METRO_ID_COL}', '{MSA_ID_COL}', "
         f"nor '{GEO_ID_COL}' column. "
         f"Available columns: {list(df.columns)}"
     )
@@ -169,9 +189,11 @@ def infer_geo_type(df: pd.DataFrame) -> str:
         return GEO_TYPE_COC
     if METRO_ID_COL in df.columns:
         return GEO_TYPE_METRO
+    if MSA_ID_COL in df.columns:
+        return GEO_TYPE_MSA
     raise ValueError(
         f"Cannot infer geo_type: DataFrame has neither '{GEO_TYPE_COL}', "
-        f"'{COC_ID_COL}', nor '{METRO_ID_COL}' columns"
+        f"'{COC_ID_COL}', '{METRO_ID_COL}', nor '{MSA_ID_COL}' columns"
     )
 
 
