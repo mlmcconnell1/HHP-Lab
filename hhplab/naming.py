@@ -1228,3 +1228,22 @@ def geo_panel_filename(
             raise ValueError("definition_version is required for geo_type='msa'")
         return msa_panel_filename(start_year, end_year, definition_version)
     raise ValueError(f"Unsupported geo_type: {geo_type!r}")
+
+
+def geo_map_filename(
+    start_year: int,
+    end_year: int,
+    *,
+    geo_type: str = "coc",
+    boundary_vintage: str | None = None,
+    definition_version: str | None = None,
+) -> str:
+    """Return the HTML map filename for any supported analysis geography."""
+    panel_name = geo_panel_filename(
+        start_year,
+        end_year,
+        geo_type=geo_type,
+        boundary_vintage=boundary_vintage,
+        definition_version=definition_version,
+    )
+    return panel_name.replace("panel__", "map__", 1).replace(".parquet", ".html")

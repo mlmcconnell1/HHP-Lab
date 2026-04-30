@@ -51,6 +51,7 @@ from hhplab.recipe.recipe_schema import (
     Acs1Policy,
     DatasetSpec,
     GeometryRef,
+    MapSpec,
     PanelPolicy,
     RecipeV1,
     TemporalFilter,
@@ -197,6 +198,42 @@ class TestLoadRecipeFromDict:
         data["datasets"]["acs"]["path"] = "/tmp/acs.parquet"
         with pytest.raises(RecipeLoadError, match="DatasetSpec.path must be a relative path"):
             load_recipe(data)
+
+    def test_target_map_output_requires_map_spec(self):
+        data = _minimal_recipe()
+        data["targets"][0]["outputs"] = ["map"]
+        with pytest.raises(RecipeLoadError, match="require 'map_spec'"):
+            load_recipe(data)
+
+    def test_target_map_spec_requires_map_output(self):
+        data = _minimal_recipe()
+        data["targets"][0]["map_spec"] = {
+            "layers": [
+                {
+                    "geometry": {"type": "coc", "vintage": 2025},
+                    "selector_ids": ["CO-500"],
+                }
+            ]
+        }
+        with pytest.raises(RecipeLoadError, match="requires outputs to include 'map'"):
+            load_recipe(data)
+
+    def test_valid_map_target_loads(self):
+        data = _minimal_recipe()
+        data["targets"][0]["outputs"] = ["map"]
+        data["targets"][0]["map_spec"] = {
+            "layers": [
+                {
+                    "geometry": {"type": "coc", "vintage": 2025},
+                    "selector_ids": ["CO-500"],
+                    "tooltip_fields": ["coc_id", "coc_name"],
+                }
+            ],
+            "viewport": {"fit_layers": True, "padding": 24},
+        }
+        recipe = load_recipe(data)
+        assert isinstance(recipe.targets[0].map_spec, MapSpec)
+        assert recipe.targets[0].map_spec.layers[0].selector_ids == ["CO-500"]
 
 
 class TestLoadRecipeFromFile:
@@ -1736,6 +1773,31 @@ class TestTargetOutputsEnforcement:
             _default_recipe_output_dir(tmp_path, "executor-test").glob("*__diagnostics.json")
         )
         assert len(diag_files) == 1
+
+    def test_map_output_adds_explicit_failure_step(self, tmp_path: Path):
+        """Map outputs should produce a dedicated actionable failure until implemented."""
+        _setup_pipeline_fixtures(tmp_path)
+        data = _recipe_with_pipeline()
+        data["datasets"]["pit"]["path"] = "data/pit.parquet"
+        data["datasets"]["acs"]["path"] = "data/acs.parquet"
+        data["targets"][0]["outputs"] = ["map"]
+        data["targets"][0]["map_spec"] = {
+            "layers": [
+                {
+                    "geometry": {"type": "coc", "vintage": 2025},
+                    "selector_ids": ["CO-500"],
+                }
+            ]
+        }
+        recipe = load_recipe(data)
+        with pytest.raises(ExecutorError, match="persist map") as exc_info:
+            execute_recipe(recipe, project_root=tmp_path)
+        map_steps = [
+            s for s in exc_info.value.partial_results[0].steps if s.step_kind == "persist_map"
+        ]
+        assert len(map_steps) == 1
+        assert not exc_info.value.partial_results[0].success
+        assert "not implemented yet" in (map_steps[0].error or "")
 
 
 class TestPersistDiagnostics:
@@ -4845,6 +4907,40 @@ class TestRecipeJsonMode:
         assert out["pipelines"][0]["artifacts"] == expected_artifacts
         for rel_path in expected_artifacts.values():
             assert (tmp_path / rel_path).exists()
+
+    def test_json_map_execution_reports_map_artifact_path(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    ):
+        _make_project_root(tmp_path)
+        monkeypatch.chdir(tmp_path)
+        _setup_pipeline_fixtures(tmp_path)
+        data = _recipe_with_pipeline()
+        data["datasets"]["pit"]["path"] = "data/pit.parquet"
+        data["datasets"]["acs"]["path"] = "data/acs.parquet"
+        data["targets"][0]["outputs"] = ["map"]
+        data["targets"][0]["map_spec"] = {
+            "layers": [
+                {
+                    "geometry": {"type": "coc", "vintage": 2025},
+                    "selector_ids": ["CO-500"],
+                }
+            ]
+        }
+        rf = self._write_recipe(tmp_path, data)
+        result = runner.invoke(app, [
+            "build", "recipe",
+            "--recipe", str(rf),
+            "--json",
+        ])
+        assert result.exit_code == 1
+        out = json.loads(result.output)
+        assert out["status"] == "error"
+        assert out["artifacts"] == {
+            "map_path": "outputs/executor-test/map__Y2020-2021@B2025.html",
+        }
+        assert out["pipelines"][0]["success"] is False
+        steps = out["pipelines"][0]["steps"]
+        assert any(step["step_kind"] == "persist_map" for step in steps)
 
     def test_json_suppresses_progress(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,

@@ -49,6 +49,35 @@ def _json_error(message: str, *, code: int = 1) -> None:
     raise typer.Exit(code=code)
 
 
+def _pipeline_payload(
+    parsed: RecipeV1,
+    results,
+    *,
+    storage_cfg,
+) -> list[dict]:
+    """Serialize pipeline execution results for JSON responses."""
+    return [
+        {
+            "pipeline_id": r.pipeline_id,
+            "success": r.success,
+            "artifacts": resolve_pipeline_artifacts(
+                parsed, r.pipeline_id, storage_config=storage_cfg,
+            ),
+            "steps": [
+                {
+                    "step_kind": s.step_kind,
+                    "detail": s.detail,
+                    "success": s.success,
+                    "error": s.error,
+                    "notes": s.notes,
+                }
+                for s in r.steps
+            ],
+        }
+        for r in results
+    ]
+
+
 def _format_geometry(ref: object) -> str:
     """Render a GeometryRef-like object for human CLI output."""
     geo_type = ref.type
@@ -302,31 +331,32 @@ def recipe_cmd(
         )
     except ExecutorError as exc:
         if use_json:
-            _json_error(str(exc))
+            payload = {
+                "status": "error",
+                "recipe_name": parsed.name,
+                "recipe_version": parsed.version,
+                "error": str(exc),
+            }
+            if exc.partial_results:
+                pipeline_items = _pipeline_payload(
+                    parsed,
+                    exc.partial_results,
+                    storage_cfg=storage_cfg,
+                )
+                payload["pipelines"] = pipeline_items
+                if len(pipeline_items) == 1:
+                    payload["artifacts"] = pipeline_items[0]["artifacts"]
+            _json_out(payload)
+            raise typer.Exit(code=1)
         typer.echo(f"\nExecution error: {exc}", err=True)
         raise typer.Exit(code=1) from exc
 
     if use_json:
-        pipeline_items = [
-            {
-                "pipeline_id": r.pipeline_id,
-                "success": r.success,
-                "artifacts": resolve_pipeline_artifacts(
-                    parsed, r.pipeline_id, storage_config=storage_cfg,
-                ),
-                "steps": [
-                    {
-                        "step_kind": s.step_kind,
-                        "detail": s.detail,
-                        "success": s.success,
-                        "error": s.error,
-                        "notes": s.notes,
-                    }
-                    for s in r.steps
-                ],
-            }
-            for r in results
-        ]
+        pipeline_items = _pipeline_payload(
+            parsed,
+            results,
+            storage_cfg=storage_cfg,
+        )
         payload = {
             "status": "ok",
             "recipe_name": parsed.name,

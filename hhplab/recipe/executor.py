@@ -46,6 +46,7 @@ from hhplab.recipe.executor_manifest import (
     _build_manifest,
     _build_provenance,
     _deduplicate_assets,
+    _resolve_map_output_file,
     _recipe_output_dirname,
     _resolve_panel_output_file,
     _resolve_pipeline_target,
@@ -145,6 +146,7 @@ __all__ = [
     "_materialize_generated_metro_transform",
     "_materialize_generated_msa_transform",
     "_needs_ct_planning_to_legacy_alignment",
+    "_resolve_map_output_file",
     "_persist_diagnostics",
     "_persist_outputs",
     "_recipe_output_dirname",
@@ -736,6 +738,35 @@ def _execute_join(
 # compatibility with tests and CLI callers.
 
 
+def _persist_map_output(
+    plan: ExecutionPlan,
+    ctx: ExecutionContext,
+) -> StepResult:
+    """Acknowledge recipe-native map outputs and fail with clear remediation."""
+    output_file = _resolve_map_output_file(
+        ctx.recipe,
+        plan.pipeline_id,
+        ctx.project_root,
+        storage_config=ctx.storage_config,
+    )
+    try:
+        display = str(output_file.relative_to(ctx.project_root))
+    except ValueError:
+        display = str(output_file)
+
+    return StepResult(
+        step_kind="persist_map",
+        detail=f"persist map: {display}",
+        success=False,
+        error=(
+            "Recipe target requested output kind 'map', but the recipe-native "
+            "map renderer and geometry resolvers are not implemented yet. "
+            "Continue with coclab-ogze.2 (multi-layer Folium renderer) plus "
+            "coclab-ogze.4/.5 for MSA and metro boundary sources."
+        ),
+    )
+
+
 # ---------------------------------------------------------------------------
 # Pipeline orchestrator
 # ---------------------------------------------------------------------------
@@ -785,22 +816,20 @@ def _execute_plan(
         if not step.success:
             return result
 
-    # Phase 4: persist outputs (only if there are join tasks AND
-    # the target declares "panel" in its outputs list).
-    if plan.join_tasks:
-        # Resolve target to check declared outputs
-        pipeline = next(
-            (p for p in ctx.recipe.pipelines if p.id == plan.pipeline_id),
+    # Phase 4: persist declared outputs.
+    pipeline = next(
+        (p for p in ctx.recipe.pipelines if p.id == plan.pipeline_id),
+        None,
+    )
+    target = None
+    if pipeline is not None:
+        target = next(
+            (t for t in ctx.recipe.targets if t.id == pipeline.target),
             None,
         )
-        target = None
-        if pipeline is not None:
-            target = next(
-                (t for t in ctx.recipe.targets if t.id == pipeline.target),
-                None,
-            )
-        declared_outputs = target.outputs if target is not None else ["panel"]
+    declared_outputs = target.outputs if target is not None else ["panel"]
 
+    if plan.join_tasks:
         if "panel" in declared_outputs:
             step = _persist_outputs(plan, ctx)
             result.steps.append(step)
@@ -812,6 +841,12 @@ def _execute_plan(
             result.steps.append(step)
             if not step.success:
                 return result
+
+    if "map" in declared_outputs:
+        step = _persist_map_output(plan, ctx)
+        result.steps.append(step)
+        if not step.success:
+            return result
 
     return result
 

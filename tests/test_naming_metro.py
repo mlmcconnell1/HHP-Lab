@@ -3,6 +3,7 @@
 import pytest
 
 from hhplab.naming import (
+    geo_map_filename,
     geo_panel_filename,
     metro_coc_membership_filename,
     metro_county_membership_filename,
@@ -105,3 +106,19 @@ class TestGeoPanelFilename:
     def test_unknown_geo_type_raises(self):
         with pytest.raises(ValueError, match="Unsupported geo_type"):
             geo_panel_filename(2015, 2024, geo_type="county")
+
+
+class TestGeoMapFilename:
+    def test_coc(self):
+        assert (
+            geo_map_filename(2015, 2024, geo_type="coc", boundary_vintage="2025")
+            == "map__Y2015-2024@B2025.html"
+        )
+
+    def test_metro(self):
+        assert (
+            geo_map_filename(
+                2011, 2016, geo_type="metro", definition_version="glynn_fox_v1"
+            )
+            == "map__metro__Y2011-2016@Dglynnfoxv1.html"
+        )

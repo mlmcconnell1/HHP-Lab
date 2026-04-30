@@ -327,7 +327,7 @@ FilterSpec = TemporalFilter  # Extensible: Union[TemporalFilter, ...] in future
 # Targets / outputs
 # -----------------------------
 
-OutputKind = Literal["panel", "diagnostics"]
+OutputKind = Literal["panel", "diagnostics", "map"]
 
 CohortMethod = Literal["top_n", "bottom_n", "percentile"]
 
@@ -426,6 +426,127 @@ class PanelPolicy(BaseModel):
     )
 
 
+class MapLayerStyle(BaseModel):
+    """Declarative style controls for a rendered map overlay layer."""
+    model_config = ConfigDict(extra="forbid")
+
+    fill_color: str = Field(
+        default="#3388ff",
+        description="Polygon fill color.",
+    )
+    stroke_color: str = Field(
+        default="#3388ff",
+        description="Polygon outline color.",
+    )
+    fill_opacity: float = Field(
+        default=0.3, ge=0.0, le=1.0,
+        description="Polygon fill opacity.",
+    )
+    stroke_opacity: float = Field(
+        default=1.0, ge=0.0, le=1.0,
+        description="Polygon outline opacity.",
+    )
+    line_weight: float = Field(
+        default=2.0, ge=0.0,
+        description="Polygon outline width in pixels.",
+    )
+    z_order: int = Field(
+        default=0, ge=0,
+        description="Relative overlay draw order.",
+    )
+
+
+class MapViewportSpec(BaseModel):
+    """Viewport policy for a rendered recipe map."""
+    model_config = ConfigDict(extra="forbid")
+
+    fit_layers: bool = Field(
+        default=True,
+        description="If true, fit map bounds to the selected overlay layers.",
+    )
+    center: tuple[float, float] | None = Field(
+        default=None,
+        description="Optional explicit map center as (lat, lon).",
+    )
+    zoom: int | None = Field(
+        default=None, ge=0,
+        description="Optional explicit zoom level.",
+    )
+    padding: int = Field(
+        default=20, ge=0,
+        description="Padding in pixels when fitting layer bounds.",
+    )
+
+    @model_validator(mode="after")
+    def _validate_explicit_view(self) -> MapViewportSpec:
+        if not self.fit_layers and (self.center is None or self.zoom is None):
+            raise ValueError(
+                "MapViewportSpec with fit_layers=false requires both 'center' and 'zoom'."
+            )
+        return self
+
+
+class MapLayerSpec(BaseModel):
+    """One overlay layer within a recipe-native map target."""
+    model_config = ConfigDict(extra="forbid")
+
+    geometry: GeometryRef = Field(
+        ...,
+        description="Geometry universe to render for this layer (e.g. coc, msa, metro).",
+    )
+    selector_ids: list[str] = Field(
+        ...,
+        min_length=1,
+        description="Explicit geography identifiers to draw in this layer.",
+    )
+    style: MapLayerStyle = Field(
+        default_factory=MapLayerStyle,
+        description="Render style for the selected features.",
+    )
+    tooltip_fields: list[str] = Field(
+        default_factory=list,
+        description="Explicit allowlist of feature fields exposed in the tooltip.",
+    )
+    label: str | None = Field(
+        default=None,
+        description="Optional human-readable layer label.",
+    )
+    group: str | None = Field(
+        default=None,
+        description="Optional legend/group name.",
+    )
+    initial_visibility: bool = Field(
+        default=True,
+        description="Whether the layer is visible on initial render.",
+    )
+
+    @field_validator("selector_ids", "tooltip_fields")
+    @classmethod
+    def _validate_non_blank_items(cls, value: list[str]) -> list[str]:
+        if any(not item.strip() for item in value):
+            raise ValueError("Map layer string lists may not contain blank items.")
+        return value
+
+
+class MapSpec(BaseModel):
+    """Declarative map artifact definition for a target."""
+    model_config = ConfigDict(extra="forbid")
+
+    layers: list[MapLayerSpec] = Field(
+        ...,
+        min_length=1,
+        description="Overlay layers rendered into one HTML map artifact.",
+    )
+    basemap: str = Field(
+        default="cartodbpositron",
+        description="Deterministic basemap identifier for the rendered HTML map.",
+    )
+    viewport: MapViewportSpec = Field(
+        default_factory=MapViewportSpec,
+        description="Viewport behavior for the rendered map.",
+    )
+
+
 class CohortSelector(BaseModel):
     """Declarative cohort filter that ranks geographies by a measure column
     at a reference year and keeps only the selected subset."""
@@ -483,6 +604,19 @@ class TargetSpec(BaseModel):
         default=None,
         description="Declarative panel output and finalization policy.",
     )
+    map_spec: MapSpec | None = Field(
+        default=None,
+        description="Declarative recipe-native map artifact configuration.",
+    )
+
+    @model_validator(mode="after")
+    def _validate_output_policies(self) -> TargetSpec:
+        outputs = set(self.outputs)
+        if "map" in outputs and self.map_spec is None:
+            raise ValueError("Target outputs including 'map' require 'map_spec'.")
+        if "map" not in outputs and self.map_spec is not None:
+            raise ValueError("Target 'map_spec' requires outputs to include 'map'.")
+        return self
 
 
 # -----------------------------

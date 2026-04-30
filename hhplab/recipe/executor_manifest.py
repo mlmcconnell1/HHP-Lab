@@ -14,7 +14,7 @@ import re
 from pathlib import Path
 
 from hhplab.config import StorageConfig, load_config
-from hhplab.naming import geo_panel_filename
+from hhplab.naming import geo_map_filename, geo_panel_filename
 from hhplab.recipe.executor_core import (
     ExecutionContext,
     ExecutorError,
@@ -169,6 +169,41 @@ def _resolve_panel_output_file(
     )
 
 
+def _resolve_map_output_file(
+    recipe: RecipeV1,
+    pipeline_id: str,
+    project_root: Path,
+    storage_config: StorageConfig | None = None,
+) -> Path:
+    """Return the canonical HTML map path for a pipeline."""
+    _, target = _resolve_pipeline_target(recipe, pipeline_id)
+    target_geo_type, boundary_vintage, definition_version = _target_geometry_metadata(
+        target.geometry,
+    )
+
+    if target_geo_type in {"metro", "msa"} and definition_version is None:
+        raise ExecutorError(
+            f"{target_geo_type.upper()} recipe targets must set geometry.source "
+            "to the geography definition version so map outputs can be named."
+        )
+
+    universe_years = expand_year_spec(recipe.universe)
+    start_year = min(universe_years)
+    end_year = max(universe_years)
+
+    cfg = storage_config or load_config(project_root=project_root)
+    recipe_dir = _recipe_output_dirname(recipe.name)
+    return (
+        cfg.output_root / recipe_dir / geo_map_filename(
+            start_year,
+            end_year,
+            geo_type=target_geo_type,
+            boundary_vintage=boundary_vintage if target_geo_type == "coc" else None,
+            definition_version=definition_version,
+        )
+    )
+
+
 def resolve_pipeline_artifacts(
     recipe: RecipeV1,
     pipeline_id: str,
@@ -207,5 +242,11 @@ def resolve_pipeline_artifacts(
             f"{panel_file.stem}__diagnostics.json",
         )
         artifacts["diagnostics_path"] = _display_path(diagnostics_file)
+
+    if "map" in target.outputs:
+        map_file = _resolve_map_output_file(
+            recipe, pipeline_id, project_root, storage_config=storage_config,
+        )
+        artifacts["map_path"] = _display_path(map_file)
 
     return artifacts
