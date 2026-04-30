@@ -414,6 +414,73 @@ def _dataset_remediation(ds_id: str, ds, *, years: list[int] | None = None) -> R
     )
 
 
+def _msa_transform_remediation(transform_id: str, transform, missing_inputs: list[str]) -> Remediation:
+    """Build an actionable remediation hint for an MSA transform artifact."""
+    from pathlib import Path
+
+    from hhplab.recipe.executor_transforms import _identify_msa_and_base
+
+    msa_ref, base_ref = _identify_msa_and_base(transform.from_, transform.to)
+    definition_version = msa_ref.source if msa_ref is not None else None
+
+    if base_ref.type == "coc" and base_ref.vintage is not None and definition_version is not None:
+        crosswalk_command = (
+            "hhplab generate msa-xwalk "
+            f"--boundary {base_ref.vintage} "
+            f"--definition-version {definition_version} "
+            f"--counties {base_ref.vintage}"
+        )
+    else:
+        crosswalk_command = None
+
+    if not missing_inputs:
+        return Remediation(
+            hint=(
+                f"Generate the cached CoC-to-MSA crosswalk artifact for transform "
+                f"'{transform_id}'."
+            ),
+            command=crosswalk_command,
+        )
+
+    details: list[str] = []
+    commands: list[str] = []
+    for missing in missing_inputs:
+        name = Path(missing).name
+        if name.startswith("msa_county_membership__") and definition_version is not None:
+            details.append(f"missing MSA county membership artifact '{missing}'")
+            commands.append(f"hhplab generate msa --definition-version {definition_version}")
+            continue
+        if name.startswith("msa_definitions__") and definition_version is not None:
+            details.append(f"missing MSA definitions artifact '{missing}'")
+            commands.append(f"hhplab generate msa --definition-version {definition_version}")
+            continue
+        if name.startswith("coc__B") and base_ref.type == "coc" and base_ref.vintage is not None:
+            details.append(f"missing CoC boundary artifact '{missing}'")
+            commands.append(
+                f"hhplab ingest boundaries --source hud_exchange --vintage {base_ref.vintage}"
+            )
+            continue
+        if name.startswith("counties__C") and base_ref.type == "coc" and base_ref.vintage is not None:
+            details.append(f"missing county geometry artifact '{missing}'")
+            commands.append(f"hhplab ingest tiger --year {base_ref.vintage} --type counties")
+            continue
+        if name.startswith("tracts__T") and base_ref.type == "tract" and base_ref.vintage is not None:
+            details.append(f"missing tract geometry artifact '{missing}'")
+            commands.append(f"hhplab ingest tiger --year {base_ref.vintage} --type tracts")
+            continue
+        details.append(f"missing prerequisite artifact '{missing}'")
+
+    hint = (
+        f"MSA transform '{transform_id}' can be generated once its prerequisites exist: "
+        + "; ".join(details)
+        + "."
+    )
+    return Remediation(
+        hint=hint,
+        command=commands[0] if commands else crosswalk_command,
+    )
+
+
 def _check_adapter_validation(
     recipe: RecipeV1,
 ) -> list[PreflightFinding]:
@@ -702,6 +769,11 @@ def _check_transforms(
                 and (transform.from_.type == "metro"
                      or transform.to.type == "metro")
             )
+            is_msa = (
+                transform is not None
+                and (transform.from_.type == "msa"
+                     or transform.to.type == "msa")
+            )
             if is_metro:
                 cmd = "hhplab generate metro"
                 missing_inputs = (
@@ -718,17 +790,24 @@ def _check_transforms(
                         f"Metro transform '{tid}' can be generated. "
                         f"Ensure metro definition artifacts exist."
                     )
+                remediation = Remediation(hint=hint, command=cmd)
+            elif is_msa:
+                missing_inputs = (
+                    result.detail.get("missing_inputs", [])
+                    if result.detail else []
+                )
+                remediation = _msa_transform_remediation(tid, transform, missing_inputs)
             else:
-                cmd = "hhplab generate xwalks"
-                hint = (
-                    f"Generate crosswalk artifacts for transform '{tid}'."
+                remediation = Remediation(
+                    hint=f"Generate crosswalk artifacts for transform '{tid}'.",
+                    command="hhplab generate xwalks",
                 )
             findings.append(PreflightFinding(
                 severity=Severity.ERROR,
                 kind=FindingKind.MISSING_TRANSFORM,
                 message=result.message,
                 transform_id=tid,
-                remediation=Remediation(hint=hint, command=cmd),
+                remediation=remediation,
             ))
     return findings
 

@@ -351,6 +351,61 @@ def _setup_preflight_fixtures(
         }).to_parquet(acs_path)
 
 
+def _msa_preflight_recipe() -> dict:
+    """Return a recipe dict with a CoC-to-MSA transform."""
+    return {
+        "version": 1,
+        "name": "msa-preflight-test",
+        "universe": {"years": [2020]},
+        "targets": [
+            {"id": "msa_panel", "geometry": {"type": "msa", "source": "census_msa_2023"}},
+        ],
+        "datasets": {
+            "pit": {
+                "provider": "hud",
+                "product": "pit",
+                "version": 1,
+                "native_geometry": {"type": "coc"},
+                "years": {"years": [2020]},
+                "path": "data/pit.parquet",
+            },
+        },
+        "transforms": [
+            {
+                "id": "coc_to_msa",
+                "type": "crosswalk",
+                "from": {"type": "coc", "vintage": 2020},
+                "to": {"type": "msa", "source": "census_msa_2023"},
+                "spec": {"weighting": {"scheme": "area"}},
+            },
+        ],
+        "pipelines": [
+            {
+                "id": "main",
+                "target": "msa_panel",
+                "steps": [
+                    {"materialize": {"transforms": ["coc_to_msa"]}},
+                    {
+                        "resample": {
+                            "dataset": "pit",
+                            "to_geometry": {"type": "msa", "source": "census_msa_2023"},
+                            "method": "aggregate",
+                            "via": "coc_to_msa",
+                            "measures": ["pit_total"],
+                        },
+                    },
+                    {
+                        "join": {
+                            "datasets": ["pit"],
+                            "join_on": ["geo_id", "year"],
+                        },
+                    },
+                ],
+            },
+        ],
+    }
+
+
 class TestRunPreflight:
 
     def test_clean_preflight(self, tmp_path: Path):
@@ -377,6 +432,32 @@ class TestRunPreflight:
         assert len(transform_findings) >= 1
         assert transform_findings[0].transform_id == "tract_to_coc"
         assert transform_findings[0].remediation is not None
+
+    def test_msa_transform_missing_membership_is_actionable(self, tmp_path: Path):
+        data = _msa_preflight_recipe()
+        _setup_preflight_fixtures(tmp_path, include_xwalk=False, include_acs=False)
+
+        curated = tmp_path / "data" / "curated"
+        boundaries = curated / "coc_boundaries"
+        tiger = curated / "tiger"
+        boundaries.mkdir(parents=True, exist_ok=True)
+        tiger.mkdir(parents=True, exist_ok=True)
+        pd.DataFrame({"coc_id": ["COC1"]}).to_parquet(boundaries / "coc__B2020.parquet")
+        pd.DataFrame({"GEOID": ["36061"]}).to_parquet(tiger / "counties__C2020.parquet")
+
+        recipe = load_recipe(data)
+        report = run_preflight(recipe, project_root=tmp_path)
+        transform_findings = [
+            f for f in report.findings
+            if f.kind == FindingKind.MISSING_TRANSFORM and f.transform_id == "coc_to_msa"
+        ]
+        assert len(transform_findings) == 1
+        finding = transform_findings[0]
+        assert finding.remediation is not None
+        assert "msa county membership artifact" in finding.remediation.hint.lower()
+        assert finding.remediation.command == (
+            "hhplab generate msa --definition-version census_msa_2023"
+        )
 
     def test_missing_dataset_file(self, tmp_path: Path):
         data = _preflight_recipe(with_path=True, identity_only=True)

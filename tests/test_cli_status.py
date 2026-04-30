@@ -34,11 +34,27 @@ def _scaffold_curated(tmp_path: Path) -> Path:
     xdir.mkdir(parents=True)
     pd.DataFrame({"coc_id": ["CO-500"]}).to_parquet(xdir / "xwalk__B2025xT2023.parquet")
     pd.DataFrame({"coc_id": ["CO-500"]}).to_parquet(xdir / "xwalk__B2025xC2023.parquet")
+    pd.DataFrame({"coc_id": ["CO-500"], "msa_id": ["35620"]}).to_parquet(
+        xdir / "msa_coc_xwalk__B2025xMcensus_msa_2023xC2023.parquet"
+    )
 
     # PIT
     pdir = curated / "pit"
     pdir.mkdir(parents=True)
     pd.DataFrame({"coc_id": ["CO-500"]}).to_parquet(pdir / "pit__P2024.parquet")
+    pd.DataFrame({"msa_id": ["35620"]}).to_parquet(
+        pdir / "pit__msa__P2024@Mcensus_msa_2023xB2025xC2023.parquet"
+    )
+
+    # MSA
+    msadir = curated / "msa"
+    msadir.mkdir(parents=True)
+    pd.DataFrame({"msa_id": ["35620"]}).to_parquet(
+        msadir / "msa_definitions__census_msa_2023.parquet"
+    )
+    pd.DataFrame({"msa_id": ["35620"], "county_fips": ["36061"]}).to_parquet(
+        msadir / "msa_county_membership__census_msa_2023.parquet"
+    )
 
     # ACS
     adir = curated / "acs"
@@ -105,7 +121,10 @@ class TestStatusHuman:
         assert "Counties: 1 vintage(s)" in result.output
         assert "B2025xT2023" in result.output
         assert "B2025xC2023" in result.output
+        assert "B2025xMcensus_msa_2023xC2023" in result.output
         assert "PIT Counts: 1 year(s)" in result.output
+        assert "MSA PIT:    1 file(s)" in result.output
+        assert "MSA Artifacts: 1 complete version(s)" in result.output
         assert "ACS Tracts: 1 file(s)" in result.output
         assert "Measures:   1 file(s)" in result.output
         assert "ZORI:       1 file(s)" in result.output
@@ -181,7 +200,18 @@ class TestStatusJSON:
         assert payload["assets"]["census"]["counties"] == [2023]
         assert len(payload["assets"]["crosswalks"]["tract"]) == 1
         assert len(payload["assets"]["crosswalks"]["county"]) == 1
+        assert payload["assets"]["crosswalks"]["msa"] == ["B2025xMcensus_msa_2023xC2023"]
         assert payload["assets"]["pit"]["count"] == 1
+        assert payload["assets"]["pit"]["msa_count"] == 1
+        assert payload["assets"]["pit"]["msa_items"] == [{
+            "year": 2024,
+            "definition_version": "census_msa_2023",
+            "boundary_vintage": 2025,
+            "county_vintage": 2023,
+        }]
+        assert payload["assets"]["msa"]["definitions"] == ["census_msa_2023"]
+        assert payload["assets"]["msa"]["county_memberships"] == ["census_msa_2023"]
+        assert payload["assets"]["msa"]["complete_versions"] == ["census_msa_2023"]
         assert payload["assets"]["acs"]["count"] == 1
         assert payload["assets"]["measures"]["count"] == 1
         assert payload["assets"]["zori"]["count"] == 1
@@ -227,8 +257,34 @@ class TestStatusJSON:
         payload = json.loads(result.output)
         assert set(payload.keys()) == {"status", "assets", "builds", "issues"}
         assert set(payload["assets"].keys()) == {
-            "boundaries", "census", "crosswalks", "pit", "measures", "acs", "zori", "laus",
+            "boundaries", "census", "crosswalks", "pit", "msa", "measures", "acs", "zori", "laus",
         }
+
+    def test_status_json_warns_on_partial_msa_artifacts(self, tmp_path):
+        data_dir = tmp_path / "data"
+        curated = data_dir / "curated"
+        msadir = curated / "msa"
+        msadir.mkdir(parents=True)
+
+        import pandas as pd
+
+        pd.DataFrame({"msa_id": ["35620"]}).to_parquet(
+            msadir / "msa_definitions__census_msa_2023.parquet"
+        )
+
+        result = runner.invoke(
+            app,
+            ["status", "--json", "--data-dir", str(data_dir), "--builds-dir", str(tmp_path / "builds")],
+        )
+
+        payload = json.loads(result.output)
+        msa_issues = [issue for issue in payload["issues"] if issue["area"] == "msa"]
+        assert msa_issues
+        assert "missing county membership" in msa_issues[0]["message"].lower()
+        assert (
+            "Run: hhplab generate msa --definition-version census_msa_2023 --force"
+            == msa_issues[0]["hint"]
+        )
 
 
 class TestStatusBuilds:

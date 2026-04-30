@@ -68,6 +68,7 @@ def _scan_xwalks(curated: Path) -> dict:
     xdir = curated / "xwalks"
     tract_xwalks: list[str] = []
     county_xwalks: list[str] = []
+    msa_xwalks: list[str] = []
     if xdir.exists():
         for p in sorted(xdir.glob("*.parquet")):
             m = re.match(r"^xwalk__B(\d{4})xT(\d{4})\.parquet$", p.name)
@@ -86,7 +87,11 @@ def _scan_xwalks(curated: Path) -> dict:
             m = re.match(r"^coc_county_xwalk__(.+?)\.parquet$", p.name)
             if m:
                 county_xwalks.append(f"B{m.group(1)}")
-    return {"tract": tract_xwalks, "county": county_xwalks}
+                continue
+            m = re.match(r"^msa_coc_xwalk__B(\d{4})xM(\w+)xC(\d{4})\.parquet$", p.name)
+            if m:
+                msa_xwalks.append(f"B{m.group(1)}xM{m.group(2)}xC{m.group(3)}")
+    return {"tract": tract_xwalks, "county": county_xwalks, "msa": msa_xwalks}
 
 
 def _scan_pit(curated: Path) -> dict:
@@ -100,13 +105,52 @@ def _scan_pit(curated: Path) -> dict:
 
     pdir = curated / "pit"
     year_set: set[int] = set()
+    msa_items: list[dict] = []
     if pdir.exists():
         for p in sorted(pdir.glob("*.parquet")):
             m = re.match(r"^pit__P(\d{4})(?:@B\d{4})?\.parquet$", p.name)
             if m:
                 year_set.add(int(m.group(1)))
+                continue
+            m = re.match(r"^pit__msa__P(\d{4})@M(\w+)xB(\d{4})xC(\d{4})\.parquet$", p.name)
+            if m:
+                msa_items.append({
+                    "year": int(m.group(1)),
+                    "definition_version": m.group(2),
+                    "boundary_vintage": int(m.group(3)),
+                    "county_vintage": int(m.group(4)),
+                })
     years = sorted(year_set)
-    return {"count": len(years), "years": years}
+    return {
+        "count": len(years),
+        "years": years,
+        "msa_count": len(msa_items),
+        "msa_items": msa_items,
+    }
+
+
+def _scan_msa(curated: Path) -> dict:
+    """Scan curated MSA definition and membership artifacts."""
+    import re
+
+    mdir = curated / "msa"
+    definitions: list[str] = []
+    county_memberships: list[str] = []
+    if mdir.exists():
+        for p in sorted(mdir.glob("*.parquet")):
+            m = re.match(r"^msa_definitions__(\w+)\.parquet$", p.name)
+            if m:
+                definitions.append(m.group(1))
+                continue
+            m = re.match(r"^msa_county_membership__(\w+)\.parquet$", p.name)
+            if m:
+                county_memberships.append(m.group(1))
+    complete_versions = sorted(set(definitions) & set(county_memberships))
+    return {
+        "definitions": definitions,
+        "county_memberships": county_memberships,
+        "complete_versions": complete_versions,
+    }
 
 
 def _scan_measures(curated: Path) -> dict:
@@ -237,6 +281,30 @@ def _check_prerequisites(assets: dict) -> list[dict]:
             "hint": "Run: hhplab ingest pit --year <YEAR>",
         })
 
+    msa = assets["msa"]
+    definition_set = set(msa["definitions"])
+    membership_set = set(msa["county_memberships"])
+    missing_membership = sorted(definition_set - membership_set)
+    missing_definitions = sorted(membership_set - definition_set)
+    for version in missing_membership:
+        issues.append({
+            "severity": "warning",
+            "area": "msa",
+            "message": (
+                f"MSA definition version '{version}' is missing county membership artifacts."
+            ),
+            "hint": f"Run: hhplab generate msa --definition-version {version} --force",
+        })
+    for version in missing_definitions:
+        issues.append({
+            "severity": "warning",
+            "area": "msa",
+            "message": (
+                f"MSA county membership version '{version}' is missing definitions artifacts."
+            ),
+            "hint": f"Run: hhplab generate msa --definition-version {version} --force",
+        })
+
     return issues
 
 
@@ -284,6 +352,7 @@ def status_cmd(
         "census": _scan_census(curated),
         "crosswalks": _scan_xwalks(curated),
         "pit": _scan_pit(curated),
+        "msa": _scan_msa(curated),
         "measures": _scan_measures(curated),
         "acs": _scan_acs(curated),
         "zori": _scan_zori(curated),
@@ -328,12 +397,26 @@ def status_cmd(
     typer.echo("\nCrosswalks:")
     tract_list = ", ".join(x["tract"]) if x["tract"] else "-"
     county_list = ", ".join(x["county"]) if x["county"] else "-"
+    msa_list = ", ".join(x["msa"]) if x["msa"] else "-"
     typer.echo(f"  Tract:  {len(x['tract'])} file(s)  {tract_list}")
     typer.echo(f"  County: {len(x['county'])} file(s)  {county_list}")
+    typer.echo(f"  MSA:    {len(x['msa'])} file(s)  {msa_list}")
 
     # PIT
     p = assets["pit"]
     typer.echo(f"\nPIT Counts: {p['count']} year(s)  {_fmt_years(p['years'])}")
+    msa_pit_versions = ", ".join(
+        f"A{item['year']}@M{item['definition_version']}xB{item['boundary_vintage']}xC{item['county_vintage']}"
+        for item in p["msa_items"]
+    ) if p["msa_items"] else "-"
+    typer.echo(f"MSA PIT:    {p['msa_count']} file(s)  {msa_pit_versions}")
+
+    msa = assets["msa"]
+    typer.echo(
+        "MSA Artifacts: "
+        f"{len(msa['complete_versions'])} complete version(s)  "
+        f"{', '.join(msa['complete_versions']) if msa['complete_versions'] else '-'}"
+    )
 
     # ACS
     a = assets["acs"]
