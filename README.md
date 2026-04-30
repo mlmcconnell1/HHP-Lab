@@ -140,6 +140,40 @@ The repository includes committed examples for all three surfaces under
 see [background/msa_geography.md](background/msa_geography.md) and
 [recipes/examples/msa-census-pit-acs-pep-2020-2021.yaml](recipes/examples/msa-census-pit-acs-pep-2020-2021.yaml).
 
+## Map Targets
+
+Recipe targets can emit `map` artifacts in addition to panel-style outputs.
+Declare `outputs: [map]` and provide a `map_spec` with one or more overlay
+layers:
+
+```yaml
+targets:
+  - id: coc_map
+    geometry: { type: coc, vintage: 2025 }
+    outputs: [map]
+    map_spec:
+      layers:
+        - geometry: { type: coc, vintage: 2025 }
+          selector_ids: [CO-500]
+          label: Primary CoC
+          tooltip_fields: [coc_id, coc_name]
+```
+
+Map layer prerequisites are geometry-specific:
+
+- `coc`: curated CoC boundaries for the requested boundary vintage, for example
+  `hhplab ingest boundaries --source hud_exchange --vintage 2025`
+- `msa`: official MSA boundary polygons for the requested definition version and
+  county geometry year, for example
+  `hhplab ingest msa-boundaries --definition-version census_msa_2023 --year 2023`
+- `metro`: generated metro boundary polygons for the requested definition version
+  and county geometry vintage, for example
+  `hhplab generate metro-boundaries --definition-version glynn_fox_v1 --counties 2025`
+
+Run `uv run hhplab build recipe-preflight --recipe <file> --json` before
+execution to surface missing map boundary artifacts with exact remediation
+commands.
+
 ## Project Layout
 
 - `hhplab/`: Python package and CLI implementation

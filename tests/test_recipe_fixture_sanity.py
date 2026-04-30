@@ -22,8 +22,10 @@ from hhplab.recipe.loader import load_recipe
 REPO_ROOT = Path(__file__).resolve().parent.parent
 RECIPE_FIXTURE_DIR = REPO_ROOT / "tests" / "fixtures" / "recipes"
 COC_PANEL_SANITY_RECIPE = RECIPE_FIXTURE_DIR / "coc-panel-sanity.yaml"
+COC_MAP_SANITY_RECIPE = RECIPE_FIXTURE_DIR / "coc-map-sanity.yaml"
 MSA_PANEL_SANITY_RECIPE = RECIPE_FIXTURE_DIR / "msa-panel-sanity.yaml"
 COC_PANEL_OUTPUT = Path("outputs/coc-panel-sanity/panel__Y2020-2021@B2025.parquet")
+COC_MAP_OUTPUT = Path("outputs/coc-map-sanity/map__Y2020-2021@B2025.html")
 MSA_PANEL_OUTPUT = Path(
     "outputs/msa-panel-sanity/panel__msa__Y2020-2021@Mcensusmsa2023.parquet"
 )
@@ -341,6 +343,8 @@ class ExecutedFixturePanel:
 def _write_fixture_assets(project_root: Path) -> None:
     data_dir = project_root / "data"
     data_dir.mkdir(parents=True, exist_ok=True)
+    boundaries_dir = data_dir / "curated" / "coc_boundaries"
+    boundaries_dir.mkdir(parents=True, exist_ok=True)
     xwalk_dir = data_dir / "curated" / "xwalks"
     xwalk_dir.mkdir(parents=True, exist_ok=True)
 
@@ -350,6 +354,16 @@ def _write_fixture_assets(project_root: Path) -> None:
         xwalk_dir / "xwalk__B2025xT2020.parquet",
         index=False,
     )
+    gpd.GeoDataFrame(
+        {
+            "coc_id": ["COC1", "COC2"],
+            "coc_name": ["Fixture CoC 1", "Fixture CoC 2"],
+            "boundary_vintage": ["2025", "2025"],
+            "source": ["fixture", "fixture"],
+        },
+        geometry=[box(0, 0, 10, 10), box(10, 0, 20, 10)],
+        crs="EPSG:4326",
+    ).to_parquet(boundaries_dir / "coc__B2025.parquet")
 
 
 @dataclass(frozen=True)
@@ -569,6 +583,23 @@ def executed_msa_panel(tmp_path: Path) -> ExecutedFixturePanel:
     output_path = tmp_path / MSA_PANEL_OUTPUT
     panel = pd.read_parquet(output_path).sort_values(["geo_id", "year"]).reset_index(drop=True)
     return ExecutedFixturePanel(output_path=output_path, panel=panel)
+
+
+def test_coc_map_sanity_recipe_writes_expected_html(tmp_path: Path):
+    _write_fixture_assets(tmp_path)
+    recipe = load_recipe(COC_MAP_SANITY_RECIPE)
+    results = execute_recipe(recipe, project_root=tmp_path, quiet=True)
+
+    assert len(results) == 1
+    assert results[0].success
+
+    output_path = tmp_path / COC_MAP_OUTPUT
+    assert output_path == tmp_path / "outputs" / "coc-map-sanity" / "map__Y2020-2021@B2025.html"
+    assert output_path.exists()
+    html = output_path.read_text(encoding="utf-8")
+    assert "COC1" in html
+    assert "Fixture CoC 1" in html
+    assert "Leaflet" in html or "leaflet" in html
 
 
 def test_coc_panel_sanity_recipe_writes_expected_panel_schema(

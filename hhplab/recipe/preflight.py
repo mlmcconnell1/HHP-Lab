@@ -23,6 +23,8 @@ from hhplab.geo.ct_planning_regions import (
     is_ct_legacy_county_fips,
     is_ct_planning_region_fips,
 )
+from hhplab.geo.io import resolve_curated_boundary_path
+from hhplab.naming import metro_boundaries_path, msa_boundaries_path
 from hhplab.naming import county_path
 from hhplab.recipe.adapters import (
     dataset_registry,
@@ -86,6 +88,7 @@ class FindingKind(str, enum.Enum):
     DATASET_PROVENANCE = "dataset_provenance"
     MISSING_SUPPORT_DATASET = "missing_support_dataset"
     CT_COUNTY_ALIGNMENT = "ct_county_alignment"
+    MISSING_MAP_ARTIFACT = "missing_map_artifact"
 
 
 @dataclass
@@ -206,6 +209,7 @@ class PreflightReport:
             FindingKind.DATASET_PROVENANCE,
             FindingKind.MISSING_SUPPORT_DATASET,
             FindingKind.CT_COUNTY_ALIGNMENT,
+            FindingKind.MISSING_MAP_ARTIFACT,
         }
         gaps = [f for f in self.findings if f.kind in gap_kinds]
         by_kind: dict[str, list[dict]] = {}
@@ -538,6 +542,105 @@ def _check_temporal_alignment_guidance(
                         ),
                     ),
                 ))
+
+    return findings
+
+
+def _map_artifact_remediation(geo_type: str, *, source: str | None, vintage: int | None) -> Remediation:
+    """Build actionable remediation for missing map boundary artifacts."""
+    if geo_type == "coc":
+        return Remediation(
+            hint=(
+                f"Ingest curated CoC boundary polygons for vintage {vintage} "
+                "before rendering this map layer."
+            ),
+            command=(
+                f"hhplab ingest boundaries --source hud_exchange --vintage {vintage}"
+                if vintage is not None
+                else None
+            ),
+        )
+
+    if geo_type == "msa":
+        return Remediation(
+            hint=(
+                f"Ingest official MSA boundary polygons for definition version "
+                f"'{source}' aligned to county geometry vintage {vintage}."
+            ),
+            command=(
+                f"hhplab ingest msa-boundaries --definition-version {source} --year {vintage}"
+                if source is not None and vintage is not None
+                else None
+            ),
+        )
+
+    if geo_type == "metro":
+        return Remediation(
+            hint=(
+                f"Generate metro boundary polygons for definition version "
+                f"'{source}' using county geometry vintage {vintage}."
+            ),
+            command=(
+                f"hhplab generate metro-boundaries --definition-version {source} --counties {vintage}"
+                if source is not None and vintage is not None
+                else None
+            ),
+        )
+
+    return Remediation(hint="Create the missing boundary artifact required by the map layer.")
+
+
+def _check_map_artifacts(
+    recipe: RecipeV1,
+    project_root: Path,
+) -> list[PreflightFinding]:
+    """Check recipe-native map targets for required boundary artifacts."""
+    findings: list[PreflightFinding] = []
+    base_dir = project_root / "data"
+
+    for target in recipe.targets:
+        if "map" not in target.outputs or target.map_spec is None:
+            continue
+
+        for index, layer in enumerate(target.map_spec.layers, start=1):
+            layer_name = layer.label or layer.group or f"layer {index}"
+            geometry = layer.geometry
+            geo_type = geometry.type
+            vintage = geometry.vintage
+            source = geometry.source
+
+            artifact_path: Path | None = None
+            if geo_type == "coc" and vintage is not None:
+                try:
+                    artifact_path = resolve_curated_boundary_path(str(vintage), base_dir=base_dir)
+                except FileNotFoundError:
+                    artifact_path = base_dir / "curated" / "coc_boundaries" / f"coc__B{vintage}.parquet"
+            elif geo_type == "msa" and source is not None and vintage is not None:
+                artifact_path = msa_boundaries_path(source, base_dir)
+            elif geo_type == "metro" and source is not None and vintage is not None:
+                artifact_path = metro_boundaries_path(source, vintage, base_dir)
+            else:
+                continue
+
+            if artifact_path.exists():
+                continue
+
+            findings.append(
+                PreflightFinding(
+                    severity=Severity.ERROR,
+                    kind=FindingKind.MISSING_MAP_ARTIFACT,
+                    message=(
+                        f"Map target '{target.id}' layer '{layer_name}' requires missing "
+                        f"{geo_type.upper()} boundary artifact: {artifact_path}"
+                    ),
+                    geometry=geo_type,
+                    remediation=_map_artifact_remediation(
+                        geo_type,
+                        source=source,
+                        vintage=vintage,
+                    ),
+                )
+            )
 
     return findings
 
@@ -1360,6 +1463,7 @@ def run_preflight(
 
     # 1. Adapter validation
     report.findings.extend(_check_adapter_validation(recipe))
+    report.findings.extend(_check_map_artifacts(recipe, project_root))
 
     # 2. Resolve plans and collect tasks (before path checks so we
     #    can scope path checking to plan-required dataset-years only)

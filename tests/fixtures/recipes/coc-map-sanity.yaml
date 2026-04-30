@@ -1,0 +1,43 @@
+version: 1
+name: coc-map-sanity
+universe:
+  range: "2020-2021"
+targets:
+  - id: coc_map
+    geometry:
+      type: coc
+      vintage: 2025
+    outputs:
+      - map
+    map_spec:
+      layers:
+        - geometry:
+            type: coc
+            vintage: 2025
+          selector_ids:
+            - COC1
+          label: Primary CoC
+          tooltip_fields:
+            - coc_id
+            - coc_name
+datasets:
+  pit:
+    provider: hud
+    product: pit
+    version: 1
+    native_geometry:
+      type: coc
+    path: data/pit.parquet
+    years: "2020-2021"
+pipelines:
+  - id: main
+    target: coc_map
+    steps:
+      - resample:
+          dataset: pit
+          to_geometry:
+            type: coc
+            vintage: 2025
+          method: identity
+          measures:
+            - pit_total

@@ -7,6 +7,7 @@ users. Together they cover the current recipe surface:
 - PIT, ACS5 tract inputs, PEP county inputs, ZORI county inputs, and ACS1 metro inputs
 - Identity and aggregate resampling
 - CoC crosswalks and generated metro/MSA transforms
+- Recipe-native map outputs with layered CoC / MSA / metro overlays
 - `file_set`-driven year/geometry switching
 - Point-in-time and calendar-mean temporal filters
 
@@ -50,6 +51,10 @@ the output downstream.
 
 - Use `metro` for the custom Glynn/Fox metro definition.
 - Use `msa` for official Census delineations keyed by `msa_id` / CBSA code.
+- Map targets use the same geometry ids plus a `map_spec.layers[*].selector_ids`
+  list. CoC layers need curated CoC boundaries, MSA layers need
+  `hhplab ingest msa-boundaries`, and metro layers need
+  `hhplab generate metro-boundaries`.
 - MSA PIT values are derived from the stored CoC-to-MSA crosswalk rather than
   published natively by HUD. See [background/msa_geography.md](../../background/msa_geography.md)
   for the allocation rule and prerequisites.

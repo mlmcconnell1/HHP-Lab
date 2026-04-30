@@ -406,6 +406,22 @@ def _msa_preflight_recipe() -> dict:
     }
 
 
+def _map_preflight_recipe(*, geometry: dict[str, object]) -> dict:
+    """Return a recipe dict with a recipe-native map target."""
+    base = _preflight_recipe(with_path=True, identity_only=True)
+    base["targets"][0]["outputs"] = ["map"]
+    base["targets"][0]["map_spec"] = {
+        "layers": [
+            {
+                "geometry": geometry,
+                "selector_ids": ["COC1" if geometry["type"] == "coc" else "19740"],
+                "label": "Primary layer",
+            }
+        ]
+    }
+    return base
+
+
 class TestRunPreflight:
 
     def test_clean_preflight(self, tmp_path: Path):
@@ -470,6 +486,50 @@ class TestRunPreflight:
         ]
         assert len(ds_findings) >= 1
         assert ds_findings[0].dataset_id == "pit"
+
+    def test_map_target_missing_coc_boundary_is_actionable(self, tmp_path: Path):
+        data = _map_preflight_recipe(
+            geometry={"type": "coc", "vintage": 2025},
+        )
+        _setup_preflight_fixtures(tmp_path, include_xwalk=False, include_acs=False)
+
+        recipe = load_recipe(data)
+        report = run_preflight(recipe, project_root=tmp_path)
+
+        map_findings = [
+            f for f in report.findings if f.kind == FindingKind.MISSING_MAP_ARTIFACT
+        ]
+        assert len(map_findings) == 1
+        finding = map_findings[0]
+        assert "coc boundary artifact" in finding.message.lower()
+        assert finding.remediation is not None
+        assert finding.remediation.command == (
+            "hhplab ingest boundaries --source hud_exchange --vintage 2025"
+        )
+
+    def test_map_target_missing_msa_boundary_is_actionable(self, tmp_path: Path):
+        data = _map_preflight_recipe(
+            geometry={
+                "type": "msa",
+                "source": "census_msa_2023",
+                "vintage": 2023,
+            },
+        )
+        _setup_preflight_fixtures(tmp_path, include_xwalk=False, include_acs=False)
+
+        recipe = load_recipe(data)
+        report = run_preflight(recipe, project_root=tmp_path)
+
+        map_findings = [
+            f for f in report.findings if f.kind == FindingKind.MISSING_MAP_ARTIFACT
+        ]
+        assert len(map_findings) == 1
+        finding = map_findings[0]
+        assert "msa boundary artifact" in finding.message.lower()
+        assert finding.remediation is not None
+        assert finding.remediation.command == (
+            "hhplab ingest msa-boundaries --definition-version census_msa_2023 --year 2023"
+        )
 
     def test_blocks_stale_translated_acs_cache(self, tmp_path: Path):
         data = _preflight_recipe(with_path=True)
@@ -1940,6 +2000,24 @@ class TestGapsManifest:
         assert len(xform_gaps) >= 1
         assert xform_gaps[0]["transform_id"] == "tract_to_coc"
         assert "remediation" in xform_gaps[0]
+
+    def test_gaps_manifest_missing_map_artifact(self, tmp_path: Path):
+        """Missing map artifacts should appear in the gaps manifest."""
+        data = _map_preflight_recipe(
+            geometry={"type": "coc", "vintage": 2025},
+        )
+        _setup_preflight_fixtures(tmp_path, include_xwalk=False, include_acs=False)
+
+        recipe = load_recipe(data)
+        report = run_preflight(recipe, project_root=tmp_path)
+        manifest = report.gaps_manifest()
+        map_gaps = manifest["gaps_by_kind"].get("missing_map_artifact", [])
+
+        assert len(map_gaps) == 1
+        assert map_gaps[0]["geometry"] == "coc"
+        assert map_gaps[0]["remediation"]["command"] == (
+            "hhplab ingest boundaries --source hud_exchange --vintage 2025"
+        )
 
     def test_gaps_manifest_missing_column(self, tmp_path: Path):
         """Missing measure column gaps should appear in the manifest."""
