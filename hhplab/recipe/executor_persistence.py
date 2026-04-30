@@ -133,7 +133,7 @@ def persist_outputs(
         ),
         **(
             {"source": definition_version}
-            if target_geo_type == "metro" and definition_version is not None
+            if target_geo_type in {"metro", "msa"} and definition_version is not None
             else {}
         ),
     }

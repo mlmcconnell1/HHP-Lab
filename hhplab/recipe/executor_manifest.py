@@ -105,7 +105,9 @@ def _target_geometry_metadata(
         if target_geometry.vintage is not None
         else None
     )
-    definition_version = target_geometry.source if geo_type == "metro" else None
+    definition_version = (
+        target_geometry.source if geo_type in {"metro", "msa"} else None
+    )
     return geo_type, boundary_vintage, definition_version
 
 
@@ -144,10 +146,10 @@ def _resolve_panel_output_file(
         target.geometry,
     )
 
-    if target_geo_type == "metro" and definition_version is None:
+    if target_geo_type in {"metro", "msa"} and definition_version is None:
         raise ExecutorError(
-            "Metro recipe targets must set geometry.source to the "
-            "metro definition version so panel outputs can be named."
+            f"{target_geo_type.upper()} recipe targets must set geometry.source "
+            "to the geography definition version so panel outputs can be named."
         )
 
     universe_years = expand_year_spec(recipe.universe)

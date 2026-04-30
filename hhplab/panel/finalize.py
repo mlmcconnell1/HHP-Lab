@@ -18,7 +18,7 @@ import logging
 
 import pandas as pd
 
-from hhplab.analysis_geo import GEO_TYPE_METRO
+from hhplab.analysis_geo import GEO_TYPE_METRO, GEO_TYPE_MSA
 
 logger = logging.getLogger(__name__)
 
@@ -80,6 +80,31 @@ METRO_PANEL_COLUMNS: list[str] = [
     "source",
 ]
 
+MSA_PANEL_COLUMNS: list[str] = [
+    "msa_id",
+    "cbsa_code",
+    "geo_type",
+    "geo_id",
+    "year",
+    "pit_total",
+    "pit_sheltered",
+    "pit_unsheltered",
+    "definition_version_used",
+    "acs5_vintage_used",
+    "tract_vintage_used",
+    "alignment_type",
+    "weighting_method",
+    "total_population",
+    "adult_population",
+    "population_below_poverty",
+    "median_household_income",
+    "median_gross_rent",
+    "population",
+    "coverage_ratio",
+    "boundary_changed",
+    "source",
+]
+
 ZORI_COLUMNS: list[str] = [
     "zori_coc",
     "zori_coverage_ratio",
@@ -126,9 +151,11 @@ _PANEL_DTYPE_SPEC: dict[str, str | type] = {
     # Geo identifiers
     "coc_id": "str",
     "metro_id": "str",
+    "msa_id": "str",
     "geo_id": "str",
     "geo_type": "str",
     "metro_name": "str",
+    "cbsa_code": "str",
     # Temporal
     "year": "int",
     # PIT counts
@@ -218,6 +245,8 @@ def _resolve_column_order(
         columns = list(canonical_columns)
     elif geo_type == GEO_TYPE_METRO:
         columns = list(METRO_PANEL_COLUMNS)
+    elif geo_type == GEO_TYPE_MSA:
+        columns = list(MSA_PANEL_COLUMNS)
     else:
         columns = list(COC_PANEL_COLUMNS)
 
@@ -246,7 +275,11 @@ def _apply_dtype_spec(df: pd.DataFrame) -> pd.DataFrame:
 
 def _default_source_label(geo_type: str) -> str:
     """Return the default source label for a geo type."""
-    return "metro_panel" if geo_type == GEO_TYPE_METRO else "hhplab_panel"
+    if geo_type == GEO_TYPE_METRO:
+        return "metro_panel"
+    if geo_type == GEO_TYPE_MSA:
+        return "msa_panel"
+    return "hhplab_panel"
 
 
 def finalize_panel(
@@ -307,9 +340,15 @@ def finalize_panel(
         Finalized panel with canonical column ordering and dtypes.
     """
     result = df.copy()
-    geo_col = "metro_id" if geo_type == GEO_TYPE_METRO else "coc_id"
+    if geo_type == GEO_TYPE_METRO:
+        geo_col = "metro_id"
+    elif geo_type == GEO_TYPE_MSA:
+        geo_col = "msa_id"
+    else:
+        geo_col = "coc_id"
     vintage_col = (
-        "definition_version_used" if geo_type == GEO_TYPE_METRO
+        "definition_version_used"
+        if geo_type in {GEO_TYPE_METRO, GEO_TYPE_MSA}
         else "boundary_vintage_used"
     )
 

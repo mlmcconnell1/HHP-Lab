@@ -313,12 +313,24 @@ def collect_conformance_flags(
             or (product == "acs1" and "acs1" in recipe_products)
         )
     )
-    if acs_products:
-        measure_columns: list[str] | None = None
-    else:
-        # Non-ACS schema: check whichever known measures are in the panel.
-        known = set(ACS_MEASURE_COLUMNS) | set(ACS1_MEASURE_COLUMNS) | {"population"}
-        measure_columns = [c for c in panel.columns if c in known] or None
+    base_cols: list[str] = []
+    if "acs5" in acs_products:
+        base_cols.extend(ACS_MEASURE_COLUMNS)
+    if "acs1" in acs_products:
+        base_cols.extend(ACS1_MEASURE_COLUMNS)
+
+    # Include non-ACS measures that are present in the panel so mixed
+    # pipelines (for example ACS + PEP) validate the full output schema.
+    known = (
+        set(ACS_MEASURE_COLUMNS)
+        | set(ACS1_MEASURE_COLUMNS)
+        | set(LAUS_MEASURE_COLUMNS)
+        | {"population"}
+    )
+    for col in panel.columns:
+        if col in known and col not in base_cols:
+            base_cols.append(col)
+    measure_columns: list[str] | None = base_cols or None
 
     policy: PanelPolicy | None = getattr(target, "panel_policy", None)
 
@@ -340,17 +352,12 @@ def collect_conformance_flags(
     if policy is not None and policy.column_aliases:
         aliases = dict(policy.column_aliases)
     if aliases:
-        if measure_columns is None:
-            base_cols: list[str] = []
-            if "acs5" in acs_products:
-                base_cols.extend(ACS_MEASURE_COLUMNS)
-            if "acs1" in acs_products:
-                base_cols.extend(ACS1_MEASURE_COLUMNS)
-        else:
-            base_cols = list(measure_columns)
+        aliased_base_cols = list(measure_columns or [])
         if include_laus:
-            base_cols += [c for c in LAUS_MEASURE_COLUMNS if c not in base_cols]
-        measure_columns = [aliases.get(c, c) for c in base_cols]
+            aliased_base_cols += [
+                c for c in LAUS_MEASURE_COLUMNS if c not in aliased_base_cols
+            ]
+        measure_columns = [aliases.get(c, c) for c in aliased_base_cols]
     elif include_laus and measure_columns is not None:
         # No aliases, but non-ACS path explicitly set measure_columns.
         # _effective_measure_columns() returns measure_columns directly when it

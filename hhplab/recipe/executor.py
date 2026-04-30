@@ -86,7 +86,9 @@ from hhplab.recipe.executor_transforms import (
     _generated_metro_transform_path,
     _identify_coc_and_base,
     _identify_metro_and_base,
+    _identify_msa_and_base,
     _materialize_generated_metro_transform,
+    _materialize_generated_msa_transform,
     _resolve_metro_transform_df,
     _resolve_transform_path,
 )
@@ -137,9 +139,11 @@ __all__ = [
     "_generated_metro_transform_path",
     "_identify_coc_and_base",
     "_identify_metro_and_base",
+    "_identify_msa_and_base",
     "_load_ct_county_alignment_crosswalk",
     "_load_support_dataset_for_year",
     "_materialize_generated_metro_transform",
+    "_materialize_generated_msa_transform",
     "_needs_ct_planning_to_legacy_alignment",
     "_persist_diagnostics",
     "_persist_outputs",
@@ -310,9 +314,23 @@ def _execute_materialize(
             if transform is not None
             else (None, None)
         )
+        msa_ref, _msa_base_ref = (
+            _identify_msa_and_base(transform.from_, transform.to)
+            if transform is not None
+            else (None, None)
+        )
         if metro_ref is not None and not path.exists():
             try:
                 path = _materialize_generated_metro_transform(
+                    tid,
+                    ctx.recipe,
+                    ctx.project_root,
+                )
+            except ExecutorError as exc:
+                generation_error = str(exc)
+        elif msa_ref is not None and not path.exists():
+            try:
+                path = _materialize_generated_msa_transform(
                     tid,
                     ctx.recipe,
                     ctx.project_root,

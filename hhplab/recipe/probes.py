@@ -410,6 +410,7 @@ def probe_transform_path(
     from hhplab.recipe.executor import (
         ExecutorError,
         _identify_metro_and_base,
+        _identify_msa_and_base,
         _resolve_transform_path,
     )
 
@@ -429,9 +430,10 @@ def probe_transform_path(
     except ExecutorError as exc:
         return ProbeResult(ok=False, message=str(exc))
 
-    # For metro transforms, the artifact can be generated on demand
+    # For synthetic-geometry transforms, the artifact can be generated on demand.
     metro_ref, base_ref = _identify_metro_and_base(transform.from_, transform.to)
-    can_generate = metro_ref is not None
+    msa_ref, msa_base_ref = _identify_msa_and_base(transform.from_, transform.to)
+    can_generate = metro_ref is not None or msa_ref is not None
 
     if path.exists():
         return ProbeResult(
@@ -467,6 +469,36 @@ def probe_transform_path(
             for path in prereq_paths
             if not path.exists()
         ]
+        generation_ready = len(missing_inputs) == 0
+    elif can_generate and msa_ref is not None and msa_ref.source:
+        data_root = project_root / "data"
+        prereq_paths = []
+        if msa_base_ref.type == "coc" and msa_base_ref.vintage is not None:
+            from hhplab.naming import coc_base_path, county_path, msa_county_membership_path
+
+            boundary_vintage = str(msa_base_ref.vintage)
+            county_vintage = boundary_vintage
+            prereq_paths.extend(
+                [
+                    coc_base_path(boundary_vintage, data_root),
+                    county_path(county_vintage, data_root),
+                    msa_county_membership_path(msa_ref.source, data_root),
+                ]
+            )
+        elif msa_base_ref.type == "county":
+            from hhplab.naming import msa_county_membership_path
+
+            prereq_paths.append(msa_county_membership_path(msa_ref.source, data_root))
+        elif msa_base_ref.type == "tract" and msa_base_ref.vintage is not None:
+            from hhplab.naming import msa_county_membership_path, tract_path
+
+            prereq_paths.extend(
+                [
+                    tract_path(msa_base_ref.vintage, data_root),
+                    msa_county_membership_path(msa_ref.source, data_root),
+                ]
+            )
+        missing_inputs = [str(p.relative_to(project_root)) for p in prereq_paths if not p.exists()]
         generation_ready = len(missing_inputs) == 0
 
     return ProbeResult(

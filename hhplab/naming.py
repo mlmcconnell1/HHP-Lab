@@ -839,6 +839,19 @@ def metro_panel_filename(
     return f"panel__metro__Y{start_year}-{end_year}@D{defn}.parquet"
 
 
+def msa_panel_filename(
+    start_year: int,
+    end_year: int,
+    definition_version: str,
+) -> str:
+    """Generate filename for MSA-scoped panel.
+
+    Pattern: ``panel__msa__Y{start}-{end}@M{def}.parquet``
+    """
+    defn = _normalize_definition_version(definition_version)
+    return f"panel__msa__Y{start_year}-{end_year}@M{defn}.parquet"
+
+
 def metro_pit_filename(
     pit_year: str | int,
     definition_version: str,
@@ -1200,6 +1213,7 @@ def geo_panel_filename(
 
     For ``geo_type="coc"``, delegates to :func:`panel_filename`.
     For ``geo_type="metro"``, delegates to :func:`metro_panel_filename`.
+    For ``geo_type="msa"``, delegates to :func:`msa_panel_filename`.
     """
     if geo_type == "coc":
         if boundary_vintage is None:
@@ -1209,4 +1223,8 @@ def geo_panel_filename(
         if definition_version is None:
             raise ValueError("definition_version is required for geo_type='metro'")
         return metro_panel_filename(start_year, end_year, definition_version)
+    if geo_type == "msa":
+        if definition_version is None:
+            raise ValueError("definition_version is required for geo_type='msa'")
+        return msa_panel_filename(start_year, end_year, definition_version)
     raise ValueError(f"Unsupported geo_type: {geo_type!r}")

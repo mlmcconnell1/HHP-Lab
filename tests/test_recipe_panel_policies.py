@@ -20,6 +20,7 @@ import pyarrow.parquet as pq
 
 from hhplab.recipe.executor import execute_recipe
 from hhplab.recipe.loader import load_recipe
+from hhplab.recipe.executor_panel_policies import collect_conformance_flags
 
 # ---------------------------------------------------------------------------
 # ZORI recipe and fixture helpers
@@ -840,6 +841,240 @@ class TestMetroPanelParity:
         panel = pd.read_parquet(_find_panel_output(tmp_path))
         assert (panel["geo_type"] == "metro").all()
         assert panel["metro_id"].notna().all()
+
+
+def _msa_recipe_dict() -> dict:
+    """Mixed-geometry MSA recipe with PIT, ACS5, and PEP inputs."""
+    return {
+        "version": 1,
+        "name": "msa-mixed-pipeline-test",
+        "universe": {"years": [2020, 2021]},
+        "targets": [
+            {
+                "id": "msa_panel",
+                "geometry": {"type": "msa", "source": "census_msa_2023"},
+                "outputs": ["panel"],
+            },
+        ],
+        "datasets": {
+            "pit": {
+                "provider": "hud",
+                "product": "pit",
+                "version": 1,
+                "native_geometry": {"type": "coc", "vintage": 2025},
+                "years": {"years": [2020, 2021]},
+                "path": "data/pit.parquet",
+            },
+            "acs": {
+                "provider": "census",
+                "product": "acs5",
+                "version": 1,
+                "native_geometry": {"type": "tract", "vintage": 2020},
+                "years": {"years": [2020, 2021]},
+                "path": "data/acs.parquet",
+            },
+            "pep": {
+                "provider": "census",
+                "product": "pep",
+                "version": 1,
+                "native_geometry": {"type": "county", "vintage": 2025},
+                "years": {"years": [2020, 2021]},
+                "path": "data/pep.parquet",
+            },
+        },
+        "transforms": [
+            {
+                "id": "coc_to_msa",
+                "type": "crosswalk",
+                "from": {"type": "coc", "vintage": 2025},
+                "to": {"type": "msa", "source": "census_msa_2023"},
+                "spec": {"weighting": {"scheme": "area"}},
+            },
+            {
+                "id": "tract_to_msa",
+                "type": "crosswalk",
+                "from": {"type": "tract", "vintage": 2020},
+                "to": {"type": "msa", "source": "census_msa_2023"},
+                "spec": {"weighting": {"scheme": "area"}},
+            },
+            {
+                "id": "county_to_msa",
+                "type": "crosswalk",
+                "from": {"type": "county", "vintage": 2025},
+                "to": {"type": "msa", "source": "census_msa_2023"},
+                "spec": {"weighting": {"scheme": "area"}},
+            },
+        ],
+        "pipelines": [
+            {
+                "id": "main",
+                "target": "msa_panel",
+                "steps": [
+                    {
+                        "materialize": {
+                            "transforms": [
+                                "coc_to_msa",
+                                "tract_to_msa",
+                                "county_to_msa",
+                            ]
+                        },
+                    },
+                    {
+                        "resample": {
+                            "dataset": "pit",
+                            "to_geometry": {"type": "msa", "source": "census_msa_2023"},
+                            "method": "aggregate",
+                            "via": "coc_to_msa",
+                            "measures": ["pit_total"],
+                            "aggregation": "sum",
+                        },
+                    },
+                    {
+                        "resample": {
+                            "dataset": "acs",
+                            "to_geometry": {"type": "msa", "source": "census_msa_2023"},
+                            "method": "aggregate",
+                            "via": "tract_to_msa",
+                            "measures": [
+                                "total_population",
+                                "adult_population",
+                                "population_below_poverty",
+                                "median_household_income",
+                                "median_gross_rent",
+                                "unemployment_rate",
+                            ],
+                        },
+                    },
+                    {
+                        "resample": {
+                            "dataset": "pep",
+                            "to_geometry": {"type": "msa", "source": "census_msa_2023"},
+                            "method": "aggregate",
+                            "via": "county_to_msa",
+                            "measures": ["population"],
+                            "aggregation": "sum",
+                        },
+                    },
+                    {
+                        "join": {
+                            "datasets": ["pit", "acs", "pep"],
+                            "join_on": ["geo_id", "year"],
+                        },
+                    },
+                ],
+            },
+        ],
+    }
+
+
+def _setup_msa_recipe_fixtures(tmp_path: Path) -> None:
+    """Create synthetic datasets and materialized MSA transforms."""
+    data_dir = tmp_path / "data"
+    data_dir.mkdir(parents=True, exist_ok=True)
+    transform_dir = tmp_path / ".recipe_cache" / "transforms"
+    transform_dir.mkdir(parents=True, exist_ok=True)
+
+    pd.DataFrame({
+        "coc_id": ["COC1", "COC2", "COC1", "COC2"],
+        "year": [2020, 2020, 2021, 2021],
+        "pit_total": [100, 250, 110, 260],
+    }).to_parquet(data_dir / "pit.parquet")
+
+    pd.DataFrame({
+        "tract_geoid": ["01001000100", "01003000100", "01001000100", "01003000100"],
+        "year": [2020, 2020, 2021, 2021],
+        "acs_vintage": [2019, 2019, 2020, 2020],
+        "total_population": [50000, 80000, 51000, 82000],
+        "adult_population": [38000, 60000, 39000, 61500],
+        "population_below_poverty": [8000, 12000, 8100, 12300],
+        "median_household_income": [52000.0, 61000.0, 53000.0, 62000.0],
+        "median_gross_rent": [950.0, 1125.0, 975.0, 1150.0],
+        "unemployment_rate": [0.06, 0.045, 0.055, 0.04],
+    }).to_parquet(data_dir / "acs.parquet")
+
+    pd.DataFrame({
+        "county_fips": ["01001", "01003", "01001", "01003"],
+        "year": [2020, 2020, 2021, 2021],
+        "population": [55000, 90000, 56000, 91000],
+    }).to_parquet(data_dir / "pep.parquet")
+
+    pd.DataFrame({
+        "msa_id": ["35620", "41180"],
+        "coc_id": ["COC1", "COC2"],
+        "area_share": [1.0, 1.0],
+        "definition_version": ["census_msa_2023", "census_msa_2023"],
+    }).to_parquet(transform_dir / "coc_to_msa__coc_2025__census_msa_2023.parquet")
+
+    pd.DataFrame({
+        "msa_id": ["35620", "41180"],
+        "tract_geoid": ["01001000100", "01003000100"],
+        "area_share": [1.0, 1.0],
+        "definition_version": ["census_msa_2023", "census_msa_2023"],
+    }).to_parquet(transform_dir / "tract_to_msa__tract_2020__census_msa_2023.parquet")
+
+    pd.DataFrame({
+        "msa_id": ["35620", "41180"],
+        "county_fips": ["01001", "01003"],
+        "area_share": [1.0, 1.0],
+        "definition_version": ["census_msa_2023", "census_msa_2023"],
+    }).to_parquet(transform_dir / "county_to_msa__county_2025__census_msa_2023.parquet")
+
+
+class TestMsaPanelParity:
+    """Recipe-native MSA panel uses the standard first-class workflow."""
+
+    def test_msa_panel_columns_and_filename(self, tmp_path: Path):
+        _setup_msa_recipe_fixtures(tmp_path)
+        recipe = load_recipe(_msa_recipe_dict())
+        results = execute_recipe(recipe, project_root=tmp_path)
+
+        assert results[0].success
+        panel_path = _find_panel_output(tmp_path)
+        assert panel_path.name == "panel__msa__Y2020-2021@Mcensusmsa2023.parquet"
+
+        panel = pd.read_parquet(panel_path)
+        expected = {
+            "msa_id",
+            "geo_type",
+            "geo_id",
+            "year",
+            "pit_total",
+            "definition_version_used",
+            "acs5_vintage_used",
+            "tract_vintage_used",
+            "total_population",
+            "adult_population",
+            "population_below_poverty",
+            "median_household_income",
+            "median_gross_rent",
+            "unemployment_rate",
+            "population",
+            "boundary_changed",
+            "source",
+        }
+        assert set(panel.columns) == expected
+        assert "coc_id" not in panel.columns
+        assert (panel["geo_type"] == "msa").all()
+        assert (panel["definition_version_used"] == "census_msa_2023").all()
+
+    def test_msa_conformance_flags_include_acs_and_pep_measures(self, tmp_path: Path):
+        recipe = load_recipe(_msa_recipe_dict())
+        target = recipe.targets[0]
+        panel = pd.DataFrame(
+            {
+                "msa_id": ["35620"],
+                "geo_id": ["35620"],
+                "year": [2020],
+                "total_population": [50000],
+                "population": [55000],
+            }
+        )
+
+        flags = collect_conformance_flags(recipe=recipe, target=target, panel=panel)
+
+        assert flags.measure_columns is not None
+        assert "total_population" in flags.measure_columns
+        assert "population" in flags.measure_columns
 
 
 # ===========================================================================

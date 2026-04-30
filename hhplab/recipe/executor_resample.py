@@ -40,6 +40,7 @@ _XWALK_JOIN_KEYS: dict[str, str] = {
     "county": "county_fips",
     "coc": "coc_id",
     "metro": "metro_id",
+    "msa": "msa_id",
 }
 
 # Columns in crosswalks that are NOT the target geography identifier.
@@ -47,6 +48,9 @@ _XWALK_NON_GEO_COLS: set[str] = {
     "tract_geoid", "county_fips", "area_share", "pop_share",
     "intersection_area", "tract_area", "county_area", "coc_area", "geo_area",
     "boundary_vintage", "tract_vintage", "definition_version",
+    "cbsa_code", "county_vintage", "allocation_method", "share_column",
+    "share_denominator", "allocation_share", "intersection_area",
+    "intersecting_county_count", "intersecting_county_fips",
 }
 
 
@@ -63,18 +67,18 @@ def _detect_xwalk_target_col(
     candidates = [
         c for c in xwalk.columns
         if c not in _XWALK_NON_GEO_COLS and c != source_key
-        and c in {"coc_id", "metro_id", "geo_id"}
+        and c in {"coc_id", "metro_id", "msa_id", "geo_id"}
     ]
     if len(candidates) == 1:
         return candidates[0]
     # Prefer more specific names
-    for c in ("coc_id", "metro_id", "geo_id"):
+    for c in ("coc_id", "metro_id", "msa_id", "geo_id"):
         if c in candidates:
             return c
     raise ExecutorError(
         f"Cannot detect target geography column in crosswalk. "
         f"Columns: {list(xwalk.columns)}, source_key: {source_key!r}. "
-        f"Expected one of: coc_id, metro_id, geo_id."
+        f"Expected one of: coc_id, metro_id, msa_id, geo_id."
     )
 
 

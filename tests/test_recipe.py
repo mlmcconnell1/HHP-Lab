@@ -2062,6 +2062,28 @@ class TestMaterialize:
         assert ".recipe_cache/transforms" in str(path)
         assert "coc_to_metro__coc_2025__glynn_fox_v1.parquet" in str(path)
 
+    def test_resolve_coc_to_msa_crosswalk_path(self, tmp_path: Path):
+        data = _recipe_with_pipeline()
+        data["targets"] = [{
+            "id": "msa_panel",
+            "geometry": {"type": "msa", "source": "census_msa_2023"},
+        }]
+        data["pipelines"][0]["target"] = "msa_panel"
+        data["pipelines"][0]["steps"] = [
+            {"materialize": {"transforms": ["coc_to_msa"]}},
+        ]
+        data["transforms"] = [{
+            "id": "coc_to_msa",
+            "type": "crosswalk",
+            "from": {"type": "coc", "vintage": 2025},
+            "to": {"type": "msa", "source": "census_msa_2023"},
+            "spec": {"weighting": {"scheme": "area"}},
+        }]
+        recipe = load_recipe(data)
+        path = _resolve_transform_path("coc_to_msa", recipe, tmp_path)
+        assert ".recipe_cache/transforms" in str(path)
+        assert "coc_to_msa__coc_2025__census_msa_2023.parquet" in str(path)
+
     def test_unknown_transform_raises(self, tmp_path: Path):
         recipe = load_recipe(_recipe_with_pipeline())
         with pytest.raises(ExecutorError, match="not found in recipe"):

@@ -72,6 +72,14 @@ def canonicalize_panel_for_target(
                 and "definition_version_used" not in result.columns
             ):
                 result["definition_version_used"] = definition_version
+        if geo_type == "msa":
+            if "msa_id" not in result.columns:
+                result["msa_id"] = result["geo_id"]
+            if (
+                definition_version is not None
+                and "definition_version_used" not in result.columns
+            ):
+                result["definition_version_used"] = definition_version
         if (
             geo_type == "coc"
             and boundary_vintage is not None
@@ -216,6 +224,31 @@ _RECIPE_METRO_COLUMN_ORDER: list[str] = [
     "source",
 ]
 
+_RECIPE_MSA_COLUMN_ORDER: list[str] = [
+    "msa_id",
+    "cbsa_code",
+    "geo_type",
+    "geo_id",
+    "year",
+    "pit_total",
+    "pit_sheltered",
+    "pit_unsheltered",
+    "definition_version_used",
+    "acs5_vintage_used",
+    "tract_vintage_used",
+    "alignment_type",
+    "weighting_method",
+    "total_population",
+    "adult_population",
+    "population_below_poverty",
+    "median_household_income",
+    "median_gross_rent",
+    "population",
+    "coverage_ratio",
+    "boundary_changed",
+    "source",
+]
+
 
 def _recipe_column_order(
     *,
@@ -224,11 +257,12 @@ def _recipe_column_order(
     extra_columns: list[str] | None,
 ) -> list[str]:
     """Return the preferred recipe output column order."""
-    columns = (
-        list(_RECIPE_METRO_COLUMN_ORDER)
-        if geo_type == "metro"
-        else list(_RECIPE_COC_COLUMN_ORDER)
-    )
+    if geo_type == "metro":
+        columns = list(_RECIPE_METRO_COLUMN_ORDER)
+    elif geo_type == "msa":
+        columns = list(_RECIPE_MSA_COLUMN_ORDER)
+    else:
+        columns = list(_RECIPE_COC_COLUMN_ORDER)
     if include_zori:
         columns += ZORI_COLUMNS + ZORI_PROVENANCE_COLUMNS
     if extra_columns:

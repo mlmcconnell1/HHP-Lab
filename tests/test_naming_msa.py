@@ -1,6 +1,7 @@
 """Tests for MSA definition naming helpers."""
 
 from hhplab.naming import (
+    geo_panel_filename,
     msa_pit_filename,
     msa_coc_xwalk_filename,
     msa_coc_xwalk_path,
@@ -54,4 +55,16 @@ def test_msa_pit_filename():
     assert (
         msa_pit_filename(2024, "census_msa_2023", 2024, 2024)
         == "pit__msa__P2024@Mcensusmsa2023xB2024xC2024.parquet"
+    )
+
+
+def test_msa_panel_filename():
+    assert (
+        geo_panel_filename(
+            2020,
+            2024,
+            geo_type="msa",
+            definition_version="census_msa_2023",
+        )
+        == "panel__msa__Y2020-2024@Mcensusmsa2023.parquet"
     )

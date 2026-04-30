@@ -1,10 +1,10 @@
 """Transform artifact resolution helpers for recipe execution.
 
-Resolves the on-disk path for a recipe transform, identifies metro vs.
-CoC vs. base geometry roles, and materializes generated metro
-crosswalks on demand.  These helpers are imported back into
-``hhplab.recipe.executor`` so legacy callers (and the lazy probe
-import in ``hhplab.recipe.probes``) keep working unchanged.
+Resolves the on-disk path for a recipe transform, identifies synthetic
+analysis geographies (metro/MSA) versus CoC/base geometry roles, and
+materializes generated crosswalks on demand. These helpers are imported
+back into ``hhplab.recipe.executor`` so legacy callers (and the lazy
+probe import in ``hhplab.recipe.probes``) keep working unchanged.
 """
 
 from __future__ import annotations
@@ -15,6 +15,7 @@ import pandas as pd
 
 from hhplab.naming import (
     county_xwalk_path,
+    msa_coc_xwalk_path,
     tract_path,
     tract_xwalk_path,
 )
@@ -47,6 +48,14 @@ def _resolve_transform_path(
         return _generated_metro_transform_path(
             transform_id,
             metro_ref=metro_ref,
+            base_ref=base_ref,
+            project_root=project_root,
+        )
+    msa_ref, base_ref = _identify_msa_and_base(from_, to)
+    if msa_ref is not None:
+        return _generated_msa_transform_path(
+            transform_id,
+            msa_ref=msa_ref,
             base_ref=base_ref,
             project_root=project_root,
         )
@@ -84,7 +93,7 @@ def _resolve_transform_path(
         raise ExecutorError(
             f"Transform '{transform_id}': unsupported geometry pair "
             f"{from_.type} → {to.type}. Only tract↔coc and county↔coc "
-            f"crosswalks are currently supported."
+            f"crosswalks plus generated metro/MSA transforms are currently supported."
         )
 
 
@@ -110,6 +119,17 @@ def _identify_metro_and_base(
     return None, from_
 
 
+def _identify_msa_and_base(
+    from_: GeometryRef, to: GeometryRef,
+) -> tuple[GeometryRef | None, GeometryRef]:
+    """Identify which end of a transform is the MSA geometry."""
+    if to.type == "msa":
+        return to, from_
+    if from_.type == "msa":
+        return from_, to
+    return None, from_
+
+
 def _generated_metro_transform_path(
     transform_id: str,
     *,
@@ -119,6 +139,22 @@ def _generated_metro_transform_path(
 ) -> Path:
     """Return the recipe-cache path for a generated metro transform."""
     definition = metro_ref.source or "unknown_definition"
+    base_suffix = base_ref.type
+    if base_ref.vintage is not None:
+        base_suffix = f"{base_suffix}_{base_ref.vintage}"
+    filename = f"{transform_id}__{base_suffix}__{definition}.parquet"
+    return project_root / _RECIPE_TRANSFORM_DIR / filename
+
+
+def _generated_msa_transform_path(
+    transform_id: str,
+    *,
+    msa_ref: GeometryRef,
+    base_ref: GeometryRef,
+    project_root: Path,
+) -> Path:
+    """Return the recipe-cache path for a generated MSA transform."""
+    definition = msa_ref.source or "unknown_definition"
     base_suffix = base_ref.type
     if base_ref.vintage is not None:
         base_suffix = f"{base_suffix}_{base_ref.vintage}"
@@ -198,6 +234,101 @@ def _resolve_metro_transform_df(
     )
 
 
+def _resolve_msa_transform_df(
+    *,
+    msa_ref: GeometryRef,
+    base_ref: GeometryRef,
+    project_root: Path,
+) -> pd.DataFrame:
+    """Build an MSA crosswalk DataFrame from curated artifacts."""
+    if not msa_ref.source:
+        raise ExecutorError(
+            "MSA transforms require geometry.source to identify the "
+            "definition version (for example 'census_msa_2023')."
+        )
+
+    from hhplab.msa.crosswalk import build_coc_msa_crosswalk
+    from hhplab.msa.io import read_msa_county_membership
+    from hhplab.naming import coc_base_path, county_path
+
+    data_root = project_root / "data"
+    definition_version = msa_ref.source
+
+    if base_ref.type == "county":
+        xwalk = read_msa_county_membership(
+            definition_version=definition_version,
+            base_dir=data_root,
+        ).copy()
+        xwalk["area_share"] = 1.0
+        return xwalk[["msa_id", "county_fips", "area_share", "definition_version"]]
+
+    if base_ref.type == "tract":
+        if base_ref.vintage is None:
+            raise ExecutorError(
+                "MSA tract transforms require a tract vintage so the executor "
+                "can load the tract geometry artifact."
+            )
+        county_membership = read_msa_county_membership(
+            definition_version=definition_version,
+            base_dir=data_root,
+        )
+        tracts = pd.read_parquet(tract_path(base_ref.vintage, data_root))
+        tract_col: str | None = None
+        for candidate in ("tract_geoid", "GEOID", "geoid"):
+            if candidate in tracts.columns:
+                tract_col = candidate
+                break
+        if tract_col is None:
+            raise ExecutorError(
+                "Tract geometry artifact is missing a tract identifier column. "
+                f"Expected one of tract_geoid/GEOID/geoid. "
+                f"Available columns: {sorted(tracts.columns)}"
+            )
+        tract_index = tracts[[tract_col]].copy()
+        tract_index["tract_geoid"] = tract_index[tract_col].astype(str)
+        tract_index["county_fips"] = tract_index["tract_geoid"].str[:5]
+        xwalk = county_membership.merge(tract_index, on="county_fips", how="inner")
+        xwalk["area_share"] = 1.0
+        return xwalk[["msa_id", "tract_geoid", "area_share", "definition_version"]]
+
+    if base_ref.type == "coc":
+        if base_ref.vintage is None:
+            raise ExecutorError(
+                "MSA CoC transforms require a CoC boundary vintage so the executor "
+                "can build the CoC-to-MSA allocation crosswalk."
+            )
+        boundary_vintage = str(base_ref.vintage)
+        county_vintage = boundary_vintage
+        cached_path = msa_coc_xwalk_path(
+            boundary_vintage=boundary_vintage,
+            definition_version=definition_version,
+            county_vintage=county_vintage,
+            base_dir=data_root,
+        )
+        if cached_path.exists():
+            return pd.read_parquet(cached_path)
+
+        coc_boundaries = pd.read_parquet(coc_base_path(boundary_vintage, data_root))
+        counties = pd.read_parquet(county_path(county_vintage, data_root))
+        membership = read_msa_county_membership(
+            definition_version=definition_version,
+            base_dir=data_root,
+        )
+        return build_coc_msa_crosswalk(
+            coc_boundaries,
+            counties,
+            membership,
+            boundary_vintage=boundary_vintage,
+            county_vintage=county_vintage,
+            definition_version=definition_version,
+        )
+
+    raise ExecutorError(
+        f"MSA transforms currently support tract, county, or coc bases; "
+        f"got '{base_ref.type}'."
+    )
+
+
 def _materialize_generated_metro_transform(
     transform_id: str,
     recipe: RecipeV1,
@@ -237,6 +368,63 @@ def _materialize_generated_metro_transform(
         county_vintage=(
             str(base_ref.vintage)
             if base_ref.type == "county" and base_ref.vintage is not None
+            else None
+        ),
+        extra={
+            "dataset_type": "recipe_transform",
+            "transform_id": transform_id,
+            "from_type": transform.from_.type,
+            "to_type": transform.to.type,
+        },
+    )
+    write_parquet_with_provenance(xwalk, output_path, provenance)
+    return output_path
+
+
+def _materialize_generated_msa_transform(
+    transform_id: str,
+    recipe: RecipeV1,
+    project_root: Path,
+) -> Path:
+    """Generate and persist an MSA transform artifact for recipe execution."""
+    transform = _get_transform(recipe, transform_id)
+
+    msa_ref, base_ref = _identify_msa_and_base(transform.from_, transform.to)
+    if msa_ref is None:
+        raise ExecutorError(
+            f"Transform '{transform_id}' does not target msa geometry."
+        )
+
+    output_path = _generated_msa_transform_path(
+        transform_id,
+        msa_ref=msa_ref,
+        base_ref=base_ref,
+        project_root=project_root,
+    )
+    if output_path.exists():
+        return output_path
+
+    xwalk = _resolve_msa_transform_df(
+        msa_ref=msa_ref,
+        base_ref=base_ref,
+        project_root=project_root,
+    )
+    provenance = ProvenanceBlock(
+        geo_type="msa",
+        definition_version=msa_ref.source,
+        tract_vintage=(
+            str(base_ref.vintage)
+            if base_ref.type == "tract" and base_ref.vintage is not None
+            else None
+        ),
+        county_vintage=(
+            str(base_ref.vintage)
+            if base_ref.type == "county" and base_ref.vintage is not None
+            else None
+        ),
+        boundary_vintage=(
+            str(base_ref.vintage)
+            if base_ref.type == "coc" and base_ref.vintage is not None
             else None
         ),
         extra={
