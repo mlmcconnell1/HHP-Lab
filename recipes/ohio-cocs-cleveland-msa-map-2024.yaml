@@ -1,0 +1,70 @@
+version: 1
+name: ohio_cocs_cleveland_msa_map_2024
+description: >
+  Render all Ohio CoC boundaries with the Cleveland, Ohio Census MSA boundary
+  overlaid as a single recipe-native HTML map artifact.
+
+universe:
+  years: [2024]
+
+targets:
+  - id: ohio_overlay_map
+    geometry: { type: coc, vintage: 2025, source: hud_exchange }
+    outputs: [map]
+    map_spec:
+      basemap: cartodbpositron
+      viewport:
+        fit_layers: true
+        padding: 30
+      layers:
+        - geometry: { type: coc, vintage: 2025, source: hud_exchange }
+          selector_ids:
+            [OH-500, OH-501, OH-502, OH-503, OH-504, OH-505, OH-506, OH-507, OH-508]
+          label: Ohio CoCs
+          tooltip_fields: [coc_id, coc_name, state_abbrev]
+          style:
+            fill_color: "#f4a261"
+            stroke_color: "#7f5539"
+            fill_opacity: 0.22
+            stroke_opacity: 0.9
+            line_weight: 1.5
+            z_order: 0
+        - geometry: { type: msa, source: census_msa_2023, vintage: 2023 }
+          selector_ids: ["17410"]
+          label: Cleveland MSA
+          tooltip_fields: [msa_id, msa_name, cbsa_code, geometry_vintage]
+          style:
+            fill_color: "#2a9d8f"
+            stroke_color: "#1d3557"
+            fill_opacity: 0.12
+            stroke_opacity: 1.0
+            line_weight: 3.0
+            z_order: 1
+
+datasets:
+  pit:
+    provider: hud
+    product: pit
+    version: 1
+    native_geometry: { type: coc }
+    years: "2024-2024"
+    year_column: pit_year
+    geo_column: coc_id
+    params:
+      vintage: 2024
+      align: point_in_time_jan
+    path: data/curated/pit/pit_vintage__P2024.parquet
+
+pipelines:
+  - id: build_map
+    target: ohio_overlay_map
+    steps:
+      - resample:
+          dataset: pit
+          to_geometry: { type: coc, vintage: 2025, source: hud_exchange }
+          method: identity
+          measures: [pit_total]
+
+validation:
+  missing_dataset:
+    default: fail

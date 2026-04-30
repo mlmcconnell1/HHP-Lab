@@ -7,12 +7,93 @@ from pathlib import Path
 
 import geopandas as gpd
 import pandas as pd
+import pytest
 from shapely.geometry import box
 from typer.testing import CliRunner
 
 from hhplab.cli.main import app
 
 runner = CliRunner()
+
+
+def test_download_msa_boundaries_preserves_cbsa_code_without_suffix_collisions(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    source_gdf = gpd.GeoDataFrame(
+        {
+            "CBSAFP": ["17410"],
+            "NAME": ["Cleveland, OH"],
+        },
+        geometry=[box(0, 0, 1, 1)],
+        crs="EPSG:4326",
+    )
+    expected = pd.DataFrame(
+        {
+            "msa_id": ["17410"],
+            "cbsa_code": ["17410"],
+            "msa_name": ["Cleveland, OH"],
+            "area_type": ["Metropolitan Statistical Area"],
+            "definition_version": ["census_msa_2023"],
+        }
+    )
+
+    monkeypatch.setattr(
+        "hhplab.msa.boundaries._load_expected_definitions",
+        lambda definition_version, base_dir=None, raw_root=None: expected,
+    )
+    monkeypatch.setattr(
+        "hhplab.msa.boundaries.persist_file_snapshot",
+        lambda raw_content, *_args, **_kwargs: (Path("/tmp/fake.zip"), "abc", len(raw_content)),
+    )
+    monkeypatch.setattr(
+        "hhplab.msa.boundaries.check_source_changed",
+        lambda **_kwargs: (False, {}),
+    )
+
+    class _FakeResponse:
+        content = b"zip-bytes"
+
+        def raise_for_status(self) -> None:
+            return None
+
+    class _FakeClient:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+        def get(self, url, follow_redirects=True):
+            return _FakeResponse()
+
+    class _FakeZipFile:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+        def extractall(self, path):
+            (Path(path) / "fake.shp").write_text("", encoding="utf-8")
+
+    monkeypatch.setattr("hhplab.msa.boundaries.httpx.Client", _FakeClient)
+    monkeypatch.setattr("hhplab.msa.boundaries.zipfile.ZipFile", _FakeZipFile)
+    monkeypatch.setattr("hhplab.msa.boundaries.gpd.read_file", lambda _path: source_gdf)
+
+    from hhplab.msa.boundaries import download_msa_boundaries
+
+    boundaries, _sha256, _size, _raw_path = download_msa_boundaries("census_msa_2023")
+
+    assert list(boundaries["cbsa_code"]) == ["17410"]
+    assert list(boundaries["msa_id"]) == ["17410"]
+    assert "cbsa_code_x" not in boundaries.columns
+    assert "cbsa_code_y" not in boundaries.columns
 
 
 def test_ingest_msa_boundaries_json(monkeypatch, tmp_path: Path):

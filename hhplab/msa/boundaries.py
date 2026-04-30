@@ -127,8 +127,7 @@ def download_msa_boundaries(
 
     merged = working.merge(
         expected[["msa_id", "cbsa_code", "msa_name", "area_type", "definition_version"]],
-        left_on="cbsa_code",
-        right_on="msa_id",
+        on="cbsa_code",
         how="inner",
         validate="one_to_one",
     )
