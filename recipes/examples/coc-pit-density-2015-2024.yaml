@@ -80,7 +80,7 @@ pipelines:
           dataset: pit
           to_geometry: { type: coc, vintage: 2025, source: hud_exchange }
           method: identity
-          measures: [coc_name, pit_total, pit_sheltered, pit_unsheltered]
+          measures: [pit_total, pit_sheltered, pit_unsheltered]
 
       - resample:
           dataset: acs_tract

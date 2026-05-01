@@ -1578,7 +1578,6 @@ class TestExecutor:
         pd.DataFrame({
             "coc_id": ["COC1", "COC2", "COC1", "COC2"],
             "year": [2020, 2020, 2021, 2021],
-            "coc_name": ["Test CoC 1", "Test CoC 2", "Test CoC 1", "Test CoC 2"],
             "pit_total": [10, 20, 11, 21],
             "pit_sheltered": [6, 12, 7, 13],
             "pit_unsheltered": [4, 8, 4, 8],
@@ -1587,12 +1586,7 @@ class TestExecutor:
         data = _recipe_with_pipeline()
         data["datasets"]["pit"]["path"] = "data/pit.parquet"
         data["datasets"]["acs"]["path"] = "data/acs.parquet"
-        data["pipelines"][0]["steps"][1]["resample"]["measures"] = [
-            "coc_name",
-            "pit_total",
-            "pit_sheltered",
-            "pit_unsheltered",
-        ]
+        data["pipelines"][0]["steps"][1]["resample"]["measures"] = ["pit_total", "pit_sheltered", "pit_unsheltered"]
 
         recipe = load_recipe(data)
         results = execute_recipe(recipe, project_root=tmp_path)

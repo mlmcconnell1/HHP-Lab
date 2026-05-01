@@ -291,6 +291,63 @@ def _add_recipe_coc_population_density(
     )
 
 
+def _add_recipe_coc_names(
+    panel: pd.DataFrame,
+    *,
+    project_root,
+) -> pd.DataFrame:
+    """Backfill CoC names from the curated boundary artifact."""
+    if panel.empty:
+        return panel
+    if "coc_id" not in panel.columns or "boundary_vintage_used" not in panel.columns:
+        return panel
+
+    from hhplab.geo.io import read_geoparquet
+    from hhplab.panel.assemble import _resolve_boundary_file
+
+    result = panel.copy()
+    boundary_vintages = sorted(
+        str(v) for v in result["boundary_vintage_used"].dropna().unique().tolist()
+    )
+    if not boundary_vintages:
+        return result
+
+    boundary_frames: list[pd.DataFrame] = []
+    for vintage in boundary_vintages:
+        boundary_path = _resolve_boundary_file(
+            vintage,
+            boundaries_dir=project_root / "data" / "curated" / "coc_boundaries",
+        )
+        if boundary_path is None:
+            continue
+        gdf = read_geoparquet(boundary_path)
+        if "coc_id" not in gdf.columns or "coc_name" not in gdf.columns:
+            continue
+        boundary_frames.append(pd.DataFrame({
+            "coc_id": gdf["coc_id"].astype(str),
+            "boundary_vintage_used": str(vintage),
+            "coc_name_boundary": gdf["coc_name"].astype(str),
+        }))
+
+    if not boundary_frames:
+        return result
+
+    name_lookup = pd.concat(boundary_frames, ignore_index=True).drop_duplicates(
+        subset=["coc_id", "boundary_vintage_used"],
+        keep="last",
+    )
+    result = result.merge(
+        name_lookup,
+        on=["coc_id", "boundary_vintage_used"],
+        how="left",
+    )
+    if "coc_name" in result.columns:
+        result["coc_name"] = result["coc_name"].fillna(result["coc_name_boundary"])
+    else:
+        result["coc_name"] = result["coc_name_boundary"]
+    return result.drop(columns=["coc_name_boundary"])
+
+
 def _resolve_single_product_value(
     *,
     values: set[str],
@@ -448,6 +505,10 @@ def assemble_panel(
             _echo(ctx, f"  [{applier.name}] {note}")
 
     if target_geo_type == "coc":
+        panel = _add_recipe_coc_names(
+            panel,
+            project_root=ctx.project_root,
+        )
         panel = _add_recipe_coc_population_density(
             panel,
             project_root=ctx.project_root,

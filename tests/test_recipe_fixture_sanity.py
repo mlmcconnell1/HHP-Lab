@@ -111,6 +111,7 @@ XWALK_ROWS: tuple[dict[str, object], ...] = (
 
 RECIPE_COC_PANEL_COLUMNS: tuple[str, ...] = (
     "coc_id",
+    "coc_name",
     "geo_type",
     "geo_id",
     "year",

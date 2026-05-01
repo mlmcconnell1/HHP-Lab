@@ -744,6 +744,7 @@ class TestCocPanelParity:
         panel = pd.read_parquet(_find_panel_output(tmp_path))
         expected = {
             "coc_id",
+            "coc_name",
             "geo_type",
             "geo_id",
             "year",
