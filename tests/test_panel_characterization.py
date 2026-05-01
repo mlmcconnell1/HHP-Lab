@@ -42,9 +42,11 @@ from __future__ import annotations
 
 import re
 
+import geopandas as gpd
 import numpy as np
 import pandas as pd
 import pytest
+from shapely.geometry import box
 
 pytestmark = pytest.mark.legacy_build_path
 
@@ -104,6 +106,13 @@ ZORI_INELIGIBLE_COCS = set(COC_IDS) - ZORI_ELIGIBLE_COCS
 # round-trip test doesn't produce a confusing failure.
 PARQUET_NORMALIZE_OK = {"rent_to_income", "zori_excluded_reason"}
 
+FIXTURE_COC_AREA_SQ_KM = {
+    "CO-500": 100.0,
+    "CA-600": 400.0,
+    "NY-501": 225.0,
+    "TX-500": 625.0,
+}
+
 
 # ============================================================================
 # Shared Fixtures
@@ -124,6 +133,8 @@ def panel_data_dirs(tmp_path):
     measures_dir.mkdir()
     rents_dir = tmp_path / "rents"
     rents_dir.mkdir()
+    boundaries_dir = tmp_path / "coc_boundaries"
+    boundaries_dir.mkdir()
 
     # --- PIT data ---
     for year in YEARS:
@@ -155,6 +166,21 @@ def panel_data_dirs(tmp_path):
             measures_dir / f"coc_measures__{boundary_year}__{acs_year}.parquet",
             index=False,
         )
+        side_lengths_m = {
+            coc_id: (FIXTURE_COC_AREA_SQ_KM[coc_id] * 1_000_000.0) ** 0.5
+            for coc_id in COC_IDS
+        }
+        gpd.GeoDataFrame(
+            {"coc_id": COC_IDS},
+            geometry=[
+                box(0, 0, side_lengths_m[coc_id], side_lengths_m[coc_id])
+                for coc_id in COC_IDS
+            ],
+            crs="ESRI:102003",
+        ).to_parquet(
+            boundaries_dir / f"coc__B{boundary_year}.parquet",
+            index=False,
+        )
 
     # --- ZORI yearly data ---
     zori_rows = []
@@ -182,6 +208,7 @@ def panel_data_dirs(tmp_path):
         "pit_dir": pit_dir,
         "measures_dir": measures_dir,
         "rents_dir": rents_dir,
+        "boundaries_dir": boundaries_dir,
         "zori_path": rents_dir / "coc_zori_yearly__test.parquet",
     }
 
@@ -235,6 +262,7 @@ STRICT_DTYPE_MAP = {
 # ACS numeric columns may be int64 or float64 depending on null presence.
 NUMERIC_COLUMNS = [
     "total_population",
+    "population_density_per_sq_km",
     "adult_population",
     "population_below_poverty",
     "median_household_income",
@@ -338,6 +366,12 @@ class TestPanelValueRanges:
     def test_monetary_column_positive(self, base_panel, col):
         """Monetary column is positive where present."""
         valid = base_panel[col].dropna()
+        if len(valid) > 0:
+            assert (valid > 0).all()
+
+    def test_population_density_positive(self, base_panel):
+        """Population density is positive where present."""
+        valid = base_panel["population_density_per_sq_km"].dropna()
         if len(valid) > 0:
             assert (valid > 0).all()
 

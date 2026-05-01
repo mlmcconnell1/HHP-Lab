@@ -16,8 +16,10 @@ Tests cover:
 
 from __future__ import annotations
 
+import geopandas as gpd
 import pandas as pd
 import pytest
+from shapely.geometry import box
 
 pytestmark = pytest.mark.legacy_build_path
 
@@ -405,6 +407,8 @@ class TestBuildPanel:
 
         measures_dir = tmp_path / "measures"
         measures_dir.mkdir()
+        boundaries_dir = tmp_path / "coc_boundaries"
+        boundaries_dir.mkdir()
 
         # Create PIT data for 2023 and 2024
         for year in [2023, 2024]:
@@ -442,7 +446,23 @@ class TestBuildPanel:
                 index=False,
             )
 
-        return {"pit_dir": pit_dir, "measures_dir": measures_dir}
+            gpd.GeoDataFrame(
+                {"coc_id": ["CO-500", "CA-600"]},
+                geometry=[
+                    box(0, 0, 10_000, 10_000),
+                    box(0, 0, 20_000, 20_000),
+                ],
+                crs="ESRI:102003",
+            ).to_parquet(
+                boundaries_dir / f"coc__B{boundary_year}.parquet",
+                index=False,
+            )
+
+        return {
+            "pit_dir": pit_dir,
+            "measures_dir": measures_dir,
+            "boundaries_dir": boundaries_dir,
+        }
 
     def test_build_single_year(self, data_dirs):
         """Test building panel for a single year."""
@@ -551,6 +571,29 @@ class TestBuildPanel:
 
         for col in PANEL_COLUMNS:
             assert col in result.columns, f"Missing column: {col}"
+
+    def test_build_computes_population_density_per_sq_km(self, data_dirs):
+        """Population density is derived from total population and CoC area."""
+        result = build_panel(
+            2024,
+            2024,
+            pit_dir=data_dirs["pit_dir"],
+            measures_dir=data_dirs["measures_dir"],
+        )
+
+        actual = dict(
+            zip(
+                result["coc_id"],
+                result["population_density_per_sq_km"],
+                strict=True,
+            )
+        )
+        assert actual == pytest.approx(
+            {
+                "CO-500": 500000 / 100.0,
+                "CA-600": 10000000 / 400.0,
+            }
+        )
 
     def test_build_sets_source_column(self, data_dirs):
         """Test that source column is set to hhplab_panel."""
@@ -729,6 +772,7 @@ class TestPanelColumns:
             "alignment_type",
             "weighting_method",
             "total_population",
+            "population_density_per_sq_km",
             "adult_population",
             "population_below_poverty",
             "median_household_income",

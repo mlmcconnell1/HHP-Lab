@@ -18,6 +18,7 @@ Panel Schema (Canonical Columns)
 - alignment_type: period_faithful, retrospective, or custom
 - weighting_method: "area" or "population"
 - total_population: From ACS measures
+- population_density_per_sq_km: total_population / CoC area in sq km
 - adult_population: From ACS measures (nullable)
 - population_below_poverty: From ACS measures (nullable)
 - median_household_income: From ACS measures (nullable)
@@ -90,6 +91,9 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
+ALBERS_EQUAL_AREA_CRS = "ESRI:102003"
+SQUARE_METERS_PER_SQUARE_KILOMETER = 1_000_000.0
+
 
 # Canonical panel columns in desired order
 PANEL_COLUMNS = [
@@ -104,6 +108,7 @@ PANEL_COLUMNS = [
     "alignment_type",
     "weighting_method",
     "total_population",
+    "population_density_per_sq_km",
     "adult_population",
     "population_below_poverty",
     "median_household_income",
@@ -905,6 +910,137 @@ def _load_zori_yearly(
     return df
 
 
+def _resolve_boundary_file(
+    boundary_vintage: str,
+    *,
+    boundaries_dir: Path | None = None,
+    measures_dir: Path | None = None,
+) -> Path | None:
+    """Resolve a CoC boundary GeoParquet for a boundary vintage."""
+    from hhplab.naming import boundary_filename, coc_base_filename
+
+    candidate_dirs: list[Path] = []
+    if boundaries_dir is not None:
+        candidate_dirs.append(Path(boundaries_dir))
+    if measures_dir is not None:
+        candidate_dirs.append(Path(measures_dir).parent / "coc_boundaries")
+    candidate_dirs.append(curated_dir("coc_boundaries"))
+
+    seen: set[Path] = set()
+    for directory in candidate_dirs:
+        directory = directory.resolve()
+        if directory in seen:
+            continue
+        seen.add(directory)
+        candidates = [
+            directory / coc_base_filename(boundary_vintage),
+            directory / boundary_filename(boundary_vintage),
+            directory / f"coc_boundaries__{boundary_vintage}.parquet",
+        ]
+        for candidate in candidates:
+            if candidate.exists():
+                return candidate
+    return None
+
+
+def _load_coc_areas(
+    boundary_vintage: str,
+    *,
+    boundaries_dir: Path | None = None,
+    measures_dir: Path | None = None,
+) -> pd.DataFrame:
+    """Return CoC areas in square kilometers for one boundary vintage."""
+    boundary_path = _resolve_boundary_file(
+        boundary_vintage,
+        boundaries_dir=boundaries_dir,
+        measures_dir=measures_dir,
+    )
+    if boundary_path is None:
+        logger.warning(
+            "No CoC boundary file found for vintage %s; population density will be null.",
+            boundary_vintage,
+        )
+        return pd.DataFrame(
+            columns=["coc_id", "boundary_vintage_used", "coc_area_sq_km"]
+        )
+
+    from hhplab.geo.io import read_geoparquet
+
+    gdf = read_geoparquet(boundary_path)
+    if "coc_id" not in gdf.columns or "geometry" not in gdf.columns:
+        logger.warning(
+            "Boundary file %s is missing required columns; population density will be null.",
+            boundary_path,
+        )
+        return pd.DataFrame(
+            columns=["coc_id", "boundary_vintage_used", "coc_area_sq_km"]
+        )
+
+    gdf = gdf[["coc_id", "geometry"]].copy().to_crs(ALBERS_EQUAL_AREA_CRS)
+    return pd.DataFrame(
+        {
+            "coc_id": gdf["coc_id"].astype(str),
+            "boundary_vintage_used": str(boundary_vintage),
+            "coc_area_sq_km": gdf.geometry.area / SQUARE_METERS_PER_SQUARE_KILOMETER,
+        }
+    )
+
+
+def _add_coc_population_density(
+    panel_df: pd.DataFrame,
+    *,
+    measures_dir: Path | None = None,
+    boundaries_dir: Path | None = None,
+) -> pd.DataFrame:
+    """Merge CoC area and derive population density in people per sq km."""
+    result = panel_df.copy()
+    density_col = "population_density_per_sq_km"
+    result[density_col] = np.nan
+
+    if result.empty:
+        return result
+    if "coc_id" not in result.columns or "boundary_vintage_used" not in result.columns:
+        return result
+    if "total_population" not in result.columns:
+        return result
+
+    boundary_vintages = sorted(
+        str(v) for v in result["boundary_vintage_used"].dropna().unique().tolist()
+    )
+    if not boundary_vintages:
+        return result
+
+    area_frames = [
+        _load_coc_areas(
+            vintage,
+            boundaries_dir=boundaries_dir,
+            measures_dir=measures_dir,
+        )
+        for vintage in boundary_vintages
+    ]
+    area_frames = [frame for frame in area_frames if not frame.empty]
+    if not area_frames:
+        return result
+
+    area_lookup = pd.concat(area_frames, ignore_index=True)
+
+    result = result.merge(
+        area_lookup,
+        on=["coc_id", "boundary_vintage_used"],
+        how="left",
+    )
+    valid_mask = (
+        result["total_population"].notna()
+        & result["coc_area_sq_km"].notna()
+        & (result["coc_area_sq_km"] > 0)
+    )
+    result.loc[valid_mask, density_col] = (
+        pd.to_numeric(result.loc[valid_mask, "total_population"], errors="coerce")
+        / pd.to_numeric(result.loc[valid_mask, "coc_area_sq_km"], errors="coerce")
+    )
+    return result.drop(columns=["coc_area_sq_km"])
+
+
 def _compute_rent_to_income(
     zori_coc: pd.Series,
     median_household_income: pd.Series,
@@ -972,6 +1108,7 @@ def build_panel(
     zori_yearly_path: Path | str | None = None,
     rents_dir: Path | None = None,
     zori_min_coverage: float = DEFAULT_ZORI_MIN_COVERAGE,
+    boundaries_dir: Path | None = None,
     *,
     geo_type: str = GEO_TYPE_COC,
     definition_version: str | None = None,
@@ -1029,6 +1166,11 @@ def build_panel(
     laus_dir : Path, optional
         Directory containing curated LAUS metro artifacts.
         Defaults to 'data/curated/laus'.
+    boundaries_dir : Path, optional
+        Directory containing curated CoC boundary GeoParquet files.
+        When omitted, the builder first looks for a sibling
+        ``coc_boundaries/`` directory next to ``measures_dir`` and then
+        falls back to the configured curated asset store.
 
     Returns
     -------
@@ -1262,6 +1404,13 @@ def build_panel(
 
     # Sort by geography and year for vintage change detection
     panel_df = panel_df.sort_values([geo_col, "year"]).reset_index(drop=True)
+
+    if geo_type == GEO_TYPE_COC:
+        panel_df = _add_coc_population_density(
+            panel_df,
+            measures_dir=measures_dir,
+            boundaries_dir=boundaries_dir,
+        )
 
     # Detect geometry-definition changes over time
     vintage_col = (

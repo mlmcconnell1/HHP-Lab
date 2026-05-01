@@ -39,6 +39,7 @@ COC_PANEL_COLUMNS: list[str] = [
     "alignment_type",
     "weighting_method",
     "total_population",
+    "population_density_per_sq_km",
     "adult_population",
     "population_below_poverty",
     "median_household_income",
