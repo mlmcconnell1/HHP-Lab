@@ -751,6 +751,7 @@ class TestCocPanelParity:
             "boundary_vintage_used",
             "acs5_vintage_used",
             "total_population",
+            "population_density_per_sq_km",
             "median_household_income",
             "boundary_changed",
             "source",

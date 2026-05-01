@@ -121,6 +121,7 @@ RECIPE_COC_PANEL_COLUMNS: tuple[str, ...] = (
     "acs5_vintage_used",
     "tract_vintage_used",
     "total_population",
+    "population_density_per_sq_km",
     "median_household_income",
     "boundary_changed",
     "source",

@@ -151,6 +151,7 @@ _ALIAS_REVERSE: dict[str, str] = {v: k for k, v in RECIPE_COLUMN_ALIASES.items()
 _PANEL_DTYPE_SPEC: dict[str, str | type] = {
     # Geo identifiers
     "coc_id": "str",
+    "coc_name": "str",
     "metro_id": "str",
     "msa_id": "str",
     "geo_id": "str",

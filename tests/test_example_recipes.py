@@ -39,6 +39,14 @@ EXAMPLE_RECIPE_CASES: tuple[ExampleRecipeCase, ...] = (
         datasets=("pit", "pep_county", "acs_tract", "zori_county"),
     ),
     ExampleRecipeCase(
+        path="coc-pit-density-2015-2024.yaml",
+        pipeline_id="build_coc_panel",
+        recipe_name="coc_pit_density_2015_2024",
+        target_type="coc",
+        years=(2015, 2016, 2017, 2018, 2019, 2020, 2021, 2022, 2023, 2024),
+        datasets=("pit", "acs_tract"),
+    ),
+    ExampleRecipeCase(
         path="coc-pep-zori-calendar-2020-2024.yaml",
         pipeline_id="build_coc_panel",
         recipe_name="coc_pep_zori_calendar_2020_2024",
@@ -95,6 +103,17 @@ AUTO_TRANSFORM_EXPECTATIONS: tuple[tuple[str, str, str, dict[int, str]], ...] = 
         "build_coc_panel",
         "acs_tract",
         {2016: "tract_to_coc_2010", 2020: "tract_to_coc_2010", 2021: "tract_to_coc_2020"},
+    ),
+    (
+        "coc-pit-density-2015-2024.yaml",
+        "build_coc_panel",
+        "acs_tract",
+        {
+            2015: "tract_to_coc_2010",
+            2020: "tract_to_coc_2010",
+            2021: "tract_to_coc_2020",
+            2024: "tract_to_coc_2020",
+        },
     ),
     (
         "metro-glynnfox-acs-income-2019-2025.yaml",

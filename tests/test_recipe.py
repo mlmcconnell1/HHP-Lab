@@ -13,6 +13,7 @@ from typer.testing import CliRunner
 
 from hhplab.cli.main import app
 from hhplab.geo.ct_planning_regions import CtPlanningRegionCrosswalk
+from hhplab.panel.assemble import _load_coc_areas
 from hhplab.provenance import ProvenanceBlock, write_parquet_with_provenance
 from hhplab.recipe.adapters import (
     DatasetAdapterRegistry,
@@ -1569,6 +1570,60 @@ class TestExecutor:
         recipe = load_recipe(data)
         results = execute_recipe(recipe, project_root=tmp_path)
         assert len(results[0].steps) == 8
+
+    def test_execute_recipe_coc_panel_preserves_name_and_derives_density(
+        self, tmp_path: Path,
+    ):
+        _setup_pipeline_fixtures(tmp_path)
+        pd.DataFrame({
+            "coc_id": ["COC1", "COC2", "COC1", "COC2"],
+            "year": [2020, 2020, 2021, 2021],
+            "coc_name": ["Test CoC 1", "Test CoC 2", "Test CoC 1", "Test CoC 2"],
+            "pit_total": [10, 20, 11, 21],
+            "pit_sheltered": [6, 12, 7, 13],
+            "pit_unsheltered": [4, 8, 4, 8],
+        }).to_parquet(tmp_path / "data" / "pit.parquet")
+
+        data = _recipe_with_pipeline()
+        data["datasets"]["pit"]["path"] = "data/pit.parquet"
+        data["datasets"]["acs"]["path"] = "data/acs.parquet"
+        data["pipelines"][0]["steps"][1]["resample"]["measures"] = [
+            "coc_name",
+            "pit_total",
+            "pit_sheltered",
+            "pit_unsheltered",
+        ]
+
+        recipe = load_recipe(data)
+        results = execute_recipe(recipe, project_root=tmp_path)
+        assert results[0].success
+
+        panel_path = (
+            _default_recipe_output_dir(tmp_path, "executor-test")
+            / "panel__Y2020-2021@B2025.parquet"
+        )
+        panel = pd.read_parquet(panel_path).sort_values(["geo_id", "year"]).reset_index(drop=True)
+        areas = (
+            _load_coc_areas("2025", boundaries_dir=tmp_path / "data" / "curated" / "coc_boundaries")
+            .set_index("coc_id")["coc_area_sq_km"]
+            .to_dict()
+        )
+
+        assert list(panel["coc_name"]) == [
+            "Test CoC 1",
+            "Test CoC 1",
+            "Test CoC 2",
+            "Test CoC 2",
+        ]
+        assert list(panel["pit_sheltered"]) == [6, 7, 12, 13]
+        assert list(panel["pit_unsheltered"]) == [4, 4, 8, 8]
+        expected_density = [
+            100.0 / areas["COC1"],
+            110.0 / areas["COC1"],
+            200.0 / areas["COC2"],
+            210.0 / areas["COC2"],
+        ]
+        assert list(panel["population_density_per_sq_km"]) == pytest.approx(expected_density)
 
     def test_execute_recipe_rejects_stale_translated_acs_cache(self, tmp_path: Path):
         _setup_pipeline_fixtures(tmp_path)

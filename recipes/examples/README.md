@@ -31,6 +31,9 @@ the output downstream.
 - `coc-base-pit-acs-zori-2016-2021.yaml`
   National CoC base panel for downstream top-N slicing. Includes PIT, PEP,
   lagged ACS5 demographics, and January ZORI.
+- `coc-pit-density-2015-2024.yaml`
+  National CoC PIT panel with CoC names plus density derived from lagged ACS5
+  total population and curated CoC boundaries.
 - `coc-pep-zori-calendar-2020-2024.yaml`
   County-driven CoC panel using PEP population plus calendar-mean ZORI.
 - `metro-glynnfox-acs-income-2019-2025.yaml`

@@ -170,6 +170,7 @@ class AssembledPanel:
 
 _RECIPE_COC_COLUMN_ORDER: list[str] = [
     "coc_id",
+    "coc_name",
     "geo_type",
     "geo_id",
     "year",
@@ -182,6 +183,7 @@ _RECIPE_COC_COLUMN_ORDER: list[str] = [
     "alignment_type",
     "weighting_method",
     "total_population",
+    "population_density_per_sq_km",
     "adult_population",
     "population_below_poverty",
     "median_household_income",
@@ -270,6 +272,23 @@ def _recipe_column_order(
             if col not in columns:
                 columns.append(col)
     return columns
+
+
+def _add_recipe_coc_population_density(
+    panel: pd.DataFrame,
+    *,
+    project_root,
+) -> pd.DataFrame:
+    """Derive CoC population density for recipe-built panels."""
+    if panel.empty:
+        return panel
+
+    from hhplab.panel.assemble import _add_coc_population_density
+
+    return _add_coc_population_density(
+        panel,
+        boundaries_dir=project_root / "data" / "curated" / "coc_boundaries",
+    )
 
 
 def _resolve_single_product_value(
@@ -427,6 +446,12 @@ def assemble_panel(
         policy_artifacts[applier.name] = application
         for note in application.notes:
             _echo(ctx, f"  [{applier.name}] {note}")
+
+    if target_geo_type == "coc":
+        panel = _add_recipe_coc_population_density(
+            panel,
+            project_root=ctx.project_root,
+        )
 
     # Shared finalization: boundary detection, column ordering, dtypes,
     # source labeling, and column aliases.
