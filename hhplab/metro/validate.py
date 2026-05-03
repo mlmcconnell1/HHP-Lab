@@ -12,8 +12,10 @@ import re
 import pandas as pd
 
 from hhplab.metro.definitions import (
+    CANONICAL_UNIVERSE_DEFINITION_VERSION,
     DEFINITION_VERSION,
     METRO_COUNT,
+    PROFILE_NAME,
 )
 
 
@@ -211,6 +213,188 @@ def validate_metro_artifacts(
             errors.append(
                 f"county_membership: {dups} duplicate "
                 f"(metro_id, county_fips) pair(s)"
+            )
+
+    return MetroValidationResult(
+        passed=len(errors) == 0,
+        errors=errors,
+        warnings=warnings,
+    )
+
+
+def validate_metro_universe_artifacts(
+    universe_df: pd.DataFrame,
+    subset_profile_df: pd.DataFrame,
+) -> MetroValidationResult:
+    """Validate canonical metro-universe and subset-profile artifacts."""
+    errors: list[str] = []
+    warnings: list[str] = []
+
+    def _check_cols(df: pd.DataFrame, name: str, required: list[str]) -> None:
+        missing = [c for c in required if c not in df.columns]
+        if missing:
+            errors.append(f"{name}: missing columns {missing}")
+
+    _check_cols(
+        universe_df,
+        "metro_universe",
+        [
+            "metro_id",
+            "cbsa_code",
+            "metro_name",
+            "area_type",
+            "definition_version",
+            "source_definition_version",
+            "source",
+            "source_ref",
+        ],
+    )
+    _check_cols(
+        subset_profile_df,
+        "metro_subset_profile",
+        [
+            "profile",
+            "profile_definition_version",
+            "metro_definition_version",
+            "metro_id",
+            "cbsa_code",
+            "metro_name",
+            "profile_metro_id",
+            "profile_metro_name",
+            "profile_rank",
+            "source",
+            "source_ref",
+        ],
+    )
+
+    code_pattern = re.compile(r"^\d{5}$")
+    gf_pattern = re.compile(r"^GF\d{2}$")
+
+    if {"metro_id", "cbsa_code"} <= set(universe_df.columns):
+        bad_metro_ids = [
+            value
+            for value in universe_df["metro_id"].unique()
+            if not code_pattern.match(str(value))
+        ]
+        if bad_metro_ids:
+            errors.append(
+                "metro_universe: invalid metro_id format "
+                f"(expected 5-digit CBSA code): {bad_metro_ids[:5]}"
+            )
+        mismatched = universe_df[
+            universe_df["metro_id"].astype(str)
+            != universe_df["cbsa_code"].astype(str)
+        ]
+        if not mismatched.empty:
+            errors.append(
+                "metro_universe: metro_id must equal cbsa_code for the canonical "
+                "metro-universe contract"
+            )
+
+    if "definition_version" in universe_df.columns:
+        versions = universe_df["definition_version"].unique()
+        if (
+            len(versions) != 1
+            or versions[0] != CANONICAL_UNIVERSE_DEFINITION_VERSION
+        ):
+            errors.append(
+                "metro_universe: definition_version mismatch; expected "
+                f"'{CANONICAL_UNIVERSE_DEFINITION_VERSION}', found {list(versions)}"
+            )
+
+    if {"metro_id", "cbsa_code"} <= set(subset_profile_df.columns):
+        bad_subset_ids = [
+            value
+            for value in subset_profile_df["metro_id"].unique()
+            if not code_pattern.match(str(value))
+        ]
+        if bad_subset_ids:
+            errors.append(
+                "metro_subset_profile: invalid metro_id format "
+                f"(expected 5-digit CBSA code): {bad_subset_ids[:5]}"
+            )
+        mismatched = subset_profile_df[
+            subset_profile_df["metro_id"].astype(str)
+            != subset_profile_df["cbsa_code"].astype(str)
+        ]
+        if not mismatched.empty:
+            errors.append(
+                "metro_subset_profile: metro_id must equal cbsa_code for "
+                "canonical-universe references"
+            )
+
+    if "profile_metro_id" in subset_profile_df.columns:
+        bad_profile_ids = [
+            value
+            for value in subset_profile_df["profile_metro_id"].unique()
+            if not gf_pattern.match(str(value))
+        ]
+        if bad_profile_ids:
+            errors.append(
+                "metro_subset_profile: invalid profile_metro_id format "
+                f"(expected GFnn): {bad_profile_ids[:5]}"
+            )
+
+    if "profile" in subset_profile_df.columns:
+        profiles = subset_profile_df["profile"].unique()
+        if len(profiles) != 1 or profiles[0] != PROFILE_NAME:
+            errors.append(
+                f"metro_subset_profile: expected profile '{PROFILE_NAME}', "
+                f"found {list(profiles)}"
+            )
+
+    if "profile_definition_version" in subset_profile_df.columns:
+        versions = subset_profile_df["profile_definition_version"].unique()
+        if len(versions) != 1 or versions[0] != DEFINITION_VERSION:
+            errors.append(
+                "metro_subset_profile: profile_definition_version mismatch; "
+                f"expected '{DEFINITION_VERSION}', found {list(versions)}"
+            )
+
+    if "metro_definition_version" in subset_profile_df.columns:
+        versions = subset_profile_df["metro_definition_version"].unique()
+        if (
+            len(versions) != 1
+            or versions[0] != CANONICAL_UNIVERSE_DEFINITION_VERSION
+        ):
+            errors.append(
+                "metro_subset_profile: metro_definition_version mismatch; "
+                f"expected '{CANONICAL_UNIVERSE_DEFINITION_VERSION}', "
+                f"found {list(versions)}"
+            )
+
+    if "metro_id" in universe_df.columns and "metro_id" in subset_profile_df.columns:
+        universe_ids = set(universe_df["metro_id"].astype(str).unique())
+        subset_ids = set(subset_profile_df["metro_id"].astype(str).unique())
+        missing = sorted(subset_ids - universe_ids)
+        if missing:
+            errors.append(
+                "metro_subset_profile: metro_ids not in canonical metro universe: "
+                f"{missing[:5]}"
+            )
+
+    if "profile_rank" in subset_profile_df.columns:
+        ranks = sorted(int(value) for value in subset_profile_df["profile_rank"].tolist())
+        expected = list(range(1, METRO_COUNT + 1))
+        if ranks != expected:
+            errors.append(
+                "metro_subset_profile: expected profile_rank values "
+                f"{expected[0]}..{expected[-1]}, found {ranks[:5]}..."
+            )
+
+    if "metro_id" in universe_df.columns:
+        dups = universe_df["metro_id"].duplicated().sum()
+        if dups:
+            errors.append(f"metro_universe: {dups} duplicate metro_id(s)")
+
+    if {"profile_metro_id", "metro_id"} <= set(subset_profile_df.columns):
+        dups = subset_profile_df.duplicated(
+            subset=["profile_metro_id", "metro_id"]
+        ).sum()
+        if dups:
+            errors.append(
+                "metro_subset_profile: duplicate "
+                f"(profile_metro_id, metro_id) pair(s): {dups}"
             )
 
     return MetroValidationResult(

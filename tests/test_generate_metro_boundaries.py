@@ -1,4 +1,4 @@
-"""Tests for `hhplab generate metro-boundaries` and `hhplab validate metro`."""
+"""Tests for metro generation and validation CLIs."""
 
 from __future__ import annotations
 
@@ -94,4 +94,78 @@ def test_validate_metro_json(monkeypatch, tmp_path: Path):
     assert payload["status"] == "ok"
     assert payload["definition_version"] == "glynn_fox_v1"
     assert payload["county_vintage"] == 2025
+    assert payload["errors"] == []
+
+
+def test_generate_metro_universe_json(monkeypatch, tmp_path: Path):
+    monkeypatch.chdir(tmp_path)
+
+    def fake_write(
+        metro_definition_version: str,
+        profile_definition_version: str,
+    ):
+        universe = (
+            tmp_path
+            / "data"
+            / "curated"
+            / "metro"
+            / "metro_universe__census_msa_2023.parquet"
+        )
+        subset = (
+            tmp_path
+            / "data"
+            / "curated"
+            / "metro"
+            / "metro_subset_membership__glynn_fox_v1xMcensus_msa_2023.parquet"
+        )
+        universe.parent.mkdir(parents=True, exist_ok=True)
+        universe.write_text(metro_definition_version)
+        subset.write_text(profile_definition_version)
+        return universe, subset
+
+    monkeypatch.setattr(
+        "hhplab.metro.io.write_metro_universe_artifacts",
+        fake_write,
+    )
+
+    result = runner.invoke(
+        app,
+        ["generate", "metro-universe", "--json"],
+        catch_exceptions=False,
+    )
+
+    assert result.exit_code == 0
+    payload = json.loads(result.stdout)
+    assert payload["status"] == "ok"
+    assert payload["definition_version"] == "census_msa_2023"
+    assert payload["profile_definition_version"] == "glynn_fox_v1"
+    assert payload["artifacts"]["metro_universe"].endswith(
+        "metro_universe__census_msa_2023.parquet"
+    )
+
+
+def test_validate_metro_universe_json(monkeypatch, tmp_path: Path):
+    monkeypatch.chdir(tmp_path)
+    from hhplab.metro.validate import MetroValidationResult
+
+    monkeypatch.setattr(
+        "hhplab.metro.io.validate_curated_metro_universe",
+        lambda metro_definition_version, profile_definition_version: MetroValidationResult(
+            passed=True,
+            errors=[],
+            warnings=[],
+        ),
+    )
+
+    result = runner.invoke(
+        app,
+        ["validate", "metro-universe", "--json"],
+        catch_exceptions=False,
+    )
+
+    assert result.exit_code == 0
+    payload = json.loads(result.stdout)
+    assert payload["status"] == "ok"
+    assert payload["definition_version"] == "census_msa_2023"
+    assert payload["profile_definition_version"] == "glynn_fox_v1"
     assert payload["errors"] == []

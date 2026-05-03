@@ -104,6 +104,8 @@ CANONICAL_PATTERNS: dict[str, list[re.Pattern[str]]] = {
         re.compile(r"^metro_definitions__\w+\.parquet$"),
         re.compile(r"^metro_coc_membership__\w+\.parquet$"),
         re.compile(r"^metro_county_membership__\w+\.parquet$"),
+        re.compile(r"^metro_universe__\w+\.parquet$"),
+        re.compile(r"^metro_subset_membership__\w+xM\w+\.parquet$"),
         re.compile(r"^metro_boundaries__\w+xC\d{4}\.parquet$"),
     ],
     "msa": [

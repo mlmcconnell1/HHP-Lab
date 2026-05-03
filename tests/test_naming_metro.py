@@ -10,6 +10,10 @@ from hhplab.naming import (
     metro_coc_membership_filename,
     metro_county_membership_filename,
     metro_definitions_filename,
+    metro_subset_membership_filename,
+    metro_subset_membership_path,
+    metro_universe_filename,
+    metro_universe_path,
     metro_measures_filename,
     metro_panel_filename,
     metro_pep_filename,
@@ -87,9 +91,34 @@ class TestMetroDefinitionFilenames:
             == "metro_boundaries__glynn_fox_v1xC2025.parquet"
         )
 
+    def test_universe(self):
+        assert (
+            metro_universe_filename("census_msa_2023")
+            == "metro_universe__census_msa_2023.parquet"
+        )
+
+    def test_subset_membership(self):
+        assert (
+            metro_subset_membership_filename("glynn_fox_v1", "census_msa_2023")
+            == "metro_subset_membership__glynn_fox_v1xMcensus_msa_2023.parquet"
+        )
+
     def test_boundaries_path(self):
         assert str(metro_boundaries_path("glynn_fox_v1", 2025)).endswith(
             "data/curated/metro/metro_boundaries__glynn_fox_v1xC2025.parquet"
+        )
+
+    def test_universe_path(self):
+        assert str(metro_universe_path("census_msa_2023")).endswith(
+            "data/curated/metro/metro_universe__census_msa_2023.parquet"
+        )
+
+    def test_subset_membership_path(self):
+        assert str(
+            metro_subset_membership_path("glynn_fox_v1", "census_msa_2023")
+        ).endswith(
+            "data/curated/metro/"
+            "metro_subset_membership__glynn_fox_v1xMcensus_msa_2023.parquet"
         )
 
 

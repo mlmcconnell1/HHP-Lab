@@ -27,12 +27,20 @@ from __future__ import annotations
 
 import pandas as pd
 
+from hhplab.msa.definitions import DEFINITION_VERSION as MSA_DEFINITION_VERSION
+
 # ---------------------------------------------------------------------------
 # Constants
 # ---------------------------------------------------------------------------
 
 #: Version identifier for this definition set.
 DEFINITION_VERSION: str = "glynn_fox_v1"
+
+#: Canonical metro-universe definition version used for full CBSA/MSA coverage.
+CANONICAL_UNIVERSE_DEFINITION_VERSION: str = MSA_DEFINITION_VERSION
+
+#: Stable profile identifier for the Glynn/Fox subset over the canonical universe.
+PROFILE_NAME: str = "glynn_fox"
 
 #: Total number of metros in the definition.
 METRO_COUNT: int = 25
@@ -352,6 +360,115 @@ def build_cbsa_mapping_df() -> pd.DataFrame:
     df["metro_id"] = df["metro_id"].astype(str)
     df["cbsa_code"] = df["cbsa_code"].astype(str)
     return df
+
+
+def build_metro_universe_df(msa_definitions_df: pd.DataFrame) -> pd.DataFrame:
+    """Build the canonical metro-universe table from curated MSA definitions."""
+    required = {
+        "msa_id",
+        "cbsa_code",
+        "msa_name",
+        "area_type",
+        "definition_version",
+        "source",
+        "source_ref",
+    }
+    missing = sorted(required - set(msa_definitions_df.columns))
+    if missing:
+        raise ValueError(
+            "MSA definitions are missing required columns for metro-universe "
+            f"construction: {missing}"
+        )
+
+    universe = (
+        msa_definitions_df[
+            [
+                "msa_id",
+                "cbsa_code",
+                "msa_name",
+                "area_type",
+                "definition_version",
+                "source",
+                "source_ref",
+            ]
+        ]
+        .drop_duplicates()
+        .rename(
+            columns={
+                "msa_id": "metro_id",
+                "msa_name": "metro_name",
+                "definition_version": "source_definition_version",
+            }
+        )
+        .sort_values("metro_id")
+        .reset_index(drop=True)
+    )
+    universe["metro_id"] = universe["metro_id"].astype(str).str.zfill(5)
+    universe["cbsa_code"] = universe["cbsa_code"].astype(str).str.zfill(5)
+    universe["definition_version"] = CANONICAL_UNIVERSE_DEFINITION_VERSION
+    return universe[
+        [
+            "metro_id",
+            "cbsa_code",
+            "metro_name",
+            "area_type",
+            "definition_version",
+            "source_definition_version",
+            "source",
+            "source_ref",
+        ]
+    ]
+
+
+def build_glynn_fox_subset_profile_df(msa_definitions_df: pd.DataFrame) -> pd.DataFrame:
+    """Build the Glynn/Fox subset-profile table over the canonical universe."""
+    universe = build_metro_universe_df(msa_definitions_df)
+    universe_lookup = (
+        universe[
+            [
+                "metro_id",
+                "cbsa_code",
+                "metro_name",
+                "definition_version",
+            ]
+        ]
+        .drop_duplicates(subset=["metro_id"])
+        .set_index("metro_id")
+    )
+
+    rows: list[dict[str, object]] = []
+    for rank, (profile_metro_id, profile_metro_name, _membership_type) in enumerate(
+        METRO_DEFINITIONS,
+        start=1,
+    ):
+        cbsa_code = METRO_CBSA_MAPPING[profile_metro_id]
+        if cbsa_code not in universe_lookup.index:
+            raise ValueError(
+                "Canonical metro universe does not contain required CBSA code "
+                f"{cbsa_code} for profile metro {profile_metro_id}."
+            )
+        canonical = universe_lookup.loc[cbsa_code]
+        rows.append(
+            {
+                "profile": PROFILE_NAME,
+                "profile_definition_version": DEFINITION_VERSION,
+                "metro_definition_version": canonical["definition_version"],
+                "metro_id": cbsa_code,
+                "cbsa_code": canonical["cbsa_code"],
+                "metro_name": canonical["metro_name"],
+                "profile_metro_id": profile_metro_id,
+                "profile_metro_name": profile_metro_name,
+                "profile_rank": rank,
+                "source": "glynn_fox_2019",
+                "source_ref": SOURCE_REF,
+            }
+        )
+
+    profile_df = pd.DataFrame(rows).sort_values("profile_rank").reset_index(drop=True)
+    profile_df["metro_id"] = profile_df["metro_id"].astype(str).str.zfill(5)
+    profile_df["cbsa_code"] = profile_df["cbsa_code"].astype(str).str.zfill(5)
+    profile_df["profile_metro_id"] = profile_df["profile_metro_id"].astype(str)
+    return profile_df
 
 
 def cbsa_to_metro_id(cbsa_code: str) -> str | None:

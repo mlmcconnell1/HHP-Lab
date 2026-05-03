@@ -1037,6 +1037,22 @@ def metro_county_membership_filename(definition_version: str) -> str:
     return f"metro_county_membership__{definition_version}.parquet"
 
 
+def metro_universe_filename(definition_version: str) -> str:
+    """Filename for canonical metro-universe definitions."""
+    return f"metro_universe__{definition_version}.parquet"
+
+
+def metro_subset_membership_filename(
+    profile_definition_version: str,
+    metro_definition_version: str,
+) -> str:
+    """Filename for a subset-profile over the canonical metro universe."""
+    return (
+        "metro_subset_membership__"
+        f"{profile_definition_version}xM{metro_definition_version}.parquet"
+    )
+
+
 def metro_boundaries_filename(
     definition_version: str,
     county_vintage: str | int,
@@ -1129,6 +1145,40 @@ def metro_boundaries_path(
     return (
         base_dir / "curated" / "metro"
         / metro_boundaries_filename(definition_version, county_vintage)
+    )
+
+
+def metro_universe_path(
+    definition_version: str,
+    base_dir: Path | str | None = None,
+) -> Path:
+    """Canonical path for the metro-universe file."""
+    if base_dir is None:
+        base_dir = Path("data")
+    else:
+        base_dir = Path(base_dir)
+    return (
+        base_dir / "curated" / "metro"
+        / metro_universe_filename(definition_version)
+    )
+
+
+def metro_subset_membership_path(
+    profile_definition_version: str,
+    metro_definition_version: str,
+    base_dir: Path | str | None = None,
+) -> Path:
+    """Canonical path for the metro subset-profile file."""
+    if base_dir is None:
+        base_dir = Path("data")
+    else:
+        base_dir = Path(base_dir)
+    return (
+        base_dir / "curated" / "metro"
+        / metro_subset_membership_filename(
+            profile_definition_version,
+            metro_definition_version,
+        )
     )
 
 

@@ -19,6 +19,7 @@ from hhplab.cli.crosscheck_pit_vintages import validate_pit_vintages
 from hhplab.cli.crosscheck_population import validate_population
 from hhplab.cli.diagnostics import diagnostics
 from hhplab.cli.generate_metro import generate_metro
+from hhplab.cli.generate_metro import generate_metro_universe
 from hhplab.cli.generate_metro_boundaries import generate_metro_boundaries
 from hhplab.cli.generate_msa import generate_msa
 from hhplab.cli.generate_msa_xwalk import generate_msa_xwalk
@@ -50,6 +51,7 @@ from hhplab.cli.show_measures import show_measures
 from hhplab.cli.status import status_cmd
 from hhplab.cli.validate_curated import validate_curated_layout_cmd
 from hhplab.cli.validate_metro import validate_metro
+from hhplab.cli.validate_metro import validate_metro_universe
 from hhplab.cli.validate_msa import validate_msa
 from hhplab.cli.zori import (
     ingest_zori,
@@ -701,6 +703,7 @@ list_app.command("measures")(list_measures)
 list_app.command("xwalks")(list_xwalks)
 validate_app.command("boundaries")(validate_boundaries)
 validate_app.command("metro")(validate_metro)
+validate_app.command("metro-universe")(validate_metro_universe)
 validate_app.command("msa")(validate_msa)
 validate_app.command("pit-vintages")(validate_pit_vintages)
 validate_app.command("population")(validate_population)
@@ -710,6 +713,7 @@ diagnostics_app.command("xwalk")(diagnostics)
 diagnostics_app.command("zori")(zori_diagnostics)
 generate_app.command("xwalks")(build_xwalks)
 generate_app.command("metro")(generate_metro)
+generate_app.command("metro-universe")(generate_metro_universe)
 generate_app.command("metro-boundaries")(generate_metro_boundaries)
 generate_app.command("msa")(generate_msa)
 generate_app.command("msa-xwalk")(generate_msa_xwalk)
