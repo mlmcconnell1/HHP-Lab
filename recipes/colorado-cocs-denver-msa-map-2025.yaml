@@ -1,0 +1,49 @@
+version: 1
+name: colorado_cocs_denver_msa_map_2025
+description: >
+  Render all Colorado CoC boundaries with the Denver-Aurora-Centennial, CO
+  Census MSA boundary overlaid as a single recipe-native HTML map artifact.
+
+universe:
+  years: [2025]
+
+targets:
+  - id: colorado_overlay_map
+    geometry: { type: coc, vintage: 2025, source: hud_exchange }
+    outputs: [map]
+    map_spec:
+      basemap: cartodbpositron
+      viewport:
+        fit_layers: true
+        padding: 30
+      layers:
+        - geometry: { type: coc, vintage: 2025, source: hud_exchange }
+          selector_ids: [CO-500, CO-503, CO-504, CO-505]
+          label: Colorado CoCs
+          tooltip_fields: [coc_id, coc_name, state_abbrev]
+          style_mode: distinct
+          style:
+            fill_color: "#8ecae6"
+            stroke_color: "#1d3557"
+            fill_opacity: 0.24
+            stroke_opacity: 0.9
+            line_weight: 1.4
+            z_order: 0
+        - geometry: { type: msa, vintage: 2023, source: census_msa_2023 }
+          selector_ids: ["19740"]
+          label: Denver MSA
+          tooltip_fields: [msa_id, msa_name, cbsa_code, definition_version]
+          style:
+            fill_color: "#ffb703"
+            stroke_color: "#9b2226"
+            fill_opacity: 0.12
+            stroke_opacity: 1.0
+            line_weight: 3.0
+            z_order: 1
+
+datasets: {}
+
+pipelines:
+  - id: colorado_overlay_map_pipeline
+    target: colorado_overlay_map
+    steps: []
