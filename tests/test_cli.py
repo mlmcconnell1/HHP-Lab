@@ -437,16 +437,13 @@ class TestRetiredCommandRegression:
         assert result.exit_code == 2  # Typer returns 2 for unknown commands
 
     def test_aggregate_no_build_create_guidance(self):
-        """Aggregate error messages must not reference deleted build create."""
-        with runner.isolated_filesystem():
-            result = runner.invoke(
-                app, ["aggregate", "pit", "--build", "nonexistent"]
-            )
-            assert result.exit_code == 2
-            assert "hhplab build create" not in result.output
+        """Aggregate CLI should reject the retired --build option outright."""
+        result = runner.invoke(app, ["aggregate", "pit", "--build", "nonexistent"])
+        assert result.exit_code != 0
+        assert "No such option: --build" in result.output
 
     def test_aggregate_works_without_build(self):
-        """Aggregate commands should require --years when --build is omitted."""
+        """Aggregate commands should require explicit years."""
         result = runner.invoke(app, ["aggregate", "pit"])
         assert result.exit_code == 2
         assert "--years is required" in result.output

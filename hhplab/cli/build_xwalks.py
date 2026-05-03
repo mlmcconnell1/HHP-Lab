@@ -7,7 +7,6 @@ import click
 import geopandas as gpd
 import typer
 
-from hhplab.builds import build_curated_dir, require_build_dir, resolve_build_dir
 from hhplab.measures.diagnostics import compute_crosswalk_diagnostics, summarize_diagnostics
 from hhplab.paths import curated_dir
 from hhplab.registry.registry import latest_vintage, list_boundaries
@@ -57,13 +56,6 @@ def build_xwalks(
             help="Which crosswalks to build: 'tracts', 'counties', or 'all'.",
         ),
     ] = "all",
-    build: Annotated[
-        str | None,
-        typer.Option(
-            "--build",
-            help="Named build directory for outputs. If omitted, writes to data/curated/xwalks/.",
-        ),
-    ] = None,
     force: Annotated[
         bool,
         typer.Option(
@@ -110,29 +102,14 @@ def build_xwalks(
         # Build only tract crosswalk
         hhplab generate xwalks --boundary 2025 --type tracts --tracts 2023
 
-        # Build crosswalks inside a named build directory
-        hhplab generate xwalks --build demo --boundary 2025 --tracts 2023
+        # Write crosswalks to the curated xwalk store
+        hhplab generate xwalks --boundary 2025 --tracts 2023
     """
     # Determine what to build
     build_tracts = xwalk_type in ("tracts", "all")
     build_counties = xwalk_type in ("counties", "all")
 
-    # Resolve output directory: build-local if --build given, else standard curated
-    if build is not None:
-        try:
-            build_dir = require_build_dir(build)
-        except FileNotFoundError as exc:
-            build_path = resolve_build_dir(build)
-            typer.echo(f"Error: Build '{build}' not found at {build_path}", err=True)
-            typer.echo(
-                "Create the directory manually or omit --build to write to data/curated/xwalks/.",
-                err=True,
-            )
-            raise typer.Exit(2) from exc
-        build_curated = build_curated_dir(build_dir)
-        output_dir = build_curated / "xwalks"
-    else:
-        output_dir = curated_dir("xwalks")
+    output_dir = curated_dir("xwalks")
 
     # Resolve county vintage (defaults to tracts vintage if not specified)
     county_vintage = counties if counties is not None else tracts

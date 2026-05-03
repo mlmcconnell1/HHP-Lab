@@ -14,7 +14,6 @@ from typing import Annotated, Literal
 import httpx
 import typer
 
-from hhplab.builds import build_curated_dir, require_build_dir, resolve_build_dir
 from hhplab.paths import curated_dir as _curated_dir
 from hhplab.paths import raw_root
 
@@ -207,13 +206,6 @@ def aggregate_zori(
             help="Weighting: renter_households, housing_units, population, or equal.",
         ),
     ] = "renter_households",
-    build: Annotated[
-        str | None,
-        typer.Option(
-            "--build",
-            help="Named build directory for outputs and build-local artifacts.",
-        ),
-    ] = None,
     output_dir: Annotated[
         Path | None,
         typer.Option(
@@ -263,7 +255,7 @@ def aggregate_zori(
 
     Examples:
 
-        hhplab aggregate zori --build demo --boundary 2025 --counties 2023 --acs 2019-2023
+        hhplab aggregate zori --boundary 2025 --counties 2023 --acs 2019-2023
     """
     if output_dir is None:
         output_dir = _curated_dir("zori")
@@ -287,24 +279,6 @@ def aggregate_zori(
             err=True,
         )
         raise typer.Exit(2)
-
-    if build is not None:
-        try:
-            build_dir = require_build_dir(build)
-        except FileNotFoundError as exc:
-            build_path = resolve_build_dir(build)
-            typer.echo(f"Error: Build '{build}' not found at {build_path}", err=True)
-            typer.echo(
-                "Create the directory manually or omit --build to write to data/curated/zori/.",
-                err=True,
-            )
-            raise typer.Exit(2) from exc
-
-        build_curated = build_curated_dir(build_dir)
-        if output_dir == _curated_dir("zori"):
-            output_dir = build_curated / "zori"
-        if xwalk_path is None:
-            xwalk_path = (build_curated / "xwalks" / f"xwalk__B{boundary}xC{counties}.parquet")
 
     if xwalk_path is not None and not Path(xwalk_path).exists():
         typer.echo(f"Error: Crosswalk not found: {xwalk_path}", err=True)

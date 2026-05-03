@@ -49,11 +49,12 @@ class TestTigerIngestCommand:
 class TestBuildXwalksCommand:
     """Tests for the generate xwalks CLI command."""
 
-    def test_build_xwalks_requires_build_flag(self):
-        """Should fail without --build."""
+    def test_build_xwalks_uses_curated_prerequisites_without_build_flag(self):
+        """Should fail on missing curated inputs, not on a retired build requirement."""
         result = runner.invoke(app, ["generate", "xwalks"])
-        # Typer shows error for missing required --build option
-        assert result.exit_code != 0
+        assert result.exit_code == 1
+        assert "--build" not in result.output
+        assert "Tract file not found" in result.output
 
     @patch("hhplab.cli.build_xwalks.list_boundaries")
     @patch("hhplab.cli.build_xwalks.gpd.read_parquet")
@@ -72,25 +73,11 @@ class TestBuildXwalksCommand:
         tmp_path,
     ):
         """Generate xwalks succeeds and skips missing counties unless requested."""
-        import json
         from datetime import UTC, datetime
 
         from hhplab.registry.schema import RegistryEntry
 
         with runner.isolated_filesystem(temp_dir=tmp_path):
-            # Create build directory
-            build_dir = Path("builds/test")
-            (build_dir / "data" / "curated" / "xwalks").mkdir(parents=True, exist_ok=True)
-            (build_dir / "data" / "raw").mkdir(parents=True, exist_ok=True)
-            (build_dir / "base").mkdir(parents=True, exist_ok=True)
-            manifest = {
-                "schema_version": 1,
-                "build": {"name": "test", "years": [2025]},
-                "base_assets": [],
-                "aggregate_runs": [],
-            }
-            (build_dir / "manifest.json").write_text(json.dumps(manifest))
-
             boundary_path = Path("data/curated/coc_boundaries/coc_boundaries__2025.parquet")
             boundary_path.parent.mkdir(parents=True, exist_ok=True)
             boundary_path.touch()
@@ -117,7 +104,7 @@ class TestBuildXwalksCommand:
                 {"coc_id": ["CO-500"], "intersection_area": [1.0]}
             )
             mock_save_crosswalk.return_value = Path(
-                "builds/test/data/curated/xwalks/coc_tract_xwalk__2025__2023.parquet"
+                "data/curated/xwalks/coc_tract_xwalk__2025__2023.parquet"
             )
             mock_diagnostics.return_value = pd.DataFrame(
                 {"coc_id": ["CO-500"], "coverage_ratio_area": [1.0]}
@@ -130,8 +117,6 @@ class TestBuildXwalksCommand:
                 [
                     "generate",
                     "xwalks",
-                    "--build",
-                    "test",
                     "--boundary",
                     "2025",
                     "--tracts",
@@ -164,25 +149,11 @@ class TestBuildXwalksCommand:
         tmp_path,
     ):
         """Generate xwalks warns when --counties is explicitly requested and missing."""
-        import json
         from datetime import UTC, datetime
 
         from hhplab.registry.schema import RegistryEntry
 
         with runner.isolated_filesystem(temp_dir=tmp_path):
-            # Create build directory
-            build_dir = Path("builds/test")
-            (build_dir / "data" / "curated" / "xwalks").mkdir(parents=True, exist_ok=True)
-            (build_dir / "data" / "raw").mkdir(parents=True, exist_ok=True)
-            (build_dir / "base").mkdir(parents=True, exist_ok=True)
-            manifest = {
-                "schema_version": 1,
-                "build": {"name": "test", "years": [2025]},
-                "base_assets": [],
-                "aggregate_runs": [],
-            }
-            (build_dir / "manifest.json").write_text(json.dumps(manifest))
-
             boundary_path = Path("data/curated/coc_boundaries/coc_boundaries__2025.parquet")
             boundary_path.parent.mkdir(parents=True, exist_ok=True)
             boundary_path.touch()
@@ -209,7 +180,7 @@ class TestBuildXwalksCommand:
                 {"coc_id": ["CO-500"], "intersection_area": [1.0]}
             )
             mock_save_crosswalk.return_value = Path(
-                "builds/test/data/curated/xwalks/coc_tract_xwalk__2025__2023.parquet"
+                "data/curated/xwalks/coc_tract_xwalk__2025__2023.parquet"
             )
             mock_diagnostics.return_value = pd.DataFrame(
                 {"coc_id": ["CO-500"], "coverage_ratio_area": [1.0]}
@@ -222,8 +193,6 @@ class TestBuildXwalksCommand:
                 [
                     "generate",
                     "xwalks",
-                    "--build",
-                    "test",
                     "--boundary",
                     "2025",
                     "--tracts",

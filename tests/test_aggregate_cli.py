@@ -1,6 +1,5 @@
 """Tests for the ``hhplab aggregate`` CLI command group."""
 
-import json
 from pathlib import Path
 
 import pytest
@@ -11,231 +10,85 @@ from hhplab.cli.main import app
 
 runner = CliRunner()
 
-
-# ---------------------------------------------------------------------------
-# Help output
-# ---------------------------------------------------------------------------
+RETIRED_BUILD_SURFACES = ("pep", "pit", "acs", "zori")
 
 
 def test_aggregate_help_shows_subcommands():
     result = runner.invoke(app, ["aggregate", "--help"])
     assert result.exit_code == 0
     assert "standalone CoC analysis inputs" in result.output
-    for name in ("acs", "zori", "pep", "pit"):
+    for name in RETIRED_BUILD_SURFACES:
         assert name in result.output
 
 
-# ---------------------------------------------------------------------------
-# Build validation
-# ---------------------------------------------------------------------------
+@pytest.mark.parametrize("subcommand", RETIRED_BUILD_SURFACES)
+def test_aggregate_commands_reject_retired_build_flag(subcommand: str):
+    result = runner.invoke(app, ["aggregate", subcommand, "--build", "demo"])
+    assert result.exit_code != 0
+    assert "No such option: --build" in result.output
 
 
-def test_aggregate_pep_missing_build():
-    with runner.isolated_filesystem():
-        result = runner.invoke(app, ["aggregate", "pep", "--build", "nonexistent"])
-        assert result.exit_code == 2
-        assert "Build 'nonexistent' not found" in result.output
+@pytest.mark.parametrize(
+    ("subcommand", "dataset"),
+    [
+        ("pep", "pep"),
+        ("pit", "pit"),
+        ("acs", "acs"),
+        ("zori", "zori"),
+    ],
+)
+def test_aggregate_commands_reject_invalid_align(subcommand: str, dataset: str):
+    result = runner.invoke(
+        app,
+        ["aggregate", subcommand, "--align", "bad_mode", "--years", "2020"],
+    )
+    assert result.exit_code == 2
+    assert f"Invalid alignment mode 'bad_mode' for {dataset}" in result.output
 
 
-def test_aggregate_pit_missing_build():
-    with runner.isolated_filesystem():
-        result = runner.invoke(app, ["aggregate", "pit", "--build", "nonexistent"])
-        assert result.exit_code == 2
-        assert "Build 'nonexistent' not found" in result.output
-
-
-def test_aggregate_acs_missing_build():
-    with runner.isolated_filesystem():
-        result = runner.invoke(app, ["aggregate", "acs", "--build", "nonexistent"])
-        assert result.exit_code == 2
-        assert "Build 'nonexistent' not found" in result.output
-
-
-def test_aggregate_zori_missing_build():
-    with runner.isolated_filesystem():
-        result = runner.invoke(app, ["aggregate", "zori", "--build", "nonexistent"])
-        assert result.exit_code == 2
-        assert "Build 'nonexistent' not found" in result.output
-
-
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
-
-
-def _create_build(name: str = "demo", *, years: list[int] | None = None) -> None:
-    """Create a build directory with a proper manifest for testing."""
-    build_dir = Path("builds") / name
-    (build_dir / "data" / "curated").mkdir(parents=True)
-    (build_dir / "data" / "raw").mkdir(parents=True)
-    (build_dir / "base").mkdir(parents=True)
-
-    if years is not None:
-        assets = [
-            {
-                "asset_type": "coc_boundary",
-                "year": y,
-                "source": "test",
-                "relative_path": f"base/coc__B{y}.parquet",
-                "sha256": "a" * 64,
-            }
-            for y in years
-        ]
-        manifest = {
-            "schema_version": 1,
-            "build": {
-                "name": name,
-                "created_at": "2026-01-01T00:00:00Z",
-                "years": years,
-            },
-            "base_assets": assets,
-            "aggregate_runs": [],
-        }
-    else:
-        manifest = {"schema_version": 1}
-
-    (build_dir / "manifest.json").write_text(json.dumps(manifest, indent=2) + "\n")
-
-
-# ---------------------------------------------------------------------------
-# Alignment validation
-# ---------------------------------------------------------------------------
-
-
-def test_aggregate_pep_invalid_align():
-    with runner.isolated_filesystem():
-        _create_build(years=[2020, 2021])
-        result = runner.invoke(
-            app, ["aggregate", "pep", "--build", "demo", "--align", "bad_mode"]
-        )
-        assert result.exit_code == 2
-        assert "Invalid alignment mode 'bad_mode' for pep" in result.output
-
-
-def test_aggregate_pit_invalid_align():
-    with runner.isolated_filesystem():
-        _create_build(years=[2020, 2021])
-        result = runner.invoke(
-            app, ["aggregate", "pit", "--build", "demo", "--align", "bad_mode"]
-        )
-        assert result.exit_code == 2
-        assert "Invalid alignment mode 'bad_mode' for pit" in result.output
-
-
-def test_aggregate_acs_invalid_align():
-    with runner.isolated_filesystem():
-        _create_build(years=[2020, 2021])
-        result = runner.invoke(
-            app, ["aggregate", "acs", "--build", "demo", "--align", "bad_mode"]
-        )
-        assert result.exit_code == 2
-        assert "Invalid alignment mode 'bad_mode' for acs" in result.output
-
-
-def test_aggregate_zori_invalid_align():
-    with runner.isolated_filesystem():
-        _create_build(years=[2020, 2021])
-        result = runner.invoke(
-            app, ["aggregate", "zori", "--build", "demo", "--align", "bad_mode"]
-        )
-        assert result.exit_code == 2
-        assert "Invalid alignment mode 'bad_mode' for zori" in result.output
-
-
-# ---------------------------------------------------------------------------
-# Missing manifest data (no years / no base assets)
-# ---------------------------------------------------------------------------
-
-
-def test_aggregate_pep_no_manifest_years():
-    """Commands should report an error when manifest has no years."""
-    with runner.isolated_filesystem():
-        _create_build()  # no years
-        result = runner.invoke(app, ["aggregate", "pep", "--build", "demo"])
-        assert result.exit_code == 2
-        output_lower = result.output.lower()
-        assert (
-            "no years" in output_lower
-            or "no pinned base assets" in output_lower
-            or "error" in output_lower
-        )
-
-
-def test_aggregate_acs_no_base_assets():
-    """ACS aggregate should fail if manifest has years but no base assets."""
-    with runner.isolated_filesystem():
-        build_dir = Path("builds") / "demo"
-        (build_dir / "data" / "curated").mkdir(parents=True)
-        (build_dir / "data" / "raw").mkdir(parents=True)
-        (build_dir / "base").mkdir(parents=True)
-        manifest = {
-            "schema_version": 1,
-            "build": {"name": "demo", "created_at": "2026-01-01T00:00:00Z", "years": [2020]},
-            "base_assets": [],
-            "aggregate_runs": [],
-        }
-        (build_dir / "manifest.json").write_text(json.dumps(manifest) + "\n")
-
-        result = runner.invoke(app, ["aggregate", "acs", "--build", "demo"])
-        assert result.exit_code == 2
-        assert "No coc_boundary base assets" in result.output
-
-
-# ---------------------------------------------------------------------------
-# --years parsing
-# ---------------------------------------------------------------------------
+def test_aggregate_pep_requires_years():
+    result = runner.invoke(app, ["aggregate", "pep"])
+    assert result.exit_code == 2
+    assert "--years is required" in result.output
 
 
 def test_aggregate_pep_with_invalid_years():
-    with runner.isolated_filesystem():
-        _create_build(years=[2020])
-        result = runner.invoke(
-            app, ["aggregate", "pep", "--build", "demo", "--years", "bad"]
-        )
-        assert result.exit_code == 2
-
-
-# ---------------------------------------------------------------------------
-# Dataset-specific options
-# ---------------------------------------------------------------------------
+    result = runner.invoke(app, ["aggregate", "pep", "--years", "bad"])
+    assert result.exit_code == 2
 
 
 def test_aggregate_pep_lagged_rejects_lag_months_out_of_range():
-    with runner.isolated_filesystem():
-        _create_build(years=[2020])
-        result = runner.invoke(
-            app,
-            [
-                "aggregate",
-                "pep",
-                "--build",
-                "demo",
-                "--align",
-                "lagged",
-                "--lag-months",
-                "13",
-            ],
-        )
-        assert result.exit_code == 2
-        assert "--lag-months must be between 0 and 12" in result.output
+    result = runner.invoke(
+        app,
+        [
+            "aggregate",
+            "pep",
+            "--years",
+            "2020",
+            "--align",
+            "lagged",
+            "--lag-months",
+            "13",
+        ],
+    )
+    assert result.exit_code == 2
+    assert "--lag-months must be between 0 and 12" in result.output
 
 
 def test_aggregate_pep_rejects_lag_months_without_lagged_align():
-    with runner.isolated_filesystem():
-        _create_build(years=[2020])
-        result = runner.invoke(
-            app,
-            [
-                "aggregate",
-                "pep",
-                "--build",
-                "demo",
-                "--lag-months",
-                "1",
-            ],
-        )
-        assert result.exit_code == 2
-        assert "--lag-months is only valid when --align=lagged" in result.output
+    result = runner.invoke(
+        app,
+        [
+            "aggregate",
+            "pep",
+            "--years",
+            "2020",
+            "--lag-months",
+            "1",
+        ],
+    )
+    assert result.exit_code == 2
+    assert "--lag-months is only valid when --align=lagged" in result.output
 
 
 def test_build_lagged_pep_series_zero_months_matches_current_year():
@@ -316,9 +169,8 @@ def _create_fake_acs_cache(acs_vintage: str, tract_vintage: str | int) -> None:
 
 def test_aggregate_acs_missing_crosswalk_suggests_decennial():
     with runner.isolated_filesystem():
-        _create_build(years=[2015])
         _create_fake_acs_cache("2011-2015", 2010)
-        result = runner.invoke(app, ["aggregate", "acs", "--build", "demo"])
+        result = runner.invoke(app, ["aggregate", "acs", "--years", "2015"])
         assert result.exit_code == 1
         assert "Crosswalk not found" in result.output
         assert "Did you mean to request" not in result.output
@@ -327,60 +179,20 @@ def test_aggregate_acs_missing_crosswalk_suggests_decennial():
 
 def test_aggregate_acs_missing_crosswalk_no_decennial_hint():
     with runner.isolated_filesystem():
-        _create_build(years=[2020])
         _create_fake_acs_cache("2016-2020", 2020)
-        result = runner.invoke(app, ["aggregate", "acs", "--build", "demo"])
+        result = runner.invoke(app, ["aggregate", "acs", "--years", "2020"])
         assert result.exit_code == 1
         assert "Crosswalk not found" in result.output
         assert "Did you mean to request" not in result.output
         assert "Run: hhplab generate xwalks --boundary 2020 --tracts 2020" in result.output
 
 
-# ---------------------------------------------------------------------------
-# PIT aggregate with real data
-# ---------------------------------------------------------------------------
-
-
-def _create_build_at(tmp_path, name="test_build", years=None):
-    """Create a build directory with manifest at a given tmp_path root."""
-    if years is None:
-        years = [2020, 2021]
-    build_dir = tmp_path / "builds" / name
-    (build_dir / "data" / "curated").mkdir(parents=True)
-    (build_dir / "data" / "raw").mkdir(parents=True)
-    (build_dir / "base").mkdir(parents=True)
-    manifest = {
-        "schema_version": 1,
-        "build": {
-            "name": name,
-            "created_at": "2026-01-01T00:00:00Z",
-            "years": years,
-        },
-        "base_assets": [
-            {
-                "asset_type": "coc_boundary",
-                "year": y,
-                "source": "test",
-                "relative_path": f"base/coc__B{y}.parquet",
-                "sha256": "a" * 64,
-            }
-            for y in years
-        ],
-        "aggregate_runs": [],
-    }
-    (build_dir / "manifest.json").write_text(json.dumps(manifest) + "\n")
-    return build_dir
-
-
 def test_aggregate_pit_collects_data(tmp_path):
-    """PIT aggregate should collect and write per-year PIT files for build years."""
+    """PIT aggregate should collect and write per-year PIT files for requested years."""
     import os
 
     import pandas as pd
 
-    _create_build_at(tmp_path, years=[2020, 2021])
-
-    # Create stub PIT individual year files
     pit_dir = tmp_path / "data" / "curated" / "pit"
     pit_dir.mkdir(parents=True)
     for year in [2020, 2021]:
@@ -396,7 +208,7 @@ def test_aggregate_pit_collects_data(tmp_path):
         os.chdir(tmp_path)
         result = runner.invoke(
             app,
-            ["aggregate", "pit", "--build", "test_build"],
+            ["aggregate", "pit", "--years", "2020-2021"],
             catch_exceptions=False,
         )
     finally:
@@ -405,10 +217,8 @@ def test_aggregate_pit_collects_data(tmp_path):
     assert result.exit_code == 0
     assert "Wrote PIT aggregate" in result.output
 
-    # Verify per-year output files
-    out_dir = tmp_path / "builds" / "test_build" / "data" / "curated" / "pit"
     for year in [2020, 2021]:
-        assert (out_dir / f"pit__P{year}@B{year}.parquet").exists()
+        assert (pit_dir / f"pit__P{year}@B{year}.parquet").exists()
 
 
 def test_aggregate_pit_falls_back_to_vintage(tmp_path):
@@ -417,9 +227,6 @@ def test_aggregate_pit_falls_back_to_vintage(tmp_path):
 
     import pandas as pd
 
-    _create_build_at(tmp_path, years=[2019, 2020, 2021])
-
-    # Create NO individual year files — only a vintage file
     pit_dir = tmp_path / "data" / "curated" / "pit"
     pit_dir.mkdir(parents=True)
 
@@ -439,7 +246,7 @@ def test_aggregate_pit_falls_back_to_vintage(tmp_path):
         os.chdir(tmp_path)
         result = runner.invoke(
             app,
-            ["aggregate", "pit", "--build", "test_build"],
+            ["aggregate", "pit", "--years", "2019-2021"],
             catch_exceptions=False,
         )
     finally:
@@ -449,10 +256,8 @@ def test_aggregate_pit_falls_back_to_vintage(tmp_path):
     assert "Using vintage P2024" in result.output
     assert "Wrote PIT aggregate" in result.output
 
-    # Verify per-year output files with correct data
-    out_dir = tmp_path / "builds" / "test_build" / "data" / "curated" / "pit"
     for year in [2019, 2020, 2021]:
-        out_file = out_dir / f"pit__P{year}@B{year}.parquet"
+        out_file = pit_dir / f"pit__P{year}@B{year}.parquet"
         assert out_file.exists()
         result_df = pd.read_parquet(out_file)
         assert sorted(result_df["pit_year"].unique()) == [year]
@@ -464,12 +269,9 @@ def test_aggregate_pit_vintage_partial_coverage(tmp_path):
 
     import pandas as pd
 
-    _create_build_at(tmp_path, years=[2020, 2021, 2025])
-
     pit_dir = tmp_path / "data" / "curated" / "pit"
     pit_dir.mkdir(parents=True)
 
-    # Vintage only has 2020 and 2021, not 2025
     rows = []
     for year in [2020, 2021]:
         for i in range(3):
@@ -486,7 +288,7 @@ def test_aggregate_pit_vintage_partial_coverage(tmp_path):
         os.chdir(tmp_path)
         result = runner.invoke(
             app,
-            ["aggregate", "pit", "--build", "test_build"],
+            ["aggregate", "pit", "--years", "2020-2021,2025"],
             catch_exceptions=False,
         )
     finally:
@@ -504,8 +306,6 @@ def test_aggregate_pit_to_msa_materializes_weighted_outputs(tmp_path):
     import pandas as pd
 
     from hhplab.naming import msa_coc_xwalk_filename, msa_pit_filename
-
-    _create_build_at(tmp_path, years=[2020])
 
     pit_dir = tmp_path / "data" / "curated" / "pit"
     xwalk_dir = tmp_path / "data" / "curated" / "xwalks"
@@ -547,8 +347,8 @@ def test_aggregate_pit_to_msa_materializes_weighted_outputs(tmp_path):
             [
                 "aggregate",
                 "pit",
-                "--build",
-                "test_build",
+                "--years",
+                "2020",
                 "--geo-type",
                 "msa",
                 "--definition-version",
@@ -563,8 +363,7 @@ def test_aggregate_pit_to_msa_materializes_weighted_outputs(tmp_path):
 
     assert result.exit_code == 0
     assert "Aggregating PIT to MSA" in result.output
-    out_dir = tmp_path / "builds" / "test_build" / "data" / "curated" / "pit"
-    out_file = out_dir / msa_pit_filename(2020, "census_msa_2023", 2020, 2020)
+    out_file = pit_dir / msa_pit_filename(2020, "census_msa_2023", 2020, 2020)
     assert out_file.exists()
 
     msa_df = pd.read_parquet(out_file).sort_values("msa_id").reset_index(drop=True)
@@ -577,8 +376,6 @@ def test_aggregate_pit_to_msa_missing_crosswalk_is_actionable(tmp_path):
     import os
 
     import pandas as pd
-
-    _create_build_at(tmp_path, years=[2020])
 
     pit_dir = tmp_path / "data" / "curated" / "pit"
     pit_dir.mkdir(parents=True)
@@ -598,8 +395,8 @@ def test_aggregate_pit_to_msa_missing_crosswalk_is_actionable(tmp_path):
             [
                 "aggregate",
                 "pit",
-                "--build",
-                "test_build",
+                "--years",
+                "2020",
                 "--geo-type",
                 "msa",
                 "--definition-version",
