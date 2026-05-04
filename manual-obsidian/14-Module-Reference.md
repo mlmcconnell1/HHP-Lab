@@ -6,12 +6,12 @@ This chapter is an orientation map of active modules in the current codebase.
 
 - `hhplab/cli/main.py`: top-level Typer app and command registration
 - `hhplab/cli/build_xwalks.py`: crosswalk generation
-- `hhplab/cli/aggregate.py`: dataset aggregation commands (`acs`, `zori`, `pep`, `pit`)
+- `hhplab/cli/aggregate_cli.py`: dataset aggregation commands (`acs`, `zori`, `pep`, `pit`)
 - `hhplab/cli/status.py`: one-shot environment readiness report (`hhplab status`)
 - `hhplab/cli/list_curated.py`: curated dataset discovery with metadata (row counts, columns, sizes)
 - `hhplab/cli/list_*.py`: dataset discovery commands with optional JSON output
 - `hhplab/cli/ingest_acs1_metro.py`: ACS 1-year CBSA-level metro unemployment ingestion
-- `hhplab/cli/diagnostics.py` and `hhplab/cli/panel_diagnostics.py`: diagnostics commands with optional JSON output
+- `hhplab/cli/diagnostics_cli.py` and `hhplab/cli/panel_diagnostics_cli.py`: diagnostics commands with optional JSON output
 - `hhplab/cli/recipe.py`: recipe execution/provenance/export commands
 - `hhplab/cli/migrate_curated.py`: curated data migration utilities
 
@@ -50,13 +50,13 @@ This chapter is an orientation map of active modules in the current codebase.
 - `hhplab/rents/`: ZORI ingest, weighting, aggregation, diagnostics
 - `hhplab/panel/`: panel diagnostics and assembly internals
 - `hhplab/metro/`: metro analysis geography module
-  - `hhplab/metro/definitions.py`: canonical metro-universe definitions plus the Glynn/Fox subset profile
+  - `hhplab/metro/metro_definitions.py`: canonical metro-universe definitions plus the Glynn/Fox subset profile
   - `hhplab/metro/pit.py`: PIT aggregation from CoC to metro via CoC membership
-  - `hhplab/metro/acs.py`: ACS aggregation from tracts to metro via county membership
-  - `hhplab/metro/pep.py`: PEP aggregation from counties to metro via county membership
-  - `hhplab/metro/zori.py`: ZORI aggregation from counties to metro via county membership
-  - `hhplab/metro/validate.py`: metro artifact validation (ID formats, referential integrity, counts)
-  - `hhplab/metro/io.py`: read/write curated metro definition artifacts
+  - `hhplab/metro/metro_acs.py`: ACS aggregation from tracts to metro via county membership
+  - `hhplab/metro/metro_pep.py`: PEP aggregation from counties to metro via county membership
+  - `hhplab/metro/metro_zori.py`: ZORI aggregation from counties to metro via county membership
+  - `hhplab/metro/metro_validate.py`: metro artifact validation (ID formats, referential integrity, counts)
+  - `hhplab/metro/metro_io.py`: read/write curated metro definition artifacts
 
 ## Utilities and Supporting Modules
 

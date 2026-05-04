@@ -16,7 +16,7 @@ from typer.testing import CliRunner
 from hhplab.cli.generate_msa_xwalk import generate_msa_xwalk
 from hhplab.cli.main import app
 from hhplab.msa.crosswalk import ALLOCATION_SHARE_TOLERANCE
-from hhplab.msa.definitions import DELINEATION_FILE_YEAR
+from hhplab.msa.msa_definitions import DELINEATION_FILE_YEAR
 from hhplab.registry.schema import RegistryEntry
 
 runner = CliRunner()
@@ -162,9 +162,7 @@ def test_generate_msa_xwalk_json(monkeypatch, tmp_path: Path):
     assert payload["rows"] == 1
     assert payload["coc_count"] == 1
     assert payload["msa_count"] == 1
-    assert payload["artifact"].endswith(
-        "msa_coc_xwalk__B2025xMcensus_msa_2023xC2023.parquet"
-    )
+    assert payload["artifact"].endswith("msa_coc_xwalk__B2025xMcensus_msa_2023xC2023.parquet")
 
 
 @pytest.mark.parametrize(

@@ -7,10 +7,10 @@ from typing import Annotated
 import geopandas as gpd
 import typer
 
-from hhplab.geo.io import resolve_curated_boundary_path
-from hhplab.msa.definitions import DEFINITION_VERSION, DELINEATION_FILE_YEAR
+from hhplab.geo.geo_io import resolve_curated_boundary_path
+from hhplab.msa.msa_definitions import DEFINITION_VERSION, DELINEATION_FILE_YEAR
 from hhplab.naming import county_path, msa_coc_xwalk_path
-from hhplab.registry.registry import latest_vintage, list_boundaries
+from hhplab.registry.boundary_registry import latest_vintage, list_boundaries
 
 
 def _resolve_boundary_vintage(boundary: str | None) -> str:
@@ -83,7 +83,7 @@ def generate_msa_xwalk(
         save_coc_msa_crosswalk,
         summarize_coc_msa_allocation,
     )
-    from hhplab.msa.io import read_msa_county_membership
+    from hhplab.msa.msa_io import read_msa_county_membership
 
     try:
         resolved_boundary = _resolve_boundary_vintage(boundary)

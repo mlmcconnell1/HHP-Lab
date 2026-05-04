@@ -15,7 +15,7 @@ from shapely.geometry import (
     Polygon,
 )
 
-from hhplab.geo.io import (
+from hhplab.geo.geo_io import (
     curated_boundary_path,
     read_geoparquet,
     registry_path,

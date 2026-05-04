@@ -6,7 +6,7 @@ from typing import Annotated
 
 import typer
 
-from hhplab.metro.definitions import DEFINITION_VERSION
+from hhplab.metro.metro_definitions import DEFINITION_VERSION
 
 
 def generate_metro_boundaries(
@@ -45,8 +45,8 @@ def generate_metro_boundaries(
     import json as json_mod
 
     import hhplab.naming as naming
-    from hhplab.metro.boundaries import generate_metro_boundaries as generate_impl
-    from hhplab.metro.boundaries import read_metro_boundaries
+    from hhplab.metro.metro_boundaries import generate_metro_boundaries as generate_impl
+    from hhplab.metro.metro_boundaries import read_metro_boundaries
 
     output_path = naming.metro_boundaries_path(definition_version, county_vintage)
     if output_path.exists() and not force:

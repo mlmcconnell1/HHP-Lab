@@ -63,8 +63,8 @@ def ingest_pit(
         parse_pit_file,
         write_pit_parquet,
     )
+    from hhplab.pit.pit_registry import register_pit_year
     from hhplab.pit.qa import validate_pit_data
-    from hhplab.pit.registry import register_pit_year
 
     typer.echo(f"Ingesting PIT data for year {year}...")
 

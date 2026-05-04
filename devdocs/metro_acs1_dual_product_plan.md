@@ -95,7 +95,7 @@ Create a dedicated metro ACS 1-year module rather than trying to force annual da
 
 Recommended new module:
 
-- `hhplab/metro/acs1.py`
+- `hhplab/metro/metro_acs1.py`
 
 Responsibilities:
 

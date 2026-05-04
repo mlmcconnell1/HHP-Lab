@@ -13,7 +13,7 @@ import warnings
 import pandas as pd
 import pytest
 
-from hhplab.rents.diagnostics import (
+from hhplab.rents.zori_diagnostics import (
     compute_coc_diagnostics,
     generate_text_summary,
     identify_problem_cocs,
@@ -29,9 +29,7 @@ from hhplab.rents.diagnostics import (
 MONTHLY_DF = pd.DataFrame(
     {
         "coc_id": ["AA-500"] * 3 + ["BB-501"] * 3,
-        "date": pd.to_datetime(
-            ["2024-01-01", "2024-02-01", "2024-03-01"] * 2
-        ),
+        "date": pd.to_datetime(["2024-01-01", "2024-02-01", "2024-03-01"] * 2),
         "zori_coc": [1200.0, 1210.0, 1220.0, 900.0, 910.0, 920.0],
         "coverage_ratio": [0.95, 0.96, 0.97, 0.60, 0.55, 0.50],
         "max_geo_contribution": [0.40, 0.42, 0.41, 0.85, 0.87, 0.90],
@@ -63,9 +61,7 @@ NO_DOMINANCE_DF = pd.DataFrame(
 ALL_GOOD_DF = pd.DataFrame(
     {
         "coc_id": ["G1"] * 4 + ["G2"] * 4,
-        "date": pd.to_datetime(
-            ["2024-01-01", "2024-02-01", "2024-03-01", "2024-04-01"] * 2
-        ),
+        "date": pd.to_datetime(["2024-01-01", "2024-02-01", "2024-03-01", "2024-04-01"] * 2),
         "zori_coc": [1000.0, 1010.0, 1020.0, 1030.0] * 2,
         "coverage_ratio": [0.99, 0.98, 0.97, 0.96, 1.0, 1.0, 1.0, 1.0],
         "max_geo_contribution": [0.30, 0.32, 0.31, 0.33, 0.20, 0.21, 0.22, 0.23],
@@ -247,9 +243,7 @@ class TestGenerateTextSummary:
     def test_flagged_cocs_count(self):
         """Flagged CoCs section should reflect actual flag counts."""
         diag = compute_coc_diagnostics(MONTHLY_DF, min_coverage=0.90, dominance_threshold=0.80)
-        text = generate_text_summary(
-            MONTHLY_DF, diag, min_coverage=0.90, dominance_threshold=0.80
-        )
+        text = generate_text_summary(MONTHLY_DF, diag, min_coverage=0.90, dominance_threshold=0.80)
         # BB-501 is flagged for both low coverage and high dominance
         assert "LOW_COV" in text
         assert "HIGH_DOM" in text
@@ -278,8 +272,7 @@ class TestGenerateTextSummary:
             warnings.simplefilter("always")
             text = generate_text_summary(empty_input, empty_diag)
         runtime_warnings = [
-            warning for warning in caught
-            if issubclass(warning.category, RuntimeWarning)
+            warning for warning in caught if issubclass(warning.category, RuntimeWarning)
         ]
         assert not runtime_warnings
         assert "Total CoCs:" in text

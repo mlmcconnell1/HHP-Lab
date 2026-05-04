@@ -6,7 +6,7 @@ from typing import Annotated
 
 import typer
 
-from hhplab.metro.definitions import (
+from hhplab.metro.metro_definitions import (
     CANONICAL_UNIVERSE_DEFINITION_VERSION,
     DEFINITION_VERSION,
 )
@@ -40,8 +40,8 @@ def validate_metro(
     """Validate curated metro definitions, memberships, and boundary polygons."""
     import json as json_mod
 
-    from hhplab.metro.io import validate_curated_metro
-    from hhplab.metro.boundaries import validate_curated_metro_boundaries
+    from hhplab.metro.metro_boundaries import validate_curated_metro_boundaries
+    from hhplab.metro.metro_io import validate_curated_metro
 
     try:
         definition_result = validate_curated_metro(definition_version)
@@ -126,7 +126,7 @@ def validate_metro_universe(
     """Validate canonical metro-universe and subset-profile artifacts."""
     import json as json_mod
 
-    from hhplab.metro.io import validate_curated_metro_universe
+    from hhplab.metro.metro_io import validate_curated_metro_universe
 
     try:
         result = validate_curated_metro_universe(

@@ -42,7 +42,7 @@ class TestIngestPitCommand:
     @patch("hhplab.pit.ingest.download_pit_data")
     @patch("hhplab.pit.ingest.parse_pit_file")
     @patch("hhplab.pit.ingest.write_pit_parquet")
-    @patch("hhplab.pit.registry.register_pit_year")
+    @patch("hhplab.pit.pit_registry.register_pit_year")
     @patch("hhplab.pit.qa.validate_pit_data")
     def test_ingest_pit_success(
         self,
@@ -56,8 +56,8 @@ class TestIngestPitCommand:
         from datetime import UTC, datetime
 
         from hhplab.pit.ingest import DownloadResult
+        from hhplab.pit.pit_registry import PitRegistryEntry
         from hhplab.pit.qa import QAReport
-        from hhplab.pit.registry import PitRegistryEntry
 
         # Mock download result
         mock_download.return_value = DownloadResult(
@@ -191,7 +191,7 @@ class TestPanelDiagnosticsCommand:
         tmp_path,
     ):
         """Diagnostics in text format should succeed."""
-        from hhplab.panel.diagnostics import DiagnosticsReport
+        from hhplab.panel.panel_diagnostics import DiagnosticsReport
 
         # Create a dummy panel file
         panel_file = tmp_path / "panel.parquet"
@@ -240,7 +240,7 @@ class TestPanelDiagnosticsCommand:
         tmp_path,
     ):
         """Diagnostics in CSV format should succeed."""
-        from hhplab.panel.diagnostics import DiagnosticsReport
+        from hhplab.panel.panel_diagnostics import DiagnosticsReport
 
         # Create a dummy panel file
         panel_file = tmp_path / "panel.parquet"

@@ -7,7 +7,7 @@ uses metro_id instead of coc_id, proving metro is a first-class target.
 import pandas as pd
 import pytest
 
-from hhplab.metro.definitions import METRO_COUNT
+from hhplab.metro.metro_definitions import METRO_COUNT
 from hhplab.panel.conformance import (
     PanelRequest,
     check_coc_count,
@@ -43,13 +43,15 @@ def metro_panel():
     rows = []
     for metro_id in metros:
         for year in [2020, 2021, 2022]:
-            rows.append({
-                "metro_id": metro_id,
-                "year": year,
-                "pit_total": 1000 + year,
-                "total_population": 500000 + year * 100,
-                "median_household_income": 60000.0,
-            })
+            rows.append(
+                {
+                    "metro_id": metro_id,
+                    "year": year,
+                    "pit_total": 1000 + year,
+                    "total_population": 500000 + year * 100,
+                    "median_household_income": 60000.0,
+                }
+            )
     return pd.DataFrame(rows)
 
 
@@ -62,17 +64,21 @@ class TestResolveGeoCol:
     def test_metro_id_resolved(self):
         """resolve_geo_col should recognize metro_id."""
         from hhplab.analysis_geo import resolve_geo_col
+
         df = pd.DataFrame({"metro_id": ["GF01"], "year": [2020]})
         assert resolve_geo_col(df) == "metro_id"
 
     def test_coc_id_preferred_over_metro_id(self):
         """If both coc_id and metro_id exist, coc_id wins (backward compat)."""
         from hhplab.analysis_geo import resolve_geo_col
-        df = pd.DataFrame({
-            "coc_id": ["NY-600"],
-            "metro_id": ["GF01"],
-            "year": [2020],
-        })
+
+        df = pd.DataFrame(
+            {
+                "coc_id": ["NY-600"],
+                "metro_id": ["GF01"],
+                "year": [2020],
+            }
+        )
         assert resolve_geo_col(df) == "coc_id"
 
 
@@ -107,12 +113,14 @@ class TestTemporalVariationWithMetro:
         rows = []
         for m in metros:
             for year in [2020, 2021, 2022]:
-                rows.append({
-                    "metro_id": m,
-                    "year": year,
-                    "total_population": 500000,
-                    "pit_total": 1000 + year,
-                })
+                rows.append(
+                    {
+                        "metro_id": m,
+                        "year": year,
+                        "total_population": 500000,
+                        "pit_total": 1000 + year,
+                    }
+                )
         df = pd.DataFrame(rows)
         results = check_temporal_variation(df, metro_request)
         pop_results = [r for r in results if "total_population" in r.message]
@@ -125,12 +133,14 @@ class TestPitExceedsPopulationWithMetro:
         assert len(results) == 0
 
     def test_impossible_values_flagged(self, metro_request):
-        df = pd.DataFrame({
-            "metro_id": ["GF01", "GF02"],
-            "year": [2020, 2020],
-            "pit_total": [99999, 100],
-            "total_population": [100, 500000],
-        })
+        df = pd.DataFrame(
+            {
+                "metro_id": ["GF01", "GF02"],
+                "year": [2020, 2020],
+                "pit_total": [99999, 100],
+                "total_population": [100, 500000],
+            }
+        )
         results = check_pit_exceeds_population(df, metro_request)
         assert len(results) == 1
         assert results[0].severity == "error"
@@ -145,10 +155,12 @@ class TestGeoCocCountWithMetro:
         assert len(results) == 0
 
     def test_missing_metros_flagged(self, metro_request):
-        df = pd.DataFrame({
-            "metro_id": ["GF01", "GF02"],
-            "year": [2020, 2020],
-        })
+        df = pd.DataFrame(
+            {
+                "metro_id": ["GF01", "GF02"],
+                "year": [2020, 2020],
+            }
+        )
         results = check_coc_count(df, metro_request)
         assert len(results) == 1
         assert "2/25" in results[0].message
@@ -160,10 +172,12 @@ class TestPanelBalanceWithMetro:
         assert len(results) == 0
 
     def test_unbalanced_panel_flagged(self, metro_request):
-        df = pd.DataFrame({
-            "metro_id": ["GF01", "GF01", "GF02"],
-            "year": [2020, 2021, 2020],
-        })
+        df = pd.DataFrame(
+            {
+                "metro_id": ["GF01", "GF01", "GF02"],
+                "year": [2020, 2021, 2020],
+            }
+        )
         results = check_panel_balance(df, metro_request)
         assert len(results) == 1
         assert "geo units" in results[0].message
@@ -175,10 +189,12 @@ class TestYearGapsWithMetro:
         assert len(results) == 0
 
     def test_gap_flagged(self, metro_request):
-        df = pd.DataFrame({
-            "metro_id": ["GF01", "GF01", "GF01"],
-            "year": [2020, 2022, 2023],
-        })
+        df = pd.DataFrame(
+            {
+                "metro_id": ["GF01", "GF01", "GF01"],
+                "year": [2020, 2022, 2023],
+            }
+        )
         results = check_coc_year_gaps(df, metro_request)
         assert len(results) == 1
         assert "geo units" in results[0].message
@@ -199,12 +215,14 @@ class TestSchemaCheckWithPepMetro:
         rows = []
         for m in metros:
             for year in [2020, 2021]:
-                rows.append({
-                    "metro_id": m,
-                    "year": year,
-                    "pit_total": 1000 + year,
-                    "population": 500000 + year * 100,
-                })
+                rows.append(
+                    {
+                        "metro_id": m,
+                        "year": year,
+                        "pit_total": 1000 + year,
+                        "population": 500000 + year * 100,
+                    }
+                )
         df = pd.DataFrame(rows)
         request = PanelRequest(
             start_year=2020,
@@ -217,12 +235,14 @@ class TestSchemaCheckWithPepMetro:
 
     def test_pep_panel_errors_without_measure_columns(self):
         """A PEP metro panel with no ACS columns errors with default settings."""
-        df = pd.DataFrame({
-            "metro_id": ["GF01"],
-            "year": [2020],
-            "pit_total": [1000],
-            "population": [500000],
-        })
+        df = pd.DataFrame(
+            {
+                "metro_id": ["GF01"],
+                "year": [2020],
+                "pit_total": [1000],
+                "population": [500000],
+            }
+        )
         request = PanelRequest(
             start_year=2020,
             end_year=2020,
@@ -238,12 +258,14 @@ class TestSchemaCheckWithPepMetro:
         rows = []
         for m in metros:
             for year in [2020, 2021, 2022]:
-                rows.append({
-                    "metro_id": m,
-                    "year": year,
-                    "pit_total": 1000 + year,
-                    "population": 500000 + year * 100,
-                })
+                rows.append(
+                    {
+                        "metro_id": m,
+                        "year": year,
+                        "pit_total": 1000 + year,
+                        "population": 500000 + year * 100,
+                    }
+                )
         df = pd.DataFrame(rows)
         request = PanelRequest(
             start_year=2020,
@@ -253,9 +275,7 @@ class TestSchemaCheckWithPepMetro:
             measure_columns=["population"],
         )
         report = run_conformance(df, request)
-        assert report.passed, (
-            f"PEP metro panel failed conformance:\n{report.summary()}"
-        )
+        assert report.passed, f"PEP metro panel failed conformance:\n{report.summary()}"
 
 
 class TestFullConformanceWithMetro:
@@ -263,9 +283,7 @@ class TestFullConformanceWithMetro:
         """A clean metro panel should pass all conformance checks."""
         report = run_conformance(metro_panel, metro_request)
         # May have warnings (e.g., static population) but no errors
-        assert report.passed, (
-            f"Clean metro panel failed conformance:\n{report.summary()}"
-        )
+        assert report.passed, f"Clean metro panel failed conformance:\n{report.summary()}"
 
     def test_conformance_report_serializes(self, metro_panel, metro_request):
         report = run_conformance(metro_panel, metro_request)

@@ -13,7 +13,7 @@ ZORI (Zillow Observed Rent Index) measures typical observed rent across a given 
 
 ## Target Geographies
 
-The aggregation engine (`hhplab.rents.aggregate.aggregate_monthly()`) is geography-neutral via `geo_id_col`:
+The aggregation engine (`hhplab.rents.zori_aggregate.aggregate_monthly()`) is geography-neutral via `geo_id_col`:
 
 - **CoC**: counties are assigned to CoCs via area-weighted spatial crosswalk
 - **Metro**: counties are assigned to metros via county membership table (no spatial crosswalk needed)

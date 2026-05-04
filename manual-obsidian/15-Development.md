@@ -59,7 +59,7 @@ ruff format .
 
 ## Extending Validation
 
-Add new checks in `hhplab/geo/validate.py`:
+Add new checks in `hhplab/geo/geo_validate.py`:
 
 ```python
 def _validate_custom(gdf: gpd.GeoDataFrame, result: ValidationResult) -> None:

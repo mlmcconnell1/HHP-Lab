@@ -7,7 +7,7 @@ import geopandas as gpd
 import pandas as pd
 import typer
 
-from hhplab.registry.registry import list_boundaries
+from hhplab.registry.boundary_registry import list_boundaries
 
 
 def compare_vintages(

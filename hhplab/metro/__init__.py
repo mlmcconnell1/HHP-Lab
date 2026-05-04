@@ -5,7 +5,14 @@ Source-specific metro aggregations live under their owning source packages
 package is limited to shared geography artifacts and validation helpers.
 """
 
-from hhplab.metro.definitions import (
+from hhplab.metro.metro_boundaries import (
+    build_metro_boundaries,
+    generate_metro_boundaries,
+    read_metro_boundaries,
+    validate_curated_metro_boundaries,
+    write_metro_boundaries,
+)
+from hhplab.metro.metro_definitions import (
     CANONICAL_UNIVERSE_DEFINITION_VERSION,
     DEFINITION_VERSION,
     METRO_CBSA_MAPPING,
@@ -23,14 +30,7 @@ from hhplab.metro.definitions import (
     cbsa_to_metro_id,
     metro_name_for_id,
 )
-from hhplab.metro.boundaries import (
-    build_metro_boundaries,
-    generate_metro_boundaries,
-    read_metro_boundaries,
-    validate_curated_metro_boundaries,
-    write_metro_boundaries,
-)
-from hhplab.metro.io import (
+from hhplab.metro.metro_io import (
     read_metro_coc_membership,
     read_metro_county_membership,
     read_metro_definitions,
@@ -41,7 +41,7 @@ from hhplab.metro.io import (
     write_metro_artifacts,
     write_metro_universe_artifacts,
 )
-from hhplab.metro.validate import (
+from hhplab.metro.metro_validate import (
     MetroValidationResult,
     validate_metro_artifacts,
     validate_metro_boundaries,

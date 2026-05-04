@@ -14,24 +14,24 @@ Truth table for metro definition structure
 
 import pytest
 
-from hhplab.metro.definitions import (
-    CBSA_ALIAS_RULES,
+from hhplab.metro.metro_definitions import (
     CANONICAL_UNIVERSE_DEFINITION_VERSION,
+    CBSA_ALIAS_RULES,
     DEFINITION_VERSION,
     METRO_COC_MEMBERSHIP,
     METRO_COUNTY_MEMBERSHIP,
     METRO_DEFINITIONS,
     PROFILE_NAME,
     build_cbsa_alias_df,
-    build_glynn_fox_subset_profile_df,
     build_coc_membership_df,
     build_county_membership_df,
     build_definitions_df,
+    build_glynn_fox_subset_profile_df,
     build_metro_universe_df,
     canonicalize_cbsa_code,
     principal_state_fips_for_metro_name,
 )
-from hhplab.metro.validate import (
+from hhplab.metro.metro_validate import (
     validate_metro_artifacts,
     validate_metro_universe_artifacts,
 )
@@ -41,9 +41,19 @@ MSA_UNIVERSE_ROWS = [
     ("31080", "31080", "Los Angeles-Long Beach-Anaheim, CA", "Metropolitan Statistical Area"),
     ("16980", "16980", "Chicago-Naperville-Elgin, IL-IN-WI", "Metropolitan Statistical Area"),
     ("19100", "19100", "Dallas-Fort Worth-Arlington, TX", "Metropolitan Statistical Area"),
-    ("37980", "37980", "Philadelphia-Camden-Wilmington, PA-NJ-DE-MD", "Metropolitan Statistical Area"),
+    (
+        "37980",
+        "37980",
+        "Philadelphia-Camden-Wilmington, PA-NJ-DE-MD",
+        "Metropolitan Statistical Area",
+    ),
     ("26420", "26420", "Houston-The Woodlands-Sugar Land, TX", "Metropolitan Statistical Area"),
-    ("47900", "47900", "Washington-Arlington-Alexandria, DC-VA-MD-WV", "Metropolitan Statistical Area"),
+    (
+        "47900",
+        "47900",
+        "Washington-Arlington-Alexandria, DC-VA-MD-WV",
+        "Metropolitan Statistical Area",
+    ),
     ("33100", "33100", "Miami-Fort Lauderdale-Pompano Beach, FL", "Metropolitan Statistical Area"),
     ("12060", "12060", "Atlanta-Sandy Springs-Roswell, GA", "Metropolitan Statistical Area"),
     ("14460", "14460", "Boston-Cambridge-Newton, MA-NH", "Metropolitan Statistical Area"),
@@ -76,6 +86,7 @@ def build_msa_universe_fixture():
     df["source"] = "census_msa_delineation_2023"
     df["source_ref"] = "https://example.test/census_msa"
     return df
+
 
 # ---------------------------------------------------------------------------
 # Constants from truth table
@@ -166,11 +177,11 @@ class TestDataFrameBuilders:
     @pytest.mark.parametrize(
         "metro_id,expected_coc_count",
         [
-            ("GF01", 1),   # New York: NY-600
-            ("GF02", 4),   # LA: CA-600, CA-606, CA-607, CA-612
-            ("GF03", 2),   # Chicago: IL-510, IL-511
-            ("GF04", 1),   # Dallas: TX-600
-            ("GF21", 1),   # Denver: CO-503
+            ("GF01", 1),  # New York: NY-600
+            ("GF02", 4),  # LA: CA-600, CA-606, CA-607, CA-612
+            ("GF03", 2),  # Chicago: IL-510, IL-511
+            ("GF04", 1),  # Dallas: TX-600
+            ("GF21", 1),  # Denver: CO-503
         ],
     )
     def test_coc_membership_per_metro(self, metro_id, expected_coc_count):
@@ -181,11 +192,11 @@ class TestDataFrameBuilders:
     @pytest.mark.parametrize(
         "metro_id,expected_county_count",
         [
-            ("GF01", 5),   # New York: 5 boroughs
-            ("GF02", 1),   # LA: Los Angeles County
-            ("GF06", 2),   # Houston: Harris, Fort Bend
-            ("GF18", 2),   # St. Louis: county + city
-            ("GF21", 7),   # Denver: 7 counties
+            ("GF01", 5),  # New York: 5 boroughs
+            ("GF02", 1),  # LA: Los Angeles County
+            ("GF06", 2),  # Houston: Harris, Fort Bend
+            ("GF18", 2),  # St. Louis: county + city
+            ("GF21", 7),  # Denver: 7 counties
         ],
     )
     def test_county_membership_per_metro(self, metro_id, expected_county_count):
@@ -274,9 +285,7 @@ class TestDataFrameBuilders:
 
     def test_principal_state_fips_uses_first_state_in_msa_name(self):
         assert (
-            principal_state_fips_for_metro_name(
-                "Washington-Arlington-Alexandria, DC-VA-MD-WV"
-            )
+            principal_state_fips_for_metro_name("Washington-Arlington-Alexandria, DC-VA-MD-WV")
             == "11"
         )
 

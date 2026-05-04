@@ -14,8 +14,8 @@ from typing import Any
 
 import numpy as np
 import pandas as pd
-import hhplab.naming as naming
 
+import hhplab.naming as naming
 from hhplab.provenance import ProvenanceBlock, write_parquet_with_provenance
 
 METRO_DEFINITION_VERSION = "glynn_fox_v1"
@@ -146,7 +146,7 @@ def _acs_module() -> Any:
 
 @lru_cache(maxsize=1)
 def _metro_io_module() -> Any:
-    return import_module("hhplab.metro.io")
+    return import_module("hhplab.metro.metro_io")
 
 
 @lru_cache(maxsize=1)
@@ -278,9 +278,8 @@ def _build_metro_source_panel(project_root: Path) -> pd.DataFrame:
 
     # Build yearly county ZORI (January) and population tables, then
     # delegate to the reusable population-weighted aggregator.
-    zori_yearly = (
-        zori[zori["year"].isin(years)][["geo_id", "year", "zori"]]
-        .rename(columns={"geo_id": "county_fips"})
+    zori_yearly = zori[zori["year"].isin(years)][["geo_id", "year", "zori"]].rename(
+        columns={"geo_id": "county_fips"}
     )
     county_pop_df = pd.concat(county_pop_frames, ignore_index=True)
     metro_zori_df = aggregate_yearly_zori_to_metro(
@@ -335,9 +334,7 @@ def _prepare_raw_panel(
         for geo_id in sorted(df.loc[bad_bound_mask, "geo_id"].unique()):
             drop_reasons.setdefault(geo_id, []).append("pit_exceeds_population")
 
-    bad_identity_mask = df["pit_total"] != (
-        df["pit_sheltered"] + df["pit_unsheltered"]
-    )
+    bad_identity_mask = df["pit_total"] != (df["pit_sheltered"] + df["pit_unsheltered"])
     if bad_identity_mask.any():
         for geo_id in sorted(df.loc[bad_identity_mask, "geo_id"].unique()):
             drop_reasons.setdefault(geo_id, []).append("pit_identity_violation")
@@ -397,13 +394,15 @@ def _validate_raw_panel(
     expected_set = set(expected_years)
     missing_years = sorted(expected_set - set(all_years))
     if missing_years:
-        issues.append({
-            "check": "year_contiguity",
-            "message": f"panel missing required years from declared window "
-                       f"{spec.start_year}-{spec.end_year}: {missing_years}",
-            "missing_years": missing_years,
-            "expected_range": f"{spec.start_year}-{spec.end_year}",
-        })
+        issues.append(
+            {
+                "check": "year_contiguity",
+                "message": f"panel missing required years from declared window "
+                f"{spec.start_year}-{spec.end_year}: {missing_years}",
+                "missing_years": missing_years,
+                "expected_range": f"{spec.start_year}-{spec.end_year}",
+            }
+        )
     else:
         passed_checks.append("year_contiguity")
 
@@ -416,11 +415,13 @@ def _validate_raw_panel(
         if years != expected_set
     }
     if geos_missing:
-        issues.append({
-            "check": "per_geo_year_coverage",
-            "message": "some units are missing years from the declared window",
-            "geos_missing_years": geos_missing,
-        })
+        issues.append(
+            {
+                "check": "per_geo_year_coverage",
+                "message": "some units are missing years from the declared window",
+                "geos_missing_years": geos_missing,
+            }
+        )
     else:
         passed_checks.append("per_geo_year_coverage")
 
@@ -431,10 +432,7 @@ def _validate_raw_panel(
         "total_population",
         "zori",
     ]
-    nonnegative_counts = {
-        col: int((raw_df[col] < 0).sum())
-        for col in numeric_cols
-    }
+    nonnegative_counts = {col: int((raw_df[col] < 0).sum()) for col in numeric_cols}
     if any(nonnegative_counts.values()):
         issues.append({"check": "nonnegative", "counts": nonnegative_counts})
     else:
@@ -454,10 +452,7 @@ def _validate_raw_panel(
     else:
         passed_checks.append("population_bound")
 
-    missing_after_policy = {
-        col: int(raw_df[col].isna().sum())
-        for col in RAW_REQUIRED_COLUMNS
-    }
+    missing_after_policy = {col: int(raw_df[col].isna().sum()) for col in RAW_REQUIRED_COLUMNS}
     if any(missing_after_policy.values()):
         issues.append(
             {
@@ -519,10 +514,12 @@ def _validate_modeling_ready(
     year_counts = modeling_df.groupby("geo_id")["year"].nunique()
     balanced_ok = not year_counts.empty and year_counts.nunique() == 1
     if not balanced_ok:
-        issues.append({
-            "check": "balanced_modeling_panel",
-            "message": "modeling table is not balanced",
-        })
+        issues.append(
+            {
+                "check": "balanced_modeling_panel",
+                "message": "modeling table is not balanced",
+            }
+        )
     else:
         passed_checks.append("balanced_modeling_panel")
 

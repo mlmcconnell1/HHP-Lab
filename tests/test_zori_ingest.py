@@ -17,7 +17,7 @@ import pandas as pd
 import pytest
 
 from hhplab.provenance import read_provenance
-from hhplab.rents.ingest import (
+from hhplab.rents.zori_ingest import (
     ZORI_URLS,
     _validate_monthly_continuity,
     download_zori,
@@ -679,8 +679,7 @@ class TestParseZoriZip:
         """Date parsing and ZORI values are correct."""
         csv_path = tmp_path / "zip.csv"
         csv_path.write_text(
-            "RegionName,StateName,2024-03-31,2024-04-30\n"
-            "90210,California,2500.50,2510.75\n"
+            "RegionName,StateName,2024-03-31,2024-04-30\n90210,California,2500.50,2510.75\n"
         )
         df = parse_zori_zip(csv_path)
 
@@ -698,9 +697,7 @@ class TestParseZoriZip:
         """ZIP codes that don't resolve to 5 digits after zfill are dropped."""
         csv_path = tmp_path / "zip.csv"
         csv_path.write_text(
-            "RegionName,StateName,2024-01-31\n"
-            "10001,New York,1500.00\n"
-            "123456,Nowhere,9999.00\n"
+            "RegionName,StateName,2024-01-31\n10001,New York,1500.00\n123456,Nowhere,9999.00\n"
         )
         df = parse_zori_zip(csv_path)
 
@@ -712,9 +709,7 @@ class TestParseZoriZip:
         """When every ZORI value is null, result is an empty DataFrame."""
         csv_path = tmp_path / "zip.csv"
         csv_path.write_text(
-            "RegionName,StateName,2024-01-31,2024-02-29\n"
-            "10001,New York,,\n"
-            "90210,California,,\n"
+            "RegionName,StateName,2024-01-31,2024-02-29\n10001,New York,,\n90210,California,,\n"
         )
         df = parse_zori_zip(csv_path)
 

@@ -321,7 +321,7 @@ def check_missing_cocs(
     else:
         # Try to load from curated path
         try:
-            from hhplab.geo.io import read_geoparquet, resolve_curated_boundary_path
+            from hhplab.geo.geo_io import read_geoparquet, resolve_curated_boundary_path
 
             if data_dir is None:
                 data_dir = Path("data")

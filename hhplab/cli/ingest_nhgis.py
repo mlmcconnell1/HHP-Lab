@@ -80,7 +80,7 @@ def ingest_nhgis(
         IPUMS_API_KEY=your_key hhplab ingest-nhgis --year 2020
     """
     from hhplab.naming import county_filename, tract_filename
-    from hhplab.nhgis.ingest import (
+    from hhplab.nhgis.nhgis_ingest import (
         SUPPORTED_YEARS,
         NhgisExtractError,
         ingest_nhgis_counties,

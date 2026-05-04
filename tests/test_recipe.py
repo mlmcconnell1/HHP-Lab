@@ -29,8 +29,8 @@ from hhplab.recipe.executor import (
     ExecutorError,
     PipelineResult,
     StepResult,
-    _assemble_panel,
     _apply_temporal_filter,
+    _assemble_panel,
     _canonicalize_panel_for_target,
     _execute_materialize,
     _execute_resample,
@@ -70,21 +70,21 @@ runner = CliRunner()
 
 STALE_TRANSLATED_ACS_PATH = "data/curated/acs/acs5_tracts__A2019xT2020.parquet"
 STALE_TRANSLATED_ACS_VINTAGE = "2015-2019"
-STALE_TRANSLATED_ACS_REBUILD = (
-    "hhplab ingest acs5-tract --acs 2015-2019 --tracts 2020 --force"
-)
+STALE_TRANSLATED_ACS_REBUILD = "hhplab ingest acs5-tract --acs 2015-2019 --tracts 2020 --force"
 
 
 def _write_stale_translated_acs_cache(path: Path) -> None:
     """Write a stale translated ACS tract cache missing translation metadata."""
     write_parquet_with_provenance(
-        pd.DataFrame({
-            "tract_geoid": ["T1"],
-            "year": [2020],
-            "acs_vintage": [STALE_TRANSLATED_ACS_VINTAGE],
-            "tract_vintage": ["2020"],
-            "total_population": [100],
-        }),
+        pd.DataFrame(
+            {
+                "tract_geoid": ["T1"],
+                "year": [2020],
+                "acs_vintage": [STALE_TRANSLATED_ACS_VINTAGE],
+                "tract_vintage": ["2020"],
+                "total_population": [100],
+            }
+        ),
         path,
         ProvenanceBlock(
             acs_vintage=STALE_TRANSLATED_ACS_VINTAGE,
@@ -97,6 +97,7 @@ def _write_stale_translated_acs_cache(path: Path) -> None:
 # ---------------------------------------------------------------------------
 # Minimal valid recipe dict (reusable fixture)
 # ---------------------------------------------------------------------------
+
 
 def _minimal_recipe() -> dict:
     """Return a minimal valid v1 recipe dict."""
@@ -195,8 +196,7 @@ class TestLoadRecipeFromDict:
         data["datasets"]["acs"]["years"] = "2020-2022"
         recipe = load_recipe(data)
         assert (
-            recipe.datasets["acs"].path
-            == "data/curated/measures/coc_measures__2020__2019.parquet"
+            recipe.datasets["acs"].path == "data/curated/measures/coc_measures__2020__2019.parquet"
         )
 
     def test_dataset_path_rejects_absolute(self):
@@ -279,7 +279,6 @@ class TestLoadRecipeFromFile:
 
 
 class TestGeometryAdapterRegistry:
-
     def test_unregistered_type_returns_error(self):
         reg = GeometryAdapterRegistry()
         ref = GeometryRef(type="alien", vintage=2025)
@@ -327,7 +326,6 @@ class TestGeometryAdapterRegistry:
 
 
 class TestDatasetAdapterRegistry:
-
     def _make_spec(self, provider: str = "census", product: str = "acs5") -> DatasetSpec:
         return DatasetSpec(
             provider=provider,
@@ -383,7 +381,6 @@ class TestDatasetAdapterRegistry:
 
 
 class TestValidateRecipeAdapters:
-
     def test_all_unregistered_returns_errors(self):
         recipe = load_recipe(_minimal_recipe())
         geo_reg = GeometryAdapterRegistry()
@@ -423,12 +420,16 @@ class TestValidateRecipeAdapters:
 
 
 class TestRecipeCLI:
-
     def test_missing_recipe_file(self, tmp_path: Path):
-        result = runner.invoke(app, [
-            "build", "recipe",
-            "--recipe", str(tmp_path / "missing.yaml"),
-        ])
+        result = runner.invoke(
+            app,
+            [
+                "build",
+                "recipe",
+                "--recipe",
+                str(tmp_path / "missing.yaml"),
+            ],
+        )
         assert result.exit_code == 2
         assert "not found" in result.output
 
@@ -437,20 +438,30 @@ class TestRecipeCLI:
 
         recipe_file = tmp_path / "recipe.yaml"
         recipe_file.write_text(yaml.dump(_minimal_recipe()), encoding="utf-8")
-        result = runner.invoke(app, [
-            "build", "recipe",
-            "--recipe", str(recipe_file),
-        ])
+        result = runner.invoke(
+            app,
+            [
+                "build",
+                "recipe",
+                "--recipe",
+                str(recipe_file),
+            ],
+        )
         # Will have adapter errors (no adapters registered) but should load OK
         assert "Loaded recipe: test-recipe" in result.output
 
     def test_invalid_yaml_exits_2(self, tmp_path: Path):
         bad = tmp_path / "bad.yaml"
         bad.write_text("version: notanint\nname: bad", encoding="utf-8")
-        result = runner.invoke(app, [
-            "build", "recipe",
-            "--recipe", str(bad),
-        ])
+        result = runner.invoke(
+            app,
+            [
+                "build",
+                "recipe",
+                "--recipe",
+                str(bad),
+            ],
+        )
         assert result.exit_code == 2
 
     def test_schema_error_exits_2(self, tmp_path: Path):
@@ -460,10 +471,15 @@ class TestRecipeCLI:
         del data["name"]
         f = tmp_path / "noname.yaml"
         f.write_text(yaml.dump(data), encoding="utf-8")
-        result = runner.invoke(app, [
-            "build", "recipe",
-            "--recipe", str(f),
-        ])
+        result = runner.invoke(
+            app,
+            [
+                "build",
+                "recipe",
+                "--recipe",
+                str(f),
+            ],
+        )
         assert result.exit_code == 2
 
     def test_dry_run_succeeds(self, tmp_path: Path):
@@ -471,11 +487,16 @@ class TestRecipeCLI:
 
         recipe_file = tmp_path / "recipe.yaml"
         recipe_file.write_text(yaml.dump(_minimal_recipe()), encoding="utf-8")
-        result = runner.invoke(app, [
-            "build", "recipe",
-            "--recipe", str(recipe_file),
-            "--dry-run",
-        ])
+        result = runner.invoke(
+            app,
+            [
+                "build",
+                "recipe",
+                "--recipe",
+                str(recipe_file),
+                "--dry-run",
+            ],
+        )
         assert "Loaded recipe: test-recipe" in result.output
 
     def test_missing_static_path_reported(self, tmp_path: Path):
@@ -486,10 +507,15 @@ class TestRecipeCLI:
         data["datasets"]["acs"]["years"] = "2020-2022"
         recipe_file = tmp_path / "recipe.yaml"
         recipe_file.write_text(yaml.dump(data), encoding="utf-8")
-        result = runner.invoke(app, [
-            "build", "recipe",
-            "--recipe", str(recipe_file),
-        ])
+        result = runner.invoke(
+            app,
+            [
+                "build",
+                "recipe",
+                "--recipe",
+                str(recipe_file),
+            ],
+        )
         # Missing dataset now routes through shared preflight output
         assert "does_not_exist.parquet" in result.output
         assert "blocker" in result.output.lower() or "Preflight" in result.output
@@ -502,10 +528,15 @@ class TestRecipeCLI:
         data["universe"] = {"range": "2015-2015"}
         recipe_file = tmp_path / "recipe.yaml"
         recipe_file.write_text(yaml.dump(data), encoding="utf-8")
-        result = runner.invoke(app, [
-            "build", "recipe",
-            "--recipe", str(recipe_file),
-        ])
+        result = runner.invoke(
+            app,
+            [
+                "build",
+                "recipe",
+                "--recipe",
+                str(recipe_file),
+            ],
+        )
         # Missing file_set paths now route through shared preflight output
         assert "acs_2015.parquet" in result.output or "missing" in result.output.lower()
         assert "blocker" in result.output.lower() or "Preflight" in result.output
@@ -530,10 +561,15 @@ class TestRecipeCLI:
         data["datasets"]["acs"]["years"] = "2020-2022"
         recipe_file = tmp_path / "recipe.yaml"
         recipe_file.write_text(yaml.dump(data), encoding="utf-8")
-        result = runner.invoke(app, [
-            "build", "recipe",
-            "--recipe", str(recipe_file),
-        ])
+        result = runner.invoke(
+            app,
+            [
+                "build",
+                "recipe",
+                "--recipe",
+                str(recipe_file),
+            ],
+        )
         assert "Missing file" not in result.output
 
     def test_optional_dataset_missing_warns_not_errors(self, tmp_path: Path):
@@ -545,10 +581,15 @@ class TestRecipeCLI:
         data["datasets"]["acs"]["optional"] = True
         recipe_file = tmp_path / "recipe.yaml"
         recipe_file.write_text(yaml.dump(data), encoding="utf-8")
-        result = runner.invoke(app, [
-            "build", "recipe",
-            "--recipe", str(recipe_file),
-        ])
+        result = runner.invoke(
+            app,
+            [
+                "build",
+                "recipe",
+                "--recipe",
+                str(recipe_file),
+            ],
+        )
         # Optional missing datasets appear as preflight warning, not blocker
         assert "missing.parquet" in result.output
         assert "Warning" in result.output or "warning" in result.output.lower()
@@ -563,10 +604,15 @@ class TestRecipeCLI:
         data["validation"] = {"missing_dataset": {"default": "warn"}}
         recipe_file = tmp_path / "recipe.yaml"
         recipe_file.write_text(yaml.dump(data), encoding="utf-8")
-        result = runner.invoke(app, [
-            "build", "recipe",
-            "--recipe", str(recipe_file),
-        ])
+        result = runner.invoke(
+            app,
+            [
+                "build",
+                "recipe",
+                "--recipe",
+                str(recipe_file),
+            ],
+        )
         assert "missing.parquet" in result.output
         assert "Warning" in result.output or "warning" in result.output.lower()
         assert "all clear" in result.output
@@ -581,10 +627,15 @@ class TestRecipeCLI:
         data["validation"] = {"missing_dataset": {"default": "fail", "acs": "warn"}}
         recipe_file = tmp_path / "recipe.yaml"
         recipe_file.write_text(yaml.dump(data), encoding="utf-8")
-        result = runner.invoke(app, [
-            "build", "recipe",
-            "--recipe", str(recipe_file),
-        ])
+        result = runner.invoke(
+            app,
+            [
+                "build",
+                "recipe",
+                "--recipe",
+                str(recipe_file),
+            ],
+        )
         # Per-dataset warn policy downgrades to preflight warning
         assert "Warning" in result.output or "warning" in result.output.lower()
         assert "all clear" in result.output
@@ -600,10 +651,15 @@ class TestRecipeCLI:
         data["validation"] = {"missing_dataset": {"default": "warn", "acs": "fail"}}
         recipe_file = tmp_path / "recipe.yaml"
         recipe_file.write_text(yaml.dump(data), encoding="utf-8")
-        result = runner.invoke(app, [
-            "build", "recipe",
-            "--recipe", str(recipe_file),
-        ])
+        result = runner.invoke(
+            app,
+            [
+                "build",
+                "recipe",
+                "--recipe",
+                str(recipe_file),
+            ],
+        )
         # Per-dataset fail policy overrides optional → preflight blocker
         assert "blocker" in result.output.lower() or "Preflight" in result.output
 
@@ -614,7 +670,6 @@ class TestRecipeCLI:
 
 
 class TestExpandYearSpec:
-
     def test_from_range_string(self):
         assert expand_year_spec("2018-2020") == [2018, 2019, 2020]
 
@@ -710,7 +765,6 @@ def _recipe_with_file_set(**overrides) -> dict:
 
 
 class TestFileSetSchema:
-
     def test_valid_file_set_parses(self):
         recipe = load_recipe(_recipe_with_file_set())
         assert recipe.datasets["acs"].file_set is not None
@@ -793,7 +847,6 @@ class TestFileSetSchema:
 
 
 class TestStaticPathMultiYear:
-
     def test_static_path_no_years_multi_year_universe_rejected(self):
         data = _minimal_recipe()
         data["datasets"]["acs"]["path"] = "data/acs.parquet"
@@ -828,7 +881,6 @@ class TestStaticPathMultiYear:
 
 
 class TestViaAuto:
-
     def test_via_auto_accepted_for_aggregate(self):
         data = _recipe_with_file_set()
         recipe = load_recipe(data)
@@ -858,7 +910,6 @@ class TestViaAuto:
 
 
 class TestJoinOn:
-
     def test_join_on_parses(self):
         data = _recipe_with_file_set()
         recipe = load_recipe(data)
@@ -867,9 +918,7 @@ class TestJoinOn:
 
     def test_join_on_default(self):
         data = _minimal_recipe()
-        data["pipelines"][0]["steps"].append(
-            {"kind": "join", "datasets": ["acs"]}
-        )
+        data["pipelines"][0]["steps"].append({"kind": "join", "datasets": ["acs"]})
         recipe = load_recipe(data)
         join_step = recipe.pipelines[0].steps[-1]
         assert join_step.join_on == ["geo_id", "year"]
@@ -881,7 +930,6 @@ class TestJoinOn:
 
 
 class TestDatasetYears:
-
     def test_years_range_string_accepted(self):
         data = _minimal_recipe()
         data["datasets"]["acs"]["years"] = "2020-2022"
@@ -906,7 +954,6 @@ class TestDatasetYears:
 
 
 class TestYearSpecCoercion:
-
     def test_bare_string_coerced_in_universe(self):
         data = _minimal_recipe()
         data["universe"] = "2020-2022"
@@ -928,7 +975,6 @@ class TestYearSpecCoercion:
 
 
 class TestOptionalTransformsPipelines:
-
     def test_missing_transforms_defaults_empty(self):
         data = _minimal_recipe()
         del data["transforms"]
@@ -951,7 +997,6 @@ class TestOptionalTransformsPipelines:
 
 
 class TestVintageSetsSchema:
-
     def test_vintage_sets_defaults_empty(self):
         """Existing recipes without vintage_sets still parse."""
         recipe = load_recipe(_minimal_recipe())
@@ -1060,7 +1105,6 @@ class TestVintageSetsSchema:
 
 
 class TestMissingDatasetPolicyValidation:
-
     def test_valid_per_dataset_policy_accepted(self):
         """Per-dataset policy keys matching declared datasets are accepted."""
         data = _minimal_recipe()
@@ -1091,7 +1135,6 @@ class TestMissingDatasetPolicyValidation:
 
 
 class TestTemporalFilterPolicyValidation:
-
     def test_acs_temporal_filter_rejected(self):
         data = _minimal_recipe()
         data["filters"] = {
@@ -1214,7 +1257,9 @@ class TestDefaultAdapters:
         from hhplab.recipe.default_dataset_adapters import _validate_hud_pit
 
         spec = DatasetSpec(
-            provider="hud", product="pit", version=1,
+            provider="hud",
+            product="pit",
+            version=1,
             native_geometry=GeometryRef(type="coc"),
             params={"vintage": 2024, "align": "point_in_time_jan"},
         )
@@ -1225,7 +1270,9 @@ class TestDefaultAdapters:
         from hhplab.recipe.default_dataset_adapters import _validate_hud_pit
 
         spec = DatasetSpec(
-            provider="hud", product="pit", version=2,
+            provider="hud",
+            product="pit",
+            version=2,
             native_geometry=GeometryRef(type="coc"),
         )
         diags = _validate_hud_pit(spec)
@@ -1235,7 +1282,9 @@ class TestDefaultAdapters:
         from hhplab.recipe.default_dataset_adapters import _validate_hud_pit
 
         spec = DatasetSpec(
-            provider="hud", product="pit", version=1,
+            provider="hud",
+            product="pit",
+            version=1,
             native_geometry=GeometryRef(type="tract"),
         )
         diags = _validate_hud_pit(spec)
@@ -1245,7 +1294,9 @@ class TestDefaultAdapters:
         from hhplab.recipe.default_dataset_adapters import _validate_hud_pit
 
         spec = DatasetSpec(
-            provider="hud", product="pit", version=1,
+            provider="hud",
+            product="pit",
+            version=1,
             native_geometry=GeometryRef(type="coc"),
             params={"vintage": 2024, "unknown_param": True},
         )
@@ -1256,7 +1307,9 @@ class TestDefaultAdapters:
         from hhplab.recipe.default_dataset_adapters import _validate_census_acs5
 
         spec = DatasetSpec(
-            provider="census", product="acs5", version=1,
+            provider="census",
+            product="acs5",
+            version=1,
             native_geometry=GeometryRef(type="tract", vintage=2020),
         )
         assert _validate_census_acs5(spec) == []
@@ -1265,7 +1318,9 @@ class TestDefaultAdapters:
         from hhplab.recipe.default_dataset_adapters import _validate_census_acs
 
         spec = DatasetSpec(
-            provider="census", product="acs", version=1,
+            provider="census",
+            product="acs",
+            version=1,
             native_geometry=GeometryRef(type="tract"),
         )
         assert _validate_census_acs(spec) == []
@@ -1274,7 +1329,9 @@ class TestDefaultAdapters:
         from hhplab.recipe.default_dataset_adapters import _validate_zillow_zori
 
         spec = DatasetSpec(
-            provider="zillow", product="zori", version=1,
+            provider="zillow",
+            product="zori",
+            version=1,
             native_geometry=GeometryRef(type="county"),
         )
         assert _validate_zillow_zori(spec) == []
@@ -1283,7 +1340,9 @@ class TestDefaultAdapters:
         from hhplab.recipe.default_dataset_adapters import _validate_zillow_zori
 
         spec = DatasetSpec(
-            provider="zillow", product="zori", version=1,
+            provider="zillow",
+            product="zori",
+            version=1,
             native_geometry=GeometryRef(type="zip"),
         )
         diags = _validate_zillow_zori(spec)
@@ -1298,19 +1357,23 @@ class TestDefaultAdapters:
         dataset_registry.reset()
         register_defaults()
 
-        recipe = load_recipe({
-            "version": 1,
-            "name": "test",
-            "universe": {"range": "2020-2022"},
-            "targets": [{"id": "t", "geometry": {"type": "coc", "vintage": 2025}}],
-            "datasets": {
-                "pit": {
-                    "provider": "hud", "product": "pit", "version": 1,
-                    "native_geometry": {"type": "coc"},
-                    "params": {"vintage": 2024, "align": "point_in_time_jan"},
+        recipe = load_recipe(
+            {
+                "version": 1,
+                "name": "test",
+                "universe": {"range": "2020-2022"},
+                "targets": [{"id": "t", "geometry": {"type": "coc", "vintage": 2025}}],
+                "datasets": {
+                    "pit": {
+                        "provider": "hud",
+                        "product": "pit",
+                        "version": 1,
+                        "native_geometry": {"type": "coc"},
+                        "params": {"vintage": 2024, "align": "point_in_time_jan"},
+                    },
                 },
-            },
-        })
+            }
+        )
         diags = validate_recipe_adapters(recipe, geometry_registry, dataset_registry)
         errors = [d for d in diags if d.level == "error"]
         assert errors == [], f"Unexpected errors: {[e.message for e in errors]}"
@@ -1398,11 +1461,13 @@ def _setup_pipeline_fixtures(tmp_path: Path) -> None:
     boundaries_dir = tmp_path / "data" / "curated" / "coc_boundaries"
     xwalk_dir.mkdir(parents=True)
     boundaries_dir.mkdir(parents=True)
-    xwalk = pd.DataFrame({
-        "coc_id": ["COC1", "COC2"],
-        "tract_geoid": ["T1", "T2"],
-        "area_share": [1.0, 1.0],
-    })
+    xwalk = pd.DataFrame(
+        {
+            "coc_id": ["COC1", "COC2"],
+            "tract_geoid": ["T1", "T2"],
+            "area_share": [1.0, 1.0],
+        }
+    )
     xwalk.to_parquet(xwalk_dir / "xwalk__B2025xT2020.parquet")
     gpd.GeoDataFrame(
         {
@@ -1421,19 +1486,23 @@ def _setup_pipeline_fixtures(tmp_path: Path) -> None:
     # PIT dataset (identity passthrough) — includes both universe years
     pit_path = tmp_path / "data" / "pit.parquet"
     pit_path.parent.mkdir(parents=True, exist_ok=True)
-    pd.DataFrame({
-        "coc_id": ["COC1", "COC2", "COC1", "COC2"],
-        "year": [2020, 2020, 2021, 2021],
-        "pit_total": [10, 20, 11, 21],
-    }).to_parquet(pit_path)
+    pd.DataFrame(
+        {
+            "coc_id": ["COC1", "COC2", "COC1", "COC2"],
+            "year": [2020, 2020, 2021, 2021],
+            "pit_total": [10, 20, 11, 21],
+        }
+    ).to_parquet(pit_path)
 
     # ACS dataset (aggregate) — includes both universe years
     acs_path = tmp_path / "data" / "acs.parquet"
-    pd.DataFrame({
-        "GEOID": ["T1", "T2", "T1", "T2"],
-        "year": [2020, 2020, 2021, 2021],
-        "total_population": [100, 200, 110, 210],
-    }).to_parquet(acs_path)
+    pd.DataFrame(
+        {
+            "GEOID": ["T1", "T2", "T1", "T2"],
+            "year": [2020, 2020, 2021, 2021],
+            "total_population": [100, 200, 110, 210],
+        }
+    ).to_parquet(acs_path)
 
 
 def _default_recipe_output_dir(project_root: Path, recipe_name: str) -> Path:
@@ -1442,7 +1511,6 @@ def _default_recipe_output_dir(project_root: Path, recipe_name: str) -> Path:
 
 
 class TestRecipeOutputPaths:
-
     def test_recipe_output_dirname_normalizes_free_form_names(self):
         assert _recipe_output_dirname("Metro Executor Test") == "metro-executor-test"
         assert _recipe_output_dirname("  demo/report v1  ") == "demo-report-v1"
@@ -1519,21 +1587,25 @@ def _setup_metro_pipeline_fixtures(tmp_path: Path) -> None:
     """Create metro-native dataset files for _recipe_with_metro_pipeline."""
     data_dir = tmp_path / "data"
     data_dir.mkdir(parents=True, exist_ok=True)
-    pd.DataFrame({
-        "metro_id": ["GF01", "GF02", "GF01", "GF02"],
-        "year": [2020, 2020, 2021, 2021],
-        "pit_total": [10, 20, 11, 21],
-    }).to_parquet(data_dir / "metro_pit.parquet")
-    pd.DataFrame({
-        "metro_id": ["GF01", "GF02", "GF01", "GF02"],
-        "year": [2020, 2020, 2021, 2021],
-        "total_population": [100, 200, 110, 210],
-    }).to_parquet(data_dir / "metro_acs.parquet")
+    pd.DataFrame(
+        {
+            "metro_id": ["GF01", "GF02", "GF01", "GF02"],
+            "year": [2020, 2020, 2021, 2021],
+            "pit_total": [10, 20, 11, 21],
+        }
+    ).to_parquet(data_dir / "metro_pit.parquet")
+    pd.DataFrame(
+        {
+            "metro_id": ["GF01", "GF02", "GF01", "GF02"],
+            "year": [2020, 2020, 2021, 2021],
+            "total_population": [100, 200, 110, 210],
+        }
+    ).to_parquet(data_dir / "metro_acs.parquet")
 
 
 def _setup_curated_metro_artifacts(tmp_path: Path) -> None:
     """Write the curated Glynn/Fox metro definition artifacts for tests."""
-    from hhplab.metro.io import write_metro_artifacts
+    from hhplab.metro.metro_io import write_metro_artifacts
 
     write_metro_artifacts(base_dir=tmp_path / "data")
 
@@ -1561,7 +1633,10 @@ def _setup_curated_metro_universe_subset_artifacts(tmp_path: Path) -> None:
         {
             "metro_id": ["35620", "31080"],
             "cbsa_code": ["35620", "31080"],
-            "metro_name": ["New York-Newark-Jersey City, NY-NJ-PA", "Los Angeles-Long Beach-Anaheim, CA"],
+            "metro_name": [
+                "New York-Newark-Jersey City, NY-NJ-PA",
+                "Los Angeles-Long Beach-Anaheim, CA",
+            ],
             "definition_version": ["census_msa_2023", "census_msa_2023"],
         }
     ).to_parquet(universe_path)
@@ -1648,7 +1723,6 @@ def _county_to_metro_recipe(
 
 
 class TestExecutor:
-
     def test_execute_recipe_returns_results(self, tmp_path: Path):
         _setup_pipeline_fixtures(tmp_path)
         data = _recipe_with_pipeline()
@@ -1683,37 +1757,39 @@ class TestExecutor:
         results = execute_recipe(recipe, project_root=tmp_path)
         assert len(results[0].steps) == 8
 
-    def test_materialize_generates_subset_filtered_canonical_metro_artifact(
-        self, tmp_path: Path
-    ):
+    def test_materialize_generates_subset_filtered_canonical_metro_artifact(self, tmp_path: Path):
         _setup_curated_metro_universe_subset_artifacts(tmp_path)
 
         data = _recipe_with_pipeline()
-        data["targets"] = [{
-            "id": "metro_panel",
-            "geometry": {
-                "type": "metro",
-                "source": "census_msa_2023",
-                "subset_profile": "glynn_fox",
-                "subset_profile_definition_version": "glynn_fox_v1",
-            },
-        }]
+        data["targets"] = [
+            {
+                "id": "metro_panel",
+                "geometry": {
+                    "type": "metro",
+                    "source": "census_msa_2023",
+                    "subset_profile": "glynn_fox",
+                    "subset_profile_definition_version": "glynn_fox_v1",
+                },
+            }
+        ]
         data["pipelines"][0]["target"] = "metro_panel"
         data["pipelines"][0]["steps"] = [
             {"materialize": {"transforms": ["county_to_metro"]}},
         ]
-        data["transforms"] = [{
-            "id": "county_to_metro",
-            "type": "crosswalk",
-            "from": {"type": "county", "vintage": 2020},
-            "to": {
-                "type": "metro",
-                "source": "census_msa_2023",
-                "subset_profile": "glynn_fox",
-                "subset_profile_definition_version": "glynn_fox_v1",
-            },
-            "spec": {"weighting": {"scheme": "area"}},
-        }]
+        data["transforms"] = [
+            {
+                "id": "county_to_metro",
+                "type": "crosswalk",
+                "from": {"type": "county", "vintage": 2020},
+                "to": {
+                    "type": "metro",
+                    "source": "census_msa_2023",
+                    "subset_profile": "glynn_fox",
+                    "subset_profile_definition_version": "glynn_fox_v1",
+                },
+                "spec": {"weighting": {"scheme": "area"}},
+            }
+        ]
         recipe = load_recipe(data)
         ctx = ExecutionContext(project_root=tmp_path, recipe=recipe)
 
@@ -1725,9 +1801,7 @@ class TestExecutor:
         assert list(xwalk["profile_metro_id"]) == ["GF02", "GF01"]
         assert (xwalk["definition_version"] == "census_msa_2023").all()
 
-    def test_assemble_panel_adds_subset_profile_metadata_for_canonical_metros(
-        self, tmp_path: Path
-    ):
+    def test_assemble_panel_adds_subset_profile_metadata_for_canonical_metros(self, tmp_path: Path):
         _setup_curated_metro_universe_subset_artifacts(tmp_path)
 
         recipe = load_recipe(
@@ -1775,21 +1849,28 @@ class TestExecutor:
         assert panel.loc[0, "metro_name"] == "Los Angeles-Long Beach-Anaheim, CA"
 
     def test_execute_recipe_coc_panel_preserves_name_and_derives_density(
-        self, tmp_path: Path,
+        self,
+        tmp_path: Path,
     ):
         _setup_pipeline_fixtures(tmp_path)
-        pd.DataFrame({
-            "coc_id": ["COC1", "COC2", "COC1", "COC2"],
-            "year": [2020, 2020, 2021, 2021],
-            "pit_total": [10, 20, 11, 21],
-            "pit_sheltered": [6, 12, 7, 13],
-            "pit_unsheltered": [4, 8, 4, 8],
-        }).to_parquet(tmp_path / "data" / "pit.parquet")
+        pd.DataFrame(
+            {
+                "coc_id": ["COC1", "COC2", "COC1", "COC2"],
+                "year": [2020, 2020, 2021, 2021],
+                "pit_total": [10, 20, 11, 21],
+                "pit_sheltered": [6, 12, 7, 13],
+                "pit_unsheltered": [4, 8, 4, 8],
+            }
+        ).to_parquet(tmp_path / "data" / "pit.parquet")
 
         data = _recipe_with_pipeline()
         data["datasets"]["pit"]["path"] = "data/pit.parquet"
         data["datasets"]["acs"]["path"] = "data/acs.parquet"
-        data["pipelines"][0]["steps"][1]["resample"]["measures"] = ["pit_total", "pit_sheltered", "pit_unsheltered"]
+        data["pipelines"][0]["steps"][1]["resample"]["measures"] = [
+            "pit_total",
+            "pit_sheltered",
+            "pit_unsheltered",
+        ]
 
         recipe = load_recipe(data)
         results = execute_recipe(recipe, project_root=tmp_path)
@@ -1843,10 +1924,12 @@ class TestExecutor:
         """A yearless dataset should not be silently reused across many years."""
         _setup_pipeline_fixtures(tmp_path)
         acs_path = tmp_path / "data" / "acs.parquet"
-        pd.DataFrame({
-            "GEOID": ["T1", "T2"],
-            "total_population": [100, 200],
-        }).to_parquet(acs_path)
+        pd.DataFrame(
+            {
+                "GEOID": ["T1", "T2"],
+                "total_population": [100, 200],
+            }
+        ).to_parquet(acs_path)
 
         data = _recipe_with_pipeline()
         data["datasets"]["pit"]["path"] = "data/pit.parquet"
@@ -1863,10 +1946,12 @@ class TestExecutor:
         """Explicit broadcast opt-in should preserve current passthrough behavior."""
         _setup_pipeline_fixtures(tmp_path)
         acs_path = tmp_path / "data" / "acs.parquet"
-        pd.DataFrame({
-            "GEOID": ["T1", "T2"],
-            "total_population": [100, 200],
-        }).to_parquet(acs_path)
+        pd.DataFrame(
+            {
+                "GEOID": ["T1", "T2"],
+                "total_population": [100, 200],
+            }
+        ).to_parquet(acs_path)
 
         data = _recipe_with_pipeline()
         data["datasets"]["pit"]["path"] = "data/pit.parquet"
@@ -1886,7 +1971,8 @@ class TestExecutor:
         assert list(panel["acs5_vintage_used"]) == ["2020", "2021", "2020", "2021"]
 
     def test_execute_recipe_allows_yearless_file_set_with_distinct_paths(
-        self, tmp_path: Path,
+        self,
+        tmp_path: Path,
     ):
         """Year-specific files should not require a row-level year column."""
         _setup_pipeline_fixtures(tmp_path)
@@ -1903,14 +1989,18 @@ class TestExecutor:
             ],
         }
 
-        pd.DataFrame({
-            "GEOID": ["T1", "T2"],
-            "total_population": [100, 200],
-        }).to_parquet(tmp_path / "data" / "acs_2020.parquet")
-        pd.DataFrame({
-            "GEOID": ["T1", "T2"],
-            "total_population": [110, 210],
-        }).to_parquet(tmp_path / "data" / "acs_2021.parquet")
+        pd.DataFrame(
+            {
+                "GEOID": ["T1", "T2"],
+                "total_population": [100, 200],
+            }
+        ).to_parquet(tmp_path / "data" / "acs_2020.parquet")
+        pd.DataFrame(
+            {
+                "GEOID": ["T1", "T2"],
+                "total_population": [110, 210],
+            }
+        ).to_parquet(tmp_path / "data" / "acs_2021.parquet")
 
         recipe = load_recipe(data)
         results = execute_recipe(recipe, project_root=tmp_path)
@@ -1925,15 +2015,18 @@ class TestExecutor:
         assert list(panel["acs5_vintage_used"]) == ["2020", "2021", "2020", "2021"]
 
     def test_execute_recipe_rejects_file_set_reusing_same_static_path(
-        self, tmp_path: Path,
+        self,
+        tmp_path: Path,
     ):
         """file_set should still fail when all years resolve to one static file."""
         _setup_pipeline_fixtures(tmp_path)
         static_path = tmp_path / "data" / "acs_static.parquet"
-        pd.DataFrame({
-            "GEOID": ["T1", "T2"],
-            "total_population": [100, 200],
-        }).to_parquet(static_path)
+        pd.DataFrame(
+            {
+                "GEOID": ["T1", "T2"],
+                "total_population": [100, 200],
+            }
+        ).to_parquet(static_path)
 
         data = _recipe_with_pipeline()
         data["datasets"]["pit"]["path"] = "data/pit.parquet"
@@ -1968,15 +2061,18 @@ class TestExecutor:
         """Planner failures should be raised as ExecutorError with pipeline context."""
         data = _recipe_with_pipeline()
         # Add a resample with via:auto but no matching transform
-        data["pipelines"][0]["steps"].insert(1, {
-            "resample": {
-                "dataset": "acs",
-                "to_geometry": {"type": "county"},
-                "method": "aggregate",
-                "via": "auto",
-                "measures": ["total_population"],
+        data["pipelines"][0]["steps"].insert(
+            1,
+            {
+                "resample": {
+                    "dataset": "acs",
+                    "to_geometry": {"type": "county"},
+                    "method": "aggregate",
+                    "via": "auto",
+                    "measures": ["total_population"],
+                },
             },
-        })
+        )
         recipe = load_recipe(data)
         with pytest.raises(ExecutorError, match="Pipeline 'main'.*planning failed"):
             execute_recipe(recipe, project_root=tmp_path)
@@ -1998,7 +2094,8 @@ class TestExecutor:
         assert (panel["definition_version_used"] == "glynn_fox_v1").all()
 
     def test_execute_recipe_explicit_subset_matches_legacy_glynn_fox_outputs(
-        self, tmp_path: Path,
+        self,
+        tmp_path: Path,
     ):
         _setup_curated_metro_artifacts(tmp_path)
         _setup_curated_metro_universe_subset_artifacts(tmp_path)
@@ -2045,10 +2142,20 @@ class TestExecutor:
             _default_recipe_output_dir(tmp_path, "legacy-glynn-fox").glob("panel__metro__*.parquet")
         )
         subset_panel_path = next(
-            _default_recipe_output_dir(tmp_path, "canonical-subset-glynn-fox").glob("panel__metro__*.parquet")
+            _default_recipe_output_dir(tmp_path, "canonical-subset-glynn-fox").glob(
+                "panel__metro__*.parquet"
+            )
         )
-        legacy_panel = pd.read_parquet(legacy_panel_path).sort_values(["metro_id", "year"]).reset_index(drop=True)
-        subset_panel = pd.read_parquet(subset_panel_path).sort_values(["profile_metro_id", "year"]).reset_index(drop=True)
+        legacy_panel = (
+            pd.read_parquet(legacy_panel_path)
+            .sort_values(["metro_id", "year"])
+            .reset_index(drop=True)
+        )
+        subset_panel = (
+            pd.read_parquet(subset_panel_path)
+            .sort_values(["profile_metro_id", "year"])
+            .reset_index(drop=True)
+        )
 
         assert list(subset_panel["metro_id"]) == ["35620", "35620", "31080", "31080"]
         assert list(subset_panel["geo_id"]) == ["35620", "35620", "31080", "31080"]
@@ -2060,16 +2167,22 @@ class TestExecutor:
         subset_projection = subset_panel[["profile_metro_id", "year", "population"]]
         pd.testing.assert_frame_equal(legacy_projection, subset_projection, check_dtype=False)
 
-        subset_canonical_names = subset_panel[["profile_metro_id", "metro_name"]].drop_duplicates().sort_values(
-            "profile_metro_id"
-        ).reset_index(drop=True)
+        subset_canonical_names = (
+            subset_panel[["profile_metro_id", "metro_name"]]
+            .drop_duplicates()
+            .sort_values("profile_metro_id")
+            .reset_index(drop=True)
+        )
         assert list(subset_canonical_names["metro_name"]) == [
             "New York-Newark-Jersey City, NY-NJ-PA",
             "Los Angeles-Long Beach-Anaheim, CA",
         ]
-        subset_profile_names = subset_panel[["profile_metro_id", "profile_metro_name"]].drop_duplicates().sort_values(
-            "profile_metro_id"
-        ).reset_index(drop=True)
+        subset_profile_names = (
+            subset_panel[["profile_metro_id", "profile_metro_name"]]
+            .drop_duplicates()
+            .sort_values("profile_metro_id")
+            .reset_index(drop=True)
+        )
         assert list(subset_profile_names["profile_metro_name"]) == ["New York", "Los Angeles"]
 
 
@@ -2142,8 +2255,7 @@ class TestTargetOutputsEnforcement:
         assert results[0].success
         assert map_steps[0].success
         assert (
-            _default_recipe_output_dir(tmp_path, "executor-test")
-            / "map__Y2020-2021@B2025.html"
+            _default_recipe_output_dir(tmp_path, "executor-test") / "map__Y2020-2021@B2025.html"
         ).exists()
 
 
@@ -2327,20 +2439,25 @@ class TestPanelPolicy:
 
 
 class TestPipelineResult:
-
     def test_success_all_ok(self):
-        r = PipelineResult(pipeline_id="test", steps=[
-            StepResult(step_kind="resample", detail="ok", success=True),
-            StepResult(step_kind="join", detail="ok", success=True),
-        ])
+        r = PipelineResult(
+            pipeline_id="test",
+            steps=[
+                StepResult(step_kind="resample", detail="ok", success=True),
+                StepResult(step_kind="join", detail="ok", success=True),
+            ],
+        )
         assert r.success
         assert r.error_count == 0
 
     def test_failure_detected(self):
-        r = PipelineResult(pipeline_id="test", steps=[
-            StepResult(step_kind="resample", detail="ok", success=True),
-            StepResult(step_kind="join", detail="boom", success=False, error="fail"),
-        ])
+        r = PipelineResult(
+            pipeline_id="test",
+            steps=[
+                StepResult(step_kind="resample", detail="ok", success=True),
+                StepResult(step_kind="join", detail="boom", success=False, error="fail"),
+            ],
+        )
         assert not r.success
         assert r.error_count == 1
 
@@ -2358,10 +2475,15 @@ class TestExecutorCLI:
         data["datasets"]["acs"]["path"] = "data/acs.parquet"
         recipe_file = tmp_path / "recipe.yaml"
         recipe_file.write_text(yaml.dump(data), encoding="utf-8")
-        result = runner.invoke(app, [
-            "build", "recipe",
-            "--recipe", str(recipe_file),
-        ])
+        result = runner.invoke(
+            app,
+            [
+                "build",
+                "recipe",
+                "--recipe",
+                str(recipe_file),
+            ],
+        )
         # Should see execution output (not just validation)
         assert "Executing pipeline" in result.output
         assert "completed" in result.output or "executed" in result.output
@@ -2371,11 +2493,16 @@ class TestExecutorCLI:
 
         recipe_file = tmp_path / "recipe.yaml"
         recipe_file.write_text(yaml.dump(_recipe_with_pipeline()), encoding="utf-8")
-        result = runner.invoke(app, [
-            "build", "recipe",
-            "--recipe", str(recipe_file),
-            "--dry-run",
-        ])
+        result = runner.invoke(
+            app,
+            [
+                "build",
+                "recipe",
+                "--recipe",
+                str(recipe_file),
+                "--dry-run",
+            ],
+        )
         assert "Executing pipeline" not in result.output
 
     def test_executor_error_exits_1(self, tmp_path: Path):
@@ -2383,21 +2510,29 @@ class TestExecutorCLI:
 
         data = _recipe_with_pipeline()
         # Add an auto-resample that can't resolve a transform
-        data["pipelines"][0]["steps"].insert(1, {
-            "resample": {
-                "dataset": "acs",
-                "to_geometry": {"type": "county"},
-                "method": "aggregate",
-                "via": "auto",
-                "measures": ["total_population"],
+        data["pipelines"][0]["steps"].insert(
+            1,
+            {
+                "resample": {
+                    "dataset": "acs",
+                    "to_geometry": {"type": "county"},
+                    "method": "aggregate",
+                    "via": "auto",
+                    "measures": ["total_population"],
+                },
             },
-        })
+        )
         recipe_file = tmp_path / "recipe.yaml"
         recipe_file.write_text(yaml.dump(data), encoding="utf-8")
-        result = runner.invoke(app, [
-            "build", "recipe",
-            "--recipe", str(recipe_file),
-        ])
+        result = runner.invoke(
+            app,
+            [
+                "build",
+                "recipe",
+                "--recipe",
+                str(recipe_file),
+            ],
+        )
         assert result.exit_code == 1
         # Preflight catches the planner error before execution starts
         assert "Preflight" in result.output or "blocker" in result.output
@@ -2409,7 +2544,6 @@ class TestExecutorCLI:
 
 
 class TestMaterialize:
-
     def _make_ctx(self, tmp_path: Path) -> ExecutionContext:
         recipe = load_recipe(_recipe_with_pipeline())
         return ExecutionContext(
@@ -2425,13 +2559,15 @@ class TestMaterialize:
 
     def test_resolve_county_to_coc_crosswalk_path(self, tmp_path: Path):
         data = _recipe_with_pipeline()
-        data["transforms"] = [{
-            "id": "county_to_coc",
-            "type": "crosswalk",
-            "from": {"type": "county", "vintage": 2023},
-            "to": {"type": "coc", "vintage": 2025},
-            "spec": {"weighting": {"scheme": "area"}},
-        }]
+        data["transforms"] = [
+            {
+                "id": "county_to_coc",
+                "type": "crosswalk",
+                "from": {"type": "county", "vintage": 2023},
+                "to": {"type": "coc", "vintage": 2025},
+                "spec": {"weighting": {"scheme": "area"}},
+            }
+        ]
         data["pipelines"][0]["steps"] = [
             {"materialize": {"transforms": ["county_to_coc"]}},
             {
@@ -2451,21 +2587,25 @@ class TestMaterialize:
 
     def test_resolve_coc_to_metro_crosswalk_path(self, tmp_path: Path):
         data = _recipe_with_pipeline()
-        data["targets"] = [{
-            "id": "metro_panel",
-            "geometry": {"type": "metro", "source": "glynn_fox_v1"},
-        }]
+        data["targets"] = [
+            {
+                "id": "metro_panel",
+                "geometry": {"type": "metro", "source": "glynn_fox_v1"},
+            }
+        ]
         data["pipelines"][0]["target"] = "metro_panel"
         data["pipelines"][0]["steps"] = [
             {"materialize": {"transforms": ["coc_to_metro"]}},
         ]
-        data["transforms"] = [{
-            "id": "coc_to_metro",
-            "type": "crosswalk",
-            "from": {"type": "coc", "vintage": 2025},
-            "to": {"type": "metro", "source": "glynn_fox_v1"},
-            "spec": {"weighting": {"scheme": "area"}},
-        }]
+        data["transforms"] = [
+            {
+                "id": "coc_to_metro",
+                "type": "crosswalk",
+                "from": {"type": "coc", "vintage": 2025},
+                "to": {"type": "metro", "source": "glynn_fox_v1"},
+                "spec": {"weighting": {"scheme": "area"}},
+            }
+        ]
         recipe = load_recipe(data)
         path = _resolve_transform_path("coc_to_metro", recipe, tmp_path)
         assert ".recipe_cache/transforms" in str(path)
@@ -2473,21 +2613,25 @@ class TestMaterialize:
 
     def test_resolve_coc_to_msa_crosswalk_path(self, tmp_path: Path):
         data = _recipe_with_pipeline()
-        data["targets"] = [{
-            "id": "msa_panel",
-            "geometry": {"type": "msa", "source": "census_msa_2023"},
-        }]
+        data["targets"] = [
+            {
+                "id": "msa_panel",
+                "geometry": {"type": "msa", "source": "census_msa_2023"},
+            }
+        ]
         data["pipelines"][0]["target"] = "msa_panel"
         data["pipelines"][0]["steps"] = [
             {"materialize": {"transforms": ["coc_to_msa"]}},
         ]
-        data["transforms"] = [{
-            "id": "coc_to_msa",
-            "type": "crosswalk",
-            "from": {"type": "coc", "vintage": 2025},
-            "to": {"type": "msa", "source": "census_msa_2023"},
-            "spec": {"weighting": {"scheme": "area"}},
-        }]
+        data["transforms"] = [
+            {
+                "id": "coc_to_msa",
+                "type": "crosswalk",
+                "from": {"type": "coc", "vintage": 2025},
+                "to": {"type": "msa", "source": "census_msa_2023"},
+                "spec": {"weighting": {"scheme": "area"}},
+            }
+        ]
         recipe = load_recipe(data)
         path = _resolve_transform_path("coc_to_msa", recipe, tmp_path)
         assert ".recipe_cache/transforms" in str(path)
@@ -2501,13 +2645,15 @@ class TestMaterialize:
     def test_unsupported_geometry_pair_raises(self, tmp_path: Path):
         data = _recipe_with_pipeline()
         # zip↔state: no crosswalk path resolver for this pair
-        data["transforms"] = [{
-            "id": "zip_to_state",
-            "type": "crosswalk",
-            "from": {"type": "zip", "vintage": 2023},
-            "to": {"type": "state", "vintage": 2023},
-            "spec": {"weighting": {"scheme": "area"}},
-        }]
+        data["transforms"] = [
+            {
+                "id": "zip_to_state",
+                "type": "crosswalk",
+                "from": {"type": "zip", "vintage": 2023},
+                "to": {"type": "state", "vintage": 2023},
+                "spec": {"weighting": {"scheme": "area"}},
+            }
+        ]
         data["pipelines"][0]["steps"] = [
             {"materialize": {"transforms": ["zip_to_state"]}},
         ]
@@ -2517,26 +2663,30 @@ class TestMaterialize:
 
     def test_none_coc_vintage_raises(self, tmp_path: Path):
         data = _recipe_with_pipeline()
-        data["transforms"] = [{
-            "id": "tract_to_coc",
-            "type": "crosswalk",
-            "from": {"type": "tract", "vintage": 2020},
-            "to": {"type": "coc"},  # no vintage
-            "spec": {"weighting": {"scheme": "area"}},
-        }]
+        data["transforms"] = [
+            {
+                "id": "tract_to_coc",
+                "type": "crosswalk",
+                "from": {"type": "tract", "vintage": 2020},
+                "to": {"type": "coc"},  # no vintage
+                "spec": {"weighting": {"scheme": "area"}},
+            }
+        ]
         recipe = load_recipe(data)
         with pytest.raises(ExecutorError, match="no vintage"):
             _resolve_transform_path("tract_to_coc", recipe, tmp_path)
 
     def test_none_base_vintage_raises(self, tmp_path: Path):
         data = _recipe_with_pipeline()
-        data["transforms"] = [{
-            "id": "tract_to_coc",
-            "type": "crosswalk",
-            "from": {"type": "tract"},  # no vintage
-            "to": {"type": "coc", "vintage": 2025},
-            "spec": {"weighting": {"scheme": "area"}},
-        }]
+        data["transforms"] = [
+            {
+                "id": "tract_to_coc",
+                "type": "crosswalk",
+                "from": {"type": "tract"},  # no vintage
+                "to": {"type": "coc", "vintage": 2025},
+                "spec": {"weighting": {"scheme": "area"}},
+            }
+        ]
         recipe = load_recipe(data)
         with pytest.raises(ExecutorError, match="no vintage"):
             _resolve_transform_path("tract_to_coc", recipe, tmp_path)
@@ -2550,6 +2700,7 @@ class TestMaterialize:
         pd.DataFrame({"a": [1]}).to_parquet(xwalk_file)
 
         from hhplab.recipe.planner import MaterializeTask
+
         task = MaterializeTask(transform_ids=["tract_to_coc"])
         result = _execute_materialize(task, ctx)
         assert result.success
@@ -2558,21 +2709,25 @@ class TestMaterialize:
     def test_materialize_generates_coc_to_metro_artifact(self, tmp_path: Path):
         _setup_curated_metro_artifacts(tmp_path)
         data = _recipe_with_pipeline()
-        data["targets"] = [{
-            "id": "metro_panel",
-            "geometry": {"type": "metro", "source": "glynn_fox_v1"},
-        }]
+        data["targets"] = [
+            {
+                "id": "metro_panel",
+                "geometry": {"type": "metro", "source": "glynn_fox_v1"},
+            }
+        ]
         data["pipelines"][0]["target"] = "metro_panel"
         data["pipelines"][0]["steps"] = [
             {"materialize": {"transforms": ["coc_to_metro"]}},
         ]
-        data["transforms"] = [{
-            "id": "coc_to_metro",
-            "type": "crosswalk",
-            "from": {"type": "coc", "vintage": 2025},
-            "to": {"type": "metro", "source": "glynn_fox_v1"},
-            "spec": {"weighting": {"scheme": "area"}},
-        }]
+        data["transforms"] = [
+            {
+                "id": "coc_to_metro",
+                "type": "crosswalk",
+                "from": {"type": "coc", "vintage": 2025},
+                "to": {"type": "metro", "source": "glynn_fox_v1"},
+                "spec": {"weighting": {"scheme": "area"}},
+            }
+        ]
         recipe = load_recipe(data)
         ctx = ExecutionContext(project_root=tmp_path, recipe=recipe)
 
@@ -2589,26 +2744,32 @@ class TestMaterialize:
         _setup_curated_metro_artifacts(tmp_path)
         tract_dir = tmp_path / "data" / "curated" / "tiger"
         tract_dir.mkdir(parents=True, exist_ok=True)
-        pd.DataFrame({
-            "GEOID": ["36061000100", "06037000100"],
-        }).to_parquet(tract_dir / "tracts__T2020.parquet")
+        pd.DataFrame(
+            {
+                "GEOID": ["36061000100", "06037000100"],
+            }
+        ).to_parquet(tract_dir / "tracts__T2020.parquet")
 
         data = _recipe_with_pipeline()
-        data["targets"] = [{
-            "id": "metro_panel",
-            "geometry": {"type": "metro", "source": "glynn_fox_v1"},
-        }]
+        data["targets"] = [
+            {
+                "id": "metro_panel",
+                "geometry": {"type": "metro", "source": "glynn_fox_v1"},
+            }
+        ]
         data["pipelines"][0]["target"] = "metro_panel"
         data["pipelines"][0]["steps"] = [
             {"materialize": {"transforms": ["tract_to_metro"]}},
         ]
-        data["transforms"] = [{
-            "id": "tract_to_metro",
-            "type": "crosswalk",
-            "from": {"type": "tract", "vintage": 2020},
-            "to": {"type": "metro", "source": "glynn_fox_v1"},
-            "spec": {"weighting": {"scheme": "area"}},
-        }]
+        data["transforms"] = [
+            {
+                "id": "tract_to_metro",
+                "type": "crosswalk",
+                "from": {"type": "tract", "vintage": 2020},
+                "to": {"type": "metro", "source": "glynn_fox_v1"},
+                "spec": {"weighting": {"scheme": "area"}},
+            }
+        ]
         recipe = load_recipe(data)
         ctx = ExecutionContext(project_root=tmp_path, recipe=recipe)
 
@@ -2625,26 +2786,32 @@ class TestMaterialize:
         _setup_curated_metro_artifacts(tmp_path)
         tract_dir = tmp_path / "data" / "curated" / "tiger"
         tract_dir.mkdir(parents=True, exist_ok=True)
-        pd.DataFrame({
-            "geoid": ["36061000100", "06037000100"],
-        }).to_parquet(tract_dir / "tracts__T2020.parquet")
+        pd.DataFrame(
+            {
+                "geoid": ["36061000100", "06037000100"],
+            }
+        ).to_parquet(tract_dir / "tracts__T2020.parquet")
 
         data = _recipe_with_pipeline()
-        data["targets"] = [{
-            "id": "metro_panel",
-            "geometry": {"type": "metro", "source": "glynn_fox_v1"},
-        }]
+        data["targets"] = [
+            {
+                "id": "metro_panel",
+                "geometry": {"type": "metro", "source": "glynn_fox_v1"},
+            }
+        ]
         data["pipelines"][0]["target"] = "metro_panel"
         data["pipelines"][0]["steps"] = [
             {"materialize": {"transforms": ["tract_to_metro"]}},
         ]
-        data["transforms"] = [{
-            "id": "tract_to_metro",
-            "type": "crosswalk",
-            "from": {"type": "tract", "vintage": 2020},
-            "to": {"type": "metro", "source": "glynn_fox_v1"},
-            "spec": {"weighting": {"scheme": "area"}},
-        }]
+        data["transforms"] = [
+            {
+                "id": "tract_to_metro",
+                "type": "crosswalk",
+                "from": {"type": "tract", "vintage": 2020},
+                "to": {"type": "metro", "source": "glynn_fox_v1"},
+                "spec": {"weighting": {"scheme": "area"}},
+            }
+        ]
         recipe = load_recipe(data)
         ctx = ExecutionContext(project_root=tmp_path, recipe=recipe)
 
@@ -2659,6 +2826,7 @@ class TestMaterialize:
     def test_materialize_fails_missing_artifact(self, tmp_path: Path):
         ctx = self._make_ctx(tmp_path)
         from hhplab.recipe.planner import MaterializeTask
+
         task = MaterializeTask(transform_ids=["tract_to_coc"])
         result = _execute_materialize(task, ctx)
         assert not result.success
@@ -2673,12 +2841,14 @@ class TestMaterialize:
 
 def _make_dataset_parquet(path: Path, geo_col: str = "geo_id") -> None:
     """Write a minimal dataset parquet for testing."""
-    df = pd.DataFrame({
-        geo_col: ["A", "B", "C"],
-        "year": [2020, 2020, 2020],
-        "pop": [100, 200, 300],
-        "income": [50000, 60000, 70000],
-    })
+    df = pd.DataFrame(
+        {
+            geo_col: ["A", "B", "C"],
+            "year": [2020, 2020, 2020],
+            "pop": [100, 200, 300],
+            "income": [50000, 60000, 70000],
+        }
+    )
     path.parent.mkdir(parents=True, exist_ok=True)
     df.to_parquet(path)
 
@@ -2686,18 +2856,22 @@ def _make_dataset_parquet(path: Path, geo_col: str = "geo_id") -> None:
 def _make_xwalk_parquet(path: Path, geo_type: str = "tract") -> None:
     """Write a minimal crosswalk parquet for testing."""
     if geo_type == "tract":
-        df = pd.DataFrame({
-            "coc_id": ["COC1", "COC1", "COC2"],
-            "tract_geoid": ["A", "B", "C"],
-            "area_share": [0.8, 0.5, 1.0],
-            "pop_share": [0.6, 0.4, 1.0],
-        })
+        df = pd.DataFrame(
+            {
+                "coc_id": ["COC1", "COC1", "COC2"],
+                "tract_geoid": ["A", "B", "C"],
+                "area_share": [0.8, 0.5, 1.0],
+                "pop_share": [0.6, 0.4, 1.0],
+            }
+        )
     else:
-        df = pd.DataFrame({
-            "coc_id": ["COC1", "COC1", "COC2"],
-            "county_fips": ["A", "B", "C"],
-            "area_share": [0.8, 0.5, 1.0],
-        })
+        df = pd.DataFrame(
+            {
+                "coc_id": ["COC1", "COC1", "COC2"],
+                "county_fips": ["A", "B", "C"],
+                "area_share": [0.8, 0.5, 1.0],
+            }
+        )
     path.parent.mkdir(parents=True, exist_ok=True)
     df.to_parquet(path)
 
@@ -2900,7 +3074,6 @@ def _setup_ct_alignment_recipe(tmp_path: Path) -> dict:
 
 
 class TestResampleIdentity:
-
     def test_identity_passthrough(self, tmp_path: Path):
         ds_path = tmp_path / "data" / "pit.parquet"
         _make_dataset_parquet(ds_path, geo_col="coc_id")
@@ -2984,7 +3157,6 @@ class TestResampleIdentity:
 
 
 class TestResampleAggregate:
-
     def _setup(self, tmp_path: Path) -> ExecutionContext:
         ds_path = tmp_path / "data" / "acs.parquet"
         _make_dataset_parquet(ds_path, geo_col="GEOID")
@@ -3045,29 +3217,35 @@ class TestResampleAggregate:
     def test_aggregate_sum_with_coc_to_metro_crosswalk(self, tmp_path: Path):
         _setup_curated_metro_artifacts(tmp_path)
         ds_path = tmp_path / "data" / "pit.parquet"
-        pd.DataFrame({
-            "coc_id": ["NY-600", "CA-600"],
-            "year": [2020, 2020],
-            "pop": [100, 200],
-        }).to_parquet(ds_path)
+        pd.DataFrame(
+            {
+                "coc_id": ["NY-600", "CA-600"],
+                "year": [2020, 2020],
+                "pop": [100, 200],
+            }
+        ).to_parquet(ds_path)
 
         data = _recipe_with_pipeline()
-        data["targets"] = [{
-            "id": "metro_panel",
-            "geometry": {"type": "metro", "source": "glynn_fox_v1"},
-        }]
+        data["targets"] = [
+            {
+                "id": "metro_panel",
+                "geometry": {"type": "metro", "source": "glynn_fox_v1"},
+            }
+        ]
         data["pipelines"][0]["target"] = "metro_panel"
         data["pipelines"][0]["steps"] = [
             {"materialize": {"transforms": ["coc_to_metro"]}},
         ]
         data["datasets"]["pit"]["path"] = "data/pit.parquet"
-        data["transforms"] = [{
-            "id": "coc_to_metro",
-            "type": "crosswalk",
-            "from": {"type": "coc", "vintage": 2025},
-            "to": {"type": "metro", "source": "glynn_fox_v1"},
-            "spec": {"weighting": {"scheme": "area"}},
-        }]
+        data["transforms"] = [
+            {
+                "id": "coc_to_metro",
+                "type": "crosswalk",
+                "from": {"type": "coc", "vintage": 2025},
+                "to": {"type": "metro", "source": "glynn_fox_v1"},
+                "spec": {"weighting": {"scheme": "area"}},
+            }
+        ]
         recipe = load_recipe(data)
         ctx = ExecutionContext(project_root=tmp_path, recipe=recipe)
         materialize_result = _execute_materialize(
@@ -3097,23 +3275,29 @@ class TestResampleAggregate:
     def test_aggregate_weighted_mean_with_dynamic_metro_pop_share(self, tmp_path: Path):
         _setup_curated_metro_artifacts(tmp_path)
         zori_path = tmp_path / "data" / "zori.parquet"
-        pd.DataFrame({
-            "county_fips": ["36061", "06037"],
-            "year": [2020, 2020],
-            "rent": [1000.0, 2000.0],
-        }).to_parquet(zori_path)
+        pd.DataFrame(
+            {
+                "county_fips": ["36061", "06037"],
+                "year": [2020, 2020],
+                "rent": [1000.0, 2000.0],
+            }
+        ).to_parquet(zori_path)
         weights_path = tmp_path / "data" / "county_weights.parquet"
-        pd.DataFrame({
-            "county_fips": ["36061", "06037"],
-            "year": [2020, 2020],
-            "total_population": [1.0, 3.0],
-        }).to_parquet(weights_path)
+        pd.DataFrame(
+            {
+                "county_fips": ["36061", "06037"],
+                "year": [2020, 2020],
+                "total_population": [1.0, 3.0],
+            }
+        ).to_parquet(weights_path)
 
         data = _recipe_with_pipeline()
-        data["targets"] = [{
-            "id": "metro_panel",
-            "geometry": {"type": "metro", "source": "glynn_fox_v1"},
-        }]
+        data["targets"] = [
+            {
+                "id": "metro_panel",
+                "geometry": {"type": "metro", "source": "glynn_fox_v1"},
+            }
+        ]
         data["pipelines"][0]["target"] = "metro_panel"
         data["pipelines"][0]["steps"] = [
             {"materialize": {"transforms": ["county_to_metro"]}},
@@ -3136,19 +3320,21 @@ class TestResampleAggregate:
             "path": "data/county_weights.parquet",
             "geo_column": "county_fips",
         }
-        data["transforms"] = [{
-            "id": "county_to_metro",
-            "type": "crosswalk",
-            "from": {"type": "county", "vintage": 2020},
-            "to": {"type": "metro", "source": "glynn_fox_v1"},
-            "spec": {
-                "weighting": {
-                    "scheme": "population",
-                    "population_source": "weights",
-                    "population_field": "total_population",
-                }
-            },
-        }]
+        data["transforms"] = [
+            {
+                "id": "county_to_metro",
+                "type": "crosswalk",
+                "from": {"type": "county", "vintage": 2020},
+                "to": {"type": "metro", "source": "glynn_fox_v1"},
+                "spec": {
+                    "weighting": {
+                        "scheme": "population",
+                        "population_source": "weights",
+                        "population_field": "total_population",
+                    }
+                },
+            }
+        ]
         recipe = load_recipe(data)
         ctx = ExecutionContext(project_root=tmp_path, recipe=recipe)
         materialize_result = _execute_materialize(
@@ -3202,11 +3388,13 @@ class TestResampleAggregate:
     def test_aggregate_zero_join_rows_fails(self, tmp_path: Path):
         # Dataset has geo_ids that don't match crosswalk
         ds_path = tmp_path / "data" / "acs.parquet"
-        df = pd.DataFrame({
-            "GEOID": ["X", "Y"],
-            "year": [2020, 2020],
-            "pop": [100, 200],
-        })
+        df = pd.DataFrame(
+            {
+                "GEOID": ["X", "Y"],
+                "year": [2020, 2020],
+                "pop": [100, 200],
+            }
+        )
         ds_path.parent.mkdir(parents=True)
         df.to_parquet(ds_path)
 
@@ -3260,23 +3448,27 @@ class TestResampleAggregate:
         _make_xwalk_parquet(xwalk_path, geo_type="county")
 
         data = _recipe_with_pipeline()
-        data["transforms"] = [{
-            "id": "county_to_coc",
-            "type": "crosswalk",
-            "from": {"type": "county"},
-            "to": {"type": "coc", "vintage": 2025},
-            "spec": {"weighting": {"scheme": "area"}},
-        }]
+        data["transforms"] = [
+            {
+                "id": "county_to_coc",
+                "type": "crosswalk",
+                "from": {"type": "county"},
+                "to": {"type": "coc", "vintage": 2025},
+                "spec": {"weighting": {"scheme": "area"}},
+            }
+        ]
         data["pipelines"][0]["steps"] = [
             {"materialize": {"transforms": ["county_to_coc"]}},
-            {"resample": {
-                "dataset": "acs",
-                "to_geometry": {"type": "coc", "vintage": 2025},
-                "method": "aggregate",
-                "via": "county_to_coc",
-                "measures": ["pop"],
-                "aggregation": "sum",
-            }},
+            {
+                "resample": {
+                    "dataset": "acs",
+                    "to_geometry": {"type": "coc", "vintage": 2025},
+                    "method": "aggregate",
+                    "via": "county_to_coc",
+                    "measures": ["pop"],
+                    "aggregation": "sum",
+                }
+            },
         ]
         recipe = load_recipe(data)
         ctx = ExecutionContext(project_root=tmp_path, recipe=recipe)
@@ -3333,13 +3525,15 @@ class TestResampleAggregate:
             "path": "data/pep.parquet",
             "geo_column": "county_fips",
         }
-        data["transforms"] = [{
-            "id": "county_to_coc",
-            "type": "crosswalk",
-            "from": {"type": "county", "vintage": 2020},
-            "to": {"type": "coc", "vintage": 2025},
-            "spec": {"weighting": {"scheme": "area"}},
-        }]
+        data["transforms"] = [
+            {
+                "id": "county_to_coc",
+                "type": "crosswalk",
+                "from": {"type": "county", "vintage": 2020},
+                "to": {"type": "coc", "vintage": 2025},
+                "spec": {"weighting": {"scheme": "area"}},
+            }
+        ]
         data["pipelines"][0]["steps"] = [
             {"materialize": {"transforms": ["county_to_coc"]}},
         ]
@@ -3422,19 +3616,21 @@ class TestResampleAggregate:
             "path": "data/weights.parquet",
             "geo_column": "county_fips",
         }
-        data["transforms"] = [{
-            "id": "county_to_coc",
-            "type": "crosswalk",
-            "from": {"type": "county", "vintage": 2020},
-            "to": {"type": "coc", "vintage": 2025},
-            "spec": {
-                "weighting": {
-                    "scheme": "population",
-                    "population_source": "weights",
-                    "population_field": "population",
-                }
-            },
-        }]
+        data["transforms"] = [
+            {
+                "id": "county_to_coc",
+                "type": "crosswalk",
+                "from": {"type": "county", "vintage": 2020},
+                "to": {"type": "coc", "vintage": 2025},
+                "spec": {
+                    "weighting": {
+                        "scheme": "population",
+                        "population_source": "weights",
+                        "population_field": "population",
+                    }
+                },
+            }
+        ]
         data["pipelines"][0]["steps"] = [
             {"materialize": {"transforms": ["county_to_coc"]}},
         ]
@@ -3503,7 +3699,8 @@ class TestResampleAggregate:
         # Confirm the schema coerces it and the planner round-trips correctly.
         recipe = load_recipe(data)
         resample_steps = [
-            s for pipe in recipe.pipelines
+            s
+            for pipe in recipe.pipelines
             for s in pipe.steps
             if hasattr(s, "kind") and s.kind == "resample"
         ]
@@ -3567,29 +3764,33 @@ class TestAttachDynamicPopShareFailures:
             "path": "data/county_weights.parquet",
             "geo_column": "county_fips",
         }
-        data["transforms"] = [{
-            "id": "county_to_coc",
-            "type": "crosswalk",
-            "from": {"type": from_type, "vintage": 2020},
-            "to": {"type": "coc", "vintage": 2025},
-            "spec": {
-                "weighting": {
-                    "scheme": "population",
-                    "population_source": "weights",
-                    "population_field": population_field,
-                }
-            },
-        }]
+        data["transforms"] = [
+            {
+                "id": "county_to_coc",
+                "type": "crosswalk",
+                "from": {"type": from_type, "vintage": 2020},
+                "to": {"type": "coc", "vintage": 2025},
+                "spec": {
+                    "weighting": {
+                        "scheme": "population",
+                        "population_source": "weights",
+                        "population_field": population_field,
+                    }
+                },
+            }
+        ]
         data["pipelines"][0]["steps"] = [
             {"materialize": {"transforms": ["county_to_coc"]}},
-            {"resample": {
-                "dataset": "acs",
-                "to_geometry": {"type": "coc", "vintage": 2025},
-                "method": "aggregate",
-                "via": "county_to_coc",
-                "measures": ["pop"],
-                "aggregation": "sum",
-            }},
+            {
+                "resample": {
+                    "dataset": "acs",
+                    "to_geometry": {"type": "coc", "vintage": 2025},
+                    "method": "aggregate",
+                    "via": "county_to_coc",
+                    "measures": ["pop"],
+                    "aggregation": "sum",
+                }
+            },
         ]
         return data
 
@@ -3604,11 +3805,13 @@ class TestAttachDynamicPopShareFailures:
         # Source dataset
         ds_path = tmp_path / "data" / "acs.parquet"
         ds_path.parent.mkdir(parents=True, exist_ok=True)
-        pd.DataFrame({
-            "county_fips": ["36061", "06037"],
-            "year": [2020, 2020],
-            "pop": [100.0, 200.0],
-        }).to_parquet(ds_path)
+        pd.DataFrame(
+            {
+                "county_fips": ["36061", "06037"],
+                "year": [2020, 2020],
+                "pop": [100.0, 200.0],
+            }
+        ).to_parquet(ds_path)
 
         # Weights (support) dataset
         weights_path = tmp_path / "data" / "county_weights.parquet"
@@ -3624,11 +3827,13 @@ class TestAttachDynamicPopShareFailures:
 
         # Crosswalk (no pop_share — forces dynamic attachment)
         xwalk_path = tmp_path / "xwalk.parquet"
-        pd.DataFrame({
-            "coc_id": ["COC1", "COC1"],
-            "county_fips": ["36061", "06037"],
-            "area_share": [1.0, 1.0],
-        }).to_parquet(xwalk_path)
+        pd.DataFrame(
+            {
+                "coc_id": ["COC1", "COC1"],
+                "county_fips": ["36061", "06037"],
+                "area_share": [1.0, 1.0],
+            }
+        ).to_parquet(xwalk_path)
 
         return xwalk_path
 
@@ -3668,26 +3873,32 @@ class TestAttachDynamicPopShareFailures:
         # Dataset keyed on tract_geoid, but crosswalk only has county_fips
         ds_path = tmp_path / "data" / "acs.parquet"
         ds_path.parent.mkdir(parents=True, exist_ok=True)
-        pd.DataFrame({
-            "tract_geoid": ["T1", "T2"],
-            "year": [2020, 2020],
-            "pop": [100.0, 200.0],
-        }).to_parquet(ds_path)
+        pd.DataFrame(
+            {
+                "tract_geoid": ["T1", "T2"],
+                "year": [2020, 2020],
+                "pop": [100.0, 200.0],
+            }
+        ).to_parquet(ds_path)
 
         weights_path = tmp_path / "data" / "county_weights.parquet"
-        pd.DataFrame({
-            "county_fips": ["36061", "06037"],
-            "year": [2020, 2020],
-            "total_population": [1.0, 3.0],
-        }).to_parquet(weights_path)
+        pd.DataFrame(
+            {
+                "county_fips": ["36061", "06037"],
+                "year": [2020, 2020],
+                "total_population": [1.0, 3.0],
+            }
+        ).to_parquet(weights_path)
 
         # Crosswalk has county_fips + coc_id but NOT tract_geoid
         xwalk_path = tmp_path / "xwalk.parquet"
-        pd.DataFrame({
-            "coc_id": ["COC1", "COC1"],
-            "county_fips": ["36061", "06037"],
-            "area_share": [1.0, 1.0],
-        }).to_parquet(xwalk_path)
+        pd.DataFrame(
+            {
+                "coc_id": ["COC1", "COC1"],
+                "county_fips": ["36061", "06037"],
+                "area_share": [1.0, 1.0],
+            }
+        ).to_parquet(xwalk_path)
 
         data = self._pop_weighted_recipe(from_type="tract")
         # Override the weights geo_column to match what the dataset actually has
@@ -3722,25 +3933,31 @@ class TestAttachDynamicPopShareFailures:
         # Write weights WITHOUT the expected population_field
         ds_path = tmp_path / "data" / "acs.parquet"
         ds_path.parent.mkdir(parents=True, exist_ok=True)
-        pd.DataFrame({
-            "county_fips": ["36061", "06037"],
-            "year": [2020, 2020],
-            "pop": [100.0, 200.0],
-        }).to_parquet(ds_path)
+        pd.DataFrame(
+            {
+                "county_fips": ["36061", "06037"],
+                "year": [2020, 2020],
+                "pop": [100.0, 200.0],
+            }
+        ).to_parquet(ds_path)
 
         weights_path = tmp_path / "data" / "county_weights.parquet"
-        pd.DataFrame({
-            "county_fips": ["36061", "06037"],
-            "year": [2020, 2020],
-            "unrelated_col": [99, 88],
-        }).to_parquet(weights_path)
+        pd.DataFrame(
+            {
+                "county_fips": ["36061", "06037"],
+                "year": [2020, 2020],
+                "unrelated_col": [99, 88],
+            }
+        ).to_parquet(weights_path)
 
         xwalk_path = tmp_path / "xwalk.parquet"
-        pd.DataFrame({
-            "coc_id": ["COC1", "COC1"],
-            "county_fips": ["36061", "06037"],
-            "area_share": [1.0, 1.0],
-        }).to_parquet(xwalk_path)
+        pd.DataFrame(
+            {
+                "coc_id": ["COC1", "COC1"],
+                "county_fips": ["36061", "06037"],
+                "area_share": [1.0, 1.0],
+            }
+        ).to_parquet(xwalk_path)
 
         data = self._pop_weighted_recipe(population_field="total_population")
         recipe = load_recipe(data)
@@ -3814,33 +4031,39 @@ class TestResampleAllocate:
     def _allocate_recipe() -> dict:
         """Recipe with a coc_to_tract crosswalk for allocate tests."""
         data = _recipe_with_pipeline()
-        data["transforms"].append({
-            "id": "coc_to_tract",
-            "type": "crosswalk",
-            "from": {"type": "coc", "vintage": 2025},
-            "to": {"type": "tract", "vintage": 2020},
-            "spec": {"weighting": {"scheme": "area"}},
-        })
+        data["transforms"].append(
+            {
+                "id": "coc_to_tract",
+                "type": "crosswalk",
+                "from": {"type": "coc", "vintage": 2025},
+                "to": {"type": "tract", "vintage": 2020},
+                "spec": {"weighting": {"scheme": "area"}},
+            }
+        )
         return data
 
     def _setup(self, tmp_path: Path) -> ExecutionContext:
         # Dataset: coarse CoC-level data
         ds_path = tmp_path / "data" / "coc_data.parquet"
         ds_path.parent.mkdir(parents=True, exist_ok=True)
-        pd.DataFrame({
-            "coc_id": ["COC1", "COC2"],
-            "pop": [1000.0, 2000.0],
-            "income": [50000.0, 60000.0],
-        }).to_parquet(ds_path)
+        pd.DataFrame(
+            {
+                "coc_id": ["COC1", "COC2"],
+                "pop": [1000.0, 2000.0],
+                "income": [50000.0, 60000.0],
+            }
+        ).to_parquet(ds_path)
 
         # Crosswalk: CoC → tract with area_share weights
         xwalk_path = tmp_path / "data" / "curated" / "xwalks" / "xwalk_alloc.parquet"
         xwalk_path.parent.mkdir(parents=True, exist_ok=True)
-        pd.DataFrame({
-            "coc_id": ["COC1", "COC1", "COC2"],
-            "tract_geoid": ["T1", "T2", "T3"],
-            "area_share": [0.6, 0.4, 1.0],
-        }).to_parquet(xwalk_path)
+        pd.DataFrame(
+            {
+                "coc_id": ["COC1", "COC1", "COC2"],
+                "tract_geoid": ["T1", "T2", "T3"],
+                "area_share": [0.6, 0.4, 1.0],
+            }
+        ).to_parquet(xwalk_path)
 
         recipe = load_recipe(self._allocate_recipe())
         ctx = ExecutionContext(project_root=tmp_path, recipe=recipe)
@@ -3894,10 +4117,12 @@ class TestResampleAllocate:
         ctx = self._setup(tmp_path)
         # Overwrite with geo_ids that don't match the crosswalk
         ds_path = tmp_path / "data" / "coc_data.parquet"
-        pd.DataFrame({
-            "coc_id": ["ZZZ1"],
-            "pop": [999.0],
-        }).to_parquet(ds_path)
+        pd.DataFrame(
+            {
+                "coc_id": ["ZZZ1"],
+                "pop": [999.0],
+            }
+        ).to_parquet(ds_path)
         task = ResampleTask(
             dataset_id="coc_data",
             year=2020,
@@ -3916,18 +4141,22 @@ class TestResampleAllocate:
         """NaN area_share produces NaN allocated values (not silently dropped)."""
         ds_path = tmp_path / "data" / "coc_data.parquet"
         ds_path.parent.mkdir(parents=True, exist_ok=True)
-        pd.DataFrame({
-            "coc_id": ["COC1"],
-            "pop": [1000.0],
-        }).to_parquet(ds_path)
+        pd.DataFrame(
+            {
+                "coc_id": ["COC1"],
+                "pop": [1000.0],
+            }
+        ).to_parquet(ds_path)
 
         xwalk_path = tmp_path / "data" / "curated" / "xwalks" / "xwalk_alloc.parquet"
         xwalk_path.parent.mkdir(parents=True, exist_ok=True)
-        pd.DataFrame({
-            "coc_id": ["COC1", "COC1"],
-            "tract_geoid": ["T1", "T2"],
-            "area_share": [0.6, float("nan")],
-        }).to_parquet(xwalk_path)
+        pd.DataFrame(
+            {
+                "coc_id": ["COC1", "COC1"],
+                "tract_geoid": ["T1", "T2"],
+                "area_share": [0.6, float("nan")],
+            }
+        ).to_parquet(xwalk_path)
 
         recipe = load_recipe(self._allocate_recipe())
         ctx = ExecutionContext(project_root=tmp_path, recipe=recipe)
@@ -3958,15 +4187,16 @@ class TestResampleAllocate:
 
 
 class TestTemporalFilters:
-
     def test_calendar_mean_preserves_year_groups(self):
         """Calendar mean should aggregate within year, not across years."""
-        df = pd.DataFrame({
-            "geo_id": ["A", "A", "A", "A"],
-            "year": [2020, 2020, 2021, 2021],
-            "month": [1, 2, 1, 2],
-            "value": [10.0, 20.0, 30.0, 50.0],
-        })
+        df = pd.DataFrame(
+            {
+                "geo_id": ["A", "A", "A", "A"],
+                "year": [2020, 2020, 2021, 2021],
+                "month": [1, 2, 1, 2],
+                "value": [10.0, 20.0, 30.0, 50.0],
+            }
+        )
 
         out = _apply_temporal_filter(
             df,
@@ -3983,12 +4213,14 @@ class TestTemporalFilters:
 
     def test_calendar_median_preserves_declared_year_column(self):
         """Calendar median should keep declared year column as grouping key."""
-        df = pd.DataFrame({
-            "geo_id": ["A", "A", "A", "A"],
-            "pit_year": [2020, 2020, 2021, 2021],
-            "month": [1, 2, 1, 2],
-            "value": [10.0, 30.0, 20.0, 80.0],
-        })
+        df = pd.DataFrame(
+            {
+                "geo_id": ["A", "A", "A", "A"],
+                "pit_year": [2020, 2020, 2021, 2021],
+                "month": [1, 2, 1, 2],
+                "value": [10.0, 30.0, 20.0, 80.0],
+            }
+        )
 
         out = _apply_temporal_filter(
             df,
@@ -4006,11 +4238,13 @@ class TestTemporalFilters:
 
     def test_declared_year_column_missing_raises(self):
         """Declared year_column absent from DataFrame should raise ExecutorError."""
-        df = pd.DataFrame({
-            "geo_id": ["A", "A"],
-            "month": [1, 2],
-            "value": [10.0, 20.0],
-        })
+        df = pd.DataFrame(
+            {
+                "geo_id": ["A", "A"],
+                "month": [1, 2],
+                "value": [10.0, 20.0],
+            }
+        )
 
         with pytest.raises(ExecutorError, match="declared year column.*'pit_year'.*not found"):
             _apply_temporal_filter(
@@ -4024,11 +4258,13 @@ class TestTemporalFilters:
     def test_empty_group_cols_raises(self):
         """When temporal column is the only non-numeric column, group_cols is empty."""
         # All columns except 'month' are numeric; no year column present.
-        df = pd.DataFrame({
-            "month": [1, 2, 3],
-            "value_a": [10.0, 20.0, 30.0],
-            "value_b": [1.0, 2.0, 3.0],
-        })
+        df = pd.DataFrame(
+            {
+                "month": [1, 2, 3],
+                "value_a": [10.0, 20.0, 30.0],
+                "value_b": [1.0, 2.0, 3.0],
+            }
+        )
 
         with pytest.raises(ExecutorError, match="no grouping columns found"):
             _apply_temporal_filter(
@@ -4042,11 +4278,13 @@ class TestTemporalFilters:
         """Numeric 'year' column is auto-added as group key even when all others are numeric."""
         # Every column except 'month' is numeric, but 'year' exists so the
         # fallback on line 545-546 rescues group_cols from being empty.
-        df = pd.DataFrame({
-            "year": [2020, 2020, 2021, 2021],
-            "month": [1, 2, 1, 2],
-            "value": [10.0, 30.0, 50.0, 70.0],
-        })
+        df = pd.DataFrame(
+            {
+                "year": [2020, 2020, 2021, 2021],
+                "month": [1, 2, 1, 2],
+                "value": [10.0, 30.0, 50.0, 70.0],
+            }
+        )
 
         out = _apply_temporal_filter(
             df,
@@ -4063,19 +4301,18 @@ class TestTemporalFilters:
         assert val_2020 == pytest.approx(20.0)
         assert val_2021 == pytest.approx(60.0)
 
-
     # --- interpolate_to_month tests ----------------------------------------
 
     def test_interpolate_to_month_basic_january(self):
         """PEP July→January: jan(Y) = 0.5 * jul(Y-1) + 0.5 * jul(Y)."""
-        df = pd.DataFrame({
-            "county_fips": ["01001"] * 3,
-            "year": [2018, 2019, 2020],
-            "reference_date": pd.to_datetime(
-                ["2018-07-01", "2019-07-01", "2020-07-01"]
-            ),
-            "population": [1000.0, 1100.0, 1200.0],
-        })
+        df = pd.DataFrame(
+            {
+                "county_fips": ["01001"] * 3,
+                "year": [2018, 2019, 2020],
+                "reference_date": pd.to_datetime(["2018-07-01", "2019-07-01", "2020-07-01"]),
+                "population": [1000.0, 1100.0, 1200.0],
+            }
+        )
 
         out = _apply_temporal_filter(
             df,
@@ -4101,14 +4338,16 @@ class TestTemporalFilters:
 
     def test_interpolate_to_month_multiple_geos(self):
         """Interpolation groups by geography independently."""
-        df = pd.DataFrame({
-            "county_fips": ["A", "A", "B", "B"],
-            "year": [2019, 2020, 2019, 2020],
-            "reference_date": pd.to_datetime(
-                ["2019-07-01", "2020-07-01", "2019-07-01", "2020-07-01"]
-            ),
-            "population": [100.0, 200.0, 500.0, 600.0],
-        })
+        df = pd.DataFrame(
+            {
+                "county_fips": ["A", "A", "B", "B"],
+                "year": [2019, 2020, 2019, 2020],
+                "reference_date": pd.to_datetime(
+                    ["2019-07-01", "2020-07-01", "2019-07-01", "2020-07-01"]
+                ),
+                "population": [100.0, 200.0, 500.0, 600.0],
+            }
+        )
 
         out = _apply_temporal_filter(
             df,
@@ -4123,23 +4362,21 @@ class TestTemporalFilters:
             year_column="year",
         )
 
-        a_2020 = out.loc[
-            (out["county_fips"] == "A") & (out["year"] == 2020), "population"
-        ].iloc[0]
-        b_2020 = out.loc[
-            (out["county_fips"] == "B") & (out["year"] == 2020), "population"
-        ].iloc[0]
+        a_2020 = out.loc[(out["county_fips"] == "A") & (out["year"] == 2020), "population"].iloc[0]
+        b_2020 = out.loc[(out["county_fips"] == "B") & (out["year"] == 2020), "population"].iloc[0]
         assert a_2020 == pytest.approx(150.0)  # 0.5*100 + 0.5*200
         assert b_2020 == pytest.approx(550.0)  # 0.5*500 + 0.5*600
 
     def test_interpolate_to_month_same_source_target(self):
         """When source month == target month, no interpolation needed."""
-        df = pd.DataFrame({
-            "geo_id": ["A", "A"],
-            "year": [2019, 2020],
-            "reference_date": pd.to_datetime(["2019-07-01", "2020-07-01"]),
-            "value": [10.0, 20.0],
-        })
+        df = pd.DataFrame(
+            {
+                "geo_id": ["A", "A"],
+                "year": [2019, 2020],
+                "reference_date": pd.to_datetime(["2019-07-01", "2020-07-01"]),
+                "value": [10.0, 20.0],
+            }
+        )
 
         out = _apply_temporal_filter(
             df,
@@ -4160,14 +4397,20 @@ class TestTemporalFilters:
 
     def test_interpolate_to_month_string_year_column(self):
         """String-typed year column must not crash arithmetic."""
-        df = pd.DataFrame({
-            "county_fips": ["01001"] * 3,
-            "year": ["2018", "2019", "2020"],
-            "reference_date": pd.to_datetime([
-                "2018-07-01", "2019-07-01", "2020-07-01",
-            ]),
-            "population": [1000.0, 1100.0, 1200.0],
-        })
+        df = pd.DataFrame(
+            {
+                "county_fips": ["01001"] * 3,
+                "year": ["2018", "2019", "2020"],
+                "reference_date": pd.to_datetime(
+                    [
+                        "2018-07-01",
+                        "2019-07-01",
+                        "2020-07-01",
+                    ]
+                ),
+                "population": [1000.0, 1100.0, 1200.0],
+            }
+        )
 
         out = _apply_temporal_filter(
             df,
@@ -4190,14 +4433,20 @@ class TestTemporalFilters:
 
     def test_interpolate_to_month_string_year_target_after_source(self):
         """String year column with target_month > source_month."""
-        df = pd.DataFrame({
-            "geo_id": ["A", "A", "A"],
-            "year": ["2019", "2020", "2021"],
-            "reference_date": pd.to_datetime([
-                "2019-01-01", "2020-01-01", "2021-01-01",
-            ]),
-            "value": [100.0, 200.0, 300.0],
-        })
+        df = pd.DataFrame(
+            {
+                "geo_id": ["A", "A", "A"],
+                "year": ["2019", "2020", "2021"],
+                "reference_date": pd.to_datetime(
+                    [
+                        "2019-01-01",
+                        "2020-01-01",
+                        "2021-01-01",
+                    ]
+                ),
+                "value": [100.0, 200.0, 300.0],
+            }
+        )
 
         out = _apply_temporal_filter(
             df,
@@ -4221,11 +4470,13 @@ class TestTemporalFilters:
 
     def test_interpolate_to_month_no_year_col_raises(self):
         """Missing year column raises ExecutorError."""
-        df = pd.DataFrame({
-            "geo_id": ["A"],
-            "reference_date": pd.to_datetime(["2020-07-01"]),
-            "value": [10.0],
-        })
+        df = pd.DataFrame(
+            {
+                "geo_id": ["A"],
+                "reference_date": pd.to_datetime(["2020-07-01"]),
+                "value": [10.0],
+            }
+        )
 
         with pytest.raises(ExecutorError, match="requires a year column"):
             _apply_temporal_filter(
@@ -4242,12 +4493,14 @@ class TestTemporalFilters:
 
     def test_interpolate_to_month_non_datetime_raises(self):
         """Non-datetime column raises ExecutorError."""
-        df = pd.DataFrame({
-            "geo_id": ["A"],
-            "year": [2020],
-            "reference_date": [7],
-            "value": [10.0],
-        })
+        df = pd.DataFrame(
+            {
+                "geo_id": ["A"],
+                "year": [2020],
+                "reference_date": [7],
+                "value": [10.0],
+            }
+        )
 
         with pytest.raises(ExecutorError, match="requires a datetime column"):
             _apply_temporal_filter(
@@ -4270,16 +4523,17 @@ class TestTemporalFilters:
 
 
 class TestColumnResolution:
-
     def test_declared_geo_column_used(self, tmp_path: Path):
         """When geo_column is declared, the executor uses it."""
         ds_path = tmp_path / "data" / "ds.parquet"
         ds_path.parent.mkdir(parents=True)
-        pd.DataFrame({
-            "my_geo": ["T1", "T2"],
-            "year": [2020, 2020],
-            "val": [10, 20],
-        }).to_parquet(ds_path)
+        pd.DataFrame(
+            {
+                "my_geo": ["T1", "T2"],
+                "year": [2020, 2020],
+                "val": [10, 20],
+            }
+        ).to_parquet(ds_path)
 
         data = _recipe_with_pipeline()
         data["datasets"]["acs"]["geo_column"] = "my_geo"
@@ -4306,11 +4560,13 @@ class TestColumnResolution:
         """Declared geo_column that doesn't exist in data raises error."""
         ds_path = tmp_path / "data" / "ds.parquet"
         ds_path.parent.mkdir(parents=True)
-        pd.DataFrame({
-            "GEOID": ["T1"],
-            "year": [2020],
-            "val": [10],
-        }).to_parquet(ds_path)
+        pd.DataFrame(
+            {
+                "GEOID": ["T1"],
+                "year": [2020],
+                "val": [10],
+            }
+        ).to_parquet(ds_path)
 
         data = _recipe_with_pipeline()
         recipe = load_recipe(data)
@@ -4335,11 +4591,13 @@ class TestColumnResolution:
         """When year_column is declared, the executor filters on it."""
         ds_path = tmp_path / "data" / "ds.parquet"
         ds_path.parent.mkdir(parents=True)
-        pd.DataFrame({
-            "coc_id": ["COC1", "COC1"],
-            "pit_year": [2020, 2021],
-            "val": [10, 20],
-        }).to_parquet(ds_path)
+        pd.DataFrame(
+            {
+                "coc_id": ["COC1", "COC1"],
+                "pit_year": [2020, 2021],
+                "val": [10, 20],
+            }
+        ).to_parquet(ds_path)
 
         data = _recipe_with_pipeline()
         data["datasets"]["pit"]["year_column"] = "pit_year"
@@ -4367,11 +4625,13 @@ class TestColumnResolution:
         """String-typed year columns should still match the requested year."""
         ds_path = tmp_path / "data" / "ds.parquet"
         ds_path.parent.mkdir(parents=True)
-        pd.DataFrame({
-            "metro_id": ["GF01", "GF01"],
-            "acs1_vintage": ["2023", "2024"],
-            "val": [10, 20],
-        }).to_parquet(ds_path)
+        pd.DataFrame(
+            {
+                "metro_id": ["GF01", "GF01"],
+                "acs1_vintage": ["2023", "2024"],
+                "val": [10, 20],
+            }
+        ).to_parquet(ds_path)
 
         data = _recipe_with_pipeline()
         data["datasets"]["pit"]["year_column"] = "acs1_vintage"
@@ -4402,11 +4662,13 @@ class TestColumnResolution:
         """Lagged ACS1 vintages should survive execution without breaking joins."""
         ds_path = tmp_path / "data" / "ds.parquet"
         ds_path.parent.mkdir(parents=True)
-        pd.DataFrame({
-            "metro_id": ["GF01", "GF02"],
-            "acs1_vintage": [2022, 2022],
-            "val": [10, 20],
-        }).to_parquet(ds_path)
+        pd.DataFrame(
+            {
+                "metro_id": ["GF01", "GF02"],
+                "acs1_vintage": [2022, 2022],
+                "val": [10, 20],
+            }
+        ).to_parquet(ds_path)
 
         data = _recipe_with_pipeline()
         data["datasets"]["pit"]["provider"] = "census"
@@ -4440,11 +4702,13 @@ class TestColumnResolution:
         """ACS1 source with multiple distinct vintages (none matching) should error."""
         ds_path = tmp_path / "data" / "ds.parquet"
         ds_path.parent.mkdir(parents=True)
-        pd.DataFrame({
-            "metro_id": ["GF01", "GF02"],
-            "acs1_vintage": [2021, 2022],
-            "val": [10, 20],
-        }).to_parquet(ds_path)
+        pd.DataFrame(
+            {
+                "metro_id": ["GF01", "GF02"],
+                "acs1_vintage": [2021, 2022],
+                "val": [10, 20],
+            }
+        ).to_parquet(ds_path)
 
         data = _recipe_with_pipeline()
         data["datasets"]["pit"]["provider"] = "census"
@@ -4474,11 +4738,13 @@ class TestColumnResolution:
         """Non-ACS1 dataset with acs1_vintage column should not get lagged tolerance."""
         ds_path = tmp_path / "data" / "ds.parquet"
         ds_path.parent.mkdir(parents=True)
-        pd.DataFrame({
-            "coc_id": ["NY-600"],
-            "acs1_vintage": [2022],
-            "val": [10],
-        }).to_parquet(ds_path)
+        pd.DataFrame(
+            {
+                "coc_id": ["NY-600"],
+                "acs1_vintage": [2022],
+                "val": [10],
+            }
+        ).to_parquet(ds_path)
 
         data = _recipe_with_pipeline()
         data["datasets"]["pit"]["year_column"] = "acs1_vintage"
@@ -4506,12 +4772,14 @@ class TestColumnResolution:
         """Multiple geo-ID candidate columns without declaration should error."""
         ds_path = tmp_path / "data" / "ds.parquet"
         ds_path.parent.mkdir(parents=True)
-        pd.DataFrame({
-            "geo_id": ["T1"],
-            "GEOID": ["T1"],
-            "year": [2020],
-            "val": [10],
-        }).to_parquet(ds_path)
+        pd.DataFrame(
+            {
+                "geo_id": ["T1"],
+                "GEOID": ["T1"],
+                "year": [2020],
+                "val": [10],
+            }
+        ).to_parquet(ds_path)
 
         data = _recipe_with_pipeline()
         recipe = load_recipe(data)
@@ -4538,7 +4806,6 @@ class TestColumnResolution:
 
 
 class TestJoinPersistence:
-
     def test_full_pipeline_writes_panel(self, tmp_path: Path):
         """End-to-end: materialize → resample → join → persist."""
         _setup_pipeline_fixtures(tmp_path)
@@ -4613,8 +4880,7 @@ class TestJoinPersistence:
         data["datasets"]["acs"]["path"] = "data/acs.parquet"
         # Remove the join step
         data["pipelines"][0]["steps"] = [
-            s for s in data["pipelines"][0]["steps"]
-            if not (isinstance(s, dict) and "join" in s)
+            s for s in data["pipelines"][0]["steps"] if not (isinstance(s, dict) and "join" in s)
         ]
         recipe = load_recipe(data)
         results = execute_recipe(recipe, project_root=tmp_path)
@@ -4631,10 +4897,15 @@ class TestJoinPersistence:
         data["datasets"]["acs"]["path"] = "data/acs.parquet"
         recipe_file = tmp_path / "recipe.yaml"
         recipe_file.write_text(yaml.dump(data), encoding="utf-8")
-        result = runner.invoke(app, [
-            "build", "recipe",
-            "--recipe", str(recipe_file),
-        ])
+        result = runner.invoke(
+            app,
+            [
+                "build",
+                "recipe",
+                "--recipe",
+                str(recipe_file),
+            ],
+        )
         assert result.exit_code == 0
         assert "persist" in result.output.lower()
         assert "panel" in result.output.lower()
@@ -4646,7 +4917,6 @@ class TestJoinPersistence:
 
 
 class TestRecipeCache:
-
     def test_cache_avoids_reread(self, tmp_path: Path):
         """Second read of same file returns cached DataFrame."""
         f = tmp_path / "data.parquet"
@@ -4755,7 +5025,6 @@ class TestRecipeCache:
 
 
 class TestRecipeManifest:
-
     def test_roundtrip_json(self):
         m = RecipeManifest(
             recipe_name="test",
@@ -4830,6 +5099,7 @@ class TestRecipeManifest:
         )
         out = tmp_path / "bundle"
         import logging
+
         with caplog.at_level(logging.WARNING, logger="hhplab.recipe.manifest"):
             export_bundle(m, tmp_path, out)
         assert (out / "manifest.json").exists()
@@ -4860,6 +5130,7 @@ class TestRecipeManifest:
 
         out = tmp_path / "bundle"
         import logging
+
         with caplog.at_level(logging.WARNING, logger="hhplab.recipe.manifest"):
             result = export_bundle(m, tmp_path, out)
 
@@ -4869,7 +5140,9 @@ class TestRecipeManifest:
         assert "skipping missing asset" in caplog.text
 
     def test_export_bundle_completeness_with_partial_missing(
-        self, tmp_path: Path, caplog,
+        self,
+        tmp_path: Path,
+        caplog,
     ):
         """Bundle copies present assets and skips deleted ones."""
         (tmp_path / "data").mkdir()
@@ -4903,6 +5176,7 @@ class TestRecipeManifest:
 
         out = tmp_path / "bundle"
         import logging
+
         with caplog.at_level(logging.WARNING, logger="hhplab.recipe.manifest"):
             export_bundle(m, tmp_path, out)
 
@@ -4984,7 +5258,6 @@ class TestRecipeManifest:
 
 
 class TestProvenanceManifest:
-
     def test_execution_writes_manifest_sidecar(self, tmp_path: Path):
         """Full pipeline writes both panel and manifest.json sidecar."""
         _setup_pipeline_fixtures(tmp_path)
@@ -5076,7 +5349,6 @@ class TestProvenanceManifest:
 
 
 class TestRecipeProvenanceCLI:
-
     def test_provenance_shows_manifest(self, tmp_path: Path):
         m = RecipeManifest(
             recipe_name="demo",
@@ -5096,20 +5368,30 @@ class TestRecipeProvenanceCLI:
         mf = tmp_path / "test.manifest.json"
         write_manifest(m, mf)
 
-        result = runner.invoke(app, [
-            "build", "recipe-provenance",
-            "--manifest", str(mf),
-        ])
+        result = runner.invoke(
+            app,
+            [
+                "build",
+                "recipe-provenance",
+                "--manifest",
+                str(mf),
+            ],
+        )
         assert result.exit_code == 0
         assert "demo" in result.output
         assert "pit" in result.output
         assert "aaaaaaaaaaaa" in result.output  # sha256 prefix
 
     def test_provenance_missing_manifest(self, tmp_path: Path):
-        result = runner.invoke(app, [
-            "build", "recipe-provenance",
-            "--manifest", str(tmp_path / "nope.json"),
-        ])
+        result = runner.invoke(
+            app,
+            [
+                "build",
+                "recipe-provenance",
+                "--manifest",
+                str(tmp_path / "nope.json"),
+            ],
+        )
         assert result.exit_code == 1
 
     def test_export_creates_bundle(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
@@ -5134,11 +5416,17 @@ class TestRecipeProvenanceCLI:
         write_manifest(m, mf)
         out = tmp_path / "my_bundle"
 
-        result = runner.invoke(app, [
-            "build", "recipe-export",
-            "--manifest", str(mf),
-            "--destination", str(out),
-        ])
+        result = runner.invoke(
+            app,
+            [
+                "build",
+                "recipe-export",
+                "--manifest",
+                str(mf),
+                "--destination",
+                str(out),
+            ],
+        )
         assert result.exit_code == 0
         assert (out / "manifest.json").exists()
         assert (out / "assets" / "data" / "pit.parquet").exists()
@@ -5153,11 +5441,16 @@ class TestRecipeProvenanceCLI:
         data["datasets"]["acs"]["path"] = "data/acs.parquet"
         recipe_file = tmp_path / "recipe.yaml"
         recipe_file.write_text(yaml.dump(data), encoding="utf-8")
-        result = runner.invoke(app, [
-            "build", "recipe",
-            "--recipe", str(recipe_file),
-            "--no-cache",
-        ])
+        result = runner.invoke(
+            app,
+            [
+                "build",
+                "recipe",
+                "--recipe",
+                str(recipe_file),
+                "--no-cache",
+            ],
+        )
         assert result.exit_code == 0
         assert "executed" in result.output.lower()
 
@@ -5175,7 +5468,6 @@ def _make_project_root(tmp_path: Path) -> None:
 
 
 class TestRecipeJsonMode:
-
     def _write_recipe(self, tmp_path: Path, data: dict) -> Path:
         import yaml
 
@@ -5188,11 +5480,18 @@ class TestRecipeJsonMode:
         monkeypatch.chdir(tmp_path)
         data = _recipe_with_pipeline()
         rf = self._write_recipe(tmp_path, data)
-        result = runner.invoke(app, [
-            "build", "recipe",
-            "--recipe", str(rf),
-            "--dry-run", "--json", "--skip-preflight",
-        ])
+        result = runner.invoke(
+            app,
+            [
+                "build",
+                "recipe",
+                "--recipe",
+                str(rf),
+                "--dry-run",
+                "--json",
+                "--skip-preflight",
+            ],
+        )
         assert result.exit_code == 0
         out = json.loads(result.output)
         assert out["status"] == "ok"
@@ -5201,7 +5500,9 @@ class TestRecipeJsonMode:
         assert "validation" in out
 
     def test_json_full_execution(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
     ):
         _make_project_root(tmp_path)
         monkeypatch.chdir(tmp_path)
@@ -5210,11 +5511,16 @@ class TestRecipeJsonMode:
         data["datasets"]["pit"]["path"] = "data/pit.parquet"
         data["datasets"]["acs"]["path"] = "data/acs.parquet"
         rf = self._write_recipe(tmp_path, data)
-        result = runner.invoke(app, [
-            "build", "recipe",
-            "--recipe", str(rf),
-            "--json",
-        ])
+        result = runner.invoke(
+            app,
+            [
+                "build",
+                "recipe",
+                "--recipe",
+                str(rf),
+                "--json",
+            ],
+        )
         assert result.exit_code == 0
         out = json.loads(result.output)
         assert out["status"] == "ok"
@@ -5228,7 +5534,9 @@ class TestRecipeJsonMode:
         assert "join" in kinds
 
     def test_json_full_execution_reports_written_artifact_paths(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
     ):
         _make_project_root(tmp_path)
         monkeypatch.chdir(tmp_path)
@@ -5238,11 +5546,16 @@ class TestRecipeJsonMode:
         data["datasets"]["acs"]["path"] = "data/acs.parquet"
         data["targets"][0]["outputs"] = ["panel", "diagnostics"]
         rf = self._write_recipe(tmp_path, data)
-        result = runner.invoke(app, [
-            "build", "recipe",
-            "--recipe", str(rf),
-            "--json",
-        ])
+        result = runner.invoke(
+            app,
+            [
+                "build",
+                "recipe",
+                "--recipe",
+                str(rf),
+                "--json",
+            ],
+        )
         assert result.exit_code == 0
         out = json.loads(result.output)
         expected_artifacts = {
@@ -5256,7 +5569,9 @@ class TestRecipeJsonMode:
             assert (tmp_path / rel_path).exists()
 
     def test_json_map_execution_reports_map_artifact_path(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
     ):
         _make_project_root(tmp_path)
         monkeypatch.chdir(tmp_path)
@@ -5274,11 +5589,16 @@ class TestRecipeJsonMode:
             ]
         }
         rf = self._write_recipe(tmp_path, data)
-        result = runner.invoke(app, [
-            "build", "recipe",
-            "--recipe", str(rf),
-            "--json",
-        ])
+        result = runner.invoke(
+            app,
+            [
+                "build",
+                "recipe",
+                "--recipe",
+                str(rf),
+                "--json",
+            ],
+        )
         assert result.exit_code == 0
         out = json.loads(result.output)
         assert out["status"] == "ok"
@@ -5291,7 +5611,9 @@ class TestRecipeJsonMode:
         assert (tmp_path / out["artifacts"]["map_path"]).exists()
 
     def test_json_suppresses_progress(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
     ):
         """JSON mode should not include human-readable progress lines."""
         _make_project_root(tmp_path)
@@ -5301,17 +5623,24 @@ class TestRecipeJsonMode:
         data["datasets"]["pit"]["path"] = "data/pit.parquet"
         data["datasets"]["acs"]["path"] = "data/acs.parquet"
         rf = self._write_recipe(tmp_path, data)
-        result = runner.invoke(app, [
-            "build", "recipe",
-            "--recipe", str(rf),
-            "--json",
-        ])
+        result = runner.invoke(
+            app,
+            [
+                "build",
+                "recipe",
+                "--recipe",
+                str(rf),
+                "--json",
+            ],
+        )
         # Output should be valid JSON (no interleaved echo lines)
         out = json.loads(result.output)
         assert isinstance(out, dict)
 
     def test_json_validation_error(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
     ):
         """Missing datasets now route through preflight as blocked status."""
         _make_project_root(tmp_path)
@@ -5322,11 +5651,16 @@ class TestRecipeJsonMode:
         data["datasets"]["acs"]["path"] = "also_missing.parquet"
         data["validation"] = {"missing_dataset": {"default": "fail"}}
         rf = self._write_recipe(tmp_path, data)
-        result = runner.invoke(app, [
-            "build", "recipe",
-            "--recipe", str(rf),
-            "--json",
-        ])
+        result = runner.invoke(
+            app,
+            [
+                "build",
+                "recipe",
+                "--recipe",
+                str(rf),
+                "--json",
+            ],
+        )
         assert result.exit_code == 1
         out = json.loads(result.output)
         assert out["status"] == "blocked"
@@ -5343,20 +5677,22 @@ class TestRecipeJsonMode:
         _patch_ct_recipe_alignment(monkeypatch)
         rf = self._write_recipe(tmp_path, _setup_ct_alignment_recipe(tmp_path))
 
-        result = runner.invoke(app, [
-            "build", "recipe-preflight",
-            "--recipe", str(rf),
-            "--json",
-        ])
+        result = runner.invoke(
+            app,
+            [
+                "build",
+                "recipe-preflight",
+                "--recipe",
+                str(rf),
+                "--json",
+            ],
+        )
 
         assert result.exit_code == 0
         out = json.loads(result.output)
         assert out["status"] == "ok"
         assert out["warning_count"] == 2
-        ct_findings = [
-            f for f in out["findings"]
-            if f["kind"] == "ct_county_alignment"
-        ]
+        ct_findings = [f for f in out["findings"] if f["kind"] == "ct_county_alignment"]
         assert len(ct_findings) == 2
         assert any("planning-region dataset 'pep_county'" in f["message"] for f in ct_findings)
         assert any("population_source 'weights'" in f["message"] for f in ct_findings)
@@ -5371,19 +5707,21 @@ class TestRecipeJsonMode:
         _patch_ct_recipe_alignment_failure(monkeypatch)
         rf = self._write_recipe(tmp_path, _setup_ct_alignment_recipe(tmp_path))
 
-        result = runner.invoke(app, [
-            "build", "recipe-preflight",
-            "--recipe", str(rf),
-            "--json",
-        ])
+        result = runner.invoke(
+            app,
+            [
+                "build",
+                "recipe-preflight",
+                "--recipe",
+                str(rf),
+                "--json",
+            ],
+        )
 
         assert result.exit_code == 1
         out = json.loads(result.output)
         assert out["status"] == "blocked"
-        ct_findings = [
-            f for f in out["findings"]
-            if f["kind"] == "ct_county_alignment"
-        ]
+        ct_findings = [f for f in out["findings"] if f["kind"] == "ct_county_alignment"]
         assert ct_findings
         assert all(f["severity"] == "error" for f in ct_findings)
         assert all(
@@ -5401,11 +5739,16 @@ class TestRecipeJsonMode:
         _patch_ct_recipe_alignment(monkeypatch)
         rf = self._write_recipe(tmp_path, _setup_ct_alignment_recipe(tmp_path))
 
-        result = runner.invoke(app, [
-            "build", "recipe",
-            "--recipe", str(rf),
-            "--json",
-        ])
+        result = runner.invoke(
+            app,
+            [
+                "build",
+                "recipe",
+                "--recipe",
+                str(rf),
+                "--json",
+            ],
+        )
 
         assert result.exit_code == 0
         out = json.loads(result.output)
@@ -5429,10 +5772,15 @@ class TestRecipeJsonMode:
         _patch_ct_recipe_alignment(monkeypatch)
         rf = self._write_recipe(tmp_path, _setup_ct_alignment_recipe(tmp_path))
 
-        result = runner.invoke(app, [
-            "build", "recipe",
-            "--recipe", str(rf),
-        ])
+        result = runner.invoke(
+            app,
+            [
+                "build",
+                "recipe",
+                "--recipe",
+                str(rf),
+            ],
+        )
 
         assert result.exit_code == 0
         assert "Connecticut special-case alignment applied" in result.output
@@ -5444,18 +5792,26 @@ class TestRecipeJsonMode:
             pipeline_id="main",
             assets=[
                 AssetRecord(
-                    role="dataset", path="data/x.parquet",
-                    sha256="a" * 64, size=100, dataset_id="x",
+                    role="dataset",
+                    path="data/x.parquet",
+                    sha256="a" * 64,
+                    size=100,
+                    dataset_id="x",
                 ),
             ],
         )
         mf = tmp_path / "test.manifest.json"
         write_manifest(m, mf)
-        result = runner.invoke(app, [
-            "build", "recipe-provenance",
-            "--manifest", str(mf),
-            "--json",
-        ])
+        result = runner.invoke(
+            app,
+            [
+                "build",
+                "recipe-provenance",
+                "--manifest",
+                str(mf),
+                "--json",
+            ],
+        )
         assert result.exit_code == 0
         out = json.loads(result.output)
         assert out["status"] == "ok"
@@ -5474,31 +5830,44 @@ class TestRecipeJsonMode:
             pipeline_id="main",
             assets=[
                 AssetRecord(
-                    role="dataset", path="data/pit.parquet",
-                    sha256="a" * 64, size=100,
+                    role="dataset",
+                    path="data/pit.parquet",
+                    sha256="a" * 64,
+                    size=100,
                 ),
             ],
         )
         mf = tmp_path / "test.manifest.json"
         write_manifest(m, mf)
         out_dir = tmp_path / "bundle"
-        result = runner.invoke(app, [
-            "build", "recipe-export",
-            "--manifest", str(mf),
-            "--destination", str(out_dir),
-            "--json",
-        ])
+        result = runner.invoke(
+            app,
+            [
+                "build",
+                "recipe-export",
+                "--manifest",
+                str(mf),
+                "--destination",
+                str(out_dir),
+                "--json",
+            ],
+        )
         assert result.exit_code == 0
         out = json.loads(result.output)
         assert out["status"] == "ok"
         assert out["assets_copied"] == 1
 
     def test_json_provenance_missing_manifest(self, tmp_path: Path):
-        result = runner.invoke(app, [
-            "build", "recipe-provenance",
-            "--manifest", str(tmp_path / "nope.json"),
-            "--json",
-        ])
+        result = runner.invoke(
+            app,
+            [
+                "build",
+                "recipe-provenance",
+                "--manifest",
+                str(tmp_path / "nope.json"),
+                "--json",
+            ],
+        )
         assert result.exit_code == 1
         out = json.loads(result.output)
         assert out["status"] == "error"
@@ -5510,7 +5879,6 @@ class TestRecipeJsonMode:
 
 
 class TestRecipePlanCmd:
-
     def _write_recipe(self, tmp_path: Path, data: dict) -> Path:
         import yaml
 
@@ -5519,16 +5887,23 @@ class TestRecipePlanCmd:
         return recipe_file
 
     def test_plan_human_output(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
     ):
         _make_project_root(tmp_path)
         monkeypatch.chdir(tmp_path)
         data = _recipe_with_pipeline()
         rf = self._write_recipe(tmp_path, data)
-        result = runner.invoke(app, [
-            "build", "recipe-plan",
-            "--recipe", str(rf),
-        ])
+        result = runner.invoke(
+            app,
+            [
+                "build",
+                "recipe-plan",
+                "--recipe",
+                str(rf),
+            ],
+        )
         assert result.exit_code == 0
         assert "Pipeline 'main'" in result.output
         assert "[materialize]" in result.output
@@ -5536,33 +5911,47 @@ class TestRecipePlanCmd:
         assert "[join]" in result.output
 
     def test_plan_human_output_shows_metro_definition_version(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
     ):
         _make_project_root(tmp_path)
         monkeypatch.chdir(tmp_path)
         _setup_metro_pipeline_fixtures(tmp_path)
         data = _recipe_with_metro_pipeline()
         rf = self._write_recipe(tmp_path, data)
-        result = runner.invoke(app, [
-            "build", "recipe-plan",
-            "--recipe", str(rf),
-        ])
+        result = runner.invoke(
+            app,
+            [
+                "build",
+                "recipe-plan",
+                "--recipe",
+                str(rf),
+            ],
+        )
         assert result.exit_code == 0
         assert "geometry=metro@glynn_fox_v1" in result.output
         assert "to=metro@glynn_fox_v1" in result.output
 
     def test_plan_json_output(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
     ):
         _make_project_root(tmp_path)
         monkeypatch.chdir(tmp_path)
         data = _recipe_with_pipeline()
         rf = self._write_recipe(tmp_path, data)
-        result = runner.invoke(app, [
-            "build", "recipe-plan",
-            "--recipe", str(rf),
-            "--json",
-        ])
+        result = runner.invoke(
+            app,
+            [
+                "build",
+                "recipe-plan",
+                "--recipe",
+                str(rf),
+                "--json",
+            ],
+        )
         assert result.exit_code == 0
         out = json.loads(result.output)
         assert out["status"] == "ok"
@@ -5576,7 +5965,9 @@ class TestRecipePlanCmd:
         assert plan["task_count"] == 7
 
     def test_plan_json_shows_resolved_paths(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
     ):
         _make_project_root(tmp_path)
         monkeypatch.chdir(tmp_path)
@@ -5586,85 +5977,109 @@ class TestRecipePlanCmd:
         data = _recipe_with_pipeline()
         data["datasets"]["pit"]["path"] = "data/pit.parquet"
         rf = self._write_recipe(tmp_path, data)
-        result = runner.invoke(app, [
-            "build", "recipe-plan",
-            "--recipe", str(rf),
-            "--json",
-        ])
+        result = runner.invoke(
+            app,
+            [
+                "build",
+                "recipe-plan",
+                "--recipe",
+                str(rf),
+                "--json",
+            ],
+        )
         out = json.loads(result.output)
         resample_tasks = out["pipelines"][0]["resample_tasks"]
         pit_tasks = [t for t in resample_tasks if t["dataset_id"] == "pit"]
         assert pit_tasks[0]["input_path"] == "data/pit.parquet"
 
     def test_plan_json_shows_geometry(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
     ):
         _make_project_root(tmp_path)
         monkeypatch.chdir(tmp_path)
         data = _recipe_with_pipeline()
         rf = self._write_recipe(tmp_path, data)
-        result = runner.invoke(app, [
-            "build", "recipe-plan",
-            "--recipe", str(rf),
-            "--json",
-        ])
+        result = runner.invoke(
+            app,
+            [
+                "build",
+                "recipe-plan",
+                "--recipe",
+                str(rf),
+                "--json",
+            ],
+        )
         out = json.loads(result.output)
         resample_tasks = out["pipelines"][0]["resample_tasks"]
-        acs_task = next(
-            t for t in resample_tasks if t["dataset_id"] == "acs"
-        )
+        acs_task = next(t for t in resample_tasks if t["dataset_id"] == "acs")
         assert acs_task["effective_geometry"]["type"] == "tract"
         assert acs_task["effective_geometry"]["vintage"] == 2020
         assert acs_task["to_geometry"]["type"] == "coc"
 
     def test_plan_json_shows_transform_selection(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
     ):
         _make_project_root(tmp_path)
         monkeypatch.chdir(tmp_path)
         data = _recipe_with_pipeline()
         rf = self._write_recipe(tmp_path, data)
-        result = runner.invoke(app, [
-            "build", "recipe-plan",
-            "--recipe", str(rf),
-            "--json",
-        ])
+        result = runner.invoke(
+            app,
+            [
+                "build",
+                "recipe-plan",
+                "--recipe",
+                str(rf),
+                "--json",
+            ],
+        )
         out = json.loads(result.output)
         resample_tasks = out["pipelines"][0]["resample_tasks"]
-        acs_task = next(
-            t for t in resample_tasks if t["dataset_id"] == "acs"
-        )
+        acs_task = next(t for t in resample_tasks if t["dataset_id"] == "acs")
         assert acs_task["transform_id"] == "tract_to_coc"
 
     def test_plan_planner_error_json(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
     ):
         _make_project_root(tmp_path)
         monkeypatch.chdir(tmp_path)
         data = _recipe_with_pipeline()
         # Add an unresolvable auto transform
-        data["pipelines"][0]["steps"].insert(1, {
-            "resample": {
-                "dataset": "acs",
-                "to_geometry": {"type": "county"},
-                "method": "aggregate",
-                "via": "auto",
-                "measures": ["total_population"],
+        data["pipelines"][0]["steps"].insert(
+            1,
+            {
+                "resample": {
+                    "dataset": "acs",
+                    "to_geometry": {"type": "county"},
+                    "method": "aggregate",
+                    "via": "auto",
+                    "measures": ["total_population"],
+                },
             },
-        })
+        )
         rf = self._write_recipe(tmp_path, data)
-        result = runner.invoke(app, [
-            "build", "recipe-plan",
-            "--recipe", str(rf),
-            "--json",
-        ])
+        result = runner.invoke(
+            app,
+            [
+                "build",
+                "recipe-plan",
+                "--recipe",
+                str(rf),
+                "--json",
+            ],
+        )
         assert result.exit_code == 1
         out = json.loads(result.output)
         assert out["status"] == "error"
 
 
 class TestExecutionPlanToDict:
-
     def test_plan_to_dict(self):
         recipe = load_recipe(_recipe_with_pipeline())
         plan = resolve_plan(recipe, "main")
@@ -5674,9 +6089,7 @@ class TestExecutionPlanToDict:
         assert "resample_tasks" in d
         assert "join_tasks" in d
         assert d["task_count"] == (
-            len(d["materialize_tasks"])
-            + len(d["resample_tasks"])
-            + len(d["join_tasks"])
+            len(d["materialize_tasks"]) + len(d["resample_tasks"]) + len(d["join_tasks"])
         )
 
     def test_plan_to_dict_geometry_fields(self):
@@ -5789,7 +6202,10 @@ class TestApplyCohortSelector:
 
         panel = self._make_panel()
         cohort = CohortSelector(
-            rank_by="total_population", method="top_n", n=3, reference_year=2021,
+            rank_by="total_population",
+            method="top_n",
+            n=3,
+            reference_year=2021,
         )
         result = _apply_cohort_selector(panel, cohort)
         selected_geos = set(result["geo_id"].unique())
@@ -5803,7 +6219,10 @@ class TestApplyCohortSelector:
 
         panel = self._make_panel()
         cohort = CohortSelector(
-            rank_by="total_population", method="bottom_n", n=2, reference_year=2021,
+            rank_by="total_population",
+            method="bottom_n",
+            n=2,
+            reference_year=2021,
         )
         result = _apply_cohort_selector(panel, cohort)
         selected_geos = set(result["geo_id"].unique())
@@ -5834,7 +6253,10 @@ class TestApplyCohortSelector:
 
         panel = self._make_panel()
         cohort = CohortSelector(
-            rank_by="nonexistent_col", method="top_n", n=3, reference_year=2021,
+            rank_by="nonexistent_col",
+            method="top_n",
+            n=3,
+            reference_year=2021,
         )
         with pytest.raises(ExecutorError, match="rank_by column"):
             _apply_cohort_selector(panel, cohort)
@@ -5845,7 +6267,10 @@ class TestApplyCohortSelector:
 
         panel = self._make_panel()
         cohort = CohortSelector(
-            rank_by="total_population", method="top_n", n=3, reference_year=2099,
+            rank_by="total_population",
+            method="top_n",
+            n=3,
+            reference_year=2099,
         )
         with pytest.raises(ExecutorError, match="reference_year"):
             _apply_cohort_selector(panel, cohort)
@@ -5864,19 +6289,23 @@ class TestCanonicalizeMetroNameBackfill:
         assert result["metro_name"].notna().all()
 
     def test_backfills_when_column_has_nulls(self):
-        df = pd.DataFrame({
-            "geo_id": ["GF01", "GF02"],
-            "year": [2020, 2020],
-            "metro_name": [None, None],
-        })
+        df = pd.DataFrame(
+            {
+                "geo_id": ["GF01", "GF02"],
+                "year": [2020, 2020],
+                "metro_name": [None, None],
+            }
+        )
         result = _canonicalize_panel_for_target(df, self._metro_geometry())
         assert result["metro_name"].notna().all()
 
     def test_backfills_partial_nulls(self):
-        df = pd.DataFrame({
-            "geo_id": ["GF01", "GF02"],
-            "year": [2020, 2020],
-            "metro_name": ["New York", None],
-        })
+        df = pd.DataFrame(
+            {
+                "geo_id": ["GF01", "GF02"],
+                "year": [2020, 2020],
+                "metro_name": ["New York", None],
+            }
+        )
         result = _canonicalize_panel_for_target(df, self._metro_geometry())
         assert result["metro_name"].notna().all()

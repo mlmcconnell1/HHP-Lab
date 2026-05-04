@@ -14,7 +14,7 @@ from hhplab.acs.variables_acs1 import (
     ACS1_VARIABLE_NAMES,
     DERIVED_ACS1_MEASURES,
 )
-from hhplab.metro.definitions import (
+from hhplab.metro.metro_definitions import (
     _CBSA_METRO_NAMES,
     _CBSA_TO_METRO,
     METRO_CBSA_MAPPING,
@@ -139,9 +139,7 @@ class TestACS1VariableDefinitions:
 
     def test_variable_codes_end_with_E(self):
         for var_code in ACS1_UNEMPLOYMENT_VARIABLES:
-            assert var_code.endswith("E"), (
-                f"Variable {var_code} should end with 'E' (estimate)"
-            )
+            assert var_code.endswith("E"), f"Variable {var_code} should end with 'E' (estimate)"
 
     def test_friendly_names_are_unique(self):
         names = list(ACS1_VARIABLE_NAMES.values())

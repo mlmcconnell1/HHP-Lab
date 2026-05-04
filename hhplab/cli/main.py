@@ -12,14 +12,13 @@ from typing import Annotated
 
 import typer
 
-from hhplab.cli.aggregate import aggregate_app
+from hhplab.cli.aggregate_cli import aggregate_app
 from hhplab.cli.build_xwalks import build_xwalks
 from hhplab.cli.compare_vintages import compare_vintages
 from hhplab.cli.crosscheck_pit_vintages import validate_pit_vintages
 from hhplab.cli.crosscheck_population import validate_population
-from hhplab.cli.diagnostics import diagnostics
-from hhplab.cli.generate_metro import generate_metro
-from hhplab.cli.generate_metro import generate_metro_universe
+from hhplab.cli.diagnostics_cli import diagnostics
+from hhplab.cli.generate_metro import generate_metro, generate_metro_universe
 from hhplab.cli.generate_metro_boundaries import generate_metro_boundaries
 from hhplab.cli.generate_msa import generate_msa
 from hhplab.cli.generate_msa_xwalk import generate_msa_xwalk
@@ -37,8 +36,8 @@ from hhplab.cli.list_curated import list_curated
 from hhplab.cli.list_measures import list_measures
 from hhplab.cli.list_xwalks import list_xwalks
 from hhplab.cli.migrate_curated import migrate_curated_cmd
-from hhplab.cli.panel_diagnostics import panel_diagnostics
-from hhplab.cli.pep import ingest_pep
+from hhplab.cli.panel_diagnostics_cli import panel_diagnostics
+from hhplab.cli.pep_cli import ingest_pep
 from hhplab.cli.recipe import (
     recipe_cmd,
     recipe_export_cmd,
@@ -50,10 +49,9 @@ from hhplab.cli.registry_rebuild import registry_rebuild
 from hhplab.cli.show_measures import show_measures
 from hhplab.cli.status import status_cmd
 from hhplab.cli.validate_curated import validate_curated_layout_cmd
-from hhplab.cli.validate_metro import validate_metro
-from hhplab.cli.validate_metro import validate_metro_universe
+from hhplab.cli.validate_metro import validate_metro, validate_metro_universe
 from hhplab.cli.validate_msa import validate_msa
-from hhplab.cli.zori import (
+from hhplab.cli.zori_cli import (
     ingest_zori,
     zori_diagnostics,
 )
@@ -211,8 +209,7 @@ def main_callback(
         typer.Option(
             "--non-interactive",
             help=(
-                "Disable interactive prompts. Can also be enabled with "
-                "HHPLAB_NON_INTERACTIVE=1."
+                "Disable interactive prompts. Can also be enabled with HHPLAB_NON_INTERACTIVE=1."
             ),
         ),
     ] = False,
@@ -284,9 +281,9 @@ def ingest_boundaries(
             typer.echo("Error: --vintage is required for hud_exchange source", err=True)
             raise typer.Exit(1)
 
-        from hhplab.geo.io import curated_boundary_path
+        from hhplab.geo.geo_io import curated_boundary_path
         from hhplab.hud import ingest_hud_exchange
-        from hhplab.registry.registry import list_boundaries
+        from hhplab.registry.boundary_registry import list_boundaries
 
         output_path = curated_boundary_path(vintage)
         registered_vintages = [v.boundary_vintage for v in list_boundaries()]
@@ -367,7 +364,7 @@ def delete_boundaries(
 
         hhplab registry delete-entry 2024 hud_exchange --yes
     """
-    from hhplab.registry.registry import delete_vintage, list_boundaries
+    from hhplab.registry.boundary_registry import delete_vintage, list_boundaries
     from hhplab.source_registry import delete_by_local_path
 
     # Check if the entry exists first
@@ -419,7 +416,7 @@ def list_boundaries_cmd(
     """List all available boundary vintages in the registry."""
     import json
 
-    from hhplab.registry.registry import list_boundaries
+    from hhplab.registry.boundary_registry import list_boundaries
 
     vintages = list_boundaries()
 
@@ -641,9 +638,7 @@ def source_status(
                     json.dumps(
                         {
                             "status": "ok",
-                            "sources": json.loads(
-                                df.to_json(orient="records", date_format="iso")
-                            ),
+                            "sources": json.loads(df.to_json(orient="records", date_format="iso")),
                         },
                     )
                 )

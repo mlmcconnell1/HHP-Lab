@@ -1,11 +1,9 @@
 """Tests for the ``hhplab aggregate`` CLI command group."""
 
-from pathlib import Path
-
 import pytest
 from typer.testing import CliRunner
 
-from hhplab.cli.aggregate import _build_lagged_pep_series
+from hhplab.cli.aggregate_cli import _build_lagged_pep_series
 from hhplab.cli.main import app
 
 runner = CliRunner()
@@ -94,11 +92,13 @@ def test_aggregate_pep_rejects_lag_months_without_lagged_align():
 def test_build_lagged_pep_series_zero_months_matches_current_year():
     import pandas as pd
 
-    pep_df = pd.DataFrame({
-        "county_fips": ["01001", "01003", "01001", "01003"],
-        "year": [2019, 2019, 2020, 2020],
-        "population": [90000, 120000, 100000, 130000],
-    })
+    pep_df = pd.DataFrame(
+        {
+            "county_fips": ["01001", "01003", "01001", "01003"],
+            "year": [2019, 2019, 2020, 2020],
+            "population": [90000, 120000, 100000, 130000],
+        }
+    )
 
     result = _build_lagged_pep_series(pep_df, target_year=2020, lag_months=0)
     result = result.sort_values("county_fips").reset_index(drop=True)
@@ -108,11 +108,13 @@ def test_build_lagged_pep_series_zero_months_matches_current_year():
 def test_build_lagged_pep_series_twelve_months_matches_previous_year():
     import pandas as pd
 
-    pep_df = pd.DataFrame({
-        "county_fips": ["01001", "01003", "01001", "01003"],
-        "year": [2019, 2019, 2020, 2020],
-        "population": [90000, 120000, 100000, 130000],
-    })
+    pep_df = pd.DataFrame(
+        {
+            "county_fips": ["01001", "01003", "01001", "01003"],
+            "year": [2019, 2019, 2020, 2020],
+            "population": [90000, 120000, 100000, 130000],
+        }
+    )
 
     result = _build_lagged_pep_series(pep_df, target_year=2020, lag_months=12)
     result = result.sort_values("county_fips").reset_index(drop=True)
@@ -122,11 +124,13 @@ def test_build_lagged_pep_series_twelve_months_matches_previous_year():
 def test_build_lagged_pep_series_interpolates_for_partial_month_lag():
     import pandas as pd
 
-    pep_df = pd.DataFrame({
-        "county_fips": ["01001", "01003", "01001", "01003"],
-        "year": [2019, 2019, 2020, 2020],
-        "population": [90000, 120000, 100000, 130000],
-    })
+    pep_df = pd.DataFrame(
+        {
+            "county_fips": ["01001", "01003", "01001", "01003"],
+            "year": [2019, 2019, 2020, 2020],
+            "population": [90000, 120000, 100000, 130000],
+        }
+    )
 
     result = _build_lagged_pep_series(pep_df, target_year=2020, lag_months=6)
     result = result.sort_values("county_fips").reset_index(drop=True)
@@ -136,11 +140,13 @@ def test_build_lagged_pep_series_interpolates_for_partial_month_lag():
 def test_build_lagged_pep_series_rejects_invalid_lag_months():
     import pandas as pd
 
-    pep_df = pd.DataFrame({
-        "county_fips": ["01001"],
-        "year": [2020],
-        "population": [100000],
-    })
+    pep_df = pd.DataFrame(
+        {
+            "county_fips": ["01001"],
+            "year": [2020],
+            "population": [100000],
+        }
+    )
 
     with pytest.raises(ValueError, match="--lag-months must be between 0 and 12"):
         _build_lagged_pep_series(pep_df, target_year=2020, lag_months=-1)
@@ -154,17 +160,19 @@ def _create_fake_acs_cache(acs_vintage: str, tract_vintage: str | int) -> None:
 
     cache_path = get_output_path(acs_vintage, str(tract_vintage))
     cache_path.parent.mkdir(parents=True, exist_ok=True)
-    pd.DataFrame({
-        "tract_geoid": ["01001020100"],
-        "total_population": [100],
-        "adult_population": [80],
-        "median_household_income": [50000.0],
-        "median_gross_rent": [1200.0],
-        "poverty_universe": [95],
-        "below_50pct_poverty": [5],
-        "50_to_99pct_poverty": [10],
-        "population_below_poverty": [15],
-    }).to_parquet(cache_path)
+    pd.DataFrame(
+        {
+            "tract_geoid": ["01001020100"],
+            "total_population": [100],
+            "adult_population": [80],
+            "median_household_income": [50000.0],
+            "median_gross_rent": [1200.0],
+            "poverty_universe": [95],
+            "below_50pct_poverty": [5],
+            "50_to_99pct_poverty": [10],
+            "population_below_poverty": [15],
+        }
+    ).to_parquet(cache_path)
 
 
 def test_aggregate_acs_missing_crosswalk_suggests_decennial():
@@ -196,11 +204,13 @@ def test_aggregate_pit_collects_data(tmp_path):
     pit_dir = tmp_path / "data" / "curated" / "pit"
     pit_dir.mkdir(parents=True)
     for year in [2020, 2021]:
-        df = pd.DataFrame({
-            "coc_id": [f"XX-{i:03d}" for i in range(3)],
-            "pit_year": [year] * 3,
-            "total_homeless": [100, 200, 300],
-        })
+        df = pd.DataFrame(
+            {
+                "coc_id": [f"XX-{i:03d}" for i in range(3)],
+                "pit_year": [year] * 3,
+                "total_homeless": [100, 200, 300],
+            }
+        )
         df.to_parquet(pit_dir / f"pit__P{year}.parquet", index=False)
 
     old_cwd = os.getcwd()
@@ -233,11 +243,13 @@ def test_aggregate_pit_falls_back_to_vintage(tmp_path):
     rows = []
     for year in range(2015, 2025):
         for i in range(3):
-            rows.append({
-                "coc_id": f"XX-{i:03d}",
-                "pit_year": year,
-                "total_homeless": 100 * (i + 1),
-            })
+            rows.append(
+                {
+                    "coc_id": f"XX-{i:03d}",
+                    "pit_year": year,
+                    "total_homeless": 100 * (i + 1),
+                }
+            )
     vintage_df = pd.DataFrame(rows)
     vintage_df.to_parquet(pit_dir / "pit_vintage__P2024.parquet", index=False)
 
@@ -275,11 +287,13 @@ def test_aggregate_pit_vintage_partial_coverage(tmp_path):
     rows = []
     for year in [2020, 2021]:
         for i in range(3):
-            rows.append({
-                "coc_id": f"XX-{i:03d}",
-                "pit_year": year,
-                "total_homeless": 100 * (i + 1),
-            })
+            rows.append(
+                {
+                    "coc_id": f"XX-{i:03d}",
+                    "pit_year": year,
+                    "total_homeless": 100 * (i + 1),
+                }
+            )
     vintage_df = pd.DataFrame(rows)
     vintage_df.to_parquet(pit_dir / "pit_vintage__P2021.parquet", index=False)
 
@@ -410,4 +424,7 @@ def test_aggregate_pit_to_msa_missing_crosswalk_is_actionable(tmp_path):
         os.chdir(old_cwd)
 
     assert result.exit_code == 1
-    assert "generate msa-xwalk --boundary 2020 --definition-version census_msa_2023 --counties 2020" in result.output
+    assert (
+        "generate msa-xwalk --boundary 2020 --definition-version census_msa_2023 --counties 2020"
+        in result.output
+    )

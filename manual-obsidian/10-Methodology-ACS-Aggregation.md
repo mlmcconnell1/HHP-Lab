@@ -4,7 +4,7 @@ This section documents how ACS demographic measures are aggregated from census t
 
 ## Target Geographies
 
-The aggregation engine is geography-neutral via the `geo_id_col` parameter in `hhplab.measures.acs.aggregate_to_geo()`:
+The aggregation engine is geography-neutral via the `geo_id_col` parameter in `hhplab.measures.measures_acs.aggregate_to_geo()`:
 
 - **CoC**: tracts are assigned to CoCs via area-weighted spatial crosswalk (`xwalk__B{boundary}xT{tract}.parquet`)
 - **Metro**: tracts are assigned to metros via county membership (tract's county FIPS → metro county membership table)

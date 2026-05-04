@@ -10,7 +10,7 @@ import logging
 import pandas as pd
 
 from hhplab.geo.ct_planning_regions import CT_STATE_FIPS, CtPlanningRegionCrosswalk
-from hhplab.rents.aggregate import _align_ct_geographies
+from hhplab.rents.zori_aggregate import _align_ct_geographies
 
 
 def _synthetic_crosswalk() -> CtPlanningRegionCrosswalk:
@@ -38,7 +38,7 @@ def _synthetic_crosswalk() -> CtPlanningRegionCrosswalk:
 def _patch_build_crosswalk(monkeypatch):
     """Patch build_ct_county_planning_region_crosswalk to return the synthetic crosswalk."""
     monkeypatch.setattr(
-        "hhplab.rents.aggregate.build_ct_county_planning_region_crosswalk",
+        "hhplab.rents.zori_aggregate.build_ct_county_planning_region_crosswalk",
         lambda **kwargs: _synthetic_crosswalk(),
     )
 
@@ -82,9 +82,7 @@ class TestAlignCtGeographies:
         assert non_ct.iloc[0]["weight_value"] == 400.0
 
         # CT weights should now be keyed to legacy county FIPS
-        ct_weights = result_weights[
-            result_weights["county_fips"].isin(["09001", "09003"])
-        ]
+        ct_weights = result_weights[result_weights["county_fips"].isin(["09001", "09003"])]
         assert not ct_weights.empty
         # Planning-region codes should be gone from the result
         planning_remaining = result_weights[
@@ -127,9 +125,7 @@ class TestAlignCtGeographies:
 
         # Legacy CT geo_ids should be replaced with planning-region codes
         ct_result = result_zori[result_zori["geo_id"].str.startswith(CT_STATE_FIPS)]
-        legacy_remaining = result_zori[
-            result_zori["geo_id"].isin(["09001", "09003"])
-        ]
+        legacy_remaining = result_zori[result_zori["geo_id"].isin(["09001", "09003"])]
         assert legacy_remaining.empty
         assert set(ct_result["geo_id"]).issubset({"09110", "09120", "09130"})
 
@@ -149,7 +145,7 @@ class TestAlignCtGeographies:
             raise FileNotFoundError("geometry file missing")
 
         monkeypatch.setattr(
-            "hhplab.rents.aggregate.build_ct_county_planning_region_crosswalk",
+            "hhplab.rents.zori_aggregate.build_ct_county_planning_region_crosswalk",
             _raise,
         )
 
@@ -174,7 +170,7 @@ class TestAlignCtGeographies:
             }
         )
 
-        with caplog.at_level(logging.WARNING, logger="hhplab.rents.aggregate"):
+        with caplog.at_level(logging.WARNING, logger="hhplab.rents.zori_aggregate"):
             result_zori, result_weights = _align_ct_geographies(
                 zori_df, xwalk_df, weights_df, county_vintage=2023
             )
@@ -194,7 +190,7 @@ class TestAlignCtGeographies:
             raise ValueError("empty geometries")
 
         monkeypatch.setattr(
-            "hhplab.rents.aggregate.build_ct_county_planning_region_crosswalk",
+            "hhplab.rents.zori_aggregate.build_ct_county_planning_region_crosswalk",
             _raise,
         )
 
@@ -219,7 +215,7 @@ class TestAlignCtGeographies:
             }
         )
 
-        with caplog.at_level(logging.WARNING, logger="hhplab.rents.aggregate"):
+        with caplog.at_level(logging.WARNING, logger="hhplab.rents.zori_aggregate"):
             result_zori, result_weights = _align_ct_geographies(
                 zori_df, xwalk_df, weights_df, county_vintage=2020
             )
@@ -318,9 +314,7 @@ class TestAlignCtGeographies:
             }
         )
 
-        result_zori, _ = _align_ct_geographies(
-            zori_df, xwalk_df, weights_df, county_vintage=2023
-        )
+        result_zori, _ = _align_ct_geographies(zori_df, xwalk_df, weights_df, county_vintage=2023)
 
         assert "geo_id" in result_zori.columns
         assert "date" in result_zori.columns

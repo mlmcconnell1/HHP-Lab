@@ -9,10 +9,10 @@ from __future__ import annotations
 from importlib import import_module
 
 _EXPORTS = {
-    "aggregate_acs_to_metro": ("hhplab.acs.metro", "aggregate_acs_to_metro"),
-    "aggregate_to_coc": ("hhplab.acs.aggregate", "aggregate_to_coc"),
-    "aggregate_to_geo": ("hhplab.acs.aggregate", "aggregate_to_geo"),
-    "build_metro_tract_crosswalk": ("hhplab.acs.metro", "build_metro_tract_crosswalk"),
+    "aggregate_acs_to_metro": ("hhplab.acs.acs_metro", "aggregate_acs_to_metro"),
+    "aggregate_to_coc": ("hhplab.acs.acs_aggregate", "aggregate_to_coc"),
+    "aggregate_to_geo": ("hhplab.acs.acs_aggregate", "aggregate_to_geo"),
+    "build_metro_tract_crosswalk": ("hhplab.acs.acs_metro", "build_metro_tract_crosswalk"),
     "TranslationStats": ("hhplab.acs.translate", "TranslationStats"),
     "fetch_state_tract_data": ("hhplab.acs.ingest.tract_population", "fetch_state_tract_data"),
     "fetch_tract_data": ("hhplab.acs.ingest.tract_population", "fetch_tract_data"),

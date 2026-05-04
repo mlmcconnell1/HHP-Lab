@@ -29,9 +29,8 @@ from hhplab.pit.ingest import (
     write_pit_parquet,
 )
 from hhplab.pit.msa import aggregate_pit_to_msa, save_msa_pit
-from hhplab.pit.metro import aggregate_pit_to_metro
-from hhplab.pit.qa import QAReport, QAIssue, Severity, validate_pit_data
-from hhplab.pit.registry import (
+from hhplab.pit.pit_metro import aggregate_pit_to_metro
+from hhplab.pit.pit_registry import (
     PitRegistryEntry,
     compute_file_hash,
     get_pit_path,
@@ -39,6 +38,7 @@ from hhplab.pit.registry import (
     list_pit_years,
     register_pit_year,
 )
+from hhplab.pit.qa import QAIssue, QAReport, Severity, validate_pit_data
 
 __all__ = [
     "CANONICAL_COLUMNS",

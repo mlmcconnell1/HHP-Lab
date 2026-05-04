@@ -32,19 +32,19 @@ from hhplab.panel.conformance import (
     register_check,
     run_conformance,
 )
-from hhplab.panel.diagnostics import (
+from hhplab.panel.finalize import (
+    RECIPE_COLUMN_ALIASES,
+    detect_boundary_changes,
+    determine_alignment_type,
+    finalize_panel,
+)
+from hhplab.panel.panel_diagnostics import (
     DiagnosticsReport,
     boundary_change_summary,
     coverage_summary,
     generate_diagnostics_report,
     missingness_report,
     weighting_sensitivity,
-)
-from hhplab.panel.finalize import (
-    RECIPE_COLUMN_ALIASES,
-    detect_boundary_changes,
-    determine_alignment_type,
-    finalize_panel,
 )
 from hhplab.panel.policies import (
     DEFAULT_POLICY,

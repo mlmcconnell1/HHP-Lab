@@ -21,7 +21,7 @@ import pyarrow as pa
 import pyarrow.parquet as pq
 
 from hhplab.panel.conformance import PanelRequest, run_conformance
-from hhplab.panel.diagnostics import generate_diagnostics_report
+from hhplab.panel.panel_diagnostics import generate_diagnostics_report
 from hhplab.panel.zori_eligibility import summarize_zori_eligibility
 from hhplab.recipe.executor_core import (
     ExecutionContext,
@@ -68,7 +68,9 @@ def persist_outputs(
 
     try:
         output_file = _resolve_panel_output_file(
-            ctx.recipe, plan.pipeline_id, ctx.project_root,
+            ctx.recipe,
+            plan.pipeline_id,
+            ctx.project_root,
             storage_config=ctx.storage_config,
         )
     except ExecutorError as exc:
@@ -159,16 +161,15 @@ def persist_outputs(
 
     # Write manifest sidecar JSON
     manifest = _build_manifest(
-        ctx.recipe, plan.pipeline_id, ctx, output_path=output_rel,
+        ctx.recipe,
+        plan.pipeline_id,
+        ctx,
+        output_path=output_rel,
     )
     manifest_file = output_file.with_suffix(".manifest.json")
     write_manifest(manifest, manifest_file)
 
-    detail = (
-        f"persist panel: {len(frames)} year(s), "
-        f"{len(panel)} rows → "
-        f"{output_rel}"
-    )
+    detail = f"persist panel: {len(frames)} year(s), {len(panel)} rows → {output_rel}"
     _echo(ctx, f"  [persist] {detail}")
     return StepResult(step_kind="persist", detail=detail, success=True)
 

@@ -9,7 +9,7 @@ import pandas as pd
 import pytest
 
 from hhplab.acs import aggregate_acs_to_metro, build_metro_tract_crosswalk
-from hhplab.metro.definitions import (
+from hhplab.metro.metro_definitions import (
     METRO_COUNT,
     METRO_COUNTY_MEMBERSHIP,
     build_county_membership_df,
@@ -33,15 +33,17 @@ def synthetic_tracts(all_county_fips):
     for fips in all_county_fips:
         for suffix in ["000100", "000200"]:
             geoid = fips + suffix
-            rows.append({
-                "GEOID": geoid,
-                "total_population": 5000,
-                "adult_population": 4000,
-                "population_below_poverty": 500,
-                "poverty_universe": 4800,
-                "median_household_income": 60000.0,
-                "median_gross_rent": 1500.0,
-            })
+            rows.append(
+                {
+                    "GEOID": geoid,
+                    "total_population": 5000,
+                    "adult_population": 4000,
+                    "population_below_poverty": 500,
+                    "poverty_universe": 4800,
+                    "median_household_income": 60000.0,
+                    "median_gross_rent": 1500.0,
+                }
+            )
     return pd.DataFrame(rows)
 
 
@@ -97,14 +99,14 @@ class TestMetroTractCrosswalk:
 
     def test_custom_membership(self, synthetic_tracts):
         """Custom membership table overrides built-in."""
-        custom = pd.DataFrame({
-            "metro_id": ["TEST01"],
-            "county_fips": ["36061"],
-            "definition_version": "test_v1",
-        })
-        xwalk = build_metro_tract_crosswalk(
-            synthetic_tracts, county_membership_df=custom
+        custom = pd.DataFrame(
+            {
+                "metro_id": ["TEST01"],
+                "county_fips": ["36061"],
+                "definition_version": "test_v1",
+            }
         )
+        xwalk = build_metro_tract_crosswalk(synthetic_tracts, county_membership_df=custom)
         assert xwalk["metro_id"].unique().tolist() == ["TEST01"]
         assert len(xwalk) == 2
 
@@ -122,9 +124,14 @@ class TestBasicAggregation:
     def test_output_columns(self, synthetic_tracts):
         result = aggregate_acs_to_metro(synthetic_tracts)
         expected_cols = {
-            "metro_id", "total_population", "adult_population",
-            "median_household_income", "median_gross_rent",
-            "coverage_ratio", "weighting_method", "source",
+            "metro_id",
+            "total_population",
+            "adult_population",
+            "median_household_income",
+            "median_gross_rent",
+            "coverage_ratio",
+            "weighting_method",
+            "source",
             "definition_version",
         }
         assert expected_cols.issubset(set(result.columns))
@@ -152,15 +159,17 @@ class TestBasicAggregation:
 class TestSingleCountyMetro:
     def test_gf04_dallas_population(self):
         """GF04 (Dallas, county 48113): sum of tract populations."""
-        acs = pd.DataFrame({
-            "GEOID": ["48113000100", "48113000200"],
-            "total_population": [3000, 2000],
-            "adult_population": [2400, 1600],
-            "population_below_poverty": [300, 200],
-            "poverty_universe": [2800, 1900],
-            "median_household_income": [55000.0, 65000.0],
-            "median_gross_rent": [1200.0, 1400.0],
-        })
+        acs = pd.DataFrame(
+            {
+                "GEOID": ["48113000100", "48113000200"],
+                "total_population": [3000, 2000],
+                "adult_population": [2400, 1600],
+                "population_below_poverty": [300, 200],
+                "poverty_universe": [2800, 1900],
+                "median_household_income": [55000.0, 65000.0],
+                "median_gross_rent": [1200.0, 1400.0],
+            }
+        )
         result = aggregate_acs_to_metro(acs)
         gf04 = result[result["metro_id"] == "GF04"]
         assert len(gf04) == 1
@@ -170,15 +179,17 @@ class TestSingleCountyMetro:
 
     def test_gf04_median_income_weighted(self):
         """Median income should be population-weighted average of tract medians."""
-        acs = pd.DataFrame({
-            "GEOID": ["48113000100", "48113000200"],
-            "total_population": [3000, 2000],
-            "adult_population": [2400, 1600],
-            "population_below_poverty": [300, 200],
-            "poverty_universe": [2800, 1900],
-            "median_household_income": [50000.0, 70000.0],
-            "median_gross_rent": [1200.0, 1800.0],
-        })
+        acs = pd.DataFrame(
+            {
+                "GEOID": ["48113000100", "48113000200"],
+                "total_population": [3000, 2000],
+                "adult_population": [2400, 1600],
+                "population_below_poverty": [300, 200],
+                "poverty_universe": [2800, 1900],
+                "median_household_income": [50000.0, 70000.0],
+                "median_gross_rent": [1200.0, 1800.0],
+            }
+        )
         result = aggregate_acs_to_metro(acs)
         gf04 = result[result["metro_id"] == "GF04"]
         # Weighted income: (3000*50000 + 2000*70000) / (3000+2000) = 58000
@@ -198,15 +209,17 @@ class TestMultiCountyMetro:
         boroughs = ["36061", "36005", "36081", "36047", "36085"]
         rows = []
         for fips in boroughs:
-            rows.append({
-                "GEOID": fips + "000100",
-                "total_population": 10000,
-                "adult_population": 8000,
-                "population_below_poverty": 1000,
-                "poverty_universe": 9500,
-                "median_household_income": 60000.0,
-                "median_gross_rent": 1500.0,
-            })
+            rows.append(
+                {
+                    "GEOID": fips + "000100",
+                    "total_population": 10000,
+                    "adult_population": 8000,
+                    "population_below_poverty": 1000,
+                    "poverty_universe": 9500,
+                    "median_household_income": 60000.0,
+                    "median_gross_rent": 1500.0,
+                }
+            )
         acs = pd.DataFrame(rows)
         result = aggregate_acs_to_metro(acs)
         gf01 = result[result["metro_id"] == "GF01"]
@@ -215,15 +228,17 @@ class TestMultiCountyMetro:
 
     def test_gf06_houston_two_counties(self):
         """GF06 (Houston): Harris + Fort Bend."""
-        acs = pd.DataFrame({
-            "GEOID": ["48201000100", "48157000100"],
-            "total_population": [20000, 5000],
-            "adult_population": [16000, 4000],
-            "population_below_poverty": [2000, 500],
-            "poverty_universe": [19000, 4800],
-            "median_household_income": [50000.0, 80000.0],
-            "median_gross_rent": [1200.0, 1800.0],
-        })
+        acs = pd.DataFrame(
+            {
+                "GEOID": ["48201000100", "48157000100"],
+                "total_population": [20000, 5000],
+                "adult_population": [16000, 4000],
+                "population_below_poverty": [2000, 500],
+                "poverty_universe": [19000, 4800],
+                "median_household_income": [50000.0, 80000.0],
+                "median_gross_rent": [1200.0, 1800.0],
+            }
+        )
         result = aggregate_acs_to_metro(acs)
         gf06 = result[result["metro_id"] == "GF06"]
         assert gf06.iloc[0]["total_population"] == pytest.approx(25000)
@@ -240,15 +255,17 @@ class TestCoverageHandling:
     def test_metro_with_no_tracts_has_zero_population(self):
         """Metro whose counties have no tracts in ACS gets no data."""
         # Supply only GF04's tracts; GF01 gets nothing
-        acs = pd.DataFrame({
-            "GEOID": ["48113000100"],
-            "total_population": [5000],
-            "adult_population": [4000],
-            "population_below_poverty": [500],
-            "poverty_universe": [4800],
-            "median_household_income": [60000.0],
-            "median_gross_rent": [1500.0],
-        })
+        acs = pd.DataFrame(
+            {
+                "GEOID": ["48113000100"],
+                "total_population": [5000],
+                "adult_population": [4000],
+                "population_below_poverty": [500],
+                "poverty_universe": [4800],
+                "median_household_income": [60000.0],
+                "median_gross_rent": [1500.0],
+            }
+        )
         result = aggregate_acs_to_metro(acs)
         # GF01 should not appear (no tracts matched)
         # or have zero/missing values
@@ -275,8 +292,7 @@ class TestTruthTable:
             expected_pop = n_tracts * 5000
             row = result[result["metro_id"] == metro_id]
             assert row.iloc[0]["total_population"] == pytest.approx(expected_pop), (
-                f"{metro_id}: expected pop {expected_pop}, "
-                f"got {row.iloc[0]['total_population']}"
+                f"{metro_id}: expected pop {expected_pop}, got {row.iloc[0]['total_population']}"
             )
 
     def test_uniform_median_unchanged(self, synthetic_tracts):
@@ -284,10 +300,8 @@ class TestTruthTable:
         result = aggregate_acs_to_metro(synthetic_tracts)
         for _, row in result.iterrows():
             assert row["median_household_income"] == pytest.approx(60000.0), (
-                f"{row['metro_id']}: expected income 60000, "
-                f"got {row['median_household_income']}"
+                f"{row['metro_id']}: expected income 60000, got {row['median_household_income']}"
             )
             assert row["median_gross_rent"] == pytest.approx(1500.0), (
-                f"{row['metro_id']}: expected rent 1500, "
-                f"got {row['median_gross_rent']}"
+                f"{row['metro_id']}: expected rent 1500, got {row['median_gross_rent']}"
             )

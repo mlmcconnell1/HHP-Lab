@@ -65,7 +65,7 @@ def ingest_pit_vintage(
         parse_pit_vintage,
         write_pit_parquet,
     )
-    from hhplab.pit.registry import register_pit_vintage
+    from hhplab.pit.pit_registry import register_pit_vintage
 
     typer.echo(f"Ingesting PIT vintage {vintage} (all years)...")
 

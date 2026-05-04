@@ -6,7 +6,7 @@ from typing import Annotated
 import pandas as pd
 import typer
 
-from hhplab.pit.registry import get_pit_vintage_path, list_pit_vintages
+from hhplab.pit.pit_registry import get_pit_vintage_path, list_pit_vintages
 
 
 def _run_pit_vintages_validation(
@@ -474,5 +474,3 @@ def validate_pit_vintages(
         show_unchanged=show_unchanged,
         year=year,
     )
-
-

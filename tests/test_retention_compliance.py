@@ -22,7 +22,7 @@ INGEST_MODULES = [
     "hhplab/census/ingest/tiger_tracts.py",
     "hhplab/census/ingest/tiger_counties.py",
     "hhplab/census/ingest/tract_relationship.py",
-    "hhplab/nhgis/ingest.py",
+    "hhplab/nhgis/nhgis_ingest.py",
     "hhplab/acs/ingest/tract_population.py",
     "hhplab/rents/weights.py",
 ]
@@ -40,7 +40,7 @@ FILE_INGEST_MODULES = [
     "hhplab/census/ingest/tiger_tracts.py",
     "hhplab/census/ingest/tiger_counties.py",
     "hhplab/census/ingest/tract_relationship.py",
-    "hhplab/nhgis/ingest.py",
+    "hhplab/nhgis/nhgis_ingest.py",
 ]
 
 

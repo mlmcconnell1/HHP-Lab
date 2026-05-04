@@ -21,7 +21,7 @@ def test_generate_msa_json(monkeypatch, tmp_path: Path):
         county.write_text("county")
         return defs, county
 
-    monkeypatch.setattr("hhplab.msa.io.write_msa_artifacts", fake_write_msa_artifacts)
+    monkeypatch.setattr("hhplab.msa.msa_io.write_msa_artifacts", fake_write_msa_artifacts)
 
     with runner.isolated_filesystem(temp_dir=tmp_path):
         result = runner.invoke(app, ["generate", "msa", "--json"], catch_exceptions=False)
@@ -38,16 +38,14 @@ def test_generate_msa_json_rejects_existing_artifact_without_force(
     tmp_path: Path,
 ):
     monkeypatch.chdir(tmp_path)
-    existing = tmp_path / "data" / "curated" / "msa" / (
-        "msa_definitions__census_msa_2023.parquet"
-    )
+    existing = tmp_path / "data" / "curated" / "msa" / ("msa_definitions__census_msa_2023.parquet")
     existing.parent.mkdir(parents=True, exist_ok=True)
     existing.write_text("existing", encoding="utf-8")
 
     def fail_write_msa_artifacts(definition_version: str):
         raise AssertionError("write_msa_artifacts should not run without --force")
 
-    monkeypatch.setattr("hhplab.msa.io.write_msa_artifacts", fail_write_msa_artifacts)
+    monkeypatch.setattr("hhplab.msa.msa_io.write_msa_artifacts", fail_write_msa_artifacts)
 
     result = runner.invoke(app, ["generate", "msa", "--json"], catch_exceptions=False)
 
@@ -55,18 +53,16 @@ def test_generate_msa_json_rejects_existing_artifact_without_force(
     payload = json.loads(result.stdout)
     assert payload["status"] == "error"
     assert payload["error"] == "artifacts_exist"
-    assert payload["existing"] == [
-        "data/curated/msa/msa_definitions__census_msa_2023.parquet"
-    ]
+    assert payload["existing"] == ["data/curated/msa/msa_definitions__census_msa_2023.parquet"]
 
 
 def test_generate_msa_force_allows_existing_artifact(monkeypatch, tmp_path: Path):
     monkeypatch.chdir(tmp_path)
-    existing_defs = tmp_path / "data" / "curated" / "msa" / (
-        "msa_definitions__census_msa_2023.parquet"
+    existing_defs = (
+        tmp_path / "data" / "curated" / "msa" / ("msa_definitions__census_msa_2023.parquet")
     )
-    existing_county = tmp_path / "data" / "curated" / "msa" / (
-        "msa_county_membership__census_msa_2023.parquet"
+    existing_county = (
+        tmp_path / "data" / "curated" / "msa" / ("msa_county_membership__census_msa_2023.parquet")
     )
     existing_defs.parent.mkdir(parents=True, exist_ok=True)
     existing_defs.write_text("existing defs", encoding="utf-8")
@@ -76,7 +72,7 @@ def test_generate_msa_force_allows_existing_artifact(monkeypatch, tmp_path: Path
         existing_county.write_text("new county", encoding="utf-8")
         return existing_defs, existing_county
 
-    monkeypatch.setattr("hhplab.msa.io.write_msa_artifacts", fake_write_msa_artifacts)
+    monkeypatch.setattr("hhplab.msa.msa_io.write_msa_artifacts", fake_write_msa_artifacts)
 
     result = runner.invoke(
         app,

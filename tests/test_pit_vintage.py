@@ -18,7 +18,7 @@ from hhplab.pit.ingest.parser import (
     PITVintageParseResult,
     write_pit_parquet,
 )
-from hhplab.pit.registry import (
+from hhplab.pit.pit_registry import (
     PitVintageRegistryEntry,
     get_pit_vintage_path,
     list_pit_vintages,
@@ -29,6 +29,7 @@ from hhplab.provenance import PROVENANCE_KEY, ProvenanceBlock
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _make_pit_df(
     coc_ids: list[str] | None = None,
@@ -66,6 +67,7 @@ def _dummy_parquet(tmp_path: Path, name: str = "dummy.parquet") -> Path:
 # ---------------------------------------------------------------------------
 # 1. Vintage registry CRUD
 # ---------------------------------------------------------------------------
+
 
 class TestVintageRegistryCRUD:
     """register_pit_vintage, list_pit_vintages, get_pit_vintage_path."""
@@ -184,8 +186,8 @@ class TestVintageRegistryCRUD:
 # 2. PITParseResult.duplicates_dropped
 # ---------------------------------------------------------------------------
 
-class TestPITParseResultDuplicatesDropped:
 
+class TestPITParseResultDuplicatesDropped:
     def test_default_is_empty_list(self):
         result = PITParseResult(df=pd.DataFrame())
         assert result.duplicates_dropped == []
@@ -213,8 +215,8 @@ class TestPITParseResultDuplicatesDropped:
 # 3. PITVintageParseResult.years_failed
 # ---------------------------------------------------------------------------
 
-class TestPITVintageParseResultYearsFailed:
 
+class TestPITVintageParseResultYearsFailed:
     def test_default_is_empty_list(self):
         result = PITVintageParseResult(df=pd.DataFrame(), vintage=2024)
         assert result.years_failed == []
@@ -263,8 +265,8 @@ class TestPITVintageParseResultYearsFailed:
 # 4. write_pit_parquet provenance
 # ---------------------------------------------------------------------------
 
-class TestWritePitParquetProvenance:
 
+class TestWritePitParquetProvenance:
     def test_single_year_provenance(self, tmp_path: Path):
         df = _make_pit_df(year=2024)
         out = tmp_path / "pit_2024.parquet"

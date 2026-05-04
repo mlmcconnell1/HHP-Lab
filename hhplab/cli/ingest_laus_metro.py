@@ -7,7 +7,7 @@ from typing import Annotated
 
 import typer
 
-from hhplab.metro.definitions import CANONICAL_UNIVERSE_DEFINITION_VERSION
+from hhplab.metro.metro_definitions import CANONICAL_UNIVERSE_DEFINITION_VERSION
 
 
 def ingest_laus_metro(
@@ -87,9 +87,7 @@ def ingest_laus_metro(
 
     # Resolve years to process
     if year is not None and (start_year is not None or end_year is not None):
-        raise typer.BadParameter(
-            "--year cannot be combined with --start-year/--end-year"
-        )
+        raise typer.BadParameter("--year cannot be combined with --start-year/--end-year")
     if year is not None:
         years = [year]
     elif start_year is not None and end_year is not None:
@@ -139,19 +137,25 @@ def ingest_laus_metro(
             if not json_output:
                 typer.echo(f"  ✗ {y}: BLS quota exhausted — {e}", err=True)
             for remaining in years[years.index(y) + 1 :]:
-                errors.append({
-                    "year": remaining,
-                    "error": "skipped: BLS quota already exhausted",
-                    "reason": "bls_quota_exhausted",
-                })
+                errors.append(
+                    {
+                        "year": remaining,
+                        "error": "skipped: BLS quota already exhausted",
+                        "reason": "bls_quota_exhausted",
+                    }
+                )
             if len(years) == 1:
                 if json_output:
-                    typer.echo(json.dumps({
-                        "status": "error",
-                        "year": y,
-                        "error": str(e),
-                        "reason": "bls_quota_exhausted",
-                    }))
+                    typer.echo(
+                        json.dumps(
+                            {
+                                "status": "error",
+                                "year": y,
+                                "error": str(e),
+                                "reason": "bls_quota_exhausted",
+                            }
+                        )
+                    )
                 raise typer.Exit(1) from e
             break
         except Exception as e:
@@ -209,8 +213,7 @@ def ingest_laus_metro(
                 "years_succeeded": [r["year"] for r in results],
                 "years_failed": [e["year"] for e in errors],
                 "outputs": [
-                    {"year": r["year"], "path": r["path"], "metros": r["metros"]}
-                    for r in results
+                    {"year": r["year"], "path": r["path"], "metros": r["metros"]} for r in results
                 ],
                 "errors": errors,
             }

@@ -9,15 +9,15 @@ import pandas as pd
 import pytest
 from shapely.geometry import GeometryCollection, box
 
-from hhplab.msa.definitions import (
+from hhplab.msa.msa_definitions import (
     DEFINITION_VERSION,
     MSA_AREA_TYPE,
     build_county_membership_df,
     build_definitions_df,
     parse_delineation_workbook,
 )
-from hhplab.msa.io import read_msa_definitions
-from hhplab.msa.validate import validate_msa_artifacts, validate_msa_boundaries
+from hhplab.msa.msa_io import read_msa_definitions
+from hhplab.msa.msa_validate import validate_msa_artifacts, validate_msa_boundaries
 
 WORKBOOK_ROWS = [
     {

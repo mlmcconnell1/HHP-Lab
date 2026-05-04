@@ -67,21 +67,15 @@ def canonicalize_panel_for_target(
             if "metro_id" not in result.columns:
                 result["metro_id"] = result["geo_id"]
             if "metro_name" not in result.columns or result["metro_name"].isna().any():
-                from hhplab.metro.definitions import metro_name_for_id
+                from hhplab.metro.metro_definitions import metro_name_for_id
 
                 result["metro_name"] = result["metro_id"].map(metro_name_for_id)
-            if (
-                definition_version is not None
-                and "definition_version_used" not in result.columns
-            ):
+            if definition_version is not None and "definition_version_used" not in result.columns:
                 result["definition_version_used"] = definition_version
         if geo_type == "msa":
             if "msa_id" not in result.columns:
                 result["msa_id"] = result["geo_id"]
-            if (
-                definition_version is not None
-                and "definition_version_used" not in result.columns
-            ):
+            if definition_version is not None and "definition_version_used" not in result.columns:
                 result["definition_version_used"] = definition_version
         if (
             geo_type == "coc"
@@ -120,8 +114,7 @@ def apply_cohort_selector(
     ref = panel[panel[year_col] == cohort.reference_year]
     if ref.empty:
         raise ExecutorError(
-            f"Cohort selector reference_year {cohort.reference_year} "
-            f"produced no rows in the panel."
+            f"Cohort selector reference_year {cohort.reference_year} produced no rows in the panel."
         )
     if cohort.rank_by not in ref.columns:
         raise ExecutorError(
@@ -311,7 +304,7 @@ def _add_recipe_coc_names(
     if "coc_id" not in panel.columns or "boundary_vintage_used" not in panel.columns:
         return panel
 
-    from hhplab.geo.io import read_geoparquet
+    from hhplab.geo.geo_io import read_geoparquet
     from hhplab.panel.assemble import _resolve_boundary_file
 
     result = panel.copy()
@@ -332,11 +325,15 @@ def _add_recipe_coc_names(
         gdf = read_geoparquet(boundary_path)
         if "coc_id" not in gdf.columns or "coc_name" not in gdf.columns:
             continue
-        boundary_frames.append(pd.DataFrame({
-            "coc_id": gdf["coc_id"].astype(str),
-            "boundary_vintage_used": str(vintage),
-            "coc_name_boundary": gdf["coc_name"].astype(str),
-        }))
+        boundary_frames.append(
+            pd.DataFrame(
+                {
+                    "coc_id": gdf["coc_id"].astype(str),
+                    "boundary_vintage_used": str(vintage),
+                    "coc_name_boundary": gdf["coc_name"].astype(str),
+                }
+            )
+        )
 
     if not boundary_frames:
         return result
@@ -375,7 +372,7 @@ def _add_recipe_metro_metadata(
     ):
         return panel
 
-    from hhplab.metro.io import read_metro_subset_membership, read_metro_universe
+    from hhplab.metro.metro_io import read_metro_subset_membership, read_metro_universe
 
     result = panel.copy()
     geo_col = "metro_id" if "metro_id" in result.columns else "geo_id"
@@ -401,11 +398,7 @@ def _add_recipe_metro_metadata(
     if "metro_id_x" in result.columns:
         result = result.rename(columns={"metro_id_x": "metro_id"})
     result = result.drop(
-        columns=[
-            col
-            for col in ("metro_id_y", "metro_name_universe")
-            if col in result.columns
-        ]
+        columns=[col for col in ("metro_id_y", "metro_name_universe") if col in result.columns]
     )
 
     profile_definition_version = target_geometry.resolved_metro_subset_definition_version()
@@ -454,7 +447,7 @@ def _add_recipe_msa_metadata(
     if target_geometry.source is None:
         return panel
 
-    from hhplab.msa.io import read_msa_definitions
+    from hhplab.msa.msa_io import read_msa_definitions
 
     result = panel.copy()
     geo_col = "msa_id" if "msa_id" in result.columns else "geo_id"

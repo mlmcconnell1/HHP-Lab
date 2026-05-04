@@ -1,12 +1,9 @@
 {"id":"el:file-laus-py-r6tt2sm3f6mt","summary":"Defines Glynn-Fox metro LAUS series-ID constants and builders for BLS annual labor-market ingestion.","ai":{"architectural_layer":"source","confidence":0.95}}
 {"id":"el:file-init-py-fkmsr0614qhe","summary":"Lazy public API for ACS ingestion, translation, and aggregation helpers that preserves the root import surface without statically coupling the package to its child modules.","ai":{"architectural_layer":"source","confidence":0.95}}
-{"id":"el:file-acs-py-2fsadyhf7mt5","summary":"Compatibility facade that forwards legacy hhplab.measures.acs imports to the ACS-owned aggregation implementation in hhplab.acs.aggregate.","ai":{"architectural_layer":"analytics","confidence":0.95}}
 {"id":"el:file-test-source-entrypoints-py-mp1g2d18xbjr","summary":"Verifies the refactored source package entrypoints and lazy root exports for HUD, Census, NHGIS, and PIT surfaces.","ai":{"architectural_layer":"tests","confidence":0.95}}
 {"id":"el:package-tests-qgn0wge319x9","summary":"Comprehensive regression test package covering CLI behavior, ingest paths, crosswalks, metro definitions, recipes, panel assembly, and output contracts across the codebase.","ai":{"architectural_layer":"tests","confidence":0.97}}
 {"id":"el:package-msa-bp2as7z1477h","summary":"Shared Census MSA geography package that parses official delineation files, writes curated MSA definition artifacts, and validates the identifier/membership contract for later pipeline stages.","ai":{"architectural_layer":"domain","confidence":0.96}}
 {"id":"el:file-definitions-py-pe2wd1gkzwxd","summary":"Parses the Census July 2023 CBSA delineation workbook into normalized rows, filters to metropolitan statistical areas, and builds canonical MSA definition and county-membership tables keyed by 5-digit MSA/CBSA codes.","ai":{"architectural_layer":"domain","confidence":0.97}}
-{"id":"el:file-io-py-798mcrpykzg1","summary":"Downloads the official Census MSA delineation workbook, retains a raw snapshot, records source-registry metadata, writes curated MSA definition artifacts, and provides read/validate helpers for the new artifact family.","ai":{"architectural_layer":"domain","confidence":0.97}}
-{"id":"el:file-validate-py-m2kv50pet3yq","summary":"Validates curated MSA definitions and county-membership tables, enforcing the current contract that the canonical MSA ID equals the 5-digit CBSA code and that only metropolitan rows appear in the artifact family.","ai":{"architectural_layer":"domain","confidence":0.96}}
 {"id":"el:file-init-py-3nt48chxd9v2","summary":"Exports the public MSA definition, IO, and validation helpers so other packages can depend on a single shared Census MSA geography surface.","ai":{"architectural_layer":"domain","confidence":0.94}}
 {"id":"el:file-generate-msa-py-trn6bfp0h6gr","summary":"Adds the hhplab generate msa CLI command, including non-interactive artifact generation, overwrite protection, and JSON output for automation-friendly MSA artifact setup.","ai":{"architectural_layer":"cli","confidence":0.95}}
 {"id":"el:file-test-msa-definitions-py-d2d3a42eg09n","summary":"Regression tests for the MSA workbook parser, metro-only filtering, MSA definition and county-membership builders, and validation failures such as malformed IDs or orphan membership rows.","ai":{"architectural_layer":"tests","confidence":0.95}}
@@ -15,11 +12,9 @@
 {"id":"el:file-generate-msa-xwalk-py-cakzsv3yfmrg","summary":"Adds the hhplab generate msa-xwalk command that validates prerequisite CoC boundaries, county geometries, and MSA membership artifacts, then writes a JSON-capable CoC-to-MSA crosswalk build output with actionable errors.","ai":{"architectural_layer":"application","confidence":0.95}}
 {"id":"el:file-crosswalk-py-x9am88bek0xt","summary":"Builds the auditable CoC-to-MSA PIT allocation crosswalk by combining CoC-to-county overlays with official MSA county membership, then persists/readbacks the resulting share table with provenance metadata.","ai":{"architectural_layer":"domain","confidence":0.95}}
 {"id":"el:file-msa-py-sn6m9z38ak8d","summary":"Aggregates CoC-native PIT counts to Census MSAs using the stored CoC-to-MSA allocation crosswalk, preserving coverage and provenance metadata before writing canonical MSA PIT artifacts.","ai":{"architectural_layer":"domain","confidence":0.95}}
-{"id":"el:file-boundaries-py-rv6fnnmvknh3","summary":"Downloads Census TIGER CBSA polygons, aligns them to the curated MSA definition set, validates the resulting GeoParquet, and registers the raw-to-curated ingest lineage.","ai":{"architectural_layer":"ingest","confidence":0.95}}
 {"id":"el:file-ingest-msa-boundaries-py-9hzq686bmm0d","summary":"Exposes the non-interactive hhplab ingest msa-boundaries command with force and JSON modes, reporting the written artifact and MSA count after ingest.","ai":{"architectural_layer":"cli","confidence":0.95}}
 {"id":"el:file-validate-msa-py-ct5khzpvc4m3","summary":"Adds hhplab validate msa, combining definition-table, county-membership, and boundary-polygon checks into a single actionable validation entrypoint with JSON output.","ai":{"architectural_layer":"cli","confidence":0.95}}
 {"id":"el:file-test-ingest-msa-boundaries-py-a8pzybsxkmmc","summary":"Covers the new MSA boundary ingest and validation CLI surfaces, asserting JSON payloads and a minimal curated MSA artifact set for validate msa.","ai":{"architectural_layer":"tests","confidence":0.94}}
-{"id":"el:file-boundaries-py-6tktvqz1fz6j","summary":"Builds deterministic metro overlay polygons by dissolving curated county geometries through the Glynn/Fox county membership table, validates the result, and writes a provenance-tagged GeoParquet keyed by definition version and county vintage.","ai":{"architectural_layer":"ingest","confidence":0.96}}
 {"id":"el:file-generate-metro-boundaries-py-v4vhvgzqvpw7","summary":"Adds the hhplab generate metro-boundaries CLI entrypoint, enforcing explicit county-vintage selection, force semantics, and structured JSON output for the materialized metro boundary artifact.","ai":{"architectural_layer":"cli","confidence":0.96}}
 {"id":"el:file-validate-metro-py-5e91jm3gdrsh","summary":"Adds hhplab validate metro, combining metro definition-table checks with county-vintage-specific metro boundary validation and JSON-friendly failure reporting.","ai":{"architectural_layer":"cli","confidence":0.96}}
 {"id":"el:file-test-generate-metro-boundaries-py-vp5dhx4b0c31","summary":"Exercises the metro boundary generation and validation CLI surfaces with JSON output assertions, complementing renderer tests that now require materialized metro polygons instead of runtime dissolves.","ai":{"architectural_layer":"tests","confidence":0.95}}
@@ -28,7 +23,6 @@
 {"id":"el:file-aggregate-py-29mb385kg307","summary":"ACS measure builders for CoC-level and metro-level statistics.","ai":{"architectural_layer":"domain","confidence":0.95}}
 {"id":"el:file-aggregate-py-9mkgb2eht7t3","summary":"CLI command group for aggregating source datasets into standalone CoC artifacts.","ai":{"architectural_layer":"cli","confidence":0.95}}
 {"id":"el:file-aggregate-py-sggnt55sy41b","summary":"Aggregate PEP county population estimates to CoC boundaries.","ai":{"architectural_layer":"domain","confidence":0.95}}
-{"id":"el:file-aggregate-py-w52ecwt0a25c","summary":"ZORI aggregation from county to CoC geography.","ai":{"architectural_layer":"domain","confidence":0.95}}
 {"id":"el:file-analysis-geo-py-4030fe771d27","summary":"Analysis geography model for HHP-Lab.","ai":{"architectural_layer":"analytics","confidence":0.95}}
 {"id":"el:file-assemble-py-ssc2enr0wtjz","summary":"Panel assembly engine for HHP-Lab Phase 3.","ai":{"architectural_layer":"application","confidence":0.95}}
 {"id":"el:file-audit-panels-py-3wcnzn68yx6b","summary":"Frozen panel builder for the Glynn-Fox claims audit.","ai":{"architectural_layer":"analytics","confidence":0.95}}
@@ -47,12 +41,10 @@
 {"id":"el:file-default-adapters-py-g0q81n1hsgkc","summary":"Bootstrap built-in recipe adapters.","ai":{"architectural_layer":"application","confidence":0.95}}
 {"id":"el:file-default-dataset-adapters-py-mw8fccae9jyd","summary":"Built-in dataset adapters for recipe validation.","ai":{"architectural_layer":"application","confidence":0.95}}
 {"id":"el:file-default-geometry-adapters-py-a45jbk9am5da","summary":"Built-in geometry adapters for recipe validation.","ai":{"architectural_layer":"application","confidence":0.95}}
-{"id":"el:file-definitions-py-y2s0n64fdqst","summary":"Authoritative Glynn/Fox metro definition data.","ai":{"architectural_layer":"domain","confidence":0.95}}
 {"id":"el:file-diagnostics-py-23wex31qa4rb","summary":"Diagnostics and reporting for CoC-level ZORI data.","ai":{"architectural_layer":"analytics","confidence":0.95}}
 {"id":"el:file-diagnostics-py-4xgx8szkrre4","summary":"Attribution diagnostics and coverage reporting for crosswalks.","ai":{"architectural_layer":"analytics","confidence":0.95}}
 {"id":"el:file-diagnostics-py-7d9wygc9gwnx","summary":"Panel diagnostics and sensitivity checks for HHP-Lab Phase 3.","ai":{"architectural_layer":"application","confidence":0.95}}
 {"id":"el:file-diagnostics-py-crwt73ay6269","summary":"Diagnostics and reporting for CoC-level PEP population data.","ai":{"architectural_layer":"analytics","confidence":0.95}}
-{"id":"el:file-diagnostics-py-jck45vf2nazj","summary":"CLI command for running crosswalk quality diagnostics.","ai":{"architectural_layer":"cli","confidence":0.95}}
 {"id":"el:file-executor-core-py-ppxr1r7yc0pn","summary":"Shared primitives for the recipe executor and its submodules.","ai":{"architectural_layer":"application","confidence":0.95}}
 {"id":"el:file-executor-ct-alignment-py-v4mxneq684d4","summary":"Connecticut planning-region → legacy-county alignment helpers.","ai":{"architectural_layer":"application","confidence":0.95}}
 {"id":"el:file-executor-inputs-py-8y7dnxrqw0pd","summary":"Dataset input preparation: column resolution, year filtering, temporal filters.","ai":{"architectural_layer":"application","confidence":0.95}}
@@ -99,9 +91,7 @@
 {"id":"el:file-init-py-tcfsgsfcytrz","summary":"PIT (Point-in-Time) homelessness count data processing.","ai":{"architectural_layer":"domain","confidence":0.95}}
 {"id":"el:file-init-py-xeks31ww85th","summary":"PIT data ingestion and parsing modules.","ai":{"architectural_layer":"source","confidence":0.95}}
 {"id":"el:file-init-py-yny0xqmbwf75","summary":"CLI module for HHP-Lab.","ai":{"architectural_layer":"cli","confidence":0.95}}
-{"id":"el:file-io-py-gyqz41p6t0fk","summary":"Read and write curated metro definition artifacts.","ai":{"architectural_layer":"ingest","confidence":0.95}}
 {"id":"el:file-io-py-wd2v4ta6h1hz","summary":"GeoParquet I/O utilities for CoC boundary data.","ai":{"architectural_layer":"ingest","confidence":0.95}}
-{"id":"el:file-laus-py-r5d2pyx03dzf","summary":"Compatibility wrappers for BLS-owned LAUS metro helpers.","ai":{"architectural_layer":"domain","confidence":0.95}}
 {"id":"el:file-list-census-py-4nnhbtz1hnh2","summary":"CLI command for listing available census geometry files.","ai":{"architectural_layer":"cli","confidence":0.95}}
 {"id":"el:file-list-curated-py-84bhp0rfx2bp","summary":"CLI command for listing curated dataset files by provider/product.","ai":{"architectural_layer":"cli","confidence":0.95}}
 {"id":"el:file-list-measures-py-2dbhws4mvb4a","summary":"CLI command for listing available measure files.","ai":{"architectural_layer":"cli","confidence":0.95}}
@@ -111,10 +101,6 @@
 {"id":"el:file-manifest-py-88d74x0fjaad","summary":"Recipe-level provenance manifest and replication export.","ai":{"architectural_layer":"application","confidence":0.95}}
 {"id":"el:file-map-folium-py-j4fs3fdgjhmg","summary":"Folium-based interactive map rendering for CoC, MSA, and metro overlays.","ai":{"architectural_layer":"application","confidence":0.95}}
 {"id":"el:file-metro-acs1-py-49kc9sqb6gqz","summary":"ACS 1-year metro-native data fetcher.","ai":{"architectural_layer":"source","confidence":0.95}}
-{"id":"el:file-metro-py-54dq70kncsvj","summary":"Metro-level ACS measure aggregation from tract-native inputs.","ai":{"architectural_layer":"domain","confidence":0.95}}
-{"id":"el:file-metro-py-nxak2dyedh4s","summary":"Metro-level PEP population aggregation from county-native inputs.","ai":{"architectural_layer":"domain","confidence":0.95}}
-{"id":"el:file-metro-py-tyn0ggecsav2","summary":"Metro-level PIT aggregation from CoC-native PIT counts.","ai":{"architectural_layer":"domain","confidence":0.95}}
-{"id":"el:file-metro-py-vrq4fhy5jmcd","summary":"Metro-level ZORI aggregation from county-native inputs.","ai":{"architectural_layer":"domain","confidence":0.95}}
 {"id":"el:file-migrate-curated-py-psdc8qhczx32","summary":"CLI command for curated data migration.","ai":{"architectural_layer":"cli","confidence":0.95}}
 {"id":"el:file-naming-py-6dezjk7tk081","summary":"Centralized filename generation using temporal shorthand notation.","ai":{"architectural_layer":"domain","confidence":0.95}}
 {"id":"el:file-normalize-py-mcm69erd1r37","summary":"Geometry normalization utilities for CoC boundary data.","ai":{"architectural_layer":"domain","confidence":0.95}}
@@ -148,7 +134,6 @@
 {"id":"el:file-tract-relationship-py-gwfgbas1jh0c","summary":"Census tract relationship file ingestion (2010↔2020).","ai":{"architectural_layer":"ingest","confidence":0.95}}
 {"id":"el:file-translate-py-7tfmmc9zq7k2","summary":"Tract vintage translation for ACS data.","ai":{"architectural_layer":"domain","confidence":0.95}}
 {"id":"el:file-validate-curated-py-zdxncexxxzvb","summary":"CLI command for curated layout validation.","ai":{"architectural_layer":"cli","confidence":0.95}}
-{"id":"el:file-validate-py-chht34nr7xmh","summary":"Validation for metro definition artifacts.","ai":{"architectural_layer":"domain","confidence":0.95}}
 {"id":"el:file-validate-py-fbnp56x2j1yp","summary":"Boundary validation utilities for CoC GeoDataFrames.","ai":{"architectural_layer":"domain","confidence":0.95}}
 {"id":"el:file-variables-acs1-py-tmaf7np642ga","summary":"ACS 1-year variable definitions for metro-native unemployment data.","ai":{"architectural_layer":"domain","confidence":0.95}}
 {"id":"el:file-variables-py-03b7feadng1k","summary":"Centralized ACS variable definitions and column classification.","ai":{"architectural_layer":"domain","confidence":0.95}}
@@ -178,3 +163,18 @@
 {"id":"el:package-rents-m60qpy0d671w","summary":"ZORI rent package for county ingestion, ACS weighting, CoC and metro aggregation, and diagnostics.","ai":{"architectural_layer":"domain","confidence":0.95}}
 {"id":"el:package-viz-7tr7zbydqkdp","summary":"Visualization package for Folium-based map rendering across CoC, MSA, metro, and recipe-driven overlays.","ai":{"architectural_layer":"application","confidence":0.95}}
 {"id":"el:package-xwalks-aqgbe12na4xd","summary":"Crosswalk package for area-weighted county and tract allocation tables across supported analysis geographies.","ai":{"architectural_layer":"domain","confidence":0.95}}
+{"id":"el:file-acs-metro-py-f2zqd0q0rp71","summary":"Metro-level ACS measure aggregation from tract-native inputs.","ai":{"architectural_layer":"domain","confidence":0.95}}
+{"id":"el:file-diagnostics-cli-py-593vsp2n47zg","summary":"CLI command for running crosswalk quality diagnostics.","ai":{"architectural_layer":"cli","confidence":0.95}}
+{"id":"el:file-measures-acs-py-h1ep8bqf5fm3","summary":"Compatibility facade that forwards legacy hhplab.measures imports to ACS-owned aggregation helpers.","ai":{"architectural_layer":"analytics","confidence":0.95}}
+{"id":"el:file-metro-boundaries-py-xf7z1fbgsdkb","summary":"Builds deterministic metro overlay polygons by dissolving curated county geometries through metro county membership and writes provenance-tagged GeoParquet outputs.","ai":{"architectural_layer":"ingest","confidence":0.96}}
+{"id":"el:file-metro-definitions-py-0f7pfxesvrv8","summary":"Authoritative Glynn/Fox and canonical metro definition data, membership tables, CBSA aliases, and metro identifier helpers.","ai":{"architectural_layer":"domain","confidence":0.95}}
+{"id":"el:file-metro-io-py-4mx6fgfdh383","summary":"Read and write curated metro definition, membership, universe, subset, and boundary artifacts with validation and provenance.","ai":{"architectural_layer":"ingest","confidence":0.95}}
+{"id":"el:file-metro-laus-py-r6n5znr4aaat","summary":"Compatibility wrappers for BLS-owned LAUS metro series helpers.","ai":{"architectural_layer":"domain","confidence":0.95}}
+{"id":"el:file-metro-validate-py-k44301skp5st","summary":"Validation for metro definition, universe, membership, and boundary artifacts.","ai":{"architectural_layer":"domain","confidence":0.95}}
+{"id":"el:file-msa-boundaries-py-t2g4t7z3x141","summary":"Downloads Census TIGER CBSA polygons, aligns them to curated MSA definitions, validates GeoParquet output, and registers raw-to-curated lineage.","ai":{"architectural_layer":"ingest","confidence":0.95}}
+{"id":"el:file-msa-io-py-53k2za3zctt7","summary":"Downloads official Census MSA delineation data, retains raw snapshots, writes curated definition artifacts, and provides read/validate helpers.","ai":{"architectural_layer":"domain","confidence":0.97}}
+{"id":"el:file-msa-validate-py-np6t8je2ahs9","summary":"Validates curated MSA definitions, county membership tables, and boundary artifacts for identifier and geography contracts.","ai":{"architectural_layer":"domain","confidence":0.96}}
+{"id":"el:file-pep-metro-py-x2f01xg8zzp7","summary":"Metro-level PEP population aggregation from county-native inputs.","ai":{"architectural_layer":"domain","confidence":0.95}}
+{"id":"el:file-pit-metro-py-3tjqn3hm1fvp","summary":"Metro-level PIT aggregation from CoC-native PIT counts.","ai":{"architectural_layer":"domain","confidence":0.95}}
+{"id":"el:file-zori-aggregate-py-pza1yfg927py","summary":"ZORI aggregation from county to CoC geography with weighting, coverage, yearly collapse, and provenance-aware artifact writing.","ai":{"architectural_layer":"domain","confidence":0.95}}
+{"id":"el:file-zori-metro-py-eymt8c976x24","summary":"Metro-level ZORI aggregation from county-native inputs and yearly ZORI panels.","ai":{"architectural_layer":"domain","confidence":0.95}}

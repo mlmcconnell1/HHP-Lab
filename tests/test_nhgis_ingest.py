@@ -17,7 +17,7 @@ import geopandas as gpd
 import pytest
 from shapely.geometry import Point
 
-from hhplab.nhgis.ingest import (
+from hhplab.nhgis.nhgis_ingest import (
     NHGIS_COUNTY_SHAPEFILES,
     NHGIS_TRACT_SHAPEFILES,
     NhgisExtractError,
@@ -30,6 +30,7 @@ from hhplab.nhgis.ingest import (
 # ---------------------------------------------------------------------------
 # Helpers: build synthetic GeoDataFrames
 # ---------------------------------------------------------------------------
+
 
 def _make_tract_gdf(columns: dict, crs: str = "EPSG:4326") -> gpd.GeoDataFrame:
     """Build a small GeoDataFrame with a geometry column and given CRS."""
@@ -105,9 +106,7 @@ class TestNormalizeToSchema:
 
     def test_gisjoin_multiple_rows(self):
         """GISJOIN conversion works for multiple rows."""
-        gdf = _make_tract_gdf(
-            {"GISJOIN": ["G0100010020100", "G0600370100200"]}
-        )
+        gdf = _make_tract_gdf({"GISJOIN": ["G0100010020100", "G0600370100200"]})
         result = _normalize_to_schema(gdf, 2020)
         assert list(result["geoid"]) == ["01001020100", "06037100200"]
 
@@ -169,9 +168,7 @@ class TestNormalizeToSchema:
 
     def test_geoid_column_priority_order(self):
         """When multiple GEOID-like columns exist, GEOID is preferred."""
-        gdf = _make_tract_gdf(
-            {"GEOID": ["01001020100"], "GISJOIN": ["G0100010020100"]}
-        )
+        gdf = _make_tract_gdf({"GEOID": ["01001020100"], "GISJOIN": ["G0100010020100"]})
         result = _normalize_to_schema(gdf, 2020)
         # Should use GEOID (the first match), not GISJOIN
         assert result["geoid"].iloc[0] == "01001020100"
@@ -260,9 +257,7 @@ class TestWaitForExtract:
         extract = MagicMock()
 
         with pytest.raises(NhgisExtractError, match="failed"):
-            _wait_for_extract(
-                client, extract, poll_interval_minutes=0, max_wait_minutes=1
-            )
+            _wait_for_extract(client, extract, poll_interval_minutes=0, max_wait_minutes=1)
 
     def test_timeout_raises_error(self):
         """Extract that never completes raises NhgisExtractError after timeout."""

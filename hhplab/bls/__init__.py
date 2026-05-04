@@ -7,7 +7,7 @@ from hhplab.bls.ingest_laus import (
     fetch_laus_annual_averages,
     ingest_laus_metro,
 )
-from hhplab.bls.laus import (
+from hhplab.bls.laus_series import (
     BLS_ANNUAL_AVERAGE_PERIOD,
     BLS_API_V2_URL,
     LAUS_MEASURE_CODES,

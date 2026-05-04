@@ -56,8 +56,8 @@ from typing import TYPE_CHECKING, Literal
 
 import numpy as np
 import pandas as pd
-import hhplab.naming as naming
 
+import hhplab.naming as naming
 from hhplab.analysis_geo import (
     GEO_ID_COL,
     GEO_TYPE_COC,
@@ -65,7 +65,7 @@ from hhplab.analysis_geo import (
     ensure_canonical_geo_columns,
     resolve_geo_col,
 )
-from hhplab.metro.definitions import metro_name_for_id
+from hhplab.metro.metro_definitions import metro_name_for_id
 from hhplab.panel.finalize import (
     detect_boundary_changes,
     determine_alignment_type,
@@ -83,7 +83,7 @@ from hhplab.panel.zori_eligibility import (
 from hhplab.paths import curated_dir, raw_root
 from hhplab.pit.ingest import parse_pit_file
 from hhplab.pit.ingest.hud_exchange import MIN_PIT_YEAR as MIN_PIT_VINTAGE_YEAR
-from hhplab.pit.registry import get_pit_path
+from hhplab.pit.pit_registry import get_pit_path
 from hhplab.provenance import ProvenanceBlock, read_provenance, write_parquet_with_provenance
 
 if TYPE_CHECKING:
@@ -143,11 +143,11 @@ METRO_PANEL_COLUMNS = [
     "labor_force",
     "employed",
     "unemployed",
-    "unemployment_rate",       # BLS LAUS official unemployment rate
+    "unemployment_rate",  # BLS LAUS official unemployment rate
     "coverage_ratio",
     "boundary_changed",
-    "acs1_vintage_used",   # Which ACS1 vintage contributed (nullable)
-    "laus_vintage_used",   # Which LAUS reference year contributed (nullable)
+    "acs1_vintage_used",  # Which ACS1 vintage contributed (nullable)
+    "laus_vintage_used",  # Which LAUS reference year contributed (nullable)
     "source",
 ]
 
@@ -354,9 +354,7 @@ def _load_pit_for_year(
             logger.warning(
                 f"No metro PIT data found for year {year} and definition {definition_version}"
             )
-            return pd.DataFrame(
-                columns=[geo_col, "pit_total", "pit_sheltered", "pit_unsheltered"]
-            )
+            return pd.DataFrame(columns=[geo_col, "pit_total", "pit_sheltered", "pit_unsheltered"])
 
         df = pd.read_parquet(candidates[0])
         if "pit_year" in df.columns and "year" not in df.columns:
@@ -368,9 +366,7 @@ def _load_pit_for_year(
             if GEO_ID_COL in df.columns:
                 df = df.rename(columns={GEO_ID_COL: geo_col})
             else:
-                raise ValueError(
-                    f"Metro PIT file {candidates[0]} is missing '{geo_col}' column."
-                )
+                raise ValueError(f"Metro PIT file {candidates[0]} is missing '{geo_col}' column.")
 
         result_cols = [geo_col, "pit_total"]
         for col in ["pit_sheltered", "pit_unsheltered"]:
@@ -549,8 +545,7 @@ def _load_acs_measures(
                 df = df.rename(columns={GEO_ID_COL: geo_col})
             else:
                 raise ValueError(
-                    f"Metro ACS measures file {measures_path.name} is missing "
-                    f"'{geo_col}' column."
+                    f"Metro ACS measures file {measures_path.name} is missing '{geo_col}' column."
                 )
 
         if "weighting_method" in df.columns:
@@ -699,9 +694,7 @@ def _load_acs1_metro_measures(
     if measures_dir is None:
         measures_dir = curated_dir("acs")
 
-    artifact_path = measures_dir / naming.acs1_metro_filename(
-        acs1_vintage, definition_version
-    )
+    artifact_path = measures_dir / naming.acs1_metro_filename(acs1_vintage, definition_version)
 
     if not artifact_path.exists():
         canonical = naming.acs1_metro_path(
@@ -718,9 +711,7 @@ def _load_acs1_metro_measures(
     df = pd.read_parquet(artifact_path)
 
     if "metro_id" not in df.columns:
-        logger.warning(
-            f"ACS1 metro artifact {artifact_path.name} missing 'metro_id' column"
-        )
+        logger.warning(f"ACS1 metro artifact {artifact_path.name} missing 'metro_id' column")
         return None
 
     result_cols = ["metro_id"]
@@ -728,8 +719,7 @@ def _load_acs1_metro_measures(
         result_cols.append("unemployment_rate_acs1")
     else:
         logger.warning(
-            f"ACS1 metro artifact {artifact_path.name} missing "
-            f"'unemployment_rate_acs1' column"
+            f"ACS1 metro artifact {artifact_path.name} missing 'unemployment_rate_acs1' column"
         )
         return None
 
@@ -781,17 +771,13 @@ def _load_laus_metro_measures(
     df = pd.read_parquet(artifact_path)
 
     if "metro_id" not in df.columns:
-        logger.warning(
-            f"LAUS metro artifact {artifact_path.name} missing 'metro_id' column"
-        )
+        logger.warning(f"LAUS metro artifact {artifact_path.name} missing 'metro_id' column")
         return None
 
     laus_cols = ["metro_id", "labor_force", "employed", "unemployed", "unemployment_rate"]
     result_cols = [c for c in laus_cols if c in df.columns]
     if len(result_cols) <= 1:  # only metro_id, no measures
-        logger.warning(
-            f"LAUS metro artifact {artifact_path.name} missing measure columns"
-        )
+        logger.warning(f"LAUS metro artifact {artifact_path.name} missing measure columns")
         return None
 
     df = df[result_cols].copy()
@@ -960,11 +946,9 @@ def _load_coc_areas(
             "No CoC boundary file found for vintage %s; population density will be null.",
             boundary_vintage,
         )
-        return pd.DataFrame(
-            columns=["coc_id", "boundary_vintage_used", "coc_area_sq_km"]
-        )
+        return pd.DataFrame(columns=["coc_id", "boundary_vintage_used", "coc_area_sq_km"])
 
-    from hhplab.geo.io import read_geoparquet
+    from hhplab.geo.geo_io import read_geoparquet
 
     gdf = read_geoparquet(boundary_path)
     if "coc_id" not in gdf.columns or "geometry" not in gdf.columns:
@@ -972,9 +956,7 @@ def _load_coc_areas(
             "Boundary file %s is missing required columns; population density will be null.",
             boundary_path,
         )
-        return pd.DataFrame(
-            columns=["coc_id", "boundary_vintage_used", "coc_area_sq_km"]
-        )
+        return pd.DataFrame(columns=["coc_id", "boundary_vintage_used", "coc_area_sq_km"])
 
     gdf = gdf[["coc_id", "geometry"]].copy().to_crs(ALBERS_EQUAL_AREA_CRS)
     return pd.DataFrame(
@@ -1034,10 +1016,9 @@ def _add_coc_population_density(
         & result["coc_area_sq_km"].notna()
         & (result["coc_area_sq_km"] > 0)
     )
-    result.loc[valid_mask, density_col] = (
-        pd.to_numeric(result.loc[valid_mask, "total_population"], errors="coerce")
-        / pd.to_numeric(result.loc[valid_mask, "coc_area_sq_km"], errors="coerce")
-    )
+    result.loc[valid_mask, density_col] = pd.to_numeric(
+        result.loc[valid_mask, "total_population"], errors="coerce"
+    ) / pd.to_numeric(result.loc[valid_mask, "coc_area_sq_km"], errors="coerce")
     return result.drop(columns=["coc_area_sq_km"])
 
 
@@ -1335,9 +1316,7 @@ def build_panel(
                     f"{year_df['unemployment_rate_acs1'].notna().sum()} matched"
                 )
             else:
-                logger.warning(
-                    f"Year {year}: no ACS1 metro artifact for vintage {acs1_vintage}"
-                )
+                logger.warning(f"Year {year}: no ACS1 metro artifact for vintage {acs1_vintage}")
                 year_df["unemployment_rate_acs1"] = np.nan
                 year_df["acs1_vintage_used"] = pd.NA
         elif geo_type == GEO_TYPE_METRO:
@@ -1358,8 +1337,7 @@ def build_panel(
                 year_df["laus_vintage_used"] = str(year)
                 n_matched = year_df["unemployment_rate"].notna().sum()
                 logger.info(
-                    f"Year {year}: merged LAUS data, "
-                    f"{n_matched} metros with unemployment_rate"
+                    f"Year {year}: merged LAUS data, {n_matched} metros with unemployment_rate"
                 )
             else:
                 logger.warning(
@@ -1413,9 +1391,7 @@ def build_panel(
         )
 
     # Detect geometry-definition changes over time
-    vintage_col = (
-        "boundary_vintage_used" if geo_type == GEO_TYPE_COC else "definition_version_used"
-    )
+    vintage_col = "boundary_vintage_used" if geo_type == GEO_TYPE_COC else "definition_version_used"
     panel_df["boundary_changed"] = _detect_boundary_changes(
         panel_df,
         geo_col=geo_col,
@@ -1586,9 +1562,7 @@ def save_panel(
     # Generate filename with temporal shorthand
     if geo_type == GEO_TYPE_METRO:
         if definition_version is None:
-            raise ValueError(
-                "definition_version is required to save a metro panel."
-            )
+            raise ValueError("definition_version is required to save a metro panel.")
         filename = naming.geo_panel_filename(
             start_year,
             end_year,

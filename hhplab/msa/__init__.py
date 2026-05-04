@@ -1,12 +1,5 @@
 """Shared Census MSA definitions, IO, and validation utilities."""
 
-from hhplab.msa.boundaries import (
-    download_msa_boundaries,
-    ingest_msa_boundaries,
-    read_msa_boundaries,
-    validate_curated_msa_boundaries,
-    write_msa_boundaries,
-)
 from hhplab.msa.crosswalk import (
     ALLOCATION_SHARE_TOLERANCE,
     COC_MSA_CROSSWALK_COLUMNS,
@@ -16,7 +9,14 @@ from hhplab.msa.crosswalk import (
     save_coc_msa_crosswalk,
     summarize_coc_msa_allocation,
 )
-from hhplab.msa.definitions import (
+from hhplab.msa.msa_boundaries import (
+    download_msa_boundaries,
+    ingest_msa_boundaries,
+    read_msa_boundaries,
+    validate_curated_msa_boundaries,
+    write_msa_boundaries,
+)
+from hhplab.msa.msa_definitions import (
     DEFINITION_VERSION,
     DELINEATION_FILE_YEAR,
     MSA_AREA_TYPE,
@@ -27,14 +27,14 @@ from hhplab.msa.definitions import (
     build_definitions_df,
     parse_delineation_workbook,
 )
-from hhplab.msa.io import (
+from hhplab.msa.msa_io import (
     download_delineation_rows,
     read_msa_county_membership,
     read_msa_definitions,
     validate_curated_msa,
     write_msa_artifacts,
 )
-from hhplab.msa.validate import (
+from hhplab.msa.msa_validate import (
     MSAValidationResult,
     validate_msa_artifacts,
     validate_msa_boundaries,

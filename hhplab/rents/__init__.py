@@ -8,9 +8,9 @@ This package provides tools for:
 
 Usage
 -----
-    from hhplab.rents.ingest import ingest_zori
+    from hhplab.rents.zori_ingest import ingest_zori
     from hhplab.rents.weights import build_county_weights
-    from hhplab.rents.aggregate import aggregate_zori_to_coc
+    from hhplab.rents.zori_aggregate import aggregate_zori_to_coc
 
     # Ingest county-level ZORI data
     zori_path = ingest_zori(geography="county")
@@ -27,7 +27,13 @@ Usage
     )
 """
 
-from hhplab.rents.aggregate import (
+from hhplab.rents.weights import (
+    build_county_weights,
+    fetch_county_acs_totals,
+    get_county_weights_path,
+    load_county_weights,
+)
+from hhplab.rents.zori_aggregate import (
     aggregate_monthly,
     aggregate_zori_to_coc,
     collapse_to_yearly,
@@ -39,24 +45,18 @@ from hhplab.rents.aggregate import (
     load_weights,
     load_zori,
 )
-from hhplab.rents.diagnostics import (
+from hhplab.rents.zori_diagnostics import (
     compute_coc_diagnostics,
     generate_text_summary,
     identify_problem_cocs,
     run_zori_diagnostics,
     summarize_coc_zori,
 )
-from hhplab.rents.ingest import ingest_zori
-from hhplab.rents.metro import (
+from hhplab.rents.zori_ingest import ingest_zori
+from hhplab.rents.zori_metro import (
     aggregate_yearly_zori_to_metro,
     aggregate_zori_to_metro,
     collapse_zori_to_yearly,
-)
-from hhplab.rents.weights import (
-    build_county_weights,
-    fetch_county_acs_totals,
-    get_county_weights_path,
-    load_county_weights,
 )
 
 __all__ = [

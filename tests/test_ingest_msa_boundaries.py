@@ -31,15 +31,15 @@ def _patch_msa_boundary_download(
     )
 
     monkeypatch.setattr(
-        "hhplab.msa.boundaries._load_expected_definitions",
+        "hhplab.msa.msa_boundaries._load_expected_definitions",
         lambda definition_version, base_dir=None, raw_root=None: expected,
     )
     monkeypatch.setattr(
-        "hhplab.msa.boundaries.persist_file_snapshot",
+        "hhplab.msa.msa_boundaries.persist_file_snapshot",
         lambda raw_content, *_args, **_kwargs: (Path("/tmp/fake.zip"), "abc", len(raw_content)),
     )
     monkeypatch.setattr(
-        "hhplab.msa.boundaries.check_source_changed",
+        "hhplab.msa.msa_boundaries.check_source_changed",
         lambda **_kwargs: (False, {}),
     )
 
@@ -75,9 +75,9 @@ def _patch_msa_boundary_download(
         def extractall(self, path):
             (Path(path) / "fake.shp").write_text("", encoding="utf-8")
 
-    monkeypatch.setattr("hhplab.msa.boundaries.httpx.Client", _FakeClient)
-    monkeypatch.setattr("hhplab.msa.boundaries.zipfile.ZipFile", _FakeZipFile)
-    monkeypatch.setattr("hhplab.msa.boundaries.gpd.read_file", lambda _path: source_gdf)
+    monkeypatch.setattr("hhplab.msa.msa_boundaries.httpx.Client", _FakeClient)
+    monkeypatch.setattr("hhplab.msa.msa_boundaries.zipfile.ZipFile", _FakeZipFile)
+    monkeypatch.setattr("hhplab.msa.msa_boundaries.gpd.read_file", lambda _path: source_gdf)
 
 
 @pytest.mark.parametrize("name_col", ["NAME", "NAMELSAD", "CBSA_NAME"])
@@ -96,7 +96,7 @@ def test_download_msa_boundaries_uses_supported_name_column_fallbacks(
     )
     _patch_msa_boundary_download(monkeypatch, source_gdf)
 
-    from hhplab.msa.boundaries import download_msa_boundaries
+    from hhplab.msa.msa_boundaries import download_msa_boundaries
 
     boundaries, _sha256, _size, _raw_path = download_msa_boundaries("census_msa_2023")
 
@@ -119,7 +119,7 @@ def test_download_msa_boundaries_missing_crs_raises_actionable_error(
     )
     _patch_msa_boundary_download(monkeypatch, source_gdf)
 
-    from hhplab.msa.boundaries import download_msa_boundaries
+    from hhplab.msa.msa_boundaries import download_msa_boundaries
 
     with pytest.raises(ValueError, match="source has no CRS; cannot safely ingest"):
         download_msa_boundaries("census_msa_2023")
@@ -138,7 +138,7 @@ def test_download_msa_boundaries_reprojects_to_epsg_4326(
     )
     _patch_msa_boundary_download(monkeypatch, source_gdf)
 
-    from hhplab.msa.boundaries import download_msa_boundaries
+    from hhplab.msa.msa_boundaries import download_msa_boundaries
 
     boundaries, _sha256, _size, _raw_path = download_msa_boundaries("census_msa_2023")
 
@@ -169,11 +169,11 @@ def test_ingest_msa_boundaries_json(monkeypatch, tmp_path: Path):
         return artifact
 
     monkeypatch.setattr(
-        "hhplab.msa.boundaries.ingest_msa_boundaries",
+        "hhplab.msa.msa_boundaries.ingest_msa_boundaries",
         fake_ingest,
     )
     monkeypatch.setattr(
-        "hhplab.msa.boundaries.read_msa_boundaries",
+        "hhplab.msa.msa_boundaries.read_msa_boundaries",
         lambda definition_version: gpd.read_parquet(artifact),
     )
 
@@ -202,7 +202,7 @@ def test_ingest_msa_boundaries_json_surfaces_validation_failure(
         raise ValueError("MSA boundary validation failed:\nmissing expected MSA ids")
 
     monkeypatch.setattr(
-        "hhplab.msa.boundaries.ingest_msa_boundaries",
+        "hhplab.msa.msa_boundaries.ingest_msa_boundaries",
         fake_ingest,
     )
 

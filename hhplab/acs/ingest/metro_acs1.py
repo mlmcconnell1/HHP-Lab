@@ -42,8 +42,8 @@ from pathlib import Path
 
 import httpx
 import pandas as pd
-import hhplab.naming as naming
 
+import hhplab.naming as naming
 from hhplab.acs.variables_acs1 import (
     ACS1_FIRST_RELIABLE_YEAR,
     ACS1_FLOAT_COLUMNS,
@@ -51,20 +51,22 @@ from hhplab.acs.variables_acs1 import (
     ACS1_METRO_OUTPUT_COLUMNS,
     ACS1_TABLES,
     ACS1_UNAVAILABLE_VINTAGES,
-    ACS1_VARIABLES_BY_TABLE,
     ACS1_VARIABLE_NAMES,
+    ACS1_VARIABLES_BY_TABLE,
     acs1_tables_for_vintage,
     acs1_unavailable_tables_for_vintage,
 )
-from hhplab.metro.definitions import (
+from hhplab.metro.metro_definitions import (
     CANONICAL_UNIVERSE_DEFINITION_VERSION,
-    DEFINITION_VERSION as GLYNN_FOX_DEFINITION_VERSION,
     METRO_CBSA_MAPPING,
     build_cbsa_alias_df,
     canonicalize_cbsa_code,
     metro_name_for_id,
 )
-from hhplab.metro.io import read_metro_subset_membership, read_metro_universe
+from hhplab.metro.metro_definitions import (
+    DEFINITION_VERSION as GLYNN_FOX_DEFINITION_VERSION,
+)
+from hhplab.metro.metro_io import read_metro_subset_membership, read_metro_universe
 from hhplab.provenance import ProvenanceBlock, write_parquet_with_provenance
 from hhplab.sources import CENSUS_API_ACS1
 
@@ -222,9 +224,7 @@ def fetch_acs1_cbsa_data(
             cbsa_col = CBSA_GEO_PARAM
             if cbsa_col not in table_df.columns:
                 cbsa_candidates = [
-                    column
-                    for column in table_df.columns
-                    if "metropolitan" in column.lower()
+                    column for column in table_df.columns if "metropolitan" in column.lower()
                 ]
                 if cbsa_candidates:
                     cbsa_col = cbsa_candidates[0]
@@ -249,9 +249,7 @@ def fetch_acs1_cbsa_data(
             frames.append(table_df[keep_columns].copy())
 
     if not frames:
-        raise ValueError(
-            f"No ACS 1-year tables were available to fetch for vintage {vintage}."
-        )
+        raise ValueError(f"No ACS 1-year tables were available to fetch for vintage {vintage}.")
 
     merged = frames[0]
     for frame in frames[1:]:
@@ -322,8 +320,7 @@ def ingest_metro_acs1(
     dropped = total_cbsas - len(mapped)
 
     logger.info(
-        "CBSA-to-metro mapping: %d of %d CBSAs mapped to definition %s "
-        "(%d CBSAs dropped)",
+        "CBSA-to-metro mapping: %d of %d CBSAs mapped to definition %s (%d CBSAs dropped)",
         len(mapped),
         total_cbsas,
         definition_version,
@@ -343,10 +340,7 @@ def ingest_metro_acs1(
 
     # Compute derived unemployment rate.
     mapped["unemployment_rate_acs1"] = pd.NA
-    valid_denom = (
-        mapped["civilian_labor_force"].notna()
-        & (mapped["civilian_labor_force"] > 0)
-    )
+    valid_denom = mapped["civilian_labor_force"].notna() & (mapped["civilian_labor_force"] > 0)
     mapped.loc[valid_denom, "unemployment_rate_acs1"] = (
         mapped.loc[valid_denom, "unemployed_count"]
         / mapped.loc[valid_denom, "civilian_labor_force"]

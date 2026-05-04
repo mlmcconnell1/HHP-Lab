@@ -11,7 +11,7 @@ import pandas as pd
 
 @lru_cache(maxsize=1)
 def _impl() -> ModuleType:
-    return import_module("hhplab.pit.metro")
+    return import_module("hhplab.pit.pit_metro")
 
 
 def aggregate_pit_to_metro(
@@ -20,7 +20,7 @@ def aggregate_pit_to_metro(
     definition_version: str = "glynn_fox_v1",
     coc_membership_df: pd.DataFrame | None = None,
 ) -> pd.DataFrame:
-    """Delegate to ``hhplab.pit.metro.aggregate_pit_to_metro``."""
+    """Delegate to ``hhplab.pit.pit_metro.aggregate_pit_to_metro``."""
     return _impl().aggregate_pit_to_metro(
         pit_df,
         definition_version=definition_version,

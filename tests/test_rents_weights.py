@@ -12,7 +12,6 @@ import pandas as pd
 import pytest
 
 from hhplab.provenance import read_provenance
-from hhplab.rents.aggregate import compute_geo_county_weights
 from hhplab.rents.weights import (
     ACS_WEIGHT_VARS,
     build_county_weights,
@@ -23,6 +22,7 @@ from hhplab.rents.weights import (
     normalize_county_fips,
     parse_acs_vintage,
 )
+from hhplab.rents.zori_aggregate import compute_geo_county_weights
 
 
 def make_census_county_response(
@@ -628,16 +628,20 @@ class TestComputeGeoCountyWeightsMissingACS:
 
     def test_some_counties_missing_weights_are_dropped_with_warning(self, caplog):
         """Counties in the crosswalk with no matching weight_value are excluded."""
-        xwalk = self._make_xwalk([
-            ("COC-A", "08031", 0.6),
-            ("COC-A", "08001", 0.4),  # no weight for this county
-        ])
-        weights = self._make_weights([
-            ("08031", 5000.0),
-            # 08001 intentionally absent
-        ])
+        xwalk = self._make_xwalk(
+            [
+                ("COC-A", "08031", 0.6),
+                ("COC-A", "08001", 0.4),  # no weight for this county
+            ]
+        )
+        weights = self._make_weights(
+            [
+                ("08031", 5000.0),
+                # 08001 intentionally absent
+            ]
+        )
 
-        with caplog.at_level(logging.WARNING, logger="hhplab.rents.aggregate"):
+        with caplog.at_level(logging.WARNING, logger="hhplab.rents.zori_aggregate"):
             result = compute_geo_county_weights(xwalk, weights)
 
         # Only the county with a weight should survive
@@ -648,24 +652,26 @@ class TestComputeGeoCountyWeightsMissingACS:
         assert result.iloc[0]["weight"] == pytest.approx(1.0)
 
         # A warning should have been logged about the missing county
-        warning_messages = [
-            r.message for r in caplog.records if r.levelno >= logging.WARNING
-        ]
+        warning_messages = [r.message for r in caplog.records if r.levelno >= logging.WARNING]
         assert any("no ACS weight data" in m for m in warning_messages)
 
     def test_all_counties_missing_weights_geography_absent_from_output(self):
         """If ALL counties for a geography lack weights, the geography is excluded."""
-        xwalk = self._make_xwalk([
-            ("COC-A", "08031", 0.6),
-            ("COC-A", "08001", 0.4),
-            ("COC-B", "99001", 0.5),  # no weights for either county
-            ("COC-B", "99002", 0.5),
-        ])
-        weights = self._make_weights([
-            ("08031", 5000.0),
-            ("08001", 3000.0),
-            # 99001, 99002 intentionally absent
-        ])
+        xwalk = self._make_xwalk(
+            [
+                ("COC-A", "08031", 0.6),
+                ("COC-A", "08001", 0.4),
+                ("COC-B", "99001", 0.5),  # no weights for either county
+                ("COC-B", "99002", 0.5),
+            ]
+        )
+        weights = self._make_weights(
+            [
+                ("08031", 5000.0),
+                ("08001", 3000.0),
+                # 99001, 99002 intentionally absent
+            ]
+        )
 
         result = compute_geo_county_weights(xwalk, weights)
 
@@ -679,10 +685,12 @@ class TestComputeGeoCountyWeightsMissingACS:
 
     def test_empty_weights_dataframe_returns_empty_result(self):
         """An entirely empty weights DataFrame should produce an empty result."""
-        xwalk = self._make_xwalk([
-            ("COC-A", "08031", 0.6),
-            ("COC-A", "08001", 0.4),
-        ])
+        xwalk = self._make_xwalk(
+            [
+                ("COC-A", "08031", 0.6),
+                ("COC-A", "08001", 0.4),
+            ]
+        )
         weights = self._make_weights([])
 
         result = compute_geo_county_weights(xwalk, weights)
@@ -694,16 +702,20 @@ class TestComputeGeoCountyWeightsMissingACS:
 
     def test_partial_missing_weights_renormalize_correctly(self):
         """Remaining counties after dropping missing ones renormalize to sum to 1."""
-        xwalk = self._make_xwalk([
-            ("COC-A", "08031", 0.5),
-            ("COC-A", "08001", 0.3),
-            ("COC-A", "08005", 0.2),  # no weight
-        ])
-        weights = self._make_weights([
-            ("08031", 4000.0),
-            ("08001", 6000.0),
-            # 08005 intentionally absent
-        ])
+        xwalk = self._make_xwalk(
+            [
+                ("COC-A", "08031", 0.5),
+                ("COC-A", "08001", 0.3),
+                ("COC-A", "08005", 0.2),  # no weight
+            ]
+        )
+        weights = self._make_weights(
+            [
+                ("08031", 4000.0),
+                ("08001", 6000.0),
+                # 08005 intentionally absent
+            ]
+        )
 
         result = compute_geo_county_weights(xwalk, weights)
 
@@ -723,15 +735,19 @@ class TestComputeGeoCountyWeightsMissingACS:
 
     def test_custom_geo_id_col_with_missing_weights(self):
         """Missing-weight handling works with a non-default geo_id_col."""
-        xwalk = pd.DataFrame({
-            "tract_id": ["T001", "T001"],
-            "county_fips": ["08031", "08001"],
-            "area_share": [0.7, 0.3],
-        })
-        weights = self._make_weights([
-            ("08031", 2000.0),
-            # 08001 absent
-        ])
+        xwalk = pd.DataFrame(
+            {
+                "tract_id": ["T001", "T001"],
+                "county_fips": ["08031", "08001"],
+                "area_share": [0.7, 0.3],
+            }
+        )
+        weights = self._make_weights(
+            [
+                ("08031", 2000.0),
+                # 08001 absent
+            ]
+        )
 
         result = compute_geo_county_weights(xwalk, weights, geo_id_col="tract_id")
 

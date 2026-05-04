@@ -13,7 +13,7 @@ from hhplab.registry import (
     list_boundaries,
     register_vintage,
 )
-from hhplab.registry.registry import _is_temp_path
+from hhplab.registry.boundary_registry import _is_temp_path
 
 
 @pytest.fixture

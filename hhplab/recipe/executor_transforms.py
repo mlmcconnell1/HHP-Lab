@@ -98,7 +98,8 @@ def _resolve_transform_path(
 
 
 def _identify_coc_and_base(
-    from_: GeometryRef, to: GeometryRef,
+    from_: GeometryRef,
+    to: GeometryRef,
 ) -> tuple[GeometryRef | None, GeometryRef]:
     """Identify which end of a transform is the CoC boundary."""
     if to.type == "coc":
@@ -109,7 +110,8 @@ def _identify_coc_and_base(
 
 
 def _identify_metro_and_base(
-    from_: GeometryRef, to: GeometryRef,
+    from_: GeometryRef,
+    to: GeometryRef,
 ) -> tuple[GeometryRef | None, GeometryRef]:
     """Identify which end of a transform is the metro geometry."""
     if to.type == "metro":
@@ -120,7 +122,8 @@ def _identify_metro_and_base(
 
 
 def _identify_msa_and_base(
-    from_: GeometryRef, to: GeometryRef,
+    from_: GeometryRef,
+    to: GeometryRef,
 ) -> tuple[GeometryRef | None, GeometryRef]:
     """Identify which end of a transform is the MSA geometry."""
     if to.type == "msa":
@@ -168,7 +171,7 @@ def _metro_subset_membership(
     if profile_definition_version is None:
         return None
 
-    from hhplab.metro.io import read_metro_subset_membership
+    from hhplab.metro.metro_io import read_metro_subset_membership
 
     metro_definition_version = metro_ref.resolved_metro_definition_version()
     if metro_definition_version is None:
@@ -221,7 +224,7 @@ def _resolve_metro_transform_df(
     definition_version = metro_ref.source
 
     if _metro_uses_legacy_membership(metro_ref):
-        from hhplab.metro.io import (
+        from hhplab.metro.metro_io import (
             read_metro_coc_membership,
             read_metro_county_membership,
         )
@@ -321,7 +324,7 @@ def _resolve_msa_transform_df(
         )
 
     from hhplab.msa.crosswalk import build_coc_msa_crosswalk
-    from hhplab.msa.io import read_msa_county_membership
+    from hhplab.msa.msa_io import read_msa_county_membership
     from hhplab.naming import coc_base_path, county_path
 
     data_root = project_root / "data"
@@ -399,8 +402,7 @@ def _resolve_msa_transform_df(
         )
 
     raise ExecutorError(
-        f"MSA transforms currently support tract, county, or coc bases; "
-        f"got '{base_ref.type}'."
+        f"MSA transforms currently support tract, county, or coc bases; got '{base_ref.type}'."
     )
 
 
@@ -414,9 +416,7 @@ def _materialize_generated_metro_transform(
 
     metro_ref, base_ref = _identify_metro_and_base(transform.from_, transform.to)
     if metro_ref is None:
-        raise ExecutorError(
-            f"Transform '{transform_id}' does not target metro geometry."
-        )
+        raise ExecutorError(f"Transform '{transform_id}' does not target metro geometry.")
 
     output_path = _generated_metro_transform_path(
         transform_id,
@@ -471,9 +471,7 @@ def _materialize_generated_msa_transform(
 
     msa_ref, base_ref = _identify_msa_and_base(transform.from_, transform.to)
     if msa_ref is None:
-        raise ExecutorError(
-            f"Transform '{transform_id}' does not target msa geometry."
-        )
+        raise ExecutorError(f"Transform '{transform_id}' does not target msa geometry.")
 
     output_path = _generated_msa_transform_path(
         transform_id,

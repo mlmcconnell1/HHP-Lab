@@ -23,9 +23,8 @@ from hhplab.geo.ct_planning_regions import (
     is_ct_legacy_county_fips,
     is_ct_planning_region_fips,
 )
-from hhplab.geo.io import resolve_curated_boundary_path
-from hhplab.naming import metro_boundaries_path, msa_boundaries_path
-from hhplab.naming import county_path
+from hhplab.geo.geo_io import resolve_curated_boundary_path
+from hhplab.naming import county_path, metro_boundaries_path, msa_boundaries_path
 from hhplab.recipe.adapters import (
     dataset_registry,
     geometry_registry,
@@ -64,8 +63,10 @@ from hhplab.recipe.recipe_schema import (
 # Finding model
 # ---------------------------------------------------------------------------
 
+
 class Severity(str, enum.Enum):
     """Severity of a preflight finding."""
+
     ERROR = "error"
     WARNING = "warning"
     INFO = "info"
@@ -73,6 +74,7 @@ class Severity(str, enum.Enum):
 
 class FindingKind(str, enum.Enum):
     """Classification of preflight findings."""
+
     MISSING_DATASET = "missing_dataset"
     MISSING_TRANSFORM = "missing_transform"
     MISSING_COLUMN = "missing_column"
@@ -94,6 +96,7 @@ class FindingKind(str, enum.Enum):
 @dataclass
 class Remediation:
     """Actionable remediation for a finding."""
+
     hint: str
     command: str | None = None
 
@@ -107,6 +110,7 @@ class Remediation:
 @dataclass
 class PreflightFinding:
     """A single preflight finding."""
+
     severity: Severity
     kind: FindingKind
     message: str
@@ -146,9 +150,11 @@ class PreflightFinding:
 # Report model
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class PipelineSummary:
     """Summary of preflight results for one pipeline."""
+
     pipeline_id: str
     plan: ExecutionPlan | None = None
     plan_error: str | None = None
@@ -166,6 +172,7 @@ class PipelineSummary:
 @dataclass
 class PreflightReport:
     """Structured preflight report for a recipe."""
+
     recipe_name: str
     recipe_version: int
     universe_years: list[int]
@@ -178,9 +185,7 @@ class PreflightReport:
 
     @property
     def warning_count(self) -> int:
-        return sum(
-            1 for f in self.findings if f.severity == Severity.WARNING
-        )
+        return sum(1 for f in self.findings if f.severity == Severity.WARNING)
 
     @property
     def is_ready(self) -> bool:
@@ -239,6 +244,7 @@ class PreflightReport:
 # Analyzer implementation
 # ---------------------------------------------------------------------------
 
+
 def _check_dataset_paths(
     recipe: RecipeV1,
     project_root: Path,
@@ -266,11 +272,15 @@ def _check_dataset_paths(
 
         is_optional = ds.optional
         per_ds_policy = policy_extra.get(ds_id)
-        severity = Severity.WARNING if (
-            per_ds_policy == "warn" or (per_ds_policy is None and is_optional)
-            or (per_ds_policy is None and not is_optional
-                and policy.default == "warn")
-        ) else Severity.ERROR
+        severity = (
+            Severity.WARNING
+            if (
+                per_ds_policy == "warn"
+                or (per_ds_policy is None and is_optional)
+                or (per_ds_policy is None and not is_optional and policy.default == "warn")
+            )
+            else Severity.ERROR
+        )
 
         # Deduplicate: check each resolved path once
         checked_paths: set[str] = set()
@@ -284,16 +294,15 @@ def _check_dataset_paths(
                 if ds.path is not None and ds.path not in checked_paths:
                     checked_paths.add(ds.path)
                     if not (project_root / ds.path).exists():
-                        findings.append(PreflightFinding(
-                            severity=severity,
-                            kind=FindingKind.MISSING_DATASET,
-                            message=(
-                                f"Dataset '{ds_id}' path not found: "
-                                f"{ds.path}"
-                            ),
-                            dataset_id=ds_id,
-                            remediation=_dataset_remediation(ds_id, ds),
-                        ))
+                        findings.append(
+                            PreflightFinding(
+                                severity=severity,
+                                kind=FindingKind.MISSING_DATASET,
+                                message=(f"Dataset '{ds_id}' path not found: {ds.path}"),
+                                dataset_id=ds_id,
+                                remediation=_dataset_remediation(ds_id, ds),
+                            )
+                        )
                 continue
 
             if path in checked_paths:
@@ -306,23 +315,22 @@ def _check_dataset_paths(
 
         if missing_years:
             if len(missing_paths) == 1:
-                msg = (
-                    f"Dataset '{ds_id}' path not found: "
-                    f"{next(iter(missing_paths))}"
-                )
+                msg = f"Dataset '{ds_id}' path not found: {next(iter(missing_paths))}"
             else:
                 msg = (
                     f"Dataset '{ds_id}': {len(missing_years)} "
                     f"file(s) missing for years {missing_years}"
                 )
-            findings.append(PreflightFinding(
-                severity=severity,
-                kind=FindingKind.MISSING_DATASET,
-                message=msg,
-                dataset_id=ds_id,
-                years=missing_years,
-                remediation=_dataset_remediation(ds_id, ds, years=missing_years),
-            ))
+            findings.append(
+                PreflightFinding(
+                    severity=severity,
+                    kind=FindingKind.MISSING_DATASET,
+                    message=msg,
+                    dataset_id=ds_id,
+                    years=missing_years,
+                    remediation=_dataset_remediation(ds_id, ds, years=missing_years),
+                )
+            )
 
     return findings
 
@@ -361,28 +369,24 @@ def _check_dataset_provenance(
             continue
 
         remediation_command = (
-            result.detail.get("remediation_command")
-            if result.detail is not None
-            else None
+            result.detail.get("remediation_command") if result.detail is not None else None
         )
-        findings.append(PreflightFinding(
-            severity=Severity.ERROR,
-            kind=FindingKind.DATASET_PROVENANCE,
-            message=result.message or "Dataset provenance validation failed.",
-            dataset_id=dataset_id,
-            years=sorted(task.year for task in tasks),
-            remediation=Remediation(
-                hint=(
-                    "Rebuild the translated ACS tract cache so its provenance "
-                    "records the source and target tract vintages."
+        findings.append(
+            PreflightFinding(
+                severity=Severity.ERROR,
+                kind=FindingKind.DATASET_PROVENANCE,
+                message=result.message or "Dataset provenance validation failed.",
+                dataset_id=dataset_id,
+                years=sorted(task.year for task in tasks),
+                remediation=Remediation(
+                    hint=(
+                        "Rebuild the translated ACS tract cache so its provenance "
+                        "records the source and target tract vintages."
+                    ),
+                    command=(str(remediation_command) if remediation_command is not None else None),
                 ),
-                command=(
-                    str(remediation_command)
-                    if remediation_command is not None
-                    else None
-                ),
-            ),
-        ))
+            )
+        )
 
     return findings
 
@@ -411,14 +415,14 @@ def _dataset_remediation(ds_id: str, ds, *, years: list[int] | None = None) -> R
             )
 
     return Remediation(
-        hint=(
-            f"Ingest {provider}/{product} data for dataset '{ds_id}'."
-        ),
+        hint=(f"Ingest {provider}/{product} data for dataset '{ds_id}'."),
         command=f"hhplab ingest {product}" if product else None,
     )
 
 
-def _msa_transform_remediation(transform_id: str, transform, missing_inputs: list[str]) -> Remediation:
+def _msa_transform_remediation(
+    transform_id: str, transform, missing_inputs: list[str]
+) -> Remediation:
     """Build an actionable remediation hint for an MSA transform artifact."""
     from pathlib import Path
 
@@ -440,8 +444,7 @@ def _msa_transform_remediation(transform_id: str, transform, missing_inputs: lis
     if not missing_inputs:
         return Remediation(
             hint=(
-                f"Generate the cached CoC-to-MSA crosswalk artifact for transform "
-                f"'{transform_id}'."
+                f"Generate the cached CoC-to-MSA crosswalk artifact for transform '{transform_id}'."
             ),
             command=crosswalk_command,
         )
@@ -464,11 +467,19 @@ def _msa_transform_remediation(transform_id: str, transform, missing_inputs: lis
                 f"hhplab ingest boundaries --source hud_exchange --vintage {base_ref.vintage}"
             )
             continue
-        if name.startswith("counties__C") and base_ref.type == "coc" and base_ref.vintage is not None:
+        if (
+            name.startswith("counties__C")
+            and base_ref.type == "coc"
+            and base_ref.vintage is not None
+        ):
             details.append(f"missing county geometry artifact '{missing}'")
             commands.append(f"hhplab ingest tiger --year {base_ref.vintage} --type counties")
             continue
-        if name.startswith("tracts__T") and base_ref.type == "tract" and base_ref.vintage is not None:
+        if (
+            name.startswith("tracts__T")
+            and base_ref.type == "tract"
+            and base_ref.vintage is not None
+        ):
             details.append(f"missing tract geometry artifact '{missing}'")
             commands.append(f"hhplab ingest tiger --year {base_ref.vintage} --type tracts")
             continue
@@ -491,17 +502,19 @@ def _check_adapter_validation(
     """Run adapter registry validation and convert to findings."""
     register_defaults()
     diagnostics = validate_recipe_adapters(
-        recipe, geometry_registry, dataset_registry,
+        recipe,
+        geometry_registry,
+        dataset_registry,
     )
     findings: list[PreflightFinding] = []
     for d in diagnostics:
-        findings.append(PreflightFinding(
-            severity=(
-                Severity.ERROR if d.level == "error" else Severity.WARNING
-            ),
-            kind=FindingKind.ADAPTER_ERROR,
-            message=d.message,
-        ))
+        findings.append(
+            PreflightFinding(
+                severity=(Severity.ERROR if d.level == "error" else Severity.WARNING),
+                kind=FindingKind.ADAPTER_ERROR,
+                message=d.message,
+            )
+        )
     return findings
 
 
@@ -522,31 +535,35 @@ def _check_temporal_alignment_guidance(
                     continue
                 years = expand_year_spec(seg.years)
                 year_label = seg.years.range or seg.years.years
-                findings.append(PreflightFinding(
-                    severity=Severity.WARNING,
-                    kind=FindingKind.TEMPORAL_ALIGNMENT,
-                    message=(
-                        f"Dataset '{ds_id}' segment {year_label} uses "
-                        f"acs_end offset {acs_end_offset}. HHP-Lab's standard "
-                        "ACS lag for PIT/January-aligned panels is acs_end=-1; "
-                        "review this offset against the ACS temporal guidance "
-                        "before building."
-                    ),
-                    dataset_id=ds_id,
-                    years=years,
-                    remediation=Remediation(
-                        hint=(
-                            "Use year_offsets: { acs_end: -1 } for the standard "
-                            "PIT/January-aligned ACS lag, or document why a "
-                            "different offset is intentional."
+                findings.append(
+                    PreflightFinding(
+                        severity=Severity.WARNING,
+                        kind=FindingKind.TEMPORAL_ALIGNMENT,
+                        message=(
+                            f"Dataset '{ds_id}' segment {year_label} uses "
+                            f"acs_end offset {acs_end_offset}. HHP-Lab's standard "
+                            "ACS lag for PIT/January-aligned panels is acs_end=-1; "
+                            "review this offset against the ACS temporal guidance "
+                            "before building."
                         ),
-                    ),
-                ))
+                        dataset_id=ds_id,
+                        years=years,
+                        remediation=Remediation(
+                            hint=(
+                                "Use year_offsets: { acs_end: -1 } for the standard "
+                                "PIT/January-aligned ACS lag, or document why a "
+                                "different offset is intentional."
+                            ),
+                        ),
+                    )
+                )
 
     return findings
 
 
-def _map_artifact_remediation(geo_type: str, *, source: str | None, vintage: int | None) -> Remediation:
+def _map_artifact_remediation(
+    geo_type: str, *, source: str | None, vintage: int | None
+) -> Remediation:
     """Build actionable remediation for missing map boundary artifacts."""
     if geo_type == "coc":
         return Remediation(
@@ -581,7 +598,8 @@ def _map_artifact_remediation(geo_type: str, *, source: str | None, vintage: int
                 f"'{source}' using county geometry vintage {vintage}."
             ),
             command=(
-                f"hhplab generate metro-boundaries --definition-version {source} --counties {vintage}"
+                "hhplab generate metro-boundaries "
+                f"--definition-version {source} --counties {vintage}"
                 if source is not None and vintage is not None
                 else None
             ),
@@ -614,7 +632,9 @@ def _check_map_artifacts(
                 try:
                     artifact_path = resolve_curated_boundary_path(str(vintage), base_dir=base_dir)
                 except FileNotFoundError:
-                    artifact_path = base_dir / "curated" / "coc_boundaries" / f"coc__B{vintage}.parquet"
+                    artifact_path = (
+                        base_dir / "curated" / "coc_boundaries" / f"coc__B{vintage}.parquet"
+                    )
             elif geo_type == "msa" and source is not None and vintage is not None:
                 artifact_path = msa_boundaries_path(source, base_dir)
             elif geo_type == "metro" and source is not None and vintage is not None:
@@ -815,29 +835,31 @@ def _check_acs1_temporal_alignment_guidance(
             )
 
     for (pipeline_id, dataset_id), years in sorted(same_year_usage.items()):
-        findings.append(PreflightFinding(
-            severity=Severity.WARNING,
-            kind=FindingKind.TEMPORAL_ALIGNMENT,
-            message=(
-                f"Pipeline '{pipeline_id}': dataset '{dataset_id}' uses "
-                f"same-year ACS1 vintage for analysis year(s) {sorted(years)}. "
-                "ACS1 data for year Y is published in fall of year Y and is "
-                "not available at January-aligned observation dates; use "
-                "prior-year ACS1 vintages or document why same-year ACS1 is "
-                "intentional."
-            ),
-            pipeline_id=pipeline_id,
-            dataset_id=dataset_id,
-            years=sorted(years),
-            remediation=Remediation(
-                hint=(
-                    "For PIT/January-aligned pipelines, use lagged ACS1 "
-                    "vintages (for example year_offsets: { acs1_end: -1 } or "
-                    "a prior-year static artifact path), or document why "
-                    "same-year ACS1 is intentional."
+        findings.append(
+            PreflightFinding(
+                severity=Severity.WARNING,
+                kind=FindingKind.TEMPORAL_ALIGNMENT,
+                message=(
+                    f"Pipeline '{pipeline_id}': dataset '{dataset_id}' uses "
+                    f"same-year ACS1 vintage for analysis year(s) {sorted(years)}. "
+                    "ACS1 data for year Y is published in fall of year Y and is "
+                    "not available at January-aligned observation dates; use "
+                    "prior-year ACS1 vintages or document why same-year ACS1 is "
+                    "intentional."
                 ),
-            ),
-        ))
+                pipeline_id=pipeline_id,
+                dataset_id=dataset_id,
+                years=sorted(years),
+                remediation=Remediation(
+                    hint=(
+                        "For PIT/January-aligned pipelines, use lagged ACS1 "
+                        "vintages (for example year_offsets: { acs1_end: -1 } or "
+                        "a prior-year static artifact path), or document why "
+                        "same-year ACS1 is intentional."
+                    ),
+                ),
+            )
+        )
 
     return findings
 
@@ -852,13 +874,9 @@ def _check_transforms(
     for tid in sorted(needed_transforms):
         result = probe_transform_path(tid, recipe, project_root)
         if not result.ok:
-            can_generate = (
-                result.detail.get("can_generate", False)
-                if result.detail else False
-            )
+            can_generate = result.detail.get("can_generate", False) if result.detail else False
             generation_ready = (
-                result.detail.get("generation_ready", False)
-                if result.detail else False
+                result.detail.get("generation_ready", False) if result.detail else False
             )
             if can_generate and generation_ready:
                 continue
@@ -867,36 +885,22 @@ def _check_transforms(
                 if t.id == tid:
                     transform = t
                     break
-            is_metro = (
-                transform is not None
-                and (transform.from_.type == "metro"
-                     or transform.to.type == "metro")
+            is_metro = transform is not None and (
+                transform.from_.type == "metro" or transform.to.type == "metro"
             )
-            is_msa = (
-                transform is not None
-                and (transform.from_.type == "msa"
-                     or transform.to.type == "msa")
+            is_msa = transform is not None and (
+                transform.from_.type == "msa" or transform.to.type == "msa"
             )
             if is_metro:
-                missing_inputs = (
-                    result.detail.get("missing_inputs", [])
-                    if result.detail else []
-                )
+                missing_inputs = result.detail.get("missing_inputs", []) if result.detail else []
                 cmd = None
                 if transform is not None:
-                    metro_ref = (
-                        transform.to
-                        if transform.to.type == "metro"
-                        else transform.from_
-                    )
+                    metro_ref = transform.to if transform.to.type == "metro" else transform.from_
                     metro_definition_version = metro_ref.resolved_metro_definition_version()
-                    subset_definition_version = (
-                        metro_ref.resolved_metro_subset_definition_version()
-                    )
+                    subset_definition_version = metro_ref.resolved_metro_subset_definition_version()
                     if any("msa_county_membership__" in item for item in missing_inputs):
                         cmd = (
-                            "hhplab generate msa "
-                            f"--definition-version {metro_definition_version}"
+                            f"hhplab generate msa --definition-version {metro_definition_version}"
                             if metro_definition_version is not None
                             else "hhplab generate msa"
                         )
@@ -909,7 +913,10 @@ def _check_transforms(
                             and subset_definition_version is not None
                             else "hhplab generate metro-universe"
                         )
-                    elif any("metro_coc_membership__" in item or "metro_county_membership__" in item for item in missing_inputs):
+                    elif any(
+                        "metro_coc_membership__" in item or "metro_county_membership__" in item
+                        for item in missing_inputs
+                    ):
                         cmd = "hhplab generate metro"
                     elif any("coc__B" in item for item in missing_inputs):
                         coc_ref = (
@@ -920,9 +927,13 @@ def _check_transforms(
                             else None
                         )
                         vintage = coc_ref.vintage if coc_ref is not None else None
-                        cmd = None if vintage is None else (
-                            "hhplab ingest boundaries --source hud_exchange "
-                            f"--vintage {vintage}"
+                        cmd = (
+                            None
+                            if vintage is None
+                            else (
+                                "hhplab ingest boundaries --source hud_exchange "
+                                f"--vintage {vintage}"
+                            )
                         )
                 if missing_inputs:
                     hint = (
@@ -936,23 +947,22 @@ def _check_transforms(
                     )
                 remediation = Remediation(hint=hint, command=cmd)
             elif is_msa:
-                missing_inputs = (
-                    result.detail.get("missing_inputs", [])
-                    if result.detail else []
-                )
+                missing_inputs = result.detail.get("missing_inputs", []) if result.detail else []
                 remediation = _msa_transform_remediation(tid, transform, missing_inputs)
             else:
                 remediation = Remediation(
                     hint=f"Generate crosswalk artifacts for transform '{tid}'.",
                     command="hhplab generate xwalks",
                 )
-            findings.append(PreflightFinding(
-                severity=Severity.ERROR,
-                kind=FindingKind.MISSING_TRANSFORM,
-                message=result.message,
-                transform_id=tid,
-                remediation=remediation,
-            ))
+            findings.append(
+                PreflightFinding(
+                    severity=Severity.ERROR,
+                    kind=FindingKind.MISSING_TRANSFORM,
+                    message=result.message,
+                    transform_id=tid,
+                    remediation=remediation,
+                )
+            )
     return findings
 
 
@@ -967,9 +977,7 @@ def _check_dataset_schemas(
     distinct_paths_by_dataset: dict[str, set[str]] = {}
     for task in resample_tasks:
         if task.input_path is not None:
-            distinct_paths_by_dataset.setdefault(task.dataset_id, set()).add(
-                task.input_path
-            )
+            distinct_paths_by_dataset.setdefault(task.dataset_id, set()).add(task.input_path)
 
     # Deduplicate: check each (dataset_id, path) once
     checked: set[tuple[str, str]] = set()
@@ -1002,15 +1010,16 @@ def _check_dataset_schemas(
                 kind = FindingKind.AMBIGUOUS_COLUMN
             else:
                 kind = FindingKind.MISSING_COLUMN
-            findings.append(PreflightFinding(
-                severity=sev,
-                kind=kind,
-                message=(
-                    f"Dataset '{task.dataset_id}' ({task.input_path}): "
-                    f"{year_result.message}"
-                ),
-                dataset_id=task.dataset_id,
-            ))
+            findings.append(
+                PreflightFinding(
+                    severity=sev,
+                    kind=kind,
+                    message=(
+                        f"Dataset '{task.dataset_id}' ({task.input_path}): {year_result.message}"
+                    ),
+                    dataset_id=task.dataset_id,
+                )
+            )
 
         # Geo column
         geo_result = probe_geo_column(columns, ds.geo_column)
@@ -1019,30 +1028,34 @@ def _check_dataset_schemas(
                 kind = FindingKind.AMBIGUOUS_COLUMN
             else:
                 kind = FindingKind.MISSING_COLUMN
-            findings.append(PreflightFinding(
-                severity=Severity.ERROR,
-                kind=kind,
-                message=(
-                    f"Dataset '{task.dataset_id}' ({task.input_path}): "
-                    f"{geo_result.message}"
-                ),
-                dataset_id=task.dataset_id,
-            ))
+            findings.append(
+                PreflightFinding(
+                    severity=Severity.ERROR,
+                    kind=kind,
+                    message=(
+                        f"Dataset '{task.dataset_id}' ({task.input_path}): {geo_result.message}"
+                    ),
+                    dataset_id=task.dataset_id,
+                )
+            )
 
         # Measures
         measure_result = probe_measures(
-            columns, task.measures, task.dataset_id,
+            columns,
+            task.measures,
+            task.dataset_id,
         )
         if not measure_result.ok:
-            findings.append(PreflightFinding(
-                severity=Severity.ERROR,
-                kind=FindingKind.MISSING_MEASURE,
-                message=(
-                    f"Dataset '{task.dataset_id}' ({task.input_path}): "
-                    f"{measure_result.message}"
-                ),
-                dataset_id=task.dataset_id,
-            ))
+            findings.append(
+                PreflightFinding(
+                    severity=Severity.ERROR,
+                    kind=FindingKind.MISSING_MEASURE,
+                    message=(
+                        f"Dataset '{task.dataset_id}' ({task.input_path}): {measure_result.message}"
+                    ),
+                    dataset_id=task.dataset_id,
+                )
+            )
 
         # Temporal filter
         filt = recipe.filters.get(task.dataset_id)
@@ -1060,15 +1073,16 @@ def _check_dataset_schemas(
                 column_types=column_types,
             )
             if not tf_result.ok:
-                findings.append(PreflightFinding(
-                    severity=Severity.ERROR,
-                    kind=FindingKind.TEMPORAL_FILTER,
-                    message=(
-                        f"Dataset '{task.dataset_id}' ({task.input_path}): "
-                        f"{tf_result.message}"
-                    ),
-                    dataset_id=task.dataset_id,
-                ))
+                findings.append(
+                    PreflightFinding(
+                        severity=Severity.ERROR,
+                        kind=FindingKind.TEMPORAL_FILTER,
+                        message=(
+                            f"Dataset '{task.dataset_id}' ({task.input_path}): {tf_result.message}"
+                        ),
+                        dataset_id=task.dataset_id,
+                    )
+                )
             elif filt.method == "interpolate_to_month":
                 tf_data_result = probe_interpolate_to_month_data(
                     full_path,
@@ -1076,15 +1090,17 @@ def _check_dataset_schemas(
                     task.dataset_id,
                 )
                 if not tf_data_result.ok:
-                    findings.append(PreflightFinding(
-                        severity=Severity.ERROR,
-                        kind=FindingKind.TEMPORAL_FILTER,
-                        message=(
-                            f"Dataset '{task.dataset_id}' ({task.input_path}): "
-                            f"{tf_data_result.message}"
-                        ),
-                        dataset_id=task.dataset_id,
-                    ))
+                    findings.append(
+                        PreflightFinding(
+                            severity=Severity.ERROR,
+                            kind=FindingKind.TEMPORAL_FILTER,
+                            message=(
+                                f"Dataset '{task.dataset_id}' ({task.input_path}): "
+                                f"{tf_data_result.message}"
+                            ),
+                            dataset_id=task.dataset_id,
+                        )
+                    )
 
         # Static broadcast
         year_col_found = (
@@ -1104,22 +1120,21 @@ def _check_dataset_schemas(
             ),
         )
         if not broadcast_result.ok:
-            findings.append(PreflightFinding(
-                severity=Severity.ERROR,
-                kind=FindingKind.STATIC_BROADCAST,
-                message=(
-                    f"Dataset '{task.dataset_id}': "
-                    f"{broadcast_result.message}"
-                ),
-                dataset_id=task.dataset_id,
-                years=universe_years,
-                remediation=Remediation(
-                    hint=(
-                        "Add year_column, use file_set for per-year files, "
-                        "or set params.broadcast_static=true."
+            findings.append(
+                PreflightFinding(
+                    severity=Severity.ERROR,
+                    kind=FindingKind.STATIC_BROADCAST,
+                    message=(f"Dataset '{task.dataset_id}': {broadcast_result.message}"),
+                    dataset_id=task.dataset_id,
+                    years=universe_years,
+                    remediation=Remediation(
+                        hint=(
+                            "Add year_column, use file_set for per-year files, "
+                            "or set params.broadcast_static=true."
+                        ),
                     ),
-                ),
-            ))
+                )
+            )
 
     return findings
 
@@ -1183,25 +1198,22 @@ def _check_support_datasets(
                     "records the source and target tract vintages."
                 )
                 remediation_command = r.detail.get("remediation_command")
-            findings.append(PreflightFinding(
-                severity=Severity.ERROR,
-                kind=finding_kind,
-                message=r.message,
-                transform_id=tid,
-                dataset_id=population_source,
-                years=(
-                    r.detail.get("missing_years")
-                    if r.detail else None
-                ),
-                remediation=Remediation(
-                    hint=remediation_hint,
-                    command=(
-                        str(remediation_command)
-                        if remediation_command is not None
-                        else None
+            findings.append(
+                PreflightFinding(
+                    severity=Severity.ERROR,
+                    kind=finding_kind,
+                    message=r.message,
+                    transform_id=tid,
+                    dataset_id=population_source,
+                    years=(r.detail.get("missing_years") if r.detail else None),
+                    remediation=Remediation(
+                        hint=remediation_hint,
+                        command=(
+                            str(remediation_command) if remediation_command is not None else None
+                        ),
                     ),
-                ),
-            ))
+                )
+            )
 
     return findings
 
@@ -1267,12 +1279,22 @@ def _needs_ct_planning_to_legacy_alignment(
     if source_values is None:
         return False
 
-    xwalk_has_ct_legacy = xwalk_values.dropna().astype(str).map(
-        is_ct_legacy_county_fips,
-    ).any()
-    source_has_ct_planning = source_values.dropna().astype(str).map(
-        is_ct_planning_region_fips,
-    ).any()
+    xwalk_has_ct_legacy = (
+        xwalk_values.dropna()
+        .astype(str)
+        .map(
+            is_ct_legacy_county_fips,
+        )
+        .any()
+    )
+    source_has_ct_planning = (
+        source_values.dropna()
+        .astype(str)
+        .map(
+            is_ct_planning_region_fips,
+        )
+        .any()
+    )
     return bool(xwalk_has_ct_legacy and source_has_ct_planning)
 
 
@@ -1350,27 +1372,29 @@ def _check_ct_county_alignment(
                         set(),
                     ).add(task.year)
                 else:
-                    findings.append(PreflightFinding(
-                        severity=Severity.ERROR,
-                        kind=FindingKind.CT_COUNTY_ALIGNMENT,
-                        message=(
-                            f"Pipeline '{pipeline_id}': dataset '{task.dataset_id}' "
-                            "uses Connecticut planning-region county IDs against "
-                            f"legacy county crosswalk '{task.transform_id}' for "
-                            f"year {task.year}. {bridge_error}"
-                        ),
-                        pipeline_id=pipeline_id,
-                        dataset_id=task.dataset_id,
-                        transform_id=task.transform_id,
-                        years=[task.year],
-                        remediation=Remediation(
-                            hint=(
-                                "Materialize the CT planning-region county geometry "
-                                "before running this recipe so the bridge can be built."
+                    findings.append(
+                        PreflightFinding(
+                            severity=Severity.ERROR,
+                            kind=FindingKind.CT_COUNTY_ALIGNMENT,
+                            message=(
+                                f"Pipeline '{pipeline_id}': dataset '{task.dataset_id}' "
+                                "uses Connecticut planning-region county IDs against "
+                                f"legacy county crosswalk '{task.transform_id}' for "
+                                f"year {task.year}. {bridge_error}"
                             ),
-                            command="hhplab ingest tiger --year 2023 --type counties",
-                        ),
-                    ))
+                            pipeline_id=pipeline_id,
+                            dataset_id=task.dataset_id,
+                            transform_id=task.transform_id,
+                            years=[task.year],
+                            remediation=Remediation(
+                                hint=(
+                                    "Materialize the CT planning-region county geometry "
+                                    "before running this recipe so the bridge can be built."
+                                ),
+                                command="hhplab ingest tiger --year 2023 --type counties",
+                            ),
+                        )
+                    )
 
         transform = next((t for t in recipe.transforms if t.id == task.transform_id), None)
         reqs = get_weighted_transform_requirements(transform) if transform is not None else None
@@ -1405,61 +1429,67 @@ def _check_ct_county_alignment(
                     set(),
                 ).add(task.year)
             else:
-                findings.append(PreflightFinding(
-                    severity=Severity.ERROR,
-                    kind=FindingKind.CT_COUNTY_ALIGNMENT,
-                    message=(
-                        f"Pipeline '{pipeline_id}': population_source "
-                        f"'{population_source}' for transform '{task.transform_id}' "
-                        "uses Connecticut planning-region county IDs against a "
-                        f"legacy county crosswalk for year {task.year}. {bridge_error}"
-                    ),
-                    pipeline_id=pipeline_id,
-                    dataset_id=population_source,
-                    transform_id=task.transform_id,
-                    years=[task.year],
-                    remediation=Remediation(
-                        hint=(
-                            "Materialize the CT planning-region county geometry "
-                            "before running this recipe so the bridge can be built."
+                findings.append(
+                    PreflightFinding(
+                        severity=Severity.ERROR,
+                        kind=FindingKind.CT_COUNTY_ALIGNMENT,
+                        message=(
+                            f"Pipeline '{pipeline_id}': population_source "
+                            f"'{population_source}' for transform '{task.transform_id}' "
+                            "uses Connecticut planning-region county IDs against a "
+                            f"legacy county crosswalk for year {task.year}. {bridge_error}"
                         ),
-                        command="hhplab ingest tiger --year 2023 --type counties",
-                    ),
-                ))
+                        pipeline_id=pipeline_id,
+                        dataset_id=population_source,
+                        transform_id=task.transform_id,
+                        years=[task.year],
+                        remediation=Remediation(
+                            hint=(
+                                "Materialize the CT planning-region county geometry "
+                                "before running this recipe so the bridge can be built."
+                            ),
+                            command="hhplab ingest tiger --year 2023 --type counties",
+                        ),
+                    )
+                )
 
     for (pipeline_id, dataset_id, legacy_vintage), years in sorted(source_events.items()):
-        findings.append(PreflightFinding(
-            severity=Severity.WARNING,
-            kind=FindingKind.CT_COUNTY_ALIGNMENT,
-            message=(
-                f"Pipeline '{pipeline_id}': Connecticut special-case alignment "
-                f"will translate planning-region dataset '{dataset_id}' to "
-                f"legacy counties for years {sorted(years)} using "
-                f"{county_path(legacy_vintage)} and "
-                f"{county_path(CT_PLANNING_REGION_VINTAGE)}."
-            ),
-            pipeline_id=pipeline_id,
-            dataset_id=dataset_id,
-            years=sorted(years),
-        ))
+        findings.append(
+            PreflightFinding(
+                severity=Severity.WARNING,
+                kind=FindingKind.CT_COUNTY_ALIGNMENT,
+                message=(
+                    f"Pipeline '{pipeline_id}': Connecticut special-case alignment "
+                    f"will translate planning-region dataset '{dataset_id}' to "
+                    f"legacy counties for years {sorted(years)} using "
+                    f"{county_path(legacy_vintage)} and "
+                    f"{county_path(CT_PLANNING_REGION_VINTAGE)}."
+                ),
+                pipeline_id=pipeline_id,
+                dataset_id=dataset_id,
+                years=sorted(years),
+            )
+        )
 
     for key, years in sorted(support_events.items()):
         pipeline_id, transform_id, dataset_id, legacy_vintage = key
-        findings.append(PreflightFinding(
-            severity=Severity.WARNING,
-            kind=FindingKind.CT_COUNTY_ALIGNMENT,
-            message=(
-                f"Pipeline '{pipeline_id}': Connecticut special-case alignment "
-                f"will translate planning-region population_source '{dataset_id}' "
-                f"for transform '{transform_id}' to legacy counties for years "
-                f"{sorted(years)} using {county_path(legacy_vintage)} and "
-                f"{county_path(CT_PLANNING_REGION_VINTAGE)}."
-            ),
-            pipeline_id=pipeline_id,
-            dataset_id=dataset_id,
-            transform_id=transform_id,
-            years=sorted(years),
-        ))
+        findings.append(
+            PreflightFinding(
+                severity=Severity.WARNING,
+                kind=FindingKind.CT_COUNTY_ALIGNMENT,
+                message=(
+                    f"Pipeline '{pipeline_id}': Connecticut special-case alignment "
+                    f"will translate planning-region population_source '{dataset_id}' "
+                    f"for transform '{transform_id}' to legacy counties for years "
+                    f"{sorted(years)} using {county_path(legacy_vintage)} and "
+                    f"{county_path(CT_PLANNING_REGION_VINTAGE)}."
+                ),
+                pipeline_id=pipeline_id,
+                dataset_id=dataset_id,
+                transform_id=transform_id,
+                years=sorted(years),
+            )
+        )
 
     return findings
 
@@ -1467,6 +1497,7 @@ def _check_ct_county_alignment(
 # ---------------------------------------------------------------------------
 # Public entry point
 # ---------------------------------------------------------------------------
+
 
 def run_preflight(
     recipe: RecipeV1,
@@ -1521,9 +1552,7 @@ def run_preflight(
                 pipeline_id=pipeline.id,
                 plan=plan,
                 task_count=(
-                    len(plan.materialize_tasks)
-                    + len(plan.resample_tasks)
-                    + len(plan.join_tasks)
+                    len(plan.materialize_tasks) + len(plan.resample_tasks) + len(plan.join_tasks)
                 ),
             )
             report.pipelines.append(summary)
@@ -1548,12 +1577,14 @@ def run_preflight(
             # Surface planner errors as both PLANNER_ERROR and
             # UNCOVERED_YEARS when they indicate year-coverage gaps,
             # so the gaps manifest includes them.
-            report.findings.append(PreflightFinding(
-                severity=Severity.ERROR,
-                kind=FindingKind.PLANNER_ERROR,
-                message=f"Pipeline '{pipeline.id}': {exc}",
-                pipeline_id=pipeline.id,
-            ))
+            report.findings.append(
+                PreflightFinding(
+                    severity=Severity.ERROR,
+                    kind=FindingKind.PLANNER_ERROR,
+                    message=f"Pipeline '{pipeline.id}': {exc}",
+                    pipeline_id=pipeline.id,
+                )
+            )
             if "not covered" in err_str or "no file_set segment" in err_str:
                 # Extract dataset_id from common planner error patterns
                 ds_id_from_err: str | None = None
@@ -1564,28 +1595,27 @@ def run_preflight(
 
                 # Extract the specific missing year from the error
                 _year_match = re.search(r"year (\d{4})", err_str)
-                missing_years = (
-                    [int(_year_match.group(1))] if _year_match
-                    else universe_years
-                )
+                missing_years = [int(_year_match.group(1))] if _year_match else universe_years
 
-                report.findings.append(PreflightFinding(
-                    severity=Severity.ERROR,
-                    kind=FindingKind.UNCOVERED_YEARS,
-                    message=f"Pipeline '{pipeline.id}': {exc}",
-                    pipeline_id=pipeline.id,
-                    dataset_id=ds_id_from_err,
-                    years=missing_years,
-                    remediation=Remediation(
-                        hint=(
-                            f"Year(s) {missing_years} not covered by "
-                            f"dataset '{ds_id_from_err or '?'}'. "
-                            f"Extend dataset year coverage or narrow "
-                            f"the recipe universe "
-                            f"({min(universe_years)}-{max(universe_years)})."
+                report.findings.append(
+                    PreflightFinding(
+                        severity=Severity.ERROR,
+                        kind=FindingKind.UNCOVERED_YEARS,
+                        message=f"Pipeline '{pipeline.id}': {exc}",
+                        pipeline_id=pipeline.id,
+                        dataset_id=ds_id_from_err,
+                        years=missing_years,
+                        remediation=Remediation(
+                            hint=(
+                                f"Year(s) {missing_years} not covered by "
+                                f"dataset '{ds_id_from_err or '?'}'. "
+                                f"Extend dataset year coverage or narrow "
+                                f"the recipe universe "
+                                f"({min(universe_years)}-{max(universe_years)})."
+                            ),
                         ),
-                    ),
-                ))
+                    )
+                )
 
     report.findings.extend(
         _check_acs1_temporal_alignment_guidance(
@@ -1619,7 +1649,10 @@ def run_preflight(
     # 7. Support-dataset probes for weighted transforms
     report.findings.extend(
         _check_support_datasets(
-            recipe, project_root, needed_transforms, universe_years,
+            recipe,
+            project_root,
+            needed_transforms,
+            universe_years,
         ),
     )
 

@@ -6,7 +6,7 @@ from typing import Annotated
 
 import typer
 
-from hhplab.metro.definitions import (
+from hhplab.metro.metro_definitions import (
     CANONICAL_UNIVERSE_DEFINITION_VERSION,
     DEFINITION_VERSION,
 )
@@ -52,7 +52,7 @@ def generate_metro(
     import json as json_mod
 
     import hhplab.naming as naming
-    from hhplab.metro.io import write_metro_artifacts
+    from hhplab.metro.metro_io import write_metro_artifacts
 
     # Check for existing artifacts unless --force
     paths_to_write = [
@@ -63,16 +63,19 @@ def generate_metro(
     existing = [p for p in paths_to_write if p.exists()]
     if existing and not force:
         if json_output:
-            typer.echo(json_mod.dumps({
-                "status": "error",
-                "error": "artifacts_exist",
-                "existing": [str(p) for p in existing],
-            }))
+            typer.echo(
+                json_mod.dumps(
+                    {
+                        "status": "error",
+                        "error": "artifacts_exist",
+                        "existing": [str(p) for p in existing],
+                    }
+                )
+            )
         else:
             paths_str = "\n".join(f"  - {p}" for p in existing)
             typer.echo(
-                f"Error: Metro artifacts already exist:\n{paths_str}\n"
-                "Use --force to overwrite.",
+                f"Error: Metro artifacts already exist:\n{paths_str}\nUse --force to overwrite.",
                 err=True,
             )
         raise typer.Exit(1)
@@ -86,25 +89,33 @@ def generate_metro(
         )
     except ValueError as exc:
         if json_output:
-            typer.echo(json_mod.dumps({
-                "status": "error",
-                "error": "validation_failed",
-                "detail": str(exc),
-            }))
+            typer.echo(
+                json_mod.dumps(
+                    {
+                        "status": "error",
+                        "error": "validation_failed",
+                        "detail": str(exc),
+                    }
+                )
+            )
         else:
             typer.echo(f"Error: {exc}", err=True)
         raise typer.Exit(1) from exc
 
     if json_output:
-        typer.echo(json_mod.dumps({
-            "status": "ok",
-            "definition_version": definition_version,
-            "artifacts": {
-                "definitions": str(defs_path),
-                "coc_membership": str(coc_path),
-                "county_membership": str(county_path),
-            },
-        }))
+        typer.echo(
+            json_mod.dumps(
+                {
+                    "status": "ok",
+                    "definition_version": definition_version,
+                    "artifacts": {
+                        "definitions": str(defs_path),
+                        "coc_membership": str(coc_path),
+                        "county_membership": str(county_path),
+                    },
+                }
+            )
+        )
     else:
         typer.echo(f"  Written: {defs_path}")
         typer.echo(f"  Written: {coc_path}")
@@ -147,7 +158,7 @@ def generate_metro_universe(
     import json as json_mod
 
     import hhplab.naming as naming
-    from hhplab.metro.io import write_metro_universe_artifacts
+    from hhplab.metro.metro_io import write_metro_universe_artifacts
 
     paths_to_write = [
         naming.metro_universe_path(definition_version),

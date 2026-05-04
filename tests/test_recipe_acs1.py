@@ -87,73 +87,85 @@ def _acs1_recipe_dict() -> dict:
 
 def _make_acs1_parquet(path: Path) -> None:
     """Write a minimal ACS1 metro parquet file for testing."""
-    df = pd.DataFrame({
-        "metro_id": ["GF01", "GF02"],
-        "unemployment_rate_acs1": [0.05, 0.03],
-        "acs1_vintage": [2023, 2023],
-        "metro_name": ["New York", "Los Angeles"],
-        "definition_version": ["glynn_fox_v1", "glynn_fox_v1"],
-        "cbsa_code": ["35620", "31080"],
-        "pop_16_plus": [16000000, 10500000],
-        "civilian_labor_force": [10000000, 6800000],
-        "unemployed_count": [500000, 340000],
-        "data_source": ["census_acs1", "census_acs1"],
-        "source_ref": [
-            "https://api.census.gov/data/2023/acs/acs1",
-            "https://api.census.gov/data/2023/acs/acs1",
-        ],
-        "ingested_at": [pd.Timestamp.now(), pd.Timestamp.now()],
-    })
+    df = pd.DataFrame(
+        {
+            "metro_id": ["GF01", "GF02"],
+            "unemployment_rate_acs1": [0.05, 0.03],
+            "acs1_vintage": [2023, 2023],
+            "metro_name": ["New York", "Los Angeles"],
+            "definition_version": ["glynn_fox_v1", "glynn_fox_v1"],
+            "cbsa_code": ["35620", "31080"],
+            "pop_16_plus": [16000000, 10500000],
+            "civilian_labor_force": [10000000, 6800000],
+            "unemployed_count": [500000, 340000],
+            "data_source": ["census_acs1", "census_acs1"],
+            "source_ref": [
+                "https://api.census.gov/data/2023/acs/acs1",
+                "https://api.census.gov/data/2023/acs/acs1",
+            ],
+            "ingested_at": [pd.Timestamp.now(), pd.Timestamp.now()],
+        }
+    )
     path.parent.mkdir(parents=True, exist_ok=True)
     df.to_parquet(path)
 
 
 def _setup_committed_recipe_execution_fixtures(tmp_path: Path) -> None:
     """Create the lagged ACS1 inputs needed to execute the committed recipe."""
-    from hhplab.metro.io import write_metro_artifacts
+    from hhplab.metro.metro_io import write_metro_artifacts
 
     write_metro_artifacts(base_dir=tmp_path / "data")
 
     tract_dir = tmp_path / "data" / "curated" / "tiger"
     tract_dir.mkdir(parents=True, exist_ok=True)
-    pd.DataFrame({
-        "GEOID": ["36061000100", "06037000100"],
-    }).to_parquet(tract_dir / "tracts__T2020.parquet")
+    pd.DataFrame(
+        {
+            "GEOID": ["36061000100", "06037000100"],
+        }
+    ).to_parquet(tract_dir / "tracts__T2020.parquet")
 
     pit_dir = tmp_path / "data" / "curated" / "pit"
     pit_dir.mkdir(parents=True, exist_ok=True)
-    pd.DataFrame({
-        "coc_id": ["NY-600", "CA-600"],
-        "pit_year": [2023, 2023],
-        "pit_total": [100, 200],
-        "pit_sheltered": [60, 120],
-        "pit_unsheltered": [40, 80],
-    }).to_parquet(pit_dir / "pit_vintage__P2024.parquet")
+    pd.DataFrame(
+        {
+            "coc_id": ["NY-600", "CA-600"],
+            "pit_year": [2023, 2023],
+            "pit_total": [100, 200],
+            "pit_sheltered": [60, 120],
+            "pit_unsheltered": [40, 80],
+        }
+    ).to_parquet(pit_dir / "pit_vintage__P2024.parquet")
 
     pep_dir = tmp_path / "data" / "curated" / "pep"
     pep_dir.mkdir(parents=True, exist_ok=True)
-    pd.DataFrame({
-        "county_fips": ["36061", "06037"],
-        "year": [2023, 2023],
-        "population": [1600000, 950000],
-    }).to_parquet(pep_dir / "pep_county__v2024.parquet")
+    pd.DataFrame(
+        {
+            "county_fips": ["36061", "06037"],
+            "year": [2023, 2023],
+            "population": [1600000, 950000],
+        }
+    ).to_parquet(pep_dir / "pep_county__v2024.parquet")
 
     acs_dir = tmp_path / "data" / "curated" / "acs"
     acs_dir.mkdir(parents=True, exist_ok=True)
-    pd.DataFrame({
-        "tract_geoid": ["36061000100", "06037000100"],
-        "total_population": [500000, 450000],
-        "adult_population": [400000, 350000],
-        "population_below_poverty": [75000, 90000],
-        "median_household_income": [85000.0, 70000.0],
-        "median_gross_rent": [2200.0, 1800.0],
-    }).to_parquet(acs_dir / "acs5_tracts__A2022xT2020.parquet")
+    pd.DataFrame(
+        {
+            "tract_geoid": ["36061000100", "06037000100"],
+            "total_population": [500000, 450000],
+            "adult_population": [400000, 350000],
+            "population_below_poverty": [75000, 90000],
+            "median_household_income": [85000.0, 70000.0],
+            "median_gross_rent": [2200.0, 1800.0],
+        }
+    ).to_parquet(acs_dir / "acs5_tracts__A2022xT2020.parquet")
 
-    pd.DataFrame({
-        "metro_id": ["GF01", "GF02"],
-        "acs1_vintage": [2022, 2022],
-        "unemployment_rate_acs1": [0.041, 0.052],
-    }).to_parquet(acs_dir / "acs1_metro__A2022@Dglynnfoxv1.parquet")
+    pd.DataFrame(
+        {
+            "metro_id": ["GF01", "GF02"],
+            "acs1_vintage": [2022, 2022],
+            "unemployment_rate_acs1": [0.041, 0.052],
+        }
+    ).to_parquet(acs_dir / "acs1_metro__A2022@Dglynnfoxv1.parquet")
 
 
 def _find_panel_output(tmp_path: Path) -> Path:
@@ -248,10 +260,7 @@ class TestCommittedACS1Recipe:
 
         acs5_tasks = [t for t in plan.resample_tasks if t.dataset_id == "acs_tract"]
         assert len(acs5_tasks) == 1
-        assert (
-            acs5_tasks[0].input_path
-            == "data/curated/acs/acs5_tracts__A2022xT2020.parquet"
-        )
+        assert acs5_tasks[0].input_path == "data/curated/acs/acs5_tracts__A2022xT2020.parquet"
 
     def test_plan_uses_lagged_acs1_path(self):
         with ACS1_RECIPE_PATH.open(encoding="utf-8") as f:
@@ -261,10 +270,7 @@ class TestCommittedACS1Recipe:
 
         acs1_tasks = [t for t in plan.resample_tasks if t.dataset_id == "acs1_metro"]
         assert len(acs1_tasks) == 1
-        assert (
-            acs1_tasks[0].input_path
-            == "data/curated/acs/acs1_metro__A2022@Dglynnfoxv1.parquet"
-        )
+        assert acs1_tasks[0].input_path == "data/curated/acs/acs1_metro__A2022@Dglynnfoxv1.parquet"
 
     def test_join_includes_acs1(self):
         with ACS1_RECIPE_PATH.open(encoding="utf-8") as f:
@@ -368,7 +374,8 @@ class TestPreflightACS1:
         report = run_preflight(recipe, project_root=tmp_path)
 
         missing = [
-            f for f in report.findings
+            f
+            for f in report.findings
             if f.kind == FindingKind.MISSING_DATASET and f.dataset_id == "acs1_metro"
         ]
         assert len(missing) >= 1
@@ -386,13 +393,9 @@ class TestPreflightACS1:
 
         report = run_preflight(recipe, project_root=tmp_path)
 
-        measure_findings = [
-            f for f in report.findings
-            if f.kind == FindingKind.MISSING_MEASURE
-        ]
+        measure_findings = [f for f in report.findings if f.kind == FindingKind.MISSING_MEASURE]
         assert len(measure_findings) == 0, (
-            f"Should not report missing measures but found: "
-            f"{[f.message for f in measure_findings]}"
+            f"Should not report missing measures but found: {[f.message for f in measure_findings]}"
         )
 
     def test_preflight_detects_missing_measure(self, tmp_path: Path):
@@ -409,10 +412,7 @@ class TestPreflightACS1:
 
         report = run_preflight(recipe, project_root=tmp_path)
 
-        measure_findings = [
-            f for f in report.findings
-            if f.kind == FindingKind.MISSING_MEASURE
-        ]
+        measure_findings = [f for f in report.findings if f.kind == FindingKind.MISSING_MEASURE]
         assert len(measure_findings) >= 1
         assert "nonexistent_measure" in measure_findings[0].message
 
@@ -426,10 +426,7 @@ class TestPreflightACS1:
 
         report = run_preflight(recipe, project_root=tmp_path)
 
-        planner_findings = [
-            f for f in report.findings
-            if f.kind == FindingKind.PLANNER_ERROR
-        ]
+        planner_findings = [f for f in report.findings if f.kind == FindingKind.PLANNER_ERROR]
         assert len(planner_findings) == 0
 
         assert len(report.pipelines) == 1
@@ -450,11 +447,13 @@ class TestExecutorIdentityResampleACS1:
         from hhplab.recipe.executor import _resample_identity
         from hhplab.recipe.planner import GeometryRef, ResampleTask
 
-        df = pd.DataFrame({
-            "metro_id": ["GF01", "GF02"],
-            "unemployment_rate_acs1": [0.05, 0.03],
-            "year": [2023, 2023],
-        })
+        df = pd.DataFrame(
+            {
+                "metro_id": ["GF01", "GF02"],
+                "unemployment_rate_acs1": [0.05, 0.03],
+                "year": [2023, 2023],
+            }
+        )
 
         task = ResampleTask(
             dataset_id="acs1_metro",
@@ -481,11 +480,13 @@ class TestExecutorIdentityResampleACS1:
         from hhplab.recipe.executor import _resample_identity
         from hhplab.recipe.planner import GeometryRef, ResampleTask
 
-        df = pd.DataFrame({
-            "metro_id": ["GF01"],
-            "unemployment_rate_acs1": [0.05],
-            "year": [2023],
-        })
+        df = pd.DataFrame(
+            {
+                "metro_id": ["GF01"],
+                "unemployment_rate_acs1": [0.05],
+                "year": [2023],
+            }
+        )
 
         task = ResampleTask(
             dataset_id="acs1_metro",

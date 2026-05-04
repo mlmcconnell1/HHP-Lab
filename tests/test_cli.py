@@ -39,7 +39,7 @@ class TestNestedIngestCommand:
 class TestListBoundariesCommand:
     """Tests for the 'list boundaries' command."""
 
-    @patch("hhplab.registry.registry.list_boundaries")
+    @patch("hhplab.registry.boundary_registry.list_boundaries")
     def test_list_boundaries_empty(self, mock_list):
         """List boundaries when no vintages registered."""
         mock_list.return_value = []
@@ -49,7 +49,7 @@ class TestListBoundariesCommand:
         assert result.exit_code == 0
         assert "No vintages registered" in result.output
 
-    @patch("hhplab.registry.registry.list_boundaries")
+    @patch("hhplab.registry.boundary_registry.list_boundaries")
     def test_list_boundaries_with_entries(self, mock_list):
         """List boundaries with registered entries."""
         from datetime import UTC, datetime
@@ -327,8 +327,8 @@ class TestValidatePopulation:
 class TestRegistryDeleteEntry:
     """Tests for the 'registry delete-entry' command."""
 
-    @patch("hhplab.registry.registry.delete_vintage")
-    @patch("hhplab.registry.registry.list_boundaries")
+    @patch("hhplab.registry.boundary_registry.delete_vintage")
+    @patch("hhplab.registry.boundary_registry.list_boundaries")
     def test_registry_delete_entry_not_found(self, mock_list, mock_delete):
         """Should fail if entry not found."""
         mock_list.return_value = []
@@ -342,8 +342,8 @@ class TestRegistryDeleteEntry:
         assert "No entry found" in result.output
 
     @patch("hhplab.source_registry.delete_by_local_path")
-    @patch("hhplab.registry.registry.delete_vintage")
-    @patch("hhplab.registry.registry.list_boundaries")
+    @patch("hhplab.registry.boundary_registry.delete_vintage")
+    @patch("hhplab.registry.boundary_registry.list_boundaries")
     def test_registry_delete_entry_success(self, mock_list, mock_delete, mock_delete_src):
         """Should delete entry when found and confirmed."""
         from unittest.mock import MagicMock

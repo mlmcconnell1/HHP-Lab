@@ -9,15 +9,15 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from hhplab.measures.acs import aggregate_to_coc, aggregate_to_geo
-from hhplab.measures.diagnostics import (
+from hhplab.measures.measures_acs import aggregate_to_coc, aggregate_to_geo
+from hhplab.measures.measures_diagnostics import (
     compute_crosswalk_diagnostics,
     compute_measure_diagnostics,
     identify_problem_cocs,
     identify_problem_geos,
 )
-from hhplab.pep.aggregate import aggregate_pep_counties
-from hhplab.rents.aggregate import (
+from hhplab.pep.pep_aggregate import aggregate_pep_counties
+from hhplab.rents.zori_aggregate import (
     collapse_to_yearly,
     compute_coc_county_weights,
     compute_geo_county_weights,
@@ -40,8 +40,11 @@ def metro_tract_crosswalk():
             "metro_id": ["GF01", "GF01", "GF02", "GF02", "GF02"],
             "boundary_vintage": "glynn_fox_v1",
             "tract_geoid": [
-                "36061000100", "36061000200",
-                "06037000100", "06037000200", "06037000300",
+                "36061000100",
+                "36061000200",
+                "06037000100",
+                "06037000200",
+                "06037000300",
             ],
             "tract_vintage": "2020",
             "area_share": [0.8, 0.6, 1.0, 0.5, 0.3],
@@ -101,15 +104,16 @@ class TestTractCrosswalkGeneralization:
         pop_data = pd.DataFrame(
             {
                 "GEOID": [
-                    "36061000100", "36061000200",
-                    "06037000100", "06037000200", "06037000300",
+                    "36061000100",
+                    "36061000200",
+                    "06037000100",
+                    "06037000200",
+                    "06037000300",
                 ],
                 "total_population": [5000, 3000, 8000, 4000, 2000],
             }
         )
-        result = add_population_weights(
-            metro_tract_crosswalk, pop_data, geo_id_col="metro_id"
-        )
+        result = add_population_weights(metro_tract_crosswalk, pop_data, geo_id_col="metro_id")
         assert "pop_share" in result.columns
         # Pop shares should sum to ~1 per metro
         for metro_id in result["metro_id"].unique():
@@ -120,15 +124,16 @@ class TestTractCrosswalkGeneralization:
         pop_data = pd.DataFrame(
             {
                 "GEOID": [
-                    "36061000100", "36061000200",
-                    "06037000100", "06037000200", "06037000300",
+                    "36061000100",
+                    "36061000200",
+                    "06037000100",
+                    "06037000200",
+                    "06037000300",
                 ],
                 "total_population": [5000, 3000, 8000, 4000, 2000],
             }
         )
-        xwalk = add_population_weights(
-            metro_tract_crosswalk, pop_data, geo_id_col="metro_id"
-        )
+        xwalk = add_population_weights(metro_tract_crosswalk, pop_data, geo_id_col="metro_id")
         result = validate_population_shares(xwalk, geo_id_col="metro_id")
         assert "metro_id" in result.columns
         assert result["is_valid"].all()
@@ -184,9 +189,7 @@ class TestACSAggregationGeneralization:
 
 
 class TestPEPAggregationGeneralization:
-    def test_aggregate_pep_counties_with_metro_id(
-        self, metro_county_crosswalk, county_pep_data
-    ):
+    def test_aggregate_pep_counties_with_metro_id(self, metro_county_crosswalk, county_pep_data):
         result = aggregate_pep_counties(
             county_pep_data,
             metro_county_crosswalk,
@@ -199,18 +202,14 @@ class TestPEPAggregationGeneralization:
         assert "population" in result.columns
         assert "coverage_ratio" in result.columns
 
-    def test_aggregate_pep_counties_backward_compat(
-        self, metro_county_crosswalk, county_pep_data
-    ):
+    def test_aggregate_pep_counties_backward_compat(self, metro_county_crosswalk, county_pep_data):
         """Default geo_id_col='coc_id' works with coc_id crosswalks."""
         coc_xwalk = metro_county_crosswalk.rename(columns={"metro_id": "coc_id"})
         result = aggregate_pep_counties(county_pep_data, coc_xwalk)
         assert "coc_id" in result.columns
         assert len(result) == 4  # 2 geos x 2 years
 
-    def test_aggregate_pep_counties_values_match(
-        self, metro_county_crosswalk, county_pep_data
-    ):
+    def test_aggregate_pep_counties_values_match(self, metro_county_crosswalk, county_pep_data):
         """Metro and CoC paths produce identical values."""
         coc_xwalk = metro_county_crosswalk.rename(columns={"metro_id": "coc_id"})
         coc_result = aggregate_pep_counties(county_pep_data, coc_xwalk)
@@ -254,9 +253,7 @@ class TestZORIWeightGeneralization:
                 "weight_value": [1000.0, 500.0, 2000.0, 300.0],
             }
         )
-        result = compute_geo_county_weights(
-            metro_county_crosswalk, weights, geo_id_col="metro_id"
-        )
+        result = compute_geo_county_weights(metro_county_crosswalk, weights, geo_id_col="metro_id")
         assert "metro_id" in result.columns
         # Weights should sum to 1 per metro
         for metro_id in result["metro_id"].unique():
@@ -300,9 +297,7 @@ class TestCollapseToYearlyGeneralization:
 
 class TestDiagnosticsGeneralization:
     def test_crosswalk_diagnostics_with_metro_id(self, metro_tract_crosswalk):
-        result = compute_crosswalk_diagnostics(
-            metro_tract_crosswalk, geo_id_col="metro_id"
-        )
+        result = compute_crosswalk_diagnostics(metro_tract_crosswalk, geo_id_col="metro_id")
         assert "metro_id" in result.columns
         assert "coc_id" not in result.columns
         assert len(result) == 2
@@ -314,19 +309,13 @@ class TestDiagnosticsGeneralization:
         assert "coc_id" in result.columns
 
     def test_measure_diagnostics_with_metro_id(self):
-        area = pd.DataFrame(
-            {"metro_id": ["GF01", "GF02"], "total_population": [100.0, 200.0]}
-        )
-        pop = pd.DataFrame(
-            {"metro_id": ["GF01", "GF02"], "total_population": [105.0, 195.0]}
-        )
+        area = pd.DataFrame({"metro_id": ["GF01", "GF02"], "total_population": [100.0, 200.0]})
+        pop = pd.DataFrame({"metro_id": ["GF01", "GF02"], "total_population": [105.0, 195.0]})
         result = compute_measure_diagnostics(area, pop, geo_id_col="metro_id")
         assert "metro_id" in result.columns
 
     def test_identify_problem_geos_with_metro_id(self, metro_tract_crosswalk):
-        diag = compute_crosswalk_diagnostics(
-            metro_tract_crosswalk, geo_id_col="metro_id"
-        )
+        diag = compute_crosswalk_diagnostics(metro_tract_crosswalk, geo_id_col="metro_id")
         result = identify_problem_geos(diag, geo_id_col="metro_id")
         assert "metro_id" in result.columns or result.empty
 
@@ -346,25 +335,19 @@ class TestExecutorCrosswalkDetection:
     def test_detects_coc_id(self):
         from hhplab.recipe.executor import _detect_xwalk_target_col
 
-        xwalk = pd.DataFrame(
-            {"coc_id": ["A"], "tract_geoid": ["B"], "area_share": [0.5]}
-        )
+        xwalk = pd.DataFrame({"coc_id": ["A"], "tract_geoid": ["B"], "area_share": [0.5]})
         assert _detect_xwalk_target_col(xwalk, "tract_geoid") == "coc_id"
 
     def test_detects_metro_id(self):
         from hhplab.recipe.executor import _detect_xwalk_target_col
 
-        xwalk = pd.DataFrame(
-            {"metro_id": ["GF01"], "tract_geoid": ["B"], "area_share": [0.5]}
-        )
+        xwalk = pd.DataFrame({"metro_id": ["GF01"], "tract_geoid": ["B"], "area_share": [0.5]})
         assert _detect_xwalk_target_col(xwalk, "tract_geoid") == "metro_id"
 
     def test_detects_geo_id(self):
         from hhplab.recipe.executor import _detect_xwalk_target_col
 
-        xwalk = pd.DataFrame(
-            {"geo_id": ["X"], "county_fips": ["Y"], "area_share": [0.5]}
-        )
+        xwalk = pd.DataFrame({"geo_id": ["X"], "county_fips": ["Y"], "area_share": [0.5]})
         assert _detect_xwalk_target_col(xwalk, "county_fips") == "geo_id"
 
     def test_prefers_coc_id_over_geo_id(self):
@@ -379,8 +362,6 @@ class TestExecutorCrosswalkDetection:
         """Regression: no silent fallback to 'coc_id' (coclab-0jfm)."""
         from hhplab.recipe.executor import ExecutorError, _detect_xwalk_target_col
 
-        xwalk = pd.DataFrame(
-            {"county_fips": ["A"], "tract_geoid": ["B"], "area_share": [0.5]}
-        )
+        xwalk = pd.DataFrame({"county_fips": ["A"], "tract_geoid": ["B"], "area_share": [0.5]})
         with pytest.raises(ExecutorError, match="Cannot detect target geography"):
             _detect_xwalk_target_col(xwalk, "tract_geoid")

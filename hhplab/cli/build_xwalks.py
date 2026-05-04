@@ -7,9 +7,12 @@ import click
 import geopandas as gpd
 import typer
 
-from hhplab.measures.diagnostics import compute_crosswalk_diagnostics, summarize_diagnostics
+from hhplab.measures.measures_diagnostics import (
+    compute_crosswalk_diagnostics,
+    summarize_diagnostics,
+)
 from hhplab.paths import curated_dir
-from hhplab.registry.registry import latest_vintage, list_boundaries
+from hhplab.registry.boundary_registry import latest_vintage, list_boundaries
 from hhplab.xwalks.county import build_coc_county_crosswalk, save_county_crosswalk
 from hhplab.xwalks.tract import (
     add_population_weights,
@@ -173,9 +176,7 @@ def build_xwalks(
     if existing_outputs and not force:
         paths = "\n".join(f"  - {path}" for path in existing_outputs)
         typer.echo(
-            "Error: Crosswalk already exists:\n"
-            f"{paths}\n"
-            "Use --force to regenerate the crosswalk.",
+            f"Error: Crosswalk already exists:\n{paths}\nUse --force to regenerate the crosswalk.",
             err=True,
         )
         raise typer.Exit(1)

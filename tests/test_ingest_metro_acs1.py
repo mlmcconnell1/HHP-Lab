@@ -14,14 +14,14 @@ from hhplab.acs.ingest.metro_acs1 import (
     fetch_acs1_cbsa_data,
     ingest_metro_acs1,
 )
-from hhplab.cli.ingest_acs1_metro import ingest_acs1_metro as ingest_acs1_metro_cli
 from hhplab.acs.variables_acs1 import (
     ACS1_METRO_OUTPUT_COLUMNS,
     ACS1_UNAVAILABLE_VINTAGES,
     ACS1_VARIABLES_BY_TABLE,
     acs1_tables_for_vintage,
 )
-from hhplab.metro.definitions import CANONICAL_UNIVERSE_DEFINITION_VERSION
+from hhplab.cli.ingest_acs1_metro import ingest_acs1_metro as ingest_acs1_metro_cli
+from hhplab.metro.metro_definitions import CANONICAL_UNIVERSE_DEFINITION_VERSION
 from hhplab.provenance import read_provenance
 
 # ---------------------------------------------------------------------------
@@ -112,9 +112,7 @@ def build_canonical_metro_universe_fixture() -> pd.DataFrame:
     )
 
 
-CENSUS_API_URL_PATTERN = re.compile(
-    r"https://api\.census\.gov/data/\d{4}/acs/acs1.*"
-)
+CENSUS_API_URL_PATTERN = re.compile(r"https://api\.census\.gov/data/\d{4}/acs/acs1.*")
 
 
 # ---------------------------------------------------------------------------

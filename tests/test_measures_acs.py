@@ -5,7 +5,7 @@ from __future__ import annotations
 import pandas as pd
 import pytest
 
-from hhplab.measures.acs import (
+from hhplab.measures.measures_acs import (
     aggregate_to_coc,
 )
 
@@ -421,7 +421,7 @@ class TestCtRemapFailurePaths:
         import sys
         import warnings
 
-        from hhplab.measures.acs import _maybe_remap_ct_planning_regions
+        from hhplab.measures.measures_acs import _maybe_remap_ct_planning_regions
 
         real_import = builtins.__import__
 
@@ -469,7 +469,7 @@ class TestCtRemapFailurePaths:
         """When geometry files are missing, aggregation continues with a warning."""
         import warnings
 
-        from hhplab.measures.acs import _maybe_remap_ct_planning_regions
+        from hhplab.measures.measures_acs import _maybe_remap_ct_planning_regions
 
         monkeypatch.setattr(
             "hhplab.geo.ct_planning_regions.build_ct_tract_planning_region_map",
@@ -505,7 +505,7 @@ class TestCtRemapFailurePaths:
         """When mapping raises ValueError, aggregation continues with a warning."""
         import warnings
 
-        from hhplab.measures.acs import _maybe_remap_ct_planning_regions
+        from hhplab.measures.measures_acs import _maybe_remap_ct_planning_regions
 
         monkeypatch.setattr(
             "hhplab.geo.ct_planning_regions.build_ct_tract_planning_region_map",
@@ -688,9 +688,7 @@ def _three_tract_crosswalk():
 class TestNullHeavyACSInputs:
     """Edge cases where ACS columns are predominantly NA."""
 
-    def test_coverage_ratio_vs_per_measure_coverage_with_null_median(
-        self, _simple_crosswalk
-    ):
+    def test_coverage_ratio_vs_per_measure_coverage_with_null_median(self, _simple_crosswalk):
         """coverage_ratio=100% but coverage_median_household_income is low
         when median_household_income is NA for most tracts but total_population
         is present everywhere.
@@ -831,8 +829,8 @@ class TestZeroPopulationWeightMedian:
     @pytest.mark.parametrize(
         "populations,expected_income",
         [
-            ([0, 2000], 60000),         # Only tract 2 has nonzero pop
-            ([1000, 0], 50000),         # Only tract 1 has nonzero pop
+            ([0, 2000], 60000),  # Only tract 2 has nonzero pop
+            ([1000, 0], 50000),  # Only tract 1 has nonzero pop
         ],
         ids=["only_second_tract", "only_first_tract"],
     )
@@ -852,9 +850,7 @@ class TestZeroPopulationWeightMedian:
         )
 
         result = aggregate_to_coc(acs_data, _simple_crosswalk)
-        assert result.iloc[0]["median_household_income"] == pytest.approx(
-            expected_income
-        )
+        assert result.iloc[0]["median_household_income"] == pytest.approx(expected_income)
 
 
 # ---------------------------------------------------------------------------
@@ -882,9 +878,7 @@ class TestPerMeasureCoverage:
         assert "coverage_median_household_income" in result.columns
         assert "coverage_median_gross_rent" in result.columns
 
-    def test_per_measure_coverage_equals_ratio_when_all_present(
-        self, _simple_crosswalk
-    ):
+    def test_per_measure_coverage_equals_ratio_when_all_present(self, _simple_crosswalk):
         """When every tract has data for all columns, per-measure coverage
         equals coverage_ratio.
         """
@@ -899,12 +893,8 @@ class TestPerMeasureCoverage:
 
         result = aggregate_to_coc(acs_data, _simple_crosswalk)
         row = result.iloc[0]
-        assert row["coverage_median_household_income"] == pytest.approx(
-            row["coverage_ratio"]
-        )
-        assert row["coverage_median_gross_rent"] == pytest.approx(
-            row["coverage_ratio"]
-        )
+        assert row["coverage_median_household_income"] == pytest.approx(row["coverage_ratio"])
+        assert row["coverage_median_gross_rent"] == pytest.approx(row["coverage_ratio"])
 
     def test_per_measure_coverage_differs_from_ratio(self, _three_tract_crosswalk):
         """Per-measure coverage diverges from coverage_ratio when data
@@ -939,10 +929,7 @@ class TestPerMeasureCoverage:
         # All three values are different
         assert row["coverage_ratio"] != row["coverage_median_household_income"]
         assert row["coverage_ratio"] != row["coverage_median_gross_rent"]
-        assert (
-            row["coverage_median_household_income"]
-            != row["coverage_median_gross_rent"]
-        )
+        assert row["coverage_median_household_income"] != row["coverage_median_gross_rent"]
 
     def test_per_measure_coverage_without_intersection_area(self):
         """Without intersection_area, per-measure coverage falls back to

@@ -1,6 +1,6 @@
 """Registry module for tracking boundary vintages."""
 
-from hhplab.registry.registry import (
+from hhplab.registry.boundary_registry import (
     RegistryHealthIssue,
     RegistryHealthReport,
     check_registry_health,

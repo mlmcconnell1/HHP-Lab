@@ -10,7 +10,7 @@ Tests cover:
 import pandas as pd
 import pytest
 
-from hhplab.rents.aggregate import aggregate_monthly, collapse_to_yearly
+from hhplab.rents.zori_aggregate import aggregate_monthly, collapse_to_yearly
 
 
 class TestAggregateMonthly:

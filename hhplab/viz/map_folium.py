@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import colorsys
-import hashlib
 from dataclasses import dataclass
 from datetime import date, datetime
 from pathlib import Path
@@ -74,9 +73,7 @@ def _normalize_selector(value: object) -> str:
 def _resolve_basemap(name: str) -> str:
     key = name.strip().lower()
     if key not in SUPPORTED_BASEMAPS:
-        raise ValueError(
-            f"Unsupported basemap '{name}'. Available: {sorted(SUPPORTED_BASEMAPS)}"
-        )
+        raise ValueError(f"Unsupported basemap '{name}'. Available: {sorted(SUPPORTED_BASEMAPS)}")
     return SUPPORTED_BASEMAPS[key]
 
 
@@ -87,7 +84,7 @@ def _normalize_coc_id(coc_id: str) -> str:
 
 def _find_coc_boundary_file(vintage: str, *, base_dir: Path) -> Path:
     """Find the GeoParquet file for a given vintage."""
-    from hhplab.geo.io import resolve_curated_boundary_path
+    from hhplab.geo.geo_io import resolve_curated_boundary_path
 
     return resolve_curated_boundary_path(vintage, base_dir)
 
@@ -110,7 +107,7 @@ def _load_msa_boundaries(
     county_vintage: str | int,
     base_dir: Path,
 ) -> gpd.GeoDataFrame:
-    from hhplab.msa.boundaries import read_msa_boundaries
+    from hhplab.msa.msa_boundaries import read_msa_boundaries
 
     gdf = read_msa_boundaries(definition_version, base_dir)
     if "geometry_vintage" in gdf.columns:
@@ -131,7 +128,7 @@ def _load_metro_boundaries(
     county_vintage: str | int,
     base_dir: Path,
 ) -> gpd.GeoDataFrame:
-    from hhplab.metro.boundaries import read_metro_boundaries
+    from hhplab.metro.metro_boundaries import read_metro_boundaries
 
     return read_metro_boundaries(
         definition_version=definition_version,
@@ -265,20 +262,13 @@ def _darken_hex(color: str, factor: float = 0.65) -> str:
     value = color.lstrip("#")
     if len(value) != 6:
         return color
-    channels = [
-        max(0, min(255, int(int(value[i:i + 2], 16) * factor)))
-        for i in range(0, 6, 2)
-    ]
+    channels = [max(0, min(255, int(int(value[i : i + 2], 16) * factor))) for i in range(0, 6, 2)]
     return "#{:02x}{:02x}{:02x}".format(*channels)
 
 
 def _rgb_to_hex(red: float, green: float, blue: float) -> str:
     """Convert normalized RGB values to a hex color string."""
-    return "#{:02x}{:02x}{:02x}".format(
-        round(red * 255),
-        round(green * 255),
-        round(blue * 255),
-    )
+    return f"#{round(red * 255):02x}{round(green * 255):02x}{round(blue * 255):02x}"
 
 
 def _generate_distinct_colors(count: int) -> list[str]:
@@ -293,9 +283,7 @@ def _generate_distinct_colors(count: int) -> list[str]:
         hue = (index * 0.618033988749895) % 1.0
         lightness = 0.58 if index % 2 == 0 else 0.66
         saturation = 0.62 if index % 3 else 0.74
-        colors.append(
-            _rgb_to_hex(*colorsys.hls_to_rgb(hue, lightness, saturation))
-        )
+        colors.append(_rgb_to_hex(*colorsys.hls_to_rgb(hue, lightness, saturation)))
     return colors
 
 
@@ -356,9 +344,7 @@ def _distinct_palette_colors_for_layer(
 
     for index in order:
         used_colors = {
-            color_by_index[neighbor]
-            for neighbor in adjacency[index]
-            if neighbor in color_by_index
+            color_by_index[neighbor] for neighbor in adjacency[index] if neighbor in color_by_index
         }
         palette_index = 0
         while True:
@@ -370,10 +356,7 @@ def _distinct_palette_colors_for_layer(
                 break
             palette_index += 1
 
-    return {
-        normalized_ids.iloc[index]: color_by_index[index]
-        for index in order
-    }
+    return {normalized_ids.iloc[index]: color_by_index[index] for index in order}
 
 
 def _apply_distinct_feature_styles(
@@ -466,9 +449,7 @@ def render_overlay_map(
 ) -> Path:
     """Render multiple resolved overlay layers to one HTML map."""
     map_location = (
-        list(viewport.center)
-        if viewport.center is not None
-        else _initial_map_view(layers)
+        list(viewport.center) if viewport.center is not None else _initial_map_view(layers)
     )
     zoom_start = viewport.zoom if viewport.zoom is not None else DEFAULT_MAP_ZOOM
     m = folium.Map(

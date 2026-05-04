@@ -30,6 +30,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 # Utility / value objects
 # -----------------------------
 
+
 class YearSpec(BaseModel):
     """
     Represents a year domain.
@@ -38,6 +39,7 @@ class YearSpec(BaseModel):
       - years: [2018, 2019, ...]
     Also accepts a bare string like "2018-2024" as shorthand for {range: "2018-2024"}.
     """
+
     model_config = ConfigDict(extra="forbid")
 
     range: str | None = Field(
@@ -101,6 +103,7 @@ class GeometryRef(BaseModel):
             and lets runtime adapters enforce requirements.
     source: optional provenance hint (e.g., 'hud_exchange', 'tiger', 'nhgis').
     """
+
     model_config = ConfigDict(extra="forbid")
 
     type: str = Field(
@@ -149,8 +152,10 @@ class GeometryRef(BaseModel):
         if self.source is None:
             return None
 
-        from hhplab.metro.definitions import (
+        from hhplab.metro.metro_definitions import (
             CANONICAL_UNIVERSE_DEFINITION_VERSION,
+        )
+        from hhplab.metro.metro_definitions import (
             DEFINITION_VERSION as GLYNN_FOX_DEFINITION_VERSION,
         )
 
@@ -169,8 +174,10 @@ class GeometryRef(BaseModel):
         if self.subset_profile is not None:
             return self.subset_profile
 
-        from hhplab.metro.definitions import (
+        from hhplab.metro.metro_definitions import (
             DEFINITION_VERSION as GLYNN_FOX_DEFINITION_VERSION,
+        )
+        from hhplab.metro.metro_definitions import (
             PROFILE_NAME,
         )
 
@@ -188,7 +195,9 @@ class GeometryRef(BaseModel):
         if self.subset_profile_definition_version is not None:
             return self.subset_profile_definition_version
 
-        from hhplab.metro.definitions import DEFINITION_VERSION as GLYNN_FOX_DEFINITION_VERSION
+        from hhplab.metro.metro_definitions import (
+            DEFINITION_VERSION as GLYNN_FOX_DEFINITION_VERSION,
+        )
 
         if self.source == GLYNN_FOX_DEFINITION_VERSION and self.subset_profile is None:
             return GLYNN_FOX_DEFINITION_VERSION
@@ -202,6 +211,7 @@ class GeometryRef(BaseModel):
 
 class VintageSetRule(BaseModel):
     """A rule within a vintage set that maps years to dimension values."""
+
     model_config = ConfigDict(extra="forbid")
 
     years: YearSpec
@@ -217,14 +227,17 @@ class VintageSetRule(BaseModel):
 
 class VintageSetSpec(BaseModel):
     """A named set of vintage tuples, expanded from compact range rules."""
+
     model_config = ConfigDict(extra="forbid")
 
     dimensions: list[str] = Field(
-        ..., min_length=1,
+        ...,
+        min_length=1,
         description="Ordered list of dimension names in each tuple.",
     )
     rules: list[VintageSetRule] = Field(
-        ..., min_length=1,
+        ...,
+        min_length=1,
         description="Year-banded rules that expand into tuples.",
     )
 
@@ -233,8 +246,10 @@ class VintageSetSpec(BaseModel):
 # File set (time-banded dataset paths)
 # -----------------------------
 
+
 class FileSetSegment(BaseModel):
     """A time-banded segment mapping years to a geometry vintage and optional path overrides."""
+
     model_config = ConfigDict(extra="forbid")
 
     years: YearSpec
@@ -243,8 +258,7 @@ class FileSetSegment(BaseModel):
     constants: dict[str, str | int] = Field(
         default_factory=dict,
         description=(
-            "Optional constant template variables for path rendering, "
-            "for example {'tract': 2010}."
+            "Optional constant template variables for path rendering, for example {'tract': 2010}."
         ),
     )
     year_offsets: dict[str, int] = Field(
@@ -258,6 +272,7 @@ class FileSetSegment(BaseModel):
 
 class FileSetSpec(BaseModel):
     """Path template + segments for datasets whose geometry vintage varies by year."""
+
     model_config = ConfigDict(extra="forbid")
 
     path_template: str = Field(
@@ -281,6 +296,7 @@ class FileSetSpec(BaseModel):
 # Datasets (extensible)
 # -----------------------------
 
+
 class DatasetSpec(BaseModel):
     """
     Extensible dataset declaration. Adapter resolution is via (provider, product, version).
@@ -289,20 +305,17 @@ class DatasetSpec(BaseModel):
     path optionally points to a project-relative on-disk artifact to use for this dataset.
     file_set provides time-banded paths and geometry vintages for multi-segment datasets.
     """
+
     model_config = ConfigDict(extra="forbid")
 
     provider: str = Field(
         ...,
-        description=(
-            "Dataset provider namespace, e.g. 'hud', 'census',"
-            " 'zillow', 'mit-election'."
-        ),
+        description=("Dataset provider namespace, e.g. 'hud', 'census', 'zillow', 'mit-election'."),
     )
     product: str = Field(
         ...,
         description=(
-            "Dataset product name within provider, e.g. 'pit',"
-            " 'acs5', 'pep', 'county-returns'."
+            "Dataset product name within provider, e.g. 'pit', 'acs5', 'pep', 'county-returns'."
         ),
     )
     version: int = Field(
@@ -338,10 +351,7 @@ class DatasetSpec(BaseModel):
     )
     optional: bool = Field(
         default=False,
-        description=(
-            "If true, missing dataset does not fail the build"
-            " (policy still applies)."
-        ),
+        description=("If true, missing dataset does not fail the build (policy still applies)."),
     )
 
     @field_validator("path")
@@ -374,6 +384,7 @@ TemporalMethod = Literal[
 
 class TemporalFilter(BaseModel):
     """Temporal filter applied before geographic resampling."""
+
     model_config = ConfigDict(extra="forbid")
 
     type: Literal["temporal"] = "temporal"
@@ -385,7 +396,8 @@ class TemporalFilter(BaseModel):
     month: int | None = Field(
         default=None,
         description="Month for point_in_time filter (1-12).",
-        ge=1, le=12,
+        ge=1,
+        le=12,
     )
 
     @model_validator(mode="after")
@@ -414,10 +426,13 @@ class ZoriPolicy(BaseModel):
     rules and provenance column generation using these settings instead of
     relying on implicit ``build_panel`` defaults.
     """
+
     model_config = ConfigDict(extra="forbid")
 
     min_coverage: float = Field(
-        default=0.90, ge=0.0, le=1.0,
+        default=0.90,
+        ge=0.0,
+        le=1.0,
         description="Minimum coverage ratio for ZORI eligibility.",
     )
 
@@ -429,6 +444,7 @@ class Acs1Policy(BaseModel):
     (e.g. unemployment_rate_acs1) into the panel alongside ACS 5-year
     measures.
     """
+
     model_config = ConfigDict(extra="forbid")
 
     include: bool = Field(
@@ -451,6 +467,7 @@ class LausPolicy(BaseModel):
     for metro statistical areas, while ACS1 provides survey-based estimates.
     Do not confuse the BLS unemployment_rate with unemployment_rate_acs1.
     """
+
     model_config = ConfigDict(extra="forbid")
 
     include: bool = Field(
@@ -470,6 +487,7 @@ class PanelPolicy(BaseModel):
     thresholds, ACS 1-year merge behavior, LAUS labor-market merge behavior,
     source labeling, and column rename aliases.
     """
+
     model_config = ConfigDict(extra="forbid")
 
     source_label: str | None = Field(
@@ -503,6 +521,7 @@ class PanelPolicy(BaseModel):
 
 class MapLayerStyle(BaseModel):
     """Declarative style controls for a rendered map overlay layer."""
+
     model_config = ConfigDict(extra="forbid")
 
     fill_color: str = Field(
@@ -514,25 +533,32 @@ class MapLayerStyle(BaseModel):
         description="Polygon outline color.",
     )
     fill_opacity: float = Field(
-        default=0.3, ge=0.0, le=1.0,
+        default=0.3,
+        ge=0.0,
+        le=1.0,
         description="Polygon fill opacity.",
     )
     stroke_opacity: float = Field(
-        default=1.0, ge=0.0, le=1.0,
+        default=1.0,
+        ge=0.0,
+        le=1.0,
         description="Polygon outline opacity.",
     )
     line_weight: float = Field(
-        default=2.0, ge=0.0,
+        default=2.0,
+        ge=0.0,
         description="Polygon outline width in pixels.",
     )
     z_order: int = Field(
-        default=0, ge=0,
+        default=0,
+        ge=0,
         description="Relative overlay draw order.",
     )
 
 
 class MapViewportSpec(BaseModel):
     """Viewport policy for a rendered recipe map."""
+
     model_config = ConfigDict(extra="forbid")
 
     fit_layers: bool = Field(
@@ -544,11 +570,13 @@ class MapViewportSpec(BaseModel):
         description="Optional explicit map center as (lat, lon).",
     )
     zoom: int | None = Field(
-        default=None, ge=0,
+        default=None,
+        ge=0,
         description="Optional explicit zoom level.",
     )
     padding: int = Field(
-        default=20, ge=0,
+        default=20,
+        ge=0,
         description="Padding in pixels when fitting layer bounds.",
     )
 
@@ -566,6 +594,7 @@ MapStyleMode = Literal["uniform", "distinct"]
 
 class MapLayerSpec(BaseModel):
     """One overlay layer within a recipe-native map target."""
+
     model_config = ConfigDict(extra="forbid")
 
     geometry: GeometryRef = Field(
@@ -615,6 +644,7 @@ class MapLayerSpec(BaseModel):
 
 class MapSpec(BaseModel):
     """Declarative map artifact definition for a target."""
+
     model_config = ConfigDict(extra="forbid")
 
     layers: list[MapLayerSpec] = Field(
@@ -643,14 +673,18 @@ class CohortSelector(BaseModel):
         description="Measure column to rank geographies on (e.g. 'total_population').",
     )
     method: CohortMethod = Field(
-        ..., description="Selection method: top_n, bottom_n, or percentile.",
+        ...,
+        description="Selection method: top_n, bottom_n, or percentile.",
     )
     n: int | None = Field(
-        default=None, ge=1,
+        default=None,
+        ge=1,
         description="Number of geographies to keep (for top_n / bottom_n).",
     )
     threshold: float | None = Field(
-        default=None, ge=0.0, le=1.0,
+        default=None,
+        ge=0.0,
+        le=1.0,
         description="Percentile threshold (for 'percentile' method). 0.75 keeps the top 25%%.",
     )
     reference_year: int = Field(
@@ -673,6 +707,7 @@ class TargetSpec(BaseModel):
     """
     A recipe can define multiple targets (e.g., CoC panel + county panel + state rollup).
     """
+
     model_config = ConfigDict(extra="forbid")
 
     id: str = Field(..., description="Unique target identifier.")
@@ -717,6 +752,7 @@ class CrosswalkWeighting(BaseModel):
     If scheme == 'population', a population source/field may be referenced
     (optional here; required by adapter).
     """
+
     model_config = ConfigDict(extra="forbid")
 
     scheme: WeightScheme = Field(..., description="Crosswalk share weighting scheme.")
@@ -750,6 +786,7 @@ class RollupSpec(BaseModel):
     the source key. The expression language is intentionally unspecified
     here; implement a safe evaluator in compiler layer.
     """
+
     model_config = ConfigDict(extra="forbid")
     keys: RollupKeys = Field(..., description="Key mapping config.")
     derive: dict[str, str] = Field(
@@ -795,6 +832,7 @@ class MaterializeStep(BaseModel):
 
 class MeasureAggConfig(BaseModel):
     """Per-measure aggregation configuration."""
+
     model_config = ConfigDict(extra="forbid")
     aggregation: AggregationMethod = Field(..., description="Aggregation method for this measure.")
 
@@ -810,15 +848,18 @@ class ResampleStep(BaseModel):
     - a list of strings (uniform aggregation via top-level ``aggregation``)
     - a dict mapping measure name → MeasureAggConfig (per-measure aggregation)
     """
+
     model_config = ConfigDict(extra="forbid")
 
     kind: Literal["resample"] = "resample"
     dataset: str = Field(..., description="Dataset id to resample.")
     to_geometry: GeometryRef = Field(
-        ..., description="Destination geometry for this dataset output.",
+        ...,
+        description="Destination geometry for this dataset output.",
     )
     method: ResampleMethod = Field(
-        ..., description="Resampling method.",
+        ...,
+        description="Resampling method.",
     )
     via: str | None = Field(
         default=None,
@@ -913,12 +954,14 @@ class PipelineSpec(BaseModel):
 # Validation / policy blocks
 # -----------------------------
 
+
 class MissingDatasetPolicy(BaseModel):
     """
     Controls behavior when required datasets are missing.
     Keys are dataset ids; 'default' applies when dataset not explicitly listed.
     Values are 'fail' or 'warn'.
     """
+
     model_config = ConfigDict(extra="allow")  # allow arbitrary dataset keys
 
     default: Literal["fail", "warn"] = Field(default="fail")
@@ -941,6 +984,7 @@ class ValidationPolicy(BaseModel):
 # The full recipe model
 # -----------------------------
 
+
 class RecipeV1(BaseModel):
     """
     Top-level recipe.
@@ -948,6 +992,7 @@ class RecipeV1(BaseModel):
     - Uses open sets for geometry types and dataset providers/products.
     - Performs referential integrity checks across ids (targets, datasets, transforms, pipelines).
     """
+
     model_config = ConfigDict(extra="forbid", populate_by_name=True)
 
     version: Literal[1] = 1
@@ -1020,8 +1065,7 @@ class RecipeV1(BaseModel):
                     missing = [d for d in step.datasets if d not in dataset_ids]
                     if missing:
                         raise ValueError(
-                            f"Pipeline '{p.id}' join step references"
-                            f" unknown datasets: {missing}"
+                            f"Pipeline '{p.id}' join step references unknown datasets: {missing}"
                         )
 
         return self
@@ -1089,8 +1133,7 @@ class RecipeV1(BaseModel):
                 overlap = all_years & seg_years
                 if overlap:
                     raise ValueError(
-                        f"Dataset '{ds_id}' file_set segments overlap "
-                        f"on years: {sorted(overlap)}."
+                        f"Dataset '{ds_id}' file_set segments overlap on years: {sorted(overlap)}."
                     )
                 all_years |= seg_years
         return self
@@ -1105,8 +1148,7 @@ class RecipeV1(BaseModel):
                 overlap = all_years & rule_years
                 if overlap:
                     raise ValueError(
-                        f"Vintage set '{vs_name}' rules overlap "
-                        f"on years: {sorted(overlap)}."
+                        f"Vintage set '{vs_name}' rules overlap on years: {sorted(overlap)}."
                     )
                 all_years |= rule_years
 

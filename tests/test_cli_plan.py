@@ -222,9 +222,9 @@ class TestDiagnosticsCommand:
         assert result.exit_code == 1
         assert "Crosswalk file not found" in result.output
 
-    @patch("hhplab.cli.diagnostics.compute_crosswalk_diagnostics")
-    @patch("hhplab.cli.diagnostics.summarize_diagnostics")
-    @patch("hhplab.cli.diagnostics.identify_problem_cocs")
+    @patch("hhplab.cli.diagnostics_cli.compute_crosswalk_diagnostics")
+    @patch("hhplab.cli.diagnostics_cli.summarize_diagnostics")
+    @patch("hhplab.cli.diagnostics_cli.identify_problem_cocs")
     @patch("pandas.read_parquet")
     def test_diagnostics_show_problems(
         self,

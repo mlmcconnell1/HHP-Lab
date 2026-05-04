@@ -6,7 +6,7 @@ from typing import Annotated
 
 import typer
 
-from hhplab.msa.definitions import DEFINITION_VERSION
+from hhplab.msa.msa_definitions import DEFINITION_VERSION
 
 
 def validate_msa(
@@ -29,8 +29,8 @@ def validate_msa(
     """Validate curated MSA definitions, membership, and boundary polygons."""
     import json as json_mod
 
-    from hhplab.msa.boundaries import validate_curated_msa_boundaries
-    from hhplab.msa.io import validate_curated_msa
+    from hhplab.msa.msa_boundaries import validate_curated_msa_boundaries
+    from hhplab.msa.msa_io import validate_curated_msa
 
     try:
         definitions_result = validate_curated_msa(definition_version)
@@ -75,9 +75,6 @@ def validate_msa(
             typer.echo(f"  WARN:  {warning}", err=True)
         raise typer.Exit(1)
 
-    typer.echo(
-        f"MSA validation passed for {definition_version} "
-        f"({len(warnings)} warning(s))."
-    )
+    typer.echo(f"MSA validation passed for {definition_version} ({len(warnings)} warning(s)).")
     for warning in warnings:
         typer.echo(f"  WARN:  {warning}")

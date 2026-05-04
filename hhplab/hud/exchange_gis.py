@@ -787,7 +787,7 @@ def ingest_hud_exchange(
     import click
 
     from hhplab.geo import normalize_boundaries, validate_boundaries
-    from hhplab.geo.io import curated_boundary_path, write_geoparquet
+    from hhplab.geo.geo_io import curated_boundary_path, write_geoparquet
 
     if curated_dir is None:
         curated_dir = Path("data")

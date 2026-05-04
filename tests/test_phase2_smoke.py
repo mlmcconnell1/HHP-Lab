@@ -10,8 +10,8 @@ import pandas as pd
 import pytest
 from shapely.geometry import box
 
-from hhplab.measures.acs import aggregate_to_coc
-from hhplab.measures.diagnostics import (
+from hhplab.measures.measures_acs import aggregate_to_coc
+from hhplab.measures.measures_diagnostics import (
     compute_crosswalk_diagnostics,
     summarize_diagnostics,
 )
