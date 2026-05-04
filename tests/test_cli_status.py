@@ -129,7 +129,10 @@ class TestStatusHuman:
         assert "MSA Artifacts: 1 complete version(s)" in result.output
         assert "LAUS:       2 file(s)" in result.output
         assert "Recipe Outputs: 1 namespace(s)" in result.output
-        assert "demo-recipe: 1 panel(s), 1 manifest(s), 1 diagnostics file(s), 1 map(s)" in result.output
+        assert (
+            "demo-recipe: 1 panel(s), 1 manifest(s), 1 diagnostics file(s), 1 map(s)"
+            in result.output
+        )
         assert "Recipe Workflow:" in result.output
         assert RECIPE_PREFLIGHT_CMD in result.output
         assert RECIPE_EXECUTE_CMD in result.output
@@ -226,7 +229,14 @@ class TestStatusJSON:
 
         result = runner.invoke(
             app,
-            ["status", "--json", "--data-dir", str(data_dir), "--output-root", str(tmp_path / "outputs")],
+            [
+                "status",
+                "--json",
+                "--data-dir",
+                str(data_dir),
+                "--output-root",
+                str(tmp_path / "outputs"),
+            ],
         )
 
         assert result.exit_code == 1
@@ -241,13 +251,21 @@ class TestStatusJSON:
 
         result = runner.invoke(
             app,
-            ["status", "--json", "--data-dir", str(data_dir), "--output-root", str(tmp_path / "outputs")],
+            [
+                "status",
+                "--json",
+                "--data-dir",
+                str(data_dir),
+                "--output-root",
+                str(tmp_path / "outputs"),
+            ],
         )
 
         payload = json.loads(result.output)
         assert set(payload.keys()) == {"status", "assets", "recipe_outputs", "guidance", "issues"}
         assert set(payload["assets"].keys()) == {
-            "boundaries", "census", "crosswalks", "pit", "metro", "msa", "measures", "acs", "zori", "laus",
+            "boundaries", "census", "crosswalks", "pit", "metro",
+            "msa", "measures", "acs", "zori", "laus",
         }
 
     def test_status_json_warns_on_partial_msa_artifacts(self, tmp_path):
@@ -263,7 +281,14 @@ class TestStatusJSON:
 
         result = runner.invoke(
             app,
-            ["status", "--json", "--data-dir", str(data_dir), "--output-root", str(tmp_path / "outputs")],
+            [
+                "status",
+                "--json",
+                "--data-dir",
+                str(data_dir),
+                "--output-root",
+                str(tmp_path / "outputs"),
+            ],
         )
 
         payload = json.loads(result.output)
@@ -285,14 +310,24 @@ class TestStatusJSON:
 
         result = runner.invoke(
             app,
-            ["status", "--json", "--data-dir", str(data_dir), "--output-root", str(tmp_path / "outputs")],
+            [
+                "status",
+                "--json",
+                "--data-dir",
+                str(data_dir),
+                "--output-root",
+                str(tmp_path / "outputs"),
+            ],
         )
 
         payload = json.loads(result.output)
         metro_issues = [issue for issue in payload["issues"] if issue["area"] == "metro"]
         assert metro_issues
         assert any("missing coc membership" in issue["message"].lower() for issue in metro_issues)
-        assert any("missing county membership" in issue["message"].lower() for issue in metro_issues)
+        assert any(
+            "missing county membership" in issue["message"].lower()
+            for issue in metro_issues
+        )
         assert any("missing boundary polygon" in issue["message"].lower() for issue in metro_issues)
 
     def test_status_json_ignores_empty_output_namespaces(self, tmp_path):
@@ -335,7 +370,14 @@ class TestPitDeduplication:
 
         result = runner.invoke(
             app,
-            ["status", "--json", "--data-dir", str(data_dir), "--output-root", str(tmp_path / "outputs")],
+            [
+                "status",
+                "--json",
+                "--data-dir",
+                str(data_dir),
+                "--output-root",
+                str(tmp_path / "outputs"),
+            ],
         )
 
         assert result.exit_code == 0
@@ -380,7 +422,14 @@ class TestLausScan:
 
         result = runner.invoke(
             app,
-            ["status", "--json", "--data-dir", str(data_dir), "--output-root", str(tmp_path / "outputs")],
+            [
+                "status",
+                "--json",
+                "--data-dir",
+                str(data_dir),
+                "--output-root",
+                str(tmp_path / "outputs"),
+            ],
         )
 
         payload = json.loads(result.output)
@@ -397,7 +446,14 @@ class TestLausScan:
 
         result = runner.invoke(
             app,
-            ["status", "--json", "--data-dir", str(data_dir), "--output-root", str(tmp_path / "outputs")],
+            [
+                "status",
+                "--json",
+                "--data-dir",
+                str(data_dir),
+                "--output-root",
+                str(tmp_path / "outputs"),
+            ],
         )
 
         payload = json.loads(result.output)
@@ -413,7 +469,14 @@ class TestLausScan:
 
         result = runner.invoke(
             app,
-            ["status", "--json", "--data-dir", str(data_dir), "--output-root", str(tmp_path / "outputs")],
+            [
+                "status",
+                "--json",
+                "--data-dir",
+                str(data_dir),
+                "--output-root",
+                str(tmp_path / "outputs"),
+            ],
         )
 
         payload = json.loads(result.output)
@@ -432,7 +495,14 @@ class TestLausScan:
 
         result = runner.invoke(
             app,
-            ["status", "--json", "--data-dir", str(data_dir), "--output-root", str(tmp_path / "outputs")],
+            [
+                "status",
+                "--json",
+                "--data-dir",
+                str(data_dir),
+                "--output-root",
+                str(tmp_path / "outputs"),
+            ],
         )
 
         payload = json.loads(result.output)

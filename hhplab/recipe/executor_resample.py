@@ -49,7 +49,7 @@ _XWALK_NON_GEO_COLS: set[str] = {
     "intersection_area", "tract_area", "county_area", "coc_area", "geo_area",
     "boundary_vintage", "tract_vintage", "definition_version",
     "cbsa_code", "county_vintage", "allocation_method", "share_column",
-    "share_denominator", "allocation_share", "intersection_area",
+    "share_denominator", "allocation_share",
     "intersecting_county_count", "intersecting_county_fips",
 }
 

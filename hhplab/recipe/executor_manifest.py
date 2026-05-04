@@ -152,9 +152,12 @@ def _resolve_panel_output_file(
 ) -> Path:
     """Return the canonical panel parquet path for a pipeline."""
     _, target = _resolve_pipeline_target(recipe, pipeline_id)
-    target_geo_type, boundary_vintage, definition_version, profile_definition_version = _target_geometry_metadata(
-        target.geometry,
-    )
+    (
+        target_geo_type,
+        boundary_vintage,
+        definition_version,
+        profile_definition_version,
+    ) = _target_geometry_metadata(target.geometry)
 
     if target_geo_type in {"metro", "msa"} and definition_version is None:
         raise ExecutorError(
@@ -188,9 +191,12 @@ def _resolve_map_output_file(
 ) -> Path:
     """Return the canonical HTML map path for a pipeline."""
     _, target = _resolve_pipeline_target(recipe, pipeline_id)
-    target_geo_type, boundary_vintage, definition_version, profile_definition_version = _target_geometry_metadata(
-        target.geometry,
-    )
+    (
+        target_geo_type,
+        boundary_vintage,
+        definition_version,
+        profile_definition_version,
+    ) = _target_geometry_metadata(target.geometry)
 
     if target_geo_type in {"metro", "msa"} and definition_version is None:
         raise ExecutorError(

@@ -10,8 +10,8 @@ including:
 
 from __future__ import annotations
 
-from pathlib import Path
 import warnings
+from pathlib import Path
 
 import geopandas as gpd
 import pandas as pd

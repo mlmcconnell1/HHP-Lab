@@ -7,8 +7,14 @@ import pandas as pd
 import pytest
 from shapely.geometry import Polygon
 
+from hhplab.recipe.recipe_schema import (
+    GeometryRef,
+    MapLayerSpec,
+    MapSpec,
+    MapViewportSpec,
+    TargetSpec,
+)
 from hhplab.registry import register_vintage
-from hhplab.recipe.recipe_schema import GeometryRef, MapLayerSpec, MapSpec, MapViewportSpec, TargetSpec
 from hhplab.viz import render_coc_map, render_recipe_map
 from hhplab.viz.map_folium import (
     DISTINCT_FILL_PALETTE,

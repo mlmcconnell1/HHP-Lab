@@ -512,7 +512,9 @@ class TestIngestTractPopulation:
         assert result_path == cached_path
 
     @pytest.mark.httpx_mock(can_send_already_matched_responses=True)
-    def test_refreshes_stale_translated_cache_without_force(self, httpx_mock, tmp_path, monkeypatch):
+    def test_refreshes_stale_translated_cache_without_force(
+        self, httpx_mock, tmp_path, monkeypatch,
+    ):
         """Translated-target caches without translation provenance must be rebuilt."""
         cached_path = tmp_path / "acs5_tracts__A2019xT2020.parquet"
         cached_df = pd.DataFrame(

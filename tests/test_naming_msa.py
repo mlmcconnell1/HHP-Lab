@@ -4,13 +4,13 @@ from hhplab.naming import (
     geo_panel_filename,
     msa_boundaries_filename,
     msa_boundaries_path,
-    msa_pit_filename,
     msa_coc_xwalk_filename,
     msa_coc_xwalk_path,
     msa_county_membership_filename,
     msa_county_membership_path,
     msa_definitions_filename,
     msa_definitions_path,
+    msa_pit_filename,
 )
 
 

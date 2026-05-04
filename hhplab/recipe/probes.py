@@ -9,9 +9,9 @@ primitives so validation logic stays in one place.
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from pathlib import Path
-import re
 
 import pandas as pd
 import pyarrow.parquet as pq
@@ -469,7 +469,7 @@ def probe_transform_path(
                 if base_ref.vintage is not None:
                     prereq_paths.append(tract_path(base_ref.vintage, data_root))
         else:
-            from hhplab.naming import msa_county_membership_path, metro_subset_membership_path
+            from hhplab.naming import metro_subset_membership_path, msa_county_membership_path
 
             metro_definition_version = metro_ref.resolved_metro_definition_version()
             if metro_definition_version is not None:

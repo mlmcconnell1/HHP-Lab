@@ -347,7 +347,7 @@ def recipe_cmd(
                 if len(pipeline_items) == 1:
                     payload["artifacts"] = pipeline_items[0]["artifacts"]
             _json_out(payload)
-            raise typer.Exit(code=1)
+            raise typer.Exit(code=1) from None
         typer.echo(f"\nExecution error: {exc}", err=True)
         raise typer.Exit(code=1) from exc
 

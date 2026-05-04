@@ -42,8 +42,8 @@ from pathlib import Path
 
 import httpx
 import pandas as pd
-import hhplab.naming as naming
 
+import hhplab.naming as naming
 from hhplab.acs.translate import (
     get_source_tract_vintage,
     needs_translation,
