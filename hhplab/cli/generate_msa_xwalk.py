@@ -8,7 +8,7 @@ import geopandas as gpd
 import typer
 
 from hhplab.geo.io import resolve_curated_boundary_path
-from hhplab.msa.definitions import DEFINITION_VERSION
+from hhplab.msa.definitions import DEFINITION_VERSION, DELINEATION_FILE_YEAR
 from hhplab.naming import county_path, msa_coc_xwalk_path
 from hhplab.registry.registry import latest_vintage, list_boundaries
 
@@ -50,7 +50,7 @@ def generate_msa_xwalk(
             "-c",
             help="County geometry vintage used to derive MSA overlaps.",
         ),
-    ] = 2023,
+    ] = DELINEATION_FILE_YEAR,
     definition_version: Annotated[
         str,
         typer.Option(
@@ -78,7 +78,7 @@ def generate_msa_xwalk(
     import json
 
     from hhplab.msa.crosswalk import (
-        ALLOCATION_SHARE_TOLERANCE,
+        FULL_ALLOCATION_THRESHOLD,
         build_coc_msa_crosswalk,
         save_coc_msa_crosswalk,
         summarize_coc_msa_allocation,
@@ -181,7 +181,7 @@ def generate_msa_xwalk(
     )
     allocation_summary = summarize_coc_msa_allocation(crosswalk)
     partial_allocations = int(
-        (allocation_summary["allocation_share_sum"] < 1.0 - ALLOCATION_SHARE_TOLERANCE).sum()
+        (allocation_summary["allocation_share_sum"] < FULL_ALLOCATION_THRESHOLD).sum()
     )
     max_unallocated = (
         float(allocation_summary["unallocated_share"].max())

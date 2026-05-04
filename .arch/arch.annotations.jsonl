@@ -34,7 +34,6 @@
 {"id":"el:file-audit-panels-py-3wcnzn68yx6b","summary":"Frozen panel builder for the Glynn-Fox claims audit.","ai":{"architectural_layer":"analytics","confidence":0.95}}
 {"id":"el:file-bls-laus-py-h6xnjeg3s40h","summary":"BLS LAUS yearly metro ingest.","ai":{"architectural_layer":"source","confidence":0.95}}
 {"id":"el:file-build-xwalks-py-031s703fgx0z","summary":"CLI command for building CoC crosswalks.","ai":{"architectural_layer":"cli","confidence":0.95}}
-{"id":"el:file-builds-py-w8yzty9rw8d0","summary":"Helpers for named build directories.","ai":{"architectural_layer":"domain","confidence":0.95}}
 {"id":"el:file-cache-py-amqrcmvcfa4m","summary":"Recipe-level asset caching.","ai":{"architectural_layer":"application","confidence":0.95}}
 {"id":"el:file-compare-vintages-py-cfsptmwfj1a3","summary":"CLI command for comparing CoC boundaries between two vintages.","ai":{"architectural_layer":"cli","confidence":0.95}}
 {"id":"el:file-config-py-9xzmjy0khn6w","summary":"Runtime configuration with layered precedence for storage roots.","ai":{"architectural_layer":"domain","confidence":0.95}}

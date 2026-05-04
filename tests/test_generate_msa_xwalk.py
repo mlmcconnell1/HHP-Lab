@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import inspect
 from pathlib import Path
 import warnings
 
@@ -11,8 +12,10 @@ import pandas as pd
 from shapely.geometry import box
 from typer.testing import CliRunner
 
+from hhplab.cli.generate_msa_xwalk import generate_msa_xwalk
 from hhplab.cli.main import app
 from hhplab.msa.crosswalk import ALLOCATION_SHARE_TOLERANCE
+from hhplab.msa.definitions import DELINEATION_FILE_YEAR
 from hhplab.registry.schema import RegistryEntry
 
 runner = CliRunner()
@@ -148,6 +151,12 @@ def test_generate_msa_xwalk_uses_shared_partial_allocation_tolerance(
     assert result.exit_code == 0
     payload = json.loads(result.stdout)
     assert payload["partially_allocated_cocs"] == 1
+
+
+def test_generate_msa_xwalk_uses_shared_county_default_year():
+    counties_param = inspect.signature(generate_msa_xwalk).parameters["counties"]
+
+    assert counties_param.default == DELINEATION_FILE_YEAR
 
 
 def test_generate_msa_xwalk_missing_membership_is_actionable(monkeypatch, tmp_path: Path):

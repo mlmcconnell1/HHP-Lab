@@ -38,6 +38,9 @@ COC_MSA_CROSSWALK_COLUMNS: tuple[str, ...] = (
 #: Numerical tolerance for validating CoC-to-MSA allocation shares and totals.
 ALLOCATION_SHARE_TOLERANCE = 1e-6
 
+#: Allocation totals below this threshold are treated as materially partial.
+FULL_ALLOCATION_THRESHOLD = 1.0 - ALLOCATION_SHARE_TOLERANCE
+
 logger = logging.getLogger(__name__)
 
 

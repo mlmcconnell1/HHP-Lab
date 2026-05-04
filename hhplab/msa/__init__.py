@@ -10,6 +10,7 @@ from hhplab.msa.boundaries import (
 from hhplab.msa.crosswalk import (
     ALLOCATION_SHARE_TOLERANCE,
     COC_MSA_CROSSWALK_COLUMNS,
+    FULL_ALLOCATION_THRESHOLD,
     build_coc_msa_crosswalk,
     read_coc_msa_crosswalk,
     save_coc_msa_crosswalk,
@@ -44,6 +45,7 @@ __all__ = [
     "COC_MSA_CROSSWALK_COLUMNS",
     "DEFINITION_VERSION",
     "DELINEATION_FILE_YEAR",
+    "FULL_ALLOCATION_THRESHOLD",
     "MSA_AREA_TYPE",
     "SOURCE_NAME",
     "SOURCE_REF",
