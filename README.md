@@ -11,13 +11,15 @@ The project started as CoC boundary infrastructure, but it now supports three
 analysis geography families:
 
 - `coc`: HUD Continuum of Care geographies with explicit boundary vintages
-- `metro`: synthetic researcher-defined metro geographies keyed by a `definition_version`
+- `metro`: canonical Census metro-universe geographies keyed by a `definition_version`, with optional subset-profile metadata layered on top
 - `msa`: Census Metropolitan Statistical Areas keyed by 5-digit CBSA/MSA identifiers plus a delineation `definition_version`
 
-The current `metro` implementation includes the 25 Glynn/Fox metros from
-*Dynamics of Homelessness in Urban America* via `glynn_fox_v1`. The `msa`
-surface is separate and uses official Census delineations such as
-`census_msa_2023`.
+The current metro-universe implementation uses official Census delineations
+such as `census_msa_2023` as the canonical `metro` surface. The 25 Glynn/Fox
+metros from *Dynamics of Homelessness in Urban America* now live as a subset
+profile (`glynn_fox` / `glynn_fox_v1`) over that universe. The `msa` surface
+remains separate and uses the same official delineations keyed explicitly as
+MSAs / CBSAs.
 
 Full operational documentation lives in [manual-obsidian/HHP-Lab-Manual.md](manual-obsidian/HHP-Lab-Manual.md).
 
@@ -155,12 +157,42 @@ Use the three geography families differently:
 | Geography | Choose it when | Primary identifier | Common artifact family |
 | --- | --- | --- | --- |
 | `coc` | You want official HUD CoC units with explicit boundary vintages. | `coc_id` | `coc__B...`, `panel__Y...@B...` |
-| `metro` | You want the project’s custom Glynn/Fox metros. | `metro_id` + `definition_version` | `metro_definitions__...`, `panel__metro__...` |
+| `metro` | You want the canonical Census metro universe, optionally filtered to a named subset profile such as Glynn/Fox. | `metro_id` + `definition_version` | `metro_universe__...`, `metro_subset_membership__...`, `panel__metro__...` |
 | `msa` | You want official Census MSAs / CBSAs. | `msa_id` + `definition_version` | `msa_definitions__...`, `pit__msa__...`, `panel__msa__...` |
 
-`metro` and `msa` are intentionally separate. A custom metro recipe should use
-`metro_id`; a Census MSA recipe should use `msa_id`. Do not treat one as a
+`metro` and `msa` are intentionally separate. Use `metro` when you want the
+project's metro analysis surface, either as the full canonical universe or as a
+declared subset profile over that universe. Use `msa` when you want official
+Census MSA / CBSA outputs keyed directly by `msa_id`. Do not treat one as a
 renamed version of the other.
+
+For new metro recipes:
+
+- Use `geometry: { type: metro, source: census_msa_2023 }` for the full
+  canonical metro universe.
+- Add `subset_profile: glynn_fox` and
+  `subset_profile_definition_version: glynn_fox_v1` when you want the
+  historical 25-metro Glynn/Fox slice.
+- Treat legacy `geometry: { type: metro, source: glynn_fox_v1 }` as a
+  compatibility shim. Runtime execution resolves it through the canonical metro
+  universe plus the Glynn/Fox subset profile, but contributors should prefer
+  the explicit subset form in new docs and recipes.
+
+Remaining compatibility shims are intentionally narrow:
+
+- legacy metro recipe inputs may still use `source: glynn_fox_v1`
+- legacy metro artifact families such as `metro_definitions__glynn_fox_v1` and
+  `metro_county_membership__glynn_fox_v1` still exist for regression coverage
+  and migration safety
+
+Removal path:
+
+- keep the shim while committed recipes, examples, and downstream users still
+  depend on the legacy form
+- prove parity between legacy Glynn/Fox outputs and explicit subset-derived
+  canonical outputs in regression tests
+- drop the legacy syntax only after the committed recipes and migration docs no
+  longer require it
 
 The repository includes committed examples for all three surfaces under
 [recipes/examples](recipes/examples/README.md). For the MSA-specific workflow,

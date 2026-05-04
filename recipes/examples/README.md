@@ -22,9 +22,9 @@ the output downstream.
   Use `coc-base-pit-acs-zori-2016-2021.yaml`, then filter the built panel on
   `year == 2021` and keep the 50 largest `population` values.
 - Requested idea: 25 smallest metros with at least 1M population and ACS income, 2019-2025
-  Use `metro-glynnfox-acs-income-2019-2025.yaml`. The current metro example
-  set uses the fixed 25 Glynn/Fox metros, so downstream ranking happens after
-  the panel is built.
+  Use `metro-glynnfox-acs-income-2019-2025.yaml`. That example still uses the
+  historical Glynn/Fox cohort, which is now a subset profile over the canonical
+  metro universe, so downstream ranking happens after the panel is built.
 
 ## Recipes
 
@@ -37,8 +37,9 @@ the output downstream.
 - `coc-pep-zori-calendar-2020-2024.yaml`
   County-driven CoC panel using PEP population plus calendar-mean ZORI.
 - `metro-glynnfox-acs-income-2019-2025.yaml`
-  ACS-only metro panel for the 25 Glynn/Fox metros. Good for long ACS-only
-  spans that extend beyond PIT coverage.
+  ACS-only metro panel for the 25 Glynn/Fox metros. Treat this as a
+  compatibility-profile example over the canonical metro universe. Good for
+  long ACS-only spans that extend beyond PIT coverage.
 - `metro-glynnfox-pit-acs-pep-zori-2016-2024.yaml`
   Full-feature metro panel that combines all major crosswalk-based inputs.
 - `metro-glynnfox-pit-pep-2011-2014.yaml`
@@ -52,7 +53,15 @@ the output downstream.
 
 ## Geography Notes
 
-- Use `metro` for the custom Glynn/Fox metro definition.
+- Use `metro` for the project's metro analysis surface.
+- For new recipes, use `geometry: { type: metro, source: census_msa_2023 }`
+  when you want the full canonical metro universe.
+- Add `subset_profile: glynn_fox` and
+  `subset_profile_definition_version: glynn_fox_v1` when you want the
+  historical 25-metro Glynn/Fox subset over that universe.
+- Existing examples that still say `source: glynn_fox_v1` are compatibility
+  examples. Runtime execution resolves them through the canonical metro
+  universe plus the Glynn/Fox subset profile.
 - Use `msa` for official Census delineations keyed by `msa_id` / CBSA code.
 - Map targets use the same geometry ids plus a `map_spec.layers[*].selector_ids`
   list. CoC layers need curated CoC boundaries, MSA layers need

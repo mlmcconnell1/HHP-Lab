@@ -1586,6 +1586,67 @@ def _setup_curated_metro_universe_subset_artifacts(tmp_path: Path) -> None:
     ).to_parquet(msa_county_path)
 
 
+def _county_to_metro_recipe(
+    *,
+    name: str,
+    target_geometry: dict[str, object],
+    to_geometry: dict[str, object],
+) -> dict[str, object]:
+    """Build a minimal county-to-metro recipe for legacy/subset parity tests."""
+    return {
+        "version": 1,
+        "name": name,
+        "universe": {"range": "2020-2021"},
+        "targets": [
+            {
+                "id": "metro_panel",
+                "geometry": target_geometry,
+            }
+        ],
+        "datasets": {
+            "pep_county": {
+                "provider": "census",
+                "product": "pep",
+                "version": 1,
+                "native_geometry": {"type": "county", "vintage": 2020, "source": "tiger"},
+                "years": "2020-2021",
+                "year_column": "year",
+                "geo_column": "county_fips",
+                "path": "data/county_population.parquet",
+            }
+        },
+        "transforms": [
+            {
+                "id": "county_to_metro",
+                "type": "crosswalk",
+                "from": {"type": "county", "vintage": 2020, "source": "tiger"},
+                "to": to_geometry,
+                "spec": {"weighting": {"scheme": "area"}},
+            }
+        ],
+        "pipelines": [
+            {
+                "id": "build_metro_panel",
+                "target": "metro_panel",
+                "steps": [
+                    {"materialize": {"transforms": ["county_to_metro"]}},
+                    {
+                        "resample": {
+                            "dataset": "pep_county",
+                            "to_geometry": to_geometry,
+                            "method": "aggregate",
+                            "via": "county_to_metro",
+                            "measures": ["population"],
+                            "aggregation": "sum",
+                        }
+                    },
+                    {"join": {"datasets": ["pep_county"], "join_on": ["geo_id", "year"]}},
+                ],
+            }
+        ],
+    }
+
+
 class TestExecutor:
 
     def test_execute_recipe_returns_results(self, tmp_path: Path):
@@ -1935,6 +1996,81 @@ class TestExecutor:
         assert (panel["geo_type"] == "metro").all()
         assert list(panel["metro_id"]) == ["GF01", "GF01", "GF02", "GF02"]
         assert (panel["definition_version_used"] == "glynn_fox_v1").all()
+
+    def test_execute_recipe_explicit_subset_matches_legacy_glynn_fox_outputs(
+        self, tmp_path: Path,
+    ):
+        _setup_curated_metro_artifacts(tmp_path)
+        _setup_curated_metro_universe_subset_artifacts(tmp_path)
+        pd.DataFrame(
+            {
+                "county_fips": ["36061", "06037", "36061", "06037"],
+                "year": [2020, 2020, 2021, 2021],
+                "population": [1000, 2000, 1100, 2100],
+            }
+        ).to_parquet(tmp_path / "data" / "county_population.parquet")
+
+        legacy_recipe = load_recipe(
+            _county_to_metro_recipe(
+                name="legacy-glynn-fox",
+                target_geometry={"type": "metro", "source": "glynn_fox_v1"},
+                to_geometry={"type": "metro", "source": "glynn_fox_v1"},
+            )
+        )
+        subset_recipe = load_recipe(
+            _county_to_metro_recipe(
+                name="canonical-subset-glynn-fox",
+                target_geometry={
+                    "type": "metro",
+                    "source": "census_msa_2023",
+                    "subset_profile": "glynn_fox",
+                    "subset_profile_definition_version": "glynn_fox_v1",
+                },
+                to_geometry={
+                    "type": "metro",
+                    "source": "census_msa_2023",
+                    "subset_profile": "glynn_fox",
+                    "subset_profile_definition_version": "glynn_fox_v1",
+                },
+            )
+        )
+
+        legacy_results = execute_recipe(legacy_recipe, project_root=tmp_path)
+        subset_results = execute_recipe(subset_recipe, project_root=tmp_path)
+
+        assert legacy_results[0].success
+        assert subset_results[0].success
+
+        legacy_panel_path = next(
+            _default_recipe_output_dir(tmp_path, "legacy-glynn-fox").glob("panel__metro__*.parquet")
+        )
+        subset_panel_path = next(
+            _default_recipe_output_dir(tmp_path, "canonical-subset-glynn-fox").glob("panel__metro__*.parquet")
+        )
+        legacy_panel = pd.read_parquet(legacy_panel_path).sort_values(["metro_id", "year"]).reset_index(drop=True)
+        subset_panel = pd.read_parquet(subset_panel_path).sort_values(["profile_metro_id", "year"]).reset_index(drop=True)
+
+        assert list(subset_panel["metro_id"]) == ["35620", "35620", "31080", "31080"]
+        assert list(subset_panel["geo_id"]) == ["35620", "35620", "31080", "31080"]
+        assert list(subset_panel["profile_metro_id"]) == ["GF01", "GF01", "GF02", "GF02"]
+
+        legacy_projection = legacy_panel[["metro_id", "year", "population"]].rename(
+            columns={"metro_id": "profile_metro_id"}
+        )
+        subset_projection = subset_panel[["profile_metro_id", "year", "population"]]
+        pd.testing.assert_frame_equal(legacy_projection, subset_projection, check_dtype=False)
+
+        subset_canonical_names = subset_panel[["profile_metro_id", "metro_name"]].drop_duplicates().sort_values(
+            "profile_metro_id"
+        ).reset_index(drop=True)
+        assert list(subset_canonical_names["metro_name"]) == [
+            "New York-Newark-Jersey City, NY-NJ-PA",
+            "Los Angeles-Long Beach-Anaheim, CA",
+        ]
+        subset_profile_names = subset_panel[["profile_metro_id", "profile_metro_name"]].drop_duplicates().sort_values(
+            "profile_metro_id"
+        ).reset_index(drop=True)
+        assert list(subset_profile_names["profile_metro_name"]) == ["New York", "Los Angeles"]
 
 
 class TestTargetOutputsEnforcement:
