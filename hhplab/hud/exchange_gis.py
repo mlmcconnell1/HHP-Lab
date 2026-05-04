@@ -55,12 +55,61 @@ HUD_EXCHANGE_STATE_SHAPEFILE_TEMPLATE = HUD_EXCHANGE_COC_STATE_SHAPEFILE_TEMPLAT
 # State/territory abbreviations used by HUD Exchange per-state shapefiles.
 # Covers all 50 states, DC, and the five populated US territories.
 _HUD_STATE_ABBREVIATIONS = [
-    "AK", "AL", "AR", "AZ", "CA", "CO", "CT", "DC", "DE", "FL",
-    "GA", "GU", "HI", "IA", "ID", "IL", "IN", "KS", "KY", "LA",
-    "MA", "MD", "ME", "MI", "MN", "MO", "MP", "MS", "MT", "NC",
-    "ND", "NE", "NH", "NJ", "NM", "NV", "NY", "OH", "OK", "OR",
-    "PA", "PR", "RI", "SC", "SD", "TN", "TX", "UT", "VA", "VI",
-    "VT", "WA", "WI", "WV", "WY",
+    "AK",
+    "AL",
+    "AR",
+    "AZ",
+    "CA",
+    "CO",
+    "CT",
+    "DC",
+    "DE",
+    "FL",
+    "GA",
+    "GU",
+    "HI",
+    "IA",
+    "ID",
+    "IL",
+    "IN",
+    "KS",
+    "KY",
+    "LA",
+    "MA",
+    "MD",
+    "ME",
+    "MI",
+    "MN",
+    "MO",
+    "MP",
+    "MS",
+    "MT",
+    "NC",
+    "ND",
+    "NE",
+    "NH",
+    "NJ",
+    "NM",
+    "NV",
+    "NY",
+    "OH",
+    "OK",
+    "OR",
+    "PA",
+    "PR",
+    "RI",
+    "SC",
+    "SD",
+    "TN",
+    "TX",
+    "UT",
+    "VA",
+    "VI",
+    "VT",
+    "WA",
+    "WI",
+    "WV",
+    "WY",
 ]
 
 # Pagination settings for ArcGIS API
@@ -551,9 +600,7 @@ def download_hud_exchange_gdb(
         )
         if result is not None:
             return result
-        raise RuntimeError(
-            f"Download from explicit URL failed: {url}"
-        )
+        raise RuntimeError(f"Download from explicit URL failed: {url}")
 
     # --- Fallback chain ---
     urls_tried: list[str] = []
@@ -593,7 +640,8 @@ def download_hud_exchange_gdb(
     # 3. Per-state shapefiles
     urls_tried.append(
         HUD_EXCHANGE_STATE_SHAPEFILE_TEMPLATE.format(
-            state="<STATE>", vintage=boundary_vintage,
+            state="<STATE>",
+            vintage=boundary_vintage,
         )
     )
     result = _download_per_state_shapefiles(boundary_vintage, output_dir)
@@ -606,9 +654,12 @@ def download_hud_exchange_gdb(
         + "\n".join(f"  - {u}" for u in urls_tried)
         + "\n\nYou can manually download boundary data from:\n"
         f"  National:   {national_url}\n"
-        f"  Per-state:  {HUD_EXCHANGE_STATE_SHAPEFILE_TEMPLATE.format(
-            state='<ST>', vintage=boundary_vintage,
-        )}"
+        f"  Per-state:  {
+            HUD_EXCHANGE_STATE_SHAPEFILE_TEMPLATE.format(
+                state='<ST>',
+                vintage=boundary_vintage,
+            )
+        }"
     )
 
 

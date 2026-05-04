@@ -131,9 +131,7 @@ def _features_to_geodataframe(features: list[dict[str, Any]]) -> gpd.GeoDataFram
             null_count += 1
 
     if null_count:
-        logger.warning(
-            f"Dropped {null_count} of {len(features)} features with null geometry"
-        )
+        logger.warning(f"Dropped {null_count} of {len(features)} features with null geometry")
 
     gdf = gpd.GeoDataFrame(records, geometry=geometries, crs="EPSG:4326")
     return gdf

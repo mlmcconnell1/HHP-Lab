@@ -8,7 +8,7 @@ import geopandas as gpd
 import httpx
 import pytest
 
-from hhplab.ingest.hud_opendata_arcgis import (
+from hhplab.hud.opendata_arcgis import (
     FEATURE_SERVICE_URL,
     PAGE_SIZE,
     _features_to_geodataframe,

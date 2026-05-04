@@ -95,7 +95,6 @@
 {"id":"el:file-init-py-mzsrepddc2cy","summary":"HHP-Lab - Continuum of Care boundary data infrastructure.","ai":{"architectural_layer":"domain","confidence":0.95}}
 {"id":"el:file-init-py-ph7f3r94scy9","summary":"Census geometry and tract-relationship entrypoints.","ai":{"architectural_layer":"domain","confidence":0.95}}
 {"id":"el:file-init-py-pt1m3tt9tpe5","summary":"Measures from ACS and other data sources.","ai":{"architectural_layer":"analytics","confidence":0.95}}
-{"id":"el:file-init-py-pxhxw5vmrcsd","summary":"Compatibility entrypoints for legacy generic ingest imports.","ai":{"architectural_layer":"source","confidence":0.95}}
 {"id":"el:file-init-py-qxrd5rxj8my6","summary":"BLS source helpers and metro-native LAUS workflows.","ai":{"architectural_layer":"source","confidence":0.95}}
 {"id":"el:file-init-py-tcfsgsfcytrz","summary":"PIT (Point-in-Time) homelessness count data processing.","ai":{"architectural_layer":"domain","confidence":0.95}}
 {"id":"el:file-init-py-xeks31ww85th","summary":"PIT data ingestion and parsing modules.","ai":{"architectural_layer":"source","confidence":0.95}}
@@ -167,7 +166,6 @@
 {"id":"el:package-cli-te4eyc2pcar3","summary":"Typer CLI package exposing the project's ingest, aggregation, validation, diagnostics, and recipe workflow commands.","ai":{"architectural_layer":"cli","confidence":0.95}}
 {"id":"el:package-geo-ay4bdrd68rmr","summary":"Shared CoC geography package for normalization, validation, GeoParquet I/O, and Connecticut planning-region helpers.","ai":{"architectural_layer":"domain","confidence":0.95}}
 {"id":"el:package-hud-nk3ak3k20w5d","summary":"HUD source entrypoint package for CoC boundary ingest workflows.","ai":{"architectural_layer":"source","confidence":0.95}}
-{"id":"el:package-ingest-gsfyhvxcj7cp","summary":"Legacy-compatible source-ingest package for BLS and HUD raw data acquisition helpers.","ai":{"architectural_layer":"source","confidence":0.95}}
 {"id":"el:package-measures-7g5nrmrjgmk3","summary":"Measures compatibility package for legacy ACS measure imports and crosswalk attribution diagnostics.","ai":{"architectural_layer":"analytics","confidence":0.95}}
 {"id":"el:package-metro-j0spgbja8e3q","summary":"Shared metro package for curated definitions, boundary artifacts, validation, and metro-level ACS, PIT, PEP, LAUS, and ZORI aggregation helpers.","ai":{"architectural_layer":"domain","confidence":0.95}}
 {"id":"el:package-nhgis-d0hc5a3s9rsp","summary":"NHGIS ingest package for tract and county geometry acquisition workflows.","ai":{"architectural_layer":"ingest","confidence":0.95}}

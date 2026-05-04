@@ -2,8 +2,8 @@
 
 from hhplab import census, hud, nhgis, pit
 from hhplab.census.ingest import ingest_tiger_counties, ingest_tiger_tracts, load_tract_relationship
-from hhplab.ingest.hud_exchange_gis import ingest_hud_exchange
-from hhplab.ingest.hud_opendata_arcgis import ingest_hud_opendata
+from hhplab.hud.exchange_gis import ingest_hud_exchange
+from hhplab.hud.opendata_arcgis import ingest_hud_opendata
 from hhplab.nhgis.ingest import ingest_nhgis_counties, ingest_nhgis_tracts
 from hhplab.pit.ingest import download_pit_data, parse_pit_file
 from hhplab.pit.qa import validate_pit_data

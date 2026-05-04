@@ -10,7 +10,7 @@ average rows.
 
 Usage
 -----
-    from hhplab.ingest.bls_laus import ingest_laus_metro
+    from hhplab.bls.ingest_laus import ingest_laus_metro
 
     path = ingest_laus_metro(year=2023)
 
@@ -52,8 +52,8 @@ from pathlib import Path
 
 import httpx
 import pandas as pd
-import hhplab.naming as naming
 
+import hhplab.naming as naming
 from hhplab.bls.laus import (
     BLS_ANNUAL_AVERAGE_PERIOD,
     LAUS_MEASURE_CODES,
@@ -62,11 +62,13 @@ from hhplab.bls.laus import (
 )
 from hhplab.metro.definitions import (
     CANONICAL_UNIVERSE_DEFINITION_VERSION,
-    DEFINITION_VERSION as GLYNN_FOX_DEFINITION_VERSION,
     METRO_CBSA_MAPPING,
     METRO_STATE_FIPS,
     metro_name_for_id,
     principal_state_fips_for_metro_name,
+)
+from hhplab.metro.definitions import (
+    DEFINITION_VERSION as GLYNN_FOX_DEFINITION_VERSION,
 )
 from hhplab.metro.io import read_metro_subset_membership, read_metro_universe
 from hhplab.provenance import ProvenanceBlock, write_parquet_with_provenance
@@ -175,9 +177,7 @@ def _load_metro_targets(
     universe_df = read_metro_universe(definition_version, base_dir)[
         ["metro_id", "cbsa_code", "metro_name"]
     ].copy()
-    universe_df["state_fips"] = universe_df["metro_name"].map(
-        principal_state_fips_for_metro_name
-    )
+    universe_df["state_fips"] = universe_df["metro_name"].map(principal_state_fips_for_metro_name)
     return universe_df
 
 
@@ -270,9 +270,7 @@ def fetch_laus_annual_averages(
         if api_key:
             payload["registrationkey"] = api_key
 
-        logger.info(
-            "Fetching %d BLS LAUS series for year %d", len(batch), year
-        )
+        logger.info("Fetching %d BLS LAUS series for year %d", len(batch), year)
 
         with httpx.Client(timeout=60.0) as client:
             response = client.post(
@@ -288,9 +286,7 @@ def fetch_laus_annual_averages(
             msg = data.get("message", []) or []
             if _is_bls_quota_response(status, msg):
                 raise BlsQuotaExhausted(_bls_quota_message(has_api_key=has_api_key))
-            raise ValueError(
-                f"BLS API request failed (status={status!r}): {msg}"
-            )
+            raise ValueError(f"BLS API request failed (status={status!r}): {msg}")
 
         for series_data in data.get("Results", {}).get("series", []):
             sid = series_data["seriesID"]
@@ -301,9 +297,7 @@ def fetch_laus_annual_averages(
                         try:
                             results[sid] = float(raw)
                         except (ValueError, TypeError):
-                            logger.warning(
-                                "Cannot parse BLS value %r for series %s", raw, sid
-                            )
+                            logger.warning("Cannot parse BLS value %r for series %s", raw, sid)
 
     logger.info(
         "Retrieved annual-average values for %d of %d series",
@@ -358,9 +352,7 @@ def ingest_laus_metro(
     # Collect all series IDs in a stable order (metro ordering × measure ordering)
     measure_names = list(LAUS_MEASURE_CODES.keys())
     all_series_ids: list[str] = [
-        metro_series[mid][measure]
-        for mid in sorted(metro_series)
-        for measure in measure_names
+        metro_series[mid][measure] for mid in sorted(metro_series) for measure in measure_names
     ]
 
     # Fetch annual-average values from BLS API
@@ -405,7 +397,10 @@ def ingest_laus_metro(
     # rather than a legitimate data gap.  Writing a partial parquet silently
     # corrupts downstream panels.
     measure_cols = [
-        "unemployment_rate", "unemployed", "employed", "labor_force",
+        "unemployment_rate",
+        "unemployed",
+        "employed",
+        "labor_force",
     ]
     measure_cols_present = [c for c in measure_cols if c in df.columns]
     if measure_cols_present:
@@ -432,8 +427,7 @@ def ingest_laus_metro(
         partial_metros = df.loc[partial_null_mask, "metro_id"].tolist()
         if partial_metros:
             affected_measures = [
-                c for c in measure_cols_present
-                if df.loc[partial_null_mask, c].isna().any()
+                c for c in measure_cols_present if df.loc[partial_null_mask, c].isna().any()
             ]
             raise ValueError(
                 f"{len(partial_metros)} metro(s) have partial measure data in year {year}: "
@@ -449,9 +443,9 @@ def ingest_laus_metro(
             df[col] = pd.to_numeric(df[col], errors="coerce").astype("Int64")
 
     if "unemployment_rate" in df.columns:
-        df["unemployment_rate"] = pd.to_numeric(
-            df["unemployment_rate"], errors="coerce"
-        ).astype("Float64")
+        df["unemployment_rate"] = pd.to_numeric(df["unemployment_rate"], errors="coerce").astype(
+            "Float64"
+        )
 
     df["year"] = df["year"].astype(int)
     df["metro_id"] = df["metro_id"].astype(str)

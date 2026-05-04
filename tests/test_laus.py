@@ -31,14 +31,14 @@ from hhplab.bls import (
     build_all_series_ids,
     build_laus_series_id,
 )
-from hhplab.cli.ingest_laus_metro import ingest_laus_metro as ingest_laus_metro_cli
-from hhplab.ingest.bls_laus import (
+from hhplab.bls.ingest_laus import (
     BlsQuotaExhausted,
     _build_metro_series_map,
     _chunked,
     fetch_laus_annual_averages,
     ingest_laus_metro,
 )
+from hhplab.cli.ingest_laus_metro import ingest_laus_metro as ingest_laus_metro_cli
 from hhplab.metro.definitions import (
     CANONICAL_UNIVERSE_DEFINITION_VERSION,
     METRO_CBSA_MAPPING,
@@ -61,17 +61,17 @@ from hhplab.panel.conformance import (
 #: Used as the reference case to guard the BLS series ID format.
 NY_SERIES_IDS = {
     "unemployment_rate": "LAUMT363562000000003",
-    "unemployed":        "LAUMT363562000000004",
-    "employed":          "LAUMT363562000000005",
-    "labor_force":       "LAUMT363562000000006",
+    "unemployed": "LAUMT363562000000004",
+    "employed": "LAUMT363562000000005",
+    "labor_force": "LAUMT363562000000006",
 }
 
 #: Expected series IDs for Los Angeles (GF02, state_fips=06, cbsa=31080).
 LA_SERIES_IDS = {
     "unemployment_rate": "LAUMT063108000000003",
-    "unemployed":        "LAUMT063108000000004",
-    "employed":          "LAUMT063108000000005",
-    "labor_force":       "LAUMT063108000000006",
+    "unemployed": "LAUMT063108000000004",
+    "employed": "LAUMT063108000000005",
+    "labor_force": "LAUMT063108000000006",
 }
 
 #: Expected series ID for Washington DC (GF07, state_fips=11, cbsa=47900).
@@ -127,9 +127,7 @@ class TestLausSeriesIds:
             state_fips = METRO_STATE_FIPS[metro_id]
             for measure in LAUS_MEASURE_CODES:
                 sid = build_laus_series_id(cbsa, measure, state_fips)
-                assert len(sid) == 20, (
-                    f"Series ID for {metro_id}/{measure} is not 20 chars: {sid}"
-                )
+                assert len(sid) == 20, f"Series ID for {metro_id}/{measure} is not 20 chars: {sid}"
 
     def test_all_series_start_with_laumt(self):
         for metro_id, cbsa in list(METRO_CBSA_MAPPING.items())[:5]:
@@ -183,9 +181,7 @@ class TestMetroSeriesMap:
     def test_each_metro_has_four_measures(self):
         mapping = _build_metro_series_map()
         for metro_id, series in mapping.items():
-            assert set(series) == set(LAUS_MEASURE_CODES), (
-                f"Metro {metro_id} missing measures"
-            )
+            assert set(series) == set(LAUS_MEASURE_CODES), f"Metro {metro_id} missing measures"
 
     def test_series_ids_are_unique(self):
         mapping = _build_metro_series_map()
@@ -203,7 +199,7 @@ class TestMetroSeriesMap:
 
     def test_canonical_universe_series_map_uses_cbsa_ids(self, monkeypatch):
         monkeypatch.setattr(
-            "hhplab.ingest.bls_laus.read_metro_universe",
+            "hhplab.bls.ingest_laus.read_metro_universe",
             lambda definition_version, base_dir=None: build_canonical_metro_targets_fixture()[
                 ["metro_id", "cbsa_code", "metro_name"]
             ],
@@ -271,11 +267,8 @@ class TestFetchLausAnnualAverages:
         sid = NY_SERIES_IDS["unemployment_rate"]
         mock_response = _make_bls_response({sid: 4.2})
 
-        with patch("hhplab.ingest.bls_laus.httpx.Client") as mock_client:
-            post_rv = (
-                mock_client.return_value.__enter__.return_value
-                .post.return_value
-            )
+        with patch("hhplab.bls.ingest_laus.httpx.Client") as mock_client:
+            post_rv = mock_client.return_value.__enter__.return_value.post.return_value
             post_rv.json.return_value = mock_response
             post_rv.raise_for_status.return_value = None
 
@@ -299,11 +292,8 @@ class TestFetchLausAnnualAverages:
                 ]
             },
         }
-        with patch("hhplab.ingest.bls_laus.httpx.Client") as mock_client:
-            post_rv = (
-                mock_client.return_value.__enter__.return_value
-                .post.return_value
-            )
+        with patch("hhplab.bls.ingest_laus.httpx.Client") as mock_client:
+            post_rv = mock_client.return_value.__enter__.return_value.post.return_value
             post_rv.json.return_value = monthly_only_response
             post_rv.raise_for_status.return_value = None
 
@@ -316,11 +306,8 @@ class TestFetchLausAnnualAverages:
             "status": "REQUEST_FAILED",
             "message": ["Bad request"],
         }
-        with patch("hhplab.ingest.bls_laus.httpx.Client") as mock_client:
-            post_rv = (
-                mock_client.return_value.__enter__.return_value
-                .post.return_value
-            )
+        with patch("hhplab.bls.ingest_laus.httpx.Client") as mock_client:
+            post_rv = mock_client.return_value.__enter__.return_value.post.return_value
             post_rv.json.return_value = failed_response
             post_rv.raise_for_status.return_value = None
 
@@ -333,7 +320,7 @@ class TestFetchLausAnnualAverages:
         sids = [f"LAUMT36{i:05d}00000003" for i in range(60)]
         empty_response = {"status": "REQUEST_SUCCEEDED", "Results": {"series": []}}
 
-        with patch("hhplab.ingest.bls_laus.httpx.Client") as mock_client:
+        with patch("hhplab.bls.ingest_laus.httpx.Client") as mock_client:
             mock_post = mock_client.return_value.__enter__.return_value.post
             mock_post.return_value.json.return_value = empty_response
             mock_post.return_value.raise_for_status.return_value = None
@@ -348,7 +335,7 @@ class TestFetchLausAnnualAverages:
         sids = [f"LAUMT36{i:05d}00000003" for i in range(60)]
         empty_response = {"status": "REQUEST_SUCCEEDED", "Results": {"series": []}}
 
-        with patch("hhplab.ingest.bls_laus.httpx.Client") as mock_client:
+        with patch("hhplab.bls.ingest_laus.httpx.Client") as mock_client:
             mock_post = mock_client.return_value.__enter__.return_value.post
             mock_post.return_value.json.return_value = empty_response
             mock_post.return_value.raise_for_status.return_value = None
@@ -400,11 +387,8 @@ class TestBlsQuotaExhausted:
         quota_response = {"status": status, "message": message}
         sid = NY_SERIES_IDS["unemployment_rate"]
 
-        with patch("hhplab.ingest.bls_laus.httpx.Client") as mock_client:
-            post_rv = (
-                mock_client.return_value.__enter__.return_value
-                .post.return_value
-            )
+        with patch("hhplab.bls.ingest_laus.httpx.Client") as mock_client:
+            post_rv = mock_client.return_value.__enter__.return_value.post.return_value
             post_rv.json.return_value = quota_response
             post_rv.raise_for_status.return_value = None
 
@@ -424,11 +408,8 @@ class TestBlsQuotaExhausted:
         }
         sid = NY_SERIES_IDS["unemployment_rate"]
 
-        with patch("hhplab.ingest.bls_laus.httpx.Client") as mock_client:
-            post_rv = (
-                mock_client.return_value.__enter__.return_value
-                .post.return_value
-            )
+        with patch("hhplab.bls.ingest_laus.httpx.Client") as mock_client:
+            post_rv = mock_client.return_value.__enter__.return_value.post.return_value
             post_rv.json.return_value = quota_response
             post_rv.raise_for_status.return_value = None
 
@@ -450,11 +431,8 @@ class TestBlsQuotaExhausted:
         bad_request = {"status": "REQUEST_FAILED", "message": ["Invalid series id"]}
         sid = NY_SERIES_IDS["unemployment_rate"]
 
-        with patch("hhplab.ingest.bls_laus.httpx.Client") as mock_client:
-            post_rv = (
-                mock_client.return_value.__enter__.return_value
-                .post.return_value
-            )
+        with patch("hhplab.bls.ingest_laus.httpx.Client") as mock_client:
+            post_rv = mock_client.return_value.__enter__.return_value.post.return_value
             post_rv.json.return_value = bad_request
             post_rv.raise_for_status.return_value = None
 
@@ -548,7 +526,7 @@ def _mock_ingest(tmp_path: Path, year: int) -> Path:
 
         return FakeResp()
 
-    with patch("hhplab.ingest.bls_laus.httpx.Client") as mock_client:
+    with patch("hhplab.bls.ingest_laus.httpx.Client") as mock_client:
         mock_client.return_value.__enter__.return_value.post = mock_post
         return ingest_laus_metro(year=year, project_root=tmp_path)
 
@@ -565,8 +543,12 @@ class TestIngestLausMetro:
         path = _mock_ingest(tmp_path, 2022)
         df = pd.read_parquet(path)
         expected_cols = [
-            "metro_id", "year", "unemployment_rate",
-            "unemployed", "employed", "labor_force",
+            "metro_id",
+            "year",
+            "unemployment_rate",
+            "unemployed",
+            "employed",
+            "labor_force",
         ]
         for col in expected_cols:
             assert col in df.columns, f"Missing column: {col}"
@@ -595,13 +577,13 @@ class TestIngestLausMetro:
         response = _make_bls_response_for_targets(targets, year=2023)
 
         monkeypatch.setattr(
-            "hhplab.ingest.bls_laus.read_metro_universe",
+            "hhplab.bls.ingest_laus.read_metro_universe",
             lambda definition_version, base_dir=None: targets[
                 ["metro_id", "cbsa_code", "metro_name"]
             ],
         )
 
-        with patch("hhplab.ingest.bls_laus.httpx.Client") as mock_client:
+        with patch("hhplab.bls.ingest_laus.httpx.Client") as mock_client:
             mock_post = mock_client.return_value.__enter__.return_value.post
             mock_post.return_value.json.return_value = response
             mock_post.return_value.raise_for_status.return_value = None
@@ -634,7 +616,7 @@ class TestIngestLausMetro:
         """Ingest must fail fast rather than write an all-null parquet."""
         empty_response = {"status": "REQUEST_SUCCEEDED", "Results": {"series": []}}
 
-        with patch("hhplab.ingest.bls_laus.httpx.Client") as mock_client:
+        with patch("hhplab.bls.ingest_laus.httpx.Client") as mock_client:
             mock_post = mock_client.return_value.__enter__.return_value.post
             mock_post.return_value.json.return_value = empty_response
             mock_post.return_value.raise_for_status.return_value = None
@@ -651,7 +633,7 @@ class TestIngestLausMetro:
         The remaining 12 metros have all-null measures.
         Expected: ValueError — partial output must not be written silently.
         """
-        from hhplab.ingest.bls_laus import _build_metro_series_map
+        from hhplab.bls.ingest_laus import _build_metro_series_map
 
         # Build values for only the first 13 metros (sorted order)
         metro_series = _build_metro_series_map()
@@ -664,7 +646,7 @@ class TestIngestLausMetro:
         def _partial_fetch(series_ids, year, api_key=None):
             return {sid: v for sid, v in partial_values.items() if sid in series_ids}
 
-        with patch("hhplab.ingest.bls_laus.fetch_laus_annual_averages", _partial_fetch):
+        with patch("hhplab.bls.ingest_laus.fetch_laus_annual_averages", _partial_fetch):
             with pytest.raises(ValueError, match="metro\\(s\\) have no data for any measure"):
                 ingest_laus_metro(year=2023, project_root=tmp_path)
 
@@ -680,7 +662,7 @@ class TestIngestLausMetro:
         Expected: ValueError naming the missing measure.
         """
         from hhplab.bls import LAUS_MEASURE_CODES
-        from hhplab.ingest.bls_laus import _build_metro_series_map
+        from hhplab.bls.ingest_laus import _build_metro_series_map
 
         # Collect series IDs for every measure except unemployment_rate
         metro_series = _build_metro_series_map()
@@ -695,7 +677,7 @@ class TestIngestLausMetro:
         def _no_rate_fetch(series_ids, year, api_key=None):
             return {sid: v for sid, v in non_rate_values.items() if sid in series_ids}
 
-        with patch("hhplab.ingest.bls_laus.fetch_laus_annual_averages", _no_rate_fetch):
+        with patch("hhplab.bls.ingest_laus.fetch_laus_annual_averages", _no_rate_fetch):
             with pytest.raises(ValueError, match="unemployment_rate"):
                 ingest_laus_metro(year=2023, project_root=tmp_path)
 
@@ -711,7 +693,7 @@ class TestIngestLausMetro:
         written with a null rate.
         Expected: ValueError naming GF01 and unemployment_rate.
         """
-        from hhplab.ingest.bls_laus import _build_metro_series_map
+        from hhplab.bls.ingest_laus import _build_metro_series_map
 
         metro_series = _build_metro_series_map()
         skip_metro = sorted(metro_series)[0]  # GF01
@@ -728,7 +710,7 @@ class TestIngestLausMetro:
         def _one_missing_fetch(series_ids, year, api_key=None):
             return {sid: v for sid, v in all_values.items() if sid in series_ids}
 
-        with patch("hhplab.ingest.bls_laus.fetch_laus_annual_averages", _one_missing_fetch):
+        with patch("hhplab.bls.ingest_laus.fetch_laus_annual_averages", _one_missing_fetch):
             with pytest.raises(ValueError, match="partial measure data"):
                 ingest_laus_metro(year=2023, project_root=tmp_path)
 
@@ -744,8 +726,7 @@ class TestLausNaming:
 
     def test_filename_string_year(self):
         assert (
-            laus_metro_filename("2022", "glynn_fox_v1")
-            == "laus_metro__A2022@Dglynnfoxv1.parquet"
+            laus_metro_filename("2022", "glynn_fox_v1") == "laus_metro__A2022@Dglynnfoxv1.parquet"
         )
 
     def test_path_default_base(self):
@@ -877,16 +858,18 @@ class TestLausPanelIntegration:
         rows = []
         for metro_id, cbsa in METRO_CBSA_MAPPING.items():
             METRO_STATE_FIPS[metro_id]
-            rows.append({
-                "metro_id": metro_id,
-                "year": year,
-                "cbsa_code": cbsa,
-                "labor_force": 1_000_000,
-                "employed": 950_000,
-                "unemployed": 50_000,
-                "unemployment_rate": 5.0,
-                "data_source": "bls_laus",
-            })
+            rows.append(
+                {
+                    "metro_id": metro_id,
+                    "year": year,
+                    "cbsa_code": cbsa,
+                    "labor_force": 1_000_000,
+                    "employed": 950_000,
+                    "unemployed": 50_000,
+                    "unemployment_rate": 5.0,
+                    "data_source": "bls_laus",
+                }
+            )
 
         df = pd.DataFrame(rows)
         df["labor_force"] = df["labor_force"].astype("Int64")
@@ -932,6 +915,7 @@ class TestLausPanelIntegration:
 
     def test_laus_measures_appear_in_metro_panel_columns(self):
         from hhplab.panel.assemble import METRO_PANEL_COLUMNS
+
         for col in ["labor_force", "employed", "unemployed", "unemployment_rate"]:
             assert col in METRO_PANEL_COLUMNS, (
                 f"LAUS column '{col}' missing from METRO_PANEL_COLUMNS"
@@ -944,21 +928,32 @@ class TestLausPanelIntegration:
 
 
 def _make_mock_ingest_fn(tmp_path: Path, year_override: int | None = None) -> Any:
-    """Return a mock for hhplab.ingest.bls_laus.ingest_laus_metro that writes a
+    """Return a mock for hhplab.bls.ingest_laus_metro that writes a
     minimal parquet and returns the path."""
     import pandas as pd
 
     from hhplab.naming import laus_metro_path
 
-    def _mock_ingest(year: int, definition_version: str = "glynn_fox_v1",
-                     api_key: Any = None, project_root: Path | None = None) -> Path:
+    def _mock_ingest(
+        year: int,
+        definition_version: str = "glynn_fox_v1",
+        api_key: Any = None,
+        project_root: Path | None = None,
+    ) -> Path:
         effective_year = year_override if year_override is not None else year
-        rows = [{"metro_id": f"GF{i:02d}", "year": effective_year,
-                 "labor_force": 1_000_000, "employed": 950_000,
-                 "unemployed": 50_000, "unemployment_rate": 5.0,
-                 "data_source": "bls_laus",
-                 "metro_name": f"Metro {i}"}
-                for i in range(1, 26)]
+        rows = [
+            {
+                "metro_id": f"GF{i:02d}",
+                "year": effective_year,
+                "labor_force": 1_000_000,
+                "employed": 950_000,
+                "unemployed": 50_000,
+                "unemployment_rate": 5.0,
+                "data_source": "bls_laus",
+                "metro_name": f"Metro {i}",
+            }
+            for i in range(1, 26)
+        ]
         df = pd.DataFrame(rows)
         df["labor_force"] = df["labor_force"].astype("Int64")
         df["employed"] = df["employed"].astype("Int64")
@@ -979,33 +974,42 @@ class TestCliLausMetro:
 
     def _runner(self):
         from typer.testing import CliRunner
+
         return CliRunner()
 
     def _app(self):
         from hhplab.cli.main import app
+
         return app
 
     def test_single_year_exits_zero(self, tmp_path):
         mock_fn = _make_mock_ingest_fn(tmp_path)
-        with patch("hhplab.ingest.bls_laus.ingest_laus_metro", mock_fn), \
-             patch("hhplab.cli.main._check_working_directory"):
+        with (
+            patch("hhplab.bls.ingest_laus_metro", mock_fn),
+            patch("hhplab.cli.main._check_working_directory"),
+        ):
             result = self._runner().invoke(self._app(), ["ingest", "laus-metro", "--year", "2023"])
         assert result.exit_code == 0, result.output
 
     def test_single_year_output_mentions_metros(self, tmp_path):
         mock_fn = _make_mock_ingest_fn(tmp_path)
-        with patch("hhplab.ingest.bls_laus.ingest_laus_metro", mock_fn), \
-             patch("hhplab.cli.main._check_working_directory"):
+        with (
+            patch("hhplab.bls.ingest_laus_metro", mock_fn),
+            patch("hhplab.cli.main._check_working_directory"),
+        ):
             result = self._runner().invoke(self._app(), ["ingest", "laus-metro", "--year", "2023"])
         assert result.exit_code == 0, result.output
         assert "25" in result.output or "Metro" in result.output
 
     def test_json_output_flag(self, tmp_path):
         mock_fn = _make_mock_ingest_fn(tmp_path)
-        with patch("hhplab.ingest.bls_laus.ingest_laus_metro", mock_fn), \
-             patch("hhplab.cli.main._check_working_directory"):
-            result = self._runner().invoke(self._app(),
-                                           ["ingest", "laus-metro", "--year", "2023", "--json"])
+        with (
+            patch("hhplab.bls.ingest_laus_metro", mock_fn),
+            patch("hhplab.cli.main._check_working_directory"),
+        ):
+            result = self._runner().invoke(
+                self._app(), ["ingest", "laus-metro", "--year", "2023", "--json"]
+            )
         assert result.exit_code == 0, result.output
         data = json.loads(result.output)
         assert data["status"] == "ok"
@@ -1016,21 +1020,24 @@ class TestCliLausMetro:
 
     def test_year_range_backfill(self, tmp_path):
         mock_fn = _make_mock_ingest_fn(tmp_path)
-        with patch("hhplab.ingest.bls_laus.ingest_laus_metro", mock_fn), \
-             patch("hhplab.cli.main._check_working_directory"):
+        with (
+            patch("hhplab.bls.ingest_laus_metro", mock_fn),
+            patch("hhplab.cli.main._check_working_directory"),
+        ):
             result = self._runner().invoke(
-                self._app(),
-                ["ingest", "laus-metro", "--start-year", "2021", "--end-year", "2023"]
+                self._app(), ["ingest", "laus-metro", "--start-year", "2021", "--end-year", "2023"]
             )
         assert result.exit_code == 0, result.output
 
     def test_year_range_json_output(self, tmp_path):
         mock_fn = _make_mock_ingest_fn(tmp_path)
-        with patch("hhplab.ingest.bls_laus.ingest_laus_metro", mock_fn), \
-             patch("hhplab.cli.main._check_working_directory"):
+        with (
+            patch("hhplab.bls.ingest_laus_metro", mock_fn),
+            patch("hhplab.cli.main._check_working_directory"),
+        ):
             result = self._runner().invoke(
                 self._app(),
-                ["ingest", "laus-metro", "--start-year", "2021", "--end-year", "2022", "--json"]
+                ["ingest", "laus-metro", "--start-year", "2021", "--end-year", "2022", "--json"],
             )
         assert result.exit_code == 0, result.output
         data = json.loads(result.output)
@@ -1045,16 +1052,14 @@ class TestCliLausMetro:
     def test_year_and_start_year_conflict_exits_nonzero(self, tmp_path):
         with patch("hhplab.cli.main._check_working_directory"):
             result = self._runner().invoke(
-                self._app(),
-                ["ingest", "laus-metro", "--year", "2023", "--start-year", "2021"]
+                self._app(), ["ingest", "laus-metro", "--year", "2023", "--start-year", "2021"]
             )
         assert result.exit_code != 0
 
     def test_reversed_range_exits_nonzero(self, tmp_path):
         with patch("hhplab.cli.main._check_working_directory"):
             result = self._runner().invoke(
-                self._app(),
-                ["ingest", "laus-metro", "--start-year", "2023", "--end-year", "2021"]
+                self._app(), ["ingest", "laus-metro", "--start-year", "2023", "--end-year", "2021"]
             )
         assert result.exit_code != 0
 
@@ -1062,11 +1067,11 @@ class TestCliLausMetro:
         def _failing_ingest(**kwargs):
             raise ValueError("BLS API down")
 
-        with patch("hhplab.ingest.bls_laus.ingest_laus_metro", _failing_ingest), \
-             patch("hhplab.cli.main._check_working_directory"):
-            result = self._runner().invoke(
-                self._app(), ["ingest", "laus-metro", "--year", "2023"]
-            )
+        with (
+            patch("hhplab.bls.ingest_laus_metro", _failing_ingest),
+            patch("hhplab.cli.main._check_working_directory"),
+        ):
+            result = self._runner().invoke(self._app(), ["ingest", "laus-metro", "--year", "2023"])
         assert result.exit_code != 0
 
     def test_partial_backfill_json_exits_nonzero(self, tmp_path):
@@ -1086,8 +1091,10 @@ class TestCliLausMetro:
                 raise ValueError("No data for 2022")
             return mock_fn(year=year, **kwargs)
 
-        with patch("hhplab.ingest.bls_laus.ingest_laus_metro", _partial_ingest), \
-             patch("hhplab.cli.main._check_working_directory"):
+        with (
+            patch("hhplab.bls.ingest_laus_metro", _partial_ingest),
+            patch("hhplab.cli.main._check_working_directory"),
+        ):
             result = self._runner().invoke(
                 self._app(),
                 ["ingest", "laus-metro", "--start-year", "2021", "--end-year", "2022", "--json"],
@@ -1101,11 +1108,14 @@ class TestCliLausMetro:
 
     def test_all_failed_backfill_json_exits_nonzero(self, tmp_path):
         """--json mode must exit 1 and report status 'error' when all years fail."""
+
         def _failing_ingest(**kwargs):
             raise ValueError("BLS API unavailable")
 
-        with patch("hhplab.ingest.bls_laus.ingest_laus_metro", _failing_ingest), \
-             patch("hhplab.cli.main._check_working_directory"):
+        with (
+            patch("hhplab.bls.ingest_laus_metro", _failing_ingest),
+            patch("hhplab.cli.main._check_working_directory"),
+        ):
             result = self._runner().invoke(
                 self._app(),
                 ["ingest", "laus-metro", "--start-year", "2021", "--end-year", "2022", "--json"],
@@ -1124,7 +1134,7 @@ class TestCliLausMetro:
     def test_quota_exhausted_single_year_text_includes_actionable_hint(self, tmp_path):
         """Single-year ingest must surface the BlsQuotaExhausted message verbatim
         so the user immediately sees how to recover (API key or wait)."""
-        from hhplab.ingest.bls_laus import BlsQuotaExhausted
+        from hhplab.bls import BlsQuotaExhausted
 
         actionable = (
             "The anonymous BLS API daily threshold has been reached. "
@@ -1136,11 +1146,11 @@ class TestCliLausMetro:
         def _quota_ingest(**kwargs):
             raise BlsQuotaExhausted(actionable)
 
-        with patch("hhplab.ingest.bls_laus.ingest_laus_metro", _quota_ingest), \
-             patch("hhplab.cli.main._check_working_directory"):
-            result = self._runner().invoke(
-                self._app(), ["ingest", "laus-metro", "--year", "2023"]
-            )
+        with (
+            patch("hhplab.bls.ingest_laus_metro", _quota_ingest),
+            patch("hhplab.cli.main._check_working_directory"),
+        ):
+            result = self._runner().invoke(self._app(), ["ingest", "laus-metro", "--year", "2023"])
 
         assert result.exit_code == 1, result.output
         combined = (result.output or "") + (result.stderr if hasattr(result, "stderr") else "")
@@ -1150,7 +1160,7 @@ class TestCliLausMetro:
         assert "wait" in combined.lower()
 
     def test_quota_exhausted_single_year_json_carries_reason(self, tmp_path):
-        from hhplab.ingest.bls_laus import BlsQuotaExhausted
+        from hhplab.bls import BlsQuotaExhausted
 
         def _quota_ingest(**kwargs):
             raise BlsQuotaExhausted(
@@ -1158,8 +1168,10 @@ class TestCliLausMetro:
                 "or wait for the threshold to reset"
             )
 
-        with patch("hhplab.ingest.bls_laus.ingest_laus_metro", _quota_ingest), \
-             patch("hhplab.cli.main._check_working_directory"):
+        with (
+            patch("hhplab.bls.ingest_laus_metro", _quota_ingest),
+            patch("hhplab.cli.main._check_working_directory"),
+        ):
             result = self._runner().invoke(
                 self._app(), ["ingest", "laus-metro", "--year", "2023", "--json"]
             )
@@ -1176,7 +1188,7 @@ class TestCliLausMetro:
         must NOT be retried (they would all fail with the same condition).  All
         years should be reported as failed and the JSON payload must carry the
         bls_quota_exhausted reason."""
-        from hhplab.ingest.bls_laus import BlsQuotaExhausted
+        from hhplab.bls import BlsQuotaExhausted
 
         call_log: list[int] = []
 
@@ -1187,8 +1199,10 @@ class TestCliLausMetro:
                 "or wait for the threshold to reset"
             )
 
-        with patch("hhplab.ingest.bls_laus.ingest_laus_metro", _quota_ingest), \
-             patch("hhplab.cli.main._check_working_directory"):
+        with (
+            patch("hhplab.bls.ingest_laus_metro", _quota_ingest),
+            patch("hhplab.cli.main._check_working_directory"),
+        ):
             result = self._runner().invoke(
                 self._app(),
                 ["ingest", "laus-metro", "--start-year", "2015", "--end-year", "2023", "--json"],
@@ -1208,7 +1222,7 @@ class TestCliLausMetro:
         """If some early years succeed and a later year hits the quota, the
         backfill must report status=partial, mark only the unattempted years
         as failed, and tag the payload with bls_quota_exhausted."""
-        from hhplab.ingest.bls_laus import BlsQuotaExhausted
+        from hhplab.bls import BlsQuotaExhausted
 
         mock_fn = _make_mock_ingest_fn(tmp_path)
         call_log: list[int] = []
@@ -1222,8 +1236,10 @@ class TestCliLausMetro:
                 )
             return mock_fn(year=year, **kwargs)
 
-        with patch("hhplab.ingest.bls_laus.ingest_laus_metro", _mixed_ingest), \
-             patch("hhplab.cli.main._check_working_directory"):
+        with (
+            patch("hhplab.bls.ingest_laus_metro", _mixed_ingest),
+            patch("hhplab.cli.main._check_working_directory"),
+        ):
             result = self._runner().invoke(
                 self._app(),
                 ["ingest", "laus-metro", "--start-year", "2015", "--end-year", "2020", "--json"],
@@ -1251,11 +1267,13 @@ class TestLausRecipeSchema:
 
     def test_laus_policy_default(self):
         from hhplab.recipe.recipe_schema import LausPolicy
+
         p = LausPolicy()
         assert p.include is False
 
     def test_laus_policy_include_true(self):
         from hhplab.recipe.recipe_schema import LausPolicy
+
         p = LausPolicy(include=True)
         assert p.include is True
 
@@ -1263,44 +1281,52 @@ class TestLausRecipeSchema:
         from pydantic import ValidationError
 
         from hhplab.recipe.recipe_schema import LausPolicy
+
         with pytest.raises(ValidationError):
             LausPolicy(include=True, bogus_field=42)
 
     def test_panel_policy_with_laus(self):
         from hhplab.recipe.recipe_schema import LausPolicy, PanelPolicy
+
         policy = PanelPolicy(laus=LausPolicy(include=True))
         assert policy.laus is not None
         assert policy.laus.include is True
 
     def test_panel_policy_laus_none_by_default(self):
         from hhplab.recipe.recipe_schema import PanelPolicy
+
         policy = PanelPolicy()
         assert policy.laus is None
 
     def test_laus_policy_round_trips_via_recipe_load(self):
         """LausPolicy is preserved after loading a recipe dict."""
         from hhplab.recipe.loader import load_recipe
-        recipe = load_recipe({
-            "version": 1,
-            "name": "test-laus",
-            "universe": {"years": [2023]},
-            "targets": [{
-                "id": "metro_panel",
-                "geometry": {"type": "metro", "source": "glynn_fox_v1"},
-                "panel_policy": {
-                    "laus": {"include": True},
+
+        recipe = load_recipe(
+            {
+                "version": 1,
+                "name": "test-laus",
+                "universe": {"years": [2023]},
+                "targets": [
+                    {
+                        "id": "metro_panel",
+                        "geometry": {"type": "metro", "source": "glynn_fox_v1"},
+                        "panel_policy": {
+                            "laus": {"include": True},
+                        },
+                    }
+                ],
+                "datasets": {
+                    "laus_metro": {
+                        "provider": "bls",
+                        "product": "laus",
+                        "version": 1,
+                        "native_geometry": {"type": "metro", "source": "glynn_fox_v1"},
+                        "path": "data/curated/laus/laus_metro__A2023@Dglynnfoxv1.parquet",
+                    },
                 },
-            }],
-            "datasets": {
-                "laus_metro": {
-                    "provider": "bls",
-                    "product": "laus",
-                    "version": 1,
-                    "native_geometry": {"type": "metro", "source": "glynn_fox_v1"},
-                    "path": "data/curated/laus/laus_metro__A2023@Dglynnfoxv1.parquet",
-                },
-            },
-        })
+            }
+        )
         target = recipe.targets[0]
         assert target.panel_policy is not None
         assert target.panel_policy.laus is not None
@@ -1312,6 +1338,7 @@ class TestValidateBLSLaus:
 
     def _make_spec(self, **overrides) -> Any:
         from hhplab.recipe.recipe_schema import DatasetSpec, GeometryRef
+
         defaults: dict[str, Any] = {
             "provider": "bls",
             "product": "laus",
@@ -1324,12 +1351,14 @@ class TestValidateBLSLaus:
 
     def test_valid_spec_no_diagnostics(self):
         from hhplab.recipe.default_dataset_adapters import _validate_bls_laus
+
         spec = self._make_spec()
         diags = _validate_bls_laus(spec)
         assert diags == []
 
     def test_wrong_version_is_error(self):
         from hhplab.recipe.default_dataset_adapters import _validate_bls_laus
+
         spec = self._make_spec(version=2)
         diags = _validate_bls_laus(spec)
         assert any(d.level == "error" and "version" in d.message for d in diags)
@@ -1337,6 +1366,7 @@ class TestValidateBLSLaus:
     def test_wrong_geometry_type_is_error(self):
         from hhplab.recipe.default_dataset_adapters import _validate_bls_laus
         from hhplab.recipe.recipe_schema import GeometryRef
+
         # No path → validator cannot fall back to materialized artifact
         spec = self._make_spec(native_geometry=GeometryRef(type="county"), path=None)
         diags = _validate_bls_laus(spec)
@@ -1345,18 +1375,21 @@ class TestValidateBLSLaus:
     def test_no_source_warns(self):
         from hhplab.recipe.default_dataset_adapters import _validate_bls_laus
         from hhplab.recipe.recipe_schema import GeometryRef
+
         spec = self._make_spec(native_geometry=GeometryRef(type="metro"))
         diags = _validate_bls_laus(spec)
         assert any(d.level == "warning" and "source" in d.message for d in diags)
 
     def test_no_path_warns(self):
         from hhplab.recipe.default_dataset_adapters import _validate_bls_laus
+
         spec = self._make_spec(path=None)
         diags = _validate_bls_laus(spec)
         assert any(d.level == "warning" and "path" in d.message.lower() for d in diags)
 
     def test_unknown_params_warns(self):
         from hhplab.recipe.default_dataset_adapters import _validate_bls_laus
+
         spec = self._make_spec(params={"bogus": "value"})
         diags = _validate_bls_laus(spec)
         assert any(d.level == "warning" and "unrecognized" in d.message for d in diags)
@@ -1368,12 +1401,16 @@ class TestValidateBLSLaus:
         # Force a clean registry with defaults to verify registration
         local_registry = type(dataset_registry)()
         from hhplab.recipe.default_dataset_adapters import register_dataset_defaults
+
         register_dataset_defaults(local_registry)
 
         # Build a minimal spec
         from hhplab.recipe.recipe_schema import DatasetSpec, GeometryRef
+
         spec = DatasetSpec(
-            provider="bls", product="laus", version=1,
+            provider="bls",
+            product="laus",
+            version=1,
             native_geometry=GeometryRef(type="metro", source="glynn_fox_v1"),
             path="data/curated/laus/laus_metro__A2023@Dglynnfoxv1.parquet",
         )
@@ -1470,9 +1507,7 @@ class TestValidateBLSLaus:
         plan = resolve_plan(recipe, "build_metro_panel")
 
         acs_tasks = {
-            task.year: task
-            for task in plan.resample_tasks
-            if task.dataset_id == "acs_tract"
+            task.year: task for task in plan.resample_tasks if task.dataset_id == "acs_tract"
         }
 
         for year, expected_path in LAUS_RECIPE_ACS_PATH_BY_YEAR.items():

@@ -18,7 +18,7 @@ import pytest
 
 # All ingest modules that must comply with the retention policy
 INGEST_MODULES = [
-    "hhplab/ingest/hud_opendata_arcgis.py",
+    "hhplab/hud/opendata_arcgis.py",
     "hhplab/census/ingest/tiger_tracts.py",
     "hhplab/census/ingest/tiger_counties.py",
     "hhplab/census/ingest/tract_relationship.py",
@@ -29,8 +29,8 @@ INGEST_MODULES = [
 
 # API ingest modules must use year+variant (not legacy snapshot_id)
 API_INGEST_MODULES = [
-    "hhplab/ingest/hud_opendata_arcgis.py",
-    "hhplab/ingest/hud_exchange_gis.py",
+    "hhplab/hud/opendata_arcgis.py",
+    "hhplab/hud/exchange_gis.py",
     "hhplab/acs/ingest/tract_population.py",
     "hhplab/rents/weights.py",
 ]
@@ -90,13 +90,9 @@ class TestRetentionPolicyCallSites:
     def test_calls_raw_snapshot_function(self, module_path: str):
         """Each ingester must call persist_file_snapshot or write_api_snapshot."""
         source = _module_source(module_path)
-        has_call = (
-            "persist_file_snapshot(" in source
-            or "write_api_snapshot(" in source
-        )
+        has_call = "persist_file_snapshot(" in source or "write_api_snapshot(" in source
         assert has_call, (
-            f"{module_path} does not call persist_file_snapshot() "
-            f"or write_api_snapshot()"
+            f"{module_path} does not call persist_file_snapshot() or write_api_snapshot()"
         )
 
 
@@ -129,9 +125,7 @@ class TestLocalPathSemantic:
                 if paren_depth <= 0 and in_register and ")" in stripped:
                     in_register = False
 
-        assert local_path_lines, (
-            f"{module_path}: no local_path= found in register_source call"
-        )
+        assert local_path_lines, f"{module_path}: no local_path= found in register_source call"
 
         for line in local_path_lines:
             # The local_path should NOT reference output_path directly
@@ -214,20 +208,15 @@ class TestYearFirstFileLayout:
         source = _module_source(module_path)
         # Find subdirs=(...) in persist_file_snapshot calls
         # The year segment should be first in subdirs (e.g., str(year), "2020")
-        subdirs_pattern = re.compile(r'subdirs=\(([^)]+)\)')
+        subdirs_pattern = re.compile(r"subdirs=\(([^)]+)\)")
         matches = subdirs_pattern.findall(source)
-        assert matches, (
-            f"{module_path}: no subdirs= found in persist_file_snapshot call"
-        )
+        assert matches, f"{module_path}: no subdirs= found in persist_file_snapshot call"
         for match in matches:
             # The first element should contain a year reference
             first_arg = match.split(",")[0].strip().strip("'\"")
             has_year_ref = (
-                "year" in first_arg.lower()
-                or first_arg.isdigit()
-                or first_arg.startswith("str(")
+                "year" in first_arg.lower() or first_arg.isdigit() or first_arg.startswith("str(")
             )
             assert has_year_ref, (
-                f"{module_path}: first subdir segment should be a year, "
-                f"got: {first_arg}"
+                f"{module_path}: first subdir segment should be a year, got: {first_arg}"
             )

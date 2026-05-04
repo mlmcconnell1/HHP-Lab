@@ -5,7 +5,7 @@ This chapter documents stable import surfaces that exist in the current codebase
 ## Core Imports
 
 ```python
-from hhplab.ingest import ingest_hud_exchange, ingest_hud_opendata
+from hhplab.hud import ingest_hud_exchange, ingest_hud_opendata
 from hhplab.registry import list_boundaries, latest_vintage
 from hhplab.census.ingest import (
     ingest_tiger_tracts,

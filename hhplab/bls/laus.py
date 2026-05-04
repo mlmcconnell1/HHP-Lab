@@ -113,8 +113,7 @@ def build_laus_series_id(cbsa_code: str, measure: str, state_fips: str) -> str:
     """
     if measure not in LAUS_MEASURE_CODES:
         raise ValueError(
-            f"Unknown LAUS measure {measure!r}. "
-            f"Valid measures: {sorted(LAUS_MEASURE_CODES)}"
+            f"Unknown LAUS measure {measure!r}. Valid measures: {sorted(LAUS_MEASURE_CODES)}"
         )
     code = LAUS_MEASURE_CODES[measure]
     return f"{_LAUS_METRO_PREFIX}{state_fips}{cbsa_code}{_LAUS_AREA_PADDING}{code}"

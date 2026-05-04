@@ -50,7 +50,7 @@ ruff format .
 
 ## Adding a New Data Source
 
-1. Create new ingester in `hhplab/ingest/`
+1. Create new ingester under its source-owned package, such as `hhplab/hud/` or `hhplab/census/ingest/`
 2. Implement the canonical schema mapping
 3. Call `normalize_boundaries()` and `validate_boundaries()`
 4. Register vintage using `register_vintage()`
