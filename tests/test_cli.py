@@ -5,9 +5,20 @@ from unittest.mock import patch
 
 from typer.testing import CliRunner
 
+from hhplab import __version__
 from hhplab.cli.main import app
 
 runner = CliRunner()
+
+
+class TestRootCommand:
+    """Tests for root CLI behavior."""
+
+    def test_version_option(self):
+        result = runner.invoke(app, ["--version"])
+
+        assert result.exit_code == 0
+        assert result.output == f"hhplab {__version__}\n"
 
 
 class TestNestedIngestCommand:

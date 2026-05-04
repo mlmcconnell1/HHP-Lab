@@ -39,6 +39,8 @@ import pandas as pd
 import pyarrow as pa
 import pyarrow.parquet as pq
 
+from hhplab._version import __version__
+
 logger = logging.getLogger(__name__)
 
 # Metadata key used in Parquet schema
@@ -86,7 +88,7 @@ class ProvenanceBlock:
     geo_type: str | None = None
     definition_version: str | None = None
     created_at: str = field(default_factory=lambda: datetime.now(UTC).isoformat())
-    hhplab_version: str = "0.1.0"
+    hhplab_version: str = __version__
     extra: dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:

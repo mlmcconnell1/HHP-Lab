@@ -6,6 +6,7 @@ import pandas as pd
 import pyarrow.parquet as pq
 import pytest
 
+from hhplab import __version__
 from hhplab.provenance import (
     PROVENANCE_KEY,
     ProvenanceBlock,
@@ -28,7 +29,7 @@ def full_block():
         geo_type="coc",
         definition_version="glynn_fox_v1",
         created_at="2025-01-15T12:00:00+00:00",
-        hhplab_version="0.1.0",
+        hhplab_version=__version__,
         extra={"source_url": "https://example.com", "note": "test run"},
     )
 

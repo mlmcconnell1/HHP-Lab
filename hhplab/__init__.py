@@ -10,6 +10,8 @@ from __future__ import annotations
 
 from importlib import import_module
 
+from hhplab._version import __version__ as __version__
+
 _LAZY_EXPORTS = frozenset(
     {
         "acs",
@@ -46,7 +48,7 @@ _LAZY_EXPORTS = frozenset(
     }
 )
 
-__all__ = sorted(_LAZY_EXPORTS)
+__all__ = sorted(_LAZY_EXPORTS | {"__version__"})
 
 
 def __getattr__(name: str) -> object:

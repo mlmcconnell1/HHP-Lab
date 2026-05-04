@@ -12,6 +12,7 @@ from typing import Annotated
 
 import typer
 
+from hhplab import __version__
 from hhplab.cli.commands import register_commands
 
 # Suppress known PyArrow warnings on macOS (sysctlbyname failures in sandboxed environments)
@@ -55,6 +56,13 @@ def _check_working_directory(*, non_interactive: bool = False) -> None:
         if sys.stdin.isatty() and not non_interactive:
             if not typer.confirm("Do you still want to continue?", default=False):
                 raise typer.Exit(0)
+
+
+def _version_callback(value: bool) -> None:
+    """Print the CLI version and exit."""
+    if value:
+        typer.echo(f"hhplab {__version__}")
+        raise typer.Exit()
 
 
 app = typer.Typer(
@@ -112,6 +120,15 @@ registry_app = typer.Typer(
 @app.callback()
 def main_callback(
     ctx: typer.Context,
+    version: Annotated[
+        bool | None,
+        typer.Option(
+            "--version",
+            callback=_version_callback,
+            help="Show the HHP-Lab version and exit.",
+            is_eager=True,
+        ),
+    ] = None,
     non_interactive: Annotated[
         bool,
         typer.Option(
@@ -123,6 +140,7 @@ def main_callback(
     ] = False,
 ) -> None:
     """Check working directory before running any command."""
+    _ = version
     if not isinstance(ctx.obj, dict):
         ctx.obj = {}
     ctx.obj["non_interactive"] = bool(non_interactive)

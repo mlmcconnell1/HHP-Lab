@@ -1,6 +1,6 @@
 [project]
 name = "hhp-lab"
-version = "0.1.0"
+version = "0.1"
 description = "HHP-Lab - homelessness and housing precarity data infrastructure"
 readme = "README.md"
 requires-python = ">=3.12"
