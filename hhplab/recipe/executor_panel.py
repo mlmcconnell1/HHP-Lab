@@ -41,10 +41,9 @@ from hhplab.recipe.executor_panel_policies import (
 from hhplab.recipe.planner import ExecutionPlan
 from hhplab.recipe.recipe_schema import (
     CohortSelector,
-    GeometryRef,
     PanelPolicy,
-    expand_year_spec,
 )
+from hhplab.recipe.schema_common import GeometryRef, expand_year_spec
 
 
 def canonicalize_panel_for_target(

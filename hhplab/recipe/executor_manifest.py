@@ -25,10 +25,9 @@ from hhplab.recipe.manifest import (
     RecipeManifest,
 )
 from hhplab.recipe.recipe_schema import (
-    GeometryRef,
     RecipeV1,
-    expand_year_spec,
 )
+from hhplab.recipe.schema_common import GeometryRef, expand_year_spec
 
 
 def _deduplicate_assets(

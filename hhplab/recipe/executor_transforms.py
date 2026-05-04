@@ -21,7 +21,8 @@ from hhplab.naming import (
 )
 from hhplab.provenance import ProvenanceBlock, write_parquet_with_provenance
 from hhplab.recipe.executor_core import ExecutorError, _get_transform
-from hhplab.recipe.recipe_schema import GeometryRef, RecipeV1
+from hhplab.recipe.recipe_schema import RecipeV1
+from hhplab.recipe.schema_common import GeometryRef
 
 _RECIPE_TRANSFORM_DIR = Path(".recipe_cache") / "transforms"
 

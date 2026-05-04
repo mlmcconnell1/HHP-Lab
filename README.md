@@ -31,6 +31,15 @@ Full operational documentation lives in [manual-obsidian/HHP-Lab-Manual.md](manu
 - Assembles panel datasets across years with provenance metadata embedded in parquet artifacts
 - Supports recipe-driven builds, export bundles, curated-layout validation, and machine-readable CLI output for automation
 
+## Package Boundaries
+
+Source-owned aggregation code lives with its provider package, such as
+`hhplab.acs`, `hhplab.pep`, `hhplab.pit`, and `hhplab.rents`. The
+`hhplab.measures` package is intentionally narrower: it is a compatibility
+facade for legacy ACS measure imports plus the home for reusable
+crosswalk/measure attribution diagnostics used by CLI commands and tests. New
+source-specific aggregation helpers should not be added there.
+
 ## Supported Inputs
 
 | Provider | Product | Native geometry | Coverage |

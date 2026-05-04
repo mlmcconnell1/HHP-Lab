@@ -13,13 +13,12 @@ from dataclasses import dataclass, field
 
 from hhplab.recipe.recipe_schema import (
     FileSetSpec,
-    GeometryRef,
     JoinStep,
     MaterializeStep,
     RecipeV1,
     ResampleStep,
-    expand_year_spec,
 )
+from hhplab.recipe.schema_common import GeometryRef, expand_year_spec
 
 
 class PlannerError(Exception):

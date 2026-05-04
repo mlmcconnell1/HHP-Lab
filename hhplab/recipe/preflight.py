@@ -56,8 +56,8 @@ from hhplab.recipe.recipe_schema import (
     RecipeV1,
     ResampleStep,
     TemporalFilter,
-    expand_year_spec,
 )
+from hhplab.recipe.schema_common import expand_year_spec
 
 # ---------------------------------------------------------------------------
 # Finding model

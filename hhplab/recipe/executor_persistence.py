@@ -39,7 +39,7 @@ from hhplab.recipe.executor_panel import assemble_panel
 from hhplab.recipe.executor_panel_policies import collect_conformance_flags
 from hhplab.recipe.manifest import write_manifest
 from hhplab.recipe.planner import ExecutionPlan
-from hhplab.recipe.recipe_schema import expand_year_spec
+from hhplab.recipe.schema_common import expand_year_spec
 
 
 def persist_outputs(

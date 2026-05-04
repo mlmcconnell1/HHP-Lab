@@ -32,8 +32,8 @@ from hhplab.recipe.probes import (
 )
 from hhplab.recipe.recipe_schema import (
     TemporalFilter,
-    expand_year_spec,
 )
+from hhplab.recipe.schema_common import expand_year_spec
 
 
 def _resolve_year_column(

@@ -4,6 +4,10 @@ Computes per-geography diagnostics to validate crosswalk quality and compare
 area-weighted vs population-weighted estimates.  All functions accept a
 ``geo_id_col`` parameter (default ``"coc_id"``) so they work with any
 analysis geography.
+
+This module is the intentional diagnostics half of ``hhplab.measures``.  Source
+aggregation should live in source-owned packages; reusable diagnostics that
+compare crosswalk attribution and weighted measures remain here.
 """
 
 import pandas as pd

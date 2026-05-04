@@ -6,7 +6,7 @@ from hhplab.recipe.adapters import (
     GeometryAdapterRegistry,
     ValidationDiagnostic,
 )
-from hhplab.recipe.recipe_schema import GeometryRef
+from hhplab.recipe.schema_common import GeometryRef
 
 
 def _validate_coc(ref: GeometryRef) -> list[ValidationDiagnostic]:

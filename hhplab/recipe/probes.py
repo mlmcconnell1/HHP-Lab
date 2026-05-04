@@ -21,10 +21,10 @@ from hhplab.provenance import read_provenance
 from hhplab.recipe.recipe_schema import (
     CrosswalkTransform,
     DatasetSpec,
-    GeometryRef,
     RecipeV1,
     TemporalFilter,
 )
+from hhplab.recipe.schema_common import GeometryRef
 
 # Auto-detect candidates for geo-ID and year columns.
 GEO_CANDIDATES: list[str] = [

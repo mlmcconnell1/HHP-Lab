@@ -14,7 +14,8 @@ from __future__ import annotations
 from collections.abc import Callable
 from dataclasses import dataclass
 
-from hhplab.recipe.recipe_schema import DatasetSpec, GeometryRef, RecipeV1
+from hhplab.recipe.recipe_schema import DatasetSpec, RecipeV1
+from hhplab.recipe.schema_common import GeometryRef
 
 
 @dataclass
