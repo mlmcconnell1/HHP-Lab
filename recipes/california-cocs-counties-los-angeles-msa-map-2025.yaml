@@ -1,0 +1,167 @@
+version: 1
+name: california_cocs_counties_los_angeles_msa_map_2025
+description: >
+  Render California county boundaries, California CoC boundaries, and the
+  Los Angeles-Long Beach-Anaheim, CA Census MSA boundary as a single
+  recipe-native HTML map artifact.
+
+universe:
+  years: [2025]
+
+targets:
+  - id: california_overlay_map
+    geometry: { type: coc, vintage: 2025, source: hud_exchange }
+    outputs: [map]
+    map_spec:
+      basemap: cartodbpositron
+      viewport:
+        fit_layers: true
+        padding: 30
+      layers:
+        - geometry: { type: county, vintage: 2023, source: tiger_line }
+          selector_ids:
+            [
+              "06001",
+              "06003",
+              "06005",
+              "06007",
+              "06009",
+              "06011",
+              "06013",
+              "06015",
+              "06017",
+              "06019",
+              "06021",
+              "06023",
+              "06025",
+              "06027",
+              "06029",
+              "06031",
+              "06033",
+              "06035",
+              "06037",
+              "06039",
+              "06041",
+              "06043",
+              "06045",
+              "06047",
+              "06049",
+              "06051",
+              "06053",
+              "06055",
+              "06057",
+              "06059",
+              "06061",
+              "06063",
+              "06065",
+              "06067",
+              "06069",
+              "06071",
+              "06073",
+              "06075",
+              "06077",
+              "06079",
+              "06081",
+              "06083",
+              "06085",
+              "06087",
+              "06089",
+              "06091",
+              "06093",
+              "06095",
+              "06097",
+              "06099",
+              "06101",
+              "06103",
+              "06105",
+              "06107",
+              "06109",
+              "06111",
+              "06113",
+              "06115",
+            ]
+          label: California Counties
+          tooltip_fields: [county_fips, geo_vintage, source]
+          style:
+            fill_color: "#f8f9fa"
+            stroke_color: "#495057"
+            fill_opacity: 0.04
+            stroke_opacity: 0.75
+            line_weight: 0.9
+            z_order: 0
+        - geometry: { type: coc, vintage: 2025, source: hud_exchange }
+          selector_ids:
+            [
+              CA-500,
+              CA-501,
+              CA-502,
+              CA-503,
+              CA-504,
+              CA-505,
+              CA-506,
+              CA-507,
+              CA-508,
+              CA-509,
+              CA-510,
+              CA-511,
+              CA-512,
+              CA-513,
+              CA-514,
+              CA-515,
+              CA-516,
+              CA-517,
+              CA-518,
+              CA-519,
+              CA-520,
+              CA-521,
+              CA-522,
+              CA-523,
+              CA-524,
+              CA-525,
+              CA-526,
+              CA-527,
+              CA-529,
+              CA-530,
+              CA-531,
+              CA-600,
+              CA-601,
+              CA-602,
+              CA-603,
+              CA-604,
+              CA-606,
+              CA-607,
+              CA-608,
+              CA-609,
+              CA-611,
+              CA-612,
+              CA-613,
+              CA-614,
+            ]
+          label: California CoCs
+          tooltip_fields: [coc_id, coc_name, state_abbrev]
+          style_mode: distinct
+          style:
+            fill_color: "#74c0fc"
+            stroke_color: "#1864ab"
+            fill_opacity: 0.22
+            stroke_opacity: 0.9
+            line_weight: 1.4
+            z_order: 1
+        - geometry: { type: msa, vintage: 2023, source: census_msa_2023 }
+          selector_ids: ["31080"]
+          label: Los Angeles MSA
+          tooltip_fields: [msa_id, msa_name, cbsa_code, definition_version]
+          style:
+            fill_color: "#ffd43b"
+            stroke_color: "#c92a2a"
+            fill_opacity: 0.14
+            stroke_opacity: 1.0
+            line_weight: 3.2
+            z_order: 2
+
+datasets: {}
+
+pipelines:
+  - id: california_overlay_map_pipeline
+    target: california_overlay_map
+    steps: []
