@@ -449,20 +449,61 @@ def probe_transform_path(
     if can_generate and metro_ref is not None and metro_ref.source:
         data_root = project_root / "data"
         prereq_paths: list[Path] = []
-        if base_ref.type == "coc":
-            prereq_paths.append(
-                metro_coc_membership_path(metro_ref.source, data_root)
-            )
-        elif base_ref.type == "county":
-            prereq_paths.append(
-                metro_county_membership_path(metro_ref.source, data_root)
-            )
-        elif base_ref.type == "tract":
-            prereq_paths.append(
-                metro_county_membership_path(metro_ref.source, data_root)
-            )
-            if base_ref.vintage is not None:
-                prereq_paths.append(tract_path(base_ref.vintage, data_root))
+        if (
+            metro_ref.source == metro_ref.resolved_metro_subset_definition_version()
+            and metro_ref.subset_profile is None
+            and metro_ref.subset_profile_definition_version is None
+        ):
+            if base_ref.type == "coc":
+                prereq_paths.append(
+                    metro_coc_membership_path(metro_ref.source, data_root)
+                )
+            elif base_ref.type == "county":
+                prereq_paths.append(
+                    metro_county_membership_path(metro_ref.source, data_root)
+                )
+            elif base_ref.type == "tract":
+                prereq_paths.append(
+                    metro_county_membership_path(metro_ref.source, data_root)
+                )
+                if base_ref.vintage is not None:
+                    prereq_paths.append(tract_path(base_ref.vintage, data_root))
+        else:
+            from hhplab.naming import msa_county_membership_path, metro_subset_membership_path
+
+            metro_definition_version = metro_ref.resolved_metro_definition_version()
+            if metro_definition_version is not None:
+                if base_ref.type == "coc" and base_ref.vintage is not None:
+                    from hhplab.naming import coc_base_path, county_path
+
+                    boundary_vintage = str(base_ref.vintage)
+                    county_vintage = boundary_vintage
+                    prereq_paths.extend(
+                        [
+                            coc_base_path(boundary_vintage, data_root),
+                            county_path(county_vintage, data_root),
+                            msa_county_membership_path(metro_definition_version, data_root),
+                        ]
+                    )
+                elif base_ref.type == "county":
+                    prereq_paths.append(
+                        msa_county_membership_path(metro_definition_version, data_root)
+                    )
+                elif base_ref.type == "tract":
+                    prereq_paths.append(
+                        msa_county_membership_path(metro_definition_version, data_root)
+                    )
+                    if base_ref.vintage is not None:
+                        prereq_paths.append(tract_path(base_ref.vintage, data_root))
+            subset_definition_version = metro_ref.resolved_metro_subset_definition_version()
+            if subset_definition_version is not None and metro_definition_version is not None:
+                prereq_paths.append(
+                    metro_subset_membership_path(
+                        subset_definition_version,
+                        metro_definition_version,
+                        data_root,
+                    )
+                )
 
         missing_inputs = [
             str(path.relative_to(project_root))

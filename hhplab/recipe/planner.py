@@ -75,6 +75,10 @@ def _geometry_to_dict(g: GeometryRef) -> dict:
         d["vintage"] = g.vintage
     if g.source is not None:
         d["source"] = g.source
+    if g.subset_profile is not None:
+        d["subset_profile"] = g.subset_profile
+    if g.subset_profile_definition_version is not None:
+        d["subset_profile_definition_version"] = g.subset_profile_definition_version
     return d
 
 
@@ -218,7 +222,12 @@ def _geometry_matches(a: GeometryRef, b: GeometryRef) -> bool:
     """
     if a.type != b.type:
         return False
-    return a.vintage == b.vintage and a.source == b.source
+    return (
+        a.vintage == b.vintage
+        and a.source == b.source
+        and a.subset_profile == b.subset_profile
+        and a.subset_profile_definition_version == b.subset_profile_definition_version
+    )
 
 
 def _resolve_auto_transform(

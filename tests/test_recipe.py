@@ -29,6 +29,7 @@ from hhplab.recipe.executor import (
     ExecutorError,
     PipelineResult,
     StepResult,
+    _assemble_panel,
     _apply_temporal_filter,
     _canonicalize_panel_for_target,
     _execute_materialize,
@@ -46,6 +47,8 @@ from hhplab.recipe.manifest import (
     write_manifest,
 )
 from hhplab.recipe.planner import (
+    ExecutionPlan,
+    JoinTask,
     MaterializeTask,
     ResampleTask,
     resolve_plan,
@@ -1535,6 +1538,54 @@ def _setup_curated_metro_artifacts(tmp_path: Path) -> None:
     write_metro_artifacts(base_dir=tmp_path / "data")
 
 
+def _setup_curated_metro_universe_subset_artifacts(tmp_path: Path) -> None:
+    """Write minimal canonical-metro and subset artifacts for recipe tests."""
+    from hhplab.naming import (
+        metro_subset_membership_path,
+        metro_universe_path,
+        msa_county_membership_path,
+    )
+
+    data_root = tmp_path / "data"
+    universe_path = metro_universe_path("census_msa_2023", data_root)
+    subset_path = metro_subset_membership_path(
+        "glynn_fox_v1",
+        "census_msa_2023",
+        data_root,
+    )
+    msa_county_path = msa_county_membership_path("census_msa_2023", data_root)
+
+    universe_path.parent.mkdir(parents=True, exist_ok=True)
+    msa_county_path.parent.mkdir(parents=True, exist_ok=True)
+    pd.DataFrame(
+        {
+            "metro_id": ["35620", "31080"],
+            "cbsa_code": ["35620", "31080"],
+            "metro_name": ["New York-Newark-Jersey City, NY-NJ-PA", "Los Angeles-Long Beach-Anaheim, CA"],
+            "definition_version": ["census_msa_2023", "census_msa_2023"],
+        }
+    ).to_parquet(universe_path)
+    pd.DataFrame(
+        {
+            "metro_id": ["35620", "31080"],
+            "cbsa_code": ["35620", "31080"],
+            "profile": ["glynn_fox", "glynn_fox"],
+            "profile_definition_version": ["glynn_fox_v1", "glynn_fox_v1"],
+            "metro_definition_version": ["census_msa_2023", "census_msa_2023"],
+            "profile_metro_id": ["GF01", "GF02"],
+            "profile_metro_name": ["New York", "Los Angeles"],
+            "profile_rank": [1, 2],
+        }
+    ).to_parquet(subset_path)
+    pd.DataFrame(
+        {
+            "msa_id": ["35620", "31080"],
+            "county_fips": ["36061", "06037"],
+            "definition_version": ["census_msa_2023", "census_msa_2023"],
+        }
+    ).to_parquet(msa_county_path)
+
+
 class TestExecutor:
 
     def test_execute_recipe_returns_results(self, tmp_path: Path):
@@ -1570,6 +1621,97 @@ class TestExecutor:
         recipe = load_recipe(data)
         results = execute_recipe(recipe, project_root=tmp_path)
         assert len(results[0].steps) == 8
+
+    def test_materialize_generates_subset_filtered_canonical_metro_artifact(
+        self, tmp_path: Path
+    ):
+        _setup_curated_metro_universe_subset_artifacts(tmp_path)
+
+        data = _recipe_with_pipeline()
+        data["targets"] = [{
+            "id": "metro_panel",
+            "geometry": {
+                "type": "metro",
+                "source": "census_msa_2023",
+                "subset_profile": "glynn_fox",
+                "subset_profile_definition_version": "glynn_fox_v1",
+            },
+        }]
+        data["pipelines"][0]["target"] = "metro_panel"
+        data["pipelines"][0]["steps"] = [
+            {"materialize": {"transforms": ["county_to_metro"]}},
+        ]
+        data["transforms"] = [{
+            "id": "county_to_metro",
+            "type": "crosswalk",
+            "from": {"type": "county", "vintage": 2020},
+            "to": {
+                "type": "metro",
+                "source": "census_msa_2023",
+                "subset_profile": "glynn_fox",
+                "subset_profile_definition_version": "glynn_fox_v1",
+            },
+            "spec": {"weighting": {"scheme": "area"}},
+        }]
+        recipe = load_recipe(data)
+        ctx = ExecutionContext(project_root=tmp_path, recipe=recipe)
+
+        result = _execute_materialize(MaterializeTask(transform_ids=["county_to_metro"]), ctx)
+
+        assert result.success
+        xwalk = pd.read_parquet(ctx.transform_paths["county_to_metro"]).sort_values("metro_id")
+        assert list(xwalk["metro_id"]) == ["31080", "35620"]
+        assert list(xwalk["profile_metro_id"]) == ["GF02", "GF01"]
+        assert (xwalk["definition_version"] == "census_msa_2023").all()
+
+    def test_assemble_panel_adds_subset_profile_metadata_for_canonical_metros(
+        self, tmp_path: Path
+    ):
+        _setup_curated_metro_universe_subset_artifacts(tmp_path)
+
+        recipe = load_recipe(
+            {
+                "version": 1,
+                "name": "metro-subset-panel",
+                "universe": {"years": [2023]},
+                "targets": [
+                    {
+                        "id": "metro_panel",
+                        "geometry": {
+                            "type": "metro",
+                            "source": "census_msa_2023",
+                            "subset_profile": "glynn_fox",
+                            "subset_profile_definition_version": "glynn_fox_v1",
+                        },
+                    }
+                ],
+                "datasets": {},
+                "transforms": [],
+                "pipelines": [{"id": "main", "target": "metro_panel", "steps": []}],
+            }
+        )
+        ctx = ExecutionContext(project_root=tmp_path, recipe=recipe)
+        ctx.intermediates[("__joined__", 2023)] = pd.DataFrame(
+            {
+                "geo_id": ["35620", "31080"],
+                "year": [2023, 2023],
+                "pit_total": [100, 200],
+            }
+        )
+        plan = ExecutionPlan(
+            pipeline_id="main",
+            join_tasks=[JoinTask(datasets=[], join_on=["geo_id", "year"], year=2023)],
+        )
+
+        assembled = _assemble_panel(plan, ctx)
+
+        assert not isinstance(assembled, StepResult)
+        panel = assembled.panel.sort_values("metro_id").reset_index(drop=True)
+        assert list(panel["metro_id"]) == ["31080", "35620"]
+        assert list(panel["geo_id"]) == ["31080", "35620"]
+        assert list(panel["profile_definition_version"]) == ["glynn_fox_v1", "glynn_fox_v1"]
+        assert list(panel["profile_metro_id"]) == ["GF02", "GF01"]
+        assert panel.loc[0, "metro_name"] == "Los Angeles-Long Beach-Anaheim, CA"
 
     def test_execute_recipe_coc_panel_preserves_name_and_derives_density(
         self, tmp_path: Path,

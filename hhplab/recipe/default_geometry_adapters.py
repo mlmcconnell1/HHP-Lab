@@ -66,6 +66,18 @@ def _validate_metro(ref: GeometryRef) -> list[ValidationDiagnostic]:
                 "use source for the synthetic geography definition version.",
             )
         )
+    if (
+        ref.subset_profile is None
+        and ref.subset_profile_definition_version is not None
+    ):
+        diags.append(
+            ValidationDiagnostic(
+                "warning",
+                "Metro geometry sets subset_profile_definition_version without "
+                "subset_profile. The subset artifact will still resolve, but "
+                "including subset_profile makes the recipe intent explicit.",
+            )
+        )
     return diags
 
 

@@ -158,13 +158,15 @@ def _scan_msa(curated: Path) -> dict:
 
 
 def _scan_metro(curated: Path) -> dict:
-    """Scan curated metro definition, membership, and boundary artifacts."""
+    """Scan curated metro definition, universe, subset, and boundary artifacts."""
     import re
 
     mdir = curated / "metro"
     definitions: list[str] = []
     coc_memberships: list[str] = []
     county_memberships: list[str] = []
+    universes: list[str] = []
+    subset_memberships: list[dict] = []
     boundaries: list[dict] = []
     if mdir.exists():
         for p in sorted(mdir.glob("*.parquet")):
@@ -179,6 +181,19 @@ def _scan_metro(curated: Path) -> dict:
             m = re.match(r"^metro_county_membership__(\w+)\.parquet$", p.name)
             if m:
                 county_memberships.append(m.group(1))
+                continue
+            m = re.match(r"^metro_universe__(\w+)\.parquet$", p.name)
+            if m:
+                universes.append(m.group(1))
+                continue
+            m = re.match(r"^metro_subset_membership__(\w+)xM(\w+)\.parquet$", p.name)
+            if m:
+                subset_memberships.append(
+                    {
+                        "profile_definition_version": m.group(1),
+                        "metro_definition_version": m.group(2),
+                    }
+                )
                 continue
             m = re.match(r"^metro_boundaries__(\w+)xC(\d{4})\.parquet$", p.name)
             if m:
@@ -196,6 +211,8 @@ def _scan_metro(curated: Path) -> dict:
         "definitions": definitions,
         "coc_memberships": coc_memberships,
         "county_memberships": county_memberships,
+        "universes": universes,
+        "subset_memberships": subset_memberships,
         "boundaries": boundaries,
         "boundary_versions": boundary_versions,
         "complete_versions": complete_versions,

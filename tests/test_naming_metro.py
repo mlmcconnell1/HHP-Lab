@@ -47,6 +47,17 @@ class TestMetroFilenames:
             == "panel__metro__Y2011-2016@Dglynnfoxv1.parquet"
         )
 
+    def test_metro_panel_with_subset_profile(self):
+        assert (
+            metro_panel_filename(
+                2011,
+                2016,
+                "census_msa_2023",
+                profile_definition_version="glynn_fox_v1",
+            )
+            == "panel__metro__Y2011-2016@Dcensusmsa2023xSglynnfoxv1.parquet"
+        )
+
     def test_metro_pit(self):
         assert (
             metro_pit_filename(2015, "glynn_fox_v1")
@@ -137,6 +148,18 @@ class TestGeoPanelFilename:
             == "panel__metro__Y2011-2016@Dglynnfoxv1.parquet"
         )
 
+    def test_metro_subset_profile(self):
+        assert (
+            geo_panel_filename(
+                2011,
+                2016,
+                geo_type="metro",
+                definition_version="census_msa_2023",
+                profile_definition_version="glynn_fox_v1",
+            )
+            == "panel__metro__Y2011-2016@Dcensusmsa2023xSglynnfoxv1.parquet"
+        )
+
     def test_coc_missing_boundary_raises(self):
         with pytest.raises(ValueError, match="boundary_vintage"):
             geo_panel_filename(2015, 2024, geo_type="coc")
@@ -163,4 +186,16 @@ class TestGeoMapFilename:
                 2011, 2016, geo_type="metro", definition_version="glynn_fox_v1"
             )
             == "map__metro__Y2011-2016@Dglynnfoxv1.html"
+        )
+
+    def test_metro_subset_profile(self):
+        assert (
+            geo_map_filename(
+                2011,
+                2016,
+                geo_type="metro",
+                definition_version="census_msa_2023",
+                profile_definition_version="glynn_fox_v1",
+            )
+            == "map__metro__Y2011-2016@Dcensusmsa2023xSglynnfoxv1.html"
         )

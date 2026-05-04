@@ -878,11 +878,52 @@ def _check_transforms(
                      or transform.to.type == "msa")
             )
             if is_metro:
-                cmd = "hhplab generate metro"
                 missing_inputs = (
                     result.detail.get("missing_inputs", [])
                     if result.detail else []
                 )
+                cmd = None
+                if transform is not None:
+                    metro_ref = (
+                        transform.to
+                        if transform.to.type == "metro"
+                        else transform.from_
+                    )
+                    metro_definition_version = metro_ref.resolved_metro_definition_version()
+                    subset_definition_version = (
+                        metro_ref.resolved_metro_subset_definition_version()
+                    )
+                    if any("msa_county_membership__" in item for item in missing_inputs):
+                        cmd = (
+                            "hhplab generate msa "
+                            f"--definition-version {metro_definition_version}"
+                            if metro_definition_version is not None
+                            else "hhplab generate msa"
+                        )
+                    elif any("metro_subset_membership__" in item for item in missing_inputs):
+                        cmd = (
+                            "hhplab generate metro-universe "
+                            f"--definition-version {metro_definition_version} "
+                            f"--profile-definition-version {subset_definition_version}"
+                            if metro_definition_version is not None
+                            and subset_definition_version is not None
+                            else "hhplab generate metro-universe"
+                        )
+                    elif any("metro_coc_membership__" in item or "metro_county_membership__" in item for item in missing_inputs):
+                        cmd = "hhplab generate metro"
+                    elif any("coc__B" in item for item in missing_inputs):
+                        coc_ref = (
+                            transform.to
+                            if transform.to.type == "coc"
+                            else transform.from_
+                            if transform.from_.type == "coc"
+                            else None
+                        )
+                        vintage = coc_ref.vintage if coc_ref is not None else None
+                        cmd = None if vintage is None else (
+                            "hhplab ingest boundaries --source hud_exchange "
+                            f"--vintage {vintage}"
+                        )
                 if missing_inputs:
                     hint = (
                         f"Metro transform '{tid}' can be generated once its "

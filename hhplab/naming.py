@@ -830,13 +830,17 @@ def metro_panel_filename(
     start_year: int,
     end_year: int,
     definition_version: str,
+    profile_definition_version: str | None = None,
 ) -> str:
     """Generate filename for metro-scoped panel.
 
-    Pattern: ``panel__metro__Y{start}-{end}@D{def}.parquet``
+    Pattern: ``panel__metro__Y{start}-{end}@D{def}[xS{subset}].parquet``
     """
     defn = _normalize_definition_version(definition_version)
-    return f"panel__metro__Y{start_year}-{end_year}@D{defn}.parquet"
+    subset = ""
+    if profile_definition_version is not None:
+        subset = f"xS{_normalize_definition_version(profile_definition_version)}"
+    return f"panel__metro__Y{start_year}-{end_year}@D{defn}{subset}.parquet"
 
 
 def msa_panel_filename(
@@ -1314,6 +1318,7 @@ def geo_panel_filename(
     geo_type: str = "coc",
     boundary_vintage: str | None = None,
     definition_version: str | None = None,
+    profile_definition_version: str | None = None,
 ) -> str:
     """Return the panel filename for any supported analysis geography.
 
@@ -1328,7 +1333,12 @@ def geo_panel_filename(
     if geo_type == "metro":
         if definition_version is None:
             raise ValueError("definition_version is required for geo_type='metro'")
-        return metro_panel_filename(start_year, end_year, definition_version)
+        return metro_panel_filename(
+            start_year,
+            end_year,
+            definition_version,
+            profile_definition_version=profile_definition_version,
+        )
     if geo_type == "msa":
         if definition_version is None:
             raise ValueError("definition_version is required for geo_type='msa'")
@@ -1343,6 +1353,7 @@ def geo_map_filename(
     geo_type: str = "coc",
     boundary_vintage: str | None = None,
     definition_version: str | None = None,
+    profile_definition_version: str | None = None,
 ) -> str:
     """Return the HTML map filename for any supported analysis geography."""
     panel_name = geo_panel_filename(
@@ -1351,5 +1362,6 @@ def geo_map_filename(
         geo_type=geo_type,
         boundary_vintage=boundary_vintage,
         definition_version=definition_version,
+        profile_definition_version=profile_definition_version,
     )
     return panel_name.replace("panel__", "map__", 1).replace(".parquet", ".html")

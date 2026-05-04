@@ -118,6 +118,81 @@ class GeometryRef(BaseModel):
         description="Geometry source hint (optional).",
         examples=["hud_exchange", "tiger", "nhgis"],
     )
+    subset_profile: str | None = Field(
+        default=None,
+        description=(
+            "Optional subset/profile name layered over a canonical geometry "
+            "universe. Primarily used for metro targets."
+        ),
+        examples=["glynn_fox"],
+    )
+    subset_profile_definition_version: str | None = Field(
+        default=None,
+        description=(
+            "Optional version token for the selected subset/profile. "
+            "Primarily used for metro targets."
+        ),
+        examples=["glynn_fox_v1"],
+    )
+
+    def resolved_metro_definition_version(self) -> str | None:
+        """Return the runtime metro-universe definition version.
+
+        Legacy metro recipes use ``source='glynn_fox_v1'`` to mean the
+        historical Glynn/Fox metro family. Runtime metro-universe execution
+        treats that as the canonical metro universe filtered through the
+        Glynn/Fox subset profile, while preserving the original recipe value
+        for naming/backward compatibility elsewhere.
+        """
+        if self.type != "metro":
+            return self.source
+        if self.source is None:
+            return None
+
+        from hhplab.metro.definitions import (
+            CANONICAL_UNIVERSE_DEFINITION_VERSION,
+            DEFINITION_VERSION as GLYNN_FOX_DEFINITION_VERSION,
+        )
+
+        if (
+            self.source == GLYNN_FOX_DEFINITION_VERSION
+            and self.subset_profile is None
+            and self.subset_profile_definition_version is None
+        ):
+            return CANONICAL_UNIVERSE_DEFINITION_VERSION
+        return self.source
+
+    def resolved_metro_subset_profile(self) -> str | None:
+        """Return the runtime metro subset/profile name, if any."""
+        if self.type != "metro":
+            return None
+        if self.subset_profile is not None:
+            return self.subset_profile
+
+        from hhplab.metro.definitions import (
+            DEFINITION_VERSION as GLYNN_FOX_DEFINITION_VERSION,
+            PROFILE_NAME,
+        )
+
+        if (
+            self.source == GLYNN_FOX_DEFINITION_VERSION
+            and self.subset_profile_definition_version is None
+        ):
+            return PROFILE_NAME
+        return None
+
+    def resolved_metro_subset_definition_version(self) -> str | None:
+        """Return the runtime metro subset/profile definition version, if any."""
+        if self.type != "metro":
+            return None
+        if self.subset_profile_definition_version is not None:
+            return self.subset_profile_definition_version
+
+        from hhplab.metro.definitions import DEFINITION_VERSION as GLYNN_FOX_DEFINITION_VERSION
+
+        if self.source == GLYNN_FOX_DEFINITION_VERSION and self.subset_profile is None:
+            return GLYNN_FOX_DEFINITION_VERSION
+        return None
 
 
 # -----------------------------

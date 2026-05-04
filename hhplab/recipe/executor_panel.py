@@ -53,7 +53,7 @@ def canonicalize_panel_for_target(
 ) -> pd.DataFrame:
     """Add target-geometry metadata columns expected by downstream tools."""
     result = panel.copy()
-    geo_type, boundary_vintage, definition_version = _target_geometry_metadata(
+    geo_type, boundary_vintage, definition_version, _profile_definition_version = _target_geometry_metadata(
         target_geometry
     )
     if "geo_id" in result.columns:
@@ -204,6 +204,11 @@ _RECIPE_METRO_COLUMN_ORDER: list[str] = [
     "pit_sheltered",
     "pit_unsheltered",
     "definition_version_used",
+    "profile",
+    "profile_definition_version",
+    "profile_metro_id",
+    "profile_metro_name",
+    "profile_rank",
     "acs5_vintage_used",
     "acs1_vintage_used",
     "tract_vintage_used",
@@ -348,6 +353,83 @@ def _add_recipe_coc_names(
     return result.drop(columns=["coc_name_boundary"])
 
 
+def _add_recipe_metro_metadata(
+    panel: pd.DataFrame,
+    *,
+    project_root,
+    target_geometry: GeometryRef,
+) -> pd.DataFrame:
+    """Backfill metro names and optional subset-profile provenance."""
+    if panel.empty:
+        return panel
+    if "metro_id" not in panel.columns and "geo_id" not in panel.columns:
+        return panel
+    if (
+        target_geometry.source == target_geometry.resolved_metro_subset_definition_version()
+        and target_geometry.subset_profile is None
+        and target_geometry.subset_profile_definition_version is None
+    ):
+        return panel
+
+    from hhplab.metro.io import read_metro_subset_membership, read_metro_universe
+
+    result = panel.copy()
+    geo_col = "metro_id" if "metro_id" in result.columns else "geo_id"
+    data_root = project_root / "data"
+    metro_definition_version = target_geometry.resolved_metro_definition_version()
+    if metro_definition_version is None:
+        return result
+
+    universe_df = read_metro_universe(
+        metro_definition_version,
+        base_dir=data_root,
+    )[["metro_id", "metro_name"]].drop_duplicates(subset=["metro_id"])
+    result = result.merge(
+        universe_df.rename(columns={"metro_name": "metro_name_universe"}),
+        left_on=geo_col,
+        right_on="metro_id",
+        how="left",
+    )
+    if "metro_name" in result.columns:
+        result["metro_name"] = result["metro_name"].fillna(result["metro_name_universe"])
+    else:
+        result["metro_name"] = result["metro_name_universe"]
+    if "metro_id_x" in result.columns:
+        result = result.rename(columns={"metro_id_x": "metro_id"})
+    result = result.drop(columns=[col for col in ("metro_id_y", "metro_name_universe") if col in result.columns])
+
+    profile_definition_version = target_geometry.resolved_metro_subset_definition_version()
+    if profile_definition_version is None:
+        return result
+
+    subset_df = read_metro_subset_membership(
+        profile_definition_version=profile_definition_version,
+        metro_definition_version=metro_definition_version,
+        base_dir=data_root,
+    ).copy()
+    profile_name = target_geometry.resolved_metro_subset_profile()
+    if profile_name is not None and "profile" in subset_df.columns:
+        subset_df = subset_df[subset_df["profile"].astype(str) == profile_name].copy()
+
+    subset_cols = [
+        "metro_id",
+        "profile",
+        "profile_definition_version",
+        "profile_metro_id",
+        "profile_metro_name",
+        "profile_rank",
+    ]
+    result = result.merge(
+        subset_df[subset_cols].drop_duplicates(subset=["metro_id"]),
+        left_on=geo_col,
+        right_on="metro_id",
+        how="left",
+    )
+    if "metro_id_x" in result.columns:
+        result = result.rename(columns={"metro_id_x": "metro_id"})
+    return result.drop(columns=[col for col in ("metro_id_y",) if col in result.columns])
+
+
 def _resolve_single_product_value(
     *,
     values: set[str],
@@ -475,7 +557,7 @@ def assemble_panel(
             error=str(exc),
         )
 
-    target_geo_type, boundary_vintage, definition_version = _target_geometry_metadata(
+    target_geo_type, boundary_vintage, definition_version, _profile_definition_version = _target_geometry_metadata(
         target.geometry,
     )
 
@@ -512,6 +594,12 @@ def assemble_panel(
         panel = _add_recipe_coc_population_density(
             panel,
             project_root=ctx.project_root,
+        )
+    elif target_geo_type == "metro":
+        panel = _add_recipe_metro_metadata(
+            panel,
+            project_root=ctx.project_root,
+            target_geometry=target.geometry,
         )
 
     # Shared finalization: boundary detection, column ordering, dtypes,

@@ -139,11 +139,53 @@ def _generated_metro_transform_path(
 ) -> Path:
     """Return the recipe-cache path for a generated metro transform."""
     definition = metro_ref.source or "unknown_definition"
+    subset_definition = metro_ref.subset_profile_definition_version
     base_suffix = base_ref.type
     if base_ref.vintage is not None:
         base_suffix = f"{base_suffix}_{base_ref.vintage}"
+    if subset_definition:
+        definition = f"{definition}__subset_{subset_definition}"
     filename = f"{transform_id}__{base_suffix}__{definition}.parquet"
     return project_root / _RECIPE_TRANSFORM_DIR / filename
+
+
+def _metro_uses_legacy_membership(metro_ref: GeometryRef) -> bool:
+    """Return True when the metro ref should use legacy Glynn/Fox artifacts."""
+    return (
+        metro_ref.source == metro_ref.resolved_metro_subset_definition_version()
+        and metro_ref.subset_profile is None
+        and metro_ref.subset_profile_definition_version is None
+    )
+
+
+def _metro_subset_membership(
+    metro_ref: GeometryRef,
+    *,
+    data_root: Path,
+) -> pd.DataFrame | None:
+    """Load the subset selector table for a metro target, if one is active."""
+    profile_definition_version = metro_ref.resolved_metro_subset_definition_version()
+    if profile_definition_version is None:
+        return None
+
+    from hhplab.metro.io import read_metro_subset_membership
+
+    metro_definition_version = metro_ref.resolved_metro_definition_version()
+    if metro_definition_version is None:
+        raise ExecutorError(
+            "Metro subset selectors require geometry.source to identify the "
+            "canonical metro-universe definition version."
+        )
+
+    subset_df = read_metro_subset_membership(
+        profile_definition_version=profile_definition_version,
+        metro_definition_version=metro_definition_version,
+        base_dir=data_root,
+    ).copy()
+    profile_name = metro_ref.resolved_metro_subset_profile()
+    if profile_name is not None and "profile" in subset_df.columns:
+        subset_df = subset_df[subset_df["profile"].astype(str) == profile_name].copy()
+    return subset_df
 
 
 def _generated_msa_transform_path(
@@ -175,63 +217,94 @@ def _resolve_metro_transform_df(
             "definition version (for example 'glynn_fox_v1')."
         )
 
-    from hhplab.metro.io import (
-        read_metro_coc_membership,
-        read_metro_county_membership,
-    )
-
     data_root = project_root / "data"
     definition_version = metro_ref.source
 
-    if base_ref.type == "coc":
-        xwalk = read_metro_coc_membership(
-            definition_version=definition_version,
-            base_dir=data_root,
+    if _metro_uses_legacy_membership(metro_ref):
+        from hhplab.metro.io import (
+            read_metro_coc_membership,
+            read_metro_county_membership,
         )
-        xwalk["area_share"] = 1.0
-        return xwalk[["metro_id", "coc_id", "area_share", "definition_version"]]
 
-    if base_ref.type == "county":
-        xwalk = read_metro_county_membership(
-            definition_version=definition_version,
-            base_dir=data_root,
-        )
-        xwalk["area_share"] = 1.0
-        return xwalk[["metro_id", "county_fips", "area_share", "definition_version"]]
-
-    if base_ref.type == "tract":
-        if base_ref.vintage is None:
-            raise ExecutorError(
-                "Metro tract transforms require a tract vintage so the "
-                "executor can load the tract geometry artifact."
+        if base_ref.type == "coc":
+            xwalk = read_metro_coc_membership(
+                definition_version=definition_version,
+                base_dir=data_root,
             )
-        county_membership = read_metro_county_membership(
-            definition_version=definition_version,
-            base_dir=data_root,
-        )
-        tracts = pd.read_parquet(tract_path(base_ref.vintage, data_root))
-        tract_col: str | None = None
-        for candidate in ("tract_geoid", "GEOID", "geoid"):
-            if candidate in tracts.columns:
-                tract_col = candidate
-                break
-        if tract_col is None:
-            raise ExecutorError(
-                "Tract geometry artifact is missing a tract identifier column. "
-                f"Expected one of tract_geoid/GEOID/geoid. "
-                f"Available columns: {sorted(tracts.columns)}"
-            )
-        tract_index = tracts[[tract_col]].copy()
-        tract_index["tract_geoid"] = tract_index[tract_col].astype(str)
-        tract_index["county_fips"] = tract_index["tract_geoid"].str[:5]
-        xwalk = county_membership.merge(tract_index, on="county_fips", how="inner")
-        xwalk["area_share"] = 1.0
-        return xwalk[["metro_id", "tract_geoid", "area_share", "definition_version"]]
+            xwalk["area_share"] = 1.0
+            return xwalk[["metro_id", "coc_id", "area_share", "definition_version"]]
 
-    raise ExecutorError(
-        f"Metro transforms currently support tract, county, or coc bases; "
-        f"got '{base_ref.type}'."
+        if base_ref.type == "county":
+            xwalk = read_metro_county_membership(
+                definition_version=definition_version,
+                base_dir=data_root,
+            )
+            xwalk["area_share"] = 1.0
+            return xwalk[["metro_id", "county_fips", "area_share", "definition_version"]]
+
+        if base_ref.type == "tract":
+            if base_ref.vintage is None:
+                raise ExecutorError(
+                    "Metro tract transforms require a tract vintage so the "
+                    "executor can load the tract geometry artifact."
+                )
+            county_membership = read_metro_county_membership(
+                definition_version=definition_version,
+                base_dir=data_root,
+            )
+            tracts = pd.read_parquet(tract_path(base_ref.vintage, data_root))
+            tract_col: str | None = None
+            for candidate in ("tract_geoid", "GEOID", "geoid"):
+                if candidate in tracts.columns:
+                    tract_col = candidate
+                    break
+            if tract_col is None:
+                raise ExecutorError(
+                    "Tract geometry artifact is missing a tract identifier column. "
+                    f"Expected one of tract_geoid/GEOID/geoid. "
+                    f"Available columns: {sorted(tracts.columns)}"
+                )
+            tract_index = tracts[[tract_col]].copy()
+            tract_index["tract_geoid"] = tract_index[tract_col].astype(str)
+            tract_index["county_fips"] = tract_index["tract_geoid"].str[:5]
+            xwalk = county_membership.merge(tract_index, on="county_fips", how="inner")
+            xwalk["area_share"] = 1.0
+            return xwalk[["metro_id", "tract_geoid", "area_share", "definition_version"]]
+
+        raise ExecutorError(
+            f"Metro transforms currently support tract, county, or coc bases; "
+            f"got '{base_ref.type}'."
+        )
+
+    msa_ref = GeometryRef(
+        type="msa",
+        vintage=metro_ref.vintage,
+        source=metro_ref.resolved_metro_definition_version(),
     )
+    xwalk = _resolve_msa_transform_df(
+        msa_ref=msa_ref,
+        base_ref=base_ref,
+        project_root=project_root,
+    ).rename(columns={"msa_id": "metro_id"})
+
+    subset_df = _metro_subset_membership(metro_ref, data_root=data_root)
+    if subset_df is not None:
+        keep_cols = [
+            "metro_id",
+            "profile",
+            "profile_definition_version",
+            "profile_metro_id",
+            "profile_metro_name",
+            "profile_rank",
+        ]
+        available = [col for col in keep_cols if col in subset_df.columns]
+        xwalk = xwalk.merge(
+            subset_df[available].drop_duplicates(subset=["metro_id"]),
+            on="metro_id",
+            how="inner",
+        )
+    xwalk["definition_version"] = definition_version
+    return xwalk
 
 
 def _resolve_msa_transform_df(
@@ -377,6 +450,11 @@ def _materialize_generated_metro_transform(
             "transform_id": transform_id,
             "from_type": transform.from_.type,
             "to_type": transform.to.type,
+            "metro_definition_version": metro_ref.resolved_metro_definition_version(),
+            "subset_profile": metro_ref.resolved_metro_subset_profile(),
+            "subset_profile_definition_version": (
+                metro_ref.resolved_metro_subset_definition_version()
+            ),
         },
     )
     write_parquet_with_provenance(xwalk, output_path, provenance)

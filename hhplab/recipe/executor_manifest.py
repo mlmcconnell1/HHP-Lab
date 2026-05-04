@@ -97,8 +97,8 @@ def _build_manifest(
 
 def _target_geometry_metadata(
     target_geometry: GeometryRef,
-) -> tuple[str, str | None, str | None]:
-    """Return (geo_type, boundary_vintage, definition_version) for a target."""
+) -> tuple[str, str | None, str | None, str | None]:
+    """Return target geometry metadata for naming and panel provenance."""
     geo_type = target_geometry.type
     boundary_vintage = (
         str(target_geometry.vintage)
@@ -108,7 +108,17 @@ def _target_geometry_metadata(
     definition_version = (
         target_geometry.source if geo_type in {"metro", "msa"} else None
     )
-    return geo_type, boundary_vintage, definition_version
+    profile_definition_version = (
+        target_geometry.subset_profile_definition_version
+        if geo_type == "metro"
+        else None
+    )
+    return (
+        geo_type,
+        boundary_vintage,
+        definition_version,
+        profile_definition_version,
+    )
 
 
 def _resolve_pipeline_target(
@@ -142,7 +152,7 @@ def _resolve_panel_output_file(
 ) -> Path:
     """Return the canonical panel parquet path for a pipeline."""
     _, target = _resolve_pipeline_target(recipe, pipeline_id)
-    target_geo_type, boundary_vintage, definition_version = _target_geometry_metadata(
+    target_geo_type, boundary_vintage, definition_version, profile_definition_version = _target_geometry_metadata(
         target.geometry,
     )
 
@@ -165,6 +175,7 @@ def _resolve_panel_output_file(
             geo_type=target_geo_type,
             boundary_vintage=boundary_vintage if target_geo_type == "coc" else None,
             definition_version=definition_version,
+            profile_definition_version=profile_definition_version,
         )
     )
 
@@ -177,7 +188,7 @@ def _resolve_map_output_file(
 ) -> Path:
     """Return the canonical HTML map path for a pipeline."""
     _, target = _resolve_pipeline_target(recipe, pipeline_id)
-    target_geo_type, boundary_vintage, definition_version = _target_geometry_metadata(
+    target_geo_type, boundary_vintage, definition_version, profile_definition_version = _target_geometry_metadata(
         target.geometry,
     )
 
@@ -200,6 +211,7 @@ def _resolve_map_output_file(
             geo_type=target_geo_type,
             boundary_vintage=boundary_vintage if target_geo_type == "coc" else None,
             definition_version=definition_version,
+            profile_definition_version=profile_definition_version,
         )
     )
 
