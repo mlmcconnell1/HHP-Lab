@@ -1,8 +1,9 @@
 version: 1
 name: florida_cocs_orlando_msa_map_2025
 description: >
-  Render all Florida CoC boundaries with the Orlando-Kissimmee-Sanford, FL
-  Census MSA boundary overlaid as a single recipe-native HTML map artifact.
+  Render Florida county boundaries and all Florida CoC boundaries with the
+  Orlando-Kissimmee-Sanford, FL Census MSA boundary overlaid as a single
+  recipe-native HTML map artifact.
 
 universe:
   years: [2025]
@@ -17,6 +18,86 @@ targets:
         fit_layers: true
         padding: 30
       layers:
+        - geometry: { type: county, vintage: 2023, source: tiger_line }
+          selector_ids:
+            [
+              "12001",
+              "12003",
+              "12005",
+              "12007",
+              "12009",
+              "12011",
+              "12013",
+              "12015",
+              "12017",
+              "12019",
+              "12021",
+              "12023",
+              "12027",
+              "12029",
+              "12031",
+              "12033",
+              "12035",
+              "12037",
+              "12039",
+              "12041",
+              "12043",
+              "12045",
+              "12047",
+              "12049",
+              "12051",
+              "12053",
+              "12055",
+              "12057",
+              "12059",
+              "12061",
+              "12063",
+              "12065",
+              "12067",
+              "12069",
+              "12071",
+              "12073",
+              "12075",
+              "12077",
+              "12079",
+              "12081",
+              "12083",
+              "12085",
+              "12086",
+              "12087",
+              "12089",
+              "12091",
+              "12093",
+              "12095",
+              "12097",
+              "12099",
+              "12101",
+              "12103",
+              "12105",
+              "12107",
+              "12109",
+              "12111",
+              "12113",
+              "12115",
+              "12117",
+              "12119",
+              "12121",
+              "12123",
+              "12125",
+              "12127",
+              "12129",
+              "12131",
+              "12133",
+            ]
+          label: Florida Counties
+          tooltip_fields: [county_fips, geo_vintage, source]
+          style:
+            fill_color: "#f8f9fa"
+            stroke_color: "#495057"
+            fill_opacity: 0.04
+            stroke_opacity: 0.75
+            line_weight: 0.9
+            z_order: 0
         - geometry: { type: coc, vintage: 2025, source: hud_exchange }
           selector_ids:
             [
