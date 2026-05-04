@@ -194,6 +194,18 @@ class TestEnsureCanonicalGeoColumns:
         result = ensure_canonical_geo_columns(df, "metro")
         assert list(result["geo_id"]) == ["GF01"]
 
+    def test_msa_adds_geo_id_from_msa_id_and_geo_type(self):
+        df = pd.DataFrame({"msa_id": ["35620"], "year": [2020]})
+        result = ensure_canonical_geo_columns(df, "msa")
+        assert list(result.columns) == ["msa_id", "year", "geo_id", "geo_type"]
+        assert list(result["geo_id"]) == ["35620"]
+        assert list(result["geo_type"]) == ["msa"]
+
+    def test_msa_missing_msa_id_raises_actionable_error(self):
+        df = pd.DataFrame({"year": [2020], "value": [42]})
+        with pytest.raises(KeyError, match="geo_type='msa'.*ensure 'msa_id' exists"):
+            ensure_canonical_geo_columns(df, "msa")
+
     def test_missing_source_raises(self):
         df = pd.DataFrame({"metro_id": ["GF01"]})
         with pytest.raises(KeyError, match="Cannot determine"):

@@ -60,6 +60,26 @@ EXPECTED_UNALLOCATED_SHARE: dict[str, float] = {
     "CO-400": 0.0,
 }
 
+# Input validation truth table:
+# - missing CoC id column -> coc_gdf 'coc_id' error
+# - missing CoC geometry column -> coc_gdf 'geometry' error
+# - missing county geometry column -> county_gdf 'geometry' error
+MISSING_INPUT_COLUMN_CASES = [
+    pytest.param("coc", "coc_id", "coc_gdf must have 'coc_id' column", id="coc-id"),
+    pytest.param(
+        "coc",
+        "geometry",
+        "coc_gdf must have 'geometry' column",
+        id="coc-geometry",
+    ),
+    pytest.param(
+        "county",
+        "geometry",
+        "county_gdf must have 'geometry' column",
+        id="county-geometry",
+    ),
+]
+
 
 def _county_gdf() -> gpd.GeoDataFrame:
     return gpd.GeoDataFrame(
@@ -135,6 +155,56 @@ def test_truth_table_allocations(
 
 def test_null_intersection_coc_is_excluded(coc_msa_crosswalk: pd.DataFrame):
     assert "CO-900" not in set(coc_msa_crosswalk["coc_id"])
+
+
+@pytest.mark.parametrize(
+    ("input_name", "column", "expected_error"),
+    MISSING_INPUT_COLUMN_CASES,
+)
+def test_missing_required_input_columns_raise_clear_errors(
+    input_name: str,
+    column: str,
+    expected_error: str,
+):
+    coc_gdf = _coc_gdf()
+    county_gdf = _county_gdf()
+    if input_name == "coc":
+        coc_gdf = coc_gdf.drop(columns=[column])
+    else:
+        county_gdf = county_gdf.drop(columns=[column])
+
+    with pytest.raises(ValueError, match=expected_error):
+        build_coc_msa_crosswalk(
+            coc_gdf,
+            county_gdf,
+            _msa_membership_df(),
+            boundary_vintage="2025",
+            county_vintage="2023",
+            definition_version="census_msa_2023",
+        )
+
+
+def test_lowercase_county_geoid_column_is_normalized():
+    expected = build_coc_msa_crosswalk(
+        _coc_gdf(),
+        _county_gdf(),
+        _msa_membership_df(),
+        boundary_vintage="2025",
+        county_vintage="2023",
+        definition_version="census_msa_2023",
+    )
+    lowercase_counties = _county_gdf().rename(columns={"GEOID": "geoid"})
+
+    actual = build_coc_msa_crosswalk(
+        _coc_gdf(),
+        lowercase_counties,
+        _msa_membership_df(),
+        boundary_vintage="2025",
+        county_vintage="2023",
+        definition_version="census_msa_2023",
+    )
+
+    pd.testing.assert_frame_equal(actual, expected)
 
 
 def test_allocation_summary_flags_unallocated_share(coc_msa_crosswalk: pd.DataFrame):

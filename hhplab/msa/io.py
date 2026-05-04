@@ -128,7 +128,14 @@ def read_msa_definitions(
     base_dir: Path | str | None = None,
 ) -> pd.DataFrame:
     """Read MSA definitions from the curated parquet file."""
-    return pd.read_parquet(naming.msa_definitions_path(definition_version, base_dir))
+    path = naming.msa_definitions_path(definition_version, base_dir)
+    try:
+        return pd.read_parquet(path)
+    except FileNotFoundError:
+        raise FileNotFoundError(
+            f"MSA definitions artifact not found at {path}. "
+            f"Run: hhplab generate msa --definition-version {definition_version}"
+        ) from None
 
 
 def read_msa_county_membership(

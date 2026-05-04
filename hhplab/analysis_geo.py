@@ -233,13 +233,16 @@ def ensure_canonical_geo_columns(
     if geo_id_source_col is None:
         if GEO_ID_COL in df.columns:
             geo_id_source_col = GEO_ID_COL
+        elif geo_type == GEO_TYPE_MSA and MSA_ID_COL in df.columns:
+            geo_id_source_col = MSA_ID_COL
         elif COC_ID_COL in df.columns:
             geo_id_source_col = COC_ID_COL
         else:
             raise KeyError(
                 f"Cannot determine geo_id source column. "
                 f"Provide geo_id_source_col or ensure '{COC_ID_COL}' "
-                f"or '{GEO_ID_COL}' exists."
+                f"or '{GEO_ID_COL}' exists. For geo_type='{GEO_TYPE_MSA}', "
+                f"ensure '{MSA_ID_COL}' exists."
             )
 
     # Set geo_id from source column (no-op if same column)
