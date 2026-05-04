@@ -595,6 +595,19 @@ def _map_artifact_remediation(
             ),
         )
 
+    if geo_type == "county":
+        return Remediation(
+            hint=(
+                f"Ingest TIGER county polygons for vintage {vintage} before "
+                "rendering this map layer."
+            ),
+            command=(
+                f"hhplab ingest tiger --year {vintage} --type counties"
+                if vintage is not None
+                else None
+            ),
+        )
+
     if geo_type == "msa":
         return Remediation(
             hint=(
@@ -656,6 +669,8 @@ def _check_map_artifacts(
                 artifact_path = msa_boundaries_path(source, base_dir)
             elif geo_type == "metro" and source is not None and vintage is not None:
                 artifact_path = metro_boundaries_path(source, vintage, base_dir)
+            elif geo_type == "county" and vintage is not None:
+                artifact_path = county_path(vintage, base_dir)
             else:
                 continue
 

@@ -531,6 +531,24 @@ class TestRunPreflight:
             "hhplab ingest msa-boundaries --definition-version census_msa_2023 --year 2023"
         )
 
+    def test_map_target_missing_county_boundary_is_actionable(self, tmp_path: Path):
+        data = _map_preflight_recipe(
+            geometry={"type": "county", "vintage": 2025},
+        )
+        _setup_preflight_fixtures(tmp_path, include_xwalk=False, include_acs=False)
+
+        recipe = load_recipe(data)
+        report = run_preflight(recipe, project_root=tmp_path)
+
+        map_findings = [
+            f for f in report.findings if f.kind == FindingKind.MISSING_MAP_ARTIFACT
+        ]
+        assert len(map_findings) == 1
+        finding = map_findings[0]
+        assert "county boundary artifact" in finding.message.lower()
+        assert finding.remediation is not None
+        assert finding.remediation.command == "hhplab ingest tiger --year 2025 --type counties"
+
     def test_blocks_stale_translated_acs_cache(self, tmp_path: Path):
         data = _preflight_recipe(with_path=True)
         data["universe"] = {"years": [2020]}

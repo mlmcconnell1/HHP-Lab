@@ -113,7 +113,13 @@ def sample_overlay_artifacts(temp_data_dir):
     metro_dir.mkdir(parents=True, exist_ok=True)
 
     gpd.GeoDataFrame(
-        {"GEOID": ["08001", "08005"]},
+        {
+            "GEOID": ["08001", "08005"],
+            "county_name": ["Adams", "Arapahoe"],
+            "state_name": ["Colorado", "Colorado"],
+            "source": ["tiger_line", "tiger_line"],
+            "geo_vintage": ["2025", "2025"],
+        },
         geometry=[
             Polygon(
                 [
@@ -320,6 +326,32 @@ def _mixed_overlay_with_tract_target() -> TargetSpec:
                     label="Tract layer",
                     style_mode="distinct",
                     tooltip_fields=["tract_geoid", "geo_vintage"],
+                ),
+            ],
+            viewport=MapViewportSpec(fit_layers=True, padding=18),
+        ),
+    )
+
+
+def _mixed_overlay_with_county_target() -> TargetSpec:
+    return TargetSpec(
+        id="overlay_map_with_counties",
+        geometry=GeometryRef(type="coc", vintage=2025),
+        outputs=["map"],
+        map_spec=MapSpec(
+            layers=[
+                MapLayerSpec(
+                    geometry=GeometryRef(type="coc", vintage=2025),
+                    selector_ids=["CO-500"],
+                    label="CoC layer",
+                    tooltip_fields=["coc_id", "coc_name"],
+                ),
+                MapLayerSpec(
+                    geometry=GeometryRef(type="county", vintage=2025),
+                    selector_ids=["08001", "08005"],
+                    label="County layer",
+                    style_mode="distinct",
+                    tooltip_fields=["county_fips", "county_name", "geo_vintage"],
                 ),
             ],
             viewport=MapViewportSpec(fit_layers=True, padding=18),
@@ -560,6 +592,24 @@ class TestRenderRecipeMap:
         assert "Tract layer" in content
         assert "08001000100" in content
         assert "08001000300" in content
+
+    def test_render_mixed_overlay_map_with_county_layer(
+        self,
+        sample_boundaries,
+        sample_overlay_artifacts,
+        temp_data_dir,
+    ):
+        out_path = render_recipe_map(
+            _mixed_overlay_with_county_target(),
+            project_root=temp_data_dir,
+            out_html=temp_data_dir / "outputs" / "overlay-with-counties.html",
+        )
+
+        content = out_path.read_text()
+        assert "CoC layer" in content
+        assert "County layer" in content
+        assert "08001" in content
+        assert "Arapahoe" in content
 
     def test_distinct_style_mode_reuses_colors_for_noncontiguous_polygons(self):
         gdf = gpd.GeoDataFrame(

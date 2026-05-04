@@ -12,7 +12,7 @@ import folium
 import geopandas as gpd
 import pandas as pd
 
-from hhplab.naming import tract_path
+from hhplab.naming import county_path, tract_path
 from hhplab.paths import curated_dir
 from hhplab.registry import latest_vintage
 
@@ -28,12 +28,14 @@ SUPPORTED_BASEMAPS = {
 }
 IDENTIFIER_COLUMNS = {
     "coc": "coc_id",
+    "county": "county_fips",
     "msa": "msa_id",
     "metro": "metro_id",
     "tract": "tract_geoid",
 }
 DEFAULT_TOOLTIP_FIELDS = {
     "coc": ["coc_id", "coc_name", "boundary_vintage", "source"],
+    "county": ["county_fips", "geo_vintage", "source"],
     "msa": ["msa_id", "msa_name", "cbsa_code", "definition_version"],
     "metro": ["metro_id", "metro_name", "definition_version"],
     "tract": ["tract_geoid", "geo_vintage", "source"],
@@ -137,6 +139,38 @@ def _load_metro_boundaries(
     )
 
 
+def _load_county_boundaries(
+    county_vintage: str | int,
+    *,
+    base_dir: Path,
+) -> gpd.GeoDataFrame:
+    canonical_path = county_path(county_vintage, base_dir)
+    legacy_path = canonical_path.with_name(f"counties__{county_vintage}.parquet")
+    path = canonical_path if canonical_path.exists() else legacy_path
+    gdf = gpd.read_parquet(path)
+
+    fips_column = next(
+        (
+            column
+            for column in ("county_fips", "GEOID", "geoid", "GEOID20", "GEOID10")
+            if column in gdf.columns
+        ),
+        None,
+    )
+    if fips_column is None:
+        raise ValueError(
+            "County geometry artifact must contain one of "
+            "'county_fips', 'GEOID', 'geoid', 'GEOID20', or 'GEOID10'."
+        )
+
+    if "county_fips" not in gdf.columns:
+        gdf = gdf.rename(columns={fips_column: "county_fips"})
+    gdf["county_fips"] = gdf["county_fips"].astype(str).str.strip().str.zfill(5)
+    if "geo_vintage" not in gdf.columns:
+        gdf["geo_vintage"] = str(county_vintage)
+    return gdf
+
+
 def _load_tract_boundaries(
     tract_vintage: str | int,
     *,
@@ -207,6 +241,13 @@ def _load_layer_geometries(layer: MapLayerSpec, *, base_dir: Path) -> gpd.GeoDat
             base_dir=base_dir,
         )
 
+    if geo_type == "county":
+        if vintage is None:
+            raise ValueError(
+                "County map layers require geometry.vintage to name the county geometry vintage."
+            )
+        return _load_county_boundaries(vintage, base_dir=base_dir)
+
     if geo_type == "tract":
         if vintage is None:
             raise ValueError(
@@ -215,7 +256,8 @@ def _load_layer_geometries(layer: MapLayerSpec, *, base_dir: Path) -> gpd.GeoDat
         return _load_tract_boundaries(vintage, base_dir=base_dir)
 
     raise ValueError(
-        f"Unsupported map layer geometry '{geo_type}'. Supported types: coc, msa, metro, tract."
+        f"Unsupported map layer geometry '{geo_type}'. "
+        "Supported types: coc, county, msa, metro, tract."
     )
 
 
@@ -377,7 +419,8 @@ def _resolve_map_layer(layer: MapLayerSpec, *, base_dir: Path) -> ResolvedMapLay
     geo_type = layer.geometry.type
     if geo_type not in IDENTIFIER_COLUMNS:
         raise ValueError(
-            f"Unsupported map layer geometry '{geo_type}'. Supported types: coc, msa, metro, tract."
+            f"Unsupported map layer geometry '{geo_type}'. "
+            "Supported types: coc, county, msa, metro, tract."
         )
 
     gdf = _load_layer_geometries(layer, base_dir=base_dir)

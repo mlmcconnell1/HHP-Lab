@@ -390,7 +390,7 @@ class MapLayerSpec(BaseModel):
 
     geometry: GeometryRef = Field(
         ...,
-        description="Geometry universe to render for this layer (e.g. coc, msa, metro).",
+        description="Geometry universe to render for this layer (e.g. coc, county, msa, metro).",
     )
     selector_ids: list[str] = Field(
         ...,
