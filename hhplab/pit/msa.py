@@ -84,6 +84,11 @@ def _resolve_single_value(series: pd.Series, field_name: str) -> str:
     return values[0]
 
 
+def _is_missing_scalar(value: object) -> bool:
+    """Return True for scalar missing values without inspecting tuple/list contents."""
+    return bool(pd.api.types.is_scalar(value) and pd.isna(value))
+
+
 def aggregate_pit_to_msa(
     pit_df: pd.DataFrame,
     crosswalk_df: pd.DataFrame,
@@ -204,7 +209,7 @@ def aggregate_pit_to_msa(
 
         for row in year_result.itertuples(index=False):
             found_cocs_raw = getattr(row, "found_cocs", ())
-            if pd.isna(found_cocs_raw):
+            if _is_missing_scalar(found_cocs_raw):
                 found_cocs = set()
             else:
                 found_cocs = set(found_cocs_raw or ())

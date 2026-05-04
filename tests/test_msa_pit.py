@@ -134,6 +134,25 @@ class TestAggregatePitToMsa:
         assert result["pit_total"].isna().all()
         assert (result["allocation_coverage_ratio"] == 0.0).all()
 
+    def test_found_coc_tuples_do_not_use_pd_isna(
+        self,
+        coc_pit: pd.DataFrame,
+        msa_crosswalk: pd.DataFrame,
+        monkeypatch: pytest.MonkeyPatch,
+    ):
+        real_isna = pd.isna
+
+        def strict_isna(value):
+            if isinstance(value, tuple):
+                raise ValueError("pd.isna called on tuple")
+            return real_isna(value)
+
+        monkeypatch.setattr("hhplab.pit.msa.pd.isna", strict_isna)
+
+        result = aggregate_pit_to_msa(coc_pit, msa_crosswalk)
+
+        assert set(result["msa_id"]) == {"35620", "41180"}
+
     def test_missing_crosswalk_columns_raise(self, coc_pit: pd.DataFrame):
         bad = pd.DataFrame({"coc_id": ["CO-100"], "msa_id": ["35620"]})
         with pytest.raises(ValueError, match="CoC-to-MSA crosswalk must have columns"):
