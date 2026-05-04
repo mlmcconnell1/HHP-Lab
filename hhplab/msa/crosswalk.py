@@ -75,7 +75,11 @@ def _validate_inputs(
     if "geometry" not in county_gdf.columns:
         raise ValueError("county_gdf must have 'geometry' column")
 
-    missing = [col for col in REQUIRED_MSA_MEMBERSHIP_COLUMNS if col not in msa_county_membership.columns]
+    missing = [
+        col
+        for col in REQUIRED_MSA_MEMBERSHIP_COLUMNS
+        if col not in msa_county_membership.columns
+    ]
     if missing:
         raise ValueError(
             "msa_county_membership is missing required columns "
@@ -173,6 +177,34 @@ def _validate_allocation_totals(summary: pd.DataFrame) -> None:
     )
 
 
+def _validate_coc_area_consistency(county_crosswalk: pd.DataFrame) -> None:
+    """Raise when one CoC carries multiple material coc_area denominators."""
+    if county_crosswalk.empty:
+        return
+
+    area_stats = (
+        county_crosswalk.groupby("coc_id")["coc_area"]
+        .agg(coc_area_min="min", coc_area_max="max")
+        .reset_index()
+    )
+    tolerance = area_stats["coc_area_max"].abs().clip(lower=1.0) * ALLOCATION_SHARE_TOLERANCE
+    invalid = area_stats[
+        (area_stats["coc_area_max"] - area_stats["coc_area_min"]).abs() > tolerance
+    ].copy()
+    if invalid.empty:
+        return
+
+    examples = ", ".join(
+        f"{row.coc_id}: min={row.coc_area_min:.9f}, max={row.coc_area_max:.9f}"
+        for row in invalid.itertuples(index=False)
+    )
+    raise ValueError(
+        "CoC-to-county crosswalk produced inconsistent coc_area values for the same "
+        "coc_id before MSA aggregation. Rebuild the county crosswalk or inspect the "
+        f"input geometries. Offending CoCs: {examples}"
+    )
+
+
 def build_coc_msa_crosswalk(
     coc_gdf: gpd.GeoDataFrame,
     county_gdf: gpd.GeoDataFrame,
@@ -211,6 +243,7 @@ def build_coc_msa_crosswalk(
             f"definition_version={definition_version}. This usually indicates a geometry mismatch "
             "or CRS issue between CoC boundaries and county geometries."
         )
+    _validate_coc_area_consistency(county_crosswalk)
 
     membership = msa_county_membership[
         ["msa_id", "cbsa_code", "county_fips"]
@@ -223,7 +256,8 @@ def build_coc_msa_crosswalk(
         expected_msa_counties = _format_expected_msa_preview(membership)
         return _empty_crosswalk_with_warning(
             "CoC-to-county intersections were found, but none matched the MSA county membership "
-            f"artifact for definition_version={definition_version}. Tried county_fips: {tried_counties}. "
+            f"artifact for definition_version={definition_version}. "
+            f"Tried county_fips: {tried_counties}. "
             f"MSA counties by msa_id: {expected_msa_counties}."
         )
 

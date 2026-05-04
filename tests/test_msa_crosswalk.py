@@ -232,6 +232,41 @@ def test_invalid_allocation_share_raises_clear_error(monkeypatch: pytest.MonkeyP
         )
 
 
+def test_inconsistent_coc_area_raises_clear_error(monkeypatch: pytest.MonkeyPatch):
+    inconsistent_county_crosswalk = pd.DataFrame(
+        {
+            "coc_id": ["CO-999", "CO-999"],
+            "boundary_vintage": ["2025", "2025"],
+            "county_fips": ["36061", "29510"],
+            "area_share": [0.5, 0.5],
+            "intersection_area": [50.0, 50.0],
+            "county_area": [100.0, 100.0],
+            "coc_area": [100.0, 100.1],
+        }
+    )
+
+    monkeypatch.setattr(
+        "hhplab.msa.crosswalk.build_county_crosswalk",
+        lambda *args, **kwargs: inconsistent_county_crosswalk,
+    )
+
+    with pytest.raises(
+        ValueError,
+        match=(
+            r"CoC-to-county crosswalk produced inconsistent coc_area values .* "
+            r"Offending CoCs: CO-999: min=100\.000000000, max=100\.100000000"
+        ),
+    ):
+        build_coc_msa_crosswalk(
+            _coc_gdf(),
+            _county_gdf(),
+            _msa_membership_df(),
+            boundary_vintage="2025",
+            county_vintage="2023",
+            definition_version="census_msa_2023",
+        )
+
+
 def test_allocation_summary_rejects_total_above_one_plus_tolerance():
     crosswalk = pd.DataFrame(
         {
