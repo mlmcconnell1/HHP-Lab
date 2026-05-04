@@ -19,7 +19,7 @@ the CLI can inspect local curated artifacts with
 | Census | TIGER counties | county polygons | Decennial/current vintages used by recipes | county FIPS, county name/state, geometry, vintage/provenance | county boundaries, CoC-county crosswalks, metro county membership joins | County-native sources such as PEP and ZORI use this geometry for aggregation. |
 | Census | TIGER/NHGIS tracts | tract polygons | Decennial tract eras | tract GEOID, tract vintage, geometry, provenance | tract boundaries, CoC-tract crosswalks, tract relationship bridges | ACS and tract crosswalks must match the correct decennial tract era. |
 | Census | ACS 5-year | tract | 2009-ongoing | `total_population`, `adult_population`, `population_below_poverty`, `median_household_income`, `median_gross_rent`, `moe_total_population`, ACS vintage | CoC ACS measures, metro ACS measures, county weights for ZORI, panel demographic columns | ACS 5-year vintages are end years for five-year collection windows. |
-| Census | ACS 1-year | CBSA/metro | Available where population thresholds are met | `unemployment_rate_acs1`, ACS1 vintage, metro definition version | metro-native ACS1 artifact, optional metro panel unemployment column | Only used for metro targets via `panel_policy.acs1`. |
+| Census | ACS 1-year | CBSA/metro | 2012-ongoing except 2020; available where ACS1 population thresholds are met | CBSA employment counts and `unemployment_rate_acs1`; income distribution; rent and owner-cost measures; rent/owner-cost burden bins; tenure-by-income; utility costs; heating fuel; gross rent by bedrooms; structure age; units-in-structure; household size; ACS1 vintage; metro definition version | metro-native ACS1 artifact, optional metro panel ACS1 measures | Only used for metro targets via `panel_policy.acs1`; utility-cost tables begin in 2021 and are null-backed in earlier supported vintages. |
 | Census | PEP | county | 2010-ongoing | annual `population`, county FIPS/name/state, reference date, PEP vintage/provenance | CoC PEP population, metro PEP population, optional panel `population` measure | PEP reference dates are July 1 annual estimates; recipes can use temporal filters to align to January when needed. |
 | Zillow | ZORI | county or ZIP, normalized to county for standard panels | 2015-ongoing | monthly `zori`, region name/state, source URL, raw hash, metric/provenance fields | normalized ZORI, CoC ZORI, metro ZORI, yearly collapsed ZORI, panel rent columns | Standard panel alignment uses January observations to match PIT timing. |
 
@@ -471,7 +471,7 @@ Analysis-ready metro×year panels combining PIT counts with ACS measures:
 
 When ZORI is enabled, the same ZORI columns as CoC panels are appended (`zori_coc`, `zori_coverage_ratio`, `zori_is_eligible`, `zori_excluded_reason`, `rent_to_income`).
 
-When ACS 1-year data is included (`panel_policy.acs1.include: true`), metro panels also carry:
+When ACS 1-year data is included (`panel_policy.acs1.include: true`), metro panels also carry requested ACS1 metro-native measures. Current examples commonly request:
 - `unemployment_rate_acs1` — ACS 1-year unemployment rate (metro-native, from CBSA-level B23025)
 - `acs1_vintage_used` — Which ACS1 vintage contributed (nullable when no ACS1 data available)
 - `acs_products_used` — Comma-separated product list: `"acs5"` or `"acs5,acs1"`
@@ -483,13 +483,26 @@ ACS 1-year data is ingested at CBSA geography and stored against the canonical m
 | Column | Type | Description |
 |--------|------|-------------|
 | `metro_id` | string | Canonical CBSA code by default, or profile metro ID for subset outputs |
-| `geo_type` | string | Always `"metro"` |
-| `geo_id` | string | Same as `metro_id` |
-| `unemployment_rate_acs1` | float | Unemployment rate from ACS 1-year B23025 |
+| `metro_name` | string | Metro area name |
 | `definition_version` | string | Metro definition version |
-| `acs1_vintage` | int | ACS 1-year vintage end year |
+| `acs1_vintage` | string | ACS 1-year vintage end year |
+| `cbsa_code` | string | Census CBSA code used for source traceability |
+| `pop_16_plus` | Int64 | Population age 16 and over from B23025 |
+| `civilian_labor_force` | Int64 | Civilian labor force from B23025 |
+| `unemployed_count` | Int64 | Unemployed civilians from B23025 |
+| `unemployment_rate_acs1` | Float64 | `unemployed_count / civilian_labor_force` |
+| income distribution columns | Int64/Float64 | Household income quintile cutoffs, mean income by quintile, and aggregate income shares from B19080/B19081/B19082 |
+| housing-cost columns | Int64 | Median gross rent, median and aggregate owner costs, gross-rent burden bins, and owner-cost burden bins from B25064/B25088/B25089/B25070/B25091 |
+| tenure and household columns | Int64/Float64 | Tenure-by-income, median household income by tenure, and average household size by tenure from B25118/B25119/B25010 |
+| utility and fuel columns | Int64 | Electricity, gas, water/sewer cost bins, and heating-fuel categories from B25132/B25133/B25134/B25040 |
+| housing-stock columns | Int64 | Gross rent by bedrooms, median structure year built, and units in structure from B25068/B25035/B25024 |
+| `data_source` | string | Always `"census_acs1"` |
+| `source_ref` | string | Census API endpoint and fetched table set |
+| `ingested_at` | datetime | UTC ingest timestamp |
 
-Storage: `data/curated/acs/acs1__metro__A{vintage}@D{version}.parquet`
+The canonical output schema currently has 187 columns: 5 identity/version columns, 179 ACS1 measure columns, and 3 provenance columns. The requested ACS1 tables are B23025, B19080, B19081, B19082, B25064, B25088, B25089, B25070, B25091, B25119, B25118, B25132, B25133, B25134, B25040, B25068, B25035, B25024, and B25010. Utility-cost tables B25132, B25133, and B25134 are available beginning with ACS1 vintage 2021; earlier supported vintages keep those columns as nulls for schema stability.
+
+Storage: `data/curated/acs/acs1_metro__A{vintage}@D{version}.parquet`
 
 ACS 1-year estimates are only available for geographies with population >= 65,000. Subset profiles such as Glynn/Fox inherit eligibility from their underlying CBSAs.
 
@@ -508,7 +521,7 @@ ACS 1-year estimates are only available for geographies with population >= 65,00
 | Metro ZORI | `data/curated/zori/zori__metro__A{acs}@D{version}xC{county}__w{weight}.parquet` | Metro rent index |
 | Metro ZORI yearly | `data/curated/zori/zori_yearly__metro__A{acs}@D{version}xC{county}__w{weight}__m{method}.parquet` | Metro yearly-collapsed rent index |
 | Metro panels | `outputs/<recipe-name>/panel__metro__Y{start}-{end}@D{version}.parquet` | Metro analysis panels |
-| Metro ACS1 | `data/curated/acs/acs1__metro__A{vintage}@D{version}.parquet` | Metro-native ACS 1-year unemployment |
+| Metro ACS1 | `data/curated/acs/acs1_metro__A{vintage}@D{version}.parquet` | Metro-native ACS 1-year measures |
 
 ## Normalized ZORI Schema
 

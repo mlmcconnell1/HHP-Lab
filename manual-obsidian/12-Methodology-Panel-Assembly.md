@@ -29,7 +29,7 @@ When the target geography is metro, the recipe system adapts its behavior:
 |------|-----|-------|
 | PIT source | CoC-native PIT counts | Aggregated from member CoCs via metro-CoC membership table |
 | ACS5 measures | Tract→CoC crosswalk | Tract→county→metro via county membership |
-| ACS1 unemployment | Not applicable | Metro-native CBSA identity resampling (optional, `panel_policy.acs1`) |
+| ACS1 metro measures | Not applicable | Metro-native CBSA identity resampling (optional, `panel_policy.acs1`) |
 | PEP population | County→CoC crosswalk | County→metro via county membership |
 | ZORI rents | County→CoC crosswalk | County→metro via county membership |
 | Boundary alignment | `period_faithful` or `retrospective` | `definition_fixed` (metros are version-pinned, not vintaged) |
@@ -40,10 +40,10 @@ PIT coverage tracking for metro panels reports `coc_count`, `coc_expected`, `coc
 
 ### ACS 1-Year Metro Integration
 
-ACS 1-year data provides CBSA-native unemployment rates that do not require crosswalk-based aggregation. When `panel_policy.acs1.include` is set on a metro target:
+ACS 1-year data provides CBSA-native measures that do not require crosswalk-based aggregation. The current ingest covers B23025 employment/unemployment plus income distribution, housing-cost, utility-cost, tenure, housing-stock, and household-size detailed tables. When `panel_policy.acs1.include` is set on a metro target:
 
 - ACS1 data is resampled via identity (metro-native) and joined into the panel on `geo_id` and `year`
-- The merge is optional: if no ACS1 data is available for a given vintage, the panel proceeds with `unemployment_rate_acs1` set to null
+- The merge is optional: if no ACS1 data is available for a given vintage, the panel proceeds with requested ACS1 measure columns set to null
 - `acs1_vintage_used` reflects the resolved ACS1 input vintage (derived from the data, not a lag heuristic)
 - `acs_products_used` tracks which ACS products contributed (`"acs5"` or `"acs5,acs1"`)
 

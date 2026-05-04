@@ -227,7 +227,7 @@ When `panel_policy.zori` is present, the executor canonicalizes the aggregated Z
 |-------|------|---------|-------------|
 | `include` | `bool` | `false` | If true, merge ACS 1-year metro-native measures into the panel. |
 
-When `panel_policy.acs1.include` is true on a metro target, the executor adds `unemployment_rate_acs1`, `acs1_vintage_used`, and sets `acs_products_used` to `"acs5,acs1"`.
+When `panel_policy.acs1.include` is true on a metro target, the executor preserves requested ACS1 metro-native measure columns, adds `acs1_vintage_used`, and sets `acs_products_used` to `"acs5,acs1"`. Existing example recipes request `unemployment_rate_acs1`, but the ACS1 ingest artifact also contains additional income, housing-cost, utility-cost, tenure, housing-stock, and household-size measures.
 
 ```yaml
 targets:

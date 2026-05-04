@@ -48,7 +48,7 @@ flowchart TB
 - `hhplab/xwalks/`: tract/county crosswalk generation (geography-neutral via `geo_id_col` parameter)
 - `hhplab/measures/`, `hhplab/rents/`, `hhplab/pep/`, `hhplab/pit/`: dataset-specific ingestion and aggregation (generalized to arbitrary target geographies)
 - `hhplab/metro/`: metro definition data, PIT/ACS/PEP/ZORI aggregation to metro, validation, I/O
-- `hhplab/acs/ingest/metro_acs1.py`: ACS 1-year CBSA-level unemployment ingestion for metros
+- `hhplab/acs/ingest/metro_acs1.py`: ACS 1-year CBSA-level detailed-table ingestion for metro-native measures
 
 ## Storage Model
 

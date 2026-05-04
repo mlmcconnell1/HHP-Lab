@@ -3,7 +3,7 @@
 ## Recipe-Driven Build
 
 1. Inspect available curated assets if needed (`hhplab status --json` for automation, `hhplab list curated` for browsing).
-2. Ingest required global assets (`boundaries`, `tiger`, `acs5-tract`, `pit`, `zori`, `pep`, and optionally `acs1-metro` for metro unemployment).
+2. Ingest required global assets (`boundaries`, `tiger`, `acs5-tract`, `pit`, `zori`, `pep`, and optionally `acs1-metro` for metro-native ACS1 measures).
 3. Generate required crosswalks.
 4. Run `hhplab build recipe-preflight` when you want a no-execute readiness gate.
 5. Run a YAML recipe for deterministic panel construction.
@@ -24,7 +24,7 @@ Example command sequence:
 hhplab ingest boundaries --source hud_exchange --vintage 2025
 hhplab ingest tiger --year 2023 --type all
 hhplab ingest acs5-tract --acs 2019-2023 --tracts 2023
-hhplab ingest acs1-metro --vintage 2023          # optional: metro ACS1 unemployment
+hhplab ingest acs1-metro --vintage 2023          # optional: metro-native ACS1 measures
 hhplab ingest pit-vintage --vintage 2024
 hhplab ingest zori --geography county
 hhplab ingest pep --series auto
