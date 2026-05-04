@@ -115,7 +115,19 @@ def generate_msa_xwalk(
             )
         raise typer.Exit(1)
 
-    boundary_path = resolve_curated_boundary_path(resolved_boundary)
+    try:
+        boundary_path = resolve_curated_boundary_path(resolved_boundary)
+    except FileNotFoundError as exc:
+        message = (
+            f"{exc}. "
+            f"Run: hhplab ingest boundaries --source hud_exchange --vintage {resolved_boundary}"
+        )
+        if json_output:
+            typer.echo(json.dumps({"status": "error", "error": message}))
+        else:
+            typer.echo(f"Error: {message}", err=True)
+        raise typer.Exit(1) from exc
+
     county_geometry_path = county_path(counties)
 
     if not boundary_path.exists():

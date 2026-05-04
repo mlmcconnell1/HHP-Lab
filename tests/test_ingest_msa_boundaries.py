@@ -16,17 +16,10 @@ from hhplab.cli.main import app
 runner = CliRunner()
 
 
-def test_download_msa_boundaries_preserves_cbsa_code_without_suffix_collisions(
+def _patch_msa_boundary_download(
     monkeypatch: pytest.MonkeyPatch,
-):
-    source_gdf = gpd.GeoDataFrame(
-        {
-            "CBSAFP": ["17410"],
-            "NAME": ["Cleveland, OH"],
-        },
-        geometry=[box(0, 0, 1, 1)],
-        crs="EPSG:4326",
-    )
+    source_gdf: gpd.GeoDataFrame,
+) -> None:
     expected = pd.DataFrame(
         {
             "msa_id": ["17410"],
@@ -86,14 +79,70 @@ def test_download_msa_boundaries_preserves_cbsa_code_without_suffix_collisions(
     monkeypatch.setattr("hhplab.msa.boundaries.zipfile.ZipFile", _FakeZipFile)
     monkeypatch.setattr("hhplab.msa.boundaries.gpd.read_file", lambda _path: source_gdf)
 
+
+@pytest.mark.parametrize("name_col", ["NAME", "NAMELSAD", "CBSA_NAME"])
+def test_download_msa_boundaries_uses_supported_name_column_fallbacks(
+    monkeypatch: pytest.MonkeyPatch,
+    name_col: str,
+):
+    source_name = f"{name_col} Cleveland, OH"
+    source_gdf = gpd.GeoDataFrame(
+        {
+            "CBSAFP": ["17410"],
+            name_col: [source_name],
+        },
+        geometry=[box(0, 0, 1, 1)],
+        crs="EPSG:4326",
+    )
+    _patch_msa_boundary_download(monkeypatch, source_gdf)
+
     from hhplab.msa.boundaries import download_msa_boundaries
 
     boundaries, _sha256, _size, _raw_path = download_msa_boundaries("census_msa_2023")
 
     assert list(boundaries["cbsa_code"]) == ["17410"]
     assert list(boundaries["msa_id"]) == ["17410"]
+    assert list(boundaries["cbsa_name_source"]) == [source_name]
     assert "cbsa_code_x" not in boundaries.columns
     assert "cbsa_code_y" not in boundaries.columns
+
+
+def test_download_msa_boundaries_missing_crs_raises_actionable_error(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    source_gdf = gpd.GeoDataFrame(
+        {
+            "CBSAFP": ["17410"],
+            "NAME": ["Cleveland, OH"],
+        },
+        geometry=[box(0, 0, 1, 1)],
+    )
+    _patch_msa_boundary_download(monkeypatch, source_gdf)
+
+    from hhplab.msa.boundaries import download_msa_boundaries
+
+    with pytest.raises(ValueError, match="source has no CRS; cannot safely ingest"):
+        download_msa_boundaries("census_msa_2023")
+
+
+def test_download_msa_boundaries_reprojects_to_epsg_4326(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    source_gdf = gpd.GeoDataFrame(
+        {
+            "CBSAFP": ["17410"],
+            "NAME": ["Cleveland, OH"],
+        },
+        geometry=[box(0, 0, 1000, 1000)],
+        crs="EPSG:5070",
+    )
+    _patch_msa_boundary_download(monkeypatch, source_gdf)
+
+    from hhplab.msa.boundaries import download_msa_boundaries
+
+    boundaries, _sha256, _size, _raw_path = download_msa_boundaries("census_msa_2023")
+
+    assert boundaries.crs.to_epsg() == 4326
 
 
 def test_ingest_msa_boundaries_json(monkeypatch, tmp_path: Path):
@@ -141,6 +190,35 @@ def test_ingest_msa_boundaries_json(monkeypatch, tmp_path: Path):
     assert payload["geometry_vintage"] == 2023
     assert payload["msa_count"] == 1
     assert payload["artifact"].endswith("msa_boundaries__census_msa_2023.parquet")
+
+
+def test_ingest_msa_boundaries_json_surfaces_validation_failure(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+):
+    monkeypatch.chdir(tmp_path)
+
+    def fake_ingest(definition_version: str, *, tiger_year: int):
+        raise ValueError("MSA boundary validation failed:\nmissing expected MSA ids")
+
+    monkeypatch.setattr(
+        "hhplab.msa.boundaries.ingest_msa_boundaries",
+        fake_ingest,
+    )
+
+    result = runner.invoke(
+        app,
+        ["ingest", "msa-boundaries", "--json"],
+        catch_exceptions=False,
+    )
+
+    assert result.exit_code == 1
+    payload = json.loads(result.stdout)
+    assert payload == {
+        "status": "error",
+        "error": "validation_failed",
+        "detail": "MSA boundary validation failed:\nmissing expected MSA ids",
+    }
 
 
 def test_validate_msa_json(monkeypatch, tmp_path: Path):

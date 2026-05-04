@@ -2,13 +2,14 @@
 
 from __future__ import annotations
 
-import json
 import inspect
-from pathlib import Path
+import json
 import warnings
+from pathlib import Path
 
 import geopandas as gpd
 import pandas as pd
+import pytest
 from shapely.geometry import box
 from typer.testing import CliRunner
 
@@ -19,6 +20,17 @@ from hhplab.msa.definitions import DELINEATION_FILE_YEAR
 from hhplab.registry.schema import RegistryEntry
 
 runner = CliRunner()
+
+
+def _boundary_registry_entry(tmp_path: Path) -> RegistryEntry:
+    return RegistryEntry(
+        boundary_vintage="2025",
+        source="hud_exchange",
+        ingested_at=pd.Timestamp("2026-04-30T00:00:00Z").to_pydatetime(),
+        path=tmp_path / "data" / "curated" / "coc_boundaries" / "coc__B2025.parquet",
+        feature_count=1,
+        hash_of_file="abc",
+    )
 
 
 def _write_test_inputs(tmp_path: Path) -> None:
@@ -52,6 +64,69 @@ def _write_test_inputs(tmp_path: Path) -> None:
             "definition_version": ["census_msa_2023"],
         }
     ).to_parquet(msa_dir / "msa_county_membership__census_msa_2023.parquet")
+
+
+def _write_boundary_input(tmp_path: Path) -> None:
+    boundaries_dir = tmp_path / "data" / "curated" / "coc_boundaries"
+    boundaries_dir.mkdir(parents=True, exist_ok=True)
+    gpd.GeoDataFrame(
+        {"coc_id": ["CO-100"]},
+        geometry=[box(0, 0, 10, 10)],
+        crs="EPSG:4326",
+    ).to_parquet(boundaries_dir / "coc__B2025.parquet")
+
+
+def _setup_no_boundary_registry(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> list[str]:
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr("hhplab.cli.generate_msa_xwalk.latest_vintage", lambda: None)
+    return ["generate", "msa-xwalk", "--counties", "2023", "--json"]
+
+
+def _setup_missing_boundary_file(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> list[str]:
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(
+        "hhplab.cli.generate_msa_xwalk.list_boundaries",
+        lambda: [_boundary_registry_entry(tmp_path)],
+    )
+    return ["generate", "msa-xwalk", "--boundary", "2025", "--counties", "2023", "--json"]
+
+
+def _setup_missing_county_geometry(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> list[str]:
+    monkeypatch.chdir(tmp_path)
+    _write_boundary_input(tmp_path)
+    monkeypatch.setattr(
+        "hhplab.cli.generate_msa_xwalk.list_boundaries",
+        lambda: [_boundary_registry_entry(tmp_path)],
+    )
+    return ["generate", "msa-xwalk", "--boundary", "2025", "--counties", "2023", "--json"]
+
+
+GENERATE_MSA_XWALK_ERROR_CASES = [
+    pytest.param(
+        _setup_no_boundary_registry,
+        "No boundary vintages found in the registry",
+        "hhplab ingest boundaries --source hud_exchange --vintage <year>",
+        id="empty-registry",
+    ),
+    pytest.param(
+        _setup_missing_boundary_file,
+        "Boundary file not found",
+        "hhplab ingest boundaries --source hud_exchange --vintage 2025",
+        id="missing-boundary-file",
+    ),
+    pytest.param(
+        _setup_missing_county_geometry,
+        "County geometry file not found",
+        "hhplab ingest tiger --year 2023 --type counties",
+        id="missing-county-geometry",
+    ),
+]
 
 
 def test_generate_msa_xwalk_json(monkeypatch, tmp_path: Path):
@@ -90,6 +165,28 @@ def test_generate_msa_xwalk_json(monkeypatch, tmp_path: Path):
     assert payload["artifact"].endswith(
         "msa_coc_xwalk__B2025xMcensus_msa_2023xC2023.parquet"
     )
+
+
+@pytest.mark.parametrize(
+    ("setup_case", "expected_problem", "expected_action"),
+    GENERATE_MSA_XWALK_ERROR_CASES,
+)
+def test_generate_msa_xwalk_json_error_paths_are_actionable(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    setup_case,
+    expected_problem: str,
+    expected_action: str,
+):
+    args = setup_case(monkeypatch, tmp_path)
+
+    result = runner.invoke(app, args, catch_exceptions=False)
+
+    assert result.exit_code == 1
+    payload = json.loads(result.stdout)
+    assert payload["status"] == "error"
+    assert expected_problem in payload["error"]
+    assert expected_action in payload["error"]
 
 
 def test_generate_msa_xwalk_uses_shared_partial_allocation_tolerance(
