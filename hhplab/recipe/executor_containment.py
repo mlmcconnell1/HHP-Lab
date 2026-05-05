@@ -243,7 +243,7 @@ def _require_input(value: object | None, label: str, command: str) -> None:
 
 
 def _required_vintage(ref: object, label: str) -> int:
-    vintage = getattr(ref, "vintage")
+    vintage = ref.vintage  # type: ignore[attr-defined]
     if vintage is None:
         raise ValueError(f"Missing {label} vintage for containment output.")
     return vintage

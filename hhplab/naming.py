@@ -172,6 +172,43 @@ def tract_mediated_county_xwalk_filename(
     )
 
 
+def tract_mediated_county_xwalk_path(
+    boundary_vintage: str | int,
+    county_vintage: str | int,
+    tract_vintage: str | int,
+    acs_vintage: str | int,
+    base_dir: Path | str | None = None,
+) -> Path:
+    """Get canonical path for tract-mediated county-to-CoC weights.
+
+    Args:
+        boundary_vintage: CoC boundary vintage
+        county_vintage: County vintage encoded by county FIPS
+        tract_vintage: Tract geometry vintage used by the tract crosswalk
+        acs_vintage: ACS denominator vintage or range
+        base_dir: Base data directory (defaults to "data")
+
+    Returns:
+        Path like
+        data/curated/xwalks/xwalk_tract_mediated_county__A2023@B2025xC2020xT2020.parquet
+    """
+    if base_dir is None:
+        base_dir = Path("data")
+    else:
+        base_dir = Path(base_dir)
+    return (
+        base_dir
+        / "curated"
+        / "xwalks"
+        / tract_mediated_county_xwalk_filename(
+            boundary_vintage,
+            county_vintage,
+            tract_vintage,
+            acs_vintage,
+        )
+    )
+
+
 def msa_coc_xwalk_filename(
     boundary_vintage: str,
     definition_version: str,

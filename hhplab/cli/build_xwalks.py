@@ -1,10 +1,12 @@
 """CLI command for building CoC crosswalks."""
 
+import json
 from pathlib import Path
-from typing import TYPE_CHECKING, Annotated, Literal
+from typing import Annotated, Literal
 
 import click
 import geopandas as gpd
+import pandas as pd
 import typer
 
 from hhplab.measures.measures_diagnostics import (
@@ -20,11 +22,26 @@ from hhplab.xwalks.tract import (
     save_crosswalk,
     validate_population_shares,
 )
+from hhplab.xwalks.tract_mediated import (
+    WEIGHT_COLUMNS,
+    build_tract_mediated_county_crosswalk,
+    save_tract_mediated_county_crosswalk,
+)
 
-if TYPE_CHECKING:
-    import pandas as pd
-
-XwalkType = Literal["tracts", "counties", "all"]
+XwalkType = Literal["tracts", "counties", "tract-mediated", "all"]
+WeightingMode = Literal["area", "population", "household", "renter_household"]
+DEFAULT_TRACT_MEDIATED_WEIGHTING_MODES: tuple[WeightingMode, ...] = (
+    "area",
+    "population",
+    "household",
+    "renter_household",
+)
+WEIGHTING_MODE_TO_COLUMN: dict[WeightingMode, str] = {
+    "area": "area_weight",
+    "population": "population_weight",
+    "household": "household_weight",
+    "renter_household": "renter_household_weight",
+}
 
 
 def build_xwalks(
@@ -56,9 +73,39 @@ def build_xwalks(
         XwalkType,
         typer.Option(
             "--type",
-            help="Which crosswalks to build: 'tracts', 'counties', or 'all'.",
+            help=(
+                "Which crosswalks to build: 'tracts', 'counties', "
+                "'tract-mediated', or 'all'."
+            ),
         ),
     ] = "all",
+    acs_vintage: Annotated[
+        str | None,
+        typer.Option(
+            "--acs",
+            help=(
+                "ACS denominator vintage for tract-mediated county weights. "
+                "Defaults to the 5-year range ending in --tracts."
+            ),
+        ),
+    ] = None,
+    weighting_modes: Annotated[
+        list[str] | None,
+        typer.Option(
+            "--weighting-mode",
+            help=(
+                "Weighting mode to validate for tract-mediated output. "
+                "Repeat for multiple modes; defaults to all supported modes."
+            ),
+        ),
+    ] = None,
+    dry_run: Annotated[
+        bool,
+        typer.Option(
+            "--dry-run",
+            help="Validate inputs and planned outputs without writing artifacts.",
+        ),
+    ] = False,
     force: Annotated[
         bool,
         typer.Option(
@@ -79,6 +126,13 @@ def build_xwalks(
         typer.Option(
             "--auto-fetch",
             help="Auto-fetch population data if not cached (needs --population-weights).",
+        ),
+    ] = False,
+    json_output: Annotated[
+        bool,
+        typer.Option(
+            "--json",
+            help="Output machine-readable JSON instead of human text.",
         ),
     ] = False,
 ) -> None:
@@ -102,6 +156,14 @@ def build_xwalks(
         # Build only county crosswalk
         hhplab generate xwalks --boundary 2025 --type counties --counties 2020
 
+        # Preflight tract-mediated county weights
+        hhplab generate xwalks --boundary 2025 --type tract-mediated \
+            --tracts 2020 --counties 2020 --acs 2019-2023 --dry-run --json
+
+        # Build tract-mediated county weights
+        hhplab generate xwalks --boundary 2025 --type tract-mediated \
+            --tracts 2020 --counties 2020 --acs 2019-2023 --json
+
         # Build only tract crosswalk
         hhplab generate xwalks --boundary 2025 --type tracts --tracts 2023
 
@@ -111,35 +173,73 @@ def build_xwalks(
     # Determine what to build
     build_tracts = xwalk_type in ("tracts", "all")
     build_counties = xwalk_type in ("counties", "all")
+    build_tract_mediated = xwalk_type == "tract-mediated"
 
     output_dir = curated_dir("xwalks")
 
     # Resolve county vintage (defaults to tracts vintage if not specified)
     county_vintage = counties if counties is not None else tracts
+    resolved_acs_vintage = acs_vintage or f"{tracts - 4}-{tracts}"
+    try:
+        selected_weighting_modes = _normalize_weighting_modes(weighting_modes)
+    except ValueError as exc:
+        _emit_error(str(exc), json_output=json_output)
+        raise typer.Exit(1) from exc
 
     # Resolve boundary vintage from registry
     if boundary is None:
         boundary = latest_vintage()
         if boundary is None:
-            typer.echo(
-                "Error: No boundary vintages found in registry. Run 'hhplab ingest' first.",
-                err=True,
+            _emit_error(
+                "No boundary vintages found in registry. "
+                "Run 'hhplab ingest boundaries --source hud_exchange --vintage <year>' first.",
+                json_output=json_output,
             )
             raise typer.Exit(1)
-        typer.echo(f"Using latest boundary vintage: {boundary}")
+        if not json_output:
+            typer.echo(f"Using latest boundary vintage: {boundary}")
     else:
         # Verify the boundary vintage exists
         vintages = list_boundaries()
         vintage_ids = [v.boundary_vintage for v in vintages]
         if boundary not in vintage_ids:
-            typer.echo(
-                f"Error: Boundary vintage '{boundary}' not found in registry. "
-                f"Available: {vintage_ids}",
-                err=True,
+            _emit_error(
+                f"Boundary vintage '{boundary}' not found in registry. "
+                f"Available: {vintage_ids}. "
+                f"Run 'hhplab ingest boundaries --source hud_exchange --vintage {boundary}' first.",
+                json_output=json_output,
             )
             raise typer.Exit(1)
 
+    if build_tract_mediated:
+        _build_tract_mediated_xwalk_cli(
+            boundary=boundary,
+            county_vintage=county_vintage,
+            tract_vintage=tracts,
+            acs_vintage=resolved_acs_vintage,
+            selected_weighting_modes=selected_weighting_modes,
+            force=force,
+            dry_run=dry_run,
+            json_output=json_output,
+        )
+        return
+
     # Load CoC boundaries from registry
+    if json_output:
+        _emit_error(
+            "--json is currently supported for --type tract-mediated only. "
+            "Run 'hhplab generate xwalks --type tract-mediated --json', or omit --json.",
+            json_output=True,
+        )
+        raise typer.Exit(1)
+
+    if dry_run:
+        _emit_error(
+            "--dry-run is currently supported for --type tract-mediated only.",
+            json_output=False,
+        )
+        raise typer.Exit(1)
+
     typer.echo(f"Loading CoC boundaries (vintage: {boundary})...")
     vintages = list_boundaries()
     boundary_entry = next(v for v in vintages if v.boundary_vintage == boundary)
@@ -316,6 +416,246 @@ def build_xwalks(
     typer.echo(f"Saved county crosswalk to: {county_output}")
 
     typer.echo("\nCrosswalk generation complete!")
+
+
+def _emit_error(message: str, *, json_output: bool) -> None:
+    if json_output:
+        typer.echo(json.dumps({"status": "error", "error": message}))
+    else:
+        typer.echo(f"Error: {message}", err=True)
+
+
+def _normalize_weighting_modes(values: list[str] | None) -> tuple[WeightingMode, ...]:
+    if not values:
+        return DEFAULT_TRACT_MEDIATED_WEIGHTING_MODES
+    valid = set(WEIGHTING_MODE_TO_COLUMN)
+    invalid = sorted(set(values) - valid)
+    if invalid:
+        raise ValueError(
+            f"Invalid --weighting-mode value(s): {', '.join(invalid)}. "
+            f"Supported values: {', '.join(sorted(valid))}."
+        )
+    return tuple(values)  # type: ignore[return-value]
+
+
+def _input_status(path: Path) -> dict[str, str | bool]:
+    return {"path": str(path), "exists": path.exists()}
+
+
+def _tract_mediated_paths(
+    *,
+    boundary: str,
+    county_vintage: int,
+    tract_vintage: int,
+    acs_vintage: str,
+) -> dict[str, Path]:
+    from hhplab.acs.ingest.tract_population import get_output_path as acs_tract_path
+    from hhplab.naming import (
+        tract_mediated_county_xwalk_path,
+        tract_xwalk_path,
+    )
+
+    return {
+        "tract_crosswalk": tract_xwalk_path(boundary, tract_vintage),
+        "acs_tracts": acs_tract_path(acs_vintage, str(tract_vintage)),
+        "output": tract_mediated_county_xwalk_path(
+            boundary,
+            county_vintage,
+            tract_vintage,
+            acs_vintage,
+        ),
+    }
+
+
+def _build_tract_mediated_xwalk_cli(
+    *,
+    boundary: str,
+    county_vintage: int,
+    tract_vintage: int,
+    acs_vintage: str,
+    selected_weighting_modes: tuple[WeightingMode, ...],
+    force: bool,
+    dry_run: bool,
+    json_output: bool,
+) -> None:
+    paths = _tract_mediated_paths(
+        boundary=boundary,
+        county_vintage=county_vintage,
+        tract_vintage=tract_vintage,
+        acs_vintage=acs_vintage,
+    )
+    inputs = {
+        "tract_crosswalk": _input_status(paths["tract_crosswalk"]),
+        "acs_tracts": _input_status(paths["acs_tracts"]),
+    }
+    payload: dict[str, object] = {
+        "status": "ok",
+        "action": "dry_run" if dry_run else "generate",
+        "boundary_vintage": boundary,
+        "county_vintage": str(county_vintage),
+        "tract_vintage": str(tract_vintage),
+        "acs_vintage": acs_vintage,
+        "weighting_family": "tract_mediated",
+        "weighting_modes": list(selected_weighting_modes),
+        "inputs": inputs,
+        "artifact": str(paths["output"]),
+        "will_write": not dry_run,
+        "force": force,
+    }
+
+    missing_inputs = [
+        name for name, status in inputs.items() if not bool(status["exists"])
+    ]
+    if missing_inputs:
+        commands = {
+            "tract_crosswalk": (
+                "hhplab generate xwalks "
+                f"--boundary {boundary} --type tracts --tracts {tract_vintage}"
+            ),
+            "acs_tracts": (
+                "hhplab ingest acs5-tract "
+                f"--acs {acs_vintage} --tracts {tract_vintage}"
+            ),
+        }
+        payload.update(
+            {
+                "status": "error",
+                "error": "missing_inputs",
+                "missing_inputs": missing_inputs,
+                "commands": {
+                    name: command
+                    for name, command in commands.items()
+                    if name in missing_inputs
+                },
+            }
+        )
+        if json_output:
+            typer.echo(json.dumps(payload))
+        else:
+            missing = ", ".join(missing_inputs)
+            command_hints = "\n".join(
+                f"  {command}"
+                for name, command in commands.items()
+                if name in missing_inputs
+            )
+            typer.echo(
+                f"Error: Missing tract-mediated input(s): {missing}. Run:\n{command_hints}",
+                err=True,
+            )
+        raise typer.Exit(1)
+
+    output_exists = paths["output"].exists()
+    payload["output_exists"] = output_exists
+    if output_exists and not force and not dry_run:
+        payload.update({"status": "error", "error": "artifact_exists"})
+        if json_output:
+            typer.echo(json.dumps(payload))
+        else:
+            typer.echo(
+                f"Error: Tract-mediated county crosswalk already exists at {paths['output']}. "
+                "Use --force to regenerate the crosswalk.",
+                err=True,
+            )
+        raise typer.Exit(1)
+
+    if dry_run:
+        if json_output:
+            typer.echo(json.dumps(payload))
+        else:
+            typer.echo("Tract-mediated county crosswalk preflight passed.")
+            typer.echo(f"  Output: {paths['output']}")
+        return
+
+    try:
+        tract_crosswalk = pd.read_parquet(paths["tract_crosswalk"])
+        acs_tracts = pd.read_parquet(paths["acs_tracts"])
+        crosswalk = build_tract_mediated_county_crosswalk(
+            tract_crosswalk,
+            acs_tracts,
+            boundary_vintage=boundary,
+            county_vintage=county_vintage,
+            tract_vintage=tract_vintage,
+            acs_vintage=acs_vintage,
+        )
+    except (ValueError, OSError) as exc:
+        if json_output:
+            typer.echo(json.dumps({"status": "error", "error": str(exc)}))
+        else:
+            typer.echo(f"Error: {exc}", err=True)
+        raise typer.Exit(1) from exc
+
+    written_path = save_tract_mediated_county_crosswalk(
+        crosswalk,
+        boundary_vintage=boundary,
+        county_vintage=county_vintage,
+        tract_vintage=tract_vintage,
+        acs_vintage=acs_vintage,
+    )
+    payload.update(
+        {
+            "rows": int(len(crosswalk)),
+            "geo_count": int(crosswalk["coc_id"].nunique()) if "coc_id" in crosswalk else 0,
+            "county_count": (
+                int(crosswalk["county_fips"].nunique())
+                if "county_fips" in crosswalk
+                else 0
+            ),
+            "artifact": str(written_path),
+            "validation": _summarize_tract_mediated_crosswalk(
+                crosswalk,
+                selected_weighting_modes,
+            ),
+        }
+    )
+    if json_output:
+        typer.echo(json.dumps(payload))
+        return
+
+    typer.echo(f"Saved tract-mediated county crosswalk to: {written_path}")
+    validation = payload["validation"]
+    if isinstance(validation, dict):
+        typer.echo(
+            "Validation: "
+            f"{validation.get('county_count', 0)} counties, "
+            f"{validation.get('full_coverage_count', 0)} fully covered."
+        )
+
+
+def _summarize_tract_mediated_crosswalk(
+    crosswalk: pd.DataFrame,
+    selected_weighting_modes: tuple[WeightingMode, ...],
+) -> dict[str, object]:
+    selected_columns = [
+        WEIGHTING_MODE_TO_COLUMN[mode]
+        for mode in selected_weighting_modes
+        if WEIGHTING_MODE_TO_COLUMN[mode] in crosswalk.columns
+    ]
+    available_columns = [col for col in WEIGHT_COLUMNS if col in crosswalk.columns]
+    county_count = int(crosswalk["county_fips"].nunique()) if "county_fips" in crosswalk else 0
+    summary: dict[str, object] = {
+        "county_count": county_count,
+        "available_weight_columns": available_columns,
+        "selected_weight_columns": selected_columns,
+    }
+    if "county_area_coverage_ratio" in crosswalk.columns:
+        coverage = (
+            crosswalk[["county_fips", "county_area_coverage_ratio"]]
+            .drop_duplicates("county_fips")
+            .dropna()
+        )
+        summary["min_area_coverage_ratio"] = (
+            float(coverage["county_area_coverage_ratio"].min())
+            if not coverage.empty
+            else None
+        )
+        summary["full_coverage_count"] = int(
+            (coverage["county_area_coverage_ratio"] >= 0.999999).sum()
+        )
+    for column in selected_columns:
+        non_null = crosswalk[column].dropna()
+        summary[f"{column}_non_null_count"] = int(non_null.shape[0])
+        summary[f"{column}_max"] = float(non_null.max()) if not non_null.empty else None
+    return summary
 
 
 def _apply_population_weights(

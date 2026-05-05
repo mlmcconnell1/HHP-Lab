@@ -1,5 +1,6 @@
 """Tests for CLI commands referenced in the HHP-Lab CLI test plan."""
 
+import json
 from pathlib import Path
 from unittest.mock import patch
 
@@ -208,6 +209,156 @@ class TestBuildXwalksCommand:
         assert "Warning: County file not found" in result.output
         mock_build_crosswalk.assert_called_once()
         mock_save_crosswalk.assert_called_once()
+
+    @patch("hhplab.cli.build_xwalks.list_boundaries")
+    def test_build_tract_mediated_xwalk_dry_run_json(self, mock_list_boundaries, tmp_path):
+        """Tract-mediated crosswalk preflight reports deterministic inputs and output."""
+        from datetime import UTC, datetime
+
+        from hhplab.acs.ingest.tract_population import get_output_path
+        from hhplab.naming import tract_xwalk_path
+        from hhplab.registry.schema import RegistryEntry
+
+        with runner.isolated_filesystem(temp_dir=tmp_path):
+            Path("pyproject.toml").touch()
+            Path("hhplab").mkdir()
+            boundary_path = Path("data/curated/coc_boundaries/coc__B2025.parquet")
+            boundary_path.parent.mkdir(parents=True, exist_ok=True)
+            boundary_path.touch()
+            tract_path = tract_xwalk_path("2025", "2020")
+            acs_path = get_output_path("2019-2023", "2020")
+            tract_path.parent.mkdir(parents=True, exist_ok=True)
+            acs_path.parent.mkdir(parents=True, exist_ok=True)
+            tract_path.touch()
+            acs_path.touch()
+            mock_list_boundaries.return_value = [
+                RegistryEntry(
+                    boundary_vintage="2025",
+                    source="hud_exchange",
+                    ingested_at=datetime(2025, 1, 1, tzinfo=UTC),
+                    path=boundary_path,
+                    feature_count=1,
+                    hash_of_file="abc123",
+                )
+            ]
+
+            result = runner.invoke(
+                app,
+                [
+                    "generate",
+                    "xwalks",
+                    "--boundary",
+                    "2025",
+                    "--type",
+                    "tract-mediated",
+                    "--tracts",
+                    "2020",
+                    "--counties",
+                    "2020",
+                    "--acs",
+                    "2019-2023",
+                    "--weighting-mode",
+                    "population",
+                    "--dry-run",
+                    "--json",
+                ],
+            )
+
+        assert result.exit_code == 0
+        payload = json.loads(result.output)
+        assert payload["status"] == "ok"
+        assert payload["action"] == "dry_run"
+        assert payload["will_write"] is False
+        assert payload["weighting_modes"] == ["population"]
+        assert payload["inputs"]["tract_crosswalk"]["exists"] is True
+        assert payload["inputs"]["acs_tracts"]["exists"] is True
+        assert (
+            Path(payload["artifact"]).name
+            == "xwalk_tract_mediated_county__A2023@B2025xC2020xT2020.parquet"
+        )
+
+    @patch("hhplab.cli.build_xwalks.list_boundaries")
+    def test_build_tract_mediated_xwalk_generate_json(self, mock_list_boundaries, tmp_path):
+        """Tract-mediated generation writes the artifact and reports validation summary."""
+        from datetime import UTC, datetime
+
+        from hhplab.acs.ingest.tract_population import get_output_path
+        from hhplab.naming import tract_xwalk_path
+        from hhplab.registry.schema import RegistryEntry
+
+        with runner.isolated_filesystem(temp_dir=tmp_path):
+            Path("pyproject.toml").touch()
+            Path("hhplab").mkdir()
+            boundary_path = Path("data/curated/coc_boundaries/coc__B2025.parquet")
+            boundary_path.parent.mkdir(parents=True, exist_ok=True)
+            boundary_path.touch()
+            mock_list_boundaries.return_value = [
+                RegistryEntry(
+                    boundary_vintage="2025",
+                    source="hud_exchange",
+                    ingested_at=datetime(2025, 1, 1, tzinfo=UTC),
+                    path=boundary_path,
+                    feature_count=1,
+                    hash_of_file="abc123",
+                )
+            ]
+            tract_path = tract_xwalk_path("2025", "2020")
+            acs_path = get_output_path("2019-2023", "2020")
+            tract_path.parent.mkdir(parents=True, exist_ok=True)
+            acs_path.parent.mkdir(parents=True, exist_ok=True)
+            pd.DataFrame(
+                {
+                    "coc_id": ["A", "B"],
+                    "tract_geoid": ["01001000100", "01001000100"],
+                    "area_share": [0.25, 0.75],
+                    "intersection_area": [25.0, 75.0],
+                    "tract_area": [100.0, 100.0],
+                }
+            ).to_parquet(tract_path)
+            pd.DataFrame(
+                {
+                    "tract_geoid": ["01001000100"],
+                    "total_population": [100.0],
+                    "total_households": [40.0],
+                    "renter_households": [10.0],
+                }
+            ).to_parquet(acs_path)
+
+            result = runner.invoke(
+                app,
+                [
+                    "generate",
+                    "xwalks",
+                    "--boundary",
+                    "2025",
+                    "--type",
+                    "tract-mediated",
+                    "--tracts",
+                    "2020",
+                    "--counties",
+                    "2020",
+                    "--acs",
+                    "2019-2023",
+                    "--json",
+                    "--force",
+                ],
+            )
+
+            payload = json.loads(result.output)
+            artifact = Path(payload["artifact"])
+            artifact_exists = artifact.exists()
+
+        assert result.exit_code == 0
+        assert payload["status"] == "ok"
+        assert payload["rows"] == 2
+        assert payload["county_count"] == 1
+        assert payload["validation"]["selected_weight_columns"] == [
+            "area_weight",
+            "population_weight",
+            "household_weight",
+            "renter_household_weight",
+        ]
+        assert artifact_exists
 
 
 class TestDiagnosticsCommand:

@@ -313,7 +313,11 @@ def resolve_pipeline_artifacts(
             storage_config=storage_config,
         )
         artifacts["containment_path"] = _display_path(containment_file)
-        manifest_key = "manifest_path" if "panel" not in target.outputs else "containment_manifest_path"
+        manifest_key = (
+            "manifest_path"
+            if "panel" not in target.outputs
+            else "containment_manifest_path"
+        )
         artifacts[manifest_key] = _display_path(
             containment_file.with_suffix(".manifest.json"),
         )

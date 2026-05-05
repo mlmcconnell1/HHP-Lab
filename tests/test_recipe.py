@@ -302,8 +302,16 @@ class TestLoadRecipeFromDict:
     @pytest.mark.parametrize(
         ("container", "candidate"),
         [
-            pytest.param({"type": "tract", "vintage": 2020}, {"type": "coc", "vintage": 2025}, id="tract-coc"),
-            pytest.param({"type": "coc", "vintage": 2025}, {"type": "msa", "vintage": 2023}, id="coc-msa"),
+            pytest.param(
+                {"type": "tract", "vintage": 2020},
+                {"type": "coc", "vintage": 2025},
+                id="tract-coc",
+            ),
+            pytest.param(
+                {"type": "coc", "vintage": 2025},
+                {"type": "msa", "vintage": 2023},
+                id="coc-msa",
+            ),
         ],
     )
     def test_containment_rejects_unsupported_geometry_pair(self, container, candidate):
