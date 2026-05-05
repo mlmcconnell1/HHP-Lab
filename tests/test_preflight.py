@@ -422,6 +422,62 @@ def _map_preflight_recipe(*, geometry: dict[str, object]) -> dict:
     return base
 
 
+def _containment_preflight_recipe(pair: tuple[str, str]) -> dict:
+    """Return a recipe dict with one recipe-native containment target."""
+    container, candidate = pair
+    base = _preflight_recipe(with_path=True, identity_only=True)
+    target_geometry = (
+        {"type": "msa", "source": "census_msa_2023"}
+        if container == "msa"
+        else {"type": container, "vintage": 2023}
+    )
+    base["targets"][0] = {
+        "id": f"{container}_{candidate}_containment",
+        "geometry": target_geometry,
+        "outputs": ["containment"],
+        "containment_spec": {
+            "container": {"type": container, "vintage": 2023},
+            "candidate": {"type": candidate, "vintage": 2025 if candidate == "coc" else 2023},
+            "selector_ids": ["19740" if container == "msa" else "COC1"],
+            "candidate_selector_ids": ["COC1" if candidate == "coc" else "001"],
+        },
+    }
+    if container == "msa":
+        base["targets"][0]["containment_spec"]["container"]["source"] = "census_msa_2023"
+    base["pipelines"][0]["target"] = base["targets"][0]["id"]
+    return base
+
+
+def _setup_containment_artifacts(
+    tmp_path: Path,
+    pair: tuple[str, str],
+    *,
+    include_coc: bool = True,
+    include_county: bool = True,
+    include_msa: bool = True,
+) -> None:
+    """Set up minimal containment artifact tables for preflight tests."""
+    curated = tmp_path / "data" / "curated"
+    if include_coc:
+        coc_dir = curated / "coc_boundaries"
+        coc_dir.mkdir(parents=True, exist_ok=True)
+        coc_vintage = 2025 if pair == ("msa", "coc") else 2023
+        pd.DataFrame({"coc_id": ["COC1"]}).to_parquet(coc_dir / f"coc__B{coc_vintage}.parquet")
+    if include_county:
+        tiger_dir = curated / "tiger"
+        tiger_dir.mkdir(parents=True, exist_ok=True)
+        pd.DataFrame({"GEOID": ["001"]}).to_parquet(tiger_dir / "counties__C2023.parquet")
+    if include_msa and pair == ("msa", "coc"):
+        msa_dir = curated / "msa"
+        msa_dir.mkdir(parents=True, exist_ok=True)
+        pd.DataFrame({"msa_id": ["19740"], "name": ["Denver-Aurora-Centennial, CO"]}).to_parquet(
+            msa_dir / "msa_definitions__census_msa_2023.parquet"
+        )
+        pd.DataFrame({"msa_id": ["19740"], "county_fips": ["001"]}).to_parquet(
+            msa_dir / "msa_county_membership__census_msa_2023.parquet"
+        )
+
+
 class TestRunPreflight:
 
     def test_clean_preflight(self, tmp_path: Path):
@@ -548,6 +604,108 @@ class TestRunPreflight:
         assert "county boundary artifact" in finding.message.lower()
         assert finding.remediation is not None
         assert finding.remediation.command == "hhplab ingest tiger --year 2025 --type counties"
+
+    def test_containment_coc_county_ready_when_artifacts_exist(self, tmp_path: Path):
+        data = _containment_preflight_recipe(("coc", "county"))
+        _setup_preflight_fixtures(tmp_path, include_xwalk=False, include_acs=False)
+        _setup_containment_artifacts(tmp_path, ("coc", "county"))
+
+        recipe = load_recipe(data)
+        report = run_preflight(recipe, project_root=tmp_path)
+
+        assert report.is_ready
+        assert [
+            f for f in report.findings
+            if f.kind
+            in {
+                FindingKind.MISSING_CONTAINMENT_ARTIFACT,
+                FindingKind.CONTAINMENT_SELECTOR,
+            }
+        ] == []
+
+    def test_containment_msa_coc_ready_when_artifacts_exist(self, tmp_path: Path):
+        data = _containment_preflight_recipe(("msa", "coc"))
+        _setup_preflight_fixtures(tmp_path, include_xwalk=False, include_acs=False)
+        _setup_containment_artifacts(tmp_path, ("msa", "coc"))
+
+        recipe = load_recipe(data)
+        report = run_preflight(recipe, project_root=tmp_path)
+
+        assert report.is_ready
+        assert [
+            f for f in report.findings
+            if f.kind
+            in {
+                FindingKind.MISSING_CONTAINMENT_ARTIFACT,
+                FindingKind.CONTAINMENT_SELECTOR,
+            }
+        ] == []
+
+    def test_containment_coc_county_missing_county_is_actionable(self, tmp_path: Path):
+        data = _containment_preflight_recipe(("coc", "county"))
+        _setup_preflight_fixtures(tmp_path, include_xwalk=False, include_acs=False)
+        _setup_containment_artifacts(
+            tmp_path,
+            ("coc", "county"),
+            include_county=False,
+        )
+
+        recipe = load_recipe(data)
+        report = run_preflight(recipe, project_root=tmp_path)
+
+        containment_findings = [
+            f for f in report.findings
+            if f.kind == FindingKind.MISSING_CONTAINMENT_ARTIFACT
+        ]
+        assert len(containment_findings) == 1
+        finding = containment_findings[0]
+        assert "candidate county geometry artifact" in finding.message
+        assert finding.remediation is not None
+        assert finding.remediation.command == "hhplab ingest tiger --year 2023 --type counties"
+
+    def test_containment_msa_coc_missing_msa_artifacts_are_actionable(
+        self,
+        tmp_path: Path,
+    ):
+        data = _containment_preflight_recipe(("msa", "coc"))
+        _setup_preflight_fixtures(tmp_path, include_xwalk=False, include_acs=False)
+        _setup_containment_artifacts(
+            tmp_path,
+            ("msa", "coc"),
+            include_msa=False,
+        )
+
+        recipe = load_recipe(data)
+        report = run_preflight(recipe, project_root=tmp_path)
+
+        containment_findings = [
+            f for f in report.findings
+            if f.kind == FindingKind.MISSING_CONTAINMENT_ARTIFACT
+        ]
+        assert len(containment_findings) == 2
+        assert {f.remediation.command for f in containment_findings if f.remediation} == {
+            "hhplab generate msa --definition-version census_msa_2023"
+        }
+        assert any("MSA definitions artifact" in f.message for f in containment_findings)
+        assert any("MSA county membership artifact" in f.message for f in containment_findings)
+
+    def test_containment_selector_mismatch_is_clear(self, tmp_path: Path):
+        data = _containment_preflight_recipe(("coc", "county"))
+        data["targets"][0]["containment_spec"]["candidate_selector_ids"] = ["999"]
+        _setup_preflight_fixtures(tmp_path, include_xwalk=False, include_acs=False)
+        _setup_containment_artifacts(tmp_path, ("coc", "county"))
+
+        recipe = load_recipe(data)
+        report = run_preflight(recipe, project_root=tmp_path)
+
+        selector_findings = [
+            f for f in report.findings
+            if f.kind == FindingKind.CONTAINMENT_SELECTOR
+        ]
+        assert len(selector_findings) == 1
+        assert "candidate_selector_ids did not match available COUNTY IDs: 999" in (
+            selector_findings[0].message
+        )
 
     def test_blocks_stale_translated_acs_cache(self, tmp_path: Path):
         data = _preflight_recipe(with_path=True)
