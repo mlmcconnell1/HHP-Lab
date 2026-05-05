@@ -14,7 +14,11 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
-from hhplab.pep.pep_aggregate import aggregate_pep_counties, aggregate_pep_to_coc
+from hhplab.pep.pep_aggregate import (
+    aggregate_pep_counties,
+    aggregate_pep_to_coc,
+    aggregate_pep_to_coc_many,
+)
 
 
 class TestAggregationIntegration:
@@ -291,6 +295,98 @@ class TestAggregationUnit:
         assert row["coverage_ratio"] == pytest.approx(0.5)
         assert row["population"] == pytest.approx(40000)
         assert row["county_count"] == 1
+
+    @pytest.mark.parametrize(
+        ("weighting", "expected_population", "expected_coverage", "expected_max"),
+        [
+            ("area_share", 220.0, 1.0, 120.0 / 220.0),
+            ("population_weight", 212.5, 1.0, 150.0 / 212.5),
+            ("household_weight", 218.75, 1.0, 125.0 / 218.75),
+            ("renter_household_weight", 200.0, 1.0, 1.0),
+        ],
+        ids=["area", "population", "household", "renter-household"],
+    )
+    def test_explicit_tract_mediated_weight_columns(
+        self,
+        weighting,
+        expected_population,
+        expected_coverage,
+        expected_max,
+    ):
+        """PEP aggregation can select derived tract-mediated weight columns."""
+        xwalk = pd.DataFrame(
+            {
+                "coc_id": ["COC-001", "COC-001"],
+                "county_fips": ["01001", "01003"],
+                "area_share": [0.6, 0.4],
+                "population_weight": [0.75, 0.25],
+                "household_weight": [0.625, 0.375],
+                "renter_household_weight": [1.0, 0.0],
+            }
+        )
+        pep = pd.DataFrame(
+            {
+                "county_fips": ["01001", "01003"],
+                "year": [2020, 2020],
+                "population": [200.0, 250.0],
+            }
+        )
+
+        result = aggregate_pep_counties(
+            pep,
+            xwalk,
+            weighting=weighting,
+            min_coverage=0.0,
+        )
+
+        row = result[result["coc_id"] == "COC-001"].iloc[0]
+        assert row["population"] == pytest.approx(expected_population)
+        assert row["coverage_ratio"] == pytest.approx(expected_coverage)
+        assert row["max_county_contribution"] == pytest.approx(expected_max)
+        assert row["weighting_method"] == weighting
+
+    def test_multiple_weightings_write_comparable_outputs(self, tmp_path):
+        """One workflow can materialize multiple weighting-specific PEP outputs."""
+        pep_path = tmp_path / "pep.parquet"
+        pd.DataFrame(
+            {
+                "county_fips": ["01001", "01003"],
+                "year": [2020, 2020],
+                "population": [200.0, 250.0],
+            }
+        ).to_parquet(pep_path, index=False)
+
+        xwalk_path = tmp_path / "xwalk.parquet"
+        pd.DataFrame(
+            {
+                "coc_id": ["COC-001", "COC-001"],
+                "county_fips": ["01001", "01003"],
+                "area_share": [0.6, 0.4],
+                "population_weight": [0.75, 0.25],
+            }
+        ).to_parquet(xwalk_path, index=False)
+
+        outputs = aggregate_pep_to_coc_many(
+            boundary_vintage="2024",
+            county_vintage="2020",
+            weightings=["area_share", "population_weight"],
+            pep_path=pep_path,
+            xwalk_path=xwalk_path,
+            start_year=2020,
+            end_year=2020,
+            min_coverage=0.0,
+            output_dir=tmp_path,
+            force=True,
+        )
+
+        assert set(outputs) == {"area_share", "population_weight"}
+        area = pd.read_parquet(outputs["area_share"])
+        population = pd.read_parquet(outputs["population_weight"])
+        assert list(area.columns) == list(population.columns)
+        assert area.iloc[0]["population"] == pytest.approx(220.0)
+        assert population.iloc[0]["population"] == pytest.approx(212.5)
+        assert area.iloc[0]["weighting_method"] == "area_share"
+        assert population.iloc[0]["weighting_method"] == "population_weight"
 
     def test_year_filter_without_matching_rows_raises_clear_error(self, tmp_path):
         """Year filters outside available coverage should fail with guidance."""

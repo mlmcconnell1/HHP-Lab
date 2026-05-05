@@ -6,6 +6,14 @@ It aggregates county-level ZORI (Zillow Observed Rent Index) data to CoC
 (Continuum of Care) geography using area-weighted crosswalks and ACS-based
 demographic weights.
 
+Tract-mediated county crosswalk weights are intentionally not reused here
+by default.  They are allocation shares for county totals such as PEP
+population, while ZORI is an index that is aggregated as a normalized
+weighted mean over counties with available observations for each month.
+The existing ACS county weights keep the ZORI denominator tied directly
+to the monthly mean formula and avoid treating a county-to-CoC allocation
+share as a county rental-market size denominator.
+
 Aggregation Formula (per spec section 5.2):
 -------------------------------------------
 For each CoC i and month t:

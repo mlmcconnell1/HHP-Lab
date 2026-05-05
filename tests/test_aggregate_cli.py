@@ -1,5 +1,7 @@
 """Tests for the ``hhplab aggregate`` CLI command group."""
 
+from unittest.mock import patch
+
 import pytest
 from typer.testing import CliRunner
 
@@ -53,6 +55,38 @@ def test_aggregate_pep_requires_years():
 def test_aggregate_pep_with_invalid_years():
     result = runner.invoke(app, ["aggregate", "pep", "--years", "bad"])
     assert result.exit_code == 2
+
+
+@patch("hhplab.pep.pep_aggregate.aggregate_pep_to_coc_many")
+def test_aggregate_pep_accepts_repeated_weighting(mock_aggregate, tmp_path):
+    """PEP CLI passes repeated weighting requests to one multi-output workflow."""
+    mock_aggregate.return_value = {
+        "area_share": tmp_path / "area.parquet",
+        "population_weight": tmp_path / "population.parquet",
+    }
+
+    result = runner.invoke(
+        app,
+        [
+            "aggregate",
+            "pep",
+            "--years",
+            "2020",
+            "--weighting",
+            "area_share",
+            "--weighting",
+            "population_weight",
+        ],
+    )
+
+    assert result.exit_code == 0
+    mock_aggregate.assert_called_once()
+    assert mock_aggregate.call_args.kwargs["weightings"] == [
+        "area_share",
+        "population_weight",
+    ]
+    assert "Wrote (area_share)" in result.output
+    assert "Wrote (population_weight)" in result.output
 
 
 def test_aggregate_pep_lagged_rejects_lag_months_out_of_range():

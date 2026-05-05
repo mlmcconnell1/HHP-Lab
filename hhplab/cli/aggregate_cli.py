@@ -148,14 +148,17 @@ def aggregate_pep(
             help=("Lag in months for --align=lagged (0-12). 0 = current year, 12 = previous year."),
         ),
     ] = 0,
-    weighting: Annotated[
-        str,
+    weightings: Annotated[
+        list[str] | None,
         typer.Option(
             "--weighting",
             "-w",
-            help="Weighting method: 'area_share' (default) or 'equal'.",
+            help=(
+                "Weighting method or crosswalk weight column. Repeat for "
+                "side-by-side outputs. Defaults to area_share."
+            ),
         ),
-    ] = "area_share",
+    ] = None,
     min_coverage: Annotated[
         float,
         typer.Option(
@@ -189,9 +192,10 @@ def aggregate_pep(
     output_dir = curated_root() / "pep"
     typer.echo(f"Aggregating PEP to CoC (curated output, align '{align}')...")
 
-    from hhplab.pep.pep_aggregate import aggregate_pep_to_coc, load_pep_county
+    from hhplab.pep.pep_aggregate import aggregate_pep_to_coc_many, load_pep_county
 
     pep_source_df = pd.DataFrame()
+    selected_weightings = weightings or ["area_share"]
     if align == "lagged":
         try:
             pep_source_df = load_pep_county()
@@ -214,7 +218,7 @@ def aggregate_pep(
                 typer.echo(
                     f"  B{build_year}: lag {lag_months} months "
                     f"(w_current={1.0 - weight_prev:.3f}, w_previous={weight_prev:.3f}), "
-                    f"counties {county_vintage}"
+                    f"counties {county_vintage}, weights {', '.join(selected_weightings)}"
                 )
                 if lag_months > 0:
                     lagged_series = _build_lagged_pep_series(
@@ -230,12 +234,15 @@ def aggregate_pep(
                         pep_path = Path(tmp.name)
                     lagged_series.to_parquet(pep_path, index=False)
             else:
-                typer.echo(f"  B{build_year}: PEP year {pep_year}, counties {county_vintage}")
+                typer.echo(
+                    f"  B{build_year}: PEP year {pep_year}, counties {county_vintage}, "
+                    f"weights {', '.join(selected_weightings)}"
+                )
 
-            result_path = aggregate_pep_to_coc(
+            result_paths = aggregate_pep_to_coc_many(
                 boundary_vintage=boundary_vintage,
                 county_vintage=county_vintage,
-                weighting=weighting,
+                weightings=selected_weightings,
                 pep_path=pep_path,
                 start_year=pep_year,
                 end_year=pep_year,
@@ -244,9 +251,11 @@ def aggregate_pep(
                 force=True,
             )
 
-            all_outputs.append(str(result_path))
+            for result_path in result_paths.values():
+                all_outputs.append(str(result_path))
             materialized.append(build_year)
-            typer.echo(f"    Wrote: {result_path.name}")
+            for weighting, result_path in result_paths.items():
+                typer.echo(f"    Wrote ({weighting}): {result_path.name}")
 
         except FileNotFoundError as exc:
             typer.echo(f"Error: {exc}", err=True)

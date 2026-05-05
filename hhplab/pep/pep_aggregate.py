@@ -5,15 +5,13 @@ Population Estimates Program data to Continuum of Care geography.
 
 Weighting strategy
 ------------------
-PEP aggregation uses raw ``area_share`` from the crosswalk (uniform
-density assumption).  This differs from ZORI aggregation, which
-combines ``area_share`` with ACS demographic weights.  The rationale:
-PEP is already a population count, so area-based apportionment of
-county totals is the natural choice.  Adding ACS weights would
-circularly weight population by population.  For large counties with
-uneven population distributions this is less precise, but avoids
-introducing ACS vintage coupling into what is otherwise a simple
-population pipeline.
+PEP aggregation defaults to raw ``area_share`` from the direct county
+crosswalk (uniform density assumption).  Callers may also pass an
+explicit weight column from a tract-mediated county crosswalk, such as
+``population_weight``, ``household_weight``, or
+``renter_household_weight``.  Those columns allocate county population
+totals to CoCs with denominator-specific tract evidence while preserving
+the same coverage and contribution diagnostics as the direct overlay.
 
 Usage
 -----
@@ -229,7 +227,10 @@ def aggregate_pep_counties(
         Name of the geography identifier column in the crosswalk.
         Defaults to ``"coc_id"``.
     weighting : str
-        Weighting method: ``"area_share"`` (default) or ``"equal"``.
+        Weighting method. ``"area_share"`` uses the direct county overlay,
+        ``"equal"`` gives each county in a geography equal weight, and any
+        other value is interpreted as an explicit crosswalk weight column
+        such as ``"population_weight"`` from a tract-mediated artifact.
     min_coverage : float
         Minimum coverage ratio threshold.  Geo-years below this have
         population set to null.  Default 0.95.
@@ -373,6 +374,44 @@ def aggregate_pep_counties(
     return result_df
 
 
+def aggregate_pep_to_coc_many(
+    boundary_vintage: str,
+    county_vintage: str,
+    weightings: list[str] | tuple[str, ...],
+    pep_path: Path | str | None = None,
+    xwalk_path: Path | str | None = None,
+    start_year: int | None = None,
+    end_year: int | None = None,
+    min_coverage: float = DEFAULT_MIN_COVERAGE,
+    output_dir: Path | str | None = None,
+    force: bool = False,
+) -> dict[str, Path]:
+    """Aggregate PEP to CoC once per requested weighting column.
+
+    This is a small orchestration convenience for sensitivity workflows.
+    A shared PEP source and crosswalk artifact are reused, and each
+    requested weighting writes its own deterministic output file.
+    """
+    if not weightings:
+        raise ValueError("At least one weighting must be requested.")
+
+    outputs: dict[str, Path] = {}
+    for weighting in weightings:
+        outputs[weighting] = aggregate_pep_to_coc(
+            boundary_vintage=boundary_vintage,
+            county_vintage=county_vintage,
+            weighting=weighting,
+            pep_path=pep_path,
+            xwalk_path=xwalk_path,
+            start_year=start_year,
+            end_year=end_year,
+            min_coverage=min_coverage,
+            output_dir=output_dir,
+            force=force,
+        )
+    return outputs
+
+
 def aggregate_pep_to_coc(
     boundary_vintage: str,
     county_vintage: str,
@@ -397,7 +436,8 @@ def aggregate_pep_to_coc(
     county_vintage : str
         TIGER county vintage year for crosswalk (e.g., "2024").
     weighting : str
-        Weighting method: "area_share" (default) or "equal".
+        Weighting method: "area_share" (default), "equal", or an explicit
+        crosswalk weight column such as "population_weight".
     pep_path : Path or str, optional
         Explicit path to PEP county parquet. If None, auto-detects.
     xwalk_path : Path or str, optional
