@@ -1,0 +1,297 @@
+version: 1
+name: kansas_missouri_cocs_counties_kansas_city_msa_map_2025
+description: >
+  Render Kansas and Missouri county boundaries, all Kansas and Missouri CoC
+  boundaries, and the Kansas City, MO-KS Census MSA boundary as a single
+  recipe-native HTML map artifact.
+
+universe:
+  years: [2025]
+
+targets:
+  - id: kansas_missouri_overlay_map
+    geometry: { type: coc, vintage: 2025, source: hud_exchange }
+    outputs: [map]
+    map_spec:
+      basemap: cartodbpositron
+      viewport:
+        fit_layers: true
+        padding: 30
+      layers:
+        - geometry: { type: county, vintage: 2023, source: tiger_line }
+          selector_ids:
+            [
+              "20001",
+              "20003",
+              "20005",
+              "20007",
+              "20009",
+              "20011",
+              "20013",
+              "20015",
+              "20017",
+              "20019",
+              "20021",
+              "20023",
+              "20025",
+              "20027",
+              "20029",
+              "20031",
+              "20033",
+              "20035",
+              "20037",
+              "20039",
+              "20041",
+              "20043",
+              "20045",
+              "20047",
+              "20049",
+              "20051",
+              "20053",
+              "20055",
+              "20057",
+              "20059",
+              "20061",
+              "20063",
+              "20065",
+              "20067",
+              "20069",
+              "20071",
+              "20073",
+              "20075",
+              "20077",
+              "20079",
+              "20081",
+              "20083",
+              "20085",
+              "20087",
+              "20089",
+              "20091",
+              "20093",
+              "20095",
+              "20097",
+              "20099",
+              "20101",
+              "20103",
+              "20105",
+              "20107",
+              "20109",
+              "20111",
+              "20113",
+              "20115",
+              "20117",
+              "20119",
+              "20121",
+              "20123",
+              "20125",
+              "20127",
+              "20129",
+              "20131",
+              "20133",
+              "20135",
+              "20137",
+              "20139",
+              "20141",
+              "20143",
+              "20145",
+              "20147",
+              "20149",
+              "20151",
+              "20153",
+              "20155",
+              "20157",
+              "20159",
+              "20161",
+              "20163",
+              "20165",
+              "20167",
+              "20169",
+              "20171",
+              "20173",
+              "20175",
+              "20177",
+              "20179",
+              "20181",
+              "20183",
+              "20185",
+              "20187",
+              "20189",
+              "20191",
+              "20193",
+              "20195",
+              "20197",
+              "20199",
+              "20201",
+              "20203",
+              "20205",
+              "20207",
+              "20209",
+              "29001",
+              "29003",
+              "29005",
+              "29007",
+              "29009",
+              "29011",
+              "29013",
+              "29015",
+              "29017",
+              "29019",
+              "29021",
+              "29023",
+              "29025",
+              "29027",
+              "29029",
+              "29031",
+              "29033",
+              "29035",
+              "29037",
+              "29039",
+              "29041",
+              "29043",
+              "29045",
+              "29047",
+              "29049",
+              "29051",
+              "29053",
+              "29055",
+              "29057",
+              "29059",
+              "29061",
+              "29063",
+              "29065",
+              "29067",
+              "29069",
+              "29071",
+              "29073",
+              "29075",
+              "29077",
+              "29079",
+              "29081",
+              "29083",
+              "29085",
+              "29087",
+              "29089",
+              "29091",
+              "29093",
+              "29095",
+              "29097",
+              "29099",
+              "29101",
+              "29103",
+              "29105",
+              "29107",
+              "29109",
+              "29111",
+              "29113",
+              "29115",
+              "29117",
+              "29119",
+              "29121",
+              "29123",
+              "29125",
+              "29127",
+              "29129",
+              "29131",
+              "29133",
+              "29135",
+              "29137",
+              "29139",
+              "29141",
+              "29143",
+              "29145",
+              "29147",
+              "29149",
+              "29151",
+              "29153",
+              "29155",
+              "29157",
+              "29159",
+              "29161",
+              "29163",
+              "29165",
+              "29167",
+              "29169",
+              "29171",
+              "29173",
+              "29175",
+              "29177",
+              "29179",
+              "29181",
+              "29183",
+              "29185",
+              "29186",
+              "29187",
+              "29189",
+              "29195",
+              "29197",
+              "29199",
+              "29201",
+              "29203",
+              "29205",
+              "29207",
+              "29209",
+              "29211",
+              "29213",
+              "29215",
+              "29217",
+              "29219",
+              "29221",
+              "29223",
+              "29225",
+              "29227",
+              "29229",
+              "29510",
+            ]
+          label: Kansas and Missouri Counties
+          tooltip_fields: [county_fips, geo_vintage, source]
+          style:
+            fill_color: "#f8f9fa"
+            stroke_color: "#495057"
+            fill_opacity: 0.04
+            stroke_opacity: 0.75
+            line_weight: 0.9
+            z_order: 0
+        - geometry: { type: coc, vintage: 2025, source: hud_exchange }
+          selector_ids:
+            [
+              KS-502,
+              KS-503,
+              KS-505,
+              KS-507,
+              MO-500,
+              MO-501,
+              MO-503,
+              MO-600,
+              MO-602,
+              MO-603,
+              MO-604,
+              MO-606,
+            ]
+          label: Kansas and Missouri CoCs
+          tooltip_fields: [coc_id, coc_name, state_abbrev]
+          style_mode: distinct
+          style:
+            fill_color: "#8ecae6"
+            stroke_color: "#1d3557"
+            fill_opacity: 0.24
+            stroke_opacity: 0.9
+            line_weight: 1.4
+            z_order: 1
+        - geometry: { type: msa, vintage: 2023, source: census_msa_2023 }
+          selector_ids: ["28140"]
+          label: Kansas City MSA
+          tooltip_fields: [msa_id, msa_name, cbsa_code, definition_version]
+          style:
+            fill_color: "#ffb703"
+            stroke_color: "#9b2226"
+            fill_opacity: 0.12
+            stroke_opacity: 1.0
+            line_weight: 3.0
+            z_order: 2
+
+datasets: {}
+
+pipelines:
+  - id: kansas_missouri_overlay_map_pipeline
+    target: kansas_missouri_overlay_map
+    steps: []
