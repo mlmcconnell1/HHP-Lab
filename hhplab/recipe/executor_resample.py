@@ -51,6 +51,17 @@ _XWALK_NON_GEO_COLS: set[str] = {
     "cbsa_code", "county_vintage", "allocation_method", "share_column",
     "share_denominator", "allocation_share",
     "intersecting_county_count", "intersecting_county_fips",
+    "acs_vintage", "weighting_method", "area_weight", "population_weight",
+    "household_weight", "renter_household_weight",
+    "area_denominator", "population_denominator", "household_denominator",
+    "renter_household_denominator", "county_area_total",
+    "county_population_total", "county_household_total",
+    "county_renter_household_total", "geo_area_total", "geo_population_total",
+    "geo_household_total", "geo_renter_household_total",
+    "county_area_coverage_ratio", "county_population_coverage_ratio",
+    "county_household_coverage_ratio", "county_renter_household_coverage_ratio",
+    "tract_count", "missing_population_tract_count",
+    "missing_household_tract_count", "missing_renter_household_tract_count",
 }
 
 
@@ -215,7 +226,7 @@ def _resample_aggregate(
             f"Crosswalk columns: {sorted(xwalk.columns)}"
         )
 
-    base_weight_col = "area_share"
+    base_weight_col = task.weight_column or "area_share"
     if base_weight_col not in xwalk.columns:
         declared_weight_col = (
             str(xwalk["share_column"].dropna().iloc[0])

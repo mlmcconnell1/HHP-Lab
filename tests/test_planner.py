@@ -240,6 +240,110 @@ class TestPlannerAutoTransform:
         assert len(alloc_tasks) > 0
         assert alloc_tasks[0].transform_id is not None
 
+    def test_tract_mediated_scalar_weighting_variety(self):
+        data = _segmented_recipe()
+        data["universe"] = {"range": "2021-2021"}
+        data["datasets"]["pep"] = {
+            "provider": "census",
+            "product": "pep",
+            "version": 1,
+            "native_geometry": {"type": "county", "vintage": 2020},
+            "years": "2021-2021",
+            "path": "data/pep/pep.parquet",
+        }
+        data["transforms"] = [
+            {
+                "id": "coc_to_county_tract_mediated",
+                "type": "crosswalk",
+                "from": {"type": "coc", "vintage": 2025},
+                "to": {"type": "county", "vintage": 2020},
+                "spec": {
+                    "weighting": {
+                        "scheme": "tract_mediated",
+                        "variety": "population",
+                        "tract_vintage": 2020,
+                        "acs_vintage": 2023,
+                    },
+                },
+            },
+        ]
+        data["pipelines"][0]["steps"] = [
+            {"materialize": {"transforms": ["coc_to_county_tract_mediated"]}},
+            {
+                "resample": {
+                    "dataset": "pep",
+                    "to_geometry": {"type": "coc", "vintage": 2025},
+                    "method": "aggregate",
+                    "via": "auto",
+                    "measures": {"population": {"aggregation": "sum"}},
+                },
+            },
+        ]
+
+        recipe = load_recipe(data)
+        plan = resolve_plan(recipe, "main")
+        pep_tasks = [t for t in plan.resample_tasks if t.dataset_id == "pep"]
+
+        assert len(pep_tasks) == 1
+        assert pep_tasks[0].transform_id == "coc_to_county_tract_mediated"
+        assert pep_tasks[0].weighting_variety == "population"
+        assert pep_tasks[0].weight_column == "population_weight"
+        assert pep_tasks[0].weighting_variety_count == 1
+
+    def test_tract_mediated_multi_weighting_varieties_fan_out(self):
+        data = _segmented_recipe()
+        data["universe"] = {"range": "2021-2021"}
+        data["datasets"]["pep"] = {
+            "provider": "census",
+            "product": "pep",
+            "version": 1,
+            "native_geometry": {"type": "county", "vintage": 2020},
+            "years": "2021-2021",
+            "path": "data/pep/pep.parquet",
+        }
+        data["transforms"] = [
+            {
+                "id": "coc_to_county_tract_mediated",
+                "type": "crosswalk",
+                "from": {"type": "coc", "vintage": 2025},
+                "to": {"type": "county", "vintage": 2020},
+                "spec": {
+                    "weighting": {
+                        "scheme": "tract_mediated",
+                        "varieties": ["area", "renter_households"],
+                        "tract_vintage": 2020,
+                        "acs_vintage": "2019-2023",
+                    },
+                },
+            },
+        ]
+        data["pipelines"][0]["steps"] = [
+            {"materialize": {"transforms": ["coc_to_county_tract_mediated"]}},
+            {
+                "resample": {
+                    "dataset": "pep",
+                    "to_geometry": {"type": "coc", "vintage": 2025},
+                    "method": "aggregate",
+                    "via": "auto",
+                    "measures": {"population": {"aggregation": "sum"}},
+                },
+            },
+        ]
+
+        recipe = load_recipe(data)
+        plan = resolve_plan(recipe, "main")
+        pep_tasks = [t for t in plan.resample_tasks if t.dataset_id == "pep"]
+
+        assert [t.weighting_variety for t in pep_tasks] == [
+            "area",
+            "renter_households",
+        ]
+        assert [t.weight_column for t in pep_tasks] == [
+            "area_weight",
+            "renter_household_weight",
+        ]
+        assert [t.weighting_variety_count for t in pep_tasks] == [2, 2]
+
 
 # ===========================================================================
 # Planner: error cases

@@ -16,6 +16,7 @@ import pandas as pd
 from hhplab.naming import (
     county_xwalk_path,
     msa_coc_xwalk_path,
+    tract_mediated_county_xwalk_path,
     tract_path,
     tract_xwalk_path,
 )
@@ -89,6 +90,20 @@ def _resolve_transform_path(
     if base_ref.type == "tract":
         return project_root / tract_xwalk_path(boundary_vintage, base_vintage)
     elif base_ref.type == "county":
+        weighting = getattr(transform.spec, "weighting", None)
+        if weighting is not None and weighting.scheme == "tract_mediated":
+            if weighting.tract_vintage is None or weighting.acs_vintage is None:
+                raise ExecutorError(
+                    f"Transform '{transform_id}': tract-mediated county "
+                    "weighting requires weighting.tract_vintage and "
+                    "weighting.acs_vintage."
+                )
+            return project_root / tract_mediated_county_xwalk_path(
+                boundary_vintage,
+                base_vintage,
+                weighting.tract_vintage,
+                weighting.acs_vintage,
+            )
         return project_root / county_xwalk_path(boundary_vintage, base_vintage)
     else:
         raise ExecutorError(

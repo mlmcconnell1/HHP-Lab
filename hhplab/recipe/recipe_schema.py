@@ -623,7 +623,13 @@ class TargetSpec(BaseModel):
 # Transforms (v1 operators)
 # -----------------------------
 
-WeightScheme = Literal["area", "population"]
+WeightScheme = Literal["area", "population", "tract_mediated"]
+TractMediatedWeightingVariety = Literal[
+    "area",
+    "population",
+    "households",
+    "renter_households",
+]
 
 
 class CrosswalkWeighting(BaseModel):
@@ -636,6 +642,29 @@ class CrosswalkWeighting(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     scheme: WeightScheme = Field(..., description="Crosswalk share weighting scheme.")
+    variety: TractMediatedWeightingVariety | None = Field(
+        default=None,
+        description=(
+            "Single tract-mediated county weighting variety. Required when "
+            "scheme='tract_mediated' unless varieties is provided."
+        ),
+    )
+    varieties: list[TractMediatedWeightingVariety] | None = Field(
+        default=None,
+        min_length=1,
+        description=(
+            "Multiple tract-mediated county weighting varieties for "
+            "side-by-side sensitivity runs."
+        ),
+    )
+    tract_vintage: int | str | None = Field(
+        default=None,
+        description="Census tract vintage used by the tract-mediated crosswalk.",
+    )
+    acs_vintage: int | str | None = Field(
+        default=None,
+        description="ACS denominator vintage used by demographic weighting varieties.",
+    )
     population_source: str | None = Field(
         default=None,
         description="Dataset id to source population weights from (when scheme=population).",
@@ -646,6 +675,51 @@ class CrosswalkWeighting(BaseModel):
         description="Field in the population dataset used for weights.",
         examples=["total_population"],
     )
+
+    @model_validator(mode="after")
+    def _validate_tract_mediated(self) -> CrosswalkWeighting:
+        has_variety = self.variety is not None
+        has_varieties = self.varieties is not None
+        if self.scheme != "tract_mediated":
+            if has_variety or has_varieties:
+                raise ValueError(
+                    "Crosswalk weighting varieties are only valid when "
+                    "scheme='tract_mediated'."
+                )
+            if self.tract_vintage is not None or self.acs_vintage is not None:
+                raise ValueError(
+                    "tract_vintage and acs_vintage are only valid when "
+                    "scheme='tract_mediated'."
+                )
+            return self
+
+        if has_variety and has_varieties:
+            raise ValueError(
+                "Use either weighting.variety or weighting.varieties, not both."
+            )
+        if not has_variety and not has_varieties:
+            raise ValueError(
+                "scheme='tract_mediated' requires weighting.variety or "
+                "weighting.varieties."
+            )
+        if self.tract_vintage is None:
+            raise ValueError(
+                "scheme='tract_mediated' requires weighting.tract_vintage."
+            )
+        if self.acs_vintage is None:
+            raise ValueError(
+                "scheme='tract_mediated' requires weighting.acs_vintage."
+            )
+        return self
+
+    @property
+    def resolved_varieties(self) -> tuple[TractMediatedWeightingVariety, ...]:
+        """Return requested tract-mediated varieties in declaration order."""
+        if self.varieties is not None:
+            return tuple(self.varieties)
+        if self.variety is not None:
+            return (self.variety,)
+        return ()
 
 
 class CrosswalkSpec(BaseModel):

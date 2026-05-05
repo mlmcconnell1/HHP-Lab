@@ -52,6 +52,9 @@ class ResampleTask:
     measure_aggregations: dict[str, str] | None = None
     year_column: str | None = None
     geo_column: str | None = None
+    weighting_variety: str | None = None
+    weight_column: str | None = None
+    weighting_variety_count: int = 1
 
 
 @dataclass
@@ -110,6 +113,9 @@ class ExecutionPlan:
                     "to_geometry": _geometry_to_dict(t.to_geometry),
                     "measures": t.measures,
                     "measure_aggregations": t.measure_aggregations,
+                    "weighting_variety": t.weighting_variety,
+                    "weight_column": t.weight_column,
+                    "weighting_variety_count": t.weighting_variety_count,
                 }
                 for t in self.resample_tasks
             ],
@@ -289,6 +295,36 @@ def _resolve_auto_transform(
     return candidates[0]
 
 
+_TRACT_MEDIATED_WEIGHT_COLUMNS: dict[str, str] = {
+    "area": "area_weight",
+    "population": "population_weight",
+    "households": "household_weight",
+    "renter_households": "renter_household_weight",
+}
+
+
+def _transform_weighting_varieties(
+    recipe: RecipeV1,
+    transform_id: str | None,
+) -> tuple[str | None, ...]:
+    """Return the resample task variants implied by a transform."""
+    if transform_id is None:
+        return (None,)
+    transform = next((t for t in recipe.transforms if t.id == transform_id), None)
+    if transform is None or transform.type != "crosswalk":
+        return (None,)
+    weighting = transform.spec.weighting
+    if weighting.scheme != "tract_mediated":
+        return (None,)
+    return tuple(weighting.resolved_varieties)
+
+
+def _weight_column_for_variety(variety: str | None) -> str | None:
+    if variety is None:
+        return None
+    return _TRACT_MEDIATED_WEIGHT_COLUMNS[variety]
+
+
 # ---------------------------------------------------------------------------
 # Plan resolution
 # ---------------------------------------------------------------------------
@@ -343,26 +379,34 @@ def resolve_plan(recipe: RecipeV1, pipeline_id: str) -> ExecutionPlan:
                     else:
                         transform_id = step.via
 
-                ds = recipe.datasets[step.dataset]
-                measure_aggs = {
-                    name: cfg.aggregation
-                    for name, cfg in step.measures.items()
-                }
-                plan.resample_tasks.append(
-                    ResampleTask(
-                        dataset_id=step.dataset,
-                        year=year,
-                        input_path=resolved.path,
-                        effective_geometry=resolved.effective_geometry,
-                        method=step.method,
-                        transform_id=transform_id,
-                        to_geometry=step.to_geometry,
-                        measures=step.measure_names,
-                        measure_aggregations=measure_aggs,
-                        year_column=ds.year_column,
-                        geo_column=ds.geo_column,
-                    )
+                weighting_varieties = _transform_weighting_varieties(
+                    recipe,
+                    transform_id,
                 )
+                for weighting_variety in weighting_varieties:
+                    ds = recipe.datasets[step.dataset]
+                    measure_aggs = {
+                        name: cfg.aggregation
+                        for name, cfg in step.measures.items()
+                    }
+                    plan.resample_tasks.append(
+                        ResampleTask(
+                            dataset_id=step.dataset,
+                            year=year,
+                            input_path=resolved.path,
+                            effective_geometry=resolved.effective_geometry,
+                            method=step.method,
+                            transform_id=transform_id,
+                            to_geometry=step.to_geometry,
+                            measures=step.measure_names,
+                            measure_aggregations=measure_aggs,
+                            year_column=ds.year_column,
+                            geo_column=ds.geo_column,
+                            weighting_variety=weighting_variety,
+                            weight_column=_weight_column_for_variety(weighting_variety),
+                            weighting_variety_count=len(weighting_varieties),
+                        )
+                    )
 
         elif isinstance(step, JoinStep):
             for year in universe_years:

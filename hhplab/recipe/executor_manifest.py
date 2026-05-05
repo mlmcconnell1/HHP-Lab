@@ -143,6 +143,32 @@ def _recipe_output_dirname(recipe_name: str) -> str:
     return normalized or "recipe"
 
 
+def _pipeline_weighting_suffix(recipe: RecipeV1, pipeline_id: str) -> str:
+    """Return a deterministic output suffix for tract-mediated weighting varieties."""
+    pipeline, _target = _resolve_pipeline_target(recipe, pipeline_id)
+    materialized_transform_ids: set[str] = set()
+    for step in pipeline.steps:
+        transform_ids = getattr(step, "transforms", None)
+        if transform_ids is not None:
+            materialized_transform_ids.update(transform_ids)
+
+    varieties: list[str] = []
+    for transform in recipe.transforms:
+        if materialized_transform_ids and transform.id not in materialized_transform_ids:
+            continue
+        if transform.type != "crosswalk":
+            continue
+        weighting = transform.spec.weighting
+        if weighting.scheme != "tract_mediated":
+            continue
+        varieties.extend(weighting.resolved_varieties)
+
+    if not varieties:
+        return ""
+    unique_varieties = list(dict.fromkeys(varieties))
+    return "__w" + "-".join(unique_varieties)
+
+
 def _resolve_panel_output_file(
     recipe: RecipeV1,
     pipeline_id: str,
@@ -170,15 +196,20 @@ def _resolve_panel_output_file(
 
     cfg = storage_config or load_config(project_root=project_root)
     recipe_dir = _recipe_output_dirname(recipe.name)
+    filename = geo_panel_filename(
+        start_year,
+        end_year,
+        geo_type=target_geo_type,
+        boundary_vintage=boundary_vintage if target_geo_type == "coc" else None,
+        definition_version=definition_version,
+        profile_definition_version=profile_definition_version,
+    )
+    weighting_suffix = _pipeline_weighting_suffix(recipe, pipeline_id)
+    if weighting_suffix:
+        path = Path(filename)
+        filename = f"{path.stem}{weighting_suffix}{path.suffix}"
     return (
-        cfg.output_root / recipe_dir / geo_panel_filename(
-            start_year,
-            end_year,
-            geo_type=target_geo_type,
-            boundary_vintage=boundary_vintage if target_geo_type == "coc" else None,
-            definition_version=definition_version,
-            profile_definition_version=profile_definition_version,
-        )
+        cfg.output_root / recipe_dir / filename
     )
 
 

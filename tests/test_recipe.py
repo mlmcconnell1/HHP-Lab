@@ -35,6 +35,7 @@ from hhplab.recipe.executor import (
     _execute_materialize,
     _execute_resample,
     _recipe_output_dirname,
+    _resolve_panel_output_file,
     _resolve_transform_path,
     execute_recipe,
 )
@@ -2683,6 +2684,67 @@ class TestMaterialize:
         recipe = load_recipe(data)
         path = _resolve_transform_path("county_to_coc", recipe, tmp_path)
         assert "xwalk__B2025xC2023" in str(path)
+
+    def test_resolve_tract_mediated_county_crosswalk_path(self, tmp_path: Path):
+        data = _recipe_with_pipeline()
+        data["transforms"] = [
+            {
+                "id": "county_to_coc_tract_mediated",
+                "type": "crosswalk",
+                "from": {"type": "county", "vintage": 2020},
+                "to": {"type": "coc", "vintage": 2025},
+                "spec": {
+                    "weighting": {
+                        "scheme": "tract_mediated",
+                        "variety": "renter_households",
+                        "tract_vintage": 2020,
+                        "acs_vintage": "2019-2023",
+                    },
+                },
+            }
+        ]
+        data["pipelines"][0]["steps"] = [
+            {"materialize": {"transforms": ["county_to_coc_tract_mediated"]}},
+        ]
+        recipe = load_recipe(data)
+
+        path = _resolve_transform_path(
+            "county_to_coc_tract_mediated",
+            recipe,
+            tmp_path,
+        )
+
+        assert (
+            "xwalk_tract_mediated_county__A2023@B2025xC2020xT2020"
+            in str(path)
+        )
+
+    def test_panel_output_filename_encodes_tract_mediated_varieties(self, tmp_path: Path):
+        data = _recipe_with_pipeline()
+        data["transforms"] = [
+            {
+                "id": "county_to_coc_tract_mediated",
+                "type": "crosswalk",
+                "from": {"type": "county", "vintage": 2020},
+                "to": {"type": "coc", "vintage": 2025},
+                "spec": {
+                    "weighting": {
+                        "scheme": "tract_mediated",
+                        "varieties": ["area", "population"],
+                        "tract_vintage": 2020,
+                        "acs_vintage": 2023,
+                    },
+                },
+            }
+        ]
+        data["pipelines"][0]["steps"] = [
+            {"materialize": {"transforms": ["county_to_coc_tract_mediated"]}},
+        ]
+        recipe = load_recipe(data)
+
+        path = _resolve_panel_output_file(recipe, "main", tmp_path)
+
+        assert path.name.endswith("__warea-population.parquet")
 
     def test_resolve_coc_to_metro_crosswalk_path(self, tmp_path: Path):
         data = _recipe_with_pipeline()

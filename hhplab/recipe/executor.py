@@ -293,6 +293,8 @@ def _execute_resample(
     step_notes: list[str] = []
     if task.transform_id:
         detail += f" via={task.transform_id}"
+    if task.weighting_variety:
+        detail += f" weighting={task.weighting_variety}"
     _echo(ctx, f"  [resample] {detail}")
 
     # Load input dataset
@@ -559,8 +561,42 @@ def _execute_resample(
             notes=step_notes,
         )
 
-    # Store intermediate
-    ctx.intermediates[(task.dataset_id, task.year)] = result_df
+    # Store intermediate. Multi-variety tract-mediated resamples reuse the same
+    # dataset/year key, so keep each requested variety as side-by-side columns.
+    intermediate_key = (task.dataset_id, task.year)
+    if task.weighting_variety is not None and task.weighting_variety_count > 1:
+        suffix = f"__w{task.weighting_variety}"
+        rename_cols = {
+            measure: f"{measure}{suffix}"
+            for measure in task.measures
+            if measure in result_df.columns
+        }
+        result_df = result_df.rename(columns=rename_cols)
+        if intermediate_key in ctx.intermediates:
+            merge_keys = [
+                key
+                for key in ("geo_id", "year")
+                if key in ctx.intermediates[intermediate_key].columns
+                and key in result_df.columns
+            ]
+            if not merge_keys:
+                return StepResult(
+                    step_kind="resample",
+                    detail=detail,
+                    success=False,
+                    error=(
+                        f"Dataset '{task.dataset_id}' year {task.year}: "
+                        "cannot merge tract-mediated weighting varieties "
+                        "because no common geo/year keys are present."
+                    ),
+                    notes=step_notes,
+                )
+            result_df = ctx.intermediates[intermediate_key].merge(
+                result_df,
+                on=merge_keys,
+                how="outer",
+            )
+    ctx.intermediates[intermediate_key] = result_df
     return StepResult(
         step_kind="resample",
         detail=detail,

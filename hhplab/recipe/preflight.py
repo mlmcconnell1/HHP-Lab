@@ -1231,6 +1231,10 @@ def _check_transforms(
             is_msa = transform is not None and (
                 transform.from_.type == "msa" or transform.to.type == "msa"
             )
+            is_tract_mediated = (
+                transform is not None
+                and getattr(transform.spec.weighting, "scheme", None) == "tract_mediated"
+            )
             if is_metro:
                 missing_inputs = result.detail.get("missing_inputs", []) if result.detail else []
                 cmd = None
@@ -1289,6 +1293,47 @@ def _check_transforms(
             elif is_msa:
                 missing_inputs = result.detail.get("missing_inputs", []) if result.detail else []
                 remediation = _msa_transform_remediation(tid, transform, missing_inputs)
+            elif is_tract_mediated and transform is not None:
+                weighting = transform.spec.weighting
+                coc_ref = (
+                    transform.to
+                    if transform.to.type == "coc"
+                    else transform.from_
+                    if transform.from_.type == "coc"
+                    else None
+                )
+                county_ref = (
+                    transform.to
+                    if transform.to.type == "county"
+                    else transform.from_
+                    if transform.from_.type == "county"
+                    else None
+                )
+                command = None
+                if (
+                    coc_ref is not None
+                    and county_ref is not None
+                    and coc_ref.vintage is not None
+                    and county_ref.vintage is not None
+                    and weighting.tract_vintage is not None
+                    and weighting.acs_vintage is not None
+                ):
+                    command = (
+                        "hhplab generate xwalks "
+                        f"--boundary {coc_ref.vintage} "
+                        "--type tract-mediated "
+                        f"--counties {county_ref.vintage} "
+                        f"--tracts {weighting.tract_vintage} "
+                        f"--acs {weighting.acs_vintage}"
+                    )
+                remediation = Remediation(
+                    hint=(
+                        f"Generate tract-mediated county crosswalk artifact "
+                        f"for transform '{tid}'. This requires the CoC-tract "
+                        "crosswalk and ACS tract denominator cache."
+                    ),
+                    command=command,
+                )
             else:
                 remediation = Remediation(
                     hint=f"Generate crosswalk artifacts for transform '{tid}'.",
