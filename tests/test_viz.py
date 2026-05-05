@@ -10,6 +10,7 @@ from shapely.geometry import Polygon
 from hhplab.recipe.recipe_schema import (
     GeometryRef,
     MapLayerSpec,
+    MapLayerStyle,
     MapSpec,
     MapViewportSpec,
     TargetSpec,
@@ -490,6 +491,27 @@ class TestRenderRecipeMap:
         assert "Denver-Aurora-Lakewood, CO" in content
         assert "Denver, CO" in content
         assert "fitBounds" in content
+
+    def test_render_map_honors_layer_z_order(
+        self,
+        sample_boundaries,
+        sample_overlay_artifacts,
+        temp_data_dir,
+    ):
+        target = _mixed_overlay_target()
+        target.map_spec.layers[0].style = MapLayerStyle(z_order=20)
+        target.map_spec.layers[1].style = MapLayerStyle(z_order=0)
+        target.map_spec.layers[2].style = MapLayerStyle(z_order=10)
+
+        out_path = render_recipe_map(
+            target,
+            project_root=temp_data_dir,
+            out_html=temp_data_dir / "outputs" / "z-order.html",
+        )
+
+        content = out_path.read_text()
+        assert content.index("MSA layer") < content.index("Metro layer")
+        assert content.index("Metro layer") < content.index("CoC layer")
 
     def test_render_map_missing_selector_raises(
         self,

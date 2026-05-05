@@ -66,6 +66,7 @@ class ResolvedMapLayer:
     show: bool
     style: dict[str, Any]
     id_column: str
+    z_order: int = 0
 
 
 def _normalize_selector(value: object) -> str:
@@ -455,6 +456,7 @@ def _resolve_map_layer(layer: MapLayerSpec, *, base_dir: Path) -> ResolvedMapLay
         show=layer.initial_visibility,
         style=style,
         id_column=id_column,
+        z_order=layer.style.z_order,
     )
 
 
@@ -501,7 +503,7 @@ def render_overlay_map(
         tiles=_resolve_basemap(basemap),
     )
 
-    for layer in layers:
+    for layer in sorted(layers, key=lambda item: item.z_order):
         feature_group = folium.FeatureGroup(name=layer.name, show=layer.show)
         geojson_tooltip = None
         if layer.tooltip_fields:
