@@ -14,7 +14,7 @@ import re
 from pathlib import Path
 
 from hhplab.config import StorageConfig, load_config
-from hhplab.naming import geo_map_filename, geo_panel_filename
+from hhplab.naming import containment_filename, geo_map_filename, geo_panel_filename
 from hhplab.recipe.executor_core import (
     ExecutionContext,
     ExecutorError,
@@ -221,6 +221,45 @@ def _resolve_map_output_file(
     )
 
 
+def _resolve_containment_output_file(
+    recipe: RecipeV1,
+    pipeline_id: str,
+    project_root: Path,
+    storage_config: StorageConfig | None = None,
+) -> Path:
+    """Return the canonical containment parquet path for a pipeline."""
+    _, target = _resolve_pipeline_target(recipe, pipeline_id)
+    if target.containment_spec is None:
+        raise ExecutorError(
+            f"Target '{target.id}' declares containment output without containment_spec."
+        )
+
+    spec = target.containment_spec
+    definition_version = (
+        spec.definition_version
+        or spec.container.source
+        or (
+            str(spec.container.vintage)
+            if spec.container.type == "msa" and spec.container.vintage is not None
+            else None
+        )
+    )
+    cfg = storage_config or load_config(project_root=project_root)
+    recipe_dir = _recipe_output_dirname(recipe.name)
+    return (
+        cfg.output_root
+        / recipe_dir
+        / containment_filename(
+            container_type=spec.container.type,
+            candidate_type=spec.candidate.type,
+            container_vintage=spec.container.vintage,
+            candidate_vintage=spec.candidate.vintage,
+            definition_version=definition_version,
+            output_id=target.id,
+        )
+    )
+
+
 def resolve_pipeline_artifacts(
     recipe: RecipeV1,
     pipeline_id: str,
@@ -265,5 +304,18 @@ def resolve_pipeline_artifacts(
             recipe, pipeline_id, project_root, storage_config=storage_config,
         )
         artifacts["map_path"] = _display_path(map_file)
+
+    if "containment" in target.outputs:
+        containment_file = _resolve_containment_output_file(
+            recipe,
+            pipeline_id,
+            project_root,
+            storage_config=storage_config,
+        )
+        artifacts["containment_path"] = _display_path(containment_file)
+        manifest_key = "manifest_path" if "panel" not in target.outputs else "containment_manifest_path"
+        artifacts[manifest_key] = _display_path(
+            containment_file.with_suffix(".manifest.json"),
+        )
 
     return artifacts

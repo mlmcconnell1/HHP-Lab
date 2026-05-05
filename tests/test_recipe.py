@@ -55,6 +55,7 @@ from hhplab.recipe.planner import (
 )
 from hhplab.recipe.recipe_schema import (
     Acs1Policy,
+    ContainmentSpec,
     DatasetSpec,
     GeometryRef,
     MapSpec,
@@ -242,6 +243,96 @@ class TestLoadRecipeFromDict:
         assert isinstance(recipe.targets[0].map_spec, MapSpec)
         assert recipe.targets[0].map_spec.layers[0].selector_ids == ["CO-500"]
         assert recipe.targets[0].map_spec.layers[0].style_mode == "distinct"
+
+    def test_target_containment_output_requires_containment_spec(self):
+        data = _minimal_recipe()
+        data["targets"][0]["outputs"] = ["containment"]
+        with pytest.raises(RecipeLoadError, match="require 'containment_spec'"):
+            load_recipe(data)
+
+    def test_target_containment_spec_requires_containment_output(self):
+        data = _minimal_recipe()
+        data["targets"][0]["containment_spec"] = {
+            "container": {"type": "msa", "source": "census_msa_2023", "vintage": 2023},
+            "candidate": {"type": "coc", "vintage": 2025},
+            "selector_ids": ["17460"],
+        }
+        with pytest.raises(RecipeLoadError, match="requires outputs to include 'containment'"):
+            load_recipe(data)
+
+    @pytest.mark.parametrize(
+        ("container", "candidate", "selector_ids"),
+        [
+            pytest.param(
+                {"type": "msa", "source": "census_msa_2023", "vintage": 2023},
+                {"type": "coc", "vintage": 2025},
+                ["17460"],
+                id="msa-coc",
+            ),
+            pytest.param(
+                {"type": "coc", "vintage": 2025},
+                {"type": "county", "vintage": 2023},
+                ["CA-600"],
+                id="coc-county",
+            ),
+        ],
+    )
+    def test_valid_containment_target_loads(self, container, candidate, selector_ids):
+        data = _minimal_recipe()
+        data["targets"][0]["outputs"] = ["containment"]
+        data["targets"][0]["containment_spec"] = {
+            "container": container,
+            "candidate": candidate,
+            "selector_ids": selector_ids,
+            "candidate_selector_ids": ["candidate-1"],
+            "min_share": 0.2,
+            "denominator": "candidate_area",
+            "method": "planar_intersection",
+            "definition_version": "test_definition_v1",
+        }
+        recipe = load_recipe(data)
+        spec = recipe.targets[0].containment_spec
+        assert isinstance(spec, ContainmentSpec)
+        assert spec.container.type == container["type"]
+        assert spec.candidate.type == candidate["type"]
+        assert spec.selector_ids == selector_ids
+        assert spec.candidate_selector_ids == ["candidate-1"]
+        assert spec.min_share == pytest.approx(0.2)
+
+    @pytest.mark.parametrize(
+        ("container", "candidate"),
+        [
+            pytest.param({"type": "tract", "vintage": 2020}, {"type": "coc", "vintage": 2025}, id="tract-coc"),
+            pytest.param({"type": "coc", "vintage": 2025}, {"type": "msa", "vintage": 2023}, id="coc-msa"),
+        ],
+    )
+    def test_containment_rejects_unsupported_geometry_pair(self, container, candidate):
+        data = _minimal_recipe()
+        data["targets"][0]["outputs"] = ["containment"]
+        data["targets"][0]["containment_spec"] = {
+            "container": container,
+            "candidate": candidate,
+        }
+        with pytest.raises(
+            RecipeLoadError,
+            match="Unsupported containment geometry pair .* Supported pairs:",
+        ):
+            load_recipe(data)
+
+    @pytest.mark.parametrize(
+        "field",
+        ["selector_ids", "candidate_selector_ids"],
+    )
+    def test_containment_rejects_empty_selector_lists(self, field):
+        data = _minimal_recipe()
+        data["targets"][0]["outputs"] = ["containment"]
+        data["targets"][0]["containment_spec"] = {
+            "container": {"type": "msa", "source": "census_msa_2023", "vintage": 2023},
+            "candidate": {"type": "coc", "vintage": 2025},
+            field: [],
+        }
+        with pytest.raises(RecipeLoadError, match="selector lists may not be empty"):
+            load_recipe(data)
 
 
 class TestLoadRecipeFromFile:

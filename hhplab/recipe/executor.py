@@ -46,6 +46,7 @@ from hhplab.recipe.executor_manifest import (
     _build_provenance,
     _deduplicate_assets,
     _recipe_output_dirname,
+    _resolve_containment_output_file,
     _resolve_map_output_file,
     _resolve_panel_output_file,
     _resolve_pipeline_target,
@@ -69,6 +70,9 @@ from hhplab.recipe.executor_panel import (
 )
 from hhplab.recipe.executor_panel import (
     resolve_panel_aliases as _resolve_panel_aliases,  # noqa: F401
+)
+from hhplab.recipe.executor_persistence import (
+    persist_containment as _persist_containment,
 )
 from hhplab.recipe.executor_persistence import (
     persist_diagnostics as _persist_diagnostics,
@@ -149,7 +153,9 @@ __all__ = [
     "_materialize_generated_msa_transform",
     "_needs_ct_planning_to_legacy_alignment",
     "_resolve_map_output_file",
+    "_resolve_containment_output_file",
     "_persist_diagnostics",
+    "_persist_containment",
     "_persist_outputs",
     "_recipe_output_dirname",
     "_reject_implicit_static_broadcast",
@@ -752,6 +758,12 @@ def _execute_plan(
 
     if "map" in declared_outputs:
         step = _persist_map_output(plan, ctx)
+        result.steps.append(step)
+        if not step.success:
+            return result
+
+    if "containment" in declared_outputs:
+        step = _persist_containment(plan, ctx)
         result.steps.append(step)
         if not step.success:
             return result

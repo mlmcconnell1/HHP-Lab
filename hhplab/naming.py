@@ -24,6 +24,7 @@ Geography-scoped naming:
 See background/temporal-terminology.md for full specification.
 """
 
+import re
 from pathlib import Path
 
 # =============================================================================
@@ -167,6 +168,66 @@ def msa_coc_xwalk_filename(
         f"msa_coc_xwalk__B{boundary_vintage}"
         f"xM{definition_version}xC{county_vintage}.parquet"
     )
+
+
+def containment_filename(
+    *,
+    container_type: str,
+    candidate_type: str,
+    output_id: str,
+    container_vintage: str | int | None = None,
+    candidate_vintage: str | int | None = None,
+    definition_version: str | None = None,
+) -> str:
+    """Generate filename for a recipe containment-list output."""
+    container_token = _containment_geometry_token(
+        container_type,
+        vintage=container_vintage,
+        definition_version=definition_version,
+    )
+    candidate_token = _containment_geometry_token(
+        candidate_type,
+        vintage=candidate_vintage,
+        definition_version=None,
+    )
+    return (
+        f"containment__{container_token}x{candidate_token}"
+        f"__{_slug_output_id(output_id)}.parquet"
+    )
+
+
+def _containment_geometry_token(
+    geometry_type: str,
+    *,
+    vintage: str | int | None,
+    definition_version: str | None,
+) -> str:
+    if geometry_type == "coc":
+        if vintage is None:
+            raise ValueError("CoC containment filenames require a boundary vintage.")
+        return f"B{vintage}"
+    if geometry_type == "county":
+        if vintage is None:
+            raise ValueError("County containment filenames require a county vintage.")
+        return f"C{vintage}"
+    if geometry_type == "msa":
+        if definition_version:
+            return f"M{definition_version}"
+        if vintage is None:
+            raise ValueError(
+                "MSA containment filenames require a definition version or vintage."
+            )
+        return f"M{vintage}"
+    raise ValueError(
+        f"Unsupported containment geometry type '{geometry_type}'. "
+        "Supported types: coc, county, msa."
+    )
+
+
+def _slug_output_id(output_id: str) -> str:
+    normalized = re.sub(r"[^A-Za-z0-9._-]+", "-", output_id.strip().lower())
+    normalized = re.sub(r"-{2,}", "-", normalized).strip("-.")
+    return normalized or "containment"
 
 
 def tract_relationship_filename(

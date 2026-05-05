@@ -16,29 +16,38 @@ from __future__ import annotations
 
 import json
 import sys
+from pathlib import Path
 
+import geopandas as gpd
+import pandas as pd
 import pyarrow as pa
 import pyarrow.parquet as pq
 
+from hhplab.config import load_config
+from hhplab.naming import coc_base_path, county_path, msa_county_membership_path
 from hhplab.panel.conformance import PanelRequest, run_conformance
 from hhplab.panel.panel_diagnostics import generate_diagnostics_report
 from hhplab.panel.zori_eligibility import summarize_zori_eligibility
+from hhplab.recipe.executor_containment import build_containment_list
 from hhplab.recipe.executor_core import (
     ExecutionContext,
     ExecutorError,
     StepResult,
+    _classify_path,
     _echo,
 )
 from hhplab.recipe.executor_manifest import (
     _build_manifest,
     _build_provenance,
+    _resolve_containment_output_file,
     _resolve_panel_output_file,
     _resolve_pipeline_target,
 )
 from hhplab.recipe.executor_panel import assemble_panel
 from hhplab.recipe.executor_panel_policies import collect_conformance_flags
-from hhplab.recipe.manifest import write_manifest
+from hhplab.recipe.manifest import AssetRecord, write_manifest
 from hhplab.recipe.planner import ExecutionPlan
+from hhplab.recipe.recipe_schema import ContainmentSpec
 from hhplab.recipe.schema_common import expand_year_spec
 
 
@@ -223,3 +232,165 @@ def persist_diagnostics(
     detail = f"persist diagnostics: {diag_display}"
     _echo(ctx, f"  [persist] {detail}")
     return StepResult(step_kind="persist_diagnostics", detail=detail, success=True)
+
+
+def persist_containment(
+    plan: ExecutionPlan,
+    ctx: ExecutionContext,
+) -> StepResult:
+    """Build and persist a containment-list parquet output."""
+    try:
+        _pipeline, target = _resolve_pipeline_target(ctx.recipe, plan.pipeline_id)
+        if target.containment_spec is None:
+            raise ExecutorError(
+                f"Target '{target.id}' declares containment output without containment_spec."
+            )
+        spec = target.containment_spec
+        output_file = _resolve_containment_output_file(
+            ctx.recipe,
+            plan.pipeline_id,
+            ctx.project_root,
+            storage_config=ctx.storage_config,
+        )
+        coc_gdf, county_gdf, msa_county_membership = _load_containment_inputs(spec, ctx)
+        containment = build_containment_list(
+            spec,
+            coc_gdf=coc_gdf,
+            county_gdf=county_gdf,
+            msa_county_membership=msa_county_membership,
+        )
+    except (ExecutorError, FileNotFoundError, ValueError) as exc:
+        return StepResult(
+            step_kind="persist_containment",
+            detail="persist containment",
+            success=False,
+            error=str(exc),
+        )
+
+    output_file.parent.mkdir(parents=True, exist_ok=True)
+    if output_file.exists() and output_file in getattr(ctx, "_written_outputs", set()):
+        return StepResult(
+            step_kind="persist_containment",
+            detail="persist containment",
+            success=False,
+            error=(
+                f"Output collision: pipeline '{plan.pipeline_id}' resolves to "
+                f"'{output_file}' which was already written by another pipeline "
+                "in this recipe."
+            ),
+        )
+
+    try:
+        output_rel = str(output_file.relative_to(ctx.project_root))
+    except ValueError:
+        output_rel = str(output_file)
+
+    provenance = _build_provenance(ctx.recipe, plan.pipeline_id, ctx)
+    provenance["target_geometry"] = target.geometry.model_dump(mode="json")
+    provenance["containment_spec"] = spec.model_dump(mode="json")
+    provenance["containment"] = {
+        "row_count": len(containment),
+        "min_share": spec.min_share,
+        "denominator": spec.denominator,
+        "method": spec.method,
+    }
+
+    table = pa.Table.from_pandas(containment)
+    metadata = table.schema.metadata or {}
+    metadata[b"hhplab_provenance"] = json.dumps(provenance).encode()
+    table = table.replace_schema_metadata(metadata)
+    pq.write_table(table, output_file)
+
+    if not hasattr(ctx, "_written_outputs"):
+        ctx._written_outputs = set()  # type: ignore[attr-defined]
+    ctx._written_outputs.add(output_file)  # type: ignore[attr-defined]
+
+    manifest = _build_manifest(
+        ctx.recipe,
+        plan.pipeline_id,
+        ctx,
+        output_path=output_rel,
+    )
+    manifest_file = output_file.with_suffix(".manifest.json")
+    write_manifest(manifest, manifest_file)
+
+    detail = f"persist containment: {len(containment)} rows -> {output_rel}"
+    _echo(ctx, f"  [persist] {detail}")
+    return StepResult(step_kind="persist_containment", detail=detail, success=True)
+
+
+def _load_containment_inputs(
+    spec: ContainmentSpec,
+    ctx: ExecutionContext,
+) -> tuple[gpd.GeoDataFrame, gpd.GeoDataFrame, pd.DataFrame | None]:
+    cfg = ctx.storage_config or load_config(project_root=ctx.project_root)
+    data_root = cfg.asset_store_root
+    pair = (spec.container.type, spec.candidate.type)
+
+    if pair == ("msa", "coc"):
+        coc_file = coc_base_path(_required_vintage(spec.candidate, "candidate CoC"), data_root)
+        county_file = county_path(_required_vintage(spec.container, "container MSA"), data_root)
+        definition_version = spec.definition_version or spec.container.source
+        if definition_version is None:
+            raise ValueError(
+                "MSA containment output requires containment_spec.definition_version "
+                "or container.source."
+            )
+        membership_file = msa_county_membership_path(definition_version, data_root)
+        _record_containment_asset(ctx, coc_file)
+        _record_containment_asset(ctx, county_file)
+        _record_containment_asset(ctx, membership_file)
+        return (
+            _read_geoparquet(coc_file, "CoC boundary geometry"),
+            _read_geoparquet(county_file, "county geometry"),
+            _read_parquet(membership_file, "MSA county membership"),
+        )
+
+    if pair == ("coc", "county"):
+        coc_file = coc_base_path(_required_vintage(spec.container, "container CoC"), data_root)
+        county_file = county_path(_required_vintage(spec.candidate, "candidate county"), data_root)
+        _record_containment_asset(ctx, coc_file)
+        _record_containment_asset(ctx, county_file)
+        return (
+            _read_geoparquet(coc_file, "CoC boundary geometry"),
+            _read_geoparquet(county_file, "county geometry"),
+            None,
+        )
+
+    raise ValueError(
+        "Unsupported containment geometry pair "
+        f"'{spec.container.type} -> {spec.candidate.type}'. "
+        "Supported pairs: msa -> coc, coc -> county."
+    )
+
+
+def _record_containment_asset(ctx: ExecutionContext, path: Path) -> None:
+    root, rel = _classify_path(path, ctx)
+    ctx.consumed_assets.append(
+        AssetRecord(
+            role="geometry",
+            path=rel,
+            sha256="",
+            size=path.stat().st_size if path.exists() else 0,
+            root=root,
+        )
+    )
+
+
+def _read_geoparquet(path: Path, label: str) -> gpd.GeoDataFrame:
+    if not path.exists():
+        raise FileNotFoundError(f"Missing {label} for containment output: {path}")
+    return gpd.read_parquet(path)
+
+
+def _read_parquet(path: Path, label: str) -> pd.DataFrame:
+    if not path.exists():
+        raise FileNotFoundError(f"Missing {label} for containment output: {path}")
+    return pd.read_parquet(path)
+
+
+def _required_vintage(ref: object, label: str) -> int:
+    vintage = getattr(ref, "vintage")
+    if vintage is None:
+        raise ValueError(f"Missing {label} vintage for containment output.")
+    return vintage

@@ -205,7 +205,7 @@ FilterSpec = TemporalFilter  # Extensible: Union[TemporalFilter, ...] in future
 # Targets / outputs
 # -----------------------------
 
-OutputKind = Literal["panel", "diagnostics", "map"]
+OutputKind = Literal["panel", "diagnostics", "map", "containment"]
 
 CohortMethod = Literal["top_n", "bottom_n", "percentile"]
 
@@ -453,6 +453,83 @@ class MapSpec(BaseModel):
     )
 
 
+ContainmentDenominator = Literal["candidate_area", "container_area"]
+ContainmentMethod = Literal["planar_intersection"]
+SUPPORTED_CONTAINMENT_PAIRS: frozenset[tuple[str, str]] = frozenset(
+    {
+        ("msa", "coc"),
+        ("coc", "county"),
+    }
+)
+
+
+class ContainmentSpec(BaseModel):
+    """Declarative containment-list output definition for a target."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    container: GeometryRef = Field(
+        ...,
+        description="Containing geometry evaluated against candidate geographies.",
+    )
+    candidate: GeometryRef = Field(
+        ...,
+        description="Candidate geometry whose overlap with the container is measured.",
+    )
+    selector_ids: list[str] | None = Field(
+        default=None,
+        description="Optional container IDs to evaluate. If omitted, all containers are eligible.",
+    )
+    candidate_selector_ids: list[str] | None = Field(
+        default=None,
+        description="Optional candidate IDs to evaluate. If omitted, all candidates are eligible.",
+    )
+    min_share: float = Field(
+        default=0.0,
+        ge=0.0,
+        le=1.0,
+        description="Inclusive minimum contained_share threshold.",
+    )
+    denominator: ContainmentDenominator = Field(
+        default="candidate_area",
+        description="Area denominator used to calculate contained_share.",
+    )
+    method: ContainmentMethod = Field(
+        default="planar_intersection",
+        description="Geometry operation used to calculate overlap.",
+    )
+    definition_version: str | None = Field(
+        default=None,
+        description="Optional stable definition version for synthetic or curated geometries.",
+    )
+
+    @field_validator("selector_ids", "candidate_selector_ids")
+    @classmethod
+    def _validate_selector_ids(cls, value: list[str] | None) -> list[str] | None:
+        if value is None:
+            return value
+        if not value:
+            raise ValueError("Containment selector lists may not be empty when provided.")
+        if any(not item.strip() for item in value):
+            raise ValueError("Containment selector lists may not contain blank items.")
+        return value
+
+    @model_validator(mode="after")
+    def _validate_supported_pair(self) -> ContainmentSpec:
+        pair = (self.container.type, self.candidate.type)
+        if pair not in SUPPORTED_CONTAINMENT_PAIRS:
+            supported = ", ".join(
+                f"{container} -> {candidate}"
+                for container, candidate in sorted(SUPPORTED_CONTAINMENT_PAIRS)
+            )
+            raise ValueError(
+                "Unsupported containment geometry pair "
+                f"'{self.container.type} -> {self.candidate.type}'. "
+                f"Supported pairs: {supported}."
+            )
+        return self
+
+
 class CohortSelector(BaseModel):
     """Declarative cohort filter that ranks geographies by a measure column
     at a reference year and keeps only the selected subset."""
@@ -519,6 +596,10 @@ class TargetSpec(BaseModel):
         default=None,
         description="Declarative recipe-native map artifact configuration.",
     )
+    containment_spec: ContainmentSpec | None = Field(
+        default=None,
+        description="Declarative containment-list artifact configuration.",
+    )
 
     @model_validator(mode="after")
     def _validate_output_policies(self) -> TargetSpec:
@@ -527,6 +608,14 @@ class TargetSpec(BaseModel):
             raise ValueError("Target outputs including 'map' require 'map_spec'.")
         if "map" not in outputs and self.map_spec is not None:
             raise ValueError("Target 'map_spec' requires outputs to include 'map'.")
+        if "containment" in outputs and self.containment_spec is None:
+            raise ValueError(
+                "Target outputs including 'containment' require 'containment_spec'."
+            )
+        if "containment" not in outputs and self.containment_spec is not None:
+            raise ValueError(
+                "Target 'containment_spec' requires outputs to include 'containment'."
+            )
         return self
 
 
