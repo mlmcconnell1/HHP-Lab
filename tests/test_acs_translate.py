@@ -198,6 +198,26 @@ class TestTranslateTracts2010To2020:
         # Total population should be preserved
         assert result["total_population"].sum() == pytest.approx(1000, rel=0.01)
 
+    def test_household_denominators_translate_as_counts(self, mock_relationship_file):
+        """Household denominator columns are area-weighted like population counts."""
+        df = pd.DataFrame(
+            {
+                "tract_geoid": ["01001020200"],
+                "total_population": [1000],
+                "total_households": [400],
+                "owner_households": [250],
+                "renter_households": [150],
+            }
+        )
+
+        result, _ = translate_tracts_2010_to_2020(df)
+
+        result = result.sort_values("tract_geoid").reset_index(drop=True)
+        assert result.iloc[0]["total_households"] == pytest.approx(240, rel=0.01)
+        assert result.iloc[1]["total_households"] == pytest.approx(160, rel=0.01)
+        assert result["owner_households"].sum() == pytest.approx(250, rel=0.01)
+        assert result["renter_households"].sum() == pytest.approx(150, rel=0.01)
+
     def test_tract_merge(self, mock_relationship_file):
         """Test translation of multiple tracts that merge into one 2020 tract."""
         df = pd.DataFrame(

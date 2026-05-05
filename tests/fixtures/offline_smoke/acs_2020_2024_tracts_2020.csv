@@ -1,4 +1,4 @@
-tract_geoid,acs_vintage,tract_vintage,total_population,moe_total_population,adult_population,median_household_income,median_gross_rent,poverty_universe,below_50pct_poverty,50_to_99pct_poverty,population_below_poverty,data_source,source_ref
-08001000100,2020-2024,2020,1000,10,800,60000,1400,950,50,50,100,acs_fixture,offline_smoke
-08001000200,2020-2024,2020,1600,12,1200,70000,1600,1500,80,120,200,acs_fixture,offline_smoke
-08001000300,2020-2024,2020,900,9,700,65000,1500,850,40,70,110,acs_fixture,offline_smoke
+tract_geoid,acs_vintage,tract_vintage,total_population,moe_total_population,adult_population,total_households,owner_households,renter_households,median_household_income,median_gross_rent,poverty_universe,below_50pct_poverty,50_to_99pct_poverty,population_below_poverty,data_source,source_ref
+08001000100,2020-2024,2020,1000,10,800,420,250,170,60000,1400,950,50,50,100,acs_fixture,offline_smoke
+08001000200,2020-2024,2020,1600,12,1200,650,390,260,70000,1600,1500,80,120,200,acs_fixture,offline_smoke
+08001000300,2020-2024,2020,900,9,700,360,210,150,65000,1500,850,40,70,110,acs_fixture,offline_smoke

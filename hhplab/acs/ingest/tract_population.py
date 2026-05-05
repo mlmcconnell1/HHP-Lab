@@ -2,8 +2,9 @@
 
 Fetches and caches tract-level ACS data from the Census Bureau API.
 Retrieves population (B01003), income (B19013), rent (B25064), poverty
-(C17002), and age/sex (B01001) variables in a single pass per state,
-then computes derived columns (adult_population, population_below_poverty).
+(C17002), tenure (B25003), and age/sex (B01001) variables in a single
+pass per state, then computes derived columns (adult_population,
+population_below_poverty).
 
 Usage
 -----
@@ -22,6 +23,9 @@ Output Schema
 - total_population (Int64)
 - moe_total_population (Float64)
 - adult_population (Int64): derived from B01001 age 18+ groups
+- total_households (Int64)
+- owner_households (Int64)
+- renter_households (Int64)
 - median_household_income (Float64)
 - median_gross_rent (Float64)
 - poverty_universe (Int64)
@@ -288,6 +292,9 @@ def fetch_state_tract_data(year: int, state_fips: str) -> tuple[pd.DataFrame, by
         "total_population",
         "moe_total_population",
         "adult_population",
+        "total_households",
+        "owner_households",
+        "renter_households",
         "median_household_income",
         "median_gross_rent",
         "poverty_universe",
@@ -395,7 +402,8 @@ def fetch_tract_data(
     # Ensure proper column types
     result["tract_geoid"] = result["tract_geoid"].astype(str)
     int_cols = [
-        "total_population", "adult_population", "poverty_universe",
+        "total_population", "adult_population", "total_households",
+        "owner_households", "renter_households", "poverty_universe",
         "below_50pct_poverty", "50_to_99pct_poverty", "population_below_poverty",
         "civilian_labor_force", "unemployed_count",
     ]

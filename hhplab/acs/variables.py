@@ -19,6 +19,10 @@ ACS_VARIABLES: dict[str, str] = {
     "B19013_001E": "median_household_income",
     # B25064 — Median Gross Rent
     "B25064_001E": "median_gross_rent",
+    # B25003 — Tenure
+    "B25003_001E": "total_households",
+    "B25003_002E": "owner_households",
+    "B25003_003E": "renter_households",
     # C17002 — Ratio of Income to Poverty Level
     "C17002_001E": "poverty_universe",
     "C17002_002E": "below_50pct_poverty",
@@ -42,7 +46,15 @@ ACS_VARS = ACS_VARIABLES
 ALL_API_VARS: list[str] = list(ACS_VARIABLES.keys()) + ADULT_VARS
 
 # Tables included (for provenance tracking)
-ACS_TABLES: list[str] = ["B01003", "B01001", "B19013", "B25064", "C17002", "B23025"]
+ACS_TABLES: list[str] = [
+    "B01003",
+    "B01001",
+    "B19013",
+    "B25064",
+    "B25003",
+    "C17002",
+    "B23025",
+]
 
 # ---------------------------------------------------------------------------
 # Column classification (for translation and aggregation)
@@ -52,6 +64,9 @@ ACS_TABLES: list[str] = ["B01003", "B01001", "B19013", "B25064", "C17002", "B230
 COUNT_COLUMNS: list[str] = [
     "total_population",
     "adult_population",
+    "total_households",
+    "owner_households",
+    "renter_households",
     "poverty_universe",
     "below_50pct_poverty",
     "50_to_99pct_poverty",
@@ -88,6 +103,9 @@ TRACT_OUTPUT_COLUMNS: list[str] = [
     "total_population",
     "moe_total_population",
     "adult_population",
+    "total_households",
+    "owner_households",
+    "renter_households",
     "median_household_income",
     "median_gross_rent",
     "poverty_universe",

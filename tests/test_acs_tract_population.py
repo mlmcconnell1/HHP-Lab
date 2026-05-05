@@ -143,6 +143,9 @@ class TestFetchStateTractPopulation:
                     "B01003_001M": "150",  # margin of error
                     "B19013_001E": "65000",  # median_household_income
                     "B25064_001E": "1400",  # median_gross_rent
+                    "B25003_001E": "2100",  # total_households
+                    "B25003_002E": "1200",  # owner_households
+                    "B25003_003E": "900",  # renter_households
                     "C17002_001E": "4800",  # poverty_universe
                     "C17002_002E": "200",  # below_50pct_poverty
                     "C17002_003E": "350",  # 50_to_99pct_poverty
@@ -164,6 +167,9 @@ class TestFetchStateTractPopulation:
         assert df.iloc[0]["moe_total_population"] == 150
         assert df.iloc[0]["median_household_income"] == 65000
         assert df.iloc[0]["median_gross_rent"] == 1400
+        assert df.iloc[0]["total_households"] == 2100
+        assert df.iloc[0]["owner_households"] == 1200
+        assert df.iloc[0]["renter_households"] == 900
         assert df.iloc[0]["poverty_universe"] == 4800
         assert df.iloc[0]["below_50pct_poverty"] == 200
         assert df.iloc[0]["50_to_99pct_poverty"] == 350
@@ -181,6 +187,9 @@ class TestFetchStateTractPopulation:
                     "B01003_001M": "-666666666",  # Missing MOE
                     "B19013_001E": "-666666666",  # Missing income
                     "B25064_001E": "-666666666",  # Missing rent
+                    "B25003_001E": "-666666666",  # Missing households
+                    "B25003_002E": "-666666666",  # Missing owner households
+                    "B25003_003E": "-666666666",  # Missing renter households
                 }
             ]
         )
@@ -196,6 +205,9 @@ class TestFetchStateTractPopulation:
         assert pd.isna(df.iloc[0]["moe_total_population"])
         assert pd.isna(df.iloc[0]["median_household_income"])
         assert pd.isna(df.iloc[0]["median_gross_rent"])
+        assert pd.isna(df.iloc[0]["total_households"])
+        assert pd.isna(df.iloc[0]["owner_households"])
+        assert pd.isna(df.iloc[0]["renter_households"])
 
     def test_derives_adult_population(self, httpx_mock):
         """Test that adult population is derived from B01001 age groups."""
@@ -288,6 +300,9 @@ class TestFetchTractPopulation:
                     "B01003_001M": "150",
                     "B19013_001E": "65000",
                     "B25064_001E": "1400",
+                    "B25003_001E": "2100",
+                    "B25003_002E": "1200",
+                    "B25003_003E": "900",
                     "C17002_001E": "4800",
                     "C17002_002E": "200",
                     "C17002_003E": "350",
@@ -316,6 +331,9 @@ class TestFetchTractPopulation:
         assert row["tract_vintage"] == "2023"
         assert row["data_source"] == "acs_5yr"
         assert row["total_population"] == 5000
+        assert row["total_households"] == 2100
+        assert row["owner_households"] == 1200
+        assert row["renter_households"] == 900
         assert row["median_household_income"] == 65000
         assert row["median_gross_rent"] == 1400
         assert row["poverty_universe"] == 4800
@@ -826,3 +844,41 @@ class TestUnemploymentIngest:
         """TRACT_OUTPUT_COLUMNS includes unemployment fields."""
         assert "civilian_labor_force" in TRACT_OUTPUT_COLUMNS
         assert "unemployed_count" in TRACT_OUTPUT_COLUMNS
+
+
+class TestTenureHouseholdIngest:
+    """Tests for B25003 household denominator ingestion."""
+
+    def test_household_denominator_columns_parsed(self, httpx_mock):
+        """B25003 variables are included in tract output."""
+        response_data = make_census_response(
+            [
+                {
+                    "county": "031",
+                    "tract": "001000",
+                    "B01003_001E": "5000",
+                    "B25003_001E": "2100",
+                    "B25003_002E": "1200",
+                    "B25003_003E": "900",
+                }
+            ]
+        )
+        httpx_mock.add_response(
+            url=re.compile(r"https://api\.census\.gov/data/2023/acs/acs5.*"),
+            json=response_data,
+        )
+
+        df, _ = fetch_state_tract_data(2023, "08")
+
+        assert "total_households" in df.columns
+        assert "owner_households" in df.columns
+        assert "renter_households" in df.columns
+        assert df.iloc[0]["total_households"] == 2100
+        assert df.iloc[0]["owner_households"] == 1200
+        assert df.iloc[0]["renter_households"] == 900
+
+    def test_household_denominators_in_tract_output_columns(self):
+        """TRACT_OUTPUT_COLUMNS includes household denominator fields."""
+        assert "total_households" in TRACT_OUTPUT_COLUMNS
+        assert "owner_households" in TRACT_OUTPUT_COLUMNS
+        assert "renter_households" in TRACT_OUTPUT_COLUMNS
