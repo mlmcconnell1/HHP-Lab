@@ -27,26 +27,24 @@ panel, diagnostics, map, and containment outputs side by side.
 
 ```yaml
 targets:
-  selected_msa_containment:
-    geometry:
-      type: msa
-      source: census_msa_2023
-      vintage: 2023
-    outputs:
-      - kind: containment
-        id: cleveland_msa_coc_candidates
-        containment_spec:
-          container:
-            type: msa
-            source: census_msa_2023
-            vintage: 2023
-          candidate:
-            type: coc
-            vintage: 2025
-          selector_ids: ["17460"]
-          min_share: 0.20
-          denominator: candidate_area
-          method: planar_intersection
+  - id: cleveland_msa_coc_candidates
+    geometry: { type: msa, source: census_msa_2023 }
+    outputs: [containment]
+    containment_spec:
+      container: { type: msa, source: census_msa_2023, vintage: 2023 }
+      candidate: { type: coc, vintage: 2025 }
+      selector_ids: ["17460"]
+      min_share: 0.20
+      denominator: candidate_area
+      method: planar_intersection
+
+datasets: {}
+transforms: []
+
+pipelines:
+  - id: build_cleveland_msa_coc_candidates
+    target: cleveland_msa_coc_candidates
+    steps: []
 ```
 
 `containment_spec` fields:
@@ -56,6 +54,7 @@ targets:
 | `container` | yes | `GeometryRef` for the selected containing geography. |
 | `candidate` | yes | `GeometryRef` for possible contained geographies. |
 | `selector_ids` | yes | Container IDs to evaluate. Empty lists are invalid. |
+| `candidate_selector_ids` | no | Optional candidate IDs to restrict before thresholding. Empty lists are invalid. |
 | `min_share` | no | Inclusive threshold for `contained_share`; default `0.0`, range `[0, 1]`. |
 | `denominator` | no | Area denominator used for thresholding; default `candidate_area`. |
 | `method` | no | Geometry operation identifier; default `planar_intersection`. |
@@ -79,7 +78,7 @@ must reject unsupported pairs until an implementation exists.
 
 | Pair | Required inputs | Notes |
 |------|-----------------|-------|
-| `msa -> coc` | MSA boundary artifact and CoC boundary artifact | MSA IDs are CBSA codes. CoC candidates are keyed by `coc_id`. |
+| `msa -> coc` | CoC boundary artifact, TIGER county geometry, and MSA definition/membership artifacts | MSA IDs are CBSA codes. CoC candidates are keyed by `coc_id`. |
 | `coc -> county` | CoC boundary artifact and county geometry artifact | County candidates are keyed by county FIPS/GEOID. |
 
 Reverse pairings such as `coc -> msa` and `county -> coc` are not aliases in
@@ -147,9 +146,42 @@ containment__Mcensus_msa_2023xB2025__cleveland_msa_coc_candidates.parquet
 containment__B2025xC2023__la_coc_county_candidates.parquet
 ```
 
-`output_id` is the output-level `id` if present. If an implementation must
-derive an ID, it should use a lowercase slug from the target ID plus
-`containment`, and it must be stable across runs.
+`output_id` is the target ID slug. The executor writes the file under the
+configured output root in a recipe-name directory.
+
+Example output paths:
+
+```text
+outputs/msa-coc-containment-denver-2025/containment__Mcensus_msa_2023xB2025__denver_msa_coc_candidates.parquet
+outputs/coc-county-containment-los-angeles-2025/containment__B2025xC2023__los-angeles-coc-county-candidates.parquet
+```
+
+See the runnable examples:
+
+- `recipes/examples/msa-coc-containment-denver-2025.yaml`
+- `recipes/examples/coc-county-containment-los-angeles-2025.yaml`
+
+## Workflow
+
+Run preflight before building containment outputs. Preflight checks required
+CoC, county, and MSA artifacts, and reports selector mismatches when it can
+read the artifact ID columns cheaply.
+
+```bash
+HHPLAB_NON_INTERACTIVE=1 hhplab build recipe-preflight \
+  --recipe recipes/examples/msa-coc-containment-denver-2025.yaml --json
+
+HHPLAB_NON_INTERACTIVE=1 hhplab build recipe \
+  --recipe recipes/examples/msa-coc-containment-denver-2025.yaml --json
+```
+
+Common remediation commands surfaced by preflight:
+
+```bash
+hhplab ingest boundaries --source hud_exchange --vintage 2025
+hhplab ingest tiger --year 2023 --type counties
+hhplab generate msa --definition-version census_msa_2023
+```
 
 ## Provenance
 

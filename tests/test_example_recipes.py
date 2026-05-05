@@ -156,6 +156,17 @@ class MapRecipeCase:
     target_id: str
 
 
+@dataclass(frozen=True)
+class ContainmentRecipeCase:
+    path: str
+    pipeline_id: str
+    recipe_name: str
+    target_id: str
+    container_type: str
+    candidate_type: str
+    selector_ids: tuple[str, ...]
+
+
 MAP_RECIPE_CASES: tuple[MapRecipeCase, ...] = (
     MapRecipeCase(
         path="recipes/florida-cocs-orlando-msa-map-2025.yaml",
@@ -168,6 +179,28 @@ MAP_RECIPE_CASES: tuple[MapRecipeCase, ...] = (
         pipeline_id="colorado_overlay_map_pipeline",
         recipe_name="colorado_cocs_denver_msa_map_2025",
         target_id="colorado_overlay_map",
+    ),
+)
+
+
+CONTAINMENT_RECIPE_CASES: tuple[ContainmentRecipeCase, ...] = (
+    ContainmentRecipeCase(
+        path="msa-coc-containment-denver-2025.yaml",
+        pipeline_id="build_denver_msa_coc_candidates",
+        recipe_name="msa_coc_containment_denver_2025",
+        target_id="denver_msa_coc_candidates",
+        container_type="msa",
+        candidate_type="coc",
+        selector_ids=("19740",),
+    ),
+    ContainmentRecipeCase(
+        path="coc-county-containment-los-angeles-2025.yaml",
+        pipeline_id="build_los_angeles_coc_county_candidates",
+        recipe_name="coc_county_containment_los_angeles_2025",
+        target_id="los_angeles_coc_county_candidates",
+        container_type="coc",
+        candidate_type="county",
+        selector_ids=("CA-600",),
     ),
 )
 
@@ -194,6 +227,29 @@ def test_example_recipe_loads_and_resolves(case: ExampleRecipeCase):
     assert [task.year for task in plan.join_tasks] == list(case.years)
     assert tuple(plan.join_tasks[0].datasets) == case.datasets
     assert len(plan.resample_tasks) == len(case.years) * len(case.datasets)
+
+
+@pytest.mark.parametrize(
+    "case",
+    CONTAINMENT_RECIPE_CASES,
+    ids=lambda case: case.path,
+)
+def test_containment_example_recipe_loads_and_resolves(case: ContainmentRecipeCase):
+    recipe = _load_example(case.path)
+    plan = resolve_plan(recipe, case.pipeline_id)
+    target = recipe.targets[0]
+
+    assert recipe.name == case.recipe_name
+    assert target.id == case.target_id
+    assert target.outputs == ["containment"]
+    assert target.containment_spec is not None
+    assert target.containment_spec.container.type == case.container_type
+    assert target.containment_spec.candidate.type == case.candidate_type
+    assert tuple(target.containment_spec.selector_ids or ()) == case.selector_ids
+    assert recipe.datasets == {}
+    assert plan.materialize_tasks == []
+    assert plan.resample_tasks == []
+    assert plan.join_tasks == []
 
 
 @pytest.mark.parametrize(

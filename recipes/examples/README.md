@@ -8,6 +8,7 @@ users. Together they cover the current recipe surface:
 - Identity and aggregate resampling
 - CoC crosswalks and generated metro/MSA transforms
 - Recipe-native map outputs with layered CoC / MSA / metro overlays
+- Recipe-native containment outputs for MSA-to-CoC and CoC-to-county candidate lists
 - `file_set`-driven year/geometry switching
 - Point-in-time and calendar-mean temporal filters
 
@@ -36,6 +37,9 @@ the output downstream.
   total population and curated CoC boundaries.
 - `coc-pep-zori-calendar-2020-2024.yaml`
   County-driven CoC panel using PEP population plus calendar-mean ZORI.
+- `coc-county-containment-los-angeles-2025.yaml`
+  Containment-only recipe that writes counties whose 2023 geometry is at least
+  50 percent contained by the selected 2025 Los Angeles CoC boundary.
 - `metro-glynnfox-acs-income-2019-2025.yaml`
   ACS-only metro panel for the 25 Glynn/Fox metros. Treat this as a
   compatibility-profile example over the canonical metro universe. Good for
@@ -50,6 +54,9 @@ the output downstream.
 - `msa-census-pit-acs-pep-2020-2021.yaml`
   Census MSA panel that uses CoC-native PIT allocated through the generated
   CoC-to-MSA crosswalk, plus county PEP and lagged ACS5 tract measures.
+- `msa-coc-containment-denver-2025.yaml`
+  Containment-only recipe that writes 2025 CoCs whose area overlaps the Denver
+  Census MSA above the configured threshold.
 
 ## Geography Notes
 
@@ -70,6 +77,12 @@ the output downstream.
 - MSA PIT values are derived from the stored CoC-to-MSA crosswalk rather than
   published natively by HUD. See [background/msa_geography.md](../../background/msa_geography.md)
   for the allocation rule and prerequisites.
+- Containment recipes do not need datasets or transforms. They read curated
+  geometry artifacts directly and should be checked with `hhplab build
+  recipe-preflight --json` before running `hhplab build recipe --json`.
+  MSA-to-CoC containment requires CoC boundaries, TIGER counties, and generated
+  MSA definition/membership artifacts; CoC-to-county containment requires CoC
+  boundaries and TIGER counties.
 
 ## Suggested Commands
 

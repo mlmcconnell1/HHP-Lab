@@ -1,0 +1,35 @@
+# Example recipe: CoCs substantially contained in the Denver Census MSA.
+# Run preflight before build:
+#   HHPLAB_NON_INTERACTIVE=1 hhplab build recipe-preflight --recipe recipes/examples/msa-coc-containment-denver-2025.yaml --json
+# Expected containment output:
+#   outputs/msa-coc-containment-denver-2025/containment__Mcensus_msa_2023xB2025__denver_msa_coc_candidates.parquet
+
+version: 1
+name: msa_coc_containment_denver_2025
+description: >
+  Build a containment list of 2025 CoC boundaries whose area overlaps the
+  Denver-Aurora-Centennial, CO Census MSA above the configured threshold.
+  The selector is the MSA CBSA code 19740.
+
+universe:
+  years: [2025]
+
+targets:
+  - id: denver_msa_coc_candidates
+    geometry: { type: msa, source: census_msa_2023 }
+    outputs: [containment]
+    containment_spec:
+      container: { type: msa, source: census_msa_2023, vintage: 2023 }
+      candidate: { type: coc, vintage: 2025 }
+      selector_ids: ["19740"]
+      min_share: 0.20
+      denominator: candidate_area
+      method: planar_intersection
+
+datasets: {}
+transforms: []
+
+pipelines:
+  - id: build_denver_msa_coc_candidates
+    target: denver_msa_coc_candidates
+    steps: []
