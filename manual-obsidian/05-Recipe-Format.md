@@ -344,7 +344,11 @@ Spatial transform operators that define how data moves between geometries. Each 
 
 ### Crosswalk Transform
 
-Builds area- or population-weighted crosswalk shares between two geometries.
+Builds crosswalk shares between two geometries. Direct tract/county overlays
+use `scheme: area` or `scheme: population`. County-native source data can also
+request `scheme: tract_mediated`, which uses the wide
+`xwalk_tract_mediated_county__A{acs}@B{boundary}xC{county}xT{tract}.parquet`
+artifact instead of the direct county overlay.
 
 ```yaml
 transforms:
@@ -361,9 +365,41 @@ transforms:
 
 | `spec.weighting` Field | Type | Required | Description |
 |------------------------|------|----------|-------------|
-| `scheme` | `area` or `population` | Yes | Weighting method for crosswalk shares. |
+| `scheme` | `area`, `population`, or `tract_mediated` | Yes | Weighting method or family for crosswalk shares. |
 | `population_source` | `string` | No | Dataset id for population weights (when `scheme: population`). |
 | `population_field` | `string` | No | Field name in the population dataset. |
+| `variety` | `area`, `population`, `households`, or `renter_households` | For single `tract_mediated` runs | One tract-mediated county weighting variety. |
+| `varieties` | list of weighting varieties | For multi-variety `tract_mediated` runs | Planned as independent resample tasks for sensitivity analysis. |
+| `tract_vintage` | integer or string | For `tract_mediated` | Tract vintage used to build the mediated artifact. |
+| `acs_vintage` | integer or string | For `tract_mediated` | ACS denominator vintage used by demographic varieties. |
+
+Example tract-mediated sensitivity transform:
+
+```yaml
+transforms:
+  - id: county_to_coc_tract_mediated
+    type: crosswalk
+    from: { type: county, vintage: 2020 }
+    to: { type: coc, vintage: 2025 }
+    spec:
+      weighting:
+        scheme: tract_mediated
+        varieties: [area, population, renter_households]
+        tract_vintage: 2020
+        acs_vintage: 2023
+```
+
+Denominator semantics:
+
+- `area` uses tract intersection area.
+- `population` uses `total_population` from ACS tract denominators.
+- `households` uses `total_households`.
+- `renter_households` uses `renter_households`.
+
+All varieties reuse the same wide tract-mediated crosswalk artifact. Missing
+optional household denominators produce nullable household weight columns;
+missing required tract crosswalk or ACS denominator inputs are preflight
+blockers with generation/ingest command hints.
 
 ### Rollup Transform
 

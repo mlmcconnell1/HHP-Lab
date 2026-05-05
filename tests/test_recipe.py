@@ -3354,6 +3354,104 @@ class TestResampleAggregate:
         assert coc1 == pytest.approx(180.0)
         assert coc2 == pytest.approx(300.0)
 
+    def test_aggregate_multi_tract_mediated_varieties_side_by_side(self, tmp_path: Path):
+        ds_path = tmp_path / "data" / "pep.parquet"
+        _make_dataset_parquet(ds_path, geo_col="county_fips")
+
+        xwalk_path = (
+            tmp_path
+            / "data"
+            / "curated"
+            / "xwalks"
+            / "xwalk_tract_mediated_county__A2023@B2025xC2020xT2020.parquet"
+        )
+        xwalk_path.parent.mkdir(parents=True, exist_ok=True)
+        pd.DataFrame(
+            {
+                "coc_id": ["COC1", "COC1", "COC2"],
+                "county_fips": ["A", "B", "C"],
+                "area_weight": [0.8, 0.5, 1.0],
+                "population_weight": [0.25, 0.75, 1.0],
+                "weighting_method": ["tract_mediated"] * 3,
+                "boundary_vintage": ["2025"] * 3,
+                "county_vintage": ["2020"] * 3,
+                "tract_vintage": ["2020"] * 3,
+                "acs_vintage": ["2023"] * 3,
+            }
+        ).to_parquet(xwalk_path)
+
+        data = _recipe_with_pipeline()
+        data["datasets"]["pep"] = {
+            "provider": "census",
+            "product": "pep",
+            "version": 1,
+            "native_geometry": {"type": "county", "vintage": 2020},
+            "years": "2020-2020",
+            "path": "data/pep.parquet",
+            "geo_column": "county_fips",
+        }
+        data["transforms"] = [
+            {
+                "id": "county_to_coc_tract_mediated",
+                "type": "crosswalk",
+                "from": {"type": "county", "vintage": 2020},
+                "to": {"type": "coc", "vintage": 2025},
+                "spec": {
+                    "weighting": {
+                        "scheme": "tract_mediated",
+                        "varieties": ["area", "population"],
+                        "tract_vintage": 2020,
+                        "acs_vintage": 2023,
+                    },
+                },
+            }
+        ]
+        data["pipelines"][0]["steps"] = [
+            {"materialize": {"transforms": ["county_to_coc_tract_mediated"]}},
+        ]
+        recipe = load_recipe(data)
+        ctx = ExecutionContext(project_root=tmp_path, recipe=recipe)
+        ctx.transform_paths["county_to_coc_tract_mediated"] = xwalk_path
+
+        base_task = dict(
+            dataset_id="pep",
+            year=2020,
+            input_path="data/pep.parquet",
+            effective_geometry=GeometryRef(type="county", vintage=2020),
+            method="aggregate",
+            transform_id="county_to_coc_tract_mediated",
+            to_geometry=GeometryRef(type="coc", vintage=2025),
+            measures=["pop"],
+            measure_aggregations={"pop": "sum"},
+            geo_column="county_fips",
+            weighting_variety_count=2,
+        )
+
+        area_result = _execute_resample(
+            ResampleTask(
+                **base_task,
+                weighting_variety="area",
+                weight_column="area_weight",
+            ),
+            ctx,
+        )
+        population_result = _execute_resample(
+            ResampleTask(
+                **base_task,
+                weighting_variety="population",
+                weight_column="population_weight",
+            ),
+            ctx,
+        )
+
+        assert area_result.success
+        assert population_result.success
+        df = ctx.intermediates[("pep", 2020)]
+        coc1 = df[df.geo_id == "COC1"].iloc[0]
+        assert coc1["pop__warea"] == pytest.approx(180.0)
+        assert coc1["pop__wpopulation"] == pytest.approx(175.0)
+        assert "pop" not in df.columns
+
     def test_aggregate_weighted_mean(self, tmp_path: Path):
         ctx = self._setup(tmp_path)
         task = ResampleTask(

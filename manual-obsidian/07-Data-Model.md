@@ -635,6 +635,7 @@ Filenames use temporal shorthand notation (see [[08-Temporal-Terminology]]).
 | Census counties | `data/curated/tiger/counties__C{year}.parquet` | TIGER county geometries |
 | Tract crosswalks | `data/curated/xwalks/xwalk__B{boundary}xT{tract}.parquet` | CoC-tract mapping |
 | County crosswalks | `data/curated/xwalks/xwalk__B{boundary}xC{county}.parquet` | CoC-county mapping |
+| Tract-mediated county crosswalks | `data/curated/xwalks/xwalk_tract_mediated_county__A{acs}@B{boundary}xC{county}xT{tract}.parquet` | County-to-CoC weights derived through tract intersections and ACS tract denominators; includes `area_weight`, `population_weight`, `household_weight`, and `renter_household_weight` where denominators are available |
 | CoC measures | `data/curated/measures/measures__A{acs_end}@B{boundary}xT{tract}.parquet` | Aggregated ACS data |
 | PIT counts | `data/curated/pit/pit__P{year}.parquet` | Canonical PIT data (single year) |
 | PIT vintages | `data/curated/pit/pit_vintage__P{vintage}.parquet` | All years from a vintage release |
