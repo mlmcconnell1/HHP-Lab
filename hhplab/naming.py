@@ -148,6 +148,30 @@ def county_xwalk_filename(boundary_vintage: str, county_vintage: str | int) -> s
     return f"xwalk__B{boundary_vintage}xC{county_vintage}.parquet"
 
 
+def tract_mediated_county_xwalk_filename(
+    boundary_vintage: str | int,
+    county_vintage: str | int,
+    tract_vintage: str | int,
+    acs_vintage: str | int,
+) -> str:
+    """Generate filename for tract-mediated county-to-CoC weights.
+
+    Args:
+        boundary_vintage: CoC boundary vintage (e.g., "2025")
+        county_vintage: County geometry vintage represented by county FIPS
+        tract_vintage: Census tract geometry vintage used by the tract crosswalk
+        acs_vintage: ACS denominator vintage (range or end year)
+
+    Returns:
+        Filename like ``xwalk_tract_mediated_county__A2023@B2025xC2023xT2020.parquet``
+    """
+    acs_year = _normalize_acs_vintage(str(acs_vintage))
+    return (
+        f"xwalk_tract_mediated_county__A{acs_year}@B{boundary_vintage}"
+        f"xC{county_vintage}xT{tract_vintage}.parquet"
+    )
+
+
 def msa_coc_xwalk_filename(
     boundary_vintage: str,
     definition_version: str,
