@@ -20,7 +20,7 @@ import pyarrow.parquet as pq
 import pytest
 from shapely.geometry import box
 
-from hhplab.naming import coc_base_path, county_path
+from hhplab.naming import coc_base_path, county_path, msa_county_membership_path
 from hhplab.recipe.executor import execute_recipe
 from hhplab.recipe.executor_containment import (
     ALBERS_EQUAL_AREA_CRS,
@@ -278,3 +278,169 @@ def test_execute_recipe_persists_containment_output(tmp_path) -> None:
     manifest = read_manifest(manifest_path)
     assert manifest.output_path == artifacts["containment_path"]
     assert {asset.role for asset in manifest.assets} == {"geometry"}
+
+
+def test_execute_recipe_persists_msa_coc_containment_output(tmp_path) -> None:
+    coc_file = coc_base_path("2025", tmp_path / "data")
+    county_file = county_path("2023", tmp_path / "data")
+    membership_file = msa_county_membership_path("test_msa_v1", tmp_path / "data")
+    coc_file.parent.mkdir(parents=True, exist_ok=True)
+    county_file.parent.mkdir(parents=True, exist_ok=True)
+    membership_file.parent.mkdir(parents=True, exist_ok=True)
+    _coc_gdf().to_parquet(coc_file)
+    _county_gdf().to_parquet(county_file)
+    MSA_MEMBERSHIP.to_parquet(membership_file)
+
+    recipe = load_recipe(
+        {
+            "version": 1,
+            "name": "msa-containment-executor-test",
+            "universe": {"years": [2020]},
+            "targets": [
+                {
+                    "id": "msa_coc_containment",
+                    "geometry": {"type": "msa", "source": "test_msa_v1"},
+                    "outputs": ["containment"],
+                    "containment_spec": {
+                        "container": {
+                            "type": "msa",
+                            "vintage": 2023,
+                            "source": "test_msa_v1",
+                        },
+                        "candidate": {"type": "coc", "vintage": 2025},
+                        "selector_ids": ["MSA-1"],
+                        "min_share": 0.51,
+                    },
+                }
+            ],
+            "datasets": {},
+            "transforms": [],
+            "pipelines": [
+                {
+                    "id": "main",
+                    "target": "msa_coc_containment",
+                    "steps": [],
+                }
+            ],
+        }
+    )
+
+    results = execute_recipe(recipe, project_root=tmp_path, quiet=True)
+
+    assert results[0].success
+    assert [step.step_kind for step in results[0].steps] == ["persist_containment"]
+    artifacts = resolve_pipeline_artifacts(recipe, "main", project_root=tmp_path)
+    containment_path = tmp_path / artifacts["containment_path"]
+    manifest_path = tmp_path / artifacts["manifest_path"]
+    assert containment_path.exists()
+    assert manifest_path.exists()
+
+    containment = pd.read_parquet(containment_path)
+    assert list(containment.columns) == list(CONTAINMENT_COLUMNS)
+    assert containment["container_id"].tolist() == ["MSA-1"]
+    assert containment["candidate_id"].tolist() == ["COC-A"]
+    assert containment["contained_share"].tolist() == pytest.approx([2 / 3])
+
+    metadata = pq.read_metadata(containment_path).metadata or {}
+    provenance = json.loads(metadata[b"hhplab_provenance"])
+    assert provenance["containment"]["row_count"] == 1
+    assert provenance["containment_spec"]["container"]["type"] == "msa"
+    assert provenance["containment_spec"]["container"]["source"] == "test_msa_v1"
+
+    manifest = read_manifest(manifest_path)
+    assert manifest.output_path == artifacts["containment_path"]
+    assert {asset.role for asset in manifest.assets} == {"geometry"}
+
+
+def test_execute_recipe_persists_panel_and_containment_outputs(tmp_path) -> None:
+    coc_file = coc_base_path("2025", tmp_path / "data")
+    county_file = county_path("2023", tmp_path / "data")
+    pit_file = tmp_path / "data" / "pit.parquet"
+    coc_file.parent.mkdir(parents=True, exist_ok=True)
+    county_file.parent.mkdir(parents=True, exist_ok=True)
+    _coc_gdf(ids=["COC-A"]).to_parquet(coc_file)
+    _county_gdf().to_parquet(county_file)
+    pd.DataFrame(
+        {
+            "coc_id": ["COC-A"],
+            "year": [2020],
+            "pit_total": [42],
+        }
+    ).to_parquet(pit_file)
+
+    recipe = load_recipe(
+        {
+            "version": 1,
+            "name": "panel-containment-executor-test",
+            "universe": {"years": [2020]},
+            "targets": [
+                {
+                    "id": "coc_panel_and_containment",
+                    "geometry": {"type": "coc", "vintage": 2025},
+                    "outputs": ["panel", "containment"],
+                    "containment_spec": {
+                        "container": {"type": "coc", "vintage": 2025},
+                        "candidate": {"type": "county", "vintage": 2023},
+                        "selector_ids": ["COC-A"],
+                        "min_share": 0.5,
+                    },
+                }
+            ],
+            "datasets": {
+                "pit": {
+                    "provider": "hud",
+                    "product": "pit",
+                    "version": 1,
+                    "native_geometry": {"type": "coc"},
+                    "path": "data/pit.parquet",
+                    "years": {"years": [2020]},
+                },
+            },
+            "transforms": [],
+            "pipelines": [
+                {
+                    "id": "main",
+                    "target": "coc_panel_and_containment",
+                    "steps": [
+                        {
+                            "resample": {
+                                "dataset": "pit",
+                                "to_geometry": {"type": "coc", "vintage": 2025},
+                                "method": "identity",
+                                "measures": ["pit_total"],
+                            }
+                        },
+                        {
+                            "join": {
+                                "datasets": ["pit"],
+                                "join_on": ["geo_id", "year"],
+                            }
+                        },
+                    ],
+                }
+            ],
+        }
+    )
+
+    results = execute_recipe(recipe, project_root=tmp_path, quiet=True)
+
+    assert results[0].success
+    assert [step.step_kind for step in results[0].steps][-2:] == [
+        "persist",
+        "persist_containment",
+    ]
+    artifacts = resolve_pipeline_artifacts(recipe, "main", project_root=tmp_path)
+    panel_path = tmp_path / artifacts["panel_path"]
+    containment_path = tmp_path / artifacts["containment_path"]
+    panel_manifest_path = tmp_path / artifacts["manifest_path"]
+    containment_manifest_path = tmp_path / artifacts["containment_manifest_path"]
+    assert panel_path.exists()
+    assert containment_path.exists()
+    assert panel_manifest_path.exists()
+    assert containment_manifest_path.exists()
+
+    panel = pd.read_parquet(panel_path)
+    assert panel["pit_total"].tolist() == [42]
+    containment = pd.read_parquet(containment_path)
+    assert containment["candidate_id"].tolist() == ["001", "002"]
+    assert containment["contained_share"].tolist() == pytest.approx([1.0, 0.5])
