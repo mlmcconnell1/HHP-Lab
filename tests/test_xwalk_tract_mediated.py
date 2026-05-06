@@ -19,6 +19,7 @@ from __future__ import annotations
 import pandas as pd
 import pytest
 
+from hhplab.cli.build_xwalks import _summarize_tract_mediated_crosswalk
 from hhplab.naming import tract_mediated_county_xwalk_filename
 from hhplab.provenance import read_provenance
 from hhplab.xwalks.tract_mediated import (
@@ -143,6 +144,102 @@ class TestTractMediatedCountyCrosswalk:
         assert pd.isna(row["household_weight"])
         assert pd.isna(row["renter_household_weight"])
 
+    def test_duplicate_denominator_tract_rows_do_not_multiply_weights(self):
+        duplicated_denominators = pd.concat(
+            [
+                ACS_TRACTS,
+                pd.DataFrame(
+                    {
+                        "tract_geoid": ["01001000100"],
+                        "total_population": [9999.0],
+                        "total_households": [9999.0],
+                        "renter_households": [9999.0],
+                    }
+                ),
+            ],
+            ignore_index=True,
+        )
+
+        result = build_tract_mediated_county_crosswalk(
+            TRACT_CROSSWALK,
+            duplicated_denominators,
+            boundary_vintage="2025",
+            county_vintage="2020",
+            tract_vintage="2020",
+            acs_vintage="2023",
+        )
+
+        row = result[(result["coc_id"] == "B") & (result["county_fips"] == "01001")].iloc[0]
+        assert row["population_weight"] == pytest.approx(0.875)
+        assert row["county_population_total"] == pytest.approx(400.0)
+        assert row["denominator_tract_count"] == 2
+        assert row["missing_denominator_tract_count"] == 0
+
+    def test_non_numeric_required_denominator_is_treated_as_missing(self):
+        denominators = ACS_TRACTS.copy().astype({"total_population": "object"})
+        denominators.loc[denominators["tract_geoid"] == "01001000200", "total_population"] = "bad"
+
+        with pytest.raises(ValueError, match="Tract-mediated denominator coverage is incomplete"):
+            build_tract_mediated_county_crosswalk(
+                TRACT_CROSSWALK,
+                denominators,
+                boundary_vintage="2025",
+                county_vintage="2020",
+                tract_vintage="2020",
+                acs_vintage="2023",
+            )
+
+    def test_partial_tract_area_coverage_is_visible_in_county_diagnostics(self):
+        partial = TRACT_CROSSWALK.copy()
+        partial.loc[partial["tract_geoid"] == "01001000200", "area_share"] = 0.5
+        partial.loc[partial["tract_geoid"] == "01001000200", "intersection_area"] = 50.0
+
+        result = build_tract_mediated_county_crosswalk(
+            partial,
+            ACS_TRACTS,
+            boundary_vintage="2025",
+            county_vintage="2020",
+            tract_vintage="2020",
+            acs_vintage="2023",
+        )
+
+        county_rows = result[result["county_fips"] == "01001"]
+        assert county_rows["county_area_coverage_ratio"].unique().tolist() == [pytest.approx(0.75)]
+        assert county_rows["county_population_coverage_ratio"].unique().tolist() == [
+            pytest.approx(0.625)
+        ]
+
+    def test_tract_and_denominator_geoids_are_zero_padded(self):
+        tract_crosswalk = pd.DataFrame(
+            {
+                "coc_id": ["A"],
+                "tract_geoid": [1001000100],
+                "area_share": [1.0],
+                "intersection_area": [100.0],
+                "tract_area": [100.0],
+            }
+        )
+        denominators = pd.DataFrame(
+            {
+                "tract_geoid": [1001000100],
+                "total_population": [50.0],
+            }
+        )
+
+        result = build_tract_mediated_county_crosswalk(
+            tract_crosswalk,
+            denominators,
+            boundary_vintage="2025",
+            county_vintage="2020",
+            tract_vintage="2020",
+            acs_vintage="2023",
+        )
+
+        row = result.iloc[0]
+        assert row["county_fips"] == "01001"
+        assert row["population_weight"] == pytest.approx(1.0)
+        assert row["denominator_tract_coverage_ratio"] == pytest.approx(1.0)
+
     def test_missing_optional_household_columns_produce_nullable_weights(self):
         result = build_tract_mediated_county_crosswalk(
             TRACT_CROSSWALK,
@@ -217,6 +314,54 @@ class TestTractMediatedCountyCrosswalk:
         assert result_2020["acs_vintage"].isna().all()
         assert set(result_2020["denominator_source"]) == {"decennial"}
         assert set(result_2020["denominator_vintage"]) == {"2020"}
+
+    def test_multi_county_multi_coc_weight_sums_match_coverage_diagnostics(self):
+        result = build_fixture()
+
+        county_sums = result.groupby("county_fips", dropna=False).agg(
+            area_sum=("area_weight", lambda s: s.sum(min_count=1)),
+            population_sum=("population_weight", lambda s: s.sum(min_count=1)),
+            area_coverage=("county_area_coverage_ratio", "first"),
+            population_coverage=("county_population_coverage_ratio", "first"),
+            geo_count=("coc_id", "nunique"),
+        )
+
+        row_01001 = county_sums.loc["01001"]
+        assert row_01001["geo_count"] == 2
+        assert row_01001["area_sum"] == pytest.approx(row_01001["area_coverage"])
+        assert row_01001["population_sum"] == pytest.approx(row_01001["population_coverage"])
+
+        row_02001 = county_sums.loc["02001"]
+        assert row_02001["geo_count"] == 1
+        assert row_02001["area_sum"] == pytest.approx(row_02001["area_coverage"])
+        assert pd.isna(row_02001["population_sum"])
+        assert row_02001["population_coverage"] == pytest.approx(0.0)
+
+    def test_selected_weighting_summary_reports_only_requested_modes(self):
+        result = build_fixture()
+
+        summary = _summarize_tract_mediated_crosswalk(
+            result,
+            selected_weighting_modes=("population", "renter_household"),
+        )
+
+        assert summary["county_count"] == 2
+        assert summary["selected_weight_columns"] == [
+            "population_weight",
+            "renter_household_weight",
+        ]
+        assert summary["available_weight_columns"] == [
+            "area_weight",
+            "population_weight",
+            "household_weight",
+            "renter_household_weight",
+        ]
+        assert summary["min_area_coverage_ratio"] == pytest.approx(1.0)
+        assert summary["full_coverage_count"] == 2
+        assert summary["population_weight_non_null_count"] == 2
+        assert summary["population_weight_max"] == pytest.approx(0.875)
+        assert summary["renter_household_weight_non_null_count"] == 2
+        assert summary["renter_household_weight_max"] == pytest.approx(0.875)
 
     def test_save_embeds_provenance(self, tmp_path):
         result = build_fixture()
