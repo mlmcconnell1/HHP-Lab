@@ -609,13 +609,9 @@ class TargetSpec(BaseModel):
         if "map" not in outputs and self.map_spec is not None:
             raise ValueError("Target 'map_spec' requires outputs to include 'map'.")
         if "containment" in outputs and self.containment_spec is None:
-            raise ValueError(
-                "Target outputs including 'containment' require 'containment_spec'."
-            )
+            raise ValueError("Target outputs including 'containment' require 'containment_spec'.")
         if "containment" not in outputs and self.containment_spec is not None:
-            raise ValueError(
-                "Target 'containment_spec' requires outputs to include 'containment'."
-            )
+            raise ValueError("Target 'containment_spec' requires outputs to include 'containment'.")
         return self
 
 
@@ -624,6 +620,7 @@ class TargetSpec(BaseModel):
 # -----------------------------
 
 WeightScheme = Literal["area", "population", "tract_mediated"]
+TractMediatedDenominatorSource = Literal["acs", "decennial"]
 TractMediatedWeightingVariety = Literal[
     "area",
     "population",
@@ -653,8 +650,7 @@ class CrosswalkWeighting(BaseModel):
         default=None,
         min_length=1,
         description=(
-            "Multiple tract-mediated county weighting varieties for "
-            "side-by-side sensitivity runs."
+            "Multiple tract-mediated county weighting varieties for side-by-side sensitivity runs."
         ),
     )
     tract_vintage: int | str | None = Field(
@@ -664,6 +660,16 @@ class CrosswalkWeighting(BaseModel):
     acs_vintage: int | str | None = Field(
         default=None,
         description="ACS denominator vintage used by demographic weighting varieties.",
+    )
+    denominator_source: TractMediatedDenominatorSource = Field(
+        default="acs",
+        description="Tract denominator source for tract-mediated weights.",
+    )
+    denominator_vintage: int | str | None = Field(
+        default=None,
+        description=(
+            "Explicit tract denominator vintage. Required when denominator_source='decennial'."
+        ),
     )
     population_source: str | None = Field(
         default=None,
@@ -683,34 +689,64 @@ class CrosswalkWeighting(BaseModel):
         if self.scheme != "tract_mediated":
             if has_variety or has_varieties:
                 raise ValueError(
-                    "Crosswalk weighting varieties are only valid when "
-                    "scheme='tract_mediated'."
+                    "Crosswalk weighting varieties are only valid when scheme='tract_mediated'."
                 )
-            if self.tract_vintage is not None or self.acs_vintage is not None:
+            if (
+                self.tract_vintage is not None
+                or self.acs_vintage is not None
+                or self.denominator_source != "acs"
+                or self.denominator_vintage is not None
+            ):
                 raise ValueError(
-                    "tract_vintage and acs_vintage are only valid when "
-                    "scheme='tract_mediated'."
+                    "tract_vintage, acs_vintage, denominator_source, and "
+                    "denominator_vintage are only valid when scheme='tract_mediated'."
                 )
             return self
 
         if has_variety and has_varieties:
-            raise ValueError(
-                "Use either weighting.variety or weighting.varieties, not both."
-            )
+            raise ValueError("Use either weighting.variety or weighting.varieties, not both.")
         if not has_variety and not has_varieties:
             raise ValueError(
-                "scheme='tract_mediated' requires weighting.variety or "
-                "weighting.varieties."
+                "scheme='tract_mediated' requires weighting.variety or weighting.varieties."
             )
         if self.tract_vintage is None:
+            raise ValueError("scheme='tract_mediated' requires weighting.tract_vintage.")
+        if self.denominator_source == "acs" and self.acs_vintage is None:
             raise ValueError(
-                "scheme='tract_mediated' requires weighting.tract_vintage."
+                "scheme='tract_mediated' with denominator_source='acs' "
+                "requires weighting.acs_vintage."
             )
-        if self.acs_vintage is None:
+        if self.denominator_source == "decennial" and self.denominator_vintage is None:
             raise ValueError(
-                "scheme='tract_mediated' requires weighting.acs_vintage."
+                "scheme='tract_mediated' with denominator_source='decennial' "
+                "requires weighting.denominator_vintage."
             )
+        if self.denominator_source == "decennial":
+            if str(self.denominator_vintage) not in {"2010", "2020"}:
+                raise ValueError(
+                    "scheme='tract_mediated' with denominator_source='decennial' "
+                    "supports denominator_vintage 2010 or 2020."
+                )
+            if str(self.tract_vintage) != str(self.denominator_vintage):
+                raise ValueError(
+                    "scheme='tract_mediated' with denominator_source='decennial' "
+                    "requires weighting.tract_vintage to match "
+                    "weighting.denominator_vintage."
+                )
         return self
+
+    @property
+    def resolved_denominator_vintage(self) -> str | int:
+        """Return the denominator vintage implied by the weighting source."""
+        if self.denominator_source == "acs":
+            if self.denominator_vintage is not None:
+                return self.denominator_vintage
+            if self.acs_vintage is None:
+                raise ValueError("ACS tract-mediated weighting requires acs_vintage.")
+            return self.acs_vintage
+        if self.denominator_vintage is None:
+            raise ValueError("Decennial tract-mediated weighting requires denominator_vintage.")
+        return self.denominator_vintage
 
     @property
     def resolved_varieties(self) -> tuple[TractMediatedWeightingVariety, ...]:

@@ -271,10 +271,79 @@ class TestBuildXwalksCommand:
         assert payload["will_write"] is False
         assert payload["weighting_modes"] == ["population"]
         assert payload["inputs"]["tract_crosswalk"]["exists"] is True
-        assert payload["inputs"]["acs_tracts"]["exists"] is True
+        assert payload["inputs"]["denominator_tracts"]["exists"] is True
         assert (
             Path(payload["artifact"]).name
             == "xwalk_tract_mediated_county__A2023@B2025xC2020xT2020.parquet"
+        )
+
+    @patch("hhplab.cli.build_xwalks.list_boundaries")
+    def test_build_tract_mediated_xwalk_decennial_dry_run_json(
+        self,
+        mock_list_boundaries,
+        tmp_path,
+    ):
+        """Decennial tract-mediated preflight resolves fixed denominator artifacts."""
+        from datetime import UTC, datetime
+
+        from hhplab.census.ingest.decennial_tract_population import get_output_path
+        from hhplab.naming import tract_xwalk_path
+        from hhplab.registry.schema import RegistryEntry
+
+        with runner.isolated_filesystem(temp_dir=tmp_path):
+            Path("pyproject.toml").touch()
+            Path("hhplab").mkdir()
+            boundary_path = Path("data/curated/coc_boundaries/coc__B2025.parquet")
+            boundary_path.parent.mkdir(parents=True, exist_ok=True)
+            boundary_path.touch()
+            tract_path = tract_xwalk_path("2025", "2020")
+            denominator_path = get_output_path("2020", "2020")
+            tract_path.parent.mkdir(parents=True, exist_ok=True)
+            denominator_path.parent.mkdir(parents=True, exist_ok=True)
+            tract_path.touch()
+            denominator_path.touch()
+            mock_list_boundaries.return_value = [
+                RegistryEntry(
+                    boundary_vintage="2025",
+                    source="hud_exchange",
+                    ingested_at=datetime(2025, 1, 1, tzinfo=UTC),
+                    path=boundary_path,
+                    feature_count=1,
+                    hash_of_file="abc123",
+                )
+            ]
+
+            result = runner.invoke(
+                app,
+                [
+                    "generate",
+                    "xwalks",
+                    "--boundary",
+                    "2025",
+                    "--type",
+                    "tract-mediated",
+                    "--tracts",
+                    "2020",
+                    "--counties",
+                    "2020",
+                    "--denominator-source",
+                    "decennial",
+                    "--denominator-vintage",
+                    "2020",
+                    "--dry-run",
+                    "--json",
+                ],
+            )
+
+        assert result.exit_code == 0
+        payload = json.loads(result.output)
+        assert payload["status"] == "ok"
+        assert payload["denominator_source"] == "decennial"
+        assert payload["denominator_vintage"] == "2020"
+        assert payload["inputs"]["denominator_tracts"]["exists"] is True
+        assert (
+            Path(payload["artifact"]).name
+            == "xwalk_tract_mediated_county__N2020@B2025xC2020xT2020.parquet"
         )
 
     @patch("hhplab.cli.build_xwalks.list_boundaries")

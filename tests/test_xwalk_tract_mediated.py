@@ -79,6 +79,18 @@ def build_fixture() -> pd.DataFrame:
     )
 
 
+def build_decennial_fixture(analysis_year: int) -> pd.DataFrame:
+    return build_tract_mediated_county_crosswalk(
+        TRACT_CROSSWALK.assign(analysis_year=analysis_year),
+        ACS_TRACTS[["tract_geoid", "total_population"]],
+        boundary_vintage="2025",
+        county_vintage="2020",
+        tract_vintage="2020",
+        denominator_source="decennial",
+        denominator_vintage="2020",
+    )
+
+
 class TestTractMediatedCountyCrosswalk:
     @pytest.mark.parametrize(
         ("coc_id", "weight_col", "expected"),
@@ -104,6 +116,8 @@ class TestTractMediatedCountyCrosswalk:
         assert row["county_vintage"] == "2020"
         assert row["tract_vintage"] == "2020"
         assert row["acs_vintage"] == "2019-2023"
+        assert row["denominator_source"] == "acs"
+        assert row["denominator_vintage"] == "2019-2023"
         assert row["weighting_method"] == "tract_mediated"
         assert row["population_denominator"] == pytest.approx(350.0)
         assert row["county_population_total"] == pytest.approx(400.0)
@@ -145,6 +159,16 @@ class TestTractMediatedCountyCrosswalk:
                 acs_vintage="2023",
             )
 
+    def test_decennial_denominator_weights_do_not_vary_by_analysis_year(self):
+        result_2020 = build_decennial_fixture(2020)
+        result_2024 = build_decennial_fixture(2024)
+
+        weight_cols = ["coc_id", "county_fips", "population_weight"]
+        pd.testing.assert_frame_equal(result_2020[weight_cols], result_2024[weight_cols])
+        assert result_2020["acs_vintage"].isna().all()
+        assert set(result_2020["denominator_source"]) == {"decennial"}
+        assert set(result_2020["denominator_vintage"]) == {"2020"}
+
     def test_save_embeds_provenance(self, tmp_path):
         result = build_fixture()
 
@@ -157,14 +181,29 @@ class TestTractMediatedCountyCrosswalk:
             output_dir=tmp_path,
         )
 
-        assert output_path.name == (
-            "xwalk_tract_mediated_county__A2023@B2025xC2020xT2020.parquet"
-        )
+        assert output_path.name == ("xwalk_tract_mediated_county__A2023@B2025xC2020xT2020.parquet")
         provenance = read_provenance(output_path)
         assert provenance is not None
         assert provenance.weighting == "tract_mediated"
         assert provenance.extra["dataset_type"] == "tract_mediated_county_crosswalk"
+        assert provenance.extra["denominator_source"] == "acs"
+        assert provenance.extra["denominator_vintage"] == "2019-2023"
         assert "renter_household_weight" in provenance.extra["weight_columns"]
+
+    def test_save_decennial_denominator_uses_decennial_filename(self, tmp_path):
+        result = build_decennial_fixture(2024)
+
+        output_path = save_tract_mediated_county_crosswalk(
+            result,
+            boundary_vintage="2025",
+            county_vintage="2020",
+            tract_vintage="2020",
+            denominator_source="decennial",
+            denominator_vintage="2020",
+            output_dir=tmp_path,
+        )
+
+        assert output_path.name == ("xwalk_tract_mediated_county__N2020@B2025xC2020xT2020.parquet")
 
 
 class TestTractMediatedNaming:
@@ -172,4 +211,16 @@ class TestTractMediatedNaming:
         assert (
             tract_mediated_county_xwalk_filename("2025", "2020", "2020", "2019-2023")
             == "xwalk_tract_mediated_county__A2023@B2025xC2020xT2020.parquet"
+        )
+
+    def test_filename_supports_decennial_denominator(self):
+        assert (
+            tract_mediated_county_xwalk_filename(
+                "2025",
+                "2020",
+                "2020",
+                denominator_source="decennial",
+                denominator_vintage="2020",
+            )
+            == "xwalk_tract_mediated_county__N2020@B2025xC2020xT2020.parquet"
         )

@@ -762,9 +762,7 @@ def _containment_missing_artifact_finding(
     return PreflightFinding(
         severity=Severity.ERROR,
         kind=FindingKind.MISSING_CONTAINMENT_ARTIFACT,
-        message=(
-            f"Containment target '{target_id}' requires missing {label}: {path}"
-        ),
+        message=(f"Containment target '{target_id}' requires missing {label}: {path}"),
         geometry=geo_type,
         remediation=_containment_artifact_remediation(
             label,
@@ -962,9 +960,7 @@ def _check_containment_artifacts(
             if "CoC" in label:
                 geo_type = "coc"
                 vintage = (
-                    spec.candidate.vintage
-                    if pair == ("msa", "coc")
-                    else spec.container.vintage
+                    spec.candidate.vintage if pair == ("msa", "coc") else spec.container.vintage
                 )
                 definition_version = None
             elif "county" in label and "MSA" not in label:
@@ -1316,21 +1312,28 @@ def _check_transforms(
                     and coc_ref.vintage is not None
                     and county_ref.vintage is not None
                     and weighting.tract_vintage is not None
-                    and weighting.acs_vintage is not None
                 ):
+                    denominator_args = ""
+                    if weighting.denominator_source == "decennial":
+                        denominator_args = (
+                            " --denominator-source decennial "
+                            f"--denominator-vintage {weighting.resolved_denominator_vintage}"
+                        )
+                    elif weighting.acs_vintage is not None:
+                        denominator_args = f" --acs {weighting.acs_vintage}"
                     command = (
                         "hhplab generate xwalks "
                         f"--boundary {coc_ref.vintage} "
                         "--type tract-mediated "
                         f"--counties {county_ref.vintage} "
-                        f"--tracts {weighting.tract_vintage} "
-                        f"--acs {weighting.acs_vintage}"
+                        f"--tracts {weighting.tract_vintage}"
+                        f"{denominator_args}"
                     )
                 remediation = Remediation(
                     hint=(
                         f"Generate tract-mediated county crosswalk artifact "
                         f"for transform '{tid}'. This requires the CoC-tract "
-                        "crosswalk and ACS tract denominator cache."
+                        "crosswalk and tract denominator cache."
                     ),
                     command=command,
                 )

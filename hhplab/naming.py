@@ -8,6 +8,7 @@ Temporal notation uses single-letter prefixes:
 - T{year}: Census tract geometry (e.g., T2023)
 - C{year}: Census county geometry (e.g., C2023)
 - A{year}: ACS vintage end year (e.g., A2023)
+- N{year}: Decennial census denominator vintage (e.g., N2020)
 - P{year}: PIT count year (e.g., P2024)
 - Y{year}: Panel year (e.g., Y2023)
 - D{version}: Synthetic geography definition version (e.g., Dglynnfoxv1)
@@ -152,7 +153,10 @@ def tract_mediated_county_xwalk_filename(
     boundary_vintage: str | int,
     county_vintage: str | int,
     tract_vintage: str | int,
-    acs_vintage: str | int,
+    acs_vintage: str | int | None = None,
+    *,
+    denominator_source: str = "acs",
+    denominator_vintage: str | int | None = None,
 ) -> str:
     """Generate filename for tract-mediated county-to-CoC weights.
 
@@ -160,15 +164,45 @@ def tract_mediated_county_xwalk_filename(
         boundary_vintage: CoC boundary vintage (e.g., "2025")
         county_vintage: County geometry vintage represented by county FIPS
         tract_vintage: Census tract geometry vintage used by the tract crosswalk
-        acs_vintage: ACS denominator vintage (range or end year)
+        acs_vintage: ACS denominator vintage (range or end year). Retained for
+            backward-compatible callers using ACS denominators.
+        denominator_source: Denominator source, either ``"acs"`` or ``"decennial"``.
+        denominator_vintage: Explicit denominator vintage. Required for decennial
+            denominators and optional for ACS denominators.
 
     Returns:
         Filename like ``xwalk_tract_mediated_county__A2023@B2025xC2023xT2020.parquet``
     """
-    acs_year = _normalize_acs_vintage(str(acs_vintage))
+    denominator_token = _tract_mediated_denominator_token(
+        acs_vintage=acs_vintage,
+        denominator_source=denominator_source,
+        denominator_vintage=denominator_vintage,
+    )
     return (
-        f"xwalk_tract_mediated_county__A{acs_year}@B{boundary_vintage}"
+        f"xwalk_tract_mediated_county__{denominator_token}@B{boundary_vintage}"
         f"xC{county_vintage}xT{tract_vintage}.parquet"
+    )
+
+
+def _tract_mediated_denominator_token(
+    *,
+    acs_vintage: str | int | None,
+    denominator_source: str,
+    denominator_vintage: str | int | None,
+) -> str:
+    """Return the filename token for a tract-mediated denominator artifact."""
+    if denominator_source == "acs":
+        vintage = denominator_vintage if denominator_vintage is not None else acs_vintage
+        if vintage is None:
+            raise ValueError("ACS tract-mediated denominators require acs_vintage.")
+        return f"A{_normalize_acs_vintage(str(vintage))}"
+    if denominator_source == "decennial":
+        if denominator_vintage is None:
+            raise ValueError("Decennial tract-mediated denominators require denominator_vintage.")
+        return f"N{denominator_vintage}"
+    raise ValueError(
+        "Unsupported tract-mediated denominator_source "
+        f"{denominator_source!r}; expected 'acs' or 'decennial'."
     )
 
 
@@ -176,8 +210,11 @@ def tract_mediated_county_xwalk_path(
     boundary_vintage: str | int,
     county_vintage: str | int,
     tract_vintage: str | int,
-    acs_vintage: str | int,
+    acs_vintage: str | int | None = None,
     base_dir: Path | str | None = None,
+    *,
+    denominator_source: str = "acs",
+    denominator_vintage: str | int | None = None,
 ) -> Path:
     """Get canonical path for tract-mediated county-to-CoC weights.
 
@@ -187,6 +224,8 @@ def tract_mediated_county_xwalk_path(
         tract_vintage: Tract geometry vintage used by the tract crosswalk
         acs_vintage: ACS denominator vintage or range
         base_dir: Base data directory (defaults to "data")
+        denominator_source: Denominator source, either ``"acs"`` or ``"decennial"``.
+        denominator_vintage: Explicit denominator vintage.
 
     Returns:
         Path like
@@ -205,6 +244,8 @@ def tract_mediated_county_xwalk_path(
             county_vintage,
             tract_vintage,
             acs_vintage,
+            denominator_source=denominator_source,
+            denominator_vintage=denominator_vintage,
         )
     )
 
@@ -225,10 +266,7 @@ def msa_coc_xwalk_filename(
         Filename like
         ``msa_coc_xwalk__B2025xMcensus_msa_2023xC2023.parquet``
     """
-    return (
-        f"msa_coc_xwalk__B{boundary_vintage}"
-        f"xM{definition_version}xC{county_vintage}.parquet"
-    )
+    return f"msa_coc_xwalk__B{boundary_vintage}xM{definition_version}xC{county_vintage}.parquet"
 
 
 def containment_filename(
@@ -251,10 +289,7 @@ def containment_filename(
         vintage=candidate_vintage,
         definition_version=None,
     )
-    return (
-        f"containment__{container_token}x{candidate_token}"
-        f"__{_slug_output_id(output_id)}.parquet"
-    )
+    return f"containment__{container_token}x{candidate_token}__{_slug_output_id(output_id)}.parquet"
 
 
 def _containment_geometry_token(
@@ -275,9 +310,7 @@ def _containment_geometry_token(
         if definition_version:
             return f"M{definition_version}"
         if vintage is None:
-            raise ValueError(
-                "MSA containment filenames require a definition version or vintage."
-            )
+            raise ValueError("MSA containment filenames require a definition version or vintage.")
         return f"M{vintage}"
     raise ValueError(
         f"Unsupported containment geometry type '{geometry_type}'. "
@@ -437,6 +470,24 @@ def acs5_tracts_filename(acs_vintage: str, tract_vintage: str | int) -> str:
     return f"acs5_tracts__A{acs_year}xT{tract_vintage}.parquet"
 
 
+def decennial_tracts_filename(
+    decennial_vintage: str | int,
+    tract_vintage: str | int | None = None,
+) -> str:
+    """Generate filename for decennial tract population denominators.
+
+    Args:
+        decennial_vintage: Decennial census year, currently 2010 or 2020.
+        tract_vintage: Target tract geometry vintage. Defaults to the decennial
+            vintage because decennial denominators are native to their era.
+
+    Returns:
+        Filename like ``decennial_tracts__N2020xT2020.parquet``.
+    """
+    resolved_tract_vintage = decennial_vintage if tract_vintage is None else tract_vintage
+    return f"decennial_tracts__N{decennial_vintage}xT{resolved_tract_vintage}.parquet"
+
+
 def county_weights_filename(acs_vintage: str, weighting: str) -> str:
     """Generate filename for county-level ACS weights.
 
@@ -552,7 +603,9 @@ def msa_coc_xwalk_path(
     else:
         base_dir = Path(base_dir)
     return (
-        base_dir / "curated" / "xwalks"
+        base_dir
+        / "curated"
+        / "xwalks"
         / msa_coc_xwalk_filename(boundary_vintage, definition_version, county_vintage)
     )
 
@@ -685,6 +738,7 @@ def discover_zori_ingest(
     """
     if output_dir is None:
         from hhplab.paths import curated_dir
+
         output_dir = curated_dir("zori")
     else:
         output_dir = Path(output_dir)
@@ -920,9 +974,7 @@ def _normalize_definition_version(definition_version: str) -> str:
     Strips non-alphanumeric characters (except underscores) and
     lowercases. Example: ``"glynn_fox_v1"`` -> ``"glynnfoxv1"``.
     """
-    return "".join(
-        c for c in definition_version.lower() if c.isalnum()
-    )
+    return "".join(c for c in definition_version.lower() if c.isalnum())
 
 
 # =============================================================================
@@ -1001,10 +1053,7 @@ def msa_pit_filename(
     Pattern: ``pit__msa__P{year}@M{def}xB{boundary}xC{county}.parquet``
     """
     defn = _normalize_definition_version(definition_version)
-    return (
-        f"pit__msa__P{pit_year}@M{defn}"
-        f"xB{boundary_vintage}xC{county_vintage}.parquet"
-    )
+    return f"pit__msa__P{pit_year}@M{defn}xB{boundary_vintage}xC{county_vintage}.parquet"
 
 
 def metro_pep_filename(
@@ -1019,10 +1068,7 @@ def metro_pep_filename(
     Pattern: ``pep__metro__D{def}xC{county}__w{weighting}__{start}_{end}.parquet``
     """
     defn = _normalize_definition_version(definition_version)
-    return (
-        f"pep__metro__D{defn}xC{county_vintage}"
-        f"__w{weighting}__{start_year}_{end_year}.parquet"
-    )
+    return f"pep__metro__D{defn}xC{county_vintage}__w{weighting}__{start_year}_{end_year}.parquet"
 
 
 def acs1_metro_filename(acs1_vintage: int, definition_version: str) -> str:
@@ -1144,10 +1190,7 @@ def metro_zori_filename(
     acs_year = _normalize_acs_vintage(acs_vintage)
     defn = _normalize_definition_version(definition_version)
     weight_abbrev = _abbreviate_weighting(weighting)
-    return (
-        f"zori__metro__A{acs_year}@D{defn}xC{county_vintage}"
-        f"__w{weight_abbrev}.parquet"
-    )
+    return f"zori__metro__A{acs_year}@D{defn}xC{county_vintage}__w{weight_abbrev}.parquet"
 
 
 # =============================================================================
@@ -1198,8 +1241,7 @@ def metro_subset_membership_filename(
 ) -> str:
     """Filename for a subset-profile over the canonical metro universe."""
     return (
-        "metro_subset_membership__"
-        f"{profile_definition_version}xM{metro_definition_version}.parquet"
+        f"metro_subset_membership__{profile_definition_version}xM{metro_definition_version}.parquet"
     )
 
 
@@ -1234,10 +1276,7 @@ def metro_definitions_path(
         base_dir = Path("data")
     else:
         base_dir = Path(base_dir)
-    return (
-        base_dir / "curated" / "metro"
-        / metro_definitions_filename(definition_version)
-    )
+    return base_dir / "curated" / "metro" / metro_definitions_filename(definition_version)
 
 
 def metro_coc_membership_path(
@@ -1253,10 +1292,7 @@ def metro_coc_membership_path(
         base_dir = Path("data")
     else:
         base_dir = Path(base_dir)
-    return (
-        base_dir / "curated" / "metro"
-        / metro_coc_membership_filename(definition_version)
-    )
+    return base_dir / "curated" / "metro" / metro_coc_membership_filename(definition_version)
 
 
 def metro_county_membership_path(
@@ -1272,10 +1308,7 @@ def metro_county_membership_path(
         base_dir = Path("data")
     else:
         base_dir = Path(base_dir)
-    return (
-        base_dir / "curated" / "metro"
-        / metro_county_membership_filename(definition_version)
-    )
+    return base_dir / "curated" / "metro" / metro_county_membership_filename(definition_version)
 
 
 def metro_boundaries_path(
@@ -1293,7 +1326,9 @@ def metro_boundaries_path(
     else:
         base_dir = Path(base_dir)
     return (
-        base_dir / "curated" / "metro"
+        base_dir
+        / "curated"
+        / "metro"
         / metro_boundaries_filename(definition_version, county_vintage)
     )
 
@@ -1307,10 +1342,7 @@ def metro_universe_path(
         base_dir = Path("data")
     else:
         base_dir = Path(base_dir)
-    return (
-        base_dir / "curated" / "metro"
-        / metro_universe_filename(definition_version)
-    )
+    return base_dir / "curated" / "metro" / metro_universe_filename(definition_version)
 
 
 def metro_subset_membership_path(
@@ -1324,7 +1356,9 @@ def metro_subset_membership_path(
     else:
         base_dir = Path(base_dir)
     return (
-        base_dir / "curated" / "metro"
+        base_dir
+        / "curated"
+        / "metro"
         / metro_subset_membership_filename(
             profile_definition_version,
             metro_definition_version,
@@ -1375,10 +1409,7 @@ def msa_definitions_path(
         base_dir = Path("data")
     else:
         base_dir = Path(base_dir)
-    return (
-        base_dir / "curated" / "msa"
-        / msa_definitions_filename(definition_version)
-    )
+    return base_dir / "curated" / "msa" / msa_definitions_filename(definition_version)
 
 
 def msa_county_membership_path(
@@ -1390,10 +1421,7 @@ def msa_county_membership_path(
         base_dir = Path("data")
     else:
         base_dir = Path(base_dir)
-    return (
-        base_dir / "curated" / "msa"
-        / msa_county_membership_filename(definition_version)
-    )
+    return base_dir / "curated" / "msa" / msa_county_membership_filename(definition_version)
 
 
 def msa_boundaries_path(
@@ -1405,10 +1433,7 @@ def msa_boundaries_path(
         base_dir = Path("data")
     else:
         base_dir = Path(base_dir)
-    return (
-        base_dir / "curated" / "msa"
-        / msa_boundaries_filename(definition_version)
-    )
+    return base_dir / "curated" / "msa" / msa_boundaries_filename(definition_version)
 
 
 # =============================================================================

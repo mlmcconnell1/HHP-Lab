@@ -2714,10 +2714,42 @@ class TestMaterialize:
             tmp_path,
         )
 
-        assert (
-            "xwalk_tract_mediated_county__A2023@B2025xC2020xT2020"
-            in str(path)
+        assert "xwalk_tract_mediated_county__A2023@B2025xC2020xT2020" in str(path)
+
+    def test_resolve_tract_mediated_decennial_county_crosswalk_path(
+        self,
+        tmp_path: Path,
+    ):
+        data = _recipe_with_pipeline()
+        data["transforms"] = [
+            {
+                "id": "county_to_coc_tract_mediated",
+                "type": "crosswalk",
+                "from": {"type": "county", "vintage": 2020},
+                "to": {"type": "coc", "vintage": 2025},
+                "spec": {
+                    "weighting": {
+                        "scheme": "tract_mediated",
+                        "variety": "population",
+                        "tract_vintage": 2020,
+                        "denominator_source": "decennial",
+                        "denominator_vintage": 2020,
+                    },
+                },
+            }
+        ]
+        data["pipelines"][0]["steps"] = [
+            {"materialize": {"transforms": ["county_to_coc_tract_mediated"]}},
+        ]
+        recipe = load_recipe(data)
+
+        path = _resolve_transform_path(
+            "county_to_coc_tract_mediated",
+            recipe,
+            tmp_path,
         )
+
+        assert "xwalk_tract_mediated_county__N2020@B2025xC2020xT2020" in str(path)
 
     def test_panel_output_filename_encodes_tract_mediated_varieties(self, tmp_path: Path):
         data = _recipe_with_pipeline()

@@ -1,7 +1,8 @@
 """Tract-mediated county-to-geography crosswalk weights.
 
 This module derives county-to-analysis-geography allocation weights by
-composing a tract crosswalk with ACS tract denominator columns.  It is
+composing a tract crosswalk with tract denominator columns. Denominators can
+come from ACS tract estimates or fixed decennial tract populations. It is
 intentionally separate from direct county polygon overlays so existing
 ``area_share`` semantics remain unchanged.
 """
@@ -40,19 +41,26 @@ def _require_columns(df: pd.DataFrame, required: set[str], *, label: str) -> Non
         )
 
 
-def _standardize_acs_tracts(acs_tracts: pd.DataFrame) -> pd.DataFrame:
-    acs = acs_tracts.copy()
-    if "GEOID" in acs.columns and "tract_geoid" not in acs.columns:
-        acs = acs.rename(columns={"GEOID": "tract_geoid"})
-    _require_columns(acs, {"tract_geoid", "total_population"}, label="acs_tracts")
-    acs["tract_geoid"] = acs["tract_geoid"].astype(str).str.zfill(11)
+def _standardize_denominator_tracts(
+    denominator_tracts: pd.DataFrame,
+    *,
+    label: str,
+) -> pd.DataFrame:
+    denominators = denominator_tracts.copy()
+    if "GEOID" in denominators.columns and "tract_geoid" not in denominators.columns:
+        denominators = denominators.rename(columns={"GEOID": "tract_geoid"})
+    _require_columns(denominators, {"tract_geoid", "total_population"}, label=label)
+    denominators["tract_geoid"] = denominators["tract_geoid"].astype(str).str.zfill(11)
 
     keep = ["tract_geoid"]
     for denominator_col in set(DENOMINATOR_COLUMNS.values()) - {"tract_area"}:
-        if denominator_col in acs.columns:
-            acs[denominator_col] = pd.to_numeric(acs[denominator_col], errors="coerce")
+        if denominator_col in denominators.columns:
+            denominators[denominator_col] = pd.to_numeric(
+                denominators[denominator_col],
+                errors="coerce",
+            )
             keep.append(denominator_col)
-    return acs[keep].drop_duplicates("tract_geoid")
+    return denominators[keep].drop_duplicates("tract_geoid")
 
 
 def _safe_divide(numerator: pd.Series, denominator: pd.Series) -> pd.Series:
@@ -62,12 +70,14 @@ def _safe_divide(numerator: pd.Series, denominator: pd.Series) -> pd.Series:
 
 def build_tract_mediated_county_crosswalk(
     tract_crosswalk: pd.DataFrame,
-    acs_tracts: pd.DataFrame,
+    denominator_tracts: pd.DataFrame,
     *,
     boundary_vintage: str | int,
     county_vintage: str | int,
     tract_vintage: str | int,
-    acs_vintage: str | int,
+    acs_vintage: str | int | None = None,
+    denominator_source: str = "acs",
+    denominator_vintage: str | int | None = None,
     geo_id_col: str = "coc_id",
 ) -> pd.DataFrame:
     """Build county-to-geography weights mediated through tracts.
@@ -78,11 +88,17 @@ def build_tract_mediated_county_crosswalk(
         Analysis geography to tract crosswalk with ``geo_id_col``,
         ``tract_geoid``, ``area_share``, ``intersection_area``, and
         ``tract_area`` columns.
-    acs_tracts : pd.DataFrame
-        ACS tract table with ``tract_geoid`` or ``GEOID``, ``total_population``,
-        and optionally ``total_households`` and ``renter_households``.
-    boundary_vintage, county_vintage, tract_vintage, acs_vintage
+    denominator_tracts : pd.DataFrame
+        Tract denominator table with ``tract_geoid`` or ``GEOID``,
+        ``total_population``, and optionally ``total_households`` and
+        ``renter_households``.
+    boundary_vintage, county_vintage, tract_vintage
         Vintage metadata carried into output rows and provenance.
+    acs_vintage
+        ACS denominator vintage for backward-compatible ACS callers.
+    denominator_source, denominator_vintage
+        Explicit denominator metadata. ``denominator_source`` must be
+        ``"acs"`` or ``"decennial"``.
     geo_id_col : str
         Analysis geography identifier column. Defaults to ``"coc_id"``.
 
@@ -105,10 +121,19 @@ def build_tract_mediated_county_crosswalk(
     for col in ("area_share", "intersection_area", "tract_area"):
         xwalk[col] = pd.to_numeric(xwalk[col], errors="coerce")
 
-    household_available = "total_households" in acs_tracts.columns
-    renter_available = "renter_households" in acs_tracts.columns
-    acs = _standardize_acs_tracts(acs_tracts)
-    merged = xwalk.merge(acs, on="tract_geoid", how="left")
+    resolved_denominator_vintage = _resolve_denominator_vintage(
+        denominator_source=denominator_source,
+        denominator_vintage=denominator_vintage,
+        acs_vintage=acs_vintage,
+    )
+    denominator_label = f"{denominator_source}_tracts"
+    household_available = "total_households" in denominator_tracts.columns
+    renter_available = "renter_households" in denominator_tracts.columns
+    denominators = _standardize_denominator_tracts(
+        denominator_tracts,
+        label=denominator_label,
+    )
+    merged = xwalk.merge(denominators, on="tract_geoid", how="left")
 
     # Pair-level raw contributions: tract fraction in geography times tract denominator.
     merged["area_denominator"] = merged["intersection_area"]
@@ -233,7 +258,9 @@ def build_tract_mediated_county_crosswalk(
     grouped["boundary_vintage"] = str(boundary_vintage)
     grouped["county_vintage"] = str(county_vintage)
     grouped["tract_vintage"] = str(tract_vintage)
-    grouped["acs_vintage"] = str(acs_vintage)
+    grouped["acs_vintage"] = str(acs_vintage) if acs_vintage is not None else pd.NA
+    grouped["denominator_source"] = denominator_source
+    grouped["denominator_vintage"] = str(resolved_denominator_vintage)
     grouped["weighting_method"] = "tract_mediated"
 
     column_order = [
@@ -243,6 +270,8 @@ def build_tract_mediated_county_crosswalk(
         "county_vintage",
         "tract_vintage",
         "acs_vintage",
+        "denominator_source",
+        "denominator_vintage",
         "weighting_method",
         "area_weight",
         "population_weight",
@@ -279,7 +308,9 @@ def save_tract_mediated_county_crosswalk(
     boundary_vintage: str | int,
     county_vintage: str | int,
     tract_vintage: str | int,
-    acs_vintage: str | int,
+    acs_vintage: str | int | None = None,
+    denominator_source: str = "acs",
+    denominator_vintage: str | int | None = None,
     output_dir: Path | str | None = None,
     geo_type: str = "coc",
 ) -> Path:
@@ -292,23 +323,53 @@ def save_tract_mediated_county_crosswalk(
         output_dir = Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
 
+    resolved_denominator_vintage = _resolve_denominator_vintage(
+        denominator_source=denominator_source,
+        denominator_vintage=denominator_vintage,
+        acs_vintage=acs_vintage,
+    )
     output_path = output_dir / tract_mediated_county_xwalk_filename(
         boundary_vintage,
         county_vintage,
         tract_vintage,
         acs_vintage,
+        denominator_source=denominator_source,
+        denominator_vintage=resolved_denominator_vintage,
     )
     provenance = ProvenanceBlock(
         boundary_vintage=str(boundary_vintage),
         county_vintage=str(county_vintage),
         tract_vintage=str(tract_vintage),
-        acs_vintage=str(acs_vintage),
+        acs_vintage=str(acs_vintage) if acs_vintage is not None else None,
         weighting="tract_mediated",
         geo_type=geo_type,
         extra={
             "dataset_type": "tract_mediated_county_crosswalk",
+            "denominator_source": denominator_source,
+            "denominator_vintage": str(resolved_denominator_vintage),
             "weight_columns": list(WEIGHT_COLUMNS),
         },
     )
     write_parquet_with_provenance(crosswalk, output_path, provenance)
     return output_path
+
+
+def _resolve_denominator_vintage(
+    *,
+    denominator_source: str,
+    denominator_vintage: str | int | None,
+    acs_vintage: str | int | None,
+) -> str | int:
+    if denominator_source == "acs":
+        vintage = denominator_vintage if denominator_vintage is not None else acs_vintage
+        if vintage is None:
+            raise ValueError("ACS tract-mediated denominators require acs_vintage.")
+        return vintage
+    if denominator_source == "decennial":
+        if denominator_vintage is None:
+            raise ValueError("Decennial tract-mediated denominators require denominator_vintage.")
+        return denominator_vintage
+    raise ValueError(
+        "Unsupported tract-mediated denominator_source "
+        f"{denominator_source!r}; expected 'acs' or 'decennial'."
+    )
