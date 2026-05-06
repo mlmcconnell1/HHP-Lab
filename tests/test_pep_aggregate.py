@@ -19,6 +19,7 @@ from hhplab.pep.pep_aggregate import (
     aggregate_pep_to_coc,
     aggregate_pep_to_coc_many,
 )
+from hhplab.provenance import read_provenance
 
 
 class TestAggregationIntegration:
@@ -345,6 +346,69 @@ class TestAggregationUnit:
         assert row["max_county_contribution"] == pytest.approx(expected_max)
         assert row["weighting_method"] == weighting
 
+    def test_decennial_population_weights_scale_from_pep_baseline(self):
+        """Decennial population weights use PEP_Y / PEP_decennial_year growth ratios."""
+        xwalk = pd.DataFrame(
+            {
+                "coc_id": ["COC-001", "COC-001"],
+                "county_fips": ["01001", "01003"],
+                "population_weight": [0.25, 0.50],
+                "county_population_total": [1000.0, 2000.0],
+                "denominator_source": ["decennial", "decennial"],
+                "denominator_vintage": ["2020", "2020"],
+            }
+        )
+        pep = pd.DataFrame(
+            {
+                "county_fips": ["01001", "01003", "01001", "01003"],
+                "year": [2020, 2020, 2024, 2024],
+                "population": [1100.0, 1800.0, 1210.0, 2160.0],
+            }
+        )
+
+        result = aggregate_pep_counties(
+            pep,
+            xwalk,
+            weighting="population_weight",
+            min_coverage=0.0,
+        )
+
+        row_2024 = result[(result["coc_id"] == "COC-001") & (result["year"] == 2024)].iloc[0]
+        expected = (0.25 * 1000.0 * (1210.0 / 1100.0)) + (
+            0.50 * 2000.0 * (2160.0 / 1800.0)
+        )
+        assert row_2024["population"] == pytest.approx(expected)
+        assert row_2024["coverage_ratio"] == pytest.approx(0.75 / 0.75)
+        assert row_2024["population_scaling_method"] == "decennial_pep_baseline_ratio"
+        assert row_2024["population_scaling_baseline_year"] == 2020
+
+    def test_decennial_population_weights_require_pep_baseline_year(self):
+        xwalk = pd.DataFrame(
+            {
+                "coc_id": ["COC-001"],
+                "county_fips": ["01001"],
+                "population_weight": [1.0],
+                "county_population_total": [1000.0],
+                "denominator_source": ["decennial"],
+                "denominator_vintage": ["2020"],
+            }
+        )
+        pep = pd.DataFrame(
+            {
+                "county_fips": ["01001"],
+                "year": [2024],
+                "population": [1210.0],
+            }
+        )
+
+        with pytest.raises(ValueError, match="baseline year 2020"):
+            aggregate_pep_counties(
+                pep,
+                xwalk,
+                weighting="population_weight",
+                min_coverage=0.0,
+            )
+
     def test_multiple_weightings_write_comparable_outputs(self, tmp_path):
         """One workflow can materialize multiple weighting-specific PEP outputs."""
         pep_path = tmp_path / "pep.parquet"
@@ -387,6 +451,53 @@ class TestAggregationUnit:
         assert population.iloc[0]["population"] == pytest.approx(212.5)
         assert area.iloc[0]["weighting_method"] == "area_share"
         assert population.iloc[0]["weighting_method"] == "population_weight"
+
+    def test_decennial_population_scaling_is_recorded_in_output_provenance(self, tmp_path):
+        pep_path = tmp_path / "pep.parquet"
+        pd.DataFrame(
+            {
+                "county_fips": ["01001", "01001"],
+                "year": [2020, 2024],
+                "population": [1100.0, 1210.0],
+            }
+        ).to_parquet(pep_path, index=False)
+
+        xwalk_path = tmp_path / "xwalk.parquet"
+        pd.DataFrame(
+            {
+                "coc_id": ["COC-001"],
+                "county_fips": ["01001"],
+                "population_weight": [0.25],
+                "county_population_total": [1000.0],
+                "denominator_source": ["decennial"],
+                "denominator_vintage": ["2020"],
+            }
+        ).to_parquet(xwalk_path, index=False)
+
+        output = aggregate_pep_to_coc(
+            boundary_vintage="2024",
+            county_vintage="2020",
+            weighting="population_weight",
+            pep_path=pep_path,
+            xwalk_path=xwalk_path,
+            start_year=2020,
+            end_year=2024,
+            min_coverage=0.0,
+            output_dir=tmp_path,
+            force=True,
+        )
+
+        result = pd.read_parquet(output)
+        row_2024 = result[result["year"] == 2024].iloc[0]
+        assert row_2024["population"] == pytest.approx(0.25 * 1000.0 * (1210.0 / 1100.0))
+        assert row_2024["population_scaling_method"] == "decennial_pep_baseline_ratio"
+
+        provenance = read_provenance(output)
+        assert provenance is not None
+        assert provenance.extra["population_scaling_method"] == "decennial_pep_baseline_ratio"
+        assert provenance.extra["population_scaling_baseline_year"] == 2020
+        assert "April 1" in provenance.extra["population_scaling_rationale"]
+        assert "July 1" in provenance.extra["population_scaling_rationale"]
 
     def test_year_filter_without_matching_rows_raises_clear_error(self, tmp_path):
         """Year filters outside available coverage should fail with guidance."""

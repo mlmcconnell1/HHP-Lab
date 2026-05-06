@@ -12,6 +12,11 @@ explicit weight column from a tract-mediated county crosswalk, such as
 ``renter_household_weight``.  Those columns allocate county population
 totals to CoCs with denominator-specific tract evidence while preserving
 the same coverage and contribution diagnostics as the direct overlay.
+When ``population_weight`` comes from fixed decennial tract denominators,
+the decennial counts define only the within-county spatial distribution.
+Annual scaling uses PEP July 1 county estimates relative to the PEP
+estimate for the matching decennial baseline year, not the April 1
+decennial count.
 
 Usage
 -----
@@ -43,6 +48,9 @@ logger = logging.getLogger(__name__)
 # every county has a PEP estimate, so missing data is unusual and likely
 # indicates a real problem rather than expected sparsity.
 DEFAULT_MIN_COVERAGE = 0.95
+
+DECENNIAL_PEP_BASELINE_SCALING = "decennial_pep_baseline_ratio"
+DIRECT_PEP_WEIGHTED_SUM = "direct_pep_weighted_sum"
 
 
 def load_crosswalk(
@@ -200,6 +208,49 @@ def get_output_path(
     return output_dir / filename
 
 
+def _decennial_population_baseline_year(
+    xwalk_df: pd.DataFrame,
+    *,
+    weighting: str,
+) -> int | None:
+    if weighting != "population_weight" or "denominator_source" not in xwalk_df.columns:
+        return None
+
+    sources = set(xwalk_df["denominator_source"].dropna().astype(str))
+    if sources != {"decennial"}:
+        return None
+
+    if "denominator_vintage" not in xwalk_df.columns:
+        raise ValueError(
+            "Decennial tract-mediated population_weight requires "
+            "denominator_vintage in the crosswalk. Regenerate the "
+            "tract-mediated county crosswalk."
+        )
+
+    vintages = set(xwalk_df["denominator_vintage"].dropna().astype(str))
+    if len(vintages) != 1:
+        raise ValueError(
+            "Decennial tract-mediated population_weight requires exactly one "
+            f"denominator_vintage; found {sorted(vintages)}."
+        )
+    baseline_year = int(next(iter(vintages)))
+    if baseline_year not in {2010, 2020}:
+        raise ValueError(
+            "Decennial tract-mediated population_weight supports PEP baseline "
+            f"years 2010 or 2020; found {baseline_year}."
+        )
+
+    required = {"county_population_total", "population_weight"}
+    missing = sorted(required - set(xwalk_df.columns))
+    if missing:
+        raise ValueError(
+            "Decennial tract-mediated population_weight requires "
+            f"{', '.join(missing)} in the crosswalk. Regenerate the "
+            "tract-mediated county crosswalk with decennial denominators."
+        )
+    return baseline_year
+
+
 def aggregate_pep_counties(
     pep_df: pd.DataFrame,
     xwalk_df: pd.DataFrame,
@@ -273,6 +324,11 @@ def aggregate_pep_counties(
     # Pre-compute total weight per geography (constant across years)
     total_weight_per_geo = xwalk_df.groupby(geo_id_col)[weight_col].sum()
     logger.info(f"Crosswalk contains {len(total_weight_per_geo)} geography units")
+    decennial_baseline_year = _decennial_population_baseline_year(
+        xwalk_df,
+        weighting=weighting,
+    )
+    population_scaling_method = DIRECT_PEP_WEIGHTED_SUM
 
     # Check for missing counties in PEP data
     xwalk_counties = set(xwalk_df["county_fips"].unique())
@@ -305,7 +361,46 @@ def aggregate_pep_counties(
     )
 
     # Weighted population per row
-    merged["weighted_pop"] = merged[weight_col] * merged["population"]
+    if decennial_baseline_year is None:
+        merged["weighted_pop"] = merged[weight_col] * merged["population"]
+    else:
+        baseline = pep_df.loc[
+            pep_df["year"] == decennial_baseline_year,
+            ["county_fips", "population"],
+        ].rename(columns={"population": "baseline_pep_population"})
+        if baseline.empty:
+            raise ValueError(
+                "Decennial tract-mediated population_weight requires PEP "
+                f"county estimates for baseline year {decennial_baseline_year}. "
+                "Load a PEP vintage that includes the baseline year."
+            )
+        merged = merged.merge(baseline, on="county_fips", how="left")
+        if merged["baseline_pep_population"].isna().any():
+            missing = sorted(
+                merged.loc[merged["baseline_pep_population"].isna(), "county_fips"].unique()
+            )
+            raise ValueError(
+                "Decennial tract-mediated population_weight is missing PEP "
+                f"baseline year {decennial_baseline_year} estimates for "
+                f"county_fips values {missing[:10]}"
+                f"{'...' if len(missing) > 10 else ''}."
+            )
+        if (merged["baseline_pep_population"] <= 0).any():
+            bad = sorted(
+                merged.loc[merged["baseline_pep_population"] <= 0, "county_fips"].unique()
+            )
+            raise ValueError(
+                "Decennial tract-mediated population_weight requires positive "
+                f"PEP baseline year {decennial_baseline_year} estimates; "
+                f"non-positive county_fips values: {bad[:10]}"
+                f"{'...' if len(bad) > 10 else ''}."
+            )
+        merged["weighted_pop"] = (
+            merged[weight_col]
+            * merged["county_population_total"]
+            * (merged["population"] / merged["baseline_pep_population"])
+        )
+        population_scaling_method = DECENNIAL_PEP_BASELINE_SCALING
 
     # Vectorised groupby aggregation (replaces the O(G*Y) Python loop)
     grouped = merged.groupby([geo_id_col, "year"])
@@ -357,6 +452,11 @@ def aggregate_pep_counties(
     if county_vintage is not None:
         result_df["county_vintage"] = county_vintage
     result_df["weighting_method"] = weighting
+    result_df["population_scaling_method"] = population_scaling_method
+    if decennial_baseline_year is not None:
+        result_df["population_scaling_baseline_year"] = decennial_baseline_year
+    else:
+        result_df["population_scaling_baseline_year"] = pd.NA
 
     # Apply minimum coverage threshold
     low_coverage = result_df["coverage_ratio"] < min_coverage
@@ -523,6 +623,8 @@ def aggregate_pep_to_coc(
         "boundary_vintage",
         "county_vintage",
         "weighting_method",
+        "population_scaling_method",
+        "population_scaling_baseline_year",
     ]
     result_df = result_df[col_order]
 
@@ -548,6 +650,22 @@ def aggregate_pep_to_coc(
             "xwalk_source": xwalk_provenance.to_dict() if xwalk_provenance else None,
             "aggregation_method": "weighted_sum",
             "weighting_method": weighting,
+            "population_scaling_method": (
+                result_df["population_scaling_method"].dropna().iloc[0]
+                if not result_df.empty
+                else DIRECT_PEP_WEIGHTED_SUM
+            ),
+            "population_scaling_baseline_year": (
+                int(result_df["population_scaling_baseline_year"].dropna().iloc[0])
+                if result_df["population_scaling_baseline_year"].notna().any()
+                else None
+            ),
+            "population_scaling_rationale": (
+                "Decennial tract counts are April 1 counts; PEP county estimates "
+                "are July 1 annual estimates. Decennial tract-mediated population "
+                "weights use decennial counts for within-county distribution and "
+                "PEP_Y / PEP_baseline_year for annual county scaling."
+            ),
             "min_coverage_threshold": min_coverage,
             "year_range": [actual_start, actual_end],
             "coc_count": result_df["coc_id"].nunique(),
