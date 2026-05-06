@@ -370,7 +370,7 @@ class TestPlannerErrors:
             "type": "crosswalk",
             "from": {"type": "coc", "vintage": 2025},
             "to": {"type": "tract", "vintage": 2010},
-            "spec": {"weighting": {"scheme": "population"}},
+            "spec": {"weighting": {"scheme": "area"}},
         })
         recipe = load_recipe(data)
         with pytest.raises(PlannerError, match="multiple compatible transforms"):

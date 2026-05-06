@@ -648,8 +648,8 @@ def get_weighted_transform_requirements(
 ) -> tuple[str, str] | None:
     """Extract (population_source, population_field) if a transform needs them.
 
-    Returns None if the transform does not use population weighting or
-    if the required fields are not configured.
+    Returns None if the transform does not use population weighting.
+    The recipe schema requires both fields for population weighting.
 
     Both the executor and preflight call this to decide whether
     support-dataset validation is needed.

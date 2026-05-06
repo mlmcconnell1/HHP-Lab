@@ -632,8 +632,8 @@ TractMediatedWeightingVariety = Literal[
 class CrosswalkWeighting(BaseModel):
     """
     Weighting spec for spatial crosswalk shares.
-    If scheme == 'population', a population source/field may be referenced
-    (optional here; required by adapter).
+    If scheme == 'population', a population source/field is required so
+    preflight and execution can derive ``pop_share`` explicitly.
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -687,6 +687,14 @@ class CrosswalkWeighting(BaseModel):
         has_variety = self.variety is not None
         has_varieties = self.varieties is not None
         if self.scheme != "tract_mediated":
+            if self.scheme == "population" and (
+                not self.population_source or not self.population_field
+            ):
+                raise ValueError(
+                    "scheme='population' requires weighting.population_source "
+                    "and weighting.population_field so pop_share can be "
+                    "derived explicitly."
+                )
             if has_variety or has_varieties:
                 raise ValueError(
                     "Crosswalk weighting varieties are only valid when scheme='tract_mediated'."

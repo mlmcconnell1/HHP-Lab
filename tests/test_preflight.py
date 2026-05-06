@@ -6,6 +6,7 @@ import json
 from pathlib import Path
 
 import pandas as pd
+import pytest
 from typer.testing import CliRunner
 
 from hhplab.cli.main import app
@@ -2685,6 +2686,23 @@ class TestGetWeightedTransformRequirements:
         )
         result = get_weighted_transform_requirements(t)
         assert result is None
+
+    @pytest.mark.parametrize(
+        "weighting",
+        [
+            {"scheme": "population"},
+            {"scheme": "population", "population_source": "weights"},
+            {"scheme": "population", "population_field": "total_pop"},
+        ],
+        ids=["missing-both", "missing-field", "missing-source"],
+    )
+    def test_population_weighting_requires_explicit_source_and_field(self, weighting):
+        from pydantic import ValidationError
+
+        from hhplab.recipe.recipe_schema import CrosswalkWeighting
+
+        with pytest.raises(ValidationError, match="scheme='population' requires"):
+            CrosswalkWeighting(**weighting)
 
     def test_rollup_transform_returns_none(self):
         from hhplab.recipe.probes import get_weighted_transform_requirements
