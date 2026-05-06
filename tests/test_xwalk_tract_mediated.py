@@ -124,6 +124,13 @@ class TestTractMediatedCountyCrosswalk:
         assert row["geo_population_total"] == pytest.approx(350.0)
         assert row["county_population_coverage_ratio"] == pytest.approx(1.0)
         assert row["tract_count"] == 2
+        assert row["denominator_tract_count"] == 2
+        assert row["missing_denominator_tract_count"] == 0
+        assert row["denominator_tract_coverage_ratio"] == pytest.approx(1.0)
+        assert row["county_tract_count"] == 2
+        assert row["county_denominator_tract_count"] == 2
+        assert row["county_missing_denominator_tract_count"] == 0
+        assert row["county_denominator_tract_coverage_ratio"] == pytest.approx(1.0)
 
     def test_zero_county_denominators_produce_nullable_weights(self):
         result = build_fixture()
@@ -153,6 +160,23 @@ class TestTractMediatedCountyCrosswalk:
             build_tract_mediated_county_crosswalk(
                 TRACT_CROSSWALK.drop(columns=["intersection_area"]),
                 ACS_TRACTS,
+                boundary_vintage="2025",
+                county_vintage="2020",
+                tract_vintage="2020",
+                acs_vintage="2023",
+            )
+
+    def test_missing_required_denominator_rows_raise_actionable_error(self):
+        with pytest.raises(
+            ValueError,
+            match=(
+                "Tract-mediated denominator coverage is incomplete: "
+                "B/01001: 1 of 2 tract"
+            ),
+        ):
+            build_tract_mediated_county_crosswalk(
+                TRACT_CROSSWALK,
+                ACS_TRACTS[ACS_TRACTS["tract_geoid"] != "01001000200"],
                 boundary_vintage="2025",
                 county_vintage="2020",
                 tract_vintage="2020",

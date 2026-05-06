@@ -68,6 +68,27 @@ def _safe_divide(numerator: pd.Series, denominator: pd.Series) -> pd.Series:
     return numerator / denom
 
 
+def _format_missing_denominator_coverage(
+    coverage: pd.DataFrame,
+    *,
+    geo_id_col: str,
+    max_rows: int = 5,
+) -> str:
+    missing = coverage[coverage["missing_denominator_tract_count"] > 0]
+    examples = [
+        (
+            f"{row[geo_id_col]}/{row['county_fips']}: "
+            f"{int(row['missing_denominator_tract_count'])} of "
+            f"{int(row['tract_count'])} tract(s) missing"
+        )
+        for _, row in missing.head(max_rows).iterrows()
+    ]
+    suffix = ""
+    if len(missing) > max_rows:
+        suffix = f"; {len(missing) - max_rows} more geography/county pair(s)"
+    return "; ".join(examples) + suffix
+
+
 def build_tract_mediated_county_crosswalk(
     tract_crosswalk: pd.DataFrame,
     denominator_tracts: pd.DataFrame,
@@ -135,6 +156,52 @@ def build_tract_mediated_county_crosswalk(
     )
     merged = xwalk.merge(denominators, on="tract_geoid", how="left")
 
+    tract_coverage = merged[
+        [geo_id_col, "county_fips", "tract_geoid", "total_population"]
+    ].drop_duplicates([geo_id_col, "county_fips", "tract_geoid"])
+    group_coverage = (
+        tract_coverage.groupby([geo_id_col, "county_fips"], dropna=False)
+        .agg(
+            tract_count=("tract_geoid", "nunique"),
+            denominator_tract_count=("total_population", "count"),
+        )
+        .reset_index()
+    )
+    group_coverage["missing_denominator_tract_count"] = (
+        group_coverage["tract_count"] - group_coverage["denominator_tract_count"]
+    )
+    group_coverage["denominator_tract_coverage_ratio"] = _safe_divide(
+        group_coverage["denominator_tract_count"],
+        group_coverage["tract_count"],
+    )
+    county_coverage = (
+        tract_coverage.drop_duplicates(["county_fips", "tract_geoid"])
+        .groupby("county_fips", dropna=False)
+        .agg(
+            county_tract_count=("tract_geoid", "nunique"),
+            county_denominator_tract_count=("total_population", "count"),
+        )
+        .reset_index()
+    )
+    county_coverage["county_missing_denominator_tract_count"] = (
+        county_coverage["county_tract_count"]
+        - county_coverage["county_denominator_tract_count"]
+    )
+    county_coverage["county_denominator_tract_coverage_ratio"] = _safe_divide(
+        county_coverage["county_denominator_tract_count"],
+        county_coverage["county_tract_count"],
+    )
+    if (group_coverage["missing_denominator_tract_count"] > 0).any():
+        details = _format_missing_denominator_coverage(
+            group_coverage,
+            geo_id_col=geo_id_col,
+        )
+        raise ValueError(
+            "Tract-mediated denominator coverage is incomplete: "
+            f"{details}. Add the missing tract denominator rows to "
+            f"{denominator_label} before building county weights."
+        )
+
     # Pair-level raw contributions: tract fraction in geography times tract denominator.
     merged["area_denominator"] = merged["intersection_area"]
     for output_name, denominator_col in DENOMINATOR_COLUMNS.items():
@@ -160,7 +227,6 @@ def build_tract_mediated_county_crosswalk(
             population_denominator=("population_denominator", "sum"),
             household_denominator=("household_denominator", "sum"),
             renter_household_denominator=("renter_household_denominator", "sum"),
-            tract_count=("tract_geoid", "nunique"),
             missing_population_tract_count=("total_population", lambda s: int(s.isna().sum())),
             missing_household_tract_count=(
                 "total_households",
@@ -177,6 +243,7 @@ def build_tract_mediated_county_crosswalk(
         )
         .reset_index()
     )
+    grouped = grouped.merge(group_coverage, on=[geo_id_col, "county_fips"], how="left")
 
     unique_tracts = merged.drop_duplicates("tract_geoid")
     county_totals = unique_tracts.groupby("county_fips", dropna=False).agg(
@@ -196,6 +263,7 @@ def build_tract_mediated_county_crosswalk(
         else ("tract_geoid", lambda s: pd.NA),
     )
     grouped = grouped.merge(county_totals.reset_index(), on="county_fips", how="left")
+    grouped = grouped.merge(county_coverage, on="county_fips", how="left")
 
     geo_totals = grouped.groupby(geo_id_col, dropna=False)[pair_denominator_cols].transform("sum")
     geo_totals = geo_totals.rename(
@@ -294,6 +362,13 @@ def build_tract_mediated_county_crosswalk(
         "county_household_coverage_ratio",
         "county_renter_household_coverage_ratio",
         "tract_count",
+        "denominator_tract_count",
+        "missing_denominator_tract_count",
+        "denominator_tract_coverage_ratio",
+        "county_tract_count",
+        "county_denominator_tract_count",
+        "county_missing_denominator_tract_count",
+        "county_denominator_tract_coverage_ratio",
         "missing_population_tract_count",
         "missing_household_tract_count",
         "missing_renter_household_tract_count",
