@@ -11,6 +11,9 @@ Data Sources
 - Vintage 2024 (2020-2024): Current postcensal estimates
   https://www2.census.gov/programs-surveys/popest/datasets/2020-2024/counties/totals/co-est2024-alldata.csv
 
+- Vintage 2025 (2020-2025): Current postcensal estimates
+  https://www2.census.gov/programs-surveys/popest/datasets/2020-2025/counties/totals/co-est2025-alldata.csv
+
 Usage
 -----
     from hhplab.pep.pep_ingest import ingest_pep_county
@@ -18,8 +21,8 @@ Usage
     # Ingest best-available PEP county estimates (postcensal)
     path = ingest_pep_county()
 
-    # Ingest postcensal vintage 2024 data (covers 2020-2024)
-    path = ingest_pep_county(series="postcensal", vintage=2024)
+    # Ingest postcensal vintage 2025 data (covers 2020-2025)
+    path = ingest_pep_county(series="postcensal", vintage=2025)
 """
 
 from __future__ import annotations
@@ -44,9 +47,11 @@ logger = logging.getLogger(__name__)
 # Census Bureau PEP download URLs by vintage (postcensal)
 # Vintage 2020 = estimates through July 1, 2020 (released 2021)
 # Vintage 2024 = estimates through July 1, 2024 (released 2025)
+# Vintage 2025 = estimates through July 1, 2025 (released 2026)
 PEP_URLS = {
     2020: f"{CENSUS_PEP_DATASETS_BASE}/2010-2020/counties/totals/co-est2020-alldata.csv",
     2024: f"{CENSUS_PEP_DATASETS_BASE}/2020-2024/counties/totals/co-est2024-alldata.csv",
+    2025: f"{CENSUS_PEP_DATASETS_BASE}/2020-2025/counties/totals/co-est2025-alldata.csv",
 }
 
 # Census Bureau attribution (public domain, but cite source)
@@ -56,9 +61,11 @@ CENSUS_ATTRIBUTION = "Source: U.S. Census Bureau, Population Estimates Program (
 # Population columns by vintage
 # Vintage 2020 file: POPESTIMATE2010 through POPESTIMATE2020
 # Vintage 2024 file: POPESTIMATE2020 through POPESTIMATE2024
+# Vintage 2025 file: POPESTIMATE2020 through POPESTIMATE2025
 VINTAGE_YEARS = {
     2020: list(range(2010, 2021)),  # 2010-2020
     2024: list(range(2020, 2025)),  # 2020-2024
+    2025: list(range(2020, 2026)),  # 2020-2025
 }
 
 POSTCENSAL_SERIES = "postcensal"
@@ -103,7 +110,7 @@ def download_pep(
     Parameters
     ----------
     vintage : int
-        Data vintage year (2020 or 2024).
+        Data vintage year (2020, 2024, or 2025).
     url : str, optional
         Override URL for download. If None, uses default URL for vintage.
     raw_dir_override : Path or str, optional
@@ -346,7 +353,7 @@ def get_output_path(
     Parameters
     ----------
     vintage : int or str
-        Data vintage (2020, 2024).
+        Data vintage (2020, 2024, or 2025).
     output_dir : Path or str, optional
         Output directory. Defaults to 'data/curated/pep'.
 

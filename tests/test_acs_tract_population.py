@@ -9,6 +9,7 @@ from typing import Any
 
 import pandas as pd
 import pytest
+import httpx
 
 from hhplab.acs.ingest.tract_population import (
     fetch_state_tract_data,
@@ -18,7 +19,7 @@ from hhplab.acs.ingest.tract_population import (
     normalize_geoid,
     parse_acs_vintage,
 )
-from hhplab.acs.variables import ALL_API_VARS, TRACT_OUTPUT_COLUMNS
+from hhplab.acs.variables import ALL_API_VARS, TRACT_OUTPUT_COLUMNS, api_vars_for_year
 from hhplab.provenance import (
     ProvenanceBlock,
     read_provenance,
@@ -130,6 +131,37 @@ class TestGetOutputPath:
 
 class TestFetchStateTractPopulation:
     """Tests for fetch_state_tract_data function."""
+
+    def test_older_vintage_request_omits_unsupported_variables(self, httpx_mock):
+        """ACS 2010 omits API variables that make older vintage requests fail."""
+        response_data = make_census_response(
+            [
+                {
+                    "county": "031",
+                    "tract": "001000",
+                    "B01003_001E": "5000",
+                    "B19013_001E": "65000",
+                }
+            ]
+        )
+        captured_get: list[str] = []
+
+        def respond(request):
+            captured_get.append(str(request.url.params["get"]))
+            return httpx.Response(200, json=response_data)
+
+        httpx_mock.add_callback(
+            respond,
+            url=re.compile(r"https://api\.census\.gov/data/2010/acs/acs5.*"),
+        )
+
+        df, _ = fetch_state_tract_data(2010, "08")
+
+        assert "B01003_001E" in captured_get[0]
+        assert "B01003_001M" not in captured_get[0]
+        assert "B23025_003E" not in captured_get[0]
+        assert "B23025_005E" not in captured_get[0]
+        assert df.iloc[0]["total_population"] == 5000
 
     def test_parses_response_correctly(self, httpx_mock):
         """Test that Census API response is parsed into correct DataFrame structure."""

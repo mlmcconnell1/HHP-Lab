@@ -54,11 +54,12 @@ from hhplab.acs.translate import (
     translate_acs_to_target_vintage,
 )
 from hhplab.acs.variables import (
-    ACS_TABLES,
     ACS_VARIABLES,
     ADULT_VARS,
     ALL_API_VARS,
     TRACT_OUTPUT_COLUMNS,
+    api_vars_for_year,
+    tables_for_api_vars,
 )
 from hhplab.paths import curated_dir
 from hhplab.provenance import (
@@ -85,10 +86,6 @@ STATE_FIPS_CODES = [
     "56",
     "72",  # Puerto Rico
 ]
-
-
-# Source ref string listing all tables fetched
-_TABLES_REF = "+".join(ACS_TABLES)
 
 
 def _translation_metadata(
@@ -209,7 +206,11 @@ def normalize_geoid(state: str, county: str, tract: str) -> str:
     return f"{state_str}{county_str}{tract_str}"
 
 
-def fetch_state_tract_data(year: int, state_fips: str) -> tuple[pd.DataFrame, bytes]:
+def fetch_state_tract_data(
+    year: int,
+    state_fips: str,
+    api_vars: list[str] | None = None,
+) -> tuple[pd.DataFrame, bytes]:
     """Fetch all ACS tract-level data for a single state.
 
     Fetches population, income, rent, poverty, and age variables in a single
@@ -234,7 +235,9 @@ def fetch_state_tract_data(year: int, state_fips: str) -> tuple[pd.DataFrame, by
         If the Census API request fails.
     """
     url = CENSUS_API.format(year=year)
-    variables = ",".join(ALL_API_VARS)
+    if api_vars is None:
+        api_vars = api_vars_for_year(year)
+    variables = ",".join(api_vars)
 
     params = {
         "get": f"NAME,{variables}",
@@ -259,7 +262,7 @@ def fetch_state_tract_data(year: int, state_fips: str) -> tuple[pd.DataFrame, by
     )
 
     # Convert all numeric columns; Census uses negative values for missing
-    for var_code in ALL_API_VARS:
+    for var_code in api_vars:
         if var_code in df.columns:
             df[var_code] = pd.to_numeric(df[var_code], errors="coerce")
             df.loc[df[var_code] < 0, var_code] = pd.NA
@@ -340,6 +343,8 @@ def fetch_tract_data(
     year = parse_acs_vintage(acs_vintage)
     ingested_at = datetime.now(UTC)
     translation = _translation_metadata(acs_vintage, tract_vintage)
+    api_vars = api_vars_for_year(year)
+    tables = tables_for_api_vars(api_vars)
 
     logger.info(f"Fetching ACS {acs_vintage} tract data (API year: {year})")
 
@@ -347,7 +352,7 @@ def fetch_tract_data(
     all_raw_content: list[bytes] = []
     for state_fips in STATE_FIPS_CODES:
         try:
-            df, raw_content = fetch_state_tract_data(year, state_fips)
+            df, raw_content = fetch_state_tract_data(year, state_fips, api_vars)
             dfs.append(df)
             all_raw_content.append(raw_content)
             logger.debug(f"Fetched {len(df)} tracts for state {state_fips}")
@@ -371,11 +376,12 @@ def fetch_tract_data(
         request_metadata={
             "url": source_url,
             "params": {
-                "get": f"NAME,{','.join(ALL_API_VARS)}",
+                "get": f"NAME,{','.join(api_vars)}",
                 "for": "tract:*",
                 "in": "state:{fips}",
             },
-            "tables": ACS_TABLES,
+            "tables": tables,
+            "variables": api_vars,
             "acs_vintage": acs_vintage,
         },
         record_count=sum(len(df) for df in dfs),
@@ -396,8 +402,12 @@ def fetch_tract_data(
     result["acs_vintage"] = acs_vintage
     result["tract_vintage"] = tract_vintage
     result["data_source"] = "acs_5yr"
-    result["source_ref"] = f"census_api/acs/acs5/{year}/{_TABLES_REF}"
+    result["source_ref"] = f"census_api/acs/acs5/{year}/{'+'.join(tables)}"
     result["ingested_at"] = ingested_at
+
+    for col in TRACT_OUTPUT_COLUMNS:
+        if col not in result.columns:
+            result[col] = pd.NA
 
     # Ensure proper column types
     result["tract_geoid"] = result["tract_geoid"].astype(str)
@@ -509,7 +519,9 @@ def ingest_tract_data(
     )
 
     year = parse_acs_vintage(acs_vintage)
-    source_url = f"{CENSUS_API.format(year=year)}?tables={_TABLES_REF}"
+    api_vars = api_vars_for_year(year)
+    tables = tables_for_api_vars(api_vars)
+    source_url = f"{CENSUS_API.format(year=year)}?tables={'+'.join(tables)}"
 
     changed, details = check_source_changed(
         source_type="acs5_tract",
@@ -532,8 +544,9 @@ def ingest_tract_data(
         tract_vintage=tract_vintage,
         extra={
             "dataset": "acs5_tract_data",
-            "tables": ACS_TABLES,
-            "variables": ALL_API_VARS,
+            "tables": tables,
+            "variables": api_vars,
+            "unavailable_variables": sorted(set(ALL_API_VARS) - set(api_vars)),
             "api_year": year,
             "retrieved_at": datetime.now(UTC).isoformat(),
             "row_count": len(df),
@@ -556,7 +569,9 @@ def ingest_tract_data(
             "acs_vintage": acs_vintage,
             "tract_vintage": tract_vintage,
             **translation,
-            "tables": ACS_TABLES,
+            "tables": tables,
+            "variables": api_vars,
+            "unavailable_variables": sorted(set(ALL_API_VARS) - set(api_vars)),
             "row_count": len(df),
             "curated_path": str(output_path),
         },

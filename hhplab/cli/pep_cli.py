@@ -93,9 +93,9 @@ def ingest_pep(
 
         hhplab ingest pep --series auto
 
-        hhplab ingest pep --series postcensal --vintage 2024
+        hhplab ingest pep --series postcensal --vintage 2025
 
-        hhplab ingest pep --series postcensal --vintage 2024 --start 2015 --end 2020
+        hhplab ingest pep --series postcensal --vintage 2025 --start 2020 --end 2025
     """
     if output_dir is None:
         output_dir = curated_dir("pep")

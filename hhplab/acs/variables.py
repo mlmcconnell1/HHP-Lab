@@ -45,6 +45,30 @@ ACS_VARS = ACS_VARIABLES
 # All Census API variable codes to request (base + adult age groups)
 ALL_API_VARS: list[str] = list(ACS_VARIABLES.keys()) + ADULT_VARS
 
+# Variables unavailable in older ACS API vintages. Requesting any of these
+# variables makes the whole state request fail with HTTP 400, so tract ingest
+# filters them by API year and leaves their output columns nullable.
+UNAVAILABLE_API_VARS_BY_YEAR: dict[int, set[str]] = {
+    2010: {"B01003_001M", "B23025_003E", "B23025_005E"},
+    2011: {"B01003_001M"},
+    2012: {"B01003_001M"},
+    2013: {"B01003_001M"},
+    2014: {"B01003_001M"},
+}
+
+
+def api_vars_for_year(year: int) -> list[str]:
+    """Return ACS API variables supported by a specific ACS5 vintage year."""
+    unavailable = UNAVAILABLE_API_VARS_BY_YEAR.get(year, set())
+    return [var for var in ALL_API_VARS if var not in unavailable]
+
+
+def tables_for_api_vars(api_vars: list[str]) -> list[str]:
+    """Return table identifiers represented by an API variable request."""
+    table_order = {table: index for index, table in enumerate(ACS_TABLES)}
+    tables = {var.split("_", maxsplit=1)[0] for var in api_vars}
+    return sorted(tables, key=lambda table: table_order.get(table, len(table_order)))
+
 # Tables included (for provenance tracking)
 ACS_TABLES: list[str] = [
     "B01003",

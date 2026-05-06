@@ -22,6 +22,7 @@ from hhplab.pep.pep_ingest import (
     ingest_pep_county,
     parse_pep_county,
 )
+from hhplab.provenance import read_provenance
 
 # Sample Census PEP CSV data in wide format (mimics co-est2024-alldata.csv structure)
 # Note: Census files use STATE and COUNTY as separate columns, SUMLEV to indicate geography level
@@ -52,6 +53,12 @@ SAMPLE_PEP_CSV_LEADING_ZEROS = """SUMLEV,STATE,COUNTY,STNAME,CTYNAME,POPESTIMATE
 50,01,001,Alabama,Autauga County,58239
 50,02,020,Alaska,Anchorage Municipality,291247
 50,06,001,California,Alameda County,1682353
+"""
+
+SAMPLE_PEP_CSV_2025 = """SUMLEV,REGION,DIVISION,STATE,COUNTY,STNAME,CTYNAME,ESTIMATESBASE2020,POPESTIMATE2020,POPESTIMATE2021,POPESTIMATE2022,POPESTIMATE2023,POPESTIMATE2024,POPESTIMATE2025
+40,3,6,01,000,Alabama,Alabama,5024356,5031362,5039877,5074296,5108468,5157699,5239000
+50,3,6,01,001,Alabama,Autauga County,58805,58239,58443,58920,59534,60342,61000
+50,3,6,01,003,Alabama,Baldwin County,231767,231640,239294,246118,251122,253507,260000
 """
 # fmt: on
 
@@ -159,6 +166,17 @@ class TestParsePepCounty:
             assert ref_date.day == 1
             assert ref_date.year == row["year"]
 
+    def test_vintage_2025_parses_through_2025(self, tmp_path):
+        """Vintage 2025 county files include POPESTIMATE2025."""
+        csv_path = tmp_path / "test.csv"
+        csv_path.write_text(SAMPLE_PEP_CSV_2025)
+
+        df = parse_pep_county(csv_path, vintage=2025)
+
+        assert sorted(df["year"].unique()) == [2020, 2021, 2022, 2023, 2024, 2025]
+        autauga_2025 = df[(df["county_fips"] == "01001") & (df["year"] == 2025)]
+        assert autauga_2025.iloc[0]["population"] == 61000
+
 
 class TestGetOutputPath:
     """Tests for get_output_path function."""
@@ -189,6 +207,12 @@ class TestPepUrls:
         assert "2020-2024" in PEP_URLS[2024]
         assert "co-est2024-alldata.csv" in PEP_URLS[2024]
 
+    def test_vintage_2025_url_exists(self):
+        """Test that vintage 2025 URL is configured."""
+        assert 2025 in PEP_URLS
+        assert "2020-2025" in PEP_URLS[2025]
+        assert "co-est2025-alldata.csv" in PEP_URLS[2025]
+
     def test_vintage_years_configured(self):
         """Test that year ranges are configured for each vintage."""
         assert 2020 in VINTAGE_YEARS
@@ -196,6 +220,9 @@ class TestPepUrls:
 
         assert 2024 in VINTAGE_YEARS
         assert VINTAGE_YEARS[2024] == list(range(2020, 2025))
+
+        assert 2025 in VINTAGE_YEARS
+        assert VINTAGE_YEARS[2025] == list(range(2020, 2026))
 
 
 class TestSeriesValidation:
@@ -208,6 +235,38 @@ class TestSeriesValidation:
     def test_postcensal_invalid_vintage_raises(self):
         with pytest.raises(ValueError):
             ingest_pep_county(series=POSTCENSAL_SERIES, vintage=1999)
+
+
+class TestPepIngest:
+    """Tests for normalized PEP writes."""
+
+    def test_ingest_vintage_2025_embeds_provenance(self, tmp_path, monkeypatch):
+        raw_path = tmp_path / "raw" / "co-est2025-alldata.csv"
+        raw_path.parent.mkdir()
+        raw_path.write_text(SAMPLE_PEP_CSV_2025)
+
+        def fake_download(vintage, url=None, raw_dir_override=None, force=False):
+            assert vintage == 2025
+            return raw_path, "abc123"
+
+        monkeypatch.setattr("hhplab.pep.pep_ingest.download_pep", fake_download)
+
+        output = ingest_pep_county(
+            series=POSTCENSAL_SERIES,
+            vintage=2025,
+            output_dir=tmp_path,
+            force=True,
+        )
+
+        df = pd.read_parquet(output)
+        assert sorted(df["year"].unique()) == [2020, 2021, 2022, 2023, 2024, 2025]
+        assert set(df["vintage"]) == {2025}
+
+        provenance = read_provenance(output)
+        assert provenance is not None
+        assert provenance.extra["vintage"] == 2025
+        assert provenance.extra["year_range"] == [2020, 2025]
+        assert "2020-2025" in provenance.extra["download_url"]
 
 
 class TestIntegration:
