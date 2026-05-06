@@ -155,7 +155,8 @@ def aggregate_pep(
             "-w",
             help=(
                 "Weighting method or crosswalk weight column. Repeat for "
-                "side-by-side outputs. Defaults to area_share."
+                "side-by-side outputs. Defaults to area_share for back-compat; "
+                "area_share is deprecated for analytical population panels."
             ),
         ),
     ] = None,
@@ -192,10 +193,17 @@ def aggregate_pep(
     output_dir = curated_root() / "pep"
     typer.echo(f"Aggregating PEP to CoC (curated output, align '{align}')...")
 
-    from hhplab.pep.pep_aggregate import aggregate_pep_to_coc_many, load_pep_county
+    from hhplab.pep.pep_aggregate import (
+        DIRECT_COUNTY_AREA_DEPRECATION_NOTICE,
+        aggregate_pep_to_coc_many,
+        is_deprecated_direct_county_area_weighting,
+        load_pep_county,
+    )
 
     pep_source_df = pd.DataFrame()
     selected_weightings = weightings or ["area_share"]
+    if any(is_deprecated_direct_county_area_weighting(w) for w in selected_weightings):
+        typer.echo(f"Warning: {DIRECT_COUNTY_AREA_DEPRECATION_NOTICE}", err=True)
     if align == "lagged":
         try:
             pep_source_df = load_pep_county()

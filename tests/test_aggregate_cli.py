@@ -85,6 +85,7 @@ def test_aggregate_pep_accepts_repeated_weighting(mock_aggregate, tmp_path):
         "area_share",
         "population_weight",
     ]
+    assert "deprecated direct county/CoC area-overlap method" in result.output
     assert "Wrote (area_share)" in result.output
     assert "Wrote (population_weight)" in result.output
 

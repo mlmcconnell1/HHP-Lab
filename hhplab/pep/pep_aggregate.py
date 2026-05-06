@@ -5,13 +5,16 @@ Population Estimates Program data to Continuum of Care geography.
 
 Weighting strategy
 ------------------
-PEP aggregation defaults to raw ``area_share`` from the direct county
-crosswalk (uniform density assumption).  Callers may also pass an
-explicit weight column from a tract-mediated county crosswalk, such as
-``population_weight``, ``household_weight``, or
+PEP aggregation supports explicit weight columns from tract-mediated county
+crosswalks, such as ``population_weight``, ``household_weight``, or
 ``renter_household_weight``.  Those columns allocate county population
 totals to CoCs with denominator-specific tract evidence while preserving
-the same coverage and contribution diagnostics as the direct overlay.
+coverage and contribution diagnostics.
+
+The older raw ``area_share`` path from the direct county crosswalk assumes
+uniform population density inside each county.  It remains available for
+diagnostics, back-compatibility, and emergency fallback use, but outputs are
+flagged as deprecated and callers receive a warning.
 When ``population_weight`` comes from fixed decennial tract denominators,
 the decennial counts define only the within-county spatial distribution.
 Annual scaling uses PEP July 1 county estimates relative to the PEP
@@ -32,6 +35,7 @@ Usage
 from __future__ import annotations
 
 import logging
+import warnings
 from pathlib import Path
 
 import pandas as pd
@@ -51,6 +55,34 @@ DEFAULT_MIN_COVERAGE = 0.95
 
 DECENNIAL_PEP_BASELINE_SCALING = "decennial_pep_baseline_ratio"
 DIRECT_PEP_WEIGHTED_SUM = "direct_pep_weighted_sum"
+DIRECT_COUNTY_AREA_ALLOCATION = "direct_county_area_overlap"
+TRACT_MEDIATED_COUNTY_ALLOCATION = "tract_mediated_county_weights"
+DEPRECATED_DIRECT_COUNTY_AREA_STATUS = "deprecated_direct_county_area"
+CURRENT_TRACT_MEDIATED_STATUS = "current_tract_mediated"
+DIRECT_COUNTY_AREA_DEPRECATION_NOTICE = (
+    "PEP CoC population allocation with weighting='area_share' uses the deprecated "
+    "direct county/CoC area-overlap method. It assumes uniform population density "
+    "within counties and is retained only for diagnostics, back-compatibility, and "
+    "fallback use. Prefer a tract-mediated county crosswalk weight such as "
+    "'population_weight' for analytical population panels."
+)
+
+
+def is_deprecated_direct_county_area_weighting(weighting: str) -> bool:
+    """Return True when *weighting* selects the deprecated county-area path."""
+    return weighting == "area_share"
+
+
+def warn_deprecated_direct_county_area_weighting(weighting: str) -> None:
+    """Emit a user-visible warning for deprecated direct county-area allocation."""
+    if not is_deprecated_direct_county_area_weighting(weighting):
+        return
+    warnings.warn(
+        DIRECT_COUNTY_AREA_DEPRECATION_NOTICE,
+        FutureWarning,
+        stacklevel=2,
+    )
+    logger.warning(DIRECT_COUNTY_AREA_DEPRECATION_NOTICE)
 
 
 def load_crosswalk(
@@ -299,6 +331,8 @@ def aggregate_pep_counties(
     """
     xwalk_df = xwalk_df.copy()
 
+    warn_deprecated_direct_county_area_weighting(weighting)
+
     # Normalize weighting column name
     if weighting == "area_share" and "area_share" in xwalk_df.columns:
         weight_col = "area_share"
@@ -453,6 +487,12 @@ def aggregate_pep_counties(
         result_df["county_vintage"] = county_vintage
     result_df["weighting_method"] = weighting
     result_df["population_scaling_method"] = population_scaling_method
+    if is_deprecated_direct_county_area_weighting(weighting):
+        result_df["allocation_method"] = DIRECT_COUNTY_AREA_ALLOCATION
+        result_df["allocation_method_status"] = DEPRECATED_DIRECT_COUNTY_AREA_STATUS
+    else:
+        result_df["allocation_method"] = TRACT_MEDIATED_COUNTY_ALLOCATION
+        result_df["allocation_method_status"] = CURRENT_TRACT_MEDIATED_STATUS
     if decennial_baseline_year is not None:
         result_df["population_scaling_baseline_year"] = decennial_baseline_year
     else:
@@ -623,6 +663,8 @@ def aggregate_pep_to_coc(
         "boundary_vintage",
         "county_vintage",
         "weighting_method",
+        "allocation_method",
+        "allocation_method_status",
         "population_scaling_method",
         "population_scaling_baseline_year",
     ]
@@ -650,6 +692,22 @@ def aggregate_pep_to_coc(
             "xwalk_source": xwalk_provenance.to_dict() if xwalk_provenance else None,
             "aggregation_method": "weighted_sum",
             "weighting_method": weighting,
+            "allocation_method": (
+                DIRECT_COUNTY_AREA_ALLOCATION
+                if is_deprecated_direct_county_area_weighting(weighting)
+                else TRACT_MEDIATED_COUNTY_ALLOCATION
+            ),
+            "allocation_method_status": (
+                DEPRECATED_DIRECT_COUNTY_AREA_STATUS
+                if is_deprecated_direct_county_area_weighting(weighting)
+                else CURRENT_TRACT_MEDIATED_STATUS
+            ),
+            "deprecated": is_deprecated_direct_county_area_weighting(weighting),
+            "deprecation_notice": (
+                DIRECT_COUNTY_AREA_DEPRECATION_NOTICE
+                if is_deprecated_direct_county_area_weighting(weighting)
+                else None
+            ),
             "population_scaling_method": (
                 result_df["population_scaling_method"].dropna().iloc[0]
                 if not result_df.empty

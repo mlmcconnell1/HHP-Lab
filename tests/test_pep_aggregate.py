@@ -15,6 +15,10 @@ import pandas as pd
 import pytest
 
 from hhplab.pep.pep_aggregate import (
+    DEPRECATED_DIRECT_COUNTY_AREA_STATUS,
+    DIRECT_COUNTY_AREA_ALLOCATION,
+    DIRECT_COUNTY_AREA_DEPRECATION_NOTICE,
+    CURRENT_TRACT_MEDIATED_STATUS,
     aggregate_pep_counties,
     aggregate_pep_to_coc,
     aggregate_pep_to_coc_many,
@@ -265,7 +269,8 @@ class TestAggregationUnit:
             }
         )
 
-        result = aggregate_pep_counties(pep, xwalk, min_coverage=0.0)
+        with pytest.warns(FutureWarning, match="direct county/CoC area-overlap"):
+            result = aggregate_pep_counties(pep, xwalk, min_coverage=0.0)
 
         result_years = sorted(result["year"].unique())
         assert result_years == [2020, 2022]
@@ -290,12 +295,37 @@ class TestAggregationUnit:
             }
         )
 
-        result = aggregate_pep_counties(pep, xwalk, min_coverage=0.0)
+        with pytest.warns(FutureWarning, match="direct county/CoC area-overlap"):
+            result = aggregate_pep_counties(pep, xwalk, min_coverage=0.0)
 
         row = result[result["coc_id"] == "COC-001"].iloc[0]
         assert row["coverage_ratio"] == pytest.approx(0.5)
         assert row["population"] == pytest.approx(40000)
         assert row["county_count"] == 1
+
+    def test_direct_area_weighting_is_labeled_deprecated(self):
+        """Direct county-area PEP allocation remains available but is explicitly deprecated."""
+        xwalk = pd.DataFrame(
+            {
+                "coc_id": ["COC-001"],
+                "county_fips": ["01001"],
+                "area_share": [1.0],
+            }
+        )
+        pep = pd.DataFrame(
+            {
+                "county_fips": ["01001"],
+                "year": [2020],
+                "population": [80000],
+            }
+        )
+
+        with pytest.warns(FutureWarning, match="direct county/CoC area-overlap"):
+            result = aggregate_pep_counties(pep, xwalk, min_coverage=0.0)
+
+        row = result.iloc[0]
+        assert row["allocation_method"] == DIRECT_COUNTY_AREA_ALLOCATION
+        assert row["allocation_method_status"] == DEPRECATED_DIRECT_COUNTY_AREA_STATUS
 
     @pytest.mark.parametrize(
         ("weighting", "expected_population", "expected_coverage", "expected_max"),
@@ -381,6 +411,7 @@ class TestAggregationUnit:
         assert row_2024["coverage_ratio"] == pytest.approx(0.75 / 0.75)
         assert row_2024["population_scaling_method"] == "decennial_pep_baseline_ratio"
         assert row_2024["population_scaling_baseline_year"] == 2020
+        assert row_2024["allocation_method_status"] == CURRENT_TRACT_MEDIATED_STATUS
 
     def test_decennial_population_weights_require_pep_baseline_year(self):
         xwalk = pd.DataFrame(
@@ -451,6 +482,8 @@ class TestAggregationUnit:
         assert population.iloc[0]["population"] == pytest.approx(212.5)
         assert area.iloc[0]["weighting_method"] == "area_share"
         assert population.iloc[0]["weighting_method"] == "population_weight"
+        assert area.iloc[0]["allocation_method_status"] == DEPRECATED_DIRECT_COUNTY_AREA_STATUS
+        assert population.iloc[0]["allocation_method_status"] == CURRENT_TRACT_MEDIATED_STATUS
 
     def test_decennial_population_scaling_is_recorded_in_output_provenance(self, tmp_path):
         pep_path = tmp_path / "pep.parquet"
@@ -496,8 +529,48 @@ class TestAggregationUnit:
         assert provenance is not None
         assert provenance.extra["population_scaling_method"] == "decennial_pep_baseline_ratio"
         assert provenance.extra["population_scaling_baseline_year"] == 2020
+        assert provenance.extra["deprecated"] is False
         assert "April 1" in provenance.extra["population_scaling_rationale"]
         assert "July 1" in provenance.extra["population_scaling_rationale"]
+
+    def test_direct_area_output_provenance_is_labeled_deprecated(self, tmp_path):
+        pep_path = tmp_path / "pep.parquet"
+        pd.DataFrame(
+            {
+                "county_fips": ["01001"],
+                "year": [2020],
+                "population": [100000],
+            }
+        ).to_parquet(pep_path, index=False)
+
+        xwalk_path = tmp_path / "xwalk.parquet"
+        pd.DataFrame(
+            {
+                "coc_id": ["COC-001"],
+                "county_fips": ["01001"],
+                "area_share": [1.0],
+            }
+        ).to_parquet(xwalk_path, index=False)
+
+        with pytest.warns(FutureWarning, match="direct county/CoC area-overlap"):
+            output = aggregate_pep_to_coc(
+                boundary_vintage="2024",
+                county_vintage="2020",
+                weighting="area_share",
+                pep_path=pep_path,
+                xwalk_path=xwalk_path,
+                start_year=2020,
+                end_year=2020,
+                min_coverage=0.0,
+                output_dir=tmp_path,
+                force=True,
+            )
+
+        provenance = read_provenance(output)
+        assert provenance is not None
+        assert provenance.extra["deprecated"] is True
+        assert provenance.extra["allocation_method_status"] == DEPRECATED_DIRECT_COUNTY_AREA_STATUS
+        assert provenance.extra["deprecation_notice"] == DIRECT_COUNTY_AREA_DEPRECATION_NOTICE
 
     def test_year_filter_without_matching_rows_raises_clear_error(self, tmp_path):
         """Year filters outside available coverage should fail with guidance."""
