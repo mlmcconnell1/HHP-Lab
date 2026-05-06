@@ -283,6 +283,27 @@ def _decennial_population_baseline_year(
     return baseline_year
 
 
+def _validate_crosswalk_county_vintage(
+    xwalk_df: pd.DataFrame,
+    *,
+    requested_county_vintage: str | None,
+) -> None:
+    if requested_county_vintage is None or "county_vintage" not in xwalk_df.columns:
+        return
+
+    vintages = sorted(set(xwalk_df["county_vintage"].dropna().astype(str)))
+    if not vintages:
+        return
+    if vintages != [str(requested_county_vintage)]:
+        raise ValueError(
+            "PEP aggregation county_vintage mismatch: requested county_vintage "
+            f"{requested_county_vintage}, but the crosswalk carries county_vintage "
+            f"{vintages}. For tract-mediated county crosswalks, county_vintage names "
+            "the downstream county-FIPS universe expected by county-native PEP data; "
+            "use a matching crosswalk or adjust the requested county vintage."
+        )
+
+
 def aggregate_pep_counties(
     pep_df: pd.DataFrame,
     xwalk_df: pd.DataFrame,
@@ -358,6 +379,10 @@ def aggregate_pep_counties(
     # Pre-compute total weight per geography (constant across years)
     total_weight_per_geo = xwalk_df.groupby(geo_id_col)[weight_col].sum()
     logger.info(f"Crosswalk contains {len(total_weight_per_geo)} geography units")
+    _validate_crosswalk_county_vintage(
+        xwalk_df,
+        requested_county_vintage=county_vintage,
+    )
     decennial_baseline_year = _decennial_population_baseline_year(
         xwalk_df,
         weighting=weighting,

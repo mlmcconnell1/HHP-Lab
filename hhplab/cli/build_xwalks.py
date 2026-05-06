@@ -13,6 +13,7 @@ from hhplab.measures.measures_diagnostics import (
     compute_crosswalk_diagnostics,
     summarize_diagnostics,
 )
+from hhplab.naming import county_path
 from hhplab.paths import curated_dir
 from hhplab.registry.boundary_registry import latest_vintage, list_boundaries
 from hhplab.xwalks.county import build_coc_county_crosswalk, save_county_crosswalk
@@ -528,6 +529,7 @@ def _tract_mediated_paths(
     return {
         "tract_crosswalk": tract_xwalk_path(boundary, tract_vintage),
         "denominator_tracts": denominator_path,
+        "counties": county_path(county_vintage),
         "output": tract_mediated_county_xwalk_path(
             boundary,
             county_vintage,
@@ -643,6 +645,12 @@ def _build_tract_mediated_xwalk_cli(
     try:
         tract_crosswalk = pd.read_parquet(paths["tract_crosswalk"])
         denominator_tracts = pd.read_parquet(paths["denominator_tracts"])
+        expected_county_fips = None
+        if paths["counties"].exists():
+            counties = pd.read_parquet(paths["counties"])
+            county_col = "GEOID" if "GEOID" in counties.columns else "county_fips"
+            if county_col in counties.columns:
+                expected_county_fips = counties[county_col]
         crosswalk = build_tract_mediated_county_crosswalk(
             tract_crosswalk,
             denominator_tracts,
@@ -652,6 +660,7 @@ def _build_tract_mediated_xwalk_cli(
             acs_vintage=acs_vintage,
             denominator_source=denominator_source,
             denominator_vintage=denominator_vintage,
+            expected_county_fips=expected_county_fips,
         )
     except (ValueError, OSError) as exc:
         if json_output:

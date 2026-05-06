@@ -22,6 +22,7 @@ import pytest
 from hhplab.naming import tract_mediated_county_xwalk_filename
 from hhplab.provenance import read_provenance
 from hhplab.xwalks.tract_mediated import (
+    COUNTY_VINTAGE_SEMANTICS,
     build_tract_mediated_county_crosswalk,
     save_tract_mediated_county_crosswalk,
 )
@@ -118,6 +119,7 @@ class TestTractMediatedCountyCrosswalk:
         assert row["acs_vintage"] == "2019-2023"
         assert row["denominator_source"] == "acs"
         assert row["denominator_vintage"] == "2019-2023"
+        assert row["county_vintage_semantics"] == COUNTY_VINTAGE_SEMANTICS
         assert row["weighting_method"] == "tract_mediated"
         assert row["population_denominator"] == pytest.approx(350.0)
         assert row["county_population_total"] == pytest.approx(400.0)
@@ -183,6 +185,29 @@ class TestTractMediatedCountyCrosswalk:
                 acs_vintage="2023",
             )
 
+    def test_rejects_county_vintage_older_than_tract_vintage(self):
+        with pytest.raises(ValueError, match="county_vintage 2010 is older than tract_vintage 2020"):
+            build_tract_mediated_county_crosswalk(
+                TRACT_CROSSWALK,
+                ACS_TRACTS,
+                boundary_vintage="2025",
+                county_vintage="2010",
+                tract_vintage="2020",
+                acs_vintage="2023",
+            )
+
+    def test_rejects_derived_county_fips_absent_from_expected_universe(self):
+        with pytest.raises(ValueError, match="absent from the expected county-FIPS universe"):
+            build_tract_mediated_county_crosswalk(
+                TRACT_CROSSWALK,
+                ACS_TRACTS,
+                boundary_vintage="2025",
+                county_vintage="2020",
+                tract_vintage="2020",
+                acs_vintage="2023",
+                expected_county_fips=["01001"],
+            )
+
     def test_decennial_denominator_weights_do_not_vary_by_analysis_year(self):
         result_2020 = build_decennial_fixture(2020)
         result_2024 = build_decennial_fixture(2024)
@@ -212,6 +237,7 @@ class TestTractMediatedCountyCrosswalk:
         assert provenance.extra["dataset_type"] == "tract_mediated_county_crosswalk"
         assert provenance.extra["denominator_source"] == "acs"
         assert provenance.extra["denominator_vintage"] == "2019-2023"
+        assert provenance.extra["county_vintage_semantics"] == COUNTY_VINTAGE_SEMANTICS
         assert "renter_household_weight" in provenance.extra["weight_columns"]
 
     def test_save_decennial_denominator_uses_decennial_filename(self, tmp_path):

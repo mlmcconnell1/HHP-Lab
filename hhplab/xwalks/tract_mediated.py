@@ -9,6 +9,7 @@ intentionally separate from direct county polygon overlays so existing
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from pathlib import Path
 
 import pandas as pd
@@ -28,6 +29,11 @@ WEIGHT_COLUMNS: tuple[str, ...] = (
     "population_weight",
     "household_weight",
     "renter_household_weight",
+)
+COUNTY_VINTAGE_SEMANTICS = (
+    "county_vintage identifies the downstream county-FIPS universe expected "
+    "by county-native inputs. Tract-mediated county_fips values are derived "
+    "from tract GEOID prefixes; no county geometry is intersected."
 )
 
 
@@ -61,6 +67,51 @@ def _standardize_denominator_tracts(
             )
             keep.append(denominator_col)
     return denominators[keep].drop_duplicates("tract_geoid")
+
+
+def _normalize_county_fips(values: Iterable[object]) -> set[str]:
+    return {str(value).zfill(5) for value in values if pd.notna(value)}
+
+
+def _validate_county_vintage_semantics(
+    *,
+    tract_county_fips: Iterable[object],
+    county_vintage: str | int,
+    tract_vintage: str | int,
+    expected_county_fips: Iterable[object] | None = None,
+) -> None:
+    try:
+        county_year = int(county_vintage)
+        tract_year = int(tract_vintage)
+    except (TypeError, ValueError) as exc:
+        raise ValueError(
+            "Tract-mediated county_vintage and tract_vintage must be numeric years "
+            f"because county_fips are derived from tract GEOID prefixes; got "
+            f"county_vintage={county_vintage!r}, tract_vintage={tract_vintage!r}."
+        ) from exc
+
+    if county_year < tract_year:
+        raise ValueError(
+            "Unsupported tract-mediated county vintage combination: "
+            f"county_vintage {county_vintage} is older than tract_vintage {tract_vintage}. "
+            f"{COUNTY_VINTAGE_SEMANTICS} Use a county_vintage that matches the "
+            "county-native downstream data, or rebuild with a compatible tract vintage."
+        )
+
+    if expected_county_fips is None:
+        return
+
+    derived = _normalize_county_fips(tract_county_fips)
+    expected = _normalize_county_fips(expected_county_fips)
+    missing = sorted(derived - expected)
+    if missing:
+        raise ValueError(
+            "Tract-mediated county_fips are incompatible with the requested "
+            f"county_vintage {county_vintage}: {missing[:10]}"
+            f"{'...' if len(missing) > 10 else ''} are derived from tract GEOID "
+            "prefixes but absent from the expected county-FIPS universe. "
+            f"{COUNTY_VINTAGE_SEMANTICS}"
+        )
 
 
 def _safe_divide(numerator: pd.Series, denominator: pd.Series) -> pd.Series:
@@ -99,6 +150,7 @@ def build_tract_mediated_county_crosswalk(
     acs_vintage: str | int | None = None,
     denominator_source: str = "acs",
     denominator_vintage: str | int | None = None,
+    expected_county_fips: Iterable[object] | None = None,
     geo_id_col: str = "coc_id",
 ) -> pd.DataFrame:
     """Build county-to-geography weights mediated through tracts.
@@ -114,12 +166,18 @@ def build_tract_mediated_county_crosswalk(
         ``total_population``, and optionally ``total_households`` and
         ``renter_households``.
     boundary_vintage, county_vintage, tract_vintage
-        Vintage metadata carried into output rows and provenance.
+        Vintage metadata carried into output rows and provenance. The
+        ``county_vintage`` names the downstream county-FIPS universe expected
+        by county-native inputs; this builder derives ``county_fips`` from
+        tract GEOID prefixes and does not read county geometry.
     acs_vintage
         ACS denominator vintage for backward-compatible ACS callers.
     denominator_source, denominator_vintage
         Explicit denominator metadata. ``denominator_source`` must be
         ``"acs"`` or ``"decennial"``.
+    expected_county_fips
+        Optional county-FIPS universe for validating derived tract-prefix
+        county codes against the requested ``county_vintage``.
     geo_id_col : str
         Analysis geography identifier column. Defaults to ``"coc_id"``.
 
@@ -141,6 +199,12 @@ def build_tract_mediated_county_crosswalk(
     xwalk["county_fips"] = xwalk["tract_geoid"].str[:5]
     for col in ("area_share", "intersection_area", "tract_area"):
         xwalk[col] = pd.to_numeric(xwalk[col], errors="coerce")
+    _validate_county_vintage_semantics(
+        tract_county_fips=xwalk["county_fips"].unique(),
+        county_vintage=county_vintage,
+        tract_vintage=tract_vintage,
+        expected_county_fips=expected_county_fips,
+    )
 
     resolved_denominator_vintage = _resolve_denominator_vintage(
         denominator_source=denominator_source,
@@ -329,6 +393,7 @@ def build_tract_mediated_county_crosswalk(
     grouped["acs_vintage"] = str(acs_vintage) if acs_vintage is not None else pd.NA
     grouped["denominator_source"] = denominator_source
     grouped["denominator_vintage"] = str(resolved_denominator_vintage)
+    grouped["county_vintage_semantics"] = COUNTY_VINTAGE_SEMANTICS
     grouped["weighting_method"] = "tract_mediated"
 
     column_order = [
@@ -340,6 +405,7 @@ def build_tract_mediated_county_crosswalk(
         "acs_vintage",
         "denominator_source",
         "denominator_vintage",
+        "county_vintage_semantics",
         "weighting_method",
         "area_weight",
         "population_weight",
@@ -422,6 +488,7 @@ def save_tract_mediated_county_crosswalk(
             "dataset_type": "tract_mediated_county_crosswalk",
             "denominator_source": denominator_source,
             "denominator_vintage": str(resolved_denominator_vintage),
+            "county_vintage_semantics": COUNTY_VINTAGE_SEMANTICS,
             "weight_columns": list(WEIGHT_COLUMNS),
         },
     )

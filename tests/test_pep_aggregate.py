@@ -440,6 +440,32 @@ class TestAggregationUnit:
                 min_coverage=0.0,
             )
 
+    def test_tract_mediated_crosswalk_county_vintage_must_match_request(self):
+        xwalk = pd.DataFrame(
+            {
+                "coc_id": ["COC-001"],
+                "county_fips": ["01001"],
+                "county_vintage": ["2020"],
+                "population_weight": [1.0],
+            }
+        )
+        pep = pd.DataFrame(
+            {
+                "county_fips": ["01001"],
+                "year": [2024],
+                "population": [1210.0],
+            }
+        )
+
+        with pytest.raises(ValueError, match="county_vintage mismatch"):
+            aggregate_pep_counties(
+                pep,
+                xwalk,
+                weighting="population_weight",
+                min_coverage=0.0,
+                county_vintage="2024",
+            )
+
     def test_multiple_weightings_write_comparable_outputs(self, tmp_path):
         """One workflow can materialize multiple weighting-specific PEP outputs."""
         pep_path = tmp_path / "pep.parquet"
