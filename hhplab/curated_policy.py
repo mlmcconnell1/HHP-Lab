@@ -33,6 +33,7 @@ class CuratedViolation:
 CURATED_SUBDIRS: set[str] = {
     "coc_boundaries",
     "tiger",
+    "census",
     "xwalks",
     "acs",
     "measures",
@@ -58,9 +59,13 @@ CANONICAL_PATTERNS: dict[str, list[re.Pattern[str]]] = {
         re.compile(r"^counties__C\d{4}\.parquet$"),
         re.compile(r"^tract_relationship__T\d{4}xT\d{4}\.parquet$"),
     ],
+    "census": [
+        re.compile(r"^decennial_tracts__N\d{4}xT\d{4}\.parquet$"),
+    ],
     "xwalks": [
         re.compile(r"^xwalk__B\d{4}xT\d{4}\.parquet$"),
         re.compile(r"^xwalk__B\d{4}xC\d{4}\.parquet$"),
+        re.compile(r"^xwalk_tract_mediated_county__[AN]\d{4}@B\d{4}xC\d{4}xT\d{4}\.parquet$"),
         re.compile(r"^msa_coc_xwalk__B\d{4}xM\w+xC\d{4}\.parquet$"),
     ],
     "acs": [

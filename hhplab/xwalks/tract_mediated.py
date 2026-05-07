@@ -147,6 +147,7 @@ def build_tract_mediated_county_crosswalk(
     denominator_vintage: str | int | None = None,
     expected_county_fips: Iterable[object] | None = None,
     geo_id_col: str = "coc_id",
+    allow_incomplete_denominator_coverage: bool = False,
 ) -> pd.DataFrame:
     """Build county-to-geography weights mediated through tracts.
 
@@ -175,6 +176,11 @@ def build_tract_mediated_county_crosswalk(
         county codes against the requested ``county_vintage``.
     geo_id_col : str
         Analysis geography identifier column. Defaults to ``"coc_id"``.
+    allow_incomplete_denominator_coverage : bool
+        If False (default), any missing tract denominator row is an error.
+        Set True only for materializing artifacts where unsupported source
+        geographies should remain visible through missing-denominator
+        diagnostics and null denominator-based weights.
 
     Returns
     -------
@@ -250,7 +256,10 @@ def build_tract_mediated_county_crosswalk(
         county_coverage["county_denominator_tract_count"],
         county_coverage["county_tract_count"],
     )
-    if (group_coverage["missing_denominator_tract_count"] > 0).any():
+    if (
+        not allow_incomplete_denominator_coverage
+        and (group_coverage["missing_denominator_tract_count"] > 0).any()
+    ):
         details = _format_missing_denominator_coverage(
             group_coverage,
             geo_id_col=geo_id_col,

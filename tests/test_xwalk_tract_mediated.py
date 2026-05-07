@@ -19,6 +19,7 @@ from __future__ import annotations
 import pandas as pd
 import pytest
 
+from hhplab.census.ingest.decennial_tract_population import STATE_FIPS_CODES
 from hhplab.cli.build_xwalks import _summarize_tract_mediated_crosswalk
 from hhplab.naming import tract_mediated_county_xwalk_filename
 from hhplab.provenance import read_provenance
@@ -68,6 +69,13 @@ EXPECTED_01001 = {
         "renter_household_weight": 0.875,
     },
 }
+
+TERRITORY_FIPS_CODES = {"60", "66", "69", "72", "78"}
+
+
+def test_decennial_denominator_ingest_includes_territory_fips() -> None:
+    """Decennial denominators must cover the same territory tracts as TIGER."""
+    assert TERRITORY_FIPS_CODES <= set(STATE_FIPS_CODES)
 
 
 def build_fixture() -> pd.DataFrame:
@@ -282,8 +290,27 @@ class TestTractMediatedCountyCrosswalk:
                 acs_vintage="2023",
             )
 
+    def test_missing_denominator_rows_can_be_materialized_with_diagnostics(self):
+        result = build_tract_mediated_county_crosswalk(
+            TRACT_CROSSWALK,
+            ACS_TRACTS[ACS_TRACTS["tract_geoid"] != "02001000100"],
+            boundary_vintage="2025",
+            county_vintage="2020",
+            tract_vintage="2020",
+            acs_vintage="2023",
+            allow_incomplete_denominator_coverage=True,
+        )
+
+        row = result[(result["coc_id"] == "C") & (result["county_fips"] == "02001")].iloc[0]
+        assert row["missing_denominator_tract_count"] == 1
+        assert row["denominator_tract_coverage_ratio"] == 0
+        assert pd.isna(row["population_weight"])
+
     def test_rejects_county_vintage_older_than_tract_vintage(self):
-        with pytest.raises(ValueError, match="county_vintage 2010 is older than tract_vintage 2020"):
+        with pytest.raises(
+            ValueError,
+            match="county_vintage 2010 is older than tract_vintage 2020",
+        ):
             build_tract_mediated_county_crosswalk(
                 TRACT_CROSSWALK,
                 ACS_TRACTS,

@@ -70,7 +70,11 @@ STATE_FIPS_CODES: tuple[str, ...] = (
     "54",
     "55",
     "56",
+    "60",
+    "66",
+    "69",
     "72",
+    "78",
 )
 
 DECENNIAL_API_SPECS: dict[str, tuple[str, str]] = {
@@ -117,6 +121,8 @@ def fetch_decennial_tract_population(
                 },
             )
             response.raise_for_status()
+            if not response.content:
+                continue
             raw_parts.append(response.content)
             data = response.json()
             headers = data[0]

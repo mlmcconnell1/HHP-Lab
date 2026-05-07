@@ -661,6 +661,7 @@ def _build_tract_mediated_xwalk_cli(
             denominator_source=denominator_source,
             denominator_vintage=denominator_vintage,
             expected_county_fips=expected_county_fips,
+            allow_incomplete_denominator_coverage=denominator_source == "decennial",
         )
     except (ValueError, OSError) as exc:
         if json_output:
@@ -733,6 +734,12 @@ def _summarize_tract_mediated_crosswalk(
         )
         summary["full_coverage_count"] = int(
             (coverage["county_area_coverage_ratio"] >= 0.999999).sum()
+        )
+    if "missing_denominator_tract_count" in crosswalk.columns:
+        missing_pairs = crosswalk[crosswalk["missing_denominator_tract_count"] > 0]
+        summary["missing_denominator_pair_count"] = int(len(missing_pairs))
+        summary["missing_denominator_tract_count"] = int(
+            missing_pairs["missing_denominator_tract_count"].sum()
         )
     for column in selected_columns:
         non_null = crosswalk[column].dropna()
