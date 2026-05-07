@@ -54,6 +54,7 @@ from hhplab.cli.status import status_cmd
 from hhplab.cli.validate_curated import validate_curated_layout_cmd
 from hhplab.cli.validate_metro import validate_metro, validate_metro_universe
 from hhplab.cli.validate_msa import validate_msa
+from hhplab.cli.validate_schema_contract import validate_schema_contract_cmd
 from hhplab.cli.zori_cli import ingest_zori, zori_diagnostics
 
 
@@ -113,6 +114,7 @@ def register_commands(
     validate_app.command("pit-vintages")(validate_pit_vintages)
     validate_app.command("population")(validate_population)
     validate_app.command("curated-layout")(validate_curated_layout_cmd)
+    validate_app.command("schema-contract")(validate_schema_contract_cmd)
     diagnostics_app.command("panel")(panel_diagnostics)
     diagnostics_app.command("xwalk")(diagnostics)
     diagnostics_app.command("zori")(zori_diagnostics)

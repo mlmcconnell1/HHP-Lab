@@ -7,7 +7,16 @@ from typing import Literal
 
 import pandas as pd
 
-from hhplab.schema.columns import COC_PANEL_COLUMNS, DRIFT_PRONE_SOURCE_COLUMNS
+from hhplab.schema.columns import (
+    ACS_TRACT_OUTPUT_COLUMNS,
+    COC_PANEL_COLUMNS,
+    DRIFT_PRONE_SOURCE_COLUMNS,
+    LAUS_METRO_OUTPUT_COLUMNS,
+    PEP_COUNTY_OUTPUT_COLUMNS,
+    PIT_CANONICAL_COLUMNS,
+    TRACT_MEDIATED_COUNTY_XWALK_COLUMNS,
+    ZORI_INGEST_OUTPUT_COLUMNS,
+)
 from hhplab.schema.lineage import population_lineage_columns
 
 
@@ -20,6 +29,7 @@ class ArtifactContract:
     canonical_measures: tuple[str, ...] = ()
     lineage_measures: tuple[str, ...] = ()
     drift_prone_columns: tuple[str, ...] = DRIFT_PRONE_SOURCE_COLUMNS
+    required_any_columns: tuple[tuple[str, ...], ...] = ()
 
 
 @dataclass(frozen=True)
@@ -47,6 +57,54 @@ COC_PANEL_CONTRACT = ArtifactContract(
     lineage_measures=("total_population",),
 )
 
+ACS_TRACT_CONTRACT = ArtifactContract(
+    name="acs_tract",
+    required_columns=tuple(ACS_TRACT_OUTPUT_COLUMNS),
+)
+
+PEP_COUNTY_CONTRACT = ArtifactContract(
+    name="pep_county",
+    required_columns=tuple(PEP_COUNTY_OUTPUT_COLUMNS),
+)
+
+PIT_CONTRACT = ArtifactContract(
+    name="pit",
+    required_columns=tuple(PIT_CANONICAL_COLUMNS),
+)
+
+ZORI_INGEST_CONTRACT = ArtifactContract(
+    name="zori_ingest",
+    required_columns=tuple(ZORI_INGEST_OUTPUT_COLUMNS),
+)
+
+LAUS_METRO_CONTRACT = ArtifactContract(
+    name="laus_metro",
+    required_columns=tuple(LAUS_METRO_OUTPUT_COLUMNS),
+)
+
+TRACT_MEDIATED_COUNTY_XWALK_CONTRACT = ArtifactContract(
+    name="tract_mediated_county_xwalk",
+    required_columns=tuple(
+        column
+        for column in TRACT_MEDIATED_COUNTY_XWALK_COLUMNS
+        if column != "geo_id"
+    ),
+    required_any_columns=(("geo_id", "coc_id", "metro_id", "msa_id"),),
+)
+
+ARTIFACT_CONTRACTS: dict[str, ArtifactContract] = {
+    contract.name: contract
+    for contract in (
+        ACS_TRACT_CONTRACT,
+        COC_PANEL_CONTRACT,
+        LAUS_METRO_CONTRACT,
+        PEP_COUNTY_CONTRACT,
+        PIT_CONTRACT,
+        TRACT_MEDIATED_COUNTY_XWALK_CONTRACT,
+        ZORI_INGEST_CONTRACT,
+    )
+}
+
 
 def validate_artifact_contract(
     df: pd.DataFrame,
@@ -67,6 +125,21 @@ def validate_artifact_contract(
                         f"{contract.name}. Add it or update the schema contract."
                     ),
                     column=col,
+                )
+            )
+
+    for candidates in contract.required_any_columns:
+        if columns.isdisjoint(candidates):
+            candidate_label = ", ".join(candidates)
+            findings.append(
+                ContractFinding(
+                    severity="error",
+                    code="missing_required_column_group",
+                    message=(
+                        f"Missing required column group for {contract.name}: "
+                        f"provide one of {candidate_label}."
+                    ),
+                    column="|".join(candidates),
                 )
             )
 

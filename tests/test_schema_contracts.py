@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
+import json
 from types import SimpleNamespace
 
 import pandas as pd
 import pytest
+from typer.testing import CliRunner
 
 from hhplab.acs.variables import (
     COUNT_COLUMNS,
@@ -16,8 +18,11 @@ from hhplab.acs.variables import (
 )
 from hhplab.bls.laus_series import (
     LAUS_MEASURE_CODES as BLS_LAUS_MEASURE_CODES,
+)
+from hhplab.bls.laus_series import (
     LAUS_METRO_OUTPUT_COLUMNS as BLS_LAUS_METRO_OUTPUT_COLUMNS,
 )
+from hhplab.cli.main import app
 from hhplab.panel.conformance import PanelRequest, run_conformance
 from hhplab.pep.pep_ingest import PEP_COUNTY_OUTPUT_COLUMNS as PEP_INGEST_COLUMNS
 from hhplab.pit.ingest.parser import CANONICAL_COLUMNS as PIT_PARSER_COLUMNS
@@ -34,8 +39,12 @@ from hhplab.schema.lineage import (
 )
 from hhplab.xwalks.tract_mediated import (
     DENOMINATOR_COLUMNS as XWALK_DENOMINATOR_COLUMNS,
+)
+from hhplab.xwalks.tract_mediated import (
     WEIGHT_COLUMNS as XWALK_WEIGHT_COLUMNS,
 )
+
+runner = CliRunner()
 
 SCHEMA_ALIAS_CASES = {
     "acs_count_columns": (COUNT_COLUMNS, schema_columns.ACS5_COUNT_COLUMNS),
@@ -67,6 +76,172 @@ def test_source_schema_aliases_use_canonical_schema_constants(case_name: str) ->
     source_constant, schema_constant = SCHEMA_ALIAS_CASES[case_name]
 
     assert source_constant is schema_constant
+
+
+def test_validate_schema_contract_json_passes_for_source_artifact(tmp_path) -> None:
+    path = tmp_path / "zori.parquet"
+    pd.DataFrame(
+        {
+            "geo_type": ["county"],
+            "geo_id": ["08001"],
+            "date": [pd.Timestamp("2024-01-01")],
+            "year": [2024],
+            "month": [1],
+            "zori": [1200.0],
+            "region_name": ["Adams County"],
+            "state": ["CO"],
+            "data_source": ["Zillow Economic Research"],
+            "metric": ["ZORI"],
+            "ingested_at": [pd.Timestamp("2026-01-01T00:00:00Z")],
+            "source_ref": ["https://example.com"],
+            "raw_sha256": ["abc123"],
+        }
+    ).to_parquet(path)
+
+    result = runner.invoke(
+        app,
+        [
+            "validate",
+            "schema-contract",
+            str(path),
+            "--artifact-type",
+            "zori_ingest",
+            "--json",
+        ],
+    )
+
+    assert result.exit_code == 0
+    payload = json.loads(result.output)
+    assert payload["status"] == "ok"
+    assert payload["findings"] == []
+    assert payload["exit_behavior"]["warnings"] == "reported_only"
+
+
+def test_validate_schema_contract_json_reports_warnings_without_failing(tmp_path) -> None:
+    path = tmp_path / "panel.parquet"
+    pd.DataFrame(
+        {
+            "coc_id": ["CO-500"],
+            "year": [2024],
+            "pit_total": [10],
+            "pit_sheltered": [8],
+            "pit_unsheltered": [2],
+            "boundary_vintage_used": ["2024"],
+            "acs5_vintage_used": ["2023"],
+            "tract_vintage_used": ["2020"],
+            "alignment_type": ["native"],
+            "weighting_method": ["population"],
+            "total_population": [1000],
+            "population_density_per_sq_km": [100.0],
+            "adult_population": [800],
+            "population_below_poverty": [100],
+            "median_household_income": [65000],
+            "median_gross_rent": [1400],
+            "unemployment_rate": [0.05],
+            "coverage_ratio": [1.0],
+            "boundary_changed": [False],
+            "source": ["fixture"],
+            "population": [999],
+        }
+    ).to_parquet(path)
+
+    result = runner.invoke(
+        app,
+        [
+            "validate",
+            "schema-contract",
+            str(path),
+            "--artifact-type",
+            "coc_panel",
+            "--json",
+        ],
+    )
+
+    assert result.exit_code == 0
+    payload = json.loads(result.output)
+    assert payload["status"] == "ok"
+    assert payload["warning_count"] == 2
+    assert {finding["code"] for finding in payload["findings"]} == {
+        "drift_prone_column",
+        "missing_lineage_columns",
+    }
+
+
+def test_validate_schema_contract_can_promote_warnings_to_errors(tmp_path) -> None:
+    path = tmp_path / "panel.parquet"
+    pd.DataFrame(
+        {
+            "coc_id": ["CO-500"],
+            "year": [2024],
+            "pit_total": [10],
+            "pit_sheltered": [8],
+            "pit_unsheltered": [2],
+            "boundary_vintage_used": ["2024"],
+            "acs5_vintage_used": ["2023"],
+            "tract_vintage_used": ["2020"],
+            "alignment_type": ["native"],
+            "weighting_method": ["population"],
+            "total_population": [1000],
+            "population_density_per_sq_km": [100.0],
+            "adult_population": [800],
+            "population_below_poverty": [100],
+            "median_household_income": [65000],
+            "median_gross_rent": [1400],
+            "unemployment_rate": [0.05],
+            "coverage_ratio": [1.0],
+            "boundary_changed": [False],
+            "source": ["fixture"],
+        }
+    ).to_parquet(path)
+
+    result = runner.invoke(
+        app,
+        [
+            "validate",
+            "schema-contract",
+            str(path),
+            "--artifact-type",
+            "coc_panel",
+            "--warnings-as-errors",
+            "--json",
+        ],
+    )
+
+    assert result.exit_code == 1
+    payload = json.loads(result.output)
+    assert payload["status"] == "error"
+    assert payload["error_count"] == 0
+    assert payload["warning_count"] == 1
+    assert payload["exit_behavior"]["warnings"] == "nonzero_exit"
+
+
+def test_validate_schema_contract_allows_crosswalk_geo_key_alias(tmp_path) -> None:
+    columns = [
+        "coc_id",
+        *[
+            column
+            for column in schema_columns.TRACT_MEDIATED_COUNTY_XWALK_COLUMNS
+            if column != "geo_id"
+        ],
+    ]
+    path = tmp_path / "xwalk.parquet"
+    pd.DataFrame([{column: "value" for column in columns}]).to_parquet(path)
+
+    result = runner.invoke(
+        app,
+        [
+            "validate",
+            "schema-contract",
+            str(path),
+            "--artifact-type",
+            "tract_mediated_county_xwalk",
+            "--json",
+        ],
+    )
+
+    assert result.exit_code == 0
+    payload = json.loads(result.output)
+    assert payload["status"] == "ok"
 
 
 def test_population_normalization_adds_controlled_lineage_columns() -> None:
