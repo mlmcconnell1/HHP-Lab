@@ -37,6 +37,11 @@ period ``"M13"``.
 
 from __future__ import annotations
 
+from hhplab.schema.columns import (
+    LAUS_MEASURE_CODES,
+    LAUS_METRO_OUTPUT_COLUMNS,
+)
+
 # ---------------------------------------------------------------------------
 # BLS LAUS series constants
 # ---------------------------------------------------------------------------
@@ -55,31 +60,6 @@ _LAUS_AREA_PADDING: str = "000000"
 
 #: BLS period code for annual average values (returned when annualaverage=true).
 BLS_ANNUAL_AVERAGE_PERIOD: str = "M13"
-
-#: Measure codes for the four core LAUS labor-market measures at MSA geography.
-LAUS_MEASURE_CODES: dict[str, str] = {
-    "unemployment_rate": "03",
-    "unemployed": "04",
-    "employed": "05",
-    "labor_force": "06",
-}
-
-#: Canonical column order for curated LAUS metro output.
-LAUS_METRO_OUTPUT_COLUMNS: list[str] = [
-    "metro_id",
-    "metro_name",
-    "definition_version",
-    "year",
-    "cbsa_code",
-    "labor_force",
-    "employed",
-    "unemployed",
-    "unemployment_rate",
-    "data_source",
-    "series_ids",
-    "source_ref",
-    "ingested_at",
-]
 
 # ---------------------------------------------------------------------------
 # Series ID builder

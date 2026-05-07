@@ -5,17 +5,68 @@ from __future__ import annotations
 from types import SimpleNamespace
 
 import pandas as pd
+import pytest
 
+from hhplab.acs.variables import (
+    COUNT_COLUMNS,
+    DERIVED_COLUMNS,
+    MEDIAN_COLUMNS,
+    MOE_COLUMNS,
+    TRACT_OUTPUT_COLUMNS,
+)
+from hhplab.bls.laus_series import (
+    LAUS_MEASURE_CODES as BLS_LAUS_MEASURE_CODES,
+    LAUS_METRO_OUTPUT_COLUMNS as BLS_LAUS_METRO_OUTPUT_COLUMNS,
+)
 from hhplab.panel.conformance import PanelRequest, run_conformance
+from hhplab.pep.pep_ingest import PEP_COUNTY_OUTPUT_COLUMNS as PEP_INGEST_COLUMNS
+from hhplab.pit.ingest.parser import CANONICAL_COLUMNS as PIT_PARSER_COLUMNS
 from hhplab.recipe.executor import _normalize_recipe_population_measure
 from hhplab.recipe.planner import ResampleTask
 from hhplab.recipe.schema_common import GeometryRef
+from hhplab.rents.zori_ingest import ZORI_INGEST_OUTPUT_COLUMNS as ZORI_INGEST_COLUMNS
+from hhplab.schema import columns as schema_columns
 from hhplab.schema.lineage import (
     PopulationLineage,
     PopulationMethod,
     PopulationSource,
     normalize_population_measure,
 )
+from hhplab.xwalks.tract_mediated import (
+    DENOMINATOR_COLUMNS as XWALK_DENOMINATOR_COLUMNS,
+    WEIGHT_COLUMNS as XWALK_WEIGHT_COLUMNS,
+)
+
+SCHEMA_ALIAS_CASES = {
+    "acs_count_columns": (COUNT_COLUMNS, schema_columns.ACS5_COUNT_COLUMNS),
+    "acs_median_columns": (MEDIAN_COLUMNS, schema_columns.ACS5_MEDIAN_COLUMNS),
+    "acs_moe_columns": (MOE_COLUMNS, schema_columns.ACS5_MOE_COLUMNS),
+    "acs_derived_columns": (DERIVED_COLUMNS, schema_columns.ACS5_DERIVED_COLUMNS),
+    "acs_tract_output": (TRACT_OUTPUT_COLUMNS, schema_columns.ACS_TRACT_OUTPUT_COLUMNS),
+    "pep_county_output": (PEP_INGEST_COLUMNS, schema_columns.PEP_COUNTY_OUTPUT_COLUMNS),
+    "pit_canonical_output": (PIT_PARSER_COLUMNS, schema_columns.PIT_CANONICAL_COLUMNS),
+    "zori_ingest_output": (ZORI_INGEST_COLUMNS, schema_columns.ZORI_INGEST_OUTPUT_COLUMNS),
+    "laus_measure_codes": (BLS_LAUS_MEASURE_CODES, schema_columns.LAUS_MEASURE_CODES),
+    "laus_metro_output": (
+        BLS_LAUS_METRO_OUTPUT_COLUMNS,
+        schema_columns.LAUS_METRO_OUTPUT_COLUMNS,
+    ),
+    "tract_mediated_denominators": (
+        XWALK_DENOMINATOR_COLUMNS,
+        schema_columns.TRACT_MEDIATED_DENOMINATOR_COLUMNS,
+    ),
+    "tract_mediated_weights": (
+        XWALK_WEIGHT_COLUMNS,
+        schema_columns.TRACT_MEDIATED_WEIGHT_COLUMNS,
+    ),
+}
+
+
+@pytest.mark.parametrize("case_name", list(SCHEMA_ALIAS_CASES), ids=list(SCHEMA_ALIAS_CASES))
+def test_source_schema_aliases_use_canonical_schema_constants(case_name: str) -> None:
+    source_constant, schema_constant = SCHEMA_ALIAS_CASES[case_name]
+
+    assert source_constant is schema_constant
 
 
 def test_population_normalization_adds_controlled_lineage_columns() -> None:

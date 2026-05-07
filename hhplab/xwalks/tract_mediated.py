@@ -16,20 +16,15 @@ import pandas as pd
 
 from hhplab.paths import curated_dir
 from hhplab.provenance import ProvenanceBlock, write_parquet_with_provenance
-
-DENOMINATOR_COLUMNS: dict[str, str] = {
-    "area": "tract_area",
-    "population": "total_population",
-    "household": "total_households",
-    "renter_household": "renter_households",
-}
-
-WEIGHT_COLUMNS: tuple[str, ...] = (
-    "area_weight",
-    "population_weight",
-    "household_weight",
-    "renter_household_weight",
+from hhplab.schema.columns import (
+    TRACT_MEDIATED_COUNTY_XWALK_COLUMNS,
+    TRACT_MEDIATED_DENOMINATOR_COLUMNS,
+    TRACT_MEDIATED_WEIGHT_COLUMNS,
 )
+
+DENOMINATOR_COLUMNS: dict[str, str] = TRACT_MEDIATED_DENOMINATOR_COLUMNS
+
+WEIGHT_COLUMNS: tuple[str, ...] = TRACT_MEDIATED_WEIGHT_COLUMNS
 COUNTY_VINTAGE_SEMANTICS = (
     "county_vintage identifies the downstream county-FIPS universe expected "
     "by county-native inputs. Tract-mediated county_fips values are derived "
@@ -397,47 +392,8 @@ def build_tract_mediated_county_crosswalk(
     grouped["weighting_method"] = "tract_mediated"
 
     column_order = [
-        geo_id_col,
-        "boundary_vintage",
-        "county_fips",
-        "county_vintage",
-        "tract_vintage",
-        "acs_vintage",
-        "denominator_source",
-        "denominator_vintage",
-        "county_vintage_semantics",
-        "weighting_method",
-        "area_weight",
-        "population_weight",
-        "household_weight",
-        "renter_household_weight",
-        "area_denominator",
-        "population_denominator",
-        "household_denominator",
-        "renter_household_denominator",
-        "county_area_total",
-        "county_population_total",
-        "county_household_total",
-        "county_renter_household_total",
-        "geo_area_total",
-        "geo_population_total",
-        "geo_household_total",
-        "geo_renter_household_total",
-        "county_area_coverage_ratio",
-        "county_population_coverage_ratio",
-        "county_household_coverage_ratio",
-        "county_renter_household_coverage_ratio",
-        "tract_count",
-        "denominator_tract_count",
-        "missing_denominator_tract_count",
-        "denominator_tract_coverage_ratio",
-        "county_tract_count",
-        "county_denominator_tract_count",
-        "county_missing_denominator_tract_count",
-        "county_denominator_tract_coverage_ratio",
-        "missing_population_tract_count",
-        "missing_household_tract_count",
-        "missing_renter_household_tract_count",
+        geo_id_col if column == "geo_id" else column
+        for column in TRACT_MEDIATED_COUNTY_XWALK_COLUMNS
     ]
     grouped = grouped[column_order]
     return grouped.sort_values([geo_id_col, "county_fips"]).reset_index(drop=True)

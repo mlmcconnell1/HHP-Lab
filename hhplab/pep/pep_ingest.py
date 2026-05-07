@@ -39,6 +39,7 @@ import pandas as pd
 from hhplab.paths import curated_dir
 from hhplab.provenance import ProvenanceBlock, write_parquet_with_provenance
 from hhplab.raw_snapshot import raw_dir as canonical_raw_dir
+from hhplab.schema.columns import PEP_COUNTY_OUTPUT_COLUMNS
 from hhplab.source_registry import check_source_changed, register_source
 from hhplab.sources import CENSUS_PEP_DATASETS_BASE
 
@@ -472,21 +473,7 @@ def ingest_pep_county(
         df = df[df["population"] >= 0]
 
     # Reorder columns
-    col_order = [
-        "county_fips",
-        "state_fips",
-        "county_name",
-        "state_name",
-        "year",
-        "reference_date",
-        "population",
-        "estimate_type",
-        "vintage",
-        "data_source",
-        "source_url",
-        "raw_sha256",
-        "ingested_at",
-    ]
+    col_order = PEP_COUNTY_OUTPUT_COLUMNS
     # Only include columns that exist
     col_order = [c for c in col_order if c in df.columns]
     df = df[col_order]

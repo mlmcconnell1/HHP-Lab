@@ -41,6 +41,7 @@ import pandas as pd
 from hhplab.paths import curated_dir
 from hhplab.provenance import ProvenanceBlock, write_parquet_with_provenance
 from hhplab.raw_snapshot import raw_dir
+from hhplab.schema.columns import ZORI_INGEST_OUTPUT_COLUMNS
 from hhplab.source_registry import check_source_changed, register_source
 from hhplab.sources import ZILLOW_ZORI_COUNTY, ZILLOW_ZORI_ZIP
 
@@ -477,22 +478,7 @@ def ingest_zori(
     df["month"] = df["date"].dt.month.astype("int32")
 
     # Reorder columns to match schema
-    col_order = [
-        "geo_type",
-        "geo_id",
-        "date",
-        "year",
-        "month",
-        "zori",
-        "region_name",
-        "state",
-        "data_source",
-        "metric",
-        "ingested_at",
-        "source_ref",
-        "raw_sha256",
-    ]
-    df = df[col_order]
+    df = df[ZORI_INGEST_OUTPUT_COLUMNS]
 
     # Derive max year for temporal filename
     max_year = int(df["date"].dt.year.max())

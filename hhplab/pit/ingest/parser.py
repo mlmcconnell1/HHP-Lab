@@ -39,6 +39,7 @@ import pyarrow as pa
 import pyarrow.parquet as pq
 
 from hhplab.paths import curated_dir
+from hhplab.schema.columns import PIT_CANONICAL_COLUMNS
 
 logger = logging.getLogger(__name__)
 
@@ -68,17 +69,7 @@ class PITParseResult:
 
 
 # Standard column names in canonical schema
-CANONICAL_COLUMNS = [
-    "pit_year",
-    "coc_id",
-    "pit_total",
-    "pit_sheltered",
-    "pit_unsheltered",
-    "data_source",
-    "source_ref",
-    "ingested_at",
-    "notes",
-]
+CANONICAL_COLUMNS = PIT_CANONICAL_COLUMNS
 
 # Common column name mappings from HUD Exchange files
 COLUMN_MAPPINGS = {

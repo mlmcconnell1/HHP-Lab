@@ -6,6 +6,14 @@ column types (count vs median vs MOE), and derived column specifications.
 
 from __future__ import annotations
 
+from hhplab.schema.columns import (
+    ACS5_COUNT_COLUMNS,
+    ACS5_DERIVED_COLUMNS,
+    ACS5_MEDIAN_COLUMNS,
+    ACS5_MOE_COLUMNS,
+    ACS_TRACT_OUTPUT_COLUMNS,
+)
+
 # ---------------------------------------------------------------------------
 # Census API variables → friendly column names
 # ---------------------------------------------------------------------------
@@ -85,60 +93,19 @@ ACS_TABLES: list[str] = [
 # ---------------------------------------------------------------------------
 
 # Count columns: area-weighted during translation and aggregation
-COUNT_COLUMNS: list[str] = [
-    "total_population",
-    "adult_population",
-    "total_households",
-    "owner_households",
-    "renter_households",
-    "poverty_universe",
-    "below_50pct_poverty",
-    "50_to_99pct_poverty",
-    "population_below_poverty",
-    "civilian_labor_force",
-    "unemployed_count",
-]
+COUNT_COLUMNS: list[str] = ACS5_COUNT_COLUMNS
 
 # Median columns: population-weighted average during translation/aggregation
-MEDIAN_COLUMNS: list[str] = [
-    "median_household_income",
-    "median_gross_rent",
-]
+MEDIAN_COLUMNS: list[str] = ACS5_MEDIAN_COLUMNS
 
 # Margin of error columns: propagated via sqrt(sum(w² × m²))
-MOE_COLUMNS: list[str] = [
-    "moe_total_population",
-]
+MOE_COLUMNS: list[str] = ACS5_MOE_COLUMNS
 
 # Derived columns (computed from raw variables, not fetched directly)
-DERIVED_COLUMNS: list[str] = [
-    "adult_population",
-    "population_below_poverty",
-]
+DERIVED_COLUMNS: list[str] = ACS5_DERIVED_COLUMNS
 
 # ---------------------------------------------------------------------------
 # Output column order for canonical tract-level file
 # ---------------------------------------------------------------------------
 
-TRACT_OUTPUT_COLUMNS: list[str] = [
-    "tract_geoid",
-    "acs_vintage",
-    "tract_vintage",
-    "total_population",
-    "moe_total_population",
-    "adult_population",
-    "total_households",
-    "owner_households",
-    "renter_households",
-    "median_household_income",
-    "median_gross_rent",
-    "poverty_universe",
-    "below_50pct_poverty",
-    "50_to_99pct_poverty",
-    "population_below_poverty",
-    "civilian_labor_force",
-    "unemployed_count",
-    "data_source",
-    "source_ref",
-    "ingested_at",
-]
+TRACT_OUTPUT_COLUMNS: list[str] = ACS_TRACT_OUTPUT_COLUMNS
