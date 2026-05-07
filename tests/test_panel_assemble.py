@@ -28,6 +28,7 @@ from hhplab.panel.assemble import (
     PANEL_COLUMNS,
     _detect_boundary_changes,
     _determine_alignment_type,
+    _add_coc_population_density,
     _load_acs_measures,
     _load_pit_for_year,
     build_panel,
@@ -579,6 +580,37 @@ class TestBuildPanel:
             2024,
             pit_dir=data_dirs["pit_dir"],
             measures_dir=data_dirs["measures_dir"],
+        )
+
+        actual = dict(
+            zip(
+                result["coc_id"],
+                result["population_density_per_sq_km"],
+                strict=True,
+            )
+        )
+        assert actual == pytest.approx(
+            {
+                "CO-500": 500000 / 100.0,
+                "CA-600": 10000000 / 400.0,
+            }
+        )
+
+    def test_recipe_density_can_prefer_pep_population(self, data_dirs):
+        """Recipe CoC density can use PEP population ahead of ACS total_population."""
+        panel = pd.DataFrame(
+            {
+                "coc_id": ["CO-500", "CA-600"],
+                "boundary_vintage_used": ["2024", "2024"],
+                "total_population": [999.0, 999.0],
+                "population": [500000.0, 10000000.0],
+            }
+        )
+
+        result = _add_coc_population_density(
+            panel,
+            boundaries_dir=data_dirs["boundaries_dir"],
+            population_columns=("population", "total_population"),
         )
 
         actual = dict(

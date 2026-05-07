@@ -109,23 +109,16 @@ transforms:
       weighting:
         scheme: area
 
-  - id: county_to_coc_area
-    type: crosswalk
-    from: { type: county, vintage: 2020 }
-    to: { type: coc, vintage: 2025, source: hud_exchange }
-    spec:
-      weighting:
-        scheme: area
-
   - id: county_to_coc_population
     type: crosswalk
     from: { type: county, vintage: 2020 }
     to: { type: coc, vintage: 2025, source: hud_exchange }
     spec:
       weighting:
-        scheme: population
-        population_source: pep_county
-        population_field: population
+        scheme: tract_mediated
+        variety: population
+        tract_vintage: 2020
+        acs_vintage: 2023
 
 pipelines:
   - id: build_coc_panel
@@ -133,7 +126,7 @@ pipelines:
     steps:
       - materialize:
           transforms:
-            [tract_to_coc_2010, tract_to_coc_2020, county_to_coc_area, county_to_coc_population]
+            [tract_to_coc_2010, tract_to_coc_2020, county_to_coc_population]
 
       - resample:
           dataset: pit
@@ -145,7 +138,7 @@ pipelines:
           dataset: pep_county
           to_geometry: { type: coc, vintage: 2025, source: hud_exchange }
           method: aggregate
-          via: county_to_coc_area
+          via: county_to_coc_population
           measures: [population]
           aggregation: sum
 

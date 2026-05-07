@@ -273,6 +273,27 @@ def test_example_recipe_auto_transform_selection(
         assert transform_by_year[year] == transform_id
 
 
+@pytest.mark.parametrize(
+    "path",
+    [
+        "coc-base-pit-acs-zori-2016-2021.yaml",
+        "coc-pep-zori-calendar-2020-2024.yaml",
+    ],
+)
+def test_coc_pep_population_uses_tract_mediated_crosswalk(path: str):
+    recipe = _load_example(path)
+    plan = resolve_plan(recipe, "build_coc_panel")
+
+    transform = next(t for t in recipe.transforms if t.id == "county_to_coc_population")
+    assert transform.spec.weighting.scheme == "tract_mediated"
+    assert transform.spec.weighting.variety == "population"
+
+    pep_tasks = [task for task in plan.resample_tasks if task.dataset_id == "pep_county"]
+    assert pep_tasks
+    assert {task.transform_id for task in pep_tasks} == {"county_to_coc_population"}
+    assert {task.weight_column for task in pep_tasks} == {"population_weight"}
+
+
 @pytest.mark.parametrize("case", MAP_RECIPE_CASES, ids=lambda case: Path(case.path).name)
 def test_map_recipe_loads_and_resolves_without_datasets(case: MapRecipeCase):
     recipe = _load_repo_recipe(case.path)

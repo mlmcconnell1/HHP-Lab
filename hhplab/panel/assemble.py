@@ -973,6 +973,7 @@ def _add_coc_population_density(
     *,
     measures_dir: Path | None = None,
     boundaries_dir: Path | None = None,
+    population_columns: tuple[str, ...] = ("total_population",),
 ) -> pd.DataFrame:
     """Merge CoC area and derive population density in people per sq km."""
     result = panel_df.copy()
@@ -983,7 +984,8 @@ def _add_coc_population_density(
         return result
     if "coc_id" not in result.columns or "boundary_vintage_used" not in result.columns:
         return result
-    if "total_population" not in result.columns:
+    population_col = next((col for col in population_columns if col in result.columns), None)
+    if population_col is None:
         return result
 
     boundary_vintages = sorted(
@@ -1012,12 +1014,12 @@ def _add_coc_population_density(
         how="left",
     )
     valid_mask = (
-        result["total_population"].notna()
+        result[population_col].notna()
         & result["coc_area_sq_km"].notna()
         & (result["coc_area_sq_km"] > 0)
     )
     result.loc[valid_mask, density_col] = pd.to_numeric(
-        result.loc[valid_mask, "total_population"], errors="coerce"
+        result.loc[valid_mask, population_col], errors="coerce"
     ) / pd.to_numeric(result.loc[valid_mask, "coc_area_sq_km"], errors="coerce")
     return result.drop(columns=["coc_area_sq_km"])
 
