@@ -114,6 +114,12 @@ from hhplab.recipe.recipe_schema import (
     RecipeV1,
     TemporalFilter,
 )
+from hhplab.schema.lineage import (
+    PopulationLineage,
+    PopulationMethod,
+    PopulationSource,
+    normalize_population_measure,
+)
 
 # Re-export the core primitives so ``from hhplab.recipe.executor import
 # ExecutorError`` (and similar imports used by tests, the CLI, and third-
@@ -181,6 +187,46 @@ __all__ = [
 # ---------------------------------------------------------------------------
 # Step executors
 # ---------------------------------------------------------------------------
+
+def _normalize_recipe_population_measure(
+    result_df: pd.DataFrame,
+    *,
+    task: ResampleTask,
+    ctx: ExecutionContext,
+) -> pd.DataFrame:
+    """Normalize PEP CoC population outputs to canonical total_population."""
+    ds = ctx.recipe.datasets.get(task.dataset_id)
+    if (
+        ds is None
+        or ds.provider != "census"
+        or ds.product != "pep"
+        or task.to_geometry.type != "coc"
+        or "population" not in result_df.columns
+        or "total_population" in result_df.columns
+    ):
+        return result_df
+
+    method = (
+        PopulationMethod.POPULATION_CROSSWALK
+        if (task.weight_column or "") == "pop_share"
+        else PopulationMethod.AREA_CROSSWALK
+    )
+    return normalize_population_measure(
+        result_df,
+        source_column="population",
+        lineage=PopulationLineage(
+            source=PopulationSource.PEP,
+            source_year=task.year,
+            method=method,
+            crosswalk_id=task.transform_id,
+            crosswalk_geometry=(
+                f"{task.effective_geometry.type}_to_{task.to_geometry.type}"
+                if task.transform_id is not None
+                else None
+            ),
+            crosswalk_vintage=task.effective_geometry.vintage,
+        ),
+    )
 
 def _execute_materialize(
     task: MaterializeTask,
@@ -553,6 +599,20 @@ def _execute_resample(
                 error=f"Unknown resample method '{task.method}'.",
             )
     except ExecutorError as exc:
+        return StepResult(
+            step_kind="resample",
+            detail=detail,
+            success=False,
+            error=str(exc),
+            notes=step_notes,
+        )
+    try:
+        result_df = _normalize_recipe_population_measure(
+            result_df,
+            task=task,
+            ctx=ctx,
+        )
+    except ValueError as exc:
         return StepResult(
             step_kind="resample",
             detail=detail,

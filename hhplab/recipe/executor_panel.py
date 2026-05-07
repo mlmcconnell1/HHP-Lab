@@ -289,7 +289,6 @@ def _add_recipe_coc_population_density(
     return _add_coc_population_density(
         panel,
         boundaries_dir=project_root / "data" / "curated" / "coc_boundaries",
-        population_columns=("population", "total_population"),
     )
 
 

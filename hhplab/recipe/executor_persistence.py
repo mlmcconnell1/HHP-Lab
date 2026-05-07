@@ -124,6 +124,7 @@ def persist_outputs(
         acs_products=list(conformance_flags.acs_products),
         include_zori=conformance_flags.include_zori,
         include_laus=conformance_flags.include_laus,
+        enforce_schema_contract=True,
     )
     conformance_report = run_conformance(panel, panel_request)
     if not ctx.quiet:

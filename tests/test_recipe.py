@@ -3848,9 +3848,13 @@ class TestResampleAggregate:
 
         assert result.success
         df = ctx.intermediates[("pep", 2024)].sort_values("geo_id").reset_index(drop=True)
-        assert dict(zip(df["geo_id"], df["population"], strict=True)) == pytest.approx(
+        assert "population" not in df.columns
+        assert dict(zip(df["geo_id"], df["total_population"], strict=True)) == pytest.approx(
             CT_RECIPE_ALIGNMENT_EXPECTED_POP,
         )
+        assert set(df["total_population_source"]) == {"pep"}
+        assert set(df["total_population_method"]) == {"area_crosswalk"}
+        assert set(df["total_population_crosswalk_id"]) == {"county_to_coc"}
 
     def test_aggregate_weighted_mean_translates_ct_population_source_to_legacy(
         self,

@@ -23,7 +23,7 @@ from typing import Protocol
 import pandas as pd
 
 from hhplab.acs.variables_acs1 import ACS1_METRO_MEASURE_COLUMNS
-from hhplab.panel.conformance import (
+from hhplab.schema.columns import (
     ACS1_MEASURE_COLUMNS,
     ACS_MEASURE_COLUMNS,
     LAUS_MEASURE_COLUMNS,

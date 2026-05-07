@@ -42,10 +42,15 @@ from typing import Any, Literal
 import pandas as pd
 
 from hhplab.analysis_geo import resolve_geo_col as _resolve_geo_col
-from hhplab.panel.assemble import (
+from hhplab.schema.columns import (
+    ACS1_MEASURE_COLUMNS,
+    ACS_MEASURE_COLUMNS,
+    LAUS_MEASURE_COLUMNS,
+    TOTAL_POPULATION,
     ZORI_COLUMNS,
     ZORI_PROVENANCE_COLUMNS,
 )
+from hhplab.schema.contracts import COC_PANEL_CONTRACT, validate_artifact_contract
 
 # ---------------------------------------------------------------------------
 # Column and threshold constants
@@ -54,35 +59,10 @@ from hhplab.panel.assemble import (
 #: ACS measure columns checked for schema presence and data completeness.
 #: Includes ACS5 tract-level measures (apportioned to analysis geography) and
 #: the ACS1-derived metro unemployment rate used in CoC and metro panels.
-ACS_MEASURE_COLUMNS: list[str] = [
-    "total_population",
-    "adult_population",
-    "population_below_poverty",
-    "median_household_income",
-    "median_gross_rent",
-    "unemployment_rate",
-]
-
-#: ACS 1-year measure columns (metro-native measures from ACS 1-year estimates).
-ACS1_MEASURE_COLUMNS: list[str] = [
-    "unemployment_rate_acs1",
-]
-
-#: BLS LAUS metro-native measure columns.
-#: These are sourced from the BLS LAUS annual-average ingest, not ACS.
-#: The unemployment_rate here is the official BLS rate; it must not be confused
-#: with unemployment_rate_acs1 which comes from the ACS 1-year survey.
-LAUS_MEASURE_COLUMNS: list[str] = [
-    "labor_force",
-    "employed",
-    "unemployed",
-    "unemployment_rate",
-]
-
 #: Measures that should normally vary across years. If too many CoC-year
 #: pairs show identical values year-over-year, a data broadcast bug is likely.
 TEMPORAL_VARIATION_MEASURES: list[str] = [
-    "total_population",
+    TOTAL_POPULATION,
     "pit_total",
 ]
 
@@ -150,6 +130,8 @@ class PanelRequest:
         Whether BLS LAUS metro-native labor-market measures are expected
         (``labor_force``, ``employed``, ``unemployed``, ``unemployment_rate``).
         These are distinct from ACS-derived unemployment measures.
+    enforce_schema_contract : bool
+        Whether to report canonical schema-contract drift and lineage findings.
     """
 
     start_year: int
@@ -164,6 +146,7 @@ class PanelRequest:
     measure_columns: list[str] | None = None
     acs_products: list[str] = field(default_factory=lambda: ["acs5"])
     include_laus: bool = False
+    enforce_schema_contract: bool = False
 
 
 @dataclass
@@ -489,6 +472,31 @@ def check_schema_measures(
 
 # Backward-compatible alias (coclab-d0qm).
 check_schema_acs = check_schema_measures
+
+
+@register_check
+def check_schema_contract(
+    panel_df: pd.DataFrame,
+    request: PanelRequest,
+) -> list[ConformanceResult]:
+    """Report ambiguous drift-prone columns and missing measure lineage."""
+    if not request.enforce_schema_contract or request.geo_type != "coc":
+        return []
+
+    findings = [
+        finding
+        for finding in validate_artifact_contract(panel_df, COC_PANEL_CONTRACT)
+        if finding.code in {"drift_prone_column", "missing_lineage_columns"}
+    ]
+    return [
+        ConformanceResult(
+            check_name="check_schema_contract",
+            severity=finding.severity,
+            message=finding.message,
+            details=finding.to_dict(),
+        )
+        for finding in findings
+    ]
 
 
 @register_check

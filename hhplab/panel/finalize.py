@@ -19,6 +19,13 @@ import logging
 import pandas as pd
 
 from hhplab.analysis_geo import GEO_TYPE_METRO, GEO_TYPE_MSA
+from hhplab.schema.columns import (
+    COC_PANEL_COLUMNS,
+    METRO_PANEL_COLUMNS,
+    MSA_PANEL_COLUMNS,
+    ZORI_COLUMNS,
+    ZORI_PROVENANCE_COLUMNS,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -26,101 +33,6 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 # Canonical column ordering
 # ---------------------------------------------------------------------------
-
-COC_PANEL_COLUMNS: list[str] = [
-    "coc_id",
-    "year",
-    "pit_total",
-    "pit_sheltered",
-    "pit_unsheltered",
-    "boundary_vintage_used",
-    "acs5_vintage_used",
-    "tract_vintage_used",
-    "alignment_type",
-    "weighting_method",
-    "total_population",
-    "population_density_per_sq_km",
-    "adult_population",
-    "population_below_poverty",
-    "median_household_income",
-    "median_gross_rent",
-    "unemployment_rate",
-    "coverage_ratio",
-    "boundary_changed",
-    "source",
-]
-
-METRO_PANEL_COLUMNS: list[str] = [
-    "metro_id",
-    "metro_name",
-    "geo_type",
-    "geo_id",
-    "year",
-    "pit_total",
-    "pit_sheltered",
-    "pit_unsheltered",
-    "definition_version_used",
-    "acs5_vintage_used",
-    "tract_vintage_used",
-    "alignment_type",
-    "weighting_method",
-    "total_population",
-    "adult_population",
-    "population_below_poverty",
-    "median_household_income",
-    "median_gross_rent",
-    "unemployment_rate_acs1",
-    "labor_force",
-    "employed",
-    "unemployed",
-    "unemployment_rate",
-    "coverage_ratio",
-    "boundary_changed",
-    "acs1_vintage_used",
-    "laus_vintage_used",
-    "source",
-]
-
-MSA_PANEL_COLUMNS: list[str] = [
-    "msa_id",
-    "msa_name",
-    "cbsa_code",
-    "geo_type",
-    "geo_id",
-    "year",
-    "pit_total",
-    "pit_sheltered",
-    "pit_unsheltered",
-    "definition_version_used",
-    "acs5_vintage_used",
-    "tract_vintage_used",
-    "alignment_type",
-    "weighting_method",
-    "total_population",
-    "adult_population",
-    "population_below_poverty",
-    "median_household_income",
-    "median_gross_rent",
-    "population",
-    "coverage_ratio",
-    "boundary_changed",
-    "source",
-]
-
-ZORI_COLUMNS: list[str] = [
-    "zori_coc",
-    "zori_coverage_ratio",
-    "zori_is_eligible",
-    "zori_excluded_reason",
-    "rent_to_income",
-]
-
-ZORI_PROVENANCE_COLUMNS: list[str] = [
-    "rent_metric",
-    "rent_alignment",
-    "zori_min_coverage",
-]
-
 
 # ---------------------------------------------------------------------------
 # Preferred column aliases for recipe outputs (coclab-t9rp)

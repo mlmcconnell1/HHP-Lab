@@ -596,8 +596,8 @@ class TestBuildPanel:
             }
         )
 
-    def test_recipe_density_can_prefer_pep_population(self, data_dirs):
-        """Recipe CoC density can use PEP population ahead of ACS total_population."""
+    def test_density_uses_canonical_total_population(self, data_dirs):
+        """Population density ignores source-native population when canonical exists."""
         panel = pd.DataFrame(
             {
                 "coc_id": ["CO-500", "CA-600"],
@@ -610,7 +610,6 @@ class TestBuildPanel:
         result = _add_coc_population_density(
             panel,
             boundaries_dir=data_dirs["boundaries_dir"],
-            population_columns=("population", "total_population"),
         )
 
         actual = dict(
@@ -622,8 +621,8 @@ class TestBuildPanel:
         )
         assert actual == pytest.approx(
             {
-                "CO-500": 500000 / 100.0,
-                "CA-600": 10000000 / 400.0,
+                "CO-500": 999.0 / 100.0,
+                "CA-600": 999.0 / 400.0,
             }
         )
 

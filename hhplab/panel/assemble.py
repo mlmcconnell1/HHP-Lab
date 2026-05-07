@@ -85,6 +85,14 @@ from hhplab.pit.ingest import parse_pit_file
 from hhplab.pit.ingest.hud_exchange import MIN_PIT_YEAR as MIN_PIT_VINTAGE_YEAR
 from hhplab.pit.pit_registry import get_pit_path
 from hhplab.provenance import ProvenanceBlock, read_provenance, write_parquet_with_provenance
+from hhplab.schema.columns import (
+    COC_PANEL_COLUMNS,
+    METRO_PANEL_COLUMNS as SCHEMA_METRO_PANEL_COLUMNS,
+    POPULATION_DENSITY_COLUMN,
+    TOTAL_POPULATION,
+    ZORI_COLUMNS,
+    ZORI_PROVENANCE_COLUMNS,
+)
 
 if TYPE_CHECKING:
     from hhplab.panel.conformance import ConformanceReport
@@ -96,77 +104,9 @@ SQUARE_METERS_PER_SQUARE_KILOMETER = 1_000_000.0
 
 
 # Canonical panel columns in desired order
-PANEL_COLUMNS = [
-    "coc_id",
-    "year",
-    "pit_total",
-    "pit_sheltered",
-    "pit_unsheltered",
-    "boundary_vintage_used",
-    "acs5_vintage_used",
-    "tract_vintage_used",
-    "alignment_type",
-    "weighting_method",
-    "total_population",
-    "population_density_per_sq_km",
-    "adult_population",
-    "population_below_poverty",
-    "median_household_income",
-    "median_gross_rent",
-    "unemployment_rate",
-    "coverage_ratio",
-    "boundary_changed",
-    "source",
-]
+PANEL_COLUMNS = COC_PANEL_COLUMNS
 
-METRO_PANEL_COLUMNS = [
-    "metro_id",
-    "metro_name",
-    "geo_type",
-    "geo_id",
-    "year",
-    "pit_total",
-    "pit_sheltered",
-    "pit_unsheltered",
-    "definition_version_used",
-    "acs5_vintage_used",
-    "tract_vintage_used",
-    "alignment_type",
-    "weighting_method",
-    "total_population",
-    "adult_population",
-    "population_below_poverty",
-    "median_household_income",
-    "median_gross_rent",
-    "unemployment_rate_acs1",  # ACS 1-year metro-native unemployment
-    # BLS LAUS metro-native labor-market measures (present when include_laus=True)
-    "labor_force",
-    "employed",
-    "unemployed",
-    "unemployment_rate",  # BLS LAUS official unemployment rate
-    "coverage_ratio",
-    "boundary_changed",
-    "acs1_vintage_used",  # Which ACS1 vintage contributed (nullable)
-    "laus_vintage_used",  # Which LAUS reference year contributed (nullable)
-    "source",
-]
-
-# Additional columns added when ZORI is enabled
-ZORI_COLUMNS = [
-    "zori_coc",
-    "zori_coverage_ratio",
-    "zori_is_eligible",
-    "zori_excluded_reason",
-    "rent_to_income",
-]
-
-# Provenance columns added when ZORI is enabled
-ZORI_PROVENANCE_COLUMNS = [
-    "rent_metric",
-    "rent_alignment",
-    "zori_min_coverage",
-]
-
+METRO_PANEL_COLUMNS = SCHEMA_METRO_PANEL_COLUMNS
 
 def _panel_geo_id_col(geo_type: str) -> str:
     """Return the native identifier column for a panel geo type."""
@@ -973,11 +913,11 @@ def _add_coc_population_density(
     *,
     measures_dir: Path | None = None,
     boundaries_dir: Path | None = None,
-    population_columns: tuple[str, ...] = ("total_population",),
+    population_columns: tuple[str, ...] = (TOTAL_POPULATION,),
 ) -> pd.DataFrame:
     """Merge CoC area and derive population density in people per sq km."""
     result = panel_df.copy()
-    density_col = "population_density_per_sq_km"
+    density_col = POPULATION_DENSITY_COLUMN
     result[density_col] = np.nan
 
     if result.empty:
