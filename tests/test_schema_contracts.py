@@ -270,6 +270,21 @@ def test_population_normalization_adds_controlled_lineage_columns() -> None:
     assert result.loc[0, "total_population_crosswalk_vintage"] == "2025"
 
 
+def test_population_lineage_tokens_distinguish_supported_sources_and_methods() -> None:
+    assert {source.value for source in PopulationSource} >= {
+        "acs5",
+        "pep",
+        "decennial",
+        "block",
+    }
+    assert {method.value for method in PopulationMethod} >= {
+        "area_crosswalk",
+        "population_crosswalk",
+        "tract_mediated_crosswalk",
+        "block_mediated_crosswalk",
+    }
+
+
 def test_recipe_pep_county_to_coc_population_becomes_canonical() -> None:
     task = ResampleTask(
         dataset_id="pep_county",
