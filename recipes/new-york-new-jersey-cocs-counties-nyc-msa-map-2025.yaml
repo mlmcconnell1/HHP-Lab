@@ -1,0 +1,188 @@
+version: 1
+name: new_york_new_jersey_cocs_counties_nyc_msa_map_2025
+description: >
+  Render New York and New Jersey county boundaries, all New York and New Jersey
+  CoC boundaries, and the New York-Newark-Jersey City, NY-NJ Census MSA boundary
+  as a single recipe-native HTML map artifact.
+
+universe:
+  years: [2025]
+
+targets:
+  - id: new_york_new_jersey_overlay_map
+    geometry: { type: coc, vintage: 2025, source: hud_exchange }
+    outputs: [map]
+    map_spec:
+      basemap: cartodbpositron
+      viewport:
+        fit_layers: true
+        padding: 30
+      layers:
+        - geometry: { type: county, vintage: 2023, source: tiger_line }
+          selector_ids:
+            [
+              "34001",
+              "34003",
+              "34005",
+              "34007",
+              "34009",
+              "34011",
+              "34013",
+              "34015",
+              "34017",
+              "34019",
+              "34021",
+              "34023",
+              "34025",
+              "34027",
+              "34029",
+              "34031",
+              "34033",
+              "34035",
+              "34037",
+              "34039",
+              "34041",
+              "36001",
+              "36003",
+              "36005",
+              "36007",
+              "36009",
+              "36011",
+              "36013",
+              "36015",
+              "36017",
+              "36019",
+              "36021",
+              "36023",
+              "36025",
+              "36027",
+              "36029",
+              "36031",
+              "36033",
+              "36035",
+              "36037",
+              "36039",
+              "36041",
+              "36043",
+              "36045",
+              "36047",
+              "36049",
+              "36051",
+              "36053",
+              "36055",
+              "36057",
+              "36059",
+              "36061",
+              "36063",
+              "36065",
+              "36067",
+              "36069",
+              "36071",
+              "36073",
+              "36075",
+              "36077",
+              "36079",
+              "36081",
+              "36083",
+              "36085",
+              "36087",
+              "36089",
+              "36091",
+              "36093",
+              "36095",
+              "36097",
+              "36099",
+              "36101",
+              "36103",
+              "36105",
+              "36107",
+              "36109",
+              "36111",
+              "36113",
+              "36115",
+              "36117",
+              "36119",
+              "36121",
+              "36123",
+            ]
+          label: New York and New Jersey Counties
+          tooltip_fields: [county_fips, geo_vintage, source]
+          style:
+            fill_color: "#f8f9fa"
+            stroke_color: "#495057"
+            fill_opacity: 0.04
+            stroke_opacity: 0.75
+            line_weight: 0.9
+            z_order: 0
+        - geometry: { type: coc, vintage: 2025, source: hud_exchange }
+          selector_ids:
+            [
+              NJ-500,
+              NJ-501,
+              NJ-502,
+              NJ-503,
+              NJ-504,
+              NJ-506,
+              NJ-507,
+              NJ-508,
+              NJ-509,
+              NJ-510,
+              NJ-511,
+              NJ-512,
+              NJ-513,
+              NJ-514,
+              NJ-515,
+              NJ-516,
+              NY-500,
+              NY-501,
+              NY-503,
+              NY-505,
+              NY-507,
+              NY-508,
+              NY-510,
+              NY-511,
+              NY-512,
+              NY-513,
+              NY-514,
+              NY-518,
+              NY-519,
+              NY-520,
+              NY-522,
+              NY-523,
+              NY-525,
+              NY-600,
+              NY-601,
+              NY-602,
+              NY-603,
+              NY-604,
+              NY-606,
+              NY-608,
+            ]
+          label: New York and New Jersey CoCs
+          tooltip_fields: [coc_id, coc_name, state_abbrev]
+          style_mode: distinct
+          style:
+            fill_color: "#74c0fc"
+            stroke_color: "#1864ab"
+            fill_opacity: 0.22
+            stroke_opacity: 0.9
+            line_weight: 1.4
+            z_order: 1
+        - geometry: { type: msa, vintage: 2023, source: census_msa_2023 }
+          selector_ids: ["35620"]
+          label: New York-Newark-Jersey City MSA
+          tooltip_fields: [msa_id, msa_name, cbsa_code, definition_version]
+          style:
+            fill_color: "#ffd43b"
+            stroke_color: "#c92a2a"
+            fill_opacity: 0.14
+            stroke_opacity: 1.0
+            line_weight: 3.2
+            z_order: 2
+
+datasets: {}
+
+pipelines:
+  - id: new_york_new_jersey_overlay_map_pipeline
+    target: new_york_new_jersey_overlay_map
+    steps: []
