@@ -29,6 +29,7 @@ from hhplab.panel.conformance import (
     ConformanceReport,
     ConformanceResult,
     PanelRequest,
+    check_schema_measures,
     register_check,
     run_conformance,
 )
@@ -285,6 +286,35 @@ class TestPanelRequest:
         assert req.zori_min_coverage == 0.80
         assert req.expected_coc_count == 400
         assert req.null_rate_threshold == 0.25
+
+    def test_sae_product_validates_sae_measures_without_direct_acs(self) -> None:
+        req = PanelRequest(start_year=2023, end_year=2023, acs_products=["sae"])
+        panel = pd.DataFrame(
+            {
+                "coc_id": ["COC-A"],
+                "year": [2023],
+                "sae_rent_burden_30_plus": [0.4],
+                "sae_household_income_median": [65000.0],
+            }
+        )
+
+        results = check_schema_measures(panel, req)
+
+        assert len(results) == 1
+        assert results[0].severity == "warning"
+        assert "total_population" not in results[0].details["expected_columns"]
+        assert "unemployment_rate_acs1" not in results[0].details["expected_columns"]
+        assert "sae_rent_burden_30_plus" in results[0].details["present_columns"]
+
+    def test_sae_product_errors_when_no_sae_measure_present(self) -> None:
+        req = PanelRequest(start_year=2023, end_year=2023, acs_products=["sae"])
+        panel = pd.DataFrame({"coc_id": ["COC-A"], "year": [2023]})
+
+        results = check_schema_measures(panel, req)
+
+        assert len(results) == 1
+        assert results[0].severity == "error"
+        assert "sae_rent_burden_30_plus" in results[0].details["expected_columns"]
 
 
 # ============================================================================

@@ -30,6 +30,7 @@ from hhplab.recipe.executor import _normalize_recipe_population_measure
 from hhplab.recipe.planner import ResampleTask
 from hhplab.recipe.schema_common import GeometryRef
 from hhplab.rents.zori_ingest import ZORI_INGEST_OUTPUT_COLUMNS as ZORI_INGEST_COLUMNS
+from hhplab.schema import SAE_OUTPUT_CONTRACT, validate_artifact_contract
 from hhplab.schema import columns as schema_columns
 from hhplab.schema.lineage import (
     PopulationLineage,
@@ -76,6 +77,54 @@ def test_source_schema_aliases_use_canonical_schema_constants(case_name: str) ->
     source_constant, schema_constant = SCHEMA_ALIAS_CASES[case_name]
 
     assert source_constant is schema_constant
+
+
+def test_sae_schema_constants_define_outputs_lineage_and_diagnostics() -> None:
+    assert "sae_rent_burden_30_plus" in schema_columns.SAE_MEASURE_COLUMNS
+    assert "sae_household_income_median" in schema_columns.SAE_DERIVED_MEASURE_COLUMNS
+    assert "sae_crosswalk_id" in schema_columns.SAE_LINEAGE_COLUMNS
+    assert "sae_direct_county_comparable" in schema_columns.SAE_DIAGNOSTIC_COLUMNS
+    assert schema_columns.SAE_OUTPUT_COLUMNS == [
+        "geo_type",
+        "geo_id",
+        "year",
+        *schema_columns.SAE_LINEAGE_COLUMNS,
+        *schema_columns.SAE_MEASURE_COLUMNS,
+        *schema_columns.SAE_DIAGNOSTIC_COLUMNS,
+    ]
+
+
+def test_validate_sae_output_contract_passes_for_complete_artifact() -> None:
+    row = {column: pd.NA for column in schema_columns.SAE_OUTPUT_COLUMNS}
+    row.update(
+        {
+            "geo_type": "coc",
+            "geo_id": "COC-A",
+            "year": 2023,
+            "acs1_vintage_used": "2023",
+            "acs5_vintage_used": "2022",
+            "tract_vintage_used": "2020",
+            "sae_allocation_method": "tract_share_within_county",
+            "sae_denominator_source": "acs5_tract_support",
+            "sae_crosswalk_id": "tract2020_to_coc2025",
+            "sae_rent_burden_30_plus": 0.4,
+            "sae_direct_county_comparable": True,
+        }
+    )
+
+    findings = validate_artifact_contract(pd.DataFrame([row]), SAE_OUTPUT_CONTRACT)
+
+    assert findings == []
+
+
+def test_validate_sae_output_contract_reports_missing_lineage_column() -> None:
+    row = {column: pd.NA for column in schema_columns.SAE_OUTPUT_COLUMNS}
+    del row["sae_crosswalk_id"]
+
+    findings = validate_artifact_contract(pd.DataFrame([row]), SAE_OUTPUT_CONTRACT)
+
+    assert [finding.code for finding in findings] == ["missing_required_column"]
+    assert findings[0].column == "sae_crosswalk_id"
 
 
 def test_validate_schema_contract_json_passes_for_source_artifact(tmp_path) -> None:

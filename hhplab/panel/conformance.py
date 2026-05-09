@@ -46,6 +46,7 @@ from hhplab.schema.columns import (
     ACS1_MEASURE_COLUMNS,
     ACS_MEASURE_COLUMNS,
     LAUS_MEASURE_COLUMNS,
+    SAE_MEASURE_COLUMNS,
     TOTAL_POPULATION,
     ZORI_COLUMNS,
     ZORI_PROVENANCE_COLUMNS,
@@ -126,6 +127,8 @@ class PanelRequest:
         Which ACS products are expected in the panel.  Default ``["acs5"]``
         validates only ACS 5-year columns.  Include ``"acs1"`` to also
         validate ACS 1-year columns (e.g., ``["acs5", "acs1"]``).
+        Include ``"sae"`` to validate SAE-derived ACS measures without
+        requiring direct ACS5/ACS1 columns.
     include_laus : bool
         Whether BLS LAUS metro-native labor-market measures are expected
         (``labor_force``, ``employed``, ``unemployed``, ``unemployment_rate``).
@@ -337,7 +340,8 @@ def _effective_measure_columns(request: PanelRequest) -> list[str]:
     When ``request.measure_columns`` is set, those columns are used.
     Otherwise builds the expected set from the union of requested data
     products: ACS5 columns when ``"acs5"`` is requested, ACS1 columns
-    when ``"acs1"`` is requested, and LAUS columns when
+    when ``"acs1"`` is requested, SAE columns when ``"sae"`` is requested,
+    and LAUS columns when
     ``request.include_laus`` is True.
     """
     if request.measure_columns is not None:
@@ -347,6 +351,8 @@ def _effective_measure_columns(request: PanelRequest) -> list[str]:
         columns.extend(ACS_MEASURE_COLUMNS)
     if "acs1" in request.acs_products:
         columns.extend(ACS1_MEASURE_COLUMNS)
+    if "sae" in request.acs_products:
+        columns.extend(SAE_MEASURE_COLUMNS)
     if request.include_laus:
         columns.extend(LAUS_MEASURE_COLUMNS)
     # Deduplicate while preserving order: unemployment_rate appears in both

@@ -148,6 +148,64 @@ ACS5_SAE_COUNT_COLUMNS: list[str] = [
     "tenure_income_renter_occupied_150000_plus",
 ]
 
+SAE_COMPONENT_COLUMNS: list[str] = [
+    f"sae_{column}" for column in ACS5_SAE_COUNT_COLUMNS
+]
+
+SAE_DERIVED_MEASURE_COLUMNS: list[str] = [
+    "sae_household_income_quintile_cutoff_20",
+    "sae_household_income_quintile_cutoff_40",
+    "sae_household_income_median",
+    "sae_household_income_quintile_cutoff_60",
+    "sae_household_income_quintile_cutoff_80",
+    "sae_gross_rent_median",
+    "sae_rent_burden_30_plus",
+    "sae_rent_burden_50_plus",
+    "sae_owner_cost_burden_30_plus",
+    "sae_owner_cost_burden_50_plus",
+    "sae_civilian_labor_force",
+    "sae_unemployed_count",
+    "sae_unemployment_rate",
+]
+
+SAE_DIAGNOSTIC_COLUMNS: list[str] = [
+    "sae_source_county_count",
+    "sae_source_counties",
+    "sae_crosswalk_tract_count",
+    "sae_allocated_tract_count",
+    "sae_missing_allocation_tract_count",
+    "sae_crosswalk_coverage_ratio",
+    "sae_missing_support_count",
+    "sae_zero_denominator_count",
+    "sae_partial_coverage_count",
+    "sae_direct_county_comparable",
+    "sae_direct_county_comparability_reason",
+    "sae_direct_county_absolute_difference",
+    "sae_direct_county_relative_difference",
+]
+
+SAE_LINEAGE_COLUMNS: list[str] = [
+    "acs1_vintage_used",
+    "acs5_vintage_used",
+    "tract_vintage_used",
+    "sae_allocation_method",
+    "sae_denominator_source",
+    "sae_crosswalk_id",
+]
+
+SAE_MEASURE_COLUMNS: list[str] = [
+    *SAE_DERIVED_MEASURE_COLUMNS,
+]
+
+SAE_OUTPUT_COLUMNS: list[str] = [
+    "geo_type",
+    "geo_id",
+    "year",
+    *SAE_LINEAGE_COLUMNS,
+    *SAE_MEASURE_COLUMNS,
+    *SAE_DIAGNOSTIC_COLUMNS,
+]
+
 ACS5_COUNT_COLUMNS: list[str] = [
     TOTAL_POPULATION,
     "adult_population",

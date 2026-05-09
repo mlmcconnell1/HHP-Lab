@@ -14,6 +14,7 @@ _EXPORTS = {
     "aggregate_to_geo": ("hhplab.acs.acs_aggregate", "aggregate_to_geo"),
     "allocate_acs1_county_to_tracts": ("hhplab.acs.sae", "allocate_acs1_county_to_tracts"),
     "build_metro_tract_crosswalk": ("hhplab.acs.acs_metro", "build_metro_tract_crosswalk"),
+    "build_sae_provenance": ("hhplab.acs.sae", "build_sae_provenance"),
     "compare_sae_to_direct_counties": ("hhplab.acs.sae", "compare_sae_to_direct_counties"),
     "derive_sae_burden_measures": ("hhplab.acs.sae", "derive_sae_burden_measures"),
     "derive_sae_distribution_measures": ("hhplab.acs.sae", "derive_sae_distribution_measures"),
@@ -25,6 +26,10 @@ _EXPORTS = {
     "ingest_tract_data": ("hhplab.acs.ingest.tract_population", "ingest_tract_data"),
     "needs_translation": ("hhplab.acs.translate", "needs_translation"),
     "rollup_sae_tracts_to_geos": ("hhplab.acs.sae", "rollup_sae_tracts_to_geos"),
+    "write_sae_parquet_with_provenance": (
+        "hhplab.acs.sae",
+        "write_sae_parquet_with_provenance",
+    ),
     "translate_acs_to_target_vintage": (
         "hhplab.acs.translate",
         "translate_acs_to_target_vintage",

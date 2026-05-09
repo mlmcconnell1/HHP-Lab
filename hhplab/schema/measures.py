@@ -9,6 +9,7 @@ from hhplab.schema.columns import (
     ACS1_MEASURE_COLUMNS,
     ACS_MEASURE_COLUMNS,
     LAUS_MEASURE_COLUMNS,
+    SAE_MEASURE_COLUMNS,
     TOTAL_POPULATION,
 )
 
@@ -39,3 +40,4 @@ PIT_MEASURES: tuple[MeasureDefinition, ...] = (
 ACS5_MEASURES: tuple[str, ...] = tuple(ACS_MEASURE_COLUMNS)
 ACS1_MEASURES: tuple[str, ...] = tuple(ACS1_MEASURE_COLUMNS)
 LAUS_MEASURES: tuple[str, ...] = tuple(LAUS_MEASURE_COLUMNS)
+SAE_MEASURES: tuple[str, ...] = tuple(SAE_MEASURE_COLUMNS)

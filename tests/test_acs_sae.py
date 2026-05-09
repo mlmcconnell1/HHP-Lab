@@ -12,11 +12,14 @@ from hhplab.acs.sae import (
     HOUSEHOLD_INCOME_BINS,
     SAE_ALLOCATION_METHOD,
     allocate_acs1_county_to_tracts,
+    build_sae_provenance,
     compare_sae_to_direct_counties,
     derive_sae_burden_measures,
     derive_sae_distribution_measures,
     rollup_sae_tracts_to_geos,
+    write_sae_parquet_with_provenance,
 )
+from hhplab.provenance import read_provenance
 
 COUNTY_SOURCE = pd.DataFrame(
     [
@@ -535,3 +538,71 @@ def test_direct_county_comparison_requires_measures() -> None:
             ),
             measure_columns=[],
         )
+
+
+def test_builds_sae_provenance_with_lineage_fields() -> None:
+    provenance = build_sae_provenance(
+        acs1_vintage=2023,
+        acs5_vintage=2022,
+        tract_vintage=2020,
+        target_geo_type="coc",
+        target_vintage=2025,
+        denominator_source="acs5_tract_support",
+        crosswalk_id="tract2020_to_coc2025",
+        source_dataset_path="data/curated/acs/acs1_county_sae__A2023.parquet",
+        support_dataset_path="data/curated/acs/acs5_tract_sae_support__A2022xT2020.parquet",
+        requested_measures=["rent_burden"],
+        derived_output_columns=["sae_rent_burden_30_plus"],
+        diagnostics_summary={"max_residual": 0.0},
+        source_tables=["B25070"],
+        support_tables=["B25070"],
+        source_row_count=1,
+        support_row_count=2,
+        output_row_count=1,
+    )
+
+    assert provenance.acs_vintage == "2022"
+    assert provenance.tract_vintage == "2020"
+    assert provenance.boundary_vintage == "2025"
+    assert provenance.notation == "A2022@B2025\u00d7T2020"
+    assert provenance.extra["acs1_vintage"] == "2023"
+    assert provenance.extra["acs5_terminal_vintage"] == "2022"
+    assert provenance.extra["allocation_method"] == SAE_ALLOCATION_METHOD
+    assert provenance.extra["denominator_source"] == "acs5_tract_support"
+    assert provenance.extra["crosswalk_id"] == "tract2020_to_coc2025"
+    assert provenance.extra["requested_measures"] == ["rent_burden"]
+    assert provenance.extra["derived_output_columns"] == ["sae_rent_burden_30_plus"]
+    assert provenance.extra["diagnostics_summary"] == {"max_residual": 0.0}
+
+
+def test_writes_sae_parquet_with_embedded_provenance(tmp_path) -> None:
+    output_path = tmp_path / "sae.parquet"
+    df = pd.DataFrame(
+        {
+            "geo_type": ["coc"],
+            "geo_id": ["COC-A"],
+            "year": [2023],
+            "sae_rent_burden_30_plus": [0.4],
+        }
+    )
+
+    returned = write_sae_parquet_with_provenance(
+        df,
+        output_path,
+        acs1_vintage=2023,
+        acs5_vintage=2022,
+        tract_vintage=2020,
+        target_geo_type="coc",
+        target_vintage=2025,
+        denominator_source="acs5_tract_support",
+        crosswalk_id="tract2020_to_coc2025",
+        requested_measures=["rent_burden"],
+        derived_output_columns=["sae_rent_burden_30_plus"],
+    )
+
+    provenance = read_provenance(returned)
+    assert returned == output_path
+    assert provenance is not None
+    assert provenance.extra["dataset"] == "acs_sae"
+    assert provenance.extra["acs1_vintage"] == "2023"
+    assert provenance.extra["output_row_count"] == 1

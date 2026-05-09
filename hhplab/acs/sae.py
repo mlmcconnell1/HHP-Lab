@@ -4,11 +4,14 @@ from __future__ import annotations
 
 import json
 from collections.abc import Iterable
+from pathlib import Path
+from typing import Any
 
 import pandas as pd
 
 from hhplab.acs.variables import ACS5_SAE_SUPPORT_COLUMNS
 from hhplab.acs.variables_acs1 import ACS1_SAE_SOURCE_COLUMNS
+from hhplab.provenance import ProvenanceBlock, write_parquet_with_provenance
 
 SAE_ALLOCATION_METHOD = "tract_share_within_county"
 
@@ -120,6 +123,119 @@ def _safe_rate(numerator: pd.Series, denominator: pd.Series) -> pd.Series:
     valid = numerator.notna() & denominator.notna() & (denominator > 0)
     rate.loc[valid] = numerator.loc[valid] / denominator.loc[valid]
     return rate
+
+
+def build_sae_provenance(
+    *,
+    acs1_vintage: int | str,
+    acs5_vintage: int | str,
+    tract_vintage: int | str,
+    target_geo_type: str,
+    target_vintage: int | str | None = None,
+    allocation_method: str = SAE_ALLOCATION_METHOD,
+    denominator_source: str | None = None,
+    crosswalk_id: str | None = None,
+    source_dataset_path: str | Path | None = None,
+    support_dataset_path: str | Path | None = None,
+    crosswalk_path: str | Path | None = None,
+    requested_measures: Iterable[str] | None = None,
+    derived_output_columns: Iterable[str] | None = None,
+    diagnostics_summary: dict[str, Any] | None = None,
+    source_tables: Iterable[str] | None = None,
+    support_tables: Iterable[str] | None = None,
+    source_row_count: int | None = None,
+    support_row_count: int | None = None,
+    output_row_count: int | None = None,
+) -> ProvenanceBlock:
+    """Build embedded provenance for an SAE artifact."""
+    extra: dict[str, Any] = {
+        "dataset": "acs_sae",
+        "acs1_vintage": str(acs1_vintage),
+        "acs5_terminal_vintage": str(acs5_vintage),
+        "allocation_method": allocation_method,
+    }
+    optional_extra = {
+        "denominator_source": denominator_source,
+        "crosswalk_id": crosswalk_id,
+        "source_dataset_path": None if source_dataset_path is None else str(source_dataset_path),
+        "support_dataset_path": None
+        if support_dataset_path is None
+        else str(support_dataset_path),
+        "crosswalk_path": None if crosswalk_path is None else str(crosswalk_path),
+        "source_row_count": source_row_count,
+        "support_row_count": support_row_count,
+        "output_row_count": output_row_count,
+    }
+    extra.update({key: value for key, value in optional_extra.items() if value is not None})
+    if requested_measures is not None:
+        extra["requested_measures"] = list(requested_measures)
+    if derived_output_columns is not None:
+        extra["derived_output_columns"] = list(derived_output_columns)
+    if diagnostics_summary is not None:
+        extra["diagnostics_summary"] = diagnostics_summary
+    if source_tables is not None:
+        extra["source_tables"] = list(source_tables)
+    if support_tables is not None:
+        extra["support_tables"] = list(support_tables)
+
+    provenance = ProvenanceBlock(
+        boundary_vintage=None if target_vintage is None else str(target_vintage),
+        tract_vintage=str(tract_vintage),
+        acs_vintage=str(acs5_vintage),
+        weighting=allocation_method,
+        geo_type=target_geo_type,
+        extra=extra,
+    )
+    provenance.notation = provenance.generate_notation()
+    return provenance
+
+
+def write_sae_parquet_with_provenance(
+    df: pd.DataFrame,
+    path: str | Path,
+    *,
+    acs1_vintage: int | str,
+    acs5_vintage: int | str,
+    tract_vintage: int | str,
+    target_geo_type: str,
+    target_vintage: int | str | None = None,
+    allocation_method: str = SAE_ALLOCATION_METHOD,
+    denominator_source: str | None = None,
+    crosswalk_id: str | None = None,
+    source_dataset_path: str | Path | None = None,
+    support_dataset_path: str | Path | None = None,
+    crosswalk_path: str | Path | None = None,
+    requested_measures: Iterable[str] | None = None,
+    derived_output_columns: Iterable[str] | None = None,
+    diagnostics_summary: dict[str, Any] | None = None,
+    source_tables: Iterable[str] | None = None,
+    support_tables: Iterable[str] | None = None,
+    source_row_count: int | None = None,
+    support_row_count: int | None = None,
+) -> Path:
+    """Write an SAE artifact with embedded lineage metadata."""
+    provenance = build_sae_provenance(
+        acs1_vintage=acs1_vintage,
+        acs5_vintage=acs5_vintage,
+        tract_vintage=tract_vintage,
+        target_geo_type=target_geo_type,
+        target_vintage=target_vintage,
+        allocation_method=allocation_method,
+        denominator_source=denominator_source,
+        crosswalk_id=crosswalk_id,
+        source_dataset_path=source_dataset_path,
+        support_dataset_path=support_dataset_path,
+        crosswalk_path=crosswalk_path,
+        requested_measures=requested_measures,
+        derived_output_columns=derived_output_columns,
+        diagnostics_summary=diagnostics_summary,
+        source_tables=source_tables,
+        support_tables=support_tables,
+        source_row_count=source_row_count,
+        support_row_count=support_row_count,
+        output_row_count=len(df),
+    )
+    return write_parquet_with_provenance(df, path, provenance)
 
 
 def _quantile_from_bins(

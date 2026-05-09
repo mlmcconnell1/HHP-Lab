@@ -14,6 +14,8 @@ from hhplab.schema.columns import (
     LAUS_METRO_OUTPUT_COLUMNS,
     PEP_COUNTY_OUTPUT_COLUMNS,
     PIT_CANONICAL_COLUMNS,
+    SAE_MEASURE_COLUMNS,
+    SAE_OUTPUT_COLUMNS,
     TRACT_MEDIATED_COUNTY_XWALK_COLUMNS,
     ZORI_INGEST_OUTPUT_COLUMNS,
 )
@@ -82,6 +84,13 @@ LAUS_METRO_CONTRACT = ArtifactContract(
     required_columns=tuple(LAUS_METRO_OUTPUT_COLUMNS),
 )
 
+SAE_OUTPUT_CONTRACT = ArtifactContract(
+    name="sae_output",
+    required_columns=tuple(SAE_OUTPUT_COLUMNS),
+    canonical_measures=tuple(SAE_MEASURE_COLUMNS),
+    drift_prone_columns=(),
+)
+
 TRACT_MEDIATED_COUNTY_XWALK_CONTRACT = ArtifactContract(
     name="tract_mediated_county_xwalk",
     required_columns=tuple(
@@ -100,6 +109,7 @@ ARTIFACT_CONTRACTS: dict[str, ArtifactContract] = {
         LAUS_METRO_CONTRACT,
         PEP_COUNTY_CONTRACT,
         PIT_CONTRACT,
+        SAE_OUTPUT_CONTRACT,
         TRACT_MEDIATED_COUNTY_XWALK_CONTRACT,
         ZORI_INGEST_CONTRACT,
     )
