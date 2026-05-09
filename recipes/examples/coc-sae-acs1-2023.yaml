@@ -1,0 +1,98 @@
+# Example recipe: one-year CoC small-area estimation from ACS1 county aggregates.
+# Allocates ACS1 county components through ACS5 tract distribution supports,
+# then rolls the allocated components to 2025 CoC boundaries.
+
+version: 1
+name: coc_sae_acs1_2023
+description: >
+  Build a one-year CoC SAE panel for 2023 using ACS1 county source aggregates
+  and terminal-vintage ACS5 tract distribution supports. This example requests
+  labor-force counts, rent burden rates, and distribution-derived household
+  income and gross-rent measures. Medians are derived from bins; direct ACS
+  median columns are not averaged.
+
+universe:
+  years: [2023]
+
+targets:
+  - id: coc_panel
+    geometry: { type: coc, vintage: 2025, source: hud_exchange }
+    outputs: [panel, diagnostics]
+    panel_policy:
+      source_label: acs_sae_panel
+
+datasets:
+  acs1_county_sae:
+    provider: census
+    product: acs1
+    version: 1
+    native_geometry: { type: county, vintage: 2020, source: tiger }
+    year_column: acs1_vintage
+    geo_column: county_fips
+    path: data/curated/acs/acs1_county_sae__A2023.parquet
+
+  acs5_tract_sae_support:
+    provider: census
+    product: acs5
+    version: 1
+    native_geometry: { type: tract, vintage: 2020, source: tiger }
+    year_column: acs_vintage
+    geo_column: tract_geoid
+    path: data/curated/acs/acs5_tract_sae_support__A2022xT2020.parquet
+
+pipelines:
+  - id: build_coc_sae_panel
+    target: coc_panel
+    steps:
+      - small_area_estimate:
+          output_dataset: acs_sae_coc
+          source_dataset: acs1_county_sae
+          support_dataset: acs5_tract_sae_support
+          source_geometry: { type: county, vintage: 2020, source: tiger }
+          support_geometry: { type: tract, vintage: 2020, source: tiger }
+          target_geometry: { type: coc, vintage: 2025, source: hud_exchange }
+          terminal_acs5_vintage: 2022
+          tract_vintage: 2020
+          allocation_method: tract_share_within_county
+          denominators:
+            labor_force: civilian_labor_force
+            rent_burden: gross_rent_pct_income_total
+            owner_cost_burden: owner_costs_pct_income_total
+          measures:
+            labor_force:
+              outputs:
+                - sae_civilian_labor_force
+                - sae_unemployed_count
+                - sae_unemployment_rate
+            rent_burden:
+              outputs:
+                - sae_rent_burden_30_plus
+                - sae_rent_burden_50_plus
+            owner_cost_burden:
+              outputs:
+                - sae_owner_cost_burden_30_plus
+                - sae_owner_cost_burden_50_plus
+            household_income_bins:
+              outputs:
+                - sae_household_income_median
+                - sae_household_income_quintile_cutoff_20
+                - sae_household_income_quintile_cutoff_40
+                - sae_household_income_quintile_cutoff_60
+                - sae_household_income_quintile_cutoff_80
+            gross_rent_bins:
+              outputs:
+                - sae_gross_rent_median
+          zero_denominator_policy: null_rate
+          fallback_policy: diagnose_only
+          diagnostics:
+            conservation: true
+            denominator: true
+            direct_county_comparison: true
+
+      - join:
+          datasets: [acs_sae_coc]
+          join_on: [geo_id, year]
+
+validation:
+  missing_dataset:
+    default: fail

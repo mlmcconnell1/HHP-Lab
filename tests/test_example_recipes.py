@@ -167,6 +167,17 @@ class ContainmentRecipeCase:
     selector_ids: tuple[str, ...]
 
 
+@dataclass(frozen=True)
+class SaeRecipeCase:
+    path: str
+    pipeline_id: str
+    recipe_name: str
+    output_dataset: str
+    source_dataset: str
+    support_dataset: str
+    measure_families: tuple[str, ...]
+
+
 MAP_RECIPE_CASES: tuple[MapRecipeCase, ...] = (
     MapRecipeCase(
         path="recipes/florida-cocs-orlando-msa-map-2025.yaml",
@@ -179,6 +190,25 @@ MAP_RECIPE_CASES: tuple[MapRecipeCase, ...] = (
         pipeline_id="colorado_overlay_map_pipeline",
         recipe_name="colorado_cocs_denver_msa_map_2025",
         target_id="colorado_overlay_map",
+    ),
+)
+
+
+SAE_RECIPE_CASES: tuple[SaeRecipeCase, ...] = (
+    SaeRecipeCase(
+        path="coc-sae-acs1-2023.yaml",
+        pipeline_id="build_coc_sae_panel",
+        recipe_name="coc_sae_acs1_2023",
+        output_dataset="acs_sae_coc",
+        source_dataset="acs1_county_sae",
+        support_dataset="acs5_tract_sae_support",
+        measure_families=(
+            "labor_force",
+            "rent_burden",
+            "owner_cost_burden",
+            "household_income_bins",
+            "gross_rent_bins",
+        ),
     ),
 )
 
@@ -250,6 +280,23 @@ def test_containment_example_recipe_loads_and_resolves(case: ContainmentRecipeCa
     assert plan.materialize_tasks == []
     assert plan.resample_tasks == []
     assert plan.join_tasks == []
+
+
+@pytest.mark.parametrize("case", SAE_RECIPE_CASES, ids=lambda case: case.path)
+def test_sae_example_recipe_loads_and_resolves(case: SaeRecipeCase):
+    recipe = _load_example(case.path)
+    plan = resolve_plan(recipe, case.pipeline_id)
+
+    assert recipe.name == case.recipe_name
+    assert len(plan.small_area_estimate_tasks) == 1
+    task = plan.small_area_estimate_tasks[0]
+    assert task.output_dataset == case.output_dataset
+    assert task.source_dataset == case.source_dataset
+    assert task.support_dataset == case.support_dataset
+    assert tuple(task.measure_families) == case.measure_families
+    assert task.terminal_acs5_vintage == "2022"
+    assert task.tract_vintage == "2020"
+    assert plan.join_tasks[0].datasets == [case.output_dataset]
 
 
 @pytest.mark.parametrize(

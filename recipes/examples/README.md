@@ -11,6 +11,7 @@ users. Together they cover the current recipe surface:
 - Recipe-native containment outputs for MSA-to-CoC and CoC-to-county candidate lists
 - `file_set`-driven year/geometry switching
 - Point-in-time and calendar-mean temporal filters
+- ACS1/ACS5 small-area estimation (SAE) recipe planning and preflight
 
 ## Cohort-Style Examples
 
@@ -35,6 +36,10 @@ the output downstream.
 - `coc-pit-density-2015-2024.yaml`
   National CoC PIT panel with CoC names plus density derived from lagged ACS5
   total population and curated CoC boundaries.
+- `coc-sae-acs1-2023.yaml`
+  One-year CoC SAE example that allocates ACS1 county components through ACS5
+  tract distribution supports. It requests labor-force, rent-burden, and
+  distribution-derived median/quintile outputs with diagnostics.
 - `coc-pep-zori-calendar-2020-2024.yaml`
   County-driven CoC panel using PEP population plus calendar-mean ZORI.
 - `coc-county-containment-los-angeles-2025.yaml`
@@ -83,6 +88,11 @@ the output downstream.
   MSA-to-CoC containment requires CoC boundaries, TIGER counties, and generated
   MSA definition/membership artifacts; CoC-to-county containment requires CoC
   boundaries and TIGER counties.
+- SAE recipes use `small_area_estimate` steps rather than generic
+  `weighted_mean` aggregation. They require ACS1 county source components, ACS5
+  tract support components, and a target tract crosswalk. Median-like SAE
+  outputs must be distribution-derived; direct ACS median columns are context
+  fields and must not be averaged.
 
 ## Suggested Commands
 
@@ -92,4 +102,10 @@ HHPLAB_NON_INTERACTIVE=1 hhplab build recipe-preflight \
 
 HHPLAB_NON_INTERACTIVE=1 hhplab build recipe \
   --recipe recipes/examples/coc-base-pit-acs-zori-2016-2021.yaml --json
+
+HHPLAB_NON_INTERACTIVE=1 hhplab build recipe-preflight \
+  --recipe recipes/examples/coc-sae-acs1-2023.yaml --json
+
+HHPLAB_NON_INTERACTIVE=1 hhplab build recipe-plan \
+  --recipe recipes/examples/coc-sae-acs1-2023.yaml --json
 ```
