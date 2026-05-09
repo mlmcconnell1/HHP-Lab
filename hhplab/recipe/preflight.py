@@ -1568,7 +1568,7 @@ _SAE_FAMILY_EXACT_COLUMNS: dict[str, tuple[str, ...]] = {
 
 _SAE_OUTPUT_PREFIXES: dict[str, tuple[str, ...]] = {
     "household_income_bins": ("sae_household_income_",),
-    "gross_rent_bins": ("sae_gross_rent_",),
+    "gross_rent_bins": ("sae_gross_rent_distribution_",),
     "rent_burden": ("sae_rent_burden_",),
     "owner_cost_burden": ("sae_owner_cost_burden_",),
     "tenure_income": ("sae_tenure_income_",),
@@ -1577,6 +1577,17 @@ _SAE_OUTPUT_PREFIXES: dict[str, tuple[str, ...]] = {
         "sae_unemployed_count",
         "sae_unemployment_rate",
     ),
+}
+
+_SAE_OUTPUT_EXACT_COLUMNS: dict[str, tuple[str, ...]] = {
+    "household_income_bins": (
+        "sae_household_income_median",
+        "sae_household_income_quintile_cutoff_20",
+        "sae_household_income_quintile_cutoff_40",
+        "sae_household_income_quintile_cutoff_60",
+        "sae_household_income_quintile_cutoff_80",
+    ),
+    "gross_rent_bins": ("sae_gross_rent_median",),
 }
 
 
@@ -1591,6 +1602,8 @@ def _sae_family_columns(family: str, available: list[str]) -> list[str]:
 
 
 def _sae_output_allowed(family: str, output: str) -> bool:
+    if output in _SAE_OUTPUT_EXACT_COLUMNS.get(family, ()):
+        return True
     prefixes = _SAE_OUTPUT_PREFIXES.get(family, ())
     return any(output.startswith(prefix) for prefix in prefixes)
 

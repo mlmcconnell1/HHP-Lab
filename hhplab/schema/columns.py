@@ -175,6 +175,8 @@ SAE_DIAGNOSTIC_COLUMNS: list[str] = [
     "sae_allocated_tract_count",
     "sae_missing_allocation_tract_count",
     "sae_crosswalk_coverage_ratio",
+    "sae_crosswalk_share_sum",
+    "sae_nan_share_tract_count",
     "sae_missing_support_count",
     "sae_zero_denominator_count",
     "sae_partial_coverage_count",

@@ -255,9 +255,13 @@ def _quantile_from_bins(
 
     target = float(total) * quantile
     cumulative = 0.0
+    skipped_null_bin = False
     for column, lower, upper in bins:
         count = pd.to_numeric(pd.Series([row.get(column)]), errors="coerce").iloc[0]
-        if pd.isna(count) or count <= 0:
+        if pd.isna(count):
+            skipped_null_bin = True
+            continue
+        if count <= 0:
             continue
         next_cumulative = cumulative + float(count)
         if target <= next_cumulative:
@@ -280,7 +284,11 @@ def _quantile_from_bins(
 
     return None, {
         "status": "unsupported",
-        "reason": "distribution_total_exceeds_bin_sum",
+        "reason": (
+            "null_bins_prevent_reaching_quantile"
+            if skipped_null_bin
+            else "distribution_total_exceeds_bin_sum"
+        ),
         "quantile": quantile,
     }
 
@@ -324,7 +332,13 @@ def allocate_acs1_county_to_tracts(
     *,
     component_columns: Iterable[str] | None = None,
 ) -> pd.DataFrame:
-    """Allocate ACS1 county components to ACS5 tracts using within-county shares."""
+    """Allocate ACS1 county components to ACS5 tracts using within-county shares.
+
+    If a support column has partial county coverage, non-null tracts receive the
+    full county source total for that component. This conserves ACS1 county
+    totals under the assumption that the missing tracts follow the observed
+    tract distribution.
+    """
     components = _component_columns(component_columns)
     if not components:
         raise ValueError("No SAE component columns were requested for allocation.")
@@ -531,6 +545,18 @@ def rollup_sae_tracts_to_geos(
         diagnostics["sae_allocated_tract_count"]
         / diagnostics["sae_crosswalk_tract_count"].replace(0, pd.NA)
     )
+    share_sum = grouped[share_column].sum(min_count=1)
+    diagnostics["sae_crosswalk_share_sum"] = (
+        diagnostics[geo_id_col].map(share_sum).astype("Float64")
+    )
+    nan_share_tracts = (
+        merged.loc[merged[share_column].isna()]
+        .groupby(geo_id_col)["tract_geoid"]
+        .nunique()
+    )
+    diagnostics["sae_nan_share_tract_count"] = (
+        diagnostics[geo_id_col].map(nan_share_tracts).fillna(0).astype("Int64")
+    )
 
     if "sae_missing_support_count" in merged.columns:
         missing_support = grouped["sae_missing_support_count"].sum(min_count=1)
@@ -576,6 +602,8 @@ def rollup_sae_tracts_to_geos(
         "sae_allocated_tract_count",
         "sae_missing_allocation_tract_count",
         "sae_crosswalk_coverage_ratio",
+        "sae_crosswalk_share_sum",
+        "sae_nan_share_tract_count",
         "sae_missing_support_count",
         "sae_zero_denominator_count",
         "sae_partial_coverage_count",
@@ -794,23 +822,34 @@ def compare_sae_to_direct_counties(
     coverage[coverage_column] = pd.to_numeric(coverage[coverage_column], errors="coerce")
 
     rows: list[dict[str, object]] = []
-    for geo_id, members in coverage.groupby(geo_id_col, dropna=False):
-        member_counties = sorted(members["county_fips"].dropna().astype(str).unique())
-        coverages = members[coverage_column]
-        has_partial = bool((coverages < 1.0 - full_coverage_tolerance).any())
-        has_missing_coverage = bool(coverages.isna().any())
-        if has_missing_coverage:
+    coverage_geo_ids = set(coverage[geo_id_col].dropna().astype(str))
+    sae_geo_ids = set(sae_geo[geo_id_col].dropna().astype(str))
+    grouped_coverage = coverage.groupby(geo_id_col, dropna=False)
+
+    for geo_id in sorted(coverage_geo_ids | sae_geo_ids):
+        if geo_id not in coverage_geo_ids:
+            members = coverage.iloc[0:0]
+            member_counties: list[str] = []
             comparable = False
-            reason = "missing_containment"
-        elif has_partial and len(member_counties) > 1:
-            comparable = False
-            reason = "mixed_containment"
-        elif has_partial:
-            comparable = False
-            reason = "partial_county"
+            reason = "not_in_coverage"
         else:
-            comparable = True
-            reason = "whole_county"
+            members = grouped_coverage.get_group(geo_id)
+            member_counties = sorted(members["county_fips"].dropna().astype(str).unique())
+            coverages = members[coverage_column]
+            has_partial = bool((coverages < 1.0 - full_coverage_tolerance).any())
+            has_missing_coverage = bool(coverages.isna().any())
+            if has_missing_coverage:
+                comparable = False
+                reason = "missing_containment"
+            elif has_partial and len(member_counties) > 1:
+                comparable = False
+                reason = "mixed_containment"
+            elif has_partial:
+                comparable = False
+                reason = "partial_county"
+            else:
+                comparable = True
+                reason = "whole_county"
 
         sae_rows = sae_geo[sae_geo[geo_id_col] == geo_id]
         source_rows = source[source["county_fips"].isin(member_counties)]

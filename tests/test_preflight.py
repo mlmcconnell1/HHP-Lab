@@ -865,10 +865,48 @@ class TestRunPreflight:
 
         report = run_preflight(recipe, project_root=tmp_path)
 
-        findings = [f for f in report.findings if f.kind == FindingKind.MISSING_MEASURE]
+        findings = [
+            f
+            for f in report.findings
+            if f.kind == FindingKind.MISSING_MEASURE
+            and "cannot produce outputs" in f.message
+        ]
         assert len(findings) == 1
-        assert "cannot produce outputs" in findings[0].message
         assert "direct medians" in findings[0].message
+
+    def test_sae_preflight_rejects_rent_burden_outputs_under_gross_rent_bins(
+        self,
+        tmp_path: Path,
+    ):
+        _write_sae_preflight_fixtures(tmp_path)
+        acs_dir = tmp_path / "data" / "curated" / "acs"
+        source = pd.read_parquet(acs_dir / "acs1_county_sae__A2023.parquet")
+        source["gross_rent_distribution_total"] = [100]
+        source["gross_rent_distribution_cash_rent_3500_plus"] = [10]
+        source.to_parquet(acs_dir / "acs1_county_sae__A2023.parquet")
+        support = pd.read_parquet(acs_dir / "acs5_tract_sae_support__A2022xT2020.parquet")
+        support["gross_rent_distribution_total"] = [100]
+        support["gross_rent_distribution_cash_rent_3500_plus"] = [10]
+        support.to_parquet(acs_dir / "acs5_tract_sae_support__A2022xT2020.parquet")
+        data = _sae_recipe_dict()
+        step = data["pipelines"][0]["steps"][0]
+        step["denominators"] = {"gross_rent_bins": "gross_rent_distribution_total"}
+        step["measures"] = {
+            "gross_rent_bins": {
+                "outputs": ["sae_gross_rent_pct_income_30_plus"],
+            },
+        }
+        recipe = load_recipe(data)
+
+        report = run_preflight(recipe, project_root=tmp_path)
+
+        findings = [
+            f
+            for f in report.findings
+            if f.kind == FindingKind.MISSING_MEASURE
+            and "cannot produce outputs" in f.message
+        ]
+        assert len(findings) == 1
 
     def test_sae_preflight_reports_missing_denominator_column(self, tmp_path: Path):
         _write_sae_preflight_fixtures(tmp_path)

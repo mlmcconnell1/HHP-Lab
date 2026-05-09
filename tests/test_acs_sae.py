@@ -174,6 +174,23 @@ def test_zero_denominator_produces_null_allocation_and_diagnostic() -> None:
     assert county_rows["sae_zero_denominator_count"].tolist() == [1, 1]
 
 
+def test_nan_source_component_produces_null_allocation_without_support_diagnostic() -> None:
+    source = COUNTY_SOURCE.copy()
+    source.loc[source["county_fips"] == "08031", "household_income_total"] = pd.NA
+
+    result = allocate_acs1_county_to_tracts(
+        source,
+        TRACT_SUPPORT,
+        component_columns=["household_income_total"],
+    )
+
+    county_rows = result[result["county_fips"] == "08031"]
+    assert county_rows["sae_household_income_total"].isna().all()
+    assert county_rows["sae_missing_support_count"].tolist() == [0, 0]
+    residuals = json.loads(county_rows["sae_allocation_residuals"].iloc[0])
+    assert residuals["household_income_total"] is None
+
+
 def test_missing_distribution_support_marks_partial_coverage() -> None:
     support = TRACT_SUPPORT.copy()
     support.loc[support["tract_geoid"] == "08031001000", "household_income_total"] = pd.NA
@@ -191,6 +208,25 @@ def test_missing_distribution_support_marks_partial_coverage() -> None:
     assert json.loads(missing_row["sae_missing_support_columns"]) == ["household_income_total"]
     assert json.loads(missing_row["sae_partial_coverage_columns"]) == ["household_income_total"]
     assert json.loads(covered_row["sae_partial_coverage_columns"]) == ["household_income_total"]
+
+
+def test_partial_coverage_boosts_nonmissing_tracts_to_conserve_county_total() -> None:
+    support = TRACT_SUPPORT.copy()
+    support.loc[support["tract_geoid"] == "08031001000", "household_income_total"] = pd.NA
+
+    result = allocate_acs1_county_to_tracts(
+        COUNTY_SOURCE,
+        support,
+        component_columns=["household_income_total"],
+    )
+
+    boosted_row = result[result["tract_geoid"] == "08031001100"].iloc[0]
+    assert boosted_row["sae_household_income_total"] == pytest.approx(1000.0)
+    assert json.loads(boosted_row["sae_partial_coverage_columns"]) == [
+        "household_income_total"
+    ]
+    residuals = json.loads(boosted_row["sae_allocation_residuals"])
+    assert residuals["household_income_total"] == pytest.approx(0.0)
 
 
 def test_records_missing_county_coverage_in_attrs() -> None:
@@ -252,6 +288,7 @@ def test_rolls_allocated_components_to_single_partial_and_multi_county_cocs() ->
     assert by_coc.loc["COC-MULTI", "sae_source_county_count"] == 2
     assert json.loads(by_coc.loc["COC-MULTI", "sae_source_counties"]) == ["08031", "08059"]
     assert by_coc.loc["COC-MULTI", "sae_crosswalk_coverage_ratio"] == pytest.approx(1.0)
+    assert by_coc.loc["COC-MULTI", "sae_crosswalk_share_sum"] == pytest.approx(2.0)
 
 
 def test_rollup_emits_missing_allocation_and_support_diagnostics() -> None:
@@ -289,6 +326,56 @@ def test_rollup_emits_missing_allocation_and_support_diagnostics() -> None:
     assert result.loc["COC-MISSING", "sae_missing_allocation_tract_count"] == 1
     assert result.loc["COC-MISSING", "sae_crosswalk_coverage_ratio"] == pytest.approx(0.0)
     assert pd.isna(result.loc["COC-MISSING", "sae_household_income_total"])
+
+
+def test_rollup_diagnoses_nan_crosswalk_share_rows() -> None:
+    allocated = allocate_acs1_county_to_tracts(
+        COUNTY_SOURCE,
+        TRACT_SUPPORT,
+        component_columns=["household_income_total"],
+    )
+    crosswalk = pd.DataFrame(
+        [
+            {"coc_id": "COC-A", "tract_geoid": "08031001000", "area_share": 0.5},
+            {"coc_id": "COC-A", "tract_geoid": "08031001100", "area_share": pd.NA},
+        ]
+    )
+
+    result = rollup_sae_tracts_to_geos(
+        allocated,
+        crosswalk,
+        component_columns=["household_income_total"],
+    ).set_index("coc_id")
+
+    assert result.loc["COC-A", "sae_household_income_total"] == pytest.approx(300.0)
+    assert result.loc["COC-A", "sae_nan_share_tract_count"] == 1
+    assert result.loc["COC-A", "sae_crosswalk_share_sum"] == pytest.approx(0.5)
+
+
+def test_rollup_preserves_partial_crosswalk_share_leakage() -> None:
+    allocated = allocate_acs1_county_to_tracts(
+        COUNTY_SOURCE,
+        TRACT_SUPPORT,
+        component_columns=["household_income_total"],
+    )
+    crosswalk = pd.DataFrame(
+        [
+            {"coc_id": "COC-A", "tract_geoid": "08031001000", "area_share": 0.4},
+            {"coc_id": "COC-B", "tract_geoid": "08031001000", "area_share": 0.4},
+        ]
+    )
+
+    result = rollup_sae_tracts_to_geos(
+        allocated,
+        crosswalk,
+        component_columns=["household_income_total"],
+    ).set_index("coc_id")
+
+    assert result.loc["COC-A", "sae_household_income_total"] == pytest.approx(240.0)
+    assert result.loc["COC-B", "sae_household_income_total"] == pytest.approx(240.0)
+    assert result["sae_household_income_total"].sum() == pytest.approx(480.0)
+    assert result.loc["COC-A", "sae_crosswalk_coverage_ratio"] == pytest.approx(1.0)
+    assert result.loc["COC-A", "sae_crosswalk_share_sum"] == pytest.approx(0.4)
 
 
 BURDEN_COMPONENTS = pd.DataFrame(
@@ -420,6 +507,30 @@ def test_distribution_derivation_returns_null_for_open_ended_quantile() -> None:
     assert diagnostics["sae_household_income_median"]["reason"] == "quantile_in_open_ended_bin"
 
 
+def test_distribution_derivation_distinguishes_null_bins_from_short_totals() -> None:
+    row = {
+        "coc_id": "COC-A",
+        "sae_household_income_total": 100,
+        **_zero_distribution(HOUSEHOLD_INCOME_BINS),
+    }
+    row["sae_household_income_lt_10000"] = 40
+    row["sae_household_income_10000_to_14999"] = pd.NA
+
+    result = derive_sae_distribution_measures(
+        pd.DataFrame([row]),
+        families=["household_income"],
+    )
+    output = result.iloc[0]
+
+    assert pd.isna(output["sae_household_income_median"])
+    diagnostics = json.loads(output["sae_household_income_distribution_diagnostics"])
+    assert diagnostics["sae_household_income_median"]["status"] == "unsupported"
+    assert (
+        diagnostics["sae_household_income_median"]["reason"]
+        == "null_bins_prevent_reaching_quantile"
+    )
+
+
 def test_derives_gross_rent_median_from_cash_rent_distribution() -> None:
     row = {
         "coc_id": "COC-A",
@@ -522,6 +633,42 @@ def test_direct_county_comparison_labels_partial_and_mixed_containment() -> None
     assert result.loc["COC-PARTIAL", "sae_value"] == pytest.approx(300.0)
     assert bool(result.loc["COC-MIXED", "comparable"]) is False
     assert result.loc["COC-MIXED", "comparability_reason"] == "mixed_containment"
+
+
+def test_direct_county_comparison_emits_uncovered_sae_geographies() -> None:
+    county_source = pd.DataFrame(
+        {
+            "county_fips": ["08031"],
+            "sae_household_income_total": [1000.0],
+        }
+    )
+    sae_geo = pd.DataFrame(
+        {
+            "coc_id": ["COC-COVERED", "COC-NOT-IN-COVERAGE"],
+            "sae_household_income_total": [1005.0, 250.0],
+        }
+    )
+    coverage = pd.DataFrame(
+        {
+            "coc_id": ["COC-COVERED"],
+            "county_fips": ["08031"],
+            "county_area_coverage_ratio": [1.0],
+        }
+    )
+
+    result = compare_sae_to_direct_counties(
+        sae_geo,
+        county_source,
+        coverage,
+        measure_columns=["sae_household_income_total"],
+    ).set_index("coc_id")
+
+    assert bool(result.loc["COC-NOT-IN-COVERAGE", "comparable"]) is False
+    assert result.loc["COC-NOT-IN-COVERAGE", "comparability_reason"] == "not_in_coverage"
+    assert pd.isna(result.loc["COC-NOT-IN-COVERAGE", "direct_county_value"])
+    assert result.loc["COC-NOT-IN-COVERAGE", "sae_value"] == pytest.approx(250.0)
+    assert result.loc["COC-NOT-IN-COVERAGE", "source_county_count"] == 0
+    assert json.loads(result.loc["COC-NOT-IN-COVERAGE", "source_counties"]) == []
 
 
 def test_direct_county_comparison_requires_measures() -> None:

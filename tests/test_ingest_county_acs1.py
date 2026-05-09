@@ -4,13 +4,15 @@ from __future__ import annotations
 
 import json
 import re
+import warnings
 from typing import Any
 
 import pandas as pd
 import pytest
+from pandas.errors import PerformanceWarning
 from typer.testing import CliRunner
 
-from hhplab.acs.ingest._acs1_api import ACS1_COUNTY_GEOGRAPHY
+from hhplab.acs.ingest._acs1_api import ACS1_COUNTY_GEOGRAPHY, normalize_acs1_measures
 from hhplab.acs.ingest.county_acs1 import (
     fetch_acs1_county_data,
     ingest_county_acs1,
@@ -216,6 +218,27 @@ def test_county_sae_source_rejects_unavailable_acs1_2020() -> None:
             pd.DataFrame(SAMPLE_COUNTIES),
             acs1_vintage=2020,
         )
+
+
+def test_normalize_acs1_measures_adds_missing_columns_without_fragmentation_warning() -> None:
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        result = normalize_acs1_measures(
+            pd.DataFrame(
+                {
+                    "B23025_003E": [100],
+                    "B23025_005E": [5],
+                }
+            )
+        )
+
+    performance_warnings = [
+        warning for warning in caught if issubclass(warning.category, PerformanceWarning)
+    ]
+    assert performance_warnings == []
+    assert result["civilian_labor_force"].dtype == "Int64"
+    assert result["unemployment_rate_acs1"].dtype == "Float64"
+    assert result["unemployment_rate_acs1"].tolist() == pytest.approx([0.05])
 
 
 @pytest.mark.parametrize(

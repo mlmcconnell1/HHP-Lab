@@ -179,9 +179,13 @@ def normalize_acs1_measures(df: pd.DataFrame) -> pd.DataFrame:
         / result.loc[valid_denom, "civilian_labor_force"]
     )
 
-    for column_name in ACS1_INTEGER_COLUMNS + ACS1_FLOAT_COLUMNS:
-        if column_name not in result.columns:
-            result[column_name] = pd.NA
+    expected_measure_columns = list(dict.fromkeys(ACS1_INTEGER_COLUMNS + ACS1_FLOAT_COLUMNS))
+    missing_measure_columns = [
+        col for col in expected_measure_columns if col not in result.columns
+    ]
+    result = result.reindex(
+        columns=[*result.columns, *missing_measure_columns],
+    )
 
     for col in ACS1_INTEGER_COLUMNS:
         if col in result.columns:
