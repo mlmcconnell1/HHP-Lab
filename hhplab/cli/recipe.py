@@ -468,6 +468,7 @@ def recipe_plan_cmd(
         total = (
             len(plan.materialize_tasks)
             + len(plan.resample_tasks)
+            + len(plan.small_area_estimate_tasks)
             + len(plan.join_tasks)
         )
         typer.echo(f"\nPipeline '{plan.pipeline_id}' ({total} tasks):")
@@ -491,6 +492,14 @@ def recipe_plan_cmd(
             if rt.input_path:
                 line += f" path={rt.input_path}"
             typer.echo(line)
+
+        for st in plan.small_area_estimate_tasks:
+            target_geo_str = _format_geometry(st.target_geometry)
+            typer.echo(
+                f"  [small_area_estimate] {st.output_dataset} year={st.year} "
+                f"source={st.source_dataset} support={st.support_dataset} "
+                f"target={target_geo_str} measures={st.measure_families}",
+            )
 
         for jt in plan.join_tasks:
             typer.echo(

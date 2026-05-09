@@ -153,6 +153,12 @@ def _write_sae_preflight_fixtures(root: Path, *, year: int = 2023) -> None:
     ).to_parquet(xwalk_dir / "xwalk__B2025xT2020.parquet")
 
 
+def _write_cli_project_markers(root: Path) -> None:
+    (root / "pyproject.toml").touch()
+    (root / "hhplab").mkdir(exist_ok=True)
+    (root / "data").mkdir(exist_ok=True)
+
+
 # ---------------------------------------------------------------------------
 # Probe unit tests
 # ---------------------------------------------------------------------------
@@ -893,6 +899,103 @@ class TestRunPreflight:
         assert findings[0].years == [2020]
         assert findings[0].remediation is not None
         assert findings[0].remediation.command is None
+
+    def test_sae_recipe_plan_cli_json_exposes_resolved_task(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ):
+        _write_cli_project_markers(tmp_path)
+        recipe_path = tmp_path / "sae_recipe.json"
+        recipe_path.write_text(json.dumps(_sae_recipe_dict()), encoding="utf-8")
+        monkeypatch.chdir(tmp_path)
+
+        result = runner.invoke(
+            app,
+            ["build", "recipe-plan", "--recipe", str(recipe_path), "--json"],
+        )
+
+        assert result.exit_code == 0
+        payload = json.loads(result.output)
+        assert payload["status"] == "ok"
+        sae_tasks = payload["pipelines"][0]["small_area_estimate_tasks"]
+        assert len(sae_tasks) == 1
+        assert sae_tasks[0]["output_dataset"] == "acs_sae_coc"
+        assert sae_tasks[0]["source_path"] == "data/curated/acs/acs1_county_sae__A2023.parquet"
+        assert sae_tasks[0]["support_path"] == (
+            "data/curated/acs/acs5_tract_sae_support__A2022xT2020.parquet"
+        )
+        assert sae_tasks[0]["derived_outputs"] == {
+            "labor_force": ["sae_unemployment_rate"]
+        }
+
+    def test_sae_recipe_preflight_cli_json_reports_ready(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ):
+        _write_cli_project_markers(tmp_path)
+        _write_sae_preflight_fixtures(tmp_path)
+        recipe_path = tmp_path / "sae_recipe.json"
+        recipe_path.write_text(json.dumps(_sae_recipe_dict()), encoding="utf-8")
+        monkeypatch.chdir(tmp_path)
+
+        result = runner.invoke(
+            app,
+            [
+                "build",
+                "recipe-preflight",
+                "--recipe",
+                str(recipe_path),
+                "--json",
+                "--non-interactive",
+            ],
+        )
+
+        assert result.exit_code == 0
+        payload = json.loads(result.output)
+        assert payload["status"] == "ok"
+        assert payload["ready"] is True
+        assert payload["blocking_count"] == 0
+        assert payload["pipelines"][0]["task_count"] == 2
+
+    def test_sae_recipe_preflight_cli_json_reports_invalid_measure_config(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ):
+        _write_cli_project_markers(tmp_path)
+        _write_sae_preflight_fixtures(tmp_path)
+        data = _sae_recipe_dict()
+        data["pipelines"][0]["steps"][0]["measures"]["labor_force"]["outputs"] = [
+            "sae_household_income_median"
+        ]
+        recipe_path = tmp_path / "sae_recipe.json"
+        recipe_path.write_text(json.dumps(data), encoding="utf-8")
+        monkeypatch.chdir(tmp_path)
+
+        result = runner.invoke(
+            app,
+            [
+                "build",
+                "recipe-preflight",
+                "--recipe",
+                str(recipe_path),
+                "--json",
+                "--non-interactive",
+            ],
+        )
+
+        assert result.exit_code == 1
+        payload = json.loads(result.output)
+        assert payload["status"] == "blocked"
+        measure_findings = [
+            finding
+            for finding in payload["findings"]
+            if finding["kind"] == "missing_measure"
+        ]
+        assert len(measure_findings) == 1
+        assert "cannot produce outputs" in measure_findings[0]["message"]
 
     def test_blocks_stale_translated_acs_cache(self, tmp_path: Path):
         data = _preflight_recipe(with_path=True)
