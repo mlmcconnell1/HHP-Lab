@@ -12,6 +12,7 @@ from hhplab.acs.sae import (
     HOUSEHOLD_INCOME_BINS,
     SAE_ALLOCATION_METHOD,
     allocate_acs1_county_to_tracts,
+    compare_sae_to_direct_counties,
     derive_sae_burden_measures,
     derive_sae_distribution_measures,
     rollup_sae_tracts_to_geos,
@@ -443,3 +444,94 @@ def test_derives_gross_rent_median_from_cash_rent_distribution() -> None:
 def test_distribution_derivation_rejects_unsupported_family() -> None:
     with pytest.raises(ValueError, match="Unsupported SAE distribution measure families"):
         derive_sae_distribution_measures(pd.DataFrame({"coc_id": ["COC-A"]}), families=["median"])
+
+
+def test_compares_sae_to_direct_counties_for_whole_county_cocs() -> None:
+    county_source = pd.DataFrame(
+        {
+            "county_fips": ["08031", "08059"],
+            "sae_household_income_total": [1000.0, 500.0],
+        }
+    )
+    sae_geo = pd.DataFrame(
+        {
+            "coc_id": ["COC-SINGLE", "COC-MULTI"],
+            "sae_household_income_total": [1005.0, 1490.0],
+        }
+    )
+    coverage = pd.DataFrame(
+        {
+            "coc_id": ["COC-SINGLE", "COC-MULTI", "COC-MULTI"],
+            "county_fips": ["08031", "08031", "08059"],
+            "county_area_coverage_ratio": [1.0, 1.0, 1.0],
+        }
+    )
+
+    result = compare_sae_to_direct_counties(
+        sae_geo,
+        county_source,
+        coverage,
+        measure_columns=["sae_household_income_total"],
+    ).set_index("coc_id")
+
+    assert bool(result.loc["COC-SINGLE", "comparable"]) is True
+    assert result.loc["COC-SINGLE", "direct_county_value"] == pytest.approx(1000.0)
+    assert result.loc["COC-SINGLE", "sae_value"] == pytest.approx(1005.0)
+    assert result.loc["COC-SINGLE", "absolute_difference"] == pytest.approx(5.0)
+    assert result.loc["COC-SINGLE", "relative_difference"] == pytest.approx(0.005)
+    assert bool(result.loc["COC-MULTI", "comparable"]) is True
+    assert result.loc["COC-MULTI", "direct_county_value"] == pytest.approx(1500.0)
+    assert result.loc["COC-MULTI", "absolute_difference"] == pytest.approx(-10.0)
+    assert json.loads(result.loc["COC-MULTI", "source_counties"]) == ["08031", "08059"]
+
+
+def test_direct_county_comparison_labels_partial_and_mixed_containment() -> None:
+    county_source = pd.DataFrame(
+        {
+            "county_fips": ["08031", "08059"],
+            "sae_household_income_total": [1000.0, 500.0],
+        }
+    )
+    sae_geo = pd.DataFrame(
+        {
+            "coc_id": ["COC-PARTIAL", "COC-MIXED"],
+            "sae_household_income_total": [300.0, 1200.0],
+        }
+    )
+    coverage = pd.DataFrame(
+        {
+            "coc_id": ["COC-PARTIAL", "COC-MIXED", "COC-MIXED"],
+            "county_fips": ["08031", "08031", "08059"],
+            "county_area_coverage_ratio": [0.5, 1.0, 0.75],
+        }
+    )
+
+    result = compare_sae_to_direct_counties(
+        sae_geo,
+        county_source,
+        coverage,
+        measure_columns=["sae_household_income_total"],
+    ).set_index("coc_id")
+
+    assert bool(result.loc["COC-PARTIAL", "comparable"]) is False
+    assert result.loc["COC-PARTIAL", "comparability_reason"] == "partial_county"
+    assert pd.isna(result.loc["COC-PARTIAL", "direct_county_value"])
+    assert result.loc["COC-PARTIAL", "sae_value"] == pytest.approx(300.0)
+    assert bool(result.loc["COC-MIXED", "comparable"]) is False
+    assert result.loc["COC-MIXED", "comparability_reason"] == "mixed_containment"
+
+
+def test_direct_county_comparison_requires_measures() -> None:
+    with pytest.raises(ValueError, match="measure_columns"):
+        compare_sae_to_direct_counties(
+            pd.DataFrame({"coc_id": ["COC-A"]}),
+            pd.DataFrame({"county_fips": ["08031"]}),
+            pd.DataFrame(
+                {
+                    "coc_id": ["COC-A"],
+                    "county_fips": ["08031"],
+                    "county_area_coverage_ratio": [1.0],
+                }
+            ),
+            measure_columns=[],
+        )

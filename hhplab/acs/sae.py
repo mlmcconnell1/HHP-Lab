@@ -646,3 +646,99 @@ def derive_sae_distribution_measures(
         ]
 
     return result
+
+
+def compare_sae_to_direct_counties(
+    sae_geo: pd.DataFrame,
+    county_source: pd.DataFrame,
+    geo_county_coverage: pd.DataFrame,
+    *,
+    geo_id_col: str = "coc_id",
+    measure_columns: Iterable[str],
+    coverage_column: str = "county_area_coverage_ratio",
+    full_coverage_tolerance: float = 1e-9,
+) -> pd.DataFrame:
+    """Compare SAE geography estimates with direct whole-county source sums."""
+    measures = list(measure_columns)
+    if not measures:
+        raise ValueError("measure_columns must contain at least one measure.")
+
+    _require_columns(sae_geo, [geo_id_col, *measures], "sae_geo")
+    _require_columns(county_source, ["county_fips"], "county_source")
+    _require_columns(
+        geo_county_coverage,
+        [geo_id_col, "county_fips", coverage_column],
+        "geo_county_coverage",
+    )
+
+    source = county_source.copy()
+    source["county_fips"] = _normalize_county_key(source["county_fips"])
+    coverage = geo_county_coverage.copy()
+    coverage["county_fips"] = _normalize_county_key(coverage["county_fips"])
+    coverage[coverage_column] = pd.to_numeric(coverage[coverage_column], errors="coerce")
+
+    rows: list[dict[str, object]] = []
+    for geo_id, members in coverage.groupby(geo_id_col, dropna=False):
+        member_counties = sorted(members["county_fips"].dropna().astype(str).unique())
+        coverages = members[coverage_column]
+        has_partial = bool((coverages < 1.0 - full_coverage_tolerance).any())
+        has_missing_coverage = bool(coverages.isna().any())
+        if has_missing_coverage:
+            comparable = False
+            reason = "missing_containment"
+        elif has_partial and len(member_counties) > 1:
+            comparable = False
+            reason = "mixed_containment"
+        elif has_partial:
+            comparable = False
+            reason = "partial_county"
+        else:
+            comparable = True
+            reason = "whole_county"
+
+        sae_rows = sae_geo[sae_geo[geo_id_col] == geo_id]
+        source_rows = source[source["county_fips"].isin(member_counties)]
+        for measure in measures:
+            direct_value = pd.NA
+            absolute_difference = pd.NA
+            relative_difference = pd.NA
+            if comparable:
+                _require_columns(source, [measure], "county_source")
+                direct_value = pd.to_numeric(source_rows[measure], errors="coerce").sum(
+                    min_count=1,
+                )
+            sae_value = pd.NA
+            if not sae_rows.empty:
+                sae_value = pd.to_numeric(sae_rows[measure], errors="coerce").sum(
+                    min_count=1,
+                )
+            if comparable and pd.notna(direct_value) and pd.notna(sae_value):
+                absolute_difference = float(sae_value - direct_value)
+                if direct_value != 0:
+                    relative_difference = float(absolute_difference / direct_value)
+
+            rows.append(
+                {
+                    geo_id_col: geo_id,
+                    "measure": measure,
+                    "direct_county_value": direct_value,
+                    "sae_value": sae_value,
+                    "absolute_difference": absolute_difference,
+                    "relative_difference": relative_difference,
+                    "comparable": comparable,
+                    "comparability_reason": reason,
+                    "source_county_count": len(member_counties),
+                    "source_counties": _json_list(member_counties),
+                }
+            )
+
+    result = pd.DataFrame(rows)
+    numeric_columns = [
+        "direct_county_value",
+        "sae_value",
+        "absolute_difference",
+        "relative_difference",
+    ]
+    for column in numeric_columns:
+        result[column] = pd.to_numeric(result[column], errors="coerce").astype("Float64")
+    return result.sort_values([geo_id_col, "measure"]).reset_index(drop=True)
