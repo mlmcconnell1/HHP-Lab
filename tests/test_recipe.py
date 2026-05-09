@@ -62,6 +62,9 @@ from hhplab.recipe.recipe_schema import (
     MapSpec,
     PanelPolicy,
     RecipeV1,
+    SAEDiagnosticsSpec,
+    SAEMeasureConfig,
+    SmallAreaEstimateStep,
     TemporalFilter,
     YearSpec,
     ZoriPolicy,
@@ -143,6 +146,88 @@ def _minimal_recipe() -> dict:
                         "method": "allocate",
                         "via": "tract_to_coc",
                         "measures": ["total_population"],
+                    },
+                ],
+            }
+        ],
+    }
+
+
+def _sae_recipe() -> dict:
+    """Return a minimal valid recipe with an ACS1/ACS5 SAE step."""
+    return {
+        "version": 1,
+        "name": "sae-test-recipe",
+        "universe": {"years": [2023]},
+        "targets": [
+            {
+                "id": "coc_panel",
+                "geometry": {"type": "coc", "vintage": 2025},
+            }
+        ],
+        "datasets": {
+            "acs1_county": {
+                "provider": "census",
+                "product": "acs1",
+                "version": 1,
+                "native_geometry": {"type": "county", "vintage": 2020, "source": "tiger"},
+                "path": "data/curated/acs/acs1_county_sae__A2023.parquet",
+            },
+            "acs5_tract_support": {
+                "provider": "census",
+                "product": "acs5",
+                "version": 1,
+                "native_geometry": {"type": "tract", "vintage": 2020, "source": "tiger"},
+                "path": "data/curated/acs/acs5_tract_sae_support__A2022xT2020.parquet",
+            },
+        },
+        "pipelines": [
+            {
+                "id": "main",
+                "target": "coc_panel",
+                "steps": [
+                    {
+                        "kind": "small_area_estimate",
+                        "output_dataset": "acs_sae_coc",
+                        "source_dataset": "acs1_county",
+                        "support_dataset": "acs5_tract_support",
+                        "source_geometry": {
+                            "type": "county",
+                            "vintage": 2020,
+                            "source": "tiger",
+                        },
+                        "support_geometry": {
+                            "type": "tract",
+                            "vintage": 2020,
+                            "source": "tiger",
+                        },
+                        "target_geometry": {"type": "coc", "vintage": 2025},
+                        "terminal_acs5_vintage": 2022,
+                        "tract_vintage": 2020,
+                        "denominators": {
+                            "rent_burden": "gross_rent_pct_income_total",
+                            "labor_force": "civilian_labor_force",
+                        },
+                        "measures": {
+                            "household_income_bins": {
+                                "outputs": [
+                                    "sae_household_income_median",
+                                    "sae_household_income_quintile_cutoff_20",
+                                ]
+                            },
+                            "rent_burden": {
+                                "outputs": [
+                                    "sae_rent_burden_30_plus",
+                                    "sae_rent_burden_50_plus",
+                                ]
+                            },
+                        },
+                        "diagnostics": {"direct_county_comparison": True},
+                    },
+                    {
+                        "kind": "join",
+                        "datasets": ["acs_sae_coc"],
+                        "join_on": ["geo_id", "year"],
                     },
                 ],
             }
@@ -2536,6 +2621,123 @@ class TestPanelPolicy:
         assert restored.zori.min_coverage == 0.95
         assert restored.acs1.include is True
         assert restored.column_aliases == {"zori_coc": "zori"}
+
+
+class TestSmallAreaEstimateSchema:
+    """Schema tests for explicit ACS1/ACS5 small-area estimation steps."""
+
+    def test_sae_step_loads_with_explicit_contract(self):
+        recipe = load_recipe(_sae_recipe())
+        step = recipe.pipelines[0].steps[0]
+
+        assert isinstance(step, SmallAreaEstimateStep)
+        assert step.output_dataset == "acs_sae_coc"
+        assert step.source_dataset == "acs1_county"
+        assert step.support_dataset == "acs5_tract_support"
+        assert step.source_geometry.type == "county"
+        assert step.support_geometry.type == "tract"
+        assert step.target_geometry == recipe.targets[0].geometry
+        assert step.terminal_acs5_vintage == 2022
+        assert step.tract_vintage == 2020
+        assert step.allocation_method == "tract_share_within_county"
+        assert step.zero_denominator_policy == "null_rate"
+        assert step.fallback_policy == "diagnose_only"
+        assert step.denominators["rent_burden"] == "gross_rent_pct_income_total"
+        assert "rent_burden" in step.measures
+        assert step.measures["rent_burden"].outputs == [
+            "sae_rent_burden_30_plus",
+            "sae_rent_burden_50_plus",
+        ]
+        assert step.diagnostics.direct_county_comparison is True
+
+    def test_sae_wrapper_step_shorthand_loads(self):
+        data = _sae_recipe()
+        step = data["pipelines"][0]["steps"][0]
+        data["pipelines"][0]["steps"][0] = {"small_area_estimate": step}
+
+        recipe = load_recipe(data)
+
+        assert isinstance(recipe.pipelines[0].steps[0], SmallAreaEstimateStep)
+
+    def test_join_can_reference_sae_output_dataset(self):
+        recipe = load_recipe(_sae_recipe())
+        join_step = recipe.pipelines[0].steps[1]
+
+        assert join_step.datasets == ["acs_sae_coc"]
+
+    @pytest.mark.parametrize(
+        ("field", "value", "message"),
+        [
+            ("source_geometry", {"type": "tract", "vintage": 2020}, "source_geometry.type"),
+            ("support_geometry", {"type": "county", "vintage": 2020}, "support_geometry.type"),
+        ],
+    )
+    def test_sae_rejects_invalid_source_or_support_geometry(self, field, value, message):
+        data = _sae_recipe()
+        data["pipelines"][0]["steps"][0][field] = value
+
+        with pytest.raises(RecipeLoadError, match=message):
+            load_recipe(data)
+
+    def test_sae_rejects_support_geometry_vintage_mismatch(self):
+        data = _sae_recipe()
+        data["pipelines"][0]["steps"][0]["support_geometry"]["vintage"] = 2010
+
+        with pytest.raises(RecipeLoadError, match="support_geometry.vintage must match"):
+            load_recipe(data)
+
+    def test_sae_rejects_direct_median_outputs(self):
+        data = _sae_recipe()
+        data["pipelines"][0]["steps"][0]["measures"]["household_income_bins"][
+            "outputs"
+        ] = ["median_household_income"]
+
+        with pytest.raises(RecipeLoadError, match="direct ACS median/context columns"):
+            load_recipe(data)
+
+    def test_sae_rejects_non_sae_output_columns(self):
+        with pytest.raises(ValueError, match="sae_"):
+            SAEMeasureConfig(outputs=["rent_burden_30_plus"])
+
+    def test_sae_rejects_direct_median_denominator(self):
+        data = _sae_recipe()
+        data["pipelines"][0]["steps"][0]["denominators"] = {
+            "household_income_bins": "median_household_income",
+        }
+
+        with pytest.raises(RecipeLoadError, match="denominators cannot use direct ACS"):
+            load_recipe(data)
+
+    def test_sae_rejects_unknown_source_dataset(self):
+        data = _sae_recipe()
+        data["pipelines"][0]["steps"][0]["source_dataset"] = "missing_acs1"
+
+        with pytest.raises(RecipeLoadError, match="unknown dataset"):
+            load_recipe(data)
+
+    def test_sae_output_dataset_must_not_conflict_with_declared_dataset(self):
+        data = _sae_recipe()
+        data["pipelines"][0]["steps"][0]["output_dataset"] = "acs1_county"
+
+        with pytest.raises(RecipeLoadError, match="conflicts with a declared dataset"):
+            load_recipe(data)
+
+    def test_sae_target_geometry_must_match_pipeline_target(self):
+        data = _sae_recipe()
+        data["pipelines"][0]["steps"][0]["target_geometry"] = {
+            "type": "metro",
+            "source": "glynn_fox_v1",
+        }
+
+        with pytest.raises(RecipeLoadError, match="target_geometry must match"):
+            load_recipe(data)
+
+    def test_sae_diagnostics_defaults(self):
+        diagnostics = SAEDiagnosticsSpec()
+
+        assert diagnostics.conservation is True
+        assert diagnostics.denominator is True
+        assert diagnostics.direct_county_comparison is True
 
 
 class TestPipelineResult:

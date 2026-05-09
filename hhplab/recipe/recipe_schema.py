@@ -820,6 +820,35 @@ TransformSpec = Annotated[CrosswalkTransform | RollupTransform, Field(discrimina
 
 ResampleMethod = Literal["identity", "allocate", "aggregate"]
 AggregationMethod = Literal["sum", "mean", "weighted_mean"]
+SAEAllocationMethod = Literal["tract_share_within_county"]
+SAEFallbackPolicy = Literal["diagnose_only", "fail"]
+SAEZeroDenominatorPolicy = Literal["null_rate", "diagnostic"]
+SAEMeasureFamily = Literal[
+    "household_income_bins",
+    "gross_rent_bins",
+    "rent_burden",
+    "owner_cost_burden",
+    "tenure_income",
+    "labor_force",
+]
+
+_SAE_DIRECT_MEDIAN_CONTEXT_COLUMNS = frozenset(
+    {
+        "median_household_income",
+        "median_gross_rent",
+        "median_household_income_owner_occupied",
+        "median_household_income_renter_occupied",
+        "household_income_quintile_upper_limit_first",
+        "household_income_quintile_upper_limit_second",
+        "household_income_quintile_upper_limit_third",
+        "household_income_quintile_upper_limit_fourth",
+        "household_income_quintile_mean_lowest",
+        "household_income_quintile_mean_second",
+        "household_income_quintile_mean_third",
+        "household_income_quintile_mean_fourth",
+        "household_income_quintile_mean_highest",
+    }
+)
 
 
 class MaterializeStep(BaseModel):
@@ -903,6 +932,175 @@ class ResampleStep(BaseModel):
         return list(self.measures.keys())
 
 
+class SAEMeasureConfig(BaseModel):
+    """Requested outputs for one SAE measure family.
+
+    Outputs must be derived SAE columns, not direct ACS median/context
+    measures. Empty outputs mean the executor may emit the family defaults.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    outputs: list[str] = Field(
+        default_factory=list,
+        description=(
+            "Optional derived SAE output columns requested for this family. "
+            "Columns must use the sae_ prefix."
+        ),
+    )
+
+    @field_validator("outputs")
+    @classmethod
+    def _validate_outputs(cls, value: list[str]) -> list[str]:
+        if any(not output.strip() for output in value):
+            raise ValueError("SAE measure outputs may not contain blank items.")
+        direct_medians = sorted(set(value) & _SAE_DIRECT_MEDIAN_CONTEXT_COLUMNS)
+        if direct_medians:
+            raise ValueError(
+                "SAE measure outputs cannot request direct ACS median/context "
+                f"columns: {direct_medians}. Request distribution-derived "
+                "sae_* outputs instead."
+            )
+        non_sae = [output for output in value if not output.startswith("sae_")]
+        if non_sae:
+            raise ValueError(
+                "SAE measure outputs must use explicit sae_* derived columns. "
+                f"Invalid outputs: {non_sae}."
+            )
+        return value
+
+
+class SAEDiagnosticsSpec(BaseModel):
+    """Diagnostics emitted by a small-area estimation step."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    conservation: bool = Field(
+        default=True,
+        description="Emit allocation conservation residual diagnostics.",
+    )
+    denominator: bool = Field(
+        default=True,
+        description="Emit missing-support and zero-denominator diagnostics.",
+    )
+    direct_county_comparison: bool = Field(
+        default=True,
+        description=(
+            "Emit direct county comparison diagnostics for whole-county target geographies."
+        ),
+    )
+
+
+class SmallAreaEstimateStep(BaseModel):
+    """ACS1/ACS5 small-area estimation pipeline step.
+
+    This step explicitly models county ACS1 source aggregates allocated through
+    ACS5 tract distribution supports and then rolled to the target geometry.
+    It intentionally avoids generic weighted_mean semantics.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    kind: Literal["small_area_estimate"] = "small_area_estimate"
+    output_dataset: str = Field(
+        ...,
+        description="Dataset id produced by this SAE step for downstream joins.",
+    )
+    source_dataset: str = Field(..., description="ACS1 county source aggregate dataset id.")
+    support_dataset: str = Field(..., description="ACS5 tract support dataset id.")
+    source_geometry: GeometryRef = Field(..., description="Source geometry; must be county.")
+    support_geometry: GeometryRef = Field(..., description="Support geometry; must be tract.")
+    target_geometry: GeometryRef = Field(..., description="Destination analysis geometry.")
+    terminal_acs5_vintage: int | str = Field(
+        ...,
+        description="Terminal ACS5 vintage used for tract distribution supports.",
+    )
+    tract_vintage: int | str = Field(
+        ...,
+        description="Census tract vintage used by the ACS5 support artifact.",
+    )
+    allocation_method: SAEAllocationMethod = Field(
+        default="tract_share_within_county",
+        description="SAE allocation method.",
+    )
+    denominators: dict[str, str] = Field(
+        default_factory=dict,
+        description=(
+            "Optional measure-family to denominator-column mapping. "
+            "Omitted families use the canonical support column for each component."
+        ),
+    )
+    measures: dict[SAEMeasureFamily, SAEMeasureConfig] = Field(
+        ...,
+        min_length=1,
+        description="Requested SAE measure families and optional derived outputs.",
+    )
+    zero_denominator_policy: SAEZeroDenominatorPolicy = Field(
+        default="null_rate",
+        description="How derived rates behave when allocated denominators are zero.",
+    )
+    fallback_policy: SAEFallbackPolicy = Field(
+        default="diagnose_only",
+        description=(
+            "Policy for missing unsupported source/support components. "
+            "diagnose_only records diagnostics without substituting ACS5 medians."
+        ),
+    )
+    diagnostics: SAEDiagnosticsSpec = Field(
+        default_factory=SAEDiagnosticsSpec,
+        description="Diagnostics requested for the SAE step.",
+    )
+
+    @field_validator("output_dataset", "source_dataset", "support_dataset")
+    @classmethod
+    def _validate_dataset_ids(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("SAE dataset identifiers must be non-empty.")
+        return value
+
+    @field_validator("denominators")
+    @classmethod
+    def _validate_denominators(cls, value: dict[str, str]) -> dict[str, str]:
+        blank_keys = [key for key in value if not key.strip()]
+        blank_values = [key for key, column in value.items() if not column.strip()]
+        if blank_keys:
+            raise ValueError("SAE denominators may not contain blank measure-family keys.")
+        if blank_values:
+            raise ValueError(
+                "SAE denominators may not contain blank denominator columns "
+                f"for families: {blank_values}."
+            )
+        direct_medians = sorted(set(value.values()) & _SAE_DIRECT_MEDIAN_CONTEXT_COLUMNS)
+        if direct_medians:
+            raise ValueError(
+                "SAE denominators cannot use direct ACS median/context columns: "
+                f"{direct_medians}."
+            )
+        return value
+
+    @model_validator(mode="after")
+    def _validate_geometries(self) -> SmallAreaEstimateStep:
+        if self.source_dataset == self.support_dataset:
+            raise ValueError(
+                "SAE source_dataset and support_dataset must be different artifacts."
+            )
+        if self.source_geometry.type != "county":
+            raise ValueError(
+                "SAE source_geometry.type must be 'county' for ACS1 county aggregates."
+            )
+        if self.support_geometry.type != "tract":
+            raise ValueError(
+                "SAE support_geometry.type must be 'tract' for ACS5 tract distributions."
+            )
+        if self.support_geometry.vintage is not None and (
+            str(self.support_geometry.vintage) != str(self.tract_vintage)
+        ):
+            raise ValueError(
+                "SAE support_geometry.vintage must match tract_vintage when both are set."
+            )
+        return self
+
+
 class JoinStep(BaseModel):
     model_config = ConfigDict(extra="forbid")
     kind: Literal["join"] = "join"
@@ -910,10 +1108,13 @@ class JoinStep(BaseModel):
     join_on: list[str] = Field(default_factory=lambda: ["geo_id", "year"], description="Join keys.")
 
 
-StepSpec = Annotated[MaterializeStep | ResampleStep | JoinStep, Field(discriminator="kind")]
+StepSpec = Annotated[
+    MaterializeStep | ResampleStep | SmallAreaEstimateStep | JoinStep,
+    Field(discriminator="kind"),
+]
 
 
-_STEP_KINDS = frozenset({"materialize", "resample", "join"})
+_STEP_KINDS = frozenset({"materialize", "resample", "small_area_estimate", "join"})
 
 
 def _unwrap_step(raw: Any) -> Any:
@@ -1038,6 +1239,8 @@ class RecipeV1(BaseModel):
             if p.target not in target_id_set:
                 raise ValueError(f"Pipeline '{p.id}' references unknown target '{p.target}'.")
 
+            produced_dataset_ids: set[str] = set()
+            target = next(t for t in self.targets if t.id == p.target)
             for step in p.steps:
                 if isinstance(step, MaterializeStep):
                     missing = [x for x in step.transforms if x not in transform_id_set]
@@ -1059,8 +1262,37 @@ class RecipeV1(BaseModel):
                             f" unknown transform '{step.via}'."
                         )
 
+                elif isinstance(step, SmallAreaEstimateStep):
+                    missing = [
+                        dataset_id
+                        for dataset_id in (step.source_dataset, step.support_dataset)
+                        if dataset_id not in dataset_ids
+                    ]
+                    if missing:
+                        raise ValueError(
+                            f"Pipeline '{p.id}' small_area_estimate step references "
+                            f"unknown dataset(s): {missing}"
+                        )
+                    if step.output_dataset in dataset_ids:
+                        raise ValueError(
+                            f"Pipeline '{p.id}' small_area_estimate output_dataset "
+                            f"'{step.output_dataset}' conflicts with a declared dataset."
+                        )
+                    if step.output_dataset in produced_dataset_ids:
+                        raise ValueError(
+                            f"Pipeline '{p.id}' produces duplicate small_area_estimate "
+                            f"output_dataset '{step.output_dataset}'."
+                        )
+                    if step.target_geometry != target.geometry:
+                        raise ValueError(
+                            f"Pipeline '{p.id}' small_area_estimate step target_geometry "
+                            f"must match target '{p.target}' geometry."
+                        )
+                    produced_dataset_ids.add(step.output_dataset)
+
                 elif isinstance(step, JoinStep):
-                    missing = [d for d in step.datasets if d not in dataset_ids]
+                    available_dataset_ids = dataset_ids | produced_dataset_ids
+                    missing = [d for d in step.datasets if d not in available_dataset_ids]
                     if missing:
                         raise ValueError(
                             f"Pipeline '{p.id}' join step references unknown datasets: {missing}"
