@@ -10,6 +10,7 @@ import pytest
 from hhplab.acs.sae import (
     SAE_ALLOCATION_METHOD,
     allocate_acs1_county_to_tracts,
+    derive_sae_burden_measures,
     rollup_sae_tracts_to_geos,
 )
 
@@ -281,3 +282,75 @@ def test_rollup_emits_missing_allocation_and_support_diagnostics() -> None:
     assert result.loc["COC-MISSING", "sae_missing_allocation_tract_count"] == 1
     assert result.loc["COC-MISSING", "sae_crosswalk_coverage_ratio"] == pytest.approx(0.0)
     assert pd.isna(result.loc["COC-MISSING", "sae_household_income_total"])
+
+
+BURDEN_COMPONENTS = pd.DataFrame(
+    [
+        {
+            "coc_id": "COC-A",
+            "sae_gross_rent_pct_income_total": 100,
+            "sae_gross_rent_pct_income_30_to_34_9": 20,
+            "sae_gross_rent_pct_income_35_to_39_9": 10,
+            "sae_gross_rent_pct_income_40_to_49_9": 5,
+            "sae_gross_rent_pct_income_50_plus": 15,
+            "sae_gross_rent_pct_income_not_computed": 10,
+            "sae_owner_costs_pct_income_with_mortgage_total": 80,
+            "sae_owner_costs_pct_income_with_mortgage_30_to_34_9": 10,
+            "sae_owner_costs_pct_income_with_mortgage_35_to_39_9": 5,
+            "sae_owner_costs_pct_income_with_mortgage_40_to_49_9": 5,
+            "sae_owner_costs_pct_income_with_mortgage_50_plus": 10,
+            "sae_owner_costs_pct_income_with_mortgage_not_computed": 5,
+            "sae_owner_costs_pct_income_without_mortgage_total": 20,
+            "sae_owner_costs_pct_income_without_mortgage_30_to_34_9": 2,
+            "sae_owner_costs_pct_income_without_mortgage_35_to_39_9": 1,
+            "sae_owner_costs_pct_income_without_mortgage_40_to_49_9": 1,
+            "sae_owner_costs_pct_income_without_mortgage_50_plus": 1,
+            "sae_owner_costs_pct_income_without_mortgage_not_computed": 0,
+        }
+    ]
+)
+
+
+def test_derives_rent_and_owner_burden_rates_from_allocated_bins() -> None:
+    result = derive_sae_burden_measures(BURDEN_COMPONENTS)
+    row = result.iloc[0]
+
+    assert row["sae_rent_burden_not_computed_count"] == pytest.approx(10.0)
+    assert row["sae_rent_burden_denominator"] == pytest.approx(90.0)
+    assert row["sae_rent_burden_30_plus_count"] == pytest.approx(50.0)
+    assert row["sae_rent_burden_50_plus_count"] == pytest.approx(15.0)
+    assert row["sae_rent_burden_30_plus"] == pytest.approx(50.0 / 90.0)
+    assert row["sae_rent_burden_50_plus"] == pytest.approx(15.0 / 90.0)
+
+    assert row["sae_owner_cost_burden_not_computed_count"] == pytest.approx(5.0)
+    assert row["sae_owner_cost_burden_denominator"] == pytest.approx(95.0)
+    assert row["sae_owner_cost_burden_30_plus_count"] == pytest.approx(35.0)
+    assert row["sae_owner_cost_burden_50_plus_count"] == pytest.approx(11.0)
+    assert row["sae_owner_cost_burden_30_plus"] == pytest.approx(35.0 / 95.0)
+    assert row["sae_owner_cost_burden_50_plus"] == pytest.approx(11.0 / 95.0)
+
+
+def test_burden_rate_derivation_handles_zero_denominators_explicitly() -> None:
+    components = BURDEN_COMPONENTS.copy()
+    components["sae_gross_rent_pct_income_total"] = 10
+    components["sae_gross_rent_pct_income_not_computed"] = 10
+    components["sae_owner_costs_pct_income_with_mortgage_total"] = 5
+    components["sae_owner_costs_pct_income_with_mortgage_not_computed"] = 5
+    components["sae_owner_costs_pct_income_without_mortgage_total"] = 0
+
+    result = derive_sae_burden_measures(components)
+    row = result.iloc[0]
+
+    assert row["sae_rent_burden_denominator"] == pytest.approx(0.0)
+    assert row["sae_owner_cost_burden_denominator"] == pytest.approx(0.0)
+    assert pd.isna(row["sae_rent_burden_30_plus"])
+    assert pd.isna(row["sae_owner_cost_burden_30_plus"])
+    diagnostics = json.loads(row["sae_burden_rate_diagnostics"])
+    assert diagnostics["rent_denominator_zero"] is True
+    assert diagnostics["owner_denominator_zero"] is True
+    assert diagnostics["not_computed_excluded"] is True
+
+
+def test_burden_rate_derivation_requires_allocated_bins() -> None:
+    with pytest.raises(ValueError, match="missing required columns"):
+        derive_sae_burden_measures(pd.DataFrame({"coc_id": ["COC-A"]}))

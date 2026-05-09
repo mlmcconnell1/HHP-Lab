@@ -12,6 +12,27 @@ from hhplab.acs.variables_acs1 import ACS1_SAE_SOURCE_COLUMNS
 
 SAE_ALLOCATION_METHOD = "tract_share_within_county"
 
+RENTER_BURDEN_30_PLUS_COLUMNS: tuple[str, ...] = (
+    "sae_gross_rent_pct_income_30_to_34_9",
+    "sae_gross_rent_pct_income_35_to_39_9",
+    "sae_gross_rent_pct_income_40_to_49_9",
+    "sae_gross_rent_pct_income_50_plus",
+)
+
+OWNER_WITH_MORTGAGE_BURDEN_30_PLUS_COLUMNS: tuple[str, ...] = (
+    "sae_owner_costs_pct_income_with_mortgage_30_to_34_9",
+    "sae_owner_costs_pct_income_with_mortgage_35_to_39_9",
+    "sae_owner_costs_pct_income_with_mortgage_40_to_49_9",
+    "sae_owner_costs_pct_income_with_mortgage_50_plus",
+)
+
+OWNER_WITHOUT_MORTGAGE_BURDEN_30_PLUS_COLUMNS: tuple[str, ...] = (
+    "sae_owner_costs_pct_income_without_mortgage_30_to_34_9",
+    "sae_owner_costs_pct_income_without_mortgage_35_to_39_9",
+    "sae_owner_costs_pct_income_without_mortgage_40_to_49_9",
+    "sae_owner_costs_pct_income_without_mortgage_50_plus",
+)
+
 
 def _json_list(values: Iterable[str]) -> str:
     return json.dumps(sorted(set(values)))
@@ -41,6 +62,18 @@ def _require_columns(df: pd.DataFrame, columns: Iterable[str], label: str) -> No
     missing = [column for column in columns if column not in df.columns]
     if missing:
         raise ValueError(f"{label} is missing required columns: {missing}.")
+
+
+def _sum_columns(df: pd.DataFrame, columns: Iterable[str]) -> pd.Series:
+    numeric = [pd.to_numeric(df[column], errors="coerce") for column in columns]
+    return pd.concat(numeric, axis=1).sum(axis=1, min_count=1).astype("Float64")
+
+
+def _safe_rate(numerator: pd.Series, denominator: pd.Series) -> pd.Series:
+    rate = pd.Series(pd.NA, index=numerator.index, dtype="Float64")
+    valid = numerator.notna() & denominator.notna() & (denominator > 0)
+    rate.loc[valid] = numerator.loc[valid] / denominator.loc[valid]
+    return rate
 
 
 def _normalize_county_key(series: pd.Series) -> pd.Series:
@@ -342,4 +375,110 @@ def rollup_sae_tracts_to_geos(
     result.attrs["geo_id_col"] = geo_id_col
     result.attrs["share_column"] = share_column
     result.attrs["component_columns"] = components
+    return result
+
+
+def derive_sae_burden_measures(df: pd.DataFrame) -> pd.DataFrame:
+    """Derive renter and owner burden rates from allocated SAE burden bins."""
+    renter_required = [
+        "sae_gross_rent_pct_income_total",
+        "sae_gross_rent_pct_income_not_computed",
+        *RENTER_BURDEN_30_PLUS_COLUMNS,
+    ]
+    owner_required = [
+        "sae_owner_costs_pct_income_with_mortgage_total",
+        "sae_owner_costs_pct_income_with_mortgage_not_computed",
+        "sae_owner_costs_pct_income_without_mortgage_total",
+        "sae_owner_costs_pct_income_without_mortgage_not_computed",
+        *OWNER_WITH_MORTGAGE_BURDEN_30_PLUS_COLUMNS,
+        *OWNER_WITHOUT_MORTGAGE_BURDEN_30_PLUS_COLUMNS,
+    ]
+    _require_columns(df, [*renter_required, *owner_required], "SAE burden input")
+
+    result = df.copy()
+    result["sae_rent_burden_not_computed_count"] = pd.to_numeric(
+        result["sae_gross_rent_pct_income_not_computed"],
+        errors="coerce",
+    ).astype("Float64")
+    rent_total = pd.to_numeric(result["sae_gross_rent_pct_income_total"], errors="coerce")
+    result["sae_rent_burden_denominator"] = (
+        rent_total - result["sae_rent_burden_not_computed_count"].fillna(0)
+    ).astype("Float64")
+    result["sae_rent_burden_30_plus_count"] = _sum_columns(
+        result,
+        RENTER_BURDEN_30_PLUS_COLUMNS,
+    )
+    result["sae_rent_burden_50_plus_count"] = pd.to_numeric(
+        result["sae_gross_rent_pct_income_50_plus"],
+        errors="coerce",
+    ).astype("Float64")
+    result["sae_rent_burden_30_plus"] = _safe_rate(
+        result["sae_rent_burden_30_plus_count"],
+        result["sae_rent_burden_denominator"],
+    )
+    result["sae_rent_burden_50_plus"] = _safe_rate(
+        result["sae_rent_burden_50_plus_count"],
+        result["sae_rent_burden_denominator"],
+    )
+
+    owner_not_computed = _sum_columns(
+        result,
+        [
+            "sae_owner_costs_pct_income_with_mortgage_not_computed",
+            "sae_owner_costs_pct_income_without_mortgage_not_computed",
+        ],
+    )
+    owner_total = _sum_columns(
+        result,
+        [
+            "sae_owner_costs_pct_income_with_mortgage_total",
+            "sae_owner_costs_pct_income_without_mortgage_total",
+        ],
+    )
+    result["sae_owner_cost_burden_not_computed_count"] = owner_not_computed
+    result["sae_owner_cost_burden_denominator"] = (
+        owner_total - owner_not_computed.fillna(0)
+    ).astype("Float64")
+    result["sae_owner_cost_burden_30_plus_count"] = _sum_columns(
+        result,
+        [
+            *OWNER_WITH_MORTGAGE_BURDEN_30_PLUS_COLUMNS,
+            *OWNER_WITHOUT_MORTGAGE_BURDEN_30_PLUS_COLUMNS,
+        ],
+    )
+    result["sae_owner_cost_burden_50_plus_count"] = _sum_columns(
+        result,
+        [
+            "sae_owner_costs_pct_income_with_mortgage_50_plus",
+            "sae_owner_costs_pct_income_without_mortgage_50_plus",
+        ],
+    )
+    result["sae_owner_cost_burden_30_plus"] = _safe_rate(
+        result["sae_owner_cost_burden_30_plus_count"],
+        result["sae_owner_cost_burden_denominator"],
+    )
+    result["sae_owner_cost_burden_50_plus"] = _safe_rate(
+        result["sae_owner_cost_burden_50_plus_count"],
+        result["sae_owner_cost_burden_denominator"],
+    )
+
+    result["sae_burden_rate_diagnostics"] = [
+        json.dumps(
+            {
+                "rent_denominator_zero": bool(
+                    pd.notna(rent_denominator) and rent_denominator == 0
+                ),
+                "owner_denominator_zero": bool(
+                    pd.notna(owner_denominator) and owner_denominator == 0
+                ),
+                "not_computed_excluded": True,
+            },
+            sort_keys=True,
+        )
+        for rent_denominator, owner_denominator in zip(
+            result["sae_rent_burden_denominator"],
+            result["sae_owner_cost_burden_denominator"],
+            strict=True,
+        )
+    ]
     return result
