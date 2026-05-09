@@ -21,6 +21,15 @@ def _json_dict(values: dict[str, float | None]) -> str:
     return json.dumps(values, sort_keys=True)
 
 
+def _single_or_json(values: pd.Series) -> str | None:
+    unique_values = sorted(values.dropna().astype(str).unique())
+    if not unique_values:
+        return None
+    if len(unique_values) == 1:
+        return unique_values[0]
+    return json.dumps(unique_values)
+
+
 def _component_columns(component_columns: Iterable[str] | None) -> list[str]:
     if component_columns is not None:
         return list(component_columns)
@@ -188,4 +197,149 @@ def allocate_acs1_county_to_tracts(
     result.attrs["component_columns"] = components
     result.attrs["missing_support_counties"] = missing_support_counties
     result.attrs["missing_source_counties"] = missing_source_counties
+    return result
+
+
+def _allocated_component_columns(
+    tract_allocations: pd.DataFrame,
+    component_columns: Iterable[str] | None,
+) -> list[str]:
+    if component_columns is None:
+        return [
+            column
+            for column in tract_allocations.columns
+            if column.startswith("sae_")
+            and column
+            not in {
+                "sae_missing_support_columns",
+                "sae_zero_denominator_columns",
+                "sae_partial_coverage_columns",
+                "sae_missing_support_count",
+                "sae_zero_denominator_count",
+                "sae_source_county_count",
+                "sae_support_tract_count",
+                "sae_allocation_residuals",
+            }
+        ]
+    return [
+        column if column.startswith("sae_") else f"sae_{column}"
+        for column in component_columns
+    ]
+
+
+def rollup_sae_tracts_to_geos(
+    tract_allocations: pd.DataFrame,
+    tract_crosswalk: pd.DataFrame,
+    *,
+    geo_id_col: str = "coc_id",
+    share_column: str = "area_share",
+    component_columns: Iterable[str] | None = None,
+) -> pd.DataFrame:
+    """Roll allocated SAE tract components to analysis geographies."""
+    components = _allocated_component_columns(tract_allocations, component_columns)
+    if not components:
+        raise ValueError("No allocated SAE component columns were available to roll up.")
+
+    _require_columns(
+        tract_allocations,
+        [
+            "tract_geoid",
+            "source_county_fips",
+            "acs1_vintage",
+            "acs_vintage",
+            "tract_vintage",
+            *components,
+        ],
+        "tract_allocations",
+    )
+    _require_columns(tract_crosswalk, [geo_id_col, "tract_geoid", share_column], "tract_crosswalk")
+
+    allocations = tract_allocations.copy()
+    xwalk = tract_crosswalk.copy()
+    allocations["tract_geoid"] = allocations["tract_geoid"].astype("string").str.zfill(11)
+    xwalk["tract_geoid"] = xwalk["tract_geoid"].astype("string").str.zfill(11)
+    xwalk[share_column] = pd.to_numeric(xwalk[share_column], errors="coerce")
+
+    merged = xwalk.merge(allocations, on="tract_geoid", how="left")
+    for column in components:
+        merged[column] = pd.to_numeric(merged[column], errors="coerce")
+        merged[f"weighted_{column}"] = merged[column] * merged[share_column]
+
+    grouped = merged.groupby(geo_id_col, dropna=False)
+    result = pd.DataFrame({geo_id_col: sorted(merged[geo_id_col].dropna().unique())})
+    result["target_geo_type"] = geo_id_col.removesuffix("_id")
+    result["target_geo_id"] = result[geo_id_col]
+
+    for column in components:
+        totals = grouped[f"weighted_{column}"].sum(min_count=1)
+        result[column] = result[geo_id_col].map(totals).astype("Float64")
+
+    diagnostics = grouped.agg(
+        acs1_vintage=("acs1_vintage", _single_or_json),
+        acs5_vintage=("acs_vintage", _single_or_json),
+        tract_vintage=("tract_vintage", _single_or_json),
+        sae_source_county_count=("source_county_fips", lambda s: int(s.dropna().nunique())),
+        sae_crosswalk_tract_count=("tract_geoid", lambda s: int(s.dropna().nunique())),
+        sae_allocated_tract_count=("allocation_method", lambda s: int(s.notna().sum())),
+    ).reset_index()
+    diagnostics["sae_missing_allocation_tract_count"] = (
+        diagnostics["sae_crosswalk_tract_count"] - diagnostics["sae_allocated_tract_count"]
+    )
+    diagnostics["sae_crosswalk_coverage_ratio"] = (
+        diagnostics["sae_allocated_tract_count"]
+        / diagnostics["sae_crosswalk_tract_count"].replace(0, pd.NA)
+    )
+
+    if "sae_missing_support_count" in merged.columns:
+        missing_support = grouped["sae_missing_support_count"].sum(min_count=1)
+    else:
+        missing_support = pd.Series(dtype="float64")
+    if "sae_zero_denominator_count" in merged.columns:
+        zero_denominator = grouped["sae_zero_denominator_count"].sum(min_count=1)
+    else:
+        zero_denominator = pd.Series(dtype="float64")
+    if "sae_partial_coverage_columns" in merged.columns:
+        partial_coverage = grouped["sae_partial_coverage_columns"].apply(
+            lambda s: int(sum(bool(json.loads(value)) for value in s.dropna()))
+        )
+    else:
+        partial_coverage = pd.Series(dtype="float64")
+
+    result = result.merge(diagnostics, on=geo_id_col, how="left")
+    result["sae_missing_support_count"] = (
+        result[geo_id_col].map(missing_support).fillna(0).astype("Int64")
+    )
+    result["sae_zero_denominator_count"] = (
+        result[geo_id_col].map(zero_denominator).fillna(0).astype("Int64")
+    )
+    result["sae_partial_coverage_count"] = (
+        result[geo_id_col].map(partial_coverage).fillna(0).astype("Int64")
+    )
+    source_counties = grouped["source_county_fips"].apply(
+        lambda s: _json_list(s.dropna().astype(str))
+    )
+    result["sae_source_counties"] = result[geo_id_col].map(source_counties)
+
+    ordered_columns = [
+        geo_id_col,
+        "target_geo_type",
+        "target_geo_id",
+        "acs1_vintage",
+        "acs5_vintage",
+        "tract_vintage",
+        *components,
+        "sae_source_county_count",
+        "sae_source_counties",
+        "sae_crosswalk_tract_count",
+        "sae_allocated_tract_count",
+        "sae_missing_allocation_tract_count",
+        "sae_crosswalk_coverage_ratio",
+        "sae_missing_support_count",
+        "sae_zero_denominator_count",
+        "sae_partial_coverage_count",
+    ]
+    result = result[ordered_columns].sort_values(geo_id_col).reset_index(drop=True)
+    result.attrs["geo_id_col"] = geo_id_col
+    result.attrs["share_column"] = share_column
+    result.attrs["component_columns"] = components
     return result

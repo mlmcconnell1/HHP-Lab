@@ -21,6 +21,7 @@ _EXPORTS = {
     "get_source_tract_vintage": ("hhplab.acs.translate", "get_source_tract_vintage"),
     "ingest_tract_data": ("hhplab.acs.ingest.tract_population", "ingest_tract_data"),
     "needs_translation": ("hhplab.acs.translate", "needs_translation"),
+    "rollup_sae_tracts_to_geos": ("hhplab.acs.sae", "rollup_sae_tracts_to_geos"),
     "translate_acs_to_target_vintage": (
         "hhplab.acs.translate",
         "translate_acs_to_target_vintage",

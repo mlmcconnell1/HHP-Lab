@@ -7,7 +7,11 @@ import json
 import pandas as pd
 import pytest
 
-from hhplab.acs.sae import SAE_ALLOCATION_METHOD, allocate_acs1_county_to_tracts
+from hhplab.acs.sae import (
+    SAE_ALLOCATION_METHOD,
+    allocate_acs1_county_to_tracts,
+    rollup_sae_tracts_to_geos,
+)
 
 COUNTY_SOURCE = pd.DataFrame(
     [
@@ -72,6 +76,15 @@ TRACT_SUPPORT = pd.DataFrame(
             "civilian_labor_force": 400,
             "unemployed_count": 20,
         },
+    ]
+)
+
+TRACT_TO_COC = pd.DataFrame(
+    [
+        {"coc_id": "COC-SINGLE", "tract_geoid": "08059000100", "area_share": 1.0},
+        {"coc_id": "COC-PARTIAL", "tract_geoid": "08031001000", "area_share": 0.5},
+        {"coc_id": "COC-MULTI", "tract_geoid": "08031001100", "area_share": 1.0},
+        {"coc_id": "COC-MULTI", "tract_geoid": "08059000100", "area_share": 1.0},
     ]
 )
 
@@ -208,3 +221,63 @@ def test_rejects_duplicate_county_source_rows() -> None:
             TRACT_SUPPORT,
             component_columns=["household_income_total"],
         )
+
+
+def test_rolls_allocated_components_to_single_partial_and_multi_county_cocs() -> None:
+    allocated = allocate_acs1_county_to_tracts(
+        COUNTY_SOURCE,
+        TRACT_SUPPORT,
+        component_columns=["household_income_total"],
+    )
+
+    result = rollup_sae_tracts_to_geos(
+        allocated,
+        TRACT_TO_COC,
+        component_columns=["household_income_total"],
+    )
+
+    by_coc = result.set_index("coc_id")
+    assert by_coc.loc["COC-SINGLE", "sae_household_income_total"] == pytest.approx(500.0)
+    assert by_coc.loc["COC-PARTIAL", "sae_household_income_total"] == pytest.approx(300.0)
+    assert by_coc.loc["COC-MULTI", "sae_household_income_total"] == pytest.approx(900.0)
+    assert by_coc.loc["COC-SINGLE", "sae_source_county_count"] == 1
+    assert by_coc.loc["COC-MULTI", "sae_source_county_count"] == 2
+    assert json.loads(by_coc.loc["COC-MULTI", "sae_source_counties"]) == ["08031", "08059"]
+    assert by_coc.loc["COC-MULTI", "sae_crosswalk_coverage_ratio"] == pytest.approx(1.0)
+
+
+def test_rollup_emits_missing_allocation_and_support_diagnostics() -> None:
+    support = TRACT_SUPPORT.copy()
+    support.loc[support["tract_geoid"] == "08031001000", "household_income_total"] = pd.NA
+    allocated = allocate_acs1_county_to_tracts(
+        COUNTY_SOURCE,
+        support,
+        component_columns=["household_income_total"],
+    )
+    crosswalk = pd.concat(
+        [
+            TRACT_TO_COC,
+            pd.DataFrame(
+                [
+                    {
+                        "coc_id": "COC-MISSING",
+                        "tract_geoid": "08999000100",
+                        "area_share": 1.0,
+                    }
+                ]
+            ),
+        ],
+        ignore_index=True,
+    )
+
+    result = rollup_sae_tracts_to_geos(
+        allocated,
+        crosswalk,
+        component_columns=["household_income_total"],
+    ).set_index("coc_id")
+
+    assert result.loc["COC-PARTIAL", "sae_missing_support_count"] == 1
+    assert result.loc["COC-PARTIAL", "sae_partial_coverage_count"] == 1
+    assert result.loc["COC-MISSING", "sae_missing_allocation_tract_count"] == 1
+    assert result.loc["COC-MISSING", "sae_crosswalk_coverage_ratio"] == pytest.approx(0.0)
+    assert pd.isna(result.loc["COC-MISSING", "sae_household_income_total"])
