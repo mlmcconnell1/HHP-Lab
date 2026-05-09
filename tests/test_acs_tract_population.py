@@ -26,6 +26,8 @@ from hhplab.provenance import (
     write_parquet_with_provenance,
 )
 
+pytestmark = pytest.mark.httpx_mock(can_send_already_matched_responses=True)
+
 
 def make_census_response(
     tracts: list[dict[str, Any]],
@@ -208,6 +210,47 @@ class TestFetchStateTractPopulation:
         assert df.iloc[0]["population_below_poverty"] == 550  # 200 + 350
         assert isinstance(raw_content, bytes)
 
+    def test_parses_sae_distribution_support_columns(self, httpx_mock):
+        """SAE support distributions are fetched, normalized, and exposed."""
+        response_data = make_census_response(
+            [
+                {
+                    "NAME": "Census Tract 1, Test County, Colorado",
+                    "county": "031",
+                    "tract": "001000",
+                    "B19001_001E": "2100",
+                    "B19001_017E": "125",
+                    "B25063_001E": "900",
+                    "B25063_026E": "70",
+                    "B25070_001E": "880",
+                    "B25070_010E": "220",
+                    "B25091_001E": "1200",
+                    "B25091_011E": "180",
+                    "B25118_001E": "2100",
+                    "B25118_014E": "900",
+                }
+            ]
+        )
+
+        httpx_mock.add_response(
+            url=re.compile(r"https://api\.census\.gov/data/2023/acs/acs5.*"),
+            json=response_data,
+        )
+
+        df, _ = fetch_state_tract_data(2023, "08")
+        row = df.iloc[0]
+
+        assert row["household_income_total"] == 2100
+        assert row["household_income_200000_plus"] == 125
+        assert row["gross_rent_distribution_total"] == 900
+        assert row["gross_rent_distribution_cash_rent_3500_plus"] == 70
+        assert row["gross_rent_pct_income_total"] == 880
+        assert row["gross_rent_pct_income_50_plus"] == 220
+        assert row["owner_costs_pct_income_total"] == 1200
+        assert row["owner_costs_pct_income_with_mortgage_50_plus"] == 180
+        assert row["tenure_income_total"] == 2100
+        assert row["tenure_income_renter_occupied_total"] == 900
+
     def test_handles_missing_values(self, httpx_mock):
         """Test that negative values (Census missing indicator) are converted to NA."""
         response_data = make_census_response(
@@ -346,9 +389,10 @@ class TestFetchTractPopulation:
         httpx_mock.add_response(
             url=re.compile(r"https://api\.census\.gov/data/2023/acs/acs5.*state%3A08.*"),
             json=response_data,
+            is_reusable=True,
         )
         httpx_mock.add_response(
-            url=re.compile(r"https://api\.census\.gov/data/2023/acs/acs5.*"),
+            url=re.compile(r"https://api\.census\.gov/data/2023/acs/acs5(?!.*state%3A08).*"),
             status_code=404,
         )
 
@@ -394,9 +438,10 @@ class TestFetchTractPopulation:
         httpx_mock.add_response(
             url=re.compile(r"https://api\.census\.gov/data/2023/acs/acs5.*state%3A08.*"),
             json=response_data,
+            is_reusable=True,
         )
         httpx_mock.add_response(
-            url=re.compile(r"https://api\.census\.gov/data/2023/acs/acs5.*"),
+            url=re.compile(r"https://api\.census\.gov/data/2023/acs/acs5(?!.*state%3A08).*"),
             status_code=404,
         )
 
@@ -423,9 +468,10 @@ class TestFetchTractPopulation:
         httpx_mock.add_response(
             url=re.compile(r"https://api\.census\.gov/data/2023/acs/acs5.*state%3A08.*"),
             json=response_data,
+            is_reusable=True,
         )
         httpx_mock.add_response(
-            url=re.compile(r"https://api\.census\.gov/data/2023/acs/acs5.*"),
+            url=re.compile(r"https://api\.census\.gov/data/2023/acs/acs5(?!.*state%3A08).*"),
             status_code=404,
         )
 
@@ -450,9 +496,10 @@ class TestFetchTractPopulation:
         httpx_mock.add_response(
             url=re.compile(r"https://api\.census\.gov/data/2019/acs/acs5.*state%3A08.*"),
             json=response_data,
+            is_reusable=True,
         )
         httpx_mock.add_response(
-            url=re.compile(r"https://api\.census\.gov/data/2019/acs/acs5.*"),
+            url=re.compile(r"https://api\.census\.gov/data/2019/acs/acs5(?!.*state%3A08).*"),
             status_code=404,
         )
 
@@ -516,9 +563,10 @@ class TestIngestTractPopulation:
         httpx_mock.add_response(
             url=re.compile(r"https://api\.census\.gov/data/2023/acs/acs5.*state%3A08.*"),
             json=response_data,
+            is_reusable=True,
         )
         httpx_mock.add_response(
-            url=re.compile(r"https://api\.census\.gov/data/2023/acs/acs5.*"),
+            url=re.compile(r"https://api\.census\.gov/data/2023/acs/acs5(?!.*state%3A08).*"),
             status_code=404,
         )
 
@@ -602,9 +650,10 @@ class TestIngestTractPopulation:
         httpx_mock.add_response(
             url=re.compile(r"https://api\.census\.gov/data/2019/acs/acs5.*state%3A08.*"),
             json=response_data,
+            is_reusable=True,
         )
         httpx_mock.add_response(
-            url=re.compile(r"https://api\.census\.gov/data/2019/acs/acs5.*"),
+            url=re.compile(r"https://api\.census\.gov/data/2019/acs/acs5(?!.*state%3A08).*"),
             status_code=404,
         )
 
@@ -668,9 +717,10 @@ class TestIngestTractPopulation:
         httpx_mock.add_response(
             url=re.compile(r"https://api\.census\.gov/data/2023/acs/acs5.*state%3A08.*"),
             json=response_data,
+            is_reusable=True,
         )
         httpx_mock.add_response(
-            url=re.compile(r"https://api\.census\.gov/data/2023/acs/acs5.*"),
+            url=re.compile(r"https://api\.census\.gov/data/2023/acs/acs5(?!.*state%3A08).*"),
             status_code=404,
         )
 
@@ -703,9 +753,10 @@ class TestIngestTractPopulation:
         httpx_mock.add_response(
             url=re.compile(r"https://api\.census\.gov/data/2023/acs/acs5.*state%3A08.*"),
             json=response_data,
+            is_reusable=True,
         )
         httpx_mock.add_response(
-            url=re.compile(r"https://api\.census\.gov/data/2023/acs/acs5.*"),
+            url=re.compile(r"https://api\.census\.gov/data/2023/acs/acs5(?!.*state%3A08).*"),
             status_code=404,
         )
 
@@ -725,6 +776,9 @@ class TestIngestTractPopulation:
         assert provenance.extra.get("source_tract_vintage") == 2020
         assert provenance.extra.get("target_tract_vintage") == 2023
         assert "B01003" in provenance.extra.get("tables", [])
+        assert "B19001" in provenance.extra.get("tables", [])
+        assert "B25063" in provenance.extra.get("tables", [])
+        assert "B25118" in provenance.extra.get("tables", [])
 
 
 class TestSchemaValidation:
@@ -753,9 +807,10 @@ class TestSchemaValidation:
         httpx_mock.add_response(
             url=re.compile(r"https://api\.census\.gov/data/2023/acs/acs5.*state%3A08.*"),
             json=response_data,
+            is_reusable=True,
         )
         httpx_mock.add_response(
-            url=re.compile(r"https://api\.census\.gov/data/2023/acs/acs5.*"),
+            url=re.compile(r"https://api\.census\.gov/data/2023/acs/acs5(?!.*state%3A08).*"),
             status_code=404,
         )
 
@@ -781,9 +836,10 @@ class TestSchemaValidation:
         httpx_mock.add_response(
             url=re.compile(r"https://api\.census\.gov/data/2023/acs/acs5.*state%3A08.*"),
             json=response_data,
+            is_reusable=True,
         )
         httpx_mock.add_response(
-            url=re.compile(r"https://api\.census\.gov/data/2023/acs/acs5.*"),
+            url=re.compile(r"https://api\.census\.gov/data/2023/acs/acs5(?!.*state%3A08).*"),
             status_code=404,
         )
 
@@ -808,9 +864,10 @@ class TestSchemaValidation:
         httpx_mock.add_response(
             url=re.compile(r"https://api\.census\.gov/data/2023/acs/acs5.*state%3A08.*"),
             json=response_data,
+            is_reusable=True,
         )
         httpx_mock.add_response(
-            url=re.compile(r"https://api\.census\.gov/data/2023/acs/acs5.*"),
+            url=re.compile(r"https://api\.census\.gov/data/2023/acs/acs5(?!.*state%3A08).*"),
             status_code=404,
         )
 
@@ -914,3 +971,34 @@ class TestTenureHouseholdIngest:
         assert "total_households" in TRACT_OUTPUT_COLUMNS
         assert "owner_households" in TRACT_OUTPUT_COLUMNS
         assert "renter_households" in TRACT_OUTPUT_COLUMNS
+
+
+SAE_REQUIRED_ACS5_TRACT_COLUMNS = {
+    "income_distribution": ["household_income_total", "household_income_200000_plus"],
+    "gross_rent_distribution": [
+        "gross_rent_distribution_total",
+        "gross_rent_distribution_cash_rent_3500_plus",
+    ],
+    "rent_burden_bins": ["gross_rent_pct_income_total", "gross_rent_pct_income_50_plus"],
+    "owner_cost_burden_bins": [
+        "owner_costs_pct_income_total",
+        "owner_costs_pct_income_with_mortgage_50_plus",
+        "owner_costs_pct_income_without_mortgage_50_plus",
+    ],
+    "tenure_income": ["tenure_income_total", "tenure_income_renter_occupied_total"],
+}
+
+
+@pytest.mark.parametrize(
+    ("family", "columns"),
+    [
+        pytest.param(family, columns, id=family)
+        for family, columns in SAE_REQUIRED_ACS5_TRACT_COLUMNS.items()
+    ],
+)
+def test_sae_required_tract_columns_are_canonical(
+    family: str,
+    columns: list[str],
+) -> None:
+    for column in columns:
+        assert column in TRACT_OUTPUT_COLUMNS, family

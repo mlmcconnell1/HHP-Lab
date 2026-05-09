@@ -39,6 +39,7 @@ Output Schema
 
 from __future__ import annotations
 
+import json
 import logging
 import re
 from datetime import UTC, datetime
@@ -57,6 +58,9 @@ from hhplab.acs.variables import (
     ACS_VARIABLES,
     ADULT_VARS,
     ALL_API_VARS,
+    COUNT_COLUMNS,
+    MEDIAN_COLUMNS,
+    MOE_COLUMNS,
     TRACT_OUTPUT_COLUMNS,
     api_vars_for_year,
     tables_for_api_vars,
@@ -76,6 +80,8 @@ logger = logging.getLogger(__name__)
 # Census Bureau API endpoint for ACS 5-year estimates
 CENSUS_API = CENSUS_API_ACS5
 
+ACS_API_VARIABLE_CHUNK_SIZE = 45
+
 # US State and territory FIPS codes
 STATE_FIPS_CODES = [
     "01", "02", "04", "05", "06", "08", "09", "10", "11", "12",
@@ -86,6 +92,11 @@ STATE_FIPS_CODES = [
     "56",
     "72",  # Puerto Rico
 ]
+
+
+def _chunks(values: list[str], size: int) -> list[list[str]]:
+    """Split Census API variables into request-sized chunks."""
+    return [values[index : index + size] for index in range(0, len(values), size)]
 
 
 def _translation_metadata(
@@ -237,23 +248,33 @@ def fetch_state_tract_data(
     url = CENSUS_API.format(year=year)
     if api_vars is None:
         api_vars = api_vars_for_year(year)
-    variables = ",".join(api_vars)
-
-    params = {
-        "get": f"NAME,{variables}",
-        "for": "tract:*",
-        "in": f"state:{state_fips}",
-    }
+    frames: list[pd.DataFrame] = []
+    raw_parts: list[bytes] = []
+    merge_columns = ["NAME", "state", "county", "tract"]
 
     with httpx.Client(timeout=60.0) as client:
-        response = client.get(url, params=params)
-        response.raise_for_status()
-        raw_content = response.content
-        data = response.json()
+        for chunk in _chunks(api_vars, ACS_API_VARIABLE_CHUNK_SIZE):
+            variables = ",".join(chunk)
+            params = {
+                "get": f"NAME,{variables}",
+                "for": "tract:*",
+                "in": f"state:{state_fips}",
+            }
 
-    headers = data[0]
-    rows = data[1:]
-    df = pd.DataFrame(rows, columns=headers)
+            response = client.get(url, params=params)
+            response.raise_for_status()
+            raw_parts.append(response.content)
+            data = response.json()
+
+            headers = data[0]
+            rows = data[1:]
+            chunk_df = pd.DataFrame(rows, columns=headers)
+            keep = [column for column in [*merge_columns, *chunk] if column in chunk_df.columns]
+            frames.append(chunk_df[keep].copy())
+
+    df = frames[0]
+    for frame in frames[1:]:
+        df = df.merge(frame, on=merge_columns, how="inner")
 
     # Build GEOID from state, county, tract
     df["tract_geoid"] = df.apply(
@@ -290,26 +311,11 @@ def fetch_state_tract_data(
         df["population_below_poverty"] = pd.NA
 
     # Select output columns (only those present)
-    keep = [
-        "tract_geoid",
-        "total_population",
-        "moe_total_population",
-        "adult_population",
-        "total_households",
-        "owner_households",
-        "renter_households",
-        "median_household_income",
-        "median_gross_rent",
-        "poverty_universe",
-        "below_50pct_poverty",
-        "50_to_99pct_poverty",
-        "population_below_poverty",
-        "civilian_labor_force",
-        "unemployed_count",
-    ]
+    keep = ["tract_geoid", *COUNT_COLUMNS, *MEDIAN_COLUMNS, *MOE_COLUMNS]
     keep = [c for c in keep if c in df.columns]
 
-    return df[keep].copy(), raw_content
+    raw_bundle = json.dumps([json.loads(part) for part in raw_parts]).encode()
+    return df[keep].copy(), raw_bundle
 
 
 def fetch_tract_data(
@@ -411,22 +417,13 @@ def fetch_tract_data(
 
     # Ensure proper column types
     result["tract_geoid"] = result["tract_geoid"].astype(str)
-    int_cols = [
-        "total_population", "adult_population", "total_households",
-        "owner_households", "renter_households", "poverty_universe",
-        "below_50pct_poverty", "50_to_99pct_poverty", "population_below_poverty",
-        "civilian_labor_force", "unemployed_count",
-    ]
-    for col in int_cols:
+    for col in COUNT_COLUMNS:
         if col in result.columns:
             # Translation can yield fractional expected counts after area weighting.
             # Round back to the canonical nullable-integer schema used by ACS tract files.
             result[col] = pd.to_numeric(result[col], errors="coerce").round().astype("Int64")
 
-    float_cols = [
-        "moe_total_population", "median_household_income", "median_gross_rent",
-    ]
-    for col in float_cols:
+    for col in [*MOE_COLUMNS, *MEDIAN_COLUMNS]:
         if col in result.columns:
             result[col] = result[col].astype("Float64")
 
