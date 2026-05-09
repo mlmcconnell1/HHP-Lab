@@ -33,6 +33,52 @@ OWNER_WITHOUT_MORTGAGE_BURDEN_30_PLUS_COLUMNS: tuple[str, ...] = (
     "sae_owner_costs_pct_income_without_mortgage_50_plus",
 )
 
+HOUSEHOLD_INCOME_BINS: tuple[tuple[str, float, float | None], ...] = (
+    ("sae_household_income_lt_10000", 0.0, 10000.0),
+    ("sae_household_income_10000_to_14999", 10000.0, 15000.0),
+    ("sae_household_income_15000_to_19999", 15000.0, 20000.0),
+    ("sae_household_income_20000_to_24999", 20000.0, 25000.0),
+    ("sae_household_income_25000_to_29999", 25000.0, 30000.0),
+    ("sae_household_income_30000_to_34999", 30000.0, 35000.0),
+    ("sae_household_income_35000_to_39999", 35000.0, 40000.0),
+    ("sae_household_income_40000_to_44999", 40000.0, 45000.0),
+    ("sae_household_income_45000_to_49999", 45000.0, 50000.0),
+    ("sae_household_income_50000_to_59999", 50000.0, 60000.0),
+    ("sae_household_income_60000_to_74999", 60000.0, 75000.0),
+    ("sae_household_income_75000_to_99999", 75000.0, 100000.0),
+    ("sae_household_income_100000_to_124999", 100000.0, 125000.0),
+    ("sae_household_income_125000_to_149999", 125000.0, 150000.0),
+    ("sae_household_income_150000_to_199999", 150000.0, 200000.0),
+    ("sae_household_income_200000_plus", 200000.0, None),
+)
+
+GROSS_RENT_BINS: tuple[tuple[str, float, float | None], ...] = (
+    ("sae_gross_rent_distribution_cash_rent_lt_100", 0.0, 100.0),
+    ("sae_gross_rent_distribution_cash_rent_100_to_149", 100.0, 150.0),
+    ("sae_gross_rent_distribution_cash_rent_150_to_199", 150.0, 200.0),
+    ("sae_gross_rent_distribution_cash_rent_200_to_249", 200.0, 250.0),
+    ("sae_gross_rent_distribution_cash_rent_250_to_299", 250.0, 300.0),
+    ("sae_gross_rent_distribution_cash_rent_300_to_349", 300.0, 350.0),
+    ("sae_gross_rent_distribution_cash_rent_350_to_399", 350.0, 400.0),
+    ("sae_gross_rent_distribution_cash_rent_400_to_449", 400.0, 450.0),
+    ("sae_gross_rent_distribution_cash_rent_450_to_499", 450.0, 500.0),
+    ("sae_gross_rent_distribution_cash_rent_500_to_549", 500.0, 550.0),
+    ("sae_gross_rent_distribution_cash_rent_550_to_599", 550.0, 600.0),
+    ("sae_gross_rent_distribution_cash_rent_600_to_649", 600.0, 650.0),
+    ("sae_gross_rent_distribution_cash_rent_650_to_699", 650.0, 700.0),
+    ("sae_gross_rent_distribution_cash_rent_700_to_749", 700.0, 750.0),
+    ("sae_gross_rent_distribution_cash_rent_750_to_799", 750.0, 800.0),
+    ("sae_gross_rent_distribution_cash_rent_800_to_899", 800.0, 900.0),
+    ("sae_gross_rent_distribution_cash_rent_900_to_999", 900.0, 1000.0),
+    ("sae_gross_rent_distribution_cash_rent_1000_to_1249", 1000.0, 1250.0),
+    ("sae_gross_rent_distribution_cash_rent_1250_to_1499", 1250.0, 1500.0),
+    ("sae_gross_rent_distribution_cash_rent_1500_to_1999", 1500.0, 2000.0),
+    ("sae_gross_rent_distribution_cash_rent_2000_to_2499", 2000.0, 2500.0),
+    ("sae_gross_rent_distribution_cash_rent_2500_to_2999", 2500.0, 3000.0),
+    ("sae_gross_rent_distribution_cash_rent_3000_to_3499", 3000.0, 3500.0),
+    ("sae_gross_rent_distribution_cash_rent_3500_plus", 3500.0, None),
+)
+
 
 def _json_list(values: Iterable[str]) -> str:
     return json.dumps(sorted(set(values)))
@@ -74,6 +120,53 @@ def _safe_rate(numerator: pd.Series, denominator: pd.Series) -> pd.Series:
     valid = numerator.notna() & denominator.notna() & (denominator > 0)
     rate.loc[valid] = numerator.loc[valid] / denominator.loc[valid]
     return rate
+
+
+def _quantile_from_bins(
+    row: pd.Series,
+    *,
+    total_column: str,
+    bins: tuple[tuple[str, float, float | None], ...],
+    quantile: float,
+) -> tuple[float | None, dict[str, object]]:
+    total = pd.to_numeric(pd.Series([row.get(total_column)]), errors="coerce").iloc[0]
+    if pd.isna(total) or total <= 0:
+        return None, {
+            "status": "unsupported",
+            "reason": "zero_or_missing_denominator",
+            "quantile": quantile,
+        }
+
+    target = float(total) * quantile
+    cumulative = 0.0
+    for column, lower, upper in bins:
+        count = pd.to_numeric(pd.Series([row.get(column)]), errors="coerce").iloc[0]
+        if pd.isna(count) or count <= 0:
+            continue
+        next_cumulative = cumulative + float(count)
+        if target <= next_cumulative:
+            if upper is None:
+                return None, {
+                    "status": "unsupported",
+                    "reason": "quantile_in_open_ended_bin",
+                    "bin": column,
+                    "lower_bound": lower,
+                    "quantile": quantile,
+                }
+            fraction = (target - cumulative) / float(count)
+            return lower + fraction * (upper - lower), {
+                "status": "ok",
+                "bin": column,
+                "interpolation": "linear_within_bin",
+                "quantile": quantile,
+            }
+        cumulative = next_cumulative
+
+    return None, {
+        "status": "unsupported",
+        "reason": "distribution_total_exceeds_bin_sum",
+        "quantile": quantile,
+    }
 
 
 def _normalize_county_key(series: pd.Series) -> pd.Series:
@@ -481,4 +574,75 @@ def derive_sae_burden_measures(df: pd.DataFrame) -> pd.DataFrame:
             strict=True,
         )
     ]
+    return result
+
+
+def derive_sae_distribution_measures(
+    df: pd.DataFrame,
+    *,
+    families: Iterable[str] = ("household_income", "gross_rent"),
+) -> pd.DataFrame:
+    """Derive median and quantile measures from allocated SAE distributions."""
+    family_list = list(families)
+    unsupported = sorted(set(family_list) - {"household_income", "gross_rent"})
+    if unsupported:
+        raise ValueError(f"Unsupported SAE distribution measure families: {unsupported}.")
+
+    result = df.copy()
+    if "household_income" in family_list:
+        _require_columns(
+            result,
+            ["sae_household_income_total", *[column for column, _, _ in HOUSEHOLD_INCOME_BINS]],
+            "SAE household income distribution input",
+        )
+        row_diagnostics: list[dict[str, object]] = [{} for _ in range(len(result))]
+        quantiles = {
+            "sae_household_income_quintile_cutoff_20": 0.20,
+            "sae_household_income_quintile_cutoff_40": 0.40,
+            "sae_household_income_median": 0.50,
+            "sae_household_income_quintile_cutoff_60": 0.60,
+            "sae_household_income_quintile_cutoff_80": 0.80,
+        }
+        for output_column, quantile in quantiles.items():
+            values: list[float | None] = []
+            for row_index, row in enumerate(result.itertuples(index=False)):
+                row_series = pd.Series(row._asdict())
+                value, diagnostic = _quantile_from_bins(
+                    row_series,
+                    total_column="sae_household_income_total",
+                    bins=HOUSEHOLD_INCOME_BINS,
+                    quantile=quantile,
+                )
+                values.append(value)
+                row_diagnostics[row_index][output_column] = diagnostic
+            result[output_column] = pd.Series(values, dtype="Float64")
+        result["sae_household_income_distribution_diagnostics"] = [
+            json.dumps(diagnostic, sort_keys=True) for diagnostic in row_diagnostics
+        ]
+
+    if "gross_rent" in family_list:
+        _require_columns(
+            result,
+            [
+                "sae_gross_rent_distribution_with_cash_rent",
+                *[column for column, _, _ in GROSS_RENT_BINS],
+            ],
+            "SAE gross rent distribution input",
+        )
+        values = []
+        diagnostics = []
+        for _, row in result.iterrows():
+            value, diagnostic = _quantile_from_bins(
+                row,
+                total_column="sae_gross_rent_distribution_with_cash_rent",
+                bins=GROSS_RENT_BINS,
+                quantile=0.50,
+            )
+            values.append(value)
+            diagnostics.append(diagnostic)
+        result["sae_gross_rent_median"] = pd.Series(values, dtype="Float64")
+        result["sae_gross_rent_distribution_diagnostics"] = [
+            json.dumps(diagnostic, sort_keys=True) for diagnostic in diagnostics
+        ]
+
     return result

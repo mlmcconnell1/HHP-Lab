@@ -15,6 +15,7 @@ _EXPORTS = {
     "allocate_acs1_county_to_tracts": ("hhplab.acs.sae", "allocate_acs1_county_to_tracts"),
     "build_metro_tract_crosswalk": ("hhplab.acs.acs_metro", "build_metro_tract_crosswalk"),
     "derive_sae_burden_measures": ("hhplab.acs.sae", "derive_sae_burden_measures"),
+    "derive_sae_distribution_measures": ("hhplab.acs.sae", "derive_sae_distribution_measures"),
     "TranslationStats": ("hhplab.acs.translate", "TranslationStats"),
     "fetch_state_tract_data": ("hhplab.acs.ingest.tract_population", "fetch_state_tract_data"),
     "fetch_tract_data": ("hhplab.acs.ingest.tract_population", "fetch_tract_data"),

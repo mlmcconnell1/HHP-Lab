@@ -8,9 +8,12 @@ import pandas as pd
 import pytest
 
 from hhplab.acs.sae import (
+    GROSS_RENT_BINS,
+    HOUSEHOLD_INCOME_BINS,
     SAE_ALLOCATION_METHOD,
     allocate_acs1_county_to_tracts,
     derive_sae_burden_measures,
+    derive_sae_distribution_measures,
     rollup_sae_tracts_to_geos,
 )
 
@@ -354,3 +357,89 @@ def test_burden_rate_derivation_handles_zero_denominators_explicitly() -> None:
 def test_burden_rate_derivation_requires_allocated_bins() -> None:
     with pytest.raises(ValueError, match="missing required columns"):
         derive_sae_burden_measures(pd.DataFrame({"coc_id": ["COC-A"]}))
+
+
+def _zero_distribution(columns: tuple[tuple[str, float, float | None], ...]) -> dict[str, int]:
+    return {column: 0 for column, _, _ in columns}
+
+
+def test_derives_income_median_and_quintiles_from_distribution_bins() -> None:
+    row = {
+        "coc_id": "COC-A",
+        "median_household_income": 90000,
+        "sae_household_income_total": 100,
+        **_zero_distribution(HOUSEHOLD_INCOME_BINS),
+    }
+    row.update(
+        {
+            "sae_household_income_lt_10000": 20,
+            "sae_household_income_10000_to_14999": 20,
+            "sae_household_income_15000_to_19999": 20,
+            "sae_household_income_20000_to_24999": 20,
+            "sae_household_income_25000_to_29999": 20,
+        }
+    )
+
+    result = derive_sae_distribution_measures(
+        pd.DataFrame([row]),
+        families=["household_income"],
+    )
+    output = result.iloc[0]
+
+    assert output["sae_household_income_quintile_cutoff_20"] == pytest.approx(10000.0)
+    assert output["sae_household_income_quintile_cutoff_40"] == pytest.approx(15000.0)
+    assert output["sae_household_income_median"] == pytest.approx(17500.0)
+    assert output["sae_household_income_quintile_cutoff_60"] == pytest.approx(20000.0)
+    assert output["sae_household_income_quintile_cutoff_80"] == pytest.approx(25000.0)
+    assert output["median_household_income"] == 90000
+    diagnostics = json.loads(output["sae_household_income_distribution_diagnostics"])
+    assert diagnostics["sae_household_income_median"]["interpolation"] == "linear_within_bin"
+
+
+def test_distribution_derivation_returns_null_for_open_ended_quantile() -> None:
+    row = {
+        "coc_id": "COC-A",
+        "sae_household_income_total": 100,
+        **_zero_distribution(HOUSEHOLD_INCOME_BINS),
+    }
+    row["sae_household_income_200000_plus"] = 100
+
+    result = derive_sae_distribution_measures(
+        pd.DataFrame([row]),
+        families=["household_income"],
+    )
+    output = result.iloc[0]
+
+    assert pd.isna(output["sae_household_income_median"])
+    diagnostics = json.loads(output["sae_household_income_distribution_diagnostics"])
+    assert diagnostics["sae_household_income_median"]["status"] == "unsupported"
+    assert diagnostics["sae_household_income_median"]["reason"] == "quantile_in_open_ended_bin"
+
+
+def test_derives_gross_rent_median_from_cash_rent_distribution() -> None:
+    row = {
+        "coc_id": "COC-A",
+        "median_gross_rent": 2500,
+        "sae_gross_rent_distribution_with_cash_rent": 100,
+        **_zero_distribution(GROSS_RENT_BINS),
+    }
+    row.update(
+        {
+            "sae_gross_rent_distribution_cash_rent_500_to_549": 40,
+            "sae_gross_rent_distribution_cash_rent_550_to_599": 40,
+            "sae_gross_rent_distribution_cash_rent_600_to_649": 20,
+        }
+    )
+
+    result = derive_sae_distribution_measures(pd.DataFrame([row]), families=["gross_rent"])
+    output = result.iloc[0]
+
+    assert output["sae_gross_rent_median"] == pytest.approx(562.5)
+    assert output["median_gross_rent"] == 2500
+    diagnostics = json.loads(output["sae_gross_rent_distribution_diagnostics"])
+    assert diagnostics["interpolation"] == "linear_within_bin"
+
+
+def test_distribution_derivation_rejects_unsupported_family() -> None:
+    with pytest.raises(ValueError, match="Unsupported SAE distribution measure families"):
+        derive_sae_distribution_measures(pd.DataFrame({"coc_id": ["COC-A"]}), families=["median"])
