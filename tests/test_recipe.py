@@ -52,6 +52,7 @@ from hhplab.recipe.planner import (
     JoinTask,
     MaterializeTask,
     ResampleTask,
+    SmallAreaEstimateTask,
     resolve_plan,
 )
 from hhplab.recipe.recipe_schema import (
@@ -2738,6 +2739,49 @@ class TestSmallAreaEstimateSchema:
         assert diagnostics.conservation is True
         assert diagnostics.denominator is True
         assert diagnostics.direct_county_comparison is True
+
+    def test_plan_exposes_resolved_sae_task_metadata(self):
+        recipe = load_recipe(_sae_recipe())
+
+        plan = resolve_plan(recipe, "main")
+
+        assert len(plan.small_area_estimate_tasks) == 1
+        task = plan.small_area_estimate_tasks[0]
+        assert isinstance(task, SmallAreaEstimateTask)
+        assert task.output_dataset == "acs_sae_coc"
+        assert task.year == 2023
+        assert task.source_dataset == "acs1_county"
+        assert task.support_dataset == "acs5_tract_support"
+        assert task.source_path == "data/curated/acs/acs1_county_sae__A2023.parquet"
+        assert task.support_path == "data/curated/acs/acs5_tract_sae_support__A2022xT2020.parquet"
+        assert task.source_geometry.type == "county"
+        assert task.support_geometry.type == "tract"
+        assert task.target_geometry.type == "coc"
+        assert task.terminal_acs5_vintage == "2022"
+        assert task.tract_vintage == "2020"
+        assert task.allocation_method == "tract_share_within_county"
+        assert task.denominators["rent_burden"] == "gross_rent_pct_income_total"
+        assert task.measure_families == ["household_income_bins", "rent_burden"]
+        assert task.derived_outputs["rent_burden"] == [
+            "sae_rent_burden_30_plus",
+            "sae_rent_burden_50_plus",
+        ]
+        assert task.diagnostics["direct_county_comparison"] is True
+
+    def test_plan_serializes_sae_tasks_to_json_safe_dict(self):
+        recipe = load_recipe(_sae_recipe())
+
+        plan_dict = resolve_plan(recipe, "main").to_dict()
+
+        assert plan_dict["task_count"] == 2
+        sae_task = plan_dict["small_area_estimate_tasks"][0]
+        assert sae_task["output_dataset"] == "acs_sae_coc"
+        assert sae_task["source_geometry"] == {
+            "type": "county",
+            "vintage": 2020,
+            "source": "tiger",
+        }
+        assert sae_task["diagnostics"]["conservation"] is True
 
 
 class TestPipelineResult:

@@ -17,6 +17,7 @@ from hhplab.recipe.recipe_schema import (
     MaterializeStep,
     RecipeV1,
     ResampleStep,
+    SmallAreaEstimateStep,
 )
 from hhplab.recipe.schema_common import GeometryRef, expand_year_spec
 
@@ -71,6 +72,28 @@ class MaterializeTask:
     transform_ids: list[str]
 
 
+@dataclass
+class SmallAreaEstimateTask:
+    """Resolved ACS1/ACS5 small-area estimation task for one analysis year."""
+
+    output_dataset: str
+    year: int
+    source_dataset: str
+    support_dataset: str
+    source_path: str | None
+    support_path: str | None
+    source_geometry: GeometryRef
+    support_geometry: GeometryRef
+    target_geometry: GeometryRef
+    terminal_acs5_vintage: str
+    tract_vintage: str
+    allocation_method: str
+    denominators: dict[str, str]
+    measure_families: list[str]
+    derived_outputs: dict[str, list[str]]
+    diagnostics: dict[str, bool]
+
+
 def _geometry_to_dict(g: GeometryRef) -> dict:
     d: dict = {"type": g.type}
     if g.vintage is not None:
@@ -90,6 +113,7 @@ class ExecutionPlan:
     pipeline_id: str
     materialize_tasks: list[MaterializeTask] = field(default_factory=list)
     resample_tasks: list[ResampleTask] = field(default_factory=list)
+    small_area_estimate_tasks: list[SmallAreaEstimateTask] = field(default_factory=list)
     join_tasks: list[JoinTask] = field(default_factory=list)
 
     def to_dict(self) -> dict:
@@ -119,6 +143,30 @@ class ExecutionPlan:
                 }
                 for t in self.resample_tasks
             ],
+            "small_area_estimate_tasks": [
+                {
+                    "output_dataset": t.output_dataset,
+                    "year": t.year,
+                    "source_dataset": t.source_dataset,
+                    "support_dataset": t.support_dataset,
+                    "source_path": t.source_path,
+                    "support_path": t.support_path,
+                    "source_geometry": _geometry_to_dict(t.source_geometry),
+                    "support_geometry": _geometry_to_dict(t.support_geometry),
+                    "target_geometry": _geometry_to_dict(t.target_geometry),
+                    "terminal_acs5_vintage": t.terminal_acs5_vintage,
+                    "tract_vintage": t.tract_vintage,
+                    "allocation_method": t.allocation_method,
+                    "denominators": dict(t.denominators),
+                    "measure_families": list(t.measure_families),
+                    "derived_outputs": {
+                        family: list(outputs)
+                        for family, outputs in t.derived_outputs.items()
+                    },
+                    "diagnostics": dict(t.diagnostics),
+                }
+                for t in self.small_area_estimate_tasks
+            ],
             "join_tasks": [
                 {
                     "datasets": t.datasets,
@@ -130,6 +178,7 @@ class ExecutionPlan:
             "task_count": (
                 len(self.materialize_tasks)
                 + len(self.resample_tasks)
+                + len(self.small_area_estimate_tasks)
                 + len(self.join_tasks)
             ),
         }
@@ -407,6 +456,34 @@ def resolve_plan(recipe: RecipeV1, pipeline_id: str) -> ExecutionPlan:
                             weighting_variety_count=len(weighting_varieties),
                         )
                     )
+
+        elif isinstance(step, SmallAreaEstimateStep):
+            for year in universe_years:
+                source = _resolve_dataset_year(step.source_dataset, year, recipe)
+                support = _resolve_dataset_year(step.support_dataset, year, recipe)
+                plan.small_area_estimate_tasks.append(
+                    SmallAreaEstimateTask(
+                        output_dataset=step.output_dataset,
+                        year=year,
+                        source_dataset=step.source_dataset,
+                        support_dataset=step.support_dataset,
+                        source_path=source.path,
+                        support_path=support.path,
+                        source_geometry=source.effective_geometry,
+                        support_geometry=support.effective_geometry,
+                        target_geometry=step.target_geometry,
+                        terminal_acs5_vintage=str(step.terminal_acs5_vintage),
+                        tract_vintage=str(step.tract_vintage),
+                        allocation_method=step.allocation_method,
+                        denominators=dict(step.denominators),
+                        measure_families=[str(family) for family in step.measures],
+                        derived_outputs={
+                            str(family): list(config.outputs)
+                            for family, config in step.measures.items()
+                        },
+                        diagnostics=step.diagnostics.model_dump(),
+                    )
+                )
 
         elif isinstance(step, JoinStep):
             for year in universe_years:

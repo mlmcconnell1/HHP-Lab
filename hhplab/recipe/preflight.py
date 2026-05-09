@@ -16,6 +16,11 @@ from pathlib import Path
 import pandas as pd
 import pyarrow.parquet as pq
 
+from hhplab.acs.variables import ACS5_SAE_SUPPORT_COLUMNS
+from hhplab.acs.variables_acs1 import (
+    ACS1_SAE_SOURCE_COLUMNS,
+    ACS1_UNAVAILABLE_VINTAGES,
+)
 from hhplab.config import load_config
 from hhplab.geo.ct_planning_regions import (
     CT_LEGACY_COUNTY_VINTAGE,
@@ -32,6 +37,7 @@ from hhplab.naming import (
     msa_boundaries_path,
     msa_county_membership_path,
     msa_definitions_path,
+    tract_xwalk_path,
 )
 from hhplab.recipe.adapters import (
     dataset_registry,
@@ -43,6 +49,7 @@ from hhplab.recipe.planner import (
     ExecutionPlan,
     PlannerError,
     ResampleTask,
+    SmallAreaEstimateTask,
     _resolve_dataset_year,
     resolve_plan,
 )
@@ -63,6 +70,7 @@ from hhplab.recipe.recipe_schema import (
     JoinStep,
     RecipeV1,
     ResampleStep,
+    SmallAreaEstimateStep,
     TemporalFilter,
 )
 from hhplab.recipe.schema_common import expand_year_spec
@@ -441,6 +449,22 @@ def _dataset_remediation(ds_id: str, ds, *, years: list[int] | None = None) -> R
             return Remediation(
                 hint=f"Ingest metro-native Census ACS 1-year data for dataset '{ds_id}'.",
                 command="hhplab ingest acs1-metro --vintage <year>",
+            )
+
+    if provider == "census" and product in {"acs", "acs5"}:
+        native_type = getattr(ds.native_geometry, "type", None)
+        if native_type == "tract":
+            tract_vintage = getattr(ds.native_geometry, "vintage", None)
+            command = "hhplab ingest acs5-tract --acs <acs-years>"
+            if tract_vintage is not None:
+                command += f" --tracts {tract_vintage}"
+            return Remediation(
+                hint=(
+                    f"Ingest Census ACS 5-year tract data for dataset '{ds_id}'. "
+                    "SAE support artifacts must include the requested tract "
+                    "distribution component columns."
+                ),
+                command=command,
             )
 
     return Remediation(
@@ -1001,14 +1025,17 @@ def _check_containment_artifacts(
     return findings
 
 
-def _pipeline_dataset_ids(pipeline) -> set[str]:
+def _pipeline_dataset_ids(recipe: RecipeV1, pipeline) -> set[str]:
     """Return dataset ids referenced by a pipeline."""
     dataset_ids: set[str] = set()
     for step in pipeline.steps:
         if isinstance(step, ResampleStep):
             dataset_ids.add(step.dataset)
+        elif isinstance(step, SmallAreaEstimateStep):
+            dataset_ids.add(step.source_dataset)
+            dataset_ids.add(step.support_dataset)
         elif isinstance(step, JoinStep):
-            dataset_ids.update(step.datasets)
+            dataset_ids.update(ds_id for ds_id in step.datasets if ds_id in recipe.datasets)
     return dataset_ids
 
 
@@ -1037,7 +1064,7 @@ def _january_aligned_pipeline_ids(recipe: RecipeV1) -> set[str]:
     """Return pipeline ids that include January/PIT-aligned inputs."""
     pipeline_ids: set[str] = set()
     for pipeline in recipe.pipelines:
-        dataset_ids = _pipeline_dataset_ids(pipeline)
+        dataset_ids = _pipeline_dataset_ids(recipe, pipeline)
         if any(_dataset_is_january_aligned(recipe, ds_id) for ds_id in dataset_ids):
             pipeline_ids.add(pipeline.id)
     return pipeline_ids
@@ -1527,6 +1554,318 @@ def _check_dataset_schemas(
     return findings
 
 
+_SAE_FAMILY_PREFIXES: dict[str, tuple[str, ...]] = {
+    "household_income_bins": ("household_income_",),
+    "gross_rent_bins": ("gross_rent_distribution_",),
+    "rent_burden": ("gross_rent_pct_income_",),
+    "owner_cost_burden": ("owner_costs_pct_income_",),
+    "tenure_income": ("tenure_income_",),
+}
+
+_SAE_FAMILY_EXACT_COLUMNS: dict[str, tuple[str, ...]] = {
+    "labor_force": ("civilian_labor_force", "unemployed_count"),
+}
+
+_SAE_OUTPUT_PREFIXES: dict[str, tuple[str, ...]] = {
+    "household_income_bins": ("sae_household_income_",),
+    "gross_rent_bins": ("sae_gross_rent_",),
+    "rent_burden": ("sae_rent_burden_",),
+    "owner_cost_burden": ("sae_owner_cost_burden_",),
+    "tenure_income": ("sae_tenure_income_",),
+    "labor_force": (
+        "sae_civilian_labor_force",
+        "sae_unemployed_count",
+        "sae_unemployment_rate",
+    ),
+}
+
+
+def _sae_family_columns(family: str, available: list[str]) -> list[str]:
+    exact = set(_SAE_FAMILY_EXACT_COLUMNS.get(family, ()))
+    prefixes = _SAE_FAMILY_PREFIXES.get(family, ())
+    return [
+        column
+        for column in available
+        if column in exact or any(column.startswith(prefix) for prefix in prefixes)
+    ]
+
+
+def _sae_output_allowed(family: str, output: str) -> bool:
+    prefixes = _SAE_OUTPUT_PREFIXES.get(family, ())
+    return any(output.startswith(prefix) for prefix in prefixes)
+
+
+def _check_sae_task_paths(
+    recipe: RecipeV1,
+    project_root: Path,
+    tasks: list[SmallAreaEstimateTask],
+) -> list[PreflightFinding]:
+    """Check SAE source/support artifacts and target crosswalk prerequisites."""
+    findings: list[PreflightFinding] = []
+    checked_paths: set[tuple[str, str | None, str]] = set()
+
+    for task in tasks:
+        if task.year in ACS1_UNAVAILABLE_VINTAGES:
+            findings.append(
+                PreflightFinding(
+                    severity=Severity.ERROR,
+                    kind=FindingKind.MISSING_DATASET,
+                    message=(
+                        f"SAE source dataset '{task.source_dataset}' requests ACS1 "
+                        f"vintage {task.year}, but Census ACS 1-year data is "
+                        "unavailable for that vintage."
+                    ),
+                    dataset_id=task.source_dataset,
+                    years=[task.year],
+                    remediation=_dataset_remediation(
+                        task.source_dataset,
+                        recipe.datasets[task.source_dataset],
+                        years=[task.year],
+                    ),
+                )
+            )
+
+        for role, dataset_id, path in (
+            ("source", task.source_dataset, task.source_path),
+            ("support", task.support_dataset, task.support_path),
+        ):
+            key = (dataset_id, path, role)
+            if key in checked_paths:
+                continue
+            checked_paths.add(key)
+            ds = recipe.datasets[dataset_id]
+            if path is None:
+                path = ds.path
+            if path is None:
+                findings.append(
+                    PreflightFinding(
+                        severity=Severity.ERROR,
+                        kind=FindingKind.MISSING_DATASET,
+                        message=(
+                            f"SAE {role} dataset '{dataset_id}' does not resolve "
+                            "to an artifact path."
+                        ),
+                        dataset_id=dataset_id,
+                        years=[task.year],
+                        remediation=_dataset_remediation(dataset_id, ds, years=[task.year]),
+                    )
+                )
+                continue
+            if not (project_root / path).exists():
+                findings.append(
+                    PreflightFinding(
+                        severity=Severity.ERROR,
+                        kind=FindingKind.MISSING_DATASET,
+                        message=f"SAE {role} dataset '{dataset_id}' path not found: {path}",
+                        dataset_id=dataset_id,
+                        years=[task.year],
+                        remediation=_dataset_remediation(dataset_id, ds, years=[task.year]),
+                    )
+                )
+
+        if task.target_geometry.type == "coc" and task.target_geometry.vintage is not None:
+            xwalk_path = tract_xwalk_path(
+                str(task.target_geometry.vintage),
+                task.tract_vintage,
+            )
+            if not (project_root / xwalk_path).exists():
+                findings.append(
+                    PreflightFinding(
+                        severity=Severity.ERROR,
+                        kind=FindingKind.MISSING_TRANSFORM,
+                        message=(
+                            "SAE target rollup requires a CoC-to-tract crosswalk "
+                            f"artifact: {xwalk_path}"
+                        ),
+                        years=[task.year],
+                        geometry=f"coc@{task.target_geometry.vintage}",
+                        remediation=Remediation(
+                            hint=(
+                                "Generate the tract crosswalk for the SAE target "
+                                "geometry and ACS5 tract support vintage."
+                            ),
+                            command=(
+                                "hhplab generate xwalks "
+                                f"--boundary {task.target_geometry.vintage} "
+                                "--type tract "
+                                f"--tracts {task.tract_vintage}"
+                            ),
+                        ),
+                    )
+                )
+
+    return findings
+
+
+def _check_sae_task_schemas(
+    project_root: Path,
+    tasks: list[SmallAreaEstimateTask],
+) -> list[PreflightFinding]:
+    """Inspect SAE source/support schemas for required component columns."""
+    findings: list[PreflightFinding] = []
+    checked: set[tuple[str, str | None, tuple[str, ...], tuple[tuple[str, str], ...]]] = set()
+
+    for task in tasks:
+        if task.support_geometry.vintage is not None and (
+            str(task.support_geometry.vintage) != task.tract_vintage
+        ):
+            findings.append(
+                PreflightFinding(
+                    severity=Severity.ERROR,
+                    kind=FindingKind.DATASET_PROVENANCE,
+                    message=(
+                        f"SAE support dataset '{task.support_dataset}' resolved to "
+                        f"tract vintage {task.support_geometry.vintage}, but the "
+                        f"step requires tract_vintage {task.tract_vintage}."
+                    ),
+                    dataset_id=task.support_dataset,
+                    years=[task.year],
+                    remediation=Remediation(
+                        hint=(
+                            "Use an ACS5 tract SAE support artifact whose tract "
+                            "vintage matches the SAE step tract_vintage."
+                        ),
+                    ),
+                )
+            )
+
+        task_key = (
+            task.output_dataset,
+            task.source_path,
+            task.support_path,
+            tuple(task.measure_families),
+            tuple(sorted(task.denominators.items())),
+        )
+        if task_key in checked:
+            continue
+        checked.add(task_key)
+
+        source_path = None if task.source_path is None else project_root / task.source_path
+        support_path = None if task.support_path is None else project_root / task.support_path
+        if source_path is None or not source_path.exists():
+            continue
+        if support_path is None or not support_path.exists():
+            continue
+
+        source_schema = probe_dataset_schema(source_path)
+        support_schema = probe_dataset_schema(support_path)
+        if not source_schema.ok or not support_schema.ok:
+            continue
+
+        source_columns = list(source_schema.detail["columns"])
+        support_columns = list(support_schema.detail["columns"])
+
+        source_required = ["county_fips", "acs1_vintage"]
+        support_required = ["tract_geoid", "county_fips", "acs_vintage", "tract_vintage"]
+        for family in task.measure_families:
+            source_required.extend(_sae_family_columns(family, ACS1_SAE_SOURCE_COLUMNS))
+            support_required.extend(_sae_family_columns(family, ACS5_SAE_SUPPORT_COLUMNS))
+            bad_outputs = [
+                output
+                for output in task.derived_outputs.get(family, [])
+                if not _sae_output_allowed(family, output)
+            ]
+            if bad_outputs:
+                findings.append(
+                    PreflightFinding(
+                        severity=Severity.ERROR,
+                        kind=FindingKind.MISSING_MEASURE,
+                        message=(
+                            f"SAE measure family '{family}' cannot produce outputs "
+                            f"{bad_outputs}. Use outputs derived from the matching "
+                            "component distribution; do not request direct medians "
+                            "or unrelated sae_* columns."
+                        ),
+                        dataset_id=task.output_dataset,
+                        years=[task.year],
+                        remediation=Remediation(
+                            hint=(
+                                "Move the output to the correct SAE measure family "
+                                "or remove unsupported median/quintile configuration."
+                            ),
+                        ),
+                    )
+                )
+
+        missing_source = [
+            column for column in dict.fromkeys(source_required) if column not in source_columns
+        ]
+        if missing_source:
+            findings.append(
+                PreflightFinding(
+                    severity=Severity.ERROR,
+                    kind=FindingKind.MISSING_MEASURE,
+                    message=(
+                        f"SAE source dataset '{task.source_dataset}' "
+                        f"({task.source_path}) is missing columns: {missing_source}"
+                    ),
+                    dataset_id=task.source_dataset,
+                    years=[task.year],
+                    remediation=Remediation(
+                        hint=(
+                            "Rebuild the ACS1 county SAE source artifact so it "
+                            "contains the requested measure family components."
+                        ),
+                        command="hhplab ingest acs1-county --vintage <year>",
+                    ),
+                )
+            )
+
+        missing_support = [
+            column for column in dict.fromkeys(support_required) if column not in support_columns
+        ]
+        if missing_support:
+            findings.append(
+                PreflightFinding(
+                    severity=Severity.ERROR,
+                    kind=FindingKind.MISSING_MEASURE,
+                    message=(
+                        f"SAE support dataset '{task.support_dataset}' "
+                        f"({task.support_path}) is missing columns: {missing_support}"
+                    ),
+                    dataset_id=task.support_dataset,
+                    years=[task.year],
+                    remediation=Remediation(
+                        hint=(
+                            "Rebuild the ACS5 tract SAE support artifact so it "
+                            "contains the requested distribution components."
+                        ),
+                        command=(
+                            "hhplab ingest acs5-tract "
+                            f"--acs {task.terminal_acs5_vintage} "
+                            f"--tracts {task.tract_vintage}"
+                        ),
+                    ),
+                )
+            )
+
+        missing_denominators = [
+            column for column in task.denominators.values() if column not in support_columns
+        ]
+        if missing_denominators:
+            findings.append(
+                PreflightFinding(
+                    severity=Severity.ERROR,
+                    kind=FindingKind.MISSING_MEASURE,
+                    message=(
+                        f"SAE support dataset '{task.support_dataset}' "
+                        f"({task.support_path}) is missing denominator columns: "
+                        f"{missing_denominators}"
+                    ),
+                    dataset_id=task.support_dataset,
+                    years=[task.year],
+                    remediation=Remediation(
+                        hint=(
+                            "Use denominator columns from the ACS5 tract SAE "
+                            "support schema or rebuild the support artifact."
+                        ),
+                    ),
+                )
+            )
+
+    return findings
+
+
 def _check_support_datasets(
     recipe: RecipeV1,
     project_root: Path,
@@ -1942,6 +2281,7 @@ def run_preflight(
                 plan=plan,
                 task_count=(
                     len(plan.materialize_tasks) + len(plan.resample_tasks) + len(plan.join_tasks)
+                    + len(plan.small_area_estimate_tasks)
                 ),
             )
             report.pipelines.append(summary)
@@ -1954,6 +2294,19 @@ def run_preflight(
                     needed_transforms.add(rt.transform_id)
                 pipeline_resample_tasks.append((pipeline.id, rt))
             all_resample_tasks.extend(plan.resample_tasks)
+            report.findings.extend(
+                _check_sae_task_paths(
+                    recipe,
+                    project_root,
+                    plan.small_area_estimate_tasks,
+                )
+            )
+            report.findings.extend(
+                _check_sae_task_schemas(
+                    project_root,
+                    plan.small_area_estimate_tasks,
+                )
+            )
 
         except PlannerError as exc:
             err_str = str(exc)

@@ -57,6 +57,102 @@ def _write_stale_translated_acs_cache(path: Path) -> None:
     )
 
 
+def _sae_recipe_dict(year: int = 2023) -> dict:
+    return {
+        "version": 1,
+        "name": "sae-preflight",
+        "universe": {"years": [year]},
+        "targets": [
+            {
+                "id": "coc_panel",
+                "geometry": {"type": "coc", "vintage": 2025},
+            }
+        ],
+        "datasets": {
+            "acs1_county": {
+                "provider": "census",
+                "product": "acs1",
+                "version": 1,
+                "native_geometry": {"type": "county", "vintage": 2020, "source": "tiger"},
+                "path": f"data/curated/acs/acs1_county_sae__A{year}.parquet",
+            },
+            "acs5_support": {
+                "provider": "census",
+                "product": "acs5",
+                "version": 1,
+                "native_geometry": {"type": "tract", "vintage": 2020, "source": "tiger"},
+                "path": "data/curated/acs/acs5_tract_sae_support__A2022xT2020.parquet",
+            },
+        },
+        "pipelines": [
+            {
+                "id": "main",
+                "target": "coc_panel",
+                "steps": [
+                    {
+                        "kind": "small_area_estimate",
+                        "output_dataset": "acs_sae_coc",
+                        "source_dataset": "acs1_county",
+                        "support_dataset": "acs5_support",
+                        "source_geometry": {
+                            "type": "county",
+                            "vintage": 2020,
+                            "source": "tiger",
+                        },
+                        "support_geometry": {
+                            "type": "tract",
+                            "vintage": 2020,
+                            "source": "tiger",
+                        },
+                        "target_geometry": {"type": "coc", "vintage": 2025},
+                        "terminal_acs5_vintage": 2022,
+                        "tract_vintage": 2020,
+                        "denominators": {"labor_force": "civilian_labor_force"},
+                        "measures": {
+                            "labor_force": {
+                                "outputs": ["sae_unemployment_rate"],
+                            },
+                        },
+                    },
+                    {"kind": "join", "datasets": ["acs_sae_coc"]},
+                ],
+            }
+        ],
+    }
+
+
+def _write_sae_preflight_fixtures(root: Path, *, year: int = 2023) -> None:
+    acs_dir = root / "data" / "curated" / "acs"
+    acs_dir.mkdir(parents=True, exist_ok=True)
+    pd.DataFrame(
+        {
+            "county_fips": ["08031"],
+            "acs1_vintage": [year],
+            "civilian_labor_force": [1000],
+            "unemployed_count": [50],
+        }
+    ).to_parquet(acs_dir / f"acs1_county_sae__A{year}.parquet")
+    pd.DataFrame(
+        {
+            "tract_geoid": ["08031000100"],
+            "county_fips": ["08031"],
+            "acs_vintage": ["2022"],
+            "tract_vintage": ["2020"],
+            "civilian_labor_force": [600],
+            "unemployed_count": [30],
+        }
+    ).to_parquet(acs_dir / "acs5_tract_sae_support__A2022xT2020.parquet")
+    xwalk_dir = root / "data" / "curated" / "xwalks"
+    xwalk_dir.mkdir(parents=True, exist_ok=True)
+    pd.DataFrame(
+        {
+            "coc_id": ["COC-A"],
+            "tract_geoid": ["08031000100"],
+            "area_share": [1.0],
+        }
+    ).to_parquet(xwalk_dir / "xwalk__B2025xT2020.parquet")
+
+
 # ---------------------------------------------------------------------------
 # Probe unit tests
 # ---------------------------------------------------------------------------
@@ -707,6 +803,96 @@ class TestRunPreflight:
         assert "candidate_selector_ids did not match available COUNTY IDs: 999" in (
             selector_findings[0].message
         )
+
+    def test_sae_preflight_ready_when_artifacts_and_crosswalk_exist(self, tmp_path: Path):
+        _write_sae_preflight_fixtures(tmp_path)
+        recipe = load_recipe(_sae_recipe_dict())
+
+        report = run_preflight(recipe, project_root=tmp_path)
+
+        assert report.is_ready
+        assert report.pipelines[0].task_count == 2
+        assert report.findings == []
+
+    def test_sae_preflight_reports_missing_source_and_support_artifacts(
+        self,
+        tmp_path: Path,
+    ):
+        xwalk_dir = tmp_path / "data" / "curated" / "xwalks"
+        xwalk_dir.mkdir(parents=True, exist_ok=True)
+        pd.DataFrame({"coc_id": ["COC-A"], "tract_geoid": ["08031000100"]}).to_parquet(
+            xwalk_dir / "xwalk__B2025xT2020.parquet"
+        )
+        recipe = load_recipe(_sae_recipe_dict())
+
+        report = run_preflight(recipe, project_root=tmp_path)
+
+        missing = [f for f in report.findings if f.kind == FindingKind.MISSING_DATASET]
+        assert {f.dataset_id for f in missing} == {"acs1_county", "acs5_support"}
+        assert {f.remediation.command for f in missing if f.remediation} == {
+            "hhplab ingest acs1-county --vintage <year>",
+            "hhplab ingest acs5-tract --acs <acs-years> --tracts 2020",
+        }
+
+    def test_sae_preflight_reports_missing_target_crosswalk(self, tmp_path: Path):
+        _write_sae_preflight_fixtures(tmp_path)
+        (tmp_path / "data" / "curated" / "xwalks" / "xwalk__B2025xT2020.parquet").unlink()
+        recipe = load_recipe(_sae_recipe_dict())
+
+        report = run_preflight(recipe, project_root=tmp_path)
+
+        missing = [f for f in report.findings if f.kind == FindingKind.MISSING_TRANSFORM]
+        assert len(missing) == 1
+        assert "CoC-to-tract crosswalk" in missing[0].message
+        assert missing[0].remediation is not None
+        assert missing[0].remediation.command == (
+            "hhplab generate xwalks --boundary 2025 --type tract --tracts 2020"
+        )
+
+    def test_sae_preflight_reports_invalid_output_family(self, tmp_path: Path):
+        _write_sae_preflight_fixtures(tmp_path)
+        data = _sae_recipe_dict()
+        data["pipelines"][0]["steps"][0]["measures"]["labor_force"]["outputs"] = [
+            "sae_household_income_median"
+        ]
+        recipe = load_recipe(data)
+
+        report = run_preflight(recipe, project_root=tmp_path)
+
+        findings = [f for f in report.findings if f.kind == FindingKind.MISSING_MEASURE]
+        assert len(findings) == 1
+        assert "cannot produce outputs" in findings[0].message
+        assert "direct medians" in findings[0].message
+
+    def test_sae_preflight_reports_missing_denominator_column(self, tmp_path: Path):
+        _write_sae_preflight_fixtures(tmp_path)
+        data = _sae_recipe_dict()
+        data["pipelines"][0]["steps"][0]["denominators"] = {
+            "labor_force": "missing_denominator"
+        }
+        recipe = load_recipe(data)
+
+        report = run_preflight(recipe, project_root=tmp_path)
+
+        findings = [f for f in report.findings if f.kind == FindingKind.MISSING_MEASURE]
+        assert len(findings) == 1
+        assert "missing denominator columns" in findings[0].message
+        assert findings[0].dataset_id == "acs5_support"
+
+    def test_sae_preflight_reports_acs1_unavailable_vintage(self, tmp_path: Path):
+        _write_sae_preflight_fixtures(tmp_path, year=2020)
+        recipe = load_recipe(_sae_recipe_dict(year=2020))
+
+        report = run_preflight(recipe, project_root=tmp_path)
+
+        findings = [
+            f for f in report.findings
+            if f.kind == FindingKind.MISSING_DATASET and f.dataset_id == "acs1_county"
+        ]
+        assert len(findings) == 1
+        assert findings[0].years == [2020]
+        assert findings[0].remediation is not None
+        assert findings[0].remediation.command is None
 
     def test_blocks_stale_translated_acs_cache(self, tmp_path: Path):
         data = _preflight_recipe(with_path=True)
