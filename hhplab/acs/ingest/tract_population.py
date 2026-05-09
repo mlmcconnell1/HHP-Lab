@@ -55,6 +55,11 @@ from hhplab.acs.translate import (
     translate_acs_to_target_vintage,
 )
 from hhplab.acs.variables import (
+    ACS5_SAE_DENOMINATOR_COLUMNS,
+    ACS5_SAE_SUPPORT_COLUMNS,
+    ACS5_SAE_SUPPORT_COLUMNS_BY_TABLE,
+    ACS5_SAE_SUPPORT_OUTPUT_COLUMNS,
+    ACS5_SAE_SUPPORT_TABLES,
     ACS_VARIABLES,
     ADULT_VARS,
     ALL_API_VARS,
@@ -215,6 +220,135 @@ def normalize_geoid(state: str, county: str, tract: str) -> str:
     county_str = str(county).zfill(3)
     tract_str = str(tract).zfill(6)
     return f"{state_str}{county_str}{tract_str}"
+
+
+def _resolve_single_value(
+    df: pd.DataFrame,
+    column: str,
+    explicit_value: str | None,
+    label: str,
+) -> str:
+    if explicit_value is not None:
+        return str(explicit_value)
+    if column in df.columns and df[column].notna().any():
+        values = set(df[column].dropna().astype(str))
+        if len(values) != 1:
+            raise ValueError(
+                f"ACS5 tract SAE support normalization requires one {label}. "
+                f"Found values: {sorted(values)}."
+            )
+        return values.pop()
+    raise ValueError(
+        f"ACS5 tract SAE support normalization requires {label} either as an "
+        f"argument or as an input column."
+    )
+
+
+def _normalize_support_tract_geoid(df: pd.DataFrame) -> pd.Series:
+    if "tract_geoid" in df.columns:
+        return df["tract_geoid"].astype("string").str.zfill(11)
+    if {"state", "county", "tract"}.issubset(df.columns):
+        return (
+            df["state"].astype("string").str.zfill(2)
+            + df["county"].astype("string").str.zfill(3)
+            + df["tract"].astype("string").str.zfill(6)
+        )
+    raise ValueError(
+        "ACS5 tract SAE support normalization requires tract_geoid or state, "
+        "county, and tract columns."
+    )
+
+
+def _missing_support_tables(row: pd.Series) -> str:
+    missing_tables = [
+        table
+        for table, columns in ACS5_SAE_SUPPORT_COLUMNS_BY_TABLE.items()
+        if row[columns].isna().all()
+    ]
+    return json.dumps(missing_tables, sort_keys=True)
+
+
+def _zero_denominator_columns(row: pd.Series) -> str:
+    zero_columns = [
+        column
+        for column in ACS5_SAE_DENOMINATOR_COLUMNS
+        if column in row.index and pd.notna(row[column]) and row[column] == 0
+    ]
+    return json.dumps(zero_columns, sort_keys=True)
+
+
+def normalize_acs5_tract_sae_support(
+    df: pd.DataFrame,
+    *,
+    acs_vintage: str | None = None,
+    tract_vintage: str | None = None,
+) -> pd.DataFrame:
+    """Normalize ACS5 tract distributions into the SAE support contract."""
+    resolved_acs_vintage = _resolve_single_value(df, "acs_vintage", acs_vintage, "acs_vintage")
+    resolved_tract_vintage = _resolve_single_value(
+        df,
+        "tract_vintage",
+        tract_vintage,
+        "tract_vintage",
+    )
+    if any(column.startswith("B") and column.endswith("E") for column in df.columns):
+        result = df.rename(columns=ACS_VARIABLES).copy()
+    else:
+        result = df.copy()
+
+    tract_geoid = _normalize_support_tract_geoid(result)
+    normalized = pd.DataFrame(
+        {
+            "tract_geoid": tract_geoid,
+            "county_fips": tract_geoid.str.slice(0, 5),
+            "acs_vintage": resolved_acs_vintage,
+            "tract_vintage": resolved_tract_vintage,
+        }
+    )
+
+    for column in ACS5_SAE_SUPPORT_COLUMNS:
+        if column in result.columns:
+            normalized[column] = pd.to_numeric(result[column], errors="coerce")
+            normalized.loc[normalized[column] < 0, column] = pd.NA
+        else:
+            normalized[column] = pd.NA
+        normalized[column] = normalized[column].astype("Int64")
+
+    column_table_map = {
+        column: table
+        for table, columns in ACS5_SAE_SUPPORT_COLUMNS_BY_TABLE.items()
+        for column in columns
+    }
+    normalized["sae_support_tables"] = json.dumps(ACS5_SAE_SUPPORT_TABLES, sort_keys=True)
+    normalized["sae_missing_support_tables"] = normalized.apply(_missing_support_tables, axis=1)
+    normalized["sae_zero_denominator_columns"] = normalized.apply(
+        _zero_denominator_columns,
+        axis=1,
+    )
+    normalized["sae_support_column_tables"] = json.dumps(column_table_map, sort_keys=True)
+
+    normalized = normalized[ACS5_SAE_SUPPORT_OUTPUT_COLUMNS].copy()
+    normalized = normalized.sort_values("tract_geoid").reset_index(drop=True)
+    normalized.attrs["acs_vintage"] = resolved_acs_vintage
+    normalized.attrs["tract_vintage"] = resolved_tract_vintage
+    normalized.attrs["sae_support_tables"] = ACS5_SAE_SUPPORT_TABLES
+    normalized.attrs["sae_support_column_tables"] = column_table_map
+    return normalized
+
+
+def load_acs5_tract_sae_support(
+    path: str | Path,
+    *,
+    acs_vintage: str | None = None,
+    tract_vintage: str | None = None,
+) -> pd.DataFrame:
+    """Load a curated ACS5 tract artifact as normalized SAE support data."""
+    df = pd.read_parquet(path)
+    return normalize_acs5_tract_sae_support(
+        df,
+        acs_vintage=acs_vintage,
+        tract_vintage=tract_vintage,
+    )
 
 
 def fetch_state_tract_data(

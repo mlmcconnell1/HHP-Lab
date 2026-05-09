@@ -2,24 +2,33 @@
 
 from __future__ import annotations
 
+import json
 import re
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+import httpx
 import pandas as pd
 import pytest
-import httpx
 
 from hhplab.acs.ingest.tract_population import (
     fetch_state_tract_data,
     fetch_tract_data,
     get_output_path,
     ingest_tract_data,
+    load_acs5_tract_sae_support,
+    normalize_acs5_tract_sae_support,
     normalize_geoid,
     parse_acs_vintage,
 )
-from hhplab.acs.variables import ALL_API_VARS, TRACT_OUTPUT_COLUMNS, api_vars_for_year
+from hhplab.acs.variables import (
+    ACS5_SAE_SUPPORT_OUTPUT_COLUMNS,
+    ACS5_SAE_SUPPORT_TABLES,
+    ALL_API_VARS,
+    TRACT_OUTPUT_COLUMNS,
+    tables_for_api_vars,
+)
 from hhplab.provenance import (
     ProvenanceBlock,
     read_provenance,
@@ -250,6 +259,138 @@ class TestFetchStateTractPopulation:
         assert row["owner_costs_pct_income_with_mortgage_50_plus"] == 180
         assert row["tenure_income_total"] == 2100
         assert row["tenure_income_renter_occupied_total"] == 900
+
+    def test_normalizes_sae_tract_support_contract(self) -> None:
+        """SAE tract support frames expose county, denominators, and metadata."""
+        df = normalize_acs5_tract_sae_support(
+            pd.DataFrame(
+                [
+                    {
+                        "tract_geoid": "08031001000",
+                        "acs_vintage": "2019-2023",
+                        "tract_vintage": "2023",
+                        "total_population": 5000,
+                        "adult_population": 4200,
+                        "total_households": 2100,
+                        "owner_households": 1200,
+                        "renter_households": 900,
+                        "civilian_labor_force": 2600,
+                        "unemployed_count": 130,
+                        "household_income_total": 2100,
+                        "household_income_200000_plus": 125,
+                        "gross_rent_distribution_total": 900,
+                        "gross_rent_distribution_cash_rent_3500_plus": 70,
+                        "gross_rent_pct_income_total": 880,
+                        "gross_rent_pct_income_50_plus": 220,
+                        "owner_costs_pct_income_with_mortgage_total": 700,
+                        "owner_costs_pct_income_with_mortgage_50_plus": 80,
+                        "tenure_income_total": 2100,
+                        "tenure_income_renter_occupied_total": 900,
+                    }
+                ]
+            )
+        )
+
+        assert list(df.columns) == ACS5_SAE_SUPPORT_OUTPUT_COLUMNS
+        assert df.loc[0, "county_fips"] == "08031"
+        assert df.loc[0, "acs_vintage"] == "2019-2023"
+        assert df.loc[0, "tract_vintage"] == "2023"
+        assert df["household_income_200000_plus"].dtype == "Int64"
+        assert df.loc[0, "gross_rent_pct_income_50_plus"] == 220
+
+        support_tables = json.loads(df.loc[0, "sae_support_tables"])
+        column_tables = json.loads(df.loc[0, "sae_support_column_tables"])
+        assert support_tables == [
+            "B01003",
+            "B01001",
+            "B25003",
+            "B23025",
+            "B19001",
+            "B25063",
+            "B25070",
+            "B25091",
+            "B25118",
+        ]
+        assert column_tables["household_income_total"] == "B19001"
+        assert column_tables["gross_rent_pct_income_50_plus"] == "B25070"
+        assert column_tables["tenure_income_renter_occupied_total"] == "B25118"
+        assert df.attrs["sae_support_column_tables"] == column_tables
+
+    def test_normalizes_sae_tract_support_from_geography_parts(self) -> None:
+        """County membership can be derived before tract_geoid is materialized."""
+        df = normalize_acs5_tract_sae_support(
+            pd.DataFrame(
+                [
+                    {
+                        "state": "8",
+                        "county": "31",
+                        "tract": "1000",
+                        "total_population": "0",
+                        "total_households": "0",
+                    }
+                ]
+            ),
+            acs_vintage="2019-2023",
+            tract_vintage="2023",
+        )
+
+        assert df.loc[0, "tract_geoid"] == "08031001000"
+        assert df.loc[0, "county_fips"] == "08031"
+        assert json.loads(df.loc[0, "sae_zero_denominator_columns"]) == [
+            "total_population",
+            "total_households",
+        ]
+
+    def test_normalizes_sae_tract_support_missing_distribution_diagnostics(self) -> None:
+        """Rows with absent support distributions carry explicit table diagnostics."""
+        df = normalize_acs5_tract_sae_support(
+            pd.DataFrame(
+                [
+                    {
+                        "tract_geoid": "08031001000",
+                        "acs_vintage": "2019-2023",
+                        "tract_vintage": "2023",
+                        "total_population": 5000,
+                        "adult_population": 4200,
+                        "total_households": 2100,
+                        "owner_households": 1200,
+                        "renter_households": 900,
+                        "civilian_labor_force": 2600,
+                        "unemployed_count": 130,
+                    }
+                ]
+            )
+        )
+
+        missing_tables = json.loads(df.loc[0, "sae_missing_support_tables"])
+        assert "B19001" in missing_tables
+        assert "B25063" in missing_tables
+        assert "B25070" in missing_tables
+        assert "B01003" not in missing_tables
+        assert "B25003" not in missing_tables
+
+    def test_loads_sae_tract_support_from_curated_artifact(self, tmp_path) -> None:
+        """Curated ACS5 tract parquet files can feed the SAE support contract."""
+        path = tmp_path / "acs5_tracts__A2023xT2023.parquet"
+        pd.DataFrame(
+            [
+                {
+                    "tract_geoid": "08031001000",
+                    "acs_vintage": "2019-2023",
+                    "tract_vintage": "2023",
+                    "total_population": 5000,
+                    "total_households": 2100,
+                    "household_income_total": 2100,
+                    "gross_rent_distribution_total": 900,
+                }
+            ]
+        ).to_parquet(path)
+
+        df = load_acs5_tract_sae_support(path)
+
+        assert df.loc[0, "county_fips"] == "08031"
+        assert df.loc[0, "household_income_total"] == 2100
+        assert df.loc[0, "gross_rent_distribution_total"] == 900
 
     def test_handles_missing_values(self, httpx_mock):
         """Test that negative values (Census missing indicator) are converted to NA."""
@@ -1002,3 +1143,23 @@ def test_sae_required_tract_columns_are_canonical(
 ) -> None:
     for column in columns:
         assert column in TRACT_OUTPUT_COLUMNS, family
+
+
+def test_sae_required_tract_tables_are_in_provenance_order() -> None:
+    """SAE support tables have deterministic order in ACS5 table metadata."""
+    assert tables_for_api_vars(ALL_API_VARS) == [
+        "B01003",
+        "B01001",
+        "B19013",
+        "B25064",
+        "B25003",
+        "C17002",
+        "B23025",
+        "B19001",
+        "B25063",
+        "B25070",
+        "B25091",
+        "B25118",
+    ]
+    for table in ACS5_SAE_SUPPORT_TABLES:
+        assert table in tables_for_api_vars(ALL_API_VARS)

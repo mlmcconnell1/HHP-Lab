@@ -11,6 +11,7 @@ from hhplab.schema.columns import (
     ACS5_DERIVED_COLUMNS,
     ACS5_MEDIAN_COLUMNS,
     ACS5_MOE_COLUMNS,
+    ACS5_SAE_COUNT_COLUMNS,
     ACS_TRACT_OUTPUT_COLUMNS,
 )
 
@@ -234,6 +235,11 @@ ACS_TABLES: list[str] = [
     "B25003",
     "C17002",
     "B23025",
+    "B19001",
+    "B25063",
+    "B25070",
+    "B25091",
+    "B25118",
 ]
 
 # ---------------------------------------------------------------------------
@@ -257,3 +263,79 @@ DERIVED_COLUMNS: list[str] = ACS5_DERIVED_COLUMNS
 # ---------------------------------------------------------------------------
 
 TRACT_OUTPUT_COLUMNS: list[str] = ACS_TRACT_OUTPUT_COLUMNS
+
+# ---------------------------------------------------------------------------
+# SAE tract support contract
+# ---------------------------------------------------------------------------
+
+ACS5_SAE_SUPPORT_COLUMNS_BY_TABLE: dict[str, list[str]] = {
+    "B01003": ["total_population"],
+    "B01001": ["adult_population"],
+    "B25003": ["total_households", "owner_households", "renter_households"],
+    "B23025": ["civilian_labor_force", "unemployed_count"],
+    "B19001": [
+        column
+        for column in ACS5_SAE_COUNT_COLUMNS
+        if column.startswith("household_income_")
+    ],
+    "B25063": [
+        column
+        for column in ACS5_SAE_COUNT_COLUMNS
+        if column.startswith("gross_rent_distribution_")
+    ],
+    "B25070": [
+        column
+        for column in ACS5_SAE_COUNT_COLUMNS
+        if column.startswith("gross_rent_pct_income_")
+    ],
+    "B25091": [
+        column
+        for column in ACS5_SAE_COUNT_COLUMNS
+        if column.startswith("owner_costs_pct_income_")
+    ],
+    "B25118": [
+        column
+        for column in ACS5_SAE_COUNT_COLUMNS
+        if column.startswith("tenure_income_")
+    ],
+}
+
+ACS5_SAE_SUPPORT_TABLES: list[str] = list(ACS5_SAE_SUPPORT_COLUMNS_BY_TABLE)
+
+ACS5_SAE_DENOMINATOR_COLUMNS: list[str] = [
+    "total_population",
+    "adult_population",
+    "total_households",
+    "owner_households",
+    "renter_households",
+    "civilian_labor_force",
+    "household_income_total",
+    "gross_rent_distribution_total",
+    "gross_rent_pct_income_total",
+    "owner_costs_pct_income_with_mortgage_total",
+    "owner_costs_pct_income_without_mortgage_total",
+    "tenure_income_owner_occupied_total",
+    "tenure_income_renter_occupied_total",
+]
+
+ACS5_SAE_SUPPORT_COLUMNS: list[str] = [
+    column
+    for table in ACS5_SAE_SUPPORT_TABLES
+    for column in ACS5_SAE_SUPPORT_COLUMNS_BY_TABLE[table]
+]
+
+ACS5_SAE_SUPPORT_METADATA_COLUMNS: list[str] = [
+    "sae_support_tables",
+    "sae_missing_support_tables",
+    "sae_zero_denominator_columns",
+    "sae_support_column_tables",
+]
+
+ACS5_SAE_SUPPORT_OUTPUT_COLUMNS: list[str] = [
+    "tract_geoid",
+    "county_fips",
+    "acs_vintage",
+    "tract_vintage",
+    *ACS5_SAE_SUPPORT_COLUMNS,
+    *ACS5_SAE_SUPPORT_METADATA_COLUMNS,
+]
