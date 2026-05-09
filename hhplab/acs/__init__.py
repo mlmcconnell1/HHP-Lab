@@ -12,6 +12,7 @@ _EXPORTS = {
     "aggregate_acs_to_metro": ("hhplab.acs.acs_metro", "aggregate_acs_to_metro"),
     "aggregate_to_coc": ("hhplab.acs.acs_aggregate", "aggregate_to_coc"),
     "aggregate_to_geo": ("hhplab.acs.acs_aggregate", "aggregate_to_geo"),
+    "allocate_acs1_county_to_tracts": ("hhplab.acs.sae", "allocate_acs1_county_to_tracts"),
     "build_metro_tract_crosswalk": ("hhplab.acs.acs_metro", "build_metro_tract_crosswalk"),
     "TranslationStats": ("hhplab.acs.translate", "TranslationStats"),
     "fetch_state_tract_data": ("hhplab.acs.ingest.tract_population", "fetch_state_tract_data"),
