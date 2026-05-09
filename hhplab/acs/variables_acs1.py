@@ -439,6 +439,51 @@ ACS1_COUNTY_OUTPUT_COLUMNS: list[str] = [
 ]
 
 # ---------------------------------------------------------------------------
+# SAE source aggregate contract
+# ---------------------------------------------------------------------------
+
+ACS1_SAE_SOURCE_TABLES: list[str] = [
+    "B23025",
+    "B19001",
+    "B25063",
+    "B25070",
+    "B25091",
+    "B25118",
+]
+
+ACS1_SAE_SOURCE_COLUMNS_BY_TABLE: dict[str, list[str]] = {
+    "B23025": [
+        "pop_16_plus",
+        "civilian_labor_force",
+        "unemployed_count",
+    ],
+    **{
+        table: list(ACS1_TABLE_COLUMN_NAMES[table].values())
+        for table in ACS1_SAE_SOURCE_TABLES
+        if table != "B23025"
+    },
+}
+
+ACS1_SAE_SOURCE_COLUMNS: list[str] = [
+    column_name
+    for table in ACS1_SAE_SOURCE_TABLES
+    for column_name in ACS1_SAE_SOURCE_COLUMNS_BY_TABLE[table]
+]
+
+ACS1_SAE_SOURCE_METADATA_COLUMNS: list[str] = [
+    "sae_source_tables",
+    "sae_unavailable_tables",
+    "sae_source_column_tables",
+]
+
+ACS1_SAE_SOURCE_OUTPUT_COLUMNS: list[str] = [
+    "county_fips",
+    "acs1_vintage",
+    *ACS1_SAE_SOURCE_COLUMNS,
+    *ACS1_SAE_SOURCE_METADATA_COLUMNS,
+]
+
+# ---------------------------------------------------------------------------
 # ACS 1-year availability
 # ---------------------------------------------------------------------------
 

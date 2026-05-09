@@ -11,9 +11,15 @@ import pytest
 from typer.testing import CliRunner
 
 from hhplab.acs.ingest._acs1_api import ACS1_COUNTY_GEOGRAPHY
-from hhplab.acs.ingest.county_acs1 import fetch_acs1_county_data, ingest_county_acs1
+from hhplab.acs.ingest.county_acs1 import (
+    fetch_acs1_county_data,
+    ingest_county_acs1,
+    load_acs1_county_sae_source,
+    normalize_acs1_county_sae_source,
+)
 from hhplab.acs.variables_acs1 import (
     ACS1_COUNTY_OUTPUT_COLUMNS,
+    ACS1_SAE_SOURCE_OUTPUT_COLUMNS,
     ACS1_VARIABLES_BY_TABLE,
     acs1_tables_for_vintage,
 )
@@ -159,6 +165,57 @@ def test_ingest_county_writes_schema_and_provenance(httpx_mock, tmp_path) -> Non
     assert provenance.extra["counties_fetched"] == 2
     assert "B19001" in provenance.extra["tables_requested"]
     assert "B25063" in provenance.extra["tables_requested"]
+
+
+def test_normalize_county_sae_source_exposes_components_and_metadata() -> None:
+    df = normalize_acs1_county_sae_source(
+        pd.DataFrame(SAMPLE_COUNTIES),
+        acs1_vintage=2023,
+        unavailable_tables=["B25070"],
+    )
+
+    assert list(df.columns) == ACS1_SAE_SOURCE_OUTPUT_COLUMNS
+    assert list(df["county_fips"]) == ["06037", "36047"]
+    assert list(df["acs1_vintage"]) == ["2023", "2023"]
+
+    # Representative source components for count, income-distribution, and
+    # burden-bin families are normalized to stable nullable integer columns.
+    assert df["civilian_labor_force"].tolist() == [5200000, 1300000]
+    assert df["household_income_200000_plus"].tolist() == [710000, 160000]
+    assert df["gross_rent_pct_income_50_plus"].dtype == "Int64"
+    assert df["owner_costs_pct_income_with_mortgage_total"].dtype == "Int64"
+
+    source_tables = json.loads(df.loc[0, "sae_source_tables"])
+    column_tables = json.loads(df.loc[0, "sae_source_column_tables"])
+    assert source_tables == ["B23025", "B19001", "B25063", "B25091", "B25118"]
+    assert json.loads(df.loc[0, "sae_unavailable_tables"]) == ["B25070"]
+    assert column_tables["civilian_labor_force"] == "B23025"
+    assert column_tables["household_income_200000_plus"] == "B19001"
+    assert column_tables["gross_rent_pct_income_50_plus"] == "B25070"
+    assert column_tables["owner_costs_pct_income_with_mortgage_total"] == "B25091"
+    assert df.attrs["sae_source_column_tables"] == column_tables
+
+
+def test_load_county_sae_source_from_curated_artifact(httpx_mock, tmp_path) -> None:
+    queue_acs1_county_responses(httpx_mock, SAMPLE_COUNTIES, vintage=2023)
+    path = ingest_county_acs1(vintage=2023, project_root=tmp_path)
+
+    df = load_acs1_county_sae_source(path)
+
+    assert list(df["county_fips"]) == ["06037", "36047"]
+    assert df["gross_rent_distribution_cash_rent_3500_plus"].tolist() == [
+        220000,
+        65000,
+    ]
+    assert df["tenure_income_renter_occupied_total"].dtype == "Int64"
+
+
+def test_county_sae_source_rejects_unavailable_acs1_2020() -> None:
+    with pytest.raises(ValueError, match="unavailable for vintage 2020"):
+        normalize_acs1_county_sae_source(
+            pd.DataFrame(SAMPLE_COUNTIES),
+            acs1_vintage=2020,
+        )
 
 
 @pytest.mark.parametrize(
