@@ -7,6 +7,11 @@ import pandas as pd
 import typer
 
 from hhplab.pit.pit_registry import get_pit_vintage_path, list_pit_vintages
+from hhplab.pit.vintage_compare import (
+    PIT_DELTA_COLUMNS,
+    PitVintageComparisonResult,
+    compare_pit_vintages,
+)
 
 
 def _run_pit_vintages_validation(
@@ -121,137 +126,68 @@ def _run_pit_vintages_validation(
         typer.echo(f"Error reading {path2}: {e}", err=True)
         raise typer.Exit(1) from e
 
-    # Validate required columns
-    required_cols = {"pit_year", "coc_id", "pit_total", "pit_sheltered", "pit_unsheltered"}
-    for df, _vintage, path in [(df1, vintage1, path1), (df2, vintage2, path2)]:
-        missing = required_cols - set(df.columns)
-        if missing:
-            typer.echo(
-                f"Error: Vintage file {path} missing required columns: {missing}",
-                err=True,
-            )
-            raise typer.Exit(1)
+    try:
+        result = compare_pit_vintages(df1, df2, year=year)
+    except ValueError as e:
+        typer.echo(f"Error: {e}", err=True)
+        raise typer.Exit(1) from e
 
-    # Find common years
-    years1 = set(df1["pit_year"].unique())
-    years2 = set(df2["pit_year"].unique())
-    common_years = sorted(years1 & years2)
-
-    if not common_years:
-        typer.echo(
-            f"Error: No common years between vintages. "
-            f"Vintage {vintage1} has years {sorted(years1)}, "
-            f"vintage {vintage2} has years {sorted(years2)}",
-            err=True,
-        )
-        raise typer.Exit(1)
-
-    # Filter to specific year if requested
-    if year is not None:
-        if year not in common_years:
-            typer.echo(
-                f"Error: Year {year} not found in both vintages. Common years: {common_years}",
-                err=True,
-            )
-            raise typer.Exit(1)
-        common_years = [year]
-
+    common_years = result.common_years
     typer.echo(f"Comparing {len(common_years)} common years: {common_years[0]}-{common_years[-1]}")
     typer.echo("")
 
-    # Filter to common years
-    df1_filtered = df1[df1["pit_year"].isin(common_years)].copy()
-    df2_filtered = df2[df2["pit_year"].isin(common_years)].copy()
-
-    # Create comparison keys
-    df1_filtered["key"] = df1_filtered["pit_year"].astype(str) + "_" + df1_filtered["coc_id"]
-    df2_filtered["key"] = df2_filtered["pit_year"].astype(str) + "_" + df2_filtered["coc_id"]
-
-    # Merge on key
-    merged = pd.merge(
-        df1_filtered[["key", "pit_total", "pit_sheltered", "pit_unsheltered"]],
-        df2_filtered[["key", "pit_total", "pit_sheltered", "pit_unsheltered"]],
-        on="key",
-        how="outer",
-        suffixes=("_v1", "_v2"),
+    _render_pit_vintage_comparison(
+        result,
+        vintage1=vintage1,
+        vintage2=vintage2,
+        output=output,
+        show_unchanged=show_unchanged,
     )
 
-    # Extract pit_year and coc_id from key (format: "YEAR_COC_ID")
-    merged["pit_year"] = merged["key"].str.split("_").str[0].astype(int)
-    merged["coc_id"] = merged["key"].str.split("_", n=1).str[1]
+    # Exit with code 1 if there are changes (useful for CI/CD)
+    if result.has_differences:
+        raise typer.Exit(1)
+    raise typer.Exit(0)
 
-    # Calculate differences
-    merged["total_delta"] = merged["pit_total_v2"] - merged["pit_total_v1"]
-    merged["sheltered_delta"] = merged["pit_sheltered_v2"] - merged["pit_sheltered_v1"]
-    merged["unsheltered_delta"] = merged["pit_unsheltered_v2"] - merged["pit_unsheltered_v1"]
 
-    # Classify changes
-    def classify_change(row: pd.Series) -> str:
-        if pd.isna(row["pit_total_v1"]):
-            return "added"
-        if pd.isna(row["pit_total_v2"]):
-            return "removed"
-        if row["total_delta"] != 0 or row["sheltered_delta"] != 0 or row["unsheltered_delta"] != 0:
-            # Check for NaN deltas (when one side has null sheltered/unsheltered)
-            total_changed = row["total_delta"] != 0 if not pd.isna(row["total_delta"]) else False
-            sheltered_changed = (
-                row["sheltered_delta"] != 0 if not pd.isna(row["sheltered_delta"]) else False
-            )
-            unsheltered_changed = (
-                row["unsheltered_delta"] != 0 if not pd.isna(row["unsheltered_delta"]) else False
-            )
-            if total_changed or sheltered_changed or unsheltered_changed:
-                return "changed"
-        return "unchanged"
-
-    merged["status"] = merged.apply(classify_change, axis=1)
-
-    # Summary statistics
-    added = merged[merged["status"] == "added"]
-    removed = merged[merged["status"] == "removed"]
-    changed = merged[merged["status"] == "changed"]
-    unchanged = merged[merged["status"] == "unchanged"]
+def _render_pit_vintage_comparison(
+    result: PitVintageComparisonResult,
+    *,
+    vintage1: str,
+    vintage2: str,
+    output: Path | None,
+    show_unchanged: bool,
+) -> None:
+    added = result.records_with_status("added")
+    removed = result.records_with_status("removed")
+    changed = result.records_with_status("changed")
+    unchanged = result.records_with_status("unchanged")
 
     # Display summary
     typer.echo("=" * 70)
     typer.echo(f"PIT VINTAGE COMPARISON: {vintage1} -> {vintage2}")
     typer.echo("=" * 70)
     typer.echo("")
-    typer.echo(f"Vintage {vintage1}: {len(df1_filtered)} CoC-year records")
-    typer.echo(f"Vintage {vintage2}: {len(df2_filtered)} CoC-year records")
-    typer.echo(f"Years compared: {len(common_years)} ({common_years[0]}-{common_years[-1]})")
+    typer.echo(f"Vintage {vintage1}: {result.vintage1_record_count} CoC-year records")
+    typer.echo(f"Vintage {vintage2}: {result.vintage2_record_count} CoC-year records")
+    typer.echo(
+        f"Years compared: {len(result.common_years)} "
+        f"({result.common_years[0]}-{result.common_years[-1]})"
+    )
     typer.echo("")
     typer.echo("-" * 40)
     typer.echo("SUMMARY")
     typer.echo("-" * 40)
-    typer.echo(f"  Added:     {len(added):>6} CoC-years")
-    typer.echo(f"  Removed:   {len(removed):>6} CoC-years")
-    typer.echo(f"  Changed:   {len(changed):>6} CoC-years")
-    typer.echo(f"  Unchanged: {len(unchanged):>6} CoC-years")
+    typer.echo(f"  Added:     {result.added_count:>6} CoC-years")
+    typer.echo(f"  Removed:   {result.removed_count:>6} CoC-years")
+    typer.echo(f"  Changed:   {result.changed_count:>6} CoC-years")
+    typer.echo(f"  Unchanged: {result.unchanged_count:>6} CoC-years")
     typer.echo("")
 
     # Compare tab totals (all-CoC totals) by year
     typer.echo("-" * 70)
     typer.echo("TAB TOTALS BY YEAR (all CoCs summed)")
     typer.echo("-" * 70)
-
-    # Calculate totals by year for each vintage
-    totals_v1 = df1_filtered.groupby("pit_year")[
-        ["pit_total", "pit_sheltered", "pit_unsheltered"]
-    ].sum()
-    totals_v2 = df2_filtered.groupby("pit_year")[
-        ["pit_total", "pit_sheltered", "pit_unsheltered"]
-    ].sum()
-
-    # Merge and calculate deltas
-    totals_compare = totals_v1.join(totals_v2, lsuffix="_v1", rsuffix="_v2", how="outer")
-    totals_compare["total_delta"] = totals_compare["pit_total_v2"] - totals_compare["pit_total_v1"]
-    totals_compare["sheltered_delta"] = (
-        totals_compare["pit_sheltered_v2"] - totals_compare["pit_sheltered_v1"]
-    )
-    totals_compare["unsheltered_delta"] = (
-        totals_compare["pit_unsheltered_v2"] - totals_compare["pit_unsheltered_v1"]
-    )
 
     # Display header
     typer.echo(
@@ -262,8 +198,8 @@ def _run_pit_vintages_validation(
     typer.echo("  " + "-" * 106)
 
     any_tab_differences = False
-    for pit_year in sorted(totals_compare.index):
-        row = totals_compare.loc[pit_year]
+    for pit_year in sorted(result.tab_totals.index):
+        row = result.tab_totals.loc[pit_year]
         total_v1 = int(row["pit_total_v1"]) if not pd.isna(row["pit_total_v1"]) else 0
         total_v2 = int(row["pit_total_v2"]) if not pd.isna(row["pit_total_v2"]) else 0
         total_delta = int(row["total_delta"]) if not pd.isna(row["total_delta"]) else 0
@@ -284,8 +220,9 @@ def _run_pit_vintages_validation(
         unshelt_delta_str = f"{unshelt_delta:+d}" if unshelt_delta != 0 else "0"
 
         # Mark rows with differences
-        marker = " *" if (total_delta != 0 or shelt_delta != 0 or unshelt_delta != 0) else "  "
-        if total_delta != 0 or shelt_delta != 0 or unshelt_delta != 0:
+        row_has_differences = any(row[column] != 0 for column in PIT_DELTA_COLUMNS)
+        marker = " *" if row_has_differences else "  "
+        if row_has_differences:
             any_tab_differences = True
 
         typer.echo(
@@ -395,34 +332,11 @@ def _run_pit_vintages_validation(
     # Save to CSV if output path specified
     if output:
         # Prepare output DataFrame
-        output_df = merged[
-            [
-                "pit_year",
-                "coc_id",
-                "status",
-                "pit_total_v1",
-                "pit_total_v2",
-                "total_delta",
-                "pit_sheltered_v1",
-                "pit_sheltered_v2",
-                "sheltered_delta",
-                "pit_unsheltered_v1",
-                "pit_unsheltered_v2",
-                "unsheltered_delta",
-            ]
-        ].copy()
-        output_df.insert(0, "vintage1", vintage1)
-        output_df.insert(1, "vintage2", vintage2)
-        output_df = output_df.sort_values(["pit_year", "coc_id"])
+        output_df = result.csv_frame(vintage1, vintage2)
 
         output.parent.mkdir(parents=True, exist_ok=True)
         output_df.to_csv(output, index=False)
         typer.echo(f"\nComparison saved to: {output}")
-
-    # Exit with code 1 if there are changes (useful for CI/CD)
-    if len(changed) > 0 or len(added) > 0 or len(removed) > 0:
-        raise typer.Exit(1)
-    raise typer.Exit(0)
 
 
 def validate_pit_vintages(

@@ -39,6 +39,10 @@ from hhplab.pit.pit_registry import (
     register_pit_year,
 )
 from hhplab.pit.qa import QAIssue, QAReport, Severity, validate_pit_data
+from hhplab.pit.vintage_compare import (
+    PitVintageComparisonResult,
+    compare_pit_vintages,
+)
 
 __all__ = [
     "CANONICAL_COLUMNS",
@@ -68,6 +72,8 @@ __all__ = [
     "normalize_coc_id",
     "parse_pit_file",
     "parse_pit_vintage",
+    "PitVintageComparisonResult",
+    "compare_pit_vintages",
     "register_pit_year",
     "validate_pit_data",
     "write_pit_parquet",
