@@ -475,6 +475,7 @@ def test_execute_recipe_containment_filter_keeps_selected_panel_candidates(tmp_p
                     "id": "filtered_coc_panel",
                     "geometry": {"type": "coc", "vintage": 2025},
                     "outputs": ["panel"],
+                    "selector_ids": ["COC-A", "COC-B"],
                     "containment_filter": {
                         "container": {
                             "type": "msa",
@@ -539,3 +540,86 @@ def test_execute_recipe_containment_filter_keeps_selected_panel_candidates(tmp_p
     assert containment_filter["panel_rows_before"] == 2
     assert containment_filter["panel_rows_after"] == 1
     assert containment_filter["spec"]["selector_ids"] == ["MSA-1"]
+    target_selector = provenance["target_selector"]
+    assert target_selector["selector_ids"] == ["COC-A", "COC-B"]
+    assert target_selector["selected_count"] == 2
+
+
+def test_execute_recipe_target_selector_filters_panel_rows(tmp_path) -> None:
+    coc_file = coc_base_path("2025", tmp_path / "data")
+    pit_file = tmp_path / "data" / "pit.parquet"
+    coc_file.parent.mkdir(parents=True, exist_ok=True)
+    _coc_gdf().to_parquet(coc_file)
+    pd.DataFrame(
+        {
+            "coc_id": ["COC-A", "COC-B"],
+            "year": [2020, 2020],
+            "pit_total": [42, 7],
+        }
+    ).to_parquet(pit_file)
+
+    recipe = load_recipe(
+        {
+            "version": 1,
+            "name": "panel-target-selector-test",
+            "universe": {"years": [2020]},
+            "targets": [
+                {
+                    "id": "selected_coc_panel",
+                    "geometry": {"type": "coc", "vintage": 2025},
+                    "outputs": ["panel"],
+                    "selector_ids": ["COC-B"],
+                }
+            ],
+            "datasets": {
+                "pit": {
+                    "provider": "hud",
+                    "product": "pit",
+                    "version": 1,
+                    "native_geometry": {"type": "coc"},
+                    "path": "data/pit.parquet",
+                    "years": {"years": [2020]},
+                },
+            },
+            "transforms": [],
+            "pipelines": [
+                {
+                    "id": "main",
+                    "target": "selected_coc_panel",
+                    "steps": [
+                        {
+                            "resample": {
+                                "dataset": "pit",
+                                "to_geometry": {"type": "coc", "vintage": 2025},
+                                "method": "identity",
+                                "measures": ["pit_total"],
+                            }
+                        },
+                        {
+                            "join": {
+                                "datasets": ["pit"],
+                                "join_on": ["geo_id", "year"],
+                            }
+                        },
+                    ],
+                }
+            ],
+        }
+    )
+
+    results = execute_recipe(recipe, project_root=tmp_path, quiet=True)
+
+    assert results[0].success
+    artifacts = resolve_pipeline_artifacts(recipe, "main", project_root=tmp_path)
+    panel_path = tmp_path / artifacts["panel_path"]
+    panel = pd.read_parquet(panel_path)
+    assert panel["geo_id"].tolist() == ["COC-B"]
+    assert panel["pit_total"].tolist() == [7]
+
+    metadata = pq.read_metadata(panel_path).metadata or {}
+    provenance = json.loads(metadata[b"hhplab_provenance"])
+    target_selector = provenance["target_selector"]
+    assert target_selector["selector_ids"] == ["COC-B"]
+    assert target_selector["selected_count"] == 1
+    assert target_selector["panel_rows_before"] == 2
+    assert target_selector["panel_rows_after"] == 1

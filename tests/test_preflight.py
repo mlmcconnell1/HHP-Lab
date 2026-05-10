@@ -850,6 +850,26 @@ class TestRunPreflight:
             }
         ] == []
 
+    def test_target_selector_mismatch_is_actionable(self, tmp_path: Path):
+        data = _preflight_recipe(with_path=True, identity_only=True)
+        data["targets"][0]["selector_ids"] = ["COC2"]
+        _setup_preflight_fixtures(tmp_path, include_xwalk=False, include_acs=False)
+        _setup_containment_artifacts(tmp_path, ("msa", "coc"))
+
+        recipe = load_recipe(data)
+        report = run_preflight(recipe, project_root=tmp_path)
+
+        selector_findings = [
+            f for f in report.findings
+            if f.kind == FindingKind.TARGET_SELECTOR
+        ]
+        assert len(selector_findings) == 1
+        assert "selector_ids did not match available COC IDs: COC2" in (
+            selector_findings[0].message
+        )
+        assert selector_findings[0].remediation is not None
+        assert "target.selector_ids" in selector_findings[0].remediation.hint
+
     def test_containment_coc_county_missing_county_is_actionable(self, tmp_path: Path):
         data = _containment_preflight_recipe(("coc", "county"))
         _setup_preflight_fixtures(tmp_path, include_xwalk=False, include_acs=False)

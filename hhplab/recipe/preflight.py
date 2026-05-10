@@ -110,6 +110,7 @@ class FindingKind(str, enum.Enum):
     MISSING_MAP_ARTIFACT = "missing_map_artifact"
     MISSING_CONTAINMENT_ARTIFACT = "missing_containment_artifact"
     CONTAINMENT_SELECTOR = "containment_selector"
+    TARGET_SELECTOR = "target_selector"
 
 
 @dataclass
@@ -236,6 +237,7 @@ class PreflightReport:
             FindingKind.MISSING_MAP_ARTIFACT,
             FindingKind.MISSING_CONTAINMENT_ARTIFACT,
             FindingKind.CONTAINMENT_SELECTOR,
+            FindingKind.TARGET_SELECTOR,
         }
         gaps = [f for f in self.findings if f.kind in gap_kinds]
         by_kind: dict[str, list[dict]] = {}
@@ -1028,6 +1030,61 @@ def _check_containment_artifacts(
                             geo_type=geo_type,
                         )
                     )
+
+    return findings
+
+
+def _check_target_selectors(
+    recipe: RecipeV1,
+    project_root: Path,
+) -> list[PreflightFinding]:
+    """Check explicit panel target selectors against available geography artifacts."""
+    findings: list[PreflightFinding] = []
+    data_root = load_config(project_root=project_root).asset_store_root
+
+    for target in recipe.targets:
+        if "panel" not in target.outputs or target.selector_ids is None:
+            continue
+
+        selector_artifact: Path | None = None
+        candidate_columns: tuple[str, ...] = ()
+        geo_type = target.geometry.type
+        if geo_type == "coc" and target.geometry.vintage is not None:
+            selector_artifact = coc_base_path(target.geometry.vintage, data_root)
+            candidate_columns = ("coc_id", "geo_id")
+        elif geo_type == "msa" and target.geometry.source is not None:
+            selector_artifact = msa_definitions_path(target.geometry.source, data_root)
+            candidate_columns = ("msa_id", "cbsa_code", "geo_id")
+
+        if selector_artifact is None or not selector_artifact.exists():
+            continue
+
+        available = _read_parquet_id_values(selector_artifact, candidate_columns)
+        if available is None:
+            continue
+
+        missing = sorted(set(target.selector_ids) - available)
+        if not missing:
+            continue
+        preview = ", ".join(missing[:5])
+        suffix = ", ..." if len(missing) > 5 else ""
+        findings.append(
+            PreflightFinding(
+                severity=Severity.ERROR,
+                kind=FindingKind.TARGET_SELECTOR,
+                message=(
+                    f"Target '{target.id}' selector_ids did not match available "
+                    f"{geo_type.upper()} IDs: {preview}{suffix}."
+                ),
+                geometry=geo_type,
+                remediation=Remediation(
+                    hint=(
+                        "Check target.selector_ids against the curated target "
+                        "geometry artifact, or build the artifact for the intended vintage."
+                    ),
+                ),
+            )
+        )
 
     return findings
 
@@ -2284,6 +2341,7 @@ def run_preflight(
     report.findings.extend(_check_adapter_validation(recipe))
     report.findings.extend(_check_map_artifacts(recipe, project_root))
     report.findings.extend(_check_containment_artifacts(recipe, project_root))
+    report.findings.extend(_check_target_selectors(recipe, project_root))
 
     # 2. Resolve plans and collect tasks (before path checks so we
     #    can scope path checking to plan-required dataset-years only)

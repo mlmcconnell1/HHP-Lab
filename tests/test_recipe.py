@@ -384,6 +384,35 @@ class TestLoadRecipeFromDict:
         with pytest.raises(RecipeLoadError, match="candidate geometry must match"):
             load_recipe(data)
 
+    def test_valid_panel_target_selector_ids_load(self):
+        data = _minimal_recipe()
+        data["targets"][0]["outputs"] = ["panel"]
+        data["targets"][0]["selector_ids"] = ["COC-A", "COC-B"]
+
+        recipe = load_recipe(data)
+
+        assert recipe.targets[0].selector_ids == ["COC-A", "COC-B"]
+
+    def test_target_selector_ids_requires_panel_output(self):
+        data = _minimal_recipe()
+        data["targets"][0]["outputs"] = ["containment"]
+        data["targets"][0]["containment_spec"] = {
+            "container": {"type": "coc", "vintage": 2025},
+            "candidate": {"type": "county", "vintage": 2023},
+        }
+        data["targets"][0]["selector_ids"] = ["COC-A"]
+
+        with pytest.raises(RecipeLoadError, match="selector_ids.*requires outputs"):
+            load_recipe(data)
+
+    @pytest.mark.parametrize("selector_ids", [[], ["COC-A", " "]])
+    def test_target_selector_ids_rejects_empty_or_blank_items(self, selector_ids):
+        data = _minimal_recipe()
+        data["targets"][0]["selector_ids"] = selector_ids
+
+        with pytest.raises(RecipeLoadError, match="selector_ids"):
+            load_recipe(data)
+
     @pytest.mark.parametrize(
         ("container", "candidate", "selector_ids"),
         [

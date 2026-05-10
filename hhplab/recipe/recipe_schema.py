@@ -592,6 +592,13 @@ class TargetSpec(BaseModel):
         default_factory=lambda: ["panel"],
         description="Requested outputs for this target.",
     )
+    selector_ids: list[str] | None = Field(
+        default=None,
+        description=(
+            "Optional explicit geography IDs to keep in panel outputs. "
+            "Selectors are applied to the target geography ID column before persistence."
+        ),
+    )
     cohort: CohortSelector | None = Field(
         default=None,
         description="Optional cohort selector to filter to a ranked subset of geographies.",
@@ -629,6 +636,13 @@ class TargetSpec(BaseModel):
             raise ValueError("Target outputs including 'containment' require 'containment_spec'.")
         if "containment" not in outputs and self.containment_spec is not None:
             raise ValueError("Target 'containment_spec' requires outputs to include 'containment'.")
+        if self.selector_ids is not None:
+            if "panel" not in outputs:
+                raise ValueError("Target 'selector_ids' requires outputs to include 'panel'.")
+            if not self.selector_ids:
+                raise ValueError("Target 'selector_ids' may not be empty when provided.")
+            if any(not item.strip() for item in self.selector_ids):
+                raise ValueError("Target 'selector_ids' may not contain blank items.")
         if self.containment_filter is not None:
             if "panel" not in outputs:
                 raise ValueError("Target 'containment_filter' requires outputs to include 'panel'.")

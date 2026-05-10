@@ -70,6 +70,7 @@ def persist_outputs(
     target_geo_type = assembled.target_geo_type
     boundary_vintage = assembled.boundary_vintage
     definition_version = assembled.definition_version
+    target_selector_summary: dict[str, object] | None = None
     containment_filter_summary: dict[str, object] | None = None
 
     universe_years = expand_year_spec(ctx.recipe.universe)
@@ -111,6 +112,22 @@ def persist_outputs(
     # reads are centralised in ``collect_conformance_flags`` so assembly
     # and persistence share a single policy-read path.
     _, persist_target = _resolve_pipeline_target(ctx.recipe, plan.pipeline_id)
+    if persist_target.selector_ids is not None:
+        try:
+            panel, target_selector_summary = _apply_target_panel_selector(
+                panel,
+                persist_target.selector_ids,
+                target_geo_type=target_geo_type,
+                ctx=ctx,
+            )
+        except ValueError as exc:
+            return StepResult(
+                step_kind="persist",
+                detail="persist outputs",
+                success=False,
+                error=str(exc),
+            )
+
     if persist_target.containment_filter is not None:
         try:
             panel, containment_filter_summary = _apply_containment_panel_filter(
@@ -166,6 +183,8 @@ def persist_outputs(
         ),
     }
     provenance["conformance"] = conformance_report.to_dict()
+    if target_selector_summary is not None:
+        provenance["target_selector"] = target_selector_summary
     if containment_filter_summary is not None:
         provenance["containment_filter"] = containment_filter_summary
 
@@ -336,6 +355,48 @@ def persist_containment(
     detail = f"persist containment: {len(containment)} rows -> {output_rel}"
     _echo(ctx, f"  [persist] {detail}")
     return StepResult(step_kind="persist_containment", detail=detail, success=True)
+
+
+def _apply_target_panel_selector(
+    panel: pd.DataFrame,
+    selector_ids: list[str],
+    *,
+    target_geo_type: str,
+    ctx: ExecutionContext,
+) -> tuple[pd.DataFrame, dict[str, object]]:
+    """Filter a panel to explicit target geography IDs."""
+    selector_set = set(str(selector_id) for selector_id in selector_ids)
+    candidate_col = _panel_candidate_column(panel, target_geo_type)
+    available_ids = set(panel[candidate_col].dropna().astype(str))
+    missing = sorted(selector_set - available_ids)
+    if missing:
+        preview = ", ".join(missing[:5])
+        suffix = ", ..." if len(missing) > 5 else ""
+        raise ValueError(
+            "Target selector_ids did not match panel geography IDs: "
+            f"{preview}{suffix}. Check target.selector_ids, upstream datasets, "
+            "or containment filters."
+        )
+
+    before_rows = len(panel)
+    before_geographies = panel[candidate_col].nunique(dropna=True)
+    filtered = panel[panel[candidate_col].astype(str).isin(selector_set)].reset_index(drop=True)
+    after_geographies = filtered[candidate_col].nunique(dropna=True)
+    summary = {
+        "selector_ids": list(selector_ids),
+        "selected_count": int(after_geographies),
+        "panel_rows_before": before_rows,
+        "panel_rows_after": len(filtered),
+        "panel_geographies_before": int(before_geographies),
+        "panel_geographies_after": int(after_geographies),
+    }
+    _echo(
+        ctx,
+        "  [target_selector] "
+        f"{before_geographies} -> {after_geographies} geographies, "
+        f"{before_rows} -> {len(filtered)} panel rows",
+    )
+    return filtered, summary
 
 
 def _apply_containment_panel_filter(
