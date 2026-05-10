@@ -6,6 +6,7 @@ from typing import Annotated
 import typer
 
 from hhplab.paths import curated_dir
+from hhplab.xwalks.diagnostics import PopulationValidationResult, validate_population_crosswalk
 
 
 def _run_population_validation(
@@ -92,14 +93,12 @@ def _run_population_validation(
     if acs_dir is None:
         acs_dir = curated_dir("acs")
 
-    import pandas as pd
-
     # Find crosswalk file
     if boundary is None:
         # Find the latest boundary vintage
         xwalk_files = sorted(xwalk_dir.glob("xwalk__B*xT*.parquet"), reverse=True)
         if not xwalk_files:
-            typer.echo("Error: No crosswalk files found in {xwalk_dir}", err=True)
+            typer.echo(f"Error: No crosswalk files found in {xwalk_dir}", err=True)
             raise typer.Exit(1)
         xwalk_path = xwalk_files[0]
         # Extract boundary vintage from filename
@@ -158,119 +157,114 @@ def _run_population_validation(
 
     # Load data
     typer.echo("Loading data...")
+    import pandas as pd
+
     xwalk = pd.read_parquet(xwalk_path)
     tract_pop = pd.read_parquet(acs_path)
+    result = validate_population_crosswalk(
+        xwalk,
+        tract_pop,
+        warn_threshold=warn_threshold,
+        include_state=by_state,
+    )
 
-    # National total
-    national_total = tract_pop["total_population"].sum()
+    _render_population_validation_result(
+        result,
+        by_state=by_state,
+        warn_threshold=warn_threshold,
+    )
+
+    # Exit with appropriate code
+    if not result.within_threshold:
+        typer.echo(
+            f"\nWARNING: CoC/National ratio ({result.ratio:.4f}) deviates more than "
+            f"{warn_threshold:.0%} from 1.0"
+        )
+        raise typer.Exit(1)
+
+
+def _render_population_validation_result(
+    result: PopulationValidationResult,
+    *,
+    by_state: bool,
+    warn_threshold: float,
+) -> None:
+    """Render a population validation result for the CLI."""
     typer.echo("")
-    typer.echo(f"1. NATIONAL TOTAL (sum of all tracts): {national_total:,.0f}")
+    typer.echo(f"1. NATIONAL TOTAL (sum of all tracts): {result.national_total:,.0f}")
 
     # Crosswalk statistics
     typer.echo("")
     typer.echo("2. CROSSWALK STATISTICS:")
-    typer.echo(f"   Total tract-CoC relationships: {len(xwalk):,}")
-    typer.echo(f"   Unique tracts in crosswalk:    {xwalk['tract_geoid'].nunique():,}")
-    typer.echo(f"   Unique tracts in ACS:          {tract_pop['tract_geoid'].nunique():,}")
-    typer.echo(f"   Unique CoCs:                   {xwalk['coc_id'].nunique():,}")
+    typer.echo(f"   Total tract-CoC relationships: {result.relationship_count:,}")
+    typer.echo(f"   Unique tracts in crosswalk:    {result.unique_crosswalk_tracts:,}")
+    typer.echo(f"   Unique tracts in ACS:          {result.unique_population_tracts:,}")
+    typer.echo(f"   Unique CoCs:                   {result.unique_geographies:,}")
 
-    # Check coverage
-    acs_tracts = set(tract_pop["tract_geoid"])
-    xwalk_tracts = set(xwalk["tract_geoid"])
-    missing_tracts = acs_tracts - xwalk_tracts
-    extra_tracts = xwalk_tracts - acs_tracts
+    typer.echo(f"   Tracts in ACS but not crosswalk: {result.missing_tract_count:,}")
+    typer.echo(f"   Tracts in crosswalk but not ACS: {result.extra_tract_count:,}")
 
-    typer.echo(f"   Tracts in ACS but not crosswalk: {len(missing_tracts):,}")
-    typer.echo(f"   Tracts in crosswalk but not ACS: {len(extra_tracts):,}")
-
-    if missing_tracts:
-        missing_pop = tract_pop[tract_pop["tract_geoid"].isin(missing_tracts)][
-            "total_population"
-        ].sum()
+    if result.missing_tract_count:
         typer.echo(
-            f"   Population in uncovered tracts:  {missing_pop:,.0f} "
-            f"({100 * missing_pop / national_total:.2f}%)"
+            f"   Population in uncovered tracts:  {result.missing_population:,.0f} "
+            f"({100 * result.missing_population / result.national_total:.2f}%)"
         )
-
-    # Join and calculate CoC-level totals
-    merged = xwalk.merge(
-        tract_pop[["tract_geoid", "total_population"]],
-        on="tract_geoid",
-        how="left",
-    )
-    merged["weighted_pop"] = (
-        merged["total_population"].fillna(0) * merged["area_share"].fillna(0)
-    )
-    coc_totals = merged.groupby("coc_id")["weighted_pop"].sum()
-    total_coc_pop = coc_totals.sum()
 
     # Results
     typer.echo("")
-    typer.echo(f"3. COC-AGGREGATED TOTAL: {total_coc_pop:,.0f}")
-    diff = total_coc_pop - national_total
-    ratio = total_coc_pop / national_total
-    typer.echo(f"   Difference from national: {diff:+,.0f}")
-    typer.echo(f"   Ratio (CoC/National):     {ratio:.4f}")
+    typer.echo(f"3. COC-AGGREGATED TOTAL: {result.total_coc_population:,.0f}")
+    typer.echo(f"   Difference from national: {result.diff:+,.0f}")
+    typer.echo(f"   Ratio (CoC/National):     {result.ratio:.4f}")
 
     # Check status
-    if abs(1 - ratio) <= warn_threshold:
+    if result.within_threshold:
         typer.echo(f"   Status: OK (within {warn_threshold:.0%} threshold)")
     else:
         typer.echo(
             f"   Status: WARNING - deviation exceeds {warn_threshold:.0%} threshold",
         )
 
-    # Area share validation
-    tract_area_sums = merged.groupby("tract_geoid")["area_share"].sum()
-    overcounted = tract_area_sums[tract_area_sums > 1.01]
-    undercounted = tract_area_sums[tract_area_sums < 0.99]
-
     typer.echo("")
     typer.echo("4. AREA_SHARE VALIDATION:")
-    typer.echo(f"   Tracts with sum > 1.01 (potential overlap): {len(overcounted):,}")
-    typer.echo(f"   Tracts with sum < 0.99 (partial coverage):  {len(undercounted):,}")
+    typer.echo(
+        "   Tracts with sum > 1.01 (potential overlap): "
+        f"{result.area_share.overcounted_count:,}"
+    )
+    typer.echo(
+        "   Tracts with sum < 0.99 (partial coverage):  "
+        f"{result.area_share.undercounted_count:,}"
+    )
     typer.echo(
         f"   Tracts with sum ≈ 1.0:                       "
-        f"{len(tract_area_sums) - len(overcounted) - len(undercounted):,}"
+        f"{result.area_share.balanced_count:,}"
     )
 
-    if len(overcounted) > 0:
+    if result.area_share.overcounted_samples:
         typer.echo("")
         typer.echo("   Sample overcounted tracts:")
-        for geoid in list(overcounted.head(5).index):
-            typer.echo(f"     {geoid}: area_share sum = {tract_area_sums[geoid]:.4f}")
+        for geoid, area_share_sum in result.area_share.overcounted_samples:
+            typer.echo(f"     {geoid}: area_share sum = {area_share_sum:.4f}")
 
     # State-level comparison
     if by_state:
         typer.echo("")
         typer.echo("5. STATE-LEVEL COMPARISON:")
 
-        tract_pop_with_state = tract_pop.copy()
-        tract_pop_with_state["state"] = tract_pop_with_state["tract_geoid"].str[:2]
-        state_acs = tract_pop_with_state.groupby("state")["total_population"].sum()
-
-        merged["state"] = merged["tract_geoid"].str[:2]
-        state_coc = merged.groupby("state")["weighted_pop"].sum()
-
-        comparison = pd.DataFrame({"acs_total": state_acs, "coc_total": state_coc}).fillna(0)
-        comparison["diff"] = comparison["coc_total"] - comparison["acs_total"]
-        comparison["ratio"] = comparison["coc_total"] / comparison["acs_total"]
-        comparison["ratio"] = comparison["ratio"].fillna(0)
-
         # States with issues
-        problem_states = comparison[
-            (comparison["ratio"] < 1 - warn_threshold) | (comparison["ratio"].isna())
-        ].sort_values("ratio")
+        problem_states = sorted(
+            (state for state in result.state_comparison if state.ratio < 1 - warn_threshold),
+            key=lambda state: state.ratio,
+        )
 
-        if len(problem_states) > 0:
+        if problem_states:
             typer.echo("")
             typer.echo(f"   States below {1 - warn_threshold:.0%} coverage:")
             typer.echo(f"   {'State':<8} {'ACS Total':>15} {'CoC Total':>15} {'Ratio':>8}")
             typer.echo("   " + "-" * 50)
-            for state, row in problem_states.iterrows():
+            for state in problem_states:
                 typer.echo(
-                    f"   {state:<8} {row['acs_total']:>15,.0f} "
-                    f"{row['coc_total']:>15,.0f} {row['ratio']:>8.3f}"
+                    f"   {state.state:<8} {state.acs_total:>15,.0f} "
+                    f"{state.coc_total:>15,.0f} {state.ratio:>8.3f}"
                 )
 
         # Full state table
@@ -278,23 +272,15 @@ def _run_population_validation(
         typer.echo("   All states:")
         typer.echo(f"   {'State':<8} {'ACS Total':>15} {'CoC Total':>15} {'Ratio':>8}")
         typer.echo("   " + "-" * 50)
-        for state, row in comparison.sort_index().iterrows():
-            marker = " " if 1 - warn_threshold <= row["ratio"] <= 1 + warn_threshold else "*"
+        for state in result.state_comparison:
+            marker = " " if 1 - warn_threshold <= state.ratio <= 1 + warn_threshold else "*"
             typer.echo(
-                f"   {state:<8} {row['acs_total']:>15,.0f} "
-                f"{row['coc_total']:>15,.0f} {row['ratio']:>7.3f}{marker}"
+                f"   {state.state:<8} {state.acs_total:>15,.0f} "
+                f"{state.coc_total:>15,.0f} {state.ratio:>7.3f}{marker}"
             )
 
     typer.echo("")
     typer.echo("=" * 70)
-
-    # Exit with appropriate code
-    if abs(1 - ratio) > warn_threshold:
-        typer.echo(
-            f"\nWARNING: CoC/National ratio ({ratio:.4f}) deviates more than "
-            f"{warn_threshold:.0%} from 1.0"
-        )
-        raise typer.Exit(1)
 
 
 def validate_population(
@@ -368,5 +354,4 @@ def validate_population(
         by_state=by_state,
         warn_threshold=warn_threshold,
     )
-
 

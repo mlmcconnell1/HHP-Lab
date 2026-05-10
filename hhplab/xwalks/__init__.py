@@ -5,6 +5,12 @@ Provides geometry-neutral crosswalk builders (``build_tract_crosswalk``,
 """
 
 from hhplab.xwalks.county import build_coc_county_crosswalk, build_county_crosswalk
+from hhplab.xwalks.diagnostics import (
+    AreaShareValidation,
+    PopulationValidationResult,
+    StatePopulationComparison,
+    validate_population_crosswalk,
+)
 from hhplab.xwalks.tract import (
     add_population_weights,
     build_coc_tract_crosswalk,
@@ -27,4 +33,8 @@ __all__ = [
     "validate_population_shares",
     "build_tract_mediated_county_crosswalk",
     "save_tract_mediated_county_crosswalk",
+    "AreaShareValidation",
+    "PopulationValidationResult",
+    "StatePopulationComparison",
+    "validate_population_crosswalk",
 ]
