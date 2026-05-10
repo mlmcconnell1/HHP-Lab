@@ -87,11 +87,17 @@ from hhplab.pit.pit_registry import get_pit_path
 from hhplab.provenance import ProvenanceBlock, read_provenance, write_parquet_with_provenance
 from hhplab.schema.columns import (
     COC_PANEL_COLUMNS,
-    METRO_PANEL_COLUMNS as SCHEMA_METRO_PANEL_COLUMNS,
     POPULATION_DENSITY_COLUMN,
     TOTAL_POPULATION,
-    ZORI_COLUMNS,
-    ZORI_PROVENANCE_COLUMNS,
+)
+from hhplab.schema.columns import (
+    METRO_PANEL_COLUMNS as SCHEMA_METRO_PANEL_COLUMNS,
+)
+from hhplab.schema.columns import (
+    ZORI_COLUMNS as ZORI_COLUMNS,
+)
+from hhplab.schema.columns import (
+    ZORI_PROVENANCE_COLUMNS as ZORI_PROVENANCE_COLUMNS,
 )
 
 if TYPE_CHECKING:

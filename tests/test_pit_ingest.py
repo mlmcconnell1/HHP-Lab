@@ -195,7 +195,12 @@ class TestDownloadPitData:
             content=b"",
             headers={"content-length": "0"},
         )
-        for pattern in ["PIT-Counts-by-CoC", "Point-in-Time-Estimates-by-CoC", "PIT-Estimates-by-CoC"]:
+        patterns = [
+            "PIT-Counts-by-CoC",
+            "Point-in-Time-Estimates-by-CoC",
+            "PIT-Estimates-by-CoC",
+        ]
+        for pattern in patterns:
             for ext in [".xlsx", ".xlsb"]:
                 url = f"{base}{pattern}{ext}"
                 if url.endswith("PIT-Counts-by-CoC.xlsb"):

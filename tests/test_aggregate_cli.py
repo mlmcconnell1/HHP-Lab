@@ -5,8 +5,8 @@ from unittest.mock import patch
 import pytest
 from typer.testing import CliRunner
 
-from hhplab.cli.aggregate_cli import _build_lagged_pep_series
 from hhplab.cli.main import app
+from hhplab.pep.pep_aggregate import build_lagged_pep_series
 
 runner = CliRunner()
 
@@ -135,7 +135,7 @@ def test_build_lagged_pep_series_zero_months_matches_current_year():
         }
     )
 
-    result = _build_lagged_pep_series(pep_df, target_year=2020, lag_months=0)
+    result = build_lagged_pep_series(pep_df, target_year=2020, lag_months=0)
     result = result.sort_values("county_fips").reset_index(drop=True)
     assert list(result["population"]) == [100000, 130000]
 
@@ -151,7 +151,7 @@ def test_build_lagged_pep_series_twelve_months_matches_previous_year():
         }
     )
 
-    result = _build_lagged_pep_series(pep_df, target_year=2020, lag_months=12)
+    result = build_lagged_pep_series(pep_df, target_year=2020, lag_months=12)
     result = result.sort_values("county_fips").reset_index(drop=True)
     assert list(result["population"]) == [90000, 120000]
 
@@ -167,7 +167,7 @@ def test_build_lagged_pep_series_interpolates_for_partial_month_lag():
         }
     )
 
-    result = _build_lagged_pep_series(pep_df, target_year=2020, lag_months=6)
+    result = build_lagged_pep_series(pep_df, target_year=2020, lag_months=6)
     result = result.sort_values("county_fips").reset_index(drop=True)
     assert list(result["population"]) == [95000, 125000]
 
@@ -184,7 +184,7 @@ def test_build_lagged_pep_series_rejects_invalid_lag_months():
     )
 
     with pytest.raises(ValueError, match="--lag-months must be between 0 and 12"):
-        _build_lagged_pep_series(pep_df, target_year=2020, lag_months=-1)
+        build_lagged_pep_series(pep_df, target_year=2020, lag_months=-1)
 
 
 def _create_fake_acs_cache(acs_vintage: str, tract_vintage: str | int) -> None:

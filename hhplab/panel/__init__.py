@@ -18,8 +18,6 @@ When building panels with `include_zori=True`, the following columns are added:
 from hhplab.panel.assemble import (
     METRO_PANEL_COLUMNS,
     PANEL_COLUMNS,
-    ZORI_COLUMNS,
-    ZORI_PROVENANCE_COLUMNS,
     build_panel,
     save_panel,
 )
@@ -65,6 +63,7 @@ from hhplab.panel.zori_eligibility import (
     get_zori_panel_columns,
     summarize_zori_eligibility,
 )
+from hhplab.schema.columns import ZORI_COLUMNS, ZORI_PROVENANCE_COLUMNS
 
 __all__ = [
     # Policies

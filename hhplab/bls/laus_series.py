@@ -39,7 +39,9 @@ from __future__ import annotations
 
 from hhplab.schema.columns import (
     LAUS_MEASURE_CODES,
-    LAUS_METRO_OUTPUT_COLUMNS,
+)
+from hhplab.schema.columns import (
+    LAUS_METRO_OUTPUT_COLUMNS as LAUS_METRO_OUTPUT_COLUMNS,
 )
 
 # ---------------------------------------------------------------------------

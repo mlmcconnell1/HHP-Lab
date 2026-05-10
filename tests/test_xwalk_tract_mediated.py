@@ -20,13 +20,13 @@ import pandas as pd
 import pytest
 
 from hhplab.census.ingest.decennial_tract_population import STATE_FIPS_CODES
-from hhplab.cli.build_xwalks import _summarize_tract_mediated_crosswalk
 from hhplab.naming import tract_mediated_county_xwalk_filename
 from hhplab.provenance import read_provenance
 from hhplab.xwalks.tract_mediated import (
     COUNTY_VINTAGE_SEMANTICS,
     build_tract_mediated_county_crosswalk,
     save_tract_mediated_county_crosswalk,
+    summarize_tract_mediated_crosswalk,
 )
 
 TRACT_CROSSWALK = pd.DataFrame(
@@ -367,7 +367,7 @@ class TestTractMediatedCountyCrosswalk:
     def test_selected_weighting_summary_reports_only_requested_modes(self):
         result = build_fixture()
 
-        summary = _summarize_tract_mediated_crosswalk(
+        summary = summarize_tract_mediated_crosswalk(
             result,
             selected_weighting_modes=("population", "renter_household"),
         )

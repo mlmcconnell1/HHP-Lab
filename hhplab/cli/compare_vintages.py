@@ -4,9 +4,9 @@ from pathlib import Path
 from typing import Annotated
 
 import geopandas as gpd
-import pandas as pd
 import typer
 
+from hhplab.registry.boundary_diff import compare_boundary_records
 from hhplab.registry.boundary_registry import list_boundaries
 
 
@@ -108,33 +108,11 @@ def compare_vintages(
         typer.echo(f"Error reading {path2}: {e}", err=True)
         raise typer.Exit(1) from e
 
-    # Validate required columns
-    required_cols = {"coc_id", "geom_hash"}
-    for gdf, _vintage, path in [(gdf1, vintage1, path1), (gdf2, vintage2, path2)]:
-        missing = required_cols - set(gdf.columns)
-        if missing:
-            typer.echo(
-                f"Error: Boundary file {path} missing required columns: {missing}",
-                err=True,
-            )
-            raise typer.Exit(1)
-
-    # Create lookup dictionaries: coc_id -> geom_hash
-    v1_hashes = dict(zip(gdf1["coc_id"], gdf1["geom_hash"], strict=True))
-    v2_hashes = dict(zip(gdf2["coc_id"], gdf2["geom_hash"], strict=True))
-
-    v1_ids = set(v1_hashes.keys())
-    v2_ids = set(v2_hashes.keys())
-
-    # Compute differences
-    added_ids = sorted(v2_ids - v1_ids)
-    removed_ids = sorted(v1_ids - v2_ids)
-    common_ids = v1_ids & v2_ids
-
-    changed_ids = sorted(coc_id for coc_id in common_ids if v1_hashes[coc_id] != v2_hashes[coc_id])
-    unchanged_ids = sorted(
-        coc_id for coc_id in common_ids if v1_hashes[coc_id] == v2_hashes[coc_id]
-    )
+    try:
+        diff = compare_boundary_records(gdf1, gdf2)
+    except ValueError as exc:
+        typer.echo(f"Error: {exc}", err=True)
+        raise typer.Exit(1) from exc
 
     # Display summary
     typer.echo("")
@@ -142,51 +120,51 @@ def compare_vintages(
     typer.echo(f"COMPARISON: {vintage1} -> {vintage2}")
     typer.echo("=" * 60)
     typer.echo("")
-    typer.echo(f"Vintage {vintage1}: {len(v1_ids)} CoCs")
-    typer.echo(f"Vintage {vintage2}: {len(v2_ids)} CoCs")
+    typer.echo(f"Vintage {vintage1}: {diff.v1_count} CoCs")
+    typer.echo(f"Vintage {vintage2}: {diff.v2_count} CoCs")
     typer.echo("")
     typer.echo("-" * 40)
     typer.echo("SUMMARY")
     typer.echo("-" * 40)
-    typer.echo(f"  Added:     {len(added_ids):>4}")
-    typer.echo(f"  Removed:   {len(removed_ids):>4}")
-    typer.echo(f"  Changed:   {len(changed_ids):>4}")
-    typer.echo(f"  Unchanged: {len(unchanged_ids):>4}")
+    typer.echo(f"  Added:     {len(diff.added_ids):>4}")
+    typer.echo(f"  Removed:   {len(diff.removed_ids):>4}")
+    typer.echo(f"  Changed:   {len(diff.changed_ids):>4}")
+    typer.echo(f"  Unchanged: {len(diff.unchanged_ids):>4}")
     typer.echo("")
 
     # Display added CoCs
-    if added_ids:
+    if diff.added_ids:
         typer.echo("-" * 40)
-        typer.echo(f"ADDED ({len(added_ids)}):")
+        typer.echo(f"ADDED ({len(diff.added_ids)}):")
         typer.echo("-" * 40)
-        for coc_id in added_ids:
+        for coc_id in diff.added_ids:
             typer.echo(f"  + {coc_id}")
         typer.echo("")
 
     # Display removed CoCs
-    if removed_ids:
+    if diff.removed_ids:
         typer.echo("-" * 40)
-        typer.echo(f"REMOVED ({len(removed_ids)}):")
+        typer.echo(f"REMOVED ({len(diff.removed_ids)}):")
         typer.echo("-" * 40)
-        for coc_id in removed_ids:
+        for coc_id in diff.removed_ids:
             typer.echo(f"  - {coc_id}")
         typer.echo("")
 
     # Display changed CoCs
-    if changed_ids:
+    if diff.changed_ids:
         typer.echo("-" * 40)
-        typer.echo(f"CHANGED ({len(changed_ids)}):")
+        typer.echo(f"CHANGED ({len(diff.changed_ids)}):")
         typer.echo("-" * 40)
-        for coc_id in changed_ids:
+        for coc_id in diff.changed_ids:
             typer.echo(f"  ~ {coc_id}")
         typer.echo("")
 
     # Display unchanged CoCs (if requested)
-    if show_unchanged and unchanged_ids:
+    if show_unchanged and diff.unchanged_ids:
         typer.echo("-" * 40)
-        typer.echo(f"UNCHANGED ({len(unchanged_ids)}):")
+        typer.echo(f"UNCHANGED ({len(diff.unchanged_ids)}):")
         typer.echo("-" * 40)
-        for coc_id in unchanged_ids:
+        for coc_id in diff.unchanged_ids:
             typer.echo(f"    {coc_id}")
         typer.echo("")
 
@@ -194,57 +172,6 @@ def compare_vintages(
 
     # Save to CSV if output path specified
     if output:
-        # Build diff DataFrame
-        diff_records = []
-
-        for coc_id in added_ids:
-            diff_records.append(
-                {
-                    "coc_id": coc_id,
-                    "status": "added",
-                    "geom_hash_v1": None,
-                    "geom_hash_v2": v2_hashes[coc_id],
-                }
-            )
-
-        for coc_id in removed_ids:
-            diff_records.append(
-                {
-                    "coc_id": coc_id,
-                    "status": "removed",
-                    "geom_hash_v1": v1_hashes[coc_id],
-                    "geom_hash_v2": None,
-                }
-            )
-
-        for coc_id in changed_ids:
-            diff_records.append(
-                {
-                    "coc_id": coc_id,
-                    "status": "changed",
-                    "geom_hash_v1": v1_hashes[coc_id],
-                    "geom_hash_v2": v2_hashes[coc_id],
-                }
-            )
-
-        for coc_id in unchanged_ids:
-            diff_records.append(
-                {
-                    "coc_id": coc_id,
-                    "status": "unchanged",
-                    "geom_hash_v1": v1_hashes[coc_id],
-                    "geom_hash_v2": v2_hashes[coc_id],
-                }
-            )
-
-        diff_df = pd.DataFrame(diff_records)
-        diff_df = diff_df.sort_values("coc_id")
-
-        # Add metadata columns
-        diff_df.insert(0, "vintage1", vintage1)
-        diff_df.insert(1, "vintage2", vintage2)
-
-        # Save CSV
         output.parent.mkdir(parents=True, exist_ok=True)
-        diff_df.to_csv(output, index=False)
+        diff.to_frame(vintage1, vintage2).to_csv(output, index=False)
         typer.echo(f"\nDiff saved to: {output}")

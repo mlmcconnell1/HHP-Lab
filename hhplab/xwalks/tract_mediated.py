@@ -11,6 +11,7 @@ from __future__ import annotations
 
 from collections.abc import Iterable
 from pathlib import Path
+from typing import Literal
 
 import pandas as pd
 
@@ -25,11 +26,162 @@ from hhplab.schema.columns import (
 DENOMINATOR_COLUMNS: dict[str, str] = TRACT_MEDIATED_DENOMINATOR_COLUMNS
 
 WEIGHT_COLUMNS: tuple[str, ...] = TRACT_MEDIATED_WEIGHT_COLUMNS
+WeightingMode = Literal["area", "population", "household", "renter_household"]
+DenominatorSource = Literal["acs", "decennial"]
+DEFAULT_WEIGHTING_MODES: tuple[WeightingMode, ...] = (
+    "area",
+    "population",
+    "household",
+    "renter_household",
+)
+WEIGHTING_MODE_TO_COLUMN: dict[WeightingMode, str] = {
+    "area": "area_weight",
+    "population": "population_weight",
+    "household": "household_weight",
+    "renter_household": "renter_household_weight",
+}
 COUNTY_VINTAGE_SEMANTICS = (
     "county_vintage identifies the downstream county-FIPS universe expected "
     "by county-native inputs. Tract-mediated county_fips values are derived "
     "from tract GEOID prefixes; no county geometry is intersected."
 )
+
+
+def normalize_weighting_modes(values: list[str] | None) -> tuple[WeightingMode, ...]:
+    """Normalize CLI-style weighting-mode values into supported mode names."""
+    if not values:
+        return DEFAULT_WEIGHTING_MODES
+    valid = set(WEIGHTING_MODE_TO_COLUMN)
+    invalid = sorted(set(values) - valid)
+    if invalid:
+        raise ValueError(
+            f"Invalid --weighting-mode value(s): {', '.join(invalid)}. "
+            f"Supported values: {', '.join(sorted(valid))}."
+        )
+    return tuple(values)  # type: ignore[return-value]
+
+
+def resolve_denominator_vintage(
+    *,
+    denominator_source: DenominatorSource,
+    denominator_vintage: str | None,
+    acs_vintage: str,
+    tract_vintage: int,
+) -> str:
+    """Resolve tract-mediated denominator vintage from source-specific options."""
+    if denominator_source == "acs":
+        return denominator_vintage or acs_vintage
+    if denominator_source == "decennial":
+        if denominator_vintage is None:
+            raise ValueError(
+                "--denominator-vintage is required when --denominator-source decennial."
+            )
+        if denominator_vintage not in {"2010", "2020"}:
+            raise ValueError(
+                "Unsupported decennial denominator vintage "
+                f"{denominator_vintage!r}. Supported vintages: 2010, 2020."
+            )
+        if str(tract_vintage) != denominator_vintage:
+            raise ValueError(
+                "Decennial tract-mediated denominators are native to their "
+                f"tract era; got --denominator-vintage {denominator_vintage} "
+                f"with --tracts {tract_vintage}."
+            )
+        return denominator_vintage
+    raise ValueError(
+        f"Invalid denominator source {denominator_source!r}; use 'acs' or 'decennial'."
+    )
+
+
+def input_status(path: Path) -> dict[str, str | bool]:
+    """Return a JSON-serializable path existence payload."""
+    return {"path": str(path), "exists": path.exists()}
+
+
+def tract_mediated_paths(
+    *,
+    boundary: str,
+    county_vintage: int,
+    tract_vintage: int,
+    acs_vintage: str,
+    denominator_source: DenominatorSource,
+    denominator_vintage: str | int,
+) -> dict[str, Path]:
+    """Resolve all input and output paths for a tract-mediated county crosswalk."""
+    from hhplab.acs.ingest.tract_population import get_output_path as acs_tract_path
+    from hhplab.census.ingest.decennial_tract_population import (
+        get_output_path as decennial_tract_path,
+    )
+    from hhplab.naming import (
+        county_path,
+        tract_mediated_county_xwalk_path,
+        tract_xwalk_path,
+    )
+
+    denominator_path = (
+        acs_tract_path(acs_vintage, str(tract_vintage))
+        if denominator_source == "acs"
+        else decennial_tract_path(str(denominator_vintage), str(tract_vintage))
+    )
+    return {
+        "tract_crosswalk": tract_xwalk_path(boundary, tract_vintage),
+        "denominator_tracts": denominator_path,
+        "counties": county_path(county_vintage),
+        "output": tract_mediated_county_xwalk_path(
+            boundary,
+            county_vintage,
+            tract_vintage,
+            acs_vintage,
+            denominator_source=denominator_source,
+            denominator_vintage=denominator_vintage,
+        ),
+    }
+
+
+def tract_mediated_preflight_payload(
+    *,
+    boundary: str,
+    county_vintage: int,
+    tract_vintage: int,
+    acs_vintage: str,
+    denominator_source: DenominatorSource,
+    denominator_vintage: str | int,
+    selected_weighting_modes: tuple[WeightingMode, ...],
+    force: bool,
+    dry_run: bool,
+) -> tuple[dict[str, object], dict[str, Path]]:
+    """Build a path-aware preflight payload for tract-mediated generation."""
+    paths = tract_mediated_paths(
+        boundary=boundary,
+        county_vintage=county_vintage,
+        tract_vintage=tract_vintage,
+        acs_vintage=acs_vintage,
+        denominator_source=denominator_source,
+        denominator_vintage=denominator_vintage,
+    )
+    inputs = {
+        "tract_crosswalk": input_status(paths["tract_crosswalk"]),
+        "denominator_tracts": input_status(paths["denominator_tracts"]),
+    }
+    return (
+        {
+            "status": "ok",
+            "action": "dry_run" if dry_run else "generate",
+            "boundary_vintage": boundary,
+            "county_vintage": str(county_vintage),
+            "tract_vintage": str(tract_vintage),
+            "acs_vintage": acs_vintage,
+            "denominator_source": denominator_source,
+            "denominator_vintage": str(denominator_vintage),
+            "weighting_family": "tract_mediated",
+            "weighting_modes": list(selected_weighting_modes),
+            "inputs": inputs,
+            "artifact": str(paths["output"]),
+            "will_write": not dry_run,
+            "force": force,
+        },
+        paths,
+    )
 
 
 def _require_columns(df: pd.DataFrame, required: set[str], *, label: str) -> None:
@@ -459,6 +611,48 @@ def save_tract_mediated_county_crosswalk(
     )
     write_parquet_with_provenance(crosswalk, output_path, provenance)
     return output_path
+
+
+def summarize_tract_mediated_crosswalk(
+    crosswalk: pd.DataFrame,
+    selected_weighting_modes: tuple[WeightingMode, ...],
+) -> dict[str, object]:
+    """Summarize tract-mediated county crosswalk validation diagnostics."""
+    selected_columns = [
+        WEIGHTING_MODE_TO_COLUMN[mode]
+        for mode in selected_weighting_modes
+        if WEIGHTING_MODE_TO_COLUMN[mode] in crosswalk.columns
+    ]
+    available_columns = [col for col in WEIGHT_COLUMNS if col in crosswalk.columns]
+    county_count = int(crosswalk["county_fips"].nunique()) if "county_fips" in crosswalk else 0
+    summary: dict[str, object] = {
+        "county_count": county_count,
+        "available_weight_columns": available_columns,
+        "selected_weight_columns": selected_columns,
+    }
+    if "county_area_coverage_ratio" in crosswalk.columns:
+        coverage = (
+            crosswalk[["county_fips", "county_area_coverage_ratio"]]
+            .drop_duplicates("county_fips")
+            .dropna()
+        )
+        summary["min_area_coverage_ratio"] = (
+            float(coverage["county_area_coverage_ratio"].min()) if not coverage.empty else None
+        )
+        summary["full_coverage_count"] = int(
+            (coverage["county_area_coverage_ratio"] >= 0.999999).sum()
+        )
+    if "missing_denominator_tract_count" in crosswalk.columns:
+        missing_pairs = crosswalk[crosswalk["missing_denominator_tract_count"] > 0]
+        summary["missing_denominator_pair_count"] = int(len(missing_pairs))
+        summary["missing_denominator_tract_count"] = int(
+            missing_pairs["missing_denominator_tract_count"].sum()
+        )
+    for column in selected_columns:
+        non_null = crosswalk[column].dropna()
+        summary[f"{column}_non_null_count"] = int(non_null.shape[0])
+        summary[f"{column}_max"] = float(non_null.max()) if not non_null.empty else None
+    return summary
 
 
 def _resolve_denominator_vintage(

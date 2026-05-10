@@ -264,6 +264,29 @@ def validate_population_shares(
     return sums
 
 
+def load_tract_population_for_weights(
+    tract_vintage: int,
+    *,
+    auto_fetch: bool = False,
+) -> tuple[pd.DataFrame | None, Path, bool]:
+    """Load or optionally fetch ACS tract population used for crosswalk weights."""
+    from hhplab.acs.ingest.tract_population import get_output_path, ingest_tract_data
+
+    acs_vintage = f"{tract_vintage - 4}-{tract_vintage}"
+    pop_path = get_output_path(acs_vintage, str(tract_vintage))
+
+    if pop_path.exists():
+        return pd.read_parquet(pop_path), pop_path, False
+    if not auto_fetch:
+        return None, pop_path, False
+
+    pop_path = ingest_tract_data(
+        acs_vintage=acs_vintage,
+        tract_vintage=str(tract_vintage),
+    )
+    return pd.read_parquet(pop_path), pop_path, True
+
+
 def save_crosswalk(
     crosswalk: pd.DataFrame,
     boundary_vintage: str,

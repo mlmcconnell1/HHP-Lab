@@ -18,12 +18,6 @@ from dataclasses import dataclass, field
 
 import pandas as pd
 
-from hhplab.schema.columns import POPULATION_DENSITY_COLUMN, TOTAL_POPULATION
-from hhplab.schema.lineage import (
-    PopulationMethod,
-    PopulationSource,
-    population_lineage_columns,
-)
 from hhplab.panel.finalize import (
     ZORI_COLUMNS,
     ZORI_PROVENANCE_COLUMNS,
@@ -50,6 +44,12 @@ from hhplab.recipe.recipe_schema import (
     PanelPolicy,
 )
 from hhplab.recipe.schema_common import GeometryRef, expand_year_spec
+from hhplab.schema.columns import POPULATION_DENSITY_COLUMN, TOTAL_POPULATION
+from hhplab.schema.lineage import (
+    PopulationMethod,
+    PopulationSource,
+    population_lineage_columns,
+)
 
 
 def canonicalize_panel_for_target(
@@ -404,7 +404,10 @@ def _resolve_canonical_population(
         return panel
 
     selected_source = policy.canonical_population_source if policy else None
-    if selected_source is None and (len(source_specific) > 1 or (has_canonical and source_specific)):
+    ambiguous_population_source = len(source_specific) > 1 or (
+        has_canonical and source_specific
+    )
+    if selected_source is None and ambiguous_population_source:
         available_sources = sorted(
             {
                 *source_specific,

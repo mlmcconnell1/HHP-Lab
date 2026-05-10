@@ -2059,7 +2059,9 @@ def _check_pep_decennial_tract_mediated_inputs(
                     pep_years = pd.read_parquet(pep_path, columns=["year"])["year"]
                 except (OSError, ValueError, KeyError):
                     pep_years = pd.Series(dtype="int64")
-                available_years = set(pd.to_numeric(pep_years, errors="coerce").dropna().astype(int))
+                available_years = set(
+                    pd.to_numeric(pep_years, errors="coerce").dropna().astype(int)
+                )
                 if baseline_year not in available_years:
                     findings.append(
                         PreflightFinding(

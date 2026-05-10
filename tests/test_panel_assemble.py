@@ -26,9 +26,9 @@ pytestmark = pytest.mark.legacy_build_path
 from hhplab.panel.assemble import (
     METRO_PANEL_COLUMNS,
     PANEL_COLUMNS,
+    _add_coc_population_density,
     _detect_boundary_changes,
     _determine_alignment_type,
-    _add_coc_population_density,
     _load_acs_measures,
     _load_pit_for_year,
     build_panel,

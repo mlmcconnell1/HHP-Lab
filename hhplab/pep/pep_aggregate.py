@@ -85,6 +85,62 @@ def warn_deprecated_direct_county_area_weighting(weighting: str) -> None:
     logger.warning(DIRECT_COUNTY_AREA_DEPRECATION_NOTICE)
 
 
+def build_lagged_pep_series(
+    pep_df: pd.DataFrame,
+    target_year: int,
+    lag_months: int,
+) -> pd.DataFrame:
+    """Build a one-year county PEP series with month-based lag interpolation."""
+    if lag_months < 0 or lag_months > 12:
+        raise ValueError("--lag-months must be between 0 and 12.")
+
+    current = (
+        pep_df.loc[pep_df["year"] == target_year, ["county_fips", "population"]]
+        .drop_duplicates(subset=["county_fips"])
+        .rename(columns={"population": "population_current"})
+    )
+    if current.empty:
+        raise FileNotFoundError(f"No PEP data found for year {target_year}.")
+
+    weight_prev = lag_months / 12.0
+    weight_current = 1.0 - weight_prev
+
+    if lag_months == 0:
+        out = current.rename(columns={"population_current": "population"})[
+            ["county_fips", "population"]
+        ].copy()
+        out["year"] = target_year
+        return out[["county_fips", "year", "population"]]
+
+    previous = (
+        pep_df.loc[pep_df["year"] == target_year - 1, ["county_fips", "population"]]
+        .drop_duplicates(subset=["county_fips"])
+        .rename(columns={"population": "population_previous"})
+    )
+    if previous.empty:
+        raise FileNotFoundError(
+            f"No PEP data found for year {target_year - 1} "
+            f"(required for --lag-months={lag_months})."
+        )
+
+    merged = current.merge(previous, on="county_fips", how="outer")
+    interpolated = (
+        weight_current * merged["population_current"].fillna(0.0)
+        + weight_prev * merged["population_previous"].fillna(0.0)
+    )
+
+    valid = pd.Series(True, index=merged.index)
+    if weight_current > 0:
+        valid &= merged["population_current"].notna()
+    if weight_prev > 0:
+        valid &= merged["population_previous"].notna()
+    merged["population"] = interpolated.where(valid)
+
+    out = merged[["county_fips", "population"]].copy()
+    out["year"] = target_year
+    return out[["county_fips", "year", "population"]]
+
+
 def load_crosswalk(
     boundary_vintage: str,
     county_vintage: str,
