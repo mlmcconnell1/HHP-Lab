@@ -1,0 +1,213 @@
+# Top 50 2024-population MSAs: contained CoCs with PIT plus PEP density.
+#
+# The MSA selector_ids are the top 50 Census MSAs by 2024 resident population,
+# computed from Census PEP county population aggregated over Census MSA 2023
+# county membership. CoCs are kept when their 2025 boundary is fully contained
+# in one of those MSAs by area.
+
+version: 1
+name: top50_msas_cocs_pit_pep_density_2010_2024
+description: >
+  Build a CoC panel for 2010-2024 with HUD PIT sheltered and unsheltered
+  counts plus Census PEP county population allocated to 2025 CoC boundaries
+  through tract-mediated decennial population weights. The panel is filtered to
+  CoCs fully contained in one of the top 50 Census MSAs by 2024 PEP population,
+  using Census MSA 2023 membership and 2025 CoC boundaries.
+
+universe:
+  range: "2010-2024"
+
+targets:
+  - id: top50_msas_coc_panel
+    geometry: { type: coc, vintage: 2025, source: hud_exchange }
+    outputs: [panel, containment]
+    containment_spec:
+      container: { type: msa, vintage: 2023, source: census_msa_2023 }
+      candidate: { type: coc, vintage: 2025, source: hud_exchange }
+      selector_ids:
+        - "35620"
+        - "31080"
+        - "16980"
+        - "19100"
+        - "26420"
+        - "12060"
+        - "47900"
+        - "33100"
+        - "37980"
+        - "38060"
+        - "14460"
+        - "40140"
+        - "41860"
+        - "19820"
+        - "42660"
+        - "33460"
+        - "45300"
+        - "41740"
+        - "19740"
+        - "36740"
+        - "16740"
+        - "12580"
+        - "41180"
+        - "41700"
+        - "12420"
+        - "38900"
+        - "40900"
+        - "38300"
+        - "29820"
+        - "17140"
+        - "28140"
+        - "18140"
+        - "26900"
+        - "17410"
+        - "34980"
+        - "41940"
+        - "47260"
+        - "27260"
+        - "39300"
+        - "33340"
+        - "39580"
+        - "36420"
+        - "31140"
+        - "40060"
+        - "32820"
+        - "41620"
+        - "23420"
+        - "13820"
+        - "24340"
+        - "25540"
+      min_share: 0.999999
+      denominator: candidate_area
+      definition_version: census_msa_2023
+    containment_filter:
+      container: { type: msa, vintage: 2023, source: census_msa_2023 }
+      candidate: { type: coc, vintage: 2025, source: hud_exchange }
+      selector_ids:
+        - "35620"
+        - "31080"
+        - "16980"
+        - "19100"
+        - "26420"
+        - "12060"
+        - "47900"
+        - "33100"
+        - "37980"
+        - "38060"
+        - "14460"
+        - "40140"
+        - "41860"
+        - "19820"
+        - "42660"
+        - "33460"
+        - "45300"
+        - "41740"
+        - "19740"
+        - "36740"
+        - "16740"
+        - "12580"
+        - "41180"
+        - "41700"
+        - "12420"
+        - "38900"
+        - "40900"
+        - "38300"
+        - "29820"
+        - "17140"
+        - "28140"
+        - "18140"
+        - "26900"
+        - "17410"
+        - "34980"
+        - "41940"
+        - "47260"
+        - "27260"
+        - "39300"
+        - "33340"
+        - "39580"
+        - "36420"
+        - "31140"
+        - "40060"
+        - "32820"
+        - "41620"
+        - "23420"
+        - "13820"
+        - "24340"
+        - "25540"
+      min_share: 0.999999
+      denominator: candidate_area
+      definition_version: census_msa_2023
+
+datasets:
+  pit:
+    provider: hud
+    product: pit
+    version: 1
+    native_geometry: { type: coc }
+    years: "2010-2024"
+    year_column: pit_year
+    geo_column: coc_id
+    params:
+      vintage: 2024
+      align: point_in_time_jan
+    path: data/curated/pit/pit_vintage__P2024.parquet
+
+  pep_county:
+    provider: census
+    product: pep
+    version: 1
+    native_geometry: { type: county, vintage: 2020 }
+    year_column: year
+    geo_column: county_fips
+    file_set:
+      path_template: "data/curated/pep/{pep_file}"
+      segments:
+        - years: "2010-2019"
+          geometry: { type: county, vintage: 2020 }
+          constants: { pep_file: "pep_county__v2020.parquet" }
+        - years: "2020-2024"
+          geometry: { type: county, vintage: 2020 }
+          constants: { pep_file: "pep_county__v2025__y2020-2025.parquet" }
+
+transforms:
+  - id: county_to_coc_population
+    type: crosswalk
+    from: { type: county, vintage: 2020 }
+    to: { type: coc, vintage: 2025, source: hud_exchange }
+    spec:
+      weighting:
+        scheme: tract_mediated
+        variety: population
+        tract_vintage: 2020
+        denominator_source: decennial
+        denominator_vintage: 2020
+
+pipelines:
+  - id: build_top50_msas_coc_panel
+    target: top50_msas_coc_panel
+    steps:
+      - materialize:
+          transforms: [county_to_coc_population]
+
+      - resample:
+          dataset: pit
+          to_geometry: { type: coc, vintage: 2025, source: hud_exchange }
+          method: identity
+          measures: [pit_total, pit_sheltered, pit_unsheltered]
+
+      - resample:
+          dataset: pep_county
+          to_geometry: { type: coc, vintage: 2025, source: hud_exchange }
+          method: aggregate
+          via: county_to_coc_population
+          measures: [population]
+          aggregation: sum
+
+      - join:
+          datasets: [pit, pep_county]
+          join_on: [geo_id, year]
+
+validation:
+  crosswalk_coverage:
+    warn_below: 0.95
+    fail_below: 0.90
+  missing_dataset:
+    default: fail
