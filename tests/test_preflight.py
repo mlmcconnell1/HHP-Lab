@@ -685,6 +685,72 @@ class TestRunPreflight:
         ]
         assert set(transform_findings) == {"tract2010_to_coc", "tract2020_to_coc"}
 
+    def test_pep_decennial_tract_mediated_requires_baseline_year(self, tmp_path: Path):
+        data_dir = tmp_path / "data"
+        data_dir.mkdir(parents=True)
+        pd.DataFrame(
+            {
+                "county_fips": ["001"],
+                "year": [2024],
+                "population": [100],
+            }
+        ).to_parquet(data_dir / "pep.parquet")
+
+        data = _preflight_recipe(with_path=True, identity_only=True)
+        data["universe"] = {"years": [2024]}
+        data["datasets"]["pit"]["years"] = "2024-2024"
+        data["datasets"]["pep"] = {
+            "provider": "census",
+            "product": "pep",
+            "version": 1,
+            "native_geometry": {"type": "county", "vintage": 2020},
+            "years": "2020-2024",
+            "path": "data/pep.parquet",
+            "geo_column": "county_fips",
+        }
+        data["transforms"] = [
+            {
+                "id": "county_to_coc_tract_mediated",
+                "type": "crosswalk",
+                "from": {"type": "county", "vintage": 2020},
+                "to": {"type": "coc", "vintage": 2025},
+                "spec": {
+                    "weighting": {
+                        "scheme": "tract_mediated",
+                        "variety": "population",
+                        "tract_vintage": 2020,
+                        "denominator_source": "decennial",
+                        "denominator_vintage": 2020,
+                    }
+                },
+            }
+        ]
+        data["pipelines"][0]["steps"].insert(
+            1,
+            {
+                "resample": {
+                    "dataset": "pep",
+                    "to_geometry": {"type": "coc", "vintage": 2025},
+                    "method": "aggregate",
+                    "via": "county_to_coc_tract_mediated",
+                    "measures": ["population"],
+                }
+            },
+        )
+        data["pipelines"][0]["steps"][-1]["join"]["datasets"] = ["pit", "pep"]
+        _setup_preflight_fixtures(tmp_path, include_xwalk=False, include_acs=False)
+
+        recipe = load_recipe(data)
+        report = run_preflight(recipe, project_root=tmp_path)
+
+        baseline_findings = [
+            f for f in report.findings
+            if f.kind == FindingKind.MISSING_SUPPORT_DATASET
+            and f.transform_id == "county_to_coc_tract_mediated"
+        ]
+        assert len(baseline_findings) == 1
+        assert "baseline-year PEP county estimates for 2020" in baseline_findings[0].message
+
     def test_msa_transform_missing_membership_is_actionable(self, tmp_path: Path):
         data = _msa_preflight_recipe()
         _setup_preflight_fixtures(tmp_path, include_xwalk=False, include_acs=False)

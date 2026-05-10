@@ -3869,6 +3869,119 @@ class TestResampleAggregate:
         assert coc1["pop__wpopulation"] == pytest.approx(175.0)
         assert "pop" not in df.columns
 
+    def test_pep_decennial_tract_mediated_population_uses_baseline_scaling(
+        self,
+        tmp_path: Path,
+    ):
+        from hhplab.pep.pep_aggregate import aggregate_pep_counties
+
+        ds_path = tmp_path / "data" / "pep.parquet"
+        ds_path.parent.mkdir(parents=True, exist_ok=True)
+        pep_df = pd.DataFrame(
+            {
+                "county_fips": ["A", "B", "A", "B"],
+                "year": [2020, 2020, 2024, 2024],
+                "population": [100.0, 200.0, 120.0, 260.0],
+            }
+        )
+        pep_df.to_parquet(ds_path)
+
+        xwalk_path = (
+            tmp_path
+            / "data"
+            / "curated"
+            / "xwalks"
+            / "xwalk_tract_mediated_county__N2020@B2025xC2020xT2020.parquet"
+        )
+        xwalk_path.parent.mkdir(parents=True, exist_ok=True)
+        xwalk = pd.DataFrame(
+            {
+                "coc_id": ["COC1", "COC1", "COC2"],
+                "county_fips": ["A", "B", "B"],
+                "population_weight": [0.4, 0.6, 0.4],
+                "county_population_total": [90.0, 210.0, 210.0],
+                "denominator_source": ["decennial"] * 3,
+                "denominator_vintage": [2020] * 3,
+                "weighting_method": ["tract_mediated"] * 3,
+                "boundary_vintage": ["2025"] * 3,
+                "county_vintage": ["2020"] * 3,
+                "tract_vintage": ["2020"] * 3,
+            }
+        )
+        xwalk.to_parquet(xwalk_path)
+
+        expected = aggregate_pep_counties(
+            pep_df,
+            xwalk,
+            weighting="population_weight",
+            boundary_vintage="2025",
+            county_vintage="2020",
+        )
+        expected_2024 = expected[expected["year"] == 2024].set_index("coc_id")
+
+        data = _recipe_with_pipeline()
+        data["universe"] = {"range": "2024-2024"}
+        data["datasets"]["pep"] = {
+            "provider": "census",
+            "product": "pep",
+            "version": 1,
+            "native_geometry": {"type": "county", "vintage": 2020},
+            "years": "2020-2024",
+            "path": "data/pep.parquet",
+            "geo_column": "county_fips",
+        }
+        data["transforms"] = [
+            {
+                "id": "county_to_coc_tract_mediated",
+                "type": "crosswalk",
+                "from": {"type": "county", "vintage": 2020},
+                "to": {"type": "coc", "vintage": 2025},
+                "spec": {
+                    "weighting": {
+                        "scheme": "tract_mediated",
+                        "variety": "population",
+                        "tract_vintage": 2020,
+                        "denominator_source": "decennial",
+                        "denominator_vintage": 2020,
+                    },
+                },
+            }
+        ]
+        data["pipelines"][0]["steps"] = [
+            {"materialize": {"transforms": ["county_to_coc_tract_mediated"]}},
+        ]
+        recipe = load_recipe(data)
+        ctx = ExecutionContext(project_root=tmp_path, recipe=recipe)
+        ctx.transform_paths["county_to_coc_tract_mediated"] = xwalk_path
+
+        result = _execute_resample(
+            ResampleTask(
+                dataset_id="pep",
+                year=2024,
+                input_path="data/pep.parquet",
+                effective_geometry=GeometryRef(type="county", vintage=2020),
+                method="aggregate",
+                transform_id="county_to_coc_tract_mediated",
+                to_geometry=GeometryRef(type="coc", vintage=2025),
+                measures=["population"],
+                measure_aggregations={"population": "sum"},
+                geo_column="county_fips",
+                weighting_variety="population",
+                weight_column="population_weight",
+            ),
+            ctx,
+        )
+
+        assert result.success
+        df = ctx.intermediates[("pep", 2024)].set_index("geo_id")
+        assert df["total_population"].to_dict() == pytest.approx(
+            expected_2024["population"].to_dict(),
+        )
+        assert set(df["population_scaling_method"]) == {"decennial_pep_baseline_ratio"}
+        assert set(df["population_scaling_baseline_year"]) == {2020}
+        assert set(df["total_population_source"]) == {"pep"}
+        assert set(df["total_population_method"]) == {"tract_mediated_crosswalk"}
+
     def test_aggregate_weighted_mean(self, tmp_path: Path):
         ctx = self._setup(tmp_path)
         task = ResampleTask(

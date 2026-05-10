@@ -277,6 +277,89 @@ def _rename_conflicting_population_columns(
     return renamed
 
 
+def _is_pep_decennial_tract_mediated_population_task(
+    task: ResampleTask,
+    ctx: ExecutionContext,
+) -> bool:
+    ds = ctx.recipe.datasets.get(task.dataset_id)
+    if ds is None or ds.provider != "census" or ds.product != "pep":
+        return False
+    if task.method != "aggregate" or task.transform_id is None:
+        return False
+    if task.weight_column != "population_weight":
+        return False
+    if "population" not in task.measures:
+        return False
+    transform = _get_transform(ctx.recipe, task.transform_id)
+    weighting = getattr(transform.spec, "weighting", None)
+    return (
+        weighting is not None
+        and weighting.scheme == "tract_mediated"
+        and weighting.denominator_source == "decennial"
+    )
+
+
+def _resample_pep_decennial_tract_mediated_population(
+    source_df: pd.DataFrame,
+    xwalk: pd.DataFrame,
+    task: ResampleTask,
+) -> pd.DataFrame:
+    """Use PEP's baseline-scaling semantics for decennial tract-mediated weights."""
+    from hhplab.pep.pep_aggregate import aggregate_pep_counties
+
+    geo_col = _resolve_geo_column(source_df, task.geo_column)
+    _validate_columns(source_df, ["population"], task.dataset_id, task.year)
+    if "year" not in source_df.columns:
+        raise ExecutorError(
+            f"Dataset '{task.dataset_id}' requires a year column for "
+            "PEP decennial tract-mediated population aggregation."
+        )
+    xwalk_key = _XWALK_JOIN_KEYS.get(task.effective_geometry.type)
+    if xwalk_key is None or xwalk_key not in xwalk.columns:
+        raise ExecutorError(
+            f"PEP decennial tract-mediated transform '{task.transform_id}' "
+            f"requires crosswalk join key '{xwalk_key}'."
+        )
+    target_col = _detect_xwalk_target_col(xwalk, xwalk_key)
+    pep_df = (
+        source_df[[geo_col, "year", "population"]]
+        .rename(columns={geo_col: "county_fips"})
+        .copy()
+    )
+    result = aggregate_pep_counties(
+        pep_df,
+        xwalk,
+        geo_id_col=target_col,
+        weighting="population_weight",
+        boundary_vintage=(
+            str(task.to_geometry.vintage) if task.to_geometry.vintage is not None else None
+        ),
+        county_vintage=(
+            str(task.effective_geometry.vintage)
+            if task.effective_geometry.vintage is not None
+            else None
+        ),
+    )
+    result = result[result["year"] == task.year].reset_index(drop=True)
+    if target_col != "geo_id":
+        result = result.rename(columns={target_col: "geo_id"})
+    result = normalize_population_measure(
+        result,
+        source_column="population",
+        lineage=PopulationLineage(
+            source=PopulationSource.PEP,
+            source_year=task.year,
+            method=PopulationMethod.TRACT_MEDIATED_CROSSWALK,
+            crosswalk_id=task.transform_id,
+            crosswalk_geometry=(
+                f"{task.effective_geometry.type}_to_{task.to_geometry.type}"
+            ),
+            crosswalk_vintage=task.effective_geometry.vintage,
+        ),
+    )
+    return result
+
+
 def _execute_materialize(
     task: MaterializeTask,
     ctx: ExecutionContext,
@@ -473,6 +556,8 @@ def _execute_resample(
                 error=str(exc),
             )
 
+    source_df = df.copy()
+
     # Filter to the target year if the dataset has a year column
     year_col = _resolve_year_column(df, task.year_column)
     static_broadcast_error = _reject_implicit_static_broadcast(
@@ -589,55 +674,62 @@ def _execute_resample(
                 )
 
             if task.method == "aggregate":
-                if task.effective_geometry.type == "county":
-                    measure_aggs = task.measure_aggregations or {
-                        measure: "sum" for measure in task.measures
-                    }
-                    non_sum_measures = [
-                        measure
-                        for measure in task.measures
-                        if measure_aggs.get(measure, "sum") != "sum"
-                    ]
-                    geo_col = _resolve_geo_column(df, task.geo_column)
-                    if _needs_ct_planning_to_legacy_alignment(
-                        xwalk=xwalk,
-                        source_values=df[geo_col],
-                        source_key="county_fips",
-                    ):
-                        if non_sum_measures:
-                            raise ExecutorError(
-                                f"Resample aggregate for '{task.dataset_id}' "
-                                f"year {task.year}: Connecticut planning-region "
-                                "county inputs require legacy-county alignment, "
-                                "but the current recipe uses non-sum measures "
-                                f"{non_sum_measures}. Add an explicit CT "
-                                "compatibility mapping for those measures."
+                if _is_pep_decennial_tract_mediated_population_task(task, ctx):
+                    result_df = _resample_pep_decennial_tract_mediated_population(
+                        source_df,
+                        xwalk,
+                        task,
+                    )
+                else:
+                    if task.effective_geometry.type == "county":
+                        measure_aggs = task.measure_aggregations or {
+                            measure: "sum" for measure in task.measures
+                        }
+                        non_sum_measures = [
+                            measure
+                            for measure in task.measures
+                            if measure_aggs.get(measure, "sum") != "sum"
+                        ]
+                        geo_col = _resolve_geo_column(df, task.geo_column)
+                        if _needs_ct_planning_to_legacy_alignment(
+                            xwalk=xwalk,
+                            source_values=df[geo_col],
+                            source_key="county_fips",
+                        ):
+                            if non_sum_measures:
+                                raise ExecutorError(
+                                    f"Resample aggregate for '{task.dataset_id}' "
+                                    f"year {task.year}: Connecticut planning-region "
+                                    "county inputs require legacy-county alignment, "
+                                    "but the current recipe uses non-sum measures "
+                                    f"{non_sum_measures}. Add an explicit CT "
+                                    "compatibility mapping for those measures."
+                                )
+                            legacy_vintage = (
+                                int(task.effective_geometry.vintage)
+                                if task.effective_geometry.vintage is not None
+                                else CT_LEGACY_COUNTY_VINTAGE
                             )
-                        legacy_vintage = (
-                            int(task.effective_geometry.vintage)
-                            if task.effective_geometry.vintage is not None
-                            else CT_LEGACY_COUNTY_VINTAGE
-                        )
-                        ct_bridge = _load_ct_county_alignment_crosswalk(
-                            ctx=ctx,
-                            legacy_vintage=legacy_vintage,
-                        )
-                        _record_step_note(
-                            ctx,
-                            step_notes,
-                            "Connecticut special-case alignment applied: "
-                            f"translated planning-region dataset "
-                            f"'{task.dataset_id}' to legacy counties before "
-                            "aggregate resampling.",
-                        )
-                        df = _translate_ct_planning_values_to_legacy(
-                            df=df[[geo_col, *task.measures]].copy(),
-                            geo_col=geo_col,
-                            value_columns=task.measures,
-                            crosswalk=ct_bridge,
-                            year_value=task.year if "year" in df.columns else None,
-                        )
-                result_df = _resample_aggregate(df, xwalk, task)
+                            ct_bridge = _load_ct_county_alignment_crosswalk(
+                                ctx=ctx,
+                                legacy_vintage=legacy_vintage,
+                            )
+                            _record_step_note(
+                                ctx,
+                                step_notes,
+                                "Connecticut special-case alignment applied: "
+                                f"translated planning-region dataset "
+                                f"'{task.dataset_id}' to legacy counties before "
+                                "aggregate resampling.",
+                            )
+                            df = _translate_ct_planning_values_to_legacy(
+                                df=df[[geo_col, *task.measures]].copy(),
+                                geo_col=geo_col,
+                                value_columns=task.measures,
+                                crosswalk=ct_bridge,
+                                year_value=task.year if "year" in df.columns else None,
+                            )
+                    result_df = _resample_aggregate(df, xwalk, task)
             else:
                 result_df = _resample_allocate(df, xwalk, task)
         else:

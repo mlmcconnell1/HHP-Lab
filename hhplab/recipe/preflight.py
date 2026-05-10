@@ -2022,6 +2022,108 @@ def _check_support_datasets(
     return findings
 
 
+def _check_pep_decennial_tract_mediated_inputs(
+    recipe: RecipeV1,
+    project_root: Path,
+    resample_tasks: list[ResampleTask],
+) -> list[PreflightFinding]:
+    """Validate PEP baseline and crosswalk columns for decennial tract-mediated population."""
+    findings: list[PreflightFinding] = []
+
+    for task in resample_tasks:
+        ds = recipe.datasets.get(task.dataset_id)
+        if (
+            ds is None
+            or ds.provider != "census"
+            or ds.product != "pep"
+            or task.transform_id is None
+            or task.weight_column != "population_weight"
+        ):
+            continue
+        transform = next((t for t in recipe.transforms if t.id == task.transform_id), None)
+        if transform is None:
+            continue
+        weighting = getattr(transform.spec, "weighting", None)
+        if (
+            weighting is None
+            or weighting.scheme != "tract_mediated"
+            or weighting.denominator_source != "decennial"
+        ):
+            continue
+        baseline_year = int(weighting.resolved_denominator_vintage)
+
+        if task.input_path is not None:
+            pep_path = project_root / task.input_path
+            if pep_path.exists():
+                try:
+                    pep_years = pd.read_parquet(pep_path, columns=["year"])["year"]
+                except (OSError, ValueError, KeyError):
+                    pep_years = pd.Series(dtype="int64")
+                available_years = set(pd.to_numeric(pep_years, errors="coerce").dropna().astype(int))
+                if baseline_year not in available_years:
+                    findings.append(
+                        PreflightFinding(
+                            severity=Severity.ERROR,
+                            kind=FindingKind.MISSING_SUPPORT_DATASET,
+                            message=(
+                                f"Pipeline PEP dataset '{task.dataset_id}' for transform "
+                                f"'{task.transform_id}' requires baseline-year PEP "
+                                f"county estimates for {baseline_year}."
+                            ),
+                            dataset_id=task.dataset_id,
+                            transform_id=task.transform_id,
+                            years=[baseline_year],
+                            remediation=Remediation(
+                                hint=(
+                                    "Use a PEP county vintage that includes the decennial "
+                                    "baseline year required by the tract-mediated denominator."
+                                ),
+                                command="hhplab ingest pep",
+                            ),
+                        )
+                    )
+
+        try:
+            from hhplab.recipe.executor_transforms import _resolve_transform_path
+
+            xwalk_path = _resolve_transform_path(task.transform_id, recipe, project_root)
+        except Exception:
+            continue
+        if not xwalk_path.exists():
+            continue
+        try:
+            columns = set(pq.read_schema(xwalk_path).names)
+        except (OSError, ValueError):
+            continue
+        required_columns = {
+            "population_weight",
+            "county_population_total",
+            "denominator_source",
+            "denominator_vintage",
+        }
+        missing_columns = sorted(required_columns - columns)
+        if missing_columns:
+            findings.append(
+                PreflightFinding(
+                    severity=Severity.ERROR,
+                    kind=FindingKind.MISSING_COLUMN,
+                    message=(
+                        f"Transform '{task.transform_id}' decennial PEP population "
+                        f"aggregation requires crosswalk columns {missing_columns}."
+                    ),
+                    transform_id=task.transform_id,
+                    remediation=Remediation(
+                        hint=(
+                            "Regenerate the tract-mediated county crosswalk with "
+                            "decennial denominators so baseline scaling columns are present."
+                        ),
+                    ),
+                )
+            )
+
+    return findings
+
+
 def _filter_to_year(
     df: pd.DataFrame,
     year_col: str,
@@ -2476,7 +2578,16 @@ def run_preflight(
         ),
     )
 
-    # 8. Connecticut county-transition detection and bridge readiness
+    # 8. PEP decennial tract-mediated baseline and denominator checks
+    report.findings.extend(
+        _check_pep_decennial_tract_mediated_inputs(
+            recipe,
+            project_root,
+            all_resample_tasks,
+        ),
+    )
+
+    # 9. Connecticut county-transition detection and bridge readiness
     report.findings.extend(
         _check_ct_county_alignment(recipe, project_root, pipeline_resample_tasks),
     )
