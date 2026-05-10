@@ -67,6 +67,7 @@ from hhplab.recipe.probes import (
     probe_year_column,
 )
 from hhplab.recipe.recipe_schema import (
+    ContainmentSpec,
     JoinStep,
     RecipeV1,
     ResampleStep,
@@ -858,169 +859,175 @@ def _check_containment_artifacts(
     data_root = load_config(project_root=project_root).asset_store_root
 
     for target in recipe.targets:
-        if "containment" not in target.outputs or target.containment_spec is None:
+        specs: list[tuple[str, ContainmentSpec]] = []
+        if "containment" in target.outputs and target.containment_spec is not None:
+            specs.append(("containment_spec", target.containment_spec))
+        if target.containment_filter is not None:
+            specs.append(("containment_filter", target.containment_filter))
+        if not specs:
             continue
 
-        spec = target.containment_spec
-        pair = (spec.container.type, spec.candidate.type)
-        artifact_paths: dict[str, Path] = {}
-        selectors: dict[str, tuple[Path, tuple[str, ...], str, list[str] | None]] = {}
+        for spec_field, spec in specs:
+            pair = (spec.container.type, spec.candidate.type)
+            artifact_paths: dict[str, Path] = {}
+            selectors: dict[str, tuple[Path, tuple[str, ...], str, list[str] | None]] = {}
 
-        if pair == ("msa", "coc"):
-            coc_vintage = spec.candidate.vintage
-            county_vintage = spec.container.vintage
-            definition_version = spec.definition_version or spec.container.source
-
-            if coc_vintage is not None:
-                artifact_paths["candidate CoC boundary artifact"] = coc_base_path(
-                    coc_vintage,
-                    data_root,
-                )
-            if county_vintage is not None:
-                artifact_paths["container MSA county geometry artifact"] = county_path(
-                    county_vintage,
-                    data_root,
-                )
-            if definition_version is not None:
-                artifact_paths["MSA definitions artifact"] = msa_definitions_path(
-                    definition_version,
-                    data_root,
-                )
-                artifact_paths["MSA county membership artifact"] = msa_county_membership_path(
-                    definition_version,
-                    data_root,
-                )
-            else:
-                findings.append(
-                    PreflightFinding(
-                        severity=Severity.ERROR,
-                        kind=FindingKind.MISSING_CONTAINMENT_ARTIFACT,
-                        message=(
-                            f"Containment target '{target.id}' requires "
-                            "containment_spec.definition_version or container.source "
-                            "for MSA containment outputs."
-                        ),
-                        geometry="msa",
-                        remediation=Remediation(
-                            hint=(
-                                "Set containment_spec.definition_version or "
-                                "containment_spec.container.source to the MSA "
-                                "definition version used by curated artifacts."
-                            ),
-                        ),
-                    )
-                )
-
-            membership_path = (
-                artifact_paths.get("MSA county membership artifact")
-                if definition_version is not None
-                else None
-            )
-            coc_path = (
-                artifact_paths.get("candidate CoC boundary artifact")
-                if coc_vintage is not None
-                else None
-            )
-            if membership_path is not None:
-                selectors["container selector_ids"] = (
-                    membership_path,
-                    ("msa_id", "cbsa_code"),
-                    "msa",
-                    spec.selector_ids,
-                )
-            if coc_path is not None:
-                selectors["candidate_selector_ids"] = (
-                    coc_path,
-                    ("coc_id", "geo_id"),
-                    "coc",
-                    spec.candidate_selector_ids,
-                )
-
-        elif pair == ("coc", "county"):
-            coc_vintage = spec.container.vintage
-            county_vintage = spec.candidate.vintage
-            if coc_vintage is not None:
-                artifact_paths["container CoC boundary artifact"] = coc_base_path(
-                    coc_vintage,
-                    data_root,
-                )
-            if county_vintage is not None:
-                artifact_paths["candidate county geometry artifact"] = county_path(
-                    county_vintage,
-                    data_root,
-                )
-
-            coc_path = (
-                artifact_paths.get("container CoC boundary artifact")
-                if coc_vintage is not None
-                else None
-            )
-            county_file = (
-                artifact_paths.get("candidate county geometry artifact")
-                if county_vintage is not None
-                else None
-            )
-            if coc_path is not None:
-                selectors["container selector_ids"] = (
-                    coc_path,
-                    ("coc_id", "geo_id"),
-                    "coc",
-                    spec.selector_ids,
-                )
-            if county_file is not None:
-                selectors["candidate_selector_ids"] = (
-                    county_file,
-                    ("GEOID", "geoid", "county_fips", "geo_id"),
-                    "county",
-                    spec.candidate_selector_ids,
-                )
-
-        else:
-            continue
-
-        missing_labels = {label for label, path in artifact_paths.items() if not path.exists()}
-        for label in sorted(missing_labels):
-            path = artifact_paths[label]
-            if "CoC" in label:
-                geo_type = "coc"
-                vintage = (
-                    spec.candidate.vintage if pair == ("msa", "coc") else spec.container.vintage
-                )
-                definition_version = None
-            elif "county" in label and "MSA" not in label:
-                geo_type = "county"
-                vintage = spec.candidate.vintage
-                definition_version = None
-            elif "geometry" in label:
-                geo_type = "county"
-                vintage = spec.container.vintage
-                definition_version = None
-            else:
-                geo_type = "msa"
-                vintage = spec.container.vintage
+            if pair == ("msa", "coc"):
+                coc_vintage = spec.candidate.vintage
+                county_vintage = spec.container.vintage
                 definition_version = spec.definition_version or spec.container.source
-            findings.append(
-                _containment_missing_artifact_finding(
-                    target_id=target.id,
-                    label=label,
-                    path=path,
-                    geo_type=geo_type,
-                    vintage=vintage,
-                    definition_version=definition_version,
-                )
-            )
 
-        for selector_label, (path, columns, geo_type, requested) in selectors.items():
-            if path.exists():
-                findings.extend(
-                    _check_containment_selector(
+                if coc_vintage is not None:
+                    artifact_paths["candidate CoC boundary artifact"] = coc_base_path(
+                        coc_vintage,
+                        data_root,
+                    )
+                if county_vintage is not None:
+                    artifact_paths["container MSA county geometry artifact"] = county_path(
+                        county_vintage,
+                        data_root,
+                    )
+                if definition_version is not None:
+                    artifact_paths["MSA definitions artifact"] = msa_definitions_path(
+                        definition_version,
+                        data_root,
+                    )
+                    artifact_paths["MSA county membership artifact"] = msa_county_membership_path(
+                        definition_version,
+                        data_root,
+                    )
+                else:
+                    findings.append(
+                        PreflightFinding(
+                            severity=Severity.ERROR,
+                            kind=FindingKind.MISSING_CONTAINMENT_ARTIFACT,
+                            message=(
+                                f"Containment target '{target.id}' {spec_field} requires "
+                                "definition_version or container.source for MSA containment."
+                            ),
+                            geometry="msa",
+                            remediation=Remediation(
+                                hint=(
+                                    f"Set {spec_field}.definition_version or "
+                                    f"{spec_field}.container.source to the MSA "
+                                    "definition version used by curated artifacts."
+                                ),
+                            ),
+                        )
+                    )
+
+                membership_path = (
+                    artifact_paths.get("MSA county membership artifact")
+                    if definition_version is not None
+                    else None
+                )
+                coc_path = (
+                    artifact_paths.get("candidate CoC boundary artifact")
+                    if coc_vintage is not None
+                    else None
+                )
+                if membership_path is not None:
+                    selectors["container selector_ids"] = (
+                        membership_path,
+                        ("msa_id", "cbsa_code"),
+                        "msa",
+                        spec.selector_ids,
+                    )
+                if coc_path is not None:
+                    selectors["candidate_selector_ids"] = (
+                        coc_path,
+                        ("coc_id", "geo_id"),
+                        "coc",
+                        spec.candidate_selector_ids,
+                    )
+
+            elif pair == ("coc", "county"):
+                coc_vintage = spec.container.vintage
+                county_vintage = spec.candidate.vintage
+                if coc_vintage is not None:
+                    artifact_paths["container CoC boundary artifact"] = coc_base_path(
+                        coc_vintage,
+                        data_root,
+                    )
+                if county_vintage is not None:
+                    artifact_paths["candidate county geometry artifact"] = county_path(
+                        county_vintage,
+                        data_root,
+                    )
+
+                coc_path = (
+                    artifact_paths.get("container CoC boundary artifact")
+                    if coc_vintage is not None
+                    else None
+                )
+                county_file = (
+                    artifact_paths.get("candidate county geometry artifact")
+                    if county_vintage is not None
+                    else None
+                )
+                if coc_path is not None:
+                    selectors["container selector_ids"] = (
+                        coc_path,
+                        ("coc_id", "geo_id"),
+                        "coc",
+                        spec.selector_ids,
+                    )
+                if county_file is not None:
+                    selectors["candidate_selector_ids"] = (
+                        county_file,
+                        ("GEOID", "geoid", "county_fips", "geo_id"),
+                        "county",
+                        spec.candidate_selector_ids,
+                    )
+
+            else:
+                continue
+
+            missing_labels = {label for label, path in artifact_paths.items() if not path.exists()}
+            for label in sorted(missing_labels):
+                path = artifact_paths[label]
+                if "CoC" in label:
+                    geo_type = "coc"
+                    vintage = (
+                        spec.candidate.vintage
+                        if pair == ("msa", "coc")
+                        else spec.container.vintage
+                    )
+                    definition_version = None
+                elif "county" in label and "MSA" not in label:
+                    geo_type = "county"
+                    vintage = spec.candidate.vintage
+                    definition_version = None
+                elif "geometry" in label:
+                    geo_type = "county"
+                    vintage = spec.container.vintage
+                    definition_version = None
+                else:
+                    geo_type = "msa"
+                    vintage = spec.container.vintage
+                    definition_version = spec.definition_version or spec.container.source
+                findings.append(
+                    _containment_missing_artifact_finding(
                         target_id=target.id,
-                        selector_label=selector_label,
-                        requested=requested,
-                        available=_read_parquet_id_values(path, columns),
+                        label=f"{spec_field} {label}",
+                        path=path,
                         geo_type=geo_type,
+                        vintage=vintage,
+                        definition_version=definition_version,
                     )
                 )
+
+            for selector_label, (path, columns, geo_type, requested) in selectors.items():
+                if path.exists():
+                    findings.extend(
+                        _check_containment_selector(
+                            target_id=target.id,
+                            selector_label=f"{spec_field} {selector_label}",
+                            requested=requested,
+                            available=_read_parquet_id_values(path, columns),
+                            geo_type=geo_type,
+                        )
+                    )
 
     return findings
 

@@ -70,6 +70,7 @@ def persist_outputs(
     target_geo_type = assembled.target_geo_type
     boundary_vintage = assembled.boundary_vintage
     definition_version = assembled.definition_version
+    containment_filter_summary: dict[str, object] | None = None
 
     universe_years = expand_year_spec(ctx.recipe.universe)
     start_year = min(universe_years)
@@ -110,6 +111,21 @@ def persist_outputs(
     # reads are centralised in ``collect_conformance_flags`` so assembly
     # and persistence share a single policy-read path.
     _, persist_target = _resolve_pipeline_target(ctx.recipe, plan.pipeline_id)
+    if persist_target.containment_filter is not None:
+        try:
+            panel, containment_filter_summary = _apply_containment_panel_filter(
+                panel,
+                persist_target.containment_filter,
+                ctx,
+            )
+        except (ExecutorError, FileNotFoundError, ValueError) as exc:
+            return StepResult(
+                step_kind="persist",
+                detail="persist outputs",
+                success=False,
+                error=str(exc),
+            )
+
     conformance_flags = collect_conformance_flags(
         recipe=ctx.recipe,
         target=persist_target,
@@ -150,6 +166,8 @@ def persist_outputs(
         ),
     }
     provenance["conformance"] = conformance_report.to_dict()
+    if containment_filter_summary is not None:
+        provenance["containment_filter"] = containment_filter_summary
 
     # Embed ZORI provenance and summary (coclab-gude.2).
     if assembled.zori_provenance is not None:
@@ -318,6 +336,59 @@ def persist_containment(
     detail = f"persist containment: {len(containment)} rows -> {output_rel}"
     _echo(ctx, f"  [persist] {detail}")
     return StepResult(step_kind="persist_containment", detail=detail, success=True)
+
+
+def _apply_containment_panel_filter(
+    panel: pd.DataFrame,
+    spec: ContainmentSpec,
+    ctx: ExecutionContext,
+) -> tuple[pd.DataFrame, dict[str, object]]:
+    """Filter a panel to candidate geographies selected by a containment list."""
+    coc_gdf, county_gdf, msa_county_membership = _load_containment_inputs(spec, ctx)
+    containment = build_containment_list(
+        spec,
+        coc_gdf=coc_gdf,
+        county_gdf=county_gdf,
+        msa_county_membership=msa_county_membership,
+    )
+    candidate_ids = set(containment["candidate_id"].astype(str))
+    candidate_col = _panel_candidate_column(panel, spec.candidate.type)
+    before_rows = len(panel)
+    before_geographies = panel[candidate_col].nunique(dropna=True)
+    filtered = panel[panel[candidate_col].astype(str).isin(candidate_ids)].reset_index(drop=True)
+    after_geographies = filtered[candidate_col].nunique(dropna=True)
+    summary = {
+        "spec": spec.model_dump(mode="json"),
+        "containment_row_count": len(containment),
+        "candidate_count": len(candidate_ids),
+        "panel_rows_before": before_rows,
+        "panel_rows_after": len(filtered),
+        "panel_geographies_before": int(before_geographies),
+        "panel_geographies_after": int(after_geographies),
+    }
+    _echo(
+        ctx,
+        "  [containment_filter] "
+        f"{before_geographies} -> {after_geographies} geographies, "
+        f"{before_rows} -> {len(filtered)} panel rows",
+    )
+    return filtered, summary
+
+
+def _panel_candidate_column(panel: pd.DataFrame, candidate_type: str) -> str:
+    preferred = {
+        "coc": ("geo_id", "coc_id"),
+        "county": ("geo_id", "county_fips", "GEOID", "geoid"),
+        "msa": ("geo_id", "msa_id", "cbsa_code"),
+        "metro": ("geo_id", "metro_id"),
+    }
+    for column in preferred.get(candidate_type, ("geo_id",)):
+        if column in panel.columns:
+            return column
+    raise ValueError(
+        "Containment filter cannot be applied because the panel does not "
+        f"contain a candidate ID column for geometry type '{candidate_type}'."
+    )
 
 
 def _load_containment_inputs(

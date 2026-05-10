@@ -347,6 +347,43 @@ class TestLoadRecipeFromDict:
         with pytest.raises(RecipeLoadError, match="requires outputs to include 'containment'"):
             load_recipe(data)
 
+    def test_valid_panel_containment_filter_loads_without_containment_output(self):
+        data = _minimal_recipe()
+        data["targets"][0]["outputs"] = ["panel"]
+        data["targets"][0]["containment_filter"] = {
+            "container": {"type": "msa", "source": "census_msa_2023", "vintage": 2023},
+            "candidate": {"type": "coc", "vintage": 2025},
+            "selector_ids": ["17460"],
+            "min_share": 0.5,
+        }
+
+        recipe = load_recipe(data)
+
+        assert isinstance(recipe.targets[0].containment_filter, ContainmentSpec)
+        assert recipe.targets[0].containment_filter.selector_ids == ["17460"]
+
+    def test_panel_containment_filter_requires_panel_output(self):
+        data = _minimal_recipe()
+        data["targets"][0]["outputs"] = ["diagnostics"]
+        data["targets"][0]["containment_filter"] = {
+            "container": {"type": "msa", "source": "census_msa_2023", "vintage": 2023},
+            "candidate": {"type": "coc", "vintage": 2025},
+        }
+
+        with pytest.raises(RecipeLoadError, match="requires outputs to include 'panel'"):
+            load_recipe(data)
+
+    def test_panel_containment_filter_candidate_must_match_target_geometry(self):
+        data = _minimal_recipe()
+        data["targets"][0]["outputs"] = ["panel"]
+        data["targets"][0]["containment_filter"] = {
+            "container": {"type": "coc", "vintage": 2025},
+            "candidate": {"type": "county", "vintage": 2023},
+        }
+
+        with pytest.raises(RecipeLoadError, match="candidate geometry must match"):
+            load_recipe(data)
+
     @pytest.mark.parametrize(
         ("container", "candidate", "selector_ids"),
         [

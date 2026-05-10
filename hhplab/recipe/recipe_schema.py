@@ -608,6 +608,15 @@ class TargetSpec(BaseModel):
         default=None,
         description="Declarative containment-list artifact configuration.",
     )
+    containment_filter: ContainmentSpec | None = Field(
+        default=None,
+        description=(
+            "Optional containment filter applied to panel rows. Uses the same "
+            "ContainmentSpec semantics as containment outputs and keeps panel "
+            "geographies whose geo_id appears as a candidate_id in the resolved "
+            "containment list."
+        ),
+    )
 
     @model_validator(mode="after")
     def _validate_output_policies(self) -> TargetSpec:
@@ -620,6 +629,14 @@ class TargetSpec(BaseModel):
             raise ValueError("Target outputs including 'containment' require 'containment_spec'.")
         if "containment" not in outputs and self.containment_spec is not None:
             raise ValueError("Target 'containment_spec' requires outputs to include 'containment'.")
+        if self.containment_filter is not None:
+            if "panel" not in outputs:
+                raise ValueError("Target 'containment_filter' requires outputs to include 'panel'.")
+            if self.containment_filter.candidate.type != self.geometry.type:
+                raise ValueError(
+                    "Target 'containment_filter' candidate geometry must match "
+                    f"target geometry type '{self.geometry.type}'."
+                )
         return self
 
 

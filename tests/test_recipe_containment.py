@@ -444,3 +444,98 @@ def test_execute_recipe_persists_panel_and_containment_outputs(tmp_path) -> None
     containment = pd.read_parquet(containment_path)
     assert containment["candidate_id"].tolist() == ["001", "002"]
     assert containment["contained_share"].tolist() == pytest.approx([1.0, 0.5])
+
+
+def test_execute_recipe_containment_filter_keeps_selected_panel_candidates(tmp_path) -> None:
+    coc_file = coc_base_path("2025", tmp_path / "data")
+    county_file = county_path("2023", tmp_path / "data")
+    membership_file = msa_county_membership_path("test_msa_v1", tmp_path / "data")
+    pit_file = tmp_path / "data" / "pit.parquet"
+    coc_file.parent.mkdir(parents=True, exist_ok=True)
+    county_file.parent.mkdir(parents=True, exist_ok=True)
+    membership_file.parent.mkdir(parents=True, exist_ok=True)
+    _coc_gdf().to_parquet(coc_file)
+    _county_gdf().to_parquet(county_file)
+    MSA_MEMBERSHIP.to_parquet(membership_file)
+    pd.DataFrame(
+        {
+            "coc_id": ["COC-A", "COC-B"],
+            "year": [2020, 2020],
+            "pit_total": [42, 7],
+        }
+    ).to_parquet(pit_file)
+
+    recipe = load_recipe(
+        {
+            "version": 1,
+            "name": "panel-containment-filter-test",
+            "universe": {"years": [2020]},
+            "targets": [
+                {
+                    "id": "filtered_coc_panel",
+                    "geometry": {"type": "coc", "vintage": 2025},
+                    "outputs": ["panel"],
+                    "containment_filter": {
+                        "container": {
+                            "type": "msa",
+                            "vintage": 2023,
+                            "source": "test_msa_v1",
+                        },
+                        "candidate": {"type": "coc", "vintage": 2025},
+                        "selector_ids": ["MSA-1"],
+                        "min_share": 0.51,
+                    },
+                }
+            ],
+            "datasets": {
+                "pit": {
+                    "provider": "hud",
+                    "product": "pit",
+                    "version": 1,
+                    "native_geometry": {"type": "coc"},
+                    "path": "data/pit.parquet",
+                    "years": {"years": [2020]},
+                },
+            },
+            "transforms": [],
+            "pipelines": [
+                {
+                    "id": "main",
+                    "target": "filtered_coc_panel",
+                    "steps": [
+                        {
+                            "resample": {
+                                "dataset": "pit",
+                                "to_geometry": {"type": "coc", "vintage": 2025},
+                                "method": "identity",
+                                "measures": ["pit_total"],
+                            }
+                        },
+                        {
+                            "join": {
+                                "datasets": ["pit"],
+                                "join_on": ["geo_id", "year"],
+                            }
+                        },
+                    ],
+                }
+            ],
+        }
+    )
+
+    results = execute_recipe(recipe, project_root=tmp_path, quiet=True)
+
+    assert results[0].success
+    artifacts = resolve_pipeline_artifacts(recipe, "main", project_root=tmp_path)
+    panel_path = tmp_path / artifacts["panel_path"]
+    panel = pd.read_parquet(panel_path)
+    assert panel["geo_id"].tolist() == ["COC-A"]
+    assert panel["pit_total"].tolist() == [42]
+
+    metadata = pq.read_metadata(panel_path).metadata or {}
+    provenance = json.loads(metadata[b"hhplab_provenance"])
+    containment_filter = provenance["containment_filter"]
+    assert containment_filter["candidate_count"] == 1
+    assert containment_filter["panel_rows_before"] == 2
+    assert containment_filter["panel_rows_after"] == 1
+    assert containment_filter["spec"]["selector_ids"] == ["MSA-1"]

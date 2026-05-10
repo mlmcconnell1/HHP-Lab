@@ -744,6 +744,35 @@ class TestRunPreflight:
             }
         ] == []
 
+    def test_containment_filter_preflight_validates_artifacts_and_selectors(
+        self,
+        tmp_path: Path,
+    ):
+        data = _preflight_recipe(with_path=True, identity_only=True)
+        data["targets"][0]["outputs"] = ["panel"]
+        data["targets"][0]["containment_filter"] = {
+            "container": {"type": "msa", "vintage": 2023, "source": "census_msa_2023"},
+            "candidate": {"type": "coc", "vintage": 2025},
+            "selector_ids": ["19740"],
+            "candidate_selector_ids": ["COC1"],
+            "min_share": 0.5,
+        }
+        _setup_preflight_fixtures(tmp_path, include_xwalk=False, include_acs=False)
+        _setup_containment_artifacts(tmp_path, ("msa", "coc"))
+
+        recipe = load_recipe(data)
+        report = run_preflight(recipe, project_root=tmp_path)
+
+        assert report.is_ready
+        assert [
+            f for f in report.findings
+            if f.kind
+            in {
+                FindingKind.MISSING_CONTAINMENT_ARTIFACT,
+                FindingKind.CONTAINMENT_SELECTOR,
+            }
+        ] == []
+
     def test_containment_coc_county_missing_county_is_actionable(self, tmp_path: Path):
         data = _containment_preflight_recipe(("coc", "county"))
         _setup_preflight_fixtures(tmp_path, include_xwalk=False, include_acs=False)
