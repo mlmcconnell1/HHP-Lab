@@ -186,3 +186,44 @@ class TestDownloadPitData:
         with tempfile.TemporaryDirectory() as tmpdir:
             with pytest.raises(httpx.HTTPStatusError):
                 download_pit_data(2020, output_dir=tmpdir)
+
+    def test_download_rejects_empty_hud_response_without_writing_file(self, httpx_mock):
+        """Empty HTTP 200 responses are treated as unpublished PIT files."""
+        base = "https://www.huduser.gov/portal/sites/default/files/xls/2007-2025-"
+        httpx_mock.add_response(
+            url=f"{base}PIT-Counts-by-CoC.xlsb",
+            content=b"",
+            headers={"content-length": "0"},
+        )
+        for pattern in ["PIT-Counts-by-CoC", "Point-in-Time-Estimates-by-CoC", "PIT-Estimates-by-CoC"]:
+            for ext in [".xlsx", ".xlsb"]:
+                url = f"{base}{pattern}{ext}"
+                if url.endswith("PIT-Counts-by-CoC.xlsb"):
+                    continue
+                httpx_mock.add_response(url=url, status_code=404)
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            output_dir = Path(tmpdir)
+            with pytest.raises(FileNotFoundError, match="no usable workbook content"):
+                download_pit_data(2025, output_dir=output_dir)
+
+            assert not (output_dir / "2007-2025-PIT-Counts-by-CoC.xlsb").exists()
+            assert list(output_dir.glob("*.meta.json")) == []
+
+    def test_download_redownloads_existing_empty_file(self, httpx_mock):
+        """A prior zero-byte workbook is not treated as a valid cached download."""
+        new_content = b"new workbook content"
+        httpx_mock.add_response(
+            url="https://www.huduser.gov/portal/sites/default/files/xls/2007-2024-PIT-Counts-by-CoC.xlsb",
+            content=new_content,
+        )
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            output_dir = Path(tmpdir)
+            existing_file = output_dir / "2007-2024-PIT-Counts-by-CoC.xlsb"
+            existing_file.write_bytes(b"")
+
+            result = download_pit_data(2024, output_dir=output_dir, force=False)
+
+            assert result.file_size == len(new_content)
+            assert existing_file.read_bytes() == new_content

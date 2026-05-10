@@ -136,6 +136,18 @@ def _try_download_url(
         raise
 
 
+def _has_empty_body(response: httpx.Response) -> bool:
+    """Return True when HUD returned no workbook bytes."""
+    content_length = response.headers.get("content-length")
+    if content_length is not None:
+        try:
+            if int(content_length) == 0:
+                return True
+        except ValueError:
+            pass
+    return len(response.content) == 0
+
+
 def _generate_alternate_urls(url: str, year: int) -> list[str]:
     """Generate alternate URLs to try if primary fails.
 
@@ -237,11 +249,16 @@ def download_pit_data(
         logger.info(f"File already exists: {output_path}")
         # Return result with existing file info
         file_size = output_path.stat().st_size
-        return DownloadResult(
-            path=output_path,
-            source_url=url,
-            downloaded_at=datetime.now(UTC),
-            file_size=file_size,
+        if file_size > 0:
+            return DownloadResult(
+                path=output_path,
+                source_url=url,
+                downloaded_at=datetime.now(UTC),
+                file_size=file_size,
+            )
+        logger.warning(
+            "Existing PIT workbook is empty and will be re-downloaded: %s",
+            output_path,
         )
 
     logger.info(f"Downloading PIT data for {year} from {url}")
@@ -251,25 +268,28 @@ def download_pit_data(
     with httpx.Client(follow_redirects=True, timeout=timeout) as client:
         response = _try_download_url(client, url)
 
-        # If primary URL failed with 404, try alternate URLs
-        if response is None:
+        # If the primary URL failed or returned an unpublished empty workbook,
+        # try alternate filename patterns before giving up.
+        if response is None or _has_empty_body(response):
             alternate_urls = _generate_alternate_urls(url, year)
             for alt_url in alternate_urls:
                 logger.info(f"Primary URL not found, trying: {alt_url}")
                 tried_urls.append(alt_url)
                 response = _try_download_url(client, alt_url)
 
-                if response is not None:
+                if response is not None and not _has_empty_body(response):
                     url = alt_url
                     filename = url.split("/")[-1]
                     output_path = output_dir / filename
                     break
 
-        if response is None:
+        if response is None or _has_empty_body(response):
             raise FileNotFoundError(
                 f"PIT data file not found for year {year}. "
                 f"Tried URLs: {tried_urls}. "
-                f"The file may not yet be published by HUD."
+                "HUD returned no usable workbook content. "
+                "The file may not yet be published by HUD; retry after HUD "
+                "publishes the vintage or use the latest available PIT vintage."
             )
 
     # Compute SHA-256 hash of raw content
