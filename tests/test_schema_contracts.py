@@ -26,8 +26,10 @@ from hhplab.cli.main import app
 from hhplab.panel.conformance import PanelRequest, run_conformance
 from hhplab.pep.pep_ingest import PEP_COUNTY_OUTPUT_COLUMNS as PEP_INGEST_COLUMNS
 from hhplab.pit.ingest.parser import CANONICAL_COLUMNS as PIT_PARSER_COLUMNS
-from hhplab.recipe.executor import _normalize_recipe_population_measure
+from hhplab.recipe.executor import ExecutorError, _normalize_recipe_population_measure
+from hhplab.recipe.executor_panel import _resolve_canonical_population
 from hhplab.recipe.planner import ResampleTask
+from hhplab.recipe.recipe_schema import PanelPolicy
 from hhplab.recipe.schema_common import GeometryRef
 from hhplab.rents.zori_ingest import ZORI_INGEST_OUTPUT_COLUMNS as ZORI_INGEST_COLUMNS
 from hhplab.schema import SAE_OUTPUT_CONTRACT, validate_artifact_contract
@@ -371,6 +373,83 @@ def test_recipe_pep_county_to_coc_population_becomes_canonical() -> None:
     ]
     assert result.loc[0, "total_population"] == 1000.0
     assert result.loc[0, "total_population_source"] == "pep"
+
+
+def test_acs_population_gets_canonical_lineage_defaults() -> None:
+    panel = pd.DataFrame(
+        {
+            "geo_id": ["COC1"],
+            "year": [2024],
+            "acs5_vintage_used": ["2023"],
+            "total_population": [1200.0],
+        }
+    )
+
+    result = _resolve_canonical_population(panel, policy=None)
+
+    assert result.loc[0, "total_population"] == 1200.0
+    assert result.loc[0, "total_population_source"] == "acs5"
+    assert result.loc[0, "total_population_source_year"] == "2023"
+    assert result.loc[0, "total_population_method"] == "native"
+
+
+def test_multiple_population_sources_require_explicit_canonical_source() -> None:
+    panel = pd.DataFrame(
+        {
+            "geo_id": ["COC1"],
+            "year": [2024],
+            "acs5_vintage_used": ["2023"],
+            "total_population_acs5": [1200.0],
+            "total_population_pep": [1300.0],
+            "total_population_pep_source": ["pep"],
+            "total_population_pep_source_year": ["2024"],
+            "total_population_pep_method": ["area_crosswalk"],
+        }
+    )
+
+    with pytest.raises(ExecutorError, match="multiple population sources"):
+        _resolve_canonical_population(panel, policy=None)
+
+    result = _resolve_canonical_population(
+        panel,
+        policy=PanelPolicy(canonical_population_source="pep"),
+    )
+
+    assert result.loc[0, "total_population"] == 1300.0
+    assert result.loc[0, "total_population_source"] == "pep"
+    assert result.loc[0, "total_population_source_year"] == "2024"
+    assert result.loc[0, "total_population_method"] == "area_crosswalk"
+    assert result.loc[0, "total_population_acs5"] == 1200.0
+    assert result.loc[0, "total_population_pep"] == 1300.0
+
+
+def test_existing_canonical_with_source_specific_population_still_requires_policy() -> None:
+    panel = pd.DataFrame(
+        {
+            "geo_id": ["COC1"],
+            "year": [2024],
+            "acs5_vintage_used": ["2023"],
+            "total_population": [1200.0],
+            "total_population_pep": [1300.0],
+        }
+    )
+
+    with pytest.raises(ExecutorError, match="multiple population sources"):
+        _resolve_canonical_population(panel, policy=None)
+
+    acs_result = _resolve_canonical_population(
+        panel,
+        policy=PanelPolicy(canonical_population_source="acs5"),
+    )
+    assert acs_result.loc[0, "total_population"] == 1200.0
+    assert acs_result.loc[0, "total_population_source"] == "acs5"
+
+    pep_result = _resolve_canonical_population(
+        panel,
+        policy=PanelPolicy(canonical_population_source="pep"),
+    )
+    assert pep_result.loc[0, "total_population"] == 1300.0
+    assert pep_result.loc[0, "total_population_source"] == "pep"
 
 
 def test_schema_contract_reports_ambiguous_population_and_missing_lineage() -> None:

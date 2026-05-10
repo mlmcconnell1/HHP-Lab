@@ -301,6 +301,14 @@ class PanelPolicy(BaseModel):
             "LAUS-aware conformance checks."
         ),
     )
+    canonical_population_source: Literal["acs5", "pep", "decennial", "block"] | None = Field(
+        default=None,
+        description=(
+            "Population source promoted to canonical total_population when a panel "
+            "contains multiple population estimates. Density is derived only from "
+            "this canonical total_population column."
+        ),
+    )
     column_aliases: dict[str, str] = Field(
         default_factory=dict,
         description=(

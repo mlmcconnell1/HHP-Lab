@@ -2550,6 +2550,7 @@ class TestPanelPolicy:
         assert policy.source_label is None
         assert policy.zori is None
         assert policy.acs1 is None
+        assert policy.canonical_population_source is None
         assert policy.column_aliases == {}
 
     def test_zori_policy_defaults(self):
@@ -2579,6 +2580,7 @@ class TestPanelPolicy:
         data["targets"][0]["panel_policy"] = {
             "source_label": "custom_source",
             "zori": {"min_coverage": 0.85},
+            "canonical_population_source": "acs5",
             "column_aliases": {"total_population": "total_population_acs5"},
         }
         recipe = load_recipe(data)
@@ -2586,6 +2588,7 @@ class TestPanelPolicy:
         assert target.panel_policy is not None
         assert target.panel_policy.source_label == "custom_source"
         assert target.panel_policy.zori.min_coverage == 0.85
+        assert target.panel_policy.canonical_population_source == "acs5"
         assert target.panel_policy.column_aliases == {
             "total_population": "total_population_acs5",
         }
@@ -2614,6 +2617,7 @@ class TestPanelPolicy:
             source_label="test_panel",
             zori=ZoriPolicy(min_coverage=0.95),
             acs1=Acs1Policy(include=True),
+            canonical_population_source="pep",
             column_aliases={"zori_coc": "zori"},
         )
         d = policy.model_dump()
@@ -2621,6 +2625,7 @@ class TestPanelPolicy:
         assert restored.source_label == "test_panel"
         assert restored.zori.min_coverage == 0.95
         assert restored.acs1.include is True
+        assert restored.canonical_population_source == "pep"
         assert restored.column_aliases == {"zori_coc": "zori"}
 
 

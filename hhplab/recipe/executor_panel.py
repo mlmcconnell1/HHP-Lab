@@ -18,6 +18,12 @@ from dataclasses import dataclass, field
 
 import pandas as pd
 
+from hhplab.schema.columns import POPULATION_DENSITY_COLUMN, TOTAL_POPULATION
+from hhplab.schema.lineage import (
+    PopulationMethod,
+    PopulationSource,
+    population_lineage_columns,
+)
 from hhplab.panel.finalize import (
     ZORI_COLUMNS,
     ZORI_PROVENANCE_COLUMNS,
@@ -178,6 +184,12 @@ _RECIPE_COC_COLUMN_ORDER: list[str] = [
     "alignment_type",
     "weighting_method",
     "total_population",
+    "total_population_source",
+    "total_population_source_year",
+    "total_population_method",
+    "total_population_crosswalk_id",
+    "total_population_crosswalk_geometry",
+    "total_population_crosswalk_vintage",
     "population_density_per_sq_km",
     "adult_population",
     "population_below_poverty",
@@ -211,6 +223,12 @@ _RECIPE_METRO_COLUMN_ORDER: list[str] = [
     "alignment_type",
     "weighting_method",
     "total_population",
+    "total_population_source",
+    "total_population_source_year",
+    "total_population_method",
+    "total_population_crosswalk_id",
+    "total_population_crosswalk_geometry",
+    "total_population_crosswalk_vintage",
     "adult_population",
     "population_below_poverty",
     "median_household_income",
@@ -242,6 +260,12 @@ _RECIPE_MSA_COLUMN_ORDER: list[str] = [
     "alignment_type",
     "weighting_method",
     "total_population",
+    "total_population_source",
+    "total_population_source_year",
+    "total_population_method",
+    "total_population_crosswalk_id",
+    "total_population_crosswalk_geometry",
+    "total_population_crosswalk_vintage",
     "adult_population",
     "population_below_poverty",
     "median_household_income",
@@ -283,6 +307,15 @@ def _add_recipe_coc_population_density(
     """Derive CoC population density for recipe-built panels."""
     if panel.empty:
         return panel
+    if TOTAL_POPULATION not in panel.columns:
+        if POPULATION_DENSITY_COLUMN in panel.columns:
+            raise ExecutorError(
+                "Cannot derive population_density_per_sq_km because no canonical "
+                "total_population column is available. Add a population measure or "
+                "set target.panel_policy.canonical_population_source when multiple "
+                "population sources are present."
+            )
+        return panel
 
     from hhplab.panel.assemble import _add_coc_population_density
 
@@ -290,6 +323,129 @@ def _add_recipe_coc_population_density(
         panel,
         boundaries_dir=project_root / "data" / "curated" / "coc_boundaries",
     )
+
+
+_POPULATION_LINEAGE_SUFFIXES = tuple(
+    column.removeprefix(TOTAL_POPULATION) for column in population_lineage_columns()
+)
+_POPULATION_LINEAGE_NAMES = {
+    suffix.lstrip("_") for suffix in _POPULATION_LINEAGE_SUFFIXES
+}
+_KNOWN_POPULATION_SOURCE_TOKENS = {source.value for source in PopulationSource}
+
+
+def _source_specific_population_columns(panel: pd.DataFrame) -> dict[str, str]:
+    """Return source token to source-specific total_population column."""
+    candidates: dict[str, str] = {}
+    prefix = f"{TOTAL_POPULATION}_"
+    for column in panel.columns:
+        if not column.startswith(prefix):
+            continue
+        suffix = column.removeprefix(prefix)
+        if suffix in _POPULATION_LINEAGE_NAMES:
+            continue
+        if any(suffix.endswith(lineage_suffix) for lineage_suffix in _POPULATION_LINEAGE_SUFFIXES):
+            continue
+        if suffix in _KNOWN_POPULATION_SOURCE_TOKENS:
+            candidates[suffix] = column
+    return candidates
+
+
+def _copy_source_specific_population_lineage(
+    panel: pd.DataFrame,
+    *,
+    source_column: str,
+) -> pd.DataFrame:
+    result = panel.copy()
+    for suffix in _POPULATION_LINEAGE_SUFFIXES:
+        specific_col = f"{source_column}{suffix}"
+        canonical_col = f"{TOTAL_POPULATION}{suffix}"
+        if specific_col in result.columns:
+            result[canonical_col] = result[specific_col]
+    return result
+
+
+def _fill_missing_population_lineage(
+    panel: pd.DataFrame,
+    *,
+    source: str,
+) -> pd.DataFrame:
+    """Attach canonical population lineage when the selected source lacks it."""
+    result = panel.copy()
+    source_col, year_col, method_col, xwalk_id_col, xwalk_geom_col, xwalk_vintage_col = (
+        population_lineage_columns()
+    )
+    if source_col not in result.columns or result[source_col].isna().all():
+        result[source_col] = source
+    if method_col not in result.columns or result[method_col].isna().all():
+        result[method_col] = PopulationMethod.NATIVE.value
+    if year_col not in result.columns or result[year_col].isna().all():
+        if source == PopulationSource.ACS5.value and "acs5_vintage_used" in result.columns:
+            result[year_col] = result["acs5_vintage_used"].astype("string")
+        elif "year" in result.columns:
+            result[year_col] = result["year"].astype("string")
+        else:
+            result[year_col] = pd.NA
+    for col in (xwalk_id_col, xwalk_geom_col, xwalk_vintage_col):
+        if col not in result.columns:
+            result[col] = pd.NA
+    return result
+
+
+def _resolve_canonical_population(
+    panel: pd.DataFrame,
+    *,
+    policy: PanelPolicy | None,
+) -> pd.DataFrame:
+    """Promote exactly one population estimate to canonical total_population."""
+    source_specific = _source_specific_population_columns(panel)
+    has_canonical = TOTAL_POPULATION in panel.columns
+    if not has_canonical and not source_specific:
+        return panel
+
+    selected_source = policy.canonical_population_source if policy else None
+    if selected_source is None and (len(source_specific) > 1 or (has_canonical and source_specific)):
+        available_sources = sorted(
+            {
+                *source_specific,
+                *(["acs5"] if has_canonical and "acs5_vintage_used" in panel.columns else []),
+            }
+        )
+        raise ExecutorError(
+            "Panel contains multiple population sources "
+            f"{available_sources} but no canonical source was selected. "
+            "Set target.panel_policy.canonical_population_source to one of "
+            f"{available_sources}."
+        )
+
+    result = panel.copy()
+    if selected_source is not None:
+        if selected_source in source_specific:
+            selected_col = source_specific[selected_source]
+            result[TOTAL_POPULATION] = result[selected_col]
+            result = _copy_source_specific_population_lineage(
+                result,
+                source_column=selected_col,
+            )
+        elif not has_canonical:
+            raise ExecutorError(
+                "target.panel_policy.canonical_population_source="
+                f"'{selected_source}' did not match any available population "
+                f"source. Available sources: {sorted(source_specific)}."
+            )
+    else:
+        selected_source = next(iter(source_specific), PopulationSource.ACS5.value)
+        if not has_canonical:
+            selected_col = source_specific[selected_source]
+            result[TOTAL_POPULATION] = result[selected_col]
+            result = _copy_source_specific_population_lineage(
+                result,
+                source_column=selected_col,
+            )
+        elif "acs5_vintage_used" in result.columns:
+            selected_source = PopulationSource.ACS5.value
+
+    return _fill_missing_population_lineage(result, source=selected_source)
 
 
 def _add_recipe_coc_names(
@@ -650,15 +806,33 @@ def assemble_panel(
         for note in application.notes:
             _echo(ctx, f"  [{applier.name}] {note}")
 
+    try:
+        panel = _resolve_canonical_population(panel, policy=policy)
+    except ExecutorError as exc:
+        return StepResult(
+            step_kind=step_kind,
+            detail=f"{step_kind}",
+            success=False,
+            error=str(exc),
+        )
+
     if target_geo_type == "coc":
-        panel = _add_recipe_coc_names(
-            panel,
-            project_root=ctx.project_root,
-        )
-        panel = _add_recipe_coc_population_density(
-            panel,
-            project_root=ctx.project_root,
-        )
+        try:
+            panel = _add_recipe_coc_names(
+                panel,
+                project_root=ctx.project_root,
+            )
+            panel = _add_recipe_coc_population_density(
+                panel,
+                project_root=ctx.project_root,
+            )
+        except ExecutorError as exc:
+            return StepResult(
+                step_kind=step_kind,
+                detail=f"{step_kind}",
+                success=False,
+                error=str(exc),
+            )
     elif target_geo_type == "metro":
         panel = _add_recipe_metro_metadata(
             panel,

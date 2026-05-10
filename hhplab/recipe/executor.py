@@ -114,11 +114,13 @@ from hhplab.recipe.recipe_schema import (
     RecipeV1,
     TemporalFilter,
 )
+from hhplab.schema.columns import TOTAL_POPULATION
 from hhplab.schema.lineage import (
     PopulationLineage,
     PopulationMethod,
     PopulationSource,
     normalize_population_measure,
+    population_lineage_columns,
 )
 
 # Re-export the core primitives so ``from hhplab.recipe.executor import
@@ -227,6 +229,53 @@ def _normalize_recipe_population_measure(
             crosswalk_vintage=task.effective_geometry.vintage,
         ),
     )
+
+
+def _population_source_token_for_dataset(dataset_id: str, ctx: ExecutionContext) -> str:
+    ds = ctx.recipe.datasets.get(dataset_id)
+    if ds is None:
+        return dataset_id
+    if ds.provider == "census" and ds.product in {"acs", "acs5"}:
+        return "acs5"
+    if ds.provider == "census" and ds.product == "pep":
+        return "pep"
+    return dataset_id
+
+
+def _rename_conflicting_population_columns(
+    frames: list[pd.DataFrame],
+    dataset_ids: list[str],
+    ctx: ExecutionContext,
+) -> list[pd.DataFrame]:
+    """Preserve multiple population estimates as source-specific columns."""
+    population_frame_indexes = [
+        index for index, frame in enumerate(frames) if TOTAL_POPULATION in frame.columns
+    ]
+    if len(population_frame_indexes) <= 1:
+        return frames
+
+    tokens = [_population_source_token_for_dataset(dataset_id, ctx) for dataset_id in dataset_ids]
+    if len(tokens) != len(set(tokens)):
+        tokens = list(dataset_ids)
+
+    lineage_cols = population_lineage_columns()
+    renamed: list[pd.DataFrame] = []
+    for index, frame in enumerate(frames):
+        if index not in population_frame_indexes:
+            renamed.append(frame)
+            continue
+
+        token = tokens[index]
+        rename_map = {TOTAL_POPULATION: f"{TOTAL_POPULATION}_{token}"}
+        for lineage_col in lineage_cols:
+            if lineage_col in frame.columns:
+                rename_map[lineage_col] = (
+                    f"{TOTAL_POPULATION}_{token}"
+                    f"{lineage_col.removeprefix(TOTAL_POPULATION)}"
+                )
+        renamed.append(frame.rename(columns=rename_map))
+    return renamed
+
 
 def _execute_materialize(
     task: MaterializeTask,
@@ -703,6 +752,7 @@ def _execute_join(
             success=False,
             error="No datasets to join.",
         )
+    frames = _rename_conflicting_population_columns(frames, task.datasets, ctx)
 
     # Use the available join keys that exist in all frames
     join_keys = [k for k in task.join_on if all(k in f.columns for f in frames)]
