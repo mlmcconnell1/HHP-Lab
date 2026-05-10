@@ -374,6 +374,36 @@ def _weight_column_for_variety(variety: str | None) -> str | None:
     return _TRACT_MEDIATED_WEIGHT_COLUMNS[variety]
 
 
+def _resolve_transform_set_via(
+    step: ResampleStep,
+    *,
+    dataset_id: str,
+    year: int,
+) -> str:
+    """Resolve a year-banded transform selection for a resample step."""
+    if step.transform_set is None:
+        raise PlannerError(
+            f"Resample step for dataset '{dataset_id}' year {year} has no transform_set."
+        )
+
+    matching_segments = [
+        segment
+        for segment in step.transform_set.segments
+        if year in expand_year_spec(segment.years)
+    ]
+    if len(matching_segments) == 0:
+        raise PlannerError(
+            f"Resample step for dataset '{dataset_id}' transform_set has no "
+            f"segment covering year {year}."
+        )
+    if len(matching_segments) > 1:
+        raise PlannerError(
+            f"Resample step for dataset '{dataset_id}' transform_set has multiple "
+            f"segments covering year {year}."
+        )
+    return matching_segments[0].via
+
+
 # ---------------------------------------------------------------------------
 # Plan resolution
 # ---------------------------------------------------------------------------
@@ -416,7 +446,16 @@ def resolve_plan(recipe: RecipeV1, pipeline_id: str) -> ExecutionPlan:
 
                 transform_id: str | None = None
                 if step.method != "identity":
-                    if step.via == "auto":
+                    via = (
+                        _resolve_transform_set_via(
+                            step,
+                            dataset_id=step.dataset,
+                            year=year,
+                        )
+                        if step.transform_set is not None
+                        else step.via
+                    )
+                    if via == "auto":
                         transform_id = _resolve_auto_transform(
                             dataset_id=step.dataset,
                             year=year,
@@ -426,7 +465,7 @@ def resolve_plan(recipe: RecipeV1, pipeline_id: str) -> ExecutionPlan:
                             method=step.method,
                         )
                     else:
-                        transform_id = step.via
+                        transform_id = via
 
                 weighting_varieties = _transform_weighting_varieties(
                     recipe,

@@ -882,6 +882,46 @@ class MaterializeStep(BaseModel):
     transforms: list[str] = Field(..., description="Transform ids to ensure exist/materialized.")
 
 
+class TransformSetSegment(BaseModel):
+    """A time-banded transform selection for resample steps."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    years: YearSpec
+    via: str = Field(
+        ...,
+        description="Transform id, or 'auto', to use for this segment's years.",
+    )
+
+    @field_validator("via")
+    @classmethod
+    def _validate_via(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("TransformSetSegment.via must be non-empty.")
+        return value
+
+
+class TransformSetSpec(BaseModel):
+    """Year-banded transform resolution for allocate/aggregate resample steps."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    segments: list[TransformSetSegment] = Field(..., min_length=1)
+
+    @model_validator(mode="after")
+    def _validate_non_overlapping_segments(self) -> TransformSetSpec:
+        all_years: set[int] = set()
+        for seg in self.segments:
+            seg_years = set(expand_year_spec(seg.years))
+            overlap = all_years & seg_years
+            if overlap:
+                raise ValueError(
+                    f"TransformSetSpec segments overlap on years: {sorted(overlap)}."
+                )
+            all_years |= seg_years
+        return self
+
+
 class MeasureAggConfig(BaseModel):
     """Per-measure aggregation configuration."""
 
@@ -917,6 +957,14 @@ class ResampleStep(BaseModel):
         default=None,
         description="Transform id or 'auto' for allocate/aggregate.",
     )
+    transform_set: TransformSetSpec | None = Field(
+        default=None,
+        description=(
+            "Optional year-banded transform selection for allocate/aggregate. "
+            "Use when one resample step needs different transform ids across "
+            "analysis-year segments."
+        ),
+    )
     measures: dict[str, MeasureAggConfig] = Field(
         ...,
         description="Map of measure name → aggregation config.",
@@ -945,10 +993,18 @@ class ResampleStep(BaseModel):
 
     @model_validator(mode="after")
     def _validate_via_requirement(self) -> ResampleStep:
-        if self.method in ("allocate", "aggregate") and not self.via:
-            raise ValueError("ResampleStep.method in {allocate,aggregate} requires 'via'.")
-        if self.method == "identity" and self.via is not None:
-            raise ValueError("ResampleStep.method=identity must not set 'via'.")
+        has_via = self.via is not None
+        has_transform_set = self.transform_set is not None
+        if has_via and has_transform_set:
+            raise ValueError("ResampleStep may set either 'via' or 'transform_set', not both.")
+        if self.method in ("allocate", "aggregate") and not (has_via or has_transform_set):
+            raise ValueError(
+                "ResampleStep.method in {allocate,aggregate} requires 'via' or 'transform_set'."
+            )
+        if self.method == "identity" and (has_via or has_transform_set):
+            raise ValueError(
+                "ResampleStep.method=identity must not set 'via' or 'transform_set'."
+            )
         return self
 
     @property
@@ -1286,6 +1342,17 @@ class RecipeV1(BaseModel):
                             f"Pipeline '{p.id}' resample step references"
                             f" unknown transform '{step.via}'."
                         )
+                    if step.transform_set is not None:
+                        missing = [
+                            seg.via
+                            for seg in step.transform_set.segments
+                            if seg.via != "auto" and seg.via not in transform_id_set
+                        ]
+                        if missing:
+                            raise ValueError(
+                                f"Pipeline '{p.id}' resample transform_set references"
+                                f" unknown transforms: {missing}"
+                            )
 
                 elif isinstance(step, SmallAreaEstimateStep):
                     missing = [

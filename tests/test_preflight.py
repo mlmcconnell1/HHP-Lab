@@ -608,6 +608,83 @@ class TestRunPreflight:
         assert transform_findings[0].transform_id == "tract_to_coc"
         assert transform_findings[0].remediation is not None
 
+    def test_transform_set_missing_artifacts_are_reported_per_segment(self, tmp_path: Path):
+        data = _preflight_recipe(with_path=True, identity_only=True)
+        data["universe"] = {"range": "2019-2020"}
+        data["datasets"]["pit"]["years"] = "2019-2020"
+        data["datasets"]["acs"] = {
+            "provider": "census",
+            "product": "acs5",
+            "version": 1,
+            "native_geometry": {"type": "tract"},
+            "file_set": {
+                "path_template": "data/acs_{year}.parquet",
+                "segments": [
+                    {
+                        "years": {"range": "2010-2019"},
+                        "geometry": {"type": "tract", "vintage": 2010},
+                    },
+                    {
+                        "years": {"range": "2020-2024"},
+                        "geometry": {"type": "tract", "vintage": 2020},
+                    },
+                ],
+            },
+        }
+        data["transforms"] = [
+            {
+                "id": "tract2010_to_coc",
+                "type": "crosswalk",
+                "from": {"type": "tract", "vintage": 2010},
+                "to": {"type": "coc", "vintage": 2025},
+                "spec": {"weighting": {"scheme": "area"}},
+            },
+            {
+                "id": "tract2020_to_coc",
+                "type": "crosswalk",
+                "from": {"type": "tract", "vintage": 2020},
+                "to": {"type": "coc", "vintage": 2025},
+                "spec": {"weighting": {"scheme": "area"}},
+            },
+        ]
+        data["pipelines"][0]["steps"].insert(
+            1,
+            {
+                "resample": {
+                    "dataset": "acs",
+                    "to_geometry": {"type": "coc", "vintage": 2025},
+                    "method": "aggregate",
+                    "transform_set": {
+                        "segments": [
+                            {"years": {"range": "2010-2019"}, "via": "tract2010_to_coc"},
+                            {"years": {"range": "2020-2024"}, "via": "tract2020_to_coc"},
+                        ]
+                    },
+                    "measures": ["total_population"],
+                },
+            },
+        )
+        data["pipelines"][0]["steps"][-1]["join"]["datasets"] = ["pit", "acs"]
+        _setup_preflight_fixtures(tmp_path, include_xwalk=False, include_acs=False)
+        for year in (2019, 2020):
+            pd.DataFrame(
+                {
+                    "GEOID": ["T1"],
+                    "year": [year],
+                    "total_population": [100 + year],
+                }
+            ).to_parquet(tmp_path / "data" / f"acs_{year}.parquet")
+
+        recipe = load_recipe(data)
+        report = run_preflight(recipe, project_root=tmp_path)
+
+        transform_findings = [
+            finding.transform_id
+            for finding in report.findings
+            if finding.kind == FindingKind.MISSING_TRANSFORM
+        ]
+        assert set(transform_findings) == {"tract2010_to_coc", "tract2020_to_coc"}
+
     def test_msa_transform_missing_membership_is_actionable(self, tmp_path: Path):
         data = _msa_preflight_recipe()
         _setup_preflight_fixtures(tmp_path, include_xwalk=False, include_acs=False)

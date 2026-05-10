@@ -112,6 +112,25 @@ def _segmented_recipe() -> dict:
     }
 
 
+def _transform_set_segmented_recipe() -> dict:
+    """Recipe with explicit year-banded transform selection."""
+    data = _segmented_recipe()
+    data["universe"] = {"range": "2010-2024"}
+    data["datasets"]["acs"]["file_set"]["segments"][0]["years"] = {"range": "2010-2019"}
+    data["datasets"]["acs"]["file_set"]["segments"][1]["years"] = {"range": "2020-2024"}
+    data["datasets"]["pit"]["years"] = "2010-2024"
+
+    resample = data["pipelines"][0]["steps"][1]["resample"]
+    resample.pop("via")
+    resample["transform_set"] = {
+        "segments": [
+            {"years": {"range": "2010-2019"}, "via": "coc_to_tract_2010"},
+            {"years": {"range": "2020-2024"}, "via": "coc_to_tract_2020"},
+        ]
+    }
+    return data
+
+
 # ===========================================================================
 # Planner: dataset-year resolution
 # ===========================================================================
@@ -343,6 +362,42 @@ class TestPlannerAutoTransform:
             "renter_household_weight",
         ]
         assert [t.weighting_variety_count for t in pep_tasks] == [2, 2]
+
+
+class TestPlannerTransformSet:
+    def test_transform_set_resolves_expected_transform_per_year_band(self):
+        recipe = load_recipe(_transform_set_segmented_recipe())
+        plan = resolve_plan(recipe, "main")
+        acs_tasks = {
+            task.year: task
+            for task in plan.resample_tasks
+            if task.dataset_id == "acs"
+        }
+
+        for year in range(2010, 2020):
+            assert acs_tasks[year].transform_id == "coc_to_tract_2010"
+            assert acs_tasks[year].effective_geometry.vintage == 2010
+        for year in range(2020, 2025):
+            assert acs_tasks[year].transform_id == "coc_to_tract_2020"
+            assert acs_tasks[year].effective_geometry.vintage == 2020
+
+    def test_transform_set_supports_single_joined_panel_across_year_bands(self):
+        recipe = load_recipe(_transform_set_segmented_recipe())
+        plan = resolve_plan(recipe, "main")
+
+        assert len([task for task in plan.resample_tasks if task.dataset_id == "acs"]) == 15
+        assert len([task for task in plan.resample_tasks if task.dataset_id == "pit"]) == 15
+        assert sorted(task.year for task in plan.join_tasks) == list(range(2010, 2025))
+
+    def test_transform_set_reports_uncovered_year(self):
+        data = _transform_set_segmented_recipe()
+        data["pipelines"][0]["steps"][1]["resample"]["transform_set"]["segments"] = [
+            {"years": {"range": "2010-2019"}, "via": "coc_to_tract_2010"},
+        ]
+        recipe = load_recipe(data)
+
+        with pytest.raises(PlannerError, match="transform_set has no segment covering year 2020"):
+            resolve_plan(recipe, "main")
 
 
 # ===========================================================================

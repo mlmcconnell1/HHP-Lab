@@ -1127,6 +1127,74 @@ class TestViaAuto:
         assert recipe.pipelines[0].steps[1].via == "auto"
 
 
+class TestTransformSetSchema:
+    def test_transform_set_accepted_for_aggregate(self):
+        data = _recipe_with_file_set()
+        resample = data["pipelines"][0]["steps"][0]["resample"]
+        resample.pop("via")
+        resample["transform_set"] = {
+            "segments": [
+                {"years": {"range": "2015-2019"}, "via": "coc_to_tract_2010"},
+                {"years": {"range": "2020-2024"}, "via": "coc_to_tract_2020"},
+            ]
+        }
+
+        recipe = load_recipe(data)
+
+        step = recipe.pipelines[0].steps[0]
+        assert step.transform_set is not None
+        assert [segment.via for segment in step.transform_set.segments] == [
+            "coc_to_tract_2010",
+            "coc_to_tract_2020",
+        ]
+
+    def test_transform_set_and_via_are_mutually_exclusive(self):
+        data = _recipe_with_file_set()
+        data["pipelines"][0]["steps"][0]["resample"]["transform_set"] = {
+            "segments": [{"years": {"range": "2015-2024"}, "via": "coc_to_tract_2010"}]
+        }
+
+        with pytest.raises(RecipeLoadError, match="either 'via' or 'transform_set'"):
+            load_recipe(data)
+
+    def test_identity_rejects_transform_set(self):
+        data = _minimal_recipe()
+        resample = data["pipelines"][0]["steps"][1]
+        resample["method"] = "identity"
+        resample.pop("via")
+        resample["transform_set"] = {
+            "segments": [{"years": {"range": "2020-2022"}, "via": "coc_to_tract_2010"}]
+        }
+
+        with pytest.raises(RecipeLoadError, match="must not set 'via' or 'transform_set'"):
+            load_recipe(data)
+
+    def test_transform_set_rejects_unknown_transform(self):
+        data = _recipe_with_file_set()
+        resample = data["pipelines"][0]["steps"][0]["resample"]
+        resample.pop("via")
+        resample["transform_set"] = {
+            "segments": [{"years": {"range": "2015-2024"}, "via": "missing_transform"}]
+        }
+
+        with pytest.raises(RecipeLoadError, match="transform_set references unknown transforms"):
+            load_recipe(data)
+
+    def test_transform_set_rejects_overlapping_years(self):
+        data = _recipe_with_file_set()
+        resample = data["pipelines"][0]["steps"][0]["resample"]
+        resample.pop("via")
+        resample["transform_set"] = {
+            "segments": [
+                {"years": {"range": "2015-2020"}, "via": "coc_to_tract_2010"},
+                {"years": {"range": "2020-2024"}, "via": "coc_to_tract_2020"},
+            ]
+        }
+
+        with pytest.raises(RecipeLoadError, match="TransformSetSpec segments overlap"):
+            load_recipe(data)
+
+
 # ===========================================================================
 # join_on schema tests
 # ===========================================================================
