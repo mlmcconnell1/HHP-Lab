@@ -2,8 +2,8 @@
 #
 # The MSA selector_ids are the top 50 Census MSAs by 2024 resident population,
 # computed from Census PEP county population aggregated over Census MSA 2023
-# county membership. CoCs are kept when their 2025 boundary is fully contained
-# in one of those MSAs by area.
+# county membership. CoCs are kept when at least 99.5% of their 2025 boundary
+# area is contained in one of those MSAs.
 
 version: 1
 name: top50_msas_cocs_pit_pep_density_2010_2024
@@ -11,8 +11,9 @@ description: >
   Build a CoC panel for 2010-2024 with HUD PIT sheltered and unsheltered
   counts plus Census PEP county population allocated to 2025 CoC boundaries
   through tract-mediated decennial population weights. The panel is filtered to
-  CoCs fully contained in one of the top 50 Census MSAs by 2024 PEP population,
-  using Census MSA 2023 membership and 2025 CoC boundaries.
+  CoCs with at least 99.5% of their 2025 boundary area contained in one of the
+  top 50 Census MSAs by 2024 PEP population, using Census MSA 2023 membership
+  and 2025 CoC boundaries.
 
 universe:
   range: "2010-2024"
@@ -75,7 +76,7 @@ targets:
         - "13820"
         - "24340"
         - "25540"
-      min_share: 0.999999
+      min_share: 0.995
       denominator: candidate_area
       definition_version: census_msa_2023
     containment_filter:
@@ -132,7 +133,7 @@ targets:
         - "13820"
         - "24340"
         - "25540"
-      min_share: 0.999999
+      min_share: 0.995
       denominator: candidate_area
       definition_version: census_msa_2023
 
