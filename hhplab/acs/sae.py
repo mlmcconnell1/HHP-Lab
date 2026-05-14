@@ -166,6 +166,183 @@ def _assert_within_tolerance(
         )
 
 
+def acs1_imputation_source_columns(
+    specs: Iterable[ACS1ImputationMeasureSpec] = ACS1_IMPUTATION_MEASURE_SPECS,
+) -> list[str]:
+    """Return ACS1 target columns required by the requested imputation specs."""
+    return list(dict.fromkeys(column for spec in specs for column in spec.acs1_source_columns))
+
+
+def acs5_imputation_support_columns(
+    specs: Iterable[ACS1ImputationMeasureSpec] = ACS1_IMPUTATION_MEASURE_SPECS,
+) -> list[str]:
+    """Return ACS5 tract support columns required by requested imputation specs."""
+    return list(dict.fromkeys(column for spec in specs for column in spec.acs5_support_columns))
+
+
+def prepare_acs1_imputation_targets(
+    df: pd.DataFrame,
+    *,
+    specs: Iterable[ACS1ImputationMeasureSpec] = ACS1_IMPUTATION_MEASURE_SPECS,
+    target_id_col: str = "county_fips",
+    acs1_vintage: int | str | None = None,
+    target_geo_type: str = "county",
+) -> pd.DataFrame:
+    """Select and validate ACS1 target counts for generic imputation.
+
+    The adapter exposes count columns only. Rate measures declare numerator
+    and denominator count columns through their measure specs; percentages are
+    intentionally not accepted as substitutes.
+    """
+    spec_list = tuple(specs)
+    for spec in spec_list:
+        spec.validate()
+    if target_geo_type == "tract":
+        raise ValueError(
+            "ACS1 tract target data is not available from Census. Use a supported "
+            "ACS1 target geography such as county, place, or metro, or provide a "
+            "pre-materialized modeled tract artifact."
+        )
+
+    columns = acs1_imputation_source_columns(spec_list)
+    required = [target_id_col, *columns]
+    missing = [column for column in required if column not in df.columns]
+    if missing:
+        raise ValueError(
+            "ACS1 imputation target adapter is missing required count columns "
+            f"{missing}. For rate measures, provide numerator and denominator "
+            "counts separately; do not provide percentages only."
+        )
+
+    if acs1_vintage is None:
+        if "acs1_vintage" not in df.columns:
+            raise ValueError(
+                "ACS1 imputation target adapter requires acs1_vintage either as "
+                "an argument or as an input column."
+            )
+        vintages = sorted(df["acs1_vintage"].dropna().astype(str).unique())
+        if len(vintages) != 1:
+            raise ValueError(
+                "ACS1 imputation target adapter requires one acs1_vintage. "
+                f"Found vintages: {vintages}."
+            )
+        resolved_vintage = vintages[0]
+    else:
+        resolved_vintage = str(acs1_vintage)
+
+    result = pd.DataFrame(
+        {
+            target_id_col: df[target_id_col].astype("string"),
+            "target_geo_type": target_geo_type,
+            "target_geo_id": df[target_id_col].astype("string"),
+            "acs1_vintage": resolved_vintage,
+        }
+    )
+    for column in columns:
+        result[column] = pd.to_numeric(df[column], errors="coerce")
+        result.loc[result[column] < 0, column] = pd.NA
+        result[column] = result[column].astype("Float64")
+
+    if result[target_id_col].duplicated(keep=False).any():
+        duplicated = sorted(
+            result.loc[result[target_id_col].duplicated(keep=False), target_id_col]
+            .dropna()
+            .astype(str)
+            .unique()
+        )
+        raise ValueError(
+            f"ACS1 imputation target adapter requires one row per {target_id_col}. "
+            f"Duplicates: {duplicated}."
+        )
+
+    result = result.sort_values(target_id_col).reset_index(drop=True)
+    result.attrs["target_id_col"] = target_id_col
+    result.attrs["target_geo_type"] = target_geo_type
+    result.attrs["acs1_vintage"] = resolved_vintage
+    result.attrs["source_columns"] = columns
+    return result
+
+
+def prepare_acs5_imputation_support(
+    df: pd.DataFrame,
+    *,
+    specs: Iterable[ACS1ImputationMeasureSpec] = ACS1_IMPUTATION_MEASURE_SPECS,
+    target_id_col: str | None = "county_fips",
+    acs_vintage: int | str | None = None,
+    tract_vintage: int | str | None = None,
+) -> pd.DataFrame:
+    """Select and validate ACS5 tract support counts for generic imputation."""
+    spec_list = tuple(specs)
+    for spec in spec_list:
+        spec.validate()
+    columns = acs5_imputation_support_columns(spec_list)
+    required = ["tract_geoid", *columns]
+    if target_id_col is not None:
+        required.append(target_id_col)
+    missing = [column for column in required if column not in df.columns]
+    if missing:
+        raise ValueError(
+            "ACS5 imputation support adapter is missing required tract count "
+            f"columns {missing}. Build ACS5 tract support first, for example "
+            "`hhplab ingest acs-population --year YEAR`, then normalize SAE support."
+        )
+
+    support = pd.DataFrame({"tract_geoid": df["tract_geoid"].astype("string").str.zfill(11)})
+    if target_id_col is not None:
+        support[target_id_col] = df[target_id_col].astype("string")
+    support["county_fips"] = (
+        df["county_fips"].astype("string").str.zfill(5)
+        if "county_fips" in df.columns
+        else support["tract_geoid"].str.slice(0, 5)
+    )
+
+    if acs_vintage is None:
+        if "acs_vintage" not in df.columns:
+            raise ValueError(
+                "ACS5 imputation support adapter requires acs_vintage either as "
+                "an argument or as an input column."
+            )
+        resolved_acs_vintage = df["acs_vintage"].dropna().astype(str).unique()
+        if len(resolved_acs_vintage) != 1:
+            raise ValueError(
+                "ACS5 imputation support adapter requires one acs_vintage. "
+                f"Found vintages: {sorted(resolved_acs_vintage)}."
+            )
+        acs_vintage_value = resolved_acs_vintage[0]
+    else:
+        acs_vintage_value = str(acs_vintage)
+
+    if tract_vintage is None:
+        if "tract_vintage" not in df.columns:
+            raise ValueError(
+                "ACS5 imputation support adapter requires tract_vintage either as "
+                "an argument or as an input column."
+            )
+        resolved_tract_vintage = df["tract_vintage"].dropna().astype(str).unique()
+        if len(resolved_tract_vintage) != 1:
+            raise ValueError(
+                "ACS5 imputation support adapter requires one tract_vintage. "
+                f"Found vintages: {sorted(resolved_tract_vintage)}."
+            )
+        tract_vintage_value = resolved_tract_vintage[0]
+    else:
+        tract_vintage_value = str(tract_vintage)
+
+    support["acs_vintage"] = acs_vintage_value
+    support["tract_vintage"] = tract_vintage_value
+    for column in columns:
+        support[column] = pd.to_numeric(df[column], errors="coerce")
+        support.loc[support[column] < 0, column] = pd.NA
+        support[column] = support[column].astype("Float64")
+
+    support = support.sort_values("tract_geoid").reset_index(drop=True)
+    support.attrs["target_id_col"] = target_id_col
+    support.attrs["acs_vintage"] = acs_vintage_value
+    support.attrs["tract_vintage"] = tract_vintage_value
+    support.attrs["support_columns"] = columns
+    return support
+
+
 def build_sae_provenance(
     *,
     acs1_vintage: int | str,

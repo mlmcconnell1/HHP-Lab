@@ -12,12 +12,16 @@ from hhplab.acs.sae import (
     GROSS_RENT_BINS,
     HOUSEHOLD_INCOME_BINS,
     SAE_ALLOCATION_METHOD,
+    acs1_imputation_source_columns,
+    acs5_imputation_support_columns,
     allocate_acs1_county_to_tracts,
     build_sae_provenance,
     compare_sae_to_direct_counties,
     derive_sae_burden_measures,
     derive_sae_distribution_measures,
     impute_acs1_targets_to_tracts,
+    prepare_acs1_imputation_targets,
+    prepare_acs5_imputation_support,
     rollup_sae_tracts_to_geos,
     write_sae_parquet_with_provenance,
 )
@@ -270,6 +274,84 @@ def test_impute_acs1_targets_zero_denominator_rate_is_null() -> None:
     assert county_rows["acs1_imputed_poverty_universe"].isna().all()
     assert county_rows["acs1_imputed_poverty_rate"].isna().all()
     assert county_rows["acs1_imputation_zero_denominator_count"].tolist() == [1, 1]
+
+
+def test_imputation_adapters_expose_spec_required_columns() -> None:
+    assert acs1_imputation_source_columns(
+        (ACS1_IMPUTED_POVERTY_SPEC, ACS1_IMPUTED_TOTAL_HOUSEHOLDS_SPEC)
+    ) == ["population_below_poverty", "poverty_universe", "total_households"]
+    assert acs5_imputation_support_columns(
+        (ACS1_IMPUTED_POVERTY_SPEC, ACS1_IMPUTED_TOTAL_HOUSEHOLDS_SPEC)
+    ) == ["population_below_poverty", "poverty_universe", "total_households"]
+
+
+def test_prepare_acs1_imputation_targets_selects_count_columns_and_metadata() -> None:
+    result = prepare_acs1_imputation_targets(
+        ACS1_TARGETS,
+        specs=(ACS1_IMPUTED_POVERTY_SPEC, ACS1_IMPUTED_TOTAL_HOUSEHOLDS_SPEC),
+        target_geo_type="county",
+    )
+
+    assert list(result.columns) == [
+        "county_fips",
+        "target_geo_type",
+        "target_geo_id",
+        "acs1_vintage",
+        "population_below_poverty",
+        "poverty_universe",
+        "total_households",
+    ]
+    assert result.attrs["target_id_col"] == "county_fips"
+    assert result.attrs["target_geo_type"] == "county"
+    assert result.attrs["source_columns"] == [
+        "population_below_poverty",
+        "poverty_universe",
+        "total_households",
+    ]
+
+
+def test_prepare_acs1_imputation_targets_rejects_percent_only_rate_input() -> None:
+    targets = ACS1_TARGETS.drop(columns=["population_below_poverty"]).assign(
+        poverty_rate=0.1,
+    )
+
+    with pytest.raises(ValueError, match="numerator and denominator counts separately"):
+        prepare_acs1_imputation_targets(
+            targets,
+            specs=(ACS1_IMPUTED_POVERTY_SPEC,),
+            target_geo_type="county",
+        )
+
+
+def test_prepare_acs1_imputation_targets_rejects_direct_tract_targets() -> None:
+    with pytest.raises(ValueError, match="ACS1 tract target data is not available"):
+        prepare_acs1_imputation_targets(
+            ACS1_TARGETS,
+            specs=(ACS1_IMPUTED_POVERTY_SPEC,),
+            target_geo_type="tract",
+        )
+
+
+def test_prepare_acs5_imputation_support_selects_tract_counts() -> None:
+    result = prepare_acs5_imputation_support(
+        ACS5_IMPUTATION_SUPPORT,
+        specs=(ACS1_IMPUTED_POVERTY_SPEC, ACS1_IMPUTED_TOTAL_HOUSEHOLDS_SPEC),
+    )
+
+    assert list(result.columns) == [
+        "tract_geoid",
+        "county_fips",
+        "acs_vintage",
+        "tract_vintage",
+        "population_below_poverty",
+        "poverty_universe",
+        "total_households",
+    ]
+    assert result.attrs["support_columns"] == [
+        "population_below_poverty",
+        "poverty_universe",
+        "total_households",
+    ]
 
 
 def test_allocates_county_components_by_matching_tract_support_shares() -> None:
