@@ -148,9 +148,7 @@ ACS5_SAE_COUNT_COLUMNS: list[str] = [
     "tenure_income_renter_occupied_150000_plus",
 ]
 
-SAE_COMPONENT_COLUMNS: list[str] = [
-    f"sae_{column}" for column in ACS5_SAE_COUNT_COLUMNS
-]
+SAE_COMPONENT_COLUMNS: list[str] = [f"sae_{column}" for column in ACS5_SAE_COUNT_COLUMNS]
 
 SAE_DERIVED_MEASURE_COLUMNS: list[str] = [
     "sae_household_income_quintile_cutoff_20",
@@ -206,6 +204,50 @@ SAE_OUTPUT_COLUMNS: list[str] = [
     *SAE_LINEAGE_COLUMNS,
     *SAE_MEASURE_COLUMNS,
     *SAE_DIAGNOSTIC_COLUMNS,
+]
+
+ACS1_IMPUTATION_LINEAGE_COLUMNS: list[str] = [
+    "acs1_vintage_used",
+    "acs5_vintage_used",
+    "tract_vintage_used",
+    "acs1_imputation_method",
+    "acs1_imputation_denominator_source",
+    "acs1_imputation_crosswalk_id",
+]
+
+ACS1_IMPUTATION_FLAG_COLUMNS: list[str] = [
+    "is_modeled",
+    "is_synthetic",
+]
+
+ACS1_IMPUTATION_DIAGNOSTIC_COLUMNS: list[str] = [
+    "acs1_imputation_source_county_count",
+    "acs1_imputation_tract_count",
+    "acs1_imputation_zero_denominator_count",
+    "acs1_imputation_missing_support_count",
+    "acs1_imputation_validation_abs_diff",
+    "acs1_imputation_validation_rel_diff",
+]
+
+ACS1_IMPUTATION_MEASURE_COLUMNS: list[str] = [
+    "acs1_imputed_population_below_poverty",
+    "acs1_imputed_poverty_universe",
+    "acs1_imputed_poverty_rate",
+    "acs1_imputed_total_households",
+]
+
+ACS1_IMPUTATION_BASE_OUTPUT_COLUMNS: list[str] = [
+    "geo_type",
+    "geo_id",
+    "year",
+    *ACS1_IMPUTATION_LINEAGE_COLUMNS,
+    *ACS1_IMPUTATION_FLAG_COLUMNS,
+]
+
+ACS1_IMPUTATION_OUTPUT_COLUMNS: list[str] = [
+    *ACS1_IMPUTATION_BASE_OUTPUT_COLUMNS,
+    *ACS1_IMPUTATION_MEASURE_COLUMNS,
+    *ACS1_IMPUTATION_DIAGNOSTIC_COLUMNS,
 ]
 
 ACS5_COUNT_COLUMNS: list[str] = [

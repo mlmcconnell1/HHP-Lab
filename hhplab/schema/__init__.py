@@ -1,6 +1,12 @@
 """Canonical analysis schema contracts for HHP-Lab artifacts."""
 
 from hhplab.schema.columns import (
+    ACS1_IMPUTATION_BASE_OUTPUT_COLUMNS,
+    ACS1_IMPUTATION_DIAGNOSTIC_COLUMNS,
+    ACS1_IMPUTATION_FLAG_COLUMNS,
+    ACS1_IMPUTATION_LINEAGE_COLUMNS,
+    ACS1_IMPUTATION_MEASURE_COLUMNS,
+    ACS1_IMPUTATION_OUTPUT_COLUMNS,
     ACS1_MEASURE_COLUMNS,
     ACS5_COUNT_COLUMNS,
     ACS5_DERIVED_COLUMNS,
@@ -33,6 +39,7 @@ from hhplab.schema.columns import (
     ZORI_PROVENANCE_COLUMNS,
 )
 from hhplab.schema.contracts import (
+    ACS1_IMPUTATION_OUTPUT_CONTRACT,
     ACS_TRACT_CONTRACT,
     ARTIFACT_CONTRACTS,
     COC_PANEL_CONTRACT,
@@ -54,16 +61,35 @@ from hhplab.schema.lineage import (
     population_lineage_columns,
 )
 from hhplab.schema.measures import (
+    ACS1_IMPUTATION_MEASURE_SPECS,
+    ACS1_IMPUTATION_MEASURES,
+    ACS1_IMPUTATION_REQUIRED_ACS1_SOURCE_COLUMNS,
+    ACS1_IMPUTATION_REQUIRED_ACS5_SUPPORT_COLUMNS,
+    ACS1_IMPUTED_POVERTY_SPEC,
+    ACS1_IMPUTED_TOTAL_HOUSEHOLDS_SPEC,
     ACS1_MEASURES,
     ACS5_MEASURES,
     LAUS_MEASURES,
     PIT_MEASURES,
     SAE_MEASURES,
     TOTAL_POPULATION_MEASURE,
+    ACS1ImputationMeasureSpec,
     MeasureDefinition,
+    acs1_imputation_output_columns,
 )
 
 __all__ = [
+    "ACS1_IMPUTATION_BASE_OUTPUT_COLUMNS",
+    "ACS1_IMPUTATION_DIAGNOSTIC_COLUMNS",
+    "ACS1_IMPUTATION_FLAG_COLUMNS",
+    "ACS1_IMPUTATION_LINEAGE_COLUMNS",
+    "ACS1_IMPUTATION_MEASURE_COLUMNS",
+    "ACS1_IMPUTATION_MEASURES",
+    "ACS1_IMPUTATION_MEASURE_SPECS",
+    "ACS1_IMPUTATION_OUTPUT_COLUMNS",
+    "ACS1_IMPUTATION_OUTPUT_CONTRACT",
+    "ACS1_IMPUTATION_REQUIRED_ACS1_SOURCE_COLUMNS",
+    "ACS1_IMPUTATION_REQUIRED_ACS5_SUPPORT_COLUMNS",
     "ACS1_MEASURE_COLUMNS",
     "ACS5_COUNT_COLUMNS",
     "ACS5_DERIVED_COLUMNS",
@@ -75,6 +101,9 @@ __all__ = [
     "ARTIFACT_CONTRACTS",
     "ArtifactContract",
     "ACS1_MEASURES",
+    "ACS1_IMPUTED_POVERTY_SPEC",
+    "ACS1_IMPUTED_TOTAL_HOUSEHOLDS_SPEC",
+    "ACS1ImputationMeasureSpec",
     "ACS5_MEASURES",
     "COC_PANEL_COLUMNS",
     "COC_PANEL_CONTRACT",
@@ -118,4 +147,5 @@ __all__ = [
     "normalize_population_measure",
     "population_lineage_columns",
     "validate_artifact_contract",
+    "acs1_imputation_output_columns",
 ]

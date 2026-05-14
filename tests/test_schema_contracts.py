@@ -32,7 +32,16 @@ from hhplab.recipe.planner import ResampleTask
 from hhplab.recipe.recipe_schema import PanelPolicy
 from hhplab.recipe.schema_common import GeometryRef
 from hhplab.rents.zori_ingest import ZORI_INGEST_OUTPUT_COLUMNS as ZORI_INGEST_COLUMNS
-from hhplab.schema import SAE_OUTPUT_CONTRACT, validate_artifact_contract
+from hhplab.schema import (
+    ACS1_IMPUTATION_MEASURE_SPECS,
+    ACS1_IMPUTATION_OUTPUT_CONTRACT,
+    ACS1_IMPUTED_POVERTY_SPEC,
+    ACS1_IMPUTED_TOTAL_HOUSEHOLDS_SPEC,
+    SAE_OUTPUT_CONTRACT,
+    ACS1ImputationMeasureSpec,
+    acs1_imputation_output_columns,
+    validate_artifact_contract,
+)
 from hhplab.schema import columns as schema_columns
 from hhplab.schema.lineage import (
     PopulationLineage,
@@ -73,12 +82,142 @@ SCHEMA_ALIAS_CASES = {
     ),
 }
 
+ACS1_IMPUTATION_SPEC_CASES = {
+    "poverty_rate": ACS1_IMPUTED_POVERTY_SPEC,
+    "total_households": ACS1_IMPUTED_TOTAL_HOUSEHOLDS_SPEC,
+}
+
+ACS1_IMPUTATION_COMPLETE_ROW = {
+    column: pd.NA for column in schema_columns.ACS1_IMPUTATION_OUTPUT_COLUMNS
+} | {
+    "geo_type": "tract",
+    "geo_id": "08031001000",
+    "year": 2023,
+    "acs1_vintage_used": "2023",
+    "acs5_vintage_used": "2022",
+    "tract_vintage_used": "2020",
+    "acs1_imputation_method": "acs1_controlled_acs5_tract_share",
+    "acs1_imputation_denominator_source": "acs5_tract_support",
+    "acs1_imputation_crosswalk_id": "county_to_tract_2020",
+    "is_modeled": True,
+    "is_synthetic": True,
+    "acs1_imputed_population_below_poverty": 125.0,
+    "acs1_imputed_poverty_universe": 1000.0,
+    "acs1_imputed_poverty_rate": 0.125,
+    "acs1_imputed_total_households": 450.0,
+    "acs1_imputation_source_county_count": 1,
+    "acs1_imputation_tract_count": 24,
+    "acs1_imputation_zero_denominator_count": 0,
+    "acs1_imputation_missing_support_count": 0,
+    "acs1_imputation_validation_abs_diff": 0.0,
+    "acs1_imputation_validation_rel_diff": 0.0,
+}
+
 
 @pytest.mark.parametrize("case_name", list(SCHEMA_ALIAS_CASES), ids=list(SCHEMA_ALIAS_CASES))
 def test_source_schema_aliases_use_canonical_schema_constants(case_name: str) -> None:
     source_constant, schema_constant = SCHEMA_ALIAS_CASES[case_name]
 
     assert source_constant is schema_constant
+
+
+@pytest.mark.parametrize(
+    "case_name",
+    list(ACS1_IMPUTATION_SPEC_CASES),
+    ids=list(ACS1_IMPUTATION_SPEC_CASES),
+)
+def test_acs1_imputation_measure_specs_are_valid(case_name: str) -> None:
+    spec = ACS1_IMPUTATION_SPEC_CASES[case_name]
+
+    spec.validate()
+    assert spec.target_geo_type == "tract"
+    assert spec.provenance_columns == tuple(schema_columns.ACS1_IMPUTATION_LINEAGE_COLUMNS)
+    assert spec.modeled_flag_column in schema_columns.ACS1_IMPUTATION_FLAG_COLUMNS
+    assert spec.synthetic_flag_column in schema_columns.ACS1_IMPUTATION_FLAG_COLUMNS
+
+
+def test_acs1_imputation_rate_spec_declares_numerator_denominator_contract() -> None:
+    spec = ACS1_IMPUTED_POVERTY_SPEC
+
+    assert spec.value_kind == "rate"
+    assert spec.numerator_source_columns == ("population_below_poverty",)
+    assert spec.denominator_source_column == "poverty_universe"
+    assert spec.output_columns == (
+        "acs1_imputed_population_below_poverty",
+        "acs1_imputed_poverty_universe",
+        "acs1_imputed_poverty_rate",
+    )
+    assert spec.zero_denominator_policy == "null_rate"
+
+
+def test_acs1_imputation_count_spec_has_single_output_without_rate_fields() -> None:
+    spec = ACS1_IMPUTED_TOTAL_HOUSEHOLDS_SPEC
+
+    assert spec.value_kind == "count"
+    assert spec.output_columns == ("acs1_imputed_total_households",)
+    assert spec.numerator_source_columns == ()
+    assert spec.denominator_source_column is None
+    assert spec.zero_denominator_policy == "zero_count"
+
+
+def test_acs1_imputation_output_columns_are_declared_from_specs() -> None:
+    assert acs1_imputation_output_columns(ACS1_IMPUTATION_MEASURE_SPECS) == (
+        schema_columns.ACS1_IMPUTATION_OUTPUT_COLUMNS
+    )
+    assert len(schema_columns.ACS1_IMPUTATION_OUTPUT_COLUMNS) == len(
+        set(schema_columns.ACS1_IMPUTATION_OUTPUT_COLUMNS)
+    )
+
+
+def test_validate_acs1_imputation_output_contract_passes_for_complete_artifact() -> None:
+    findings = validate_artifact_contract(
+        pd.DataFrame([ACS1_IMPUTATION_COMPLETE_ROW]),
+        ACS1_IMPUTATION_OUTPUT_CONTRACT,
+    )
+
+    assert findings == []
+
+
+@pytest.mark.parametrize(
+    "missing_column",
+    [
+        "acs1_imputed_poverty_rate",
+        "is_synthetic",
+        "acs1_imputation_zero_denominator_count",
+    ],
+)
+def test_validate_acs1_imputation_output_contract_reports_missing_columns(
+    missing_column: str,
+) -> None:
+    row = dict(ACS1_IMPUTATION_COMPLETE_ROW)
+    del row[missing_column]
+
+    findings = validate_artifact_contract(
+        pd.DataFrame([row]),
+        ACS1_IMPUTATION_OUTPUT_CONTRACT,
+    )
+
+    assert [finding.code for finding in findings] == ["missing_required_column"]
+    assert findings[0].column == missing_column
+
+
+def test_acs1_imputation_rate_spec_requires_denominator_support() -> None:
+    spec = ACS1ImputationMeasureSpec(
+        name="bad_rate",
+        family="labor",
+        target_geo_type="tract",
+        value_kind="rate",
+        acs1_source_columns=("unemployed_count", "civilian_labor_force"),
+        acs5_support_columns=("unemployed_count",),
+        numerator_source_columns=("unemployed_count",),
+        denominator_source_column="civilian_labor_force",
+        numerator_output_column="acs1_imputed_unemployed_count",
+        denominator_output_column="acs1_imputed_civilian_labor_force",
+        output_column="acs1_imputed_unemployment_rate",
+    )
+
+    with pytest.raises(ValueError, match="denominator_source_column"):
+        spec.validate()
 
 
 def test_sae_schema_constants_define_outputs_lineage_and_diagnostics() -> None:

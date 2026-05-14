@@ -8,6 +8,7 @@ from typing import Literal
 import pandas as pd
 
 from hhplab.schema.columns import (
+    ACS1_IMPUTATION_OUTPUT_COLUMNS,
     ACS_TRACT_OUTPUT_COLUMNS,
     COC_PANEL_COLUMNS,
     DRIFT_PRONE_SOURCE_COLUMNS,
@@ -91,12 +92,19 @@ SAE_OUTPUT_CONTRACT = ArtifactContract(
     drift_prone_columns=(),
 )
 
+ACS1_IMPUTATION_OUTPUT_CONTRACT = ArtifactContract(
+    name="acs1_imputation_output",
+    required_columns=tuple(ACS1_IMPUTATION_OUTPUT_COLUMNS),
+    canonical_measures=tuple(
+        column for column in ACS1_IMPUTATION_OUTPUT_COLUMNS if column.startswith("acs1_imputed_")
+    ),
+    drift_prone_columns=(),
+)
+
 TRACT_MEDIATED_COUNTY_XWALK_CONTRACT = ArtifactContract(
     name="tract_mediated_county_xwalk",
     required_columns=tuple(
-        column
-        for column in TRACT_MEDIATED_COUNTY_XWALK_COLUMNS
-        if column != "geo_id"
+        column for column in TRACT_MEDIATED_COUNTY_XWALK_COLUMNS if column != "geo_id"
     ),
     required_any_columns=(("geo_id", "coc_id", "metro_id", "msa_id"),),
 )
@@ -105,6 +113,7 @@ ARTIFACT_CONTRACTS: dict[str, ArtifactContract] = {
     contract.name: contract
     for contract in (
         ACS_TRACT_CONTRACT,
+        ACS1_IMPUTATION_OUTPUT_CONTRACT,
         COC_PANEL_CONTRACT,
         LAUS_METRO_CONTRACT,
         PEP_COUNTY_CONTRACT,
@@ -171,9 +180,7 @@ def validate_artifact_contract(
     for measure in contract.lineage_measures:
         if measure not in columns:
             continue
-        missing = [
-            col for col in population_lineage_columns(measure) if col not in columns
-        ]
+        missing = [col for col in population_lineage_columns(measure) if col not in columns]
         if missing:
             findings.append(
                 ContractFinding(
