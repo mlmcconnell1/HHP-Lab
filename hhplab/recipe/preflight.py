@@ -466,10 +466,11 @@ def _dataset_remediation(ds_id: str, ds, *, years: list[int] | None = None) -> R
         return Remediation(
             hint=(
                 f"Dataset '{ds_id}' requests ACS1 tract poverty artifacts, but "
-                "Census ACS 1-year subject tables S1701/S1702 are not published "
-                "at tract geography through the standard Census API. Use ACS5 "
-                "tract poverty, a county/PUMA fallback, or provide vetted "
-                "non-API tract artifacts with counts and poverty universes. "
+                "direct Census ACS 1-year tract poverty tables are not published "
+                "through the standard Census API. Build or provide the modeled "
+                "acs1_poverty_tracts artifact from an ACS1 imputation target "
+                "dataset plus ACS5 tract support; downstream recipes can then "
+                "aggregate imputed poverty counts/universes and recompute rates. "
                 f"{unavailable_note}"
             ),
             command=None,
@@ -1550,6 +1551,32 @@ def _check_dataset_schemas(
                     kind=FindingKind.MISSING_MEASURE,
                     message=(
                         f"Dataset '{task.dataset_id}' ({task.input_path}): {measure_result.message}"
+                    ),
+                    dataset_id=task.dataset_id,
+                )
+            )
+        derived_required_columns = sorted(
+            {
+                str(config[column])
+                for config in (task.derived_measures or {}).values()
+                for column in ("source_rate_column", "denominator_column")
+                if config.get(column) is not None
+            }
+        )
+        derived_missing = [
+            column
+            for column in derived_required_columns
+            if column not in columns
+        ]
+        if derived_missing:
+            findings.append(
+                PreflightFinding(
+                    severity=Severity.ERROR,
+                    kind=FindingKind.MISSING_MEASURE,
+                    message=(
+                        f"Dataset '{task.dataset_id}' ({task.input_path}): "
+                        "derived measures require missing source column(s): "
+                        f"{derived_missing}"
                     ),
                     dataset_id=task.dataset_id,
                 )

@@ -9,6 +9,7 @@ the orchestration glue that picks the right helper.
 
 from __future__ import annotations
 
+import json
 import warnings
 
 import numpy as np
@@ -33,6 +34,10 @@ from hhplab.recipe.executor_inputs import (
 )
 from hhplab.recipe.planner import ResampleTask
 from hhplab.recipe.probes import get_weighted_transform_requirements
+from hhplab.schema.columns import (
+    ACS1_IMPUTATION_FLAG_COLUMNS,
+    ACS1_IMPUTATION_LINEAGE_COLUMNS,
+)
 
 # Maps geometry types to the column name used as join key in crosswalks.
 _XWALK_JOIN_KEYS: dict[str, str] = {
@@ -92,6 +97,11 @@ _XWALK_NON_GEO_COLS: set[str] = {
     "missing_household_tract_count",
     "missing_renter_household_tract_count",
 }
+
+_ACS1_IMPUTATION_PASSTHROUGH_COLUMNS: tuple[str, ...] = (
+    *ACS1_IMPUTATION_LINEAGE_COLUMNS,
+    *ACS1_IMPUTATION_FLAG_COLUMNS,
+)
 
 
 def _detect_xwalk_target_col(
@@ -220,7 +230,12 @@ def _resample_identity(
     geo_col = _resolve_geo_column(df, task.geo_column)
     _validate_columns(df, task.measures, task.dataset_id, task.year)
 
-    cols = [geo_col] + task.measures
+    passthrough_cols = [
+        column
+        for column in _ACS1_IMPUTATION_PASSTHROUGH_COLUMNS
+        if column in df.columns and column not in task.measures
+    ]
+    cols = [geo_col] + task.measures + passthrough_cols
     if (
         task.year_column == "acs1_vintage"
         and task.year_column in df.columns
@@ -235,6 +250,47 @@ def _resample_identity(
     if geo_col != "geo_id":
         result = result.rename(columns={geo_col: "geo_id"})
     return result
+
+
+def _metadata_value(series: pd.Series) -> object:
+    values = sorted(series.dropna().astype(str).unique())
+    if not values:
+        return None
+    if len(values) == 1:
+        return values[0]
+    return json.dumps(values)
+
+
+def _flag_value(series: pd.Series) -> object:
+    nonmissing = series.dropna()
+    if nonmissing.empty:
+        return None
+    return bool(nonmissing.astype(bool).any())
+
+
+def _aggregate_acs1_imputation_passthrough(
+    merged: pd.DataFrame,
+    *,
+    target_col: str,
+) -> pd.DataFrame | None:
+    columns = [
+        column
+        for column in _ACS1_IMPUTATION_PASSTHROUGH_COLUMNS
+        if column in merged.columns
+    ]
+    if not columns:
+        return None
+
+    rows: list[dict[str, object]] = []
+    for geo_id, group in merged.groupby(target_col):
+        row: dict[str, object] = {target_col: geo_id}
+        for column in columns:
+            if column in ACS1_IMPUTATION_FLAG_COLUMNS:
+                row[column] = _flag_value(group[column])
+            else:
+                row[column] = _metadata_value(group[column])
+        rows.append(row)
+    return pd.DataFrame(rows)
 
 
 def _resample_aggregate(
@@ -391,6 +447,13 @@ def _resample_aggregate(
                 )
             derived_rows.append(row)
         result_parts.append(pd.DataFrame(derived_rows))
+
+    passthrough_part = _aggregate_acs1_imputation_passthrough(
+        merged,
+        target_col=target_col,
+    )
+    if passthrough_part is not None:
+        result_parts.append(passthrough_part)
 
     # Merge all result parts on target column
     result = result_parts[0]

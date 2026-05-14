@@ -4494,6 +4494,26 @@ class TestResampleAggregate:
                 "year": [2020, 2020, 2020],
                 "poverty_universe_individuals_acs1": [100.0, 50.0, 200.0],
                 "poverty_rate_individuals_acs1": [0.20, 0.60, 0.10],
+                "acs1_vintage_used": ["2020", "2020", "2020"],
+                "acs5_vintage_used": ["2016-2020", "2016-2020", "2016-2020"],
+                "tract_vintage_used": ["2020", "2020", "2020"],
+                "acs1_imputation_method": [
+                    "acs1_controlled_acs5_tract_share",
+                    "acs1_controlled_acs5_tract_share",
+                    "acs1_controlled_acs5_tract_share",
+                ],
+                "acs1_imputation_denominator_source": [
+                    "acs5_tract_support",
+                    "acs5_tract_support",
+                    "acs5_tract_support",
+                ],
+                "acs1_imputation_crosswalk_id": [
+                    "county_to_tract",
+                    "county_to_tract",
+                    "county_to_tract",
+                ],
+                "is_modeled": [True, True, True],
+                "is_synthetic": [True, True, True],
             }
         ).to_parquet(ds_path)
 
@@ -4536,6 +4556,13 @@ class TestResampleAggregate:
         )
         assert df.loc["COC1", "poverty_rate_individuals_acs1"] == pytest.approx(31.0 / 105.0)
         assert df.loc["COC2", "poverty_rate_individuals_acs1"] == pytest.approx(0.10)
+        assert df.loc["COC1", "acs1_vintage_used"] == "2020"
+        assert df.loc["COC1", "acs5_vintage_used"] == "2016-2020"
+        assert df.loc["COC1", "acs1_imputation_method"] == "acs1_controlled_acs5_tract_share"
+        assert df.loc["COC1", "acs1_imputation_denominator_source"] == "acs5_tract_support"
+        assert df.loc["COC1", "acs1_imputation_crosswalk_id"] == "county_to_tract"
+        assert bool(df.loc["COC1", "is_modeled"]) is True
+        assert bool(df.loc["COC1", "is_synthetic"]) is True
 
     def test_measures_list_backward_compat(self, tmp_path: Path):
         """Old list format (measures: [a, b] + aggregation: sum) still works."""

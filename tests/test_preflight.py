@@ -454,6 +454,65 @@ def _setup_preflight_fixtures(
         }).to_parquet(acs_path)
 
 
+def _acs1_poverty_preflight_recipe() -> dict:
+    return {
+        "version": 1,
+        "name": "acs1-poverty-preflight",
+        "universe": {"years": [2021]},
+        "targets": [
+            {"id": "coc_panel", "geometry": {"type": "coc", "vintage": 2025}},
+        ],
+        "datasets": {
+            "acs1_poverty": {
+                "provider": "census",
+                "product": "acs1_poverty",
+                "version": 1,
+                "native_geometry": {"type": "tract", "vintage": 2020},
+                "path": "data/curated/acs/acs1_poverty_tracts__A2021xT2020.parquet",
+                "geo_column": "tract_geoid",
+            },
+        },
+        "transforms": [
+            {
+                "id": "tract_to_coc",
+                "type": "crosswalk",
+                "from": {"type": "tract", "vintage": 2020},
+                "to": {"type": "coc", "vintage": 2025},
+                "spec": {"weighting": {"scheme": "area"}},
+            },
+        ],
+        "pipelines": [
+            {
+                "id": "main",
+                "target": "coc_panel",
+                "steps": [
+                    {"kind": "materialize", "transforms": ["tract_to_coc"]},
+                    {
+                        "kind": "resample",
+                        "dataset": "acs1_poverty",
+                        "to_geometry": {"type": "coc", "vintage": 2025},
+                        "method": "aggregate",
+                        "via": "tract_to_coc",
+                        "measures": {
+                            "acs1_imputed_poverty_universe": {"aggregation": "sum"},
+                        },
+                        "derived_measures": {
+                            "acs1_imputed_poverty_rate": {
+                                "source_rate_column": "acs1_imputed_poverty_rate",
+                                "denominator_column": "acs1_imputed_poverty_universe",
+                                "numerator_output_column": (
+                                    "acs1_imputed_population_below_poverty"
+                                ),
+                            },
+                        },
+                    },
+                    {"kind": "join", "datasets": ["acs1_poverty"]},
+                ],
+            }
+        ],
+    }
+
+
 def _msa_preflight_recipe() -> dict:
     """Return a recipe dict with a CoC-to-MSA transform."""
     return {
@@ -788,6 +847,51 @@ class TestRunPreflight:
         ]
         assert len(ds_findings) >= 1
         assert ds_findings[0].dataset_id == "pit"
+
+    def test_missing_acs1_poverty_artifact_points_to_modeled_imputation(
+        self,
+        tmp_path: Path,
+    ):
+        data = _acs1_poverty_preflight_recipe()
+        _setup_preflight_fixtures(tmp_path, include_pit=False, include_acs=False)
+
+        recipe = load_recipe(data)
+        report = run_preflight(recipe, project_root=tmp_path)
+
+        findings = [
+            f for f in report.findings
+            if f.kind == FindingKind.MISSING_DATASET
+            and f.dataset_id == "acs1_poverty"
+        ]
+        assert len(findings) == 1
+        assert findings[0].remediation is not None
+        assert "modeled acs1_poverty_tracts artifact" in findings[0].remediation.hint.lower()
+        assert "acs1 imputation target" in findings[0].remediation.hint.lower()
+        assert "acs5 tract support" in findings[0].remediation.hint.lower()
+
+    def test_preflight_checks_acs1_poverty_derived_rate_inputs(self, tmp_path: Path):
+        data = _acs1_poverty_preflight_recipe()
+        _setup_preflight_fixtures(tmp_path, include_pit=False, include_acs=False)
+        path = tmp_path / "data" / "curated" / "acs" / "acs1_poverty_tracts__A2021xT2020.parquet"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        pd.DataFrame({
+            "tract_geoid": ["T1"],
+            "year": [2021],
+            "acs1_imputed_poverty_universe": [100.0],
+        }).to_parquet(path)
+
+        recipe = load_recipe(data)
+        report = run_preflight(recipe, project_root=tmp_path)
+
+        findings = [
+            f for f in report.findings
+            if f.kind == FindingKind.MISSING_MEASURE
+            and f.dataset_id == "acs1_poverty"
+        ]
+        assert any(
+            "acs1_imputed_poverty_rate" in finding.message
+            for finding in findings
+        )
 
     def test_map_target_missing_coc_boundary_is_actionable(self, tmp_path: Path):
         data = _map_preflight_recipe(
