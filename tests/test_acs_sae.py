@@ -15,6 +15,8 @@ from hhplab.acs.sae import (
     acs1_imputation_source_columns,
     acs5_imputation_support_columns,
     allocate_acs1_county_to_tracts,
+    build_acs1_poverty_tract_artifact,
+    build_acs1_poverty_tracts_provenance,
     build_sae_provenance,
     compare_sae_to_direct_counties,
     derive_sae_burden_measures,
@@ -23,6 +25,7 @@ from hhplab.acs.sae import (
     prepare_acs1_imputation_targets,
     prepare_acs5_imputation_support,
     rollup_sae_tracts_to_geos,
+    write_acs1_poverty_tract_artifact,
     write_sae_parquet_with_provenance,
 )
 from hhplab.provenance import read_provenance
@@ -352,6 +355,73 @@ def test_prepare_acs5_imputation_support_selects_tract_counts() -> None:
         "poverty_universe",
         "total_households",
     ]
+
+
+def test_build_acs1_poverty_tract_artifact_uses_poverty_spec_only() -> None:
+    result = build_acs1_poverty_tract_artifact(
+        ACS1_TARGETS,
+        ACS5_IMPUTATION_SUPPORT,
+        year=2023,
+    )
+
+    assert "acs1_imputed_population_below_poverty" in result.columns
+    assert "acs1_imputed_poverty_universe" in result.columns
+    assert "acs1_imputed_poverty_rate" in result.columns
+    assert "acs1_imputed_total_households" not in result.columns
+    assert result.attrs["artifact_family"] == "acs1_poverty_tracts"
+    assert result.attrs["measure_specs"] == ["poverty_rate"]
+
+    allocated = result.groupby("county_fips")[
+        ["acs1_imputed_population_below_poverty", "acs1_imputed_poverty_universe"]
+    ].sum()
+    assert allocated.loc["08031", "acs1_imputed_population_below_poverty"] == pytest.approx(100.0)
+    assert allocated.loc["08031", "acs1_imputed_poverty_universe"] == pytest.approx(1000.0)
+    assert allocated.loc["08059", "acs1_imputed_population_below_poverty"] == pytest.approx(50.0)
+    assert allocated.loc["08059", "acs1_imputed_poverty_universe"] == pytest.approx(200.0)
+
+
+def test_build_acs1_poverty_tract_artifact_handles_zero_denominator() -> None:
+    support = ACS5_IMPUTATION_SUPPORT.copy()
+    support.loc[support["county_fips"] == "08031", "poverty_universe"] = 0
+
+    result = build_acs1_poverty_tract_artifact(
+        ACS1_TARGETS,
+        support,
+        year=2023,
+    )
+
+    county_rows = result[result["county_fips"] == "08031"]
+    assert county_rows["acs1_imputed_poverty_universe"].isna().all()
+    assert county_rows["acs1_imputed_poverty_rate"].isna().all()
+    assert county_rows["acs1_imputation_zero_denominator_count"].tolist() == [1, 1]
+
+
+def test_build_acs1_poverty_tract_artifact_handles_partial_crosswalk_coverage() -> None:
+    result = build_acs1_poverty_tract_artifact(
+        ACS1_TARGETS,
+        CROSSWALK_IMPUTATION_SUPPORT,
+        year=2023,
+        tract_crosswalk=TRACT_TO_COUNTY_SPLIT,
+        crosswalk_id="tract2020_to_county_split",
+    )
+
+    split_rows = result[result["tract_geoid"] == "08031001100"].sort_values("county_fips")
+    county_31 = split_rows.iloc[0]
+    county_59 = split_rows.iloc[1]
+
+    assert county_31["acs1_imputed_population_below_poverty"] == pytest.approx(53.8461538462)
+    assert county_31["acs1_imputed_poverty_universe"] == pytest.approx(538.4615384615)
+    assert county_59["acs1_imputed_population_below_poverty"] == pytest.approx(20.5882352941)
+    assert county_59["acs1_imputed_poverty_universe"] == pytest.approx(127.2727272727)
+    assert set(result["acs1_imputation_crosswalk_id"]) == {"tract2020_to_county_split"}
+
+    allocated = result.groupby("county_fips")[
+        ["acs1_imputed_population_below_poverty", "acs1_imputed_poverty_universe"]
+    ].sum()
+    assert allocated.loc["08031", "acs1_imputed_population_below_poverty"] == pytest.approx(100.0)
+    assert allocated.loc["08031", "acs1_imputed_poverty_universe"] == pytest.approx(1000.0)
+    assert allocated.loc["08059", "acs1_imputed_population_below_poverty"] == pytest.approx(50.0)
+    assert allocated.loc["08059", "acs1_imputed_poverty_universe"] == pytest.approx(200.0)
 
 
 def test_allocates_county_components_by_matching_tract_support_shares() -> None:
@@ -975,6 +1045,65 @@ def test_builds_sae_provenance_with_lineage_fields() -> None:
     assert provenance.extra["requested_measures"] == ["rent_burden"]
     assert provenance.extra["derived_output_columns"] == ["sae_rent_burden_30_plus"]
     assert provenance.extra["diagnostics_summary"] == {"max_residual": 0.0}
+
+
+def test_builds_acs1_poverty_tracts_provenance() -> None:
+    provenance = build_acs1_poverty_tracts_provenance(
+        acs1_vintage=2023,
+        acs5_vintage="2019-2023",
+        tract_vintage=2020,
+        target_geo_type="county",
+        target_vintage=2025,
+        target_id_col="county_fips",
+        crosswalk_id="tract2020_to_county_split",
+        source_dataset_path="data/curated/acs/acs1_county__A2023.parquet",
+        support_dataset_path="data/curated/acs/acs5_tracts__A2023xT2020.parquet",
+        crosswalk_path="data/curated/xwalks/county_to_tract.parquet",
+        output_row_count=3,
+    )
+
+    assert provenance.geo_type == "tract"
+    assert provenance.acs_vintage == "2023"
+    assert provenance.tract_vintage == "2020"
+    assert provenance.boundary_vintage == "2025"
+    assert provenance.extra["dataset"] == "acs1_poverty_tracts"
+    assert provenance.extra["acs5_terminal_vintage"] == "2019-2023"
+    assert provenance.extra["allocation_method"] == ACS1_IMPUTATION_METHOD
+    assert provenance.extra["requested_measures"] == ["poverty_rate"]
+    assert provenance.extra["derived_output_columns"] == [
+        "acs1_imputed_population_below_poverty",
+        "acs1_imputed_poverty_universe",
+        "acs1_imputed_poverty_rate",
+    ]
+    assert provenance.extra["output_row_count"] == 3
+
+
+def test_writes_acs1_poverty_tract_artifact_with_embedded_provenance(tmp_path) -> None:
+    artifact = build_acs1_poverty_tract_artifact(
+        ACS1_TARGETS,
+        ACS5_IMPUTATION_SUPPORT,
+        year=2023,
+    )
+
+    returned = write_acs1_poverty_tract_artifact(
+        artifact,
+        acs1_vintage=2023,
+        acs5_vintage="2019-2023",
+        tract_vintage=2020,
+        target_geo_type="county",
+        base_dir=tmp_path,
+    )
+
+    expected = tmp_path / "curated" / "acs" / "acs1_poverty_tracts__A2023xT2020.parquet"
+    provenance = read_provenance(returned)
+    written = pd.read_parquet(returned)
+
+    assert returned == expected
+    assert provenance is not None
+    assert provenance.extra["dataset"] == "acs1_poverty_tracts"
+    assert provenance.extra["output_row_count"] == len(artifact)
+    assert "acs1_imputed_total_households" not in written.columns
+    assert written["is_modeled"].unique().tolist() == [True]
 
 
 def test_writes_sae_parquet_with_embedded_provenance(tmp_path) -> None:

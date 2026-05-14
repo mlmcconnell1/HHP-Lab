@@ -9,16 +9,23 @@ from typing import Any
 
 import pandas as pd
 
+from hhplab import naming
 from hhplab.acs.variables import ACS5_SAE_SUPPORT_COLUMNS
 from hhplab.acs.variables_acs1 import ACS1_SAE_SOURCE_COLUMNS
 from hhplab.provenance import ProvenanceBlock, write_parquet_with_provenance
+from hhplab.schema.contracts import ArtifactContract, validate_artifact_contract
 from hhplab.schema.measures import (
     ACS1_IMPUTATION_MEASURE_SPECS,
+    ACS1_IMPUTED_POVERTY_SPEC,
     ACS1ImputationMeasureSpec,
+    acs1_imputation_output_columns,
 )
 
 SAE_ALLOCATION_METHOD = "tract_share_within_county"
 ACS1_IMPUTATION_METHOD = "acs1_controlled_acs5_tract_share"
+ACS1_POVERTY_IMPUTATION_MEASURE_SPECS: tuple[ACS1ImputationMeasureSpec, ...] = (
+    ACS1_IMPUTED_POVERTY_SPEC,
+)
 
 RENTER_BURDEN_30_PLUS_COLUMNS: tuple[str, ...] = (
     "sae_gross_rent_pct_income_30_to_34_9",
@@ -404,6 +411,220 @@ def build_sae_provenance(
     )
     provenance.notation = provenance.generate_notation()
     return provenance
+
+
+def build_acs1_poverty_tracts_provenance(
+    *,
+    acs1_vintage: int | str,
+    acs5_vintage: int | str,
+    tract_vintage: int | str,
+    target_geo_type: str,
+    target_vintage: int | str | None = None,
+    target_id_col: str = "county_fips",
+    crosswalk_id: str | None = None,
+    source_dataset_path: str | Path | None = None,
+    support_dataset_path: str | Path | None = None,
+    crosswalk_path: str | Path | None = None,
+    output_row_count: int | None = None,
+) -> ProvenanceBlock:
+    """Build embedded provenance for an ACS1-imputed tract poverty artifact."""
+    extra: dict[str, Any] = {
+        "dataset": "acs1_poverty_tracts",
+        "acs_product": "acs1",
+        "acs1_vintage": str(acs1_vintage),
+        "acs5_terminal_vintage": str(acs5_vintage),
+        "target_geo_type": target_geo_type,
+        "target_id_col": target_id_col,
+        "allocation_method": ACS1_IMPUTATION_METHOD,
+        "denominator_source": "acs5_tract_support",
+        "requested_measures": [spec.name for spec in ACS1_POVERTY_IMPUTATION_MEASURE_SPECS],
+        "derived_output_columns": list(
+            dict.fromkeys(
+                column
+                for spec in ACS1_POVERTY_IMPUTATION_MEASURE_SPECS
+                for column in spec.output_columns
+            )
+        ),
+    }
+    optional_extra = {
+        "target_vintage": None if target_vintage is None else str(target_vintage),
+        "crosswalk_id": crosswalk_id,
+        "source_dataset_path": None if source_dataset_path is None else str(source_dataset_path),
+        "support_dataset_path": None if support_dataset_path is None else str(support_dataset_path),
+        "crosswalk_path": None if crosswalk_path is None else str(crosswalk_path),
+        "output_row_count": output_row_count,
+    }
+    extra.update({key: value for key, value in optional_extra.items() if value is not None})
+
+    provenance = ProvenanceBlock(
+        boundary_vintage=None if target_vintage is None else str(target_vintage),
+        tract_vintage=str(tract_vintage),
+        acs_vintage=str(acs1_vintage),
+        weighting=ACS1_IMPUTATION_METHOD,
+        geo_type="tract",
+        extra=extra,
+    )
+    provenance.notation = provenance.generate_notation()
+    return provenance
+
+
+def _single_metadata_value(
+    df: pd.DataFrame,
+    *,
+    attr_name: str,
+    column_name: str,
+    label: str,
+) -> str:
+    value = df.attrs.get(attr_name)
+    if value is not None:
+        return str(value)
+    if column_name not in df.columns:
+        raise ValueError(f"{label} requires {column_name} either as metadata or as a column.")
+    values = sorted(df[column_name].dropna().astype(str).unique())
+    if len(values) != 1:
+        raise ValueError(f"{label} requires one {column_name}. Found values: {values}.")
+    return values[0]
+
+
+def build_acs1_poverty_tract_artifact(
+    acs1_targets: pd.DataFrame,
+    acs5_tract_support: pd.DataFrame,
+    *,
+    target_id_col: str = "county_fips",
+    target_geo_type: str = "county",
+    year: int | str | None = None,
+    tract_crosswalk: pd.DataFrame | None = None,
+    share_column: str = "area_share",
+    crosswalk_id: str | None = None,
+    acs1_vintage: int | str | None = None,
+    acs5_vintage: int | str | None = None,
+    tract_vintage: int | str | None = None,
+) -> pd.DataFrame:
+    """Build an ACS1-imputed tract poverty artifact from target and tract inputs."""
+    targets = prepare_acs1_imputation_targets(
+        acs1_targets,
+        specs=ACS1_POVERTY_IMPUTATION_MEASURE_SPECS,
+        target_id_col=target_id_col,
+        acs1_vintage=acs1_vintage,
+        target_geo_type=target_geo_type,
+    )
+    support = prepare_acs5_imputation_support(
+        acs5_tract_support,
+        specs=ACS1_POVERTY_IMPUTATION_MEASURE_SPECS,
+        target_id_col=None if tract_crosswalk is not None else target_id_col,
+        acs_vintage=acs5_vintage,
+        tract_vintage=tract_vintage,
+    )
+    if tract_crosswalk is not None and target_id_col in support.columns:
+        support = support.drop(columns=[target_id_col])
+    artifact = impute_acs1_targets_to_tracts(
+        targets,
+        support,
+        specs=ACS1_POVERTY_IMPUTATION_MEASURE_SPECS,
+        target_id_col=target_id_col,
+        target_geo_type=target_geo_type,
+        year=year,
+        tract_crosswalk=tract_crosswalk,
+        share_column=share_column,
+        crosswalk_id=crosswalk_id,
+    )
+    artifact.attrs["artifact_family"] = "acs1_poverty_tracts"
+    artifact.attrs["measure_specs"] = [spec.name for spec in ACS1_POVERTY_IMPUTATION_MEASURE_SPECS]
+    return artifact
+
+
+def write_acs1_poverty_tract_artifact(
+    artifact: pd.DataFrame,
+    path: str | Path | None = None,
+    *,
+    acs1_vintage: int | str | None = None,
+    acs5_vintage: int | str | None = None,
+    tract_vintage: int | str | None = None,
+    target_geo_type: str = "county",
+    target_vintage: int | str | None = None,
+    target_id_col: str = "county_fips",
+    crosswalk_id: str | None = None,
+    source_dataset_path: str | Path | None = None,
+    support_dataset_path: str | Path | None = None,
+    crosswalk_path: str | Path | None = None,
+    base_dir: Path | str | None = None,
+) -> Path:
+    """Write an ACS1-imputed tract poverty artifact to its canonical Parquet path."""
+    required_columns = tuple(
+        acs1_imputation_output_columns(ACS1_POVERTY_IMPUTATION_MEASURE_SPECS)
+    )
+    contract = ArtifactContract(
+        name="acs1_poverty_tracts",
+        required_columns=required_columns,
+        canonical_measures=tuple(
+            column
+            for spec in ACS1_POVERTY_IMPUTATION_MEASURE_SPECS
+            for column in spec.output_columns
+        ),
+        drift_prone_columns=(),
+    )
+    findings = validate_artifact_contract(artifact, contract)
+    errors = [finding for finding in findings if finding.severity == "error"]
+    if errors:
+        missing = [finding.column for finding in errors]
+        raise ValueError(
+            "ACS1 poverty tract artifact is missing required columns "
+            f"{missing}. Build it with build_acs1_poverty_tract_artifact first."
+        )
+
+    resolved_acs1_vintage = (
+        str(acs1_vintage)
+        if acs1_vintage is not None
+        else _single_metadata_value(
+            artifact,
+            attr_name="acs1_vintage",
+            column_name="acs1_vintage_used",
+            label="ACS1 poverty tract artifact",
+        )
+    )
+    resolved_acs5_vintage = (
+        str(acs5_vintage)
+        if acs5_vintage is not None
+        else _single_metadata_value(
+            artifact,
+            attr_name="acs5_vintage",
+            column_name="acs5_vintage_used",
+            label="ACS1 poverty tract artifact",
+        )
+    )
+    resolved_tract_vintage = (
+        str(tract_vintage)
+        if tract_vintage is not None
+        else _single_metadata_value(
+            artifact,
+            attr_name="tract_vintage",
+            column_name="tract_vintage_used",
+            label="ACS1 poverty tract artifact",
+        )
+    )
+    output_path = (
+        Path(path)
+        if path is not None
+        else naming.acs1_poverty_tracts_path(
+            int(resolved_acs1_vintage),
+            resolved_tract_vintage,
+            base_dir=base_dir,
+        )
+    )
+    provenance = build_acs1_poverty_tracts_provenance(
+        acs1_vintage=resolved_acs1_vintage,
+        acs5_vintage=resolved_acs5_vintage,
+        tract_vintage=resolved_tract_vintage,
+        target_geo_type=target_geo_type,
+        target_vintage=target_vintage,
+        target_id_col=target_id_col,
+        crosswalk_id=crosswalk_id,
+        source_dataset_path=source_dataset_path,
+        support_dataset_path=support_dataset_path,
+        crosswalk_path=crosswalk_path,
+        output_row_count=len(artifact),
+    )
+    return write_parquet_with_provenance(artifact, output_path, provenance)
 
 
 def write_sae_parquet_with_provenance(
