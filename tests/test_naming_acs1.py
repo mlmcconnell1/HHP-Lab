@@ -7,6 +7,8 @@ from hhplab.naming import (
     acs1_county_path,
     acs1_metro_filename,
     acs1_metro_path,
+    acs1_poverty_tracts_filename,
+    acs1_poverty_tracts_path,
     metro_measures_acs1_filename,
     metro_measures_acs1_path,
 )
@@ -14,23 +16,14 @@ from hhplab.naming import (
 
 class TestAcs1MetroFilename:
     def test_basic(self):
-        assert (
-            acs1_metro_filename(2023, "glynn_fox_v1")
-            == "acs1_metro__A2023@Dglynnfoxv1.parquet"
-        )
+        assert acs1_metro_filename(2023, "glynn_fox_v1") == "acs1_metro__A2023@Dglynnfoxv1.parquet"
 
     def test_definition_version_sanitized(self):
         # Underscores and mixed case should be stripped/lowered
-        assert (
-            acs1_metro_filename(2022, "Glynn_Fox_V2")
-            == "acs1_metro__A2022@Dglynnfoxv2.parquet"
-        )
+        assert acs1_metro_filename(2022, "Glynn_Fox_V2") == "acs1_metro__A2022@Dglynnfoxv2.parquet"
 
     def test_different_vintage(self):
-        assert (
-            acs1_metro_filename(2019, "mydef")
-            == "acs1_metro__A2019@Dmydef.parquet"
-        )
+        assert acs1_metro_filename(2019, "mydef") == "acs1_metro__A2019@Dmydef.parquet"
 
 
 class TestAcs1MetroPath:
@@ -40,9 +33,7 @@ class TestAcs1MetroPath:
 
     def test_custom_base(self):
         result = acs1_metro_path(2023, "glynn_fox_v1", base_dir="/tmp/project/data")
-        assert result == Path(
-            "/tmp/project/data/curated/acs/acs1_metro__A2023@Dglynnfoxv1.parquet"
-        )
+        assert result == Path("/tmp/project/data/curated/acs/acs1_metro__A2023@Dglynnfoxv1.parquet")
 
     def test_subdirectory_is_acs(self):
         result = acs1_metro_path(2023, "glynn_fox_v1")
@@ -62,6 +53,25 @@ class TestAcs1CountyPath:
     def test_custom_base(self):
         result = acs1_county_path(2023, base_dir="/tmp/project/data")
         assert result == Path("/tmp/project/data/curated/acs/acs1_county__A2023.parquet")
+
+
+class TestAcs1PovertyTractsFilename:
+    def test_basic(self):
+        assert (
+            acs1_poverty_tracts_filename(2023, 2020) == "acs1_poverty_tracts__A2023xT2020.parquet"
+        )
+
+
+class TestAcs1PovertyTractsPath:
+    def test_default_base(self):
+        result = acs1_poverty_tracts_path(2023, 2020)
+        assert result == Path("data/curated/acs/acs1_poverty_tracts__A2023xT2020.parquet")
+
+    def test_custom_base(self):
+        result = acs1_poverty_tracts_path(2023, 2020, base_dir="/tmp/project/data")
+        assert result == Path(
+            "/tmp/project/data/curated/acs/acs1_poverty_tracts__A2023xT2020.parquet"
+        )
 
 
 class TestMetroMeasuresAcs1Filename:
@@ -91,9 +101,7 @@ class TestMetroMeasuresAcs1Path:
         )
 
     def test_custom_base(self):
-        result = metro_measures_acs1_path(
-            2023, "glynn_fox_v1", base_dir="/tmp/data"
-        )
+        result = metro_measures_acs1_path(2023, "glynn_fox_v1", base_dir="/tmp/data")
         assert result == Path(
             "/tmp/data/curated/measures/measures__metro__acs1__A2023@Dglynnfoxv1.parquet"
         )

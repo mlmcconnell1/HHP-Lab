@@ -1131,6 +1131,32 @@ def acs1_county_path(
     return base_dir / "curated" / "acs" / acs1_county_filename(acs1_vintage)
 
 
+def acs1_poverty_tracts_filename(acs1_vintage: int, tract_vintage: str | int) -> str:
+    """Generate filename for curated ACS 1-year tract poverty-rate artifacts."""
+    return f"acs1_poverty_tracts__A{acs1_vintage}xT{tract_vintage}.parquet"
+
+
+def acs1_poverty_tracts_path(
+    acs1_vintage: int,
+    tract_vintage: str | int,
+    base_dir: Path | str | None = None,
+) -> Path:
+    """Get canonical path for ACS 1-year tract poverty-rate artifacts."""
+    if base_dir is None:
+        base_dir = Path("data")
+    else:
+        base_dir = Path(base_dir)
+    return (
+        base_dir
+        / "curated"
+        / "acs"
+        / acs1_poverty_tracts_filename(
+            acs1_vintage,
+            tract_vintage,
+        )
+    )
+
+
 def metro_measures_acs1_filename(
     acs1_vintage: int,
     definition_version: str,

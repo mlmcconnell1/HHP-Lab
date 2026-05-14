@@ -431,8 +431,9 @@ def _dataset_remediation(ds_id: str, ds, *, years: list[int] | None = None) -> R
                     f"ACS 1-year data for vintage(s) {years_str} is not "
                     f"available from Census (data collection was disrupted by "
                     f"COVID-19 in 2020). No ingest command can succeed for "
-                    f"these vintages. Consider BLS LAUS data for labor-market "
-                    f"measures, or exclude {years_str} from the recipe universe."
+                    f"these vintages. Exclude {years_str}, choose an explicit "
+                    "fallback vintage, or ingest the 2020 experimental tables "
+                    "from a non-API source."
                 ),
                 command=None,
             )
@@ -455,13 +456,21 @@ def _dataset_remediation(ds_id: str, ds, *, years: list[int] | None = None) -> R
             )
 
     if provider == "census" and product == "acs1_poverty":
+        unavailable_note = ""
+        if years and sorted(set(years) & ACS1_UNAVAILABLE_VINTAGES):
+            unavailable_note = (
+                " Standard ACS1 vintage 2020 is unavailable through the Census API; "
+                "use an explicit fallback or non-API experimental source for any "
+                "file_set path that resolves to A2020."
+            )
         return Remediation(
             hint=(
-                f"Materialize precomputed ACS1 poverty artifacts for dataset "
-                f"'{ds_id}' with source tract rate columns and poverty-universe "
-                "denominators. ACS 1-year does not have a built-in tract ingest "
-                "command in hhplab; provide the recipe file_set paths or adjust "
-                "the recipe to an available ACS poverty source."
+                f"Dataset '{ds_id}' requests ACS1 tract poverty artifacts, but "
+                "Census ACS 1-year subject tables S1701/S1702 are not published "
+                "at tract geography through the standard Census API. Use ACS5 "
+                "tract poverty, a county/PUMA fallback, or provide vetted "
+                "non-API tract artifacts with counts and poverty universes. "
+                f"{unavailable_note}"
             ),
             command=None,
         )
