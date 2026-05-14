@@ -12,8 +12,13 @@ import pandas as pd
 from hhplab.acs.variables import ACS5_SAE_SUPPORT_COLUMNS
 from hhplab.acs.variables_acs1 import ACS1_SAE_SOURCE_COLUMNS
 from hhplab.provenance import ProvenanceBlock, write_parquet_with_provenance
+from hhplab.schema.measures import (
+    ACS1_IMPUTATION_MEASURE_SPECS,
+    ACS1ImputationMeasureSpec,
+)
 
 SAE_ALLOCATION_METHOD = "tract_share_within_county"
+ACS1_IMPUTATION_METHOD = "acs1_controlled_acs5_tract_share"
 
 RENTER_BURDEN_30_PLUS_COLUMNS: tuple[str, ...] = (
     "sae_gross_rent_pct_income_30_to_34_9",
@@ -125,6 +130,42 @@ def _safe_rate(numerator: pd.Series, denominator: pd.Series) -> pd.Series:
     return rate
 
 
+def _validation_diff(
+    allocated_total: float | None,
+    source_total: float | None,
+) -> tuple[float | None, float | None]:
+    if allocated_total is None or source_total is None:
+        return None, None
+    abs_diff = float(allocated_total - source_total)
+    if source_total == 0:
+        rel_diff = 0.0 if abs_diff == 0 else float("inf")
+    else:
+        rel_diff = abs_diff / abs(float(source_total))
+    return abs_diff, rel_diff
+
+
+def _assert_within_tolerance(
+    *,
+    spec: ACS1ImputationMeasureSpec,
+    target_id: str,
+    column: str,
+    abs_diff: float | None,
+    rel_diff: float | None,
+) -> None:
+    if abs_diff is None or rel_diff is None:
+        return
+    if (
+        abs(abs_diff) > spec.validation_abs_tolerance
+        and abs(rel_diff) > spec.validation_rel_tolerance
+    ):
+        raise ValueError(
+            "ACS1 imputation failed conservation validation for "
+            f"{spec.name} target {target_id} column {column}: "
+            f"abs_diff={abs_diff}, rel_diff={rel_diff}. "
+            "Check ACS1 target totals, ACS5 tract support, and crosswalk weights."
+        )
+
+
 def build_sae_provenance(
     *,
     acs1_vintage: int | str,
@@ -158,9 +199,7 @@ def build_sae_provenance(
         "denominator_source": denominator_source,
         "crosswalk_id": crosswalk_id,
         "source_dataset_path": None if source_dataset_path is None else str(source_dataset_path),
-        "support_dataset_path": None
-        if support_dataset_path is None
-        else str(support_dataset_path),
+        "support_dataset_path": None if support_dataset_path is None else str(support_dataset_path),
         "crosswalk_path": None if crosswalk_path is None else str(crosswalk_path),
         "source_row_count": source_row_count,
         "support_row_count": support_row_count,
@@ -236,6 +275,252 @@ def write_sae_parquet_with_provenance(
         output_row_count=len(df),
     )
     return write_parquet_with_provenance(df, path, provenance)
+
+
+def impute_acs1_targets_to_tracts(
+    acs1_targets: pd.DataFrame,
+    acs5_tract_support: pd.DataFrame,
+    *,
+    specs: Iterable[ACS1ImputationMeasureSpec] = ACS1_IMPUTATION_MEASURE_SPECS,
+    target_id_col: str = "county_fips",
+    target_geo_type: str = "county",
+    year: int | str | None = None,
+    tract_crosswalk: pd.DataFrame | None = None,
+    share_column: str = "area_share",
+    crosswalk_id: str | None = None,
+) -> pd.DataFrame:
+    """Impute ACS1 target totals to tracts using ACS5 tract support shares.
+
+    Rate specs allocate numerator and denominator counts independently, then
+    recompute the rate. If ``tract_crosswalk`` is omitted, ``acs5_tract_support``
+    must already carry ``target_id_col``.
+    """
+    spec_list = tuple(specs)
+    if not spec_list:
+        raise ValueError("At least one ACS1 imputation measure spec is required.")
+    for spec in spec_list:
+        spec.validate()
+
+    source_columns = list(
+        dict.fromkeys(column for spec in spec_list for column in spec.acs1_source_columns)
+    )
+    support_columns = list(
+        dict.fromkeys(column for spec in spec_list for column in spec.acs5_support_columns)
+    )
+    _require_columns(
+        acs1_targets,
+        [target_id_col, "acs1_vintage", *source_columns],
+        "acs1_targets",
+    )
+    _require_columns(
+        acs5_tract_support,
+        ["tract_geoid", "acs_vintage", "tract_vintage", *support_columns],
+        "acs5_tract_support",
+    )
+
+    targets = acs1_targets.copy()
+    support = acs5_tract_support.copy()
+    targets[target_id_col] = targets[target_id_col].astype("string")
+    support["tract_geoid"] = support["tract_geoid"].astype("string").str.zfill(11)
+
+    if targets[target_id_col].duplicated(keep=False).any():
+        duplicated = sorted(
+            targets.loc[targets[target_id_col].duplicated(keep=False), target_id_col]
+            .dropna()
+            .astype(str)
+            .unique()
+        )
+        raise ValueError(
+            f"acs1_targets must have one row per {target_id_col}. Duplicates: {duplicated}."
+        )
+
+    if tract_crosswalk is None:
+        _require_columns(support, [target_id_col], "acs5_tract_support")
+        support[target_id_col] = support[target_id_col].astype("string")
+        support["_imputation_share"] = 1.0
+        merged = support
+    else:
+        _require_columns(
+            tract_crosswalk,
+            [target_id_col, "tract_geoid", share_column],
+            "tract_crosswalk",
+        )
+        xwalk = tract_crosswalk.copy()
+        xwalk[target_id_col] = xwalk[target_id_col].astype("string")
+        xwalk["tract_geoid"] = xwalk["tract_geoid"].astype("string").str.zfill(11)
+        xwalk["_imputation_share"] = pd.to_numeric(xwalk[share_column], errors="coerce")
+        merged = xwalk[[target_id_col, "tract_geoid", "_imputation_share"]].merge(
+            support,
+            on="tract_geoid",
+            how="left",
+        )
+
+    for column in [*source_columns, *support_columns]:
+        if column in targets.columns:
+            targets[column] = pd.to_numeric(targets[column], errors="coerce")
+        if column in merged.columns:
+            merged[column] = pd.to_numeric(merged[column], errors="coerce")
+    merged["_imputation_share"] = pd.to_numeric(
+        merged["_imputation_share"],
+        errors="coerce",
+    )
+
+    target_index = targets.set_index(target_id_col, drop=True)
+    result = merged[["tract_geoid", target_id_col, "acs_vintage", "tract_vintage"]].copy()
+    result["geo_type"] = "tract"
+    result["geo_id"] = result["tract_geoid"]
+    result["year"] = year if year is not None else result["acs_vintage"]
+    result["target_geo_type"] = target_geo_type
+    result["target_geo_id"] = result[target_id_col]
+    result["acs1_vintage_used"] = result[target_id_col].map(target_index["acs1_vintage"])
+    result["acs5_vintage_used"] = result["acs_vintage"].astype("string")
+    result["tract_vintage_used"] = result["tract_vintage"].astype("string")
+    result["acs1_imputation_method"] = ACS1_IMPUTATION_METHOD
+    result["acs1_imputation_denominator_source"] = "acs5_tract_support"
+    result["acs1_imputation_crosswalk_id"] = crosswalk_id
+    result["is_modeled"] = True
+    result["is_synthetic"] = True
+
+    zero_by_index: dict[int, set[str]] = {int(index): set() for index in merged.index}
+    missing_by_index: dict[int, set[str]] = {int(index): set() for index in merged.index}
+    validation_abs_diffs: dict[int, list[float]] = {int(index): [] for index in merged.index}
+    validation_rel_diffs: dict[int, list[float]] = {int(index): [] for index in merged.index}
+
+    for spec in spec_list:
+        component_pairs: list[tuple[str, str]] = []
+        if spec.value_kind == "rate":
+            assert spec.numerator_output_column is not None
+            assert spec.denominator_source_column is not None
+            assert spec.denominator_output_column is not None
+            numerator_source = spec.numerator_source_columns[0]
+            component_pairs = [
+                (numerator_source, spec.numerator_output_column),
+                (spec.denominator_source_column, spec.denominator_output_column),
+            ]
+        else:
+            component_pairs = [(spec.acs1_source_columns[0], spec.output_column)]
+
+        for source_column, output_column in component_pairs:
+            support_total = (
+                merged.assign(_weighted_support=merged[source_column] * merged["_imputation_share"])
+                .groupby(target_id_col, dropna=False)["_weighted_support"]
+                .sum(min_count=1)
+            )
+            source_total = target_index[source_column]
+            row_support_total = merged[target_id_col].map(support_total)
+            row_source_total = merged[target_id_col].map(source_total)
+            weighted_support = merged[source_column] * merged["_imputation_share"]
+            allocated = pd.Series(pd.NA, index=merged.index, dtype="Float64")
+            valid = (
+                row_source_total.notna()
+                & weighted_support.notna()
+                & row_support_total.notna()
+                & (row_support_total > 0)
+            )
+            allocated.loc[valid] = (
+                row_source_total.loc[valid]
+                * weighted_support.loc[valid]
+                / row_support_total.loc[valid]
+            )
+
+            zero_mask = row_support_total.notna() & (row_support_total == 0)
+            if spec.zero_denominator_policy == "zero_count":
+                zero_source = zero_mask & row_source_total.fillna(0).eq(0)
+                allocated.loc[zero_source] = 0.0
+            for index in merged.index[zero_mask]:
+                zero_by_index[int(index)].add(source_column)
+
+            missing_mask = weighted_support.isna() | row_source_total.isna()
+            for index in merged.index[missing_mask]:
+                missing_by_index[int(index)].add(source_column)
+
+            result[output_column] = allocated.astype("Float64")
+
+            allocated_by_target = result.groupby(target_id_col, dropna=False)[output_column].sum(
+                min_count=1
+            )
+            for target_id in sorted(merged[target_id_col].dropna().astype(str).unique()):
+                allocated_value = allocated_by_target.get(target_id, pd.NA)
+                source_value = source_total.get(target_id, pd.NA)
+                allocated_float = None if pd.isna(allocated_value) else float(allocated_value)
+                source_float = None if pd.isna(source_value) else float(source_value)
+                abs_diff, rel_diff = _validation_diff(allocated_float, source_float)
+                _assert_within_tolerance(
+                    spec=spec,
+                    target_id=target_id,
+                    column=source_column,
+                    abs_diff=abs_diff,
+                    rel_diff=rel_diff,
+                )
+                target_mask = result[target_id_col].astype(str).eq(target_id)
+                for index in result.index[target_mask]:
+                    if abs_diff is not None:
+                        validation_abs_diffs[int(index)].append(abs(abs_diff))
+                    if rel_diff is not None:
+                        validation_rel_diffs[int(index)].append(abs(rel_diff))
+
+        if spec.value_kind == "rate":
+            assert spec.numerator_output_column is not None
+            assert spec.denominator_output_column is not None
+            result[spec.output_column] = _safe_rate(
+                result[spec.numerator_output_column],
+                result[spec.denominator_output_column],
+            )
+
+    result["acs1_imputation_source_county_count"] = (
+        result[target_id_col].map(targets.groupby(target_id_col).size()).fillna(0).astype("Int64")
+    )
+    result["acs1_imputation_tract_count"] = (
+        result[target_id_col]
+        .map(result.groupby(target_id_col)["tract_geoid"].nunique())
+        .fillna(0)
+        .astype("Int64")
+    )
+    result["acs1_imputation_zero_denominator_count"] = [
+        len(zero_by_index[int(index)]) for index in merged.index
+    ]
+    result["acs1_imputation_missing_support_count"] = [
+        len(missing_by_index[int(index)]) for index in merged.index
+    ]
+    result["acs1_imputation_validation_abs_diff"] = [
+        max(validation_abs_diffs[int(index)], default=0.0) for index in merged.index
+    ]
+    result["acs1_imputation_validation_rel_diff"] = [
+        max(validation_rel_diffs[int(index)], default=0.0) for index in merged.index
+    ]
+
+    output_columns = [
+        "geo_type",
+        "geo_id",
+        "year",
+        "target_geo_type",
+        "target_geo_id",
+        target_id_col,
+        "tract_geoid",
+        "acs1_vintage_used",
+        "acs5_vintage_used",
+        "tract_vintage_used",
+        "acs1_imputation_method",
+        "acs1_imputation_denominator_source",
+        "acs1_imputation_crosswalk_id",
+        "is_modeled",
+        "is_synthetic",
+        *dict.fromkeys(column for spec in spec_list for column in spec.output_columns),
+        "acs1_imputation_source_county_count",
+        "acs1_imputation_tract_count",
+        "acs1_imputation_zero_denominator_count",
+        "acs1_imputation_missing_support_count",
+        "acs1_imputation_validation_abs_diff",
+        "acs1_imputation_validation_rel_diff",
+    ]
+    result = (
+        result[output_columns].sort_values([target_id_col, "tract_geoid"]).reset_index(drop=True)
+    )
+    result.attrs["target_id_col"] = target_id_col
+    result.attrs["target_geo_type"] = target_geo_type
+    result.attrs["imputation_method"] = ACS1_IMPUTATION_METHOD
+    result.attrs["measure_specs"] = [spec.name for spec in spec_list]
+    return result
 
 
 def _quantile_from_bins(
@@ -314,10 +599,7 @@ def _diagnostic_lists(
             nonmissing_count=lambda s: int(s.notna().sum()),
         )
         partial_counties = set(
-            coverage[
-                (coverage["missing_count"] > 0)
-                & (coverage["nonmissing_count"] > 0)
-            ].index
+            coverage[(coverage["missing_count"] > 0) & (coverage["nonmissing_count"] > 0)].index
         )
         partial_mask = support["county_fips"].isin(partial_counties)
         for index in support.index[partial_mask]:
@@ -360,8 +642,7 @@ def allocate_acs1_county_to_tracts(
     if duplicated_source.any():
         counties = sorted(source.loc[duplicated_source, "county_fips"].astype(str).unique())
         raise ValueError(
-            "county_source must have one row per county_fips. "
-            f"Duplicates: {counties}."
+            f"county_source must have one row per county_fips. Duplicates: {counties}."
         )
 
     source_counties = set(source["county_fips"].dropna().astype(str))
@@ -399,9 +680,7 @@ def allocate_acs1_county_to_tracts(
         )
         allocated = pd.Series(pd.NA, index=support.index, dtype="Float64")
         allocated.loc[valid] = (
-            source_value.loc[valid]
-            * support.loc[valid, column]
-            / support_total.loc[valid]
+            source_value.loc[valid] * support.loc[valid, column] / support_total.loc[valid]
         )
         result[f"sae_{column}"] = allocated.astype("Float64")
 
@@ -435,17 +714,23 @@ def allocate_acs1_county_to_tracts(
     result["sae_zero_denominator_count"] = [
         len(zero_by_index[int(index)]) for index in support.index
     ]
-    result["sae_source_county_count"] = result["county_fips"].map(
-        pd.Series(1, index=source.index),
-    ).fillna(0).astype("Int64")
-    result["sae_support_tract_count"] = result["county_fips"].map(
-        support.groupby("county_fips").size(),
-    ).astype("Int64")
+    result["sae_source_county_count"] = (
+        result["county_fips"]
+        .map(
+            pd.Series(1, index=source.index),
+        )
+        .fillna(0)
+        .astype("Int64")
+    )
+    result["sae_support_tract_count"] = (
+        result["county_fips"]
+        .map(
+            support.groupby("county_fips").size(),
+        )
+        .astype("Int64")
+    )
     result["sae_allocation_residuals"] = result["county_fips"].map(
-        {
-            county: _json_dict(residuals)
-            for county, residuals in residuals_by_county.items()
-        }
+        {county: _json_dict(residuals) for county, residuals in residuals_by_county.items()}
     )
 
     result = result.sort_values(["county_fips", "tract_geoid"]).reset_index(drop=True)
@@ -478,8 +763,7 @@ def _allocated_component_columns(
             }
         ]
     return [
-        column if column.startswith("sae_") else f"sae_{column}"
-        for column in component_columns
+        column if column.startswith("sae_") else f"sae_{column}" for column in component_columns
     ]
 
 
@@ -541,18 +825,15 @@ def rollup_sae_tracts_to_geos(
     diagnostics["sae_missing_allocation_tract_count"] = (
         diagnostics["sae_crosswalk_tract_count"] - diagnostics["sae_allocated_tract_count"]
     )
-    diagnostics["sae_crosswalk_coverage_ratio"] = (
-        diagnostics["sae_allocated_tract_count"]
-        / diagnostics["sae_crosswalk_tract_count"].replace(0, pd.NA)
-    )
+    diagnostics["sae_crosswalk_coverage_ratio"] = diagnostics[
+        "sae_allocated_tract_count"
+    ] / diagnostics["sae_crosswalk_tract_count"].replace(0, pd.NA)
     share_sum = grouped[share_column].sum(min_count=1)
     diagnostics["sae_crosswalk_share_sum"] = (
         diagnostics[geo_id_col].map(share_sum).astype("Float64")
     )
     nan_share_tracts = (
-        merged.loc[merged[share_column].isna()]
-        .groupby(geo_id_col)["tract_geoid"]
-        .nunique()
+        merged.loc[merged[share_column].isna()].groupby(geo_id_col)["tract_geoid"].nunique()
     )
     diagnostics["sae_nan_share_tract_count"] = (
         diagnostics[geo_id_col].map(nan_share_tracts).fillna(0).astype("Int64")
@@ -702,9 +983,7 @@ def derive_sae_burden_measures(df: pd.DataFrame) -> pd.DataFrame:
     result["sae_burden_rate_diagnostics"] = [
         json.dumps(
             {
-                "rent_denominator_zero": bool(
-                    pd.notna(rent_denominator) and rent_denominator == 0
-                ),
+                "rent_denominator_zero": bool(pd.notna(rent_denominator) and rent_denominator == 0),
                 "owner_denominator_zero": bool(
                     pd.notna(owner_denominator) and owner_denominator == 0
                 ),

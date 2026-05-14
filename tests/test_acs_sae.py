@@ -8,6 +8,7 @@ import pandas as pd
 import pytest
 
 from hhplab.acs.sae import (
+    ACS1_IMPUTATION_METHOD,
     GROSS_RENT_BINS,
     HOUSEHOLD_INCOME_BINS,
     SAE_ALLOCATION_METHOD,
@@ -16,10 +17,15 @@ from hhplab.acs.sae import (
     compare_sae_to_direct_counties,
     derive_sae_burden_measures,
     derive_sae_distribution_measures,
+    impute_acs1_targets_to_tracts,
     rollup_sae_tracts_to_geos,
     write_sae_parquet_with_provenance,
 )
 from hhplab.provenance import read_provenance
+from hhplab.schema import (
+    ACS1_IMPUTED_POVERTY_SPEC,
+    ACS1_IMPUTED_TOTAL_HOUSEHOLDS_SPEC,
+)
 
 COUNTY_SOURCE = pd.DataFrame(
     [
@@ -95,6 +101,175 @@ TRACT_TO_COC = pd.DataFrame(
         {"coc_id": "COC-MULTI", "tract_geoid": "08059000100", "area_share": 1.0},
     ]
 )
+
+ACS1_TARGETS = pd.DataFrame(
+    [
+        {
+            "county_fips": "08031",
+            "acs1_vintage": "2023",
+            "population_below_poverty": 100,
+            "poverty_universe": 1000,
+            "total_households": 500,
+        },
+        {
+            "county_fips": "08059",
+            "acs1_vintage": "2023",
+            "population_below_poverty": 50,
+            "poverty_universe": 200,
+            "total_households": 100,
+        },
+    ]
+)
+
+ACS5_IMPUTATION_SUPPORT = pd.DataFrame(
+    [
+        {
+            "tract_geoid": "08031001000",
+            "county_fips": "08031",
+            "acs_vintage": "2019-2023",
+            "tract_vintage": "2020",
+            "population_below_poverty": 30,
+            "poverty_universe": 300,
+            "total_households": 200,
+        },
+        {
+            "tract_geoid": "08031001100",
+            "county_fips": "08031",
+            "acs_vintage": "2019-2023",
+            "tract_vintage": "2020",
+            "population_below_poverty": 70,
+            "poverty_universe": 700,
+            "total_households": 300,
+        },
+        {
+            "tract_geoid": "08059000100",
+            "county_fips": "08059",
+            "acs_vintage": "2019-2023",
+            "tract_vintage": "2020",
+            "population_below_poverty": 50,
+            "poverty_universe": 200,
+            "total_households": 100,
+        },
+    ]
+)
+
+CROSSWALK_IMPUTATION_SUPPORT = ACS5_IMPUTATION_SUPPORT.drop(columns=["county_fips"])
+
+TRACT_TO_COUNTY_SPLIT = pd.DataFrame(
+    [
+        {"county_fips": "08031", "tract_geoid": "08031001000", "area_share": 1.0},
+        {"county_fips": "08031", "tract_geoid": "08031001100", "area_share": 0.5},
+        {"county_fips": "08059", "tract_geoid": "08031001100", "area_share": 0.5},
+        {"county_fips": "08059", "tract_geoid": "08059000100", "area_share": 1.0},
+    ]
+)
+
+
+def test_impute_acs1_targets_allocates_rate_and_count_specs() -> None:
+    result = impute_acs1_targets_to_tracts(
+        ACS1_TARGETS,
+        ACS5_IMPUTATION_SUPPORT,
+        specs=(ACS1_IMPUTED_POVERTY_SPEC, ACS1_IMPUTED_TOTAL_HOUSEHOLDS_SPEC),
+        year=2023,
+    )
+
+    first = result[result["tract_geoid"] == "08031001000"].iloc[0]
+    second = result[result["tract_geoid"] == "08031001100"].iloc[0]
+
+    assert first["acs1_imputed_population_below_poverty"] == pytest.approx(30.0)
+    assert first["acs1_imputed_poverty_universe"] == pytest.approx(300.0)
+    assert first["acs1_imputed_poverty_rate"] == pytest.approx(0.1)
+    assert first["acs1_imputed_total_households"] == pytest.approx(200.0)
+    assert second["acs1_imputed_population_below_poverty"] == pytest.approx(70.0)
+    assert second["acs1_imputed_poverty_universe"] == pytest.approx(700.0)
+    assert second["acs1_imputed_total_households"] == pytest.approx(300.0)
+    assert result["acs1_imputation_method"].unique().tolist() == [ACS1_IMPUTATION_METHOD]
+    assert result["is_modeled"].unique().tolist() == [True]
+    assert result["is_synthetic"].unique().tolist() == [True]
+    assert result["acs1_imputation_validation_abs_diff"].max() == pytest.approx(0.0)
+
+
+def test_impute_acs1_targets_conserves_target_totals() -> None:
+    result = impute_acs1_targets_to_tracts(
+        ACS1_TARGETS,
+        ACS5_IMPUTATION_SUPPORT,
+        specs=(ACS1_IMPUTED_POVERTY_SPEC, ACS1_IMPUTED_TOTAL_HOUSEHOLDS_SPEC),
+        year=2023,
+    )
+
+    allocated = result.groupby("county_fips")[
+        [
+            "acs1_imputed_population_below_poverty",
+            "acs1_imputed_poverty_universe",
+            "acs1_imputed_total_households",
+        ]
+    ].sum()
+
+    assert allocated.loc["08031", "acs1_imputed_population_below_poverty"] == pytest.approx(100.0)
+    assert allocated.loc["08031", "acs1_imputed_poverty_universe"] == pytest.approx(1000.0)
+    assert allocated.loc["08031", "acs1_imputed_total_households"] == pytest.approx(500.0)
+    assert allocated.loc["08059", "acs1_imputed_population_below_poverty"] == pytest.approx(50.0)
+    assert allocated.loc["08059", "acs1_imputed_poverty_universe"] == pytest.approx(200.0)
+    assert allocated.loc["08059", "acs1_imputed_total_households"] == pytest.approx(100.0)
+
+
+def test_impute_acs1_targets_uses_tract_to_target_crosswalk_weights() -> None:
+    result = impute_acs1_targets_to_tracts(
+        ACS1_TARGETS,
+        CROSSWALK_IMPUTATION_SUPPORT,
+        specs=(ACS1_IMPUTED_TOTAL_HOUSEHOLDS_SPEC,),
+        year=2023,
+        tract_crosswalk=TRACT_TO_COUNTY_SPLIT,
+        crosswalk_id="tract2020_to_county_split",
+    )
+
+    split_rows = result[result["tract_geoid"] == "08031001100"].sort_values("county_fips")
+    county_31 = split_rows.iloc[0]
+    county_59 = split_rows.iloc[1]
+
+    assert county_31["acs1_imputed_total_households"] == pytest.approx(214.2857142857)
+    assert county_59["acs1_imputed_total_households"] == pytest.approx(60.0)
+    assert county_31["acs1_imputation_crosswalk_id"] == "tract2020_to_county_split"
+    assert county_59["acs1_imputation_crosswalk_id"] == "tract2020_to_county_split"
+
+    allocated = result.groupby("county_fips")["acs1_imputed_total_households"].sum()
+    assert allocated.loc["08031"] == pytest.approx(500.0)
+    assert allocated.loc["08059"] == pytest.approx(100.0)
+
+
+def test_impute_acs1_targets_zero_denominator_policy_sets_zero_count() -> None:
+    targets = ACS1_TARGETS.copy()
+    support = ACS5_IMPUTATION_SUPPORT.copy()
+    targets.loc[targets["county_fips"] == "08031", "total_households"] = 0
+    support.loc[support["county_fips"] == "08031", "total_households"] = 0
+
+    result = impute_acs1_targets_to_tracts(
+        targets,
+        support,
+        specs=(ACS1_IMPUTED_TOTAL_HOUSEHOLDS_SPEC,),
+        year=2023,
+    )
+
+    county_rows = result[result["county_fips"] == "08031"]
+    assert county_rows["acs1_imputed_total_households"].tolist() == [0.0, 0.0]
+    assert county_rows["acs1_imputation_zero_denominator_count"].tolist() == [1, 1]
+
+
+def test_impute_acs1_targets_zero_denominator_rate_is_null() -> None:
+    support = ACS5_IMPUTATION_SUPPORT.copy()
+    support.loc[support["county_fips"] == "08031", "poverty_universe"] = 0
+
+    result = impute_acs1_targets_to_tracts(
+        ACS1_TARGETS,
+        support,
+        specs=(ACS1_IMPUTED_POVERTY_SPEC,),
+        year=2023,
+    )
+
+    county_rows = result[result["county_fips"] == "08031"]
+    assert county_rows["acs1_imputed_poverty_universe"].isna().all()
+    assert county_rows["acs1_imputed_poverty_rate"].isna().all()
+    assert county_rows["acs1_imputation_zero_denominator_count"].tolist() == [1, 1]
 
 
 def test_allocates_county_components_by_matching_tract_support_shares() -> None:
@@ -222,9 +397,7 @@ def test_partial_coverage_boosts_nonmissing_tracts_to_conserve_county_total() ->
 
     boosted_row = result[result["tract_geoid"] == "08031001100"].iloc[0]
     assert boosted_row["sae_household_income_total"] == pytest.approx(1000.0)
-    assert json.loads(boosted_row["sae_partial_coverage_columns"]) == [
-        "household_income_total"
-    ]
+    assert json.loads(boosted_row["sae_partial_coverage_columns"]) == ["household_income_total"]
     residuals = json.loads(boosted_row["sae_allocation_residuals"])
     assert residuals["household_income_total"] == pytest.approx(0.0)
 
