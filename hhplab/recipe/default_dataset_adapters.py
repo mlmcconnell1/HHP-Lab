@@ -142,6 +142,37 @@ def _validate_census_acs1(spec: DatasetSpec) -> list[ValidationDiagnostic]:
     return diags
 
 
+def _validate_census_acs1_poverty(spec: DatasetSpec) -> list[ValidationDiagnostic]:
+    """Validate pre-materialized ACS1 poverty-rate artifacts."""
+    diags: list[ValidationDiagnostic] = []
+    if spec.version != 1:
+        diags.append(
+            ValidationDiagnostic(
+                "error",
+                f"census/acs1_poverty: unsupported version {spec.version}; expected 1.",
+            )
+        )
+    if spec.native_geometry.type != "tract" and not _uses_materialized_artifact(spec):
+        diags.append(
+            ValidationDiagnostic(
+                "error",
+                f"census/acs1_poverty: expected native_geometry type 'tract', "
+                f"got '{spec.native_geometry.type}'. Recipes that point to "
+                "pre-materialized derived artifacts must set path or file_set.",
+            )
+        )
+    known_params = {"align", "broadcast_static"}
+    unknown = set(spec.params.keys()) - known_params
+    if unknown:
+        diags.append(
+            ValidationDiagnostic(
+                "warning",
+                f"census/acs1_poverty: unrecognized params {sorted(unknown)}.",
+            )
+        )
+    return diags
+
+
 def _validate_census_pep(spec: DatasetSpec) -> list[ValidationDiagnostic]:
     """Validate Census PEP dataset specification."""
     diags: list[ValidationDiagnostic] = []
@@ -278,6 +309,7 @@ def register_dataset_defaults(registry: DatasetAdapterRegistry) -> None:
     registry.register("census", "acs5", _validate_census_acs5)
     registry.register("census", "acs", _validate_census_acs)
     registry.register("census", "acs1", _validate_census_acs1)
+    registry.register("census", "acs1_poverty", _validate_census_acs1_poverty)
     registry.register("census", "pep", _validate_census_pep)
     registry.register("zillow", "zori", _validate_zillow_zori)
     registry.register("bls", "laus", _validate_bls_laus)

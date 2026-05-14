@@ -2828,9 +2828,9 @@ class TestSmallAreaEstimateSchema:
 
     def test_sae_rejects_direct_median_outputs(self):
         data = _sae_recipe()
-        data["pipelines"][0]["steps"][0]["measures"]["household_income_bins"][
-            "outputs"
-        ] = ["median_household_income"]
+        data["pipelines"][0]["steps"][0]["measures"]["household_income_bins"]["outputs"] = [
+            "median_household_income"
+        ]
 
         with pytest.raises(RecipeLoadError, match="direct ACS median/context columns"):
             load_recipe(data)
@@ -4483,6 +4483,59 @@ class TestResampleAggregate:
         coc2_income = df[df.geo_id == "COC2"]["income"].iloc[0]
         assert coc1_income == pytest.approx(54000.0)
         assert coc2_income == pytest.approx(70000.0)
+
+    def test_aggregate_derived_rate_from_weighted_counts(self, tmp_path: Path):
+        """Derived rates are recomputed from weighted numerator and universe sums."""
+        ds_path = tmp_path / "data" / "acs1_poverty.parquet"
+        ds_path.parent.mkdir(parents=True, exist_ok=True)
+        pd.DataFrame(
+            {
+                "tract_geoid": ["A", "B", "C"],
+                "year": [2020, 2020, 2020],
+                "poverty_universe_individuals_acs1": [100.0, 50.0, 200.0],
+                "poverty_rate_individuals_acs1": [0.20, 0.60, 0.10],
+            }
+        ).to_parquet(ds_path)
+
+        xwalk_path = tmp_path / "data" / "curated" / "xwalks" / "xwalk__B2025xT2020.parquet"
+        _make_xwalk_parquet(xwalk_path, geo_type="tract")
+
+        recipe = load_recipe(_recipe_with_pipeline())
+        ctx = ExecutionContext(project_root=tmp_path, recipe=recipe)
+        ctx.transform_paths["tract_to_coc"] = xwalk_path
+
+        task = ResampleTask(
+            dataset_id="acs",
+            year=2020,
+            input_path="data/acs1_poverty.parquet",
+            effective_geometry=GeometryRef(type="tract", vintage=2020),
+            method="aggregate",
+            transform_id="tract_to_coc",
+            to_geometry=GeometryRef(type="coc", vintage=2025),
+            measures=["poverty_universe_individuals_acs1"],
+            measure_aggregations={"poverty_universe_individuals_acs1": "sum"},
+            geo_column="tract_geoid",
+            derived_measures={
+                "poverty_rate_individuals_acs1": {
+                    "type": "rate_from_weighted_counts",
+                    "source_rate_column": "poverty_rate_individuals_acs1",
+                    "denominator_column": "poverty_universe_individuals_acs1",
+                    "numerator_output_column": "poor_individuals_acs1",
+                },
+            },
+        )
+        result = _execute_resample(task, ctx)
+
+        assert result.success
+        df = ctx.intermediates[("acs", 2020)].set_index("geo_id")
+        assert df.loc["COC1", "poor_individuals_acs1"] == pytest.approx(
+            (0.20 * 100.0 * 0.8) + (0.60 * 50.0 * 0.5),
+        )
+        assert df.loc["COC1", "poverty_universe_individuals_acs1"] == pytest.approx(
+            (100.0 * 0.8) + (50.0 * 0.5),
+        )
+        assert df.loc["COC1", "poverty_rate_individuals_acs1"] == pytest.approx(31.0 / 105.0)
+        assert df.loc["COC2", "poverty_rate_individuals_acs1"] == pytest.approx(0.10)
 
     def test_measures_list_backward_compat(self, tmp_path: Path):
         """Old list format (measures: [a, b] + aggregation: sum) still works."""

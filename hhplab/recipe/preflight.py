@@ -454,6 +454,18 @@ def _dataset_remediation(ds_id: str, ds, *, years: list[int] | None = None) -> R
                 command="hhplab ingest acs1-metro --vintage <year>",
             )
 
+    if provider == "census" and product == "acs1_poverty":
+        return Remediation(
+            hint=(
+                f"Materialize precomputed ACS1 poverty artifacts for dataset "
+                f"'{ds_id}' with source tract rate columns and poverty-universe "
+                "denominators. ACS 1-year does not have a built-in tract ingest "
+                "command in hhplab; provide the recipe file_set paths or adjust "
+                "the recipe to an available ACS poverty source."
+            ),
+            command=None,
+        )
+
     if provider == "census" and product in {"acs", "acs5"}:
         native_type = getattr(ds.native_geometry, "type", None)
         if native_type == "tract":
@@ -991,9 +1003,7 @@ def _check_containment_artifacts(
                 if "CoC" in label:
                     geo_type = "coc"
                     vintage = (
-                        spec.candidate.vintage
-                        if pair == ("msa", "coc")
-                        else spec.container.vintage
+                        spec.candidate.vintage if pair == ("msa", "coc") else spec.container.vintage
                     )
                     definition_version = None
                 elif "county" in label and "MSA" not in label:
@@ -2462,7 +2472,9 @@ def run_preflight(
                 pipeline_id=pipeline.id,
                 plan=plan,
                 task_count=(
-                    len(plan.materialize_tasks) + len(plan.resample_tasks) + len(plan.join_tasks)
+                    len(plan.materialize_tasks)
+                    + len(plan.resample_tasks)
+                    + len(plan.join_tasks)
                     + len(plan.small_area_estimate_tasks)
                 ),
             )

@@ -30,9 +30,11 @@ class PlannerError(Exception):
 # Plan data structures
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class ResolvedDatasetYear:
     """Resolution result for a single (dataset_id, year)."""
+
     dataset_id: str
     year: int
     path: str | None
@@ -42,6 +44,7 @@ class ResolvedDatasetYear:
 @dataclass
 class ResampleTask:
     """A single resample operation for one dataset-year."""
+
     dataset_id: str
     year: int
     input_path: str | None
@@ -51,6 +54,7 @@ class ResampleTask:
     to_geometry: GeometryRef
     measures: list[str]
     measure_aggregations: dict[str, str] | None = None
+    derived_measures: dict[str, dict[str, object]] | None = None
     year_column: str | None = None
     geo_column: str | None = None
     weighting_variety: str | None = None
@@ -61,6 +65,7 @@ class ResampleTask:
 @dataclass
 class JoinTask:
     """A join operation merging resampled datasets for a year."""
+
     datasets: list[str]
     join_on: list[str]
     year: int
@@ -69,6 +74,7 @@ class JoinTask:
 @dataclass
 class MaterializeTask:
     """Ensure specified transforms are materialized."""
+
     transform_ids: list[str]
 
 
@@ -110,6 +116,7 @@ def _geometry_to_dict(g: GeometryRef) -> dict:
 @dataclass
 class ExecutionPlan:
     """The full resolved execution plan for a recipe pipeline."""
+
     pipeline_id: str
     materialize_tasks: list[MaterializeTask] = field(default_factory=list)
     resample_tasks: list[ResampleTask] = field(default_factory=list)
@@ -121,8 +128,7 @@ class ExecutionPlan:
         return {
             "pipeline_id": self.pipeline_id,
             "materialize_tasks": [
-                {"transform_ids": t.transform_ids}
-                for t in self.materialize_tasks
+                {"transform_ids": t.transform_ids} for t in self.materialize_tasks
             ],
             "resample_tasks": [
                 {
@@ -137,6 +143,7 @@ class ExecutionPlan:
                     "to_geometry": _geometry_to_dict(t.to_geometry),
                     "measures": t.measures,
                     "measure_aggregations": t.measure_aggregations,
+                    "derived_measures": t.derived_measures,
                     "weighting_variety": t.weighting_variety,
                     "weight_column": t.weight_column,
                     "weighting_variety_count": t.weighting_variety_count,
@@ -160,8 +167,7 @@ class ExecutionPlan:
                     "denominators": dict(t.denominators),
                     "measure_families": list(t.measure_families),
                     "derived_outputs": {
-                        family: list(outputs)
-                        for family, outputs in t.derived_outputs.items()
+                        family: list(outputs) for family, outputs in t.derived_outputs.items()
                     },
                     "diagnostics": dict(t.diagnostics),
                 }
@@ -187,6 +193,7 @@ class ExecutionPlan:
 # ---------------------------------------------------------------------------
 # Dataset-year resolution
 # ---------------------------------------------------------------------------
+
 
 def _resolve_dataset_year(
     dataset_id: str,
@@ -230,9 +237,7 @@ def _resolve_via_file_set(
             matching_segments.append(seg)
 
     if len(matching_segments) == 0:
-        raise PlannerError(
-            f"Dataset '{dataset_id}' has no file_set segment covering year {year}."
-        )
+        raise PlannerError(f"Dataset '{dataset_id}' has no file_set segment covering year {year}.")
     if len(matching_segments) > 1:
         raise PlannerError(
             f"Dataset '{dataset_id}' has multiple file_set segments covering "
@@ -267,6 +272,7 @@ def _resolve_via_file_set(
 # ---------------------------------------------------------------------------
 # Transform auto-selection
 # ---------------------------------------------------------------------------
+
 
 def _geometry_matches(a: GeometryRef, b: GeometryRef) -> bool:
     """Check if two geometry refs match on type, vintage, and source.
@@ -308,15 +314,13 @@ def _resolve_auto_transform(
     for t in recipe.transforms:
         # Direction A: transform from→to_geometry, to→effective_geometry
         # (crosswalk goes target → source, used by allocate)
-        fwd = (
-            _geometry_matches(t.from_, to_geometry)
-            and _geometry_matches(t.to, effective_geometry)
+        fwd = _geometry_matches(t.from_, to_geometry) and _geometry_matches(
+            t.to, effective_geometry
         )
         # Direction B: transform from→effective_geometry, to→to_geometry
         # (crosswalk goes source → target, used by aggregate)
-        rev = (
-            _geometry_matches(t.from_, effective_geometry)
-            and _geometry_matches(t.to, to_geometry)
+        rev = _geometry_matches(t.from_, effective_geometry) and _geometry_matches(
+            t.to, to_geometry
         )
 
         if fwd or rev:
@@ -408,6 +412,7 @@ def _resolve_transform_set_via(
 # Plan resolution
 # ---------------------------------------------------------------------------
 
+
 def resolve_plan(recipe: RecipeV1, pipeline_id: str) -> ExecutionPlan:
     """Resolve an execution plan for one pipeline in the recipe.
 
@@ -436,9 +441,7 @@ def resolve_plan(recipe: RecipeV1, pipeline_id: str) -> ExecutionPlan:
 
     for step in pipeline.steps:
         if isinstance(step, MaterializeStep):
-            plan.materialize_tasks.append(
-                MaterializeTask(transform_ids=list(step.transforms))
-            )
+            plan.materialize_tasks.append(MaterializeTask(transform_ids=list(step.transforms)))
 
         elif isinstance(step, ResampleStep):
             for year in universe_years:
@@ -473,9 +476,9 @@ def resolve_plan(recipe: RecipeV1, pipeline_id: str) -> ExecutionPlan:
                 )
                 for weighting_variety in weighting_varieties:
                     ds = recipe.datasets[step.dataset]
-                    measure_aggs = {
-                        name: cfg.aggregation
-                        for name, cfg in step.measures.items()
+                    measure_aggs = {name: cfg.aggregation for name, cfg in step.measures.items()}
+                    derived_measures = {
+                        name: cfg.model_dump() for name, cfg in step.derived_measures.items()
                     }
                     plan.resample_tasks.append(
                         ResampleTask(
@@ -488,6 +491,7 @@ def resolve_plan(recipe: RecipeV1, pipeline_id: str) -> ExecutionPlan:
                             to_geometry=step.to_geometry,
                             measures=step.measure_names,
                             measure_aggregations=measure_aggs,
+                            derived_measures=derived_measures,
                             year_column=ds.year_column,
                             geo_column=ds.geo_column,
                             weighting_variety=weighting_variety,

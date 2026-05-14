@@ -45,23 +45,52 @@ _XWALK_JOIN_KEYS: dict[str, str] = {
 
 # Columns in crosswalks that are NOT the target geography identifier.
 _XWALK_NON_GEO_COLS: set[str] = {
-    "tract_geoid", "county_fips", "area_share", "pop_share",
-    "intersection_area", "tract_area", "county_area", "coc_area", "geo_area",
-    "boundary_vintage", "tract_vintage", "definition_version",
-    "cbsa_code", "county_vintage", "allocation_method", "share_column",
-    "share_denominator", "allocation_share",
-    "intersecting_county_count", "intersecting_county_fips",
-    "acs_vintage", "weighting_method", "area_weight", "population_weight",
-    "household_weight", "renter_household_weight",
-    "area_denominator", "population_denominator", "household_denominator",
-    "renter_household_denominator", "county_area_total",
-    "county_population_total", "county_household_total",
-    "county_renter_household_total", "geo_area_total", "geo_population_total",
-    "geo_household_total", "geo_renter_household_total",
-    "county_area_coverage_ratio", "county_population_coverage_ratio",
-    "county_household_coverage_ratio", "county_renter_household_coverage_ratio",
-    "tract_count", "missing_population_tract_count",
-    "missing_household_tract_count", "missing_renter_household_tract_count",
+    "tract_geoid",
+    "county_fips",
+    "area_share",
+    "pop_share",
+    "intersection_area",
+    "tract_area",
+    "county_area",
+    "coc_area",
+    "geo_area",
+    "boundary_vintage",
+    "tract_vintage",
+    "definition_version",
+    "cbsa_code",
+    "county_vintage",
+    "allocation_method",
+    "share_column",
+    "share_denominator",
+    "allocation_share",
+    "intersecting_county_count",
+    "intersecting_county_fips",
+    "acs_vintage",
+    "weighting_method",
+    "area_weight",
+    "population_weight",
+    "household_weight",
+    "renter_household_weight",
+    "area_denominator",
+    "population_denominator",
+    "household_denominator",
+    "renter_household_denominator",
+    "county_area_total",
+    "county_population_total",
+    "county_household_total",
+    "county_renter_household_total",
+    "geo_area_total",
+    "geo_population_total",
+    "geo_household_total",
+    "geo_renter_household_total",
+    "county_area_coverage_ratio",
+    "county_population_coverage_ratio",
+    "county_household_coverage_ratio",
+    "county_renter_household_coverage_ratio",
+    "tract_count",
+    "missing_population_tract_count",
+    "missing_household_tract_count",
+    "missing_renter_household_tract_count",
 }
 
 
@@ -76,8 +105,10 @@ def _detect_xwalk_target_col(
     found, rather than silently returning a default that may not exist.
     """
     candidates = [
-        c for c in xwalk.columns
-        if c not in _XWALK_NON_GEO_COLS and c != source_key
+        c
+        for c in xwalk.columns
+        if c not in _XWALK_NON_GEO_COLS
+        and c != source_key
         and c in {"coc_id", "metro_id", "msa_id", "geo_id"}
     ]
     if len(candidates) == 1:
@@ -213,7 +244,21 @@ def _resample_aggregate(
 ) -> pd.DataFrame:
     """Aggregate resample: many-to-few via crosswalk weights."""
     geo_col = _resolve_geo_column(df, task.geo_column)
-    _validate_columns(df, task.measures, task.dataset_id, task.year)
+    derived_measures = task.derived_measures or {}
+    derived_required_columns = sorted(
+        {
+            str(config[column])
+            for config in derived_measures.values()
+            for column in ("source_rate_column", "denominator_column")
+            if config.get(column) is not None
+        }
+    )
+    _validate_columns(
+        df,
+        [*task.measures, *derived_required_columns],
+        task.dataset_id,
+        task.year,
+    )
 
     # Determine join key in crosswalk based on effective geometry type
     geo_type = task.effective_geometry.type
@@ -264,12 +309,12 @@ def _resample_aggregate(
         )
 
     # Resolve per-measure aggregation methods
-    measure_aggs: dict[str, str] = task.measure_aggregations or {
-        m: "sum" for m in task.measures
-    }
+    measure_aggs: dict[str, str] = task.measure_aggregations or {m: "sum" for m in task.measures}
+
+    numeric_columns = list(dict.fromkeys([*task.measures, *derived_required_columns]))
 
     # Convert measures to float64 to handle nullable Pandas types (Int64, Float64)
-    for m in task.measures:
+    for m in numeric_columns:
         before_notna = merged[m].notna().sum()
         merged[m] = pd.to_numeric(merged[m], errors="coerce").astype("float64")
         lost = before_notna - merged[m].notna().sum()
@@ -316,9 +361,36 @@ def _resample_aggregate(
             result_parts.append(pd.DataFrame(rows))
         else:
             raise ExecutorError(
-                f"Unsupported aggregation method '{agg}' for "
-                f"dataset '{task.dataset_id}'."
+                f"Unsupported aggregation method '{agg}' for dataset '{task.dataset_id}'."
             )
+
+    if derived_measures:
+        weight_col = base_weight_col
+        derived_rows = []
+        for geo_id, group in merged.groupby(target_col):
+            row: dict[str, object] = {target_col: geo_id}
+            weight = group[weight_col]
+            for output_name, config in derived_measures.items():
+                if config.get("type", "rate_from_weighted_counts") != "rate_from_weighted_counts":
+                    raise ExecutorError(
+                        f"Unsupported derived measure type "
+                        f"{config.get('type')!r} for '{output_name}'."
+                    )
+                rate_col = str(config["source_rate_column"])
+                denom_col = str(config["denominator_column"])
+                numerator_output = config.get("numerator_output_column")
+                valid = group[rate_col].notna() & group[denom_col].notna() & weight.notna()
+                weighted_numerator = (
+                    group.loc[valid, rate_col] * group.loc[valid, denom_col] * weight.loc[valid]
+                ).sum()
+                weighted_denominator = (group.loc[valid, denom_col] * weight.loc[valid]).sum()
+                if numerator_output is not None:
+                    row[str(numerator_output)] = weighted_numerator
+                row[output_name] = (
+                    weighted_numerator / weighted_denominator if weighted_denominator > 0 else None
+                )
+            derived_rows.append(row)
+        result_parts.append(pd.DataFrame(derived_rows))
 
     # Merge all result parts on target column
     result = result_parts[0]
@@ -355,8 +427,7 @@ def _resample_allocate(
     weight_col = "area_share"
     if weight_col not in xwalk.columns:
         raise ExecutorError(
-            f"Crosswalk missing weight column '{weight_col}'. "
-            f"Available: {sorted(xwalk.columns)}"
+            f"Crosswalk missing weight column '{weight_col}'. Available: {sorted(xwalk.columns)}"
         )
 
     # Detect the source geography column in the crosswalk
@@ -372,8 +443,7 @@ def _resample_allocate(
 
     if merged.empty:
         raise ExecutorError(
-            f"Resample allocate for '{task.dataset_id}' year {task.year}: "
-            f"zero rows after join."
+            f"Resample allocate for '{task.dataset_id}' year {task.year}: zero rows after join."
         )
 
     # Allocate: distribute source value by weight

@@ -859,6 +859,7 @@ TransformSpec = Annotated[CrosswalkTransform | RollupTransform, Field(discrimina
 
 ResampleMethod = Literal["identity", "allocate", "aggregate"]
 AggregationMethod = Literal["sum", "mean", "weighted_mean"]
+DerivedMeasureType = Literal["rate_from_weighted_counts"]
 SAEAllocationMethod = Literal["tract_share_within_county"]
 SAEFallbackPolicy = Literal["diagnose_only", "fail"]
 SAEZeroDenominatorPolicy = Literal["null_rate", "diagnostic"]
@@ -929,9 +930,7 @@ class TransformSetSpec(BaseModel):
             seg_years = set(expand_year_spec(seg.years))
             overlap = all_years & seg_years
             if overlap:
-                raise ValueError(
-                    f"TransformSetSpec segments overlap on years: {sorted(overlap)}."
-                )
+                raise ValueError(f"TransformSetSpec segments overlap on years: {sorted(overlap)}.")
             all_years |= seg_years
         return self
 
@@ -941,6 +940,47 @@ class MeasureAggConfig(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
     aggregation: AggregationMethod = Field(..., description="Aggregation method for this measure.")
+
+
+class DerivedMeasureConfig(BaseModel):
+    """Derived measure computed during aggregate resampling.
+
+    ``rate_from_weighted_counts`` is for source rate columns that must be
+    converted back to count-like numerators before geographic aggregation:
+    ``source_rate_column * denominator_column``. The executor applies the
+    crosswalk weight to both that numerator and the denominator, sums both at
+    target geography, then emits ``numerator_sum / denominator_sum``.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    type: DerivedMeasureType = Field(
+        default="rate_from_weighted_counts",
+        description="Derived-measure algorithm.",
+    )
+    source_rate_column: str = Field(
+        ...,
+        description="Input rate column at source geography.",
+    )
+    denominator_column: str = Field(
+        ...,
+        description="Input denominator/universe column at source geography.",
+    )
+    numerator_output_column: str | None = Field(
+        default=None,
+        description="Optional output column for the weighted numerator sum.",
+    )
+    zero_denominator_policy: Literal["null_rate"] = Field(
+        default="null_rate",
+        description="How to emit rates when the weighted denominator sum is zero.",
+    )
+
+    @field_validator("source_rate_column", "denominator_column", "numerator_output_column")
+    @classmethod
+    def _validate_non_blank_column(cls, value: str | None) -> str | None:
+        if value is not None and not value.strip():
+            raise ValueError("Derived measure column names may not be blank.")
+        return value
 
 
 class ResampleStep(BaseModel):
@@ -983,6 +1023,14 @@ class ResampleStep(BaseModel):
         ...,
         description="Map of measure name → aggregation config.",
     )
+    derived_measures: dict[str, DerivedMeasureConfig] = Field(
+        default_factory=dict,
+        description=(
+            "Map of output measure name → derived aggregation config. "
+            "Used for rates that must be recomputed from weighted numerators "
+            "and denominators rather than averaged."
+        ),
+    )
     aggregation: AggregationMethod | None = Field(
         default=None,
         description="Deprecated: uniform aggregation method. Use per-measure config instead.",
@@ -1016,9 +1064,7 @@ class ResampleStep(BaseModel):
                 "ResampleStep.method in {allocate,aggregate} requires 'via' or 'transform_set'."
             )
         if self.method == "identity" and (has_via or has_transform_set):
-            raise ValueError(
-                "ResampleStep.method=identity must not set 'via' or 'transform_set'."
-            )
+            raise ValueError("ResampleStep.method=identity must not set 'via' or 'transform_set'.")
         return self
 
     @property
@@ -1168,17 +1214,14 @@ class SmallAreaEstimateStep(BaseModel):
         direct_medians = sorted(set(value.values()) & _SAE_DIRECT_MEDIAN_CONTEXT_COLUMNS)
         if direct_medians:
             raise ValueError(
-                "SAE denominators cannot use direct ACS median/context columns: "
-                f"{direct_medians}."
+                f"SAE denominators cannot use direct ACS median/context columns: {direct_medians}."
             )
         return value
 
     @model_validator(mode="after")
     def _validate_geometries(self) -> SmallAreaEstimateStep:
         if self.source_dataset == self.support_dataset:
-            raise ValueError(
-                "SAE source_dataset and support_dataset must be different artifacts."
-            )
+            raise ValueError("SAE source_dataset and support_dataset must be different artifacts.")
         if self.source_geometry.type != "county":
             raise ValueError(
                 "SAE source_geometry.type must be 'county' for ACS1 county aggregates."

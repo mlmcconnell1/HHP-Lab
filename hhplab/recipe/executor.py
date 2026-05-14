@@ -190,6 +190,7 @@ __all__ = [
 # Step executors
 # ---------------------------------------------------------------------------
 
+
 def _normalize_recipe_population_measure(
     result_df: pd.DataFrame,
     *,
@@ -270,8 +271,7 @@ def _rename_conflicting_population_columns(
         for lineage_col in lineage_cols:
             if lineage_col in frame.columns:
                 rename_map[lineage_col] = (
-                    f"{TOTAL_POPULATION}_{token}"
-                    f"{lineage_col.removeprefix(TOTAL_POPULATION)}"
+                    f"{TOTAL_POPULATION}_{token}{lineage_col.removeprefix(TOTAL_POPULATION)}"
                 )
         renamed.append(frame.rename(columns=rename_map))
     return renamed
@@ -322,9 +322,7 @@ def _resample_pep_decennial_tract_mediated_population(
         )
     target_col = _detect_xwalk_target_col(xwalk, xwalk_key)
     pep_df = (
-        source_df[[geo_col, "year", "population"]]
-        .rename(columns={geo_col: "county_fips"})
-        .copy()
+        source_df[[geo_col, "year", "population"]].rename(columns={geo_col: "county_fips"}).copy()
     )
     result = aggregate_pep_counties(
         pep_df,
@@ -351,9 +349,7 @@ def _resample_pep_decennial_tract_mediated_population(
             source_year=task.year,
             method=PopulationMethod.TRACT_MEDIATED_CROSSWALK,
             crosswalk_id=task.transform_id,
-            crosswalk_geometry=(
-                f"{task.effective_geometry.type}_to_{task.to_geometry.type}"
-            ),
+            crosswalk_geometry=(f"{task.effective_geometry.type}_to_{task.to_geometry.type}"),
             crosswalk_vintage=task.effective_geometry.vintage,
         ),
     )
@@ -382,7 +378,9 @@ def _execute_materialize(
                 break
         try:
             path = _resolve_transform_path(
-                tid, ctx.recipe, ctx.project_root,
+                tid,
+                ctx.recipe,
+                ctx.project_root,
             )
         except ExecutorError as exc:
             return StepResult(
@@ -426,14 +424,16 @@ def _execute_materialize(
             ctx.transform_paths[tid] = path
             identity = ctx.cache.file_identity(path)
             xwalk_root, xwalk_rel = _classify_path(path, ctx)
-            ctx.consumed_assets.append(AssetRecord(
-                role="crosswalk",
-                path=xwalk_rel,
-                sha256=identity.sha256,
-                size=identity.size,
-                root=xwalk_root,
-                transform_id=tid,
-            ))
+            ctx.consumed_assets.append(
+                AssetRecord(
+                    role="crosswalk",
+                    path=xwalk_rel,
+                    sha256=identity.sha256,
+                    size=identity.size,
+                    root=xwalk_root,
+                    transform_id=tid,
+                )
+            )
         else:
             return StepResult(
                 step_kind="materialize",
@@ -464,10 +464,7 @@ def _execute_resample(
     Loads the input dataset, applies the resampling method, validates
     required columns, and stores the result in ``ctx.intermediates``.
     """
-    detail = (
-        f"resample {task.dataset_id} year={task.year} "
-        f"method={task.method}"
-    )
+    detail = f"resample {task.dataset_id} year={task.year} method={task.method}"
     step_notes: list[str] = []
     if task.transform_id:
         detail += f" via={task.transform_id}"
@@ -482,8 +479,7 @@ def _execute_resample(
             detail=detail,
             success=False,
             error=(
-                f"Dataset '{task.dataset_id}' year {task.year}: "
-                f"no input path resolved by planner."
+                f"Dataset '{task.dataset_id}' year {task.year}: no input path resolved by planner."
             ),
         )
 
@@ -528,14 +524,16 @@ def _execute_resample(
     # Record consumed asset (deduplicated by path later in manifest)
     identity = ctx.cache.file_identity(input_file)
     ds_root, ds_rel = _classify_path(input_file, ctx)
-    ctx.consumed_assets.append(AssetRecord(
-        role="dataset",
-        path=ds_rel,
-        sha256=identity.sha256,
-        size=identity.size,
-        root=ds_root,
-        dataset_id=task.dataset_id,
-    ))
+    ctx.consumed_assets.append(
+        AssetRecord(
+            role="dataset",
+            path=ds_rel,
+            sha256=identity.sha256,
+            size=identity.size,
+            root=ds_root,
+            dataset_id=task.dataset_id,
+        )
+    )
 
     # Apply temporal filter if declared for this dataset
     filt = ctx.recipe.filters.get(task.dataset_id)
@@ -690,6 +688,8 @@ def _execute_resample(
                             for measure in task.measures
                             if measure_aggs.get(measure, "sum") != "sum"
                         ]
+                        if task.derived_measures:
+                            non_sum_measures.extend(sorted(task.derived_measures))
                         geo_col = _resolve_geo_column(df, task.geo_column)
                         if _needs_ct_planning_to_legacy_alignment(
                             xwalk=xwalk,
@@ -722,10 +722,30 @@ def _execute_resample(
                                 f"'{task.dataset_id}' to legacy counties before "
                                 "aggregate resampling.",
                             )
+                            derived_required_columns = (
+                                sorted(
+                                    {
+                                        str(config[column])
+                                        for config in task.derived_measures.values()
+                                        for column in ("source_rate_column", "denominator_column")
+                                        if config.get(column) is not None
+                                    }
+                                )
+                                if task.derived_measures
+                                else []
+                            )
+                            value_columns = list(
+                                dict.fromkeys(
+                                    [
+                                        *task.measures,
+                                        *derived_required_columns,
+                                    ]
+                                )
+                            )
                             df = _translate_ct_planning_values_to_legacy(
-                                df=df[[geo_col, *task.measures]].copy(),
+                                df=df[[geo_col, *value_columns]].copy(),
                                 geo_col=geo_col,
-                                value_columns=task.measures,
+                                value_columns=value_columns,
                                 crosswalk=ct_bridge,
                                 year_value=task.year if "year" in df.columns else None,
                             )
@@ -767,9 +787,15 @@ def _execute_resample(
     intermediate_key = (task.dataset_id, task.year)
     if task.weighting_variety is not None and task.weighting_variety_count > 1:
         suffix = f"__w{task.weighting_variety}"
+        derived_output_cols = []
+        for output_name, config in (task.derived_measures or {}).items():
+            derived_output_cols.append(output_name)
+            numerator_output = config.get("numerator_output_column")
+            if numerator_output is not None:
+                derived_output_cols.append(str(numerator_output))
         rename_cols = {
             measure: f"{measure}{suffix}"
-            for measure in task.measures
+            for measure in [*task.measures, *derived_output_cols]
             if measure in result_df.columns
         }
         result_df = result_df.rename(columns=rename_cols)
@@ -777,8 +803,7 @@ def _execute_resample(
             merge_keys = [
                 key
                 for key in ("geo_id", "year")
-                if key in ctx.intermediates[intermediate_key].columns
-                and key in result_df.columns
+                if key in ctx.intermediates[intermediate_key].columns and key in result_df.columns
             ]
             if not merge_keys:
                 return StepResult(
@@ -816,10 +841,7 @@ def _execute_join(
     performs an outer join on the specified keys.  Stores the result
     back in ``ctx.intermediates`` keyed as ``("__joined__", year)``.
     """
-    detail = (
-        f"join datasets={task.datasets} year={task.year} "
-        f"on={task.join_on}"
-    )
+    detail = f"join datasets={task.datasets} year={task.year} on={task.join_on}"
     _echo(ctx, f"  [join] {detail}")
 
     frames: list[pd.DataFrame] = []
@@ -854,8 +876,7 @@ def _execute_join(
             detail=detail,
             success=False,
             error=(
-                f"None of the join keys {task.join_on} are present "
-                f"in all intermediate datasets."
+                f"None of the join keys {task.join_on} are present in all intermediate datasets."
             ),
         )
 
@@ -1070,42 +1091,41 @@ def execute_recipe(
             errors.append(msg)
             _log(f"  {msg}")
             # Record a failed result so partial_results is complete
-            results.append(PipelineResult(
-                pipeline_id=pipeline.id,
-                steps=[StepResult(
-                    step_kind="plan",
-                    detail=f"planning failed: {exc}",
-                    success=False,
-                    error=str(exc),
-                )],
-            ))
+            results.append(
+                PipelineResult(
+                    pipeline_id=pipeline.id,
+                    steps=[
+                        StepResult(
+                            step_kind="plan",
+                            detail=f"planning failed: {exc}",
+                            success=False,
+                            error=str(exc),
+                        )
+                    ],
+                )
+            )
             continue
 
-        task_count = (
-            len(plan.materialize_tasks)
-            + len(plan.resample_tasks)
-            + len(plan.join_tasks)
-        )
+        task_count = len(plan.materialize_tasks) + len(plan.resample_tasks) + len(plan.join_tasks)
         _log(f"  Resolved {task_count} tasks")
 
         # Execute the plan
         result = _execute_plan(
-            plan, recipe, project_root,
-            cache=cache, quiet=quiet, storage_config=storage_config,
+            plan,
+            recipe,
+            project_root,
+            cache=cache,
+            quiet=quiet,
+            storage_config=storage_config,
         )
         results.append(result)
 
         if result.success:
-            _log(
-                f"  Pipeline '{pipeline.id}' completed: "
-                f"{len(result.steps)} steps OK"
-            )
+            _log(f"  Pipeline '{pipeline.id}' completed: {len(result.steps)} steps OK")
         else:
             failed = next(s for s in result.steps if not s.success)
-            msg = (
-                f"Pipeline '{pipeline.id}': step failed: "
-                f"[{failed.step_kind}] {failed.detail}"
-                + (f" — {failed.error}" if failed.error else "")
+            msg = f"Pipeline '{pipeline.id}': step failed: [{failed.step_kind}] {failed.detail}" + (
+                f" — {failed.error}" if failed.error else ""
             )
             errors.append(msg)
 
