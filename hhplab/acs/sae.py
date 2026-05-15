@@ -4,8 +4,9 @@ from __future__ import annotations
 
 import json
 from collections.abc import Iterable
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 import pandas as pd
 
@@ -26,6 +27,32 @@ ACS1_IMPUTATION_METHOD = "acs1_controlled_acs5_tract_share"
 ACS1_POVERTY_IMPUTATION_MEASURE_SPECS: tuple[ACS1ImputationMeasureSpec, ...] = (
     ACS1_IMPUTED_POVERTY_SPEC,
 )
+
+
+@dataclass(frozen=True)
+class ACS1ImputationDiagnosticFinding:
+    """Structured finding from ACS1 imputation diagnostics."""
+
+    severity: Literal["error", "warning"]
+    code: str
+    message: str
+    measure: str | None = None
+    target_id: str | None = None
+    tract_geoid: str | None = None
+    column: str | None = None
+    details: dict[str, object] | None = None
+
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "severity": self.severity,
+            "code": self.code,
+            "message": self.message,
+            "measure": self.measure,
+            "target_id": self.target_id,
+            "tract_geoid": self.tract_geoid,
+            "column": self.column,
+            "details": self.details or {},
+        }
 
 RENTER_BURDEN_30_PLUS_COLUMNS: tuple[str, ...] = (
     "sae_gross_rent_pct_income_30_to_34_9",
@@ -919,6 +946,467 @@ def impute_acs1_targets_to_tracts(
     result.attrs["imputation_method"] = ACS1_IMPUTATION_METHOD
     result.attrs["measure_specs"] = [spec.name for spec in spec_list]
     return result
+
+
+def _diagnostic_missing_columns(
+    df: pd.DataFrame,
+    *,
+    label: str,
+    columns: Iterable[str],
+) -> list[ACS1ImputationDiagnosticFinding]:
+    findings: list[ACS1ImputationDiagnosticFinding] = []
+    for column in columns:
+        if column not in df.columns:
+            findings.append(
+                ACS1ImputationDiagnosticFinding(
+                    severity="error",
+                    code="missing_required_column",
+                    message=(
+                        f"{label} is missing required column {column!r}. "
+                        "Add the column or adjust the imputation measure spec."
+                    ),
+                    column=column,
+                    details={"dataset": label},
+                )
+            )
+    return findings
+
+
+def _diagnostic_frame(
+    df: pd.DataFrame,
+    columns: Iterable[str],
+) -> pd.DataFrame:
+    result = df.copy()
+    for column in columns:
+        if column not in result.columns:
+            result[column] = pd.NA
+    return result
+
+
+def _append_finding(
+    findings: list[ACS1ImputationDiagnosticFinding],
+    *,
+    severity: Literal["error", "warning"],
+    code: str,
+    message: str,
+    measure: str | None = None,
+    target_id: str | None = None,
+    tract_geoid: str | None = None,
+    column: str | None = None,
+    details: dict[str, object] | None = None,
+) -> None:
+    findings.append(
+        ACS1ImputationDiagnosticFinding(
+            severity=severity,
+            code=code,
+            message=message,
+            measure=measure,
+            target_id=target_id,
+            tract_geoid=tract_geoid,
+            column=column,
+            details=details,
+        )
+    )
+
+
+def diagnose_acs1_imputation(
+    imputed_tracts: pd.DataFrame,
+    acs1_targets: pd.DataFrame,
+    acs5_tract_support: pd.DataFrame,
+    *,
+    specs: Iterable[ACS1ImputationMeasureSpec] = ACS1_IMPUTATION_MEASURE_SPECS,
+    target_id_col: str = "county_fips",
+    tract_crosswalk: pd.DataFrame | None = None,
+    share_column: str = "area_share",
+) -> list[ACS1ImputationDiagnosticFinding]:
+    """Validate ACS1-controlled tract imputation outputs.
+
+    Findings are intentionally structured and JSON-serializable via
+    ``to_dict()`` so recipe preflight and CI jobs can report actionable failures
+    without parsing human text.
+    """
+    spec_list = tuple(specs)
+    findings: list[ACS1ImputationDiagnosticFinding] = []
+    if not spec_list:
+        return [
+            ACS1ImputationDiagnosticFinding(
+                severity="error",
+                code="missing_measure_spec",
+                message="ACS1 imputation diagnostics require at least one measure spec.",
+            )
+        ]
+    for spec in spec_list:
+        spec.validate()
+
+    source_columns = list(
+        dict.fromkeys(column for spec in spec_list for column in spec.acs1_source_columns)
+    )
+    support_columns = list(
+        dict.fromkeys(column for spec in spec_list for column in spec.acs5_support_columns)
+    )
+    output_columns = list(
+        dict.fromkeys(column for spec in spec_list for column in spec.output_columns)
+    )
+    required_output = [
+        target_id_col,
+        "tract_geoid",
+        "acs1_vintage_used",
+        "acs5_vintage_used",
+        "tract_vintage_used",
+        "acs1_imputation_method",
+        "acs1_imputation_denominator_source",
+        "acs1_imputation_crosswalk_id",
+        "is_modeled",
+        "is_synthetic",
+        *output_columns,
+        "acs1_imputation_validation_abs_diff",
+        "acs1_imputation_validation_rel_diff",
+    ]
+
+    findings.extend(
+        _diagnostic_missing_columns(
+            acs1_targets,
+            label="acs1_targets",
+            columns=[target_id_col, "acs1_vintage", *source_columns],
+        )
+    )
+    findings.extend(
+        _diagnostic_missing_columns(
+            acs5_tract_support,
+            label="acs5_tract_support",
+            columns=["tract_geoid", "acs_vintage", "tract_vintage", *support_columns],
+        )
+    )
+    findings.extend(
+        _diagnostic_missing_columns(
+            imputed_tracts,
+            label="imputed_tracts",
+            columns=required_output,
+        )
+    )
+    if tract_crosswalk is None:
+        findings.extend(
+            _diagnostic_missing_columns(
+                acs5_tract_support,
+                label="acs5_tract_support",
+                columns=[target_id_col],
+            )
+        )
+    else:
+        findings.extend(
+            _diagnostic_missing_columns(
+                tract_crosswalk,
+                label="tract_crosswalk",
+                columns=[target_id_col, "tract_geoid", share_column],
+            )
+        )
+    has_missing_columns = any(
+        finding.severity == "error" and finding.code == "missing_required_column"
+        for finding in findings
+    )
+    if has_missing_columns:
+        return findings
+
+    targets = _diagnostic_frame(acs1_targets, [target_id_col, "acs1_vintage", *source_columns])
+    support = _diagnostic_frame(
+        acs5_tract_support,
+        ["tract_geoid", "acs_vintage", "tract_vintage", *support_columns],
+    )
+    output = _diagnostic_frame(imputed_tracts, required_output)
+    targets[target_id_col] = targets[target_id_col].astype("string")
+    support["tract_geoid"] = support["tract_geoid"].astype("string").str.zfill(11)
+    output[target_id_col] = output[target_id_col].astype("string")
+    output["tract_geoid"] = output["tract_geoid"].astype("string").str.zfill(11)
+    for column in [*source_columns]:
+        targets[column] = pd.to_numeric(targets[column], errors="coerce")
+    for column in [*support_columns]:
+        support[column] = pd.to_numeric(support[column], errors="coerce")
+    for column in output_columns:
+        output[column] = pd.to_numeric(output[column], errors="coerce")
+
+    if targets[target_id_col].duplicated(keep=False).any():
+        duplicated = sorted(
+            targets.loc[targets[target_id_col].duplicated(keep=False), target_id_col]
+            .dropna()
+            .astype(str)
+            .unique()
+        )
+        for target_id in duplicated:
+            _append_finding(
+                findings,
+                severity="error",
+                code="duplicate_acs1_target",
+                message=(
+                    f"ACS1 target {target_id} has multiple rows. Keep one row per "
+                    f"{target_id_col} before imputation."
+                ),
+                target_id=target_id,
+                details={"target_id_col": target_id_col},
+            )
+
+    target_ids = set(targets[target_id_col].dropna().astype(str))
+    output_target_ids = set(output[target_id_col].dropna().astype(str))
+    for target_id in sorted(target_ids - output_target_ids):
+        _append_finding(
+            findings,
+            severity="error",
+            code="missing_acs1_target_allocation",
+            message=(
+                f"ACS1 target {target_id} has no imputed tract rows. Add ACS5 support "
+                "and crosswalk coverage for the target."
+            ),
+            target_id=target_id,
+        )
+    for target_id in sorted(output_target_ids - target_ids):
+        _append_finding(
+            findings,
+            severity="error",
+            code="unmatched_imputed_target",
+            message=(
+                f"Imputed output includes target {target_id} with no ACS1 target row. "
+                "Remove the row or add the matching ACS1 target."
+            ),
+            target_id=target_id,
+        )
+
+    if tract_crosswalk is None:
+        support[target_id_col] = support[target_id_col].astype("string")
+        allocation_frame = support[[target_id_col, "tract_geoid", *support_columns]].copy()
+        allocation_frame["_imputation_share"] = 1.0
+        for target_id in sorted(set(support[target_id_col].dropna().astype(str)) - target_ids):
+            _append_finding(
+                findings,
+                severity="warning",
+                code="unmatched_support_target",
+                message=(
+                    f"ACS5 support includes target {target_id} with no ACS1 target row. "
+                    "It will not receive controlled ACS1 totals."
+                ),
+                target_id=target_id,
+            )
+    else:
+        xwalk = tract_crosswalk.copy()
+        xwalk[target_id_col] = xwalk[target_id_col].astype("string")
+        xwalk["tract_geoid"] = xwalk["tract_geoid"].astype("string").str.zfill(11)
+        xwalk["_imputation_share"] = pd.to_numeric(xwalk[share_column], errors="coerce")
+        for target_id in sorted(set(xwalk[target_id_col].dropna().astype(str)) - target_ids):
+            _append_finding(
+                findings,
+                severity="error",
+                code="unmatched_crosswalk_target",
+                message=(
+                    f"Crosswalk includes target {target_id} with no ACS1 target row. "
+                    "Align target geography IDs before imputation."
+                ),
+                target_id=target_id,
+            )
+        support_tracts = set(support["tract_geoid"].dropna().astype(str))
+        xwalk_tracts = set(xwalk["tract_geoid"].dropna().astype(str))
+        for tract_geoid in sorted(xwalk_tracts - support_tracts):
+            _append_finding(
+                findings,
+                severity="error",
+                code="missing_acs5_tract_support",
+                message=(
+                    f"Crosswalk tract {tract_geoid} is absent from ACS5 support. "
+                    "Add support rows for all crosswalk tracts."
+                ),
+                tract_geoid=tract_geoid,
+            )
+        for tract_geoid in sorted(support_tracts - xwalk_tracts):
+            _append_finding(
+                findings,
+                severity="warning",
+                code="unmatched_support_tract",
+                message=(
+                    f"ACS5 support tract {tract_geoid} is not present in the crosswalk. "
+                    "Confirm this is outside the requested target geography."
+                ),
+                tract_geoid=tract_geoid,
+            )
+        invalid_share = xwalk["_imputation_share"].isna() | (xwalk["_imputation_share"] < 0)
+        for row in xwalk.loc[invalid_share, [target_id_col, "tract_geoid"]].itertuples(index=False):
+            _append_finding(
+                findings,
+                severity="error",
+                code="invalid_crosswalk_share",
+                message=(
+                    f"Crosswalk row for target {row[0]} tract {row[1]} has a missing "
+                    "or negative share. Provide non-negative numeric shares."
+                ),
+                target_id=str(row[0]),
+                tract_geoid=str(row[1]),
+                column=share_column,
+            )
+        allocation_frame = xwalk[[target_id_col, "tract_geoid", "_imputation_share"]].merge(
+            support[["tract_geoid", *support_columns]],
+            on="tract_geoid",
+            how="left",
+        )
+
+    target_index = targets.set_index(target_id_col, drop=True)
+    allocation_frame[target_id_col] = allocation_frame[target_id_col].astype("string")
+    allocation_frame["_imputation_share"] = pd.to_numeric(
+        allocation_frame["_imputation_share"],
+        errors="coerce",
+    )
+
+    for target_id in sorted(target_ids):
+        target_rows = allocation_frame[allocation_frame[target_id_col].astype(str).eq(target_id)]
+        if target_rows.empty:
+            _append_finding(
+                findings,
+                severity="error",
+                code="missing_target_support_coverage",
+                message=(
+                    f"Target {target_id} has no ACS5 tract support rows. Add support "
+                    "or remove the target from the imputation request."
+                ),
+                target_id=target_id,
+            )
+            continue
+        for spec in spec_list:
+            for source_column in spec.acs1_source_columns:
+                source_value = target_index.at[target_id, source_column]
+                if pd.isna(source_value):
+                    _append_finding(
+                        findings,
+                        severity="error",
+                        code="missing_acs1_target_value",
+                        message=(
+                            f"ACS1 target {target_id} is missing {source_column}. "
+                            "Provide count inputs for every configured measure."
+                        ),
+                        measure=spec.name,
+                        target_id=target_id,
+                        column=source_column,
+                    )
+                support_total = (
+                    target_rows[source_column] * target_rows["_imputation_share"]
+                ).sum(min_count=1)
+                if pd.isna(support_total):
+                    _append_finding(
+                        findings,
+                        severity="error",
+                        code="missing_acs5_support_value",
+                        message=(
+                            f"Target {target_id} has no ACS5 support values for "
+                            f"{source_column}. Populate ACS5 tract support for this measure."
+                        ),
+                        measure=spec.name,
+                        target_id=target_id,
+                        column=source_column,
+                    )
+                elif float(support_total) == 0.0:
+                    severity: Literal["error", "warning"] = (
+                        "warning"
+                        if pd.isna(source_value) or float(source_value) == 0.0
+                        else "error"
+                    )
+                    _append_finding(
+                        findings,
+                        severity=severity,
+                        code="zero_support_denominator",
+                        message=(
+                            f"Target {target_id} has zero ACS5 support for {source_column}. "
+                            "Use an explicit zero-denominator policy or repair support data."
+                        ),
+                        measure=spec.name,
+                        target_id=target_id,
+                        column=source_column,
+                        details={"zero_denominator_policy": spec.zero_denominator_policy},
+                    )
+
+    provenance_expectations: tuple[tuple[str, object, str], ...] = (
+        ("acs1_imputation_method", ACS1_IMPUTATION_METHOD, "modeled imputation method"),
+        ("acs1_imputation_denominator_source", "acs5_tract_support", "denominator source"),
+        ("is_modeled", True, "modeled flag"),
+        ("is_synthetic", True, "synthetic flag"),
+    )
+    for column, expected, label in provenance_expectations:
+        bad_mask = output[column].ne(expected) | output[column].isna()
+        for row in output.loc[bad_mask, [target_id_col, "tract_geoid", column]].itertuples(
+            index=False
+        ):
+            _append_finding(
+                findings,
+                severity="error",
+                code="invalid_modeled_provenance",
+                message=(
+                    f"Imputed row for target {row[0]} tract {row[1]} has invalid "
+                    f"{label}: {row[2]!r}. Expected {expected!r}."
+                ),
+                target_id=str(row[0]),
+                tract_geoid=str(row[1]),
+                column=column,
+                details={"expected": expected, "actual": row[2]},
+            )
+    if tract_crosswalk is not None:
+        missing_crosswalk_id = output["acs1_imputation_crosswalk_id"].isna()
+        for row in output.loc[missing_crosswalk_id, [target_id_col, "tract_geoid"]].itertuples(
+            index=False
+        ):
+            _append_finding(
+                findings,
+                severity="error",
+                code="missing_crosswalk_provenance",
+                message=(
+                    f"Imputed row for target {row[0]} tract {row[1]} is missing "
+                    "acs1_imputation_crosswalk_id. Preserve crosswalk provenance."
+                ),
+                target_id=str(row[0]),
+                tract_geoid=str(row[1]),
+                column="acs1_imputation_crosswalk_id",
+            )
+
+    output_by_target = output.groupby(target_id_col, dropna=False)
+    for spec in spec_list:
+        component_pairs: list[tuple[str, str]] = []
+        if spec.value_kind == "rate":
+            assert spec.numerator_output_column is not None
+            assert spec.denominator_output_column is not None
+            component_pairs = [
+                (spec.numerator_source_columns[0], spec.numerator_output_column),
+                (spec.denominator_source_column or "", spec.denominator_output_column),
+            ]
+        else:
+            component_pairs = [(spec.acs1_source_columns[0], spec.output_column)]
+        for source_column, output_column in component_pairs:
+            allocated_by_target = output_by_target[output_column].sum(min_count=1)
+            for target_id in sorted(target_ids & output_target_ids):
+                allocated_value = allocated_by_target.get(target_id, pd.NA)
+                source_value = target_index.at[target_id, source_column]
+                allocated_float = None if pd.isna(allocated_value) else float(allocated_value)
+                source_float = None if pd.isna(source_value) else float(source_value)
+                abs_diff, rel_diff = _validation_diff(allocated_float, source_float)
+                if abs_diff is None or rel_diff is None:
+                    continue
+                if (
+                    abs(abs_diff) > spec.validation_abs_tolerance
+                    and abs(rel_diff) > spec.validation_rel_tolerance
+                ):
+                    _append_finding(
+                        findings,
+                        severity="error",
+                        code="conservation_residual",
+                        message=(
+                            f"Imputed {output_column} for target {target_id} does not "
+                            f"sum to ACS1 {source_column}. abs_diff={abs_diff}, "
+                            f"rel_diff={rel_diff}."
+                        ),
+                        measure=spec.name,
+                        target_id=target_id,
+                        column=output_column,
+                        details={
+                            "source_column": source_column,
+                            "source_total": source_float,
+                            "allocated_total": allocated_float,
+                            "abs_diff": abs_diff,
+                            "rel_diff": rel_diff,
+                        },
+                    )
+
+    return findings
 
 
 def _quantile_from_bins(

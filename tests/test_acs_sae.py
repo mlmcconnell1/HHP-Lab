@@ -21,6 +21,7 @@ from hhplab.acs.sae import (
     compare_sae_to_direct_counties,
     derive_sae_burden_measures,
     derive_sae_distribution_measures,
+    diagnose_acs1_imputation,
     impute_acs1_targets_to_tracts,
     prepare_acs1_imputation_targets,
     prepare_acs5_imputation_support,
@@ -218,6 +219,125 @@ def test_impute_acs1_targets_conserves_target_totals() -> None:
     assert allocated.loc["08059", "acs1_imputed_population_below_poverty"] == pytest.approx(50.0)
     assert allocated.loc["08059", "acs1_imputed_poverty_universe"] == pytest.approx(200.0)
     assert allocated.loc["08059", "acs1_imputed_total_households"] == pytest.approx(100.0)
+
+
+def test_diagnose_acs1_imputation_returns_json_clean_findings() -> None:
+    result = impute_acs1_targets_to_tracts(
+        ACS1_TARGETS,
+        ACS5_IMPUTATION_SUPPORT,
+        specs=(ACS1_IMPUTED_POVERTY_SPEC, ACS1_IMPUTED_TOTAL_HOUSEHOLDS_SPEC),
+        year=2023,
+    )
+
+    findings = diagnose_acs1_imputation(
+        result,
+        ACS1_TARGETS,
+        ACS5_IMPUTATION_SUPPORT,
+        specs=(ACS1_IMPUTED_POVERTY_SPEC, ACS1_IMPUTED_TOTAL_HOUSEHOLDS_SPEC),
+    )
+
+    assert findings == []
+    assert json.dumps([finding.to_dict() for finding in findings]) == "[]"
+
+
+def test_diagnose_acs1_imputation_reports_missing_target_allocation() -> None:
+    result = impute_acs1_targets_to_tracts(
+        ACS1_TARGETS,
+        ACS5_IMPUTATION_SUPPORT,
+        specs=(ACS1_IMPUTED_TOTAL_HOUSEHOLDS_SPEC,),
+        year=2023,
+    )
+    incomplete = result[result["county_fips"] != "08059"].copy()
+
+    findings = diagnose_acs1_imputation(
+        incomplete,
+        ACS1_TARGETS,
+        ACS5_IMPUTATION_SUPPORT,
+        specs=(ACS1_IMPUTED_TOTAL_HOUSEHOLDS_SPEC,),
+    )
+
+    assert [finding.code for finding in findings] == ["missing_acs1_target_allocation"]
+    assert findings[0].target_id == "08059"
+
+
+def test_diagnose_acs1_imputation_reports_missing_support_and_unmatched_crosswalk() -> None:
+    result = impute_acs1_targets_to_tracts(
+        ACS1_TARGETS,
+        ACS5_IMPUTATION_SUPPORT,
+        specs=(ACS1_IMPUTED_TOTAL_HOUSEHOLDS_SPEC,),
+        year=2023,
+    )
+    crosswalk = pd.DataFrame(
+        [
+            {"county_fips": "08031", "tract_geoid": "08031001000", "area_share": 1.0},
+            {"county_fips": "08031", "tract_geoid": "08031009999", "area_share": 1.0},
+            {"county_fips": "99999", "tract_geoid": "08059000100", "area_share": 1.0},
+        ]
+    )
+
+    findings = diagnose_acs1_imputation(
+        result,
+        ACS1_TARGETS,
+        ACS5_IMPUTATION_SUPPORT,
+        specs=(ACS1_IMPUTED_TOTAL_HOUSEHOLDS_SPEC,),
+        tract_crosswalk=crosswalk,
+    )
+
+    assert {finding.code for finding in findings} >= {
+        "unmatched_crosswalk_target",
+        "missing_acs5_tract_support",
+        "missing_crosswalk_provenance",
+    }
+
+
+def test_diagnose_acs1_imputation_reports_zero_denominator_and_missing_acs1_target() -> None:
+    result = impute_acs1_targets_to_tracts(
+        ACS1_TARGETS,
+        ACS5_IMPUTATION_SUPPORT,
+        specs=(ACS1_IMPUTED_TOTAL_HOUSEHOLDS_SPEC,),
+        year=2023,
+    )
+    targets = ACS1_TARGETS.copy()
+    support = ACS5_IMPUTATION_SUPPORT.copy()
+    targets.loc[targets["county_fips"] == "08059", "total_households"] = pd.NA
+    support.loc[support["county_fips"] == "08031", "total_households"] = 0
+
+    findings = diagnose_acs1_imputation(
+        result,
+        targets,
+        support,
+        specs=(ACS1_IMPUTED_TOTAL_HOUSEHOLDS_SPEC,),
+    )
+
+    assert {finding.code for finding in findings} >= {
+        "missing_acs1_target_value",
+        "zero_support_denominator",
+    }
+
+
+def test_diagnose_acs1_imputation_reports_conservation_and_provenance_failures() -> None:
+    result = impute_acs1_targets_to_tracts(
+        ACS1_TARGETS,
+        ACS5_IMPUTATION_SUPPORT,
+        specs=(ACS1_IMPUTED_TOTAL_HOUSEHOLDS_SPEC,),
+        year=2023,
+    )
+    broken = result.copy()
+    broken.loc[0, "acs1_imputed_total_households"] += 1
+    broken.loc[0, "is_synthetic"] = False
+
+    findings = diagnose_acs1_imputation(
+        broken,
+        ACS1_TARGETS,
+        ACS5_IMPUTATION_SUPPORT,
+        specs=(ACS1_IMPUTED_TOTAL_HOUSEHOLDS_SPEC,),
+    )
+
+    assert {finding.code for finding in findings} >= {
+        "conservation_residual",
+        "invalid_modeled_provenance",
+    }
+    assert any(finding.measure == "total_households" for finding in findings)
 
 
 def test_impute_acs1_targets_uses_tract_to_target_crosswalk_weights() -> None:

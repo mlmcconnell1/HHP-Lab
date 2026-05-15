@@ -16,6 +16,7 @@ _EXPORTS = {
     "build_metro_tract_crosswalk": ("hhplab.acs.acs_metro", "build_metro_tract_crosswalk"),
     "build_sae_provenance": ("hhplab.acs.sae", "build_sae_provenance"),
     "compare_sae_to_direct_counties": ("hhplab.acs.sae", "compare_sae_to_direct_counties"),
+    "diagnose_acs1_imputation": ("hhplab.acs.sae", "diagnose_acs1_imputation"),
     "derive_sae_burden_measures": ("hhplab.acs.sae", "derive_sae_burden_measures"),
     "derive_sae_distribution_measures": ("hhplab.acs.sae", "derive_sae_distribution_measures"),
     "TranslationStats": ("hhplab.acs.translate", "TranslationStats"),
