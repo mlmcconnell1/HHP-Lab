@@ -101,6 +101,14 @@ _XWALK_NON_GEO_COLS: set[str] = {
 _ACS1_IMPUTATION_PASSTHROUGH_COLUMNS: tuple[str, ...] = (
     *ACS1_IMPUTATION_LINEAGE_COLUMNS,
     *ACS1_IMPUTATION_FLAG_COLUMNS,
+    "acs1_control_geo_type",
+    "acs1_control_geo_id",
+    "acs1_control_reason",
+    "acs1_control_policy_id",
+    "acs1_control_ct_bridge_status",
+    "control_geo_type",
+    "control_geo_id",
+    "fallback_reason",
 )
 
 
@@ -274,9 +282,7 @@ def _aggregate_acs1_imputation_passthrough(
     target_col: str,
 ) -> pd.DataFrame | None:
     columns = [
-        column
-        for column in _ACS1_IMPUTATION_PASSTHROUGH_COLUMNS
-        if column in merged.columns
+        column for column in _ACS1_IMPUTATION_PASSTHROUGH_COLUMNS if column in merged.columns
     ]
     if not columns:
         return None
@@ -438,14 +444,8 @@ def _resample_aggregate(
                 numerator_output = config.get("numerator_output_column")
                 if numerator_col is not None:
                     numerator_col = str(numerator_col)
-                    valid = (
-                        group[numerator_col].notna()
-                        & group[denom_col].notna()
-                        & weight.notna()
-                    )
-                    weighted_numerator = (
-                        group.loc[valid, numerator_col] * weight.loc[valid]
-                    ).sum()
+                    valid = group[numerator_col].notna() & group[denom_col].notna() & weight.notna()
+                    weighted_numerator = (group.loc[valid, numerator_col] * weight.loc[valid]).sum()
                 else:
                     valid = group[rate_col].notna() & group[denom_col].notna() & weight.notna()
                     weighted_numerator = (

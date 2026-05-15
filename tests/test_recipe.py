@@ -4514,6 +4514,13 @@ class TestResampleAggregate:
                 ],
                 "is_modeled": [True, True, True],
                 "is_synthetic": [True, True, True],
+                "control_geo_type": ["county", "metro", "county"],
+                "control_geo_id": ["08031", "19740", "08059"],
+                "fallback_reason": [
+                    "county_available_and_material",
+                    "county_missing_or_unavailable",
+                    "county_available_and_material",
+                ],
             }
         ).to_parquet(ds_path)
 
@@ -4563,6 +4570,11 @@ class TestResampleAggregate:
         assert df.loc["COC1", "acs1_imputation_crosswalk_id"] == "county_to_tract"
         assert bool(df.loc["COC1", "is_modeled"]) is True
         assert bool(df.loc["COC1", "is_synthetic"]) is True
+        assert df.loc["COC1", "control_geo_type"] == '["county", "metro"]'
+        assert df.loc["COC1", "control_geo_id"] == '["08031", "19740"]'
+        assert df.loc["COC1", "fallback_reason"] == (
+            '["county_available_and_material", "county_missing_or_unavailable"]'
+        )
 
     def test_aggregate_derived_rate_can_use_explicit_numerator_count(self, tmp_path: Path):
         """Explicit numerator counts are aggregated directly before recomputing rates."""

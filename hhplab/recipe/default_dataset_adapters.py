@@ -214,7 +214,18 @@ def _validate_census_acs1_imputation_target(spec: DatasetSpec) -> list[Validatio
                 "set source for target matching provenance.",
             )
         )
-    known_params = {"vintage", "align", "broadcast_static", "target_id_col", "measure_specs"}
+    known_params = {
+        "vintage",
+        "align",
+        "broadcast_static",
+        "target_id_col",
+        "measure_specs",
+        "control_policy",
+        "control_preference",
+        "control_geo_type_column",
+        "control_geo_id_column",
+        "fallback_reason_column",
+    }
     unknown = set(spec.params.keys()) - known_params
     if unknown:
         diags.append(

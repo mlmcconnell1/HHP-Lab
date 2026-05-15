@@ -461,7 +461,7 @@ def _dataset_remediation(ds_id: str, ds, *, years: list[int] | None = None) -> R
                 command="hhplab ingest acs1-metro --vintage <year>",
             )
 
-    if provider == "census" and product == "acs1_poverty":
+    if provider == "census" and product in {"acs1_poverty", "acs1_imputation_target"}:
         unavailable_note = ""
         if years and sorted(set(years) & ACS1_UNAVAILABLE_VINTAGES):
             unavailable_note = (
@@ -474,9 +474,11 @@ def _dataset_remediation(ds_id: str, ds, *, years: list[int] | None = None) -> R
                 f"Dataset '{ds_id}' requests ACS1 tract poverty artifacts, but "
                 "direct Census ACS 1-year tract poverty tables are not published "
                 "through the standard Census API. Build or provide the modeled "
-                "acs1_poverty_tracts artifact from an ACS1 imputation target "
-                "dataset plus ACS5 tract support; downstream recipes can then "
-                "aggregate imputed poverty counts/universes and recompute rates. "
+                "acs1_poverty_tracts artifact from ACS1 county controls, ACS1 "
+                "metro fallback controls, CoC/county overlap policy inputs, and "
+                "ACS5 tract support; downstream recipes can then aggregate "
+                "imputed poverty counts/universes, recompute rates, and retain "
+                "county-vs-metro control metadata. "
                 f"{unavailable_note}"
             ),
             command=None,
@@ -1611,11 +1613,7 @@ def _check_dataset_schemas(
                 if config.get(column) is not None
             }
         )
-        derived_missing = [
-            column
-            for column in derived_required_columns
-            if column not in columns
-        ]
+        derived_missing = [column for column in derived_required_columns if column not in columns]
         if derived_missing:
             findings.append(
                 PreflightFinding(

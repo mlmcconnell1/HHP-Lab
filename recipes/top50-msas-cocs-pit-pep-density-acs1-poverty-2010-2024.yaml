@@ -14,7 +14,10 @@ description: >
   through tract-mediated decennial population weights, plus tract-level ACS1
   poverty estimates modeled with ACS1-controlled / ACS5-share imputation. Each
   year uses the ACS1 target vintage for that same year and ACS5 tract support
-  whose terminal vintage is also that year. The imputed tract artifact provides
+  whose terminal vintage is also that year. The hybrid imputed tract artifact
+  uses ACS1 county controls where county coverage is available and material,
+  falls back to ACS1 metro controls for missing or below-threshold county gaps,
+  and retains modeled/synthetic plus control-geography metadata. It provides
   allocated poor-count numerators and poverty-universe denominators separately;
   both counts are crosswalk-weighted and summed to 2025 CoC boundaries, and the
   CoC rate is recomputed as summed poor count divided by summed universe. The
@@ -183,7 +186,11 @@ datasets:
     geo_column: tract_geoid
     params:
       align: same_year_acs1_controlled_acs5_terminal
-      target_id_col: county_fips
+      control_policy: hybrid_acs1_county_primary_metro_gap_fill_v1
+      control_preference: county_then_metro_gap_fill
+      control_geo_type_column: control_geo_type
+      control_geo_id_column: control_geo_id
+      fallback_reason_column: fallback_reason
       measure_specs: [poverty_rate]
     file_set:
       path_template: "data/curated/acs/acs1_poverty_tracts__A{acs1_end}xT{tract}.parquet"

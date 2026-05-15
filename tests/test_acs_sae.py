@@ -8,24 +8,29 @@ import pandas as pd
 import pytest
 
 from hhplab.acs.sae import (
+    ACS1_HYBRID_CONTROL_SELECTION_POLICY_ID,
     ACS1_IMPUTATION_METHOD,
     GROSS_RENT_BINS,
     HOUSEHOLD_INCOME_BINS,
     SAE_ALLOCATION_METHOD,
+    ACS1HybridControlSelectionPolicy,
     acs1_imputation_source_columns,
     acs5_imputation_support_columns,
     allocate_acs1_county_to_tracts,
     build_acs1_poverty_tract_artifact,
     build_acs1_poverty_tracts_provenance,
+    build_hybrid_acs1_poverty_tract_artifact,
     build_sae_provenance,
     compare_sae_to_direct_counties,
     derive_sae_burden_measures,
     derive_sae_distribution_measures,
     diagnose_acs1_imputation,
+    diagnose_hybrid_acs1_poverty_tract_artifact,
     impute_acs1_targets_to_tracts,
     prepare_acs1_imputation_targets,
     prepare_acs5_imputation_support,
     rollup_sae_tracts_to_geos,
+    select_hybrid_acs1_controls,
     write_acs1_poverty_tract_artifact,
     write_sae_parquet_with_provenance,
 )
@@ -129,6 +134,23 @@ ACS1_TARGETS = pd.DataFrame(
     ]
 )
 
+ACS1_METRO_TARGETS = pd.DataFrame(
+    [
+        {
+            "cbsa_code": "19740",
+            "acs1_vintage": "2023",
+            "population_below_poverty": 220,
+            "poverty_universe": 1600,
+        },
+        {
+            "cbsa_code": "25540",
+            "acs1_vintage": "2023",
+            "population_below_poverty": 30,
+            "poverty_universe": 300,
+        },
+    ]
+)
+
 ACS5_IMPUTATION_SUPPORT = pd.DataFrame(
     [
         {
@@ -171,6 +193,128 @@ TRACT_TO_COUNTY_SPLIT = pd.DataFrame(
         {"county_fips": "08059", "tract_geoid": "08059000100", "area_share": 1.0},
     ]
 )
+
+HYBRID_CONTROL_OVERLAPS = pd.DataFrame(
+    [
+        {
+            "tract_geoid": "08031001000",
+            "county_fips": "08031",
+            "cbsa_code": "19740",
+            "county_overlap_share": 0.75,
+        },
+        {
+            "tract_geoid": "08031001100",
+            "county_fips": "08059",
+            "cbsa_code": "19740",
+            "county_overlap_share": 0.002,
+        },
+        {
+            "tract_geoid": "09001100100",
+            "county_fips": "09110",
+            "cbsa_code": "25540",
+            "county_overlap_share": 0.8,
+        },
+        {
+            "tract_geoid": "49035100100",
+            "county_fips": "49035",
+            "cbsa_code": "41620",
+            "county_overlap_share": 0.9,
+        },
+    ]
+)
+
+
+@pytest.mark.parametrize(
+    ("tract_geoid", "expected_source", "expected_geo_type", "expected_reason"),
+    [
+        pytest.param(
+            "08031001000",
+            "acs1_county",
+            "county",
+            "county_available_and_material",
+            id="county-material",
+        ),
+        pytest.param(
+            "08031001100",
+            "acs1_metro",
+            "metro",
+            "county_below_materiality",
+            id="county-below-threshold",
+        ),
+        pytest.param(
+            "09001100100",
+            "acs1_county",
+            "county",
+            "county_available_and_material",
+            id="ct-planning-county",
+        ),
+        pytest.param(
+            "49035100100",
+            pd.NA,
+            pd.NA,
+            "no_available_acs1_control",
+            id="no-control",
+        ),
+    ],
+)
+def test_select_hybrid_acs1_controls_prefers_county_and_fills_gaps(
+    tract_geoid: str,
+    expected_source: object,
+    expected_geo_type: object,
+    expected_reason: str,
+) -> None:
+    result = select_hybrid_acs1_controls(
+        HYBRID_CONTROL_OVERLAPS,
+        acs1_vintage=2023,
+        county_availability={"08031": True, "08059": True, "09110": True, "49035": False},
+        metro_availability={"19740": True, "25540": True, "41620": False},
+    )
+
+    row = result[result["tract_geoid"].eq(tract_geoid)].iloc[0]
+    assert row["acs1_control_policy_id"] == ACS1_HYBRID_CONTROL_SELECTION_POLICY_ID
+    assert row["acs1_control_materiality_threshold"] == pytest.approx(0.01)
+    assert (
+        row["acs1_control_source"] is expected_source
+        or row["acs1_control_source"] == expected_source
+    )
+    assert (
+        row["acs1_control_geo_type"] is expected_geo_type
+        or row["acs1_control_geo_type"] == expected_geo_type
+    )
+    assert row["acs1_control_reason"] == expected_reason
+    assert result.attrs["acs1_control_policy"]["acs1_control_county_gap_rule"] == (
+        "use_metro_when_county_missing_or_below_materiality"
+    )
+
+
+def test_select_hybrid_acs1_controls_labels_connecticut_bridge() -> None:
+    result = select_hybrid_acs1_controls(
+        HYBRID_CONTROL_OVERLAPS,
+        acs1_vintage=2023,
+        county_availability={"09110": True},
+        metro_availability={"25540": True},
+    )
+
+    row = result[result["county_fips"].eq("09110")].iloc[0]
+    assert row["acs1_control_ct_bridge_status"] == "planning_region_to_legacy_required"
+
+
+def test_select_hybrid_acs1_controls_rejects_nationally_unavailable_2020() -> None:
+    with pytest.raises(
+        ValueError,
+        match="ACS1 vintage 2020 is nationally unavailable",
+    ):
+        select_hybrid_acs1_controls(
+            HYBRID_CONTROL_OVERLAPS,
+            acs1_vintage=2020,
+            county_availability={"08031": True},
+            metro_availability={"19740": True},
+        )
+
+
+def test_acs1_hybrid_control_policy_validates_materiality_threshold() -> None:
+    with pytest.raises(ValueError, match="materiality_threshold must be between 0 and 1"):
+        ACS1HybridControlSelectionPolicy(materiality_threshold=1.1).metadata()
 
 
 def test_impute_acs1_targets_allocates_rate_and_count_specs() -> None:
@@ -582,6 +726,106 @@ def test_build_acs1_poverty_tract_artifact_uses_poverty_spec_only() -> None:
     assert allocated.loc["08031", "acs1_imputed_poverty_universe"] == pytest.approx(1000.0)
     assert allocated.loc["08059", "acs1_imputed_population_below_poverty"] == pytest.approx(50.0)
     assert allocated.loc["08059", "acs1_imputed_poverty_universe"] == pytest.approx(200.0)
+
+
+def test_build_hybrid_acs1_poverty_tract_artifact_uses_county_then_metro_controls() -> None:
+    overlaps = pd.DataFrame(
+        [
+            {
+                "tract_geoid": "08031001000",
+                "county_fips": "08031",
+                "cbsa_code": "19740",
+                "county_overlap_share": 1.0,
+            },
+            {
+                "tract_geoid": "08031001100",
+                "county_fips": "08059",
+                "cbsa_code": "19740",
+                "county_overlap_share": 0.002,
+            },
+        ]
+    )
+
+    result = build_hybrid_acs1_poverty_tract_artifact(
+        ACS1_TARGETS,
+        ACS1_METRO_TARGETS,
+        ACS5_IMPUTATION_SUPPORT,
+        overlaps,
+        acs1_vintage=2023,
+        acs5_vintage="2019-2023",
+        tract_vintage=2020,
+        year=2023,
+    )
+
+    county_row = result[result["tract_geoid"].eq("08031001000")].iloc[0]
+    metro_row = result[result["tract_geoid"].eq("08031001100")].iloc[0]
+    assert county_row["control_geo_type"] == "county"
+    assert county_row["control_geo_id"] == "08031"
+    assert county_row["fallback_reason"] == "county_available_and_material"
+    assert county_row["acs1_imputed_population_below_poverty"] == pytest.approx(100.0)
+    assert metro_row["control_geo_type"] == "metro"
+    assert metro_row["control_geo_id"] == "19740"
+    assert metro_row["fallback_reason"] == "county_below_materiality"
+    assert metro_row["acs1_imputed_population_below_poverty"] == pytest.approx(120.0)
+    assert result.attrs["acs1_control_selection_counts"] == {"county": 1, "metro": 1}
+    assert result.attrs["acs1_control_policy"]["acs1_control_policy_id"] == (
+        ACS1_HYBRID_CONTROL_SELECTION_POLICY_ID
+    )
+    assert (
+        diagnose_hybrid_acs1_poverty_tract_artifact(
+            result,
+            ACS1_TARGETS,
+            ACS1_METRO_TARGETS,
+            overlaps,
+        )
+        == []
+    )
+
+
+def test_diagnose_hybrid_acs1_poverty_tract_artifact_reports_residuals() -> None:
+    overlaps = pd.DataFrame(
+        [
+            {
+                "tract_geoid": "08031001000",
+                "county_fips": "08031",
+                "cbsa_code": "19740",
+                "county_overlap_share": 1.0,
+            },
+            {
+                "tract_geoid": "08031001100",
+                "county_fips": "08059",
+                "cbsa_code": "19740",
+                "county_overlap_share": 0.002,
+            },
+        ]
+    )
+    artifact = build_hybrid_acs1_poverty_tract_artifact(
+        ACS1_TARGETS,
+        ACS1_METRO_TARGETS,
+        ACS5_IMPUTATION_SUPPORT,
+        overlaps,
+        acs1_vintage=2023,
+        acs5_vintage="2019-2023",
+        tract_vintage=2020,
+        year=2023,
+    )
+    artifact.loc[artifact["control_geo_type"].eq("metro"), "acs1_imputed_poverty_universe"] += 1
+
+    findings = diagnose_hybrid_acs1_poverty_tract_artifact(
+        artifact,
+        ACS1_TARGETS,
+        ACS1_METRO_TARGETS,
+        overlaps,
+    )
+
+    assert {finding.code for finding in findings} >= {
+        "hybrid_rate_not_recomputed_from_counts",
+        "hybrid_control_conservation_residual",
+    }
+    residual = [
+        finding for finding in findings if finding.code == "hybrid_control_conservation_residual"
+    ][0]
+    assert residual.details["control_geo_type"] == "metro"
 
 
 def test_build_acs1_poverty_tract_artifact_handles_zero_denominator() -> None:
@@ -1276,6 +1520,11 @@ def test_builds_acs1_poverty_tracts_provenance() -> None:
     assert provenance.extra["acs5_terminal_vintage"] == "2019-2023"
     assert provenance.extra["allocation_method"] == ACS1_IMPUTATION_METHOD
     assert provenance.extra["requested_measures"] == ["poverty_rate"]
+    assert provenance.extra["acs1_control_policy_id"] == ACS1_HYBRID_CONTROL_SELECTION_POLICY_ID
+    assert provenance.extra["acs1_control_unavailable_vintages"] == [2020]
+    assert provenance.extra["acs1_control_ct_bridge_rule"] == (
+        "bridge_ct_planning_region_counties_to_legacy_counties"
+    )
     assert provenance.extra["derived_output_columns"] == [
         "acs1_imputed_population_below_poverty",
         "acs1_imputed_poverty_universe",
@@ -1308,6 +1557,7 @@ def test_writes_acs1_poverty_tract_artifact_with_embedded_provenance(tmp_path) -
     assert provenance is not None
     assert provenance.extra["dataset"] == "acs1_poverty_tracts"
     assert provenance.extra["output_row_count"] == len(artifact)
+    assert provenance.extra["acs1_control_policy_id"] == ACS1_HYBRID_CONTROL_SELECTION_POLICY_ID
     assert "acs1_imputed_total_households" not in written.columns
     assert written["is_modeled"].unique().tolist() == [True]
 

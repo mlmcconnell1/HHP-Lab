@@ -33,21 +33,21 @@ runner = CliRunner()
 
 STALE_TRANSLATED_ACS_PATH = "data/curated/acs/acs5_tracts__A2019xT2020.parquet"
 STALE_TRANSLATED_ACS_VINTAGE = "2015-2019"
-STALE_TRANSLATED_ACS_REBUILD = (
-    "hhplab ingest acs5-tract --acs 2015-2019 --tracts 2020 --force"
-)
+STALE_TRANSLATED_ACS_REBUILD = "hhplab ingest acs5-tract --acs 2015-2019 --tracts 2020 --force"
 
 
 def _write_stale_translated_acs_cache(path: Path) -> None:
     """Write a pre-fix translated ACS cache lacking translation provenance."""
     write_parquet_with_provenance(
-        pd.DataFrame({
-            "tract_geoid": ["T1"],
-            "year": [2020],
-            "acs_vintage": [STALE_TRANSLATED_ACS_VINTAGE],
-            "tract_vintage": ["2020"],
-            "total_population": [100],
-        }),
+        pd.DataFrame(
+            {
+                "tract_geoid": ["T1"],
+                "year": [2020],
+                "acs_vintage": [STALE_TRANSLATED_ACS_VINTAGE],
+                "tract_vintage": ["2020"],
+                "total_population": [100],
+            }
+        ),
         path,
         ProvenanceBlock(
             acs_vintage=STALE_TRANSLATED_ACS_VINTAGE,
@@ -163,8 +163,8 @@ def _write_cli_project_markers(root: Path) -> None:
 # Probe unit tests
 # ---------------------------------------------------------------------------
 
-class TestProbeYearColumn:
 
+class TestProbeYearColumn:
     def test_declared_present(self):
         r = probe_year_column(["year", "geo_id", "pop"], "year")
         assert r.ok
@@ -192,7 +192,6 @@ class TestProbeYearColumn:
 
 
 class TestProbeGeoColumn:
-
     def test_declared_present(self):
         r = probe_geo_column(["coc_id", "year", "pop"], "coc_id")
         assert r.ok
@@ -219,7 +218,6 @@ class TestProbeGeoColumn:
 
 
 class TestProbeMeasures:
-
     def test_all_present(self):
         r = probe_measures(["geo_id", "pop", "income"], ["pop", "income"], "ds1")
         assert r.ok
@@ -232,7 +230,6 @@ class TestProbeMeasures:
 
 
 class TestProbeTemporalFilter:
-
     def test_column_present(self):
         filt = TemporalFilter(column="date", method="point_in_time", month=1)
         r = probe_temporal_filter(["date", "year", "pop"], filt, "ds1")
@@ -276,7 +273,6 @@ class TestProbeTemporalFilter:
 
 
 class TestProbeStaticBroadcast:
-
     def _make_ds(self, **overrides) -> DatasetSpec:
         defaults = {
             "provider": "test",
@@ -315,7 +311,6 @@ class TestProbeStaticBroadcast:
 
 
 class TestProbeDatasetSchema:
-
     def test_valid_parquet(self, tmp_path: Path):
         path = tmp_path / "test.parquet"
         pd.DataFrame({"geo_id": ["A"], "year": [2020]}).to_parquet(path)
@@ -332,6 +327,7 @@ class TestProbeDatasetSchema:
 # ---------------------------------------------------------------------------
 # Preflight analyzer tests
 # ---------------------------------------------------------------------------
+
 
 def _preflight_recipe(
     *,
@@ -401,18 +397,24 @@ def _preflight_recipe(
                 "spec": {"weighting": {"scheme": "area"}},
             },
         ]
-        base["pipelines"][0]["steps"].insert(0, {
-            "materialize": {"transforms": ["tract_to_coc"]},
-        })
-        base["pipelines"][0]["steps"].insert(2, {
-            "resample": {
-                "dataset": "acs",
-                "to_geometry": {"type": "coc", "vintage": 2025},
-                "method": "aggregate",
-                "via": "tract_to_coc",
-                "measures": ["total_population"],
+        base["pipelines"][0]["steps"].insert(
+            0,
+            {
+                "materialize": {"transforms": ["tract_to_coc"]},
             },
-        })
+        )
+        base["pipelines"][0]["steps"].insert(
+            2,
+            {
+                "resample": {
+                    "dataset": "acs",
+                    "to_geometry": {"type": "coc", "vintage": 2025},
+                    "method": "aggregate",
+                    "via": "tract_to_coc",
+                    "measures": ["total_population"],
+                },
+            },
+        )
         base["pipelines"][0]["steps"][-1]["join"]["datasets"] = ["pit", "acs"]
 
     return base
@@ -429,29 +431,35 @@ def _setup_preflight_fixtures(
     if include_xwalk:
         xwalk_dir = tmp_path / "data" / "curated" / "xwalks"
         xwalk_dir.mkdir(parents=True, exist_ok=True)
-        pd.DataFrame({
-            "coc_id": ["COC1", "COC2"],
-            "tract_geoid": ["T1", "T2"],
-            "area_share": [1.0, 1.0],
-        }).to_parquet(xwalk_dir / "xwalk__B2025xT2020.parquet")
+        pd.DataFrame(
+            {
+                "coc_id": ["COC1", "COC2"],
+                "tract_geoid": ["T1", "T2"],
+                "area_share": [1.0, 1.0],
+            }
+        ).to_parquet(xwalk_dir / "xwalk__B2025xT2020.parquet")
 
     if include_pit:
         pit_path = tmp_path / "data" / "pit.parquet"
         pit_path.parent.mkdir(parents=True, exist_ok=True)
-        pd.DataFrame({
-            "coc_id": ["COC1", "COC2", "COC1", "COC2", "COC1", "COC2"],
-            "year": [2020, 2020, 2021, 2021, 2022, 2022],
-            "pit_total": [10, 20, 11, 21, 12, 22],
-        }).to_parquet(pit_path)
+        pd.DataFrame(
+            {
+                "coc_id": ["COC1", "COC2", "COC1", "COC2", "COC1", "COC2"],
+                "year": [2020, 2020, 2021, 2021, 2022, 2022],
+                "pit_total": [10, 20, 11, 21, 12, 22],
+            }
+        ).to_parquet(pit_path)
 
     if include_acs:
         acs_path = tmp_path / "data" / "acs.parquet"
         (tmp_path / "data").mkdir(parents=True, exist_ok=True)
-        pd.DataFrame({
-            "GEOID": ["T1", "T2", "T1", "T2", "T1", "T2"],
-            "year": [2020, 2020, 2021, 2021, 2022, 2022],
-            "total_population": [100, 200, 110, 210, 120, 220],
-        }).to_parquet(acs_path)
+        pd.DataFrame(
+            {
+                "GEOID": ["T1", "T2", "T1", "T2", "T1", "T2"],
+                "year": [2020, 2020, 2021, 2021, 2022, 2022],
+                "total_population": [100, 200, 110, 210, 120, 220],
+            }
+        ).to_parquet(acs_path)
 
 
 def _acs1_poverty_preflight_recipe() -> dict:
@@ -641,7 +649,6 @@ def _setup_containment_artifacts(
 
 
 class TestRunPreflight:
-
     def test_clean_preflight(self, tmp_path: Path):
         data = _preflight_recipe(with_path=True, identity_only=True)
         _setup_preflight_fixtures(tmp_path, include_xwalk=False, include_acs=False)
@@ -659,10 +666,7 @@ class TestRunPreflight:
         recipe = load_recipe(data)
         report = run_preflight(recipe, project_root=tmp_path)
         assert not report.is_ready
-        transform_findings = [
-            f for f in report.findings
-            if f.kind == FindingKind.MISSING_TRANSFORM
-        ]
+        transform_findings = [f for f in report.findings if f.kind == FindingKind.MISSING_TRANSFORM]
         assert len(transform_findings) >= 1
         assert transform_findings[0].transform_id == "tract_to_coc"
         assert transform_findings[0].remediation is not None
@@ -803,7 +807,8 @@ class TestRunPreflight:
         report = run_preflight(recipe, project_root=tmp_path)
 
         baseline_findings = [
-            f for f in report.findings
+            f
+            for f in report.findings
             if f.kind == FindingKind.MISSING_SUPPORT_DATASET
             and f.transform_id == "county_to_coc_tract_mediated"
         ]
@@ -825,7 +830,8 @@ class TestRunPreflight:
         recipe = load_recipe(data)
         report = run_preflight(recipe, project_root=tmp_path)
         transform_findings = [
-            f for f in report.findings
+            f
+            for f in report.findings
             if f.kind == FindingKind.MISSING_TRANSFORM and f.transform_id == "coc_to_msa"
         ]
         assert len(transform_findings) == 1
@@ -841,10 +847,7 @@ class TestRunPreflight:
         # Don't create the pit file
         recipe = load_recipe(data)
         report = run_preflight(recipe, project_root=tmp_path)
-        ds_findings = [
-            f for f in report.findings
-            if f.kind == FindingKind.MISSING_DATASET
-        ]
+        ds_findings = [f for f in report.findings if f.kind == FindingKind.MISSING_DATASET]
         assert len(ds_findings) >= 1
         assert ds_findings[0].dataset_id == "pit"
 
@@ -859,15 +862,17 @@ class TestRunPreflight:
         report = run_preflight(recipe, project_root=tmp_path)
 
         findings = [
-            f for f in report.findings
-            if f.kind == FindingKind.MISSING_DATASET
-            and f.dataset_id == "acs1_poverty"
+            f
+            for f in report.findings
+            if f.kind == FindingKind.MISSING_DATASET and f.dataset_id == "acs1_poverty"
         ]
         assert len(findings) == 1
         assert findings[0].remediation is not None
         assert "modeled acs1_poverty_tracts artifact" in findings[0].remediation.hint.lower()
-        assert "acs1 imputation target" in findings[0].remediation.hint.lower()
+        assert "acs1 county controls" in findings[0].remediation.hint.lower()
+        assert "acs1 metro fallback controls" in findings[0].remediation.hint.lower()
         assert "acs5 tract support" in findings[0].remediation.hint.lower()
+        assert "control metadata" in findings[0].remediation.hint.lower()
 
     def test_missing_acs1_poverty_file_set_reports_unavailable_resolved_vintage(
         self,
@@ -877,9 +882,7 @@ class TestRunPreflight:
         dataset = data["datasets"]["acs1_poverty"]
         del dataset["path"]
         dataset["file_set"] = {
-            "path_template": (
-                "data/curated/acs/acs1_poverty_tracts__A{acs1_end}xT2020.parquet"
-            ),
+            "path_template": ("data/curated/acs/acs1_poverty_tracts__A{acs1_end}xT2020.parquet"),
             "segments": [
                 {
                     "years": {"years": [2021]},
@@ -896,8 +899,7 @@ class TestRunPreflight:
         findings = [
             f
             for f in report.findings
-            if f.kind == FindingKind.MISSING_DATASET
-            and f.dataset_id == "acs1_poverty"
+            if f.kind == FindingKind.MISSING_DATASET and f.dataset_id == "acs1_poverty"
         ]
         assert len(findings) == 1
         assert findings[0].years == [2021]
@@ -910,24 +912,23 @@ class TestRunPreflight:
         _setup_preflight_fixtures(tmp_path, include_pit=False, include_acs=False)
         path = tmp_path / "data" / "curated" / "acs" / "acs1_poverty_tracts__A2021xT2020.parquet"
         path.parent.mkdir(parents=True, exist_ok=True)
-        pd.DataFrame({
-            "tract_geoid": ["T1"],
-            "year": [2021],
-            "acs1_imputed_poverty_universe": [100.0],
-        }).to_parquet(path)
+        pd.DataFrame(
+            {
+                "tract_geoid": ["T1"],
+                "year": [2021],
+                "acs1_imputed_poverty_universe": [100.0],
+            }
+        ).to_parquet(path)
 
         recipe = load_recipe(data)
         report = run_preflight(recipe, project_root=tmp_path)
 
         findings = [
-            f for f in report.findings
-            if f.kind == FindingKind.MISSING_MEASURE
-            and f.dataset_id == "acs1_poverty"
+            f
+            for f in report.findings
+            if f.kind == FindingKind.MISSING_MEASURE and f.dataset_id == "acs1_poverty"
         ]
-        assert any(
-            "acs1_imputed_poverty_rate" in finding.message
-            for finding in findings
-        )
+        assert any("acs1_imputed_poverty_rate" in finding.message for finding in findings)
 
     def test_map_target_missing_coc_boundary_is_actionable(self, tmp_path: Path):
         data = _map_preflight_recipe(
@@ -938,9 +939,7 @@ class TestRunPreflight:
         recipe = load_recipe(data)
         report = run_preflight(recipe, project_root=tmp_path)
 
-        map_findings = [
-            f for f in report.findings if f.kind == FindingKind.MISSING_MAP_ARTIFACT
-        ]
+        map_findings = [f for f in report.findings if f.kind == FindingKind.MISSING_MAP_ARTIFACT]
         assert len(map_findings) == 1
         finding = map_findings[0]
         assert "coc boundary artifact" in finding.message.lower()
@@ -962,9 +961,7 @@ class TestRunPreflight:
         recipe = load_recipe(data)
         report = run_preflight(recipe, project_root=tmp_path)
 
-        map_findings = [
-            f for f in report.findings if f.kind == FindingKind.MISSING_MAP_ARTIFACT
-        ]
+        map_findings = [f for f in report.findings if f.kind == FindingKind.MISSING_MAP_ARTIFACT]
         assert len(map_findings) == 1
         finding = map_findings[0]
         assert "msa boundary artifact" in finding.message.lower()
@@ -982,9 +979,7 @@ class TestRunPreflight:
         recipe = load_recipe(data)
         report = run_preflight(recipe, project_root=tmp_path)
 
-        map_findings = [
-            f for f in report.findings if f.kind == FindingKind.MISSING_MAP_ARTIFACT
-        ]
+        map_findings = [f for f in report.findings if f.kind == FindingKind.MISSING_MAP_ARTIFACT]
         assert len(map_findings) == 1
         finding = map_findings[0]
         assert "county boundary artifact" in finding.message.lower()
@@ -1001,7 +996,8 @@ class TestRunPreflight:
 
         assert report.is_ready
         assert [
-            f for f in report.findings
+            f
+            for f in report.findings
             if f.kind
             in {
                 FindingKind.MISSING_CONTAINMENT_ARTIFACT,
@@ -1019,7 +1015,8 @@ class TestRunPreflight:
 
         assert report.is_ready
         assert [
-            f for f in report.findings
+            f
+            for f in report.findings
             if f.kind
             in {
                 FindingKind.MISSING_CONTAINMENT_ARTIFACT,
@@ -1048,7 +1045,8 @@ class TestRunPreflight:
 
         assert report.is_ready
         assert [
-            f for f in report.findings
+            f
+            for f in report.findings
             if f.kind
             in {
                 FindingKind.MISSING_CONTAINMENT_ARTIFACT,
@@ -1065,10 +1063,7 @@ class TestRunPreflight:
         recipe = load_recipe(data)
         report = run_preflight(recipe, project_root=tmp_path)
 
-        selector_findings = [
-            f for f in report.findings
-            if f.kind == FindingKind.TARGET_SELECTOR
-        ]
+        selector_findings = [f for f in report.findings if f.kind == FindingKind.TARGET_SELECTOR]
         assert len(selector_findings) == 1
         assert "selector_ids did not match available COC IDs: COC2" in (
             selector_findings[0].message
@@ -1089,8 +1084,7 @@ class TestRunPreflight:
         report = run_preflight(recipe, project_root=tmp_path)
 
         containment_findings = [
-            f for f in report.findings
-            if f.kind == FindingKind.MISSING_CONTAINMENT_ARTIFACT
+            f for f in report.findings if f.kind == FindingKind.MISSING_CONTAINMENT_ARTIFACT
         ]
         assert len(containment_findings) == 1
         finding = containment_findings[0]
@@ -1114,8 +1108,7 @@ class TestRunPreflight:
         report = run_preflight(recipe, project_root=tmp_path)
 
         containment_findings = [
-            f for f in report.findings
-            if f.kind == FindingKind.MISSING_CONTAINMENT_ARTIFACT
+            f for f in report.findings if f.kind == FindingKind.MISSING_CONTAINMENT_ARTIFACT
         ]
         assert len(containment_findings) == 2
         assert {f.remediation.command for f in containment_findings if f.remediation} == {
@@ -1134,8 +1127,7 @@ class TestRunPreflight:
         report = run_preflight(recipe, project_root=tmp_path)
 
         selector_findings = [
-            f for f in report.findings
-            if f.kind == FindingKind.CONTAINMENT_SELECTOR
+            f for f in report.findings if f.kind == FindingKind.CONTAINMENT_SELECTOR
         ]
         assert len(selector_findings) == 1
         assert "candidate_selector_ids did not match available COUNTY IDs: 999" in (
@@ -1200,8 +1192,7 @@ class TestRunPreflight:
         findings = [
             f
             for f in report.findings
-            if f.kind == FindingKind.MISSING_MEASURE
-            and "cannot produce outputs" in f.message
+            if f.kind == FindingKind.MISSING_MEASURE and "cannot produce outputs" in f.message
         ]
         assert len(findings) == 1
         assert "direct medians" in findings[0].message
@@ -1235,17 +1226,14 @@ class TestRunPreflight:
         findings = [
             f
             for f in report.findings
-            if f.kind == FindingKind.MISSING_MEASURE
-            and "cannot produce outputs" in f.message
+            if f.kind == FindingKind.MISSING_MEASURE and "cannot produce outputs" in f.message
         ]
         assert len(findings) == 1
 
     def test_sae_preflight_reports_missing_denominator_column(self, tmp_path: Path):
         _write_sae_preflight_fixtures(tmp_path)
         data = _sae_recipe_dict()
-        data["pipelines"][0]["steps"][0]["denominators"] = {
-            "labor_force": "missing_denominator"
-        }
+        data["pipelines"][0]["steps"][0]["denominators"] = {"labor_force": "missing_denominator"}
         recipe = load_recipe(data)
 
         report = run_preflight(recipe, project_root=tmp_path)
@@ -1262,7 +1250,8 @@ class TestRunPreflight:
         report = run_preflight(recipe, project_root=tmp_path)
 
         findings = [
-            f for f in report.findings
+            f
+            for f in report.findings
             if f.kind == FindingKind.MISSING_DATASET and f.dataset_id == "acs1_county"
         ]
         assert len(findings) == 1
@@ -1295,9 +1284,7 @@ class TestRunPreflight:
         assert sae_tasks[0]["support_path"] == (
             "data/curated/acs/acs5_tract_sae_support__A2022xT2020.parquet"
         )
-        assert sae_tasks[0]["derived_outputs"] == {
-            "labor_force": ["sae_unemployment_rate"]
-        }
+        assert sae_tasks[0]["derived_outputs"] == {"labor_force": ["sae_unemployment_rate"]}
 
     def test_sae_recipe_preflight_cli_json_reports_ready(
         self,
@@ -1360,9 +1347,7 @@ class TestRunPreflight:
         payload = json.loads(result.output)
         assert payload["status"] == "blocked"
         measure_findings = [
-            finding
-            for finding in payload["findings"]
-            if finding["kind"] == "missing_measure"
+            finding for finding in payload["findings"] if finding["kind"] == "missing_measure"
         ]
         assert len(measure_findings) == 1
         assert "cannot produce outputs" in measure_findings[0]["message"]
@@ -1382,8 +1367,7 @@ class TestRunPreflight:
         report = run_preflight(recipe, project_root=tmp_path)
 
         provenance_findings = [
-            f for f in report.findings
-            if f.kind == FindingKind.DATASET_PROVENANCE
+            f for f in report.findings if f.kind == FindingKind.DATASET_PROVENANCE
         ]
         assert len(provenance_findings) == 1
         finding = provenance_findings[0]
@@ -1397,14 +1381,17 @@ class TestRunPreflight:
     def test_planner_error_captured(self, tmp_path: Path):
         data = _preflight_recipe(with_path=True, identity_only=True)
         # Add step referencing a dataset not in the recipe
-        data["pipelines"][0]["steps"].insert(0, {
-            "resample": {
-                "dataset": "nonexistent",
-                "to_geometry": {"type": "coc", "vintage": 2025},
-                "method": "identity",
-                "measures": ["x"],
+        data["pipelines"][0]["steps"].insert(
+            0,
+            {
+                "resample": {
+                    "dataset": "nonexistent",
+                    "to_geometry": {"type": "coc", "vintage": 2025},
+                    "method": "identity",
+                    "measures": ["x"],
+                },
             },
-        })
+        )
         # Pydantic will reject this since 'nonexistent' isn't in datasets —
         # add a dummy dataset to pass schema validation
         data["datasets"]["nonexistent"] = {
@@ -1424,26 +1411,28 @@ class TestRunPreflight:
         data = _preflight_recipe(with_path=True, identity_only=True)
         _setup_preflight_fixtures(tmp_path, include_xwalk=False, include_acs=False)
         # Add a second pipeline
-        data["pipelines"].append({
-            "id": "secondary",
-            "target": "coc_panel",
-            "steps": [
-                {
-                    "resample": {
-                        "dataset": "pit",
-                        "to_geometry": {"type": "coc", "vintage": 2025},
-                        "method": "identity",
-                        "measures": ["pit_total"],
+        data["pipelines"].append(
+            {
+                "id": "secondary",
+                "target": "coc_panel",
+                "steps": [
+                    {
+                        "resample": {
+                            "dataset": "pit",
+                            "to_geometry": {"type": "coc", "vintage": 2025},
+                            "method": "identity",
+                            "measures": ["pit_total"],
+                        },
                     },
-                },
-                {
-                    "join": {
-                        "datasets": ["pit"],
-                        "join_on": ["geo_id", "year"],
+                    {
+                        "join": {
+                            "datasets": ["pit"],
+                            "join_on": ["geo_id", "year"],
+                        },
                     },
-                },
-            ],
-        })
+                ],
+            }
+        )
         recipe = load_recipe(data)
         report = run_preflight(recipe, project_root=tmp_path)
         assert len(report.pipelines) == 2
@@ -1455,29 +1444,30 @@ class TestRunPreflight:
         # Create a pit file WITHOUT the pit_total column
         pit_path = tmp_path / "data" / "pit.parquet"
         pit_path.parent.mkdir(parents=True, exist_ok=True)
-        pd.DataFrame({
-            "coc_id": ["COC1"],
-            "year": [2020],
-            "wrong_column": [10],
-        }).to_parquet(pit_path)
+        pd.DataFrame(
+            {
+                "coc_id": ["COC1"],
+                "year": [2020],
+                "wrong_column": [10],
+            }
+        ).to_parquet(pit_path)
 
         recipe = load_recipe(data)
         report = run_preflight(recipe, project_root=tmp_path)
-        measure_findings = [
-            f for f in report.findings
-            if f.kind == FindingKind.MISSING_MEASURE
-        ]
+        measure_findings = [f for f in report.findings if f.kind == FindingKind.MISSING_MEASURE]
         assert len(measure_findings) >= 1
         assert "pit_total" in measure_findings[0].message
 
     def test_preflight_warns_on_nonstandard_acs_lag_offset(self, tmp_path: Path):
         data_dir = tmp_path / "data"
         data_dir.mkdir(parents=True)
-        pd.DataFrame({
-            "tract_geoid": ["T1"],
-            "year": [2020],
-            "total_population": [100],
-        }).to_parquet(data_dir / "acs_2020.parquet")
+        pd.DataFrame(
+            {
+                "tract_geoid": ["T1"],
+                "year": [2020],
+                "total_population": [100],
+            }
+        ).to_parquet(data_dir / "acs_2020.parquet")
 
         recipe_data = {
             "version": 1,
@@ -1532,10 +1522,7 @@ class TestRunPreflight:
 
         recipe = load_recipe(recipe_data)
         report = run_preflight(recipe, project_root=tmp_path)
-        lag_findings = [
-            f for f in report.findings
-            if f.kind == FindingKind.TEMPORAL_ALIGNMENT
-        ]
+        lag_findings = [f for f in report.findings if f.kind == FindingKind.TEMPORAL_ALIGNMENT]
         assert len(lag_findings) == 1
         assert lag_findings[0].severity == Severity.WARNING
         assert "acs_end offset 0" in lag_findings[0].message
@@ -1544,11 +1531,13 @@ class TestRunPreflight:
         """Warn only when same-year ACS1 is used in a PIT/January-aligned pipeline."""
         data_dir = tmp_path / "data" / "curated" / "acs"
         data_dir.mkdir(parents=True)
-        pd.DataFrame({
-            "metro_id": ["M1"],
-            "acs1_vintage": [2023],
-            "unemployment_rate_acs1": [0.05],
-        }).to_parquet(data_dir / "acs1_metro__A2023@Dglynnfoxv1.parquet")
+        pd.DataFrame(
+            {
+                "metro_id": ["M1"],
+                "acs1_vintage": [2023],
+                "unemployment_rate_acs1": [0.05],
+            }
+        ).to_parquet(data_dir / "acs1_metro__A2023@Dglynnfoxv1.parquet")
 
         recipe_data = {
             "version": 1,
@@ -1613,10 +1602,7 @@ class TestRunPreflight:
 
         recipe = load_recipe(recipe_data)
         report = run_preflight(recipe, project_root=tmp_path)
-        lag_findings = [
-            f for f in report.findings
-            if f.kind == FindingKind.TEMPORAL_ALIGNMENT
-        ]
+        lag_findings = [f for f in report.findings if f.kind == FindingKind.TEMPORAL_ALIGNMENT]
         assert len(lag_findings) == 1
         assert lag_findings[0].severity == Severity.WARNING
         assert "same-year ACS1 vintage" in lag_findings[0].message
@@ -1628,11 +1614,13 @@ class TestRunPreflight:
         """Same-year ACS1 outside PIT/January-aligned pipelines should not warn."""
         data_dir = tmp_path / "data" / "curated" / "acs"
         data_dir.mkdir(parents=True)
-        pd.DataFrame({
-            "metro_id": ["M1"],
-            "acs1_vintage": [2023],
-            "unemployment_rate_acs1": [0.05],
-        }).to_parquet(data_dir / "acs1_metro__A2023@Dglynnfoxv1.parquet")
+        pd.DataFrame(
+            {
+                "metro_id": ["M1"],
+                "acs1_vintage": [2023],
+                "unemployment_rate_acs1": [0.05],
+            }
+        ).to_parquet(data_dir / "acs1_metro__A2023@Dglynnfoxv1.parquet")
 
         recipe_data = {
             "version": 1,
@@ -1680,10 +1668,7 @@ class TestRunPreflight:
 
         recipe = load_recipe(recipe_data)
         report = run_preflight(recipe, project_root=tmp_path)
-        lag_findings = [
-            f for f in report.findings
-            if f.kind == FindingKind.TEMPORAL_ALIGNMENT
-        ]
+        lag_findings = [f for f in report.findings if f.kind == FindingKind.TEMPORAL_ALIGNMENT]
         assert lag_findings == []
 
     def test_preflight_no_warning_on_prior_year_acs1_vintage_static_path(self, tmp_path: Path):
@@ -1691,11 +1676,13 @@ class TestRunPreflight:
         -> no TEMPORAL_ALIGNMENT warning."""
         data_dir = tmp_path / "data" / "curated" / "acs"
         data_dir.mkdir(parents=True)
-        pd.DataFrame({
-            "metro_id": ["M1"],
-            "acs1_vintage": [2022],
-            "unemployment_rate_acs1": [0.05],
-        }).to_parquet(data_dir / "acs1_metro__A2022@Dglynnfoxv1.parquet")
+        pd.DataFrame(
+            {
+                "metro_id": ["M1"],
+                "acs1_vintage": [2022],
+                "unemployment_rate_acs1": [0.05],
+            }
+        ).to_parquet(data_dir / "acs1_metro__A2022@Dglynnfoxv1.parquet")
 
         recipe_data = {
             "version": 1,
@@ -1743,21 +1730,20 @@ class TestRunPreflight:
 
         recipe = load_recipe(recipe_data)
         report = run_preflight(recipe, project_root=tmp_path)
-        lag_findings = [
-            f for f in report.findings
-            if f.kind == FindingKind.TEMPORAL_ALIGNMENT
-        ]
+        lag_findings = [f for f in report.findings if f.kind == FindingKind.TEMPORAL_ALIGNMENT]
         assert lag_findings == []
 
     def test_preflight_warns_on_same_year_acs1_file_set(self, tmp_path: Path):
         """File-set ACS1 with explicit acs1_end offset 0 warns in January-aligned pipelines."""
         data_dir = tmp_path / "data"
         data_dir.mkdir(parents=True)
-        pd.DataFrame({
-            "metro_id": ["M1"],
-            "acs1_vintage": [2023],
-            "unemployment_rate_acs1": [0.05],
-        }).to_parquet(data_dir / "acs1_2023.parquet")
+        pd.DataFrame(
+            {
+                "metro_id": ["M1"],
+                "acs1_vintage": [2023],
+                "unemployment_rate_acs1": [0.05],
+            }
+        ).to_parquet(data_dir / "acs1_2023.parquet")
 
         recipe_data = {
             "version": 1,
@@ -1829,10 +1815,7 @@ class TestRunPreflight:
 
         recipe = load_recipe(recipe_data)
         report = run_preflight(recipe, project_root=tmp_path)
-        lag_findings = [
-            f for f in report.findings
-            if f.kind == FindingKind.TEMPORAL_ALIGNMENT
-        ]
+        lag_findings = [f for f in report.findings if f.kind == FindingKind.TEMPORAL_ALIGNMENT]
         assert len(lag_findings) == 1
         assert lag_findings[0].severity == Severity.WARNING
         assert "same-year ACS1 vintage" in lag_findings[0].message
@@ -1843,11 +1826,13 @@ class TestRunPreflight:
         """Direct {year} file-set templates should also warn for January-aligned recipes."""
         data_dir = tmp_path / "data"
         data_dir.mkdir(parents=True)
-        pd.DataFrame({
-            "metro_id": ["M1"],
-            "acs1_vintage": [2023],
-            "unemployment_rate_acs1": [0.05],
-        }).to_parquet(data_dir / "acs1_2023.parquet")
+        pd.DataFrame(
+            {
+                "metro_id": ["M1"],
+                "acs1_vintage": [2023],
+                "unemployment_rate_acs1": [0.05],
+            }
+        ).to_parquet(data_dir / "acs1_2023.parquet")
 
         recipe_data = {
             "version": 1,
@@ -1919,10 +1904,7 @@ class TestRunPreflight:
 
         recipe = load_recipe(recipe_data)
         report = run_preflight(recipe, project_root=tmp_path)
-        lag_findings = [
-            f for f in report.findings
-            if f.kind == FindingKind.TEMPORAL_ALIGNMENT
-        ]
+        lag_findings = [f for f in report.findings if f.kind == FindingKind.TEMPORAL_ALIGNMENT]
         assert len(lag_findings) == 1
         assert lag_findings[0].severity == Severity.WARNING
         assert "same-year ACS1 vintage" in lag_findings[0].message
@@ -1932,12 +1914,14 @@ class TestRunPreflight:
     def test_preflight_blocks_bad_interpolate_to_month_source_data(self, tmp_path: Path):
         data_dir = tmp_path / "data"
         data_dir.mkdir(parents=True)
-        pd.DataFrame({
-            "county_fips": ["01001", "01001"],
-            "year": [2019, 2020],
-            "reference_date": [7, 7],
-            "population": [1000, 1100],
-        }).to_parquet(data_dir / "pep.parquet")
+        pd.DataFrame(
+            {
+                "county_fips": ["01001", "01001"],
+                "year": [2019, 2020],
+                "reference_date": [7, 7],
+                "population": [1000, 1100],
+            }
+        ).to_parquet(data_dir / "pep.parquet")
 
         recipe_data = {
             "version": 1,
@@ -1992,10 +1976,7 @@ class TestRunPreflight:
 
         recipe = load_recipe(recipe_data)
         report = run_preflight(recipe, project_root=tmp_path)
-        temporal_findings = [
-            f for f in report.findings
-            if f.kind == FindingKind.TEMPORAL_FILTER
-        ]
+        temporal_findings = [f for f in report.findings if f.kind == FindingKind.TEMPORAL_FILTER]
         assert len(temporal_findings) >= 1
         assert "requires a datetime column" in temporal_findings[0].message
         assert not report.is_ready
@@ -2005,8 +1986,8 @@ class TestRunPreflight:
 # Report model tests
 # ---------------------------------------------------------------------------
 
-class TestPreflightReport:
 
+class TestPreflightReport:
     def test_to_dict(self):
         report = PreflightReport(
             recipe_name="test",
@@ -2089,6 +2070,7 @@ class TestPreflightReport:
 
 def _make_remediation():
     from hhplab.recipe.preflight import Remediation
+
     return Remediation(
         hint="Generate crosswalk artifacts.",
         command="hhplab generate xwalks",
@@ -2098,6 +2080,7 @@ def _make_remediation():
 # ---------------------------------------------------------------------------
 # CLI tests
 # ---------------------------------------------------------------------------
+
 
 def _make_project_root(tmp_path: Path) -> None:
     """Create marker files so _check_working_directory() doesn't warn."""
@@ -2115,19 +2098,25 @@ def _write_recipe(tmp_path: Path, data: dict) -> Path:
 
 
 class TestPreflightCLI:
-
     def test_human_output_clean(self, tmp_path: Path, monkeypatch):
         _make_project_root(tmp_path)
         monkeypatch.chdir(tmp_path)
         data = _preflight_recipe(with_path=True, identity_only=True)
         _setup_preflight_fixtures(
-            tmp_path, include_xwalk=False, include_acs=False,
+            tmp_path,
+            include_xwalk=False,
+            include_acs=False,
         )
         rf = _write_recipe(tmp_path, data)
-        result = runner.invoke(app, [
-            "build", "recipe-preflight",
-            "--recipe", str(rf),
-        ])
+        result = runner.invoke(
+            app,
+            [
+                "build",
+                "recipe-preflight",
+                "--recipe",
+                str(rf),
+            ],
+        )
         assert result.exit_code == 0
         assert "Ready to build" in result.output
 
@@ -2137,10 +2126,15 @@ class TestPreflightCLI:
         data = _preflight_recipe(with_path=True, identity_only=True)
         # Don't create fixtures — missing files
         rf = _write_recipe(tmp_path, data)
-        result = runner.invoke(app, [
-            "build", "recipe-preflight",
-            "--recipe", str(rf),
-        ])
+        result = runner.invoke(
+            app,
+            [
+                "build",
+                "recipe-preflight",
+                "--recipe",
+                str(rf),
+            ],
+        )
         assert result.exit_code == 1
         assert "Blocker" in result.output or "FAILED" in result.output
 
@@ -2149,14 +2143,21 @@ class TestPreflightCLI:
         monkeypatch.chdir(tmp_path)
         data = _preflight_recipe(with_path=True, identity_only=True)
         _setup_preflight_fixtures(
-            tmp_path, include_xwalk=False, include_acs=False,
+            tmp_path,
+            include_xwalk=False,
+            include_acs=False,
         )
         rf = _write_recipe(tmp_path, data)
-        result = runner.invoke(app, [
-            "build", "recipe-preflight",
-            "--recipe", str(rf),
-            "--json",
-        ])
+        result = runner.invoke(
+            app,
+            [
+                "build",
+                "recipe-preflight",
+                "--recipe",
+                str(rf),
+                "--json",
+            ],
+        )
         assert result.exit_code == 0
         out = json.loads(result.output)
         assert out["status"] == "ok"
@@ -2171,15 +2172,22 @@ class TestPreflightCLI:
         monkeypatch.chdir(tmp_path)
         data = _preflight_recipe(with_path=True, identity_only=True)
         _setup_preflight_fixtures(
-            tmp_path, include_xwalk=False, include_acs=False,
+            tmp_path,
+            include_xwalk=False,
+            include_acs=False,
         )
         rf = _write_recipe(tmp_path, data)
-        result = runner.invoke(app, [
-            "build", "recipe-preflight",
-            "--recipe", str(rf),
-            "--json",
-            "--non-interactive",
-        ])
+        result = runner.invoke(
+            app,
+            [
+                "build",
+                "recipe-preflight",
+                "--recipe",
+                str(rf),
+                "--json",
+                "--non-interactive",
+            ],
+        )
         assert result.exit_code == 0
         out = json.loads(result.output)
         assert out["status"] == "ok"
@@ -2190,11 +2198,16 @@ class TestPreflightCLI:
         monkeypatch.chdir(tmp_path)
         data = _preflight_recipe(with_path=True, identity_only=True)
         rf = _write_recipe(tmp_path, data)
-        result = runner.invoke(app, [
-            "build", "recipe-preflight",
-            "--recipe", str(rf),
-            "--json",
-        ])
+        result = runner.invoke(
+            app,
+            [
+                "build",
+                "recipe-preflight",
+                "--recipe",
+                str(rf),
+                "--json",
+            ],
+        )
         assert result.exit_code == 1
         out = json.loads(result.output)
         assert out["status"] == "blocked"
@@ -2205,11 +2218,16 @@ class TestPreflightCLI:
         monkeypatch.chdir(tmp_path)
         data = _preflight_recipe(with_path=True, identity_only=True)
         rf = _write_recipe(tmp_path, data)
-        result = runner.invoke(app, [
-            "build", "recipe-preflight",
-            "--recipe", str(rf),
-            "--gaps",
-        ])
+        result = runner.invoke(
+            app,
+            [
+                "build",
+                "recipe-preflight",
+                "--recipe",
+                str(rf),
+                "--gaps",
+            ],
+        )
         out = json.loads(result.output)
         assert "total_gaps" in out
         assert "gaps_by_kind" in out
@@ -2219,15 +2237,19 @@ class TestPreflightCLI:
         monkeypatch.chdir(tmp_path)
         rf = tmp_path / "bad.yaml"
         rf.write_text("not: a: recipe", encoding="utf-8")
-        result = runner.invoke(app, [
-            "build", "recipe-preflight",
-            "--recipe", str(rf),
-        ])
+        result = runner.invoke(
+            app,
+            [
+                "build",
+                "recipe-preflight",
+                "--recipe",
+                str(rf),
+            ],
+        )
         assert result.exit_code == 2
 
 
 class TestBuildRecipeWithPreflight:
-
     def test_preflight_blocks_execution(self, tmp_path: Path, monkeypatch):
         """When dataset files exist but transform is missing, preflight catches it."""
         _make_project_root(tmp_path)
@@ -2236,13 +2258,19 @@ class TestBuildRecipeWithPreflight:
         data["datasets"]["pit"]["path"] = "data/pit.parquet"
         data["datasets"]["acs"]["path"] = "data/acs.parquet"
         _setup_preflight_fixtures(
-            tmp_path, include_xwalk=False,
+            tmp_path,
+            include_xwalk=False,
         )
         rf = _write_recipe(tmp_path, data)
-        result = runner.invoke(app, [
-            "build", "recipe",
-            "--recipe", str(rf),
-        ])
+        result = runner.invoke(
+            app,
+            [
+                "build",
+                "recipe",
+                "--recipe",
+                str(rf),
+            ],
+        )
         assert result.exit_code == 1
         assert "Preflight" in result.output or "blocker" in result.output
 
@@ -2254,14 +2282,20 @@ class TestBuildRecipeWithPreflight:
         data["datasets"]["pit"]["path"] = "data/pit.parquet"
         data["datasets"]["acs"]["path"] = "data/acs.parquet"
         _setup_preflight_fixtures(
-            tmp_path, include_xwalk=False,
+            tmp_path,
+            include_xwalk=False,
         )
         rf = _write_recipe(tmp_path, data)
-        result = runner.invoke(app, [
-            "build", "recipe",
-            "--recipe", str(rf),
-            "--json",
-        ])
+        result = runner.invoke(
+            app,
+            [
+                "build",
+                "recipe",
+                "--recipe",
+                str(rf),
+                "--json",
+            ],
+        )
         assert result.exit_code == 1
         out = json.loads(result.output)
         assert out["status"] == "blocked"
@@ -2273,33 +2307,50 @@ class TestBuildRecipeWithPreflight:
         # Use a recipe without path so old validation passes
         data = _preflight_recipe(with_path=False, identity_only=True)
         rf = _write_recipe(tmp_path, data)
-        result = runner.invoke(app, [
-            "build", "recipe",
-            "--recipe", str(rf),
-            "--dry-run", "--skip-preflight",
-        ])
+        result = runner.invoke(
+            app,
+            [
+                "build",
+                "recipe",
+                "--recipe",
+                str(rf),
+                "--dry-run",
+                "--skip-preflight",
+            ],
+        )
         assert result.exit_code == 0
 
     def test_clean_preflight_allows_dry_run(
-        self, tmp_path: Path, monkeypatch,
+        self,
+        tmp_path: Path,
+        monkeypatch,
     ):
         _make_project_root(tmp_path)
         monkeypatch.chdir(tmp_path)
         data = _preflight_recipe(with_path=True, identity_only=True)
         _setup_preflight_fixtures(
-            tmp_path, include_xwalk=False, include_acs=False,
+            tmp_path,
+            include_xwalk=False,
+            include_acs=False,
         )
         rf = _write_recipe(tmp_path, data)
-        result = runner.invoke(app, [
-            "build", "recipe",
-            "--recipe", str(rf),
-            "--dry-run",
-        ])
+        result = runner.invoke(
+            app,
+            [
+                "build",
+                "recipe",
+                "--recipe",
+                str(rf),
+                "--dry-run",
+            ],
+        )
         assert result.exit_code == 0
         assert "all clear" in result.output
 
     def test_missing_dataset_routes_through_preflight_json(
-        self, tmp_path: Path, monkeypatch,
+        self,
+        tmp_path: Path,
+        monkeypatch,
     ):
         """Missing dataset paths should produce status=blocked with preflight
         payload, not status=error with validation.errors (coclab-pu6j.3)."""
@@ -2308,11 +2359,16 @@ class TestBuildRecipeWithPreflight:
         data = _preflight_recipe(with_path=True, identity_only=True)
         # Don't create pit file — missing dataset
         rf = _write_recipe(tmp_path, data)
-        result = runner.invoke(app, [
-            "build", "recipe",
-            "--recipe", str(rf),
-            "--json",
-        ])
+        result = runner.invoke(
+            app,
+            [
+                "build",
+                "recipe",
+                "--recipe",
+                str(rf),
+                "--json",
+            ],
+        )
         assert result.exit_code == 1
         out = json.loads(result.output)
         assert out["status"] == "blocked"
@@ -2334,9 +2390,13 @@ class TestRecipeScopedPathChecks:
         data_dir = tmp_path / "data"
         data_dir.mkdir(parents=True)
         # Create ONLY the 2020 file
-        pd.DataFrame({
-            "coc_id": ["COC1"], "year": [2020], "pit_total": [10],
-        }).to_parquet(data_dir / "pit_2020.parquet")
+        pd.DataFrame(
+            {
+                "coc_id": ["COC1"],
+                "year": [2020],
+                "pit_total": [10],
+            }
+        ).to_parquet(data_dir / "pit_2020.parquet")
 
         recipe_data = {
             "version": 1,
@@ -2387,13 +2447,9 @@ class TestRecipeScopedPathChecks:
         recipe = load_recipe(recipe_data)
         report = run_preflight(recipe, project_root=tmp_path)
         # Should be ready — only 2020 is needed and 2020 file exists
-        ds_findings = [
-            f for f in report.findings
-            if f.kind == FindingKind.MISSING_DATASET
-        ]
+        ds_findings = [f for f in report.findings if f.kind == FindingKind.MISSING_DATASET]
         assert len(ds_findings) == 0, (
-            f"Expected no missing-dataset findings but got: "
-            f"{[f.message for f in ds_findings]}"
+            f"Expected no missing-dataset findings but got: {[f.message for f in ds_findings]}"
         )
         assert report.is_ready
 
@@ -2402,9 +2458,13 @@ class TestRecipeScopedPathChecks:
         should not generate missing-file findings."""
         data_dir = tmp_path / "data"
         data_dir.mkdir(parents=True)
-        pd.DataFrame({
-            "coc_id": ["COC1"], "year": [2020], "pit_total": [10],
-        }).to_parquet(data_dir / "pit.parquet")
+        pd.DataFrame(
+            {
+                "coc_id": ["COC1"],
+                "year": [2020],
+                "pit_total": [10],
+            }
+        ).to_parquet(data_dir / "pit.parquet")
 
         recipe_data = {
             "version": 1,
@@ -2458,25 +2518,25 @@ class TestRecipeScopedPathChecks:
 
         recipe = load_recipe(recipe_data)
         report = run_preflight(recipe, project_root=tmp_path)
-        ds_findings = [
-            f for f in report.findings
-            if f.kind == FindingKind.MISSING_DATASET
-        ]
+        ds_findings = [f for f in report.findings if f.kind == FindingKind.MISSING_DATASET]
         assert len(ds_findings) == 0
         assert report.is_ready
 
     def test_file_set_distinct_paths_do_not_trigger_static_broadcast(
-        self, tmp_path: Path,
+        self,
+        tmp_path: Path,
     ):
         """A file_set with distinct per-year files is safe without a
         year column in the individual parquet files."""
         data_dir = tmp_path / "data"
         data_dir.mkdir(parents=True)
         for year in (2020, 2021, 2022):
-            pd.DataFrame({
-                "coc_id": ["COC1"],
-                "pit_total": [10 + (year - 2020)],
-            }).to_parquet(data_dir / f"pit_{year}.parquet")
+            pd.DataFrame(
+                {
+                    "coc_id": ["COC1"],
+                    "pit_total": [10 + (year - 2020)],
+                }
+            ).to_parquet(data_dir / f"pit_{year}.parquet")
 
         recipe_data = {
             "version": 1,
@@ -2526,30 +2586,27 @@ class TestRecipeScopedPathChecks:
 
         recipe = load_recipe(recipe_data)
         report = run_preflight(recipe, project_root=tmp_path)
-        broadcast_findings = [
-            f for f in report.findings
-            if f.kind == FindingKind.STATIC_BROADCAST
-        ]
+        broadcast_findings = [f for f in report.findings if f.kind == FindingKind.STATIC_BROADCAST]
         assert len(broadcast_findings) == 0
         assert report.is_ready
 
     def test_generated_metro_transform_ready_when_inputs_exist(
-        self, tmp_path: Path,
+        self,
+        tmp_path: Path,
     ):
         """Generated metro transforms should not block preflight when
         their source artifacts are present."""
         data_dir = tmp_path / "data"
         (data_dir / "curated" / "metro").mkdir(parents=True)
-        pd.DataFrame({
-            "county_fips": ["01001"],
-            "year": [2020],
-            "population": [1000],
-        }).to_parquet(data_dir / "pep.parquet")
+        pd.DataFrame(
+            {
+                "county_fips": ["01001"],
+                "year": [2020],
+                "population": [1000],
+            }
+        ).to_parquet(data_dir / "pep.parquet")
         pd.DataFrame({"metro_id": ["GF01"], "county_fips": ["01001"]}).to_parquet(
-            data_dir
-            / "curated"
-            / "metro"
-            / "metro_county_membership__glynn_fox_v1.parquet"
+            data_dir / "curated" / "metro" / "metro_county_membership__glynn_fox_v1.parquet"
         )
 
         recipe_data = {
@@ -2608,15 +2665,13 @@ class TestRecipeScopedPathChecks:
 
         recipe = load_recipe(recipe_data)
         report = run_preflight(recipe, project_root=tmp_path)
-        transform_findings = [
-            f for f in report.findings
-            if f.kind == FindingKind.MISSING_TRANSFORM
-        ]
+        transform_findings = [f for f in report.findings if f.kind == FindingKind.MISSING_TRANSFORM]
         assert len(transform_findings) == 0
         assert report.is_ready
 
     def test_multi_pipeline_deduplicates_dataset_year_checks(
-        self, tmp_path: Path,
+        self,
+        tmp_path: Path,
     ):
         """Two pipelines referencing the same dataset-year should not
         produce duplicate missing-file findings."""
@@ -2642,41 +2697,43 @@ class TestRecipeScopedPathChecks:
                 {
                     "id": "p1",
                     "target": "t1",
-                    "steps": [{
-                        "resample": {
-                            "dataset": "pit",
-                            "to_geometry": {"type": "coc", "vintage": 2025},
-                            "method": "identity",
-                            "measures": ["pit_total"],
-                        },
-                    }],
+                    "steps": [
+                        {
+                            "resample": {
+                                "dataset": "pit",
+                                "to_geometry": {"type": "coc", "vintage": 2025},
+                                "method": "identity",
+                                "measures": ["pit_total"],
+                            },
+                        }
+                    ],
                 },
                 {
                     "id": "p2",
                     "target": "t1",
-                    "steps": [{
-                        "resample": {
-                            "dataset": "pit",
-                            "to_geometry": {"type": "coc", "vintage": 2025},
-                            "method": "identity",
-                            "measures": ["pit_total"],
-                        },
-                    }],
+                    "steps": [
+                        {
+                            "resample": {
+                                "dataset": "pit",
+                                "to_geometry": {"type": "coc", "vintage": 2025},
+                                "method": "identity",
+                                "measures": ["pit_total"],
+                            },
+                        }
+                    ],
                 },
             ],
         }
 
         recipe = load_recipe(recipe_data)
         report = run_preflight(recipe, project_root=tmp_path)
-        ds_findings = [
-            f for f in report.findings
-            if f.kind == FindingKind.MISSING_DATASET
-        ]
+        ds_findings = [f for f in report.findings if f.kind == FindingKind.MISSING_DATASET]
         # Should be exactly 1 finding (deduplicated), not 2
         assert len(ds_findings) == 1
 
     def test_planner_error_surfaces_as_uncovered_years_gap(
-        self, tmp_path: Path,
+        self,
+        tmp_path: Path,
     ):
         """When a planner error indicates uncovered years, the gaps
         manifest should include an uncovered_years entry (coclab-hh6d)."""
@@ -2701,14 +2758,16 @@ class TestRecipeScopedPathChecks:
                 {
                     "id": "main",
                     "target": "t1",
-                    "steps": [{
-                        "resample": {
-                            "dataset": "pit",
-                            "to_geometry": {"type": "coc", "vintage": 2025},
-                            "method": "identity",
-                            "measures": ["pit_total"],
-                        },
-                    }],
+                    "steps": [
+                        {
+                            "resample": {
+                                "dataset": "pit",
+                                "to_geometry": {"type": "coc", "vintage": 2025},
+                                "method": "identity",
+                                "measures": ["pit_total"],
+                            },
+                        }
+                    ],
                 },
             ],
         }
@@ -2754,18 +2813,22 @@ class TestGapsManifest:
                 },
             },
             "transforms": [],
-            "pipelines": [{
-                "id": "main",
-                "target": "t1",
-                "steps": [{
-                    "resample": {
-                        "dataset": "pit",
-                        "to_geometry": {"type": "coc", "vintage": 2025},
-                        "method": "identity",
-                        "measures": ["pit_total"],
-                    },
-                }],
-            }],
+            "pipelines": [
+                {
+                    "id": "main",
+                    "target": "t1",
+                    "steps": [
+                        {
+                            "resample": {
+                                "dataset": "pit",
+                                "to_geometry": {"type": "coc", "vintage": 2025},
+                                "method": "identity",
+                                "measures": ["pit_total"],
+                            },
+                        }
+                    ],
+                }
+            ],
         }
 
         recipe = load_recipe(recipe_data)
@@ -2783,9 +2846,13 @@ class TestGapsManifest:
         """Missing transform gaps should include transform_id and remediation."""
         data_dir = tmp_path / "data"
         data_dir.mkdir(parents=True)
-        pd.DataFrame({
-            "coc_id": ["COC1"], "year": [2020], "pop": [100],
-        }).to_parquet(data_dir / "acs.parquet")
+        pd.DataFrame(
+            {
+                "coc_id": ["COC1"],
+                "year": [2020],
+                "pop": [100],
+            }
+        ).to_parquet(data_dir / "acs.parquet")
 
         recipe_data = {
             "version": 1,
@@ -2804,29 +2871,33 @@ class TestGapsManifest:
                     "years": "2020-2020",
                 },
             },
-            "transforms": [{
-                "id": "tract_to_coc",
-                "type": "crosswalk",
-                "from": {"type": "tract", "vintage": 2020},
-                "to": {"type": "coc", "vintage": 2025},
-                "spec": {"weighting": {"scheme": "area"}},
-            }],
-            "pipelines": [{
-                "id": "main",
-                "target": "t1",
-                "steps": [
-                    {"materialize": {"transforms": ["tract_to_coc"]}},
-                    {
-                        "resample": {
-                            "dataset": "acs",
-                            "to_geometry": {"type": "coc", "vintage": 2025},
-                            "method": "aggregate",
-                            "via": "tract_to_coc",
-                            "measures": ["pop"],
+            "transforms": [
+                {
+                    "id": "tract_to_coc",
+                    "type": "crosswalk",
+                    "from": {"type": "tract", "vintage": 2020},
+                    "to": {"type": "coc", "vintage": 2025},
+                    "spec": {"weighting": {"scheme": "area"}},
+                }
+            ],
+            "pipelines": [
+                {
+                    "id": "main",
+                    "target": "t1",
+                    "steps": [
+                        {"materialize": {"transforms": ["tract_to_coc"]}},
+                        {
+                            "resample": {
+                                "dataset": "acs",
+                                "to_geometry": {"type": "coc", "vintage": 2025},
+                                "method": "aggregate",
+                                "via": "tract_to_coc",
+                                "measures": ["pop"],
+                            },
                         },
-                    },
-                ],
-            }],
+                    ],
+                }
+            ],
         }
 
         recipe = load_recipe(recipe_data)
@@ -2859,9 +2930,13 @@ class TestGapsManifest:
         """Missing measure column gaps should appear in the manifest."""
         data_dir = tmp_path / "data"
         data_dir.mkdir(parents=True)
-        pd.DataFrame({
-            "coc_id": ["COC1"], "year": [2020], "wrong_col": [10],
-        }).to_parquet(data_dir / "pit.parquet")
+        pd.DataFrame(
+            {
+                "coc_id": ["COC1"],
+                "year": [2020],
+                "wrong_col": [10],
+            }
+        ).to_parquet(data_dir / "pit.parquet")
 
         recipe_data = {
             "version": 1,
@@ -2881,18 +2956,22 @@ class TestGapsManifest:
                 },
             },
             "transforms": [],
-            "pipelines": [{
-                "id": "main",
-                "target": "t1",
-                "steps": [{
-                    "resample": {
-                        "dataset": "pit",
-                        "to_geometry": {"type": "coc", "vintage": 2025},
-                        "method": "identity",
-                        "measures": ["pit_total"],
-                    },
-                }],
-            }],
+            "pipelines": [
+                {
+                    "id": "main",
+                    "target": "t1",
+                    "steps": [
+                        {
+                            "resample": {
+                                "dataset": "pit",
+                                "to_geometry": {"type": "coc", "vintage": 2025},
+                                "method": "identity",
+                                "measures": ["pit_total"],
+                            },
+                        }
+                    ],
+                }
+            ],
         }
 
         recipe = load_recipe(recipe_data)
@@ -2903,7 +2982,8 @@ class TestGapsManifest:
         assert "pit_total" in measure_gaps[0]["message"]
 
     def test_gaps_manifest_uncovered_years_with_remediation(
-        self, tmp_path: Path,
+        self,
+        tmp_path: Path,
     ):
         """Uncovered-year gaps from planner errors should include
         actionable remediation metadata (coclab-hh6d regression)."""
@@ -2924,18 +3004,22 @@ class TestGapsManifest:
                 },
             },
             "transforms": [],
-            "pipelines": [{
-                "id": "main",
-                "target": "t1",
-                "steps": [{
-                    "resample": {
-                        "dataset": "pit",
-                        "to_geometry": {"type": "coc", "vintage": 2025},
-                        "method": "identity",
-                        "measures": ["pit_total"],
-                    },
-                }],
-            }],
+            "pipelines": [
+                {
+                    "id": "main",
+                    "target": "t1",
+                    "steps": [
+                        {
+                            "resample": {
+                                "dataset": "pit",
+                                "to_geometry": {"type": "coc", "vintage": 2025},
+                                "method": "identity",
+                                "measures": ["pit_total"],
+                            },
+                        }
+                    ],
+                }
+            ],
         }
 
         recipe = load_recipe(recipe_data)
@@ -2960,7 +3044,9 @@ class TestGapsManifest:
         assert "universe" in gap["remediation"]["hint"].lower()
 
     def test_gaps_cli_uncovered_years_not_empty(
-        self, tmp_path: Path, monkeypatch,
+        self,
+        tmp_path: Path,
+        monkeypatch,
     ):
         """CLI --gaps should report blocking gaps for uncovered-year
         planner errors, not status=ok with total_gaps=0."""
@@ -2983,25 +3069,34 @@ class TestGapsManifest:
                 },
             },
             "transforms": [],
-            "pipelines": [{
-                "id": "main",
-                "target": "t1",
-                "steps": [{
-                    "resample": {
-                        "dataset": "pit",
-                        "to_geometry": {"type": "coc", "vintage": 2025},
-                        "method": "identity",
-                        "measures": ["pit_total"],
-                    },
-                }],
-            }],
+            "pipelines": [
+                {
+                    "id": "main",
+                    "target": "t1",
+                    "steps": [
+                        {
+                            "resample": {
+                                "dataset": "pit",
+                                "to_geometry": {"type": "coc", "vintage": 2025},
+                                "method": "identity",
+                                "measures": ["pit_total"],
+                            },
+                        }
+                    ],
+                }
+            ],
         }
         rf = _write_recipe(tmp_path, recipe_data)
-        result = runner.invoke(app, [
-            "build", "recipe-preflight",
-            "--recipe", str(rf),
-            "--gaps",
-        ])
+        result = runner.invoke(
+            app,
+            [
+                "build",
+                "recipe-preflight",
+                "--recipe",
+                str(rf),
+                "--gaps",
+            ],
+        )
         out = json.loads(result.output)
         assert out["total_gaps"] > 0
         assert out["blocking_gaps"] > 0
@@ -3024,25 +3119,33 @@ class TestSupportDatasetProbe:
         data_dir.mkdir(parents=True)
 
         # Create pit dataset
-        pd.DataFrame({
-            "coc_id": ["COC1"], "year": [2020], "pit_total": [10],
-        }).to_parquet(data_dir / "pit.parquet")
+        pd.DataFrame(
+            {
+                "coc_id": ["COC1"],
+                "year": [2020],
+                "pit_total": [10],
+            }
+        ).to_parquet(data_dir / "pit.parquet")
 
         # Create weights dataset WITHOUT the required population field
-        pd.DataFrame({
-            "GEOID": ["T1", "T2"],
-            "year": [2020, 2020],
-            "wrong_field": [100, 200],
-        }).to_parquet(data_dir / "weights.parquet")
+        pd.DataFrame(
+            {
+                "GEOID": ["T1", "T2"],
+                "year": [2020, 2020],
+                "wrong_field": [100, 200],
+            }
+        ).to_parquet(data_dir / "weights.parquet")
 
         # Create crosswalk
         xwalk_dir = data_dir / "curated" / "xwalks"
         xwalk_dir.mkdir(parents=True)
-        pd.DataFrame({
-            "coc_id": ["COC1", "COC2"],
-            "tract_geoid": ["T1", "T2"],
-            "area_share": [1.0, 1.0],
-        }).to_parquet(xwalk_dir / "xwalk__B2025xT2020.parquet")
+        pd.DataFrame(
+            {
+                "coc_id": ["COC1", "COC2"],
+                "tract_geoid": ["T1", "T2"],
+                "area_share": [1.0, 1.0],
+            }
+        ).to_parquet(xwalk_dir / "xwalk__B2025xT2020.parquet")
 
         recipe_data = {
             "version": 1,
@@ -3112,8 +3215,7 @@ class TestSupportDatasetProbe:
         recipe = load_recipe(recipe_data)
         report = run_preflight(recipe, project_root=tmp_path)
         support_findings = [
-            f for f in report.findings
-            if f.kind == FindingKind.MISSING_SUPPORT_DATASET
+            f for f in report.findings if f.kind == FindingKind.MISSING_SUPPORT_DATASET
         ]
         assert len(support_findings) >= 1
         assert "total_population" in support_findings[0].message
@@ -3125,24 +3227,32 @@ class TestSupportDatasetProbe:
         data_dir = tmp_path / "data"
         data_dir.mkdir(parents=True)
 
-        pd.DataFrame({
-            "coc_id": ["COC1"], "year": [2020], "pit_total": [10],
-        }).to_parquet(data_dir / "pit.parquet")
+        pd.DataFrame(
+            {
+                "coc_id": ["COC1"],
+                "year": [2020],
+                "pit_total": [10],
+            }
+        ).to_parquet(data_dir / "pit.parquet")
 
         # Create weights dataset WITH the required population field
-        pd.DataFrame({
-            "GEOID": ["T1", "T2"],
-            "year": [2020, 2020],
-            "total_population": [100, 200],
-        }).to_parquet(data_dir / "weights.parquet")
+        pd.DataFrame(
+            {
+                "GEOID": ["T1", "T2"],
+                "year": [2020, 2020],
+                "total_population": [100, 200],
+            }
+        ).to_parquet(data_dir / "weights.parquet")
 
         xwalk_dir = data_dir / "curated" / "xwalks"
         xwalk_dir.mkdir(parents=True)
-        pd.DataFrame({
-            "coc_id": ["COC1", "COC2"],
-            "tract_geoid": ["T1", "T2"],
-            "area_share": [1.0, 1.0],
-        }).to_parquet(xwalk_dir / "xwalk__B2025xT2020.parquet")
+        pd.DataFrame(
+            {
+                "coc_id": ["COC1", "COC2"],
+                "tract_geoid": ["T1", "T2"],
+                "area_share": [1.0, 1.0],
+            }
+        ).to_parquet(xwalk_dir / "xwalk__B2025xT2020.parquet")
 
         recipe_data = {
             "version": 1,
@@ -3212,8 +3322,7 @@ class TestSupportDatasetProbe:
         recipe = load_recipe(recipe_data)
         report = run_preflight(recipe, project_root=tmp_path)
         support_findings = [
-            f for f in report.findings
-            if f.kind == FindingKind.MISSING_SUPPORT_DATASET
+            f for f in report.findings if f.kind == FindingKind.MISSING_SUPPORT_DATASET
         ]
         assert len(support_findings) == 0
 
@@ -3223,17 +3332,23 @@ class TestSupportDatasetProbe:
         data_dir = tmp_path / "data"
         data_dir.mkdir(parents=True)
 
-        pd.DataFrame({
-            "coc_id": ["COC1"], "year": [2020], "pit_total": [10],
-        }).to_parquet(data_dir / "pit.parquet")
+        pd.DataFrame(
+            {
+                "coc_id": ["COC1"],
+                "year": [2020],
+                "pit_total": [10],
+            }
+        ).to_parquet(data_dir / "pit.parquet")
 
         xwalk_dir = data_dir / "curated" / "xwalks"
         xwalk_dir.mkdir(parents=True)
-        pd.DataFrame({
-            "coc_id": ["COC1", "COC2"],
-            "tract_geoid": ["T1", "T2"],
-            "area_share": [1.0, 1.0],
-        }).to_parquet(xwalk_dir / "xwalk__B2025xT2020.parquet")
+        pd.DataFrame(
+            {
+                "coc_id": ["COC1", "COC2"],
+                "tract_geoid": ["T1", "T2"],
+                "area_share": [1.0, 1.0],
+            }
+        ).to_parquet(xwalk_dir / "xwalk__B2025xT2020.parquet")
 
         recipe_data = {
             "version": 1,
@@ -3289,8 +3404,7 @@ class TestSupportDatasetProbe:
         recipe = load_recipe(recipe_data)
         report = run_preflight(recipe, project_root=tmp_path)
         support_findings = [
-            f for f in report.findings
-            if f.kind == FindingKind.MISSING_SUPPORT_DATASET
+            f for f in report.findings if f.kind == FindingKind.MISSING_SUPPORT_DATASET
         ]
         assert len(support_findings) == 0
 
@@ -3301,7 +3415,6 @@ class TestSupportDatasetProbe:
 
 
 class TestGetWeightedTransformRequirements:
-
     def test_population_weighted(self):
         from hhplab.recipe.probes import get_weighted_transform_requirements
         from hhplab.recipe.recipe_schema import (
@@ -3399,9 +3512,7 @@ class TestPreflightPlannerErrors:
         data["datasets"]["acs"]["years"] = "2020-2021"
         recipe = load_recipe(data)
         report = run_preflight(recipe, project_root=tmp_path)
-        planner_findings = [
-            f for f in report.findings if f.kind == FindingKind.PLANNER_ERROR
-        ]
+        planner_findings = [f for f in report.findings if f.kind == FindingKind.PLANNER_ERROR]
         assert planner_findings
         assert "2022" in planner_findings[0].message
 

@@ -12,7 +12,11 @@ import pandas as pd
 
 from hhplab import naming
 from hhplab.acs.variables import ACS5_SAE_SUPPORT_COLUMNS
-from hhplab.acs.variables_acs1 import ACS1_SAE_SOURCE_COLUMNS
+from hhplab.acs.variables_acs1 import ACS1_SAE_SOURCE_COLUMNS, ACS1_UNAVAILABLE_VINTAGES
+from hhplab.geo.ct_planning_regions import (
+    is_ct_legacy_county_fips,
+    is_ct_planning_region_fips,
+)
 from hhplab.provenance import ProvenanceBlock, write_parquet_with_provenance
 from hhplab.schema.contracts import ArtifactContract, validate_artifact_contract
 from hhplab.schema.measures import (
@@ -24,6 +28,8 @@ from hhplab.schema.measures import (
 
 SAE_ALLOCATION_METHOD = "tract_share_within_county"
 ACS1_IMPUTATION_METHOD = "acs1_controlled_acs5_tract_share"
+ACS1_HYBRID_CONTROL_SELECTION_POLICY_ID = "hybrid_acs1_county_primary_metro_gap_fill_v1"
+ACS1_HYBRID_CONTROL_MATERIALITY_THRESHOLD = 0.01
 ACS1_POVERTY_IMPUTATION_MEASURE_SPECS: tuple[ACS1ImputationMeasureSpec, ...] = (
     ACS1_IMPUTED_POVERTY_SPEC,
 )
@@ -53,6 +59,36 @@ class ACS1ImputationDiagnosticFinding:
             "column": self.column,
             "details": self.details or {},
         }
+
+
+@dataclass(frozen=True)
+class ACS1HybridControlSelectionPolicy:
+    """Machine-readable policy for selecting ACS1 controls for tract imputation."""
+
+    policy_id: str = ACS1_HYBRID_CONTROL_SELECTION_POLICY_ID
+    materiality_threshold: float = ACS1_HYBRID_CONTROL_MATERIALITY_THRESHOLD
+    county_available_source: str = "acs1_county"
+    gap_fill_source: str = "acs1_metro"
+    unavailable_vintages: tuple[int, ...] = tuple(sorted(ACS1_UNAVAILABLE_VINTAGES))
+    county_gap_rule: str = "use_metro_when_county_missing_or_below_materiality"
+    ct_bridge_rule: str = "bridge_ct_planning_region_counties_to_legacy_counties"
+
+    def validate(self) -> None:
+        if not 0 <= self.materiality_threshold <= 1:
+            raise ValueError("materiality_threshold must be between 0 and 1.")
+
+    def metadata(self) -> dict[str, object]:
+        self.validate()
+        return {
+            "acs1_control_policy_id": self.policy_id,
+            "acs1_control_materiality_threshold": self.materiality_threshold,
+            "acs1_control_county_available_source": self.county_available_source,
+            "acs1_control_gap_fill_source": self.gap_fill_source,
+            "acs1_control_unavailable_vintages": list(self.unavailable_vintages),
+            "acs1_control_county_gap_rule": self.county_gap_rule,
+            "acs1_control_ct_bridge_rule": self.ct_bridge_rule,
+        }
+
 
 RENTER_BURDEN_30_PLUS_COLUMNS: tuple[str, ...] = (
     "sae_gross_rent_pct_income_30_to_34_9",
@@ -144,6 +180,143 @@ def _component_columns(component_columns: Iterable[str] | None) -> list[str]:
         return list(component_columns)
     support_columns = set(ACS5_SAE_SUPPORT_COLUMNS)
     return [column for column in ACS1_SAE_SOURCE_COLUMNS if column in support_columns]
+
+
+def _availability_index(values: Iterable[str] | pd.Series | None) -> set[str]:
+    if values is None:
+        return set()
+    return {str(value).zfill(5) for value in values if pd.notna(value)}
+
+
+def _availability_map(
+    values: dict[str, bool] | Iterable[str] | pd.Series | None,
+) -> dict[str, bool] | None:
+    if values is None:
+        return None
+    if isinstance(values, dict):
+        return {str(key).zfill(5): bool(value) for key, value in values.items()}
+    return {value: True for value in _availability_index(values)}
+
+
+def _geo_id(value: object, width: int | None = None) -> str | None:
+    if pd.isna(value):
+        return None
+    text = str(value)
+    return text.zfill(width) if width is not None else text
+
+
+def _ct_bridge_status(county_fips: str | None) -> str:
+    if county_fips is None:
+        return "not_applicable"
+    if is_ct_planning_region_fips(county_fips):
+        return "planning_region_to_legacy_required"
+    if is_ct_legacy_county_fips(county_fips):
+        return "legacy_county"
+    return "not_applicable"
+
+
+def select_hybrid_acs1_controls(
+    overlaps: pd.DataFrame,
+    *,
+    acs1_vintage: int | str,
+    policy: ACS1HybridControlSelectionPolicy | None = None,
+    county_availability: dict[str, bool] | Iterable[str] | pd.Series | None = None,
+    metro_availability: dict[str, bool] | Iterable[str] | pd.Series | None = None,
+    county_id_col: str = "county_fips",
+    metro_id_col: str = "cbsa_code",
+    overlap_share_col: str = "county_overlap_share",
+    tract_id_col: str = "tract_geoid",
+) -> pd.DataFrame:
+    """Resolve county-first, metro-gap-fill ACS1 controls for tract imputation.
+
+    County ACS1 controls are preferred when the county has ACS1 coverage and
+    the tract/county overlap is material. Metro ACS1 controls fill gaps only
+    when the county control is missing or below the materiality threshold.
+    """
+    resolved_policy = policy or ACS1HybridControlSelectionPolicy()
+    resolved_policy.validate()
+    vintage = int(acs1_vintage)
+    if vintage in resolved_policy.unavailable_vintages:
+        raise ValueError(
+            f"ACS1 vintage {vintage} is nationally unavailable. "
+            "Choose a different ACS1 vintage or declare an explicit fallback policy."
+        )
+
+    required = [county_id_col, metro_id_col, overlap_share_col]
+    missing = [column for column in required if column not in overlaps.columns]
+    if missing:
+        raise ValueError(f"ACS1 hybrid control selection requires columns: {missing}.")
+
+    county_map = _availability_map(county_availability)
+    metro_map = _availability_map(metro_availability)
+    rows: list[dict[str, object]] = []
+    for _, row in overlaps.iterrows():
+        county_fips = _geo_id(row[county_id_col], 5)
+        metro_id = _geo_id(row[metro_id_col])
+        overlap_share = pd.to_numeric(pd.Series([row[overlap_share_col]]), errors="coerce").iloc[0]
+        material = bool(
+            pd.notna(overlap_share) and overlap_share >= resolved_policy.materiality_threshold
+        )
+        county_available = (
+            bool(row["county_acs1_available"])
+            if "county_acs1_available" in overlaps.columns
+            and pd.notna(row["county_acs1_available"])
+            else (
+                county_map.get(county_fips, False)
+                if county_map is not None and county_fips
+                else False
+            )
+        )
+        metro_available = (
+            bool(row["metro_acs1_available"])
+            if "metro_acs1_available" in overlaps.columns and pd.notna(row["metro_acs1_available"])
+            else (metro_map.get(metro_id, False) if metro_map is not None and metro_id else False)
+        )
+
+        if county_available and material:
+            control_geo_type = "county"
+            control_geo_id = county_fips
+            control_source = resolved_policy.county_available_source
+            control_reason = "county_available_and_material"
+        elif metro_available:
+            control_geo_type = "metro"
+            control_geo_id = metro_id
+            control_source = resolved_policy.gap_fill_source
+            control_reason = (
+                "county_below_materiality" if county_available else "county_missing_or_unavailable"
+            )
+        else:
+            control_geo_type = pd.NA
+            control_geo_id = pd.NA
+            control_source = pd.NA
+            control_reason = "no_available_acs1_control"
+
+        output_row = row.to_dict()
+        output_row.update(
+            {
+                "acs1_vintage": str(vintage),
+                "acs1_control_policy_id": resolved_policy.policy_id,
+                "acs1_control_materiality_threshold": resolved_policy.materiality_threshold,
+                "acs1_control_county_available": county_available,
+                "acs1_control_metro_available": metro_available,
+                "acs1_control_overlap_share": overlap_share,
+                "acs1_control_source": control_source,
+                "acs1_control_geo_type": control_geo_type,
+                "acs1_control_geo_id": control_geo_id,
+                "acs1_control_reason": control_reason,
+                "acs1_control_ct_bridge_status": _ct_bridge_status(county_fips),
+            }
+        )
+        rows.append(output_row)
+
+    result = pd.DataFrame(rows)
+    sort_columns = [
+        column for column in (tract_id_col, county_id_col, metro_id_col) if column in result.columns
+    ]
+    if sort_columns:
+        result = result.sort_values(sort_columns).reset_index(drop=True)
+    result.attrs["acs1_control_policy"] = resolved_policy.metadata()
+    return result
 
 
 def _require_columns(df: pd.DataFrame, columns: Iterable[str], label: str) -> None:
@@ -455,6 +628,7 @@ def build_acs1_poverty_tracts_provenance(
     support_dataset_path: str | Path | None = None,
     crosswalk_path: str | Path | None = None,
     output_row_count: int | None = None,
+    control_policy: ACS1HybridControlSelectionPolicy | dict[str, object] | None = None,
 ) -> ProvenanceBlock:
     """Build embedded provenance for an ACS1-imputed tract poverty artifact."""
     extra: dict[str, Any] = {
@@ -484,6 +658,12 @@ def build_acs1_poverty_tracts_provenance(
         "output_row_count": output_row_count,
     }
     extra.update({key: value for key, value in optional_extra.items() if value is not None})
+    if control_policy is None:
+        extra.update(ACS1HybridControlSelectionPolicy().metadata())
+    elif isinstance(control_policy, ACS1HybridControlSelectionPolicy):
+        extra.update(control_policy.metadata())
+    else:
+        extra.update(control_policy)
 
     provenance = ProvenanceBlock(
         boundary_vintage=None if target_vintage is None else str(target_vintage),
@@ -562,6 +742,302 @@ def build_acs1_poverty_tract_artifact(
     return artifact
 
 
+def build_hybrid_acs1_poverty_tract_artifact(
+    acs1_county_targets: pd.DataFrame,
+    acs1_metro_targets: pd.DataFrame,
+    acs5_tract_support: pd.DataFrame,
+    control_overlaps: pd.DataFrame,
+    *,
+    acs1_vintage: int | str | None = None,
+    year: int | str | None = None,
+    policy: ACS1HybridControlSelectionPolicy | None = None,
+    county_id_col: str = "county_fips",
+    metro_id_col: str = "cbsa_code",
+    tract_id_col: str = "tract_geoid",
+    overlap_share_col: str = "county_overlap_share",
+    share_column: str = "area_share",
+    acs5_vintage: int | str | None = None,
+    tract_vintage: int | str | None = None,
+) -> pd.DataFrame:
+    """Build a county-first, metro-gap-fill ACS1 poverty tract artifact."""
+    resolved_acs1_vintage = (
+        str(acs1_vintage)
+        if acs1_vintage is not None
+        else _single_metadata_value(
+            acs1_county_targets,
+            attr_name="acs1_vintage",
+            column_name="acs1_vintage",
+            label="ACS1 county poverty targets",
+        )
+    )
+    county_available = set(acs1_county_targets[county_id_col].dropna().astype(str))
+    metro_available = set(acs1_metro_targets[metro_id_col].dropna().astype(str))
+    controls = select_hybrid_acs1_controls(
+        control_overlaps,
+        acs1_vintage=resolved_acs1_vintage,
+        policy=policy,
+        county_availability=county_available,
+        metro_availability=metro_available,
+        county_id_col=county_id_col,
+        metro_id_col=metro_id_col,
+        overlap_share_col=overlap_share_col,
+        tract_id_col=tract_id_col,
+    )
+
+    support = prepare_acs5_imputation_support(
+        acs5_tract_support,
+        specs=ACS1_POVERTY_IMPUTATION_MEASURE_SPECS,
+        target_id_col=None,
+        acs_vintage=acs5_vintage,
+        tract_vintage=tract_vintage,
+    )
+    source_columns = acs1_imputation_source_columns(ACS1_POVERTY_IMPUTATION_MEASURE_SPECS)
+    metro_residual_targets = acs1_metro_targets.copy()
+    county_controlled = controls[controls["acs1_control_geo_type"].eq("county")]
+    if not county_controlled.empty and not metro_residual_targets.empty:
+        county_to_metro = county_controlled[[county_id_col, metro_id_col]].drop_duplicates()
+        county_target_values = county_to_metro.merge(
+            acs1_county_targets[[county_id_col, *source_columns]],
+            on=county_id_col,
+            how="left",
+        )
+        county_totals_by_metro = county_target_values.groupby(metro_id_col, dropna=False)[
+            source_columns
+        ].sum(min_count=1)
+        metro_residual_targets = metro_residual_targets.set_index(metro_id_col, drop=False)
+        for source_column in source_columns:
+            residual = pd.to_numeric(
+                metro_residual_targets[source_column], errors="coerce"
+            ) - metro_residual_targets.index.map(county_totals_by_metro[source_column]).fillna(0)
+            if (residual < -1e-6).any():
+                invalid = sorted(metro_residual_targets.index[residual < -1e-6].astype(str))
+                raise ValueError(
+                    "Hybrid ACS1 metro residual controls cannot be negative for "
+                    f"{source_column}. Metro IDs: {invalid}."
+                )
+            metro_residual_targets[source_column] = residual.clip(lower=0)
+        metro_residual_targets = metro_residual_targets.reset_index(drop=True)
+
+    outputs: list[pd.DataFrame] = []
+    control_groups = (
+        ("county", county_id_col, acs1_county_targets, "county_control"),
+        ("metro", metro_id_col, metro_residual_targets, "metro_gap_fill"),
+    )
+    for control_geo_type, target_id_col, targets, crosswalk_id in control_groups:
+        selected = controls[controls["acs1_control_geo_type"].eq(control_geo_type)].copy()
+        if selected.empty:
+            continue
+        selected[target_id_col] = selected["acs1_control_geo_id"].astype("string")
+        selected[share_column] = pd.to_numeric(
+            selected["acs1_control_overlap_share"],
+            errors="coerce",
+        )
+        crosswalk = selected[[target_id_col, tract_id_col, share_column]].rename(
+            columns={tract_id_col: "tract_geoid"}
+        )
+        imputed = build_acs1_poverty_tract_artifact(
+            targets,
+            support,
+            target_id_col=target_id_col,
+            target_geo_type=control_geo_type,
+            year=year,
+            tract_crosswalk=crosswalk,
+            share_column=share_column,
+            crosswalk_id=crosswalk_id,
+            acs1_vintage=resolved_acs1_vintage,
+            acs5_vintage=acs5_vintage,
+            tract_vintage=tract_vintage,
+        )
+        metadata = selected[
+            [
+                tract_id_col,
+                "acs1_control_geo_type",
+                "acs1_control_geo_id",
+                "acs1_control_reason",
+                "acs1_control_policy_id",
+                "acs1_control_ct_bridge_status",
+            ]
+        ].rename(columns={tract_id_col: "tract_geoid"})
+        imputed = imputed.merge(metadata, on="tract_geoid", how="left")
+        imputed["control_geo_type"] = imputed["acs1_control_geo_type"]
+        imputed["control_geo_id"] = imputed["acs1_control_geo_id"]
+        imputed["fallback_reason"] = imputed["acs1_control_reason"]
+        outputs.append(imputed)
+
+    if outputs:
+        artifact = pd.concat(outputs, ignore_index=True).sort_values(
+            ["tract_geoid", "control_geo_type", "control_geo_id"]
+        )
+    else:
+        artifact = pd.DataFrame(
+            columns=[
+                *acs1_imputation_output_columns(ACS1_POVERTY_IMPUTATION_MEASURE_SPECS),
+                "control_geo_type",
+                "control_geo_id",
+                "fallback_reason",
+            ]
+        )
+    artifact = artifact.reset_index(drop=True)
+    artifact.attrs["artifact_family"] = "acs1_poverty_tracts"
+    artifact.attrs["measure_specs"] = [spec.name for spec in ACS1_POVERTY_IMPUTATION_MEASURE_SPECS]
+    artifact.attrs["acs1_control_policy"] = controls.attrs["acs1_control_policy"]
+    artifact.attrs["acs1_control_selection_counts"] = (
+        controls["acs1_control_geo_type"].dropna().value_counts().sort_index().to_dict()
+    )
+    return artifact
+
+
+def diagnose_hybrid_acs1_poverty_tract_artifact(
+    artifact: pd.DataFrame,
+    acs1_county_targets: pd.DataFrame,
+    acs1_metro_targets: pd.DataFrame,
+    control_overlaps: pd.DataFrame,
+    *,
+    county_id_col: str = "county_fips",
+    metro_id_col: str = "cbsa_code",
+    abs_tolerance: float = 1e-6,
+    rel_tolerance: float = 1e-9,
+) -> list[ACS1ImputationDiagnosticFinding]:
+    """Validate hybrid county/metro ACS1 poverty tract artifacts."""
+    required_columns = [
+        "acs1_imputed_population_below_poverty",
+        "acs1_imputed_poverty_universe",
+        "acs1_imputed_poverty_rate",
+        "control_geo_type",
+        "control_geo_id",
+        "fallback_reason",
+    ]
+    findings = _diagnostic_missing_columns(
+        artifact,
+        label="hybrid ACS1 poverty tract artifact",
+        columns=required_columns,
+    )
+    if findings:
+        return findings
+
+    numerator_col = "acs1_imputed_population_below_poverty"
+    denominator_col = "acs1_imputed_poverty_universe"
+    rate_col = "acs1_imputed_poverty_rate"
+    missing_values = artifact[
+        artifact[[numerator_col, denominator_col, rate_col, "control_geo_type", "control_geo_id"]]
+        .isna()
+        .any(axis=1)
+    ]
+    for _, row in missing_values.iterrows():
+        findings.append(
+            ACS1ImputationDiagnosticFinding(
+                severity="error",
+                code="missing_hybrid_poverty_output",
+                message=(
+                    "Hybrid ACS1 poverty artifact rows must include numerator, "
+                    "universe, rate, and control geography metadata."
+                ),
+                target_id=None
+                if pd.isna(row.get("control_geo_id"))
+                else str(row["control_geo_id"]),
+                tract_geoid=None if pd.isna(row.get("tract_geoid")) else str(row["tract_geoid"]),
+            )
+        )
+
+    valid_rate = artifact[denominator_col].notna() & artifact[denominator_col].gt(0)
+    expected_rate = artifact[numerator_col] / artifact[denominator_col]
+    rate_diff = (artifact[rate_col] - expected_rate).abs()
+    bad_rate = artifact[valid_rate & rate_diff.gt(abs_tolerance)]
+    for _, row in bad_rate.iterrows():
+        findings.append(
+            ACS1ImputationDiagnosticFinding(
+                severity="error",
+                code="hybrid_rate_not_recomputed_from_counts",
+                message="Hybrid ACS1 poverty rate must equal numerator divided by universe.",
+                target_id=str(row["control_geo_id"]),
+                tract_geoid=None if pd.isna(row.get("tract_geoid")) else str(row["tract_geoid"]),
+                details={
+                    "observed_rate": float(row[rate_col]),
+                    "expected_rate": float(row[numerator_col] / row[denominator_col]),
+                },
+            )
+        )
+
+    control_targets = {
+        "county": acs1_county_targets.set_index(county_id_col, drop=False),
+        "metro": acs1_metro_targets.set_index(metro_id_col, drop=False).copy(),
+    }
+    county_controlled = artifact[artifact["control_geo_type"].eq("county")]
+    if not county_controlled.empty:
+        county_to_metro = control_overlaps[[county_id_col, metro_id_col]].drop_duplicates()
+        county_to_metro = county_to_metro[
+            county_to_metro[county_id_col].isin(county_controlled["control_geo_id"])
+        ]
+        county_values = county_to_metro.merge(
+            acs1_county_targets[[county_id_col, "population_below_poverty", "poverty_universe"]],
+            on=county_id_col,
+            how="left",
+        )
+        county_totals_by_metro = county_values.groupby(metro_id_col, dropna=False)[
+            ["population_below_poverty", "poverty_universe"]
+        ].sum(min_count=1)
+        for source_column in ("population_below_poverty", "poverty_universe"):
+            residual = pd.to_numeric(
+                control_targets["metro"][source_column], errors="coerce"
+            ) - control_targets["metro"].index.map(county_totals_by_metro[source_column]).fillna(0)
+            control_targets["metro"][source_column] = residual.clip(lower=0)
+
+    output_to_source = {
+        "acs1_imputed_population_below_poverty": "population_below_poverty",
+        "acs1_imputed_poverty_universe": "poverty_universe",
+    }
+    for control_geo_type, targets in control_targets.items():
+        controlled = artifact[artifact["control_geo_type"].eq(control_geo_type)]
+        if controlled.empty:
+            continue
+        allocated = controlled.groupby("control_geo_id", dropna=False)[list(output_to_source)].sum(
+            min_count=1
+        )
+        for control_geo_id, row in allocated.iterrows():
+            if control_geo_id not in targets.index:
+                findings.append(
+                    ACS1ImputationDiagnosticFinding(
+                        severity="error",
+                        code="missing_hybrid_control_target",
+                        message=(
+                            f"Hybrid ACS1 {control_geo_type} control {control_geo_id} "
+                            "has output rows but no ACS1 target row."
+                        ),
+                        target_id=str(control_geo_id),
+                    )
+                )
+                continue
+            for output_column, source_column in output_to_source.items():
+                source_value = targets.loc[control_geo_id, source_column]
+                allocated_value = row[output_column]
+                allocated_float = None if pd.isna(allocated_value) else float(allocated_value)
+                source_float = None if pd.isna(source_value) else float(source_value)
+                abs_diff, rel_diff = _validation_diff(allocated_float, source_float)
+                if abs_diff is None or rel_diff is None:
+                    continue
+                if abs(abs_diff) > abs_tolerance and abs(rel_diff) > rel_tolerance:
+                    findings.append(
+                        ACS1ImputationDiagnosticFinding(
+                            severity="error",
+                            code="hybrid_control_conservation_residual",
+                            message=(
+                                f"Hybrid ACS1 {control_geo_type} control {control_geo_id} "
+                                f"does not conserve {source_column}."
+                            ),
+                            target_id=str(control_geo_id),
+                            column=output_column,
+                            details={
+                                "control_geo_type": control_geo_type,
+                                "allocated_total": allocated_float,
+                                "source_total": source_float,
+                                "abs_diff": abs_diff,
+                                "rel_diff": rel_diff,
+                            },
+                        )
+                    )
+    return findings
+
+
 def write_acs1_poverty_tract_artifact(
     artifact: pd.DataFrame,
     path: str | Path | None = None,
@@ -577,11 +1053,10 @@ def write_acs1_poverty_tract_artifact(
     support_dataset_path: str | Path | None = None,
     crosswalk_path: str | Path | None = None,
     base_dir: Path | str | None = None,
+    control_policy: ACS1HybridControlSelectionPolicy | dict[str, object] | None = None,
 ) -> Path:
     """Write an ACS1-imputed tract poverty artifact to its canonical Parquet path."""
-    required_columns = tuple(
-        acs1_imputation_output_columns(ACS1_POVERTY_IMPUTATION_MEASURE_SPECS)
-    )
+    required_columns = tuple(acs1_imputation_output_columns(ACS1_POVERTY_IMPUTATION_MEASURE_SPECS))
     contract = ArtifactContract(
         name="acs1_poverty_tracts",
         required_columns=required_columns,
@@ -652,6 +1127,7 @@ def write_acs1_poverty_tract_artifact(
         support_dataset_path=support_dataset_path,
         crosswalk_path=crosswalk_path,
         output_row_count=len(artifact),
+        control_policy=control_policy or artifact.attrs.get("acs1_control_policy"),
     )
     return write_parquet_with_provenance(artifact, output_path, provenance)
 
@@ -1283,9 +1759,9 @@ def diagnose_acs1_imputation(
                         target_id=target_id,
                         column=source_column,
                     )
-                support_total = (
-                    target_rows[source_column] * target_rows["_imputation_share"]
-                ).sum(min_count=1)
+                support_total = (target_rows[source_column] * target_rows["_imputation_share"]).sum(
+                    min_count=1
+                )
                 if pd.isna(support_total):
                     _append_finding(
                         findings,
