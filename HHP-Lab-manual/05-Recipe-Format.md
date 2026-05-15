@@ -231,6 +231,12 @@ When `panel_policy.acs1.include` is true on a metro target, the executor preserv
 
 Recipe datasets with `provider: census`, `product: acs1`, and `native_geometry.type: county` may point at county-native ACS1 artifacts such as `data/curated/acs/acs1_county__A2023.parquet`. Use `year_column: acs1_vintage` and `geo_column: county_fips` or `geo_id`; recipes must account for Census ACS1 threshold sparsity because omitted counties are not present in the artifact.
 
+ACS1-derived CoC measures are not enabled through `panel_policy.acs1`, which is
+metro-only. For CoC workflows, use either a modeled ACS1 tract dataset
+(`product: acs1_poverty`) with normal `resample` steps, or an explicit
+`small_area_estimate` step that allocates ACS1 county components through ACS5
+tract support distributions.
+
 ```yaml
 targets:
   - id: metro_panel
@@ -337,6 +343,32 @@ datasets:
 - `year_offsets`: segment-level derived variables (`value = year + offset`)
 
 Optional `overrides` still let you replace specific years with an explicit path.
+
+Modeled ACS1 poverty recipes use the same `file_set` mechanism because the
+tract era changes across analysis years:
+
+```yaml
+datasets:
+  acs1_poverty_tract:
+    provider: census
+    product: acs1_poverty
+    version: 1
+    native_geometry: { type: tract }
+    file_set:
+      path_template: "data/curated/acs/acs1_poverty_tracts__A{acs1_end}xT{tract}.parquet"
+      segments:
+        - years: "2010-2019"
+          geometry: { type: tract, vintage: 2010 }
+          constants: { tract: 2010 }
+          year_offsets: { acs1_end: -1 }
+        - years: "2020-2024"
+          geometry: { type: tract, vintage: 2020 }
+          constants: { tract: 2020 }
+          year_offsets: { acs1_end: -1 }
+```
+
+This artifact is modeled, not a direct Census tract ACS1 product. Census does
+not publish ACS1 tract data.
 
 ## Transforms
 
@@ -495,6 +527,58 @@ Resamples a dataset to a different geometry.
 | `identity` | Same geometry | Forbidden | Dataset already at target geometry (e.g., PIT → CoC). |
 | `allocate` | Few → many | Required | Distribute values via crosswalk shares. |
 | `aggregate` | Many → few | Required | Aggregate values via crosswalk (e.g., tract ACS → CoC). |
+
+For modeled ACS1 poverty rates, derive rates from allocated components rather
+than averaging tract rates directly:
+
+```yaml
+aggregation:
+  acs1_imputed_poverty_universe: { aggregation: sum }
+  acs1_imputed_poverty_rate:
+    aggregation: rate_from_weighted_counts
+    source_rate_column: acs1_imputed_poverty_rate
+    denominator_column: acs1_imputed_poverty_universe
+    numerator_output_column: acs1_imputed_population_below_poverty
+```
+
+### SmallAreaEstimate Step
+
+`small_area_estimate` allocates ACS1 county aggregate components through ACS5
+tract support distributions, then rolls the allocated tract components to the
+target geography.
+
+```yaml
+- small_area_estimate:
+    output_dataset: acs_sae_coc
+    source_dataset: acs1_county_sae
+    support_dataset: acs5_tract_sae_support
+    to_geometry: { type: coc, vintage: 2025 }
+    via: tract_to_coc
+    terminal_acs5_vintage: 2022
+    tract_vintage: 2020
+    allocation_method: tract_share_within_county
+    measures:
+      - family: labor_force
+        outputs:
+          - sae_civilian_labor_force
+          - sae_unemployed_count
+          - sae_unemployment_rate
+```
+
+| Field | Required | Description |
+|-------|----------|-------------|
+| `output_dataset` | Yes | Dataset id produced by the step and referenced by later joins. |
+| `source_dataset` | Yes | ACS1 county source aggregate dataset. |
+| `support_dataset` | Yes | ACS5 tract support-distribution dataset. |
+| `to_geometry` | Yes | Final analysis geography. |
+| `via` | Yes | Tract-to-target crosswalk transform. |
+| `terminal_acs5_vintage` | Yes | ACS5 vintage used for support shares. |
+| `tract_vintage` | Yes | Tract era for support and crosswalk compatibility. |
+| `allocation_method` | Yes | Currently `tract_share_within_county`. |
+| `measures` | Yes | SAE measure families such as `labor_force`, `rent_burden`, `owner_cost_burden`, `household_income_bins`, and `gross_rent_bins`. |
+
+SAE medians and quintiles are derived from allocated bins. Do not request direct
+weighted means of ACS1 or ACS5 median columns as SAE outputs.
 
 ### Join Step
 

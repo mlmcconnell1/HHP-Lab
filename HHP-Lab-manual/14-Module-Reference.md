@@ -18,13 +18,13 @@ This chapter is an orientation map of active modules in the current codebase.
 
 ## Recipe System
 
-- `hhplab/recipe/recipe_schema.py`: versioned recipe schema models (including `CohortSelector`, `TemporalFilter`)
+- `hhplab/recipe/recipe_schema.py`: versioned recipe schema models (including `CohortSelector`, `TemporalFilter`, `SmallAreaEstimateStep`)
 - `hhplab/recipe/loader.py`: YAML loading + schema dispatch
 - `hhplab/recipe/adapters.py`: semantic validation registries
 - `hhplab/recipe/default_*.py`: built-in adapter registration (including `default_dataset_adapters.py`)
-- `hhplab/recipe/planner.py`: deterministic task planning
-- `hhplab/recipe/executor.py`: runtime execution engine
-- `hhplab/recipe/preflight.py`: no-execute readiness validation (plan-scoped path checks, support-dataset probes)
+- `hhplab/recipe/planner.py`: deterministic task planning, including SAE tasks
+- `hhplab/recipe/executor.py`: runtime execution engine, including `small_area_estimate` execution
+- `hhplab/recipe/preflight.py`: no-execute readiness validation (plan-scoped path checks, support-dataset probes, SAE source/support checks)
 - `hhplab/recipe/probes.py`: dataset probe helpers for preflight validation
 - `hhplab/recipe/manifest.py`: consumed-asset manifests and recipe bundle export
 
@@ -45,7 +45,7 @@ This chapter is an orientation map of active modules in the current codebase.
 - `hhplab/census/ingest/`: TIGER and tract-relationship ingestion
 - `hhplab/xwalks/`: tract and county crosswalk construction
 - `hhplab/measures/`: compatibility facade for legacy ACS aggregation imports plus reusable crosswalk/measure diagnostics
-- `hhplab/acs/`: ACS ingest, translation, and source-owned aggregation support (including `ingest/metro_acs1.py` and `ingest/county_acs1.py` for ACS 1-year native data, `variables_acs1.py` for ACS1 detailed-table definitions)
+- `hhplab/acs/`: ACS ingest, translation, source-owned aggregation, ACS1 imputation, and SAE support (including `ingest/metro_acs1.py` and `ingest/county_acs1.py` for ACS 1-year native data, `variables_acs1.py` for ACS1 detailed-table definitions, and `sae.py` for allocation, diagnostics, and provenance helpers)
 - `hhplab/pit/`: PIT ingest, registry, QA
 - `hhplab/pep/`: PEP ingest, aggregation, and diagnostics
 - `hhplab/rents/`: ZORI ingest, weighting, aggregation, diagnostics

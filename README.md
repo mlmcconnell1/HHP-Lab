@@ -21,7 +21,7 @@ profile (`glynn_fox` / `glynn_fox_v1`) over that universe. The `msa` surface
 remains separate and uses the same official delineations keyed explicitly as
 MSAs / CBSAs.
 
-Full operational documentation lives in [manual-obsidian/HHP-Lab-Manual.md](manual-obsidian/HHP-Lab-Manual.md).
+Full operational documentation lives in [HHP-Lab-manual/HHP-Lab-Manual.md](HHP-Lab-manual/HHP-Lab-Manual.md).
 
 ## What HHP-Lab Does
 
@@ -253,7 +253,7 @@ commands.
 - `hhplab/`: Python package and CLI implementation
 - `recipes/`: committed example recipes, including Glynn/Fox metro panel builds
 - `tests/`: regression coverage for CLI, aggregation, panel assembly, recipes, and metro logic
-- `manual-obsidian/`: the full project manual
+- `HHP-Lab-manual/`: the full project manual
 - `data/`: default local asset store when built-in storage-root defaults are used
 
 ## Development

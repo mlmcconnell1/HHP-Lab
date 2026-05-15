@@ -20,7 +20,7 @@ This is not a request to make all geometry handling fully generic in one phase. 
 
 ## Alignment With Current Manual
 
-This plan is intended to extend the architecture described in `manual-obsidian/`, not replace it wholesale.
+This plan is intended to extend the architecture described in `HHP-Lab-manual/`, not replace it wholesale.
 
 The current manual has two simultaneously true statements:
 

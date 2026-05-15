@@ -20,8 +20,8 @@ not define runtime behavior on their own.
 
 For current behavior and command syntax, use:
 
-- `manual-obsidian/04-CLI-Reference.md`
-- `manual-obsidian/07-Temporal-Terminology.md`
+- `HHP-Lab-manual/04-CLI-Reference.md`
+- `HHP-Lab-manual/08-Temporal-Terminology.md`
 - `hhplab/cli/main.py`
 
 Background docs are planning/support material, not authoritative runtime docs.

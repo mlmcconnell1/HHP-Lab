@@ -30,6 +30,7 @@ When the target geography is metro, the recipe system adapts its behavior:
 | PIT source | CoC-native PIT counts | Aggregated from member CoCs via metro-CoC membership table |
 | ACS5 measures | Tract→CoC crosswalk | Tract→county→metro via county membership |
 | ACS1 metro measures | Not applicable | Metro-native CBSA identity resampling (optional, `panel_policy.acs1`) |
+| ACS1 modeled/SAE measures | Modeled tract resampling or `small_area_estimate` | Not handled by `panel_policy.acs1`; use explicit recipe datasets/steps |
 | PEP population | County→CoC crosswalk | County→metro via county membership |
 | ZORI rents | County→CoC crosswalk | County→metro via county membership |
 | Boundary alignment | `period_faithful` or `retrospective` | `definition_fixed` (metros are version-pinned, not vintaged) |
@@ -46,6 +47,22 @@ ACS 1-year data provides CBSA-native measures that do not require crosswalk-base
 - The merge is optional: if no ACS1 data is available for a given vintage, the panel proceeds with requested ACS1 measure columns set to null
 - `acs1_vintage_used` reflects the resolved ACS1 input vintage (derived from the data, not a lag heuristic)
 - `acs_products_used` tracks which ACS products contributed (`"acs5"` or `"acs5,acs1"`)
+
+### ACS1-Derived CoC Integration
+
+CoC panels can include ACS1-derived measures in two ways:
+
+- Modeled ACS1 poverty tract datasets are resampled through the normal tract to
+  CoC crosswalk. Rates are derived from weighted numerator/denominator counts
+  after aggregation.
+- SAE recipes run a `small_area_estimate` step that allocates ACS1 county
+  components through ACS5 tract support distributions, rolls them to CoC, and
+  joins the resulting `sae_*` measures.
+
+These paths are intentionally separate from metro-native ACS1 integration.
+`panel_policy.acs1` only controls direct CBSA ACS1 joins for metro targets.
+CoC ACS1-derived measures must be declared as recipe datasets or SAE outputs so
+their modeled lineage remains visible.
 
 ## Quality Signals
 

@@ -81,6 +81,54 @@ CoCs with few tracts or low populations have estimates more sensitive to individ
 
 Population-weighted tract coverage does not guarantee housing-market representativeness. Tracts with high population density may have systematically different rental markets, vacancy rates, or housing stock than lower-density tracts within the same CoC. Sensitivity analysis should explicitly test weighting choices (`area` vs `population`) and report effect size on downstream outcomes.
 
+## ACS1 Modeled Tract Poverty
+
+Census does not publish ACS1 tract estimates. HHP-Lab's ACS1 tract poverty
+artifacts are modeled products that use ACS1 county control totals and ACS5
+tract shares:
+
+1. Read ACS1 county numerator/denominator controls for the target vintage.
+2. Read ACS5 tract poverty numerator/denominator support for the matching tract
+   era.
+3. Within each county, compute tract shares from ACS5 support denominators.
+4. Allocate ACS1 county totals to tracts with those shares.
+5. Recompute rates from allocated numerators and denominators.
+
+The output columns are
+`acs1_imputed_population_below_poverty`,
+`acs1_imputed_poverty_universe`, and
+`acs1_imputed_poverty_rate`; optional household controls use the
+`acs1_imputed_*` prefix. Allocation conserves the source county totals when
+support is available. Nonzero source counties with all-null support are surfaced
+as diagnostics or errors rather than silently fabricated.
+
+These estimates should be described as modeled ACS1-imputed measures, not direct
+ACS1 tract measures.
+
+## ACS1/ACS5 Small-Area Estimation
+
+SAE recipes allocate richer ACS1 county components through ACS5 tract
+distributions and then roll the allocated components to target geographies such
+as CoCs. The current allocation method is `tract_share_within_county`.
+
+SAE v1 is component-based:
+
+- Labor force counts allocate ACS1 county `civilian_labor_force` and
+  `unemployed_count`, then derive `sae_unemployment_rate`.
+- Rent-burden and owner-cost-burden measures allocate bins and derive rates
+  from allocated numerators and denominators.
+- Household-income and gross-rent median/quintile outputs are derived from
+  allocated distributions, not by averaging median columns.
+
+SAE outputs use the `sae_*` prefix and carry lineage/diagnostic fields for
+source vintage, support vintage, tract vintage, source county counts,
+zero-denominator conditions, missing support, allocation residuals, and optional
+direct-county comparisons.
+
+ACS1 vintage 2020 is unavailable. Preflight reports that as an availability
+gap with no direct ingest command; recipes must choose another ACS1 vintage or
+declare an explicit fallback policy.
+
 ## References
 
 - Byrne, T., et al. (2012). "Predicting Homelessness Using ACS Data."

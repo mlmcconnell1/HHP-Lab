@@ -19,7 +19,7 @@ the CLI can inspect local curated artifacts with
 | Census | TIGER counties | county polygons | Decennial/current vintages used by recipes | county FIPS, county name/state, geometry, vintage/provenance | county boundaries, CoC-county crosswalks, metro county membership joins | County-native sources such as PEP and ZORI use this geometry for aggregation. |
 | Census | TIGER/NHGIS tracts | tract polygons | Decennial tract eras | tract GEOID, tract vintage, geometry, provenance | tract boundaries, CoC-tract crosswalks, tract relationship bridges | ACS and tract crosswalks must match the correct decennial tract era. |
 | Census | ACS 5-year | tract | 2009-ongoing | `total_population`, `adult_population`, `population_below_poverty`, `median_household_income`, `median_gross_rent`, `moe_total_population`, ACS vintage | CoC ACS measures, metro ACS measures, county weights for ZORI, panel demographic columns | ACS 5-year vintages are end years for five-year collection windows. |
-| Census | ACS 1-year | CBSA/metro or county | 2012-ongoing except 2020; available where ACS1 population thresholds are met | CBSA or county employment counts and `unemployment_rate_acs1`; income distribution; rent and owner-cost measures; rent/owner-cost burden bins; tenure-by-income; utility costs; heating fuel; gross rent by bedrooms; structure age; units-in-structure; household size; ACS1 vintage; metro definition version for metro artifacts | metro-native ACS1 artifact, county-native ACS1 artifact, optional metro panel ACS1 measures | Utility-cost tables begin in 2021 and are null-backed in earlier supported vintages. County ACS1 artifacts contain only published threshold counties. |
+| Census | ACS 1-year | CBSA/metro or county | 2012-ongoing except 2020; available where ACS1 population thresholds are met | CBSA or county employment counts and `unemployment_rate_acs1`; income distribution; rent and owner-cost measures; rent/owner-cost burden bins; tenure-by-income; utility costs; heating fuel; gross rent by bedrooms; structure age; units-in-structure; household size; ACS1 vintage; metro definition version for metro artifacts | metro-native ACS1 artifact, county-native ACS1 artifact, modeled ACS1 poverty tract artifacts, ACS1/ACS5 SAE source/support artifacts, optional metro panel ACS1 measures, optional CoC `sae_*` measures | Utility-cost tables begin in 2021 and are null-backed in earlier supported vintages. County ACS1 artifacts contain only published threshold counties. Modeled tract and SAE outputs must retain lineage because Census does not publish ACS1 tract data. |
 | Census | PEP | county | 2010-ongoing | annual `population`, county FIPS/name/state, reference date, PEP vintage/provenance | CoC PEP population, metro PEP population, optional panel `population` measure | PEP reference dates are July 1 annual estimates; recipes can use temporal filters to align to January when needed. |
 | Zillow | ZORI | county or ZIP, normalized to county for standard panels | 2015-ongoing | monthly `zori`, region name/state, source URL, raw hash, metric/provenance fields | normalized ZORI, CoC ZORI, metro ZORI, yearly collapsed ZORI, panel rent columns | Standard panel alignment uses January observations to match PIT timing. |
 
@@ -352,6 +352,11 @@ When ZORI is enabled, the panel appends:
 - `rent_to_income`
 - provenance fields `rent_metric`, `rent_alignment`, `zori_min_coverage`
 
+When ACS1-derived modeled measures are joined through recipes, panels may also
+append explicitly requested `acs1_imputed_*` or `sae_*` columns plus their
+available lineage/diagnostic columns. These are distinct from direct ACS5
+columns and from metro-native ACS1 panel columns.
+
 ## Metro Definition Schemas
 
 Metro areas use a two-layer contract:
@@ -506,6 +511,46 @@ Storage: `data/curated/acs/acs1_metro__A{vintage}@D{version}.parquet` and `data/
 
 ACS 1-year estimates are only available for geographies with population >= 65,000. Subset profiles such as Glynn/Fox inherit eligibility from their underlying CBSAs. County ACS1 does not manufacture rows for counties that Census omits.
 
+## ACS1 Modeled Poverty and SAE Schemas
+
+ACS1 tract-level poverty files are modeled artifacts, not direct Census ACS1
+tract releases. They allocate ACS1 control totals through ACS5 tract shares and
+must retain enough lineage to identify the ACS1 vintage, ACS5 support vintage,
+tract era, and allocation method.
+
+Modeled ACS1 poverty tract storage:
+`data/curated/acs/acs1_poverty_tracts__A{acs1}xT{tract}.parquet`
+
+Core modeled poverty columns include:
+
+| Column | Description |
+|--------|-------------|
+| `tract_geoid` | Tract identifier in the declared tract vintage. |
+| `county_fips` | Source ACS1 county control geography. |
+| `acs1_vintage_used` | ACS1 county vintage used as the control total. |
+| `acs5_vintage_used` | ACS5 tract vintage used for support shares. |
+| `tract_vintage_used` | Decennial tract era used by the artifact. |
+| `acs1_imputed_population_below_poverty` | Allocated ACS1 poverty numerator. |
+| `acs1_imputed_poverty_universe` | Allocated ACS1 poverty denominator. |
+| `acs1_imputed_poverty_rate` | Numerator divided by denominator after allocation. |
+| `acs1_imputed_total_households` | Optional allocated ACS1 household control. |
+
+SAE recipes use two normalized inputs:
+
+| Artifact | Path Pattern | Description |
+|----------|--------------|-------------|
+| ACS1 county SAE source | `data/curated/acs/acs1_county_sae__A{vintage}.parquet` | County ACS1 source components plus `sae_source_tables`, unavailable-table, and column-table metadata. |
+| ACS5 tract SAE support | `data/curated/acs/acs5_tract_sae_support__A{acs}xT{tract}.parquet` | Tract support distributions, denominators, support-table metadata, and zero-denominator diagnostics. |
+
+Final SAE outputs use `sae_*` measures such as
+`sae_civilian_labor_force`, `sae_unemployed_count`,
+`sae_unemployment_rate`, `sae_rent_burden_30_plus`,
+`sae_owner_cost_burden_50_plus`, `sae_household_income_median`,
+`sae_household_income_quintile_cutoff_20`, and `sae_gross_rent_median`.
+Diagnostics include source-county counts, missing-support counts,
+zero-denominator counts, allocation residuals, and direct-county comparability
+flags where applicable.
+
 ## Metro Derived Dataset Storage
 
 | File | Path Pattern | Description |
@@ -523,6 +568,9 @@ ACS 1-year estimates are only available for geographies with population >= 65,00
 | Metro panels | `outputs/<recipe-name>/panel__metro__Y{start}-{end}@D{version}.parquet` | Metro analysis panels |
 | Metro ACS1 | `data/curated/acs/acs1_metro__A{vintage}@D{version}.parquet` | Metro-native ACS 1-year measures |
 | County ACS1 | `data/curated/acs/acs1_county__A{vintage}.parquet` | County-native ACS 1-year measures |
+| ACS1 imputed poverty tracts | `data/curated/acs/acs1_poverty_tracts__A{acs1}xT{tract}.parquet` | Modeled tract poverty controls derived from ACS1 county totals and ACS5 tract shares |
+| ACS1 county SAE source | `data/curated/acs/acs1_county_sae__A{vintage}.parquet` | Normalized ACS1 county components for SAE |
+| ACS5 tract SAE support | `data/curated/acs/acs5_tract_sae_support__A{acs}xT{tract}.parquet` | ACS5 tract distributions for SAE allocation |
 
 ## Normalized ZORI Schema
 
@@ -665,6 +713,9 @@ Filenames use temporal shorthand notation (see [[08-Temporal-Terminology]]).
 | Metro ZORI | `data/curated/zori/zori__metro__A{acs}@D{version}xC{county}__w{weight}.parquet` | Metro ZORI |
 | Metro ZORI yearly | `data/curated/zori/zori_yearly__metro__A{acs}@D{version}xC{county}__w{weight}__m{method}.parquet` | Metro yearly ZORI |
 | Metro panels | `outputs/<recipe-name>/panel__metro__Y{start}-{end}@D{version}.parquet` | Metro analysis panels |
+| ACS1 imputed poverty tracts | `data/curated/acs/acs1_poverty_tracts__A{acs1}xT{tract}.parquet` | Modeled tract poverty controls derived from ACS1 county totals and ACS5 tract shares |
+| ACS1 county SAE source | `data/curated/acs/acs1_county_sae__A{vintage}.parquet` | Normalized ACS1 county components for SAE |
+| ACS5 tract SAE support | `data/curated/acs/acs5_tract_sae_support__A{acs}xT{tract}.parquet` | ACS5 tract distributions for SAE allocation |
 
 ## Dataset Provenance
 

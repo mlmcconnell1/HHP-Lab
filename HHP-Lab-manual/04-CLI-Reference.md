@@ -90,7 +90,8 @@ hhplab build recipe --recipe recipes/metro25-glynnfox.yaml --dry-run
 
 Current behavior:
 - Runs schema + adapter validation and the same preflight checks used by `recipe-preflight` before execution
-- Executes `materialize -> resample -> join -> persist`
+- Executes `materialize -> resample -> join -> persist`; recipes that use
+  `small_area_estimate` insert that step before the final join
 - Persists panel output under the configured `output_root/<recipe-name>/` when
   the target declares `outputs: [panel]` (default). Built-in default:
   `<project_root>/outputs/<recipe-name>/`
@@ -116,6 +117,10 @@ Current special-case note:
 - When a recipe mixes Connecticut planning-region county IDs with a
   legacy-county crosswalk, preflight emits `ct_county_alignment` findings
   instead of treating the build as an unexplained green pass.
+- `small_area_estimate` recipes are validated for ACS1 county source artifacts,
+  ACS5 tract support artifacts, target crosswalk availability, compatible
+  vintages, and ACS1 2020 unavailability. Missing-artifact findings include
+  remediation guidance when a direct ingest or normalization path exists.
 
 ### Recipe Plan (No Execution)
 
@@ -124,7 +129,9 @@ hhplab build recipe-plan --recipe recipes/metro25-glynnfox.yaml
 hhplab build recipe-plan --recipe recipes/metro25-glynnfox.yaml --json
 ```
 
-Use this to resolve and inspect planned tasks (`materialize`, `resample`, `join`) while authoring or debugging a recipe. For a readiness gate, use `recipe-preflight`.
+Use this to resolve and inspect planned tasks (`materialize`, `resample`,
+`small_area_estimate`, `join`) while authoring or debugging a recipe. For a
+readiness gate, use `recipe-preflight`.
 
 ### Legacy CLI Migration
 
@@ -190,6 +197,15 @@ Boundary ingestion uses a multi-source fallback chain: national boundary file fi
 ACS1 metro ingestion (`acs1-metro`) fetches ACS 1-year detailed-table data at CBSA geography, keeps canonical CBSA IDs for the full metro universe by default, and can materialize subset-profile outputs such as Glynn/Fox when `--definition-version` requests one. The curated artifact includes B23025 employment counts and `unemployment_rate_acs1`, plus current ACS1 income-distribution, housing-cost, utility-cost, tenure, housing-stock, and household-size measures. Options: `--vintage`, `--definition-version`, `--api-key`, `--json`.
 
 ACS1 county ingestion (`acs1-county`) fetches the same ACS 1-year detailed-table set at county geography and writes `data/curated/acs/acs1_county__A{vintage}.parquet`. Census only publishes ACS1 for qualifying counties, so non-threshold counties are absent by design. Options: `--vintage`, `--api-key`, `--json`.
+
+County ACS1 artifacts are also the source for ACS1/ACS5 small-area-estimation
+recipes. Those recipes consume normalized ACS1 county source artifacts such as
+`data/curated/acs/acs1_county_sae__A2023.parquet` and ACS5 tract support
+artifacts such as
+`data/curated/acs/acs5_tract_sae_support__A2022xT2020.parquet`. There is no
+separate top-level SAE ingest command; use `build recipe-plan` and
+`build recipe-preflight` on a recipe with a `small_area_estimate` step to see
+the exact required artifacts and remediation.
 
 Useful PEP options:
 - `--start` / `--end` to trim the emitted year range

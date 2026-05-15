@@ -3,7 +3,7 @@
 ## Recipe-Driven Build
 
 1. Inspect available curated assets if needed (`hhplab status --json` for automation, `hhplab list curated` for browsing).
-2. Ingest required global assets (`boundaries`, `tiger`, `acs5-tract`, `pit`, `zori`, `pep`, and optionally `acs1-metro` for metro-native ACS1 measures).
+2. Ingest required global assets (`boundaries`, `tiger`, `acs5-tract`, `pit`, `zori`, `pep`, optionally `acs1-metro` for metro-native ACS1 measures, and optionally `acs1-county` plus ACS5 tract support inputs for SAE workflows).
 3. Generate required crosswalks.
 4. Run `hhplab build recipe-preflight` when you want a no-execute readiness gate.
 5. Run a YAML recipe for deterministic panel construction.
@@ -43,6 +43,10 @@ hhplab build recipe-plan --recipe recipes/metro25-glynnfox.yaml --json
 # 5) Recipe execution
 hhplab build recipe --recipe recipes/metro25-glynnfox.yaml
 
+# Optional: ACS1/ACS5 small-area estimation example
+hhplab build recipe-preflight --recipe recipes/examples/coc-sae-acs1-2023.yaml --json
+hhplab build recipe --recipe recipes/examples/coc-sae-acs1-2023.yaml
+
 # 6) Export bundle
 hhplab build recipe-export --manifest <manifest_path> --destination exports/bundle
 ```
@@ -59,6 +63,10 @@ repository tree.
 - `hhplab build recipe-plan --json` is for authoring/debugging, not for readiness checking.
 - `hhplab aggregate ...` is a parallel path for standalone CoC artifacts, not a default prerequisite for recipe execution.
 - See `recipes/examples/README.md` for runnable example recipes that cover CoC, metro, PIT, ACS5, PEP, ZORI, and ACS1 paths.
+- Use `recipes/examples/coc-sae-acs1-2023.yaml` for ACS1 county-to-CoC SAE
+  planning, and
+  `recipes/top50-msas-cocs-pit-pep-density-acs1-poverty-2010-2024.yaml` for
+  modeled ACS1 poverty tract integration.
 - Use `--non-interactive` (or `HHPLAB_NON_INTERACTIVE=1`) for agent automation.
 
 ---

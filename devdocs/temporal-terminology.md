@@ -3,7 +3,7 @@
 > Note: the repository/runtime is now HHP-Lab/`hhplab`. This file is kept in
 > its historical form, so older CoC-Lab references may remain intentionally.
 
-This is a compact reference aligned to `manual-obsidian/07-Temporal-Terminology.md`.
+This is a compact reference aligned to `HHP-Lab-manual/08-Temporal-Terminology.md`.
 Use the manual chapter as the canonical version.
 
 ## Core Concepts
@@ -41,4 +41,4 @@ Use `@` for "analyzed on" and `x` for crosswalk geometry:
 - ACS is a 5-year rolling estimate with lagged publication.
 - Alignment choices must be explicit in aggregation metadata.
 
-For full examples and provenance conventions, see `manual-obsidian/07-Temporal-Terminology.md`.
+For full examples and provenance conventions, see `HHP-Lab-manual/08-Temporal-Terminology.md`.

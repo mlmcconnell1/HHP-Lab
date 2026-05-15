@@ -129,7 +129,7 @@ rename anchors in later stages:
   - default source-label policy
 - `README.md`
   - installation, CLI, config, and automation examples
-- `manual-obsidian/07-Data-Model.md`
+- `HHP-Lab-manual/07-Data-Model.md`
   - provenance examples and field contract
 - `.beads/config.yaml`
   - future issue prefix
@@ -145,7 +145,7 @@ Later stages should use these buckets rather than a monolithic search/replace:
 1. Repository and branding paths
    - repo slug
    - local directory name
-   - `manual-obsidian/CoC-Lab-Manual.md`
+   - `HHP-Lab-manual/CoC-Lab-Manual.md`
 
 2. Packaging and imports
    - `pyproject.toml`
