@@ -3,7 +3,7 @@
 #
 # The MSA selector_ids are the top 50 Census MSAs by 2024 resident population,
 # computed from Census PEP county population aggregated over Census MSA 2023
-# county membership. CoCs are kept when at least 99.5% of their 2025 boundary
+# county membership. CoCs are kept when at least 99% of their 2025 boundary
 # area is contained in one of those MSAs.
 
 version: 1
@@ -21,7 +21,7 @@ description: >
   allocated poor-count numerators and poverty-universe denominators separately;
   both counts are crosswalk-weighted and summed to 2025 CoC boundaries, and the
   CoC rate is recomputed as summed poor count divided by summed universe. The
-  panel is filtered to CoCs with at least 99.5% of their 2025 boundary area
+  panel is filtered to CoCs with at least 99% of their 2025 boundary area
   contained in one of the top 50 Census MSAs by 2024 PEP population, using
   Census MSA 2023 membership and 2025 CoC boundaries.
 
@@ -86,7 +86,7 @@ targets:
         - "13820"
         - "24340"
         - "25540"
-      min_share: 0.995
+      min_share: 0.99
       denominator: candidate_area
       definition_version: census_msa_2023
     containment_filter:
@@ -143,7 +143,7 @@ targets:
         - "13820"
         - "24340"
         - "25540"
-      min_share: 0.995
+      min_share: 0.99
       denominator: candidate_area
       definition_version: census_msa_2023
 
@@ -183,6 +183,7 @@ datasets:
     product: acs1_imputation_target
     version: 1
     native_geometry: { type: tract }
+    year_column: acs1_vintage_used
     geo_column: tract_geoid
     params:
       align: same_year_acs1_controlled_acs5_terminal
