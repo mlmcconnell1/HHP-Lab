@@ -72,6 +72,7 @@ CANONICAL_PATTERNS: dict[str, list[re.Pattern[str]]] = {
         re.compile(r"^acs5_tracts__A\d{4}xT\d{4}\.parquet$"),
         re.compile(r"^acs1_metro__A\d{4}@D\w+\.parquet$"),
         re.compile(r"^acs1_county__A\d{4}\.parquet$"),
+        re.compile(r"^acs1_poverty_tracts__A\d{4}xT\d{4}\.parquet$"),
         re.compile(r"^county_weights__A\d{4}__w\w+\.parquet$"),
     ],
     "measures": [
