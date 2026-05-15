@@ -946,10 +946,11 @@ class DerivedMeasureConfig(BaseModel):
     """Derived measure computed during aggregate resampling.
 
     ``rate_from_weighted_counts`` is for source rate columns that must be
-    converted back to count-like numerators before geographic aggregation:
-    ``source_rate_column * denominator_column``. The executor applies the
-    crosswalk weight to both that numerator and the denominator, sums both at
-    target geography, then emits ``numerator_sum / denominator_sum``.
+    converted back to count-like numerators before geographic aggregation.
+    When ``source_numerator_column`` is present, the executor uses that count
+    directly; otherwise it computes ``source_rate_column * denominator_column``.
+    The executor applies the crosswalk weight to both numerator and denominator,
+    sums both at target geography, then emits ``numerator_sum / denominator_sum``.
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -966,6 +967,14 @@ class DerivedMeasureConfig(BaseModel):
         ...,
         description="Input denominator/universe column at source geography.",
     )
+    source_numerator_column: str | None = Field(
+        default=None,
+        description=(
+            "Optional input numerator/count column at source geography. When set, "
+            "the executor aggregates this column instead of deriving a numerator "
+            "from source_rate_column * denominator_column."
+        ),
+    )
     numerator_output_column: str | None = Field(
         default=None,
         description="Optional output column for the weighted numerator sum.",
@@ -975,7 +984,12 @@ class DerivedMeasureConfig(BaseModel):
         description="How to emit rates when the weighted denominator sum is zero.",
     )
 
-    @field_validator("source_rate_column", "denominator_column", "numerator_output_column")
+    @field_validator(
+        "source_rate_column",
+        "denominator_column",
+        "source_numerator_column",
+        "numerator_output_column",
+    )
     @classmethod
     def _validate_non_blank_column(cls, value: str | None) -> str | None:
         if value is not None and not value.strip():

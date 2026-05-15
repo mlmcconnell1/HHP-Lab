@@ -11,15 +11,16 @@ name: top50_msas_cocs_pit_pep_density_acs1_poverty_2010_2024
 description: >
   Build a CoC panel for 2010-2024 with HUD PIT sheltered and unsheltered
   counts plus Census PEP county population allocated to 2025 CoC boundaries
-  through tract-mediated decennial population weights, plus pre-materialized
-  modeled ACS1 tract poverty rates. ACS1-imputed rates are
-  converted to estimated poor-count numerators by multiplying each tract rate
-  by its poverty universe, the numerator and universe are crosswalk-weighted
-  and summed to 2025 CoC boundaries, and the CoC rate is recomputed as
-  summed poor count divided by summed universe. The panel is filtered to CoCs
-  with at least 99.5% of their 2025 boundary area contained in one of the top
-  50 Census MSAs by 2024 PEP population, using Census MSA 2023 membership and
-  2025 CoC boundaries.
+  through tract-mediated decennial population weights, plus tract-level ACS1
+  poverty estimates modeled with ACS1-controlled / ACS5-share imputation. Each
+  year uses the ACS1 target vintage for that same year and ACS5 tract support
+  whose terminal vintage is also that year. The imputed tract artifact provides
+  allocated poor-count numerators and poverty-universe denominators separately;
+  both counts are crosswalk-weighted and summed to 2025 CoC boundaries, and the
+  CoC rate is recomputed as summed poor count divided by summed universe. The
+  panel is filtered to CoCs with at least 99.5% of their 2025 boundary area
+  contained in one of the top 50 Census MSAs by 2024 PEP population, using
+  Census MSA 2023 membership and 2025 CoC boundaries.
 
 universe:
   range: "2010-2024"
@@ -174,26 +175,28 @@ datasets:
           geometry: { type: county, vintage: 2020 }
           constants: { pep_file: "pep_county__v2025__y2020-2025.parquet" }
 
-  acs1_poverty_tract:
+  acs1_imputed_poverty_tract:
     provider: census
-    product: acs1_poverty
+    product: acs1_imputation_target
     version: 1
     native_geometry: { type: tract }
     year_column: year
     geo_column: tract_geoid
     params:
-      align: prior_year_for_january_pit
+      align: same_year_acs1_controlled_acs5_terminal
+      target_id_col: county_fips
+      measure_specs: [poverty_rate]
     file_set:
       path_template: "data/curated/acs/acs1_poverty_tracts__A{acs1_end}xT{tract}.parquet"
       segments:
         - years: "2010-2019"
           geometry: { type: tract, vintage: 2010, source: tiger }
           constants: { tract: 2010 }
-          year_offsets: { acs1_end: -1 }
+          year_offsets: { acs1_end: 0 }
         - years: "2020-2024"
           geometry: { type: tract, vintage: 2020, source: tiger }
           constants: { tract: 2020 }
-          year_offsets: { acs1_end: -1 }
+          year_offsets: { acs1_end: 0 }
 
 transforms:
   - id: county_to_coc_population
@@ -249,7 +252,7 @@ pipelines:
           aggregation: sum
 
       - resample:
-          dataset: acs1_poverty_tract
+          dataset: acs1_imputed_poverty_tract
           to_geometry: { type: coc, vintage: 2025, source: hud_exchange }
           method: aggregate
           transform_set:
@@ -264,11 +267,12 @@ pipelines:
             acs1_imputed_poverty_rate:
               type: rate_from_weighted_counts
               source_rate_column: acs1_imputed_poverty_rate
+              source_numerator_column: acs1_imputed_population_below_poverty
               denominator_column: acs1_imputed_poverty_universe
               numerator_output_column: acs1_imputed_population_below_poverty
 
       - join:
-          datasets: [pit, pep_county, acs1_poverty_tract]
+          datasets: [pit, pep_county, acs1_imputed_poverty_tract]
           join_on: [geo_id, year]
 
 validation:

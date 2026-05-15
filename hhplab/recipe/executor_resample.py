@@ -305,7 +305,7 @@ def _resample_aggregate(
         {
             str(config[column])
             for config in derived_measures.values()
-            for column in ("source_rate_column", "denominator_column")
+            for column in ("source_rate_column", "denominator_column", "source_numerator_column")
             if config.get(column) is not None
         }
     )
@@ -434,11 +434,23 @@ def _resample_aggregate(
                     )
                 rate_col = str(config["source_rate_column"])
                 denom_col = str(config["denominator_column"])
+                numerator_col = config.get("source_numerator_column")
                 numerator_output = config.get("numerator_output_column")
-                valid = group[rate_col].notna() & group[denom_col].notna() & weight.notna()
-                weighted_numerator = (
-                    group.loc[valid, rate_col] * group.loc[valid, denom_col] * weight.loc[valid]
-                ).sum()
+                if numerator_col is not None:
+                    numerator_col = str(numerator_col)
+                    valid = (
+                        group[numerator_col].notna()
+                        & group[denom_col].notna()
+                        & weight.notna()
+                    )
+                    weighted_numerator = (
+                        group.loc[valid, numerator_col] * weight.loc[valid]
+                    ).sum()
+                else:
+                    valid = group[rate_col].notna() & group[denom_col].notna() & weight.notna()
+                    weighted_numerator = (
+                        group.loc[valid, rate_col] * group.loc[valid, denom_col] * weight.loc[valid]
+                    ).sum()
                 weighted_denominator = (group.loc[valid, denom_col] * weight.loc[valid]).sum()
                 if numerator_output is not None:
                     row[str(numerator_output)] = weighted_numerator

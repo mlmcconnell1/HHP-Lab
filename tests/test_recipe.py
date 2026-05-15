@@ -4564,6 +4564,58 @@ class TestResampleAggregate:
         assert bool(df.loc["COC1", "is_modeled"]) is True
         assert bool(df.loc["COC1", "is_synthetic"]) is True
 
+    def test_aggregate_derived_rate_can_use_explicit_numerator_count(self, tmp_path: Path):
+        """Explicit numerator counts are aggregated directly before recomputing rates."""
+        ds_path = tmp_path / "data" / "acs1_poverty.parquet"
+        ds_path.parent.mkdir(parents=True, exist_ok=True)
+        pd.DataFrame(
+            {
+                "tract_geoid": ["A", "B", "C"],
+                "year": [2020, 2020, 2020],
+                "poor_individuals_acs1": [25.0, 35.0, 20.0],
+                "poverty_universe_individuals_acs1": [100.0, 50.0, 200.0],
+                # Deliberately rounded/coarse rates; the explicit count should win.
+                "poverty_rate_individuals_acs1": [0.20, 0.60, 0.10],
+            }
+        ).to_parquet(ds_path)
+
+        xwalk_path = tmp_path / "data" / "curated" / "xwalks" / "xwalk__B2025xT2020.parquet"
+        _make_xwalk_parquet(xwalk_path, geo_type="tract")
+
+        recipe = load_recipe(_recipe_with_pipeline())
+        ctx = ExecutionContext(project_root=tmp_path, recipe=recipe)
+        ctx.transform_paths["tract_to_coc"] = xwalk_path
+
+        task = ResampleTask(
+            dataset_id="acs",
+            year=2020,
+            input_path="data/acs1_poverty.parquet",
+            effective_geometry=GeometryRef(type="tract", vintage=2020),
+            method="aggregate",
+            transform_id="tract_to_coc",
+            to_geometry=GeometryRef(type="coc", vintage=2025),
+            measures=["poverty_universe_individuals_acs1"],
+            measure_aggregations={"poverty_universe_individuals_acs1": "sum"},
+            geo_column="tract_geoid",
+            derived_measures={
+                "poverty_rate_individuals_acs1": {
+                    "type": "rate_from_weighted_counts",
+                    "source_rate_column": "poverty_rate_individuals_acs1",
+                    "source_numerator_column": "poor_individuals_acs1",
+                    "denominator_column": "poverty_universe_individuals_acs1",
+                    "numerator_output_column": "poor_individuals_acs1",
+                },
+            },
+        )
+        result = _execute_resample(task, ctx)
+
+        assert result.success
+        df = ctx.intermediates[("acs", 2020)].set_index("geo_id")
+        assert df.loc["COC1", "poor_individuals_acs1"] == pytest.approx(
+            (25.0 * 0.8) + (35.0 * 0.5),
+        )
+        assert df.loc["COC1", "poverty_rate_individuals_acs1"] == pytest.approx(37.5 / 105.0)
+
     def test_measures_list_backward_compat(self, tmp_path: Path):
         """Old list format (measures: [a, b] + aggregation: sum) still works."""
         data = _recipe_with_pipeline()
