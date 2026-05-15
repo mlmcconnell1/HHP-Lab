@@ -180,7 +180,6 @@ datasets:
     product: acs1_imputation_target
     version: 1
     native_geometry: { type: tract }
-    year_column: year
     geo_column: tract_geoid
     params:
       align: same_year_acs1_controlled_acs5_terminal
