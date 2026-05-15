@@ -168,8 +168,10 @@ def _validation_diff(
     allocated_total: float | None,
     source_total: float | None,
 ) -> tuple[float | None, float | None]:
-    if allocated_total is None or source_total is None:
+    if source_total is None:
         return None, None
+    if allocated_total is None:
+        allocated_total = 0.0
     abs_diff = float(allocated_total - source_total)
     if source_total == 0:
         rel_diff = 0.0 if abs_diff == 0 else float("inf")
@@ -1400,7 +1402,11 @@ def diagnose_acs1_imputation(
                         details={
                             "source_column": source_column,
                             "source_total": source_float,
-                            "allocated_total": allocated_float,
+                            "allocated_total": (
+                                0.0
+                                if allocated_float is None and source_float is not None
+                                else allocated_float
+                            ),
                             "abs_diff": abs_diff,
                             "rel_diff": rel_diff,
                         },

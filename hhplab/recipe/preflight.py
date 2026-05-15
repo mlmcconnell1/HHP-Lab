@@ -308,6 +308,7 @@ def _check_dataset_paths(
         # Deduplicate: check each resolved path once
         checked_paths: set[str] = set()
         missing_years: list[int] = []
+        missing_tasks: list[ResampleTask] = []
         missing_paths: set[str] = set()
 
         for task in tasks:
@@ -334,6 +335,7 @@ def _check_dataset_paths(
 
             if not (project_root / path).exists():
                 missing_years.append(task.year)
+                missing_tasks.append(task)
                 missing_paths.add(path)
 
         if missing_years:
@@ -351,7 +353,11 @@ def _check_dataset_paths(
                     message=msg,
                     dataset_id=ds_id,
                     years=missing_years,
-                    remediation=_dataset_remediation(ds_id, ds, years=missing_years),
+                    remediation=_dataset_remediation(
+                        ds_id,
+                        ds,
+                        years=_remediation_years_for_missing_dataset(ds, missing_tasks),
+                    ),
                 )
             )
 
@@ -1203,6 +1209,48 @@ def _file_set_segment_for_year(ds, year: int):
         if year in expand_year_spec(seg.years):
             return seg
     return None
+
+
+def _resolved_acs1_vintage_for_task(ds, task: ResampleTask) -> int | None:
+    """Return the ACS1 vintage a resample task resolves to, when discoverable."""
+    if task.input_path is not None:
+        match = re.search(r"__A(\d{4})", task.input_path)
+        if match:
+            return int(match.group(1))
+
+    seg = _file_set_segment_for_year(ds, task.year)
+    if seg is None:
+        return None
+
+    override_path = seg.overrides.get(task.year)
+    if override_path is not None:
+        match = re.search(r"__A(\d{4})", override_path)
+        if match:
+            return int(match.group(1))
+
+    for key in ("acs1_end", "acs_end"):
+        if key in seg.year_offsets:
+            return task.year + int(seg.year_offsets[key])
+
+    if ds.file_set is not None:
+        template = ds.file_set.path_template
+        if re.search(r"__A\{year(?::[^}]*)?\}", template):
+            return task.year
+
+    return None
+
+
+def _remediation_years_for_missing_dataset(ds, tasks: list[ResampleTask]) -> list[int]:
+    """Return source-vintage years to use in missing-dataset remediation."""
+    if ds.provider == "census" and ds.product in {"acs1", "acs1_poverty"}:
+        vintages = [
+            vintage
+            for task in tasks
+            if (vintage := _resolved_acs1_vintage_for_task(ds, task)) is not None
+        ]
+        if vintages:
+            return sorted(set(vintages))
+    return sorted({task.year for task in tasks})
 
 
 def _task_uses_same_year_acs1(

@@ -869,6 +869,42 @@ class TestRunPreflight:
         assert "acs1 imputation target" in findings[0].remediation.hint.lower()
         assert "acs5 tract support" in findings[0].remediation.hint.lower()
 
+    def test_missing_acs1_poverty_file_set_reports_unavailable_resolved_vintage(
+        self,
+        tmp_path: Path,
+    ):
+        data = _acs1_poverty_preflight_recipe()
+        dataset = data["datasets"]["acs1_poverty"]
+        del dataset["path"]
+        dataset["file_set"] = {
+            "path_template": (
+                "data/curated/acs/acs1_poverty_tracts__A{acs1_end}xT2020.parquet"
+            ),
+            "segments": [
+                {
+                    "years": {"years": [2021]},
+                    "geometry": {"type": "tract", "vintage": 2020},
+                    "year_offsets": {"acs1_end": -1},
+                },
+            ],
+        }
+        _setup_preflight_fixtures(tmp_path, include_pit=False, include_acs=False)
+
+        recipe = load_recipe(data)
+        report = run_preflight(recipe, project_root=tmp_path)
+
+        findings = [
+            f
+            for f in report.findings
+            if f.kind == FindingKind.MISSING_DATASET
+            and f.dataset_id == "acs1_poverty"
+        ]
+        assert len(findings) == 1
+        assert findings[0].years == [2021]
+        assert findings[0].remediation is not None
+        assert "A2020" in findings[0].remediation.hint
+        assert "experimental source" in findings[0].remediation.hint
+
     def test_preflight_checks_acs1_poverty_derived_rate_inputs(self, tmp_path: Path):
         data = _acs1_poverty_preflight_recipe()
         _setup_preflight_fixtures(tmp_path, include_pit=False, include_acs=False)

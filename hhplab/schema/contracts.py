@@ -8,7 +8,6 @@ from typing import Literal
 import pandas as pd
 
 from hhplab.schema.columns import (
-    ACS1_IMPUTATION_OUTPUT_COLUMNS,
     ACS_TRACT_OUTPUT_COLUMNS,
     COC_PANEL_COLUMNS,
     DRIFT_PRONE_SOURCE_COLUMNS,
@@ -21,6 +20,7 @@ from hhplab.schema.columns import (
     ZORI_INGEST_OUTPUT_COLUMNS,
 )
 from hhplab.schema.lineage import population_lineage_columns
+from hhplab.schema.measures import ACS1_IMPUTATION_OUTPUT_COLUMNS
 
 
 @dataclass(frozen=True)

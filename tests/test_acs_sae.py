@@ -384,19 +384,103 @@ def test_impute_acs1_targets_zero_denominator_policy_sets_zero_count() -> None:
 
 def test_impute_acs1_targets_zero_denominator_rate_is_null() -> None:
     support = ACS5_IMPUTATION_SUPPORT.copy()
+    support.loc[support["county_fips"] == "08031", "population_below_poverty"] = 0
     support.loc[support["county_fips"] == "08031", "poverty_universe"] = 0
 
+    with pytest.raises(
+        ValueError,
+        match=(
+            "ACS1 imputation failed conservation validation for poverty_rate "
+            "target 08031 column population_below_poverty"
+        ),
+    ):
+        impute_acs1_targets_to_tracts(
+            ACS1_TARGETS,
+            support,
+            specs=(ACS1_IMPUTED_POVERTY_SPEC,),
+            year=2023,
+        )
+
+
+def test_diagnose_acs1_imputation_reports_all_na_conservation_residual() -> None:
     result = impute_acs1_targets_to_tracts(
         ACS1_TARGETS,
+        ACS5_IMPUTATION_SUPPORT,
+        specs=(ACS1_IMPUTED_POVERTY_SPEC,),
+        year=2023,
+    )
+    broken = result.copy()
+    broken.loc[
+        broken["county_fips"].eq("08031"),
+        "acs1_imputed_population_below_poverty",
+    ] = pd.NA
+
+    findings = diagnose_acs1_imputation(
+        broken,
+        ACS1_TARGETS,
+        ACS5_IMPUTATION_SUPPORT,
+        specs=(ACS1_IMPUTED_POVERTY_SPEC,),
+    )
+
+    residuals = [
+        finding
+        for finding in findings
+        if finding.code == "conservation_residual"
+        and finding.target_id == "08031"
+        and finding.column == "acs1_imputed_population_below_poverty"
+    ]
+    assert len(residuals) == 1
+    assert residuals[0].details["allocated_total"] == 0.0
+    assert residuals[0].details["source_total"] == 100.0
+
+
+@pytest.mark.parametrize(
+    ("zero_support", "expected_codes"),
+    [
+        pytest.param(False, {"missing_acs1_target_value"}, id="support-present"),
+        pytest.param(
+            True,
+            {"missing_acs1_target_value", "zero_support_denominator"},
+            id="support-zero",
+        ),
+    ],
+)
+def test_impute_acs1_targets_all_na_acs1_rate_target_emits_diagnostic(
+    zero_support: bool,
+    expected_codes: set[str],
+) -> None:
+    targets = ACS1_TARGETS.copy()
+    support = ACS5_IMPUTATION_SUPPORT.copy()
+    target_mask = targets["county_fips"].eq("08031")
+    support_mask = support["county_fips"].eq("08031")
+    targets.loc[target_mask, ["population_below_poverty", "poverty_universe"]] = pd.NA
+    if zero_support:
+        support.loc[support_mask, ["population_below_poverty", "poverty_universe"]] = 0
+
+    result = impute_acs1_targets_to_tracts(
+        targets,
         support,
         specs=(ACS1_IMPUTED_POVERTY_SPEC,),
         year=2023,
     )
 
     county_rows = result[result["county_fips"] == "08031"]
+    assert county_rows["acs1_imputed_population_below_poverty"].isna().all()
     assert county_rows["acs1_imputed_poverty_universe"].isna().all()
     assert county_rows["acs1_imputed_poverty_rate"].isna().all()
-    assert county_rows["acs1_imputation_zero_denominator_count"].tolist() == [1, 1]
+
+    findings = diagnose_acs1_imputation(
+        result,
+        targets,
+        support,
+        specs=(ACS1_IMPUTED_POVERTY_SPEC,),
+    )
+
+    assert {finding.code for finding in findings} >= expected_codes
+    missing_target_columns = {
+        finding.column for finding in findings if finding.code == "missing_acs1_target_value"
+    }
+    assert missing_target_columns == {"population_below_poverty", "poverty_universe"}
 
 
 def test_imputation_adapters_expose_spec_required_columns() -> None:
@@ -504,16 +588,18 @@ def test_build_acs1_poverty_tract_artifact_handles_zero_denominator() -> None:
     support = ACS5_IMPUTATION_SUPPORT.copy()
     support.loc[support["county_fips"] == "08031", "poverty_universe"] = 0
 
-    result = build_acs1_poverty_tract_artifact(
-        ACS1_TARGETS,
-        support,
-        year=2023,
-    )
-
-    county_rows = result[result["county_fips"] == "08031"]
-    assert county_rows["acs1_imputed_poverty_universe"].isna().all()
-    assert county_rows["acs1_imputed_poverty_rate"].isna().all()
-    assert county_rows["acs1_imputation_zero_denominator_count"].tolist() == [1, 1]
+    with pytest.raises(
+        ValueError,
+        match=(
+            "ACS1 imputation failed conservation validation for poverty_rate "
+            "target 08031 column poverty_universe"
+        ),
+    ):
+        build_acs1_poverty_tract_artifact(
+            ACS1_TARGETS,
+            support,
+            year=2023,
+        )
 
 
 def test_build_acs1_poverty_tract_artifact_handles_partial_crosswalk_coverage() -> None:
@@ -1224,6 +1310,52 @@ def test_writes_acs1_poverty_tract_artifact_with_embedded_provenance(tmp_path) -
     assert provenance.extra["output_row_count"] == len(artifact)
     assert "acs1_imputed_total_households" not in written.columns
     assert written["is_modeled"].unique().tolist() == [True]
+
+
+def test_writes_acs1_poverty_tract_artifact_infers_vintages_from_columns(tmp_path) -> None:
+    artifact = build_acs1_poverty_tract_artifact(
+        ACS1_TARGETS,
+        ACS5_IMPUTATION_SUPPORT,
+        year=2023,
+    )
+    artifact.attrs.clear()
+
+    returned = write_acs1_poverty_tract_artifact(
+        artifact,
+        target_geo_type="county",
+        base_dir=tmp_path,
+    )
+
+    expected = tmp_path / "curated" / "acs" / "acs1_poverty_tracts__A2023xT2020.parquet"
+    provenance = read_provenance(returned)
+
+    assert returned == expected
+    assert provenance is not None
+    assert provenance.acs_vintage == "2023"
+    assert provenance.extra["acs5_terminal_vintage"] == "2019-2023"
+    assert provenance.tract_vintage == "2020"
+
+
+def test_write_acs1_poverty_tract_artifact_requires_single_inferred_acs1_vintage(
+    tmp_path,
+) -> None:
+    artifact = build_acs1_poverty_tract_artifact(
+        ACS1_TARGETS,
+        ACS5_IMPUTATION_SUPPORT,
+        year=2023,
+    )
+    artifact.attrs.clear()
+    artifact.loc[0, "acs1_vintage_used"] = "2022"
+
+    with pytest.raises(
+        ValueError,
+        match="ACS1 poverty tract artifact requires one acs1_vintage_used",
+    ):
+        write_acs1_poverty_tract_artifact(
+            artifact,
+            target_geo_type="county",
+            base_dir=tmp_path,
+        )
 
 
 def test_writes_sae_parquet_with_embedded_provenance(tmp_path) -> None:

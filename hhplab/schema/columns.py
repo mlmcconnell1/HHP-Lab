@@ -229,25 +229,16 @@ ACS1_IMPUTATION_DIAGNOSTIC_COLUMNS: list[str] = [
     "acs1_imputation_validation_rel_diff",
 ]
 
-ACS1_IMPUTATION_MEASURE_COLUMNS: list[str] = [
-    "acs1_imputed_population_below_poverty",
-    "acs1_imputed_poverty_universe",
-    "acs1_imputed_poverty_rate",
-    "acs1_imputed_total_households",
-]
-
 ACS1_IMPUTATION_BASE_OUTPUT_COLUMNS: list[str] = [
     "geo_type",
     "geo_id",
     "year",
+    "target_geo_type",
+    "target_geo_id",
+    "county_fips",
+    "tract_geoid",
     *ACS1_IMPUTATION_LINEAGE_COLUMNS,
     *ACS1_IMPUTATION_FLAG_COLUMNS,
-]
-
-ACS1_IMPUTATION_OUTPUT_COLUMNS: list[str] = [
-    *ACS1_IMPUTATION_BASE_OUTPUT_COLUMNS,
-    *ACS1_IMPUTATION_MEASURE_COLUMNS,
-    *ACS1_IMPUTATION_DIAGNOSTIC_COLUMNS,
 ]
 
 ACS5_COUNT_COLUMNS: list[str] = [

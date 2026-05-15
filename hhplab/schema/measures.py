@@ -9,7 +9,6 @@ from hhplab.schema.columns import (
     ACS1_IMPUTATION_BASE_OUTPUT_COLUMNS,
     ACS1_IMPUTATION_DIAGNOSTIC_COLUMNS,
     ACS1_IMPUTATION_LINEAGE_COLUMNS,
-    ACS1_IMPUTATION_MEASURE_COLUMNS,
     ACS1_MEASURE_COLUMNS,
     ACS_MEASURE_COLUMNS,
     LAUS_MEASURE_COLUMNS,
@@ -89,6 +88,21 @@ class ACS1ImputationMeasureSpec:
             ]
             if missing:
                 raise ValueError(f"{self.name} rate spec is missing required fields: {missing}.")
+            if len(self.numerator_source_columns) != 1:
+                raise ValueError(
+                    f"{self.name} rate spec must declare exactly one numerator_source_columns "
+                    "entry because ACS1 rate imputation allocates one numerator component."
+                )
+            invalid_numerators = [
+                column
+                for column in self.numerator_source_columns
+                if column not in self.acs1_source_columns
+            ]
+            if invalid_numerators:
+                raise ValueError(
+                    f"{self.name} numerator_source_columns must be present in "
+                    f"acs1_source_columns: {invalid_numerators}."
+                )
             if self.denominator_source_column not in self.acs5_support_columns:
                 raise ValueError(
                     f"{self.name} denominator_source_column must be present in "
@@ -134,6 +148,16 @@ ACS1_IMPUTATION_MEASURE_SPECS: tuple[ACS1ImputationMeasureSpec, ...] = (
     ACS1_IMPUTED_POVERTY_SPEC,
     ACS1_IMPUTED_TOTAL_HOUSEHOLDS_SPEC,
 )
+
+ACS1_IMPUTATION_MEASURE_COLUMNS: list[str] = list(
+    dict.fromkeys(column for spec in ACS1_IMPUTATION_MEASURE_SPECS for column in spec.output_columns)
+)
+
+ACS1_IMPUTATION_OUTPUT_COLUMNS: list[str] = [
+    *ACS1_IMPUTATION_BASE_OUTPUT_COLUMNS,
+    *ACS1_IMPUTATION_MEASURE_COLUMNS,
+    *ACS1_IMPUTATION_DIAGNOSTIC_COLUMNS,
+]
 
 ACS1_IMPUTATION_MEASURES: tuple[str, ...] = tuple(ACS1_IMPUTATION_MEASURE_COLUMNS)
 

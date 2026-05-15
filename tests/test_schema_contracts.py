@@ -34,6 +34,7 @@ from hhplab.recipe.schema_common import GeometryRef
 from hhplab.rents.zori_ingest import ZORI_INGEST_OUTPUT_COLUMNS as ZORI_INGEST_COLUMNS
 from hhplab.schema import (
     ACS1_IMPUTATION_MEASURE_SPECS,
+    ACS1_IMPUTATION_OUTPUT_COLUMNS,
     ACS1_IMPUTATION_OUTPUT_CONTRACT,
     ACS1_IMPUTED_POVERTY_SPEC,
     ACS1_IMPUTED_TOTAL_HOUSEHOLDS_SPEC,
@@ -88,11 +89,15 @@ ACS1_IMPUTATION_SPEC_CASES = {
 }
 
 ACS1_IMPUTATION_COMPLETE_ROW = {
-    column: pd.NA for column in schema_columns.ACS1_IMPUTATION_OUTPUT_COLUMNS
+    column: pd.NA for column in ACS1_IMPUTATION_OUTPUT_COLUMNS
 } | {
     "geo_type": "tract",
     "geo_id": "08031001000",
     "year": 2023,
+    "target_geo_type": "county",
+    "target_geo_id": "08031",
+    "county_fips": "08031",
+    "tract_geoid": "08031001000",
     "acs1_vintage_used": "2023",
     "acs5_vintage_used": "2022",
     "tract_vintage_used": "2020",
@@ -162,11 +167,9 @@ def test_acs1_imputation_count_spec_has_single_output_without_rate_fields() -> N
 
 def test_acs1_imputation_output_columns_are_declared_from_specs() -> None:
     assert acs1_imputation_output_columns(ACS1_IMPUTATION_MEASURE_SPECS) == (
-        schema_columns.ACS1_IMPUTATION_OUTPUT_COLUMNS
+        ACS1_IMPUTATION_OUTPUT_COLUMNS
     )
-    assert len(schema_columns.ACS1_IMPUTATION_OUTPUT_COLUMNS) == len(
-        set(schema_columns.ACS1_IMPUTATION_OUTPUT_COLUMNS)
-    )
+    assert len(ACS1_IMPUTATION_OUTPUT_COLUMNS) == len(set(ACS1_IMPUTATION_OUTPUT_COLUMNS))
 
 
 def test_validate_acs1_imputation_output_contract_passes_for_complete_artifact() -> None:
@@ -182,6 +185,8 @@ def test_validate_acs1_imputation_output_contract_passes_for_complete_artifact()
     "missing_column",
     [
         "acs1_imputed_poverty_rate",
+        "tract_geoid",
+        "target_geo_id",
         "is_synthetic",
         "acs1_imputation_zero_denominator_count",
     ],
@@ -217,6 +222,44 @@ def test_acs1_imputation_rate_spec_requires_denominator_support() -> None:
     )
 
     with pytest.raises(ValueError, match="denominator_source_column"):
+        spec.validate()
+
+
+def test_acs1_imputation_rate_spec_rejects_multiple_numerator_columns() -> None:
+    spec = ACS1ImputationMeasureSpec(
+        name="bad_rate",
+        family="labor",
+        target_geo_type="tract",
+        value_kind="rate",
+        acs1_source_columns=("unemployed_count", "employed_count", "civilian_labor_force"),
+        acs5_support_columns=("unemployed_count", "employed_count", "civilian_labor_force"),
+        numerator_source_columns=("unemployed_count", "employed_count"),
+        denominator_source_column="civilian_labor_force",
+        numerator_output_column="acs1_imputed_unemployed_count",
+        denominator_output_column="acs1_imputed_civilian_labor_force",
+        output_column="acs1_imputed_unemployment_rate",
+    )
+
+    with pytest.raises(ValueError, match="exactly one numerator_source_columns"):
+        spec.validate()
+
+
+def test_acs1_imputation_rate_spec_requires_numerator_source_subset() -> None:
+    spec = ACS1ImputationMeasureSpec(
+        name="bad_rate",
+        family="labor",
+        target_geo_type="tract",
+        value_kind="rate",
+        acs1_source_columns=("civilian_labor_force",),
+        acs5_support_columns=("unemployed_count", "civilian_labor_force"),
+        numerator_source_columns=("unemployed_count",),
+        denominator_source_column="civilian_labor_force",
+        numerator_output_column="acs1_imputed_unemployed_count",
+        denominator_output_column="acs1_imputed_civilian_labor_force",
+        output_column="acs1_imputed_unemployment_rate",
+    )
+
+    with pytest.raises(ValueError, match="numerator_source_columns"):
         spec.validate()
 
 
