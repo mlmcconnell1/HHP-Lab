@@ -930,6 +930,49 @@ class TestRunPreflight:
         ]
         assert any("acs1_imputed_poverty_rate" in finding.message for finding in findings)
 
+    def test_preflight_reports_existing_file_with_no_rows_for_task_year(self, tmp_path: Path):
+        data = _acs1_poverty_preflight_recipe()
+        dataset = data["datasets"]["acs1_poverty"]
+        del dataset["path"]
+        dataset["file_set"] = {
+            "path_template": "data/curated/acs/acs1_poverty_tracts__A{acs1_end}xT2020.parquet",
+            "segments": [
+                {
+                    "years": {"years": [2021]},
+                    "geometry": {"type": "tract", "vintage": 2020},
+                    "year_offsets": {"acs1_end": 0},
+                },
+            ],
+        }
+        _setup_preflight_fixtures(tmp_path, include_pit=False, include_acs=False)
+        path = tmp_path / "data" / "curated" / "acs" / "acs1_poverty_tracts__A2021xT2020.parquet"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        pd.DataFrame(
+            {
+                "tract_geoid": ["T1"],
+                "year": [2022],
+                "acs1_vintage_used": [2021],
+                "acs1_imputed_poverty_universe": [100.0],
+                "acs1_imputed_population_below_poverty": [20.0],
+                "acs1_imputed_poverty_rate": [0.2],
+            }
+        ).to_parquet(path)
+
+        recipe = load_recipe(data)
+        report = run_preflight(recipe, project_root=tmp_path)
+
+        findings = [
+            f
+            for f in report.findings
+            if f.kind == FindingKind.UNCOVERED_YEARS and f.dataset_id == "acs1_poverty"
+        ]
+        assert len(findings) == 1
+        assert findings[0].years == [2021]
+        assert "no rows for planned year(s) [2021] after filtering year" in findings[0].message
+        assert findings[0].remediation is not None
+        assert "Set year_column" in findings[0].remediation.hint
+        assert not report.is_ready
+
     def test_map_target_missing_coc_boundary_is_actionable(self, tmp_path: Path):
         data = _map_preflight_recipe(
             geometry={"type": "coc", "vintage": 2025},

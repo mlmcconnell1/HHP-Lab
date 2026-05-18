@@ -364,6 +364,89 @@ def _check_dataset_paths(
     return findings
 
 
+def _check_dataset_year_values(
+    recipe: RecipeV1,
+    project_root: Path,
+    resample_tasks: list[ResampleTask],
+) -> list[PreflightFinding]:
+    """Verify existing inputs contain rows for each planned task year.
+
+    Path and schema checks can pass while execution later fails because the
+    resolved year column has no rows for a specific task year. This check keeps
+    the validation plan-scoped and reads only the resolved year column.
+    """
+    findings: list[PreflightFinding] = []
+    tasks_by_input: dict[tuple[str, str], list[ResampleTask]] = {}
+
+    for task in resample_tasks:
+        if task.input_path is None:
+            continue
+        tasks_by_input.setdefault((task.dataset_id, task.input_path), []).append(task)
+
+    for (dataset_id, input_path), tasks in tasks_by_input.items():
+        ds = recipe.datasets.get(dataset_id)
+        if ds is None:
+            continue
+
+        full_path = project_root / input_path
+        if not full_path.exists():
+            continue
+
+        schema_result = probe_dataset_schema(full_path)
+        if not schema_result.ok or schema_result.detail is None:
+            continue
+
+        columns = schema_result.detail["columns"]
+        year_result = probe_year_column(columns, ds.year_column)
+        if not year_result.ok or year_result.detail is None:
+            continue
+
+        year_column = year_result.detail.get("year_column")
+        if year_column is None:
+            continue
+
+        try:
+            df = pd.read_parquet(full_path, columns=[year_column])
+        except (FileNotFoundError, OSError, ValueError, KeyError):
+            continue
+
+        if year_column not in df.columns:
+            continue
+
+        years = pd.to_numeric(df[year_column], errors="coerce")
+        missing_years = sorted(
+            {
+                task.year
+                for task in tasks
+                if not bool((years == task.year).any())
+            }
+        )
+        if not missing_years:
+            continue
+
+        findings.append(
+            PreflightFinding(
+                severity=Severity.ERROR,
+                kind=FindingKind.UNCOVERED_YEARS,
+                message=(
+                    f"Dataset '{dataset_id}' ({input_path}): no rows for planned "
+                    f"year(s) {missing_years} after filtering {year_column}."
+                ),
+                dataset_id=dataset_id,
+                years=missing_years,
+                remediation=Remediation(
+                    hint=(
+                        f"Set year_column to the artifact column that contains the "
+                        f"planned analysis/source years, or rebuild {input_path} so "
+                        f"it includes rows where {year_column} is in {missing_years}."
+                    ),
+                ),
+            )
+        )
+
+    return findings
+
+
 def _check_dataset_provenance(
     recipe: RecipeV1,
     project_root: Path,
@@ -2649,22 +2732,28 @@ def run_preflight(
         _check_dataset_paths(recipe, project_root, all_resample_tasks),
     )
 
-    # 4. Dataset provenance checks for translated ACS tract caches
+    # 4. Dataset year-value checks catch files that exist but cannot satisfy
+    #    executor filtering for a planned task year.
+    report.findings.extend(
+        _check_dataset_year_values(recipe, project_root, all_resample_tasks),
+    )
+
+    # 5. Dataset provenance checks for translated ACS tract caches
     report.findings.extend(
         _check_dataset_provenance(recipe, project_root, all_resample_tasks),
     )
 
-    # 5. Transform artifact checks
+    # 6. Transform artifact checks
     report.findings.extend(
         _check_transforms(recipe, project_root, needed_transforms),
     )
 
-    # 6. Dataset schema probes
+    # 7. Dataset schema probes
     report.findings.extend(
         _check_dataset_schemas(recipe, project_root, all_resample_tasks),
     )
 
-    # 7. Support-dataset probes for weighted transforms
+    # 8. Support-dataset probes for weighted transforms
     report.findings.extend(
         _check_support_datasets(
             recipe,
