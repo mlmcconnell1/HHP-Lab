@@ -27,6 +27,7 @@ from hhplab.acs.variables import (
     ACS5_SAE_SUPPORT_TABLES,
     ALL_API_VARS,
     TRACT_OUTPUT_COLUMNS,
+    api_vars_for_year,
     tables_for_api_vars,
 )
 from hhplab.provenance import (
@@ -168,11 +169,70 @@ class TestFetchStateTractPopulation:
 
         df, _ = fetch_state_tract_data(2010, "08")
 
-        assert "B01003_001E" in captured_get[0]
-        assert "B01003_001M" not in captured_get[0]
-        assert "B23025_003E" not in captured_get[0]
-        assert "B23025_005E" not in captured_get[0]
+        requested_vars = ",".join(captured_get)
+        assert "B01003_001E" in requested_vars
+        assert "B01003_001M" not in requested_vars
+        assert "B23025_003E" not in requested_vars
+        assert "B23025_005E" not in requested_vars
+        assert "B25063_025E" not in requested_vars
+        assert "B25063_026E" not in requested_vars
+        assert "B25063_027E" not in requested_vars
+        assert "C17002_001E" in requested_vars
         assert df.iloc[0]["total_population"] == 5000
+
+    def test_api_vars_for_early_vintages_omit_known_unsupported_variables(self):
+        """Early ACS5 endpoints skip variables that produce Census HTTP 400s."""
+        unsupported_2010 = {
+            "B01003_001M",
+            "B23025_003E",
+            "B23025_005E",
+            "B25063_025E",
+            "B25063_026E",
+            "B25063_027E",
+        }
+        unsupported_2011_to_2014 = {
+            "B01003_001M",
+            "B25063_025E",
+            "B25063_026E",
+            "B25063_027E",
+        }
+
+        assert unsupported_2010.isdisjoint(api_vars_for_year(2010))
+        for year in [2011, 2012, 2013, 2014]:
+            assert unsupported_2011_to_2014.isdisjoint(api_vars_for_year(year))
+            assert {"B23025_003E", "B23025_005E"}.issubset(api_vars_for_year(year))
+
+        assert {"B25063_025E", "B25063_026E", "B25063_027E"}.issubset(
+            api_vars_for_year(2015)
+        )
+
+    def test_uses_census_api_key_from_environment(self, httpx_mock, monkeypatch):
+        """ACS5 tract requests pass through CENSUS_API_KEY when it is configured."""
+        monkeypatch.setenv("CENSUS_API_KEY", "test-census-key")
+        response_data = make_census_response(
+            [
+                {
+                    "county": "031",
+                    "tract": "001000",
+                    "B01003_001E": "5000",
+                }
+            ]
+        )
+        captured_keys: list[str] = []
+
+        def respond(request):
+            captured_keys.append(str(request.url.params["key"]))
+            return httpx.Response(200, json=response_data)
+
+        httpx_mock.add_callback(
+            respond,
+            url=re.compile(r"https://api\.census\.gov/data/2010/acs/acs5.*"),
+        )
+
+        fetch_state_tract_data(2010, "08")
+
+        assert captured_keys
+        assert set(captured_keys) == {"test-census-key"}
 
     def test_parses_response_correctly(self, httpx_mock):
         """Test that Census API response is parsed into correct DataFrame structure."""

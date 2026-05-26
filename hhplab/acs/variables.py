@@ -206,12 +206,15 @@ ALL_API_VARS: list[str] = list(ACS_VARIABLES.keys()) + ADULT_VARS
 # variables makes the whole state request fail with HTTP 400, so tract ingest
 # filters them by API year and leaves their output columns nullable.
 UNAVAILABLE_API_VARS_BY_YEAR: dict[int, set[str]] = {
-    2010: {"B01003_001M", "B23025_003E", "B23025_005E"},
-    2011: {"B01003_001M"},
-    2012: {"B01003_001M"},
-    2013: {"B01003_001M"},
-    2014: {"B01003_001M"},
+    year: {
+        "B01003_001M",
+        "B25063_025E",
+        "B25063_026E",
+        "B25063_027E",
+    }
+    for year in range(2010, 2015)
 }
+UNAVAILABLE_API_VARS_BY_YEAR[2010].update({"B23025_003E", "B23025_005E"})
 
 
 def api_vars_for_year(year: int) -> list[str]:

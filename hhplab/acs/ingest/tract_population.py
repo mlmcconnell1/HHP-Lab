@@ -41,6 +41,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import re
 from datetime import UTC, datetime
 from pathlib import Path
@@ -355,6 +356,7 @@ def fetch_state_tract_data(
     year: int,
     state_fips: str,
     api_vars: list[str] | None = None,
+    api_key: str | None = None,
 ) -> tuple[pd.DataFrame, bytes]:
     """Fetch all ACS tract-level data for a single state.
 
@@ -382,6 +384,8 @@ def fetch_state_tract_data(
     url = CENSUS_API.format(year=year)
     if api_vars is None:
         api_vars = api_vars_for_year(year)
+    if api_key is None:
+        api_key = os.environ.get("CENSUS_API_KEY")
     frames: list[pd.DataFrame] = []
     raw_parts: list[bytes] = []
     merge_columns = ["NAME", "state", "county", "tract"]
@@ -394,6 +398,8 @@ def fetch_state_tract_data(
                 "for": "tract:*",
                 "in": f"state:{state_fips}",
             }
+            if api_key:
+                params["key"] = api_key
 
             response = client.get(url, params=params)
             response.raise_for_status()
@@ -456,6 +462,7 @@ def fetch_tract_data(
     acs_vintage: str,
     tract_vintage: str,
     raw_root: Path | None = None,
+    api_key: str | None = None,
 ) -> tuple[pd.DataFrame, str, int, Path | None]:
     """Fetch tract-level ACS data for all US states and territories.
 
@@ -485,6 +492,8 @@ def fetch_tract_data(
     translation = _translation_metadata(acs_vintage, tract_vintage)
     api_vars = api_vars_for_year(year)
     tables = tables_for_api_vars(api_vars)
+    if api_key is None:
+        api_key = os.environ.get("CENSUS_API_KEY")
 
     logger.info(f"Fetching ACS {acs_vintage} tract data (API year: {year})")
 
@@ -492,7 +501,12 @@ def fetch_tract_data(
     all_raw_content: list[bytes] = []
     for state_fips in STATE_FIPS_CODES:
         try:
-            df, raw_content = fetch_state_tract_data(year, state_fips, api_vars)
+            df, raw_content = fetch_state_tract_data(
+                year,
+                state_fips,
+                api_vars,
+                api_key=api_key,
+            )
             dfs.append(df)
             all_raw_content.append(raw_content)
             logger.debug(f"Fetched {len(df)} tracts for state {state_fips}")
@@ -605,6 +619,7 @@ def ingest_tract_data(
     force: bool = False,
     output_dir: Path | str | None = None,
     raw_root: Path | None = None,
+    api_key: str | None = None,
 ) -> Path:
     """Fetch and cache full ACS tract-level data.
 
@@ -646,7 +661,10 @@ def ingest_tract_data(
         )
 
     df, content_sha256, content_size, snap_dir = fetch_tract_data(
-        acs_vintage, tract_vintage, raw_root=raw_root,
+        acs_vintage,
+        tract_vintage,
+        raw_root=raw_root,
+        api_key=api_key,
     )
 
     year = parse_acs_vintage(acs_vintage)
