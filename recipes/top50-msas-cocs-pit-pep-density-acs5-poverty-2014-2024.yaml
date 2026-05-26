@@ -1,5 +1,5 @@
-# Top 50 2024-population MSAs: contained CoCs with PIT, PEP density,
-# and terminal-vintage ACS5 tract poverty counts.
+# Top 50 2024-population MSAs: contained CoCs with PIT, PEP population,
+# and terminal-vintage ACS5 tract population and poverty counts.
 #
 # The MSA selector_ids are the top 50 Census MSAs by 2024 resident population,
 # computed from Census PEP county population aggregated over Census MSA 2023
@@ -14,11 +14,14 @@ description: >
   through tract-mediated decennial population weights, plus tract-level ACS5
   terminal-vintage total population, poverty universe, and persons below the
   poverty level. Each panel year uses the ACS5 vintage ending in that same
-  year, aggregated from the tract vintage appropriate to the source year and
-  crosswalk-weighted to 2025 CoC boundaries. The panel is filtered to CoCs with
-  at least 99% of their 2025 boundary area contained in one of the top 50 Census
-  MSAs by 2024 PEP population, using Census MSA 2023 membership and 2025 CoC
-  boundaries.
+  year for both population and poverty, aggregated from the tract vintage
+  appropriate to the source year and crosswalk-weighted to 2025 CoC boundaries.
+  The ACS5 terminal-year population is promoted to the canonical
+  total_population column so it can be compared directly with PEP/ACS1 panels,
+  while PEP remains available as pep_population. The panel is filtered to CoCs
+  with at least 99% of their 2025 boundary area contained in one of the top 50
+  Census MSAs by 2024 PEP population, using Census MSA 2023 membership and 2025
+  CoC boundaries.
 
 universe:
   range: "2014-2024"
@@ -28,7 +31,12 @@ targets:
     geometry: { type: coc, vintage: 2025, source: hud_exchange }
     outputs: [panel, containment]
     panel_policy:
-      canonical_population_source: pep
+      canonical_population_source: acs5
+      column_aliases:
+        total_population_pep: pep_population
+        total_population_acs5: acs5_total_population
+        population_below_poverty: acs5_population_below_poverty
+        poverty_universe: acs5_poverty_universe
     containment_spec:
       container: { type: msa, vintage: 2023, source: census_msa_2023 }
       candidate: { type: coc, vintage: 2025, source: hud_exchange }
