@@ -1,0 +1,109 @@
+version: 1
+name: south_carolina_cocs_counties_columbia_msa_map_2025
+description: >
+  Render South Carolina county boundaries, all South Carolina CoC boundaries,
+  and the Columbia, SC Census MSA boundary as a single recipe-native HTML map
+  artifact.
+
+universe:
+  years: [2025]
+
+targets:
+  - id: south_carolina_overlay_map
+    geometry: { type: coc, vintage: 2025, source: hud_exchange }
+    outputs: [map]
+    map_spec:
+      basemap: cartodbpositron
+      viewport:
+        fit_layers: true
+        padding: 30
+      layers:
+        - geometry: { type: county, vintage: 2023, source: tiger_line }
+          selector_ids:
+            [
+              "45001",
+              "45003",
+              "45005",
+              "45007",
+              "45009",
+              "45011",
+              "45013",
+              "45015",
+              "45017",
+              "45019",
+              "45021",
+              "45023",
+              "45025",
+              "45027",
+              "45029",
+              "45031",
+              "45033",
+              "45035",
+              "45037",
+              "45039",
+              "45041",
+              "45043",
+              "45045",
+              "45047",
+              "45049",
+              "45051",
+              "45053",
+              "45055",
+              "45057",
+              "45059",
+              "45061",
+              "45063",
+              "45065",
+              "45067",
+              "45069",
+              "45071",
+              "45073",
+              "45075",
+              "45077",
+              "45079",
+              "45081",
+              "45083",
+              "45085",
+              "45087",
+              "45089",
+              "45091",
+            ]
+          label: South Carolina Counties
+          tooltip_fields: [county_fips, geo_vintage, source]
+          style:
+            fill_color: "#f8f9fa"
+            stroke_color: "#495057"
+            fill_opacity: 0.04
+            stroke_opacity: 0.75
+            line_weight: 0.9
+            z_order: 0
+        - geometry: { type: coc, vintage: 2025, source: hud_exchange }
+          selector_ids: [SC-500, SC-501, SC-502, SC-503]
+          label: South Carolina CoCs
+          tooltip_fields: [coc_id, coc_name, state_abbrev]
+          style_mode: distinct
+          style:
+            fill_color: "#8ecae6"
+            stroke_color: "#1d3557"
+            fill_opacity: 0.24
+            stroke_opacity: 0.9
+            line_weight: 1.4
+            z_order: 1
+        - geometry: { type: msa, vintage: 2023, source: census_msa_2023 }
+          selector_ids: ["17900"]
+          label: Columbia MSA
+          tooltip_fields: [msa_id, msa_name, cbsa_code, definition_version]
+          style:
+            fill_color: "#ffb703"
+            stroke_color: "#9b2226"
+            fill_opacity: 0.12
+            stroke_opacity: 1.0
+            line_weight: 3.0
+            z_order: 2
+
+datasets: {}
+
+pipelines:
+  - id: south_carolina_overlay_map_pipeline
+    target: south_carolina_overlay_map
+    steps: []
