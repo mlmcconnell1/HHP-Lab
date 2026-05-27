@@ -1,0 +1,224 @@
+# Example recipe: top 100 Census MSAs x substantially contained CoCs, 2010-2019.
+#
+# Required source artifacts before build:
+#   hhplab ingest hud-pit --start-year 2010 --end-year 2019
+#   hhplab ingest boundaries --source hud_exchange --vintage 2025
+#   hhplab ingest tiger --year 2023 --type counties
+#   hhplab ingest tiger --year 2000 --type tracts
+#   hhplab ingest tiger --year 2010 --type tracts
+#   hhplab generate msa --definition-version census_msa_2023
+#   hhplab ingest pep --vintage 2020
+#   hhplab ingest acs5-tract --acs 2009-2018 --tracts 2000
+#   hhplab ingest acs5-tract --acs 2009-2018 --tracts 2010
+#
+# ACS lag: PIT year Y uses ACS5 vintage Y-1. The 2010-2019 panel therefore
+# resolves ACS5 vintages 2009-2018.
+#
+# Tract-era segmentation: ACS5 2009 uses 2000-era tracts; ACS5 2010-2018 uses
+# 2010-era tracts. Cross-era analysis intentionally uses separate transform
+# segments instead of mixing tract vintages.
+#
+# LAUS note: BLS LAUS metro annual-average artifacts begin in 2015. This
+# 2010-2019 example defaults unemployment_source to ACS5 so the full requested
+# window is buildable. For a 2015-2019 variant, ingest LAUS and switch:
+#   hhplab ingest laus-metro --start-year 2015 --end-year 2019 --definition-version census_msa_2023
+#   msa_coc_panel.unemployment_source: laus
+#   add the laus_msa dataset/resample step shown in the comments below.
+#
+# Expected panel output:
+#   outputs/top100-msa-coc-panel-2010-2019/panel__msa-coc__Y2010-2019@B2025xMcensusmsa2023.parquet
+
+version: 1
+name: top100_msa_coc_panel_2010_2019
+description: >
+  Build an MSA-CoC containment panel at msa_id x coc_id x year grain for the
+  top 100 official Census MSAs. CoCs are retained when at least 99% of their
+  2025 boundary area is contained in a selected MSA. MSA population defaults
+  to Census PEP, MSA unemployment defaults to ACS5 for the full 2010-2019
+  window, and ACS5 supplies vacancy, rent burden, poverty, rent, and income
+  covariates.
+
+universe:
+  range: "2010-2019"
+
+targets:
+  - id: top100_msa_coc_panel
+    geometry: { type: coc, vintage: 2025, source: hud_exchange }
+    outputs: [panel]
+    msa_coc_panel:
+      top_n: 100
+      ranking_population_source: pep
+      ranking_reference_year: 2019
+      containment_min_share: 0.99
+      containment_denominator: candidate_area
+      coc_boundary_vintage: 2025
+      msa_definition_version: census_msa_2023
+      # Switch to acs5 to emit ACS5 aggregate population as msa_population.
+      msa_population_source: pep
+      # Switch to laus only for panels whose years are all >= 2015.
+      unemployment_source: acs5
+      output_aliases:
+        msa_population: msa_population_pep
+        msa_unemployment: msa_unemployment_acs5
+
+datasets:
+  pit:
+    provider: hud
+    product: pit
+    version: 1
+    native_geometry: { type: coc }
+    years: "2010-2019"
+    year_column: pit_year
+    geo_column: coc_id
+    params:
+      vintage: 2024
+      align: point_in_time_jan
+    path: data/curated/pit/pit_vintage__P2024.parquet
+
+  pep_county:
+    provider: census
+    product: pep
+    version: 1
+    native_geometry: { type: county, vintage: 2020 }
+    years: "2010-2019"
+    year_column: year
+    geo_column: county_fips
+    path: data/curated/pep/pep_county__v2020.parquet
+
+  acs_tract:
+    provider: census
+    product: acs5
+    version: 1
+    native_geometry: { type: tract }
+    geo_column: tract_geoid
+    file_set:
+      path_template: "data/curated/acs/acs5_tracts__A{acs_end}xT{tract}.parquet"
+      segments:
+        - years: "2010-2010"
+          geometry: { type: tract, vintage: 2000 }
+          constants: { tract: 2000 }
+          year_offsets: { acs_end: -1 }
+        - years: "2011-2019"
+          geometry: { type: tract, vintage: 2010 }
+          constants: { tract: 2010 }
+          year_offsets: { acs_end: -1 }
+
+  # Optional LAUS source for a 2015+ variant:
+  # laus_msa:
+  #   provider: bls
+  #   product: laus
+  #   version: 1
+  #   native_geometry: { type: msa, source: census_msa_2023 }
+  #   year_column: year
+  #   geo_column: msa_id
+  #   file_set:
+  #     path_template: "data/curated/laus/laus_metro__A{year}@Dcensusmsa2023.parquet"
+  #     segments:
+  #       - years: "2015-2019"
+  #         geometry: { type: msa, source: census_msa_2023 }
+
+transforms:
+  - id: county_to_coc_population
+    type: crosswalk
+    from: { type: county, vintage: 2020 }
+    to: { type: coc, vintage: 2025, source: hud_exchange }
+    spec:
+      weighting:
+        scheme: tract_mediated
+        variety: population
+        tract_vintage: 2010
+        denominator_source: decennial
+        denominator_vintage: 2010
+
+  - id: county_to_msa
+    type: crosswalk
+    from: { type: county, vintage: 2020 }
+    to: { type: msa, source: census_msa_2023 }
+    spec:
+      weighting:
+        scheme: area
+
+  - id: tract_to_msa_2000
+    type: crosswalk
+    from: { type: tract, vintage: 2000 }
+    to: { type: msa, source: census_msa_2023 }
+    spec:
+      weighting:
+        scheme: area
+
+  - id: tract_to_msa_2010
+    type: crosswalk
+    from: { type: tract, vintage: 2010 }
+    to: { type: msa, source: census_msa_2023 }
+    spec:
+      weighting:
+        scheme: area
+
+pipelines:
+  - id: build_top100_msa_coc_panel
+    target: top100_msa_coc_panel
+    steps:
+      - materialize:
+          transforms:
+            - county_to_coc_population
+            - county_to_msa
+            - tract_to_msa_2000
+            - tract_to_msa_2010
+
+      - resample:
+          dataset: pit
+          to_geometry: { type: coc, vintage: 2025, source: hud_exchange }
+          method: identity
+          measures: [pit_total, pit_sheltered, pit_unsheltered]
+
+      - resample:
+          dataset: pep_county
+          to_geometry: { type: coc, vintage: 2025, source: hud_exchange }
+          method: aggregate
+          via: county_to_coc_population
+          measures: [population]
+          aggregation: sum
+
+      - resample:
+          dataset: pep_county
+          to_geometry: { type: msa, source: census_msa_2023 }
+          method: aggregate
+          via: county_to_msa
+          measures: [population]
+          aggregation: sum
+
+      - resample:
+          dataset: acs_tract
+          to_geometry: { type: msa, source: census_msa_2023 }
+          method: aggregate
+          via: auto
+          measures:
+            total_population: { aggregation: sum }
+            median_household_income: { aggregation: weighted_mean }
+            median_gross_rent: { aggregation: weighted_mean }
+            poverty_universe: { aggregation: sum }
+            population_below_poverty: { aggregation: sum }
+            total_housing_units: { aggregation: sum }
+            vacant_housing_units: { aggregation: sum }
+            gross_rent_pct_income_total: { aggregation: sum }
+            gross_rent_pct_income_30_to_34_9: { aggregation: sum }
+            gross_rent_pct_income_35_to_39_9: { aggregation: sum }
+            gross_rent_pct_income_40_to_49_9: { aggregation: sum }
+            gross_rent_pct_income_50_plus: { aggregation: sum }
+            civilian_labor_force: { aggregation: sum }
+            unemployed_count: { aggregation: sum }
+
+      # Optional for a 2015+ LAUS variant:
+      # - resample:
+      #     dataset: laus_msa
+      #     to_geometry: { type: msa, source: census_msa_2023 }
+      #     method: identity
+      #     measures: [labor_force, employed, unemployed, unemployment_rate]
+
+      - join:
+          datasets: [pit, pep_county]
+          join_on: [geo_id, year]
+
+validation:
+  missing_dataset:
+    default: fail

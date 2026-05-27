@@ -9,6 +9,7 @@ users. Together they cover the current recipe surface:
 - CoC crosswalks and generated metro/MSA transforms
 - Recipe-native map outputs with layered CoC / MSA / metro overlays
 - Recipe-native containment outputs for MSA-to-CoC and CoC-to-county candidate lists
+- MSA-CoC containment panels at `msa_id x coc_id x year` grain
 - `file_set`-driven year/geometry switching
 - Point-in-time and calendar-mean temporal filters
 - ACS1/ACS5 small-area estimation (SAE) recipe planning and preflight
@@ -62,6 +63,11 @@ the output downstream.
 - `msa-coc-containment-denver-2025.yaml`
   Containment-only recipe that writes 2025 CoCs whose area overlaps the Denver
   Census MSA above the configured threshold.
+- `top100-msa-coc-panel-2010-2019.yaml`
+  MSA-CoC panel recipe for the top 100 Census MSAs, 2010-2019. It keeps CoCs
+  with at least 99 percent containment, emits MSA-year ACS5 covariates plus
+  CoC-year PIT/population measures, and documents how to switch population and
+  unemployment sources.
 
 ## Geography Notes
 
@@ -88,6 +94,10 @@ the output downstream.
   MSA-to-CoC containment requires CoC boundaries, TIGER counties, and generated
   MSA definition/membership artifacts; CoC-to-county containment requires CoC
   boundaries and TIGER counties.
+- MSA-CoC panel recipes use the containment artifacts plus panel source
+  datasets. For 2010-2019 examples, ACS5 unemployment covers the full window;
+  LAUS unemployment can be selected for 2015+ windows after ingesting
+  `hhplab ingest laus-metro`.
 - SAE recipes use `small_area_estimate` steps rather than generic
   `weighted_mean` aggregation. They require ACS1 county source components, ACS5
   tract support components, and a target tract crosswalk. Median-like SAE
