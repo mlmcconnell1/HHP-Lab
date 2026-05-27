@@ -2772,7 +2772,7 @@ class TestMsaCocPanelSpec:
         data["targets"][0]["msa_coc_panel"] = {
             "top_n": 100,
             "ranking_population_source": "pep",
-            "ranking_reference_year": 2024,
+            "ranking_reference_year": 2021,
             "containment_min_share": 0.99,
             "containment_denominator": "candidate_area",
             "coc_boundary_vintage": 2025,
@@ -2791,7 +2791,7 @@ class TestMsaCocPanelSpec:
         assert isinstance(spec, MsaCocPanelSpec)
         assert spec.top_n == 100
         assert spec.ranking_population_source == "pep"
-        assert spec.ranking_reference_year == 2024
+        assert spec.ranking_reference_year == 2021
         assert spec.containment_min_share == 0.99
         assert spec.containment_denominator == "candidate_area"
         assert spec.coc_boundary_vintage == 2025
@@ -2809,7 +2809,7 @@ class TestMsaCocPanelSpec:
                 "msa_coc_panel": {
                     "top_n": 100,
                     "ranking_population_source": "pep",
-                    "ranking_reference_year": 2024,
+                    "ranking_reference_year": 2021,
                     "containment_min_share": 0.99,
                     "coc_boundary_vintage": 2025,
                     "msa_definition_version": "census_msa_2023",
@@ -2829,7 +2829,7 @@ class TestMsaCocPanelSpec:
                 "msa_coc_panel": {
                     "top_n": 100,
                     "ranking_population_source": "pep",
-                    "ranking_reference_year": 2024,
+                    "ranking_reference_year": 2021,
                     "containment_min_share": 0.99,
                     "coc_boundary_vintage": 2025,
                     "msa_definition_version": "census_msa_2023",
@@ -2839,6 +2839,22 @@ class TestMsaCocPanelSpec:
             }
             data = _minimal_recipe()
             data["targets"] = [target_data]
+            load_recipe(data)
+
+    def test_spec_rejects_ranking_reference_year_outside_universe(self):
+        data = _minimal_recipe()
+        data["targets"][0]["msa_coc_panel"] = {
+            "top_n": 100,
+            "ranking_population_source": "pep",
+            "ranking_reference_year": 2024,
+            "containment_min_share": 0.99,
+            "coc_boundary_vintage": 2025,
+            "msa_definition_version": "census_msa_2023",
+            "msa_population_source": "pep",
+            "unemployment_source": "acs5",
+        }
+
+        with pytest.raises(RecipeLoadError, match="ranking_reference_year"):
             load_recipe(data)
 
     @pytest.mark.parametrize(
@@ -2869,6 +2885,49 @@ class TestMsaCocPanelSpec:
 
         with pytest.raises(ValidationError):
             MsaCocPanelSpec(**kwargs)
+
+    @pytest.mark.parametrize(
+        "msa_population_source,alias",
+        [
+            ("acs5", "msa_population_acs5"),
+            ("pep", "msa_population_pep"),
+            ("acs5", "msa_population_model_input"),
+        ],
+    )
+    def test_spec_accepts_matching_or_neutral_population_alias(
+        self,
+        msa_population_source: str,
+        alias: str,
+    ):
+        spec = MsaCocPanelSpec(
+            top_n=100,
+            ranking_population_source="pep",
+            ranking_reference_year=2024,
+            containment_min_share=0.99,
+            coc_boundary_vintage=2025,
+            msa_definition_version="census_msa_2023",
+            msa_population_source=msa_population_source,
+            unemployment_source="acs5",
+            output_aliases={"msa_population": alias},
+        )
+
+        assert spec.output_aliases["msa_population"] == alias
+
+    def test_spec_rejects_mismatched_source_qualified_population_alias(self):
+        from pydantic import ValidationError
+
+        with pytest.raises(ValidationError, match="msa_population_source"):
+            MsaCocPanelSpec(
+                top_n=100,
+                ranking_population_source="pep",
+                ranking_reference_year=2024,
+                containment_min_share=0.99,
+                coc_boundary_vintage=2025,
+                msa_definition_version="census_msa_2023",
+                msa_population_source="acs5",
+                unemployment_source="acs5",
+                output_aliases={"msa_population": "msa_population_pep"},
+            )
 
 
 class TestSmallAreaEstimateSchema:

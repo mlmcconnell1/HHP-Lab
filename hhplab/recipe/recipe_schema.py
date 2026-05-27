@@ -611,6 +611,25 @@ class MsaCocPanelSpec(BaseModel):
                 )
         return value
 
+    @model_validator(mode="after")
+    def _validate_population_output_aliases(self) -> MsaCocPanelSpec:
+        alias = self.output_aliases.get("msa_population")
+        expected_alias = f"msa_population_{self.msa_population_source}"
+        source_qualified_aliases = {"msa_population_acs5", "msa_population_pep"}
+        if (
+            alias is not None
+            and alias in source_qualified_aliases
+            and alias != expected_alias
+        ):
+            raise ValueError(
+                "MsaCocPanelSpec.output_aliases maps 'msa_population' to "
+                f"'{alias}', but msa_population_source is "
+                f"'{self.msa_population_source}'. Use '{expected_alias}' "
+                "or choose an alias that does not look like a source-qualified "
+                "MSA population provenance column."
+            )
+        return self
+
 
 class CohortSelector(BaseModel):
     """Declarative cohort filter that ranks geographies by a measure column
@@ -1702,13 +1721,22 @@ class RecipeV1(BaseModel):
 
     @model_validator(mode="after")
     def _validate_cohort_selectors(self) -> RecipeV1:
-        """Validate that cohort reference_year falls within the recipe universe."""
+        """Validate that target reference years fall within the recipe universe."""
         universe_years = set(expand_year_spec(self.universe))
         for t in self.targets:
             if t.cohort is not None and t.cohort.reference_year not in universe_years:
                 raise ValueError(
                     f"Target '{t.id}' cohort reference_year "
                     f"{t.cohort.reference_year} is not in the recipe universe "
+                    f"({min(universe_years)}-{max(universe_years)})."
+                )
+            if (
+                t.msa_coc_panel is not None
+                and t.msa_coc_panel.ranking_reference_year not in universe_years
+            ):
+                raise ValueError(
+                    f"Target '{t.id}' msa_coc_panel ranking_reference_year "
+                    f"{t.msa_coc_panel.ranking_reference_year} is not in the recipe universe "
                     f"({min(universe_years)}-{max(universe_years)})."
                 )
         return self

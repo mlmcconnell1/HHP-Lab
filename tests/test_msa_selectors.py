@@ -2,16 +2,17 @@
 
 Truth table for 2024 selector fixtures:
 
-| MSA   | Counties      | PEP population | ACS5 tract population |
-|-------|---------------|----------------|-----------------------|
-| 11111 | 01001, 01003  | 100 partial    | 330                   |
-| 22222 | 02001         | 400            | 390                   |
-| 33333 | 03001         | missing        | 300                   |
-| 44444 | 04001         | 400            | 390                   |
+| MSA   | Counties      | PEP population | ACS5 county population | ACS5 tract population |
+|-------|---------------|----------------|------------------------|-----------------------|
+| 11111 | 01001, 01003  | 100 partial    | 330                    | 330                   |
+| 22222 | 02001         | 400            | 390                    | 390                   |
+| 33333 | 03001         | missing        | 300                    | 300                   |
+| 44444 | 04001         | 400            | 390                    | 390                   |
 
 Top-2 PEP ordering is 22222, 44444 because both tie at 400 and the selector
 breaks ties by MSA ID. MSA 33333 is reported missing for PEP coverage.
-Top-2 ACS5 tract ordering is 22222, 44444 for the same deterministic tie.
+Top-2 ACS5 county and tract ordering is 22222, 44444 for the same
+deterministic tie.
 """
 
 from __future__ import annotations
@@ -47,6 +48,13 @@ ACS5_TRACT_ROWS: tuple[dict[str, object], ...] = (
     {"tract_geoid": "03001000100", "year": 2024, "total_population": 300},
     {"tract_geoid": "04001000100", "year": 2024, "total_population": 390},
 )
+ACS5_COUNTY_ROWS: tuple[dict[str, object], ...] = (
+    {"county_fips": "01001", "year": 2024, "total_population": 110},
+    {"county_fips": "01003", "year": 2024, "total_population": 220},
+    {"county_fips": "02001", "year": 2024, "total_population": 390},
+    {"county_fips": "03001", "year": 2024, "total_population": 300},
+    {"county_fips": "04001", "year": 2024, "total_population": 390},
+)
 EXPECTED_PEP_RANKING: tuple[tuple[str, float], ...] = (
     ("22222", 400.0),
     ("44444", 400.0),
@@ -72,13 +80,18 @@ def _acs5_tracts() -> pd.DataFrame:
     return pd.DataFrame(ACS5_TRACT_ROWS)
 
 
+def _acs5_counties() -> pd.DataFrame:
+    return pd.DataFrame(ACS5_COUNTY_ROWS)
+
+
 @pytest.mark.parametrize(
     "ranking_source,population_df,population_column,expected_ranking",
     [
         ("pep", _pep(), "population", EXPECTED_PEP_RANKING),
+        ("acs5", _acs5_counties(), "total_population", EXPECTED_ACS5_RANKING),
         ("acs5", _acs5_tracts(), "total_population", EXPECTED_ACS5_RANKING),
     ],
-    ids=["pep-county", "acs5-tract"],
+    ids=["pep-county", "acs5-county", "acs5-tract"],
 )
 def test_top_msa_selector_rolls_population_to_msa(
     ranking_source: str,

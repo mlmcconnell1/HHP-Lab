@@ -36,7 +36,11 @@ class _FrameRecord:
     frame: pd.DataFrame
 
 
-def build_msa_coc_containment_spec(panel_spec: Any) -> ContainmentSpec:
+def build_msa_coc_containment_spec(
+    panel_spec: Any,
+    *,
+    selector_ids: list[str] | None = None,
+) -> ContainmentSpec:
     """Translate ``MsaCocPanelSpec`` into the containment builder contract."""
     county_vintage = _county_vintage_from_msa_definition_version(
         panel_spec.msa_definition_version
@@ -54,6 +58,7 @@ def build_msa_coc_containment_spec(panel_spec: Any) -> ContainmentSpec:
         min_share=panel_spec.containment_min_share,
         denominator=panel_spec.containment_denominator,
         definition_version=panel_spec.msa_definition_version,
+        selector_ids=selector_ids,
     )
 
 
@@ -90,7 +95,10 @@ def assemble_msa_coc_panel(
         top_n=panel_spec.top_n,
         population_column=ranking_column,
     )
-    containment_spec.selector_ids = list(selection.selector_ids)
+    containment_spec = build_msa_coc_containment_spec(
+        panel_spec,
+        selector_ids=list(selection.selector_ids),
+    )
     membership = build_msa_coc_membership(
         containment_spec,
         coc_gdf=coc_gdf,
@@ -360,7 +368,7 @@ def _population_column(frame: pd.DataFrame, source_token: str) -> str:
 def _first_available(frame: pd.DataFrame, candidates: list[str]) -> pd.Series:
     for column in candidates:
         if column in frame.columns:
-            return pd.to_numeric(frame[column], errors="coerce")
+            return pd.to_numeric(frame[column], errors="coerce").astype("Float64")
     return pd.Series(pd.NA, index=frame.index, dtype="Float64")
 
 

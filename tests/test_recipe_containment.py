@@ -29,10 +29,14 @@ from hhplab.recipe.executor_containment import (
     build_containment_list,
     build_msa_coc_membership,
 )
+from hhplab.recipe.executor_msa_coc_panel import (
+    _first_available,
+    build_msa_coc_containment_spec,
+)
 from hhplab.recipe.executor_manifest import resolve_pipeline_artifacts
 from hhplab.recipe.loader import load_recipe
 from hhplab.recipe.manifest import read_manifest
-from hhplab.recipe.recipe_schema import ContainmentSpec
+from hhplab.recipe.recipe_schema import ContainmentSpec, MsaCocPanelSpec
 from hhplab.schema.columns import MSA_COC_PANEL_COLUMNS
 
 CRS = ALBERS_EQUAL_AREA_CRS
@@ -97,6 +101,52 @@ def _containment_spec(
             "denominator": denominator,
         }
     )
+
+
+@pytest.mark.parametrize(
+    "frame,candidates,expected",
+    [
+        (
+            pd.DataFrame({"value": ["1.5", "bad", None]}),
+            ["value"],
+            [1.5, pd.NA, pd.NA],
+        ),
+        (
+            pd.DataFrame({"other": [1, 2, 3]}),
+            ["missing"],
+            [pd.NA, pd.NA, pd.NA],
+        ),
+    ],
+    ids=["column-present", "column-missing"],
+)
+def test_first_available_returns_consistent_nullable_float_dtype(
+    frame: pd.DataFrame,
+    candidates: list[str],
+    expected: list[object],
+) -> None:
+    result = _first_available(frame, candidates)
+
+    assert str(result.dtype) == "Float64"
+    assert result.tolist() == expected
+
+
+def test_msa_coc_containment_spec_builds_with_validated_selector_ids() -> None:
+    panel_spec = MsaCocPanelSpec(
+        top_n=1,
+        ranking_population_source="acs5",
+        ranking_reference_year=2020,
+        containment_min_share=0.5,
+        coc_boundary_vintage=2025,
+        msa_definition_version="census_msa_2023",
+        msa_population_source="acs5",
+        unemployment_source="acs5",
+    )
+
+    spec = build_msa_coc_containment_spec(panel_spec, selector_ids=["MSA-1"])
+
+    assert spec.selector_ids == ["MSA-1"]
+    with pytest.raises(ValueError, match="blank"):
+        build_msa_coc_containment_spec(panel_spec, selector_ids=[" "])
 
 
 def test_coc_county_containment_filters_inclusively_and_sorts() -> None:
