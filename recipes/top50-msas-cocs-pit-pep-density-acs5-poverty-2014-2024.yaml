@@ -7,9 +7,9 @@
 # area is contained in one of those MSAs.
 
 version: 1
-name: top50_msas_cocs_pit_pep_density_acs5_poverty_2014_2024
+name: top50_msas_cocs_pit_pep_density_acs5_poverty_2010_2024
 description: >
-  Build a CoC panel for 2014-2024 with HUD PIT sheltered and unsheltered
+  Build a CoC panel for 2010-2024 with HUD PIT sheltered and unsheltered
   counts plus Census PEP county population allocated to 2025 CoC boundaries
   through tract-mediated decennial population weights, plus tract-level ACS5
   terminal-vintage total population, poverty universe, and persons below the
@@ -24,7 +24,7 @@ description: >
   CoC boundaries.
 
 universe:
-  range: "2014-2024"
+  range: "2010-2024"
 
 targets:
   - id: top50_msas_coc_panel
@@ -158,7 +158,7 @@ datasets:
     product: pit
     version: 1
     native_geometry: { type: coc }
-    years: "2014-2024"
+    years: "2010-2024"
     year_column: pit_year
     geo_column: coc_id
     params:
@@ -176,7 +176,7 @@ datasets:
     file_set:
       path_template: "data/curated/pep/{pep_file}"
       segments:
-        - years: "2014-2019"
+        - years: "2010-2019"
           geometry: { type: county, vintage: 2020 }
           constants: { pep_file: "pep_county__v2020.parquet" }
         - years: "2020-2024"
@@ -192,7 +192,7 @@ datasets:
     file_set:
       path_template: "data/curated/acs/acs5_tracts__A{acs_end}xT{tract}.parquet"
       segments:
-        - years: "2014-2019"
+        - years: "2010-2019"
           geometry: { type: tract, vintage: 2010, source: tiger }
           constants: { tract: 2010 }
           year_offsets: { acs_end: 0 }
@@ -260,7 +260,7 @@ pipelines:
           method: aggregate
           transform_set:
             segments:
-              - years: "2014-2019"
+              - years: "2010-2019"
                 via: tract2010_to_coc_area
               - years: "2020-2024"
                 via: tract2020_to_coc_area
