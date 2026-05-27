@@ -492,6 +492,32 @@ MSA_PANEL_COLUMNS: list[str] = [
     "source",
 ]
 
+MSA_COC_PANEL_COLUMNS: list[str] = [
+    "msa_id",
+    "coc_id",
+    "year",
+    "msa_population",
+    "msa_median_rent",
+    "msa_vacancy_rate",
+    "msa_poverty_rate",
+    "msa_unemployment",
+    "msa_income",
+    "msa_rent_burden",
+    "pit_total",
+    "pit_sheltered",
+    "pit_unsheltered",
+    "coc_population",
+    "ranking_population_source",
+    "ranking_reference_year",
+    "containment_min_share",
+    "containment_denominator",
+    "coc_boundary_vintage_used",
+    "msa_definition_version_used",
+    "msa_population_source",
+    "unemployment_source",
+    "source",
+]
+
 ZORI_COLUMNS: list[str] = [
     "zori_coc",
     "zori_coverage_ratio",

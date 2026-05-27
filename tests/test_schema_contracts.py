@@ -38,6 +38,9 @@ from hhplab.schema import (
     ACS1_IMPUTATION_OUTPUT_CONTRACT,
     ACS1_IMPUTED_POVERTY_SPEC,
     ACS1_IMPUTED_TOTAL_HOUSEHOLDS_SPEC,
+    ARTIFACT_CONTRACTS,
+    MSA_COC_PANEL_COLUMNS,
+    MSA_COC_PANEL_CONTRACT,
     SAE_OUTPUT_CONTRACT,
     ACS1ImputationMeasureSpec,
     acs1_imputation_output_columns,
@@ -118,6 +121,32 @@ ACS1_IMPUTATION_COMPLETE_ROW = {
     "acs1_imputation_validation_rel_diff": 0.0,
 }
 
+MSA_COC_PANEL_COMPLETE_ROW = {
+    "msa_id": "35620",
+    "coc_id": "NY-600",
+    "year": 2024,
+    "msa_population": 19_498_249,
+    "msa_median_rent": 1732.0,
+    "msa_vacancy_rate": 0.054,
+    "msa_poverty_rate": 0.128,
+    "msa_unemployment": 0.041,
+    "msa_income": 92_153.0,
+    "msa_rent_burden": 0.462,
+    "pit_total": 88_025,
+    "pit_sheltered": 83_169,
+    "pit_unsheltered": 4_856,
+    "coc_population": 8_258_035,
+    "ranking_population_source": "pep",
+    "ranking_reference_year": 2024,
+    "containment_min_share": 0.99,
+    "containment_denominator": "candidate_area",
+    "coc_boundary_vintage_used": 2025,
+    "msa_definition_version_used": "census_msa_2023",
+    "msa_population_source": "acs5",
+    "unemployment_source": "laus",
+    "source": "msa_coc_panel",
+}
+
 
 @pytest.mark.parametrize("case_name", list(SCHEMA_ALIAS_CASES), ids=list(SCHEMA_ALIAS_CASES))
 def test_source_schema_aliases_use_canonical_schema_constants(case_name: str) -> None:
@@ -179,6 +208,45 @@ def test_validate_acs1_imputation_output_contract_passes_for_complete_artifact()
     )
 
     assert findings == []
+
+
+def test_msa_coc_panel_contract_declares_initial_output_columns() -> None:
+    assert tuple(MSA_COC_PANEL_COLUMNS) == MSA_COC_PANEL_CONTRACT.required_columns
+    assert MSA_COC_PANEL_CONTRACT.name == "msa_coc_panel"
+    assert ARTIFACT_CONTRACTS["msa_coc_panel"] is MSA_COC_PANEL_CONTRACT
+
+
+def test_validate_msa_coc_panel_contract_passes_for_complete_artifact() -> None:
+    findings = validate_artifact_contract(
+        pd.DataFrame([MSA_COC_PANEL_COMPLETE_ROW]),
+        MSA_COC_PANEL_CONTRACT,
+    )
+
+    assert findings == []
+
+
+@pytest.mark.parametrize(
+    "missing_column",
+    [
+        "msa_id",
+        "coc_id",
+        "msa_population",
+        "msa_unemployment",
+        "coc_population",
+        "msa_definition_version_used",
+    ],
+)
+def test_validate_msa_coc_panel_contract_reports_missing_columns(missing_column: str) -> None:
+    row = dict(MSA_COC_PANEL_COMPLETE_ROW)
+    del row[missing_column]
+
+    findings = validate_artifact_contract(
+        pd.DataFrame([row]),
+        MSA_COC_PANEL_CONTRACT,
+    )
+
+    assert [finding.code for finding in findings] == ["missing_required_column"]
+    assert findings[0].column == missing_column
 
 
 @pytest.mark.parametrize(

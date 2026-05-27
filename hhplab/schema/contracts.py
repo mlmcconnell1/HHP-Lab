@@ -16,6 +16,7 @@ from hhplab.schema.columns import (
     PIT_CANONICAL_COLUMNS,
     SAE_MEASURE_COLUMNS,
     SAE_OUTPUT_COLUMNS,
+    MSA_COC_PANEL_COLUMNS,
     TRACT_MEDIATED_COUNTY_XWALK_COLUMNS,
     ZORI_INGEST_OUTPUT_COLUMNS,
 )
@@ -58,6 +59,25 @@ COC_PANEL_CONTRACT = ArtifactContract(
     required_columns=tuple(COC_PANEL_COLUMNS),
     canonical_measures=("total_population",),
     lineage_measures=("total_population",),
+)
+
+MSA_COC_PANEL_CONTRACT = ArtifactContract(
+    name="msa_coc_panel",
+    required_columns=tuple(MSA_COC_PANEL_COLUMNS),
+    canonical_measures=(
+        "msa_population",
+        "msa_median_rent",
+        "msa_vacancy_rate",
+        "msa_poverty_rate",
+        "msa_unemployment",
+        "msa_income",
+        "msa_rent_burden",
+        "pit_total",
+        "pit_sheltered",
+        "pit_unsheltered",
+        "coc_population",
+    ),
+    drift_prone_columns=(),
 )
 
 ACS_TRACT_CONTRACT = ArtifactContract(
@@ -116,6 +136,7 @@ ARTIFACT_CONTRACTS: dict[str, ArtifactContract] = {
         ACS1_IMPUTATION_OUTPUT_CONTRACT,
         COC_PANEL_CONTRACT,
         LAUS_METRO_CONTRACT,
+        MSA_COC_PANEL_CONTRACT,
         PEP_COUNTY_CONTRACT,
         PIT_CONTRACT,
         SAE_OUTPUT_CONTRACT,

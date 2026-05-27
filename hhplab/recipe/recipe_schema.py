@@ -463,6 +463,8 @@ class MapSpec(BaseModel):
 
 ContainmentDenominator = Literal["candidate_area", "container_area"]
 ContainmentMethod = Literal["planar_intersection"]
+MsaCocPopulationSource = Literal["pep", "acs5"]
+MsaCocUnemploymentSource = Literal["acs5", "laus"]
 SUPPORTED_CONTAINMENT_PAIRS: frozenset[tuple[str, str]] = frozenset(
     {
         ("msa", "coc"),
@@ -536,6 +538,76 @@ class ContainmentSpec(BaseModel):
                 f"Supported pairs: {supported}."
             )
         return self
+
+
+class MsaCocPanelSpec(BaseModel):
+    """Declarative MSA-CoC containment panel contract.
+
+    The output grain is ``msa_id x coc_id x year``. This schema records the
+    selection, containment, source, and alias choices needed by downstream
+    implementation stages to build the panel deterministically.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    top_n: int = Field(
+        ...,
+        ge=1,
+        description="Number of MSAs retained by the ranking population source.",
+    )
+    ranking_population_source: MsaCocPopulationSource = Field(
+        ...,
+        description="Population source used to rank candidate MSAs.",
+    )
+    ranking_reference_year: int = Field(
+        ...,
+        description="Reference year whose population values rank candidate MSAs.",
+    )
+    containment_min_share: float = Field(
+        ...,
+        ge=0.0,
+        le=1.0,
+        description="Inclusive minimum MSA-to-CoC containment share.",
+    )
+    containment_denominator: ContainmentDenominator = Field(
+        default="candidate_area",
+        description="Area denominator used for containment share calculation.",
+    )
+    coc_boundary_vintage: int | str = Field(
+        ...,
+        description="CoC boundary vintage used for containment and output provenance.",
+    )
+    msa_definition_version: str = Field(
+        ...,
+        description="MSA definition version used for membership and output provenance.",
+    )
+    msa_population_source: MsaCocPopulationSource = Field(
+        ...,
+        description="Population source emitted as msa_population in the output panel.",
+    )
+    unemployment_source: MsaCocUnemploymentSource = Field(
+        ...,
+        description="Unemployment source emitted as msa_unemployment.",
+    )
+    output_aliases: dict[str, str] = Field(
+        default_factory=dict,
+        description="Optional aliases from canonical output columns to requested names.",
+    )
+
+    @field_validator("msa_definition_version")
+    @classmethod
+    def _validate_msa_definition_version(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("MsaCocPanelSpec.msa_definition_version must be non-empty.")
+        return value
+
+    @field_validator("output_aliases")
+    @classmethod
+    def _validate_output_aliases(cls, value: dict[str, str]) -> dict[str, str]:
+        for source, alias in value.items():
+            if not source.strip() or not alias.strip():
+                raise ValueError("MsaCocPanelSpec.output_aliases may not contain blank keys/values.")
+        return value
 
 
 class CohortSelector(BaseModel):
@@ -624,6 +696,13 @@ class TargetSpec(BaseModel):
             "containment list."
         ),
     )
+    msa_coc_panel: MsaCocPanelSpec | None = Field(
+        default=None,
+        description=(
+            "Declarative MSA-CoC containment panel surface with row grain "
+            "msa_id x coc_id x year."
+        ),
+    )
 
     @model_validator(mode="after")
     def _validate_output_policies(self) -> TargetSpec:
@@ -651,6 +730,11 @@ class TargetSpec(BaseModel):
                     "Target 'containment_filter' candidate geometry must match "
                     f"target geometry type '{self.geometry.type}'."
                 )
+        if self.msa_coc_panel is not None:
+            if "panel" not in outputs:
+                raise ValueError("Target 'msa_coc_panel' requires outputs to include 'panel'.")
+            if self.geometry.type != "coc":
+                raise ValueError("Target 'msa_coc_panel' requires target geometry type 'coc'.")
         return self
 
 

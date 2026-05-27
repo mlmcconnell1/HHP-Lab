@@ -61,6 +61,7 @@ from hhplab.recipe.recipe_schema import (
     DatasetSpec,
     GeometryRef,
     MapSpec,
+    MsaCocPanelSpec,
     PanelPolicy,
     RecipeV1,
     SAEDiagnosticsSpec,
@@ -2761,6 +2762,113 @@ class TestPanelPolicy:
         assert restored.acs1.include is True
         assert restored.canonical_population_source == "pep"
         assert restored.column_aliases == {"zori_coc": "zori"}
+
+
+class TestMsaCocPanelSpec:
+    """Tests for the MSA-CoC containment panel schema surface."""
+
+    def test_spec_loads_with_required_contract_fields(self):
+        data = _minimal_recipe()
+        data["targets"][0]["msa_coc_panel"] = {
+            "top_n": 100,
+            "ranking_population_source": "pep",
+            "ranking_reference_year": 2024,
+            "containment_min_share": 0.99,
+            "containment_denominator": "candidate_area",
+            "coc_boundary_vintage": 2025,
+            "msa_definition_version": "census_msa_2023",
+            "msa_population_source": "acs5",
+            "unemployment_source": "laus",
+            "output_aliases": {
+                "msa_population": "msa_population_acs5",
+                "msa_unemployment": "msa_unemployment_laus",
+            },
+        }
+
+        recipe = load_recipe(data)
+        spec = recipe.targets[0].msa_coc_panel
+
+        assert isinstance(spec, MsaCocPanelSpec)
+        assert spec.top_n == 100
+        assert spec.ranking_population_source == "pep"
+        assert spec.ranking_reference_year == 2024
+        assert spec.containment_min_share == 0.99
+        assert spec.containment_denominator == "candidate_area"
+        assert spec.coc_boundary_vintage == 2025
+        assert spec.msa_definition_version == "census_msa_2023"
+        assert spec.msa_population_source == "acs5"
+        assert spec.unemployment_source == "laus"
+        assert spec.output_aliases["msa_population"] == "msa_population_acs5"
+
+    def test_spec_requires_panel_output_and_coc_target_geometry(self):
+        with pytest.raises(RecipeLoadError, match="requires outputs to include 'panel'"):
+            target_data = {
+                "id": "msa_coc_panel",
+                "geometry": {"type": "coc", "vintage": 2025},
+                "outputs": ["diagnostics"],
+                "msa_coc_panel": {
+                    "top_n": 100,
+                    "ranking_population_source": "pep",
+                    "ranking_reference_year": 2024,
+                    "containment_min_share": 0.99,
+                    "coc_boundary_vintage": 2025,
+                    "msa_definition_version": "census_msa_2023",
+                    "msa_population_source": "pep",
+                    "unemployment_source": "acs5",
+                },
+            }
+            data = _minimal_recipe()
+            data["targets"] = [target_data]
+            load_recipe(data)
+
+        with pytest.raises(RecipeLoadError, match="requires target geometry type 'coc'"):
+            target_data = {
+                "id": "msa_coc_panel",
+                "geometry": {"type": "msa", "vintage": 2023},
+                "outputs": ["panel"],
+                "msa_coc_panel": {
+                    "top_n": 100,
+                    "ranking_population_source": "pep",
+                    "ranking_reference_year": 2024,
+                    "containment_min_share": 0.99,
+                    "coc_boundary_vintage": 2025,
+                    "msa_definition_version": "census_msa_2023",
+                    "msa_population_source": "pep",
+                    "unemployment_source": "acs5",
+                },
+            }
+            data = _minimal_recipe()
+            data["targets"] = [target_data]
+            load_recipe(data)
+
+    @pytest.mark.parametrize(
+        "field,bad_value",
+        [
+            ("top_n", 0),
+            ("ranking_population_source", "decennial"),
+            ("containment_min_share", 1.01),
+            ("containment_denominator", "total_area"),
+            ("msa_population_source", "decennial"),
+            ("unemployment_source", "acs1"),
+        ],
+    )
+    def test_spec_rejects_invalid_values(self, field: str, bad_value):
+        from pydantic import ValidationError
+
+        kwargs = {
+            "top_n": 100,
+            "ranking_population_source": "pep",
+            "ranking_reference_year": 2024,
+            "containment_min_share": 0.99,
+            "coc_boundary_vintage": 2025,
+            "msa_definition_version": "census_msa_2023",
+            "msa_population_source": "pep",
+            "unemployment_source": "acs5",
+        }
+        kwargs[field] = bad_value
+
+        with pytest.raises(ValidationError):
+            MsaCocPanelSpec(**kwargs)
 
 
 class TestSmallAreaEstimateSchema:
