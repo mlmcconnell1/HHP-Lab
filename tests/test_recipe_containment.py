@@ -29,11 +29,11 @@ from hhplab.recipe.executor_containment import (
     build_containment_list,
     build_msa_coc_membership,
 )
+from hhplab.recipe.executor_manifest import resolve_pipeline_artifacts
 from hhplab.recipe.executor_msa_coc_panel import (
     _first_available,
     build_msa_coc_containment_spec,
 )
-from hhplab.recipe.executor_manifest import resolve_pipeline_artifacts
 from hhplab.recipe.loader import load_recipe
 from hhplab.recipe.manifest import read_manifest
 from hhplab.recipe.recipe_schema import ContainmentSpec, MsaCocPanelSpec
@@ -695,10 +695,16 @@ def test_execute_recipe_persists_msa_coc_panel_output(tmp_path) -> None:
             "year": [2020, 2021],
             "total_population": [10_000, 10_100],
             "median_gross_rent": [1500.0, 1525.0],
-            "vacancy_rate": [0.05, 0.04],
-            "poverty_rate": [0.12, 0.11],
+            "total_housing_units": [5000.0, 5100.0],
+            "vacant_housing_units": [250.0, 204.0],
+            "poverty_universe": [9000.0, 9100.0],
+            "population_below_poverty": [1080.0, 1001.0],
             "median_household_income": [80_000.0, 81_000.0],
-            "rent_burden_30_plus": [0.31, 0.30],
+            "gross_rent_pct_income_total": [2000.0, 2100.0],
+            "gross_rent_pct_income_30_to_34_9": [100.0, 105.0],
+            "gross_rent_pct_income_35_to_39_9": [120.0, 126.0],
+            "gross_rent_pct_income_40_to_49_9": [180.0, 189.0],
+            "gross_rent_pct_income_50_plus": [220.0, 210.0],
             "civilian_labor_force": [5000.0, 5050.0],
             "unemployed_count": [250.0, 202.0],
         }
@@ -787,10 +793,16 @@ def test_execute_recipe_persists_msa_coc_panel_output(tmp_path) -> None:
                                 "measures": [
                                     "total_population",
                                     "median_gross_rent",
-                                    "vacancy_rate",
-                                    "poverty_rate",
+                                    "total_housing_units",
+                                    "vacant_housing_units",
+                                    "poverty_universe",
+                                    "population_below_poverty",
                                     "median_household_income",
-                                    "rent_burden_30_plus",
+                                    "gross_rent_pct_income_total",
+                                    "gross_rent_pct_income_30_to_34_9",
+                                    "gross_rent_pct_income_35_to_39_9",
+                                    "gross_rent_pct_income_40_to_49_9",
+                                    "gross_rent_pct_income_50_plus",
                                     "civilian_labor_force",
                                     "unemployed_count",
                                 ],
@@ -828,6 +840,9 @@ def test_execute_recipe_persists_msa_coc_panel_output(tmp_path) -> None:
     assert (panel.groupby(grain_columns, dropna=False).size() == 1).all()
     assert panel["msa_population"].tolist() == [10_000, 10_100, 10_000, 10_100]
     assert panel["msa_population_acs5_alias"].tolist() == [10_000, 10_100, 10_000, 10_100]
+    assert panel["msa_vacancy_rate"].tolist() == pytest.approx([0.05, 0.04, 0.05, 0.04])
+    assert panel["msa_poverty_rate"].tolist() == pytest.approx([0.12, 0.11, 0.12, 0.11])
+    assert panel["msa_rent_burden"].tolist() == pytest.approx([0.31, 0.30, 0.31, 0.30])
     assert panel["msa_unemployment"].tolist() == pytest.approx([0.05, 0.04, 0.05, 0.04])
     assert panel["coc_population"].tolist() == [1000, 1010, 500, 505]
     assert panel["pit_total"].tolist() == [42, 45, 7, 9]

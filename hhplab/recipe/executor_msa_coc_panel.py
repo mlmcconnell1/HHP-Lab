@@ -42,9 +42,7 @@ def build_msa_coc_containment_spec(
     selector_ids: list[str] | None = None,
 ) -> ContainmentSpec:
     """Translate ``MsaCocPanelSpec`` into the containment builder contract."""
-    county_vintage = _county_vintage_from_msa_definition_version(
-        panel_spec.msa_definition_version
-    )
+    county_vintage = _county_vintage_from_msa_definition_version(panel_spec.msa_definition_version)
     return ContainmentSpec(
         container=GeometryRef(
             type="msa",
@@ -238,10 +236,30 @@ def _msa_covariates_for_year(
 
     result = acs5[["msa_id", "year"]].copy()
     result["msa_median_rent"] = _first_available(acs5, ["msa_median_rent", "median_gross_rent"])
-    result["msa_vacancy_rate"] = _first_available(acs5, ["msa_vacancy_rate", "vacancy_rate"])
-    result["msa_poverty_rate"] = _first_available(acs5, ["msa_poverty_rate", "poverty_rate"])
+    result["msa_vacancy_rate"] = _first_available(
+        acs5,
+        ["msa_vacancy_rate", "vacancy_rate"],
+        fallback=_rate_from_columns(
+            acs5,
+            numerator="vacant_housing_units",
+            denominator="total_housing_units",
+        ),
+    )
+    result["msa_poverty_rate"] = _first_available(
+        acs5,
+        ["msa_poverty_rate", "poverty_rate"],
+        fallback=_rate_from_columns(
+            acs5,
+            numerator="population_below_poverty",
+            denominator="poverty_universe",
+        ),
+    )
     result["msa_income"] = _first_available(acs5, ["msa_income", "median_household_income"])
-    result["msa_rent_burden"] = _first_available(acs5, ["msa_rent_burden", "rent_burden_30_plus"])
+    result["msa_rent_burden"] = _first_available(
+        acs5,
+        ["msa_rent_burden", "rent_burden_30_plus"],
+        fallback=_rate_from_rent_burden_columns(acs5),
+    )
     population_column = _population_column(population, panel_spec.msa_population_source)
     population_values = population[["msa_id", "year", population_column]].rename(
         columns={population_column: "msa_population"}
@@ -365,11 +383,53 @@ def _population_column(frame: pd.DataFrame, source_token: str) -> str:
     )
 
 
-def _first_available(frame: pd.DataFrame, candidates: list[str]) -> pd.Series:
+def _first_available(
+    frame: pd.DataFrame,
+    candidates: list[str],
+    *,
+    fallback: pd.Series | None = None,
+) -> pd.Series:
     for column in candidates:
         if column in frame.columns:
-            return pd.to_numeric(frame[column], errors="coerce").astype("Float64")
+            values = pd.to_numeric(frame[column], errors="coerce").astype("Float64")
+            if fallback is not None:
+                values = values.fillna(fallback)
+            return values
+    if fallback is not None:
+        return fallback
     return pd.Series(pd.NA, index=frame.index, dtype="Float64")
+
+
+def _rate_from_columns(
+    frame: pd.DataFrame,
+    *,
+    numerator: str,
+    denominator: str,
+) -> pd.Series:
+    if numerator not in frame.columns or denominator not in frame.columns:
+        return pd.Series(pd.NA, index=frame.index, dtype="Float64")
+    num = pd.to_numeric(frame[numerator], errors="coerce")
+    den = pd.to_numeric(frame[denominator], errors="coerce")
+    return (num / den.where(den > 0)).astype("Float64")
+
+
+def _rate_from_rent_burden_columns(frame: pd.DataFrame) -> pd.Series:
+    numerator_columns = [
+        "gross_rent_pct_income_30_to_34_9",
+        "gross_rent_pct_income_35_to_39_9",
+        "gross_rent_pct_income_40_to_49_9",
+        "gross_rent_pct_income_50_plus",
+    ]
+    denominator = "gross_rent_pct_income_total"
+    if denominator not in frame.columns or not all(
+        column in frame.columns for column in numerator_columns
+    ):
+        return pd.Series(pd.NA, index=frame.index, dtype="Float64")
+    numerator = sum(
+        pd.to_numeric(frame[column], errors="coerce").fillna(0) for column in numerator_columns
+    )
+    den = pd.to_numeric(frame[denominator], errors="coerce")
+    return (numerator / den.where(den > 0)).astype("Float64")
 
 
 def _source_token(provider: str, product: str) -> str:

@@ -182,7 +182,7 @@ class TestFetchStateTractPopulation:
 
     def test_api_vars_for_early_vintages_omit_known_unsupported_variables(self):
         """Early ACS5 endpoints skip variables that produce Census HTTP 400s."""
-        unsupported_2010 = {
+        unsupported_2009_2010 = {
             "B01003_001M",
             "B23025_003E",
             "B23025_005E",
@@ -197,14 +197,13 @@ class TestFetchStateTractPopulation:
             "B25063_027E",
         }
 
-        assert unsupported_2010.isdisjoint(api_vars_for_year(2010))
+        for year in [2009, 2010]:
+            assert unsupported_2009_2010.isdisjoint(api_vars_for_year(year))
         for year in [2011, 2012, 2013, 2014]:
             assert unsupported_2011_to_2014.isdisjoint(api_vars_for_year(year))
             assert {"B23025_003E", "B23025_005E"}.issubset(api_vars_for_year(year))
 
-        assert {"B25063_025E", "B25063_026E", "B25063_027E"}.issubset(
-            api_vars_for_year(2015)
-        )
+        assert {"B25063_025E", "B25063_026E", "B25063_027E"}.issubset(api_vars_for_year(2015))
 
     def test_uses_census_api_key_from_environment(self, httpx_mock, monkeypatch):
         """ACS5 tract requests pass through CENSUS_API_KEY when it is configured."""
@@ -812,7 +811,10 @@ class TestIngestTractPopulation:
 
     @pytest.mark.httpx_mock(can_send_already_matched_responses=True)
     def test_refreshes_stale_translated_cache_without_force(
-        self, httpx_mock, tmp_path, monkeypatch,
+        self,
+        httpx_mock,
+        tmp_path,
+        monkeypatch,
     ):
         """Translated-target caches without translation provenance must be rebuilt."""
         cached_path = tmp_path / "acs5_tracts__A2019xT2020.parquet"

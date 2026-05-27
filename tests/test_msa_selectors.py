@@ -41,6 +41,12 @@ PEP_ROWS: tuple[dict[str, object], ...] = (
     {"county_fips": "04001", "year": 2024, "population": 400},
     {"county_fips": "01001", "year": 2023, "population": 9000},
 )
+PEP_MSA_ROWS: tuple[dict[str, object], ...] = (
+    {"msa_id": "11111", "year": 2024, "population": 100},
+    {"msa_id": "22222", "year": 2024, "population": 400},
+    {"msa_id": "44444", "year": 2024, "population": 400},
+    {"msa_id": "11111", "year": 2023, "population": 9000},
+)
 ACS5_TRACT_ROWS: tuple[dict[str, object], ...] = (
     {"tract_geoid": "01001000100", "year": 2024, "total_population": 110},
     {"tract_geoid": "01003000100", "year": 2024, "total_population": 220},
@@ -76,6 +82,10 @@ def _pep() -> pd.DataFrame:
     return pd.DataFrame(PEP_ROWS)
 
 
+def _pep_msa() -> pd.DataFrame:
+    return pd.DataFrame(PEP_MSA_ROWS)
+
+
 def _acs5_tracts() -> pd.DataFrame:
     return pd.DataFrame(ACS5_TRACT_ROWS)
 
@@ -88,10 +98,11 @@ def _acs5_counties() -> pd.DataFrame:
     "ranking_source,population_df,population_column,expected_ranking",
     [
         ("pep", _pep(), "population", EXPECTED_PEP_RANKING),
+        ("pep", _pep_msa(), "population", EXPECTED_PEP_RANKING),
         ("acs5", _acs5_counties(), "total_population", EXPECTED_ACS5_RANKING),
         ("acs5", _acs5_tracts(), "total_population", EXPECTED_ACS5_RANKING),
     ],
-    ids=["pep-county", "acs5-county", "acs5-tract"],
+    ids=["pep-county", "pep-msa", "acs5-county", "acs5-tract"],
 )
 def test_top_msa_selector_rolls_population_to_msa(
     ranking_source: str,

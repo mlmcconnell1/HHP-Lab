@@ -2,6 +2,7 @@
 
 import hashlib
 import logging
+import re
 import tempfile
 import zipfile
 from datetime import UTC, datetime
@@ -81,6 +82,8 @@ STATE_FIPS_CODES = [
     "78",  # U.S. Virgin Islands
 ]
 
+TIGER_2000_TRACT_INDEX_URL = f"{TIGER_BASE.format(year=2010, layer='TRACT')}2000/"
+
 
 def _tract_zip_name(year: int, state_fips: str) -> str:
     """Return the Census ZIP filename for one state's tract shapefile."""
@@ -96,12 +99,29 @@ def _tract_url(year: int, state_fips: str) -> str:
     return f"{TIGER_BASE.format(year=year, layer='TRACT')}{zip_name}"
 
 
+def _tract_2000_zip_name(state_fips: str) -> str:
+    """Return the Census ZIP filename for one state's 2000 tract shapefile."""
+    return f"tl_2010_{state_fips}_tract00.zip"
+
+
+def _tract_2000_url(state_fips: str) -> str:
+    """Return the Census download URL for one state's 2000 tract shapefile."""
+    return f"{TIGER_2000_TRACT_INDEX_URL}{_tract_2000_zip_name(state_fips)}"
+
+
 def _resolve_geoid_column(gdf: gpd.GeoDataFrame) -> str:
     """Return the tract GEOID column across modern and 2010 schema variants."""
-    for column in ["GEOID", "GEOID10", "GEOID20"]:
+    for column in ["GEOID", "GEOID10", "GEOID20", "CTIDFP00"]:
         if column in gdf.columns:
             return column
     raise ValueError(f"Could not find GEOID column. Available: {list(gdf.columns)}")
+
+
+def _list_tract_2000_state_fips(client: httpx.Client) -> list[str]:
+    """List state FIPS codes available in the Census 2000 tract directory."""
+    response = client.get(TIGER_2000_TRACT_INDEX_URL, follow_redirects=True)
+    response.raise_for_status()
+    return sorted(set(re.findall(r"tl_2010_(\d{2})_tract00\.zip", response.text)))
 
 
 def _download_state_tracts(
@@ -131,6 +151,40 @@ def _download_state_tracts(
     zip_path.write_bytes(raw_content)
 
     # Extract and read
+    extract_dir = tmpdir / state_fips
+    extract_dir.mkdir(exist_ok=True)
+
+    with zipfile.ZipFile(zip_path, "r") as zf:
+        zf.extractall(extract_dir)
+
+    shp_files = list(extract_dir.glob("*.shp"))
+    if not shp_files:
+        return None, None
+
+    return gpd.read_file(shp_files[0]), raw_content
+
+
+def _download_state_tracts_2000(
+    client: httpx.Client,
+    state_fips: str,
+    tmpdir: Path,
+) -> tuple[gpd.GeoDataFrame | None, bytes | None]:
+    """Download Census 2000 tract data for a single state."""
+    zip_name = _tract_2000_zip_name(state_fips)
+    url = _tract_2000_url(state_fips)
+    zip_path = tmpdir / zip_name
+
+    try:
+        response = client.get(url, follow_redirects=True)
+        response.raise_for_status()
+    except httpx.HTTPStatusError as e:
+        if e.response.status_code == 404:
+            return None, None
+        raise
+
+    raw_content = response.content
+    zip_path.write_bytes(raw_content)
+
     extract_dir = tmpdir / state_fips
     extract_dir.mkdir(exist_ok=True)
 
@@ -180,6 +234,39 @@ def download_tiger_tracts(
         tmppath = Path(tmpdir)
 
         with httpx.Client(timeout=300.0) as client:
+            if year == 2000:
+                state_fips_codes = _list_tract_2000_state_fips(client)
+                if show_progress:
+                    states_2000 = click.progressbar(
+                        state_fips_codes,
+                        label="Downloading state tracts",
+                        show_pos=True,
+                    )
+                else:
+                    states_2000 = state_fips_codes
+
+                with states_2000 if show_progress else nullcontext(states_2000) as state_iter:
+                    for state_fips in state_iter:
+                        gdf, raw_content = _download_state_tracts_2000(
+                            client,
+                            state_fips,
+                            tmppath,
+                        )
+                        if gdf is not None and raw_content is not None:
+                            gdfs.append(gdf)
+                            all_content.append(raw_content)
+                            total_size += len(raw_content)
+
+                            raw_path, _, _ = persist_file_snapshot(
+                                raw_content,
+                                "tiger",
+                                _tract_2000_zip_name(state_fips),
+                                subdirs=(str(year), "tracts"),
+                                raw_root=raw_root,
+                            )
+                            raw_paths.append(raw_path)
+                return _finalize_tract_download(year, gdfs, all_content, total_size, raw_paths)
+
             if show_progress:
                 states = click.progressbar(
                     STATE_FIPS_CODES,
@@ -207,6 +294,17 @@ def download_tiger_tracts(
                         )
                         raw_paths.append(raw_path)
 
+    return _finalize_tract_download(year, gdfs, all_content, total_size, raw_paths)
+
+
+def _finalize_tract_download(
+    year: int,
+    gdfs: list[gpd.GeoDataFrame],
+    all_content: list[bytes],
+    total_size: int,
+    raw_paths: list[Path],
+) -> tuple[gpd.GeoDataFrame, str, int, list[Path]]:
+    """Combine downloaded tract files and normalize the curated schema."""
     if not gdfs:
         raise ValueError(f"No tract data found for year {year}")
 
@@ -295,10 +393,14 @@ def ingest_tiger_tracts(
         Path to saved parquet file
     """
     # Build source URL (base URL for this year's tract data)
-    source_url = TIGER_BASE.format(year=year, layer="TRACT")
+    source_url = (
+        TIGER_2000_TRACT_INDEX_URL if year == 2000 else TIGER_BASE.format(year=year, layer="TRACT")
+    )
 
     gdf, combined_sha256, total_size, raw_paths = download_tiger_tracts(
-        year, show_progress=show_progress, raw_root=raw_root,
+        year,
+        show_progress=show_progress,
+        raw_root=raw_root,
     )
     output_path = save_tracts(gdf, year)
 
@@ -335,7 +437,7 @@ def ingest_tiger_tracts(
             "vintage": str(year),
             "data_source": "US Census Bureau",
             "tract_count": len(gdf),
-            "states_downloaded": len(STATE_FIPS_CODES),
+            "files_downloaded": len(raw_paths),
             "curated_path": str(output_path),
         },
     )

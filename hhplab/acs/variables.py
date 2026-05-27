@@ -216,8 +216,9 @@ UNAVAILABLE_API_VARS_BY_YEAR: dict[int, set[str]] = {
         "B25063_026E",
         "B25063_027E",
     }
-    for year in range(2010, 2015)
+    for year in range(2009, 2015)
 }
+UNAVAILABLE_API_VARS_BY_YEAR[2009].update({"B23025_003E", "B23025_005E"})
 UNAVAILABLE_API_VARS_BY_YEAR[2010].update({"B23025_003E", "B23025_005E"})
 
 
@@ -232,6 +233,7 @@ def tables_for_api_vars(api_vars: list[str]) -> list[str]:
     table_order = {table: index for index, table in enumerate(ACS_TABLES)}
     tables = {var.split("_", maxsplit=1)[0] for var in api_vars}
     return sorted(tables, key=lambda table: table_order.get(table, len(table_order)))
+
 
 # Tables included (for provenance tracking)
 ACS_TABLES: list[str] = [
@@ -282,30 +284,18 @@ ACS5_SAE_SUPPORT_COLUMNS_BY_TABLE: dict[str, list[str]] = {
     "B25003": ["total_households", "owner_households", "renter_households"],
     "B23025": ["civilian_labor_force", "unemployed_count"],
     "B19001": [
-        column
-        for column in ACS5_SAE_COUNT_COLUMNS
-        if column.startswith("household_income_")
+        column for column in ACS5_SAE_COUNT_COLUMNS if column.startswith("household_income_")
     ],
     "B25063": [
-        column
-        for column in ACS5_SAE_COUNT_COLUMNS
-        if column.startswith("gross_rent_distribution_")
+        column for column in ACS5_SAE_COUNT_COLUMNS if column.startswith("gross_rent_distribution_")
     ],
     "B25070": [
-        column
-        for column in ACS5_SAE_COUNT_COLUMNS
-        if column.startswith("gross_rent_pct_income_")
+        column for column in ACS5_SAE_COUNT_COLUMNS if column.startswith("gross_rent_pct_income_")
     ],
     "B25091": [
-        column
-        for column in ACS5_SAE_COUNT_COLUMNS
-        if column.startswith("owner_costs_pct_income_")
+        column for column in ACS5_SAE_COUNT_COLUMNS if column.startswith("owner_costs_pct_income_")
     ],
-    "B25118": [
-        column
-        for column in ACS5_SAE_COUNT_COLUMNS
-        if column.startswith("tenure_income_")
-    ],
+    "B25118": [column for column in ACS5_SAE_COUNT_COLUMNS if column.startswith("tenure_income_")],
 }
 
 ACS5_SAE_SUPPORT_TABLES: list[str] = list(ACS5_SAE_SUPPORT_COLUMNS_BY_TABLE)

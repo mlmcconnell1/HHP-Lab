@@ -73,10 +73,10 @@ def select_top_msa_ids_by_population(
 ) -> TopMsaSelection:
     """Resolve top-N Census MSA selector IDs from source population rows.
 
-    ``ranking_source='pep'`` expects county-level rows with ``county_fips``,
-    ``year``, and a population column. ``ranking_source='acs5'`` accepts
-    tract-level rows with ``tract_geoid`` or ``GEOID``, county-level rows with
-    ``county_fips``, or MSA-level rows with ``msa_id``.
+    Both ranking sources accept MSA-level rows with ``msa_id`` when a recipe
+    has already resampled population to MSA geography. County-level rows with
+    ``county_fips`` are rolled up through the membership table. ``acs5`` also
+    accepts tract-level rows with ``tract_geoid`` or ``GEOID``.
     """
     if top_n < 1:
         raise ValueError("top_n must be at least 1.")
@@ -92,12 +92,18 @@ def select_top_msa_ids_by_population(
         )
 
     if ranking_source == "pep":
-        msa_population = _roll_county_population_to_msa(
-            yearly,
-            membership,
-            population_column=population_column,
-            source_label="PEP",
-        )
+        if "msa_id" in yearly.columns:
+            msa_population = _roll_msa_population(
+                yearly,
+                population_column=population_column,
+            )
+        else:
+            msa_population = _roll_county_population_to_msa(
+                yearly,
+                membership,
+                population_column=population_column,
+                source_label="PEP",
+            )
     else:
         msa_population = _roll_acs5_population_to_msa(
             yearly,
@@ -201,6 +207,21 @@ def _roll_county_population_to_msa(
     return pd.DataFrame(rows)
 
 
+def _roll_msa_population(
+    yearly: pd.DataFrame,
+    *,
+    population_column: str,
+) -> pd.DataFrame:
+    msa_pop = yearly[["msa_id", population_column]].copy()
+    msa_pop["msa_id"] = msa_pop["msa_id"].astype(str).str.zfill(5)
+    msa_pop[population_column] = pd.to_numeric(msa_pop[population_column], errors="coerce")
+    return (
+        msa_pop.groupby("msa_id", as_index=False)[population_column]
+        .sum(min_count=1)
+        .rename(columns={population_column: "population"})
+    )
+
+
 def _roll_acs5_population_to_msa(
     yearly: pd.DataFrame,
     membership: pd.DataFrame,
@@ -208,14 +229,7 @@ def _roll_acs5_population_to_msa(
     population_column: str,
 ) -> pd.DataFrame:
     if "msa_id" in yearly.columns:
-        msa_pop = yearly[["msa_id", population_column]].copy()
-        msa_pop["msa_id"] = msa_pop["msa_id"].astype(str).str.zfill(5)
-        msa_pop[population_column] = pd.to_numeric(msa_pop[population_column], errors="coerce")
-        return (
-            msa_pop.groupby("msa_id", as_index=False)[population_column]
-            .sum(min_count=1)
-            .rename(columns={population_column: "population"})
-        )
+        return _roll_msa_population(yearly, population_column=population_column)
 
     if "county_fips" in yearly.columns:
         return _roll_county_population_to_msa(

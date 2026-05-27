@@ -75,7 +75,17 @@ datasets:
       align: point_in_time_jan
     path: data/curated/pit/pit_vintage__P2024.parquet
 
-  pep_county:
+  pep_county_coc:
+    provider: census
+    product: pep
+    version: 1
+    native_geometry: { type: county, vintage: 2020 }
+    years: "2010-2019"
+    year_column: year
+    geo_column: county_fips
+    path: data/curated/pep/pep_county__v2020.parquet
+
+  pep_county_msa:
     provider: census
     product: pep
     version: 1
@@ -172,7 +182,7 @@ pipelines:
           measures: [pit_total, pit_sheltered, pit_unsheltered]
 
       - resample:
-          dataset: pep_county
+          dataset: pep_county_coc
           to_geometry: { type: coc, vintage: 2025, source: hud_exchange }
           method: aggregate
           via: county_to_coc_population
@@ -180,7 +190,7 @@ pipelines:
           aggregation: sum
 
       - resample:
-          dataset: pep_county
+          dataset: pep_county_msa
           to_geometry: { type: msa, source: census_msa_2023 }
           method: aggregate
           via: county_to_msa
@@ -216,7 +226,7 @@ pipelines:
       #     measures: [labor_force, employed, unemployed, unemployment_rate]
 
       - join:
-          datasets: [pit, pep_county]
+          datasets: [pit, pep_county_coc]
           join_on: [geo_id, year]
 
 validation:
