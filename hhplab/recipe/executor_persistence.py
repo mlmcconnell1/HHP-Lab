@@ -43,6 +43,10 @@ from hhplab.recipe.executor_manifest import (
     _resolve_panel_output_file,
     _resolve_pipeline_target,
 )
+from hhplab.recipe.executor_msa_coc_panel import (
+    assemble_msa_coc_panel,
+    build_msa_coc_containment_spec,
+)
 from hhplab.recipe.executor_panel import assemble_panel
 from hhplab.recipe.executor_panel_policies import collect_conformance_flags
 from hhplab.recipe.manifest import AssetRecord, write_manifest
@@ -61,6 +65,18 @@ def persist_outputs(
     single DataFrame, writes it to the canonical panel path, and
     attaches provenance metadata.
     """
+    try:
+        _pipeline, target = _resolve_pipeline_target(ctx.recipe, plan.pipeline_id)
+    except ExecutorError as exc:
+        return StepResult(
+            step_kind="persist",
+            detail="persist outputs",
+            success=False,
+            error=str(exc),
+        )
+    if target.msa_coc_panel is not None:
+        return persist_msa_coc_panel(plan, ctx)
+
     assembled = assemble_panel(plan, ctx, step_kind="persist")
     if isinstance(assembled, StepResult):
         return assembled
@@ -217,6 +233,90 @@ def persist_outputs(
     write_manifest(manifest, manifest_file)
 
     detail = f"persist panel: {len(frames)} year(s), {len(panel)} rows → {output_rel}"
+    _echo(ctx, f"  [persist] {detail}")
+    return StepResult(step_kind="persist", detail=detail, success=True)
+
+
+def persist_msa_coc_panel(
+    plan: ExecutionPlan,
+    ctx: ExecutionContext,
+) -> StepResult:
+    """Build and persist an MSA-CoC containment panel parquet output."""
+    try:
+        _pipeline, target = _resolve_pipeline_target(ctx.recipe, plan.pipeline_id)
+        if target.msa_coc_panel is None:
+            raise ExecutorError(f"Target '{target.id}' does not declare msa_coc_panel.")
+        containment_spec = build_msa_coc_containment_spec(target.msa_coc_panel)
+        coc_gdf, county_gdf, msa_county_membership = _load_containment_inputs(
+            containment_spec,
+            ctx,
+        )
+        if msa_county_membership is None:
+            raise ExecutorError("MSA-CoC panel requires MSA county membership.")
+        assembled = assemble_msa_coc_panel(
+            plan,
+            ctx,
+            target=target,
+            coc_gdf=coc_gdf,
+            county_gdf=county_gdf,
+            msa_county_membership=msa_county_membership,
+        )
+        output_file = _resolve_panel_output_file(
+            ctx.recipe,
+            plan.pipeline_id,
+            ctx.project_root,
+            storage_config=ctx.storage_config,
+        )
+    except (ExecutorError, FileNotFoundError, ValueError) as exc:
+        return StepResult(
+            step_kind="persist",
+            detail="persist msa-coc panel",
+            success=False,
+            error=str(exc),
+        )
+
+    output_file.parent.mkdir(parents=True, exist_ok=True)
+    if output_file.exists() and output_file in getattr(ctx, "_written_outputs", set()):
+        return StepResult(
+            step_kind="persist",
+            detail="persist msa-coc panel",
+            success=False,
+            error=(
+                f"Output collision: pipeline '{plan.pipeline_id}' resolves to "
+                f"'{output_file}' which was already written by another pipeline "
+                "in this recipe."
+            ),
+        )
+
+    try:
+        output_rel = str(output_file.relative_to(ctx.project_root))
+    except ValueError:
+        output_rel = str(output_file)
+
+    provenance = _build_provenance(ctx.recipe, plan.pipeline_id, ctx)
+    provenance["target_geometry"] = target.geometry.model_dump(mode="json")
+    provenance.update(assembled.provenance)
+
+    table = pa.Table.from_pandas(assembled.panel)
+    metadata = table.schema.metadata or {}
+    metadata[b"hhplab_provenance"] = json.dumps(provenance).encode()
+    table = table.replace_schema_metadata(metadata)
+    pq.write_table(table, output_file)
+
+    if not hasattr(ctx, "_written_outputs"):
+        ctx._written_outputs = set()  # type: ignore[attr-defined]
+    ctx._written_outputs.add(output_file)  # type: ignore[attr-defined]
+
+    manifest = _build_manifest(
+        ctx.recipe,
+        plan.pipeline_id,
+        ctx,
+        output_path=output_rel,
+    )
+    manifest_file = output_file.with_suffix(".manifest.json")
+    write_manifest(manifest, manifest_file)
+
+    detail = f"persist msa-coc panel: {len(assembled.panel)} rows -> {output_rel}"
     _echo(ctx, f"  [persist] {detail}")
     return StepResult(step_kind="persist", detail=detail, success=True)
 

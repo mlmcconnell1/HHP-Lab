@@ -97,8 +97,9 @@ def test_top_msa_selector_rolls_population_to_msa(
 
     assert isinstance(selection, TopMsaSelection)
     assert selection.selector_ids == ("22222", "44444")
-    assert tuple(selection.ranking[["msa_id", "population"]].itertuples(index=False, name=None)) == (
-        expected_ranking
+    assert (
+        tuple(selection.ranking[["msa_id", "population"]].itertuples(index=False, name=None))
+        == expected_ranking
     )
 
 

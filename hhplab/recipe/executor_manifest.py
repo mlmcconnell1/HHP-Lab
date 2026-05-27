@@ -14,7 +14,12 @@ import re
 from pathlib import Path
 
 from hhplab.config import StorageConfig, load_config
-from hhplab.naming import containment_filename, geo_map_filename, geo_panel_filename
+from hhplab.naming import (
+    containment_filename,
+    geo_map_filename,
+    geo_panel_filename,
+    msa_coc_panel_filename,
+)
 from hhplab.recipe.executor_core import (
     ExecutionContext,
     ExecutorError,
@@ -196,6 +201,15 @@ def _resolve_panel_output_file(
 
     cfg = storage_config or load_config(project_root=project_root)
     recipe_dir = _recipe_output_dirname(recipe.name)
+    if target.msa_coc_panel is not None:
+        filename = msa_coc_panel_filename(
+            start_year,
+            end_year,
+            target.msa_coc_panel.coc_boundary_vintage,
+            target.msa_coc_panel.msa_definition_version,
+        )
+        return cfg.output_root / recipe_dir / filename
+
     filename = geo_panel_filename(
         start_year,
         end_year,

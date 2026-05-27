@@ -1030,6 +1030,20 @@ def msa_panel_filename(
     return f"panel__msa__Y{start_year}-{end_year}@M{defn}.parquet"
 
 
+def msa_coc_panel_filename(
+    start_year: int,
+    end_year: int,
+    coc_boundary_vintage: str | int,
+    msa_definition_version: str,
+) -> str:
+    """Generate filename for MSA-to-CoC containment panels.
+
+    Pattern: ``panel__msa-coc__Y{start}-{end}@B{boundary}xM{def}.parquet``
+    """
+    defn = _normalize_definition_version(msa_definition_version)
+    return f"panel__msa-coc__Y{start_year}-{end_year}@B{coc_boundary_vintage}xM{defn}.parquet"
+
+
 def metro_pit_filename(
     pit_year: str | int,
     definition_version: str,

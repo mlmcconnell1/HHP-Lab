@@ -1002,7 +1002,8 @@ def _execute_plan(
         )
     declared_outputs = target.outputs if target is not None else ["panel"]
 
-    if plan.join_tasks:
+    has_msa_coc_panel = target is not None and target.msa_coc_panel is not None
+    if plan.join_tasks or has_msa_coc_panel:
         if "panel" in declared_outputs:
             step = _persist_outputs(plan, ctx)
             result.steps.append(step)

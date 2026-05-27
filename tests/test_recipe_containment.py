@@ -33,6 +33,7 @@ from hhplab.recipe.executor_manifest import resolve_pipeline_artifacts
 from hhplab.recipe.loader import load_recipe
 from hhplab.recipe.manifest import read_manifest
 from hhplab.recipe.recipe_schema import ContainmentSpec
+from hhplab.schema.columns import MSA_COC_PANEL_COLUMNS
 
 CRS = ALBERS_EQUAL_AREA_CRS
 COUNTY_FIXTURES = {
@@ -606,6 +607,181 @@ def test_execute_recipe_containment_filter_keeps_selected_panel_candidates(tmp_p
     target_selector = provenance["target_selector"]
     assert target_selector["selector_ids"] == ["COC-A", "COC-B"]
     assert target_selector["selected_count"] == 2
+
+
+def test_execute_recipe_persists_msa_coc_panel_output(tmp_path) -> None:
+    definition_version = "test_msa_2023_v1"
+    coc_file = coc_base_path("2025", tmp_path / "data")
+    county_file = county_path("2023", tmp_path / "data")
+    membership_file = msa_county_membership_path(definition_version, tmp_path / "data")
+    pit_file = tmp_path / "data" / "pit.parquet"
+    coc_population_file = tmp_path / "data" / "coc_population.parquet"
+    msa_acs_file = tmp_path / "data" / "msa_acs.parquet"
+    coc_file.parent.mkdir(parents=True, exist_ok=True)
+    county_file.parent.mkdir(parents=True, exist_ok=True)
+    membership_file.parent.mkdir(parents=True, exist_ok=True)
+    _coc_gdf().to_parquet(coc_file)
+    _county_gdf().to_parquet(county_file)
+    MSA_MEMBERSHIP.to_parquet(membership_file)
+    pd.DataFrame(
+        {
+            "coc_id": ["COC-A", "COC-B"],
+            "year": [2020, 2020],
+            "pit_total": [42, 7],
+            "pit_sheltered": [40, 5],
+            "pit_unsheltered": [2, 2],
+        }
+    ).to_parquet(pit_file)
+    pd.DataFrame(
+        {
+            "coc_id": ["COC-A", "COC-B"],
+            "year": [2020, 2020],
+            "population": [1000, 500],
+        }
+    ).to_parquet(coc_population_file)
+    pd.DataFrame(
+        {
+            "msa_id": ["MSA-1"],
+            "year": [2020],
+            "total_population": [10_000],
+            "median_gross_rent": [1500.0],
+            "vacancy_rate": [0.05],
+            "poverty_rate": [0.12],
+            "median_household_income": [80_000.0],
+            "rent_burden_30_plus": [0.31],
+            "civilian_labor_force": [5000.0],
+            "unemployed_count": [250.0],
+        }
+    ).to_parquet(msa_acs_file)
+
+    recipe = load_recipe(
+        {
+            "version": 1,
+            "name": "msa-coc-panel-executor-test",
+            "universe": {"years": [2020]},
+            "targets": [
+                {
+                    "id": "msa_coc_panel",
+                    "geometry": {"type": "coc", "vintage": 2025},
+                    "outputs": ["panel"],
+                    "msa_coc_panel": {
+                        "top_n": 1,
+                        "ranking_population_source": "acs5",
+                        "ranking_reference_year": 2020,
+                        "containment_min_share": 0.5,
+                        "containment_denominator": "candidate_area",
+                        "coc_boundary_vintage": 2025,
+                        "msa_definition_version": definition_version,
+                        "msa_population_source": "acs5",
+                        "unemployment_source": "acs5",
+                        "output_aliases": {"msa_population": "msa_population_acs5_alias"},
+                    },
+                }
+            ],
+            "datasets": {
+                "pit": {
+                    "provider": "hud",
+                    "product": "pit",
+                    "version": 1,
+                    "native_geometry": {"type": "coc"},
+                    "path": "data/pit.parquet",
+                    "years": {"years": [2020]},
+                    "geo_column": "coc_id",
+                },
+                "coc_population": {
+                    "provider": "census",
+                    "product": "pep",
+                    "version": 1,
+                    "native_geometry": {"type": "coc"},
+                    "path": "data/coc_population.parquet",
+                    "years": {"years": [2020]},
+                    "geo_column": "coc_id",
+                },
+                "msa_acs": {
+                    "provider": "census",
+                    "product": "acs5",
+                    "version": 1,
+                    "native_geometry": {"type": "msa"},
+                    "path": "data/msa_acs.parquet",
+                    "years": {"years": [2020]},
+                    "geo_column": "msa_id",
+                },
+            },
+            "transforms": [],
+            "pipelines": [
+                {
+                    "id": "main",
+                    "target": "msa_coc_panel",
+                    "steps": [
+                        {
+                            "resample": {
+                                "dataset": "pit",
+                                "to_geometry": {"type": "coc", "vintage": 2025},
+                                "method": "identity",
+                                "measures": ["pit_total", "pit_sheltered", "pit_unsheltered"],
+                            }
+                        },
+                        {
+                            "resample": {
+                                "dataset": "coc_population",
+                                "to_geometry": {"type": "coc", "vintage": 2025},
+                                "method": "identity",
+                                "measures": ["population"],
+                            }
+                        },
+                        {
+                            "resample": {
+                                "dataset": "msa_acs",
+                                "to_geometry": {"type": "msa", "source": definition_version},
+                                "method": "identity",
+                                "measures": [
+                                    "total_population",
+                                    "median_gross_rent",
+                                    "vacancy_rate",
+                                    "poverty_rate",
+                                    "median_household_income",
+                                    "rent_burden_30_plus",
+                                    "civilian_labor_force",
+                                    "unemployed_count",
+                                ],
+                            }
+                        },
+                        {
+                            "join": {
+                                "datasets": ["pit", "coc_population"],
+                                "join_on": ["geo_id", "year"],
+                            }
+                        },
+                    ],
+                }
+            ],
+        }
+    )
+
+    results = execute_recipe(recipe, project_root=tmp_path, quiet=True)
+
+    assert results[0].success
+    assert results[0].steps[-1].step_kind == "persist"
+    artifacts = resolve_pipeline_artifacts(recipe, "main", project_root=tmp_path)
+    panel_path = tmp_path / artifacts["panel_path"]
+    assert panel_path.name == "panel__msa-coc__Y2020-2020@B2025xMtestmsa2023v1.parquet"
+    panel = pd.read_parquet(panel_path)
+    assert list(panel.columns[: len(MSA_COC_PANEL_COLUMNS)]) == MSA_COC_PANEL_COLUMNS
+    assert panel[["msa_id", "coc_id", "year"]].to_dict(orient="records") == [
+        {"msa_id": "MSA-1", "coc_id": "COC-A", "year": 2020},
+        {"msa_id": "MSA-1", "coc_id": "COC-B", "year": 2020},
+    ]
+    assert panel["msa_population"].tolist() == [10_000, 10_000]
+    assert panel["msa_population_acs5_alias"].tolist() == [10_000, 10_000]
+    assert panel["msa_unemployment"].tolist() == pytest.approx([0.05, 0.05])
+    assert panel["coc_population"].tolist() == [1000, 500]
+    assert panel["pit_total"].tolist() == [42, 7]
+
+    metadata = pq.read_metadata(panel_path).metadata or {}
+    provenance = json.loads(metadata[b"hhplab_provenance"])
+    assert provenance["msa_coc_panel"]["selected_msa_ids"] == ["MSA-1"]
+    assert provenance["msa_coc_panel"]["msa_population_source"] == "acs5"
+    assert provenance["msa_coc_panel"]["unemployment_source"] == "acs5"
 
 
 def test_execute_recipe_target_selector_filters_panel_rows(tmp_path) -> None:

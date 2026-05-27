@@ -606,7 +606,9 @@ class MsaCocPanelSpec(BaseModel):
     def _validate_output_aliases(cls, value: dict[str, str]) -> dict[str, str]:
         for source, alias in value.items():
             if not source.strip() or not alias.strip():
-                raise ValueError("MsaCocPanelSpec.output_aliases may not contain blank keys/values.")
+                raise ValueError(
+                    "MsaCocPanelSpec.output_aliases may not contain blank keys/values."
+                )
         return value
 
 

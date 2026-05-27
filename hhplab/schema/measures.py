@@ -150,7 +150,9 @@ ACS1_IMPUTATION_MEASURE_SPECS: tuple[ACS1ImputationMeasureSpec, ...] = (
 )
 
 ACS1_IMPUTATION_MEASURE_COLUMNS: list[str] = list(
-    dict.fromkeys(column for spec in ACS1_IMPUTATION_MEASURE_SPECS for column in spec.output_columns)
+    dict.fromkeys(
+        column for spec in ACS1_IMPUTATION_MEASURE_SPECS for column in spec.output_columns
+    )
 )
 
 ACS1_IMPUTATION_OUTPUT_COLUMNS: list[str] = [
