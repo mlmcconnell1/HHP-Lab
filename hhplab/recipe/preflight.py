@@ -45,6 +45,8 @@ from hhplab.recipe.adapters import (
     validate_recipe_adapters,
 )
 from hhplab.recipe.default_adapters import register_defaults
+from hhplab.recipe.executor_core import ExecutorError
+from hhplab.recipe.executor_msa_coc_panel import build_msa_coc_containment_spec
 from hhplab.recipe.planner import (
     ExecutionPlan,
     PlannerError,
@@ -583,6 +585,15 @@ def _dataset_remediation(ds_id: str, ds, *, years: list[int] | None = None) -> R
                 command=command,
             )
 
+    if provider == "bls" and product == "laus":
+        return Remediation(
+            hint=(
+                f"Ingest BLS LAUS annual-average metro data for dataset '{ds_id}' "
+                "for every requested panel year."
+            ),
+            command="hhplab ingest laus-metro --year <year>",
+        )
+
     return Remediation(
         hint=(f"Ingest {provider}/{product} data for dataset '{ds_id}'."),
         command=f"hhplab ingest {product}" if product else None,
@@ -979,6 +990,30 @@ def _check_containment_artifacts(
             specs.append(("containment_spec", target.containment_spec))
         if target.containment_filter is not None:
             specs.append(("containment_filter", target.containment_filter))
+        if target.msa_coc_panel is not None:
+            try:
+                specs.append(
+                    (
+                        "msa_coc_panel",
+                        build_msa_coc_containment_spec(target.msa_coc_panel),
+                    )
+                )
+            except (ExecutorError, ValueError) as exc:
+                findings.append(
+                    PreflightFinding(
+                        severity=Severity.ERROR,
+                        kind=FindingKind.MISSING_CONTAINMENT_ARTIFACT,
+                        message=f"MSA-CoC panel target '{target.id}' is invalid: {exc}",
+                        geometry="msa",
+                        remediation=Remediation(
+                            hint=(
+                                "Set msa_coc_panel.msa_definition_version to a version "
+                                "that includes the county geometry year, for example "
+                                "'census_msa_2023'."
+                            ),
+                        ),
+                    )
+                )
         if not specs:
             continue
 
@@ -2577,6 +2612,94 @@ def _check_ct_county_alignment(
     return findings
 
 
+def _check_msa_coc_panel_sources(
+    recipe: RecipeV1,
+    pipeline_resample_tasks: list[tuple[str, ResampleTask]],
+) -> list[PreflightFinding]:
+    """Check that MSA-CoC panel targets have the required source steps."""
+    findings: list[PreflightFinding] = []
+    tasks_by_pipeline: dict[str, list[ResampleTask]] = {}
+    for pipeline_id, task in pipeline_resample_tasks:
+        tasks_by_pipeline.setdefault(pipeline_id, []).append(task)
+
+    for pipeline in recipe.pipelines:
+        target = next((target for target in recipe.targets if target.id == pipeline.target), None)
+        if target is None or target.msa_coc_panel is None:
+            continue
+        panel_spec = target.msa_coc_panel
+        tasks = tasks_by_pipeline.get(pipeline.id, [])
+        source_geometries = {
+            (_preflight_source_token(recipe, task.dataset_id), task.to_geometry.type)
+            for task in tasks
+        }
+        dataset_ids_by_source = {
+            _preflight_source_token(recipe, task.dataset_id): task.dataset_id for task in tasks
+        }
+
+        required: list[tuple[str, str, str, str | None]] = [
+            ("acs5", "msa", "ACS5 MSA covariate source", None),
+            (
+                panel_spec.msa_population_source,
+                "msa",
+                f"{panel_spec.msa_population_source.upper()} MSA population source",
+                None,
+            ),
+            ("pit", "coc", "CoC PIT source", None),
+        ]
+        if panel_spec.unemployment_source == "laus":
+            required.append(
+                (
+                    "laus",
+                    "msa",
+                    "BLS LAUS MSA unemployment source",
+                    "hhplab ingest laus-metro --year <year>",
+                )
+            )
+        else:
+            required.append(("acs5", "msa", "ACS5 MSA unemployment source", None))
+
+        for source_token, geo_type, label, command in required:
+            if (source_token, geo_type) in source_geometries:
+                continue
+            findings.append(
+                PreflightFinding(
+                    severity=Severity.ERROR,
+                    kind=FindingKind.MISSING_DATASET,
+                    message=(
+                        f"MSA-CoC panel target '{target.id}' requires a recipe "
+                        f"resample step for {label} at {geo_type.upper()} geometry."
+                    ),
+                    pipeline_id=pipeline.id,
+                    dataset_id=dataset_ids_by_source.get(source_token),
+                    geometry=geo_type,
+                    remediation=Remediation(
+                        hint=(
+                            "Add a dataset and resample step that materializes this "
+                            "source for the MSA-CoC panel before persistence."
+                        ),
+                        command=command,
+                    ),
+                )
+            )
+
+    return findings
+
+
+def _preflight_source_token(recipe: RecipeV1, dataset_id: str) -> str:
+    ds = recipe.datasets.get(dataset_id)
+    if ds is None:
+        return dataset_id
+    if ds.provider == "census" and ds.product in {"acs", "acs5"}:
+        return "acs5"
+    if ds.provider == "census" and ds.product == "pep":
+        return "pep"
+    if ds.provider == "bls" and ds.product == "laus":
+        return "laus"
+    if ds.provider == "hud" and ds.product == "pit":
+        return "pit"
+    return ds.product
+
+
 # ---------------------------------------------------------------------------
 # Public entry point
 # ---------------------------------------------------------------------------
@@ -2722,6 +2845,12 @@ def run_preflight(
         _check_acs1_temporal_alignment_guidance(
             recipe,
             project_root,
+            pipeline_resample_tasks,
+        ),
+    )
+    report.findings.extend(
+        _check_msa_coc_panel_sources(
+            recipe,
             pipeline_resample_tasks,
         ),
     )

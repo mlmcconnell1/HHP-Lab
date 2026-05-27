@@ -648,6 +648,173 @@ def _setup_containment_artifacts(
         )
 
 
+def _msa_coc_panel_preflight_recipe(
+    *,
+    population_source: str = "acs5",
+    unemployment_source: str = "acs5",
+    include_pep: bool = False,
+    include_laus: bool = False,
+) -> dict:
+    datasets: dict[str, dict[str, object]] = {
+        "pit": {
+            "provider": "hud",
+            "product": "pit",
+            "version": 1,
+            "native_geometry": {"type": "coc"},
+            "path": "data/pit.parquet",
+            "years": {"years": [2020]},
+            "geo_column": "coc_id",
+        },
+        "msa_acs": {
+            "provider": "census",
+            "product": "acs5",
+            "version": 1,
+            "native_geometry": {"type": "msa", "source": "census_msa_2023"},
+            "path": "data/msa_acs.parquet",
+            "years": {"years": [2020]},
+            "geo_column": "msa_id",
+        },
+    }
+    steps: list[dict[str, object]] = [
+        {
+            "resample": {
+                "dataset": "pit",
+                "to_geometry": {"type": "coc", "vintage": 2025},
+                "method": "identity",
+                "measures": ["pit_total"],
+            }
+        },
+        {
+            "resample": {
+                "dataset": "msa_acs",
+                "to_geometry": {"type": "msa", "source": "census_msa_2023"},
+                "method": "identity",
+                "measures": [
+                    "total_population",
+                    "median_gross_rent",
+                    "vacancy_rate",
+                    "poverty_rate",
+                    "median_household_income",
+                    "rent_burden_30_plus",
+                    "civilian_labor_force",
+                    "unemployed_count",
+                ],
+            }
+        },
+        {"join": {"datasets": ["pit"], "join_on": ["geo_id", "year"]}},
+    ]
+    if include_pep:
+        datasets["msa_pep"] = {
+            "provider": "census",
+            "product": "pep",
+            "version": 1,
+            "native_geometry": {"type": "msa", "source": "census_msa_2023"},
+            "path": "data/msa_pep.parquet",
+            "years": {"years": [2020]},
+            "geo_column": "msa_id",
+        }
+        steps.insert(
+            2,
+            {
+                "resample": {
+                    "dataset": "msa_pep",
+                    "to_geometry": {"type": "msa", "source": "census_msa_2023"},
+                    "method": "identity",
+                    "measures": ["population"],
+                }
+            },
+        )
+    if include_laus:
+        datasets["laus"] = {
+            "provider": "bls",
+            "product": "laus",
+            "version": 1,
+            "native_geometry": {"type": "msa", "source": "census_msa_2023"},
+            "path": "data/laus.parquet",
+            "years": {"years": [2020]},
+            "geo_column": "msa_id",
+        }
+        steps.insert(
+            -1,
+            {
+                "resample": {
+                    "dataset": "laus",
+                    "to_geometry": {"type": "msa", "source": "census_msa_2023"},
+                    "method": "identity",
+                    "measures": ["labor_force", "employed", "unemployed", "unemployment_rate"],
+                }
+            },
+        )
+
+    return {
+        "version": 1,
+        "name": "msa-coc-panel-preflight",
+        "universe": {"years": [2020]},
+        "targets": [
+            {
+                "id": "msa_coc_panel",
+                "geometry": {"type": "coc", "vintage": 2025},
+                "outputs": ["panel"],
+                "msa_coc_panel": {
+                    "top_n": 1,
+                    "ranking_population_source": population_source,
+                    "ranking_reference_year": 2020,
+                    "containment_min_share": 0.99,
+                    "containment_denominator": "candidate_area",
+                    "coc_boundary_vintage": 2025,
+                    "msa_definition_version": "census_msa_2023",
+                    "msa_population_source": population_source,
+                    "unemployment_source": unemployment_source,
+                },
+            }
+        ],
+        "datasets": datasets,
+        "transforms": [],
+        "pipelines": [{"id": "main", "target": "msa_coc_panel", "steps": steps}],
+    }
+
+
+def _setup_msa_coc_panel_source_artifacts(
+    tmp_path: Path,
+    *,
+    include_pep: bool = False,
+    include_laus: bool = False,
+) -> None:
+    data_dir = tmp_path / "data"
+    pd.DataFrame({"coc_id": ["COC1"], "year": [2020], "pit_total": [10]}).to_parquet(
+        data_dir / "pit.parquet"
+    )
+    pd.DataFrame(
+        {
+            "msa_id": ["19740"],
+            "year": [2020],
+            "total_population": [1000],
+            "median_gross_rent": [1200.0],
+            "vacancy_rate": [0.05],
+            "poverty_rate": [0.1],
+            "median_household_income": [75_000.0],
+            "rent_burden_30_plus": [0.3],
+            "civilian_labor_force": [500.0],
+            "unemployed_count": [25.0],
+        }
+    ).to_parquet(data_dir / "msa_acs.parquet")
+    if include_pep:
+        pd.DataFrame(
+            {"msa_id": ["19740"], "year": [2020], "population": [1100]}
+        ).to_parquet(data_dir / "msa_pep.parquet")
+    if include_laus:
+        pd.DataFrame(
+            {
+                "msa_id": ["19740"],
+                "year": [2020],
+                "labor_force": [500],
+                "employed": [475],
+                "unemployed": [25],
+                "unemployment_rate": [5.0],
+            }
+        ).to_parquet(data_dir / "laus.parquet")
+
+
 class TestRunPreflight:
     def test_clean_preflight(self, tmp_path: Path):
         data = _preflight_recipe(with_path=True, identity_only=True)
@@ -1066,6 +1233,81 @@ class TestRunPreflight:
                 FindingKind.CONTAINMENT_SELECTOR,
             }
         ] == []
+
+    def test_msa_coc_panel_preflight_ready_for_pep_and_laus_variant(self, tmp_path: Path):
+        data = _msa_coc_panel_preflight_recipe(
+            population_source="pep",
+            unemployment_source="laus",
+            include_pep=True,
+            include_laus=True,
+        )
+        _setup_containment_artifacts(tmp_path, ("msa", "coc"))
+        _setup_msa_coc_panel_source_artifacts(
+            tmp_path,
+            include_pep=True,
+            include_laus=True,
+        )
+
+        recipe = load_recipe(data)
+        report = run_preflight(recipe, project_root=tmp_path)
+
+        assert report.is_ready
+        assert [
+            finding
+            for finding in report.findings
+            if finding.kind
+            in {
+                FindingKind.MISSING_DATASET,
+                FindingKind.MISSING_CONTAINMENT_ARTIFACT,
+            }
+        ] == []
+
+    def test_msa_coc_panel_preflight_reports_missing_laus_source_step(
+        self,
+        tmp_path: Path,
+    ):
+        data = _msa_coc_panel_preflight_recipe(
+            unemployment_source="laus",
+            include_laus=False,
+        )
+        _setup_containment_artifacts(tmp_path, ("msa", "coc"))
+        _setup_msa_coc_panel_source_artifacts(tmp_path)
+
+        recipe = load_recipe(data)
+        report = run_preflight(recipe, project_root=tmp_path)
+
+        findings = [
+            finding
+            for finding in report.findings
+            if finding.kind == FindingKind.MISSING_DATASET
+            and "BLS LAUS MSA unemployment source" in finding.message
+        ]
+        assert len(findings) == 1
+        assert findings[0].remediation is not None
+        assert findings[0].remediation.command == "hhplab ingest laus-metro --year <year>"
+
+    def test_msa_coc_panel_preflight_missing_laus_artifact_is_actionable(
+        self,
+        tmp_path: Path,
+    ):
+        data = _msa_coc_panel_preflight_recipe(
+            unemployment_source="laus",
+            include_laus=True,
+        )
+        _setup_containment_artifacts(tmp_path, ("msa", "coc"))
+        _setup_msa_coc_panel_source_artifacts(tmp_path, include_laus=False)
+
+        recipe = load_recipe(data)
+        report = run_preflight(recipe, project_root=tmp_path)
+
+        findings = [
+            finding
+            for finding in report.findings
+            if finding.kind == FindingKind.MISSING_DATASET and finding.dataset_id == "laus"
+        ]
+        assert len(findings) == 1
+        assert findings[0].remediation is not None
+        assert findings[0].remediation.command == "hhplab ingest laus-metro --year <year>"
 
     def test_containment_filter_preflight_validates_artifacts_and_selectors(
         self,
