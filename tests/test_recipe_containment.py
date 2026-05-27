@@ -625,32 +625,32 @@ def test_execute_recipe_persists_msa_coc_panel_output(tmp_path) -> None:
     MSA_MEMBERSHIP.to_parquet(membership_file)
     pd.DataFrame(
         {
-            "coc_id": ["COC-A", "COC-B"],
-            "year": [2020, 2020],
-            "pit_total": [42, 7],
-            "pit_sheltered": [40, 5],
-            "pit_unsheltered": [2, 2],
+            "coc_id": ["COC-A", "COC-B", "COC-A", "COC-B"],
+            "year": [2020, 2020, 2021, 2021],
+            "pit_total": [42, 7, 45, 9],
+            "pit_sheltered": [40, 5, 41, 6],
+            "pit_unsheltered": [2, 2, 4, 3],
         }
     ).to_parquet(pit_file)
     pd.DataFrame(
         {
-            "coc_id": ["COC-A", "COC-B"],
-            "year": [2020, 2020],
-            "population": [1000, 500],
+            "coc_id": ["COC-A", "COC-B", "COC-A", "COC-B"],
+            "year": [2020, 2020, 2021, 2021],
+            "population": [1000, 500, 1010, 505],
         }
     ).to_parquet(coc_population_file)
     pd.DataFrame(
         {
-            "msa_id": ["MSA-1"],
-            "year": [2020],
-            "total_population": [10_000],
-            "median_gross_rent": [1500.0],
-            "vacancy_rate": [0.05],
-            "poverty_rate": [0.12],
-            "median_household_income": [80_000.0],
-            "rent_burden_30_plus": [0.31],
-            "civilian_labor_force": [5000.0],
-            "unemployed_count": [250.0],
+            "msa_id": ["MSA-1", "MSA-1"],
+            "year": [2020, 2021],
+            "total_population": [10_000, 10_100],
+            "median_gross_rent": [1500.0, 1525.0],
+            "vacancy_rate": [0.05, 0.04],
+            "poverty_rate": [0.12, 0.11],
+            "median_household_income": [80_000.0, 81_000.0],
+            "rent_burden_30_plus": [0.31, 0.30],
+            "civilian_labor_force": [5000.0, 5050.0],
+            "unemployed_count": [250.0, 202.0],
         }
     ).to_parquet(msa_acs_file)
 
@@ -658,7 +658,7 @@ def test_execute_recipe_persists_msa_coc_panel_output(tmp_path) -> None:
         {
             "version": 1,
             "name": "msa-coc-panel-executor-test",
-            "universe": {"years": [2020]},
+            "universe": {"years": [2020, 2021]},
             "targets": [
                 {
                     "id": "msa_coc_panel",
@@ -685,7 +685,7 @@ def test_execute_recipe_persists_msa_coc_panel_output(tmp_path) -> None:
                     "version": 1,
                     "native_geometry": {"type": "coc"},
                     "path": "data/pit.parquet",
-                    "years": {"years": [2020]},
+                    "years": {"years": [2020, 2021]},
                     "geo_column": "coc_id",
                 },
                 "coc_population": {
@@ -694,7 +694,7 @@ def test_execute_recipe_persists_msa_coc_panel_output(tmp_path) -> None:
                     "version": 1,
                     "native_geometry": {"type": "coc"},
                     "path": "data/coc_population.parquet",
-                    "years": {"years": [2020]},
+                    "years": {"years": [2020, 2021]},
                     "geo_column": "coc_id",
                 },
                 "msa_acs": {
@@ -703,7 +703,7 @@ def test_execute_recipe_persists_msa_coc_panel_output(tmp_path) -> None:
                     "version": 1,
                     "native_geometry": {"type": "msa"},
                     "path": "data/msa_acs.parquet",
-                    "years": {"years": [2020]},
+                    "years": {"years": [2020, 2021]},
                     "geo_column": "msa_id",
                 },
             },
@@ -764,18 +764,23 @@ def test_execute_recipe_persists_msa_coc_panel_output(tmp_path) -> None:
     assert results[0].steps[-1].step_kind == "persist"
     artifacts = resolve_pipeline_artifacts(recipe, "main", project_root=tmp_path)
     panel_path = tmp_path / artifacts["panel_path"]
-    assert panel_path.name == "panel__msa-coc__Y2020-2020@B2025xMtestmsa2023v1.parquet"
+    assert panel_path.name == "panel__msa-coc__Y2020-2021@B2025xMtestmsa2023v1.parquet"
     panel = pd.read_parquet(panel_path)
     assert list(panel.columns[: len(MSA_COC_PANEL_COLUMNS)]) == MSA_COC_PANEL_COLUMNS
     assert panel[["msa_id", "coc_id", "year"]].to_dict(orient="records") == [
         {"msa_id": "MSA-1", "coc_id": "COC-A", "year": 2020},
+        {"msa_id": "MSA-1", "coc_id": "COC-A", "year": 2021},
         {"msa_id": "MSA-1", "coc_id": "COC-B", "year": 2020},
+        {"msa_id": "MSA-1", "coc_id": "COC-B", "year": 2021},
     ]
-    assert panel["msa_population"].tolist() == [10_000, 10_000]
-    assert panel["msa_population_acs5_alias"].tolist() == [10_000, 10_000]
-    assert panel["msa_unemployment"].tolist() == pytest.approx([0.05, 0.05])
-    assert panel["coc_population"].tolist() == [1000, 500]
-    assert panel["pit_total"].tolist() == [42, 7]
+    grain_columns = ["msa_id", "coc_id", "year"]
+    assert not panel.duplicated(grain_columns).any()
+    assert (panel.groupby(grain_columns, dropna=False).size() == 1).all()
+    assert panel["msa_population"].tolist() == [10_000, 10_100, 10_000, 10_100]
+    assert panel["msa_population_acs5_alias"].tolist() == [10_000, 10_100, 10_000, 10_100]
+    assert panel["msa_unemployment"].tolist() == pytest.approx([0.05, 0.04, 0.05, 0.04])
+    assert panel["coc_population"].tolist() == [1000, 1010, 500, 505]
+    assert panel["pit_total"].tolist() == [42, 45, 7, 9]
 
     metadata = pq.read_metadata(panel_path).metadata or {}
     provenance = json.loads(metadata[b"hhplab_provenance"])
