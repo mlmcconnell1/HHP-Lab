@@ -39,6 +39,12 @@ from hhplab.msa.msa_validate import (
     validate_msa_artifacts,
     validate_msa_boundaries,
 )
+from hhplab.msa.selectors import (
+    TopMsaSelection,
+    TopMsaSelectionDiagnostics,
+    select_top_msa_ids_for_panel_spec,
+    select_top_msa_ids_by_population,
+)
 
 __all__ = [
     "ALLOCATION_SHARE_TOLERANCE",
@@ -63,6 +69,8 @@ __all__ = [
     "read_msa_county_membership",
     "save_coc_msa_crosswalk",
     "summarize_coc_msa_allocation",
+    "select_top_msa_ids_for_panel_spec",
+    "select_top_msa_ids_by_population",
     "write_msa_boundaries",
     "write_msa_artifacts",
     "validate_curated_msa",
@@ -70,4 +78,6 @@ __all__ = [
     "MSAValidationResult",
     "validate_msa_artifacts",
     "validate_msa_boundaries",
+    "TopMsaSelection",
+    "TopMsaSelectionDiagnostics",
 ]
