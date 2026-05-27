@@ -42,8 +42,16 @@ from hhplab.msa.msa_validate import (
 from hhplab.msa.selectors import (
     TopMsaSelection,
     TopMsaSelectionDiagnostics,
-    select_top_msa_ids_for_panel_spec,
     select_top_msa_ids_by_population,
+    select_top_msa_ids_for_panel_spec,
+)
+from hhplab.msa.unemployment import (
+    MSA_ACS5_UNEMPLOYMENT_COLUMNS,
+    MSA_LAUS_UNEMPLOYMENT_COLUMNS,
+    MSA_UNEMPLOYMENT_COMMON_COLUMNS,
+    load_laus_msa_unemployment,
+    resolve_msa_unemployment,
+    validate_laus_years_available,
 )
 
 __all__ = [
@@ -80,4 +88,10 @@ __all__ = [
     "validate_msa_boundaries",
     "TopMsaSelection",
     "TopMsaSelectionDiagnostics",
+    "MSA_ACS5_UNEMPLOYMENT_COLUMNS",
+    "MSA_LAUS_UNEMPLOYMENT_COLUMNS",
+    "MSA_UNEMPLOYMENT_COMMON_COLUMNS",
+    "load_laus_msa_unemployment",
+    "resolve_msa_unemployment",
+    "validate_laus_years_available",
 ]
