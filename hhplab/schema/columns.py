@@ -19,8 +19,11 @@ ACS_MEASURE_COLUMNS: list[str] = [
     TOTAL_POPULATION,
     "adult_population",
     "population_below_poverty",
+    "poverty_rate",
     "median_household_income",
     "median_gross_rent",
+    "vacancy_rate",
+    "rent_burden_30_plus",
     "unemployment_rate",
 ]
 
@@ -244,6 +247,9 @@ ACS1_IMPUTATION_BASE_OUTPUT_COLUMNS: list[str] = [
 ACS5_COUNT_COLUMNS: list[str] = [
     TOTAL_POPULATION,
     "adult_population",
+    "total_housing_units",
+    "occupied_housing_units",
+    "vacant_housing_units",
     "total_households",
     "owner_households",
     "renter_households",
@@ -268,6 +274,9 @@ ACS5_MOE_COLUMNS: list[str] = [
 ACS5_DERIVED_COLUMNS: list[str] = [
     "adult_population",
     "population_below_poverty",
+    "poverty_rate",
+    "vacancy_rate",
+    "rent_burden_30_plus",
 ]
 
 ACS_TRACT_OUTPUT_COLUMNS: list[str] = [
@@ -277,6 +286,9 @@ ACS_TRACT_OUTPUT_COLUMNS: list[str] = [
     TOTAL_POPULATION,
     "moe_total_population",
     "adult_population",
+    "total_housing_units",
+    "occupied_housing_units",
+    "vacant_housing_units",
     "total_households",
     "owner_households",
     "renter_households",

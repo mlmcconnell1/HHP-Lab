@@ -1212,6 +1212,7 @@ def test_sae_required_tract_tables_are_in_provenance_order() -> None:
         "B01001",
         "B19013",
         "B25064",
+        "B25002",
         "B25003",
         "C17002",
         "B23025",

@@ -28,6 +28,10 @@ ACS_VARIABLES: dict[str, str] = {
     "B19013_001E": "median_household_income",
     # B25064 — Median Gross Rent
     "B25064_001E": "median_gross_rent",
+    # B25002 — Occupancy Status
+    "B25002_001E": "total_housing_units",
+    "B25002_002E": "occupied_housing_units",
+    "B25002_003E": "vacant_housing_units",
     # B25003 — Tenure
     "B25003_001E": "total_households",
     "B25003_002E": "owner_households",
@@ -235,6 +239,7 @@ ACS_TABLES: list[str] = [
     "B01001",
     "B19013",
     "B25064",
+    "B25002",
     "B25003",
     "C17002",
     "B23025",

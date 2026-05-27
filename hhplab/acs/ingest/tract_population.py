@@ -23,6 +23,9 @@ Output Schema
 - total_population (Int64)
 - moe_total_population (Float64)
 - adult_population (Int64): derived from B01001 age 18+ groups
+- total_housing_units (Int64)
+- occupied_housing_units (Int64)
+- vacant_housing_units (Int64)
 - total_households (Int64)
 - owner_households (Int64)
 - renter_households (Int64)

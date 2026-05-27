@@ -99,6 +99,21 @@ import pandas as pd
 from hhplab.acs.variables import COUNT_COLUMNS, MEDIAN_COLUMNS, MOE_COLUMNS
 from hhplab.geo.ct_planning_regions import CT_STATE_FIPS
 
+RENT_BURDEN_30_PLUS_COLUMNS: tuple[str, ...] = (
+    "gross_rent_pct_income_30_to_34_9",
+    "gross_rent_pct_income_35_to_39_9",
+    "gross_rent_pct_income_40_to_49_9",
+    "gross_rent_pct_income_50_plus",
+)
+
+MSA_ACS5_COVARIATE_ALIASES: dict[str, str] = {
+    "median_gross_rent": "msa_median_rent",
+    "vacancy_rate": "msa_vacancy_rate",
+    "poverty_rate": "msa_poverty_rate",
+    "median_household_income": "msa_income",
+    "rent_burden_30_plus": "msa_rent_burden",
+}
+
 
 def _maybe_remap_ct_planning_regions(
     acs_data: pd.DataFrame,
@@ -408,11 +423,46 @@ def aggregate_to_geo(
         clf = result_df["civilian_labor_force"]
         result_df["unemployment_rate"] = result_df["unemployed_count"] / clf.where(clf > 0)
 
+    _derive_acs5_covariates(result_df)
+    if geo_id_col == "msa_id":
+        _apply_msa_acs5_covariate_aliases(result_df)
+
     # Add metadata columns
     result_df["weighting_method"] = weighting
     result_df["source"] = "acs_5yr"
 
     return result_df
+
+
+def _derive_acs5_covariates(result_df: pd.DataFrame) -> None:
+    """Derive canonical ACS5 rates from aggregated numerator/denominator columns."""
+    if "population_below_poverty" in result_df.columns and "poverty_universe" in result_df.columns:
+        denominator = pd.to_numeric(result_df["poverty_universe"], errors="coerce")
+        numerator = pd.to_numeric(result_df["population_below_poverty"], errors="coerce")
+        result_df["poverty_rate"] = numerator / denominator.where(denominator > 0)
+
+    if "vacant_housing_units" in result_df.columns and "total_housing_units" in result_df.columns:
+        denominator = pd.to_numeric(result_df["total_housing_units"], errors="coerce")
+        numerator = pd.to_numeric(result_df["vacant_housing_units"], errors="coerce")
+        result_df["vacancy_rate"] = numerator / denominator.where(denominator > 0)
+
+    if "gross_rent_pct_income_total" in result_df.columns and all(
+        column in result_df.columns for column in RENT_BURDEN_30_PLUS_COLUMNS
+    ):
+        denominator = pd.to_numeric(result_df["gross_rent_pct_income_total"], errors="coerce")
+        numerator = sum(
+            pd.to_numeric(result_df[column], errors="coerce").fillna(0.0)
+            for column in RENT_BURDEN_30_PLUS_COLUMNS
+        )
+        numerator = numerator.where(denominator.notna())
+        result_df["rent_burden_30_plus"] = numerator / denominator.where(denominator > 0)
+
+
+def _apply_msa_acs5_covariate_aliases(result_df: pd.DataFrame) -> None:
+    """Add MSA-CoC panel-facing aliases for ACS5 MSA covariates."""
+    for source_column, alias_column in MSA_ACS5_COVARIATE_ALIASES.items():
+        if source_column in result_df.columns:
+            result_df[alias_column] = result_df[source_column]
 
 
 def aggregate_to_coc(

@@ -7,6 +7,7 @@ import pytest
 
 from hhplab.measures.measures_acs import (
     aggregate_to_coc,
+    aggregate_to_geo,
 )
 
 
@@ -266,6 +267,87 @@ class TestACSSchemaMeasures:
 
         for col in required_columns:
             assert col in result.columns, f"Missing required column: {col}"
+
+
+class TestMsaAcs5Covariates:
+    """Tests for ACS5-derived MSA covariates used by MSA-CoC panels."""
+
+    def test_msa_covariates_are_derived_from_aggregated_counts(self):
+        acs_data = pd.DataFrame(
+            {
+                "GEOID": ["08001000100", "08001000200"],
+                "total_population": [1000, 2000],
+                "median_household_income": [60_000.0, 90_000.0],
+                "median_gross_rent": [1000.0, 1600.0],
+                "poverty_universe": [900.0, 1800.0],
+                "population_below_poverty": [90.0, 360.0],
+                "total_housing_units": [500.0, 1000.0],
+                "vacant_housing_units": [50.0, 250.0],
+                "gross_rent_pct_income_total": [400.0, 800.0],
+                "gross_rent_pct_income_30_to_34_9": [40.0, 80.0],
+                "gross_rent_pct_income_35_to_39_9": [30.0, 70.0],
+                "gross_rent_pct_income_40_to_49_9": [20.0, 60.0],
+                "gross_rent_pct_income_50_plus": [10.0, 50.0],
+            }
+        )
+        crosswalk = pd.DataFrame(
+            {
+                "tract_geoid": ["08001000100", "08001000200"],
+                "msa_id": ["19740", "19740"],
+                "area_share": [1.0, 1.0],
+                "pop_share": [1.0, 1.0],
+            }
+        )
+
+        result = aggregate_to_geo(
+            acs_data,
+            crosswalk,
+            weighting="population",
+            geo_id_col="msa_id",
+        )
+
+        row = result.iloc[0]
+        assert row["msa_id"] == "19740"
+        assert row["poverty_rate"] == pytest.approx(450.0 / 2700.0)
+        assert row["vacancy_rate"] == pytest.approx(300.0 / 1500.0)
+        assert row["rent_burden_30_plus"] == pytest.approx(360.0 / 1200.0)
+        assert row["msa_poverty_rate"] == pytest.approx(row["poverty_rate"])
+        assert row["msa_vacancy_rate"] == pytest.approx(row["vacancy_rate"])
+        assert row["msa_rent_burden"] == pytest.approx(row["rent_burden_30_plus"])
+        assert row["msa_median_rent"] == pytest.approx(row["median_gross_rent"])
+        assert row["msa_income"] == pytest.approx(row["median_household_income"])
+
+    def test_derived_covariates_are_null_for_zero_denominators(self):
+        acs_data = pd.DataFrame(
+            {
+                "GEOID": ["08001000100"],
+                "total_population": [1000],
+                "poverty_universe": [0.0],
+                "population_below_poverty": [10.0],
+                "total_housing_units": [0.0],
+                "vacant_housing_units": [5.0],
+                "gross_rent_pct_income_total": [0.0],
+                "gross_rent_pct_income_30_to_34_9": [1.0],
+                "gross_rent_pct_income_35_to_39_9": [1.0],
+                "gross_rent_pct_income_40_to_49_9": [1.0],
+                "gross_rent_pct_income_50_plus": [1.0],
+            }
+        )
+        crosswalk = pd.DataFrame(
+            {
+                "tract_geoid": ["08001000100"],
+                "msa_id": ["19740"],
+                "area_share": [1.0],
+                "pop_share": [1.0],
+            }
+        )
+
+        result = aggregate_to_geo(acs_data, crosswalk, geo_id_col="msa_id")
+        row = result.iloc[0]
+
+        assert pd.isna(row["poverty_rate"])
+        assert pd.isna(row["vacancy_rate"])
+        assert pd.isna(row["rent_burden_30_plus"])
 
 
 class TestGEOIDValidation:
