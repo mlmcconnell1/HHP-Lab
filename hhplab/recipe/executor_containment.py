@@ -24,6 +24,25 @@ CONTAINMENT_COLUMNS: tuple[str, ...] = (
     "definition_version",
 )
 
+MSA_COC_MEMBERSHIP_COLUMNS: tuple[str, ...] = (
+    "msa_id",
+    "coc_id",
+    "contained_share",
+    "containment_denominator",
+    "intersection_area",
+    "coc_area",
+    "msa_area",
+    "coc_boundary_vintage",
+    "msa_definition_version",
+    "container_type",
+    "container_id",
+    "candidate_type",
+    "candidate_id",
+    "container_vintage",
+    "candidate_vintage",
+    "method",
+)
+
 
 def build_containment_list(
     spec: ContainmentSpec,
@@ -57,6 +76,63 @@ def build_containment_list(
     filtered = _apply_selector_filters(raw, spec)
     filtered = filtered[filtered["contained_share"] >= spec.min_share].copy()
     return _sort_containment(filtered)
+
+
+def build_msa_coc_membership(
+    spec: ContainmentSpec,
+    *,
+    coc_gdf: gpd.GeoDataFrame | None = None,
+    county_gdf: gpd.GeoDataFrame | None = None,
+    msa_county_membership: pd.DataFrame | None = None,
+) -> pd.DataFrame:
+    """Build a canonical MSA-CoC membership table from containment semantics.
+
+    The returned table has one row per selected ``msa_id`` x ``coc_id`` pair
+    whose contained share meets ``spec.min_share``. It is intentionally a
+    reshaped view of ``build_containment_list`` so containment-only outputs and
+    panel assembly use identical selector, denominator, and threshold behavior.
+    """
+    pair = (spec.container.type, spec.candidate.type)
+    if pair != ("msa", "coc"):
+        raise ValueError(
+            "MSA-CoC membership requires containment geometry pair 'msa -> coc'. "
+            f"Received '{spec.container.type} -> {spec.candidate.type}'."
+        )
+
+    containment = build_containment_list(
+        spec,
+        coc_gdf=coc_gdf,
+        county_gdf=county_gdf,
+        msa_county_membership=msa_county_membership,
+    )
+    if containment.empty:
+        return pd.DataFrame(columns=list(MSA_COC_MEMBERSHIP_COLUMNS))
+
+    membership = pd.DataFrame(
+        {
+            "msa_id": containment["container_id"].astype(str),
+            "coc_id": containment["candidate_id"].astype(str),
+            "contained_share": containment["contained_share"],
+            "containment_denominator": spec.denominator,
+            "intersection_area": containment["intersection_area"],
+            "coc_area": containment["candidate_area"],
+            "msa_area": containment["container_area"],
+            "coc_boundary_vintage": containment["candidate_vintage"],
+            "msa_definition_version": containment["definition_version"],
+            "container_type": containment["container_type"],
+            "container_id": containment["container_id"],
+            "candidate_type": containment["candidate_type"],
+            "candidate_id": containment["candidate_id"],
+            "container_vintage": containment["container_vintage"],
+            "candidate_vintage": containment["candidate_vintage"],
+            "method": containment["method"],
+        }
+    )
+    return (
+        membership.loc[:, MSA_COC_MEMBERSHIP_COLUMNS]
+        .sort_values(["msa_id", "coc_id"])
+        .reset_index(drop=True)
+    )
 
 
 def _build_msa_coc_containment(

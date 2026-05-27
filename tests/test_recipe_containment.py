@@ -25,7 +25,9 @@ from hhplab.recipe.executor import execute_recipe
 from hhplab.recipe.executor_containment import (
     ALBERS_EQUAL_AREA_CRS,
     CONTAINMENT_COLUMNS,
+    MSA_COC_MEMBERSHIP_COLUMNS,
     build_containment_list,
+    build_msa_coc_membership,
 )
 from hhplab.recipe.executor_manifest import resolve_pipeline_artifacts
 from hhplab.recipe.loader import load_recipe
@@ -176,6 +178,67 @@ def test_msa_coc_containment_uses_coc_area_denominator() -> None:
     assert (containment["candidate_area"] > 0).all()
     assert (containment["container_area"] > 0).all()
     assert containment["definition_version"].unique().tolist() == ["test_msa_v1"]
+
+
+def test_msa_coc_membership_reuses_containment_threshold_and_metadata() -> None:
+    spec = _containment_spec(
+        "msa",
+        "coc",
+        selector_ids=["MSA-1"],
+        min_share=0.66,
+    )
+
+    membership = build_msa_coc_membership(
+        spec,
+        coc_gdf=_coc_gdf(),
+        county_gdf=_county_gdf(),
+        msa_county_membership=MSA_MEMBERSHIP,
+    )
+
+    assert list(membership.columns) == list(MSA_COC_MEMBERSHIP_COLUMNS)
+    assert membership["msa_id"].tolist() == ["MSA-1"]
+    assert membership["coc_id"].tolist() == ["COC-A"]
+    assert membership["contained_share"].tolist() == pytest.approx([2 / 3])
+    assert membership["containment_denominator"].tolist() == ["candidate_area"]
+    assert membership["coc_boundary_vintage"].tolist() == [2025]
+    assert membership["msa_definition_version"].tolist() == ["test_msa_v1"]
+    assert membership["container_type"].tolist() == ["msa"]
+    assert membership["container_id"].tolist() == ["MSA-1"]
+    assert membership["candidate_type"].tolist() == ["coc"]
+    assert membership["candidate_id"].tolist() == ["COC-A"]
+    assert (membership["intersection_area"] > 0).all()
+    assert (membership["coc_area"] > 0).all()
+    assert (membership["msa_area"] > 0).all()
+
+
+def test_msa_coc_membership_returns_empty_contract_for_no_matches() -> None:
+    spec = _containment_spec(
+        "msa",
+        "coc",
+        selector_ids=["MSA-1"],
+        min_share=0.99,
+    )
+
+    membership = build_msa_coc_membership(
+        spec,
+        coc_gdf=_coc_gdf(),
+        county_gdf=_county_gdf(),
+        msa_county_membership=MSA_MEMBERSHIP,
+    )
+
+    assert membership.empty
+    assert list(membership.columns) == list(MSA_COC_MEMBERSHIP_COLUMNS)
+
+
+def test_msa_coc_membership_rejects_non_msa_coc_pair() -> None:
+    spec = _containment_spec("coc", "county")
+
+    with pytest.raises(ValueError, match="requires containment geometry pair 'msa -> coc'"):
+        build_msa_coc_membership(
+            spec,
+            coc_gdf=_coc_gdf(),
+            county_gdf=_county_gdf(),
+        )
 
 
 @pytest.mark.parametrize(
