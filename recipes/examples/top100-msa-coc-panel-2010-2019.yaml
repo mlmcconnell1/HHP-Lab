@@ -1,7 +1,7 @@
 # Example recipe: top 100 Census MSAs x substantially contained CoCs, 2010-2019.
 #
 # Required source artifacts before build:
-#   hhplab ingest hud-pit --start-year 2010 --end-year 2019
+#   hhplab ingest pit-vintage --vintage 2024
 #   hhplab ingest boundaries --source hud_exchange --vintage 2025
 #   hhplab ingest tiger --year 2023 --type counties
 #   hhplab ingest tiger --year 2000 --type tracts
