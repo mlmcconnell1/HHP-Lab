@@ -119,6 +119,10 @@ CANONICAL_PATTERNS: dict[str, list[re.Pattern[str]]] = {
         re.compile(r"^msa_definitions__\w+\.parquet$"),
         re.compile(r"^msa_county_membership__\w+\.parquet$"),
         re.compile(r"^msa_boundaries__\w+\.parquet$"),
+        re.compile(
+            r"^msa_coc_coverage__Y\d{4}@B\d{4}xM\w+xC\d{4}__top\d+"
+            r"__basis-(area|population|area-population)\.parquet$"
+        ),
     ],
     "laus": [
         re.compile(r"^laus_metro__A\d{4}@D\w+\.parquet$"),

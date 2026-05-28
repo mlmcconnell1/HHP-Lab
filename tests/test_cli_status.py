@@ -56,6 +56,19 @@ def _scaffold_curated(tmp_path: Path) -> Path:
     pd.DataFrame({"msa_id": ["35620"]}).to_parquet(
         msadir / "msa_boundaries__census_msa_2023.parquet"
     )
+    pd.DataFrame(
+        {
+            "msa_id": ["35620"],
+            "coc_id": ["NY-600"],
+            "overlap_basis": ["population"],
+        }
+    ).to_parquet(
+        msadir
+        / (
+            "msa_coc_coverage__Y2024@B2025xMcensus_msa_2023xC2023"
+            "__top100__basis-area-population.parquet"
+        )
+    )
 
     metrodir = curated / "metro"
     metrodir.mkdir(parents=True)
@@ -127,6 +140,8 @@ class TestStatusHuman:
         assert "PIT Counts: 1 year(s)" in result.output
         assert "Metro Artifacts: 1 complete version(s)" in result.output
         assert "MSA Artifacts: 1 complete version(s)" in result.output
+        assert "MSA-CoC Coverage: 1 file(s)" in result.output
+        assert "basis=area+population" in result.output
         assert "LAUS:       2 file(s)" in result.output
         assert "Recipe Outputs: 1 namespace(s)" in result.output
         assert (
@@ -212,6 +227,8 @@ class TestStatusJSON:
         assert payload["assets"]["pit"]["msa_count"] == 1
         assert payload["assets"]["metro"]["complete_versions"] == ["glynn_fox_v1"]
         assert payload["assets"]["msa"]["fully_materialized_versions"] == ["census_msa_2023"]
+        assert payload["assets"]["msa"]["coverage_count"] == 1
+        assert payload["assets"]["msa"]["coverage"][0]["overlap_bases"] == ["area", "population"]
         assert payload["assets"]["laus"]["years"] == [2022, 2023]
         assert payload["recipe_outputs"]["count"] == 1
         assert payload["recipe_outputs"]["panel_count"] == 1

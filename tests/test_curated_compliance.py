@@ -161,6 +161,11 @@ class TestCanonicalFilenamesAccepted:
             ("metro", "metro_county_membership__glynn_fox_v1.parquet"),
             ("metro", "metro_boundaries__glynn_fox_v1xC2025.parquet"),
             ("msa", "msa_boundaries__census_msa_2023.parquet"),
+            (
+                "msa",
+                "msa_coc_coverage__Y2024@B2025xMcensus_msa_2023xC2023"
+                "__top100__basis-area-population.parquet",
+            ),
             ("maps", "CO-500__2025.html"),
         ],
     )

@@ -4,6 +4,8 @@ from hhplab.naming import (
     geo_panel_filename,
     msa_boundaries_filename,
     msa_boundaries_path,
+    msa_coc_coverage_filename,
+    msa_coc_coverage_path,
     msa_coc_xwalk_filename,
     msa_coc_xwalk_path,
     msa_county_membership_filename,
@@ -63,6 +65,40 @@ def test_msa_coc_xwalk_filename():
 def test_msa_coc_xwalk_path():
     assert str(msa_coc_xwalk_path("2025", "census_msa_2023", 2023)).endswith(
         "data/curated/xwalks/msa_coc_xwalk__B2025xMcensus_msa_2023xC2023.parquet"
+    )
+
+
+def test_msa_coc_coverage_filename():
+    assert (
+        msa_coc_coverage_filename(
+            2024,
+            2025,
+            "census_msa_2023",
+            2023,
+            100,
+            ("population", "area"),
+        )
+        == (
+            "msa_coc_coverage__Y2024@B2025xMcensus_msa_2023xC2023"
+            "__top100__basis-area-population.parquet"
+        )
+    )
+
+
+def test_msa_coc_coverage_path():
+    assert str(
+        msa_coc_coverage_path(
+            2024,
+            2025,
+            "census_msa_2023",
+            2023,
+            100,
+            ("area", "population"),
+        )
+    ).endswith(
+        "data/curated/msa/"
+        "msa_coc_coverage__Y2024@B2025xMcensus_msa_2023xC2023"
+        "__top100__basis-area-population.parquet"
     )
 
 

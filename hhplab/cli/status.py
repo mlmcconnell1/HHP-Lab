@@ -125,6 +125,14 @@ def status_cmd(
         f"{len(msa['boundaries'])} version(s)  "
         f"{', '.join(msa['boundaries']) if msa['boundaries'] else '-'}"
     )
+    msa_coverage_versions = ", ".join(
+        f"Y{item['year']}@B{item['boundary_vintage']}xM{item['definition_version']}"
+        f"xC{item['county_vintage']} top{item['top_n']} basis={'+'.join(item['overlap_bases'])}"
+        for item in msa["coverage"]
+    ) if msa["coverage"] else "-"
+    typer.echo(
+        f"MSA-CoC Coverage: {msa['coverage_count']} file(s)  {msa_coverage_versions}"
+    )
 
     # ACS
     a = assets["acs"]

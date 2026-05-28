@@ -133,6 +133,7 @@ def _scan_msa(curated: Path) -> dict:
     definitions: list[str] = []
     county_memberships: list[str] = []
     boundaries: list[str] = []
+    coverage: list[dict] = []
     if mdir.exists():
         for p in sorted(mdir.glob("*.parquet")):
             m = re.match(r"^msa_definitions__(\w+)\.parquet$", p.name)
@@ -146,12 +147,32 @@ def _scan_msa(curated: Path) -> dict:
             m = re.match(r"^msa_boundaries__(\w+)\.parquet$", p.name)
             if m:
                 boundaries.append(m.group(1))
+                continue
+            m = re.match(
+                r"^msa_coc_coverage__Y(\d{4})@B(\d{4})xM(\w+)xC(\d{4})__top(\d+)"
+                r"__basis-(area|population|area-population)\.parquet$",
+                p.name,
+            )
+            if m:
+                coverage.append(
+                    {
+                        "year": int(m.group(1)),
+                        "boundary_vintage": int(m.group(2)),
+                        "definition_version": m.group(3),
+                        "county_vintage": int(m.group(4)),
+                        "top_n": int(m.group(5)),
+                        "overlap_bases": m.group(6).split("-"),
+                        "path": str(p),
+                    }
+                )
     complete_versions = sorted(set(definitions) & set(county_memberships))
     fully_materialized_versions = sorted(set(complete_versions) & set(boundaries))
     return {
         "definitions": definitions,
         "county_memberships": county_memberships,
         "boundaries": boundaries,
+        "coverage": coverage,
+        "coverage_count": len(coverage),
         "complete_versions": complete_versions,
         "fully_materialized_versions": fully_materialized_versions,
     }

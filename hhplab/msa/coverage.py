@@ -10,32 +10,10 @@ import pandas as pd
 
 from hhplab.msa.selectors import PopulationRankingSource, select_top_msa_ids_by_population
 from hhplab.provenance import ProvenanceBlock, write_parquet_with_provenance
+from hhplab.schema.columns import MSA_COC_COVERAGE_COLUMNS
 from hhplab.xwalks.county import ALBERS_EQUAL_AREA_CRS
 
 OverlapBasis = Literal["area", "population"]
-
-MSA_COC_COVERAGE_COLUMNS: tuple[str, ...] = (
-    "msa_id",
-    "msa_name",
-    "year",
-    "coc_id",
-    "coc_name",
-    "overlap_basis",
-    "denominator_source",
-    "denominator_vintage",
-    "denominator_column",
-    "msa_covered_by_coc_percent",
-    "coc_contained_in_msa_percent",
-    "intersection_value",
-    "msa_denominator",
-    "coc_denominator",
-    "boundary_vintage",
-    "county_vintage",
-    "definition_version",
-    "top_n",
-    "ranking_population_source",
-    "ranking_reference_year",
-)
 
 REQUIRED_MSA_MEMBERSHIP_COLUMNS: tuple[str, ...] = (
     "msa_id",

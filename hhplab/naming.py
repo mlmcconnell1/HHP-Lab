@@ -269,6 +269,42 @@ def msa_coc_xwalk_filename(
     return f"msa_coc_xwalk__B{boundary_vintage}xM{definition_version}xC{county_vintage}.parquet"
 
 
+def msa_coc_coverage_filename(
+    year: str | int,
+    boundary_vintage: str | int,
+    definition_version: str,
+    county_vintage: str | int,
+    top_n: str | int,
+    overlap_bases: str | list[str] | tuple[str, ...],
+) -> str:
+    """Generate filename for MSA-CoC overlap coverage artifacts.
+
+    The basis token is explicit so area-only and population-enabled artifacts
+    cannot be confused during agent discovery.
+    """
+    basis_token = _overlap_basis_token(overlap_bases)
+    return (
+        f"msa_coc_coverage__Y{year}@B{boundary_vintage}xM{definition_version}"
+        f"xC{county_vintage}__top{top_n}__basis-{basis_token}.parquet"
+    )
+
+
+def _overlap_basis_token(overlap_bases: str | list[str] | tuple[str, ...]) -> str:
+    if isinstance(overlap_bases, str):
+        bases = [part for part in re.split(r"[-,+]", overlap_bases) if part]
+    else:
+        bases = list(overlap_bases)
+    if not bases:
+        raise ValueError("MSA-CoC coverage filenames require at least one overlap basis.")
+    invalid = sorted(set(bases) - {"area", "population"})
+    if invalid:
+        raise ValueError(
+            f"Unsupported MSA-CoC overlap basis values {invalid}; expected area and/or population."
+        )
+    ordered = [basis for basis in ("area", "population") if basis in set(bases)]
+    return "-".join(ordered)
+
+
 def containment_filename(
     *,
     container_type: str,
@@ -607,6 +643,35 @@ def msa_coc_xwalk_path(
         / "curated"
         / "xwalks"
         / msa_coc_xwalk_filename(boundary_vintage, definition_version, county_vintage)
+    )
+
+
+def msa_coc_coverage_path(
+    year: str | int,
+    boundary_vintage: str | int,
+    definition_version: str,
+    county_vintage: str | int,
+    top_n: str | int,
+    overlap_bases: str | list[str] | tuple[str, ...],
+    base_dir: Path | str | None = None,
+) -> Path:
+    """Get canonical path for an MSA-CoC overlap coverage artifact."""
+    if base_dir is None:
+        base_dir = Path("data")
+    else:
+        base_dir = Path(base_dir)
+    return (
+        base_dir
+        / "curated"
+        / "msa"
+        / msa_coc_coverage_filename(
+            year,
+            boundary_vintage,
+            definition_version,
+            county_vintage,
+            top_n,
+            overlap_bases,
+        )
     )
 
 

@@ -530,6 +530,29 @@ MSA_COC_PANEL_COLUMNS: list[str] = [
     "source",
 ]
 
+MSA_COC_COVERAGE_COLUMNS: tuple[str, ...] = (
+    "msa_id",
+    "msa_name",
+    "year",
+    "coc_id",
+    "coc_name",
+    "overlap_basis",
+    "denominator_source",
+    "denominator_vintage",
+    "denominator_column",
+    "msa_covered_by_coc_percent",
+    "coc_contained_in_msa_percent",
+    "intersection_value",
+    "msa_denominator",
+    "coc_denominator",
+    "boundary_vintage",
+    "county_vintage",
+    "definition_version",
+    "top_n",
+    "ranking_population_source",
+    "ranking_reference_year",
+)
+
 ZORI_COLUMNS: list[str] = [
     "zori_coc",
     "zori_coverage_ratio",

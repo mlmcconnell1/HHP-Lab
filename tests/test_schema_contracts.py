@@ -39,6 +39,8 @@ from hhplab.schema import (
     ACS1_IMPUTED_POVERTY_SPEC,
     ACS1_IMPUTED_TOTAL_HOUSEHOLDS_SPEC,
     ARTIFACT_CONTRACTS,
+    MSA_COC_COVERAGE_COLUMNS,
+    MSA_COC_COVERAGE_CONTRACT,
     MSA_COC_PANEL_COLUMNS,
     MSA_COC_PANEL_CONTRACT,
     SAE_OUTPUT_CONTRACT,
@@ -147,6 +149,29 @@ MSA_COC_PANEL_COMPLETE_ROW = {
     "source": "msa_coc_panel",
 }
 
+MSA_COC_COVERAGE_COMPLETE_ROW = {
+    "msa_id": "35620",
+    "msa_name": "New York-Newark-Jersey City, NY-NJ-PA",
+    "year": 2024,
+    "coc_id": "NY-600",
+    "coc_name": "New York City CoC",
+    "overlap_basis": "population",
+    "denominator_source": "acs5",
+    "denominator_vintage": "2023",
+    "denominator_column": "total_population",
+    "msa_covered_by_coc_percent": 41.8,
+    "coc_contained_in_msa_percent": 99.2,
+    "intersection_value": 8_250_000.0,
+    "msa_denominator": 19_750_000.0,
+    "coc_denominator": 8_316_000.0,
+    "boundary_vintage": "2025",
+    "county_vintage": "2023",
+    "definition_version": "census_msa_2023",
+    "top_n": 100,
+    "ranking_population_source": "pep",
+    "ranking_reference_year": 2024,
+}
+
 
 @pytest.mark.parametrize("case_name", list(SCHEMA_ALIAS_CASES), ids=list(SCHEMA_ALIAS_CASES))
 def test_source_schema_aliases_use_canonical_schema_constants(case_name: str) -> None:
@@ -214,6 +239,47 @@ def test_msa_coc_panel_contract_declares_initial_output_columns() -> None:
     assert tuple(MSA_COC_PANEL_COLUMNS) == MSA_COC_PANEL_CONTRACT.required_columns
     assert MSA_COC_PANEL_CONTRACT.name == "msa_coc_panel"
     assert ARTIFACT_CONTRACTS["msa_coc_panel"] is MSA_COC_PANEL_CONTRACT
+
+
+def test_msa_coc_coverage_contract_declares_output_columns() -> None:
+    assert tuple(MSA_COC_COVERAGE_COLUMNS) == MSA_COC_COVERAGE_CONTRACT.required_columns
+    assert MSA_COC_COVERAGE_CONTRACT.name == "msa_coc_coverage"
+    assert ARTIFACT_CONTRACTS["msa_coc_coverage"] is MSA_COC_COVERAGE_CONTRACT
+
+
+def test_validate_msa_coc_coverage_contract_passes_for_complete_artifact() -> None:
+    findings = validate_artifact_contract(
+        pd.DataFrame([MSA_COC_COVERAGE_COMPLETE_ROW]),
+        MSA_COC_COVERAGE_CONTRACT,
+    )
+
+    assert findings == []
+
+
+@pytest.mark.parametrize(
+    "missing_column",
+    [
+        "overlap_basis",
+        "denominator_source",
+        "denominator_vintage",
+        "denominator_column",
+        "msa_covered_by_coc_percent",
+        "coc_contained_in_msa_percent",
+    ],
+)
+def test_validate_msa_coc_coverage_contract_reports_missing_columns(
+    missing_column: str,
+) -> None:
+    row = dict(MSA_COC_COVERAGE_COMPLETE_ROW)
+    del row[missing_column]
+
+    findings = validate_artifact_contract(
+        pd.DataFrame([row]),
+        MSA_COC_COVERAGE_CONTRACT,
+    )
+
+    assert [finding.code for finding in findings] == ["missing_required_column"]
+    assert findings[0].column == missing_column
 
 
 def test_validate_msa_coc_panel_contract_passes_for_complete_artifact() -> None:
