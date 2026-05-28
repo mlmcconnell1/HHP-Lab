@@ -3,7 +3,7 @@
   "boundary_vintage": "2025",
   "county_vintage": "2023",
   "msa_definition_version": "census_msa_2023",
-  "map_count": 8,
+  "map_count": 9,
   "maps": [
     {
       "slug": "washington_dc",
@@ -92,6 +92,17 @@
       "county_fips": "17031,17037,17043,17063,17089,17093,17097,17111,17197,18073,18089,18111,18127",
       "coc_ids": "IL-500,IL-501,IL-502,IL-506,IL-510,IL-511,IL-512,IL-514,IL-517,IL-518,IN-502,WI-500",
       "map_path": "outputs/requested_msa_overlay_maps_2025/map__chicago_il__M16980@B2025xC2023.html"
+    },
+    {
+      "slug": "atlanta_ga",
+      "msa_id": "12060",
+      "msa_name": "Atlanta-Sandy Springs-Roswell, GA",
+      "states_overlapped": "Georgia",
+      "county_count": 29,
+      "overlapping_coc_count": 6,
+      "county_fips": "13013,13015,13035,13045,13057,13063,13067,13077,13085,13089,13097,13113,13117,13121,13135,13143,13149,13151,13159,13187,13199,13211,13217,13223,13227,13231,13247,13255,13297",
+      "coc_ids": "AL-507,GA-500,GA-501,GA-502,GA-506,GA-508",
+      "map_path": "outputs/requested_msa_overlay_maps_2025/map__atlanta_ga__M12060@B2025xC2023.html"
     }
   ]
 }
