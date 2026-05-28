@@ -1,5 +1,11 @@
 """Shared Census MSA definitions, IO, and validation utilities."""
 
+from hhplab.msa.coverage import (
+    MSA_COC_COVERAGE_COLUMNS,
+    build_msa_coc_coverage,
+    read_msa_coc_coverage,
+    save_msa_coc_coverage,
+)
 from hhplab.msa.crosswalk import (
     ALLOCATION_SHARE_TOLERANCE,
     COC_MSA_CROSSWALK_COLUMNS,
@@ -61,6 +67,7 @@ __all__ = [
     "DELINEATION_FILE_YEAR",
     "FULL_ALLOCATION_THRESHOLD",
     "MSA_AREA_TYPE",
+    "MSA_COC_COVERAGE_COLUMNS",
     "SOURCE_NAME",
     "SOURCE_REF",
     "WORKBOOK_FILENAME",
@@ -68,14 +75,17 @@ __all__ = [
     "build_definitions_df",
     "build_county_membership_df",
     "build_coc_msa_crosswalk",
+    "build_msa_coc_coverage",
     "download_msa_boundaries",
     "download_delineation_rows",
     "ingest_msa_boundaries",
     "read_coc_msa_crosswalk",
     "read_msa_boundaries",
+    "read_msa_coc_coverage",
     "read_msa_definitions",
     "read_msa_county_membership",
     "save_coc_msa_crosswalk",
+    "save_msa_coc_coverage",
     "summarize_coc_msa_allocation",
     "select_top_msa_ids_for_panel_spec",
     "select_top_msa_ids_by_population",
