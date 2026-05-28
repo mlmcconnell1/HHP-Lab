@@ -31,12 +31,14 @@ from hhplab.geo.ct_planning_regions import (
 )
 from hhplab.geo.geo_io import resolve_curated_boundary_path
 from hhplab.naming import (
+    acs5_tracts_filename,
     coc_base_path,
     county_path,
     metro_boundaries_path,
     msa_boundaries_path,
     msa_county_membership_path,
     msa_definitions_path,
+    tract_path,
     tract_xwalk_path,
 )
 from hhplab.recipe.adapters import (
@@ -111,6 +113,7 @@ class FindingKind(str, enum.Enum):
     CT_COUNTY_ALIGNMENT = "ct_county_alignment"
     MISSING_MAP_ARTIFACT = "missing_map_artifact"
     MISSING_CONTAINMENT_ARTIFACT = "missing_containment_artifact"
+    MISSING_MSA_COC_COVERAGE_ARTIFACT = "missing_msa_coc_coverage_artifact"
     CONTAINMENT_SELECTOR = "containment_selector"
     TARGET_SELECTOR = "target_selector"
 
@@ -1176,6 +1179,104 @@ def _check_containment_artifacts(
                             geo_type=geo_type,
                         )
                     )
+
+    return findings
+
+
+def _check_msa_coc_coverage_artifacts(
+    recipe: RecipeV1,
+    project_root: Path,
+) -> list[PreflightFinding]:
+    """Check recipe-native MSA-CoC coverage targets for required artifacts."""
+    findings: list[PreflightFinding] = []
+    data_root = load_config(project_root=project_root).asset_store_root
+
+    for target in recipe.targets:
+        spec = target.msa_coc_coverage
+        if "msa_coc_coverage" not in target.outputs or spec is None:
+            continue
+
+        artifact_paths: dict[str, tuple[Path, str, object | None, str | None, str | None]] = {
+            "CoC boundary artifact": (
+                coc_base_path(str(spec.coc_boundary_vintage), data_root),
+                "coc",
+                spec.coc_boundary_vintage,
+                None,
+                "hhplab ingest boundaries --source hud_exchange "
+                f"--vintage {spec.coc_boundary_vintage}",
+            ),
+            "county geometry artifact": (
+                county_path(spec.county_vintage, data_root),
+                "county",
+                spec.county_vintage,
+                None,
+                f"hhplab ingest tiger --year {spec.county_vintage} --type counties",
+            ),
+            "MSA definitions artifact": (
+                msa_definitions_path(spec.msa_definition_version, data_root),
+                "msa",
+                spec.county_vintage,
+                spec.msa_definition_version,
+                f"hhplab generate msa --definition-version {spec.msa_definition_version}",
+            ),
+            "MSA county membership artifact": (
+                msa_county_membership_path(spec.msa_definition_version, data_root),
+                "msa",
+                spec.county_vintage,
+                spec.msa_definition_version,
+                f"hhplab generate msa --definition-version {spec.msa_definition_version}",
+            ),
+        }
+
+        if "population" in spec.overlap_bases:
+            if spec.tract_vintage is not None:
+                artifact_paths["tract geometry artifact"] = (
+                    tract_path(spec.tract_vintage, data_root),
+                    "tract",
+                    spec.tract_vintage,
+                    None,
+                    f"hhplab ingest tiger --year {spec.tract_vintage} --type tracts",
+                )
+            if spec.acs5_population_vintage is not None and spec.tract_vintage is not None:
+                artifact_paths["ACS5 tract population artifact"] = (
+                    data_root
+                    / "curated"
+                    / "acs"
+                    / acs5_tracts_filename(
+                        str(spec.acs5_population_vintage),
+                        spec.tract_vintage,
+                    ),
+                    "tract",
+                    spec.tract_vintage,
+                    None,
+                    "hhplab ingest acs5-tract "
+                    f"--acs {spec.acs5_population_vintage} "
+                    f"--tracts {spec.tract_vintage}",
+                )
+
+        for label, (path, geo_type, vintage, definition_version, command) in sorted(
+            artifact_paths.items()
+        ):
+            if path.exists():
+                continue
+            findings.append(
+                PreflightFinding(
+                    severity=Severity.ERROR,
+                    kind=FindingKind.MISSING_MSA_COC_COVERAGE_ARTIFACT,
+                    message=(
+                        f"MSA-CoC coverage target '{target.id}' requires missing "
+                        f"{label}: {path}"
+                    ),
+                    geometry=geo_type,
+                    remediation=Remediation(
+                        hint=(
+                            f"Build or ingest the {label} for MSA-CoC coverage "
+                            f"target '{target.id}'."
+                        ),
+                        command=command,
+                    ),
+                )
+            )
 
     return findings
 
@@ -2685,6 +2786,55 @@ def _check_msa_coc_panel_sources(
     return findings
 
 
+def _check_msa_coc_coverage_sources(
+    recipe: RecipeV1,
+    pipeline_resample_tasks: list[tuple[str, ResampleTask]],
+) -> list[PreflightFinding]:
+    """Check that MSA-CoC coverage targets have a ranking source step."""
+    findings: list[PreflightFinding] = []
+    tasks_by_pipeline: dict[str, list[ResampleTask]] = {}
+    for pipeline_id, task in pipeline_resample_tasks:
+        tasks_by_pipeline.setdefault(pipeline_id, []).append(task)
+
+    for pipeline in recipe.pipelines:
+        target = next((target for target in recipe.targets if target.id == pipeline.target), None)
+        if target is None or target.msa_coc_coverage is None:
+            continue
+        spec = target.msa_coc_coverage
+        tasks = tasks_by_pipeline.get(pipeline.id, [])
+        matching = [
+            task
+            for task in tasks
+            if _preflight_source_token(recipe, task.dataset_id) == spec.ranking_population_source
+            and task.to_geometry.type == "msa"
+            and task.year == spec.ranking_reference_year
+        ]
+        if matching:
+            continue
+        findings.append(
+            PreflightFinding(
+                severity=Severity.ERROR,
+                kind=FindingKind.MISSING_DATASET,
+                message=(
+                    f"MSA-CoC coverage target '{target.id}' requires a recipe "
+                    f"resample step for {spec.ranking_population_source.upper()} "
+                    f"MSA ranking population in year {spec.ranking_reference_year}."
+                ),
+                pipeline_id=pipeline.id,
+                geometry="msa",
+                remediation=Remediation(
+                    hint=(
+                        "Add a dataset and resample step that materializes the "
+                        "ranking population source at MSA geometry before "
+                        "msa_coc_coverage persistence."
+                    ),
+                ),
+            )
+        )
+
+    return findings
+
+
 def _preflight_source_token(recipe: RecipeV1, dataset_id: str) -> str:
     ds = recipe.datasets.get(dataset_id)
     if ds is None:
@@ -2743,6 +2893,7 @@ def run_preflight(
     report.findings.extend(_check_adapter_validation(recipe))
     report.findings.extend(_check_map_artifacts(recipe, project_root))
     report.findings.extend(_check_containment_artifacts(recipe, project_root))
+    report.findings.extend(_check_msa_coc_coverage_artifacts(recipe, project_root))
     report.findings.extend(_check_target_selectors(recipe, project_root))
 
     # 2. Resolve plans and collect tasks (before path checks so we
@@ -2850,6 +3001,12 @@ def run_preflight(
     )
     report.findings.extend(
         _check_msa_coc_panel_sources(
+            recipe,
+            pipeline_resample_tasks,
+        ),
+    )
+    report.findings.extend(
+        _check_msa_coc_coverage_sources(
             recipe,
             pipeline_resample_tasks,
         ),

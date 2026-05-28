@@ -48,6 +48,7 @@ from hhplab.recipe.executor_manifest import (
     _recipe_output_dirname,
     _resolve_containment_output_file,
     _resolve_map_output_file,
+    _resolve_msa_coc_coverage_output_file,
     _resolve_panel_output_file,
     _resolve_pipeline_target,
     _target_geometry_metadata,
@@ -73,6 +74,9 @@ from hhplab.recipe.executor_panel import (
 )
 from hhplab.recipe.executor_persistence import (
     persist_containment as _persist_containment,
+)
+from hhplab.recipe.executor_persistence import (
+    persist_msa_coc_coverage as _persist_msa_coc_coverage,
 )
 from hhplab.recipe.executor_persistence import (
     persist_diagnostics as _persist_diagnostics,
@@ -1024,6 +1028,12 @@ def _execute_plan(
 
     if "containment" in declared_outputs:
         step = _persist_containment(plan, ctx)
+        result.steps.append(step)
+        if not step.success:
+            return result
+
+    if "msa_coc_coverage" in declared_outputs:
+        step = _persist_msa_coc_coverage(plan, ctx)
         result.steps.append(step)
         if not step.success:
             return result

@@ -18,6 +18,7 @@ from hhplab.naming import (
     containment_filename,
     geo_map_filename,
     geo_panel_filename,
+    msa_coc_coverage_filename,
     msa_coc_panel_filename,
 )
 from hhplab.recipe.executor_core import (
@@ -305,6 +306,37 @@ def _resolve_containment_output_file(
     )
 
 
+def _resolve_msa_coc_coverage_output_file(
+    recipe: RecipeV1,
+    pipeline_id: str,
+    project_root: Path,
+    storage_config: StorageConfig | None = None,
+) -> Path:
+    """Return the canonical MSA-CoC coverage parquet path for a pipeline."""
+    _, target = _resolve_pipeline_target(recipe, pipeline_id)
+    if target.msa_coc_coverage is None:
+        raise ExecutorError(
+            f"Target '{target.id}' declares msa_coc_coverage output without "
+            "msa_coc_coverage."
+        )
+
+    spec = target.msa_coc_coverage
+    cfg = storage_config or load_config(project_root=project_root)
+    recipe_dir = _recipe_output_dirname(recipe.name)
+    return (
+        cfg.output_root
+        / recipe_dir
+        / msa_coc_coverage_filename(
+            spec.year,
+            spec.coc_boundary_vintage,
+            spec.msa_definition_version,
+            spec.county_vintage,
+            spec.top_n,
+            spec.overlap_bases,
+        )
+    )
+
+
 def resolve_pipeline_artifacts(
     recipe: RecipeV1,
     pipeline_id: str,
@@ -366,5 +398,43 @@ def resolve_pipeline_artifacts(
         artifacts[manifest_key] = _display_path(
             containment_file.with_suffix(".manifest.json"),
         )
+
+    if "msa_coc_coverage" in target.outputs:
+        coverage_file = _resolve_msa_coc_coverage_output_file(
+            recipe,
+            pipeline_id,
+            project_root,
+            storage_config=storage_config,
+        )
+        spec = target.msa_coc_coverage
+        artifacts["msa_coc_coverage_path"] = _display_path(coverage_file)
+        artifacts["msa_coc_coverage_manifest_path"] = _display_path(
+            coverage_file.with_suffix(".manifest.json"),
+        )
+        if spec is not None and spec.csv_sidecar:
+            artifacts["msa_coc_coverage_csv_path"] = _display_path(
+                coverage_file.with_suffix(".csv"),
+            )
+        if spec is not None:
+            artifacts["msa_coc_coverage_parameters"] = {
+                "year": spec.year,
+                "top_n": spec.top_n,
+                "overlap_bases": list(spec.overlap_bases),
+                "ranking_population_source": spec.ranking_population_source,
+                "ranking_reference_year": spec.ranking_reference_year,
+                "coc_boundary_vintage": spec.coc_boundary_vintage,
+                "msa_definition_version": spec.msa_definition_version,
+                "county_vintage": spec.county_vintage,
+                "acs5_population_vintage": spec.acs5_population_vintage,
+                "acs5_population_reference_year": (
+                    spec.acs5_population_reference_year
+                    if spec.acs5_population_reference_year is not None
+                    else spec.acs5_population_vintage
+                ),
+                "tract_vintage": spec.tract_vintage,
+                "min_msa_area_coverage_share": spec.min_msa_area_coverage_share,
+                "min_msa_population_coverage_share": spec.min_msa_population_coverage_share,
+                "csv_sidecar": spec.csv_sidecar,
+            }
 
     return artifacts

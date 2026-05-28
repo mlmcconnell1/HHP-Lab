@@ -8,13 +8,13 @@ from pathlib import Path
 import geopandas as gpd
 import pandas as pd
 import pytest
-from shapely.geometry import Polygon
+from shapely.geometry import Polygon, box
 from typer.testing import CliRunner
 
 from hhplab.cli.main import app
 from hhplab.geo.ct_planning_regions import CtPlanningRegionCrosswalk
 from hhplab.panel.assemble import _load_coc_areas
-from hhplab.provenance import ProvenanceBlock, write_parquet_with_provenance
+from hhplab.provenance import ProvenanceBlock, read_provenance, write_parquet_with_provenance
 from hhplab.recipe.adapters import (
     DatasetAdapterRegistry,
     GeometryAdapterRegistry,
@@ -61,6 +61,7 @@ from hhplab.recipe.recipe_schema import (
     DatasetSpec,
     GeometryRef,
     MapSpec,
+    MsaCocCoverageSpec,
     MsaCocPanelSpec,
     PanelPolicy,
     RecipeV1,
@@ -72,6 +73,9 @@ from hhplab.recipe.recipe_schema import (
     ZoriPolicy,
     expand_year_spec,
 )
+from hhplab.recipe.preflight import run_preflight
+from hhplab.schema.columns import MSA_COC_COVERAGE_COLUMNS
+from hhplab.xwalks.county import ALBERS_EQUAL_AREA_CRS
 
 runner = CliRunner()
 
@@ -2928,6 +2932,211 @@ class TestMsaCocPanelSpec:
                 unemployment_source="acs5",
                 output_aliases={"msa_population": "msa_population_pep"},
             )
+
+
+def _msa_coc_coverage_recipe() -> dict:
+    return {
+        "version": 1,
+        "name": "msa-coverage-test",
+        "universe": {"years": [2024]},
+        "targets": [
+            {
+                "id": "msa_coc_coverage",
+                "geometry": {"type": "coc", "vintage": 2025},
+                "outputs": ["msa_coc_coverage"],
+                "msa_coc_coverage": {
+                    "year": 2024,
+                    "top_n": 2,
+                    "ranking_population_source": "pep",
+                    "ranking_reference_year": 2024,
+                    "coc_boundary_vintage": 2025,
+                    "msa_definition_version": "census_msa_2023",
+                    "county_vintage": 2023,
+                    "overlap_bases": ["area", "population"],
+                    "acs5_population_vintage": 2023,
+                    "acs5_population_reference_year": 2023,
+                    "tract_vintage": 2020,
+                    "csv_sidecar": True,
+                },
+            }
+        ],
+        "datasets": {
+            "pep_msa": {
+                "provider": "census",
+                "product": "pep",
+                "version": 1,
+                "native_geometry": {"type": "msa", "source": "census_msa_2023"},
+                "years": {"years": [2024]},
+                "path": "data/curated/pep/pep_msa.parquet",
+            }
+        },
+        "pipelines": [
+            {
+                "id": "coverage",
+                "target": "msa_coc_coverage",
+                "steps": [
+                    {
+                        "resample": {
+                            "dataset": "pep_msa",
+                            "to_geometry": {"type": "msa", "source": "census_msa_2023"},
+                            "method": "identity",
+                            "measures": ["population"],
+                        }
+                    }
+                ],
+            }
+        ],
+    }
+
+
+def _write_msa_coc_coverage_fixtures(tmp_path: Path) -> None:
+    data_root = tmp_path / "data"
+    (data_root / "curated" / "pep").mkdir(parents=True, exist_ok=True)
+    (data_root / "curated" / "coc_boundaries").mkdir(parents=True, exist_ok=True)
+    (data_root / "curated" / "tiger").mkdir(parents=True, exist_ok=True)
+    (data_root / "curated" / "msa").mkdir(parents=True, exist_ok=True)
+    (data_root / "curated" / "acs").mkdir(parents=True, exist_ok=True)
+
+    pd.DataFrame(
+        {
+            "geo_id": ["35620", "41180"],
+            "year": [2024, 2024],
+            "population": [100, 100],
+        }
+    ).to_parquet(data_root / "curated" / "pep" / "pep_msa.parquet")
+
+    county = gpd.GeoDataFrame(
+        {"GEOID": ["36061", "29510"]},
+        geometry=[box(0, 0, 10, 10), box(10, 0, 20, 10)],
+        crs=ALBERS_EQUAL_AREA_CRS,
+    )
+    county.to_parquet(data_root / "curated" / "tiger" / "counties__C2023.parquet")
+
+    coc = gpd.GeoDataFrame(
+        {
+            "coc_id": ["NY-600", "MO-500"],
+            "coc_name": ["Left CoC", "Split CoC"],
+        },
+        geometry=[box(0, 0, 10, 10), box(5, 0, 15, 10)],
+        crs=ALBERS_EQUAL_AREA_CRS,
+    )
+    coc.to_parquet(data_root / "curated" / "coc_boundaries" / "coc__B2025.parquet")
+
+    membership = pd.DataFrame(
+        {
+            "msa_id": ["35620", "41180"],
+            "cbsa_code": ["35620", "41180"],
+            "msa_name": ["Left MSA", "Right MSA"],
+            "county_fips": ["36061", "29510"],
+        }
+    )
+    membership.to_parquet(
+        data_root / "curated" / "msa" / "msa_county_membership__census_msa_2023.parquet"
+    )
+    pd.DataFrame({"msa_id": ["35620", "41180"]}).to_parquet(
+        data_root / "curated" / "msa" / "msa_definitions__census_msa_2023.parquet"
+    )
+
+    tracts = gpd.GeoDataFrame(
+        {"GEOID": ["36061000100", "36061000200", "29510000100", "29510000200"]},
+        geometry=[
+            box(0, 0, 5, 10),
+            box(5, 0, 10, 10),
+            box(10, 0, 15, 10),
+            box(15, 0, 20, 10),
+        ],
+        crs=ALBERS_EQUAL_AREA_CRS,
+    )
+    tracts.to_parquet(data_root / "curated" / "tiger" / "tracts__T2020.parquet")
+    pd.DataFrame(
+        {
+            "GEOID": ["36061000100", "36061000200", "29510000100", "29510000200"],
+            "year": [2023, 2023, 2023, 2023],
+            "total_population": [0, 100, 100, 0],
+        }
+    ).to_parquet(data_root / "curated" / "acs" / "acs5_tracts__A2023xT2020.parquet")
+
+
+class TestMsaCocCoverageSpec:
+    """Tests for the recipe-native MSA-CoC coverage schema surface."""
+
+    def test_spec_loads_with_population_basis_defaults_and_controls(self):
+        recipe = load_recipe(_msa_coc_coverage_recipe())
+        spec = recipe.targets[0].msa_coc_coverage
+
+        assert isinstance(spec, MsaCocCoverageSpec)
+        assert spec.year == 2024
+        assert spec.overlap_bases == ["area", "population"]
+        assert spec.acs5_population_vintage == 2023
+        assert spec.acs5_population_reference_year == 2023
+        assert spec.tract_vintage == 2020
+        assert spec.csv_sidecar is True
+
+    def test_population_basis_requires_acs5_denominator_fields(self):
+        data = _msa_coc_coverage_recipe()
+        spec = data["targets"][0]["msa_coc_coverage"]
+        spec.pop("acs5_population_vintage")
+
+        with pytest.raises(RecipeLoadError, match="population overlap requires"):
+            load_recipe(data)
+
+    def test_spec_requires_coverage_output_and_coc_target_geometry(self):
+        data = _msa_coc_coverage_recipe()
+        data["targets"][0]["outputs"] = ["diagnostics"]
+        with pytest.raises(RecipeLoadError, match="requires outputs to include 'msa_coc_coverage'"):
+            load_recipe(data)
+
+        data = _msa_coc_coverage_recipe()
+        data["targets"][0]["geometry"] = {"type": "msa", "source": "census_msa_2023"}
+        with pytest.raises(RecipeLoadError, match="requires target geometry type 'coc'"):
+            load_recipe(data)
+
+    def test_preflight_reports_missing_population_prerequisites(self, tmp_path: Path):
+        _make_project_root(tmp_path)
+        recipe = load_recipe(_msa_coc_coverage_recipe())
+
+        report = run_preflight(recipe, tmp_path)
+
+        messages = [finding.message for finding in report.findings]
+        assert any("ACS5 tract population artifact" in message for message in messages)
+        commands = [
+            finding.remediation.command
+            for finding in report.findings
+            if finding.remediation is not None
+        ]
+        assert any(command and "hhplab ingest acs5-tract" in command for command in commands)
+
+    def test_executor_persists_area_and_population_coverage_with_manifest(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ):
+        _make_project_root(tmp_path)
+        _write_msa_coc_coverage_fixtures(tmp_path)
+        monkeypatch.chdir(tmp_path)
+        recipe = load_recipe(_msa_coc_coverage_recipe())
+
+        results = execute_recipe(recipe, project_root=tmp_path, quiet=True)
+
+        assert len(results) == 1
+        assert results[0].success is True
+        output = (
+            tmp_path
+            / "outputs"
+            / "msa-coverage-test"
+            / "msa_coc_coverage__Y2024@B2025xMcensus_msa_2023xC2023__top2__basis-area-population.parquet"
+        )
+        assert output.exists()
+        assert output.with_suffix(".csv").exists()
+        assert output.with_suffix(".manifest.json").exists()
+        coverage = pd.read_parquet(output)
+        assert list(coverage.columns) == list(MSA_COC_COVERAGE_COLUMNS)
+        assert set(coverage["overlap_basis"]) == {"area", "population"}
+        manifest = read_manifest(output.with_suffix(".manifest.json"))
+        assert manifest.output_path == str(output.relative_to(tmp_path))
+        provenance = read_provenance(output)
+        assert provenance.extra["dataset_type"] == "msa_coc_coverage"
+        assert provenance.extra["overlap_bases"] == ["area", "population"]
 
 
 class TestSmallAreaEstimateSchema:
@@ -7067,6 +7276,40 @@ class TestRecipePlanCmd:
         assert len(plan["resample_tasks"]) == 4  # 2 datasets × 2 years
         assert len(plan["join_tasks"]) == 2  # 2 years
         assert plan["task_count"] == 7
+
+    def test_plan_json_exposes_msa_coc_coverage_artifact_metadata(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ):
+        _make_project_root(tmp_path)
+        monkeypatch.chdir(tmp_path)
+        rf = self._write_recipe(tmp_path, _msa_coc_coverage_recipe())
+
+        result = runner.invoke(
+            app,
+            [
+                "build",
+                "recipe-plan",
+                "--recipe",
+                str(rf),
+                "--json",
+            ],
+        )
+
+        assert result.exit_code == 0
+        out = json.loads(result.output)
+        artifacts = out["pipelines"][0]["artifacts"]
+        assert artifacts["msa_coc_coverage_path"] == (
+            "outputs/msa-coverage-test/"
+            "msa_coc_coverage__Y2024@B2025xMcensus_msa_2023xC2023__top2__basis-area-population.parquet"
+        )
+        assert artifacts["msa_coc_coverage_csv_path"].endswith(".csv")
+        assert artifacts["msa_coc_coverage_parameters"]["overlap_bases"] == [
+            "area",
+            "population",
+        ]
+        assert artifacts["msa_coc_coverage_parameters"]["acs5_population_vintage"] == 2023
 
     def test_plan_json_shows_resolved_paths(
         self,

@@ -1,0 +1,50 @@
+version: 1
+name: msa-coc-coverage-sanity
+description: >
+  Minimal recipe-native MSA-CoC overlap coverage fixture with area and ACS5
+  population overlap bases.
+
+universe:
+  years: [2024]
+
+targets:
+  - id: msa_coc_coverage
+    geometry: { type: coc, vintage: 2025 }
+    outputs: [msa_coc_coverage]
+    msa_coc_coverage:
+      year: 2024
+      top_n: 100
+      ranking_population_source: pep
+      ranking_reference_year: 2024
+      coc_boundary_vintage: 2025
+      msa_definition_version: census_msa_2023
+      county_vintage: 2023
+      overlap_bases: [area, population]
+      acs5_population_vintage: 2023
+      acs5_population_reference_year: 2023
+      tract_vintage: 2020
+      min_msa_area_coverage_share: 0.0
+      min_msa_population_coverage_share: 0.0
+      csv_sidecar: true
+
+datasets:
+  pep_msa:
+    provider: census
+    product: pep
+    version: 1
+    native_geometry: { type: msa, source: census_msa_2023 }
+    years:
+      years: [2024]
+    year_column: year
+    geo_column: msa_id
+    path: data/curated/pep/pep_msa__Y2024@Mcensus_msa_2023.parquet
+
+pipelines:
+  - id: coverage
+    target: msa_coc_coverage
+    steps:
+      - resample:
+          dataset: pep_msa
+          to_geometry: { type: msa, source: census_msa_2023 }
+          method: identity
+          measures: [population]

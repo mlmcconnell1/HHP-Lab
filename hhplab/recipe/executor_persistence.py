@@ -24,7 +24,14 @@ import pyarrow as pa
 import pyarrow.parquet as pq
 
 from hhplab.config import load_config
-from hhplab.naming import coc_base_path, county_path, msa_county_membership_path
+from hhplab.msa.coverage import build_msa_coc_coverage, save_msa_coc_coverage
+from hhplab.naming import (
+    acs5_tracts_filename,
+    coc_base_path,
+    county_path,
+    msa_county_membership_path,
+    tract_path,
+)
 from hhplab.panel.conformance import PanelRequest, run_conformance
 from hhplab.panel.panel_diagnostics import generate_diagnostics_report
 from hhplab.panel.zori_eligibility import summarize_zori_eligibility
@@ -40,12 +47,16 @@ from hhplab.recipe.executor_manifest import (
     _build_manifest,
     _build_provenance,
     _resolve_containment_output_file,
+    _resolve_msa_coc_coverage_output_file,
     _resolve_panel_output_file,
     _resolve_pipeline_target,
 )
 from hhplab.recipe.executor_msa_coc_panel import (
     assemble_msa_coc_panel,
     build_msa_coc_containment_spec,
+    _collect_frame_records,
+    _population_column,
+    _source_year_frame,
 )
 from hhplab.recipe.executor_panel import assemble_panel
 from hhplab.recipe.executor_panel_policies import collect_conformance_flags
@@ -455,6 +466,157 @@ def persist_containment(
     detail = f"persist containment: {len(containment)} rows -> {output_rel}"
     _echo(ctx, f"  [persist] {detail}")
     return StepResult(step_kind="persist_containment", detail=detail, success=True)
+
+
+def persist_msa_coc_coverage(
+    plan: ExecutionPlan,
+    ctx: ExecutionContext,
+) -> StepResult:
+    """Build and persist a recipe-native MSA-CoC coverage artifact."""
+    try:
+        _pipeline, target = _resolve_pipeline_target(ctx.recipe, plan.pipeline_id)
+        if target.msa_coc_coverage is None:
+            raise ExecutorError(
+                f"Target '{target.id}' declares msa_coc_coverage output without "
+                "msa_coc_coverage."
+            )
+        spec = target.msa_coc_coverage
+        cfg = ctx.storage_config or load_config(project_root=ctx.project_root)
+        data_root = cfg.asset_store_root
+
+        output_file = _resolve_msa_coc_coverage_output_file(
+            ctx.recipe,
+            plan.pipeline_id,
+            ctx.project_root,
+            storage_config=ctx.storage_config,
+        )
+
+        coc_file = coc_base_path(str(spec.coc_boundary_vintage), data_root)
+        county_file = county_path(spec.county_vintage, data_root)
+        membership_file = msa_county_membership_path(spec.msa_definition_version, data_root)
+        input_artifacts: dict[str, str] = {
+            "coc_boundaries": _coverage_input_path(coc_file, ctx),
+            "county_geometry": _coverage_input_path(county_file, ctx),
+            "msa_county_membership": _coverage_input_path(membership_file, ctx),
+        }
+        for artifact in (coc_file, county_file, membership_file):
+            _record_containment_asset(ctx, artifact)
+
+        records = _collect_frame_records(plan, ctx)
+        ranking_frame = _source_year_frame(
+            records,
+            source_token=spec.ranking_population_source,
+            geo_type="msa",
+            year=spec.ranking_reference_year,
+            purpose="MSA coverage ranking population",
+        )
+        ranking_column = _population_column(ranking_frame, spec.ranking_population_source)
+
+        acs5_population_df: pd.DataFrame | None = None
+        tract_gdf: gpd.GeoDataFrame | None = None
+        if "population" in spec.overlap_bases:
+            if spec.acs5_population_vintage is None or spec.tract_vintage is None:
+                raise ValueError(
+                    "MSA-CoC coverage population overlap requires "
+                    "acs5_population_vintage and tract_vintage."
+                )
+            tract_file = tract_path(spec.tract_vintage, data_root)
+            acs_file = (
+                data_root
+                / "curated"
+                / "acs"
+                / acs5_tracts_filename(str(spec.acs5_population_vintage), spec.tract_vintage)
+            )
+            _record_containment_asset(ctx, tract_file)
+            _record_containment_asset(ctx, acs_file)
+            input_artifacts["tract_geometry"] = _coverage_input_path(tract_file, ctx)
+            input_artifacts["acs5_population"] = _coverage_input_path(acs_file, ctx)
+            tract_gdf = _read_geoparquet(tract_file, "tract geometry")
+            acs5_population_df = _read_parquet(acs_file, "ACS5 tract population")
+
+        coverage = build_msa_coc_coverage(
+            _read_geoparquet(coc_file, "CoC boundary geometry"),
+            _read_geoparquet(county_file, "county geometry"),
+            _read_parquet(membership_file, "MSA county membership"),
+            ranking_frame,
+            year=spec.year,
+            top_n=spec.top_n,
+            ranking_population_source=spec.ranking_population_source,
+            ranking_reference_year=spec.ranking_reference_year,
+            boundary_vintage=str(spec.coc_boundary_vintage),
+            county_vintage=str(spec.county_vintage),
+            definition_version=spec.msa_definition_version,
+            overlap_bases=tuple(spec.overlap_bases),
+            acs5_population_df=acs5_population_df,
+            tract_gdf=tract_gdf,
+            acs5_population_vintage=spec.acs5_population_vintage,
+            ranking_population_column=ranking_column,
+            min_msa_area_coverage_share=spec.min_msa_area_coverage_share,
+            min_msa_population_coverage_share=spec.min_msa_population_coverage_share,
+        )
+    except (ExecutorError, FileNotFoundError, ValueError, KeyError) as exc:
+        return StepResult(
+            step_kind="persist_msa_coc_coverage",
+            detail="persist MSA-CoC coverage",
+            success=False,
+            error=str(exc),
+        )
+
+    output_file.parent.mkdir(parents=True, exist_ok=True)
+    if output_file.exists() and output_file in getattr(ctx, "_written_outputs", set()):
+        return StepResult(
+            step_kind="persist_msa_coc_coverage",
+            detail="persist MSA-CoC coverage",
+            success=False,
+            error=(
+                f"Output collision: pipeline '{plan.pipeline_id}' resolves to "
+                f"'{output_file}' which was already written by another pipeline "
+                "in this recipe."
+            ),
+        )
+
+    try:
+        output_rel = str(output_file.relative_to(ctx.project_root))
+    except ValueError:
+        output_rel = str(output_file)
+
+    save_msa_coc_coverage(
+        coverage,
+        output_file,
+        year=spec.year,
+        boundary_vintage=str(spec.coc_boundary_vintage),
+        county_vintage=str(spec.county_vintage),
+        definition_version=spec.msa_definition_version,
+        overlap_bases=tuple(spec.overlap_bases),
+        ranking_population_source=spec.ranking_population_source,
+        ranking_reference_year=spec.ranking_reference_year,
+        top_n=spec.top_n,
+        acs5_population_vintage=spec.acs5_population_vintage,
+        input_artifacts=input_artifacts,
+    )
+    if spec.csv_sidecar:
+        coverage.to_csv(output_file.with_suffix(".csv"), index=False)
+
+    if not hasattr(ctx, "_written_outputs"):
+        ctx._written_outputs = set()  # type: ignore[attr-defined]
+    ctx._written_outputs.add(output_file)  # type: ignore[attr-defined]
+
+    manifest = _build_manifest(
+        ctx.recipe,
+        plan.pipeline_id,
+        ctx,
+        output_path=output_rel,
+    )
+    write_manifest(manifest, output_file.with_suffix(".manifest.json"))
+
+    detail = f"persist MSA-CoC coverage: {len(coverage)} rows -> {output_rel}"
+    _echo(ctx, f"  [persist] {detail}")
+    return StepResult(step_kind="persist_msa_coc_coverage", detail=detail, success=True)
+
+
+def _coverage_input_path(path: Path, ctx: ExecutionContext) -> str:
+    _root, rel = _classify_path(path, ctx)
+    return rel
 
 
 def _apply_target_panel_selector(

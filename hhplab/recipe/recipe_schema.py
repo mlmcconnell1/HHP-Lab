@@ -205,7 +205,7 @@ FilterSpec = TemporalFilter  # Extensible: Union[TemporalFilter, ...] in future
 # Targets / outputs
 # -----------------------------
 
-OutputKind = Literal["panel", "diagnostics", "map", "containment"]
+OutputKind = Literal["panel", "diagnostics", "map", "containment", "msa_coc_coverage"]
 
 CohortMethod = Literal["top_n", "bottom_n", "percentile"]
 
@@ -465,6 +465,7 @@ ContainmentDenominator = Literal["candidate_area", "container_area"]
 ContainmentMethod = Literal["planar_intersection"]
 MsaCocPopulationSource = Literal["pep", "acs5"]
 MsaCocUnemploymentSource = Literal["acs5", "laus"]
+MsaCocOverlapBasis = Literal["area", "population"]
 SUPPORTED_CONTAINMENT_PAIRS: frozenset[tuple[str, str]] = frozenset(
     {
         ("msa", "coc"),
@@ -631,6 +632,106 @@ class MsaCocPanelSpec(BaseModel):
         return self
 
 
+class MsaCocCoverageSpec(BaseModel):
+    """Declarative MSA-CoC overlap coverage artifact contract."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    year: int = Field(..., description="Single analysis year represented by the output.")
+    top_n: int = Field(
+        ...,
+        ge=1,
+        description="Number of MSAs retained by the ranking population source.",
+    )
+    ranking_population_source: MsaCocPopulationSource = Field(
+        ...,
+        description="Population source used to rank candidate MSAs.",
+    )
+    ranking_reference_year: int = Field(
+        ...,
+        description="Reference year whose population values rank candidate MSAs.",
+    )
+    coc_boundary_vintage: int | str = Field(
+        ...,
+        description="CoC boundary vintage used for overlap measurement.",
+    )
+    msa_definition_version: str = Field(
+        ...,
+        description="MSA definition version used for county membership.",
+    )
+    county_vintage: int | str = Field(
+        ...,
+        description="County geometry vintage used to dissolve MSA boundaries.",
+    )
+    overlap_bases: list[MsaCocOverlapBasis] = Field(
+        default_factory=lambda: ["area"],
+        min_length=1,
+        description="Overlap denominator bases to include. Use population to add ACS5 rows.",
+    )
+    acs5_population_vintage: int | str | None = Field(
+        default=None,
+        description="ACS5 tract population vintage used for population overlap rows.",
+    )
+    acs5_population_reference_year: int | None = Field(
+        default=None,
+        description="Reference year documented for the ACS5 denominator, defaults to vintage.",
+    )
+    tract_vintage: int | str | None = Field(
+        default=None,
+        description="Tract geometry vintage paired with ACS5 population denominators.",
+    )
+    min_msa_area_coverage_share: float | None = Field(
+        default=None,
+        ge=0.0,
+        le=1.0,
+        description="Inclusive minimum MSA area coverage share for area rows.",
+    )
+    min_msa_population_coverage_share: float | None = Field(
+        default=None,
+        ge=0.0,
+        le=1.0,
+        description="Inclusive minimum MSA population coverage share for population rows.",
+    )
+    csv_sidecar: bool = Field(
+        default=False,
+        description="Also write a CSV sidecar next to the Parquet output.",
+    )
+
+    @field_validator("msa_definition_version")
+    @classmethod
+    def _validate_msa_definition_version(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("MsaCocCoverageSpec.msa_definition_version must be non-empty.")
+        return value
+
+    @field_validator("overlap_bases")
+    @classmethod
+    def _validate_overlap_bases(
+        cls,
+        value: list[MsaCocOverlapBasis],
+    ) -> list[MsaCocOverlapBasis]:
+        unique = list(dict.fromkeys(value))
+        if not unique:
+            raise ValueError("MsaCocCoverageSpec.overlap_bases must include area or population.")
+        return unique
+
+    @model_validator(mode="after")
+    def _validate_population_denominator(self) -> MsaCocCoverageSpec:
+        if "population" in self.overlap_bases:
+            missing = []
+            if self.acs5_population_vintage is None:
+                missing.append("acs5_population_vintage")
+            if self.tract_vintage is None:
+                missing.append("tract_vintage")
+            if missing:
+                raise ValueError(
+                    "MsaCocCoverageSpec population overlap requires "
+                    f"{', '.join(missing)} so the executor can load ACS5 tract "
+                    "population denominators."
+                )
+        return self
+
+
 class CohortSelector(BaseModel):
     """Declarative cohort filter that ranks geographies by a measure column
     at a reference year and keeps only the selected subset."""
@@ -724,6 +825,13 @@ class TargetSpec(BaseModel):
             "msa_id x coc_id x year."
         ),
     )
+    msa_coc_coverage: MsaCocCoverageSpec | None = Field(
+        default=None,
+        description=(
+            "Declarative MSA-CoC overlap coverage surface with row grain "
+            "msa_id x coc_id x overlap_basis for one year."
+        ),
+    )
 
     @model_validator(mode="after")
     def _validate_output_policies(self) -> TargetSpec:
@@ -756,6 +864,16 @@ class TargetSpec(BaseModel):
                 raise ValueError("Target 'msa_coc_panel' requires outputs to include 'panel'.")
             if self.geometry.type != "coc":
                 raise ValueError("Target 'msa_coc_panel' requires target geometry type 'coc'.")
+        if "msa_coc_coverage" in outputs and self.msa_coc_coverage is None:
+            raise ValueError(
+                "Target outputs including 'msa_coc_coverage' require 'msa_coc_coverage'."
+            )
+        if "msa_coc_coverage" not in outputs and self.msa_coc_coverage is not None:
+            raise ValueError(
+                "Target 'msa_coc_coverage' requires outputs to include 'msa_coc_coverage'."
+            )
+        if self.msa_coc_coverage is not None and self.geometry.type != "coc":
+            raise ValueError("Target 'msa_coc_coverage' requires target geometry type 'coc'.")
         return self
 
 

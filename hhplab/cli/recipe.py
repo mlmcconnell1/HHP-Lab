@@ -447,6 +447,16 @@ def recipe_plan_cmd(
         plans.append(plan)
 
     if use_json:
+        storage_cfg = load_config()
+        pipeline_payloads = []
+        for plan in plans:
+            payload = plan.to_dict()
+            payload["artifacts"] = resolve_pipeline_artifacts(
+                parsed,
+                plan.pipeline_id,
+                storage_config=storage_cfg,
+            )
+            pipeline_payloads.append(payload)
         _json_out({
             "status": "ok",
             "recipe_name": parsed.name,
@@ -455,7 +465,7 @@ def recipe_plan_cmd(
                 "warnings": all_warnings,
                 "errors": [],
             },
-            "pipelines": [p.to_dict() for p in plans],
+            "pipelines": pipeline_payloads,
         })
         return
 
