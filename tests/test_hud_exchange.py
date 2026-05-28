@@ -16,6 +16,7 @@ from hhplab.hud.exchange_gis import (
     _download_per_state_shapefiles,
     _extract_state_from_coc_id,
     _find_field,
+    _should_use_arcgis_source,
     download_hud_exchange_gdb,
     ingest_hud_exchange,
     map_to_canonical_schema,
@@ -377,6 +378,58 @@ class TestIngestHudExchange:
         assert re.fullmatch(r"\d{8}-\d{6}", rid), (
             f"make_run_id() returned {rid!r}, expected YYYYMMDD-HHMMSS"
         )
+
+    @pytest.mark.parametrize(
+        ("boundary_vintage", "expected"),
+        [
+            ("2019", False),
+            ("2023", False),
+            ("2024", True),
+            ("2025", True),
+            ("HUDOpenData_2025-01-04", True),
+        ],
+    )
+    def test_arcgis_default_policy_is_current_vintage_only(
+        self,
+        boundary_vintage: str,
+        expected: bool,
+    ):
+        assert _should_use_arcgis_source(boundary_vintage) is expected
+
+    def test_historical_vintage_uses_legacy_source_by_default(self, tmp_path, monkeypatch):
+        """Historical year ingests should not relabel the current ArcGIS layer."""
+        import hhplab.hud.exchange_gis as mod
+
+        raw_dir = tmp_path / "raw"
+        curated_dir = tmp_path / "curated"
+        observed: dict[str, object] = {}
+
+        def fail_arcgis(*args, **kwargs):
+            raise AssertionError("historical ingest should not call ArcGIS by default")
+
+        def fake_download(boundary_vintage, output_dir, url=None):
+            observed["boundary_vintage"] = boundary_vintage
+            observed["url"] = url
+            return _create_test_shapefile(output_dir)
+
+        def capture_check_source_changed(**kwargs):
+            observed["source_url"] = kwargs["source_url"]
+            return False, {"is_new": True, "previous_sha256": None}
+
+        monkeypatch.setattr(mod, "fetch_from_arcgis", fail_arcgis)
+        monkeypatch.setattr(mod, "download_hud_exchange_gdb", fake_download)
+        monkeypatch.setattr(mod, "check_source_changed", capture_check_source_changed)
+
+        result = ingest_hud_exchange(
+            boundary_vintage="2019",
+            raw_dir=raw_dir,
+            curated_dir=curated_dir,
+        )
+
+        assert result.exists()
+        assert observed["boundary_vintage"] == "2019"
+        assert "2019" in str(observed["url"])
+        assert observed["source_url"] == observed["url"]
 
 
 class TestPerStateFallbackCompleteness:

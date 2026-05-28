@@ -41,6 +41,7 @@ from hhplab.cli.migrate_curated import migrate_curated_cmd
 from hhplab.cli.panel_diagnostics_cli import panel_diagnostics
 from hhplab.cli.pep_cli import ingest_pep
 from hhplab.cli.recipe import (
+    recipe_init_cmd,
     recipe_cmd,
     recipe_export_cmd,
     recipe_plan_cmd,
@@ -68,6 +69,7 @@ def register_commands(
     migrate_app: typer.Typer,
     generate_app: typer.Typer,
     build_app: typer.Typer,
+    recipe_app: typer.Typer,
     show_app: typer.Typer,
     registry_app: typer.Typer,
 ) -> None:
@@ -83,6 +85,7 @@ def register_commands(
     app.add_typer(diagnostics_app, name="diagnostics")
     app.add_typer(generate_app, name="generate")
     app.add_typer(build_app, name="build")
+    app.add_typer(recipe_app, name="recipe")
     app.add_typer(aggregate_app, name="aggregate")
     app.add_typer(show_app, name="show")
     app.add_typer(registry_app, name="registry")
@@ -129,6 +132,7 @@ def register_commands(
     build_app.command("recipe-provenance")(recipe_provenance_cmd)
     build_app.command("recipe-export")(recipe_export_cmd)
     build_app.command("recipe-preflight")(recipe_preflight_cmd)
+    recipe_app.command("init")(recipe_init_cmd)
     show_app.command("vintage-diffs")(compare_vintages)
     show_app.command("map")(show)
     show_app.command("measures")(show_measures)

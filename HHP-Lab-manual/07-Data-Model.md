@@ -23,6 +23,71 @@ the CLI can inspect local curated artifacts with
 | Census | PEP | county | 2010-ongoing | annual `population`, county FIPS/name/state, reference date, PEP vintage/provenance | CoC PEP population, metro PEP population, optional panel `population` measure | PEP reference dates are July 1 annual estimates; recipes can use temporal filters to align to January when needed. |
 | Zillow | ZORI | county or ZIP, normalized to county for standard panels | 2015-ongoing | monthly `zori`, region name/state, source URL, raw hash, metric/provenance fields | normalized ZORI, CoC ZORI, metro ZORI, yearly collapsed ZORI, panel rent columns | Standard panel alignment uses January observations to match PIT timing. |
 
+## MSA-CoC Coverage Artifact
+
+MSA-CoC coverage artifacts describe how selected metropolitan statistical areas
+overlap Continuum of Care boundaries. They are long-form coverage files, not
+panels. The row grain is one selected `msa_id` x `coc_id` x `overlap_basis` for
+one `year`.
+
+Canonical filename:
+
+```text
+msa_coc_coverage__Y2024@B2025xMcensus_msa_2023xC2023__top100__basis-area-population.parquet
+```
+
+Canonical recipe output location:
+
+```text
+outputs/<recipe-name>/msa_coc_coverage__Y<year>@B<boundary>xM<msa-definition>xC<county-vintage>__top<top_n>__basis-<bases>.parquet
+```
+
+Canonical columns:
+
+| Column | Type | Description |
+|--------|------|-------------|
+| `msa_id` | string | Selected MSA/CBSA identifier. |
+| `msa_name` | string | MSA name from the membership artifact. |
+| `year` | int | Analysis year represented by the coverage artifact. |
+| `coc_id` | string | CoC identifier. |
+| `coc_name` | string | CoC name from the boundary artifact. |
+| `overlap_basis` | string | `area` or `population`. |
+| `denominator_source` | string | `geometry` for area rows, `acs5` for population rows. |
+| `denominator_vintage` | string/null | ACS5 vintage for population rows; null for area rows. |
+| `denominator_column` | string | `area` or ACS5 `total_population`. |
+| `msa_covered_by_coc_percent` | float | Share of the MSA denominator inside the CoC. |
+| `coc_contained_in_msa_percent` | float | Share of the CoC denominator inside the MSA. |
+| `intersection_value` | float | Intersection area or allocated population. |
+| `msa_denominator` | float | Full selected MSA denominator for the row basis. |
+| `coc_denominator` | float | Full CoC denominator for the row basis. |
+| `boundary_vintage` | string | CoC boundary vintage used. |
+| `county_vintage` | string | County geometry vintage used to dissolve MSA geometry. |
+| `definition_version` | string | MSA definition/membership version. |
+| `top_n` | int | Number of population-ranked MSAs requested. |
+| `ranking_population_source` | string | Ranking source, currently `pep` or `acs5`. |
+| `ranking_reference_year` | int | Year used to rank MSAs before overlap measurement. |
+
+The reciprocal percentage columns answer different questions:
+
+- `msa_covered_by_coc_percent`: "How much of this MSA is covered by this CoC?"
+- `coc_contained_in_msa_percent`: "How much of this CoC is contained in this MSA?"
+
+These values are not interchangeable. A small CoC inside a large MSA can have a
+high `coc_contained_in_msa_percent` and a low `msa_covered_by_coc_percent`.
+
+Area and population bases can also disagree. A CoC may cover a large rural
+share of an MSA by area while covering a smaller share of its ACS5 tract
+population. Conversely, a compact urban CoC may cover little MSA area but a
+large share of the MSA population.
+
+Embedded Parquet provenance uses `dataset_type: "msa_coc_coverage"` in
+`extra` and records `year`, `top_n`, `overlap_bases`,
+`ranking_population_source`, `ranking_reference_year`,
+`selection_diagnostics`, `selected_msa_ids`, denominator definitions, input
+artifact paths, `row_count`, and `selected_msa_count`. The sidecar
+`.manifest.json` records the recipe name/version, pipeline id, output path,
+datasets, transforms, and consumed assets for bundle export.
+
 ## Analysis Geography Model
 
 HHP-Lab supports multiple analysis geographies—the unit of observation in derived outputs. The abstraction separates *analysis geography* (what you want to measure) from *source geometry* (how input data is natively organized).

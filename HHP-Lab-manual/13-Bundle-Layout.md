@@ -18,6 +18,14 @@ Current bundle layout:
 - `output/`: copied downstream outputs referenced from `output_root`
 - `assets/`: legacy project-relative assets from older manifests
 
+Recipe-native MSA-CoC coverage outputs are exported like other recipe outputs:
+the Parquet artifact referenced by `msa_coc_coverage_path` is copied under
+`output/`, and its sidecar manifest records consumed CoC, county, MSA
+membership, ranking population, tract geometry, and ACS5 denominator assets.
+When the recipe requested `csv_sidecar: true`, the CSV is an adjacent
+convenience file; the Parquet file and `.manifest.json` remain the authoritative
+artifact and lineage record.
+
 `recipe-export` also accepts `--asset-store-root` and `--output-root` so
 root-aware manifests can be exported correctly when the local storage layout is
 not using the built-in defaults.

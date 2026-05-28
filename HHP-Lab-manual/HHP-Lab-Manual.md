@@ -36,5 +36,6 @@
 - Build scaffold: [[04-CLI-Reference#build-scaffolding]]
 - Recipe execution: [[04-CLI-Reference#recipe-execution-recommended]]
 - Source availability: [[07-Data-Model#source-availability-catalog]]
+- MSA-CoC coverage artifacts: [[07-Data-Model#msa-coc-coverage-artifact]]
 - Bundle export: [[04-CLI-Reference#bundle-export]]
 - Recommended end-to-end workflow: [[09-Workflows#recommended-workflow-recipe-driven-build]]

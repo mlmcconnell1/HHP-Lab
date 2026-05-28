@@ -12,6 +12,10 @@ AGENTS_INFO_TEXT = """# HHP-Lab Agent Quick Reference
   - `hhplab build recipe --recipe <file> --json`
 - Use `hhplab build recipe-plan --recipe <file> --json` when you need the
   resolved task graph while authoring or debugging a recipe.
+- Scaffold recipe-first MSA-CoC overlap coverage workflows with:
+  - `hhplab recipe init msa-coc-overlap --output <file> --json`
+  - add `--overlap-basis population --acs5-population-vintage <year> --tract-vintage <year>`
+    when population overlap is required.
 - Run non-interactively for automation:
   - `hhplab --non-interactive ...`
   - or set `HHPLAB_NON_INTERACTIVE=1`

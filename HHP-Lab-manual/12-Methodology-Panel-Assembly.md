@@ -17,7 +17,9 @@ Panel assembly uses `hhplab build recipe` to align heterogeneous inputs to a geo
 - Executor runs `materialize -> resample -> join`, then persists only when the target includes `panel` output (default)
 - Current persisted panel target is the configured `output_root/<recipe-name>/`
   (`outputs/<recipe-name>/` with built-in defaults)
-- Non-panel outputs declared in `targets[].outputs` are currently intent-only and emit runtime warnings
+- Recipe-native non-panel outputs such as `map`, `containment`, and
+  `msa_coc_coverage` persist their own artifacts under the same recipe output
+  namespace when declared in `targets[].outputs`
 - Writes `*.manifest.json` sidecar listing consumed assets, with root-aware
   asset references for configurable storage layouts
 
@@ -71,6 +73,70 @@ Across both paths, users should monitor:
 - `coverage_ratio` and related diagnostics fields
 - boundary change indicators in panel outputs
 - missingness after joins
+
+## MSA-CoC Overlap Coverage Methodology
+
+MSA-CoC overlap coverage is a first-class recipe output for measuring how
+population-ranked MSAs intersect CoC boundaries. The output is separate from
+panel assembly because it has a one-year coverage grain, not a
+geography-by-year measure panel grain.
+
+The recipe executor builds coverage as follows:
+
+1. Load CoC boundary polygons for `coc_boundary_vintage`.
+2. Load TIGER county polygons for `county_vintage`.
+3. Load MSA county membership for `msa_definition_version` and dissolve counties
+   to selected MSA geometries.
+4. Rank MSAs using the recipe-resampled MSA population frame identified by
+   `ranking_population_source` and `ranking_reference_year`.
+5. Keep the top `top_n` MSAs.
+6. Intersect selected MSA geometries with CoC geometries.
+7. Emit one row per MSA/CoC/basis pair for each requested `overlap_basis`.
+
+For `area` rows, denominators are projected geometry areas in the analysis CRS.
+For `population` rows, the required denominator source is ACS5 tract
+`total_population`; tract population is allocated to MSA/CoC intersections by
+tract area share. Other denominator families such as households or renter
+households are not part of the current contract.
+
+Two reciprocal percentages are emitted for every row:
+
+- `msa_covered_by_coc_percent = intersection_value / msa_denominator`
+- `coc_contained_in_msa_percent = intersection_value / coc_denominator`
+
+These fields intentionally have different denominators. Use the first when
+asking whether a CoC covers a meaningful share of a selected MSA. Use the
+second when asking whether a CoC is mostly contained in a selected MSA.
+
+Thresholds are basis-aware:
+
+- `min_msa_area_coverage_share` applies only to `overlap_basis: area` rows.
+- `min_msa_population_coverage_share` applies only to `overlap_basis:
+  population` rows.
+- Both thresholds filter on `msa_covered_by_coc_percent`.
+
+Because area and population density are uneven, area coverage and population
+coverage can rank the same MSA/CoC pair differently. Treat this as a diagnostic
+signal rather than a contradiction.
+
+Population-basis coverage requires these curated inputs:
+
+```text
+data/curated/acs/acs5_tracts__A<acs5_population_vintage>xT<tract_vintage>.parquet
+data/curated/tiger/tracts__T<tract_vintage>.parquet
+```
+
+Run preflight before execution to surface missing denominator inputs:
+
+```bash
+hhplab build recipe-preflight --recipe recipes/examples/msa-coc-coverage.yaml --json
+hhplab build recipe-plan --recipe recipes/examples/msa-coc-coverage.yaml --json
+```
+
+`recipe-plan --json` exposes the canonical `msa_coc_coverage_path`,
+`msa_coc_coverage_manifest_path`, optional CSV path, included bases, denominator
+vintages, thresholds, and resolved defaults so agents do not need to infer
+artifact names from logs.
 
 ---
 

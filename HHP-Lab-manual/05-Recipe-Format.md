@@ -175,9 +175,112 @@ Each target declares a geometry and requested output types.
 |-------|------|----------|-------------|
 | `id` | `string` | Yes | Unique target identifier. Referenced by pipelines. |
 | `geometry` | `GeometryRef` | Yes | Target geometry for the pipeline. |
-| `outputs` | `list[string]` | No | Output kinds: `panel`, `diagnostics`, `export`. Default: `[panel]`. |
+| `outputs` | `list[string]` | No | Output kinds: `panel`, `diagnostics`, `map`, `containment`, `msa_coc_coverage`. Default: `[panel]`. |
 | `panel_policy` | `PanelPolicy` | No | Declarative panel output and finalization policy (ZORI, ACS1, aliases). |
 | `cohort` | `CohortSelector` | No | Optional cohort filter to keep a ranked subset of geographies. |
+| `msa_coc_coverage` | `MsaCocCoverageSpec` | No | Required when `outputs` includes `msa_coc_coverage`. Builds one-year MSA-CoC overlap coverage rows. |
+
+## MSA-CoC Coverage Output
+
+`msa_coc_coverage` is the recipe-native surface for top-N MSA/CoC overlap
+coverage artifacts. It is not a panel output: the row grain is
+`msa_id x coc_id x overlap_basis` for a single analysis year.
+
+Area-only example:
+
+```yaml
+targets:
+  - id: msa_coc_area_coverage
+    geometry: { type: coc, vintage: 2025 }
+    outputs: [msa_coc_coverage]
+    msa_coc_coverage:
+      year: 2024
+      top_n: 100
+      ranking_population_source: pep
+      ranking_reference_year: 2024
+      coc_boundary_vintage: 2025
+      msa_definition_version: census_msa_2023
+      county_vintage: 2023
+      overlap_bases: [area]
+      min_msa_area_coverage_share: 0.01
+
+datasets:
+  pep_msa:
+    provider: census
+    product: pep
+    version: 1
+    native_geometry: { type: msa, source: census_msa_2023 }
+    years: { years: [2024] }
+    year_column: year
+    geo_column: msa_id
+    path: data/curated/pep/pep_msa__Y2024@Mcensus_msa_2023.parquet
+
+pipelines:
+  - id: coverage
+    target: msa_coc_area_coverage
+    steps:
+      - resample:
+          dataset: pep_msa
+          to_geometry: { type: msa, source: census_msa_2023 }
+          method: identity
+          measures: [population]
+```
+
+Area plus ACS5 population example:
+
+```yaml
+targets:
+  - id: msa_coc_area_population_coverage
+    geometry: { type: coc, vintage: 2025 }
+    outputs: [msa_coc_coverage]
+    msa_coc_coverage:
+      year: 2024
+      top_n: 100
+      ranking_population_source: pep
+      ranking_reference_year: 2024
+      coc_boundary_vintage: 2025
+      msa_definition_version: census_msa_2023
+      county_vintage: 2023
+      overlap_bases: [area, population]
+      acs5_population_vintage: 2023
+      acs5_population_reference_year: 2023
+      tract_vintage: 2020
+      min_msa_area_coverage_share: 0.01
+      min_msa_population_coverage_share: 0.01
+      csv_sidecar: true
+```
+
+Population overlap currently requires ACS5 tract `total_population` support at
+`data/curated/acs/acs5_tracts__A<acs5_population_vintage>xT<tract_vintage>.parquet`
+and matching tract geometry at
+`data/curated/tiger/tracts__T<tract_vintage>.parquet`. The ACS5 population
+vintage is the ACS 5-year end year used as the denominator source. The
+`acs5_population_reference_year` records the analysis/reference year documented
+for that denominator; when omitted, consumers should treat it as the same value
+as `acs5_population_vintage`.
+
+`overlap_bases` controls emitted long-form rows:
+
+| Basis | Denominator source | Required fields | Threshold field |
+|-------|--------------------|-----------------|-----------------|
+| `area` | Projected geometry area | none beyond CoC/county/MSA geometry | `min_msa_area_coverage_share` |
+| `population` | ACS5 tract `total_population`, area-allocated through tract intersections | `acs5_population_vintage`, `tract_vintage` | `min_msa_population_coverage_share` |
+
+Thresholds are basis-aware and filter on
+`msa_covered_by_coc_percent`: the MSA-denominator share. For example,
+`min_msa_population_coverage_share: 0.05` keeps population-basis rows where at
+least 5% of the selected MSA population lies inside the CoC. It does not filter
+on `coc_contained_in_msa_percent`.
+
+The executor writes the canonical Parquet artifact under
+`output_root/<recipe-name>/` using:
+
+```text
+msa_coc_coverage__Y<year>@B<coc_boundary_vintage>xM<msa_definition_version>xC<county_vintage>__top<top_n>__basis-<area[-population]>.parquet
+```
+
+When `csv_sidecar: true`, a same-stem `.csv` is written next to the Parquet
+artifact.
 
 ```yaml
 targets:

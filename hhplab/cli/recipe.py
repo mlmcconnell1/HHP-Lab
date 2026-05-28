@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Annotated
 
 import typer
+import yaml
 
 from hhplab.config import load_config
 from hhplab.recipe.adapters import (
@@ -47,6 +48,334 @@ def _json_error(message: str, *, code: int = 1) -> None:
     """Print a JSON error response and raise typer.Exit."""
     _json_out({"status": "error", "error": message})
     raise typer.Exit(code=code)
+
+
+def _msa_coc_coverage_recipe_dict(
+    *,
+    name: str,
+    year: int,
+    top_n: int,
+    ranking_population_source: str,
+    ranking_reference_year: int,
+    coc_boundary_vintage: int,
+    msa_definition_version: str,
+    county_vintage: int,
+    overlap_bases: list[str],
+    acs5_population_vintage: int | None,
+    acs5_population_reference_year: int | None,
+    tract_vintage: int | None,
+    min_msa_area_coverage_share: float | None,
+    min_msa_population_coverage_share: float | None,
+    csv_sidecar: bool,
+    pep_msa_path: str,
+) -> dict:
+    spec: dict[str, object] = {
+        "year": year,
+        "top_n": top_n,
+        "ranking_population_source": ranking_population_source,
+        "ranking_reference_year": ranking_reference_year,
+        "coc_boundary_vintage": coc_boundary_vintage,
+        "msa_definition_version": msa_definition_version,
+        "county_vintage": county_vintage,
+        "overlap_bases": overlap_bases,
+    }
+    if acs5_population_vintage is not None:
+        spec["acs5_population_vintage"] = acs5_population_vintage
+    if acs5_population_reference_year is not None:
+        spec["acs5_population_reference_year"] = acs5_population_reference_year
+    if tract_vintage is not None:
+        spec["tract_vintage"] = tract_vintage
+    if min_msa_area_coverage_share is not None:
+        spec["min_msa_area_coverage_share"] = min_msa_area_coverage_share
+    if min_msa_population_coverage_share is not None:
+        spec["min_msa_population_coverage_share"] = min_msa_population_coverage_share
+    if csv_sidecar:
+        spec["csv_sidecar"] = True
+
+    return {
+        "version": 1,
+        "name": name,
+        "description": (
+            "Recipe-native MSA-CoC overlap coverage artifact. "
+            "Use recipe-preflight before execution to validate prerequisites."
+        ),
+        "universe": {"years": [year]},
+        "targets": [
+            {
+                "id": "msa_coc_coverage",
+                "geometry": {"type": "coc", "vintage": coc_boundary_vintage},
+                "outputs": ["msa_coc_coverage"],
+                "msa_coc_coverage": spec,
+            }
+        ],
+        "datasets": {
+            "pep_msa": {
+                "provider": "census",
+                "product": "pep",
+                "version": 1,
+                "native_geometry": {"type": "msa", "source": msa_definition_version},
+                "years": {"years": [ranking_reference_year]},
+                "year_column": "year",
+                "geo_column": "msa_id",
+                "path": pep_msa_path,
+            }
+        },
+        "transforms": [],
+        "pipelines": [
+            {
+                "id": "coverage",
+                "target": "msa_coc_coverage",
+                "steps": [
+                    {
+                        "resample": {
+                            "dataset": "pep_msa",
+                            "to_geometry": {
+                                "type": "msa",
+                                "source": msa_definition_version,
+                            },
+                            "method": "identity",
+                            "measures": ["population"],
+                        }
+                    }
+                ],
+            }
+        ],
+    }
+
+
+def recipe_init_cmd(
+    template: Annotated[
+        str,
+        typer.Argument(
+            help="Recipe template to scaffold. Supported: msa-coc-overlap, msa-coc-coverage.",
+        ),
+    ],
+    output: Annotated[
+        Path,
+        typer.Option(
+            "--output",
+            "-o",
+            help="Path to write the scaffolded recipe YAML.",
+        ),
+    ],
+    year: Annotated[int, typer.Option("--year", help="Coverage artifact year.")] = 2024,
+    top_n: Annotated[int, typer.Option("--top-n", help="Number of MSAs to retain.")] = 100,
+    ranking_population_source: Annotated[
+        str,
+        typer.Option("--ranking-population-source", help="MSA ranking source: pep or acs5."),
+    ] = "pep",
+    ranking_reference_year: Annotated[
+        int | None,
+        typer.Option("--ranking-reference-year", help="Year used to rank MSAs."),
+    ] = None,
+    coc_boundary_vintage: Annotated[
+        int,
+        typer.Option("--coc-boundary-vintage", help="CoC boundary vintage."),
+    ] = 2025,
+    msa_definition_version: Annotated[
+        str,
+        typer.Option("--msa-definition-version", help="MSA definition version."),
+    ] = "census_msa_2023",
+    county_vintage: Annotated[
+        int,
+        typer.Option("--county-vintage", help="County geometry vintage."),
+    ] = 2023,
+    overlap_basis: Annotated[
+        list[str] | None,
+        typer.Option(
+            "--overlap-basis",
+            help="Overlap basis to include. Repeat for area and population.",
+        ),
+    ] = None,
+    acs5_population_vintage: Annotated[
+        int | None,
+        typer.Option("--acs5-population-vintage", help="ACS5 vintage for population basis."),
+    ] = None,
+    acs5_population_reference_year: Annotated[
+        int | None,
+        typer.Option(
+            "--acs5-population-reference-year",
+            help="Reference year documented for the ACS5 denominator.",
+        ),
+    ] = None,
+    tract_vintage: Annotated[
+        int | None,
+        typer.Option("--tract-vintage", help="Tract vintage for population basis."),
+    ] = None,
+    min_msa_area_coverage_share: Annotated[
+        float | None,
+        typer.Option("--min-msa-area-coverage-share", help="Area-basis MSA threshold."),
+    ] = None,
+    min_msa_population_coverage_share: Annotated[
+        float | None,
+        typer.Option(
+            "--min-msa-population-coverage-share",
+            help="Population-basis MSA threshold.",
+        ),
+    ] = None,
+    csv_sidecar: Annotated[
+        bool,
+        typer.Option("--csv-sidecar", help="Request a CSV sidecar next to Parquet."),
+    ] = False,
+    pep_msa_path: Annotated[
+        str | None,
+        typer.Option("--pep-msa-path", help="Path to the MSA-level PEP ranking artifact."),
+    ] = None,
+    name: Annotated[
+        str | None,
+        typer.Option("--name", help="Recipe name. Defaults to msa_coc_coverage_<year>."),
+    ] = None,
+    force: Annotated[
+        bool,
+        typer.Option("--force", help="Overwrite an existing recipe file."),
+    ] = False,
+    dry_run: Annotated[
+        bool,
+        typer.Option("--dry-run", help="Print/validate scaffold metadata without writing."),
+    ] = False,
+    allow_existing_artifact: Annotated[
+        bool,
+        typer.Option(
+            "--allow-existing-artifact",
+            help="Allow scaffolding when the resolved coverage artifact already exists.",
+        ),
+    ] = False,
+    use_json: _JSON_OPTION = False,
+) -> None:
+    """Scaffold recipe-first workflow files for common HHP-Lab outputs."""
+    register_defaults()
+    if template not in {"msa-coc-overlap", "msa-coc-coverage"}:
+        message = (
+            f"Unsupported recipe template '{template}'. "
+            "Supported templates: msa-coc-overlap, msa-coc-coverage."
+        )
+        if use_json:
+            _json_error(message, code=2)
+        raise typer.BadParameter(message, param_hint="template")
+
+    bases = list(overlap_basis or ["area"])
+    invalid_bases = sorted(set(bases) - {"area", "population"})
+    if invalid_bases:
+        message = f"Unsupported overlap basis values {invalid_bases}; use area and/or population."
+        if use_json:
+            _json_error(message, code=2)
+        raise typer.BadParameter(message, param_hint="--overlap-basis")
+
+    if "population" in bases:
+        missing = []
+        if acs5_population_vintage is None:
+            missing.append("--acs5-population-vintage")
+        if tract_vintage is None:
+            missing.append("--tract-vintage")
+        if missing:
+            message = (
+                "Population overlap scaffolding requires "
+                f"{', '.join(missing)} so the recipe can reference ACS5 tract "
+                "total_population denominators."
+            )
+            if use_json:
+                _json_error(message, code=2)
+            raise typer.BadParameter(message, param_hint="--overlap-basis population")
+
+    recipe_name = name or f"msa_coc_coverage_{year}"
+    resolved_ranking_year = ranking_reference_year or year
+    resolved_pep_path = (
+        pep_msa_path
+        or f"data/curated/pep/pep_msa__Y{resolved_ranking_year}@M{msa_definition_version}.parquet"
+    )
+    recipe_data = _msa_coc_coverage_recipe_dict(
+        name=recipe_name,
+        year=year,
+        top_n=top_n,
+        ranking_population_source=ranking_population_source,
+        ranking_reference_year=resolved_ranking_year,
+        coc_boundary_vintage=coc_boundary_vintage,
+        msa_definition_version=msa_definition_version,
+        county_vintage=county_vintage,
+        overlap_bases=bases,
+        acs5_population_vintage=acs5_population_vintage,
+        acs5_population_reference_year=acs5_population_reference_year,
+        tract_vintage=tract_vintage,
+        min_msa_area_coverage_share=min_msa_area_coverage_share,
+        min_msa_population_coverage_share=min_msa_population_coverage_share,
+        csv_sidecar=csv_sidecar,
+        pep_msa_path=resolved_pep_path,
+    )
+
+    try:
+        parsed = load_recipe(recipe_data)
+        artifacts = resolve_pipeline_artifacts(parsed, "coverage")
+    except (RecipeLoadError, ExecutorError, PlannerError) as exc:
+        if use_json:
+            _json_error(str(exc), code=2)
+        typer.echo(f"Error: {exc}", err=True)
+        raise typer.Exit(code=2) from exc
+
+    coverage_path = Path(artifacts["msa_coc_coverage_path"])
+    artifact_exists = coverage_path.exists()
+    recipe_exists = output.exists()
+    if recipe_exists and not force and not dry_run:
+        payload = {
+            "status": "error",
+            "error": f"Recipe file already exists: {output}. Use --force to overwrite.",
+            "recipe_path": str(output),
+            "recipe_exists": True,
+            "artifact_exists": artifact_exists,
+            "artifacts": artifacts,
+        }
+        if use_json:
+            _json_out(payload)
+        else:
+            typer.echo(payload["error"], err=True)
+        raise typer.Exit(code=1)
+
+    if artifact_exists and not allow_existing_artifact:
+        payload = {
+            "status": "error",
+            "error": (
+                f"Coverage artifact already exists: {coverage_path}. "
+                "Use --allow-existing-artifact to scaffold anyway."
+            ),
+            "recipe_path": str(output),
+            "recipe_exists": recipe_exists,
+            "artifact_exists": True,
+            "artifacts": artifacts,
+        }
+        if use_json:
+            _json_out(payload)
+        else:
+            typer.echo(payload["error"], err=True)
+        raise typer.Exit(code=1)
+
+    if not dry_run:
+        output.parent.mkdir(parents=True, exist_ok=True)
+        output.write_text(
+            yaml.safe_dump(recipe_data, sort_keys=False, default_flow_style=False),
+            encoding="utf-8",
+        )
+
+    payload = {
+        "status": "ok",
+        "template": template,
+        "recipe_path": str(output),
+        "written": not dry_run,
+        "recipe_exists": recipe_exists,
+        "artifact_exists": artifact_exists,
+        "artifacts": artifacts,
+        "next_commands": {
+            "preflight": f"hhplab build recipe-preflight --recipe {output} --json",
+            "plan": f"hhplab build recipe-plan --recipe {output} --json",
+            "execute": f"hhplab build recipe --recipe {output} --json",
+        },
+    }
+    if use_json:
+        _json_out(payload)
+        return
+
+    action = "Would write" if dry_run else "Wrote"
+    typer.echo(f"{action} {output}")
+    typer.echo(f"Coverage artifact: {artifacts['msa_coc_coverage_path']}")
+    typer.echo(f"Next: {payload['next_commands']['preflight']}")
 
 
 def _pipeline_payload(

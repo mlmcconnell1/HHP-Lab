@@ -106,6 +106,11 @@ build_app = typer.Typer(
     help="Run recipe builds and bundle utilities",
     no_args_is_help=True,
 )
+recipe_app = typer.Typer(
+    name="recipe",
+    help="Create and inspect recipe files",
+    no_args_is_help=True,
+)
 show_app = typer.Typer(
     name="show",
     help="Display and visualize data",
@@ -156,6 +161,7 @@ register_commands(
     migrate_app=migrate_app,
     generate_app=generate_app,
     build_app=build_app,
+    recipe_app=recipe_app,
     show_app=show_app,
     registry_app=registry_app,
 )

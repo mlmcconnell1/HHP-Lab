@@ -500,3 +500,4 @@ class TestRetiredCommandRegression:
         assert result.exit_code == 0
         assert "build recipe-preflight --recipe <file> --json" in result.output
         assert "build recipe --recipe <file> --json" in result.output
+        assert "recipe init msa-coc-overlap --output <file> --json" in result.output

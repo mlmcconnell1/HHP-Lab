@@ -7426,6 +7426,151 @@ class TestRecipePlanCmd:
         assert out["status"] == "error"
 
 
+class TestRecipeInitCmd:
+    def test_recipe_init_msa_coc_overlap_json_writes_population_recipe(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ):
+        _make_project_root(tmp_path)
+        monkeypatch.chdir(tmp_path)
+        output = tmp_path / "recipes" / "msa-coc-coverage.yaml"
+
+        result = runner.invoke(
+            app,
+            [
+                "recipe",
+                "init",
+                "msa-coc-overlap",
+                "--output",
+                str(output),
+                "--year",
+                "2024",
+                "--top-n",
+                "50",
+                "--overlap-basis",
+                "area",
+                "--overlap-basis",
+                "population",
+                "--acs5-population-vintage",
+                "2023",
+                "--acs5-population-reference-year",
+                "2023",
+                "--tract-vintage",
+                "2020",
+                "--csv-sidecar",
+                "--json",
+            ],
+        )
+
+        assert result.exit_code == 0
+        payload = json.loads(result.output)
+        assert payload["status"] == "ok"
+        assert payload["written"] is True
+        assert output.exists()
+        recipe = load_recipe(output)
+        spec = recipe.targets[0].msa_coc_coverage
+        assert spec is not None
+        assert spec.top_n == 50
+        assert spec.overlap_bases == ["area", "population"]
+        assert spec.acs5_population_vintage == 2023
+        assert payload["artifacts"]["msa_coc_coverage_parameters"]["overlap_bases"] == [
+            "area",
+            "population",
+        ]
+        assert "recipe-preflight" in payload["next_commands"]["preflight"]
+
+    def test_recipe_init_requires_population_denominator_fields(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ):
+        _make_project_root(tmp_path)
+        monkeypatch.chdir(tmp_path)
+
+        result = runner.invoke(
+            app,
+            [
+                "recipe",
+                "init",
+                "msa-coc-overlap",
+                "--output",
+                str(tmp_path / "recipe.yaml"),
+                "--overlap-basis",
+                "population",
+                "--json",
+            ],
+        )
+
+        assert result.exit_code == 2
+        payload = json.loads(result.output)
+        assert payload["status"] == "error"
+        assert "--acs5-population-vintage" in payload["error"]
+        assert "--tract-vintage" in payload["error"]
+
+    def test_recipe_init_reports_existing_recipe_file(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ):
+        _make_project_root(tmp_path)
+        monkeypatch.chdir(tmp_path)
+        output = tmp_path / "recipe.yaml"
+        output.write_text("existing\n", encoding="utf-8")
+
+        result = runner.invoke(
+            app,
+            [
+                "recipe",
+                "init",
+                "msa-coc-coverage",
+                "--output",
+                str(output),
+                "--json",
+            ],
+        )
+
+        assert result.exit_code == 1
+        payload = json.loads(result.output)
+        assert payload["status"] == "error"
+        assert payload["recipe_exists"] is True
+        assert "Use --force" in payload["error"]
+
+    def test_recipe_init_reports_existing_coverage_artifact(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ):
+        _make_project_root(tmp_path)
+        monkeypatch.chdir(tmp_path)
+        artifact = (
+            tmp_path
+            / "outputs"
+            / "msa_coc_coverage_2024"
+            / "msa_coc_coverage__Y2024@B2025xMcensus_msa_2023xC2023__top100__basis-area.parquet"
+        )
+        artifact.parent.mkdir(parents=True)
+        pd.DataFrame({"x": [1]}).to_parquet(artifact)
+
+        result = runner.invoke(
+            app,
+            [
+                "recipe",
+                "init",
+                "msa-coc-coverage",
+                "--output",
+                str(tmp_path / "recipe.yaml"),
+                "--json",
+            ],
+        )
+
+        assert result.exit_code == 1
+        payload = json.loads(result.output)
+        assert payload["status"] == "error"
+        assert payload["artifact_exists"] is True
+        assert "allow-existing-artifact" in payload["error"]
+
+
 class TestExecutionPlanToDict:
     def test_plan_to_dict(self):
         recipe = load_recipe(_recipe_with_pipeline())

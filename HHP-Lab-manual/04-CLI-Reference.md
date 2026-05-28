@@ -12,6 +12,7 @@ This chapter documents the currently supported CLI surface from `hhplab/cli/main
 - `hhplab diagnostics ...`
 - `hhplab generate ...`
 - `hhplab build ...`
+- `hhplab recipe ...`
 - `hhplab aggregate ...`
 - `hhplab show ...`
 - `hhplab registry ...`
@@ -95,12 +96,17 @@ Current behavior:
 - Persists panel output under the configured `output_root/<recipe-name>/` when
   the target declares `outputs: [panel]` (default). Built-in default:
   `<project_root>/outputs/<recipe-name>/`
+- Persists recipe-native non-panel artifacts when declared, including
+  `msa_coc_coverage` outputs under the same recipe output namespace
 - Writes recipe sidecar manifest: `*.manifest.json`
 - Supports `--no-cache` to disable recipe asset caching
 - Supports `--asset-store-root` and `--output-root` for one-off path overrides
 - Emits explicit Connecticut county-transition notes when county-native recipe
   inputs need planning-region to legacy-county normalization
-- `--json` output includes `artifacts` with resolved output paths (`panel_path`, `manifest_path`, and `diagnostics_path` when declared)
+- `--json` output includes `artifacts` with resolved output paths (`panel_path`,
+  `manifest_path`, `diagnostics_path`, `msa_coc_coverage_path`,
+  `msa_coc_coverage_manifest_path`, and optional
+  `msa_coc_coverage_csv_path` when declared)
 
 ### Recipe Preflight (No Execution)
 
@@ -121,6 +127,9 @@ Current special-case note:
   ACS5 tract support artifacts, target crosswalk availability, compatible
   vintages, and ACS1 2020 unavailability. Missing-artifact findings include
   remediation guidance when a direct ingest or normalization path exists.
+- `msa_coc_coverage` recipes are validated for CoC boundaries, county geometry,
+  MSA definition/membership artifacts, ranking source steps, and ACS5 tract
+  population prerequisites when `overlap_bases` includes `population`.
 
 ### Recipe Plan (No Execution)
 
@@ -132,6 +141,31 @@ hhplab build recipe-plan --recipe recipes/metro25-glynnfox.yaml --json
 Use this to resolve and inspect planned tasks (`materialize`, `resample`,
 `small_area_estimate`, `join`) while authoring or debugging a recipe. For a
 readiness gate, use `recipe-preflight`.
+
+For `msa_coc_coverage` targets, `--json` includes a structured
+`msa_coc_coverage_parameters` object with the resolved year, top-N value,
+overlap bases, ranking source/year, ACS5 denominator vintage/reference year,
+thresholds, and CSV sidecar setting. Agents should read these fields instead of
+scraping human logs or reconstructing filenames.
+
+### Recipe Scaffolding
+
+```bash
+hhplab recipe init msa-coc-overlap --output recipes/examples/msa-coc-coverage.yaml --json
+hhplab recipe init msa-coc-overlap \
+  --output recipes/examples/msa-coc-coverage.yaml \
+  --overlap-basis area \
+  --overlap-basis population \
+  --acs5-population-vintage 2023 \
+  --tract-vintage 2020 \
+  --json
+```
+
+`recipe init msa-coc-overlap` writes a recipe-first MSA-CoC coverage workflow.
+It does not generate the coverage artifact directly. JSON output includes the
+resolved artifact paths, recipe path, `artifact_exists` flag, and next
+preflight/plan/execute commands. Existing recipe files require `--force`.
+Existing resolved coverage artifacts require `--allow-existing-artifact`.
 
 ### Legacy CLI Migration
 
@@ -219,7 +253,10 @@ hhplab list curated --subdir pit          # Filter by subdirectory
 hhplab list curated --json                # JSON output for automation
 ```
 
-`list curated` shows Parquet file paths, row counts, column lists, and file sizes. Useful for exploring what curated data is available before building recipes.
+`list curated` shows Parquet file paths, row counts, column lists, and file
+sizes. Useful for exploring what curated data is available before building
+recipes. Use `hhplab status --json` to discover recipe output inventories,
+including MSA-CoC coverage artifacts already present under `output_root`.
 
 ## JSON and Non-Interactive Modes
 

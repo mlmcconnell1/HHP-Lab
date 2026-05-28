@@ -178,6 +178,17 @@ class SaeRecipeCase:
     measure_families: tuple[str, ...]
 
 
+@dataclass(frozen=True)
+class MsaCocCoverageRecipeCase:
+    path: str
+    pipeline_id: str
+    recipe_name: str
+    target_id: str
+    overlap_bases: tuple[str, ...]
+    ranking_population_source: str
+    acs5_population_vintage: int
+
+
 MAP_RECIPE_CASES: tuple[MapRecipeCase, ...] = (
     MapRecipeCase(
         path="recipes/florida-cocs-orlando-msa-map-2025.yaml",
@@ -235,6 +246,19 @@ CONTAINMENT_RECIPE_CASES: tuple[ContainmentRecipeCase, ...] = (
 )
 
 
+MSA_COC_COVERAGE_RECIPE_CASES: tuple[MsaCocCoverageRecipeCase, ...] = (
+    MsaCocCoverageRecipeCase(
+        path="msa-coc-coverage.yaml",
+        pipeline_id="build_msa_coc_coverage",
+        recipe_name="msa_coc_coverage_2024",
+        target_id="top100_msa_coc_coverage",
+        overlap_bases=("area", "population"),
+        ranking_population_source="pep",
+        acs5_population_vintage=2023,
+    ),
+)
+
+
 def _load_example(relative_path: str):
     path = EXAMPLES_DIR / relative_path
     with path.open(encoding="utf-8") as handle:
@@ -279,6 +303,32 @@ def test_containment_example_recipe_loads_and_resolves(case: ContainmentRecipeCa
     assert recipe.datasets == {}
     assert plan.materialize_tasks == []
     assert plan.resample_tasks == []
+    assert plan.join_tasks == []
+
+
+@pytest.mark.parametrize(
+    "case",
+    MSA_COC_COVERAGE_RECIPE_CASES,
+    ids=lambda case: case.path,
+)
+def test_msa_coc_coverage_example_recipe_loads_and_resolves(
+    case: MsaCocCoverageRecipeCase,
+):
+    recipe = _load_example(case.path)
+    plan = resolve_plan(recipe, case.pipeline_id)
+    target = recipe.targets[0]
+    spec = target.msa_coc_coverage
+
+    assert recipe.name == case.recipe_name
+    assert target.id == case.target_id
+    assert target.outputs == ["msa_coc_coverage"]
+    assert spec is not None
+    assert tuple(spec.overlap_bases) == case.overlap_bases
+    assert spec.ranking_population_source == case.ranking_population_source
+    assert spec.acs5_population_vintage == case.acs5_population_vintage
+    assert spec.tract_vintage == 2020
+    assert len(plan.resample_tasks) == 1
+    assert plan.resample_tasks[0].dataset_id == "pep_msa"
     assert plan.join_tasks == []
 
 

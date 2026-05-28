@@ -18,7 +18,7 @@ This chapter is an orientation map of active modules in the current codebase.
 
 ## Recipe System
 
-- `hhplab/recipe/recipe_schema.py`: versioned recipe schema models (including `CohortSelector`, `TemporalFilter`, `SmallAreaEstimateStep`)
+- `hhplab/recipe/recipe_schema.py`: versioned recipe schema models (including `CohortSelector`, `TemporalFilter`, `SmallAreaEstimateStep`, `MsaCocCoverageSpec`)
 - `hhplab/recipe/loader.py`: YAML loading + schema dispatch
 - `hhplab/recipe/adapters.py`: semantic validation registries
 - `hhplab/recipe/default_*.py`: built-in adapter registration (including `default_dataset_adapters.py`)
@@ -58,6 +58,10 @@ This chapter is an orientation map of active modules in the current codebase.
   - `hhplab/metro/metro_zori.py`: ZORI aggregation from counties to metro via county membership
   - `hhplab/metro/metro_validate.py`: metro artifact validation (ID formats, referential integrity, counts)
   - `hhplab/metro/metro_io.py`: read/write curated metro definition artifacts
+- `hhplab/msa/`: MSA-specific utilities
+  - `hhplab/msa/selectors.py`: population-ranked MSA selection helpers
+  - `hhplab/msa/coverage.py`: MSA-CoC area/population overlap coverage builder,
+    reader, and provenance-aware writer
 
 ## Utilities and Supporting Modules
 

@@ -116,6 +116,14 @@ _HUD_STATE_ABBREVIATIONS = [
 # Smaller page size for more frequent progress updates
 ARCGIS_PAGE_SIZE = 50
 ARCGIS_REQUEST_TIMEOUT = 120.0
+ARCGIS_DEFAULT_FIRST_YEAR = 2024
+
+
+def _should_use_arcgis_source(boundary_vintage: str) -> bool:
+    """Return whether the current ArcGIS service is appropriate by default."""
+    if boundary_vintage.isdigit():
+        return int(boundary_vintage) >= ARCGIS_DEFAULT_FIRST_YEAR
+    return True
 
 # Known field name mappings across different vintage years
 # HUD has changed column names over time, so we map all known variants
@@ -794,8 +802,15 @@ def ingest_hud_exchange(
     else:
         curated_dir = Path(curated_dir)
 
-    # Determine which source to use
-    use_arcgis = not use_legacy_source and url is None and not skip_download
+    # Determine which source to use. The ArcGIS service represents the current
+    # HUD boundary layer, so historical year vintages use the vintage-specific
+    # legacy downloads by default rather than relabeling current boundaries.
+    use_arcgis = (
+        not use_legacy_source
+        and url is None
+        and not skip_download
+        and _should_use_arcgis_source(boundary_vintage)
+    )
 
     source_url: str | None = None
     content_sha256: str | None = None
