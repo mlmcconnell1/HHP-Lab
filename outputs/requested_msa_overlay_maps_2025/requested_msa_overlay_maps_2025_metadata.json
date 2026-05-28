@@ -3,7 +3,7 @@
   "boundary_vintage": "2025",
   "county_vintage": "2023",
   "msa_definition_version": "census_msa_2023",
-  "map_count": 9,
+  "map_count": 10,
   "maps": [
     {
       "slug": "washington_dc",
@@ -103,6 +103,17 @@
       "county_fips": "13013,13015,13035,13045,13057,13063,13067,13077,13085,13089,13097,13113,13117,13121,13135,13143,13149,13151,13159,13187,13199,13211,13217,13223,13227,13231,13247,13255,13297",
       "coc_ids": "AL-507,GA-500,GA-501,GA-502,GA-506,GA-508",
       "map_path": "outputs/requested_msa_overlay_maps_2025/map__atlanta_ga__M12060@B2025xC2023.html"
+    },
+    {
+      "slug": "detroit_mi",
+      "msa_id": "19820",
+      "msa_name": "Detroit-Warren-Dearborn, MI",
+      "states_overlapped": "Michigan",
+      "county_count": 6,
+      "overlapping_coc_count": 11,
+      "county_fips": "26087,26093,26099,26125,26147,26163",
+      "coc_ids": "MI-500,MI-501,MI-502,MI-503,MI-504,MI-505,MI-508,MI-509,MI-515,MI-517,MI-518",
+      "map_path": "outputs/requested_msa_overlay_maps_2025/map__detroit_mi__M19820@B2025xC2023.html"
     }
   ]
 }
