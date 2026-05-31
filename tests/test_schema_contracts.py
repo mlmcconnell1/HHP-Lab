@@ -39,11 +39,19 @@ from hhplab.schema import (
     ACS1_IMPUTED_POVERTY_SPEC,
     ACS1_IMPUTED_TOTAL_HOUSEHOLDS_SPEC,
     ARTIFACT_CONTRACTS,
+    COC_URBAN_AREA_DETAIL_COLUMNS,
+    COC_URBAN_AREA_DETAIL_CONTRACT,
+    COC_URBAN_FRACTION_COLUMNS,
+    COC_URBAN_FRACTION_CONTRACT,
     MSA_COC_COVERAGE_COLUMNS,
     MSA_COC_COVERAGE_CONTRACT,
     MSA_COC_PANEL_COLUMNS,
     MSA_COC_PANEL_CONTRACT,
+    PL_BLOCK_POPULATION_COLUMNS,
+    PL_BLOCK_POPULATION_CONTRACT,
     SAE_OUTPUT_CONTRACT,
+    URBAN_AREA_GEOMETRY_COLUMNS,
+    URBAN_AREA_GEOMETRY_CONTRACT,
     ACS1ImputationMeasureSpec,
     acs1_imputation_output_columns,
     validate_artifact_contract,
@@ -172,6 +180,87 @@ MSA_COC_COVERAGE_COMPLETE_ROW = {
     "ranking_reference_year": 2024,
 }
 
+URBAN_CONTRACT_CASES = {
+    "urban_area_geometry": (
+        URBAN_AREA_GEOMETRY_CONTRACT,
+        URBAN_AREA_GEOMETRY_COLUMNS,
+        {
+            "urban_area_geoid": "78904",
+            "urban_area_name": "Denver-Aurora, CO",
+            "urban_area_type": "urbanized_area",
+            "urban_area_vintage": 2020,
+            "data_source": "census_tiger",
+            "source_ref": "tl_2020_us_uac20.zip",
+            "ingested_at": "2026-05-31T00:00:00Z",
+            "geometry": None,
+        },
+        "urban_area_geoid",
+    ),
+    "pl_block_population": (
+        PL_BLOCK_POPULATION_CONTRACT,
+        PL_BLOCK_POPULATION_COLUMNS,
+        {
+            "block_geoid": "080310001001000",
+            "state_fips": "08",
+            "county_fips": "08031",
+            "tract_geoid": "08031000100",
+            "block_vintage": 2020,
+            "decennial_vintage": 2020,
+            "total_population": 42,
+            "data_source": "census_pl_94_171",
+            "source_ref": "2020-pl-blocks",
+            "ingested_at": "2026-05-31T00:00:00Z",
+        },
+        "block_geoid",
+    ),
+    "coc_urban_fraction": (
+        COC_URBAN_FRACTION_CONTRACT,
+        COC_URBAN_FRACTION_COLUMNS,
+        {
+            "coc_id": "CO-503",
+            "boundary_vintage": 2025,
+            "urban_area_vintage": 2020,
+            "block_vintage": 2020,
+            "decennial_vintage": 2020,
+            "denominator_source": "pl_94_171_block_population",
+            "allocation_method": "block_centroid_with_area_fallback",
+            "classification_method": "census_urban_area_intersection",
+            "total_population": 1000.0,
+            "urban_population": 850.0,
+            "rural_population": 150.0,
+            "urban_population_fraction": 0.85,
+            "block_count": 120,
+            "urban_block_count": 100,
+            "rural_block_count": 20,
+            "population_coverage_ratio": 1.0,
+            "source": "coc_urban_fraction",
+        },
+        "classification_method",
+    ),
+    "coc_urban_area_detail": (
+        COC_URBAN_AREA_DETAIL_CONTRACT,
+        COC_URBAN_AREA_DETAIL_COLUMNS,
+        {
+            "coc_id": "CO-503",
+            "urban_area_geoid": "78904",
+            "urban_area_name": "Denver-Aurora, CO",
+            "boundary_vintage": 2025,
+            "urban_area_vintage": 2020,
+            "block_vintage": 2020,
+            "decennial_vintage": 2020,
+            "denominator_source": "pl_94_171_block_population",
+            "allocation_method": "block_centroid_with_area_fallback",
+            "classification_method": "census_urban_area_intersection",
+            "total_population": 850.0,
+            "urban_population": 850.0,
+            "urban_population_fraction": 1.0,
+            "block_count": 100,
+            "source": "coc_urban_area_detail",
+        },
+        "urban_area_geoid",
+    ),
+}
+
 
 @pytest.mark.parametrize("case_name", list(SCHEMA_ALIAS_CASES), ids=list(SCHEMA_ALIAS_CASES))
 def test_source_schema_aliases_use_canonical_schema_constants(case_name: str) -> None:
@@ -245,6 +334,35 @@ def test_msa_coc_coverage_contract_declares_output_columns() -> None:
     assert tuple(MSA_COC_COVERAGE_COLUMNS) == MSA_COC_COVERAGE_CONTRACT.required_columns
     assert MSA_COC_COVERAGE_CONTRACT.name == "msa_coc_coverage"
     assert ARTIFACT_CONTRACTS["msa_coc_coverage"] is MSA_COC_COVERAGE_CONTRACT
+
+
+@pytest.mark.parametrize("case_name", list(URBAN_CONTRACT_CASES), ids=list(URBAN_CONTRACT_CASES))
+def test_urban_contracts_declare_output_columns(case_name: str) -> None:
+    contract, columns, _row, _missing_column = URBAN_CONTRACT_CASES[case_name]
+
+    assert tuple(columns) == contract.required_columns
+    assert ARTIFACT_CONTRACTS[contract.name] is contract
+
+
+@pytest.mark.parametrize("case_name", list(URBAN_CONTRACT_CASES), ids=list(URBAN_CONTRACT_CASES))
+def test_validate_urban_contracts_pass_for_complete_artifact(case_name: str) -> None:
+    contract, _columns, row, _missing_column = URBAN_CONTRACT_CASES[case_name]
+
+    findings = validate_artifact_contract(pd.DataFrame([row]), contract)
+
+    assert findings == []
+
+
+@pytest.mark.parametrize("case_name", list(URBAN_CONTRACT_CASES), ids=list(URBAN_CONTRACT_CASES))
+def test_validate_urban_contracts_report_missing_columns(case_name: str) -> None:
+    contract, _columns, row, missing_column = URBAN_CONTRACT_CASES[case_name]
+    incomplete = dict(row)
+    del incomplete[missing_column]
+
+    findings = validate_artifact_contract(pd.DataFrame([incomplete]), contract)
+
+    assert [finding.code for finding in findings] == ["missing_required_column"]
+    assert findings[0].column == missing_column
 
 
 def test_validate_msa_coc_coverage_contract_passes_for_complete_artifact() -> None:

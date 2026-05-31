@@ -10,15 +10,19 @@ import pandas as pd
 from hhplab.schema.columns import (
     ACS_TRACT_OUTPUT_COLUMNS,
     COC_PANEL_COLUMNS,
+    COC_URBAN_AREA_DETAIL_COLUMNS,
+    COC_URBAN_FRACTION_COLUMNS,
     DRIFT_PRONE_SOURCE_COLUMNS,
     LAUS_METRO_OUTPUT_COLUMNS,
     MSA_COC_COVERAGE_COLUMNS,
     MSA_COC_PANEL_COLUMNS,
     PEP_COUNTY_OUTPUT_COLUMNS,
     PIT_CANONICAL_COLUMNS,
+    PL_BLOCK_POPULATION_COLUMNS,
     SAE_MEASURE_COLUMNS,
     SAE_OUTPUT_COLUMNS,
     TRACT_MEDIATED_COUNTY_XWALK_COLUMNS,
+    URBAN_AREA_GEOMETRY_COLUMNS,
     ZORI_INGEST_OUTPUT_COLUMNS,
 )
 from hhplab.schema.lineage import population_lineage_columns
@@ -97,6 +101,33 @@ PEP_COUNTY_CONTRACT = ArtifactContract(
     required_columns=tuple(PEP_COUNTY_OUTPUT_COLUMNS),
 )
 
+URBAN_AREA_GEOMETRY_CONTRACT = ArtifactContract(
+    name="urban_area_geometry",
+    required_columns=tuple(URBAN_AREA_GEOMETRY_COLUMNS),
+    drift_prone_columns=(),
+)
+
+PL_BLOCK_POPULATION_CONTRACT = ArtifactContract(
+    name="pl_block_population",
+    required_columns=tuple(PL_BLOCK_POPULATION_COLUMNS),
+    canonical_measures=("total_population",),
+    drift_prone_columns=(),
+)
+
+COC_URBAN_FRACTION_CONTRACT = ArtifactContract(
+    name="coc_urban_fraction",
+    required_columns=tuple(COC_URBAN_FRACTION_COLUMNS),
+    canonical_measures=("total_population", "urban_population", "rural_population"),
+    drift_prone_columns=(),
+)
+
+COC_URBAN_AREA_DETAIL_CONTRACT = ArtifactContract(
+    name="coc_urban_area_detail",
+    required_columns=tuple(COC_URBAN_AREA_DETAIL_COLUMNS),
+    canonical_measures=("total_population", "urban_population"),
+    drift_prone_columns=(),
+)
+
 PIT_CONTRACT = ArtifactContract(
     name="pit",
     required_columns=tuple(PIT_CANONICAL_COLUMNS),
@@ -141,14 +172,18 @@ ARTIFACT_CONTRACTS: dict[str, ArtifactContract] = {
     for contract in (
         ACS_TRACT_CONTRACT,
         ACS1_IMPUTATION_OUTPUT_CONTRACT,
+        COC_URBAN_AREA_DETAIL_CONTRACT,
+        COC_URBAN_FRACTION_CONTRACT,
         COC_PANEL_CONTRACT,
         LAUS_METRO_CONTRACT,
         MSA_COC_COVERAGE_CONTRACT,
         MSA_COC_PANEL_CONTRACT,
         PEP_COUNTY_CONTRACT,
         PIT_CONTRACT,
+        PL_BLOCK_POPULATION_CONTRACT,
         SAE_OUTPUT_CONTRACT,
         TRACT_MEDIATED_COUNTY_XWALK_CONTRACT,
+        URBAN_AREA_GEOMETRY_CONTRACT,
         ZORI_INGEST_CONTRACT,
     )
 }

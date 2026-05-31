@@ -7,6 +7,8 @@ Temporal notation uses single-letter prefixes:
 - B{year}: CoC boundary version (e.g., B2025)
 - T{year}: Census tract geometry (e.g., T2023)
 - C{year}: Census county geometry (e.g., C2023)
+- K{year}: Census block geometry (e.g., K2020)
+- U{year}: Census Urban Area vintage (e.g., U2020)
 - A{year}: ACS vintage end year (e.g., A2023)
 - N{year}: Decennial census denominator vintage (e.g., N2020)
 - P{year}: PIT count year (e.g., P2024)
@@ -81,6 +83,35 @@ def county_filename(county_vintage: str | int) -> str:
     return f"counties__C{county_vintage}.parquet"
 
 
+def urban_area_filename(urban_area_vintage: str | int) -> str:
+    """Generate filename for Census Urban Area geometry.
+
+    Args:
+        urban_area_vintage: Urban Area vintage year (e.g., 2010 or 2020)
+
+    Returns:
+        Filename like ``urban_areas__U2020.parquet``
+    """
+    return f"urban_areas__U{urban_area_vintage}.parquet"
+
+
+def pl_block_population_filename(
+    decennial_vintage: str | int,
+    block_vintage: str | int | None = None,
+) -> str:
+    """Generate filename for PL 94-171 block population denominators.
+
+    Args:
+        decennial_vintage: Decennial census vintage, currently 2010 or 2020.
+        block_vintage: Block geometry vintage. Defaults to the decennial vintage.
+
+    Returns:
+        Filename like ``pl_blocks__N2020xK2020.parquet``.
+    """
+    resolved_block_vintage = decennial_vintage if block_vintage is None else block_vintage
+    return f"pl_blocks__N{decennial_vintage}xK{resolved_block_vintage}.parquet"
+
+
 def pit_filename(pit_year: str | int) -> str:
     """Generate filename for PIT count data.
 
@@ -116,6 +147,37 @@ def pit_vintage_filename(vintage: str | int) -> str:
         Filename like 'pit_vintage__P2024.parquet'
     """
     return f"pit_vintage__P{vintage}.parquet"
+
+
+def coc_urban_fraction_filename(
+    boundary_vintage: str | int,
+    urban_area_vintage: str | int,
+    block_vintage: str | int,
+    decennial_vintage: str | int,
+) -> str:
+    """Generate filename for CoC-level urban population fractions.
+
+    The ``U`` Urban Area token keeps this artifact distinct from ``B`` CoC
+    boundary files while the ``N`` and ``K`` tokens name the population and
+    block vintages used in the denominator.
+    """
+    return (
+        f"coc_urban_fraction__N{decennial_vintage}@B{boundary_vintage}"
+        f"xU{urban_area_vintage}xK{block_vintage}.parquet"
+    )
+
+
+def coc_urban_area_detail_filename(
+    boundary_vintage: str | int,
+    urban_area_vintage: str | int,
+    block_vintage: str | int,
+    decennial_vintage: str | int,
+) -> str:
+    """Generate filename for optional CoC-by-Urban-Area detail artifacts."""
+    return (
+        f"coc_urban_area_detail__N{decennial_vintage}@B{boundary_vintage}"
+        f"xU{urban_area_vintage}xK{block_vintage}.parquet"
+    )
 
 
 # =============================================================================
@@ -614,6 +676,86 @@ def county_path(county_vintage: str | int, base_dir: Path | str | None = None) -
     else:
         base_dir = Path(base_dir)
     return base_dir / "curated" / "tiger" / county_filename(county_vintage)
+
+
+def urban_area_path(
+    urban_area_vintage: str | int,
+    base_dir: Path | str | None = None,
+) -> Path:
+    """Get canonical path for Census Urban Area geometry."""
+    if base_dir is None:
+        base_dir = Path("data")
+    else:
+        base_dir = Path(base_dir)
+    return base_dir / "curated" / "tiger" / urban_area_filename(urban_area_vintage)
+
+
+def pl_block_population_path(
+    decennial_vintage: str | int,
+    block_vintage: str | int | None = None,
+    base_dir: Path | str | None = None,
+) -> Path:
+    """Get canonical path for PL 94-171 block population denominators."""
+    if base_dir is None:
+        base_dir = Path("data")
+    else:
+        base_dir = Path(base_dir)
+    return (
+        base_dir
+        / "curated"
+        / "census"
+        / pl_block_population_filename(decennial_vintage, block_vintage)
+    )
+
+
+def coc_urban_fraction_path(
+    boundary_vintage: str | int,
+    urban_area_vintage: str | int,
+    block_vintage: str | int,
+    decennial_vintage: str | int,
+    base_dir: Path | str | None = None,
+) -> Path:
+    """Get canonical path for CoC-level urban population fractions."""
+    if base_dir is None:
+        base_dir = Path("data")
+    else:
+        base_dir = Path(base_dir)
+    return (
+        base_dir
+        / "curated"
+        / "measures"
+        / coc_urban_fraction_filename(
+            boundary_vintage,
+            urban_area_vintage,
+            block_vintage,
+            decennial_vintage,
+        )
+    )
+
+
+def coc_urban_area_detail_path(
+    boundary_vintage: str | int,
+    urban_area_vintage: str | int,
+    block_vintage: str | int,
+    decennial_vintage: str | int,
+    base_dir: Path | str | None = None,
+) -> Path:
+    """Get canonical path for optional CoC-by-Urban-Area detail artifacts."""
+    if base_dir is None:
+        base_dir = Path("data")
+    else:
+        base_dir = Path(base_dir)
+    return (
+        base_dir
+        / "curated"
+        / "measures"
+        / coc_urban_area_detail_filename(
+            boundary_vintage,
+            urban_area_vintage,
+            block_vintage,
+            decennial_vintage,
+        )
+    )
 
 
 def msa_coc_xwalk_path(

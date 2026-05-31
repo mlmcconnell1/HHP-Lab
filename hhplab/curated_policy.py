@@ -57,10 +57,12 @@ CANONICAL_PATTERNS: dict[str, list[re.Pattern[str]]] = {
     "tiger": [
         re.compile(r"^tracts__T\d{4}\.parquet$"),
         re.compile(r"^counties__C\d{4}\.parquet$"),
+        re.compile(r"^urban_areas__U\d{4}\.parquet$"),
         re.compile(r"^tract_relationship__T\d{4}xT\d{4}\.parquet$"),
     ],
     "census": [
         re.compile(r"^decennial_tracts__N\d{4}xT\d{4}\.parquet$"),
+        re.compile(r"^pl_blocks__N\d{4}xK\d{4}\.parquet$"),
     ],
     "xwalks": [
         re.compile(r"^xwalk__B\d{4}xT\d{4}\.parquet$"),
@@ -79,6 +81,8 @@ CANONICAL_PATTERNS: dict[str, list[re.Pattern[str]]] = {
         re.compile(r"^measures__A\d{4}(\(\d{4}\))?@B\d{4}(xT\d{4})?\.parquet$"),
         re.compile(r"^measures__metro__A\d{4}@D\w+(xT\d{4})?\.parquet$"),
         re.compile(r"^measures__metro__acs1__A\d{4}@D\w+\.parquet$"),
+        re.compile(r"^coc_urban_fraction__N\d{4}@B\d{4}xU\d{4}xK\d{4}\.parquet$"),
+        re.compile(r"^coc_urban_area_detail__N\d{4}@B\d{4}xU\d{4}xK\d{4}\.parquet$"),
     ],
     "zori": [
         re.compile(r"^zori__A\d{4}@B\d{4}xC\d{4}__w\w+\.parquet$"),

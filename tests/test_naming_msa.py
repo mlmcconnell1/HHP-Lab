@@ -1,6 +1,10 @@
 """Tests for MSA definition naming helpers."""
 
 from hhplab.naming import (
+    coc_urban_area_detail_filename,
+    coc_urban_area_detail_path,
+    coc_urban_fraction_filename,
+    coc_urban_fraction_path,
     geo_panel_filename,
     msa_boundaries_filename,
     msa_boundaries_path,
@@ -13,6 +17,10 @@ from hhplab.naming import (
     msa_definitions_filename,
     msa_definitions_path,
     msa_pit_filename,
+    pl_block_population_filename,
+    pl_block_population_path,
+    urban_area_filename,
+    urban_area_path,
 )
 
 
@@ -118,4 +126,53 @@ def test_msa_panel_filename():
             definition_version="census_msa_2023",
         )
         == "panel__msa__Y2020-2024@Mcensusmsa2023.parquet"
+    )
+
+
+def test_urban_area_filename_uses_distinct_urban_token():
+    assert urban_area_filename(2020) == "urban_areas__U2020.parquet"
+    assert urban_area_filename("2010") == "urban_areas__U2010.parquet"
+
+
+def test_pl_block_population_filename_uses_decennial_and_block_tokens():
+    assert pl_block_population_filename(2020) == "pl_blocks__N2020xK2020.parquet"
+    assert pl_block_population_filename("2010", "2010") == "pl_blocks__N2010xK2010.parquet"
+
+
+def test_coc_urban_fraction_filename_avoids_boundary_token_ambiguity():
+    assert (
+        coc_urban_fraction_filename(
+            boundary_vintage=2025,
+            urban_area_vintage=2020,
+            block_vintage=2020,
+            decennial_vintage=2020,
+        )
+        == "coc_urban_fraction__N2020@B2025xU2020xK2020.parquet"
+    )
+
+
+def test_coc_urban_area_detail_filename():
+    assert (
+        coc_urban_area_detail_filename(
+            boundary_vintage=2025,
+            urban_area_vintage=2010,
+            block_vintage=2010,
+            decennial_vintage=2010,
+        )
+        == "coc_urban_area_detail__N2010@B2025xU2010xK2010.parquet"
+    )
+
+
+def test_urban_paths_are_discoverable_without_globs():
+    assert str(urban_area_path(2020)).endswith(
+        "data/curated/tiger/urban_areas__U2020.parquet"
+    )
+    assert str(pl_block_population_path(2020)).endswith(
+        "data/curated/census/pl_blocks__N2020xK2020.parquet"
+    )
+    assert str(coc_urban_fraction_path(2025, 2020, 2020, 2020)).endswith(
+        "data/curated/measures/coc_urban_fraction__N2020@B2025xU2020xK2020.parquet"
+    )
+    assert str(coc_urban_area_detail_path(2025, 2020, 2020, 2020)).endswith(
+        "data/curated/measures/coc_urban_area_detail__N2020@B2025xU2020xK2020.parquet"
     )

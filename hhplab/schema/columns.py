@@ -322,6 +322,68 @@ PEP_COUNTY_OUTPUT_COLUMNS: list[str] = [
     "ingested_at",
 ]
 
+URBAN_AREA_GEOMETRY_COLUMNS: tuple[str, ...] = (
+    "urban_area_geoid",
+    "urban_area_name",
+    "urban_area_type",
+    "urban_area_vintage",
+    "data_source",
+    "source_ref",
+    "ingested_at",
+    "geometry",
+)
+
+PL_BLOCK_POPULATION_COLUMNS: tuple[str, ...] = (
+    "block_geoid",
+    "state_fips",
+    "county_fips",
+    "tract_geoid",
+    "block_vintage",
+    "decennial_vintage",
+    TOTAL_POPULATION,
+    "data_source",
+    "source_ref",
+    "ingested_at",
+)
+
+COC_URBAN_FRACTION_COLUMNS: tuple[str, ...] = (
+    "coc_id",
+    "boundary_vintage",
+    "urban_area_vintage",
+    "block_vintage",
+    "decennial_vintage",
+    "denominator_source",
+    "allocation_method",
+    "classification_method",
+    TOTAL_POPULATION,
+    "urban_population",
+    "rural_population",
+    "urban_population_fraction",
+    "block_count",
+    "urban_block_count",
+    "rural_block_count",
+    "population_coverage_ratio",
+    "source",
+)
+
+COC_URBAN_AREA_DETAIL_COLUMNS: tuple[str, ...] = (
+    "coc_id",
+    "urban_area_geoid",
+    "urban_area_name",
+    "boundary_vintage",
+    "urban_area_vintage",
+    "block_vintage",
+    "decennial_vintage",
+    "denominator_source",
+    "allocation_method",
+    "classification_method",
+    TOTAL_POPULATION,
+    "urban_population",
+    "urban_population_fraction",
+    "block_count",
+    "source",
+)
+
 PIT_CANONICAL_COLUMNS: list[str] = [
     "pit_year",
     "coc_id",
