@@ -12,14 +12,23 @@ Truth table for fixture geometries:
 
 from __future__ import annotations
 
+import json
+from pathlib import Path
+
 import geopandas as gpd
 import pandas as pd
 import pytest
 from shapely.geometry import MultiPolygon, box
+from typer.testing import CliRunner
 
+import hhplab.naming as naming
+from hhplab.cli.main import app
+from hhplab.provenance import read_provenance
 from hhplab.schema.columns import COC_URBAN_AREA_DETAIL_COLUMNS, COC_URBAN_FRACTION_COLUMNS
 from hhplab.xwalks.county import ALBERS_EQUAL_AREA_CRS
 from hhplab.xwalks.urban_fraction import build_coc_urban_fraction
+
+runner = CliRunner()
 
 COC_EXPECTATIONS = {
     "A": {
@@ -195,3 +204,190 @@ def test_build_coc_urban_fraction_reports_missing_required_columns() -> None:
             block_vintage=2020,
             decennial_vintage=2020,
         )
+
+
+def _patch_curated_dir(monkeypatch: pytest.MonkeyPatch, tmp_path) -> None:
+    monkeypatch.setattr(
+        "hhplab.cli.build_urban_fraction.curated_dir",
+        lambda name: tmp_path / name,
+    )
+
+
+def _write_cli_inputs(tmp_path, *, split_block_geometry: bool = True) -> tuple[Path, Path]:
+    for subdir in ("coc_boundaries", "tiger", "census", "measures"):
+        (tmp_path / subdir).mkdir(parents=True, exist_ok=True)
+
+    coc_fixture().to_parquet(
+        tmp_path / "coc_boundaries" / naming.coc_base_filename("2025"),
+        index=False,
+    )
+    urban_area_fixture().to_parquet(
+        tmp_path / "tiger" / naming.urban_area_filename(2020),
+        index=False,
+    )
+    block_path = tmp_path / "census" / naming.pl_block_population_filename(2020, 2020)
+    geometry_path = tmp_path / "census" / "block_geometry__K2020.parquet"
+    blocks = block_fixture()
+    if split_block_geometry:
+        pd.DataFrame(blocks.drop(columns=["geometry"])).to_parquet(block_path, index=False)
+        blocks[["block_geoid", "geometry"]].to_parquet(geometry_path, index=False)
+    else:
+        blocks.to_parquet(block_path, index=False)
+    return block_path, geometry_path
+
+
+def test_urban_fraction_cli_dry_run_success_json(monkeypatch, tmp_path) -> None:
+    _patch_curated_dir(monkeypatch, tmp_path)
+    _block_path, geometry_path = _write_cli_inputs(tmp_path)
+
+    result = runner.invoke(
+        app,
+        [
+            "build",
+            "urban-fraction",
+            "--boundary",
+            "2025",
+            "--urban-area-vintage",
+            "2020",
+            "--decennial",
+            "2020",
+            "--block-geometry",
+            str(geometry_path),
+            "--dry-run",
+            "--json",
+        ],
+    )
+
+    assert result.exit_code == 0
+    payload = json.loads(result.output)
+    assert payload["status"] == "ok"
+    assert payload["action"] == "dry_run"
+    assert payload["will_write"] is False
+    assert all(status["exists"] for status in payload["inputs"].values())
+
+
+def test_urban_fraction_cli_missing_inputs_json(monkeypatch, tmp_path) -> None:
+    _patch_curated_dir(monkeypatch, tmp_path)
+
+    result = runner.invoke(
+        app,
+        [
+            "build",
+            "urban-fraction",
+            "--boundary",
+            "2025",
+            "--urban-area-vintage",
+            "2020",
+            "--decennial",
+            "2020",
+            "--json",
+        ],
+    )
+
+    assert result.exit_code == 1
+    payload = json.loads(result.output)
+    assert payload["status"] == "error"
+    assert payload["error"] == "missing_inputs"
+    assert set(payload["missing_inputs"]) == {
+        "coc_boundaries",
+        "urban_areas",
+        "pl_blocks",
+        "block_geometry",
+    }
+    assert "hhplab ingest urban-areas --year 2020" in payload["commands"]["urban_areas"]
+
+
+def test_urban_fraction_cli_fixture_build_json(monkeypatch, tmp_path) -> None:
+    _patch_curated_dir(monkeypatch, tmp_path)
+    _block_path, geometry_path = _write_cli_inputs(tmp_path)
+
+    result = runner.invoke(
+        app,
+        [
+            "build",
+            "urban-fraction",
+            "--boundary",
+            "2025",
+            "--urban-area-vintage",
+            "2020",
+            "--decennial",
+            "2020",
+            "--block-geometry",
+            str(geometry_path),
+            "--json",
+        ],
+    )
+
+    assert result.exit_code == 0
+    payload = json.loads(result.output)
+    assert payload["status"] == "ok"
+    assert payload["rows"] == 4
+    assert payload["coc_count"] == 4
+    assert payload["total_population"] == pytest.approx(240.0)
+    assert payload["urban_population"] == pytest.approx(180.0)
+    assert payload["min_fraction"] == pytest.approx(0.4)
+    assert payload["max_fraction"] == pytest.approx(1.0)
+    assert payload["diagnostics"]["missing_denominator_block_count"] == 1
+    summary = pd.read_parquet(payload["artifact"])
+    assert list(summary.columns) == list(COC_URBAN_FRACTION_COLUMNS)
+    provenance = read_provenance(payload["artifact"])
+    assert provenance is not None
+    assert provenance.extra["dataset_type"] == "coc_urban_fraction"
+
+
+def test_urban_fraction_cli_artifact_exists_json(monkeypatch, tmp_path) -> None:
+    _patch_curated_dir(monkeypatch, tmp_path)
+    _block_path, geometry_path = _write_cli_inputs(tmp_path)
+    summary_path = (
+        tmp_path
+        / "measures"
+        / naming.coc_urban_fraction_filename(2025, 2020, 2020, 2020)
+    )
+    pd.DataFrame({"coc_id": ["A"]}).to_parquet(summary_path, index=False)
+
+    result = runner.invoke(
+        app,
+        [
+            "build",
+            "urban-fraction",
+            "--boundary",
+            "2025",
+            "--urban-area-vintage",
+            "2020",
+            "--decennial",
+            "2020",
+            "--block-geometry",
+            str(geometry_path),
+            "--json",
+        ],
+    )
+
+    assert result.exit_code == 1
+    payload = json.loads(result.output)
+    assert payload["error"] == "artifact_exists"
+    assert payload["output_exists"] is True
+
+
+def test_urban_fraction_cli_human_output_is_concise(monkeypatch, tmp_path) -> None:
+    _patch_curated_dir(monkeypatch, tmp_path)
+    _block_path, geometry_path = _write_cli_inputs(tmp_path)
+
+    result = runner.invoke(
+        app,
+        [
+            "build",
+            "urban-fraction",
+            "--boundary",
+            "2025",
+            "--urban-area-vintage",
+            "2020",
+            "--decennial",
+            "2020",
+            "--block-geometry",
+            str(geometry_path),
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert "Built CoC urban fraction artifact." in result.output
+    assert "Rows: 4" in result.output

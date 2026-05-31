@@ -11,6 +11,7 @@ from hhplab.cli.boundaries import (
     show,
     validate_boundaries,
 )
+from hhplab.cli.build_urban_fraction import build_urban_fraction
 from hhplab.cli.build_xwalks import build_xwalks
 from hhplab.cli.compare_vintages import compare_vintages
 from hhplab.cli.crosscheck_pit_vintages import validate_pit_vintages
@@ -131,6 +132,7 @@ def register_commands(
     generate_app.command("msa")(generate_msa)
     generate_app.command("msa-xwalk")(generate_msa_xwalk)
     build_app.command("recipe")(recipe_cmd)
+    build_app.command("urban-fraction")(build_urban_fraction)
     build_app.command("recipe-plan")(recipe_plan_cmd)
     build_app.command("recipe-provenance")(recipe_provenance_cmd)
     build_app.command("recipe-export")(recipe_export_cmd)

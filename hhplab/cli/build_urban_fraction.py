@@ -1,0 +1,358 @@
+"""CLI command for building CoC Urban Area population fractions."""
+
+from __future__ import annotations
+
+import json
+from pathlib import Path
+from typing import Annotated
+
+import geopandas as gpd
+import pandas as pd
+import typer
+
+import hhplab.naming as naming
+from hhplab.paths import curated_dir
+from hhplab.provenance import ProvenanceBlock, write_parquet_with_provenance
+from hhplab.xwalks.urban_fraction import (
+    DEFAULT_ALLOCATION_METHOD,
+    DEFAULT_CLASSIFICATION_METHOD,
+    build_coc_urban_fraction,
+)
+
+
+def build_urban_fraction(
+    boundary: Annotated[
+        str,
+        typer.Option(
+            "--boundary",
+            "-b",
+            help="CoC boundary vintage, e.g. 2025.",
+        ),
+    ],
+    urban_area_vintage: Annotated[
+        int,
+        typer.Option(
+            "--urban-area-vintage",
+            "--urban",
+            help="Census Urban Area vintage: 2010 or 2020.",
+        ),
+    ],
+    decennial: Annotated[
+        int,
+        typer.Option(
+            "--decennial",
+            help="PL 94-171 decennial vintage for block population: 2010 or 2020.",
+        ),
+    ],
+    block_vintage: Annotated[
+        int | None,
+        typer.Option(
+            "--block-vintage",
+            "--blocks",
+            help="Block geometry vintage. Defaults to --decennial.",
+        ),
+    ] = None,
+    block_geometry: Annotated[
+        Path | None,
+        typer.Option(
+            "--block-geometry",
+            help=(
+                "Optional GeoParquet with block_geoid and geometry when the PL block "
+                "population artifact is population-only."
+            ),
+        ),
+    ] = None,
+    dry_run: Annotated[
+        bool,
+        typer.Option(
+            "--dry-run",
+            help="Validate inputs and planned outputs without writing artifacts.",
+        ),
+    ] = False,
+    force: Annotated[
+        bool,
+        typer.Option(
+            "--force",
+            help="Overwrite existing urban fraction artifacts.",
+        ),
+    ] = False,
+    output_json: Annotated[
+        bool,
+        typer.Option(
+            "--json",
+            help="Output machine-readable JSON instead of human text.",
+        ),
+    ] = False,
+) -> None:
+    """Build CoC Urban Area population fraction artifacts."""
+    resolved_block_vintage = decennial if block_vintage is None else block_vintage
+    paths = urban_fraction_paths(
+        boundary=boundary,
+        urban_area_vintage=urban_area_vintage,
+        block_vintage=resolved_block_vintage,
+        decennial=decennial,
+        block_geometry=block_geometry,
+    )
+    payload = urban_fraction_preflight_payload(
+        boundary=boundary,
+        urban_area_vintage=urban_area_vintage,
+        block_vintage=resolved_block_vintage,
+        decennial=decennial,
+        paths=paths,
+        dry_run=dry_run,
+        force=force,
+    )
+
+    missing_inputs = [
+        name for name, status in payload["inputs"].items() if not bool(status["exists"])
+    ]
+    if missing_inputs:
+        payload.update(
+            {
+                "status": "error",
+                "error": "missing_inputs",
+                "missing_inputs": missing_inputs,
+                "commands": _missing_input_commands(
+                    boundary=boundary,
+                    urban_area_vintage=urban_area_vintage,
+                    decennial=decennial,
+                    block_vintage=resolved_block_vintage,
+                    missing_inputs=missing_inputs,
+                ),
+            }
+        )
+        _emit_payload(payload, json_output=output_json)
+        raise typer.Exit(1)
+
+    output_exists = paths["summary"].exists() or paths["detail"].exists()
+    payload["output_exists"] = output_exists
+    if output_exists and not force and not dry_run:
+        payload.update({"status": "error", "error": "artifact_exists"})
+        _emit_payload(payload, json_output=output_json)
+        raise typer.Exit(1)
+
+    if dry_run:
+        _emit_payload(payload, json_output=output_json)
+        return
+
+    try:
+        coc_gdf = gpd.read_parquet(paths["coc_boundaries"])
+        urban_area_gdf = gpd.read_parquet(paths["urban_areas"])
+        block_gdf = _load_block_inputs(paths["pl_blocks"], paths.get("block_geometry"))
+        summary, detail = build_coc_urban_fraction(
+            coc_gdf,
+            block_gdf,
+            urban_area_gdf,
+            boundary_vintage=boundary,
+            urban_area_vintage=urban_area_vintage,
+            block_vintage=resolved_block_vintage,
+            decennial_vintage=decennial,
+        )
+    except Exception as exc:
+        _emit_error(str(exc), json_output=output_json)
+        raise typer.Exit(1) from exc
+
+    provenance = ProvenanceBlock(
+        boundary_vintage=str(boundary),
+        weighting="block_area_intersection",
+        geo_type="coc",
+        extra={
+            "dataset_type": "coc_urban_fraction",
+            "urban_area_vintage": str(urban_area_vintage),
+            "block_vintage": str(resolved_block_vintage),
+            "decennial_vintage": str(decennial),
+            "denominator_source": "pl_94_171_block_population",
+            "allocation_method": DEFAULT_ALLOCATION_METHOD,
+            "classification_method": DEFAULT_CLASSIFICATION_METHOD,
+        },
+    )
+    written_summary = write_parquet_with_provenance(summary, paths["summary"], provenance)
+    written_detail = write_parquet_with_provenance(detail, paths["detail"], provenance)
+    payload.update(
+        {
+            "rows": int(len(summary)),
+            "coc_count": int(summary["coc_id"].nunique()) if not summary.empty else 0,
+            "total_population": float(summary["coc_total_population"].sum())
+            if not summary.empty
+            else 0.0,
+            "urban_population": float(summary["coc_urban_population"].sum())
+            if not summary.empty
+            else 0.0,
+            "min_fraction": _float_or_none(summary["urban_population_fraction"].min()),
+            "max_fraction": _float_or_none(summary["urban_population_fraction"].max()),
+            "artifact": str(written_summary),
+            "detail_artifact": str(written_detail),
+            "diagnostics": {
+                "missing_denominator_block_count": int(
+                    summary["missing_denominator_block_count"].sum()
+                )
+                if not summary.empty
+                else 0,
+                "min_population_coverage_ratio": _float_or_none(
+                    summary["population_coverage_ratio"].min()
+                ),
+            },
+        }
+    )
+    _emit_payload(payload, json_output=output_json)
+
+
+def urban_fraction_paths(
+    *,
+    boundary: str,
+    urban_area_vintage: int,
+    block_vintage: int,
+    decennial: int,
+    block_geometry: Path | None,
+) -> dict[str, Path]:
+    """Resolve canonical inputs and outputs for urban fraction builds."""
+    measures_dir = curated_dir("measures")
+    return {
+        "coc_boundaries": curated_dir("coc_boundaries") / naming.coc_base_filename(boundary),
+        "urban_areas": curated_dir("tiger") / naming.urban_area_filename(urban_area_vintage),
+        "pl_blocks": curated_dir("census")
+        / naming.pl_block_population_filename(decennial, block_vintage),
+        "block_geometry": block_geometry,
+        "summary": measures_dir
+        / naming.coc_urban_fraction_filename(
+            boundary,
+            urban_area_vintage,
+            block_vintage,
+            decennial,
+        ),
+        "detail": measures_dir
+        / naming.coc_urban_area_detail_filename(
+            boundary,
+            urban_area_vintage,
+            block_vintage,
+            decennial,
+        ),
+    }
+
+
+def urban_fraction_preflight_payload(
+    *,
+    boundary: str,
+    urban_area_vintage: int,
+    block_vintage: int,
+    decennial: int,
+    paths: dict[str, Path],
+    dry_run: bool,
+    force: bool,
+) -> dict[str, object]:
+    """Build a JSON-serializable preflight payload for urban fraction builds."""
+    return {
+        "status": "ok",
+        "action": "dry_run" if dry_run else "build",
+        "boundary_vintage": str(boundary),
+        "urban_area_vintage": str(urban_area_vintage),
+        "block_vintage": str(block_vintage),
+        "decennial_vintage": str(decennial),
+        "inputs": {
+            "coc_boundaries": _path_status(paths["coc_boundaries"]),
+            "urban_areas": _path_status(paths["urban_areas"]),
+            "pl_blocks": _path_status(paths["pl_blocks"]),
+            "block_geometry": _block_geometry_status(paths["pl_blocks"], paths["block_geometry"]),
+        },
+        "artifact": str(paths["summary"]),
+        "detail_artifact": str(paths["detail"]),
+        "will_write": not dry_run,
+        "force": force,
+    }
+
+
+def _load_block_inputs(pl_blocks_path: Path, block_geometry_path: Path | None) -> gpd.GeoDataFrame:
+    try:
+        pl_blocks_geo = gpd.read_parquet(pl_blocks_path)
+        if "geometry" in pl_blocks_geo.columns:
+            return pl_blocks_geo
+    except ValueError:
+        pass
+
+    pl_blocks = pd.read_parquet(pl_blocks_path)
+    if block_geometry_path is None:
+        raise ValueError(
+            "PL block population artifact has no geometry. Provide --block-geometry "
+            "with a GeoParquet containing block_geoid and geometry."
+        )
+    block_geometry = gpd.read_parquet(block_geometry_path)
+    if "block_geoid" not in block_geometry.columns:
+        raise ValueError("Block geometry artifact missing required column: block_geoid.")
+    return block_geometry[["block_geoid", "geometry"]].merge(pl_blocks, on="block_geoid")
+
+
+def _missing_input_commands(
+    *,
+    boundary: str,
+    urban_area_vintage: int,
+    decennial: int,
+    block_vintage: int,
+    missing_inputs: list[str],
+) -> dict[str, str]:
+    commands = {
+        "coc_boundaries": (
+            f"hhplab ingest boundaries --source hud_exchange --vintage {boundary}"
+        ),
+        "urban_areas": f"hhplab ingest urban-areas --year {urban_area_vintage}",
+        "pl_blocks": f"hhplab ingest pl-blocks --decennial {decennial} --blocks {block_vintage}",
+        "block_geometry": "provide --block-geometry <path-to-block-geoparquet>",
+    }
+    return {name: command for name, command in commands.items() if name in missing_inputs}
+
+
+def _path_status(path: Path) -> dict[str, str | bool]:
+    return {"path": str(path), "exists": path.exists()}
+
+
+def _block_geometry_status(
+    pl_blocks_path: Path,
+    block_geometry_path: Path | None,
+) -> dict[str, str | bool]:
+    if block_geometry_path is not None:
+        return _path_status(block_geometry_path)
+    if pl_blocks_path.exists() and _geoparquet_has_geometry(pl_blocks_path):
+        return {"path": str(pl_blocks_path), "exists": True}
+    return {"path": "", "exists": False}
+
+
+def _geoparquet_has_geometry(path: Path) -> bool:
+    try:
+        gdf = gpd.read_parquet(path)
+    except (ValueError, OSError):
+        return False
+    return "geometry" in gdf.columns
+
+
+def _emit_payload(payload: dict[str, object], *, json_output: bool) -> None:
+    if json_output:
+        typer.echo(json.dumps(payload))
+        return
+    if payload.get("status") == "error":
+        error = payload.get("error", "error")
+        typer.echo(f"Error: {error}", err=True)
+        commands = payload.get("commands")
+        if isinstance(commands, dict) and commands:
+            typer.echo("Run:", err=True)
+            for command in commands.values():
+                typer.echo(f"  {command}", err=True)
+        return
+    if payload.get("action") == "dry_run":
+        typer.echo("Urban fraction preflight passed.")
+        typer.echo(f"Output: {payload['artifact']}")
+        return
+    typer.echo("Built CoC urban fraction artifact.")
+    typer.echo(f"Output: {payload['artifact']}")
+    typer.echo(f"Rows: {payload.get('rows', 0)}")
+
+
+def _emit_error(message: str, *, json_output: bool) -> None:
+    if json_output:
+        typer.echo(json.dumps({"status": "error", "error": message}))
+    else:
+        typer.echo(f"Error: {message}", err=True)
+
+
+def _float_or_none(value: object) -> float | None:
+    if pd.isna(value):
+        return None
+    return float(value)
