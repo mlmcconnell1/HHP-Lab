@@ -117,7 +117,7 @@ PL_BLOCK_POPULATION_CONTRACT = ArtifactContract(
 COC_URBAN_FRACTION_CONTRACT = ArtifactContract(
     name="coc_urban_fraction",
     required_columns=tuple(COC_URBAN_FRACTION_COLUMNS),
-    canonical_measures=("total_population", "urban_population", "rural_population"),
+    canonical_measures=("coc_total_population", "coc_urban_population", "coc_rural_population"),
     drift_prone_columns=(),
 )
 

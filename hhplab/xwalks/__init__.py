@@ -22,6 +22,7 @@ from hhplab.xwalks.tract_mediated import (
     build_tract_mediated_county_crosswalk,
     save_tract_mediated_county_crosswalk,
 )
+from hhplab.xwalks.urban_fraction import build_coc_urban_fraction
 
 __all__ = [
     "build_tract_crosswalk",
@@ -33,6 +34,7 @@ __all__ = [
     "validate_population_shares",
     "build_tract_mediated_county_crosswalk",
     "save_tract_mediated_county_crosswalk",
+    "build_coc_urban_fraction",
     "AreaShareValidation",
     "PopulationValidationResult",
     "StatePopulationComparison",
