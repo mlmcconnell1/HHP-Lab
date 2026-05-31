@@ -6,11 +6,15 @@ from shapely.geometry import Point
 from typer.testing import CliRunner
 
 from hhplab.census.ingest.tiger_blocks import (
+    _block_geometry_parts_dir,
     _block_url,
     _block_zip_name,
+    _state_part_path,
+    _stream_state_block_parts,
     get_block_geometry_output_path,
     normalize_block_geometry,
     save_block_geometry,
+    save_block_geometry_from_parts,
 )
 from hhplab.census.ingest.tiger_tracts import (
     _resolve_geoid_column,
@@ -241,6 +245,122 @@ def test_save_block_geometry_writes_geoparquet_with_provenance(tmp_path) -> None
     assert provenance is not None
     assert provenance.extra["block_vintage"] == 2020
     assert provenance.extra["missing_state_fips"] == ["72"]
+
+
+def _raw_block_gdf(state_fips: str, block_suffix: str) -> gpd.GeoDataFrame:
+    return gpd.GeoDataFrame(
+        {
+            "GEOID20": [f"{state_fips}001090101{block_suffix}"],
+            "STATEFP20": [state_fips],
+            "COUNTYFP20": ["001"],
+            "TRACTCE20": ["090101"],
+            "geometry": [Point(float(int(state_fips)), 1)],
+        },
+        geometry="geometry",
+        crs="EPSG:4326",
+    )
+
+
+def test_stream_state_block_parts_writes_one_part_per_state(monkeypatch, tmp_path) -> None:
+    """Block geometry ingest writes per-state parts instead of retaining all states."""
+    calls: list[str] = []
+
+    def fake_fetch_or_load_state_blocks(client, *, year, state_fips, tmpdir, raw_root, force):
+        calls.append(state_fips)
+        return (
+            _raw_block_gdf(state_fips, "1234"),
+            f"raw-{state_fips}".encode(),
+            tmp_path / "raw" / f"tl_{year}_{state_fips}_tabblock20.zip",
+        )
+
+    monkeypatch.setattr(
+        "hhplab.census.ingest.tiger_blocks._fetch_or_load_state_blocks",
+        fake_fetch_or_load_state_blocks,
+    )
+    parts_dir = _block_geometry_parts_dir(2020, tmp_path)
+
+    digest, content_size, raw_paths, missing, row_counts = _stream_state_block_parts(
+        2020,
+        parts_dir=parts_dir,
+        state_fips_codes=("01", "02"),
+        raw_root=tmp_path / "raw",
+    )
+
+    assert calls == ["01", "02"]
+    assert digest
+    assert content_size == len(b"raw-01") + len(b"raw-02")
+    assert [path.name for path in raw_paths] == [
+        "tl_2020_01_tabblock20.zip",
+        "tl_2020_02_tabblock20.zip",
+    ]
+    assert missing == []
+    assert row_counts == {"01": 1, "02": 1}
+    assert _state_part_path(parts_dir, "01").exists()
+    assert _state_part_path(parts_dir, "02").exists()
+    assert gpd.read_parquet(_state_part_path(parts_dir, "01")).loc[0, "state_fips"] == "01"
+
+
+def test_stream_state_block_parts_resumes_completed_parts(monkeypatch, tmp_path) -> None:
+    """Retries skip state parts that already have the matching raw ZIP."""
+    raw_root = tmp_path / "raw"
+    raw_zip = raw_root / "tiger" / "2020" / "blocks" / "tl_2020_01_tabblock20.zip"
+    raw_zip.parent.mkdir(parents=True)
+    raw_zip.write_bytes(b"raw-01")
+    parts_dir = _block_geometry_parts_dir(2020, tmp_path)
+    _write_path = _state_part_path(parts_dir, "01")
+    normalized = normalize_block_geometry(_raw_block_gdf("01", "1234"), 2020)
+    _write_path.parent.mkdir(parents=True)
+    normalized.to_parquet(_write_path, index=False)
+
+    def fail_fetch_or_load_state_blocks(*args, **kwargs):
+        raise AssertionError("completed state should not be fetched again")
+
+    monkeypatch.setattr(
+        "hhplab.census.ingest.tiger_blocks._fetch_or_load_state_blocks",
+        fail_fetch_or_load_state_blocks,
+    )
+
+    _digest, content_size, raw_paths, missing, row_counts = _stream_state_block_parts(
+        2020,
+        parts_dir=parts_dir,
+        state_fips_codes=("01",),
+        raw_root=raw_root,
+    )
+
+    assert content_size == len(b"raw-01")
+    assert raw_paths == [raw_zip]
+    assert missing == []
+    assert row_counts == {"01": 1}
+
+
+def test_save_block_geometry_from_parts_streams_final_geoparquet(tmp_path) -> None:
+    """Per-state parts assemble into the canonical GeoParquet with provenance."""
+    parts_dir = tmp_path / "parts"
+    part_paths = []
+    for state_fips in ("01", "02"):
+        part_path = _state_part_path(parts_dir, state_fips)
+        normalized = normalize_block_geometry(_raw_block_gdf(state_fips, "1234"), 2020)
+        part_path.parent.mkdir(parents=True, exist_ok=True)
+        normalized.to_parquet(part_path, index=False)
+        part_paths.append(part_path)
+
+    output_path = save_block_geometry_from_parts(
+        part_paths,
+        2020,
+        output_dir=tmp_path,
+        content_sha256="abc123",
+        content_size=12,
+        raw_paths=[tmp_path / "tl_2020_01_tabblock20.zip"],
+    )
+
+    assert output_path == tmp_path / "blocks__K2020.parquet"
+    roundtrip = gpd.read_parquet(output_path)
+    assert list(roundtrip["state_fips"]) == ["01", "02"]
+    assert roundtrip.crs.to_epsg() == 4326
+    provenance = read_provenance(output_path)
+    assert provenance is not None
+    assert provenance.extra["content_sha256"] == "abc123"
+    assert provenance.extra["part_paths"] == [str(path) for path in part_paths]
 
 
 def test_ingest_urban_areas_cli_cached_json(monkeypatch, tmp_path) -> None:
