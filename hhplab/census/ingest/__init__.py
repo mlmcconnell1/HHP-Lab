@@ -17,6 +17,13 @@ from hhplab.census.ingest.tract_relationship import (
     load_tract_relationship,
     save_tract_relationship,
 )
+from hhplab.census.ingest.urban_areas import (
+    download_urban_areas,
+    get_urban_area_output_path,
+    ingest_urban_areas,
+    normalize_urban_areas,
+    save_urban_areas,
+)
 
 __all__ = [
     "download_tiger_tracts",
@@ -31,4 +38,9 @@ __all__ = [
     "get_tract_relationship_path",
     "load_tract_relationship",
     "TractRelationshipNotFoundError",
+    "download_urban_areas",
+    "get_urban_area_output_path",
+    "ingest_urban_areas",
+    "normalize_urban_areas",
+    "save_urban_areas",
 ]

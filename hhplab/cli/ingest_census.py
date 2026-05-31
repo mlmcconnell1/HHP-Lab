@@ -1,10 +1,13 @@
-"""CLI command for ingesting TIGER geometries."""
+"""CLI commands for ingesting Census geometries."""
 
+import json
 from typing import Annotated
 
+import geopandas as gpd
 import typer
 
-from hhplab.naming import county_filename, tract_filename
+from hhplab.census.ingest.urban_areas import get_urban_area_output_path
+from hhplab.naming import county_filename, tract_filename, urban_area_filename
 from hhplab.paths import curated_dir
 
 
@@ -22,7 +25,7 @@ def ingest_tiger(
         typer.Option(
             "--type",
             "-t",
-            help="What to download: 'tracts', 'counties', or 'all'.",
+        help="What to download: 'tracts', 'counties', 'urban-areas', or 'all'.",
         ),
     ] = "all",
     force: Annotated[
@@ -33,10 +36,11 @@ def ingest_tiger(
         ),
     ] = False,
 ) -> None:
-    """Download TIGER census geometries (tracts and/or counties).
+    """Download TIGER census geometries.
 
-    Downloads census tract and county shapefiles from the US Census Bureau's
-    TIGER/Line files, reprojects to EPSG:4326, and saves as GeoParquet files.
+    Downloads census tract, county, and optionally Urban Area shapefiles from the
+    US Census Bureau's TIGER/Line files, reprojects to EPSG:4326, and saves as
+    GeoParquet files.
 
     Examples:
 
@@ -47,7 +51,7 @@ def ingest_tiger(
         hhplab ingest tiger --year 2023 --type counties --force
     """
     # Validate type option
-    valid_types = {"tracts", "counties", "all"}
+    valid_types = {"tracts", "counties", "urban-areas", "all"}
     if type_ not in valid_types:
         typer.echo(
             f"Error: Invalid type '{type_}'. Must be one of: {', '.join(sorted(valid_types))}",
@@ -58,10 +62,12 @@ def ingest_tiger(
     # Determine what to download
     download_tracts = type_ in ("tracts", "all")
     download_counties = type_ in ("counties", "all")
+    download_urban_areas = type_ == "urban-areas"
 
     # Define output paths using canonical naming helpers
     tracts_path = curated_dir("tiger") / tract_filename(year)
     counties_path = curated_dir("tiger") / county_filename(year)
+    urban_areas_path = curated_dir("tiger") / urban_area_filename(year)
 
     # Track what was downloaded
     downloaded = []
@@ -108,11 +114,104 @@ def ingest_tiger(
                 if not downloaded:
                     raise typer.Exit(1) from e
 
+    if download_urban_areas:
+        if urban_areas_path.exists() and not force:
+            typer.echo(f"Urban Areas file already exists: {urban_areas_path}")
+            typer.echo("Use --force to re-download.")
+        else:
+            if urban_areas_path.exists() and force:
+                typer.echo(f"Forcing rebuild: removing existing {urban_areas_path}")
+            typer.echo(f"Downloading Census Urban Areas for {year}...")
+            try:
+                from hhplab.census.ingest import ingest_urban_areas
+
+                output_path = ingest_urban_areas(year, force=force)
+                typer.echo(f"Saved Urban Areas to: {output_path}")
+                downloaded.append(("urban_areas", output_path))
+            except Exception as e:
+                typer.echo(f"Error downloading Urban Areas: {e}", err=True)
+                if not downloaded:
+                    raise typer.Exit(1) from e
+
     # Summary
     if downloaded:
         typer.echo("")
         typer.echo("Census geometry ingestion complete:")
         for name, path in downloaded:
             typer.echo(f"  {name}: {path}")
-    elif not (tracts_path.exists() or counties_path.exists()):
+    elif not (tracts_path.exists() or counties_path.exists() or urban_areas_path.exists()):
         typer.echo("No files were downloaded.")
+
+
+def ingest_urban_areas_cmd(
+    year: Annotated[
+        int,
+        typer.Option(
+            "--year",
+            "-y",
+            help="Census Urban Area vintage: 2010 or 2020.",
+        ),
+    ],
+    force: Annotated[
+        bool,
+        typer.Option(
+            "--force",
+            help="Re-ingest even if cached file exists.",
+        ),
+    ] = False,
+    output_json: Annotated[
+        bool,
+        typer.Option(
+            "--json",
+            help="Output structured JSON instead of human-readable text.",
+        ),
+    ] = False,
+) -> None:
+    """Ingest Census Urban Area geometry for 2010 or 2020."""
+    from hhplab.census.ingest.urban_areas import ingest_urban_areas
+
+    output_path = get_urban_area_output_path(year)
+    if output_path.exists() and not force:
+        gdf = gpd.read_parquet(output_path)
+        if output_json:
+            typer.echo(
+                json.dumps(
+                    {
+                        "status": "ok",
+                        "cached": True,
+                        "urban_area_vintage": year,
+                        "output_path": str(output_path),
+                        "urban_area_count": int(len(gdf)),
+                    }
+                )
+            )
+            return
+        typer.echo(f"Cached file found: {output_path}")
+        typer.echo(f"Urban Areas: {len(gdf):,}")
+        typer.echo("Use --force to re-ingest.")
+        return
+
+    try:
+        path = ingest_urban_areas(year, force=force)
+    except Exception as exc:
+        typer.echo(f"Error: {exc}", err=True)
+        raise typer.Exit(1) from exc
+
+    gdf = gpd.read_parquet(path)
+    if output_json:
+        typer.echo(
+            json.dumps(
+                {
+                    "status": "ok",
+                    "cached": False,
+                    "urban_area_vintage": year,
+                    "output_path": str(path),
+                    "urban_area_count": int(len(gdf)),
+                }
+            )
+        )
+        return
+
+    typer.echo("Ingested Census Urban Area geometry.")
+    typer.echo(f"Output file: {path}")
+    typer.echo(f"Urban Areas: {len(gdf):,}")
