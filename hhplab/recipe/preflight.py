@@ -33,6 +33,7 @@ from hhplab.geo.geo_io import resolve_curated_boundary_path
 from hhplab.naming import (
     acs5_tracts_filename,
     coc_base_path,
+    coc_urban_fraction_path,
     county_path,
     metro_boundaries_path,
     msa_boundaries_path,
@@ -587,6 +588,56 @@ def _dataset_remediation(ds_id: str, ds, *, years: list[int] | None = None) -> R
                 ),
                 command=command,
             )
+
+    if provider == "census" and product == "urban_fraction":
+        boundary_vintage = ds.params.get("boundary_vintage") or getattr(
+            ds.native_geometry,
+            "vintage",
+            None,
+        )
+        decennial_vintage = ds.params.get("decennial_vintage") or ds.params.get("decennial")
+        urban_area_vintage = ds.params.get("urban_area_vintage") or decennial_vintage
+        block_vintage = ds.params.get("block_vintage") or decennial_vintage
+        if (
+            boundary_vintage is not None
+            and decennial_vintage is not None
+            and urban_area_vintage is not None
+            and block_vintage is not None
+        ):
+            artifact = coc_urban_fraction_path(
+                boundary_vintage=boundary_vintage,
+                urban_area_vintage=urban_area_vintage,
+                block_vintage=block_vintage,
+                decennial_vintage=decennial_vintage,
+                base_dir="data",
+            )
+            command = (
+                "hhplab build urban-fraction "
+                f"--boundary {boundary_vintage} "
+                f"--urban-area-vintage {urban_area_vintage} "
+                f"--decennial {decennial_vintage} "
+                f"--block-vintage {block_vintage}"
+            )
+            return Remediation(
+                hint=(
+                    f"Build the CoC urban population fraction artifact for dataset "
+                    f"'{ds_id}' at {artifact}. Recipes should treat this as a "
+                    "static CoC covariate and set params.broadcast_static=true "
+                    "when spanning multiple years."
+                ),
+                command=command,
+            )
+        return Remediation(
+            hint=(
+                f"Dataset '{ds_id}' needs params.boundary_vintage or "
+                "native_geometry.vintage plus params.decennial_vintage before "
+                "HHP-Lab can resolve the urban fraction artifact path."
+            ),
+            command=(
+                "hhplab build urban-fraction --boundary <year> "
+                "--urban-area-vintage <year> --decennial <year>"
+            ),
+        )
 
     if provider == "bls" and product == "laus":
         return Remediation(
@@ -1254,7 +1305,7 @@ def _check_msa_coc_coverage_artifacts(
                     f"--tracts {spec.tract_vintage}",
                 )
 
-        for label, (path, geo_type, vintage, definition_version, command) in sorted(
+        for label, (path, geo_type, _vintage, _definition_version, command) in sorted(
             artifact_paths.items()
         ):
             if path.exists():

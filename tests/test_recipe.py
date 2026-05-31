@@ -55,6 +55,7 @@ from hhplab.recipe.planner import (
     SmallAreaEstimateTask,
     resolve_plan,
 )
+from hhplab.recipe.preflight import FindingKind, run_preflight
 from hhplab.recipe.recipe_schema import (
     Acs1Policy,
     ContainmentSpec,
@@ -73,7 +74,6 @@ from hhplab.recipe.recipe_schema import (
     ZoriPolicy,
     expand_year_spec,
 )
-from hhplab.recipe.preflight import run_preflight
 from hhplab.schema.columns import MSA_COC_COVERAGE_COLUMNS
 from hhplab.xwalks.county import ALBERS_EQUAL_AREA_CRS
 
@@ -234,6 +234,53 @@ def _sae_recipe() -> dict:
                         "kind": "join",
                         "datasets": ["acs_sae_coc"],
                         "join_on": ["geo_id", "year"],
+                    },
+                ],
+            }
+        ],
+    }
+
+
+def _urban_fraction_recipe() -> dict:
+    """Return a minimal recipe using the static CoC urban fraction covariate."""
+    return {
+        "version": 1,
+        "name": "urban-fraction-recipe",
+        "universe": {"range": "2020-2021"},
+        "targets": [
+            {
+                "id": "coc_panel",
+                "geometry": {"type": "coc", "vintage": 2025},
+            }
+        ],
+        "datasets": {
+            "urban_fraction": {
+                "provider": "census",
+                "product": "urban_fraction",
+                "version": 1,
+                "native_geometry": {"type": "coc", "vintage": 2025},
+                "geo_column": "coc_id",
+                "params": {
+                    "decennial_vintage": 2020,
+                    "urban_area_vintage": 2020,
+                    "block_vintage": 2020,
+                    "broadcast_static": True,
+                },
+            }
+        },
+        "pipelines": [
+            {
+                "id": "main",
+                "target": "coc_panel",
+                "steps": [
+                    {
+                        "kind": "resample",
+                        "dataset": "urban_fraction",
+                        "to_geometry": {"type": "coc", "vintage": 2025},
+                        "method": "identity",
+                        "measures": {
+                            "urban_population_fraction": {"aggregation": "mean"},
+                        },
                     },
                 ],
             }
@@ -499,6 +546,84 @@ class TestLoadRecipeFromDict:
         }
         with pytest.raises(RecipeLoadError, match="selector lists may not be empty"):
             load_recipe(data)
+
+
+class TestUrbanFractionRecipeIntegration:
+    """Recipe integration for the static CoC urban fraction covariate."""
+
+    def test_planner_resolves_default_canonical_artifact_path(self):
+        recipe = load_recipe(_urban_fraction_recipe())
+
+        plan = resolve_plan(recipe, "main")
+
+        assert len(plan.resample_tasks) == 2
+        assert {
+            task.input_path for task in plan.resample_tasks
+        } == {
+            "data/curated/measures/"
+            "coc_urban_fraction__N2020@B2025xU2020xK2020.parquet"
+        }
+
+    def test_fixture_recipe_resolves_structured_plan(self):
+        recipe_path = (
+            Path(__file__).parent
+            / "fixtures"
+            / "recipes"
+            / "coc-urban-fraction-sanity.yaml"
+        )
+        recipe = load_recipe(recipe_path)
+
+        plan = resolve_plan(recipe, "main")
+
+        assert plan.to_dict()["resample_tasks"][0]["measures"] == [
+            "urban_population_fraction"
+        ]
+        assert plan.to_dict()["resample_tasks"][0]["input_path"] == (
+            "data/curated/measures/"
+            "coc_urban_fraction__N2020@B2025xU2020xK2020.parquet"
+        )
+
+    def test_preflight_reports_missing_artifact_with_build_command(self, tmp_path: Path):
+        recipe = load_recipe(_urban_fraction_recipe())
+
+        report = run_preflight(recipe, project_root=tmp_path)
+
+        missing = [
+            f
+            for f in report.findings
+            if f.kind == FindingKind.MISSING_DATASET
+            and f.dataset_id == "urban_fraction"
+        ]
+        assert len(missing) == 1
+        assert missing[0].remediation is not None
+        assert missing[0].remediation.command == (
+            "hhplab build urban-fraction --boundary 2025 "
+            "--urban-area-vintage 2020 --decennial 2020 --block-vintage 2020"
+        )
+        assert "coc_urban_fraction__N2020@B2025xU2020xK2020.parquet" in (
+            missing[0].remediation.hint
+        )
+
+    def test_preflight_accepts_existing_static_covariate_artifact(self, tmp_path: Path):
+        recipe = load_recipe(_urban_fraction_recipe())
+        artifact_path = (
+            tmp_path
+            / "data"
+            / "curated"
+            / "measures"
+            / "coc_urban_fraction__N2020@B2025xU2020xK2020.parquet"
+        )
+        artifact_path.parent.mkdir(parents=True, exist_ok=True)
+        pd.DataFrame(
+            {
+                "coc_id": ["CO-500"],
+                "urban_population_fraction": [0.75],
+            }
+        ).to_parquet(artifact_path)
+
+        report = run_preflight(recipe, project_root=tmp_path)
+
+        assert report.is_ready, [finding.message for finding in report.blocking_findings()]
 
 
 class TestLoadRecipeFromFile:
@@ -3124,7 +3249,10 @@ class TestMsaCocCoverageSpec:
             tmp_path
             / "outputs"
             / "msa-coverage-test"
-            / "msa_coc_coverage__Y2024@B2025xMcensus_msa_2023xC2023__top2__basis-area-population.parquet"
+            / (
+                "msa_coc_coverage__Y2024@B2025xMcensus_msa_2023xC2023__top2__"
+                "basis-area-population.parquet"
+            )
         )
         assert output.exists()
         assert output.with_suffix(".csv").exists()

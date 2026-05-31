@@ -381,7 +381,25 @@ The old list format (`measures: [a, b]` + `aggregation: sum`) is still supported
 
 ---
 
-## 10) Filters Section (`coclab-6k6w`)
+## 10) CoC Urban Fraction Covariate (`coclab-irsi.6`)
+
+`census/urban_fraction` is a standalone static CoC covariate, not an ACS/PEP
+panel source. Recipes may omit `path`/`file_set`; the planner resolves the
+canonical artifact from `native_geometry.vintage` or `params.boundary_vintage`
+plus `params.decennial_vintage`, `params.urban_area_vintage`, and
+`params.block_vintage`:
+
+```text
+data/curated/measures/coc_urban_fraction__N{decennial}@B{boundary}xU{urban_area}xK{block}.parquet
+```
+
+Because the artifact has no analysis-year column, multi-year recipes must set
+`params.broadcast_static: true` explicitly. Preflight reports missing artifacts
+with a `hhplab build urban-fraction` command hint.
+
+---
+
+## 11) Filters Section (`coclab-6k6w`)
 
 A new top-level `filters:` section, keyed by dataset_id, supports temporal filtering before data enters the pipeline:
 
@@ -413,11 +431,13 @@ See `TemporalFilter` and `FilterSpec` in `recipe_schema.py`.
 
 ---
 
-## 11) Align Parameter Status (`coclab-1cp3`)
+## 12) Align Parameter Status (`coclab-1cp3`)
 
 The `align` parameter in dataset params (e.g., `params.align: point_in_time_jan`) is validated by dataset adapters but is **not implemented by the executor**. It serves only as a documentation hint.
 
-The new `filters:` section (section 10) is the actual mechanism for temporal alignment. Recipe authors should migrate from `align` in params to explicit `filters:` declarations:
+The `filters:` section (section 11) is the actual mechanism for temporal
+alignment. Recipe authors should migrate from `align` in params to explicit
+`filters:` declarations:
 
 ```yaml
 # Before (documentation-only, not enforced):

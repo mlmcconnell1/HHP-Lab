@@ -1121,6 +1121,23 @@ class TestMsaPanelParity:
         assert "total_population" in flags.measure_columns
         assert "population" in flags.measure_columns
 
+    def test_conformance_flags_include_urban_fraction_measure(self, tmp_path: Path):
+        recipe = load_recipe(_msa_recipe_dict())
+        target = recipe.targets[0]
+        panel = pd.DataFrame(
+            {
+                "msa_id": ["35620"],
+                "geo_id": ["35620"],
+                "year": [2020],
+                "urban_population_fraction": [0.82],
+            }
+        )
+
+        flags = collect_conformance_flags(recipe=recipe, target=target, panel=panel)
+
+        assert flags.measure_columns is not None
+        assert "urban_population_fraction" in flags.measure_columns
+
 
 # ===========================================================================
 # LAUS-only conformance flags  (coclab-d9d3)

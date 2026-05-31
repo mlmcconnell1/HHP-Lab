@@ -1,0 +1,36 @@
+version: 1
+name: coc-urban-fraction-sanity
+description: >
+  Minimal static CoC urban population fraction recipe fixture for preflight and
+  planner contract tests.
+
+universe:
+  range: "2020-2021"
+
+targets:
+  - id: coc_panel
+    geometry: { type: coc, vintage: 2025 }
+
+datasets:
+  urban_fraction:
+    provider: census
+    product: urban_fraction
+    version: 1
+    native_geometry: { type: coc, vintage: 2025 }
+    geo_column: coc_id
+    params:
+      decennial_vintage: 2020
+      urban_area_vintage: 2020
+      block_vintage: 2020
+      broadcast_static: true
+
+pipelines:
+  - id: main
+    target: coc_panel
+    steps:
+      - resample:
+          dataset: urban_fraction
+          to_geometry: { type: coc, vintage: 2025 }
+          method: identity
+          measures:
+            urban_population_fraction: { aggregation: mean }

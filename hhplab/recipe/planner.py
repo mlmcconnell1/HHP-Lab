@@ -11,7 +11,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
+from hhplab.naming import coc_urban_fraction_path
 from hhplab.recipe.recipe_schema import (
+    DatasetSpec,
     FileSetSpec,
     JoinStep,
     MaterializeStep,
@@ -215,12 +217,54 @@ def _resolve_dataset_year(
                 f"{ds.years.range or ds.years.years} but year {year} is not covered."
             )
 
+    default_path = _default_dataset_path(ds)
     return ResolvedDatasetYear(
         dataset_id=dataset_id,
         year=year,
-        path=ds.path,
+        path=ds.path if ds.path is not None else default_path,
         effective_geometry=ds.native_geometry,
     )
+
+
+def _urban_fraction_param(ds: DatasetSpec, *names: str) -> object | None:
+    for name in names:
+        value = ds.params.get(name)
+        if value is not None:
+            return value
+    return None
+
+
+def _default_dataset_path(ds: DatasetSpec) -> str | None:
+    """Resolve canonical artifact paths for datasets with built-in naming."""
+    if ds.provider == "census" and ds.product == "urban_fraction":
+        boundary_vintage = _urban_fraction_param(ds, "boundary_vintage")
+        if boundary_vintage is None:
+            boundary_vintage = ds.native_geometry.vintage
+        decennial_vintage = _urban_fraction_param(ds, "decennial_vintage", "decennial")
+        urban_area_vintage = _urban_fraction_param(ds, "urban_area_vintage")
+        if urban_area_vintage is None:
+            urban_area_vintage = decennial_vintage
+        block_vintage = _urban_fraction_param(ds, "block_vintage")
+        if block_vintage is None:
+            block_vintage = decennial_vintage
+        if (
+            boundary_vintage is None
+            or decennial_vintage is None
+            or urban_area_vintage is None
+            or block_vintage is None
+        ):
+            return None
+        return str(
+            coc_urban_fraction_path(
+                boundary_vintage=boundary_vintage,
+                urban_area_vintage=urban_area_vintage,
+                block_vintage=block_vintage,
+                decennial_vintage=decennial_vintage,
+                base_dir="data",
+            )
+        )
+
+    return None
 
 
 def _resolve_via_file_set(

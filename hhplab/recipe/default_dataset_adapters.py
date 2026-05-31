@@ -327,6 +327,73 @@ def _validate_census_pep(spec: DatasetSpec) -> list[ValidationDiagnostic]:
     return diags
 
 
+def _validate_census_urban_fraction(spec: DatasetSpec) -> list[ValidationDiagnostic]:
+    """Validate CoC urban population fraction covariate artifacts."""
+    diags: list[ValidationDiagnostic] = []
+    if spec.version != 1:
+        diags.append(
+            ValidationDiagnostic(
+                "error",
+                f"census/urban_fraction: unsupported version {spec.version}; expected 1.",
+            )
+        )
+    if spec.native_geometry.type != "coc" and not _uses_materialized_artifact(spec):
+        diags.append(
+            ValidationDiagnostic(
+                "error",
+                f"census/urban_fraction: expected native_geometry type 'coc', "
+                f"got '{spec.native_geometry.type}'. Urban fraction artifacts "
+                "are CoC-native static covariates.",
+            )
+        )
+
+    known_params = {
+        "boundary_vintage",
+        "urban_area_vintage",
+        "block_vintage",
+        "decennial_vintage",
+        "decennial",
+        "broadcast_static",
+    }
+    unknown = set(spec.params.keys()) - known_params
+    if unknown:
+        diags.append(
+            ValidationDiagnostic(
+                "warning",
+                f"census/urban_fraction: unrecognized params {sorted(unknown)}.",
+            )
+        )
+
+    if not _uses_materialized_artifact(spec):
+        boundary_vintage = spec.params.get("boundary_vintage") or spec.native_geometry.vintage
+        decennial_vintage = spec.params.get("decennial_vintage") or spec.params.get("decennial")
+        if boundary_vintage is None:
+            diags.append(
+                ValidationDiagnostic(
+                    "error",
+                    "census/urban_fraction: default path resolution requires "
+                    "native_geometry.vintage or params.boundary_vintage.",
+                )
+            )
+        if decennial_vintage is None:
+            diags.append(
+                ValidationDiagnostic(
+                    "error",
+                    "census/urban_fraction: default path resolution requires "
+                    "params.decennial_vintage.",
+                )
+            )
+        if spec.params.get("broadcast_static") is not True:
+            diags.append(
+                ValidationDiagnostic(
+                    "warning",
+                    "census/urban_fraction: artifact is a static CoC covariate; "
+                    "set params.broadcast_static=true for multi-year recipes.",
+                )
+            )
+    return diags
+
+
 def _validate_zillow_zori(spec: DatasetSpec) -> list[ValidationDiagnostic]:
     """Validate Zillow ZORI dataset specification."""
     diags: list[ValidationDiagnostic] = []
@@ -426,5 +493,6 @@ def register_dataset_defaults(registry: DatasetAdapterRegistry) -> None:
     registry.register("census", "acs1_imputation_target", _validate_census_acs1_imputation_target)
     registry.register("census", "acs5_imputation_support", _validate_census_acs5_imputation_support)
     registry.register("census", "pep", _validate_census_pep)
+    registry.register("census", "urban_fraction", _validate_census_urban_fraction)
     registry.register("zillow", "zori", _validate_zillow_zori)
     registry.register("bls", "laus", _validate_bls_laus)

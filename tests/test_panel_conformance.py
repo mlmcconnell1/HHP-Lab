@@ -316,6 +316,41 @@ class TestPanelRequest:
         assert results[0].severity == "error"
         assert "sae_rent_burden_30_plus" in results[0].details["expected_columns"]
 
+    def test_urban_fraction_measure_columns_pass_when_requested(self) -> None:
+        req = PanelRequest(
+            start_year=2023,
+            end_year=2023,
+            measure_columns=["urban_population_fraction"],
+        )
+        panel = pd.DataFrame(
+            {
+                "coc_id": ["COC-A"],
+                "year": [2023],
+                "urban_population_fraction": [0.75],
+            }
+        )
+
+        results = check_schema_measures(panel, req)
+
+        assert results == []
+
+    def test_default_acs_measure_columns_do_not_change_for_urban_fraction(self) -> None:
+        req = PanelRequest(start_year=2023, end_year=2023)
+        panel = pd.DataFrame(
+            {
+                "coc_id": ["COC-A"],
+                "year": [2023],
+                "urban_population_fraction": [0.75],
+            }
+        )
+
+        results = check_schema_measures(panel, req)
+
+        assert len(results) == 1
+        assert results[0].severity == "error"
+        assert "total_population" in results[0].details["expected_columns"]
+        assert results[0].details["present_columns"] == []
+
 
 # ============================================================================
 # Registry and runner tests

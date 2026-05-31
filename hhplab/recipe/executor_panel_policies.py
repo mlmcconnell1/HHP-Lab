@@ -335,7 +335,7 @@ def collect_conformance_flags(
         set(ACS_MEASURE_COLUMNS)
         | set(ACS1_MEASURE_COLUMNS)
         | set(LAUS_MEASURE_COLUMNS)
-        | {"population"}
+        | {"population", "urban_population_fraction"}
     )
     for col in panel.columns:
         if col in known and col not in base_cols:
