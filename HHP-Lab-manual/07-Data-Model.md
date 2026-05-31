@@ -21,7 +21,61 @@ the CLI can inspect local curated artifacts with
 | Census | ACS 5-year | tract | 2009-ongoing | `total_population`, `adult_population`, `population_below_poverty`, `median_household_income`, `median_gross_rent`, `moe_total_population`, ACS vintage | CoC ACS measures, metro ACS measures, county weights for ZORI, panel demographic columns | ACS 5-year vintages are end years for five-year collection windows. |
 | Census | ACS 1-year | CBSA/metro or county | 2012-ongoing except 2020; available where ACS1 population thresholds are met | CBSA or county employment counts and `unemployment_rate_acs1`; income distribution; rent and owner-cost measures; rent/owner-cost burden bins; tenure-by-income; utility costs; heating fuel; gross rent by bedrooms; structure age; units-in-structure; household size; ACS1 vintage; metro definition version for metro artifacts | metro-native ACS1 artifact, county-native ACS1 artifact, modeled ACS1 poverty tract artifacts, ACS1/ACS5 SAE source/support artifacts, optional metro panel ACS1 measures, optional CoC `sae_*` measures | Utility-cost tables begin in 2021 and are null-backed in earlier supported vintages. County ACS1 artifacts contain only published threshold counties. Modeled tract and SAE outputs must retain lineage because Census does not publish ACS1 tract data. |
 | Census | PEP | county | 2010-ongoing | annual `population`, county FIPS/name/state, reference date, PEP vintage/provenance | CoC PEP population, metro PEP population, optional panel `population` measure | PEP reference dates are July 1 annual estimates; recipes can use temporal filters to align to January when needed. |
+| Census | Urban Area + PL block population | block / Urban Area, derived to CoC | 2010 and 2020 | PL 94-171 block population, block geometry, Census Urban Area polygons, CoC boundary vintage | CoC `urban_population_fraction`, CoC urban/rural population counts, optional CoC-by-Urban-Area detail | Uses block representative points for Urban Area membership and block-area allocation to CoCs. ACS/tract denominators are too coarse for this feature. |
 | Zillow | ZORI | county or ZIP, normalized to county for standard panels | 2015-ongoing | monthly `zori`, region name/state, source URL, raw hash, metric/provenance fields | normalized ZORI, CoC ZORI, metro ZORI, yearly collapsed ZORI, panel rent columns | Standard panel alignment uses January observations to match PIT timing. |
+
+## CoC Urban Fraction Artifact
+
+The CoC urban fraction workflow measures what share of each CoC's decennial
+block population falls inside Census Urban Area polygons. It is a static CoC
+covariate for a chosen boundary vintage, Urban Area vintage, block geometry
+vintage, and PL decennial population vintage.
+
+Canonical summary artifact:
+
+```text
+data/curated/measures/coc_urban_fraction__N2020@B2025xU2020xK2020.parquet
+```
+
+Canonical detail artifact:
+
+```text
+data/curated/measures/coc_urban_area_detail__N2020@B2025xU2020xK2020.parquet
+```
+
+Supported source vintages are 2010 and 2020 for Census Urban Areas and PL
+block population. Block geometry normally matches the decennial vintage. CoC
+boundaries can use any available curated boundary vintage.
+
+Urban Area membership is assigned at the block level by testing each block's
+representative point against Urban Area polygons. Population is allocated from
+blocks to CoCs by block-area intersection. This means a block that crosses CoC
+boundaries can contribute shares to multiple CoCs, but its urban/rural label is
+still determined once from the representative point.
+
+PL block population is required because Urban Area status can vary below the
+tract scale. ACS tract population denominators would smear urban and rural
+population across entire tracts and can misclassify boundary-edge CoCs,
+especially where a tract contains both incorporated urbanized territory and
+rural land. PL 94-171 block counts provide the smallest stable nationwide
+decennial denominator available for this classification.
+
+Key summary columns:
+
+| Column | Description |
+|--------|-------------|
+| `coc_id` | CoC identifier. |
+| `boundary_vintage` | CoC boundary vintage. |
+| `urban_area_vintage` | Census Urban Area vintage, 2010 or 2020. |
+| `block_vintage` | Block geometry vintage. |
+| `decennial_vintage` | PL population vintage. |
+| `coc_total_population` | Block-population denominator allocated to the CoC. |
+| `coc_urban_population` | Allocated population whose block representative point is inside an Urban Area. |
+| `coc_rural_population` | Allocated population outside Urban Areas. |
+| `urban_population_fraction` | `coc_urban_population / coc_total_population`, null when the denominator is zero. |
+| `population_coverage_ratio` | Share of allocated block records with usable population denominators. |
+| `classification_method` | `block_representative_point_in_urban_area`. |
+| `allocation_method` | `block_area_intersection`. |
 
 ## MSA-CoC Coverage Artifact
 

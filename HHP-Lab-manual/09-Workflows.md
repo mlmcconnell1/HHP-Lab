@@ -3,7 +3,12 @@
 ## Recipe-Driven Build
 
 1. Inspect available curated assets if needed (`hhplab status --json` for automation, `hhplab list curated` for browsing).
-2. Ingest required global assets (`boundaries`, `tiger`, `acs5-tract`, `pit`, `zori`, `pep`, optionally `acs1-metro` for metro-native ACS1 measures, and optionally `acs1-county` plus ACS5 tract support inputs for SAE workflows). MSA-CoC population coverage specifically requires ACS5 tract `total_population` and matching tract geometry.
+2. Ingest required global assets (`boundaries`, `tiger`, `acs5-tract`, `pit`,
+   `zori`, `pep`, optionally `acs1-metro` for metro-native ACS1 measures,
+   optionally `acs1-county` plus ACS5 tract support inputs for SAE workflows,
+   and optionally Census Urban Area plus PL block population inputs for urban
+   fraction covariates). MSA-CoC population coverage specifically requires
+   ACS5 tract `total_population` and matching tract geometry.
 3. Generate required crosswalks.
 4. Run `hhplab build recipe-preflight` when you want a no-execute readiness gate.
 5. Run a YAML recipe for deterministic panel construction.
@@ -46,6 +51,12 @@ hhplab build recipe --recipe recipes/metro25-glynnfox.yaml
 # Optional: ACS1/ACS5 small-area estimation example
 hhplab build recipe-preflight --recipe recipes/examples/coc-sae-acs1-2023.yaml --json
 hhplab build recipe --recipe recipes/examples/coc-sae-acs1-2023.yaml
+
+# Optional: CoC urban population fraction covariate
+hhplab ingest urban-areas --year 2020 --json
+hhplab ingest pl-blocks --decennial 2020 --json
+hhplab build urban-fraction --boundary 2025 --urban-area-vintage 2020 --decennial 2020 --json
+hhplab build recipe-preflight --recipe tests/fixtures/recipes/coc-urban-fraction-sanity.yaml --json
 
 # Optional: MSA-CoC overlap coverage artifact
 hhplab build recipe-preflight --recipe recipes/examples/msa-coc-coverage.yaml --json

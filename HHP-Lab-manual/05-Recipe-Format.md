@@ -410,6 +410,48 @@ datasets:
     path: data/curated/zori/zori__county__Z2025.parquet
 ```
 
+### CoC Urban Fraction Datasets
+
+Use `provider: census` and `product: urban_fraction` for the static CoC urban
+population fraction artifact. If `path` and `file_set` are omitted, the planner
+resolves the canonical curated path from `native_geometry.vintage` or
+`params.boundary_vintage` plus the decennial and Urban Area vintages:
+
+```yaml
+datasets:
+  urban_fraction:
+    provider: census
+    product: urban_fraction
+    version: 1
+    native_geometry: { type: coc, vintage: 2025 }
+    geo_column: coc_id
+    params:
+      decennial_vintage: 2020
+      urban_area_vintage: 2020
+      block_vintage: 2020
+      broadcast_static: true
+```
+
+Because the artifact is static and has no `year` column, multi-year recipes
+must set `params.broadcast_static: true`. Missing artifacts are reported by
+preflight with a build command such as:
+
+```bash
+hhplab build urban-fraction --boundary 2025 --urban-area-vintage 2020 --decennial 2020 --block-vintage 2020
+```
+
+Identity-resample the dataset into a panel when you want the covariate joined:
+
+```yaml
+steps:
+  - resample:
+      dataset: urban_fraction
+      to_geometry: { type: coc, vintage: 2025 }
+      method: identity
+      measures:
+        urban_population_fraction: { aggregation: mean }
+```
+
 For ZORI ingest outputs, the canonical curated path format is
 `data/curated/zori/zori__{geography}__Z{max_year}.parquet`, where `max_year`
 is the maximum year present in the ingested series.

@@ -221,6 +221,8 @@ hhplab ingest tiger --year 2023 --type all
 hhplab ingest acs5-tract --acs 2019-2023 --tracts 2023
 hhplab ingest acs1-metro --vintage 2023
 hhplab ingest acs1-county --vintage 2023
+hhplab ingest urban-areas --year 2020
+hhplab ingest pl-blocks --decennial 2020
 hhplab ingest pit-vintage --vintage 2024
 hhplab ingest zori --geography county
 hhplab ingest pep --series auto
@@ -240,6 +242,21 @@ artifacts such as
 separate top-level SAE ingest command; use `build recipe-plan` and
 `build recipe-preflight` on a recipe with a `small_area_estimate` step to see
 the exact required artifacts and remediation.
+
+Urban fraction prerequisites use two Census inputs: `ingest urban-areas`
+writes `data/curated/tiger/urban_areas__U{year}.parquet`, and `ingest
+pl-blocks` writes `data/curated/census/pl_blocks__N{decennial}xK{block}.parquet`.
+The build command combines those with CoC boundaries:
+
+```bash
+hhplab build urban-fraction --boundary 2025 --urban-area-vintage 2020 --decennial 2020 --json
+```
+
+The summary artifact is
+`data/curated/measures/coc_urban_fraction__N2020@B2025xU2020xK2020.parquet`.
+Use `--block-vintage` when block geometry differs from the PL vintage, and
+`--block-geometry` when the block geometry is stored separately from the PL
+population table.
 
 Useful PEP options:
 - `--start` / `--end` to trim the emitted year range
