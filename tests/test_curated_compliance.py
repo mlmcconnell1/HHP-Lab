@@ -122,6 +122,7 @@ class TestCanonicalFilenamesAccepted:
             ("coc_boundaries", "boundaries__B2024.parquet"),
             ("tiger", "tracts__T2023.parquet"),
             ("tiger", "counties__C2023.parquet"),
+            ("tiger", "blocks__K2020.parquet"),
             ("tiger", "urban_areas__U2020.parquet"),
             ("tiger", "tract_relationship__T2010xT2020.parquet"),
             ("census", "decennial_tracts__N2020xT2020.parquet"),

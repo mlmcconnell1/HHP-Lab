@@ -8,6 +8,8 @@ from typing import Annotated
 
 import geopandas as gpd
 import pandas as pd
+import pyarrow as pa
+import pyarrow.parquet as pq
 import typer
 
 import hhplab.naming as naming
@@ -358,10 +360,10 @@ def _block_geometry_status(
 
 def _geoparquet_has_geometry(path: Path) -> bool:
     try:
-        gdf = gpd.read_parquet(path)
-    except (ValueError, OSError):
+        schema = pq.ParquetFile(path).schema_arrow
+    except (pa.ArrowInvalid, ValueError, OSError):
         return False
-    return "geometry" in gdf.columns
+    return "geometry" in schema.names
 
 
 def _emit_payload(payload: dict[str, object], *, json_output: bool) -> None:

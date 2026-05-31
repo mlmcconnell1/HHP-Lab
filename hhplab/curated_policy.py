@@ -57,6 +57,7 @@ CANONICAL_PATTERNS: dict[str, list[re.Pattern[str]]] = {
     "tiger": [
         re.compile(r"^tracts__T\d{4}\.parquet$"),
         re.compile(r"^counties__C\d{4}\.parquet$"),
+        re.compile(r"^blocks__K\d{4}\.parquet$"),
         re.compile(r"^urban_areas__U\d{4}\.parquet$"),
         re.compile(r"^tract_relationship__T\d{4}xT\d{4}\.parquet$"),
     ],

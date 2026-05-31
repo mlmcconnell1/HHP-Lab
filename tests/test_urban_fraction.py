@@ -297,6 +297,24 @@ def test_urban_fraction_cli_dry_run_discovers_canonical_block_geometry(
     assert payload["inputs"]["block_geometry"]["exists"] is True
 
 
+def test_urban_fraction_geometry_preflight_uses_parquet_metadata(
+    monkeypatch,
+    tmp_path,
+) -> None:
+    """Geometry discovery does not materialize large block GeoParquet artifacts."""
+    from hhplab.cli import build_urban_fraction as build_urban_fraction_cli
+
+    _patch_curated_dir(monkeypatch, tmp_path)
+    _block_path, geometry_path = _write_cli_inputs(tmp_path)
+    monkeypatch.setattr(
+        build_urban_fraction_cli.gpd,
+        "read_parquet",
+        lambda _path: pytest.fail("preflight should inspect metadata only"),
+    )
+
+    assert build_urban_fraction_cli._geoparquet_has_geometry(geometry_path) is True
+
+
 def test_urban_fraction_cli_dry_run_accepts_integrated_block_geometry(
     monkeypatch,
     tmp_path,

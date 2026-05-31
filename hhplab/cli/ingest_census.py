@@ -4,6 +4,7 @@ import json
 from typing import Annotated
 
 import geopandas as gpd
+import pyarrow.parquet as pq
 import typer
 
 from hhplab.census.ingest.tiger_blocks import get_block_geometry_output_path
@@ -15,6 +16,11 @@ from hhplab.naming import (
     urban_area_filename,
 )
 from hhplab.paths import curated_dir
+
+
+def _parquet_row_count(path) -> int:
+    """Return a Parquet row count without materializing the full artifact."""
+    return int(pq.ParquetFile(path).metadata.num_rows)
 
 
 def ingest_tiger(
@@ -204,7 +210,7 @@ def ingest_block_geometry_cmd(
 
     output_path = get_block_geometry_output_path(year)
     if output_path.exists() and not force:
-        gdf = gpd.read_parquet(output_path)
+        block_count = _parquet_row_count(output_path)
         if output_json:
             typer.echo(
                 json.dumps(
@@ -213,13 +219,13 @@ def ingest_block_geometry_cmd(
                         "cached": True,
                         "block_vintage": year,
                         "output_path": str(output_path),
-                        "block_count": int(len(gdf)),
+                        "block_count": block_count,
                     }
                 )
             )
             return
         typer.echo(f"Cached file found: {output_path}")
-        typer.echo(f"Blocks: {len(gdf):,}")
+        typer.echo(f"Blocks: {block_count:,}")
         typer.echo("Use --force to re-ingest.")
         return
 
@@ -229,7 +235,7 @@ def ingest_block_geometry_cmd(
         typer.echo(f"Error: {exc}", err=True)
         raise typer.Exit(1) from exc
 
-    gdf = gpd.read_parquet(path)
+    block_count = _parquet_row_count(path)
     if output_json:
         typer.echo(
             json.dumps(
@@ -238,7 +244,7 @@ def ingest_block_geometry_cmd(
                     "cached": False,
                     "block_vintage": year,
                     "output_path": str(path),
-                    "block_count": int(len(gdf)),
+                    "block_count": block_count,
                 }
             )
         )
@@ -246,7 +252,7 @@ def ingest_block_geometry_cmd(
 
     typer.echo("Ingested Census tabulation block geometry.")
     typer.echo(f"Output file: {path}")
-    typer.echo(f"Blocks: {len(gdf):,}")
+    typer.echo(f"Blocks: {block_count:,}")
 
 
 def ingest_urban_areas_cmd(
