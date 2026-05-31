@@ -1,14 +1,17 @@
 """Tests for TIGER tract ingest URL and schema resolution."""
 
 import geopandas as gpd
+import httpx
 import pytest
 from shapely.geometry import Point
 from typer.testing import CliRunner
 
 from hhplab.census.ingest.tiger_blocks import (
+    STATE_DOWNLOAD_ATTEMPTS,
     _block_geometry_parts_dir,
     _block_url,
     _block_zip_name,
+    _download_state_blocks,
     _state_part_path,
     _stream_state_block_parts,
     get_block_geometry_output_path,
@@ -298,6 +301,24 @@ def test_stream_state_block_parts_writes_one_part_per_state(monkeypatch, tmp_pat
     assert _state_part_path(parts_dir, "01").exists()
     assert _state_part_path(parts_dir, "02").exists()
     assert gpd.read_parquet(_state_part_path(parts_dir, "01")).loc[0, "state_fips"] == "01"
+
+
+def test_download_state_blocks_retries_transient_http_errors(monkeypatch, tmp_path) -> None:
+    """Transient TIGER download failures are retried before aborting a state."""
+    attempts = 0
+
+    class FailingClient:
+        def get(self, url, follow_redirects):
+            nonlocal attempts
+            attempts += 1
+            raise httpx.ReadError("peer closed connection")
+
+    monkeypatch.setattr("hhplab.census.ingest.tiger_blocks.time.sleep", lambda _seconds: None)
+
+    with pytest.raises(httpx.ReadError, match="peer closed connection"):
+        _download_state_blocks(FailingClient(), 2020, "20", tmp_path)
+
+    assert attempts == STATE_DOWNLOAD_ATTEMPTS
 
 
 def test_stream_state_block_parts_resumes_completed_parts(monkeypatch, tmp_path) -> None:

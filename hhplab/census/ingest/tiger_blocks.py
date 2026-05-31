@@ -6,6 +6,7 @@ import hashlib
 import logging
 import shutil
 import tempfile
+import time
 import zipfile
 from datetime import UTC, datetime
 from pathlib import Path
@@ -27,6 +28,7 @@ from hhplab.sources import CENSUS_TIGER_BASE
 logger = logging.getLogger(__name__)
 
 SUPPORTED_BLOCK_VINTAGES: tuple[int, ...] = (2020,)
+STATE_DOWNLOAD_ATTEMPTS = 3
 
 
 def _block_zip_name(year: int, state_fips: str) -> str:
@@ -103,13 +105,20 @@ def _download_state_blocks(
     zip_name = _block_zip_name(year, state_fips)
     url = _block_url(year, state_fips)
     zip_path = tmpdir / zip_name
-    try:
-        response = client.get(url, follow_redirects=True)
-        response.raise_for_status()
-    except httpx.HTTPStatusError as exc:
-        if exc.response.status_code == 404:
-            return None, None, None
-        raise
+    for attempt in range(1, STATE_DOWNLOAD_ATTEMPTS + 1):
+        try:
+            response = client.get(url, follow_redirects=True)
+            response.raise_for_status()
+            break
+        except httpx.HTTPStatusError as exc:
+            if exc.response.status_code == 404:
+                return None, None, None
+            if attempt == STATE_DOWNLOAD_ATTEMPTS:
+                raise
+        except httpx.HTTPError:
+            if attempt == STATE_DOWNLOAD_ATTEMPTS:
+                raise
+        time.sleep(float(attempt))
 
     raw_content = response.content
     zip_path.write_bytes(raw_content)
