@@ -333,6 +333,18 @@ URBAN_AREA_GEOMETRY_COLUMNS: tuple[str, ...] = (
     "geometry",
 )
 
+BLOCK_GEOMETRY_COLUMNS: tuple[str, ...] = (
+    "block_geoid",
+    "state_fips",
+    "county_fips",
+    "tract_geoid",
+    "block_vintage",
+    "data_source",
+    "source_ref",
+    "ingested_at",
+    "geometry",
+)
+
 PL_BLOCK_POPULATION_COLUMNS: tuple[str, ...] = (
     "block_geoid",
     "state_fips",

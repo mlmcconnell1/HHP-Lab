@@ -24,7 +24,7 @@ from hhplab.cli.generate_msa_xwalk import generate_msa_xwalk
 from hhplab.cli.ingest_acs1_county import ingest_acs1_county
 from hhplab.cli.ingest_acs1_metro import ingest_acs1_metro
 from hhplab.cli.ingest_acs_population import ingest_acs_population
-from hhplab.cli.ingest_census import ingest_tiger, ingest_urban_areas_cmd
+from hhplab.cli.ingest_census import ingest_block_geometry_cmd, ingest_tiger, ingest_urban_areas_cmd
 from hhplab.cli.ingest_decennial_tract_population import (
     ingest_decennial_tract_population,
 )
@@ -99,6 +99,7 @@ def register_commands(
     ingest_app.command("acs5-tract")(ingest_acs_population)
     ingest_app.command("decennial-tracts")(ingest_decennial_tract_population)
     ingest_app.command("pl-blocks")(ingest_pl_block_population)
+    ingest_app.command("block-geometry")(ingest_block_geometry_cmd)
     ingest_app.command("urban-areas")(ingest_urban_areas_cmd)
     ingest_app.command("boundaries")(ingest_boundaries)
     ingest_app.command("msa-boundaries")(ingest_msa_boundaries)

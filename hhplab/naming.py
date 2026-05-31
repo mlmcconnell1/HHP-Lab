@@ -95,6 +95,18 @@ def urban_area_filename(urban_area_vintage: str | int) -> str:
     return f"urban_areas__U{urban_area_vintage}.parquet"
 
 
+def block_geometry_filename(block_vintage: str | int) -> str:
+    """Generate filename for Census tabulation block geometry.
+
+    Args:
+        block_vintage: Census block geometry vintage (e.g., 2020)
+
+    Returns:
+        Filename like ``blocks__K2020.parquet``
+    """
+    return f"blocks__K{block_vintage}.parquet"
+
+
 def pl_block_population_filename(
     decennial_vintage: str | int,
     block_vintage: str | int | None = None,

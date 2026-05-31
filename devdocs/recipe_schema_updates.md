@@ -397,6 +397,23 @@ Because the artifact has no analysis-year column, multi-year recipes must set
 `params.broadcast_static: true` explicitly. Preflight reports missing artifacts
 with a `hhplab build urban-fraction` command hint.
 
+For the 2020 non-Puerto-Rico CoC urban fraction panel, prepare the canonical
+source artifacts, then build the static covariate:
+
+```bash
+hhplab ingest boundaries --source hud_exchange --vintage 2020
+hhplab ingest urban-areas --year 2020
+hhplab ingest pl-blocks --decennial 2020 --blocks 2020
+hhplab ingest block-geometry --year 2020
+hhplab build urban-fraction --boundary 2020 --urban-area-vintage 2020 --decennial 2020 --block-vintage 2020 --json
+```
+
+The build command auto-discovers `data/curated/tiger/blocks__K2020.parquet`
+when the PL block population artifact is population-only. Its summary artifact
+contains `coc_id`, CoC population totals, urban/rural population totals, and
+`urban_population_fraction`; join `coc_name` from the matching `coc__B2020`
+boundary artifact when exporting a labeled panel.
+
 ---
 
 ## 11) Filters Section (`coclab-6k6w`)

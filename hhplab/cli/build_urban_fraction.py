@@ -158,6 +158,12 @@ def build_urban_fraction(
         geo_type="coc",
         extra={
             "dataset_type": "coc_urban_fraction",
+            "pl_block_population_artifact": str(paths["pl_blocks"]),
+            "block_geometry_artifact": str(paths["block_geometry"])
+            if paths.get("block_geometry") is not None
+            else None,
+            "urban_area_artifact": str(paths["urban_areas"]),
+            "coc_boundary_artifact": str(paths["coc_boundaries"]),
             "urban_area_vintage": str(urban_area_vintage),
             "block_vintage": str(resolved_block_vintage),
             "decennial_vintage": str(decennial),
@@ -207,12 +213,17 @@ def urban_fraction_paths(
 ) -> dict[str, Path]:
     """Resolve canonical inputs and outputs for urban fraction builds."""
     measures_dir = curated_dir("measures")
+    resolved_block_geometry = (
+        block_geometry
+        if block_geometry is not None
+        else curated_dir("tiger") / naming.block_geometry_filename(block_vintage)
+    )
     return {
         "coc_boundaries": curated_dir("coc_boundaries") / naming.coc_base_filename(boundary),
         "urban_areas": curated_dir("tiger") / naming.urban_area_filename(urban_area_vintage),
         "pl_blocks": curated_dir("census")
         / naming.pl_block_population_filename(decennial, block_vintage),
-        "block_geometry": block_geometry,
+        "block_geometry": resolved_block_geometry,
         "summary": measures_dir
         / naming.coc_urban_fraction_filename(
             boundary,
@@ -272,13 +283,34 @@ def _load_block_inputs(pl_blocks_path: Path, block_geometry_path: Path | None) -
     pl_blocks = pd.read_parquet(pl_blocks_path)
     if block_geometry_path is None:
         raise ValueError(
-            "PL block population artifact has no geometry. Provide --block-geometry "
-            "with a GeoParquet containing block_geoid and geometry."
+            "PL block population artifact has no geometry and no canonical block geometry "
+            "artifact was resolved. Run `hhplab ingest block-geometry --year <block-vintage>` "
+            "or provide --block-geometry with a GeoParquet containing block_geoid and geometry."
         )
     block_geometry = gpd.read_parquet(block_geometry_path)
-    if "block_geoid" not in block_geometry.columns:
-        raise ValueError("Block geometry artifact missing required column: block_geoid.")
-    return block_geometry[["block_geoid", "geometry"]].merge(pl_blocks, on="block_geoid")
+    missing_columns = sorted({"block_geoid", "geometry"} - set(block_geometry.columns))
+    if missing_columns:
+        raise ValueError(
+            "Block geometry artifact missing required column(s): "
+            f"{', '.join(missing_columns)}."
+        )
+    merged = pl_blocks.merge(
+        block_geometry[["block_geoid", "geometry"]],
+        on="block_geoid",
+        how="left",
+        validate="one_to_one",
+    )
+    missing_geometry = merged.loc[merged["geometry"].isna(), "block_geoid"]
+    if not missing_geometry.empty:
+        examples = ", ".join(missing_geometry.astype(str).head(5))
+        raise ValueError(
+            "Block geometry coverage is incomplete for PL block population rows: "
+            f"{len(missing_geometry)} block(s) lack geometry. "
+            f"Example block_geoid values: {examples}. "
+            "Rebuild block geometry for the same block vintage or exclude unsupported coverage "
+            "deliberately before running urban-fraction."
+        )
+    return gpd.GeoDataFrame(merged, geometry="geometry", crs=block_geometry.crs)
 
 
 def _missing_input_commands(
@@ -295,7 +327,10 @@ def _missing_input_commands(
         ),
         "urban_areas": f"hhplab ingest urban-areas --year {urban_area_vintage}",
         "pl_blocks": f"hhplab ingest pl-blocks --decennial {decennial} --blocks {block_vintage}",
-        "block_geometry": "provide --block-geometry <path-to-block-geoparquet>",
+        "block_geometry": (
+            f"hhplab ingest block-geometry --year {block_vintage} "
+            "or provide --block-geometry <path-to-block-geoparquet>"
+        ),
     }
     return {name: command for name, command in commands.items() if name in missing_inputs}
 
@@ -308,10 +343,16 @@ def _block_geometry_status(
     pl_blocks_path: Path,
     block_geometry_path: Path | None,
 ) -> dict[str, str | bool]:
-    if block_geometry_path is not None:
-        return _path_status(block_geometry_path)
     if pl_blocks_path.exists() and _geoparquet_has_geometry(pl_blocks_path):
-        return {"path": str(pl_blocks_path), "exists": True}
+        return {"path": str(pl_blocks_path), "exists": True, "has_geometry": True}
+    if block_geometry_path is not None:
+        status = _path_status(block_geometry_path)
+        status["has_geometry"] = (
+            _geoparquet_has_geometry(block_geometry_path)
+            if block_geometry_path.exists()
+            else False
+        )
+        return status
     return {"path": "", "exists": False}
 
 

@@ -226,7 +226,7 @@ def _write_cli_inputs(tmp_path, *, split_block_geometry: bool = True) -> tuple[P
         index=False,
     )
     block_path = tmp_path / "census" / naming.pl_block_population_filename(2020, 2020)
-    geometry_path = tmp_path / "census" / "block_geometry__K2020.parquet"
+    geometry_path = tmp_path / "tiger" / naming.block_geometry_filename(2020)
     blocks = block_fixture()
     if split_block_geometry:
         pd.DataFrame(blocks.drop(columns=["geometry"])).to_parquet(block_path, index=False)
@@ -266,6 +266,68 @@ def test_urban_fraction_cli_dry_run_success_json(monkeypatch, tmp_path) -> None:
     assert all(status["exists"] for status in payload["inputs"].values())
 
 
+def test_urban_fraction_cli_dry_run_discovers_canonical_block_geometry(
+    monkeypatch,
+    tmp_path,
+) -> None:
+    """Preflight succeeds without --block-geometry when canonical block geometry exists."""
+    _patch_curated_dir(monkeypatch, tmp_path)
+    _block_path, geometry_path = _write_cli_inputs(tmp_path)
+
+    result = runner.invoke(
+        app,
+        [
+            "build",
+            "urban-fraction",
+            "--boundary",
+            "2025",
+            "--urban-area-vintage",
+            "2020",
+            "--decennial",
+            "2020",
+            "--dry-run",
+            "--json",
+        ],
+    )
+
+    assert result.exit_code == 0
+    payload = json.loads(result.output)
+    assert payload["status"] == "ok"
+    assert payload["inputs"]["block_geometry"]["path"] == str(geometry_path)
+    assert payload["inputs"]["block_geometry"]["exists"] is True
+
+
+def test_urban_fraction_cli_dry_run_accepts_integrated_block_geometry(
+    monkeypatch,
+    tmp_path,
+) -> None:
+    """Preflight keeps accepting PL block files with embedded GeoParquet geometry."""
+    _patch_curated_dir(monkeypatch, tmp_path)
+    block_path, geometry_path = _write_cli_inputs(tmp_path, split_block_geometry=False)
+    geometry_path.unlink(missing_ok=True)
+
+    result = runner.invoke(
+        app,
+        [
+            "build",
+            "urban-fraction",
+            "--boundary",
+            "2025",
+            "--urban-area-vintage",
+            "2020",
+            "--decennial",
+            "2020",
+            "--dry-run",
+            "--json",
+        ],
+    )
+
+    assert result.exit_code == 0
+    payload = json.loads(result.output)
+    assert payload["inputs"]["block_geometry"]["path"] == str(block_path)
+    assert payload["inputs"]["block_geometry"]["has_geometry"] is True
+
+
 def test_urban_fraction_cli_missing_inputs_json(monkeypatch, tmp_path) -> None:
     _patch_curated_dir(monkeypatch, tmp_path)
 
@@ -295,6 +357,7 @@ def test_urban_fraction_cli_missing_inputs_json(monkeypatch, tmp_path) -> None:
         "block_geometry",
     }
     assert "hhplab ingest urban-areas --year 2020" in payload["commands"]["urban_areas"]
+    assert "hhplab ingest block-geometry --year 2020" in payload["commands"]["block_geometry"]
 
 
 def test_urban_fraction_cli_fixture_build_json(monkeypatch, tmp_path) -> None:
@@ -333,6 +396,66 @@ def test_urban_fraction_cli_fixture_build_json(monkeypatch, tmp_path) -> None:
     provenance = read_provenance(payload["artifact"])
     assert provenance is not None
     assert provenance.extra["dataset_type"] == "coc_urban_fraction"
+    assert provenance.extra["block_geometry_artifact"] == str(geometry_path)
+
+
+def test_urban_fraction_cli_fixture_build_discovers_canonical_block_geometry(
+    monkeypatch,
+    tmp_path,
+) -> None:
+    """End-to-end fixture build succeeds with separate canonical block geometry."""
+    _patch_curated_dir(monkeypatch, tmp_path)
+    _block_path, _geometry_path = _write_cli_inputs(tmp_path)
+
+    result = runner.invoke(
+        app,
+        [
+            "build",
+            "urban-fraction",
+            "--boundary",
+            "2025",
+            "--urban-area-vintage",
+            "2020",
+            "--decennial",
+            "2020",
+            "--json",
+        ],
+    )
+
+    assert result.exit_code == 0
+    payload = json.loads(result.output)
+    assert payload["rows"] == 4
+    assert payload["diagnostics"]["missing_denominator_block_count"] == 1
+
+
+def test_urban_fraction_cli_errors_on_incomplete_block_geometry(monkeypatch, tmp_path) -> None:
+    """Population rows without matching geometry fail with actionable coverage diagnostics."""
+    _patch_curated_dir(monkeypatch, tmp_path)
+    _block_path, geometry_path = _write_cli_inputs(tmp_path)
+    geometry = gpd.read_parquet(geometry_path)
+    geometry = geometry.loc[geometry["block_geoid"] != "M1"].copy()
+    geometry.to_parquet(geometry_path, index=False)
+
+    result = runner.invoke(
+        app,
+        [
+            "build",
+            "urban-fraction",
+            "--boundary",
+            "2025",
+            "--urban-area-vintage",
+            "2020",
+            "--decennial",
+            "2020",
+            "--json",
+        ],
+    )
+
+    assert result.exit_code == 1
+    payload = json.loads(result.output)
+    assert payload["status"] == "error"
+    assert "Block geometry coverage is incomplete" in payload["error"]
+    assert "M1" in payload["error"]
 
 
 def test_urban_fraction_cli_artifact_exists_json(monkeypatch, tmp_path) -> None:

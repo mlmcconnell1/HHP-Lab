@@ -9,6 +9,7 @@ import pandas as pd
 
 from hhplab.schema.columns import (
     ACS_TRACT_OUTPUT_COLUMNS,
+    BLOCK_GEOMETRY_COLUMNS,
     COC_PANEL_COLUMNS,
     COC_URBAN_AREA_DETAIL_COLUMNS,
     COC_URBAN_FRACTION_COLUMNS,
@@ -114,6 +115,12 @@ PL_BLOCK_POPULATION_CONTRACT = ArtifactContract(
     drift_prone_columns=(),
 )
 
+BLOCK_GEOMETRY_CONTRACT = ArtifactContract(
+    name="block_geometry",
+    required_columns=tuple(BLOCK_GEOMETRY_COLUMNS),
+    drift_prone_columns=(),
+)
+
 COC_URBAN_FRACTION_CONTRACT = ArtifactContract(
     name="coc_urban_fraction",
     required_columns=tuple(COC_URBAN_FRACTION_COLUMNS),
@@ -180,6 +187,7 @@ ARTIFACT_CONTRACTS: dict[str, ArtifactContract] = {
         MSA_COC_PANEL_CONTRACT,
         PEP_COUNTY_CONTRACT,
         PIT_CONTRACT,
+        BLOCK_GEOMETRY_CONTRACT,
         PL_BLOCK_POPULATION_CONTRACT,
         SAE_OUTPUT_CONTRACT,
         TRACT_MEDIATED_COUNTY_XWALK_CONTRACT,

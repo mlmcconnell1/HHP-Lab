@@ -5,6 +5,13 @@ import pytest
 from shapely.geometry import Point
 from typer.testing import CliRunner
 
+from hhplab.census.ingest.tiger_blocks import (
+    _block_url,
+    _block_zip_name,
+    get_block_geometry_output_path,
+    normalize_block_geometry,
+    save_block_geometry,
+)
 from hhplab.census.ingest.tiger_tracts import (
     _resolve_geoid_column,
     _tract_2000_url,
@@ -27,6 +34,12 @@ runner = CliRunner()
 def test_tract_zip_name_uses_2010_suffix() -> None:
     """2010 tract downloads use the special tract10 filename suffix."""
     assert _tract_zip_name(2010, "51") == "tl_2010_51_tract10.zip"
+
+
+def test_block_geometry_filename_uses_tabblock20_suffix() -> None:
+    """2020 tabulation block downloads use the TIGER TABBLOCK20 pattern."""
+    assert _block_zip_name(2020, "51") == "tl_2020_51_tabblock20.zip"
+    assert _block_url(2020, "51").endswith("/TIGER2020/TABBLOCK20/tl_2020_51_tabblock20.zip")
 
 
 def test_tract_url_uses_2010_subdirectory() -> None:
@@ -125,6 +138,39 @@ def test_normalize_urban_areas_accepts_2020_schema() -> None:
     assert result.loc[0, "source_ref"].endswith("tl_2020_us_uac20.zip")
 
 
+def test_normalize_block_geometry_accepts_2020_schema() -> None:
+    """2020 block shapefiles normalize to joinable block and tract identifiers."""
+    source = gpd.GeoDataFrame(
+        {
+            "GEOID20": ["510010901011234"],
+            "STATEFP20": ["51"],
+            "COUNTYFP20": ["001"],
+            "TRACTCE20": ["090101"],
+            "geometry": [Point(1, 1)],
+        },
+        geometry="geometry",
+        crs="EPSG:4326",
+    )
+
+    result = normalize_block_geometry(source, 2020)
+
+    assert list(result.columns) == [
+        "block_geoid",
+        "state_fips",
+        "county_fips",
+        "tract_geoid",
+        "block_vintage",
+        "data_source",
+        "source_ref",
+        "ingested_at",
+        "geometry",
+    ]
+    assert result.loc[0, "block_geoid"] == "510010901011234"
+    assert result.loc[0, "county_fips"] == "51001"
+    assert result.loc[0, "tract_geoid"] == "51001090101"
+    assert result.loc[0, "block_vintage"] == 2020
+
+
 def test_save_urban_areas_writes_geoparquet_with_provenance(tmp_path) -> None:
     """Saved Urban Area artifacts keep GeoParquet geometry and HHP provenance metadata."""
     gdf = gpd.GeoDataFrame(
@@ -160,6 +206,43 @@ def test_save_urban_areas_writes_geoparquet_with_provenance(tmp_path) -> None:
     assert provenance.extra["content_sha256"] == "abc123"
 
 
+def test_save_block_geometry_writes_geoparquet_with_provenance(tmp_path) -> None:
+    """Saved block geometry artifacts keep GeoParquet geometry and HHP provenance."""
+    gdf = gpd.GeoDataFrame(
+        {
+            "block_geoid": ["510010901011234"],
+            "state_fips": ["51"],
+            "county_fips": ["51001"],
+            "tract_geoid": ["51001090101"],
+            "block_vintage": [2020],
+            "data_source": ["census_tiger_tabblock"],
+            "source_ref": ["https://example.test/blocks.zip"],
+            "ingested_at": ["2026-05-31T00:00:00Z"],
+            "geometry": [Point(1, 1)],
+        },
+        geometry="geometry",
+        crs="EPSG:4326",
+    )
+
+    output_path = save_block_geometry(
+        gdf,
+        2020,
+        output_dir=tmp_path,
+        content_sha256="abc123",
+        content_size=123,
+        raw_paths=[tmp_path / "tl_2020_51_tabblock20.zip"],
+        missing_state_fips=["72"],
+    )
+
+    assert output_path == tmp_path / "blocks__K2020.parquet"
+    roundtrip = gpd.read_parquet(output_path)
+    assert roundtrip.crs.to_epsg() == 4326
+    provenance = read_provenance(output_path)
+    assert provenance is not None
+    assert provenance.extra["block_vintage"] == 2020
+    assert provenance.extra["missing_state_fips"] == ["72"]
+
+
 def test_ingest_urban_areas_cli_cached_json(monkeypatch, tmp_path) -> None:
     """Cached Urban Area CLI runs emit machine-readable JSON."""
     cached_path = get_urban_area_output_path(2020, tmp_path)
@@ -189,6 +272,38 @@ def test_ingest_urban_areas_cli_cached_json(monkeypatch, tmp_path) -> None:
     assert result.exit_code == 0
     assert '"cached": true' in result.output
     assert '"urban_area_count": 1' in result.output
+
+
+def test_ingest_block_geometry_cli_cached_json(monkeypatch, tmp_path) -> None:
+    """Cached block geometry CLI runs emit machine-readable JSON."""
+    cached_path = get_block_geometry_output_path(2020, tmp_path)
+    gdf = gpd.GeoDataFrame(
+        {
+            "block_geoid": ["510010901011234"],
+            "state_fips": ["51"],
+            "county_fips": ["51001"],
+            "tract_geoid": ["51001090101"],
+            "block_vintage": [2020],
+            "data_source": ["census_tiger_tabblock"],
+            "source_ref": ["https://example.test/blocks.zip"],
+            "ingested_at": ["2026-05-31T00:00:00Z"],
+            "geometry": [Point(1, 1)],
+        },
+        geometry="geometry",
+        crs="EPSG:4326",
+    )
+    cached_path.parent.mkdir(parents=True, exist_ok=True)
+    gdf.to_parquet(cached_path, index=False)
+    monkeypatch.setattr(
+        "hhplab.cli.ingest_census.get_block_geometry_output_path",
+        lambda year: cached_path,
+    )
+
+    result = runner.invoke(app, ["ingest", "block-geometry", "--year", "2020", "--json"])
+
+    assert result.exit_code == 0
+    assert '"cached": true' in result.output
+    assert '"block_count": 1' in result.output
 
 
 def test_ingest_urban_areas_cli_fresh_json(monkeypatch, tmp_path) -> None:
@@ -224,3 +339,39 @@ def test_ingest_urban_areas_cli_fresh_json(monkeypatch, tmp_path) -> None:
     assert result.exit_code == 0
     assert '"cached": false' in result.output
     assert '"urban_area_vintage": 2010' in result.output
+
+
+def test_ingest_block_geometry_cli_fresh_json(monkeypatch, tmp_path) -> None:
+    """Fresh block geometry CLI runs call ingest and emit machine-readable JSON."""
+    output_path = get_block_geometry_output_path(2020, tmp_path)
+    gdf = gpd.GeoDataFrame(
+        {
+            "block_geoid": ["510010901011234"],
+            "state_fips": ["51"],
+            "county_fips": ["51001"],
+            "tract_geoid": ["51001090101"],
+            "block_vintage": [2020],
+            "data_source": ["census_tiger_tabblock"],
+            "source_ref": ["https://example.test/blocks.zip"],
+            "ingested_at": ["2026-05-31T00:00:00Z"],
+            "geometry": [Point(1, 1)],
+        },
+        geometry="geometry",
+        crs="EPSG:4326",
+    )
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    gdf.to_parquet(output_path, index=False)
+    monkeypatch.setattr(
+        "hhplab.cli.ingest_census.get_block_geometry_output_path",
+        lambda year: tmp_path / "missing.parquet",
+    )
+    monkeypatch.setattr(
+        "hhplab.census.ingest.tiger_blocks.ingest_block_geometry",
+        lambda year, force=False: output_path,
+    )
+
+    result = runner.invoke(app, ["ingest", "block-geometry", "--year", "2020", "--json"])
+
+    assert result.exit_code == 0
+    assert '"cached": false' in result.output
+    assert '"block_vintage": 2020' in result.output
