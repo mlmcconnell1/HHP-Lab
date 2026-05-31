@@ -1,4 +1,9 @@
 # Census ingestion modules
+from hhplab.census.ingest.pl_block_population import (
+    fetch_pl_block_population,
+    get_pl_block_population_output_path,
+    ingest_pl_block_population,
+)
 from hhplab.census.ingest.tiger_counties import (
     download_tiger_counties,
     ingest_tiger_counties,
@@ -32,6 +37,9 @@ __all__ = [
     "download_tiger_counties",
     "ingest_tiger_counties",
     "save_counties",
+    "fetch_pl_block_population",
+    "get_pl_block_population_output_path",
+    "ingest_pl_block_population",
     "download_tract_relationship",
     "ingest_tract_relationship",
     "save_tract_relationship",

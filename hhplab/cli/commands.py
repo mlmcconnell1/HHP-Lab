@@ -32,6 +32,7 @@ from hhplab.cli.ingest_msa_boundaries import ingest_msa_boundaries
 from hhplab.cli.ingest_nhgis import ingest_nhgis
 from hhplab.cli.ingest_pit import ingest_pit
 from hhplab.cli.ingest_pit_vintage import ingest_pit_vintage
+from hhplab.cli.ingest_pl_block_population import ingest_pl_block_population
 from hhplab.cli.ingest_tract_relationship import ingest_tract_relationship
 from hhplab.cli.list_census import list_census
 from hhplab.cli.list_curated import list_curated
@@ -96,6 +97,7 @@ def register_commands(
     ingest_app.command("laus-metro")(ingest_laus_metro)
     ingest_app.command("acs5-tract")(ingest_acs_population)
     ingest_app.command("decennial-tracts")(ingest_decennial_tract_population)
+    ingest_app.command("pl-blocks")(ingest_pl_block_population)
     ingest_app.command("urban-areas")(ingest_urban_areas_cmd)
     ingest_app.command("boundaries")(ingest_boundaries)
     ingest_app.command("msa-boundaries")(ingest_msa_boundaries)
