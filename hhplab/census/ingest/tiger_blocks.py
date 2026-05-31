@@ -19,7 +19,7 @@ import hhplab.naming as naming
 from hhplab.census.ingest.decennial_tract_population import STATE_FIPS_CODES
 from hhplab.paths import curated_dir
 from hhplab.provenance import PROVENANCE_KEY, ProvenanceBlock
-from hhplab.raw_snapshot import persist_file_snapshot, raw_path
+from hhplab.raw_snapshot import persist_file_snapshot, raw_dir, raw_path
 from hhplab.schema.columns import BLOCK_GEOMETRY_COLUMNS
 from hhplab.source_registry import check_source_changed, register_source
 from hhplab.sources import CENSUS_TIGER_BASE
@@ -148,7 +148,13 @@ def _raw_block_zip_path(year: int, state_fips: str, raw_root: Path | None = None
     )
 
 
-def _block_geometry_parts_dir(year: int, output_dir: Path | str | None = None) -> Path:
+def _block_geometry_parts_dir(
+    year: int,
+    output_dir: Path | str | None = None,
+    raw_root: Path | None = None,
+) -> Path:
+    if output_dir is None:
+        return raw_dir("tiger", year, "block_geometry_parts", raw_root=raw_root)
     output_path = get_block_geometry_output_path(year, output_dir)
     return output_path.with_name(f"{output_path.stem}_parts")
 
@@ -213,44 +219,43 @@ def _stream_state_block_parts(
     row_counts: dict[str, int] = {}
     has_hash_part = False
 
-    with tempfile.TemporaryDirectory() as tmpdir:
-        tmppath = Path(tmpdir)
-        with httpx.Client(timeout=300.0) as client:
-            for state_fips in state_fips_codes:
-                part_path = _state_part_path(parts_dir, state_fips)
-                raw_zip_path = _raw_block_zip_path(year, state_fips, raw_root)
-                raw_content: bytes | None = None
+    with httpx.Client(timeout=300.0) as client:
+        for state_fips in state_fips_codes:
+            part_path = _state_part_path(parts_dir, state_fips)
+            raw_zip_path = _raw_block_zip_path(year, state_fips, raw_root)
+            raw_content: bytes | None = None
 
-                if part_path.exists() and raw_zip_path.exists() and not force:
-                    row_counts[state_fips] = pq.read_metadata(part_path).num_rows
-                    raw_content = raw_zip_path.read_bytes()
-                    raw_paths.append(raw_zip_path)
-                else:
+            if part_path.exists() and raw_zip_path.exists() and not force:
+                row_counts[state_fips] = pq.read_metadata(part_path).num_rows
+                raw_content = raw_zip_path.read_bytes()
+                raw_paths.append(raw_zip_path)
+            else:
+                with tempfile.TemporaryDirectory(dir=parts_dir) as tmpdir:
                     gdf, raw_content, raw_path_value = _fetch_or_load_state_blocks(
                         client,
                         year=year,
                         state_fips=state_fips,
-                        tmpdir=tmppath,
+                        tmpdir=Path(tmpdir),
                         raw_root=raw_root,
                         force=force,
                     )
-                    if gdf is None or raw_content is None:
-                        missing_state_fips.append(state_fips)
-                        continue
+                if gdf is None or raw_content is None:
+                    missing_state_fips.append(state_fips)
+                    continue
 
-                    normalized = normalize_block_geometry(gdf, year)
-                    _write_state_part(normalized, part_path)
-                    row_counts[state_fips] = len(normalized)
-                    raw_paths.append(raw_path_value or raw_zip_path)
+                normalized = normalize_block_geometry(gdf, year)
+                _write_state_part(normalized, part_path)
+                row_counts[state_fips] = len(normalized)
+                raw_paths.append(raw_path_value or raw_zip_path)
 
-                    del normalized
-                    del gdf
+                del normalized
+                del gdf
 
-                if has_hash_part:
-                    content_hasher.update(b"\n")
-                content_hasher.update(raw_content)
-                has_hash_part = True
-                total_size += len(raw_content)
+            if has_hash_part:
+                content_hasher.update(b"\n")
+            content_hasher.update(raw_content)
+            has_hash_part = True
+            total_size += len(raw_content)
 
     if not row_counts:
         raise ValueError(
@@ -423,7 +428,7 @@ def ingest_block_geometry(
     if output_path.exists() and not force:
         return output_path
 
-    parts_dir = _block_geometry_parts_dir(year, output_dir)
+    parts_dir = _block_geometry_parts_dir(year, output_dir, raw_root=raw_root)
     content_sha256, content_size, raw_paths, missing_state_fips, row_counts = (
         _stream_state_block_parts(
             year,
