@@ -76,6 +76,32 @@ def build_coc_urban_fraction(
     block is classified as urban when its representative point falls inside a
     Census Urban Area polygon.
     """
+    intersections = build_coc_urban_fraction_intersections(
+        coc_gdf,
+        block_gdf,
+        urban_area_gdf,
+    )
+    if intersections.empty:
+        return _empty_summary(), _empty_detail()
+
+    return summarize_coc_urban_fraction_intersections(
+        intersections,
+        boundary_vintage=boundary_vintage,
+        urban_area_vintage=urban_area_vintage,
+        block_vintage=block_vintage,
+        decennial_vintage=decennial_vintage,
+        denominator_source=denominator_source,
+        allocation_method=allocation_method,
+        classification_method=classification_method,
+    )
+
+
+def build_coc_urban_fraction_intersections(
+    coc_gdf: gpd.GeoDataFrame,
+    block_gdf: gpd.GeoDataFrame,
+    urban_area_gdf: gpd.GeoDataFrame,
+) -> pd.DataFrame:
+    """Build block/CoC intersection rows used by urban fraction summaries."""
     _require_columns(coc_gdf, {"coc_id", "geometry"}, label="coc_gdf")
     _require_columns(
         block_gdf,
@@ -101,13 +127,13 @@ def build_coc_urban_fraction(
     blocks = blocks.loc[blocks["block_area"] > 0].copy()
 
     if coc.empty or blocks.empty:
-        return _empty_summary(), _empty_detail()
+        return _empty_intersections()
 
     block_classification = _classify_blocks(blocks, urban_areas)
     intersections = _intersect_coc_blocks(coc, blocks)
     intersections = intersections.loc[~intersections.geometry.is_empty].copy()
     if intersections.empty:
-        return _empty_summary(), _empty_detail()
+        return _empty_intersections()
 
     intersections["intersection_area"] = intersections.geometry.area
     intersections = intersections.loc[intersections["intersection_area"] > 0].copy()
@@ -131,26 +157,39 @@ def build_coc_urban_fraction(
         intersections["total_population"].notna(),
         0.0,
     )
+    return pd.DataFrame(intersections.drop(columns=["geometry"]))
 
+
+def summarize_coc_urban_fraction_intersections(
+    intersections: pd.DataFrame,
+    *,
+    boundary_vintage: str | int,
+    urban_area_vintage: str | int,
+    block_vintage: str | int,
+    decennial_vintage: str | int,
+    denominator_source: str = "pl_94_171_block_population",
+    allocation_method: str = DEFAULT_ALLOCATION_METHOD,
+    classification_method: str = DEFAULT_CLASSIFICATION_METHOD,
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """Summarize prepared block/CoC intersection rows into canonical outputs."""
+    if intersections.empty:
+        return _empty_summary(), _empty_detail()
+    metadata = {
+        "boundary_vintage": boundary_vintage,
+        "urban_area_vintage": urban_area_vintage,
+        "block_vintage": block_vintage,
+        "decennial_vintage": decennial_vintage,
+        "denominator_source": denominator_source,
+        "allocation_method": allocation_method,
+        "classification_method": classification_method,
+    }
     summary = _summarize_intersections(
         intersections,
-        boundary_vintage=boundary_vintage,
-        urban_area_vintage=urban_area_vintage,
-        block_vintage=block_vintage,
-        decennial_vintage=decennial_vintage,
-        denominator_source=denominator_source,
-        allocation_method=allocation_method,
-        classification_method=classification_method,
+        **metadata,
     )
     detail = _summarize_urban_area_detail(
         intersections,
-        boundary_vintage=boundary_vintage,
-        urban_area_vintage=urban_area_vintage,
-        block_vintage=block_vintage,
-        decennial_vintage=decennial_vintage,
-        denominator_source=denominator_source,
-        allocation_method=allocation_method,
-        classification_method=classification_method,
+        **metadata,
     )
     return summary, detail
 
@@ -253,3 +292,22 @@ def _empty_summary() -> pd.DataFrame:
 
 def _empty_detail() -> pd.DataFrame:
     return pd.DataFrame(columns=COC_URBAN_AREA_DETAIL_COLUMNS)
+
+
+def _empty_intersections() -> pd.DataFrame:
+    return pd.DataFrame(
+        columns=[
+            "coc_id",
+            "block_geoid",
+            "total_population",
+            "block_area",
+            "intersection_area",
+            "allocation_share",
+            "urban_area_geoid",
+            "urban_area_name",
+            "is_urban",
+            "allocated_population",
+            "allocated_urban_population",
+            "known_denominator_area",
+        ]
+    )

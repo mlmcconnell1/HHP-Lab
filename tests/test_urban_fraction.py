@@ -524,6 +524,81 @@ def test_urban_fraction_cli_fixture_build_discovers_canonical_block_geometry(
     assert payload["diagnostics"]["missing_denominator_block_count"] == 1
 
 
+@pytest.mark.parametrize(
+    "include_state_abbrev",
+    [
+        pytest.param(True, id="with-state-abbrev"),
+        pytest.param(False, id="without-state-abbrev"),
+    ],
+)
+def test_chunked_urban_fraction_includes_cross_state_blocks(
+    tmp_path,
+    include_state_abbrev: bool,
+) -> None:
+    """Chunking must include every block state intersecting a CoC geometry."""
+    from hhplab.cli import build_urban_fraction as build_urban_fraction_cli
+
+    pl_blocks_path = tmp_path / "pl_blocks.parquet"
+    block_geometry_path = tmp_path / "block_geometry.parquet"
+    coc_data = {
+        "coc_id": ["X"],
+        "geometry": [box(0, 0, 20, 10)],
+    }
+    if include_state_abbrev:
+        coc_data["state_abbrev"] = ["CO"]
+    coc = gpd.GeoDataFrame(
+        coc_data,
+        geometry="geometry",
+        crs=ALBERS_EQUAL_AREA_CRS,
+    )
+    blocks = gpd.GeoDataFrame(
+        {
+            "block_geoid": ["080010001001000", "200010001001000"],
+            "state_fips": ["08", "20"],
+            "total_population": [100, 50],
+            "geometry": [box(0, 0, 10, 10), box(10, 0, 20, 10)],
+        },
+        geometry="geometry",
+        crs=ALBERS_EQUAL_AREA_CRS,
+    )
+    urban_areas = gpd.GeoDataFrame(
+        {
+            "urban_area_geoid": ["UA1"],
+            "urban_area_name": ["Fixture Cross-State Urban Area"],
+            "geometry": [box(-1, -1, 21, 11)],
+        },
+        geometry="geometry",
+        crs=ALBERS_EQUAL_AREA_CRS,
+    )
+    pd.DataFrame(blocks.drop(columns=["geometry"])).to_parquet(pl_blocks_path, index=False)
+    blocks[["block_geoid", "state_fips", "geometry"]].to_parquet(
+        block_geometry_path,
+        index=False,
+    )
+
+    summary, detail, chunk_count = build_urban_fraction_cli._build_coc_urban_fraction_chunked(
+        coc,
+        urban_areas,
+        pl_blocks_path=pl_blocks_path,
+        block_geometry_path=block_geometry_path,
+        boundary_vintage=2025,
+        urban_area_vintage=2020,
+        block_vintage=2020,
+        decennial_vintage=2020,
+        progress=False,
+    )
+
+    row = summary.set_index("coc_id").loc["X"]
+    assert chunk_count == 2
+    assert summary["coc_id"].tolist() == ["X"]
+    assert row["coc_total_population"] == pytest.approx(150.0)
+    assert row["coc_urban_population"] == pytest.approx(150.0)
+    assert row["block_count"] == 2
+    assert detail.set_index(["coc_id", "urban_area_geoid"]).loc[("X", "UA1")][
+        "urban_population"
+    ] == pytest.approx(150.0)
+
+
 def test_urban_fraction_cli_fixture_build_accepts_integrated_block_geometry(
     monkeypatch,
     tmp_path,
@@ -608,6 +683,24 @@ def test_urban_fraction_cli_errors_on_incomplete_block_geometry(monkeypatch, tmp
     assert payload["status"] == "error"
     assert "Block geometry coverage is incomplete" in payload["error"]
     assert "M1" in payload["error"]
+
+
+def test_load_block_inputs_for_state_requires_actionable_state_fips_geometry(
+    tmp_path,
+) -> None:
+    """Legacy block geometry without state_fips fails before Arrow emits an unknown-column error."""
+    from hhplab.cli import build_urban_fraction as build_urban_fraction_cli
+
+    pl_blocks_path, geometry_path = _write_cli_inputs(tmp_path)
+    geometry = gpd.read_parquet(geometry_path).drop(columns=["state_fips"])
+    geometry.to_parquet(geometry_path, index=False)
+
+    with pytest.raises(ValueError, match="missing state_fips column"):
+        build_urban_fraction_cli._load_block_inputs_for_state(
+            pl_blocks_path,
+            geometry_path,
+            state_fips="08",
+        )
 
 
 def test_urban_fraction_cli_artifact_exists_json(monkeypatch, tmp_path) -> None:
@@ -706,7 +799,7 @@ def test_urban_fraction_cli_human_output_is_concise(monkeypatch, tmp_path) -> No
     )
 
     assert result.exit_code == 0
-    assert "Processing block chunk 1/1: state_fips=08, cocs=4" in result.output
+    assert "Processing block chunk 1: state_fips=08, cocs=4" in result.output
     assert "Loaded 5 block rows." in result.output
     assert "Built CoC urban fraction artifact." in result.output
     assert "Rows: 4" in result.output

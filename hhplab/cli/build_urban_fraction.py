@@ -15,28 +15,16 @@ import typer
 
 import hhplab.naming as naming
 from hhplab.census.ingest.decennial_tract_population import STATE_FIPS_CODES
-from hhplab.metro.metro_definitions import STATE_ABBREV_TO_FIPS
 from hhplab.paths import curated_dir
 from hhplab.provenance import ProvenanceBlock, write_parquet_with_provenance
-from hhplab.schema.columns import COC_URBAN_AREA_DETAIL_COLUMNS, COC_URBAN_FRACTION_COLUMNS
 from hhplab.xwalks.urban_fraction import (
     DEFAULT_ALLOCATION_METHOD,
     DEFAULT_CLASSIFICATION_METHOD,
-    build_coc_urban_fraction,
+    build_coc_urban_fraction_intersections,
+    summarize_coc_urban_fraction_intersections,
 )
 
 MISSING_GEOPARQUET_METADATA_MESSAGE = "Missing geo metadata in Parquet/Feather file."
-
-TERRITORY_STATE_ABBREV_TO_FIPS: dict[str, str] = {
-    "AS": "60",
-    "GU": "66",
-    "MP": "69",
-    "VI": "78",
-}
-STATE_ABBREV_TO_BLOCK_FIPS: dict[str, str] = {
-    **STATE_ABBREV_TO_FIPS,
-    **TERRITORY_STATE_ABBREV_TO_FIPS,
-}
 
 
 def build_urban_fraction(
@@ -352,74 +340,59 @@ def _build_coc_urban_fraction_chunked(
     progress: bool,
 ) -> tuple[pd.DataFrame, pd.DataFrame, int]:
     """Build urban fractions one state at a time to bound peak memory."""
-    states = _state_chunks_for_coc_boundaries(coc_gdf, pl_blocks_path)
-    summary_parts: list[pd.DataFrame] = []
-    detail_parts: list[pd.DataFrame] = []
-    total_chunks = len(states)
+    states = _available_block_states(pl_blocks_path)
+    intersection_parts: list[pd.DataFrame] = []
+    processed_chunks = 0
 
-    for index, state_fips in enumerate(states, start=1):
-        state_coc = _coc_for_state(coc_gdf, state_fips)
-        if state_coc.empty:
-            continue
-        if progress:
-            typer.echo(
-                "Processing block chunk "
-                f"{index}/{total_chunks}: state_fips={state_fips}, "
-                f"cocs={len(state_coc)}"
-            )
+    for state_fips in states:
         started_at = time.perf_counter()
         block_gdf = _load_block_inputs_for_state(
             pl_blocks_path,
             block_geometry_path,
             state_fips=state_fips,
         )
+        state_coc = _coc_overlapping_blocks(coc_gdf, block_gdf)
+        if state_coc.empty:
+            continue
+        processed_chunks += 1
         if progress:
+            typer.echo(
+                "Processing block chunk "
+                f"{processed_chunks}: state_fips={state_fips}, "
+                f"cocs={len(state_coc)}"
+            )
             typer.echo(f"  Loaded {len(block_gdf):,} block rows.")
-        summary, detail = build_coc_urban_fraction(
+        intersections = build_coc_urban_fraction_intersections(
             state_coc,
             block_gdf,
             urban_area_gdf,
-            boundary_vintage=boundary_vintage,
-            urban_area_vintage=urban_area_vintage,
-            block_vintage=block_vintage,
-            decennial_vintage=decennial_vintage,
         )
-        summary_parts.append(summary)
-        detail_parts.append(detail)
+        if not intersections.empty:
+            intersection_parts.append(intersections)
         if progress:
             elapsed_seconds = time.perf_counter() - started_at
             typer.echo(
-                f"  Completed {len(summary):,} CoC summary row(s) "
+                f"  Completed {intersections['coc_id'].nunique():,} CoC summary row(s) "
                 f"in {elapsed_seconds:.1f}s."
             )
 
-    summary = _concat_or_empty(summary_parts, COC_URBAN_FRACTION_COLUMNS)
-    detail = _concat_or_empty(detail_parts, COC_URBAN_AREA_DETAIL_COLUMNS)
+    all_intersections = (
+        pd.concat(intersection_parts, ignore_index=True)
+        if intersection_parts
+        else pd.DataFrame()
+    )
+    summary, detail = summarize_coc_urban_fraction_intersections(
+        all_intersections,
+        boundary_vintage=boundary_vintage,
+        urban_area_vintage=urban_area_vintage,
+        block_vintage=block_vintage,
+        decennial_vintage=decennial_vintage,
+    )
     return (
         summary.sort_values("coc_id").reset_index(drop=True),
         detail.reset_index(drop=True),
-        total_chunks,
+        processed_chunks,
     )
-
-
-def _state_chunks_for_coc_boundaries(
-    coc_gdf: gpd.GeoDataFrame,
-    pl_blocks_path: Path,
-) -> list[str]:
-    if "state_abbrev" not in coc_gdf.columns:
-        return _available_block_states(pl_blocks_path)
-    state_fips = (
-        coc_gdf["state_abbrev"]
-        .dropna()
-        .astype(str)
-        .str.upper()
-        .map(STATE_ABBREV_TO_BLOCK_FIPS)
-        .dropna()
-        .drop_duplicates()
-        .tolist()
-    )
-    available = set(_available_block_states(pl_blocks_path))
-    return [state for state in STATE_FIPS_CODES if state in available and state in set(state_fips)]
 
 
 def _available_block_states(pl_blocks_path: Path) -> list[str]:
@@ -428,13 +401,24 @@ def _available_block_states(pl_blocks_path: Path) -> list[str]:
     return [state for state in STATE_FIPS_CODES if state in values]
 
 
-def _coc_for_state(coc_gdf: gpd.GeoDataFrame, state_fips: str) -> gpd.GeoDataFrame:
-    if "state_abbrev" not in coc_gdf.columns:
-        return coc_gdf
-    fips_by_abbrev = coc_gdf["state_abbrev"].astype(str).str.upper().map(
-        STATE_ABBREV_TO_BLOCK_FIPS
-    )
-    return coc_gdf.loc[fips_by_abbrev == state_fips].copy()
+def _coc_overlapping_blocks(
+    coc_gdf: gpd.GeoDataFrame,
+    block_gdf: gpd.GeoDataFrame,
+) -> gpd.GeoDataFrame:
+    """Return CoCs whose geometry intersects at least one loaded block."""
+    if coc_gdf.empty or block_gdf.empty:
+        return coc_gdf.iloc[0:0].copy()
+    if coc_gdf.crs is None:
+        raise ValueError("CoC boundary artifact has no CRS; rebuild CoC boundaries.")
+    if block_gdf.crs is None:
+        raise ValueError("Block geometry artifact has no CRS; rebuild block geometry.")
+
+    coc_for_query = coc_gdf.to_crs(block_gdf.crs)
+    query = block_gdf.sindex.query(coc_for_query.geometry, predicate="intersects")
+    if query.size == 0:
+        return coc_gdf.iloc[0:0].copy()
+    coc_positions = pd.Index(query[0]).drop_duplicates().to_numpy()
+    return coc_gdf.iloc[coc_positions].copy()
 
 
 def _load_block_inputs_for_state(
@@ -460,6 +444,12 @@ def _load_block_inputs_for_state(
             "artifact was resolved. Run `hhplab ingest block-geometry --year <block-vintage>` "
             "or provide --block-geometry with a GeoParquet containing block_geoid and geometry."
         )
+    if not _parquet_has_column(block_geometry_path, "state_fips"):
+        raise ValueError(
+            "Block geometry artifact is missing state_fips column; rebuild with "
+            "`hhplab ingest block-geometry --year <block-vintage>` or provide a "
+            "--block-geometry artifact with block_geoid, state_fips, and geometry columns."
+        )
     block_geometry = gpd.read_parquet(block_geometry_path, filters=filters)
     missing_columns = sorted({"block_geoid", "geometry"} - set(block_geometry.columns))
     if missing_columns:
@@ -484,13 +474,6 @@ def _load_block_inputs_for_state(
             "deliberately before running urban-fraction."
         )
     return gpd.GeoDataFrame(merged, geometry="geometry", crs=block_geometry.crs)
-
-
-def _concat_or_empty(parts: list[pd.DataFrame], columns: tuple[str, ...]) -> pd.DataFrame:
-    non_empty = [part for part in parts if not part.empty]
-    if not non_empty:
-        return pd.DataFrame(columns=columns)
-    return pd.concat(non_empty, ignore_index=True)[list(columns)]
 
 
 def _missing_input_commands(
@@ -542,6 +525,11 @@ def _geoparquet_has_geometry(path: Path) -> bool:
     except (pa.ArrowInvalid, ValueError, OSError):
         return False
     return "geometry" in schema.names
+
+
+def _parquet_has_column(path: Path, column: str) -> bool:
+    schema = pq.ParquetFile(path).schema_arrow
+    return column in schema.names
 
 
 def _emit_payload(payload: dict[str, object], *, json_output: bool) -> None:
