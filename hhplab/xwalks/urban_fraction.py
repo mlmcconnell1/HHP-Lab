@@ -196,14 +196,15 @@ def _summarize_urban_area_detail(intersections: pd.DataFrame, **metadata: object
     if urban.empty:
         return _empty_detail()
     rows: list[dict[str, object]] = []
-    for keys, group in urban.groupby(["coc_id", "urban_area_geoid", "urban_area_name"], sort=True):
-        coc_id, urban_area_geoid, urban_area_name = keys
+    for keys, group in urban.groupby(["coc_id", "urban_area_geoid"], sort=True):
+        coc_id, urban_area_geoid = keys
         urban_population = float(group["allocated_urban_population"].sum(skipna=True))
+        urban_area_names = group["urban_area_name"].dropna().astype(str).drop_duplicates()
         rows.append(
             {
                 "coc_id": coc_id,
                 "urban_area_geoid": urban_area_geoid,
-                "urban_area_name": urban_area_name,
+                "urban_area_name": urban_area_names.iloc[0] if not urban_area_names.empty else pd.NA,
                 **metadata,
                 "total_population": urban_population,
                 "urban_population": urban_population,

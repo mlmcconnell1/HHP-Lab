@@ -191,6 +191,34 @@ def test_build_coc_urban_fraction_preserves_urban_area_detail(key: tuple[str, st
     assert row["source"] == "coc_urban_area_detail"
 
 
+def test_urban_area_detail_groups_by_geoid_when_names_vary() -> None:
+    urban_areas = urban_area_fixture()
+    urban_areas["urban_area_geoid"] = "UA-MERGED"
+    urban_areas["urban_area_name"] = ["Fixture Merged Area", "Fixture Merged Area Alias"]
+
+    _summary, detail = build_coc_urban_fraction(
+        coc_fixture(),
+        block_fixture(),
+        urban_areas,
+        boundary_vintage=2025,
+        urban_area_vintage=2020,
+        block_vintage=2020,
+        decennial_vintage=2020,
+    )
+
+    row = detail.set_index(["coc_id", "urban_area_geoid"]).loc[("A", "UA-MERGED")]
+    assert row["urban_area_name"] == "Fixture Merged Area"
+    assert row["urban_population"] == pytest.approx(140.0)
+    assert row["total_population"] == pytest.approx(140.0)
+    assert row["block_count"] == 2
+    assert (
+        detail.loc[
+            (detail["coc_id"] == "A") & (detail["urban_area_geoid"] == "UA-MERGED")
+        ].shape[0]
+        == 1
+    )
+
+
 def test_build_coc_urban_fraction_reports_missing_required_columns() -> None:
     coc = coc_fixture().drop(columns=["coc_id"])
 
