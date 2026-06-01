@@ -7,6 +7,7 @@ import logging
 import shutil
 import tempfile
 import time
+import warnings
 import zipfile
 from datetime import UTC, datetime
 from pathlib import Path
@@ -314,7 +315,17 @@ def download_block_geometry(
     state_fips_codes: tuple[str, ...] = STATE_FIPS_CODES,
     raw_root: Path | None = None,
 ) -> tuple[gpd.GeoDataFrame, str, int, list[Path], list[str]]:
-    """Download and normalize Census tabulation block geometry."""
+    """Download and normalize Census tabulation block geometry.
+
+    Deprecated: this in-memory API accumulates every state before concatenating.
+    Use ingest_block_geometry, which streams state parts to disk.
+    """
+    warnings.warn(
+        "download_block_geometry is deprecated because it loads all state block "
+        "geometry into memory. Use ingest_block_geometry instead.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
     gdfs: list[gpd.GeoDataFrame] = []
     all_content: list[bytes] = []
     raw_paths: list[Path] = []

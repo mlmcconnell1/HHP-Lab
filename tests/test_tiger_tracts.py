@@ -14,6 +14,7 @@ from hhplab.census.ingest.tiger_blocks import (
     _download_state_blocks,
     _state_part_path,
     _stream_state_block_parts,
+    download_block_geometry,
     get_block_geometry_output_path,
     normalize_block_geometry,
     save_block_geometry,
@@ -47,6 +48,13 @@ def test_block_geometry_filename_uses_tabblock20_suffix() -> None:
     """2020 tabulation block downloads use the TIGER TABBLOCK20 pattern."""
     assert _block_zip_name(2020, "51") == "tl_2020_51_tabblock20.zip"
     assert _block_url(2020, "51").endswith("/TIGER2020/TABBLOCK20/tl_2020_51_tabblock20.zip")
+
+
+def test_download_block_geometry_warns_about_in_memory_api() -> None:
+    """Direct legacy callers receive a deprecation warning before the in-memory path runs."""
+    with pytest.warns(DeprecationWarning, match="loads all state block geometry into memory"):
+        with pytest.raises(ValueError, match="No Census tabulation block geometry rows fetched"):
+            download_block_geometry(state_fips_codes=())
 
 
 def test_tract_url_uses_2010_subdirectory() -> None:

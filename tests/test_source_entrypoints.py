@@ -1,6 +1,7 @@
 """Tests for source-owned package entrypoints."""
 
 from hhplab import census, hud, nhgis, pit
+import hhplab.census.ingest as census_ingest
 from hhplab.census.ingest import ingest_tiger_counties, ingest_tiger_tracts, load_tract_relationship
 from hhplab.hud.exchange_gis import ingest_hud_exchange
 from hhplab.hud.opendata_arcgis import ingest_hud_opendata
@@ -24,6 +25,12 @@ def test_census_root_reexports_ingest_helpers() -> None:
     assert census.ingest_tiger_counties is ingest_tiger_counties
     assert census.ingest_tiger_tracts is ingest_tiger_tracts
     assert census.load_tract_relationship is load_tract_relationship
+
+
+def test_census_ingest_does_not_export_in_memory_block_download() -> None:
+    """The package-level ingest API should not expose the OOM-prone block downloader."""
+    assert "download_block_geometry" not in census_ingest.__all__
+    assert not hasattr(census_ingest, "download_block_geometry")
 
 
 def test_hud_root_reexports_boundary_helpers() -> None:

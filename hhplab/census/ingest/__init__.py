@@ -5,7 +5,6 @@ from hhplab.census.ingest.pl_block_population import (
     ingest_pl_block_population,
 )
 from hhplab.census.ingest.tiger_blocks import (
-    download_block_geometry,
     get_block_geometry_output_path,
     ingest_block_geometry,
     normalize_block_geometry,
@@ -45,7 +44,6 @@ __all__ = [
     "download_tiger_counties",
     "ingest_tiger_counties",
     "save_counties",
-    "download_block_geometry",
     "get_block_geometry_output_path",
     "ingest_block_geometry",
     "normalize_block_geometry",
