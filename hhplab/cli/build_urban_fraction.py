@@ -163,9 +163,7 @@ def build_urban_fraction(
         extra={
             "dataset_type": "coc_urban_fraction",
             "pl_block_population_artifact": str(paths["pl_blocks"]),
-            "block_geometry_artifact": str(paths["block_geometry"])
-            if paths.get("block_geometry") is not None
-            else None,
+            "block_geometry_artifact": payload["inputs"]["block_geometry"].get("path"),
             "urban_area_artifact": str(paths["urban_areas"]),
             "coc_boundary_artifact": str(paths["coc_boundaries"]),
             "urban_area_vintage": str(urban_area_vintage),

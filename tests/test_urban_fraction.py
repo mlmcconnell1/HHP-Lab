@@ -474,6 +474,39 @@ def test_urban_fraction_cli_fixture_build_discovers_canonical_block_geometry(
     assert payload["diagnostics"]["missing_denominator_block_count"] == 1
 
 
+def test_urban_fraction_cli_fixture_build_accepts_integrated_block_geometry(
+    monkeypatch,
+    tmp_path,
+) -> None:
+    """End-to-end fixture build succeeds when PL block GeoParquet embeds geometry."""
+    _patch_curated_dir(monkeypatch, tmp_path)
+    block_path, geometry_path = _write_cli_inputs(tmp_path, split_block_geometry=False)
+    geometry_path.unlink(missing_ok=True)
+
+    result = runner.invoke(
+        app,
+        [
+            "build",
+            "urban-fraction",
+            "--boundary",
+            "2025",
+            "--urban-area-vintage",
+            "2020",
+            "--decennial",
+            "2020",
+            "--json",
+        ],
+    )
+
+    assert result.exit_code == 0
+    payload = json.loads(result.output)
+    assert payload["rows"] == 4
+    assert payload["diagnostics"]["missing_denominator_block_count"] == 1
+    provenance = read_provenance(payload["artifact"])
+    assert provenance is not None
+    assert provenance.extra["block_geometry_artifact"] == str(block_path)
+
+
 def test_load_block_inputs_reraises_non_missing_geo_metadata_value_error(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
