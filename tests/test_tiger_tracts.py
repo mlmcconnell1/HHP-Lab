@@ -363,6 +363,60 @@ def test_download_state_blocks_retries_transient_http_errors(monkeypatch, tmp_pa
     assert attempts == STATE_DOWNLOAD_ATTEMPTS
 
 
+def _http_status_error(status_code: int) -> httpx.HTTPStatusError:
+    request = httpx.Request("GET", "https://example.test/blocks.zip")
+    response = httpx.Response(status_code, request=request)
+    return httpx.HTTPStatusError(
+        f"HTTP {status_code}",
+        request=request,
+        response=response,
+    )
+
+
+def test_download_state_blocks_retries_non_404_http_status_errors(
+    monkeypatch,
+    tmp_path,
+) -> None:
+    """Non-404 TIGER status failures retry before re-raising the final error."""
+    attempts = 0
+
+    class FailingClient:
+        def get(self, url, follow_redirects):
+            nonlocal attempts
+            attempts += 1
+            raise _http_status_error(503)
+
+    monkeypatch.setattr("hhplab.census.ingest.tiger_blocks.time.sleep", lambda _seconds: None)
+
+    with pytest.raises(httpx.HTTPStatusError, match="HTTP 503"):
+        _download_state_blocks(FailingClient(), 2020, "20", tmp_path)
+
+    assert attempts == STATE_DOWNLOAD_ATTEMPTS
+
+
+def test_download_state_blocks_returns_missing_for_404_without_retry(
+    monkeypatch,
+    tmp_path,
+) -> None:
+    """A 404 means the state artifact is unavailable and should not be retried."""
+    attempts = 0
+
+    class MissingClient:
+        def get(self, url, follow_redirects):
+            nonlocal attempts
+            attempts += 1
+            raise _http_status_error(404)
+
+    monkeypatch.setattr("hhplab.census.ingest.tiger_blocks.time.sleep", lambda _seconds: None)
+
+    assert _download_state_blocks(MissingClient(), 2020, "20", tmp_path) == (
+        None,
+        None,
+        None,
+    )
+    assert attempts == 1
+
+
 def test_stream_state_block_parts_resumes_completed_parts(monkeypatch, tmp_path) -> None:
     """Retries skip state parts that already have the matching raw ZIP."""
     raw_root = tmp_path / "raw"
