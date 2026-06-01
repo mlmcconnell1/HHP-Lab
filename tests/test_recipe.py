@@ -2420,6 +2420,34 @@ class TestExecutor:
         assert list(panel["total_population"]) == [100.0, 100.0, 200.0, 200.0]
         assert list(panel["acs5_vintage_used"]) == ["2020", "2021", "2020", "2021"]
 
+    def test_execute_recipe_stamps_year_on_static_identity_broadcast(self, tmp_path: Path):
+        """Identity-resampled static broadcasts must retain joinable panel years."""
+        _setup_pipeline_fixtures(tmp_path)
+        pit_path = tmp_path / "data" / "pit.parquet"
+        pd.DataFrame(
+            {
+                "coc_id": ["COC1", "COC2"],
+                "pit_total": [10, 20],
+            }
+        ).to_parquet(pit_path)
+
+        data = _recipe_with_pipeline()
+        data["datasets"]["pit"]["path"] = "data/pit.parquet"
+        data["datasets"]["pit"]["params"] = {"broadcast_static": True}
+        data["datasets"]["acs"]["path"] = "data/acs.parquet"
+        recipe = load_recipe(data)
+
+        results = execute_recipe(recipe, project_root=tmp_path)
+        assert results[0].success
+
+        panel_path = (
+            _default_recipe_output_dir(tmp_path, "executor-test")
+            / "panel__Y2020-2021@B2025.parquet"
+        )
+        panel = pd.read_parquet(panel_path).sort_values(["geo_id", "year"])
+        assert list(panel["year"]) == [2020, 2021, 2020, 2021]
+        assert list(panel["pit_total"]) == [10, 10, 20, 20]
+
     def test_execute_recipe_allows_yearless_file_set_with_distinct_paths(
         self,
         tmp_path: Path,

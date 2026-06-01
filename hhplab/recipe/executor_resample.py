@@ -257,6 +257,8 @@ def _resample_identity(
     result = df[cols].copy()
     if geo_col != "geo_id":
         result = result.rename(columns={geo_col: "geo_id"})
+    if "year" not in result.columns:
+        result["year"] = task.year
     return result
 
 
