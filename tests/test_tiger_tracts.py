@@ -509,6 +509,17 @@ def test_save_block_geometry_from_parts_streams_final_geoparquet(tmp_path) -> No
     assert provenance.extra["part_paths"] == [str(path) for path in part_paths]
 
 
+def test_save_block_geometry_from_parts_rejects_empty_part_list(tmp_path) -> None:
+    """Empty part assembly fails with an actionable message instead of writing output."""
+    with pytest.raises(
+        ValueError,
+        match="No block geometry part files were available to assemble",
+    ):
+        save_block_geometry_from_parts([], 2020, output_dir=tmp_path)
+
+    assert not (tmp_path / "blocks__K2020.parquet").exists()
+
+
 def test_save_block_geometry_from_parts_casts_every_part_to_unified_schema(
     tmp_path,
 ) -> None:
