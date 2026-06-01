@@ -13,8 +13,11 @@ import pyarrow.parquet as pq
 import typer
 
 import hhplab.naming as naming
+from hhplab.census.ingest.decennial_tract_population import STATE_FIPS_CODES
+from hhplab.metro.metro_definitions import STATE_ABBREV_TO_FIPS
 from hhplab.paths import curated_dir
 from hhplab.provenance import ProvenanceBlock, write_parquet_with_provenance
+from hhplab.schema.columns import COC_URBAN_AREA_DETAIL_COLUMNS, COC_URBAN_FRACTION_COLUMNS
 from hhplab.xwalks.urban_fraction import (
     DEFAULT_ALLOCATION_METHOD,
     DEFAULT_CLASSIFICATION_METHOD,
@@ -22,6 +25,17 @@ from hhplab.xwalks.urban_fraction import (
 )
 
 MISSING_GEOPARQUET_METADATA_MESSAGE = "Missing geo metadata in Parquet/Feather file."
+
+TERRITORY_STATE_ABBREV_TO_FIPS: dict[str, str] = {
+    "AS": "60",
+    "GU": "66",
+    "MP": "69",
+    "VI": "78",
+}
+STATE_ABBREV_TO_BLOCK_FIPS: dict[str, str] = {
+    **STATE_ABBREV_TO_FIPS,
+    **TERRITORY_STATE_ABBREV_TO_FIPS,
+}
 
 
 def build_urban_fraction(
@@ -142,15 +156,16 @@ def build_urban_fraction(
     try:
         coc_gdf = gpd.read_parquet(paths["coc_boundaries"])
         urban_area_gdf = gpd.read_parquet(paths["urban_areas"])
-        block_gdf = _load_block_inputs(paths["pl_blocks"], paths.get("block_geometry"))
-        summary, detail = build_coc_urban_fraction(
+        summary, detail, chunk_count = _build_coc_urban_fraction_chunked(
             coc_gdf,
-            block_gdf,
             urban_area_gdf,
+            pl_blocks_path=paths["pl_blocks"],
+            block_geometry_path=paths.get("block_geometry"),
             boundary_vintage=boundary,
             urban_area_vintage=urban_area_vintage,
             block_vintage=resolved_block_vintage,
             decennial_vintage=decennial,
+            progress=not output_json,
         )
     except Exception as exc:
         _emit_error(str(exc), json_output=output_json)
@@ -199,6 +214,7 @@ def build_urban_fraction(
                 "min_population_coverage_ratio": _float_or_none(
                     summary["population_coverage_ratio"].min()
                 ),
+                "chunk_count": chunk_count,
             },
         }
     )
@@ -275,6 +291,11 @@ def urban_fraction_preflight_payload(
 
 
 def _load_block_inputs(pl_blocks_path: Path, block_geometry_path: Path | None) -> gpd.GeoDataFrame:
+    """Load all block inputs.
+
+    Kept for tests and small custom inputs. The CLI build path uses
+    _load_block_inputs_for_state to avoid materializing national blocks.
+    """
     try:
         pl_blocks_geo = gpd.read_parquet(pl_blocks_path)
         if "geometry" in pl_blocks_geo.columns:
@@ -315,6 +336,155 @@ def _load_block_inputs(pl_blocks_path: Path, block_geometry_path: Path | None) -
             "deliberately before running urban-fraction."
         )
     return gpd.GeoDataFrame(merged, geometry="geometry", crs=block_geometry.crs)
+
+
+def _build_coc_urban_fraction_chunked(
+    coc_gdf: gpd.GeoDataFrame,
+    urban_area_gdf: gpd.GeoDataFrame,
+    *,
+    pl_blocks_path: Path,
+    block_geometry_path: Path | None,
+    boundary_vintage: str | int,
+    urban_area_vintage: str | int,
+    block_vintage: str | int,
+    decennial_vintage: str | int,
+    progress: bool,
+) -> tuple[pd.DataFrame, pd.DataFrame, int]:
+    """Build urban fractions one state at a time to bound peak memory."""
+    states = _state_chunks_for_coc_boundaries(coc_gdf, pl_blocks_path)
+    summary_parts: list[pd.DataFrame] = []
+    detail_parts: list[pd.DataFrame] = []
+    total_chunks = len(states)
+
+    for index, state_fips in enumerate(states, start=1):
+        state_coc = _coc_for_state(coc_gdf, state_fips)
+        if state_coc.empty:
+            continue
+        if progress:
+            typer.echo(
+                "Processing block chunk "
+                f"{index}/{total_chunks}: state_fips={state_fips}, "
+                f"cocs={len(state_coc)}"
+            )
+        block_gdf = _load_block_inputs_for_state(
+            pl_blocks_path,
+            block_geometry_path,
+            state_fips=state_fips,
+        )
+        if progress:
+            typer.echo(f"  Loaded {len(block_gdf):,} block rows.")
+        summary, detail = build_coc_urban_fraction(
+            state_coc,
+            block_gdf,
+            urban_area_gdf,
+            boundary_vintage=boundary_vintage,
+            urban_area_vintage=urban_area_vintage,
+            block_vintage=block_vintage,
+            decennial_vintage=decennial_vintage,
+        )
+        summary_parts.append(summary)
+        detail_parts.append(detail)
+        if progress:
+            typer.echo(f"  Completed {len(summary):,} CoC summary row(s).")
+
+    summary = _concat_or_empty(summary_parts, COC_URBAN_FRACTION_COLUMNS)
+    detail = _concat_or_empty(detail_parts, COC_URBAN_AREA_DETAIL_COLUMNS)
+    return (
+        summary.sort_values("coc_id").reset_index(drop=True),
+        detail.reset_index(drop=True),
+        total_chunks,
+    )
+
+
+def _state_chunks_for_coc_boundaries(
+    coc_gdf: gpd.GeoDataFrame,
+    pl_blocks_path: Path,
+) -> list[str]:
+    if "state_abbrev" not in coc_gdf.columns:
+        return _available_block_states(pl_blocks_path)
+    state_fips = (
+        coc_gdf["state_abbrev"]
+        .dropna()
+        .astype(str)
+        .str.upper()
+        .map(STATE_ABBREV_TO_BLOCK_FIPS)
+        .dropna()
+        .drop_duplicates()
+        .tolist()
+    )
+    available = set(_available_block_states(pl_blocks_path))
+    return [state for state in STATE_FIPS_CODES if state in available and state in set(state_fips)]
+
+
+def _available_block_states(pl_blocks_path: Path) -> list[str]:
+    states = pd.read_parquet(pl_blocks_path, columns=["state_fips"])
+    values = set(states["state_fips"].dropna().astype(str).str.zfill(2))
+    return [state for state in STATE_FIPS_CODES if state in values]
+
+
+def _coc_for_state(coc_gdf: gpd.GeoDataFrame, state_fips: str) -> gpd.GeoDataFrame:
+    if "state_abbrev" not in coc_gdf.columns:
+        return coc_gdf
+    fips_by_abbrev = coc_gdf["state_abbrev"].astype(str).str.upper().map(
+        STATE_ABBREV_TO_BLOCK_FIPS
+    )
+    return coc_gdf.loc[fips_by_abbrev == state_fips].copy()
+
+
+def _load_block_inputs_for_state(
+    pl_blocks_path: Path,
+    block_geometry_path: Path | None,
+    *,
+    state_fips: str,
+) -> gpd.GeoDataFrame:
+    filters = [("state_fips", "==", state_fips)]
+    try:
+        pl_blocks_geo = gpd.read_parquet(pl_blocks_path, filters=filters)
+        if "geometry" in pl_blocks_geo.columns:
+            return pl_blocks_geo
+    except ValueError as exc:
+        message = str(exc.args[0]) if exc.args else ""
+        if not message.startswith(MISSING_GEOPARQUET_METADATA_MESSAGE):
+            raise
+
+    pl_blocks = pd.read_parquet(pl_blocks_path, filters=filters)
+    if block_geometry_path is None:
+        raise ValueError(
+            "PL block population artifact has no geometry and no canonical block geometry "
+            "artifact was resolved. Run `hhplab ingest block-geometry --year <block-vintage>` "
+            "or provide --block-geometry with a GeoParquet containing block_geoid and geometry."
+        )
+    block_geometry = gpd.read_parquet(block_geometry_path, filters=filters)
+    missing_columns = sorted({"block_geoid", "geometry"} - set(block_geometry.columns))
+    if missing_columns:
+        raise ValueError(
+            "Block geometry artifact missing required column(s): "
+            f"{', '.join(missing_columns)}."
+        )
+    merged = pl_blocks.merge(
+        block_geometry[["block_geoid", "geometry"]],
+        on="block_geoid",
+        how="left",
+        validate="one_to_one",
+    )
+    missing_geometry = merged.loc[merged["geometry"].isna(), "block_geoid"]
+    if not missing_geometry.empty:
+        examples = ", ".join(missing_geometry.astype(str).head(5))
+        raise ValueError(
+            "Block geometry coverage is incomplete for PL block population rows: "
+            f"{len(missing_geometry)} block(s) lack geometry for state_fips={state_fips}. "
+            f"Example block_geoid values: {examples}. "
+            "Rebuild block geometry for the same block vintage or exclude unsupported coverage "
+            "deliberately before running urban-fraction."
+        )
+    return gpd.GeoDataFrame(merged, geometry="geometry", crs=block_geometry.crs)
+
+
+def _concat_or_empty(parts: list[pd.DataFrame], columns: tuple[str, ...]) -> pd.DataFrame:
+    non_empty = [part for part in parts if not part.empty]
+    if not non_empty:
+        return pd.DataFrame(columns=columns)
+    return pd.concat(non_empty, ignore_index=True)[list(columns)]
 
 
 def _missing_input_commands(

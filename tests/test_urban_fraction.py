@@ -89,6 +89,7 @@ def coc_fixture() -> gpd.GeoDataFrame:
     return gpd.GeoDataFrame(
         {
             "coc_id": ["A", "B", "C", "D"],
+            "state_abbrev": ["CO", "CO", "CO", "CO"],
             "geometry": [
                 box(0, 0, 10, 10),
                 box(10, 0, 20, 10),
@@ -105,6 +106,7 @@ def block_fixture() -> gpd.GeoDataFrame:
     return gpd.GeoDataFrame(
         {
             "block_geoid": ["U1", "U2", "R1", "Z1", "M1"],
+            "state_fips": ["08", "08", "08", "08", "08"],
             "total_population": [100, 80, 60, 0, pd.NA],
             "geometry": [
                 box(0, 0, 10, 10),
@@ -285,7 +287,10 @@ def _write_cli_inputs(tmp_path, *, split_block_geometry: bool = True) -> tuple[P
     blocks = block_fixture()
     if split_block_geometry:
         pd.DataFrame(blocks.drop(columns=["geometry"])).to_parquet(block_path, index=False)
-        blocks[["block_geoid", "geometry"]].to_parquet(geometry_path, index=False)
+        blocks[["block_geoid", "state_fips", "geometry"]].to_parquet(
+            geometry_path,
+            index=False,
+        )
     else:
         blocks.to_parquet(block_path, index=False)
     return block_path, geometry_path
@@ -683,5 +688,7 @@ def test_urban_fraction_cli_human_output_is_concise(monkeypatch, tmp_path) -> No
     )
 
     assert result.exit_code == 0
+    assert "Processing block chunk 1/1: state_fips=08, cocs=4" in result.output
+    assert "Loaded 5 block rows." in result.output
     assert "Built CoC urban fraction artifact." in result.output
     assert "Rows: 4" in result.output
