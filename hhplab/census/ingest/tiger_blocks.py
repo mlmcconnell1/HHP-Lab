@@ -397,13 +397,18 @@ def _write_geoparquet_with_provenance(
     provenance: ProvenanceBlock,
 ) -> Path:
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    gdf.to_parquet(output_path, index=False)
-    table = pq.read_table(output_path)
+    tmp_path = output_path.with_suffix(output_path.suffix + ".tmp")
+    if tmp_path.exists():
+        tmp_path.unlink()
+
+    gdf.to_parquet(tmp_path, index=False)
+    table = pq.read_table(tmp_path)
     metadata = {
         **(table.schema.metadata or {}),
         PROVENANCE_KEY: provenance.to_json().encode("utf-8"),
     }
-    pq.write_table(table.replace_schema_metadata(metadata), output_path)
+    pq.write_table(table.replace_schema_metadata(metadata), tmp_path)
+    tmp_path.replace(output_path)
     return output_path
 
 

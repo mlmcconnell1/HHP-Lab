@@ -20,6 +20,7 @@ from hhplab.census.ingest.tiger_blocks import (
     save_block_geometry,
     save_block_geometry_from_parts,
 )
+from hhplab.census.ingest import tiger_blocks
 from hhplab.census.ingest.tiger_tracts import (
     _resolve_geoid_column,
     _tract_2000_url,
@@ -256,6 +257,39 @@ def test_save_block_geometry_writes_geoparquet_with_provenance(tmp_path) -> None
     assert provenance is not None
     assert provenance.extra["block_vintage"] == 2020
     assert provenance.extra["missing_state_fips"] == ["72"]
+
+
+def test_save_block_geometry_does_not_publish_unprovenanced_file_on_metadata_failure(
+    monkeypatch,
+    tmp_path,
+) -> None:
+    """A failed provenance write must not leave a final GeoParquet artifact behind."""
+    gdf = gpd.GeoDataFrame(
+        {
+            "block_geoid": ["510010901011234"],
+            "state_fips": ["51"],
+            "county_fips": ["51001"],
+            "tract_geoid": ["51001090101"],
+            "block_vintage": [2020],
+            "data_source": ["census_tiger_tabblock"],
+            "source_ref": ["https://example.test/blocks.zip"],
+            "ingested_at": ["2026-05-31T00:00:00Z"],
+            "geometry": [Point(1, 1)],
+        },
+        geometry="geometry",
+        crs="EPSG:4326",
+    )
+    output_path = tmp_path / "blocks__K2020.parquet"
+
+    def fail_write_table(*args, **kwargs):
+        raise RuntimeError("metadata write interrupted")
+
+    monkeypatch.setattr(tiger_blocks.pq, "write_table", fail_write_table)
+
+    with pytest.raises(RuntimeError, match="metadata write interrupted"):
+        save_block_geometry(gdf, 2020, output_dir=tmp_path)
+
+    assert not output_path.exists()
 
 
 def _raw_block_gdf(state_fips: str, block_suffix: str) -> gpd.GeoDataFrame:
