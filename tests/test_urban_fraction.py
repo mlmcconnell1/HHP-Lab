@@ -719,6 +719,51 @@ def test_urban_fraction_cli_errors_on_incomplete_block_geometry(monkeypatch, tmp
     assert "M1" in payload["error"]
 
 
+def test_urban_fraction_cli_errors_when_boundary_coc_has_no_block_coverage(
+    monkeypatch,
+    tmp_path,
+) -> None:
+    """Partial builds fail when stale block inputs would silently omit CoCs."""
+    _patch_curated_dir(monkeypatch, tmp_path)
+    _block_path, geometry_path = _write_cli_inputs(tmp_path)
+    boundary_path = tmp_path / "coc_boundaries" / naming.coc_base_filename("2025")
+    coc = gpd.read_parquet(boundary_path)
+    missing_coc = gpd.GeoDataFrame(
+        {
+            "coc_id": ["AS-500"],
+            "state_abbrev": ["AS"],
+            "geometry": [box(100, 100, 110, 110)],
+        },
+        geometry="geometry",
+        crs=ALBERS_EQUAL_AREA_CRS,
+    )
+    pd.concat([coc, missing_coc], ignore_index=True).to_parquet(boundary_path, index=False)
+
+    result = runner.invoke(
+        app,
+        [
+            "build",
+            "urban-fraction",
+            "--boundary",
+            "2025",
+            "--urban-area-vintage",
+            "2020",
+            "--decennial",
+            "2020",
+            "--block-geometry",
+            str(geometry_path),
+            "--json",
+        ],
+    )
+
+    assert result.exit_code == 1
+    payload = json.loads(result.output)
+    assert payload["status"] == "error"
+    assert "did not produce summary rows" in payload["error"]
+    assert "AS-500" in payload["error"]
+    assert "Rebuild PL block population and block geometry" in payload["error"]
+
+
 def test_load_block_inputs_for_state_requires_actionable_state_fips_geometry(
     tmp_path,
 ) -> None:

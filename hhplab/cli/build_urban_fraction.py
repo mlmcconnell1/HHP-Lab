@@ -156,6 +156,22 @@ def build_urban_fraction(
             decennial_vintage=decennial,
             progress=not output_json,
         )
+        missing_summary_cocs = _missing_summary_coc_ids(coc_gdf, summary)
+        if missing_summary_cocs:
+            examples = ", ".join(missing_summary_cocs[:10])
+            suffix = (
+                f" Example coc_id values: {examples}."
+                if len(missing_summary_cocs) <= 10
+                else f" Example coc_id values: {examples}, ..."
+            )
+            raise ValueError(
+                "Urban-fraction build did not produce summary rows for "
+                f"{len(missing_summary_cocs)} CoC boundary row(s)."
+                f"{suffix} "
+                "Rebuild PL block population and block geometry for the requested "
+                "coverage, or intentionally exclude unsupported CoCs before running "
+                "urban-fraction."
+            )
     except Exception as exc:
         _emit_error(str(exc), json_output=output_json)
         raise typer.Exit(1) from exc
@@ -419,6 +435,24 @@ def _coc_overlapping_blocks(
         return coc_gdf.iloc[0:0].copy()
     coc_positions = pd.Index(query[0]).drop_duplicates().to_numpy()
     return coc_gdf.iloc[coc_positions].copy()
+
+
+def _missing_summary_coc_ids(
+    coc_gdf: gpd.GeoDataFrame,
+    summary: pd.DataFrame,
+) -> list[str]:
+    """Return boundary CoC IDs missing from the urban-fraction summary."""
+    if coc_gdf.empty or "coc_id" not in coc_gdf.columns:
+        return []
+    expected = coc_gdf["coc_id"].dropna().astype(str)
+    if expected.empty:
+        return []
+    observed = (
+        set(summary["coc_id"].dropna().astype(str))
+        if "coc_id" in summary.columns
+        else set()
+    )
+    return sorted(set(expected) - observed)
 
 
 def _load_block_inputs_for_state(
