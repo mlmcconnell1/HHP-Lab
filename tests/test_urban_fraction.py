@@ -234,6 +234,33 @@ def test_build_coc_urban_fraction_reports_missing_required_columns() -> None:
         )
 
 
+@pytest.mark.parametrize(
+    ("coc", "blocks"),
+    [
+        pytest.param(coc_fixture().iloc[0:0].copy(), block_fixture(), id="empty-coc"),
+        pytest.param(coc_fixture(), block_fixture().iloc[0:0].copy(), id="empty-blocks"),
+    ],
+)
+def test_build_coc_urban_fraction_empty_inputs_return_canonical_empty_frames(
+    coc: gpd.GeoDataFrame,
+    blocks: gpd.GeoDataFrame,
+) -> None:
+    summary, detail = build_coc_urban_fraction(
+        coc,
+        blocks,
+        urban_area_fixture(),
+        boundary_vintage=2025,
+        urban_area_vintage=2020,
+        block_vintage=2020,
+        decennial_vintage=2020,
+    )
+
+    assert summary.empty
+    assert detail.empty
+    assert list(summary.columns) == list(COC_URBAN_FRACTION_COLUMNS)
+    assert list(detail.columns) == list(COC_URBAN_AREA_DETAIL_COLUMNS)
+
+
 def _patch_curated_dir(monkeypatch: pytest.MonkeyPatch, tmp_path) -> None:
     monkeypatch.setattr(
         "hhplab.cli.build_urban_fraction.curated_dir",
@@ -591,6 +618,48 @@ def test_urban_fraction_cli_artifact_exists_json(monkeypatch, tmp_path) -> None:
     payload = json.loads(result.output)
     assert payload["error"] == "artifact_exists"
     assert payload["output_exists"] is True
+
+
+def test_urban_fraction_cli_force_overwrites_existing_artifacts(monkeypatch, tmp_path) -> None:
+    _patch_curated_dir(monkeypatch, tmp_path)
+    _block_path, geometry_path = _write_cli_inputs(tmp_path)
+    summary_path = (
+        tmp_path
+        / "measures"
+        / naming.coc_urban_fraction_filename(2025, 2020, 2020, 2020)
+    )
+    detail_path = (
+        tmp_path
+        / "measures"
+        / naming.coc_urban_area_detail_filename(2025, 2020, 2020, 2020)
+    )
+    pd.DataFrame({"stale": [True]}).to_parquet(summary_path, index=False)
+    pd.DataFrame({"stale": [True]}).to_parquet(detail_path, index=False)
+
+    result = runner.invoke(
+        app,
+        [
+            "build",
+            "urban-fraction",
+            "--boundary",
+            "2025",
+            "--urban-area-vintage",
+            "2020",
+            "--decennial",
+            "2020",
+            "--block-geometry",
+            str(geometry_path),
+            "--force",
+            "--json",
+        ],
+    )
+
+    assert result.exit_code == 0
+    payload = json.loads(result.output)
+    assert payload["output_exists"] is True
+    assert payload["rows"] == 4
+    assert list(pd.read_parquet(summary_path).columns) == list(COC_URBAN_FRACTION_COLUMNS)
+    assert list(pd.read_parquet(detail_path).columns) == list(COC_URBAN_AREA_DETAIL_COLUMNS)
 
 
 def test_urban_fraction_cli_human_output_is_concise(monkeypatch, tmp_path) -> None:
