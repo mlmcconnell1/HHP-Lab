@@ -287,6 +287,7 @@ def _write_parts_to_geoparquet(
         tmp_path.unlink()
 
     writer: pq.ParquetWriter | None = None
+    schema = None
     try:
         for part_path in part_paths:
             table = pq.read_table(part_path)
@@ -297,7 +298,9 @@ def _write_parts_to_geoparquet(
                 }
                 schema = table.schema.with_metadata(metadata)
                 writer = pq.ParquetWriter(tmp_path, schema)
-                table = table.cast(schema)
+            if schema is None:
+                raise ValueError("No block geometry part files were available to assemble.")
+            table = table.cast(schema)
             writer.write_table(table)
         if writer is None:
             raise ValueError("No block geometry part files were available to assemble.")

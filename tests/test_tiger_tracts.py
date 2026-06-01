@@ -2,6 +2,8 @@
 
 import geopandas as gpd
 import httpx
+import pyarrow as pa
+import pyarrow.parquet as pq
 import pytest
 from shapely.geometry import Point
 from typer.testing import CliRunner
@@ -478,6 +480,41 @@ def test_save_block_geometry_from_parts_streams_final_geoparquet(tmp_path) -> No
     assert provenance is not None
     assert provenance.extra["content_sha256"] == "abc123"
     assert provenance.extra["part_paths"] == [str(path) for path in part_paths]
+
+
+def test_save_block_geometry_from_parts_casts_every_part_to_unified_schema(
+    tmp_path,
+) -> None:
+    """Resume assembly tolerates castable schema drift in later state part files."""
+    parts_dir = tmp_path / "parts"
+    part_paths = []
+    for state_fips in ("01", "02"):
+        part_path = _state_part_path(parts_dir, state_fips)
+        normalized = normalize_block_geometry(_raw_block_gdf(state_fips, "1234"), 2020)
+        part_path.parent.mkdir(parents=True, exist_ok=True)
+        normalized.to_parquet(part_path, index=False)
+        part_paths.append(part_path)
+
+    second_part = pq.read_table(part_paths[1])
+    state_fips_index = second_part.schema.get_field_index("state_fips")
+    second_part = second_part.set_column(
+        state_fips_index,
+        pa.field("state_fips", pa.large_string()),
+        second_part["state_fips"].cast(pa.large_string()),
+    )
+    pq.write_table(second_part, part_paths[1])
+
+    output_path = save_block_geometry_from_parts(
+        part_paths,
+        2020,
+        output_dir=tmp_path,
+        content_sha256="abc123",
+        content_size=12,
+    )
+
+    roundtrip = gpd.read_parquet(output_path)
+    assert list(roundtrip["state_fips"]) == ["01", "02"]
+    assert read_provenance(output_path) is not None
 
 
 def test_ingest_urban_areas_cli_cached_json(monkeypatch, tmp_path) -> None:
