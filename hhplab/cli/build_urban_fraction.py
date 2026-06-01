@@ -21,6 +21,8 @@ from hhplab.xwalks.urban_fraction import (
     build_coc_urban_fraction,
 )
 
+MISSING_GEOPARQUET_METADATA_MESSAGE = "Missing geo metadata in Parquet/Feather file."
+
 
 def build_urban_fraction(
     boundary: Annotated[
@@ -279,8 +281,10 @@ def _load_block_inputs(pl_blocks_path: Path, block_geometry_path: Path | None) -
         pl_blocks_geo = gpd.read_parquet(pl_blocks_path)
         if "geometry" in pl_blocks_geo.columns:
             return pl_blocks_geo
-    except ValueError:
-        pass
+    except ValueError as exc:
+        message = str(exc.args[0]) if exc.args else ""
+        if not message.startswith(MISSING_GEOPARQUET_METADATA_MESSAGE):
+            raise
 
     pl_blocks = pd.read_parquet(pl_blocks_path)
     if block_geometry_path is None:

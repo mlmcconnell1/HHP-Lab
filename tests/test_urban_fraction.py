@@ -446,6 +446,29 @@ def test_urban_fraction_cli_fixture_build_discovers_canonical_block_geometry(
     assert payload["diagnostics"]["missing_denominator_block_count"] == 1
 
 
+def test_load_block_inputs_reraises_non_missing_geo_metadata_value_error(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    """Corrupt GeoParquet errors must not fall back to population-only loading."""
+    from hhplab.cli import build_urban_fraction as build_urban_fraction_cli
+
+    block_path, geometry_path = _write_cli_inputs(tmp_path)
+
+    def raise_corrupt_parquet(_path: Path) -> gpd.GeoDataFrame:
+        raise ValueError("column type mismatch")
+
+    monkeypatch.setattr(build_urban_fraction_cli.gpd, "read_parquet", raise_corrupt_parquet)
+    monkeypatch.setattr(
+        build_urban_fraction_cli.pd,
+        "read_parquet",
+        lambda _path: pytest.fail("non-sentinel GeoPandas errors must not fall back"),
+    )
+
+    with pytest.raises(ValueError, match="column type mismatch"):
+        build_urban_fraction_cli._load_block_inputs(block_path, geometry_path)
+
+
 def test_urban_fraction_cli_errors_on_incomplete_block_geometry(monkeypatch, tmp_path) -> None:
     """Population rows without matching geometry fail with actionable coverage diagnostics."""
     _patch_curated_dir(monkeypatch, tmp_path)
