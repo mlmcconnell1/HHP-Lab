@@ -7806,6 +7806,32 @@ class TestCohortSelectorSchema:
         recipe = load_recipe(data)
         assert recipe.targets[0].cohort.threshold == 0.75
 
+    def test_predicate_parses(self):
+        data = _minimal_recipe()
+        data["targets"][0]["cohort"] = {
+            "rank_by": "urban_population_fraction",
+            "method": "predicate",
+            "operator": "gte",
+            "value": 0.75,
+            "reference_year": 2021,
+        }
+        recipe = load_recipe(data)
+        assert recipe.targets[0].cohort.method == "predicate"
+        assert recipe.targets[0].cohort.operator == "gte"
+        assert recipe.targets[0].cohort.value == 0.75
+
+    def test_predicate_requires_operator_and_value(self):
+        from pydantic import ValidationError
+
+        from hhplab.recipe.recipe_schema import CohortSelector
+
+        with pytest.raises(ValidationError, match="requires operator, value"):
+            CohortSelector(
+                rank_by="urban_population_fraction",
+                method="predicate",
+                reference_year=2021,
+            )
+
 
 class TestApplyCohortSelector:
     """Test the _apply_cohort_selector executor function."""
@@ -7869,6 +7895,71 @@ class TestApplyCohortSelector:
         assert "G2" in selected_geos
         assert "G5" in selected_geos
         assert "G1" not in selected_geos
+
+    def test_predicate_gte_keeps_all_years_for_selected_geos(self):
+        from hhplab.recipe.executor import _apply_cohort_selector
+        from hhplab.recipe.recipe_schema import CohortSelector
+
+        panel = self._make_panel()
+        panel["urban_population_fraction"] = panel["geo_id"].map(
+            {"G1": 0.20, "G2": 0.90, "G3": 0.75, "G4": 0.10, "G5": 0.80}
+        )
+        cohort = CohortSelector(
+            rank_by="urban_population_fraction",
+            method="predicate",
+            operator="gte",
+            value=0.75,
+            reference_year=2021,
+        )
+        result = _apply_cohort_selector(panel, cohort)
+        selected_geos = set(result["geo_id"].unique())
+        assert selected_geos == {"G2", "G3", "G5"}
+        assert set(result["year"].unique()) == {2020, 2021}
+        assert len(result) == 6
+
+    def test_predicate_summary_records_config_and_counts(self):
+        from hhplab.recipe.executor_panel import apply_cohort_selector_with_summary
+        from hhplab.recipe.recipe_schema import CohortSelector
+
+        panel = self._make_panel()
+        cohort = CohortSelector(
+            rank_by="total_population",
+            method="predicate",
+            operator="lte",
+            value=200.0,
+            reference_year=2021,
+        )
+        result, summary = apply_cohort_selector_with_summary(panel, cohort)
+        assert set(result["geo_id"].unique()) == {"G1", "G4"}
+        assert summary == {
+            "config": {
+                "rank_by": "total_population",
+                "method": "predicate",
+                "operator": "lte",
+                "value": 200.0,
+                "reference_year": 2021,
+            },
+            "selected_geo_count": 2,
+            "selected_geo_ids": ["G1", "G4"],
+            "row_count_before": 10,
+            "row_count_after": 4,
+        }
+
+    def test_predicate_no_match_returns_empty_panel(self):
+        from hhplab.recipe.executor import _apply_cohort_selector
+        from hhplab.recipe.recipe_schema import CohortSelector
+
+        panel = self._make_panel()
+        cohort = CohortSelector(
+            rank_by="total_population",
+            method="predicate",
+            operator="gt",
+            value=1000.0,
+            reference_year=2021,
+        )
+        result = _apply_cohort_selector(panel, cohort)
+        assert result.empty
+        assert list(result.columns) == list(panel.columns)
 
     def test_missing_rank_column_raises(self):
         from hhplab.recipe.executor import ExecutorError, _apply_cohort_selector

@@ -214,6 +214,8 @@ def persist_outputs(
         provenance["target_selector"] = target_selector_summary
     if containment_filter_summary is not None:
         provenance["containment_filter"] = containment_filter_summary
+    if assembled.cohort_summary is not None:
+        provenance["cohort_selector"] = assembled.cohort_summary
 
     # Embed ZORI provenance and summary (coclab-gude.2).
     if assembled.zori_provenance is not None:

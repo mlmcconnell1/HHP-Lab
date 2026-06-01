@@ -116,6 +116,22 @@ def apply_cohort_selector(
     Ranks geographies by ``cohort.rank_by`` at ``cohort.reference_year``,
     then keeps only the selected geo_ids across all years.
     """
+    filtered, _summary = apply_cohort_selector_with_summary(
+        panel,
+        cohort,
+        geo_id_col=geo_id_col,
+        year_col=year_col,
+    )
+    return filtered
+
+
+def apply_cohort_selector_with_summary(
+    panel: pd.DataFrame,
+    cohort: CohortSelector,
+    geo_id_col: str = "geo_id",
+    year_col: str = "year",
+) -> tuple[pd.DataFrame, dict[str, object]]:
+    """Filter panel to cohort geographies and return provenance details."""
     ref = panel[panel[year_col] == cohort.reference_year]
     if ref.empty:
         raise ExecutorError(
@@ -137,10 +153,33 @@ def apply_cohort_selector(
     elif cohort.method == "percentile":
         threshold_value = ranked[cohort.rank_by].quantile(cohort.threshold)
         selected = ranked[ranked[cohort.rank_by] >= threshold_value][geo_id_col]
+    elif cohort.method == "predicate":
+        if cohort.operator == "gte":
+            mask = ranked[cohort.rank_by] >= cohort.value
+        elif cohort.operator == "lte":
+            mask = ranked[cohort.rank_by] <= cohort.value
+        elif cohort.operator == "gt":
+            mask = ranked[cohort.rank_by] > cohort.value
+        elif cohort.operator == "lt":
+            mask = ranked[cohort.rank_by] < cohort.value
+        elif cohort.operator == "eq":
+            mask = ranked[cohort.rank_by] == cohort.value
+        else:
+            raise ExecutorError(f"Unknown cohort predicate operator: {cohort.operator}")
+        selected = ranked.loc[mask, geo_id_col]
     else:
         raise ExecutorError(f"Unknown cohort method: {cohort.method}")
 
-    return panel[panel[geo_id_col].isin(selected)].reset_index(drop=True)
+    selected_ids = sorted(selected.astype(str).unique().tolist())
+    filtered = panel[panel[geo_id_col].astype(str).isin(selected_ids)].reset_index(drop=True)
+    summary = {
+        "config": cohort.model_dump(mode="json", exclude_none=True),
+        "selected_geo_count": len(selected_ids),
+        "selected_geo_ids": selected_ids,
+        "row_count_before": int(len(panel)),
+        "row_count_after": int(len(filtered)),
+    }
+    return filtered, summary
 
 
 @dataclass
@@ -161,6 +200,7 @@ class AssembledPanel:
     boundary_vintage: str | None
     definition_version: str | None
     policy_artifacts: dict[str, PolicyApplication] = field(default_factory=dict)
+    cohort_summary: dict[str, object] | None = None
 
     @property
     def zori_provenance(self) -> object | None:
@@ -866,9 +906,10 @@ def assemble_panel(
         ensure_canonical_columns=False,
     )
 
+    cohort_summary: dict[str, object] | None = None
     if target.cohort is not None:
         pre_count = panel["geo_id"].nunique() if "geo_id" in panel.columns else len(panel)
-        panel = apply_cohort_selector(panel, target.cohort)
+        panel, cohort_summary = apply_cohort_selector_with_summary(panel, target.cohort)
         post_count = panel["geo_id"].nunique() if "geo_id" in panel.columns else len(panel)
         _echo(
             ctx,
@@ -885,4 +926,5 @@ def assemble_panel(
         boundary_vintage=boundary_vintage,
         definition_version=definition_version,
         policy_artifacts=policy_artifacts,
+        cohort_summary=cohort_summary,
     )

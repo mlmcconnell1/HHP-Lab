@@ -207,7 +207,8 @@ FilterSpec = TemporalFilter  # Extensible: Union[TemporalFilter, ...] in future
 
 OutputKind = Literal["panel", "diagnostics", "map", "containment", "msa_coc_coverage"]
 
-CohortMethod = Literal["top_n", "bottom_n", "percentile"]
+CohortMethod = Literal["top_n", "bottom_n", "percentile", "predicate"]
+CohortPredicateOperator = Literal["gte", "lte", "gt", "lt", "eq"]
 
 
 class ZoriPolicy(BaseModel):
@@ -739,8 +740,12 @@ class MsaCocCoverageSpec(BaseModel):
 
 
 class CohortSelector(BaseModel):
-    """Declarative cohort filter that ranks geographies by a measure column
-    at a reference year and keeps only the selected subset."""
+    """Declarative cohort filter for selecting panel geographies.
+
+    Ranking methods sort geographies by ``rank_by`` at a reference year.
+    The predicate method applies an absolute comparison to ``rank_by`` at
+    the reference year, then keeps the selected geographies for all years.
+    """
 
     model_config = ConfigDict(extra="forbid")
 
@@ -750,7 +755,7 @@ class CohortSelector(BaseModel):
     )
     method: CohortMethod = Field(
         ...,
-        description="Selection method: top_n, bottom_n, or percentile.",
+        description="Selection method: top_n, bottom_n, percentile, or predicate.",
     )
     n: int | None = Field(
         default=None,
@@ -762,6 +767,14 @@ class CohortSelector(BaseModel):
         ge=0.0,
         le=1.0,
         description="Percentile threshold (for 'percentile' method). 0.75 keeps the top 25%%.",
+    )
+    operator: CohortPredicateOperator | None = Field(
+        default=None,
+        description="Predicate operator for method='predicate': gte, lte, gt, lt, or eq.",
+    )
+    value: float | None = Field(
+        default=None,
+        description="Absolute comparison value for method='predicate'.",
     )
     reference_year: int = Field(
         ...,
@@ -776,6 +789,17 @@ class CohortSelector(BaseModel):
         if self.method == "percentile":
             if self.threshold is None:
                 raise ValueError("CohortSelector method 'percentile' requires 'threshold'.")
+        if self.method == "predicate":
+            missing = []
+            if self.operator is None:
+                missing.append("operator")
+            if self.value is None:
+                missing.append("value")
+            if missing:
+                raise ValueError(
+                    "CohortSelector method 'predicate' requires "
+                    f"{', '.join(missing)}."
+                )
         return self
 
 
