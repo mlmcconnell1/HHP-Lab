@@ -195,6 +195,40 @@ def test_build_coc_urban_fraction_uses_spatial_index_candidate_pairs(monkeypatch
     ] == pytest.approx(100.0)
 
 
+def test_build_coc_urban_fraction_skips_intersections_for_covered_blocks(monkeypatch) -> None:
+    """Blocks wholly covered by one CoC should not pay polygon intersection cost."""
+    from hhplab.xwalks import urban_fraction
+
+    coc = gpd.GeoDataFrame(
+        {"coc_id": ["ALL"], "geometry": [box(-1, -1, 41, 11)]},
+        geometry="geometry",
+        crs=ALBERS_EQUAL_AREA_CRS,
+    )
+
+    monkeypatch.setattr(
+        urban_fraction.gpd.GeoSeries,
+        "intersection",
+        lambda *_args, **_kwargs: pytest.fail(
+            "fully covered blocks should not call polygon intersection"
+        ),
+    )
+
+    summary, detail = build_coc_urban_fraction(
+        coc,
+        block_fixture(),
+        urban_area_fixture(),
+        boundary_vintage=2025,
+        urban_area_vintage=2020,
+        block_vintage=2020,
+        decennial_vintage=2020,
+    )
+
+    row = summary.set_index("coc_id").loc["ALL"]
+    assert row["coc_total_population"] == pytest.approx(240.0)
+    assert row["block_count"] == 5
+    assert detail["urban_population"].sum() == pytest.approx(180.0)
+
+
 @pytest.mark.parametrize(
     "key",
     list(DETAIL_EXPECTATIONS),

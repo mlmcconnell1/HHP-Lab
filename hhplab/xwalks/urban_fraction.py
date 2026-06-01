@@ -130,16 +130,10 @@ def build_coc_urban_fraction_intersections(
         return _empty_intersections()
 
     block_classification = _classify_blocks(blocks, urban_areas)
-    intersections = _intersect_coc_blocks(coc, blocks)
-    intersections = intersections.loc[~intersections.geometry.is_empty].copy()
+    intersections = _allocate_coc_blocks(coc, blocks)
     if intersections.empty:
         return _empty_intersections()
 
-    intersections["intersection_area"] = intersections.geometry.area
-    intersections = intersections.loc[intersections["intersection_area"] > 0].copy()
-    intersections["allocation_share"] = (
-        intersections["intersection_area"] / intersections["block_area"]
-    )
     intersections["total_population"] = pd.to_numeric(
         intersections["total_population"],
         errors="coerce",
@@ -157,7 +151,7 @@ def build_coc_urban_fraction_intersections(
         intersections["total_population"].notna(),
         0.0,
     )
-    return pd.DataFrame(intersections.drop(columns=["geometry"]))
+    return pd.DataFrame(intersections)
 
 
 def summarize_coc_urban_fraction_intersections(
@@ -194,21 +188,84 @@ def summarize_coc_urban_fraction_intersections(
     return summary, detail
 
 
-def _intersect_coc_blocks(
+def _allocate_coc_blocks(
     coc: gpd.GeoDataFrame,
     blocks: gpd.GeoDataFrame,
-) -> gpd.GeoDataFrame:
-    """Intersect only CoC/block candidate pairs returned by the block spatial index."""
+) -> pd.DataFrame:
+    """Allocate blocks to CoCs, intersecting only boundary-crossing candidate pairs."""
     query = blocks.sindex.query(coc.geometry, predicate="intersects")
     if query.size == 0:
-        return gpd.GeoDataFrame(
-            columns=["coc_id", "block_geoid", "total_population", "block_area", "geometry"],
-            geometry="geometry",
-            crs=coc.crs,
-        )
+        return _empty_allocations()
 
     coc_positions = query[0]
     block_positions = query[1]
+    covered_query = blocks.sindex.query(coc.geometry, predicate="covers")
+    fully_covered_pairs = _single_covered_pairs(covered_query)
+
+    full_mask = pd.Series(
+        [
+            (int(coc_position), int(block_position)) in fully_covered_pairs
+            for coc_position, block_position in zip(coc_positions, block_positions, strict=True)
+        ]
+    ).to_numpy()
+    parts: list[pd.DataFrame] = []
+    if full_mask.any():
+        full_coc_positions = coc_positions[full_mask]
+        full_block_positions = block_positions[full_mask]
+        parts.append(
+            pd.DataFrame(
+                {
+                    "coc_id": coc["coc_id"].iloc[full_coc_positions].to_numpy(),
+                    "block_geoid": blocks["block_geoid"].iloc[full_block_positions].to_numpy(),
+                    "total_population": blocks["total_population"]
+                    .iloc[full_block_positions]
+                    .to_numpy(),
+                    "block_area": blocks["block_area"].iloc[full_block_positions].to_numpy(),
+                    "intersection_area": blocks["block_area"]
+                    .iloc[full_block_positions]
+                    .to_numpy(),
+                    "allocation_share": 1.0,
+                }
+            )
+        )
+
+    partial_mask = ~full_mask
+    if partial_mask.any():
+        partial = _intersect_coc_block_pairs(
+            coc,
+            blocks,
+            coc_positions=coc_positions[partial_mask],
+            block_positions=block_positions[partial_mask],
+        )
+        if not partial.empty:
+            parts.append(partial)
+
+    if not parts:
+        return _empty_allocations()
+    return pd.concat(parts, ignore_index=True)
+
+
+def _single_covered_pairs(query: object) -> set[tuple[int, int]]:
+    if getattr(query, "size", 0) == 0:
+        return set()
+    coc_positions = query[0]
+    block_positions = query[1]
+    counts = pd.Series(block_positions).value_counts()
+    single_blocks = set(counts.loc[counts == 1].index.astype(int))
+    return {
+        (int(coc_position), int(block_position))
+        for coc_position, block_position in zip(coc_positions, block_positions, strict=True)
+        if int(block_position) in single_blocks
+    }
+
+
+def _intersect_coc_block_pairs(
+    coc: gpd.GeoDataFrame,
+    blocks: gpd.GeoDataFrame,
+    *,
+    coc_positions: object,
+    block_positions: object,
+) -> pd.DataFrame:
     left = coc[["coc_id", "geometry"]].iloc[coc_positions].reset_index(drop=True)
     right = (
         blocks[["block_geoid", "total_population", "block_area", "geometry"]]
@@ -218,7 +275,7 @@ def _intersect_coc_blocks(
     left_geometry = gpd.GeoSeries(left.geometry, crs=coc.crs)
     right_geometry = gpd.GeoSeries(right.geometry, crs=blocks.crs)
     intersections = left_geometry.intersection(right_geometry, align=False)
-    return gpd.GeoDataFrame(
+    allocated = gpd.GeoDataFrame(
         {
             "coc_id": left["coc_id"].to_numpy(),
             "block_geoid": right["block_geoid"].to_numpy(),
@@ -227,6 +284,26 @@ def _intersect_coc_blocks(
         },
         geometry=intersections,
         crs=coc.crs,
+    )
+    allocated = allocated.loc[~allocated.geometry.is_empty].copy()
+    if allocated.empty:
+        return _empty_allocations()
+    allocated["intersection_area"] = allocated.geometry.area
+    allocated = allocated.loc[allocated["intersection_area"] > 0].copy()
+    allocated["allocation_share"] = allocated["intersection_area"] / allocated["block_area"]
+    return pd.DataFrame(allocated.drop(columns=["geometry"]))
+
+
+def _empty_allocations() -> pd.DataFrame:
+    return pd.DataFrame(
+        columns=[
+            "coc_id",
+            "block_geoid",
+            "total_population",
+            "block_area",
+            "intersection_area",
+            "allocation_share",
+        ]
     )
 
 
@@ -274,7 +351,9 @@ def _summarize_urban_area_detail(intersections: pd.DataFrame, **metadata: object
             {
                 "coc_id": coc_id,
                 "urban_area_geoid": urban_area_geoid,
-                "urban_area_name": urban_area_names.iloc[0] if not urban_area_names.empty else pd.NA,
+                "urban_area_name": (
+                    urban_area_names.iloc[0] if not urban_area_names.empty else pd.NA
+                ),
                 **metadata,
                 "total_population": urban_population,
                 "urban_population": urban_population,
