@@ -3081,6 +3081,7 @@ def _msa_coc_coverage_recipe() -> dict:
                     "acs5_population_vintage": 2023,
                     "acs5_population_reference_year": 2023,
                     "tract_vintage": 2020,
+                    "min_coc_area_containment_share": 0.5,
                     "csv_sidecar": True,
                 },
             }
@@ -3195,6 +3196,7 @@ class TestMsaCocCoverageSpec:
         assert spec.acs5_population_vintage == 2023
         assert spec.acs5_population_reference_year == 2023
         assert spec.tract_vintage == 2020
+        assert spec.min_coc_area_containment_share == 0.5
         assert spec.csv_sidecar is True
 
     def test_population_basis_requires_acs5_denominator_fields(self):
@@ -7438,6 +7440,7 @@ class TestRecipePlanCmd:
             "population",
         ]
         assert artifacts["msa_coc_coverage_parameters"]["acs5_population_vintage"] == 2023
+        assert artifacts["msa_coc_coverage_parameters"]["min_coc_area_containment_share"] == 0.5
 
     def test_plan_json_shows_resolved_paths(
         self,

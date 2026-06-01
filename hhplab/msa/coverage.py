@@ -42,6 +42,7 @@ def build_msa_coc_coverage(
     ranking_population_column: str = "population",
     min_msa_area_coverage_share: float | None = None,
     min_msa_population_coverage_share: float | None = None,
+    min_coc_area_containment_share: float | None = None,
     allow_incomplete_population_denominators: bool = False,
 ) -> pd.DataFrame:
     """Build area and population overlap coverage for top-N MSAs.
@@ -93,6 +94,7 @@ def build_msa_coc_coverage(
                 county_vintage=county_vintage,
                 definition_version=definition_version,
                 min_msa_coverage_share=min_msa_area_coverage_share,
+                min_coc_containment_share=min_coc_area_containment_share,
             )
         )
     if "population" in bases:
@@ -113,6 +115,7 @@ def build_msa_coc_coverage(
                 acs5_population_vintage=acs5_population_vintage,
                 population_column=population_column,
                 min_msa_coverage_share=min_msa_population_coverage_share,
+                min_coc_containment_share=None,
                 allow_incomplete_population_denominators=allow_incomplete_population_denominators,
             )
         )
@@ -304,6 +307,7 @@ def _area_coverage_rows(
     county_vintage: str,
     definition_version: str,
     min_msa_coverage_share: float | None,
+    min_coc_containment_share: float | None,
 ) -> pd.DataFrame:
     if pair_geometries.empty:
         return _empty_coverage()
@@ -325,6 +329,7 @@ def _area_coverage_rows(
         county_vintage=county_vintage,
         definition_version=definition_version,
         min_msa_coverage_share=min_msa_coverage_share,
+        min_coc_containment_share=min_coc_containment_share,
     )
 
 
@@ -345,6 +350,7 @@ def _population_coverage_rows(
     acs5_population_vintage: int | str | None,
     population_column: str,
     min_msa_coverage_share: float | None,
+    min_coc_containment_share: float | None,
     allow_incomplete_population_denominators: bool,
 ) -> pd.DataFrame:
     if pair_geometries.empty:
@@ -401,6 +407,7 @@ def _population_coverage_rows(
         county_vintage=county_vintage,
         definition_version=definition_version,
         min_msa_coverage_share=min_msa_coverage_share,
+        min_coc_containment_share=min_coc_containment_share,
     )
 
 
@@ -491,6 +498,7 @@ def _finalize_rows(
     county_vintage: str,
     definition_version: str,
     min_msa_coverage_share: float | None,
+    min_coc_containment_share: float | None,
 ) -> pd.DataFrame:
     if rows.empty:
         return _empty_coverage()
@@ -505,6 +513,10 @@ def _finalize_rows(
     )
     if min_msa_coverage_share is not None:
         rows = rows[rows["msa_covered_by_coc_percent"] >= min_msa_coverage_share * 100].copy()
+    if min_coc_containment_share is not None:
+        rows = rows[
+            rows["coc_contained_in_msa_percent"] >= min_coc_containment_share * 100
+        ].copy()
     rows["year"] = int(year)
     rows["boundary_vintage"] = str(boundary_vintage)
     rows["county_vintage"] = str(county_vintage)

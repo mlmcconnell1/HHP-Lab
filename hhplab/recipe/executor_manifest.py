@@ -434,6 +434,7 @@ def resolve_pipeline_artifacts(
                 "tract_vintage": spec.tract_vintage,
                 "min_msa_area_coverage_share": spec.min_msa_area_coverage_share,
                 "min_msa_population_coverage_share": spec.min_msa_population_coverage_share,
+                "min_coc_area_containment_share": spec.min_coc_area_containment_share,
                 "csv_sidecar": spec.csv_sidecar,
             }
 

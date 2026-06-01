@@ -177,6 +177,17 @@ def test_basis_specific_thresholds(
     assert observed == expected_pairs
 
 
+def test_coc_area_containment_threshold_filters_area_rows() -> None:
+    coverage = _build_coverage(
+        overlap_bases=("area",),
+        min_coc_area_containment_share=0.75,
+    )
+
+    observed = set(zip(coverage["msa_id"], coverage["coc_id"], strict=True))
+    assert observed == {("35620", "CO-100")}
+    assert coverage["coc_contained_in_msa_percent"].tolist() == pytest.approx([100.0])
+
+
 def test_population_overlap_requires_complete_acs5_denominators() -> None:
     incomplete = _acs5_population_df().iloc[:-1].copy()
 

@@ -692,6 +692,12 @@ class MsaCocCoverageSpec(BaseModel):
         le=1.0,
         description="Inclusive minimum MSA population coverage share for population rows.",
     )
+    min_coc_area_containment_share: float | None = Field(
+        default=None,
+        ge=0.0,
+        le=1.0,
+        description="Inclusive minimum CoC area containment share for area rows.",
+    )
     csv_sidecar: bool = Field(
         default=False,
         description="Also write a CSV sidecar next to the Parquet output.",

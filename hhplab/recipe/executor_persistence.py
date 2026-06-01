@@ -553,6 +553,7 @@ def persist_msa_coc_coverage(
             ranking_population_column=ranking_column,
             min_msa_area_coverage_share=spec.min_msa_area_coverage_share,
             min_msa_population_coverage_share=spec.min_msa_population_coverage_share,
+            min_coc_area_containment_share=spec.min_coc_area_containment_share,
         )
     except (ExecutorError, FileNotFoundError, ValueError, KeyError) as exc:
         return StepResult(
