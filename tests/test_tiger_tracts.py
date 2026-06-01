@@ -347,6 +347,33 @@ def test_stream_state_block_parts_writes_one_part_per_state(monkeypatch, tmp_pat
     assert gpd.read_parquet(_state_part_path(parts_dir, "01")).loc[0, "state_fips"] == "01"
 
 
+def test_stream_state_block_parts_errors_when_all_states_are_missing(
+    monkeypatch,
+    tmp_path,
+) -> None:
+    """All-missing state downloads fail instead of assembling an empty artifact."""
+    calls: list[str] = []
+
+    def fake_fetch_or_load_state_blocks(client, *, year, state_fips, tmpdir, raw_root, force):
+        calls.append(state_fips)
+        return None, None, None
+
+    monkeypatch.setattr(
+        "hhplab.census.ingest.tiger_blocks._fetch_or_load_state_blocks",
+        fake_fetch_or_load_state_blocks,
+    )
+
+    with pytest.raises(ValueError, match="No Census tabulation block geometry rows fetched"):
+        _stream_state_block_parts(
+            2020,
+            parts_dir=_block_geometry_parts_dir(2020, tmp_path),
+            state_fips_codes=("01", "02"),
+            raw_root=tmp_path / "raw",
+        )
+
+    assert calls == ["01", "02"]
+
+
 def test_download_state_blocks_retries_transient_http_errors(monkeypatch, tmp_path) -> None:
     """Transient TIGER download failures are retried before aborting a state."""
     attempts = 0
