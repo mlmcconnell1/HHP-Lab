@@ -46,6 +46,24 @@ class TestTigerIngestCommand:
         mock_tracts.assert_not_called()
         mock_counties.assert_not_called()
 
+    def test_ingest_tiger_all_warns_when_skipping_non_2020_blocks(self, tmp_path):
+        """Type all tells users when block geometry is skipped for unsupported years."""
+        with runner.isolated_filesystem(temp_dir=tmp_path):
+            tracts_path = Path("data/curated/tiger/tracts__T2022.parquet")
+            counties_path = Path("data/curated/tiger/counties__C2022.parquet")
+            tracts_path.parent.mkdir(parents=True, exist_ok=True)
+            tracts_path.touch()
+            counties_path.touch()
+
+            result = runner.invoke(app, ["ingest", "tiger", "--year", "2022", "--type", "all"])
+
+        assert result.exit_code == 0
+        assert (
+            "Note: block geometry is only available for 2020; skipping blocks for year 2022."
+            in result.output
+        )
+        assert "Downloading TIGER tabulation blocks" not in result.output
+
 
 class TestBuildXwalksCommand:
     """Tests for the generate xwalks CLI command."""

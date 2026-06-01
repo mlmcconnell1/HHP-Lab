@@ -75,6 +75,10 @@ def ingest_tiger(
     download_counties = type_ in ("counties", "all")
     download_blocks = type_ == "blocks" or (type_ == "all" and year == 2020)
     download_urban_areas = type_ == "urban-areas"
+    if type_ == "all" and year != 2020:
+        typer.echo(
+            f"Note: block geometry is only available for 2020; skipping blocks for year {year}."
+        )
 
     # Define output paths using canonical naming helpers
     tracts_path = curated_dir("tiger") / tract_filename(year)
