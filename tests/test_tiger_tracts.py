@@ -189,6 +189,24 @@ def test_normalize_block_geometry_accepts_2020_schema() -> None:
     assert result.loc[0, "block_vintage"] == 2020
 
 
+def test_normalize_block_geometry_rejects_unsupported_vintage() -> None:
+    """Unsupported block vintages fail with an actionable message."""
+    source = gpd.GeoDataFrame(
+        {
+            "GEOID20": ["510010901011234"],
+            "STATEFP20": ["51"],
+            "COUNTYFP20": ["001"],
+            "TRACTCE20": ["090101"],
+            "geometry": [Point(1, 1)],
+        },
+        geometry="geometry",
+        crs="EPSG:4326",
+    )
+
+    with pytest.raises(ValueError, match="Unsupported block geometry vintage"):
+        normalize_block_geometry(source, 2010)
+
+
 def test_save_urban_areas_writes_geoparquet_with_provenance(tmp_path) -> None:
     """Saved Urban Area artifacts keep GeoParquet geometry and HHP provenance metadata."""
     gdf = gpd.GeoDataFrame(
