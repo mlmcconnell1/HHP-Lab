@@ -548,6 +548,27 @@ def test_ingest_urban_areas_cli_cached_json(monkeypatch, tmp_path) -> None:
     assert '"urban_area_count": 1' in result.output
 
 
+def test_ingest_urban_areas_cli_cached_json_uses_parquet_metadata(
+    monkeypatch,
+    tmp_path,
+) -> None:
+    """Cached Urban Area row counts come from metadata, not full GeoDataFrame reads."""
+    cached_path = get_urban_area_output_path(2020, tmp_path)
+    cached_path.parent.mkdir(parents=True, exist_ok=True)
+    cached_path.touch()
+    monkeypatch.setattr(
+        "hhplab.cli.ingest_census.get_urban_area_output_path",
+        lambda year: cached_path,
+    )
+    monkeypatch.setattr("hhplab.cli.ingest_census._parquet_row_count", lambda path: 7)
+
+    result = runner.invoke(app, ["ingest", "urban-areas", "--year", "2020", "--json"])
+
+    assert result.exit_code == 0
+    assert '"cached": true' in result.output
+    assert '"urban_area_count": 7' in result.output
+
+
 def test_ingest_block_geometry_cli_cached_json(monkeypatch, tmp_path) -> None:
     """Cached block geometry CLI runs emit machine-readable JSON."""
     cached_path = get_block_geometry_output_path(2020, tmp_path)
@@ -613,6 +634,31 @@ def test_ingest_urban_areas_cli_fresh_json(monkeypatch, tmp_path) -> None:
     assert result.exit_code == 0
     assert '"cached": false' in result.output
     assert '"urban_area_vintage": 2010' in result.output
+
+
+def test_ingest_urban_areas_cli_fresh_json_uses_parquet_metadata(
+    monkeypatch,
+    tmp_path,
+) -> None:
+    """Fresh Urban Area row counts come from metadata after ingest returns a path."""
+    output_path = get_urban_area_output_path(2010, tmp_path)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    output_path.touch()
+    monkeypatch.setattr(
+        "hhplab.cli.ingest_census.get_urban_area_output_path",
+        lambda year: tmp_path / "missing.parquet",
+    )
+    monkeypatch.setattr(
+        "hhplab.census.ingest.urban_areas.ingest_urban_areas",
+        lambda year, force=False: output_path,
+    )
+    monkeypatch.setattr("hhplab.cli.ingest_census._parquet_row_count", lambda path: 9)
+
+    result = runner.invoke(app, ["ingest", "urban-areas", "--year", "2010", "--json"])
+
+    assert result.exit_code == 0
+    assert '"cached": false' in result.output
+    assert '"urban_area_count": 9' in result.output
 
 
 def test_ingest_block_geometry_cli_fresh_json(monkeypatch, tmp_path) -> None:

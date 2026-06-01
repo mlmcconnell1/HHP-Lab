@@ -3,7 +3,6 @@
 import json
 from typing import Annotated
 
-import geopandas as gpd
 import pyarrow.parquet as pq
 import typer
 
@@ -284,7 +283,7 @@ def ingest_urban_areas_cmd(
 
     output_path = get_urban_area_output_path(year)
     if output_path.exists() and not force:
-        gdf = gpd.read_parquet(output_path)
+        urban_area_count = _parquet_row_count(output_path)
         if output_json:
             typer.echo(
                 json.dumps(
@@ -293,13 +292,13 @@ def ingest_urban_areas_cmd(
                         "cached": True,
                         "urban_area_vintage": year,
                         "output_path": str(output_path),
-                        "urban_area_count": int(len(gdf)),
+                        "urban_area_count": urban_area_count,
                     }
                 )
             )
             return
         typer.echo(f"Cached file found: {output_path}")
-        typer.echo(f"Urban Areas: {len(gdf):,}")
+        typer.echo(f"Urban Areas: {urban_area_count:,}")
         typer.echo("Use --force to re-ingest.")
         return
 
@@ -309,7 +308,7 @@ def ingest_urban_areas_cmd(
         typer.echo(f"Error: {exc}", err=True)
         raise typer.Exit(1) from exc
 
-    gdf = gpd.read_parquet(path)
+    urban_area_count = _parquet_row_count(path)
     if output_json:
         typer.echo(
             json.dumps(
@@ -318,7 +317,7 @@ def ingest_urban_areas_cmd(
                     "cached": False,
                     "urban_area_vintage": year,
                     "output_path": str(path),
-                    "urban_area_count": int(len(gdf)),
+                    "urban_area_count": urban_area_count,
                 }
             )
         )
@@ -326,4 +325,4 @@ def ingest_urban_areas_cmd(
 
     typer.echo("Ingested Census Urban Area geometry.")
     typer.echo(f"Output file: {path}")
-    typer.echo(f"Urban Areas: {len(gdf):,}")
+    typer.echo(f"Urban Areas: {urban_area_count:,}")
