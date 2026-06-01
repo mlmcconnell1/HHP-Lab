@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import time
 from pathlib import Path
 from typing import Annotated
 
@@ -366,6 +367,7 @@ def _build_coc_urban_fraction_chunked(
                 f"{index}/{total_chunks}: state_fips={state_fips}, "
                 f"cocs={len(state_coc)}"
             )
+        started_at = time.perf_counter()
         block_gdf = _load_block_inputs_for_state(
             pl_blocks_path,
             block_geometry_path,
@@ -385,7 +387,11 @@ def _build_coc_urban_fraction_chunked(
         summary_parts.append(summary)
         detail_parts.append(detail)
         if progress:
-            typer.echo(f"  Completed {len(summary):,} CoC summary row(s).")
+            elapsed_seconds = time.perf_counter() - started_at
+            typer.echo(
+                f"  Completed {len(summary):,} CoC summary row(s) "
+                f"in {elapsed_seconds:.1f}s."
+            )
 
     summary = _concat_or_empty(summary_parts, COC_URBAN_FRACTION_COLUMNS)
     detail = _concat_or_empty(detail_parts, COC_URBAN_AREA_DETAIL_COLUMNS)

@@ -177,6 +177,24 @@ def test_build_coc_urban_fraction_matches_truth_table(coc_id: str) -> None:
     assert row["classification_method"] == "block_representative_point_in_urban_area"
 
 
+def test_build_coc_urban_fraction_uses_spatial_index_candidate_pairs(monkeypatch) -> None:
+    """Block/CoC intersections should not route through full GeoPandas overlay."""
+    from hhplab.xwalks import urban_fraction
+
+    monkeypatch.setattr(
+        urban_fraction.gpd,
+        "overlay",
+        lambda *_args, **_kwargs: pytest.fail("build should not call gpd.overlay"),
+    )
+
+    summary, detail = build_fixture_outputs()
+
+    assert summary["coc_id"].tolist() == ["A", "B", "C", "D"]
+    assert detail.set_index(["coc_id", "urban_area_geoid"]).loc[("A", "UA1")][
+        "urban_population"
+    ] == pytest.approx(100.0)
+
+
 @pytest.mark.parametrize(
     "key",
     list(DETAIL_EXPECTATIONS),

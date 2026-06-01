@@ -104,12 +104,7 @@ def build_coc_urban_fraction(
         return _empty_summary(), _empty_detail()
 
     block_classification = _classify_blocks(blocks, urban_areas)
-    intersections = gpd.overlay(
-        coc,
-        blocks[["block_geoid", "total_population", "block_area", "geometry"]],
-        how="intersection",
-        keep_geom_type=False,
-    )
+    intersections = _intersect_coc_blocks(coc, blocks)
     intersections = intersections.loc[~intersections.geometry.is_empty].copy()
     if intersections.empty:
         return _empty_summary(), _empty_detail()
@@ -158,6 +153,42 @@ def build_coc_urban_fraction(
         classification_method=classification_method,
     )
     return summary, detail
+
+
+def _intersect_coc_blocks(
+    coc: gpd.GeoDataFrame,
+    blocks: gpd.GeoDataFrame,
+) -> gpd.GeoDataFrame:
+    """Intersect only CoC/block candidate pairs returned by the block spatial index."""
+    query = blocks.sindex.query(coc.geometry, predicate="intersects")
+    if query.size == 0:
+        return gpd.GeoDataFrame(
+            columns=["coc_id", "block_geoid", "total_population", "block_area", "geometry"],
+            geometry="geometry",
+            crs=coc.crs,
+        )
+
+    coc_positions = query[0]
+    block_positions = query[1]
+    left = coc[["coc_id", "geometry"]].iloc[coc_positions].reset_index(drop=True)
+    right = (
+        blocks[["block_geoid", "total_population", "block_area", "geometry"]]
+        .iloc[block_positions]
+        .reset_index(drop=True)
+    )
+    left_geometry = gpd.GeoSeries(left.geometry, crs=coc.crs)
+    right_geometry = gpd.GeoSeries(right.geometry, crs=blocks.crs)
+    intersections = left_geometry.intersection(right_geometry, align=False)
+    return gpd.GeoDataFrame(
+        {
+            "coc_id": left["coc_id"].to_numpy(),
+            "block_geoid": right["block_geoid"].to_numpy(),
+            "total_population": right["total_population"].to_numpy(),
+            "block_area": right["block_area"].to_numpy(),
+        },
+        geometry=intersections,
+        crs=coc.crs,
+    )
 
 
 def _summarize_intersections(intersections: pd.DataFrame, **metadata: object) -> pd.DataFrame:
