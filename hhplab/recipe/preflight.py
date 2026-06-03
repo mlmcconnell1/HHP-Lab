@@ -37,6 +37,7 @@ from hhplab.naming import (
     county_path,
     metro_boundaries_path,
     msa_boundaries_path,
+    msa_coc_xwalk_path,
     msa_county_membership_path,
     msa_definitions_path,
     tract_path,
@@ -115,6 +116,7 @@ class FindingKind(str, enum.Enum):
     MISSING_MAP_ARTIFACT = "missing_map_artifact"
     MISSING_CONTAINMENT_ARTIFACT = "missing_containment_artifact"
     MISSING_MSA_COC_COVERAGE_ARTIFACT = "missing_msa_coc_coverage_artifact"
+    MISSING_PRIMARY_MSA_ARTIFACT = "missing_primary_msa_artifact"
     CONTAINMENT_SELECTOR = "containment_selector"
     TARGET_SELECTOR = "target_selector"
 
@@ -1330,6 +1332,209 @@ def _check_msa_coc_coverage_artifacts(
             )
 
     return findings
+
+
+def _check_primary_msa_artifacts(
+    recipe: RecipeV1,
+    project_root: Path,
+) -> list[PreflightFinding]:
+    """Check CoC panel primary-MSA annotation prerequisites."""
+    findings: list[PreflightFinding] = []
+    data_root = load_config(project_root=project_root).asset_store_root
+
+    for target in recipe.targets:
+        policy = target.panel_policy
+        spec = policy.primary_msa if policy is not None else None
+        if "panel" not in target.outputs or spec is None:
+            continue
+
+        boundary_vintage = target.geometry.vintage
+        if boundary_vintage is None:
+            findings.append(
+                PreflightFinding(
+                    severity=Severity.ERROR,
+                    kind=FindingKind.MISSING_PRIMARY_MSA_ARTIFACT,
+                    message=(
+                        f"Target '{target.id}' panel_policy.primary_msa requires "
+                        "target.geometry.vintage so CoC boundary artifacts can be resolved."
+                    ),
+                    geometry="coc",
+                    remediation=Remediation(
+                        hint=(
+                            "Set target.geometry.vintage to the CoC boundary vintage used "
+                            "for primary-MSA annotation."
+                        ),
+                    ),
+                )
+            )
+            continue
+
+        artifact_paths: dict[
+            str,
+            tuple[Path, str, str, str | None, str, tuple[tuple[str, ...], ...]],
+        ] = {
+            "CoC boundary artifact": (
+                coc_base_path(str(boundary_vintage), data_root),
+                "coc",
+                str(boundary_vintage),
+                None,
+                "hhplab ingest boundaries --source hud_exchange "
+                f"--vintage {boundary_vintage}",
+                (("coc_id", "geo_id"),),
+            ),
+            "county geometry artifact": (
+                county_path(spec.county_vintage, data_root),
+                "county",
+                str(spec.county_vintage),
+                None,
+                f"hhplab ingest tiger --year {spec.county_vintage} --type counties",
+                (("GEOID", "geoid", "county_fips"),),
+            ),
+            "MSA definitions artifact": (
+                msa_definitions_path(spec.definition_version, data_root),
+                "msa",
+                str(spec.county_vintage),
+                spec.definition_version,
+                f"hhplab generate msa --definition-version {spec.definition_version}",
+                (("msa_id",), ("msa_name",)),
+            ),
+            "MSA county membership artifact": (
+                msa_county_membership_path(spec.definition_version, data_root),
+                "msa",
+                str(spec.county_vintage),
+                spec.definition_version,
+                f"hhplab generate msa --definition-version {spec.definition_version}",
+                (("msa_id",), ("county_fips",)),
+            ),
+            "CoC-to-MSA crosswalk artifact": (
+                msa_coc_xwalk_path(
+                    str(boundary_vintage),
+                    spec.definition_version,
+                    spec.county_vintage,
+                    data_root,
+                ),
+                "msa",
+                str(spec.county_vintage),
+                spec.definition_version,
+                "hhplab generate msa-xwalk "
+                f"--boundary {boundary_vintage} "
+                f"--definition-version {spec.definition_version} "
+                f"--counties {spec.county_vintage}",
+                (("coc_id",), ("msa_id",), ("allocation_share",)),
+            ),
+        }
+
+        if spec.overlap_basis == "population":
+            if spec.tract_vintage is not None:
+                artifact_paths["tract geometry artifact"] = (
+                    tract_path(spec.tract_vintage, data_root),
+                    "tract",
+                    str(spec.tract_vintage),
+                    None,
+                    f"hhplab ingest tiger --year {spec.tract_vintage} --type tracts",
+                    (("GEOID", "geoid", "tract_geoid"),),
+                )
+            if spec.acs5_population_vintage is not None and spec.tract_vintage is not None:
+                artifact_paths["ACS5 tract population artifact"] = (
+                    data_root
+                    / "curated"
+                    / "acs"
+                    / acs5_tracts_filename(
+                        str(spec.acs5_population_vintage),
+                        spec.tract_vintage,
+                    ),
+                    "tract",
+                    str(spec.tract_vintage),
+                    None,
+                    "hhplab ingest acs5-tract "
+                    f"--acs {spec.acs5_population_vintage} "
+                    f"--tracts {spec.tract_vintage}",
+                    (("GEOID", "tract_geoid"), ("total_population",)),
+                )
+
+        for label, (path, geo_type, _vintage, _definition_version, command, required) in sorted(
+            artifact_paths.items()
+        ):
+            if not path.exists():
+                findings.append(
+                    PreflightFinding(
+                        severity=Severity.ERROR,
+                        kind=FindingKind.MISSING_PRIMARY_MSA_ARTIFACT,
+                        message=(
+                            f"Target '{target.id}' panel_policy.primary_msa requires "
+                            f"missing {label}: {path}"
+                        ),
+                        geometry=geo_type,
+                        remediation=Remediation(
+                            hint=(
+                                f"Build or ingest the {label} for primary-MSA "
+                                f"annotations on target '{target.id}'."
+                            ),
+                            command=command,
+                        ),
+                    )
+                )
+                continue
+            findings.extend(
+                _check_primary_msa_artifact_columns(
+                    target_id=target.id,
+                    label=label,
+                    path=path,
+                    required_column_groups=required,
+                    geometry=geo_type,
+                )
+            )
+
+    return findings
+
+
+def _check_primary_msa_artifact_columns(
+    *,
+    target_id: str,
+    label: str,
+    path: Path,
+    required_column_groups: tuple[tuple[str, ...], ...],
+    geometry: str,
+) -> list[PreflightFinding]:
+    try:
+        columns = set(pq.read_schema(path).names)
+    except (FileNotFoundError, OSError, ValueError) as exc:
+        return [
+            PreflightFinding(
+                severity=Severity.ERROR,
+                kind=FindingKind.SCHEMA_UNREADABLE,
+                message=(
+                    f"Target '{target_id}' panel_policy.primary_msa could not read "
+                    f"{label} schema at {path}: {exc}"
+                ),
+                geometry=geometry,
+            )
+        ]
+
+    missing = [
+        " or ".join(group)
+        for group in required_column_groups
+        if not any(column in columns for column in group)
+    ]
+    if not missing:
+        return []
+    return [
+        PreflightFinding(
+            severity=Severity.ERROR,
+            kind=FindingKind.MISSING_COLUMN,
+            message=(
+                f"Target '{target_id}' panel_policy.primary_msa requires {label} "
+                f"columns {missing}. Available columns: {sorted(columns)}"
+            ),
+            geometry=geometry,
+            remediation=Remediation(
+                hint=(
+                    f"Rebuild the {label} so it satisfies the primary-MSA annotation "
+                    "schema contract."
+                ),
+            ),
+        )
+    ]
 
 
 def _check_target_selectors(
@@ -2945,6 +3150,7 @@ def run_preflight(
     report.findings.extend(_check_map_artifacts(recipe, project_root))
     report.findings.extend(_check_containment_artifacts(recipe, project_root))
     report.findings.extend(_check_msa_coc_coverage_artifacts(recipe, project_root))
+    report.findings.extend(_check_primary_msa_artifacts(recipe, project_root))
     report.findings.extend(_check_target_selectors(recipe, project_root))
 
     # 2. Resolve plans and collect tasks (before path checks so we

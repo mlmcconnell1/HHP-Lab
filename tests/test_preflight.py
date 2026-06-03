@@ -781,6 +781,7 @@ def _setup_msa_coc_panel_source_artifacts(
     include_laus: bool = False,
 ) -> None:
     data_dir = tmp_path / "data"
+    data_dir.mkdir(parents=True, exist_ok=True)
     pd.DataFrame({"coc_id": ["COC1"], "year": [2020], "pit_total": [10]}).to_parquet(
         data_dir / "pit.parquet"
     )
@@ -815,7 +816,202 @@ def _setup_msa_coc_panel_source_artifacts(
         ).to_parquet(data_dir / "laus.parquet")
 
 
+def _primary_msa_preflight_recipe(*, overlap_basis: str = "area") -> dict:
+    policy: dict[str, object] = {
+        "definition_version": "census_msa_2023",
+        "county_vintage": 2023,
+        "overlap_basis": overlap_basis,
+    }
+    if overlap_basis == "population":
+        policy["acs5_population_vintage"] = 2023
+        policy["tract_vintage"] = 2020
+    return {
+        "version": 1,
+        "name": "primary-msa-preflight",
+        "universe": {"years": [2020]},
+        "targets": [
+            {
+                "id": "coc_panel",
+                "geometry": {"type": "coc", "vintage": 2025},
+                "outputs": ["panel"],
+                "panel_policy": {"primary_msa": policy},
+            }
+        ],
+        "datasets": {
+            "pit": {
+                "provider": "hud",
+                "product": "pit",
+                "version": 1,
+                "native_geometry": {"type": "coc"},
+                "path": "data/pit.parquet",
+                "years": {"years": [2020]},
+                "geo_column": "coc_id",
+            },
+        },
+        "transforms": [],
+        "pipelines": [
+            {
+                "id": "main",
+                "target": "coc_panel",
+                "steps": [
+                    {
+                        "resample": {
+                            "dataset": "pit",
+                            "to_geometry": {"type": "coc", "vintage": 2025},
+                            "method": "identity",
+                            "measures": ["pit_total"],
+                        }
+                    },
+                    {"join": {"datasets": ["pit"], "join_on": ["geo_id", "year"]}},
+                ],
+            }
+        ],
+    }
+
+
+def _setup_primary_msa_preflight_artifacts(
+    tmp_path: Path,
+    *,
+    include_crosswalk: bool = True,
+    crosswalk_complete: bool = True,
+    include_population: bool = False,
+) -> None:
+    data_dir = tmp_path / "data"
+    data_dir.mkdir(parents=True, exist_ok=True)
+    pd.DataFrame({"coc_id": ["COC1"], "year": [2020], "pit_total": [10]}).to_parquet(
+        data_dir / "pit.parquet"
+    )
+    _setup_containment_artifacts(tmp_path, ("msa", "coc"))
+
+    msa_dir = data_dir / "curated" / "msa"
+    pd.DataFrame(
+        {
+            "msa_id": ["19740"],
+            "cbsa_code": ["19740"],
+            "msa_name": ["Denver-Aurora-Centennial, CO"],
+        }
+    ).to_parquet(msa_dir / "msa_definitions__census_msa_2023.parquet")
+
+    if include_crosswalk:
+        xwalk_dir = data_dir / "curated" / "xwalks"
+        xwalk_dir.mkdir(parents=True, exist_ok=True)
+        crosswalk = pd.DataFrame(
+            {
+                "coc_id": ["COC1"],
+                "msa_id": ["19740"],
+                "cbsa_code": ["19740"],
+                "allocation_share": [1.0],
+            }
+        )
+        if not crosswalk_complete:
+            crosswalk = crosswalk.drop(columns=["allocation_share"])
+        crosswalk.to_parquet(
+            xwalk_dir / "msa_coc_xwalk__B2025xMcensus_msa_2023xC2023.parquet"
+        )
+
+    if include_population:
+        tiger_dir = data_dir / "curated" / "tiger"
+        pd.DataFrame({"GEOID": ["08031000100"]}).to_parquet(
+            tiger_dir / "tracts__T2020.parquet"
+        )
+        acs_dir = data_dir / "curated" / "acs"
+        acs_dir.mkdir(parents=True, exist_ok=True)
+        pd.DataFrame(
+            {
+                "GEOID": ["08031000100"],
+                "year": [2023],
+                "total_population": [100],
+            }
+        ).to_parquet(acs_dir / "acs5_tracts__A2023xT2020.parquet")
+
+
 class TestRunPreflight:
+    def test_primary_msa_preflight_reports_missing_crosswalk(self, tmp_path: Path):
+        data = _primary_msa_preflight_recipe()
+        _setup_primary_msa_preflight_artifacts(tmp_path, include_crosswalk=False)
+
+        recipe = load_recipe(data)
+        report = run_preflight(recipe, project_root=tmp_path)
+
+        findings = [
+            f
+            for f in report.findings
+            if f.kind == FindingKind.MISSING_PRIMARY_MSA_ARTIFACT
+            and "CoC-to-MSA crosswalk artifact" in f.message
+        ]
+        assert len(findings) == 1
+        assert findings[0].remediation is not None
+        assert findings[0].remediation.command == (
+            "hhplab generate msa-xwalk --boundary 2025 "
+            "--definition-version census_msa_2023 --counties 2023"
+        )
+
+    def test_primary_msa_preflight_reports_schema_incompatible_crosswalk(
+        self,
+        tmp_path: Path,
+    ):
+        data = _primary_msa_preflight_recipe()
+        _setup_primary_msa_preflight_artifacts(tmp_path, crosswalk_complete=False)
+
+        recipe = load_recipe(data)
+        report = run_preflight(recipe, project_root=tmp_path)
+
+        findings = [
+            f
+            for f in report.findings
+            if f.kind == FindingKind.MISSING_COLUMN
+            and "panel_policy.primary_msa" in f.message
+            and "CoC-to-MSA crosswalk artifact" in f.message
+        ]
+        assert len(findings) == 1
+        assert "allocation_share" in findings[0].message
+
+    def test_primary_msa_preflight_population_basis_requires_population_artifacts(
+        self,
+        tmp_path: Path,
+    ):
+        data = _primary_msa_preflight_recipe(overlap_basis="population")
+        _setup_primary_msa_preflight_artifacts(tmp_path)
+
+        recipe = load_recipe(data)
+        report = run_preflight(recipe, project_root=tmp_path)
+
+        findings = [
+            f
+            for f in report.findings
+            if f.kind == FindingKind.MISSING_PRIMARY_MSA_ARTIFACT
+            and (
+                "tract geometry artifact" in f.message
+                or "ACS5 tract population artifact" in f.message
+            )
+        ]
+        assert {finding.remediation.command for finding in findings if finding.remediation} == {
+            "hhplab ingest tiger --year 2020 --type tracts",
+            "hhplab ingest acs5-tract --acs 2023 --tracts 2020",
+        }
+
+    def test_primary_msa_preflight_ready_when_artifacts_exist(self, tmp_path: Path):
+        data = _primary_msa_preflight_recipe(overlap_basis="population")
+        _setup_primary_msa_preflight_artifacts(
+            tmp_path,
+            include_population=True,
+        )
+
+        recipe = load_recipe(data)
+        report = run_preflight(recipe, project_root=tmp_path)
+
+        primary_findings = [
+            f
+            for f in report.findings
+            if f.kind
+            in {
+                FindingKind.MISSING_PRIMARY_MSA_ARTIFACT,
+                FindingKind.MISSING_COLUMN,
+            }
+            and "primary_msa" in f.message
+        ]
+        assert primary_findings == []
+
     def test_clean_preflight(self, tmp_path: Path):
         data = _preflight_recipe(with_path=True, identity_only=True)
         _setup_preflight_fixtures(tmp_path, include_xwalk=False, include_acs=False)
