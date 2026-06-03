@@ -12,6 +12,7 @@ from hhplab.msa.coverage import (
     build_msa_coc_coverage,
     read_msa_coc_coverage,
     save_msa_coc_coverage,
+    select_primary_msa_for_cocs,
 )
 from hhplab.provenance import read_provenance
 from hhplab.xwalks.county import ALBERS_EQUAL_AREA_CRS
@@ -186,6 +187,97 @@ def test_coc_area_containment_threshold_filters_area_rows() -> None:
     observed = set(zip(coverage["msa_id"], coverage["coc_id"], strict=True))
     assert observed == {("35620", "CO-100")}
     assert coverage["coc_contained_in_msa_percent"].tolist() == pytest.approx([100.0])
+
+
+def test_select_primary_msa_area_basis_is_deterministic() -> None:
+    coverage = _build_coverage()
+
+    primary = select_primary_msa_for_cocs(coverage, overlap_basis="area")
+
+    assert list(primary.columns) == [
+        "coc_id",
+        "primary_msa_id",
+        "primary_msa_name",
+        "primary_msa_overlap_basis",
+        "primary_msa_coc_contained_percent",
+        "primary_msa_covered_by_coc_percent",
+    ]
+    assert primary["coc_id"].tolist() == ["CO-100", "CO-200"]
+    row = primary[primary["coc_id"] == "CO-200"].iloc[0]
+    assert row["primary_msa_id"] == "35620"
+    assert row["primary_msa_name"] == "Left MSA"
+    assert row["primary_msa_overlap_basis"] == "area"
+    assert row["primary_msa_coc_contained_percent"] == pytest.approx(50.0)
+    assert row["primary_msa_covered_by_coc_percent"] == pytest.approx(50.0)
+
+
+def test_select_primary_msa_population_basis_can_differ_from_area() -> None:
+    coverage = _build_coverage()
+
+    primary = select_primary_msa_for_cocs(coverage, overlap_basis="population")
+
+    row = primary[primary["coc_id"] == "CO-200"].iloc[0]
+    assert row["primary_msa_id"] == "35620"
+    assert row["primary_msa_overlap_basis"] == "population"
+    assert row["primary_msa_coc_contained_percent"] == pytest.approx(50.0)
+    assert row["primary_msa_covered_by_coc_percent"] == pytest.approx(100.0)
+
+
+def test_select_primary_msa_emits_null_rows_for_missing_overlap() -> None:
+    coverage = _build_coverage()
+
+    primary = select_primary_msa_for_cocs(
+        coverage,
+        coc_ids=("CO-100", "CO-200", "CO-999"),
+    )
+
+    row = primary[primary["coc_id"] == "CO-999"].iloc[0]
+    assert pd.isna(row["primary_msa_id"])
+    assert pd.isna(row["primary_msa_name"])
+    assert pd.isna(row["primary_msa_overlap_basis"])
+    assert pd.isna(row["primary_msa_coc_contained_percent"])
+    assert pd.isna(row["primary_msa_covered_by_coc_percent"])
+
+
+def test_select_primary_msa_threshold_nulls_below_minimum() -> None:
+    coverage = _build_coverage()
+
+    primary = select_primary_msa_for_cocs(
+        coverage,
+        coc_ids=("CO-100", "CO-200"),
+        min_coc_contained_share=0.75,
+    )
+
+    assert primary.loc[primary["coc_id"] == "CO-100", "primary_msa_id"].iloc[0] == "35620"
+    assert pd.isna(primary.loc[primary["coc_id"] == "CO-200", "primary_msa_id"].iloc[0])
+
+
+def test_select_primary_msa_accepts_area_crosswalk_shape() -> None:
+    crosswalk = pd.DataFrame(
+        {
+            "coc_id": ["CO-100", "CO-100", "CO-200"],
+            "msa_id": ["41180", "35620", "41180"],
+            "allocation_share": [0.50, 0.50, 0.25],
+        }
+    )
+
+    primary = select_primary_msa_for_cocs(
+        crosswalk,
+        coc_ids=("CO-100", "CO-200", "CO-999"),
+    )
+
+    assert primary.loc[primary["coc_id"] == "CO-100", "primary_msa_id"].iloc[0] == "35620"
+    assert primary.loc[
+        primary["coc_id"] == "CO-100",
+        "primary_msa_coc_contained_percent",
+    ].iloc[0] == pytest.approx(50.0)
+    assert pd.isna(
+        primary.loc[
+            primary["coc_id"] == "CO-100",
+            "primary_msa_covered_by_coc_percent",
+        ].iloc[0]
+    )
+    assert pd.isna(primary.loc[primary["coc_id"] == "CO-999", "primary_msa_id"].iloc[0])
 
 
 def test_population_overlap_requires_complete_acs5_denominators() -> None:

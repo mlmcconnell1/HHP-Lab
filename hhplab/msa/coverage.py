@@ -10,7 +10,7 @@ import pandas as pd
 
 from hhplab.msa.selectors import PopulationRankingSource, select_top_msa_ids_by_population
 from hhplab.provenance import ProvenanceBlock, write_parquet_with_provenance
-from hhplab.schema.columns import MSA_COC_COVERAGE_COLUMNS
+from hhplab.schema.columns import MSA_COC_COVERAGE_COLUMNS, PRIMARY_MSA_ANNOTATION_COLUMNS
 from hhplab.xwalks.county import ALBERS_EQUAL_AREA_CRS
 
 OverlapBasis = Literal["area", "population"]
@@ -188,6 +188,139 @@ def read_msa_coc_coverage(path: Path | str) -> pd.DataFrame:
             f"MSA-CoC overlap coverage artifact not found at {path}. "
             "Build it through an MSA-CoC coverage recipe or recipe-backed helper."
         ) from None
+
+
+def select_primary_msa_for_cocs(
+    overlap: pd.DataFrame,
+    *,
+    coc_ids: list[str] | tuple[str, ...] | None = None,
+    overlap_basis: OverlapBasis = "area",
+    min_coc_contained_share: float = 0.0,
+) -> pd.DataFrame:
+    """Select one primary MSA per CoC from MSA-CoC overlap rows.
+
+    ``overlap`` may be a modern MSA-CoC coverage artifact, which carries
+    percent columns, or the older area crosswalk shape, which carries
+    ``allocation_share`` as a fraction of CoC area.  Ties are deterministic:
+    highest CoC-contained share, then lowest ``msa_id``.
+    """
+    if overlap_basis not in {"area", "population"}:
+        raise ValueError("overlap_basis must be 'area' or 'population'.")
+    if not 0.0 <= min_coc_contained_share <= 1.0:
+        raise ValueError("min_coc_contained_share must be between 0.0 and 1.0.")
+
+    universe = _primary_msa_coc_universe(overlap, coc_ids)
+    if overlap.empty:
+        return _empty_primary_msa_annotations(universe)
+
+    rows = overlap.copy()
+    missing = sorted({"coc_id", "msa_id"} - set(rows.columns))
+    if missing:
+        raise ValueError(
+            "MSA-CoC overlap rows are missing required columns "
+            f"{missing}. Available: {list(rows.columns)}"
+        )
+    if "overlap_basis" in rows.columns:
+        rows = rows[rows["overlap_basis"].astype(str) == overlap_basis].copy()
+    if rows.empty:
+        return _empty_primary_msa_annotations(universe)
+
+    rows["coc_id"] = rows["coc_id"].astype(str)
+    rows["msa_id"] = rows["msa_id"].astype(str).str.zfill(5)
+    rows["primary_msa_coc_contained_percent"] = _coc_contained_percent(rows)
+    rows["primary_msa_covered_by_coc_percent"] = _msa_covered_percent(rows)
+    rows = rows[
+        rows["primary_msa_coc_contained_percent"].fillna(-1.0)
+        >= min_coc_contained_share * 100.0
+    ].copy()
+    if rows.empty:
+        return _empty_primary_msa_annotations(universe)
+
+    if "msa_name" not in rows.columns:
+        rows["msa_name"] = pd.NA
+    rows["primary_msa_overlap_basis"] = overlap_basis
+    selected = (
+        rows.sort_values(
+            ["coc_id", "primary_msa_coc_contained_percent", "msa_id"],
+            ascending=[True, False, True],
+            kind="mergesort",
+        )
+        .drop_duplicates("coc_id", keep="first")
+        .rename(
+            columns={
+                "msa_id": "primary_msa_id",
+                "msa_name": "primary_msa_name",
+            }
+        )
+        .loc[:, PRIMARY_MSA_ANNOTATION_COLUMNS]
+    )
+    if universe:
+        base = _empty_primary_msa_annotations(universe).drop(columns=selected.columns[1:])
+        selected = base.merge(selected, on="coc_id", how="left")
+    return (
+        selected.loc[:, PRIMARY_MSA_ANNOTATION_COLUMNS]
+        .sort_values("coc_id")
+        .reset_index(drop=True)
+    )
+
+
+def _primary_msa_coc_universe(
+    overlap: pd.DataFrame,
+    coc_ids: list[str] | tuple[str, ...] | None,
+) -> list[str]:
+    values: list[str] = []
+    if coc_ids is not None:
+        values.extend(str(coc_id) for coc_id in coc_ids)
+    if "coc_id" in overlap.columns:
+        values.extend(overlap["coc_id"].dropna().astype(str).tolist())
+    return sorted(dict.fromkeys(values))
+
+
+def _empty_primary_msa_annotations(coc_ids: list[str]) -> pd.DataFrame:
+    result = pd.DataFrame({"coc_id": coc_ids})
+    result["primary_msa_id"] = pd.NA
+    result["primary_msa_name"] = pd.NA
+    result["primary_msa_overlap_basis"] = pd.NA
+    result["primary_msa_coc_contained_percent"] = pd.Series(
+        pd.NA,
+        index=result.index,
+        dtype="Float64",
+    )
+    result["primary_msa_covered_by_coc_percent"] = pd.Series(
+        pd.NA,
+        index=result.index,
+        dtype="Float64",
+    )
+    return result.loc[:, PRIMARY_MSA_ANNOTATION_COLUMNS]
+
+
+def _coc_contained_percent(rows: pd.DataFrame) -> pd.Series:
+    if "coc_contained_in_msa_percent" in rows.columns:
+        return pd.to_numeric(rows["coc_contained_in_msa_percent"], errors="coerce")
+    if "allocation_share" in rows.columns:
+        return pd.to_numeric(rows["allocation_share"], errors="coerce") * 100.0
+    if {"intersection_area", "coc_area"} <= set(rows.columns):
+        numerator = pd.to_numeric(rows["intersection_area"], errors="coerce")
+        denominator = pd.to_numeric(rows["coc_area"], errors="coerce")
+        return (numerator / denominator.where(denominator > 0)) * 100.0
+    raise ValueError(
+        "MSA-CoC overlap rows must include coc_contained_in_msa_percent, "
+        "allocation_share, or intersection_area + coc_area."
+    )
+
+
+def _msa_covered_percent(rows: pd.DataFrame) -> pd.Series:
+    if "msa_covered_by_coc_percent" in rows.columns:
+        return pd.to_numeric(rows["msa_covered_by_coc_percent"], errors="coerce")
+    if {"intersection_value", "msa_denominator"} <= set(rows.columns):
+        numerator = pd.to_numeric(rows["intersection_value"], errors="coerce")
+        denominator = pd.to_numeric(rows["msa_denominator"], errors="coerce")
+        return (numerator / denominator.where(denominator > 0)) * 100.0
+    if {"intersection_area", "msa_denominator"} <= set(rows.columns):
+        numerator = pd.to_numeric(rows["intersection_area"], errors="coerce")
+        denominator = pd.to_numeric(rows["msa_denominator"], errors="coerce")
+        return (numerator / denominator.where(denominator > 0)) * 100.0
+    return pd.Series(pd.NA, index=rows.index, dtype="Float64")
 
 
 def _empty_coverage() -> pd.DataFrame:

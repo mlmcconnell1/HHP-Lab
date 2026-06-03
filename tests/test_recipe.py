@@ -2897,7 +2897,7 @@ class TestPanelPolicy:
         assert policy.acs5_population_vintage is None
         assert policy.tract_vintage is None
         assert policy.output_columns.msa_id == "primary_msa_id"
-        assert policy.output_columns.contained_share == "primary_msa_coc_contained_share"
+        assert policy.output_columns.contained_share == "primary_msa_coc_contained_percent"
 
     def test_primary_msa_policy_population_basis_requires_denominators(self):
         from pydantic import ValidationError

@@ -5,6 +5,7 @@ from hhplab.msa.coverage import (
     build_msa_coc_coverage,
     read_msa_coc_coverage,
     save_msa_coc_coverage,
+    select_primary_msa_for_cocs,
 )
 from hhplab.msa.crosswalk import (
     ALLOCATION_SHARE_TOLERANCE,
@@ -86,6 +87,7 @@ __all__ = [
     "read_msa_county_membership",
     "save_coc_msa_crosswalk",
     "save_msa_coc_coverage",
+    "select_primary_msa_for_cocs",
     "summarize_coc_msa_allocation",
     "select_top_msa_ids_for_panel_spec",
     "select_top_msa_ids_by_population",

@@ -286,7 +286,7 @@ class PrimaryMsaAnnotationColumns(BaseModel):
         description="Output column containing the selected primary MSA display name.",
     )
     contained_share: str = Field(
-        default="primary_msa_coc_contained_share",
+        default="primary_msa_coc_contained_percent",
         description="Output column containing the CoC share contained in the primary MSA.",
     )
     overlap_basis: str = Field(
