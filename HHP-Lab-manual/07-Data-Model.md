@@ -47,6 +47,14 @@ Supported source vintages are 2010 and 2020 for Census Urban Areas and PL
 block population. Block geometry normally matches the decennial vintage. CoC
 boundaries can use any available curated boundary vintage.
 
+The `B2020_non_pr` 2020 CoC urban-fraction artifacts intentionally exclude
+American Samoa (`AS-500`), Guam (`GU-500`), the Northern Mariana Islands
+(`MP-500`), and the U.S. Virgin Islands (`VI-500`). Those island territory
+block populations are published through a separate Census island territory
+source, and HHP-Lab does not support that source because these territories are
+not part of the current research scope. The exclusion is a documented scope
+choice, not a missing-data build failure.
+
 Urban Area membership is assigned at the block level by testing each block's
 representative point against Urban Area polygons. Population is allocated from
 blocks to CoCs by block-area intersection. This means a block that crosses CoC

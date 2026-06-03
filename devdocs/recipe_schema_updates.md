@@ -414,6 +414,14 @@ contains `coc_id`, CoC population totals, urban/rural population totals, and
 `urban_population_fraction`; join `coc_name` from the matching `coc__B2020`
 boundary artifact when exporting a labeled panel.
 
+The `B2020_non_pr` 2020 urban-fraction artifacts intentionally exclude
+American Samoa (`AS-500`), Guam (`GU-500`), the Northern Mariana Islands
+(`MP-500`), and the U.S. Virgin Islands (`VI-500`). Their block populations
+come from a separate Census island territory source that HHP-Lab does not
+currently ingest because those territories are outside the current research
+scope. Treat their absence from the non-PR artifacts as an explicit scope
+decision rather than a rebuild failure.
+
 ---
 
 ## 11) Filters Section (`coclab-6k6w`)
