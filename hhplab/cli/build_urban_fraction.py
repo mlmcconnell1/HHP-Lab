@@ -165,20 +165,22 @@ def build_urban_fraction(
         )
         missing_summary_cocs = _missing_summary_coc_ids(coc_gdf, summary)
         if missing_summary_cocs:
-            examples = ", ".join(missing_summary_cocs[:10])
-            suffix = (
-                f" Example coc_id values: {examples}."
-                if len(missing_summary_cocs) <= 10
-                else f" Example coc_id values: {examples}, ..."
+            summary = _append_missing_summary_cocs(
+                summary,
+                missing_summary_cocs,
+                boundary_vintage=boundary,
+                urban_area_vintage=urban_area_vintage,
+                block_vintage=resolved_block_vintage,
+                decennial_vintage=decennial,
             )
-            raise ValueError(
-                "Urban-fraction build did not produce summary rows for "
-                f"{len(missing_summary_cocs)} CoC boundary row(s)."
-                f"{suffix} "
-                "Rebuild PL block population and block geometry for the requested "
-                "coverage, or intentionally exclude unsupported CoCs before running "
-                "urban-fraction."
-            )
+            if not output_json:
+                examples = ", ".join(missing_summary_cocs[:10])
+                suffix = "..." if len(missing_summary_cocs) > 10 else ""
+                typer.echo(
+                    "  Warning: wrote null urban-fraction rows for "
+                    f"{len(missing_summary_cocs)} CoC(s) without block population "
+                    f"coverage: {examples}{suffix}"
+                )
     except Exception as exc:
         _emit_error(str(exc), json_output=output_json)
         raise typer.Exit(1) from exc
@@ -223,6 +225,8 @@ def build_urban_fraction(
                 )
                 if not summary.empty
                 else 0,
+                "missing_summary_coc_count": int(len(missing_summary_cocs)),
+                "missing_summary_coc_ids": missing_summary_cocs,
                 "min_population_coverage_ratio": _float_or_none(
                     summary["population_coverage_ratio"].min()
                 ),
@@ -478,6 +482,49 @@ def _missing_summary_coc_ids(
         else set()
     )
     return sorted(set(expected) - observed)
+
+
+def _append_missing_summary_cocs(
+    summary: pd.DataFrame,
+    missing_coc_ids: list[str],
+    *,
+    boundary_vintage: str | int,
+    urban_area_vintage: str | int,
+    block_vintage: str | int,
+    decennial_vintage: str | int,
+) -> pd.DataFrame:
+    """Add explicit null rows for CoCs absent from block population coverage."""
+    if not missing_coc_ids:
+        return summary
+    missing = pd.DataFrame(
+        [
+            {
+                "coc_id": coc_id,
+                "boundary_vintage": boundary_vintage,
+                "urban_area_vintage": urban_area_vintage,
+                "block_vintage": block_vintage,
+                "decennial_vintage": decennial_vintage,
+                "denominator_source": "pl_94_171_block_population",
+                "allocation_method": DEFAULT_ALLOCATION_METHOD,
+                "classification_method": DEFAULT_CLASSIFICATION_METHOD,
+                "coc_total_population": pd.NA,
+                "coc_urban_population": pd.NA,
+                "coc_rural_population": pd.NA,
+                "urban_population_fraction": pd.NA,
+                "block_count": 0,
+                "urban_block_count": 0,
+                "rural_block_count": 0,
+                "missing_denominator_block_count": pd.NA,
+                "population_coverage_ratio": pd.NA,
+                "source": "coc_urban_fraction",
+            }
+            for coc_id in missing_coc_ids
+        ],
+        columns=summary.columns,
+    )
+    missing_non_null = missing.dropna(axis="columns", how="all")
+    result = pd.concat([summary, missing_non_null], ignore_index=True)
+    return result.loc[:, summary.columns].sort_values("coc_id").reset_index(drop=True)
 
 
 def _load_block_inputs_for_state(

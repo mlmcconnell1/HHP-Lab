@@ -719,11 +719,11 @@ def test_urban_fraction_cli_errors_on_incomplete_block_geometry(monkeypatch, tmp
     assert "M1" in payload["error"]
 
 
-def test_urban_fraction_cli_errors_when_boundary_coc_has_no_block_coverage(
+def test_urban_fraction_cli_writes_null_rows_when_boundary_coc_has_no_block_coverage(
     monkeypatch,
     tmp_path,
 ) -> None:
-    """Partial builds fail when stale block inputs would silently omit CoCs."""
+    """Partial builds preserve unsupported CoCs with null denominator-derived values."""
     _patch_curated_dir(monkeypatch, tmp_path)
     _block_path, geometry_path = _write_cli_inputs(tmp_path)
     boundary_path = tmp_path / "coc_boundaries" / naming.coc_base_filename("2025")
@@ -756,12 +756,23 @@ def test_urban_fraction_cli_errors_when_boundary_coc_has_no_block_coverage(
         ],
     )
 
-    assert result.exit_code == 1
+    assert result.exit_code == 0
     payload = json.loads(result.output)
-    assert payload["status"] == "error"
-    assert "did not produce summary rows" in payload["error"]
-    assert "AS-500" in payload["error"]
-    assert "Rebuild PL block population and block geometry" in payload["error"]
+    assert payload["status"] == "ok"
+    assert payload["diagnostics"]["missing_summary_coc_count"] == 1
+    assert payload["diagnostics"]["missing_summary_coc_ids"] == ["AS-500"]
+
+    summary = pd.read_parquet(payload["artifact"])
+    row = summary.set_index("coc_id").loc["AS-500"]
+    assert pd.isna(row["coc_total_population"])
+    assert pd.isna(row["coc_urban_population"])
+    assert pd.isna(row["coc_rural_population"])
+    assert pd.isna(row["urban_population_fraction"])
+    assert row["block_count"] == 0
+    assert row["urban_block_count"] == 0
+    assert row["rural_block_count"] == 0
+    assert pd.isna(row["missing_denominator_block_count"])
+    assert pd.isna(row["population_coverage_ratio"])
 
 
 def test_load_block_inputs_for_state_requires_actionable_state_fips_geometry(
