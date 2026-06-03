@@ -32,6 +32,30 @@ class ExampleRecipeCase:
     datasets: tuple[str, ...]
 
 
+@dataclass(frozen=True)
+class CanonicalUrbanRecipeCase:
+    path: str
+    pipeline_id: str
+    recipe_name: str
+    target_id: str
+    threshold: float
+
+
+CANONICAL_URBAN_OUTPUT_COLUMNS: tuple[str, ...] = (
+    "coc_id",
+    "coc_name",
+    "year",
+    "urban_population_fraction",
+    "coc_population",
+    "population_density_per_sq_km",
+    "primary_msa_id",
+    "primary_msa_name",
+    "primary_msa_overlap_basis",
+    "primary_msa_coc_contained_percent",
+    "primary_msa_covered_by_coc_percent",
+)
+
+
 EXAMPLE_RECIPE_CASES: tuple[ExampleRecipeCase, ...] = (
     ExampleRecipeCase(
         path="coc-base-pit-acs-zori-2016-2021.yaml",
@@ -96,6 +120,24 @@ EXAMPLE_RECIPE_CASES: tuple[ExampleRecipeCase, ...] = (
         target_type="msa",
         years=(2020, 2021),
         datasets=("pit", "pep_county", "acs_tract"),
+    ),
+)
+
+
+CANONICAL_URBAN_RECIPE_CASES: tuple[CanonicalUrbanRecipeCase, ...] = (
+    CanonicalUrbanRecipeCase(
+        path="recipes/coc-urban-fraction-gte-95-2020.yaml",
+        pipeline_id="build_urban_fraction_gte_95",
+        recipe_name="coc_urban_fraction_gte_95_2020",
+        target_id="urban_fraction_gte_95",
+        threshold=0.95,
+    ),
+    CanonicalUrbanRecipeCase(
+        path="recipes/coc-urban-fraction-gte-99-2020.yaml",
+        pipeline_id="build_urban_fraction_gte_99",
+        recipe_name="coc_urban_fraction_gte_99_2020",
+        target_id="urban_fraction_gte_99",
+        threshold=0.99,
     ),
 )
 
@@ -330,6 +372,33 @@ def test_msa_coc_coverage_example_recipe_loads_and_resolves(
     assert len(plan.resample_tasks) == 1
     assert plan.resample_tasks[0].dataset_id == "pep_msa"
     assert plan.join_tasks == []
+
+
+@pytest.mark.parametrize(
+    "case",
+    CANONICAL_URBAN_RECIPE_CASES,
+    ids=lambda case: Path(case.path).name,
+)
+def test_canonical_urban_recipes_request_primary_msa_annotations(
+    case: CanonicalUrbanRecipeCase,
+):
+    recipe = _load_repo_recipe(case.path)
+    plan = resolve_plan(recipe, case.pipeline_id)
+    target = recipe.targets[0]
+    policy = target.panel_policy
+
+    assert recipe.name == case.recipe_name
+    assert target.id == case.target_id
+    assert target.outputs == ["panel"]
+    assert target.cohort.value == case.threshold
+    assert policy is not None
+    assert policy.primary_msa is not None
+    assert policy.primary_msa.definition_version == "census_msa_2023"
+    assert policy.primary_msa.county_vintage == 2023
+    assert policy.primary_msa.overlap_basis == "area"
+    assert policy.output_columns == list(CANONICAL_URBAN_OUTPUT_COLUMNS)
+    assert [task.year for task in plan.join_tasks] == [2020]
+    assert tuple(plan.join_tasks[0].datasets) == ("urban_fraction",)
 
 
 @pytest.mark.parametrize("case", SAE_RECIPE_CASES, ids=lambda case: case.path)

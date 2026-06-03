@@ -6,8 +6,9 @@ name: coc_urban_fraction_gte_99_2020
 description: >
   Build the canonical 2020 selector list of CoCs whose decennial block-based
   urban population fraction is at least 0.99. The selector uses the full 2020
-  CoC boundary universe, including Puerto Rico, and outputs only CoC identity,
-  year, urban fraction, CoC population, and population density.
+  CoC boundary universe, including Puerto Rico, and outputs CoC identity,
+  year, urban fraction, CoC population, population density, and recipe-native
+  primary MSA annotations.
 
 universe:
   years: [2020]
@@ -17,6 +18,10 @@ targets:
     geometry: { type: coc, vintage: 2020, source: hud_exchange }
     outputs: [panel]
     panel_policy:
+      primary_msa:
+        definition_version: census_msa_2023
+        county_vintage: 2023
+        overlap_basis: area
       column_aliases:
         coc_total_population: coc_population
       output_columns:
@@ -26,6 +31,11 @@ targets:
         - urban_population_fraction
         - coc_population
         - population_density_per_sq_km
+        - primary_msa_id
+        - primary_msa_name
+        - primary_msa_overlap_basis
+        - primary_msa_coc_contained_percent
+        - primary_msa_covered_by_coc_percent
     cohort:
       rank_by: urban_population_fraction
       method: predicate
