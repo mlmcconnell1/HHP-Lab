@@ -15,13 +15,16 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import geopandas as gpd
 import pandas as pd
 import pyarrow.parquet as pq
+from shapely.geometry import box
 
 from hhplab.recipe.executor import execute_recipe
 from hhplab.recipe.executor_panel_policies import collect_conformance_flags
 from hhplab.recipe.loader import load_recipe
 from hhplab.recipe.manifest import read_manifest
+from hhplab.xwalks.county import ALBERS_EQUAL_AREA_CRS
 
 # ---------------------------------------------------------------------------
 # ZORI recipe and fixture helpers
@@ -243,8 +246,18 @@ def _setup_acs1_policy_fixtures(tmp_path: Path) -> None:
 # Primary-MSA recipe and fixture helpers
 # ---------------------------------------------------------------------------
 
-def _primary_msa_recipe_dict() -> dict:
+def _primary_msa_recipe_dict(*, overlap_basis: str = "area") -> dict:
     """CoC panel recipe with panel_policy.primary_msa declared."""
+    primary_msa = {
+        "definition_version": "census_msa_2023",
+        "county_vintage": 2023,
+        "overlap_basis": overlap_basis,
+        "min_coc_contained_share": 0.50,
+    }
+    if overlap_basis == "population":
+        primary_msa["acs5_population_vintage"] = 2023
+        primary_msa["acs5_population_reference_year"] = 2023
+        primary_msa["tract_vintage"] = 2020
     return {
         "version": 1,
         "name": "primary-msa-policy-test",
@@ -255,11 +268,7 @@ def _primary_msa_recipe_dict() -> dict:
                 "geometry": {"type": "coc", "vintage": 2025, "source": "hud_exchange"},
                 "outputs": ["panel"],
                 "panel_policy": {
-                    "primary_msa": {
-                        "definition_version": "census_msa_2023",
-                        "county_vintage": 2023,
-                        "min_coc_contained_share": 0.50,
-                    },
+                    "primary_msa": primary_msa,
                     "output_columns": [
                         "coc_id",
                         "year",
@@ -390,6 +399,74 @@ def _setup_primary_msa_fixtures(tmp_path: Path) -> None:
     )
 
 
+def _setup_primary_msa_population_fixtures(tmp_path: Path) -> None:
+    """Create geometry and tract-population artifacts for population-basis MSA annotations."""
+    _setup_primary_msa_fixtures(tmp_path)
+    data_dir = tmp_path / "data"
+
+    coc_dir = data_dir / "curated" / "coc_boundaries"
+    coc_dir.mkdir(parents=True, exist_ok=True)
+    gpd.GeoDataFrame(
+        {
+            "coc_id": ["COC1", "COC2", "COC3"],
+            "coc_name": ["Split population CoC", "Zero population CoC", "No overlap CoC"],
+        },
+        geometry=[
+            box(0, 0, 20, 10),
+            box(0, 0, 5, 10),
+            box(30, 30, 40, 40),
+        ],
+        crs=ALBERS_EQUAL_AREA_CRS,
+    ).to_parquet(coc_dir / "coc__B2025.parquet")
+
+    tiger_dir = data_dir / "curated" / "tiger"
+    tiger_dir.mkdir(parents=True, exist_ok=True)
+    gpd.GeoDataFrame(
+        {"GEOID": ["36061", "29510"]},
+        geometry=[box(0, 0, 10, 10), box(10, 0, 20, 10)],
+        crs=ALBERS_EQUAL_AREA_CRS,
+    ).to_parquet(tiger_dir / "counties__C2023.parquet")
+    gpd.GeoDataFrame(
+        {"GEOID": ["36061000100", "29510000100"]},
+        geometry=[box(0, 0, 10, 10), box(10, 0, 20, 10)],
+        crs=ALBERS_EQUAL_AREA_CRS,
+    ).to_parquet(tiger_dir / "tracts__T2020.parquet")
+
+    msa_dir = data_dir / "curated" / "msa"
+    pd.DataFrame(
+        {
+            "msa_id": ["35620", "41180"],
+            "cbsa_code": ["35620", "41180"],
+            "msa_name": ["New York MSA", "St. Louis MSA"],
+            "county_fips": ["36061", "29510"],
+        }
+    ).to_parquet(msa_dir / "msa_county_membership__census_msa_2023.parquet")
+
+    acs_dir = data_dir / "curated" / "acs"
+    acs_dir.mkdir(parents=True, exist_ok=True)
+    pd.DataFrame(
+        {
+            "GEOID": ["36061000100", "29510000100"],
+            "year": [2023, 2023],
+            "total_population": [0, 100],
+        }
+    ).to_parquet(acs_dir / "acs5_tracts__A2023xT2020.parquet")
+
+    xwalk_dir = data_dir / "curated" / "xwalks"
+    pd.DataFrame(
+        {
+            "coc_id": ["COC1", "COC1", "COC2"],
+            "boundary_vintage": ["2025", "2025", "2025"],
+            "tract_geoid": ["36061000100", "29510000100", "36061000100"],
+            "tract_vintage": ["2020", "2020", "2020"],
+            "area_share": [1.0, 1.0, 0.5],
+            "pop_share": [None, None, None],
+            "intersection_area": [100.0, 100.0, 50.0],
+            "tract_area": [100.0, 100.0, 100.0],
+        }
+    ).to_parquet(xwalk_dir / "xwalk__B2025xT2020.parquet")
+
+
 # ===========================================================================
 # ZORI panel policy tests (coclab-gude.2)
 # ===========================================================================
@@ -451,6 +528,21 @@ class TestPrimaryMsaPanelPolicy:
         provenance = json.loads(metadata[b"hhplab_provenance"])
         provenance_paths = {asset["path"] for asset in provenance["consumed_assets"]}
         assert asset_paths <= provenance_paths
+
+    def test_primary_msa_population_basis_selects_by_coc_population(self, tmp_path: Path):
+        _setup_primary_msa_population_fixtures(tmp_path)
+        recipe = load_recipe(_primary_msa_recipe_dict(overlap_basis="population"))
+
+        results = execute_recipe(recipe, project_root=tmp_path)
+
+        assert results[0].success
+        panel = pd.read_parquet(_find_panel_output(tmp_path))
+        coc1 = panel[panel["coc_id"] == "COC1"]
+        assert set(coc1["primary_msa_id"]) == {"41180"}
+        assert set(coc1["primary_msa_name"]) == {"St. Louis MSA"}
+        assert set(coc1["primary_msa_overlap_basis"]) == {"population"}
+        assert coc1["primary_msa_coc_contained_percent"].tolist() == [100.0, 100.0]
+        assert coc1["primary_msa_covered_by_coc_percent"].tolist() == [100.0, 100.0]
 
 
 class TestZoriPanelPolicy:

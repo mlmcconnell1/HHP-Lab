@@ -39,6 +39,7 @@ class CanonicalUrbanRecipeCase:
     recipe_name: str
     target_id: str
     threshold: float
+    primary_msa_overlap_basis: str
 
 
 CANONICAL_URBAN_OUTPUT_COLUMNS: tuple[str, ...] = (
@@ -131,6 +132,7 @@ CANONICAL_URBAN_RECIPE_CASES: tuple[CanonicalUrbanRecipeCase, ...] = (
         recipe_name="coc_urban_fraction_gte_95_2020",
         target_id="urban_fraction_gte_95",
         threshold=0.95,
+        primary_msa_overlap_basis="population",
     ),
     CanonicalUrbanRecipeCase(
         path="recipes/coc-urban-fraction-gte-99-2020.yaml",
@@ -138,6 +140,7 @@ CANONICAL_URBAN_RECIPE_CASES: tuple[CanonicalUrbanRecipeCase, ...] = (
         recipe_name="coc_urban_fraction_gte_99_2020",
         target_id="urban_fraction_gte_99",
         threshold=0.99,
+        primary_msa_overlap_basis="area",
     ),
 )
 
@@ -395,7 +398,11 @@ def test_canonical_urban_recipes_request_primary_msa_annotations(
     assert policy.primary_msa is not None
     assert policy.primary_msa.definition_version == "census_msa_2023"
     assert policy.primary_msa.county_vintage == 2023
-    assert policy.primary_msa.overlap_basis == "area"
+    assert policy.primary_msa.overlap_basis == case.primary_msa_overlap_basis
+    if case.primary_msa_overlap_basis == "population":
+        assert policy.primary_msa.acs5_population_vintage == 2023
+        assert policy.primary_msa.acs5_population_reference_year == 2023
+        assert policy.primary_msa.tract_vintage == 2020
     assert policy.output_columns == list(CANONICAL_URBAN_OUTPUT_COLUMNS)
     assert [task.year for task in plan.join_tasks] == [2020]
     assert tuple(plan.join_tasks[0].datasets) == ("urban_fraction",)

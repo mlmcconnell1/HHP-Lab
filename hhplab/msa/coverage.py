@@ -98,11 +98,22 @@ def build_msa_coc_coverage(
             )
         )
     if "population" in bases:
+        population_msa_proj = msa_proj
+        population_coc_proj = coc_proj
+        if pair_geometries is not None and not pair_geometries.empty:
+            population_msa_ids = set(pair_geometries["msa_id"].astype(str))
+            population_coc_ids = set(pair_geometries["coc_id"].astype(str))
+            population_msa_proj = msa_proj[
+                msa_proj["msa_id"].astype(str).isin(population_msa_ids)
+            ].copy()
+            population_coc_proj = coc_proj[
+                coc_proj["coc_id"].astype(str).isin(population_coc_ids)
+            ].copy()
         frames.append(
             _population_coverage_rows(
                 pair_geometries,
-                msa_proj,
-                coc_proj,
+                population_msa_proj,
+                population_coc_proj,
                 acs5_population_df=acs5_population_df,
                 tract_gdf=tract_gdf,
                 year=year,
@@ -552,12 +563,24 @@ def _prepare_population_tracts(
     population_column: str,
     allow_incomplete_population_denominators: bool,
 ) -> gpd.GeoDataFrame:
-    tract_id_col = "tract_geoid" if "tract_geoid" in tract_gdf.columns else "GEOID"
+    tract_id_col = next(
+        (column for column in ("tract_geoid", "GEOID", "geoid") if column in tract_gdf.columns),
+        "GEOID",
+    )
     if tract_id_col not in tract_gdf.columns:
-        raise ValueError("tract_gdf must have 'tract_geoid' or 'GEOID' column")
-    pop_id_col = "tract_geoid" if "tract_geoid" in acs5_population_df.columns else "GEOID"
+        raise ValueError("tract_gdf must have 'tract_geoid', 'GEOID', or 'geoid' column")
+    pop_id_col = next(
+        (
+            column
+            for column in ("tract_geoid", "GEOID", "geoid")
+            if column in acs5_population_df.columns
+        ),
+        "GEOID",
+    )
     if pop_id_col not in acs5_population_df.columns:
-        raise ValueError("ACS5 population rows must have 'tract_geoid' or 'GEOID' column")
+        raise ValueError(
+            "ACS5 population rows must have 'tract_geoid', 'GEOID', or 'geoid' column"
+        )
     if population_column not in acs5_population_df.columns:
         raise ValueError(
             f"ACS5 population rows are missing '{population_column}'. "
@@ -604,9 +627,15 @@ def _population_totals_for_geometries(
     group_cols: list[str],
     value_name: str,
 ) -> pd.DataFrame:
+    if geometries.empty:
+        return pd.DataFrame(columns=[*group_cols, value_name])
+    minx, miny, maxx, maxy = geometries.total_bounds
+    candidate_tracts = tracts.cx[minx:maxx, miny:maxy].copy()
+    if candidate_tracts.empty:
+        return pd.DataFrame(columns=[*group_cols, value_name])
     overlay = gpd.overlay(
         geometries,
-        tracts[["tract_geoid", "tract_area", "total_population", "geometry"]],
+        candidate_tracts[["tract_geoid", "tract_area", "total_population", "geometry"]],
         how="intersection",
         keep_geom_type=False,
     )

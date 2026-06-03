@@ -21,7 +21,10 @@ targets:
       primary_msa:
         definition_version: census_msa_2023
         county_vintage: 2023
-        overlap_basis: area
+        overlap_basis: population
+        acs5_population_vintage: 2023
+        acs5_population_reference_year: 2023
+        tract_vintage: 2020
       column_aliases:
         coc_total_population: coc_population
       output_columns:

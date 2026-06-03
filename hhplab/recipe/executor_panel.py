@@ -21,8 +21,14 @@ import pandas as pd
 from hhplab.config import load_config
 from hhplab.msa.coverage import select_primary_msa_for_cocs
 from hhplab.msa.crosswalk import read_coc_msa_crosswalk
-from hhplab.msa.msa_io import read_msa_definitions
-from hhplab.naming import msa_coc_xwalk_path, msa_definitions_path
+from hhplab.msa.msa_io import read_msa_county_membership, read_msa_definitions
+from hhplab.naming import (
+    acs5_tracts_filename,
+    msa_coc_xwalk_path,
+    msa_county_membership_path,
+    msa_definitions_path,
+    tract_xwalk_path,
+)
 from hhplab.panel.finalize import (
     ZORI_COLUMNS,
     ZORI_PROVENANCE_COLUMNS,
@@ -815,6 +821,127 @@ def _record_panel_policy_asset(
     )
 
 
+def _primary_msa_population_reference_year(primary_policy) -> int:
+    return int(
+        primary_policy.acs5_population_reference_year
+        or primary_policy.acs5_population_vintage
+    )
+
+
+def _read_primary_msa_population_overlap(
+    *,
+    ctx: ExecutionContext,
+    data_root,
+    boundary_vintage: str,
+    primary_policy,
+    coc_ids: tuple[str, ...],
+) -> tuple[pd.DataFrame, list]:
+    if primary_policy.acs5_population_vintage is None or primary_policy.tract_vintage is None:
+        raise ExecutorError(
+            "target.panel_policy.primary_msa overlap_basis='population' requires "
+            "acs5_population_vintage and tract_vintage."
+        )
+
+    membership_file = msa_county_membership_path(primary_policy.definition_version, data_root)
+    definitions_file = msa_definitions_path(primary_policy.definition_version, data_root)
+    xwalk_file = tract_xwalk_path(boundary_vintage, primary_policy.tract_vintage, data_root)
+    acs_file = (
+        data_root
+        / "curated"
+        / "acs"
+        / acs5_tracts_filename(
+            str(primary_policy.acs5_population_vintage),
+            primary_policy.tract_vintage,
+        )
+    )
+    artifacts = [xwalk_file, membership_file, definitions_file, acs_file]
+    missing = [path for path in artifacts if not path.exists()]
+    if missing:
+        rel_missing = [str(path.relative_to(ctx.project_root)) for path in missing]
+        raise ExecutorError(
+            "target.panel_policy.primary_msa overlap_basis='population' requires "
+            f"population-overlap artifacts. Missing: {rel_missing}."
+        )
+
+    membership = read_msa_county_membership(primary_policy.definition_version, base_dir=data_root)
+    membership = membership[["msa_id", "county_fips"]].copy()
+    membership["msa_id"] = membership["msa_id"].astype(str).str.zfill(5)
+    membership["county_fips"] = membership["county_fips"].astype(str).str.zfill(5)
+
+    xwalk = pd.read_parquet(xwalk_file)
+    xwalk = xwalk[xwalk["coc_id"].astype(str).isin(coc_ids)].copy()
+    xwalk["coc_id"] = xwalk["coc_id"].astype(str)
+    xwalk["tract_geoid"] = xwalk["tract_geoid"].astype(str).str.zfill(11)
+    xwalk["county_fips"] = xwalk["tract_geoid"].str[:5]
+    xwalk["area_share"] = pd.to_numeric(xwalk["area_share"], errors="coerce").fillna(0.0)
+
+    acs = pd.read_parquet(acs_file)
+    tract_col = next(
+        (column for column in ("tract_geoid", "GEOID", "geoid") if column in acs.columns),
+        None,
+    )
+    if tract_col is None or "total_population" not in acs.columns:
+        raise ExecutorError(
+            "target.panel_policy.primary_msa overlap_basis='population' requires ACS5 "
+            "tract population rows with tract_geoid/GEOID/geoid and total_population."
+        )
+    acs = acs.copy()
+    if "year" in acs.columns:
+        acs = acs[acs["year"].astype(str) == str(primary_policy.acs5_population_vintage)].copy()
+    acs["tract_geoid"] = acs[tract_col].astype(str).str.zfill(11)
+    acs["total_population"] = pd.to_numeric(acs["total_population"], errors="coerce").fillna(0.0)
+    acs = acs[["tract_geoid", "total_population"]].drop_duplicates("tract_geoid")
+
+    allocated = xwalk.merge(acs, on="tract_geoid", how="left")
+    allocated["total_population"] = allocated["total_population"].fillna(0.0)
+    allocated["allocated_population"] = allocated["total_population"] * allocated["area_share"]
+    allocated = allocated.merge(membership, on="county_fips", how="inner")
+    if allocated.empty:
+        return pd.DataFrame(columns=["coc_id", "msa_id", "overlap_basis"]), artifacts
+
+    pair = (
+        allocated.groupby(["coc_id", "msa_id"], as_index=False)["allocated_population"]
+        .sum()
+        .rename(columns={"allocated_population": "intersection_value"})
+    )
+    coc_denominator = (
+        allocated.groupby("coc_id", as_index=False)["allocated_population"]
+        .sum()
+        .rename(columns={"allocated_population": "coc_denominator"})
+    )
+    msa_denominator = (
+        allocated.groupby("msa_id", as_index=False)["allocated_population"]
+        .sum()
+        .rename(columns={"allocated_population": "msa_denominator"})
+    )
+    coverage = pair.merge(coc_denominator, on="coc_id", how="left").merge(
+        msa_denominator,
+        on="msa_id",
+        how="left",
+    )
+    coverage["overlap_basis"] = "population"
+    coverage["coc_contained_in_msa_percent"] = (
+        coverage["intersection_value"]
+        / coverage["coc_denominator"].where(coverage["coc_denominator"] > 0)
+        * 100.0
+    )
+    coverage["msa_covered_by_coc_percent"] = (
+        coverage["intersection_value"]
+        / coverage["msa_denominator"].where(coverage["msa_denominator"] > 0)
+        * 100.0
+    )
+    definitions = read_msa_definitions(primary_policy.definition_version, base_dir=data_root)
+    if {"msa_id", "msa_name"} <= set(definitions.columns):
+        names = definitions[["msa_id", "msa_name"]].copy()
+        names["msa_id"] = names["msa_id"].astype(str).str.zfill(5)
+        coverage = coverage.merge(
+            names.drop_duplicates("msa_id"),
+            on="msa_id",
+            how="left",
+        )
+    return coverage, artifacts
+
+
 def _add_primary_msa_annotations(
     panel: pd.DataFrame,
     *,
@@ -826,12 +953,6 @@ def _add_primary_msa_annotations(
     primary_policy = policy.primary_msa if policy is not None else None
     if primary_policy is None:
         return panel, []
-    if primary_policy.overlap_basis != "area":
-        raise ExecutorError(
-            "target.panel_policy.primary_msa currently supports overlap_basis='area' "
-            "during panel assembly. Use area overlap or add a recipe-native "
-            "MSA-CoC coverage artifact for population-basis primary MSA annotations."
-        )
     if boundary_vintage is None:
         raise ExecutorError(
             "target.panel_policy.primary_msa requires the CoC target geometry to declare "
@@ -849,31 +970,43 @@ def _add_primary_msa_annotations(
         data_root,
     )
     definitions_file = msa_definitions_path(primary_policy.definition_version, data_root)
-    missing = [path for path in (xwalk_file, definitions_file) if not path.exists()]
-    if missing:
-        rel_missing = [str(path.relative_to(ctx.project_root)) for path in missing]
-        raise ExecutorError(
-            "target.panel_policy.primary_msa requires MSA-CoC overlap artifacts. "
-            f"Missing: {rel_missing}. Run `hhplab generate msa-xwalk "
-            f"--boundaries {boundary_vintage} --counties {primary_policy.county_vintage}` "
-            "and `hhplab generate msa` for the requested definition version."
+    if primary_policy.overlap_basis == "population":
+        coc_ids = tuple(panel["coc_id"].dropna().astype(str).unique())
+        overlap, consumed_assets = _read_primary_msa_population_overlap(
+            ctx=ctx,
+            data_root=data_root,
+            boundary_vintage=str(boundary_vintage),
+            primary_policy=primary_policy,
+            coc_ids=coc_ids,
         )
+    else:
+        missing = [path for path in (xwalk_file, definitions_file) if not path.exists()]
+        if missing:
+            rel_missing = [str(path.relative_to(ctx.project_root)) for path in missing]
+            raise ExecutorError(
+                "target.panel_policy.primary_msa requires MSA-CoC overlap artifacts. "
+                f"Missing: {rel_missing}. Run `hhplab generate msa-xwalk "
+                f"--boundaries {boundary_vintage} --counties {primary_policy.county_vintage}` "
+                "and `hhplab generate msa` for the requested definition version."
+            )
 
-    crosswalk = read_coc_msa_crosswalk(
-        str(boundary_vintage),
-        primary_policy.definition_version,
-        str(primary_policy.county_vintage),
-        base_dir=data_root,
-    )
-    definitions = read_msa_definitions(primary_policy.definition_version, base_dir=data_root)
-    if {"msa_id", "msa_name"} <= set(definitions.columns):
-        crosswalk = crosswalk.merge(
-            definitions[["msa_id", "msa_name"]].drop_duplicates("msa_id"),
-            on="msa_id",
-            how="left",
+        overlap = read_coc_msa_crosswalk(
+            str(boundary_vintage),
+            primary_policy.definition_version,
+            str(primary_policy.county_vintage),
+            base_dir=data_root,
         )
+        definitions = read_msa_definitions(primary_policy.definition_version, base_dir=data_root)
+        if {"msa_id", "msa_name"} <= set(definitions.columns):
+            overlap = overlap.merge(
+                definitions[["msa_id", "msa_name"]].drop_duplicates("msa_id"),
+                on="msa_id",
+                how="left",
+            )
+        consumed_assets = [xwalk_file, definitions_file]
+
     annotations = select_primary_msa_for_cocs(
-        crosswalk,
+        overlap,
         coc_ids=tuple(panel["coc_id"].dropna().astype(str).unique()),
         overlap_basis=primary_policy.overlap_basis,
         min_coc_contained_share=primary_policy.min_coc_contained_share,
@@ -889,8 +1022,8 @@ def _add_primary_msa_annotations(
     )
 
     result = panel.merge(annotations, on="coc_id", how="left")
-    _record_panel_policy_asset(ctx, xwalk_file, role="crosswalk")
-    _record_panel_policy_asset(ctx, definitions_file, role="definition")
+    for asset in consumed_assets:
+        _record_panel_policy_asset(ctx, asset, role="primary_msa")
     extras = [
         columns.msa_id,
         columns.msa_name,
@@ -1004,13 +1137,6 @@ def assemble_panel(
                 panel,
                 project_root=ctx.project_root,
             )
-            panel, primary_msa_extras = _add_primary_msa_annotations(
-                panel,
-                ctx=ctx,
-                policy=policy,
-                boundary_vintage=boundary_vintage,
-            )
-            extras.extend(primary_msa_extras)
         except ExecutorError as exc:
             return StepResult(
                 step_kind=step_kind,
@@ -1059,6 +1185,22 @@ def assemble_panel(
             f"ref_year={target.cohort.reference_year}: "
             f"{pre_count} → {post_count} geographies",
         )
+
+    if target_geo_type == "coc":
+        try:
+            panel, _primary_msa_extras = _add_primary_msa_annotations(
+                panel,
+                ctx=ctx,
+                policy=policy,
+                boundary_vintage=boundary_vintage,
+            )
+        except ExecutorError as exc:
+            return StepResult(
+                step_kind=step_kind,
+                detail=f"{step_kind}",
+                success=False,
+                error=str(exc),
+            )
 
     try:
         panel = _project_panel_output(panel, policy)

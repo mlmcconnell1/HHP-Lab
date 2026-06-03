@@ -151,6 +151,14 @@ def test_population_overlap_can_differ_from_area_overlap() -> None:
     assert population["denominator_column"] == "total_population"
 
 
+def test_population_overlap_accepts_lowercase_geoid_tract_geometry() -> None:
+    tracts = _tract_gdf().rename(columns={"GEOID": "geoid"})
+
+    coverage = _build_coverage(tract_gdf=tracts)
+
+    assert set(coverage["overlap_basis"]) == {"area", "population"}
+
+
 @pytest.mark.parametrize(
     ("basis", "threshold", "expected_pairs"),
     [
