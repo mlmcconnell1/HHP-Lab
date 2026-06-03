@@ -209,6 +209,7 @@ OutputKind = Literal["panel", "diagnostics", "map", "containment", "msa_coc_cove
 
 CohortMethod = Literal["top_n", "bottom_n", "percentile", "predicate"]
 CohortPredicateOperator = Literal["gte", "lte", "gt", "lt", "eq"]
+MsaCocOverlapBasis = Literal["area", "population"]
 
 
 class ZoriPolicy(BaseModel):
@@ -271,6 +272,111 @@ class LausPolicy(BaseModel):
     )
 
 
+class PrimaryMsaAnnotationColumns(BaseModel):
+    """Output column controls for primary-MSA annotations on CoC panels."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    msa_id: str = Field(
+        default="primary_msa_id",
+        description="Output column containing the selected primary MSA identifier.",
+    )
+    msa_name: str = Field(
+        default="primary_msa_name",
+        description="Output column containing the selected primary MSA display name.",
+    )
+    contained_share: str = Field(
+        default="primary_msa_coc_contained_share",
+        description="Output column containing the CoC share contained in the primary MSA.",
+    )
+    overlap_basis: str = Field(
+        default="primary_msa_overlap_basis",
+        description="Output column documenting the basis used to choose the primary MSA.",
+    )
+
+    @model_validator(mode="after")
+    def _validate_column_names(self) -> PrimaryMsaAnnotationColumns:
+        values = [
+            self.msa_id,
+            self.msa_name,
+            self.contained_share,
+            self.overlap_basis,
+        ]
+        normalized = [value.strip() for value in values]
+        if any(not value for value in normalized):
+            raise ValueError("PrimaryMsaAnnotationColumns may not contain blank column names.")
+        if len(set(normalized)) != len(normalized):
+            raise ValueError("PrimaryMsaAnnotationColumns may not contain duplicate column names.")
+        return self
+
+
+class PrimaryMsaPolicy(BaseModel):
+    """Declarative primary-MSA annotation policy for CoC panel targets."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    definition_version: str = Field(
+        ...,
+        description="MSA definition version used for membership and annotation provenance.",
+    )
+    county_vintage: int | str = Field(
+        ...,
+        description="County geometry vintage used to dissolve MSA boundaries.",
+    )
+    overlap_basis: MsaCocOverlapBasis = Field(
+        default="area",
+        description="Overlap basis used to choose each CoC's primary MSA.",
+    )
+    min_coc_contained_share: float = Field(
+        default=0.0,
+        ge=0.0,
+        le=1.0,
+        description=(
+            "Inclusive minimum CoC-contained share required before annotating "
+            "a primary MSA."
+        ),
+    )
+    acs5_population_vintage: int | str | None = Field(
+        default=None,
+        description="ACS5 tract population vintage required for population-basis overlap.",
+    )
+    acs5_population_reference_year: int | None = Field(
+        default=None,
+        description="Reference year documented for the ACS5 denominator, defaults to vintage.",
+    )
+    tract_vintage: int | str | None = Field(
+        default=None,
+        description="Tract geometry vintage paired with ACS5 population denominators.",
+    )
+    output_columns: PrimaryMsaAnnotationColumns = Field(
+        default_factory=PrimaryMsaAnnotationColumns,
+        description="Column names used for primary-MSA annotations.",
+    )
+
+    @field_validator("definition_version")
+    @classmethod
+    def _validate_definition_version(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("PrimaryMsaPolicy.definition_version must be non-empty.")
+        return value
+
+    @model_validator(mode="after")
+    def _validate_population_denominator(self) -> PrimaryMsaPolicy:
+        if self.overlap_basis == "population":
+            missing = []
+            if self.acs5_population_vintage is None:
+                missing.append("acs5_population_vintage")
+            if self.tract_vintage is None:
+                missing.append("tract_vintage")
+            if missing:
+                raise ValueError(
+                    "PrimaryMsaPolicy population overlap requires "
+                    f"{', '.join(missing)} so the executor can load ACS5 tract "
+                    "population denominators."
+                )
+        return self
+
+
 class PanelPolicy(BaseModel):
     """Declarative panel output and finalization policy.
 
@@ -300,6 +406,13 @@ class PanelPolicy(BaseModel):
             "BLS LAUS metro-native labor-market merge policy (metro targets only). "
             "Declares that the pipeline includes a bls/laus dataset and enables "
             "LAUS-aware conformance checks."
+        ),
+    )
+    primary_msa: PrimaryMsaPolicy | None = Field(
+        default=None,
+        description=(
+            "Primary-MSA annotation policy for CoC panel targets. Null means no "
+            "primary-MSA columns are requested."
         ),
     )
     canonical_population_source: Literal["acs5", "pep", "decennial", "block"] | None = Field(
@@ -485,7 +598,6 @@ ContainmentDenominator = Literal["candidate_area", "container_area"]
 ContainmentMethod = Literal["planar_intersection"]
 MsaCocPopulationSource = Literal["pep", "acs5"]
 MsaCocUnemploymentSource = Literal["acs5", "laus"]
-MsaCocOverlapBasis = Literal["area", "population"]
 SUPPORTED_CONTAINMENT_PAIRS: frozenset[tuple[str, str]] = frozenset(
     {
         ("msa", "coc"),
@@ -907,6 +1019,15 @@ class TargetSpec(BaseModel):
                 raise ValueError(
                     "Target 'containment_filter' candidate geometry must match "
                     f"target geometry type '{self.geometry.type}'."
+                )
+        if self.panel_policy is not None and self.panel_policy.primary_msa is not None:
+            if "panel" not in outputs:
+                raise ValueError(
+                    "Target panel_policy.primary_msa requires outputs to include 'panel'."
+                )
+            if self.geometry.type != "coc":
+                raise ValueError(
+                    "Target panel_policy.primary_msa requires target geometry type 'coc'."
                 )
         if self.msa_coc_panel is not None:
             if "panel" not in outputs:

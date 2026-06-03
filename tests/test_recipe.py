@@ -65,6 +65,8 @@ from hhplab.recipe.recipe_schema import (
     MsaCocCoverageSpec,
     MsaCocPanelSpec,
     PanelPolicy,
+    PrimaryMsaAnnotationColumns,
+    PrimaryMsaPolicy,
     RecipeV1,
     SAEDiagnosticsSpec,
     SAEMeasureConfig,
@@ -2842,6 +2844,7 @@ class TestPanelPolicy:
         assert policy.source_label is None
         assert policy.zori is None
         assert policy.acs1 is None
+        assert policy.primary_msa is None
         assert policy.canonical_population_source is None
         assert policy.column_aliases == {}
         assert policy.output_columns is None
@@ -2882,11 +2885,78 @@ class TestPanelPolicy:
             "urban_population_fraction",
         ]
 
+    def test_primary_msa_policy_area_defaults(self):
+        policy = PrimaryMsaPolicy(
+            definition_version="census_msa_2023",
+            county_vintage=2023,
+        )
+        assert policy.definition_version == "census_msa_2023"
+        assert policy.county_vintage == 2023
+        assert policy.overlap_basis == "area"
+        assert policy.min_coc_contained_share == 0.0
+        assert policy.acs5_population_vintage is None
+        assert policy.tract_vintage is None
+        assert policy.output_columns.msa_id == "primary_msa_id"
+        assert policy.output_columns.contained_share == "primary_msa_coc_contained_share"
+
+    def test_primary_msa_policy_population_basis_requires_denominators(self):
+        from pydantic import ValidationError
+
+        with pytest.raises(ValidationError, match="acs5_population_vintage, tract_vintage"):
+            PrimaryMsaPolicy(
+                definition_version="census_msa_2023",
+                county_vintage=2023,
+                overlap_basis="population",
+            )
+
+    def test_primary_msa_policy_population_basis_accepts_denominators(self):
+        policy = PrimaryMsaPolicy(
+            definition_version="census_msa_2023",
+            county_vintage=2023,
+            overlap_basis="population",
+            acs5_population_vintage=2023,
+            acs5_population_reference_year=2022,
+            tract_vintage=2020,
+        )
+        assert policy.overlap_basis == "population"
+        assert policy.acs5_population_vintage == 2023
+        assert policy.acs5_population_reference_year == 2022
+        assert policy.tract_vintage == 2020
+
+    def test_primary_msa_policy_rejects_unsupported_basis(self):
+        from pydantic import ValidationError
+
+        with pytest.raises(ValidationError, match="overlap_basis"):
+            PrimaryMsaPolicy(
+                definition_version="census_msa_2023",
+                county_vintage=2023,
+                overlap_basis="households",
+            )
+
+    def test_primary_msa_output_columns_validate_names(self):
+        from pydantic import ValidationError
+
+        with pytest.raises(ValidationError, match="duplicate column names"):
+            PrimaryMsaAnnotationColumns(msa_id="primary_msa", msa_name="primary_msa")
+        with pytest.raises(ValidationError, match="blank column names"):
+            PrimaryMsaAnnotationColumns(msa_id=" ")
+
     def test_target_with_panel_policy(self):
         data = _minimal_recipe()
         data["targets"][0]["panel_policy"] = {
             "source_label": "custom_source",
             "zori": {"min_coverage": 0.85},
+            "primary_msa": {
+                "definition_version": "census_msa_2023",
+                "county_vintage": 2023,
+                "min_coc_contained_share": 0.25,
+                "output_columns": {
+                    "msa_id": "primary_msa_cbsa",
+                    "msa_name": "primary_msa_title",
+                    "contained_share": "primary_msa_share",
+                    "overlap_basis": "primary_msa_basis",
+                },
+            },
             "canonical_population_source": "acs5",
             "column_aliases": {"total_population": "total_population_acs5"},
             "output_columns": ["coc_id", "year", "total_population_acs5"],
@@ -2896,6 +2966,10 @@ class TestPanelPolicy:
         assert target.panel_policy is not None
         assert target.panel_policy.source_label == "custom_source"
         assert target.panel_policy.zori.min_coverage == 0.85
+        assert target.panel_policy.primary_msa is not None
+        assert target.panel_policy.primary_msa.definition_version == "census_msa_2023"
+        assert target.panel_policy.primary_msa.min_coc_contained_share == 0.25
+        assert target.panel_policy.primary_msa.output_columns.msa_id == "primary_msa_cbsa"
         assert target.panel_policy.canonical_population_source == "acs5"
         assert target.panel_policy.column_aliases == {
             "total_population": "total_population_acs5",
@@ -2925,11 +2999,27 @@ class TestPanelPolicy:
         with pytest.raises(ValidationError):
             ZoriPolicy(min_coverage=-0.1)
 
+    def test_primary_msa_policy_requires_coc_panel_target(self):
+        data = _minimal_recipe()
+        data["targets"][0]["geometry"] = {"type": "metro", "source": "glynn_fox_v1"}
+        data["targets"][0]["panel_policy"] = {
+            "primary_msa": {
+                "definition_version": "census_msa_2023",
+                "county_vintage": 2023,
+            },
+        }
+        with pytest.raises(RecipeLoadError, match="target geometry type 'coc'"):
+            load_recipe(data)
+
     def test_full_panel_policy_round_trip(self):
         policy = PanelPolicy(
             source_label="test_panel",
             zori=ZoriPolicy(min_coverage=0.95),
             acs1=Acs1Policy(include=True),
+            primary_msa=PrimaryMsaPolicy(
+                definition_version="census_msa_2023",
+                county_vintage=2023,
+            ),
             canonical_population_source="pep",
             column_aliases={"zori_coc": "zori"},
         )
@@ -2938,6 +3028,7 @@ class TestPanelPolicy:
         assert restored.source_label == "test_panel"
         assert restored.zori.min_coverage == 0.95
         assert restored.acs1.include is True
+        assert restored.primary_msa.definition_version == "census_msa_2023"
         assert restored.canonical_population_source == "pep"
         assert restored.column_aliases == {"zori_coc": "zori"}
 
