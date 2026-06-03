@@ -14,6 +14,51 @@ users. Together they cover the current recipe surface:
 - Point-in-time and calendar-mean temporal filters
 - ACS1/ACS5 small-area estimation (SAE) recipe planning and preflight
 
+## Canonical Urban-Fraction Recipes
+
+The repository root includes two canonical selector recipes:
+
+- `recipes/coc-urban-fraction-gte-95-2020.yaml`
+- `recipes/coc-urban-fraction-gte-99-2020.yaml`
+
+Both recipes build one 2020 row per selected CoC and write to the configured
+output root, which defaults to `../HHP-Data` in `hhplab.yaml`. They request
+recipe-native primary MSA annotations through `panel_policy.primary_msa`, so
+no post-run MSA join is needed.
+
+Required curated inputs:
+
+- 2020 CoC boundaries:
+  `hhplab ingest boundaries --source hud_exchange --vintage 2020`
+- 2023 county geometry:
+  `hhplab ingest tiger --year 2023 --type counties`
+- Census MSA 2023 definitions and county membership:
+  `hhplab generate msa --definition-version census_msa_2023`
+- 2020 CoC-to-MSA area crosswalk:
+  `hhplab generate msa-xwalk --boundary 2020 --definition-version census_msa_2023 --counties 2023`
+- 2020 CoC urban-fraction measure:
+  `hhplab build urban-fraction --boundary 2020 --decennial 2020 --urban-area-vintage 2020 --block-vintage 2020`
+
+Run preflight before execution:
+
+```bash
+HHPLAB_NON_INTERACTIVE=1 hhplab build recipe-preflight \
+  --recipe recipes/coc-urban-fraction-gte-95-2020.yaml --json
+
+HHPLAB_NON_INTERACTIVE=1 hhplab build recipe \
+  --recipe recipes/coc-urban-fraction-gte-95-2020.yaml --json
+```
+
+Primary MSA output fields:
+
+| Column | Meaning |
+|--------|---------|
+| `primary_msa_id` | Selected Census MSA / CBSA code, or null when no MSA overlaps the CoC. |
+| `primary_msa_name` | Display name from the requested MSA definition version. |
+| `primary_msa_overlap_basis` | Basis used to select the MSA; the canonical recipes use `area`. |
+| `primary_msa_coc_contained_percent` | Percent of the CoC area contained by the selected MSA. |
+| `primary_msa_covered_by_coc_percent` | Percent of the selected MSA area covered by the CoC. |
+
 ## Cohort-Style Examples
 
 The current recipe DSL builds a target geography and time span, but it does not
