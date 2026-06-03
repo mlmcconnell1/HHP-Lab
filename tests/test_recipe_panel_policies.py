@@ -21,6 +21,7 @@ import pyarrow.parquet as pq
 from hhplab.recipe.executor import execute_recipe
 from hhplab.recipe.executor_panel_policies import collect_conformance_flags
 from hhplab.recipe.loader import load_recipe
+from hhplab.recipe.manifest import read_manifest
 
 # ---------------------------------------------------------------------------
 # ZORI recipe and fixture helpers
@@ -238,9 +239,218 @@ def _setup_acs1_policy_fixtures(tmp_path: Path) -> None:
     }).to_parquet(data_dir / "metro_acs1.parquet")
 
 
+# ---------------------------------------------------------------------------
+# Primary-MSA recipe and fixture helpers
+# ---------------------------------------------------------------------------
+
+def _primary_msa_recipe_dict() -> dict:
+    """CoC panel recipe with panel_policy.primary_msa declared."""
+    return {
+        "version": 1,
+        "name": "primary-msa-policy-test",
+        "universe": {"years": [2020, 2021]},
+        "targets": [
+            {
+                "id": "coc_panel",
+                "geometry": {"type": "coc", "vintage": 2025, "source": "hud_exchange"},
+                "outputs": ["panel"],
+                "panel_policy": {
+                    "primary_msa": {
+                        "definition_version": "census_msa_2023",
+                        "county_vintage": 2023,
+                        "min_coc_contained_share": 0.50,
+                    },
+                    "output_columns": [
+                        "coc_id",
+                        "year",
+                        "pit_total",
+                        "total_population",
+                        "primary_msa_id",
+                        "primary_msa_name",
+                        "primary_msa_overlap_basis",
+                        "primary_msa_coc_contained_percent",
+                        "primary_msa_covered_by_coc_percent",
+                    ],
+                },
+            },
+        ],
+        "datasets": {
+            "pit": {
+                "provider": "hud",
+                "product": "pit",
+                "version": 1,
+                "native_geometry": {"type": "coc"},
+                "years": {"years": [2020, 2021]},
+                "path": "data/pit.parquet",
+            },
+            "pep": {
+                "provider": "census",
+                "product": "pep",
+                "version": 1,
+                "native_geometry": {"type": "coc"},
+                "years": {"years": [2020, 2021]},
+                "path": "data/pep.parquet",
+            },
+        },
+        "transforms": [],
+        "pipelines": [
+            {
+                "id": "main",
+                "target": "coc_panel",
+                "steps": [
+                    {
+                        "resample": {
+                            "dataset": "pit",
+                            "to_geometry": {
+                                "type": "coc",
+                                "vintage": 2025,
+                                "source": "hud_exchange",
+                            },
+                            "method": "identity",
+                            "measures": ["pit_total"],
+                        },
+                    },
+                    {
+                        "resample": {
+                            "dataset": "pep",
+                            "to_geometry": {
+                                "type": "coc",
+                                "vintage": 2025,
+                                "source": "hud_exchange",
+                            },
+                            "method": "identity",
+                            "measures": ["population"],
+                        },
+                    },
+                    {
+                        "join": {
+                            "datasets": ["pit", "pep"],
+                            "join_on": ["geo_id", "year"],
+                        },
+                    },
+                ],
+            },
+        ],
+    }
+
+
+def _setup_primary_msa_fixtures(tmp_path: Path) -> None:
+    """Create CoC panel inputs plus curated MSA artifacts."""
+    data_dir = tmp_path / "data"
+    data_dir.mkdir(parents=True, exist_ok=True)
+
+    coc_ids = ["COC1", "COC2", "COC3"]
+    years = [2020, 2021]
+    pd.DataFrame(
+        {
+            "coc_id": [coc_id for year in years for coc_id in coc_ids],
+            "year": [year for year in years for _coc_id in coc_ids],
+            "pit_total": [100, 200, 300, 110, 210, 310],
+        }
+    ).to_parquet(data_dir / "pit.parquet")
+    pd.DataFrame(
+        {
+            "coc_id": [coc_id for year in years for coc_id in coc_ids],
+            "year": [year for year in years for _coc_id in coc_ids],
+            "population": [1000, 2000, 3000, 1100, 2100, 3100],
+        }
+    ).to_parquet(data_dir / "pep.parquet")
+
+    msa_dir = data_dir / "curated" / "msa"
+    msa_dir.mkdir(parents=True, exist_ok=True)
+    pd.DataFrame(
+        {
+            "msa_id": ["35620", "41180"],
+            "cbsa_code": ["35620", "41180"],
+            "msa_name": ["New York MSA", "St. Louis MSA"],
+        }
+    ).to_parquet(msa_dir / "msa_definitions__census_msa_2023.parquet")
+
+    xwalk_dir = data_dir / "curated" / "xwalks"
+    xwalk_dir.mkdir(parents=True, exist_ok=True)
+    pd.DataFrame(
+        {
+            "coc_id": ["COC1", "COC1", "COC2"],
+            "msa_id": ["41180", "35620", "41180"],
+            "cbsa_code": ["41180", "35620", "41180"],
+            "boundary_vintage": ["2025", "2025", "2025"],
+            "county_vintage": ["2023", "2023", "2023"],
+            "definition_version": ["census_msa_2023"] * 3,
+            "allocation_method": ["area", "area", "area"],
+            "share_column": ["allocation_share", "allocation_share", "allocation_share"],
+            "share_denominator": ["coc_area", "coc_area", "coc_area"],
+            "allocation_share": [0.80, 0.80, 0.40],
+            "intersection_area": [80.0, 80.0, 40.0],
+            "coc_area": [100.0, 100.0, 100.0],
+            "intersecting_county_count": [1, 1, 1],
+            "intersecting_county_fips": ["29510", "36061", "29510"],
+        }
+    ).to_parquet(
+        xwalk_dir / "msa_coc_xwalk__B2025xMcensus_msa_2023xC2023.parquet"
+    )
+
+
 # ===========================================================================
 # ZORI panel policy tests (coclab-gude.2)
 # ===========================================================================
+
+
+class TestPrimaryMsaPanelPolicy:
+    """Recipe executor applies primary-MSA annotations to CoC panels."""
+
+    def test_primary_msa_annotations_project_into_panel_output(self, tmp_path: Path):
+        _setup_primary_msa_fixtures(tmp_path)
+        recipe = load_recipe(_primary_msa_recipe_dict())
+
+        results = execute_recipe(recipe, project_root=tmp_path)
+
+        assert results[0].success
+        panel_path = _find_panel_output(tmp_path)
+        panel = pd.read_parquet(panel_path)
+        assert list(panel.columns) == [
+            "coc_id",
+            "year",
+            "pit_total",
+            "total_population",
+            "primary_msa_id",
+            "primary_msa_name",
+            "primary_msa_overlap_basis",
+            "primary_msa_coc_contained_percent",
+            "primary_msa_covered_by_coc_percent",
+        ]
+        assert len(panel) == 6
+
+        coc1 = panel[panel["coc_id"] == "COC1"]
+        assert set(coc1["primary_msa_id"]) == {"35620"}
+        assert set(coc1["primary_msa_name"]) == {"New York MSA"}
+        assert set(coc1["primary_msa_overlap_basis"]) == {"area"}
+        assert coc1["primary_msa_coc_contained_percent"].tolist() == [80.0, 80.0]
+        assert coc1["primary_msa_covered_by_coc_percent"].isna().all()
+
+        coc2 = panel[panel["coc_id"] == "COC2"]
+        assert coc2["primary_msa_id"].isna().all()
+        coc3 = panel[panel["coc_id"] == "COC3"]
+        assert coc3["primary_msa_id"].isna().all()
+
+    def test_primary_msa_artifacts_are_recorded_in_manifest_and_provenance(
+        self,
+        tmp_path: Path,
+    ):
+        _setup_primary_msa_fixtures(tmp_path)
+        recipe = load_recipe(_primary_msa_recipe_dict())
+
+        execute_recipe(recipe, project_root=tmp_path)
+
+        panel_path = _find_panel_output(tmp_path)
+        manifest = read_manifest(panel_path.with_suffix(".manifest.json"))
+        asset_paths = {asset.path for asset in manifest.assets}
+        assert "curated/xwalks/msa_coc_xwalk__B2025xMcensus_msa_2023xC2023.parquet" in asset_paths
+        assert "curated/msa/msa_definitions__census_msa_2023.parquet" in asset_paths
+
+        metadata = pq.read_metadata(panel_path).schema.to_arrow_schema().metadata
+        provenance = json.loads(metadata[b"hhplab_provenance"])
+        provenance_paths = {asset["path"] for asset in provenance["consumed_assets"]}
+        assert asset_paths <= provenance_paths
 
 
 class TestZoriPanelPolicy:

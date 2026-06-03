@@ -18,6 +18,11 @@ from dataclasses import dataclass, field
 
 import pandas as pd
 
+from hhplab.config import load_config
+from hhplab.msa.coverage import select_primary_msa_for_cocs
+from hhplab.msa.crosswalk import read_coc_msa_crosswalk
+from hhplab.msa.msa_io import read_msa_definitions
+from hhplab.naming import msa_coc_xwalk_path, msa_definitions_path
 from hhplab.panel.finalize import (
     ZORI_COLUMNS,
     ZORI_PROVENANCE_COLUMNS,
@@ -27,6 +32,7 @@ from hhplab.recipe.executor_core import (
     ExecutionContext,
     ExecutorError,
     StepResult,
+    _classify_path,
     _echo,
 )
 from hhplab.recipe.executor_manifest import (
@@ -38,13 +44,17 @@ from hhplab.recipe.executor_panel_policies import (
     PanelPolicyApplier,
     PolicyApplication,
 )
+from hhplab.recipe.manifest import AssetRecord
 from hhplab.recipe.planner import ExecutionPlan
 from hhplab.recipe.recipe_schema import (
     CohortSelector,
     PanelPolicy,
 )
 from hhplab.recipe.schema_common import GeometryRef, expand_year_spec
-from hhplab.schema.columns import POPULATION_DENSITY_COLUMN, TOTAL_POPULATION
+from hhplab.schema.columns import (
+    POPULATION_DENSITY_COLUMN,
+    TOTAL_POPULATION,
+)
 from hhplab.schema.lineage import (
     PopulationMethod,
     PopulationSource,
@@ -786,6 +796,111 @@ def _project_panel_output(panel: pd.DataFrame, policy: PanelPolicy | None) -> pd
     return panel.loc[:, policy.output_columns].copy()
 
 
+def _record_panel_policy_asset(
+    ctx: ExecutionContext,
+    path,
+    *,
+    role: str,
+) -> None:
+    identity = ctx.cache.file_identity(path)
+    root, rel = _classify_path(path, ctx)
+    ctx.consumed_assets.append(
+        AssetRecord(
+            role=role,
+            path=rel,
+            sha256=identity.sha256,
+            size=identity.size,
+            root=root,
+        )
+    )
+
+
+def _add_primary_msa_annotations(
+    panel: pd.DataFrame,
+    *,
+    ctx: ExecutionContext,
+    policy: PanelPolicy | None,
+    boundary_vintage: str | None,
+) -> tuple[pd.DataFrame, list[str]]:
+    """Apply ``panel_policy.primary_msa`` to a CoC panel."""
+    primary_policy = policy.primary_msa if policy is not None else None
+    if primary_policy is None:
+        return panel, []
+    if primary_policy.overlap_basis != "area":
+        raise ExecutorError(
+            "target.panel_policy.primary_msa currently supports overlap_basis='area' "
+            "during panel assembly. Use area overlap or add a recipe-native "
+            "MSA-CoC coverage artifact for population-basis primary MSA annotations."
+        )
+    if boundary_vintage is None:
+        raise ExecutorError(
+            "target.panel_policy.primary_msa requires the CoC target geometry to declare "
+            "a boundary vintage."
+        )
+    if "coc_id" not in panel.columns:
+        raise ExecutorError("target.panel_policy.primary_msa requires a panel with 'coc_id'.")
+
+    cfg = ctx.storage_config or load_config(project_root=ctx.project_root)
+    data_root = cfg.asset_store_root
+    xwalk_file = msa_coc_xwalk_path(
+        str(boundary_vintage),
+        primary_policy.definition_version,
+        primary_policy.county_vintage,
+        data_root,
+    )
+    definitions_file = msa_definitions_path(primary_policy.definition_version, data_root)
+    missing = [path for path in (xwalk_file, definitions_file) if not path.exists()]
+    if missing:
+        rel_missing = [str(path.relative_to(ctx.project_root)) for path in missing]
+        raise ExecutorError(
+            "target.panel_policy.primary_msa requires MSA-CoC overlap artifacts. "
+            f"Missing: {rel_missing}. Run `hhplab generate msa-xwalk "
+            f"--boundaries {boundary_vintage} --counties {primary_policy.county_vintage}` "
+            "and `hhplab generate msa` for the requested definition version."
+        )
+
+    crosswalk = read_coc_msa_crosswalk(
+        str(boundary_vintage),
+        primary_policy.definition_version,
+        str(primary_policy.county_vintage),
+        base_dir=data_root,
+    )
+    definitions = read_msa_definitions(primary_policy.definition_version, base_dir=data_root)
+    if {"msa_id", "msa_name"} <= set(definitions.columns):
+        crosswalk = crosswalk.merge(
+            definitions[["msa_id", "msa_name"]].drop_duplicates("msa_id"),
+            on="msa_id",
+            how="left",
+        )
+    annotations = select_primary_msa_for_cocs(
+        crosswalk,
+        coc_ids=tuple(panel["coc_id"].dropna().astype(str).unique()),
+        overlap_basis=primary_policy.overlap_basis,
+        min_coc_contained_share=primary_policy.min_coc_contained_share,
+    )
+    columns = primary_policy.output_columns
+    annotations = annotations.rename(
+        columns={
+            "primary_msa_id": columns.msa_id,
+            "primary_msa_name": columns.msa_name,
+            "primary_msa_overlap_basis": columns.overlap_basis,
+            "primary_msa_coc_contained_percent": columns.contained_share,
+        }
+    )
+
+    result = panel.merge(annotations, on="coc_id", how="left")
+    _record_panel_policy_asset(ctx, xwalk_file, role="crosswalk")
+    _record_panel_policy_asset(ctx, definitions_file, role="definition")
+    extras = [
+        columns.msa_id,
+        columns.msa_name,
+        columns.overlap_basis,
+        columns.contained_share,
+        "primary_msa_covered_by_coc_percent",
+    ]
+    return result, extras
+
+
 def assemble_panel(
     plan: ExecutionPlan,
     ctx: ExecutionContext,
@@ -889,6 +1004,13 @@ def assemble_panel(
                 panel,
                 project_root=ctx.project_root,
             )
+            panel, primary_msa_extras = _add_primary_msa_annotations(
+                panel,
+                ctx=ctx,
+                policy=policy,
+                boundary_vintage=boundary_vintage,
+            )
+            extras.extend(primary_msa_extras)
         except ExecutorError as exc:
             return StepResult(
                 step_kind=step_kind,
