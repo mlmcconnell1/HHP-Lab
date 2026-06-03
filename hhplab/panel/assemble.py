@@ -930,9 +930,9 @@ def _add_coc_population_density(
         return result
     if "coc_id" not in result.columns or "boundary_vintage_used" not in result.columns:
         return result
-    if TOTAL_POPULATION not in result.columns:
+    population_col = next((col for col in population_columns if col in result.columns), None)
+    if population_col is None:
         return result
-    population_col = TOTAL_POPULATION
 
     boundary_vintages = sorted(
         str(v) for v in result["boundary_vintage_used"].dropna().unique().tolist()

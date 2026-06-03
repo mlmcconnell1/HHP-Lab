@@ -347,13 +347,19 @@ def _add_recipe_coc_population_density(
     """Derive CoC population density for recipe-built panels."""
     if panel.empty:
         return panel
-    if TOTAL_POPULATION not in panel.columns:
+    urban_fraction_population_col = "coc_total_population"
+    population_columns = (
+        (TOTAL_POPULATION, urban_fraction_population_col)
+        if urban_fraction_population_col in panel.columns
+        else (TOTAL_POPULATION,)
+    )
+    if not any(column in panel.columns for column in population_columns):
         if POPULATION_DENSITY_COLUMN in panel.columns:
             raise ExecutorError(
                 "Cannot derive population_density_per_sq_km because no canonical "
-                "total_population column is available. Add a population measure or "
-                "set target.panel_policy.canonical_population_source when multiple "
-                "population sources are present."
+                "population column is available. Add total_population, "
+                "coc_total_population, or set target.panel_policy."
+                "canonical_population_source when multiple population sources are present."
             )
         return panel
 
@@ -362,6 +368,7 @@ def _add_recipe_coc_population_density(
     return _add_coc_population_density(
         panel,
         boundaries_dir=project_root / "data" / "curated" / "coc_boundaries",
+        population_columns=population_columns,
     )
 
 
@@ -766,6 +773,19 @@ def _stamp_recipe_acs5_provenance(
     return result
 
 
+def _project_panel_output(panel: pd.DataFrame, policy: PanelPolicy | None) -> pd.DataFrame:
+    """Apply an explicit final panel projection declared by the recipe."""
+    if policy is None or policy.output_columns is None:
+        return panel
+    missing = [column for column in policy.output_columns if column not in panel.columns]
+    if missing:
+        raise ExecutorError(
+            "Target panel_policy.output_columns references missing columns "
+            f"{missing}. Available columns: {sorted(panel.columns.tolist())}"
+        )
+    return panel.loc[:, policy.output_columns].copy()
+
+
 def assemble_panel(
     plan: ExecutionPlan,
     ctx: ExecutionContext,
@@ -916,6 +936,16 @@ def assemble_panel(
             f"  [cohort] {target.cohort.method} rank_by={target.cohort.rank_by} "
             f"ref_year={target.cohort.reference_year}: "
             f"{pre_count} → {post_count} geographies",
+        )
+
+    try:
+        panel = _project_panel_output(panel, policy)
+    except ExecutorError as exc:
+        return StepResult(
+            step_kind=step_kind,
+            detail=f"{step_kind}",
+            success=False,
+            error=str(exc),
         )
 
     return AssembledPanel(

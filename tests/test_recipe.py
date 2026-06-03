@@ -2844,6 +2844,7 @@ class TestPanelPolicy:
         assert policy.acs1 is None
         assert policy.canonical_population_source is None
         assert policy.column_aliases == {}
+        assert policy.output_columns is None
 
     def test_zori_policy_defaults(self):
         zori = ZoriPolicy()
@@ -2867,6 +2868,20 @@ class TestPanelPolicy:
         assert policy.column_aliases["total_population"] == "total_population_acs5"
         assert policy.column_aliases["population"] == "pep_population"
 
+    def test_panel_policy_with_output_columns(self):
+        policy = PanelPolicy(
+            output_columns=[
+                "coc_id",
+                "year",
+                "urban_population_fraction",
+            ],
+        )
+        assert policy.output_columns == [
+            "coc_id",
+            "year",
+            "urban_population_fraction",
+        ]
+
     def test_target_with_panel_policy(self):
         data = _minimal_recipe()
         data["targets"][0]["panel_policy"] = {
@@ -2874,6 +2889,7 @@ class TestPanelPolicy:
             "zori": {"min_coverage": 0.85},
             "canonical_population_source": "acs5",
             "column_aliases": {"total_population": "total_population_acs5"},
+            "output_columns": ["coc_id", "year", "total_population_acs5"],
         }
         recipe = load_recipe(data)
         target = recipe.targets[0]
@@ -2884,6 +2900,11 @@ class TestPanelPolicy:
         assert target.panel_policy.column_aliases == {
             "total_population": "total_population_acs5",
         }
+        assert target.panel_policy.output_columns == [
+            "coc_id",
+            "year",
+            "total_population_acs5",
+        ]
 
     def test_target_without_panel_policy(self):
         data = _minimal_recipe()

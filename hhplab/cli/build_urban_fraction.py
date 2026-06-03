@@ -143,8 +143,15 @@ def build_urban_fraction(
         return
 
     try:
+        if not output_json:
+            typer.echo("Loading CoC boundaries and Census Urban Areas...")
         coc_gdf = gpd.read_parquet(paths["coc_boundaries"])
         urban_area_gdf = gpd.read_parquet(paths["urban_areas"])
+        if not output_json:
+            typer.echo(
+                f"  Loaded {len(coc_gdf):,} CoC boundary row(s) and "
+                f"{len(urban_area_gdf):,} urban area row(s)."
+            )
         summary, detail, chunk_count = _build_coc_urban_fraction_chunked(
             coc_gdf,
             urban_area_gdf,
@@ -357,18 +364,31 @@ def _build_coc_urban_fraction_chunked(
 ) -> tuple[pd.DataFrame, pd.DataFrame, int]:
     """Build urban fractions one state at a time to bound peak memory."""
     states = _available_block_states(pl_blocks_path)
+    if progress:
+        typer.echo(
+            f"Processing {len(states)} state/territory block chunk(s): "
+            f"{', '.join(states)}"
+        )
     intersection_parts: list[pd.DataFrame] = []
     processed_chunks = 0
 
     for state_fips in states:
         started_at = time.perf_counter()
+        if progress:
+            typer.echo(f"Loading block chunk candidate: state_fips={state_fips}")
         block_gdf = _load_block_inputs_for_state(
             pl_blocks_path,
             block_geometry_path,
             state_fips=state_fips,
         )
+        if progress:
+            typer.echo(f"  Loaded {len(block_gdf):,} block rows.")
+            typer.echo("  Finding overlapping CoCs...")
         state_coc = _coc_overlapping_blocks(coc_gdf, block_gdf)
         if state_coc.empty:
+            if progress:
+                elapsed_seconds = time.perf_counter() - started_at
+                typer.echo(f"  No overlapping CoCs; skipped in {elapsed_seconds:.1f}s.")
             continue
         processed_chunks += 1
         if progress:
@@ -377,7 +397,7 @@ def _build_coc_urban_fraction_chunked(
                 f"{processed_chunks}: state_fips={state_fips}, "
                 f"cocs={len(state_coc)}"
             )
-            typer.echo(f"  Loaded {len(block_gdf):,} block rows.")
+            typer.echo("  Building block urban classifications and CoC intersections...")
         intersections = build_coc_urban_fraction_intersections(
             state_coc,
             block_gdf,
@@ -392,6 +412,11 @@ def _build_coc_urban_fraction_chunked(
                 f"in {elapsed_seconds:.1f}s."
             )
 
+    if progress:
+        typer.echo(
+            f"Summarizing {sum(len(part) for part in intersection_parts):,} "
+            "block/CoC intersection row(s)..."
+        )
     all_intersections = (
         pd.concat(intersection_parts, ignore_index=True)
         if intersection_parts

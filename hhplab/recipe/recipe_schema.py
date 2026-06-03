@@ -317,6 +317,25 @@ class PanelPolicy(BaseModel):
             "E.g. {'total_population': 'acs_total_population', 'population': 'pep_population'}."
         ),
     )
+    output_columns: list[str] | None = Field(
+        default=None,
+        description=(
+            "Optional final output projection after aliases and cohort filters. "
+            "When set, panel output contains exactly these columns in this order."
+        ),
+    )
+
+    @field_validator("output_columns")
+    @classmethod
+    def _validate_output_columns(cls, value: list[str] | None) -> list[str] | None:
+        if value is None:
+            return value
+        normalized = [column.strip() for column in value]
+        if any(not column for column in normalized):
+            raise ValueError("PanelPolicy.output_columns may not contain blank column names.")
+        if len(set(normalized)) != len(normalized):
+            raise ValueError("PanelPolicy.output_columns may not contain duplicate column names.")
+        return normalized
 
 
 class MapLayerStyle(BaseModel):

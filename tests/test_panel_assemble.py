@@ -626,8 +626,8 @@ class TestBuildPanel:
             }
         )
 
-    def test_density_ignores_requested_noncanonical_population_column(self, data_dirs):
-        """Population density does not use caller-selected source-native columns."""
+    def test_density_uses_requested_population_column(self, data_dirs):
+        """Population density can use an explicit noncanonical population column."""
         panel = pd.DataFrame(
             {
                 "coc_id": ["CO-500"],
@@ -642,7 +642,9 @@ class TestBuildPanel:
             population_columns=("population",),
         )
 
-        assert pd.isna(result.loc[0, "population_density_per_sq_km"])
+        assert result.loc[0, "population_density_per_sq_km"] == pytest.approx(
+            500000.0 / 100.0
+        )
 
     def test_build_sets_source_column(self, data_dirs):
         """Test that source column is set to hhplab_panel."""

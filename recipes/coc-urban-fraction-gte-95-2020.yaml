@@ -1,0 +1,70 @@
+# Full-universe CoCs whose 2020 decennial urban population fraction is at
+# least 0.95, including Puerto Rico.
+
+version: 1
+name: coc_urban_fraction_gte_95_2020
+description: >
+  Build the canonical 2020 selector list of CoCs whose decennial block-based
+  urban population fraction is at least 0.95. The selector uses the full 2020
+  CoC boundary universe, including Puerto Rico, and outputs only CoC identity,
+  year, urban fraction, CoC population, and population density.
+
+universe:
+  years: [2020]
+
+targets:
+  - id: urban_fraction_gte_95
+    geometry: { type: coc, vintage: 2020, source: hud_exchange }
+    outputs: [panel]
+    panel_policy:
+      column_aliases:
+        coc_total_population: coc_population
+      output_columns:
+        - coc_id
+        - coc_name
+        - year
+        - urban_population_fraction
+        - coc_population
+        - population_density_per_sq_km
+    cohort:
+      rank_by: urban_population_fraction
+      method: predicate
+      operator: gte
+      value: 0.95
+      reference_year: 2020
+
+datasets:
+  urban_fraction:
+    provider: census
+    product: urban_fraction
+    version: 1
+    native_geometry: { type: coc, vintage: 2020, source: hud_exchange }
+    years: { years: [2020] }
+    geo_column: coc_id
+    params:
+      boundary_vintage: 2020
+      decennial_vintage: 2020
+      urban_area_vintage: 2020
+      block_vintage: 2020
+      broadcast_static: true
+    path: data/curated/measures/coc_urban_fraction__N2020@B2020xU2020xK2020.parquet
+
+pipelines:
+  - id: build_urban_fraction_gte_95
+    target: urban_fraction_gte_95
+    steps:
+      - resample:
+          dataset: urban_fraction
+          to_geometry: { type: coc, vintage: 2020, source: hud_exchange }
+          method: identity
+          measures:
+            coc_total_population: { aggregation: sum }
+            urban_population_fraction: { aggregation: mean }
+
+      - join:
+          datasets: [urban_fraction]
+          join_on: [geo_id, year]
+
+validation:
+  missing_dataset:
+    default: fail
