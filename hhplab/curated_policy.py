@@ -49,9 +49,11 @@ CURATED_SUBDIRS: set[str] = {
 
 # ---- Canonical filename patterns per subdirectory ----
 
+COC_BOUNDARY_TOKEN = r"B\d{4}(?:_non_pr)?"
+
 CANONICAL_PATTERNS: dict[str, list[re.Pattern[str]]] = {
     "coc_boundaries": [
-        re.compile(r"^coc__B\d{4}\.parquet$"),
+        re.compile(rf"^coc__{COC_BOUNDARY_TOKEN}\.parquet$"),
         re.compile(r"^boundaries__B\d{4}\.parquet$"),  # legacy but recognised
     ],
     "tiger": [
@@ -79,11 +81,20 @@ CANONICAL_PATTERNS: dict[str, list[re.Pattern[str]]] = {
         re.compile(r"^county_weights__A\d{4}__w\w+\.parquet$"),
     ],
     "measures": [
-        re.compile(r"^measures__A\d{4}(\(\d{4}\))?@B\d{4}(xT\d{4})?\.parquet$"),
+        re.compile(
+            rf"^measures__A\d{{4}}(\(\d{{4}}\))?@{COC_BOUNDARY_TOKEN}"
+            r"(xT\d{4})?\.parquet$"
+        ),
         re.compile(r"^measures__metro__A\d{4}@D\w+(xT\d{4})?\.parquet$"),
         re.compile(r"^measures__metro__acs1__A\d{4}@D\w+\.parquet$"),
-        re.compile(r"^coc_urban_fraction__N\d{4}@B\d{4}xU\d{4}xK\d{4}\.parquet$"),
-        re.compile(r"^coc_urban_area_detail__N\d{4}@B\d{4}xU\d{4}xK\d{4}\.parquet$"),
+        re.compile(
+            rf"^coc_urban_fraction__N\d{{4}}@{COC_BOUNDARY_TOKEN}"
+            r"xU\d{4}xK\d{4}\.parquet$"
+        ),
+        re.compile(
+            rf"^coc_urban_area_detail__N\d{{4}}@{COC_BOUNDARY_TOKEN}"
+            r"xU\d{4}xK\d{4}\.parquet$"
+        ),
     ],
     "zori": [
         re.compile(r"^zori__A\d{4}@B\d{4}xC\d{4}__w\w+\.parquet$"),

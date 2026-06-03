@@ -119,6 +119,7 @@ class TestCanonicalFilenamesAccepted:
         "subdir, good_name",
         [
             ("coc_boundaries", "coc__B2025.parquet"),
+            ("coc_boundaries", "coc__B2020_non_pr.parquet"),
             ("coc_boundaries", "boundaries__B2024.parquet"),
             ("tiger", "tracts__T2023.parquet"),
             ("tiger", "counties__C2023.parquet"),
@@ -137,9 +138,15 @@ class TestCanonicalFilenamesAccepted:
             ("acs", "county_weights__A2023__wrenter.parquet"),
             ("measures", "measures__A2023@B2025xT2023.parquet"),
             ("measures", "measures__A2023@B2025.parquet"),
+            ("measures", "measures__A2020@B2020_non_pr.parquet"),
             ("measures", "measures__A2015(2013)@B2013xT2010.parquet"),
             ("measures", "coc_urban_fraction__N2020@B2025xU2020xK2020.parquet"),
+            ("measures", "coc_urban_fraction__N2020@B2020_non_prxU2020xK2020.parquet"),
             ("measures", "coc_urban_area_detail__N2010@B2025xU2010xK2010.parquet"),
+            (
+                "measures",
+                "coc_urban_area_detail__N2020@B2020_non_prxU2020xK2020.parquet",
+            ),
             ("zori", "zori__A2023@B2025xC2023__wrenter.parquet"),
             ("zori", "zori_yearly__A2023@B2025xC2023__wrenter__mpit_january.parquet"),
             ("zori", "zori__county__Z2026.parquet"),
@@ -181,6 +188,22 @@ class TestCanonicalFilenamesAccepted:
         _touch(curated / subdir / good_name)
         violations = validate_curated_layout(curated)
         assert violations == [], f"Unexpected violation for {subdir}/{good_name}: {violations}"
+
+    @pytest.mark.parametrize(
+        "subdir, bad_name",
+        [
+            ("coc_boundaries", "coc__B2020_non_contiguous.parquet"),
+            ("measures", "coc_urban_fraction__N2020@B2020_non_contiguousxU2020xK2020.parquet"),
+        ],
+    )
+    def test_unknown_boundary_selector_rejected(
+        self, tmp_path: Path, subdir: str, bad_name: str
+    ) -> None:
+        curated = tmp_path / "curated"
+        _touch(curated / subdir / bad_name)
+        violations = validate_curated_layout(curated)
+        assert len(violations) == 1
+        assert violations[0].category == "non_canonical"
 
 
 class TestNestedPaths:
