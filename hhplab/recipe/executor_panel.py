@@ -24,6 +24,7 @@ from hhplab.msa.crosswalk import read_coc_msa_crosswalk
 from hhplab.msa.msa_io import read_msa_county_membership, read_msa_definitions
 from hhplab.naming import (
     acs5_tracts_filename,
+    decennial_tracts_filename,
     msa_coc_xwalk_path,
     msa_county_membership_path,
     msa_definitions_path,
@@ -822,9 +823,43 @@ def _record_panel_policy_asset(
 
 
 def _primary_msa_population_reference_year(primary_policy) -> int:
+    if primary_policy.population_source == "decennial":
+        return int(primary_policy.decennial_population_vintage)
     return int(
         primary_policy.acs5_population_reference_year
         or primary_policy.acs5_population_vintage
+    )
+
+
+def _primary_msa_population_path(data_root, primary_policy):
+    if primary_policy.population_source == "decennial":
+        if primary_policy.decennial_population_vintage is None:
+            raise ExecutorError(
+                "target.panel_policy.primary_msa overlap_basis='population' with "
+                "population_source='decennial' requires decennial_population_vintage."
+            )
+        return (
+            data_root
+            / "curated"
+            / "census"
+            / decennial_tracts_filename(
+                primary_policy.decennial_population_vintage,
+                primary_policy.tract_vintage,
+            )
+        )
+    if primary_policy.acs5_population_vintage is None:
+        raise ExecutorError(
+            "target.panel_policy.primary_msa overlap_basis='population' with "
+            "population_source='acs5' requires acs5_population_vintage."
+        )
+    return (
+        data_root
+        / "curated"
+        / "acs"
+        / acs5_tracts_filename(
+            str(primary_policy.acs5_population_vintage),
+            primary_policy.tract_vintage,
+        )
     )
 
 
@@ -836,25 +871,17 @@ def _read_primary_msa_population_overlap(
     primary_policy,
     coc_ids: tuple[str, ...],
 ) -> tuple[pd.DataFrame, list]:
-    if primary_policy.acs5_population_vintage is None or primary_policy.tract_vintage is None:
+    if primary_policy.tract_vintage is None:
         raise ExecutorError(
             "target.panel_policy.primary_msa overlap_basis='population' requires "
-            "acs5_population_vintage and tract_vintage."
+            "tract_vintage."
         )
 
     membership_file = msa_county_membership_path(primary_policy.definition_version, data_root)
     definitions_file = msa_definitions_path(primary_policy.definition_version, data_root)
     xwalk_file = tract_xwalk_path(boundary_vintage, primary_policy.tract_vintage, data_root)
-    acs_file = (
-        data_root
-        / "curated"
-        / "acs"
-        / acs5_tracts_filename(
-            str(primary_policy.acs5_population_vintage),
-            primary_policy.tract_vintage,
-        )
-    )
-    artifacts = [xwalk_file, membership_file, definitions_file, acs_file]
+    population_file = _primary_msa_population_path(data_root, primary_policy)
+    artifacts = [xwalk_file, membership_file, definitions_file, population_file]
     missing = [path for path in artifacts if not path.exists()]
     if missing:
         rel_missing = [str(path.relative_to(ctx.project_root)) for path in missing]
@@ -875,24 +902,29 @@ def _read_primary_msa_population_overlap(
     xwalk["county_fips"] = xwalk["tract_geoid"].str[:5]
     xwalk["area_share"] = pd.to_numeric(xwalk["area_share"], errors="coerce").fillna(0.0)
 
-    acs = pd.read_parquet(acs_file)
+    population = pd.read_parquet(population_file)
     tract_col = next(
-        (column for column in ("tract_geoid", "GEOID", "geoid") if column in acs.columns),
+        (column for column in ("tract_geoid", "GEOID", "geoid") if column in population.columns),
         None,
     )
-    if tract_col is None or "total_population" not in acs.columns:
+    if tract_col is None or "total_population" not in population.columns:
         raise ExecutorError(
-            "target.panel_policy.primary_msa overlap_basis='population' requires ACS5 "
+            "target.panel_policy.primary_msa overlap_basis='population' requires "
             "tract population rows with tract_geoid/GEOID/geoid and total_population."
         )
-    acs = acs.copy()
-    if "year" in acs.columns:
-        acs = acs[acs["year"].astype(str) == str(primary_policy.acs5_population_vintage)].copy()
-    acs["tract_geoid"] = acs[tract_col].astype(str).str.zfill(11)
-    acs["total_population"] = pd.to_numeric(acs["total_population"], errors="coerce").fillna(0.0)
-    acs = acs[["tract_geoid", "total_population"]].drop_duplicates("tract_geoid")
+    population = population.copy()
+    if primary_policy.population_source == "acs5" and "year" in population.columns:
+        population = population[
+            population["year"].astype(str) == str(primary_policy.acs5_population_vintage)
+        ].copy()
+    population["tract_geoid"] = population[tract_col].astype(str).str.zfill(11)
+    population["total_population"] = pd.to_numeric(
+        population["total_population"],
+        errors="coerce",
+    ).fillna(0.0)
+    population = population[["tract_geoid", "total_population"]].drop_duplicates("tract_geoid")
 
-    allocated = xwalk.merge(acs, on="tract_geoid", how="left")
+    allocated = xwalk.merge(population, on="tract_geoid", how="left")
     allocated["total_population"] = allocated["total_population"].fillna(0.0)
     allocated["allocated_population"] = allocated["total_population"] * allocated["area_share"]
     allocated = allocated.merge(membership, on="county_fips", how="inner")

@@ -816,14 +816,22 @@ def _setup_msa_coc_panel_source_artifacts(
         ).to_parquet(data_dir / "laus.parquet")
 
 
-def _primary_msa_preflight_recipe(*, overlap_basis: str = "area") -> dict:
+def _primary_msa_preflight_recipe(
+    *,
+    overlap_basis: str = "area",
+    population_source: str = "acs5",
+) -> dict:
     policy: dict[str, object] = {
         "definition_version": "census_msa_2023",
         "county_vintage": 2023,
         "overlap_basis": overlap_basis,
     }
     if overlap_basis == "population":
-        policy["acs5_population_vintage"] = 2023
+        policy["population_source"] = population_source
+        if population_source == "decennial":
+            policy["decennial_population_vintage"] = 2020
+        else:
+            policy["acs5_population_vintage"] = 2023
         policy["tract_vintage"] = 2020
     return {
         "version": 1,
@@ -875,6 +883,7 @@ def _setup_primary_msa_preflight_artifacts(
     include_crosswalk: bool = True,
     crosswalk_complete: bool = True,
     include_population: bool = False,
+    population_source: str = "acs5",
 ) -> None:
     data_dir = tmp_path / "data"
     data_dir.mkdir(parents=True, exist_ok=True)
@@ -914,15 +923,27 @@ def _setup_primary_msa_preflight_artifacts(
         pd.DataFrame({"GEOID": ["08031000100"]}).to_parquet(
             tiger_dir / "tracts__T2020.parquet"
         )
-        acs_dir = data_dir / "curated" / "acs"
-        acs_dir.mkdir(parents=True, exist_ok=True)
-        pd.DataFrame(
-            {
-                "GEOID": ["08031000100"],
-                "year": [2023],
-                "total_population": [100],
-            }
-        ).to_parquet(acs_dir / "acs5_tracts__A2023xT2020.parquet")
+        if population_source == "decennial":
+            census_dir = data_dir / "curated" / "census"
+            census_dir.mkdir(parents=True, exist_ok=True)
+            pd.DataFrame(
+                {
+                    "tract_geoid": ["08031000100"],
+                    "total_population": [100],
+                    "decennial_vintage": ["2020"],
+                    "tract_vintage": ["2020"],
+                }
+            ).to_parquet(census_dir / "decennial_tracts__N2020xT2020.parquet")
+        else:
+            acs_dir = data_dir / "curated" / "acs"
+            acs_dir.mkdir(parents=True, exist_ok=True)
+            pd.DataFrame(
+                {
+                    "GEOID": ["08031000100"],
+                    "year": [2023],
+                    "total_population": [100],
+                }
+            ).to_parquet(acs_dir / "acs5_tracts__A2023xT2020.parquet")
 
 
 class TestRunPreflight:
@@ -970,7 +991,10 @@ class TestRunPreflight:
         self,
         tmp_path: Path,
     ):
-        data = _primary_msa_preflight_recipe(overlap_basis="population")
+        data = _primary_msa_preflight_recipe(
+            overlap_basis="population",
+            population_source="decennial",
+        )
         _setup_primary_msa_preflight_artifacts(tmp_path)
 
         recipe = load_recipe(data)
@@ -982,19 +1006,23 @@ class TestRunPreflight:
             if f.kind == FindingKind.MISSING_PRIMARY_MSA_ARTIFACT
             and (
                 "tract geometry artifact" in f.message
-                or "ACS5 tract population artifact" in f.message
+                or "decennial tract population artifact" in f.message
             )
         ]
         assert {finding.remediation.command for finding in findings if finding.remediation} == {
             "hhplab ingest tiger --year 2020 --type tracts",
-            "hhplab ingest acs5-tract --acs 2023 --tracts 2020",
+            "hhplab ingest decennial-tracts --decennial 2020 --tracts 2020",
         }
 
     def test_primary_msa_preflight_ready_when_artifacts_exist(self, tmp_path: Path):
-        data = _primary_msa_preflight_recipe(overlap_basis="population")
+        data = _primary_msa_preflight_recipe(
+            overlap_basis="population",
+            population_source="decennial",
+        )
         _setup_primary_msa_preflight_artifacts(
             tmp_path,
             include_population=True,
+            population_source="decennial",
         )
 
         recipe = load_recipe(data)

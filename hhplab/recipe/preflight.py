@@ -35,6 +35,7 @@ from hhplab.naming import (
     coc_base_path,
     coc_urban_fraction_path,
     county_path,
+    decennial_tracts_filename,
     metro_boundaries_path,
     msa_boundaries_path,
     msa_coc_xwalk_path,
@@ -1434,7 +1435,11 @@ def _check_primary_msa_artifacts(
                     f"hhplab ingest tiger --year {spec.tract_vintage} --type tracts",
                     (("GEOID", "geoid", "tract_geoid"),),
                 )
-            if spec.acs5_population_vintage is not None and spec.tract_vintage is not None:
+            if (
+                spec.population_source == "acs5"
+                and spec.acs5_population_vintage is not None
+                and spec.tract_vintage is not None
+            ):
                 artifact_paths["ACS5 tract population artifact"] = (
                     data_root
                     / "curated"
@@ -1448,6 +1453,27 @@ def _check_primary_msa_artifacts(
                     None,
                     "hhplab ingest acs5-tract "
                     f"--acs {spec.acs5_population_vintage} "
+                    f"--tracts {spec.tract_vintage}",
+                    (("GEOID", "tract_geoid"), ("total_population",)),
+                )
+            if (
+                spec.population_source == "decennial"
+                and spec.decennial_population_vintage is not None
+                and spec.tract_vintage is not None
+            ):
+                artifact_paths["decennial tract population artifact"] = (
+                    data_root
+                    / "curated"
+                    / "census"
+                    / decennial_tracts_filename(
+                        spec.decennial_population_vintage,
+                        spec.tract_vintage,
+                    ),
+                    "tract",
+                    str(spec.tract_vintage),
+                    None,
+                    "hhplab ingest decennial-tracts "
+                    f"--decennial {spec.decennial_population_vintage} "
                     f"--tracts {spec.tract_vintage}",
                     (("GEOID", "tract_geoid"), ("total_population",)),
                 )

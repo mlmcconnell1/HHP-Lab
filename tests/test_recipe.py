@@ -2923,6 +2923,20 @@ class TestPanelPolicy:
         assert policy.acs5_population_reference_year == 2022
         assert policy.tract_vintage == 2020
 
+    def test_primary_msa_policy_population_basis_accepts_decennial_denominators(self):
+        policy = PrimaryMsaPolicy(
+            definition_version="census_msa_2023",
+            county_vintage=2023,
+            overlap_basis="population",
+            population_source="decennial",
+            decennial_population_vintage=2020,
+            tract_vintage=2020,
+        )
+        assert policy.overlap_basis == "population"
+        assert policy.population_source == "decennial"
+        assert policy.decennial_population_vintage == 2020
+        assert policy.tract_vintage == 2020
+
     def test_primary_msa_policy_rejects_unsupported_basis(self):
         from pydantic import ValidationError
 

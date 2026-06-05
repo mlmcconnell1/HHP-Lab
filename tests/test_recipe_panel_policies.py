@@ -246,7 +246,11 @@ def _setup_acs1_policy_fixtures(tmp_path: Path) -> None:
 # Primary-MSA recipe and fixture helpers
 # ---------------------------------------------------------------------------
 
-def _primary_msa_recipe_dict(*, overlap_basis: str = "area") -> dict:
+def _primary_msa_recipe_dict(
+    *,
+    overlap_basis: str = "area",
+    population_source: str = "acs5",
+) -> dict:
     """CoC panel recipe with panel_policy.primary_msa declared."""
     primary_msa = {
         "definition_version": "census_msa_2023",
@@ -255,8 +259,12 @@ def _primary_msa_recipe_dict(*, overlap_basis: str = "area") -> dict:
         "min_coc_contained_share": 0.50,
     }
     if overlap_basis == "population":
-        primary_msa["acs5_population_vintage"] = 2023
-        primary_msa["acs5_population_reference_year"] = 2023
+        primary_msa["population_source"] = population_source
+        if population_source == "decennial":
+            primary_msa["decennial_population_vintage"] = 2020
+        else:
+            primary_msa["acs5_population_vintage"] = 2023
+            primary_msa["acs5_population_reference_year"] = 2023
         primary_msa["tract_vintage"] = 2020
     return {
         "version": 1,
@@ -452,6 +460,17 @@ def _setup_primary_msa_population_fixtures(tmp_path: Path) -> None:
         }
     ).to_parquet(acs_dir / "acs5_tracts__A2023xT2020.parquet")
 
+    census_dir = data_dir / "curated" / "census"
+    census_dir.mkdir(parents=True, exist_ok=True)
+    pd.DataFrame(
+        {
+            "tract_geoid": ["36061000100", "29510000100"],
+            "total_population": [0, 100],
+            "decennial_vintage": ["2020", "2020"],
+            "tract_vintage": ["2020", "2020"],
+        }
+    ).to_parquet(census_dir / "decennial_tracts__N2020xT2020.parquet")
+
     xwalk_dir = data_dir / "curated" / "xwalks"
     pd.DataFrame(
         {
@@ -543,6 +562,26 @@ class TestPrimaryMsaPanelPolicy:
         assert set(coc1["primary_msa_overlap_basis"]) == {"population"}
         assert coc1["primary_msa_coc_contained_percent"].tolist() == [100.0, 100.0]
         assert coc1["primary_msa_covered_by_coc_percent"].tolist() == [100.0, 100.0]
+
+    def test_primary_msa_population_basis_accepts_decennial_population(
+        self,
+        tmp_path: Path,
+    ):
+        _setup_primary_msa_population_fixtures(tmp_path)
+        recipe = load_recipe(
+            _primary_msa_recipe_dict(
+                overlap_basis="population",
+                population_source="decennial",
+            )
+        )
+
+        results = execute_recipe(recipe, project_root=tmp_path)
+
+        assert results[0].success
+        panel = pd.read_parquet(_find_panel_output(tmp_path))
+        coc1 = panel[panel["coc_id"] == "COC1"]
+        assert set(coc1["primary_msa_id"]) == {"41180"}
+        assert set(coc1["primary_msa_overlap_basis"]) == {"population"}
 
 
 class TestZoriPanelPolicy:

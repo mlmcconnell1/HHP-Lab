@@ -210,6 +210,7 @@ OutputKind = Literal["panel", "diagnostics", "map", "containment", "msa_coc_cove
 CohortMethod = Literal["top_n", "bottom_n", "percentile", "predicate"]
 CohortPredicateOperator = Literal["gte", "lte", "gt", "lt", "eq"]
 MsaCocOverlapBasis = Literal["area", "population"]
+PrimaryMsaPopulationSource = Literal["acs5", "decennial"]
 
 
 class ZoriPolicy(BaseModel):
@@ -327,6 +328,13 @@ class PrimaryMsaPolicy(BaseModel):
         default="area",
         description="Overlap basis used to choose each CoC's primary MSA.",
     )
+    population_source: PrimaryMsaPopulationSource = Field(
+        default="acs5",
+        description=(
+            "Tract population denominator source used when overlap_basis is "
+            "'population'. Defaults to ACS5 for backwards compatibility."
+        ),
+    )
     min_coc_contained_share: float = Field(
         default=0.0,
         ge=0.0,
@@ -344,9 +352,16 @@ class PrimaryMsaPolicy(BaseModel):
         default=None,
         description="Reference year documented for the ACS5 denominator, defaults to vintage.",
     )
+    decennial_population_vintage: int | str | None = Field(
+        default=None,
+        description=(
+            "Decennial tract population vintage required when population_source "
+            "is 'decennial'."
+        ),
+    )
     tract_vintage: int | str | None = Field(
         default=None,
-        description="Tract geometry vintage paired with ACS5 population denominators.",
+        description="Tract geometry vintage paired with tract population denominators.",
     )
     output_columns: PrimaryMsaAnnotationColumns = Field(
         default_factory=PrimaryMsaAnnotationColumns,
@@ -364,14 +379,19 @@ class PrimaryMsaPolicy(BaseModel):
     def _validate_population_denominator(self) -> PrimaryMsaPolicy:
         if self.overlap_basis == "population":
             missing = []
-            if self.acs5_population_vintage is None:
+            if self.population_source == "acs5" and self.acs5_population_vintage is None:
                 missing.append("acs5_population_vintage")
+            if (
+                self.population_source == "decennial"
+                and self.decennial_population_vintage is None
+            ):
+                missing.append("decennial_population_vintage")
             if self.tract_vintage is None:
                 missing.append("tract_vintage")
             if missing:
                 raise ValueError(
                     "PrimaryMsaPolicy population overlap requires "
-                    f"{', '.join(missing)} so the executor can load ACS5 tract "
+                    f"{', '.join(missing)} so the executor can load tract "
                     "population denominators."
                 )
         return self
