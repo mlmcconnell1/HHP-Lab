@@ -36,6 +36,8 @@ Required curated inputs:
   `hhplab generate msa --definition-version census_msa_2023`
 - 2020 CoC-to-MSA area crosswalk:
   `hhplab generate msa-xwalk --boundary 2020 --definition-version census_msa_2023 --counties 2023`
+- 2020 ACS5 tract population denominators for population-basis primary MSA selection:
+  `hhplab ingest acs5-tract --acs 2020 --tracts 2020`
 - 2020 CoC urban-fraction measure:
   `hhplab build urban-fraction --boundary 2020 --decennial 2020 --urban-area-vintage 2020 --block-vintage 2020`
 
@@ -55,9 +57,9 @@ Primary MSA output fields:
 |--------|---------|
 | `primary_msa_id` | Selected Census MSA / CBSA code, or null when no MSA overlaps the CoC. |
 | `primary_msa_name` | Display name from the requested MSA definition version. |
-| `primary_msa_overlap_basis` | Basis used to select the MSA; the canonical recipes use `area`. |
-| `primary_msa_coc_contained_percent` | Percent of the CoC area contained by the selected MSA. |
-| `primary_msa_covered_by_coc_percent` | Percent of the selected MSA area covered by the CoC. |
+| `primary_msa_overlap_basis` | Basis used to select the MSA; `gte_95` uses 2020 tract population and `gte_99` uses area. |
+| `primary_msa_coc_contained_percent` | Percent of the CoC overlap basis contained by the selected MSA. |
+| `primary_msa_covered_by_coc_percent` | Percent of the selected MSA overlap basis covered by the CoC. |
 
 ## Cohort-Style Examples
 

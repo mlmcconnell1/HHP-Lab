@@ -400,8 +400,8 @@ def test_canonical_urban_recipes_request_primary_msa_annotations(
     assert policy.primary_msa.county_vintage == 2023
     assert policy.primary_msa.overlap_basis == case.primary_msa_overlap_basis
     if case.primary_msa_overlap_basis == "population":
-        assert policy.primary_msa.acs5_population_vintage == 2023
-        assert policy.primary_msa.acs5_population_reference_year == 2023
+        assert policy.primary_msa.acs5_population_vintage == 2020
+        assert policy.primary_msa.acs5_population_reference_year == 2020
         assert policy.primary_msa.tract_vintage == 2020
     assert policy.output_columns == list(CANONICAL_URBAN_OUTPUT_COLUMNS)
     assert [task.year for task in plan.join_tasks] == [2020]
