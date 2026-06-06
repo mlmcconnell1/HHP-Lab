@@ -1,0 +1,57 @@
+# All CoCs with HUD PIT sheltered and unsheltered counts, 2010-2020.
+
+version: 1
+name: cocs_pit_sheltered_unsheltered_2010_2020
+description: >
+  Build an all-CoC panel for 2010-2020 from the curated HUD PIT vintage
+  artifact. The panel keeps total, sheltered, and unsheltered PIT counts and
+  uses the 2025 CoC boundary vintage only for recipe-native CoC identity and
+  name annotation.
+
+universe:
+  range: "2010-2020"
+
+targets:
+  - id: coc_pit_panel
+    geometry: { type: coc, vintage: 2025, source: hud_exchange }
+    outputs: [panel]
+    panel_policy:
+      output_columns:
+        - coc_id
+        - coc_name
+        - year
+        - pit_total
+        - pit_sheltered
+        - pit_unsheltered
+
+datasets:
+  pit:
+    provider: hud
+    product: pit
+    version: 1
+    native_geometry: { type: coc }
+    years: "2010-2020"
+    year_column: pit_year
+    geo_column: coc_id
+    params:
+      vintage: 2024
+      align: point_in_time_jan
+    path: data/curated/pit/pit_vintage__P2024.parquet
+
+pipelines:
+  - id: build_coc_pit_panel
+    target: coc_pit_panel
+    steps:
+      - resample:
+          dataset: pit
+          to_geometry: { type: coc, vintage: 2025, source: hud_exchange }
+          method: identity
+          measures: [pit_total, pit_sheltered, pit_unsheltered]
+
+      - join:
+          datasets: [pit]
+          join_on: [geo_id, year]
+
+validation:
+  missing_dataset:
+    default: fail

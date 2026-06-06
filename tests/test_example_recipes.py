@@ -410,6 +410,33 @@ def test_canonical_urban_recipes_request_primary_msa_annotations(
     assert tuple(plan.join_tasks[0].datasets) == ("urban_fraction",)
 
 
+def test_all_coc_pit_sheltered_unsheltered_recipe_loads_and_resolves():
+    recipe = _load_repo_recipe("recipes/cocs-pit-sheltered-unsheltered-2010-2020.yaml")
+    plan = resolve_plan(recipe, "build_coc_pit_panel")
+    target = recipe.targets[0]
+
+    assert recipe.name == "cocs_pit_sheltered_unsheltered_2010_2020"
+    assert target.id == "coc_pit_panel"
+    assert target.geometry.type == "coc"
+    assert target.geometry.vintage == 2025
+    assert target.outputs == ["panel"]
+    assert target.panel_policy is not None
+    assert target.panel_policy.output_columns == [
+        "coc_id",
+        "coc_name",
+        "year",
+        "pit_total",
+        "pit_sheltered",
+        "pit_unsheltered",
+    ]
+    assert [task.year for task in plan.join_tasks] == list(range(2010, 2021))
+    assert all(tuple(task.datasets) == ("pit",) for task in plan.join_tasks)
+    assert len(plan.resample_tasks) == 11
+    assert {tuple(task.measures) for task in plan.resample_tasks} == {
+        ("pit_total", "pit_sheltered", "pit_unsheltered")
+    }
+
+
 @pytest.mark.parametrize("case", SAE_RECIPE_CASES, ids=lambda case: case.path)
 def test_sae_example_recipe_loads_and_resolves(case: SaeRecipeCase):
     recipe = _load_example(case.path)
