@@ -22,6 +22,7 @@ from typing import Protocol
 
 import pandas as pd
 
+from hhplab.acs.variables import ACS5_EXPANDED_COVARIATE_COLUMNS
 from hhplab.acs.variables_acs1 import ACS1_METRO_MEASURE_COLUMNS
 from hhplab.recipe.recipe_schema import PanelPolicy, RecipeV1
 from hhplab.schema.columns import (
@@ -80,8 +81,7 @@ class PanelPolicyApplier(Protocol):
         *,
         target_geo_type: str,
         policy: PanelPolicy | None,
-    ) -> bool:
-        ...
+    ) -> bool: ...
 
     def apply(
         self,
@@ -89,8 +89,7 @@ class PanelPolicyApplier(Protocol):
         *,
         policy: PanelPolicy,
         target_geo_type: str,
-    ) -> PolicyApplication:
-        ...
+    ) -> PolicyApplication: ...
 
 
 @dataclass
@@ -205,10 +204,7 @@ class Acs1PolicyApplier:
         policy: PanelPolicy,
         target_geo_type: str,
     ) -> PolicyApplication:
-        if (
-            "unemployment_rate_acs1" not in panel.columns
-            and "acs1_vintage" not in panel.columns
-        ):
+        if "unemployment_rate_acs1" not in panel.columns and "acs1_vintage" not in panel.columns:
             return PolicyApplication(name=self.name, panel=panel)
 
         vintage_source = "acs1_vintage" if "acs1_vintage" in panel.columns else "year"
@@ -333,6 +329,7 @@ def collect_conformance_flags(
     # pipelines (for example ACS + PEP) validate the full output schema.
     known = (
         set(ACS_MEASURE_COLUMNS)
+        | set(ACS5_EXPANDED_COVARIATE_COLUMNS)
         | set(ACS1_MEASURE_COLUMNS)
         | set(LAUS_MEASURE_COLUMNS)
         | {"population", "urban_population_fraction"}
@@ -347,11 +344,7 @@ def collect_conformance_flags(
     # LAUS-aware conformance: determine include_laus before alias translation
     # so that LAUS columns are included in the alias-translated measure_columns
     # list (coclab-xt72).
-    include_laus = (
-        policy is not None
-        and policy.laus is not None
-        and policy.laus.include
-    )
+    include_laus = policy is not None and policy.laus is not None and policy.laus.include
 
     # Translate measure_columns through any active column aliases so that
     # conformance checks look for the renamed names in the finalized panel.
@@ -364,9 +357,7 @@ def collect_conformance_flags(
     if aliases:
         aliased_base_cols = list(measure_columns or [])
         if include_laus:
-            aliased_base_cols += [
-                c for c in LAUS_MEASURE_COLUMNS if c not in aliased_base_cols
-            ]
+            aliased_base_cols += [c for c in LAUS_MEASURE_COLUMNS if c not in aliased_base_cols]
         measure_columns = [aliases.get(c, c) for c in aliased_base_cols]
     elif include_laus and measure_columns is not None:
         # No aliases, but non-ACS path explicitly set measure_columns.

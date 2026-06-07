@@ -35,7 +35,11 @@ from hhplab.pit.ingest.parser import CANONICAL_COLUMNS as PIT_PARSER_COLUMNS
 from hhplab.recipe.executor import ExecutorError, _normalize_recipe_population_measure
 from hhplab.recipe.executor_panel import _resolve_canonical_population
 from hhplab.recipe.planner import ResampleTask
-from hhplab.recipe.recipe_schema import PanelPolicy
+from hhplab.recipe.recipe_schema import (
+    ACS5_RECIPE_DEFAULT_MEASURES,
+    ACS5_RECIPE_SELECTABLE_MEASURES,
+    PanelPolicy,
+)
 from hhplab.recipe.schema_common import GeometryRef
 from hhplab.rents.zori_ingest import ZORI_INGEST_OUTPUT_COLUMNS as ZORI_INGEST_COLUMNS
 from hhplab.schema import (
@@ -342,6 +346,14 @@ def test_acs5_expanded_covariates_remain_outside_default_canonical_measures() ->
     assert "household_income_total" in ACS5_EXPANDED_COVARIATE_COLUMNS
     assert "owner_costs_pct_income_total" in ACS5_EXPANDED_COVARIATE_COLUMNS
     assert "median_household_income" not in ACS5_EXPANDED_COVARIATE_COLUMNS
+
+
+def test_recipe_selectable_acs5_measures_include_expanded_without_changing_defaults() -> None:
+    assert ACS5_RECIPE_DEFAULT_MEASURES == tuple(schema_columns.ACS_MEASURE_COLUMNS)
+    assert "per_capita_income" in ACS5_RECIPE_SELECTABLE_MEASURES
+    assert "gini_index" in ACS5_RECIPE_SELECTABLE_MEASURES
+    assert "per_capita_income" not in ACS5_RECIPE_DEFAULT_MEASURES
+    assert set(ACS5_RECIPE_DEFAULT_MEASURES) < set(ACS5_RECIPE_SELECTABLE_MEASURES)
 
 
 def test_acs5_covariate_output_lookup_returns_owning_registry_entry() -> None:

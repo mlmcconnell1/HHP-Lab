@@ -26,12 +26,23 @@ from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
+from hhplab.acs.variables import (
+    ACS5_COVARIATE_REGISTRY,
+    ACS5_EXPANDED_COVARIATE_COLUMNS,
+)
 from hhplab.recipe.schema_common import (
     GeometryRef,
     VintageSetSpec,
     YearSpec,
     expand_year_spec,
 )
+from hhplab.schema.columns import ACS_MEASURE_COLUMNS
+
+ACS5_RECIPE_DEFAULT_MEASURES: tuple[str, ...] = tuple(ACS_MEASURE_COLUMNS)
+ACS5_RECIPE_SELECTABLE_MEASURES: tuple[str, ...] = tuple(
+    dict.fromkeys([*ACS5_RECIPE_DEFAULT_MEASURES, *ACS5_EXPANDED_COVARIATE_COLUMNS])
+)
+ACS5_RECIPE_COVARIATE_REGISTRY = ACS5_COVARIATE_REGISTRY
 
 # -----------------------------
 # File set (time-banded dataset paths)
@@ -340,8 +351,7 @@ class PrimaryMsaPolicy(BaseModel):
         ge=0.0,
         le=1.0,
         description=(
-            "Inclusive minimum CoC-contained share required before annotating "
-            "a primary MSA."
+            "Inclusive minimum CoC-contained share required before annotating a primary MSA."
         ),
     )
     acs5_population_vintage: int | str | None = Field(
@@ -355,8 +365,7 @@ class PrimaryMsaPolicy(BaseModel):
     decennial_population_vintage: int | str | None = Field(
         default=None,
         description=(
-            "Decennial tract population vintage required when population_source "
-            "is 'decennial'."
+            "Decennial tract population vintage required when population_source is 'decennial'."
         ),
     )
     tract_vintage: int | str | None = Field(
@@ -381,10 +390,7 @@ class PrimaryMsaPolicy(BaseModel):
             missing = []
             if self.population_source == "acs5" and self.acs5_population_vintage is None:
                 missing.append("acs5_population_vintage")
-            if (
-                self.population_source == "decennial"
-                and self.decennial_population_vintage is None
-            ):
+            if self.population_source == "decennial" and self.decennial_population_vintage is None:
                 missing.append("decennial_population_vintage")
             if self.tract_vintage is None:
                 missing.append("tract_vintage")
@@ -769,11 +775,7 @@ class MsaCocPanelSpec(BaseModel):
         alias = self.output_aliases.get("msa_population")
         expected_alias = f"msa_population_{self.msa_population_source}"
         source_qualified_aliases = {"msa_population_acs5", "msa_population_pep"}
-        if (
-            alias is not None
-            and alias in source_qualified_aliases
-            and alias != expected_alias
-        ):
+        if alias is not None and alias in source_qualified_aliases and alias != expected_alias:
             raise ValueError(
                 "MsaCocPanelSpec.output_aliases maps 'msa_population' to "
                 f"'{alias}', but msa_population_source is "
@@ -948,8 +950,7 @@ class CohortSelector(BaseModel):
                 missing.append("value")
             if missing:
                 raise ValueError(
-                    "CohortSelector method 'predicate' requires "
-                    f"{', '.join(missing)}."
+                    f"CohortSelector method 'predicate' requires {', '.join(missing)}."
                 )
         return self
 
@@ -1002,8 +1003,7 @@ class TargetSpec(BaseModel):
     msa_coc_panel: MsaCocPanelSpec | None = Field(
         default=None,
         description=(
-            "Declarative MSA-CoC containment panel surface with row grain "
-            "msa_id x coc_id x year."
+            "Declarative MSA-CoC containment panel surface with row grain msa_id x coc_id x year."
         ),
     )
     msa_coc_coverage: MsaCocCoverageSpec | None = Field(

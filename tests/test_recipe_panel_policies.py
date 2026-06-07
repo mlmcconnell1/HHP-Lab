@@ -30,6 +30,7 @@ from hhplab.xwalks.county import ALBERS_EQUAL_AREA_CRS
 # ZORI recipe and fixture helpers
 # ---------------------------------------------------------------------------
 
+
 def _zori_recipe_dict() -> dict:
     """Recipe with PIT + ZORI datasets and a panel_policy.zori declaration."""
     return {
@@ -74,7 +75,8 @@ def _zori_recipe_dict() -> dict:
                         "resample": {
                             "dataset": "pit",
                             "to_geometry": {
-                                "type": "coc", "vintage": 2025,
+                                "type": "coc",
+                                "vintage": 2025,
                                 "source": "hud_exchange",
                             },
                             "method": "identity",
@@ -85,7 +87,8 @@ def _zori_recipe_dict() -> dict:
                         "resample": {
                             "dataset": "zori",
                             "to_geometry": {
-                                "type": "coc", "vintage": 2025,
+                                "type": "coc",
+                                "vintage": 2025,
                                 "source": "hud_exchange",
                             },
                             "method": "identity",
@@ -110,25 +113,30 @@ def _setup_zori_fixtures(tmp_path: Path) -> None:
     data_dir.mkdir(parents=True, exist_ok=True)
 
     # PIT data with median_household_income for rent_to_income calculation
-    pd.DataFrame({
-        "coc_id": ["COC1", "COC2", "COC1", "COC2"],
-        "year": [2020, 2020, 2021, 2021],
-        "pit_total": [100, 200, 110, 210],
-        "median_household_income": [60000.0, 48000.0, 62000.0, 50000.0],
-    }).to_parquet(data_dir / "pit.parquet")
+    pd.DataFrame(
+        {
+            "coc_id": ["COC1", "COC2", "COC1", "COC2"],
+            "year": [2020, 2020, 2021, 2021],
+            "pit_total": [100, 200, 110, 210],
+            "median_household_income": [60000.0, 48000.0, 62000.0, 50000.0],
+        }
+    ).to_parquet(data_dir / "pit.parquet")
 
     # ZORI data: COC1 has high coverage (eligible), COC2 has low coverage
-    pd.DataFrame({
-        "coc_id": ["COC1", "COC2", "COC1", "COC2"],
-        "year": [2020, 2020, 2021, 2021],
-        "zori_coc": [1500.0, 1200.0, 1550.0, 1250.0],
-        "zori_coverage_ratio": [0.95, 0.50, 0.92, 0.60],
-    }).to_parquet(data_dir / "zori.parquet")
+    pd.DataFrame(
+        {
+            "coc_id": ["COC1", "COC2", "COC1", "COC2"],
+            "year": [2020, 2020, 2021, 2021],
+            "zori_coc": [1500.0, 1200.0, 1550.0, 1250.0],
+            "zori_coverage_ratio": [0.95, 0.50, 0.92, 0.60],
+        }
+    ).to_parquet(data_dir / "zori.parquet")
 
 
 # ---------------------------------------------------------------------------
 # ACS1 recipe and fixture helpers
 # ---------------------------------------------------------------------------
+
 
 def _acs1_policy_recipe_dict() -> dict:
     """Metro recipe with PIT + ACS5 + ACS1 and panel_policy.acs1 declared."""
@@ -221,30 +229,37 @@ def _setup_acs1_policy_fixtures(tmp_path: Path) -> None:
     data_dir = tmp_path / "data"
     data_dir.mkdir(parents=True, exist_ok=True)
 
-    pd.DataFrame({
-        "metro_id": ["GF01", "GF02"],
-        "year": [2023, 2023],
-        "pit_total": [100, 200],
-    }).to_parquet(data_dir / "metro_pit.parquet")
+    pd.DataFrame(
+        {
+            "metro_id": ["GF01", "GF02"],
+            "year": [2023, 2023],
+            "pit_total": [100, 200],
+        }
+    ).to_parquet(data_dir / "metro_pit.parquet")
 
-    pd.DataFrame({
-        "metro_id": ["GF01", "GF02"],
-        "year": [2023, 2023],
-        "acs_vintage": [2022, 2022],
-        "total_population": [5000000, 3000000],
-        "median_household_income": [70000.0, 55000.0],
-    }).to_parquet(data_dir / "metro_acs5.parquet")
+    pd.DataFrame(
+        {
+            "metro_id": ["GF01", "GF02"],
+            "year": [2023, 2023],
+            "acs_vintage": [2022, 2022],
+            "total_population": [5000000, 3000000],
+            "median_household_income": [70000.0, 55000.0],
+        }
+    ).to_parquet(data_dir / "metro_acs5.parquet")
 
-    pd.DataFrame({
-        "metro_id": ["GF01", "GF02"],
-        "acs1_vintage": [2023, 2023],
-        "unemployment_rate_acs1": [0.045, 0.032],
-    }).to_parquet(data_dir / "metro_acs1.parquet")
+    pd.DataFrame(
+        {
+            "metro_id": ["GF01", "GF02"],
+            "acs1_vintage": [2023, 2023],
+            "unemployment_rate_acs1": [0.045, 0.032],
+        }
+    ).to_parquet(data_dir / "metro_acs1.parquet")
 
 
 # ---------------------------------------------------------------------------
 # Primary-MSA recipe and fixture helpers
 # ---------------------------------------------------------------------------
+
 
 def _primary_msa_recipe_dict(
     *,
@@ -402,9 +417,7 @@ def _setup_primary_msa_fixtures(tmp_path: Path) -> None:
             "intersecting_county_count": [1, 1, 1],
             "intersecting_county_fips": ["29510", "36061", "29510"],
         }
-    ).to_parquet(
-        xwalk_dir / "msa_coc_xwalk__B2025xMcensus_msa_2023xC2023.parquet"
-    )
+    ).to_parquet(xwalk_dir / "msa_coc_xwalk__B2025xMcensus_msa_2023xC2023.parquet")
 
 
 def _setup_primary_msa_population_fixtures(tmp_path: Path) -> None:
@@ -623,9 +636,7 @@ class TestZoriPanelPolicy:
         coc1 = panel[panel["coc_id"] == "COC1"]
         coc2 = panel[panel["coc_id"] == "COC2"]
 
-        assert coc1["zori_is_eligible"].all(), (
-            "COC1 should be eligible (coverage 0.95 > 0.80)"
-        )
+        assert coc1["zori_is_eligible"].all(), "COC1 should be eligible (coverage 0.95 > 0.80)"
         assert not coc2["zori_is_eligible"].any(), (
             "COC2 should be ineligible (coverage 0.50 < 0.80)"
         )
@@ -641,9 +652,7 @@ class TestZoriPanelPolicy:
         coc1 = panel[panel["coc_id"] == "COC1"]
         coc2 = panel[panel["coc_id"] == "COC2"]
 
-        assert coc1["rent_to_income"].notna().all(), (
-            "Eligible rows should have rent_to_income"
-        )
+        assert coc1["rent_to_income"].notna().all(), "Eligible rows should have rent_to_income"
         assert coc2["rent_to_income"].isna().all(), (
             "Ineligible rows should have null rent_to_income"
         )
@@ -701,6 +710,7 @@ class TestZoriPanelPolicy:
 # County-native ZORI aggregate-path helpers (coclab-scwk regression)
 # ---------------------------------------------------------------------------
 
+
 def _zori_county_native_recipe_dict() -> dict:
     """Recipe where ZORI is aggregated from county-native data as measure ``zori``.
 
@@ -752,7 +762,8 @@ def _zori_county_native_recipe_dict() -> dict:
                         "resample": {
                             "dataset": "pit",
                             "to_geometry": {
-                                "type": "coc", "vintage": 2025,
+                                "type": "coc",
+                                "vintage": 2025,
                                 "source": "hud_exchange",
                             },
                             "method": "identity",
@@ -763,7 +774,8 @@ def _zori_county_native_recipe_dict() -> dict:
                         "resample": {
                             "dataset": "zori_county",
                             "to_geometry": {
-                                "type": "coc", "vintage": 2025,
+                                "type": "coc",
+                                "vintage": 2025,
                                 "source": "hud_exchange",
                             },
                             "method": "identity",
@@ -787,20 +799,24 @@ def _setup_zori_county_native_fixtures(tmp_path: Path) -> None:
     data_dir = tmp_path / "data"
     data_dir.mkdir(parents=True, exist_ok=True)
 
-    pd.DataFrame({
-        "coc_id": ["COC1", "COC2"],
-        "year": [2020, 2020],
-        "pit_total": [100, 200],
-        "median_household_income": [60000.0, 48000.0],
-    }).to_parquet(data_dir / "pit.parquet")
+    pd.DataFrame(
+        {
+            "coc_id": ["COC1", "COC2"],
+            "year": [2020, 2020],
+            "pit_total": [100, 200],
+            "median_household_income": [60000.0, 48000.0],
+        }
+    ).to_parquet(data_dir / "pit.parquet")
 
     # Column is "zori" (county-native name), not "zori_coc".
-    pd.DataFrame({
-        "coc_id": ["COC1", "COC2"],
-        "year": [2020, 2020],
-        "zori": [1500.0, 1200.0],
-        "zori_coverage_ratio": [0.95, 0.50],
-    }).to_parquet(data_dir / "zori_county.parquet")
+    pd.DataFrame(
+        {
+            "coc_id": ["COC1", "COC2"],
+            "year": [2020, 2020],
+            "zori": [1500.0, 1200.0],
+            "zori_coverage_ratio": [0.95, 0.50],
+        }
+    ).to_parquet(data_dir / "zori_county.parquet")
 
 
 class TestZoriCountyNativeAggregatePath:
@@ -846,8 +862,7 @@ class TestZoriCountyNativeAggregatePath:
 
         panel = pd.read_parquet(_find_panel_output(tmp_path))
         assert "zori" not in panel.columns, (
-            "Stray 'zori' column should not survive; it should be "
-            "canonicalized to 'zori_coc'"
+            "Stray 'zori' column should not survive; it should be canonicalized to 'zori_coc'"
         )
 
     def test_rent_to_income_computed(self, tmp_path: Path):
@@ -928,11 +943,13 @@ class TestAcs1PanelPolicy:
         _setup_acs1_policy_fixtures(tmp_path)
         # Overwrite ACS1 data with only one metro
         data_dir = tmp_path / "data"
-        pd.DataFrame({
-            "metro_id": ["GF01"],
-            "acs1_vintage": [2023],
-            "unemployment_rate_acs1": [0.045],
-        }).to_parquet(data_dir / "metro_acs1.parquet")
+        pd.DataFrame(
+            {
+                "metro_id": ["GF01"],
+                "acs1_vintage": [2023],
+                "unemployment_rate_acs1": [0.045],
+            }
+        ).to_parquet(data_dir / "metro_acs1.parquet")
 
         recipe = load_recipe(_acs1_policy_recipe_dict())
         results = execute_recipe(recipe, project_root=tmp_path)
@@ -985,7 +1002,8 @@ def _coc_recipe_dict() -> dict:
             {
                 "id": "coc_panel",
                 "geometry": {
-                    "type": "coc", "vintage": 2025,
+                    "type": "coc",
+                    "vintage": 2025,
                     "source": "hud_exchange",
                 },
                 "outputs": ["panel"],
@@ -1019,7 +1037,8 @@ def _coc_recipe_dict() -> dict:
                         "resample": {
                             "dataset": "pit",
                             "to_geometry": {
-                                "type": "coc", "vintage": 2025,
+                                "type": "coc",
+                                "vintage": 2025,
                                 "source": "hud_exchange",
                             },
                             "method": "identity",
@@ -1030,7 +1049,8 @@ def _coc_recipe_dict() -> dict:
                         "resample": {
                             "dataset": "acs",
                             "to_geometry": {
-                                "type": "coc", "vintage": 2025,
+                                "type": "coc",
+                                "vintage": 2025,
                                 "source": "hud_exchange",
                             },
                             "method": "identity",
@@ -1057,19 +1077,23 @@ def _setup_coc_parity_fixtures(tmp_path: Path) -> None:
     data_dir = tmp_path / "data"
     data_dir.mkdir(parents=True, exist_ok=True)
 
-    pd.DataFrame({
-        "coc_id": ["COC1", "COC2", "COC1", "COC2"],
-        "year": [2020, 2020, 2021, 2021],
-        "pit_total": [100, 200, 110, 210],
-    }).to_parquet(data_dir / "pit.parquet")
+    pd.DataFrame(
+        {
+            "coc_id": ["COC1", "COC2", "COC1", "COC2"],
+            "year": [2020, 2020, 2021, 2021],
+            "pit_total": [100, 200, 110, 210],
+        }
+    ).to_parquet(data_dir / "pit.parquet")
 
-    pd.DataFrame({
-        "coc_id": ["COC1", "COC2", "COC1", "COC2"],
-        "year": [2020, 2020, 2021, 2021],
-        "acs_vintage": [2019, 2019, 2020, 2020],
-        "total_population": [50000, 80000, 51000, 82000],
-        "median_household_income": [60000.0, 48000.0, 62000.0, 50000.0],
-    }).to_parquet(data_dir / "acs.parquet")
+    pd.DataFrame(
+        {
+            "coc_id": ["COC1", "COC2", "COC1", "COC2"],
+            "year": [2020, 2020, 2021, 2021],
+            "acs_vintage": [2019, 2019, 2020, 2020],
+            "total_population": [50000, 80000, 51000, 82000],
+            "median_household_income": [60000.0, 48000.0, 62000.0, 50000.0],
+        }
+    ).to_parquet(data_dir / "acs.parquet")
 
 
 class TestCocPanelParity:
@@ -1333,61 +1357,75 @@ def _setup_msa_recipe_fixtures(tmp_path: Path) -> None:
     msa_dir = tmp_path / "data" / "curated" / "msa"
     msa_dir.mkdir(parents=True, exist_ok=True)
 
-    pd.DataFrame({
-        "coc_id": ["COC1", "COC2", "COC1", "COC2"],
-        "year": [2020, 2020, 2021, 2021],
-        "pit_total": [100, 250, 110, 260],
-    }).to_parquet(data_dir / "pit.parquet")
+    pd.DataFrame(
+        {
+            "coc_id": ["COC1", "COC2", "COC1", "COC2"],
+            "year": [2020, 2020, 2021, 2021],
+            "pit_total": [100, 250, 110, 260],
+        }
+    ).to_parquet(data_dir / "pit.parquet")
 
-    pd.DataFrame({
-        "tract_geoid": ["01001000100", "01003000100", "01001000100", "01003000100"],
-        "year": [2020, 2020, 2021, 2021],
-        "acs_vintage": [2019, 2019, 2020, 2020],
-        "total_population": [50000, 80000, 51000, 82000],
-        "adult_population": [38000, 60000, 39000, 61500],
-        "population_below_poverty": [8000, 12000, 8100, 12300],
-        "median_household_income": [52000.0, 61000.0, 53000.0, 62000.0],
-        "median_gross_rent": [950.0, 1125.0, 975.0, 1150.0],
-        "unemployment_rate": [0.06, 0.045, 0.055, 0.04],
-    }).to_parquet(data_dir / "acs.parquet")
+    pd.DataFrame(
+        {
+            "tract_geoid": ["01001000100", "01003000100", "01001000100", "01003000100"],
+            "year": [2020, 2020, 2021, 2021],
+            "acs_vintage": [2019, 2019, 2020, 2020],
+            "total_population": [50000, 80000, 51000, 82000],
+            "adult_population": [38000, 60000, 39000, 61500],
+            "population_below_poverty": [8000, 12000, 8100, 12300],
+            "median_household_income": [52000.0, 61000.0, 53000.0, 62000.0],
+            "median_gross_rent": [950.0, 1125.0, 975.0, 1150.0],
+            "unemployment_rate": [0.06, 0.045, 0.055, 0.04],
+        }
+    ).to_parquet(data_dir / "acs.parquet")
 
-    pd.DataFrame({
-        "county_fips": ["01001", "01003", "01001", "01003"],
-        "year": [2020, 2020, 2021, 2021],
-        "population": [55000, 90000, 56000, 91000],
-    }).to_parquet(data_dir / "pep.parquet")
+    pd.DataFrame(
+        {
+            "county_fips": ["01001", "01003", "01001", "01003"],
+            "year": [2020, 2020, 2021, 2021],
+            "population": [55000, 90000, 56000, 91000],
+        }
+    ).to_parquet(data_dir / "pep.parquet")
 
-    pd.DataFrame({
-        "msa_id": ["35620", "41180"],
-        "coc_id": ["COC1", "COC2"],
-        "area_share": [1.0, 1.0],
-        "definition_version": ["census_msa_2023", "census_msa_2023"],
-    }).to_parquet(transform_dir / "coc_to_msa__coc_2025__census_msa_2023.parquet")
+    pd.DataFrame(
+        {
+            "msa_id": ["35620", "41180"],
+            "coc_id": ["COC1", "COC2"],
+            "area_share": [1.0, 1.0],
+            "definition_version": ["census_msa_2023", "census_msa_2023"],
+        }
+    ).to_parquet(transform_dir / "coc_to_msa__coc_2025__census_msa_2023.parquet")
 
-    pd.DataFrame({
-        "msa_id": ["35620", "41180"],
-        "tract_geoid": ["01001000100", "01003000100"],
-        "area_share": [1.0, 1.0],
-        "definition_version": ["census_msa_2023", "census_msa_2023"],
-    }).to_parquet(transform_dir / "tract_to_msa__tract_2020__census_msa_2023.parquet")
+    pd.DataFrame(
+        {
+            "msa_id": ["35620", "41180"],
+            "tract_geoid": ["01001000100", "01003000100"],
+            "area_share": [1.0, 1.0],
+            "definition_version": ["census_msa_2023", "census_msa_2023"],
+        }
+    ).to_parquet(transform_dir / "tract_to_msa__tract_2020__census_msa_2023.parquet")
 
-    pd.DataFrame({
-        "msa_id": ["35620", "41180"],
-        "county_fips": ["01001", "01003"],
-        "area_share": [1.0, 1.0],
-        "definition_version": ["census_msa_2023", "census_msa_2023"],
-    }).to_parquet(transform_dir / "county_to_msa__county_2025__census_msa_2023.parquet")
+    pd.DataFrame(
+        {
+            "msa_id": ["35620", "41180"],
+            "county_fips": ["01001", "01003"],
+            "area_share": [1.0, 1.0],
+            "definition_version": ["census_msa_2023", "census_msa_2023"],
+        }
+    ).to_parquet(transform_dir / "county_to_msa__county_2025__census_msa_2023.parquet")
 
-    pd.DataFrame({
-        "msa_id": ["35620", "41180"],
-        "msa_name": [
-            "New York-Newark-Jersey City, NY-NJ-PA",
-            "St. Louis, MO-IL",
-        ],
-        "cbsa_code": ["35620", "41180"],
-        "area_type": ["Metropolitan Statistical Area", "Metropolitan Statistical Area"],
-        "definition_version": ["census_msa_2023", "census_msa_2023"],
-    }).to_parquet(msa_definitions_path("census_msa_2023", tmp_path / "data"))
+    pd.DataFrame(
+        {
+            "msa_id": ["35620", "41180"],
+            "msa_name": [
+                "New York-Newark-Jersey City, NY-NJ-PA",
+                "St. Louis, MO-IL",
+            ],
+            "cbsa_code": ["35620", "41180"],
+            "area_type": ["Metropolitan Statistical Area", "Metropolitan Statistical Area"],
+            "definition_version": ["census_msa_2023", "census_msa_2023"],
+        }
+    ).to_parquet(msa_definitions_path("census_msa_2023", tmp_path / "data"))
 
 
 class TestMsaPanelParity:
@@ -1479,6 +1517,27 @@ class TestMsaPanelParity:
         assert flags.measure_columns is not None
         assert "urban_population_fraction" in flags.measure_columns
 
+    def test_conformance_flags_include_present_expanded_acs5_covariates(self, tmp_path: Path):
+        recipe = load_recipe(_msa_recipe_dict())
+        target = recipe.targets[0]
+        panel = pd.DataFrame(
+            {
+                "msa_id": ["35620"],
+                "geo_id": ["35620"],
+                "year": [2020],
+                "total_population": [50000],
+                "per_capita_income": [42000.0],
+                "gini_index": [0.4812],
+            }
+        )
+
+        flags = collect_conformance_flags(recipe=recipe, target=target, panel=panel)
+
+        assert flags.measure_columns is not None
+        assert "total_population" in flags.measure_columns
+        assert "per_capita_income" in flags.measure_columns
+        assert "gini_index" in flags.measure_columns
+
 
 # ===========================================================================
 # LAUS-only conformance flags  (coclab-d9d3)
@@ -1507,9 +1566,7 @@ class TestLausOnlyConformanceFlags:
         """Minimal target with panel_policy.laus.include=True."""
         from hhplab.recipe.recipe_schema import LausPolicy, PanelPolicy
 
-        aliases = (
-            {"total_population": "total_population_acs5"} if with_aliases else {}
-        )
+        aliases = {"total_population": "total_population_acs5"} if with_aliases else {}
         policy = PanelPolicy(laus=LausPolicy(include=True), column_aliases=aliases)
 
         from dataclasses import dataclass
@@ -1524,14 +1581,16 @@ class TestLausOnlyConformanceFlags:
         """Minimal panel DataFrame with all four LAUS columns."""
         import pandas as pd
 
-        return pd.DataFrame({
-            "geo_id": ["GF01", "GF01"],
-            "year": [2022, 2023],
-            "labor_force": [100_000, 101_000],
-            "employed": [95_000, 96_000],
-            "unemployed": [5_000, 5_000],
-            "unemployment_rate": [5.0, 4.95],
-        })
+        return pd.DataFrame(
+            {
+                "geo_id": ["GF01", "GF01"],
+                "year": [2022, 2023],
+                "labor_force": [100_000, 101_000],
+                "employed": [95_000, 96_000],
+                "unemployed": [5_000, 5_000],
+                "unemployment_rate": [5.0, 4.95],
+            }
+        )
 
     def test_no_aliases_includes_all_laus_columns(self):
         """Without aliases, collect_conformance_flags must include all four LAUS
@@ -1571,8 +1630,7 @@ class TestLausOnlyConformanceFlags:
         # LAUS columns are not aliased by the fixture, so they appear verbatim.
         for col in LAUS_MEASURE_COLUMNS:
             assert col in flags.measure_columns, (
-                f"LAUS column '{col}' missing from aliased measure_columns "
-                f"{flags.measure_columns}"
+                f"LAUS column '{col}' missing from aliased measure_columns {flags.measure_columns}"
             )
 
 
