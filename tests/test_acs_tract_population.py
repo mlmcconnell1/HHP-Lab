@@ -365,10 +365,12 @@ class TestFetchStateTractPopulation:
             "B25003",
             "B23025",
             "B19001",
+            "B25075",
             "B25063",
             "B25070",
             "B25091",
             "B25118",
+            "B15003",
         ]
         assert column_tables["household_income_total"] == "B19001"
         assert column_tables["gross_rent_pct_income_50_plus"] == "B25070"
@@ -1176,11 +1178,105 @@ class TestTenureHouseholdIngest:
         assert "renter_households" in TRACT_OUTPUT_COLUMNS
 
 
+EXPANDED_ACS5_MAPPING_CASES = {
+    "income_value_gini_scalars": {
+        "api_values": {
+            "B19301_001E": "42000",
+            "B25077_001E": "350000",
+            "B19083_001E": "0.4812",
+        },
+        "expected": {
+            "per_capita_income": 42000,
+            "median_owner_occupied_home_value": 350000,
+            "gini_index": 0.4812,
+        },
+    },
+    "owner_occupied_value_distribution": {
+        "api_values": {
+            "B25075_001E": "1200",
+            "B25075_026E": "20",
+            "B25075_027E": "5",
+        },
+        "expected": {
+            "owner_occupied_value_total": 1200,
+            "owner_occupied_value_1500000_to_1999999": 20,
+            "owner_occupied_value_2000000_plus": 5,
+        },
+    },
+    "educational_attainment_distribution": {
+        "api_values": {
+            "B15003_001E": "3000",
+            "B15003_022E": "900",
+            "B15003_025E": "75",
+        },
+        "expected": {
+            "educational_attainment_25plus_total": 3000,
+            "educational_attainment_25plus_bachelors_degree": 900,
+            "educational_attainment_25plus_doctorate_degree": 75,
+        },
+    },
+}
+
+
+@pytest.mark.parametrize(
+    "case_name",
+    list(EXPANDED_ACS5_MAPPING_CASES),
+    ids=list(EXPANDED_ACS5_MAPPING_CASES),
+)
+def test_expanded_acs5_table_mappings_are_parsed(case_name: str, httpx_mock) -> None:
+    case = EXPANDED_ACS5_MAPPING_CASES[case_name]
+    response_data = make_census_response(
+        [
+            {
+                "county": "031",
+                "tract": "001000",
+                **case["api_values"],
+            }
+        ]
+    )
+    httpx_mock.add_response(
+        url=re.compile(r"https://api\.census\.gov/data/2024/acs/acs5.*"),
+        json=response_data,
+        is_reusable=True,
+    )
+
+    df, _ = fetch_state_tract_data(2024, "08")
+    row = df.iloc[0]
+
+    for column, expected in case["expected"].items():
+        assert column in df.columns
+        assert row[column] == pytest.approx(expected)
+        assert column in TRACT_OUTPUT_COLUMNS
+
+
+def test_expanded_acs5_unavailable_variables_are_filtered_by_vintage() -> None:
+    assert "B19083_001E" not in api_vars_for_year(2009)
+    assert "B19083_001E" in api_vars_for_year(2010)
+
+    assert "B15003_001E" not in api_vars_for_year(2011)
+    assert "B15003_001E" in api_vars_for_year(2012)
+    assert "B15003_025E" in api_vars_for_year(2012)
+
+    assert "B25075_026E" not in api_vars_for_year(2014)
+    assert "B25075_027E" not in api_vars_for_year(2014)
+    assert "B25075_026E" in api_vars_for_year(2015)
+    assert "B25075_027E" in api_vars_for_year(2015)
+
+
 SAE_REQUIRED_ACS5_TRACT_COLUMNS = {
     "income_distribution": ["household_income_total", "household_income_200000_plus"],
+    "income_value_gini_scalars": [
+        "per_capita_income",
+        "median_owner_occupied_home_value",
+        "gini_index",
+    ],
     "gross_rent_distribution": [
         "gross_rent_distribution_total",
         "gross_rent_distribution_cash_rent_3500_plus",
+    ],
+    "owner_occupied_value_distribution": [
+        "owner_occupied_value_total",
+        "owner_occupied_value_2000000_plus",
     ],
     "rent_burden_bins": ["gross_rent_pct_income_total", "gross_rent_pct_income_50_plus"],
     "owner_cost_burden_bins": [
@@ -1189,6 +1285,10 @@ SAE_REQUIRED_ACS5_TRACT_COLUMNS = {
         "owner_costs_pct_income_without_mortgage_50_plus",
     ],
     "tenure_income": ["tenure_income_total", "tenure_income_renter_occupied_total"],
+    "educational_attainment": [
+        "educational_attainment_25plus_total",
+        "educational_attainment_25plus_bachelors_degree",
+    ],
 }
 
 
@@ -1213,16 +1313,21 @@ def test_sae_required_tract_tables_are_in_provenance_order() -> None:
         "B01003",
         "B01001",
         "B19013",
+        "B19301",
+        "B19083",
         "B25064",
+        "B25077",
         "B25002",
         "B25003",
         "C17002",
         "B23025",
         "B19001",
+        "B25075",
         "B25063",
         "B25070",
         "B25091",
         "B25118",
+        "B15003",
     ]
     for table in ACS5_SAE_SUPPORT_TABLES:
         assert table in tables_for_api_vars(ALL_API_VARS)

@@ -30,8 +30,14 @@ ACS_VARIABLES: dict[str, str] = {
     "B01003_001M": "moe_total_population",
     # B19013 — Median Household Income
     "B19013_001E": "median_household_income",
+    # B19301 — Per Capita Income
+    "B19301_001E": "per_capita_income",
+    # B19083 — Gini Index of Income Inequality
+    "B19083_001E": "gini_index",
     # B25064 — Median Gross Rent
     "B25064_001E": "median_gross_rent",
+    # B25077 — Median Value of Owner-Occupied Housing Units
+    "B25077_001E": "median_owner_occupied_home_value",
     # B25002 — Occupancy Status
     "B25002_001E": "total_housing_units",
     "B25002_002E": "occupied_housing_units",
@@ -105,6 +111,42 @@ ACS_VARIABLES: dict[str, str] = {
                 "gross_rent_distribution_cash_rent_3000_to_3499",
                 "gross_rent_distribution_cash_rent_3500_plus",
                 "gross_rent_distribution_no_cash_rent",
+            ],
+            start=1,
+        )
+    },
+    # B25075 — Value
+    **{
+        f"B25075_{idx:03d}E": column
+        for idx, column in enumerate(
+            [
+                "owner_occupied_value_total",
+                "owner_occupied_value_lt_10000",
+                "owner_occupied_value_10000_to_14999",
+                "owner_occupied_value_15000_to_19999",
+                "owner_occupied_value_20000_to_24999",
+                "owner_occupied_value_25000_to_29999",
+                "owner_occupied_value_30000_to_34999",
+                "owner_occupied_value_35000_to_39999",
+                "owner_occupied_value_40000_to_49999",
+                "owner_occupied_value_50000_to_59999",
+                "owner_occupied_value_60000_to_69999",
+                "owner_occupied_value_70000_to_79999",
+                "owner_occupied_value_80000_to_89999",
+                "owner_occupied_value_90000_to_99999",
+                "owner_occupied_value_100000_to_124999",
+                "owner_occupied_value_125000_to_149999",
+                "owner_occupied_value_150000_to_174999",
+                "owner_occupied_value_175000_to_199999",
+                "owner_occupied_value_200000_to_249999",
+                "owner_occupied_value_250000_to_299999",
+                "owner_occupied_value_300000_to_399999",
+                "owner_occupied_value_400000_to_499999",
+                "owner_occupied_value_500000_to_749999",
+                "owner_occupied_value_750000_to_999999",
+                "owner_occupied_value_1000000_to_1499999",
+                "owner_occupied_value_1500000_to_1999999",
+                "owner_occupied_value_2000000_plus",
             ],
             start=1,
         )
@@ -195,6 +237,40 @@ ACS_VARIABLES: dict[str, str] = {
             start=1,
         )
     },
+    # B15003 — Educational Attainment for the Population 25 Years and Over
+    **{
+        f"B15003_{idx:03d}E": column
+        for idx, column in enumerate(
+            [
+                "educational_attainment_25plus_total",
+                "educational_attainment_25plus_no_schooling_completed",
+                "educational_attainment_25plus_nursery_school",
+                "educational_attainment_25plus_kindergarten",
+                "educational_attainment_25plus_1st_grade",
+                "educational_attainment_25plus_2nd_grade",
+                "educational_attainment_25plus_3rd_grade",
+                "educational_attainment_25plus_4th_grade",
+                "educational_attainment_25plus_5th_grade",
+                "educational_attainment_25plus_6th_grade",
+                "educational_attainment_25plus_7th_grade",
+                "educational_attainment_25plus_8th_grade",
+                "educational_attainment_25plus_9th_grade",
+                "educational_attainment_25plus_10th_grade",
+                "educational_attainment_25plus_11th_grade",
+                "educational_attainment_25plus_12th_grade_no_diploma",
+                "educational_attainment_25plus_high_school_diploma",
+                "educational_attainment_25plus_ged_or_alternative_credential",
+                "educational_attainment_25plus_some_college_lt_1_year",
+                "educational_attainment_25plus_some_college_1plus_year_no_degree",
+                "educational_attainment_25plus_associates_degree",
+                "educational_attainment_25plus_bachelors_degree",
+                "educational_attainment_25plus_masters_degree",
+                "educational_attainment_25plus_professional_school_degree",
+                "educational_attainment_25plus_doctorate_degree",
+            ],
+            start=1,
+        )
+    },
 }
 
 # B01001 — Sex by Age (for deriving adult population 18+)
@@ -224,6 +300,11 @@ UNAVAILABLE_API_VARS_BY_YEAR: dict[int, set[str]] = {
 }
 UNAVAILABLE_API_VARS_BY_YEAR[2009].update({"B23025_003E", "B23025_005E"})
 UNAVAILABLE_API_VARS_BY_YEAR[2010].update({"B23025_003E", "B23025_005E"})
+for year in range(2009, 2015):
+    UNAVAILABLE_API_VARS_BY_YEAR[year].update({"B25075_026E", "B25075_027E"})
+UNAVAILABLE_API_VARS_BY_YEAR[2009].add("B19083_001E")
+for year in range(2009, 2012):
+    UNAVAILABLE_API_VARS_BY_YEAR[year].update({f"B15003_{idx:03d}E" for idx in range(1, 26)})
 
 
 def api_vars_for_year(year: int) -> list[str]:
@@ -244,16 +325,21 @@ ACS_TABLES: list[str] = [
     "B01003",
     "B01001",
     "B19013",
+    "B19301",
+    "B19083",
     "B25064",
+    "B25077",
     "B25002",
     "B25003",
     "C17002",
     "B23025",
     "B19001",
+    "B25075",
     "B25063",
     "B25070",
     "B25091",
     "B25118",
+    "B15003",
 ]
 
 # ---------------------------------------------------------------------------
@@ -352,6 +438,30 @@ ACS5_COVARIATE_REGISTRY: tuple[ACS5CovariateSpec, ...] = (
         ),
     ),
     ACS5CovariateSpec(
+        name="per_capita_income",
+        table="B19301",
+        source_variables=("B19301_001E",),
+        output_columns=("per_capita_income",),
+        measure_kind="median",
+        denominator_column="total_population",
+        weight_column="total_population * selected_overlap_weight",
+        rollup_method="population_weighted_mean",
+        caveats="Per-capita income is declared for weighted-average rollup by population.",
+    ),
+    ACS5CovariateSpec(
+        name="gini_index",
+        table="B19083",
+        source_variables=("B19083_001E",),
+        output_columns=("gini_index",),
+        measure_kind="median",
+        denominator_column="total_population",
+        weight_column="total_population * selected_overlap_weight",
+        rollup_method="population_weighted_mean",
+        caveats=(
+            "Weighted tract Gini is an approximation and is not a true pooled geography-level Gini."
+        ),
+    ),
+    ACS5CovariateSpec(
         name="median_gross_rent",
         table="B25064",
         source_variables=("B25064_001E",),
@@ -362,6 +472,20 @@ ACS5_COVARIATE_REGISTRY: tuple[ACS5CovariateSpec, ...] = (
         rollup_method="population_weighted_mean",
         canonical_measure=True,
         caveats="Population-weighted mean of tract medians; it is not a true pooled rent median.",
+    ),
+    ACS5CovariateSpec(
+        name="median_owner_occupied_home_value",
+        table="B25077",
+        source_variables=("B25077_001E",),
+        output_columns=("median_owner_occupied_home_value",),
+        measure_kind="median",
+        denominator_column="owner_households",
+        weight_column="owner_households * selected_overlap_weight",
+        rollup_method="population_weighted_mean",
+        caveats=(
+            "Temporary broad median rollup uses the existing weighted-average path; "
+            "the aggregation-semantics task will apply owner-household weights."
+        ),
     ),
     ACS5CovariateSpec(
         name="housing_occupancy",
@@ -472,6 +596,21 @@ ACS5_COVARIATE_REGISTRY: tuple[ACS5CovariateSpec, ...] = (
         ),
     ),
     ACS5CovariateSpec(
+        name="owner_occupied_value_distribution",
+        table="B25075",
+        source_variables=_source_variables_for_outputs(
+            _columns_with_prefix("owner_occupied_value_")
+        ),
+        output_columns=_columns_with_prefix("owner_occupied_value_"),
+        measure_kind="distribution",
+        denominator_column="owner_occupied_value_total",
+        weight_column="area_share",
+        rollup_method="area_weighted_sum",
+        caveats=(
+            "Top value bins B25075_026E and B25075_027E are unavailable before ACS5 vintage 2015."
+        ),
+    ),
+    ACS5CovariateSpec(
         name="rent_burden",
         table="B25070",
         source_variables=_source_variables_for_outputs(
@@ -517,6 +656,19 @@ ACS5_COVARIATE_REGISTRY: tuple[ACS5CovariateSpec, ...] = (
             "Tenure-by-income bins support recipe-selected owner/renter income "
             "distribution measures and Gini approximations."
         ),
+    ),
+    ACS5CovariateSpec(
+        name="educational_attainment_25plus",
+        table="B15003",
+        source_variables=_source_variables_for_outputs(
+            _columns_with_prefix("educational_attainment_25plus_")
+        ),
+        output_columns=_columns_with_prefix("educational_attainment_25plus_"),
+        measure_kind="distribution",
+        denominator_column="educational_attainment_25plus_total",
+        weight_column="area_share",
+        rollup_method="area_weighted_sum",
+        caveats="B15003 is unavailable before ACS5 vintage 2012.",
     ),
 )
 
@@ -574,6 +726,9 @@ ACS5_SAE_SUPPORT_COLUMNS_BY_TABLE: dict[str, list[str]] = {
     "B19001": [
         column for column in ACS5_SAE_COUNT_COLUMNS if column.startswith("household_income_")
     ],
+    "B25075": [
+        column for column in ACS5_SAE_COUNT_COLUMNS if column.startswith("owner_occupied_value_")
+    ],
     "B25063": [
         column for column in ACS5_SAE_COUNT_COLUMNS if column.startswith("gross_rent_distribution_")
     ],
@@ -584,6 +739,11 @@ ACS5_SAE_SUPPORT_COLUMNS_BY_TABLE: dict[str, list[str]] = {
         column for column in ACS5_SAE_COUNT_COLUMNS if column.startswith("owner_costs_pct_income_")
     ],
     "B25118": [column for column in ACS5_SAE_COUNT_COLUMNS if column.startswith("tenure_income_")],
+    "B15003": [
+        column
+        for column in ACS5_SAE_COUNT_COLUMNS
+        if column.startswith("educational_attainment_25plus_")
+    ],
 }
 
 ACS5_SAE_SUPPORT_TABLES: list[str] = list(ACS5_SAE_SUPPORT_COLUMNS_BY_TABLE)
@@ -602,6 +762,8 @@ ACS5_SAE_DENOMINATOR_COLUMNS: list[str] = [
     "owner_costs_pct_income_without_mortgage_total",
     "tenure_income_owner_occupied_total",
     "tenure_income_renter_occupied_total",
+    "owner_occupied_value_total",
+    "educational_attainment_25plus_total",
 ]
 
 ACS5_SAE_SUPPORT_COLUMNS: list[str] = [
