@@ -349,6 +349,7 @@ ACS_TABLES: list[str] = [
 ACS5MeasureKind = Literal["count", "median", "rate", "distribution", "moe"]
 ACS5RollupMethod = Literal[
     "area_weighted_sum",
+    "denominator_weighted_mean",
     "population_weighted_mean",
     "ratio_of_area_weighted_sums",
     "root_sum_squared_moe",
@@ -467,11 +468,14 @@ ACS5_COVARIATE_REGISTRY: tuple[ACS5CovariateSpec, ...] = (
         source_variables=("B25064_001E",),
         output_columns=("median_gross_rent",),
         measure_kind="median",
-        denominator_column="total_population",
-        weight_column="total_population * selected_overlap_weight",
-        rollup_method="population_weighted_mean",
+        denominator_column="renter_households",
+        weight_column="renter_households * selected_overlap_weight",
+        rollup_method="denominator_weighted_mean",
         canonical_measure=True,
-        caveats="Population-weighted mean of tract medians; it is not a true pooled rent median.",
+        caveats=(
+            "Renter-household-weighted mean of tract medians when renter household "
+            "counts are available; it is not a true pooled rent median."
+        ),
     ),
     ACS5CovariateSpec(
         name="median_owner_occupied_home_value",
@@ -481,10 +485,10 @@ ACS5_COVARIATE_REGISTRY: tuple[ACS5CovariateSpec, ...] = (
         measure_kind="median",
         denominator_column="owner_households",
         weight_column="owner_households * selected_overlap_weight",
-        rollup_method="population_weighted_mean",
+        rollup_method="denominator_weighted_mean",
         caveats=(
-            "Temporary broad median rollup uses the existing weighted-average path; "
-            "the aggregation-semantics task will apply owner-household weights."
+            "Owner-household-weighted mean of tract medians when owner household "
+            "counts are available; it is not a true pooled home-value median."
         ),
     ),
     ACS5CovariateSpec(

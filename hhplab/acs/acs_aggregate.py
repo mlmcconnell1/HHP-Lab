@@ -114,6 +114,14 @@ MSA_ACS5_COVARIATE_ALIASES: dict[str, str] = {
     "rent_burden_30_plus": "msa_rent_burden",
 }
 
+AVERAGE_WEIGHT_DENOMINATORS: dict[str, tuple[str, ...]] = {
+    "median_household_income": ("total_population",),
+    "per_capita_income": ("total_population",),
+    "median_gross_rent": ("renter_households", "total_population"),
+    "median_owner_occupied_home_value": ("owner_households", "total_population"),
+    "gini_index": ("total_population",),
+}
+
 
 def _maybe_remap_ct_planning_regions(
     acs_data: pd.DataFrame,
@@ -172,8 +180,7 @@ def _maybe_remap_ct_planning_regions(
         mapping = build_ct_tract_planning_region_map(tract_vintage)
     except (FileNotFoundError, ValueError) as exc:
         warnings.warn(
-            "CT planning-region GEOID remap skipped. "
-            f"{exc}",
+            f"CT planning-region GEOID remap skipped. {exc}",
             UserWarning,
             stacklevel=2,
         )
@@ -263,17 +270,13 @@ def _validate_geoid_overlap(
         overlap_ratio = len(overlap) / len(xwalk_tracts) if xwalk_tracts else 0
 
         if overlap_ratio < min_overlap_threshold:
-            low_overlap_states.append(
-                (state, overlap_ratio, len(xwalk_tracts), len(overlap))
-            )
+            low_overlap_states.append((state, overlap_ratio, len(xwalk_tracts), len(overlap)))
 
     if low_overlap_states:
         # Format warning message
         state_details = []
         for state, ratio, total, matched in low_overlap_states:
-            state_details.append(
-                f"  State {state}: {matched}/{total} tracts matched ({ratio:.1%})"
-            )
+            state_details.append(f"  State {state}: {matched}/{total} tracts matched ({ratio:.1%})")
 
         warning_msg = (
             "Low GEOID overlap detected between crosswalk and ACS data. "
@@ -286,6 +289,22 @@ def _validate_geoid_overlap(
 
         logger.warning(warning_msg)
         warnings.warn(warning_msg, UserWarning, stacklevel=3)
+
+
+def _weighted_mean_denominator(
+    group: pd.DataFrame,
+    column: str,
+    overlap_weight: pd.Series,
+) -> pd.Series:
+    """Return the best available denominator weights for an averaged ACS estimate."""
+    for denominator_column in AVERAGE_WEIGHT_DENOMINATORS.get(column, ("total_population",)):
+        if denominator_column not in group.columns:
+            continue
+        denominator = pd.to_numeric(group[denominator_column], errors="coerce").fillna(0)
+        weights = denominator * overlap_weight
+        if (weights > 0).any():
+            return weights
+    return pd.Series(0.0, index=group.index)
 
 
 def aggregate_to_geo(
@@ -369,19 +388,27 @@ def aggregate_to_geo(
                 weighted = pd.to_numeric(group[col], errors="coerce").fillna(0) * area_share
                 row[col] = weighted.sum()
 
-        # Weighted averages for median values
-        # Use the specified weighting method (area or population)
-        pop_weights = (
-            pd.to_numeric(group["total_population"], errors="coerce").fillna(0)
-            * pd.to_numeric(group[median_weight_col], errors="coerce").fillna(0)
-        )
+        # Weighted averages for scalar estimates. Each column chooses the most
+        # defensible denominator available, then applies the requested overlap basis.
+        average_overlap_weight = pd.to_numeric(
+            group[median_weight_col],
+            errors="coerce",
+        ).fillna(0)
 
         for col in avg_cols:
             if col in group.columns:
-                valid_mask = group[col].notna() & (pop_weights > 0)
+                average_weights = _weighted_mean_denominator(
+                    group,
+                    col,
+                    average_overlap_weight,
+                )
+                valid_mask = group[col].notna() & (average_weights > 0)
                 if valid_mask.any():
-                    weighted_sum = (group.loc[valid_mask, col] * pop_weights[valid_mask]).sum()
-                    row[col] = weighted_sum / pop_weights[valid_mask].sum()
+                    weighted_sum = (
+                        pd.to_numeric(group.loc[valid_mask, col], errors="coerce")
+                        * average_weights[valid_mask]
+                    ).sum()
+                    row[col] = weighted_sum / average_weights[valid_mask].sum()
                 else:
                     row[col] = pd.NA
 
