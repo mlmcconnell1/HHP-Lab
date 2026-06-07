@@ -233,6 +233,44 @@ class TestFetchStateTractPopulation:
         assert captured_keys
         assert set(captured_keys) == {"test-census-key"}
 
+    def test_expanded_acs5_variables_are_requested_across_api_chunks(self, httpx_mock):
+        """Large expanded ACS5 variable requests are chunked deterministically."""
+        response_data = make_census_response(
+            [
+                {
+                    "county": "031",
+                    "tract": "001000",
+                    "B01003_001E": "5000",
+                    "B19301_001E": "42000",
+                    "B25075_027E": "5",
+                    "B15003_025E": "75",
+                }
+            ]
+        )
+        captured_get: list[str] = []
+
+        def respond(request):
+            captured_get.append(str(request.url.params["get"]))
+            return httpx.Response(200, json=response_data)
+
+        httpx_mock.add_callback(
+            respond,
+            url=re.compile(r"https://api\.census\.gov/data/2024/acs/acs5.*"),
+        )
+
+        df, _ = fetch_state_tract_data(2024, "08")
+
+        requested_vars = ",".join(captured_get)
+        max_chunk_size = max(len(get_param.split(",")) - 1 for get_param in captured_get)
+        assert len(captured_get) > 1
+        assert max_chunk_size <= 45
+        assert "B19301_001E" in requested_vars
+        assert "B25075_027E" in requested_vars
+        assert "B15003_025E" in requested_vars
+        assert df.iloc[0]["per_capita_income"] == 42000
+        assert df.iloc[0]["owner_occupied_value_2000000_plus"] == 5
+        assert df.iloc[0]["educational_attainment_25plus_doctorate_degree"] == 75
+
     def test_parses_response_correctly(self, httpx_mock):
         """Test that Census API response is parsed into correct DataFrame structure."""
         response_data = make_census_response(

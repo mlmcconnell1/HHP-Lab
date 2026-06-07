@@ -218,6 +218,29 @@ class TestTranslateTracts2010To2020:
         assert result["owner_households"].sum() == pytest.approx(250, rel=0.01)
         assert result["renter_households"].sum() == pytest.approx(150, rel=0.01)
 
+    def test_expanded_covariates_translate_by_column_semantics(self, mock_relationship_file):
+        """Expanded count bins are summed and scalar estimates are weighted."""
+        df = pd.DataFrame(
+            {
+                "tract_geoid": ["01001020300", "01001020400"],
+                "total_population": [1000, 3000],
+                "owner_occupied_value_total": [10, 30],
+                "educational_attainment_25plus_bachelors_degree": [100, 300],
+                "per_capita_income": [100.0, 300.0],
+                "gini_index": [0.2, 0.6],
+            }
+        )
+
+        result, _ = translate_tracts_2010_to_2020(df)
+        row = result[result["tract_geoid"] == "01001020301"].iloc[0]
+
+        # Relationship weights are 0.7 and 0.3 for the two merging tracts.
+        assert row["total_population"] == pytest.approx(1600.0)
+        assert row["owner_occupied_value_total"] == pytest.approx(16.0)
+        assert row["educational_attainment_25plus_bachelors_degree"] == pytest.approx(160.0)
+        assert row["per_capita_income"] == pytest.approx((100 * 700 + 300 * 900) / 1600)
+        assert row["gini_index"] == pytest.approx((0.2 * 700 + 0.6 * 900) / 1600)
+
     def test_tract_merge(self, mock_relationship_file):
         """Test translation of multiple tracts that merge into one 2020 tract."""
         df = pd.DataFrame(
@@ -320,9 +343,7 @@ class TestTranslateTracts2010To2020:
         with pytest.raises(ValueError, match="Missing required column: total_population"):
             translate_tracts_2010_to_2020(df)
 
-    def test_missing_median_excluded_from_weighted_average(
-        self, mock_relationship_file
-    ):
+    def test_missing_median_excluded_from_weighted_average(self, mock_relationship_file):
         """Tracts with NA medians must NOT bias the denominator.
 
         Regression test for coclab-i2fj.5.20: a merged target tract with
@@ -345,10 +366,7 @@ class TestTranslateTracts2010To2020:
         assert len(merged) == 1
         # Only the tract with valid income (pop-weight 1000*0.7=700)
         # should contribute; result should be 100_000, NOT biased down.
-        assert merged.iloc[0]["median_household_income"] == pytest.approx(
-            100_000.0, rel=0.01
-        )
-
+        assert merged.iloc[0]["median_household_income"] == pytest.approx(100_000.0, rel=0.01)
 
     @pytest.mark.parametrize(
         ("median_values", "weights", "populations", "expected_medians"),
@@ -399,9 +417,7 @@ class TestTranslateTracts2010To2020:
         result = result.sort_values("tract_geoid").reset_index(drop=True)
         assert len(result) == 2
         for _, row in result.iterrows():
-            assert row["median_household_income"] == pytest.approx(
-                80_000.0, rel=0.01
-            )
+            assert row["median_household_income"] == pytest.approx(80_000.0, rel=0.01)
 
     @pytest.mark.parametrize(
         ("incomes", "populations", "expected_income"),
@@ -497,9 +513,7 @@ class TestTranslateTracts2010To2020:
         # Only the matched tract should appear
         assert len(result) == 1
         assert result.iloc[0]["tract_geoid"] == "01001020101"
-        assert result.iloc[0]["median_household_income"] == pytest.approx(
-            60_000.0, rel=0.01
-        )
+        assert result.iloc[0]["median_household_income"] == pytest.approx(60_000.0, rel=0.01)
 
     def test_median_translation_multiple_median_columns(self, mock_relationship_file):
         """Both median_household_income and median_gross_rent are translated."""
@@ -526,9 +540,7 @@ class TestTranslateTracts2010To2020:
 
         # rent: (1200*700 + 800*150) / 850
         expected_rent = (1200 * 700 + 800 * 150) / 850
-        assert merged.iloc[0]["median_gross_rent"] == pytest.approx(
-            expected_rent, rel=0.001
-        )
+        assert merged.iloc[0]["median_gross_rent"] == pytest.approx(expected_rent, rel=0.001)
 
     def test_pre_2010_acs_to_2020_target_raises(self):
         """Regression test for coclab-i2fj.5.21: pre-2010 ACS vintages must
