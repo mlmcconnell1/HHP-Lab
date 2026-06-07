@@ -10,11 +10,17 @@ import pytest
 from typer.testing import CliRunner
 
 from hhplab.acs.variables import (
+    ACS5_COVARIATE_REGISTRY,
+    ACS5_COVARIATE_REGISTRY_BY_OUTPUT,
+    ACS5_EXPANDED_COVARIATE_COLUMNS,
+    ACS_TABLES,
+    ACS_VARIABLES,
     COUNT_COLUMNS,
     DERIVED_COLUMNS,
     MEDIAN_COLUMNS,
     MOE_COLUMNS,
     TRACT_OUTPUT_COLUMNS,
+    acs5_covariate_spec_for_output,
 )
 from hhplab.bls.laus_series import (
     LAUS_MEASURE_CODES as BLS_LAUS_MEASURE_CODES,
@@ -96,14 +102,23 @@ SCHEMA_ALIAS_CASES = {
     ),
 }
 
+ACS5_REGISTRY_REQUIRED_FIELDS = (
+    "name",
+    "table",
+    "source_variables",
+    "output_columns",
+    "measure_kind",
+    "weight_column",
+    "rollup_method",
+    "caveats",
+)
+
 ACS1_IMPUTATION_SPEC_CASES = {
     "poverty_rate": ACS1_IMPUTED_POVERTY_SPEC,
     "total_households": ACS1_IMPUTED_TOTAL_HOUSEHOLDS_SPEC,
 }
 
-ACS1_IMPUTATION_COMPLETE_ROW = {
-    column: pd.NA for column in ACS1_IMPUTATION_OUTPUT_COLUMNS
-} | {
+ACS1_IMPUTATION_COMPLETE_ROW = {column: pd.NA for column in ACS1_IMPUTATION_OUTPUT_COLUMNS} | {
     "geo_type": "tract",
     "geo_id": "08031001000",
     "year": 2023,
@@ -268,6 +283,74 @@ def test_source_schema_aliases_use_canonical_schema_constants(case_name: str) ->
     source_constant, schema_constant = SCHEMA_ALIAS_CASES[case_name]
 
     assert source_constant is schema_constant
+
+
+@pytest.mark.parametrize(
+    "field_name",
+    ACS5_REGISTRY_REQUIRED_FIELDS,
+    ids=ACS5_REGISTRY_REQUIRED_FIELDS,
+)
+def test_acs5_covariate_registry_declares_required_metadata(field_name: str) -> None:
+    missing = [spec.name for spec in ACS5_COVARIATE_REGISTRY if not getattr(spec, field_name)]
+
+    assert missing == []
+
+
+def test_acs5_covariate_registry_owns_supported_outputs_once() -> None:
+    registry_outputs = [
+        column for spec in ACS5_COVARIATE_REGISTRY for column in spec.output_columns
+    ]
+    duplicate_outputs = sorted(
+        column for column in set(registry_outputs) if registry_outputs.count(column) > 1
+    )
+    expected_outputs = (
+        set(COUNT_COLUMNS) | set(MEDIAN_COLUMNS) | set(MOE_COLUMNS) | set(DERIVED_COLUMNS)
+    )
+
+    assert duplicate_outputs == []
+    assert expected_outputs <= set(registry_outputs)
+    assert set(ACS5_COVARIATE_REGISTRY_BY_OUTPUT) == set(registry_outputs)
+
+
+def test_acs5_covariate_registry_references_known_tables_and_source_variables() -> None:
+    known_source_variables = set(ACS_VARIABLES) | {
+        variable
+        for spec in ACS5_COVARIATE_REGISTRY
+        if spec.table == "B01001"
+        for variable in spec.source_variables
+    }
+
+    invalid_tables = sorted(
+        {spec.table for spec in ACS5_COVARIATE_REGISTRY if spec.table not in ACS_TABLES}
+    )
+    invalid_sources = sorted(
+        {
+            variable
+            for spec in ACS5_COVARIATE_REGISTRY
+            for variable in spec.source_variables
+            if variable not in known_source_variables
+        }
+    )
+
+    assert invalid_tables == []
+    assert invalid_sources == []
+
+
+def test_acs5_expanded_covariates_remain_outside_default_canonical_measures() -> None:
+    assert ACS5_EXPANDED_COVARIATE_COLUMNS
+    assert set(ACS5_EXPANDED_COVARIATE_COLUMNS).isdisjoint(schema_columns.ACS_MEASURE_COLUMNS)
+    assert "household_income_total" in ACS5_EXPANDED_COVARIATE_COLUMNS
+    assert "owner_costs_pct_income_total" in ACS5_EXPANDED_COVARIATE_COLUMNS
+    assert "median_household_income" not in ACS5_EXPANDED_COVARIATE_COLUMNS
+
+
+def test_acs5_covariate_output_lookup_returns_owning_registry_entry() -> None:
+    spec = acs5_covariate_spec_for_output("rent_burden_30_plus")
+
+    assert spec.name == "rent_burden"
+    assert spec.table == "B25070"
+    assert spec.denominator_column == "gross_rent_pct_income_total"
+    assert spec.rollup_method == "ratio_of_area_weighted_sums"
 
 
 @pytest.mark.parametrize(

@@ -6,12 +6,16 @@ column types (count vs median vs MOE), and derived column specifications.
 
 from __future__ import annotations
 
+from dataclasses import dataclass
+from typing import Literal
+
 from hhplab.schema.columns import (
     ACS5_COUNT_COLUMNS,
     ACS5_DERIVED_COLUMNS,
     ACS5_MEDIAN_COLUMNS,
     ACS5_MOE_COLUMNS,
     ACS5_SAE_COUNT_COLUMNS,
+    ACS_MEASURE_COLUMNS,
     ACS_TRACT_OUTPUT_COLUMNS,
 )
 
@@ -251,6 +255,290 @@ ACS_TABLES: list[str] = [
     "B25091",
     "B25118",
 ]
+
+# ---------------------------------------------------------------------------
+# Aggregation registry
+# ---------------------------------------------------------------------------
+
+ACS5MeasureKind = Literal["count", "median", "rate", "distribution", "moe"]
+ACS5RollupMethod = Literal[
+    "area_weighted_sum",
+    "population_weighted_mean",
+    "ratio_of_area_weighted_sums",
+    "root_sum_squared_moe",
+]
+
+
+@dataclass(frozen=True)
+class ACS5CovariateSpec:
+    """Declarative aggregation contract for a supported ACS5 covariate family."""
+
+    name: str
+    table: str
+    source_variables: tuple[str, ...]
+    output_columns: tuple[str, ...]
+    measure_kind: ACS5MeasureKind
+    denominator_column: str | None
+    weight_column: str
+    rollup_method: ACS5RollupMethod
+    canonical_measure: bool = False
+    recipe_selectable: bool = True
+    caveats: str = ""
+
+
+def _columns_with_prefix(prefix: str) -> tuple[str, ...]:
+    return tuple(column for column in ACS5_SAE_COUNT_COLUMNS if column.startswith(prefix))
+
+
+def _source_variables_for_outputs(output_columns: tuple[str, ...]) -> tuple[str, ...]:
+    output_set = set(output_columns)
+    return tuple(variable for variable, column in ACS_VARIABLES.items() if column in output_set)
+
+
+ACS5_COVARIATE_REGISTRY: tuple[ACS5CovariateSpec, ...] = (
+    ACS5CovariateSpec(
+        name="total_population",
+        table="B01003",
+        source_variables=("B01003_001E",),
+        output_columns=("total_population",),
+        measure_kind="count",
+        denominator_column=None,
+        weight_column="area_share",
+        rollup_method="area_weighted_sum",
+        canonical_measure=True,
+        caveats=(
+            "Counts are apportioned by tract overlap; population is not uniformly "
+            "distributed within every tract."
+        ),
+    ),
+    ACS5CovariateSpec(
+        name="total_population_moe",
+        table="B01003",
+        source_variables=("B01003_001M",),
+        output_columns=("moe_total_population",),
+        measure_kind="moe",
+        denominator_column=None,
+        weight_column="area_share",
+        rollup_method="root_sum_squared_moe",
+        caveats=(
+            "Only count-style total population MOE propagation is declared here; "
+            "median MOEs are not propagated."
+        ),
+    ),
+    ACS5CovariateSpec(
+        name="adult_population",
+        table="B01001",
+        source_variables=tuple(ADULT_VARS),
+        output_columns=("adult_population",),
+        measure_kind="count",
+        denominator_column=None,
+        weight_column="area_share",
+        rollup_method="area_weighted_sum",
+        canonical_measure=True,
+        caveats="Derived from age-by-sex bins before geographic aggregation.",
+    ),
+    ACS5CovariateSpec(
+        name="median_household_income",
+        table="B19013",
+        source_variables=("B19013_001E",),
+        output_columns=("median_household_income",),
+        measure_kind="median",
+        denominator_column="total_population",
+        weight_column="total_population * selected_overlap_weight",
+        rollup_method="population_weighted_mean",
+        canonical_measure=True,
+        caveats=(
+            "Population-weighted mean of tract medians; it is not a true pooled household median."
+        ),
+    ),
+    ACS5CovariateSpec(
+        name="median_gross_rent",
+        table="B25064",
+        source_variables=("B25064_001E",),
+        output_columns=("median_gross_rent",),
+        measure_kind="median",
+        denominator_column="total_population",
+        weight_column="total_population * selected_overlap_weight",
+        rollup_method="population_weighted_mean",
+        canonical_measure=True,
+        caveats="Population-weighted mean of tract medians; it is not a true pooled rent median.",
+    ),
+    ACS5CovariateSpec(
+        name="housing_occupancy",
+        table="B25002",
+        source_variables=_source_variables_for_outputs(
+            ("total_housing_units", "occupied_housing_units", "vacant_housing_units")
+        ),
+        output_columns=(
+            "total_housing_units",
+            "occupied_housing_units",
+            "vacant_housing_units",
+            "vacancy_rate",
+        ),
+        measure_kind="rate",
+        denominator_column="total_housing_units",
+        weight_column="area_share",
+        rollup_method="ratio_of_area_weighted_sums",
+        canonical_measure=True,
+        caveats=(
+            "Vacancy rate is derived after count rollup as vacant_housing_units / "
+            "total_housing_units."
+        ),
+    ),
+    ACS5CovariateSpec(
+        name="tenure_counts",
+        table="B25003",
+        source_variables=_source_variables_for_outputs(
+            ("total_households", "owner_households", "renter_households")
+        ),
+        output_columns=("total_households", "owner_households", "renter_households"),
+        measure_kind="count",
+        denominator_column=None,
+        weight_column="area_share",
+        rollup_method="area_weighted_sum",
+        caveats=(
+            "Household counts are support covariates and denominators for selected "
+            "expanded measures."
+        ),
+    ),
+    ACS5CovariateSpec(
+        name="poverty",
+        table="C17002",
+        source_variables=_source_variables_for_outputs(
+            ("poverty_universe", "below_50pct_poverty", "50_to_99pct_poverty")
+        ),
+        output_columns=(
+            "poverty_universe",
+            "below_50pct_poverty",
+            "50_to_99pct_poverty",
+            "population_below_poverty",
+            "poverty_rate",
+        ),
+        measure_kind="rate",
+        denominator_column="poverty_universe",
+        weight_column="area_share",
+        rollup_method="ratio_of_area_weighted_sums",
+        canonical_measure=True,
+        caveats=(
+            "population_below_poverty is derived from the under-50% and 50-99% "
+            "poverty bins before rollup."
+        ),
+    ),
+    ACS5CovariateSpec(
+        name="labor_force_status",
+        table="B23025",
+        source_variables=_source_variables_for_outputs(
+            ("civilian_labor_force", "unemployed_count")
+        ),
+        output_columns=("civilian_labor_force", "unemployed_count", "unemployment_rate"),
+        measure_kind="rate",
+        denominator_column="civilian_labor_force",
+        weight_column="area_share",
+        rollup_method="ratio_of_area_weighted_sums",
+        canonical_measure=True,
+        caveats=(
+            "unemployment_rate is derived after count rollup as unemployed_count / "
+            "civilian_labor_force."
+        ),
+    ),
+    ACS5CovariateSpec(
+        name="household_income_distribution",
+        table="B19001",
+        source_variables=_source_variables_for_outputs(_columns_with_prefix("household_income_")),
+        output_columns=_columns_with_prefix("household_income_"),
+        measure_kind="distribution",
+        denominator_column="household_income_total",
+        weight_column="area_share",
+        rollup_method="area_weighted_sum",
+        caveats=(
+            "Distribution bins support recipe-selected derived measures such as "
+            "quintiles and Gini approximations; bins are aggregated as counts."
+        ),
+    ),
+    ACS5CovariateSpec(
+        name="gross_rent_distribution",
+        table="B25063",
+        source_variables=_source_variables_for_outputs(
+            _columns_with_prefix("gross_rent_distribution_")
+        ),
+        output_columns=_columns_with_prefix("gross_rent_distribution_"),
+        measure_kind="distribution",
+        denominator_column="gross_rent_distribution_total",
+        weight_column="area_share",
+        rollup_method="area_weighted_sum",
+        caveats=(
+            "Distribution bins support recipe-selected rent distribution summaries "
+            "and are not canonical panel measures by default."
+        ),
+    ),
+    ACS5CovariateSpec(
+        name="rent_burden",
+        table="B25070",
+        source_variables=_source_variables_for_outputs(
+            _columns_with_prefix("gross_rent_pct_income_")
+        ),
+        output_columns=(*_columns_with_prefix("gross_rent_pct_income_"), "rent_burden_30_plus"),
+        measure_kind="rate",
+        denominator_column="gross_rent_pct_income_total",
+        weight_column="area_share",
+        rollup_method="ratio_of_area_weighted_sums",
+        canonical_measure=True,
+        caveats=(
+            "rent_burden_30_plus excludes households where gross rent as a "
+            "percentage of income is not computed."
+        ),
+    ),
+    ACS5CovariateSpec(
+        name="owner_cost_burden",
+        table="B25091",
+        source_variables=_source_variables_for_outputs(
+            _columns_with_prefix("owner_costs_pct_income_")
+        ),
+        output_columns=_columns_with_prefix("owner_costs_pct_income_"),
+        measure_kind="distribution",
+        denominator_column="owner_costs_pct_income_total",
+        weight_column="area_share",
+        rollup_method="area_weighted_sum",
+        caveats=(
+            "Owner cost burden bins are expanded covariates and remain "
+            "recipe-selectable rather than canonical by default."
+        ),
+    ),
+    ACS5CovariateSpec(
+        name="tenure_by_household_income",
+        table="B25118",
+        source_variables=_source_variables_for_outputs(_columns_with_prefix("tenure_income_")),
+        output_columns=_columns_with_prefix("tenure_income_"),
+        measure_kind="distribution",
+        denominator_column="tenure_income_total",
+        weight_column="area_share",
+        rollup_method="area_weighted_sum",
+        caveats=(
+            "Tenure-by-income bins support recipe-selected owner/renter income "
+            "distribution measures and Gini approximations."
+        ),
+    ),
+)
+
+ACS5_COVARIATE_REGISTRY_BY_OUTPUT: dict[str, ACS5CovariateSpec] = {
+    column: spec for spec in ACS5_COVARIATE_REGISTRY for column in spec.output_columns
+}
+
+ACS5_EXPANDED_COVARIATE_COLUMNS: tuple[str, ...] = tuple(
+    column
+    for spec in ACS5_COVARIATE_REGISTRY
+    for column in spec.output_columns
+    if spec.recipe_selectable and column not in ACS_MEASURE_COLUMNS
+)
+
+
+def acs5_covariate_spec_for_output(column: str) -> ACS5CovariateSpec:
+    """Return the aggregation registry entry that owns an ACS5 output column."""
+    try:
+        return ACS5_COVARIATE_REGISTRY_BY_OUTPUT[column]
+    except KeyError as exc:
+        raise KeyError(f"Unsupported ACS5 covariate output column: {column}") from exc
+
 
 # ---------------------------------------------------------------------------
 # Column classification (for translation and aggregation)
