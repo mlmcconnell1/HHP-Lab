@@ -332,6 +332,7 @@ ACS5_DERIVED_COLUMNS: list[str] = [
     "adult_population",
     "population_below_poverty",
     "poverty_rate",
+    "unemployment_rate",
     "vacancy_rate",
     "rent_burden_30_plus",
 ]

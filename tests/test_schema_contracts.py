@@ -9,6 +9,7 @@ import pandas as pd
 import pytest
 from typer.testing import CliRunner
 
+from hhplab.acs.acs_aggregate import AVERAGE_WEIGHT_DENOMINATORS
 from hhplab.acs.variables import (
     ACS5_COVARIATE_REGISTRY,
     ACS5_COVARIATE_REGISTRY_BY_OUTPUT,
@@ -338,6 +339,39 @@ def test_acs5_covariate_registry_references_known_tables_and_source_variables() 
 
     assert invalid_tables == []
     assert invalid_sources == []
+
+
+def test_acs5_covariate_registry_matches_aggregation_column_contracts() -> None:
+    count_columns = set(COUNT_COLUMNS)
+    median_columns = set(MEDIAN_COLUMNS)
+    moe_columns = set(MOE_COLUMNS)
+    derived_columns = set(DERIVED_COLUMNS)
+
+    for spec in ACS5_COVARIATE_REGISTRY:
+        if spec.rollup_method == "area_weighted_sum":
+            assert set(spec.output_columns) <= count_columns, spec.name
+            assert spec.weight_column == "area_share"
+            continue
+
+        if spec.rollup_method == "root_sum_squared_moe":
+            assert set(spec.output_columns) <= moe_columns, spec.name
+            assert spec.weight_column == "area_share"
+            continue
+
+        if spec.rollup_method in {"population_weighted_mean", "denominator_weighted_mean"}:
+            assert set(spec.output_columns) <= median_columns, spec.name
+            assert spec.denominator_column is not None, spec.name
+            assert spec.denominator_column in AVERAGE_WEIGHT_DENOMINATORS[spec.output_columns[0]]
+            continue
+
+        if spec.rollup_method == "ratio_of_area_weighted_sums":
+            assert spec.denominator_column in count_columns, spec.name
+            assert spec.weight_column == "area_share"
+            assert set(spec.output_columns) <= count_columns | derived_columns, spec.name
+            assert set(spec.output_columns) - count_columns <= derived_columns, spec.name
+            continue
+
+        pytest.fail(f"Unhandled ACS5 rollup method {spec.rollup_method!r} for {spec.name}")
 
 
 def test_acs5_expanded_covariates_remain_outside_default_canonical_measures() -> None:
