@@ -8,6 +8,7 @@ from pathlib import Path
 import geopandas as gpd
 import pandas as pd
 import pytest
+from pydantic import ValidationError
 from shapely.geometry import Polygon, box
 from typer.testing import CliRunner
 
@@ -60,6 +61,7 @@ from hhplab.recipe.recipe_schema import (
     Acs1Policy,
     ContainmentSpec,
     DatasetSpec,
+    DerivedMeasureConfig,
     GeometryRef,
     MapSpec,
     MsaCocCoverageSpec,
@@ -84,6 +86,34 @@ runner = CliRunner()
 STALE_TRANSLATED_ACS_PATH = "data/curated/acs/acs5_tracts__A2019xT2020.parquet"
 STALE_TRANSLATED_ACS_VINTAGE = "2015-2019"
 STALE_TRANSLATED_ACS_REBUILD = "hhplab ingest acs5-tract --acs 2015-2019 --tracts 2020 --force"
+
+
+def test_derived_measure_config_accepts_multi_column_numerator_without_rate() -> None:
+    config = DerivedMeasureConfig(
+        denominator_column="household_income_total",
+        source_numerator_columns=[
+            "household_income_150000_to_199999",
+            "household_income_200000_plus",
+        ],
+    )
+
+    assert config.source_rate_column is None
+    assert config.source_numerator_columns == [
+        "household_income_150000_to_199999",
+        "household_income_200000_plus",
+    ]
+
+
+def test_derived_measure_config_rejects_ambiguous_numerator_sources() -> None:
+    with pytest.raises(ValidationError, match="Use either source_numerator_column"):
+        DerivedMeasureConfig(
+            denominator_column="household_income_total",
+            source_numerator_column="household_income_200000_plus",
+            source_numerator_columns=[
+                "household_income_150000_to_199999",
+                "household_income_200000_plus",
+            ],
+        )
 
 
 def _write_stale_translated_acs_cache(path: Path) -> None:
@@ -5287,6 +5317,65 @@ class TestResampleAggregate:
             (25.0 * 0.8) + (35.0 * 0.5),
         )
         assert df.loc["COC1", "poverty_rate_individuals_acs1"] == pytest.approx(37.5 / 105.0)
+
+    def test_aggregate_derived_rate_can_sum_explicit_numerator_counts(self, tmp_path: Path):
+        """Derived rates can sum multiple count columns before weighted aggregation."""
+        ds_path = tmp_path / "data" / "acs5_income.parquet"
+        ds_path.parent.mkdir(parents=True, exist_ok=True)
+        pd.DataFrame(
+            {
+                "tract_geoid": ["A", "B", "C"],
+                "year": [2020, 2020, 2020],
+                "household_income_total": [100.0, 50.0, 200.0],
+                "household_income_150000_to_199999": [10.0, 5.0, 20.0],
+                "household_income_200000_plus": [5.0, 10.0, 30.0],
+            }
+        ).to_parquet(ds_path)
+
+        xwalk_path = tmp_path / "data" / "curated" / "xwalks" / "xwalk__B2025xT2020.parquet"
+        _make_xwalk_parquet(xwalk_path, geo_type="tract")
+
+        recipe = load_recipe(_recipe_with_pipeline())
+        ctx = ExecutionContext(project_root=tmp_path, recipe=recipe)
+        ctx.transform_paths["tract_to_coc"] = xwalk_path
+
+        task = ResampleTask(
+            dataset_id="acs",
+            year=2020,
+            input_path="data/acs5_income.parquet",
+            effective_geometry=GeometryRef(type="tract", vintage=2020),
+            method="aggregate",
+            transform_id="tract_to_coc",
+            to_geometry=GeometryRef(type="coc", vintage=2025),
+            measures=["household_income_total"],
+            measure_aggregations={"household_income_total": "sum"},
+            geo_column="tract_geoid",
+            derived_measures={
+                "household_income_pct_150000_plus": {
+                    "type": "rate_from_weighted_counts",
+                    "source_numerator_columns": [
+                        "household_income_150000_to_199999",
+                        "household_income_200000_plus",
+                    ],
+                    "denominator_column": "household_income_total",
+                    "numerator_output_column": "household_income_150000_plus",
+                },
+            },
+        )
+        result = _execute_resample(task, ctx)
+
+        assert result.success
+        df = ctx.intermediates[("acs", 2020)].set_index("geo_id")
+        assert df.loc["COC1", "household_income_150000_plus"] == pytest.approx(
+            ((10.0 + 5.0) * 0.8) + ((5.0 + 10.0) * 0.5),
+        )
+        assert df.loc["COC1", "household_income_total"] == pytest.approx(
+            (100.0 * 0.8) + (50.0 * 0.5),
+        )
+        assert df.loc["COC1", "household_income_pct_150000_plus"] == pytest.approx(
+            19.5 / 105.0,
+        )
+        assert df.loc["COC2", "household_income_pct_150000_plus"] == pytest.approx(50.0 / 200.0)
 
     def test_measures_list_backward_compat(self, tmp_path: Path):
         """Old list format (measures: [a, b] + aggregation: sum) still works."""

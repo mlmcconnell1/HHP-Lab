@@ -729,10 +729,15 @@ def _execute_resample(
                             derived_required_columns = (
                                 sorted(
                                     {
-                                        str(config[column])
+                                        str(column_name)
                                         for config in task.derived_measures.values()
-                                        for column in ("source_rate_column", "denominator_column")
-                                        if config.get(column) is not None
+                                        for column_name in [
+                                            config.get("source_rate_column"),
+                                            config.get("denominator_column"),
+                                            config.get("source_numerator_column"),
+                                            *(config.get("source_numerator_columns") or []),
+                                        ]
+                                        if column_name is not None
                                     }
                                 )
                                 if task.derived_measures

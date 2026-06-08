@@ -1360,10 +1360,11 @@ class DerivedMeasureConfig(BaseModel):
 
     ``rate_from_weighted_counts`` is for source rate columns that must be
     converted back to count-like numerators before geographic aggregation.
-    When ``source_numerator_column`` is present, the executor uses that count
-    directly; otherwise it computes ``source_rate_column * denominator_column``.
-    The executor applies the crosswalk weight to both numerator and denominator,
-    sums both at target geography, then emits ``numerator_sum / denominator_sum``.
+    When ``source_numerator_column`` or ``source_numerator_columns`` is present,
+    the executor uses those count columns directly; otherwise it computes
+    ``source_rate_column * denominator_column``. The executor applies the
+    crosswalk weight to both numerator and denominator, sums both at target
+    geography, then emits ``numerator_sum / denominator_sum``.
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -1372,8 +1373,8 @@ class DerivedMeasureConfig(BaseModel):
         default="rate_from_weighted_counts",
         description="Derived-measure algorithm.",
     )
-    source_rate_column: str = Field(
-        ...,
+    source_rate_column: str | None = Field(
+        default=None,
         description="Input rate column at source geography.",
     )
     denominator_column: str = Field(
@@ -1386,6 +1387,15 @@ class DerivedMeasureConfig(BaseModel):
             "Optional input numerator/count column at source geography. When set, "
             "the executor aggregates this column instead of deriving a numerator "
             "from source_rate_column * denominator_column."
+        ),
+    )
+    source_numerator_columns: list[str] | None = Field(
+        default=None,
+        min_length=1,
+        description=(
+            "Optional input numerator/count columns at source geography. When set, "
+            "the executor aggregates their row-wise sum instead of deriving a "
+            "numerator from source_rate_column * denominator_column."
         ),
     )
     numerator_output_column: str | None = Field(
@@ -1408,6 +1418,28 @@ class DerivedMeasureConfig(BaseModel):
         if value is not None and not value.strip():
             raise ValueError("Derived measure column names may not be blank.")
         return value
+
+    @field_validator("source_numerator_columns")
+    @classmethod
+    def _validate_non_blank_column_list(cls, value: list[str] | None) -> list[str] | None:
+        if value is not None and any(not column.strip() for column in value):
+            raise ValueError("Derived measure column names may not be blank.")
+        return value
+
+    @model_validator(mode="after")
+    def _validate_numerator_source(self) -> DerivedMeasureConfig:
+        if self.source_numerator_column is not None and self.source_numerator_columns is not None:
+            raise ValueError(
+                "Use either source_numerator_column or source_numerator_columns, not both."
+            )
+        if self.source_rate_column is None and (
+            self.source_numerator_column is None and self.source_numerator_columns is None
+        ):
+            raise ValueError(
+                "Derived measures require source_rate_column unless an explicit "
+                "source_numerator_column or source_numerator_columns is provided."
+            )
+        return self
 
 
 class ResampleStep(BaseModel):

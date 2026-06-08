@@ -2108,10 +2108,15 @@ def _check_dataset_schemas(
             )
         derived_required_columns = sorted(
             {
-                str(config[column])
+                str(column_name)
                 for config in (task.derived_measures or {}).values()
-                for column in ("source_rate_column", "denominator_column")
-                if config.get(column) is not None
+                for column_name in [
+                    config.get("source_rate_column"),
+                    config.get("denominator_column"),
+                    config.get("source_numerator_column"),
+                    *(config.get("source_numerator_columns") or []),
+                ]
+                if column_name is not None
             }
         )
         derived_missing = [column for column in derived_required_columns if column not in columns]

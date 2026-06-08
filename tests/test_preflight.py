@@ -1321,6 +1321,44 @@ class TestRunPreflight:
         ]
         assert any("acs1_imputed_poverty_rate" in finding.message for finding in findings)
 
+    def test_preflight_checks_multi_column_derived_rate_numerators(self, tmp_path: Path):
+        data = _acs1_poverty_preflight_recipe()
+        resample = data["pipelines"][0]["steps"][1]
+        resample["measures"] = {
+            "household_income_total": {"aggregation": "sum"},
+        }
+        resample["derived_measures"] = {
+            "household_income_pct_150000_plus": {
+                "type": "rate_from_weighted_counts",
+                "source_numerator_columns": [
+                    "household_income_150000_to_199999",
+                    "household_income_200000_plus",
+                ],
+                "denominator_column": "household_income_total",
+            },
+        }
+        _setup_preflight_fixtures(tmp_path, include_pit=False, include_acs=False)
+        path = tmp_path / "data" / "curated" / "acs" / "acs1_poverty_tracts__A2021xT2020.parquet"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        pd.DataFrame(
+            {
+                "tract_geoid": ["T1"],
+                "year": [2021],
+                "household_income_total": [100.0],
+                "household_income_150000_to_199999": [20.0],
+            }
+        ).to_parquet(path)
+
+        recipe = load_recipe(data)
+        report = run_preflight(recipe, project_root=tmp_path)
+
+        findings = [
+            f
+            for f in report.findings
+            if f.kind == FindingKind.MISSING_MEASURE and f.dataset_id == "acs1_poverty"
+        ]
+        assert any("household_income_200000_plus" in finding.message for finding in findings)
+
     def test_preflight_reports_existing_file_with_no_rows_for_task_year(self, tmp_path: Path):
         data = _acs1_poverty_preflight_recipe()
         dataset = data["datasets"]["acs1_poverty"]

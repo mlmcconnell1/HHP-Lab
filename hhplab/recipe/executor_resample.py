@@ -311,10 +311,15 @@ def _resample_aggregate(
     derived_measures = task.derived_measures or {}
     derived_required_columns = sorted(
         {
-            str(config[column])
+            str(column_name)
             for config in derived_measures.values()
-            for column in ("source_rate_column", "denominator_column", "source_numerator_column")
-            if config.get(column) is not None
+            for column_name in [
+                config.get("source_rate_column"),
+                config.get("denominator_column"),
+                config.get("source_numerator_column"),
+                *(config.get("source_numerator_columns") or []),
+            ]
+            if column_name is not None
         }
     )
     _validate_columns(
@@ -440,15 +445,24 @@ def _resample_aggregate(
                         f"Unsupported derived measure type "
                         f"{config.get('type')!r} for '{output_name}'."
                     )
-                rate_col = str(config["source_rate_column"])
                 denom_col = str(config["denominator_column"])
                 numerator_col = config.get("source_numerator_column")
+                numerator_cols = config.get("source_numerator_columns")
                 numerator_output = config.get("numerator_output_column")
-                if numerator_col is not None:
+                if numerator_cols is not None:
+                    numerator_cols = [str(column) for column in numerator_cols]
+                    valid = group[denom_col].notna() & weight.notna()
+                    for column in numerator_cols:
+                        valid &= group[column].notna()
+                    weighted_numerator = (
+                        group.loc[valid, numerator_cols].sum(axis=1) * weight.loc[valid]
+                    ).sum()
+                elif numerator_col is not None:
                     numerator_col = str(numerator_col)
                     valid = group[numerator_col].notna() & group[denom_col].notna() & weight.notna()
                     weighted_numerator = (group.loc[valid, numerator_col] * weight.loc[valid]).sum()
                 else:
+                    rate_col = str(config["source_rate_column"])
                     valid = group[rate_col].notna() & group[denom_col].notna() & weight.notna()
                     weighted_numerator = (
                         group.loc[valid, rate_col] * group.loc[valid, denom_col] * weight.loc[valid]
