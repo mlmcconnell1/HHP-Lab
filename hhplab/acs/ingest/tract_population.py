@@ -64,13 +64,13 @@ from hhplab.acs.variables import (
     ACS5_SAE_SUPPORT_COLUMNS_BY_TABLE,
     ACS5_SAE_SUPPORT_OUTPUT_COLUMNS,
     ACS5_SAE_SUPPORT_TABLES,
-    ACS_VARIABLES,
     ADULT_VARS,
     ALL_API_VARS,
     COUNT_COLUMNS,
     MEDIAN_COLUMNS,
     MOE_COLUMNS,
     TRACT_OUTPUT_COLUMNS,
+    acs_variables_for_year,
     api_vars_for_year,
     tables_for_api_vars,
 )
@@ -432,7 +432,7 @@ def fetch_state_tract_data(
             df.loc[df[var_code] < 0, var_code] = pd.NA
 
     # Rename base ACS variables to friendly names
-    df = df.rename(columns=ACS_VARIABLES)
+    df = df.rename(columns=acs_variables_for_year(year))
 
     # Derive adult_population (18+) by summing B01001 age groups
     adult_cols_in_df = [c for c in ADULT_VARS if c in df.columns]

@@ -27,6 +27,7 @@ from hhplab.acs.variables import (
     ACS5_SAE_SUPPORT_TABLES,
     ALL_API_VARS,
     TRACT_OUTPUT_COLUMNS,
+    acs_variables_for_year,
     api_vars_for_year,
     tables_for_api_vars,
 )
@@ -1299,6 +1300,50 @@ def test_expanded_acs5_unavailable_variables_are_filtered_by_vintage() -> None:
     assert "B25075_027E" not in api_vars_for_year(2014)
     assert "B25075_026E" in api_vars_for_year(2015)
     assert "B25075_027E" in api_vars_for_year(2015)
+
+
+def test_early_acs5_top_category_variables_use_vintage_specific_columns() -> None:
+    early = acs_variables_for_year(2014)
+    modern = acs_variables_for_year(2015)
+
+    assert early["B25063_023E"] == "gross_rent_distribution_cash_rent_2000_plus"
+    assert early["B25063_024E"] == "gross_rent_distribution_no_cash_rent"
+    assert early["B25075_025E"] == "owner_occupied_value_1000000_plus"
+
+    assert modern["B25063_023E"] == "gross_rent_distribution_cash_rent_2000_to_2499"
+    assert modern["B25063_024E"] == "gross_rent_distribution_cash_rent_2500_to_2999"
+    assert modern["B25075_025E"] == "owner_occupied_value_1000000_to_1499999"
+
+
+def test_early_acs5_response_preserves_top_category_semantics(httpx_mock) -> None:
+    response_data = make_census_response(
+        [
+            {
+                "county": "031",
+                "tract": "001000",
+                "B25063_023E": "17",
+                "B25063_024E": "9",
+                "B25075_025E": "6",
+            }
+        ]
+    )
+    httpx_mock.add_response(
+        url=re.compile(r"https://api\.census\.gov/data/2014/acs/acs5.*"),
+        json=response_data,
+        is_reusable=True,
+    )
+
+    df, _ = fetch_state_tract_data(2014, "08")
+    row = df.iloc[0]
+
+    assert row["gross_rent_distribution_cash_rent_2000_plus"] == 17
+    assert row["gross_rent_distribution_no_cash_rent"] == 9
+    assert row["owner_occupied_value_1000000_plus"] == 6
+
+    assert "gross_rent_distribution_cash_rent_2500_to_2999" not in df.columns
+    assert "owner_occupied_value_1000000_to_1499999" not in df.columns
+    assert "gross_rent_distribution_cash_rent_2000_plus" in TRACT_OUTPUT_COLUMNS
+    assert "owner_occupied_value_1000000_plus" in TRACT_OUTPUT_COLUMNS
 
 
 SAE_REQUIRED_ACS5_TRACT_COLUMNS = {

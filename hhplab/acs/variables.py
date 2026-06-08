@@ -283,6 +283,15 @@ ADULT_VARS: list[str] = ADULT_MALE_VARS + ADULT_FEMALE_VARS
 # Legacy alias for backwards compatibility (consumers import measures.ACS_VARS)
 ACS_VARS = ACS_VARIABLES
 
+# ACS5 vintages before 2015 used broader top-coded categories in two
+# distribution tables. Keep the API variables but map them to columns that
+# preserve the early-vintage category semantics.
+EARLY_ACS5_VARIABLE_OVERRIDES: dict[str, str] = {
+    "B25063_023E": "gross_rent_distribution_cash_rent_2000_plus",
+    "B25063_024E": "gross_rent_distribution_no_cash_rent",
+    "B25075_025E": "owner_occupied_value_1000000_plus",
+}
+
 # All Census API variable codes to request (base + adult age groups)
 ALL_API_VARS: list[str] = list(ACS_VARIABLES.keys()) + ADULT_VARS
 
@@ -311,6 +320,14 @@ def api_vars_for_year(year: int) -> list[str]:
     """Return ACS API variables supported by a specific ACS5 vintage year."""
     unavailable = UNAVAILABLE_API_VARS_BY_YEAR.get(year, set())
     return [var for var in ALL_API_VARS if var not in unavailable]
+
+
+def acs_variables_for_year(year: int) -> dict[str, str]:
+    """Return Census API variable renames with vintage-specific semantics."""
+    variables = dict(ACS_VARIABLES)
+    if 2009 <= year <= 2014:
+        variables.update(EARLY_ACS5_VARIABLE_OVERRIDES)
+    return variables
 
 
 def tables_for_api_vars(api_vars: list[str]) -> list[str]:

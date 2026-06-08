@@ -29,8 +29,8 @@ The code-owned source of truth is:
 | `C17002` | `poverty_rate`, poverty counts | Ratio of area-weighted sums | `poverty_universe` | `population_below_poverty` is derived from under-50% and 50-99% bins. |
 | `B23025` | `unemployment_rate`, labor-force counts | Ratio of area-weighted sums | `civilian_labor_force` | Derived after count rollup. |
 | `B19001` | household income distribution bins | Area-weighted counts | `area_share` | Supports recipe-selected distribution summaries and grouped-income comparisons. |
-| `B25075` | owner-occupied value distribution bins | Area-weighted counts | `area_share` | Top bins `B25075_026E` and `B25075_027E` are unavailable before ACS5 vintage 2015. |
-| `B25063` | gross rent distribution bins | Area-weighted counts | `area_share` | Supports recipe-selected rent distribution summaries. |
+| `B25075` | owner-occupied value distribution bins | Area-weighted counts | `area_share` | ACS5 vintages 2009-2014 publish a single `$1,000,000 or more` residual bin, mapped to `owner_occupied_value_1000000_plus`; split top bins `B25075_026E` and `B25075_027E` are unavailable before vintage 2015. |
+| `B25063` | gross rent distribution bins | Area-weighted counts | `area_share` | ACS5 vintages 2009-2014 publish a single `$2,000 or more` cash-rent residual bin, mapped to `gross_rent_distribution_cash_rent_2000_plus`; split top bins `B25063_025E` through `B25063_027E` are unavailable before vintage 2015. |
 | `B25070` | `rent_burden_30_plus`, rent burden bins | Ratio of area-weighted sums | `gross_rent_pct_income_total` | Excludes households where rent burden is not computed. |
 | `B25091` | owner cost burden bins | Area-weighted counts | `area_share` | Recipe-selectable support columns. |
 | `B25118` | tenure-by-household-income bins | Area-weighted counts | `area_share` | Supports owner/renter income distribution analysis. |
