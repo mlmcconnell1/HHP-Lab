@@ -19,6 +19,8 @@ artifact is written by `hhplab.acs.ingest.county_acs1.ingest_county_acs1` to
 | Aggregate income shares | `B19082` | `aggregate_income_share_*_quintile`, `aggregate_income_share_top_5pct` | Covered |
 | Gross rent distribution | `B25063` | `gross_rent_distribution_total`, cash-rent bins through `gross_rent_distribution_cash_rent_3500_plus`, `gross_rent_distribution_no_cash_rent` | Covered; added in this audit |
 | Median gross rent | `B25064` | `median_gross_rent` | Covered; downstream SAE should not average medians |
+| Contract rent distribution | `B25056` | `contract_rent_distribution_total`, `contract_rent_distribution_with_cash_rent`, cash-rent bins through `contract_rent_distribution_cash_rent_3500_plus`, `contract_rent_distribution_no_cash_rent` | Covered; contract rent excludes utilities and is distinct from gross rent |
+| Median contract rent | `B25058` | `median_contract_rent` | Covered; downstream SAE should not average medians |
 | Owner monthly costs | `B25088`, `B25089` | median and aggregate owner-cost columns by mortgage status | Covered |
 | Gross rent burden bins | `B25070` | `gross_rent_pct_income_total`, bins from `<10%` through `50%+`, and not-computed | Covered |
 | Owner cost burden bins | `B25091` | with- and without-mortgage totals, burden bins, and not-computed columns | Covered |
@@ -34,9 +36,13 @@ publish standard ACS 1-year estimates for that vintage. The shared ACS1 API
 helper raises an actionable error before making API calls for 2020.
 
 The registry uses `ACS1_TABLE_FIRST_YEAR` to preserve a stable output schema
-while skipping tables unavailable for older vintages. Utility-cost tables
-`B25132`, `B25133`, and `B25134` start in 2021; their columns are backfilled as
-nullable values for earlier supported vintages.
+while skipping tables unavailable for older vintages. ACS5 `B25056` contract
+rent uses a broader `contract_rent_distribution_cash_rent_2000_plus` top bin
+for vintages 2009-2014 and finer 2000+ bins for vintages 2015 and later. ACS1
+contract-rent outputs follow the standard current `B25056` bin layout for
+supported ACS1 vintages. Utility-cost tables `B25132`, `B25133`, and `B25134`
+start in 2021; their columns are backfilled as nullable values for earlier
+supported vintages.
 
 ## Schema, Types, And Provenance
 
@@ -75,5 +81,11 @@ registry before this audit:
 Both tables are now registered in `hhplab/acs/variables_acs1.py`, included in
 county and metro ACS1 fetches, exposed through `ACS1_COUNTY_OUTPUT_COLUMNS`, and
 covered by `tests/test_ingest_county_acs1.py`.
+
+Contract-rent support was added separately through `B25056` and `B25058`.
+`B25056` bins are additive distribution counts suitable for allocation and
+rollup. `B25058` is a direct median context field; if a downstream workflow
+needs a target-level contract-rent median, it should derive it from allocated
+`B25056` bins rather than averaging or summing `median_contract_rent`.
 
 No additional ingest gaps were found for the SAE source families listed above.

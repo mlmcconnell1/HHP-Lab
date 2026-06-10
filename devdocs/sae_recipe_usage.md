@@ -45,13 +45,21 @@ Supported recipe measure families:
 - `owner_cost_burden`
 - `household_income_bins`
 - `gross_rent_bins`
+- `contract_rent_bins`
 - `tenure_income`
 
 Do not request direct ACS median columns such as `median_household_income` or
-`median_gross_rent` as SAE outputs. SAE medians and quintile cutoffs must be
+`median_gross_rent` as SAE outputs. This also applies to
+`median_contract_rent` from `B25058`. SAE medians and quintile cutoffs must be
 derived from allocated distributions, for example
-`sae_household_income_median`, `sae_household_income_quintile_cutoff_20`, and
-`sae_gross_rent_median`.
+`sae_household_income_median`, `sae_household_income_quintile_cutoff_20`,
+`sae_gross_rent_median`, and `sae_contract_rent_median`.
+
+Use `gross_rent_bins` for `B25063` gross rent, which includes tenant-paid
+utilities. Use `contract_rent_bins` for `B25056` contract rent, which measures
+cash rent before utilities. Contract-rent bins are additive counts after
+allocation; direct `B25058` medians are only context fields unless a recipe
+derives a median from allocated `B25056` bins.
 
 ## Direct County Comparison
 

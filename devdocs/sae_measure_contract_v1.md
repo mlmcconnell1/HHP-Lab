@@ -17,6 +17,7 @@ distribution components. It does not average county or tract medians.
 | --- | --- | --- | --- | --- | --- |
 | Household income bins | `B19001` | `B19001` | matching household income bin counts | Allocate each ACS1 county bin to tracts by the tract share of that county bin; sum allocated bins to target geography | `sae_household_income_*`, `sae_household_income_total` |
 | Gross rent bins | `B25063` | `B25063` | matching gross-rent bin counts | Allocate each ACS1 county rent bin to tracts by the tract share of that county bin; sum allocated bins | `sae_gross_rent_distribution_*`, `sae_gross_rent_distribution_total` |
+| Contract rent bins | `B25056` | `B25056` | matching contract-rent bin counts | Allocate each ACS1 county contract-rent bin to tracts by the tract share of that county bin; sum allocated bins | `sae_contract_rent_distribution_*`, `sae_contract_rent_distribution_total` |
 | Rent burden bins | `B25070` | `B25070` | matching renter burden bin counts | Allocate burden bins, then derive rates from allocated numerators and denominators | `sae_rent_burden_30_plus`, `sae_rent_burden_50_plus`, `sae_rent_burden_denominator` |
 | Owner cost burden bins | `B25091` | `B25091` | matching owner burden bin counts by mortgage status | Allocate with- and without-mortgage burden bins; derive owner burden rates from allocated components | `sae_owner_cost_burden_30_plus`, `sae_owner_cost_burden_50_plus`, `sae_owner_cost_burden_denominator` |
 | Tenure by household income | `B25118` | `B25118` | matching owner/renter income-bin counts | Allocate tenure-income bins independently, preserving owner/renter totals | `sae_tenure_income_*` |
@@ -35,8 +36,20 @@ Rates are derived only after allocation and rollup:
 Distribution-derived medians and quantiles are allowed only when implemented
 from allocated distribution bins. They must expose the source bin family and
 interpolation rule in provenance. Median and quintile values from ACS1 or ACS5
-tables such as `B19013`, `B25064`, `B19080`, `B19081`, `B19082`, and `B25119`
-are context fields only in v1 and must not be averaged.
+tables such as `B19013`, `B25058`, `B25064`, `B19080`, `B19081`, `B19082`, and
+`B25119` are context fields only in v1 and must not be averaged.
+
+`B25056` contract rent is not the same universe as `B25063` gross rent:
+contract rent records cash rent before tenant-paid utilities, while gross rent
+includes utility costs. Recipe authors should choose `contract_rent_bins` when
+they need rent-exclusive contract-rent distributions and `gross_rent_bins` when
+they need housing-cost-inclusive rent distributions.
+
+Direct `B25058` `median_contract_rent` rollups in the ACS aggregation path are
+weighted averages of tract medians, using `contract_rent_distribution_with_cash_rent`
+when available and `renter_households` as a fallback. They are not valid SAE
+outputs in v1. SAE contract-rent medians must be derived from allocated
+`B25056` bins before being exposed as `sae_contract_rent_median`.
 
 ## Recipe Semantics
 

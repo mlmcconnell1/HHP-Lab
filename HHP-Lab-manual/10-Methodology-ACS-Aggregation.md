@@ -33,6 +33,36 @@ CoC_estimate = Σ(tract_median × pop_weight) / Σ(pop_weight)
 
 These are **population-weighted averages** of tract medians—NOT true medians computed from underlying household distributions.
 
+Contract-rent medians from ACS table `B25058` use the same approximation, but
+with a rent-specific denominator when available: HHP-Lab weights
+`median_contract_rent` by `contract_rent_distribution_with_cash_rent` from
+`B25056`, falling back to `renter_households` if the cash-rent denominator is
+absent. `B25058` rollups should be read as weighted averages of tract medians,
+not pooled medians.
+
+### Rent Distribution Variables
+
+ACS gross rent and contract rent are distinct universes:
+
+- `B25063` gross rent distribution includes rent plus tenant-paid utilities.
+- `B25056` contract rent distribution includes cash rent only and excludes
+  utilities.
+
+HHP-Lab exposes `B25056` bins with the `contract_rent_distribution_*` prefix
+and `B25058` as `median_contract_rent`. `B25056` bins are additive counts after
+tract allocation and can be summed to target geographies. `B25058` is a median
+and must not be summed; use it only through the weighted-median approximation
+described above unless a future workflow derives a pooled estimate from
+allocated contract-rent bins.
+
+ACS5 vintage coverage also differs across contract-rent bins. Vintages
+2009-2014 expose a top-coded `contract_rent_distribution_cash_rent_2000_plus`
+bin. Vintages 2015 and later expose finer top bins:
+`contract_rent_distribution_cash_rent_2000_to_2499`,
+`contract_rent_distribution_cash_rent_2500_to_2999`,
+`contract_rent_distribution_cash_rent_3000_to_3499`, and
+`contract_rent_distribution_cash_rent_3500_plus`.
+
 ## Why This Approach Is Acceptable
 
 | Justification | Explanation |
@@ -117,8 +147,9 @@ SAE v1 is component-based:
   `unemployed_count`, then derive `sae_unemployment_rate`.
 - Rent-burden and owner-cost-burden measures allocate bins and derive rates
   from allocated numerators and denominators.
-- Household-income and gross-rent median/quintile outputs are derived from
-  allocated distributions, not by averaging median columns.
+- Household-income, gross-rent, and contract-rent median/quintile outputs are
+  derived from allocated distributions when available, not by averaging direct
+  median columns.
 
 SAE outputs use the `sae_*` prefix and carry lineage/diagnostic fields for
 source vintage, support vintage, tract vintage, source county counts,
