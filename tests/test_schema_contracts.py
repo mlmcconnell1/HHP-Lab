@@ -22,7 +22,9 @@ from hhplab.acs.variables import (
     MOE_COLUMNS,
     TRACT_OUTPUT_COLUMNS,
     acs5_covariate_spec_for_output,
+    acs_variables_for_year,
 )
+from hhplab.acs.variables_acs1 import ACS1_TABLE_COLUMN_NAMES, ACS1_VARIABLES_BY_TABLE
 from hhplab.bls.laus_series import (
     LAUS_MEASURE_CODES as BLS_LAUS_MEASURE_CODES,
 )
@@ -339,6 +341,37 @@ def test_acs5_covariate_registry_references_known_tables_and_source_variables() 
 
     assert invalid_tables == []
     assert invalid_sources == []
+
+
+def test_contract_rent_acs5_variable_mappings_include_current_and_early_bins() -> None:
+    current = acs_variables_for_year(2023)
+    early = acs_variables_for_year(2014)
+
+    assert "B25056" in ACS_TABLES
+    assert "B25058" in ACS_TABLES
+    assert current["B25056_001E"] == "contract_rent_distribution_total"
+    assert current["B25056_002E"] == "contract_rent_distribution_with_cash_rent"
+    assert current["B25056_026E"] == "contract_rent_distribution_cash_rent_3500_plus"
+    assert current["B25056_027E"] == "contract_rent_distribution_no_cash_rent"
+    assert current["B25058_001E"] == "median_contract_rent"
+    assert early["B25056_023E"] == "contract_rent_distribution_cash_rent_2000_plus"
+    assert early["B25056_024E"] == "contract_rent_distribution_no_cash_rent"
+
+
+def test_contract_rent_acs1_variable_mappings_use_acs5_column_names() -> None:
+    assert ACS1_TABLE_COLUMN_NAMES["B25058"]["B25058_001E"] == "median_contract_rent"
+    assert (
+        ACS1_TABLE_COLUMN_NAMES["B25056"]["B25056_001E"]
+        == "contract_rent_distribution_total"
+    )
+    assert (
+        ACS1_TABLE_COLUMN_NAMES["B25056"]["B25056_026E"]
+        == "contract_rent_distribution_cash_rent_3500_plus"
+    )
+    assert ACS1_TABLE_COLUMN_NAMES["B25056"]["B25056_027E"] == (
+        "contract_rent_distribution_no_cash_rent"
+    )
+    assert ACS1_VARIABLES_BY_TABLE["B25056"] == list(ACS1_TABLE_COLUMN_NAMES["B25056"])
 
 
 def test_acs5_covariate_registry_matches_aggregation_column_contracts() -> None:

@@ -118,6 +118,7 @@ AVERAGE_WEIGHT_DENOMINATORS: dict[str, tuple[str, ...]] = {
     "median_household_income": ("total_population",),
     "per_capita_income": ("total_population",),
     "median_gross_rent": ("renter_households", "total_population"),
+    "median_contract_rent": ("contract_rent_distribution_with_cash_rent", "renter_households"),
     "median_owner_occupied_home_value": ("owner_households", "total_population"),
     "gini_index": ("total_population",),
 }

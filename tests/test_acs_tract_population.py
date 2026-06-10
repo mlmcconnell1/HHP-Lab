@@ -406,12 +406,14 @@ class TestFetchStateTractPopulation:
             "B19001",
             "B25075",
             "B25063",
+            "B25056",
             "B25070",
             "B25091",
             "B25118",
             "B15003",
         ]
         assert column_tables["household_income_total"] == "B19001"
+        assert column_tables["contract_rent_distribution_total"] == "B25056"
         assert column_tables["gross_rent_pct_income_50_plus"] == "B25070"
         assert column_tables["tenure_income_renter_occupied_total"] == "B25118"
         assert df.attrs["sae_support_column_tables"] == column_tables
@@ -1399,6 +1401,7 @@ def test_sae_required_tract_tables_are_in_provenance_order() -> None:
         "B19301",
         "B19083",
         "B25064",
+        "B25058",
         "B25077",
         "B25002",
         "B25003",
@@ -1407,6 +1410,7 @@ def test_sae_required_tract_tables_are_in_provenance_order() -> None:
         "B19001",
         "B25075",
         "B25063",
+        "B25056",
         "B25070",
         "B25091",
         "B25118",

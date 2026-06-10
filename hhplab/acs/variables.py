@@ -36,6 +36,8 @@ ACS_VARIABLES: dict[str, str] = {
     "B19083_001E": "gini_index",
     # B25064 — Median Gross Rent
     "B25064_001E": "median_gross_rent",
+    # B25058 — Median Contract Rent
+    "B25058_001E": "median_contract_rent",
     # B25077 — Median Value of Owner-Occupied Housing Units
     "B25077_001E": "median_owner_occupied_home_value",
     # B25002 — Occupancy Status
@@ -111,6 +113,42 @@ ACS_VARIABLES: dict[str, str] = {
                 "gross_rent_distribution_cash_rent_3000_to_3499",
                 "gross_rent_distribution_cash_rent_3500_plus",
                 "gross_rent_distribution_no_cash_rent",
+            ],
+            start=1,
+        )
+    },
+    # B25056 — Contract Rent
+    **{
+        f"B25056_{idx:03d}E": column
+        for idx, column in enumerate(
+            [
+                "contract_rent_distribution_total",
+                "contract_rent_distribution_with_cash_rent",
+                "contract_rent_distribution_cash_rent_lt_100",
+                "contract_rent_distribution_cash_rent_100_to_149",
+                "contract_rent_distribution_cash_rent_150_to_199",
+                "contract_rent_distribution_cash_rent_200_to_249",
+                "contract_rent_distribution_cash_rent_250_to_299",
+                "contract_rent_distribution_cash_rent_300_to_349",
+                "contract_rent_distribution_cash_rent_350_to_399",
+                "contract_rent_distribution_cash_rent_400_to_449",
+                "contract_rent_distribution_cash_rent_450_to_499",
+                "contract_rent_distribution_cash_rent_500_to_549",
+                "contract_rent_distribution_cash_rent_550_to_599",
+                "contract_rent_distribution_cash_rent_600_to_649",
+                "contract_rent_distribution_cash_rent_650_to_699",
+                "contract_rent_distribution_cash_rent_700_to_749",
+                "contract_rent_distribution_cash_rent_750_to_799",
+                "contract_rent_distribution_cash_rent_800_to_899",
+                "contract_rent_distribution_cash_rent_900_to_999",
+                "contract_rent_distribution_cash_rent_1000_to_1249",
+                "contract_rent_distribution_cash_rent_1250_to_1499",
+                "contract_rent_distribution_cash_rent_1500_to_1999",
+                "contract_rent_distribution_cash_rent_2000_to_2499",
+                "contract_rent_distribution_cash_rent_2500_to_2999",
+                "contract_rent_distribution_cash_rent_3000_to_3499",
+                "contract_rent_distribution_cash_rent_3500_plus",
+                "contract_rent_distribution_no_cash_rent",
             ],
             start=1,
         )
@@ -289,6 +327,8 @@ ACS_VARS = ACS_VARIABLES
 EARLY_ACS5_VARIABLE_OVERRIDES: dict[str, str] = {
     "B25063_023E": "gross_rent_distribution_cash_rent_2000_plus",
     "B25063_024E": "gross_rent_distribution_no_cash_rent",
+    "B25056_023E": "contract_rent_distribution_cash_rent_2000_plus",
+    "B25056_024E": "contract_rent_distribution_no_cash_rent",
     "B25075_025E": "owner_occupied_value_1000000_plus",
 }
 
@@ -304,6 +344,9 @@ UNAVAILABLE_API_VARS_BY_YEAR: dict[int, set[str]] = {
         "B25063_025E",
         "B25063_026E",
         "B25063_027E",
+        "B25056_025E",
+        "B25056_026E",
+        "B25056_027E",
     }
     for year in range(2009, 2015)
 }
@@ -345,6 +388,7 @@ ACS_TABLES: list[str] = [
     "B19301",
     "B19083",
     "B25064",
+    "B25058",
     "B25077",
     "B25002",
     "B25003",
@@ -353,6 +397,7 @@ ACS_TABLES: list[str] = [
     "B19001",
     "B25075",
     "B25063",
+    "B25056",
     "B25070",
     "B25091",
     "B25118",
@@ -495,6 +540,20 @@ ACS5_COVARIATE_REGISTRY: tuple[ACS5CovariateSpec, ...] = (
         ),
     ),
     ACS5CovariateSpec(
+        name="median_contract_rent",
+        table="B25058",
+        source_variables=("B25058_001E",),
+        output_columns=("median_contract_rent",),
+        measure_kind="median",
+        denominator_column="contract_rent_distribution_with_cash_rent",
+        weight_column="contract_rent_distribution_with_cash_rent * selected_overlap_weight",
+        rollup_method="denominator_weighted_mean",
+        caveats=(
+            "Cash-rent-household-weighted mean of tract medians; it is not a true pooled "
+            "contract-rent median."
+        ),
+    ),
+    ACS5CovariateSpec(
         name="median_owner_occupied_home_value",
         table="B25077",
         source_variables=("B25077_001E",),
@@ -614,6 +673,22 @@ ACS5_COVARIATE_REGISTRY: tuple[ACS5CovariateSpec, ...] = (
         caveats=(
             "Distribution bins support recipe-selected rent distribution summaries "
             "and are not canonical panel measures by default."
+        ),
+    ),
+    ACS5CovariateSpec(
+        name="contract_rent_distribution",
+        table="B25056",
+        source_variables=_source_variables_for_outputs(
+            _columns_with_prefix("contract_rent_distribution_")
+        ),
+        output_columns=_columns_with_prefix("contract_rent_distribution_"),
+        measure_kind="distribution",
+        denominator_column="contract_rent_distribution_total",
+        weight_column="area_share",
+        rollup_method="area_weighted_sum",
+        caveats=(
+            "Contract-rent distribution bins exclude utility costs; ACS5 vintages before "
+            "2015 use a broader $2,000-plus top cash-rent bin."
         ),
     ),
     ACS5CovariateSpec(
@@ -753,6 +828,11 @@ ACS5_SAE_SUPPORT_COLUMNS_BY_TABLE: dict[str, list[str]] = {
     "B25063": [
         column for column in ACS5_SAE_COUNT_COLUMNS if column.startswith("gross_rent_distribution_")
     ],
+    "B25056": [
+        column
+        for column in ACS5_SAE_COUNT_COLUMNS
+        if column.startswith("contract_rent_distribution_")
+    ],
     "B25070": [
         column for column in ACS5_SAE_COUNT_COLUMNS if column.startswith("gross_rent_pct_income_")
     ],
@@ -778,6 +858,7 @@ ACS5_SAE_DENOMINATOR_COLUMNS: list[str] = [
     "civilian_labor_force",
     "household_income_total",
     "gross_rent_distribution_total",
+    "contract_rent_distribution_total",
     "gross_rent_pct_income_total",
     "owner_costs_pct_income_with_mortgage_total",
     "owner_costs_pct_income_without_mortgage_total",
