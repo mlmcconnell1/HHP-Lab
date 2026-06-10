@@ -795,7 +795,9 @@ def acs5_covariate_spec_for_output(column: str) -> ACS5CovariateSpec:
 # Count columns: area-weighted during translation and aggregation
 COUNT_COLUMNS: list[str] = ACS5_COUNT_COLUMNS
 
-# Median columns: population-weighted average during translation/aggregation
+# Median/scalar columns: weighted averages during translation/aggregation.
+# Measure-specific denominator choices are declared in ACS5_COVARIATE_REGISTRY
+# and consumed by aggregation/translation helpers where available.
 MEDIAN_COLUMNS: list[str] = ACS5_MEDIAN_COLUMNS
 
 # Margin of error columns: propagated via sqrt(sum(w² × m²))

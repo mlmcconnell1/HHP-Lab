@@ -15,6 +15,30 @@ from hhplab.acs.translate import (
 )
 from hhplab.census.ingest.tract_relationship import TractRelationshipNotFoundError
 
+TRANSLATION_MEDIAN_DENOMINATOR_CASES = {
+    "gross_rent": {
+        "median_column": "median_gross_rent",
+        "denominator_column": "renter_households",
+        "median_values": [1000.0, 2000.0],
+        "denominator_values": [10.0, 90.0],
+        "expected": (1000.0 * 7.0 + 2000.0 * 27.0) / 34.0,
+    },
+    "contract_rent": {
+        "median_column": "median_contract_rent",
+        "denominator_column": "contract_rent_distribution_with_cash_rent",
+        "median_values": [900.0, 1900.0],
+        "denominator_values": [10.0, 90.0],
+        "expected": (900.0 * 7.0 + 1900.0 * 27.0) / 34.0,
+    },
+    "owner_value": {
+        "median_column": "median_owner_occupied_home_value",
+        "denominator_column": "owner_households",
+        "median_values": [100_000.0, 200_000.0],
+        "denominator_values": [10.0, 90.0],
+        "expected": (100_000.0 * 7.0 + 200_000.0 * 27.0) / 34.0,
+    },
+}
+
 
 class TestGetSourceTractVintage:
     """Tests for get_source_tract_vintage function."""
@@ -475,6 +499,37 @@ class TestTranslateTracts2010To2020:
         assert merged.iloc[0]["median_household_income"] == pytest.approx(
             expected_income, rel=0.001
         )
+
+    @pytest.mark.parametrize(
+        ("case_name", "case"),
+        [
+            pytest.param(case_name, case, id=case_name)
+            for case_name, case in TRANSLATION_MEDIAN_DENOMINATOR_CASES.items()
+        ],
+    )
+    def test_median_translation_merge_uses_measure_denominator(
+        self,
+        mock_relationship_file,
+        case_name,
+        case,
+    ):
+        del case_name
+        median_column = case["median_column"]
+        denominator_column = case["denominator_column"]
+        df = pd.DataFrame(
+            {
+                "tract_geoid": ["01001020300", "01001020400"],
+                "total_population": [1000.0, 500.0],
+                median_column: case["median_values"],
+                denominator_column: case["denominator_values"],
+            }
+        )
+
+        result, _ = translate_tracts_2010_to_2020(df)
+
+        merged = result[result["tract_geoid"] == "01001020301"]
+        assert len(merged) == 1
+        assert merged.iloc[0][median_column] == pytest.approx(case["expected"], rel=0.001)
 
     def test_median_translation_unmatched_passthrough(self, mock_relationship_file):
         """Unmatched tracts are dropped (not passed through unchanged).

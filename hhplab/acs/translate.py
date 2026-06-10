@@ -30,6 +30,7 @@ from dataclasses import dataclass
 
 import pandas as pd
 
+from hhplab.acs.acs_aggregate import AVERAGE_WEIGHT_DENOMINATORS
 from hhplab.acs.variables import COUNT_COLUMNS, MEDIAN_COLUMNS
 from hhplab.census.ingest.tract_relationship import load_tract_relationship
 
@@ -41,6 +42,22 @@ def _parse_acs_end_year(acs_vintage: str) -> int:
     if "-" in acs_vintage:
         return int(acs_vintage.split("-")[1])
     return int(acs_vintage)
+
+
+def _translation_median_weights(
+    translated: pd.DataFrame,
+    column: str,
+    population_column: str,
+) -> pd.Series:
+    """Return row-wise denominator weights for translated median estimates."""
+    resolved_weights = pd.Series(0.0, index=translated.index)
+    for denominator_column in AVERAGE_WEIGHT_DENOMINATORS.get(column, (population_column,)):
+        if denominator_column not in translated.columns:
+            continue
+        weights = pd.to_numeric(translated[denominator_column], errors="coerce").fillna(0)
+        fill_mask = (resolved_weights <= 0) & (weights > 0)
+        resolved_weights.loc[fill_mask] = weights.loc[fill_mask]
+    return resolved_weights
 
 
 def default_tract_vintage_for_acs(acs_vintage: str) -> int:
@@ -294,13 +311,16 @@ def translate_tracts_2010_to_2020(
             translated[col] * translated["area_2010_to_2020_weight"]
         )
 
-    # Prepare population-weighted median aggregation
-    # Weight = area-weighted population (already weighted in count_cols loop above)
+    # Prepare denominator-weighted median aggregation. Denominator columns are
+    # area-weighted above with other count columns before they are used here.
     # Use per-column valid masks: only tracts with non-null medians contribute
-    # their population weight to that column's denominator.
+    # their denominator weight to that column's denominator.
     for col in median_cols:
         valid = translated[col].notna()
-        col_weight = translated[population_column].fillna(0).where(valid, 0)
+        col_weight = _translation_median_weights(translated, col, population_column).where(
+            valid,
+            0,
+        )
         translated[f"__{col}_wt"] = col_weight
         translated[f"__{col}_pw"] = (
             pd.to_numeric(translated[col], errors="coerce").fillna(0) * col_weight
