@@ -483,6 +483,44 @@ def _validate_bls_laus(spec: DatasetSpec) -> list[ValidationDiagnostic]:
     return diags
 
 
+def _validate_bls_cpi_u(spec: DatasetSpec) -> list[ValidationDiagnostic]:
+    """Validate BLS CPI-U annual index dataset specifications."""
+    diags: list[ValidationDiagnostic] = []
+    if spec.version != 1:
+        diags.append(
+            ValidationDiagnostic(
+                "error",
+                f"bls/cpi_u: unsupported version {spec.version}; expected 1.",
+            )
+        )
+    if spec.native_geometry.type != "national" and not _uses_materialized_artifact(spec):
+        diags.append(
+            ValidationDiagnostic(
+                "error",
+                f"bls/cpi_u: expected native_geometry type 'national', "
+                f"got '{spec.native_geometry.type}'. CPI-U is a national index.",
+            )
+        )
+    if not _uses_materialized_artifact(spec):
+        diags.append(
+            ValidationDiagnostic(
+                "warning",
+                "bls/cpi_u: no path set. CPI-U data must be ingested before "
+                "recipe execution. Run: hhplab ingest cpi-u --start-year START --end-year END",
+            )
+        )
+    known_params: set[str] = set()
+    unknown = set(spec.params.keys()) - known_params
+    if unknown:
+        diags.append(
+            ValidationDiagnostic(
+                "warning",
+                f"bls/cpi_u: unrecognized params {sorted(unknown)}.",
+            )
+        )
+    return diags
+
+
 def register_dataset_defaults(registry: DatasetAdapterRegistry) -> None:
     """Register built-in dataset adapters."""
     registry.register("hud", "pit", _validate_hud_pit)
@@ -496,3 +534,4 @@ def register_dataset_defaults(registry: DatasetAdapterRegistry) -> None:
     registry.register("census", "urban_fraction", _validate_census_urban_fraction)
     registry.register("zillow", "zori", _validate_zillow_zori)
     registry.register("bls", "laus", _validate_bls_laus)
+    registry.register("bls", "cpi_u", _validate_bls_cpi_u)

@@ -18,6 +18,7 @@ from dataclasses import dataclass, field
 
 import pandas as pd
 
+import hhplab.naming as naming
 from hhplab.config import load_config
 from hhplab.msa.coverage import select_primary_msa_for_cocs
 from hhplab.msa.crosswalk import read_coc_msa_crosswalk
@@ -55,6 +56,7 @@ from hhplab.recipe.manifest import AssetRecord
 from hhplab.recipe.planner import ExecutionPlan
 from hhplab.recipe.recipe_schema import (
     CohortSelector,
+    InflationAdjustmentPolicy,
     PanelPolicy,
 )
 from hhplab.recipe.schema_common import GeometryRef, expand_year_spec
@@ -218,6 +220,7 @@ class AssembledPanel:
     definition_version: str | None
     policy_artifacts: dict[str, PolicyApplication] = field(default_factory=dict)
     cohort_summary: dict[str, object] | None = None
+    inflation_summary: dict[str, object] | None = None
 
     @property
     def zori_provenance(self) -> object | None:
@@ -803,6 +806,134 @@ def _project_panel_output(panel: pd.DataFrame, policy: PanelPolicy | None) -> pd
     return panel.loc[:, policy.output_columns].copy()
 
 
+def _resolve_inflation_cpi_path(
+    policy: InflationAdjustmentPolicy,
+    ctx: ExecutionContext,
+) -> Path:
+    if policy.cpi_path is not None:
+        return ctx.project_root / policy.cpi_path
+    if policy.cpi_dataset is not None:
+        ds = ctx.recipe.datasets.get(policy.cpi_dataset)
+        if ds is None:
+            raise ExecutorError(
+                "target.panel_policy.inflation_adjustment references unknown "
+                f"cpi_dataset '{policy.cpi_dataset}'."
+            )
+        if ds.path is None:
+            raise ExecutorError(
+                "target.panel_policy.inflation_adjustment cpi_dataset "
+                f"'{policy.cpi_dataset}' must declare a path to a CPI-U artifact."
+            )
+        return ctx.project_root / ds.path
+    return naming.cpi_u_path(base_dir=ctx.project_root / "data")
+
+
+def _load_inflation_index(
+    policy: InflationAdjustmentPolicy,
+    ctx: ExecutionContext,
+) -> tuple[pd.Series, Path]:
+    cpi_path = _resolve_inflation_cpi_path(policy, ctx)
+    if not cpi_path.exists():
+        raise ExecutorError(
+            "CPI-U artifact not found for target.panel_policy.inflation_adjustment: "
+            f"{cpi_path}. Run `hhplab ingest cpi-u --start-year START --end-year END` "
+            "or set cpi_path/cpi_dataset to an existing CPI-U parquet file."
+        )
+
+    cpi = pd.read_parquet(cpi_path)
+    required = [policy.cpi_year_column, policy.cpi_value_column]
+    missing = [column for column in required if column not in cpi.columns]
+    if missing:
+        raise ExecutorError(
+            f"CPI-U artifact {cpi_path} is missing required columns {missing}. "
+            f"Available columns: {sorted(cpi.columns.tolist())}"
+        )
+
+    index = cpi[[policy.cpi_year_column, policy.cpi_value_column]].copy()
+    index[policy.cpi_year_column] = pd.to_numeric(index[policy.cpi_year_column], errors="coerce")
+    index[policy.cpi_value_column] = pd.to_numeric(index[policy.cpi_value_column], errors="coerce")
+    index = index.dropna(subset=[policy.cpi_year_column, policy.cpi_value_column])
+    index[policy.cpi_year_column] = index[policy.cpi_year_column].astype(int)
+    duplicated = index[index[policy.cpi_year_column].duplicated()][policy.cpi_year_column]
+    if not duplicated.empty:
+        raise ExecutorError(
+            f"CPI-U artifact {cpi_path} contains duplicate year rows: "
+            f"{sorted(duplicated.astype(int).unique().tolist())}."
+        )
+    series = index.set_index(policy.cpi_year_column)[policy.cpi_value_column]
+    if policy.base_year not in series.index:
+        raise ExecutorError(
+            f"CPI-U artifact {cpi_path} does not contain base_year {policy.base_year}. "
+            "Ingest a range that includes the requested base year."
+        )
+    return series, cpi_path
+
+
+def _apply_inflation_adjustment(
+    panel: pd.DataFrame,
+    *,
+    policy: PanelPolicy | None,
+    ctx: ExecutionContext,
+) -> tuple[pd.DataFrame, dict[str, object] | None]:
+    if policy is None or policy.inflation_adjustment is None:
+        return panel, None
+
+    adjustment = policy.inflation_adjustment
+    missing = [column for column in [adjustment.year_column, *adjustment.columns] if column not in panel.columns]
+    if missing:
+        raise ExecutorError(
+            "target.panel_policy.inflation_adjustment references missing panel "
+            f"columns {missing}. Available columns: {sorted(panel.columns.tolist())}"
+        )
+
+    cpi, cpi_path = _load_inflation_index(adjustment, ctx)
+    year_values = pd.to_numeric(panel[adjustment.year_column], errors="coerce")
+    missing_year_rows = panel[year_values.isna()]
+    if not missing_year_rows.empty:
+        raise ExecutorError(
+            f"Inflation adjustment year column '{adjustment.year_column}' contains "
+            f"{len(missing_year_rows)} non-numeric row(s)."
+        )
+    years = year_values.astype(int)
+    missing_cpi_years = sorted(set(years.unique().tolist()) - set(cpi.index.astype(int)))
+    if missing_cpi_years:
+        raise ExecutorError(
+            f"CPI-U artifact {cpi_path} is missing panel year(s) {missing_cpi_years}. "
+            "Ingest CPI-U for the full recipe universe or provide a complete cpi_path."
+        )
+
+    result = panel.copy()
+    base_cpi = float(cpi.loc[adjustment.base_year])
+    factors = years.map(lambda year: base_cpi / float(cpi.loc[int(year)]))
+    if adjustment.factor_column is not None:
+        result[adjustment.factor_column] = factors.astype(float)
+
+    suffix = adjustment.output_suffix.format(base_year=adjustment.base_year)
+    output_columns: list[str] = []
+    for column in adjustment.columns:
+        output_column = f"{column}{suffix}"
+        if output_column in result.columns and output_column not in adjustment.columns:
+            raise ExecutorError(
+                "Inflation adjustment output column collision: "
+                f"'{output_column}' already exists."
+            )
+        result[output_column] = pd.to_numeric(result[column], errors="coerce") * factors
+        output_columns.append(output_column)
+
+    _record_panel_policy_asset(ctx, cpi_path, role="inflation_adjustment_cpi")
+    summary = {
+        "base_year": adjustment.base_year,
+        "columns": list(adjustment.columns),
+        "output_columns": output_columns,
+        "factor_column": adjustment.factor_column,
+        "cpi_path": str(cpi_path),
+        "cpi_year_column": adjustment.cpi_year_column,
+        "cpi_value_column": adjustment.cpi_value_column,
+        "base_cpi": base_cpi,
+    }
+    return result, summary
+
+
 def _record_panel_policy_asset(
     ctx: ExecutionContext,
     path,
@@ -1207,6 +1338,7 @@ def assemble_panel(
     )
 
     cohort_summary: dict[str, object] | None = None
+    inflation_summary: dict[str, object] | None = None
     if target.cohort is not None:
         pre_count = panel["geo_id"].nunique() if "geo_id" in panel.columns else len(panel)
         panel, cohort_summary = apply_cohort_selector_with_summary(panel, target.cohort)
@@ -1235,6 +1367,16 @@ def assemble_panel(
             )
 
     try:
+        panel, inflation_summary = _apply_inflation_adjustment(panel, policy=policy, ctx=ctx)
+    except ExecutorError as exc:
+        return StepResult(
+            step_kind=step_kind,
+            detail=f"{step_kind}",
+            success=False,
+            error=str(exc),
+        )
+
+    try:
         panel = _project_panel_output(panel, policy)
     except ExecutorError as exc:
         return StepResult(
@@ -1253,4 +1395,5 @@ def assemble_panel(
         definition_version=definition_version,
         policy_artifacts=policy_artifacts,
         cohort_summary=cohort_summary,
+        inflation_summary=inflation_summary,
     )

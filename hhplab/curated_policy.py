@@ -45,6 +45,7 @@ CURATED_SUBDIRS: set[str] = {
     "msa",
     "maps",
     "laus",
+    "cpi",
 }
 
 # ---- Canonical filename patterns per subdirectory ----
@@ -142,6 +143,9 @@ CANONICAL_PATTERNS: dict[str, list[re.Pattern[str]]] = {
     ],
     "laus": [
         re.compile(r"^laus_metro__A\d{4}@D\w+\.parquet$"),
+    ],
+    "cpi": [
+        re.compile(r"^cpi_u__Aall\.parquet$"),
     ],
     "maps": [
         re.compile(r"^.+\.html$"),

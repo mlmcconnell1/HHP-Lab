@@ -1737,6 +1737,36 @@ def laus_metro_path(
 
 
 # =============================================================================
+# BLS CPI-U artifact filenames
+# =============================================================================
+
+
+def cpi_u_filename() -> str:
+    """Generate filename for the curated annual CPI-U index artifact.
+
+    Returns:
+        Filename ``cpi_u__Aall.parquet``.
+    """
+    return "cpi_u__Aall.parquet"
+
+
+def cpi_u_path(base_dir: Path | str | None = None) -> Path:
+    """Get canonical path for the curated annual CPI-U index artifact.
+
+    Args:
+        base_dir: Base data directory (defaults to "data").
+
+    Returns:
+        Path like ``data/curated/cpi/cpi_u__Aall.parquet``.
+    """
+    if base_dir is None:
+        base_dir = Path("data")
+    else:
+        base_dir = Path(base_dir)
+    return base_dir / "curated" / "cpi" / cpi_u_filename()
+
+
+# =============================================================================
 # Geography-aware filename dispatcher
 # =============================================================================
 

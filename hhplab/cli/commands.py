@@ -25,6 +25,7 @@ from hhplab.cli.ingest_acs1_county import ingest_acs1_county
 from hhplab.cli.ingest_acs1_metro import ingest_acs1_metro
 from hhplab.cli.ingest_acs_population import ingest_acs_population
 from hhplab.cli.ingest_census import ingest_block_geometry_cmd, ingest_tiger, ingest_urban_areas_cmd
+from hhplab.cli.ingest_cpi import ingest_cpi_u
 from hhplab.cli.ingest_decennial_tract_population import (
     ingest_decennial_tract_population,
 )
@@ -96,6 +97,7 @@ def register_commands(
     ingest_app.command("acs1-metro")(ingest_acs1_metro)
     ingest_app.command("acs1-county")(ingest_acs1_county)
     ingest_app.command("laus-metro")(ingest_laus_metro)
+    ingest_app.command("cpi-u")(ingest_cpi_u)
     ingest_app.command("acs5-tract")(ingest_acs_population)
     ingest_app.command("decennial-tracts")(ingest_decennial_tract_population)
     ingest_app.command("pl-blocks")(ingest_pl_block_population)

@@ -284,6 +284,102 @@ class LausPolicy(BaseModel):
     )
 
 
+class InflationAdjustmentPolicy(BaseModel):
+    """Declarative CPI-U inflation adjustment policy for panel outputs.
+
+    The executor multiplies each requested column by
+    ``CPI-U(base_year) / CPI-U(row year)`` and writes adjusted columns
+    expressed in the base year's equivalent dollars.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    base_year: int = Field(
+        ...,
+        description="Dollar year for adjusted values, e.g. 2024 for 2024 dollars.",
+    )
+    columns: list[str] = Field(
+        ...,
+        min_length=1,
+        description="Panel output columns to adjust after output aliases are applied.",
+    )
+    output_suffix: str = Field(
+        default="_{base_year}_dollars",
+        description=(
+            "Suffix appended to each adjusted column. Supports {base_year}, "
+            "for example median_gross_rent_2024_dollars."
+        ),
+    )
+    cpi_dataset: str | None = Field(
+        default=None,
+        description="Optional recipe dataset id containing annual CPI-U values.",
+    )
+    cpi_path: str | None = Field(
+        default=None,
+        description=(
+            "Optional project-relative path to a CPI-U parquet artifact. "
+            "If omitted, the canonical data/curated/cpi/cpi_u__Aall.parquet is used."
+        ),
+    )
+    year_column: str = Field(
+        default="year",
+        description="Panel column containing the value year.",
+    )
+    cpi_year_column: str = Field(
+        default="year",
+        description="CPI artifact column containing index years.",
+    )
+    cpi_value_column: str = Field(
+        default="cpi_u",
+        description="CPI artifact column containing annual CPI-U index values.",
+    )
+    factor_column: str | None = Field(
+        default=None,
+        description="Optional output column for the applied CPI adjustment factor.",
+    )
+
+    @field_validator("columns")
+    @classmethod
+    def _validate_columns(cls, value: list[str]) -> list[str]:
+        normalized = [column.strip() for column in value]
+        if any(not column for column in normalized):
+            raise ValueError("InflationAdjustmentPolicy.columns may not contain blank names.")
+        if len(set(normalized)) != len(normalized):
+            raise ValueError("InflationAdjustmentPolicy.columns may not contain duplicate names.")
+        return normalized
+
+    @field_validator(
+        "output_suffix",
+        "year_column",
+        "cpi_year_column",
+        "cpi_value_column",
+    )
+    @classmethod
+    def _validate_non_blank(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("InflationAdjustmentPolicy string fields may not be blank.")
+        return value
+
+    @field_validator("cpi_path")
+    @classmethod
+    def _validate_cpi_path_is_relative(cls, value: str | None) -> str | None:
+        if value is None:
+            return value
+        if not value.strip():
+            raise ValueError("InflationAdjustmentPolicy.cpi_path must be non-empty.")
+        if Path(value).is_absolute():
+            raise ValueError("InflationAdjustmentPolicy.cpi_path must be relative, not absolute.")
+        return value
+
+    @model_validator(mode="after")
+    def _validate_cpi_source(self) -> InflationAdjustmentPolicy:
+        if self.cpi_dataset is not None and self.cpi_path is not None:
+            raise ValueError(
+                "InflationAdjustmentPolicy may set cpi_dataset or cpi_path, not both."
+            )
+        return self
+
+
 class PrimaryMsaAnnotationColumns(BaseModel):
     """Output column controls for primary-MSA annotations on CoC panels."""
 
@@ -432,6 +528,13 @@ class PanelPolicy(BaseModel):
             "BLS LAUS metro-native labor-market merge policy (metro targets only). "
             "Declares that the pipeline includes a bls/laus dataset and enables "
             "LAUS-aware conformance checks."
+        ),
+    )
+    inflation_adjustment: InflationAdjustmentPolicy | None = Field(
+        default=None,
+        description=(
+            "CPI-U adjustment policy for monetary output columns. Null means "
+            "values remain in nominal dollars."
         ),
     )
     primary_msa: PrimaryMsaPolicy | None = Field(
