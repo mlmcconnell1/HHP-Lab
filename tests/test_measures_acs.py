@@ -10,6 +10,37 @@ from hhplab.measures.measures_acs import (
     aggregate_to_geo,
 )
 
+ERA_SPECIFIC_RENT_BIN_ROLLUP_CASES = {
+    "early_2000_plus": {
+        "input": {
+            "gross_rent_distribution_cash_rent_2000_plus": [17.0, 3.0],
+            "gross_rent_distribution_cash_rent_3500_plus": [pd.NA, pd.NA],
+            "contract_rent_distribution_cash_rent_2000_plus": [19.0, 1.0],
+            "contract_rent_distribution_cash_rent_3500_plus": [pd.NA, pd.NA],
+        },
+        "expected": {
+            "gross_rent_distribution_cash_rent_2000_plus": 17.0 * 0.5 + 3.0 * 0.25,
+            "gross_rent_distribution_cash_rent_3500_plus": pd.NA,
+            "contract_rent_distribution_cash_rent_2000_plus": 19.0 * 0.5 + 1.0 * 0.25,
+            "contract_rent_distribution_cash_rent_3500_plus": pd.NA,
+        },
+    },
+    "modern_3500_plus": {
+        "input": {
+            "gross_rent_distribution_cash_rent_2000_plus": [pd.NA, pd.NA],
+            "gross_rent_distribution_cash_rent_3500_plus": [17.0, 3.0],
+            "contract_rent_distribution_cash_rent_2000_plus": [pd.NA, pd.NA],
+            "contract_rent_distribution_cash_rent_3500_plus": [19.0, 1.0],
+        },
+        "expected": {
+            "gross_rent_distribution_cash_rent_2000_plus": pd.NA,
+            "gross_rent_distribution_cash_rent_3500_plus": 17.0 * 0.5 + 3.0 * 0.25,
+            "contract_rent_distribution_cash_rent_2000_plus": pd.NA,
+            "contract_rent_distribution_cash_rent_3500_plus": 19.0 * 0.5 + 1.0 * 0.25,
+        },
+    },
+}
+
 
 class TestAggregateToCoC:
     """Tests for aggregate_to_coc function."""
@@ -448,6 +479,43 @@ class TestExpandedAcs5AggregationSemantics:
             200 * 0.5 + 800 * 0.25
         )
 
+    @pytest.mark.parametrize(
+        ("case_name", "case"),
+        [
+            pytest.param(case_name, case, id=case_name)
+            for case_name, case in ERA_SPECIFIC_RENT_BIN_ROLLUP_CASES.items()
+        ],
+    )
+    def test_era_specific_rent_bins_stay_null_when_structurally_absent(
+        self,
+        case_name,
+        case,
+    ):
+        del case_name
+        acs_data = pd.DataFrame(
+            {
+                "GEOID": ["08001000100", "08001000200"],
+                "total_population": [1000.0, 2000.0],
+                **case["input"],
+            }
+        )
+        crosswalk = pd.DataFrame(
+            {
+                "tract_geoid": ["08001000100", "08001000200"],
+                "coc_id": ["CO-500", "CO-500"],
+                "area_share": [0.5, 0.25],
+            }
+        )
+
+        result = aggregate_to_coc(acs_data, crosswalk)
+        row = result.iloc[0]
+
+        for column, expected in case["expected"].items():
+            if pd.isna(expected):
+                assert pd.isna(row[column]), column
+            else:
+                assert row[column] == pytest.approx(expected), column
+
 
 class TestGEOIDValidation:
     """Tests for GEOID overlap validation between crosswalk and ACS data."""
@@ -491,8 +559,8 @@ class TestGEOIDValidation:
         # Result should still be computed, but with zero coverage
         assert len(result) == 1
         assert result.iloc[0]["coverage_ratio"] == 0.0
-        # Population should be 0 since no tracts matched
-        assert result.iloc[0]["total_population"] == 0
+        # Population should be missing since no tracts matched
+        assert pd.isna(result.iloc[0]["total_population"])
 
     def test_no_warning_when_geoids_match(self):
         """Test that no warning is raised when GEOIDs match correctly."""

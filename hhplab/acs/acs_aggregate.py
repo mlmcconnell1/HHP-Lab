@@ -392,8 +392,9 @@ def aggregate_to_geo(
         area_share = pd.to_numeric(group["area_share"], errors="coerce").fillna(0)
         for col in sum_cols:
             if col in group.columns:
-                weighted = pd.to_numeric(group[col], errors="coerce").fillna(0) * area_share
-                row[col] = weighted.sum()
+                values = pd.to_numeric(group[col], errors="coerce")
+                weighted = values * area_share
+                row[col] = weighted.sum(min_count=1)
 
         # Weighted averages for scalar estimates. Each column chooses the most
         # defensible denominator available, then applies the requested overlap basis.
