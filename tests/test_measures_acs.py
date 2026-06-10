@@ -360,8 +360,10 @@ class TestExpandedAcs5AggregationSemantics:
                 "total_population": [100.0, 900.0],
                 "renter_households": [90.0, 10.0],
                 "owner_households": [10.0, 90.0],
+                "contract_rent_distribution_with_cash_rent": [80.0, 20.0],
                 "per_capita_income": [100.0, 200.0],
                 "median_gross_rent": [1000.0, 2000.0],
+                "median_contract_rent": [900.0, 1900.0],
                 "median_owner_occupied_home_value": [100_000.0, 200_000.0],
                 "gini_index": [0.2, 0.8],
             }
@@ -380,15 +382,41 @@ class TestExpandedAcs5AggregationSemantics:
         assert row["per_capita_income"] == pytest.approx((100 * 100 + 200 * 900) / 1000)
         assert row["gini_index"] == pytest.approx((0.2 * 100 + 0.8 * 900) / 1000)
         assert row["median_gross_rent"] == pytest.approx((1000 * 90 + 2000 * 10) / 100)
+        assert row["median_contract_rent"] == pytest.approx((900 * 80 + 1900 * 20) / 100)
         assert row["median_owner_occupied_home_value"] == pytest.approx(
             (100_000 * 10 + 200_000 * 90) / 100
         )
+
+    def test_contract_rent_median_falls_back_to_renter_household_weights(self):
+        acs_data = pd.DataFrame(
+            {
+                "GEOID": ["08001000100", "08001000200"],
+                "total_population": [1000.0, 2000.0],
+                "renter_households": [25.0, 75.0],
+                "median_contract_rent": [900.0, 1900.0],
+            }
+        )
+        crosswalk = pd.DataFrame(
+            {
+                "tract_geoid": ["08001000100", "08001000200"],
+                "coc_id": ["CO-500", "CO-500"],
+                "area_share": [1.0, 1.0],
+            }
+        )
+
+        result = aggregate_to_coc(acs_data, crosswalk)
+        row = result.iloc[0]
+
+        assert row["median_contract_rent"] == pytest.approx((900 * 25 + 1900 * 75) / 100)
+        assert row["coverage_median_contract_rent"] == pytest.approx(1.0)
 
     def test_expanded_distribution_bins_roll_up_as_area_weighted_counts(self):
         acs_data = pd.DataFrame(
             {
                 "GEOID": ["08001000100", "08001000200"],
                 "total_population": [1000.0, 2000.0],
+                "contract_rent_distribution_total": [200.0, 600.0],
+                "contract_rent_distribution_cash_rent_3500_plus": [20.0, 60.0],
                 "owner_occupied_value_total": [100.0, 300.0],
                 "owner_occupied_value_2000000_plus": [10.0, 30.0],
                 "educational_attainment_25plus_total": [800.0, 1600.0],
@@ -409,6 +437,12 @@ class TestExpandedAcs5AggregationSemantics:
 
         assert row["owner_occupied_value_total"] == pytest.approx(100 * 0.5 + 300 * 0.25)
         assert row["owner_occupied_value_2000000_plus"] == pytest.approx(10 * 0.5 + 30 * 0.25)
+        assert row["contract_rent_distribution_total"] == pytest.approx(
+            200 * 0.5 + 600 * 0.25
+        )
+        assert row["contract_rent_distribution_cash_rent_3500_plus"] == pytest.approx(
+            20 * 0.5 + 60 * 0.25
+        )
         assert row["educational_attainment_25plus_total"] == pytest.approx(800 * 0.5 + 1600 * 0.25)
         assert row["educational_attainment_25plus_bachelors_degree"] == pytest.approx(
             200 * 0.5 + 800 * 0.25

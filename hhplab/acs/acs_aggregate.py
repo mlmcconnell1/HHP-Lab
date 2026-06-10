@@ -19,10 +19,13 @@ estimates. The algorithm differs by measure type:
     - pop_share: population-proportional weight (tract_pop × area_share / total)
 
 **Median variables** (income, rent):
-    CoC_estimate = Σ(tract_median × pop_weight) / Σ(pop_weight)
+    CoC_estimate = Σ(tract_median × denominator_weight) / Σ(denominator_weight)
 
-    These are population-weighted averages of tract medians, NOT true medians
-    computed from underlying household distributions.
+    Income medians use population weights. Gross rent medians use renter
+    household weights. Contract rent medians use B25056 with-cash-rent
+    household weights when available, with renter households as fallback.
+    These are weighted averages of tract medians, NOT true medians computed
+    from underlying household distributions.
 
 Why This Approach Is Acceptable
 -------------------------------
@@ -118,7 +121,10 @@ AVERAGE_WEIGHT_DENOMINATORS: dict[str, tuple[str, ...]] = {
     "median_household_income": ("total_population",),
     "per_capita_income": ("total_population",),
     "median_gross_rent": ("renter_households", "total_population"),
-    "median_contract_rent": ("contract_rent_distribution_with_cash_rent", "renter_households"),
+    "median_contract_rent": (
+        "contract_rent_distribution_with_cash_rent",
+        "renter_households",
+    ),
     "median_owner_occupied_home_value": ("owner_households", "total_population"),
     "gini_index": ("total_population",),
 }
