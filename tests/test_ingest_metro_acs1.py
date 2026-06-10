@@ -428,6 +428,11 @@ class TestIngestWritesParquet:
                 "cbsa_code": "35620",
                 "B19080_001E": "32000",
                 "B25064_001E": "1764",
+                "B25058_001E": "1580",
+                "B25056_001E": "720000",
+                "B25056_002E": "700000",
+                "B25056_026E": "65000",
+                "B25056_027E": "20000",
                 "B25088_002E": "3245",
                 "B25132_003E": "7490498",
                 "B25035_001E": "1960",
@@ -446,6 +451,10 @@ class TestIngestWritesParquet:
 
         assert row["household_income_quintile_cutoff_lowest"] == 32000
         assert row["median_gross_rent"] == 1764
+        assert row["median_contract_rent"] == 1580
+        assert row["contract_rent_distribution_total"] == 720000
+        assert row["contract_rent_distribution_cash_rent_3500_plus"] == 65000
+        assert row["contract_rent_distribution_no_cash_rent"] == 20000
         assert row["median_owner_costs_with_mortgage"] == 3245
         assert row["electricity_cost_charged"] == 7490498
         assert row["median_year_structure_built"] == 1960

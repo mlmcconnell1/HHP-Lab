@@ -54,9 +54,20 @@ SAE_REQUIRED_ACS1_TABLES = {
             "gross_rent_distribution_cash_rent_3500_plus",
         ],
     },
+    "contract_rent_distribution": {
+        "table": "B25056",
+        "columns": [
+            "contract_rent_distribution_total",
+            "contract_rent_distribution_cash_rent_3500_plus",
+        ],
+    },
     "median_gross_rent": {
         "table": "B25064",
         "columns": ["median_gross_rent"],
+    },
+    "median_contract_rent": {
+        "table": "B25058",
+        "columns": ["median_contract_rent"],
     },
     "tenure_income": {
         "table": "B25118",
@@ -89,6 +100,11 @@ SAMPLE_COUNTIES = [
         "B25063_002E": "1700000",
         "B25063_026E": "220000",
         "B25063_027E": "50000",
+        "B25056_001E": "1680000",
+        "B25056_002E": "1630000",
+        "B25056_026E": "205000",
+        "B25056_027E": "50000",
+        "B25058_001E": "1375",
     },
     {
         "NAME": "Kings County, New York",
@@ -103,6 +119,11 @@ SAMPLE_COUNTIES = [
         "B25063_002E": "700000",
         "B25063_026E": "65000",
         "B25063_027E": "20000",
+        "B25056_001E": "700000",
+        "B25056_002E": "680000",
+        "B25056_026E": "60000",
+        "B25056_027E": "20000",
+        "B25058_001E": "1280",
     },
 ]
 
@@ -158,8 +179,14 @@ def test_ingest_county_writes_schema_and_provenance(httpx_mock, tmp_path) -> Non
         220000,
         65000,
     ]
+    assert df["contract_rent_distribution_cash_rent_3500_plus"].tolist() == [
+        205000,
+        60000,
+    ]
+    assert df["median_contract_rent"].tolist() == [1375, 1280]
     assert df["household_income_total"].dtype == "Int64"
     assert df["gross_rent_distribution_total"].dtype == "Int64"
+    assert df["contract_rent_distribution_total"].dtype == "Int64"
 
     provenance = read_provenance(path)
     assert provenance.geo_type == "county"
@@ -167,6 +194,8 @@ def test_ingest_county_writes_schema_and_provenance(httpx_mock, tmp_path) -> Non
     assert provenance.extra["counties_fetched"] == 2
     assert "B19001" in provenance.extra["tables_requested"]
     assert "B25063" in provenance.extra["tables_requested"]
+    assert "B25056" in provenance.extra["tables_requested"]
+    assert "B25058" in provenance.extra["tables_requested"]
 
 
 def test_normalize_county_sae_source_exposes_components_and_metadata() -> None:
