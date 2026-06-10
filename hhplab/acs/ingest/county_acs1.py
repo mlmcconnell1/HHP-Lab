@@ -23,9 +23,9 @@ from hhplab.acs.variables_acs1 import (
     ACS1_SAE_SOURCE_OUTPUT_COLUMNS,
     ACS1_TABLES,
     ACS1_UNAVAILABLE_VINTAGES,
-    ACS1_VARIABLES_BY_TABLE,
     acs1_tables_for_vintage,
     acs1_unavailable_tables_for_vintage,
+    acs1_variables_by_table_for_vintage,
 )
 from hhplab.provenance import ProvenanceBlock, write_parquet_with_provenance
 from hhplab.sources import CENSUS_API_ACS1
@@ -108,12 +108,12 @@ def normalize_acs1_county_sae_source(
     vintage = _resolve_acs1_vintage(df, acs1_vintage)
     if any(column.startswith("B") and column.endswith("E") for column in df.columns):
         raw = df.copy()
-        for variable_codes in ACS1_VARIABLES_BY_TABLE.values():
+        for variable_codes in acs1_variables_by_table_for_vintage(int(vintage)).values():
             for column in variable_codes:
                 if column in raw.columns:
                     raw[column] = pd.to_numeric(raw[column], errors="coerce")
                     raw.loc[raw[column] < 0, column] = pd.NA
-        result = normalize_acs1_measures(raw)
+        result = normalize_acs1_measures(raw, vintage=vintage)
     else:
         result = df.copy()
 
@@ -184,8 +184,12 @@ def ingest_county_acs1(
     df = fetch_acs1_county_data(vintage, api_key=api_key)
     fetched_tables = df.attrs.get("acs1_tables_fetched", ACS1_TABLES)
     unavailable_tables = df.attrs.get("acs1_tables_unavailable", [])
+    variables_by_table = df.attrs.get(
+        "acs1_variables_by_table",
+        acs1_variables_by_table_for_vintage(vintage),
+    )
 
-    result = normalize_acs1_measures(df)
+    result = normalize_acs1_measures(df, vintage=vintage)
     result["state"] = result["state"].astype(str).str.zfill(2)
     result["county"] = result["county"].astype(str).str.zfill(3)
     result["county_fips"] = result["state"] + result["county"]
@@ -218,7 +222,7 @@ def ingest_county_acs1(
             "variables": [
                 variable_code
                 for table in fetched_tables
-                for variable_code in ACS1_VARIABLES_BY_TABLE[table]
+                for variable_code in variables_by_table[table]
             ],
             "api_year": vintage,
             "retrieved_at": ingested_at.isoformat(),

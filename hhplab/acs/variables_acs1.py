@@ -403,6 +403,30 @@ ACS1_VARIABLES: list[str] = [
     for variable_code in ACS1_VARIABLES_BY_TABLE[table]
 ]
 
+EARLY_ACS1_VARIABLE_OVERRIDES: dict[str, str] = {
+    "B25063_023E": "gross_rent_distribution_cash_rent_2000_plus",
+    "B25063_024E": "gross_rent_distribution_no_cash_rent",
+    "B25056_023E": "contract_rent_distribution_cash_rent_2000_plus",
+    "B25056_024E": "contract_rent_distribution_no_cash_rent",
+}
+
+UNAVAILABLE_ACS1_API_VARS_BY_YEAR: dict[int, set[str]] = {
+    year: {
+        "B25063_025E",
+        "B25063_026E",
+        "B25063_027E",
+        "B25056_025E",
+        "B25056_026E",
+        "B25056_027E",
+    }
+    for year in range(2012, 2015)
+}
+
+ACS1_EARLY_RENT_TOP_BIN_COLUMNS_BY_TABLE: dict[str, tuple[str, ...]] = {
+    "B25063": ("gross_rent_distribution_cash_rent_2000_plus",),
+    "B25056": ("contract_rent_distribution_cash_rent_2000_plus",),
+}
+
 # Backward-compatible aliases used by older tests and call sites.
 ACS1_UNEMPLOYMENT_TABLE: str = "B23025"
 ACS1_UNEMPLOYMENT_VARIABLES: list[str] = ACS1_VARIABLES_BY_TABLE["B23025"]
@@ -432,7 +456,14 @@ ACS1_FLOAT_COLUMNS: list[str] = [
 
 ACS1_INTEGER_COLUMNS: list[str] = [
     column_name
-    for column_name in ACS1_VARIABLE_NAMES.values()
+    for column_name in [
+        *ACS1_VARIABLE_NAMES.values(),
+        *[
+            column
+            for columns in ACS1_EARLY_RENT_TOP_BIN_COLUMNS_BY_TABLE.values()
+            for column in columns
+        ],
+    ]
     if column_name not in ACS1_FLOAT_COLUMNS
 ]
 
@@ -500,6 +531,10 @@ ACS1_SAE_SOURCE_COLUMNS_BY_TABLE: dict[str, list[str]] = {
         if table != "B23025"
     },
 }
+for table, columns in ACS1_EARLY_RENT_TOP_BIN_COLUMNS_BY_TABLE.items():
+    ACS1_SAE_SOURCE_COLUMNS_BY_TABLE[table] = list(
+        dict.fromkeys([*ACS1_SAE_SOURCE_COLUMNS_BY_TABLE[table], *columns])
+    )
 
 ACS1_SAE_SOURCE_COLUMNS: list[str] = [
     column_name
@@ -556,3 +591,24 @@ def acs1_unavailable_tables_for_vintage(vintage: int) -> list[str]:
     """Return requested ACS1 tables absent for a given vintage."""
     available = set(acs1_tables_for_vintage(vintage))
     return [table for table in ACS1_TABLES if table not in available]
+
+
+def acs1_variables_by_table_for_vintage(vintage: int) -> dict[str, list[str]]:
+    """Return ACS1 API variables supported by a specific vintage."""
+    unavailable = UNAVAILABLE_ACS1_API_VARS_BY_YEAR.get(vintage, set())
+    return {
+        table: [
+            variable_code
+            for variable_code in variables
+            if variable_code not in unavailable
+        ]
+        for table, variables in ACS1_VARIABLES_BY_TABLE.items()
+    }
+
+
+def acs1_variable_names_for_vintage(vintage: int | str | None = None) -> dict[str, str]:
+    """Return ACS1 API variable renames with vintage-specific semantics."""
+    variable_names = dict(ACS1_VARIABLE_NAMES)
+    if vintage is not None and 2012 <= int(vintage) <= 2014:
+        variable_names.update(EARLY_ACS1_VARIABLE_OVERRIDES)
+    return variable_names

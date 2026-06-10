@@ -14,10 +14,10 @@ from hhplab.acs.variables_acs1 import (
     ACS1_FLOAT_COLUMNS,
     ACS1_INTEGER_COLUMNS,
     ACS1_UNAVAILABLE_VINTAGES,
-    ACS1_VARIABLE_NAMES,
-    ACS1_VARIABLES_BY_TABLE,
     acs1_tables_for_vintage,
     acs1_unavailable_tables_for_vintage,
+    acs1_variable_names_for_vintage,
+    acs1_variables_by_table_for_vintage,
 )
 from hhplab.sources import CENSUS_API_ACS1
 
@@ -94,6 +94,7 @@ def fetch_acs1_api_data(
 
     available_tables = acs1_tables_for_vintage(vintage)
     unavailable_tables = acs1_unavailable_tables_for_vintage(vintage)
+    variables_by_table = acs1_variables_by_table_for_vintage(vintage)
 
     if api_key is None:
         api_key = os.environ.get("CENSUS_API_KEY")
@@ -116,7 +117,7 @@ def fetch_acs1_api_data(
     geography_columns = list(geography.response_columns.values())
     with httpx.Client(timeout=60.0) as client:
         for table in available_tables:
-            table_variables = ACS1_VARIABLES_BY_TABLE[table]
+            table_variables = variables_by_table[table]
             params: dict[str, str] = {
                 "get": f"NAME,{','.join(table_variables)}",
                 **geography.request_params,
@@ -162,12 +163,21 @@ def fetch_acs1_api_data(
     logger.info("Fetched ACS 1-year data for %d %s", len(merged), geography.label)
     merged.attrs["acs1_tables_fetched"] = available_tables
     merged.attrs["acs1_tables_unavailable"] = unavailable_tables
+    merged.attrs["acs1_vintage"] = vintage
+    merged.attrs["acs1_variables_by_table"] = {
+        table: variables_by_table[table] for table in available_tables
+    }
     return merged
 
 
-def normalize_acs1_measures(df: pd.DataFrame) -> pd.DataFrame:
+def normalize_acs1_measures(
+    df: pd.DataFrame,
+    *,
+    vintage: int | str | None = None,
+) -> pd.DataFrame:
     """Rename Census variables, derive rates, and enforce stable ACS1 dtypes."""
-    result = df.rename(columns=ACS1_VARIABLE_NAMES).copy()
+    resolved_vintage = vintage if vintage is not None else df.attrs.get("acs1_vintage")
+    result = df.rename(columns=acs1_variable_names_for_vintage(resolved_vintage)).copy()
 
     result["unemployment_rate_acs1"] = pd.NA
     valid_denom = (

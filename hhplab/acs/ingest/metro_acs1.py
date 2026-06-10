@@ -53,7 +53,7 @@ from hhplab.acs.ingest._acs1_api import (
 from hhplab.acs.variables_acs1 import (
     ACS1_METRO_OUTPUT_COLUMNS,
     ACS1_TABLES,
-    ACS1_VARIABLES_BY_TABLE,
+    acs1_variables_by_table_for_vintage,
 )
 from hhplab.metro.metro_definitions import (
     CANONICAL_UNIVERSE_DEFINITION_VERSION,
@@ -234,7 +234,11 @@ def ingest_metro_acs1(
             "or that the requested definition version is correct."
         )
 
-    mapped = normalize_acs1_measures(mapped)
+    variables_by_table = df.attrs.get(
+        "acs1_variables_by_table",
+        acs1_variables_by_table_for_vintage(vintage),
+    )
+    mapped = normalize_acs1_measures(mapped, vintage=vintage)
 
     # Add provenance columns.
     api_url = CENSUS_API_ACS1.format(year=vintage)
@@ -276,7 +280,7 @@ def ingest_metro_acs1(
             "variables": [
                 variable_code
                 for table in fetched_tables
-                for variable_code in ACS1_VARIABLES_BY_TABLE[table]
+                for variable_code in variables_by_table[table]
             ],
             "api_year": vintage,
             "retrieved_at": ingested_at.isoformat(),

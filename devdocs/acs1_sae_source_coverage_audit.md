@@ -39,10 +39,13 @@ The registry uses `ACS1_TABLE_FIRST_YEAR` to preserve a stable output schema
 while skipping tables unavailable for older vintages. ACS5 `B25056` contract
 rent uses a broader `contract_rent_distribution_cash_rent_2000_plus` top bin
 for vintages 2009-2014 and finer 2000+ bins for vintages 2015 and later. ACS1
-contract-rent outputs follow the standard current `B25056` bin layout for
-supported ACS1 vintages. Utility-cost tables `B25132`, `B25133`, and `B25134`
-start in 2021; their columns are backfilled as nullable values for earlier
-supported vintages.
+`B25056` and `B25063` use the same early rent-bin layout for supported
+2012-2014 vintages: the API request omits unavailable `_025E`-`_027E`
+variables and maps `_023E` to the `*_2000_plus` top-bin columns. ACS1 vintages
+2015 and later use the standard split `*_2000_to_2499` through `*_3500_plus`
+layout. Utility-cost tables `B25132`, `B25133`, and `B25134` start in 2021;
+their columns are backfilled as nullable values for earlier supported
+vintages.
 
 ## Schema, Types, And Provenance
 

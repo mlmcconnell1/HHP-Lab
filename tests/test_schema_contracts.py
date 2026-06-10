@@ -24,7 +24,12 @@ from hhplab.acs.variables import (
     acs5_covariate_spec_for_output,
     acs_variables_for_year,
 )
-from hhplab.acs.variables_acs1 import ACS1_TABLE_COLUMN_NAMES, ACS1_VARIABLES_BY_TABLE
+from hhplab.acs.variables_acs1 import (
+    ACS1_TABLE_COLUMN_NAMES,
+    ACS1_VARIABLES_BY_TABLE,
+    acs1_variable_names_for_vintage,
+    acs1_variables_by_table_for_vintage,
+)
 from hhplab.bls.laus_series import (
     LAUS_MEASURE_CODES as BLS_LAUS_MEASURE_CODES,
 )
@@ -372,6 +377,25 @@ def test_contract_rent_acs1_variable_mappings_use_acs5_column_names() -> None:
         "contract_rent_distribution_no_cash_rent"
     )
     assert ACS1_VARIABLES_BY_TABLE["B25056"] == list(ACS1_TABLE_COLUMN_NAMES["B25056"])
+
+
+def test_contract_rent_acs1_early_vintage_uses_top_bin_override() -> None:
+    early_variables = acs1_variables_by_table_for_vintage(2014)
+    modern_variables = acs1_variables_by_table_for_vintage(2015)
+    early_names = acs1_variable_names_for_vintage(2014)
+    modern_names = acs1_variable_names_for_vintage(2015)
+
+    assert "B25056_025E" not in early_variables["B25056"]
+    assert "B25056_026E" not in early_variables["B25056"]
+    assert "B25056_027E" not in early_variables["B25056"]
+    assert "B25063_025E" not in early_variables["B25063"]
+    assert "B25056_025E" in modern_variables["B25056"]
+    assert "B25063_025E" in modern_variables["B25063"]
+
+    assert early_names["B25056_023E"] == "contract_rent_distribution_cash_rent_2000_plus"
+    assert early_names["B25063_023E"] == "gross_rent_distribution_cash_rent_2000_plus"
+    assert modern_names["B25056_023E"] == "contract_rent_distribution_cash_rent_2000_to_2499"
+    assert modern_names["B25063_023E"] == "gross_rent_distribution_cash_rent_2000_to_2499"
 
 
 def test_acs5_covariate_registry_matches_aggregation_column_contracts() -> None:

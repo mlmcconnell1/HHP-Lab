@@ -24,6 +24,7 @@ from hhplab.acs.variables_acs1 import (
     ACS1_SAE_SOURCE_OUTPUT_COLUMNS,
     ACS1_VARIABLES_BY_TABLE,
     acs1_tables_for_vintage,
+    acs1_variables_by_table_for_vintage,
 )
 from hhplab.cli.main import app
 from hhplab.provenance import read_provenance
@@ -143,10 +144,11 @@ def make_county_response(
 
 
 def queue_acs1_county_responses(httpx_mock, counties: list[dict[str, Any]], vintage: int) -> None:
+    variables_by_table = acs1_variables_by_table_for_vintage(vintage)
     for table in acs1_tables_for_vintage(vintage):
         httpx_mock.add_response(
             url=CENSUS_API_URL_PATTERN,
-            json=make_county_response(counties, ACS1_VARIABLES_BY_TABLE[table]),
+            json=make_county_response(counties, variables_by_table[table]),
         )
 
 
@@ -196,6 +198,45 @@ def test_ingest_county_writes_schema_and_provenance(httpx_mock, tmp_path) -> Non
     assert "B25063" in provenance.extra["tables_requested"]
     assert "B25056" in provenance.extra["tables_requested"]
     assert "B25058" in provenance.extra["tables_requested"]
+
+
+def test_ingest_county_preserves_early_rent_top_bin_semantics(httpx_mock, tmp_path) -> None:
+    counties = [
+        {
+            "NAME": "Los Angeles County, California",
+            "state": "06",
+            "county": "037",
+            "B23025_001E": "8000000",
+            "B23025_003E": "5200000",
+            "B23025_005E": "260000",
+            "B25063_001E": "1750000",
+            "B25063_002E": "1700000",
+            "B25063_023E": "220000",
+            "B25063_024E": "50000",
+            "B25056_001E": "1680000",
+            "B25056_002E": "1630000",
+            "B25056_023E": "205000",
+            "B25056_024E": "50000",
+        },
+    ]
+    queue_acs1_county_responses(httpx_mock, counties, vintage=2014)
+
+    path = ingest_county_acs1(vintage=2014, project_root=tmp_path)
+    df = pd.read_parquet(path)
+    row = df.iloc[0]
+
+    assert row["gross_rent_distribution_cash_rent_2000_plus"] == 220000
+    assert row["gross_rent_distribution_no_cash_rent"] == 50000
+    assert row["contract_rent_distribution_cash_rent_2000_plus"] == 205000
+    assert row["contract_rent_distribution_no_cash_rent"] == 50000
+    assert pd.isna(row["gross_rent_distribution_cash_rent_3500_plus"])
+    assert pd.isna(row["contract_rent_distribution_cash_rent_3500_plus"])
+
+    provenance = read_provenance(path)
+    assert "B25063_023E" in provenance.extra["variables"]
+    assert "B25063_025E" not in provenance.extra["variables"]
+    assert "B25056_023E" in provenance.extra["variables"]
+    assert "B25056_025E" not in provenance.extra["variables"]
 
 
 def test_normalize_county_sae_source_exposes_components_and_metadata() -> None:

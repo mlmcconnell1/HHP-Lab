@@ -19,6 +19,7 @@ from hhplab.acs.variables_acs1 import (
     ACS1_UNAVAILABLE_VINTAGES,
     ACS1_VARIABLES_BY_TABLE,
     acs1_tables_for_vintage,
+    acs1_variables_by_table_for_vintage,
 )
 from hhplab.cli.ingest_acs1_metro import ingest_acs1_metro as ingest_acs1_metro_cli
 from hhplab.metro.metro_definitions import CANONICAL_UNIVERSE_DEFINITION_VERSION
@@ -49,10 +50,11 @@ def make_cbsa_response(
 
 def queue_acs1_group_responses(httpx_mock, cbsas: list[dict[str, Any]], vintage: int) -> None:
     """Queue one mocked Census API response per ACS1 table fetch."""
+    variables_by_table = acs1_variables_by_table_for_vintage(vintage)
     for table in acs1_tables_for_vintage(vintage):
         httpx_mock.add_response(
             url=CENSUS_API_URL_PATTERN,
-            json=make_cbsa_response(cbsas, ACS1_VARIABLES_BY_TABLE[table]),
+            json=make_cbsa_response(cbsas, variables_by_table[table]),
         )
 
 
@@ -460,6 +462,42 @@ class TestIngestWritesParquet:
         assert row["median_year_structure_built"] == 1960
         assert row["units_in_structure_50_plus"] == 150000
         assert float(row["average_household_size_total"]) == pytest.approx(2.61)
+
+    def test_early_rent_top_bins_are_preserved(self, httpx_mock, tmp_path):
+        cbsas = [
+            {
+                "cbsa_code": "35620",
+                "B23025_001E": "16000000",
+                "B23025_003E": "10000000",
+                "B23025_005E": "500000",
+                "B25063_001E": "720000",
+                "B25063_002E": "700000",
+                "B25063_023E": "65000",
+                "B25063_024E": "20000",
+                "B25056_001E": "700000",
+                "B25056_002E": "680000",
+                "B25056_023E": "60000",
+                "B25056_024E": "20000",
+            },
+        ]
+        queue_acs1_group_responses(httpx_mock, cbsas, vintage=2014)
+
+        path = ingest_metro_acs1(vintage=2014, project_root=tmp_path)
+        df = pd.read_parquet(path)
+        row = df.iloc[0]
+
+        assert row["gross_rent_distribution_cash_rent_2000_plus"] == 65000
+        assert row["gross_rent_distribution_no_cash_rent"] == 20000
+        assert row["contract_rent_distribution_cash_rent_2000_plus"] == 60000
+        assert row["contract_rent_distribution_no_cash_rent"] == 20000
+        assert pd.isna(row["gross_rent_distribution_cash_rent_3500_plus"])
+        assert pd.isna(row["contract_rent_distribution_cash_rent_3500_plus"])
+
+        provenance = read_provenance(path)
+        assert "B25063_023E" in provenance.extra["variables"]
+        assert "B25063_025E" not in provenance.extra["variables"]
+        assert "B25056_023E" in provenance.extra["variables"]
+        assert "B25056_025E" not in provenance.extra["variables"]
 
     def test_utility_tables_backfill_na_before_2021(self, httpx_mock, tmp_path):
         """Utility-cost tables are absent before 2021 and should backfill as NA."""
