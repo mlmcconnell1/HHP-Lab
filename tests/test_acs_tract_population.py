@@ -618,6 +618,11 @@ class TestFetchTractPopulation:
                     "B01003_001M": "150",
                     "B19013_001E": "65000",
                     "B25064_001E": "1400",
+                    "B25058_001E": "1250",
+                    "B25056_001E": "900",
+                    "B25056_002E": "850",
+                    "B25056_026E": "45",
+                    "B25056_027E": "50",
                     "B25003_001E": "2100",
                     "B25003_002E": "1200",
                     "B25003_003E": "900",
@@ -655,6 +660,13 @@ class TestFetchTractPopulation:
         assert row["renter_households"] == 900
         assert row["median_household_income"] == 65000
         assert row["median_gross_rent"] == 1400
+        assert row["median_contract_rent"] == 1250
+        assert row["contract_rent_distribution_total"] == 900
+        assert row["contract_rent_distribution_with_cash_rent"] == 850
+        assert row["contract_rent_distribution_cash_rent_3500_plus"] == 45
+        assert row["contract_rent_distribution_no_cash_rent"] == 50
+        assert str(df["contract_rent_distribution_total"].dtype) == "Int64"
+        assert str(df["median_contract_rent"].dtype) == "Float64"
         assert row["poverty_universe"] == 4800
         assert row["population_below_poverty"] == 550  # 200 + 350
 
@@ -1024,7 +1036,11 @@ class TestIngestTractPopulation:
         assert "B01003" in provenance.extra.get("tables", [])
         assert "B19001" in provenance.extra.get("tables", [])
         assert "B25063" in provenance.extra.get("tables", [])
+        assert "B25056" in provenance.extra.get("tables", [])
+        assert "B25058" in provenance.extra.get("tables", [])
         assert "B25118" in provenance.extra.get("tables", [])
+        assert "B25056_001E" in provenance.extra.get("variables", [])
+        assert "B25058_001E" in provenance.extra.get("variables", [])
 
 
 class TestSchemaValidation:
@@ -1244,6 +1260,22 @@ EXPANDED_ACS5_MAPPING_CASES = {
             "owner_occupied_value_2000000_plus": 5,
         },
     },
+    "contract_rent_distribution_and_median": {
+        "api_values": {
+            "B25056_001E": "900",
+            "B25056_002E": "850",
+            "B25056_026E": "45",
+            "B25056_027E": "50",
+            "B25058_001E": "1250",
+        },
+        "expected": {
+            "contract_rent_distribution_total": 900,
+            "contract_rent_distribution_with_cash_rent": 850,
+            "contract_rent_distribution_cash_rent_3500_plus": 45,
+            "contract_rent_distribution_no_cash_rent": 50,
+            "median_contract_rent": 1250,
+        },
+    },
     "educational_attainment_distribution": {
         "api_values": {
             "B15003_001E": "3000",
@@ -1303,6 +1335,13 @@ def test_expanded_acs5_unavailable_variables_are_filtered_by_vintage() -> None:
     assert "B25075_026E" in api_vars_for_year(2015)
     assert "B25075_027E" in api_vars_for_year(2015)
 
+    assert "B25056_025E" not in api_vars_for_year(2014)
+    assert "B25056_026E" not in api_vars_for_year(2014)
+    assert "B25056_027E" not in api_vars_for_year(2014)
+    assert "B25056_025E" in api_vars_for_year(2015)
+    assert "B25056_026E" in api_vars_for_year(2015)
+    assert "B25056_027E" in api_vars_for_year(2015)
+
 
 def test_early_acs5_top_category_variables_use_vintage_specific_columns() -> None:
     early = acs_variables_for_year(2014)
@@ -1310,10 +1349,14 @@ def test_early_acs5_top_category_variables_use_vintage_specific_columns() -> Non
 
     assert early["B25063_023E"] == "gross_rent_distribution_cash_rent_2000_plus"
     assert early["B25063_024E"] == "gross_rent_distribution_no_cash_rent"
+    assert early["B25056_023E"] == "contract_rent_distribution_cash_rent_2000_plus"
+    assert early["B25056_024E"] == "contract_rent_distribution_no_cash_rent"
     assert early["B25075_025E"] == "owner_occupied_value_1000000_plus"
 
     assert modern["B25063_023E"] == "gross_rent_distribution_cash_rent_2000_to_2499"
     assert modern["B25063_024E"] == "gross_rent_distribution_cash_rent_2500_to_2999"
+    assert modern["B25056_023E"] == "contract_rent_distribution_cash_rent_2000_to_2499"
+    assert modern["B25056_024E"] == "contract_rent_distribution_cash_rent_2500_to_2999"
     assert modern["B25075_025E"] == "owner_occupied_value_1000000_to_1499999"
 
 
@@ -1325,6 +1368,8 @@ def test_early_acs5_response_preserves_top_category_semantics(httpx_mock) -> Non
                 "tract": "001000",
                 "B25063_023E": "17",
                 "B25063_024E": "9",
+                "B25056_023E": "19",
+                "B25056_024E": "11",
                 "B25075_025E": "6",
             }
         ]
@@ -1340,11 +1385,15 @@ def test_early_acs5_response_preserves_top_category_semantics(httpx_mock) -> Non
 
     assert row["gross_rent_distribution_cash_rent_2000_plus"] == 17
     assert row["gross_rent_distribution_no_cash_rent"] == 9
+    assert row["contract_rent_distribution_cash_rent_2000_plus"] == 19
+    assert row["contract_rent_distribution_no_cash_rent"] == 11
     assert row["owner_occupied_value_1000000_plus"] == 6
 
     assert "gross_rent_distribution_cash_rent_2500_to_2999" not in df.columns
+    assert "contract_rent_distribution_cash_rent_2500_to_2999" not in df.columns
     assert "owner_occupied_value_1000000_to_1499999" not in df.columns
     assert "gross_rent_distribution_cash_rent_2000_plus" in TRACT_OUTPUT_COLUMNS
+    assert "contract_rent_distribution_cash_rent_2000_plus" in TRACT_OUTPUT_COLUMNS
     assert "owner_occupied_value_1000000_plus" in TRACT_OUTPUT_COLUMNS
 
 
@@ -1358,6 +1407,10 @@ SAE_REQUIRED_ACS5_TRACT_COLUMNS = {
     "gross_rent_distribution": [
         "gross_rent_distribution_total",
         "gross_rent_distribution_cash_rent_3500_plus",
+    ],
+    "contract_rent_distribution": [
+        "contract_rent_distribution_total",
+        "contract_rent_distribution_cash_rent_3500_plus",
     ],
     "owner_occupied_value_distribution": [
         "owner_occupied_value_total",

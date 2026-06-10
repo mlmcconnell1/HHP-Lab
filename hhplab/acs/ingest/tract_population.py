@@ -1,10 +1,10 @@
 """ACS tract-level data fetcher.
 
 Fetches and caches tract-level ACS data from the Census Bureau API.
-Retrieves population (B01003), income (B19013), rent (B25064), poverty
-(C17002), tenure (B25003), and age/sex (B01001) variables in a single
-pass per state, then computes derived columns (adult_population,
-population_below_poverty).
+Retrieves population (B01003), income (B19013), rent (B25064/B25063),
+contract rent (B25058/B25056), poverty (C17002), tenure (B25003), and
+age/sex (B01001) variables in a single pass per state, then computes
+derived columns (adult_population, population_below_poverty).
 
 Usage
 -----
@@ -31,6 +31,7 @@ Output Schema
 - renter_households (Int64)
 - median_household_income (Float64)
 - median_gross_rent (Float64)
+- median_contract_rent (Float64)
 - poverty_universe (Int64)
 - below_50pct_poverty (Int64)
 - 50_to_99pct_poverty (Int64)
@@ -296,7 +297,8 @@ def normalize_acs5_tract_sae_support(
         "tract_vintage",
     )
     if any(column.startswith("B") and column.endswith("E") for column in df.columns):
-        result = df.rename(columns=ACS_VARIABLES).copy()
+        variable_names = acs_variables_for_year(parse_acs_vintage(resolved_acs_vintage))
+        result = df.rename(columns=variable_names).copy()
     else:
         result = df.copy()
 
