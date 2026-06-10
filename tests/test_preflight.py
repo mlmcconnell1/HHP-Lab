@@ -1777,6 +1777,69 @@ class TestRunPreflight:
         ]
         assert len(findings) == 1
 
+    def test_sae_preflight_validates_contract_rent_family_columns(self, tmp_path: Path):
+        _write_sae_preflight_fixtures(tmp_path)
+        data = _sae_recipe_dict()
+        step = data["pipelines"][0]["steps"][0]
+        step["denominators"] = {
+            "contract_rent_bins": "contract_rent_distribution_with_cash_rent"
+        }
+        step["measures"] = {
+            "contract_rent_bins": {
+                "outputs": ["sae_contract_rent_median"],
+            },
+        }
+        recipe = load_recipe(data)
+
+        report = run_preflight(recipe, project_root=tmp_path)
+
+        findings = [f for f in report.findings if f.kind == FindingKind.MISSING_MEASURE]
+        assert len(findings) == 3
+        messages = [finding.message for finding in findings]
+        assert any("SAE source dataset 'acs1_county'" in message for message in messages)
+        assert any("SAE support dataset 'acs5_support'" in message for message in messages)
+        assert any("missing denominator columns" in message for message in messages)
+        component_messages = [
+            message for message in messages if "missing columns" in message
+        ]
+        assert all("contract_rent_distribution_total" in message for message in component_messages)
+
+    def test_sae_preflight_rejects_gross_rent_output_under_contract_rent_bins(
+        self,
+        tmp_path: Path,
+    ):
+        _write_sae_preflight_fixtures(tmp_path)
+        acs_dir = tmp_path / "data" / "curated" / "acs"
+        for path in (
+            acs_dir / "acs1_county_sae__A2023.parquet",
+            acs_dir / "acs5_tract_sae_support__A2022xT2020.parquet",
+        ):
+            frame = pd.read_parquet(path)
+            frame["contract_rent_distribution_total"] = [100]
+            frame["contract_rent_distribution_with_cash_rent"] = [90]
+            frame["contract_rent_distribution_cash_rent_3500_plus"] = [10]
+            frame.to_parquet(path)
+        data = _sae_recipe_dict()
+        step = data["pipelines"][0]["steps"][0]
+        step["denominators"] = {
+            "contract_rent_bins": "contract_rent_distribution_with_cash_rent"
+        }
+        step["measures"] = {
+            "contract_rent_bins": {
+                "outputs": ["sae_gross_rent_median"],
+            },
+        }
+        recipe = load_recipe(data)
+
+        report = run_preflight(recipe, project_root=tmp_path)
+
+        findings = [
+            f
+            for f in report.findings
+            if f.kind == FindingKind.MISSING_MEASURE and "cannot produce outputs" in f.message
+        ]
+        assert len(findings) == 1
+
     def test_sae_preflight_reports_missing_denominator_column(self, tmp_path: Path):
         _write_sae_preflight_fixtures(tmp_path)
         data = _sae_recipe_dict()

@@ -2218,6 +2218,7 @@ def _check_dataset_schemas(
 
 _SAE_FAMILY_PREFIXES: dict[str, tuple[str, ...]] = {
     "household_income_bins": ("household_income_",),
+    "contract_rent_bins": ("contract_rent_distribution_",),
     "gross_rent_bins": ("gross_rent_distribution_",),
     "rent_burden": ("gross_rent_pct_income_",),
     "owner_cost_burden": ("owner_costs_pct_income_",),
@@ -2230,6 +2231,7 @@ _SAE_FAMILY_EXACT_COLUMNS: dict[str, tuple[str, ...]] = {
 
 _SAE_OUTPUT_PREFIXES: dict[str, tuple[str, ...]] = {
     "household_income_bins": ("sae_household_income_",),
+    "contract_rent_bins": ("sae_contract_rent_distribution_",),
     "gross_rent_bins": ("sae_gross_rent_distribution_",),
     "rent_burden": ("sae_rent_burden_",),
     "owner_cost_burden": ("sae_owner_cost_burden_",),
@@ -2250,6 +2252,7 @@ _SAE_OUTPUT_EXACT_COLUMNS: dict[str, tuple[str, ...]] = {
         "sae_household_income_quintile_cutoff_80",
     ),
     "gross_rent_bins": ("sae_gross_rent_median",),
+    "contract_rent_bins": ("sae_contract_rent_median",),
 }
 
 

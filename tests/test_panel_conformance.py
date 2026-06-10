@@ -334,6 +334,30 @@ class TestPanelRequest:
 
         assert results == []
 
+    def test_contract_rent_measure_columns_pass_when_requested(self) -> None:
+        req = PanelRequest(
+            start_year=2023,
+            end_year=2023,
+            measure_columns=[
+                "median_contract_rent",
+                "contract_rent_distribution_total",
+                "contract_rent_distribution_cash_rent_3500_plus",
+            ],
+        )
+        panel = pd.DataFrame(
+            {
+                "coc_id": ["COC-A"],
+                "year": [2023],
+                "median_contract_rent": [1250.0],
+                "contract_rent_distribution_total": [100.0],
+                "contract_rent_distribution_cash_rent_3500_plus": [5.0],
+            }
+        )
+
+        results = check_schema_measures(panel, req)
+
+        assert results == []
+
     def test_default_acs_measure_columns_do_not_change_for_urban_fraction(self) -> None:
         req = PanelRequest(start_year=2023, end_year=2023)
         panel = pd.DataFrame(

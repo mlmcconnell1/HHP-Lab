@@ -58,6 +58,7 @@ from hhplab.recipe.planner import (
 )
 from hhplab.recipe.preflight import FindingKind, run_preflight
 from hhplab.recipe.recipe_schema import (
+    ACS5_RECIPE_SELECTABLE_MEASURES,
     Acs1Policy,
     ContainmentSpec,
     DatasetSpec,
@@ -3480,6 +3481,34 @@ class TestSmallAreaEstimateSchema:
         ]
         assert step.diagnostics.direct_county_comparison is True
 
+    def test_contract_rent_columns_are_recipe_selectable(self):
+        assert "median_contract_rent" in ACS5_RECIPE_SELECTABLE_MEASURES
+        assert "contract_rent_distribution_total" in ACS5_RECIPE_SELECTABLE_MEASURES
+        assert (
+            "contract_rent_distribution_cash_rent_3500_plus"
+            in ACS5_RECIPE_SELECTABLE_MEASURES
+        )
+
+    def test_sae_step_accepts_contract_rent_family(self):
+        data = _sae_recipe()
+        step_data = data["pipelines"][0]["steps"][0]
+        step_data["denominators"]["contract_rent_bins"] = (
+            "contract_rent_distribution_with_cash_rent"
+        )
+        step_data["measures"]["contract_rent_bins"] = {
+            "outputs": ["sae_contract_rent_median"],
+        }
+
+        recipe = load_recipe(data)
+        step = recipe.pipelines[0].steps[0]
+
+        assert isinstance(step, SmallAreaEstimateStep)
+        assert step.denominators["contract_rent_bins"] == (
+            "contract_rent_distribution_with_cash_rent"
+        )
+        assert "contract_rent_bins" in step.measures
+        assert step.measures["contract_rent_bins"].outputs == ["sae_contract_rent_median"]
+
     def test_sae_wrapper_step_shorthand_loads(self):
         data = _sae_recipe()
         step = data["pipelines"][0]["steps"][0]
@@ -3521,6 +3550,15 @@ class TestSmallAreaEstimateSchema:
         data["pipelines"][0]["steps"][0]["measures"]["household_income_bins"]["outputs"] = [
             "median_household_income"
         ]
+
+        with pytest.raises(RecipeLoadError, match="direct ACS median/context columns"):
+            load_recipe(data)
+
+    def test_sae_rejects_direct_contract_rent_median_output(self):
+        data = _sae_recipe()
+        data["pipelines"][0]["steps"][0]["measures"]["contract_rent_bins"] = {
+            "outputs": ["median_contract_rent"],
+        }
 
         with pytest.raises(RecipeLoadError, match="direct ACS median/context columns"):
             load_recipe(data)

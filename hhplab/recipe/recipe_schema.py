@@ -1278,6 +1278,7 @@ SAEFallbackPolicy = Literal["diagnose_only", "fail"]
 SAEZeroDenominatorPolicy = Literal["null_rate", "diagnostic"]
 SAEMeasureFamily = Literal[
     "household_income_bins",
+    "contract_rent_bins",
     "gross_rent_bins",
     "rent_burden",
     "owner_cost_burden",
@@ -1289,6 +1290,7 @@ _SAE_DIRECT_MEDIAN_CONTEXT_COLUMNS = frozenset(
     {
         "median_household_income",
         "median_gross_rent",
+        "median_contract_rent",
         "median_household_income_owner_occupied",
         "median_household_income_renter_occupied",
         "household_income_quintile_upper_limit_first",

@@ -411,6 +411,8 @@ def test_acs5_expanded_covariates_remain_outside_default_canonical_measures() ->
     assert ACS5_EXPANDED_COVARIATE_COLUMNS
     assert set(ACS5_EXPANDED_COVARIATE_COLUMNS).isdisjoint(schema_columns.ACS_MEASURE_COLUMNS)
     assert "household_income_total" in ACS5_EXPANDED_COVARIATE_COLUMNS
+    assert "contract_rent_distribution_total" in ACS5_EXPANDED_COVARIATE_COLUMNS
+    assert "median_contract_rent" in ACS5_EXPANDED_COVARIATE_COLUMNS
     assert "owner_costs_pct_income_total" in ACS5_EXPANDED_COVARIATE_COLUMNS
     assert "median_household_income" not in ACS5_EXPANDED_COVARIATE_COLUMNS
 
@@ -419,6 +421,8 @@ def test_recipe_selectable_acs5_measures_include_expanded_without_changing_defau
     assert ACS5_RECIPE_DEFAULT_MEASURES == tuple(schema_columns.ACS_MEASURE_COLUMNS)
     assert "per_capita_income" in ACS5_RECIPE_SELECTABLE_MEASURES
     assert "gini_index" in ACS5_RECIPE_SELECTABLE_MEASURES
+    assert "contract_rent_distribution_total" in ACS5_RECIPE_SELECTABLE_MEASURES
+    assert "median_contract_rent" in ACS5_RECIPE_SELECTABLE_MEASURES
     assert "per_capita_income" not in ACS5_RECIPE_DEFAULT_MEASURES
     assert set(ACS5_RECIPE_DEFAULT_MEASURES) < set(ACS5_RECIPE_SELECTABLE_MEASURES)
 

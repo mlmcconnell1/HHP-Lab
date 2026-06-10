@@ -189,7 +189,7 @@ def test_normalize_county_sae_source_exposes_components_and_metadata() -> None:
 
     source_tables = json.loads(df.loc[0, "sae_source_tables"])
     column_tables = json.loads(df.loc[0, "sae_source_column_tables"])
-    assert source_tables == ["B23025", "B19001", "B25063", "B25091", "B25118"]
+    assert source_tables == ["B23025", "B19001", "B25063", "B25056", "B25091", "B25118"]
     assert json.loads(df.loc[0, "sae_unavailable_tables"]) == ["B25070"]
     assert column_tables["civilian_labor_force"] == "B23025"
     assert column_tables["household_income_200000_plus"] == "B19001"
