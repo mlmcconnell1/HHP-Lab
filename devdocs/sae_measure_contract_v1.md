@@ -48,8 +48,15 @@ they need housing-cost-inclusive rent distributions.
 Direct `B25058` `median_contract_rent` rollups in the ACS aggregation path are
 weighted averages of tract medians, using `contract_rent_distribution_with_cash_rent`
 when available and `renter_households` as a fallback. They are not valid SAE
-outputs in v1. SAE contract-rent medians must be derived from allocated
-`B25056` bins before being exposed as `sae_contract_rent_median`.
+outputs in v1. SAE exposes `sae_contract_rent_median` only after deriving it
+from allocated `B25056` bins.
+
+Rent medians derived from allocated `B25056` or `B25063` bins use linear
+interpolation within the bin containing the 50th percentile cash-rent
+household. Diagnostics identify the rent-bin layout used: the 2009-2014 ACS5
+layout with the `*_2000_plus` open-ended top bin, or the 2015+ layout with the
+split `*_2000_to_2499` through `*_3500_plus` bins. Quantiles in an open-ended
+top bin are reported as unsupported rather than estimated.
 
 ## Recipe Semantics
 

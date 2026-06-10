@@ -242,6 +242,7 @@ SAE_DERIVED_MEASURE_COLUMNS: list[str] = [
     "sae_household_income_quintile_cutoff_60",
     "sae_household_income_quintile_cutoff_80",
     "sae_gross_rent_median",
+    "sae_contract_rent_median",
     "sae_rent_burden_30_plus",
     "sae_rent_burden_50_plus",
     "sae_owner_cost_burden_30_plus",

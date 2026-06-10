@@ -685,6 +685,7 @@ def test_acs1_imputation_rate_spec_requires_numerator_source_subset() -> None:
 def test_sae_schema_constants_define_outputs_lineage_and_diagnostics() -> None:
     assert "sae_rent_burden_30_plus" in schema_columns.SAE_MEASURE_COLUMNS
     assert "sae_household_income_median" in schema_columns.SAE_DERIVED_MEASURE_COLUMNS
+    assert "sae_contract_rent_median" in schema_columns.SAE_DERIVED_MEASURE_COLUMNS
     assert "sae_crosswalk_id" in schema_columns.SAE_LINEAGE_COLUMNS
     assert "sae_direct_county_comparable" in schema_columns.SAE_DIAGNOSTIC_COLUMNS
     assert schema_columns.SAE_OUTPUT_COLUMNS == [

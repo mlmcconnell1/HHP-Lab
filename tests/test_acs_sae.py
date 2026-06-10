@@ -10,7 +10,10 @@ import pytest
 from hhplab.acs.sae import (
     ACS1_HYBRID_CONTROL_SELECTION_POLICY_ID,
     ACS1_IMPUTATION_METHOD,
+    CONTRACT_RENT_BINS,
+    CONTRACT_RENT_BINS_EARLY,
     GROSS_RENT_BINS,
+    GROSS_RENT_BINS_EARLY,
     HOUSEHOLD_INCOME_BINS,
     SAE_ALLOCATION_METHOD,
     ACS1HybridControlSelectionPolicy,
@@ -1328,6 +1331,74 @@ def test_derives_gross_rent_median_from_cash_rent_distribution() -> None:
     assert output["median_gross_rent"] == 2500
     diagnostics = json.loads(output["sae_gross_rent_distribution_diagnostics"])
     assert diagnostics["interpolation"] == "linear_within_bin"
+    assert diagnostics["bin_layout"] == "modern_3500_plus"
+
+
+def test_derives_gross_rent_median_from_early_cash_rent_distribution() -> None:
+    row = {
+        "coc_id": "COC-A",
+        "sae_gross_rent_distribution_with_cash_rent": 100,
+        **_zero_distribution(GROSS_RENT_BINS_EARLY),
+    }
+    row.update(
+        {
+            "sae_gross_rent_distribution_cash_rent_1500_to_1999": 60,
+            "sae_gross_rent_distribution_cash_rent_2000_plus": 40,
+        }
+    )
+
+    result = derive_sae_distribution_measures(pd.DataFrame([row]), families=["gross_rent"])
+    output = result.iloc[0]
+
+    assert output["sae_gross_rent_median"] == pytest.approx(1916.6666666666667)
+    diagnostics = json.loads(output["sae_gross_rent_distribution_diagnostics"])
+    assert diagnostics["bin_layout"] == "early_2000_plus"
+
+
+def test_derives_contract_rent_median_from_cash_rent_distribution() -> None:
+    row = {
+        "coc_id": "COC-A",
+        "median_contract_rent": 2200,
+        "sae_contract_rent_distribution_with_cash_rent": 100,
+        **_zero_distribution(CONTRACT_RENT_BINS),
+    }
+    row.update(
+        {
+            "sae_contract_rent_distribution_cash_rent_500_to_549": 40,
+            "sae_contract_rent_distribution_cash_rent_550_to_599": 40,
+            "sae_contract_rent_distribution_cash_rent_600_to_649": 20,
+        }
+    )
+
+    result = derive_sae_distribution_measures(pd.DataFrame([row]), families=["contract_rent"])
+    output = result.iloc[0]
+
+    assert output["sae_contract_rent_median"] == pytest.approx(562.5)
+    assert output["median_contract_rent"] == 2200
+    diagnostics = json.loads(output["sae_contract_rent_distribution_diagnostics"])
+    assert diagnostics["interpolation"] == "linear_within_bin"
+    assert diagnostics["bin_layout"] == "modern_3500_plus"
+
+
+def test_derives_contract_rent_median_from_early_cash_rent_distribution() -> None:
+    row = {
+        "coc_id": "COC-A",
+        "sae_contract_rent_distribution_with_cash_rent": 100,
+        **_zero_distribution(CONTRACT_RENT_BINS_EARLY),
+    }
+    row.update(
+        {
+            "sae_contract_rent_distribution_cash_rent_1500_to_1999": 60,
+            "sae_contract_rent_distribution_cash_rent_2000_plus": 40,
+        }
+    )
+
+    result = derive_sae_distribution_measures(pd.DataFrame([row]), families=["contract_rent"])
+    output = result.iloc[0]
+
+    assert output["sae_contract_rent_median"] == pytest.approx(1916.6666666666667)
+    diagnostics = json.loads(output["sae_contract_rent_distribution_diagnostics"])
+    assert diagnostics["bin_layout"] == "early_2000_plus"
 
 
 def test_distribution_derivation_rejects_unsupported_family() -> None:

@@ -61,6 +61,14 @@ cash rent before utilities. Contract-rent bins are additive counts after
 allocation; direct `B25058` medians are only context fields unless a recipe
 derives a median from allocated `B25056` bins.
 
+`sae_gross_rent_median` and `sae_contract_rent_median` use linear
+interpolation within the allocated cash-rent bin containing the median
+household. Vintages with the 2009-2014 rent table layout use the
+`*_2000_plus` open-ended top bin; vintages with the 2015+ layout use the
+split `*_2000_to_2499` through `*_3500_plus` bins. If the median falls in an
+open-ended top bin, the derived median is null and diagnostics report the
+unsupported open-ended quantile.
+
 ## Direct County Comparison
 
 Direct county comparison diagnostics are valid only when a target geography is

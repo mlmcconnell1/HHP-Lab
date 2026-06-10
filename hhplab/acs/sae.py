@@ -157,6 +157,26 @@ GROSS_RENT_BINS: tuple[tuple[str, float, float | None], ...] = (
     ("sae_gross_rent_distribution_cash_rent_3500_plus", 3500.0, None),
 )
 
+GROSS_RENT_BINS_EARLY: tuple[tuple[str, float, float | None], ...] = (
+    *GROSS_RENT_BINS[:20],
+    ("sae_gross_rent_distribution_cash_rent_2000_plus", 2000.0, None),
+)
+
+CONTRACT_RENT_BINS: tuple[tuple[str, float, float | None], ...] = tuple(
+    (column.replace("sae_gross_rent_", "sae_contract_rent_"), lower, upper)
+    for column, lower, upper in GROSS_RENT_BINS
+)
+
+CONTRACT_RENT_BINS_EARLY: tuple[tuple[str, float, float | None], ...] = tuple(
+    (column.replace("sae_gross_rent_", "sae_contract_rent_"), lower, upper)
+    for column, lower, upper in GROSS_RENT_BINS_EARLY
+)
+
+_RENT_BIN_LAYOUTS: dict[str, tuple[tuple[tuple[str, float, float | None], ...], ...]] = {
+    "gross_rent": (GROSS_RENT_BINS, GROSS_RENT_BINS_EARLY),
+    "contract_rent": (CONTRACT_RENT_BINS, CONTRACT_RENT_BINS_EARLY),
+}
+
 
 def _json_list(values: Iterable[str]) -> str:
     return json.dumps(sorted(set(values)))
@@ -1946,6 +1966,28 @@ def _quantile_from_bins(
     }
 
 
+def _select_rent_bins(
+    df: pd.DataFrame,
+    *,
+    family: Literal["gross_rent", "contract_rent"],
+) -> tuple[tuple[str, float, float | None], ...]:
+    """Select the rent-bin layout supported by an allocated SAE frame."""
+    for bins in _RENT_BIN_LAYOUTS[family]:
+        if all(column in df.columns for column, _, _ in bins):
+            return bins
+    supported_layouts = [
+        [column for column, _, _ in bins] for bins in _RENT_BIN_LAYOUTS[family]
+    ]
+    missing_by_layout = [
+        [column for column in columns if column not in df.columns]
+        for columns in supported_layouts
+    ]
+    raise ValueError(
+        f"SAE {family.replace('_', ' ')} distribution input is missing required columns "
+        f"for every supported rent-bin layout: {missing_by_layout}."
+    )
+
+
 def _normalize_county_key(series: pd.Series) -> pd.Series:
     return series.astype("string").str.zfill(5)
 
@@ -2375,7 +2417,7 @@ def derive_sae_distribution_measures(
 ) -> pd.DataFrame:
     """Derive median and quantile measures from allocated SAE distributions."""
     family_list = list(families)
-    unsupported = sorted(set(family_list) - {"household_income", "gross_rent"})
+    unsupported = sorted(set(family_list) - {"household_income", "gross_rent", "contract_rent"})
     if unsupported:
         raise ValueError(f"Unsupported SAE distribution measure families: {unsupported}.")
 
@@ -2412,11 +2454,12 @@ def derive_sae_distribution_measures(
         ]
 
     if "gross_rent" in family_list:
+        gross_rent_bins = _select_rent_bins(result, family="gross_rent")
         _require_columns(
             result,
             [
                 "sae_gross_rent_distribution_with_cash_rent",
-                *[column for column, _, _ in GROSS_RENT_BINS],
+                *[column for column, _, _ in gross_rent_bins],
             ],
             "SAE gross rent distribution input",
         )
@@ -2426,13 +2469,49 @@ def derive_sae_distribution_measures(
             value, diagnostic = _quantile_from_bins(
                 row,
                 total_column="sae_gross_rent_distribution_with_cash_rent",
-                bins=GROSS_RENT_BINS,
+                bins=gross_rent_bins,
                 quantile=0.50,
             )
             values.append(value)
+            diagnostic["bin_layout"] = (
+                "early_2000_plus"
+                if gross_rent_bins is GROSS_RENT_BINS_EARLY
+                else "modern_3500_plus"
+            )
             diagnostics.append(diagnostic)
         result["sae_gross_rent_median"] = pd.Series(values, dtype="Float64")
         result["sae_gross_rent_distribution_diagnostics"] = [
+            json.dumps(diagnostic, sort_keys=True) for diagnostic in diagnostics
+        ]
+
+    if "contract_rent" in family_list:
+        contract_rent_bins = _select_rent_bins(result, family="contract_rent")
+        _require_columns(
+            result,
+            [
+                "sae_contract_rent_distribution_with_cash_rent",
+                *[column for column, _, _ in contract_rent_bins],
+            ],
+            "SAE contract rent distribution input",
+        )
+        values = []
+        diagnostics = []
+        for _, row in result.iterrows():
+            value, diagnostic = _quantile_from_bins(
+                row,
+                total_column="sae_contract_rent_distribution_with_cash_rent",
+                bins=contract_rent_bins,
+                quantile=0.50,
+            )
+            values.append(value)
+            diagnostic["bin_layout"] = (
+                "early_2000_plus"
+                if contract_rent_bins is CONTRACT_RENT_BINS_EARLY
+                else "modern_3500_plus"
+            )
+            diagnostics.append(diagnostic)
+        result["sae_contract_rent_median"] = pd.Series(values, dtype="Float64")
+        result["sae_contract_rent_distribution_diagnostics"] = [
             json.dumps(diagnostic, sort_keys=True) for diagnostic in diagnostics
         ]
 
