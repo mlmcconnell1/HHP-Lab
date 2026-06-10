@@ -1,0 +1,73 @@
+# All non-island CoCs with PIT counts and ACS5 terminal-year contract rents,
+# 2010-2019, with rent measures stated in constant 2019 dollars.
+
+version: 1
+name: cocs_pit_contract_rent_2010_2019
+description: >
+  Build the all-CoC contract-rent panel for 2010-2019, excluding Puerto Rico
+  and island territories. Rent measures use ACS5 terminal-year values and are
+  stated in constant 2019 dollars using BLS CPI-U annual-average adjustment.
+  The materialized source panel contains median contract rent and first
+  quartile contract rent derived from ACS5 B25058/B25056, plus HUD PIT total,
+  sheltered, and unsheltered counts.
+
+universe:
+  range: "2010-2019"
+
+targets:
+  - id: coc_pit_contract_rent_panel
+    geometry: { type: coc, vintage: 2025, source: hud_exchange }
+    outputs: [panel]
+    panel_policy:
+      output_columns:
+        - coc_id
+        - coc_name
+        - year
+        - median_contract_rent_2019_dollars
+        - first_quartile_contract_rent_2019_dollars
+        - pit_total
+        - pit_sheltered
+        - pit_unsheltered
+        - acs5_vintage_used
+        - tract_vintage_used
+        - cpi_u_adjustment_factor
+
+datasets:
+  coc_pit_contract_rent_panel:
+    provider: census
+    product: acs5
+    version: 1
+    native_geometry: { type: coc, vintage: 2025, source: hud_exchange }
+    years: "2010-2019"
+    year_column: year
+    geo_column: coc_id
+    path: outputs/cocs_pit_contract_rent_2010_2019/cocs_pit_contract_rent_panel__Y2010-2019@B2025.parquet
+    params:
+      excluded_coc_prefixes: [AS, GU, MP, PR, VI]
+      rent_source: acs5_terminal_year_b25058_b25056
+      rent_dollars: constant_2019
+      cpi_source: data/curated/cpi/cpi_u__Aall.parquet
+
+pipelines:
+  - id: build_coc_pit_contract_rent_panel
+    target: coc_pit_contract_rent_panel
+    steps:
+      - resample:
+          dataset: coc_pit_contract_rent_panel
+          to_geometry: { type: coc, vintage: 2025, source: hud_exchange }
+          method: identity
+          measures:
+            median_contract_rent_2019_dollars: { aggregation: mean }
+            first_quartile_contract_rent_2019_dollars: { aggregation: mean }
+            pit_total: { aggregation: sum }
+            pit_sheltered: { aggregation: sum }
+            pit_unsheltered: { aggregation: sum }
+            cpi_u_adjustment_factor: { aggregation: mean }
+
+      - join:
+          datasets: [coc_pit_contract_rent_panel]
+          join_on: [geo_id, year]
+
+validation:
+  missing_dataset:
+    default: fail
