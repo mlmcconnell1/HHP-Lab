@@ -41,6 +41,36 @@ ERA_SPECIFIC_RENT_BIN_ROLLUP_CASES = {
     },
 }
 
+ROW_WISE_MEDIAN_DENOMINATOR_FALLBACK_CASES = {
+    "contract_rent": {
+        "median_column": "median_contract_rent",
+        "input": {
+            "median_contract_rent": [900.0, pd.NA],
+            "contract_rent_distribution_with_cash_rent": [pd.NA, 60.0],
+            "renter_households": [50.0, 80.0],
+        },
+        "expected": 900.0,
+    },
+    "gross_rent": {
+        "median_column": "median_gross_rent",
+        "input": {
+            "median_gross_rent": [1000.0, pd.NA],
+            "renter_households": [pd.NA, 60.0],
+            "total_population": [100.0, 200.0],
+        },
+        "expected": 1000.0,
+    },
+    "owner_value": {
+        "median_column": "median_owner_occupied_home_value",
+        "input": {
+            "median_owner_occupied_home_value": [100_000.0, pd.NA],
+            "owner_households": [pd.NA, 60.0],
+            "total_population": [100.0, 200.0],
+        },
+        "expected": 100_000.0,
+    },
+}
+
 
 class TestAggregateToCoC:
     """Tests for aggregate_to_coc function."""
@@ -440,6 +470,38 @@ class TestExpandedAcs5AggregationSemantics:
 
         assert row["median_contract_rent"] == pytest.approx((900 * 25 + 1900 * 75) / 100)
         assert row["coverage_median_contract_rent"] == pytest.approx(1.0)
+
+    @pytest.mark.parametrize(
+        ("case_name", "case"),
+        [
+            pytest.param(case_name, case, id=case_name)
+            for case_name, case in ROW_WISE_MEDIAN_DENOMINATOR_FALLBACK_CASES.items()
+        ],
+    )
+    def test_median_denominator_fallback_is_row_wise(self, case_name, case):
+        del case_name
+        median_column = case["median_column"]
+        acs_data = pd.DataFrame(
+            {
+                "GEOID": ["08001000100", "08001000200"],
+                "total_population": [100.0, 200.0],
+                **case["input"],
+            }
+        )
+        crosswalk = pd.DataFrame(
+            {
+                "tract_geoid": ["08001000100", "08001000200"],
+                "coc_id": ["CO-500", "CO-500"],
+                "area_share": [1.0, 1.0],
+                "intersection_area": [50.0, 50.0],
+            }
+        )
+
+        result = aggregate_to_coc(acs_data, crosswalk)
+        row = result.iloc[0]
+
+        assert row[median_column] == pytest.approx(case["expected"])
+        assert row[f"coverage_{median_column}"] == pytest.approx(0.5)
 
     def test_expanded_distribution_bins_roll_up_as_area_weighted_counts(self):
         acs_data = pd.DataFrame(

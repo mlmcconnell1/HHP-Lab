@@ -304,14 +304,15 @@ def _weighted_mean_denominator(
     overlap_weight: pd.Series,
 ) -> pd.Series:
     """Return the best available denominator weights for an averaged ACS estimate."""
+    resolved_weights = pd.Series(0.0, index=group.index)
     for denominator_column in AVERAGE_WEIGHT_DENOMINATORS.get(column, ("total_population",)):
         if denominator_column not in group.columns:
             continue
-        denominator = pd.to_numeric(group[denominator_column], errors="coerce").fillna(0)
-        weights = denominator * overlap_weight
-        if (weights > 0).any():
-            return weights
-    return pd.Series(0.0, index=group.index)
+        denominator = pd.to_numeric(group[denominator_column], errors="coerce")
+        weights = denominator.fillna(0) * overlap_weight
+        fill_mask = (resolved_weights <= 0) & (weights > 0)
+        resolved_weights.loc[fill_mask] = weights.loc[fill_mask]
+    return resolved_weights
 
 
 def aggregate_to_geo(
