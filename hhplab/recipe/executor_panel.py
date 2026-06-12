@@ -1179,6 +1179,7 @@ def _add_primary_msa_annotations(
         columns={
             "primary_msa_id": columns.msa_id,
             "primary_msa_name": columns.msa_name,
+            "primary_msa_population": columns.population,
             "primary_msa_overlap_basis": columns.overlap_basis,
             "primary_msa_coc_contained_percent": columns.contained_share,
         }
@@ -1190,6 +1191,7 @@ def _add_primary_msa_annotations(
     extras = [
         columns.msa_id,
         columns.msa_name,
+        columns.population,
         columns.overlap_basis,
         columns.contained_share,
         "primary_msa_covered_by_coc_percent",

@@ -52,6 +52,7 @@ CANONICAL_URBAN_OUTPUT_COLUMNS: tuple[str, ...] = (
     "population_density_per_sq_km",
     "primary_msa_id",
     "primary_msa_name",
+    "primary_msa_population",
     "primary_msa_overlap_basis",
     "primary_msa_coc_contained_percent",
     "primary_msa_covered_by_coc_percent",

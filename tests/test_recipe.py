@@ -2998,6 +2998,7 @@ class TestPanelPolicy:
                 "output_columns": {
                     "msa_id": "primary_msa_cbsa",
                     "msa_name": "primary_msa_title",
+                    "population": "primary_msa_population_total",
                     "contained_share": "primary_msa_share",
                     "overlap_basis": "primary_msa_basis",
                 },

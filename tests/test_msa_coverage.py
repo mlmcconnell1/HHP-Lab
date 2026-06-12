@@ -206,6 +206,7 @@ def test_select_primary_msa_area_basis_is_deterministic() -> None:
         "coc_id",
         "primary_msa_id",
         "primary_msa_name",
+        "primary_msa_population",
         "primary_msa_overlap_basis",
         "primary_msa_coc_contained_percent",
         "primary_msa_covered_by_coc_percent",
@@ -214,6 +215,7 @@ def test_select_primary_msa_area_basis_is_deterministic() -> None:
     row = primary[primary["coc_id"] == "CO-200"].iloc[0]
     assert row["primary_msa_id"] == "35620"
     assert row["primary_msa_name"] == "Left MSA"
+    assert pd.isna(row["primary_msa_population"])
     assert row["primary_msa_overlap_basis"] == "area"
     assert row["primary_msa_coc_contained_percent"] == pytest.approx(50.0)
     assert row["primary_msa_covered_by_coc_percent"] == pytest.approx(50.0)
@@ -226,6 +228,7 @@ def test_select_primary_msa_population_basis_can_differ_from_area() -> None:
 
     row = primary[primary["coc_id"] == "CO-200"].iloc[0]
     assert row["primary_msa_id"] == "35620"
+    assert row["primary_msa_population"] == pytest.approx(100.0)
     assert row["primary_msa_overlap_basis"] == "population"
     assert row["primary_msa_coc_contained_percent"] == pytest.approx(50.0)
     assert row["primary_msa_covered_by_coc_percent"] == pytest.approx(100.0)
@@ -242,6 +245,7 @@ def test_select_primary_msa_emits_null_rows_for_missing_overlap() -> None:
     row = primary[primary["coc_id"] == "CO-999"].iloc[0]
     assert pd.isna(row["primary_msa_id"])
     assert pd.isna(row["primary_msa_name"])
+    assert pd.isna(row["primary_msa_population"])
     assert pd.isna(row["primary_msa_overlap_basis"])
     assert pd.isna(row["primary_msa_coc_contained_percent"])
     assert pd.isna(row["primary_msa_covered_by_coc_percent"])

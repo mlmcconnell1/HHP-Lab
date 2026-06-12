@@ -57,6 +57,7 @@ Primary MSA output fields:
 |--------|---------|
 | `primary_msa_id` | Selected Census MSA / CBSA code, or null when no MSA overlaps the CoC. |
 | `primary_msa_name` | Display name from the requested MSA definition version. |
+| `primary_msa_population` | Selected MSA population when population-basis overlap is used; null for area-basis selection. |
 | `primary_msa_overlap_basis` | Basis used to select the MSA; `gte_95` uses 2020 decennial tract population and `gte_99` uses area. |
 | `primary_msa_coc_contained_percent` | Percent of the CoC overlap basis contained by the selected MSA. |
 | `primary_msa_covered_by_coc_percent` | Percent of the selected MSA overlap basis covered by the CoC. |

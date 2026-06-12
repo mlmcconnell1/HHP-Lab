@@ -249,6 +249,17 @@ def select_primary_msa_for_cocs(
 
     if "msa_name" not in rows.columns:
         rows["msa_name"] = pd.NA
+    if overlap_basis == "population" and "msa_denominator" in rows.columns:
+        rows["primary_msa_population"] = pd.to_numeric(
+            rows["msa_denominator"],
+            errors="coerce",
+        )
+    else:
+        rows["primary_msa_population"] = pd.Series(
+            pd.NA,
+            index=rows.index,
+            dtype="Float64",
+        )
     rows["primary_msa_overlap_basis"] = overlap_basis
     selected = (
         rows.sort_values(
@@ -291,6 +302,11 @@ def _empty_primary_msa_annotations(coc_ids: list[str]) -> pd.DataFrame:
     result = pd.DataFrame({"coc_id": coc_ids})
     result["primary_msa_id"] = pd.NA
     result["primary_msa_name"] = pd.NA
+    result["primary_msa_population"] = pd.Series(
+        pd.NA,
+        index=result.index,
+        dtype="Float64",
+    )
     result["primary_msa_overlap_basis"] = pd.NA
     result["primary_msa_coc_contained_percent"] = pd.Series(
         pd.NA,

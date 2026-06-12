@@ -299,6 +299,7 @@ def _primary_msa_recipe_dict(
                         "total_population",
                         "primary_msa_id",
                         "primary_msa_name",
+                        "primary_msa_population",
                         "primary_msa_overlap_basis",
                         "primary_msa_coc_contained_percent",
                         "primary_msa_covered_by_coc_percent",
@@ -523,6 +524,7 @@ class TestPrimaryMsaPanelPolicy:
             "total_population",
             "primary_msa_id",
             "primary_msa_name",
+            "primary_msa_population",
             "primary_msa_overlap_basis",
             "primary_msa_coc_contained_percent",
             "primary_msa_covered_by_coc_percent",
@@ -532,6 +534,7 @@ class TestPrimaryMsaPanelPolicy:
         coc1 = panel[panel["coc_id"] == "COC1"]
         assert set(coc1["primary_msa_id"]) == {"35620"}
         assert set(coc1["primary_msa_name"]) == {"New York MSA"}
+        assert coc1["primary_msa_population"].isna().all()
         assert set(coc1["primary_msa_overlap_basis"]) == {"area"}
         assert coc1["primary_msa_coc_contained_percent"].tolist() == [80.0, 80.0]
         assert coc1["primary_msa_covered_by_coc_percent"].isna().all()
@@ -572,6 +575,7 @@ class TestPrimaryMsaPanelPolicy:
         coc1 = panel[panel["coc_id"] == "COC1"]
         assert set(coc1["primary_msa_id"]) == {"41180"}
         assert set(coc1["primary_msa_name"]) == {"St. Louis MSA"}
+        assert coc1["primary_msa_population"].tolist() == [100.0, 100.0]
         assert set(coc1["primary_msa_overlap_basis"]) == {"population"}
         assert coc1["primary_msa_coc_contained_percent"].tolist() == [100.0, 100.0]
         assert coc1["primary_msa_covered_by_coc_percent"].tolist() == [100.0, 100.0]

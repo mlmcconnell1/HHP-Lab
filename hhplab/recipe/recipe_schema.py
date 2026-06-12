@@ -393,6 +393,10 @@ class PrimaryMsaAnnotationColumns(BaseModel):
         default="primary_msa_name",
         description="Output column containing the selected primary MSA display name.",
     )
+    population: str = Field(
+        default="primary_msa_population",
+        description="Output column containing the selected primary MSA population.",
+    )
     contained_share: str = Field(
         default="primary_msa_coc_contained_percent",
         description="Output column containing the CoC share contained in the primary MSA.",
@@ -407,6 +411,7 @@ class PrimaryMsaAnnotationColumns(BaseModel):
         values = [
             self.msa_id,
             self.msa_name,
+            self.population,
             self.contained_share,
             self.overlap_basis,
         ]
