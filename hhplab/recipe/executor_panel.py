@@ -1058,12 +1058,12 @@ def _read_primary_msa_population_overlap(
     allocated = xwalk.merge(population, on="tract_geoid", how="left")
     allocated["total_population"] = allocated["total_population"].fillna(0.0)
     allocated["allocated_population"] = allocated["total_population"] * allocated["area_share"]
-    allocated = allocated.merge(membership, on="county_fips", how="inner")
-    if allocated.empty:
+    pair_allocated = allocated.merge(membership, on="county_fips", how="inner")
+    if pair_allocated.empty:
         return pd.DataFrame(columns=["coc_id", "msa_id", "overlap_basis"]), artifacts
 
     pair = (
-        allocated.groupby(["coc_id", "msa_id"], as_index=False)["allocated_population"]
+        pair_allocated.groupby(["coc_id", "msa_id"], as_index=False)["allocated_population"]
         .sum()
         .rename(columns={"allocated_population": "intersection_value"})
     )
@@ -1072,10 +1072,13 @@ def _read_primary_msa_population_overlap(
         .sum()
         .rename(columns={"allocated_population": "coc_denominator"})
     )
+    msa_population = population.copy()
+    msa_population["county_fips"] = msa_population["tract_geoid"].str[:5]
     msa_denominator = (
-        allocated.groupby("msa_id", as_index=False)["allocated_population"]
+        msa_population.merge(membership, on="county_fips", how="inner")
+        .groupby("msa_id", as_index=False)["total_population"]
         .sum()
-        .rename(columns={"allocated_population": "msa_denominator"})
+        .rename(columns={"total_population": "msa_denominator"})
     )
     coverage = pair.merge(coc_denominator, on="coc_id", how="left").merge(
         msa_denominator,

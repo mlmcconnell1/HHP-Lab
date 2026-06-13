@@ -468,9 +468,9 @@ def _setup_primary_msa_population_fixtures(tmp_path: Path) -> None:
     acs_dir.mkdir(parents=True, exist_ok=True)
     pd.DataFrame(
         {
-            "GEOID": ["36061000100", "29510000100"],
-            "year": [2023, 2023],
-            "total_population": [0, 100],
+            "GEOID": ["36061000100", "29510000100", "29510000200"],
+            "year": [2023, 2023, 2023],
+            "total_population": [0, 100, 50],
         }
     ).to_parquet(acs_dir / "acs5_tracts__A2023xT2020.parquet")
 
@@ -478,10 +478,10 @@ def _setup_primary_msa_population_fixtures(tmp_path: Path) -> None:
     census_dir.mkdir(parents=True, exist_ok=True)
     pd.DataFrame(
         {
-            "tract_geoid": ["36061000100", "29510000100"],
-            "total_population": [0, 100],
-            "decennial_vintage": ["2020", "2020"],
-            "tract_vintage": ["2020", "2020"],
+            "tract_geoid": ["36061000100", "29510000100", "29510000200"],
+            "total_population": [0, 100, 50],
+            "decennial_vintage": ["2020", "2020", "2020"],
+            "tract_vintage": ["2020", "2020", "2020"],
         }
     ).to_parquet(census_dir / "decennial_tracts__N2020xT2020.parquet")
 
@@ -575,10 +575,13 @@ class TestPrimaryMsaPanelPolicy:
         coc1 = panel[panel["coc_id"] == "COC1"]
         assert set(coc1["primary_msa_id"]) == {"41180"}
         assert set(coc1["primary_msa_name"]) == {"St. Louis MSA"}
-        assert coc1["primary_msa_population"].tolist() == [100.0, 100.0]
+        assert coc1["primary_msa_population"].tolist() == [150.0, 150.0]
         assert set(coc1["primary_msa_overlap_basis"]) == {"population"}
         assert coc1["primary_msa_coc_contained_percent"].tolist() == [100.0, 100.0]
-        assert coc1["primary_msa_covered_by_coc_percent"].tolist() == [100.0, 100.0]
+        assert coc1["primary_msa_covered_by_coc_percent"].round(6).tolist() == [
+            66.666667,
+            66.666667,
+        ]
 
     def test_primary_msa_population_basis_accepts_decennial_population(
         self,
