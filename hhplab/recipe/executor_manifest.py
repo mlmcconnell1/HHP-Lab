@@ -20,6 +20,7 @@ from hhplab.naming import (
     geo_panel_filename,
     msa_coc_coverage_filename,
     msa_coc_panel_filename,
+    msa_fractional_rollup_filename,
 )
 from hhplab.recipe.executor_core import (
     ExecutionContext,
@@ -208,6 +209,25 @@ def _resolve_panel_output_file(
             end_year,
             target.msa_coc_panel.coc_boundary_vintage,
             target.msa_coc_panel.msa_definition_version,
+        )
+        return cfg.output_root / recipe_dir / filename
+
+    if target.msa_fractional_rollup is not None:
+        spec = target.msa_fractional_rollup
+        filename = msa_fractional_rollup_filename(
+            start_year,
+            end_year,
+            spec.naming.output_id or spec.naming.measure_set_id,
+            spec.allocation_basis,
+            spec.coc_boundary_vintage,
+            spec.msa_definition_version,
+            spec.county_vintage,
+            spec.block_vintage if spec.allocation_basis == "block_population" else None,
+            (
+                spec.decennial_population_vintage
+                if spec.allocation_basis == "block_population"
+                else None
+            ),
         )
         return cfg.output_root / recipe_dir / filename
 

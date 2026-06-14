@@ -25,10 +25,13 @@ import pyarrow.parquet as pq
 
 from hhplab.config import load_config
 from hhplab.msa.coverage import build_msa_coc_coverage, save_msa_coc_coverage
+from hhplab.msa.crosswalk import aggregate_coc_to_msa_fractional_rollup
 from hhplab.naming import (
     acs5_tracts_filename,
     coc_base_path,
     county_path,
+    msa_coc_block_population_xwalk_path,
+    msa_coc_xwalk_path,
     msa_county_membership_path,
     tract_path,
 )
@@ -52,17 +55,17 @@ from hhplab.recipe.executor_manifest import (
     _resolve_pipeline_target,
 )
 from hhplab.recipe.executor_msa_coc_panel import (
-    assemble_msa_coc_panel,
-    build_msa_coc_containment_spec,
     _collect_frame_records,
     _population_column,
     _source_year_frame,
+    assemble_msa_coc_panel,
+    build_msa_coc_containment_spec,
 )
 from hhplab.recipe.executor_panel import assemble_panel
 from hhplab.recipe.executor_panel_policies import collect_conformance_flags
 from hhplab.recipe.manifest import AssetRecord, write_manifest
 from hhplab.recipe.planner import ExecutionPlan
-from hhplab.recipe.recipe_schema import ContainmentSpec
+from hhplab.recipe.recipe_schema import ContainmentSpec, MsaFractionalRollupSpec
 from hhplab.recipe.schema_common import expand_year_spec
 
 
@@ -87,6 +90,8 @@ def persist_outputs(
         )
     if target.msa_coc_panel is not None:
         return persist_msa_coc_panel(plan, ctx)
+    if target.msa_fractional_rollup is not None:
+        return persist_msa_fractional_rollup(plan, ctx)
 
     assembled = assemble_panel(plan, ctx, step_kind="persist")
     if isinstance(assembled, StepResult):
@@ -252,6 +257,125 @@ def persist_outputs(
     return StepResult(step_kind="persist", detail=detail, success=True)
 
 
+def persist_msa_fractional_rollup(
+    plan: ExecutionPlan,
+    ctx: ExecutionContext,
+) -> StepResult:
+    """Build and persist a CoC-to-MSA fractional rollup panel."""
+    try:
+        _pipeline, target = _resolve_pipeline_target(ctx.recipe, plan.pipeline_id)
+        spec = target.msa_fractional_rollup
+        if spec is None:
+            raise ExecutorError(
+                f"Target '{target.id}' declares fractional rollup output without "
+                "msa_fractional_rollup."
+            )
+
+        source = _fractional_rollup_source_frame(plan, ctx, spec.provenance.source_dataset_id)
+        cfg = ctx.storage_config or load_config(project_root=ctx.project_root)
+        xwalk_file = _fractional_rollup_crosswalk_path(spec, cfg.asset_store_root)
+        if not xwalk_file.exists():
+            raise FileNotFoundError(
+                f"MSA fractional rollup crosswalk not found at {xwalk_file}. "
+                f"Run `hhplab generate msa-xwalk --allocation-basis {spec.allocation_basis} "
+                f"--boundary {spec.coc_boundary_vintage} "
+                f"--definition-version {spec.msa_definition_version} "
+                f"--counties {spec.county_vintage}` first."
+            )
+        _record_fractional_rollup_crosswalk_asset(ctx, xwalk_file)
+        xwalk = _read_parquet(xwalk_file, "MSA fractional rollup crosswalk")
+        rollup = aggregate_coc_to_msa_fractional_rollup(
+            source,
+            xwalk,
+            additive_measure_columns=spec.additive_measure_columns,
+            source_dataset_id=spec.provenance.source_dataset_id,
+            year_column=spec.provenance.source_year_column,
+            source_coc_id_column=spec.provenance.source_coc_id_column,
+            min_coc_population_containment_share=spec.min_coc_population_containment_share,
+            min_msa_population_coverage_share=spec.min_msa_population_coverage_share,
+            min_allocation_share=spec.min_allocation_share,
+        )
+        if spec.output_aliases:
+            rollup = rollup.rename(columns=dict(spec.output_aliases))
+
+        output_file = _resolve_panel_output_file(
+            ctx.recipe,
+            plan.pipeline_id,
+            ctx.project_root,
+            storage_config=ctx.storage_config,
+        )
+    except (ExecutorError, FileNotFoundError, ValueError, KeyError) as exc:
+        return StepResult(
+            step_kind="persist",
+            detail="persist msa fractional rollup",
+            success=False,
+            error=str(exc),
+        )
+
+    output_file.parent.mkdir(parents=True, exist_ok=True)
+    if output_file.exists() and output_file in getattr(ctx, "_written_outputs", set()):
+        return StepResult(
+            step_kind="persist",
+            detail="persist msa fractional rollup",
+            success=False,
+            error=(
+                f"Output collision: pipeline '{plan.pipeline_id}' resolves to "
+                f"'{output_file}' which was already written by another pipeline "
+                "in this recipe."
+            ),
+        )
+
+    try:
+        output_rel = str(output_file.relative_to(ctx.project_root))
+    except ValueError:
+        output_rel = str(output_file)
+
+    provenance = _build_provenance(ctx.recipe, plan.pipeline_id, ctx)
+    provenance["target_geometry"] = target.geometry.model_dump(mode="json")
+    provenance["msa_fractional_rollup"] = {
+        "row_grain": spec.row_grain,
+        "measure_set_id": spec.naming.measure_set_id,
+        "output_id": spec.naming.output_id,
+        "allocation_basis": spec.allocation_basis,
+        "denominator_source": spec.denominator_source,
+        "coc_boundary_vintage": str(spec.coc_boundary_vintage),
+        "msa_definition_version": spec.msa_definition_version,
+        "county_vintage": str(spec.county_vintage),
+        "block_vintage": str(spec.block_vintage),
+        "decennial_population_vintage": str(spec.decennial_population_vintage),
+        "additive_measure_columns": list(spec.additive_measure_columns),
+        "output_aliases": dict(spec.output_aliases),
+        "source_dataset_id": spec.provenance.source_dataset_id,
+        "source_measure_columns": list(spec.provenance.source_measure_columns),
+        "source_year_column": spec.provenance.source_year_column,
+        "source_coc_id_column": spec.provenance.source_coc_id_column,
+        "source_label": spec.provenance.source_label,
+        "row_count": len(rollup),
+    }
+
+    table = pa.Table.from_pandas(rollup)
+    metadata = table.schema.metadata or {}
+    metadata[b"hhplab_provenance"] = json.dumps(provenance).encode()
+    table = table.replace_schema_metadata(metadata)
+    pq.write_table(table, output_file)
+
+    if not hasattr(ctx, "_written_outputs"):
+        ctx._written_outputs = set()  # type: ignore[attr-defined]
+    ctx._written_outputs.add(output_file)  # type: ignore[attr-defined]
+
+    manifest = _build_manifest(
+        ctx.recipe,
+        plan.pipeline_id,
+        ctx,
+        output_path=output_rel,
+    )
+    write_manifest(manifest, output_file.with_suffix(".manifest.json"))
+
+    detail = f"persist msa fractional rollup: {len(rollup)} rows -> {output_rel}"
+    _echo(ctx, f"  [persist] {detail}")
+    return StepResult(step_kind="persist", detail=detail, success=True)
+
+
 def persist_msa_coc_panel(
     plan: ExecutionPlan,
     ctx: ExecutionContext,
@@ -334,6 +458,74 @@ def persist_msa_coc_panel(
     detail = f"persist msa-coc panel: {len(assembled.panel)} rows -> {output_rel}"
     _echo(ctx, f"  [persist] {detail}")
     return StepResult(step_kind="persist", detail=detail, success=True)
+
+
+def _fractional_rollup_source_frame(
+    plan: ExecutionPlan,
+    ctx: ExecutionContext,
+    source_dataset_id: str,
+) -> pd.DataFrame:
+    """Return the CoC-year source frame requested by an MSA fractional rollup."""
+    frames: list[pd.DataFrame] = []
+    universe_years = expand_year_spec(ctx.recipe.universe)
+
+    if plan.join_tasks:
+        for year in universe_years:
+            joined = ctx.intermediates.get(("__joined__", year))
+            if joined is not None:
+                frames.append(joined)
+    else:
+        for year in universe_years:
+            source = ctx.intermediates.get((source_dataset_id, year))
+            if source is not None:
+                frames.append(source)
+
+    if not frames:
+        raise ExecutorError(
+            "MSA fractional rollup could not find CoC-year source rows. "
+            f"Add resample/join steps that produce dataset '{source_dataset_id}' "
+            "at CoC-year grain before persistence."
+        )
+
+    source = pd.concat(frames, ignore_index=True)
+    if "coc_id" not in source.columns and "geo_id" in source.columns:
+        source = source.rename(columns={"geo_id": "coc_id"})
+    return source
+
+
+def _fractional_rollup_crosswalk_path(
+    spec: MsaFractionalRollupSpec,
+    data_root: Path,
+) -> Path:
+    if spec.allocation_basis == "block_population":
+        return msa_coc_block_population_xwalk_path(
+            spec.coc_boundary_vintage,
+            spec.msa_definition_version,
+            spec.county_vintage,
+            spec.block_vintage,
+            spec.decennial_population_vintage,
+            data_root,
+        )
+    return msa_coc_xwalk_path(
+        str(spec.coc_boundary_vintage),
+        spec.msa_definition_version,
+        spec.county_vintage,
+        data_root,
+    )
+
+
+def _record_fractional_rollup_crosswalk_asset(ctx: ExecutionContext, path: Path) -> None:
+    identity = ctx.cache.file_identity(path)
+    root, rel = _classify_path(path, ctx)
+    ctx.consumed_assets.append(
+        AssetRecord(
+            role="crosswalk",
+            path=rel,
+            sha256=identity.sha256,
+            size=identity.size,
+            root=root,
+        )
+    )
 
 
 def persist_diagnostics(

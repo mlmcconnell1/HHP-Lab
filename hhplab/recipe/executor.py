@@ -48,7 +48,7 @@ from hhplab.recipe.executor_manifest import (
     _recipe_output_dirname,
     _resolve_containment_output_file,
     _resolve_map_output_file,
-    _resolve_msa_coc_coverage_output_file,
+    _resolve_msa_coc_coverage_output_file,  # noqa: F401
     _resolve_panel_output_file,
     _resolve_pipeline_target,
     _target_geometry_metadata,
@@ -76,10 +76,10 @@ from hhplab.recipe.executor_persistence import (
     persist_containment as _persist_containment,
 )
 from hhplab.recipe.executor_persistence import (
-    persist_msa_coc_coverage as _persist_msa_coc_coverage,
+    persist_diagnostics as _persist_diagnostics,
 )
 from hhplab.recipe.executor_persistence import (
-    persist_diagnostics as _persist_diagnostics,
+    persist_msa_coc_coverage as _persist_msa_coc_coverage,
 )
 from hhplab.recipe.executor_persistence import (
     persist_outputs as _persist_outputs,
@@ -1012,7 +1012,10 @@ def _execute_plan(
     declared_outputs = target.outputs if target is not None else ["panel"]
 
     has_msa_coc_panel = target is not None and target.msa_coc_panel is not None
-    if plan.join_tasks or has_msa_coc_panel:
+    has_msa_fractional_rollup = (
+        target is not None and target.msa_fractional_rollup is not None
+    )
+    if plan.join_tasks or has_msa_coc_panel or has_msa_fractional_rollup:
         if "panel" in declared_outputs:
             step = _persist_outputs(plan, ctx)
             result.steps.append(step)

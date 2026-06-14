@@ -20,7 +20,12 @@ import pyarrow.parquet as pq
 import pytest
 from shapely.geometry import box
 
-from hhplab.naming import coc_base_path, county_path, msa_county_membership_path
+from hhplab.naming import (
+    coc_base_path,
+    county_path,
+    msa_coc_block_population_xwalk_path,
+    msa_county_membership_path,
+)
 from hhplab.recipe.executor import execute_recipe
 from hhplab.recipe.executor_containment import (
     ALBERS_EQUAL_AREA_CRS,
@@ -37,7 +42,7 @@ from hhplab.recipe.executor_msa_coc_panel import (
 from hhplab.recipe.loader import load_recipe
 from hhplab.recipe.manifest import read_manifest
 from hhplab.recipe.recipe_schema import ContainmentSpec, MsaCocPanelSpec
-from hhplab.schema.columns import MSA_COC_PANEL_COLUMNS
+from hhplab.schema.columns import MSA_COC_PANEL_COLUMNS, MSA_FRACTIONAL_ROLLUP_COLUMNS
 
 CRS = ALBERS_EQUAL_AREA_CRS
 COUNTY_FIXTURES = {
@@ -53,6 +58,34 @@ MSA_MEMBERSHIP = pd.DataFrame(
         "msa_id": ["MSA-1"],
         "cbsa_code": ["MSA-1"],
         "county_fips": ["001"],
+    }
+)
+MSA_FRACTIONAL_ROLLUP_XWALK = pd.DataFrame(
+    {
+        "coc_id": ["COC-A", "COC-B", "COC-B"],
+        "msa_id": ["MSA-1", "MSA-1", "MSA-2"],
+        "cbsa_code": ["MSA-1", "MSA-1", "MSA-2"],
+        "boundary_vintage": ["2025", "2025", "2025"],
+        "county_vintage": ["2023", "2023", "2023"],
+        "block_vintage": ["2020", "2020", "2020"],
+        "decennial_vintage": ["2020", "2020", "2020"],
+        "definition_version": ["test_msa_v1", "test_msa_v1", "test_msa_v1"],
+        "allocation_method": ["block_population", "block_population", "block_population"],
+        "share_column": ["allocation_share", "allocation_share", "allocation_share"],
+        "share_denominator": ["coc_population", "coc_population", "coc_population"],
+        "allocation_share": [0.75, 0.5, 0.5],
+        "intersection_population": [75.0, 50.0, 50.0],
+        "coc_population_denominator": [100.0, 100.0, 100.0],
+        "msa_population_denominator": [125.0, 125.0, 50.0],
+        "coc_population_containment_share": [0.75, 0.5, 0.5],
+        "msa_population_coverage_share": [0.6, 0.4, 1.0],
+        "intersection_area": [75.0, 50.0, 50.0],
+        "coc_intersection_area": [75.0, 50.0, 50.0],
+        "msa_intersection_area": [75.0, 50.0, 50.0],
+        "block_count": [3, 2, 2],
+        "missing_population_block_count": [0, 0, 0],
+        "zero_population_coc": [False, False, False],
+        "partial_coc_population_coverage": [False, False, False],
     }
 )
 
@@ -852,6 +885,156 @@ def test_execute_recipe_persists_msa_coc_panel_output(tmp_path) -> None:
     assert provenance["msa_coc_panel"]["selected_msa_ids"] == ["MSA-1"]
     assert provenance["msa_coc_panel"]["msa_population_source"] == "acs5"
     assert provenance["msa_coc_panel"]["unemployment_source"] == "acs5"
+
+
+def test_execute_recipe_persists_msa_fractional_rollup_output(tmp_path) -> None:
+    pit_file = tmp_path / "data" / "pit.parquet"
+    xwalk_file = msa_coc_block_population_xwalk_path(
+        2025,
+        "test_msa_v1",
+        2023,
+        2020,
+        2020,
+        tmp_path / "data",
+    )
+    pit_file.parent.mkdir(parents=True, exist_ok=True)
+    xwalk_file.parent.mkdir(parents=True, exist_ok=True)
+    pd.DataFrame(
+        {
+            "coc_id": ["COC-A", "COC-B", "COC-A", "COC-B"],
+            "year": [2020, 2020, 2021, 2021],
+            "pit_total": [42.0, 8.0, 46.0, 10.0],
+            "pit_sheltered": [40.0, 6.0, 43.0, 7.0],
+            "pit_unsheltered": [2.0, 2.0, 3.0, 3.0],
+        }
+    ).to_parquet(pit_file)
+    MSA_FRACTIONAL_ROLLUP_XWALK.to_parquet(xwalk_file)
+
+    recipe = load_recipe(
+        {
+            "version": 1,
+            "name": "msa-fractional-rollup-executor-test",
+            "universe": {"years": [2020, 2021]},
+            "targets": [
+                {
+                    "id": "msa_pit_rollup",
+                    "geometry": {"type": "msa", "source": "test_msa_v1", "vintage": 2023},
+                    "outputs": ["panel"],
+                    "msa_fractional_rollup": {
+                        "allocation_basis": "block_population",
+                        "denominator_source": "pl_94_171_block_population",
+                        "coc_boundary_vintage": 2025,
+                        "msa_definition_version": "test_msa_v1",
+                        "county_vintage": 2023,
+                        "block_vintage": 2020,
+                        "decennial_population_vintage": 2020,
+                        "additive_measure_columns": [
+                            "pit_total",
+                            "pit_sheltered",
+                            "pit_unsheltered",
+                        ],
+                        "min_allocation_share": 0.01,
+                        "output_aliases": {
+                            "pit_total": "msa_pit_total",
+                            "pit_sheltered": "msa_pit_sheltered",
+                        },
+                        "naming": {
+                            "measure_set_id": "pit",
+                            "output_id": "january_pit",
+                        },
+                        "provenance": {
+                            "source_dataset_id": "pit",
+                            "source_measure_columns": [
+                                "pit_total",
+                                "pit_sheltered",
+                                "pit_unsheltered",
+                            ],
+                            "source_year_column": "year",
+                            "source_coc_id_column": "coc_id",
+                            "source_label": "hud_pit_fractional_msa_rollup",
+                        },
+                    },
+                }
+            ],
+            "datasets": {
+                "pit": {
+                    "provider": "hud",
+                    "product": "pit",
+                    "version": 1,
+                    "native_geometry": {"type": "coc"},
+                    "path": "data/pit.parquet",
+                    "years": {"years": [2020, 2021]},
+                    "geo_column": "coc_id",
+                },
+            },
+            "transforms": [],
+            "pipelines": [
+                {
+                    "id": "main",
+                    "target": "msa_pit_rollup",
+                    "steps": [
+                        {
+                            "resample": {
+                                "dataset": "pit",
+                                "to_geometry": {"type": "coc", "vintage": 2025},
+                                "method": "identity",
+                                "measures": [
+                                    "pit_total",
+                                    "pit_sheltered",
+                                    "pit_unsheltered",
+                                ],
+                            }
+                        },
+                    ],
+                }
+            ],
+        }
+    )
+
+    results = execute_recipe(recipe, project_root=tmp_path, quiet=True)
+
+    assert results[0].success
+    assert results[0].steps[-1].step_kind == "persist"
+    artifacts = resolve_pipeline_artifacts(recipe, "main", project_root=tmp_path)
+    panel_path = tmp_path / artifacts["panel_path"]
+    assert (
+        panel_path.name
+        == "panel__msa-rollup-januarypit__Y2020-2021__basis-block-population"
+        "@B2025xMtestmsav1xC2023xK2020xN2020.parquet"
+    )
+    panel = pd.read_parquet(panel_path).sort_values(["msa_id", "year"]).reset_index(drop=True)
+    assert list(panel.columns[: len(MSA_FRACTIONAL_ROLLUP_COLUMNS)]) == list(
+        MSA_FRACTIONAL_ROLLUP_COLUMNS
+    )
+    assert panel[["msa_id", "year"]].to_dict(orient="records") == [
+        {"msa_id": "MSA-1", "year": 2020},
+        {"msa_id": "MSA-1", "year": 2021},
+        {"msa_id": "MSA-2", "year": 2020},
+        {"msa_id": "MSA-2", "year": 2021},
+    ]
+    assert panel["msa_pit_total"].tolist() == pytest.approx([35.5, 39.5, 4.0, 5.0])
+    assert panel["msa_pit_sheltered"].tolist() == pytest.approx([33.0, 35.75, 3.0, 3.5])
+    assert panel["pit_unsheltered"].tolist() == pytest.approx([2.5, 3.75, 1.0, 1.5])
+    assert panel["allocation_basis"].unique().tolist() == ["block_population"]
+    assert panel["denominator_source"].unique().tolist() == ["pl_94_171_block_population"]
+    assert panel["source_dataset_id"].unique().tolist() == ["pit"]
+    assert panel["min_allocation_share"].dropna().unique().tolist() == [0.01]
+
+    manifest = read_manifest(panel_path.with_suffix(".manifest.json"))
+    assert manifest.output_path == artifacts["panel_path"]
+    assert any(
+        asset.role == "crosswalk" and "basis-block_population" in asset.path
+        for asset in manifest.assets
+    )
+
+    metadata = pq.read_metadata(panel_path).metadata or {}
+    provenance = json.loads(metadata[b"hhplab_provenance"])
+    rollup_provenance = provenance["msa_fractional_rollup"]
+    assert rollup_provenance["row_grain"] == "msa_id x year"
+    assert rollup_provenance["measure_set_id"] == "pit"
+    assert rollup_provenance["output_id"] == "january_pit"
+    assert rollup_provenance["source_label"] == "hud_pit_fractional_msa_rollup"
+    assert rollup_provenance["row_count"] == 4
 
 
 def test_execute_recipe_target_selector_filters_panel_rows(tmp_path) -> None:
