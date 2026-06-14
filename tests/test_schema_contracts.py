@@ -65,6 +65,8 @@ from hhplab.schema import (
     MSA_COC_COVERAGE_CONTRACT,
     MSA_COC_PANEL_COLUMNS,
     MSA_COC_PANEL_CONTRACT,
+    MSA_FRACTIONAL_ROLLUP_COLUMNS,
+    MSA_FRACTIONAL_ROLLUP_CONTRACT,
     PL_BLOCK_POPULATION_COLUMNS,
     PL_BLOCK_POPULATION_CONTRACT,
     SAE_OUTPUT_CONTRACT,
@@ -205,6 +207,37 @@ MSA_COC_COVERAGE_COMPLETE_ROW = {
     "top_n": 100,
     "ranking_population_source": "pep",
     "ranking_reference_year": 2024,
+}
+
+MSA_FRACTIONAL_ROLLUP_COMPLETE_ROW = {
+    "msa_id": "35620",
+    "year": 2024,
+    "source_dataset_id": "pit_coc",
+    "source_geo_type": "coc",
+    "source_additive_measure_columns": "pit_total,pit_sheltered,pit_unsheltered",
+    "native_msa_covariate_columns": "msa_population",
+    "allocation_basis": "block_population",
+    "denominator_source": "pl_94_171_block_population",
+    "boundary_vintage": "2025",
+    "county_vintage": "2023",
+    "block_vintage": "2020",
+    "decennial_vintage": "2020",
+    "msa_definition_version": "census_msa_2023",
+    "coc_count": 12,
+    "covered_coc_count": 11,
+    "missing_coc_count": 1,
+    "zero_population_coc_count": 0,
+    "missing_population_block_count": 3,
+    "min_coc_population_containment_share": 0.5,
+    "min_msa_population_coverage_share": 0.9,
+    "min_allocation_share": 0.01,
+    "coc_population_coverage_ratio": 0.98,
+    "msa_population_coverage_ratio": 0.95,
+    "allocation_share_sum": 1.0,
+    "source": "msa_fractional_rollup",
+    "pit_total": 88025.0,
+    "pit_sheltered": 83169.0,
+    "pit_unsheltered": 4856.0,
 }
 
 URBAN_CONTRACT_CASES = {
@@ -527,6 +560,14 @@ def test_msa_coc_coverage_contract_declares_output_columns() -> None:
     assert ARTIFACT_CONTRACTS["msa_coc_coverage"] is MSA_COC_COVERAGE_CONTRACT
 
 
+def test_msa_fractional_rollup_contract_declares_output_columns() -> None:
+    assert tuple(MSA_FRACTIONAL_ROLLUP_COLUMNS) == (
+        MSA_FRACTIONAL_ROLLUP_CONTRACT.required_columns
+    )
+    assert MSA_FRACTIONAL_ROLLUP_CONTRACT.name == "msa_fractional_rollup"
+    assert ARTIFACT_CONTRACTS["msa_fractional_rollup"] is MSA_FRACTIONAL_ROLLUP_CONTRACT
+
+
 @pytest.mark.parametrize("case_name", list(URBAN_CONTRACT_CASES), ids=list(URBAN_CONTRACT_CASES))
 def test_urban_contracts_declare_output_columns(case_name: str) -> None:
     contract, columns, _row, _missing_column = URBAN_CONTRACT_CASES[case_name]
@@ -563,6 +604,47 @@ def test_validate_msa_coc_coverage_contract_passes_for_complete_artifact() -> No
     )
 
     assert findings == []
+
+
+def test_validate_msa_fractional_rollup_contract_passes_for_complete_artifact() -> None:
+    findings = validate_artifact_contract(
+        pd.DataFrame([MSA_FRACTIONAL_ROLLUP_COMPLETE_ROW]),
+        MSA_FRACTIONAL_ROLLUP_CONTRACT,
+    )
+
+    assert findings == []
+
+
+@pytest.mark.parametrize(
+    "missing_column",
+    [
+        "source_additive_measure_columns",
+        "native_msa_covariate_columns",
+        "allocation_basis",
+        "denominator_source",
+        "boundary_vintage",
+        "county_vintage",
+        "block_vintage",
+        "decennial_vintage",
+        "msa_definition_version",
+        "coc_population_coverage_ratio",
+        "msa_population_coverage_ratio",
+        "min_coc_population_containment_share",
+    ],
+)
+def test_validate_msa_fractional_rollup_contract_reports_missing_columns(
+    missing_column: str,
+) -> None:
+    row = dict(MSA_FRACTIONAL_ROLLUP_COMPLETE_ROW)
+    del row[missing_column]
+
+    findings = validate_artifact_contract(
+        pd.DataFrame([row]),
+        MSA_FRACTIONAL_ROLLUP_CONTRACT,
+    )
+
+    assert [finding.code for finding in findings] == ["missing_required_column"]
+    assert findings[0].column == missing_column
 
 
 @pytest.mark.parametrize(

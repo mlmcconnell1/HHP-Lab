@@ -11,6 +11,7 @@ from hhplab.provenance import (
     PROVENANCE_KEY,
     ProvenanceBlock,
     has_provenance,
+    msa_fractional_rollup_provenance,
     read_provenance,
     write_parquet_with_provenance,
 )
@@ -164,6 +165,48 @@ class TestGenerateNotation:
             acs_vintage=acs, boundary_vintage=boundary, tract_vintage=tract
         )
         assert block.generate_notation() is None
+
+
+def test_msa_fractional_rollup_provenance_declares_required_metadata():
+    block = msa_fractional_rollup_provenance(
+        allocation_basis="block_population",
+        denominator_source="pl_94_171_block_population",
+        boundary_vintage=2025,
+        county_vintage=2023,
+        block_vintage=2020,
+        decennial_vintage=2020,
+        msa_definition_version="census_msa_2023",
+        source_dataset_id="pit_coc",
+        source_additive_measure_columns=("pit_total", "pit_sheltered"),
+        native_msa_covariate_columns=("msa_population",),
+        min_coc_population_containment_share=0.5,
+        min_msa_population_coverage_share=0.9,
+        min_allocation_share=0.01,
+        input_artifacts={"crosswalk": "data/curated/xwalks/example.parquet"},
+    )
+
+    assert block.boundary_vintage == "2025"
+    assert block.county_vintage == "2023"
+    assert block.geo_type == "msa"
+    assert block.definition_version == "census_msa_2023"
+    assert block.weighting == "block_population"
+    assert block.extra["dataset_type"] == "msa_fractional_rollup"
+    assert block.extra["row_grain"] == "msa_id x year"
+    assert block.extra["allocation_basis"] == "block_population"
+    assert block.extra["denominator_source"] == "pl_94_171_block_population"
+    assert block.extra["block_vintage"] == "2020"
+    assert block.extra["decennial_vintage"] == "2020"
+    assert block.extra["source_dataset_id"] == "pit_coc"
+    assert block.extra["source_additive_measure_columns"] == ["pit_total", "pit_sheltered"]
+    assert block.extra["native_msa_covariate_columns"] == ["msa_population"]
+    assert block.extra["thresholds"] == {
+        "min_coc_population_containment_share": 0.5,
+        "min_msa_population_coverage_share": 0.9,
+        "min_allocation_share": 0.01,
+    }
+    assert block.extra["input_artifacts"] == {
+        "crosswalk": "data/curated/xwalks/example.parquet"
+    }
 
 
 # ── Parquet round-trip ───────────────────────────────────────────────────────

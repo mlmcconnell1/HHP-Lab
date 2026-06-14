@@ -720,6 +720,34 @@ MSA_COC_COVERAGE_COLUMNS: tuple[str, ...] = (
     "ranking_reference_year",
 )
 
+MSA_FRACTIONAL_ROLLUP_COLUMNS: tuple[str, ...] = (
+    "msa_id",
+    "year",
+    "source_dataset_id",
+    "source_geo_type",
+    "source_additive_measure_columns",
+    "native_msa_covariate_columns",
+    "allocation_basis",
+    "denominator_source",
+    "boundary_vintage",
+    "county_vintage",
+    "block_vintage",
+    "decennial_vintage",
+    "msa_definition_version",
+    "coc_count",
+    "covered_coc_count",
+    "missing_coc_count",
+    "zero_population_coc_count",
+    "missing_population_block_count",
+    "min_coc_population_containment_share",
+    "min_msa_population_coverage_share",
+    "min_allocation_share",
+    "coc_population_coverage_ratio",
+    "msa_population_coverage_ratio",
+    "allocation_share_sum",
+    "source",
+)
+
 PRIMARY_MSA_ANNOTATION_COLUMNS: tuple[str, ...] = (
     "coc_id",
     "primary_msa_id",

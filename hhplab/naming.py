@@ -1136,6 +1136,41 @@ def panel_path(
     return base_dir / "curated" / "panel" / panel_filename(start_year, end_year, boundary_vintage)
 
 
+def msa_fractional_rollup_path(
+    start_year: int,
+    end_year: int,
+    measure_set_id: str,
+    allocation_basis: str,
+    coc_boundary_vintage: str | int,
+    msa_definition_version: str,
+    county_vintage: str | int,
+    block_vintage: str | int | None = None,
+    decennial_vintage: str | int | None = None,
+    base_dir: Path | str | None = None,
+) -> Path:
+    """Get canonical path for a CoC-to-MSA fractional rollup panel."""
+    if base_dir is None:
+        base_dir = Path("data")
+    else:
+        base_dir = Path(base_dir)
+    return (
+        base_dir
+        / "curated"
+        / "panel"
+        / msa_fractional_rollup_filename(
+            start_year,
+            end_year,
+            measure_set_id,
+            allocation_basis,
+            coc_boundary_vintage,
+            msa_definition_version,
+            county_vintage,
+            block_vintage,
+            decennial_vintage,
+        )
+    )
+
+
 def county_weights_path(
     acs_vintage: str,
     weighting: str,
@@ -1315,6 +1350,36 @@ def msa_coc_panel_filename(
     """
     defn = _normalize_definition_version(msa_definition_version)
     return f"panel__msa-coc__Y{start_year}-{end_year}@B{coc_boundary_vintage}xM{defn}.parquet"
+
+
+def msa_fractional_rollup_filename(
+    start_year: int,
+    end_year: int,
+    measure_set_id: str,
+    allocation_basis: str,
+    coc_boundary_vintage: str | int,
+    msa_definition_version: str,
+    county_vintage: str | int,
+    block_vintage: str | int | None = None,
+    decennial_vintage: str | int | None = None,
+) -> str:
+    """Generate filename for CoC-to-MSA fractional rollup panels.
+
+    Pattern:
+    ``panel__msa-rollup-{measures}__Y{start}-{end}__basis-{basis}@B{boundary}xM{def}xC{county}[xK{block}xN{decennial}].parquet``
+    """
+    defn = _normalize_definition_version(msa_definition_version)
+    measure_token = _normalize_definition_version(measure_set_id)
+    basis_token = allocation_basis.replace("_", "-")
+    suffix = f"@B{coc_boundary_vintage}xM{defn}xC{county_vintage}"
+    if block_vintage is not None:
+        suffix += f"xK{block_vintage}"
+    if decennial_vintage is not None:
+        suffix += f"xN{decennial_vintage}"
+    return (
+        f"panel__msa-rollup-{measure_token}__Y{start_year}-{end_year}"
+        f"__basis-{basis_token}{suffix}.parquet"
+    )
 
 
 def metro_pit_filename(

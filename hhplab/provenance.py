@@ -167,6 +167,52 @@ class ProvenanceBlock:
         return cls.from_dict(json.loads(json_str))
 
 
+def msa_fractional_rollup_provenance(
+    *,
+    allocation_basis: str,
+    denominator_source: str,
+    boundary_vintage: str | int,
+    county_vintage: str | int,
+    msa_definition_version: str,
+    source_dataset_id: str,
+    source_additive_measure_columns: list[str] | tuple[str, ...],
+    native_msa_covariate_columns: list[str] | tuple[str, ...] = (),
+    block_vintage: str | int | None = None,
+    decennial_vintage: str | int | None = None,
+    min_coc_population_containment_share: float | None = None,
+    min_msa_population_coverage_share: float | None = None,
+    min_allocation_share: float | None = None,
+    input_artifacts: dict[str, str] | None = None,
+) -> ProvenanceBlock:
+    """Build canonical provenance for CoC-to-MSA fractional rollup outputs."""
+    return ProvenanceBlock(
+        boundary_vintage=str(boundary_vintage),
+        county_vintage=str(county_vintage),
+        geo_type="msa",
+        definition_version=msa_definition_version,
+        weighting=allocation_basis,
+        extra={
+            "dataset_type": "msa_fractional_rollup",
+            "row_grain": "msa_id x year",
+            "allocation_basis": allocation_basis,
+            "denominator_source": denominator_source,
+            "block_vintage": str(block_vintage) if block_vintage is not None else None,
+            "decennial_vintage": (
+                str(decennial_vintage) if decennial_vintage is not None else None
+            ),
+            "source_dataset_id": source_dataset_id,
+            "source_additive_measure_columns": list(source_additive_measure_columns),
+            "native_msa_covariate_columns": list(native_msa_covariate_columns),
+            "thresholds": {
+                "min_coc_population_containment_share": min_coc_population_containment_share,
+                "min_msa_population_coverage_share": min_msa_population_coverage_share,
+                "min_allocation_share": min_allocation_share,
+            },
+            "input_artifacts": input_artifacts or {},
+        },
+    )
+
+
 def write_parquet_with_provenance(
     df: pd.DataFrame,
     path: Path | str,

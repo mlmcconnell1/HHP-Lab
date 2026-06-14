@@ -19,6 +19,8 @@ from hhplab.naming import (
     msa_county_membership_path,
     msa_definitions_filename,
     msa_definitions_path,
+    msa_fractional_rollup_filename,
+    msa_fractional_rollup_path,
     msa_pit_filename,
     pl_block_population_filename,
     pl_block_population_path,
@@ -146,6 +148,44 @@ def test_msa_coc_coverage_path():
         "data/curated/msa/"
         "msa_coc_coverage__Y2024@B2025xMcensus_msa_2023xC2023"
         "__top100__basis-area-population.parquet"
+    )
+
+
+def test_msa_fractional_rollup_filename():
+    assert (
+        msa_fractional_rollup_filename(
+            2020,
+            2024,
+            "pit",
+            "block_population",
+            2025,
+            "census_msa_2023",
+            2023,
+            2020,
+            2020,
+        )
+        == (
+            "panel__msa-rollup-pit__Y2020-2024__basis-block-population"
+            "@B2025xMcensusmsa2023xC2023xK2020xN2020.parquet"
+        )
+    )
+
+
+def test_msa_fractional_rollup_path():
+    assert str(
+        msa_fractional_rollup_path(
+            2020,
+            2024,
+            "pit",
+            "area",
+            2025,
+            "census_msa_2023",
+            2023,
+        )
+    ).endswith(
+        "data/curated/panel/"
+        "panel__msa-rollup-pit__Y2020-2024__basis-area"
+        "@B2025xMcensusmsa2023xC2023.parquet"
     )
 
 

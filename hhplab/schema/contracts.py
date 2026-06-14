@@ -17,6 +17,7 @@ from hhplab.schema.columns import (
     LAUS_METRO_OUTPUT_COLUMNS,
     MSA_COC_COVERAGE_COLUMNS,
     MSA_COC_PANEL_COLUMNS,
+    MSA_FRACTIONAL_ROLLUP_COLUMNS,
     PEP_COUNTY_OUTPUT_COLUMNS,
     PIT_CANONICAL_COLUMNS,
     PL_BLOCK_POPULATION_COLUMNS,
@@ -89,6 +90,12 @@ MSA_COC_PANEL_CONTRACT = ArtifactContract(
 MSA_COC_COVERAGE_CONTRACT = ArtifactContract(
     name="msa_coc_coverage",
     required_columns=tuple(MSA_COC_COVERAGE_COLUMNS),
+    drift_prone_columns=(),
+)
+
+MSA_FRACTIONAL_ROLLUP_CONTRACT = ArtifactContract(
+    name="msa_fractional_rollup",
+    required_columns=tuple(MSA_FRACTIONAL_ROLLUP_COLUMNS),
     drift_prone_columns=(),
 )
 
@@ -185,6 +192,7 @@ ARTIFACT_CONTRACTS: dict[str, ArtifactContract] = {
         LAUS_METRO_CONTRACT,
         MSA_COC_COVERAGE_CONTRACT,
         MSA_COC_PANEL_CONTRACT,
+        MSA_FRACTIONAL_ROLLUP_CONTRACT,
         PEP_COUNTY_CONTRACT,
         PIT_CONTRACT,
         BLOCK_GEOMETRY_CONTRACT,
