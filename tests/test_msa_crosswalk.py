@@ -339,6 +339,65 @@ def test_fractional_rollup_thresholds_filter_crosswalk_rows(
     assert "CO-200" not in set(result["missing_cocs"].str.split(",").sum())
 
 
+def test_block_population_rollup_matches_area_when_allocation_shares_match(
+    coc_msa_crosswalk: pd.DataFrame,
+):
+    source = pd.DataFrame(
+        {
+            "coc_id": ["CO-100", "CO-200", "CO-300", "CO-400"],
+            "year": [2020, 2020, 2020, 2020],
+            "pit_total": [100.0, 80.0, 60.0, 40.0],
+        }
+    )
+    block_like_crosswalk = coc_msa_crosswalk.copy()
+    block_like_crosswalk["block_vintage"] = "2020"
+    block_like_crosswalk["decennial_vintage"] = "2020"
+    block_like_crosswalk["allocation_method"] = "block_population"
+    block_like_crosswalk["share_denominator"] = "coc_population_denominator"
+    block_like_crosswalk["intersection_population"] = (
+        block_like_crosswalk["allocation_share"] * 100.0
+    )
+    block_like_crosswalk["coc_population_denominator"] = 100.0
+    block_like_crosswalk["msa_population_denominator"] = 100.0
+    block_like_crosswalk["coc_population_containment_share"] = block_like_crosswalk[
+        "allocation_share"
+    ]
+    block_like_crosswalk["msa_population_coverage_share"] = block_like_crosswalk[
+        "allocation_share"
+    ]
+    block_like_crosswalk["coc_intersection_area"] = block_like_crosswalk["intersection_area"]
+    block_like_crosswalk["msa_intersection_area"] = block_like_crosswalk["intersection_area"]
+    block_like_crosswalk["block_count"] = 1
+    block_like_crosswalk["missing_population_block_count"] = 0
+    block_like_crosswalk["zero_population_coc"] = False
+    block_like_crosswalk["partial_coc_population_coverage"] = False
+    block_like_crosswalk = block_like_crosswalk.loc[
+        :,
+        COC_MSA_BLOCK_POPULATION_CROSSWALK_COLUMNS,
+    ]
+
+    area = aggregate_coc_to_msa_fractional_rollup(
+        source,
+        coc_msa_crosswalk,
+        additive_measure_columns=("pit_total",),
+        source_dataset_id="pit_coc",
+    )
+    block_population = aggregate_coc_to_msa_fractional_rollup(
+        source,
+        block_like_crosswalk,
+        additive_measure_columns=("pit_total",),
+        source_dataset_id="pit_coc",
+    )
+
+    area_values = area[["msa_id", "year", "pit_total"]].reset_index(drop=True)
+    block_values = block_population[["msa_id", "year", "pit_total"]].reset_index(drop=True)
+    pd.testing.assert_frame_equal(block_values, area_values)
+    assert block_population["allocation_basis"].unique().tolist() == ["block_population"]
+    assert block_population["denominator_source"].unique().tolist() == [
+        "pl_94_171_block_population"
+    ]
+
+
 @pytest.fixture
 def block_population_crosswalk() -> pd.DataFrame:
     return build_coc_msa_block_population_crosswalk(
@@ -451,6 +510,42 @@ def test_fractional_rollup_preserves_block_population_diagnostics(
     assert ny["min_msa_population_coverage_share"] == pytest.approx(0.5)
     assert ny["zero_population_coc_count"] == 0
     assert ny["missing_population_block_count"] == 0
+
+
+def test_fractional_rollup_population_containment_threshold_keeps_high_share(
+    block_population_crosswalk: pd.DataFrame,
+):
+    source = pd.DataFrame(
+        {
+            "coc_id": ["CO-200", "CO-600", "CO-700"],
+            "year": [2020, 2020, 2020],
+            "pit_total": [80.0, 20.0, 40.0],
+        }
+    )
+    threshold_crosswalk = block_population_crosswalk.copy()
+    high_share = (
+        (threshold_crosswalk["coc_id"] == "CO-200")
+        & (threshold_crosswalk["msa_id"] == "41180")
+    )
+    threshold_crosswalk.loc[high_share, "coc_population_containment_share"] = 0.95
+
+    result = aggregate_coc_to_msa_fractional_rollup(
+        source,
+        threshold_crosswalk,
+        additive_measure_columns=("pit_total",),
+        source_dataset_id="pit_coc",
+        min_coc_population_containment_share=0.9,
+    )
+
+    assert result[["msa_id", "year"]].to_dict(orient="records") == [
+        {"msa_id": "41180", "year": 2020}
+    ]
+    row = result.iloc[0]
+    assert row["pit_total"] == pytest.approx(60.0)
+    assert row["coc_count"] == 1
+    assert row["covered_coc_count"] == 1
+    assert row["missing_coc_count"] == 0
+    assert row["min_coc_population_containment_share"] == pytest.approx(0.9)
 
 
 def test_block_population_save_read_roundtrip_preserves_schema_and_provenance(
