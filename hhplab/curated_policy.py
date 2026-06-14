@@ -48,6 +48,12 @@ CURATED_SUBDIRS: set[str] = {
     "cpi",
 }
 
+# Cache namespaces may live next to curated assets during local development,
+# but they are not curated artifact families and should not be policy-checked.
+IGNORED_SUBDIRS: set[str] = {
+    "acs_contract_rent_cache",
+}
+
 # ---- Canonical filename patterns per subdirectory ----
 
 COC_BOUNDARY_TOKEN = r"B\d{4}(?:_non_pr)?"
@@ -214,6 +220,8 @@ def validate_curated_layout(
         # --- Subdirectories ---
         subdir_name = entry.name
         if subdir_name.startswith("."):
+            continue
+        if subdir_name in IGNORED_SUBDIRS:
             continue
 
         if subdir_name not in CURATED_SUBDIRS:

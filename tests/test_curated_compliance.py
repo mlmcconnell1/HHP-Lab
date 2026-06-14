@@ -21,6 +21,7 @@ from hhplab.cli.main import app
 from hhplab.curated_policy import (
     CANONICAL_PATTERNS,
     CURATED_SUBDIRS,
+    IGNORED_SUBDIRS,
     validate_curated_layout,
 )
 
@@ -241,6 +242,13 @@ class TestUnknownSubdirs:
         curated = tmp_path / "curated"
         for name in CURATED_SUBDIRS:
             (curated / name).mkdir(parents=True, exist_ok=True)
+        violations = validate_curated_layout(curated)
+        assert violations == []
+
+    def test_ignored_cache_subdirs_accepted(self, tmp_path: Path) -> None:
+        curated = tmp_path / "curated"
+        for name in IGNORED_SUBDIRS:
+            _touch(curated / name / "cache_file.parquet")
         violations = validate_curated_layout(curated)
         assert violations == []
 
