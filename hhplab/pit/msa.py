@@ -7,6 +7,7 @@ from pathlib import Path
 import pandas as pd
 
 from hhplab.analysis_geo import MSA_ID_COL
+from hhplab.msa import aggregate_coc_to_msa_fractional_rollup
 from hhplab.paths import curated_dir
 from hhplab.provenance import ProvenanceBlock, write_parquet_with_provenance
 
@@ -120,139 +121,45 @@ def aggregate_pit_to_msa(
         raise ValueError(
             f"Unsupported share_column '{share_column}'. Expected 'allocation_share'."
         )
-
-    expected_meta = (
-        crosswalk.groupby([MSA_ID_COL, "cbsa_code"], as_index=False)
-        .agg(
-            expected_coc_count=("coc_id", "nunique"),
-            expected_allocation_share_sum=("allocation_share", "sum"),
-            expected_cocs=("coc_id", lambda s: tuple(sorted({str(value) for value in s}))),
-        )
-        .sort_values([MSA_ID_COL, "cbsa_code"])
-        .reset_index(drop=True)
+    additive_columns = [
+        column
+        for column in ("pit_total", "pit_sheltered", "pit_unsheltered")
+        if column in df.columns
+    ]
+    rollup = aggregate_coc_to_msa_fractional_rollup(
+        df,
+        crosswalk,
+        additive_measure_columns=additive_columns,
+        source_dataset_id="pit_coc",
+        year_column="year",
     )
-
-    merged = df.merge(
-        crosswalk[
-            [
-                "coc_id",
-                MSA_ID_COL,
-                "cbsa_code",
-                "allocation_share",
-            ]
-        ],
-        on="coc_id",
-        how="inner",
+    cbsa_lookup = crosswalk[[MSA_ID_COL, "cbsa_code"]].drop_duplicates(MSA_ID_COL)
+    rollup = rollup.merge(cbsa_lookup, on=MSA_ID_COL, how="left")
+    for optional_column in ("pit_sheltered", "pit_unsheltered"):
+        if optional_column not in rollup.columns:
+            rollup[optional_column] = pd.NA
+    result_df = pd.DataFrame(
+        {
+            "msa_id": rollup["msa_id"],
+            "cbsa_code": rollup["cbsa_code"],
+            "year": rollup["year"],
+            "pit_total": rollup["pit_total"],
+            "pit_sheltered": rollup["pit_sheltered"],
+            "pit_unsheltered": rollup["pit_unsheltered"],
+            "covered_coc_count": rollup["covered_coc_count"],
+            "expected_coc_count": rollup["coc_count"],
+            "allocation_share_sum": rollup["allocation_share_sum"],
+            "expected_allocation_share_sum": rollup["expected_allocation_share_sum"],
+            "allocation_coverage_ratio": rollup["coc_population_coverage_ratio"],
+            "missing_cocs": rollup["missing_cocs"],
+            "boundary_vintage": resolved_boundary,
+            "county_vintage": resolved_county,
+            "definition_version": resolved_definition,
+            "allocation_method": allocation_method,
+            "share_column": share_column,
+        },
+        columns=list(MSA_PIT_COLUMNS),
     )
-
-    results: list[dict[str, object]] = []
-    years = sorted(pd.to_numeric(df["year"], errors="raise").astype(int).unique().tolist())
-
-    for year in years:
-        year_alloc = merged[merged["year"] == year].copy()
-        if not year_alloc.empty:
-            year_alloc["pit_total_weighted"] = (
-                pd.to_numeric(year_alloc["pit_total"], errors="raise")
-                * year_alloc["allocation_share"]
-            )
-        year_summary = (
-            year_alloc.groupby([MSA_ID_COL, "cbsa_code"], as_index=False)
-            .agg(
-                pit_total=("pit_total_weighted", "sum"),
-                covered_coc_count=("coc_id", "nunique"),
-                allocation_share_sum=("allocation_share", "sum"),
-                found_cocs=("coc_id", lambda s: tuple(sorted({str(value) for value in s}))),
-            )
-            if not year_alloc.empty
-            else pd.DataFrame(
-                columns=[
-                    MSA_ID_COL,
-                    "cbsa_code",
-                    "pit_total",
-                    "covered_coc_count",
-                    "allocation_share_sum",
-                    "found_cocs",
-                ]
-            )
-        )
-
-        sheltered_summary = pd.DataFrame(columns=[MSA_ID_COL, "cbsa_code", "pit_sheltered"])
-        if "pit_sheltered" in year_alloc.columns:
-            sheltered_rows = year_alloc.dropna(subset=["pit_sheltered"]).copy()
-            if not sheltered_rows.empty:
-                sheltered_rows["pit_sheltered_weighted"] = (
-                    sheltered_rows["pit_sheltered"] * sheltered_rows["allocation_share"]
-                )
-                sheltered_summary = sheltered_rows.groupby(
-                    [MSA_ID_COL, "cbsa_code"], as_index=False
-                ).agg(pit_sheltered=("pit_sheltered_weighted", "sum"))
-
-        unsheltered_summary = pd.DataFrame(columns=[MSA_ID_COL, "cbsa_code", "pit_unsheltered"])
-        if "pit_unsheltered" in year_alloc.columns:
-            unsheltered_rows = year_alloc.dropna(subset=["pit_unsheltered"]).copy()
-            if not unsheltered_rows.empty:
-                unsheltered_rows["pit_unsheltered_weighted"] = (
-                    unsheltered_rows["pit_unsheltered"] * unsheltered_rows["allocation_share"]
-                )
-                unsheltered_summary = unsheltered_rows.groupby(
-                    [MSA_ID_COL, "cbsa_code"], as_index=False
-                ).agg(pit_unsheltered=("pit_unsheltered_weighted", "sum"))
-
-        year_result = expected_meta.merge(year_summary, on=[MSA_ID_COL, "cbsa_code"], how="left")
-        year_result = year_result.merge(
-            sheltered_summary, on=[MSA_ID_COL, "cbsa_code"], how="left"
-        )
-        year_result = year_result.merge(
-            unsheltered_summary, on=[MSA_ID_COL, "cbsa_code"], how="left"
-        )
-        year_result["year"] = year
-
-        for row in year_result.itertuples(index=False):
-            found_cocs_raw = getattr(row, "found_cocs", ())
-            if _is_missing_scalar(found_cocs_raw):
-                found_cocs = set()
-            else:
-                found_cocs = set(found_cocs_raw or ())
-            expected_cocs = set(row.expected_cocs)
-            missing_cocs = ",".join(sorted(expected_cocs - found_cocs))
-            covered_coc_count = int(row.covered_coc_count) if pd.notna(row.covered_coc_count) else 0
-            allocation_share_sum = (
-                float(row.allocation_share_sum) if pd.notna(row.allocation_share_sum) else 0.0
-            )
-            expected_share = float(row.expected_allocation_share_sum)
-            coverage_ratio = (
-                allocation_share_sum / expected_share if expected_share > 0 else 0.0
-            )
-
-            results.append(
-                {
-                    "msa_id": row.msa_id,
-                    "cbsa_code": row.cbsa_code,
-                    "year": year,
-                    "pit_total": float(row.pit_total) if pd.notna(row.pit_total) else pd.NA,
-                    "pit_sheltered": (
-                        float(row.pit_sheltered) if pd.notna(row.pit_sheltered) else pd.NA
-                    ),
-                    "pit_unsheltered": (
-                        float(row.pit_unsheltered)
-                        if pd.notna(row.pit_unsheltered)
-                        else pd.NA
-                    ),
-                    "covered_coc_count": covered_coc_count,
-                    "expected_coc_count": int(row.expected_coc_count),
-                    "allocation_share_sum": allocation_share_sum,
-                    "expected_allocation_share_sum": expected_share,
-                    "allocation_coverage_ratio": coverage_ratio,
-                    "missing_cocs": missing_cocs,
-                    "boundary_vintage": resolved_boundary,
-                    "county_vintage": resolved_county,
-                    "definition_version": resolved_definition,
-                    "allocation_method": allocation_method,
-                    "share_column": share_column,
-                }
-            )
-
-    result_df = pd.DataFrame(results, columns=list(MSA_PIT_COLUMNS))
     if result_df.empty:
         return result_df
 

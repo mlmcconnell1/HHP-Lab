@@ -10,12 +10,24 @@ import pandas as pd
 
 from hhplab.paths import curated_dir
 from hhplab.provenance import ProvenanceBlock, write_parquet_with_provenance
+from hhplab.schema.columns import MSA_FRACTIONAL_ROLLUP_COLUMNS
 from hhplab.xwalks.county import ALBERS_EQUAL_AREA_CRS, build_county_crosswalk
 
 REQUIRED_MSA_MEMBERSHIP_COLUMNS: tuple[str, ...] = (
     "msa_id",
     "cbsa_code",
     "county_fips",
+)
+
+FRACTIONAL_ROLLUP_REQUIRED_CROSSWALK_COLUMNS: tuple[str, ...] = (
+    "coc_id",
+    "msa_id",
+    "boundary_vintage",
+    "county_vintage",
+    "definition_version",
+    "allocation_method",
+    "share_column",
+    "allocation_share",
 )
 
 COC_MSA_CROSSWALK_COLUMNS: tuple[str, ...] = (
@@ -654,6 +666,341 @@ def summarize_coc_msa_allocation(crosswalk: pd.DataFrame) -> pd.DataFrame:
     _validate_allocation_totals(summary)
     summary["unallocated_share"] = (1.0 - summary["allocation_share_sum"]).clip(lower=0.0)
     return summary.sort_values("coc_id").reset_index(drop=True)
+
+
+def aggregate_coc_to_msa_fractional_rollup(
+    source_df: pd.DataFrame,
+    crosswalk_df: pd.DataFrame,
+    *,
+    additive_measure_columns: list[str] | tuple[str, ...],
+    source_dataset_id: str,
+    year_column: str = "year",
+    source_coc_id_column: str = "coc_id",
+    native_msa_covariate_columns: list[str] | tuple[str, ...] = (),
+    min_coc_population_containment_share: float | None = None,
+    min_msa_population_coverage_share: float | None = None,
+    min_allocation_share: float | None = None,
+) -> pd.DataFrame:
+    """Roll up additive CoC-native measures to ``msa_id x year`` rows.
+
+    The function is allocation-basis agnostic. Area and block-population
+    crosswalks both use ``allocation_share``; basis-specific denominator and
+    vintage metadata are carried through output diagnostics.
+    """
+    measures = _validate_fractional_rollup_source(
+        source_df,
+        additive_measure_columns,
+        year_column=year_column,
+        source_coc_id_column=source_coc_id_column,
+    )
+    crosswalk = _validate_fractional_rollup_crosswalk(crosswalk_df)
+    if source_df.empty:
+        return _empty_fractional_rollup(measures)
+
+    source = source_df.copy()
+    source = source.rename(columns={source_coc_id_column: "coc_id", year_column: "year"})
+    source["coc_id"] = source["coc_id"].astype(str)
+    source["year"] = pd.to_numeric(source["year"], errors="raise").astype(int)
+    for measure in measures:
+        source[measure] = pd.to_numeric(source[measure], errors="raise")
+
+    crosswalk = _apply_fractional_rollup_thresholds(
+        crosswalk,
+        min_coc_population_containment_share=min_coc_population_containment_share,
+        min_msa_population_coverage_share=min_msa_population_coverage_share,
+        min_allocation_share=min_allocation_share,
+    )
+    if crosswalk.empty:
+        return _empty_fractional_rollup(measures)
+
+    resolved = _fractional_rollup_metadata(crosswalk)
+    expected_meta = _fractional_rollup_expected_meta(crosswalk)
+    merged = source.merge(
+        crosswalk[["coc_id", "msa_id", "allocation_share"]],
+        on="coc_id",
+        how="inner",
+    )
+    weighted = merged.copy()
+    for measure in measures:
+        weighted[measure] = weighted[measure] * weighted["allocation_share"]
+
+    rollup = (
+        weighted.groupby(["msa_id", "year"], as_index=False)
+        .agg(
+            **{
+                measure: (measure, "sum")
+                for measure in measures
+            },
+            covered_coc_count=("coc_id", "nunique"),
+            allocation_share_sum=("allocation_share", "sum"),
+            found_cocs=("coc_id", lambda s: tuple(sorted({str(value) for value in s}))),
+        )
+        if not weighted.empty
+        else pd.DataFrame(
+            columns=[
+                "msa_id",
+                "year",
+                *measures,
+                "covered_coc_count",
+                "allocation_share_sum",
+                "found_cocs",
+            ]
+        )
+    )
+
+    years = sorted(source["year"].unique().tolist())
+    skeleton = expected_meta[["msa_id"]].drop_duplicates().merge(
+        pd.DataFrame({"year": years}),
+        how="cross",
+    )
+    result = skeleton.merge(rollup, on=["msa_id", "year"], how="left").merge(
+        expected_meta,
+        on="msa_id",
+        how="left",
+    )
+
+    rows: list[dict[str, object]] = []
+    for row in result.itertuples(index=False):
+        found_cocs = _tuple_or_empty(getattr(row, "found_cocs", ()))
+        expected_cocs = set(row.expected_cocs)
+        missing_cocs = sorted(expected_cocs - set(found_cocs))
+        allocation_share_sum = (
+            float(row.allocation_share_sum) if pd.notna(row.allocation_share_sum) else 0.0
+        )
+        output_row = {
+            "msa_id": row.msa_id,
+            "year": int(row.year),
+            "source_dataset_id": source_dataset_id,
+            "source_geo_type": "coc",
+            "source_additive_measure_columns": ",".join(measures),
+            "native_msa_covariate_columns": ",".join(native_msa_covariate_columns),
+            "allocation_basis": resolved["allocation_basis"],
+            "denominator_source": resolved["denominator_source"],
+            "boundary_vintage": resolved["boundary_vintage"],
+            "county_vintage": resolved["county_vintage"],
+            "block_vintage": resolved["block_vintage"],
+            "decennial_vintage": resolved["decennial_vintage"],
+            "msa_definition_version": resolved["definition_version"],
+            "coc_count": int(row.expected_coc_count),
+            "covered_coc_count": (
+                int(row.covered_coc_count) if pd.notna(row.covered_coc_count) else 0
+            ),
+            "missing_coc_count": len(missing_cocs),
+            "missing_cocs": ",".join(missing_cocs),
+            "zero_population_coc_count": int(row.zero_population_coc_count),
+            "missing_population_block_count": int(row.missing_population_block_count),
+            "min_coc_population_containment_share": min_coc_population_containment_share,
+            "min_msa_population_coverage_share": min_msa_population_coverage_share,
+            "min_allocation_share": min_allocation_share,
+            "coc_population_coverage_ratio": (
+                allocation_share_sum / float(row.expected_allocation_share_sum)
+                if float(row.expected_allocation_share_sum) > 0
+                else 0.0
+            ),
+            "msa_population_coverage_ratio": _coverage_value(
+                row,
+                "expected_msa_population_coverage_share",
+                default=allocation_share_sum,
+            ),
+            "allocation_share_sum": allocation_share_sum,
+            "expected_allocation_share_sum": float(row.expected_allocation_share_sum),
+            "source": "msa_fractional_rollup",
+        }
+        for measure in measures:
+            value = getattr(row, measure)
+            output_row[measure] = float(value) if pd.notna(value) else pd.NA
+        rows.append(output_row)
+
+    columns = [*MSA_FRACTIONAL_ROLLUP_COLUMNS, *measures]
+    out = pd.DataFrame(rows, columns=columns)
+    if out.empty:
+        return out
+    for measure in measures:
+        out[measure] = out[measure].astype("Float64")
+    return out.sort_values(["msa_id", "year"]).reset_index(drop=True)
+
+
+def _validate_fractional_rollup_source(
+    source_df: pd.DataFrame,
+    additive_measure_columns: list[str] | tuple[str, ...],
+    *,
+    year_column: str,
+    source_coc_id_column: str,
+) -> tuple[str, ...]:
+    measures = tuple(dict.fromkeys(column.strip() for column in additive_measure_columns))
+    if not measures or any(not column for column in measures):
+        raise ValueError("additive_measure_columns must contain at least one non-blank column.")
+    required = {source_coc_id_column, year_column, *measures}
+    missing = sorted(required - set(source_df.columns))
+    if missing:
+        raise ValueError(
+            "CoC source data missing required column(s): "
+            f"{', '.join(missing)}. Available: {list(source_df.columns)}"
+        )
+    return measures
+
+
+def _validate_fractional_rollup_crosswalk(crosswalk_df: pd.DataFrame) -> pd.DataFrame:
+    missing = sorted(set(FRACTIONAL_ROLLUP_REQUIRED_CROSSWALK_COLUMNS) - set(crosswalk_df.columns))
+    if missing:
+        raise ValueError(
+            "CoC-to-MSA crosswalk missing required column(s): "
+            f"{', '.join(missing)}. Available: {list(crosswalk_df.columns)}"
+        )
+    crosswalk = crosswalk_df.copy()
+    crosswalk["coc_id"] = crosswalk["coc_id"].astype(str)
+    crosswalk["msa_id"] = crosswalk["msa_id"].astype(str)
+    crosswalk["allocation_share"] = pd.to_numeric(
+        crosswalk["allocation_share"],
+        errors="raise",
+    )
+    share_column = _resolve_single_crosswalk_value(crosswalk["share_column"], "share_column")
+    if share_column != "allocation_share":
+        raise ValueError(
+            f"Unsupported share_column '{share_column}'. Expected 'allocation_share'."
+        )
+    _validate_allocation_shares(crosswalk)
+    zero_population = (
+        crosswalk["zero_population_coc"].fillna(False).astype(bool)
+        if "zero_population_coc" in crosswalk.columns
+        else pd.Series(False, index=crosswalk.index)
+    )
+    crosswalk = crosswalk[
+        (crosswalk["allocation_share"] > ALLOCATION_SHARE_TOLERANCE) | zero_population
+    ].copy()
+    return crosswalk
+
+
+def _apply_fractional_rollup_thresholds(
+    crosswalk: pd.DataFrame,
+    *,
+    min_coc_population_containment_share: float | None,
+    min_msa_population_coverage_share: float | None,
+    min_allocation_share: float | None,
+) -> pd.DataFrame:
+    filtered = crosswalk.copy()
+    if min_coc_population_containment_share is not None:
+        column = (
+            "coc_population_containment_share"
+            if "coc_population_containment_share" in filtered.columns
+            else "allocation_share"
+        )
+        filtered = filtered[
+            pd.to_numeric(filtered[column], errors="coerce")
+            >= min_coc_population_containment_share
+        ].copy()
+    if min_msa_population_coverage_share is not None:
+        if "msa_population_coverage_share" not in filtered.columns:
+            raise ValueError(
+                "min_msa_population_coverage_share requires crosswalk column "
+                "'msa_population_coverage_share'."
+            )
+        filtered = filtered[
+            pd.to_numeric(filtered["msa_population_coverage_share"], errors="coerce")
+            >= min_msa_population_coverage_share
+        ].copy()
+    if min_allocation_share is not None:
+        filtered = filtered[filtered["allocation_share"] >= min_allocation_share].copy()
+    return filtered
+
+
+def _fractional_rollup_metadata(crosswalk: pd.DataFrame) -> dict[str, object]:
+    allocation_basis = _resolve_single_crosswalk_value(
+        crosswalk["allocation_method"],
+        "allocation_method",
+    )
+    return {
+        "allocation_basis": allocation_basis,
+        "denominator_source": _denominator_source_for_allocation_basis(allocation_basis),
+        "boundary_vintage": _resolve_single_crosswalk_value(
+            crosswalk["boundary_vintage"],
+            "boundary_vintage",
+        ),
+        "county_vintage": _resolve_single_crosswalk_value(
+            crosswalk["county_vintage"],
+            "county_vintage",
+        ),
+        "block_vintage": _optional_single_crosswalk_value(crosswalk, "block_vintage"),
+        "decennial_vintage": _optional_single_crosswalk_value(crosswalk, "decennial_vintage"),
+        "definition_version": _resolve_single_crosswalk_value(
+            crosswalk["definition_version"],
+            "definition_version",
+        ),
+    }
+
+
+def _fractional_rollup_expected_meta(crosswalk: pd.DataFrame) -> pd.DataFrame:
+    aggregations: dict[str, tuple[str, object]] = {
+        "expected_coc_count": ("coc_id", "nunique"),
+        "expected_allocation_share_sum": ("allocation_share", "sum"),
+        "expected_cocs": ("coc_id", lambda s: tuple(sorted({str(value) for value in s}))),
+    }
+    if "zero_population_coc" in crosswalk.columns:
+        aggregations["zero_population_coc_count"] = (
+            "zero_population_coc",
+            lambda s: int(pd.Series(s).fillna(False).astype(bool).sum()),
+        )
+    if "missing_population_block_count" in crosswalk.columns:
+        aggregations["missing_population_block_count"] = (
+            "missing_population_block_count",
+            "sum",
+        )
+    if "msa_population_coverage_share" in crosswalk.columns:
+        aggregations["expected_msa_population_coverage_share"] = (
+            "msa_population_coverage_share",
+            "sum",
+        )
+    meta = crosswalk.groupby("msa_id", as_index=False).agg(**aggregations)
+    if "zero_population_coc_count" not in meta.columns:
+        meta["zero_population_coc_count"] = 0
+    if "missing_population_block_count" not in meta.columns:
+        meta["missing_population_block_count"] = 0
+    if "expected_msa_population_coverage_share" not in meta.columns:
+        meta["expected_msa_population_coverage_share"] = meta[
+            "expected_allocation_share_sum"
+        ]
+    return meta
+
+
+def _resolve_single_crosswalk_value(series: pd.Series, field_name: str) -> str:
+    values = sorted({str(value) for value in series.dropna().unique()})
+    if len(values) != 1:
+        raise ValueError(f"Crosswalk must have exactly one {field_name} value, found {values}")
+    return values[0]
+
+
+def _optional_single_crosswalk_value(crosswalk: pd.DataFrame, field_name: str) -> str | None:
+    if field_name not in crosswalk.columns:
+        return None
+    values = sorted({str(value) for value in crosswalk[field_name].dropna().unique()})
+    if not values:
+        return None
+    if len(values) != 1:
+        raise ValueError(f"Crosswalk must have exactly one {field_name} value, found {values}")
+    return values[0]
+
+
+def _denominator_source_for_allocation_basis(allocation_basis: str) -> str:
+    if allocation_basis == "block_population":
+        return "pl_94_171_block_population"
+    if allocation_basis == "area":
+        return "geometry_area"
+    return allocation_basis
+
+
+def _tuple_or_empty(value: object) -> tuple[str, ...]:
+    if bool(pd.api.types.is_scalar(value) and pd.isna(value)):
+        return ()
+    return tuple(value or ())
+
+
+def _coverage_value(row: object, field_name: str, *, default: float) -> float:
+    value = getattr(row, field_name, default)
+    return float(value) if pd.notna(value) else default
+
+
+def _empty_fractional_rollup(measures: tuple[str, ...]) -> pd.DataFrame:
+    return pd.DataFrame(columns=[*MSA_FRACTIONAL_ROLLUP_COLUMNS, *measures])
 
 
 def save_coc_msa_crosswalk(

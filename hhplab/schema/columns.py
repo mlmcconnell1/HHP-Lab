@@ -737,6 +737,7 @@ MSA_FRACTIONAL_ROLLUP_COLUMNS: tuple[str, ...] = (
     "coc_count",
     "covered_coc_count",
     "missing_coc_count",
+    "missing_cocs",
     "zero_population_coc_count",
     "missing_population_block_count",
     "min_coc_population_containment_share",
@@ -745,6 +746,7 @@ MSA_FRACTIONAL_ROLLUP_COLUMNS: tuple[str, ...] = (
     "coc_population_coverage_ratio",
     "msa_population_coverage_ratio",
     "allocation_share_sum",
+    "expected_allocation_share_sum",
     "source",
 )
 

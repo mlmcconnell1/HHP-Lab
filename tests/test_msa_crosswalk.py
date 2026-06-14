@@ -11,6 +11,7 @@ from hhplab.msa.crosswalk import (
     ALLOCATION_SHARE_TOLERANCE,
     COC_MSA_BLOCK_POPULATION_CROSSWALK_COLUMNS,
     COC_MSA_CROSSWALK_COLUMNS,
+    aggregate_coc_to_msa_fractional_rollup,
     build_coc_msa_block_population_crosswalk,
     build_coc_msa_crosswalk,
     read_coc_msa_block_population_crosswalk,
@@ -247,6 +248,97 @@ def test_schema_is_explicit_and_auditable(coc_msa_crosswalk: pd.DataFrame):
     assert set(coc_msa_crosswalk["share_denominator"]) == {"coc_area"}
 
 
+def test_fractional_rollup_aggregates_area_crosswalk_additive_measures(
+    coc_msa_crosswalk: pd.DataFrame,
+):
+    source = pd.DataFrame(
+        {
+            "coc_id": ["CO-100", "CO-200", "CO-300", "CO-400"],
+            "year": [2020, 2020, 2020, 2020],
+            "pit_total": [100.0, 80.0, 60.0, 40.0],
+            "pit_sheltered": [60.0, 40.0, 30.0, 20.0],
+        }
+    )
+
+    result = aggregate_coc_to_msa_fractional_rollup(
+        source,
+        coc_msa_crosswalk,
+        additive_measure_columns=("pit_total", "pit_sheltered"),
+        source_dataset_id="pit_coc",
+        native_msa_covariate_columns=("msa_population",),
+    )
+
+    ny = result[(result["msa_id"] == "35620") & (result["year"] == 2020)].iloc[0]
+    stl = result[(result["msa_id"] == "41180") & (result["year"] == 2020)].iloc[0]
+    assert ny["pit_total"] == pytest.approx(140.0)
+    assert ny["pit_sheltered"] == pytest.approx(80.0)
+    assert stl["pit_total"] == pytest.approx(140.0)
+    assert stl["pit_sheltered"] == pytest.approx(70.0)
+    assert ny["allocation_basis"] == "area"
+    assert ny["denominator_source"] == "geometry_area"
+    assert ny["source_additive_measure_columns"] == "pit_total,pit_sheltered"
+    assert ny["native_msa_covariate_columns"] == "msa_population"
+    assert ny["covered_coc_count"] == 2
+    assert ny["missing_coc_count"] == 0
+    assert ny["allocation_share_sum"] == pytest.approx(1.5)
+    assert ny["expected_allocation_share_sum"] == pytest.approx(1.5)
+    assert ny["coc_population_coverage_ratio"] == pytest.approx(1.0)
+
+
+def test_fractional_rollup_reports_missing_source_cocs(coc_msa_crosswalk: pd.DataFrame):
+    source = pd.DataFrame(
+        {
+            "coc_id": ["CO-100"],
+            "year": [2020],
+            "pit_total": [100.0],
+        }
+    )
+
+    result = aggregate_coc_to_msa_fractional_rollup(
+        source,
+        coc_msa_crosswalk,
+        additive_measure_columns=("pit_total",),
+        source_dataset_id="pit_coc",
+    )
+
+    ny = result[(result["msa_id"] == "35620") & (result["year"] == 2020)].iloc[0]
+    stl = result[(result["msa_id"] == "41180") & (result["year"] == 2020)].iloc[0]
+    assert ny["pit_total"] == pytest.approx(100.0)
+    assert ny["missing_cocs"] == "CO-200"
+    assert ny["missing_coc_count"] == 1
+    assert ny["coc_population_coverage_ratio"] == pytest.approx(2.0 / 3.0)
+    assert pd.isna(stl["pit_total"])
+    assert stl["missing_cocs"] == "CO-200,CO-300,CO-400"
+    assert stl["coc_population_coverage_ratio"] == pytest.approx(0.0)
+
+
+def test_fractional_rollup_thresholds_filter_crosswalk_rows(
+    coc_msa_crosswalk: pd.DataFrame,
+):
+    source = pd.DataFrame(
+        {
+            "coc_id": ["CO-100", "CO-200", "CO-300", "CO-400"],
+            "year": [2020, 2020, 2020, 2020],
+            "pit_total": [100.0, 80.0, 60.0, 40.0],
+        }
+    )
+
+    result = aggregate_coc_to_msa_fractional_rollup(
+        source,
+        coc_msa_crosswalk,
+        additive_measure_columns=("pit_total",),
+        source_dataset_id="pit_coc",
+        min_allocation_share=0.75,
+    )
+
+    assert set(result["msa_id"]) == {"35620", "41180"}
+    ny = result[(result["msa_id"] == "35620") & (result["year"] == 2020)].iloc[0]
+    stl = result[(result["msa_id"] == "41180") & (result["year"] == 2020)].iloc[0]
+    assert ny["pit_total"] == pytest.approx(100.0)
+    assert stl["pit_total"] == pytest.approx(100.0)
+    assert "CO-200" not in set(result["missing_cocs"].str.split(",").sum())
+
+
 @pytest.fixture
 def block_population_crosswalk() -> pd.DataFrame:
     return build_coc_msa_block_population_crosswalk(
@@ -326,6 +418,39 @@ def test_block_population_summary_flags_zero_and_missing_population(
     assert bool(zero_row["zero_population_coc"]) is True
     assert zero_row["missing_population_block_count"] == 0
     assert bool(zero_row["partial_coc_population_coverage"]) is False
+
+
+def test_fractional_rollup_preserves_block_population_diagnostics(
+    block_population_crosswalk: pd.DataFrame,
+):
+    source = pd.DataFrame(
+        {
+            "coc_id": ["CO-200", "CO-700"],
+            "year": [2020, 2020],
+            "pit_total": [80.0, 40.0],
+        }
+    )
+
+    result = aggregate_coc_to_msa_fractional_rollup(
+        source,
+        block_population_crosswalk,
+        additive_measure_columns=("pit_total",),
+        source_dataset_id="pit_coc",
+        min_msa_population_coverage_share=0.5,
+    )
+
+    ny = result[(result["msa_id"] == "35620") & (result["year"] == 2020)].iloc[0]
+    stl = result[(result["msa_id"] == "41180") & (result["year"] == 2020)].iloc[0]
+    assert ny["pit_total"] == pytest.approx(20.0)
+    assert stl["pit_total"] == pytest.approx(60.0)
+    assert ny["allocation_basis"] == "block_population"
+    assert ny["denominator_source"] == "pl_94_171_block_population"
+    assert ny["block_vintage"] == "2020"
+    assert ny["decennial_vintage"] == "2020"
+    assert ny["msa_population_coverage_ratio"] == pytest.approx(0.5)
+    assert ny["min_msa_population_coverage_share"] == pytest.approx(0.5)
+    assert ny["zero_population_coc_count"] == 0
+    assert ny["missing_population_block_count"] == 0
 
 
 def test_block_population_save_read_roundtrip_preserves_schema_and_provenance(
