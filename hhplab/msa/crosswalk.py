@@ -420,13 +420,7 @@ def build_coc_msa_block_population_crosswalk(
         left_id_col="coc_id",
         output_area_col="coc_intersection_area",
     )
-    msa_blocks = _block_geometry_denominator(
-        msa,
-        blocks,
-        left_id_col="msa_id",
-        output_area_col="msa_intersection_area",
-    )
-    if coc_blocks.empty or msa_blocks.empty:
+    if coc_blocks.empty:
         return _empty_block_population_crosswalk()
 
     coc_denominators = _summarize_block_denominator(
@@ -437,14 +431,7 @@ def build_coc_msa_block_population_crosswalk(
         output_area_col="coc_intersection_area",
         missing_col="coc_missing_population_block_count",
     )
-    msa_denominators = _summarize_block_denominator(
-        msa_blocks,
-        id_col="msa_id",
-        denominator_col="msa_population_denominator",
-        area_col="msa_intersection_area",
-        output_area_col="msa_intersection_area",
-        missing_col="msa_missing_population_block_count",
-    )
+    msa_denominators = _summarize_msa_block_denominator_from_membership(blocks, membership)
 
     intersections = _block_coc_msa_intersections(coc_blocks, msa)
     if intersections.empty:
@@ -504,6 +491,48 @@ def build_coc_msa_block_population_crosswalk(
 
 def _empty_block_population_crosswalk() -> pd.DataFrame:
     return pd.DataFrame(columns=list(COC_MSA_BLOCK_POPULATION_CROSSWALK_COLUMNS))
+
+
+def _summarize_msa_block_denominator_from_membership(
+    blocks: gpd.GeoDataFrame,
+    membership: pd.DataFrame,
+) -> pd.DataFrame:
+    block_denominators = blocks[
+        ["block_geoid", "total_population", "block_area"]
+    ].copy()
+    block_denominators["county_fips"] = block_denominators["block_geoid"].astype(str).str[:5]
+    block_denominators["total_population"] = pd.to_numeric(
+        block_denominators["total_population"],
+        errors="coerce",
+    )
+    block_denominators["missing_population"] = block_denominators["total_population"].isna()
+    block_denominators["allocated_population"] = block_denominators[
+        "total_population"
+    ].fillna(0.0)
+
+    member_counties = membership[["msa_id", "county_fips"]].drop_duplicates().copy()
+    joined = member_counties.merge(block_denominators, on="county_fips", how="inner")
+    if joined.empty:
+        return pd.DataFrame(
+            columns=[
+                "msa_id",
+                "msa_population_denominator",
+                "msa_intersection_area",
+                "msa_missing_population_block_count",
+            ]
+        )
+    return (
+        joined.groupby("msa_id", as_index=False)
+        .agg(
+            msa_population_denominator=("allocated_population", "sum"),
+            msa_intersection_area=("block_area", "sum"),
+            msa_missing_population_block_count=(
+                "missing_population",
+                lambda s: int(s.fillna(False).sum()),
+            ),
+        )
+        .reset_index(drop=True)
+    )
 
 
 def _prepare_blocks(

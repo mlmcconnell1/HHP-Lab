@@ -14,7 +14,10 @@ from hhplab.msa.crosswalk import (
     COC_MSA_BLOCK_POPULATION_CROSSWALK_COLUMNS,
     COC_MSA_CROSSWALK_COLUMNS,
     _block_geometry_denominator,
+    _build_msa_geometry_from_counties,
     _prepare_blocks,
+    _summarize_block_denominator,
+    _summarize_msa_block_denominator_from_membership,
     aggregate_coc_to_msa_fractional_rollup,
     build_coc_msa_block_population_crosswalk,
     build_coc_msa_crosswalk,
@@ -70,17 +73,17 @@ EXPECTED_UNALLOCATED_SHARE: dict[str, float] = {
 }
 
 BLOCK_GEOMETRY_ROWS = [
-    ("B1", box(0, 0, 10, 10)),
-    ("B2", box(10, 0, 20, 10)),
-    ("B3", box(20, 0, 30, 10)),
-    ("B4", box(30, 0, 40, 10)),
+    ("360610001001000", box(0, 0, 10, 10)),
+    ("295100001001000", box(10, 0, 20, 10)),
+    ("060750001001000", box(20, 0, 30, 10)),
+    ("170310001001000", box(30, 0, 40, 10)),
 ]
 
 BLOCK_POPULATION_ROWS = [
-    ("B1", 100),
-    ("B2", 300),
-    ("B3", None),
-    ("B4", 0),
+    ("360610001001000", 100),
+    ("295100001001000", 300),
+    ("060750001001000", None),
+    ("170310001001000", 0),
 ]
 
 BLOCK_POPULATION_COC_ROWS = [
@@ -330,6 +333,16 @@ def _denominator_comparison_frame(df: pd.DataFrame) -> pd.DataFrame:
         "missing_population",
     ]
     return df.loc[:, columns].sort_values(["geometry_id", "block_geoid"]).reset_index(drop=True)
+
+
+def _msa_denominator_comparison_frame(df: pd.DataFrame) -> pd.DataFrame:
+    columns = [
+        "msa_id",
+        "msa_population_denominator",
+        "msa_intersection_area",
+        "msa_missing_population_block_count",
+    ]
+    return df.loc[:, columns].sort_values("msa_id").reset_index(drop=True)
 
 
 @pytest.fixture
@@ -710,6 +723,40 @@ def test_block_geometry_denominator_avoids_full_overlay(monkeypatch: pytest.Monk
 
     assert set(zip(result["geometry_id"], result["block_geoid"], strict=True)) == set(
         EXPECTED_DENOMINATOR_ROWS
+    )
+
+
+def test_msa_block_denominator_from_membership_matches_overlay_reference():
+    membership = pd.DataFrame(
+        {
+            "msa_id": ["99999", "99999", "99999", "88888"],
+            "cbsa_code": ["99999", "99999", "99999", "88888"],
+            "county_fips": ["36061", "29510", "06075", "17031"],
+        }
+    )
+    county_gdf = _block_population_county_gdf()
+    blocks = _prepare_blocks(_block_gdf(), _block_population_df())
+    msa = _build_msa_geometry_from_counties(county_gdf, membership)
+    overlay_intersections = _block_geometry_denominator(
+        msa,
+        blocks,
+        left_id_col="msa_id",
+        output_area_col="msa_intersection_area",
+    )
+    expected = _summarize_block_denominator(
+        overlay_intersections,
+        id_col="msa_id",
+        denominator_col="msa_population_denominator",
+        area_col="msa_intersection_area",
+        output_area_col="msa_intersection_area",
+        missing_col="msa_missing_population_block_count",
+    )
+
+    actual = _summarize_msa_block_denominator_from_membership(blocks, membership)
+
+    pd.testing.assert_frame_equal(
+        _msa_denominator_comparison_frame(actual),
+        _msa_denominator_comparison_frame(expected),
     )
 
 

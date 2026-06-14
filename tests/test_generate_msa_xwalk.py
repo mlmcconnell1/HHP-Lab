@@ -72,12 +72,13 @@ def _write_block_population_inputs(tmp_path: Path) -> None:
     tiger_dir.mkdir(parents=True, exist_ok=True)
     census_dir.mkdir(parents=True, exist_ok=True)
 
+    block_geoid = "360610001001000"
     gpd.GeoDataFrame(
-        {"block_geoid": ["B1"]},
+        {"block_geoid": [block_geoid]},
         geometry=[box(0, 0, 10, 10)],
         crs="EPSG:4326",
     ).to_parquet(tiger_dir / "blocks__K2020.parquet")
-    pd.DataFrame({"block_geoid": ["B1"], "total_population": [100]}).to_parquet(
+    pd.DataFrame({"block_geoid": [block_geoid], "total_population": [100]}).to_parquet(
         census_dir / "pl_blocks__N2020xK2020.parquet"
     )
 
@@ -223,6 +224,8 @@ def test_generate_msa_xwalk_json_block_population(monkeypatch, tmp_path: Path):
         "msa_coc_xwalk__N2020@B2025xMcensus_msa_2023xC2023xK2020"
         "__basis-block_population.parquet"
     )
+    crosswalk = pd.read_parquet(payload["artifact"])
+    assert crosswalk["msa_population_denominator"].tolist() == [100.0]
 
 
 @pytest.mark.parametrize(
