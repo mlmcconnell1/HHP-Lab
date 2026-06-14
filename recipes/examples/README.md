@@ -10,6 +10,7 @@ users. Together they cover the current recipe surface:
 - Recipe-native map outputs with layered CoC / MSA / metro overlays
 - Recipe-native containment outputs for MSA-to-CoC and CoC-to-county candidate lists
 - MSA-CoC containment panels at `msa_id x coc_id x year` grain
+- CoC-to-MSA fractional rollups at `msa_id x year` grain
 - `file_set`-driven year/geometry switching
 - Point-in-time and calendar-mean temporal filters
 - ACS1/ACS5 small-area estimation (SAE) recipe planning and preflight
@@ -108,6 +109,11 @@ the output downstream.
 - `msa-census-pit-acs-pep-2020-2021.yaml`
   Census MSA panel that uses CoC-native PIT allocated through the generated
   CoC-to-MSA crosswalk, plus county PEP and lagged ACS5 tract measures.
+- `msa-fractional-pit-rollup-2020-2021.yaml`
+  Census MSA-year PIT panel that uses the first-class
+  `msa_fractional_rollup` target contract. It allocates CoC-native additive PIT
+  counts through a block-population CoC-to-MSA fractional crosswalk and writes
+  one row per `msa_id x year`.
 - `msa-coc-containment-denver-2025.yaml`
   Containment-only recipe that writes 2025 CoCs whose area overlaps the Denver
   Census MSA above the configured threshold.
@@ -136,6 +142,36 @@ the output downstream.
 - MSA PIT values are derived from the stored CoC-to-MSA crosswalk rather than
   published natively by HUD. See [background/msa_geography.md](../../background/msa_geography.md)
   for the allocation rule and prerequisites.
+- Use `msa_fractional_rollup` when the desired output grain is `msa_id x year`
+  and the source measures are additive CoC-year quantities such as PIT counts.
+  Do not use it for native MSA covariates such as MSA PEP population, ACS1
+  unemployment, or LAUS unemployment; build those with MSA-native or
+  county/tract-to-MSA recipe steps and join downstream if needed.
+- `allocation_basis: block_population` is the preferred MSA rollup basis when
+  PL 94-171 block population and TIGER block geometry are available. It
+  allocates each CoC's additive source values by the share of its decennial
+  block population that falls in each MSA. `allocation_basis: area` remains a
+  supported fallback or explicit diagnostic mode and uses geometric overlap
+  area instead of population.
+- Block-population MSA rollups need these curated prerequisites:
+  `hhplab ingest boundaries --source hud_exchange --vintage 2025`,
+  `hhplab ingest tiger --year 2023 --type counties`,
+  `hhplab generate msa --definition-version census_msa_2023`,
+  `hhplab ingest tiger --year 2020 --type blocks`,
+  `hhplab ingest pl-blocks --decennial 2020 --blocks 2020`, then
+  `hhplab generate msa-xwalk --allocation-basis block_population --boundary 2025 --definition-version census_msa_2023 --counties 2023 --blocks 2020 --decennial 2020`.
+  Area mode uses the shorter crosswalk build command:
+  `hhplab generate msa-xwalk --allocation-basis area --boundary 2025 --definition-version census_msa_2023 --counties 2023`.
+- Fractional rollup thresholds are inclusive filters applied before summing:
+  `min_coc_population_containment_share` keeps only CoC-MSA rows where enough
+  of the CoC denominator population is contained in that MSA,
+  `min_msa_population_coverage_share` keeps rows where CoCs cover enough of
+  the MSA denominator population, and `min_allocation_share` drops very small
+  fractional allocations. The output diagnostics preserve the threshold values
+  plus missing-CoC, zero-population, allocation-share, and coverage fields.
+- PL 94-171 block population is decennial. Current block-population examples
+  use 2020 block geometry and 2020 PL population as stable denominators for
+  allocation; those values are not current-year population estimates.
 - Containment recipes do not need datasets or transforms. They read curated
   geometry artifacts directly and should be checked with `hhplab build
   recipe-preflight --json` before running `hhplab build recipe --json`.

@@ -1,0 +1,85 @@
+# Example recipe: Census MSA PIT rollup with fractional CoC allocation.
+# Run preflight before build:
+#   HHPLAB_NON_INTERACTIVE=1 hhplab build recipe-preflight --recipe recipes/examples/msa-fractional-pit-rollup-2020-2021.yaml --json
+# Inspect the resolved task graph:
+#   HHPLAB_NON_INTERACTIVE=1 hhplab build recipe-plan --recipe recipes/examples/msa-fractional-pit-rollup-2020-2021.yaml --json
+#
+# This recipe writes an MSA-year panel from CoC-native additive PIT counts.
+# It uses a prebuilt CoC-to-MSA fractional crosswalk rather than generic
+# recipe transforms because one CoC can contribute fractional shares to
+# multiple MSAs.
+
+version: 1
+name: msa_fractional_pit_rollup_2020_2021
+description: >
+  Build a Census MSA-year PIT panel for 2020-2021 by allocating CoC-native PIT
+  counts to official Census MSAs with a block-population CoC-to-MSA fractional
+  crosswalk. The output grain is msa_id x year.
+
+universe:
+  range: "2020-2021"
+
+targets:
+  - id: msa_pit_rollup
+    geometry: { type: msa, source: census_msa_2023 }
+    outputs: [panel]
+    msa_fractional_rollup:
+      allocation_basis: block_population
+      denominator_source: pl_94_171_block_population
+      coc_boundary_vintage: 2025
+      msa_definition_version: census_msa_2023
+      county_vintage: 2023
+      block_vintage: 2020
+      decennial_population_vintage: 2020
+      additive_measure_columns:
+        - pit_total
+        - pit_sheltered
+        - pit_unsheltered
+      min_coc_population_containment_share: 0.0
+      min_msa_population_coverage_share: 0.0
+      min_allocation_share: 0.01
+      output_aliases:
+        pit_total: msa_pit_total
+        pit_sheltered: msa_pit_sheltered
+        pit_unsheltered: msa_pit_unsheltered
+      naming:
+        measure_set_id: pit
+        output_id: january_pit
+      provenance:
+        source_dataset_id: pit
+        source_measure_columns:
+          - pit_total
+          - pit_sheltered
+          - pit_unsheltered
+        source_year_column: pit_year
+        source_coc_id_column: coc_id
+        source_label: hud_pit_fractional_msa_rollup
+
+datasets:
+  pit:
+    provider: hud
+    product: pit
+    version: 1
+    native_geometry: { type: coc }
+    years: "2020-2021"
+    year_column: pit_year
+    geo_column: coc_id
+    params:
+      vintage: 2024
+      align: point_in_time_jan
+    path: data/curated/pit/pit_vintage__P2024.parquet
+
+transforms: []
+
+pipelines:
+  - id: build_msa_pit_rollup
+    target: msa_pit_rollup
+    steps:
+      - resample:
+          dataset: pit
+          to_geometry: { type: coc, vintage: 2025 }
+          method: identity
+          measures:
+            - pit_total
+            - pit_sheltered
+            - pit_unsheltered
