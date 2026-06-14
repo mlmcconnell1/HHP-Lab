@@ -715,8 +715,11 @@ def aggregate_coc_to_msa_fractional_rollup(
 
     resolved = _fractional_rollup_metadata(crosswalk)
     expected_meta = _fractional_rollup_expected_meta(crosswalk)
+    merge_columns = ["coc_id", "msa_id", "allocation_share"]
+    if "msa_population_coverage_share" in crosswalk.columns:
+        merge_columns.append("msa_population_coverage_share")
     merged = source.merge(
-        crosswalk[["coc_id", "msa_id", "allocation_share"]],
+        crosswalk[merge_columns],
         on="coc_id",
         how="inner",
     )
@@ -724,17 +727,26 @@ def aggregate_coc_to_msa_fractional_rollup(
     for measure in measures:
         weighted[measure] = weighted[measure] * weighted["allocation_share"]
 
+    rollup_aggregations: dict[str, tuple[str, object]] = {
+        measure: (measure, "sum")
+        for measure in measures
+    }
+    rollup_aggregations.update(
+        {
+            "covered_coc_count": ("coc_id", "nunique"),
+            "allocation_share_sum": ("allocation_share", "sum"),
+            "found_cocs": ("coc_id", lambda s: tuple(sorted({str(value) for value in s}))),
+        }
+    )
+    if "msa_population_coverage_share" in weighted.columns:
+        rollup_aggregations["actual_msa_population_coverage_share"] = (
+            "msa_population_coverage_share",
+            "sum",
+        )
+
     rollup = (
         weighted.groupby(["msa_id", "year"], as_index=False)
-        .agg(
-            **{
-                measure: (measure, "sum")
-                for measure in measures
-            },
-            covered_coc_count=("coc_id", "nunique"),
-            allocation_share_sum=("allocation_share", "sum"),
-            found_cocs=("coc_id", lambda s: tuple(sorted({str(value) for value in s}))),
-        )
+        .agg(**rollup_aggregations)
         if not weighted.empty
         else pd.DataFrame(
             columns=[
@@ -799,8 +811,11 @@ def aggregate_coc_to_msa_fractional_rollup(
             ),
             "msa_population_coverage_ratio": _coverage_value(
                 row,
-                "expected_msa_population_coverage_share",
-                default=allocation_share_sum,
+                "actual_msa_population_coverage_share",
+                default=_coverage_fraction(
+                    allocation_share_sum,
+                    float(row.expected_allocation_share_sum),
+                ),
             ),
             "allocation_share_sum": allocation_share_sum,
             "expected_allocation_share_sum": float(row.expected_allocation_share_sum),
@@ -996,7 +1011,19 @@ def _tuple_or_empty(value: object) -> tuple[str, ...]:
 
 def _coverage_value(row: object, field_name: str, *, default: float) -> float:
     value = getattr(row, field_name, default)
-    return float(value) if pd.notna(value) else default
+    if pd.isna(value):
+        value = default
+    return _bounded_coverage(float(value))
+
+
+def _coverage_fraction(numerator: float, denominator: float) -> float:
+    if denominator <= 0:
+        return 0.0
+    return _bounded_coverage(numerator / denominator)
+
+
+def _bounded_coverage(value: float) -> float:
+    return min(max(value, 0.0), 1.0)
 
 
 def _empty_fractional_rollup(measures: tuple[str, ...]) -> pd.DataFrame:

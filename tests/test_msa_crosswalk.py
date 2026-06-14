@@ -283,6 +283,7 @@ def test_fractional_rollup_aggregates_area_crosswalk_additive_measures(
     assert ny["allocation_share_sum"] == pytest.approx(1.5)
     assert ny["expected_allocation_share_sum"] == pytest.approx(1.5)
     assert ny["coc_population_coverage_ratio"] == pytest.approx(1.0)
+    assert ny["msa_population_coverage_ratio"] == pytest.approx(1.0)
 
 
 def test_fractional_rollup_reports_missing_source_cocs(coc_msa_crosswalk: pd.DataFrame):
@@ -307,9 +308,11 @@ def test_fractional_rollup_reports_missing_source_cocs(coc_msa_crosswalk: pd.Dat
     assert ny["missing_cocs"] == "CO-200"
     assert ny["missing_coc_count"] == 1
     assert ny["coc_population_coverage_ratio"] == pytest.approx(2.0 / 3.0)
+    assert ny["msa_population_coverage_ratio"] == pytest.approx(2.0 / 3.0)
     assert pd.isna(stl["pit_total"])
     assert stl["missing_cocs"] == "CO-200,CO-300,CO-400"
     assert stl["coc_population_coverage_ratio"] == pytest.approx(0.0)
+    assert stl["msa_population_coverage_ratio"] == pytest.approx(0.0)
 
 
 def test_fractional_rollup_thresholds_filter_crosswalk_rows(
@@ -396,6 +399,37 @@ def test_block_population_rollup_matches_area_when_allocation_shares_match(
     assert block_population["denominator_source"].unique().tolist() == [
         "pl_94_171_block_population"
     ]
+
+
+def test_fractional_rollup_msa_population_coverage_uses_source_covered_cocs(
+    coc_msa_crosswalk: pd.DataFrame,
+):
+    source = pd.DataFrame(
+        {
+            "coc_id": ["CO-100"],
+            "year": [2020],
+            "pit_total": [100.0],
+        }
+    )
+    block_like_crosswalk = coc_msa_crosswalk[
+        (coc_msa_crosswalk["msa_id"] == "35620")
+    ].copy()
+    block_like_crosswalk["allocation_method"] = "block_population"
+    block_like_crosswalk["msa_population_coverage_share"] = block_like_crosswalk[
+        "coc_id"
+    ].map({"CO-100": 0.4, "CO-200": 0.6})
+
+    result = aggregate_coc_to_msa_fractional_rollup(
+        source,
+        block_like_crosswalk,
+        additive_measure_columns=("pit_total",),
+        source_dataset_id="pit_coc",
+    )
+
+    row = result.iloc[0]
+    assert row["pit_total"] == pytest.approx(100.0)
+    assert row["missing_cocs"] == "CO-200"
+    assert row["msa_population_coverage_ratio"] == pytest.approx(0.4)
 
 
 @pytest.fixture
