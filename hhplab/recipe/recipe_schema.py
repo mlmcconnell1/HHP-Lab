@@ -221,6 +221,11 @@ OutputKind = Literal["panel", "diagnostics", "map", "containment", "msa_coc_cove
 CohortMethod = Literal["top_n", "bottom_n", "percentile", "predicate"]
 CohortPredicateOperator = Literal["gte", "lte", "gt", "lt", "eq"]
 MsaCocOverlapBasis = Literal["area", "population"]
+MsaFractionalRollupAllocationBasis = Literal["block_population", "area"]
+MsaFractionalRollupDenominatorSource = Literal[
+    "pl_94_171_block_population",
+    "geometry_area",
+]
 PrimaryMsaPopulationSource = Literal["acs5", "decennial"]
 
 
@@ -1000,6 +1005,237 @@ class MsaCocCoverageSpec(BaseModel):
         return self
 
 
+class MsaFractionalRollupNamingSpec(BaseModel):
+    """Output naming inputs for fractional CoC-to-MSA rollup panels."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    measure_set_id: str = Field(
+        ...,
+        description=(
+            "Stable token identifying the source additive measure set, for example 'pit'."
+        ),
+    )
+    output_id: str | None = Field(
+        default=None,
+        description=(
+            "Optional stable output token when a recipe writes multiple fractional "
+            "MSA rollups from the same measure set."
+        ),
+    )
+
+    @field_validator("measure_set_id", "output_id")
+    @classmethod
+    def _validate_tokens(cls, value: str | None) -> str | None:
+        if value is None:
+            return value
+        if not value.strip():
+            raise ValueError("MsaFractionalRollupNamingSpec tokens may not be blank.")
+        return value
+
+
+class MsaFractionalRollupProvenanceSpec(BaseModel):
+    """Provenance fields required for fractional CoC-to-MSA rollup outputs."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    source_dataset_id: str = Field(
+        ...,
+        description="Recipe dataset id containing the CoC-native additive measures.",
+    )
+    source_measure_columns: list[str] = Field(
+        ...,
+        min_length=1,
+        description="CoC-native additive source columns consumed by the rollup.",
+    )
+    source_year_column: str = Field(
+        default="year",
+        description="Year column in the CoC-native source artifact.",
+    )
+    source_coc_id_column: str = Field(
+        default="coc_id",
+        description="CoC identifier column in the source artifact.",
+    )
+    source_label: str = Field(
+        default="coc_to_msa_fractional_rollup",
+        description="Stable source label embedded in the output artifact.",
+    )
+
+    @field_validator(
+        "source_dataset_id",
+        "source_year_column",
+        "source_coc_id_column",
+        "source_label",
+    )
+    @classmethod
+    def _validate_required_text(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("MsaFractionalRollupProvenanceSpec string fields may not be blank.")
+        return value
+
+    @field_validator("source_measure_columns")
+    @classmethod
+    def _validate_source_measure_columns(cls, value: list[str]) -> list[str]:
+        normalized = [column.strip() for column in value]
+        if any(not column for column in normalized):
+            raise ValueError(
+                "MsaFractionalRollupProvenanceSpec.source_measure_columns may not contain blanks."
+            )
+        if len(set(normalized)) != len(normalized):
+            raise ValueError(
+                "MsaFractionalRollupProvenanceSpec.source_measure_columns may not "
+                "contain duplicates."
+            )
+        return normalized
+
+
+class MsaFractionalRollupSpec(BaseModel):
+    """Declarative contract for CoC-to-MSA fractional rollup panels.
+
+    The output grain is exactly ``msa_id x year``. Source measures must be
+    additive at CoC-year grain because each value is multiplied by a
+    CoC-to-MSA allocation share before summing to MSA-year rows.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    row_grain: Literal["msa_id x year"] = Field(
+        default="msa_id x year",
+        description="Explicit output grain for the rollup artifact.",
+    )
+    allocation_basis: MsaFractionalRollupAllocationBasis = Field(
+        ...,
+        description="Basis used to allocate CoC-native additive measures to MSAs.",
+    )
+    denominator_source: MsaFractionalRollupDenominatorSource = Field(
+        ...,
+        description="Denominator source paired with the selected allocation basis.",
+    )
+    coc_boundary_vintage: int | str = Field(
+        ...,
+        description="CoC boundary vintage used by the allocation crosswalk.",
+    )
+    msa_definition_version: str = Field(
+        ...,
+        description="MSA definition version used for county membership.",
+    )
+    county_vintage: int | str = Field(
+        ...,
+        description="County geometry vintage used to dissolve MSA boundaries.",
+    )
+    block_vintage: int | str = Field(
+        ...,
+        description="Census block geometry vintage used for block-population allocation.",
+    )
+    decennial_population_vintage: int | str = Field(
+        ...,
+        description="Decennial PL 94-171 population vintage used for block denominators.",
+    )
+    additive_measure_columns: list[str] = Field(
+        ...,
+        min_length=1,
+        description="CoC-native additive measure columns to allocate and sum.",
+    )
+    min_coc_population_containment_share: float | None = Field(
+        default=None,
+        ge=0.0,
+        le=1.0,
+        description=(
+            "Inclusive minimum share of each CoC's denominator population that must "
+            "be allocated to an MSA before the CoC contributes to that MSA row."
+        ),
+    )
+    min_msa_population_coverage_share: float | None = Field(
+        default=None,
+        ge=0.0,
+        le=1.0,
+        description=(
+            "Inclusive minimum share of each MSA's denominator population covered by "
+            "allocated CoC intersections."
+        ),
+    )
+    min_allocation_share: float | None = Field(
+        default=None,
+        ge=0.0,
+        le=1.0,
+        description="Inclusive minimum CoC-to-MSA allocation share retained in rollups.",
+    )
+    output_aliases: dict[str, str] = Field(
+        default_factory=dict,
+        description="Optional aliases from additive source columns to output measure columns.",
+    )
+    naming: MsaFractionalRollupNamingSpec = Field(
+        ...,
+        description="Canonical output naming inputs for the rollup artifact.",
+    )
+    provenance: MsaFractionalRollupProvenanceSpec = Field(
+        ...,
+        description="Source and field provenance embedded in the output artifact.",
+    )
+
+    @field_validator("msa_definition_version")
+    @classmethod
+    def _validate_msa_definition_version(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("MsaFractionalRollupSpec.msa_definition_version must be non-empty.")
+        return value
+
+    @field_validator("additive_measure_columns")
+    @classmethod
+    def _validate_additive_measure_columns(cls, value: list[str]) -> list[str]:
+        normalized = [column.strip() for column in value]
+        if any(not column for column in normalized):
+            raise ValueError(
+                "MsaFractionalRollupSpec.additive_measure_columns may not contain blanks."
+            )
+        if len(set(normalized)) != len(normalized):
+            raise ValueError(
+                "MsaFractionalRollupSpec.additive_measure_columns may not contain duplicates."
+            )
+        return normalized
+
+    @field_validator("output_aliases")
+    @classmethod
+    def _validate_output_aliases(cls, value: dict[str, str]) -> dict[str, str]:
+        for source, alias in value.items():
+            if not source.strip() or not alias.strip():
+                raise ValueError(
+                    "MsaFractionalRollupSpec.output_aliases may not contain blank keys/values."
+                )
+        return value
+
+    @model_validator(mode="after")
+    def _validate_allocation_contract(self) -> MsaFractionalRollupSpec:
+        expected_denominator = {
+            "block_population": "pl_94_171_block_population",
+            "area": "geometry_area",
+        }[self.allocation_basis]
+        if self.denominator_source != expected_denominator:
+            raise ValueError(
+                "MsaFractionalRollupSpec denominator_source must be "
+                f"'{expected_denominator}' when allocation_basis is "
+                f"'{self.allocation_basis}'."
+            )
+        missing_from_provenance = sorted(
+            set(self.additive_measure_columns) - set(self.provenance.source_measure_columns)
+        )
+        if missing_from_provenance:
+            raise ValueError(
+                "MsaFractionalRollupSpec provenance.source_measure_columns must include "
+                "every additive_measure_columns value; missing "
+                f"{', '.join(missing_from_provenance)}."
+            )
+        unknown_alias_sources = sorted(
+            set(self.output_aliases) - set(self.additive_measure_columns)
+        )
+        if unknown_alias_sources:
+            raise ValueError(
+                "MsaFractionalRollupSpec.output_aliases keys must be additive measures; "
+                f"unknown {', '.join(unknown_alias_sources)}."
+            )
+        return self
+
+
 class CohortSelector(BaseModel):
     """Declarative cohort filter for selecting panel geographies.
 
@@ -1121,6 +1357,12 @@ class TargetSpec(BaseModel):
             "msa_id x coc_id x overlap_basis for one year."
         ),
     )
+    msa_fractional_rollup: MsaFractionalRollupSpec | None = Field(
+        default=None,
+        description=(
+            "Declarative CoC-to-MSA fractional rollup panel with row grain msa_id x year."
+        ),
+    )
 
     @model_validator(mode="after")
     def _validate_output_policies(self) -> TargetSpec:
@@ -1172,6 +1414,15 @@ class TargetSpec(BaseModel):
             )
         if self.msa_coc_coverage is not None and self.geometry.type != "coc":
             raise ValueError("Target 'msa_coc_coverage' requires target geometry type 'coc'.")
+        if self.msa_fractional_rollup is not None:
+            if "panel" not in outputs:
+                raise ValueError(
+                    "Target 'msa_fractional_rollup' requires outputs to include 'panel'."
+                )
+            if self.geometry.type != "msa":
+                raise ValueError(
+                    "Target 'msa_fractional_rollup' requires target geometry type 'msa'."
+                )
         return self
 
 

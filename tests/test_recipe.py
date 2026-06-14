@@ -67,6 +67,7 @@ from hhplab.recipe.recipe_schema import (
     MapSpec,
     MsaCocCoverageSpec,
     MsaCocPanelSpec,
+    MsaFractionalRollupSpec,
     PanelPolicy,
     PrimaryMsaAnnotationColumns,
     PrimaryMsaPolicy,
@@ -3243,6 +3244,129 @@ class TestMsaCocPanelSpec:
                 unemployment_source="acs5",
                 output_aliases={"msa_population": "msa_population_pep"},
             )
+
+
+def _msa_fractional_rollup_recipe() -> dict:
+    data = _minimal_recipe()
+    data["universe"] = {"years": [2024]}
+    data["targets"] = [
+        {
+            "id": "msa_pit_rollup",
+            "geometry": {
+                "type": "msa",
+                "source": "census_msa_2023",
+                "vintage": 2023,
+            },
+            "outputs": ["panel"],
+            "msa_fractional_rollup": {
+                "allocation_basis": "block_population",
+                "denominator_source": "pl_94_171_block_population",
+                "coc_boundary_vintage": 2025,
+                "msa_definition_version": "census_msa_2023",
+                "county_vintage": 2023,
+                "block_vintage": 2020,
+                "decennial_population_vintage": 2020,
+                "additive_measure_columns": [
+                    "pit_total",
+                    "pit_sheltered",
+                    "pit_unsheltered",
+                ],
+                "min_coc_population_containment_share": 0.5,
+                "min_msa_population_coverage_share": 0.9,
+                "min_allocation_share": 0.01,
+                "output_aliases": {
+                    "pit_total": "msa_pit_total",
+                    "pit_sheltered": "msa_pit_sheltered",
+                },
+                "naming": {
+                    "measure_set_id": "pit",
+                    "output_id": "january_pit",
+                },
+                "provenance": {
+                    "source_dataset_id": "pit_coc",
+                    "source_measure_columns": [
+                        "pit_total",
+                        "pit_sheltered",
+                        "pit_unsheltered",
+                    ],
+                    "source_year_column": "year",
+                    "source_coc_id_column": "coc_id",
+                    "source_label": "hud_pit_fractional_msa_rollup",
+                },
+            },
+        }
+    ]
+    data["pipelines"][0]["target"] = "msa_pit_rollup"
+    return data
+
+
+class TestMsaFractionalRollupSpec:
+    """Tests for the CoC-to-MSA fractional rollup recipe contract."""
+
+    def test_spec_loads_with_block_population_contract_fields(self):
+        recipe = load_recipe(_msa_fractional_rollup_recipe())
+        spec = recipe.targets[0].msa_fractional_rollup
+
+        assert isinstance(spec, MsaFractionalRollupSpec)
+        assert spec.row_grain == "msa_id x year"
+        assert spec.allocation_basis == "block_population"
+        assert spec.denominator_source == "pl_94_171_block_population"
+        assert spec.coc_boundary_vintage == 2025
+        assert spec.msa_definition_version == "census_msa_2023"
+        assert spec.county_vintage == 2023
+        assert spec.block_vintage == 2020
+        assert spec.decennial_population_vintage == 2020
+        assert spec.additive_measure_columns == [
+            "pit_total",
+            "pit_sheltered",
+            "pit_unsheltered",
+        ]
+        assert spec.min_coc_population_containment_share == 0.5
+        assert spec.min_msa_population_coverage_share == 0.9
+        assert spec.naming.measure_set_id == "pit"
+        assert spec.provenance.source_dataset_id == "pit_coc"
+
+    def test_area_basis_requires_geometry_area_denominator_source(self):
+        data = _msa_fractional_rollup_recipe()
+        spec = data["targets"][0]["msa_fractional_rollup"]
+        spec["allocation_basis"] = "area"
+
+        with pytest.raises(RecipeLoadError, match="denominator_source must be 'geometry_area'"):
+            load_recipe(data)
+
+        spec["denominator_source"] = "geometry_area"
+        recipe = load_recipe(data)
+
+        assert recipe.targets[0].msa_fractional_rollup.allocation_basis == "area"
+
+    def test_spec_requires_panel_output_and_msa_target_geometry(self):
+        data = _msa_fractional_rollup_recipe()
+        data["targets"][0]["outputs"] = ["diagnostics"]
+
+        with pytest.raises(RecipeLoadError, match="requires outputs to include 'panel'"):
+            load_recipe(data)
+
+        data = _msa_fractional_rollup_recipe()
+        data["targets"][0]["geometry"] = {"type": "coc", "vintage": 2025}
+
+        with pytest.raises(RecipeLoadError, match="requires target geometry type 'msa'"):
+            load_recipe(data)
+
+    def test_provenance_must_cover_all_additive_measures(self):
+        data = _msa_fractional_rollup_recipe()
+        spec = data["targets"][0]["msa_fractional_rollup"]
+        spec["provenance"]["source_measure_columns"] = ["pit_total"]
+
+        with pytest.raises(RecipeLoadError, match="must include every additive_measure_columns"):
+            load_recipe(data)
+
+    def test_output_alias_keys_must_be_additive_measures(self):
+        data = _msa_fractional_rollup_recipe()
+        spec = data["targets"][0]["msa_fractional_rollup"]
+        spec["output_aliases"]["median_rent"] = "msa_median_rent"
+
+        with pytest.raises(RecipeLoadError, match="output_aliases keys must be additive measures"):
+            load_recipe(data)
 
 
 def _msa_coc_coverage_recipe() -> dict:
