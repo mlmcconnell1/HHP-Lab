@@ -2,14 +2,21 @@
 
 from __future__ import annotations
 
-from typing import Annotated
+from typing import Annotated, Literal
 
 import geopandas as gpd
+import pandas as pd
 import typer
 
 from hhplab.geo.geo_io import resolve_curated_boundary_path
 from hhplab.msa.msa_definitions import DEFINITION_VERSION, DELINEATION_FILE_YEAR
-from hhplab.naming import county_path, msa_coc_xwalk_path
+from hhplab.naming import (
+    block_geometry_path,
+    county_path,
+    msa_coc_block_population_xwalk_path,
+    msa_coc_xwalk_path,
+    pl_block_population_path,
+)
 from hhplab.registry.boundary_registry import latest_vintage, list_boundaries
 
 
@@ -59,6 +66,27 @@ def generate_msa_xwalk(
             help="MSA definition version to use.",
         ),
     ] = DEFINITION_VERSION,
+    allocation_basis: Annotated[
+        Literal["area", "block_population"],
+        typer.Option(
+            "--allocation-basis",
+            help="Allocation basis for the CoC-to-MSA crosswalk.",
+        ),
+    ] = "area",
+    blocks: Annotated[
+        int,
+        typer.Option(
+            "--blocks",
+            help="Block geometry vintage for block-population allocation.",
+        ),
+    ] = 2020,
+    decennial: Annotated[
+        int,
+        typer.Option(
+            "--decennial",
+            help="Decennial PL 94-171 population vintage for block-population allocation.",
+        ),
+    ] = 2020,
     force: Annotated[
         bool,
         typer.Option(
@@ -79,7 +107,9 @@ def generate_msa_xwalk(
 
     from hhplab.msa.crosswalk import (
         FULL_ALLOCATION_THRESHOLD,
+        build_coc_msa_block_population_crosswalk,
         build_coc_msa_crosswalk,
+        save_coc_msa_block_population_crosswalk,
         save_coc_msa_crosswalk,
         summarize_coc_msa_allocation,
     )
@@ -94,11 +124,20 @@ def generate_msa_xwalk(
             typer.echo(f"Error: {exc}", err=True)
         raise typer.Exit(1) from exc
 
-    output_path = msa_coc_xwalk_path(
-        resolved_boundary,
-        definition_version,
-        counties,
-    )
+    if allocation_basis == "block_population":
+        output_path = msa_coc_block_population_xwalk_path(
+            resolved_boundary,
+            definition_version,
+            counties,
+            blocks,
+            decennial,
+        )
+    else:
+        output_path = msa_coc_xwalk_path(
+            resolved_boundary,
+            definition_version,
+            counties,
+        )
     if output_path.exists() and not force:
         payload = {
             "status": "error",
@@ -129,6 +168,8 @@ def generate_msa_xwalk(
         raise typer.Exit(1) from exc
 
     county_geometry_path = county_path(counties)
+    block_geometry_artifact = block_geometry_path(blocks)
+    block_population_artifact = pl_block_population_path(decennial, blocks)
 
     if not boundary_path.exists():
         message = (
@@ -151,6 +192,26 @@ def generate_msa_xwalk(
         else:
             typer.echo(f"Error: {message}", err=True)
         raise typer.Exit(1)
+    if allocation_basis == "block_population" and not block_geometry_artifact.exists():
+        message = (
+            f"Block geometry file not found at {block_geometry_artifact}. "
+            f"Run: hhplab ingest tiger --year {blocks} --type blocks"
+        )
+        if json_output:
+            typer.echo(json.dumps({"status": "error", "error": message}))
+        else:
+            typer.echo(f"Error: {message}", err=True)
+        raise typer.Exit(1)
+    if allocation_basis == "block_population" and not block_population_artifact.exists():
+        message = (
+            f"PL block population file not found at {block_population_artifact}. "
+            f"Run: hhplab ingest pl-blocks --decennial {decennial} --blocks {blocks}"
+        )
+        if json_output:
+            typer.echo(json.dumps({"status": "error", "error": message}))
+        else:
+            typer.echo(f"Error: {message}", err=True)
+        raise typer.Exit(1)
 
     try:
         msa_membership = read_msa_county_membership(definition_version)
@@ -164,20 +225,37 @@ def generate_msa_xwalk(
     if not json_output:
         typer.echo(
             "Building CoC-to-MSA crosswalk "
-            f"(boundary={resolved_boundary}, msa={definition_version}, counties={counties})..."
+            f"(boundary={resolved_boundary}, msa={definition_version}, counties={counties}, "
+            f"allocation_basis={allocation_basis})..."
         )
 
     try:
         coc_gdf = gpd.read_parquet(boundary_path)
         county_gdf = gpd.read_parquet(county_geometry_path)
-        crosswalk = build_coc_msa_crosswalk(
-            coc_gdf,
-            county_gdf,
-            msa_membership,
-            boundary_vintage=resolved_boundary,
-            county_vintage=str(counties),
-            definition_version=definition_version,
-        )
+        if allocation_basis == "block_population":
+            block_gdf = gpd.read_parquet(block_geometry_artifact)
+            block_population = pd.read_parquet(block_population_artifact)
+            crosswalk = build_coc_msa_block_population_crosswalk(
+                coc_gdf,
+                county_gdf,
+                msa_membership,
+                block_gdf,
+                block_population,
+                boundary_vintage=resolved_boundary,
+                county_vintage=str(counties),
+                block_vintage=str(blocks),
+                decennial_vintage=str(decennial),
+                definition_version=definition_version,
+            )
+        else:
+            crosswalk = build_coc_msa_crosswalk(
+                coc_gdf,
+                county_gdf,
+                msa_membership,
+                boundary_vintage=resolved_boundary,
+                county_vintage=str(counties),
+                definition_version=definition_version,
+            )
     except (ValueError, OSError) as exc:
         if json_output:
             typer.echo(json.dumps({"status": "error", "error": str(exc)}))
@@ -185,12 +263,22 @@ def generate_msa_xwalk(
             typer.echo(f"Error: {exc}", err=True)
         raise typer.Exit(1) from exc
 
-    written_path = save_coc_msa_crosswalk(
-        crosswalk,
-        boundary_vintage=resolved_boundary,
-        county_vintage=str(counties),
-        definition_version=definition_version,
-    )
+    if allocation_basis == "block_population":
+        written_path = save_coc_msa_block_population_crosswalk(
+            crosswalk,
+            boundary_vintage=resolved_boundary,
+            county_vintage=str(counties),
+            block_vintage=str(blocks),
+            decennial_vintage=str(decennial),
+            definition_version=definition_version,
+        )
+    else:
+        written_path = save_coc_msa_crosswalk(
+            crosswalk,
+            boundary_vintage=resolved_boundary,
+            county_vintage=str(counties),
+            definition_version=definition_version,
+        )
     allocation_summary = summarize_coc_msa_allocation(crosswalk)
     partial_allocations = int(
         (allocation_summary["allocation_share_sum"] < FULL_ALLOCATION_THRESHOLD).sum()
@@ -202,9 +290,12 @@ def generate_msa_xwalk(
     )
     payload = {
         "status": "ok",
+        "allocation_basis": allocation_basis,
         "boundary_vintage": resolved_boundary,
         "definition_version": definition_version,
         "county_vintage": str(counties),
+        "block_vintage": str(blocks) if allocation_basis == "block_population" else None,
+        "decennial_vintage": str(decennial) if allocation_basis == "block_population" else None,
         "rows": int(len(crosswalk)),
         "coc_count": int(crosswalk["coc_id"].nunique()) if not crosswalk.empty else 0,
         "msa_count": int(crosswalk["msa_id"].nunique()) if not crosswalk.empty else 0,

@@ -1,6 +1,7 @@
 """Tests for MSA definition naming helpers."""
 
 from hhplab.naming import (
+    block_geometry_path,
     coc_urban_area_detail_filename,
     coc_urban_area_detail_path,
     coc_urban_fraction_filename,
@@ -8,6 +9,8 @@ from hhplab.naming import (
     geo_panel_filename,
     msa_boundaries_filename,
     msa_boundaries_path,
+    msa_coc_block_population_xwalk_filename,
+    msa_coc_block_population_xwalk_path,
     msa_coc_coverage_filename,
     msa_coc_coverage_path,
     msa_coc_xwalk_filename,
@@ -73,6 +76,42 @@ def test_msa_coc_xwalk_filename():
 def test_msa_coc_xwalk_path():
     assert str(msa_coc_xwalk_path("2025", "census_msa_2023", 2023)).endswith(
         "data/curated/xwalks/msa_coc_xwalk__B2025xMcensus_msa_2023xC2023.parquet"
+    )
+
+
+def test_block_geometry_path():
+    assert str(block_geometry_path(2020)).endswith("data/curated/tiger/blocks__K2020.parquet")
+
+
+def test_msa_coc_block_population_xwalk_filename():
+    assert (
+        msa_coc_block_population_xwalk_filename(
+            2025,
+            "census_msa_2023",
+            2023,
+            2020,
+            2020,
+        )
+        == (
+            "msa_coc_xwalk__N2020@B2025xMcensus_msa_2023xC2023xK2020"
+            "__basis-block_population.parquet"
+        )
+    )
+
+
+def test_msa_coc_block_population_xwalk_path():
+    assert str(
+        msa_coc_block_population_xwalk_path(
+            2025,
+            "census_msa_2023",
+            2023,
+            2020,
+            2020,
+        )
+    ).endswith(
+        "data/curated/xwalks/"
+        "msa_coc_xwalk__N2020@B2025xMcensus_msa_2023xC2023xK2020"
+        "__basis-block_population.parquet"
     )
 
 

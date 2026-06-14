@@ -87,6 +87,17 @@ def _scan_xwalks(curated: Path) -> dict:
             m = re.match(r"^msa_coc_xwalk__B(\d{4})xM(\w+)xC(\d{4})\.parquet$", p.name)
             if m:
                 msa_xwalks.append(f"B{m.group(1)}xM{m.group(2)}xC{m.group(3)}")
+                continue
+            m = re.match(
+                r"^msa_coc_xwalk__N(\d{4})@B(\d{4})xM(\w+)xC(\d{4})xK(\d{4})"
+                r"__basis-block_population\.parquet$",
+                p.name,
+            )
+            if m:
+                msa_xwalks.append(
+                    f"N{m.group(1)}@B{m.group(2)}xM{m.group(3)}xC{m.group(4)}"
+                    f"xK{m.group(5)}:block_population"
+                )
     return {"tract": tract_xwalks, "county": county_xwalks, "msa": msa_xwalks}
 
 

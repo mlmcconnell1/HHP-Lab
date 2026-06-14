@@ -73,6 +73,10 @@ CANONICAL_PATTERNS: dict[str, list[re.Pattern[str]]] = {
         re.compile(r"^xwalk__B\d{4}xC\d{4}\.parquet$"),
         re.compile(r"^xwalk_tract_mediated_county__[AN]\d{4}@B\d{4}xC\d{4}xT\d{4}\.parquet$"),
         re.compile(r"^msa_coc_xwalk__B\d{4}xM\w+xC\d{4}\.parquet$"),
+        re.compile(
+            r"^msa_coc_xwalk__N\d{4}@B\d{4}xM\w+xC\d{4}xK\d{4}"
+            r"__basis-block_population\.parquet$"
+        ),
     ],
     "acs": [
         re.compile(r"^acs5_tracts__A\d{4}xT\d{4}\.parquet$"),

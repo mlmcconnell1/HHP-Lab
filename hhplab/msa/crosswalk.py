@@ -10,7 +10,7 @@ import pandas as pd
 
 from hhplab.paths import curated_dir
 from hhplab.provenance import ProvenanceBlock, write_parquet_with_provenance
-from hhplab.xwalks.county import build_county_crosswalk
+from hhplab.xwalks.county import ALBERS_EQUAL_AREA_CRS, build_county_crosswalk
 
 REQUIRED_MSA_MEMBERSHIP_COLUMNS: tuple[str, ...] = (
     "msa_id",
@@ -33,6 +33,33 @@ COC_MSA_CROSSWALK_COLUMNS: tuple[str, ...] = (
     "coc_area",
     "intersecting_county_count",
     "intersecting_county_fips",
+)
+
+COC_MSA_BLOCK_POPULATION_CROSSWALK_COLUMNS: tuple[str, ...] = (
+    "coc_id",
+    "msa_id",
+    "cbsa_code",
+    "boundary_vintage",
+    "county_vintage",
+    "block_vintage",
+    "decennial_vintage",
+    "definition_version",
+    "allocation_method",
+    "share_column",
+    "share_denominator",
+    "allocation_share",
+    "intersection_population",
+    "coc_population_denominator",
+    "msa_population_denominator",
+    "coc_population_containment_share",
+    "msa_population_coverage_share",
+    "intersection_area",
+    "coc_intersection_area",
+    "msa_intersection_area",
+    "block_count",
+    "missing_population_block_count",
+    "zero_population_coc",
+    "partial_coc_population_coverage",
 )
 
 #: Numerical tolerance for validating CoC-to-MSA allocation shares and totals.
@@ -63,6 +90,28 @@ def _standardize_county_geometry_columns(county_gdf: gpd.GeoDataFrame) -> gpd.Ge
     raise ValueError("county_gdf must have 'GEOID' or 'geoid' column")
 
 
+def _standardize_block_geometry_columns(block_gdf: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
+    if "block_geoid" in block_gdf.columns:
+        return block_gdf
+    if "GEOID" in block_gdf.columns:
+        return block_gdf.rename(columns={"GEOID": "block_geoid"})
+    if "geoid" in block_gdf.columns:
+        return block_gdf.rename(columns={"geoid": "block_geoid"})
+    raise ValueError("block_gdf must have 'block_geoid', 'GEOID', or 'geoid' column")
+
+
+def _standardize_block_population_columns(block_population_df: pd.DataFrame) -> pd.DataFrame:
+    if "block_geoid" in block_population_df.columns:
+        return block_population_df
+    if "GEOID" in block_population_df.columns:
+        return block_population_df.rename(columns={"GEOID": "block_geoid"})
+    if "geoid" in block_population_df.columns:
+        return block_population_df.rename(columns={"geoid": "block_geoid"})
+    raise ValueError(
+        "block_population_df must have 'block_geoid', 'GEOID', or 'geoid' column"
+    )
+
+
 def _validate_inputs(
     coc_gdf: gpd.GeoDataFrame,
     county_gdf: gpd.GeoDataFrame,
@@ -85,6 +134,18 @@ def _validate_inputs(
             "msa_county_membership is missing required columns "
             f"{missing}. Available: {list(msa_county_membership.columns)}"
         )
+
+
+def _require_columns(df: pd.DataFrame, required: set[str], *, label: str) -> None:
+    missing = sorted(required - set(df.columns))
+    if missing:
+        raise ValueError(f"{label} missing required column(s): {', '.join(missing)}.")
+
+
+def _project(gdf: gpd.GeoDataFrame, *, label: str) -> gpd.GeoDataFrame:
+    if gdf.crs is None:
+        raise ValueError(f"{label} GeoDataFrame has no CRS; set CRS before MSA allocation.")
+    return gdf.to_crs(ALBERS_EQUAL_AREA_CRS)
 
 
 def _validate_membership_counties(
@@ -288,6 +349,298 @@ def build_coc_msa_crosswalk(
     return grouped.loc[:, COC_MSA_CROSSWALK_COLUMNS]
 
 
+def build_coc_msa_block_population_crosswalk(
+    coc_gdf: gpd.GeoDataFrame,
+    county_gdf: gpd.GeoDataFrame,
+    msa_county_membership: pd.DataFrame,
+    block_gdf: gpd.GeoDataFrame,
+    block_population_df: pd.DataFrame,
+    *,
+    boundary_vintage: str,
+    county_vintage: str,
+    block_vintage: str,
+    decennial_vintage: str,
+    definition_version: str,
+) -> pd.DataFrame:
+    """Build a block-population CoC-to-MSA allocation crosswalk.
+
+    Block population is allocated by the area share of each block intersected
+    by CoC and MSA geometries. ``allocation_share`` is the fraction of each
+    CoC's block-population denominator allocated to an MSA.
+    """
+    county_gdf = _standardize_county_geometry_columns(county_gdf)
+    block_gdf = _standardize_block_geometry_columns(block_gdf)
+    block_population_df = _standardize_block_population_columns(block_population_df)
+    _validate_inputs(coc_gdf, county_gdf, msa_county_membership)
+    _require_columns(block_gdf, {"block_geoid", "geometry"}, label="block_gdf")
+    _require_columns(
+        block_population_df,
+        {"block_geoid", "total_population"},
+        label="block_population_df",
+    )
+    _validate_membership_counties(
+        county_gdf,
+        msa_county_membership,
+        county_vintage=county_vintage,
+    )
+
+    coc = _project(coc_gdf[["coc_id", "geometry"]].copy(), label="coc_gdf")
+    counties = _project(
+        county_gdf[["GEOID", "geometry"]].copy(),
+        label="county_gdf",
+    )
+    blocks = _prepare_blocks(block_gdf, block_population_df)
+    membership = msa_county_membership[
+        ["msa_id", "cbsa_code", "county_fips"]
+    ].copy()
+    membership["msa_id"] = membership["msa_id"].astype(str)
+    membership["cbsa_code"] = membership["cbsa_code"].astype(str)
+    membership["county_fips"] = membership["county_fips"].astype(str)
+    msa = _build_msa_geometry_from_counties(counties, membership)
+
+    if coc.empty or blocks.empty or msa.empty:
+        return _empty_block_population_crosswalk()
+
+    coc_blocks = _block_geometry_denominator(
+        coc,
+        blocks,
+        left_id_col="coc_id",
+        output_area_col="coc_intersection_area",
+    )
+    msa_blocks = _block_geometry_denominator(
+        msa,
+        blocks,
+        left_id_col="msa_id",
+        output_area_col="msa_intersection_area",
+    )
+    if coc_blocks.empty or msa_blocks.empty:
+        return _empty_block_population_crosswalk()
+
+    coc_denominators = _summarize_block_denominator(
+        coc_blocks,
+        id_col="coc_id",
+        denominator_col="coc_population_denominator",
+        area_col="coc_intersection_area",
+        output_area_col="coc_intersection_area",
+        missing_col="coc_missing_population_block_count",
+    )
+    msa_denominators = _summarize_block_denominator(
+        msa_blocks,
+        id_col="msa_id",
+        denominator_col="msa_population_denominator",
+        area_col="msa_intersection_area",
+        output_area_col="msa_intersection_area",
+        missing_col="msa_missing_population_block_count",
+    )
+
+    intersections = _block_coc_msa_intersections(coc_blocks, msa)
+    if intersections.empty:
+        return _empty_block_population_crosswalk()
+
+    grouped = (
+        intersections.groupby(["coc_id", "msa_id", "cbsa_code"], as_index=False)
+        .agg(
+            intersection_population=("intersection_population", "sum"),
+            intersection_area=("intersection_area", "sum"),
+            block_count=("block_geoid", "nunique"),
+            missing_population_block_count=(
+                "missing_population",
+                lambda s: int(s.fillna(False).sum()),
+            ),
+        )
+        .merge(coc_denominators, on="coc_id", how="left")
+        .merge(msa_denominators, on="msa_id", how="left")
+        .sort_values(["coc_id", "msa_id"])
+        .reset_index(drop=True)
+    )
+    grouped["boundary_vintage"] = boundary_vintage
+    grouped["county_vintage"] = county_vintage
+    grouped["block_vintage"] = block_vintage
+    grouped["decennial_vintage"] = decennial_vintage
+    grouped["definition_version"] = definition_version
+    grouped["allocation_method"] = "block_population"
+    grouped["share_column"] = "allocation_share"
+    grouped["share_denominator"] = "coc_population_denominator"
+    grouped["zero_population_coc"] = grouped["coc_population_denominator"].fillna(0.0) == 0.0
+    grouped["allocation_share"] = grouped["intersection_population"] / grouped[
+        "coc_population_denominator"
+    ]
+    grouped.loc[grouped["zero_population_coc"], "allocation_share"] = 0.0
+    grouped["coc_population_containment_share"] = grouped["allocation_share"]
+    grouped["msa_population_coverage_share"] = grouped["intersection_population"] / grouped[
+        "msa_population_denominator"
+    ]
+    grouped = grouped.fillna(
+        {
+            "allocation_share": 0.0,
+            "coc_population_containment_share": 0.0,
+            "msa_population_coverage_share": 0.0,
+        }
+    )
+    allocation_totals = grouped.groupby("coc_id")["allocation_share"].transform("sum")
+    grouped["partial_coc_population_coverage"] = (
+        (grouped["coc_missing_population_block_count"] > 0)
+        | (
+            ~grouped["zero_population_coc"]
+            & (allocation_totals < FULL_ALLOCATION_THRESHOLD)
+        )
+    )
+    _validate_allocation_shares(grouped)
+    return grouped.loc[:, COC_MSA_BLOCK_POPULATION_CROSSWALK_COLUMNS]
+
+
+def _empty_block_population_crosswalk() -> pd.DataFrame:
+    return pd.DataFrame(columns=list(COC_MSA_BLOCK_POPULATION_CROSSWALK_COLUMNS))
+
+
+def _prepare_blocks(
+    block_gdf: gpd.GeoDataFrame,
+    block_population_df: pd.DataFrame,
+) -> gpd.GeoDataFrame:
+    blocks = _project(block_gdf[["block_geoid", "geometry"]].copy(), label="block_gdf")
+    population = block_population_df[["block_geoid", "total_population"]].copy()
+    blocks["block_geoid"] = blocks["block_geoid"].astype(str)
+    population["block_geoid"] = population["block_geoid"].astype(str)
+    population["total_population"] = pd.to_numeric(
+        population["total_population"],
+        errors="coerce",
+    )
+    blocks = blocks.merge(population, on="block_geoid", how="left")
+    blocks["block_area"] = blocks.geometry.area
+    return blocks.loc[blocks["block_area"] > 0].copy()
+
+
+def _build_msa_geometry_from_counties(
+    county_gdf: gpd.GeoDataFrame,
+    membership: pd.DataFrame,
+) -> gpd.GeoDataFrame:
+    counties = county_gdf.copy()
+    counties["county_fips"] = counties["GEOID"].astype(str)
+    joined = membership.merge(counties[["county_fips", "geometry"]], on="county_fips", how="inner")
+    if joined.empty:
+        return gpd.GeoDataFrame(
+            columns=["msa_id", "cbsa_code", "geometry"],
+            geometry="geometry",
+            crs=county_gdf.crs,
+        )
+    joined = gpd.GeoDataFrame(joined, geometry="geometry", crs=county_gdf.crs)
+    return joined.dissolve(by=["msa_id", "cbsa_code"], as_index=False)[
+        ["msa_id", "cbsa_code", "geometry"]
+    ]
+
+
+def _block_geometry_denominator(
+    geometry_gdf: gpd.GeoDataFrame,
+    blocks: gpd.GeoDataFrame,
+    *,
+    left_id_col: str,
+    output_area_col: str,
+) -> gpd.GeoDataFrame:
+    intersections = gpd.overlay(
+        geometry_gdf[[left_id_col, "geometry"]],
+        blocks[["block_geoid", "total_population", "block_area", "geometry"]],
+        how="intersection",
+        keep_geom_type=False,
+    )
+    if intersections.empty:
+        return gpd.GeoDataFrame(
+            columns=[
+                left_id_col,
+                "block_geoid",
+                "total_population",
+                "block_area",
+                output_area_col,
+                "allocated_population",
+                "missing_population",
+                "geometry",
+            ],
+            geometry="geometry",
+            crs=geometry_gdf.crs,
+        )
+    intersections = intersections.loc[~intersections.geometry.is_empty].copy()
+    intersections[output_area_col] = intersections.geometry.area
+    intersections = intersections.loc[intersections[output_area_col] > 0].copy()
+    intersections["total_population"] = pd.to_numeric(
+        intersections["total_population"],
+        errors="coerce",
+    )
+    intersections["missing_population"] = intersections["total_population"].isna()
+    intersections["allocated_population"] = (
+        intersections["total_population"].fillna(0.0)
+        * intersections[output_area_col]
+        / intersections["block_area"]
+    )
+    return intersections
+
+
+def _summarize_block_denominator(
+    intersections: pd.DataFrame,
+    *,
+    id_col: str,
+    denominator_col: str,
+    area_col: str,
+    output_area_col: str,
+    missing_col: str,
+) -> pd.DataFrame:
+    return (
+        intersections.groupby(id_col, as_index=False)
+        .agg(
+            **{
+                denominator_col: ("allocated_population", "sum"),
+                output_area_col: (area_col, "sum"),
+                missing_col: ("missing_population", lambda s: int(s.fillna(False).sum())),
+            }
+        )
+        .reset_index(drop=True)
+    )
+
+
+def _block_coc_msa_intersections(
+    coc_blocks: gpd.GeoDataFrame,
+    msa_gdf: gpd.GeoDataFrame,
+) -> gpd.GeoDataFrame:
+    intersections = gpd.overlay(
+        coc_blocks[
+            [
+                "coc_id",
+                "block_geoid",
+                "total_population",
+                "block_area",
+                "missing_population",
+                "geometry",
+            ]
+        ],
+        msa_gdf[["msa_id", "cbsa_code", "geometry"]],
+        how="intersection",
+        keep_geom_type=False,
+    )
+    if intersections.empty:
+        return gpd.GeoDataFrame(
+            columns=[
+                "coc_id",
+                "msa_id",
+                "cbsa_code",
+                "block_geoid",
+                "total_population",
+                "missing_population",
+                "intersection_area",
+                "intersection_population",
+                "geometry",
+            ],
+            geometry="geometry",
+            crs=coc_blocks.crs,
+        )
+    intersections = intersections.loc[~intersections.geometry.is_empty].copy()
+    intersections["intersection_area"] = intersections.geometry.area
+    intersections = intersections.loc[intersections["intersection_area"] > 0].copy()
+    intersections["intersection_population"] = (
+        intersections["total_population"].fillna(0.0)
+        * intersections["intersection_area"]
+        / intersections["block_area"]
+    )
+    return intersections
+
+
 def summarize_coc_msa_allocation(crosswalk: pd.DataFrame) -> pd.DataFrame:
     """Summarize allocation completeness per CoC."""
     if crosswalk.empty:
@@ -342,6 +695,53 @@ def save_coc_msa_crosswalk(
     return output_path
 
 
+def save_coc_msa_block_population_crosswalk(
+    crosswalk: pd.DataFrame,
+    *,
+    boundary_vintage: str,
+    county_vintage: str,
+    block_vintage: str,
+    decennial_vintage: str,
+    definition_version: str,
+    output_dir: Path | str | None = None,
+) -> Path:
+    """Persist a block-population CoC-to-MSA crosswalk with provenance."""
+    from hhplab.naming import msa_coc_block_population_xwalk_filename
+
+    if output_dir is None:
+        output_dir = curated_dir("xwalks")
+    else:
+        output_dir = Path(output_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    output_path = output_dir / msa_coc_block_population_xwalk_filename(
+        boundary_vintage,
+        definition_version,
+        county_vintage,
+        block_vintage,
+        decennial_vintage,
+    )
+    provenance = ProvenanceBlock(
+        boundary_vintage=boundary_vintage,
+        county_vintage=county_vintage,
+        geo_type="msa",
+        definition_version=definition_version,
+        weighting="block_population",
+        extra={
+            "dataset_type": "coc_msa_crosswalk",
+            "allocation_basis": "block_population",
+            "block_vintage": block_vintage,
+            "decennial_vintage": decennial_vintage,
+            "denominator_source": "pl_94_171_block_population",
+            "share_column": "allocation_share",
+            "share_denominator": "coc_population_denominator",
+            "derivation": "block_population_coc_msa_area_intersection",
+        },
+    )
+    write_parquet_with_provenance(crosswalk, output_path, provenance)
+    return output_path
+
+
 def read_coc_msa_crosswalk(
     boundary_vintage: str,
     definition_version: str,
@@ -367,4 +767,36 @@ def read_coc_msa_crosswalk(
             f"--boundary {boundary_vintage} "
             f"--definition-version {definition_version} "
             f"--counties {county_vintage}"
+        ) from None
+
+
+def read_coc_msa_block_population_crosswalk(
+    boundary_vintage: str,
+    definition_version: str,
+    county_vintage: str,
+    block_vintage: str,
+    decennial_vintage: str,
+    *,
+    base_dir: Path | str | None = None,
+) -> pd.DataFrame:
+    """Read a curated block-population CoC-to-MSA crosswalk from disk."""
+    from hhplab.naming import msa_coc_block_population_xwalk_path
+
+    path = msa_coc_block_population_xwalk_path(
+        boundary_vintage,
+        definition_version,
+        county_vintage,
+        block_vintage,
+        decennial_vintage,
+        base_dir=base_dir,
+    )
+    try:
+        return pd.read_parquet(path)
+    except FileNotFoundError:
+        raise FileNotFoundError(
+            f"Block-population CoC-to-MSA crosswalk artifact not found at {path}. "
+            "Run: hhplab generate msa-xwalk "
+            f"--allocation-basis block_population --boundary {boundary_vintage} "
+            f"--definition-version {definition_version} --counties {county_vintage} "
+            f"--blocks {block_vintage} --decennial {decennial_vintage}"
         ) from None

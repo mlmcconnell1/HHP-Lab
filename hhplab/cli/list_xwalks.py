@@ -81,6 +81,21 @@ def _parse_county_filename(filename: str) -> dict | None:
 
 def _parse_msa_filename(filename: str) -> dict | None:
     """Parse CoC-to-MSA crosswalk filename to extract versions."""
+    population_pattern = (
+        r"^msa_coc_xwalk__N(\d{4})@B(\d{4})xM(\w+)xC(\d{4})xK(\d{4})"
+        r"__basis-block_population\.parquet$"
+    )
+    population_match = re.match(population_pattern, filename)
+    if population_match:
+        return {
+            "type": "msa",
+            "boundary_vintage": population_match.group(2),
+            "definition_version": population_match.group(3),
+            "census_vintage": population_match.group(4),
+            "block_vintage": population_match.group(5),
+            "decennial_vintage": population_match.group(1),
+            "allocation_basis": "block_population",
+        }
     pattern = r"^msa_coc_xwalk__B(\d{4})xM(\w+)xC(\d{4})\.parquet$"
     match = re.match(pattern, filename)
     if match:
@@ -89,6 +104,7 @@ def _parse_msa_filename(filename: str) -> dict | None:
             "boundary_vintage": match.group(1),
             "definition_version": match.group(2),
             "census_vintage": match.group(3),
+            "allocation_basis": "area",
         }
     return None
 

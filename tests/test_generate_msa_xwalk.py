@@ -66,6 +66,22 @@ def _write_test_inputs(tmp_path: Path) -> None:
     ).to_parquet(msa_dir / "msa_county_membership__census_msa_2023.parquet")
 
 
+def _write_block_population_inputs(tmp_path: Path) -> None:
+    tiger_dir = tmp_path / "data" / "curated" / "tiger"
+    census_dir = tmp_path / "data" / "curated" / "census"
+    tiger_dir.mkdir(parents=True, exist_ok=True)
+    census_dir.mkdir(parents=True, exist_ok=True)
+
+    gpd.GeoDataFrame(
+        {"block_geoid": ["B1"]},
+        geometry=[box(0, 0, 10, 10)],
+        crs="EPSG:4326",
+    ).to_parquet(tiger_dir / "blocks__K2020.parquet")
+    pd.DataFrame({"block_geoid": ["B1"], "total_population": [100]}).to_parquet(
+        census_dir / "pl_blocks__N2020xK2020.parquet"
+    )
+
+
 def _write_boundary_input(tmp_path: Path) -> None:
     boundaries_dir = tmp_path / "data" / "curated" / "coc_boundaries"
     boundaries_dir.mkdir(parents=True, exist_ok=True)
@@ -163,6 +179,50 @@ def test_generate_msa_xwalk_json(monkeypatch, tmp_path: Path):
     assert payload["coc_count"] == 1
     assert payload["msa_count"] == 1
     assert payload["artifact"].endswith("msa_coc_xwalk__B2025xMcensus_msa_2023xC2023.parquet")
+
+
+def test_generate_msa_xwalk_json_block_population(monkeypatch, tmp_path: Path):
+    _write_test_inputs(tmp_path)
+    _write_block_population_inputs(tmp_path)
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(
+        "hhplab.cli.generate_msa_xwalk.list_boundaries",
+        lambda: [_boundary_registry_entry(tmp_path)],
+    )
+    monkeypatch.setattr(
+        "hhplab.cli.generate_msa_xwalk.latest_vintage",
+        lambda: "2025",
+    )
+
+    result = runner.invoke(
+        app,
+        [
+            "generate",
+            "msa-xwalk",
+            "--boundary",
+            "2025",
+            "--counties",
+            "2023",
+            "--allocation-basis",
+            "block_population",
+            "--blocks",
+            "2020",
+            "--decennial",
+            "2020",
+            "--json",
+        ],
+        catch_exceptions=False,
+    )
+
+    assert result.exit_code == 0
+    payload = json.loads(result.stdout)
+    assert payload["status"] == "ok"
+    assert payload["allocation_basis"] == "block_population"
+    assert payload["rows"] == 1
+    assert payload["artifact"].endswith(
+        "msa_coc_xwalk__N2020@B2025xMcensus_msa_2023xC2023xK2020"
+        "__basis-block_population.parquet"
+    )
 
 
 @pytest.mark.parametrize(

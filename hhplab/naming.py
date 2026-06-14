@@ -343,6 +343,21 @@ def msa_coc_xwalk_filename(
     return f"msa_coc_xwalk__B{boundary_vintage}xM{definition_version}xC{county_vintage}.parquet"
 
 
+def msa_coc_block_population_xwalk_filename(
+    boundary_vintage: str | int,
+    definition_version: str,
+    county_vintage: str | int,
+    block_vintage: str | int,
+    decennial_vintage: str | int,
+) -> str:
+    """Generate filename for a block-population CoC-to-MSA crosswalk."""
+    return (
+        f"msa_coc_xwalk__N{decennial_vintage}@B{boundary_vintage}"
+        f"xM{definition_version}xC{county_vintage}xK{block_vintage}"
+        "__basis-block_population.parquet"
+    )
+
+
 def msa_coc_coverage_filename(
     year: str | int,
     boundary_vintage: str | int,
@@ -690,6 +705,18 @@ def county_path(county_vintage: str | int, base_dir: Path | str | None = None) -
     return base_dir / "curated" / "tiger" / county_filename(county_vintage)
 
 
+def block_geometry_path(
+    block_vintage: str | int,
+    base_dir: Path | str | None = None,
+) -> Path:
+    """Get canonical path for Census block geometry."""
+    if base_dir is None:
+        base_dir = Path("data")
+    else:
+        base_dir = Path(base_dir)
+    return base_dir / "curated" / "tiger" / block_geometry_filename(block_vintage)
+
+
 def urban_area_path(
     urban_area_vintage: str | int,
     base_dir: Path | str | None = None,
@@ -797,6 +824,33 @@ def msa_coc_xwalk_path(
         / "curated"
         / "xwalks"
         / msa_coc_xwalk_filename(boundary_vintage, definition_version, county_vintage)
+    )
+
+
+def msa_coc_block_population_xwalk_path(
+    boundary_vintage: str | int,
+    definition_version: str,
+    county_vintage: str | int,
+    block_vintage: str | int,
+    decennial_vintage: str | int,
+    base_dir: Path | str | None = None,
+) -> Path:
+    """Get canonical path for a block-population CoC-to-MSA crosswalk."""
+    if base_dir is None:
+        base_dir = Path("data")
+    else:
+        base_dir = Path(base_dir)
+    return (
+        base_dir
+        / "curated"
+        / "xwalks"
+        / msa_coc_block_population_xwalk_filename(
+            boundary_vintage,
+            definition_version,
+            county_vintage,
+            block_vintage,
+            decennial_vintage,
+        )
     )
 
 
