@@ -3393,6 +3393,115 @@ class TestMsaFractionalRollupSpec:
         with pytest.raises(RecipeLoadError, match="output_aliases keys must be additive measures"):
             load_recipe(data)
 
+    def test_preflight_reports_block_population_prerequisites(self, tmp_path: Path):
+        _make_project_root(tmp_path)
+        recipe = load_recipe(_msa_fractional_rollup_recipe())
+
+        report = run_preflight(recipe, tmp_path)
+
+        rollup_findings = [
+            finding
+            for finding in report.findings
+            if finding.kind == FindingKind.MISSING_MSA_FRACTIONAL_ROLLUP_ARTIFACT
+        ]
+        messages = [finding.message for finding in rollup_findings]
+        assert any("block geometry artifact" in message for message in messages)
+        assert any("PL block population artifact" in message for message in messages)
+        assert any(
+            "CoC-to-MSA fractional rollup crosswalk artifact" in message for message in messages
+        )
+
+        commands = [
+            finding.remediation.command
+            for finding in rollup_findings
+            if finding.remediation is not None
+        ]
+        assert (
+            "hhplab ingest tiger --year 2020 --type blocks"
+            in commands
+        )
+        assert (
+            "hhplab ingest pl-blocks --decennial 2020 --blocks 2020"
+            in commands
+        )
+        assert any(
+            command
+            == (
+                "hhplab generate msa-xwalk --allocation-basis block_population "
+                "--boundary 2025 --definition-version census_msa_2023 "
+                "--counties 2023 --blocks 2020 --decennial 2020"
+            )
+            for command in commands
+        )
+
+    def test_preflight_area_rollup_uses_area_crosswalk_prerequisites(
+        self,
+        tmp_path: Path,
+    ):
+        _make_project_root(tmp_path)
+        data = _msa_fractional_rollup_recipe()
+        spec = data["targets"][0]["msa_fractional_rollup"]
+        spec["allocation_basis"] = "area"
+        spec["denominator_source"] = "geometry_area"
+        recipe = load_recipe(data)
+
+        report = run_preflight(recipe, tmp_path)
+
+        rollup_findings = [
+            finding
+            for finding in report.findings
+            if finding.kind == FindingKind.MISSING_MSA_FRACTIONAL_ROLLUP_ARTIFACT
+        ]
+        messages = [finding.message for finding in rollup_findings]
+        assert not any("block geometry artifact" in message for message in messages)
+        assert not any("PL block population artifact" in message for message in messages)
+
+        commands = [
+            finding.remediation.command
+            for finding in rollup_findings
+            if finding.remediation is not None
+        ]
+        assert any(
+            command
+            == (
+                "hhplab generate msa-xwalk --allocation-basis area "
+                "--boundary 2025 --definition-version census_msa_2023 --counties 2023"
+            )
+            for command in commands
+        )
+        assert all(command is None or "pl-blocks" not in command for command in commands)
+
+    def test_recipe_preflight_cli_reports_rollup_prerequisite_commands(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ):
+        import yaml
+
+        _make_project_root(tmp_path)
+        recipe_file = tmp_path / "recipe.yaml"
+        recipe_file.write_text(yaml.dump(_msa_fractional_rollup_recipe()), encoding="utf-8")
+        monkeypatch.chdir(tmp_path)
+        monkeypatch.setenv("HHPLAB_NON_INTERACTIVE", "1")
+
+        result = runner.invoke(
+            app,
+            ["build", "recipe-preflight", "--recipe", str(recipe_file), "--json"],
+        )
+
+        assert result.exit_code == 1
+        payload = json.loads(result.output)
+        commands = [
+            finding.get("remediation", {}).get("command")
+            for finding in payload["findings"]
+            if finding["kind"] == "missing_msa_fractional_rollup_artifact"
+        ]
+        assert (
+            "hhplab generate msa-xwalk --allocation-basis block_population "
+            "--boundary 2025 --definition-version census_msa_2023 "
+            "--counties 2023 --blocks 2020 --decennial 2020"
+        ) in commands
+
 
 def _msa_coc_coverage_recipe() -> dict:
     return {

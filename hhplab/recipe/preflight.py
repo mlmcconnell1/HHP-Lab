@@ -32,15 +32,18 @@ from hhplab.geo.ct_planning_regions import (
 from hhplab.geo.geo_io import resolve_curated_boundary_path
 from hhplab.naming import (
     acs5_tracts_filename,
+    block_geometry_path,
     coc_base_path,
     coc_urban_fraction_path,
     county_path,
     decennial_tracts_filename,
     metro_boundaries_path,
     msa_boundaries_path,
+    msa_coc_block_population_xwalk_path,
     msa_coc_xwalk_path,
     msa_county_membership_path,
     msa_definitions_path,
+    pl_block_population_path,
     tract_path,
     tract_xwalk_path,
 )
@@ -118,6 +121,7 @@ class FindingKind(str, enum.Enum):
     MISSING_MAP_ARTIFACT = "missing_map_artifact"
     MISSING_CONTAINMENT_ARTIFACT = "missing_containment_artifact"
     MISSING_MSA_COC_COVERAGE_ARTIFACT = "missing_msa_coc_coverage_artifact"
+    MISSING_MSA_FRACTIONAL_ROLLUP_ARTIFACT = "missing_msa_fractional_rollup_artifact"
     MISSING_PRIMARY_MSA_ARTIFACT = "missing_primary_msa_artifact"
     CONTAINMENT_SELECTOR = "containment_selector"
     TARGET_SELECTOR = "target_selector"
@@ -1334,6 +1338,189 @@ def _check_msa_coc_coverage_artifacts(
             )
 
     return findings
+
+
+def _check_msa_fractional_rollup_artifacts(
+    recipe: RecipeV1,
+    project_root: Path,
+) -> list[PreflightFinding]:
+    """Check CoC-to-MSA fractional rollup prerequisites."""
+    findings: list[PreflightFinding] = []
+    data_root = load_config(project_root=project_root).asset_store_root
+
+    for target in recipe.targets:
+        spec = target.msa_fractional_rollup
+        if "panel" not in target.outputs or spec is None:
+            continue
+
+        generate_xwalk_command = (
+            "hhplab generate msa-xwalk "
+            f"--allocation-basis {spec.allocation_basis} "
+            f"--boundary {spec.coc_boundary_vintage} "
+            f"--definition-version {spec.msa_definition_version} "
+            f"--counties {spec.county_vintage}"
+        )
+        if spec.allocation_basis == "block_population":
+            generate_xwalk_command = (
+                f"{generate_xwalk_command} "
+                f"--blocks {spec.block_vintage} "
+                f"--decennial {spec.decennial_population_vintage}"
+            )
+            crosswalk_path = msa_coc_block_population_xwalk_path(
+                spec.coc_boundary_vintage,
+                spec.msa_definition_version,
+                spec.county_vintage,
+                spec.block_vintage,
+                spec.decennial_population_vintage,
+                data_root,
+            )
+        else:
+            crosswalk_path = msa_coc_xwalk_path(
+                str(spec.coc_boundary_vintage),
+                spec.msa_definition_version,
+                spec.county_vintage,
+                data_root,
+            )
+
+        artifact_paths: dict[
+            str,
+            tuple[Path, str, str, tuple[tuple[str, ...], ...]],
+        ] = {
+            "CoC boundary artifact": (
+                coc_base_path(str(spec.coc_boundary_vintage), data_root),
+                "coc",
+                "hhplab ingest boundaries --source hud_exchange "
+                f"--vintage {spec.coc_boundary_vintage}",
+                (("coc_id", "geo_id"),),
+            ),
+            "county geometry artifact": (
+                county_path(spec.county_vintage, data_root),
+                "county",
+                f"hhplab ingest tiger --year {spec.county_vintage} --type counties",
+                (("GEOID", "geoid", "county_fips"),),
+            ),
+            "MSA definitions artifact": (
+                msa_definitions_path(spec.msa_definition_version, data_root),
+                "msa",
+                f"hhplab generate msa --definition-version {spec.msa_definition_version}",
+                (("msa_id",),),
+            ),
+            "MSA county membership artifact": (
+                msa_county_membership_path(spec.msa_definition_version, data_root),
+                "msa",
+                f"hhplab generate msa --definition-version {spec.msa_definition_version}",
+                (("msa_id",), ("county_fips",)),
+            ),
+            "CoC-to-MSA fractional rollup crosswalk artifact": (
+                crosswalk_path,
+                "msa",
+                generate_xwalk_command,
+                (("coc_id",), ("msa_id",), ("allocation_share",), ("allocation_basis",)),
+            ),
+        }
+
+        if spec.allocation_basis == "block_population":
+            artifact_paths["block geometry artifact"] = (
+                block_geometry_path(spec.block_vintage, data_root),
+                "block",
+                f"hhplab ingest tiger --year {spec.block_vintage} --type blocks",
+                (("GEOID", "geoid", "block_geoid"),),
+            )
+            artifact_paths["PL block population artifact"] = (
+                pl_block_population_path(
+                    spec.decennial_population_vintage,
+                    spec.block_vintage,
+                    data_root,
+                ),
+                "block",
+                "hhplab ingest pl-blocks "
+                f"--decennial {spec.decennial_population_vintage} "
+                f"--blocks {spec.block_vintage}",
+                (("block_geoid", "GEOID", "geoid"), ("total_population",)),
+            )
+
+        for label, (path, geo_type, command, required) in sorted(artifact_paths.items()):
+            if not path.exists():
+                findings.append(
+                    PreflightFinding(
+                        severity=Severity.ERROR,
+                        kind=FindingKind.MISSING_MSA_FRACTIONAL_ROLLUP_ARTIFACT,
+                        message=(
+                            f"MSA fractional rollup target '{target.id}' requires "
+                            f"missing {label}: {path}"
+                        ),
+                        geometry=geo_type,
+                        remediation=Remediation(
+                            hint=(
+                                f"Build or ingest the {label} for MSA fractional "
+                                f"rollup target '{target.id}'."
+                            ),
+                            command=command,
+                        ),
+                    )
+                )
+                continue
+
+            findings.extend(
+                _check_msa_fractional_rollup_artifact_columns(
+                    target_id=target.id,
+                    label=label,
+                    path=path,
+                    required_column_groups=required,
+                    geometry=geo_type,
+                )
+            )
+
+    return findings
+
+
+def _check_msa_fractional_rollup_artifact_columns(
+    *,
+    target_id: str,
+    label: str,
+    path: Path,
+    required_column_groups: tuple[tuple[str, ...], ...],
+    geometry: str,
+) -> list[PreflightFinding]:
+    try:
+        columns = set(pq.read_schema(path).names)
+    except (FileNotFoundError, OSError, ValueError) as exc:
+        return [
+            PreflightFinding(
+                severity=Severity.ERROR,
+                kind=FindingKind.SCHEMA_UNREADABLE,
+                message=(
+                    f"MSA fractional rollup target '{target_id}' could not read "
+                    f"{label} schema at {path}: {exc}"
+                ),
+                geometry=geometry,
+            )
+        ]
+
+    missing = [
+        " or ".join(group)
+        for group in required_column_groups
+        if not any(column in columns for column in group)
+    ]
+    if not missing:
+        return []
+    return [
+        PreflightFinding(
+            severity=Severity.ERROR,
+            kind=FindingKind.MISSING_COLUMN,
+            message=(
+                f"MSA fractional rollup target '{target_id}' requires {label} "
+                f"columns {missing}. Available columns: {sorted(columns)}"
+            ),
+            geometry=geometry,
+            remediation=Remediation(
+                hint=(
+                    f"Rebuild the {label} so it satisfies the fractional MSA "
+                    "rollup schema contract."
+                ),
+            ),
+        )
+    ]
 
 
 def _check_primary_msa_artifacts(
@@ -3182,6 +3369,7 @@ def run_preflight(
     report.findings.extend(_check_map_artifacts(recipe, project_root))
     report.findings.extend(_check_containment_artifacts(recipe, project_root))
     report.findings.extend(_check_msa_coc_coverage_artifacts(recipe, project_root))
+    report.findings.extend(_check_msa_fractional_rollup_artifacts(recipe, project_root))
     report.findings.extend(_check_primary_msa_artifacts(recipe, project_root))
     report.findings.extend(_check_target_selectors(recipe, project_root))
 
