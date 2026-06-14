@@ -298,6 +298,18 @@ def generate_msa_xwalk(
                 county_vintage=str(counties),
                 definition_version=definition_version,
             )
+    except MemoryError as exc:
+        message = (
+            "Block-population MSA crosswalk generation ran out of memory. "
+            "The default execution path uses state shards; retry with --reuse-shards "
+            "to resume completed shards, or rerun with more memory. Avoid "
+            "--no-state-shards for national block-population builds."
+        )
+        if json_output:
+            typer.echo(json.dumps({"status": "error", "error": message}))
+        else:
+            typer.echo(f"Error: {message}", err=True)
+        raise typer.Exit(1) from exc
     except (ValueError, OSError) as exc:
         if json_output:
             typer.echo(json.dumps({"status": "error", "error": str(exc)}))

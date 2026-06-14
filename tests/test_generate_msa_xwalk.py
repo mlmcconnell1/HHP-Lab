@@ -281,6 +281,58 @@ def test_generate_msa_xwalk_json_block_population_can_opt_out_of_state_shards(
     assert payload["rows"] == 1
 
 
+def test_generate_msa_xwalk_json_block_population_oom_error_is_actionable(
+    monkeypatch,
+    tmp_path: Path,
+):
+    _write_test_inputs(tmp_path)
+    _write_block_population_inputs(tmp_path)
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(
+        "hhplab.cli.generate_msa_xwalk.list_boundaries",
+        lambda: [_boundary_registry_entry(tmp_path)],
+    )
+    monkeypatch.setattr(
+        "hhplab.cli.generate_msa_xwalk.latest_vintage",
+        lambda: "2025",
+    )
+
+    def raise_memory_error(*args, **kwargs):
+        raise MemoryError("simulated OOM")
+
+    monkeypatch.setattr(
+        "hhplab.cli.generate_msa_xwalk._build_block_population_state_shards",
+        raise_memory_error,
+    )
+
+    result = runner.invoke(
+        app,
+        [
+            "generate",
+            "msa-xwalk",
+            "--boundary",
+            "2025",
+            "--counties",
+            "2023",
+            "--allocation-basis",
+            "block_population",
+            "--blocks",
+            "2020",
+            "--decennial",
+            "2020",
+            "--json",
+        ],
+        catch_exceptions=False,
+    )
+
+    assert result.exit_code == 1
+    payload = json.loads(result.stdout)
+    assert payload["status"] == "error"
+    assert "ran out of memory" in payload["error"]
+    assert "--reuse-shards" in payload["error"]
+    assert "--no-state-shards" in payload["error"]
+
+
 def test_generate_msa_xwalk_json_block_population_state_shards_alabama_smoke(
     monkeypatch,
     tmp_path: Path,
