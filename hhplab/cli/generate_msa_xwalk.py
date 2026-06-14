@@ -94,10 +94,11 @@ def generate_msa_xwalk(
             "--state-shards/--no-state-shards",
             help=(
                 "Build block-population crosswalks as deterministic state shards before "
-                "concatenating the canonical artifact."
+                "concatenating the canonical artifact. Enabled by default for "
+                "block_population because national single-pass block overlays can OOM."
             ),
         ),
-    ] = False,
+    ] = True,
     reuse_shards: Annotated[
         bool,
         typer.Option(
@@ -349,6 +350,7 @@ def generate_msa_xwalk(
         payload["state_sharded"] = True
         payload["state_shard_dir"] = str(shard_dir)
         payload["state_shard_count"] = len(list(shard_dir.glob("*__state-*.parquet")))
+        payload["failed_state_shards"] = []
         payload["reused_state_shards"] = bool(reuse_shards)
         if cleanup_shards and shard_dir.exists():
             shutil.rmtree(shard_dir)

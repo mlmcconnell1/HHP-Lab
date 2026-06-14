@@ -182,6 +182,7 @@ def test_generate_msa_xwalk_json(monkeypatch, tmp_path: Path):
     assert payload["rows"] == 1
     assert payload["coc_count"] == 1
     assert payload["msa_count"] == 1
+    assert "state_sharded" not in payload
     assert payload["artifact"].endswith("msa_coc_xwalk__B2025xMcensus_msa_2023xC2023.parquet")
 
 
@@ -222,6 +223,10 @@ def test_generate_msa_xwalk_json_block_population(monkeypatch, tmp_path: Path):
     payload = json.loads(result.stdout)
     assert payload["status"] == "ok"
     assert payload["allocation_basis"] == "block_population"
+    assert payload["state_sharded"] is True
+    assert payload["state_shard_count"] == 1
+    assert payload["failed_state_shards"] == []
+    assert Path(payload["state_shard_dir"]).exists()
     assert payload["rows"] == 1
     assert payload["artifact"].endswith(
         "msa_coc_xwalk__N2020@B2025xMcensus_msa_2023xC2023xK2020"
@@ -229,6 +234,51 @@ def test_generate_msa_xwalk_json_block_population(monkeypatch, tmp_path: Path):
     )
     crosswalk = pd.read_parquet(payload["artifact"])
     assert crosswalk["msa_population_denominator"].tolist() == [100.0]
+
+
+def test_generate_msa_xwalk_json_block_population_can_opt_out_of_state_shards(
+    monkeypatch,
+    tmp_path: Path,
+):
+    _write_test_inputs(tmp_path)
+    _write_block_population_inputs(tmp_path)
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(
+        "hhplab.cli.generate_msa_xwalk.list_boundaries",
+        lambda: [_boundary_registry_entry(tmp_path)],
+    )
+    monkeypatch.setattr(
+        "hhplab.cli.generate_msa_xwalk.latest_vintage",
+        lambda: "2025",
+    )
+
+    result = runner.invoke(
+        app,
+        [
+            "generate",
+            "msa-xwalk",
+            "--boundary",
+            "2025",
+            "--counties",
+            "2023",
+            "--allocation-basis",
+            "block_population",
+            "--blocks",
+            "2020",
+            "--decennial",
+            "2020",
+            "--no-state-shards",
+            "--json",
+        ],
+        catch_exceptions=False,
+    )
+
+    assert result.exit_code == 0
+    payload = json.loads(result.stdout)
+    assert payload["status"] == "ok"
+    assert payload["allocation_basis"] == "block_population"
+    assert "state_sharded" not in payload
+    assert payload["rows"] == 1
 
 
 def test_generate_msa_xwalk_json_block_population_state_shards_alabama_smoke(
@@ -310,6 +360,7 @@ def test_generate_msa_xwalk_json_block_population_state_shards_alabama_smoke(
     assert payload["status"] == "ok"
     assert payload["state_sharded"] is True
     assert payload["state_shard_count"] == 1
+    assert payload["failed_state_shards"] == []
     shard_dir = Path(payload["state_shard_dir"])
     assert (shard_dir / f"{Path(payload['artifact']).stem}__state-01.parquet").exists()
     crosswalk = pd.read_parquet(payload["artifact"])
