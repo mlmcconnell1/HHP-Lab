@@ -12,6 +12,7 @@ from pydantic import ValidationError
 from shapely.geometry import Polygon, box
 from typer.testing import CliRunner
 
+from hhplab.acs.sae import CONTRACT_RENT_BINS
 from hhplab.cli.main import app
 from hhplab.geo.ct_planning_regions import CtPlanningRegionCrosswalk
 from hhplab.panel.assemble import _load_coc_areas
@@ -88,6 +89,9 @@ runner = CliRunner()
 STALE_TRANSLATED_ACS_PATH = "data/curated/acs/acs5_tracts__A2019xT2020.parquet"
 STALE_TRANSLATED_ACS_VINTAGE = "2015-2019"
 STALE_TRANSLATED_ACS_REBUILD = "hhplab ingest acs5-tract --acs 2015-2019 --tracts 2020 --force"
+CONTRACT_RENT_RECIPE_BIN_COLUMNS = [
+    column.removeprefix("sae_") for column, _, _ in CONTRACT_RENT_BINS
+]
 
 
 def test_derived_measure_config_accepts_multi_column_numerator_without_rate() -> None:
@@ -115,6 +119,27 @@ def test_derived_measure_config_rejects_ambiguous_numerator_sources() -> None:
                 "household_income_150000_to_199999",
                 "household_income_200000_plus",
             ],
+        )
+
+
+def test_derived_measure_config_accepts_contract_rent_quantile() -> None:
+    config = DerivedMeasureConfig(
+        type="quantile_from_distribution",
+        distribution_family="contract_rent",
+        quantile=0.25,
+        diagnostic_output_column="first_quartile_contract_rent_diagnostics",
+    )
+
+    assert config.distribution_family == "contract_rent"
+    assert config.quantile == 0.25
+    assert config.denominator_column is None
+
+
+def test_derived_measure_config_quantile_requires_quantile() -> None:
+    with pytest.raises(ValidationError, match="requires quantile"):
+        DerivedMeasureConfig(
+            type="quantile_from_distribution",
+            distribution_family="contract_rent",
         )
 
 
@@ -5539,6 +5564,68 @@ class TestResampleAggregate:
             19.5 / 105.0,
         )
         assert df.loc["COC2", "household_income_pct_150000_plus"] == pytest.approx(50.0 / 200.0)
+
+    def test_aggregate_derives_contract_rent_quantile_from_weighted_bins(
+        self,
+        tmp_path: Path,
+    ):
+        """Distribution quantiles are derived after target-geometry bin aggregation."""
+        ds_path = tmp_path / "data" / "acs5_contract_rent.parquet"
+        ds_path.parent.mkdir(parents=True, exist_ok=True)
+        rows = pd.DataFrame(
+            {
+                "tract_geoid": ["A", "B", "C"],
+                "year": [2020, 2020, 2020],
+                "contract_rent_distribution_with_cash_rent": [100.0, 40.0, 200.0],
+            }
+        )
+        for column in CONTRACT_RENT_RECIPE_BIN_COLUMNS:
+            rows[column] = 0.0
+        rows.loc[0, "contract_rent_distribution_cash_rent_500_to_549"] = 100.0
+        rows.loc[1, "contract_rent_distribution_cash_rent_600_to_649"] = 40.0
+        rows.loc[2, "contract_rent_distribution_cash_rent_900_to_999"] = 200.0
+        rows.to_parquet(ds_path)
+
+        xwalk_path = tmp_path / "data" / "curated" / "xwalks" / "xwalk__B2025xT2020.parquet"
+        _make_xwalk_parquet(xwalk_path, geo_type="tract")
+
+        recipe = load_recipe(_recipe_with_pipeline())
+        ctx = ExecutionContext(project_root=tmp_path, recipe=recipe)
+        ctx.transform_paths["tract_to_coc"] = xwalk_path
+
+        task = ResampleTask(
+            dataset_id="acs",
+            year=2020,
+            input_path="data/acs5_contract_rent.parquet",
+            effective_geometry=GeometryRef(type="tract", vintage=2020),
+            method="aggregate",
+            transform_id="tract_to_coc",
+            to_geometry=GeometryRef(type="coc", vintage=2025),
+            measures=["contract_rent_distribution_with_cash_rent"],
+            measure_aggregations={"contract_rent_distribution_with_cash_rent": "sum"},
+            geo_column="tract_geoid",
+            derived_measures={
+                "first_quartile_contract_rent": {
+                    "type": "quantile_from_distribution",
+                    "distribution_family": "contract_rent",
+                    "quantile": 0.25,
+                    "diagnostic_output_column": "first_quartile_contract_rent_diagnostics",
+                },
+            },
+        )
+        result = _execute_resample(task, ctx)
+
+        assert result.success
+        df = ctx.intermediates[("acs", 2020)].set_index("geo_id")
+        assert df.loc["COC1", "contract_rent_distribution_with_cash_rent"] == pytest.approx(
+            (100.0 * 0.8) + (40.0 * 0.5),
+        )
+        assert df.loc["COC1", "first_quartile_contract_rent"] == pytest.approx(515.625)
+        assert df.loc["COC2", "first_quartile_contract_rent"] == pytest.approx(925.0)
+        diagnostics = json.loads(df.loc["COC1", "first_quartile_contract_rent_diagnostics"])
+        assert diagnostics["status"] == "ok"
+        assert diagnostics["family"] == "contract_rent"
+        assert diagnostics["quantile"] == 0.25
 
     def test_measures_list_backward_compat(self, tmp_path: Path):
         """Old list format (measures: [a, b] + aggregation: sum) still works."""

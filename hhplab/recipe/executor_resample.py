@@ -15,6 +15,11 @@ import warnings
 import numpy as np
 import pandas as pd
 
+from hhplab.acs.sae import (
+    CONTRACT_RENT_BINS,
+    CONTRACT_RENT_BINS_EARLY,
+    _quantile_from_bins,
+)
 from hhplab.geo.ct_planning_regions import CT_LEGACY_COUNTY_VINTAGE
 from hhplab.recipe.executor_core import (
     ExecutionContext,
@@ -111,6 +116,48 @@ _ACS1_IMPUTATION_PASSTHROUGH_COLUMNS: tuple[str, ...] = (
     "fallback_reason",
 )
 
+_CONTRACT_RENT_BINS: tuple[tuple[str, float, float | None], ...] = tuple(
+    (column.removeprefix("sae_"), lower, upper)
+    for column, lower, upper in CONTRACT_RENT_BINS
+)
+_CONTRACT_RENT_BINS_EARLY: tuple[tuple[str, float, float | None], ...] = tuple(
+    (column.removeprefix("sae_"), lower, upper)
+    for column, lower, upper in CONTRACT_RENT_BINS_EARLY
+)
+_DISTRIBUTION_BIN_LAYOUTS: dict[str, tuple[tuple[tuple[str, float, float | None], ...], ...]] = {
+    "contract_rent": (_CONTRACT_RENT_BINS, _CONTRACT_RENT_BINS_EARLY),
+}
+_DISTRIBUTION_TOTAL_COLUMNS: dict[str, str] = {
+    "contract_rent": "contract_rent_distribution_with_cash_rent",
+}
+
+
+def derived_measure_required_columns(
+    config: dict[str, object],
+    *,
+    available_columns: set[str] | None = None,
+) -> list[str]:
+    """Return source columns required by one aggregate derived-measure config."""
+    measure_type = str(config.get("type", "rate_from_weighted_counts"))
+    if measure_type == "rate_from_weighted_counts":
+        return [
+            str(column_name)
+            for column_name in [
+                config.get("source_rate_column"),
+                config.get("denominator_column"),
+                config.get("source_numerator_column"),
+                *(config.get("source_numerator_columns") or []),
+            ]
+            if column_name is not None
+        ]
+    if measure_type == "quantile_from_distribution":
+        total_column, bins = _distribution_total_and_bins(
+            config,
+            available_columns=available_columns,
+        )
+        return [total_column, *[column for column, _, _ in bins]]
+    raise ExecutorError(f"Unsupported derived measure type {measure_type!r}.")
+
 
 def _detect_xwalk_target_col(
     xwalk: pd.DataFrame,
@@ -140,6 +187,29 @@ def _detect_xwalk_target_col(
         f"Columns: {list(xwalk.columns)}, source_key: {source_key!r}. "
         f"Expected one of: coc_id, metro_id, msa_id, geo_id."
     )
+
+
+def _distribution_total_and_bins(
+    config: dict[str, object],
+    *,
+    available_columns: set[str] | None = None,
+) -> tuple[str, tuple[tuple[str, float, float | None], ...]]:
+    family = str(config.get("distribution_family") or "")
+    if family not in _DISTRIBUTION_BIN_LAYOUTS:
+        supported = ", ".join(sorted(_DISTRIBUTION_BIN_LAYOUTS))
+        raise ExecutorError(
+            "Unsupported distribution_family "
+            f"{family!r} for quantile_from_distribution. Supported: {supported}."
+        )
+    total_column = str(config.get("total_column") or _DISTRIBUTION_TOTAL_COLUMNS[family])
+    layouts = _DISTRIBUTION_BIN_LAYOUTS[family]
+    if available_columns is not None:
+        for bins in layouts:
+            if total_column in available_columns and all(
+                column in available_columns for column, _, _ in bins
+            ):
+                return total_column, bins
+    return total_column, layouts[0]
 
 
 def _attach_dynamic_pop_share(
@@ -311,15 +381,12 @@ def _resample_aggregate(
     derived_measures = task.derived_measures or {}
     derived_required_columns = sorted(
         {
-            str(column_name)
+            column_name
             for config in derived_measures.values()
-            for column_name in [
-                config.get("source_rate_column"),
-                config.get("denominator_column"),
-                config.get("source_numerator_column"),
-                *(config.get("source_numerator_columns") or []),
-            ]
-            if column_name is not None
+            for column_name in derived_measure_required_columns(
+                config,
+                available_columns=set(df.columns),
+            )
         }
     )
     _validate_columns(
@@ -440,10 +507,43 @@ def _resample_aggregate(
             row: dict[str, object] = {target_col: geo_id}
             weight = group[weight_col]
             for output_name, config in derived_measures.items():
-                if config.get("type", "rate_from_weighted_counts") != "rate_from_weighted_counts":
+                derived_type = config.get("type", "rate_from_weighted_counts")
+                if derived_type == "quantile_from_distribution":
+                    total_column, bins = _distribution_total_and_bins(
+                        config,
+                        available_columns=set(group.columns),
+                    )
+                    weighted_distribution: dict[str, object] = {}
+                    distribution_columns = [total_column, *[column for column, _, _ in bins]]
+                    valid_weight = weight.notna()
+                    for column in distribution_columns:
+                        valid = group[column].notna() & valid_weight
+                        weighted_distribution[column] = (
+                            group.loc[valid, column] * weight.loc[valid]
+                        ).sum()
+                    value, diagnostic = _quantile_from_bins(
+                        pd.Series(weighted_distribution),
+                        total_column=total_column,
+                        bins=bins,
+                        quantile=float(config["quantile"]),
+                    )
+                    diagnostic["family"] = config.get("distribution_family")
+                    diagnostic["total_column"] = total_column
+                    diagnostic["bin_layout"] = (
+                        "early_2000_plus"
+                        if bins == _CONTRACT_RENT_BINS_EARLY
+                        else "modern_3500_plus"
+                    )
+                    row[output_name] = value
+                    diagnostic_output = config.get("diagnostic_output_column")
+                    if diagnostic_output is not None:
+                        row[str(diagnostic_output)] = json.dumps(diagnostic, sort_keys=True)
+                    continue
+
+                if derived_type != "rate_from_weighted_counts":
                     raise ExecutorError(
                         f"Unsupported derived measure type "
-                        f"{config.get('type')!r} for '{output_name}'."
+                        f"{derived_type!r} for '{output_name}'."
                     )
                 denom_col = str(config["denominator_column"])
                 numerator_col = config.get("source_numerator_column")

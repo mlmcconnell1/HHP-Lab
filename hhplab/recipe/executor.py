@@ -92,6 +92,7 @@ from hhplab.recipe.executor_resample import (
     _resample_aggregate,
     _resample_allocate,
     _resample_identity,
+    derived_measure_required_columns,
 )
 from hhplab.recipe.executor_transforms import (
     _generated_metro_transform_path,
@@ -729,15 +730,12 @@ def _execute_resample(
                             derived_required_columns = (
                                 sorted(
                                     {
-                                        str(column_name)
+                                        column_name
                                         for config in task.derived_measures.values()
-                                        for column_name in [
-                                            config.get("source_rate_column"),
-                                            config.get("denominator_column"),
-                                            config.get("source_numerator_column"),
-                                            *(config.get("source_numerator_columns") or []),
-                                        ]
-                                        if column_name is not None
+                                        for column_name in derived_measure_required_columns(
+                                            config,
+                                            available_columns=set(df.columns),
+                                        )
                                     }
                                 )
                                 if task.derived_measures

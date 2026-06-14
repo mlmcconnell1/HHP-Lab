@@ -52,6 +52,7 @@ from hhplab.recipe.adapters import (
 from hhplab.recipe.default_adapters import register_defaults
 from hhplab.recipe.executor_core import ExecutorError
 from hhplab.recipe.executor_msa_coc_panel import build_msa_coc_containment_spec
+from hhplab.recipe.executor_resample import derived_measure_required_columns
 from hhplab.recipe.planner import (
     ExecutionPlan,
     PlannerError,
@@ -2108,15 +2109,12 @@ def _check_dataset_schemas(
             )
         derived_required_columns = sorted(
             {
-                str(column_name)
+                column_name
                 for config in (task.derived_measures or {}).values()
-                for column_name in [
-                    config.get("source_rate_column"),
-                    config.get("denominator_column"),
-                    config.get("source_numerator_column"),
-                    *(config.get("source_numerator_columns") or []),
-                ]
-                if column_name is not None
+                for column_name in derived_measure_required_columns(
+                    config,
+                    available_columns=columns,
+                )
             }
         )
         derived_missing = [column for column in derived_required_columns if column not in columns]

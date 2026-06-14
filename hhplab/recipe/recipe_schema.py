@@ -1631,7 +1631,8 @@ TransformSpec = Annotated[CrosswalkTransform | RollupTransform, Field(discrimina
 
 ResampleMethod = Literal["identity", "allocate", "aggregate"]
 AggregationMethod = Literal["sum", "mean", "weighted_mean"]
-DerivedMeasureType = Literal["rate_from_weighted_counts"]
+DerivedMeasureType = Literal["rate_from_weighted_counts", "quantile_from_distribution"]
+DerivedDistributionFamily = Literal["contract_rent"]
 SAEAllocationMethod = Literal["tract_share_within_county"]
 SAEFallbackPolicy = Literal["diagnose_only", "fail"]
 SAEZeroDenominatorPolicy = Literal["null_rate", "diagnostic"]
@@ -1726,6 +1727,11 @@ class DerivedMeasureConfig(BaseModel):
     ``source_rate_column * denominator_column``. The executor applies the
     crosswalk weight to both numerator and denominator, sums both at target
     geography, then emits ``numerator_sum / denominator_sum``.
+
+    ``quantile_from_distribution`` is for additive distribution bins, currently
+    ACS B25056 contract-rent bins. The executor weights and sums the bins to
+    target geography first, then linearly interpolates the requested quantile
+    within the aggregated distribution.
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -1738,9 +1744,26 @@ class DerivedMeasureConfig(BaseModel):
         default=None,
         description="Input rate column at source geography.",
     )
-    denominator_column: str = Field(
-        ...,
+    denominator_column: str | None = Field(
+        default=None,
         description="Input denominator/universe column at source geography.",
+    )
+    total_column: str | None = Field(
+        default=None,
+        description=(
+            "Input distribution-total column for quantile_from_distribution. "
+            "Defaults to the family total column."
+        ),
+    )
+    distribution_family: DerivedDistributionFamily | None = Field(
+        default=None,
+        description="Distribution-bin family used by quantile_from_distribution.",
+    )
+    quantile: float | None = Field(
+        default=None,
+        ge=0.0,
+        le=1.0,
+        description="Quantile to derive from aggregated distribution bins, e.g. 0.25.",
     )
     source_numerator_column: str | None = Field(
         default=None,
@@ -1763,6 +1786,10 @@ class DerivedMeasureConfig(BaseModel):
         default=None,
         description="Optional output column for the weighted numerator sum.",
     )
+    diagnostic_output_column: str | None = Field(
+        default=None,
+        description="Optional output column containing JSON quantile diagnostics.",
+    )
     zero_denominator_policy: Literal["null_rate"] = Field(
         default="null_rate",
         description="How to emit rates when the weighted denominator sum is zero.",
@@ -1771,8 +1798,10 @@ class DerivedMeasureConfig(BaseModel):
     @field_validator(
         "source_rate_column",
         "denominator_column",
+        "total_column",
         "source_numerator_column",
         "numerator_output_column",
+        "diagnostic_output_column",
     )
     @classmethod
     def _validate_non_blank_column(cls, value: str | None) -> str | None:
@@ -1789,6 +1818,37 @@ class DerivedMeasureConfig(BaseModel):
 
     @model_validator(mode="after")
     def _validate_numerator_source(self) -> DerivedMeasureConfig:
+        if self.type == "quantile_from_distribution":
+            if self.distribution_family is None:
+                raise ValueError(
+                    "Derived measure type 'quantile_from_distribution' requires "
+                    "distribution_family."
+                )
+            if self.quantile is None:
+                raise ValueError(
+                    "Derived measure type 'quantile_from_distribution' requires quantile."
+                )
+            unsupported_rate_fields = [
+                name
+                for name, value in {
+                    "source_rate_column": self.source_rate_column,
+                    "source_numerator_column": self.source_numerator_column,
+                    "source_numerator_columns": self.source_numerator_columns,
+                    "numerator_output_column": self.numerator_output_column,
+                }.items()
+                if value is not None
+            ]
+            if unsupported_rate_fields:
+                raise ValueError(
+                    "Derived measure type 'quantile_from_distribution' does not use "
+                    f"{', '.join(unsupported_rate_fields)}."
+                )
+            return self
+
+        if self.denominator_column is None:
+            raise ValueError(
+                "Derived measure type 'rate_from_weighted_counts' requires denominator_column."
+            )
         if self.source_numerator_column is not None and self.source_numerator_columns is not None:
             raise ValueError(
                 "Use either source_numerator_column or source_numerator_columns, not both."
