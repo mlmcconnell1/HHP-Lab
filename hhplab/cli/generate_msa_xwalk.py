@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import shutil
 from typing import Annotated, Literal
 
 import geopandas as gpd
@@ -87,6 +88,30 @@ def generate_msa_xwalk(
             help="Decennial PL 94-171 population vintage for block-population allocation.",
         ),
     ] = 2020,
+    state_shards: Annotated[
+        bool,
+        typer.Option(
+            "--state-shards/--no-state-shards",
+            help=(
+                "Build block-population crosswalks as deterministic state shards before "
+                "concatenating the canonical artifact."
+            ),
+        ),
+    ] = False,
+    reuse_shards: Annotated[
+        bool,
+        typer.Option(
+            "--reuse-shards",
+            help="Reuse existing per-state shard parquet files when --state-shards is enabled.",
+        ),
+    ] = False,
+    cleanup_shards: Annotated[
+        bool,
+        typer.Option(
+            "--cleanup-shards",
+            help="Delete per-state shard parquet files after writing the final artifact.",
+        ),
+    ] = False,
     force: Annotated[
         bool,
         typer.Option(
@@ -235,18 +260,34 @@ def generate_msa_xwalk(
         if allocation_basis == "block_population":
             block_gdf = gpd.read_parquet(block_geometry_artifact)
             block_population = pd.read_parquet(block_population_artifact)
-            crosswalk = build_coc_msa_block_population_crosswalk(
-                coc_gdf,
-                county_gdf,
-                msa_membership,
-                block_gdf,
-                block_population,
-                boundary_vintage=resolved_boundary,
-                county_vintage=str(counties),
-                block_vintage=str(blocks),
-                decennial_vintage=str(decennial),
-                definition_version=definition_version,
-            )
+            if state_shards:
+                crosswalk = _build_block_population_state_shards(
+                    coc_gdf,
+                    county_gdf,
+                    msa_membership,
+                    block_gdf,
+                    block_population,
+                    boundary_vintage=resolved_boundary,
+                    county_vintage=str(counties),
+                    block_vintage=str(blocks),
+                    decennial_vintage=str(decennial),
+                    definition_version=definition_version,
+                    output_path=output_path,
+                    reuse_shards=reuse_shards,
+                )
+            else:
+                crosswalk = build_coc_msa_block_population_crosswalk(
+                    coc_gdf,
+                    county_gdf,
+                    msa_membership,
+                    block_gdf,
+                    block_population,
+                    boundary_vintage=resolved_boundary,
+                    county_vintage=str(counties),
+                    block_vintage=str(blocks),
+                    decennial_vintage=str(decennial),
+                    definition_version=definition_version,
+                )
         else:
             crosswalk = build_coc_msa_crosswalk(
                 coc_gdf,
@@ -303,6 +344,15 @@ def generate_msa_xwalk(
         "max_unallocated_share": max_unallocated,
         "artifact": str(written_path),
     }
+    if allocation_basis == "block_population" and state_shards:
+        shard_dir = _state_shard_dir(output_path)
+        payload["state_sharded"] = True
+        payload["state_shard_dir"] = str(shard_dir)
+        payload["state_shard_count"] = len(list(shard_dir.glob("*__state-*.parquet")))
+        payload["reused_state_shards"] = bool(reuse_shards)
+        if cleanup_shards and shard_dir.exists():
+            shutil.rmtree(shard_dir)
+            payload["state_shards_cleaned"] = True
     warning = crosswalk.attrs.get("warning")
     if warning:
         payload["warning"] = str(warning)
@@ -318,3 +368,219 @@ def generate_msa_xwalk(
     )
     if warning:
         typer.echo(f"  Warning: {warning}")
+
+
+def _build_block_population_state_shards(
+    coc_gdf: gpd.GeoDataFrame,
+    county_gdf: gpd.GeoDataFrame,
+    msa_membership: pd.DataFrame,
+    block_gdf: gpd.GeoDataFrame,
+    block_population: pd.DataFrame,
+    *,
+    boundary_vintage: str,
+    county_vintage: str,
+    block_vintage: str,
+    decennial_vintage: str,
+    definition_version: str,
+    output_path,
+    reuse_shards: bool,
+) -> pd.DataFrame:
+    from hhplab.msa.crosswalk import (
+        COC_MSA_BLOCK_POPULATION_CROSSWALK_COLUMNS,
+        build_coc_msa_block_population_crosswalk,
+    )
+
+    counties = _county_with_fips(county_gdf)
+    membership = msa_membership.copy()
+    membership["county_fips"] = membership["county_fips"].astype(str).str.zfill(5)
+    blocks = _block_with_geoid(block_gdf)
+    population = _block_population_with_geoid(block_population)
+    shard_dir = _state_shard_dir(output_path)
+    shard_dir.mkdir(parents=True, exist_ok=True)
+
+    shard_frames: list[pd.DataFrame] = []
+    for state_fips in _state_fips_for_shards(counties, membership, blocks):
+        shard_path = _state_shard_path(output_path, state_fips)
+        if reuse_shards and shard_path.exists():
+            shard = pd.read_parquet(shard_path)
+        else:
+            state_counties = counties[counties["county_fips"].str[:2] == state_fips].copy()
+            state_membership = membership[
+                membership["county_fips"].isin(state_counties["county_fips"])
+            ].copy()
+            state_blocks = blocks[blocks["block_geoid"].str[:2] == state_fips].copy()
+            state_population = population[
+                population["block_geoid"].str[:2] == state_fips
+            ].copy()
+            if state_counties.empty or state_membership.empty or state_blocks.empty:
+                continue
+            state_cocs = _cocs_intersecting_state(coc_gdf, state_counties)
+            if state_cocs.empty:
+                continue
+            shard = build_coc_msa_block_population_crosswalk(
+                state_cocs,
+                state_counties,
+                state_membership,
+                state_blocks,
+                state_population,
+                boundary_vintage=boundary_vintage,
+                county_vintage=county_vintage,
+                block_vintage=block_vintage,
+                decennial_vintage=decennial_vintage,
+                definition_version=definition_version,
+            )
+            shard.to_parquet(shard_path, index=False)
+        if not shard.empty:
+            shard = shard.copy()
+            shard["_shard_state_fips"] = state_fips
+            shard_frames.append(shard)
+
+    if not shard_frames:
+        return pd.DataFrame(columns=list(COC_MSA_BLOCK_POPULATION_CROSSWALK_COLUMNS))
+    return _concat_block_population_state_shards(shard_frames)
+
+
+def _state_shard_dir(output_path) -> object:
+    return output_path.parent / f"{output_path.stem}__state_shards"
+
+
+def _state_shard_path(output_path, state_fips: str) -> object:
+    return _state_shard_dir(output_path) / f"{output_path.stem}__state-{state_fips}.parquet"
+
+
+def _county_with_fips(county_gdf: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
+    counties = county_gdf.copy()
+    county_col = "GEOID" if "GEOID" in counties.columns else "geoid"
+    counties["county_fips"] = counties[county_col].astype(str).str.zfill(5)
+    return counties
+
+
+def _block_with_geoid(block_gdf: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
+    blocks = block_gdf.copy()
+    block_col = "block_geoid"
+    if block_col not in blocks.columns:
+        block_col = "GEOID" if "GEOID" in blocks.columns else "geoid"
+    blocks["block_geoid"] = blocks[block_col].astype(str)
+    return blocks
+
+
+def _block_population_with_geoid(block_population: pd.DataFrame) -> pd.DataFrame:
+    population = block_population.copy()
+    block_col = "block_geoid"
+    if block_col not in population.columns:
+        block_col = "GEOID" if "GEOID" in population.columns else "geoid"
+    population["block_geoid"] = population[block_col].astype(str)
+    return population
+
+
+def _state_fips_for_shards(
+    counties: pd.DataFrame,
+    membership: pd.DataFrame,
+    blocks: pd.DataFrame,
+) -> list[str]:
+    member_counties = set(membership["county_fips"].astype(str))
+    available_counties = counties[counties["county_fips"].isin(member_counties)]
+    county_states = set(available_counties["county_fips"].str[:2])
+    block_states = set(blocks["block_geoid"].astype(str).str[:2])
+    return sorted(county_states & block_states)
+
+
+def _cocs_intersecting_state(
+    coc_gdf: gpd.GeoDataFrame,
+    state_counties: gpd.GeoDataFrame,
+) -> gpd.GeoDataFrame:
+    counties = state_counties
+    if counties.crs != coc_gdf.crs:
+        counties = counties.to_crs(coc_gdf.crs)
+    state_geometry = counties.geometry.union_all()
+    mask = coc_gdf.geometry.intersects(state_geometry)
+    return coc_gdf.loc[mask].copy()
+
+
+def _concat_block_population_state_shards(shards: list[pd.DataFrame]) -> pd.DataFrame:
+    from hhplab.msa.crosswalk import (
+        COC_MSA_BLOCK_POPULATION_CROSSWALK_COLUMNS,
+        FULL_ALLOCATION_THRESHOLD,
+    )
+
+    rows = pd.concat(shards, ignore_index=True)
+    grouped = (
+        rows.groupby(["coc_id", "msa_id", "cbsa_code"], as_index=False)
+        .agg(
+            intersection_population=("intersection_population", "sum"),
+            intersection_area=("intersection_area", "sum"),
+            block_count=("block_count", "sum"),
+            missing_population_block_count=("missing_population_block_count", "sum"),
+        )
+        .sort_values(["coc_id", "msa_id"])
+        .reset_index(drop=True)
+    )
+
+    coc_denominators = (
+        rows.groupby(["_shard_state_fips", "coc_id"], as_index=False)
+        .agg(
+            coc_population_denominator=("coc_population_denominator", "first"),
+            coc_intersection_area=("coc_intersection_area", "first"),
+            coc_missing_population_block_count=(
+                "partial_coc_population_coverage",
+                lambda s: int(bool(s.any())),
+            ),
+        )
+        .groupby("coc_id", as_index=False)
+        .agg(
+            coc_population_denominator=("coc_population_denominator", "sum"),
+            coc_intersection_area=("coc_intersection_area", "sum"),
+            coc_missing_population_block_count=("coc_missing_population_block_count", "sum"),
+        )
+    )
+    msa_denominators = (
+        rows.groupby(["_shard_state_fips", "msa_id"], as_index=False)
+        .agg(
+            msa_population_denominator=("msa_population_denominator", "first"),
+            msa_intersection_area=("msa_intersection_area", "first"),
+        )
+        .groupby("msa_id", as_index=False)
+        .agg(
+            msa_population_denominator=("msa_population_denominator", "sum"),
+            msa_intersection_area=("msa_intersection_area", "sum"),
+        )
+    )
+    grouped = grouped.merge(coc_denominators, on="coc_id", how="left").merge(
+        msa_denominators,
+        on="msa_id",
+        how="left",
+    )
+    first = rows.iloc[0]
+    grouped["boundary_vintage"] = first["boundary_vintage"]
+    grouped["county_vintage"] = first["county_vintage"]
+    grouped["block_vintage"] = first["block_vintage"]
+    grouped["decennial_vintage"] = first["decennial_vintage"]
+    grouped["definition_version"] = first["definition_version"]
+    grouped["allocation_method"] = "block_population"
+    grouped["share_column"] = "allocation_share"
+    grouped["share_denominator"] = "coc_population_denominator"
+    grouped["zero_population_coc"] = grouped["coc_population_denominator"].fillna(0.0) == 0.0
+    grouped["allocation_share"] = grouped["intersection_population"] / grouped[
+        "coc_population_denominator"
+    ]
+    grouped.loc[grouped["zero_population_coc"], "allocation_share"] = 0.0
+    grouped["coc_population_containment_share"] = grouped["allocation_share"]
+    grouped["msa_population_coverage_share"] = grouped["intersection_population"] / grouped[
+        "msa_population_denominator"
+    ]
+    grouped = grouped.fillna(
+        {
+            "allocation_share": 0.0,
+            "coc_population_containment_share": 0.0,
+            "msa_population_coverage_share": 0.0,
+        }
+    )
+    allocation_totals = grouped.groupby("coc_id")["allocation_share"].transform("sum")
+    grouped["partial_coc_population_coverage"] = (
+        (grouped["coc_missing_population_block_count"] > 0)
+        | (
+            ~grouped["zero_population_coc"]
+            & (allocation_totals < FULL_ALLOCATION_THRESHOLD)
+        )
+    )
+    return grouped.loc[:, COC_MSA_BLOCK_POPULATION_CROSSWALK_COLUMNS]

@@ -15,7 +15,10 @@ from typer.testing import CliRunner
 
 from hhplab.cli.generate_msa_xwalk import generate_msa_xwalk
 from hhplab.cli.main import app
-from hhplab.msa.crosswalk import ALLOCATION_SHARE_TOLERANCE
+from hhplab.msa.crosswalk import (
+    ALLOCATION_SHARE_TOLERANCE,
+    COC_MSA_BLOCK_POPULATION_CROSSWALK_COLUMNS,
+)
 from hhplab.msa.msa_definitions import DELINEATION_FILE_YEAR
 from hhplab.registry.schema import RegistryEntry
 
@@ -226,6 +229,92 @@ def test_generate_msa_xwalk_json_block_population(monkeypatch, tmp_path: Path):
     )
     crosswalk = pd.read_parquet(payload["artifact"])
     assert crosswalk["msa_population_denominator"].tolist() == [100.0]
+
+
+def test_generate_msa_xwalk_json_block_population_state_shards_alabama_smoke(
+    monkeypatch,
+    tmp_path: Path,
+):
+    boundaries_dir = tmp_path / "data" / "curated" / "coc_boundaries"
+    tiger_dir = tmp_path / "data" / "curated" / "tiger"
+    msa_dir = tmp_path / "data" / "curated" / "msa"
+    census_dir = tmp_path / "data" / "curated" / "census"
+    boundaries_dir.mkdir(parents=True, exist_ok=True)
+    tiger_dir.mkdir(parents=True, exist_ok=True)
+    msa_dir.mkdir(parents=True, exist_ok=True)
+    census_dir.mkdir(parents=True, exist_ok=True)
+
+    block_geoid = "010010001001000"
+    gpd.GeoDataFrame(
+        {"coc_id": ["AL-500"]},
+        geometry=[box(0, 0, 10, 10)],
+        crs="EPSG:4326",
+    ).to_parquet(boundaries_dir / "coc__B2025.parquet")
+    gpd.GeoDataFrame(
+        {"GEOID": ["01001"]},
+        geometry=[box(0, 0, 10, 10)],
+        crs="EPSG:4326",
+    ).to_parquet(tiger_dir / "counties__C2023.parquet")
+    gpd.GeoDataFrame(
+        {"block_geoid": [block_geoid]},
+        geometry=[box(0, 0, 10, 10)],
+        crs="EPSG:4326",
+    ).to_parquet(tiger_dir / "blocks__K2020.parquet")
+    pd.DataFrame({"block_geoid": [block_geoid], "total_population": [125]}).to_parquet(
+        census_dir / "pl_blocks__N2020xK2020.parquet"
+    )
+    pd.DataFrame(
+        {
+            "msa_id": ["33860"],
+            "cbsa_code": ["33860"],
+            "county_fips": ["01001"],
+            "county_name": ["Autauga County"],
+            "state_name": ["Alabama"],
+            "central_outlying": ["Central"],
+            "definition_version": ["census_msa_2023"],
+        }
+    ).to_parquet(msa_dir / "msa_county_membership__census_msa_2023.parquet")
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(
+        "hhplab.cli.generate_msa_xwalk.list_boundaries",
+        lambda: [_boundary_registry_entry(tmp_path)],
+    )
+    monkeypatch.setattr(
+        "hhplab.cli.generate_msa_xwalk.latest_vintage",
+        lambda: "2025",
+    )
+
+    result = runner.invoke(
+        app,
+        [
+            "generate",
+            "msa-xwalk",
+            "--boundary",
+            "2025",
+            "--counties",
+            "2023",
+            "--allocation-basis",
+            "block_population",
+            "--blocks",
+            "2020",
+            "--decennial",
+            "2020",
+            "--state-shards",
+            "--json",
+        ],
+        catch_exceptions=False,
+    )
+
+    assert result.exit_code == 0
+    payload = json.loads(result.stdout)
+    assert payload["status"] == "ok"
+    assert payload["state_sharded"] is True
+    assert payload["state_shard_count"] == 1
+    shard_dir = Path(payload["state_shard_dir"])
+    assert (shard_dir / f"{Path(payload['artifact']).stem}__state-01.parquet").exists()
+    crosswalk = pd.read_parquet(payload["artifact"])
+    assert list(crosswalk.columns) == list(COC_MSA_BLOCK_POPULATION_CROSSWALK_COLUMNS)
+    assert crosswalk["msa_population_denominator"].tolist() == [125.0]
 
 
 @pytest.mark.parametrize(
