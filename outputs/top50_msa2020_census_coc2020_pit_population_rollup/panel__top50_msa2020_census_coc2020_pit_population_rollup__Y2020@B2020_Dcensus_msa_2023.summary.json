@@ -1,0 +1,128 @@
+{
+  "dataset_type": "top50_msa_pit_rollup",
+  "row_grain": "msa_id x year",
+  "row_count": 50,
+  "top_n": 50,
+  "pit_year": 2020,
+  "allocation_basis": "block_population",
+  "denominator_source": "2020 Census PL 94-171 block population",
+  "ranking_population_source": "2020 Census PL 94-171 block population aggregated to Census MSA 2023 counties",
+  "coc_boundary_vintage": "2020",
+  "msa_definition_version": "census_msa_2023",
+  "measure_columns": [
+    "pit_total",
+    "pit_sheltered",
+    "pit_unsheltered"
+  ],
+  "inputs": {
+    "pit": "data/curated/pit/pit_vintage__P2024.parquet",
+    "coc_boundaries": "data/curated/coc_boundaries/coc__B2020.parquet",
+    "blocks": "data/curated/tiger/blocks__K2020.parquet",
+    "block_population": "data/curated/census/pl_blocks__N2020xK2020.parquet",
+    "msa_membership": "data/curated/msa/msa_county_membership__census_msa_2023.parquet"
+  },
+  "outputs": {
+    "parquet": "/home/mlm/Source/HHP-Lab/outputs/top50_msa2020_census_coc2020_pit_population_rollup/panel__top50_msa2020_census_coc2020_pit_population_rollup__Y2020@B2020_Dcensus_msa_2023.parquet",
+    "csv": "/home/mlm/Source/HHP-Lab/outputs/top50_msa2020_census_coc2020_pit_population_rollup/panel__top50_msa2020_census_coc2020_pit_population_rollup__Y2020@B2020_Dcensus_msa_2023.csv",
+    "preview_csv": "/home/mlm/Source/HHP-Lab/outputs/top50_msa2020_census_coc2020_pit_population_rollup/panel__top50_msa2020_census_coc2020_pit_population_rollup__Y2020@B2020_Dcensus_msa_2023.preview.csv",
+    "xwalk": "/home/mlm/Source/HHP-Lab/outputs/top50_msa2020_census_coc2020_pit_population_rollup/xwalk__B2020xMcensus_msa_2023xC2023xK2020xN2020__top50_population.parquet"
+  },
+  "state_shards": 38,
+  "xwalk_rows": 364,
+  "xwalk_coc_count": 267,
+  "total_pit_count_top50": 398336.3880370519,
+  "total_sheltered_count_top50": 247394.42827270637,
+  "total_unsheltered_count_top50": 150941.95976434546,
+  "top10": [
+    {
+      "msa_population_rank_2020_census": 1,
+      "msa_id": "35620",
+      "msa_name": "New York-Newark-Jersey City, NY-NJ",
+      "msa_2020_census_population": 20081935,
+      "pit_total": 91340.48137629197,
+      "pit_sheltered": 85957.30254311499,
+      "pit_unsheltered": 5383.178833176968
+    },
+    {
+      "msa_population_rank_2020_census": 2,
+      "msa_id": "31080",
+      "msa_name": "Los Angeles-Long Beach-Anaheim, CA",
+      "msa_2020_census_population": 13200998,
+      "pit_total": 73413.11383620178,
+      "pit_sheltered": 21411.754333971592,
+      "pit_unsheltered": 52001.35950223018
+    },
+    {
+      "msa_population_rank_2020_census": 3,
+      "msa_id": "16980",
+      "msa_name": "Chicago-Naperville-Elgin, IL-IN",
+      "msa_2020_census_population": 9449351,
+      "pit_total": 8307.78744574441,
+      "pit_sheltered": 6400.972493265319,
+      "pit_unsheltered": 1906.8149524790917
+    },
+    {
+      "msa_population_rank_2020_census": 4,
+      "msa_id": "19100",
+      "msa_name": "Dallas-Fort Worth-Arlington, TX",
+      "msa_2020_census_population": 7637387,
+      "pit_total": 7756.236026424795,
+      "pit_sheltered": 4625.890578350305,
+      "pit_unsheltered": 3130.3454480744913
+    },
+    {
+      "msa_population_rank_2020_census": 5,
+      "msa_id": "26420",
+      "msa_name": "Houston-Pasadena-The Woodlands, TX",
+      "msa_2020_census_population": 7149642,
+      "pit_total": 4775.79201781266,
+      "pit_sheltered": 2617.2554900052814,
+      "pit_unsheltered": 2158.5365278073778
+    },
+    {
+      "msa_population_rank_2020_census": 6,
+      "msa_id": "47900",
+      "msa_name": "Washington-Arlington-Alexandria, DC-VA-MD-WV",
+      "msa_2020_census_population": 6278542,
+      "pit_total": 10073.97633946413,
+      "pit_sheltered": 8820.827059378891,
+      "pit_unsheltered": 1253.14928008524
+    },
+    {
+      "msa_population_rank_2020_census": 7,
+      "msa_id": "37980",
+      "msa_name": "Philadelphia-Camden-Wilmington, PA-NJ-DE-MD",
+      "msa_2020_census_population": 6245051,
+      "pit_total": 9379.41182772764,
+      "pit_sheltered": 7936.384340012145,
+      "pit_unsheltered": 1443.027487715495
+    },
+    {
+      "msa_population_rank_2020_census": 8,
+      "msa_id": "33100",
+      "msa_name": "Miami-Fort Lauderdale-West Palm Beach, FL",
+      "msa_2020_census_population": 6138333,
+      "pit_total": 7280.990836876271,
+      "pit_sheltered": 4246.997087218937,
+      "pit_unsheltered": 3033.9937496573334
+    },
+    {
+      "msa_population_rank_2020_census": 9,
+      "msa_id": "12060",
+      "msa_name": "Atlanta-Sandy Springs-Roswell, GA",
+      "msa_2020_census_population": 6104803,
+      "pit_total": 6379.840726047525,
+      "pit_sheltered": 4005.752953612597,
+      "pit_unsheltered": 2374.0877724349284
+    },
+    {
+      "msa_population_rank_2020_census": 10,
+      "msa_id": "14460",
+      "msa_name": "Boston-Cambridge-Newton, MA-NH",
+      "msa_2020_census_population": 4941632,
+      "pit_total": 14890.490940619942,
+      "pit_sheltered": 13920.320239225932,
+      "pit_unsheltered": 970.1707013940102
+    }
+  ]
+}
