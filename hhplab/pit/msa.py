@@ -24,6 +24,9 @@ MSA_PIT_COLUMNS: tuple[str, ...] = (
     "expected_allocation_share_sum",
     "allocation_coverage_ratio",
     "missing_cocs",
+    "unmapped_source_coc_count",
+    "unmapped_source_cocs",
+    "unmapped_source_additive_measure_totals",
     "boundary_vintage",
     "county_vintage",
     "definition_version",
@@ -152,6 +155,11 @@ def aggregate_pit_to_msa(
             "expected_allocation_share_sum": rollup["expected_allocation_share_sum"],
             "allocation_coverage_ratio": rollup["coc_population_coverage_ratio"],
             "missing_cocs": rollup["missing_cocs"],
+            "unmapped_source_coc_count": rollup["unmapped_source_coc_count"],
+            "unmapped_source_cocs": rollup["unmapped_source_cocs"],
+            "unmapped_source_additive_measure_totals": rollup[
+                "unmapped_source_additive_measure_totals"
+            ],
             "boundary_vintage": resolved_boundary,
             "county_vintage": resolved_county,
             "definition_version": resolved_definition,

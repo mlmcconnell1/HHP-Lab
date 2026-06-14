@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import json
+
 import pandas as pd
 import pytest
 
@@ -173,6 +175,33 @@ class TestAggregatePitToMsa:
         assert set(result["msa_id"]) == {"35620", "41180"}
         assert result["pit_total"].isna().all()
         assert (result["allocation_coverage_ratio"] == 0.0).all()
+        assert set(result["unmapped_source_coc_count"]) == {1}
+        assert set(result["unmapped_source_cocs"]) == {"ZZ-999"}
+        assert {
+            json.loads(value)["pit_total"]
+            for value in result["unmapped_source_additive_measure_totals"]
+        } == {10.0}
+
+    def test_duplicate_coc_year_rows_raise_actionable_error(
+        self,
+        msa_crosswalk: pd.DataFrame,
+    ):
+        duplicate_pit = pd.DataFrame(
+            {
+                "coc_id": ["CO-100", "CO-100"],
+                "pit_year": [2020, 2020],
+                "pit_total": [100.0, 100.0],
+            }
+        )
+
+        with pytest.raises(
+            ValueError,
+            match=(
+                "CoC source data must be unique by coc_id and year.*"
+                "CO-100/2020.*Aggregate or deduplicate"
+            ),
+        ):
+            aggregate_pit_to_msa(duplicate_pit, msa_crosswalk)
 
     def test_found_coc_tuples_do_not_use_pd_isna(
         self,

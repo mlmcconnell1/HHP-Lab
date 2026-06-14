@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import logging
 from pathlib import Path
 
@@ -703,6 +704,7 @@ def aggregate_coc_to_msa_fractional_rollup(
     source["year"] = pd.to_numeric(source["year"], errors="raise").astype(int)
     for measure in measures:
         source[measure] = pd.to_numeric(source[measure], errors="raise")
+    _validate_fractional_rollup_source_grain(source)
 
     crosswalk = _apply_fractional_rollup_thresholds(
         crosswalk,
@@ -715,6 +717,11 @@ def aggregate_coc_to_msa_fractional_rollup(
 
     resolved = _fractional_rollup_metadata(crosswalk)
     expected_meta = _fractional_rollup_expected_meta(crosswalk)
+    unmapped_source_meta = _fractional_rollup_unmapped_source_meta(
+        source,
+        crosswalk,
+        measures,
+    )
     merge_columns = ["coc_id", "msa_id", "allocation_share"]
     if "msa_population_coverage_share" in crosswalk.columns:
         merge_columns.append("msa_population_coverage_share")
@@ -765,10 +772,18 @@ def aggregate_coc_to_msa_fractional_rollup(
         pd.DataFrame({"year": years}),
         how="cross",
     )
-    result = skeleton.merge(rollup, on=["msa_id", "year"], how="left").merge(
-        expected_meta,
-        on="msa_id",
-        how="left",
+    result = (
+        skeleton.merge(rollup, on=["msa_id", "year"], how="left")
+        .merge(
+            expected_meta,
+            on="msa_id",
+            how="left",
+        )
+        .merge(
+            unmapped_source_meta,
+            on="year",
+            how="left",
+        )
     )
 
     rows: list[dict[str, object]] = []
@@ -799,6 +814,17 @@ def aggregate_coc_to_msa_fractional_rollup(
             ),
             "missing_coc_count": len(missing_cocs),
             "missing_cocs": ",".join(missing_cocs),
+            "unmapped_source_coc_count": _int_value(
+                row,
+                "unmapped_source_coc_count",
+                default=0,
+            ),
+            "unmapped_source_cocs": _string_value(row, "unmapped_source_cocs", default=""),
+            "unmapped_source_additive_measure_totals": _string_value(
+                row,
+                "unmapped_source_additive_measure_totals",
+                default=_measure_totals_json({measure: 0.0 for measure in measures}),
+            ),
             "zero_population_coc_count": int(row.zero_population_coc_count),
             "missing_population_block_count": int(row.missing_population_block_count),
             "min_coc_population_containment_share": min_coc_population_containment_share,
@@ -884,6 +910,30 @@ def _validate_fractional_rollup_crosswalk(crosswalk_df: pd.DataFrame) -> pd.Data
         (crosswalk["allocation_share"] > ALLOCATION_SHARE_TOLERANCE) | zero_population
     ].copy()
     return crosswalk
+
+
+def _validate_fractional_rollup_source_grain(source: pd.DataFrame) -> None:
+    duplicated = source[source.duplicated(subset=["coc_id", "year"], keep=False)]
+    if duplicated.empty:
+        return
+
+    examples = (
+        duplicated[["coc_id", "year"]]
+        .drop_duplicates()
+        .sort_values(["coc_id", "year"])
+        .head(5)
+    )
+    preview = ", ".join(
+        f"{row.coc_id}/{int(row.year)}" for row in examples.itertuples(index=False)
+    )
+    if len(examples) < duplicated[["coc_id", "year"]].drop_duplicates().shape[0]:
+        preview += ", ..."
+    raise ValueError(
+        "CoC source data must be unique by coc_id and year before MSA fractional "
+        f"rollup. Duplicate source row keys: {preview}. "
+        "Aggregate or deduplicate the source CoC-year data before calling "
+        "aggregate_coc_to_msa_fractional_rollup."
+    )
 
 
 def _apply_fractional_rollup_thresholds(
@@ -977,6 +1027,42 @@ def _fractional_rollup_expected_meta(crosswalk: pd.DataFrame) -> pd.DataFrame:
     return meta
 
 
+def _fractional_rollup_unmapped_source_meta(
+    source: pd.DataFrame,
+    crosswalk: pd.DataFrame,
+    measures: tuple[str, ...],
+) -> pd.DataFrame:
+    mapped_cocs = set(crosswalk["coc_id"].astype(str))
+    unmapped = source[~source["coc_id"].isin(mapped_cocs)].copy()
+    columns = [
+        "year",
+        "unmapped_source_coc_count",
+        "unmapped_source_cocs",
+        "unmapped_source_additive_measure_totals",
+    ]
+    if unmapped.empty:
+        return pd.DataFrame(columns=columns)
+
+    meta = (
+        unmapped.groupby("year", as_index=False)
+        .agg(
+            unmapped_source_coc_count=("coc_id", "nunique"),
+            unmapped_source_cocs=(
+                "coc_id",
+                lambda s: ",".join(sorted({str(value) for value in s})),
+            ),
+            **{measure: (measure, "sum") for measure in measures},
+        )
+    )
+    meta["unmapped_source_additive_measure_totals"] = meta.apply(
+        lambda row: _measure_totals_json(
+            {measure: float(getattr(row, measure)) for measure in measures}
+        ),
+        axis=1,
+    )
+    return meta[columns]
+
+
 def _resolve_single_crosswalk_value(series: pd.Series, field_name: str) -> str:
     values = sorted({str(value) for value in series.dropna().unique()})
     if len(values) != 1:
@@ -1024,6 +1110,20 @@ def _coverage_fraction(numerator: float, denominator: float) -> float:
 
 def _bounded_coverage(value: float) -> float:
     return min(max(value, 0.0), 1.0)
+
+
+def _int_value(row: object, field_name: str, *, default: int) -> int:
+    value = getattr(row, field_name, default)
+    return int(value) if pd.notna(value) else default
+
+
+def _string_value(row: object, field_name: str, *, default: str) -> str:
+    value = getattr(row, field_name, default)
+    return str(value) if pd.notna(value) else default
+
+
+def _measure_totals_json(totals: dict[str, float]) -> str:
+    return json.dumps(totals, sort_keys=True, separators=(",", ":"))
 
 
 def _empty_fractional_rollup(measures: tuple[str, ...]) -> pd.DataFrame:

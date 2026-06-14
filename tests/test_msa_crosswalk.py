@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import json
+
 import geopandas as gpd
 import pandas as pd
 import pytest
@@ -313,6 +315,59 @@ def test_fractional_rollup_reports_missing_source_cocs(coc_msa_crosswalk: pd.Dat
     assert stl["missing_cocs"] == "CO-200,CO-300,CO-400"
     assert stl["coc_population_coverage_ratio"] == pytest.approx(0.0)
     assert stl["msa_population_coverage_ratio"] == pytest.approx(0.0)
+
+
+def test_fractional_rollup_reports_unmapped_source_cocs(coc_msa_crosswalk: pd.DataFrame):
+    source = pd.DataFrame(
+        {
+            "coc_id": ["CO-100", "CO-999-UNMAPPED"],
+            "year": [2020, 2020],
+            "pit_total": [100.0, 9999.0],
+            "pit_sheltered": [60.0, 6000.0],
+        }
+    )
+
+    result = aggregate_coc_to_msa_fractional_rollup(
+        source,
+        coc_msa_crosswalk[coc_msa_crosswalk["coc_id"] == "CO-100"],
+        additive_measure_columns=("pit_total", "pit_sheltered"),
+        source_dataset_id="pit_coc",
+    )
+
+    row = result.iloc[0]
+    assert row["pit_total"] == pytest.approx(100.0)
+    assert row["unmapped_source_coc_count"] == 1
+    assert row["unmapped_source_cocs"] == "CO-999-UNMAPPED"
+    assert json.loads(row["unmapped_source_additive_measure_totals"]) == {
+        "pit_sheltered": 6000.0,
+        "pit_total": 9999.0,
+    }
+
+
+def test_fractional_rollup_rejects_duplicate_source_coc_year_rows(
+    coc_msa_crosswalk: pd.DataFrame,
+):
+    source = pd.DataFrame(
+        {
+            "coc_id": ["CO-100", "CO-100"],
+            "year": [2020, 2020],
+            "pit_total": [100.0, 100.0],
+        }
+    )
+
+    with pytest.raises(
+        ValueError,
+        match=(
+            "CoC source data must be unique by coc_id and year.*"
+            "CO-100/2020.*Aggregate or deduplicate"
+        ),
+    ):
+        aggregate_coc_to_msa_fractional_rollup(
+            source,
+            coc_msa_crosswalk,
+            additive_measure_columns=("pit_total",),
+            source_dataset_id="pit_coc",
+        )
 
 
 def test_fractional_rollup_thresholds_filter_crosswalk_rows(

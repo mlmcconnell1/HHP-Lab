@@ -227,6 +227,11 @@ MSA_FRACTIONAL_ROLLUP_COMPLETE_ROW = {
     "covered_coc_count": 11,
     "missing_coc_count": 1,
     "missing_cocs": "CO-200",
+    "unmapped_source_coc_count": 1,
+    "unmapped_source_cocs": "CO-999",
+    "unmapped_source_additive_measure_totals": (
+        '{"pit_sheltered":100.0,"pit_total":125.0,"pit_unsheltered":25.0}'
+    ),
     "zero_population_coc_count": 0,
     "missing_population_block_count": 3,
     "min_coc_population_containment_share": 0.5,
@@ -631,6 +636,8 @@ def test_validate_msa_fractional_rollup_contract_passes_for_complete_artifact() 
         "msa_definition_version",
         "coc_population_coverage_ratio",
         "msa_population_coverage_ratio",
+        "unmapped_source_coc_count",
+        "unmapped_source_additive_measure_totals",
         "min_coc_population_containment_share",
     ],
 )
