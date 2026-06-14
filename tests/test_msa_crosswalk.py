@@ -13,6 +13,8 @@ from hhplab.msa.crosswalk import (
     ALLOCATION_SHARE_TOLERANCE,
     COC_MSA_BLOCK_POPULATION_CROSSWALK_COLUMNS,
     COC_MSA_CROSSWALK_COLUMNS,
+    _block_geometry_denominator,
+    _prepare_blocks,
     aggregate_coc_to_msa_fractional_rollup,
     build_coc_msa_block_population_crosswalk,
     build_coc_msa_crosswalk,
@@ -160,6 +162,40 @@ MISSING_INPUT_COLUMN_CASES = [
     ),
 ]
 
+DENOMINATOR_GEOMETRY_ROWS = [
+    ("G1", box(0, 0, 25, 10)),
+    ("G2", box(15, 0, 30, 10)),
+]
+
+DENOMINATOR_BLOCK_ROWS = [
+    ("B_FULL", box(0, 0, 10, 10), 100),
+    ("B_PARTIAL", box(10, 0, 20, 10), 200),
+    ("B_SHARED_FULL", box(20, 0, 25, 10), 300),
+]
+
+EXPECTED_DENOMINATOR_ROWS = {
+    ("G1", "B_FULL"): {
+        "denominator_intersection_area": 100.0,
+        "allocated_population": 100.0,
+    },
+    ("G1", "B_PARTIAL"): {
+        "denominator_intersection_area": 100.0,
+        "allocated_population": 200.0,
+    },
+    ("G2", "B_PARTIAL"): {
+        "denominator_intersection_area": 50.0,
+        "allocated_population": 100.0,
+    },
+    ("G1", "B_SHARED_FULL"): {
+        "denominator_intersection_area": 50.0,
+        "allocated_population": 300.0,
+    },
+    ("G2", "B_SHARED_FULL"): {
+        "denominator_intersection_area": 50.0,
+        "allocated_population": 300.0,
+    },
+}
+
 
 def _county_gdf() -> gpd.GeoDataFrame:
     return gpd.GeoDataFrame(
@@ -221,6 +257,31 @@ def _block_population_df() -> pd.DataFrame:
     )
 
 
+def _denominator_geometry_gdf() -> gpd.GeoDataFrame:
+    return gpd.GeoDataFrame(
+        {"geometry_id": [row[0] for row in DENOMINATOR_GEOMETRY_ROWS]},
+        geometry=[row[1] for row in DENOMINATOR_GEOMETRY_ROWS],
+        crs=ALBERS_EQUAL_AREA_CRS,
+    )
+
+
+def _denominator_block_gdf() -> gpd.GeoDataFrame:
+    return gpd.GeoDataFrame(
+        {"block_geoid": [row[0] for row in DENOMINATOR_BLOCK_ROWS]},
+        geometry=[row[1] for row in DENOMINATOR_BLOCK_ROWS],
+        crs=ALBERS_EQUAL_AREA_CRS,
+    )
+
+
+def _denominator_block_population_df() -> pd.DataFrame:
+    return pd.DataFrame(
+        {
+            "block_geoid": [row[0] for row in DENOMINATOR_BLOCK_ROWS],
+            "total_population": [row[2] for row in DENOMINATOR_BLOCK_ROWS],
+        }
+    )
+
+
 def _block_population_membership_df() -> pd.DataFrame:
     return pd.DataFrame(
         {
@@ -230,6 +291,45 @@ def _block_population_membership_df() -> pd.DataFrame:
             "definition_version": ["census_msa_2023"] * len(BLOCK_POPULATION_MEMBERSHIP_ROWS),
         }
     )
+
+
+def _overlay_block_geometry_denominator_reference(
+    geometry_gdf: gpd.GeoDataFrame,
+    blocks: gpd.GeoDataFrame,
+) -> pd.DataFrame:
+    intersections = gpd.overlay(
+        geometry_gdf[["geometry_id", "geometry"]],
+        blocks[["block_geoid", "total_population", "block_area", "geometry"]],
+        how="intersection",
+        keep_geom_type=False,
+    )
+    intersections = intersections.loc[~intersections.geometry.is_empty].copy()
+    intersections["denominator_intersection_area"] = intersections.geometry.area
+    intersections = intersections.loc[intersections["denominator_intersection_area"] > 0].copy()
+    intersections["total_population"] = pd.to_numeric(
+        intersections["total_population"],
+        errors="coerce",
+    )
+    intersections["missing_population"] = intersections["total_population"].isna()
+    intersections["allocated_population"] = (
+        intersections["total_population"].fillna(0.0)
+        * intersections["denominator_intersection_area"]
+        / intersections["block_area"]
+    )
+    return intersections
+
+
+def _denominator_comparison_frame(df: pd.DataFrame) -> pd.DataFrame:
+    columns = [
+        "geometry_id",
+        "block_geoid",
+        "total_population",
+        "block_area",
+        "denominator_intersection_area",
+        "allocated_population",
+        "missing_population",
+    ]
+    return df.loc[:, columns].sort_values(["geometry_id", "block_geoid"]).reset_index(drop=True)
 
 
 @pytest.fixture
@@ -546,6 +646,71 @@ def test_block_population_truth_table_allocations(
     assert bool(row["partial_coc_population_coverage"]) is expected[
         "partial_coc_population_coverage"
     ]
+
+
+def test_block_geometry_denominator_matches_overlay_reference():
+    geometry_gdf = _denominator_geometry_gdf()
+    blocks = _prepare_blocks(_denominator_block_gdf(), _denominator_block_population_df())
+
+    actual = _block_geometry_denominator(
+        geometry_gdf,
+        blocks,
+        left_id_col="geometry_id",
+        output_area_col="denominator_intersection_area",
+    )
+    expected = _overlay_block_geometry_denominator_reference(geometry_gdf, blocks)
+
+    pd.testing.assert_frame_equal(
+        _denominator_comparison_frame(actual),
+        _denominator_comparison_frame(expected),
+    )
+
+
+@pytest.mark.parametrize(
+    ("geometry_id", "block_geoid"),
+    list(EXPECTED_DENOMINATOR_ROWS),
+    ids=[
+        f"{geometry_id}-{block_geoid}"
+        for geometry_id, block_geoid in EXPECTED_DENOMINATOR_ROWS
+    ],
+)
+def test_block_geometry_denominator_truth_table(
+    geometry_id: str,
+    block_geoid: str,
+):
+    expected = EXPECTED_DENOMINATOR_ROWS[(geometry_id, block_geoid)]
+    result = _block_geometry_denominator(
+        _denominator_geometry_gdf(),
+        _prepare_blocks(_denominator_block_gdf(), _denominator_block_population_df()),
+        left_id_col="geometry_id",
+        output_area_col="denominator_intersection_area",
+    )
+    row = result[
+        (result["geometry_id"] == geometry_id) & (result["block_geoid"] == block_geoid)
+    ].iloc[0]
+
+    assert row["denominator_intersection_area"] == pytest.approx(
+        expected["denominator_intersection_area"]
+    )
+    assert row["allocated_population"] == pytest.approx(expected["allocated_population"])
+
+
+def test_block_geometry_denominator_avoids_full_overlay(monkeypatch: pytest.MonkeyPatch):
+    def fail_overlay(*args, **kwargs):
+        raise AssertionError("_block_geometry_denominator should not call gpd.overlay")
+
+    monkeypatch.setattr(gpd, "overlay", fail_overlay)
+
+    result = _block_geometry_denominator(
+        _denominator_geometry_gdf(),
+        _prepare_blocks(_denominator_block_gdf(), _denominator_block_population_df()),
+        left_id_col="geometry_id",
+        output_area_col="denominator_intersection_area",
+    )
+
+    assert set(zip(result["geometry_id"], result["block_geoid"], strict=True)) == set(
+        EXPECTED_DENOMINATOR_ROWS
+    )
 
 
 def test_block_population_summary_flags_zero_and_missing_population(

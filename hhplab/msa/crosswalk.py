@@ -549,28 +549,70 @@ def _block_geometry_denominator(
     left_id_col: str,
     output_area_col: str,
 ) -> gpd.GeoDataFrame:
-    intersections = gpd.overlay(
-        geometry_gdf[[left_id_col, "geometry"]],
-        blocks[["block_geoid", "total_population", "block_area", "geometry"]],
-        how="intersection",
-        keep_geom_type=False,
-    )
-    if intersections.empty:
-        return gpd.GeoDataFrame(
-            columns=[
-                left_id_col,
-                "block_geoid",
-                "total_population",
-                "block_area",
-                output_area_col,
-                "allocated_population",
-                "missing_population",
-                "geometry",
-            ],
-            geometry="geometry",
+    query = blocks.sindex.query(geometry_gdf.geometry, predicate="intersects")
+    if query.size == 0:
+        return _empty_block_geometry_denominator(
+            left_id_col=left_id_col,
+            output_area_col=output_area_col,
             crs=geometry_gdf.crs,
         )
-    intersections = intersections.loc[~intersections.geometry.is_empty].copy()
+
+    left_positions = query[0]
+    block_positions = query[1]
+    covered_query = blocks.sindex.query(geometry_gdf.geometry, predicate="covers")
+    fully_covered_pairs = _single_covered_block_pairs(covered_query)
+    full_mask = pd.Series(
+        [
+            (int(left_position), int(block_position)) in fully_covered_pairs
+            for left_position, block_position in zip(
+                left_positions,
+                block_positions,
+                strict=True,
+            )
+        ]
+    ).to_numpy()
+
+    parts: list[gpd.GeoDataFrame] = []
+    if full_mask.any():
+        full_left_positions = left_positions[full_mask]
+        full_block_positions = block_positions[full_mask]
+        parts.append(
+            gpd.GeoDataFrame(
+                {
+                    left_id_col: geometry_gdf[left_id_col].iloc[full_left_positions].to_numpy(),
+                    "block_geoid": blocks["block_geoid"].iloc[full_block_positions].to_numpy(),
+                    "total_population": blocks["total_population"]
+                    .iloc[full_block_positions]
+                    .to_numpy(),
+                    "block_area": blocks["block_area"].iloc[full_block_positions].to_numpy(),
+                    output_area_col: blocks["block_area"].iloc[full_block_positions].to_numpy(),
+                },
+                geometry=blocks.geometry.iloc[full_block_positions].to_numpy(),
+                crs=geometry_gdf.crs,
+            )
+        )
+
+    partial_mask = ~full_mask
+    if partial_mask.any():
+        partial = _intersect_block_geometry_pairs(
+            geometry_gdf,
+            blocks,
+            left_id_col=left_id_col,
+            output_area_col=output_area_col,
+            left_positions=left_positions[partial_mask],
+            block_positions=block_positions[partial_mask],
+        )
+        if not partial.empty:
+            parts.append(partial)
+
+    if not parts:
+        return _empty_block_geometry_denominator(
+            left_id_col=left_id_col,
+            output_area_col=output_area_col,
+            crs=geometry_gdf.crs,
+        )
+
+    intersections = gpd.GeoDataFrame(pd.concat(parts, ignore_index=True), crs=geometry_gdf.crs)
     intersections[output_area_col] = intersections.geometry.area
     intersections = intersections.loc[intersections[output_area_col] > 0].copy()
     intersections["total_population"] = pd.to_numeric(
@@ -584,6 +626,81 @@ def _block_geometry_denominator(
         / intersections["block_area"]
     )
     return intersections
+
+
+def _single_covered_block_pairs(query: object) -> set[tuple[int, int]]:
+    if getattr(query, "size", 0) == 0:
+        return set()
+    left_positions = query[0]
+    block_positions = query[1]
+    counts = pd.Series(block_positions).value_counts()
+    single_blocks = set(counts.loc[counts == 1].index.astype(int))
+    return {
+        (int(left_position), int(block_position))
+        for left_position, block_position in zip(left_positions, block_positions, strict=True)
+        if int(block_position) in single_blocks
+    }
+
+
+def _intersect_block_geometry_pairs(
+    geometry_gdf: gpd.GeoDataFrame,
+    blocks: gpd.GeoDataFrame,
+    *,
+    left_id_col: str,
+    output_area_col: str,
+    left_positions: object,
+    block_positions: object,
+) -> gpd.GeoDataFrame:
+    left = geometry_gdf[[left_id_col, "geometry"]].iloc[left_positions].reset_index(drop=True)
+    right = (
+        blocks[["block_geoid", "total_population", "block_area", "geometry"]]
+        .iloc[block_positions]
+        .reset_index(drop=True)
+    )
+    left_geometry = gpd.GeoSeries(left.geometry, crs=geometry_gdf.crs)
+    right_geometry = gpd.GeoSeries(right.geometry, crs=blocks.crs)
+    intersections = left_geometry.intersection(right_geometry, align=False)
+    allocated = gpd.GeoDataFrame(
+        {
+            left_id_col: left[left_id_col].to_numpy(),
+            "block_geoid": right["block_geoid"].to_numpy(),
+            "total_population": right["total_population"].to_numpy(),
+            "block_area": right["block_area"].to_numpy(),
+        },
+        geometry=intersections,
+        crs=geometry_gdf.crs,
+    )
+    allocated = allocated.loc[~allocated.geometry.is_empty].copy()
+    if allocated.empty:
+        return _empty_block_geometry_denominator(
+            left_id_col=left_id_col,
+            output_area_col=output_area_col,
+            crs=geometry_gdf.crs,
+        )
+    allocated[output_area_col] = allocated.geometry.area
+    return allocated.loc[allocated[output_area_col] > 0].copy()
+
+
+def _empty_block_geometry_denominator(
+    *,
+    left_id_col: str,
+    output_area_col: str,
+    crs: object,
+) -> gpd.GeoDataFrame:
+    return gpd.GeoDataFrame(
+        columns=[
+            left_id_col,
+            "block_geoid",
+            "total_population",
+            "block_area",
+            output_area_col,
+            "allocated_population",
+            "missing_population",
+            "geometry",
+        ],
+        geometry="geometry",
+        crs=crs,
+    )
 
 
 def _summarize_block_denominator(
