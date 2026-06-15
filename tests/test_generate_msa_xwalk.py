@@ -77,13 +77,13 @@ def _write_block_population_inputs(tmp_path: Path) -> None:
 
     block_geoid = "360610001001000"
     gpd.GeoDataFrame(
-        {"block_geoid": [block_geoid]},
+        {"block_geoid": [block_geoid], "state_fips": ["36"]},
         geometry=[box(0, 0, 10, 10)],
         crs="EPSG:4326",
     ).to_parquet(tiger_dir / "blocks__K2020.parquet")
-    pd.DataFrame({"block_geoid": [block_geoid], "total_population": [100]}).to_parquet(
-        census_dir / "pl_blocks__N2020xK2020.parquet"
-    )
+    pd.DataFrame(
+        {"block_geoid": [block_geoid], "state_fips": ["36"], "total_population": [100]}
+    ).to_parquet(census_dir / "pl_blocks__N2020xK2020.parquet")
 
 
 def _write_boundary_input(tmp_path: Path) -> None:
@@ -236,6 +236,60 @@ def test_generate_msa_xwalk_json_block_population(monkeypatch, tmp_path: Path):
     assert crosswalk["msa_population_denominator"].tolist() == [100.0]
 
 
+def test_generate_msa_xwalk_state_shards_do_not_read_national_blocks(
+    monkeypatch,
+    tmp_path: Path,
+):
+    _write_test_inputs(tmp_path)
+    _write_block_population_inputs(tmp_path)
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(
+        "hhplab.cli.generate_msa_xwalk.list_boundaries",
+        lambda: [_boundary_registry_entry(tmp_path)],
+    )
+    monkeypatch.setattr(
+        "hhplab.cli.generate_msa_xwalk.latest_vintage",
+        lambda: "2025",
+    )
+    original_gpd_read = gpd.read_parquet
+    original_pd_read = pd.read_parquet
+
+    def guard_gpd_read(path, *args, **kwargs):
+        if Path(path).name == "blocks__K2020.parquet":
+            assert kwargs.get("filters") == [("state_fips", "==", "36")]
+        return original_gpd_read(path, *args, **kwargs)
+
+    def guard_pd_read(path, *args, **kwargs):
+        if Path(path).name == "pl_blocks__N2020xK2020.parquet":
+            assert kwargs.get("filters") == [("state_fips", "==", "36")]
+        return original_pd_read(path, *args, **kwargs)
+
+    monkeypatch.setattr("hhplab.cli.generate_msa_xwalk.gpd.read_parquet", guard_gpd_read)
+    monkeypatch.setattr("hhplab.cli.generate_msa_xwalk.pd.read_parquet", guard_pd_read)
+
+    result = runner.invoke(
+        app,
+        [
+            "generate",
+            "msa-xwalk",
+            "--boundary",
+            "2025",
+            "--counties",
+            "2023",
+            "--allocation-basis",
+            "block_population",
+            "--blocks",
+            "2020",
+            "--decennial",
+            "2020",
+            "--json",
+        ],
+        catch_exceptions=False,
+    )
+
+    assert result.exit_code == 0
+
+
 def test_generate_msa_xwalk_json_block_population_can_opt_out_of_state_shards(
     monkeypatch,
     tmp_path: Path,
@@ -358,13 +412,13 @@ def test_generate_msa_xwalk_json_block_population_state_shards_alabama_smoke(
         crs="EPSG:4326",
     ).to_parquet(tiger_dir / "counties__C2023.parquet")
     gpd.GeoDataFrame(
-        {"block_geoid": [block_geoid]},
+        {"block_geoid": [block_geoid], "state_fips": ["01"]},
         geometry=[box(0, 0, 10, 10)],
         crs="EPSG:4326",
     ).to_parquet(tiger_dir / "blocks__K2020.parquet")
-    pd.DataFrame({"block_geoid": [block_geoid], "total_population": [125]}).to_parquet(
-        census_dir / "pl_blocks__N2020xK2020.parquet"
-    )
+    pd.DataFrame(
+        {"block_geoid": [block_geoid], "state_fips": ["01"], "total_population": [125]}
+    ).to_parquet(census_dir / "pl_blocks__N2020xK2020.parquet")
     pd.DataFrame(
         {
             "msa_id": ["33860"],

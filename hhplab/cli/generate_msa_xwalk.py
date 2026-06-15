@@ -259,15 +259,13 @@ def generate_msa_xwalk(
         coc_gdf = gpd.read_parquet(boundary_path)
         county_gdf = gpd.read_parquet(county_geometry_path)
         if allocation_basis == "block_population":
-            block_gdf = gpd.read_parquet(block_geometry_artifact)
-            block_population = pd.read_parquet(block_population_artifact)
             if state_shards:
                 crosswalk = _build_block_population_state_shards(
                     coc_gdf,
                     county_gdf,
                     msa_membership,
-                    block_gdf,
-                    block_population,
+                    block_geometry_artifact,
+                    block_population_artifact,
                     boundary_vintage=resolved_boundary,
                     county_vintage=str(counties),
                     block_vintage=str(blocks),
@@ -277,6 +275,8 @@ def generate_msa_xwalk(
                     reuse_shards=reuse_shards,
                 )
             else:
+                block_gdf = gpd.read_parquet(block_geometry_artifact)
+                block_population = pd.read_parquet(block_population_artifact)
                 crosswalk = build_coc_msa_block_population_crosswalk(
                     coc_gdf,
                     county_gdf,
@@ -388,8 +388,8 @@ def _build_block_population_state_shards(
     coc_gdf: gpd.GeoDataFrame,
     county_gdf: gpd.GeoDataFrame,
     msa_membership: pd.DataFrame,
-    block_gdf: gpd.GeoDataFrame,
-    block_population: pd.DataFrame,
+    block_geometry_artifact,
+    block_population_artifact,
     *,
     boundary_vintage: str,
     county_vintage: str,
@@ -407,13 +407,11 @@ def _build_block_population_state_shards(
     counties = _county_with_fips(county_gdf)
     membership = msa_membership.copy()
     membership["county_fips"] = membership["county_fips"].astype(str).str.zfill(5)
-    blocks = _block_with_geoid(block_gdf)
-    population = _block_population_with_geoid(block_population)
     shard_dir = _state_shard_dir(output_path)
     shard_dir.mkdir(parents=True, exist_ok=True)
 
     shard_frames: list[pd.DataFrame] = []
-    for state_fips in _state_fips_for_shards(counties, membership, blocks):
+    for state_fips in _state_fips_for_shards(counties, membership):
         shard_path = _state_shard_path(output_path, state_fips)
         if reuse_shards and shard_path.exists():
             shard = pd.read_parquet(shard_path)
@@ -422,14 +420,17 @@ def _build_block_population_state_shards(
             state_membership = membership[
                 membership["county_fips"].isin(state_counties["county_fips"])
             ].copy()
-            state_blocks = blocks[blocks["block_geoid"].str[:2] == state_fips].copy()
-            state_population = population[
-                population["block_geoid"].str[:2] == state_fips
-            ].copy()
-            if state_counties.empty or state_membership.empty or state_blocks.empty:
+            if state_counties.empty or state_membership.empty:
                 continue
             state_cocs = _cocs_intersecting_state(coc_gdf, state_counties)
             if state_cocs.empty:
+                continue
+            state_blocks = _read_state_block_geometry(block_geometry_artifact, state_fips)
+            state_population = _read_state_block_population(
+                block_population_artifact,
+                state_fips,
+            )
+            if state_blocks.empty:
                 continue
             shard = build_coc_msa_block_population_crosswalk(
                 state_cocs,
@@ -487,16 +488,33 @@ def _block_population_with_geoid(block_population: pd.DataFrame) -> pd.DataFrame
     return population
 
 
+def _read_state_block_geometry(path, state_fips: str) -> gpd.GeoDataFrame:
+    """Read one state's block geometries without materializing the national file."""
+    return _block_with_geoid(
+        gpd.read_parquet(
+            path,
+            filters=[("state_fips", "==", state_fips)],
+        )
+    )
+
+
+def _read_state_block_population(path, state_fips: str) -> pd.DataFrame:
+    """Read one state's PL block population without materializing the national file."""
+    return _block_population_with_geoid(
+        pd.read_parquet(
+            path,
+            filters=[("state_fips", "==", state_fips)],
+        )
+    )
+
+
 def _state_fips_for_shards(
     counties: pd.DataFrame,
     membership: pd.DataFrame,
-    blocks: pd.DataFrame,
 ) -> list[str]:
     member_counties = set(membership["county_fips"].astype(str))
     available_counties = counties[counties["county_fips"].isin(member_counties)]
-    county_states = set(available_counties["county_fips"].str[:2])
-    block_states = set(blocks["block_geoid"].astype(str).str[:2])
-    return sorted(county_states & block_states)
+    return sorted(set(available_counties["county_fips"].str[:2]))
 
 
 def _cocs_intersecting_state(
