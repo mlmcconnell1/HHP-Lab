@@ -426,8 +426,8 @@ def check_prerequisites(assets: dict) -> list[dict]:
             "area": "hic",
             "message": "No HIC count files found.",
             "hint": (
-                "Place HUD HIC files under data/raw/hic/<YEAR>/, then run the HIC "
-                "ingest workflow when available."
+                "Place HUD HIC files under data/raw/hic/<YEAR>/, then run "
+                "hhplab ingest hic --year <YEAR> --parse-only."
             ),
         })
 

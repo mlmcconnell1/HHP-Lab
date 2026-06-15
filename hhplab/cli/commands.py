@@ -29,6 +29,7 @@ from hhplab.cli.ingest_cpi import ingest_cpi_u
 from hhplab.cli.ingest_decennial_tract_population import (
     ingest_decennial_tract_population,
 )
+from hhplab.cli.ingest_hic import ingest_hic
 from hhplab.cli.ingest_laus_metro import ingest_laus_metro
 from hhplab.cli.ingest_msa_boundaries import ingest_msa_boundaries
 from hhplab.cli.ingest_nhgis import ingest_nhgis
@@ -109,6 +110,7 @@ def register_commands(
     ingest_app.command("nhgis")(ingest_nhgis)
     ingest_app.command("pit")(ingest_pit)
     ingest_app.command("pit-vintage")(ingest_pit_vintage)
+    ingest_app.command("hic")(ingest_hic)
     ingest_app.command("tract-relationship")(ingest_tract_relationship)
     ingest_app.command("zori")(ingest_zori)
     ingest_app.command("pep")(ingest_pep)
