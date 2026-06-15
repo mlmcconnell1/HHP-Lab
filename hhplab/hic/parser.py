@@ -37,6 +37,7 @@ _UNIT_COLUMN_RE = re.compile(r"(?:^|_)units?(?:_|$)|(?:^|_)unit_inventory(?:_|$)
 _EXCLUDED_SUM_COMPONENT_RE = re.compile(
     r"hmis|utilization|occupied|available|seasonal|overflow|voucher|pit|persons?"
 )
+_YEAR_TOKEN_RE = re.compile(r"(?:^|_)(20\d{2}|19\d{2})(?:_|$)")
 
 
 class HICParseError(ValueError):
@@ -96,11 +97,21 @@ def _numeric_series(df: pd.DataFrame, column: str) -> pd.Series:
     return pd.to_numeric(cleaned, errors="coerce").fillna(0)
 
 
-def _candidate_sum_columns(columns: list[str], pattern: re.Pattern[str]) -> list[str]:
+def _column_years(column: str) -> set[int]:
+    return {int(match) for match in _YEAR_TOKEN_RE.findall(column)}
+
+
+def _candidate_sum_columns(
+    columns: list[str],
+    pattern: re.Pattern[str],
+    *,
+    year: int | None = None,
+) -> list[str]:
     return [
         column
         for column in columns
         if pattern.search(column) and not _EXCLUDED_SUM_COMPONENT_RE.search(column)
+        and (year is None or year in _column_years(column))
     ]
 
 
@@ -109,12 +120,21 @@ def _coerce_count_column(
     columns: list[str],
     canonical: str,
     pattern: re.Pattern[str],
+    *,
+    year: int,
 ) -> pd.Series:
     direct = _resolve_column(set(columns), canonical)
     if direct is not None:
         return _numeric_series(df, direct)
 
-    component_columns = _candidate_sum_columns(columns, pattern)
+    year_columns = _candidate_sum_columns(columns, pattern, year=year)
+    if year_columns:
+        total_year_columns = [column for column in year_columns if "total" in column]
+        component_columns = total_year_columns or year_columns
+    elif any(_column_years(column) for column in _candidate_sum_columns(columns, pattern)):
+        component_columns = []
+    else:
+        component_columns = _candidate_sum_columns(columns, pattern)
     if not component_columns:
         raise HICParseError(
             f"Missing HIC {canonical} column. Expected one of "
@@ -167,8 +187,20 @@ def parse_hic_file(
     parsed["coc_id"] = df[coc_id_col].map(lambda value: _normalize_hic_coc_id(value))
     parsed["coc_name"] = df[coc_name_col].astype("string").str.strip() if coc_name_col else pd.NA
     parsed["state"] = df[state_col].astype("string").str.strip().str.upper() if state_col else pd.NA
-    parsed["total_beds"] = _coerce_count_column(df, columns, "total_beds", _BED_COLUMN_RE)
-    parsed["total_units"] = _coerce_count_column(df, columns, "total_units", _UNIT_COLUMN_RE)
+    parsed["total_beds"] = _coerce_count_column(
+        df,
+        columns,
+        "total_beds",
+        _BED_COLUMN_RE,
+        year=year,
+    )
+    parsed["total_units"] = _coerce_count_column(
+        df,
+        columns,
+        "total_units",
+        _UNIT_COLUMN_RE,
+        year=year,
+    )
 
     valid = parsed["coc_id"].notna()
     parsed = parsed.loc[valid].copy()

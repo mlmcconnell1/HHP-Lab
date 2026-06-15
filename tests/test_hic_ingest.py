@@ -115,6 +115,58 @@ def test_parse_hic_file_supports_xlsx(tmp_path: Path) -> None:
     assert len(result.df) == 2
 
 
+def test_parse_hic_file_extracts_year_from_wide_hud_workbook(tmp_path: Path) -> None:
+    raw_path = tmp_path / "2007-2024-HIC-Counts-by-CoC.xlsx"
+    pd.DataFrame(
+        [
+            {
+                "CocState": "CO",
+                "CoC": "Denver",
+                "Coc\\ID": "CO-500",
+                "Total Beds 2020": "99",
+                "Total Units 2020": "44",
+                "Total Beds 2024": "1,200",
+                "Total Units 2024": "450",
+            },
+            {
+                "CocState": "MO",
+                "CoC": "Kansas City",
+                "Coc\\ID": "MO-604a",
+                "Total Beds 2020": "10",
+                "Total Units 2020": "4",
+                "Total Beds 2024": "20",
+                "Total Units 2024": "8",
+            },
+        ]
+    ).to_excel(raw_path, index=False)
+
+    result = parse_hic_file(raw_path, year=2024)
+
+    assert result.rows_read == 2
+    assert list(result.df["hic_year"].unique()) == [2024]
+    denver = result.df[result.df["coc_id"] == "CO-500"].iloc[0]
+    assert denver["total_beds"] == 1200
+    assert denver["total_units"] == 450
+
+
+def test_parse_hic_file_rejects_wide_workbook_without_requested_year(tmp_path: Path) -> None:
+    raw_path = tmp_path / "2007-2024-HIC-Counts-by-CoC.xlsx"
+    pd.DataFrame(
+        [
+            {
+                "CocState": "CO",
+                "CoC": "Denver",
+                "Coc\\ID": "CO-500",
+                "Total Beds 2024": "1,200",
+                "Total Units 2024": "450",
+            }
+        ]
+    ).to_excel(raw_path, index=False)
+
+    with pytest.raises(HICParseError, match="total_beds"):
+        parse_hic_file(raw_path, year=2025)
+
+
 def test_parse_hic_file_rejects_empty_file(tmp_path: Path) -> None:
     raw_path = _write_hic_csv(tmp_path / "empty.csv", [])
 
@@ -158,6 +210,13 @@ def test_write_hic_parquet_embeds_provenance(tmp_path: Path) -> None:
 
 def test_discover_local_hic_file_finds_manual_download(tmp_path: Path) -> None:
     raw_path = _write_hic_csv(tmp_path / "2020-HIC-Counts-by-State.csv")
+
+    assert discover_local_hic_file(2020, tmp_path) == raw_path
+
+
+def test_discover_local_hic_file_finds_aggregate_hic_workbook(tmp_path: Path) -> None:
+    raw_path = tmp_path / "2007-2024-HIC-Counts-by-CoC.xlsx"
+    raw_path.write_bytes(b"placeholder")
 
     assert discover_local_hic_file(2020, tmp_path) == raw_path
 
