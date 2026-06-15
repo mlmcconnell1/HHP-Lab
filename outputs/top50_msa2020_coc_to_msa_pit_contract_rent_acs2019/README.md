@@ -1,7 +1,8 @@
 # Top 50 MSA PIT and Contract Rent Panel
 
 This output joins the 2020 CoC-to-MSA PIT rollup to ACS 2019 first-quartile
-contract rent and ACS 2019 40%+ gross-rent-income burden at MSA grain.
+contract rent, ACS 2019 40%+ gross-rent-income burden, and 2020 HUD HIC
+inventory counts at MSA grain.
 
 Files:
 
@@ -39,6 +40,15 @@ Rent-burden source:
 - Method: sum ACS5 B25070 gross-rent-as-percentage-of-income bins over Census
   MSA 2023 county membership; divide the 40-49.9% plus 50%+ bins by the total
   gross-rent-income denominator.
+
+HIC source:
+
+- `data/curated/hic/hic__H2020.parquet`
+- HIC year: 2020
+- Measures: `hic_total_beds`, `hic_total_units`
+- Method: allocate HUD HIC 2020 CoC counts to Census MSA 2023 rows using the
+  same 2020 CoC-to-MSA block-population allocation shares used by the PIT
+  rollup.
 
 Notes:
 
