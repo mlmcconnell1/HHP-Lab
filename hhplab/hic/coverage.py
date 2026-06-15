@@ -1,0 +1,212 @@
+"""Coverage QA for HUD HIC artifacts against PIT CoC-year coverage."""
+
+from __future__ import annotations
+
+import re
+from dataclasses import dataclass
+from pathlib import Path
+
+import pandas as pd
+
+from hhplab.paths import curated_dir
+from hhplab.pit.qa import QAIssue, QAReport, Severity
+
+_PIT_FILE_RE = re.compile(r"^pit__P(?P<year>\d{4})(?:@B\d{4})?\.parquet$")
+_HIC_FILE_RE = re.compile(r"^hic__H(?P<year>\d{4})\.parquet$")
+
+
+@dataclass(frozen=True)
+class HICCoverageResult:
+    """HIC/PIT coverage QA report and per-year coverage table."""
+
+    report: QAReport
+    coverage: pd.DataFrame
+    pit_files: list[Path]
+    hic_files: list[Path]
+
+    def to_dict(self) -> dict:
+        """Return a JSON-serializable coverage QA payload."""
+        return {
+            "passed": self.report.passed,
+            "summary": self.report.summary,
+            "coverage": self.coverage.to_dict(orient="records"),
+            "issues": [issue.to_dict() for issue in self.report.issues],
+            "pit_files": [str(path) for path in self.pit_files],
+            "hic_files": [str(path) for path in self.hic_files],
+        }
+
+
+def validate_hic_pit_coverage(
+    *,
+    pit_dir: Path | str | None = None,
+    hic_dir: Path | str | None = None,
+    years: list[int] | None = None,
+    yoy_threshold: float = 0.75,
+) -> HICCoverageResult:
+    """Compare canonical HIC CoC-year coverage against canonical PIT coverage."""
+    resolved_pit_dir = Path(pit_dir) if pit_dir is not None else curated_dir("pit")
+    resolved_hic_dir = Path(hic_dir) if hic_dir is not None else curated_dir("hic")
+    requested_years = set(years) if years is not None else None
+
+    pit_files = _discover_year_files(resolved_pit_dir, _PIT_FILE_RE, requested_years)
+    hic_files = _discover_year_files(resolved_hic_dir, _HIC_FILE_RE, requested_years)
+    if not pit_files:
+        raise FileNotFoundError(
+            f"No PIT files found in {resolved_pit_dir}. Run `hhplab ingest pit --year <YEAR>` "
+            "or place canonical PIT parquet files under data/curated/pit/."
+        )
+    if not hic_files:
+        raise FileNotFoundError(
+            f"No HIC files found in {resolved_hic_dir}. Place HUD HIC files under "
+            "data/raw/hic/<YEAR>/, then run "
+            "`hhplab ingest hic --year <YEAR> --parse-only`."
+        )
+
+    pit = _load_year_frames(pit_files, required={"pit_year", "coc_id"}, year_column="pit_year")
+    hic = _load_year_frames(
+        hic_files,
+        required={"hic_year", "coc_id", "total_beds", "total_units"},
+        year_column="hic_year",
+    )
+    if requested_years is not None:
+        pit = pit[pit["pit_year"].isin(requested_years)].copy()
+        hic = hic[hic["hic_year"].isin(requested_years)].copy()
+
+    report = QAReport()
+    _check_duplicates(report, pit, year_column="pit_year", check_name="duplicate_pit_coc_year")
+    _check_duplicates(report, hic, year_column="hic_year", check_name="duplicate_hic_coc_year")
+    coverage = _compare_coverage(report, pit, hic)
+    _check_hic_yoy_swings(report, hic, threshold=yoy_threshold)
+    return HICCoverageResult(report=report, coverage=coverage, pit_files=pit_files, hic_files=hic_files)
+
+
+def _discover_year_files(
+    directory: Path,
+    pattern: re.Pattern[str],
+    years: set[int] | None,
+) -> list[Path]:
+    if not directory.exists():
+        return []
+
+    by_year: dict[int, list[Path]] = {}
+    for path in sorted(directory.glob("*.parquet")):
+        match = pattern.match(path.name)
+        if match is None:
+            continue
+        year = int(match.group("year"))
+        if years is not None and year not in years:
+            continue
+        by_year.setdefault(year, []).append(path)
+
+    selected: list[Path] = []
+    for year in sorted(by_year):
+        paths = by_year[year]
+        base_paths = [path for path in paths if "@" not in path.stem]
+        selected.append(sorted(base_paths or paths)[-1])
+    return selected
+
+
+def _load_year_frames(files: list[Path], *, required: set[str], year_column: str) -> pd.DataFrame:
+    frames: list[pd.DataFrame] = []
+    for path in files:
+        frame = pd.read_parquet(path)
+        missing = required - set(frame.columns)
+        if missing:
+            raise ValueError(f"{path} missing required column(s): {', '.join(sorted(missing))}.")
+        normalized = frame.copy()
+        normalized[year_column] = pd.to_numeric(normalized[year_column], errors="raise").astype(int)
+        normalized["coc_id"] = normalized["coc_id"].astype("string").str.strip()
+        frames.append(normalized)
+    return pd.concat(frames, ignore_index=True) if frames else pd.DataFrame()
+
+
+def _check_duplicates(
+    report: QAReport,
+    df: pd.DataFrame,
+    *,
+    year_column: str,
+    check_name: str,
+) -> None:
+    duplicates = df[df.duplicated([year_column, "coc_id"], keep=False)]
+    for (year, coc_id), group in duplicates.groupby([year_column, "coc_id"], dropna=False):
+        report.add_error(
+            check_name,
+            f"CoC-year appears {len(group)} times.",
+            coc_id=str(coc_id),
+            year=int(year),
+            details={"occurrence_count": int(len(group))},
+        )
+
+
+def _compare_coverage(report: QAReport, pit: pd.DataFrame, hic: pd.DataFrame) -> pd.DataFrame:
+    rows: list[dict] = []
+    years = sorted(set(pit["pit_year"].astype(int)) | set(hic["hic_year"].astype(int)))
+    for year in years:
+        pit_cocs = set(pit.loc[pit["pit_year"] == year, "coc_id"].dropna().astype(str))
+        hic_cocs = set(hic.loc[hic["hic_year"] == year, "coc_id"].dropna().astype(str))
+        missing_hic = sorted(pit_cocs - hic_cocs)
+        unexpected_hic = sorted(hic_cocs - pit_cocs)
+
+        for coc_id in missing_hic:
+            report.add_warning(
+                "missing_hic_coc_year",
+                "CoC-year exists in PIT but is missing from HIC.",
+                coc_id=coc_id,
+                year=year,
+            )
+        for coc_id in unexpected_hic:
+            report.add_warning(
+                "unexpected_hic_coc_year",
+                "CoC-year exists in HIC but is missing from PIT.",
+                coc_id=coc_id,
+                year=year,
+            )
+
+        rows.append(
+            {
+                "year": year,
+                "pit_coc_count": len(pit_cocs),
+                "hic_coc_count": len(hic_cocs),
+                "matched_coc_count": len(pit_cocs & hic_cocs),
+                "missing_hic_count": len(missing_hic),
+                "unexpected_hic_count": len(unexpected_hic),
+            }
+        )
+    return pd.DataFrame(rows).sort_values("year").reset_index(drop=True)
+
+
+def _check_hic_yoy_swings(report: QAReport, hic: pd.DataFrame, *, threshold: float) -> None:
+    if threshold <= 0 or hic.empty:
+        return
+    working = hic[["hic_year", "coc_id", "total_beds"]].copy()
+    working["total_beds"] = pd.to_numeric(working["total_beds"], errors="coerce")
+    grouped = (
+        working.dropna(subset=["total_beds"])
+        .groupby(["hic_year", "coc_id"], as_index=False)["total_beds"]
+        .sum()
+        .sort_values(["coc_id", "hic_year"])
+    )
+    for coc_id, group in grouped.groupby("coc_id"):
+        previous_year: int | None = None
+        previous_beds: float | None = None
+        for row in group.itertuples(index=False):
+            year = int(row.hic_year)
+            beds = float(row.total_beds)
+            if previous_beds is not None and previous_beds > 0:
+                ratio = abs(beds - previous_beds) / previous_beds
+                if ratio > threshold:
+                    report.add_warning(
+                        "large_hic_bed_yoy_swing",
+                        f"HIC total beds changed by {ratio:.1%} from {previous_year} to {year}.",
+                        coc_id=str(coc_id),
+                        year=year,
+                        details={
+                            "previous_year": previous_year,
+                            "previous_total_beds": previous_beds,
+                            "current_total_beds": beds,
+                            "relative_change": ratio,
+                            "threshold": threshold,
+                        },
+                    )
+            previous_year = year
+            previous_beds = beds

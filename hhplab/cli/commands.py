@@ -21,6 +21,7 @@ from hhplab.cli.generate_metro import generate_metro, generate_metro_universe
 from hhplab.cli.generate_metro_boundaries import generate_metro_boundaries
 from hhplab.cli.generate_msa import generate_msa
 from hhplab.cli.generate_msa_xwalk import generate_msa_xwalk
+from hhplab.cli.hic_coverage import hic_coverage_diagnostics
 from hhplab.cli.ingest_acs1_county import ingest_acs1_county
 from hhplab.cli.ingest_acs1_metro import ingest_acs1_metro
 from hhplab.cli.ingest_acs_population import ingest_acs_population
@@ -130,6 +131,7 @@ def register_commands(
     diagnostics_app.command("panel")(panel_diagnostics)
     diagnostics_app.command("xwalk")(diagnostics)
     diagnostics_app.command("zori")(zori_diagnostics)
+    diagnostics_app.command("hic-coverage")(hic_coverage_diagnostics)
     generate_app.command("xwalks")(build_xwalks)
     generate_app.command("metro")(generate_metro)
     generate_app.command("metro-universe")(generate_metro_universe)
