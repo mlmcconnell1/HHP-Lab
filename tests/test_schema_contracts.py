@@ -37,6 +37,7 @@ from hhplab.bls.laus_series import (
     LAUS_METRO_OUTPUT_COLUMNS as BLS_LAUS_METRO_OUTPUT_COLUMNS,
 )
 from hhplab.cli.main import app
+from hhplab.hic.parser import CANONICAL_COLUMNS as HIC_PARSER_COLUMNS
 from hhplab.panel.conformance import PanelRequest, run_conformance
 from hhplab.pep.pep_ingest import PEP_COUNTY_OUTPUT_COLUMNS as PEP_INGEST_COLUMNS
 from hhplab.pit.ingest.parser import CANONICAL_COLUMNS as PIT_PARSER_COLUMNS
@@ -100,6 +101,7 @@ SCHEMA_ALIAS_CASES = {
     "acs_tract_output": (TRACT_OUTPUT_COLUMNS, schema_columns.ACS_TRACT_OUTPUT_COLUMNS),
     "pep_county_output": (PEP_INGEST_COLUMNS, schema_columns.PEP_COUNTY_OUTPUT_COLUMNS),
     "pit_canonical_output": (PIT_PARSER_COLUMNS, schema_columns.PIT_CANONICAL_COLUMNS),
+    "hic_canonical_output": (HIC_PARSER_COLUMNS, schema_columns.HIC_CANONICAL_COLUMNS),
     "zori_ingest_output": (ZORI_INGEST_COLUMNS, schema_columns.ZORI_INGEST_OUTPUT_COLUMNS),
     "laus_measure_codes": (BLS_LAUS_MEASURE_CODES, schema_columns.LAUS_MEASURE_CODES),
     "laus_metro_output": (

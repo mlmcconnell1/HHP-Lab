@@ -501,6 +501,19 @@ PIT_CANONICAL_COLUMNS: list[str] = [
     "notes",
 ]
 
+HIC_CANONICAL_COLUMNS: list[str] = [
+    "hic_year",
+    "coc_id",
+    "coc_name",
+    "state",
+    "total_beds",
+    "total_units",
+    "data_source",
+    "source_ref",
+    "ingested_at",
+    "notes",
+]
+
 ZORI_INGEST_OUTPUT_COLUMNS: list[str] = [
     "geo_type",
     "geo_id",

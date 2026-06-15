@@ -25,9 +25,9 @@ Full operational documentation lives in [HHP-Lab-manual/HHP-Lab-Manual.md](HHP-L
 
 ## What HHP-Lab Does
 
-- Ingests curated source data for CoC boundaries, TIGER tracts and counties, ACS, PEP, PIT, and ZORI
+- Ingests curated source data for CoC boundaries, TIGER tracts and counties, ACS, PEP, PIT, HIC, and ZORI
 - Builds tract-to-CoC and county-to-CoC crosswalks
-- Aggregates ACS, PIT, PEP, and ZORI inputs into analysis-ready outputs
+- Aggregates ACS, PIT, HIC, PEP, and ZORI inputs into analysis-ready outputs
 - Assembles panel datasets across years with provenance metadata embedded in parquet artifacts
 - Supports recipe-driven builds, export bundles, curated-layout validation, and machine-readable CLI output for automation
 
@@ -45,6 +45,7 @@ source-specific aggregation helpers should not be added there.
 | Provider | Product | Native geometry | Coverage |
 | --- | --- | --- | --- |
 | HUD | PIT | CoC | 2007-ongoing |
+| HUD | HIC | CoC | 2007-ongoing |
 | Census | ACS 5-year | tract | 2009-ongoing |
 | Census | PEP | county | 2010-ongoing |
 | Zillow | ZORI | county | 2015-ongoing |
@@ -53,6 +54,7 @@ Important temporal rules:
 
 - ACS vintage for PIT year `Y` is typically `Y-1`
 - ACS tract geography follows decennial vintages: 2000-era, 2010-era, then 2020-era
+- HIC is annual CoC-native inventory data aligned to the same January survey year as PIT counts
 - ZORI support starts in January 2015, so metro panels that require rent data cannot cover 2011-2014 with the current curated Zillow artifact
 
 ## Installation

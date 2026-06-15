@@ -45,6 +45,10 @@ def _scaffold_curated(tmp_path: Path) -> Path:
         pdir / "pit__msa__P2024@Mcensus_msa_2023xB2025xC2023.parquet"
     )
 
+    hdir = curated / "hic"
+    hdir.mkdir(parents=True)
+    pd.DataFrame({"coc_id": ["CO-500"]}).to_parquet(hdir / "hic__H2024.parquet")
+
     msadir = curated / "msa"
     msadir.mkdir(parents=True)
     pd.DataFrame({"msa_id": ["35620"]}).to_parquet(
@@ -138,6 +142,7 @@ class TestStatusHuman:
         assert "2 vintage(s)" in result.output
         assert "B2025xT2023" in result.output
         assert "PIT Counts: 1 year(s)" in result.output
+        assert "HIC Counts: 1 year(s)" in result.output
         assert "Metro Artifacts: 1 complete version(s)" in result.output
         assert "MSA Artifacts: 1 complete version(s)" in result.output
         assert "MSA-CoC Coverage: 1 file(s)" in result.output
@@ -225,6 +230,8 @@ class TestStatusJSON:
         assert payload["assets"]["boundaries"]["count"] == 2
         assert payload["assets"]["crosswalks"]["msa"] == ["B2025xMcensus_msa_2023xC2023"]
         assert payload["assets"]["pit"]["msa_count"] == 1
+        assert payload["assets"]["hic"]["count"] == 1
+        assert payload["assets"]["hic"]["years"] == [2024]
         assert payload["assets"]["metro"]["complete_versions"] == ["glynn_fox_v1"]
         assert payload["assets"]["msa"]["fully_materialized_versions"] == ["census_msa_2023"]
         assert payload["assets"]["msa"]["coverage_count"] == 1
@@ -281,7 +288,7 @@ class TestStatusJSON:
         payload = json.loads(result.output)
         assert set(payload.keys()) == {"status", "assets", "recipe_outputs", "guidance", "issues"}
         assert set(payload["assets"].keys()) == {
-            "boundaries", "census", "crosswalks", "pit", "metro",
+            "boundaries", "census", "crosswalks", "pit", "hic", "metro",
             "msa", "measures", "acs", "zori", "laus",
         }
 

@@ -100,6 +100,10 @@ def status_cmd(
     ) if p["msa_items"] else "-"
     typer.echo(f"MSA PIT:    {p['msa_count']} file(s)  {msa_pit_versions}")
 
+    # HIC
+    h = assets["hic"]
+    typer.echo(f"HIC Counts: {h['count']} year(s)  {_fmt_years(h['years'])}")
+
     metro = assets["metro"]
     typer.echo(
         "Metro Artifacts: "

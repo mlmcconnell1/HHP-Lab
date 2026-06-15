@@ -72,6 +72,7 @@ SourceType = Literal[
     "census_cbsa",  # Census CBSA/MSA delineation workbook
     "census_cbsa_boundary",  # Census CBSA/MSA boundary polygons
     "pit",  # HUD PIT counts
+    "hic",  # HUD HIC inventory counts
     "other",  # Other external sources
 ]
 

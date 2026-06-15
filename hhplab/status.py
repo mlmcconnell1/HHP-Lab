@@ -136,6 +136,22 @@ def _scan_pit(curated: Path) -> dict:
     }
 
 
+def _scan_hic(curated: Path) -> dict:
+    """Scan HUD HIC count files by inventory year."""
+    import re
+
+    hdir = curated / "hic"
+    years: list[int] = []
+    items: list[str] = []
+    if hdir.exists():
+        for p in sorted(hdir.glob("*.parquet")):
+            m = re.match(r"^hic__H(\d{4})\.parquet$", p.name)
+            if m:
+                years.append(int(m.group(1)))
+                items.append(p.stem)
+    return {"count": len(years), "years": years, "items": items}
+
+
 def _scan_msa(curated: Path) -> dict:
     """Scan curated MSA definition and membership artifacts."""
     import re
@@ -404,6 +420,17 @@ def check_prerequisites(assets: dict) -> list[dict]:
             "hint": "Run: hhplab ingest pit --year <YEAR>",
         })
 
+    if assets["hic"]["count"] == 0:
+        issues.append({
+            "severity": "warning",
+            "area": "hic",
+            "message": "No HIC count files found.",
+            "hint": (
+                "Place HUD HIC files under data/raw/hic/<YEAR>/, then run the HIC "
+                "ingest workflow when available."
+            ),
+        })
+
     msa = assets["msa"]
     definition_set = set(msa["definitions"])
     membership_set = set(msa["county_memberships"])
@@ -542,6 +569,7 @@ def collect_status_report(
         "census": _scan_census(curated),
         "crosswalks": _scan_xwalks(curated),
         "pit": _scan_pit(curated),
+        "hic": _scan_hic(curated),
         "metro": _scan_metro(curated),
         "msa": _scan_msa(curated),
         "measures": _scan_measures(curated),

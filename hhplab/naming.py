@@ -12,6 +12,7 @@ Temporal notation uses single-letter prefixes:
 - A{year}: ACS vintage end year (e.g., A2023)
 - N{year}: Decennial census denominator vintage (e.g., N2020)
 - P{year}: PIT count year (e.g., P2024)
+- H{year}: HIC inventory year (e.g., H2024)
 - Y{year}: Panel year (e.g., Y2023)
 - D{version}: Synthetic geography definition version (e.g., Dglynnfoxv1)
 
@@ -134,6 +135,18 @@ def pit_filename(pit_year: str | int) -> str:
         Filename like 'pit__P2024.parquet'
     """
     return f"pit__P{pit_year}.parquet"
+
+
+def hic_filename(hic_year: str | int) -> str:
+    """Generate filename for HUD HIC count data.
+
+    Args:
+        hic_year: Housing Inventory Count year (e.g., 2024 or "2024")
+
+    Returns:
+        Filename like 'hic__H2024.parquet'
+    """
+    return f"hic__H{hic_year}.parquet"
 
 
 def coc_pit_filename(pit_year: str | int, boundary_vintage: str | int) -> str:
@@ -898,6 +911,25 @@ def pit_path(pit_year: str | int, base_dir: Path | str | None = None) -> Path:
     else:
         base_dir = Path(base_dir)
     return base_dir / "curated" / "pit" / pit_filename(pit_year)
+
+
+def hic_path(hic_year: str | int, base_dir: Path | str | None = None) -> Path:
+    """Generate full path for HIC count data.
+
+    Args:
+        hic_year: HIC inventory year
+        base_dir: Base data directory. If None, uses config asset store root.
+
+    Returns:
+        Path like data/curated/hic/hic__H2024.parquet
+    """
+    if base_dir is None:
+        from hhplab.paths import asset_store_root
+
+        base_dir = asset_store_root()
+    else:
+        base_dir = Path(base_dir)
+    return base_dir / "curated" / "hic" / hic_filename(hic_year)
 
 
 def pit_vintage_path(vintage: str | int, base_dir: Path | str | None = None) -> Path:

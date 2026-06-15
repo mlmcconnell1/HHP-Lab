@@ -40,6 +40,10 @@ HUD_EXCHANGE_COC_STATE_SHAPEFILE_TEMPLATE: Final = (
     "https://files.hudexchange.info/reports/published/CoC_GIS_State_Shapefile_{state}_{vintage}.zip"
 )
 HUD_USER_PIT_BASE: Final = "https://www.huduser.gov/portal/sites/default/files/xls/"
+HUD_USER_HIC_BASE: Final = "https://www.huduser.gov/portal/sites/default/files/xls/"
+HUD_USER_HIC_COUNTS_BY_STATE_TEMPLATE: Final = (
+    f"{HUD_USER_HIC_BASE}{{year}}-HIC-Counts-by-State.csv"
+)
 
 # BLS (Bureau of Labor Statistics)
 BLS_API_V2: Final = "https://api.bls.gov/publicAPI/v2/timeseries/data/"

@@ -40,6 +40,7 @@ CURATED_SUBDIRS: set[str] = {
     "zori",
     "pep",
     "pit",
+    "hic",
     "panel",
     "metro",
     "msa",
@@ -126,6 +127,9 @@ CANONICAL_PATTERNS: dict[str, list[re.Pattern[str]]] = {
         re.compile(r"^pit_vintage__P\d{4}\.parquet$"),
         re.compile(r"^pit_vintage_registry\.parquet$"),
         re.compile(r"^pit_registry\.parquet$"),
+    ],
+    "hic": [
+        re.compile(r"^hic__H\d{4}\.parquet$"),
     ],
     "panel": [
         re.compile(r"^panel__Y\d{4}-\d{4}@B\d{4}\.parquet$"),
