@@ -68,6 +68,22 @@ def test_validate_hic_pit_coverage_reports_mismatched_cocs(tmp_path: Path) -> No
     assert checks == {"missing_hic_coc_year", "unexpected_hic_coc_year"}
 
 
+def test_validate_hic_pit_coverage_uses_pit_vintage_files(tmp_path: Path) -> None:
+    pit_dir = tmp_path / "pit"
+    hic_dir = tmp_path / "hic"
+    _write_pit(
+        pit_dir / "pit_vintage__P2020.parquet",
+        [_pit_row(2019, "CO-500"), _pit_row(2020, "CO-500")],
+    )
+    _write_hic(hic_dir / "hic__H2020.parquet", [_hic_row(2020, "CO-500")])
+
+    result = validate_hic_pit_coverage(pit_dir=pit_dir, hic_dir=hic_dir, years=[2020])
+
+    assert result.report.passed
+    assert result.coverage.iloc[0]["year"] == 2020
+    assert result.coverage.iloc[0]["matched_coc_count"] == 1
+
+
 def test_validate_hic_pit_coverage_flags_duplicates_and_yoy_swings(tmp_path: Path) -> None:
     pit_dir = tmp_path / "pit"
     hic_dir = tmp_path / "hic"

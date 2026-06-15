@@ -25,11 +25,30 @@ _SUPPORTED_EXTENSIONS = {".csv", ".xls", ".xlsx", ".xlsb"}
 
 _COLUMN_ALIASES: dict[str, tuple[str, ...]] = {
     "hic_year": ("year", "hic_year", "inventory_year"),
-    "coc_id": ("coc_id", "cocid", "coc_id_hud", "coc_id_hud_num", "coc_id_number"),
+    "coc_id": (
+        "coc_id",
+        "cocid",
+        "coc_id_hud",
+        "coc_id_hud_num",
+        "coc_id_number",
+        "coc_number",
+    ),
     "coc_name": ("coc_name", "coc", "continuum_of_care", "cocname"),
     "state": ("state", "coc_state", "cocstate"),
-    "total_beds": ("total_beds", "total_bed_inventory", "bed_total", "beds_total"),
-    "total_units": ("total_units", "total_unit_inventory", "unit_total", "units_total"),
+    "total_beds": (
+        "total_beds",
+        "total_bed_inventory",
+        "bed_total",
+        "beds_total",
+        "total_year_round_beds_es_th_sh",
+    ),
+    "total_units": (
+        "total_units",
+        "total_unit_inventory",
+        "unit_total",
+        "units_total",
+        "total_units_for_households_with_children_es_th_sh",
+    ),
 }
 
 _BED_COLUMN_RE = re.compile(r"(?:^|_)beds?(?:_|$)|(?:^|_)bed_inventory(?:_|$)")
@@ -63,21 +82,55 @@ def normalize_column_name(name: object) -> str:
     return normalized
 
 
-def _read_hic_file(file_path: Path) -> pd.DataFrame:
+def _read_hic_file(file_path: Path, *, year: int | None = None) -> pd.DataFrame:
     suffix = file_path.suffix.lower()
     try:
         if suffix == ".csv":
             return pd.read_csv(file_path, dtype=str)
-        if suffix in {".xls", ".xlsx"}:
-            return pd.read_excel(file_path, dtype=str)
+        if suffix in {"", ".xls", ".xlsx"}:
+            return _read_hic_excel_file(file_path, year=year)
         if suffix == ".xlsb":
-            return pd.read_excel(file_path, dtype=str, engine="pyxlsb")
+            return _read_hic_excel_file(file_path, year=year, engine="pyxlsb")
     except pd.errors.EmptyDataError as exc:
         raise HICParseError(f"HIC source file is empty: {file_path}") from exc
     raise HICParseError(
         f"Unsupported HIC file extension '{file_path.suffix}'. "
         "Use a CSV, XLS, XLSX, or XLSB file."
     )
+
+
+def _read_hic_excel_file(
+    file_path: Path,
+    *,
+    year: int | None,
+    engine: str | None = None,
+) -> pd.DataFrame:
+    excel = pd.ExcelFile(file_path, engine=engine)
+    sheet_name: str | int = str(year) if year is not None and str(year) in excel.sheet_names else 0
+    raw = pd.read_excel(excel, sheet_name=sheet_name, header=None, dtype=str)
+    if raw.empty:
+        return raw
+
+    header_row = _find_hic_header_row(raw)
+    if header_row is None:
+        return pd.read_excel(excel, sheet_name=sheet_name, dtype=str)
+
+    header_values = raw.iloc[header_row].tolist()
+    data = raw.iloc[header_row + 1 :].copy()
+    data.columns = header_values
+    data = data.dropna(how="all")
+    return data
+
+
+def _find_hic_header_row(raw: pd.DataFrame) -> int | None:
+    for index, row in raw.head(25).iterrows():
+        normalized = {normalize_column_name(value) for value in row.tolist() if pd.notna(value)}
+        if _resolve_column(normalized, "coc_id") and (
+            _resolve_column(normalized, "total_beds")
+            or any(_BED_COLUMN_RE.search(column) for column in normalized)
+        ):
+            return int(index)
+    return None
 
 
 def _resolve_column(columns: set[str], canonical: str) -> str | None:
@@ -161,7 +214,7 @@ def parse_hic_file(
 
     raw_bytes = path.read_bytes()
     raw_sha256 = hashlib.sha256(raw_bytes).hexdigest()
-    raw = _read_hic_file(path)
+    raw = _read_hic_file(path, year=year)
     rows_read = len(raw)
     if raw.empty:
         raise HICParseError(f"HIC source file is empty: {path}")
@@ -186,7 +239,10 @@ def parse_hic_file(
     )
     parsed["coc_id"] = df[coc_id_col].map(lambda value: _normalize_hic_coc_id(value))
     parsed["coc_name"] = df[coc_name_col].astype("string").str.strip() if coc_name_col else pd.NA
-    parsed["state"] = df[state_col].astype("string").str.strip().str.upper() if state_col else pd.NA
+    if state_col:
+        parsed["state"] = df[state_col].astype("string").str.strip().str.upper()
+    else:
+        parsed["state"] = parsed["coc_id"].astype("string").str.extract(r"^([A-Z]{2})-", expand=False)
     parsed["total_beds"] = _coerce_count_column(
         df,
         columns,

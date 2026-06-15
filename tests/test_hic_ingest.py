@@ -149,6 +149,29 @@ def test_parse_hic_file_extracts_year_from_wide_hud_workbook(tmp_path: Path) -> 
     assert denver["total_units"] == 450
 
 
+def test_parse_hic_file_handles_coc_number_and_title_row_excel(tmp_path: Path) -> None:
+    raw_path = tmp_path / "2007-2020-HIC-Counts-by-CoC.xlsx"
+    rows = [
+        ["Total Beds (ES, TH, SH)", "Emergency Shelter (ES)", None],
+        [
+            "CoC Number",
+            "Total Year-Round Beds (ES, TH, SH)",
+            "Total Units for Households with Children (ES, TH, SH)",
+        ],
+        ["AK-500", "920", "74"],
+        ["MO-604a", "10", "4"],
+    ]
+    pd.DataFrame(rows).to_excel(raw_path, index=False, header=False, sheet_name="2020")
+
+    result = parse_hic_file(raw_path, year=2020)
+
+    assert list(result.df["coc_id"]) == ["AK-500", "MO-604"]
+    alaska = result.df[result.df["coc_id"] == "AK-500"].iloc[0]
+    assert alaska["state"] == "AK"
+    assert alaska["total_beds"] == 920
+    assert alaska["total_units"] == 74
+
+
 def test_parse_hic_file_rejects_wide_workbook_without_requested_year(tmp_path: Path) -> None:
     raw_path = tmp_path / "2007-2024-HIC-Counts-by-CoC.xlsx"
     pd.DataFrame(
@@ -219,6 +242,13 @@ def test_discover_local_hic_file_finds_aggregate_hic_workbook(tmp_path: Path) ->
     raw_path.write_bytes(b"placeholder")
 
     assert discover_local_hic_file(2020, tmp_path) == raw_path
+
+
+def test_discover_local_hic_file_accepts_year_named_file(tmp_path: Path) -> None:
+    raw_path = tmp_path / "2025"
+    raw_path.write_bytes(b"placeholder")
+
+    assert discover_local_hic_file(2025, raw_path) == raw_path
 
 
 def test_download_hic_detects_hud_waf_challenge(tmp_path: Path, httpx_mock) -> None:

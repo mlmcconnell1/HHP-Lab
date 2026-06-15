@@ -11,7 +11,9 @@ import pandas as pd
 from hhplab.paths import curated_dir
 from hhplab.pit.qa import QAIssue, QAReport, Severity
 
-_PIT_FILE_RE = re.compile(r"^pit__P(?P<year>\d{4})(?:@B\d{4})?\.parquet$")
+_PIT_FILE_RE = re.compile(
+    r"^(?:pit__P(?P<year>\d{4})(?:@B\d{4})?|pit_vintage__P(?P<vintage>\d{4}))\.parquet$"
+)
 _HIC_FILE_RE = re.compile(r"^hic__H(?P<year>\d{4})\.parquet$")
 
 
@@ -93,7 +95,7 @@ def _discover_year_files(
         match = pattern.match(path.name)
         if match is None:
             continue
-        year = int(match.group("year"))
+        year = int(match.group("year") or match.group("vintage"))
         if years is not None and year not in years:
             continue
         by_year.setdefault(year, []).append(path)

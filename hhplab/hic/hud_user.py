@@ -48,7 +48,10 @@ def discover_local_hic_file(year: int, raw_dir: Path | str | None = None) -> Pat
     directory = Path(raw_dir) if raw_dir is not None else raw_root() / "hic" / str(year)
     if not directory.exists():
         return None
+    if directory.is_file():
+        return directory
     patterns = [
+        str(year),
         f"{year}-HIC-Counts-by-State.csv",
         f"{year}-HIC-Counts-by-State.xlsx",
         f"{year}-HIC-Counts-by-State.xls",
