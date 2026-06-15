@@ -1,6 +1,7 @@
 """Tests for the Phase 3 CLI commands (ingest pit, diagnostics panel)."""
 
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 import pandas as pd
@@ -137,6 +138,67 @@ class TestIngestPitCommand:
 
         assert result.exit_code == 1
         assert "Error parsing PIT file" in result.output
+
+
+class TestIngestPitVintageCommand:
+    """Tests for the 'ingest pit-vintage' command."""
+
+    def test_parse_only_uses_alternate_hud_workbook_filename(
+        self,
+        monkeypatch,
+        tmp_path: Path,
+    ):
+        raw_root = tmp_path / "data" / "raw"
+        raw_dir = raw_root / "pit" / "2020"
+        raw_dir.mkdir(parents=True)
+        raw_file = raw_dir / "2007-2020-PIT-Estimates-by-CoC.xlsx"
+        raw_file.write_bytes(b"manual workbook")
+        parsed = pd.DataFrame(
+            {
+                "coc_id": ["CO-500"],
+                "pit_year": [2020],
+                "pit_total": [100],
+            }
+        )
+
+        from hhplab.pit.ingest import PITVintageParseResult
+        from hhplab.pit.qa import QAReport
+
+        download = MagicMock()
+        parse = MagicMock(
+            return_value=PITVintageParseResult(
+                df=parsed,
+                vintage=2020,
+                years_parsed=[2020],
+                total_rows_read=1,
+            )
+        )
+        write = MagicMock(
+            return_value=tmp_path / "data" / "curated" / "pit" / "pit_vintage.parquet"
+        )
+        register = MagicMock(
+            return_value=SimpleNamespace(vintage=2020, row_count=1, years_included=[2020])
+        )
+
+        monkeypatch.setattr("hhplab.cli.ingest_pit_vintage.raw_root", lambda: raw_root)
+        monkeypatch.setattr("hhplab.pit.ingest.download_pit_data", download)
+        monkeypatch.setattr("hhplab.pit.ingest.parse_pit_vintage", parse)
+        monkeypatch.setattr("hhplab.pit.ingest.write_pit_parquet", write)
+        monkeypatch.setattr("hhplab.pit.pit_registry.register_pit_vintage", register)
+        monkeypatch.setattr("hhplab.pit.qa.validate_pit_data", lambda df: QAReport())
+
+        result = runner.invoke(
+            app,
+            ["ingest", "pit-vintage", "--vintage", "2020", "--parse-only"],
+        )
+
+        assert result.exit_code == 0
+        assert f"Using existing file: {raw_file}" in result.output
+        download.assert_not_called()
+        assert parse.call_args.kwargs["file_path"] == raw_file
+        assert parse.call_args.kwargs["source_ref"].endswith(
+            "2007-2020-PIT-Estimates-by-CoC.xlsx"
+        )
 
 
 class TestPanelDiagnosticsCommand:

@@ -19,6 +19,7 @@ from hhplab.pit.ingest.hud_exchange import (
     download_pit_data_range,
     get_pit_source_url,
     list_available_years,
+    pit_source_url_candidates,
 )
 from hhplab.pit.ingest.parser import (
     CANONICAL_COLUMNS,
@@ -44,6 +45,7 @@ __all__ = [
     "download_pit_data_range",
     "get_pit_source_url",
     "list_available_years",
+    "pit_source_url_candidates",
     # Parser functions and constants
     "CANONICAL_COLUMNS",
     "InvalidCoCIdError",

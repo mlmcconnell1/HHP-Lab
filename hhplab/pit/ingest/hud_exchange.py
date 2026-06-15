@@ -229,6 +229,12 @@ def _generate_alternate_urls(url: str, year: int) -> list[str]:
     return alternates
 
 
+def pit_source_url_candidates(year: int) -> list[str]:
+    """Return the primary and known alternate HUD PIT workbook URLs."""
+    url = get_pit_source_url(year)
+    return [url, *_generate_alternate_urls(url, year)]
+
+
 def download_pit_data(
     year: int,
     output_dir: Path | str | None = None,

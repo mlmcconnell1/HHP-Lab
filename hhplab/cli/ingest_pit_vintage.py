@@ -1,6 +1,7 @@
 """CLI command for ingesting all years from a PIT vintage file."""
 
 import logging
+from pathlib import Path
 from typing import Annotated
 
 import typer
@@ -15,6 +16,26 @@ logging.basicConfig(
 )
 # Show INFO for PIT ingest to see CoC ID mapping messages
 logging.getLogger("hhplab.pit.ingest.parser").setLevel(logging.INFO)
+
+
+def _find_existing_pit_vintage_file(
+    raw_dir: Path,
+    vintage: int,
+    source_urls: list[str],
+) -> tuple[Path, str] | None:
+    """Find a manually placed PIT vintage workbook in known HUD filename variants."""
+    by_filename = {url.split("/")[-1]: url for url in source_urls}
+    candidates = [raw_dir / filename for filename in by_filename]
+    candidates.extend(sorted(raw_dir.glob(f"2007-{vintage}-*.xls*")))
+
+    seen: set[Path] = set()
+    for candidate in candidates:
+        if candidate in seen:
+            continue
+        seen.add(candidate)
+        if candidate.exists() and candidate.stat().st_size > 0:
+            return candidate, by_filename.get(candidate.name, source_urls[0])
+    return None
 
 
 def ingest_pit_vintage(
@@ -62,6 +83,7 @@ def ingest_pit_vintage(
     from hhplab.pit.ingest import (
         download_pit_data,
         get_pit_source_url,
+        pit_source_url_candidates,
         parse_pit_vintage,
         write_pit_parquet,
     )
@@ -76,10 +98,11 @@ def ingest_pit_vintage(
     except ValueError as e:
         typer.echo(f"Error: {e}", err=True)
         raise typer.Exit(1) from e
-    expected_filename = source_url.split("/")[-1]
-    raw_file = raw_dir / expected_filename
+    source_urls = pit_source_url_candidates(vintage)
+    existing = _find_existing_pit_vintage_file(raw_dir, vintage, source_urls)
 
-    if parse_only and raw_file.exists():
+    if parse_only and existing is not None:
+        raw_file, source_url = existing
         typer.echo(f"Using existing file: {raw_file}")
     else:
         typer.echo("Downloading PIT data from HUD User...")
