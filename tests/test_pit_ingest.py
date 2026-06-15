@@ -7,6 +7,7 @@ import pytest
 
 from hhplab.pit.ingest.hud_exchange import (
     DownloadResult,
+    HudUserWafChallengeError,
     download_pit_data,
     get_pit_source_url,
     list_available_years,
@@ -213,6 +214,27 @@ class TestDownloadPitData:
                 download_pit_data(2025, output_dir=output_dir)
 
             assert not (output_dir / "2007-2025-PIT-Counts-by-CoC.xlsb").exists()
+            assert list(output_dir.glob("*.meta.json")) == []
+
+    def test_download_reports_hud_waf_challenge_with_manual_fallback(self, httpx_mock):
+        """HTTP 202 WAF challenges get a manual-download parse-only hint."""
+        httpx_mock.add_response(
+            url="https://www.huduser.gov/portal/sites/default/files/xls/2007-2020-PIT-Counts-by-CoC.xlsx",
+            status_code=202,
+            headers={"x-amzn-waf-action": "challenge", "content-length": "0"},
+            content=b"",
+        )
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            output_dir = Path(tmpdir)
+            with pytest.raises(HudUserWafChallengeError) as excinfo:
+                download_pit_data(2020, output_dir=output_dir)
+
+            message = str(excinfo.value)
+            assert "AWS WAF challenge" in message
+            assert str(output_dir) in message
+            assert "hhplab ingest pit-vintage --vintage 2020 --parse-only" in message
+            assert not (output_dir / "2007-2020-PIT-Counts-by-CoC.xlsx").exists()
             assert list(output_dir.glob("*.meta.json")) == []
 
     def test_download_redownloads_existing_empty_file(self, httpx_mock):

@@ -84,6 +84,10 @@ class DownloadResult:
     file_size: int
 
 
+class HudUserWafChallengeError(RuntimeError):
+    """Raised when HUD User blocks automated PIT workbook download with WAF."""
+
+
 def get_pit_source_url(year: int) -> str:
     """Get the download URL for PIT data for a given year.
 
@@ -124,16 +128,39 @@ def get_pit_source_url(year: int) -> str:
 def _try_download_url(
     client: httpx.Client,
     url: str,
+    *,
+    year: int,
+    output_dir: Path,
 ) -> httpx.Response | None:
     """Attempt to download from a URL, returning None on 404."""
     try:
         response = client.get(url)
+        _raise_for_waf_challenge(response, url=url, year=year, output_dir=output_dir)
         response.raise_for_status()
         return response
     except httpx.HTTPStatusError as e:
         if e.response.status_code == 404:
             return None
         raise
+
+
+def _raise_for_waf_challenge(
+    response: httpx.Response,
+    *,
+    url: str,
+    year: int,
+    output_dir: Path,
+) -> None:
+    """Raise an actionable error for HUD User AWS WAF challenge responses."""
+    waf_action = response.headers.get("x-amzn-waf-action", "").strip().lower()
+    if response.status_code != 202 or waf_action != "challenge":
+        return
+    raise HudUserWafChallengeError(
+        f"HUD User returned an AWS WAF challenge for PIT vintage {year}: {url}. "
+        "Automated download cannot proceed from this environment. Download the "
+        f"workbook in a browser and place it under {output_dir}/, then run "
+        f"`hhplab ingest pit-vintage --vintage {year} --parse-only`."
+    )
 
 
 def _has_empty_body(response: httpx.Response) -> bool:
@@ -266,7 +293,7 @@ def download_pit_data(
     tried_urls = [url]
 
     with httpx.Client(follow_redirects=True, timeout=timeout) as client:
-        response = _try_download_url(client, url)
+        response = _try_download_url(client, url, year=year, output_dir=output_dir)
 
         # If the primary URL failed or returned an unpublished empty workbook,
         # try alternate filename patterns before giving up.
@@ -275,7 +302,12 @@ def download_pit_data(
             for alt_url in alternate_urls:
                 logger.info(f"Primary URL not found, trying: {alt_url}")
                 tried_urls.append(alt_url)
-                response = _try_download_url(client, alt_url)
+                response = _try_download_url(
+                    client,
+                    alt_url,
+                    year=year,
+                    output_dir=output_dir,
+                )
 
                 if response is not None and not _has_empty_body(response):
                     url = alt_url

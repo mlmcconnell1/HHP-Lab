@@ -12,6 +12,7 @@ WP-3B deliverables:
 
 from hhplab.pit.ingest.hud_exchange import (
     DownloadResult,
+    HudUserWafChallengeError,
     check_pit_availability,
     discover_pit_urls,
     download_pit_data,
@@ -36,6 +37,7 @@ from hhplab.pit.ingest.parser import (
 __all__ = [
     # HUD Exchange download functions
     "DownloadResult",
+    "HudUserWafChallengeError",
     "check_pit_availability",
     "discover_pit_urls",
     "download_pit_data",
