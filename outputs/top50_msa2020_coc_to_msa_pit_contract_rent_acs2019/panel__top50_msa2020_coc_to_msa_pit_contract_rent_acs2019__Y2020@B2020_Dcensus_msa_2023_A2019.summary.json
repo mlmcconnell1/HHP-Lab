@@ -11,7 +11,8 @@
   "inputs": {
     "pit_panel": "outputs/top50_msa2020_census_coc2020_pit_population_rollup_pit2020_vintage/panel__top50_msa2020_census_coc2020_pit_population_rollup_pit2020_vintage__Y2020@B2020_Dcensus_msa_2023.parquet",
     "acs_contract_rent_tracts": "data/curated/acs_contract_rent_cache/acs5_contract_rent_tracts__A2019.parquet",
-    "msa_membership": "data/curated/msa/msa_county_membership__census_msa_2023.parquet"
+    "msa_membership": "data/curated/msa/msa_county_membership__census_msa_2023.parquet",
+    "acs5_tracts_rent_burden": "data/curated/acs/acs5_tracts__A2019xT2010.parquet"
   },
   "outputs": {
     "parquet": "/home/mlm/Source/HHP-Lab/outputs/top50_msa2020_coc_to_msa_pit_contract_rent_acs2019/panel__top50_msa2020_coc_to_msa_pit_contract_rent_acs2019__Y2020@B2020_Dcensus_msa_2023_A2019.parquet",
@@ -36,7 +37,8 @@
       "pit_total": 91340.48137629197,
       "pit_sheltered": 85957.30254311499,
       "pit_unsheltered": 5383.178833176968,
-      "first_quartile_contract_rent_acs2019_dollars": 931.0309955135974
+      "first_quartile_contract_rent_acs2019_dollars": 931.0309955135974,
+      "gross_rent_income_pct_40plus_acs2019": 0.3491010903938307
     },
     {
       "msa_population_rank_2020_census": 2,
@@ -45,7 +47,8 @@
       "pit_total": 73413.11383620178,
       "pit_sheltered": 21411.754333971592,
       "pit_unsheltered": 52001.35950223018,
-      "first_quartile_contract_rent_acs2019_dollars": 1046.25120165121
+      "first_quartile_contract_rent_acs2019_dollars": 1046.25120165121,
+      "gross_rent_income_pct_40plus_acs2019": 0.3854277228969515
     },
     {
       "msa_population_rank_2020_census": 3,
@@ -54,7 +57,8 @@
       "pit_total": 8307.78744574441,
       "pit_sheltered": 6400.972493265319,
       "pit_unsheltered": 1906.8149524790917,
-      "first_quartile_contract_rent_acs2019_dollars": 743.138588226497
+      "first_quartile_contract_rent_acs2019_dollars": 743.138588226497,
+      "gross_rent_income_pct_40plus_acs2019": 0.3160755319070836
     },
     {
       "msa_population_rank_2020_census": 4,
@@ -63,7 +67,8 @@
       "pit_total": 7756.236026424795,
       "pit_sheltered": 4625.890578350305,
       "pit_unsheltered": 3130.3454480744913,
-      "first_quartile_contract_rent_acs2019_dollars": 758.3507102317268
+      "first_quartile_contract_rent_acs2019_dollars": 758.3507102317268,
+      "gross_rent_income_pct_40plus_acs2019": 0.28486913496188465
     },
     {
       "msa_population_rank_2020_census": 5,
@@ -72,7 +77,8 @@
       "pit_total": 4775.79201781266,
       "pit_sheltered": 2617.2554900052814,
       "pit_unsheltered": 2158.5365278073778,
-      "first_quartile_contract_rent_acs2019_dollars": 722.2892842971032
+      "first_quartile_contract_rent_acs2019_dollars": 722.2892842971032,
+      "gross_rent_income_pct_40plus_acs2019": 0.3119249722506716
     },
     {
       "msa_population_rank_2020_census": 6,
@@ -81,7 +87,8 @@
       "pit_total": 10083.79444057467,
       "pit_sheltered": 8847.678603312697,
       "pit_unsheltered": 1236.115837261973,
-      "first_quartile_contract_rent_acs2019_dollars": 1177.980272899272
+      "first_quartile_contract_rent_acs2019_dollars": 1177.980272899272,
+      "gross_rent_income_pct_40plus_acs2019": 0.2954778822340472
     },
     {
       "msa_population_rank_2020_census": 7,
@@ -90,7 +97,8 @@
       "pit_total": 9199.360265421197,
       "pit_sheltered": 7798.069413588447,
       "pit_unsheltered": 1401.2908518327517,
-      "first_quartile_contract_rent_acs2019_dollars": 738.8772055806319
+      "first_quartile_contract_rent_acs2019_dollars": 738.8772055806319,
+      "gross_rent_income_pct_40plus_acs2019": 0.3362670534208713
     },
     {
       "msa_population_rank_2020_census": 8,
@@ -99,7 +107,8 @@
       "pit_total": 7280.990836876271,
       "pit_sheltered": 4246.997087218937,
       "pit_unsheltered": 3033.9937496573334,
-      "first_quartile_contract_rent_acs2019_dollars": 923.4466867948514
+      "first_quartile_contract_rent_acs2019_dollars": 923.4466867948514,
+      "gross_rent_income_pct_40plus_acs2019": 0.4242579383606921
     },
     {
       "msa_population_rank_2020_census": 9,
@@ -108,7 +117,8 @@
       "pit_total": 6379.840726047525,
       "pit_sheltered": 4005.752953612597,
       "pit_unsheltered": 2374.0877724349284,
-      "first_quartile_contract_rent_acs2019_dollars": 736.8588021592857
+      "first_quartile_contract_rent_acs2019_dollars": 736.8588021592857,
+      "gross_rent_income_pct_40plus_acs2019": 0.3141421757868887
     },
     {
       "msa_population_rank_2020_census": 10,
@@ -117,7 +127,16 @@
       "pit_total": 14890.492273039154,
       "pit_sheltered": 13920.321424051908,
       "pit_unsheltered": 970.1708489872456,
-      "first_quartile_contract_rent_acs2019_dollars": 865.22960385633
+      "first_quartile_contract_rent_acs2019_dollars": 865.22960385633,
+      "gross_rent_income_pct_40plus_acs2019": 0.30909868979437544
     }
-  ]
+  ],
+  "rent_burden_measure": "gross_rent_income_pct_40plus_acs2019",
+  "rent_burden_method": "ACS5 B25070 bins summed to Census MSA 2023 county membership; (40-49.9 + 50+) / gross_rent_pct_income_total",
+  "null_gross_rent_income_pct_40plus_rows": 0,
+  "gross_rent_income_pct_40plus_summary": {
+    "min": 0.22321713176272856,
+    "median": 0.3033683932834591,
+    "max": 0.4242579383606921
+  }
 }

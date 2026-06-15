@@ -1,7 +1,7 @@
 # Top 50 MSA PIT and Contract Rent Panel
 
 This output joins the 2020 CoC-to-MSA PIT rollup to ACS 2019 first-quartile
-contract rent at MSA grain.
+contract rent and ACS 2019 40%+ gross-rent-income burden at MSA grain.
 
 Files:
 
@@ -28,6 +28,17 @@ Rent source:
 - Method: sum ACS5 B25056 contract-rent distribution bins over Census MSA
   2023 county membership, then linearly interpolate the 25th percentile from
   the pooled cash-rent distribution.
+
+Rent-burden source:
+
+- `data/curated/acs/acs5_tracts__A2019xT2010.parquet`
+- ACS vintage: 2019
+- Measure: `gross_rent_income_pct_40plus_acs2019`
+- Numerator: `households_gross_rent_income_40plus_acs2019`
+- Denominator: `gross_rent_pct_income_total_acs2019`
+- Method: sum ACS5 B25070 gross-rent-as-percentage-of-income bins over Census
+  MSA 2023 county membership; divide the 40-49.9% plus 50%+ bins by the total
+  gross-rent-income denominator.
 
 Notes:
 
