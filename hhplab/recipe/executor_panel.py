@@ -61,6 +61,7 @@ from hhplab.recipe.recipe_schema import (
 )
 from hhplab.recipe.schema_common import GeometryRef, expand_year_spec
 from hhplab.schema.columns import (
+    HIC_PANEL_MEASURE_COLUMNS,
     POPULATION_DENSITY_COLUMN,
     TOTAL_POPULATION,
 )
@@ -108,6 +109,29 @@ def canonicalize_panel_for_target(
         ):
             result["boundary_vintage_used"] = boundary_vintage
     return result
+
+
+def _recipe_uses_hic(recipe) -> bool:
+    """Whether any recipe dataset declares HUD HIC inputs."""
+    return any(
+        getattr(ds, "provider", None) == "hud" and getattr(ds, "product", None) == "hic"
+        for ds in recipe.datasets.values()
+    )
+
+
+def _normalize_recipe_hic_columns(panel: pd.DataFrame, *, recipe) -> pd.DataFrame:
+    """Rename canonical HIC source columns to stable panel measure names."""
+    if not _recipe_uses_hic(recipe):
+        return panel
+    renames = dict(zip(("total_beds", "total_units"), HIC_PANEL_MEASURE_COLUMNS, strict=True))
+    active = {
+        source: target
+        for source, target in renames.items()
+        if source in panel.columns and target not in panel.columns
+    }
+    if not active:
+        return panel
+    return panel.rename(columns=active)
 
 
 def resolve_panel_aliases(target) -> dict[str, str]:
@@ -1243,6 +1267,7 @@ def assemble_panel(
 
     panel = pd.concat(frames, ignore_index=True)
     panel = canonicalize_panel_for_target(panel, target.geometry)
+    panel = _normalize_recipe_hic_columns(panel, recipe=ctx.recipe)
     try:
         panel = _stamp_recipe_acs5_provenance(panel, plan=plan, ctx=ctx)
     except ExecutorError as exc:

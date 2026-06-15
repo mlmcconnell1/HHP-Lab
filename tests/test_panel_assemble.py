@@ -408,6 +408,8 @@ class TestBuildPanel:
 
         measures_dir = tmp_path / "measures"
         measures_dir.mkdir()
+        hic_dir = tmp_path / "hic"
+        hic_dir.mkdir()
         boundaries_dir = tmp_path / "coc_boundaries"
         boundaries_dir.mkdir()
 
@@ -462,6 +464,7 @@ class TestBuildPanel:
         return {
             "pit_dir": pit_dir,
             "measures_dir": measures_dir,
+            "hic_dir": hic_dir,
             "boundaries_dir": boundaries_dir,
         }
 
@@ -490,6 +493,103 @@ class TestBuildPanel:
 
         assert len(result) == 4  # 2 CoCs x 2 years
         assert set(result["year"].unique()) == {2023, 2024}
+
+    def test_build_with_hic_preserves_rows(self, data_dirs):
+        """HIC joins add inventory measures without changing PIT row cardinality."""
+        for year, beds, units in [
+            (2023, [100, 200], [50, 75]),
+            (2024, [110, 210], [55, 80]),
+        ]:
+            pd.DataFrame(
+                {
+                    "hic_year": [year, year],
+                    "coc_id": ["CO-500", "CA-600"],
+                    "coc_name": ["Colorado Balance", "Los Angeles"],
+                    "state": ["CO", "CA"],
+                    "total_beds": beds,
+                    "total_units": units,
+                    "data_source": ["fixture", "fixture"],
+                    "source_ref": ["fixture.csv", "fixture.csv"],
+                    "ingested_at": ["2026-06-15T00:00:00Z"] * 2,
+                    "notes": [pd.NA, pd.NA],
+                }
+            ).to_parquet(data_dirs["hic_dir"] / f"hic__H{year}.parquet", index=False)
+
+        baseline = build_panel(
+            2023,
+            2024,
+            pit_dir=data_dirs["pit_dir"],
+            measures_dir=data_dirs["measures_dir"],
+            boundaries_dir=data_dirs["boundaries_dir"],
+        )
+        result = build_panel(
+            2023,
+            2024,
+            pit_dir=data_dirs["pit_dir"],
+            measures_dir=data_dirs["measures_dir"],
+            boundaries_dir=data_dirs["boundaries_dir"],
+            include_hic=True,
+            hic_dir=data_dirs["hic_dir"],
+        )
+
+        assert len(result) == len(baseline)
+        assert "hic_total_beds" in result.columns
+        assert "hic_total_units" in result.columns
+        assert result.loc[
+            (result["coc_id"] == "CO-500") & (result["year"] == 2024),
+            "hic_total_beds",
+        ].item() == 110
+        assert result.loc[
+            (result["coc_id"] == "CA-600") & (result["year"] == 2023),
+            "hic_total_units",
+        ].item() == 75
+
+    def test_build_with_hic_missing_year_raises_actionable_error(self, data_dirs):
+        """Missing HIC years point to the ingest command and raw file location."""
+        with pytest.raises(
+            ValueError,
+            match=(
+                "No HIC data found for 2023; run hhplab ingest hic --year 2023 "
+                "or place the HUD file under data/raw/hic/2023/"
+            ),
+        ):
+            build_panel(
+                2023,
+                2023,
+                pit_dir=data_dirs["pit_dir"],
+                measures_dir=data_dirs["measures_dir"],
+                boundaries_dir=data_dirs["boundaries_dir"],
+                include_hic=True,
+                hic_dir=data_dirs["hic_dir"],
+            )
+
+    def test_build_with_hic_duplicate_coc_year_raises(self, data_dirs):
+        """Duplicate HIC CoC-year rows fail before the panel merge."""
+        pd.DataFrame(
+            {
+                "hic_year": [2023, 2023],
+                "coc_id": ["CO-500", "CO-500"],
+                "coc_name": ["Colorado Balance", "Colorado Balance"],
+                "state": ["CO", "CO"],
+                "total_beds": [100, 101],
+                "total_units": [50, 51],
+                "data_source": ["fixture", "fixture"],
+                "source_ref": ["fixture.csv", "fixture.csv"],
+                "ingested_at": ["2026-06-15T00:00:00Z"] * 2,
+                "notes": [pd.NA, pd.NA],
+            }
+        ).to_parquet(data_dirs["hic_dir"] / "hic__H2023.parquet", index=False)
+
+        with pytest.raises(ValueError, match="duplicate CoC-year rows: CO-500/2023"):
+            build_panel(
+                2023,
+                2023,
+                pit_dir=data_dirs["pit_dir"],
+                measures_dir=data_dirs["measures_dir"],
+                boundaries_dir=data_dirs["boundaries_dir"],
+                include_hic=True,
+                hic_dir=data_dirs["hic_dir"],
+            )
 
     def test_build_uses_default_policy(self, data_dirs):
         """Test that default policy is used when none specified."""

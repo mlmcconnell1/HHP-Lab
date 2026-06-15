@@ -28,6 +28,7 @@ from hhplab.recipe.recipe_schema import PanelPolicy, RecipeV1
 from hhplab.schema.columns import (
     ACS1_MEASURE_COLUMNS,
     ACS_MEASURE_COLUMNS,
+    HIC_PANEL_MEASURE_COLUMNS,
     LAUS_MEASURE_COLUMNS,
 )
 
@@ -331,6 +332,7 @@ def collect_conformance_flags(
         set(ACS_MEASURE_COLUMNS)
         | set(ACS5_EXPANDED_COVARIATE_COLUMNS)
         | set(ACS1_MEASURE_COLUMNS)
+        | set(HIC_PANEL_MEASURE_COLUMNS)
         | set(LAUS_MEASURE_COLUMNS)
         | {"population", "urban_population_fraction"}
     )

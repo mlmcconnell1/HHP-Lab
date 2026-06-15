@@ -514,6 +514,11 @@ HIC_CANONICAL_COLUMNS: list[str] = [
     "notes",
 ]
 
+HIC_PANEL_MEASURE_COLUMNS: list[str] = [
+    "hic_total_beds",
+    "hic_total_units",
+]
+
 ZORI_INGEST_OUTPUT_COLUMNS: list[str] = [
     "geo_type",
     "geo_id",

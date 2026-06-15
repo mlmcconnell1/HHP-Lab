@@ -59,6 +59,47 @@ def _validate_hud_pit(spec: DatasetSpec) -> list[ValidationDiagnostic]:
     return diags
 
 
+def _validate_hud_hic(spec: DatasetSpec) -> list[ValidationDiagnostic]:
+    """Validate HUD HIC dataset specification."""
+    diags: list[ValidationDiagnostic] = []
+    if spec.version != 1:
+        diags.append(
+            ValidationDiagnostic(
+                "error",
+                f"hud/hic: unsupported version {spec.version}; expected 1.",
+            )
+        )
+    if spec.native_geometry.type != "coc" and not _uses_materialized_artifact(spec):
+        diags.append(
+            ValidationDiagnostic(
+                "error",
+                f"hud/hic: expected native_geometry type 'coc', "
+                f"got '{spec.native_geometry.type}'. Recipes that point to "
+                "pre-materialized derived artifacts must set path or file_set.",
+            )
+        )
+    known_params = {"vintage", "align"}
+    unknown = set(spec.params.keys()) - known_params
+    if unknown:
+        diags.append(
+            ValidationDiagnostic(
+                "warning",
+                f"hud/hic: unrecognized params {sorted(unknown)}.",
+            )
+        )
+    if "align" in spec.params:
+        valid_aligns = ("point_in_time_jan", "to_calendar_year")
+        if spec.params["align"] not in valid_aligns:
+            diags.append(
+                ValidationDiagnostic(
+                    "warning",
+                    f"hud/hic: unknown align mode '{spec.params['align']}'; "
+                    f"expected one of {valid_aligns}.",
+                )
+            )
+    return diags
+
+
 def _validate_census_acs5(spec: DatasetSpec) -> list[ValidationDiagnostic]:
     """Validate Census ACS5 dataset specification."""
     diags: list[ValidationDiagnostic] = []
@@ -524,6 +565,7 @@ def _validate_bls_cpi_u(spec: DatasetSpec) -> list[ValidationDiagnostic]:
 def register_dataset_defaults(registry: DatasetAdapterRegistry) -> None:
     """Register built-in dataset adapters."""
     registry.register("hud", "pit", _validate_hud_pit)
+    registry.register("hud", "hic", _validate_hud_hic)
     registry.register("census", "acs5", _validate_census_acs5)
     registry.register("census", "acs", _validate_census_acs)
     registry.register("census", "acs1", _validate_census_acs1)

@@ -353,7 +353,13 @@ def _check_dataset_paths(
                 missing_paths.add(path)
 
         if missing_years:
-            if len(missing_paths) == 1:
+            if ds.provider == "hud" and ds.product == "hic" and len(missing_years) == 1:
+                year = missing_years[0]
+                msg = (
+                    f"No HIC data found for {year}; run hhplab ingest hic --year {year} "
+                    f"or place the HUD file under data/raw/hic/{year}/."
+                )
+            elif len(missing_paths) == 1:
                 msg = f"Dataset '{ds_id}' path not found: {next(iter(missing_paths))}"
             else:
                 msg = (
@@ -438,23 +444,34 @@ def _check_dataset_year_values(
         if not missing_years:
             continue
 
+        if ds.provider == "hud" and ds.product == "hic" and len(missing_years) == 1:
+            year = missing_years[0]
+            message = (
+                f"No HIC data found for {year}; run hhplab ingest hic --year {year} "
+                f"or place the HUD file under data/raw/hic/{year}/."
+            )
+            remediation = _dataset_remediation(dataset_id, ds, years=missing_years)
+        else:
+            message = (
+                f"Dataset '{dataset_id}' ({input_path}): no rows for planned "
+                f"year(s) {missing_years} after filtering {year_column}."
+            )
+            remediation = Remediation(
+                hint=(
+                    f"Set year_column to the artifact column that contains the "
+                    f"planned analysis/source years, or rebuild {input_path} so "
+                    f"it includes rows where {year_column} is in {missing_years}."
+                ),
+            )
+
         findings.append(
             PreflightFinding(
                 severity=Severity.ERROR,
                 kind=FindingKind.UNCOVERED_YEARS,
-                message=(
-                    f"Dataset '{dataset_id}' ({input_path}): no rows for planned "
-                    f"year(s) {missing_years} after filtering {year_column}."
-                ),
+                message=message,
                 dataset_id=dataset_id,
                 years=missing_years,
-                remediation=Remediation(
-                    hint=(
-                        f"Set year_column to the artifact column that contains the "
-                        f"planned analysis/source years, or rebuild {input_path} so "
-                        f"it includes rows where {year_column} is in {missing_years}."
-                    ),
-                ),
+                remediation=remediation,
             )
         )
 
@@ -523,6 +540,18 @@ def _dataset_remediation(ds_id: str, ds, *, years: list[int] | None = None) -> R
 
     provider = ds.provider
     product = ds.product
+
+    if provider == "hud" and product == "hic":
+        year_note = ""
+        if years:
+            year_note = f" for year(s) {', '.join(str(year) for year in sorted(set(years)))}"
+        return Remediation(
+            hint=(
+                f"Ingest HUD HIC data for dataset '{ds_id}'{year_note}, or place "
+                "the HUD source file under data/raw/hic/<year>/ before parsing."
+            ),
+            command="hhplab ingest hic --year <year>",
+        )
 
     # Detect ACS 1-year datasets that span unavailable vintages (e.g. 2020).
     if product == "acs1" and years:

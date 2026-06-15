@@ -87,6 +87,7 @@ from hhplab.pit.pit_registry import get_pit_path
 from hhplab.provenance import ProvenanceBlock, read_provenance, write_parquet_with_provenance
 from hhplab.schema.columns import (
     COC_PANEL_COLUMNS,
+    HIC_PANEL_MEASURE_COLUMNS,
     POPULATION_DENSITY_COLUMN,
     TOTAL_POPULATION,
 )
@@ -114,6 +115,8 @@ PANEL_COLUMNS = COC_PANEL_COLUMNS
 
 METRO_PANEL_COLUMNS = SCHEMA_METRO_PANEL_COLUMNS
 
+HIC_PANEL_JOIN_COLUMNS = ["coc_id", "year", *HIC_PANEL_MEASURE_COLUMNS]
+
 def _panel_geo_id_col(geo_type: str) -> str:
     """Return the native identifier column for a panel geo type."""
     if geo_type == GEO_TYPE_METRO:
@@ -140,6 +143,14 @@ def _align_label(geo_type: str) -> str:
     if geo_type == GEO_TYPE_METRO:
         return "definition_fixed"
     return "boundary_aligned"
+
+
+def _missing_hic_year_message(year: int) -> str:
+    """Return the operator-facing remediation for a missing HIC panel year."""
+    return (
+        f"No HIC data found for {year}; run hhplab ingest hic --year {year} "
+        f"or place the HUD file under data/raw/hic/{year}/."
+    )
 
 
 def _find_latest_raw_vintage_file(
@@ -398,6 +409,52 @@ def _load_pit_for_year(
     df["pit_total"] = df["pit_total"].astype(int)
 
     return df
+
+
+def _load_hic_for_year(
+    year: int,
+    hic_dir: Path | None = None,
+) -> pd.DataFrame:
+    """Load canonical HIC counts for one PIT-aligned CoC panel year."""
+    if hic_dir is None:
+        hic_dir = curated_dir("hic")
+
+    path = hic_dir / naming.hic_filename(year)
+    if not path.exists():
+        logger.warning("No HIC data found for year %s at %s", year, path)
+        return pd.DataFrame(columns=HIC_PANEL_JOIN_COLUMNS)
+
+    df = pd.read_parquet(path)
+    required = {"hic_year", "coc_id", "total_beds", "total_units"}
+    missing = sorted(required - set(df.columns))
+    if missing:
+        raise ValueError(f"HIC artifact {path} is missing required column(s): {missing}.")
+
+    df = df.loc[pd.to_numeric(df["hic_year"], errors="coerce") == year].copy()
+    if df.empty:
+        return pd.DataFrame(columns=HIC_PANEL_JOIN_COLUMNS)
+
+    df["coc_id"] = df["coc_id"].astype(str)
+    df["year"] = pd.to_numeric(df["hic_year"], errors="raise").astype(int)
+    df["hic_total_beds"] = pd.to_numeric(df["total_beds"], errors="coerce")
+    df["hic_total_units"] = pd.to_numeric(df["total_units"], errors="coerce")
+
+    duplicate_mask = df.duplicated(["coc_id", "year"], keep=False)
+    if duplicate_mask.any():
+        duplicates = (
+            df.loc[duplicate_mask, ["coc_id", "year"]]
+            .drop_duplicates()
+            .sort_values(["coc_id", "year"])
+        )
+        preview = ", ".join(
+            f"{row.coc_id}/{int(row.year)}" for row in duplicates.itertuples(index=False)
+        )
+        raise ValueError(
+            f"HIC artifact {path} has duplicate CoC-year rows: {preview}. "
+            "Rebuild the HIC artifact so each coc_id/year appears once."
+        )
+
+    return df[HIC_PANEL_JOIN_COLUMNS].copy()
 
 
 def _load_acs_measures(
@@ -1045,6 +1102,8 @@ def build_panel(
     acs1_dir: Path | None = None,
     include_laus: bool = False,
     laus_dir: Path | None = None,
+    include_hic: bool = False,
+    hic_dir: Path | None = None,
 ) -> pd.DataFrame:
     """Build analysis-ready analysis-geography x year panel.
 
@@ -1095,6 +1154,12 @@ def build_panel(
     laus_dir : Path, optional
         Directory containing curated LAUS metro artifacts.
         Defaults to 'data/curated/laus'.
+    include_hic : bool, optional
+        If True and geo_type is 'coc', merge HUD HIC inventory counts for
+        each PIT-aligned panel year. Default is False.
+    hic_dir : Path, optional
+        Directory containing curated HIC artifacts. Defaults to
+        'data/curated/hic'.
     boundaries_dir : Path, optional
         Directory containing curated CoC boundary GeoParquet files.
         When omitted, the builder first looks for a sibling
@@ -1140,6 +1205,8 @@ def build_panel(
         raise ValueError(f"Unsupported geo_type: {geo_type!r}")
     if geo_type == GEO_TYPE_METRO and not definition_version:
         raise ValueError("definition_version is required for geo_type='metro'")
+    if include_hic and geo_type != GEO_TYPE_COC:
+        raise ValueError("HIC integration currently supports geo_type='coc' panels only.")
 
     if policy is None:
         policy = DEFAULT_POLICY
@@ -1245,6 +1312,31 @@ def build_panel(
                 "coverage_ratio",
             ]:
                 year_df[col] = np.nan
+
+        # -----------------------------------------------------------------
+        # HUD HIC CoC inventory integration (when requested)
+        # -----------------------------------------------------------------
+        if include_hic:
+            hic_df = _load_hic_for_year(year, hic_dir=hic_dir)
+            if hic_df.empty:
+                raise ValueError(_missing_hic_year_message(year))
+            before_rows = len(year_df)
+            year_df = year_df.merge(
+                hic_df,
+                on=["coc_id", "year"],
+                how="left",
+                validate="one_to_one",
+            )
+            if len(year_df) != before_rows:
+                raise ValueError(
+                    f"HIC join changed row count for {year}: "
+                    f"{before_rows} before, {len(year_df)} after."
+                )
+            logger.info(
+                "Year %s: merged HIC data, %s CoCs with HIC bed counts",
+                year,
+                year_df["hic_total_beds"].notna().sum(),
+            )
 
         # -----------------------------------------------------------------
         # ACS 1-year metro integration (when requested)
@@ -1415,17 +1507,17 @@ def build_panel(
 
     # Shared finalization: column ordering, dtype enforcement, boundary
     # detection (already done above, so skip re-detection).
-    extra_cols = (
-        ["zori_max_geo_contribution"]
-        if zori_integrated and "zori_max_geo_contribution" in panel_df.columns
-        else None
-    )
+    extra_cols: list[str] = []
+    if include_hic:
+        extra_cols.extend(HIC_PANEL_MEASURE_COLUMNS)
+    if zori_integrated and "zori_max_geo_contribution" in panel_df.columns:
+        extra_cols.append("zori_max_geo_contribution")
     panel_df = finalize_panel(
         panel_df,
         geo_type=geo_type,
         include_zori=zori_integrated,
         add_boundary_changed=False,  # already computed above
-        extra_columns=extra_cols,
+        extra_columns=extra_cols or None,
     )
 
     logger.info(

@@ -982,6 +982,72 @@ class TestRecipeCLI:
         assert "acs_2015.parquet" in result.output or "missing" in result.output.lower()
         assert "blocker" in result.output.lower() or "Preflight" in result.output
 
+    def test_preflight_missing_hic_year_reports_actionable_remediation(
+        self,
+        tmp_path: Path,
+    ):
+        recipe = load_recipe(
+            {
+                "version": 1,
+                "name": "hic-preflight",
+                "universe": {"years": [2018]},
+                "targets": [
+                    {"id": "coc_panel", "geometry": {"type": "coc", "vintage": 2018}},
+                ],
+                "datasets": {
+                    "hic": {
+                        "provider": "hud",
+                        "product": "hic",
+                        "version": 1,
+                        "native_geometry": {"type": "coc", "vintage": 2018},
+                        "geo_column": "coc_id",
+                        "year_column": "hic_year",
+                        "file_set": {
+                            "path_template": "data/curated/hic/hic__H{year}.parquet",
+                            "segments": [
+                                {
+                                    "years": {"range": "2018-2018"},
+                                    "geometry": {"type": "coc", "vintage": 2018},
+                                }
+                            ],
+                        },
+                    }
+                },
+                "pipelines": [
+                    {
+                        "id": "main",
+                        "target": "coc_panel",
+                        "steps": [
+                            {
+                                "kind": "resample",
+                                "dataset": "hic",
+                                "to_geometry": {"type": "coc", "vintage": 2018},
+                                "method": "identity",
+                                "measures": ["hic_total_beds", "hic_total_units"],
+                            },
+                            {"kind": "join", "datasets": ["hic"]},
+                        ],
+                    }
+                ],
+            }
+        )
+
+        report = run_preflight(recipe, project_root=tmp_path)
+
+        missing = [
+            finding
+            for finding in report.findings
+            if finding.kind == FindingKind.MISSING_DATASET
+            and finding.dataset_id == "hic"
+        ]
+        assert len(missing) == 1
+        assert missing[0].message == (
+            "No HIC data found for 2018; run hhplab ingest hic --year 2018 "
+            "or place the HUD file under data/raw/hic/2018/."
+        )
+        assert missing[0].remediation is not None
+        assert missing[0].remediation.command == "hhplab ingest hic --year <year>"
+
     def test_existing_path_no_missing_file_error(
         self,
         tmp_path: Path,
@@ -1811,6 +1877,31 @@ class TestDefaultAdapters:
         )
         diags = _validate_hud_pit(spec)
         assert any(d.level == "warning" and "unrecognized" in d.message for d in diags)
+
+    def test_hud_hic_valid(self):
+        from hhplab.recipe.default_dataset_adapters import _validate_hud_hic
+
+        spec = DatasetSpec(
+            provider="hud",
+            product="hic",
+            version=1,
+            native_geometry=GeometryRef(type="coc"),
+            params={"vintage": 2024, "align": "point_in_time_jan"},
+        )
+        diags = _validate_hud_hic(spec)
+        assert diags == []
+
+    def test_hud_hic_wrong_geometry(self):
+        from hhplab.recipe.default_dataset_adapters import _validate_hud_hic
+
+        spec = DatasetSpec(
+            provider="hud",
+            product="hic",
+            version=1,
+            native_geometry=GeometryRef(type="tract"),
+        )
+        diags = _validate_hud_hic(spec)
+        assert any(d.level == "error" and "coc" in d.message for d in diags)
 
     def test_census_acs5_valid(self):
         from hhplab.recipe.default_dataset_adapters import _validate_census_acs5

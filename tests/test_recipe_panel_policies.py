@@ -133,6 +133,102 @@ def _setup_zori_fixtures(tmp_path: Path) -> None:
     ).to_parquet(data_dir / "zori.parquet")
 
 
+def _hic_recipe_dict() -> dict:
+    """CoC recipe joining PIT with HUD HIC inventory counts."""
+    return {
+        "version": 1,
+        "name": "hic-panel-test",
+        "universe": {"years": [2024]},
+        "targets": [
+            {
+                "id": "coc_panel",
+                "geometry": {"type": "coc", "vintage": 2024, "source": "hud_exchange"},
+                "outputs": ["panel"],
+            },
+        ],
+        "datasets": {
+            "pit": {
+                "provider": "hud",
+                "product": "pit",
+                "version": 1,
+                "native_geometry": {"type": "coc"},
+                "years": {"years": [2024]},
+                "path": "data/pit.parquet",
+            },
+            "hic": {
+                "provider": "hud",
+                "product": "hic",
+                "version": 1,
+                "native_geometry": {"type": "coc"},
+                "years": {"years": [2024]},
+                "year_column": "hic_year",
+                "path": "data/hic.parquet",
+            },
+        },
+        "transforms": [],
+        "pipelines": [
+            {
+                "id": "main",
+                "target": "coc_panel",
+                "steps": [
+                    {
+                        "resample": {
+                            "dataset": "pit",
+                            "to_geometry": {
+                                "type": "coc",
+                                "vintage": 2024,
+                                "source": "hud_exchange",
+                            },
+                            "method": "identity",
+                            "measures": ["pit_total"],
+                        },
+                    },
+                    {
+                        "resample": {
+                            "dataset": "hic",
+                            "to_geometry": {
+                                "type": "coc",
+                                "vintage": 2024,
+                                "source": "hud_exchange",
+                            },
+                            "method": "identity",
+                            "measures": ["total_beds", "total_units"],
+                        },
+                    },
+                    {
+                        "join": {
+                            "datasets": ["pit", "hic"],
+                            "join_on": ["geo_id", "year"],
+                        },
+                    },
+                ],
+            },
+        ],
+    }
+
+
+def _setup_hic_fixtures(tmp_path: Path) -> None:
+    """Create PIT + HIC dataset files for the HIC recipe."""
+    data_dir = tmp_path / "data"
+    data_dir.mkdir(parents=True, exist_ok=True)
+
+    pd.DataFrame(
+        {
+            "coc_id": ["COC1", "COC2"],
+            "year": [2024, 2024],
+            "pit_total": [100, 200],
+        }
+    ).to_parquet(data_dir / "pit.parquet")
+    pd.DataFrame(
+        {
+            "coc_id": ["COC1", "COC2"],
+            "hic_year": [2024, 2024],
+            "total_beds": [110, 210],
+            "total_units": [55, 80],
+        }
+    ).to_parquet(data_dir / "hic.parquet")
+
+
 # ---------------------------------------------------------------------------
 # ACS1 recipe and fixture helpers
 # ---------------------------------------------------------------------------
@@ -602,6 +698,25 @@ class TestPrimaryMsaPanelPolicy:
         coc1 = panel[panel["coc_id"] == "COC1"]
         assert set(coc1["primary_msa_id"]) == {"41180"}
         assert set(coc1["primary_msa_overlap_basis"]) == {"population"}
+
+
+class TestHicPanelRecipe:
+    """Recipe executor joins HIC measures into CoC panel outputs."""
+
+    def test_pit_hic_recipe_emits_stable_hic_columns(self, tmp_path: Path):
+        _setup_hic_fixtures(tmp_path)
+        recipe = load_recipe(_hic_recipe_dict())
+
+        results = execute_recipe(recipe, project_root=tmp_path)
+
+        assert results[0].success
+        panel = pd.read_parquet(_find_panel_output(tmp_path))
+        assert "hic_total_beds" in panel.columns
+        assert "hic_total_units" in panel.columns
+        assert "total_beds" not in panel.columns
+        assert "total_units" not in panel.columns
+        assert panel.loc[panel["coc_id"] == "COC1", "hic_total_beds"].item() == 110
+        assert panel.loc[panel["coc_id"] == "COC2", "hic_total_units"].item() == 80
 
 
 class TestZoriPanelPolicy:
@@ -1544,6 +1659,39 @@ class TestMsaPanelParity:
         assert "total_population" in flags.measure_columns
         assert "per_capita_income" in flags.measure_columns
         assert "gini_index" in flags.measure_columns
+
+    def test_conformance_flags_include_hic_panel_measures(self, tmp_path: Path):
+        from dataclasses import dataclass
+
+        @dataclass
+        class _DS:
+            product: str
+
+        @dataclass
+        class _Recipe:
+            datasets: dict
+
+        @dataclass
+        class _Target:
+            panel_policy: object | None = None
+
+        recipe = _Recipe(datasets={"hic": _DS(product="hic")})
+        target = _Target()
+        panel = pd.DataFrame(
+            {
+                "coc_id": ["CO-500"],
+                "geo_id": ["CO-500"],
+                "year": [2024],
+                "hic_total_beds": [110],
+                "hic_total_units": [55],
+            }
+        )
+
+        flags = collect_conformance_flags(recipe=recipe, target=target, panel=panel)
+
+        assert flags.measure_columns is not None
+        assert "hic_total_beds" in flags.measure_columns
+        assert "hic_total_units" in flags.measure_columns
 
 
 # ===========================================================================
