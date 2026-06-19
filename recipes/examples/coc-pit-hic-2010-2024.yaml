@@ -1,0 +1,82 @@
+# Example recipe: national CoC PIT + HIC inventory panel for 2010-2024.
+
+version: 1
+name: coc_pit_hic_2010_2024
+description: >
+  Build a national CoC panel for 2010-2024 that joins HUD PIT counts with HUD
+  Housing Inventory Count summary beds and units at CoC-native geography. PIT
+  and HIC are both aligned to the January point-in-time inventory year.
+
+universe:
+  range: "2010-2024"
+
+targets:
+  - id: coc_panel
+    geometry: { type: coc, vintage: 2025, source: hud_exchange }
+    outputs: [panel]
+    panel_policy:
+      output_columns:
+        - coc_id
+        - coc_name
+        - year
+        - pit_total
+        - pit_sheltered
+        - pit_unsheltered
+        - hic_total_beds
+        - hic_total_units
+
+datasets:
+  pit:
+    provider: hud
+    product: pit
+    version: 1
+    native_geometry: { type: coc }
+    years: "2010-2024"
+    year_column: pit_year
+    geo_column: coc_id
+    params:
+      vintage: 2024
+      align: point_in_time_jan
+    path: data/curated/pit/pit_vintage__P2024.parquet
+
+  hic:
+    provider: hud
+    product: hic
+    version: 1
+    native_geometry: { type: coc }
+    years: "2010-2024"
+    year_column: hic_year
+    geo_column: coc_id
+    params:
+      align: point_in_time_jan
+    file_set:
+      path_template: "data/curated/hic/hic__H{year}.parquet"
+      segments:
+        - years: "2010-2024"
+          geometry: { type: coc, source: hud_exchange }
+
+transforms: []
+
+pipelines:
+  - id: build_coc_panel
+    target: coc_panel
+    steps:
+      - resample:
+          dataset: pit
+          to_geometry: { type: coc, vintage: 2025, source: hud_exchange }
+          method: identity
+          measures: [pit_total, pit_sheltered, pit_unsheltered]
+
+      - resample:
+          dataset: hic
+          to_geometry: { type: coc, vintage: 2025, source: hud_exchange }
+          method: identity
+          measures: [total_beds, total_units]
+
+      - join:
+          datasets: [pit, hic]
+          join_on: [geo_id, year]
+
+validation:
+  missing_dataset:
+    default: fail

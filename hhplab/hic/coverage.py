@@ -9,7 +9,7 @@ from pathlib import Path
 import pandas as pd
 
 from hhplab.paths import curated_dir
-from hhplab.pit.qa import QAIssue, QAReport, Severity
+from hhplab.pit.qa import QAReport
 
 _PIT_FILE_RE = re.compile(
     r"^(?:pit__P(?P<year>\d{4})(?:@B\d{4})?|pit_vintage__P(?P<vintage>\d{4}))\.parquet$"
@@ -50,7 +50,7 @@ def validate_hic_pit_coverage(
     resolved_hic_dir = Path(hic_dir) if hic_dir is not None else curated_dir("hic")
     requested_years = set(years) if years is not None else None
 
-    pit_files = _discover_year_files(resolved_pit_dir, _PIT_FILE_RE, requested_years)
+    pit_files = _discover_pit_files(resolved_pit_dir, requested_years)
     hic_files = _discover_year_files(resolved_hic_dir, _HIC_FILE_RE, requested_years)
     if not pit_files:
         raise FileNotFoundError(
@@ -79,7 +79,28 @@ def validate_hic_pit_coverage(
     _check_duplicates(report, hic, year_column="hic_year", check_name="duplicate_hic_coc_year")
     coverage = _compare_coverage(report, pit, hic)
     _check_hic_yoy_swings(report, hic, threshold=yoy_threshold)
-    return HICCoverageResult(report=report, coverage=coverage, pit_files=pit_files, hic_files=hic_files)
+    return HICCoverageResult(
+        report=report,
+        coverage=coverage,
+        pit_files=pit_files,
+        hic_files=hic_files,
+    )
+
+
+def _discover_pit_files(directory: Path, years: set[int] | None) -> list[Path]:
+    if not directory.exists():
+        return []
+
+    vintage_files: dict[int, Path] = {}
+    for path in sorted(directory.glob("*.parquet")):
+        match = _PIT_FILE_RE.match(path.name)
+        if match is None or match.group("vintage") is None:
+            continue
+        vintage_files[int(match.group("vintage"))] = path
+    if vintage_files:
+        return [vintage_files[max(vintage_files)]]
+
+    return _discover_year_files(directory, _PIT_FILE_RE, years)
 
 
 def _discover_year_files(

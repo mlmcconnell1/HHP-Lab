@@ -84,6 +84,29 @@ def test_validate_hic_pit_coverage_uses_pit_vintage_files(tmp_path: Path) -> Non
     assert result.coverage.iloc[0]["matched_coc_count"] == 1
 
 
+def test_validate_hic_pit_coverage_prefers_latest_pit_vintage(tmp_path: Path) -> None:
+    pit_dir = tmp_path / "pit"
+    hic_dir = tmp_path / "hic"
+    _write_pit(pit_dir / "pit_vintage__P2020.parquet", [_pit_row(2020, "CO-500")])
+    _write_pit(
+        pit_dir / "pit_vintage__P2024.parquet",
+        [_pit_row(2020, "CO-500"), _pit_row(2024, "CO-500")],
+    )
+    _write_hic(hic_dir / "hic__H2020.parquet", [_hic_row(2020, "CO-500")])
+    _write_hic(hic_dir / "hic__H2024.parquet", [_hic_row(2024, "CO-500")])
+
+    result = validate_hic_pit_coverage(
+        pit_dir=pit_dir,
+        hic_dir=hic_dir,
+        years=[2020, 2024],
+    )
+
+    assert result.report.passed
+    assert [path.name for path in result.pit_files] == ["pit_vintage__P2024.parquet"]
+    assert set(result.coverage["year"]) == {2020, 2024}
+    assert {issue.check_name for issue in result.report.issues} == set()
+
+
 def test_validate_hic_pit_coverage_flags_duplicates_and_yoy_swings(tmp_path: Path) -> None:
     pit_dir = tmp_path / "pit"
     hic_dir = tmp_path / "hic"
