@@ -79,6 +79,20 @@ def _write_counties(path: Path) -> Path:
     return path
 
 
+def _write_edge_case_counties(path: Path) -> Path:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    counties = gpd.GeoDataFrame(
+        {"geoid": ["00003", "00004"]},
+        geometry=[
+            box(0.05, 1.05, 0.45, 1.45),
+            box(3.0, 3.0, 4.0, 4.0),
+        ],
+        crs="EPSG:4326",
+    )
+    counties.to_parquet(path, index=False)
+    return path
+
+
 def test_prism_monthly_url_uses_current_web_service_pattern() -> None:
     assert get_prism_monthly_source_url("tmin", 2024, 1) == PRISM_URL
     assert (
@@ -238,6 +252,38 @@ def test_materialize_prism_monthly_counties_computes_means_and_provenance(
     assert provenance.extra["variable"] == "tmin"
     assert provenance.extra["row_count"] == 2
     assert provenance.extra["output_columns"] == prism_county_monthly_columns("tmin")
+
+
+def test_materialize_prism_monthly_counties_falls_back_for_cell_center_miss(
+    tmp_path: Path,
+) -> None:
+    raw_zip = _write_prism_bil_zip(tmp_path / PRISM_ZIP_FILENAME)
+    counties = _write_edge_case_counties(tmp_path / "counties__C2024.parquet")
+    output = tmp_path / "prism_county.parquet"
+
+    materialize_prism_monthly_counties(
+        "tmin",
+        2024,
+        1,
+        2024,
+        raw_zip_path=raw_zip,
+        county_geometry_path=counties,
+        output_path=output,
+    )
+
+    df = pd.read_parquet(output).set_index("county_fips")
+    tiny_county = df.loc["00003"]
+    outside_county = df.loc["00004"]
+    assert tiny_county["tmin_c"] == pytest.approx(1.0)
+    assert tiny_county["raster_total_cell_count"] == 1
+    assert tiny_county["raster_valid_cell_count"] == 1
+    assert tiny_county["raster_nodata_cell_count"] == 0
+    assert tiny_county["raster_coverage_ratio"] == pytest.approx(1.0)
+    assert pd.isna(outside_county["tmin_c"])
+    assert outside_county["raster_total_cell_count"] == 0
+    assert outside_county["raster_valid_cell_count"] == 0
+    assert outside_county["raster_nodata_cell_count"] == 0
+    assert pd.isna(outside_county["raster_coverage_ratio"])
 
 
 def test_build_prism_county_cli_json_output(tmp_path: Path) -> None:

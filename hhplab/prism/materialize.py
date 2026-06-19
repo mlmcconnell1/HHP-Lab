@@ -237,13 +237,10 @@ def _zonal_mean(
         return _empty_stats()
 
     transform = src.window_transform(window)
-    inside = geometry_mask(
-        [mapping(geometry)],
-        out_shape=data.shape,
-        transform=transform,
-        invert=True,
-        all_touched=all_touched,
-    )
+    shapes = [mapping(geometry)]
+    inside = _geometry_mask(shapes, data.shape, transform, all_touched=all_touched)
+    if int(inside.sum()) == 0 and not all_touched:
+        inside = _geometry_mask(shapes, data.shape, transform, all_touched=True)
     total_count = int(inside.sum())
     if total_count == 0:
         return _empty_stats()
@@ -260,6 +257,22 @@ def _zonal_mean(
         "nodata_count": nodata_count,
         "coverage_ratio": valid_count / total_count,
     }
+
+
+def _geometry_mask(
+    shapes: list[dict[str, object]],
+    out_shape: tuple[int, int],
+    transform: object,
+    *,
+    all_touched: bool,
+) -> np.ndarray:
+    return geometry_mask(
+        shapes,
+        out_shape=out_shape,
+        transform=transform,
+        invert=True,
+        all_touched=all_touched,
+    )
 
 
 def _nodata_mask(data: np.ndarray, nodata: float | int | None) -> np.ndarray:
