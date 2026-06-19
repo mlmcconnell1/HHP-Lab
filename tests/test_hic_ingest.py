@@ -172,6 +172,57 @@ def test_parse_hic_file_handles_coc_number_and_title_row_excel(tmp_path: Path) -
     assert alaska["total_units"] == 74
 
 
+@pytest.mark.parametrize(
+    ("year", "bed_header", "unit_header", "expected_beds", "expected_units"),
+    [
+        (
+            2010,
+            "Total Year-Round Beds (ES,TH,SH)",
+            "Total Units for Households with Children (ES,TH)",
+            920,
+            74,
+        ),
+        (
+            2013,
+            "Total Year-Round Beds (ES,TH,RRH,SH)",
+            "Total Units for Households with Children (ES,TH,RRH)",
+            1015,
+            90,
+        ),
+    ],
+)
+def test_parse_hic_file_handles_old_aggregate_workbook_sheets(
+    tmp_path: Path,
+    year: int,
+    bed_header: str,
+    unit_header: str,
+    expected_beds: int,
+    expected_units: int,
+) -> None:
+    raw_path = tmp_path / "2007-2013-HIC-Counts-by-CoC.xlsx"
+    rows = [
+        ["Total Beds (ES,TH,SH)", "Emergency Shelter (ES)", None, None, None],
+        [
+            "CoC",
+            bed_header,
+            "Total Emergency Shelter (ES) Beds (excluding seasonal+overflow)",
+            "Total Transitional Housing (TH) Beds",
+            unit_header,
+        ],
+        ["AK-500", str(expected_beds), "574", "441", str(expected_units)],
+        ["MO-604a", "10", "7", "3", "4"],
+    ]
+    pd.DataFrame(rows).to_excel(raw_path, index=False, header=False, sheet_name=str(year))
+
+    result = parse_hic_file(raw_path, year=year)
+
+    assert list(result.df["coc_id"]) == ["AK-500", "MO-604"]
+    alaska = result.df[result.df["coc_id"] == "AK-500"].iloc[0]
+    assert alaska["state"] == "AK"
+    assert alaska["total_beds"] == expected_beds
+    assert alaska["total_units"] == expected_units
+
+
 def test_parse_hic_file_rejects_wide_workbook_without_requested_year(tmp_path: Path) -> None:
     raw_path = tmp_path / "2007-2024-HIC-Counts-by-CoC.xlsx"
     pd.DataFrame(
@@ -299,3 +350,42 @@ def test_ingest_hic_cli_parse_only_writes_canonical_output(tmp_path: Path, monke
     assert payload["status"] == "ok"
     assert Path(payload["output_path"]) == output_path
     assert output_path.exists()
+
+
+def test_ingest_hic_cli_parse_only_accepts_old_aggregate_workbook(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    raw_path = (
+        tmp_path / "data" / "raw" / "hic" / "2010" / "2007-2013-HIC-Counts-by-CoC.xlsx"
+    )
+    raw_path.parent.mkdir(parents=True)
+    rows = [
+        ["Total Beds (ES,TH,SH)", "Emergency Shelter (ES)", None],
+        [
+            "CoC",
+            "Total Year-Round Beds (ES,TH,SH)",
+            "Total Units for Households with Children (ES,TH)",
+        ],
+        ["AK-500", "920", "74"],
+    ]
+    pd.DataFrame(rows).to_excel(raw_path, index=False, header=False, sheet_name="2010")
+    monkeypatch.setenv("HHPLAB_ASSET_STORE_ROOT", str(tmp_path / "data"))
+
+    result = runner.invoke(app, ["ingest", "hic", "--year", "2010", "--parse-only", "--json"])
+
+    assert result.exit_code == 0, result.output
+    payload = json.loads(result.output)
+    output_path = tmp_path / "data" / "curated" / "hic" / "hic__H2010.parquet"
+    assert Path(payload["output_path"]) == output_path
+    output = pd.read_parquet(output_path)
+    assert output[["hic_year", "coc_id", "total_beds", "total_units"]].to_dict(
+        orient="records"
+    ) == [
+        {
+            "hic_year": 2010,
+            "coc_id": "AK-500",
+            "total_beds": 920,
+            "total_units": 74,
+        }
+    ]

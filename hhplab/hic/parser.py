@@ -7,7 +7,6 @@ import re
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
 
 import pandas as pd
 
@@ -32,6 +31,7 @@ _COLUMN_ALIASES: dict[str, tuple[str, ...]] = {
         "coc_id_hud_num",
         "coc_id_number",
         "coc_number",
+        "coc",
     ),
     "coc_name": ("coc_name", "coc", "continuum_of_care", "cocname"),
     "state": ("state", "coc_state", "cocstate"),
@@ -41,12 +41,15 @@ _COLUMN_ALIASES: dict[str, tuple[str, ...]] = {
         "bed_total",
         "beds_total",
         "total_year_round_beds_es_th_sh",
+        "total_year_round_beds_es_th_rrh_sh",
     ),
     "total_units": (
         "total_units",
         "total_unit_inventory",
         "unit_total",
         "units_total",
+        "total_units_for_households_with_children_es_th",
+        "total_units_for_households_with_children_es_th_rrh",
         "total_units_for_households_with_children_es_th_sh",
     ),
 }
@@ -229,6 +232,8 @@ def parse_hic_file(
 
     year_col = _resolve_column(column_set, "hic_year")
     coc_name_col = _resolve_column(column_set, "coc_name")
+    if coc_name_col == coc_id_col:
+        coc_name_col = None
     state_col = _resolve_column(column_set, "state")
 
     parsed = pd.DataFrame(index=df.index)
@@ -242,7 +247,9 @@ def parse_hic_file(
     if state_col:
         parsed["state"] = df[state_col].astype("string").str.strip().str.upper()
     else:
-        parsed["state"] = parsed["coc_id"].astype("string").str.extract(r"^([A-Z]{2})-", expand=False)
+        parsed["state"] = (
+            parsed["coc_id"].astype("string").str.extract(r"^([A-Z]{2})-", expand=False)
+        )
     parsed["total_beds"] = _coerce_count_column(
         df,
         columns,
