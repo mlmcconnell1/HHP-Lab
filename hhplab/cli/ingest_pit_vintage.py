@@ -83,8 +83,8 @@ def ingest_pit_vintage(
     from hhplab.pit.ingest import (
         download_pit_data,
         get_pit_source_url,
-        pit_source_url_candidates,
         parse_pit_vintage,
+        pit_source_url_candidates,
         write_pit_parquet,
     )
     from hhplab.pit.pit_registry import register_pit_vintage

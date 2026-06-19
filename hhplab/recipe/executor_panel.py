@@ -15,6 +15,7 @@ in coclab-anb0; the step-by-step extraction plan lives in
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from pathlib import Path
 
 import pandas as pd
 
@@ -903,7 +904,8 @@ def _apply_inflation_adjustment(
         return panel, None
 
     adjustment = policy.inflation_adjustment
-    missing = [column for column in [adjustment.year_column, *adjustment.columns] if column not in panel.columns]
+    inflation_columns = [adjustment.year_column, *adjustment.columns]
+    missing = [column for column in inflation_columns if column not in panel.columns]
     if missing:
         raise ExecutorError(
             "target.panel_policy.inflation_adjustment references missing panel "

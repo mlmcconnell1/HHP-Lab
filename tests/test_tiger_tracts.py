@@ -8,6 +8,7 @@ import pytest
 from shapely.geometry import Point
 from typer.testing import CliRunner
 
+from hhplab.census.ingest import tiger_blocks
 from hhplab.census.ingest.tiger_blocks import (
     STATE_DOWNLOAD_ATTEMPTS,
     _block_geometry_parts_dir,
@@ -22,7 +23,6 @@ from hhplab.census.ingest.tiger_blocks import (
     save_block_geometry,
     save_block_geometry_from_parts,
 )
-from hhplab.census.ingest import tiger_blocks
 from hhplab.census.ingest.tiger_tracts import (
     _resolve_geoid_column,
     _tract_2000_url,

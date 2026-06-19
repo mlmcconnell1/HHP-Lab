@@ -1,7 +1,7 @@
 """Tests for source-owned package entrypoints."""
 
-from hhplab import census, hud, nhgis, pit
 import hhplab.census.ingest as census_ingest
+from hhplab import census, hud, nhgis, pit
 from hhplab.census.ingest import ingest_tiger_counties, ingest_tiger_tracts, load_tract_relationship
 from hhplab.hud.exchange_gis import ingest_hud_exchange
 from hhplab.hud.opendata_arcgis import ingest_hud_opendata
