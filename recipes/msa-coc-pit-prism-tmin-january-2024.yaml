@@ -20,6 +20,11 @@ universe:
 targets:
   - id: msa_panel
     geometry: { type: msa, source: census_msa_2023 }
+    cohort:
+      rank_by: population
+      method: top_n
+      n: 50
+      reference_year: 2024
     outputs: [panel]
 
 datasets:
