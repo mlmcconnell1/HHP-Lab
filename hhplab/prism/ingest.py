@@ -173,12 +173,12 @@ def download_prism_monthly(
 
 
 def _raw_path(variable: str, year: int, filename: str, *, raw_root: Path | None) -> Path:
-    root = raw_root if raw_root is not None else None
-    base = root if root is not None else Path("data/raw")
     if raw_root is None:
         from hhplab.paths import raw_root as configured_raw_root
 
         base = configured_raw_root()
+    else:
+        base = raw_root
     return base / "prism" / variable / "monthly" / str(year) / filename
 
 
