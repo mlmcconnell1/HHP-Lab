@@ -130,6 +130,26 @@ def test_validate_hic_pit_coverage_flags_duplicates_and_yoy_swings(tmp_path: Pat
     assert "large_hic_bed_yoy_swing" in checks
 
 
+def test_validate_hic_pit_coverage_skips_yoy_swings_across_gap_years(
+    tmp_path: Path,
+) -> None:
+    pit_dir = tmp_path / "pit"
+    hic_dir = tmp_path / "hic"
+    _write_pit(pit_dir / "pit__P2020.parquet", [_pit_row(2020, "CO-500")])
+    _write_pit(pit_dir / "pit__P2024.parquet", [_pit_row(2024, "CO-500")])
+    _write_hic(hic_dir / "hic__H2020.parquet", [_hic_row(2020, "CO-500", beds=100)])
+    _write_hic(hic_dir / "hic__H2024.parquet", [_hic_row(2024, "CO-500", beds=1000)])
+
+    result = validate_hic_pit_coverage(
+        pit_dir=pit_dir,
+        hic_dir=hic_dir,
+        yoy_threshold=0.75,
+    )
+
+    checks = {issue.check_name for issue in result.report.issues}
+    assert "large_hic_bed_yoy_swing" not in checks
+
+
 def test_validate_hic_pit_coverage_missing_hic_files_is_actionable(tmp_path: Path) -> None:
     pit_dir = tmp_path / "pit"
     _write_pit(pit_dir / "pit__P2024.parquet", [_pit_row(2024, "CO-500")])

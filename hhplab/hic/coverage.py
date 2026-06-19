@@ -215,7 +215,12 @@ def _check_hic_yoy_swings(report: QAReport, hic: pd.DataFrame, *, threshold: flo
         for row in group.itertuples(index=False):
             year = int(row.hic_year)
             beds = float(row.total_beds)
-            if previous_beds is not None and previous_beds > 0:
+            if (
+                previous_year is not None
+                and year - previous_year == 1
+                and previous_beds is not None
+                and previous_beds > 0
+            ):
                 ratio = abs(beds - previous_beds) / previous_beds
                 if ratio > threshold:
                     report.add_warning(
