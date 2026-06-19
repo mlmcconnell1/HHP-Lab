@@ -329,6 +329,35 @@ def test_prism_recipe_preflight_cli_json_ready_for_coc_and_msa(
     assert payload["blocking_count"] == 0
 
 
+def test_prism_missing_dataset_remediation_uses_prism_commands(tmp_path: Path) -> None:
+    recipe_path = _write_prism_recipe_fixtures(tmp_path)
+    missing_path = (
+        tmp_path
+        / "data"
+        / "curated"
+        / "prism"
+        / "prism_county_monthly__tmin__Y2024M01@C2023.parquet"
+    )
+    missing_path.unlink()
+
+    recipe = load_recipe(recipe_path)
+    report = run_preflight(recipe, project_root=tmp_path)
+
+    findings = [
+        finding
+        for finding in report.findings
+        if finding.kind == FindingKind.MISSING_DATASET
+        and finding.dataset_id == "prism_tmin_county"
+    ]
+    assert len(findings) == 1
+    assert findings[0].remediation is not None
+    assert findings[0].remediation.command == (
+        "hhplab ingest prism --variable tmin --year 2024 --month 1 && "
+        "hhplab build prism-county --variable tmin --year 2024 --month 1 "
+        "--county-vintage 2023"
+    )
+
+
 class TestProbeYearColumn:
     def test_declared_present(self):
         r = probe_year_column(["year", "geo_id", "pop"], "year")

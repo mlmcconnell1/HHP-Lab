@@ -685,6 +685,23 @@ def _dataset_remediation(ds_id: str, ds, *, years: list[int] | None = None) -> R
             command="hhplab ingest laus-metro --year <year>",
         )
 
+    if provider == "prism" and product == "temperature":
+        variable = ds.params.get("variable") or "<variable>"
+        month = ds.params.get("month") or "<month>"
+        county_vintage = getattr(ds.native_geometry, "vintage", None) or "<county-vintage>"
+        year = years[0] if years and len(set(years)) == 1 else "<year>"
+        return Remediation(
+            hint=(
+                f"Download the PRISM monthly temperature ZIP for dataset '{ds_id}', "
+                "then materialize the county monthly temperature artifact."
+            ),
+            command=(
+                f"hhplab ingest prism --variable {variable} --year {year} "
+                f"--month {month} && hhplab build prism-county --variable {variable} "
+                f"--year {year} --month {month} --county-vintage {county_vintage}"
+            ),
+        )
+
     return Remediation(
         hint=(f"Ingest {provider}/{product} data for dataset '{ds_id}'."),
         command=f"hhplab ingest {product}" if product else None,
