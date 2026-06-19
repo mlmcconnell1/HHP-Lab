@@ -9,6 +9,7 @@ probe import in ``hhplab.recipe.probes``) keep working unchanged.
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 import pandas as pd
@@ -393,7 +394,7 @@ def _resolve_msa_transform_df(
         import geopandas as gpd
 
         boundary_vintage = str(base_ref.vintage)
-        county_vintage = boundary_vintage
+        county_vintage = _county_vintage_from_msa_definition_version(definition_version)
         cached_path = msa_coc_xwalk_path(
             boundary_vintage=boundary_vintage,
             definition_version=definition_version,
@@ -421,6 +422,16 @@ def _resolve_msa_transform_df(
     raise ExecutorError(
         f"MSA transforms currently support tract, county, or coc bases; got '{base_ref.type}'."
     )
+
+
+def _county_vintage_from_msa_definition_version(definition_version: str) -> str:
+    matches = re.findall(r"(?:19|20)\d{2}", definition_version)
+    if not matches:
+        raise ExecutorError(
+            "MSA CoC transforms require an MSA definition version containing a county "
+            "geometry year, for example 'census_msa_2023'."
+        )
+    return matches[-1]
 
 
 def _materialize_generated_metro_transform(

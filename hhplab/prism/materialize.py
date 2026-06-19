@@ -123,7 +123,7 @@ def materialize_prism_monthly_counties(
     source_url = get_prism_monthly_source_url(variable, year, month)
 
     with tempfile.TemporaryDirectory() as tmpdir:
-        raster_path = _extract_bil(raw_zip, Path(tmpdir))
+        raster_path = _extract_raster(raw_zip, Path(tmpdir))
         with rasterio.open(raster_path) as src:
             if src.crs is None:
                 raise ValueError(f"PRISM raster {raster_path} has no CRS.")
@@ -164,13 +164,21 @@ def materialize_prism_monthly_counties(
     return out_path
 
 
-def _extract_bil(raw_zip: Path, destination: Path) -> Path:
+def _extract_raster(raw_zip: Path, destination: Path) -> Path:
     with zipfile.ZipFile(raw_zip, "r") as zf:
-        bil_members = [name for name in zf.namelist() if name.lower().endswith(".bil")]
-        if not bil_members:
-            raise FileNotFoundError(f"No .bil raster found in PRISM ZIP {raw_zip}.")
+        members = zf.namelist()
+        raster_members = [
+            name
+            for suffix in (".bil", ".tif", ".tiff")
+            for name in members
+            if name.lower().endswith(suffix)
+        ]
+        if not raster_members:
+            raise FileNotFoundError(
+                f"No .bil, .tif, or .tiff raster found in PRISM ZIP {raw_zip}."
+            )
         zf.extractall(destination)
-    return destination / bil_members[0]
+    return destination / raster_members[0]
 
 
 def _county_zonal_rows(

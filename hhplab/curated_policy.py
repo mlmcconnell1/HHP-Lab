@@ -47,6 +47,7 @@ CURATED_SUBDIRS: set[str] = {
     "maps",
     "laus",
     "cpi",
+    "prism",
 }
 
 # Cache namespaces may live next to curated assets during local development,
@@ -166,6 +167,9 @@ CANONICAL_PATTERNS: dict[str, list[re.Pattern[str]]] = {
     ],
     "cpi": [
         re.compile(r"^cpi_u__Aall\.parquet$"),
+    ],
+    "prism": [
+        re.compile(r"^prism_county_monthly__\w+__Y\d{4}M\d{2}@C\d{4}\.parquet$"),
     ],
     "maps": [
         re.compile(r"^.+\.html$"),

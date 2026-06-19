@@ -4308,6 +4308,32 @@ class TestMaterialize:
         assert ".recipe_cache/transforms" in str(path)
         assert "coc_to_msa__coc_2025__census_msa_2023.parquet" in str(path)
 
+    def test_resolve_msa_coc_transform_uses_definition_county_vintage(
+        self, tmp_path: Path
+    ):
+        from hhplab.naming import msa_coc_xwalk_path
+        from hhplab.recipe.executor_transforms import _resolve_msa_transform_df
+
+        xwalk_path = msa_coc_xwalk_path("2020", "census_msa_2023", 2023, tmp_path / "data")
+        xwalk_path.parent.mkdir(parents=True, exist_ok=True)
+        expected = pd.DataFrame(
+            {
+                "msa_id": ["10180"],
+                "coc_id": ["COC-1"],
+                "area_share": [1.0],
+                "definition_version": ["census_msa_2023"],
+            }
+        )
+        expected.to_parquet(xwalk_path)
+
+        result = _resolve_msa_transform_df(
+            msa_ref=GeometryRef(type="msa", source="census_msa_2023"),
+            base_ref=GeometryRef(type="coc", vintage=2020),
+            project_root=tmp_path,
+        )
+
+        pd.testing.assert_frame_equal(result, expected)
+
     def test_unknown_transform_raises(self, tmp_path: Path):
         recipe = load_recipe(_recipe_with_pipeline())
         with pytest.raises(ExecutorError, match="not found in recipe"):

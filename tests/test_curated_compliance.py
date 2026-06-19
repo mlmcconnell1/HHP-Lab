@@ -54,6 +54,7 @@ def _build_clean_curated(base: Path) -> None:
         "metro": "metro_boundaries__glynn_fox_v1xC2025.parquet",
         "msa": "msa_boundaries__census_msa_2023.parquet",
         "maps": "CO-500__2025.html",
+        "prism": "prism_county_monthly__tmin__Y2024M01@C2023.parquet",
     }
     for subdir, filename in canonical_examples.items():
         _touch(base / subdir / filename)
@@ -95,6 +96,7 @@ class TestNonCanonicalFilenames:
             ("hic", "hic_counts.parquet"),
             ("panel", "panel_data.parquet"),
             ("maps", "report.pdf"),
+            ("prism", "prism_tmin_2024_01.parquet"),
         ],
     )
     def test_non_canonical_filename_detected(
@@ -183,6 +185,7 @@ class TestCanonicalFilenamesAccepted:
                 "__top100__basis-area-population.parquet",
             ),
             ("maps", "CO-500__2025.html"),
+            ("prism", "prism_county_monthly__tmin__Y2024M01@C2023.parquet"),
         ],
     )
     def test_canonical_name_accepted(

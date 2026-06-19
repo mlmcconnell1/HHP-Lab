@@ -68,6 +68,28 @@ def _write_prism_bil_zip(path: Path) -> Path:
     return path
 
 
+def _write_prism_tif_zip(path: Path) -> Path:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tif_path = path.parent / "prism_tmin_us_25m_202401.tif"
+    data = np.array([[1.0, -9999.0], [3.0, 4.0]], dtype="float32")
+    with rasterio.open(
+        tif_path,
+        "w",
+        driver="GTiff",
+        width=2,
+        height=2,
+        count=1,
+        dtype="float32",
+        crs="EPSG:4326",
+        transform=from_origin(0, 2, 1, 1),
+        nodata=-9999.0,
+    ) as dst:
+        dst.write(data.astype("float32"), 1)
+    with zipfile.ZipFile(path, "w") as zf:
+        zf.write(tif_path, arcname=tif_path.name)
+    return path
+
+
 def _write_counties(path: Path) -> Path:
     path.parent.mkdir(parents=True, exist_ok=True)
     counties = gpd.GeoDataFrame(
@@ -252,6 +274,26 @@ def test_materialize_prism_monthly_counties_computes_means_and_provenance(
     assert provenance.extra["variable"] == "tmin"
     assert provenance.extra["row_count"] == 2
     assert provenance.extra["output_columns"] == prism_county_monthly_columns("tmin")
+
+
+def test_materialize_prism_monthly_counties_accepts_geotiff_zip(tmp_path: Path) -> None:
+    raw_zip = _write_prism_tif_zip(tmp_path / PRISM_ZIP_FILENAME)
+    counties = _write_counties(tmp_path / "counties__C2024.parquet")
+    output = tmp_path / "prism_county.parquet"
+
+    materialize_prism_monthly_counties(
+        "tmin",
+        2024,
+        1,
+        2024,
+        raw_zip_path=raw_zip,
+        county_geometry_path=counties,
+        output_path=output,
+    )
+
+    df = pd.read_parquet(output)
+    assert list(df["county_fips"]) == ["00001", "00002"]
+    assert list(df["tmin_c"]) == [2.0, 4.0]
 
 
 def test_materialize_prism_monthly_counties_falls_back_for_cell_center_miss(

@@ -714,17 +714,21 @@ def _msa_transform_remediation(
     """Build an actionable remediation hint for an MSA transform artifact."""
     from pathlib import Path
 
-    from hhplab.recipe.executor_transforms import _identify_msa_and_base
+    from hhplab.recipe.executor_transforms import (
+        _county_vintage_from_msa_definition_version,
+        _identify_msa_and_base,
+    )
 
     msa_ref, base_ref = _identify_msa_and_base(transform.from_, transform.to)
     definition_version = msa_ref.source if msa_ref is not None else None
 
     if base_ref.type == "coc" and base_ref.vintage is not None and definition_version is not None:
+        county_vintage = _county_vintage_from_msa_definition_version(definition_version)
         crosswalk_command = (
             "hhplab generate msa-xwalk "
             f"--boundary {base_ref.vintage} "
             f"--definition-version {definition_version} "
-            f"--counties {base_ref.vintage}"
+            f"--counties {county_vintage}"
         )
     else:
         crosswalk_command = None

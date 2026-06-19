@@ -575,6 +575,11 @@ def _write_msa_fixture_assets(project_root: Path) -> None:
         geometry=[box(0, 0, 10, 10), box(10, 0, 20, 10)],
         crs="ESRI:102003",
     ).to_parquet(tiger_dir / "counties__C2020.parquet")
+    gpd.GeoDataFrame(
+        {"GEOID": ["01001", "01003"]},
+        geometry=[box(0, 0, 10, 10), box(10, 0, 20, 10)],
+        crs="ESRI:102003",
+    ).to_parquet(tiger_dir / "counties__C2023.parquet")
 
     gpd.GeoDataFrame(
         {"coc_id": ["COC1", "COC2"]},
