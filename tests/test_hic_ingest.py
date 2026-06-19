@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from types import SimpleNamespace
 
 import pandas as pd
 import pytest
@@ -350,6 +351,33 @@ def test_ingest_hic_cli_parse_only_writes_canonical_output(tmp_path: Path, monke
     assert payload["status"] == "ok"
     assert Path(payload["output_path"]) == output_path
     assert output_path.exists()
+
+
+def test_ingest_hic_cli_json_reports_hash_mismatch_error(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    raw_path = tmp_path / "data" / "raw" / "hic" / "2020" / "2020-HIC-Counts-by-State.csv"
+    _write_hic_csv(raw_path)
+    monkeypatch.setenv("HHPLAB_ASSET_STORE_ROOT", str(tmp_path / "data"))
+    monkeypatch.setattr(
+        "hhplab.cli.ingest_hic.download_hic_data",
+        lambda *_args, **_kwargs: SimpleNamespace(
+            path=raw_path,
+            source_url=get_hic_source_url(2020),
+            raw_sha256="not-the-parsed-file-hash",
+        ),
+    )
+
+    result = runner.invoke(app, ["ingest", "hic", "--year", "2020", "--json"])
+
+    assert result.exit_code == 1
+    payload = json.loads(result.output)
+    assert payload == {
+        "status": "error",
+        "error": "Downloaded HIC hash changed before parsing completed.",
+    }
+    assert not (tmp_path / "data" / "curated" / "hic" / "hic__H2020.parquet").exists()
 
 
 def test_ingest_hic_cli_parse_only_accepts_old_aggregate_workbook(

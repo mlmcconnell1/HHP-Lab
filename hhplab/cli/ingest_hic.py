@@ -69,7 +69,7 @@ def ingest_hic(
             rows_read=parse_result.rows_read,
             rows_skipped=parse_result.rows_skipped,
         )
-    except (FileNotFoundError, HICManualDownloadRequired, ValueError) as exc:
+    except (FileNotFoundError, HICManualDownloadRequired, RuntimeError, ValueError) as exc:
         if json_output:
             typer.echo(json.dumps({"status": "error", "error": str(exc)}))
         else:
