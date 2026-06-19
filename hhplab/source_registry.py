@@ -73,6 +73,7 @@ SourceType = Literal[
     "census_cbsa_boundary",  # Census CBSA/MSA boundary polygons
     "pit",  # HUD PIT counts
     "hic",  # HUD HIC inventory counts
+    "prism",  # PRISM Climate Group gridded climate data
     "other",  # Other external sources
 ]
 

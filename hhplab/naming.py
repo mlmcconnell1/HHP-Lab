@@ -84,6 +84,17 @@ def county_filename(county_vintage: str | int) -> str:
     return f"counties__C{county_vintage}.parquet"
 
 
+def prism_county_monthly_filename(
+    variable: str,
+    year: str | int,
+    month: str | int,
+    county_vintage: str | int,
+) -> str:
+    """Generate filename for curated PRISM county-month temperature artifacts."""
+    month_int = int(month)
+    return f"prism_county_monthly__{variable}__Y{year}M{month_int:02d}@C{county_vintage}.parquet"
+
+
 def urban_area_filename(urban_area_vintage: str | int) -> str:
     """Generate filename for Census Urban Area geometry.
 
@@ -716,6 +727,26 @@ def county_path(county_vintage: str | int, base_dir: Path | str | None = None) -
     else:
         base_dir = Path(base_dir)
     return base_dir / "curated" / "tiger" / county_filename(county_vintage)
+
+
+def prism_county_monthly_path(
+    variable: str,
+    year: str | int,
+    month: str | int,
+    county_vintage: str | int,
+    base_dir: Path | str | None = None,
+) -> Path:
+    """Get canonical path for curated PRISM county-month temperature artifacts."""
+    if base_dir is None:
+        base_dir = Path("data")
+    else:
+        base_dir = Path(base_dir)
+    return (
+        base_dir
+        / "curated"
+        / "prism"
+        / prism_county_monthly_filename(variable, year, month, county_vintage)
+    )
 
 
 def block_geometry_path(

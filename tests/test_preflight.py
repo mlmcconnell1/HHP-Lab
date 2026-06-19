@@ -10,6 +10,7 @@ import pytest
 from typer.testing import CliRunner
 
 from hhplab.cli.main import app
+from hhplab.naming import county_xwalk_path, msa_county_membership_path
 from hhplab.provenance import ProvenanceBlock, write_parquet_with_provenance
 from hhplab.recipe.loader import load_recipe
 from hhplab.recipe.preflight import (
@@ -159,9 +160,173 @@ def _write_cli_project_markers(root: Path) -> None:
     (root / "data").mkdir(exist_ok=True)
 
 
+def _write_prism_recipe_fixtures(root: Path) -> Path:
+    prism_path = (
+        root / "data" / "curated" / "prism" / "prism_county_monthly__tmin__Y2024M01@C2023.parquet"
+    )
+    prism_path.parent.mkdir(parents=True, exist_ok=True)
+    pd.DataFrame(
+        {
+            "geo_id": ["00001", "00002"],
+            "county_fips": ["00001", "00002"],
+            "year": [2024, 2024],
+            "month": [1, 1],
+            "tmin_c": [-5.0, 2.0],
+        }
+    ).to_parquet(prism_path)
+
+    coc_xwalk = root / county_xwalk_path("2025", "2023")
+    coc_xwalk.parent.mkdir(parents=True, exist_ok=True)
+    pd.DataFrame(
+        {
+            "coc_id": ["COC1", "COC1"],
+            "county_fips": ["00001", "00002"],
+            "area_share": [0.6, 0.4],
+        }
+    ).to_parquet(coc_xwalk)
+
+    msa_membership = root / msa_county_membership_path("census_msa_2023")
+    msa_membership.parent.mkdir(parents=True, exist_ok=True)
+    pd.DataFrame(
+        {
+            "msa_id": ["MSA1", "MSA1"],
+            "county_fips": ["00001", "00002"],
+            "definition_version": ["census_msa_2023", "census_msa_2023"],
+        }
+    ).to_parquet(msa_membership)
+
+    recipe = {
+        "version": 1,
+        "name": "prism-preflight",
+        "universe": {"years": [2024]},
+        "targets": [
+            {"id": "coc_panel", "geometry": {"type": "coc", "vintage": 2025}},
+            {"id": "msa_panel", "geometry": {"type": "msa", "source": "census_msa_2023"}},
+        ],
+        "datasets": {
+            "prism_tmin_county": {
+                "provider": "prism",
+                "product": "temperature",
+                "version": 1,
+                "native_geometry": {"type": "county", "vintage": 2023},
+                "years": "2024-2024",
+                "year_column": "year",
+                "geo_column": "county_fips",
+                "params": {"variable": "tmin", "month": 1, "align": "point_in_time_jan"},
+                "path": str(prism_path.relative_to(root)),
+            }
+        },
+        "transforms": [
+            {
+                "id": "county_to_coc_area",
+                "type": "crosswalk",
+                "from": {"type": "county", "vintage": 2023},
+                "to": {"type": "coc", "vintage": 2025},
+                "spec": {"weighting": {"scheme": "area"}},
+            },
+            {
+                "id": "county_to_msa_area",
+                "type": "crosswalk",
+                "from": {"type": "county", "vintage": 2023},
+                "to": {"type": "msa", "source": "census_msa_2023"},
+                "spec": {"weighting": {"scheme": "area"}},
+            },
+        ],
+        "pipelines": [
+            {
+                "id": "build_coc_panel",
+                "target": "coc_panel",
+                "steps": [
+                    {"materialize": {"transforms": ["county_to_coc_area"]}},
+                    {
+                        "resample": {
+                            "dataset": "prism_tmin_county",
+                            "to_geometry": {"type": "coc", "vintage": 2025},
+                            "method": "aggregate",
+                            "via": "county_to_coc_area",
+                            "measures": {"tmin_c": {"aggregation": "weighted_mean"}},
+                        }
+                    },
+                    {"join": {"datasets": ["prism_tmin_county"], "join_on": ["geo_id", "year"]}},
+                ],
+            },
+            {
+                "id": "build_msa_panel",
+                "target": "msa_panel",
+                "steps": [
+                    {"materialize": {"transforms": ["county_to_msa_area"]}},
+                    {
+                        "resample": {
+                            "dataset": "prism_tmin_county",
+                            "to_geometry": {"type": "msa", "source": "census_msa_2023"},
+                            "method": "aggregate",
+                            "via": "county_to_msa_area",
+                            "measures": {"tmin_c": {"aggregation": "weighted_mean"}},
+                        }
+                    },
+                    {"join": {"datasets": ["prism_tmin_county"], "join_on": ["geo_id", "year"]}},
+                ],
+            },
+        ],
+    }
+    recipe_path = root / "prism_recipe.json"
+    recipe_path.write_text(json.dumps(recipe), encoding="utf-8")
+    return recipe_path
+
+
 # ---------------------------------------------------------------------------
 # Probe unit tests
 # ---------------------------------------------------------------------------
+
+
+def test_prism_recipe_plan_cli_json_resolves_coc_and_msa_pipelines(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _write_cli_project_markers(tmp_path)
+    recipe_path = _write_prism_recipe_fixtures(tmp_path)
+    monkeypatch.chdir(tmp_path)
+
+    result = runner.invoke(
+        app,
+        ["build", "recipe-plan", "--recipe", str(recipe_path), "--json"],
+    )
+
+    assert result.exit_code == 0, result.output
+    payload = json.loads(result.output)
+    assert payload["status"] == "ok"
+    assert [pipeline["pipeline_id"] for pipeline in payload["pipelines"]] == [
+        "build_coc_panel",
+        "build_msa_panel",
+    ]
+    assert all(pipeline["task_count"] == 3 for pipeline in payload["pipelines"])
+
+
+def test_prism_recipe_preflight_cli_json_ready_for_coc_and_msa(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _write_cli_project_markers(tmp_path)
+    recipe_path = _write_prism_recipe_fixtures(tmp_path)
+    monkeypatch.chdir(tmp_path)
+
+    result = runner.invoke(
+        app,
+        [
+            "build",
+            "recipe-preflight",
+            "--recipe",
+            str(recipe_path),
+            "--json",
+            "--non-interactive",
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    payload = json.loads(result.output)
+    assert payload["status"] == "ok"
+    assert payload["ready"] is True
+    assert payload["blocking_count"] == 0
 
 
 class TestProbeYearColumn:
@@ -800,9 +965,9 @@ def _setup_msa_coc_panel_source_artifacts(
         }
     ).to_parquet(data_dir / "msa_acs.parquet")
     if include_pep:
-        pd.DataFrame(
-            {"msa_id": ["19740"], "year": [2020], "population": [1100]}
-        ).to_parquet(data_dir / "msa_pep.parquet")
+        pd.DataFrame({"msa_id": ["19740"], "year": [2020], "population": [1100]}).to_parquet(
+            data_dir / "msa_pep.parquet"
+        )
     if include_laus:
         pd.DataFrame(
             {
@@ -914,15 +1079,11 @@ def _setup_primary_msa_preflight_artifacts(
         )
         if not crosswalk_complete:
             crosswalk = crosswalk.drop(columns=["allocation_share"])
-        crosswalk.to_parquet(
-            xwalk_dir / "msa_coc_xwalk__B2025xMcensus_msa_2023xC2023.parquet"
-        )
+        crosswalk.to_parquet(xwalk_dir / "msa_coc_xwalk__B2025xMcensus_msa_2023xC2023.parquet")
 
     if include_population:
         tiger_dir = data_dir / "curated" / "tiger"
-        pd.DataFrame({"GEOID": ["08031000100"]}).to_parquet(
-            tiger_dir / "tracts__T2020.parquet"
-        )
+        pd.DataFrame({"GEOID": ["08031000100"]}).to_parquet(tiger_dir / "tracts__T2020.parquet")
         if population_source == "decennial":
             census_dir = data_dir / "curated" / "census"
             census_dir.mkdir(parents=True, exist_ok=True)
@@ -1781,9 +1942,7 @@ class TestRunPreflight:
         _write_sae_preflight_fixtures(tmp_path)
         data = _sae_recipe_dict()
         step = data["pipelines"][0]["steps"][0]
-        step["denominators"] = {
-            "contract_rent_bins": "contract_rent_distribution_with_cash_rent"
-        }
+        step["denominators"] = {"contract_rent_bins": "contract_rent_distribution_with_cash_rent"}
         step["measures"] = {
             "contract_rent_bins": {
                 "outputs": ["sae_contract_rent_median"],
@@ -1799,9 +1958,7 @@ class TestRunPreflight:
         assert any("SAE source dataset 'acs1_county'" in message for message in messages)
         assert any("SAE support dataset 'acs5_support'" in message for message in messages)
         assert any("missing denominator columns" in message for message in messages)
-        component_messages = [
-            message for message in messages if "missing columns" in message
-        ]
+        component_messages = [message for message in messages if "missing columns" in message]
         assert all("contract_rent_distribution_total" in message for message in component_messages)
 
     def test_sae_preflight_rejects_gross_rent_output_under_contract_rent_bins(
@@ -1821,9 +1978,7 @@ class TestRunPreflight:
             frame.to_parquet(path)
         data = _sae_recipe_dict()
         step = data["pipelines"][0]["steps"][0]
-        step["denominators"] = {
-            "contract_rent_bins": "contract_rent_distribution_with_cash_rent"
-        }
+        step["denominators"] = {"contract_rent_bins": "contract_rent_distribution_with_cash_rent"}
         step["measures"] = {
             "contract_rent_bins": {
                 "outputs": ["sae_gross_rent_median"],

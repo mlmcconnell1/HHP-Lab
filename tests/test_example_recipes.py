@@ -85,6 +85,22 @@ EXAMPLE_RECIPE_CASES: tuple[ExampleRecipeCase, ...] = (
         datasets=("pep_county", "zori_county"),
     ),
     ExampleRecipeCase(
+        path="coc-msa-prism-tmin-january-2024.yaml",
+        pipeline_id="build_coc_panel",
+        recipe_name="coc_msa_prism_tmin_january_2024",
+        target_type="coc",
+        years=(2024,),
+        datasets=("prism_tmin_county",),
+    ),
+    ExampleRecipeCase(
+        path="coc-msa-prism-tmin-january-2024.yaml",
+        pipeline_id="build_msa_panel",
+        recipe_name="coc_msa_prism_tmin_january_2024",
+        target_type="msa",
+        years=(2024,),
+        datasets=("prism_tmin_county",),
+    ),
+    ExampleRecipeCase(
         path="metro-glynnfox-acs-income-2019-2025.yaml",
         pipeline_id="build_metro_panel",
         recipe_name="metro_glynnfox_acs_income_2019_2025",
@@ -171,8 +187,10 @@ AUTO_TRANSFORM_EXPECTATIONS: tuple[tuple[str, str, str, dict[int, str]], ...] = 
         "build_metro_panel",
         "acs_tract",
         {
-            2019: "tract_to_metro_2010", 2020: "tract_to_metro_2010",
-            2021: "tract_to_metro_2020", 2025: "tract_to_metro_2020",
+            2019: "tract_to_metro_2010",
+            2020: "tract_to_metro_2010",
+            2021: "tract_to_metro_2020",
+            2025: "tract_to_metro_2020",
         },
     ),
     (
@@ -180,8 +198,10 @@ AUTO_TRANSFORM_EXPECTATIONS: tuple[tuple[str, str, str, dict[int, str]], ...] = 
         "build_metro_panel",
         "acs_tract",
         {
-            2016: "tract_to_metro_2010", 2020: "tract_to_metro_2010",
-            2021: "tract_to_metro_2020", 2024: "tract_to_metro_2020",
+            2016: "tract_to_metro_2010",
+            2020: "tract_to_metro_2010",
+            2021: "tract_to_metro_2020",
+            2024: "tract_to_metro_2020",
         },
     ),
     (
@@ -323,9 +343,11 @@ def _load_repo_recipe(relative_path: str):
 def test_example_recipe_loads_and_resolves(case: ExampleRecipeCase):
     recipe = _load_example(case.path)
     plan = resolve_plan(recipe, case.pipeline_id)
+    pipeline = next(p for p in recipe.pipelines if p.id == case.pipeline_id)
+    target = next(t for t in recipe.targets if t.id == pipeline.target)
 
     assert recipe.name == case.recipe_name
-    assert recipe.targets[0].geometry.type == case.target_type
+    assert target.geometry.type == case.target_type
     assert [task.year for task in plan.join_tasks] == list(case.years)
     assert tuple(plan.join_tasks[0].datasets) == case.datasets
     assert len(plan.resample_tasks) == len(case.years) * len(case.datasets)

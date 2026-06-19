@@ -11,6 +11,7 @@ from hhplab.cli.boundaries import (
     show,
     validate_boundaries,
 )
+from hhplab.cli.build_prism_county import build_prism_county
 from hhplab.cli.build_urban_fraction import build_urban_fraction
 from hhplab.cli.build_xwalks import build_xwalks
 from hhplab.cli.compare_vintages import compare_vintages
@@ -37,6 +38,7 @@ from hhplab.cli.ingest_nhgis import ingest_nhgis
 from hhplab.cli.ingest_pit import ingest_pit
 from hhplab.cli.ingest_pit_vintage import ingest_pit_vintage
 from hhplab.cli.ingest_pl_block_population import ingest_pl_block_population
+from hhplab.cli.ingest_prism import ingest_prism
 from hhplab.cli.ingest_tract_relationship import ingest_tract_relationship
 from hhplab.cli.list_census import list_census
 from hhplab.cli.list_curated import list_curated
@@ -112,6 +114,7 @@ def register_commands(
     ingest_app.command("pit")(ingest_pit)
     ingest_app.command("pit-vintage")(ingest_pit_vintage)
     ingest_app.command("hic")(ingest_hic)
+    ingest_app.command("prism")(ingest_prism)
     ingest_app.command("tract-relationship")(ingest_tract_relationship)
     ingest_app.command("zori")(ingest_zori)
     ingest_app.command("pep")(ingest_pep)
@@ -140,6 +143,7 @@ def register_commands(
     generate_app.command("msa-xwalk")(generate_msa_xwalk)
     build_app.command("recipe")(recipe_cmd)
     build_app.command("urban-fraction")(build_urban_fraction)
+    build_app.command("prism-county")(build_prism_county)
     build_app.command("recipe-plan")(recipe_plan_cmd)
     build_app.command("recipe-provenance")(recipe_provenance_cmd)
     build_app.command("recipe-export")(recipe_export_cmd)

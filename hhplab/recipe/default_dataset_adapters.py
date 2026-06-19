@@ -466,6 +466,97 @@ def _validate_zillow_zori(spec: DatasetSpec) -> list[ValidationDiagnostic]:
     return diags
 
 
+def _validate_prism_temperature(spec: DatasetSpec) -> list[ValidationDiagnostic]:
+    """Validate PRISM county-month temperature artifact specifications."""
+    diags: list[ValidationDiagnostic] = []
+    if spec.version != 1:
+        diags.append(
+            ValidationDiagnostic(
+                "error",
+                f"prism/temperature: unsupported version {spec.version}; expected 1.",
+            )
+        )
+    if spec.native_geometry.type != "county":
+        diags.append(
+            ValidationDiagnostic(
+                "error",
+                f"prism/temperature: expected native_geometry type 'county', "
+                f"got '{spec.native_geometry.type}'. Materialize PRISM rasters with "
+                "`hhplab build prism-county` and set native_geometry.type to 'county'.",
+            )
+        )
+    if not _uses_materialized_artifact(spec):
+        diags.append(
+            ValidationDiagnostic(
+                "error",
+                "prism/temperature: recipes must set path or file_set to a "
+                "pre-materialized county artifact. Run `hhplab build prism-county "
+                "--variable <tmin|tmean|tmax> --year <YEAR> --month <MONTH>` first.",
+            )
+        )
+    if spec.geo_column is None:
+        diags.append(
+            ValidationDiagnostic(
+                "error",
+                "prism/temperature: set geo_column to 'geo_id' or 'county_fips' "
+                "so recipe joins can identify county rows.",
+            )
+        )
+    if spec.year_column is None:
+        diags.append(
+            ValidationDiagnostic(
+                "error",
+                "prism/temperature: set year_column to 'year' for the county artifact.",
+            )
+        )
+
+    known_params = {"variable", "month", "align"}
+    unknown = set(spec.params.keys()) - known_params
+    if unknown:
+        diags.append(
+            ValidationDiagnostic(
+                "warning",
+                f"prism/temperature: unrecognized params {sorted(unknown)}.",
+            )
+        )
+
+    variable = spec.params.get("variable")
+    if variable not in {"tmin", "tmean", "tmax"}:
+        diags.append(
+            ValidationDiagnostic(
+                "error",
+                "prism/temperature: params.variable must be one of 'tmin', 'tmean', or 'tmax'.",
+            )
+        )
+
+    month = spec.params.get("month")
+    if not isinstance(month, int) or month < 1 or month > 12:
+        diags.append(
+            ValidationDiagnostic(
+                "error",
+                "prism/temperature: params.month must be an integer from 1 to 12.",
+            )
+        )
+
+    align = spec.params.get("align", "calendar_month")
+    valid_aligns = {"calendar_month", "point_in_time_jan"}
+    if align not in valid_aligns:
+        diags.append(
+            ValidationDiagnostic(
+                "error",
+                f"prism/temperature: params.align must be one of {sorted(valid_aligns)}.",
+            )
+        )
+    if align == "point_in_time_jan" and month != 1:
+        diags.append(
+            ValidationDiagnostic(
+                "error",
+                "prism/temperature: params.align='point_in_time_jan' requires params.month=1.",
+            )
+        )
+    return diags
+
+
 def _validate_bls_laus(spec: DatasetSpec) -> list[ValidationDiagnostic]:
     """Validate BLS LAUS metro dataset specification.
 
@@ -575,5 +666,6 @@ def register_dataset_defaults(registry: DatasetAdapterRegistry) -> None:
     registry.register("census", "pep", _validate_census_pep)
     registry.register("census", "urban_fraction", _validate_census_urban_fraction)
     registry.register("zillow", "zori", _validate_zillow_zori)
+    registry.register("prism", "temperature", _validate_prism_temperature)
     registry.register("bls", "laus", _validate_bls_laus)
     registry.register("bls", "cpi_u", _validate_bls_cpi_u)

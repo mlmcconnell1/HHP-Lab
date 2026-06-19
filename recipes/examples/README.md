@@ -5,6 +5,7 @@ users. Together they cover the current recipe surface:
 
 - CoC, metro, and MSA targets
 - PIT, ACS5 tract inputs, PEP county inputs, ZORI county inputs, and ACS1 metro inputs
+- PRISM county temperature inputs
 - Identity and aggregate resampling
 - CoC crosswalks and generated metro/MSA transforms
 - Recipe-native map outputs with layered CoC / MSA / metro overlays
@@ -92,6 +93,11 @@ the output downstream.
   distribution-derived median/quintile outputs with diagnostics.
 - `coc-pep-zori-calendar-2020-2024.yaml`
   County-driven CoC panel using PEP population plus calendar-mean ZORI.
+- `coc-msa-prism-tmin-january-2024.yaml`
+  County-driven PRISM example that aggregates January minimum temperature to
+  both CoCs and Census MSAs with `weighted_mean`. See
+  `devdocs/prism_county_workflow.md` for the raw ingest and county
+  materialization commands.
 - `coc-county-containment-los-angeles-2025.yaml`
   Containment-only recipe that writes counties whose 2023 geometry is at least
   50 percent contained by the selected 2025 Los Angeles CoC boundary.

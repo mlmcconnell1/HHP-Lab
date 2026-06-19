@@ -616,30 +616,21 @@ class TestUrbanFractionRecipeIntegration:
         plan = resolve_plan(recipe, "main")
 
         assert len(plan.resample_tasks) == 2
-        assert {
-            task.input_path for task in plan.resample_tasks
-        } == {
-            "data/curated/measures/"
-            "coc_urban_fraction__N2020@B2025xU2020xK2020.parquet"
+        assert {task.input_path for task in plan.resample_tasks} == {
+            "data/curated/measures/coc_urban_fraction__N2020@B2025xU2020xK2020.parquet"
         }
 
     def test_fixture_recipe_resolves_structured_plan(self):
         recipe_path = (
-            Path(__file__).parent
-            / "fixtures"
-            / "recipes"
-            / "coc-urban-fraction-sanity.yaml"
+            Path(__file__).parent / "fixtures" / "recipes" / "coc-urban-fraction-sanity.yaml"
         )
         recipe = load_recipe(recipe_path)
 
         plan = resolve_plan(recipe, "main")
 
-        assert plan.to_dict()["resample_tasks"][0]["measures"] == [
-            "urban_population_fraction"
-        ]
+        assert plan.to_dict()["resample_tasks"][0]["measures"] == ["urban_population_fraction"]
         assert plan.to_dict()["resample_tasks"][0]["input_path"] == (
-            "data/curated/measures/"
-            "coc_urban_fraction__N2020@B2025xU2020xK2020.parquet"
+            "data/curated/measures/coc_urban_fraction__N2020@B2025xU2020xK2020.parquet"
         )
 
     def test_preflight_reports_missing_artifact_with_build_command(self, tmp_path: Path):
@@ -650,8 +641,7 @@ class TestUrbanFractionRecipeIntegration:
         missing = [
             f
             for f in report.findings
-            if f.kind == FindingKind.MISSING_DATASET
-            and f.dataset_id == "urban_fraction"
+            if f.kind == FindingKind.MISSING_DATASET and f.dataset_id == "urban_fraction"
         ]
         assert len(missing) == 1
         assert missing[0].remediation is not None
@@ -1037,8 +1027,7 @@ class TestRecipeCLI:
         missing = [
             finding
             for finding in report.findings
-            if finding.kind == FindingKind.MISSING_DATASET
-            and finding.dataset_id == "hic"
+            if finding.kind == FindingKind.MISSING_DATASET and finding.dataset_id == "hic"
         ]
         assert len(missing) == 1
         assert missing[0].message == (
@@ -1794,6 +1783,7 @@ class TestDefaultAdapters:
         assert ("census", "acs5") in products
         assert ("census", "acs") in products
         assert ("zillow", "zori") in products
+        assert ("prism", "temperature") in products
 
     def test_coc_valid(self):
         from hhplab.recipe.default_geometry_adapters import _validate_coc
@@ -1947,6 +1937,40 @@ class TestDefaultAdapters:
         )
         diags = _validate_zillow_zori(spec)
         assert any(d.level == "warning" and "county" in d.message for d in diags)
+
+    def test_prism_temperature_valid(self):
+        from hhplab.recipe.default_dataset_adapters import _validate_prism_temperature
+
+        spec = DatasetSpec(
+            provider="prism",
+            product="temperature",
+            version=1,
+            native_geometry=GeometryRef(type="county", vintage=2023),
+            year_column="year",
+            geo_column="county_fips",
+            path="data/curated/prism/prism_county_monthly__tmin__Y2024M01@C2023.parquet",
+            params={"variable": "tmin", "month": 1, "align": "point_in_time_jan"},
+        )
+        assert _validate_prism_temperature(spec) == []
+
+    def test_prism_temperature_rejects_missing_artifact_and_bad_params(self):
+        from hhplab.recipe.default_dataset_adapters import _validate_prism_temperature
+
+        spec = DatasetSpec(
+            provider="prism",
+            product="temperature",
+            version=1,
+            native_geometry=GeometryRef(type="tract", vintage=2020),
+            params={"variable": "ppt", "month": 2, "align": "point_in_time_jan"},
+        )
+        diags = _validate_prism_temperature(spec)
+        messages = [d.message for d in diags if d.level == "error"]
+        assert any("native_geometry type 'county'" in message for message in messages)
+        assert any("path or file_set" in message for message in messages)
+        assert any("geo_column" in message for message in messages)
+        assert any("year_column" in message for message in messages)
+        assert any("params.variable" in message for message in messages)
+        assert any("requires params.month=1" in message for message in messages)
 
     def test_recipe_integration_no_adapter_errors(self):
         """Full recipe validation with defaults registered produces no errors."""
@@ -3507,14 +3531,8 @@ class TestMsaFractionalRollupSpec:
             for finding in rollup_findings
             if finding.remediation is not None
         ]
-        assert (
-            "hhplab ingest tiger --year 2020 --type blocks"
-            in commands
-        )
-        assert (
-            "hhplab ingest pl-blocks --decennial 2020 --blocks 2020"
-            in commands
-        )
+        assert "hhplab ingest tiger --year 2020 --type blocks" in commands
+        assert "hhplab ingest pl-blocks --decennial 2020 --blocks 2020" in commands
         assert any(
             command
             == (
@@ -3834,10 +3852,7 @@ class TestSmallAreaEstimateSchema:
     def test_contract_rent_columns_are_recipe_selectable(self):
         assert "median_contract_rent" in ACS5_RECIPE_SELECTABLE_MEASURES
         assert "contract_rent_distribution_total" in ACS5_RECIPE_SELECTABLE_MEASURES
-        assert (
-            "contract_rent_distribution_cash_rent_3500_plus"
-            in ACS5_RECIPE_SELECTABLE_MEASURES
-        )
+        assert "contract_rent_distribution_cash_rent_3500_plus" in ACS5_RECIPE_SELECTABLE_MEASURES
 
     def test_sae_step_accepts_contract_rent_family(self):
         data = _sae_recipe()

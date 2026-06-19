@@ -47,20 +47,18 @@ HUD_USER_HIC_COUNTS_BY_STATE_TEMPLATE: Final = (
 
 # BLS (Bureau of Labor Statistics)
 BLS_API_V2: Final = "https://api.bls.gov/publicAPI/v2/timeseries/data/"
-BLS_LAUS_SOURCE_REF: Final = (
-    "https://www.bls.gov/lau/home.htm"
-)
-BLS_CPI_SOURCE_REF: Final = (
-    "https://www.bls.gov/cpi/"
-)
-BLS_API_REGISTRATION_URL: Final = (
-    "https://data.bls.gov/registrationEngine/"
-)
+BLS_LAUS_SOURCE_REF: Final = "https://www.bls.gov/lau/home.htm"
+BLS_CPI_SOURCE_REF: Final = "https://www.bls.gov/cpi/"
+BLS_API_REGISTRATION_URL: Final = "https://data.bls.gov/registrationEngine/"
 
 # Zillow
-ZILLOW_ZORI_COUNTY: Final = (
-    "https://files.zillowstatic.com/research/public_csvs/zori/County_zori_uc_sfrcondomfr_sm_month.csv"
-)
+ZILLOW_ZORI_COUNTY: Final = "https://files.zillowstatic.com/research/public_csvs/zori/County_zori_uc_sfrcondomfr_sm_month.csv"
 ZILLOW_ZORI_ZIP: Final = (
     "https://files.zillowstatic.com/research/public_csvs/zori/Zip_zori_uc_sfrcondomfr_sm_month.csv"
+)
+
+# PRISM Climate Group
+PRISM_WEB_SERVICE_TEMPLATE: Final = (
+    "https://data.prism.oregonstate.edu/time_series/us/an/4km/"
+    "{variable}/monthly/{year}/prism_{variable}_us_25m_{year}{month:02d}.zip"
 )
