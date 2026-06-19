@@ -1,17 +1,18 @@
-# Census MSAs: CoC PIT rollup plus January PRISM low temperature.
+# Census MSAs: CoC PIT rollup, Census population, and January PRISM low temperature.
 #
 # This recipe writes one row per Census MSA for PIT year 2024. CoC-native PIT
-# total, sheltered, and unsheltered counts are rolled up to MSAs; January PRISM
-# county minimum temperature is aggregated to the same MSA geography as a
-# weighted mean.
+# total, sheltered, and unsheltered counts are rolled up to MSAs; Census PEP
+# county population and January PRISM county minimum temperature are aggregated
+# to the same MSA geography.
 
 version: 1
 name: msa_coc_pit_prism_tmin_january_2024
 description: >
   Build a Census MSA panel for 2024 with HUD PIT total, sheltered, and
-  unsheltered counts allocated from CoCs to official Census MSAs, plus January
-  PRISM minimum temperature aggregated from county-native monthly artifacts.
-  The output grain is msa_id x year.
+  unsheltered counts allocated from CoCs to official Census MSAs, Census PEP
+  county population aggregated to MSAs, plus January PRISM minimum temperature
+  aggregated from county-native monthly artifacts. The output grain is
+  msa_id x year.
 
 universe:
   years: [2024]
@@ -49,6 +50,16 @@ datasets:
       align: point_in_time_jan
     path: data/curated/prism/prism_county_monthly__tmin__Y2024M01@C2023.parquet
 
+  pep_county:
+    provider: census
+    product: pep
+    version: 1
+    native_geometry: { type: county, vintage: 2020 }
+    years: "2024-2024"
+    year_column: year
+    geo_column: county_fips
+    path: data/curated/pep/pep_county__v2025__y2020-2025.parquet
+
 transforms:
   - id: coc_to_msa
     type: crosswalk
@@ -58,7 +69,15 @@ transforms:
       weighting:
         scheme: area
 
-  - id: county_to_msa
+  - id: county2020_to_msa
+    type: crosswalk
+    from: { type: county, vintage: 2020 }
+    to: { type: msa, source: census_msa_2023 }
+    spec:
+      weighting:
+        scheme: area
+
+  - id: county2023_to_msa
     type: crosswalk
     from: { type: county, vintage: 2023 }
     to: { type: msa, source: census_msa_2023 }
@@ -71,7 +90,7 @@ pipelines:
     target: msa_panel
     steps:
       - materialize:
-          transforms: [coc_to_msa, county_to_msa]
+          transforms: [coc_to_msa, county2020_to_msa, county2023_to_msa]
 
       - resample:
           dataset: pit
@@ -82,15 +101,23 @@ pipelines:
           aggregation: sum
 
       - resample:
+          dataset: pep_county
+          to_geometry: { type: msa, source: census_msa_2023 }
+          method: aggregate
+          via: county2020_to_msa
+          measures: [population]
+          aggregation: sum
+
+      - resample:
           dataset: prism_tmin_county
           to_geometry: { type: msa, source: census_msa_2023 }
           method: aggregate
-          via: county_to_msa
+          via: county2023_to_msa
           measures:
             tmin_c: { aggregation: weighted_mean }
 
       - join:
-          datasets: [pit, prism_tmin_county]
+          datasets: [pit, pep_county, prism_tmin_county]
           join_on: [geo_id, year]
 
 validation:
