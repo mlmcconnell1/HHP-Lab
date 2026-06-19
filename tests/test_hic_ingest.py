@@ -107,6 +107,30 @@ def test_parse_hic_file_sums_component_bed_and_unit_columns(tmp_path: Path) -> N
     assert row["total_units"] == 7
 
 
+def test_parse_hic_file_prefers_unaliased_total_over_components(tmp_path: Path) -> None:
+    rows = [
+        {
+            "CocState": "NY",
+            "CoC": "New York",
+            "CoC ID": "NY-600",
+            "year": "2021",
+            "All Program Total Bed Count": "30",
+            "Emergency Shelter Beds": "10",
+            "Transitional Housing Beds": "20",
+            "All Program Total Unit Count": "7",
+            "Family Units": "3",
+            "Adult Units": "4",
+        }
+    ]
+    raw_path = _write_hic_csv(tmp_path / "2021-HIC-Counts-by-State.csv", rows)
+
+    result = parse_hic_file(raw_path, year=2021)
+
+    row = result.df.iloc[0]
+    assert row["total_beds"] == 30
+    assert row["total_units"] == 7
+
+
 def test_parse_hic_file_supports_xlsx(tmp_path: Path) -> None:
     raw_path = tmp_path / "2020-HIC-Counts-by-State.xlsx"
     pd.DataFrame(HIC_ROWS).to_excel(raw_path, index=False)

@@ -171,6 +171,29 @@ def _candidate_sum_columns(
     ]
 
 
+def _select_count_component_columns(df: pd.DataFrame, columns: list[str]) -> list[str]:
+    total_columns = [column for column in columns if "total" in column]
+    if not total_columns:
+        return columns
+    if len(total_columns) == 1:
+        return total_columns
+
+    numeric = {column: _numeric_series(df, column) for column in columns}
+    aggregate_columns: list[str] = []
+    for column in total_columns:
+        other_columns = [candidate for candidate in columns if candidate != column]
+        if not other_columns:
+            continue
+        other_total = pd.Series(0, index=df.index, dtype="float64")
+        for other_column in other_columns:
+            other_total = other_total + numeric[other_column]
+        if numeric[column].equals(other_total):
+            aggregate_columns.append(column)
+    if len(aggregate_columns) == 1:
+        return aggregate_columns
+    return total_columns
+
+
 def _coerce_count_column(
     df: pd.DataFrame,
     columns: list[str],
@@ -185,12 +208,14 @@ def _coerce_count_column(
 
     year_columns = _candidate_sum_columns(columns, pattern, year=year)
     if year_columns:
-        total_year_columns = [column for column in year_columns if "total" in column]
-        component_columns = total_year_columns or year_columns
+        component_columns = _select_count_component_columns(df, year_columns)
     elif any(_column_years(column) for column in _candidate_sum_columns(columns, pattern)):
         component_columns = []
     else:
-        component_columns = _candidate_sum_columns(columns, pattern)
+        component_columns = _select_count_component_columns(
+            df,
+            _candidate_sum_columns(columns, pattern),
+        )
     if not component_columns:
         raise HICParseError(
             f"Missing HIC {canonical} column. Expected one of "
