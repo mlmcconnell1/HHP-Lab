@@ -62,3 +62,9 @@ PRISM_WEB_SERVICE_TEMPLATE: Final = (
     "https://data.prism.oregonstate.edu/time_series/us/an/4km/"
     "{variable}/monthly/{year}/prism_{variable}_us_25m_{year}{month:02d}.zip"
 )
+
+# MIT Election Data and Science Lab (MEDSL)
+MEDSL_COUNTY_PRESIDENTIAL_RETURNS_DOI: Final = "https://doi.org/10.7910/DVN/VOQCHQ"
+MEDSL_COUNTY_PRESIDENTIAL_RETURNS_DATAVERSE_API: Final = (
+    "https://dataverse.harvard.edu/api/access/datafile/13573089"
+)

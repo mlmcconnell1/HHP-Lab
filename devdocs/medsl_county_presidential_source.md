@@ -1,0 +1,70 @@
+# MEDSL County Presidential Source
+
+Status: staged for ingest
+Version checked: 2026-02-25
+
+## Source
+
+Use MIT Election Data and Science Lab's county presidential returns dataset for
+county-native political leaning measures.
+
+| Field | Value |
+|-------|-------|
+| Dataset title | County Presidential Election Returns 2000-2024 |
+| DOI | `https://doi.org/10.7910/DVN/VOQCHQ` |
+| Dataverse datafile id | `13573089` |
+| Download URL | `https://dataverse.harvard.edu/api/access/datafile/13573089` |
+| Version | `20` |
+| Release/update date | `2026-02-25` |
+| License | CC0 1.0 |
+| Local raw path | `data/raw/medsl/countypres_2000-2024.tab` |
+| Raw SHA256 | `aac3d9acf9c5b1bd152a3e9b331f4f18dedfac5907cd617886d4f43308d927d1` |
+| Raw file size | `9845506` bytes |
+
+The local file has 94,151 rows and 12 columns:
+`state`, `county_name`, `year`, `state_po`, `county_fips`, `office`,
+`candidate`, `party`, `candidatevotes`, `totalvotes`, `version`, and `mode`.
+Election years are 2000, 2004, 2008, 2012, 2016, 2020, and 2024.
+
+The pre-existing `data/raw/medsl/1976-2024-president.csv` is state-level only.
+It has `state_fips` but no `county_fips` or county-equivalent identifier, so it
+is not suitable for county/MSA analysis.
+
+## Geography Handling
+
+Use `county_fips` as the join key for county-native aggregation. Normalize it as
+a zero-padded five-character string before joining to Census county membership
+or crosswalk artifacts.
+
+DC is represented as county-equivalent `11001` and can participate in normal
+county joins.
+
+Alaska rows are represented with election-district style `county_name` values
+and nonstandard `county_fips` values. Do not silently join Alaska rows to
+Census county-equivalent geography until an ingest rule explicitly validates the
+mapping. The first ingest should surface Alaska coverage diagnostics separately.
+
+Rows with missing `county_fips` are special statewide/federal/UOCAVA/write-in
+records for Connecticut, Maine, and Rhode Island. In the staged file there are
+52 such rows, all with `totalvotes == 0`. The ingest should exclude them from
+county-year measures and report the dropped row count by state/year.
+
+The file includes `TOTAL` rows and voting-mode-specific rows. County-year
+measure materialization should use `mode == "TOTAL"` after validating that the
+expected county/year coverage exists; it should not sum all modes together.
+
+## Source Registry Entry
+
+Record the staged raw artifact in `data/curated/source_registry.parquet` with:
+
+- `source_type`: `medsl`
+- `source_name`: `MEDSL County Presidential Election Returns 2000-2024`
+- `source_url`: `https://dataverse.harvard.edu/api/access/datafile/13573089`
+- `raw_sha256`: `aac3d9acf9c5b1bd152a3e9b331f4f18dedfac5907cd617886d4f43308d927d1`
+- `file_size`: `9845506`
+- `local_path`: `data/raw/medsl/countypres_2000-2024.tab`
+
+Metadata should include the DOI, Dataverse datafile id, release/update date,
+version, license, citation note, year coverage, and the geography decisions
+above. The default registry path is ignored with `data/`, so this document is
+the committed source contract for recreating the local registry entry.
