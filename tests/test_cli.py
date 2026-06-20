@@ -1,5 +1,6 @@
 """Tests for the hhplab CLI."""
 
+import json
 from pathlib import Path
 from unittest.mock import patch
 
@@ -51,6 +52,30 @@ class TestNestedIngestCommand:
 
         assert result.exit_code == 0
         assert "MEDSL county presidential returns" in result.output
+
+    def test_build_medsl_president_county_json(self):
+        output_path = Path("data/curated/medsl/medsl_president_county__Y2000-2024@C2020.parquet")
+        with (
+            patch(
+                "hhplab.cli.build_medsl.materialize_county_political_leaning",
+                return_value=output_path,
+            ) as mock_materialize,
+            patch("hhplab.cli.build_medsl.pd.read_parquet") as mock_read_parquet,
+        ):
+            mock_read_parquet.return_value = [object(), object()]
+            result = runner.invoke(
+                app,
+                ["build", "medsl-president-county", "--force", "--json"],
+            )
+
+        assert result.exit_code == 0, result.output
+        payload = json.loads(result.output)
+        assert payload["status"] == "ok"
+        assert payload["provider"] == "medsl"
+        assert payload["product"] == "president"
+        assert payload["output_path"] == str(output_path)
+        assert payload["row_count"] == 2
+        mock_materialize.assert_called_once()
 
 
 class TestListBoundariesCommand:

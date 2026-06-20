@@ -626,6 +626,22 @@ def _dataset_remediation(ds_id: str, ds, *, years: list[int] | None = None) -> R
                 command=command,
             )
 
+    if provider == "medsl" and product == "president":
+        return Remediation(
+            hint=(
+                f"Build MEDSL county presidential measures for dataset '{ds_id}'. "
+                "Stage data/raw/medsl/countypres_2000-2024.tab, ingest the "
+                "normalized county returns, then materialize the county-year "
+                "political measures. In recipes, aggregate vote counts first "
+                "and derive target-level shares or ratios from summed counts "
+                "where possible."
+            ),
+            command=(
+                "hhplab ingest medsl-presidential --force && "
+                "hhplab build medsl-president-county --force"
+            ),
+        )
+
     if provider == "census" and product == "urban_fraction":
         boundary_vintage = ds.params.get("boundary_vintage") or getattr(
             ds.native_geometry,

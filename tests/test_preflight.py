@@ -10,7 +10,7 @@ import pytest
 from typer.testing import CliRunner
 
 from hhplab.cli.main import app
-from hhplab.naming import county_xwalk_path, msa_county_membership_path
+from hhplab.naming import county_xwalk_path, medsl_president_county_path, msa_county_membership_path
 from hhplab.provenance import ProvenanceBlock, write_parquet_with_provenance
 from hhplab.recipe.loader import load_recipe
 from hhplab.recipe.preflight import (
@@ -35,6 +35,34 @@ runner = CliRunner()
 STALE_TRANSLATED_ACS_PATH = "data/curated/acs/acs5_tracts__A2019xT2020.parquet"
 STALE_TRANSLATED_ACS_VINTAGE = "2015-2019"
 STALE_TRANSLATED_ACS_REBUILD = "hhplab ingest acs5-tract --acs 2015-2019 --tracts 2020 --force"
+
+MEDSL_COUNTY_PRESIDENT_FIXTURE_ROWS = {
+    "county_fips": ["01001", "01003"],
+    "geo_id": ["01001", "01003"],
+    "geo_type": ["county", "county"],
+    "year": [2024, 2024],
+    "county_vintage": [2020, 2020],
+    "democratic_votes": [7500, 18000],
+    "republican_votes": [12500, 22000],
+    "two_party_votes": [20000, 40000],
+    "totalvotes": [21000, 43000],
+    "democratic_vote_share": [7500 / 21000, 18000 / 43000],
+    "republican_vote_share": [12500 / 21000, 22000 / 43000],
+    "democratic_republican_vote_ratio": [7500 / 12500, 18000 / 22000],
+    "republican_democratic_vote_ratio": [12500 / 7500, 22000 / 18000],
+    "democratic_margin": [(7500 - 12500) / 21000, (18000 - 22000) / 43000],
+    "major_party_vote_share": [20000 / 21000, 40000 / 43000],
+    "data_source": ["medsl", "medsl"],
+    "source_version": ["20", "20"],
+    "source_url": ["https://doi.org/10.7910/DVN/VOQCHQ"] * 2,
+    "raw_sha256": ["fixture"] * 2,
+}
+
+ACS1_COUNTY_FIXTURE_ROWS = {
+    "county_fips": ["01001", "01003"],
+    "year": [2024, 2024],
+    "total_population": [60000, 250000],
+}
 
 
 def _write_stale_translated_acs_cache(path: Path) -> None:
@@ -356,6 +384,87 @@ def test_prism_missing_dataset_remediation_uses_prism_commands(tmp_path: Path) -
         "hhplab build prism-county --variable tmin --year 2024 --month 1 "
         "--county-vintage 2023"
     )
+
+
+def test_medsl_president_default_path_resolves_to_canonical_artifact() -> None:
+    from hhplab.recipe.planner import resolve_plan
+
+    recipe = load_recipe(_medsl_acs_county_preflight_recipe())
+
+    plan = resolve_plan(recipe, "main")
+    task = next(task for task in plan.resample_tasks if task.dataset_id == "medsl_president")
+
+    assert task.input_path == str(
+        medsl_president_county_path(2000, 2024, 2020, base_dir="data")
+    )
+    assert task.measure_aggregations == {
+        "democratic_votes": "sum",
+        "republican_votes": "sum",
+        "totalvotes": "sum",
+    }
+    assert task.derived_measures == {
+        "democratic_vote_share": {
+            "type": "rate_from_weighted_counts",
+            "source_rate_column": None,
+            "denominator_column": "totalvotes",
+            "total_column": None,
+            "distribution_family": None,
+            "quantile": None,
+            "source_numerator_column": "democratic_votes",
+            "source_numerator_columns": None,
+            "numerator_output_column": None,
+            "diagnostic_output_column": None,
+            "zero_denominator_policy": "null_rate",
+        },
+    }
+
+
+def test_medsl_missing_dataset_remediation_uses_ingest_and_build_commands(
+    tmp_path: Path,
+) -> None:
+    acs_path = tmp_path / "data" / "curated" / "acs" / "acs1_county__A2024.parquet"
+    acs_path.parent.mkdir(parents=True, exist_ok=True)
+    pd.DataFrame(ACS1_COUNTY_FIXTURE_ROWS).to_parquet(acs_path)
+
+    recipe = load_recipe(_medsl_acs_county_preflight_recipe())
+    report = run_preflight(recipe, project_root=tmp_path)
+
+    findings = [
+        finding
+        for finding in report.findings
+        if finding.kind == FindingKind.MISSING_DATASET
+        and finding.dataset_id == "medsl_president"
+    ]
+    assert len(findings) == 1
+    assert findings[0].remediation is not None
+    assert findings[0].remediation.command == (
+        "hhplab ingest medsl-presidential --force && "
+        "hhplab build medsl-president-county --force"
+    )
+    assert "aggregate vote counts first" in findings[0].remediation.hint
+
+
+def test_medsl_county_recipe_preflight_joins_with_acs_measures(
+    tmp_path: Path,
+) -> None:
+    medsl_path = tmp_path / medsl_president_county_path(
+        2000,
+        2024,
+        2020,
+        base_dir="data",
+    )
+    medsl_path.parent.mkdir(parents=True, exist_ok=True)
+    pd.DataFrame(MEDSL_COUNTY_PRESIDENT_FIXTURE_ROWS).to_parquet(medsl_path)
+    acs_path = tmp_path / "data" / "curated" / "acs" / "acs1_county__A2024.parquet"
+    acs_path.parent.mkdir(parents=True, exist_ok=True)
+    pd.DataFrame(ACS1_COUNTY_FIXTURE_ROWS).to_parquet(acs_path)
+
+    recipe = load_recipe(_medsl_acs_county_preflight_recipe())
+    report = run_preflight(recipe, project_root=tmp_path)
+
+    blocking = report.blocking_findings()
+    assert blocking == []
+    assert report.is_ready
 
 
 class TestProbeYearColumn:
@@ -711,6 +820,79 @@ def _acs1_poverty_preflight_recipe() -> dict:
                     {"kind": "join", "datasets": ["acs1_poverty"]},
                 ],
             }
+        ],
+    }
+
+
+def _medsl_acs_county_preflight_recipe() -> dict:
+    return {
+        "version": 1,
+        "name": "medsl-acs-county-preflight",
+        "universe": {"years": [2024]},
+        "targets": [
+            {"id": "county_panel", "geometry": {"type": "county", "vintage": 2020}},
+        ],
+        "datasets": {
+            "medsl_president": {
+                "provider": "medsl",
+                "product": "president",
+                "version": 1,
+                "native_geometry": {"type": "county", "vintage": 2020},
+                "geo_column": "county_fips",
+                "year_column": "year",
+                "params": {"align": "presidential_election_year"},
+            },
+            "acs1_county": {
+                "provider": "census",
+                "product": "acs1",
+                "version": 1,
+                "native_geometry": {"type": "county", "vintage": 2020, "source": "tiger"},
+                "path": "data/curated/acs/acs1_county__A2024.parquet",
+                "geo_column": "county_fips",
+                "year_column": "year",
+                "params": {"align": "calendar_year"},
+            },
+        },
+        "transforms": [],
+        "pipelines": [
+            {
+                "id": "main",
+                "target": "county_panel",
+                "steps": [
+                    {
+                        "kind": "resample",
+                        "dataset": "medsl_president",
+                        "to_geometry": {"type": "county", "vintage": 2020},
+                        "method": "identity",
+                        "measures": {
+                            "democratic_votes": {"aggregation": "sum"},
+                            "republican_votes": {"aggregation": "sum"},
+                            "totalvotes": {"aggregation": "sum"},
+                        },
+                        "derived_measures": {
+                            "democratic_vote_share": {
+                                "type": "rate_from_weighted_counts",
+                                "source_numerator_column": "democratic_votes",
+                                "denominator_column": "totalvotes",
+                            },
+                        },
+                    },
+                    {
+                        "kind": "resample",
+                        "dataset": "acs1_county",
+                        "to_geometry": {"type": "county", "vintage": 2020},
+                        "method": "identity",
+                        "measures": {
+                            "total_population": {"aggregation": "sum"},
+                        },
+                    },
+                    {
+                        "kind": "join",
+                        "datasets": ["medsl_president", "acs1_county"],
+                        "join_on": ["geo_id", "year"],
+                    },
+                ],
+            },
         ],
     }
 

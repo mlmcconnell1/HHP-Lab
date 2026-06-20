@@ -87,3 +87,19 @@ use `totalvotes` as the denominator. Democratic/Republican ratios are null when
 the opposite-party denominator is zero or missing. `democratic_margin` is
 `democratic_vote_share - republican_vote_share`, and `major_party_vote_share` is
 `two_party_votes / totalvotes`.
+
+## Recipe Aggregation Pattern
+
+Recipes should aggregate MEDSL vote counts before computing target-level
+political shares or ratios. Treat `democratic_votes`, `republican_votes`,
+`two_party_votes`, and `totalvotes` as additive count measures with
+`aggregation: sum`. Then derive target-level measures from the summed counts,
+for example `democratic_votes / totalvotes`, `republican_votes / totalvotes`,
+`democratic_votes / republican_votes`, and `(democratic_votes -
+republican_votes) / totalvotes`.
+
+County-level share or ratio columns such as `democratic_vote_share` can be
+carried as descriptive covariates with `weighted_mean` only when the weighting
+choice is explicit and defensible. They should not be the default way to build
+target-level election shares, because averaging county ratios can diverge from
+the ratio of aggregated vote counts.

@@ -11,6 +11,7 @@ from hhplab.cli.boundaries import (
     show,
     validate_boundaries,
 )
+from hhplab.cli.build_medsl import build_medsl_president_county
 from hhplab.cli.build_prism_county import build_prism_county
 from hhplab.cli.build_urban_fraction import build_urban_fraction
 from hhplab.cli.build_xwalks import build_xwalks
@@ -146,6 +147,7 @@ def register_commands(
     build_app.command("recipe")(recipe_cmd)
     build_app.command("urban-fraction")(build_urban_fraction)
     build_app.command("prism-county")(build_prism_county)
+    build_app.command("medsl-president-county")(build_medsl_president_county)
     build_app.command("recipe-plan")(recipe_plan_cmd)
     build_app.command("recipe-provenance")(recipe_provenance_cmd)
     build_app.command("recipe-export")(recipe_export_cmd)

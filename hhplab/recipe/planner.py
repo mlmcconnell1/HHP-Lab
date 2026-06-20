@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from hhplab.naming import coc_urban_fraction_path
+from hhplab.naming import coc_urban_fraction_path, medsl_president_county_path
 from hhplab.recipe.recipe_schema import (
     DatasetSpec,
     FileSetSpec,
@@ -234,8 +234,27 @@ def _urban_fraction_param(ds: DatasetSpec, *names: str) -> object | None:
     return None
 
 
+def _medsl_county_vintage(ds: DatasetSpec) -> int:
+    value = ds.params.get("county_vintage")
+    if value is None:
+        value = ds.native_geometry.vintage
+    if value is None:
+        return 2020
+    return int(value)
+
+
 def _default_dataset_path(ds: DatasetSpec) -> str | None:
     """Resolve canonical artifact paths for datasets with built-in naming."""
+    if ds.provider == "medsl" and ds.product == "president":
+        return str(
+            medsl_president_county_path(
+                2000,
+                2024,
+                _medsl_county_vintage(ds),
+                base_dir="data",
+            )
+        )
+
     if ds.provider == "census" and ds.product == "urban_fraction":
         boundary_vintage = _urban_fraction_param(ds, "boundary_vintage")
         if boundary_vintage is None:

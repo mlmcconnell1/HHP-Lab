@@ -1782,6 +1782,7 @@ class TestDefaultAdapters:
         assert ("hud", "pit") in products
         assert ("census", "acs5") in products
         assert ("census", "acs") in products
+        assert ("medsl", "president") in products
         assert ("zillow", "zori") in products
         assert ("prism", "temperature") in products
 
@@ -1971,6 +1972,47 @@ class TestDefaultAdapters:
         assert any("year_column" in message for message in messages)
         assert any("params.variable" in message for message in messages)
         assert any("requires params.month=1" in message for message in messages)
+
+    def test_medsl_president_valid(self):
+        from hhplab.recipe.default_dataset_adapters import _validate_medsl_president
+
+        spec = DatasetSpec(
+            provider="medsl",
+            product="president",
+            version=1,
+            native_geometry=GeometryRef(type="county", vintage=2020),
+            geo_column="county_fips",
+            year_column="year",
+            params={"align": "presidential_election_year"},
+        )
+        assert _validate_medsl_president(spec) == []
+
+    @pytest.mark.parametrize(
+        ("field", "value", "expected"),
+        [
+            ("native_geometry", GeometryRef(type="tract", vintage=2020), "county"),
+            ("geo_column", "tract_geoid", "geo_column"),
+            ("year_column", "election_year", "year_column"),
+        ],
+        ids=["geometry", "geo-column", "year-column"],
+    )
+    def test_medsl_president_rejects_required_contract_fields(self, field, value, expected):
+        from hhplab.recipe.default_dataset_adapters import _validate_medsl_president
+
+        kwargs = {
+            "provider": "medsl",
+            "product": "president",
+            "version": 1,
+            "native_geometry": GeometryRef(type="county", vintage=2020),
+            "geo_column": "county_fips",
+            "year_column": "year",
+        }
+        kwargs[field] = value
+        spec = DatasetSpec(**kwargs)
+
+        diags = _validate_medsl_president(spec)
+
+        assert any(d.level == "error" and expected in d.message for d in diags)
 
     def test_recipe_integration_no_adapter_errors(self):
         """Full recipe validation with defaults registered produces no errors."""
