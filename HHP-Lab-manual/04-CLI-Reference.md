@@ -226,6 +226,8 @@ hhplab ingest pl-blocks --decennial 2020
 hhplab ingest pit-vintage --vintage 2024
 hhplab ingest zori --geography county
 hhplab ingest pep --series auto
+hhplab ingest prism --variable tmin --year 2024 --month 1 --json
+hhplab ingest medsl-presidential --json
 ```
 
 Boundary ingestion uses a multi-source fallback chain: national boundary file first, then legacy NatlTerrDC URL, then per-state shapefiles. This makes historical vintage ingestion more reliable.
@@ -262,6 +264,54 @@ Useful PEP options:
 - `--start` / `--end` to trim the emitted year range
 - `--prefer-postcensal-2020` when combining series
 
+PRISM temperature is a two-step county-mode workflow. First download and
+register the monthly ZIP:
+
+```bash
+hhplab ingest prism --variable tmin --year 2024 --month 1 --json
+```
+
+Then materialize county means:
+
+```bash
+hhplab build prism-county --variable tmin --year 2024 --month 1 --county-vintage 2023 --json
+```
+
+The canonical output path is:
+
+```text
+data/curated/prism/prism_county_monthly__tmin__Y2024M01@C2023.parquet
+```
+
+Supported PRISM variables are `tmin`, `tmean`, and `tmax`. Recipes consume the
+county artifact with `provider: prism`, `product: temperature`, and aggregate
+the temperature column such as `tmin_c` with `weighted_mean`.
+
+MEDSL presidential county returns also use a staged-source workflow. The
+county-level Dataverse file must be available at:
+
+```text
+data/raw/medsl/countypres_2000-2024.tab
+```
+
+Normalize the staged file, then materialize county-year presidential measures:
+
+```bash
+hhplab ingest medsl-presidential --json
+hhplab build medsl-president-county --json
+```
+
+The canonical county-year output is:
+
+```text
+data/curated/medsl/medsl_president_county__Y2000-2024@C2020.parquet
+```
+
+Recipes consume it with `provider: medsl`, `product: president`,
+`native_geometry: { type: county, vintage: 2020 }`, `year_column: year`, and
+`geo_column: county_fips`. Aggregate vote counts first, then derive target-level
+shares or ratios from the summed counts.
+
 ### Dataset Discovery
 
 ```bash
@@ -291,6 +341,10 @@ including MSA-CoC coverage artifacts already present under `output_root`.
 - `hhplab list measures`
 - `hhplab list xwalks`
 - `hhplab ingest acs1-metro`
+- `hhplab ingest prism`
+- `hhplab ingest medsl-presidential`
+- `hhplab build prism-county`
+- `hhplab build medsl-president-county`
 - `hhplab diagnostics xwalk`
 - `hhplab diagnostics panel`
 

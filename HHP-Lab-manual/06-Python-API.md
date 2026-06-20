@@ -28,6 +28,17 @@ from hhplab.panel import (
     run_conformance,
     save_panel,
 )
+from hhplab.prism import (
+    download_prism_monthly,
+    get_prism_monthly_source_url,
+    materialize_prism_monthly_counties,
+    prism_county_monthly_columns,
+)
+from hhplab.medsl import (
+    ingest_county_presidential_returns,
+    materialize_county_political_leaning,
+    parse_county_presidential_returns,
+)
 ```
 
 ## Recipe API
@@ -103,7 +114,9 @@ prov = ProvenanceBlock(
 
 ## Notes on Stability
 
-- `hhplab.__init__` currently re-exports only `census`, `measures`, `provenance`, and `xwalks`
+- `hhplab.__init__` lazy-reexports common source/domain subpackages including
+  `acs`, `census`, `hud`, `medsl`, `measures`, `panel`, `provenance`, and
+  `xwalks`; PRISM helpers are available through direct `hhplab.prism` imports
 - panel helpers are stable through `hhplab.panel`
 - geometry-neutral APIs now exist alongside CoC-specific wrappers (`aggregate_to_geo`, `build_tract_crosswalk`, `build_county_crosswalk`)
 

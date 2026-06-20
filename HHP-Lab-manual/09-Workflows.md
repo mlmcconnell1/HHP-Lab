@@ -4,7 +4,9 @@
 
 1. Inspect available curated assets if needed (`hhplab status --json` for automation, `hhplab list curated` for browsing).
 2. Ingest required global assets (`boundaries`, `tiger`, `acs5-tract`, `pit`,
-   `zori`, `pep`, optionally `acs1-metro` for metro-native ACS1 measures,
+   `zori`, `pep`, optionally `prism` for county monthly temperature,
+   optionally `medsl-presidential` for county presidential vote measures,
+   optionally `acs1-metro` for metro-native ACS1 measures,
    optionally `acs1-county` plus ACS5 tract support inputs for SAE workflows,
    and optionally Census Urban Area plus PL block population inputs for urban
    fraction covariates). MSA-CoC population coverage specifically requires
@@ -34,6 +36,10 @@ hhplab ingest acs1-county --vintage 2023         # optional: county-native ACS1 
 hhplab ingest pit-vintage --vintage 2024
 hhplab ingest zori --geography county
 hhplab ingest pep --series auto
+hhplab ingest prism --variable tmin --year 2024 --month 1 --json
+hhplab build prism-county --variable tmin --year 2024 --month 1 --county-vintage 2023 --json
+hhplab ingest medsl-presidential --json
+hhplab build medsl-president-county --json
 
 # 2) Crosswalks
 hhplab generate xwalks --boundary 2025 --tracts 2023 --counties 2023
@@ -63,6 +69,10 @@ hhplab build recipe-preflight --recipe recipes/examples/msa-coc-coverage.yaml --
 hhplab build recipe-plan --recipe recipes/examples/msa-coc-coverage.yaml --json
 hhplab build recipe --recipe recipes/examples/msa-coc-coverage.yaml --json
 
+# Optional: PRISM and MEDSL county-source recipe examples
+hhplab build recipe-preflight --recipe recipes/examples/coc-msa-prism-tmin-january-2024.yaml --json
+hhplab build recipe-preflight --recipe recipes/examples/msa-census-pit-pep-medsl-2024.yaml --json
+
 # 6) Export bundle
 hhplab build recipe-export --manifest <manifest_path> --destination exports/bundle
 ```
@@ -82,6 +92,10 @@ repository tree.
   scaffolding/wrappers so output control remains in YAML.
 - `hhplab aggregate ...` is a parallel path for standalone CoC artifacts, not a default prerequisite for recipe execution.
 - See `recipes/examples/README.md` for runnable example recipes that cover CoC, metro, PIT, ACS5, PEP, ZORI, and ACS1 paths.
+- Use `recipes/examples/coc-msa-prism-tmin-january-2024.yaml` for PRISM
+  county temperature aggregation, and
+  `recipes/examples/msa-census-pit-pep-medsl-2024.yaml` for MEDSL county
+  presidential vote aggregation.
 - Use `recipes/examples/coc-sae-acs1-2023.yaml` for ACS1 county-to-CoC SAE
   planning, and
   `recipes/top50-msas-cocs-pit-pep-density-acs1-poverty-2010-2024.yaml` for

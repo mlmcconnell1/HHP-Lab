@@ -23,6 +23,114 @@ the CLI can inspect local curated artifacts with
 | Census | PEP | county | 2010-ongoing | annual `population`, county FIPS/name/state, reference date, PEP vintage/provenance | CoC PEP population, metro PEP population, optional panel `population` measure | PEP reference dates are July 1 annual estimates; recipes can use temporal filters to align to January when needed. |
 | Census | Urban Area + PL block population | block / Urban Area, derived to CoC | 2010 and 2020 | PL 94-171 block population, block geometry, Census Urban Area polygons, CoC boundary vintage | CoC `urban_population_fraction`, CoC urban/rural population counts, optional CoC-by-Urban-Area detail | Uses block representative points for Urban Area membership and block-area allocation to CoCs. ACS/tract denominators are too coarse for this feature. |
 | Zillow | ZORI | county or ZIP, normalized to county for standard panels | 2015-ongoing | monthly `zori`, region name/state, source URL, raw hash, metric/provenance fields | normalized ZORI, CoC ZORI, metro ZORI, yearly collapsed ZORI, panel rent columns | Standard panel alignment uses January observations to match PIT timing. |
+| PRISM Climate Group | temperature | county after materialization | monthly 1895-ongoing source coverage | monthly county means for `tmin`, `tmean`, or `tmax`; `year`, `month`, `date`, county FIPS, source/provenance fields, raster coverage diagnostics | county monthly temperature artifact, CoC/MSA temperature covariates via recipes | Raster processing is intentionally outside recipe execution. Download the monthly ZIP, materialize county means, then aggregate with `weighted_mean`. Recent PRISM months can be revised for roughly six months. |
+| MIT Election Data and Science Lab | president | county | presidential election years 2000-2024 | Democratic, Republican, two-party, and total presidential votes; county FIPS; year; derived county vote shares/ratios | county presidential measure artifact, CoC/MSA political covariates via recipes | Aggregate vote counts before deriving target-level shares. Alaska election-district rows and known non-county rows are excluded from county-native outputs until a validated mapping exists. |
+
+## PRISM Temperature Artifact
+
+HHP-Lab supports PRISM Climate Group monthly temperature as a county-native
+covariate source. The workflow is intentionally county mode:
+
+1. Download one monthly PRISM 4km raster ZIP with `hhplab ingest prism`.
+2. Materialize county-level means with `hhplab build prism-county`.
+3. Use county-to-CoC or county-to-MSA recipe transforms with
+   `aggregation: weighted_mean`.
+
+Canonical raw ZIP path example:
+
+```text
+data/raw/prism/tmin/monthly/2024/prism_tmin_us_25m_202401.zip
+```
+
+Canonical curated path example:
+
+```text
+data/curated/prism/prism_county_monthly__tmin__Y2024M01@C2023.parquet
+```
+
+Supported temperature variables are `tmin`, `tmean`, and `tmax`. The source URL
+pattern is:
+
+```text
+https://data.prism.oregonstate.edu/time_series/us/an/4km/{variable}/monthly/{year}/prism_{variable}_us_25m_{YYYYMM}.zip
+```
+
+Key columns:
+
+| Column | Description |
+|--------|-------------|
+| `geo_id` / `county_fips` | Five-character county FIPS identifier. |
+| `year` | PRISM observation year. |
+| `month` | PRISM observation month, 1-12. |
+| `date` | Month date represented by the artifact. |
+| `<variable>_c` | County mean temperature in Celsius, for example `tmin_c`. |
+| `raster_total_cell_count` | Raster cell count considered for the county. |
+| `raster_valid_cell_count` | Valid raster cells used in the county mean. |
+| `raster_nodata_cell_count` | No-data raster cells encountered. |
+| `raster_coverage_ratio` | Valid-cell coverage diagnostic. |
+
+Direct recipe-time raster zonal statistics to CoC/MSA geometry are out of
+scope. Keeping raster processing at county geometry makes the expensive step
+explicit and leaves recipes to use normal county transforms.
+
+## MEDSL Presidential Artifact
+
+HHP-Lab supports county-native U.S. presidential vote measures from MIT
+Election Data and Science Lab's County Presidential Election Returns
+2000-2024 dataset.
+
+Canonical staged raw file:
+
+```text
+data/raw/medsl/countypres_2000-2024.tab
+```
+
+Canonical normalized returns artifact:
+
+```text
+data/curated/medsl/medsl_county_presidential_returns__Y2000-2024.parquet
+```
+
+Canonical county-year measure artifact:
+
+```text
+data/curated/medsl/medsl_president_county__Y2000-2024@C2020.parquet
+```
+
+Supported election years are 2000, 2004, 2008, 2012, 2016, 2020, and 2024.
+The county-year measure artifact has one row per `county_fips` and election
+year when a valid county-equivalent key exists.
+
+Key columns:
+
+| Column | Description |
+|--------|-------------|
+| `county_fips` / `geo_id` | Five-character county FIPS identifier. |
+| `year` | Presidential election year. |
+| `democratic_votes` | Democratic candidate votes in the county/year. |
+| `republican_votes` | Republican candidate votes in the county/year. |
+| `two_party_votes` | `democratic_votes + republican_votes`. |
+| `totalvotes` | MEDSL county/year total votes. |
+| `democratic_vote_share` | `democratic_votes / totalvotes`. |
+| `republican_vote_share` | `republican_votes / totalvotes`. |
+| `democratic_republican_vote_ratio` | `democratic_votes / republican_votes`, null when denominator is zero or missing. |
+| `republican_democratic_vote_ratio` | `republican_votes / democratic_votes`, null when denominator is zero or missing. |
+| `democratic_margin` | `democratic_vote_share - republican_vote_share`. |
+| `major_party_vote_share` | `two_party_votes / totalvotes`. |
+
+Geography limitations:
+
+- DC uses county-equivalent `11001` and can join normally.
+- Alaska election-district rows are excluded from county-native outputs until a
+  validated Census county-equivalent allocation rule exists.
+- Known non-county rows with missing `county_fips` for Connecticut, Maine, and
+  Rhode Island are dropped and counted in provenance.
+- Missouri `KANSAS CITY` rows with `county_fips == 2938000` are dropped and
+  counted in provenance.
+
+These exclusions mean a national aggregate from the curated county artifact is
+not a certified national popular-vote total. It is intended for geography-join
+panel features where rows must identify a county or county-equivalent key.
 
 ## CoC Urban Fraction Artifact
 

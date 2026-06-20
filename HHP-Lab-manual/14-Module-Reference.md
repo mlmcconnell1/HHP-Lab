@@ -12,6 +12,8 @@ This chapter is an orientation map of active modules in the current codebase.
 - `hhplab/cli/list_*.py`: dataset discovery commands with optional JSON output
 - `hhplab/cli/ingest_acs1_metro.py`: ACS 1-year CBSA-level metro ingestion
 - `hhplab/cli/ingest_acs1_county.py`: ACS 1-year county-level ingestion
+- `hhplab/cli/ingest_prism.py` and `hhplab/cli/build_prism_county.py`: PRISM monthly temperature download and county materialization
+- `hhplab/cli/ingest_medsl.py` and `hhplab/cli/build_medsl.py`: MEDSL county presidential ingest and county-year measure materialization
 - `hhplab/cli/diagnostics_cli.py` and `hhplab/cli/panel_diagnostics_cli.py`: diagnostics commands with optional JSON output
 - `hhplab/cli/recipe.py`: recipe execution/provenance/export commands
 - `hhplab/cli/migrate_curated.py`: curated data migration utilities
@@ -48,6 +50,8 @@ This chapter is an orientation map of active modules in the current codebase.
 - `hhplab/acs/`: ACS ingest, translation, source-owned aggregation, ACS1 imputation, and SAE support (including `ingest/metro_acs1.py` and `ingest/county_acs1.py` for ACS 1-year native data, `variables_acs1.py` for ACS1 detailed-table definitions, and `sae.py` for allocation, diagnostics, and provenance helpers)
 - `hhplab/pit/`: PIT ingest, registry, QA
 - `hhplab/pep/`: PEP ingest, aggregation, and diagnostics
+- `hhplab/prism/`: PRISM monthly temperature download and county raster materialization helpers
+- `hhplab/medsl/`: MEDSL county presidential returns parsing, ingest, and county-year political measure materialization
 - `hhplab/rents/`: ZORI ingest, weighting, aggregation, diagnostics
 - `hhplab/panel/`: panel diagnostics and assembly internals
 - `hhplab/metro/`: metro analysis geography module

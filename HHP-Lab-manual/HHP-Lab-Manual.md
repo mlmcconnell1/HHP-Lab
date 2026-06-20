@@ -36,6 +36,8 @@
 - Build scaffold: [[04-CLI-Reference#build-scaffolding]]
 - Recipe execution: [[04-CLI-Reference#recipe-execution-recommended]]
 - Source availability: [[07-Data-Model#source-availability-catalog]]
+- PRISM temperature source: [[07-Data-Model#prism-temperature-artifact]]
+- MEDSL presidential source: [[07-Data-Model#medsl-presidential-artifact]]
 - CoC urban fraction artifacts: [[07-Data-Model#coc-urban-fraction-artifact]]
 - MSA-CoC coverage artifacts: [[07-Data-Model#msa-coc-coverage-artifact]]
 - Bundle export: [[04-CLI-Reference#bundle-export]]

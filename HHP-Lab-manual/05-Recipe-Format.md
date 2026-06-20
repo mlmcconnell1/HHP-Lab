@@ -340,6 +340,113 @@ metro-only. For CoC workflows, use either a modeled ACS1 tract dataset
 `small_area_estimate` step that allocates ACS1 county components through ACS5
 tract support distributions.
 
+### PRISM Temperature Datasets
+
+PRISM temperature recipes consume pre-materialized county-month artifacts. Do
+not run raster zonal statistics directly inside a recipe. Use
+`hhplab ingest prism` and `hhplab build prism-county` first, then point the
+recipe dataset at the county parquet:
+
+```yaml
+datasets:
+  prism_tmin_county:
+    provider: prism
+    product: temperature
+    version: 1
+    native_geometry: { type: county, vintage: 2023 }
+    years: "2024-2024"
+    year_column: year
+    geo_column: county_fips
+    params:
+      variable: tmin
+      month: 1
+      align: point_in_time_jan
+    path: data/curated/prism/prism_county_monthly__tmin__Y2024M01@C2023.parquet
+```
+
+Supported `params.variable` values are `tmin`, `tmean`, and `tmax`.
+`params.align: point_in_time_jan` requires `month: 1`; otherwise use
+`calendar_month`. Aggregate temperature measures to CoCs, MSAs, or other target
+geographies with a county transform and `weighted_mean`:
+
+```yaml
+- resample:
+    dataset: prism_tmin_county
+    to_geometry: { type: msa, source: census_msa_2023 }
+    method: aggregate
+    via: county_to_msa_area
+    measures:
+      tmin_c: { aggregation: weighted_mean }
+```
+
+Complete examples:
+
+- `recipes/examples/coc-msa-prism-tmin-january-2024.yaml`
+- `recipes/msa-coc-pit-prism-tmin-january-2024.yaml`
+- `recipes/top50-msa-coc-pit-prism-medsl-2020.yaml`
+
+### MEDSL Presidential Datasets
+
+MEDSL presidential recipes consume county-year measures from:
+
+```text
+data/curated/medsl/medsl_president_county__Y2000-2024@C2020.parquet
+```
+
+Declare the dataset as county-native and election-year aligned:
+
+```yaml
+datasets:
+  medsl_president:
+    provider: medsl
+    product: president
+    version: 1
+    native_geometry: { type: county, vintage: 2020 }
+    years: "2020-2020"
+    year_column: year
+    geo_column: county_fips
+    params:
+      align: presidential_election_year
+    path: data/curated/medsl/medsl_president_county__Y2000-2024@C2020.parquet
+```
+
+MEDSL is observed in presidential election years only: 2000, 2004, 2008, 2012,
+2016, 2020, and 2024. Recipes should make temporal alignment explicit rather
+than silently carrying values across non-election years.
+
+For target geographies such as MSAs or CoCs, aggregate the additive vote counts
+and derive shares or ratios from the aggregated counts:
+
+```yaml
+- resample:
+    dataset: medsl_president
+    to_geometry: { type: msa, source: census_msa_2023 }
+    method: aggregate
+    via: county_to_msa_area
+    measures:
+      democratic_votes: { aggregation: sum }
+      republican_votes: { aggregation: sum }
+      two_party_votes: { aggregation: sum }
+      totalvotes: { aggregation: sum }
+    derived_measures:
+      democratic_vote_share:
+        type: rate_from_weighted_counts
+        source_numerator_column: democratic_votes
+        denominator_column: totalvotes
+      republican_vote_share:
+        type: rate_from_weighted_counts
+        source_numerator_column: republican_votes
+        denominator_column: totalvotes
+```
+
+Do not average county vote-share columns as the default target-level political
+measure. Averaging ratios can differ from the ratio of summed votes. Complete
+examples:
+
+- `recipes/examples/county-medsl-pep-2024.yaml`
+- `recipes/examples/msa-census-pit-pep-medsl-2024.yaml`
+- `recipes/top50-msa-coc-pit-prism-medsl-2020.yaml`
+
 ```yaml
 targets:
   - id: metro_panel
