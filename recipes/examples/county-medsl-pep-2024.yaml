@@ -1,0 +1,89 @@
+# Example recipe: county-native MEDSL presidential measures joined to PEP.
+# Run preflight before build:
+#   HHPLAB_NON_INTERACTIVE=1 hhplab build recipe-preflight --recipe recipes/examples/county-medsl-pep-2024.yaml --json
+# Inspect the resolved task graph:
+#   HHPLAB_NON_INTERACTIVE=1 hhplab build recipe-plan --recipe recipes/examples/county-medsl-pep-2024.yaml --json
+#
+# This recipe keeps the source county grain and demonstrates the preferred
+# political leaning pattern: aggregate vote counts, then derive shares/ratios
+# from those counts.
+
+version: 1
+name: county_medsl_pep_2024
+description: >
+  Build a 2024 county panel joining MEDSL county presidential vote counts and
+  derived political leaning fields to Census PEP county population.
+
+universe:
+  years: [2024]
+
+targets:
+  - id: county_panel
+    geometry: { type: county, vintage: 2020 }
+    outputs: [panel]
+
+datasets:
+  medsl_president:
+    provider: medsl
+    product: president
+    version: 1
+    native_geometry: { type: county, vintage: 2020 }
+    years: "2024-2024"
+    year_column: year
+    geo_column: county_fips
+    params:
+      align: presidential_election_year
+
+  pep_county:
+    provider: census
+    product: pep
+    version: 1
+    native_geometry: { type: county, vintage: 2020 }
+    years: "2024-2024"
+    year_column: year
+    geo_column: county_fips
+    path: data/curated/pep/pep_county__v2025__y2020-2025.parquet
+
+transforms: []
+
+pipelines:
+  - id: build_county_panel
+    target: county_panel
+    steps:
+      - resample:
+          dataset: medsl_president
+          to_geometry: { type: county, vintage: 2020 }
+          method: identity
+          measures:
+            democratic_votes: { aggregation: sum }
+            republican_votes: { aggregation: sum }
+            two_party_votes: { aggregation: sum }
+            totalvotes: { aggregation: sum }
+          derived_measures:
+            democratic_vote_share:
+              type: rate_from_weighted_counts
+              source_numerator_column: democratic_votes
+              denominator_column: totalvotes
+            republican_vote_share:
+              type: rate_from_weighted_counts
+              source_numerator_column: republican_votes
+              denominator_column: totalvotes
+            democratic_republican_vote_ratio:
+              type: rate_from_weighted_counts
+              source_numerator_column: democratic_votes
+              denominator_column: republican_votes
+
+      - resample:
+          dataset: pep_county
+          to_geometry: { type: county, vintage: 2020 }
+          method: identity
+          measures:
+            population: { aggregation: sum }
+
+      - join:
+          datasets: [medsl_president, pep_county]
+          join_on: [geo_id, year]
+
+validation:
+  missing_dataset:
+    default: fail

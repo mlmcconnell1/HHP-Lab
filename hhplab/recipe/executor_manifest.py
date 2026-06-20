@@ -235,7 +235,7 @@ def _resolve_panel_output_file(
         start_year,
         end_year,
         geo_type=target_geo_type,
-        boundary_vintage=boundary_vintage if target_geo_type == "coc" else None,
+        boundary_vintage=boundary_vintage if target_geo_type in {"coc", "county"} else None,
         definition_version=definition_version,
         profile_definition_version=profile_definition_version,
     )
@@ -280,7 +280,7 @@ def _resolve_map_output_file(
             start_year,
             end_year,
             geo_type=target_geo_type,
-            boundary_vintage=boundary_vintage if target_geo_type == "coc" else None,
+            boundary_vintage=boundary_vintage if target_geo_type in {"coc", "county"} else None,
             definition_version=definition_version,
             profile_definition_version=profile_definition_version,
         )

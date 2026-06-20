@@ -4,7 +4,8 @@ These recipes are intended to be runnable, high-signal examples for future
 users. Together they cover the current recipe surface:
 
 - CoC, metro, and MSA targets
-- PIT, ACS5 tract inputs, PEP county inputs, ZORI county inputs, and ACS1 metro inputs
+- PIT, ACS5 tract inputs, PEP county inputs, ZORI county inputs, ACS1 metro
+  inputs, and MEDSL presidential county inputs
 - PRISM county temperature inputs
 - Identity and aggregate resampling
 - CoC crosswalks and generated metro/MSA transforms
@@ -97,6 +98,10 @@ the output downstream.
   distribution-derived median/quintile outputs with diagnostics.
 - `coc-pep-zori-calendar-2020-2024.yaml`
   County-driven CoC panel using PEP population plus calendar-mean ZORI.
+- `county-medsl-pep-2024.yaml`
+  County-native 2024 panel joining MEDSL presidential vote counts and derived
+  vote shares/ratios to PEP county population. It keeps the source county grain
+  and demonstrates count-first political leaning derivation.
 - `coc-msa-prism-tmin-january-2024.yaml`
   County-driven PRISM example that aggregates January minimum temperature to
   both CoCs and Census MSAs with `weighted_mean`. See
@@ -119,6 +124,10 @@ the output downstream.
 - `msa-census-pit-acs-pep-2020-2021.yaml`
   Census MSA panel that uses CoC-native PIT allocated through the generated
   CoC-to-MSA crosswalk, plus county PEP and lagged ACS5 tract measures.
+- `msa-census-pit-pep-medsl-2024.yaml`
+  Census MSA panel that combines CoC-native PIT, county PEP population, and
+  MEDSL presidential county vote counts. Vote shares and ratios are derived
+  after county vote counts are summed to MSAs.
 - `msa-fractional-pit-rollup-2020-2021.yaml`
   Census MSA-year PIT panel that uses the first-class
   `msa_fractional_rollup` target contract. It allocates CoC-native additive PIT
@@ -212,4 +221,10 @@ HHPLAB_NON_INTERACTIVE=1 hhplab build recipe-preflight \
 
 HHPLAB_NON_INTERACTIVE=1 hhplab build recipe-plan \
   --recipe recipes/examples/coc-sae-acs1-2023.yaml --json
+
+HHPLAB_NON_INTERACTIVE=1 hhplab build recipe-preflight \
+  --recipe recipes/examples/msa-census-pit-pep-medsl-2024.yaml --json
+
+HHPLAB_NON_INTERACTIVE=1 hhplab build recipe-plan \
+  --recipe recipes/examples/msa-census-pit-pep-medsl-2024.yaml --json
 ```

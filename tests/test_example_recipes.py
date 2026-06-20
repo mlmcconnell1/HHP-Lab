@@ -109,6 +109,14 @@ EXAMPLE_RECIPE_CASES: tuple[ExampleRecipeCase, ...] = (
         datasets=("pep_county", "zori_county"),
     ),
     ExampleRecipeCase(
+        path="county-medsl-pep-2024.yaml",
+        pipeline_id="build_county_panel",
+        recipe_name="county_medsl_pep_2024",
+        target_type="county",
+        years=(2024,),
+        datasets=("medsl_president", "pep_county"),
+    ),
+    ExampleRecipeCase(
         path="coc-msa-prism-tmin-january-2024.yaml",
         pipeline_id="build_coc_panel",
         recipe_name="coc_msa_prism_tmin_january_2024",
@@ -163,6 +171,14 @@ EXAMPLE_RECIPE_CASES: tuple[ExampleRecipeCase, ...] = (
         target_type="msa",
         years=(2020, 2021),
         datasets=("pit", "pep_county", "acs_tract"),
+    ),
+    ExampleRecipeCase(
+        path="msa-census-pit-pep-medsl-2024.yaml",
+        pipeline_id="build_msa_panel",
+        recipe_name="msa_census_pit_pep_medsl_2024",
+        target_type="msa",
+        years=(2024,),
+        datasets=("pit", "pep_county", "medsl_president"),
     ),
 )
 
@@ -520,6 +536,39 @@ def test_example_recipe_auto_transform_selection(
 
     for year, transform_id in expected_by_year.items():
         assert transform_by_year[year] == transform_id
+
+
+@pytest.mark.parametrize(
+    ("path", "pipeline_id"),
+    [
+        ("county-medsl-pep-2024.yaml", "build_county_panel"),
+        ("msa-census-pit-pep-medsl-2024.yaml", "build_msa_panel"),
+    ],
+)
+def test_medsl_examples_derive_vote_rates_from_summed_counts(
+    path: str,
+    pipeline_id: str,
+):
+    recipe = _load_example(path)
+    plan = resolve_plan(recipe, pipeline_id)
+
+    task = next(task for task in plan.resample_tasks if task.dataset_id == "medsl_president")
+
+    assert task.measure_aggregations == {
+        "democratic_votes": "sum",
+        "republican_votes": "sum",
+        "two_party_votes": "sum",
+        "totalvotes": "sum",
+    }
+    assert sorted((task.derived_measures or {}).keys()) == [
+        "democratic_republican_vote_ratio",
+        "democratic_vote_share",
+        "republican_vote_share",
+    ]
+    assert task.derived_measures["democratic_vote_share"]["source_numerator_column"] == (
+        "democratic_votes"
+    )
+    assert task.derived_measures["democratic_vote_share"]["denominator_column"] == "totalvotes"
 
 
 @pytest.mark.parametrize(

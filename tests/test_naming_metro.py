@@ -160,6 +160,12 @@ class TestGeoPanelFilename:
             == "panel__metro__Y2011-2016@Dcensusmsa2023xSglynnfoxv1.parquet"
         )
 
+    def test_county(self):
+        assert (
+            geo_panel_filename(2024, 2024, geo_type="county", boundary_vintage="2020")
+            == "panel__county__Y2024-2024@C2020.parquet"
+        )
+
     def test_coc_missing_boundary_raises(self):
         with pytest.raises(ValueError, match="boundary_vintage"):
             geo_panel_filename(2015, 2024, geo_type="coc")
@@ -168,9 +174,13 @@ class TestGeoPanelFilename:
         with pytest.raises(ValueError, match="definition_version"):
             geo_panel_filename(2011, 2016, geo_type="metro")
 
+    def test_county_missing_vintage_raises(self):
+        with pytest.raises(ValueError, match="boundary_vintage"):
+            geo_panel_filename(2024, 2024, geo_type="county")
+
     def test_unknown_geo_type_raises(self):
         with pytest.raises(ValueError, match="Unsupported geo_type"):
-            geo_panel_filename(2015, 2024, geo_type="county")
+            geo_panel_filename(2015, 2024, geo_type="place")
 
 
 class TestGeoMapFilename:

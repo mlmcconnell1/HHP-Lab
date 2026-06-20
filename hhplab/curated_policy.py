@@ -135,6 +135,7 @@ CANONICAL_PATTERNS: dict[str, list[re.Pattern[str]]] = {
     ],
     "panel": [
         re.compile(r"^panel__Y\d{4}-\d{4}@B\d{4}\.parquet$"),
+        re.compile(r"^panel__county__Y\d{4}-\d{4}@C\d{4}\.parquet$"),
         re.compile(r"^panel__metro__Y\d{4}-\d{4}@D\w+\.parquet$"),
         re.compile(r"^panel__msa__Y\d{4}-\d{4}@M\w+\.parquet$"),
         re.compile(r"^panel__msa-coc__Y\d{4}-\d{4}@B\d{4}xM\w+\.parquet$"),

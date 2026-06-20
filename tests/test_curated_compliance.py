@@ -166,6 +166,7 @@ class TestCanonicalFilenamesAccepted:
             ("pit", "pit_registry.parquet"),
             ("hic", "hic__H2024.parquet"),
             ("panel", "panel__Y2015-2024@B2025.parquet"),
+            ("panel", "panel__county__Y2024-2024@C2020.parquet"),
             ("panel", "panel__metro__Y2011-2016@Dglynnfoxv1.parquet"),
             ("panel", "panel__Y2015-2024@B2025.manifest.json"),
             ("panel", "panel__metro__Y2011-2016@Dglynnfoxv1.manifest.json"),

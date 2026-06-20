@@ -1429,6 +1429,18 @@ def msa_panel_filename(
     return f"panel__msa__Y{start_year}-{end_year}@M{defn}.parquet"
 
 
+def county_panel_filename(
+    start_year: int,
+    end_year: int,
+    county_vintage: str | int,
+) -> str:
+    """Generate filename for county-scoped panel.
+
+    Pattern: ``panel__county__Y{start}-{end}@C{county}.parquet``
+    """
+    return f"panel__county__Y{start_year}-{end_year}@C{county_vintage}.parquet"
+
+
 def msa_coc_panel_filename(
     start_year: int,
     end_year: int,
@@ -1995,6 +2007,7 @@ def geo_panel_filename(
     For ``geo_type="coc"``, delegates to :func:`panel_filename`.
     For ``geo_type="metro"``, delegates to :func:`metro_panel_filename`.
     For ``geo_type="msa"``, delegates to :func:`msa_panel_filename`.
+    For ``geo_type="county"``, delegates to :func:`county_panel_filename`.
     """
     if geo_type == "coc":
         if boundary_vintage is None:
@@ -2013,6 +2026,10 @@ def geo_panel_filename(
         if definition_version is None:
             raise ValueError("definition_version is required for geo_type='msa'")
         return msa_panel_filename(start_year, end_year, definition_version)
+    if geo_type == "county":
+        if boundary_vintage is None:
+            raise ValueError("boundary_vintage is required for geo_type='county'")
+        return county_panel_filename(start_year, end_year, boundary_vintage)
     raise ValueError(f"Unsupported geo_type: {geo_type!r}")
 
 
