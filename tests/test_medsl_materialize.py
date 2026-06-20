@@ -80,6 +80,22 @@ def test_build_county_political_leaning_measures() -> None:
     assert row["major_party_vote_share"] == pytest.approx(16935 / 17208)
 
 
+def test_build_county_political_leaning_measures_flags_cross_era_fips() -> None:
+    retired_fips_rows = candidate_rows().assign(county_fips="46113", geo_id="46113", year=2000)
+    rows = pd.concat([candidate_rows(), retired_fips_rows], ignore_index=True)
+
+    result = build_county_political_leaning_measures(
+        rows,
+        county_vintage=2020,
+        declared_county_fips={"01001", "46102"},
+    )
+
+    assert set(result["county_fips"]) == {"01001", "46113"}
+    assert result.attrs["county_vintage_universe_checked"] is True
+    assert result.attrs["county_fips_not_in_declared_vintage_count"] == 1
+    assert result.attrs["county_fips_not_in_declared_vintage"] == ["46113"]
+
+
 def test_ratio_denominators_of_zero_are_null() -> None:
     rows = candidate_rows()
     rows["candidatevotes"] = 0
@@ -122,4 +138,6 @@ def test_materialize_county_political_leaning_writes_provenance(tmp_path: Path) 
     assert provenance is not None
     assert provenance.extra["raw_sha256"]
     assert provenance.extra["source_file_path"] == str(raw_path)
+    assert provenance.extra["county_vintage_universe_checked"] is True
+    assert provenance.extra["county_fips_not_in_declared_vintage_count"] == 0
     assert provenance.extra["output_schema"] == list(result.columns)

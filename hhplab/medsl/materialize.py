@@ -11,9 +11,11 @@ from hhplab.medsl.ingest import (
     default_raw_path,
     parse_county_presidential_returns,
 )
-from hhplab.naming import medsl_president_county_filename, medsl_president_county_path
+from hhplab.naming import county_path, medsl_president_county_filename, medsl_president_county_path
 from hhplab.provenance import ProvenanceBlock, write_parquet_with_provenance
 from hhplab.schema.columns import MEDSL_PRESIDENT_COUNTY_MEASURE_COLUMNS
+
+COUNTY_VINTAGE_MISMATCH_SAMPLE_SIZE = 20
 
 
 def materialize_county_political_leaning(
@@ -48,17 +50,22 @@ def materialize_county_political_leaning(
     measures = build_county_political_leaning_measures(
         candidate_rows,
         county_vintage=county_vintage,
+        declared_county_fips=_load_declared_county_fips(county_vintage),
     )
 
     destination.parent.mkdir(parents=True, exist_ok=True)
-    source_versions = sorted(str(value) for value in candidate_rows["source_version"].dropna().unique())
+    source_versions = sorted(
+        str(value) for value in candidate_rows["source_version"].dropna().unique()
+    )
     raw_sha256 = str(candidate_rows["raw_sha256"].iloc[0]) if not candidate_rows.empty else ""
+    source_url = str(candidate_rows["source_url"].iloc[0]) if not candidate_rows.empty else ""
+    source_doi = str(candidate_rows["source_doi"].iloc[0]) if not candidate_rows.empty else ""
     provenance = ProvenanceBlock(
         extra={
             "dataset": "medsl_president_county_political_leaning",
             "source": "MIT Election Data and Science Lab",
-            "source_url": str(candidate_rows["source_url"].iloc[0]) if not candidate_rows.empty else "",
-            "source_doi": str(candidate_rows["source_doi"].iloc[0]) if not candidate_rows.empty else "",
+            "source_url": source_url,
+            "source_doi": source_doi,
             "source_versions": source_versions,
             "source_file_path": str(source_path),
             "raw_sha256": raw_sha256,
@@ -68,6 +75,15 @@ def materialize_county_political_leaning(
             "year_range": [int(measures["year"].min()), int(measures["year"].max())],
             "years": sorted(int(year) for year in measures["year"].unique()),
             "county_vintage": county_vintage,
+            "county_vintage_universe_checked": bool(
+                measures.attrs.get("county_vintage_universe_checked", False)
+            ),
+            "county_fips_not_in_declared_vintage_count": int(
+                measures.attrs.get("county_fips_not_in_declared_vintage_count", 0)
+            ),
+            "county_fips_not_in_declared_vintage": list(
+                measures.attrs.get("county_fips_not_in_declared_vintage", [])
+            ),
             "output_schema": MEDSL_PRESIDENT_COUNTY_MEASURE_COLUMNS,
             "ratio_policy": "Ratios are null when the denominator is zero or missing.",
         },
@@ -80,6 +96,7 @@ def build_county_political_leaning_measures(
     candidate_rows: pd.DataFrame,
     *,
     county_vintage: int = 2020,
+    declared_county_fips: set[str] | None = None,
 ) -> pd.DataFrame:
     """Aggregate normalized MEDSL candidate rows to county-year measures."""
     required = {
@@ -136,8 +153,14 @@ def build_county_political_leaning_measures(
         ["democratic_votes", "republican_votes"]
     ].fillna(0)
     measures["two_party_votes"] = measures["democratic_votes"] + measures["republican_votes"]
-    measures["democratic_vote_share"] = _safe_divide(measures["democratic_votes"], measures["totalvotes"])
-    measures["republican_vote_share"] = _safe_divide(measures["republican_votes"], measures["totalvotes"])
+    measures["democratic_vote_share"] = _safe_divide(
+        measures["democratic_votes"],
+        measures["totalvotes"],
+    )
+    measures["republican_vote_share"] = _safe_divide(
+        measures["republican_votes"],
+        measures["totalvotes"],
+    )
     measures["democratic_republican_vote_ratio"] = _safe_divide(
         measures["democratic_votes"],
         measures["republican_votes"],
@@ -146,16 +169,23 @@ def build_county_political_leaning_measures(
         measures["republican_votes"],
         measures["democratic_votes"],
     )
-    measures["democratic_margin"] = measures["democratic_vote_share"] - measures["republican_vote_share"]
-    measures["major_party_vote_share"] = _safe_divide(measures["two_party_votes"], measures["totalvotes"])
+    measures["democratic_margin"] = (
+        measures["democratic_vote_share"] - measures["republican_vote_share"]
+    )
+    measures["major_party_vote_share"] = _safe_divide(
+        measures["two_party_votes"],
+        measures["totalvotes"],
+    )
     measures["geo_type"] = "county"
     measures["geo_id"] = measures["county_fips"]
     measures["county_vintage"] = county_vintage
     measures["data_source"] = "medsl"
 
-    return measures[MEDSL_PRESIDENT_COUNTY_MEASURE_COLUMNS].sort_values(
+    result = measures[MEDSL_PRESIDENT_COUNTY_MEASURE_COLUMNS].sort_values(
         ["county_fips", "year"]
     ).reset_index(drop=True)
+    _attach_county_vintage_diagnostics(result, declared_county_fips)
+    return result
 
 
 def _validate_totalvotes_constant(rows: pd.DataFrame) -> None:
@@ -174,6 +204,32 @@ def _safe_divide(numerator: pd.Series, denominator: pd.Series) -> pd.Series:
     denominator = pd.to_numeric(denominator, errors="coerce")
     result = numerator / denominator
     return result.mask(denominator.isna() | (denominator == 0))
+
+
+def _load_declared_county_fips(county_vintage: int) -> set[str] | None:
+    path = county_path(county_vintage)
+    if not path.exists():
+        return None
+    counties = pd.read_parquet(path, columns=["geoid"])
+    return set(counties["geoid"].astype("string").str.zfill(5))
+
+
+def _attach_county_vintage_diagnostics(
+    measures: pd.DataFrame,
+    declared_county_fips: set[str] | None,
+) -> None:
+    measures.attrs["county_vintage_universe_checked"] = declared_county_fips is not None
+    if declared_county_fips is None:
+        measures.attrs["county_fips_not_in_declared_vintage_count"] = 0
+        measures.attrs["county_fips_not_in_declared_vintage"] = []
+        return
+
+    observed = set(measures["county_fips"].astype("string").str.zfill(5))
+    missing = sorted(observed - declared_county_fips)
+    measures.attrs["county_fips_not_in_declared_vintage_count"] = len(missing)
+    measures.attrs["county_fips_not_in_declared_vintage"] = missing[
+        :COUNTY_VINTAGE_MISMATCH_SAMPLE_SIZE
+    ]
 
 
 def _default_output_path(

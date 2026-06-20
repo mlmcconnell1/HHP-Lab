@@ -57,6 +57,7 @@ KNOWN_NONCOUNTY_INVALID_FIPS: frozenset[tuple[str, str, str]] = frozenset(
         ("MO", "KANSAS CITY", "2938000"),
     }
 )
+ALASKA_ELECTION_DISTRICT_FIPS_RANGE: range = range(2001, 2041)
 
 
 def default_raw_path() -> Path:
@@ -88,6 +89,7 @@ def parse_county_presidential_returns(
     df = df.copy()
     df["office"] = _normalize_text(df["office"])
     df["mode"] = _normalize_text(df["mode"])
+    missing_total_mode_count = _count_presidential_county_years_without_total(df)
     df = df[(df["office"] == "US PRESIDENT") & (df["mode"] == "TOTAL")].copy()
     if df.empty:
         raise ValueError(
@@ -159,6 +161,15 @@ def parse_county_presidential_returns(
             f"Examples: {examples.to_dict('records')}"
         )
 
+    alaska_district_rows = _alaska_election_district_mask(df)
+    if alaska_district_rows.any():
+        logger.info(
+            "Dropping %s Alaska MEDSL election-district rows from county-native output.",
+            int(alaska_district_rows.sum()),
+        )
+        df = df[~alaska_district_rows].copy()
+    dropped_alaska_district_count = int(alaska_district_rows.sum())
+
     ingested_at = datetime.now(UTC)
     raw_sha256 = _sha256(path)
     result = pd.DataFrame(
@@ -188,6 +199,8 @@ def parse_county_presidential_returns(
     result.attrs["missing_candidatevotes_filled"] = missing_candidatevotes_count
     result.attrs["missing_county_fips_dropped"] = dropped_missing_fips_count
     result.attrs["invalid_county_fips_dropped"] = dropped_invalid_fips_count
+    result.attrs["alaska_election_district_rows_dropped"] = dropped_alaska_district_count
+    result.attrs["presidential_county_years_without_total"] = missing_total_mode_count
     return result.sort_values(["county_fips", "year", "party", "candidate"]).reset_index(drop=True)
 
 
@@ -228,7 +241,11 @@ def ingest_county_presidential_returns(
             "doi": MEDSL_COUNTY_PRESIDENTIAL_RETURNS_DOI,
             "dataset": "County Presidential Election Returns 2000-2024",
             "native_geometry": "county",
-            "years": list(expected_years) if expected_years is not None else sorted(df["year"].unique()),
+            "years": (
+                list(expected_years)
+                if expected_years is not None
+                else sorted(df["year"].unique())
+            ),
             "mode_filter": "TOTAL",
             "office_filter": "US PRESIDENT",
             "curated_path": str(destination),
@@ -249,6 +266,12 @@ def ingest_county_presidential_returns(
             "missing_candidatevotes_filled": int(df.attrs.get("missing_candidatevotes_filled", 0)),
             "missing_county_fips_dropped": int(df.attrs.get("missing_county_fips_dropped", 0)),
             "invalid_county_fips_dropped": int(df.attrs.get("invalid_county_fips_dropped", 0)),
+            "alaska_election_district_rows_dropped": int(
+                df.attrs.get("alaska_election_district_rows_dropped", 0)
+            ),
+            "presidential_county_years_without_total": int(
+                df.attrs.get("presidential_county_years_without_total", 0)
+            ),
             "office_filter": "US PRESIDENT",
             "mode_filter": "TOTAL",
             "license": "CC0 1.0",
@@ -280,8 +303,25 @@ def _normalize_party(series: pd.Series) -> pd.Series:
     return party.mask(party == "", "UNKNOWN")
 
 
+def _count_presidential_county_years_without_total(df: pd.DataFrame) -> int:
+    presidential = df[df["office"] == "US PRESIDENT"].copy()
+    if presidential.empty:
+        return 0
+    group_cols = ["state_po", "county_name", "county_fips", "year"]
+    has_total = presidential.groupby(group_cols, dropna=False)["mode"].agg(
+        lambda modes: (modes == "TOTAL").any()
+    )
+    return int((~has_total).sum())
+
+
 def _known_noncounty_missing_fips_mask(df: pd.DataFrame) -> pd.Series:
-    labels = list(zip(df["state_po"].astype("string"), _normalize_text(df["county_name"])))
+    labels = list(
+        zip(
+            df["state_po"].astype("string"),
+            _normalize_text(df["county_name"]),
+            strict=True,
+        )
+    )
     return pd.Series(
         [label in KNOWN_NONCOUNTY_MISSING_FIPS for label in labels],
         index=df.index,
@@ -294,11 +334,21 @@ def _known_noncounty_invalid_fips_mask(df: pd.DataFrame) -> pd.Series:
             df["state_po"].astype("string"),
             _normalize_text(df["county_name"]),
             df["county_fips"].astype("string"),
+            strict=True,
         )
     )
     return pd.Series(
         [label in KNOWN_NONCOUNTY_INVALID_FIPS for label in labels],
         index=df.index,
+    )
+
+
+def _alaska_election_district_mask(df: pd.DataFrame) -> pd.Series:
+    county_numbers = pd.to_numeric(df["county_fips"], errors="coerce")
+    return (
+        df["state_po"].astype("string").str.upper().str.strip().eq("AK")
+        & _normalize_text(df["county_name"]).str.match(r"^DISTRICT \d+$", na=False)
+        & county_numbers.isin(ALASKA_ELECTION_DISTRICT_FIPS_RANGE)
     )
 
 
@@ -347,7 +397,10 @@ def _validate_presidential_years(
     observed = set(int(year) for year in years.unique())
     non_presidential = sorted(year for year in observed if year % 4 != 0)
     if non_presidential:
-        raise ValueError(f"MEDSL presidential returns include non-presidential years: {non_presidential}")
+        raise ValueError(
+            "MEDSL presidential returns include non-presidential years: "
+            f"{non_presidential}"
+        )
     if expected_years is None:
         return
     expected = set(expected_years)

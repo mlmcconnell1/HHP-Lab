@@ -10,7 +10,9 @@ Truth table for the fixture rows:
 | missing-party      | kept with `party == UNKNOWN`                          |
 | statewide-writein  | dropped because it is a known non-county row          |
 | kansas-city-place  | dropped because it is a known non-county place row    |
+| alaska-district    | dropped because Alaska districts are not counties     |
 | absentee-mode      | dropped because mode is not `TOTAL`                   |
+| no-total-mode      | counted because no `TOTAL` row exists for county/year |
 """
 
 from __future__ import annotations
@@ -127,6 +129,34 @@ MEDSL_FIXTURE_ROWS = [
         "version": 20260225,
         "mode": "TOTAL",
     },
+    {
+        "state": "ALASKA",
+        "county_name": "DISTRICT 1",
+        "year": 2000,
+        "state_po": "AK",
+        "county_fips": "2001",
+        "office": "US PRESIDENT",
+        "candidate": "AL GORE",
+        "party": "DEMOCRAT",
+        "candidatevotes": 1000,
+        "totalvotes": 2500,
+        "version": 20260225,
+        "mode": "TOTAL",
+    },
+    {
+        "state": "ALABAMA",
+        "county_name": "BARBOUR",
+        "year": 2004,
+        "state_po": "AL",
+        "county_fips": "1005",
+        "office": "US PRESIDENT",
+        "candidate": "JOHN KERRY",
+        "party": "DEMOCRAT",
+        "candidatevotes": 4000,
+        "totalvotes": 9000,
+        "version": 20260225,
+        "mode": "ABSENTEE",
+    },
 ]
 
 
@@ -167,8 +197,11 @@ class TestParseCountyPresidentialReturns:
         assert set(result["geo_type"]) == {"county"}
         assert {"01001", "01003", "11001"} == set(result["county_fips"])
         assert not (result["candidatevotes"] == 30).any()
+        assert "02001" not in set(result["county_fips"])
         assert result.attrs["missing_county_fips_dropped"] == 1
         assert result.attrs["invalid_county_fips_dropped"] == 1
+        assert result.attrs["alaska_election_district_rows_dropped"] == 1
+        assert result.attrs["presidential_county_years_without_total"] == 1
 
     @pytest.mark.parametrize(
         ("candidate", "expected_party", "expected_simplified"),
@@ -237,7 +270,11 @@ class TestParseCountyPresidentialReturns:
 
 
 class TestIngestCountyPresidentialReturns:
-    def test_writes_parquet_with_provenance(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    def test_writes_parquet_with_provenance(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
         raw_path = tmp_path / "countypres_2000-2024.tab"
         output_dir = tmp_path / "curated"
         write_medsl_fixture(raw_path)
@@ -261,4 +298,6 @@ class TestIngestCountyPresidentialReturns:
         assert provenance is not None
         assert provenance.extra["dataset"] == "medsl_county_presidential_returns"
         assert provenance.extra["years"] == [2000, 2004]
+        assert provenance.extra["alaska_election_district_rows_dropped"] == 1
+        assert provenance.extra["presidential_county_years_without_total"] == 1
         assert registered[0]["source_type"] == "medsl"
