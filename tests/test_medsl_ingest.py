@@ -150,12 +150,26 @@ MEDSL_FIXTURE_ROWS = [
         "state_po": "AL",
         "county_fips": "1005",
         "office": "US PRESIDENT",
-        "candidate": "JOHN KERRY",
+        "candidate": "MODE ONLY DEMOCRAT",
         "party": "DEMOCRAT",
         "candidatevotes": 4000,
         "totalvotes": 9000,
         "version": 20260225,
         "mode": "ABSENTEE",
+    },
+    {
+        "state": "ALABAMA",
+        "county_name": "BARBOUR",
+        "year": 2004,
+        "state_po": "AL",
+        "county_fips": "1005",
+        "office": "US PRESIDENT",
+        "candidate": "MODE ONLY DEMOCRAT",
+        "party": "DEMOCRAT",
+        "candidatevotes": 300,
+        "totalvotes": 9000,
+        "version": 20260225,
+        "mode": "ELECTION DAY",
     },
 ]
 
@@ -172,7 +186,7 @@ class TestParseCountyPresidentialReturns:
 
         result = parse_county_presidential_returns(raw_path, expected_years=FIXTURE_YEARS)
 
-        assert len(result) == 4
+        assert len(result) == 5
         assert list(result.columns) == [
             "geo_type",
             "geo_id",
@@ -195,8 +209,12 @@ class TestParseCountyPresidentialReturns:
             "ingested_at",
         ]
         assert set(result["geo_type"]) == {"county"}
-        assert {"01001", "01003", "11001"} == set(result["county_fips"])
+        assert {"01001", "01003", "01005", "11001"} == set(result["county_fips"])
         assert not (result["candidatevotes"] == 30).any()
+        assert result.loc[
+            (result["county_fips"] == "01005") & (result["candidate"] == "MODE ONLY DEMOCRAT"),
+            "candidatevotes",
+        ].iloc[0] == 4300
         assert "02001" not in set(result["county_fips"])
         assert result.attrs["missing_county_fips_dropped"] == 1
         assert result.attrs["invalid_county_fips_dropped"] == 1
@@ -294,10 +312,16 @@ class TestIngestCountyPresidentialReturns:
         result = pd.read_parquet(output)
         provenance = read_provenance(output)
         assert output == output_dir / "medsl_county_presidential_returns__Y2000-2024.parquet"
-        assert len(result) == 4
+        assert len(result) == 5
         assert provenance is not None
         assert provenance.extra["dataset"] == "medsl_county_presidential_returns"
         assert provenance.extra["years"] == [2000, 2004]
         assert provenance.extra["alaska_election_district_rows_dropped"] == 1
         assert provenance.extra["presidential_county_years_without_total"] == 1
+        assert provenance.extra["mode_filter"] == (
+            "TOTAL when present, otherwise aggregate county-year mode rows"
+        )
         assert registered[0]["source_type"] == "medsl"
+        assert registered[0]["metadata"]["mode_filter"] == (
+            "TOTAL when present, otherwise aggregate county-year mode rows"
+        )

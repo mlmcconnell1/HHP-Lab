@@ -57,8 +57,11 @@ exclude them from county-native outputs unless a later mapping task explicitly
 defines an allocation rule.
 
 The file includes `TOTAL` rows and voting-mode-specific rows. County-year
-measure materialization should use `mode == "TOTAL"` after validating that the
-expected county/year coverage exists; it should not sum all modes together.
+measure materialization uses `mode == "TOTAL"` when present. Some county-years
+are mode-only in the raw file; for those, the parser sums mode-level
+`candidatevotes` by county/candidate and carries the repeated county-year
+`totalvotes`. It must not sum mode rows for county-years that already provide a
+`TOTAL` row.
 
 ## Source Registry Entry
 
@@ -117,7 +120,7 @@ Measure definitions:
 | `democratic_votes` | Sum of candidate votes where `party_simplified == DEMOCRAT` within the county/year. |
 | `republican_votes` | Sum of candidate votes where `party_simplified == REPUBLICAN` within the county/year. |
 | `two_party_votes` | `democratic_votes + republican_votes`. |
-| `totalvotes` | MEDSL county/year total votes from the `TOTAL` mode rows. |
+| `totalvotes` | MEDSL county/year total votes from `TOTAL` rows when present, otherwise the repeated county total on mode-level rows. |
 | `democratic_vote_share` | `democratic_votes / totalvotes`; null when `totalvotes` is zero or missing. |
 | `republican_vote_share` | `republican_votes / totalvotes`; null when `totalvotes` is zero or missing. |
 | `democratic_republican_vote_ratio` | `democratic_votes / republican_votes`; null when `republican_votes` is zero or missing. |

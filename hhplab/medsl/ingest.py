@@ -79,8 +79,9 @@ def parse_county_presidential_returns(
     """Parse MEDSL county presidential returns into canonical candidate rows.
 
     The MEDSL county file includes voting-mode rows as well as county totals.
-    This parser keeps only ``mode == "TOTAL"`` rows for US presidential office
-    so downstream county-year measures do not double count votes.
+    This parser uses ``mode == "TOTAL"`` rows when they exist for a county-year.
+    For county-years without a total mode, it aggregates the mode-level rows to
+    county candidate totals.
     """
     path = Path(raw_path)
     df = pd.read_csv(path, sep=_separator_for(path), dtype={"county_fips": "string"})
@@ -90,10 +91,10 @@ def parse_county_presidential_returns(
     df["office"] = _normalize_text(df["office"])
     df["mode"] = _normalize_text(df["mode"])
     missing_total_mode_count = _count_presidential_county_years_without_total(df)
-    df = df[(df["office"] == "US PRESIDENT") & (df["mode"] == "TOTAL")].copy()
+    df = _select_presidential_county_rows(df)
     if df.empty:
         raise ValueError(
-            "No MEDSL county presidential TOTAL rows found. "
+            "No MEDSL county presidential rows found. "
             "Check that the raw file is countypres_2000-2024.tab."
         )
 
@@ -169,6 +170,8 @@ def parse_county_presidential_returns(
         )
         df = df[~alaska_district_rows].copy()
     dropped_alaska_district_count = int(alaska_district_rows.sum())
+
+    df = _collapse_selected_modes_to_candidate_rows(df)
 
     ingested_at = datetime.now(UTC)
     raw_sha256 = _sha256(path)
@@ -246,7 +249,7 @@ def ingest_county_presidential_returns(
                 if expected_years is not None
                 else sorted(df["year"].unique())
             ),
-            "mode_filter": "TOTAL",
+            "mode_filter": "TOTAL when present, otherwise aggregate county-year mode rows",
             "office_filter": "US PRESIDENT",
             "curated_path": str(destination),
         },
@@ -273,7 +276,7 @@ def ingest_county_presidential_returns(
                 df.attrs.get("presidential_county_years_without_total", 0)
             ),
             "office_filter": "US PRESIDENT",
-            "mode_filter": "TOTAL",
+            "mode_filter": "TOTAL when present, otherwise aggregate county-year mode rows",
             "license": "CC0 1.0",
         }
     )
@@ -312,6 +315,18 @@ def _count_presidential_county_years_without_total(df: pd.DataFrame) -> int:
         lambda modes: (modes == "TOTAL").any()
     )
     return int((~has_total).sum())
+
+
+def _select_presidential_county_rows(df: pd.DataFrame) -> pd.DataFrame:
+    """Select total-mode rows or all mode rows for county-years lacking totals."""
+    presidential = df[df["office"] == "US PRESIDENT"].copy()
+    if presidential.empty:
+        return presidential
+    group_cols = ["state_po", "county_name", "county_fips", "year"]
+    has_total = presidential.groupby(group_cols, dropna=False)["mode"].transform(
+        lambda modes: (modes == "TOTAL").any()
+    )
+    return presidential[(presidential["mode"] == "TOTAL") | ~has_total].copy()
 
 
 def _known_noncounty_missing_fips_mask(df: pd.DataFrame) -> pd.Series:
@@ -388,6 +403,51 @@ def _validate_vote_columns(df: pd.DataFrame) -> None:
             raise ValueError(
                 f"MEDSL {column} contains negative values. Examples: {examples.to_dict('records')}"
             )
+
+
+def _collapse_selected_modes_to_candidate_rows(df: pd.DataFrame) -> pd.DataFrame:
+    """Collapse selected rows to one candidate row per county-year.
+
+    County-years with a ``TOTAL`` row already have one row per candidate, so this
+    is a no-op except for deterministic ordering. County-years without a
+    ``TOTAL`` row have one row per candidate per voting mode; summing
+    ``candidatevotes`` reconstructs county candidate totals while ``totalvotes``
+    is carried from the mode rows.
+    """
+    _validate_county_year_totalvotes_constant(df)
+    group_cols = [
+        "state",
+        "county_name",
+        "year",
+        "state_po",
+        "county_fips",
+        "office",
+        "candidate",
+        "party",
+        "version",
+    ]
+    return (
+        df.groupby(group_cols, dropna=False, as_index=False)
+        .agg(candidatevotes=("candidatevotes", "sum"), totalvotes=("totalvotes", "first"))
+        .assign(mode="TOTAL")
+    )
+
+
+def _validate_county_year_totalvotes_constant(df: pd.DataFrame) -> None:
+    group_cols = ["state_po", "county_name", "county_fips", "year"]
+    counts = df.groupby(group_cols, dropna=False)["totalvotes"].nunique(dropna=False)
+    inconsistent = counts[counts > 1]
+    if not inconsistent.empty:
+        examples = [
+            {
+                "state_po": state_po,
+                "county_name": county_name,
+                "county_fips": county_fips,
+                "year": int(year),
+            }
+            for state_po, county_name, county_fips, year in inconsistent.head(5).index
+        ]
+        raise ValueError(f"MEDSL totalvotes vary within county/year groups: {examples}.")
 
 
 def _validate_presidential_years(
