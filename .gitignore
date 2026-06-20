@@ -29,3 +29,5 @@ wheels/
 # Local agent/generated caches
 .recipe_cache/
 .beads-backup/
+# br doctor per-run artifacts
+.doctor/
