@@ -110,6 +110,20 @@ def _scaffold_curated(tmp_path: Path) -> Path:
         ldir / "laus_metro__A2023@Dglynnfoxv1.parquet"
     )
 
+    raw_medsl = data_dir / "raw" / "medsl"
+    raw_medsl.mkdir(parents=True)
+    (raw_medsl / "countypres_2000-2024.tab").write_text("county_fips\tyear\n01001\t2024\n")
+    (raw_medsl / "1976-2024-president.csv").write_text("state_fips,year\n01,2024\n")
+
+    medsl_dir = curated / "medsl"
+    medsl_dir.mkdir(parents=True)
+    pd.DataFrame({"county_fips": ["01001"]}).to_parquet(
+        medsl_dir / "medsl_county_presidential_returns__Y2000-2024.parquet"
+    )
+    pd.DataFrame({"county_fips": ["01001"]}).to_parquet(
+        medsl_dir / "medsl_president_county__Y2000-2024@C2020.parquet"
+    )
+
     return data_dir
 
 
@@ -148,6 +162,10 @@ class TestStatusHuman:
         assert "MSA-CoC Coverage: 1 file(s)" in result.output
         assert "basis=area+population" in result.output
         assert "LAUS:       2 file(s)" in result.output
+        assert "MEDSL:      2 curated file(s)" in result.output
+        assert "county raw=yes" in result.output
+        assert "state raw=yes" in result.output
+        assert "Y2000-2024@C2020" in result.output
         assert "Recipe Outputs: 1 namespace(s)" in result.output
         assert (
             "demo-recipe: 1 panel(s), 1 manifest(s), 1 diagnostics file(s), 1 map(s)"
@@ -237,6 +255,22 @@ class TestStatusJSON:
         assert payload["assets"]["msa"]["coverage_count"] == 1
         assert payload["assets"]["msa"]["coverage"][0]["overlap_bases"] == ["area", "population"]
         assert payload["assets"]["laus"]["years"] == [2022, 2023]
+        assert payload["assets"]["medsl"]["curated_count"] == 2
+        assert payload["assets"]["medsl"]["raw"]["county_presidential_returns"]["exists"] is True
+        assert payload["assets"]["medsl"]["raw"]["state_presidential_returns"]["exists"] is True
+        assert payload["assets"]["medsl"]["president_county"] == [
+            {
+                "start_year": 2000,
+                "end_year": 2024,
+                "county_vintage": 2020,
+                "path": str(
+                    data_dir
+                    / "curated"
+                    / "medsl"
+                    / "medsl_president_county__Y2000-2024@C2020.parquet"
+                ),
+            }
+        ]
         assert payload["recipe_outputs"]["count"] == 1
         assert payload["recipe_outputs"]["panel_count"] == 1
         assert payload["recipe_outputs"]["manifest_count"] == 1
@@ -289,7 +323,7 @@ class TestStatusJSON:
         assert set(payload.keys()) == {"status", "assets", "recipe_outputs", "guidance", "issues"}
         assert set(payload["assets"].keys()) == {
             "boundaries", "census", "crosswalks", "pit", "hic", "metro",
-            "msa", "measures", "acs", "zori", "laus",
+            "msa", "measures", "acs", "zori", "laus", "medsl",
         }
 
     def test_status_json_warns_on_partial_msa_artifacts(self, tmp_path):

@@ -53,6 +53,64 @@ class TestNestedIngestCommand:
         assert result.exit_code == 0
         assert "MEDSL county presidential returns" in result.output
 
+    def test_ingest_medsl_presidential_json(self):
+        output_path = Path(
+            "data/curated/medsl/medsl_county_presidential_returns__Y2000-2024.parquet"
+        )
+        with (
+            patch(
+                "hhplab.cli.ingest_medsl.ingest_county_presidential_returns",
+                return_value=output_path,
+            ) as mock_ingest,
+            patch("hhplab.cli.ingest_medsl.pd.read_parquet") as mock_read_parquet,
+        ):
+            mock_read_parquet.return_value = [object(), object(), object()]
+            result = runner.invoke(
+                app,
+                ["ingest", "medsl-presidential", "--force", "--json"],
+            )
+
+        assert result.exit_code == 0, result.output
+        payload = json.loads(result.output)
+        assert payload["status"] == "ok"
+        assert payload["provider"] == "medsl"
+        assert payload["product"] == "county_presidential_returns"
+        assert payload["output_path"] == str(output_path)
+        assert payload["row_count"] == 3
+        mock_ingest.assert_called_once()
+
+    def test_ingest_medsl_presidential_json_file_error(self):
+        with patch(
+            "hhplab.cli.ingest_medsl.ingest_county_presidential_returns",
+            side_effect=FileNotFoundError(
+                "MEDSL raw file not found at data/raw/medsl/countypres_2000-2024.tab. "
+                "Download County Presidential Election Returns 2000-2024."
+            ),
+        ):
+            result = runner.invoke(app, ["ingest", "medsl-presidential", "--json"])
+
+        assert result.exit_code == 2
+        payload = json.loads(result.output)
+        assert payload["status"] == "error"
+        assert "countypres_2000-2024.tab" in payload["error"]
+        assert "Download County Presidential Election Returns 2000-2024" in payload["error"]
+
+    def test_build_medsl_president_county_json_validation_error(self):
+        with patch(
+            "hhplab.cli.build_medsl.materialize_county_political_leaning",
+            side_effect=ValueError(
+                "MEDSL county presidential file is missing required columns: "
+                "['county_fips']. Expected columns include county_fips."
+            ),
+        ):
+            result = runner.invoke(app, ["build", "medsl-president-county", "--json"])
+
+        assert result.exit_code == 2
+        payload = json.loads(result.output)
+        assert payload["status"] == "error"
+        assert "missing required columns" in payload["error"]
+        assert "county_fips" in payload["error"]
+
     def test_build_medsl_president_county_json(self):
         output_path = Path("data/curated/medsl/medsl_president_county__Y2000-2024@C2020.parquet")
         with (

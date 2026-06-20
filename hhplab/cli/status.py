@@ -154,6 +154,22 @@ def status_cmd(
     laus = assets["laus"]
     typer.echo(f"LAUS:       {laus['count']} file(s)  {_fmt_years(laus['years'])}")
 
+    # MEDSL
+    medsl = assets["medsl"]
+    county_raw = medsl["raw"]["county_presidential_returns"]
+    state_raw = medsl["raw"]["state_presidential_returns"]
+    medsl_versions = ", ".join(
+        f"Y{item['start_year']}-{item['end_year']}@C{item['county_vintage']}"
+        for item in medsl["president_county"]
+    ) if medsl["president_county"] else "-"
+    typer.echo(
+        "MEDSL:      "
+        f"{medsl['curated_count']} curated file(s); "
+        f"county raw={'yes' if county_raw['exists'] else 'no'}; "
+        f"state raw={'yes' if state_raw['exists'] else 'no'}; "
+        f"president county={medsl_versions}"
+    )
+
     # Recipe outputs
     typer.echo(
         f"\nRecipe Outputs: {recipe_outputs['count']} namespace(s)  root={recipe_outputs['root']}"

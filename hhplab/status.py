@@ -336,6 +336,65 @@ def _scan_laus(curated: Path) -> dict:
     return {"count": len(items), "items": items, "years": sorted(years_set)}
 
 
+def _file_status(path: Path) -> dict:
+    """Return stable existence metadata for one file."""
+    payload: dict = {"path": str(path), "exists": path.exists()}
+    if path.exists():
+        payload["file_size"] = path.stat().st_size
+    return payload
+
+
+def _scan_medsl(data_dir: Path, curated: Path) -> dict:
+    """Scan raw and curated MEDSL presidential artifacts."""
+    import re
+
+    raw_dir = data_dir / "raw" / "medsl"
+    mdir = curated / "medsl"
+    returns_items: list[dict] = []
+    president_county_items: list[dict] = []
+    if mdir.exists():
+        for p in sorted(mdir.glob("*.parquet")):
+            m = re.match(
+                r"^medsl_county_presidential_returns__Y(\d{4})-(\d{4})\.parquet$",
+                p.name,
+            )
+            if m:
+                returns_items.append(
+                    {
+                        "start_year": int(m.group(1)),
+                        "end_year": int(m.group(2)),
+                        "path": str(p),
+                    }
+                )
+                continue
+            m = re.match(
+                r"^medsl_president_county__Y(\d{4})-(\d{4})@C(\d{4})\.parquet$",
+                p.name,
+            )
+            if m:
+                president_county_items.append(
+                    {
+                        "start_year": int(m.group(1)),
+                        "end_year": int(m.group(2)),
+                        "county_vintage": int(m.group(3)),
+                        "path": str(p),
+                    }
+                )
+    return {
+        "raw": {
+            "county_presidential_returns": _file_status(
+                raw_dir / "countypres_2000-2024.tab"
+            ),
+            "state_presidential_returns": _file_status(
+                raw_dir / "1976-2024-president.csv"
+            ),
+        },
+        "curated_returns": returns_items,
+        "president_county": president_county_items,
+        "curated_count": len(returns_items) + len(president_county_items),
+    }
+
+
 def _scan_recipe_outputs(output_root: Path) -> dict:
     """Scan recipe-built outputs under the configured output root."""
     recipes: list[dict] = []
@@ -576,6 +635,7 @@ def collect_status_report(
         "acs": _scan_acs(curated),
         "zori": _scan_zori(curated),
         "laus": _scan_laus(curated),
+        "medsl": _scan_medsl(data_dir, curated),
     }
     recipe_outputs = _scan_recipe_outputs(resolved_output_root)
     issues = check_prerequisites(assets)
