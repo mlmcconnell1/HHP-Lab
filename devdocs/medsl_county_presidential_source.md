@@ -46,8 +46,15 @@ mapping. The first ingest should surface Alaska coverage diagnostics separately.
 
 Rows with missing `county_fips` are special statewide/federal/UOCAVA/write-in
 records for Connecticut, Maine, and Rhode Island. In the staged file there are
-52 such rows, all with `totalvotes == 0`. The ingest should exclude them from
-county-year measures and report the dropped row count by state/year.
+52 such rows. Some 2012-2020 rows have positive vote totals, but they still do
+not identify a county-equivalent geography. The ingest should exclude those
+known non-county rows from county-year measures and report the dropped row count
+by state/year.
+
+Missouri `KANSAS CITY` rows use `county_fips == 2938000`, which is not a
+five-character county FIPS. Treat these as known non-county place rows and
+exclude them from county-native outputs unless a later mapping task explicitly
+defines an allocation rule.
 
 The file includes `TOTAL` rows and voting-mode-specific rows. County-year
 measure materialization should use `mode == "TOTAL"` after validating that the

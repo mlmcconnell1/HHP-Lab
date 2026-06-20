@@ -27,6 +27,7 @@ _LAZY_EXPORTS = frozenset(
         "geo",
         "hud",
         "ingest",
+        "medsl",
         "measures",
         "metro",
         "naming",

@@ -46,6 +46,12 @@ class TestNestedIngestCommand:
         assert "Successfully ingested" in result.output
         mock_ingest.assert_called_once_with("2025", show_progress=True)
 
+    def test_ingest_medsl_presidential_help(self):
+        result = runner.invoke(app, ["ingest", "medsl-presidential", "--help"])
+
+        assert result.exit_code == 0
+        assert "MEDSL county presidential returns" in result.output
+
 
 class TestListBoundariesCommand:
     """Tests for the 'list boundaries' command."""

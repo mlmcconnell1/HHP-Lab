@@ -55,6 +55,7 @@ def _build_clean_curated(base: Path) -> None:
         "msa": "msa_boundaries__census_msa_2023.parquet",
         "maps": "CO-500__2025.html",
         "prism": "prism_county_monthly__tmin__Y2024M01@C2023.parquet",
+        "medsl": "medsl_county_presidential_returns__Y2000-2024.parquet",
     }
     for subdir, filename in canonical_examples.items():
         _touch(base / subdir / filename)
@@ -186,6 +187,7 @@ class TestCanonicalFilenamesAccepted:
             ),
             ("maps", "CO-500__2025.html"),
             ("prism", "prism_county_monthly__tmin__Y2024M01@C2023.parquet"),
+            ("medsl", "medsl_county_presidential_returns__Y2000-2024.parquet"),
         ],
     )
     def test_canonical_name_accepted(

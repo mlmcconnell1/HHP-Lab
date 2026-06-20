@@ -33,6 +33,7 @@ from hhplab.cli.ingest_decennial_tract_population import (
 )
 from hhplab.cli.ingest_hic import ingest_hic
 from hhplab.cli.ingest_laus_metro import ingest_laus_metro
+from hhplab.cli.ingest_medsl import ingest_medsl_presidential
 from hhplab.cli.ingest_msa_boundaries import ingest_msa_boundaries
 from hhplab.cli.ingest_nhgis import ingest_nhgis
 from hhplab.cli.ingest_pit import ingest_pit
@@ -118,6 +119,7 @@ def register_commands(
     ingest_app.command("tract-relationship")(ingest_tract_relationship)
     ingest_app.command("zori")(ingest_zori)
     ingest_app.command("pep")(ingest_pep)
+    ingest_app.command("medsl-presidential")(ingest_medsl_presidential)
     list_app.command("boundaries")(list_boundaries_cmd)
     list_app.command("census")(list_census)
     list_app.command("curated")(list_curated)

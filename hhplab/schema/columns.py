@@ -414,6 +414,28 @@ PEP_COUNTY_OUTPUT_COLUMNS: list[str] = [
     "ingested_at",
 ]
 
+MEDSL_COUNTY_PRESIDENTIAL_OUTPUT_COLUMNS: list[str] = [
+    "geo_type",
+    "geo_id",
+    "county_fips",
+    "state",
+    "state_po",
+    "county_name",
+    "year",
+    "office",
+    "candidate",
+    "party",
+    "party_simplified",
+    "candidatevotes",
+    "totalvotes",
+    "source_version",
+    "data_source",
+    "source_url",
+    "source_doi",
+    "raw_sha256",
+    "ingested_at",
+]
+
 URBAN_AREA_GEOMETRY_COLUMNS: tuple[str, ...] = (
     "urban_area_geoid",
     "urban_area_name",
