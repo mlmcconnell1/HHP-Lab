@@ -55,5 +55,7 @@ def test_pit_root_reexports_ingest_and_qa_helpers() -> None:
 
 def test_medsl_root_reexports_ingest_helpers() -> None:
     """MEDSL root should expose county presidential ingest helpers."""
+    assert callable(medsl.build_county_political_leaning_measures)
     assert callable(medsl.ingest_county_presidential_returns)
+    assert callable(medsl.materialize_county_political_leaning)
     assert callable(medsl.parse_county_presidential_returns)

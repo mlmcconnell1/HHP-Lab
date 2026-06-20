@@ -75,3 +75,15 @@ Metadata should include the DOI, Dataverse datafile id, release/update date,
 version, license, citation note, year coverage, and the geography decisions
 above. The default registry path is ignored with `data/`, so this document is
 the committed source contract for recreating the local registry entry.
+
+## Derived County-Year Measures
+
+The canonical county-year political leaning artifact is:
+
+`data/curated/medsl/medsl_president_county__Y2000-2024@C2020.parquet`
+
+It contains one row per `county_fips`/presidential election year. Vote shares
+use `totalvotes` as the denominator. Democratic/Republican ratios are null when
+the opposite-party denominator is zero or missing. `democratic_margin` is
+`democratic_vote_share - republican_vote_share`, and `major_party_vote_share` is
+`two_party_votes / totalvotes`.

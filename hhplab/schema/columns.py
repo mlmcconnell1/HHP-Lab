@@ -436,6 +436,28 @@ MEDSL_COUNTY_PRESIDENTIAL_OUTPUT_COLUMNS: list[str] = [
     "ingested_at",
 ]
 
+MEDSL_PRESIDENT_COUNTY_MEASURE_COLUMNS: list[str] = [
+    "geo_type",
+    "geo_id",
+    "county_fips",
+    "county_vintage",
+    "year",
+    "democratic_votes",
+    "republican_votes",
+    "two_party_votes",
+    "totalvotes",
+    "democratic_vote_share",
+    "republican_vote_share",
+    "democratic_republican_vote_ratio",
+    "republican_democratic_vote_ratio",
+    "democratic_margin",
+    "major_party_vote_share",
+    "data_source",
+    "source_url",
+    "source_version",
+    "raw_sha256",
+]
+
 URBAN_AREA_GEOMETRY_COLUMNS: tuple[str, ...] = (
     "urban_area_geoid",
     "urban_area_name",

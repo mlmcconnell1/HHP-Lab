@@ -95,6 +95,34 @@ def prism_county_monthly_filename(
     return f"prism_county_monthly__{variable}__Y{year}M{month_int:02d}@C{county_vintage}.parquet"
 
 
+def medsl_president_county_filename(
+    start_year: str | int,
+    end_year: str | int,
+    county_vintage: str | int,
+) -> str:
+    """Generate filename for MEDSL county presidential leaning measures."""
+    return f"medsl_president_county__Y{start_year}-{end_year}@C{county_vintage}.parquet"
+
+
+def medsl_president_county_path(
+    start_year: str | int,
+    end_year: str | int,
+    county_vintage: str | int,
+    base_dir: Path | str | None = None,
+) -> Path:
+    """Get canonical path for MEDSL county presidential leaning measures."""
+    if base_dir is None:
+        base_dir = Path("data")
+    else:
+        base_dir = Path(base_dir)
+    return (
+        base_dir
+        / "curated"
+        / "medsl"
+        / medsl_president_county_filename(start_year, end_year, county_vintage)
+    )
+
+
 def urban_area_filename(urban_area_vintage: str | int) -> str:
     """Generate filename for Census Urban Area geometry.
 
