@@ -39,6 +39,7 @@ targets:
         - bottom_decile_contract_rent
         - median_contract_rent
         - bottom_decile_to_median_contract_rent_ratio
+        - bottom_decile_household_income
 
 datasets:
   pit:
@@ -153,6 +154,7 @@ pipelines:
             - bottom_decile_contract_rent
             - median_contract_rent
             - bottom_decile_to_median_contract_rent_ratio
+            - bottom_decile_household_income
 
       - join:
           datasets: [pit, hic, pep_county, acs5_msa_contract_rent]
