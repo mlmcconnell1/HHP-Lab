@@ -425,7 +425,7 @@ def _load_hic_for_year(
         return pd.DataFrame(columns=HIC_PANEL_JOIN_COLUMNS)
 
     df = pd.read_parquet(path)
-    required = {"hic_year", "coc_id", "total_beds", "total_units"}
+    required = {"hic_year", "coc_id"}
     missing = sorted(required - set(df.columns))
     if missing:
         raise ValueError(f"HIC artifact {path} is missing required column(s): {missing}.")
@@ -436,8 +436,15 @@ def _load_hic_for_year(
 
     df["coc_id"] = df["coc_id"].astype(str)
     df["year"] = pd.to_numeric(df["hic_year"], errors="raise").astype(int)
-    df["hic_total_beds"] = pd.to_numeric(df["total_beds"], errors="coerce")
-    df["hic_total_units"] = pd.to_numeric(df["total_units"], errors="coerce")
+    for column in HIC_PANEL_MEASURE_COLUMNS:
+        if column in df.columns:
+            df[column] = pd.to_numeric(df[column], errors="coerce")
+        elif column == "hic_total_beds" and "total_beds" in df.columns:
+            df[column] = pd.to_numeric(df["total_beds"], errors="coerce")
+        elif column == "hic_total_units" and "total_units" in df.columns:
+            df[column] = pd.to_numeric(df["total_units"], errors="coerce")
+        else:
+            df[column] = 0
 
     duplicate_mask = df.duplicated(["coc_id", "year"], keep=False)
     if duplicate_mask.any():

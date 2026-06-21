@@ -124,7 +124,7 @@ def _normalize_recipe_hic_columns(panel: pd.DataFrame, *, recipe) -> pd.DataFram
     """Rename canonical HIC source columns to stable panel measure names."""
     if not _recipe_uses_hic(recipe):
         return panel
-    renames = dict(zip(("total_beds", "total_units"), HIC_PANEL_MEASURE_COLUMNS, strict=True))
+    renames = {"total_beds": "hic_total_beds", "total_units": "hic_total_units"}
     active = {
         source: target
         for source, target in renames.items()

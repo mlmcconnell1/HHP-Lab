@@ -192,7 +192,12 @@ def _hic_recipe_dict() -> dict:
                                 "source": "hud_exchange",
                             },
                             "method": "identity",
-                            "measures": ["total_beds", "total_units"],
+                            "measures": [
+                                "total_beds",
+                                "total_units",
+                                "hic_es_year_round_beds",
+                                "hic_psh_year_round_beds",
+                            ],
                         },
                     },
                     {
@@ -225,6 +230,8 @@ def _setup_hic_fixtures(tmp_path: Path) -> None:
             "hic_year": [2024, 2024],
             "total_beds": [110, 210],
             "total_units": [55, 80],
+            "hic_es_year_round_beds": [40, 75],
+            "hic_psh_year_round_beds": [70, 135],
         }
     ).to_parquet(data_dir / "hic.parquet")
 
@@ -713,10 +720,14 @@ class TestHicPanelRecipe:
         panel = pd.read_parquet(_find_panel_output(tmp_path))
         assert "hic_total_beds" in panel.columns
         assert "hic_total_units" in panel.columns
+        assert "hic_es_year_round_beds" in panel.columns
+        assert "hic_psh_year_round_beds" in panel.columns
         assert "total_beds" not in panel.columns
         assert "total_units" not in panel.columns
         assert panel.loc[panel["coc_id"] == "COC1", "hic_total_beds"].item() == 110
         assert panel.loc[panel["coc_id"] == "COC2", "hic_total_units"].item() == 80
+        assert panel.loc[panel["coc_id"] == "COC1", "hic_es_year_round_beds"].item() == 40
+        assert panel.loc[panel["coc_id"] == "COC2", "hic_psh_year_round_beds"].item() == 135
 
 
 class TestZoriPanelPolicy:
@@ -1684,6 +1695,8 @@ class TestMsaPanelParity:
                 "year": [2024],
                 "hic_total_beds": [110],
                 "hic_total_units": [55],
+                "hic_es_year_round_beds": [40],
+                "hic_psh_year_round_beds": [70],
             }
         )
 
@@ -1692,6 +1705,8 @@ class TestMsaPanelParity:
         assert flags.measure_columns is not None
         assert "hic_total_beds" in flags.measure_columns
         assert "hic_total_units" in flags.measure_columns
+        assert "hic_es_year_round_beds" in flags.measure_columns
+        assert "hic_psh_year_round_beds" in flags.measure_columns
 
 
 # ===========================================================================

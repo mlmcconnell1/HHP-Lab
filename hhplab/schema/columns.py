@@ -695,10 +695,7 @@ HIC_EXPANDED_MEASURE_SCHEMA: tuple[dict[str, object], ...] = (
     },
 )
 
-HIC_PANEL_MEASURE_COLUMNS: list[str] = [
-    "hic_total_beds",
-    "hic_total_units",
-]
+HIC_PANEL_MEASURE_COLUMNS: list[str] = list(HIC_EXPANDED_MEASURE_COLUMNS)
 
 ZORI_INGEST_OUTPUT_COLUMNS: list[str] = [
     "geo_type",

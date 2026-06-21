@@ -535,6 +535,8 @@ class TestBuildPanel:
         assert len(result) == len(baseline)
         assert "hic_total_beds" in result.columns
         assert "hic_total_units" in result.columns
+        assert "hic_es_year_round_beds" in result.columns
+        assert "hic_psh_year_round_beds" in result.columns
         assert result.loc[
             (result["coc_id"] == "CO-500") & (result["year"] == 2024),
             "hic_total_beds",
@@ -543,6 +545,10 @@ class TestBuildPanel:
             (result["coc_id"] == "CA-600") & (result["year"] == 2023),
             "hic_total_units",
         ].item() == 75
+        assert result.loc[
+            (result["coc_id"] == "CO-500") & (result["year"] == 2024),
+            "hic_es_year_round_beds",
+        ].item() == 0
 
     def test_build_with_hic_missing_year_raises_actionable_error(self, data_dirs):
         """Missing HIC years point to the ingest command and raw file location."""
