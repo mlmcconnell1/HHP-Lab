@@ -4,8 +4,9 @@ version: 1
 name: coc_pit_hic_2010_2024
 description: >
   Build a national CoC panel for 2010-2024 that joins HUD PIT counts with HUD
-  Housing Inventory Count summary beds and units at CoC-native geography. PIT
-  and HIC are both aligned to the January point-in-time inventory year.
+  Housing Inventory Count shelter and permanent-housing inventory measures at
+  CoC-native geography. PIT and HIC are both aligned to the January
+  point-in-time inventory year.
 
 universe:
   range: "2010-2024"
@@ -22,6 +23,13 @@ targets:
         - pit_total
         - pit_sheltered
         - pit_unsheltered
+        - hic_es_year_round_beds
+        - hic_th_year_round_beds
+        - hic_sh_year_round_beds
+        - hic_rrh_year_round_beds
+        - hic_psh_year_round_beds
+        - hic_oph_year_round_beds
+        - hic_shelter_year_round_beds
         - hic_total_beds
         - hic_total_units
 
@@ -71,7 +79,16 @@ pipelines:
           dataset: hic
           to_geometry: { type: coc, vintage: 2025, source: hud_exchange }
           method: identity
-          measures: [total_beds, total_units]
+          measures:
+            - hic_es_year_round_beds
+            - hic_th_year_round_beds
+            - hic_sh_year_round_beds
+            - hic_rrh_year_round_beds
+            - hic_psh_year_round_beds
+            - hic_oph_year_round_beds
+            - hic_shelter_year_round_beds
+            - hic_total_beds
+            - hic_total_units
 
       - join:
           datasets: [pit, hic]

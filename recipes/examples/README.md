@@ -89,9 +89,10 @@ the output downstream.
   National CoC PIT panel with CoC names plus density derived from lagged ACS5
   total population and curated CoC boundaries.
 - `coc-pit-hic-2010-2024.yaml`
-  National CoC PIT panel joined to HUD HIC total bed and unit inventory counts.
-  Requires parsed `data/curated/hic/hic__H<YEAR>.parquet` artifacts for
-  2010-2024.
+  National CoC PIT panel joined to HUD HIC inventory measures. It requests
+  ES/TH/SH/RRH/PSH/OPH year-round bed columns, a shelter-only ES+TH+SH total,
+  the explicit all-program `hic_total_beds`, and `hic_total_units`. Requires
+  parsed `data/curated/hic/hic__H<YEAR>.parquet` artifacts for 2010-2024.
 - `coc-sae-acs1-2023.yaml`
   One-year CoC SAE example that allocates ACS1 county components through ACS5
   tract distribution supports. It requests labor-force, rent-burden, and

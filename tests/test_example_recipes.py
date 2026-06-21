@@ -393,6 +393,30 @@ def test_example_recipe_loads_and_resolves(case: ExampleRecipeCase):
     assert len(plan.resample_tasks) == len(case.years) * len(case.datasets)
 
 
+def test_coc_pit_hic_example_requests_expanded_hic_measures() -> None:
+    recipe = _load_example("coc-pit-hic-2010-2024.yaml")
+    plan = resolve_plan(recipe, "build_coc_panel")
+    target = recipe.targets[0]
+    expected_hic_measures = [
+        "hic_es_year_round_beds",
+        "hic_th_year_round_beds",
+        "hic_sh_year_round_beds",
+        "hic_rrh_year_round_beds",
+        "hic_psh_year_round_beds",
+        "hic_oph_year_round_beds",
+        "hic_shelter_year_round_beds",
+        "hic_total_beds",
+        "hic_total_units",
+    ]
+
+    hic_tasks = [task for task in plan.resample_tasks if task.dataset_id == "hic"]
+
+    assert target.panel_policy is not None
+    assert all(column in target.panel_policy.output_columns for column in expected_hic_measures)
+    assert hic_tasks
+    assert all(list(task.measures) == expected_hic_measures for task in hic_tasks)
+
+
 @pytest.mark.parametrize(
     "case",
     CONTAINMENT_RECIPE_CASES,
