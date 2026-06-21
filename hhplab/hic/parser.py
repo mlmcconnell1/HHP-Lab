@@ -14,7 +14,7 @@ from hhplab.naming import hic_filename
 from hhplab.paths import curated_dir
 from hhplab.pit.ingest.parser import normalize_coc_id
 from hhplab.provenance import ProvenanceBlock, write_parquet_with_provenance
-from hhplab.schema.columns import HIC_CANONICAL_COLUMNS
+from hhplab.schema.columns import HIC_CANONICAL_COLUMNS, HIC_PROJECT_TYPES
 
 CANONICAL_COLUMNS: list[str] = HIC_CANONICAL_COLUMNS
 
@@ -53,6 +53,49 @@ _COLUMN_ALIASES: dict[str, tuple[str, ...]] = {
         "total_units_for_households_with_children_es_th_sh",
     ),
 }
+
+_PROJECT_BED_ALIASES: dict[str, tuple[str, ...]] = {
+    "es": ("total_year_round_beds_es",),
+    "th": ("total_year_round_beds_th",),
+    "sh": ("total_year_round_beds_sh",),
+    "rrh": (
+        "total_year_round_beds_rrh",
+        "total_year_round_rrh_beds",
+        "total_rapid_rehousing_rrh_beds",
+        "total_rrh_beds",
+    ),
+    "psh": (
+        "total_year_round_beds_psh",
+        "total_year_round_psh_beds",
+        "total_psh_beds",
+    ),
+    "oph": ("total_year_round_beds_oph",),
+}
+
+_PROJECT_UNIT_ALIASES: dict[str, tuple[str, ...]] = {
+    "es": ("total_units_for_households_with_children_es",),
+    "th": ("total_units_for_households_with_children_th",),
+    "sh": ("total_units_for_households_with_children_sh",),
+    "rrh": (
+        "total_units_for_households_with_children_rrh",
+        "total_rrh_units_for_households_with_children",
+    ),
+    "psh": (
+        "total_units_for_households_with_children_psh",
+        "total_psh_units_for_households_with_children",
+    ),
+    "oph": ("total_units_for_households_with_children_oph",),
+}
+
+_SHELTER_BED_ALIASES: tuple[str, ...] = (
+    "total_year_round_beds_es_th_sh",
+    "total_year_round_beds_es_th_rrh_sh",
+)
+_SHELTER_UNIT_ALIASES: tuple[str, ...] = (
+    "total_units_for_households_with_children_es_th_sh",
+    "total_units_for_households_with_children_es_th_rrh",
+    "total_units_for_households_with_children_es_th",
+)
 
 _BED_COLUMN_RE = re.compile(r"(?:^|_)beds?(?:_|$)|(?:^|_)bed_inventory(?:_|$)")
 _UNIT_COLUMN_RE = re.compile(r"(?:^|_)units?(?:_|$)|(?:^|_)unit_inventory(?:_|$)")
@@ -143,9 +186,19 @@ def _resolve_column(columns: set[str], canonical: str) -> str | None:
     return None
 
 
+def _resolve_alias(columns: set[str], aliases: tuple[str, ...]) -> str | None:
+    for candidate in aliases:
+        if candidate in columns:
+            return candidate
+    return None
+
+
 def _numeric_series(df: pd.DataFrame, column: str) -> pd.Series:
+    raw_column = df[column]
+    if isinstance(raw_column, pd.DataFrame):
+        raw_column = raw_column.iloc[:, 0]
     cleaned = (
-        df[column]
+        raw_column
         .astype("string")
         .str.replace(",", "", regex=False)
         .str.replace(r"^\s*$", "", regex=True)
@@ -228,6 +281,89 @@ def _coerce_count_column(
     return total
 
 
+def _zero_count_series(df: pd.DataFrame) -> pd.Series:
+    return pd.Series(0, index=df.index, dtype="float64")
+
+
+def _coerce_optional_count_column(
+    df: pd.DataFrame,
+    column_set: set[str],
+    aliases: tuple[str, ...],
+) -> pd.Series:
+    column = _resolve_alias(column_set, aliases)
+    if column is None:
+        return _zero_count_series(df)
+    return _numeric_series(df, column)
+
+
+def _coerce_hic_expanded_counts(
+    df: pd.DataFrame,
+    column_set: set[str],
+    *,
+    total_beds: pd.Series,
+    total_units: pd.Series,
+) -> pd.DataFrame:
+    expanded = pd.DataFrame(index=df.index)
+
+    for project_type in HIC_PROJECT_TYPES:
+        expanded[f"hic_{project_type}_year_round_beds"] = _coerce_optional_count_column(
+            df,
+            column_set,
+            _PROJECT_BED_ALIASES[project_type],
+        )
+        expanded[f"hic_{project_type}_family_units"] = _coerce_optional_count_column(
+            df,
+            column_set,
+            _PROJECT_UNIT_ALIASES[project_type],
+        )
+
+    shelter_beds = _coerce_optional_count_column(df, column_set, _SHELTER_BED_ALIASES)
+    if "total_year_round_beds_es_th_rrh_sh" in column_set:
+        shelter_beds = (shelter_beds - expanded["hic_rrh_year_round_beds"]).clip(lower=0)
+    elif shelter_beds.eq(0).all():
+        shelter_beds = (
+            expanded["hic_es_year_round_beds"]
+            + expanded["hic_th_year_round_beds"]
+            + expanded["hic_sh_year_round_beds"]
+        )
+
+    shelter_units = _coerce_optional_count_column(df, column_set, _SHELTER_UNIT_ALIASES)
+    if "total_units_for_households_with_children_es_th_rrh" in column_set:
+        shelter_units = (shelter_units - expanded["hic_rrh_family_units"]).clip(lower=0)
+    elif shelter_units.eq(0).all():
+        shelter_units = (
+            expanded["hic_es_family_units"]
+            + expanded["hic_th_family_units"]
+            + expanded["hic_sh_family_units"]
+        )
+
+    all_program_beds = (
+        shelter_beds
+        + expanded["hic_rrh_year_round_beds"]
+        + expanded["hic_psh_year_round_beds"]
+        + expanded["hic_oph_year_round_beds"]
+    )
+    all_program_units = (
+        shelter_units
+        + expanded["hic_rrh_family_units"]
+        + expanded["hic_psh_family_units"]
+        + expanded["hic_oph_family_units"]
+    )
+
+    expanded["hic_shelter_year_round_beds"] = shelter_beds
+    expanded["hic_shelter_family_units"] = shelter_units
+    expanded["hic_total_beds"] = all_program_beds.where(
+        all_program_beds.gt(0),
+        total_beds,
+    )
+    expanded["hic_total_units"] = all_program_units.where(
+        all_program_units.gt(0),
+        total_units,
+    )
+
+    return expanded
+
+
 def parse_hic_file(
     file_path: Path | str,
     *,
@@ -289,6 +425,16 @@ def parse_hic_file(
         _UNIT_COLUMN_RE,
         year=year,
     )
+    expanded = _coerce_hic_expanded_counts(
+        df,
+        column_set,
+        total_beds=parsed["total_beds"],
+        total_units=parsed["total_units"],
+    )
+    for column in expanded.columns:
+        parsed[column] = expanded[column]
+    parsed["total_beds"] = parsed["hic_total_beds"]
+    parsed["total_units"] = parsed["hic_total_units"]
 
     valid = parsed["coc_id"].notna()
     parsed = parsed.loc[valid].copy()
@@ -307,12 +453,26 @@ def parse_hic_file(
             state=("state", _first_non_null),
             total_beds=("total_beds", "sum"),
             total_units=("total_units", "sum"),
+            **{
+                column: (column, "sum")
+                for column in CANONICAL_COLUMNS
+                if column.startswith("hic_") and column != "hic_year"
+            },
         )
         .sort_values(["hic_year", "coc_id"])
         .reset_index(drop=True)
     )
-    grouped["total_beds"] = grouped["total_beds"].round().astype("Int64")
-    grouped["total_units"] = grouped["total_units"].round().astype("Int64")
+    for column in [
+        "total_beds",
+        "total_units",
+        *[
+            column
+            for column in CANONICAL_COLUMNS
+            if column.startswith("hic_") and column != "hic_year"
+        ],
+    ]:
+        if column in grouped:
+            grouped[column] = grouped[column].round().astype("Int64")
     grouped["data_source"] = source
     grouped["source_ref"] = source_ref or str(path)
     grouped["ingested_at"] = datetime.now(UTC)
@@ -363,8 +523,16 @@ def write_hic_parquet(
 
     normalized = df[CANONICAL_COLUMNS].copy()
     normalized["hic_year"] = normalized["hic_year"].astype("int64")
-    normalized["total_beds"] = normalized["total_beds"].astype("Int64")
-    normalized["total_units"] = normalized["total_units"].astype("Int64")
+    for column in [
+        "total_beds",
+        "total_units",
+        *[
+            column
+            for column in CANONICAL_COLUMNS
+            if column.startswith("hic_") and column != "hic_year"
+        ],
+    ]:
+        normalized[column] = normalized[column].astype("Int64")
     normalized["ingested_at"] = pd.to_datetime(normalized["ingested_at"], utc=True)
 
     years = sorted(int(year) for year in normalized["hic_year"].dropna().unique())

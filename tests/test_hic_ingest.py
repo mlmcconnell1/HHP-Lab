@@ -82,6 +82,9 @@ def test_parse_hic_file_aggregates_coc_year_rows(tmp_path: Path) -> None:
     assert denver["state"] == "CO"
     assert denver["total_beds"] == 1500
     assert denver["total_units"] == 500
+    assert denver["hic_total_beds"] == 1500
+    assert denver["hic_total_units"] == 500
+    assert denver["hic_es_year_round_beds"] == 0
 
 
 def test_parse_hic_file_sums_component_bed_and_unit_columns(tmp_path: Path) -> None:
@@ -105,6 +108,54 @@ def test_parse_hic_file_sums_component_bed_and_unit_columns(tmp_path: Path) -> N
     row = result.df.iloc[0]
     assert row["total_beds"] == 30
     assert row["total_units"] == 7
+
+
+def test_parse_hic_file_expands_modern_project_type_columns(tmp_path: Path) -> None:
+    rows = [
+        {
+            "CocState": "CO",
+            "CoC": "Denver",
+            "CoC ID": "CO-500",
+            "year": "2025",
+            "Total Year-Round Beds (ES, TH, SH)": "35",
+            "Total Year-Round Beds (ES)": "10",
+            "Total Year-Round Beds (TH)": "20",
+            "Total Year-Round Beds (SH)": "5",
+            "Total Year-Round Beds (RRH)": "7",
+            "Total Year-Round Beds (PSH)": "100",
+            "Total Year-Round Beds (OPH)": "3",
+            "Total Units for Households with Children (ES, TH, SH)": "6",
+            "Total Units for Households with Children (ES)": "1",
+            "Total Units for Households with Children (TH)": "2",
+            "Total Units for Households with Children (SH)": "3",
+            "Total Units for Households with Children (RRH)": "4",
+            "Total Units for Households with Children (PSH)": "40",
+            "Total Units for Households with Children (OPH)": "5",
+        }
+    ]
+    raw_path = _write_hic_csv(tmp_path / "2025-HIC-Counts-by-CoC.csv", rows)
+
+    result = parse_hic_file(raw_path, year=2025)
+
+    row = result.df.iloc[0]
+    assert row["hic_es_year_round_beds"] == 10
+    assert row["hic_th_year_round_beds"] == 20
+    assert row["hic_sh_year_round_beds"] == 5
+    assert row["hic_rrh_year_round_beds"] == 7
+    assert row["hic_psh_year_round_beds"] == 100
+    assert row["hic_oph_year_round_beds"] == 3
+    assert row["hic_shelter_year_round_beds"] == 35
+    assert row["hic_total_beds"] == 145
+    assert row["total_beds"] == 145
+    assert row["hic_es_family_units"] == 1
+    assert row["hic_th_family_units"] == 2
+    assert row["hic_sh_family_units"] == 3
+    assert row["hic_rrh_family_units"] == 4
+    assert row["hic_psh_family_units"] == 40
+    assert row["hic_oph_family_units"] == 5
+    assert row["hic_shelter_family_units"] == 6
+    assert row["hic_total_units"] == 55
+    assert row["total_units"] == 55
 
 
 def test_parse_hic_file_prefers_unaliased_total_over_components(tmp_path: Path) -> None:
@@ -232,10 +283,24 @@ def test_parse_hic_file_handles_old_aggregate_workbook_sheets(
             bed_header,
             "Total Emergency Shelter (ES) Beds (excluding seasonal+overflow)",
             "Total Transitional Housing (TH) Beds",
+            "Total Rapid Rehousing (RRH) Beds",
+            "Total Year-Round PSH Beds",
             unit_header,
+            "Total RRH Units for Households with Children",
+            "Total PSH Units for Households with Children",
         ],
-        ["AK-500", str(expected_beds), "574", "441", str(expected_units)],
-        ["MO-604a", "10", "7", "3", "4"],
+        [
+            "AK-500",
+            str(expected_beds),
+            "574",
+            "441",
+            "0" if year == 2010 else "100",
+            "200",
+            str(expected_units),
+            "0" if year == 2010 else "8",
+            "9",
+        ],
+        ["MO-604a", "10", "7", "3", "0" if year == 2010 else "1", "2", "4", "0", "1"],
     ]
     pd.DataFrame(rows).to_excel(raw_path, index=False, header=False, sheet_name=str(year))
 
@@ -244,8 +309,18 @@ def test_parse_hic_file_handles_old_aggregate_workbook_sheets(
     assert list(result.df["coc_id"]) == ["AK-500", "MO-604"]
     alaska = result.df[result.df["coc_id"] == "AK-500"].iloc[0]
     assert alaska["state"] == "AK"
-    assert alaska["total_beds"] == expected_beds
-    assert alaska["total_units"] == expected_units
+    assert alaska["total_beds"] == expected_beds + 200
+    assert alaska["total_units"] == expected_units + 9
+    assert alaska["hic_es_year_round_beds"] == 0
+    assert alaska["hic_th_year_round_beds"] == 0
+    assert alaska["hic_sh_year_round_beds"] == 0
+    assert alaska["hic_oph_year_round_beds"] == 0
+    assert alaska["hic_psh_year_round_beds"] == 200
+    assert alaska["hic_shelter_year_round_beds"] == (
+        expected_beds - 100 if year == 2013 else expected_beds
+    )
+    assert alaska["hic_total_beds"] == expected_beds + 200
+    assert alaska["total_beds"] == alaska["hic_total_beds"]
 
 
 def test_parse_hic_file_rejects_wide_workbook_without_requested_year(tmp_path: Path) -> None:

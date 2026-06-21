@@ -545,19 +545,6 @@ PIT_CANONICAL_COLUMNS: list[str] = [
     "notes",
 ]
 
-HIC_CANONICAL_COLUMNS: list[str] = [
-    "hic_year",
-    "coc_id",
-    "coc_name",
-    "state",
-    "total_beds",
-    "total_units",
-    "data_source",
-    "source_ref",
-    "ingested_at",
-    "notes",
-]
-
 HIC_PROJECT_TYPES: tuple[str, ...] = ("es", "th", "sh", "rrh", "psh", "oph")
 
 HIC_EXPANDED_BED_MEASURE_COLUMNS: tuple[str, ...] = tuple(
@@ -580,6 +567,20 @@ HIC_EXPANDED_MEASURE_COLUMNS: tuple[str, ...] = (
     *HIC_EXPANDED_UNIT_MEASURE_COLUMNS,
     *HIC_DERIVED_MEASURE_COLUMNS,
 )
+
+HIC_CANONICAL_COLUMNS: list[str] = [
+    "hic_year",
+    "coc_id",
+    "coc_name",
+    "state",
+    "total_beds",
+    "total_units",
+    *HIC_EXPANDED_MEASURE_COLUMNS,
+    "data_source",
+    "source_ref",
+    "ingested_at",
+    "notes",
+]
 
 HIC_EXPANDED_MEASURE_SCHEMA: tuple[dict[str, object], ...] = (
     *(
