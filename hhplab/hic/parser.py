@@ -317,8 +317,13 @@ def _coerce_hic_expanded_counts(
             _PROJECT_UNIT_ALIASES[project_type],
         )
 
-    shelter_beds = _coerce_optional_count_column(df, column_set, _SHELTER_BED_ALIASES)
-    if "total_year_round_beds_es_th_rrh_sh" in column_set:
+    shelter_bed_column = _resolve_alias(column_set, _SHELTER_BED_ALIASES)
+    shelter_beds = (
+        _zero_count_series(df)
+        if shelter_bed_column is None
+        else _numeric_series(df, shelter_bed_column)
+    )
+    if shelter_bed_column == "total_year_round_beds_es_th_rrh_sh":
         shelter_beds = (shelter_beds - expanded["hic_rrh_year_round_beds"]).clip(lower=0)
     elif shelter_beds.eq(0).all():
         shelter_beds = (
@@ -327,8 +332,13 @@ def _coerce_hic_expanded_counts(
             + expanded["hic_sh_year_round_beds"]
         )
 
-    shelter_units = _coerce_optional_count_column(df, column_set, _SHELTER_UNIT_ALIASES)
-    if "total_units_for_households_with_children_es_th_rrh" in column_set:
+    shelter_unit_column = _resolve_alias(column_set, _SHELTER_UNIT_ALIASES)
+    shelter_units = (
+        _zero_count_series(df)
+        if shelter_unit_column is None
+        else _numeric_series(df, shelter_unit_column)
+    )
+    if shelter_unit_column == "total_units_for_households_with_children_es_th_rrh":
         shelter_units = (shelter_units - expanded["hic_rrh_family_units"]).clip(lower=0)
     elif shelter_units.eq(0).all():
         shelter_units = (

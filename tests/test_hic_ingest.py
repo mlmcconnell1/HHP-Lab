@@ -57,6 +57,109 @@ HIC_ROWS = [
     },
 ]
 
+DUPLICATE_EXPANDED_HIC_ROWS = [
+    {
+        "CocState": "CO",
+        "CoC": "Denver",
+        "CoC ID": "CO-500",
+        "year": "2025",
+        "Total Year-Round Beds (ES)": "10",
+        "Total Year-Round Beds (TH)": "2",
+        "Total Year-Round Beds (SH)": "3",
+        "Total Year-Round Beds (RRH)": "4",
+        "Total Year-Round Beds (PSH)": "20",
+        "Total Year-Round Beds (OPH)": "1",
+        "Total Units for Households with Children (ES)": "1",
+        "Total Units for Households with Children (TH)": "2",
+        "Total Units for Households with Children (SH)": "3",
+        "Total Units for Households with Children (RRH)": "4",
+        "Total Units for Households with Children (PSH)": "5",
+        "Total Units for Households with Children (OPH)": "6",
+    },
+    {
+        "CocState": "CO",
+        "CoC": "Denver Duplicate",
+        "CoC ID": "CO-500",
+        "year": "2025",
+        "Total Year-Round Beds (ES)": "5",
+        "Total Year-Round Beds (TH)": "1",
+        "Total Year-Round Beds (SH)": "1",
+        "Total Year-Round Beds (RRH)": "2",
+        "Total Year-Round Beds (PSH)": "8",
+        "Total Year-Round Beds (OPH)": "0",
+        "Total Units for Households with Children (ES)": "2",
+        "Total Units for Households with Children (TH)": "1",
+        "Total Units for Households with Children (SH)": "1",
+        "Total Units for Households with Children (RRH)": "1",
+        "Total Units for Households with Children (PSH)": "3",
+        "Total Units for Households with Children (OPH)": "0",
+    },
+]
+
+DUPLICATE_EXPANDED_HIC_SOURCE_COLUMNS = {
+    "hic_es_year_round_beds": "Total Year-Round Beds (ES)",
+    "hic_th_year_round_beds": "Total Year-Round Beds (TH)",
+    "hic_sh_year_round_beds": "Total Year-Round Beds (SH)",
+    "hic_rrh_year_round_beds": "Total Year-Round Beds (RRH)",
+    "hic_psh_year_round_beds": "Total Year-Round Beds (PSH)",
+    "hic_oph_year_round_beds": "Total Year-Round Beds (OPH)",
+    "hic_es_family_units": "Total Units for Households with Children (ES)",
+    "hic_th_family_units": "Total Units for Households with Children (TH)",
+    "hic_sh_family_units": "Total Units for Households with Children (SH)",
+    "hic_rrh_family_units": "Total Units for Households with Children (RRH)",
+    "hic_psh_family_units": "Total Units for Households with Children (PSH)",
+    "hic_oph_family_units": "Total Units for Households with Children (OPH)",
+}
+
+_DUPLICATE_EXPANDED_HIC_BASE_EXPECTED = {
+    output_column: sum(int(row[source_column]) for row in DUPLICATE_EXPANDED_HIC_ROWS)
+    for output_column, source_column in DUPLICATE_EXPANDED_HIC_SOURCE_COLUMNS.items()
+}
+
+DUPLICATE_EXPANDED_HIC_EXPECTED = {
+    **_DUPLICATE_EXPANDED_HIC_BASE_EXPECTED,
+    "hic_shelter_year_round_beds": sum(
+        _DUPLICATE_EXPANDED_HIC_BASE_EXPECTED[column]
+        for column in (
+            "hic_es_year_round_beds",
+            "hic_th_year_round_beds",
+            "hic_sh_year_round_beds",
+        )
+    ),
+    "hic_shelter_family_units": sum(
+        _DUPLICATE_EXPANDED_HIC_BASE_EXPECTED[column]
+        for column in ("hic_es_family_units", "hic_th_family_units", "hic_sh_family_units")
+    ),
+    "hic_total_beds": sum(
+        _DUPLICATE_EXPANDED_HIC_BASE_EXPECTED[column]
+        for column in (
+            "hic_es_year_round_beds",
+            "hic_th_year_round_beds",
+            "hic_sh_year_round_beds",
+            "hic_rrh_year_round_beds",
+            "hic_psh_year_round_beds",
+            "hic_oph_year_round_beds",
+        )
+    ),
+    "hic_total_units": sum(
+        _DUPLICATE_EXPANDED_HIC_BASE_EXPECTED[column]
+        for column in (
+            "hic_es_family_units",
+            "hic_th_family_units",
+            "hic_sh_family_units",
+            "hic_rrh_family_units",
+            "hic_psh_family_units",
+            "hic_oph_family_units",
+        )
+    ),
+}
+DUPLICATE_EXPANDED_HIC_EXPECTED["total_beds"] = DUPLICATE_EXPANDED_HIC_EXPECTED[
+    "hic_total_beds"
+]
+DUPLICATE_EXPANDED_HIC_EXPECTED["total_units"] = DUPLICATE_EXPANDED_HIC_EXPECTED[
+    "hic_total_units"
+]
+
 
 def _write_hic_csv(path: Path, rows: list[dict] | None = None) -> Path:
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -156,6 +259,55 @@ def test_parse_hic_file_expands_modern_project_type_columns(tmp_path: Path) -> N
     assert row["hic_shelter_family_units"] == 6
     assert row["hic_total_units"] == 55
     assert row["total_units"] == 55
+
+
+def test_parse_hic_file_uses_resolved_shelter_aggregate_when_rrh_alias_coexists(
+    tmp_path: Path,
+) -> None:
+    rows = [
+        {
+            "CocState": "CO",
+            "CoC": "Denver",
+            "CoC ID": "CO-500",
+            "year": "2025",
+            "Total Year-Round Beds (ES, TH, SH)": "35",
+            "Total Year-Round Beds (ES, TH, RRH, SH)": "42",
+            "Total Year-Round Beds (RRH)": "7",
+            "Total Year-Round Beds (PSH)": "100",
+            "Total Units for Households with Children (ES, TH, SH)": "6",
+            "Total Units for Households with Children (ES, TH, RRH)": "10",
+            "Total Units for Households with Children (RRH)": "4",
+            "Total Units for Households with Children (PSH)": "40",
+        }
+    ]
+    raw_path = _write_hic_csv(tmp_path / "2025-HIC-Counts-by-CoC.csv", rows)
+
+    result = parse_hic_file(raw_path, year=2025)
+
+    row = result.df.iloc[0]
+    assert row["hic_shelter_year_round_beds"] == 35
+    assert row["hic_total_beds"] == 142
+    assert row["total_beds"] == 142
+    assert row["hic_shelter_family_units"] == 6
+    assert row["hic_total_units"] == 50
+    assert row["total_units"] == 50
+
+
+def test_parse_hic_file_sums_duplicate_expanded_hic_columns(tmp_path: Path) -> None:
+    raw_path = _write_hic_csv(
+        tmp_path / "2025-HIC-Counts-by-CoC.csv",
+        DUPLICATE_EXPANDED_HIC_ROWS,
+    )
+
+    result = parse_hic_file(raw_path, year=2025)
+
+    assert len(result.df) == 1
+    row = result.df.iloc[0]
+    assert row["coc_id"] == "CO-500"
+    assert row["coc_name"] == "Denver"
+    assert row[list(DUPLICATE_EXPANDED_HIC_EXPECTED)].to_dict() == (
+        DUPLICATE_EXPANDED_HIC_EXPECTED
+    )
 
 
 def test_parse_hic_file_prefers_unaliased_total_over_components(tmp_path: Path) -> None:
