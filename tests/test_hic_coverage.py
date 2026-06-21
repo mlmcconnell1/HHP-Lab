@@ -9,7 +9,8 @@ import pandas as pd
 from typer.testing import CliRunner
 
 from hhplab.cli.main import app
-from hhplab.hic.coverage import validate_hic_pit_coverage
+from hhplab.hic.coverage import validate_expanded_hic_artifacts, validate_hic_pit_coverage
+from hhplab.schema.columns import HIC_PROJECT_TYPES
 
 runner = CliRunner()
 
@@ -40,6 +41,39 @@ def _hic_row(year: int, coc_id: str, beds: int = 80, units: int = 40) -> dict:
         "coc_id": coc_id,
         "total_beds": beds,
         "total_units": units,
+    }
+
+
+def _expanded_hic_row(year: int, coc_id: str) -> dict:
+    bed_components = {
+        f"hic_{project_type}_year_round_beds": (index + 1) * 10
+        for index, project_type in enumerate(HIC_PROJECT_TYPES)
+    }
+    unit_components = {
+        f"hic_{project_type}_family_units": index + 1
+        for index, project_type in enumerate(HIC_PROJECT_TYPES)
+    }
+    shelter_beds = sum(
+        bed_components[f"hic_{project_type}_year_round_beds"]
+        for project_type in ("es", "th", "sh")
+    )
+    shelter_units = sum(
+        unit_components[f"hic_{project_type}_family_units"]
+        for project_type in ("es", "th", "sh")
+    )
+    total_beds = sum(bed_components.values())
+    total_units = sum(unit_components.values())
+    return {
+        "hic_year": year,
+        "coc_id": coc_id,
+        "total_beds": total_beds,
+        "total_units": total_units,
+        **bed_components,
+        **unit_components,
+        "hic_shelter_year_round_beds": shelter_beds,
+        "hic_shelter_family_units": shelter_units,
+        "hic_total_beds": total_beds,
+        "hic_total_units": total_units,
     }
 
 
@@ -160,6 +194,48 @@ def test_validate_hic_pit_coverage_missing_hic_files_is_actionable(tmp_path: Pat
         assert "hhplab ingest hic --year <YEAR> --parse-only" in str(exc)
     else:
         raise AssertionError("Expected missing HIC files to raise FileNotFoundError")
+
+
+def test_validate_expanded_hic_artifacts_accepts_consistent_modern_schema(
+    tmp_path: Path,
+) -> None:
+    hic_dir = tmp_path / "hic"
+    _write_hic(hic_dir / "hic__H2024.parquet", [_expanded_hic_row(2024, "CO-500")])
+
+    report = validate_expanded_hic_artifacts(hic_dir=hic_dir, years=[2024])
+
+    assert report.passed
+    assert report.issues == []
+
+
+def test_validate_expanded_hic_artifacts_reports_missing_columns(tmp_path: Path) -> None:
+    hic_dir = tmp_path / "hic"
+    row = _expanded_hic_row(2024, "CO-500")
+    row.pop("hic_oph_year_round_beds")
+    _write_hic(hic_dir / "hic__H2024.parquet", [row])
+
+    report = validate_expanded_hic_artifacts(hic_dir=hic_dir, years=[2024])
+
+    assert not report.passed
+    issue = report.errors[0]
+    assert issue.check_name == "missing_expanded_hic_columns"
+    assert issue.details is not None
+    assert issue.details["missing_columns"] == ["hic_oph_year_round_beds"]
+
+
+def test_validate_expanded_hic_artifacts_reports_total_component_mismatch(
+    tmp_path: Path,
+) -> None:
+    hic_dir = tmp_path / "hic"
+    row = _expanded_hic_row(2024, "CO-500")
+    row["hic_total_beds"] += 1
+    row["total_beds"] = row["hic_total_beds"]
+    _write_hic(hic_dir / "hic__H2024.parquet", [row])
+
+    report = validate_expanded_hic_artifacts(hic_dir=hic_dir, years=[2024])
+
+    checks = {issue.check_name for issue in report.errors}
+    assert "hic_total_beds_component_mismatch" in checks
 
 
 def test_hic_coverage_cli_json_reports_coverage(tmp_path: Path) -> None:

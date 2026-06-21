@@ -1,6 +1,10 @@
 """HUD Housing Inventory Count support."""
 
-from hhplab.hic.coverage import HICCoverageResult, validate_hic_pit_coverage
+from hhplab.hic.coverage import (
+    HICCoverageResult,
+    validate_expanded_hic_artifacts,
+    validate_hic_pit_coverage,
+)
 from hhplab.hic.parser import (
     CANONICAL_COLUMNS,
     HICParseError,
@@ -19,6 +23,7 @@ __all__ = [
     "get_canonical_output_path",
     "normalize_column_name",
     "parse_hic_file",
+    "validate_expanded_hic_artifacts",
     "validate_hic_pit_coverage",
     "write_hic_parquet",
 ]

@@ -10,6 +10,7 @@ import pandas as pd
 
 from hhplab.paths import curated_dir
 from hhplab.pit.qa import QAReport
+from hhplab.schema.columns import HIC_PANEL_MEASURE_COLUMNS, HIC_PROJECT_TYPES
 
 _PIT_FILE_RE = re.compile(
     r"^(?:pit__P(?P<year>\d{4})(?:@B\d{4})?|pit_vintage__P(?P<vintage>\d{4}))\.parquet$"
@@ -87,6 +88,29 @@ def validate_hic_pit_coverage(
     )
 
 
+def validate_expanded_hic_artifacts(
+    *,
+    hic_dir: Path | str | None = None,
+    years: list[int] | None = None,
+) -> QAReport:
+    """Validate expanded HIC columns and total/component consistency."""
+    resolved_hic_dir = Path(hic_dir) if hic_dir is not None else curated_dir("hic")
+    requested_years = set(years) if years is not None else None
+    hic_files = _discover_year_files(resolved_hic_dir, _HIC_FILE_RE, requested_years)
+    if not hic_files:
+        raise FileNotFoundError(
+            f"No HIC files found in {resolved_hic_dir}. Place HUD HIC files under "
+            "data/raw/hic/<YEAR>/, then run "
+            "`hhplab ingest hic --year <YEAR> --parse-only`."
+        )
+
+    report = QAReport()
+    for path in hic_files:
+        frame = pd.read_parquet(path)
+        _check_expanded_hic_frame(report, frame, path=path)
+    return report
+
+
 def _discover_pit_files(directory: Path, years: set[int] | None) -> list[Path]:
     if not directory.exists():
         return []
@@ -141,6 +165,112 @@ def _load_year_frames(files: list[Path], *, required: set[str], year_column: str
         normalized["coc_id"] = normalized["coc_id"].astype("string").str.strip()
         frames.append(normalized)
     return pd.concat(frames, ignore_index=True) if frames else pd.DataFrame()
+
+
+def _check_expanded_hic_frame(report: QAReport, frame: pd.DataFrame, *, path: Path) -> None:
+    required = {"hic_year", "coc_id", "total_beds", "total_units", *HIC_PANEL_MEASURE_COLUMNS}
+    missing = sorted(required - set(frame.columns))
+    if missing:
+        report.add_error(
+            "missing_expanded_hic_columns",
+            f"HIC artifact {path.name} is missing expanded column(s): {', '.join(missing)}.",
+            details={"path": str(path), "missing_columns": missing},
+        )
+        return
+
+    working = frame.copy()
+    working["hic_year"] = pd.to_numeric(working["hic_year"], errors="coerce")
+    for column in ["total_beds", "total_units", *HIC_PANEL_MEASURE_COLUMNS]:
+        working[column] = pd.to_numeric(working[column], errors="coerce")
+
+    _check_equal_columns(
+        report,
+        working,
+        path=path,
+        left="total_beds",
+        right="hic_total_beds",
+        check_name="hic_total_beds_alias_mismatch",
+    )
+    _check_equal_columns(
+        report,
+        working,
+        path=path,
+        left="total_units",
+        right="hic_total_units",
+        check_name="hic_total_units_alias_mismatch",
+    )
+
+    modern = working[working["hic_year"] >= 2014].copy()
+    if modern.empty:
+        return
+
+    bed_components = [f"hic_{project_type}_year_round_beds" for project_type in HIC_PROJECT_TYPES]
+    unit_components = [f"hic_{project_type}_family_units" for project_type in HIC_PROJECT_TYPES]
+    modern["__component_beds"] = modern[bed_components].sum(axis=1)
+    modern["__component_units"] = modern[unit_components].sum(axis=1)
+    modern["__shelter_beds"] = modern[
+        ["hic_es_year_round_beds", "hic_th_year_round_beds", "hic_sh_year_round_beds"]
+    ].sum(axis=1)
+    modern["__shelter_units"] = modern[
+        ["hic_es_family_units", "hic_th_family_units", "hic_sh_family_units"]
+    ].sum(axis=1)
+
+    _check_equal_columns(
+        report,
+        modern,
+        path=path,
+        left="hic_total_beds",
+        right="__component_beds",
+        check_name="hic_total_beds_component_mismatch",
+    )
+    _check_equal_columns(
+        report,
+        modern,
+        path=path,
+        left="hic_total_units",
+        right="__component_units",
+        check_name="hic_total_units_component_mismatch",
+    )
+    _check_equal_columns(
+        report,
+        modern,
+        path=path,
+        left="hic_shelter_year_round_beds",
+        right="__shelter_beds",
+        check_name="hic_shelter_beds_component_mismatch",
+    )
+    _check_equal_columns(
+        report,
+        modern,
+        path=path,
+        left="hic_shelter_family_units",
+        right="__shelter_units",
+        check_name="hic_shelter_units_component_mismatch",
+    )
+
+
+def _check_equal_columns(
+    report: QAReport,
+    frame: pd.DataFrame,
+    *,
+    path: Path,
+    left: str,
+    right: str,
+    check_name: str,
+) -> None:
+    mismatch = frame[left].fillna(-1) != frame[right].fillna(-1)
+    for _, row in frame.loc[mismatch, ["hic_year", "coc_id", left, right]].iterrows():
+        report.add_error(
+            check_name,
+            f"{left} does not match {right}.",
+            coc_id=str(row["coc_id"]),
+            year=int(row["hic_year"]) if pd.notna(row["hic_year"]) else None,
+            details={
+                "path": str(path),
+                left: None if pd.isna(row[left]) else float(row[left]),
+                right: None if pd.isna(row[right]) else float(row[right]),
+            },
+        )
 
 
 def _check_duplicates(
