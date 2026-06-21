@@ -162,6 +162,61 @@ ACS1_IMPUTATION_COMPLETE_ROW = {column: pd.NA for column in ACS1_IMPUTATION_OUTP
     "acs1_imputation_validation_rel_diff": 0.0,
 }
 
+HIC_EXPANDED_SCHEMA_TRUTH_TABLE = (
+    {
+        "case": "2010-2012 aggregate shelter plus psh",
+        "year": 2010,
+        "source_headers": (
+            "total_year_round_beds_es_th_sh",
+            "total_units_for_households_with_children_es_th",
+            "total_year_round_psh_beds",
+            "total_psh_units_for_households_with_children",
+        ),
+        "present_project_types": ("psh",),
+        "historically_absent_project_types": ("es", "th", "sh", "rrh", "oph"),
+        "shelter_total_source": "published_aggregate",
+        "all_program_total_source": "derived",
+    },
+    {
+        "case": "2013 aggregate shelter plus rrh and psh",
+        "year": 2013,
+        "source_headers": (
+            "total_year_round_beds_es_th_rrh_sh",
+            "total_units_for_households_with_children_es_th_rrh",
+            "total_year_round_rrh_beds",
+            "total_rrh_units_for_households_with_children",
+            "total_year_round_psh_beds",
+            "total_psh_units_for_households_with_children",
+        ),
+        "present_project_types": ("rrh", "psh"),
+        "historically_absent_project_types": ("es", "th", "sh", "oph"),
+        "shelter_total_source": "published_aggregate_without_rrh",
+        "all_program_total_source": "derived",
+    },
+    {
+        "case": "2014+ full project type split",
+        "year": 2014,
+        "source_headers": (
+            "total_year_round_beds_es",
+            "total_year_round_beds_th",
+            "total_year_round_beds_sh",
+            "total_year_round_beds_rrh",
+            "total_year_round_beds_psh",
+            "total_year_round_beds_oph",
+            "total_units_for_households_with_children_es",
+            "total_units_for_households_with_children_th",
+            "total_units_for_households_with_children_sh",
+            "total_units_for_households_with_children_rrh",
+            "total_units_for_households_with_children_psh",
+            "total_units_for_households_with_children_oph",
+        ),
+        "present_project_types": ("es", "th", "sh", "rrh", "psh", "oph"),
+        "historically_absent_project_types": (),
+        "shelter_total_source": "derived",
+        "all_program_total_source": "derived",
+    },
+)
+
 MSA_COC_PANEL_COMPLETE_ROW = {
     "msa_id": "35620",
     "coc_id": "NY-600",
@@ -337,6 +392,89 @@ def test_source_schema_aliases_use_canonical_schema_constants(case_name: str) ->
     source_constant, schema_constant = SCHEMA_ALIAS_CASES[case_name]
 
     assert source_constant is schema_constant
+
+
+def test_hic_expanded_schema_defines_canonical_project_type_columns() -> None:
+    assert schema_columns.HIC_PROJECT_TYPES == ("es", "th", "sh", "rrh", "psh", "oph")
+    assert schema_columns.HIC_EXPANDED_BED_MEASURE_COLUMNS == (
+        "hic_es_year_round_beds",
+        "hic_th_year_round_beds",
+        "hic_sh_year_round_beds",
+        "hic_rrh_year_round_beds",
+        "hic_psh_year_round_beds",
+        "hic_oph_year_round_beds",
+    )
+    assert schema_columns.HIC_EXPANDED_UNIT_MEASURE_COLUMNS == (
+        "hic_es_family_units",
+        "hic_th_family_units",
+        "hic_sh_family_units",
+        "hic_rrh_family_units",
+        "hic_psh_family_units",
+        "hic_oph_family_units",
+    )
+    assert schema_columns.HIC_DERIVED_MEASURE_COLUMNS == (
+        "hic_shelter_year_round_beds",
+        "hic_shelter_family_units",
+        "hic_total_beds",
+        "hic_total_units",
+    )
+    assert schema_columns.HIC_EXPANDED_MEASURE_COLUMNS == (
+        *schema_columns.HIC_EXPANDED_BED_MEASURE_COLUMNS,
+        *schema_columns.HIC_EXPANDED_UNIT_MEASURE_COLUMNS,
+        *schema_columns.HIC_DERIVED_MEASURE_COLUMNS,
+    )
+
+
+def test_hic_expanded_schema_documents_total_semantics_and_missing_values() -> None:
+    by_column = {
+        str(spec["column"]): spec for spec in schema_columns.HIC_EXPANDED_MEASURE_SCHEMA
+    }
+
+    assert by_column["hic_shelter_year_round_beds"]["project_type"] == "es_th_sh"
+    assert "ES + TH + SH" in str(by_column["hic_shelter_year_round_beds"]["semantics"])
+    assert by_column["hic_total_beds"]["project_type"] == "all_programs"
+    assert "ES + TH + SH + RRH + PSH + OPH" in str(
+        by_column["hic_total_beds"]["semantics"]
+    )
+    for column in schema_columns.HIC_EXPANDED_MEASURE_COLUMNS:
+        assert "historical_missing" in by_column[column]
+        assert by_column[column]["aggregation"] == "sum"
+    for project_type in ("es", "th", "sh", "rrh", "oph"):
+        spec = by_column[f"hic_{project_type}_year_round_beds"]
+        assert "filled as 0" in str(spec["historical_missing"]).lower()
+
+
+@pytest.mark.parametrize(
+    "case",
+    HIC_EXPANDED_SCHEMA_TRUTH_TABLE,
+    ids=[str(case["case"]) for case in HIC_EXPANDED_SCHEMA_TRUTH_TABLE],
+)
+def test_hic_expanded_schema_truth_table_covers_historical_header_shapes(
+    case: dict[str, object],
+) -> None:
+    by_column = {
+        str(spec["column"]): spec for spec in schema_columns.HIC_EXPANDED_MEASURE_SCHEMA
+    }
+    year = int(case["year"])
+    present = set(case["present_project_types"])
+    absent = set(case["historically_absent_project_types"])
+
+    assert present | absent == set(schema_columns.HIC_PROJECT_TYPES)
+    assert present.isdisjoint(absent)
+    assert case["all_program_total_source"] == "derived"
+    assert case["source_headers"]
+
+    for project_type in present:
+        first_year = by_column[f"hic_{project_type}_year_round_beds"][
+            "first_distinct_hud_year"
+        ]
+        assert int(first_year) <= year
+
+    for project_type in absent:
+        first_year = by_column[f"hic_{project_type}_year_round_beds"][
+            "first_distinct_hud_year"
+        ]
+        assert int(first_year) > year or project_type in {"es", "th", "sh"}
 
 
 @pytest.mark.parametrize(

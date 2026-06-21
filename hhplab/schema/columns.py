@@ -558,6 +558,142 @@ HIC_CANONICAL_COLUMNS: list[str] = [
     "notes",
 ]
 
+HIC_PROJECT_TYPES: tuple[str, ...] = ("es", "th", "sh", "rrh", "psh", "oph")
+
+HIC_EXPANDED_BED_MEASURE_COLUMNS: tuple[str, ...] = tuple(
+    f"hic_{project_type}_year_round_beds" for project_type in HIC_PROJECT_TYPES
+)
+
+HIC_EXPANDED_UNIT_MEASURE_COLUMNS: tuple[str, ...] = tuple(
+    f"hic_{project_type}_family_units" for project_type in HIC_PROJECT_TYPES
+)
+
+HIC_DERIVED_MEASURE_COLUMNS: tuple[str, ...] = (
+    "hic_shelter_year_round_beds",
+    "hic_shelter_family_units",
+    "hic_total_beds",
+    "hic_total_units",
+)
+
+HIC_EXPANDED_MEASURE_COLUMNS: tuple[str, ...] = (
+    *HIC_EXPANDED_BED_MEASURE_COLUMNS,
+    *HIC_EXPANDED_UNIT_MEASURE_COLUMNS,
+    *HIC_DERIVED_MEASURE_COLUMNS,
+)
+
+HIC_EXPANDED_MEASURE_SCHEMA: tuple[dict[str, object], ...] = (
+    *(
+        {
+            "column": column,
+            "measure": "year_round_beds",
+            "project_type": project_type,
+            "unit": "beds",
+            "aggregation": "sum",
+            "semantics": f"HUD year-round beds for {project_type.upper()} projects.",
+            "historical_missing": (
+                "Filled as 0 when the project type predates a distinct HUD HIC column; "
+                "null only when the source column exists but the value is blank or "
+                "non-numeric."
+            ),
+            "first_distinct_hud_year": {
+                "es": 2014,
+                "th": 2014,
+                "sh": 2014,
+                "rrh": 2013,
+                "psh": 2010,
+                "oph": 2014,
+            }[project_type],
+        }
+        for project_type, column in zip(
+            HIC_PROJECT_TYPES,
+            HIC_EXPANDED_BED_MEASURE_COLUMNS,
+            strict=True,
+        )
+    ),
+    *(
+        {
+            "column": column,
+            "measure": "family_units",
+            "project_type": project_type,
+            "unit": "units",
+            "aggregation": "sum",
+            "semantics": (
+                f"HUD units for households with children for {project_type.upper()} projects."
+            ),
+            "historical_missing": (
+                "Filled as 0 when the project type predates a distinct HUD HIC column; "
+                "null only when the source column exists but the value is blank or "
+                "non-numeric."
+            ),
+            "first_distinct_hud_year": {
+                "es": 2014,
+                "th": 2014,
+                "sh": 2014,
+                "rrh": 2013,
+                "psh": 2010,
+                "oph": 2014,
+            }[project_type],
+        }
+        for project_type, column in zip(
+            HIC_PROJECT_TYPES,
+            HIC_EXPANDED_UNIT_MEASURE_COLUMNS,
+            strict=True,
+        )
+    ),
+    {
+        "column": "hic_shelter_year_round_beds",
+        "measure": "year_round_beds",
+        "project_type": "es_th_sh",
+        "unit": "beds",
+        "aggregation": "sum",
+        "semantics": "Shelter-only HUD total: ES + TH + SH year-round beds.",
+        "historical_missing": (
+            "Taken from HUD aggregate ES/TH/SH columns where available; otherwise "
+            "derived from distinct ES, TH, and SH columns."
+        ),
+        "first_distinct_hud_year": 2010,
+    },
+    {
+        "column": "hic_shelter_family_units",
+        "measure": "family_units",
+        "project_type": "es_th_sh",
+        "unit": "units",
+        "aggregation": "sum",
+        "semantics": "Shelter-only HUD total: ES + TH + SH family units.",
+        "historical_missing": (
+            "Taken from HUD aggregate ES/TH/SH columns where available; otherwise "
+            "derived from distinct ES, TH, and SH columns."
+        ),
+        "first_distinct_hud_year": 2010,
+    },
+    {
+        "column": "hic_total_beds",
+        "measure": "year_round_beds",
+        "project_type": "all_programs",
+        "unit": "beds",
+        "aggregation": "sum",
+        "semantics": "All-program total: ES + TH + SH + RRH + PSH + OPH year-round beds.",
+        "historical_missing": (
+            "Derived from project-type components, with historically absent project "
+            "types filled as 0."
+        ),
+        "first_distinct_hud_year": 2010,
+    },
+    {
+        "column": "hic_total_units",
+        "measure": "family_units",
+        "project_type": "all_programs",
+        "unit": "units",
+        "aggregation": "sum",
+        "semantics": "All-program total: ES + TH + SH + RRH + PSH + OPH family units.",
+        "historical_missing": (
+            "Derived from project-type components, with historically absent project "
+            "types filled as 0."
+        ),
+        "first_distinct_hud_year": 2010,
+    },
+)
+
 HIC_PANEL_MEASURE_COLUMNS: list[str] = [
     "hic_total_beds",
     "hic_total_units",
