@@ -417,6 +417,27 @@ def test_coc_pit_hic_example_requests_expanded_hic_measures() -> None:
     assert all(list(task.measures) == expected_hic_measures for task in hic_tasks)
 
 
+def test_top50_msa_coc_pit_acs5_poverty_2020_recipe_loads_and_resolves() -> None:
+    recipe = _load_repo_recipe("recipes/top50-msa-coc-pit-acs5-poverty-2020.yaml")
+    plan = resolve_plan(recipe, "build_msa_panel")
+    target = recipe.targets[0]
+    cohort = target.cohort
+
+    assert recipe.name == "top50_msa_coc_pit_acs5_poverty_2020"
+    assert target.geometry.type == "msa"
+    assert cohort is not None
+    assert cohort.method == "top_n"
+    assert cohort.n == 50
+    assert cohort.reference_year == 2020
+    assert [task.year for task in plan.join_tasks] == [2020]
+    assert tuple(plan.join_tasks[0].datasets) == ("pit", "pep_county", "acs_tract")
+
+    acs_tasks = [task for task in plan.resample_tasks if task.dataset_id == "acs_tract"]
+    assert len(acs_tasks) == 1
+    assert "population_below_poverty" in acs_tasks[0].measures
+    assert acs_tasks[0].to_geometry.type == "msa"
+
+
 @pytest.mark.parametrize(
     "case",
     CONTAINMENT_RECIPE_CASES,
