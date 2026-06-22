@@ -438,6 +438,31 @@ def test_top50_msa_coc_pit_acs5_poverty_2020_recipe_loads_and_resolves() -> None
     assert acs_tasks[0].to_geometry.type == "msa"
 
 
+def test_top50_msa_coc_pit_acs5_poverty_2015_2025_recipe_loads_and_resolves() -> None:
+    recipe = _load_repo_recipe("recipes/top50-msa-coc-pit-acs5-poverty-2015-2025.yaml")
+    plan = resolve_plan(recipe, "build_msa_panel")
+    target = recipe.targets[0]
+    cohort = target.cohort
+
+    assert recipe.name == "top50_msa_coc_pit_acs5_poverty_2015_2025"
+    assert target.geometry.type == "msa"
+    assert cohort is not None
+    assert cohort.method == "top_n"
+    assert cohort.n == 50
+    assert cohort.reference_year == 2025
+    assert [task.year for task in plan.join_tasks] == [2015, 2025]
+    assert all(tuple(task.datasets) == ("pit", "pep_county", "acs_tract") for task in plan.join_tasks)
+
+    acs_tasks_by_year = {
+        task.year: task for task in plan.resample_tasks if task.dataset_id == "acs_tract"
+    }
+    assert set(acs_tasks_by_year) == {2015, 2025}
+    assert acs_tasks_by_year[2015].input_path.endswith("acs5_tracts__A2014xT2010.parquet")
+    assert acs_tasks_by_year[2025].input_path.endswith("acs5_tracts__A2024xT2020.parquet")
+    assert all("population_below_poverty" in task.measures for task in acs_tasks_by_year.values())
+    assert all(task.to_geometry.type == "msa" for task in acs_tasks_by_year.values())
+
+
 @pytest.mark.parametrize(
     "case",
     CONTAINMENT_RECIPE_CASES,
