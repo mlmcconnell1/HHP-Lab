@@ -24,6 +24,13 @@ targets:
       n: 50
       reference_year: 2025
     outputs: [panel]
+    panel_policy:
+      inflation_adjustment:
+        base_year: 2025
+        columns:
+          - median_gross_rent
+          - median_household_income
+        factor_column: cpi_u_adjustment_factor
 
 datasets:
   pit:

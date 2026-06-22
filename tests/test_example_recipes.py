@@ -450,6 +450,15 @@ def test_top50_msa_coc_pit_acs5_poverty_2015_2025_recipe_loads_and_resolves() ->
     assert cohort.method == "top_n"
     assert cohort.n == 50
     assert cohort.reference_year == 2025
+    assert target.panel_policy is not None
+    inflation_adjustment = target.panel_policy.inflation_adjustment
+    assert inflation_adjustment is not None
+    assert inflation_adjustment.base_year == 2025
+    assert tuple(inflation_adjustment.columns) == (
+        "median_gross_rent",
+        "median_household_income",
+    )
+    assert inflation_adjustment.factor_column == "cpi_u_adjustment_factor"
     assert [task.year for task in plan.join_tasks] == [2015, 2025]
     assert all(tuple(task.datasets) == ("pit", "pep_county", "acs_tract") for task in plan.join_tasks)
 
