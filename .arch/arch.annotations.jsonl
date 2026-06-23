@@ -165,7 +165,6 @@
 {"id":"el:package-xwalks-aqgbe12na4xd","summary":"Crosswalk package for area-weighted county and tract allocation tables across supported analysis geographies.","ai":{"architectural_layer":"domain","confidence":0.95}}
 {"id":"el:file-acs-metro-py-f2zqd0q0rp71","summary":"Metro-level ACS measure aggregation from tract-native inputs.","ai":{"architectural_layer":"domain","confidence":0.95}}
 {"id":"el:file-diagnostics-cli-py-593vsp2n47zg","summary":"CLI command for running crosswalk quality diagnostics.","ai":{"architectural_layer":"cli","confidence":0.95}}
-{"id":"el:file-measures-acs-py-h1ep8bqf5fm3","summary":"Compatibility facade that forwards legacy hhplab.measures imports to ACS-owned aggregation helpers.","ai":{"architectural_layer":"analytics","confidence":0.95}}
 {"id":"el:file-metro-boundaries-py-xf7z1fbgsdkb","summary":"Builds deterministic metro overlay polygons by dissolving curated county geometries through metro county membership and writes provenance-tagged GeoParquet outputs.","ai":{"architectural_layer":"ingest","confidence":0.96}}
 {"id":"el:file-metro-definitions-py-0f7pfxesvrv8","summary":"Authoritative Glynn/Fox and canonical metro definition data, membership tables, CBSA aliases, and metro identifier helpers.","ai":{"architectural_layer":"domain","confidence":0.95}}
 {"id":"el:file-metro-io-py-4mx6fgfdh383","summary":"Read and write curated metro definition, membership, universe, subset, and boundary artifacts with validation and provenance.","ai":{"architectural_layer":"ingest","confidence":0.95}}
