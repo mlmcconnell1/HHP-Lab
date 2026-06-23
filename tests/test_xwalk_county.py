@@ -18,7 +18,95 @@ import pandas as pd
 import pytest
 from shapely.geometry import box
 
+from hhplab.xwalks import apply_crosswalk
 from hhplab.xwalks.county import build_coc_county_crosswalk
+
+
+class TestApplyCrosswalk:
+    """Tests for the shared crosswalk application helper."""
+
+    def test_weighted_sum_with_group_columns(self):
+        xwalk = pd.DataFrame(
+            {
+                "coc_id": ["CO-500", "CO-500", "CO-501"],
+                "county_fips": ["08001", "08002", "08002"],
+                "area_share": [0.25, 0.5, 0.5],
+            }
+        )
+        data = pd.DataFrame(
+            {
+                "county_fips": ["08001", "08001", "08002", "08002"],
+                "year": [2020, 2021, 2020, 2021],
+                "population": [100, 120, 200, 240],
+            }
+        )
+
+        result = apply_crosswalk(
+            data,
+            xwalk,
+            value_cols=["population"],
+            weight_col="area_share",
+            geo_id_col="coc_id",
+            source_id_col="county_fips",
+            group_cols=["year"],
+        ).sort_values(["coc_id", "year"]).reset_index(drop=True)
+
+        assert result[["coc_id", "year", "population"]].to_dict("records") == [
+            {"coc_id": "CO-500", "year": 2020, "population": 125.0},
+            {"coc_id": "CO-500", "year": 2021, "population": 150.0},
+            {"coc_id": "CO-501", "year": 2020, "population": 100.0},
+            {"coc_id": "CO-501", "year": 2021, "population": 120.0},
+        ]
+        assert list(result["covered_weight"]) == [0.75, 0.75, 0.5, 0.5]
+        assert list(result["source_count"]) == [2, 2, 1, 1]
+
+    def test_normalized_weighted_mean_reports_available_coverage(self):
+        xwalk = pd.DataFrame(
+            {
+                "coc_id": ["CO-500", "CO-500"],
+                "county_fips": ["08001", "08002"],
+                "weight": [0.25, 0.75],
+            }
+        )
+        data = pd.DataFrame(
+            {
+                "geo_id": ["08001", "08002"],
+                "date": pd.to_datetime(["2024-01-01", "2024-01-01"]),
+                "zori": [1000.0, 2000.0],
+            }
+        )
+
+        result = apply_crosswalk(
+            data,
+            xwalk,
+            value_cols=["zori"],
+            output_cols=["zori_coc"],
+            weight_col="weight",
+            geo_id_col="coc_id",
+            source_id_col="county_fips",
+            data_source_id_col="geo_id",
+            group_cols=["date"],
+            normalize=True,
+        )
+
+        row = result.iloc[0]
+        assert row["zori_coc"] == 1750.0
+        assert row["covered_weight"] == 1.0
+        assert row["max_source_weight"] == 0.75
+
+    def test_missing_required_columns_are_actionable(self):
+        with pytest.raises(
+            ValueError,
+            match="crosswalk missing required column\\(s\\): area_share",
+        ):
+            apply_crosswalk(
+                pd.DataFrame({"county_fips": ["08001"], "population": [100]}),
+                pd.DataFrame({"coc_id": ["CO-500"], "county_fips": ["08001"]}),
+                value_cols=["population"],
+                weight_col="area_share",
+                geo_id_col="coc_id",
+                source_id_col="county_fips",
+            )
 
 
 class TestCountyCrosswalkSchema:

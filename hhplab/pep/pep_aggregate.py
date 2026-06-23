@@ -43,6 +43,7 @@ import pandas as pd
 from hhplab.naming import coc_pep_filename, county_xwalk_path
 from hhplab.paths import curated_dir
 from hhplab.provenance import ProvenanceBlock, read_provenance, write_parquet_with_provenance
+from hhplab.xwalks import apply_crosswalk
 
 logger = logging.getLogger(__name__)
 
@@ -466,18 +467,10 @@ def aggregate_pep_counties(
             f"{'...' if len(orphan_counties) > 10 else ''}"
         )
 
-    # Single merge: crosswalk x PEP (one row per county-year-geo combo).
-    # Inner join drops crosswalk rows whose county has no PEP data for a
-    # given year, which is equivalent to the old "filter to notna" step.
-    merged = xwalk_df.merge(
-        pep_df[["county_fips", "year", "population"]],
-        on="county_fips",
-        how="inner",
-    )
-
-    # Weighted population per row
     if decennial_baseline_year is None:
-        merged["weighted_pop"] = merged[weight_col] * merged["population"]
+        apply_xwalk = xwalk_df
+        apply_data = pep_df[["county_fips", "year", "population"]]
+        apply_weight_col = weight_col
     else:
         baseline = pep_df.loc[
             pep_df["year"] == decennial_baseline_year,
@@ -489,10 +482,17 @@ def aggregate_pep_counties(
                 f"county estimates for baseline year {decennial_baseline_year}. "
                 "Load a PEP vintage that includes the baseline year."
             )
-        merged = merged.merge(baseline, on="county_fips", how="left")
-        if merged["baseline_pep_population"].isna().any():
+        baseline_for_xwalk = xwalk_df[["county_fips"]].drop_duplicates().merge(
+            baseline,
+            on="county_fips",
+            how="left",
+        )
+        if baseline_for_xwalk["baseline_pep_population"].isna().any():
             missing = sorted(
-                merged.loc[merged["baseline_pep_population"].isna(), "county_fips"].unique()
+                baseline_for_xwalk.loc[
+                    baseline_for_xwalk["baseline_pep_population"].isna(),
+                    "county_fips",
+                ].unique()
             )
             raise ValueError(
                 "Decennial tract-mediated population_weight is missing PEP "
@@ -500,9 +500,12 @@ def aggregate_pep_counties(
                 f"county_fips values {missing[:10]}"
                 f"{'...' if len(missing) > 10 else ''}."
             )
-        if (merged["baseline_pep_population"] <= 0).any():
+        if (baseline_for_xwalk["baseline_pep_population"] <= 0).any():
             bad = sorted(
-                merged.loc[merged["baseline_pep_population"] <= 0, "county_fips"].unique()
+                baseline_for_xwalk.loc[
+                    baseline_for_xwalk["baseline_pep_population"] <= 0,
+                    "county_fips",
+                ].unique()
             )
             raise ValueError(
                 "Decennial tract-mediated population_weight requires positive "
@@ -510,21 +513,37 @@ def aggregate_pep_counties(
                 f"non-positive county_fips values: {bad[:10]}"
                 f"{'...' if len(bad) > 10 else ''}."
             )
-        merged["weighted_pop"] = (
-            merged[weight_col]
-            * merged["county_population_total"]
-            * (merged["population"] / merged["baseline_pep_population"])
+        apply_xwalk = xwalk_df
+        apply_data = pep_df[["county_fips", "year", "population"]].merge(
+            baseline,
+            on="county_fips",
+            how="left",
+        ).merge(
+            xwalk_df[["county_fips", "county_population_total"]].drop_duplicates(),
+            on="county_fips",
+            how="inner",
         )
+        apply_data["population"] = (
+            apply_data["county_population_total"]
+            * (apply_data["population"] / apply_data["baseline_pep_population"])
+        )
+        apply_weight_col = weight_col
         population_scaling_method = DECENNIAL_PEP_BASELINE_SCALING
 
-    # Vectorised groupby aggregation (replaces the O(G*Y) Python loop)
-    grouped = merged.groupby([geo_id_col, "year"])
-    agg_df = grouped.agg(
-        population=("weighted_pop", "sum"),
-        covered_weight=(weight_col, "sum"),
-        county_count=("county_fips", "size"),
-        max_weighted_pop=("weighted_pop", "max"),
-    ).reset_index()
+    agg_df = apply_crosswalk(
+        apply_data,
+        apply_xwalk,
+        value_cols=["population"],
+        weight_col=apply_weight_col,
+        geo_id_col=geo_id_col,
+        source_id_col="county_fips",
+        group_cols=["year"],
+    ).rename(
+        columns={
+            "source_count": "county_count",
+            "max_weighted_population": "max_weighted_pop",
+        }
+    )
 
     # Build scaffold of all geo-year combinations so zero-coverage rows
     # are preserved (the inner join drops geos with no matching counties).
@@ -555,7 +574,7 @@ def aggregate_pep_counties(
 
     # Drop helper columns
     result_df = agg_df.drop(
-        columns=["covered_weight", "total_weight", "max_weighted_pop"],
+        columns=["covered_weight", "total_weight", "max_weighted_pop", "max_source_weight"],
     )
 
     # Add reference date

@@ -87,6 +87,7 @@ from hhplab.rents.weights import (
     get_county_weights_path,
 )
 from hhplab.rents.zori_ingest import ZILLOW_ATTRIBUTION
+from hhplab.xwalks import apply_crosswalk
 
 logger = logging.getLogger(__name__)
 
@@ -482,41 +483,36 @@ def aggregate_monthly(
     )
     geo_date_grid = geo_date_grid.sort_values([geo_id_col, "date"]).reset_index(drop=True)
 
-    # Merge weights with ZORI data to get available county-months
-    merged = geo_weights.merge(zori, on="county_fips", how="inner")
-
-    # Group by geo unit and date to compute aggregations
-    results = []
-
-    for (geo_id, date_val), group in merged.groupby([geo_id_col, "date"]):
-        available_weights = group["weight"].sum()
-        coverage_ratio = available_weights
-
-        if coverage_ratio > 0:
-            normalized_weights = group["weight"] / coverage_ratio
-            zori_coc = (normalized_weights * group["zori"]).sum()
-            max_contribution = normalized_weights.max()
-            geo_count = len(group)
-        else:
-            zori_coc = None
-            max_contribution = None
-            geo_count = 0
-
-        if coverage_ratio < min_coverage:
-            zori_coc = None
-
-        results.append(
-            {
-                geo_id_col: geo_id,
-                "date": date_val,
-                "zori_coc": zori_coc,
-                "coverage_ratio": coverage_ratio,
-                "max_geo_contribution": max_contribution,
-                "geo_count": geo_count,
-            }
+    result_df = apply_crosswalk(
+        zori,
+        geo_weights,
+        value_cols=["zori"],
+        output_cols=["zori_coc"],
+        weight_col="weight",
+        geo_id_col=geo_id_col,
+        source_id_col="county_fips",
+        group_cols=["date"],
+        normalize=True,
+    ).rename(
+        columns={
+            "covered_weight": "coverage_ratio",
+            "max_source_weight": "max_geo_contribution",
+            "source_count": "geo_count",
+        }
+    )
+    result_df = result_df.drop(columns=["max_weighted_zori_coc"], errors="ignore")
+    if result_df.empty:
+        result_df = pd.DataFrame(
+            columns=[
+                geo_id_col,
+                "date",
+                "zori_coc",
+                "coverage_ratio",
+                "max_geo_contribution",
+                "geo_count",
+            ]
         )
-
-    result_df = pd.DataFrame(results)
+    result_df.loc[result_df["coverage_ratio"] < min_coverage, "zori_coc"] = None
 
     # Merge with full grid to include geo-months with zero coverage
     full_result = geo_date_grid.merge(

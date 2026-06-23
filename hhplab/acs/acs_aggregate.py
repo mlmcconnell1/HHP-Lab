@@ -101,6 +101,7 @@ import pandas as pd
 
 from hhplab.acs.variables import COUNT_COLUMNS, MEDIAN_COLUMNS, MOE_COLUMNS
 from hhplab.geo.ct_planning_regions import CT_STATE_FIPS
+from hhplab.xwalks import apply_crosswalk
 
 RENT_BURDEN_30_PLUS_COLUMNS: tuple[str, ...] = (
     "gross_rent_pct_income_30_to_34_9",
@@ -381,6 +382,17 @@ def aggregate_to_geo(
     sum_cols = [c for c in COUNT_COLUMNS if c in acs_data.columns]
     avg_cols = [c for c in MEDIAN_COLUMNS if c in acs_data.columns]
     moe_cols = [c for c in MOE_COLUMNS if c in acs_data.columns]
+    count_sums_by_geo: dict[object, dict[str, object]] = {}
+    if sum_cols:
+        count_sums = apply_crosswalk(
+            acs_data,
+            xwalk,
+            value_cols=sum_cols,
+            weight_col="area_share",
+            geo_id_col=geo_id_col,
+            source_id_col="GEOID",
+        )
+        count_sums_by_geo = count_sums.set_index(geo_id_col)[sum_cols].to_dict("index")
 
     # Apply weights and aggregate
     results = []
@@ -391,11 +403,8 @@ def aggregate_to_geo(
         # This computes actual population totals (sum of tract_pop * area_share)
         # Using pop_share here would give weighted averages, not totals
         area_share = pd.to_numeric(group["area_share"], errors="coerce").fillna(0)
-        for col in sum_cols:
-            if col in group.columns:
-                values = pd.to_numeric(group[col], errors="coerce")
-                weighted = values * area_share
-                row[col] = weighted.sum(min_count=1)
+        row.update({col: pd.NA for col in sum_cols})
+        row.update(count_sums_by_geo.get(geo_id, {}))
 
         # Weighted averages for scalar estimates. Each column chooses the most
         # defensible denominator available, then applies the requested overlap basis.

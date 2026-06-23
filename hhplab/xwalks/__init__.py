@@ -4,6 +4,7 @@ Provides geometry-neutral crosswalk builders (``build_tract_crosswalk``,
 ``build_county_crosswalk``) and backward-compatible CoC-specific wrappers.
 """
 
+from hhplab.xwalks.apply import apply_crosswalk
 from hhplab.xwalks.county import build_coc_county_crosswalk, build_county_crosswalk
 from hhplab.xwalks.diagnostics import (
     AreaShareValidation,
@@ -25,6 +26,7 @@ from hhplab.xwalks.tract_mediated import (
 from hhplab.xwalks.urban_fraction import build_coc_urban_fraction
 
 __all__ = [
+    "apply_crosswalk",
     "build_tract_crosswalk",
     "build_coc_tract_crosswalk",
     "build_county_crosswalk",
