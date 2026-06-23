@@ -127,7 +127,7 @@ def persist_outputs(
     output_file.parent.mkdir(parents=True, exist_ok=True)
 
     # Detect output filename collision from a prior pipeline in this run.
-    if output_file.exists() and output_file in getattr(ctx, "_written_outputs", set()):
+    if output_file.exists() and output_file in ctx._written_outputs:
         return StepResult(
             step_kind="persist",
             detail="persist outputs",
@@ -238,9 +238,7 @@ def persist_outputs(
     pq.write_table(table, output_file)
 
     # Track written outputs for collision detection across pipelines.
-    if not hasattr(ctx, "_written_outputs"):
-        ctx._written_outputs = set()  # type: ignore[attr-defined]
-    ctx._written_outputs.add(output_file)  # type: ignore[attr-defined]
+    ctx._written_outputs.add(output_file)
 
     # Write manifest sidecar JSON
     manifest = _build_manifest(
@@ -313,7 +311,7 @@ def persist_msa_fractional_rollup(
         )
 
     output_file.parent.mkdir(parents=True, exist_ok=True)
-    if output_file.exists() and output_file in getattr(ctx, "_written_outputs", set()):
+    if output_file.exists() and output_file in ctx._written_outputs:
         return StepResult(
             step_kind="persist",
             detail="persist msa fractional rollup",
@@ -359,9 +357,7 @@ def persist_msa_fractional_rollup(
     table = table.replace_schema_metadata(metadata)
     pq.write_table(table, output_file)
 
-    if not hasattr(ctx, "_written_outputs"):
-        ctx._written_outputs = set()  # type: ignore[attr-defined]
-    ctx._written_outputs.add(output_file)  # type: ignore[attr-defined]
+    ctx._written_outputs.add(output_file)
 
     manifest = _build_manifest(
         ctx.recipe,
@@ -415,7 +411,7 @@ def persist_msa_coc_panel(
         )
 
     output_file.parent.mkdir(parents=True, exist_ok=True)
-    if output_file.exists() and output_file in getattr(ctx, "_written_outputs", set()):
+    if output_file.exists() and output_file in ctx._written_outputs:
         return StepResult(
             step_kind="persist",
             detail="persist msa-coc panel",
@@ -442,9 +438,7 @@ def persist_msa_coc_panel(
     table = table.replace_schema_metadata(metadata)
     pq.write_table(table, output_file)
 
-    if not hasattr(ctx, "_written_outputs"):
-        ctx._written_outputs = set()  # type: ignore[attr-defined]
-    ctx._written_outputs.add(output_file)  # type: ignore[attr-defined]
+    ctx._written_outputs.add(output_file)
 
     manifest = _build_manifest(
         ctx.recipe,
@@ -613,7 +607,7 @@ def persist_containment(
         )
 
     output_file.parent.mkdir(parents=True, exist_ok=True)
-    if output_file.exists() and output_file in getattr(ctx, "_written_outputs", set()):
+    if output_file.exists() and output_file in ctx._written_outputs:
         return StepResult(
             step_kind="persist_containment",
             detail="persist containment",
@@ -646,9 +640,7 @@ def persist_containment(
     table = table.replace_schema_metadata(metadata)
     pq.write_table(table, output_file)
 
-    if not hasattr(ctx, "_written_outputs"):
-        ctx._written_outputs = set()  # type: ignore[attr-defined]
-    ctx._written_outputs.add(output_file)  # type: ignore[attr-defined]
+    ctx._written_outputs.add(output_file)
 
     manifest = _build_manifest(
         ctx.recipe,
@@ -760,7 +752,7 @@ def persist_msa_coc_coverage(
         )
 
     output_file.parent.mkdir(parents=True, exist_ok=True)
-    if output_file.exists() and output_file in getattr(ctx, "_written_outputs", set()):
+    if output_file.exists() and output_file in ctx._written_outputs:
         return StepResult(
             step_kind="persist_msa_coc_coverage",
             detail="persist MSA-CoC coverage",
@@ -794,9 +786,7 @@ def persist_msa_coc_coverage(
     if spec.csv_sidecar:
         coverage.to_csv(output_file.with_suffix(".csv"), index=False)
 
-    if not hasattr(ctx, "_written_outputs"):
-        ctx._written_outputs = set()  # type: ignore[attr-defined]
-    ctx._written_outputs.add(output_file)  # type: ignore[attr-defined]
+    ctx._written_outputs.add(output_file)
 
     manifest = _build_manifest(
         ctx.recipe,

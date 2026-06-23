@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from dataclasses import fields
 from pathlib import Path
 
 import geopandas as gpd
@@ -4170,6 +4171,18 @@ class TestMaterialize:
             project_root=tmp_path,
             recipe=recipe,
         )
+
+    def test_execution_context_declares_output_collision_cache(self, tmp_path: Path):
+        recipe = load_recipe(_recipe_with_pipeline())
+        field_names = {field.name for field in fields(ExecutionContext)}
+        first = ExecutionContext(project_root=tmp_path / "one", recipe=recipe)
+        second = ExecutionContext(project_root=tmp_path / "two", recipe=recipe)
+
+        first._written_outputs.add(tmp_path / "panel.parquet")
+
+        assert "_written_outputs" in field_names
+        assert tmp_path / "panel.parquet" in first._written_outputs
+        assert second._written_outputs == set()
 
     def test_resolve_tract_to_coc_crosswalk_path(self, tmp_path: Path):
         recipe = load_recipe(_recipe_with_pipeline())

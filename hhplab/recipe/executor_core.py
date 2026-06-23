@@ -114,6 +114,8 @@ class ExecutionContext:
     _distinct_paths_cache: dict[str, int | None] = field(
         default_factory=dict,
     )
+    # Output paths written by prior pipelines in this execution, used to catch collisions.
+    _written_outputs: set[Path] = field(default_factory=set)
 
 
 def _classify_path(
