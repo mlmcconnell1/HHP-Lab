@@ -440,6 +440,39 @@ class TestAggregationUnit:
                 min_coverage=0.0,
             )
 
+    def test_decennial_population_weights_tolerate_crosswalk_county_absent_from_pep(self):
+        """A missing PEP county should lower coverage, not fail baseline validation."""
+        xwalk = pd.DataFrame(
+            {
+                "coc_id": ["COC-001", "COC-001"],
+                "county_fips": ["01001", "99999"],
+                "population_weight": [0.6, 0.4],
+                "county_population_total": [1000.0, 2000.0],
+                "denominator_source": ["decennial", "decennial"],
+                "denominator_vintage": ["2020", "2020"],
+            }
+        )
+        pep = pd.DataFrame(
+            {
+                "county_fips": ["01001", "01001"],
+                "year": [2020, 2024],
+                "population": [1100.0, 1210.0],
+            }
+        )
+
+        result = aggregate_pep_counties(
+            pep,
+            xwalk,
+            weighting="population_weight",
+            min_coverage=0.0,
+        )
+
+        row_2024 = result[(result["coc_id"] == "COC-001") & (result["year"] == 2024)].iloc[0]
+        assert row_2024["population"] == pytest.approx(0.6 * 1000.0 * (1210.0 / 1100.0))
+        assert row_2024["coverage_ratio"] == pytest.approx(0.6)
+        assert row_2024["county_count"] == 1
+        assert row_2024["population_scaling_method"] == "decennial_pep_baseline_ratio"
+
     def test_tract_mediated_crosswalk_county_vintage_must_match_request(self):
         xwalk = pd.DataFrame(
             {

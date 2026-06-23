@@ -482,15 +482,19 @@ def aggregate_pep_counties(
                 f"county estimates for baseline year {decennial_baseline_year}. "
                 "Load a PEP vintage that includes the baseline year."
             )
-        baseline_for_xwalk = xwalk_df[["county_fips"]].drop_duplicates().merge(
-            baseline,
-            on="county_fips",
-            how="left",
+        pep_crosswalk_counties = (
+            xwalk_df.loc[xwalk_df["county_fips"].isin(pep_counties), ["county_fips"]]
+            .drop_duplicates()
+            .merge(
+                baseline,
+                on="county_fips",
+                how="left",
+            )
         )
-        if baseline_for_xwalk["baseline_pep_population"].isna().any():
+        if pep_crosswalk_counties["baseline_pep_population"].isna().any():
             missing = sorted(
-                baseline_for_xwalk.loc[
-                    baseline_for_xwalk["baseline_pep_population"].isna(),
+                pep_crosswalk_counties.loc[
+                    pep_crosswalk_counties["baseline_pep_population"].isna(),
                     "county_fips",
                 ].unique()
             )
@@ -500,10 +504,10 @@ def aggregate_pep_counties(
                 f"county_fips values {missing[:10]}"
                 f"{'...' if len(missing) > 10 else ''}."
             )
-        if (baseline_for_xwalk["baseline_pep_population"] <= 0).any():
+        if (pep_crosswalk_counties["baseline_pep_population"] <= 0).any():
             bad = sorted(
-                baseline_for_xwalk.loc[
-                    baseline_for_xwalk["baseline_pep_population"] <= 0,
+                pep_crosswalk_counties.loc[
+                    pep_crosswalk_counties["baseline_pep_population"] <= 0,
                     "county_fips",
                 ].unique()
             )
