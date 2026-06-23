@@ -38,7 +38,7 @@ from hhplab.bls.ingest_laus import (
     fetch_laus_annual_averages,
     ingest_laus_metro,
 )
-from hhplab.cli.ingest_laus_metro import ingest_laus_metro as ingest_laus_metro_cli
+from hhplab.cli.ingest.laus_metro import ingest_laus_metro as ingest_laus_metro_cli
 from hhplab.metro.metro_definitions import (
     CANONICAL_UNIVERSE_DEFINITION_VERSION,
     METRO_CBSA_MAPPING,

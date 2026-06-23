@@ -75,12 +75,12 @@ class TestBuildXwalksCommand:
         assert "--build" not in result.output
         assert "Tract file not found" in result.output
 
-    @patch("hhplab.cli.build_xwalks.list_boundaries")
-    @patch("hhplab.cli.build_xwalks.gpd.read_parquet")
-    @patch("hhplab.cli.build_xwalks.build_coc_tract_crosswalk")
-    @patch("hhplab.cli.build_xwalks.save_crosswalk")
-    @patch("hhplab.cli.build_xwalks.compute_crosswalk_diagnostics")
-    @patch("hhplab.cli.build_xwalks.summarize_diagnostics")
+    @patch("hhplab.cli.generate.xwalks.list_boundaries")
+    @patch("hhplab.cli.generate.xwalks.gpd.read_parquet")
+    @patch("hhplab.cli.generate.xwalks.build_coc_tract_crosswalk")
+    @patch("hhplab.cli.generate.xwalks.save_crosswalk")
+    @patch("hhplab.cli.generate.xwalks.compute_crosswalk_diagnostics")
+    @patch("hhplab.cli.generate.xwalks.summarize_diagnostics")
     def test_build_xwalks_success_skips_missing_counties_silently(
         self,
         mock_summarize,
@@ -151,12 +151,12 @@ class TestBuildXwalksCommand:
         mock_build_crosswalk.assert_called_once()
         mock_save_crosswalk.assert_called_once()
 
-    @patch("hhplab.cli.build_xwalks.list_boundaries")
-    @patch("hhplab.cli.build_xwalks.gpd.read_parquet")
-    @patch("hhplab.cli.build_xwalks.build_coc_tract_crosswalk")
-    @patch("hhplab.cli.build_xwalks.save_crosswalk")
-    @patch("hhplab.cli.build_xwalks.compute_crosswalk_diagnostics")
-    @patch("hhplab.cli.build_xwalks.summarize_diagnostics")
+    @patch("hhplab.cli.generate.xwalks.list_boundaries")
+    @patch("hhplab.cli.generate.xwalks.gpd.read_parquet")
+    @patch("hhplab.cli.generate.xwalks.build_coc_tract_crosswalk")
+    @patch("hhplab.cli.generate.xwalks.save_crosswalk")
+    @patch("hhplab.cli.generate.xwalks.compute_crosswalk_diagnostics")
+    @patch("hhplab.cli.generate.xwalks.summarize_diagnostics")
     def test_build_xwalks_warns_when_counties_explicitly_requested_and_missing(
         self,
         mock_summarize,
@@ -228,7 +228,7 @@ class TestBuildXwalksCommand:
         mock_build_crosswalk.assert_called_once()
         mock_save_crosswalk.assert_called_once()
 
-    @patch("hhplab.cli.build_xwalks.list_boundaries")
+    @patch("hhplab.cli.generate.xwalks.list_boundaries")
     def test_build_tract_mediated_xwalk_dry_run_json(self, mock_list_boundaries, tmp_path):
         """Tract-mediated crosswalk preflight reports deterministic inputs and output."""
         from datetime import UTC, datetime
@@ -295,7 +295,7 @@ class TestBuildXwalksCommand:
             == "xwalk_tract_mediated_county__A2023@B2025xC2020xT2020.parquet"
         )
 
-    @patch("hhplab.cli.build_xwalks.list_boundaries")
+    @patch("hhplab.cli.generate.xwalks.list_boundaries")
     def test_build_tract_mediated_xwalk_decennial_dry_run_json(
         self,
         mock_list_boundaries,
@@ -364,7 +364,7 @@ class TestBuildXwalksCommand:
             == "xwalk_tract_mediated_county__N2020@B2025xC2020xT2020.parquet"
         )
 
-    @patch("hhplab.cli.build_xwalks.list_boundaries")
+    @patch("hhplab.cli.generate.xwalks.list_boundaries")
     def test_build_tract_mediated_xwalk_generate_json(self, mock_list_boundaries, tmp_path):
         """Tract-mediated generation writes the artifact and reports validation summary."""
         from datetime import UTC, datetime
@@ -460,9 +460,9 @@ class TestDiagnosticsCommand:
         assert result.exit_code == 1
         assert "Crosswalk file not found" in result.output
 
-    @patch("hhplab.cli.diagnostics_cli.compute_crosswalk_diagnostics")
-    @patch("hhplab.cli.diagnostics_cli.summarize_diagnostics")
-    @patch("hhplab.cli.diagnostics_cli.identify_problem_cocs")
+    @patch("hhplab.cli.diagnostics.xwalk.compute_crosswalk_diagnostics")
+    @patch("hhplab.cli.diagnostics.xwalk.summarize_diagnostics")
+    @patch("hhplab.cli.diagnostics.xwalk.identify_problem_cocs")
     @patch("pandas.read_parquet")
     def test_diagnostics_show_problems(
         self,

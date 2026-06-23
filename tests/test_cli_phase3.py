@@ -180,7 +180,7 @@ class TestIngestPitVintageCommand:
             return_value=SimpleNamespace(vintage=2020, row_count=1, years_included=[2020])
         )
 
-        monkeypatch.setattr("hhplab.cli.ingest_pit_vintage.raw_root", lambda: raw_root)
+        monkeypatch.setattr("hhplab.cli.ingest.pit_vintage.raw_root", lambda: raw_root)
         monkeypatch.setattr("hhplab.pit.ingest.download_pit_data", download)
         monkeypatch.setattr("hhplab.pit.ingest.parse_pit_vintage", parse)
         monkeypatch.setattr("hhplab.pit.ingest.write_pit_parquet", write)

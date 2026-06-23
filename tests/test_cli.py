@@ -59,10 +59,10 @@ class TestNestedIngestCommand:
         )
         with (
             patch(
-                "hhplab.cli.ingest_medsl.ingest_county_presidential_returns",
+                "hhplab.cli.ingest.medsl.ingest_county_presidential_returns",
                 return_value=output_path,
             ) as mock_ingest,
-            patch("hhplab.cli.ingest_medsl.pd.read_parquet") as mock_read_parquet,
+            patch("hhplab.cli.ingest.medsl.pd.read_parquet") as mock_read_parquet,
         ):
             mock_read_parquet.return_value = [object(), object(), object()]
             result = runner.invoke(
@@ -81,7 +81,7 @@ class TestNestedIngestCommand:
 
     def test_ingest_medsl_presidential_json_file_error(self):
         with patch(
-            "hhplab.cli.ingest_medsl.ingest_county_presidential_returns",
+            "hhplab.cli.ingest.medsl.ingest_county_presidential_returns",
             side_effect=FileNotFoundError(
                 "MEDSL raw file not found at data/raw/medsl/countypres_2000-2024.tab. "
                 "Download County Presidential Election Returns 2000-2024."
@@ -97,7 +97,7 @@ class TestNestedIngestCommand:
 
     def test_build_medsl_president_county_json_validation_error(self):
         with patch(
-            "hhplab.cli.build_medsl.materialize_county_political_leaning",
+            "hhplab.cli.build_cmds.medsl.materialize_county_political_leaning",
             side_effect=ValueError(
                 "MEDSL county presidential file is missing required columns: "
                 "['county_fips']. Expected columns include county_fips."
@@ -115,10 +115,10 @@ class TestNestedIngestCommand:
         output_path = Path("data/curated/medsl/medsl_president_county__Y2000-2024@C2020.parquet")
         with (
             patch(
-                "hhplab.cli.build_medsl.materialize_county_political_leaning",
+                "hhplab.cli.build_cmds.medsl.materialize_county_political_leaning",
                 return_value=output_path,
             ) as mock_materialize,
-            patch("hhplab.cli.build_medsl.pd.read_parquet") as mock_read_parquet,
+            patch("hhplab.cli.build_cmds.medsl.pd.read_parquet") as mock_read_parquet,
         ):
             mock_read_parquet.return_value = [object(), object()]
             result = runner.invoke(
@@ -479,7 +479,7 @@ class TestRegistryRebuild:
 
         assert "Registry not found" in result.output
 
-    @patch("hhplab.cli.registry_rebuild._load_registry")
+    @patch("hhplab.cli.registry.rebuild._load_registry")
     def test_registry_rebuild_empty_registry(self, mock_load, tmp_path):
         """Should handle empty registry."""
         import pandas as pd

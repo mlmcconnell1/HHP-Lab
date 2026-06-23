@@ -11,7 +11,7 @@ import typer
 from typer.testing import CliRunner
 
 from hhplab.cli.main import app
-from hhplab.cli.output import cli_error, emit_result
+from hhplab.cli.shared.output import cli_error, emit_result
 
 runner = CliRunner()
 

@@ -13,7 +13,7 @@ runner = CliRunner()
 class TestIngestAcs5TractCommand:
     """Tests for ingest acs5-tract CLI command."""
 
-    @patch("hhplab.cli.ingest_acs_population.get_output_path")
+    @patch("hhplab.cli.ingest.acs_population.get_output_path")
     @patch("hhplab.acs.ingest.tract_population.ingest_tract_data")
     @patch("pandas.read_parquet")
     def test_ingest_acs5_tract_uses_cache(
@@ -39,7 +39,7 @@ class TestIngestAcs5TractCommand:
         assert "Cached file found" in result.output
         mock_ingest.assert_not_called()
 
-    @patch("hhplab.cli.ingest_acs_population.get_output_path")
+    @patch("hhplab.cli.ingest.acs_population.get_output_path")
     @patch("hhplab.acs.ingest.tract_population.ingest_tract_data")
     @patch("pandas.read_parquet")
     def test_ingest_acs5_tract_success(

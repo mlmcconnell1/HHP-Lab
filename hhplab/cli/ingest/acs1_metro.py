@@ -6,7 +6,7 @@ from typing import Annotated
 
 import typer
 
-from hhplab.cli.output import JsonOutput, cli_error, emit_result
+from hhplab.cli.shared.output import JsonOutput, cli_error, emit_result
 from hhplab.metro.metro_definitions import CANONICAL_UNIVERSE_DEFINITION_VERSION
 
 

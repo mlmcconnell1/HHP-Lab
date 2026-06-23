@@ -1,12 +1,12 @@
 # Data files (downloaded/generated)
 data/
 exports/
-builds/
+/builds/
 
 # Python-generated files
 __pycache__/
 *.py[oc]
-build/
+/build/
 dist/
 wheels/
 *.egg-info

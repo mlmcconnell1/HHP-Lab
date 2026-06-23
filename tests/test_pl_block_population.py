@@ -165,7 +165,7 @@ def test_pl_blocks_cli_cached_json(monkeypatch, tmp_path) -> None:
         columns=PL_BLOCK_POPULATION_COLUMNS,
     ).to_parquet(cached_path, index=False)
     monkeypatch.setattr(
-        "hhplab.cli.ingest_pl_block_population.get_pl_block_population_output_path",
+        "hhplab.cli.ingest.pl_block_population.get_pl_block_population_output_path",
         lambda decennial, blocks=None: cached_path,
     )
 
@@ -200,7 +200,7 @@ def test_pl_blocks_cli_fresh_json(monkeypatch, tmp_path) -> None:
         columns=PL_BLOCK_POPULATION_COLUMNS,
     ).to_parquet(output_path, index=False)
     monkeypatch.setattr(
-        "hhplab.cli.ingest_pl_block_population.get_pl_block_population_output_path",
+        "hhplab.cli.ingest.pl_block_population.get_pl_block_population_output_path",
         lambda decennial, blocks=None: tmp_path / "missing.parquet",
     )
     monkeypatch.setattr(

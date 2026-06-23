@@ -317,7 +317,7 @@ def test_build_coc_urban_fraction_empty_inputs_return_canonical_empty_frames(
 
 def _patch_curated_dir(monkeypatch: pytest.MonkeyPatch, tmp_path) -> None:
     monkeypatch.setattr(
-        "hhplab.cli.build_urban_fraction.curated_dir",
+        "hhplab.cli.build_cmds.urban_fraction.curated_dir",
         lambda name: tmp_path / name,
     )
 
@@ -414,7 +414,7 @@ def test_urban_fraction_geometry_preflight_uses_parquet_metadata(
     tmp_path,
 ) -> None:
     """Geometry discovery does not materialize large block GeoParquet artifacts."""
-    from hhplab.cli import build_urban_fraction as build_urban_fraction_cli
+    from hhplab.cli.build_cmds import urban_fraction as build_urban_fraction_cli
 
     _patch_curated_dir(monkeypatch, tmp_path)
     _block_path, geometry_path = _write_cli_inputs(tmp_path)
@@ -570,7 +570,7 @@ def test_chunked_urban_fraction_includes_cross_state_blocks(
     include_state_abbrev: bool,
 ) -> None:
     """Chunking must include every block state intersecting a CoC geometry."""
-    from hhplab.cli import build_urban_fraction as build_urban_fraction_cli
+    from hhplab.cli.build_cmds import urban_fraction as build_urban_fraction_cli
 
     pl_blocks_path = tmp_path / "pl_blocks.parquet"
     block_geometry_path = tmp_path / "block_geometry.parquet"
@@ -671,7 +671,7 @@ def test_load_block_inputs_reraises_non_missing_geo_metadata_value_error(
     tmp_path: Path,
 ) -> None:
     """Corrupt GeoParquet errors must not fall back to population-only loading."""
-    from hhplab.cli import build_urban_fraction as build_urban_fraction_cli
+    from hhplab.cli.build_cmds import urban_fraction as build_urban_fraction_cli
 
     block_path, geometry_path = _write_cli_inputs(tmp_path)
 
@@ -779,7 +779,7 @@ def test_load_block_inputs_for_state_requires_actionable_state_fips_geometry(
     tmp_path,
 ) -> None:
     """Legacy block geometry without state_fips fails before Arrow emits an unknown-column error."""
-    from hhplab.cli import build_urban_fraction as build_urban_fraction_cli
+    from hhplab.cli.build_cmds import urban_fraction as build_urban_fraction_cli
 
     pl_blocks_path, geometry_path = _write_cli_inputs(tmp_path)
     geometry = gpd.read_parquet(geometry_path).drop(columns=["state_fips"])

@@ -21,7 +21,7 @@ from hhplab.acs.variables_acs1 import (
     acs1_tables_for_vintage,
     acs1_variables_by_table_for_vintage,
 )
-from hhplab.cli.ingest_acs1_metro import ingest_acs1_metro as ingest_acs1_metro_cli
+from hhplab.cli.ingest.acs1_metro import ingest_acs1_metro as ingest_acs1_metro_cli
 from hhplab.metro.metro_definitions import CANONICAL_UNIVERSE_DEFINITION_VERSION
 from hhplab.provenance import read_provenance
 

@@ -13,7 +13,7 @@ import pytest
 from shapely.geometry import box
 from typer.testing import CliRunner
 
-from hhplab.cli.generate_msa_xwalk import generate_msa_xwalk
+from hhplab.cli.generate.msa_xwalk import generate_msa_xwalk
 from hhplab.cli.main import app
 from hhplab.msa.crosswalk import (
     ALLOCATION_SHARE_TOLERANCE,
@@ -98,7 +98,7 @@ def _write_boundary_input(tmp_path: Path) -> None:
 
 def _setup_no_boundary_registry(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> list[str]:
     monkeypatch.chdir(tmp_path)
-    monkeypatch.setattr("hhplab.cli.generate_msa_xwalk.latest_vintage", lambda: None)
+    monkeypatch.setattr("hhplab.cli.generate.msa_xwalk.latest_vintage", lambda: None)
     return ["generate", "msa-xwalk", "--counties", "2023", "--json"]
 
 
@@ -108,7 +108,7 @@ def _setup_missing_boundary_file(
 ) -> list[str]:
     monkeypatch.chdir(tmp_path)
     monkeypatch.setattr(
-        "hhplab.cli.generate_msa_xwalk.list_boundaries",
+        "hhplab.cli.generate.msa_xwalk.list_boundaries",
         lambda: [_boundary_registry_entry(tmp_path)],
     )
     return ["generate", "msa-xwalk", "--boundary", "2025", "--counties", "2023", "--json"]
@@ -121,7 +121,7 @@ def _setup_missing_county_geometry(
     monkeypatch.chdir(tmp_path)
     _write_boundary_input(tmp_path)
     monkeypatch.setattr(
-        "hhplab.cli.generate_msa_xwalk.list_boundaries",
+        "hhplab.cli.generate.msa_xwalk.list_boundaries",
         lambda: [_boundary_registry_entry(tmp_path)],
     )
     return ["generate", "msa-xwalk", "--boundary", "2025", "--counties", "2023", "--json"]
@@ -153,7 +153,7 @@ def test_generate_msa_xwalk_json(monkeypatch, tmp_path: Path):
     _write_test_inputs(tmp_path)
     monkeypatch.chdir(tmp_path)
     monkeypatch.setattr(
-        "hhplab.cli.generate_msa_xwalk.list_boundaries",
+        "hhplab.cli.generate.msa_xwalk.list_boundaries",
         lambda: [
             RegistryEntry(
                 boundary_vintage="2025",
@@ -166,7 +166,7 @@ def test_generate_msa_xwalk_json(monkeypatch, tmp_path: Path):
         ],
     )
     monkeypatch.setattr(
-        "hhplab.cli.generate_msa_xwalk.latest_vintage",
+        "hhplab.cli.generate.msa_xwalk.latest_vintage",
         lambda: "2025",
     )
 
@@ -191,11 +191,11 @@ def test_generate_msa_xwalk_json_block_population(monkeypatch, tmp_path: Path):
     _write_block_population_inputs(tmp_path)
     monkeypatch.chdir(tmp_path)
     monkeypatch.setattr(
-        "hhplab.cli.generate_msa_xwalk.list_boundaries",
+        "hhplab.cli.generate.msa_xwalk.list_boundaries",
         lambda: [_boundary_registry_entry(tmp_path)],
     )
     monkeypatch.setattr(
-        "hhplab.cli.generate_msa_xwalk.latest_vintage",
+        "hhplab.cli.generate.msa_xwalk.latest_vintage",
         lambda: "2025",
     )
 
@@ -244,11 +244,11 @@ def test_generate_msa_xwalk_state_shards_do_not_read_national_blocks(
     _write_block_population_inputs(tmp_path)
     monkeypatch.chdir(tmp_path)
     monkeypatch.setattr(
-        "hhplab.cli.generate_msa_xwalk.list_boundaries",
+        "hhplab.cli.generate.msa_xwalk.list_boundaries",
         lambda: [_boundary_registry_entry(tmp_path)],
     )
     monkeypatch.setattr(
-        "hhplab.cli.generate_msa_xwalk.latest_vintage",
+        "hhplab.cli.generate.msa_xwalk.latest_vintage",
         lambda: "2025",
     )
     original_gpd_read = gpd.read_parquet
@@ -264,8 +264,8 @@ def test_generate_msa_xwalk_state_shards_do_not_read_national_blocks(
             assert kwargs.get("filters") == [("state_fips", "==", "36")]
         return original_pd_read(path, *args, **kwargs)
 
-    monkeypatch.setattr("hhplab.cli.generate_msa_xwalk.gpd.read_parquet", guard_gpd_read)
-    monkeypatch.setattr("hhplab.cli.generate_msa_xwalk.pd.read_parquet", guard_pd_read)
+    monkeypatch.setattr("hhplab.cli.generate.msa_xwalk.gpd.read_parquet", guard_gpd_read)
+    monkeypatch.setattr("hhplab.cli.generate.msa_xwalk.pd.read_parquet", guard_pd_read)
 
     result = runner.invoke(
         app,
@@ -298,11 +298,11 @@ def test_generate_msa_xwalk_json_block_population_can_opt_out_of_state_shards(
     _write_block_population_inputs(tmp_path)
     monkeypatch.chdir(tmp_path)
     monkeypatch.setattr(
-        "hhplab.cli.generate_msa_xwalk.list_boundaries",
+        "hhplab.cli.generate.msa_xwalk.list_boundaries",
         lambda: [_boundary_registry_entry(tmp_path)],
     )
     monkeypatch.setattr(
-        "hhplab.cli.generate_msa_xwalk.latest_vintage",
+        "hhplab.cli.generate.msa_xwalk.latest_vintage",
         lambda: "2025",
     )
 
@@ -343,11 +343,11 @@ def test_generate_msa_xwalk_json_block_population_oom_error_is_actionable(
     _write_block_population_inputs(tmp_path)
     monkeypatch.chdir(tmp_path)
     monkeypatch.setattr(
-        "hhplab.cli.generate_msa_xwalk.list_boundaries",
+        "hhplab.cli.generate.msa_xwalk.list_boundaries",
         lambda: [_boundary_registry_entry(tmp_path)],
     )
     monkeypatch.setattr(
-        "hhplab.cli.generate_msa_xwalk.latest_vintage",
+        "hhplab.cli.generate.msa_xwalk.latest_vintage",
         lambda: "2025",
     )
 
@@ -355,7 +355,7 @@ def test_generate_msa_xwalk_json_block_population_oom_error_is_actionable(
         raise MemoryError("simulated OOM")
 
     monkeypatch.setattr(
-        "hhplab.cli.generate_msa_xwalk._build_block_population_state_shards",
+        "hhplab.cli.generate.msa_xwalk._build_block_population_state_shards",
         raise_memory_error,
     )
 
@@ -432,11 +432,11 @@ def test_generate_msa_xwalk_json_block_population_state_shards_alabama_smoke(
     ).to_parquet(msa_dir / "msa_county_membership__census_msa_2023.parquet")
     monkeypatch.chdir(tmp_path)
     monkeypatch.setattr(
-        "hhplab.cli.generate_msa_xwalk.list_boundaries",
+        "hhplab.cli.generate.msa_xwalk.list_boundaries",
         lambda: [_boundary_registry_entry(tmp_path)],
     )
     monkeypatch.setattr(
-        "hhplab.cli.generate_msa_xwalk.latest_vintage",
+        "hhplab.cli.generate.msa_xwalk.latest_vintage",
         lambda: "2025",
     )
 
@@ -503,7 +503,7 @@ def test_generate_msa_xwalk_uses_shared_partial_allocation_tolerance(
     _write_test_inputs(tmp_path)
     monkeypatch.chdir(tmp_path)
     monkeypatch.setattr(
-        "hhplab.cli.generate_msa_xwalk.list_boundaries",
+        "hhplab.cli.generate.msa_xwalk.list_boundaries",
         lambda: [
             RegistryEntry(
                 boundary_vintage="2025",
@@ -516,7 +516,7 @@ def test_generate_msa_xwalk_uses_shared_partial_allocation_tolerance(
         ],
     )
     monkeypatch.setattr(
-        "hhplab.cli.generate_msa_xwalk.latest_vintage",
+        "hhplab.cli.generate.msa_xwalk.latest_vintage",
         lambda: "2025",
     )
     monkeypatch.setattr(
@@ -582,7 +582,7 @@ def test_generate_msa_xwalk_missing_membership_is_actionable(monkeypatch, tmp_pa
     ).to_parquet(tiger_dir / "counties__C2023.parquet")
 
     monkeypatch.setattr(
-        "hhplab.cli.generate_msa_xwalk.list_boundaries",
+        "hhplab.cli.generate.msa_xwalk.list_boundaries",
         lambda: [
             RegistryEntry(
                 boundary_vintage="2025",
@@ -639,7 +639,7 @@ def test_generate_msa_xwalk_json_surfaces_empty_intersection_warning(
     ).to_parquet(msa_dir / "msa_county_membership__census_msa_2023.parquet")
 
     monkeypatch.setattr(
-        "hhplab.cli.generate_msa_xwalk.list_boundaries",
+        "hhplab.cli.generate.msa_xwalk.list_boundaries",
         lambda: [
             RegistryEntry(
                 boundary_vintage="2025",
@@ -652,7 +652,7 @@ def test_generate_msa_xwalk_json_surfaces_empty_intersection_warning(
         ],
     )
     monkeypatch.setattr(
-        "hhplab.cli.generate_msa_xwalk.latest_vintage",
+        "hhplab.cli.generate.msa_xwalk.latest_vintage",
         lambda: "2025",
     )
 
@@ -704,7 +704,7 @@ def test_generate_msa_xwalk_json_surfaces_empty_membership_join_warning(
     ).to_parquet(msa_dir / "msa_county_membership__census_msa_2023.parquet")
 
     monkeypatch.setattr(
-        "hhplab.cli.generate_msa_xwalk.list_boundaries",
+        "hhplab.cli.generate.msa_xwalk.list_boundaries",
         lambda: [
             RegistryEntry(
                 boundary_vintage="2025",
@@ -717,7 +717,7 @@ def test_generate_msa_xwalk_json_surfaces_empty_membership_join_warning(
         ],
     )
     monkeypatch.setattr(
-        "hhplab.cli.generate_msa_xwalk.latest_vintage",
+        "hhplab.cli.generate.msa_xwalk.latest_vintage",
         lambda: "2025",
     )
 

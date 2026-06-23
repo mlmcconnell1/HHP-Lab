@@ -612,7 +612,7 @@ def test_ingest_hic_cli_json_reports_hash_mismatch_error(
     _write_hic_csv(raw_path)
     monkeypatch.setenv("HHPLAB_ASSET_STORE_ROOT", str(tmp_path / "data"))
     monkeypatch.setattr(
-        "hhplab.cli.ingest_hic.download_hic_data",
+        "hhplab.cli.ingest.hic.download_hic_data",
         lambda *_args, **_kwargs: SimpleNamespace(
             path=raw_path,
             source_url=get_hic_source_url(2020),
