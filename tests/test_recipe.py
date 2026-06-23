@@ -4811,7 +4811,7 @@ def _patch_ct_recipe_alignment(monkeypatch: pytest.MonkeyPatch) -> None:
         lambda **kwargs: _make_ct_recipe_alignment_crosswalk(),
     )
     monkeypatch.setattr(
-        "hhplab.recipe.preflight.build_ct_county_planning_region_crosswalk",
+        "hhplab.recipe.preflight.checks.build_ct_county_planning_region_crosswalk",
         lambda **kwargs: _make_ct_recipe_alignment_crosswalk(),
     )
 
@@ -4829,7 +4829,7 @@ def _patch_ct_recipe_alignment_failure(
         _raise,
     )
     monkeypatch.setattr(
-        "hhplab.recipe.preflight.build_ct_county_planning_region_crosswalk",
+        "hhplab.recipe.preflight.checks.build_ct_county_planning_region_crosswalk",
         _raise,
     )
 

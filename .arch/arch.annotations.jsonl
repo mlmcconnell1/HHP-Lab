@@ -104,7 +104,6 @@
 {"id":"el:file-pit-py-rqhyt6y1a230","summary":"Compatibility wrappers for PIT-owned metro aggregation helpers.","ai":{"architectural_layer":"domain","confidence":0.95}}
 {"id":"el:file-planner-py-vtn0zfjvnqjv","summary":"Resolution planner: deterministic expansion of recipe → execution plan.","ai":{"architectural_layer":"application","confidence":0.95}}
 {"id":"el:file-policies-py-ap6vb56x15ye","summary":"Panel assembly policies for HHP-Lab Phase 3.","ai":{"architectural_layer":"application","confidence":0.95}}
-{"id":"el:file-preflight-py-s5ede77zapwj","summary":"Recipe preflight analyzer: validate readiness without executing.","ai":{"architectural_layer":"application","confidence":0.95}}
 {"id":"el:file-probes-py-h0s1p0n9q9wp","summary":"Non-executing dataset and transform probes for recipe preflight.","ai":{"architectural_layer":"application","confidence":0.95}}
 {"id":"el:file-provenance-py-nh9qahk86kk2","summary":"Dataset provenance tracking via Parquet metadata.","ai":{"architectural_layer":"domain","confidence":0.95}}
 {"id":"el:file-qa-py-98jv9awc7ny2","summary":"PIT data quality assurance and validation.","ai":{"architectural_layer":"domain","confidence":0.95}}
@@ -245,3 +244,8 @@
 {"id":"el:file-cpi-py-x55hphvqst95","summary":"BLS CPI-U annual index ingest module that fetches all-items CPI-U annual averages from the BLS API and writes provenance-bearing curated inflation adjustment artifacts.","ai":{"architectural_layer":"source","confidence":0.92}}
 {"id":"el:file-init-py-adryqh0zka55","summary":"BLS ingest package entrypoint re-exporting CPI-U and LAUS ingest functions and quota-aware error helpers.","ai":{"architectural_layer":"source","confidence":0.9}}
 {"id":"el:package-ingest-gh1w9mk9wxfw","summary":"BLS ingest subpackage for CPI-U inflation index and LAUS metro annual-average source ingestion, including LAUS series ID helpers.","ai":{"architectural_layer":"source","confidence":0.9}}
+{"id":"el:file-init-py-fgyjytcs9fzr","summary":"Preflight package facade preserving the public report model and run_preflight imports after splitting the analyzer into models, checks, and runner modules.","ai":{"architectural_layer":"application","confidence":0.9}}
+{"id":"el:file-models-py-9e379y0yx94d","summary":"Preflight report model definitions for severities, finding kinds, remediation hints, pipeline summaries, and structured readiness reports.","ai":{"architectural_layer":"application","confidence":0.9}}
+{"id":"el:file-checks-py-bbkmq0m0enw5","summary":"Preflight validator collection covering dataset paths, adapter validation, artifacts, schema probes, support datasets, temporal alignment, PEP mediation, CT alignment, and MSA-CoC sources.","ai":{"architectural_layer":"application","confidence":0.9}}
+{"id":"el:file-runner-py-0s576fa02yb5","summary":"Preflight dispatcher that registers defaults, resolves recipe plans, invokes grouped checker functions, and assembles PreflightReport results.","ai":{"architectural_layer":"application","confidence":0.9}}
+{"id":"el:package-preflight-zp0jtpsbrww9","summary":"Recipe preflight subpackage for structured readiness analysis, split into report models, validator checks, and the run_preflight dispatcher.","ai":{"architectural_layer":"application","confidence":0.9}}
