@@ -121,6 +121,36 @@ class TestAggregateMonthly:
         coc_c = result[result["coc_id"] == "C"]
         assert coc_c["geo_count"].iloc[0] == 0
 
+    def test_zero_weight_counties_count_as_sources_but_not_coverage(self):
+        """Rows with zero effective weight are source rows, not covered weight."""
+        xwalk = pd.DataFrame(
+            {
+                "coc_id": ["A", "A"],
+                "county_fips": ["01001", "01002"],
+                "area_share": [0.5, 0.5],
+            }
+        )
+        weights = pd.DataFrame(
+            {
+                "county_fips": ["01001", "01002"],
+                "weight_value": [0.0, 0.0],
+            }
+        )
+        zori = pd.DataFrame(
+            {
+                "geo_id": ["01001", "01002"],
+                "date": pd.to_datetime(["2024-01-01", "2024-01-01"]),
+                "zori": [1000.0, 1200.0],
+            }
+        )
+
+        result = aggregate_monthly(zori, xwalk, weights, min_coverage=0.0)
+
+        row = result[result["coc_id"] == "A"].iloc[0]
+        assert row["coverage_ratio"] == 0.0
+        assert row["geo_count"] == 2
+        assert pd.isna(row["zori_coc"])
+
     def test_partial_coverage_below_threshold_nulls_zori(self, sample_xwalk, sample_weights):
         """ZORI should be null when coverage is below threshold."""
         # Only one county for CoC A

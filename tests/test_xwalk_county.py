@@ -94,6 +94,72 @@ class TestApplyCrosswalk:
         assert row["covered_weight"] == 1.0
         assert row["max_source_weight"] == 0.75
 
+    def test_all_missing_values_preserve_missing_aggregate(self):
+        xwalk = pd.DataFrame(
+            {
+                "coc_id": ["CO-500", "CO-500"],
+                "county_fips": ["08001", "08002"],
+                "area_share": [0.25, 0.75],
+            }
+        )
+        data = pd.DataFrame(
+            {
+                "county_fips": ["08001", "08002"],
+                "year": [2024, 2024],
+                "population": [None, None],
+            }
+        )
+
+        result = apply_crosswalk(
+            data,
+            xwalk,
+            value_cols=["population"],
+            weight_col="area_share",
+            geo_id_col="coc_id",
+            source_id_col="county_fips",
+            group_cols=["year"],
+        )
+
+        row = result.iloc[0]
+        assert pd.isna(row["population"])
+        assert row["covered_weight"] == 1.0
+        assert row["source_count"] == 2
+
+    def test_zero_weight_rows_count_as_sources_but_not_coverage(self):
+        xwalk = pd.DataFrame(
+            {
+                "coc_id": ["CO-500", "CO-500"],
+                "county_fips": ["08001", "08002"],
+                "weight": [0.0, 0.0],
+            }
+        )
+        data = pd.DataFrame(
+            {
+                "geo_id": ["08001", "08002"],
+                "date": pd.to_datetime(["2024-01-01", "2024-01-01"]),
+                "zori": [1000.0, 2000.0],
+            }
+        )
+
+        result = apply_crosswalk(
+            data,
+            xwalk,
+            value_cols=["zori"],
+            output_cols=["zori_coc"],
+            weight_col="weight",
+            geo_id_col="coc_id",
+            source_id_col="county_fips",
+            data_source_id_col="geo_id",
+            group_cols=["date"],
+            normalize=True,
+        )
+
+        row = result.iloc[0]
+        assert pd.isna(row["zori_coc"])
+        assert pd.isna(row["max_source_weight"])
+        assert row["covered_weight"] == 0.0
+        assert row["source_count"] == 2
+
     def test_missing_required_columns_are_actionable(self):
         with pytest.raises(
             ValueError,

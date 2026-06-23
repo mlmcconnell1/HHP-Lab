@@ -26,6 +26,13 @@ def apply_crosswalk(
     source-specific aggregators.  Callers still decide which weight column to use,
     whether values are normalized by available coverage, and how to interpret the
     returned diagnostics.
+
+    Missing values are preserved when every matched source value in a group is
+    missing; the aggregate is ``NaN`` rather than a false zero.  ``source_count``
+    counts matched source rows, including rows whose effective weight is zero.
+    ``covered_weight`` is the summed effective weight and remains the coverage
+    diagnostic callers should use when deciding whether a group has usable
+    weighted coverage.
     """
     if not value_cols:
         raise ValueError("apply_crosswalk requires at least one value column.")
