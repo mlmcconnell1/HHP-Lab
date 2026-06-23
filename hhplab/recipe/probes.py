@@ -17,6 +17,7 @@ import pandas as pd
 import pyarrow.parquet as pq
 
 from hhplab.acs.translate import get_source_tract_vintage, needs_translation
+from hhplab.acs.variables import TRACT_OUTPUT_COLUMNS
 from hhplab.provenance import read_provenance
 from hhplab.recipe.recipe_schema import (
     CrosswalkTransform,
@@ -158,6 +159,59 @@ def probe_acs5_tract_translation_provenance(
             "source_tract_vintage": source_tract_vintage,
             "target_tract_vintage": target_tract_vintage,
             "translation_applied": extra.get("translation_applied"),
+        },
+    )
+
+
+def probe_acs5_tract_schema_contract(
+    *,
+    dataset_id: str,
+    dataset_spec: DatasetSpec,
+    effective_geometry: GeometryRef,
+    path: Path,
+    path_label: str | None = None,
+) -> ProbeResult:
+    """Validate that a canonical ACS5 tract cache has the current output schema."""
+    if dataset_spec.provider != "census" or dataset_spec.product not in {"acs", "acs5"}:
+        return ProbeResult(ok=True)
+    if effective_geometry.type != "tract":
+        return ProbeResult(ok=True)
+
+    match = ACS5_TRACT_CACHE_RE.search(path.as_posix())
+    if match is None:
+        return ProbeResult(ok=True)
+
+    acs_end_year = int(match.group("acs_end"))
+    target_tract_vintage = int(match.group("tract_vintage"))
+    acs_vintage = _acs5_range_from_end_year(acs_end_year)
+    display_path = path_label or path.as_posix()
+    remediation_command = (
+        f"hhplab ingest acs5-tract --acs {acs_vintage} "
+        f"--tracts {target_tract_vintage} --force"
+    )
+
+    schema_result = probe_dataset_schema(path)
+    if not schema_result.ok:
+        return schema_result
+
+    columns = set(schema_result.detail["columns"])
+    missing = sorted(set(TRACT_OUTPUT_COLUMNS) - columns)
+    if not missing:
+        return ProbeResult(ok=True)
+
+    return ProbeResult(
+        ok=False,
+        message=(
+            f"Dataset '{dataset_id}' uses ACS5 tract cache '{display_path}' "
+            f"missing canonical column(s): {missing}."
+        ),
+        detail={
+            "acs_vintage": acs_vintage,
+            "dataset_id": dataset_id,
+            "missing_columns": missing,
+            "path": display_path,
+            "remediation_command": remediation_command,
+            "target_tract_vintage": target_tract_vintage,
         },
     )
 
@@ -735,6 +789,23 @@ def probe_support_dataset(
             results.append(ProbeResult(
                 ok=False,
                 message=provenance_result.message,
+                detail=detail,
+            ))
+
+        schema_contract_result = probe_acs5_tract_schema_contract(
+            dataset_id=population_source,
+            dataset_spec=ds,
+            effective_geometry=resolved.effective_geometry,
+            path=full_path,
+            path_label=path,
+        )
+        if not schema_contract_result.ok:
+            detail = dict(schema_contract_result.detail or {})
+            detail.setdefault("finding_kind", "missing_column")
+            detail.setdefault("transform_id", transform_id)
+            results.append(ProbeResult(
+                ok=False,
+                message=schema_contract_result.message,
                 detail=detail,
             ))
 

@@ -52,6 +52,7 @@ from pathlib import Path
 
 import httpx
 import pandas as pd
+import pyarrow.parquet as pq
 
 import hhplab.naming as naming
 from hhplab.acs.translate import (
@@ -145,6 +146,16 @@ def _cached_translation_matches_request(
         and str(extra.get("source_tract_vintage")) == str(translation["source_tract_vintage"])
         and str(extra.get("target_tract_vintage")) == str(translation["target_tract_vintage"])
     )
+
+
+def _cached_schema_matches_current_contract(output_path: Path) -> bool:
+    """Return whether a cached ACS tract file has the current canonical schema."""
+    try:
+        columns = set(pq.read_schema(output_path).names)
+    except Exception:
+        logger.warning("Unable to inspect ACS tract cache schema: %s", output_path)
+        return False
+    return set(TRACT_OUTPUT_COLUMNS).issubset(columns)
 
 
 def parse_acs_vintage(acs_vintage: str) -> int:
@@ -654,16 +665,27 @@ def ingest_tract_data(
     translation = _translation_metadata(acs_vintage, tract_vintage)
 
     if output_path.exists() and not force:
-        if _cached_translation_matches_request(output_path, acs_vintage, tract_vintage):
+        schema_matches = _cached_schema_matches_current_contract(output_path)
+        if (
+            _cached_translation_matches_request(output_path, acs_vintage, tract_vintage)
+            and schema_matches
+        ):
             logger.info(f"Using cached file: {output_path}")
             return output_path
-        logger.info(
-            "Refreshing cached ACS tract file %s because it predates translated "
-            "tract-vintage provenance for %s -> T%s.",
-            output_path,
-            acs_vintage,
-            tract_vintage,
-        )
+        if not schema_matches:
+            logger.info(
+                "Refreshing cached ACS tract file %s because it is missing columns "
+                "from the current canonical ACS tract schema.",
+                output_path,
+            )
+        else:
+            logger.info(
+                "Refreshing cached ACS tract file %s because it predates translated "
+                "tract-vintage provenance for %s -> T%s.",
+                output_path,
+                acs_vintage,
+                tract_vintage,
+            )
 
     df, content_sha256, content_size, snap_dir = fetch_tract_data(
         acs_vintage,

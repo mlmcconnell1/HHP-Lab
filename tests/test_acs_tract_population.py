@@ -40,6 +40,23 @@ from hhplab.provenance import (
 pytestmark = pytest.mark.httpx_mock(can_send_already_matched_responses=True)
 
 
+def _canonical_tract_cache_row(**overrides: object) -> dict[str, object]:
+    row: dict[str, object] = dict.fromkeys(TRACT_OUTPUT_COLUMNS, pd.NA)
+    row.update(
+        {
+            "tract_geoid": "08031001000",
+            "acs_vintage": "2019-2023",
+            "tract_vintage": "2023",
+            "total_population": 5000,
+            "data_source": "acs_5yr",
+            "source_ref": "cached",
+            "ingested_at": datetime.now(UTC),
+        }
+    )
+    row.update(overrides)
+    return row
+
+
 def make_census_response(
     tracts: list[dict[str, Any]],
     state_fips: str = "08",
@@ -841,17 +858,7 @@ class TestIngestTractPopulation:
         cached_path.parent.mkdir(parents=True, exist_ok=True)
 
         # Write a simple DataFrame
-        df = pd.DataFrame(
-            {
-                "tract_geoid": ["08031001000"],
-                "acs_vintage": ["2019-2023"],
-                "tract_vintage": ["2023"],
-                "total_population": [5000],
-                "data_source": ["acs_5yr"],
-                "source_ref": ["cached"],
-                "ingested_at": [datetime.now(UTC)],
-            }
-        )
+        df = pd.DataFrame([_canonical_tract_cache_row()])
         df.to_parquet(cached_path)
 
         # Call ingest without force - should use cache
@@ -863,6 +870,49 @@ class TestIngestTractPopulation:
         )
 
         assert result_path == cached_path
+
+    def test_refreshes_cache_missing_current_schema_without_force(self, tmp_path, monkeypatch):
+        """Pre-schema-expansion ACS tract caches must be rebuilt automatically."""
+        cached_path = tmp_path / "acs5_tracts__A2023xT2023.parquet"
+        cached_path.parent.mkdir(parents=True, exist_ok=True)
+        pd.DataFrame(
+            {
+                "tract_geoid": ["08031001000"],
+                "acs_vintage": ["2019-2023"],
+                "tract_vintage": ["2023"],
+                "total_population": [5000],
+                "data_source": ["acs_5yr"],
+                "source_ref": ["cached"],
+                "ingested_at": [datetime.now(UTC)],
+            }
+        ).to_parquet(cached_path)
+
+        fetched = pd.DataFrame(
+            [
+                _canonical_tract_cache_row(
+                    total_population=6000,
+                    median_contract_rent=1250,
+                    contract_rent_distribution_with_cash_rent=400,
+                )
+            ]
+        )
+        monkeypatch.setattr(
+            "hhplab.acs.ingest.tract_population.fetch_tract_data",
+            lambda *args, **kwargs: (fetched, "schema-refresh", 123, None),
+        )
+
+        result_path = ingest_tract_data(
+            "2019-2023",
+            "2023",
+            force=False,
+            output_dir=tmp_path,
+        )
+
+        result_df = pd.read_parquet(result_path)
+        assert result_path == cached_path
+        assert result_df.iloc[0]["total_population"] == 6000
+        assert result_df.iloc[0]["median_contract_rent"] == 1250
+        assert "contract_rent_distribution_with_cash_rent" in result_df.columns
 
     @pytest.mark.httpx_mock(can_send_already_matched_responses=True)
     def test_refreshes_stale_translated_cache_without_force(

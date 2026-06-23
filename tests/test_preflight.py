@@ -9,6 +9,7 @@ import pandas as pd
 import pytest
 from typer.testing import CliRunner
 
+from hhplab.acs.variables import TRACT_OUTPUT_COLUMNS
 from hhplab.cli.main import app
 from hhplab.naming import county_xwalk_path, medsl_president_county_path, msa_county_membership_path
 from hhplab.provenance import ProvenanceBlock, write_parquet_with_provenance
@@ -2353,6 +2354,44 @@ class TestRunPreflight:
         assert STALE_TRANSLATED_ACS_PATH in finding.message
         assert finding.remediation is not None
         assert finding.remediation.command == STALE_TRANSLATED_ACS_REBUILD
+
+    def test_blocks_acs5_tract_cache_missing_canonical_schema(self, tmp_path: Path):
+        data = _preflight_recipe(with_path=True)
+        data["universe"] = {"years": [2023]}
+        data["datasets"]["pit"]["years"] = {"years": [2023]}
+        data["datasets"]["acs"]["years"] = {"years": [2023]}
+        data["datasets"]["acs"]["path"] = "data/curated/acs/acs5_tracts__A2023xT2020.parquet"
+        _setup_preflight_fixtures(tmp_path, include_acs=False)
+        stale_path = tmp_path / data["datasets"]["acs"]["path"]
+        stale_path.parent.mkdir(parents=True, exist_ok=True)
+        complete_columns = dict.fromkeys(TRACT_OUTPUT_COLUMNS, pd.NA)
+        complete_columns.update(
+            {
+                "tract_geoid": "T1",
+                "acs_vintage": "2019-2023",
+                "tract_vintage": "2020",
+                "total_population": 100,
+            }
+        )
+        del complete_columns["median_contract_rent"]
+        del complete_columns["contract_rent_distribution_with_cash_rent"]
+        pd.DataFrame([complete_columns]).to_parquet(stale_path)
+
+        recipe = load_recipe(data)
+        report = run_preflight(recipe, project_root=tmp_path)
+
+        schema_findings = [
+            f
+            for f in report.findings
+            if f.kind == FindingKind.MISSING_COLUMN and f.dataset_id == "acs"
+        ]
+        assert not report.is_ready
+        assert any("missing canonical column" in finding.message for finding in schema_findings)
+        command = "hhplab ingest acs5-tract --acs 2019-2023 --tracts 2020 --force"
+        assert any(
+            finding.remediation and finding.remediation.command == command
+            for finding in schema_findings
+        )
 
     def test_planner_error_captured(self, tmp_path: Path):
         data = _preflight_recipe(with_path=True, identity_only=True)

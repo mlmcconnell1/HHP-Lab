@@ -66,6 +66,7 @@ from hhplab.recipe.planner import (
 )
 from hhplab.recipe.probes import (
     get_weighted_transform_requirements,
+    probe_acs5_tract_schema_contract,
     probe_acs5_tract_translation_provenance,
     probe_dataset_schema,
     probe_geo_column,
@@ -525,6 +526,62 @@ def _check_dataset_provenance(
                     hint=(
                         "Rebuild the translated ACS tract cache so its provenance "
                         "records the source and target tract vintages."
+                    ),
+                    command=(str(remediation_command) if remediation_command is not None else None),
+                ),
+            )
+        )
+
+    return findings
+
+
+def _check_acs5_tract_schema_contracts(
+    recipe: RecipeV1,
+    project_root: Path,
+    resample_tasks: list[ResampleTask],
+) -> list[PreflightFinding]:
+    """Block stale ACS5 tract caches that predate the current canonical schema."""
+    findings: list[PreflightFinding] = []
+    tasks_by_path: dict[tuple[str, str], list[ResampleTask]] = {}
+
+    for task in resample_tasks:
+        if task.input_path is None:
+            continue
+        tasks_by_path.setdefault((task.dataset_id, task.input_path), []).append(task)
+
+    for (dataset_id, input_path), tasks in tasks_by_path.items():
+        ds = recipe.datasets.get(dataset_id)
+        if ds is None:
+            continue
+
+        full_path = project_root / input_path
+        if not full_path.exists():
+            continue
+
+        result = probe_acs5_tract_schema_contract(
+            dataset_id=dataset_id,
+            dataset_spec=ds,
+            effective_geometry=tasks[0].effective_geometry,
+            path=full_path,
+            path_label=input_path,
+        )
+        if result.ok:
+            continue
+
+        remediation_command = (
+            result.detail.get("remediation_command") if result.detail is not None else None
+        )
+        findings.append(
+            PreflightFinding(
+                severity=Severity.ERROR,
+                kind=FindingKind.MISSING_COLUMN,
+                message=result.message or "Dataset schema validation failed.",
+                dataset_id=dataset_id,
+                years=sorted(task.year for task in tasks),
+                remediation=Remediation(
+                    hint=(
+                        "Rebuild the ACS5 tract cache so it includes the current "
+                        "canonical output schema."
                     ),
                     command=(str(remediation_command) if remediation_command is not None else None),
                 ),
@@ -3567,9 +3624,12 @@ def run_preflight(
         _check_dataset_year_values(recipe, project_root, all_resample_tasks),
     )
 
-    # 5. Dataset provenance checks for translated ACS tract caches
+    # 5. Dataset provenance and schema checks for ACS tract caches
     report.findings.extend(
         _check_dataset_provenance(recipe, project_root, all_resample_tasks),
+    )
+    report.findings.extend(
+        _check_acs5_tract_schema_contracts(recipe, project_root, all_resample_tasks),
     )
 
     # 6. Transform artifact checks
