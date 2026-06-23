@@ -11,8 +11,8 @@ import pandas as pd
 
 from hhplab.msa.selectors import select_top_msa_ids_by_population
 from hhplab.msa.unemployment import resolve_msa_unemployment
-from hhplab.recipe.executor_containment import build_msa_coc_membership
-from hhplab.recipe.executor_core import ExecutionContext, ExecutorError
+from hhplab.recipe.executor.containment import build_msa_coc_membership
+from hhplab.recipe.executor.core import ExecutionContext, ExecutorError
 from hhplab.recipe.planner import ExecutionPlan
 from hhplab.recipe.recipe_schema import ContainmentSpec
 from hhplab.recipe.schema_common import GeometryRef, expand_year_spec

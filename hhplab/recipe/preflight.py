@@ -53,9 +53,9 @@ from hhplab.recipe.adapters import (
     validate_recipe_adapters,
 )
 from hhplab.recipe.default_adapters import register_defaults
-from hhplab.recipe.executor_core import ExecutorError
-from hhplab.recipe.executor_msa_coc_panel import build_msa_coc_containment_spec
-from hhplab.recipe.executor_resample import derived_measure_required_columns
+from hhplab.recipe.executor.core import ExecutorError
+from hhplab.recipe.executor.msa_coc_panel import build_msa_coc_containment_spec
+from hhplab.recipe.executor.resample import derived_measure_required_columns
 from hhplab.recipe.planner import (
     ExecutionPlan,
     PlannerError,
@@ -787,7 +787,7 @@ def _msa_transform_remediation(
     """Build an actionable remediation hint for an MSA transform artifact."""
     from pathlib import Path
 
-    from hhplab.recipe.executor_transforms import (
+    from hhplab.recipe.executor.transforms import (
         _county_vintage_from_msa_definition_version,
         _identify_msa_and_base,
     )
@@ -2995,7 +2995,7 @@ def _check_pep_decennial_tract_mediated_inputs(
                     )
 
         try:
-            from hhplab.recipe.executor_transforms import _resolve_transform_path
+            from hhplab.recipe.executor.transforms import _resolve_transform_path
 
             xwalk_path = _resolve_transform_path(task.transform_id, recipe, project_root)
         except Exception:

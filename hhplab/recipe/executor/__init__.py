@@ -16,7 +16,7 @@ import typer
 from hhplab.config import StorageConfig
 from hhplab.geo.ct_planning_regions import CT_LEGACY_COUNTY_VINTAGE
 from hhplab.recipe.cache import RecipeCache
-from hhplab.recipe.executor_core import (
+from hhplab.recipe.executor.core import (
     ExecutionContext,
     ExecutorError,
     PipelineResult,
@@ -26,12 +26,7 @@ from hhplab.recipe.executor_core import (
     _get_transform,
     _record_step_note,
 )
-from hhplab.recipe.executor_ct_alignment import (
-    _load_ct_county_alignment_crosswalk,
-    _needs_ct_planning_to_legacy_alignment,
-    _translate_ct_planning_values_to_legacy,
-)
-from hhplab.recipe.executor_inputs import (
+from hhplab.recipe.executor.inputs import (
     _apply_temporal_filter,
     _filter_to_year,
     _load_support_dataset_for_year,
@@ -41,7 +36,10 @@ from hhplab.recipe.executor_inputs import (
     _validate_columns,
     _validate_input_dataset_provenance,
 )
-from hhplab.recipe.executor_manifest import (
+from hhplab.recipe.executor.inputs import (
+    record_dataset_year_metadata as _record_dataset_year_metadata,
+)
+from hhplab.recipe.executor.manifest import (
     _build_manifest,
     _build_provenance,
     _deduplicate_assets,
@@ -54,47 +52,47 @@ from hhplab.recipe.executor_manifest import (
     _target_geometry_metadata,
     resolve_pipeline_artifacts,
 )
-from hhplab.recipe.executor_metadata import (
-    record_dataset_year_metadata as _record_dataset_year_metadata,
-)
-from hhplab.recipe.executor_panel import (
+from hhplab.recipe.executor.panel import (
     AssembledPanel as _AssembledPanel,  # noqa: F401  (public re-export)
 )
-from hhplab.recipe.executor_panel import (
+from hhplab.recipe.executor.panel import (
     apply_cohort_selector as _apply_cohort_selector,  # noqa: F401  (public re-export)
 )
-from hhplab.recipe.executor_panel import (
+from hhplab.recipe.executor.panel import (
     assemble_panel as _assemble_panel,  # noqa: F401  (public re-export)
 )
-from hhplab.recipe.executor_panel import (
+from hhplab.recipe.executor.panel import (
     canonicalize_panel_for_target as _canonicalize_panel_for_target,  # noqa: F401
 )
-from hhplab.recipe.executor_panel import (
+from hhplab.recipe.executor.panel import (
     resolve_panel_aliases as _resolve_panel_aliases,  # noqa: F401
 )
-from hhplab.recipe.executor_persistence import (
+from hhplab.recipe.executor.persistence import (
     persist_containment as _persist_containment,
 )
-from hhplab.recipe.executor_persistence import (
+from hhplab.recipe.executor.persistence import (
     persist_diagnostics as _persist_diagnostics,
 )
-from hhplab.recipe.executor_persistence import (
+from hhplab.recipe.executor.persistence import (
     persist_msa_coc_coverage as _persist_msa_coc_coverage,
 )
-from hhplab.recipe.executor_persistence import (
+from hhplab.recipe.executor.persistence import (
     persist_outputs as _persist_outputs,
 )
-from hhplab.recipe.executor_resample import (
+from hhplab.recipe.executor.resample import (
     _XWALK_JOIN_KEYS,
     _XWALK_NON_GEO_COLS,
     _attach_dynamic_pop_share,
     _detect_xwalk_target_col,
+    _load_ct_county_alignment_crosswalk,
+    _needs_ct_planning_to_legacy_alignment,
     _resample_aggregate,
     _resample_allocate,
     _resample_identity,
+    _translate_ct_planning_values_to_legacy,
     derived_measure_required_columns,
 )
-from hhplab.recipe.executor_transforms import (
+from hhplab.recipe.executor.transforms import (
     _generated_metro_transform_path,
     _identify_coc_and_base,
     _identify_metro_and_base,
@@ -130,7 +128,7 @@ from hhplab.schema.lineage import (
 
 # Re-export the core primitives so ``from hhplab.recipe.executor import
 # ExecutorError`` (and similar imports used by tests, the CLI, and third-
-# party callers) keep resolving.  The canonical home is ``executor_core``;
+# party callers) keep resolving.  The canonical home is ``executor.core``;
 # importing from there avoids the partial-initialization cycle that used
 # to hit direct submodule imports (coclab-l6be).
 __all__ = [
@@ -900,9 +898,9 @@ def _execute_join(
 # Output persistence
 # ---------------------------------------------------------------------------
 
-# Panel assembly lives in ``executor_panel`` and the persistence path
+# Panel assembly lives in ``executor.panel`` and the persistence path
 # (parquet writes, manifest sidecar, diagnostics JSON) lives in
-# ``executor_persistence``.  Both are imported at the top of this module
+# ``executor.persistence``.  Both are imported at the top of this module
 # and re-exported under their original underscored names for backwards
 # compatibility with tests and CLI callers.
 

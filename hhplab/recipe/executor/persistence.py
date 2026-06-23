@@ -38,15 +38,15 @@ from hhplab.naming import (
 from hhplab.panel.conformance import PanelRequest, run_conformance
 from hhplab.panel.panel_diagnostics import generate_diagnostics_report
 from hhplab.panel.zori_eligibility import summarize_zori_eligibility
-from hhplab.recipe.executor_containment import build_containment_list
-from hhplab.recipe.executor_core import (
+from hhplab.recipe.executor.containment import build_containment_list
+from hhplab.recipe.executor.core import (
     ExecutionContext,
     ExecutorError,
     StepResult,
     _classify_path,
     _echo,
 )
-from hhplab.recipe.executor_manifest import (
+from hhplab.recipe.executor.manifest import (
     _build_manifest,
     _build_provenance,
     _resolve_containment_output_file,
@@ -54,15 +54,15 @@ from hhplab.recipe.executor_manifest import (
     _resolve_panel_output_file,
     _resolve_pipeline_target,
 )
-from hhplab.recipe.executor_msa_coc_panel import (
+from hhplab.recipe.executor.msa_coc_panel import (
     _collect_frame_records,
     _population_column,
     _source_year_frame,
     assemble_msa_coc_panel,
     build_msa_coc_containment_spec,
 )
-from hhplab.recipe.executor_panel import assemble_panel
-from hhplab.recipe.executor_panel_policies import collect_conformance_flags
+from hhplab.recipe.executor.panel import assemble_panel
+from hhplab.recipe.executor.panel_policies import collect_conformance_flags
 from hhplab.recipe.manifest import AssetRecord, write_manifest
 from hhplab.recipe.planner import ExecutionPlan
 from hhplab.recipe.recipe_schema import ContainmentSpec, MsaFractionalRollupSpec

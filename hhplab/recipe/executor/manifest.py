@@ -22,7 +22,7 @@ from hhplab.naming import (
     msa_coc_panel_filename,
     msa_fractional_rollup_filename,
 )
-from hhplab.recipe.executor_core import (
+from hhplab.recipe.executor.core import (
     ExecutionContext,
     ExecutorError,
     _classify_path,

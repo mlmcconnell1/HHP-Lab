@@ -21,7 +21,7 @@ import pyarrow.parquet as pq
 from shapely.geometry import box
 
 from hhplab.recipe.executor import execute_recipe
-from hhplab.recipe.executor_panel_policies import collect_conformance_flags
+from hhplab.recipe.executor.panel_policies import collect_conformance_flags
 from hhplab.recipe.loader import load_recipe
 from hhplab.recipe.manifest import read_manifest
 from hhplab.xwalks.county import ALBERS_EQUAL_AREA_CRS
@@ -1766,7 +1766,7 @@ class TestLausOnlyConformanceFlags:
         """Without aliases, collect_conformance_flags must include all four LAUS
         measure columns even when no ACS products are present (coclab-d9d3)."""
         from hhplab.panel.conformance import LAUS_MEASURE_COLUMNS
-        from hhplab.recipe.executor_panel_policies import collect_conformance_flags
+        from hhplab.recipe.executor.panel_policies import collect_conformance_flags
 
         flags = collect_conformance_flags(
             recipe=self._make_laus_only_recipe(),
@@ -1787,7 +1787,7 @@ class TestLausOnlyConformanceFlags:
     def test_with_aliases_includes_all_laus_columns(self):
         """With column aliases, LAUS columns must survive alias translation."""
         from hhplab.panel.conformance import LAUS_MEASURE_COLUMNS
-        from hhplab.recipe.executor_panel_policies import collect_conformance_flags
+        from hhplab.recipe.executor.panel_policies import collect_conformance_flags
 
         flags = collect_conformance_flags(
             recipe=self._make_laus_only_recipe(),

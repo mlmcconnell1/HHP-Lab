@@ -28,7 +28,7 @@ from hhplab.naming import (
     tract_xwalk_path,
 )
 from hhplab.provenance import ProvenanceBlock, write_parquet_with_provenance
-from hhplab.recipe.executor_core import ExecutorError, _get_transform
+from hhplab.recipe.executor.core import ExecutorError, _get_transform
 from hhplab.recipe.recipe_schema import RecipeV1
 from hhplab.recipe.schema_common import GeometryRef
 

@@ -4367,7 +4367,7 @@ class TestMaterialize:
         self, tmp_path: Path
     ):
         from hhplab.naming import msa_coc_xwalk_path
-        from hhplab.recipe.executor_transforms import _resolve_msa_transform_df
+        from hhplab.recipe.executor.transforms import _resolve_msa_transform_df
 
         xwalk_path = msa_coc_xwalk_path("2020", "census_msa_2023", 2023, tmp_path / "data")
         xwalk_path.parent.mkdir(parents=True, exist_ok=True)
@@ -4393,7 +4393,7 @@ class TestMaterialize:
         self, tmp_path: Path
     ):
         from hhplab.naming import county_path, msa_county_membership_path
-        from hhplab.recipe.executor_transforms import _resolve_msa_transform_df
+        from hhplab.recipe.executor.transforms import _resolve_msa_transform_df
 
         data_root = tmp_path / "data"
         msa_path = msa_county_membership_path("census_msa_2023", data_root)
@@ -4433,7 +4433,7 @@ class TestMaterialize:
         self, tmp_path: Path
     ):
         from hhplab.naming import county_path, msa_county_membership_path
-        from hhplab.recipe.executor_transforms import (
+        from hhplab.recipe.executor.transforms import (
             _generated_msa_transform_path,
             _materialize_generated_msa_transform,
         )
@@ -4501,7 +4501,7 @@ class TestMaterialize:
         self, tmp_path: Path
     ):
         from hhplab.naming import county_path, msa_county_membership_path, tract_path
-        from hhplab.recipe.executor_transforms import _resolve_msa_transform_df
+        from hhplab.recipe.executor.transforms import _resolve_msa_transform_df
 
         data_root = tmp_path / "data"
         msa_path = msa_county_membership_path("census_msa_2023", data_root)
@@ -4807,7 +4807,7 @@ def _make_ct_recipe_alignment_crosswalk() -> CtPlanningRegionCrosswalk:
 
 def _patch_ct_recipe_alignment(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(
-        "hhplab.recipe.executor_ct_alignment.build_ct_county_planning_region_crosswalk",
+        "hhplab.recipe.executor.resample.build_ct_county_planning_region_crosswalk",
         lambda **kwargs: _make_ct_recipe_alignment_crosswalk(),
     )
     monkeypatch.setattr(
@@ -4825,7 +4825,7 @@ def _patch_ct_recipe_alignment_failure(
         raise FileNotFoundError(message)
 
     monkeypatch.setattr(
-        "hhplab.recipe.executor_ct_alignment.build_ct_county_planning_region_crosswalk",
+        "hhplab.recipe.executor.resample.build_ct_county_planning_region_crosswalk",
         _raise,
     )
     monkeypatch.setattr(
@@ -8856,7 +8856,7 @@ class TestApplyCohortSelector:
         assert len(result) == 6
 
     def test_predicate_summary_records_config_and_counts(self):
-        from hhplab.recipe.executor_panel import apply_cohort_selector_with_summary
+        from hhplab.recipe.executor.panel import apply_cohort_selector_with_summary
         from hhplab.recipe.recipe_schema import CohortSelector
 
         panel = self._make_panel()

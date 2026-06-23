@@ -37,18 +37,18 @@ from hhplab.panel.finalize import (
     ZORI_PROVENANCE_COLUMNS,
     finalize_panel,
 )
-from hhplab.recipe.executor_core import (
+from hhplab.recipe.executor.core import (
     ExecutionContext,
     ExecutorError,
     StepResult,
     _classify_path,
     _echo,
 )
-from hhplab.recipe.executor_manifest import (
+from hhplab.recipe.executor.manifest import (
     _resolve_pipeline_target,
     _target_geometry_metadata,
 )
-from hhplab.recipe.executor_panel_policies import (
+from hhplab.recipe.executor.panel_policies import (
     DEFAULT_APPLIERS,
     PanelPolicyApplier,
     PolicyApplication,
@@ -62,7 +62,6 @@ from hhplab.recipe.recipe_schema import (
 )
 from hhplab.recipe.schema_common import GeometryRef, expand_year_spec
 from hhplab.schema.columns import (
-    HIC_PANEL_MEASURE_COLUMNS,
     POPULATION_DENSITY_COLUMN,
     TOTAL_POPULATION,
 )

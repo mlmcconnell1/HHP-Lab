@@ -460,7 +460,10 @@ def test_top50_msa_coc_pit_acs5_poverty_2015_2025_recipe_loads_and_resolves() ->
     )
     assert inflation_adjustment.factor_column == "cpi_u_adjustment_factor"
     assert [task.year for task in plan.join_tasks] == [2015, 2025]
-    assert all(tuple(task.datasets) == ("pit", "pep_county", "acs_tract") for task in plan.join_tasks)
+    assert all(
+        tuple(task.datasets) == ("pit", "pep_county", "acs_tract")
+        for task in plan.join_tasks
+    )
 
     acs_tasks_by_year = {
         task.year: task for task in plan.resample_tasks if task.dataset_id == "acs_tract"

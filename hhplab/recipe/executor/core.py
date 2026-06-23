@@ -5,11 +5,10 @@ helper functions (``_classify_path``, ``_echo``, ``_record_step_note``,
 ``_get_transform``) that every extracted executor submodule needs to
 reach.  This module exists to break the import cycle between
 ``hhplab.recipe.executor`` and its decomposed siblings
-(``executor_transforms``, ``executor_manifest``, ``executor_inputs``,
-``executor_ct_alignment``, ``executor_resample``): each submodule and
+(``transforms``, ``manifest``, ``inputs``, ``resample``): each submodule and
 ``executor`` itself import the primitives from here instead of from
 ``executor``, so direct imports like
-``import hhplab.recipe.executor_transforms`` no longer hit a
+``import hhplab.recipe.executor.transforms`` no longer hit a
 partially-initialized module (coclab-l6be).
 """
 

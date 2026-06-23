@@ -42,7 +42,7 @@ from hhplab.panel.conformance import PanelRequest, run_conformance
 from hhplab.pep.pep_ingest import PEP_COUNTY_OUTPUT_COLUMNS as PEP_INGEST_COLUMNS
 from hhplab.pit.ingest.parser import CANONICAL_COLUMNS as PIT_PARSER_COLUMNS
 from hhplab.recipe.executor import ExecutorError, _normalize_recipe_population_measure
-from hhplab.recipe.executor_panel import _resolve_canonical_population
+from hhplab.recipe.executor.panel import _resolve_canonical_population
 from hhplab.recipe.planner import ResampleTask
 from hhplab.recipe.recipe_schema import (
     ACS5_RECIPE_DEFAULT_MEASURES,

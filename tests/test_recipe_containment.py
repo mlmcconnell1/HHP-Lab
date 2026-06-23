@@ -27,15 +27,15 @@ from hhplab.naming import (
     msa_county_membership_path,
 )
 from hhplab.recipe.executor import execute_recipe
-from hhplab.recipe.executor_containment import (
+from hhplab.recipe.executor.containment import (
     ALBERS_EQUAL_AREA_CRS,
     CONTAINMENT_COLUMNS,
     MSA_COC_MEMBERSHIP_COLUMNS,
     build_containment_list,
     build_msa_coc_membership,
 )
-from hhplab.recipe.executor_manifest import resolve_pipeline_artifacts
-from hhplab.recipe.executor_msa_coc_panel import (
+from hhplab.recipe.executor.manifest import resolve_pipeline_artifacts
+from hhplab.recipe.executor.msa_coc_panel import (
     _first_available,
     build_msa_coc_containment_spec,
 )

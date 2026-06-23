@@ -22,8 +22,8 @@ from hhplab.bls.ingest_cpi import (
     ingest_cpi_u,
 )
 from hhplab.naming import cpi_u_filename, cpi_u_path
-from hhplab.recipe.executor_core import ExecutionContext
-from hhplab.recipe.executor_panel import _apply_inflation_adjustment
+from hhplab.recipe.executor.core import ExecutionContext
+from hhplab.recipe.executor.panel import _apply_inflation_adjustment
 from hhplab.recipe.recipe_schema import InflationAdjustmentPolicy, PanelPolicy
 
 CPI_FIXTURE = pd.DataFrame(
