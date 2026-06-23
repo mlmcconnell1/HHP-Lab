@@ -40,6 +40,8 @@ from pathlib import Path
 
 import pandas as pd
 
+from hhplab.coverage_diagnostics import coverage_diagnostics
+
 logger = logging.getLogger(__name__)
 
 # Default thresholds (per spec section 10)
@@ -116,58 +118,14 @@ def compute_coc_diagnostics(
     if missing_cols:
         raise ValueError(f"Missing required columns: {missing_cols}")
 
-    results = []
-
-    for coc_id, group in coc_zori_df.groupby("coc_id"):
-        periods_total = len(group)
-
-        # Count periods with valid ZORI (zori_coc not null)
-        if "zori_coc" in group.columns:
-            periods_covered = int(group["zori_coc"].notna().sum())
-        else:
-            # Fallback: count periods with coverage >= threshold
-            periods_covered = int((group["coverage_ratio"] >= min_coverage).sum())
-
-        # Coverage ratio statistics
-        coverage_ratios = group["coverage_ratio"]
-        coverage_mean = coverage_ratios.mean()
-        coverage_p10 = coverage_ratios.quantile(0.10)
-        coverage_p50 = coverage_ratios.quantile(0.50)
-        coverage_p90 = coverage_ratios.quantile(0.90)
-
-        # Max geo contribution statistics
-        if "max_geo_contribution" in group.columns:
-            max_contributions = group["max_geo_contribution"].dropna()
-            if len(max_contributions) > 0:
-                max_geo_p90 = max_contributions.quantile(0.90)
-            else:
-                max_geo_p90 = None
-        else:
-            max_geo_p90 = None
-
-        # Compute flags
-        flag_low_coverage = coverage_mean < min_coverage
-        flag_high_dominance = max_geo_p90 is not None and max_geo_p90 > dominance_threshold
-
-        results.append(
-            {
-                "coc_id": coc_id,
-                "periods_total": periods_total,
-                "periods_covered": periods_covered,
-                "coverage_ratio_mean": coverage_mean,
-                "coverage_ratio_p10": coverage_p10,
-                "coverage_ratio_p50": coverage_p50,
-                "coverage_ratio_p90": coverage_p90,
-                "max_geo_contribution_p90": max_geo_p90,
-                "flag_low_coverage": flag_low_coverage,
-                "flag_high_dominance": flag_high_dominance,
-            }
-        )
-
-    result_df = pd.DataFrame(results)
-    result_df = result_df.sort_values("coc_id").reset_index(drop=True)
-
-    return result_df
+    return coverage_diagnostics(
+        coc_zori_df,
+        geo_id_col="coc_id",
+        min_coverage=min_coverage,
+        value_col="zori_coc",
+        dominance_col="max_geo_contribution",
+        dominance_threshold=dominance_threshold,
+    )
 
 
 # =============================================================================

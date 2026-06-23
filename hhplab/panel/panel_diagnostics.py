@@ -38,6 +38,7 @@ from typing import Any
 import pandas as pd
 
 from hhplab.analysis_geo import infer_geo_type, resolve_geo_col
+from hhplab.coverage_diagnostics import coverage_group_summary
 
 logger = logging.getLogger(__name__)
 
@@ -127,29 +128,12 @@ def coverage_summary(panel_df: pd.DataFrame) -> pd.DataFrame:
         logger.debug("Skipping coverage_summary (no non-null %s values in panel)", coverage_col)
         return _empty_coverage_summary()
 
-    # Compute statistics by year
-    results = []
-    for year, group in df.groupby("year"):
-        coverage = group[coverage_col]
-        results.append(
-            {
-                "year": year,
-                "count": len(coverage),
-                "mean": coverage.mean(),
-                "std": coverage.std() if len(coverage) > 1 else 0.0,
-                "min": coverage.min(),
-                "q25": coverage.quantile(0.25),
-                "median": coverage.median(),
-                "q75": coverage.quantile(0.75),
-                "max": coverage.max(),
-                "low_coverage_count": int((coverage < 0.9).sum()),
-            }
-        )
-
-    result_df = pd.DataFrame(results)
-    result_df = result_df.sort_values("year").reset_index(drop=True)
-
-    return result_df
+    return coverage_group_summary(
+        df,
+        group_col="year",
+        coverage_col=coverage_col,
+        min_coverage=0.9,
+    )
 
 
 def boundary_change_summary(panel_df: pd.DataFrame) -> pd.DataFrame:

@@ -19,6 +19,7 @@ from pathlib import Path
 
 import pandas as pd
 
+from hhplab.coverage_diagnostics import coverage_diagnostics
 from hhplab.provenance import ProvenanceBlock, write_parquet_with_provenance
 
 logger = logging.getLogger(__name__)
@@ -50,34 +51,29 @@ def compute_coc_diagnostics(
     pd.DataFrame
         Diagnostics with one row per CoC.
     """
-    if geo_id_col not in pep_coc_df.columns:
-        raise ValueError(f"Missing required column: {geo_id_col}")
-
-    coverage_col = "coverage_ratio"
-    has_coverage = coverage_col in pep_coc_df.columns
-
-    results = []
-    for geo_id, group in pep_coc_df.groupby(geo_id_col):
-        years_total = group["year"].nunique() if "year" in group.columns else len(group)
-
-        if has_coverage:
-            years_covered = (group[coverage_col] >= min_coverage).sum()
-            coverage_mean = group[coverage_col].mean()
-        else:
-            years_covered = years_total
-            coverage_mean = 1.0
-
-        results.append(
-            {
-                geo_id_col: geo_id,
-                "years_total": years_total,
-                "years_covered": int(years_covered),
-                "coverage_ratio_mean": coverage_mean,
-                "flag_low_coverage": coverage_mean < min_coverage,
-            }
-        )
-
-    return pd.DataFrame(results).sort_values(geo_id_col).reset_index(drop=True)
+    diagnostics = coverage_diagnostics(
+        pep_coc_df,
+        geo_id_col=geo_id_col,
+        min_coverage=min_coverage,
+        period_col="year",
+        unique_periods=True,
+        missing_coverage_is_full=True,
+        include_quantiles=False,
+    )
+    return diagnostics.rename(
+        columns={
+            "periods_total": "years_total",
+            "periods_covered": "years_covered",
+        }
+    )[
+        [
+            geo_id_col,
+            "years_total",
+            "years_covered",
+            "coverage_ratio_mean",
+            "flag_low_coverage",
+        ]
+    ]
 
 
 def generate_text_summary(
