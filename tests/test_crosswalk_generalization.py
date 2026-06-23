@@ -9,7 +9,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from hhplab.measures.measures_acs import aggregate_to_coc, aggregate_to_geo
+from hhplab.acs.acs_aggregate import aggregate_to_coc, aggregate_to_geo
 from hhplab.measures.measures_diagnostics import (
     compute_crosswalk_diagnostics,
     compute_measure_diagnostics,
