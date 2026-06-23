@@ -100,10 +100,12 @@ def is_ct_planning_region_fips(geoid: str) -> bool:
 def build_ct_tract_planning_region_map(
     tract_vintage: int | str,
     planning_region_vintage: int | str = CT_PLANNING_REGION_VINTAGE,
+    *,
+    base_dir: Path | str | None = None,
 ) -> pd.DataFrame:
     """Build a mapping from planning-region tract GEOIDs to legacy tract GEOIDs."""
-    tracts_path = tract_path(tract_vintage)
-    planning_path = county_path(planning_region_vintage)
+    tracts_path = tract_path(tract_vintage, base_dir)
+    planning_path = county_path(planning_region_vintage, base_dir)
 
     tracts = _filter_ct(_load_geometries(tracts_path, "geoid"))
     planning_regions = _filter_ct(_load_geometries(planning_path, "geoid"))
@@ -173,10 +175,12 @@ def remap_ct_planning_region_geoids(
 def build_ct_county_planning_region_crosswalk(
     legacy_county_vintage: int | str = CT_LEGACY_COUNTY_VINTAGE,
     planning_region_vintage: int | str = CT_PLANNING_REGION_VINTAGE,
+    *,
+    base_dir: Path | str | None = None,
 ) -> CtPlanningRegionCrosswalk:
     """Build an area-share crosswalk between legacy counties and planning regions."""
-    legacy_path = county_path(legacy_county_vintage)
-    planning_path = county_path(planning_region_vintage)
+    legacy_path = county_path(legacy_county_vintage, base_dir)
+    planning_path = county_path(planning_region_vintage, base_dir)
 
     legacy = _filter_ct(_load_geometries(legacy_path, "geoid"))
     planning = _filter_ct(_load_geometries(planning_path, "geoid"))

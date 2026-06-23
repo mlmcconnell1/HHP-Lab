@@ -4389,6 +4389,155 @@ class TestMaterialize:
 
         pd.testing.assert_frame_equal(result, expected)
 
+    def test_resolve_msa_county_transform_bridges_ct_planning_regions(
+        self, tmp_path: Path
+    ):
+        from hhplab.naming import county_path, msa_county_membership_path
+        from hhplab.recipe.executor_transforms import _resolve_msa_transform_df
+
+        data_root = tmp_path / "data"
+        msa_path = msa_county_membership_path("census_msa_2023", data_root)
+        msa_path.parent.mkdir(parents=True, exist_ok=True)
+        pd.DataFrame(
+            {
+                "msa_id": ["25540"],
+                "cbsa_code": ["25540"],
+                "county_fips": ["09110"],
+                "county_name": ["Capitol Planning Region"],
+                "definition_version": ["census_msa_2023"],
+            }
+        ).to_parquet(msa_path)
+
+        county_path(2020, data_root).parent.mkdir(parents=True, exist_ok=True)
+        gpd.GeoDataFrame(
+            {"geoid": ["09003", "09007"]},
+            geometry=[box(0, 0, 10, 10), box(10, 0, 20, 10)],
+            crs="ESRI:102003",
+        ).to_parquet(county_path(2020, data_root))
+        gpd.GeoDataFrame(
+            {"geoid": ["09110", "09130"]},
+            geometry=[box(0, 0, 15, 10), box(15, 0, 20, 10)],
+            crs="ESRI:102003",
+        ).to_parquet(county_path(2023, data_root))
+
+        result = _resolve_msa_transform_df(
+            msa_ref=GeometryRef(type="msa", source="census_msa_2023"),
+            base_ref=GeometryRef(type="county", vintage=2020),
+            project_root=tmp_path,
+        )
+
+        assert result["county_fips"].tolist() == ["09003", "09007", "09110"]
+        assert result["area_share"].tolist() == pytest.approx([1.0, 0.5, 1.0])
+
+    def test_materialize_msa_county_transform_refreshes_stale_ct_cache(
+        self, tmp_path: Path
+    ):
+        from hhplab.naming import county_path, msa_county_membership_path
+        from hhplab.recipe.executor_transforms import (
+            _generated_msa_transform_path,
+            _materialize_generated_msa_transform,
+        )
+
+        data_root = tmp_path / "data"
+        msa_path = msa_county_membership_path("census_msa_2023", data_root)
+        msa_path.parent.mkdir(parents=True, exist_ok=True)
+        pd.DataFrame(
+            {
+                "msa_id": ["25540"],
+                "cbsa_code": ["25540"],
+                "county_fips": ["09110"],
+                "definition_version": ["census_msa_2023"],
+            }
+        ).to_parquet(msa_path)
+        county_path(2020, data_root).parent.mkdir(parents=True, exist_ok=True)
+        gpd.GeoDataFrame(
+            {"geoid": ["09003", "09007"]},
+            geometry=[box(0, 0, 10, 10), box(10, 0, 20, 10)],
+            crs="ESRI:102003",
+        ).to_parquet(county_path(2020, data_root))
+        gpd.GeoDataFrame(
+            {"geoid": ["09110", "09130"]},
+            geometry=[box(0, 0, 15, 10), box(15, 0, 20, 10)],
+            crs="ESRI:102003",
+        ).to_parquet(county_path(2023, data_root))
+
+        data = _recipe_with_pipeline()
+        data["pipelines"][0]["steps"] = [
+            {"materialize": {"transforms": ["county_to_msa"]}},
+        ]
+        data["transforms"] = [
+            {
+                "id": "county_to_msa",
+                "type": "crosswalk",
+                "from": {"type": "county", "vintage": 2020},
+                "to": {"type": "msa", "source": "census_msa_2023"},
+                "spec": {"weighting": {"scheme": "area"}},
+            }
+        ]
+        recipe = load_recipe(data)
+        stale_path = _generated_msa_transform_path(
+            "county_to_msa",
+            msa_ref=GeometryRef(type="msa", source="census_msa_2023"),
+            base_ref=GeometryRef(type="county", vintage=2020),
+            project_root=tmp_path,
+        )
+        stale_path.parent.mkdir(parents=True, exist_ok=True)
+        pd.DataFrame(
+            {
+                "msa_id": ["25540"],
+                "county_fips": ["09110"],
+                "area_share": [1.0],
+                "definition_version": ["census_msa_2023"],
+            }
+        ).to_parquet(stale_path)
+
+        path = _materialize_generated_msa_transform("county_to_msa", recipe, tmp_path)
+        refreshed = pd.read_parquet(path)
+
+        assert "09003" in set(refreshed["county_fips"])
+        assert "09110" in set(refreshed["county_fips"])
+
+    def test_resolve_msa_tract_transform_bridges_ct_planning_regions(
+        self, tmp_path: Path
+    ):
+        from hhplab.naming import county_path, msa_county_membership_path, tract_path
+        from hhplab.recipe.executor_transforms import _resolve_msa_transform_df
+
+        data_root = tmp_path / "data"
+        msa_path = msa_county_membership_path("census_msa_2023", data_root)
+        msa_path.parent.mkdir(parents=True, exist_ok=True)
+        pd.DataFrame(
+            {
+                "msa_id": ["25540"],
+                "cbsa_code": ["25540"],
+                "county_fips": ["09110"],
+                "county_name": ["Capitol Planning Region"],
+                "definition_version": ["census_msa_2023"],
+            }
+        ).to_parquet(msa_path)
+
+        county_path(2023, data_root).parent.mkdir(parents=True, exist_ok=True)
+        gpd.GeoDataFrame(
+            {"geoid": ["09110", "09130"]},
+            geometry=[box(0, 0, 15, 10), box(15, 0, 20, 10)],
+            crs="ESRI:102003",
+        ).to_parquet(county_path(2023, data_root))
+        gpd.GeoDataFrame(
+            {"geoid": ["09003000100", "09007000100"]},
+            geometry=[box(1, 1, 2, 2), box(16, 1, 17, 2)],
+            crs="ESRI:102003",
+        ).to_parquet(tract_path(2010, data_root))
+
+        result = _resolve_msa_transform_df(
+            msa_ref=GeometryRef(type="msa", source="census_msa_2023"),
+            base_ref=GeometryRef(type="tract", vintage=2010),
+            project_root=tmp_path,
+        )
+
+        assert result["tract_geoid"].tolist() == ["09003000100", "09110000100"]
+        assert result["msa_id"].tolist() == ["25540", "25540"]
+        assert result["area_share"].tolist() == [1.0, 1.0]
+
     def test_unknown_transform_raises(self, tmp_path: Path):
         recipe = load_recipe(_recipe_with_pipeline())
         with pytest.raises(ExecutorError, match="not found in recipe"):

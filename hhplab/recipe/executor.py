@@ -414,7 +414,7 @@ def _execute_materialize(
                 )
             except ExecutorError as exc:
                 generation_error = str(exc)
-        elif msa_ref is not None and not path.exists():
+        elif msa_ref is not None:
             try:
                 path = _materialize_generated_msa_transform(
                     tid,

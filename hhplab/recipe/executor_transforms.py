@@ -14,6 +14,12 @@ from pathlib import Path
 
 import pandas as pd
 
+from hhplab.geo.ct_planning_regions import (
+    build_ct_county_planning_region_crosswalk,
+    build_ct_tract_planning_region_map,
+    is_ct_legacy_county_fips,
+    is_ct_planning_region_fips,
+)
 from hhplab.naming import (
     county_xwalk_path,
     msa_coc_xwalk_path,
@@ -349,11 +355,16 @@ def _resolve_msa_transform_df(
     definition_version = msa_ref.source
 
     if base_ref.type == "county":
-        xwalk = read_msa_county_membership(
+        membership = read_msa_county_membership(
             definition_version=definition_version,
             base_dir=data_root,
         ).copy()
-        xwalk["area_share"] = 1.0
+        xwalk = _resolve_msa_county_transform_df(
+            membership,
+            base_ref=base_ref,
+            definition_version=definition_version,
+            data_root=data_root,
+        )
         return xwalk[["msa_id", "county_fips", "area_share", "definition_version"]]
 
     if base_ref.type == "tract":
@@ -378,11 +389,15 @@ def _resolve_msa_transform_df(
                 f"Expected one of tract_geoid/GEOID/geoid. "
                 f"Available columns: {sorted(tracts.columns)}"
             )
-        tract_index = tracts[[tract_col]].copy()
-        tract_index["tract_geoid"] = tract_index[tract_col].astype(str)
-        tract_index["county_fips"] = tract_index["tract_geoid"].str[:5]
-        xwalk = county_membership.merge(tract_index, on="county_fips", how="inner")
-        xwalk["area_share"] = 1.0
+        tract_index = _resolve_msa_tract_transform_df(
+            tracts[[tract_col]],
+            tract_col=tract_col,
+            county_membership=county_membership,
+            base_ref=base_ref,
+            definition_version=definition_version,
+            data_root=data_root,
+        )
+        xwalk = tract_index
         return xwalk[["msa_id", "tract_geoid", "area_share", "definition_version"]]
 
     if base_ref.type == "coc":
@@ -422,6 +437,184 @@ def _resolve_msa_transform_df(
     raise ExecutorError(
         f"MSA transforms currently support tract, county, or coc bases; got '{base_ref.type}'."
     )
+
+
+def _resolve_msa_county_transform_df(
+    membership: pd.DataFrame,
+    *,
+    base_ref: GeometryRef,
+    definition_version: str,
+    data_root: Path,
+) -> pd.DataFrame:
+    """Build a county-to-MSA transform, bridging CT planning regions when needed."""
+    xwalk = membership.copy()
+    xwalk["area_share"] = 1.0
+    if base_ref.vintage is None or not _has_ct_planning_membership(xwalk):
+        return xwalk
+
+    from hhplab.naming import county_path
+
+    counties_path = county_path(base_ref.vintage, data_root)
+    if not counties_path.exists():
+        return xwalk
+
+    county_ids = _read_geoids(counties_path)
+    if not any(is_ct_legacy_county_fips(value) for value in county_ids):
+        return xwalk
+
+    planning_vintage = _county_vintage_from_msa_definition_version(definition_version)
+    crosswalk = build_ct_county_planning_region_crosswalk(
+        legacy_county_vintage=base_ref.vintage,
+        planning_region_vintage=planning_vintage,
+        base_dir=data_root,
+    ).mapping
+
+    ct_members = xwalk[xwalk["county_fips"].astype(str).apply(is_ct_planning_region_fips)]
+    ct_expanded = ct_members.merge(
+        crosswalk,
+        left_on="county_fips",
+        right_on="planning_region_fips",
+        how="inner",
+    )
+    if ct_expanded.empty:
+        return xwalk
+
+    ct_expanded["county_fips"] = ct_expanded["legacy_county_fips"]
+    ct_expanded["area_share"] = ct_expanded["legacy_share"]
+    result = pd.concat(
+        [
+            xwalk[
+                ["msa_id", "cbsa_code", "county_fips", "definition_version", "area_share"]
+            ],
+            ct_expanded[
+                ["msa_id", "cbsa_code", "county_fips", "definition_version", "area_share"]
+            ],
+        ],
+        ignore_index=True,
+    )
+    return (
+        result.groupby(
+            ["msa_id", "cbsa_code", "county_fips", "definition_version"],
+            as_index=False,
+        )["area_share"]
+        .sum()
+        .sort_values(["msa_id", "county_fips"])
+        .reset_index(drop=True)
+    )
+
+
+def _resolve_msa_tract_transform_df(
+    tracts: pd.DataFrame,
+    *,
+    tract_col: str,
+    county_membership: pd.DataFrame,
+    base_ref: GeometryRef,
+    definition_version: str,
+    data_root: Path,
+) -> pd.DataFrame:
+    """Build a tract-to-MSA transform, bridging legacy CT tract GEOIDs when needed."""
+    tract_index = tracts.copy()
+    tract_index["tract_geoid"] = tract_index[tract_col].astype(str)
+    tract_index["county_fips"] = tract_index["tract_geoid"].str[:5]
+
+    regular = county_membership.merge(tract_index, on="county_fips", how="inner")
+    regular["area_share"] = 1.0
+    if (
+        base_ref.vintage is None
+        or not _has_ct_planning_membership(county_membership)
+        or not tract_index["county_fips"].apply(is_ct_legacy_county_fips).any()
+    ):
+        return regular
+
+    planning_vintage = _county_vintage_from_msa_definition_version(definition_version)
+    mapping = build_ct_tract_planning_region_map(
+        base_ref.vintage,
+        planning_region_vintage=planning_vintage,
+        base_dir=data_root,
+    )
+    ct_members = county_membership[
+        county_membership["county_fips"].astype(str).apply(is_ct_planning_region_fips)
+    ]
+    ct_tracts = ct_members.merge(
+        mapping,
+        left_on="county_fips",
+        right_on="planning_region_fips",
+        how="inner",
+    )
+    if ct_tracts.empty:
+        return regular
+
+    legacy_tracts = ct_tracts.rename(columns={"legacy_geoid": "tract_geoid"}).copy()
+    planning_tracts = ct_tracts.rename(columns={"planning_geoid": "tract_geoid"}).copy()
+    legacy_tracts["area_share"] = 1.0
+    planning_tracts["area_share"] = 1.0
+    result = pd.concat(
+        [
+            regular[["msa_id", "tract_geoid", "area_share", "definition_version"]],
+            legacy_tracts[["msa_id", "tract_geoid", "area_share", "definition_version"]],
+            planning_tracts[
+                ["msa_id", "tract_geoid", "area_share", "definition_version"]
+            ],
+        ],
+        ignore_index=True,
+    )
+    return result.drop_duplicates(subset=["msa_id", "tract_geoid"]).reset_index(drop=True)
+
+
+def _has_ct_planning_membership(membership: pd.DataFrame) -> bool:
+    return membership["county_fips"].astype(str).apply(is_ct_planning_region_fips).any()
+
+
+def _read_geoids(path: Path) -> list[str]:
+    if not path.exists():
+        return []
+    df = pd.read_parquet(path, columns=None)
+    for candidate in ("GEOID", "geoid", "county_fips"):
+        if candidate in df.columns:
+            return df[candidate].astype(str).tolist()
+    return []
+
+
+def _generated_msa_transform_is_stale(
+    output_path: Path,
+    *,
+    msa_ref: GeometryRef,
+    base_ref: GeometryRef,
+    project_root: Path,
+) -> bool:
+    """Return True when an existing generated MSA transform predates CT aliasing."""
+    if not output_path.exists() or not msa_ref.source or base_ref.vintage is None:
+        return False
+
+    data_root = project_root / "data"
+    from hhplab.msa.msa_io import read_msa_county_membership
+    from hhplab.naming import county_path, tract_path
+
+    try:
+        membership = read_msa_county_membership(msa_ref.source, data_root)
+    except FileNotFoundError:
+        return False
+    if not _has_ct_planning_membership(membership):
+        return False
+
+    cached = pd.read_parquet(output_path)
+    if base_ref.type == "county" and "county_fips" in cached.columns:
+        county_ids = _read_geoids(county_path(base_ref.vintage, data_root))
+        if not any(is_ct_legacy_county_fips(value) for value in county_ids):
+            return False
+        cached_ids = cached["county_fips"].dropna().astype(str)
+        return not cached_ids.map(is_ct_legacy_county_fips).any()
+
+    if base_ref.type == "tract" and "tract_geoid" in cached.columns:
+        tract_ids = _read_geoids(tract_path(base_ref.vintage, data_root))
+        if not any(is_ct_legacy_county_fips(value[:5]) for value in tract_ids):
+            return False
+        cached_prefixes = cached["tract_geoid"].dropna().astype(str).str[:5]
+        has_legacy = cached_prefixes.map(is_ct_legacy_county_fips).any()
+        has_planning = cached_prefixes.map(is_ct_planning_region_fips).any()
+        return not (has_legacy and has_planning)
+
+    return False
 
 
 def _county_vintage_from_msa_definition_version(definition_version: str) -> str:
@@ -507,7 +700,12 @@ def _materialize_generated_msa_transform(
         base_ref=base_ref,
         project_root=project_root,
     )
-    if output_path.exists():
+    if output_path.exists() and not _generated_msa_transform_is_stale(
+        output_path,
+        msa_ref=msa_ref,
+        base_ref=base_ref,
+        project_root=project_root,
+    ):
         return output_path
 
     xwalk = _resolve_msa_transform_df(
