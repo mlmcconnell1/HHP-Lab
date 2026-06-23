@@ -2,13 +2,13 @@
 
 from __future__ import annotations
 
-import json
 from pathlib import Path
 from typing import Annotated
 
 import pandas as pd
 import typer
 
+from hhplab.cli.output import JsonOutput, cli_error, emit_result
 from hhplab.medsl.materialize import materialize_county_political_leaning
 from hhplab.paths import curated_dir
 
@@ -41,10 +41,7 @@ def build_medsl_president_county(
             help="Rebuild even if the materialized output already exists.",
         ),
     ] = False,
-    json_output: Annotated[
-        bool,
-        typer.Option("--json", help="Output structured JSON instead of human-readable text."),
-    ] = False,
+    json_output: JsonOutput = False,
 ) -> None:
     """Materialize the MEDSL county presidential political artifact."""
     if output_dir is None:
@@ -58,11 +55,12 @@ def build_medsl_president_county(
             force=force,
         )
     except (FileNotFoundError, ValueError) as exc:
-        if json_output:
-            typer.echo(json.dumps({"status": "error", "error": str(exc)}))
-        else:
-            typer.echo(f"Error materializing MEDSL county presidential artifact: {exc}", err=True)
-        raise typer.Exit(2) from exc
+        cli_error(
+            exc,
+            json_output,
+            code=2,
+            human_prefix="Error materializing MEDSL county presidential artifact",
+        )
 
     row_count = len(pd.read_parquet(result_path))
     payload = {
@@ -73,8 +71,7 @@ def build_medsl_president_county(
         "output_path": str(result_path),
         "row_count": row_count,
     }
-    if json_output:
-        typer.echo(json.dumps(payload))
+    if emit_result(payload, json_output):
         return
 
     typer.echo("MEDSL county presidential materialization complete:")

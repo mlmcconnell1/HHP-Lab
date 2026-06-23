@@ -2,12 +2,12 @@
 
 from __future__ import annotations
 
-import json
 from pathlib import Path
 from typing import Annotated
 
 import typer
 
+from hhplab.cli.output import JsonOutput, cli_error, emit_result
 from hhplab.hic import get_canonical_output_path, parse_hic_file, write_hic_parquet
 from hhplab.hic.hud_user import (
     HICManualDownloadRequired,
@@ -31,10 +31,7 @@ def ingest_hic(
         bool,
         typer.Option("--parse-only", help="Parse an existing file under data/raw/hic/<YEAR>/."),
     ] = False,
-    json_output: Annotated[
-        bool,
-        typer.Option("--json", help="Output structured JSON instead of human-readable text."),
-    ] = False,
+    json_output: JsonOutput = False,
 ) -> None:
     """Ingest HUD Housing Inventory Count data for one year."""
     raw_dir = raw_root() / "hic" / str(year)
@@ -70,11 +67,7 @@ def ingest_hic(
             rows_skipped=parse_result.rows_skipped,
         )
     except (FileNotFoundError, HICManualDownloadRequired, RuntimeError, ValueError) as exc:
-        if json_output:
-            typer.echo(json.dumps({"status": "error", "error": str(exc)}))
-        else:
-            typer.echo(f"Error ingesting HIC data: {exc}", err=True)
-        raise typer.Exit(1) from exc
+        cli_error(exc, json_output, human_prefix="Error ingesting HIC data")
 
     payload = {
         "status": "ok",
@@ -86,8 +79,7 @@ def ingest_hic(
         "rows_skipped": parse_result.rows_skipped,
         "raw_sha256": parse_result.raw_sha256,
     }
-    if json_output:
-        typer.echo(json.dumps(payload))
+    if emit_result(payload, json_output):
         return
 
     typer.echo("HIC ingestion complete:")

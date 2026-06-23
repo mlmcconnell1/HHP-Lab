@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
-import json
 from typing import Annotated
 
 import typer
 
+from hhplab.cli.output import JsonOutput, cli_error, emit_result
 from hhplab.metro.metro_definitions import CANONICAL_UNIVERSE_DEFINITION_VERSION
 
 
@@ -34,13 +34,7 @@ def ingest_acs1_metro(
             help="Census API key. Falls back to CENSUS_API_KEY env var.",
         ),
     ] = None,
-    json_output: Annotated[
-        bool,
-        typer.Option(
-            "--json",
-            help="Emit machine-readable JSON output.",
-        ),
-    ] = False,
+    json_output: JsonOutput = False,
 ) -> None:
     """Ingest ACS 1-year detailed-table data at CBSA geography for metros.
 
@@ -80,16 +74,13 @@ def ingest_acs1_metro(
             api_key=api_key,
         )
     except Exception as e:
-        if json_output:
-            typer.echo(json.dumps({"status": "error", "error": str(e)}))
-        else:
-            typer.echo(f"Error: {e}", err=True)
+        if not json_output:
             typer.echo(
                 "Verify that ACS 1-year data is available for the requested vintage. "
                 "ACS 1-year estimates are typically released ~1 year after the survey year.",
                 err=True,
             )
-        raise typer.Exit(1) from e
+        cli_error(e, json_output)
 
     # Load and summarize results
     df = pd.read_parquet(path)
@@ -109,7 +100,7 @@ def ingest_acs1_metro(
             result["unemployment_rate_mean"] = round(float(rates.mean()), 6) if has_rates else None
             result["unemployment_rate_min"] = round(float(rates.min()), 6) if has_rates else None
             result["unemployment_rate_max"] = round(float(rates.max()), 6) if has_rates else None
-        typer.echo(json.dumps(result, indent=2))
+        emit_result(result, json_output, indent=2)
     else:
         typer.echo("=" * 60)
         typer.echo("INGEST SUMMARY")

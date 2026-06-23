@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
-import json
 from typing import Annotated
 
 import typer
 
+from hhplab.cli.output import JsonOutput, cli_error, emit_result
 from hhplab.prism import download_prism_monthly
 
 
@@ -31,20 +31,13 @@ def ingest_prism(
         bool,
         typer.Option("--force", help="Re-download even if the raw ZIP is already cached."),
     ] = False,
-    json_output: Annotated[
-        bool,
-        typer.Option("--json", help="Output structured JSON instead of human-readable text."),
-    ] = False,
+    json_output: JsonOutput = False,
 ) -> None:
     """Download and register one PRISM monthly temperature ZIP."""
     try:
         result = download_prism_monthly(variable=variable, year=year, month=month, force=force)
     except (ValueError, FileNotFoundError, RuntimeError) as exc:
-        if json_output:
-            typer.echo(json.dumps({"status": "error", "error": str(exc)}))
-        else:
-            typer.echo(f"Error ingesting PRISM data: {exc}", err=True)
-        raise typer.Exit(1) from exc
+        cli_error(exc, json_output, human_prefix="Error ingesting PRISM data")
 
     payload = {
         "status": "ok",
@@ -59,8 +52,7 @@ def ingest_prism(
         "raw_sha256": result.raw_sha256,
         "cached": result.cached,
     }
-    if json_output:
-        typer.echo(json.dumps(payload))
+    if emit_result(payload, json_output):
         return
 
     typer.echo("PRISM raw ingestion complete:")

@@ -6,6 +6,7 @@ from typing import Annotated
 
 import typer
 
+from hhplab.cli.output import JsonOutput, cli_error, emit_result
 from hhplab.msa.msa_definitions import DEFINITION_VERSION
 
 
@@ -25,17 +26,9 @@ def generate_msa(
             help="Overwrite existing artifacts if they already exist.",
         ),
     ] = False,
-    json_output: Annotated[
-        bool,
-        typer.Option(
-            "--json",
-            help="Output machine-readable JSON instead of human text.",
-        ),
-    ] = False,
+    json_output: JsonOutput = False,
 ) -> None:
     """Generate curated MSA definition parquet files from the Census workbook."""
-    import json as json_mod
-
     import hhplab.naming as naming
     from hhplab.msa.msa_io import write_msa_artifacts
 
@@ -45,23 +38,16 @@ def generate_msa(
     ]
     existing = [path for path in paths_to_write if path.exists()]
     if existing and not force:
-        if json_output:
-            typer.echo(
-                json_mod.dumps(
-                    {
-                        "status": "error",
-                        "error": "artifacts_exist",
-                        "existing": [str(path) for path in existing],
-                    }
-                )
-            )
-        else:
-            paths_str = "\n".join(f"  - {path}" for path in existing)
-            typer.echo(
-                f"Error: MSA artifacts already exist:\n{paths_str}\nUse --force to overwrite.",
-                err=True,
-            )
-        raise typer.Exit(1)
+        paths_str = "\n".join(f"  - {path}" for path in existing)
+        cli_error(
+            f"MSA artifacts already exist:\n{paths_str}\nUse --force to overwrite.",
+            json_output,
+            json_payload={
+                "status": "error",
+                "error": "artifacts_exist",
+                "existing": [str(path) for path in existing],
+            },
+        )
 
     if not json_output:
         typer.echo(f"Generating MSA artifacts (version: {definition_version})...")
@@ -69,30 +55,24 @@ def generate_msa(
     try:
         defs_path, county_path = write_msa_artifacts(definition_version=definition_version)
     except ValueError as exc:
-        if json_output:
-            typer.echo(
-                json_mod.dumps(
-                    {"status": "error", "error": "validation_failed", "detail": str(exc)}
-                )
-            )
-        else:
-            typer.echo(f"Error: {exc}", err=True)
-        raise typer.Exit(1) from exc
-
-    if json_output:
-        typer.echo(
-            json_mod.dumps(
-                {
-                    "status": "ok",
-                    "definition_version": definition_version,
-                    "artifacts": {
-                        "definitions": str(defs_path),
-                        "county_membership": str(county_path),
-                    },
-                }
-            )
+        cli_error(
+            exc,
+            json_output,
+            json_payload={"status": "error", "error": "validation_failed", "detail": str(exc)},
         )
-    else:
-        typer.echo(f"  Written: {defs_path}")
-        typer.echo(f"  Written: {county_path}")
-        typer.echo("MSA artifact generation complete.")
+
+    if emit_result(
+        {
+            "status": "ok",
+            "definition_version": definition_version,
+            "artifacts": {
+                "definitions": str(defs_path),
+                "county_membership": str(county_path),
+            },
+        },
+        json_output,
+    ):
+        return
+    typer.echo(f"  Written: {defs_path}")
+    typer.echo(f"  Written: {county_path}")
+    typer.echo("MSA artifact generation complete.")

@@ -1,11 +1,11 @@
 """CLI command for curated layout validation."""
 
-import json
 from pathlib import Path
 from typing import Annotated
 
 import typer
 
+from hhplab.cli.output import JsonOutput, emit_result
 from hhplab.curated_policy import validate_curated_layout
 from hhplab.paths import curated_root
 
@@ -19,13 +19,7 @@ def validate_curated_layout_cmd(
             help="Path to the curated data directory.",
         ),
     ] = None,
-    json_output: Annotated[
-        bool,
-        typer.Option(
-            "--json",
-            help="Output structured JSON instead of human-readable text.",
-        ),
-    ] = False,
+    json_output: JsonOutput = False,
 ) -> None:
     """Validate curated data directory for naming and layout policy violations."""
     if base_dir is None:
@@ -35,19 +29,18 @@ def validate_curated_layout_cmd(
 
     if json_output:
         if not violations:
-            typer.echo(json.dumps({"status": "ok", "violations": []}))
+            emit_result({"status": "ok", "violations": []}, json_output)
             return
         by_category: dict[str, list[str]] = {}
         for v in violations:
             by_category.setdefault(v.category, []).append(v.message)
-        typer.echo(
-            json.dumps(
-                {
-                    "status": "error",
-                    "total_violations": len(violations),
-                    "by_category": by_category,
-                },
-            )
+        emit_result(
+            {
+                "status": "error",
+                "total_violations": len(violations),
+                "by_category": by_category,
+            },
+            json_output,
         )
         raise typer.Exit(code=1)
 

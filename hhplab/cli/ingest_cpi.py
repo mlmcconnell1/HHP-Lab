@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
-import json
 from typing import Annotated
 
 import typer
+
+from hhplab.cli.output import JsonOutput, cli_error, emit_result
 
 
 def ingest_cpi_u(
@@ -21,10 +22,7 @@ def ingest_cpi_u(
         str | None,
         typer.Option("--api-key", help="BLS registration key. Falls back to BLS_API_KEY env var."),
     ] = None,
-    json_output: Annotated[
-        bool,
-        typer.Option("--json", help="Emit machine-readable JSON output."),
-    ] = False,
+    json_output: JsonOutput = False,
 ) -> None:
     """Ingest BLS CPI-U annual-average index values for inflation adjustment."""
     import pandas as pd
@@ -36,40 +34,31 @@ def ingest_cpi_u(
         path = _ingest(start_year=start_year, end_year=end_year, api_key=api_key)
         df = pd.read_parquet(path)
     except BlsQuotaExhausted as exc:
-        if json_output:
-            typer.echo(
-                json.dumps(
-                    {
-                        "status": "error",
-                        "reason": "bls_quota_exhausted",
-                        "error": str(exc),
-                    }
-                )
-            )
-        else:
-            typer.echo(f"BLS quota exhausted: {exc}", err=True)
-        raise typer.Exit(1) from exc
-    except Exception as exc:
-        if json_output:
-            typer.echo(json.dumps({"status": "error", "error": str(exc)}))
-        else:
-            typer.echo(str(exc), err=True)
-        raise typer.Exit(1) from exc
-
-    if json_output:
-        typer.echo(
-            json.dumps(
-                {
-                    "status": "ok",
-                    "output_path": str(path),
-                    "start_year": int(df["year"].min()),
-                    "end_year": int(df["year"].max()),
-                    "rows": len(df),
-                    "columns": list(df.columns),
-                },
-                indent=2,
-            )
+        cli_error(
+            exc,
+            json_output,
+            human_prefix="BLS quota exhausted",
+            json_payload={
+                "status": "error",
+                "reason": "bls_quota_exhausted",
+                "error": str(exc),
+            },
         )
+    except Exception as exc:
+        cli_error(exc, json_output, human_prefix="")
+
+    if emit_result(
+        {
+            "status": "ok",
+            "output_path": str(path),
+            "start_year": int(df["year"].min()),
+            "end_year": int(df["year"].max()),
+            "rows": len(df),
+            "columns": list(df.columns),
+        },
+        json_output,
+        indent=2,
+    ):
         return
 
     typer.echo(f"Wrote BLS CPI-U annual index to {path}")

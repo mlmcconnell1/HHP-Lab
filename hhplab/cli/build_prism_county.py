@@ -2,13 +2,13 @@
 
 from __future__ import annotations
 
-import json
 from pathlib import Path
 from typing import Annotated
 
 import pandas as pd
 import typer
 
+from hhplab.cli.output import JsonOutput, cli_error, emit_result
 from hhplab.prism import materialize_prism_monthly_counties
 
 
@@ -35,10 +35,7 @@ def build_prism_county(
         Path | None,
         typer.Option("--output", help="Override output parquet path."),
     ] = None,
-    json_output: Annotated[
-        bool,
-        typer.Option("--json", help="Output structured JSON instead of human-readable text."),
-    ] = False,
+    json_output: JsonOutput = False,
 ) -> None:
     """Materialize one PRISM monthly raster to county means."""
     try:
@@ -52,11 +49,7 @@ def build_prism_county(
             output_path=output,
         )
     except (FileNotFoundError, RuntimeError, ValueError) as exc:
-        if json_output:
-            typer.echo(json.dumps({"status": "error", "error": str(exc)}))
-        else:
-            typer.echo(f"Error materializing PRISM county data: {exc}", err=True)
-        raise typer.Exit(1) from exc
+        cli_error(exc, json_output, human_prefix="Error materializing PRISM county data")
 
     row_count = len(pd.read_parquet(output_path))
     payload = {
@@ -70,8 +63,7 @@ def build_prism_county(
         "output_path": str(output_path),
         "row_count": row_count,
     }
-    if json_output:
-        typer.echo(json.dumps(payload))
+    if emit_result(payload, json_output):
         return
 
     typer.echo("PRISM county materialization complete:")

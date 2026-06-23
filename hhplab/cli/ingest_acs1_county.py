@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
-import json
 from typing import Annotated
 
 import typer
+
+from hhplab.cli.output import JsonOutput, cli_error, emit_result
 
 
 def ingest_acs1_county(
@@ -24,13 +25,7 @@ def ingest_acs1_county(
             help="Census API key. Falls back to CENSUS_API_KEY env var.",
         ),
     ] = None,
-    json_output: Annotated[
-        bool,
-        typer.Option(
-            "--json",
-            help="Emit machine-readable JSON output.",
-        ),
-    ] = False,
+    json_output: JsonOutput = False,
 ) -> None:
     """Ingest ACS 1-year detailed-table data at county geography."""
     import pandas as pd
@@ -46,17 +41,14 @@ def ingest_acs1_county(
     try:
         path = ingest_county_acs1(vintage=vintage, api_key=api_key)
     except Exception as e:
-        if json_output:
-            typer.echo(json.dumps({"status": "error", "error": str(e)}))
-        else:
-            typer.echo(f"Error: {e}", err=True)
+        if not json_output:
             typer.echo(
                 "Verify that ACS 1-year data is available for the requested vintage. "
                 "County ACS1 only includes counties that meet Census publication "
                 "thresholds; non-threshold counties are not returned.",
                 err=True,
             )
-        raise typer.Exit(1) from e
+        cli_error(e, json_output)
 
     df = pd.read_parquet(path)
 
@@ -77,7 +69,7 @@ def ingest_acs1_county(
                 "min": round(float(rates.min()), 6) if has_rates else None,
                 "max": round(float(rates.max()), 6) if has_rates else None,
             }
-        typer.echo(json.dumps(result, indent=2))
+        emit_result(result, json_output, indent=2)
         return
 
     typer.echo("=" * 60)

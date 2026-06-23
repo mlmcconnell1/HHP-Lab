@@ -6,11 +6,39 @@ Covers coclab-265p: Expand and standardize --json output.
 import json
 
 import pandas as pd
+import pytest
+import typer
 from typer.testing import CliRunner
 
 from hhplab.cli.main import app
+from hhplab.cli.output import cli_error, emit_result
 
 runner = CliRunner()
+
+
+class TestCliOutputHelpers:
+
+    def test_emit_result_outputs_json_when_requested(self, capsys):
+        handled = emit_result({"status": "ok", "count": 2}, json_output=True)
+
+        assert handled is True
+        assert json.loads(capsys.readouterr().out) == {"status": "ok", "count": 2}
+
+    def test_emit_result_returns_false_for_human_output(self, capsys):
+        handled = emit_result({"status": "ok"}, json_output=False)
+
+        assert handled is False
+        assert capsys.readouterr().out == ""
+
+    def test_cli_error_outputs_json_and_exit_code(self, capsys):
+        with pytest.raises(typer.Exit) as exc_info:
+            cli_error("bad input", json_output=True, code=2)
+
+        assert exc_info.value.exit_code == 2
+        assert json.loads(capsys.readouterr().out) == {
+            "status": "error",
+            "error": "bad input",
+        }
 
 
 class TestListMeasuresJson:
