@@ -5,6 +5,10 @@ from __future__ import annotations
 import pandas as pd
 
 
+def _empty_frame(dtypes: dict[str, str]) -> pd.DataFrame:
+    return pd.DataFrame({column: pd.Series(dtype=dtype) for column, dtype in dtypes.items()})
+
+
 def coverage_diagnostics(
     df: pd.DataFrame,
     *,
@@ -30,6 +34,25 @@ def coverage_diagnostics(
     has_coverage = coverage_col in df.columns
     if not has_coverage and not missing_coverage_is_full:
         raise ValueError(f"Missing required column: {coverage_col}")
+
+    output_dtypes = {
+        geo_id_col: str(df[geo_id_col].dtype),
+        "periods_total": "int64",
+        "periods_covered": "int64",
+        "coverage_ratio_mean": "float64",
+        "flag_low_coverage": "bool",
+    }
+    if include_quantiles:
+        output_dtypes.update(
+            {
+                "coverage_ratio_p10": "float64",
+                "coverage_ratio_p50": "float64",
+                "coverage_ratio_p90": "float64",
+            }
+        )
+    if dominance_col is not None and dominance_threshold is not None:
+        output_dtypes[f"{dominance_col}_p90"] = "float64"
+        output_dtypes["flag_high_dominance"] = "bool"
 
     rows: list[dict[str, object]] = []
     for geo_id, group in df.groupby(geo_id_col):
@@ -87,6 +110,9 @@ def coverage_diagnostics(
 
         rows.append(row)
 
+    if not rows:
+        return _empty_frame(output_dtypes)
+
     return pd.DataFrame(rows).sort_values(geo_id_col).reset_index(drop=True)
 
 
@@ -98,6 +124,19 @@ def coverage_group_summary(
     min_coverage: float,
 ) -> pd.DataFrame:
     """Summarize coverage distributions grouped by a column such as year."""
+    output_dtypes = {
+        group_col: str(df[group_col].dtype) if group_col in df.columns else "object",
+        "count": "int64",
+        "mean": "float64",
+        "std": "float64",
+        "min": "float64",
+        "q25": "float64",
+        "median": "float64",
+        "q75": "float64",
+        "max": "float64",
+        "low_coverage_count": "int64",
+    }
+
     rows: list[dict[str, object]] = []
     for group_id, group in df.groupby(group_col):
         coverage = group[coverage_col]
@@ -115,5 +154,8 @@ def coverage_group_summary(
                 "low_coverage_count": int((coverage < min_coverage).sum()),
             }
         )
+
+    if not rows:
+        return _empty_frame(output_dtypes)
 
     return pd.DataFrame(rows).sort_values(group_col).reset_index(drop=True)

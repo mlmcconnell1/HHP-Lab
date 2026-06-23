@@ -13,6 +13,7 @@ import warnings
 import pandas as pd
 import pytest
 
+from hhplab.coverage_diagnostics import coverage_group_summary
 from hhplab.rents.zori_diagnostics import (
     compute_coc_diagnostics,
     generate_text_summary,
@@ -253,32 +254,53 @@ class TestGenerateTextSummary:
         empty_input = pd.DataFrame(
             columns=["coc_id", "date", "zori_coc", "coverage_ratio", "max_geo_contribution"]
         )
-        # Build with explicit dtypes so pandas operations (nsmallest, etc.) work
-        empty_diag = pd.DataFrame(
-            {
-                "coc_id": pd.Series([], dtype="str"),
-                "periods_total": pd.Series([], dtype="int64"),
-                "periods_covered": pd.Series([], dtype="int64"),
-                "coverage_ratio_mean": pd.Series([], dtype="float64"),
-                "coverage_ratio_p10": pd.Series([], dtype="float64"),
-                "coverage_ratio_p50": pd.Series([], dtype="float64"),
-                "coverage_ratio_p90": pd.Series([], dtype="float64"),
-                "max_geo_contribution_p90": pd.Series([], dtype="float64"),
-                "flag_low_coverage": pd.Series([], dtype="bool"),
-                "flag_high_dominance": pd.Series([], dtype="bool"),
-            }
-        )
         with warnings.catch_warnings(record=True) as caught:
             warnings.simplefilter("always")
+            empty_diag = compute_coc_diagnostics(empty_input)
             text = generate_text_summary(empty_input, empty_diag)
         runtime_warnings = [
             warning for warning in caught if issubclass(warning.category, RuntimeWarning)
         ]
         assert not runtime_warnings
+        assert empty_diag.empty
+        assert empty_diag["coverage_ratio_mean"].dtype == "float64"
+        assert empty_diag["flag_low_coverage"].dtype == "bool"
         assert "Total CoCs:" in text
         assert "0" in text
         assert "Mean coverage (across all CoCs):   n/a" in text
         assert "CoCs with >= 99% coverage:   0 (n/a)" in text
+
+    def test_empty_group_summary_has_expected_schema(self):
+        """Shared group summaries should keep their schema when input has no rows."""
+        empty_input = pd.DataFrame(
+            {
+                "year": pd.Series([], dtype="int64"),
+                "coverage_ratio": pd.Series([], dtype="float64"),
+            }
+        )
+
+        result = coverage_group_summary(
+            empty_input,
+            group_col="year",
+            coverage_col="coverage_ratio",
+            min_coverage=0.90,
+        )
+
+        assert result.empty
+        assert list(result.columns) == [
+            "year",
+            "count",
+            "mean",
+            "std",
+            "min",
+            "q25",
+            "median",
+            "q75",
+            "max",
+            "low_coverage_count",
+        ]
+        assert result["year"].dtype == "int64"
+        assert result["mean"].dtype == "float64"
 
     def test_all_flagged_cocs(self):
         """When all CoCs are flagged, counts should match total CoCs."""
