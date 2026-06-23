@@ -16,16 +16,16 @@ _FORWARDED_ATTRS = {
 
 @lru_cache(maxsize=1)
 def _impl() -> ModuleType:
-    return import_module("hhplab.bls.laus_series")
+    return import_module("hhplab.bls.ingest.series")
 
 
 def build_laus_series_id(cbsa_code: str, measure: str, state_fips: str) -> str:
-    """Delegate to ``hhplab.bls.laus_series.build_laus_series_id``."""
+    """Delegate to ``hhplab.bls.ingest.series.build_laus_series_id``."""
     return _impl().build_laus_series_id(cbsa_code, measure, state_fips)
 
 
 def build_all_series_ids(cbsa_code: str, state_fips: str) -> dict[str, str]:
-    """Delegate to ``hhplab.bls.laus_series.build_all_series_ids``."""
+    """Delegate to ``hhplab.bls.ingest.series.build_all_series_ids``."""
     return _impl().build_all_series_ids(cbsa_code, state_fips)
 
 

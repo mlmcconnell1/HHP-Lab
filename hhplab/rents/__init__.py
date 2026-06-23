@@ -8,7 +8,7 @@ This package provides tools for:
 
 Usage
 -----
-    from hhplab.rents.zori_ingest import ingest_zori
+    from hhplab.rents.ingest import ingest_zori
     from hhplab.rents.weights import build_county_weights
     from hhplab.rents.zori_aggregate import aggregate_zori_to_coc
 
@@ -27,6 +27,7 @@ Usage
     )
 """
 
+from hhplab.rents.ingest import ingest_zori
 from hhplab.rents.weights import (
     build_county_weights,
     fetch_county_acs_totals,
@@ -52,7 +53,6 @@ from hhplab.rents.zori_diagnostics import (
     run_zori_diagnostics,
     summarize_coc_zori,
 )
-from hhplab.rents.zori_ingest import ingest_zori
 from hhplab.rents.zori_metro import (
     aggregate_yearly_zori_to_metro,
     aggregate_zori_to_metro,

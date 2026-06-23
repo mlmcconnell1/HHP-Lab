@@ -17,7 +17,7 @@ import pandas as pd
 import pytest
 
 from hhplab.provenance import read_provenance
-from hhplab.rents.zori_ingest import (
+from hhplab.rents.ingest import (
     ZORI_URLS,
     _validate_monthly_continuity,
     download_zori,

@@ -16,7 +16,7 @@ from unittest.mock import patch
 import pandas as pd
 import pytest
 
-from hhplab.bls.ingest_cpi import (
+from hhplab.bls.ingest.cpi import (
     CPI_U_ALL_ITEMS_SERIES_ID,
     fetch_cpi_u_annual_index,
     ingest_cpi_u,
@@ -75,7 +75,7 @@ def _mock_cpi_response():
 
 
 def test_fetch_cpi_u_annual_index_extracts_annual_rows() -> None:
-    with patch("hhplab.bls.ingest_cpi.httpx.Client") as mock_client:
+    with patch("hhplab.bls.ingest.cpi.httpx.Client") as mock_client:
         mock_response = mock_client.return_value.__enter__.return_value.post.return_value
         mock_response.json.return_value = _mock_cpi_response()
 
@@ -87,7 +87,7 @@ def test_fetch_cpi_u_annual_index_extracts_annual_rows() -> None:
 
 def test_ingest_cpi_u_writes_canonical_artifact(tmp_path) -> None:
     with patch(
-        "hhplab.bls.ingest_cpi.fetch_cpi_u_annual_index",
+        "hhplab.bls.ingest.cpi.fetch_cpi_u_annual_index",
         return_value=CPI_FIXTURE[["year", "cpi_u", "series_id", "period", "period_name"]],
     ):
         path = ingest_cpi_u(start_year=2020, end_year=2022, project_root=tmp_path)

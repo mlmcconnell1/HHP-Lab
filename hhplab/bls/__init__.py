@@ -2,17 +2,17 @@
 
 from __future__ import annotations
 
-from hhplab.bls.ingest_cpi import (
+from hhplab.bls.ingest.cpi import (
     CPI_U_ALL_ITEMS_SERIES_ID,
     fetch_cpi_u_annual_index,
     ingest_cpi_u,
 )
-from hhplab.bls.ingest_laus import (
+from hhplab.bls.ingest.laus import (
     BlsQuotaExhausted,
     fetch_laus_annual_averages,
     ingest_laus_metro,
 )
-from hhplab.bls.laus_series import (
+from hhplab.bls.ingest.series import (
     BLS_ANNUAL_AVERAGE_PERIOD,
     BLS_API_V2_URL,
     LAUS_MEASURE_CODES,

@@ -31,7 +31,7 @@ from hhplab.bls import (
     build_all_series_ids,
     build_laus_series_id,
 )
-from hhplab.bls.ingest_laus import (
+from hhplab.bls.ingest.laus import (
     BlsQuotaExhausted,
     _build_metro_series_map,
     _chunked,
@@ -199,7 +199,7 @@ class TestMetroSeriesMap:
 
     def test_canonical_universe_series_map_uses_cbsa_ids(self, monkeypatch):
         monkeypatch.setattr(
-            "hhplab.bls.ingest_laus.read_metro_universe",
+            "hhplab.bls.ingest.laus.read_metro_universe",
             lambda definition_version, base_dir=None: build_canonical_metro_targets_fixture()[
                 ["metro_id", "cbsa_code", "metro_name"]
             ],
@@ -267,7 +267,7 @@ class TestFetchLausAnnualAverages:
         sid = NY_SERIES_IDS["unemployment_rate"]
         mock_response = _make_bls_response({sid: 4.2})
 
-        with patch("hhplab.bls.ingest_laus.httpx.Client") as mock_client:
+        with patch("hhplab.bls.ingest.laus.httpx.Client") as mock_client:
             post_rv = mock_client.return_value.__enter__.return_value.post.return_value
             post_rv.json.return_value = mock_response
             post_rv.raise_for_status.return_value = None
@@ -292,7 +292,7 @@ class TestFetchLausAnnualAverages:
                 ]
             },
         }
-        with patch("hhplab.bls.ingest_laus.httpx.Client") as mock_client:
+        with patch("hhplab.bls.ingest.laus.httpx.Client") as mock_client:
             post_rv = mock_client.return_value.__enter__.return_value.post.return_value
             post_rv.json.return_value = monthly_only_response
             post_rv.raise_for_status.return_value = None
@@ -306,7 +306,7 @@ class TestFetchLausAnnualAverages:
             "status": "REQUEST_FAILED",
             "message": ["Bad request"],
         }
-        with patch("hhplab.bls.ingest_laus.httpx.Client") as mock_client:
+        with patch("hhplab.bls.ingest.laus.httpx.Client") as mock_client:
             post_rv = mock_client.return_value.__enter__.return_value.post.return_value
             post_rv.json.return_value = failed_response
             post_rv.raise_for_status.return_value = None
@@ -320,7 +320,7 @@ class TestFetchLausAnnualAverages:
         sids = [f"LAUMT36{i:05d}00000003" for i in range(60)]
         empty_response = {"status": "REQUEST_SUCCEEDED", "Results": {"series": []}}
 
-        with patch("hhplab.bls.ingest_laus.httpx.Client") as mock_client:
+        with patch("hhplab.bls.ingest.laus.httpx.Client") as mock_client:
             mock_post = mock_client.return_value.__enter__.return_value.post
             mock_post.return_value.json.return_value = empty_response
             mock_post.return_value.raise_for_status.return_value = None
@@ -335,7 +335,7 @@ class TestFetchLausAnnualAverages:
         sids = [f"LAUMT36{i:05d}00000003" for i in range(60)]
         empty_response = {"status": "REQUEST_SUCCEEDED", "Results": {"series": []}}
 
-        with patch("hhplab.bls.ingest_laus.httpx.Client") as mock_client:
+        with patch("hhplab.bls.ingest.laus.httpx.Client") as mock_client:
             mock_post = mock_client.return_value.__enter__.return_value.post
             mock_post.return_value.json.return_value = empty_response
             mock_post.return_value.raise_for_status.return_value = None
@@ -387,7 +387,7 @@ class TestBlsQuotaExhausted:
         quota_response = {"status": status, "message": message}
         sid = NY_SERIES_IDS["unemployment_rate"]
 
-        with patch("hhplab.bls.ingest_laus.httpx.Client") as mock_client:
+        with patch("hhplab.bls.ingest.laus.httpx.Client") as mock_client:
             post_rv = mock_client.return_value.__enter__.return_value.post.return_value
             post_rv.json.return_value = quota_response
             post_rv.raise_for_status.return_value = None
@@ -408,7 +408,7 @@ class TestBlsQuotaExhausted:
         }
         sid = NY_SERIES_IDS["unemployment_rate"]
 
-        with patch("hhplab.bls.ingest_laus.httpx.Client") as mock_client:
+        with patch("hhplab.bls.ingest.laus.httpx.Client") as mock_client:
             post_rv = mock_client.return_value.__enter__.return_value.post.return_value
             post_rv.json.return_value = quota_response
             post_rv.raise_for_status.return_value = None
@@ -431,7 +431,7 @@ class TestBlsQuotaExhausted:
         bad_request = {"status": "REQUEST_FAILED", "message": ["Invalid series id"]}
         sid = NY_SERIES_IDS["unemployment_rate"]
 
-        with patch("hhplab.bls.ingest_laus.httpx.Client") as mock_client:
+        with patch("hhplab.bls.ingest.laus.httpx.Client") as mock_client:
             post_rv = mock_client.return_value.__enter__.return_value.post.return_value
             post_rv.json.return_value = bad_request
             post_rv.raise_for_status.return_value = None
@@ -526,7 +526,7 @@ def _mock_ingest(tmp_path: Path, year: int) -> Path:
 
         return FakeResp()
 
-    with patch("hhplab.bls.ingest_laus.httpx.Client") as mock_client:
+    with patch("hhplab.bls.ingest.laus.httpx.Client") as mock_client:
         mock_client.return_value.__enter__.return_value.post = mock_post
         return ingest_laus_metro(year=year, project_root=tmp_path)
 
@@ -577,13 +577,13 @@ class TestIngestLausMetro:
         response = _make_bls_response_for_targets(targets, year=2023)
 
         monkeypatch.setattr(
-            "hhplab.bls.ingest_laus.read_metro_universe",
+            "hhplab.bls.ingest.laus.read_metro_universe",
             lambda definition_version, base_dir=None: targets[
                 ["metro_id", "cbsa_code", "metro_name"]
             ],
         )
 
-        with patch("hhplab.bls.ingest_laus.httpx.Client") as mock_client:
+        with patch("hhplab.bls.ingest.laus.httpx.Client") as mock_client:
             mock_post = mock_client.return_value.__enter__.return_value.post
             mock_post.return_value.json.return_value = response
             mock_post.return_value.raise_for_status.return_value = None
@@ -616,7 +616,7 @@ class TestIngestLausMetro:
         """Ingest must fail fast rather than write an all-null parquet."""
         empty_response = {"status": "REQUEST_SUCCEEDED", "Results": {"series": []}}
 
-        with patch("hhplab.bls.ingest_laus.httpx.Client") as mock_client:
+        with patch("hhplab.bls.ingest.laus.httpx.Client") as mock_client:
             mock_post = mock_client.return_value.__enter__.return_value.post
             mock_post.return_value.json.return_value = empty_response
             mock_post.return_value.raise_for_status.return_value = None
@@ -633,7 +633,7 @@ class TestIngestLausMetro:
         The remaining 12 metros have all-null measures.
         Expected: ValueError — partial output must not be written silently.
         """
-        from hhplab.bls.ingest_laus import _build_metro_series_map
+        from hhplab.bls.ingest.laus import _build_metro_series_map
 
         # Build values for only the first 13 metros (sorted order)
         metro_series = _build_metro_series_map()
@@ -646,7 +646,7 @@ class TestIngestLausMetro:
         def _partial_fetch(series_ids, year, api_key=None):
             return {sid: v for sid, v in partial_values.items() if sid in series_ids}
 
-        with patch("hhplab.bls.ingest_laus.fetch_laus_annual_averages", _partial_fetch):
+        with patch("hhplab.bls.ingest.laus.fetch_laus_annual_averages", _partial_fetch):
             with pytest.raises(ValueError, match="metro\\(s\\) have no data for any measure"):
                 ingest_laus_metro(year=2023, project_root=tmp_path)
 
@@ -662,7 +662,7 @@ class TestIngestLausMetro:
         Expected: ValueError naming the missing measure.
         """
         from hhplab.bls import LAUS_MEASURE_CODES
-        from hhplab.bls.ingest_laus import _build_metro_series_map
+        from hhplab.bls.ingest.laus import _build_metro_series_map
 
         # Collect series IDs for every measure except unemployment_rate
         metro_series = _build_metro_series_map()
@@ -677,7 +677,7 @@ class TestIngestLausMetro:
         def _no_rate_fetch(series_ids, year, api_key=None):
             return {sid: v for sid, v in non_rate_values.items() if sid in series_ids}
 
-        with patch("hhplab.bls.ingest_laus.fetch_laus_annual_averages", _no_rate_fetch):
+        with patch("hhplab.bls.ingest.laus.fetch_laus_annual_averages", _no_rate_fetch):
             with pytest.raises(ValueError, match="unemployment_rate"):
                 ingest_laus_metro(year=2023, project_root=tmp_path)
 
@@ -693,7 +693,7 @@ class TestIngestLausMetro:
         written with a null rate.
         Expected: ValueError naming GF01 and unemployment_rate.
         """
-        from hhplab.bls.ingest_laus import _build_metro_series_map
+        from hhplab.bls.ingest.laus import _build_metro_series_map
 
         metro_series = _build_metro_series_map()
         skip_metro = sorted(metro_series)[0]  # GF01
@@ -710,7 +710,7 @@ class TestIngestLausMetro:
         def _one_missing_fetch(series_ids, year, api_key=None):
             return {sid: v for sid, v in all_values.items() if sid in series_ids}
 
-        with patch("hhplab.bls.ingest_laus.fetch_laus_annual_averages", _one_missing_fetch):
+        with patch("hhplab.bls.ingest.laus.fetch_laus_annual_averages", _one_missing_fetch):
             with pytest.raises(ValueError, match="partial measure data"):
                 ingest_laus_metro(year=2023, project_root=tmp_path)
 

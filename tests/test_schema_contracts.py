@@ -30,16 +30,16 @@ from hhplab.acs.variables_acs1 import (
     acs1_variable_names_for_vintage,
     acs1_variables_by_table_for_vintage,
 )
-from hhplab.bls.laus_series import (
+from hhplab.bls.ingest.series import (
     LAUS_MEASURE_CODES as BLS_LAUS_MEASURE_CODES,
 )
-from hhplab.bls.laus_series import (
+from hhplab.bls.ingest.series import (
     LAUS_METRO_OUTPUT_COLUMNS as BLS_LAUS_METRO_OUTPUT_COLUMNS,
 )
 from hhplab.cli.main import app
 from hhplab.hic.parser import CANONICAL_COLUMNS as HIC_PARSER_COLUMNS
 from hhplab.panel.conformance import PanelRequest, run_conformance
-from hhplab.pep.pep_ingest import PEP_COUNTY_OUTPUT_COLUMNS as PEP_INGEST_COLUMNS
+from hhplab.pep.ingest import PEP_COUNTY_OUTPUT_COLUMNS as PEP_INGEST_COLUMNS
 from hhplab.pit.ingest.parser import CANONICAL_COLUMNS as PIT_PARSER_COLUMNS
 from hhplab.recipe.executor import ExecutorError, _normalize_recipe_population_measure
 from hhplab.recipe.executor.panel import _resolve_canonical_population
@@ -50,7 +50,7 @@ from hhplab.recipe.recipe_schema import (
     PanelPolicy,
 )
 from hhplab.recipe.schema_common import GeometryRef
-from hhplab.rents.zori_ingest import ZORI_INGEST_OUTPUT_COLUMNS as ZORI_INGEST_COLUMNS
+from hhplab.rents.ingest import ZORI_INGEST_OUTPUT_COLUMNS as ZORI_INGEST_COLUMNS
 from hhplab.schema import (
     ACS1_IMPUTATION_MEASURE_SPECS,
     ACS1_IMPUTATION_OUTPUT_COLUMNS,

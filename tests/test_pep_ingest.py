@@ -14,7 +14,7 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
-from hhplab.pep.pep_ingest import (
+from hhplab.pep.ingest import (
     PEP_URLS,
     POSTCENSAL_SERIES,
     VINTAGE_YEARS,
@@ -255,7 +255,7 @@ class TestPepIngest:
             assert vintage == 2025
             return raw_path, "abc123"
 
-        monkeypatch.setattr("hhplab.pep.pep_ingest.download_pep", fake_download)
+        monkeypatch.setattr("hhplab.pep.ingest.download_pep", fake_download)
 
         output = ingest_pep_county(
             series=POSTCENSAL_SERIES,

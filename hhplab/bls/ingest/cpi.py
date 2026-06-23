@@ -16,7 +16,7 @@ import httpx
 import pandas as pd
 
 import hhplab.naming as naming
-from hhplab.bls.ingest_laus import BlsQuotaExhausted, _bls_quota_message, _is_bls_quota_response
+from hhplab.bls.ingest.laus import BlsQuotaExhausted, _bls_quota_message, _is_bls_quota_response
 from hhplab.provenance import ProvenanceBlock, write_parquet_with_provenance
 from hhplab.sources import BLS_API_V2, BLS_CPI_SOURCE_REF
 

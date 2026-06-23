@@ -113,7 +113,7 @@ def ingest_zori(
         raise typer.Exit(2)
 
     from hhplab.naming import discover_zori_ingest
-    from hhplab.rents.zori_ingest import ingest_zori as do_ingest
+    from hhplab.rents.ingest import ingest_zori as do_ingest
 
     # Check for existing output via discovery
     existing = discover_zori_ingest(geography, output_dir)

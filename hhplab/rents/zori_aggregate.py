@@ -81,12 +81,12 @@ from hhplab.provenance import (
     read_provenance,
     write_parquet_with_provenance,
 )
+from hhplab.rents.ingest import ZILLOW_ATTRIBUTION
 from hhplab.rents.weights import (
     WeightingMethod,
     build_county_weights,
     get_county_weights_path,
 )
-from hhplab.rents.zori_ingest import ZILLOW_ATTRIBUTION
 from hhplab.xwalks import apply_crosswalk
 
 logger = logging.getLogger(__name__)

@@ -1,6 +1,6 @@
 """NHGIS geometry ingest entrypoints."""
 
-from hhplab.nhgis.nhgis_ingest import (
+from hhplab.nhgis.ingest import (
     SUPPORTED_YEARS,
     NhgisExtractError,
     ingest_nhgis_counties,

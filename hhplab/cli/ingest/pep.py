@@ -102,7 +102,7 @@ def ingest_pep(
     if raw_dir is None:
         raw_dir = raw_root() / "pep"
 
-    from hhplab.pep.pep_ingest import (
+    from hhplab.pep.ingest import (
         AUTO_SERIES,
         PEP_URLS,
         POSTCENSAL_SERIES,

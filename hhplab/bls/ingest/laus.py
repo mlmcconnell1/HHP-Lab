@@ -10,7 +10,7 @@ average rows.
 
 Usage
 -----
-    from hhplab.bls.ingest_laus import ingest_laus_metro
+    from hhplab.bls.ingest.laus import ingest_laus_metro
 
     path = ingest_laus_metro(year=2023)
 
@@ -54,7 +54,7 @@ import httpx
 import pandas as pd
 
 import hhplab.naming as naming
-from hhplab.bls.laus_series import (
+from hhplab.bls.ingest.series import (
     BLS_ANNUAL_AVERAGE_PERIOD,
     LAUS_MEASURE_CODES,
     LAUS_METRO_OUTPUT_COLUMNS,
