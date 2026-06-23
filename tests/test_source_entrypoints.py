@@ -1,7 +1,7 @@
 """Tests for source-owned package entrypoints."""
 
 import hhplab.census.ingest as census_ingest
-from hhplab import census, hud, medsl, nhgis, pit
+from hhplab import census, hud, medsl, nhgis, pit, vera
 from hhplab.census.ingest import ingest_tiger_counties, ingest_tiger_tracts, load_tract_relationship
 from hhplab.hud.exchange_gis import ingest_hud_exchange
 from hhplab.hud.opendata_arcgis import ingest_hud_opendata
@@ -19,6 +19,7 @@ def test_package_root_lazy_exports() -> None:
     assert hhplab.medsl is medsl
     assert hhplab.nhgis is nhgis
     assert hhplab.pit is pit
+    assert hhplab.vera is vera
 
 
 def test_census_root_reexports_ingest_helpers() -> None:
@@ -59,3 +60,9 @@ def test_medsl_root_reexports_ingest_helpers() -> None:
     assert callable(medsl.ingest_county_presidential_returns)
     assert callable(medsl.materialize_county_political_leaning)
     assert callable(medsl.parse_county_presidential_returns)
+
+
+def test_vera_root_reexports_ingest_helpers() -> None:
+    """Vera root should expose county incarceration ingest helpers."""
+    assert callable(vera.ingest_county_incarceration_trends)
+    assert callable(vera.parse_county_incarceration_trends)

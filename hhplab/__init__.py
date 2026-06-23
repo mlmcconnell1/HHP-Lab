@@ -43,6 +43,7 @@ _LAZY_EXPORTS = frozenset(
         "rents",
         "source_registry",
         "sources",
+        "vera",
         "viz",
         "xwalks",
         "year_spec",

@@ -123,6 +123,34 @@ def medsl_president_county_path(
     )
 
 
+def vera_incarceration_county_filename(
+    start_year: str | int,
+    end_year: str | int,
+    county_vintage: str | int,
+) -> str:
+    """Generate filename for Vera county incarceration trends measures."""
+    return f"vera_incarceration_county__Y{start_year}-{end_year}@C{county_vintage}.parquet"
+
+
+def vera_incarceration_county_path(
+    start_year: str | int,
+    end_year: str | int,
+    county_vintage: str | int,
+    base_dir: Path | str | None = None,
+) -> Path:
+    """Get canonical path for Vera county incarceration trends measures."""
+    if base_dir is None:
+        base_dir = Path("data")
+    else:
+        base_dir = Path(base_dir)
+    return (
+        base_dir
+        / "curated"
+        / "vera"
+        / vera_incarceration_county_filename(start_year, end_year, county_vintage)
+    )
+
+
 def urban_area_filename(urban_area_vintage: str | int) -> str:
     """Generate filename for Census Urban Area geometry.
 

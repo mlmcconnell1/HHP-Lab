@@ -11,7 +11,11 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from hhplab.naming import coc_urban_fraction_path, medsl_president_county_path
+from hhplab.naming import (
+    coc_urban_fraction_path,
+    medsl_president_county_path,
+    vera_incarceration_county_path,
+)
 from hhplab.recipe.recipe_schema import (
     DatasetSpec,
     FileSetSpec,
@@ -243,6 +247,15 @@ def _medsl_county_vintage(ds: DatasetSpec) -> int:
     return int(value)
 
 
+def _county_vintage(ds: DatasetSpec) -> int:
+    value = ds.params.get("county_vintage")
+    if value is None:
+        value = ds.native_geometry.vintage
+    if value is None:
+        return 2020
+    return int(value)
+
+
 def _default_dataset_path(ds: DatasetSpec) -> str | None:
     """Resolve canonical artifact paths for datasets with built-in naming."""
     if ds.provider == "medsl" and ds.product == "president":
@@ -251,6 +264,16 @@ def _default_dataset_path(ds: DatasetSpec) -> str | None:
                 2000,
                 2024,
                 _medsl_county_vintage(ds),
+                base_dir="data",
+            )
+        )
+
+    if ds.provider == "vera" and ds.product == "incarceration_trends":
+        return str(
+            vera_incarceration_county_path(
+                1970,
+                2026,
+                _county_vintage(ds),
                 base_dir="data",
             )
         )

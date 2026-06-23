@@ -23,6 +23,7 @@ from hhplab.cli.ingest.pit_vintage import ingest_pit_vintage
 from hhplab.cli.ingest.pl_block_population import ingest_pl_block_population
 from hhplab.cli.ingest.prism import ingest_prism
 from hhplab.cli.ingest.tract_relationship import ingest_tract_relationship
+from hhplab.cli.ingest.vera import ingest_vera_incarceration
 from hhplab.cli.ingest.zori import ingest_zori
 from hhplab.cli.shared.boundaries import ingest_boundaries
 
@@ -50,3 +51,4 @@ def register_commands(app: typer.Typer) -> None:
     app.command("zori")(ingest_zori)
     app.command("pep")(ingest_pep)
     app.command("medsl-presidential")(ingest_medsl_presidential)
+    app.command("vera-incarceration")(ingest_vera_incarceration)

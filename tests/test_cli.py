@@ -95,6 +95,38 @@ class TestNestedIngestCommand:
         assert "countypres_2000-2024.tab" in payload["error"]
         assert "Download County Presidential Election Returns 2000-2024" in payload["error"]
 
+    def test_ingest_vera_incarceration_help(self):
+        result = runner.invoke(app, ["ingest", "vera-incarceration", "--help"])
+
+        assert result.exit_code == 0
+        assert "Vera county incarceration trends" in result.output
+
+    def test_ingest_vera_incarceration_json(self):
+        output_path = Path(
+            "data/curated/vera/vera_incarceration_county__Y1970-2026@C2020.parquet"
+        )
+        with (
+            patch(
+                "hhplab.cli.ingest.vera.ingest_county_incarceration_trends",
+                return_value=output_path,
+            ) as mock_ingest,
+            patch("hhplab.cli.ingest.vera.pd.read_parquet") as mock_read_parquet,
+        ):
+            mock_read_parquet.return_value = [object(), object()]
+            result = runner.invoke(
+                app,
+                ["ingest", "vera-incarceration", "--force", "--json"],
+            )
+
+        assert result.exit_code == 0, result.output
+        payload = json.loads(result.output)
+        assert payload["status"] == "ok"
+        assert payload["provider"] == "vera"
+        assert payload["product"] == "incarceration_trends"
+        assert payload["output_path"] == str(output_path)
+        assert payload["row_count"] == 2
+        mock_ingest.assert_called_once()
+
     def test_build_medsl_president_county_json_validation_error(self):
         with patch(
             "hhplab.cli.build_cmds.medsl.materialize_county_political_leaning",

@@ -75,6 +75,7 @@ SourceType = Literal[
     "hic",  # HUD HIC inventory counts
     "prism",  # PRISM Climate Group gridded climate data
     "medsl",  # MIT Election Data and Science Lab election returns
+    "vera",  # Vera Institute incarceration trends
     "other",  # Other external sources
 ]
 

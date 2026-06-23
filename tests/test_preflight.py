@@ -11,7 +11,12 @@ from typer.testing import CliRunner
 
 from hhplab.acs.variables import TRACT_OUTPUT_COLUMNS
 from hhplab.cli.main import app
-from hhplab.naming import county_xwalk_path, medsl_president_county_path, msa_county_membership_path
+from hhplab.naming import (
+    county_xwalk_path,
+    medsl_president_county_path,
+    msa_county_membership_path,
+    vera_incarceration_county_path,
+)
 from hhplab.provenance import ProvenanceBlock, write_parquet_with_provenance
 from hhplab.recipe.loader import load_recipe
 from hhplab.recipe.preflight import (
@@ -420,6 +425,23 @@ def test_medsl_president_default_path_resolves_to_canonical_artifact() -> None:
     }
 
 
+def test_vera_incarceration_default_path_resolves_to_canonical_artifact() -> None:
+    from hhplab.recipe.planner import resolve_plan
+
+    recipe = load_recipe(_vera_county_preflight_recipe())
+
+    plan = resolve_plan(recipe, "main")
+    task = next(task for task in plan.resample_tasks if task.dataset_id == "vera_incarceration")
+
+    assert task.input_path == str(
+        vera_incarceration_county_path(1970, 2026, 2020, base_dir="data")
+    )
+    assert task.measure_aggregations == {
+        "total_jail_pop": "sum",
+        "total_pop_15to64": "sum",
+    }
+
+
 def test_medsl_missing_dataset_remediation_uses_ingest_and_build_commands(
     tmp_path: Path,
 ) -> None:
@@ -443,6 +465,22 @@ def test_medsl_missing_dataset_remediation_uses_ingest_and_build_commands(
         "hhplab build medsl-president-county --force"
     )
     assert "aggregate vote counts first" in findings[0].remediation.hint
+
+
+def test_vera_missing_dataset_remediation_uses_ingest_command(tmp_path: Path) -> None:
+    recipe = load_recipe(_vera_county_preflight_recipe())
+    report = run_preflight(recipe, project_root=tmp_path)
+
+    findings = [
+        finding
+        for finding in report.findings
+        if finding.kind == FindingKind.MISSING_DATASET
+        and finding.dataset_id == "vera_incarceration"
+    ]
+    assert len(findings) == 1
+    assert findings[0].remediation is not None
+    assert findings[0].remediation.command == "hhplab ingest vera-incarceration --force"
+    assert "derive incarceration rates" in findings[0].remediation.hint
 
 
 def test_medsl_county_recipe_preflight_joins_with_acs_measures(
@@ -891,6 +929,54 @@ def _medsl_acs_county_preflight_recipe() -> dict:
                         "kind": "join",
                         "datasets": ["medsl_president", "acs1_county"],
                         "join_on": ["geo_id", "year"],
+                    },
+                ],
+            },
+        ],
+    }
+
+
+def _vera_county_preflight_recipe() -> dict:
+    return {
+        "version": 1,
+        "name": "vera-county-preflight",
+        "universe": {"years": [2024]},
+        "targets": [
+            {"id": "county_panel", "geometry": {"type": "county", "vintage": 2020}},
+        ],
+        "datasets": {
+            "vera_incarceration": {
+                "provider": "vera",
+                "product": "incarceration_trends",
+                "version": 1,
+                "native_geometry": {"type": "county", "vintage": 2020},
+                "geo_column": "county_fips",
+                "year_column": "year",
+                "params": {"align": "calendar_year"},
+            },
+        },
+        "transforms": [],
+        "pipelines": [
+            {
+                "id": "main",
+                "target": "county_panel",
+                "steps": [
+                    {
+                        "kind": "resample",
+                        "dataset": "vera_incarceration",
+                        "to_geometry": {"type": "county", "vintage": 2020},
+                        "method": "identity",
+                        "measures": {
+                            "total_jail_pop": {"aggregation": "sum"},
+                            "total_pop_15to64": {"aggregation": "sum"},
+                        },
+                        "derived_measures": {
+                            "total_jail_pop_rate": {
+                                "type": "rate_from_weighted_counts",
+                                "source_numerator_column": "total_jail_pop",
+                                "denominator_column": "total_pop_15to64",
+                            },
+                        },
                     },
                 ],
             },

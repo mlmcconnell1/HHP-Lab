@@ -500,6 +500,17 @@ def _dataset_remediation(ds_id: str, ds, *, years: list[int] | None = None) -> R
             ),
         )
 
+    if provider == "vera" and product == "incarceration_trends":
+        return Remediation(
+            hint=(
+                f"Ingest Vera county incarceration trends for dataset '{ds_id}'. "
+                "The curated artifact is county-year native. In recipes, aggregate "
+                "count and denominator columns first, then derive incarceration "
+                "rates at the target geography from the summed columns."
+            ),
+            command="hhplab ingest vera-incarceration --force",
+        )
+
     if provider == "census" and product == "urban_fraction":
         boundary_vintage = ds.params.get("boundary_vintage") or getattr(
             ds.native_geometry,
@@ -3252,4 +3263,3 @@ def _preflight_source_token(recipe: RecipeV1, dataset_id: str) -> str:
 # ---------------------------------------------------------------------------
 # Public entry point
 # ---------------------------------------------------------------------------
-

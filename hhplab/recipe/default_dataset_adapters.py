@@ -424,6 +424,61 @@ def _validate_medsl_president(spec: DatasetSpec) -> list[ValidationDiagnostic]:
     return diags
 
 
+def _validate_vera_incarceration_trends(spec: DatasetSpec) -> list[ValidationDiagnostic]:
+    """Validate Vera county incarceration trends measure artifacts."""
+    diags: list[ValidationDiagnostic] = []
+    if spec.version != 1:
+        diags.append(
+            ValidationDiagnostic(
+                "error",
+                f"vera/incarceration_trends: unsupported version {spec.version}; expected 1.",
+            )
+        )
+    if spec.native_geometry.type != "county":
+        diags.append(
+            ValidationDiagnostic(
+                "error",
+                f"vera/incarceration_trends: expected native_geometry type 'county', "
+                f"got '{spec.native_geometry.type}'. The Vera source is county-native.",
+            )
+        )
+    if spec.geo_column not in {"county_fips", "geo_id"}:
+        diags.append(
+            ValidationDiagnostic(
+                "error",
+                "vera/incarceration_trends: set geo_column to 'county_fips' or "
+                "'geo_id' for the county-year artifact.",
+            )
+        )
+    if spec.year_column != "year":
+        diags.append(
+            ValidationDiagnostic(
+                "error",
+                "vera/incarceration_trends: set year_column to 'year' for the "
+                "county-year artifact.",
+            )
+        )
+
+    known_params = {"county_vintage", "align", "broadcast_static"}
+    unknown = set(spec.params.keys()) - known_params
+    if unknown:
+        diags.append(
+            ValidationDiagnostic(
+                "warning",
+                f"vera/incarceration_trends: unrecognized params {sorted(unknown)}.",
+            )
+        )
+    if "align" in spec.params and spec.params["align"] != "calendar_year":
+        diags.append(
+            ValidationDiagnostic(
+                "warning",
+                "vera/incarceration_trends: params.align should be 'calendar_year' "
+                "when declared.",
+            )
+        )
+    return diags
+
+
 def _validate_census_urban_fraction(spec: DatasetSpec) -> list[ValidationDiagnostic]:
     """Validate CoC urban population fraction covariate artifacts."""
     diags: list[ValidationDiagnostic] = []
@@ -722,6 +777,7 @@ def register_dataset_defaults(registry: DatasetAdapterRegistry) -> None:
     registry.register("census", "pep", _validate_census_pep)
     registry.register("census", "urban_fraction", _validate_census_urban_fraction)
     registry.register("medsl", "president", _validate_medsl_president)
+    registry.register("vera", "incarceration_trends", _validate_vera_incarceration_trends)
     registry.register("zillow", "zori", _validate_zillow_zori)
     registry.register("prism", "temperature", _validate_prism_temperature)
     registry.register("bls", "laus", _validate_bls_laus)

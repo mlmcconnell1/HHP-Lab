@@ -68,3 +68,12 @@ MEDSL_COUNTY_PRESIDENTIAL_RETURNS_DOI: Final = "https://doi.org/10.7910/DVN/VOQC
 MEDSL_COUNTY_PRESIDENTIAL_RETURNS_DATAVERSE_API: Final = (
     "https://dataverse.harvard.edu/api/access/datafile/13573089"
 )
+
+# Vera Institute of Justice
+VERA_INCARCERATION_TRENDS_REPO: Final = (
+    "https://github.com/vera-institute/incarceration-trends"
+)
+VERA_INCARCERATION_TRENDS_COUNTY_CSV: Final = (
+    "https://raw.githubusercontent.com/vera-institute/incarceration-trends/"
+    "main/incarceration_trends_county.csv"
+)
