@@ -5094,6 +5094,42 @@ class TestResampleAggregate:
         assert coc1 == pytest.approx(180.0)
         assert coc2 == pytest.approx(300.0)
 
+    def test_aggregate_sum_preserves_all_null_group(self, tmp_path: Path):
+        ds_path = tmp_path / "data" / "acs_nulls.parquet"
+        ds_path.parent.mkdir(parents=True, exist_ok=True)
+        pd.DataFrame(
+            {
+                "GEOID": ["A", "B", "C"],
+                "year": [2020, 2020, 2020],
+                "incarcerated_population": [None, None, 30.0],
+            }
+        ).to_parquet(ds_path)
+
+        xwalk_path = tmp_path / "data" / "curated" / "xwalks" / "xwalk__B2025xT2020.parquet"
+        _make_xwalk_parquet(xwalk_path, geo_type="tract")
+
+        recipe = load_recipe(_recipe_with_pipeline())
+        ctx = ExecutionContext(project_root=tmp_path, recipe=recipe)
+        ctx.transform_paths["tract_to_coc"] = xwalk_path
+
+        task = ResampleTask(
+            dataset_id="acs",
+            year=2020,
+            input_path="data/acs_nulls.parquet",
+            effective_geometry=GeometryRef(type="tract", vintage=2020),
+            method="aggregate",
+            transform_id="tract_to_coc",
+            to_geometry=GeometryRef(type="coc", vintage=2025),
+            measures=["incarcerated_population"],
+            measure_aggregations={"incarcerated_population": "sum"},
+        )
+        result = _execute_resample(task, ctx)
+
+        assert result.success
+        df = ctx.intermediates[("acs", 2020)].set_index("geo_id")
+        assert pd.isna(df.loc["COC1", "incarcerated_population"])
+        assert df.loc["COC2", "incarcerated_population"] == pytest.approx(30.0)
+
     def test_aggregate_multi_tract_mediated_varieties_side_by_side(self, tmp_path: Path):
         ds_path = tmp_path / "data" / "pep.parquet"
         _make_dataset_parquet(ds_path, geo_col="county_fips")

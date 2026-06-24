@@ -561,7 +561,9 @@ def _resample_aggregate(
             part = merged.copy()
             for m in measures:
                 part[m] = part[m] * part[base_weight_col]
-            result_parts.append(part.groupby(target_col)[measures].sum().reset_index())
+            result_parts.append(
+                part.groupby(target_col)[measures].sum(min_count=1).reset_index(),
+            )
         elif agg == "mean":
             result_parts.append(merged.groupby(target_col)[measures].mean().reset_index())
         elif agg == "weighted_mean":
