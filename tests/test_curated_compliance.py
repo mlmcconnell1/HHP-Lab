@@ -56,6 +56,7 @@ def _build_clean_curated(base: Path) -> None:
         "maps": "CO-500__2025.html",
         "prism": "prism_county_monthly__tmin__Y2024M01@C2023.parquet",
         "medsl": "medsl_president_county__Y2000-2024@C2020.parquet",
+        "vera": "vera_incarceration_county__Y1970-2026@C2020.parquet",
     }
     for subdir, filename in canonical_examples.items():
         _touch(base / subdir / filename)
@@ -98,6 +99,7 @@ class TestNonCanonicalFilenames:
             ("panel", "panel_data.parquet"),
             ("maps", "report.pdf"),
             ("prism", "prism_tmin_2024_01.parquet"),
+            ("vera", "vera_bad.parquet"),
         ],
     )
     def test_non_canonical_filename_detected(
@@ -190,6 +192,7 @@ class TestCanonicalFilenamesAccepted:
             ("prism", "prism_county_monthly__tmin__Y2024M01@C2023.parquet"),
             ("medsl", "medsl_county_presidential_returns__Y2000-2024.parquet"),
             ("medsl", "medsl_president_county__Y2000-2024@C2020.parquet"),
+            ("vera", "vera_incarceration_county__Y1970-2026@C2020.parquet"),
         ],
     )
     def test_canonical_name_accepted(
