@@ -1632,7 +1632,7 @@ TransformSpec = Annotated[CrosswalkTransform | RollupTransform, Field(discrimina
 ResampleMethod = Literal["identity", "allocate", "aggregate"]
 AggregationMethod = Literal["sum", "mean", "weighted_mean"]
 DerivedMeasureType = Literal["rate_from_weighted_counts", "quantile_from_distribution"]
-DerivedDistributionFamily = Literal["contract_rent"]
+DerivedDistributionFamily = Literal["contract_rent", "household_income"]
 SAEAllocationMethod = Literal["tract_share_within_county"]
 SAEFallbackPolicy = Literal["diagnose_only", "fail"]
 SAEZeroDenominatorPolicy = Literal["null_rate", "diagnostic"]
@@ -1728,10 +1728,11 @@ class DerivedMeasureConfig(BaseModel):
     crosswalk weight to both numerator and denominator, sums both at target
     geography, then emits ``numerator_sum / denominator_sum``.
 
-    ``quantile_from_distribution`` is for additive distribution bins, currently
-    ACS B25056 contract-rent bins. The executor weights and sums the bins to
-    target geography first, then linearly interpolates the requested quantile
-    within the aggregated distribution.
+    ``quantile_from_distribution`` is for additive distribution bins such as
+    ACS B25056 contract-rent bins and B19001 household-income bins. The
+    executor weights and sums the bins to target geography first, then
+    linearly interpolates the requested quantile within the aggregated
+    distribution.
     """
 
     model_config = ConfigDict(extra="forbid")

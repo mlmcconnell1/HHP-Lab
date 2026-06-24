@@ -18,6 +18,7 @@ import pandas as pd
 from hhplab.acs.sae import (
     CONTRACT_RENT_BINS,
     CONTRACT_RENT_BINS_EARLY,
+    HOUSEHOLD_INCOME_BINS,
     _quantile_from_bins,
 )
 from hhplab.geo.ct_planning_regions import (
@@ -209,12 +210,29 @@ _CONTRACT_RENT_BINS_EARLY: tuple[tuple[str, float, float | None], ...] = tuple(
     (column.removeprefix("sae_"), lower, upper)
     for column, lower, upper in CONTRACT_RENT_BINS_EARLY
 )
+_HOUSEHOLD_INCOME_BINS: tuple[tuple[str, float, float | None], ...] = tuple(
+    (column.removeprefix("sae_"), lower, upper)
+    for column, lower, upper in HOUSEHOLD_INCOME_BINS
+)
 _DISTRIBUTION_BIN_LAYOUTS: dict[str, tuple[tuple[tuple[str, float, float | None], ...], ...]] = {
     "contract_rent": (_CONTRACT_RENT_BINS, _CONTRACT_RENT_BINS_EARLY),
+    "household_income": (_HOUSEHOLD_INCOME_BINS,),
 }
 _DISTRIBUTION_TOTAL_COLUMNS: dict[str, str] = {
     "contract_rent": "contract_rent_distribution_with_cash_rent",
+    "household_income": "household_income_total",
 }
+
+
+def _distribution_bin_layout_name(
+    family: object,
+    bins: tuple[tuple[str, float, float | None], ...],
+) -> str:
+    if family == "contract_rent":
+        return "early_2000_plus" if bins == _CONTRACT_RENT_BINS_EARLY else "modern_3500_plus"
+    if family == "household_income":
+        return "standard_200000_plus"
+    return "standard"
 
 
 def derived_measure_required_columns(
@@ -391,7 +409,23 @@ def _resample_identity(
 ) -> pd.DataFrame:
     """Identity resample: passthrough with column standardisation."""
     geo_col = _resolve_geo_column(df, task.geo_column)
-    _validate_columns(df, task.measures, task.dataset_id, task.year)
+    derived_measures = task.derived_measures or {}
+    derived_required_columns = sorted(
+        {
+            column_name
+            for config in derived_measures.values()
+            for column_name in derived_measure_required_columns(
+                config,
+                available_columns=set(df.columns),
+            )
+        }
+    )
+    _validate_columns(
+        df,
+        [*task.measures, *derived_required_columns],
+        task.dataset_id,
+        task.year,
+    )
 
     passthrough_cols = [
         column
@@ -410,11 +444,58 @@ def _resample_identity(
         cols.insert(insert_at, "year")
 
     result = df[cols].copy()
+    if derived_measures:
+        derived = _derive_identity_measures(df, task)
+        for column in derived.columns:
+            result[column] = derived[column].to_numpy()
     if geo_col != "geo_id":
         result = result.rename(columns={geo_col: "geo_id"})
     if "year" not in result.columns:
         result["year"] = task.year
     return result
+
+
+def _derive_identity_measures(
+    df: pd.DataFrame,
+    task: ResampleTask,
+) -> pd.DataFrame:
+    """Derive row-wise measures for identity-resampled native geography data."""
+    rows: dict[str, list[object]] = {}
+    for output_name, config in (task.derived_measures or {}).items():
+        derived_type = config.get("type", "rate_from_weighted_counts")
+        if derived_type != "quantile_from_distribution":
+            raise ExecutorError(
+                f"Identity resample for '{task.dataset_id}' year {task.year}: "
+                f"derived measure '{output_name}' uses unsupported type "
+                f"{derived_type!r}. Identity resampling supports only "
+                "quantile_from_distribution derived measures."
+            )
+        total_column, bins = _distribution_total_and_bins(
+            config,
+            available_columns=set(df.columns),
+        )
+        values: list[object] = []
+        diagnostics: list[str] = []
+        for _, row in df.iterrows():
+            value, diagnostic = _quantile_from_bins(
+                row,
+                total_column=total_column,
+                bins=bins,
+                quantile=float(config["quantile"]),
+            )
+            diagnostic["family"] = config.get("distribution_family")
+            diagnostic["total_column"] = total_column
+            diagnostic["bin_layout"] = _distribution_bin_layout_name(
+                config.get("distribution_family"),
+                bins,
+            )
+            values.append(value)
+            diagnostics.append(json.dumps(diagnostic, sort_keys=True))
+        rows[output_name] = values
+        diagnostic_output = config.get("diagnostic_output_column")
+        if diagnostic_output is not None:
+            rows[str(diagnostic_output)] = diagnostics
+    return pd.DataFrame(rows, index=df.index)
 
 
 def _metadata_value(series: pd.Series) -> object:
@@ -616,10 +697,9 @@ def _resample_aggregate(
                     )
                     diagnostic["family"] = config.get("distribution_family")
                     diagnostic["total_column"] = total_column
-                    diagnostic["bin_layout"] = (
-                        "early_2000_plus"
-                        if bins == _CONTRACT_RENT_BINS_EARLY
-                        else "modern_3500_plus"
+                    diagnostic["bin_layout"] = _distribution_bin_layout_name(
+                        config.get("distribution_family"),
+                        bins,
                     )
                     row[output_name] = value
                     diagnostic_output = config.get("diagnostic_output_column")

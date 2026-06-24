@@ -475,6 +475,61 @@ def test_top50_msa_coc_pit_acs5_poverty_2015_2025_recipe_loads_and_resolves() ->
     assert all(task.to_geometry.type == "msa" for task in acs_tasks_by_year.values())
 
 
+def test_top50_msa_coc_pit_hic_rent_income_quantiles_2020_recipe_loads_and_resolves() -> None:
+    recipe = _load_repo_recipe(
+        "recipes/top50-msa-coc-pit-hic-rent-income-quantiles-2020.yaml",
+    )
+    plan = resolve_plan(recipe, "build_msa_panel")
+    target = recipe.targets[0]
+    cohort = target.cohort
+
+    expected_quantiles = {
+        "bottom_decile_contract_rent": 0.10,
+        "bottom_quartile_contract_rent": 0.25,
+        "top_quartile_contract_rent": 0.75,
+        "top_decile_contract_rent": 0.90,
+        "bottom_decile_household_income": 0.10,
+        "bottom_quartile_household_income": 0.25,
+        "top_quartile_household_income": 0.75,
+        "top_decile_household_income": 0.90,
+    }
+
+    assert recipe.name == "top50_msa_coc_pit_hic_rent_income_quantiles_2020"
+    assert target.geometry.type == "msa"
+    assert cohort is not None
+    assert cohort.method == "top_n"
+    assert cohort.n == 50
+    assert cohort.reference_year == 2020
+    assert target.panel_policy is not None
+    assert all(column in target.panel_policy.output_columns for column in expected_quantiles)
+    assert [task.year for task in plan.join_tasks] == [2020]
+    assert tuple(plan.join_tasks[0].datasets) == (
+        "pit",
+        "hic",
+        "pep_county",
+        "acs5_msa_rent_income",
+    )
+
+    acs_task = next(
+        task for task in plan.resample_tasks if task.dataset_id == "acs5_msa_rent_income"
+    )
+    assert acs_task.method == "identity"
+    assert acs_task.input_path == "data/curated/measures/measures__metro__A2020@Dcensusmsa2023.parquet"
+    assert acs_task.transform_id is None
+    assert acs_task.measure_aggregations == {
+        "contract_rent_distribution_with_cash_rent": "sum",
+        "household_income_total": "sum",
+    }
+    assert {
+        name: config["quantile"]
+        for name, config in (acs_task.derived_measures or {}).items()
+    } == expected_quantiles
+    assert {
+        config["distribution_family"]
+        for config in (acs_task.derived_measures or {}).values()
+    } == {"contract_rent", "household_income"}
+
+
 @pytest.mark.parametrize(
     "case",
     CONTAINMENT_RECIPE_CASES,

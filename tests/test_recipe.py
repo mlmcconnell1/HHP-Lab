@@ -13,7 +13,7 @@ from pydantic import ValidationError
 from shapely.geometry import Polygon, box
 from typer.testing import CliRunner
 
-from hhplab.acs.sae import CONTRACT_RENT_BINS
+from hhplab.acs.sae import CONTRACT_RENT_BINS, HOUSEHOLD_INCOME_BINS
 from hhplab.cli.main import app
 from hhplab.geo.ct_planning_regions import CtPlanningRegionCrosswalk
 from hhplab.panel.assemble import _load_coc_areas
@@ -93,6 +93,9 @@ STALE_TRANSLATED_ACS_REBUILD = "hhplab ingest acs5-tract --acs 2015-2019 --tract
 CONTRACT_RENT_RECIPE_BIN_COLUMNS = [
     column.removeprefix("sae_") for column, _, _ in CONTRACT_RENT_BINS
 ]
+HOUSEHOLD_INCOME_RECIPE_BIN_COLUMNS = [
+    column.removeprefix("sae_") for column, _, _ in HOUSEHOLD_INCOME_BINS
+]
 
 
 def test_derived_measure_config_accepts_multi_column_numerator_without_rate() -> None:
@@ -134,6 +137,17 @@ def test_derived_measure_config_accepts_contract_rent_quantile() -> None:
     assert config.distribution_family == "contract_rent"
     assert config.quantile == 0.25
     assert config.denominator_column is None
+
+
+def test_derived_measure_config_accepts_household_income_quantile() -> None:
+    config = DerivedMeasureConfig(
+        type="quantile_from_distribution",
+        distribution_family="household_income",
+        quantile=0.90,
+    )
+
+    assert config.distribution_family == "household_income"
+    assert config.quantile == 0.90
 
 
 def test_derived_measure_config_quantile_requires_quantile() -> None:
@@ -4999,6 +5013,50 @@ class TestResampleIdentity:
         assert "pop" in df.columns
         assert len(df) == 3
 
+    def test_identity_derives_household_income_quantile_from_native_bins(self, tmp_path: Path):
+        ds_path = tmp_path / "data" / "msa_measures.parquet"
+        ds_path.parent.mkdir(parents=True, exist_ok=True)
+        rows = pd.DataFrame(
+            {
+                "msa_id": ["MSA1", "MSA2"],
+                "year": [2020, 2020],
+                "household_income_total": [100.0, 200.0],
+            }
+        )
+        for column in HOUSEHOLD_INCOME_RECIPE_BIN_COLUMNS:
+            rows[column] = 0.0
+        rows["household_income_10000_to_14999"] = [100.0, 0.0]
+        rows["household_income_15000_to_19999"] = [0.0, 200.0]
+        rows.to_parquet(ds_path)
+
+        recipe = load_recipe(_recipe_with_pipeline())
+        ctx = ExecutionContext(project_root=tmp_path, recipe=recipe)
+        task = ResampleTask(
+            dataset_id="acs_msa",
+            year=2020,
+            input_path="data/msa_measures.parquet",
+            effective_geometry=GeometryRef(type="msa", source="census_msa_2023"),
+            method="identity",
+            transform_id=None,
+            to_geometry=GeometryRef(type="msa", source="census_msa_2023"),
+            measures=["household_income_total"],
+            measure_aggregations={"household_income_total": "sum"},
+            geo_column="msa_id",
+            derived_measures={
+                "bottom_quartile_household_income": {
+                    "type": "quantile_from_distribution",
+                    "distribution_family": "household_income",
+                    "quantile": 0.25,
+                },
+            },
+        )
+        result = _execute_resample(task, ctx)
+
+        assert result.success
+        df = ctx.intermediates[("acs_msa", 2020)].set_index("geo_id")
+        assert df.loc["MSA1", "bottom_quartile_household_income"] == pytest.approx(11250.0)
+        assert df.loc["MSA2", "bottom_quartile_household_income"] == pytest.approx(16250.0)
+
     def test_identity_missing_measures_fails(self, tmp_path: Path):
         ds_path = tmp_path / "data" / "pit.parquet"
         _make_dataset_parquet(ds_path, geo_col="coc_id")
@@ -6107,6 +6165,63 @@ class TestResampleAggregate:
         assert diagnostics["status"] == "ok"
         assert diagnostics["family"] == "contract_rent"
         assert diagnostics["quantile"] == 0.25
+
+    def test_aggregate_derives_household_income_quantile_from_weighted_bins(
+        self,
+        tmp_path: Path,
+    ):
+        """Household-income quantiles are derived from aggregated B19001 bins."""
+        ds_path = tmp_path / "data" / "acs5_household_income.parquet"
+        ds_path.parent.mkdir(parents=True, exist_ok=True)
+        rows = pd.DataFrame(
+            {
+                "tract_geoid": ["A", "B", "C"],
+                "year": [2020, 2020, 2020],
+                "household_income_total": [100.0, 40.0, 200.0],
+            }
+        )
+        for column in HOUSEHOLD_INCOME_RECIPE_BIN_COLUMNS:
+            rows[column] = 0.0
+        rows["household_income_lt_10000"] = [100.0, 0.0, 0.0]
+        rows["household_income_10000_to_14999"] = [0.0, 40.0, 0.0]
+        rows["household_income_15000_to_19999"] = [0.0, 0.0, 200.0]
+        rows.to_parquet(ds_path)
+
+        xwalk_path = tmp_path / "data" / "curated" / "xwalks" / "xwalk__B2025xT2020.parquet"
+        _make_xwalk_parquet(xwalk_path, geo_type="tract")
+
+        recipe = load_recipe(_recipe_with_pipeline())
+        ctx = ExecutionContext(project_root=tmp_path, recipe=recipe)
+        ctx.transform_paths["tract_to_coc"] = xwalk_path
+
+        task = ResampleTask(
+            dataset_id="acs",
+            year=2020,
+            input_path="data/acs5_household_income.parquet",
+            effective_geometry=GeometryRef(type="tract", vintage=2020),
+            method="aggregate",
+            transform_id="tract_to_coc",
+            to_geometry=GeometryRef(type="coc", vintage=2025),
+            measures=["household_income_total"],
+            measure_aggregations={"household_income_total": "sum"},
+            geo_column="tract_geoid",
+            derived_measures={
+                "bottom_decile_household_income": {
+                    "type": "quantile_from_distribution",
+                    "distribution_family": "household_income",
+                    "quantile": 0.10,
+                },
+            },
+        )
+        result = _execute_resample(task, ctx)
+
+        assert result.success
+        df = ctx.intermediates[("acs", 2020)].set_index("geo_id")
+        assert df.loc["COC1", "household_income_total"] == pytest.approx(
+            (100.0 * 0.8) + (40.0 * 0.5),
+        )
+        assert df.loc["COC1", "bottom_decile_household_income"] == pytest.approx(1250.0)
+        assert df.loc["COC2", "bottom_decile_household_income"] == pytest.approx(15500.0)
 
     def test_measures_list_backward_compat(self, tmp_path: Path):
         """Old list format (measures: [a, b] + aggregation: sum) still works."""
