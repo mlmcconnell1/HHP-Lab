@@ -507,26 +507,39 @@ def test_top50_msa_coc_pit_hic_rent_income_quantiles_2020_recipe_loads_and_resol
         "pit",
         "hic",
         "pep_county",
-        "acs5_msa_rent_income",
+        "acs5_contract_rent_tract",
+        "acs5_household_income_tract",
     )
 
-    acs_task = next(
-        task for task in plan.resample_tasks if task.dataset_id == "acs5_msa_rent_income"
+    rent_task = next(
+        task for task in plan.resample_tasks if task.dataset_id == "acs5_contract_rent_tract"
     )
-    assert acs_task.method == "identity"
-    assert acs_task.input_path == "data/curated/measures/measures__metro__A2020@Dcensusmsa2023.parquet"
-    assert acs_task.transform_id is None
-    assert acs_task.measure_aggregations == {
+    income_task = next(
+        task for task in plan.resample_tasks if task.dataset_id == "acs5_household_income_tract"
+    )
+    assert rent_task.method == "aggregate"
+    assert rent_task.input_path == (
+        "data/curated/acs_contract_rent_cache/acs5_contract_rent_tracts__A2019.parquet"
+    )
+    assert rent_task.transform_id == "tract2010_to_msa_area"
+    assert rent_task.measure_aggregations == {
         "contract_rent_distribution_with_cash_rent": "sum",
+    }
+    assert income_task.method == "aggregate"
+    assert income_task.input_path == "data/curated/acs/acs5_tracts__A2019xT2010.parquet"
+    assert income_task.transform_id == "tract2010_to_msa_area"
+    assert income_task.measure_aggregations == {
         "household_income_total": "sum",
     }
     assert {
         name: config["quantile"]
-        for name, config in (acs_task.derived_measures or {}).items()
+        for task in (rent_task, income_task)
+        for name, config in (task.derived_measures or {}).items()
     } == expected_quantiles
     assert {
         config["distribution_family"]
-        for config in (acs_task.derived_measures or {}).values()
+        for task in (rent_task, income_task)
+        for config in (task.derived_measures or {}).values()
     } == {"contract_rent", "household_income"}
 
 

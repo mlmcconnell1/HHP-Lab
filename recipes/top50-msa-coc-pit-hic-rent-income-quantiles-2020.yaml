@@ -5,10 +5,10 @@ name: top50_msa_coc_pit_hic_rent_income_quantiles_2020
 description: >
   Build a 2020 Census MSA panel for the 50 largest MSAs by 2020 county PEP
   population. CoC-native HUD PIT counts and HIC inventory measures are rolled
-  up to Census MSAs. ACS5 terminal-year 2020 MSA-native contract-rent and
-  household-income distribution bins are linearly interpolated to derive
-  bottom-decile, bottom-quartile, top-quartile, and top-decile rent and
-  household-income measures.
+  up to Census MSAs. Lagged ACS5 terminal-year 2019 tract contract-rent and
+  household-income distribution bins are aggregated to Census MSAs, then
+  linearly interpolated to derive bottom-decile, bottom-quartile, top-quartile,
+  and top-decile rent and household-income measures.
 
 universe:
   years: [2020]
@@ -86,15 +86,23 @@ datasets:
     geo_column: county_fips
     path: data/curated/pep/pep_county__v2025__y2020-2025.parquet
 
-  acs5_msa_rent_income:
+  acs5_contract_rent_tract:
     provider: census
     product: acs5
     version: 1
-    native_geometry: { type: msa, source: census_msa_2023 }
+    native_geometry: { type: tract, vintage: 2010, source: tiger }
     years: "2020-2020"
-    year_column: year
-    geo_column: msa_id
-    path: data/curated/measures/measures__metro__A2020@Dcensusmsa2023.parquet
+    geo_column: tract_geoid
+    path: data/curated/acs_contract_rent_cache/acs5_contract_rent_tracts__A2019.parquet
+
+  acs5_household_income_tract:
+    provider: census
+    product: acs5
+    version: 1
+    native_geometry: { type: tract, vintage: 2010, source: tiger }
+    years: "2020-2020"
+    geo_column: tract_geoid
+    path: data/curated/acs/acs5_tracts__A2019xT2010.parquet
 
 transforms:
   - id: coc_to_msa_area
@@ -113,12 +121,20 @@ transforms:
       weighting:
         scheme: area
 
+  - id: tract2010_to_msa_area
+    type: crosswalk
+    from: { type: tract, vintage: 2010, source: tiger }
+    to: { type: msa, source: census_msa_2023 }
+    spec:
+      weighting:
+        scheme: area
+
 pipelines:
   - id: build_msa_panel
     target: msa_panel
     steps:
       - materialize:
-          transforms: [coc_to_msa_area, county2020_to_msa_area]
+          transforms: [coc_to_msa_area, county2020_to_msa_area, tract2010_to_msa_area]
 
       - resample:
           dataset: pit
@@ -152,12 +168,12 @@ pipelines:
             population: { aggregation: sum }
 
       - resample:
-          dataset: acs5_msa_rent_income
+          dataset: acs5_contract_rent_tract
           to_geometry: { type: msa, source: census_msa_2023 }
-          method: identity
+          method: aggregate
+          via: tract2010_to_msa_area
           measures:
             contract_rent_distribution_with_cash_rent: { aggregation: sum }
-            household_income_total: { aggregation: sum }
           derived_measures:
             bottom_decile_contract_rent:
               type: quantile_from_distribution
@@ -175,6 +191,15 @@ pipelines:
               type: quantile_from_distribution
               distribution_family: contract_rent
               quantile: 0.90
+
+      - resample:
+          dataset: acs5_household_income_tract
+          to_geometry: { type: msa, source: census_msa_2023 }
+          method: aggregate
+          via: tract2010_to_msa_area
+          measures:
+            household_income_total: { aggregation: sum }
+          derived_measures:
             bottom_decile_household_income:
               type: quantile_from_distribution
               distribution_family: household_income
@@ -193,7 +218,12 @@ pipelines:
               quantile: 0.90
 
       - join:
-          datasets: [pit, hic, pep_county, acs5_msa_rent_income]
+          datasets:
+            - pit
+            - hic
+            - pep_county
+            - acs5_contract_rent_tract
+            - acs5_household_income_tract
           join_on: [geo_id, year]
 
 validation:

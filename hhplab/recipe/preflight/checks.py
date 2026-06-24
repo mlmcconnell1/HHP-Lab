@@ -369,6 +369,27 @@ def _check_acs5_tract_schema_contracts(
         if result.ok:
             continue
 
+        schema = pq.read_schema(full_path)
+        available_columns = set(schema.names)
+        required_columns = {
+            column
+            for task in tasks
+            for column in [
+                *task.measures,
+                *(
+                    required
+                    for config in (task.derived_measures or {}).values()
+                    for required in derived_measure_required_columns(
+                        config,
+                        available_columns=available_columns,
+                    )
+                ),
+            ]
+        }
+        has_derived_measures = any(task.derived_measures for task in tasks)
+        if has_derived_measures and required_columns and required_columns <= available_columns:
+            continue
+
         remediation_command = (
             result.detail.get("remediation_command") if result.detail is not None else None
         )

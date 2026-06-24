@@ -2479,6 +2479,64 @@ class TestRunPreflight:
             for finding in schema_findings
         )
 
+    def test_allows_acs5_split_cache_when_derived_columns_are_present(self, tmp_path: Path):
+        data = _preflight_recipe(with_path=True)
+        data["universe"] = {"years": [2023]}
+        data["datasets"]["pit"]["years"] = {"years": [2023]}
+        data["datasets"]["acs"]["years"] = {"years": [2023]}
+        data["datasets"]["acs"]["path"] = "data/curated/acs/acs5_tracts__A2023xT2020.parquet"
+        data["datasets"]["acs"]["geo_column"] = "tract_geoid"
+        acs_step = data["pipelines"][0]["steps"][2]["resample"]
+        acs_step["measures"] = {
+            "household_income_total": {"aggregation": "sum"},
+        }
+        acs_step["derived_measures"] = {
+            "bottom_decile_household_income": {
+                "type": "quantile_from_distribution",
+                "distribution_family": "household_income",
+                "quantile": 0.10,
+            },
+        }
+        _setup_preflight_fixtures(tmp_path, include_acs=False)
+        split_cache_path = tmp_path / data["datasets"]["acs"]["path"]
+        split_cache_path.parent.mkdir(parents=True, exist_ok=True)
+        pd.DataFrame(
+            [
+                {
+                    "tract_geoid": "T1",
+                    "acs_vintage": "2019-2023",
+                    "tract_vintage": "2020",
+                    "household_income_total": 100,
+                    "household_income_lt_10000": 10,
+                    "household_income_10000_to_14999": 10,
+                    "household_income_15000_to_19999": 10,
+                    "household_income_20000_to_24999": 10,
+                    "household_income_25000_to_29999": 10,
+                    "household_income_30000_to_34999": 10,
+                    "household_income_35000_to_39999": 10,
+                    "household_income_40000_to_44999": 10,
+                    "household_income_45000_to_49999": 10,
+                    "household_income_50000_to_59999": 10,
+                    "household_income_60000_to_74999": 0,
+                    "household_income_75000_to_99999": 0,
+                    "household_income_100000_to_124999": 0,
+                    "household_income_125000_to_149999": 0,
+                    "household_income_150000_to_199999": 0,
+                    "household_income_200000_plus": 0,
+                }
+            ]
+        ).to_parquet(split_cache_path)
+
+        recipe = load_recipe(data)
+        report = run_preflight(recipe, project_root=tmp_path)
+
+        schema_findings = [
+            f
+            for f in report.findings
+            if f.kind == FindingKind.MISSING_COLUMN and f.dataset_id == "acs"
+        ]
+        assert schema_findings == []
+
     def test_planner_error_captured(self, tmp_path: Path):
         data = _preflight_recipe(with_path=True, identity_only=True)
         # Add step referencing a dataset not in the recipe
