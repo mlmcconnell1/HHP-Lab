@@ -122,6 +122,67 @@ def _validate_census_acs5(spec: DatasetSpec) -> list[ValidationDiagnostic]:
     return diags
 
 
+def _validate_hhplab_msa_pit_rollup(spec: DatasetSpec) -> list[ValidationDiagnostic]:
+    """Validate pre-materialized HHP-Lab MSA PIT rollup artifacts."""
+    diags: list[ValidationDiagnostic] = []
+    if spec.version != 1:
+        diags.append(
+            ValidationDiagnostic(
+                "error",
+                f"hhplab/msa_pit_rollup: unsupported version {spec.version}; expected 1.",
+            )
+        )
+    if spec.native_geometry.type != "msa":
+        diags.append(
+            ValidationDiagnostic(
+                "error",
+                "hhplab/msa_pit_rollup: expected native_geometry type 'msa', "
+                f"got '{spec.native_geometry.type}'.",
+            )
+        )
+    if not _uses_materialized_artifact(spec):
+        diags.append(
+            ValidationDiagnostic(
+                "error",
+                "hhplab/msa_pit_rollup: path or file_set is required because this "
+                "adapter validates pre-materialized rollup artifacts.",
+            )
+        )
+    return diags
+
+
+def _validate_census_acs5_contract_rent_bins(spec: DatasetSpec) -> list[ValidationDiagnostic]:
+    """Validate ACS5 tract contract-rent bin artifacts."""
+    diags = _validate_census_acs5(spec)
+    if spec.native_geometry.type != "tract":
+        return diags
+    if not _uses_materialized_artifact(spec):
+        diags.append(
+            ValidationDiagnostic(
+                "error",
+                "census/acs5_contract_rent_bins: path or file_set is required for "
+                "the pre-materialized contract-rent bin artifact.",
+            )
+        )
+    return diags
+
+
+def _validate_census_acs5_household_income_bins(spec: DatasetSpec) -> list[ValidationDiagnostic]:
+    """Validate ACS5 tract household-income bin artifacts."""
+    diags = _validate_census_acs5(spec)
+    if spec.native_geometry.type != "tract":
+        return diags
+    if not _uses_materialized_artifact(spec):
+        diags.append(
+            ValidationDiagnostic(
+                "error",
+                "census/acs5_household_income_bins: path or file_set is required for "
+                "the pre-materialized household-income bin artifact.",
+            )
+        )
+    return diags
+
+
 def _validate_census_acs(spec: DatasetSpec) -> list[ValidationDiagnostic]:
     """Validate Census ACS dataset specification."""
     diags: list[ValidationDiagnostic] = []
@@ -766,9 +827,20 @@ def _validate_bls_cpi_u(spec: DatasetSpec) -> list[ValidationDiagnostic]:
 
 def register_dataset_defaults(registry: DatasetAdapterRegistry) -> None:
     """Register built-in dataset adapters."""
+    registry.register("hhplab", "msa_pit_rollup", _validate_hhplab_msa_pit_rollup)
     registry.register("hud", "pit", _validate_hud_pit)
     registry.register("hud", "hic", _validate_hud_hic)
     registry.register("census", "acs5", _validate_census_acs5)
+    registry.register(
+        "census",
+        "acs5_contract_rent_bins",
+        _validate_census_acs5_contract_rent_bins,
+    )
+    registry.register(
+        "census",
+        "acs5_household_income_bins",
+        _validate_census_acs5_household_income_bins,
+    )
     registry.register("census", "acs", _validate_census_acs)
     registry.register("census", "acs1", _validate_census_acs1)
     registry.register("census", "acs1_poverty", _validate_census_acs1_poverty)

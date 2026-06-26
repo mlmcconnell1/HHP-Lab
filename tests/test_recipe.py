@@ -1795,7 +1795,10 @@ class TestDefaultAdapters:
         register_defaults()
         products = dataset_registry.registered_products()
         assert ("hud", "pit") in products
+        assert ("hhplab", "msa_pit_rollup") in products
         assert ("census", "acs5") in products
+        assert ("census", "acs5_contract_rent_bins") in products
+        assert ("census", "acs5_household_income_bins") in products
         assert ("census", "acs") in products
         assert ("medsl", "president") in products
         assert ("zillow", "zori") in products
@@ -1919,6 +1922,58 @@ class TestDefaultAdapters:
             native_geometry=GeometryRef(type="tract", vintage=2020),
         )
         assert _validate_census_acs5(spec) == []
+
+    def test_hhplab_msa_pit_rollup_valid_with_path(self):
+        from hhplab.recipe.default_dataset_adapters import _validate_hhplab_msa_pit_rollup
+
+        spec = DatasetSpec(
+            provider="hhplab",
+            product="msa_pit_rollup",
+            version=1,
+            native_geometry=GeometryRef(type="msa", source="census_msa_2023"),
+            path="outputs/example.parquet",
+        )
+        assert _validate_hhplab_msa_pit_rollup(spec) == []
+
+    def test_hhplab_msa_pit_rollup_requires_materialized_artifact(self):
+        from hhplab.recipe.default_dataset_adapters import _validate_hhplab_msa_pit_rollup
+
+        spec = DatasetSpec(
+            provider="hhplab",
+            product="msa_pit_rollup",
+            version=1,
+            native_geometry=GeometryRef(type="msa", source="census_msa_2023"),
+        )
+        diags = _validate_hhplab_msa_pit_rollup(spec)
+        assert any(d.level == "error" and "path or file_set" in d.message for d in diags)
+
+    def test_census_acs5_contract_rent_bins_valid_with_path(self):
+        from hhplab.recipe.default_dataset_adapters import (
+            _validate_census_acs5_contract_rent_bins,
+        )
+
+        spec = DatasetSpec(
+            provider="census",
+            product="acs5_contract_rent_bins",
+            version=1,
+            native_geometry=GeometryRef(type="tract", vintage=2010),
+            path="data/curated/acs_contract_rent_cache/example.parquet",
+        )
+        assert _validate_census_acs5_contract_rent_bins(spec) == []
+
+    def test_census_acs5_household_income_bins_valid_with_path(self):
+        from hhplab.recipe.default_dataset_adapters import (
+            _validate_census_acs5_household_income_bins,
+        )
+
+        spec = DatasetSpec(
+            provider="census",
+            product="acs5_household_income_bins",
+            version=1,
+            native_geometry=GeometryRef(type="tract", vintage=2010),
+            path="data/curated/acs/example.parquet",
+        )
+        assert _validate_census_acs5_household_income_bins(spec) == []
 
     def test_census_acs_valid(self):
         from hhplab.recipe.default_dataset_adapters import _validate_census_acs
