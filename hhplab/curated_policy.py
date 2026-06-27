@@ -34,6 +34,7 @@ CURATED_SUBDIRS: set[str] = {
     "coc_boundaries",
     "tiger",
     "census",
+    "cdc",
     "xwalks",
     "acs",
     "measures",
@@ -77,6 +78,10 @@ CANONICAL_PATTERNS: dict[str, list[re.Pattern[str]]] = {
     "census": [
         re.compile(r"^decennial_tracts__N\d{4}xT\d{4}\.parquet$"),
         re.compile(r"^pl_blocks__N\d{4}xK\d{4}\.parquet$"),
+    ],
+    "cdc": [
+        re.compile(r"^cdc_overdose__county__Y\d{4}-\d{4}@C\d{4}\.parquet$"),
+        re.compile(r"^cdc_overdose__msa__Y\d{4}-\d{4}@M\w+xC\d{4}\.parquet$"),
     ],
     "xwalks": [
         re.compile(r"^xwalk__B\d{4}xT\d{4}\.parquet$"),

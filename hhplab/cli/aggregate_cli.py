@@ -35,6 +35,7 @@ PEP_ALIGN_MODES = ("as_of_july", "lagged")
 PIT_ALIGN_MODES = ("point_in_time_jan", "to_calendar_year")
 ACS_ALIGN_MODES = ("vintage_end_year", "window_center_year")
 ZORI_ALIGN_MODES = ("monthly_native", "pit_january", "calendar_year_average")
+CDC_OVERDOSE_ALIGN_MODES = ("january_trailing_12_months",)
 
 
 # ---------------------------------------------------------------------------
@@ -63,6 +64,163 @@ def _resolve_years(years: str | None) -> list[int]:
         err=True,
     )
     raise typer.Exit(2)
+
+
+# ---------------------------------------------------------------------------
+# cdc-overdose
+# ---------------------------------------------------------------------------
+
+
+@aggregate_app.command("cdc-overdose")
+def aggregate_cdc_overdose(
+    align: Annotated[
+        str,
+        typer.Option(
+            "--align",
+            help="Temporal alignment mode. One of: january_trailing_12_months.",
+        ),
+    ] = "january_trailing_12_months",
+    years: Annotated[
+        str | None,
+        typer.Option(
+            "--years",
+            help="Year spec (e.g. '2020-2025'). January rows are used for each year.",
+        ),
+    ] = None,
+    geo_type: Annotated[
+        str,
+        typer.Option(
+            "--geo-type",
+            help="Target geography. One of: county, msa.",
+        ),
+    ] = "msa",
+    definition_version: Annotated[
+        str,
+        typer.Option(
+            "--definition-version",
+            help="MSA definition version to use when --geo-type=msa.",
+        ),
+    ] = "census_msa_2023",
+    counties: Annotated[
+        str,
+        typer.Option(
+            "--counties",
+            help="County vintage label for output provenance and filenames.",
+        ),
+    ] = "2023",
+    min_coverage: Annotated[
+        float,
+        typer.Option(
+            "--min-coverage",
+            help="Minimum county-count coverage ratio for valid MSA-year output.",
+        ),
+    ] = 0.0,
+    raw_path: Annotated[
+        Path,
+        typer.Option(
+            "--raw-path",
+            help="Path to the CDC VSRR county overdose CSV.",
+        ),
+    ] = Path("data/raw/cdc/VSRR_Provisional_County-Level_Drug_Overdose_Death_Counts.csv"),
+    output_json: Annotated[
+        bool,
+        typer.Option(
+            "--json",
+            help="Emit a structured JSON summary instead of human-readable text.",
+        ),
+    ] = False,
+) -> None:
+    """Aggregate CDC county overdose counts to MSAs using January annual values."""
+    _validate_align(align, CDC_OVERDOSE_ALIGN_MODES, "cdc-overdose")
+    parsed_years = _resolve_years(years)
+    if geo_type not in {"county", "msa"}:
+        msg = "Invalid --geo-type. Use one of: county, msa."
+        if output_json:
+            import json
+
+            typer.echo(json.dumps({"status": "error", "message": msg}))
+            raise typer.Exit(2)
+        typer.echo(f"Error: {msg}", err=True)
+        raise typer.Exit(2)
+
+    if min_coverage < 0 or min_coverage > 1:
+        msg = "--min-coverage must be between 0 and 1."
+        if output_json:
+            import json
+
+            typer.echo(json.dumps({"status": "error", "message": msg}))
+            raise typer.Exit(2)
+        typer.echo(f"Error: {msg}", err=True)
+        raise typer.Exit(2)
+
+    from hhplab.cdc.overdose import (
+        ingest_and_aggregate_overdose_to_msa,
+        ingest_county_overdose,
+    )
+
+    output_dir = curated_root() / "cdc"
+    try:
+        if geo_type == "county":
+            county_df, county_path = ingest_county_overdose(
+                raw_path=raw_path,
+                years=parsed_years,
+                reference_month=1,
+                county_vintage=counties,
+                output_dir=output_dir,
+            )
+            outputs = {"county": str(county_path)}
+            row_counts = {"county": len(county_df)}
+            msa_count = None
+        else:
+            county_df, msa_df, county_path, msa_path = ingest_and_aggregate_overdose_to_msa(
+                raw_path=raw_path,
+                years=parsed_years,
+                reference_month=1,
+                definition_version=definition_version,
+                county_vintage=counties,
+                min_coverage=min_coverage,
+                output_dir=output_dir,
+            )
+            outputs = {"county": str(county_path), "msa": str(msa_path)}
+            row_counts = {"county": len(county_df), "msa": len(msa_df)}
+            msa_count = int(msa_df["msa_id"].nunique())
+    except (FileNotFoundError, ValueError) as exc:
+        if output_json:
+            import json
+
+            typer.echo(json.dumps({"status": "error", "message": str(exc)}))
+            raise typer.Exit(1) from exc
+        typer.echo(f"Error: {exc}", err=True)
+        raise typer.Exit(1) from exc
+
+    if output_json:
+        import json
+
+        typer.echo(
+            json.dumps(
+                {
+                    "status": "ok",
+                    "dataset": "cdc-overdose",
+                    "geo_type": geo_type,
+                    "years": parsed_years,
+                    "align": align,
+                    "definition_version": definition_version if geo_type == "msa" else None,
+                    "county_vintage": counties,
+                    "min_coverage": min_coverage if geo_type == "msa" else None,
+                    "row_counts": row_counts,
+                    "msa_count": msa_count,
+                    "outputs": outputs,
+                }
+            )
+        )
+        return
+
+    typer.echo(
+        "CDC overdose aggregation complete "
+        f"({geo_type}, years {parsed_years[0]}-{parsed_years[-1]})."
+    )
+    for label, path in outputs.items():
+        typer.echo(f"  Wrote {label}: {path}")
 
 
 # ---------------------------------------------------------------------------

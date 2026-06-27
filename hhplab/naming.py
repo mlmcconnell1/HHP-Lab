@@ -1469,6 +1469,35 @@ def county_panel_filename(
     return f"panel__county__Y{start_year}-{end_year}@C{county_vintage}.parquet"
 
 
+def cdc_overdose_county_filename(
+    start_year: int,
+    end_year: int,
+    county_vintage: str | int,
+) -> str:
+    """Canonical filename for CDC county overdose annual January extracts.
+
+    Pattern: ``cdc_overdose__county__Y{start}-{end}@C{county}.parquet``
+    """
+    return f"cdc_overdose__county__Y{start_year}-{end_year}@C{county_vintage}.parquet"
+
+
+def cdc_overdose_msa_filename(
+    start_year: int,
+    end_year: int,
+    definition_version: str,
+    county_vintage: str | int,
+) -> str:
+    """Canonical filename for CDC overdose MSA rollups.
+
+    Pattern: ``cdc_overdose__msa__Y{start}-{end}@M{def}xC{county}.parquet``
+    """
+    defn = _normalize_definition_version(definition_version)
+    return (
+        f"cdc_overdose__msa__Y{start_year}-{end_year}"
+        f"@M{defn}xC{county_vintage}.parquet"
+    )
+
+
 def msa_coc_panel_filename(
     start_year: int,
     end_year: int,

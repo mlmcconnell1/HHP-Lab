@@ -19,6 +19,7 @@ _LAZY_EXPORTS = frozenset(
         "audit_panels",
         "bls",
         "builds",
+        "cdc",
         "census",
         "cli",
         "config",

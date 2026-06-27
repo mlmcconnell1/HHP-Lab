@@ -1,7 +1,9 @@
 """Tests for the ``hhplab aggregate`` CLI command group."""
 
+import json
 from unittest.mock import patch
 
+import pandas as pd
 import pytest
 from typer.testing import CliRunner
 
@@ -10,7 +12,7 @@ from hhplab.pep.pep_aggregate import build_lagged_pep_series
 
 runner = CliRunner()
 
-RETIRED_BUILD_SURFACES = ("pep", "pit", "acs", "zori")
+RETIRED_BUILD_SURFACES = ("pep", "pit", "acs", "zori", "cdc-overdose")
 
 
 def test_aggregate_help_shows_subcommands():
@@ -35,6 +37,7 @@ def test_aggregate_commands_reject_retired_build_flag(subcommand: str):
         ("pit", "pit"),
         ("acs", "acs"),
         ("zori", "zori"),
+        ("cdc-overdose", "cdc-overdose"),
     ],
 )
 def test_aggregate_commands_reject_invalid_align(subcommand: str, dataset: str):
@@ -55,6 +58,37 @@ def test_aggregate_pep_requires_years():
 def test_aggregate_pep_with_invalid_years():
     result = runner.invoke(app, ["aggregate", "pep", "--years", "bad"])
     assert result.exit_code == 2
+
+
+@patch("hhplab.cdc.overdose.ingest_and_aggregate_overdose_to_msa")
+def test_aggregate_cdc_overdose_json_summary(mock_aggregate, tmp_path):
+    county_df = pd.DataFrame({"county_fips": ["01001"], "year": [2024]})
+    msa_df = pd.DataFrame({"msa_id": ["12345"], "year": [2024]})
+    county_path = tmp_path / "county.parquet"
+    msa_path = tmp_path / "msa.parquet"
+    mock_aggregate.return_value = (county_df, msa_df, county_path, msa_path)
+
+    result = runner.invoke(
+        app,
+        [
+            "aggregate",
+            "cdc-overdose",
+            "--years",
+            "2024",
+            "--definition-version",
+            "census_msa_2023",
+            "--json",
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    payload = json.loads(result.output)
+    assert payload["status"] == "ok"
+    assert payload["dataset"] == "cdc-overdose"
+    assert payload["geo_type"] == "msa"
+    assert payload["row_counts"] == {"county": 1, "msa": 1}
+    assert payload["outputs"] == {"county": str(county_path), "msa": str(msa_path)}
+    mock_aggregate.assert_called_once()
 
 
 @patch("hhplab.pep.pep_aggregate.aggregate_pep_to_coc_many")
