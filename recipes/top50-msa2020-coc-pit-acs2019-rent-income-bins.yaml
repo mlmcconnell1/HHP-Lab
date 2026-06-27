@@ -7,7 +7,9 @@ description: >
   population. The base panel is the existing 2020-vintage CoC PIT rollup to
   Census MSAs using 2020 CoC boundaries and 2020 block-population allocation.
   Lagged ACS5 2019 tract contract-rent and household-income distribution bins
-  are aggregated to the same Census MSA 2023 geography.
+  are aggregated to the same Census MSA 2023 geography. January PRISM minimum
+  temperature and MEDSL 2020 presidential vote counts are aggregated from
+  county-native artifacts.
 
 universe:
   years: [2020]
@@ -35,6 +37,12 @@ targets:
         - pit_total
         - pit_sheltered
         - pit_unsheltered
+        - tmin_c
+        - democratic_votes
+        - republican_votes
+        - two_party_votes
+        - totalvotes
+        - democratic_republican_vote_ratio
         - coc_count
         - covered_coc_count
         - missing_coc_count
@@ -128,10 +136,52 @@ datasets:
     geo_column: tract_geoid
     path: data/curated/acs/acs5_tracts__A2019xT2010.parquet
 
+  prism_tmin_county:
+    provider: prism
+    product: temperature
+    version: 1
+    native_geometry: { type: county, vintage: 2023 }
+    years: "2020-2020"
+    year_column: year
+    geo_column: county_fips
+    params:
+      variable: tmin
+      month: 1
+      align: point_in_time_jan
+    path: data/curated/prism/prism_county_monthly__tmin__Y2020M01@C2023.parquet
+
+  medsl_president:
+    provider: medsl
+    product: president
+    version: 1
+    native_geometry: { type: county, vintage: 2020 }
+    years: "2020-2020"
+    year_column: year
+    geo_column: county_fips
+    params:
+      align: presidential_election_year
+    path: data/curated/medsl/medsl_president_county__Y2000-2024@C2020.parquet
+
 transforms:
   - id: tract2010_to_msa_area
     type: crosswalk
     from: { type: tract, vintage: 2010, source: tiger }
+    to: { type: msa, source: census_msa_2023 }
+    spec:
+      weighting:
+        scheme: area
+
+  - id: county2020_to_msa_area
+    type: crosswalk
+    from: { type: county, vintage: 2020 }
+    to: { type: msa, source: census_msa_2023 }
+    spec:
+      weighting:
+        scheme: area
+
+  - id: county2023_to_msa_area
+    type: crosswalk
+    from: { type: county, vintage: 2023 }
     to: { type: msa, source: census_msa_2023 }
     spec:
       weighting:
@@ -142,7 +192,7 @@ pipelines:
     target: msa_panel
     steps:
       - materialize:
-          transforms: [tract2010_to_msa_area]
+          transforms: [tract2010_to_msa_area, county2020_to_msa_area, county2023_to_msa_area]
 
       - resample:
           dataset: msa_pit_rollup
@@ -234,11 +284,37 @@ pipelines:
             household_income_150000_to_199999: { aggregation: sum }
             household_income_200000_plus: { aggregation: sum }
 
+      - resample:
+          dataset: prism_tmin_county
+          to_geometry: { type: msa, source: census_msa_2023 }
+          method: aggregate
+          via: county2023_to_msa_area
+          measures:
+            tmin_c: { aggregation: weighted_mean }
+
+      - resample:
+          dataset: medsl_president
+          to_geometry: { type: msa, source: census_msa_2023 }
+          method: aggregate
+          via: county2020_to_msa_area
+          measures:
+            democratic_votes: { aggregation: sum }
+            republican_votes: { aggregation: sum }
+            two_party_votes: { aggregation: sum }
+            totalvotes: { aggregation: sum }
+          derived_measures:
+            democratic_republican_vote_ratio:
+              type: rate_from_weighted_counts
+              source_numerator_column: democratic_votes
+              denominator_column: republican_votes
+
       - join:
           datasets:
             - msa_pit_rollup
             - acs5_contract_rent_bins_tract
             - acs5_household_income_bins_tract
+            - prism_tmin_county
+            - medsl_president
           join_on: [geo_id, year]
 
 validation:
