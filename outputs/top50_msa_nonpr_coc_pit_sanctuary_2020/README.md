@@ -3,7 +3,8 @@
 This output is a 2020 MSA-year panel for the top 50 non-Puerto Rico Census MSAs
 by 2020 Census PL 94-171 population. It starts from the existing non-PR top-50
 CoC PIT rollup panel and joins DOJ sanctuary-jurisdiction MSA matches on
-`cbsa_code`.
+`cbsa_code`. It also attaches January 2020 PRISM minimum temperature aggregated
+to MSA and a below-freezing flag.
 
 Files:
 
@@ -20,6 +21,12 @@ Included PIT measures:
 - `pit_sheltered`
 - `pit_unsheltered`
 
+Included temperature columns:
+
+- `january_tmin_c`: PRISM January 2020 county `tmin_c` aggregated to MSA using
+  Census MSA 2023 county membership with `area_share=1.0`.
+- `january_tmin_below_freezing`: `true` when `january_tmin_c < 0.0` Celsius.
+
 Included sanctuary status columns:
 
 - `sanctuary_match`
@@ -35,6 +42,10 @@ Sanctuary matching source:
 
 - `data/curated/sanctuary/sanctuary_msa_matches__D20250805xMcensus_msa_2023.parquet`
 - DOJ source date: 2025-08-05
+
+Temperature source:
+
+- `data/curated/prism/prism_county_monthly__tmin__Y2020M01@C2023.parquet`
 
 Notes:
 
