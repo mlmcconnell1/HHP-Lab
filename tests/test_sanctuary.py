@@ -1,0 +1,107 @@
+"""Tests for DOJ sanctuary jurisdiction MSA matching."""
+
+from __future__ import annotations
+
+import json
+from pathlib import Path
+
+import pandas as pd
+from typer.testing import CliRunner
+
+from hhplab.cli.main import app
+from hhplab.sanctuary import (
+    SANCTUARY_MSA_MATCH_COLUMNS,
+    build_sanctuary_msa_matches,
+)
+
+runner = CliRunner()
+
+DEFINITIONS = pd.DataFrame(
+    {
+        "msa_id": ["11111", "22222", "33333", "44444"],
+        "cbsa_code": ["11111", "22222", "33333", "44444"],
+        "msa_name": [
+            "California-Texas Test MSA",
+            "Cook County Test MSA",
+            "New York City Test MSA",
+            "No Match Test MSA",
+        ],
+    }
+)
+
+MEMBERSHIP = pd.DataFrame(
+    {
+        "msa_id": ["11111", "11111", "22222", "33333", "33333", "44444"],
+        "cbsa_code": ["11111", "11111", "22222", "33333", "33333", "44444"],
+        "county_fips": ["06001", "48059", "17031", "36061", "36047", "48441"],
+        "county_name": [
+            "Alameda County",
+            "Callahan County",
+            "Cook County",
+            "New York County",
+            "Kings County",
+            "Taylor County",
+        ],
+        "state_name": ["California", "Texas", "Illinois", "New York", "New York", "Texas"],
+    }
+)
+
+
+def test_build_sanctuary_msa_matches_is_conservative_and_transparent() -> None:
+    result = build_sanctuary_msa_matches(DEFINITIONS, MEMBERSHIP)
+
+    assert tuple(result.columns) == SANCTUARY_MSA_MATCH_COLUMNS
+    assert result["cbsa_code"].tolist() == ["11111", "22222", "33333"]
+
+    multistate = result.loc[result["cbsa_code"] == "11111"].iloc[0]
+    assert bool(multistate["state_match"])
+    assert not bool(multistate["county_match"])
+    assert bool(multistate["city_match"])
+    assert multistate["matched_states"] == "California"
+    assert multistate["matched_cities"] == "Berkeley, CA"
+    assert multistate["match_basis"] == "state+city"
+
+    cook = result.loc[result["cbsa_code"] == "22222"].iloc[0]
+    assert cook["matched_counties"] == "Cook County, IL"
+    assert cook["matched_cities"] == "Chicago, IL"
+    assert cook["match_basis"] == "state+county+city"
+
+    nyc = result.loc[result["cbsa_code"] == "33333"].iloc[0]
+    assert nyc["matched_states"] == "New York"
+    assert nyc["matched_cities"] == "New York City, NY"
+    assert nyc["match_basis"] == "state+city"
+
+
+def test_generate_sanctuary_msa_json(monkeypatch, tmp_path: Path) -> None:
+    output = (
+        tmp_path
+        / "data"
+        / "curated"
+        / "sanctuary"
+        / "sanctuary_msa_matches__D20250805xMcensus_msa_2023.parquet"
+    )
+
+    def fake_write_sanctuary_msa_matches(**kwargs):
+        output.parent.mkdir(parents=True, exist_ok=True)
+        output.write_text("artifact", encoding="utf-8")
+        return pd.DataFrame({"cbsa_code": ["11111"]}), output, None
+
+    monkeypatch.setattr(
+        "hhplab.sanctuary.write_sanctuary_msa_matches",
+        fake_write_sanctuary_msa_matches,
+    )
+
+    with runner.isolated_filesystem(temp_dir=tmp_path):
+        result = runner.invoke(
+            app,
+            ["generate", "sanctuary-msa", "--json", "--skip-raw-download"],
+            catch_exceptions=False,
+        )
+
+    assert result.exit_code == 0
+    payload = json.loads(result.stdout)
+    assert payload["status"] == "ok"
+    assert payload["row_count"] == 1
+    assert payload["artifact"].endswith(
+        "sanctuary_msa_matches__D20250805xMcensus_msa_2023.parquet"
+    )

@@ -1975,6 +1975,38 @@ def msa_boundaries_path(
 
 
 # =============================================================================
+# Sanctuary jurisdiction regression artifact paths
+# =============================================================================
+
+
+def sanctuary_msa_matches_filename(
+    source_date: str,
+    msa_definition_version: str,
+) -> str:
+    """Canonical filename for DOJ sanctuary jurisdiction MSA matches."""
+    compact_date = source_date.replace("-", "")
+    return f"sanctuary_msa_matches__D{compact_date}xM{msa_definition_version}.parquet"
+
+
+def sanctuary_msa_matches_path(
+    source_date: str,
+    msa_definition_version: str,
+    base_dir: Path | str | None = None,
+) -> Path:
+    """Canonical path for DOJ sanctuary jurisdiction MSA matches."""
+    if base_dir is None:
+        base_dir = Path("data")
+    else:
+        base_dir = Path(base_dir)
+    return (
+        base_dir
+        / "curated"
+        / "sanctuary"
+        / sanctuary_msa_matches_filename(source_date, msa_definition_version)
+    )
+
+
+# =============================================================================
 # BLS LAUS metro artifact filenames
 # =============================================================================
 
