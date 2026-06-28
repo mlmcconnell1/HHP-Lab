@@ -1,0 +1,138 @@
+{
+  "dataset_type": "top50_nonpr_msa_coc_pit_sanctuary_panel",
+  "row_grain": "msa_id x year",
+  "row_count": 50,
+  "msa_count": 50,
+  "year": 2020,
+  "contains_pr_msa": false,
+  "sanctuary_match_count": 21,
+  "sanctuary_state_match_count": 19,
+  "sanctuary_county_match_count": 4,
+  "sanctuary_city_match_count": 9,
+  "match_basis_counts": {
+    "city": 1,
+    "county": 1,
+    "none": 29,
+    "state": 10,
+    "state+city": 6,
+    "state+county": 1,
+    "state+county+city": 2
+  },
+  "total_pit_count_top50_nonpr": 382078.5345439012,
+  "total_sheltered_count_top50_nonpr": 236827.02125574255,
+  "total_unsheltered_count_top50_nonpr": 145251.51328815857,
+  "inputs": {
+    "base_panel": "outputs/top50_msa_nonpr_coc_pit_contract_rent_2010_2020/panel__top50_msa_nonpr_coc_pit_contract_rent_2010_2020__Y2010-2020@B2020_Dcensus_msa_2023_A2010-2020.parquet",
+    "sanctuary_matches": "data/curated/sanctuary/sanctuary_msa_matches__D20250805xMcensus_msa_2023.parquet"
+  },
+  "outputs": {
+    "parquet": "outputs/top50_msa_nonpr_coc_pit_sanctuary_2020/panel__top50_msa_nonpr_coc_pit_sanctuary_2020__Y2020@B2020_Dcensus_msa_2023_D20250805.parquet",
+    "csv": "outputs/top50_msa_nonpr_coc_pit_sanctuary_2020/panel__top50_msa_nonpr_coc_pit_sanctuary_2020__Y2020@B2020_Dcensus_msa_2023_D20250805.csv",
+    "preview_csv": "outputs/top50_msa_nonpr_coc_pit_sanctuary_2020/panel__top50_msa_nonpr_coc_pit_sanctuary_2020__Y2020@B2020_Dcensus_msa_2023_D20250805.preview.csv",
+    "summary_json": "outputs/top50_msa_nonpr_coc_pit_sanctuary_2020/panel__top50_msa_nonpr_coc_pit_sanctuary_2020__Y2020@B2020_Dcensus_msa_2023_D20250805.summary.json"
+  },
+  "top_10": [
+    {
+      "msa_population_rank_2020_census_nonpr": 1,
+      "cbsa_code": "35620",
+      "msa_name": "New York-Newark-Jersey City, NY-NJ",
+      "pit_total": 90579.39454953992,
+      "sanctuary_match": true,
+      "match_basis": "state+city"
+    },
+    {
+      "msa_population_rank_2020_census_nonpr": 2,
+      "cbsa_code": "31080",
+      "msa_name": "Los Angeles-Long Beach-Anaheim, CA",
+      "pit_total": 73409.36378373583,
+      "sanctuary_match": true,
+      "match_basis": "state+city"
+    },
+    {
+      "msa_population_rank_2020_census_nonpr": 3,
+      "cbsa_code": "16980",
+      "msa_name": "Chicago-Naperville-Elgin, IL-IN",
+      "pit_total": 8115.4126384569045,
+      "sanctuary_match": true,
+      "match_basis": "state+county+city"
+    },
+    {
+      "msa_population_rank_2020_census_nonpr": 4,
+      "cbsa_code": "19100",
+      "msa_name": "Dallas-Fort Worth-Arlington, TX",
+      "pit_total": 6786.671541965686,
+      "sanctuary_match": false,
+      "match_basis": "none"
+    },
+    {
+      "msa_population_rank_2020_census_nonpr": 5,
+      "cbsa_code": "26420",
+      "msa_name": "Houston-Pasadena-The Woodlands, TX",
+      "pit_total": 4193.629542379103,
+      "sanctuary_match": false,
+      "match_basis": "none"
+    },
+    {
+      "msa_population_rank_2020_census_nonpr": 6,
+      "cbsa_code": "47900",
+      "msa_name": "Washington-Arlington-Alexandria, DC-VA-MD-WV",
+      "pit_total": 9967.33725721209,
+      "sanctuary_match": true,
+      "match_basis": "state"
+    },
+    {
+      "msa_population_rank_2020_census_nonpr": 7,
+      "cbsa_code": "37980",
+      "msa_name": "Philadelphia-Camden-Wilmington, PA-NJ-DE-MD",
+      "pit_total": 8441.590938792584,
+      "sanctuary_match": true,
+      "match_basis": "state+city"
+    },
+    {
+      "msa_population_rank_2020_census_nonpr": 8,
+      "cbsa_code": "33100",
+      "msa_name": "Miami-Fort Lauderdale-West Palm Beach, FL",
+      "pit_total": 7280.702533055039,
+      "sanctuary_match": false,
+      "match_basis": "none"
+    },
+    {
+      "msa_population_rank_2020_census_nonpr": 9,
+      "cbsa_code": "12060",
+      "msa_name": "Atlanta-Sandy Springs-Roswell, GA",
+      "pit_total": 4882.589746566689,
+      "sanctuary_match": false,
+      "match_basis": "none"
+    },
+    {
+      "msa_population_rank_2020_census_nonpr": 10,
+      "cbsa_code": "14460",
+      "msa_name": "Boston-Cambridge-Newton, MA-NH",
+      "pit_total": 12499.488727099091,
+      "sanctuary_match": true,
+      "match_basis": "city"
+    }
+  ],
+  "columns": [
+    "geo_type",
+    "geo_id",
+    "msa_id",
+    "cbsa_code",
+    "msa_name",
+    "year",
+    "msa_population_rank_2020_census_nonpr",
+    "msa_2020_census_population",
+    "pit_total",
+    "pit_sheltered",
+    "pit_unsheltered",
+    "sanctuary_match",
+    "sanctuary_state_match",
+    "sanctuary_county_match",
+    "sanctuary_city_match",
+    "sanctuary_matched_states",
+    "sanctuary_matched_counties",
+    "sanctuary_matched_cities",
+    "match_basis",
+    "source_panel"
+  ]
+}
