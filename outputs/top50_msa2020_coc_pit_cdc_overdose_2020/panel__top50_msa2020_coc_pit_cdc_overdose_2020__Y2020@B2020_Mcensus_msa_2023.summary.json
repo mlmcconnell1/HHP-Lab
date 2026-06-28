@@ -1,0 +1,47 @@
+{
+  "name": "top50_msa2020_coc_pit_cdc_overdose_2020",
+  "row_count": 50,
+  "year_min": 2020,
+  "year_max": 2020,
+  "msa_count": 50,
+  "top_n": 50,
+  "pr_excluded": true,
+  "ranking_source": "2020 Census PEP county population, vintage 2025",
+  "pit_source": "data/curated/pit/pit_vintage__P2025.parquet",
+  "pit_total_sum": 382078.5325866992,
+  "pit_sheltered_sum": 236827.0200977037,
+  "pit_unsheltered_sum": 145251.5124889955,
+  "overdose_source": "data/curated/cdc/cdc_overdose__msa__Y2020-2025@Mcensusmsa2023xC2023.parquet",
+  "overdose_deaths_12mo_sum": 34646.0,
+  "min_overdose_coverage_ratio": 0.375,
+  "min_pit_allocation_coverage_ratio": 0.8597585531174268,
+  "outputs": {
+    "parquet": "outputs/top50_msa2020_coc_pit_cdc_overdose_2020/panel__top50_msa2020_coc_pit_cdc_overdose_2020__Y2020@B2020_Mcensus_msa_2023.parquet",
+    "csv": "outputs/top50_msa2020_coc_pit_cdc_overdose_2020/panel__top50_msa2020_coc_pit_cdc_overdose_2020__Y2020@B2020_Mcensus_msa_2023.csv",
+    "preview_csv": "outputs/top50_msa2020_coc_pit_cdc_overdose_2020/panel__top50_msa2020_coc_pit_cdc_overdose_2020__Y2020@B2020_Mcensus_msa_2023.preview.csv",
+    "summary_json": "outputs/top50_msa2020_coc_pit_cdc_overdose_2020/panel__top50_msa2020_coc_pit_cdc_overdose_2020__Y2020@B2020_Mcensus_msa_2023.summary.json"
+  },
+  "input_artifacts": {
+    "pep": "data/curated/pep/pep_county__v2025__y2020-2025.parquet",
+    "membership": "data/curated/msa/msa_county_membership__census_msa_2023.parquet",
+    "definitions": "data/curated/msa/msa_definitions__census_msa_2023.parquet",
+    "pit": "data/curated/pit/pit_vintage__P2025.parquet",
+    "xwalk": "data/curated/xwalks/msa_coc_xwalk__B2020xMcensus_msa_2023xC2023.parquet",
+    "cdc": "data/curated/cdc/cdc_overdose__msa__Y2020-2025@Mcensusmsa2023xC2023.parquet"
+  },
+  "selection_diagnostics": {
+    "ranking_source": "pep",
+    "reference_year": 2020,
+    "requested_n": 50,
+    "eligible_msa_count": 387,
+    "selected_count": 50,
+    "expected_msa_count": 387,
+    "missing_msa_count": 0,
+    "missing_msa_ids": [],
+    "incomplete_msa_count": 0,
+    "incomplete_msa_ids": [],
+    "tied_cutoff": false,
+    "cutoff_population": 1151530.0,
+    "tied_cutoff_msa_ids": []
+  }
+}
