@@ -240,7 +240,7 @@ def aggregate_county_overdose_to_msa(
         for year in years:
             group = joined.loc[(joined["msa_id"] == msa_id) & (joined["year"] == year)].copy()
             available = set(group.loc[group["overdose_deaths_12mo"].notna(), "county_fips"])
-            present = set(group.loc[group["year"].notna(), "county_fips"])
+            present = set(group["county_fips"])
             missing = expected_counties - present
             suppressed = present - available
             coverage_ratio = len(available) / expected_count if expected_count else 0.0

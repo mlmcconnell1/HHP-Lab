@@ -53,6 +53,16 @@ def test_normalize_county_overdose_uses_january_rows_for_requested_year() -> Non
     assert baldwin["overdose_deaths_suppressed"]
 
 
+def test_normalize_county_overdose_supports_multi_year_selection() -> None:
+    result = normalize_county_overdose(RAW_OVERDOSE_FIXTURE, years=[2024, 2025])
+
+    assert result["year"].tolist() == [2024, 2024, 2024, 2025]
+    assert result.loc[result["year"] == 2025, "county_fips"].tolist() == ["01001"]
+    assert result.loc[result["year"] == 2025, "overdose_deaths_12mo"].iloc[0] == (
+        pytest.approx(15)
+    )
+
+
 def test_aggregate_county_overdose_to_msa_sums_available_county_counts() -> None:
     county = normalize_county_overdose(RAW_OVERDOSE_FIXTURE, years=[2024])
 
@@ -70,6 +80,14 @@ def test_aggregate_county_overdose_to_msa_sums_available_county_counts() -> None
     assert row["county_expected"] == 2
     assert row["suppressed_counties"] == "01003"
     assert row["missing_counties"] == ""
+
+    single_county_row = result.loc[result["msa_id"] == "67890"].iloc[0]
+    assert single_county_row["overdose_deaths_12mo"] == pytest.approx(6)
+    assert single_county_row["coverage_ratio"] == pytest.approx(1.0)
+    assert single_county_row["county_count"] == 1
+    assert single_county_row["county_expected"] == 1
+    assert single_county_row["missing_counties"] == ""
+    assert single_county_row["suppressed_counties"] == ""
 
 
 def test_aggregate_county_overdose_to_msa_applies_min_coverage() -> None:

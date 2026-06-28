@@ -91,6 +91,94 @@ def test_aggregate_cdc_overdose_json_summary(mock_aggregate, tmp_path):
     mock_aggregate.assert_called_once()
 
 
+@patch("hhplab.cdc.overdose.ingest_county_overdose")
+def test_aggregate_cdc_overdose_county_json_summary(mock_ingest, tmp_path):
+    county_df = pd.DataFrame({"county_fips": ["01001", "01003"], "year": [2024, 2024]})
+    county_path = tmp_path / "county.parquet"
+    mock_ingest.return_value = (county_df, county_path)
+
+    result = runner.invoke(
+        app,
+        [
+            "aggregate",
+            "cdc-overdose",
+            "--years",
+            "2024",
+            "--geo-type",
+            "county",
+            "--json",
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    payload = json.loads(result.output)
+    assert payload["status"] == "ok"
+    assert payload["geo_type"] == "county"
+    assert payload["definition_version"] is None
+    assert payload["min_coverage"] is None
+    assert payload["row_counts"] == {"county": 2}
+    assert payload["outputs"] == {"county": str(county_path)}
+    mock_ingest.assert_called_once()
+    assert mock_ingest.call_args.kwargs["years"] == [2024]
+
+
+def test_aggregate_cdc_overdose_json_rejects_invalid_geo_type():
+    result = runner.invoke(
+        app,
+        [
+            "aggregate",
+            "cdc-overdose",
+            "--years",
+            "2024",
+            "--geo-type",
+            "tract",
+            "--json",
+        ],
+    )
+
+    assert result.exit_code == 2
+    payload = json.loads(result.output)
+    assert payload["status"] == "error"
+    assert "Use one of: county, msa" in payload["message"]
+
+
+def test_aggregate_cdc_overdose_json_rejects_invalid_min_coverage():
+    result = runner.invoke(
+        app,
+        [
+            "aggregate",
+            "cdc-overdose",
+            "--years",
+            "2024",
+            "--min-coverage",
+            "1.5",
+            "--json",
+        ],
+    )
+
+    assert result.exit_code == 2
+    payload = json.loads(result.output)
+    assert payload["status"] == "error"
+    assert "--min-coverage must be between 0 and 1" in payload["message"]
+
+
+@patch("hhplab.cdc.overdose.ingest_and_aggregate_overdose_to_msa")
+def test_aggregate_cdc_overdose_json_reports_source_errors(mock_aggregate):
+    mock_aggregate.side_effect = FileNotFoundError(
+        "CDC overdose CSV not found: data/raw/cdc/missing.csv"
+    )
+
+    result = runner.invoke(
+        app,
+        ["aggregate", "cdc-overdose", "--years", "2024", "--json"],
+    )
+
+    assert result.exit_code == 1
+    payload = json.loads(result.output)
+    assert payload["status"] == "error"
+    assert "CDC overdose CSV not found" in payload["message"]
+
+
 @patch("hhplab.pep.pep_aggregate.aggregate_pep_to_coc_many")
 def test_aggregate_pep_accepts_repeated_weighting(mock_aggregate, tmp_path):
     """PEP CLI passes repeated weighting requests to one multi-output workflow."""
