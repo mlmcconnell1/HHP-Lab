@@ -17,7 +17,7 @@ RAW_OVERDOSE_FIXTURE = pd.DataFrame(
         "Year": [2024, 2024, 2024, 2024, 2025],
         "Month": [1, 1, 2, 1, 1],
         "FIPS": ["1001", "01003", "01001", "01005", "01001"],
-        "Provisional Drug Overdose Deaths": [12, None, 99, 6, 15],
+        "Provisional Drug Overdose Deaths": ["1,308", None, 99, 6, 15],
         "MonthEndingDate": [
             "01/31/2024",
             "01/31/2024",
@@ -49,7 +49,7 @@ def test_normalize_county_overdose_uses_january_rows_for_requested_year() -> Non
     assert result["year"].tolist() == [2024, 2024, 2024]
     autauga = result.loc[result["county_fips"] == "01001"].iloc[0]
     baldwin = result.loc[result["county_fips"] == "01003"].iloc[0]
-    assert autauga["overdose_deaths_12mo"] == pytest.approx(12)
+    assert autauga["overdose_deaths_12mo"] == pytest.approx(1308)
     assert baldwin["overdose_deaths_suppressed"]
 
 
@@ -74,7 +74,7 @@ def test_aggregate_county_overdose_to_msa_sums_available_county_counts() -> None
 
     assert tuple(result.columns) == CDC_OVERDOSE_MSA_COLUMNS
     row = result.loc[result["msa_id"] == "12345"].iloc[0]
-    assert row["overdose_deaths_12mo"] == pytest.approx(12)
+    assert row["overdose_deaths_12mo"] == pytest.approx(1308)
     assert row["coverage_ratio"] == pytest.approx(0.5)
     assert row["county_count"] == 1
     assert row["county_expected"] == 2

@@ -70,6 +70,11 @@ def _normalize_county_fips(series: pd.Series) -> pd.Series:
     return series.astype("string").str.replace(r"\.0$", "", regex=True).str.zfill(5)
 
 
+def _parse_overdose_deaths_12mo(series: pd.Series) -> pd.Series:
+    normalized = series.astype("string").str.replace(",", "", regex=False)
+    return pd.to_numeric(normalized, errors="coerce")
+
+
 def load_county_overdose_csv(path: Path | str = DEFAULT_RAW_OVERDOSE_CSV) -> pd.DataFrame:
     """Load the CDC county overdose CSV as raw strings where needed."""
     path = Path(path)
@@ -132,10 +137,7 @@ def normalize_county_overdose(
     selected["reference_date"] = pd.to_datetime(selected[RAW_MONTH_ENDING_COLUMN]).dt.date.astype(
         "string"
     )
-    selected["overdose_deaths_12mo"] = pd.to_numeric(
-        selected[RAW_DEATHS_COLUMN],
-        errors="coerce",
-    )
+    selected["overdose_deaths_12mo"] = _parse_overdose_deaths_12mo(selected[RAW_DEATHS_COLUMN])
     selected["overdose_deaths_suppressed"] = selected["overdose_deaths_12mo"].isna()
 
     for raw_col, out_col in (
