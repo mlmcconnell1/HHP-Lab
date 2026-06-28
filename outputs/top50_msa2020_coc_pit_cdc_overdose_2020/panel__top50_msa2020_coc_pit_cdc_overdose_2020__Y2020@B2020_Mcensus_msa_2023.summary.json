@@ -12,7 +12,7 @@
   "pit_sheltered_sum": 236827.0200977037,
   "pit_unsheltered_sum": 145251.5124889955,
   "overdose_source": "data/curated/cdc/cdc_overdose__msa__Y2020-2025@Mcensusmsa2023xC2023.parquet",
-  "overdose_deaths_12mo_sum": 34646.0,
+  "overdose_deaths_12mo_sum": 39631.0,
   "min_overdose_coverage_ratio": 0.375,
   "min_pit_allocation_coverage_ratio": 0.8597585531174268,
   "outputs": {

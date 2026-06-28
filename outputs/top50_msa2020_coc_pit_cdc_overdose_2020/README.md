@@ -41,7 +41,7 @@ Summary:
 
 - Rows: 50
 - PIT total sum across selected MSAs: 382078.533
-- Overdose 12-month deaths sum across selected MSAs: 34646.000
+- Overdose 12-month deaths sum across selected MSAs: 39631.000
 - Minimum overdose county coverage ratio: 0.375
 - Minimum PIT allocation coverage ratio: 0.860
 
