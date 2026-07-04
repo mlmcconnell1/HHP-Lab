@@ -50,6 +50,7 @@ class CuratedSchemaIssue:
             "actual_column_count": len(self.actual_columns),
             "missing_columns": self.missing_columns,
             "extra_columns": self.extra_columns,
+            "remedy": self.remediation,
             "remediation": self.remediation,
             "message": self.message,
         }

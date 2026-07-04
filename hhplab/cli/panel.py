@@ -93,6 +93,8 @@ def _format_query(payload: dict) -> str:
         f"Rows: {payload.get('row_count', 0)}",
         f"Columns: {', '.join(payload.get('columns') or [])}",
     ]
+    if payload.get("output_path") is not None:
+        lines.append(f"Output: {payload.get('output_path')}")
     records = payload.get("records") or []
     if records:
         lines.extend(["", pd.DataFrame(records).to_string(index=False)])
@@ -153,6 +155,22 @@ def panel_query(
         int | None,
         typer.Option("--limit", help="Maximum rows to return.", min=1),
     ] = None,
+    sort: Annotated[
+        str | None,
+        typer.Option("--sort", help="Column to sort by after filtering."),
+    ] = None,
+    descending: Annotated[
+        bool,
+        typer.Option("--desc", help="Sort descending when --sort is set."),
+    ] = False,
+    top: Annotated[
+        int | None,
+        typer.Option("--top", help="Take the first N rows after filtering and sorting.", min=1),
+    ] = None,
+    output: Annotated[
+        Path | None,
+        typer.Option("--output", "-o", help="Output parquet path for the queried panel rows."),
+    ] = None,
     json_output: Annotated[
         bool,
         typer.Option("--json", help="Output machine-readable JSON."),
@@ -164,7 +182,11 @@ def panel_query(
             panel,
             columns=_parse_columns(columns),
             where=where,
+            sort=sort,
+            descending=descending,
+            top=top,
             limit=limit,
+            output_path=output,
         )
     except PanelInspectError as exc:
         raise typer.BadParameter(str(exc)) from exc

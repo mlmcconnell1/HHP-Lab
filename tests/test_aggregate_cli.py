@@ -7,6 +7,10 @@ import pandas as pd
 import pytest
 from typer.testing import CliRunner
 
+from hhplab.acs.acs_aggregate import (
+    _available_contract_rent_bins,
+    _derive_acs5_covariates,
+)
 from hhplab.cli.main import app
 from hhplab.pep.pep_aggregate import build_lagged_pep_series
 
@@ -425,6 +429,37 @@ def test_aggregate_acs_to_msa_writes_expanded_panel_ready_output():
         assert output.loc[0, "non_native_share"] == pytest.approx(0.15)
         assert output.loc[0, "contract_rent_p25"] == pytest.approx(262.5)
         assert "msa_contract_rent_p25" in output.columns
+
+
+def test_derive_acs5_covariates_propagates_missing_non_native_component():
+    df = pd.DataFrame(
+        {
+            "citizenship_total": [100.0, 100.0],
+            "naturalized_citizen": [10.0, None],
+            "not_us_citizen": [5.0, 5.0],
+        }
+    )
+
+    _derive_acs5_covariates(df)
+
+    assert df.loc[0, "non_native_share"] == pytest.approx(0.15)
+    assert pd.isna(df.loc[1, "non_native_share"])
+
+
+def test_available_contract_rent_bins_uses_early_schema_without_modern_split():
+    df = pd.DataFrame(
+        {
+            "contract_rent_distribution_cash_rent_1500_to_1999": [10.0],
+            "contract_rent_distribution_cash_rent_2000_plus": [5.0],
+        }
+    )
+
+    bins = _available_contract_rent_bins(df)
+
+    assert [column for column, _, _ in bins] == [
+        "contract_rent_distribution_cash_rent_1500_to_1999",
+        "contract_rent_distribution_cash_rent_2000_plus",
+    ]
 
 
 def test_aggregate_pit_collects_data(tmp_path):

@@ -364,10 +364,25 @@ class TestCLI:
         assert stale["artifact_family"] == "acs5_tracts"
         assert "citizenship_total" in stale["missing_columns"]
         assert (
+            stale["remedy"]
+            == "hhplab ingest acs5-tract --acs 2019-2023 --tracts 2020 --force"
+        )
+        assert (
             stale["remediation"]
             == "hhplab ingest acs5-tract --acs 2019-2023 --tracts 2020 --force"
         )
+        assert stale["remedy"] in stale["message"]
         assert "stale_schema" in payload["by_category"]
+
+        human_result = CliRunner().invoke(
+            app,
+            ["validate", "curated-layout", "--dir", str(curated)],
+        )
+
+        assert human_result.exit_code == 1
+        assert "Re-run: hhplab ingest acs5-tract --acs 2019-2023 --tracts 2020 --force" in (
+            human_result.output
+        )
 
     def test_current_acs_schema_passes(self, tmp_path: Path) -> None:
         curated = tmp_path / "curated"

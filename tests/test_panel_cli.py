@@ -9,6 +9,7 @@ import pandas as pd
 from typer.testing import CliRunner
 
 from hhplab.cli.main import app
+from hhplab.provenance import read_provenance
 
 runner = CliRunner()
 
@@ -33,6 +34,20 @@ def _unbalanced_panel_fixture(path: Path) -> Path:
             "year": [2020, 2021, 2023, 2020, 2023, 2020, 2023],
             "pit_total": [10.0, 11.0, 13.0, 20.0, 23.0, 30.0, 33.0],
             "total_population": [1000.0, 1010.0, 1030.0, 2000.0, 2030.0, 3000.0, 3030.0],
+        }
+    ).to_parquet(path)
+    return path
+
+
+def _msa_panel_fixture(path: Path) -> Path:
+    pd.DataFrame(
+        {
+            "msa_id": ["10100", "10200", "10300", "10400", "10500"],
+            "msa_name": ["Alpha, CA", "Beta, PR", "Gamma, TX", "Delta, NY", "Epsilon, WA"],
+            "year": [2024, 2024, 2024, 2024, 2024],
+            "total_population": [5000.0, 9999.0, 8000.0, 7000.0, 6000.0],
+            "non_native_share": [0.20, 0.95, 0.40, 0.35, 0.30],
+            "msa_contract_rent_p25": [900.0, 1200.0, 1300.0, 1100.0, 1000.0],
         }
     ).to_parquet(path)
     return path
@@ -211,3 +226,84 @@ class TestPanelCli:
         assert "geo_id" in result.output
         assert "A" in result.output
         assert "12.0" in result.output
+
+    def test_panel_query_sort_top_output_feeds_analyze_correlate(self, tmp_path: Path):
+        panel = _msa_panel_fixture(tmp_path / "msa_measures.parquet")
+        output = tmp_path / "top3.parquet"
+
+        result = runner.invoke(
+            app,
+            [
+                "panel",
+                "query",
+                "--panel",
+                str(panel),
+                "--where",
+                "not msa_name.str.endswith(', PR')",
+                "--sort",
+                "total_population",
+                "--desc",
+                "--top",
+                "3",
+                "--output",
+                str(output),
+                "--json",
+            ],
+        )
+
+        assert result.exit_code == 0
+        payload = json.loads(result.output)
+        assert payload["status"] == "ok"
+        assert payload["row_count"] == 3
+        assert payload["output_path"] == str(output)
+        assert [record["msa_id"] for record in payload["records"]] == ["10300", "10400", "10500"]
+
+        written = pd.read_parquet(output)
+        assert written["msa_id"].tolist() == ["10300", "10400", "10500"]
+        provenance = read_provenance(output)
+        assert provenance is not None
+        assert provenance.extra["dataset_type"] == "panel_query"
+        assert provenance.extra["input_panel"] == str(panel)
+        assert provenance.extra["parameters"]["where"] == "not msa_name.str.endswith(', PR')"
+        assert provenance.extra["parameters"]["sort"] == "total_population"
+        assert provenance.extra["parameters"]["descending"] is True
+        assert provenance.extra["parameters"]["top"] == 3
+
+        correlate = runner.invoke(
+            app,
+            [
+                "analyze",
+                "correlate",
+                "--panel",
+                str(output),
+                "--columns",
+                "non_native_share,msa_contract_rent_p25",
+                "--json",
+            ],
+        )
+
+        assert correlate.exit_code == 0
+        correlate_payload = json.loads(correlate.output)
+        assert correlate_payload["analysis_type"] == "correlate"
+        assert correlate_payload["records"][0]["n"] == 3
+
+    def test_panel_query_sort_validates_column_before_projection(self, tmp_path: Path):
+        panel = _panel_fixture(tmp_path / "panel.parquet")
+
+        result = runner.invoke(
+            app,
+            [
+                "panel",
+                "query",
+                "--panel",
+                str(panel),
+                "--sort",
+                "missing_column",
+                "--columns",
+                "geo_id,year",
+                "--json",
+            ],
+        )
+
+        assert result.exit_code != 0
+        assert "Requested panel sort column is missing: missing_column" in result.output

@@ -7,6 +7,7 @@ from typing import Any
 
 import pandas as pd
 
+from hhplab.provenance import ProvenanceBlock, read_provenance, write_parquet_with_provenance
 from hhplab.schema.measures import resolve_panel_measure_entry
 
 
@@ -214,15 +215,30 @@ def query_panel_file(
     *,
     columns: list[str] | None = None,
     where: str | None = None,
+    sort: str | None = None,
+    descending: bool = False,
+    top: int | None = None,
     limit: int | None = None,
+    output_path: Path | None = None,
 ) -> dict[str, Any]:
     """Return filtered panel records for ad-hoc agent inspection."""
     df = _read_panel(path)
+    input_row_count = int(len(df))
     if where:
         try:
             df = df.query(where)
         except Exception as exc:
             raise PanelInspectError(f"Invalid panel query expression '{where}': {exc}") from exc
+    filtered_row_count = int(len(df))
+    if sort is not None:
+        if sort not in df.columns:
+            raise PanelInspectError(
+                f"Requested panel sort column is missing: {sort}. "
+                f"Available columns: {sorted(df.columns.tolist())}"
+            )
+        df = df.sort_values(by=sort, ascending=not descending, kind="mergesort")
+    if top is not None:
+        df = df.head(top)
     if columns:
         missing = [column for column in columns if column not in df.columns]
         if missing:
@@ -233,9 +249,47 @@ def query_panel_file(
         df = df.loc[:, columns]
     if limit is not None:
         df = df.head(limit)
+    if output_path is not None:
+        source_provenance = read_provenance(path)
+        provenance_kwargs: dict[str, Any] = {}
+        if source_provenance is not None:
+            provenance_kwargs = {
+                "boundary_vintage": source_provenance.boundary_vintage,
+                "tract_vintage": source_provenance.tract_vintage,
+                "county_vintage": source_provenance.county_vintage,
+                "acs_vintage": source_provenance.acs_vintage,
+                "notation": source_provenance.notation,
+                "weighting": source_provenance.weighting,
+                "geo_type": source_provenance.geo_type,
+                "definition_version": source_provenance.definition_version,
+            }
+        provenance = ProvenanceBlock(
+            **provenance_kwargs,
+            extra={
+                "dataset_type": "panel_query",
+                "input_panel": str(path),
+                "input_provenance": (
+                    source_provenance.to_dict() if source_provenance is not None else None
+                ),
+                "parameters": {
+                    "where": where,
+                    "columns": columns,
+                    "sort": sort,
+                    "descending": descending,
+                    "top": top,
+                    "limit": limit,
+                },
+                "input_row_count": input_row_count,
+                "filtered_row_count": filtered_row_count,
+                "output_row_count": int(len(df)),
+                "output_columns": list(df.columns),
+            },
+        )
+        write_parquet_with_provenance(df, output_path, provenance)
     return {
         "status": "ok",
         "panel_path": str(path),
+        "output_path": str(output_path) if output_path is not None else None,
         "row_count": int(len(df)),
         "columns": list(df.columns),
         "records": df.to_dict(orient="records"),

@@ -519,9 +519,9 @@ def _derive_acs5_covariates(result_df: pd.DataFrame) -> None:
         "not_us_citizen",
     } <= set(result_df.columns):
         denominator = pd.to_numeric(result_df["citizenship_total"], errors="coerce")
-        numerator = pd.to_numeric(result_df["naturalized_citizen"], errors="coerce").fillna(
-            0.0
-        ) + pd.to_numeric(result_df["not_us_citizen"], errors="coerce").fillna(0.0)
+        numerator = pd.to_numeric(
+            result_df["naturalized_citizen"], errors="coerce"
+        ) + pd.to_numeric(result_df["not_us_citizen"], errors="coerce")
         result_df["non_native_share"] = numerator / denominator.where(denominator > 0)
 
     if "population_below_poverty" in result_df.columns and "poverty_universe" in result_df.columns:
@@ -573,7 +573,7 @@ def _derive_contract_rent_p25(result_df: pd.DataFrame) -> None:
 def _available_contract_rent_bins(
     result_df: pd.DataFrame,
 ) -> tuple[tuple[str, float, float | None], ...]:
-    if any(column in result_df.columns for column, _, _ in CONTRACT_RENT_BINS):
+    if "contract_rent_distribution_cash_rent_2000_to_2499" in result_df.columns:
         return tuple(column for column in CONTRACT_RENT_BINS if column[0] in result_df.columns)
     return tuple(column for column in CONTRACT_RENT_BINS_EARLY if column[0] in result_df.columns)
 
