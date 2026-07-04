@@ -9,6 +9,11 @@ from pathlib import Path
 import geopandas as gpd
 import pandas as pd
 
+from hhplab.geo.ct_planning_regions import (
+    CT_LEGACY_COUNTY_CODES,
+    CT_PLANNING_REGION_CODES,
+    CT_STATE_FIPS,
+)
 from hhplab.paths import curated_dir
 from hhplab.provenance import ProvenanceBlock, write_parquet_with_provenance
 from hhplab.schema.columns import MSA_FRACTIONAL_ROLLUP_COLUMNS
@@ -120,9 +125,7 @@ def _standardize_block_population_columns(block_population_df: pd.DataFrame) -> 
         return block_population_df.rename(columns={"GEOID": "block_geoid"})
     if "geoid" in block_population_df.columns:
         return block_population_df.rename(columns={"geoid": "block_geoid"})
-    raise ValueError(
-        "block_population_df must have 'block_geoid', 'GEOID', or 'geoid' column"
-    )
+    raise ValueError("block_population_df must have 'block_geoid', 'GEOID', or 'geoid' column")
 
 
 def _validate_inputs(
@@ -138,9 +141,7 @@ def _validate_inputs(
         raise ValueError("county_gdf must have 'geometry' column")
 
     missing = [
-        col
-        for col in REQUIRED_MSA_MEMBERSHIP_COLUMNS
-        if col not in msa_county_membership.columns
+        col for col in REQUIRED_MSA_MEMBERSHIP_COLUMNS if col not in msa_county_membership.columns
     ]
     if missing:
         raise ValueError(
@@ -210,6 +211,128 @@ def _format_expected_msa_preview(
     return "; ".join(preview) + suffix if preview else "(none)"
 
 
+def _ct_planning_region_county_fips() -> set[str]:
+    return {f"{CT_STATE_FIPS}{county_code}" for county_code in CT_PLANNING_REGION_CODES}
+
+
+def _ct_legacy_county_fips() -> set[str]:
+    return {f"{CT_STATE_FIPS}{county_code}" for county_code in CT_LEGACY_COUNTY_CODES}
+
+
+def _prepare_block_county_membership_aliases(
+    blocks: gpd.GeoDataFrame,
+    membership: pd.DataFrame,
+    county_gdf: gpd.GeoDataFrame | None = None,
+) -> pd.DataFrame:
+    aliases = pd.DataFrame({"block_geoid": blocks["block_geoid"].astype(str).dropna().unique()})
+    aliases["county_fips"] = aliases["block_geoid"].astype(str).str[:5]
+    aliases["membership_county_fips"] = aliases["county_fips"]
+
+    member_counties = set(membership["county_fips"].astype(str))
+    if member_counties & _ct_planning_region_county_fips():
+        ct_legacy_mask = aliases["county_fips"].isin(_ct_legacy_county_fips())
+        if ct_legacy_mask.any() and county_gdf is not None:
+            aliases = _assign_ct_legacy_blocks_to_planning_regions(
+                aliases,
+                blocks,
+                county_gdf,
+                member_counties,
+            )
+
+    _validate_block_prefix_membership_coverage(aliases, member_counties)
+    return aliases
+
+
+def _assign_ct_legacy_blocks_to_planning_regions(
+    aliases: pd.DataFrame,
+    blocks: gpd.GeoDataFrame,
+    county_gdf: gpd.GeoDataFrame,
+    member_counties: set[str],
+) -> pd.DataFrame:
+    planning_counties = _project(
+        county_gdf[["GEOID", "geometry"]].copy(),
+        label="county_gdf",
+    )
+    planning_counties["membership_county_fips"] = planning_counties["GEOID"].astype(str)
+    planning_counties = planning_counties[
+        planning_counties["membership_county_fips"].isin(
+            member_counties & _ct_planning_region_county_fips()
+        )
+    ].copy()
+    if planning_counties.empty:
+        return aliases
+
+    ct_legacy_block_ids = set(
+        aliases.loc[
+            aliases["county_fips"].isin(_ct_legacy_county_fips()),
+            "block_geoid",
+        ]
+    )
+    ct_blocks = blocks[blocks["block_geoid"].astype(str).isin(ct_legacy_block_ids)].copy()
+    if ct_blocks.empty:
+        return aliases
+
+    ct_points = gpd.GeoDataFrame(
+        {"block_geoid": ct_blocks["block_geoid"].astype(str).to_numpy()},
+        geometry=ct_blocks.geometry.representative_point(),
+        crs=ct_blocks.crs,
+    )
+    joined = gpd.sjoin(
+        ct_points,
+        planning_counties[["membership_county_fips", "geometry"]],
+        how="left",
+        predicate="within",
+    )
+    mapping = joined.dropna(subset=["membership_county_fips"]).drop_duplicates(
+        subset=["block_geoid"]
+    )
+    if mapping.empty:
+        return aliases
+
+    mapped = mapping.set_index("block_geoid")["membership_county_fips"]
+    aliases = aliases.copy()
+    mapped_mask = aliases["block_geoid"].isin(mapped.index)
+    aliases.loc[mapped_mask, "membership_county_fips"] = aliases.loc[
+        mapped_mask,
+        "block_geoid",
+    ].map(mapped)
+    return aliases
+
+
+def _validate_block_prefix_membership_coverage(
+    aliases: pd.DataFrame,
+    member_counties: set[str],
+) -> None:
+    if aliases.empty or not member_counties:
+        return
+
+    block_states = set(aliases["county_fips"].str[:2])
+    member_states = {county[:2] for county in member_counties}
+    failed_states: list[str] = []
+    for state_fips in sorted(block_states & member_states):
+        state_aliases = aliases[aliases["county_fips"].str[:2] == state_fips]
+        if state_aliases["membership_county_fips"].isin(member_counties).any():
+            continue
+
+        expected = sorted(county for county in member_counties if county[:2] == state_fips)
+        expected_preview = ", ".join(expected[:5])
+        if len(expected) > 5:
+            expected_preview += ", ..."
+        failed_states.append(
+            f"{state_fips} blocks={_format_county_preview(state_aliases['county_fips'])} "
+            f"membership={expected_preview or '(none)'}"
+        )
+
+    if failed_states:
+        raise ValueError(
+            "Block GEOID county prefixes do not match MSA county membership for one "
+            "or more states. This usually means the block and MSA county vintages use "
+            "different county-equivalent definitions. Rebuild with compatible inputs or "
+            "add an explicit county-prefix bridge. Unmatched state coverage: "
+            + "; ".join(failed_states)
+        )
+
+
 def _validate_allocation_shares(crosswalk: pd.DataFrame) -> None:
     """Raise when any allocation share falls materially outside [0.0, 1.0]."""
     invalid = crosswalk[
@@ -242,8 +365,7 @@ def _validate_allocation_totals(summary: pd.DataFrame) -> None:
 
     invalid["coc_id"] = invalid["coc_id"].astype(str)
     examples = ", ".join(
-        f"{row.coc_id}={row.allocation_share_sum:.9f}"
-        for row in invalid.itertuples(index=False)
+        f"{row.coc_id}={row.allocation_share_sum:.9f}" for row in invalid.itertuples(index=False)
     )
     raise ValueError(
         "Computed allocation_share_sum outside the allowed range [0.0, 1.0] "
@@ -319,9 +441,7 @@ def build_coc_msa_crosswalk(
         )
     _validate_coc_area_consistency(county_crosswalk)
 
-    membership = msa_county_membership[
-        ["msa_id", "cbsa_code", "county_fips"]
-    ].copy()
+    membership = msa_county_membership[["msa_id", "cbsa_code", "county_fips"]].copy()
     membership["county_fips"] = membership["county_fips"].astype(str)
 
     joined = county_crosswalk.merge(membership, on="county_fips", how="inner")
@@ -399,14 +519,17 @@ def build_coc_msa_block_population_crosswalk(
 
     coc = _project(coc_gdf[["coc_id", "geometry"]].copy(), label="coc_gdf")
     blocks = _prepare_blocks(block_gdf, block_population_df)
-    membership = msa_county_membership[
-        ["msa_id", "cbsa_code", "county_fips"]
-    ].copy()
+    membership = msa_county_membership[["msa_id", "cbsa_code", "county_fips"]].copy()
     membership["msa_id"] = membership["msa_id"].astype(str)
     membership["cbsa_code"] = membership["cbsa_code"].astype(str)
     membership["county_fips"] = membership["county_fips"].astype(str)
     if coc.empty or blocks.empty or membership.empty:
         return _empty_block_population_crosswalk()
+    block_membership_aliases = _prepare_block_county_membership_aliases(
+        blocks,
+        membership,
+        county_gdf,
+    )
 
     coc_blocks = _block_geometry_denominator(
         coc,
@@ -425,9 +548,17 @@ def build_coc_msa_block_population_crosswalk(
         output_area_col="coc_intersection_area",
         missing_col="coc_missing_population_block_count",
     )
-    msa_denominators = _summarize_msa_block_denominator_from_membership(blocks, membership)
+    msa_denominators = _summarize_msa_block_denominator_from_membership(
+        blocks,
+        membership,
+        block_membership_aliases=block_membership_aliases,
+    )
 
-    intersections = _block_coc_msa_intersections(coc_blocks, membership)
+    intersections = _block_coc_msa_intersections(
+        coc_blocks,
+        membership,
+        block_membership_aliases=block_membership_aliases,
+    )
     if intersections.empty:
         return _empty_block_population_crosswalk()
 
@@ -456,14 +587,14 @@ def build_coc_msa_block_population_crosswalk(
     grouped["share_column"] = "allocation_share"
     grouped["share_denominator"] = "coc_population_denominator"
     grouped["zero_population_coc"] = grouped["coc_population_denominator"].fillna(0.0) == 0.0
-    grouped["allocation_share"] = grouped["intersection_population"] / grouped[
-        "coc_population_denominator"
-    ]
+    grouped["allocation_share"] = (
+        grouped["intersection_population"] / grouped["coc_population_denominator"]
+    )
     grouped.loc[grouped["zero_population_coc"], "allocation_share"] = 0.0
     grouped["coc_population_containment_share"] = grouped["allocation_share"]
-    grouped["msa_population_coverage_share"] = grouped["intersection_population"] / grouped[
-        "msa_population_denominator"
-    ]
+    grouped["msa_population_coverage_share"] = (
+        grouped["intersection_population"] / grouped["msa_population_denominator"]
+    )
     grouped = grouped.fillna(
         {
             "allocation_share": 0.0,
@@ -473,12 +604,8 @@ def build_coc_msa_block_population_crosswalk(
     )
     allocation_totals = grouped.groupby("coc_id")["allocation_share"].transform("sum")
     grouped["partial_coc_population_coverage"] = (
-        (grouped["coc_missing_population_block_count"] > 0)
-        | (
-            ~grouped["zero_population_coc"]
-            & (allocation_totals < FULL_ALLOCATION_THRESHOLD)
-        )
-    )
+        grouped["coc_missing_population_block_count"] > 0
+    ) | (~grouped["zero_population_coc"] & (allocation_totals < FULL_ALLOCATION_THRESHOLD))
     _validate_allocation_shares(grouped)
     return grouped.loc[:, COC_MSA_BLOCK_POPULATION_CROSSWALK_COLUMNS]
 
@@ -490,22 +617,31 @@ def _empty_block_population_crosswalk() -> pd.DataFrame:
 def _summarize_msa_block_denominator_from_membership(
     blocks: gpd.GeoDataFrame,
     membership: pd.DataFrame,
+    *,
+    block_membership_aliases: pd.DataFrame | None = None,
 ) -> pd.DataFrame:
-    block_denominators = blocks[
-        ["block_geoid", "total_population", "block_area"]
-    ].copy()
+    block_denominators = blocks[["block_geoid", "total_population", "block_area"]].copy()
     block_denominators["county_fips"] = block_denominators["block_geoid"].astype(str).str[:5]
+    if block_membership_aliases is None:
+        block_membership_aliases = _prepare_block_county_membership_aliases(
+            blocks,
+            membership,
+        )
+    block_denominators = block_denominators.merge(
+        block_membership_aliases[["block_geoid", "membership_county_fips"]],
+        on="block_geoid",
+        how="left",
+    )
     block_denominators["total_population"] = pd.to_numeric(
         block_denominators["total_population"],
         errors="coerce",
     )
     block_denominators["missing_population"] = block_denominators["total_population"].isna()
-    block_denominators["allocated_population"] = block_denominators[
-        "total_population"
-    ].fillna(0.0)
+    block_denominators["allocated_population"] = block_denominators["total_population"].fillna(0.0)
 
     member_counties = membership[["msa_id", "county_fips"]].drop_duplicates().copy()
-    joined = member_counties.merge(block_denominators, on="county_fips", how="inner")
+    member_counties = member_counties.rename(columns={"county_fips": "membership_county_fips"})
+    joined = member_counties.merge(block_denominators, on="membership_county_fips", how="inner")
     if joined.empty:
         return pd.DataFrame(
             columns=[
@@ -751,6 +887,8 @@ def _summarize_block_denominator(
 def _block_coc_msa_intersections(
     coc_blocks: gpd.GeoDataFrame,
     msa_county_membership: pd.DataFrame,
+    *,
+    block_membership_aliases: pd.DataFrame | None = None,
 ) -> gpd.GeoDataFrame:
     member_counties = msa_county_membership[
         ["msa_id", "cbsa_code", "county_fips"]
@@ -768,7 +906,22 @@ def _block_coc_msa_intersections(
         ]
     ].copy()
     intersections["county_fips"] = intersections["block_geoid"].astype(str).str[:5]
-    intersections = intersections.merge(member_counties, on="county_fips", how="inner")
+    if block_membership_aliases is None:
+        block_membership_aliases = _prepare_block_county_membership_aliases(
+            intersections,
+            member_counties,
+        )
+    intersections = intersections.merge(
+        block_membership_aliases[["block_geoid", "membership_county_fips"]],
+        on="block_geoid",
+        how="left",
+    )
+    member_counties = member_counties.rename(columns={"county_fips": "membership_county_fips"})
+    intersections = intersections.merge(
+        member_counties,
+        on="membership_county_fips",
+        how="inner",
+    )
     if intersections.empty:
         return gpd.GeoDataFrame(
             columns=[
@@ -885,8 +1038,7 @@ def aggregate_coc_to_msa_fractional_rollup(
         weighted[measure] = weighted[measure] * weighted["allocation_share"]
 
     rollup_aggregations: dict[str, tuple[str, object]] = {
-        measure: (measure, "sum")
-        for measure in measures
+        measure: (measure, "sum") for measure in measures
     }
     rollup_aggregations.update(
         {
@@ -902,8 +1054,7 @@ def aggregate_coc_to_msa_fractional_rollup(
         )
 
     rollup = (
-        weighted.groupby(["msa_id", "year"], as_index=False)
-        .agg(**rollup_aggregations)
+        weighted.groupby(["msa_id", "year"], as_index=False).agg(**rollup_aggregations)
         if not weighted.empty
         else pd.DataFrame(
             columns=[
@@ -918,9 +1069,13 @@ def aggregate_coc_to_msa_fractional_rollup(
     )
 
     years = sorted(source["year"].unique().tolist())
-    skeleton = expected_meta[["msa_id"]].drop_duplicates().merge(
-        pd.DataFrame({"year": years}),
-        how="cross",
+    skeleton = (
+        expected_meta[["msa_id"]]
+        .drop_duplicates()
+        .merge(
+            pd.DataFrame({"year": years}),
+            how="cross",
+        )
     )
     result = (
         skeleton.merge(rollup, on=["msa_id", "year"], how="left")
@@ -1047,9 +1202,7 @@ def _validate_fractional_rollup_crosswalk(crosswalk_df: pd.DataFrame) -> pd.Data
     )
     share_column = _resolve_single_crosswalk_value(crosswalk["share_column"], "share_column")
     if share_column != "allocation_share":
-        raise ValueError(
-            f"Unsupported share_column '{share_column}'. Expected 'allocation_share'."
-        )
+        raise ValueError(f"Unsupported share_column '{share_column}'. Expected 'allocation_share'.")
     _validate_allocation_shares(crosswalk)
     zero_population = (
         crosswalk["zero_population_coc"].fillna(False).astype(bool)
@@ -1068,14 +1221,9 @@ def _validate_fractional_rollup_source_grain(source: pd.DataFrame) -> None:
         return
 
     examples = (
-        duplicated[["coc_id", "year"]]
-        .drop_duplicates()
-        .sort_values(["coc_id", "year"])
-        .head(5)
+        duplicated[["coc_id", "year"]].drop_duplicates().sort_values(["coc_id", "year"]).head(5)
     )
-    preview = ", ".join(
-        f"{row.coc_id}/{int(row.year)}" for row in examples.itertuples(index=False)
-    )
+    preview = ", ".join(f"{row.coc_id}/{int(row.year)}" for row in examples.itertuples(index=False))
     if len(examples) < duplicated[["coc_id", "year"]].drop_duplicates().shape[0]:
         preview += ", ..."
     raise ValueError(
@@ -1101,8 +1249,7 @@ def _apply_fractional_rollup_thresholds(
             else "allocation_share"
         )
         filtered = filtered[
-            pd.to_numeric(filtered[column], errors="coerce")
-            >= min_coc_population_containment_share
+            pd.to_numeric(filtered[column], errors="coerce") >= min_coc_population_containment_share
         ].copy()
     if min_msa_population_coverage_share is not None:
         if "msa_population_coverage_share" not in filtered.columns:
@@ -1171,9 +1318,7 @@ def _fractional_rollup_expected_meta(crosswalk: pd.DataFrame) -> pd.DataFrame:
     if "missing_population_block_count" not in meta.columns:
         meta["missing_population_block_count"] = 0
     if "expected_msa_population_coverage_share" not in meta.columns:
-        meta["expected_msa_population_coverage_share"] = meta[
-            "expected_allocation_share_sum"
-        ]
+        meta["expected_msa_population_coverage_share"] = meta["expected_allocation_share_sum"]
     return meta
 
 
@@ -1193,16 +1338,13 @@ def _fractional_rollup_unmapped_source_meta(
     if unmapped.empty:
         return pd.DataFrame(columns=columns)
 
-    meta = (
-        unmapped.groupby("year", as_index=False)
-        .agg(
-            unmapped_source_coc_count=("coc_id", "nunique"),
-            unmapped_source_cocs=(
-                "coc_id",
-                lambda s: ",".join(sorted({str(value) for value in s})),
-            ),
-            **{measure: (measure, "sum") for measure in measures},
-        )
+    meta = unmapped.groupby("year", as_index=False).agg(
+        unmapped_source_coc_count=("coc_id", "nunique"),
+        unmapped_source_cocs=(
+            "coc_id",
+            lambda s: ",".join(sorted({str(value) for value in s})),
+        ),
+        **{measure: (measure, "sum") for measure in measures},
     )
     meta["unmapped_source_additive_measure_totals"] = meta.apply(
         lambda row: _measure_totals_json(
@@ -1416,8 +1558,7 @@ def read_coc_msa_crosswalk(
         return pd.read_parquet(path)
     except FileNotFoundError:
         raise FileNotFoundError(
-            f"CoC-to-MSA crosswalk artifact not found at {path}. "
-            f"Run: {generate_command}"
+            f"CoC-to-MSA crosswalk artifact not found at {path}. Run: {generate_command}"
         ) from None
 
 

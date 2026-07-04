@@ -107,6 +107,12 @@ BLOCK_POPULATION_MEMBERSHIP_ROWS = [
     ("16980", "16980", "17031"),
 ]
 
+CT_LEGACY_BLOCK_GEOID = "090010001001000"
+CT_PLANNING_REGION_COUNTY_FIPS = "09110"
+CT_BLOCK_POPULATION = 250
+CT_BLOCK_POPULATION_COC_ID = "CT-503"
+CT_BLOCK_POPULATION_MSA_ID = "14860"
+
 EXPECTED_BLOCK_POPULATION_ROWS = {
     ("CO-200", "35620"): {
         "intersection_population": 50.0,
@@ -581,9 +587,7 @@ def test_block_population_rollup_matches_area_when_allocation_shares_match(
     block_like_crosswalk["coc_population_containment_share"] = block_like_crosswalk[
         "allocation_share"
     ]
-    block_like_crosswalk["msa_population_coverage_share"] = block_like_crosswalk[
-        "allocation_share"
-    ]
+    block_like_crosswalk["msa_population_coverage_share"] = block_like_crosswalk["allocation_share"]
     block_like_crosswalk["coc_intersection_area"] = block_like_crosswalk["intersection_area"]
     block_like_crosswalk["msa_intersection_area"] = block_like_crosswalk["intersection_area"]
     block_like_crosswalk["block_count"] = 1
@@ -627,13 +631,11 @@ def test_fractional_rollup_msa_population_coverage_uses_source_covered_cocs(
             "pit_total": [100.0],
         }
     )
-    block_like_crosswalk = coc_msa_crosswalk[
-        (coc_msa_crosswalk["msa_id"] == "35620")
-    ].copy()
+    block_like_crosswalk = coc_msa_crosswalk[(coc_msa_crosswalk["msa_id"] == "35620")].copy()
     block_like_crosswalk["allocation_method"] = "block_population"
-    block_like_crosswalk["msa_population_coverage_share"] = block_like_crosswalk[
-        "coc_id"
-    ].map({"CO-100": 0.4, "CO-200": 0.6})
+    block_like_crosswalk["msa_population_coverage_share"] = block_like_crosswalk["coc_id"].map(
+        {"CO-100": 0.4, "CO-200": 0.6}
+    )
 
     result = aggregate_coc_to_msa_fractional_rollup(
         source,
@@ -671,9 +673,7 @@ def test_block_population_schema_is_explicit_and_auditable(
         COC_MSA_BLOCK_POPULATION_CROSSWALK_COLUMNS
     )
     assert set(block_population_crosswalk["allocation_method"]) == {"block_population"}
-    assert set(block_population_crosswalk["share_denominator"]) == {
-        "coc_population_denominator"
-    }
+    assert set(block_population_crosswalk["share_denominator"]) == {"coc_population_denominator"}
 
 
 @pytest.mark.parametrize(
@@ -704,9 +704,9 @@ def test_block_population_truth_table_allocations(
         expected["msa_population_coverage_share"]
     )
     assert row["missing_population_block_count"] == expected["missing_population_block_count"]
-    assert bool(row["partial_coc_population_coverage"]) is expected[
-        "partial_coc_population_coverage"
-    ]
+    assert (
+        bool(row["partial_coc_population_coverage"]) is expected["partial_coc_population_coverage"]
+    )
 
 
 def test_block_coc_msa_intersections_match_overlay_reference():
@@ -757,6 +757,108 @@ def test_block_population_crosswalk_avoids_coc_msa_overlay(
     )
 
 
+def test_block_population_crosswalk_bridges_ct_legacy_blocks_to_planning_regions():
+    ct_box = box(0, 0, 10, 10)
+    coc_gdf = gpd.GeoDataFrame(
+        {"coc_id": [CT_BLOCK_POPULATION_COC_ID]},
+        geometry=[ct_box],
+        crs=ALBERS_EQUAL_AREA_CRS,
+    )
+    county_gdf = gpd.GeoDataFrame(
+        {"GEOID": [CT_PLANNING_REGION_COUNTY_FIPS]},
+        geometry=[ct_box],
+        crs=ALBERS_EQUAL_AREA_CRS,
+    )
+    membership = pd.DataFrame(
+        {
+            "msa_id": [CT_BLOCK_POPULATION_MSA_ID],
+            "cbsa_code": [CT_BLOCK_POPULATION_MSA_ID],
+            "county_fips": [CT_PLANNING_REGION_COUNTY_FIPS],
+            "definition_version": ["census_msa_2023"],
+        }
+    )
+    block_gdf = gpd.GeoDataFrame(
+        {"block_geoid": [CT_LEGACY_BLOCK_GEOID]},
+        geometry=[ct_box],
+        crs=ALBERS_EQUAL_AREA_CRS,
+    )
+    block_population = pd.DataFrame(
+        {
+            "block_geoid": [CT_LEGACY_BLOCK_GEOID],
+            "total_population": [CT_BLOCK_POPULATION],
+        }
+    )
+
+    result = build_coc_msa_block_population_crosswalk(
+        coc_gdf,
+        county_gdf,
+        membership,
+        block_gdf,
+        block_population,
+        boundary_vintage="2024",
+        county_vintage="2023",
+        block_vintage="2020",
+        decennial_vintage="2020",
+        definition_version="census_msa_2023",
+    )
+
+    row = result.iloc[0]
+    assert row["coc_id"] == CT_BLOCK_POPULATION_COC_ID
+    assert row["msa_id"] == CT_BLOCK_POPULATION_MSA_ID
+    assert row["intersection_population"] == pytest.approx(CT_BLOCK_POPULATION)
+    assert row["coc_population_denominator"] == pytest.approx(CT_BLOCK_POPULATION)
+    assert row["msa_population_denominator"] == pytest.approx(CT_BLOCK_POPULATION)
+    assert row["allocation_share"] == pytest.approx(1.0)
+    assert row["msa_population_coverage_share"] == pytest.approx(1.0)
+
+
+def test_block_population_crosswalk_rejects_unmatched_state_block_prefixes():
+    coc_gdf = gpd.GeoDataFrame(
+        {"coc_id": ["NY-999"]},
+        geometry=[box(0, 0, 10, 10)],
+        crs=ALBERS_EQUAL_AREA_CRS,
+    )
+    county_gdf = gpd.GeoDataFrame(
+        {"GEOID": ["36062"]},
+        geometry=[box(0, 0, 10, 10)],
+        crs=ALBERS_EQUAL_AREA_CRS,
+    )
+    membership = pd.DataFrame(
+        {
+            "msa_id": ["99999"],
+            "cbsa_code": ["99999"],
+            "county_fips": ["36062"],
+            "definition_version": ["test_msa"],
+        }
+    )
+    block_gdf = gpd.GeoDataFrame(
+        {"block_geoid": ["360610001001000"]},
+        geometry=[box(0, 0, 10, 10)],
+        crs=ALBERS_EQUAL_AREA_CRS,
+    )
+    block_population = pd.DataFrame({"block_geoid": ["360610001001000"], "total_population": [100]})
+
+    with pytest.raises(
+        ValueError,
+        match=(
+            "Block GEOID county prefixes do not match MSA county membership.*"
+            "36 blocks=36061 membership=36062"
+        ),
+    ):
+        build_coc_msa_block_population_crosswalk(
+            coc_gdf,
+            county_gdf,
+            membership,
+            block_gdf,
+            block_population,
+            boundary_vintage="2024",
+            county_vintage="2023",
+            block_vintage="2020",
+            decennial_vintage="2020",
+            definition_version="test_msa",
+        )
+
+
 def test_block_geometry_denominator_matches_overlay_reference():
     geometry_gdf = _denominator_geometry_gdf()
     blocks = _prepare_blocks(_denominator_block_gdf(), _denominator_block_population_df())
@@ -778,10 +880,7 @@ def test_block_geometry_denominator_matches_overlay_reference():
 @pytest.mark.parametrize(
     ("geometry_id", "block_geoid"),
     list(EXPECTED_DENOMINATOR_ROWS),
-    ids=[
-        f"{geometry_id}-{block_geoid}"
-        for geometry_id, block_geoid in EXPECTED_DENOMINATOR_ROWS
-    ],
+    ids=[f"{geometry_id}-{block_geoid}" for geometry_id, block_geoid in EXPECTED_DENOMINATOR_ROWS],
 )
 def test_block_geometry_denominator_truth_table(
     geometry_id: str,
@@ -920,9 +1019,8 @@ def test_fractional_rollup_population_containment_threshold_keeps_high_share(
         }
     )
     threshold_crosswalk = block_population_crosswalk.copy()
-    high_share = (
-        (threshold_crosswalk["coc_id"] == "CO-200")
-        & (threshold_crosswalk["msa_id"] == "41180")
+    high_share = (threshold_crosswalk["coc_id"] == "CO-200") & (
+        threshold_crosswalk["msa_id"] == "41180"
     )
     threshold_crosswalk.loc[high_share, "coc_population_containment_share"] = 0.95
 
