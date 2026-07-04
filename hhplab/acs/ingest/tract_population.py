@@ -1,10 +1,11 @@
 """ACS tract-level data fetcher.
 
 Fetches and caches tract-level ACS data from the Census Bureau API.
-Retrieves population (B01003), income (B19013), rent (B25064/B25063),
-contract rent (B25058/B25056), poverty (C17002), tenure (B25003), and
-age/sex (B01001) variables in a single pass per state, then computes
-derived columns (adult_population, population_below_poverty).
+Retrieves population (B01003), nativity/citizenship (B05001), income
+(B19013), rent (B25064/B25063), contract rent (B25058/B25056), poverty
+(C17002), tenure (B25003), and age/sex (B01001) variables in a single pass
+per state, then computes derived columns (adult_population,
+population_below_poverty).
 
 Usage
 -----
@@ -22,6 +23,12 @@ Output Schema
 - tract_vintage (str): e.g., "2023"
 - total_population (Int64)
 - moe_total_population (Float64)
+- citizenship_total (Int64)
+- citizen_born_us (Int64)
+- citizen_born_pr_or_us_islands (Int64)
+- citizen_born_abroad_american_parents (Int64)
+- naturalized_citizen (Int64)
+- not_us_citizen (Int64)
 - adult_population (Int64): derived from B01001 age 18+ groups
 - total_housing_units (Int64)
 - occupied_housing_units (Int64)

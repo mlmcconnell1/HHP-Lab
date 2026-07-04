@@ -628,6 +628,21 @@ B05001_EXPECTED_COLUMNS = {
     "B05001_006E": "not_us_citizen",
 }
 
+B05001_FIXTURE_VALUES: dict[str, int] = {
+    "citizenship_total": 5000,
+    "citizen_born_us": 4300,
+    "citizen_born_pr_or_us_islands": 120,
+    "citizen_born_abroad_american_parents": 80,
+    "naturalized_citizen": 300,
+    "not_us_citizen": 200,
+}
+
+B05001_SUPPORTED_YEAR_VARIABLE_CASES = [
+    pytest.param(year, api_var, column, id=f"{year}-{api_var}-{column}")
+    for year in [2009, 2010, 2015, 2024]
+    for api_var, column in B05001_EXPECTED_COLUMNS.items()
+]
+
 
 class TestB05001NativityCitizenshipIngest:
     """Tests for B05001 nativity and citizenship variable ingestion."""
@@ -640,12 +655,10 @@ class TestB05001NativityCitizenshipIngest:
                     "county": "031",
                     "tract": "001000",
                     "B01003_001E": "5000",
-                    "B05001_001E": "5000",
-                    "B05001_002E": "4300",
-                    "B05001_003E": "120",
-                    "B05001_004E": "80",
-                    "B05001_005E": "300",
-                    "B05001_006E": "200",
+                    **{
+                        api_var: str(B05001_FIXTURE_VALUES[column])
+                        for api_var, column in B05001_EXPECTED_COLUMNS.items()
+                    },
                 }
             ]
         )
@@ -668,14 +681,16 @@ class TestB05001NativityCitizenshipIngest:
             assert column in df.columns
 
         row = df.iloc[0]
-        assert row["citizenship_total"] == 5000
-        assert row["citizen_born_us"] == 4300
-        assert row["citizen_born_pr_or_us_islands"] == 120
-        assert row["citizen_born_abroad_american_parents"] == 80
-        assert row["naturalized_citizen"] == 300
-        assert row["not_us_citizen"] == 200
+        assert row[list(B05001_FIXTURE_VALUES)].to_dict() == B05001_FIXTURE_VALUES
 
-    def test_b05001_negative_sentinel_values_become_na(self, httpx_mock):
+    @pytest.mark.parametrize(
+        "column",
+        [
+            pytest.param(column, id=column)
+            for column in B05001_EXPECTED_COLUMNS.values()
+        ],
+    )
+    def test_b05001_negative_sentinel_values_become_na(self, httpx_mock, column):
         """Negative Census sentinels for B05001 counts become nullable values."""
         response_data = make_census_response(
             [
@@ -698,31 +713,36 @@ class TestB05001NativityCitizenshipIngest:
 
         df, _ = fetch_state_tract_data(2023, "08")
 
-        for column in B05001_EXPECTED_COLUMNS.values():
-            assert pd.isna(df.iloc[0][column])
+        assert pd.isna(df.iloc[0][column])
 
     def test_b05001_columns_are_in_canonical_tract_output_order(self):
         """B05001 columns are part of the stable tract parquet schema."""
         expected_order = [
             "total_population",
             "moe_total_population",
-            "citizenship_total",
-            "citizen_born_us",
-            "citizen_born_pr_or_us_islands",
-            "citizen_born_abroad_american_parents",
-            "naturalized_citizen",
-            "not_us_citizen",
+            *B05001_EXPECTED_COLUMNS.values(),
             "adult_population",
         ]
         start = TRACT_OUTPUT_COLUMNS.index("total_population")
         assert TRACT_OUTPUT_COLUMNS[start : start + len(expected_order)] == expected_order
 
-    @pytest.mark.parametrize("year", [2009, 2010, 2015, 2024])
-    def test_b05001_variables_are_available_for_supported_acs5_years(self, year):
+    @pytest.mark.parametrize(
+        ("year", "api_var", "column"),
+        B05001_SUPPORTED_YEAR_VARIABLE_CASES,
+    )
+    def test_b05001_variables_are_available_for_supported_acs5_years(
+        self,
+        year,
+        api_var,
+        column,
+    ):
         """B05001 exists across supported ACS5 tract vintages."""
-        for api_var, column in B05001_EXPECTED_COLUMNS.items():
-            assert api_var in api_vars_for_year(year)
-            assert acs_variables_for_year(year)[api_var] == column
+        assert api_var in api_vars_for_year(year)
+        assert acs_variables_for_year(year)[api_var] == column
+
+    @pytest.mark.parametrize("year", [2009, 2010, 2015, 2024])
+    def test_b05001_table_is_available_for_supported_acs5_years(self, year):
+        """B05001 table membership is declared across supported ACS5 tract vintages."""
         assert "B05001" in tables_for_api_vars(api_vars_for_year(year))
 
 
