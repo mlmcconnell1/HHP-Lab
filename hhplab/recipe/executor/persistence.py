@@ -223,6 +223,8 @@ def persist_outputs(
         provenance["cohort_selector"] = assembled.cohort_summary
     if assembled.inflation_summary is not None:
         provenance["inflation_adjustment"] = assembled.inflation_summary
+    if assembled.derived_measures_summary is not None:
+        provenance["derived_measures"] = assembled.derived_measures_summary
 
     # Embed ZORI provenance and summary (coclab-gude.2).
     if assembled.zori_provenance is not None:

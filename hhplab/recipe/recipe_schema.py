@@ -385,6 +385,115 @@ class InflationAdjustmentPolicy(BaseModel):
         return self
 
 
+DerivedMeasureKind = Literal[
+    "ratio",
+    "per_capita",
+    "per_10k",
+    "log",
+    "lag",
+    "difference",
+]
+
+
+class DerivedMeasureSpec(BaseModel):
+    """Declarative analytic measure derived from panel output columns.
+
+    Specs are applied in declaration order after aliases and CPI adjustments,
+    so later specs may reference columns created by earlier specs or by
+    ``panel_policy.inflation_adjustment``.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    type: DerivedMeasureKind = Field(..., description="Derived measure operator.")
+    output_column: str = Field(..., description="Name of the derived output column.")
+    numerator: str | None = Field(
+        default=None,
+        description="Numerator column for ratio/per-capita/per-10k measures.",
+    )
+    denominator: str | None = Field(
+        default=None,
+        description="Denominator column for ratio/per-capita/per-10k measures.",
+    )
+    column: str | None = Field(
+        default=None,
+        description="Source column for log/lag/difference measures.",
+    )
+    group_by: list[str] = Field(
+        default_factory=lambda: ["geo_id"],
+        description="Grouping columns for lag and difference measures.",
+    )
+    order_by: str = Field(
+        default="year",
+        description="Ordering column for lag and difference measures.",
+    )
+    periods: int = Field(
+        default=1,
+        ge=1,
+        description="Number of periods for lag and difference measures.",
+    )
+    log_base: Literal["e", "10"] = Field(
+        default="e",
+        description="Logarithm base for log measures.",
+    )
+    scale: float | None = Field(
+        default=None,
+        gt=0.0,
+        description="Optional ratio scale override.",
+    )
+
+    @field_validator("output_column", "numerator", "denominator", "column", "order_by")
+    @classmethod
+    def _validate_optional_column_name(cls, value: str | None) -> str | None:
+        if value is None:
+            return value
+        if not value.strip():
+            raise ValueError("DerivedMeasureSpec column names may not be blank.")
+        return value
+
+    @field_validator("group_by")
+    @classmethod
+    def _validate_group_by(cls, value: list[str]) -> list[str]:
+        normalized = [column.strip() for column in value]
+        if any(not column for column in normalized):
+            raise ValueError("DerivedMeasureSpec.group_by may not contain blank names.")
+        if len(set(normalized)) != len(normalized):
+            raise ValueError("DerivedMeasureSpec.group_by may not contain duplicate names.")
+        return normalized
+
+    @model_validator(mode="after")
+    def _validate_required_fields(self) -> DerivedMeasureSpec:
+        ratio_types = {"ratio", "per_capita", "per_10k"}
+        if self.type in ratio_types:
+            missing = [
+                field_name
+                for field_name, value in (
+                    ("numerator", self.numerator),
+                    ("denominator", self.denominator),
+                )
+                if value is None
+            ]
+            if missing:
+                raise ValueError(
+                    f"DerivedMeasureSpec type='{self.type}' requires "
+                    f"{', '.join(missing)}."
+                )
+            if self.column is not None:
+                raise ValueError(
+                    f"DerivedMeasureSpec type='{self.type}' may not set column."
+                )
+            return self
+
+        if self.type in {"log", "lag", "difference"}:
+            if self.column is None:
+                raise ValueError(f"DerivedMeasureSpec type='{self.type}' requires column.")
+            if self.numerator is not None or self.denominator is not None:
+                raise ValueError(
+                    f"DerivedMeasureSpec type='{self.type}' may not set numerator/denominator."
+                )
+        return self
+
+
 class PrimaryMsaAnnotationColumns(BaseModel):
     """Output column controls for primary-MSA annotations on CoC panels."""
 
@@ -547,6 +656,13 @@ class PanelPolicy(BaseModel):
             "values remain in nominal dollars."
         ),
     )
+    derived_measures: list[DerivedMeasureSpec] = Field(
+        default_factory=list,
+        description=(
+            "Analytic derived measures applied after aliases and inflation adjustment. "
+            "Supports rates, per-capita/per-10k scaling, logs, lags, and differences."
+        ),
+    )
     primary_msa: PrimaryMsaPolicy | None = Field(
         default=None,
         description=(
@@ -588,6 +704,21 @@ class PanelPolicy(BaseModel):
         if len(set(normalized)) != len(normalized):
             raise ValueError("PanelPolicy.output_columns may not contain duplicate column names.")
         return normalized
+
+    @field_validator("derived_measures")
+    @classmethod
+    def _validate_derived_measure_outputs(
+        cls,
+        value: list[DerivedMeasureSpec],
+    ) -> list[DerivedMeasureSpec]:
+        outputs = [spec.output_column for spec in value]
+        duplicates = sorted({column for column in outputs if outputs.count(column) > 1})
+        if duplicates:
+            raise ValueError(
+                "PanelPolicy.derived_measures output_column values must be unique; "
+                f"duplicates: {duplicates}."
+            )
+        return value
 
 
 class MapLayerStyle(BaseModel):

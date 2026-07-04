@@ -17,6 +17,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 
 import hhplab.naming as naming
@@ -57,6 +58,7 @@ from hhplab.recipe.manifest import AssetRecord
 from hhplab.recipe.planner import ExecutionPlan
 from hhplab.recipe.recipe_schema import (
     CohortSelector,
+    DerivedMeasureSpec,
     InflationAdjustmentPolicy,
     PanelPolicy,
 )
@@ -245,6 +247,7 @@ class AssembledPanel:
     policy_artifacts: dict[str, PolicyApplication] = field(default_factory=dict)
     cohort_summary: dict[str, object] | None = None
     inflation_summary: dict[str, object] | None = None
+    derived_measures_summary: dict[str, object] | None = None
 
     @property
     def zori_provenance(self) -> object | None:
@@ -959,6 +962,106 @@ def _apply_inflation_adjustment(
     return result, summary
 
 
+def _numeric_panel_column(
+    panel: pd.DataFrame,
+    column: str,
+    *,
+    policy_path: str,
+) -> pd.Series:
+    if column not in panel.columns:
+        raise ExecutorError(
+            f"{policy_path} references missing panel column '{column}'. "
+            f"Available columns: {sorted(panel.columns.tolist())}"
+        )
+    return pd.to_numeric(panel[column], errors="coerce")
+
+
+def _safe_ratio(numerator: pd.Series, denominator: pd.Series, scale: float) -> pd.Series:
+    safe_denominator = denominator.where(denominator != 0)
+    return numerator / safe_denominator * scale
+
+
+def _apply_lagged_derived_measure(
+    panel: pd.DataFrame,
+    *,
+    spec: DerivedMeasureSpec,
+    values: pd.Series,
+) -> pd.Series:
+    missing = [
+        column
+        for column in [*spec.group_by, spec.order_by]
+        if column not in panel.columns
+    ]
+    if missing:
+        raise ExecutorError(
+            "target.panel_policy.derived_measures references missing lag/difference "
+            f"grouping columns {missing}. Available columns: {sorted(panel.columns.tolist())}"
+        )
+
+    work = panel[[*spec.group_by, spec.order_by]].copy()
+    work["__value"] = values
+    work["__original_index"] = panel.index
+    work = work.sort_values([*spec.group_by, spec.order_by, "__original_index"])
+    shifted = work.groupby(spec.group_by, dropna=False)["__value"].shift(spec.periods)
+    if spec.type == "lag":
+        derived = shifted
+    else:
+        derived = work["__value"] - shifted
+    return derived.reindex(work["__original_index"]).sort_index()
+
+
+def _apply_single_derived_measure(
+    panel: pd.DataFrame,
+    spec: DerivedMeasureSpec,
+) -> pd.Series:
+    policy_path = (
+        f"target.panel_policy.derived_measures[{spec.output_column}]"
+    )
+    if spec.type in {"ratio", "per_capita", "per_10k"}:
+        assert spec.numerator is not None
+        assert spec.denominator is not None
+        numerator = _numeric_panel_column(panel, spec.numerator, policy_path=policy_path)
+        denominator = _numeric_panel_column(panel, spec.denominator, policy_path=policy_path)
+        default_scale = {"ratio": 1.0, "per_capita": 1.0, "per_10k": 10_000.0}[spec.type]
+        return _safe_ratio(numerator, denominator, spec.scale or default_scale)
+
+    assert spec.column is not None
+    values = _numeric_panel_column(panel, spec.column, policy_path=policy_path)
+    if spec.type == "log":
+        positive_values = values.where(values > 0)
+        if spec.log_base == "10":
+            return np.log10(positive_values)
+        return np.log(positive_values)
+    if spec.type in {"lag", "difference"}:
+        return _apply_lagged_derived_measure(panel, spec=spec, values=values)
+    raise ExecutorError(f"Unsupported derived measure type: {spec.type}")
+
+
+def _apply_derived_measures(
+    panel: pd.DataFrame,
+    *,
+    policy: PanelPolicy | None,
+) -> tuple[pd.DataFrame, dict[str, object] | None]:
+    if policy is None or not policy.derived_measures:
+        return panel, None
+
+    result = panel.copy()
+    summaries: list[dict[str, object]] = []
+    for spec in policy.derived_measures:
+        if spec.output_column in result.columns:
+            raise ExecutorError(
+                "target.panel_policy.derived_measures output column collision: "
+                f"'{spec.output_column}' already exists."
+            )
+        result[spec.output_column] = _apply_single_derived_measure(result, spec)
+        summaries.append(spec.model_dump(mode="json", exclude_none=True))
+
+    return result, {
+        "count": len(summaries),
+        "measures": summaries,
+    }
+
+
 def _record_panel_policy_asset(
     ctx: ExecutionContext,
     path,
@@ -1370,6 +1473,7 @@ def assemble_panel(
 
     cohort_summary: dict[str, object] | None = None
     inflation_summary: dict[str, object] | None = None
+    derived_measures_summary: dict[str, object] | None = None
     if target.cohort is not None:
         pre_count = panel["geo_id"].nunique() if "geo_id" in panel.columns else len(panel)
         panel, cohort_summary = apply_cohort_selector_with_summary(panel, target.cohort)
@@ -1408,6 +1512,16 @@ def assemble_panel(
         )
 
     try:
+        panel, derived_measures_summary = _apply_derived_measures(panel, policy=policy)
+    except ExecutorError as exc:
+        return StepResult(
+            step_kind=step_kind,
+            detail=f"{step_kind}",
+            success=False,
+            error=str(exc),
+        )
+
+    try:
         panel = _project_panel_output(panel, policy)
     except ExecutorError as exc:
         return StepResult(
@@ -1427,4 +1541,5 @@ def assemble_panel(
         policy_artifacts=policy_artifacts,
         cohort_summary=cohort_summary,
         inflation_summary=inflation_summary,
+        derived_measures_summary=derived_measures_summary,
     )
