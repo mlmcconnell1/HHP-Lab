@@ -354,6 +354,49 @@ def _validate_allocation_shares(crosswalk: pd.DataFrame) -> None:
     )
 
 
+def _coverage_share_from_denominator(
+    numerator: pd.Series,
+    denominator: pd.Series,
+) -> pd.Series:
+    numeric_numerator = pd.to_numeric(numerator, errors="coerce").fillna(0.0)
+    numeric_denominator = pd.to_numeric(denominator, errors="coerce")
+    coverage = numeric_numerator / numeric_denominator.where(numeric_denominator > 0)
+    coverage = coverage.replace([float("inf"), float("-inf")], 0.0).fillna(0.0)
+    return coverage.clip(lower=0.0, upper=1.0)
+
+
+def _validate_coverage_shares(
+    crosswalk: pd.DataFrame,
+    columns: tuple[str, ...],
+) -> None:
+    invalid_examples: list[str] = []
+    for column in columns:
+        if column not in crosswalk.columns:
+            continue
+        values = pd.to_numeric(crosswalk[column], errors="coerce")
+        invalid = crosswalk[
+            values.isna()
+            | values.isin([float("inf"), float("-inf")])
+            | (values < -ALLOCATION_SHARE_TOLERANCE)
+            | (values > 1.0 + ALLOCATION_SHARE_TOLERANCE)
+        ].copy()
+        if invalid.empty:
+            continue
+        invalid["coc_id"] = invalid.get("coc_id", "").astype(str)
+        invalid["msa_id"] = invalid.get("msa_id", "").astype(str)
+        invalid_examples.extend(
+            f"{column} {row.coc_id}->{row.msa_id}={getattr(row, column)!r}"
+            for row in invalid.head(5).itertuples(index=False)
+        )
+
+    if invalid_examples:
+        raise ValueError(
+            "Computed coverage share outside the allowed finite range [0.0, 1.0] "
+            f"with tolerance {ALLOCATION_SHARE_TOLERANCE:g}. Offending rows: "
+            + ", ".join(invalid_examples)
+        )
+
+
 def _validate_allocation_totals(summary: pd.DataFrame) -> None:
     """Raise when per-CoC allocation totals fall materially outside [0.0, 1.0]."""
     invalid = summary[
@@ -592,8 +635,9 @@ def build_coc_msa_block_population_crosswalk(
     )
     grouped.loc[grouped["zero_population_coc"], "allocation_share"] = 0.0
     grouped["coc_population_containment_share"] = grouped["allocation_share"]
-    grouped["msa_population_coverage_share"] = (
-        grouped["intersection_population"] / grouped["msa_population_denominator"]
+    grouped["msa_population_coverage_share"] = _coverage_share_from_denominator(
+        grouped["intersection_population"],
+        grouped["msa_population_denominator"],
     )
     grouped = grouped.fillna(
         {
@@ -607,6 +651,10 @@ def build_coc_msa_block_population_crosswalk(
         grouped["coc_missing_population_block_count"] > 0
     ) | (~grouped["zero_population_coc"] & (allocation_totals < FULL_ALLOCATION_THRESHOLD))
     _validate_allocation_shares(grouped)
+    _validate_coverage_shares(
+        grouped,
+        ("coc_population_containment_share", "msa_population_coverage_share"),
+    )
     return grouped.loc[:, COC_MSA_BLOCK_POPULATION_CROSSWALK_COLUMNS]
 
 

@@ -13,7 +13,7 @@ import pytest
 from shapely.geometry import box
 from typer.testing import CliRunner
 
-from hhplab.cli.generate.msa_xwalk import generate_msa_xwalk
+from hhplab.cli.generate.msa_xwalk import _concat_block_population_state_shards, generate_msa_xwalk
 from hhplab.cli.main import app
 from hhplab.msa.crosswalk import (
     ALLOCATION_SHARE_TOLERANCE,
@@ -229,8 +229,7 @@ def test_generate_msa_xwalk_json_block_population(monkeypatch, tmp_path: Path):
     assert Path(payload["state_shard_dir"]).exists()
     assert payload["rows"] == 1
     assert payload["artifact"].endswith(
-        "msa_coc_xwalk__N2020@B2025xMcensus_msa_2023xC2023xK2020"
-        "__basis-block_population.parquet"
+        "msa_coc_xwalk__N2020@B2025xMcensus_msa_2023xC2023xK2020__basis-block_population.parquet"
     )
     crosswalk = pd.read_parquet(payload["artifact"])
     assert crosswalk["msa_population_denominator"].tolist() == [100.0]
@@ -472,6 +471,42 @@ def test_generate_msa_xwalk_json_block_population_state_shards_alabama_smoke(
     crosswalk = pd.read_parquet(payload["artifact"])
     assert list(crosswalk.columns) == list(COC_MSA_BLOCK_POPULATION_CROSSWALK_COLUMNS)
     assert crosswalk["msa_population_denominator"].tolist() == [125.0]
+
+
+def test_block_population_state_shard_concat_zeroes_unusable_msa_denominator():
+    shard = pd.DataFrame(
+        {
+            "coc_id": ["CO-100"],
+            "msa_id": ["99999"],
+            "cbsa_code": ["99999"],
+            "boundary_vintage": ["2025"],
+            "county_vintage": ["2023"],
+            "block_vintage": ["2020"],
+            "decennial_vintage": ["2020"],
+            "definition_version": ["test_msa"],
+            "allocation_method": ["block_population"],
+            "share_column": ["allocation_share"],
+            "share_denominator": ["coc_population_denominator"],
+            "allocation_share": [1.0],
+            "intersection_population": [100.0],
+            "coc_population_denominator": [100.0],
+            "msa_population_denominator": [0.0],
+            "coc_population_containment_share": [1.0],
+            "msa_population_coverage_share": [0.0],
+            "intersection_area": [10.0],
+            "coc_intersection_area": [10.0],
+            "msa_intersection_area": [0.0],
+            "block_count": [1],
+            "missing_population_block_count": [0],
+            "zero_population_coc": [False],
+            "partial_coc_population_coverage": [False],
+            "_shard_state_fips": ["99"],
+        }
+    )
+
+    result = _concat_block_population_state_shards([shard])
+
+    assert result["msa_population_coverage_share"].tolist() == [0.0]
 
 
 @pytest.mark.parametrize(

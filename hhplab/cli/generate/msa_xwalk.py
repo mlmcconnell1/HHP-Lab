@@ -533,6 +533,8 @@ def _concat_block_population_state_shards(shards: list[pd.DataFrame]) -> pd.Data
     from hhplab.msa.crosswalk import (
         COC_MSA_BLOCK_POPULATION_CROSSWALK_COLUMNS,
         FULL_ALLOCATION_THRESHOLD,
+        _coverage_share_from_denominator,
+        _validate_coverage_shares,
     )
 
     rows = pd.concat(shards, ignore_index=True)
@@ -592,14 +594,15 @@ def _concat_block_population_state_shards(shards: list[pd.DataFrame]) -> pd.Data
     grouped["share_column"] = "allocation_share"
     grouped["share_denominator"] = "coc_population_denominator"
     grouped["zero_population_coc"] = grouped["coc_population_denominator"].fillna(0.0) == 0.0
-    grouped["allocation_share"] = grouped["intersection_population"] / grouped[
-        "coc_population_denominator"
-    ]
+    grouped["allocation_share"] = (
+        grouped["intersection_population"] / grouped["coc_population_denominator"]
+    )
     grouped.loc[grouped["zero_population_coc"], "allocation_share"] = 0.0
     grouped["coc_population_containment_share"] = grouped["allocation_share"]
-    grouped["msa_population_coverage_share"] = grouped["intersection_population"] / grouped[
-        "msa_population_denominator"
-    ]
+    grouped["msa_population_coverage_share"] = _coverage_share_from_denominator(
+        grouped["intersection_population"],
+        grouped["msa_population_denominator"],
+    )
     grouped = grouped.fillna(
         {
             "allocation_share": 0.0,
@@ -609,10 +612,10 @@ def _concat_block_population_state_shards(shards: list[pd.DataFrame]) -> pd.Data
     )
     allocation_totals = grouped.groupby("coc_id")["allocation_share"].transform("sum")
     grouped["partial_coc_population_coverage"] = (
-        (grouped["coc_missing_population_block_count"] > 0)
-        | (
-            ~grouped["zero_population_coc"]
-            & (allocation_totals < FULL_ALLOCATION_THRESHOLD)
-        )
+        grouped["coc_missing_population_block_count"] > 0
+    ) | (~grouped["zero_population_coc"] & (allocation_totals < FULL_ALLOCATION_THRESHOLD))
+    _validate_coverage_shares(
+        grouped,
+        ("coc_population_containment_share", "msa_population_coverage_share"),
     )
     return grouped.loc[:, COC_MSA_BLOCK_POPULATION_CROSSWALK_COLUMNS]

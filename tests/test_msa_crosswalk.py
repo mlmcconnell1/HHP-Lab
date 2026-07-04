@@ -16,9 +16,11 @@ from hhplab.msa.crosswalk import (
     _block_coc_msa_intersections,
     _block_geometry_denominator,
     _build_msa_geometry_from_counties,
+    _coverage_share_from_denominator,
     _prepare_blocks,
     _summarize_block_denominator,
     _summarize_msa_block_denominator_from_membership,
+    _validate_coverage_shares,
     aggregate_coc_to_msa_fractional_rollup,
     build_coc_msa_block_population_crosswalk,
     build_coc_msa_crosswalk,
@@ -857,6 +859,31 @@ def test_block_population_crosswalk_rejects_unmatched_state_block_prefixes():
             decennial_vintage="2020",
             definition_version="test_msa",
         )
+
+
+def test_msa_population_coverage_share_zeroes_unusable_denominators():
+    coverage = _coverage_share_from_denominator(
+        pd.Series([100.0, 100.0, 100.0, None]),
+        pd.Series([200.0, 0.0, None, 100.0]),
+    )
+
+    assert coverage.tolist() == [0.5, 0.0, 0.0, 0.0]
+
+
+def test_validate_coverage_shares_rejects_non_finite_values():
+    crosswalk = pd.DataFrame(
+        {
+            "coc_id": ["CO-100"],
+            "msa_id": ["99999"],
+            "msa_population_coverage_share": [float("inf")],
+        }
+    )
+
+    with pytest.raises(
+        ValueError,
+        match="Computed coverage share outside the allowed finite range",
+    ):
+        _validate_coverage_shares(crosswalk, ("msa_population_coverage_share",))
 
 
 def test_block_geometry_denominator_matches_overlay_reference():
