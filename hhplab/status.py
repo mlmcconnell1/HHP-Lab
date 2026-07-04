@@ -4,11 +4,20 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from hhplab.census.api import (
+    CENSUS_API_KEY_MISSING_MESSAGE,
+    census_api_credentials_status,
+    probe_census_api_reachability,
+)
 from hhplab.config import load_config
 
 STATUS_GUIDANCE = {
     "recipe_preflight": "hhplab build recipe-preflight --recipe <file> --json",
     "recipe_execute": "hhplab build recipe --recipe <file> --json",
+    "census_api_key": (
+        "Get a free key at https://api.census.gov/data/key_signup.html "
+        "and export CENSUS_API_KEY."
+    ),
 }
 
 def _count_parquet(directory: Path, pattern: str = "*.parquet") -> int:
@@ -613,6 +622,7 @@ def collect_status_report(
     data_dir: Path,
     output_root: Path | None = None,
     project_root: Path | None = None,
+    probe_census_api: bool = False,
 ) -> dict:
     """Scan configured storage roots and return the status payload."""
     curated = data_dir / "curated"
@@ -637,12 +647,23 @@ def collect_status_report(
         "laus": _scan_laus(curated),
         "medsl": _scan_medsl(data_dir, curated),
     }
+    credentials = {"census_api_key": census_api_credentials_status()}
+    if probe_census_api:
+        credentials["census_api_key"]["reachability"] = probe_census_api_reachability()
     recipe_outputs = _scan_recipe_outputs(resolved_output_root)
     issues = check_prerequisites(assets)
+    if not credentials["census_api_key"]["present"]:
+        issues.append({
+            "severity": "error",
+            "area": "credentials",
+            "message": CENSUS_API_KEY_MISSING_MESSAGE,
+            "hint": STATUS_GUIDANCE["census_api_key"],
+        })
     has_errors = any(issue["severity"] == "error" for issue in issues)
     health = "degraded" if has_errors else ("healthy" if not issues else "ok")
     return {
         "status": health,
+        "credentials": credentials,
         "assets": assets,
         "recipe_outputs": recipe_outputs,
         "guidance": STATUS_GUIDANCE,

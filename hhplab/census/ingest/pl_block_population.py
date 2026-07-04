@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import hashlib
-import os
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -11,6 +10,7 @@ import httpx
 import pandas as pd
 
 import hhplab.naming as naming
+from hhplab.census.api import get_census_api_key, raise_for_census_api_status
 from hhplab.census.ingest.decennial_tract_population import STATE_FIPS_CODES
 from hhplab.paths import curated_dir
 from hhplab.provenance import ProvenanceBlock, write_parquet_with_provenance
@@ -96,8 +96,7 @@ def fetch_pl_block_population(
 ) -> tuple[pd.DataFrame, str, int]:
     """Fetch PL 94-171 block-level total population for requested states."""
     base_url, population_var = _api_spec(decennial_vintage)
-    if api_key is None:
-        api_key = os.environ.get("CENSUS_API_KEY")
+    api_key = get_census_api_key(api_key)
     frames: list[pd.DataFrame] = []
     raw_parts: list[bytes] = []
     ingested_at = datetime.now(UTC).isoformat()
@@ -112,7 +111,7 @@ def fetch_pl_block_population(
             if api_key:
                 params["key"] = api_key
             response = client.get(base_url, params=params)
-            _raise_for_block_api_status(response)
+            raise_for_census_api_status(response)
             response.raise_for_status()
             if not response.content:
                 continue
@@ -137,17 +136,6 @@ def fetch_pl_block_population(
     digest = hashlib.sha256(b"\n".join(raw_parts)).hexdigest()
     content_size = sum(len(part) for part in raw_parts)
     return result[list(PL_BLOCK_POPULATION_COLUMNS)], digest, content_size
-
-
-def _raise_for_block_api_status(response: httpx.Response) -> None:
-    """Raise actionable errors for known Census block API failures."""
-    if response.status_code in {301, 302, 303, 307, 308}:
-        location = response.headers.get("location", "")
-        if "missing_key" in location:
-            raise ValueError(
-                "Census PL block API requires a Census API key for this request. "
-                "Set CENSUS_API_KEY or pass --api-key, then retry."
-            )
 
 
 def ingest_pl_block_population(

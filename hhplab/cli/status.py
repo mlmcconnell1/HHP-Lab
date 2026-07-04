@@ -33,6 +33,13 @@ def status_cmd(
             help="Recipe output root directory to scan.",
         ),
     ] = None,
+    probe_census_api: Annotated[
+        bool,
+        typer.Option(
+            "--probe-census-api",
+            help="Run a lightweight Census API reachability check.",
+        ),
+    ] = False,
 ) -> None:
     """One-shot environment readiness report.
 
@@ -52,10 +59,12 @@ def status_cmd(
         data_dir=data_dir,
         output_root=output_root,
         project_root=Path.cwd(),
+        probe_census_api=probe_census_api,
     )
     assets = payload["assets"]
     recipe_outputs = payload["recipe_outputs"]
     guidance = payload["guidance"]
+    credentials = payload["credentials"]
     issues = payload["issues"]
     has_errors = any(i["severity"] == "error" for i in issues)
 
@@ -80,6 +89,13 @@ def status_cmd(
     typer.echo("\nCensus Geometries:")
     typer.echo(f"  Tracts:   {len(c['tracts'])} vintage(s)  {_fmt_years(c['tracts'])}")
     typer.echo(f"  Counties: {len(c['counties'])} vintage(s)  {_fmt_years(c['counties'])}")
+
+    census_key = credentials["census_api_key"]
+    typer.echo("\nCredentials:")
+    typer.echo(f"  CENSUS_API_KEY: {'set' if census_key['present'] else 'missing'}")
+    reachability = census_key.get("reachability")
+    if reachability:
+        typer.echo(f"  Census API probe: {reachability['status']}")
 
     # Crosswalks
     x = assets["crosswalks"]

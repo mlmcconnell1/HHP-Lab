@@ -171,6 +171,20 @@ class TestFetchParsesCensusResponse:
         with pytest.raises(ValueError, match="empty or invalid response"):
             fetch_acs1_cbsa_data(vintage=2023)
 
+    def test_missing_census_api_key_redirect_is_actionable(self, httpx_mock):
+        """ACS1 missing-key redirects fail before JSON parsing."""
+        httpx_mock.add_response(
+            url=CENSUS_API_URL_PATTERN,
+            status_code=302,
+            headers={
+                "location": "https://api.census.gov/data/missing_key.html",
+                "X-DataWebAPI-KeyError": "1",
+            },
+        )
+
+        with pytest.raises(ValueError, match="CENSUS_API_KEY not set"):
+            fetch_acs1_cbsa_data(vintage=2023)
+
 
 class TestCbsaToMetroMapping:
     """Test that CBSA-to-metro mapping works correctly."""

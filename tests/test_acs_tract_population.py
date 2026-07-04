@@ -251,6 +251,19 @@ class TestFetchStateTractPopulation:
         assert captured_keys
         assert set(captured_keys) == {"test-census-key"}
 
+    def test_missing_census_api_key_redirect_is_actionable(self, httpx_mock):
+        """ACS5 missing-key redirects fail before JSON parsing."""
+        httpx_mock.add_response(
+            status_code=302,
+            headers={
+                "location": "https://api.census.gov/data/missing_key.html",
+                "X-DataWebAPI-KeyError": "1",
+            },
+        )
+
+        with pytest.raises(ValueError, match="CENSUS_API_KEY not set"):
+            fetch_state_tract_data(2023, "08", api_vars=["B01003_001E"])
+
     def test_expanded_acs5_variables_are_requested_across_api_chunks(self, httpx_mock):
         """Large expanded ACS5 variable requests are chunked deterministically."""
         response_data = make_census_response(

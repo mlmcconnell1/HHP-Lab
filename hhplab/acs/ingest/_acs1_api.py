@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import logging
-import os
 from dataclasses import dataclass
 
 import httpx
@@ -19,6 +18,7 @@ from hhplab.acs.variables_acs1 import (
     acs1_variable_names_for_vintage,
     acs1_variables_by_table_for_vintage,
 )
+from hhplab.census.api import get_census_api_key, raise_for_census_api_status
 from hhplab.sources import CENSUS_API_ACS1
 
 logger = logging.getLogger(__name__)
@@ -96,8 +96,7 @@ def fetch_acs1_api_data(
     unavailable_tables = acs1_unavailable_tables_for_vintage(vintage)
     variables_by_table = acs1_variables_by_table_for_vintage(vintage)
 
-    if api_key is None:
-        api_key = os.environ.get("CENSUS_API_KEY")
+    api_key = get_census_api_key(api_key)
     frames: list[pd.DataFrame] = []
     url = CENSUS_API_ACS1.format(year=vintage)
 
@@ -126,6 +125,7 @@ def fetch_acs1_api_data(
                 params["key"] = api_key
 
             response = client.get(url, params=params)
+            raise_for_census_api_status(response)
             response.raise_for_status()
             data = response.json()
 

@@ -15,6 +15,7 @@ import httpx
 import pandas as pd
 
 import hhplab.naming as naming
+from hhplab.census.api import get_census_api_key, raise_for_census_api_status
 from hhplab.paths import curated_dir
 from hhplab.provenance import ProvenanceBlock, write_parquet_with_provenance
 
@@ -100,6 +101,7 @@ def fetch_decennial_tract_population(
     decennial_vintage: str,
     *,
     state_fips_codes: tuple[str, ...] = STATE_FIPS_CODES,
+    api_key: str | None = None,
 ) -> tuple[pd.DataFrame, str, int]:
     """Fetch decennial tract total population for all requested states."""
     if decennial_vintage not in DECENNIAL_API_SPECS:
@@ -108,18 +110,20 @@ def fetch_decennial_tract_population(
         )
 
     base_url, population_var = DECENNIAL_API_SPECS[decennial_vintage]
+    api_key = get_census_api_key(api_key)
     frames: list[pd.DataFrame] = []
     raw_parts: list[bytes] = []
     with httpx.Client(timeout=60.0) as client:
         for state_fips in state_fips_codes:
-            response = client.get(
-                base_url,
-                params={
-                    "get": f"NAME,{population_var}",
-                    "for": "tract:*",
-                    "in": f"state:{state_fips}",
-                },
-            )
+            params = {
+                "get": f"NAME,{population_var}",
+                "for": "tract:*",
+                "in": f"state:{state_fips}",
+            }
+            if api_key:
+                params["key"] = api_key
+            response = client.get(base_url, params=params)
+            raise_for_census_api_status(response)
             response.raise_for_status()
             if not response.content:
                 continue
@@ -156,6 +160,7 @@ def ingest_decennial_tract_population(
     tract_vintage: str | None = None,
     force: bool = False,
     output_dir: Path | str | None = None,
+    api_key: str | None = None,
 ) -> Path:
     """Fetch and cache decennial tract total population denominators."""
     resolved_tract_vintage = decennial_vintage if tract_vintage is None else tract_vintage
@@ -171,7 +176,10 @@ def ingest_decennial_tract_population(
         return output_path
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    df, content_sha256, content_size = fetch_decennial_tract_population(decennial_vintage)
+    df, content_sha256, content_size = fetch_decennial_tract_population(
+        decennial_vintage,
+        api_key=api_key,
+    )
     provenance = ProvenanceBlock(
         tract_vintage=resolved_tract_vintage,
         weighting="denominator",

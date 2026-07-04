@@ -3,6 +3,7 @@
 import json
 from pathlib import Path
 
+import pytest
 from typer.testing import CliRunner
 
 from hhplab.cli.main import app
@@ -11,6 +12,12 @@ runner = CliRunner()
 
 RECIPE_PREFLIGHT_CMD = "hhplab build recipe-preflight --recipe <file> --json"
 RECIPE_EXECUTE_CMD = "hhplab build recipe --recipe <file> --json"
+
+
+@pytest.fixture(autouse=True)
+def _set_census_api_key(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Status tests default to a configured Census API key."""
+    monkeypatch.setenv("CENSUS_API_KEY", "test-census-key")
 
 
 def _scaffold_curated(tmp_path: Path) -> Path:
@@ -245,6 +252,8 @@ class TestStatusJSON:
         assert result.exit_code == 0
         payload = json.loads(result.output)
         assert payload["status"] == "healthy"
+        assert payload["credentials"]["census_api_key"]["present"] is True
+        assert payload["credentials"]["census_api_key"]["status"] == "ok"
         assert payload["assets"]["boundaries"]["count"] == 2
         assert payload["assets"]["crosswalks"]["msa"] == ["B2025xMcensus_msa_2023xC2023"]
         assert payload["assets"]["pit"]["msa_count"] == 1
@@ -320,11 +329,37 @@ class TestStatusJSON:
         )
 
         payload = json.loads(result.output)
-        assert set(payload.keys()) == {"status", "assets", "recipe_outputs", "guidance", "issues"}
+        assert set(payload.keys()) == {
+            "status", "credentials", "assets", "recipe_outputs", "guidance", "issues",
+        }
+        assert set(payload["credentials"].keys()) == {"census_api_key"}
         assert set(payload["assets"].keys()) == {
             "boundaries", "census", "crosswalks", "pit", "hic", "metro",
             "msa", "measures", "acs", "zori", "laus", "medsl",
         }
+
+    def test_status_json_reports_missing_census_api_key(self, tmp_path, monkeypatch):
+        data_dir = _scaffold_curated(tmp_path)
+        monkeypatch.delenv("CENSUS_API_KEY", raising=False)
+
+        result = runner.invoke(
+            app,
+            [
+                "status",
+                "--json",
+                "--data-dir",
+                str(data_dir),
+                "--output-root",
+                str(tmp_path / "outputs"),
+            ],
+        )
+
+        assert result.exit_code == 1
+        payload = json.loads(result.output)
+        assert payload["status"] == "degraded"
+        assert payload["credentials"]["census_api_key"]["present"] is False
+        assert "CENSUS_API_KEY not set" in payload["credentials"]["census_api_key"]["message"]
+        assert any(issue["area"] == "credentials" for issue in payload["issues"])
 
     def test_status_json_warns_on_partial_msa_artifacts(self, tmp_path):
         import pandas as pd

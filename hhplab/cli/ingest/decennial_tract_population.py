@@ -30,6 +30,13 @@ def ingest_decennial_tract_population(
             help="Re-ingest even if cached file exists.",
         ),
     ] = False,
+    api_key: Annotated[
+        str | None,
+        typer.Option(
+            "--api-key",
+            help="Census API key. Falls back to CENSUS_API_KEY env var.",
+        ),
+    ] = None,
     output_json: Annotated[
         bool,
         typer.Option(
@@ -69,7 +76,7 @@ def ingest_decennial_tract_population(
         return
 
     try:
-        path = ingest(decennial, tract_vintage=tracts, force=force)
+        path = ingest(decennial, tract_vintage=tracts, force=force, api_key=api_key)
     except Exception as exc:
         typer.echo(f"Error: {exc}", err=True)
         raise typer.Exit(1) from exc

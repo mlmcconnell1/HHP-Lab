@@ -89,7 +89,7 @@ def test_fetch_pl_block_population_missing_key_error_is_actionable(httpx_mock) -
         headers={"location": "https://api.census.gov/data/missing_key.html"},
     )
 
-    with pytest.raises(ValueError, match="Set CENSUS_API_KEY or pass --api-key"):
+    with pytest.raises(ValueError, match="CENSUS_API_KEY not set"):
         fetch_pl_block_population("2020", state_fips_codes=("08",))
 
 

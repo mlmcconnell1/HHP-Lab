@@ -52,7 +52,6 @@ from __future__ import annotations
 
 import json
 import logging
-import os
 import re
 from datetime import UTC, datetime
 from pathlib import Path
@@ -83,6 +82,7 @@ from hhplab.acs.variables import (
     api_vars_for_year,
     tables_for_api_vars,
 )
+from hhplab.census.api import get_census_api_key, raise_for_census_api_status
 from hhplab.paths import curated_dir
 from hhplab.provenance import (
     ProvenanceBlock,
@@ -407,8 +407,7 @@ def fetch_state_tract_data(
     url = CENSUS_API.format(year=year)
     if api_vars is None:
         api_vars = api_vars_for_year(year)
-    if api_key is None:
-        api_key = os.environ.get("CENSUS_API_KEY")
+    api_key = get_census_api_key(api_key)
     frames: list[pd.DataFrame] = []
     raw_parts: list[bytes] = []
     merge_columns = ["NAME", "state", "county", "tract"]
@@ -425,6 +424,7 @@ def fetch_state_tract_data(
                 params["key"] = api_key
 
             response = client.get(url, params=params)
+            raise_for_census_api_status(response)
             response.raise_for_status()
             raw_parts.append(response.content)
             data = response.json()
@@ -515,8 +515,7 @@ def fetch_tract_data(
     translation = _translation_metadata(acs_vintage, tract_vintage)
     api_vars = api_vars_for_year(year)
     tables = tables_for_api_vars(api_vars)
-    if api_key is None:
-        api_key = os.environ.get("CENSUS_API_KEY")
+    api_key = get_census_api_key(api_key)
 
     logger.info(f"Fetching ACS {acs_vintage} tract data (API year: {year})")
 
