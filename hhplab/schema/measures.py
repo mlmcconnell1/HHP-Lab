@@ -37,6 +37,7 @@ MeasureRole = Literal["outcome", "candidate_driver", "control", "denominator", "
 class PanelMeasureDictionaryEntry:
     """Machine-readable semantics for a panel measure column."""
 
+    measure_id: str
     column: str
     definition: str
     units: str
@@ -46,6 +47,7 @@ class PanelMeasureDictionaryEntry:
     first_year: int
     last_year: int | None
     role_hint: MeasureRole
+    panel_contexts: tuple[str, ...] = ()
     caveats: tuple[str, ...] = ()
 
     def to_dict(self) -> dict[str, object]:
@@ -252,8 +254,11 @@ def _entry(
     role_hint: MeasureRole,
     *caveats: str,
     last_year: int | None = None,
+    measure_id: str | None = None,
+    panel_contexts: tuple[str, ...] = (),
 ) -> PanelMeasureDictionaryEntry:
     return PanelMeasureDictionaryEntry(
+        measure_id=measure_id or f"{source_product}:{column}",
         column=column,
         definition=definition,
         units=units,
@@ -263,6 +268,7 @@ def _entry(
         first_year=first_year,
         last_year=last_year,
         role_hint=role_hint,
+        panel_contexts=panel_contexts,
         caveats=tuple(caveats),
     )
 
@@ -378,6 +384,8 @@ ACS5_PANEL_MEASURE_DICTIONARY: tuple[PanelMeasureDictionaryEntry, ...] = (
         2009,
         "candidate_driver",
         "When LAUS is also present, prefer provenance fields to distinguish ACS5 and LAUS rates.",
+        measure_id="acs5:unemployment_rate",
+        panel_contexts=("coc", "acs5", "msa"),
     ),
 )
 
@@ -477,6 +485,108 @@ LAUS_PANEL_MEASURE_DICTIONARY: tuple[PanelMeasureDictionaryEntry, ...] = (
         1990,
         "candidate_driver",
         "Column name can also appear in ACS5 contexts; inspect provenance and panel geography.",
+        measure_id="laus:unemployment_rate",
+        panel_contexts=("metro", "laus"),
+    ),
+)
+
+MSA_COC_PANEL_MEASURE_DICTIONARY: tuple[PanelMeasureDictionaryEntry, ...] = (
+    _entry(
+        "msa_population",
+        "MSA resident population used for MSA-CoC panel covariates.",
+        "persons",
+        "census",
+        "acs5_or_pep",
+        "msa",
+        2009,
+        "denominator",
+        "Population source is controlled by the MSA-CoC panel recipe policy.",
+        "Check msa_population_source to distinguish ACS5 from PEP population.",
+        panel_contexts=("msa_coc",),
+    ),
+    _entry(
+        "msa_median_rent",
+        "MSA median monthly gross rent used as a metro-context covariate.",
+        "nominal_usd_per_month",
+        "census",
+        "acs5",
+        "msa",
+        2009,
+        "candidate_driver",
+        "Nominal dollars are not inflation-adjusted.",
+        panel_contexts=("msa_coc",),
+    ),
+    _entry(
+        "msa_vacancy_rate",
+        "MSA vacant housing units divided by total housing units.",
+        "share",
+        "census",
+        "acs5",
+        "msa",
+        2009,
+        "candidate_driver",
+        "Derived from ACS5 housing counts before joining to CoC rows.",
+        panel_contexts=("msa_coc",),
+    ),
+    _entry(
+        "msa_poverty_rate",
+        "MSA share of poverty-universe population below the federal poverty threshold.",
+        "share",
+        "census",
+        "acs5",
+        "msa",
+        2009,
+        "candidate_driver",
+        "ACS poverty status excludes some group-quarter populations.",
+        panel_contexts=("msa_coc",),
+    ),
+    _entry(
+        "msa_unemployment",
+        "MSA unemployment rate selected for the MSA-CoC panel.",
+        "share",
+        "census_or_bls",
+        "acs5_or_laus",
+        "msa",
+        2009,
+        "candidate_driver",
+        "Check unemployment_source to distinguish ACS5-derived and LAUS unemployment.",
+        panel_contexts=("msa_coc",),
+    ),
+    _entry(
+        "msa_income",
+        "MSA median household income in nominal dollars.",
+        "nominal_usd",
+        "census",
+        "acs5",
+        "msa",
+        2009,
+        "candidate_driver",
+        "Nominal dollars are not inflation-adjusted; use CPI-derived transforms for real dollars.",
+        panel_contexts=("msa_coc",),
+    ),
+    _entry(
+        "msa_rent_burden",
+        "MSA share of renter households with gross rent at least 30 percent of income.",
+        "share",
+        "census",
+        "acs5",
+        "msa",
+        2009,
+        "candidate_driver",
+        "Excludes rent-burden rows where income percentage is not computed.",
+        panel_contexts=("msa_coc",),
+    ),
+    _entry(
+        "coc_population",
+        "CoC resident population used for ranking and containment in MSA-CoC panels.",
+        "persons",
+        "census",
+        "acs5_or_pep",
+        "coc",
+        2009,
+        "denominator",
+        "Population source follows the recipe input selected for CoC population.",
+        panel_contexts=("msa_coc",),
     ),
 )
 
@@ -554,6 +664,10 @@ ZORI_PANEL_MEASURE_DICTIONARY: tuple[PanelMeasureDictionaryEntry, ...] = (
     ),
 )
 
+SAE_ROLE_HINTS: dict[str, MeasureRole] = {
+    "sae_civilian_labor_force": "denominator",
+}
+
 SAE_PANEL_MEASURE_DICTIONARY: tuple[PanelMeasureDictionaryEntry, ...] = tuple(
     _entry(
         column,
@@ -563,7 +677,7 @@ SAE_PANEL_MEASURE_DICTIONARY: tuple[PanelMeasureDictionaryEntry, ...] = tuple(
         "acs1_acs5_sae",
         "tract",
         2009,
-        "candidate_driver",
+        SAE_ROLE_HINTS.get(column, "candidate_driver"),
         "SAE measures combine ACS1 controls with ACS5 tract support; inspect SAE lineage columns.",
     )
     for column in SAE_MEASURE_COLUMNS
@@ -590,19 +704,39 @@ _PANEL_MEASURE_DICTIONARY_CANDIDATES: tuple[PanelMeasureDictionaryEntry, ...] = 
     *ACS5_PANEL_MEASURE_DICTIONARY,
     *ACS1_PANEL_MEASURE_DICTIONARY,
     *LAUS_PANEL_MEASURE_DICTIONARY,
+    *MSA_COC_PANEL_MEASURE_DICTIONARY,
     *PEP_PANEL_MEASURE_DICTIONARY,
     *ZORI_PANEL_MEASURE_DICTIONARY,
     *SAE_PANEL_MEASURE_DICTIONARY,
     *HIC_PANEL_MEASURE_DICTIONARY,
 )
 
-PANEL_MEASURE_DICTIONARY_BY_COLUMN: dict[str, PanelMeasureDictionaryEntry] = {
-    entry.column: entry for entry in reversed(_PANEL_MEASURE_DICTIONARY_CANDIDATES)
+PANEL_MEASURE_DICTIONARY: tuple[PanelMeasureDictionaryEntry, ...] = tuple(
+    sorted(_PANEL_MEASURE_DICTIONARY_CANDIDATES, key=lambda entry: entry.measure_id)
+)
+
+PANEL_MEASURE_DICTIONARY_BY_ID: dict[str, PanelMeasureDictionaryEntry] = {
+    entry.measure_id: entry for entry in PANEL_MEASURE_DICTIONARY
 }
 
-PANEL_MEASURE_DICTIONARY: tuple[PanelMeasureDictionaryEntry, ...] = tuple(
-    sorted(PANEL_MEASURE_DICTIONARY_BY_COLUMN.values(), key=lambda entry: entry.column)
-)
+PANEL_MEASURE_DICTIONARY_BY_COLUMN: dict[str, PanelMeasureDictionaryEntry] = {}
+for _entry_by_column in PANEL_MEASURE_DICTIONARY:
+    PANEL_MEASURE_DICTIONARY_BY_COLUMN.setdefault(_entry_by_column.column, _entry_by_column)
+
+
+def resolve_panel_measure_entry(
+    column: str,
+    *,
+    panel_columns: set[str] | list[str] | tuple[str, ...] | None = None,
+) -> PanelMeasureDictionaryEntry | None:
+    """Return the best dictionary entry for a panel column in context."""
+    if column != "unemployment_rate":
+        return PANEL_MEASURE_DICTIONARY_BY_COLUMN.get(column)
+
+    columns = set(panel_columns or ())
+    if {"labor_force", "employed", "unemployed", "laus_vintage_used"} & columns:
+        return PANEL_MEASURE_DICTIONARY_BY_ID["laus:unemployment_rate"]
+    return PANEL_MEASURE_DICTIONARY_BY_ID["acs5:unemployment_rate"]
 
 
 def panel_measure_dictionary() -> list[dict[str, object]]:

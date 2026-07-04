@@ -96,6 +96,7 @@ from hhplab.schema.measures import (
     LAUS_MEASURES,
     PANEL_MEASURE_DICTIONARY,
     PANEL_MEASURE_DICTIONARY_BY_COLUMN,
+    PANEL_MEASURE_DICTIONARY_BY_ID,
     PIT_MEASURES,
     SAE_MEASURES,
     TOTAL_POPULATION_MEASURE,
@@ -104,6 +105,7 @@ from hhplab.schema.measures import (
     PanelMeasureDictionaryEntry,
     acs1_imputation_output_columns,
     panel_measure_dictionary,
+    resolve_panel_measure_entry,
 )
 
 __all__ = [
@@ -156,6 +158,7 @@ __all__ = [
     "LAUS_METRO_OUTPUT_COLUMNS",
     "PANEL_MEASURE_DICTIONARY",
     "PANEL_MEASURE_DICTIONARY_BY_COLUMN",
+    "PANEL_MEASURE_DICTIONARY_BY_ID",
     "METRO_PANEL_COLUMNS",
     "MSA_COC_COVERAGE_COLUMNS",
     "MSA_COC_COVERAGE_CONTRACT",
@@ -204,4 +207,5 @@ __all__ = [
     "validate_artifact_contract",
     "acs1_imputation_output_columns",
     "panel_measure_dictionary",
+    "resolve_panel_measure_entry",
 ]

@@ -13,7 +13,7 @@ import numpy as np
 import pandas as pd
 
 from hhplab.provenance import ProvenanceBlock, read_provenance, write_parquet_with_provenance
-from hhplab.schema.measures import PANEL_MEASURE_DICTIONARY_BY_COLUMN
+from hhplab.schema.measures import resolve_panel_measure_entry
 
 
 class AnalysisError(ValueError):
@@ -81,8 +81,8 @@ def _numeric_columns(df: pd.DataFrame, requested: list[str] | None) -> list[str]
     ]
 
 
-def _measure_semantics(column: str) -> dict[str, Any]:
-    entry = PANEL_MEASURE_DICTIONARY_BY_COLUMN.get(column)
+def _measure_semantics(column: str, *, panel_columns: list[str]) -> dict[str, Any]:
+    entry = resolve_panel_measure_entry(column, panel_columns=panel_columns)
     if entry is None:
         return {}
     return {
@@ -277,7 +277,7 @@ def describe_panel(
             "p75": float(non_null.quantile(0.75)) if not non_null.empty else np.nan,
             "max": float(non_null.max()) if not non_null.empty else np.nan,
         }
-        row.update(_measure_semantics(column))
+        row.update(_measure_semantics(column, panel_columns=df.columns.tolist()))
         rows.append(row)
     table = pd.DataFrame(rows)
     return _persist_result(

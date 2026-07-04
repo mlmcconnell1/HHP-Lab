@@ -58,18 +58,22 @@ from hhplab.schema import (
     ACS1_IMPUTED_POVERTY_SPEC,
     ACS1_IMPUTED_TOTAL_HOUSEHOLDS_SPEC,
     ARTIFACT_CONTRACTS,
+    COC_PANEL_COLUMNS,
     COC_URBAN_AREA_DETAIL_COLUMNS,
     COC_URBAN_AREA_DETAIL_CONTRACT,
     COC_URBAN_FRACTION_COLUMNS,
     COC_URBAN_FRACTION_CONTRACT,
+    METRO_PANEL_COLUMNS,
     MSA_COC_COVERAGE_COLUMNS,
     MSA_COC_COVERAGE_CONTRACT,
     MSA_COC_PANEL_COLUMNS,
     MSA_COC_PANEL_CONTRACT,
     MSA_FRACTIONAL_ROLLUP_COLUMNS,
     MSA_FRACTIONAL_ROLLUP_CONTRACT,
+    MSA_PANEL_COLUMNS,
     PANEL_MEASURE_DICTIONARY,
     PANEL_MEASURE_DICTIONARY_BY_COLUMN,
+    PANEL_MEASURE_DICTIONARY_BY_ID,
     PL_BLOCK_POPULATION_COLUMNS,
     PL_BLOCK_POPULATION_CONTRACT,
     SAE_OUTPUT_CONTRACT,
@@ -78,6 +82,7 @@ from hhplab.schema import (
     ACS1ImputationMeasureSpec,
     acs1_imputation_output_columns,
     panel_measure_dictionary,
+    resolve_panel_measure_entry,
     validate_artifact_contract,
 )
 from hhplab.schema import columns as schema_columns
@@ -709,8 +714,92 @@ PANEL_MEASURE_DICTIONARY_COVERAGE_GROUPS = {
     "sae": schema_columns.SAE_MEASURE_COLUMNS,
     "zori": schema_columns.ZORI_COLUMNS,
     "hic": schema_columns.HIC_PANEL_MEASURE_COLUMNS,
+    "msa_coc": [
+        "msa_population",
+        "msa_median_rent",
+        "msa_vacancy_rate",
+        "msa_poverty_rate",
+        "msa_unemployment",
+        "msa_income",
+        "msa_rent_burden",
+        "coc_population",
+    ],
     "pit": ["pit_total", "pit_sheltered", "pit_unsheltered"],
     "pep": ["population"],
+}
+
+PANEL_MEASURE_COLUMNS_BY_PANEL = {
+    "coc_panel": [
+        column
+        for column in COC_PANEL_COLUMNS
+        if column
+        in {
+            "pit_total",
+            "pit_sheltered",
+            "pit_unsheltered",
+            "total_population",
+            "population_density_per_sq_km",
+            "adult_population",
+            "population_below_poverty",
+            "median_household_income",
+            "median_gross_rent",
+            "unemployment_rate",
+        }
+    ],
+    "metro_panel": [
+        column
+        for column in METRO_PANEL_COLUMNS
+        if column
+        in {
+            "pit_total",
+            "pit_sheltered",
+            "pit_unsheltered",
+            "total_population",
+            "adult_population",
+            "population_below_poverty",
+            "median_household_income",
+            "median_gross_rent",
+            "unemployment_rate_acs1",
+            "labor_force",
+            "employed",
+            "unemployed",
+            "unemployment_rate",
+        }
+    ],
+    "msa_panel": [
+        column
+        for column in MSA_PANEL_COLUMNS
+        if column
+        in {
+            "pit_total",
+            "pit_sheltered",
+            "pit_unsheltered",
+            "total_population",
+            "adult_population",
+            "population_below_poverty",
+            "median_household_income",
+            "median_gross_rent",
+            "population",
+        }
+    ],
+    "msa_coc_panel": [
+        column
+        for column in MSA_COC_PANEL_COLUMNS
+        if column
+        in {
+            "msa_population",
+            "msa_median_rent",
+            "msa_vacancy_rate",
+            "msa_poverty_rate",
+            "msa_unemployment",
+            "msa_income",
+            "msa_rent_burden",
+            "pit_total",
+            "pit_sheltered",
+            "pit_unsheltered",
+            "coc_population",
+        }
+    ],
 }
 
 
@@ -729,11 +818,27 @@ def test_panel_measure_dictionary_covers_panel_measure_groups(group_name: str) -
     assert missing == []
 
 
-def test_panel_measure_dictionary_entries_are_machine_readable() -> None:
-    columns = [entry.column for entry in PANEL_MEASURE_DICTIONARY]
+@pytest.mark.parametrize(
+    "panel_name",
+    list(PANEL_MEASURE_COLUMNS_BY_PANEL),
+    ids=list(PANEL_MEASURE_COLUMNS_BY_PANEL),
+)
+def test_panel_measure_dictionary_covers_real_panel_measure_columns(panel_name: str) -> None:
+    missing = [
+        column
+        for column in PANEL_MEASURE_COLUMNS_BY_PANEL[panel_name]
+        if column not in PANEL_MEASURE_DICTIONARY_BY_COLUMN
+    ]
 
-    assert len(columns) == len(set(columns))
+    assert missing == []
+
+
+def test_panel_measure_dictionary_entries_are_machine_readable() -> None:
+    measure_ids = [entry.measure_id for entry in PANEL_MEASURE_DICTIONARY]
+
+    assert len(measure_ids) == len(set(measure_ids))
     for entry in PANEL_MEASURE_DICTIONARY:
+        assert entry.measure_id
         assert entry.definition
         assert entry.units
         assert entry.source_provider
@@ -749,7 +854,41 @@ def test_panel_measure_dictionary_entries_are_machine_readable() -> None:
         }
 
 
+def test_panel_measure_dictionary_preserves_shared_column_semantics() -> None:
+    assert PANEL_MEASURE_DICTIONARY_BY_ID["acs5:unemployment_rate"].source_product == "acs5"
+    assert PANEL_MEASURE_DICTIONARY_BY_ID["laus:unemployment_rate"].source_product == "laus"
+
+    metro_entry = resolve_panel_measure_entry(
+        "unemployment_rate",
+        panel_columns=["metro_id", "labor_force", "laus_vintage_used"],
+    )
+    coc_entry = resolve_panel_measure_entry(
+        "unemployment_rate",
+        panel_columns=["coc_id", "acs5_vintage_used"],
+    )
+
+    assert metro_entry is not None
+    assert metro_entry.source_provider == "bls"
+    assert metro_entry.source_product == "laus"
+    assert coc_entry is not None
+    assert coc_entry.source_provider == "census"
+    assert coc_entry.source_product == "acs5"
+
+
+def test_sae_labor_force_dictionary_role_matches_laus_denominator() -> None:
+    assert PANEL_MEASURE_DICTIONARY_BY_COLUMN["labor_force"].role_hint == "denominator"
+    assert (
+        PANEL_MEASURE_DICTIONARY_BY_COLUMN["sae_civilian_labor_force"].role_hint
+        == "denominator"
+    )
+    assert (
+        PANEL_MEASURE_DICTIONARY_BY_COLUMN["sae_unemployed_count"].role_hint
+        == "candidate_driver"
+    )
+
+
 def test_panel_measure_dictionary_json_shape_includes_required_semantics() -> None:
+    by_id = {entry["measure_id"]: entry for entry in panel_measure_dictionary()}
     by_column = {entry["column"]: entry for entry in panel_measure_dictionary()}
 
     assert by_column["pit_total"]["definition"].startswith("Total people")
@@ -763,6 +902,8 @@ def test_panel_measure_dictionary_json_shape_includes_required_semantics() -> No
     assert by_column["median_household_income"]["source_provider"] == "census"
     assert by_column["median_household_income"]["source_product"] == "acs5"
     assert by_column["zori_coc"]["coverage_years"]["first"] == 2015
+    assert by_id["laus:unemployment_rate"]["source_provider"] == "bls"
+    assert by_id["acs5:unemployment_rate"]["source_provider"] == "census"
 
 
 def test_acs1_imputation_output_columns_are_declared_from_specs() -> None:

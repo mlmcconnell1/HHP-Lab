@@ -7,7 +7,7 @@ from typing import Any
 
 import pandas as pd
 
-from hhplab.schema.measures import PANEL_MEASURE_DICTIONARY_BY_COLUMN
+from hhplab.schema.measures import resolve_panel_measure_entry
 
 
 class PanelInspectError(ValueError):
@@ -20,8 +20,8 @@ def _read_panel(path: Path) -> pd.DataFrame:
     return pd.read_parquet(path)
 
 
-def _semantics(column: str) -> dict[str, Any]:
-    entry = PANEL_MEASURE_DICTIONARY_BY_COLUMN.get(column)
+def _semantics(column: str, *, panel_columns: list[str]) -> dict[str, Any]:
+    entry = resolve_panel_measure_entry(column, panel_columns=panel_columns)
     if entry is None:
         return {}
     return {
@@ -76,7 +76,7 @@ def describe_panel_file(path: Path, *, columns: list[str] | None = None) -> dict
             "median": float(non_null.median()) if not non_null.empty else None,
             "max": float(non_null.max()) if not non_null.empty else None,
         }
-        row.update(_semantics(column))
+        row.update(_semantics(column, panel_columns=df.columns.tolist()))
         summary.append(row)
 
     missingness_by_year: list[dict[str, Any]] = []
