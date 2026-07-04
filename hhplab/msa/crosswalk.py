@@ -398,10 +398,6 @@ def build_coc_msa_block_population_crosswalk(
     )
 
     coc = _project(coc_gdf[["coc_id", "geometry"]].copy(), label="coc_gdf")
-    counties = _project(
-        county_gdf[["GEOID", "geometry"]].copy(),
-        label="county_gdf",
-    )
     blocks = _prepare_blocks(block_gdf, block_population_df)
     membership = msa_county_membership[
         ["msa_id", "cbsa_code", "county_fips"]
@@ -409,9 +405,7 @@ def build_coc_msa_block_population_crosswalk(
     membership["msa_id"] = membership["msa_id"].astype(str)
     membership["cbsa_code"] = membership["cbsa_code"].astype(str)
     membership["county_fips"] = membership["county_fips"].astype(str)
-    msa = _build_msa_geometry_from_counties(counties, membership)
-
-    if coc.empty or blocks.empty or msa.empty:
+    if coc.empty or blocks.empty or membership.empty:
         return _empty_block_population_crosswalk()
 
     coc_blocks = _block_geometry_denominator(
@@ -433,7 +427,7 @@ def build_coc_msa_block_population_crosswalk(
     )
     msa_denominators = _summarize_msa_block_denominator_from_membership(blocks, membership)
 
-    intersections = _block_coc_msa_intersections(coc_blocks, msa)
+    intersections = _block_coc_msa_intersections(coc_blocks, membership)
     if intersections.empty:
         return _empty_block_population_crosswalk()
 
@@ -756,23 +750,25 @@ def _summarize_block_denominator(
 
 def _block_coc_msa_intersections(
     coc_blocks: gpd.GeoDataFrame,
-    msa_gdf: gpd.GeoDataFrame,
+    msa_county_membership: pd.DataFrame,
 ) -> gpd.GeoDataFrame:
-    intersections = gpd.overlay(
-        coc_blocks[
-            [
-                "coc_id",
-                "block_geoid",
-                "total_population",
-                "block_area",
-                "missing_population",
-                "geometry",
-            ]
-        ],
-        msa_gdf[["msa_id", "cbsa_code", "geometry"]],
-        how="intersection",
-        keep_geom_type=False,
-    )
+    member_counties = msa_county_membership[
+        ["msa_id", "cbsa_code", "county_fips"]
+    ].drop_duplicates()
+    member_counties["county_fips"] = member_counties["county_fips"].astype(str)
+    intersections = coc_blocks[
+        [
+            "coc_id",
+            "block_geoid",
+            "total_population",
+            "missing_population",
+            "coc_intersection_area",
+            "allocated_population",
+            "geometry",
+        ]
+    ].copy()
+    intersections["county_fips"] = intersections["block_geoid"].astype(str).str[:5]
+    intersections = intersections.merge(member_counties, on="county_fips", how="inner")
     if intersections.empty:
         return gpd.GeoDataFrame(
             columns=[
@@ -789,15 +785,23 @@ def _block_coc_msa_intersections(
             geometry="geometry",
             crs=coc_blocks.crs,
         )
-    intersections = intersections.loc[~intersections.geometry.is_empty].copy()
-    intersections["intersection_area"] = intersections.geometry.area
-    intersections = intersections.loc[intersections["intersection_area"] > 0].copy()
-    intersections["intersection_population"] = (
-        intersections["total_population"].fillna(0.0)
-        * intersections["intersection_area"]
-        / intersections["block_area"]
-    )
-    return intersections
+    intersections = gpd.GeoDataFrame(intersections, geometry="geometry", crs=coc_blocks.crs)
+    intersections["intersection_area"] = intersections["coc_intersection_area"]
+    intersections["intersection_population"] = intersections["allocated_population"]
+    return intersections.loc[
+        :,
+        [
+            "coc_id",
+            "msa_id",
+            "cbsa_code",
+            "block_geoid",
+            "total_population",
+            "missing_population",
+            "intersection_area",
+            "intersection_population",
+            "geometry",
+        ],
+    ].copy()
 
 
 def summarize_coc_msa_allocation(crosswalk: pd.DataFrame) -> pd.DataFrame:

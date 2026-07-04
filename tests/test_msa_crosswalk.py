@@ -13,6 +13,7 @@ from hhplab.msa.crosswalk import (
     ALLOCATION_SHARE_TOLERANCE,
     COC_MSA_BLOCK_POPULATION_CROSSWALK_COLUMNS,
     COC_MSA_CROSSWALK_COLUMNS,
+    _block_coc_msa_intersections,
     _block_geometry_denominator,
     _build_msa_geometry_from_counties,
     _prepare_blocks,
@@ -322,6 +323,36 @@ def _overlay_block_geometry_denominator_reference(
     return intersections
 
 
+def _overlay_block_coc_msa_intersections_reference(
+    coc_blocks: gpd.GeoDataFrame,
+    msa_gdf: gpd.GeoDataFrame,
+) -> pd.DataFrame:
+    intersections = gpd.overlay(
+        coc_blocks[
+            [
+                "coc_id",
+                "block_geoid",
+                "total_population",
+                "block_area",
+                "missing_population",
+                "geometry",
+            ]
+        ],
+        msa_gdf[["msa_id", "cbsa_code", "geometry"]],
+        how="intersection",
+        keep_geom_type=False,
+    )
+    intersections = intersections.loc[~intersections.geometry.is_empty].copy()
+    intersections["intersection_area"] = intersections.geometry.area
+    intersections = intersections.loc[intersections["intersection_area"] > 0].copy()
+    intersections["intersection_population"] = (
+        intersections["total_population"].fillna(0.0)
+        * intersections["intersection_area"]
+        / intersections["block_area"]
+    )
+    return intersections
+
+
 def _denominator_comparison_frame(df: pd.DataFrame) -> pd.DataFrame:
     columns = [
         "geometry_id",
@@ -343,6 +374,23 @@ def _msa_denominator_comparison_frame(df: pd.DataFrame) -> pd.DataFrame:
         "msa_missing_population_block_count",
     ]
     return df.loc[:, columns].sort_values("msa_id").reset_index(drop=True)
+
+
+def _block_coc_msa_intersections_comparison_frame(df: pd.DataFrame) -> pd.DataFrame:
+    return (
+        df.groupby(["coc_id", "msa_id", "cbsa_code"], as_index=False)
+        .agg(
+            intersection_area=("intersection_area", "sum"),
+            intersection_population=("intersection_population", "sum"),
+            block_count=("block_geoid", "nunique"),
+            missing_population_block_count=(
+                "missing_population",
+                lambda s: int(s.fillna(False).sum()),
+            ),
+        )
+        .sort_values(["coc_id", "msa_id"])
+        .reset_index(drop=True)
+    )
 
 
 @pytest.fixture
@@ -659,6 +707,54 @@ def test_block_population_truth_table_allocations(
     assert bool(row["partial_coc_population_coverage"]) is expected[
         "partial_coc_population_coverage"
     ]
+
+
+def test_block_coc_msa_intersections_match_overlay_reference():
+    coc = _block_population_coc_gdf()
+    blocks = _prepare_blocks(_block_gdf(), _block_population_df())
+    membership = _block_population_membership_df()
+    county_gdf = _block_population_county_gdf()
+    coc_blocks = _block_geometry_denominator(
+        coc,
+        blocks,
+        left_id_col="coc_id",
+        output_area_col="coc_intersection_area",
+    )
+    msa = _build_msa_geometry_from_counties(county_gdf, membership)
+
+    actual = _block_coc_msa_intersections(coc_blocks, membership)
+    expected = _overlay_block_coc_msa_intersections_reference(coc_blocks, msa)
+
+    pd.testing.assert_frame_equal(
+        _block_coc_msa_intersections_comparison_frame(actual),
+        _block_coc_msa_intersections_comparison_frame(expected),
+    )
+
+
+def test_block_population_crosswalk_avoids_coc_msa_overlay(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    def fail_overlay(*args, **kwargs):
+        raise AssertionError("block population CoC-MSA build should not call gpd.overlay")
+
+    monkeypatch.setattr(gpd, "overlay", fail_overlay)
+
+    result = build_coc_msa_block_population_crosswalk(
+        _block_population_coc_gdf(),
+        _block_population_county_gdf(),
+        _block_population_membership_df(),
+        _block_gdf(),
+        _block_population_df(),
+        boundary_vintage="2025",
+        county_vintage="2023",
+        block_vintage="2020",
+        decennial_vintage="2020",
+        definition_version="census_msa_2023",
+    )
+
+    assert set(zip(result["coc_id"], result["msa_id"], strict=True)) == set(
+        EXPECTED_BLOCK_POPULATION_ROWS
+    )
 
 
 def test_block_geometry_denominator_matches_overlay_reference():
