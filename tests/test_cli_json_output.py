@@ -110,6 +110,55 @@ class TestListMeasuresJson:
         assert any("starts in January 2015" in caveat for caveat in zori["caveats"])
 
 
+class TestListAcsVariablesJson:
+    """Tests for ACS variable registry inventory output."""
+
+    def test_json_output_lists_ingest_paths_and_registry_columns(self):
+        result = runner.invoke(app, ["list", "acs-variables", "--json"])
+
+        assert result.exit_code == 0
+        payload = json.loads(result.output)
+        assert payload["status"] == "ok"
+        assert {path["ingest_path"] for path in payload["ingest_paths"]} == {
+            "acs5-tract",
+            "acs1-metro",
+            "acs1-county",
+        }
+
+        acs5_paths = [
+            column
+            for column in payload["output_columns"]
+            if column["ingest_path"] == "acs5-tract"
+        ]
+        assert any(
+            column["table"] == "B05001"
+            and column["output_column"] == "not_us_citizen"
+            and column["registry_name"] == "nativity_citizenship"
+            and column["artifact_family"] == "acs5_tracts"
+            for column in acs5_paths
+        )
+        assert any(
+            column["table"] == "B25056"
+            and column["output_column"] == "contract_rent_distribution_total"
+            and column["registry_name"] == "contract_rent_distribution"
+            for column in acs5_paths
+        )
+
+    def test_json_output_lists_acs1_contract_rent_for_county_and_metro(self):
+        result = runner.invoke(app, ["list", "acs-variables", "--json"])
+
+        assert result.exit_code == 0
+        payload = json.loads(result.output)
+        for ingest_path in ("acs1-metro", "acs1-county"):
+            assert any(
+                column["ingest_path"] == ingest_path
+                and column["table"] == "B25056"
+                and column["output_column"] == "contract_rent_distribution_total"
+                and column["registry_source"] == "ACS1_TABLE_COLUMN_NAMES"
+                for column in payload["output_columns"]
+            )
+
+
 class TestListCensusJson:
 
     def test_json_output(self, tmp_path):
@@ -312,6 +361,10 @@ class TestDiagnosticsPanelJson:
 
 class TestJsonHelp:
     """Verify --json appears in help for all updated commands."""
+
+    def test_list_acs_variables_help(self):
+        result = runner.invoke(app, ["list", "acs-variables", "--help"])
+        assert "--json" in result.output
 
     def test_list_measures_help(self):
         result = runner.invoke(app, ["list", "measures", "--help"])
