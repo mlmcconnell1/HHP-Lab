@@ -93,6 +93,15 @@ def _is_missing_scalar(value: object) -> bool:
     return bool(pd.api.types.is_scalar(value) and pd.isna(value))
 
 
+def _single_optional_value(df: pd.DataFrame, column: str, default: str) -> str:
+    if column not in df.columns:
+        return default
+    values = sorted({str(value) for value in df[column].dropna().unique()})
+    if len(values) == 1:
+        return values[0]
+    return default
+
+
 def aggregate_pit_to_msa(
     pit_df: pd.DataFrame,
     crosswalk_df: pd.DataFrame,
@@ -212,13 +221,13 @@ def save_msa_pit(
         county_vintage=county_vintage,
         geo_type="msa",
         definition_version=definition_version,
-        weighting="area",
+        weighting=_single_optional_value(pit_df, "allocation_method", "area"),
         extra={
             "dataset_type": "msa_pit",
             "pit_year": pit_year,
             "source_geometry": "coc",
             "share_column": "allocation_share",
-            "allocation_method": "area",
+            "allocation_method": _single_optional_value(pit_df, "allocation_method", "area"),
         },
     )
     write_parquet_with_provenance(pit_df, output_path, provenance)

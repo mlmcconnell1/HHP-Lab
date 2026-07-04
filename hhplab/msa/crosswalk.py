@@ -1367,26 +1367,53 @@ def read_coc_msa_crosswalk(
     definition_version: str,
     county_vintage: str,
     *,
+    allocation_basis: str = "area",
+    block_vintage: str | int = "2020",
+    decennial_vintage: str | int = "2020",
     base_dir: Path | str | None = None,
 ) -> pd.DataFrame:
     """Read a curated CoC-to-MSA crosswalk from disk."""
-    from hhplab.naming import msa_coc_xwalk_path
+    from hhplab.naming import msa_coc_block_population_xwalk_path, msa_coc_xwalk_path
 
-    path = msa_coc_xwalk_path(
-        boundary_vintage,
-        definition_version,
-        county_vintage,
-        base_dir=base_dir,
-    )
+    if allocation_basis == "area":
+        path = msa_coc_xwalk_path(
+            boundary_vintage,
+            definition_version,
+            county_vintage,
+            base_dir=base_dir,
+        )
+        generate_command = (
+            "hhplab generate msa-xwalk "
+            f"--boundary {boundary_vintage} "
+            f"--definition-version {definition_version} "
+            f"--counties {county_vintage}"
+        )
+    elif allocation_basis == "block_population":
+        path = msa_coc_block_population_xwalk_path(
+            boundary_vintage,
+            definition_version,
+            county_vintage,
+            block_vintage,
+            decennial_vintage,
+            base_dir=base_dir,
+        )
+        generate_command = (
+            "hhplab generate msa-xwalk "
+            f"--allocation-basis block_population --boundary {boundary_vintage} "
+            f"--definition-version {definition_version} --counties {county_vintage} "
+            f"--blocks {block_vintage} --decennial {decennial_vintage}"
+        )
+    else:
+        raise ValueError(
+            f"Unsupported CoC-to-MSA crosswalk allocation_basis '{allocation_basis}'. "
+            "Use one of: area, block_population."
+        )
     try:
         return pd.read_parquet(path)
     except FileNotFoundError:
         raise FileNotFoundError(
             f"CoC-to-MSA crosswalk artifact not found at {path}. "
-            "Run: hhplab generate msa-xwalk "
-            f"--boundary {boundary_vintage} "
-            f"--definition-version {definition_version} "
-            f"--counties {county_vintage}"
+            f"Run: {generate_command}"
         ) from None
 
 

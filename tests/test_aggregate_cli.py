@@ -652,6 +652,95 @@ def test_aggregate_pit_to_msa_materializes_weighted_outputs(tmp_path):
     assert list(msa_df["pit_total"].astype(float)) == pytest.approx([140.0, 100.0])
 
 
+def test_aggregate_pit_to_msa_uses_block_population_crosswalk(tmp_path):
+    """MSA PIT aggregate should consume generated block-population crosswalks."""
+    import os
+
+    import pandas as pd
+
+    from hhplab.naming import msa_coc_block_population_xwalk_filename, msa_pit_filename
+    from hhplab.provenance import read_provenance
+
+    pit_dir = tmp_path / "data" / "curated" / "pit"
+    xwalk_dir = tmp_path / "data" / "curated" / "xwalks"
+    pit_dir.mkdir(parents=True)
+    xwalk_dir.mkdir(parents=True)
+
+    pd.DataFrame(
+        {
+            "coc_id": ["CO-100", "CO-200"],
+            "pit_year": [2020, 2020],
+            "pit_total": [100.0, 80.0],
+            "pit_sheltered": [60.0, 40.0],
+            "pit_unsheltered": [40.0, 40.0],
+        }
+    ).to_parquet(pit_dir / "pit__P2020.parquet", index=False)
+
+    pd.DataFrame(
+        {
+            "coc_id": ["CO-100", "CO-200", "CO-200"],
+            "msa_id": ["35620", "35620", "41180"],
+            "cbsa_code": ["35620", "35620", "41180"],
+            "boundary_vintage": ["2020"] * 3,
+            "county_vintage": ["2020"] * 3,
+            "definition_version": ["census_msa_2023"] * 3,
+            "allocation_method": ["block_population"] * 3,
+            "share_column": ["allocation_share"] * 3,
+            "allocation_share": [1.0, 0.25, 0.75],
+            "allocation_basis": ["block_population"] * 3,
+            "denominator_source": ["pl_94_171_block_population"] * 3,
+        }
+    ).to_parquet(
+        xwalk_dir
+        / msa_coc_block_population_xwalk_filename(
+            2020,
+            "census_msa_2023",
+            2020,
+            2020,
+            2020,
+        ),
+        index=False,
+    )
+
+    old_cwd = os.getcwd()
+    try:
+        os.chdir(tmp_path)
+        result = runner.invoke(
+            app,
+            [
+                "aggregate",
+                "pit",
+                "--years",
+                "2020",
+                "--geo-type",
+                "msa",
+                "--definition-version",
+                "census_msa_2023",
+                "--counties",
+                "2020",
+                "--allocation-basis",
+                "block_population",
+                "--blocks",
+                "2020",
+                "--decennial",
+                "2020",
+            ],
+            catch_exceptions=False,
+        )
+    finally:
+        os.chdir(old_cwd)
+
+    assert result.exit_code == 0
+    out_file = pit_dir / msa_pit_filename(2020, "census_msa_2023", 2020, 2020)
+    msa_df = pd.read_parquet(out_file).sort_values("msa_id").reset_index(drop=True)
+    assert list(msa_df["pit_total"].astype(float)) == pytest.approx([120.0, 60.0])
+    assert msa_df["allocation_method"].unique().tolist() == ["block_population"]
+    provenance = read_provenance(out_file)
+    assert provenance is not None
+    assert provenance.weighting == "block_population"
+    assert provenance.extra["allocation_method"] == "block_population"
+
+
 def test_aggregate_pit_to_msa_missing_crosswalk_is_actionable(tmp_path):
     """MSA PIT aggregate should report the exact missing crosswalk command."""
     import os
@@ -695,3 +784,52 @@ def test_aggregate_pit_to_msa_missing_crosswalk_is_actionable(tmp_path):
         "generate msa-xwalk --boundary 2020 --definition-version census_msa_2023 --counties 2020"
         in result.output
     )
+
+
+def test_aggregate_pit_to_msa_missing_block_population_crosswalk_is_actionable(tmp_path):
+    """Missing block-population PIT MSA crosswalk should include matching generate flags."""
+    import os
+
+    import pandas as pd
+
+    pit_dir = tmp_path / "data" / "curated" / "pit"
+    pit_dir.mkdir(parents=True)
+    pd.DataFrame(
+        {
+            "coc_id": ["CO-100"],
+            "pit_year": [2020],
+            "pit_total": [100.0],
+        }
+    ).to_parquet(pit_dir / "pit__P2020.parquet", index=False)
+
+    old_cwd = os.getcwd()
+    try:
+        os.chdir(tmp_path)
+        result = runner.invoke(
+            app,
+            [
+                "aggregate",
+                "pit",
+                "--years",
+                "2020",
+                "--geo-type",
+                "msa",
+                "--definition-version",
+                "census_msa_2023",
+                "--counties",
+                "2020",
+                "--allocation-basis",
+                "block_population",
+                "--blocks",
+                "2020",
+                "--decennial",
+                "2020",
+            ],
+            catch_exceptions=False,
+        )
+    finally:
+        os.chdir(old_cwd)
+
+    assert result.exit_code == 1
+    assert "--allocation-basis block_population --boundary 2020" in result.output
+    assert "--blocks 2020 --decennial 2020" in result.output

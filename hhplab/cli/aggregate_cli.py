@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import tempfile
 from pathlib import Path
-from typing import Annotated
+from typing import Annotated, Literal
 
 import pandas as pd
 import typer
@@ -529,6 +529,27 @@ def aggregate_pit(
             help="County geometry vintage for the CoC-to-MSA crosswalk. Defaults to the PIT year.",
         ),
     ] = None,
+    allocation_basis: Annotated[
+        Literal["area", "block_population"],
+        typer.Option(
+            "--allocation-basis",
+            help="CoC-to-MSA allocation basis for --geo-type=msa.",
+        ),
+    ] = "area",
+    blocks: Annotated[
+        int,
+        typer.Option(
+            "--blocks",
+            help="Block geometry vintage for --allocation-basis block_population.",
+        ),
+    ] = 2020,
+    decennial: Annotated[
+        int,
+        typer.Option(
+            "--decennial",
+            help="Decennial population vintage for --allocation-basis block_population.",
+        ),
+    ] = 2020,
 ) -> None:
     """Aggregate PIT counts into curated CoC or MSA artifacts.
 
@@ -634,6 +655,9 @@ def aggregate_pit(
                     boundary_vintage,
                     definition_version,
                     county_vintage,
+                    allocation_basis=allocation_basis,
+                    block_vintage=str(blocks),
+                    decennial_vintage=str(decennial),
                 )
             except FileNotFoundError as exc:
                 typer.echo(f"Error: {exc}", err=True)
