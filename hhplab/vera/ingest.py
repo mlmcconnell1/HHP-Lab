@@ -10,7 +10,7 @@ from urllib.request import urlretrieve
 import pandas as pd
 
 from hhplab.naming import vera_incarceration_county_filename, vera_incarceration_county_path
-from hhplab.paths import curated_dir, raw_root
+from hhplab.paths import raw_root
 from hhplab.provenance import ProvenanceBlock, write_parquet_with_provenance
 from hhplab.schema.columns import VERA_INCARCERATION_COUNTY_MEASURE_COLUMNS
 from hhplab.source_registry import register_source
@@ -265,7 +265,9 @@ def ingest_county_incarceration_trends(
             "county_count": int(measures["county_fips"].nunique()),
             "year_range": [int(measures["year"].min()), int(measures["year"].max())],
             "county_vintage": county_vintage,
-            "jail_coverage_note": "County jail columns are available from 1970-2026 where reported.",
+            "jail_coverage_note": (
+                "County jail columns are available from 1970-2026 where reported."
+            ),
             "prison_coverage_note": "County prison columns are available from 1983-2019.",
             "output_schema": VERA_INCARCERATION_COUNTY_MEASURE_COLUMNS,
             "aggregation_policy": (

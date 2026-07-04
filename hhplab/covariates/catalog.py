@@ -153,4 +153,6 @@ def covariate_source_spec(source_id: str) -> CovariateSourceSpec:
         return COVARIATE_SOURCE_SPECS[source_id]
     except KeyError as exc:
         supported = ", ".join(sorted(COVARIATE_SOURCE_SPECS))
-        raise KeyError(f"Unsupported covariate source '{source_id}'. Supported: {supported}") from exc
+        raise KeyError(
+            f"Unsupported covariate source '{source_id}'. Supported: {supported}"
+        ) from exc
