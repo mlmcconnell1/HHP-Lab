@@ -622,3 +622,38 @@ class TestRetiredCommandRegression:
         assert "build recipe-preflight --recipe <file> --json" in result.output
         assert "build recipe --recipe <file> --json" in result.output
         assert "recipe init msa-coc-overlap --output <file> --json" in result.output
+
+    def test_agents_command_includes_human_inference_guardrails(self):
+        """Human agent guidance should name common analysis pitfalls."""
+        result = runner.invoke(app, ["agents"])
+        assert result.exit_code == 0
+        assert "Inference Guardrails" in result.output
+        assert "Small N" in result.output
+        assert "2021 PIT disruption" in result.output
+        assert "Spatial autocorrelation" in result.output
+        assert "ACS lag causal ordering" in result.output
+        assert "Multiple comparisons" in result.output
+
+    def test_agents_json_includes_machine_readable_inference_guardrails(self):
+        """Agents consuming JSON should receive structured statistical cautions."""
+        result = runner.invoke(app, ["agents", "--json"])
+        assert result.exit_code == 0
+        payload = json.loads(result.output)
+
+        guardrail_ids = {
+            guardrail["id"] for guardrail in payload["inference_guardrails"]
+        }
+        assert guardrail_ids == {
+            "small_n",
+            "pit_2021_disruption",
+            "spatial_autocorrelation",
+            "acs_lag_causal_ordering",
+            "multiple_comparisons",
+        }
+        small_n = next(
+            guardrail
+            for guardrail in payload["inference_guardrails"]
+            if guardrail["id"] == "small_n"
+        )
+        assert "50 metros" in small_n["guidance"]
+        assert "380 CoCs" in small_n["guidance"]
