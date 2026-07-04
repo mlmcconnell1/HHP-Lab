@@ -10,6 +10,7 @@ import typer
 
 from hhplab.analyze import (
     AnalysisError,
+    _json_safe,
     correlate_panel,
     describe_panel,
     lagged_associations_panel,
@@ -55,7 +56,7 @@ def _parse_lags(value: str) -> list[int]:
 def _emit(result, *, json_output: bool) -> None:
     payload = result.to_payload()
     if json_output:
-        typer.echo(json.dumps(payload, indent=2, default=str))
+        typer.echo(json.dumps(_json_safe(payload), indent=2, default=str, allow_nan=False))
         return
     typer.echo(f"Wrote {payload['analysis_type']} analysis: {payload['output_path']}")
     typer.echo(f"Manifest: {payload['manifest_path']}")
@@ -64,9 +65,9 @@ def _emit(result, *, json_output: bool) -> None:
 
 def _emit_payload(payload: dict, *, json_output: bool) -> None:
     if json_output:
-        typer.echo(json.dumps(payload, indent=2, default=str))
+        typer.echo(json.dumps(_json_safe(payload), indent=2, default=str, allow_nan=False))
         return
-    typer.echo(json.dumps(payload, indent=2, default=str))
+    typer.echo(json.dumps(_json_safe(payload), indent=2, default=str, allow_nan=False))
 
 
 @analyze_app.command("describe")

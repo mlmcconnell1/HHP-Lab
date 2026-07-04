@@ -17,12 +17,51 @@ runner = CliRunner()
 def _panel_fixture(path: Path) -> Path:
     df = pd.DataFrame(
         {
-            "geo_id": ["A", "A", "A", "B", "B", "B"],
-            "year": [2020, 2021, 2022, 2020, 2021, 2022],
-            "pit_total": [10.0, 12.0, 14.0, 20.0, 19.0, 18.0],
-            "total_population": [1000.0, 1000.0, 1000.0, 2000.0, 2000.0, 2000.0],
-            "median_gross_rent": [900.0, 950.0, 1000.0, 1100.0, 1125.0, 1150.0],
-            "unemployment_rate": [0.05, 0.06, 0.055, 0.08, 0.075, 0.07],
+            "geo_id": ["A", "A", "A", "A", "B", "B", "B", "B", "C", "C", "C", "C"],
+            "year": [2020, 2021, 2022, 2023] * 3,
+            "pit_total": [10.0, 12.0, 14.0, 15.0, 20.0, 19.0, 18.0, 17.0, 8.0, 9.0, 11.0, 12.0],
+            "total_population": [
+                1000.0,
+                1000.0,
+                1010.0,
+                1015.0,
+                2000.0,
+                2000.0,
+                2010.0,
+                2020.0,
+                900.0,
+                910.0,
+                915.0,
+                920.0,
+            ],
+            "median_gross_rent": [
+                900.0,
+                950.0,
+                1000.0,
+                1040.0,
+                1100.0,
+                1125.0,
+                1150.0,
+                1175.0,
+                850.0,
+                875.0,
+                900.0,
+                925.0,
+            ],
+            "unemployment_rate": [
+                0.05,
+                0.06,
+                0.055,
+                0.052,
+                0.08,
+                0.075,
+                0.07,
+                0.068,
+                0.045,
+                0.047,
+                0.049,
+                0.048,
+            ],
         }
     )
     write_parquet_with_provenance(
@@ -33,6 +72,20 @@ def _panel_fixture(path: Path) -> Path:
             extra={"recipe": "test-panel"},
         ),
     )
+    return path
+
+
+def _saturated_panel_fixture(path: Path) -> Path:
+    df = pd.DataFrame(
+        {
+            "geo_id": ["A", "A", "A", "B", "B", "B"],
+            "year": [2020, 2021, 2022, 2020, 2021, 2022],
+            "pit_total": [10.0, 12.0, 14.0, 20.0, 19.0, 18.0],
+            "median_gross_rent": [900.0, 950.0, 1000.0, 1100.0, 1125.0, 1150.0],
+            "unemployment_rate": [0.05, 0.06, 0.055, 0.08, 0.075, 0.07],
+        }
+    )
+    df.to_parquet(path)
     return path
 
 
@@ -135,8 +188,56 @@ class TestAnalyzeCli:
         payload = json.loads(result.output)
         assert payload["analysis_type"] == "regress"
         assert payload["std_error_type"] == "clustered:geo_id"
-        terms = set(pd.read_parquet(output)["term"])
+        regression = pd.read_parquet(output)
+        terms = set(regression["term"])
         assert {"Intercept", "median_gross_rent", "unemployment_rate"} <= terms
+        assert (regression["dof"] > 0).all()
+        assert "p_value" in regression.columns
+        assert payload["dof"] > 0
+
+    def test_regress_rejects_saturated_fixed_effect_model(self, tmp_path: Path):
+        panel = _saturated_panel_fixture(tmp_path / "panel.parquet")
+
+        result = runner.invoke(
+            app,
+            [
+                "analyze",
+                "regress",
+                "--panel",
+                str(panel),
+                "--outcome",
+                "pit_total",
+                "--predictors",
+                "median_gross_rent,unemployment_rate",
+                "--json",
+            ],
+        )
+
+        assert result.exit_code != 0
+        assert "saturated or rank-deficient" in result.output
+
+    def test_describe_json_uses_null_for_non_finite_values(self, tmp_path: Path):
+        panel = tmp_path / "panel.parquet"
+        pd.DataFrame({"geo_id": ["A"], "year": [2020], "pit_total": [10.0]}).to_parquet(panel)
+
+        result = runner.invoke(
+            app,
+            [
+                "analyze",
+                "describe",
+                "--panel",
+                str(panel),
+                "--columns",
+                "pit_total",
+                "--json",
+            ],
+        )
+
+        assert result.exit_code == 0
+        assert "NaN" not in result.output
+        assert "Infinity" not in result.output
+        payload = json.loads(result.output)
+        assert payload["records"][0]["std"] is None
 
     def test_lagged_outputs_lagged_associations(self, tmp_path: Path):
         panel = _panel_fixture(tmp_path / "panel.parquet")

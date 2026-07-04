@@ -4,9 +4,11 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
+from statistics import NormalDist
 from typing import Any
 
 import numpy as np
@@ -30,13 +32,15 @@ class AnalysisResult:
     metadata: dict[str, Any]
 
     def to_payload(self) -> dict[str, Any]:
-        return {
-            "status": "ok",
-            "output_path": str(self.output_path),
-            "manifest_path": str(self.manifest_path),
-            **self.metadata,
-            "records": self.table.to_dict(orient="records"),
-        }
+        return _json_safe(
+            {
+                "status": "ok",
+                "output_path": str(self.output_path),
+                "manifest_path": str(self.manifest_path),
+                **self.metadata,
+                "records": self.table.to_dict(orient="records"),
+            }
+        )
 
 
 def _default_output_path(panel_path: Path, analysis_type: str) -> Path:
@@ -122,10 +126,12 @@ def _json_safe(value: Any) -> Any:
         return {str(key): _json_safe(item) for key, item in value.items()}
     if isinstance(value, (list, tuple)):
         return [_json_safe(item) for item in value]
-    if pd.isna(value) and not isinstance(value, (list, tuple, dict)):
+    if isinstance(value, float) and not math.isfinite(value):
         return None
     if hasattr(value, "item"):
-        return value.item()
+        return _json_safe(value.item())
+    if pd.isna(value) and not isinstance(value, (list, tuple, dict)):
+        return None
     return value
 
 
@@ -380,6 +386,17 @@ def _clustered_standard_errors(
     return np.sqrt(np.clip(np.diag(variance), 0, None))
 
 
+def _two_sided_p_value(t_stat: float, dof: int) -> float:
+    if not math.isfinite(t_stat):
+        return np.nan
+    try:
+        from scipy import stats  # type: ignore[import-not-found]
+
+        return float(2.0 * stats.t.sf(abs(t_stat), dof))
+    except Exception:
+        return float(2.0 * (1.0 - NormalDist().cdf(abs(t_stat))))
+
+
 def regress_panel(
     panel_path: Path,
     *,
@@ -407,7 +424,10 @@ def regress_panel(
     numeric_cols = [outcome, *predictors]
     for column in numeric_cols:
         model_df[column] = pd.to_numeric(model_df[column], errors="coerce")
-    model_df = model_df.dropna(subset=numeric_cols)
+    drop_subset = list(numeric_cols)
+    if cluster_by is not None:
+        drop_subset.append(cluster_by)
+    model_df = model_df.dropna(subset=drop_subset)
     if len(model_df) <= len(predictors):
         raise AnalysisError("regress has too few complete rows for the requested model.")
 
@@ -419,10 +439,17 @@ def regress_panel(
     design = pd.concat(x_parts, axis=1).astype(float)
     y = model_df[outcome].to_numpy(dtype=float)
     x = design.to_numpy(dtype=float)
+    rank = int(np.linalg.matrix_rank(x))
+    dof = int(len(y) - rank)
+    if dof < 1:
+        raise AnalysisError(
+            "regress model is saturated or rank-deficient after fixed effects: "
+            f"n={len(y)}, design_columns={x.shape[1]}, rank={rank}, residual_dof={dof}. "
+            "Use fewer predictors/fixed effects or a larger panel."
+        )
     beta, *_ = np.linalg.lstsq(x, y, rcond=None)
     fitted = x @ beta
     residuals = y - fitted
-    dof = max(len(y) - np.linalg.matrix_rank(x), 1)
     sigma2 = float((residuals @ residuals) / dof)
     naive_se = np.sqrt(np.clip(np.diag(np.linalg.pinv(x.T @ x)) * sigma2, 0, None))
     if cluster_by is not None:
@@ -439,8 +466,13 @@ def regress_panel(
         }
     )
     coef["t_stat"] = coef["estimate"] / coef["std_error"].replace(0, np.nan)
+    coef["p_value"] = [
+        _two_sided_p_value(float(t_stat), dof) for t_stat in coef["t_stat"].tolist()
+    ]
     coef["outcome"] = outcome
     coef["n"] = int(len(y))
+    coef["design_rank"] = rank
+    coef["dof"] = dof
     coef["r_squared"] = float(1 - (residuals @ residuals) / np.sum((y - y.mean()) ** 2))
     coef["std_error_type"] = std_error_type
     return _persist_result(
@@ -462,6 +494,8 @@ def regress_panel(
             "outcome": outcome,
             "predictors": predictors,
             "n": int(len(y)),
+            "design_rank": rank,
+            "dof": dof,
             "r_squared": float(coef["r_squared"].iloc[0]),
             "std_error_type": std_error_type,
         },
