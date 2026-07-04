@@ -10,6 +10,7 @@ from typing import Any
 import pandas as pd
 
 from hhplab.covariates.catalog import CovariateSourceSpec, covariate_source_spec
+from hhplab.naming import covariate_curated_filename
 from hhplab.paths import curated_dir
 from hhplab.provenance import ProvenanceBlock, write_parquet_with_provenance
 from hhplab.source_registry import register_source
@@ -28,8 +29,13 @@ def default_covariate_output_path(
     output_dir: Path | str | None = None,
 ) -> Path:
     """Return the deterministic curated output path for a covariate source."""
+    spec = covariate_source_spec(source_id)
     base = curated_dir("covariates") if output_dir is None else Path(output_dir)
-    return base / f"{source_id}__covariates.parquet"
+    return base / covariate_curated_filename(
+        source_id,
+        spec.first_year,
+        spec.last_year,
+    )
 
 
 def ingest_covariate_source(

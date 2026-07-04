@@ -8,6 +8,7 @@ import pandas as pd
 
 from hhplab.covariates.catalog import covariate_source_spec
 from hhplab.covariates.ingest import default_covariate_output_path
+from hhplab.naming import covariate_panel_filename
 from hhplab.paths import curated_dir
 from hhplab.provenance import ProvenanceBlock, read_provenance, write_parquet_with_provenance
 
@@ -18,8 +19,13 @@ def default_covariate_panel_path(
     output_dir: Path | str | None = None,
 ) -> Path:
     """Return the deterministic panel-ready output path."""
+    spec = covariate_source_spec(source_id)
     base = curated_dir("covariates") if output_dir is None else Path(output_dir)
-    return base / f"{source_id}__panel.parquet"
+    return base / covariate_panel_filename(
+        source_id,
+        spec.first_year,
+        spec.last_year,
+    )
 
 
 def aggregate_covariate_source(

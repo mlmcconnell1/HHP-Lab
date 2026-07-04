@@ -12,6 +12,7 @@ from hhplab.cli.main import app
 from hhplab.covariates.aggregate import aggregate_covariate_source
 from hhplab.covariates.catalog import COVARIATE_SOURCE_SPECS
 from hhplab.covariates.ingest import ingest_covariate_source
+from hhplab.curated_policy import validate_curated_layout
 from hhplab.provenance import read_provenance
 
 runner = CliRunner()
@@ -58,6 +59,7 @@ def test_ingest_and_aggregate_county_covariate_roundtrip(tmp_path: Path, monkeyp
     )
     curated_df = pd.read_parquet(curated)
 
+    assert curated.name == "covariate__eviction_lab__Y2000-ongoing.parquet"
     assert curated_df["geo_type"].tolist() == ["county", "county"]
     assert curated_df["county_fips"].tolist() == ["01001", "01003"]
     assert curated_df["eviction_filings"].tolist() == [120, 140]
@@ -74,11 +76,49 @@ def test_ingest_and_aggregate_county_covariate_roundtrip(tmp_path: Path, monkeyp
         force=True,
     )
     panel_df = pd.read_parquet(panel)
+    assert panel.name == "covariate_panel__eviction_lab__Y2000-ongoing.parquet"
     assert panel_df["geo_id"].tolist() == ["01003"]
     assert panel_df["year"].tolist() == [2021]
     panel_provenance = read_provenance(panel)
     assert panel_provenance is not None
     assert panel_provenance.extra["dataset_type"] == "expanded_covariate_panel"
+
+
+def test_covariate_outputs_pass_curated_layout_policy(tmp_path: Path, monkeypatch) -> None:
+    """Covariate artifacts should use canonical names in a registered curated subdir."""
+    monkeypatch.setattr("hhplab.covariates.ingest.register_source", lambda **_: None)
+    raw = tmp_path / "fmr.csv"
+    pd.DataFrame(
+        {
+            "county_fips": ["01001"],
+            "year": [2024],
+            "fmr_0br": [750],
+            "fmr_1br": [850],
+            "fmr_2br": [1000],
+            "fmr_3br": [1250],
+            "fmr_4br": [1500],
+        }
+    ).to_csv(raw, index=False)
+    curated_root = tmp_path / "curated"
+    covariate_dir = curated_root / "covariates"
+
+    curated = ingest_covariate_source(
+        "hud_fmr",
+        raw,
+        output_dir=covariate_dir,
+        force=True,
+    )
+    panel = aggregate_covariate_source(
+        "hud_fmr",
+        curated_path=curated,
+        output_dir=covariate_dir,
+        years=[2024],
+        force=True,
+    )
+
+    assert curated.name == "covariate__hud_fmr__Y2000-ongoing.parquet"
+    assert panel.name == "covariate_panel__hud_fmr__Y2000-ongoing.parquet"
+    assert validate_curated_layout(curated_root) == []
 
 
 def test_cli_lists_covariate_sources_as_json() -> None:

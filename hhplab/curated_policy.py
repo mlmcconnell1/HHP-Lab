@@ -52,6 +52,7 @@ CURATED_SUBDIRS: set[str] = {
     "medsl",
     "vera",
     "sanctuary",
+    "covariates",
 }
 
 # Cache namespaces may live next to curated assets during local development,
@@ -189,6 +190,10 @@ CANONICAL_PATTERNS: dict[str, list[re.Pattern[str]]] = {
     ],
     "sanctuary": [
         re.compile(r"^sanctuary_msa_matches__D\d{8}xM\w+\.parquet$"),
+    ],
+    "covariates": [
+        re.compile(r"^covariate__[a-z0-9_]+__Y\d{4}-(?:\d{4}|ongoing)\.parquet$"),
+        re.compile(r"^covariate_panel__[a-z0-9_]+__Y\d{4}-(?:\d{4}|ongoing)\.parquet$"),
     ],
     "maps": [
         re.compile(r"^.+\.html$"),
