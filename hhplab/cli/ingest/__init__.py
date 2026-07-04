@@ -10,6 +10,7 @@ from hhplab.cli.ingest.census import (
     ingest_tiger,
     ingest_urban_areas_cmd,
 )
+from hhplab.cli.ingest.covariates import ingest_covariate
 from hhplab.cli.ingest.cpi import ingest_cpi_u
 from hhplab.cli.ingest.decennial_tract_population import ingest_decennial_tract_population
 from hhplab.cli.ingest.hic import ingest_hic
@@ -52,3 +53,4 @@ def register_commands(app: typer.Typer) -> None:
     app.command("pep")(ingest_pep)
     app.command("medsl-presidential")(ingest_medsl_presidential)
     app.command("vera-incarceration")(ingest_vera_incarceration)
+    app.command("covariate")(ingest_covariate)

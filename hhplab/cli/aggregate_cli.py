@@ -36,6 +36,7 @@ PIT_ALIGN_MODES = ("point_in_time_jan", "to_calendar_year")
 ACS_ALIGN_MODES = ("vintage_end_year", "window_center_year")
 ZORI_ALIGN_MODES = ("monthly_native", "pit_january", "calendar_year_average")
 CDC_OVERDOSE_ALIGN_MODES = ("january_trailing_12_months",)
+COVARIATE_ALIGN_MODES = ("native_year",)
 
 
 # ---------------------------------------------------------------------------
@@ -64,6 +65,75 @@ def _resolve_years(years: str | None) -> list[int]:
         err=True,
     )
     raise typer.Exit(2)
+
+
+@aggregate_app.command("covariate")
+def aggregate_covariate(
+    source: Annotated[
+        str,
+        typer.Option("--source", help="Covariate source id; see `hhplab list covariates`."),
+    ],
+    align: Annotated[
+        str,
+        typer.Option("--align", help="Temporal alignment mode. One of: native_year."),
+    ] = "native_year",
+    years: Annotated[
+        str | None,
+        typer.Option("--years", help="Optional year spec such as '2018-2024'."),
+    ] = None,
+    curated_path: Annotated[
+        Path | None,
+        typer.Option("--curated-path", help="Curated covariate parquet path."),
+    ] = None,
+    output_dir: Annotated[
+        Path | None,
+        typer.Option("--output-dir", "-o", help="Output directory for panel artifact."),
+    ] = None,
+    force: Annotated[
+        bool,
+        typer.Option("--force", "-f", help="Rebuild even if output already exists."),
+    ] = False,
+    output_json: Annotated[
+        bool,
+        typer.Option("--json", help="Emit structured JSON."),
+    ] = False,
+) -> None:
+    """Validate and materialize an expanded covariate source as panel-ready parquet."""
+    import json
+
+    from hhplab.covariates.aggregate import aggregate_covariate_source
+
+    _validate_align(align, COVARIATE_ALIGN_MODES, "covariate")
+    parsed_years = parse_year_spec(years) if years is not None else None
+    try:
+        result_path = aggregate_covariate_source(
+            source,
+            curated_path=curated_path,
+            output_dir=output_dir,
+            years=parsed_years,
+            force=force,
+        )
+        row_count = len(pd.read_parquet(result_path))
+    except (FileNotFoundError, KeyError, ValueError) as exc:
+        if output_json:
+            typer.echo(json.dumps({"status": "error", "message": str(exc)}))
+            raise typer.Exit(2) from exc
+        typer.echo(f"Error: {exc}", err=True)
+        raise typer.Exit(2) from exc
+
+    payload = {
+        "status": "ok",
+        "dataset": "covariate",
+        "source_id": source,
+        "align": align,
+        "years": parsed_years,
+        "output_path": str(result_path),
+        "row_count": row_count,
+    }
+    if output_json:
+        typer.echo(json.dumps(payload))
+        return
+    typer.echo(f"Covariate aggregation complete: {result_path}")
 
 
 # ---------------------------------------------------------------------------
