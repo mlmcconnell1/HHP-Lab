@@ -412,14 +412,6 @@ def _standardize_model_columns(
     metadata: dict[str, dict[str, Any]] = {}
     for column in columns:
         values = pd.to_numeric(model_df[column], errors="coerce")
-        if _is_binary_indicator(values):
-            metadata[column] = {
-                "standardized": False,
-                "mean": float(values.mean()),
-                "std": float(values.std(ddof=0)),
-                "note": "binary_indicator_not_standardized",
-            }
-            continue
         mean = float(values.mean())
         std = float(values.std(ddof=0))
         if not math.isfinite(std) or std <= 0:
@@ -427,6 +419,14 @@ def _standardize_model_columns(
                 f"Cannot standardize column '{column}' because its model-sample "
                 "standard deviation is zero or undefined."
             )
+        if _is_binary_indicator(values):
+            metadata[column] = {
+                "standardized": False,
+                "mean": mean,
+                "std": std,
+                "note": "binary_indicator_not_standardized",
+            }
+            continue
         model_df[column] = (values - mean) / std
         metadata[column] = {
             "standardized": True,
@@ -516,9 +516,7 @@ def regress_panel(
         }
     )
     coef["t_stat"] = coef["estimate"] / coef["std_error"].replace(0, np.nan)
-    coef["p_value"] = [
-        _two_sided_p_value(float(t_stat), dof) for t_stat in coef["t_stat"].tolist()
-    ]
+    coef["p_value"] = [_two_sided_p_value(float(t_stat), dof) for t_stat in coef["t_stat"].tolist()]
     coef["outcome"] = outcome
     coef["n"] = int(len(y))
     coef["design_rank"] = rank
@@ -611,9 +609,7 @@ def lagged_associations_panel(
                     "lag": lag,
                     "n": int(len(pair)),
                     "correlation": (
-                        float(pair[outcome].corr(pair[lagged_column]))
-                        if len(pair) > 1
-                        else np.nan
+                        float(pair[outcome].corr(pair[lagged_column])) if len(pair) > 1 else np.nan
                     ),
                 }
             )

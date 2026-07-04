@@ -63,6 +63,7 @@ def _panel_fixture(path: Path) -> Path:
                 0.048,
             ],
             "policy_indicator": [0, 0, 1, 1, 0, 1, 1, 1, 0, 0, 0, 1],
+            "constant_policy_indicator": [1] * 12,
         }
     )
     write_parquet_with_provenance(
@@ -241,9 +242,38 @@ class TestAnalyzeCli:
         provenance = read_provenance(output)
         assert provenance is not None
         assert provenance.extra["parameters"]["standardize"] == "predictors"
-        assert provenance.extra["parameters"]["standardization"]["policy_indicator"][
-            "note"
-        ] == "binary_indicator_not_standardized"
+        assert (
+            provenance.extra["parameters"]["standardization"]["policy_indicator"]["note"]
+            == "binary_indicator_not_standardized"
+        )
+
+    def test_regress_standardize_rejects_constant_binary_predictor(self, tmp_path: Path):
+        panel = _panel_fixture(tmp_path / "panel.parquet")
+
+        result = runner.invoke(
+            app,
+            [
+                "analyze",
+                "regress",
+                "--panel",
+                str(panel),
+                "--outcome",
+                "pit_total",
+                "--predictors",
+                "median_gross_rent,constant_policy_indicator",
+                "--no-entity-fe",
+                "--no-year-fe",
+                "--cluster-by",
+                "",
+                "--standardize",
+                "predictors",
+                "--json",
+            ],
+        )
+
+        assert result.exit_code != 0
+        assert "constant_policy_indicator" in result.output
+        assert "standard deviation is zero or undefined" in result.output
 
     def test_regress_rejects_saturated_fixed_effect_model(self, tmp_path: Path):
         panel = _saturated_panel_fixture(tmp_path / "panel.parquet")
