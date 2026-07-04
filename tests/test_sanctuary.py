@@ -11,7 +11,9 @@ from typer.testing import CliRunner
 from hhplab.cli.main import app
 from hhplab.sanctuary import (
     SANCTUARY_MSA_MATCH_COLUMNS,
+    SANCTUARY_MSA_PANEL_COLUMNS,
     build_sanctuary_msa_matches,
+    build_sanctuary_msa_panel_covariate,
 )
 
 runner = CliRunner()
@@ -72,6 +74,26 @@ def test_build_sanctuary_msa_matches_is_conservative_and_transparent() -> None:
     assert nyc["match_basis"] == "state+city"
 
 
+def test_build_sanctuary_msa_panel_covariate_has_binary_indicator_for_all_msas() -> None:
+    matches = build_sanctuary_msa_matches(DEFINITIONS, MEMBERSHIP)
+    result = build_sanctuary_msa_panel_covariate(
+        DEFINITIONS,
+        matches,
+        source_date="2025-08-05",
+    )
+
+    assert tuple(result.columns) == SANCTUARY_MSA_PANEL_COLUMNS
+    assert result["msa_id"].tolist() == ["11111", "22222", "33333", "44444"]
+    assert result["doj_sanctuary_msa"].tolist() == [1, 1, 1, 0]
+    assert result["doj_sanctuary_source_date"].unique().tolist() == ["2025-08-05"]
+
+    no_match = result.loc[result["msa_id"] == "44444"].iloc[0]
+    assert no_match["match_basis"] == ""
+    assert not bool(no_match["state_match"])
+    assert not bool(no_match["county_match"])
+    assert not bool(no_match["city_match"])
+
+
 def test_generate_sanctuary_msa_json(monkeypatch, tmp_path: Path) -> None:
     output = (
         tmp_path
@@ -104,4 +126,48 @@ def test_generate_sanctuary_msa_json(monkeypatch, tmp_path: Path) -> None:
     assert payload["row_count"] == 1
     assert payload["artifact"].endswith(
         "sanctuary_msa_matches__D20250805xMcensus_msa_2023.parquet"
+    )
+
+
+def test_generate_sanctuary_msa_panel_json(monkeypatch, tmp_path: Path) -> None:
+    output = (
+        tmp_path
+        / "data"
+        / "curated"
+        / "sanctuary"
+        / "sanctuary_msa_panel__D20250805xMcensus_msa_2023.parquet"
+    )
+
+    def fake_write_sanctuary_msa_panel_covariate(**kwargs):
+        output.parent.mkdir(parents=True, exist_ok=True)
+        pd.DataFrame(
+            {
+                "msa_id": ["11111", "22222"],
+                "doj_sanctuary_msa": [1, 0],
+                "match_basis": ["state", ""],
+            }
+        ).to_parquet(output, index=False)
+        return pd.read_parquet(output), output
+
+    monkeypatch.setattr(
+        "hhplab.sanctuary.write_sanctuary_msa_panel_covariate",
+        fake_write_sanctuary_msa_panel_covariate,
+    )
+
+    with runner.isolated_filesystem(temp_dir=tmp_path):
+        result = runner.invoke(
+            app,
+            ["generate", "sanctuary-msa-panel", "--json"],
+            catch_exceptions=False,
+        )
+
+    assert result.exit_code == 0
+    payload = json.loads(result.stdout)
+    assert payload["status"] == "ok"
+    assert payload["row_count"] == 2
+    assert payload["matched_msa_count"] == 1
+    assert payload["indicator_column"] == "doj_sanctuary_msa"
+    assert payload["match_basis_column"] == "match_basis"
+    assert payload["artifact"].endswith(
+        "sanctuary_msa_panel__D20250805xMcensus_msa_2023.parquet"
     )

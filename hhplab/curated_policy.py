@@ -190,6 +190,7 @@ CANONICAL_PATTERNS: dict[str, list[re.Pattern[str]]] = {
     ],
     "sanctuary": [
         re.compile(r"^sanctuary_msa_matches__D\d{8}xM\w+\.parquet$"),
+        re.compile(r"^sanctuary_msa_panel__D\d{8}xM\w+\.parquet$"),
     ],
     "covariates": [
         re.compile(r"^covariate__[a-z0-9_]+__Y\d{4}-(?:\d{4}|ongoing)\.parquet$"),

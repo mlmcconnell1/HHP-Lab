@@ -2062,6 +2062,33 @@ def sanctuary_msa_matches_path(
     )
 
 
+def sanctuary_msa_panel_covariate_filename(
+    source_date: str,
+    msa_definition_version: str,
+) -> str:
+    """Canonical filename for panel-ready DOJ sanctuary MSA covariates."""
+    compact_date = source_date.replace("-", "")
+    return f"sanctuary_msa_panel__D{compact_date}xM{msa_definition_version}.parquet"
+
+
+def sanctuary_msa_panel_covariate_path(
+    source_date: str,
+    msa_definition_version: str,
+    base_dir: Path | str | None = None,
+) -> Path:
+    """Canonical path for panel-ready DOJ sanctuary MSA covariates."""
+    if base_dir is None:
+        base_dir = Path("data")
+    else:
+        base_dir = Path(base_dir)
+    return (
+        base_dir
+        / "curated"
+        / "sanctuary"
+        / sanctuary_msa_panel_covariate_filename(source_date, msa_definition_version)
+    )
+
+
 # =============================================================================
 # BLS LAUS metro artifact filenames
 # =============================================================================
