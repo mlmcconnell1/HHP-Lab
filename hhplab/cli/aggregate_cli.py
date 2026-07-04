@@ -115,6 +115,37 @@ def _resolve_coc_measure_year_column(df: pd.DataFrame, requested: str | None) ->
     raise typer.Exit(2)
 
 
+def _format_bad_year_values(values: pd.Series, *, limit: int = 5) -> str:
+    normalized = values.astype("string").fillna("<null>")
+    unique_values = normalized.drop_duplicates().head(limit).tolist()
+    suffix = ", ..." if values.drop_duplicates().shape[0] > limit else ""
+    return ", ".join(str(value) for value in unique_values) + suffix
+
+
+def _coerce_coc_measure_years(source_df: pd.DataFrame, year_column: str) -> list[int]:
+    raw_years = source_df[year_column]
+    numeric_years = pd.to_numeric(raw_years, errors="coerce")
+    invalid_mask = numeric_years.isna() | ((numeric_years % 1) != 0)
+    if invalid_mask.any():
+        invalid_values = _format_bad_year_values(raw_years.loc[invalid_mask])
+        raise ValueError(
+            f"Source year column '{year_column}' must contain non-null integer years. "
+            f"Invalid values: {invalid_values}. Clean the source parquet or pass "
+            "--year-column with a numeric year column."
+        )
+    return sorted({int(year) for year in numeric_years.astype(int).unique()})
+
+
+def _emit_coc_measure_error(message: str, *, output_json: bool, exit_code: int) -> None:
+    if output_json:
+        import json
+
+        typer.echo(json.dumps({"status": "error", "message": message}))
+    else:
+        typer.echo(f"Error: {message}", err=True)
+    raise typer.Exit(exit_code)
+
+
 def _resolve_rollup_boundary_vintage(
     boundary_vintage: str | None,
     years: list[int],
@@ -123,11 +154,9 @@ def _resolve_rollup_boundary_vintage(
         return str(boundary_vintage)
     if len(set(years)) == 1:
         return str(years[0])
-    typer.echo(
-        "Error: --boundary-vintage is required when the source contains multiple years.",
-        err=True,
+    raise ValueError(
+        "--boundary-vintage is required when the source contains multiple years.",
     )
-    raise typer.Exit(2)
 
 
 @aggregate_app.command("covariate")
@@ -896,14 +925,10 @@ def aggregate_coc_measure(
         raise typer.Exit(1) from exc
 
     resolved_year_column = _resolve_coc_measure_year_column(source_df, year_column)
-    years = [
-        int(year)
-        for year in sorted(
-            pd.to_numeric(source_df[resolved_year_column], errors="raise")
-            .astype(int)
-            .unique()
-        )
-    ]
+    try:
+        years = _coerce_coc_measure_years(source_df, resolved_year_column)
+    except ValueError as exc:
+        _emit_coc_measure_error(str(exc), output_json=output_json, exit_code=1)
     if not years:
         msg = f"Source parquet has no rows: {source}"
         if output_json:
@@ -914,7 +939,10 @@ def aggregate_coc_measure(
             typer.echo(f"Error: {msg}", err=True)
         raise typer.Exit(1)
 
-    resolved_boundary = _resolve_rollup_boundary_vintage(boundary_vintage, years)
+    try:
+        resolved_boundary = _resolve_rollup_boundary_vintage(boundary_vintage, years)
+    except ValueError as exc:
+        _emit_coc_measure_error(str(exc), output_json=output_json, exit_code=2)
     resolved_county = str(counties if counties is not None else resolved_boundary)
 
     from hhplab.msa import aggregate_coc_to_msa_fractional_rollup, read_coc_msa_crosswalk
@@ -1279,8 +1307,7 @@ def aggregate_acs(
                                 ),
                                 "definition_version": definition_version,
                                 "remedy": (
-                                    "hhplab generate msa"
-                                    f" --definition-version {definition_version}"
+                                    f"hhplab generate msa --definition-version {definition_version}"
                                 ),
                             }
                         )

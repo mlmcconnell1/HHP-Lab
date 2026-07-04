@@ -896,6 +896,123 @@ def test_aggregate_coc_measure_missing_crosswalk_json_is_actionable(tmp_path):
     )
 
 
+@pytest.mark.parametrize(
+    ("rows", "extra_args", "expected_message"),
+    [
+        pytest.param(
+            {
+                "coc_id": ["CO-100"],
+                "hic_year": ["not-a-year"],
+                "hic_shelter_year_round_beds": [10.0],
+            },
+            [],
+            "Source year column 'hic_year' must contain non-null integer years",
+            id="fallback-hic-year-string",
+        ),
+        pytest.param(
+            {
+                "coc_id": ["CO-100"],
+                "source_year": ["bad"],
+                "hic_shelter_year_round_beds": [10.0],
+            },
+            ["--year-column", "source_year"],
+            "Source year column 'source_year' must contain non-null integer years",
+            id="explicit-year-column-string",
+        ),
+        pytest.param(
+            {
+                "coc_id": ["CO-100"],
+                "hic_year": [None],
+                "hic_shelter_year_round_beds": [10.0],
+            },
+            [],
+            "Invalid values: <null>",
+            id="null-year",
+        ),
+    ],
+)
+def test_aggregate_coc_measure_bad_year_json_is_actionable(
+    tmp_path,
+    rows: dict[str, list[object]],
+    extra_args: list[str],
+    expected_message: str,
+):
+    import os
+
+    hic_dir = tmp_path / "data" / "curated" / "hic"
+    hic_dir.mkdir(parents=True)
+    source_path = hic_dir / "hic__Hbad.parquet"
+    pd.DataFrame(rows).to_parquet(source_path, index=False)
+
+    old_cwd = os.getcwd()
+    try:
+        os.chdir(tmp_path)
+        result = runner.invoke(
+            app,
+            [
+                "aggregate",
+                "coc-measure",
+                "--source",
+                str(source_path),
+                "--columns",
+                "hic_shelter_year_round_beds",
+                "--geo-type",
+                "msa",
+                "--json",
+                *extra_args,
+            ],
+            catch_exceptions=False,
+        )
+    finally:
+        os.chdir(old_cwd)
+
+    assert result.exit_code == 1
+    payload = json.loads(result.output.strip().splitlines()[-1])
+    assert payload["status"] == "error"
+    assert expected_message in payload["message"]
+
+
+def test_aggregate_coc_measure_multiyear_without_boundary_json_is_actionable(tmp_path):
+    import os
+
+    hic_dir = tmp_path / "data" / "curated" / "hic"
+    hic_dir.mkdir(parents=True)
+    source_path = hic_dir / "hic__Hmulti.parquet"
+    pd.DataFrame(
+        {
+            "coc_id": ["CO-100", "CO-100"],
+            "hic_year": [2020, 2021],
+            "hic_shelter_year_round_beds": [10.0, 11.0],
+        }
+    ).to_parquet(source_path, index=False)
+
+    old_cwd = os.getcwd()
+    try:
+        os.chdir(tmp_path)
+        result = runner.invoke(
+            app,
+            [
+                "aggregate",
+                "coc-measure",
+                "--source",
+                str(source_path),
+                "--columns",
+                "hic_shelter_year_round_beds",
+                "--geo-type",
+                "msa",
+                "--json",
+            ],
+            catch_exceptions=False,
+        )
+    finally:
+        os.chdir(old_cwd)
+
+    assert result.exit_code == 2
+    payload = json.loads(result.output.strip().splitlines()[-1])
+    assert payload["status"] == "error"
+    assert "--boundary-vintage is required" in payload["message"]
+
+
 def test_aggregate_pit_to_msa_missing_crosswalk_is_actionable(tmp_path):
     """MSA PIT aggregate should report the exact missing crosswalk command."""
     import os
