@@ -10,6 +10,7 @@ from typing import Any
 import pandas as pd
 
 from hhplab.covariates.catalog import CovariateSourceSpec, covariate_source_spec
+from hhplab.metro.metro_definitions import STATE_ABBREV_TO_FIPS
 from hhplab.naming import covariate_curated_filename
 from hhplab.paths import curated_dir
 from hhplab.provenance import ProvenanceBlock, write_parquet_with_provenance
@@ -20,6 +21,62 @@ COMMON_COLUMN_ALIASES: dict[str, tuple[str, ...]] = {
     "coc_number": ("coc_number", "coc", "cocnum", "geo_id"),
     "state": ("state", "state_abbr", "state_po", "stusps", "geo_id"),
     "year": ("year", "data_year", "fy", "fiscal_year"),
+}
+
+STATE_NAME_TO_ABBREV: dict[str, str] = {
+    "ALABAMA": "AL",
+    "ALASKA": "AK",
+    "ARIZONA": "AZ",
+    "ARKANSAS": "AR",
+    "CALIFORNIA": "CA",
+    "COLORADO": "CO",
+    "CONNECTICUT": "CT",
+    "DELAWARE": "DE",
+    "DISTRICT OF COLUMBIA": "DC",
+    "WASHINGTON DC": "DC",
+    "WASHINGTON D.C.": "DC",
+    "FLORIDA": "FL",
+    "GEORGIA": "GA",
+    "HAWAII": "HI",
+    "IDAHO": "ID",
+    "ILLINOIS": "IL",
+    "INDIANA": "IN",
+    "IOWA": "IA",
+    "KANSAS": "KS",
+    "KENTUCKY": "KY",
+    "LOUISIANA": "LA",
+    "MAINE": "ME",
+    "MARYLAND": "MD",
+    "MASSACHUSETTS": "MA",
+    "MICHIGAN": "MI",
+    "MINNESOTA": "MN",
+    "MISSISSIPPI": "MS",
+    "MISSOURI": "MO",
+    "MONTANA": "MT",
+    "NEBRASKA": "NE",
+    "NEVADA": "NV",
+    "NEW HAMPSHIRE": "NH",
+    "NEW JERSEY": "NJ",
+    "NEW MEXICO": "NM",
+    "NEW YORK": "NY",
+    "NORTH CAROLINA": "NC",
+    "NORTH DAKOTA": "ND",
+    "OHIO": "OH",
+    "OKLAHOMA": "OK",
+    "OREGON": "OR",
+    "PENNSYLVANIA": "PA",
+    "RHODE ISLAND": "RI",
+    "SOUTH CAROLINA": "SC",
+    "SOUTH DAKOTA": "SD",
+    "TENNESSEE": "TN",
+    "TEXAS": "TX",
+    "UTAH": "UT",
+    "VERMONT": "VT",
+    "VIRGINIA": "VA",
+    "WASHINGTON": "WA",
+    "WEST VIRGINIA": "WV",
+    "WISCONSIN": "WI",
+    "WYOMING": "WY",
 }
 
 
@@ -87,6 +144,7 @@ def ingest_covariate_source(
         "topic",
         "data_source",
         "source_url",
+        "state_fips",
         "raw_sha256",
         "ingested_at",
     ]
@@ -162,7 +220,10 @@ def normalize_covariate_frame(
         result["coc_number"] = result["coc_number"].astype("string").str.strip()
         result["geo_id"] = result["coc_number"]
     elif spec.native_geo == "state":
-        result["state"] = result["state"].astype("string").str.upper().str.strip()
+        result["state"] = result["state"].map(
+            lambda value: _normalize_state_abbrev(value, source_id=spec.source_id)
+        )
+        result["state_fips"] = result["state"].map(STATE_ABBREV_TO_FIPS)
         result["geo_id"] = result["state"]
     else:
         raise ValueError(f"Unsupported covariate native geography: {spec.native_geo}")
@@ -195,6 +256,19 @@ def _canonical_renames(columns: pd.Index, *, spec: CovariateSourceSpec) -> dict[
 
 def _clean_column(value: Any) -> str:
     return str(value).strip().lower().replace(" ", "_").replace("-", "_")
+
+
+def _normalize_state_abbrev(value: Any, *, source_id: str) -> str:
+    raw = str(value).strip()
+    normalized = " ".join(raw.upper().replace(".", "").split())
+    if normalized in STATE_ABBREV_TO_FIPS:
+        return normalized
+    if normalized in STATE_NAME_TO_ABBREV:
+        return STATE_NAME_TO_ABBREV[normalized]
+    raise ValueError(
+        f"{source_id} raw data contains unrecognized state value {raw!r}. "
+        "Use a USPS state abbreviation or full state name."
+    )
 
 
 def _sha256(path: Path) -> str:

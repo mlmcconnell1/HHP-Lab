@@ -27,6 +27,57 @@ EXPECTED_COVARIATE_SOURCES = {
     "kff_medicaid_expansion": ("state", "medicaid_expansion_adopted"),
 }
 
+BRANCH_ROUNDTRIP_CASES = [
+    pytest.param(
+        "census_bps",
+        {
+            "county_fips": ["01001"],
+            "year": [2020],
+            "permitted_units": [100],
+            "permitted_buildings": [8],
+        },
+        "county",
+        ["01001"],
+        id="census-bps-county",
+    ),
+    pytest.param(
+        "hud_psh",
+        {
+            "county_fips": ["01001"],
+            "year": [2023],
+            "subsidized_households": [500],
+            "housing_choice_vouchers": [200],
+        },
+        "county",
+        ["01001"],
+        id="hud-psh-county",
+    ),
+    pytest.param(
+        "hud_spm",
+        {
+            "coc_number": ["CA-600"],
+            "year": [2023],
+            "spm_first_time_homeless": [120],
+            "spm_returns_to_homelessness": [25],
+            "spm_successful_exits": [80],
+        },
+        "coc",
+        ["CA-600"],
+        id="hud-spm-coc",
+    ),
+    pytest.param(
+        "kff_medicaid_expansion",
+        {
+            "state": ["Alabama", "CA"],
+            "year": [2020, 2021],
+            "medicaid_expansion_adopted": [0, 1],
+        },
+        "state",
+        ["AL", "CA"],
+        id="kff-state",
+    ),
+]
+
 
 def test_covariate_catalog_declares_hidden_cause_sources() -> None:
     """The expanded source catalog should cover all bead-requested families."""
@@ -37,6 +88,63 @@ def test_covariate_catalog_declares_hidden_cause_sources() -> None:
         assert measure in spec.measure_columns
         assert spec.source_page.startswith("https://")
         assert spec.recommended_align
+
+
+@pytest.mark.parametrize(
+    "source_id,raw_data,target_geo,expected_geo_ids",
+    BRANCH_ROUNDTRIP_CASES,
+)
+def test_covariate_ingest_and_native_aggregate_branches(
+    source_id: str,
+    raw_data: dict[str, list],
+    target_geo: str,
+    expected_geo_ids: list[str],
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    """All expanded covariate geography branches should normalize and aggregate natively."""
+    monkeypatch.setattr("hhplab.covariates.ingest.register_source", lambda **_: None)
+    raw = tmp_path / f"{source_id}.csv"
+    pd.DataFrame(raw_data).to_csv(raw, index=False)
+
+    curated = ingest_covariate_source(source_id, raw, output_dir=tmp_path, force=True)
+    curated_df = pd.read_parquet(curated)
+    assert curated_df["geo_type"].unique().tolist() == [target_geo]
+    assert curated_df["geo_id"].tolist() == expected_geo_ids
+    if source_id == "kff_medicaid_expansion":
+        assert curated_df["state"].tolist() == ["AL", "CA"]
+        assert curated_df["state_fips"].tolist() == ["01", "06"]
+
+    panel = aggregate_covariate_source(
+        source_id,
+        curated_path=curated,
+        output_dir=tmp_path,
+        target_geo=target_geo,
+        force=True,
+    )
+    panel_df = pd.read_parquet(panel)
+    assert panel_df["geo_id"].tolist() == expected_geo_ids
+
+
+def test_state_covariate_rejects_unknown_state(tmp_path: Path, monkeypatch) -> None:
+    """Unrecognized state labels should fail before incompatible geo_ids are written."""
+    monkeypatch.setattr("hhplab.covariates.ingest.register_source", lambda **_: None)
+    raw = tmp_path / "kff.csv"
+    pd.DataFrame(
+        {
+            "state": ["Atlantis"],
+            "year": [2020],
+            "medicaid_expansion_adopted": [0],
+        }
+    ).to_csv(raw, index=False)
+
+    with pytest.raises(ValueError, match="unrecognized state value 'Atlantis'"):
+        ingest_covariate_source(
+            "kff_medicaid_expansion",
+            raw,
+            output_dir=tmp_path,
+            force=True,
+        )
 
 
 def test_ingest_and_aggregate_county_covariate_roundtrip(tmp_path: Path, monkeypatch) -> None:
