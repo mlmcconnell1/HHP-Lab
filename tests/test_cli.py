@@ -624,6 +624,20 @@ class TestRetiredCommandRegression:
         assert "build recipe --recipe <file> --json" in result.output
         assert "recipe init msa-coc-overlap --output <file> --json" in result.output
 
+    def test_agents_command_includes_measure_discovery_workflow(self):
+        """Agent guidance should prefer package registries over one-off fetches."""
+        result = runner.invoke(app, ["agents"])
+        assert result.exit_code == 0
+        assert "Measure Discovery" in result.output
+        assert "hhplab/acs/variables.py" in result.output
+        assert "ACS5_COVARIATE_REGISTRY" in result.output
+        assert "hhplab/acs/variables_acs1.py" in result.output
+        assert "DERIVED_ACS1_MEASURES" in result.output
+        assert "ACS1_*_MEASURE_COLUMNS" in result.output
+        assert "hhplab list covariates" in result.output
+        assert "Curated parquet files on disk may predate the current schema" in result.output
+        assert "Only fall back to external fetching" in result.output
+
     def test_agents_command_includes_human_inference_guardrails(self):
         """Human agent guidance should name common analysis pitfalls."""
         result = runner.invoke(app, ["agents"])
@@ -661,3 +675,19 @@ class TestRetiredCommandRegression:
         assert f"{METRO_COUNT} Glynn/Fox metros" in small_n["guidance"]
         assert "50 metros" not in small_n["guidance"]
         assert "380 CoCs" in small_n["guidance"]
+
+    def test_agents_json_includes_machine_readable_measure_discovery(self):
+        """Agents consuming JSON should receive registry-first measure guidance."""
+        result = runner.invoke(app, ["agents", "--json"])
+        assert result.exit_code == 0
+        payload = json.loads(result.output)
+
+        discovery = payload["measure_discovery"]
+        registry_names = {registry["registry"] for registry in discovery["registries"]}
+        assert registry_names == {
+            "ACS5_COVARIATE_REGISTRY",
+            "DERIVED_ACS1_MEASURES and ACS1_*_MEASURE_COLUMNS",
+            "COVARIATE_SOURCE_SPECS",
+        }
+        assert "re-ingest with --force" in discovery["stale_curated_artifacts"]
+        assert "file a bead to add registry support" in discovery["rule"]

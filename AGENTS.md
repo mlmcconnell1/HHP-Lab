@@ -46,6 +46,17 @@ Prefer these HHP-Lab runtime features when automating:
   - `hhplab build recipe --recipe <file> --json`
   - Use `hhplab build recipe-plan --recipe <file> --json` when you need the resolved task graph while authoring/debugging a recipe
 
+## Measure Discovery
+
+Before calling external APIs or writing one-off scripts, determine whether the package already supports the measure:
+
+1. Check the package registries first:
+   - ACS5 tract-derived measures: `hhplab/acs/variables.py` (`ACS5_COVARIATE_REGISTRY`), or `hhplab list acs-variables` once that command exists.
+   - ACS1 metro/county-native measures: `hhplab/acs/variables_acs1.py` (`DERIVED_ACS1_MEASURES` and `ACS1_*_MEASURE_COLUMNS`), or `hhplab list acs-variables` once that command exists.
+   - External covariate sources: `hhplab list covariates`, backed by `hhplab/covariates/catalog.py`.
+2. Treat curated files on disk as possibly stale. Absence of a column in an existing parquet does **not** mean the package lacks support; re-ingest with `--force` to refresh the schema before concluding support is absent.
+3. If a measure exists in a registry, use the package ingest, aggregate, and analyze pipeline. Only fall back to external fetching when the measure is genuinely absent, and then file a bead to add registry support rather than leaving a one-off script.
+
 ## Code Style: Human and Agent Readable
 
 All code generated for this project must be easily usable by both humans and AI agents. Apply these principles when writing code, tests, CLI commands, and data pipelines:

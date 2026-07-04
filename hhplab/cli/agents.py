@@ -33,6 +33,39 @@ AGENTS_GUIDANCE = {
             "hhplab migrate curated-layout --apply",
         ],
     },
+    "measure_discovery": {
+        "registries": [
+            {
+                "source": "ACS5",
+                "where": "hhplab/acs/variables.py",
+                "registry": "ACS5_COVARIATE_REGISTRY",
+                "future_cli": "hhplab list acs-variables",
+            },
+            {
+                "source": "ACS1",
+                "where": "hhplab/acs/variables_acs1.py",
+                "registry": "DERIVED_ACS1_MEASURES and ACS1_*_MEASURE_COLUMNS",
+                "future_cli": "hhplab list acs-variables",
+            },
+            {
+                "source": "External covariates",
+                "where": "hhplab/covariates/catalog.py",
+                "registry": "COVARIATE_SOURCE_SPECS",
+                "cli": "hhplab list covariates",
+            },
+        ],
+        "stale_curated_artifacts": (
+            "Curated parquet files can predate the current schema. A missing "
+            "column on disk does not prove the package lacks support; re-ingest "
+            "with --force to refresh the schema before treating support as absent."
+        ),
+        "rule": (
+            "If a measure exists in a registry, use the package ingest, aggregate, "
+            "and analyze pipeline. Only fetch externally when the measure is "
+            "genuinely absent, and file a bead to add registry support instead of "
+            "leaving a one-off script."
+        ),
+    },
     "crosswalk_rules": {
         "principle": (
             "Every dataset must be matched to the correct geographic vintage "
@@ -161,6 +194,25 @@ AGENTS_INFO_TEXT = f"""# HHP-Lab Agent Quick Reference
 - Preview curated migration changes before applying:
   - `hhplab migrate curated-layout`
   - `hhplab migrate curated-layout --apply`
+
+## Measure Discovery
+
+- Before calling external APIs or writing a one-off script, check the package
+  registries for existing support:
+  - ACS5 tract-derived measures: `hhplab/acs/variables.py`
+    (`ACS5_COVARIATE_REGISTRY`) or `hhplab list acs-variables` once available.
+  - ACS1 metro/county-native measures: `hhplab/acs/variables_acs1.py`
+    (`DERIVED_ACS1_MEASURES` and `ACS1_*_MEASURE_COLUMNS`) or
+    `hhplab list acs-variables` once available.
+  - External covariate sources: `hhplab list covariates`
+    (`hhplab/covariates/catalog.py`).
+- Curated parquet files on disk may predate the current schema. Absence of a
+  column in an existing artifact does not mean the package lacks support; run
+  the relevant ingest command with `--force` to refresh the schema.
+- If a measure exists in a registry, use the package ingest, aggregate, and
+  analyze pipeline. Only fall back to external fetching when the measure is
+  genuinely absent, and then file a bead to add registry support rather than
+  leaving a one-off script.
 
 ## Crosswalk Rules: Geography-to-Year Matching
 
