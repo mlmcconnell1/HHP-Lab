@@ -741,6 +741,161 @@ def test_aggregate_pit_to_msa_uses_block_population_crosswalk(tmp_path):
     assert provenance.extra["allocation_method"] == "block_population"
 
 
+def test_aggregate_coc_measure_to_msa_materializes_hic_rollup(tmp_path):
+    """Generic CoC measure rollup should support HIC-style additive columns."""
+    import os
+
+    import pandas as pd
+
+    from hhplab.naming import msa_coc_xwalk_filename, msa_fractional_rollup_filename
+    from hhplab.provenance import read_provenance
+
+    hic_dir = tmp_path / "data" / "curated" / "hic"
+    xwalk_dir = tmp_path / "data" / "curated" / "xwalks"
+    hic_dir.mkdir(parents=True)
+    xwalk_dir.mkdir(parents=True)
+    source_path = hic_dir / "hic__H2020.parquet"
+
+    pd.DataFrame(
+        {
+            "coc_id": ["CO-100", "CO-200", "CO-300"],
+            "hic_year": [2020, 2020, 2020],
+            "hic_shelter_year_round_beds": [10.0, 20.0, 30.0],
+            "hic_total_units": [1.0, 2.0, 3.0],
+        }
+    ).to_parquet(source_path, index=False)
+
+    pd.DataFrame(
+        {
+            "coc_id": ["CO-100", "CO-200", "CO-200", "CO-300"],
+            "msa_id": ["35620", "35620", "41180", "41180"],
+            "cbsa_code": ["35620", "35620", "41180", "41180"],
+            "boundary_vintage": ["2020"] * 4,
+            "county_vintage": ["2020"] * 4,
+            "definition_version": ["census_msa_2023"] * 4,
+            "allocation_method": ["area"] * 4,
+            "share_column": ["allocation_share"] * 4,
+            "allocation_share": [1.0, 0.5, 0.5, 1.0],
+        }
+    ).to_parquet(
+        xwalk_dir / msa_coc_xwalk_filename("2020", "census_msa_2023", 2020),
+        index=False,
+    )
+
+    old_cwd = os.getcwd()
+    try:
+        os.chdir(tmp_path)
+        result = runner.invoke(
+            app,
+            [
+                "aggregate",
+                "coc-measure",
+                "--source",
+                str(source_path),
+                "--columns",
+                "hic_shelter_year_round_beds,hic_total_units",
+                "--geo-type",
+                "msa",
+                "--definition-version",
+                "census_msa_2023",
+                "--boundary-vintage",
+                "2020",
+                "--counties",
+                "2020",
+                "--json",
+            ],
+            catch_exceptions=False,
+        )
+    finally:
+        os.chdir(old_cwd)
+
+    assert result.exit_code == 0
+    payload = json.loads(result.output.strip().splitlines()[-1])
+    expected_path = hic_dir / msa_fractional_rollup_filename(
+        2020,
+        2020,
+        "hic",
+        "area",
+        "2020",
+        "census_msa_2023",
+        "2020",
+    )
+    assert payload["output_path"] == str(expected_path)
+    assert payload["additive_measure_columns"] == [
+        "hic_shelter_year_round_beds",
+        "hic_total_units",
+    ]
+    assert expected_path.exists()
+
+    rollup = pd.read_parquet(expected_path).sort_values("msa_id").reset_index(drop=True)
+    assert rollup["hic_shelter_year_round_beds"].astype(float).tolist() == pytest.approx(
+        [20.0, 40.0]
+    )
+    assert rollup["hic_total_units"].astype(float).tolist() == pytest.approx([2.0, 4.0])
+    assert rollup["source_dataset_id"].unique().tolist() == ["hic"]
+
+    provenance = read_provenance(expected_path)
+    assert provenance is not None
+    assert provenance.extra["dataset_type"] == "msa_fractional_rollup"
+    assert provenance.extra["source_dataset_id"] == "hic"
+    assert provenance.extra["source_additive_measure_columns"] == [
+        "hic_shelter_year_round_beds",
+        "hic_total_units",
+    ]
+
+
+def test_aggregate_coc_measure_missing_crosswalk_json_is_actionable(tmp_path):
+    import os
+
+    import pandas as pd
+
+    hic_dir = tmp_path / "data" / "curated" / "hic"
+    hic_dir.mkdir(parents=True)
+    source_path = hic_dir / "hic__H2020.parquet"
+    pd.DataFrame(
+        {
+            "coc_id": ["CO-100"],
+            "hic_year": [2020],
+            "hic_shelter_year_round_beds": [10.0],
+        }
+    ).to_parquet(source_path, index=False)
+
+    old_cwd = os.getcwd()
+    try:
+        os.chdir(tmp_path)
+        result = runner.invoke(
+            app,
+            [
+                "aggregate",
+                "coc-measure",
+                "--source",
+                str(source_path),
+                "--columns",
+                "hic_shelter_year_round_beds",
+                "--geo-type",
+                "msa",
+                "--definition-version",
+                "census_msa_2023",
+                "--boundary-vintage",
+                "2020",
+                "--counties",
+                "2020",
+                "--json",
+            ],
+            catch_exceptions=False,
+        )
+    finally:
+        os.chdir(old_cwd)
+
+    assert result.exit_code == 1
+    payload = json.loads(result.output.strip().splitlines()[-1])
+    assert payload["status"] == "error"
+    assert (
+        "generate msa-xwalk --boundary 2020 --definition-version census_msa_2023 --counties 2020"
+        in payload["message"]
+    )
+
+
 def test_aggregate_pit_to_msa_missing_crosswalk_is_actionable(tmp_path):
     """MSA PIT aggregate should report the exact missing crosswalk command."""
     import os

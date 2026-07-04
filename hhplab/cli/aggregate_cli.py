@@ -67,6 +67,69 @@ def _resolve_years(years: str | None) -> list[int]:
     raise typer.Exit(2)
 
 
+def _parse_column_list(columns: str) -> tuple[str, ...]:
+    parsed = tuple(column.strip() for column in columns.split(",") if column.strip())
+    if not parsed:
+        typer.echo(
+            "Error: --columns must contain at least one additive measure column.",
+            err=True,
+        )
+        raise typer.Exit(2)
+    return parsed
+
+
+def _resolve_source_dataset_id(source: Path, source_dataset_id: str | None) -> str:
+    if source_dataset_id:
+        return source_dataset_id
+    if source.parent.name and source.parent.name != ".":
+        return source.parent.name
+    return source.stem.split("__", maxsplit=1)[0]
+
+
+def _resolve_coc_measure_year_column(df: pd.DataFrame, requested: str | None) -> str:
+    if requested is not None:
+        if requested in df.columns:
+            return requested
+        typer.echo(
+            f"Error: --year-column '{requested}' not found. Available: {list(df.columns)}",
+            err=True,
+        )
+        raise typer.Exit(2)
+    if "year" in df.columns:
+        return "year"
+    fallback_columns = [column for column in ("hic_year", "pit_year") if column in df.columns]
+    if len(fallback_columns) == 1:
+        return fallback_columns[0]
+    year_like_columns = [
+        column
+        for column in df.columns
+        if column.endswith("_year") and pd.api.types.is_numeric_dtype(df[column])
+    ]
+    if len(year_like_columns) == 1:
+        return year_like_columns[0]
+    typer.echo(
+        "Error: CoC measure source must have a year column. Use --year-column to select "
+        f"one. Available: {list(df.columns)}",
+        err=True,
+    )
+    raise typer.Exit(2)
+
+
+def _resolve_rollup_boundary_vintage(
+    boundary_vintage: str | None,
+    years: list[int],
+) -> str:
+    if boundary_vintage is not None:
+        return str(boundary_vintage)
+    if len(set(years)) == 1:
+        return str(years[0])
+    typer.echo(
+        "Error: --boundary-vintage is required when the source contains multiple years.",
+        err=True,
+    )
+    raise typer.Exit(2)
+
+
 @aggregate_app.command("covariate")
 def aggregate_covariate(
     source: Annotated[
@@ -705,6 +768,246 @@ def aggregate_pit(
             f"  Source CoCs: {source_coc_count}, Records: {total_records:,}, "
             f"MSA definition: {definition_version}"
         )
+
+
+@aggregate_app.command("coc-measure")
+def aggregate_coc_measure(
+    source: Annotated[
+        Path,
+        typer.Option(
+            "--source",
+            help="CoC-year parquet source with coc_id, a year column, and additive measures.",
+        ),
+    ],
+    columns: Annotated[
+        str,
+        typer.Option(
+            "--columns",
+            help="Comma-separated additive measure columns to roll up.",
+        ),
+    ],
+    geo_type: Annotated[
+        str,
+        typer.Option("--geo-type", help="Target analysis geography. Currently only: msa."),
+    ] = "msa",
+    source_dataset_id: Annotated[
+        str | None,
+        typer.Option(
+            "--source-dataset-id",
+            help="Dataset id recorded in output/provenance. Defaults to the source directory.",
+        ),
+    ] = None,
+    year_column: Annotated[
+        str | None,
+        typer.Option(
+            "--year-column",
+            help="Source year column. Defaults to year, hic_year, pit_year, or one *_year column.",
+        ),
+    ] = None,
+    coc_id_column: Annotated[
+        str,
+        typer.Option("--coc-id-column", help="Source CoC identifier column."),
+    ] = "coc_id",
+    definition_version: Annotated[
+        str,
+        typer.Option("--definition-version", help="MSA definition version."),
+    ] = "census_msa_2023",
+    boundary_vintage: Annotated[
+        str | None,
+        typer.Option(
+            "--boundary-vintage",
+            help="CoC boundary vintage for the CoC-to-MSA crosswalk.",
+        ),
+    ] = None,
+    counties: Annotated[
+        int | None,
+        typer.Option(
+            "--counties",
+            help=(
+                "County geometry vintage for the CoC-to-MSA crosswalk. "
+                "Defaults to boundary vintage."
+            ),
+        ),
+    ] = None,
+    allocation_basis: Annotated[
+        Literal["area", "block_population"],
+        typer.Option("--allocation-basis", help="CoC-to-MSA allocation basis."),
+    ] = "area",
+    blocks: Annotated[
+        int,
+        typer.Option("--blocks", help="Block geometry vintage for block-population crosswalks."),
+    ] = 2020,
+    decennial: Annotated[
+        int,
+        typer.Option(
+            "--decennial",
+            help="Decennial population vintage for block-population crosswalks.",
+        ),
+    ] = 2020,
+    output_dir: Annotated[
+        Path | None,
+        typer.Option(
+            "--output-dir",
+            "-o",
+            help="Output directory. Defaults to data/curated/<source_dataset_id>.",
+        ),
+    ] = None,
+    output_json: Annotated[
+        bool,
+        typer.Option("--json", help="Emit structured JSON."),
+    ] = False,
+) -> None:
+    """Roll up additive CoC-year measures to MSA-year rows."""
+    if geo_type != "msa":
+        msg = "Invalid --geo-type. Generic CoC measure rollup currently supports only: msa."
+        if output_json:
+            import json
+
+            typer.echo(json.dumps({"status": "error", "message": msg}))
+        else:
+            typer.echo(f"Error: {msg}", err=True)
+        raise typer.Exit(2)
+
+    if not source.exists():
+        msg = f"Source parquet not found: {source}"
+        if output_json:
+            import json
+
+            typer.echo(json.dumps({"status": "error", "message": msg}))
+        else:
+            typer.echo(f"Error: {msg}", err=True)
+        raise typer.Exit(1)
+
+    measure_columns = _parse_column_list(columns)
+    dataset_id = _resolve_source_dataset_id(source, source_dataset_id)
+    resolved_output_dir = output_dir if output_dir is not None else curated_root() / dataset_id
+    resolved_output_dir.mkdir(parents=True, exist_ok=True)
+
+    try:
+        source_df = pd.read_parquet(source)
+    except Exception as exc:
+        msg = f"Could not read source parquet {source}: {exc}"
+        if output_json:
+            import json
+
+            typer.echo(json.dumps({"status": "error", "message": msg}))
+        else:
+            typer.echo(f"Error: {msg}", err=True)
+        raise typer.Exit(1) from exc
+
+    resolved_year_column = _resolve_coc_measure_year_column(source_df, year_column)
+    years = [
+        int(year)
+        for year in sorted(
+            pd.to_numeric(source_df[resolved_year_column], errors="raise")
+            .astype(int)
+            .unique()
+        )
+    ]
+    if not years:
+        msg = f"Source parquet has no rows: {source}"
+        if output_json:
+            import json
+
+            typer.echo(json.dumps({"status": "error", "message": msg}))
+        else:
+            typer.echo(f"Error: {msg}", err=True)
+        raise typer.Exit(1)
+
+    resolved_boundary = _resolve_rollup_boundary_vintage(boundary_vintage, years)
+    resolved_county = str(counties if counties is not None else resolved_boundary)
+
+    from hhplab.msa import aggregate_coc_to_msa_fractional_rollup, read_coc_msa_crosswalk
+    from hhplab.naming import msa_fractional_rollup_filename
+    from hhplab.provenance import (
+        msa_fractional_rollup_provenance,
+        write_parquet_with_provenance,
+    )
+
+    try:
+        crosswalk = read_coc_msa_crosswalk(
+            resolved_boundary,
+            definition_version,
+            resolved_county,
+            allocation_basis=allocation_basis,
+            block_vintage=str(blocks),
+            decennial_vintage=str(decennial),
+        )
+        rollup = aggregate_coc_to_msa_fractional_rollup(
+            source_df,
+            crosswalk,
+            additive_measure_columns=measure_columns,
+            source_dataset_id=dataset_id,
+            year_column=resolved_year_column,
+            source_coc_id_column=coc_id_column,
+        )
+    except (FileNotFoundError, ValueError) as exc:
+        if output_json:
+            import json
+
+            typer.echo(json.dumps({"status": "error", "message": str(exc)}))
+        else:
+            typer.echo(f"Error: {exc}", err=True)
+        raise typer.Exit(1) from exc
+
+    output_path = resolved_output_dir / msa_fractional_rollup_filename(
+        min(years),
+        max(years),
+        dataset_id,
+        allocation_basis,
+        resolved_boundary,
+        definition_version,
+        resolved_county,
+        block_vintage=str(blocks) if allocation_basis == "block_population" else None,
+        decennial_vintage=str(decennial) if allocation_basis == "block_population" else None,
+    )
+    provenance = msa_fractional_rollup_provenance(
+        allocation_basis=allocation_basis,
+        denominator_source=(
+            "pl_94_171_block_population"
+            if allocation_basis == "block_population"
+            else "geometry_area"
+        ),
+        boundary_vintage=resolved_boundary,
+        county_vintage=resolved_county,
+        msa_definition_version=definition_version,
+        source_dataset_id=dataset_id,
+        source_additive_measure_columns=measure_columns,
+        block_vintage=str(blocks) if allocation_basis == "block_population" else None,
+        decennial_vintage=str(decennial) if allocation_basis == "block_population" else None,
+        input_artifacts={"source": str(source)},
+    )
+    write_parquet_with_provenance(rollup, output_path, provenance)
+
+    payload = {
+        "status": "ok",
+        "output_path": str(output_path),
+        "source_path": str(source),
+        "source_dataset_id": dataset_id,
+        "geo_type": "msa",
+        "years": years,
+        "row_count": int(len(rollup)),
+        "msa_count": int(rollup["msa_id"].nunique()) if "msa_id" in rollup.columns else 0,
+        "source_coc_count": (
+            int(source_df[coc_id_column].nunique()) if coc_id_column in source_df.columns else 0
+        ),
+        "additive_measure_columns": list(measure_columns),
+        "allocation_basis": allocation_basis,
+        "boundary_vintage": resolved_boundary,
+        "county_vintage": resolved_county,
+        "definition_version": definition_version,
+    }
+    if output_json:
+        import json
+
+        typer.echo(json.dumps(payload))
+        return
+
+    typer.echo(f"Wrote CoC measure MSA rollup: {output_path}")
+    typer.echo(
+        f"  Source CoCs: {payload['source_coc_count']}, MSAs: {payload['msa_count']}, "
+        f"Rows: {payload['row_count']}"
+    )
 
 
 # ---------------------------------------------------------------------------
