@@ -35,6 +35,7 @@ from hhplab.bls.ingest.laus import (
     BlsQuotaExhausted,
     _build_metro_series_map,
     _chunked,
+    _load_metro_targets,
     fetch_laus_annual_averages,
     ingest_laus_metro,
 )
@@ -196,6 +197,14 @@ class TestMetroSeriesMap:
     def test_new_york_series_ids_in_map(self):
         mapping = _build_metro_series_map()
         assert mapping["GF01"]["unemployment_rate"] == NY_SERIES_IDS["unemployment_rate"]
+
+    def test_glynn_fox_targets_use_profile_ids_without_duplicate_metro_columns(self):
+        targets = _load_metro_targets("glynn_fox_v1", None)
+
+        assert targets.columns.tolist() == ["metro_id", "cbsa_code", "metro_name", "state_fips"]
+        assert targets["metro_id"].tolist() == [f"GF{i:02d}" for i in range(1, 26)]
+        assert targets.loc[targets["metro_id"] == "GF01", "cbsa_code"].item() == "35620"
+        assert targets.loc[targets["metro_id"] == "GF01", "state_fips"].item() == "36"
 
     def test_canonical_universe_series_map_uses_cbsa_ids(self, monkeypatch):
         monkeypatch.setattr(

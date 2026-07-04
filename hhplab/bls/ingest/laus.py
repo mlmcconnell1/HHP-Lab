@@ -154,12 +154,13 @@ def _load_metro_targets(
                 metro_definition_version=CANONICAL_UNIVERSE_DEFINITION_VERSION,
                 base_dir=base_dir,
             )
+            subset_df = subset_df[["profile_metro_id", "cbsa_code", "profile_metro_name"]].copy()
             subset_df = subset_df.rename(
                 columns={
                     "profile_metro_id": "metro_id",
                     "profile_metro_name": "metro_name",
                 }
-            )[["metro_id", "cbsa_code", "metro_name"]].copy()
+            )
             subset_df["state_fips"] = subset_df["metro_id"].map(METRO_STATE_FIPS)
             return subset_df
         except FileNotFoundError:

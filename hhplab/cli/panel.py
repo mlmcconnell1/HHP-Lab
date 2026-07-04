@@ -10,6 +10,7 @@ from typing import Annotated
 import pandas as pd
 import typer
 
+from hhplab.panel.enrich import PanelEnrichError, RateSpec, enrich_panel_file
 from hhplab.panel.inspect import PanelInspectError, describe_panel_file, query_panel_file
 
 panel_app = typer.Typer(
@@ -24,6 +25,27 @@ def _parse_columns(value: str | None) -> list[str] | None:
         return None
     columns = [part.strip() for part in value.split(",") if part.strip()]
     return columns or None
+
+
+def _parse_rate_specs(
+    *,
+    numerator: str | None,
+    denominator: str | None,
+    rate_per: float,
+    rate_name: str | None,
+) -> list[RateSpec]:
+    if numerator is None and denominator is None and rate_name is None:
+        return []
+    if numerator is None or denominator is None:
+        raise typer.BadParameter("--numerator and --denominator must be passed together.")
+    return [
+        RateSpec(
+            numerator=numerator,
+            denominator=denominator,
+            rate_per=rate_per,
+            name=rate_name,
+        )
+    ]
 
 
 def _json_safe(value):
@@ -103,6 +125,23 @@ def _format_query(payload: dict) -> str:
     return "\n".join(lines)
 
 
+def _format_enrich(payload: dict) -> str:
+    lines = [
+        f"Panel: {payload.get('panel_path')}",
+        f"Source: {payload.get('source_path')}",
+        f"Output: {payload.get('output_path')}",
+        f"Rows: {payload.get('row_count', 0)} | Matched: {payload.get('matched_row_count', 0)}",
+        f"Added columns: {', '.join(payload.get('source_columns') or [])}",
+    ]
+    derived = payload.get("derived_rates") or []
+    if derived:
+        lines.append(
+            "Derived rates: "
+            + ", ".join(str(record.get("name")) for record in derived if record.get("name"))
+        )
+    return "\n".join(lines)
+
+
 def _emit(payload: dict, *, json_output: bool) -> None:
     payload = _json_safe(payload)
     if json_output:
@@ -110,6 +149,9 @@ def _emit(payload: dict, *, json_output: bool) -> None:
         return
     if "measures" in payload:
         typer.echo(_format_describe(payload))
+        return
+    if payload.get("source_path") is not None:
+        typer.echo(_format_enrich(payload))
         return
     typer.echo(_format_query(payload))
 
@@ -189,5 +231,84 @@ def panel_query(
             output_path=output,
         )
     except PanelInspectError as exc:
+        raise typer.BadParameter(str(exc)) from exc
+    _emit(payload, json_output=json_output)
+
+
+@panel_app.command("enrich")
+def panel_enrich(
+    panel: Annotated[
+        Path,
+        typer.Option("--panel", "-p", help="Input panel parquet path.", exists=True),
+    ],
+    source: Annotated[
+        Path,
+        typer.Option("--source", "-s", help="Curated source parquet path.", exists=True),
+    ],
+    output: Annotated[
+        Path,
+        typer.Option("--output", "-o", help="Output enriched panel parquet path."),
+    ],
+    columns: Annotated[
+        str | None,
+        typer.Option("--columns", help="Comma-separated source columns to join."),
+    ] = None,
+    panel_geo_column: Annotated[
+        str | None,
+        typer.Option("--panel-geo-column", help="Panel geography key column."),
+    ] = None,
+    source_geo_column: Annotated[
+        str | None,
+        typer.Option("--source-geo-column", help="Source geography key column."),
+    ] = None,
+    include_year: Annotated[
+        bool | None,
+        typer.Option(
+            "--include-year/--no-include-year",
+            help=(
+                "Join on year in addition to geography. "
+                "Defaults to auto when both inputs have year."
+            ),
+        ),
+    ] = None,
+    numerator: Annotated[
+        str | None,
+        typer.Option("--numerator", help="Numerator column for an optional derived rate."),
+    ] = None,
+    denominator: Annotated[
+        str | None,
+        typer.Option("--denominator", help="Denominator column for an optional derived rate."),
+    ] = None,
+    rate_per: Annotated[
+        float,
+        typer.Option("--rate-per", help="Scale for the optional derived rate."),
+    ] = 1000.0,
+    rate_name: Annotated[
+        str | None,
+        typer.Option("--rate-name", help="Output column name for the optional derived rate."),
+    ] = None,
+    json_output: Annotated[
+        bool,
+        typer.Option("--json", help="Output machine-readable JSON."),
+    ] = False,
+) -> None:
+    """Join curated source columns onto a panel and optionally derive a rate."""
+    try:
+        payload = enrich_panel_file(
+            panel,
+            source_path=source,
+            output_path=output,
+            columns=_parse_columns(columns),
+            panel_geo_column=panel_geo_column,
+            source_geo_column=source_geo_column,
+            include_year=include_year,
+            rate_specs=_parse_rate_specs(
+                numerator=numerator,
+                denominator=denominator,
+                rate_per=rate_per,
+                rate_name=rate_name,
+            ),
+        )
+    except (PanelEnrichError, PanelInspectError) as exc:
         raise typer.BadParameter(str(exc)) from exc
     _emit(payload, json_output=json_output)

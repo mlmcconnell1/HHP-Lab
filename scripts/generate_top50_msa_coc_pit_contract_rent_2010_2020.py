@@ -10,7 +10,6 @@ import pyarrow.parquet as pq
 
 from hhplab.provenance import ProvenanceBlock, write_parquet_with_provenance
 
-
 ROOT = Path(__file__).resolve().parents[1]
 OUTPUT_DIR = ROOT / "outputs" / "top50_msa_nonpr_coc_pit_contract_rent_2010_2020"
 
@@ -266,7 +265,10 @@ def _build_panel() -> pd.DataFrame:
 
 def _write_outputs(panel: pd.DataFrame) -> None:
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-    stem = "panel__top50_msa_nonpr_coc_pit_contract_rent_2010_2020__Y2010-2020@B2020_Dcensus_msa_2023_A2010-2020"
+    stem = (
+        "panel__top50_msa_nonpr_coc_pit_contract_rent_2010_2020__"
+        "Y2010-2020@B2020_Dcensus_msa_2023_A2010-2020"
+    )
     parquet_path = OUTPUT_DIR / f"{stem}.parquet"
     csv_path = OUTPUT_DIR / f"{stem}.csv"
     preview_path = OUTPUT_DIR / f"{stem}.preview.csv"

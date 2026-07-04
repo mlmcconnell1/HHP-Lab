@@ -307,3 +307,98 @@ class TestPanelCli:
 
         assert result.exit_code != 0
         assert "Requested panel sort column is missing: missing_column" in result.output
+
+    def test_panel_enrich_joins_source_columns_and_derives_rate(self, tmp_path: Path):
+        panel = _msa_panel_fixture(tmp_path / "msa_panel.parquet")
+        source = tmp_path / "sanctuary.parquet"
+        output = tmp_path / "enriched.parquet"
+        pd.DataFrame(
+            {
+                "cbsa_code": ["10100", "10200", "10300", "10400", "10500"],
+                "sanctuary_policy": [1, 0, 1, 0, 1],
+            }
+        ).to_parquet(source)
+
+        result = runner.invoke(
+            app,
+            [
+                "panel",
+                "enrich",
+                "--panel",
+                str(panel),
+                "--source",
+                str(source),
+                "--columns",
+                "sanctuary_policy",
+                "--output",
+                str(output),
+                "--numerator",
+                "total_population",
+                "--denominator",
+                "msa_contract_rent_p25",
+                "--rate-per",
+                "1000",
+                "--rate-name",
+                "population_per_1000_rent_dollars",
+                "--json",
+            ],
+        )
+
+        assert result.exit_code == 0
+        payload = json.loads(result.output)
+        assert payload["status"] == "ok"
+        assert payload["row_count"] == 5
+        assert payload["matched_row_count"] == 5
+        assert payload["join"]["panel_geo_column"] == "msa_id"
+        assert payload["join"]["source_geo_column"] == "cbsa_code"
+        assert payload["source_columns"] == ["sanctuary_policy"]
+        assert payload["derived_rates"] == [
+            {
+                "name": "population_per_1000_rent_dollars",
+                "numerator": "total_population",
+                "denominator": "msa_contract_rent_p25",
+                "rate_per": 1000.0,
+            }
+        ]
+
+        enriched = pd.read_parquet(output)
+        assert enriched["sanctuary_policy"].tolist() == [1, 0, 1, 0, 1]
+        assert "cbsa_code" not in enriched.columns
+        assert enriched.loc[0, "population_per_1000_rent_dollars"] == 5000.0 / 900.0 * 1000
+        provenance = read_provenance(output)
+        assert provenance is not None
+        assert provenance.extra["dataset_type"] == "panel_enrichment"
+        assert provenance.extra["input_panel"] == str(panel)
+        assert provenance.extra["input_source"] == str(source)
+        assert provenance.extra["join"]["include_year"] is False
+
+    def test_panel_enrich_rejects_duplicate_source_join_keys(self, tmp_path: Path):
+        panel = _panel_fixture(tmp_path / "panel.parquet")
+        source = tmp_path / "source.parquet"
+        pd.DataFrame(
+            {
+                "geo_id": ["A", "A", "B"],
+                "year": [2020, 2020, 2020],
+                "extra_covariate": [1.0, 2.0, 3.0],
+            }
+        ).to_parquet(source)
+
+        result = runner.invoke(
+            app,
+            [
+                "panel",
+                "enrich",
+                "--panel",
+                str(panel),
+                "--source",
+                str(source),
+                "--columns",
+                "extra_covariate",
+                "--output",
+                str(tmp_path / "enriched.parquet"),
+                "--json",
+            ],
+        )
+
+        assert result.exit_code != 0
+        assert "Source rows are not unique by join keys" in result.output
