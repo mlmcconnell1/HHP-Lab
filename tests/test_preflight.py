@@ -564,11 +564,25 @@ class TestProbeMeasures:
         r = probe_measures(["geo_id", "pop", "income"], ["pop", "income"], "ds1")
         assert r.ok
 
+    def test_b05001_measure_columns_are_accepted_when_present(self):
+        r = probe_measures(
+            ["geo_id", "citizenship_total", "not_us_citizen"],
+            ["citizenship_total", "not_us_citizen"],
+            "acs5_tract",
+        )
+        assert r.ok
+
     def test_some_missing(self):
         r = probe_measures(["geo_id", "pop"], ["pop", "income"], "ds1")
         assert not r.ok
         assert "income" in r.message
         assert r.detail["missing_measures"] == ["income"]
+
+    def test_b05001_measure_columns_report_missing_when_absent(self):
+        r = probe_measures(["geo_id", "total_population"], ["not_us_citizen"], "acs5_tract")
+        assert not r.ok
+        assert "not_us_citizen" in r.message
+        assert r.detail["missing_measures"] == ["not_us_citizen"]
 
 
 class TestProbeTemporalFilter:

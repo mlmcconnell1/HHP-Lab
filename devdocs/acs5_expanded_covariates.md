@@ -18,6 +18,7 @@ The code-owned source of truth is:
 | ACS5 table | Output family | Rollup method | Denominator or weight | Notes |
 | --- | --- | --- | --- | --- |
 | `B01003` | `total_population`, `moe_total_population` | Area-weighted count; root-sum-squared MOE | `area_share` | Count MOE propagation is implemented for total population. |
+| `B05001` | nativity and citizenship-status counts | Area-weighted counts | `area_share` | Raw count components: `citizenship_total`, `citizen_born_us`, `citizen_born_pr_or_us_islands`, `citizen_born_abroad_american_parents`, `naturalized_citizen`, and `not_us_citizen`. |
 | `B01001` | `adult_population` | Area-weighted count | `area_share` | Derived from age-by-sex bins before rollup. |
 | `B19013` | `median_household_income` | Weighted mean of tract medians | `total_population` fallback path | Approximation, not a pooled household median. |
 | `B19301` | `per_capita_income` | Population-weighted mean | `total_population` | Scalar tract estimate averaged with population weights. |
@@ -69,6 +70,8 @@ resample:
       aggregation: weighted_mean
     gini_index:
       aggregation: weighted_mean
+    not_us_citizen:
+      aggregation: sum
     owner_occupied_value_total:
       aggregation: sum
 ```
@@ -80,3 +83,9 @@ registry. Generic recipe resampling still follows the aggregation methods
 declared in the recipe step; recipe authors should use `sum` for count/bin
 columns and `weighted_mean` for scalar estimates unless a source-owned
 aggregation command is being used.
+
+B05001 follows the same ACS5 tract ingest and tract-vintage rules as other
+ACS5 tract-derived covariates. For PIT/January-aligned workflows, use the
+project ACS lag rule: analysis year `Y` uses ACS5 vintage `Y-1`. The B05001
+columns are counts, not rates; derive shares such as non-citizen share from
+the rolled-up numerator and `citizenship_total` denominator after aggregation.

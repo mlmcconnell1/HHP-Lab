@@ -28,6 +28,13 @@ ACS_VARIABLES: dict[str, str] = {
     # B01003 — Total Population
     "B01003_001E": "total_population",
     "B01003_001M": "moe_total_population",
+    # B05001 — Nativity and Citizenship Status in the United States
+    "B05001_001E": "citizenship_total",
+    "B05001_002E": "citizen_born_us",
+    "B05001_003E": "citizen_born_pr_or_us_islands",
+    "B05001_004E": "citizen_born_abroad_american_parents",
+    "B05001_005E": "naturalized_citizen",
+    "B05001_006E": "not_us_citizen",
     # B19013 — Median Household Income
     "B19013_001E": "median_household_income",
     # B19301 — Per Capita Income
@@ -383,6 +390,7 @@ def tables_for_api_vars(api_vars: list[str]) -> list[str]:
 # Tables included (for provenance tracking)
 ACS_TABLES: list[str] = [
     "B01003",
+    "B05001",
     "B01001",
     "B19013",
     "B19301",
@@ -472,6 +480,36 @@ ACS5_COVARIATE_REGISTRY: tuple[ACS5CovariateSpec, ...] = (
         caveats=(
             "Only count-style total population MOE propagation is declared here; "
             "median MOEs are not propagated."
+        ),
+    ),
+    ACS5CovariateSpec(
+        name="nativity_citizenship",
+        table="B05001",
+        source_variables=_source_variables_for_outputs(
+            (
+                "citizenship_total",
+                "citizen_born_us",
+                "citizen_born_pr_or_us_islands",
+                "citizen_born_abroad_american_parents",
+                "naturalized_citizen",
+                "not_us_citizen",
+            )
+        ),
+        output_columns=(
+            "citizenship_total",
+            "citizen_born_us",
+            "citizen_born_pr_or_us_islands",
+            "citizen_born_abroad_american_parents",
+            "naturalized_citizen",
+            "not_us_citizen",
+        ),
+        measure_kind="distribution",
+        denominator_column="citizenship_total",
+        weight_column="area_share",
+        rollup_method="area_weighted_sum",
+        caveats=(
+            "B05001 count components are raw nativity and citizenship-status "
+            "counts; rates or shares should be derived explicitly by consumers."
         ),
     ),
     ACS5CovariateSpec(

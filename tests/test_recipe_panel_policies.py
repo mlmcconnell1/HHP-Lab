@@ -1661,6 +1661,7 @@ class TestMsaPanelParity:
                 "total_population": [50000],
                 "per_capita_income": [42000.0],
                 "gini_index": [0.4812],
+                "not_us_citizen": [2600],
             }
         )
 
@@ -1670,6 +1671,7 @@ class TestMsaPanelParity:
         assert "total_population" in flags.measure_columns
         assert "per_capita_income" in flags.measure_columns
         assert "gini_index" in flags.measure_columns
+        assert "not_us_citizen" in flags.measure_columns
 
     def test_conformance_flags_include_hic_panel_measures(self, tmp_path: Path):
         from dataclasses import dataclass

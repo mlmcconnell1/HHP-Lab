@@ -618,6 +618,7 @@ def test_acs5_expanded_covariates_remain_outside_default_canonical_measures() ->
     assert "contract_rent_distribution_total" in ACS5_EXPANDED_COVARIATE_COLUMNS
     assert "median_contract_rent" in ACS5_EXPANDED_COVARIATE_COLUMNS
     assert "owner_costs_pct_income_total" in ACS5_EXPANDED_COVARIATE_COLUMNS
+    assert "not_us_citizen" in ACS5_EXPANDED_COVARIATE_COLUMNS
     assert "median_household_income" not in ACS5_EXPANDED_COVARIATE_COLUMNS
 
 
@@ -627,7 +628,9 @@ def test_recipe_selectable_acs5_measures_include_expanded_without_changing_defau
     assert "gini_index" in ACS5_RECIPE_SELECTABLE_MEASURES
     assert "contract_rent_distribution_total" in ACS5_RECIPE_SELECTABLE_MEASURES
     assert "median_contract_rent" in ACS5_RECIPE_SELECTABLE_MEASURES
+    assert "naturalized_citizen" in ACS5_RECIPE_SELECTABLE_MEASURES
     assert "per_capita_income" not in ACS5_RECIPE_DEFAULT_MEASURES
+    assert "naturalized_citizen" not in ACS5_RECIPE_DEFAULT_MEASURES
     assert set(ACS5_RECIPE_DEFAULT_MEASURES) < set(ACS5_RECIPE_SELECTABLE_MEASURES)
 
 
@@ -638,6 +641,23 @@ def test_acs5_covariate_output_lookup_returns_owning_registry_entry() -> None:
     assert spec.table == "B25070"
     assert spec.denominator_column == "gross_rent_pct_income_total"
     assert spec.rollup_method == "ratio_of_area_weighted_sums"
+
+
+def test_acs5_covariate_output_lookup_returns_b05001_registry_entry() -> None:
+    spec = acs5_covariate_spec_for_output("not_us_citizen")
+
+    assert spec.name == "nativity_citizenship"
+    assert spec.table == "B05001"
+    assert spec.source_variables == (
+        "B05001_001E",
+        "B05001_002E",
+        "B05001_003E",
+        "B05001_004E",
+        "B05001_005E",
+        "B05001_006E",
+    )
+    assert spec.denominator_column == "citizenship_total"
+    assert spec.rollup_method == "area_weighted_sum"
 
 
 @pytest.mark.parametrize(

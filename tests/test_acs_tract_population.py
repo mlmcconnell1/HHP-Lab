@@ -619,6 +619,113 @@ class TestFetchStateTractPopulation:
         assert geoid.startswith("01")
 
 
+B05001_EXPECTED_COLUMNS = {
+    "B05001_001E": "citizenship_total",
+    "B05001_002E": "citizen_born_us",
+    "B05001_003E": "citizen_born_pr_or_us_islands",
+    "B05001_004E": "citizen_born_abroad_american_parents",
+    "B05001_005E": "naturalized_citizen",
+    "B05001_006E": "not_us_citizen",
+}
+
+
+class TestB05001NativityCitizenshipIngest:
+    """Tests for B05001 nativity and citizenship variable ingestion."""
+
+    def test_b05001_variables_are_requested_and_parsed(self, httpx_mock):
+        """B05001 variables flow through API chunks into friendly columns."""
+        response_data = make_census_response(
+            [
+                {
+                    "county": "031",
+                    "tract": "001000",
+                    "B01003_001E": "5000",
+                    "B05001_001E": "5000",
+                    "B05001_002E": "4300",
+                    "B05001_003E": "120",
+                    "B05001_004E": "80",
+                    "B05001_005E": "300",
+                    "B05001_006E": "200",
+                }
+            ]
+        )
+        captured_get: list[str] = []
+
+        def respond(request):
+            captured_get.append(str(request.url.params["get"]))
+            return httpx.Response(200, json=response_data)
+
+        httpx_mock.add_callback(
+            respond,
+            url=re.compile(r"https://api\.census\.gov/data/2023/acs/acs5.*"),
+        )
+
+        df, _ = fetch_state_tract_data(2023, "08")
+
+        requested_vars = ",".join(captured_get)
+        for api_var, column in B05001_EXPECTED_COLUMNS.items():
+            assert api_var in requested_vars
+            assert column in df.columns
+
+        row = df.iloc[0]
+        assert row["citizenship_total"] == 5000
+        assert row["citizen_born_us"] == 4300
+        assert row["citizen_born_pr_or_us_islands"] == 120
+        assert row["citizen_born_abroad_american_parents"] == 80
+        assert row["naturalized_citizen"] == 300
+        assert row["not_us_citizen"] == 200
+
+    def test_b05001_negative_sentinel_values_become_na(self, httpx_mock):
+        """Negative Census sentinels for B05001 counts become nullable values."""
+        response_data = make_census_response(
+            [
+                {
+                    "county": "001",
+                    "tract": "000100",
+                    "B05001_001E": "-666666666",
+                    "B05001_002E": "-666666666",
+                    "B05001_003E": "-666666666",
+                    "B05001_004E": "-666666666",
+                    "B05001_005E": "-666666666",
+                    "B05001_006E": "-666666666",
+                }
+            ]
+        )
+        httpx_mock.add_response(
+            url=re.compile(r"https://api\.census\.gov/data/2023/acs/acs5.*"),
+            json=response_data,
+        )
+
+        df, _ = fetch_state_tract_data(2023, "08")
+
+        for column in B05001_EXPECTED_COLUMNS.values():
+            assert pd.isna(df.iloc[0][column])
+
+    def test_b05001_columns_are_in_canonical_tract_output_order(self):
+        """B05001 columns are part of the stable tract parquet schema."""
+        expected_order = [
+            "total_population",
+            "moe_total_population",
+            "citizenship_total",
+            "citizen_born_us",
+            "citizen_born_pr_or_us_islands",
+            "citizen_born_abroad_american_parents",
+            "naturalized_citizen",
+            "not_us_citizen",
+            "adult_population",
+        ]
+        start = TRACT_OUTPUT_COLUMNS.index("total_population")
+        assert TRACT_OUTPUT_COLUMNS[start : start + len(expected_order)] == expected_order
+
+    @pytest.mark.parametrize("year", [2009, 2010, 2015, 2024])
+    def test_b05001_variables_are_available_for_supported_acs5_years(self, year):
+        """B05001 exists across supported ACS5 tract vintages."""
+        for api_var, column in B05001_EXPECTED_COLUMNS.items():
+            assert api_var in api_vars_for_year(year)
+            assert acs_variables_for_year(year)[api_var] == column
+        assert "B05001" in tables_for_api_vars(api_vars_for_year(year))
+
+
 class TestFetchTractPopulation:
     """Tests for fetch_tract_data function."""
 
@@ -633,6 +740,12 @@ class TestFetchTractPopulation:
                     "tract": "001000",
                     "B01003_001E": "5000",
                     "B01003_001M": "150",
+                    "B05001_001E": "5000",
+                    "B05001_002E": "4300",
+                    "B05001_003E": "120",
+                    "B05001_004E": "80",
+                    "B05001_005E": "300",
+                    "B05001_006E": "200",
                     "B19013_001E": "65000",
                     "B25064_001E": "1400",
                     "B25058_001E": "1250",
@@ -672,6 +785,13 @@ class TestFetchTractPopulation:
         assert row["tract_vintage"] == "2023"
         assert row["data_source"] == "acs_5yr"
         assert row["total_population"] == 5000
+        assert row["citizenship_total"] == 5000
+        assert row["citizen_born_us"] == 4300
+        assert row["citizen_born_pr_or_us_islands"] == 120
+        assert row["citizen_born_abroad_american_parents"] == 80
+        assert row["naturalized_citizen"] == 300
+        assert row["not_us_citizen"] == 200
+        assert str(df["citizenship_total"].dtype) == "Int64"
         assert row["total_households"] == 2100
         assert row["owner_households"] == 1200
         assert row["renter_households"] == 900
@@ -1084,11 +1204,14 @@ class TestIngestTractPopulation:
         assert provenance.extra.get("source_tract_vintage") == 2020
         assert provenance.extra.get("target_tract_vintage") == 2023
         assert "B01003" in provenance.extra.get("tables", [])
+        assert "B05001" in provenance.extra.get("tables", [])
         assert "B19001" in provenance.extra.get("tables", [])
         assert "B25063" in provenance.extra.get("tables", [])
         assert "B25056" in provenance.extra.get("tables", [])
         assert "B25058" in provenance.extra.get("tables", [])
         assert "B25118" in provenance.extra.get("tables", [])
+        assert "B05001_001E" in provenance.extra.get("variables", [])
+        assert "B05001_006E" in provenance.extra.get("variables", [])
         assert "B25056_001E" in provenance.extra.get("variables", [])
         assert "B25058_001E" in provenance.extra.get("variables", [])
 
@@ -1499,6 +1622,7 @@ def test_sae_required_tract_tables_are_in_provenance_order() -> None:
     """SAE support tables have deterministic order in ACS5 table metadata."""
     assert tables_for_api_vars(ALL_API_VARS) == [
         "B01003",
+        "B05001",
         "B01001",
         "B19013",
         "B19301",

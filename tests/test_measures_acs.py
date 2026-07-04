@@ -541,6 +541,40 @@ class TestExpandedAcs5AggregationSemantics:
             200 * 0.5 + 800 * 0.25
         )
 
+    def test_b05001_citizenship_counts_roll_up_as_area_weighted_counts(self):
+        acs_data = pd.DataFrame(
+            {
+                "GEOID": ["08001000100", "08001000200"],
+                "total_population": [1000.0, 2000.0],
+                "citizenship_total": [1000.0, 2000.0],
+                "citizen_born_us": [820.0, 1400.0],
+                "citizen_born_pr_or_us_islands": [20.0, 40.0],
+                "citizen_born_abroad_american_parents": [10.0, 30.0],
+                "naturalized_citizen": [100.0, 300.0],
+                "not_us_citizen": [50.0, 230.0],
+            }
+        )
+        crosswalk = pd.DataFrame(
+            {
+                "tract_geoid": ["08001000100", "08001000200"],
+                "coc_id": ["CO-500", "CO-500"],
+                "area_share": [0.5, 0.25],
+                "pop_share": [0.4, 0.6],
+            }
+        )
+
+        result = aggregate_to_coc(acs_data, crosswalk, weighting="population")
+        row = result.iloc[0]
+
+        assert row["citizenship_total"] == pytest.approx(1000 * 0.5 + 2000 * 0.25)
+        assert row["citizen_born_us"] == pytest.approx(820 * 0.5 + 1400 * 0.25)
+        assert row["citizen_born_pr_or_us_islands"] == pytest.approx(20 * 0.5 + 40 * 0.25)
+        assert row["citizen_born_abroad_american_parents"] == pytest.approx(
+            10 * 0.5 + 30 * 0.25
+        )
+        assert row["naturalized_citizen"] == pytest.approx(100 * 0.5 + 300 * 0.25)
+        assert row["not_us_citizen"] == pytest.approx(50 * 0.5 + 230 * 0.25)
+
     @pytest.mark.parametrize(
         ("case_name", "case"),
         [
