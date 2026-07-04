@@ -93,9 +93,27 @@ def aggregate_covariate(
         str,
         typer.Option(
             "--target-geo",
-            help="Target geography for pass-through covariate output: coc, county, or state.",
+            help="Target geography for covariate output: coc, county, state, or msa.",
         ),
     ] = "coc",
+    msa_definition_version: Annotated[
+        str,
+        typer.Option(
+            "--msa-definition-version",
+            help="MSA definition version for --target-geo msa.",
+        ),
+    ] = "census_msa_2023",
+    county_population_path: Annotated[
+        Path | None,
+        typer.Option(
+            "--county-population-path",
+            help="PEP county population parquet used as weights for --target-geo msa.",
+        ),
+    ] = None,
+    data_root: Annotated[
+        Path | None,
+        typer.Option("--data-root", help="Data root containing curated MSA/PEP artifacts."),
+    ] = None,
     force: Annotated[
         bool,
         typer.Option("--force", "-f", help="Rebuild even if output already exists."),
@@ -119,6 +137,9 @@ def aggregate_covariate(
             output_dir=output_dir,
             years=parsed_years,
             target_geo=target_geo,
+            msa_definition_version=msa_definition_version,
+            county_population_path=county_population_path,
+            data_root=data_root,
             force=force,
         )
         row_count = len(pd.read_parquet(result_path))
@@ -135,6 +156,10 @@ def aggregate_covariate(
         "source_id": source,
         "align": align,
         "target_geo": target_geo,
+        "msa_definition_version": msa_definition_version if target_geo == "msa" else None,
+        "county_population_path": (
+            str(county_population_path) if county_population_path is not None else None
+        ),
         "years": parsed_years,
         "output_path": str(result_path),
         "row_count": row_count,

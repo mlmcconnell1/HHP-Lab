@@ -144,6 +144,32 @@ COVARIATE_SOURCE_SPECS: dict[str, CovariateSourceSpec] = {
             "must avoid assigning sub-state variation that is not in the source."
         ),
     ),
+    "prism_tmin_january": CovariateSourceSpec(
+        source_id="prism_tmin_january",
+        provider="prism",
+        product="temperature",
+        topic="climate",
+        native_geo="county",
+        first_year=1895,
+        last_year=None,
+        source_page="https://prism.oregonstate.edu/",
+        source_url=(
+            "https://data.prism.oregonstate.edu/time_series/us/an/4km/"
+            "tmin/monthly/"
+        ),
+        required_columns=("county_fips", "year"),
+        measure_columns=(
+            "tmin_c",
+            "tmin_below_freezing",
+            "tmin_code_blue_band",
+            "tmin_above_code_blue",
+        ),
+        recommended_align="point_in_time_jan",
+        notes=(
+            "January county PRISM minimum temperature in Celsius, with policy-threshold "
+            "hinge basis columns at freezing and common 40F Code Blue activation."
+        ),
+    ),
 }
 
 

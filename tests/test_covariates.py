@@ -10,7 +10,11 @@ import pytest
 from typer.testing import CliRunner
 
 from hhplab.cli.main import app
-from hhplab.covariates.aggregate import aggregate_covariate_source
+from hhplab.covariates.aggregate import (
+    EMERGENCY_SHELTER_ACTIVATION_C,
+    aggregate_covariate_source,
+    derive_prism_temperature_basis,
+)
 from hhplab.covariates.catalog import COVARIATE_SOURCE_SPECS
 from hhplab.covariates.ingest import ingest_covariate_source
 from hhplab.curated_policy import validate_curated_layout
@@ -25,6 +29,7 @@ EXPECTED_COVARIATE_SOURCES = {
     "hud_psh": ("county", "subsidized_households"),
     "hud_spm": ("coc", "spm_first_time_homeless"),
     "kff_medicaid_expansion": ("state", "medicaid_expansion_adopted"),
+    "prism_tmin_january": ("county", "tmin_c"),
 }
 
 BRANCH_ROUNDTRIP_CASES = [
@@ -242,6 +247,83 @@ def test_covariate_outputs_pass_curated_layout_policy(tmp_path: Path, monkeypatc
     assert validate_curated_layout(curated_root) == []
 
 
+def test_prism_tmin_basis_columns_sum_to_temperature() -> None:
+    """PRISM tmin basis columns should be policy-threshold pieces of tmin_c."""
+    df = pd.DataFrame({"tmin_c": [-3.0, 2.0, 7.0]})
+
+    result = derive_prism_temperature_basis(df)
+
+    assert result["tmin_below_freezing"].tolist() == [-3.0, 0.0, 0.0]
+    assert result["tmin_code_blue_band"].tolist() == [0.0, 2.0, EMERGENCY_SHELTER_ACTIVATION_C]
+    assert result["tmin_above_code_blue"].tolist() == pytest.approx([0.0, 0.0, 2.6])
+    total = (
+        result["tmin_below_freezing"]
+        + result["tmin_code_blue_band"]
+        + result["tmin_above_code_blue"]
+    )
+    assert total.tolist() == pytest.approx(result["tmin_c"].tolist())
+
+
+def test_prism_county_covariate_aggregates_to_msa_with_population_weights(
+    tmp_path: Path,
+) -> None:
+    """County-native PRISM tmin rolls up to MSA-year rows with PEP population weights."""
+    curated = tmp_path / "prism_county_monthly__tmin__Y2024M01@C2023.parquet"
+    pd.DataFrame(
+        {
+            "geo_type": ["county", "county", "county"],
+            "geo_id": ["01001", "01003", "02001"],
+            "county_fips": ["01001", "01003", "02001"],
+            "year": [2024, 2024, 2024],
+            "month": [1, 1, 1],
+            "tmin_c": [0.0, 10.0, -2.0],
+        }
+    ).to_parquet(curated)
+    population = tmp_path / "pep_county__v2024.parquet"
+    pd.DataFrame(
+        {
+            "county_fips": ["01001", "01003", "02001"],
+            "year": [2024, 2024, 2024],
+            "population": [100.0, 300.0, 500.0],
+        }
+    ).to_parquet(population)
+    data_root = tmp_path / "data"
+    msa_dir = data_root / "curated" / "msa"
+    msa_dir.mkdir(parents=True)
+    pd.DataFrame(
+        {
+            "msa_id": ["11111", "11111", "22222"],
+            "cbsa_code": ["11111", "11111", "22222"],
+            "county_fips": ["01001", "01003", "02001"],
+            "definition_version": ["test_msa_v1", "test_msa_v1", "test_msa_v1"],
+        }
+    ).to_parquet(msa_dir / "msa_county_membership__test_msa_v1.parquet")
+
+    panel = aggregate_covariate_source(
+        "prism_tmin_january",
+        curated_path=curated,
+        output_dir=tmp_path,
+        years=[2024],
+        target_geo="msa",
+        msa_definition_version="test_msa_v1",
+        county_population_path=population,
+        data_root=data_root,
+        force=True,
+    )
+
+    result = pd.read_parquet(panel)
+    by_msa = result.set_index("msa_id")
+    assert by_msa.loc["11111", "tmin_c"] == pytest.approx(7.5)
+    assert by_msa.loc["22222", "tmin_c"] == pytest.approx(-2.0)
+    assert by_msa.loc["11111", "tmin_code_blue_band"] == pytest.approx(3.3)
+    assert by_msa.loc["11111", "population_weight_denominator"] == pytest.approx(400.0)
+    provenance = read_provenance(panel)
+    assert provenance is not None
+    assert provenance.geo_type == "msa"
+    assert provenance.extra["target_geo"] == "msa"
+    assert provenance.extra["msa_definition_version"] == "test_msa_v1"
+
+
 def test_cli_lists_covariate_sources_as_json() -> None:
     """Agents can discover expanded covariate support without scraping text."""
     result = runner.invoke(app, ["list", "covariates", "--json"])
@@ -362,3 +444,68 @@ def test_cli_aggregate_county_covariate_rejects_default_coc_target(
     assert payload["status"] == "error"
     assert "native to county geography" in payload["message"]
     assert "--target-geo county" in payload["message"]
+
+
+def test_cli_aggregate_prism_covariate_to_msa(tmp_path: Path) -> None:
+    """CLI exposes population-weighted MSA output for county-native PRISM covariates."""
+    curated = tmp_path / "prism.parquet"
+    pd.DataFrame(
+        {
+            "geo_type": ["county", "county"],
+            "geo_id": ["01001", "01003"],
+            "county_fips": ["01001", "01003"],
+            "year": [2024, 2024],
+            "tmin_c": [1.0, 5.0],
+        }
+    ).to_parquet(curated)
+    population = tmp_path / "pep.parquet"
+    pd.DataFrame(
+        {
+            "county_fips": ["01001", "01003"],
+            "year": [2024, 2024],
+            "population": [25.0, 75.0],
+        }
+    ).to_parquet(population)
+    data_root = tmp_path / "data"
+    msa_dir = data_root / "curated" / "msa"
+    msa_dir.mkdir(parents=True)
+    pd.DataFrame(
+        {
+            "msa_id": ["11111", "11111"],
+            "county_fips": ["01001", "01003"],
+        }
+    ).to_parquet(msa_dir / "msa_county_membership__test_msa_v1.parquet")
+
+    result = runner.invoke(
+        app,
+        [
+            "aggregate",
+            "covariate",
+            "--source",
+            "prism_tmin_january",
+            "--curated-path",
+            str(curated),
+            "--output-dir",
+            str(tmp_path),
+            "--years",
+            "2024",
+            "--target-geo",
+            "msa",
+            "--msa-definition-version",
+            "test_msa_v1",
+            "--county-population-path",
+            str(population),
+            "--data-root",
+            str(data_root),
+            "--force",
+            "--json",
+        ],
+    )
+
+    assert result.exit_code == 0
+    payload = json.loads(result.output)
+    assert payload["status"] == "ok"
+    assert payload["target_geo"] == "msa"
+    assert payload["msa_definition_version"] == "test_msa_v1"
+    panel = pd.read_parquet(payload["output_path"])
+    assert panel.loc[0, "tmin_c"] == pytest.approx(4.0)

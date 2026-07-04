@@ -198,6 +198,11 @@ def normalize_covariate_frame(
             f"Expected canonical columns or aliases: {COMMON_COLUMN_ALIASES}"
         )
     missing_measures = [column for column in spec.measure_columns if column not in rows.columns]
+    if spec.source_id == "prism_tmin_january" and "tmin_c" in rows.columns:
+        from hhplab.covariates.aggregate import derive_prism_temperature_basis
+
+        rows = derive_prism_temperature_basis(rows)
+        missing_measures = [column for column in spec.measure_columns if column not in rows.columns]
     if missing_measures:
         raise ValueError(
             f"{spec.source_id} raw data is missing measure columns {missing_measures}. "
