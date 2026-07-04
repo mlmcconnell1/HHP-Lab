@@ -35,16 +35,29 @@ def aggregate_covariate_source(
     output_dir: Path | str | None = None,
     output_path: Path | str | None = None,
     years: list[int] | None = None,
+    target_geo: str = "coc",
     force: bool = False,
 ) -> Path:
     """Materialize a panel-ready covariate table from curated source data.
 
-    County, CoC, and state policy sources are already native to analysis
-    geographies, so this aggregation step validates schema, filters years, and
-    emits a stable panel artifact with provenance. Cross-geography recipes can
-    then join or crosswalk the output explicitly.
+    This step is a pass-through only when the source is already native to the
+    requested target geography. Cross-geography covariate aggregation must be
+    handled by an explicit recipe crosswalk/resample step.
     """
     spec = covariate_source_spec(source_id)
+    if target_geo not in {"county", "coc", "state"}:
+        raise ValueError(
+            "Unsupported covariate target geography "
+            f"'{target_geo}'. Use one of: county, coc, state."
+        )
+    if spec.native_geo != target_geo:
+        raise ValueError(
+            f"Covariate source '{source_id}' is native to {spec.native_geo} geography "
+            f"and cannot be emitted as {target_geo} panel-ready data without an explicit "
+            "crosswalk. Use --target-geo "
+            f"{spec.native_geo} for native output, or add a recipe resample/crosswalk step "
+            "before joining it to the target panel."
+        )
     input_path = (
         Path(curated_path)
         if curated_path is not None
@@ -82,6 +95,7 @@ def aggregate_covariate_source(
             "provider": spec.provider,
             "product": spec.product,
             "native_geo": spec.native_geo,
+            "target_geo": target_geo,
             "years": years,
             "measure_columns": list(spec.measure_columns),
             "input_path": str(input_path),

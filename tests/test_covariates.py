@@ -6,6 +6,7 @@ import json
 from pathlib import Path
 
 import pandas as pd
+import pytest
 from typer.testing import CliRunner
 
 from hhplab.cli.main import app
@@ -68,11 +69,21 @@ def test_ingest_and_aggregate_county_covariate_roundtrip(tmp_path: Path, monkeyp
     assert provenance.extra["dataset_type"] == "expanded_covariate"
     assert provenance.extra["source_id"] == "eviction_lab"
 
+    with pytest.raises(ValueError, match="cannot be emitted as coc panel-ready data"):
+        aggregate_covariate_source(
+            "eviction_lab",
+            curated_path=curated,
+            output_dir=tmp_path,
+            years=[2021],
+            force=True,
+        )
+
     panel = aggregate_covariate_source(
         "eviction_lab",
         curated_path=curated,
         output_dir=tmp_path,
         years=[2021],
+        target_geo="county",
         force=True,
     )
     panel_df = pd.read_parquet(panel)
@@ -82,6 +93,7 @@ def test_ingest_and_aggregate_county_covariate_roundtrip(tmp_path: Path, monkeyp
     panel_provenance = read_provenance(panel)
     assert panel_provenance is not None
     assert panel_provenance.extra["dataset_type"] == "expanded_covariate_panel"
+    assert panel_provenance.extra["target_geo"] == "county"
 
 
 def test_covariate_outputs_pass_curated_layout_policy(tmp_path: Path, monkeypatch) -> None:
@@ -113,6 +125,7 @@ def test_covariate_outputs_pass_curated_layout_policy(tmp_path: Path, monkeypatc
         curated_path=curated,
         output_dir=covariate_dir,
         years=[2024],
+        target_geo="county",
         force=True,
     )
 
@@ -182,6 +195,8 @@ def test_cli_ingest_and_aggregate_covariate(tmp_path: Path, monkeypatch) -> None
             str(tmp_path),
             "--years",
             "2024",
+            "--target-geo",
+            "county",
             "--force",
             "--json",
         ],
@@ -189,4 +204,53 @@ def test_cli_ingest_and_aggregate_covariate(tmp_path: Path, monkeypatch) -> None
     assert aggregate_result.exit_code == 0
     aggregate_payload = json.loads(aggregate_result.output)
     assert aggregate_payload["status"] == "ok"
+    assert aggregate_payload["target_geo"] == "county"
     assert aggregate_payload["row_count"] == 1
+
+
+def test_cli_aggregate_county_covariate_rejects_default_coc_target(
+    tmp_path: Path, monkeypatch
+) -> None:
+    """County-native sources must not silently masquerade as CoC panel data."""
+    monkeypatch.setattr("hhplab.covariates.ingest.register_source", lambda **_: None)
+    raw = tmp_path / "fmr.csv"
+    pd.DataFrame(
+        {
+            "county_fips": ["01001"],
+            "year": [2024],
+            "fmr_0br": [750],
+            "fmr_1br": [850],
+            "fmr_2br": [1000],
+            "fmr_3br": [1250],
+            "fmr_4br": [1500],
+        }
+    ).to_csv(raw, index=False)
+    curated = ingest_covariate_source(
+        "hud_fmr",
+        raw,
+        output_dir=tmp_path,
+        force=True,
+    )
+
+    result = runner.invoke(
+        app,
+        [
+            "aggregate",
+            "covariate",
+            "--source",
+            "hud_fmr",
+            "--curated-path",
+            str(curated),
+            "--output-dir",
+            str(tmp_path),
+            "--years",
+            "2024",
+            "--json",
+        ],
+    )
+
+    assert result.exit_code == 2
+    payload = json.loads(result.output)
+    assert payload["status"] == "error"
+    assert "native to county geography" in payload["message"]
+    assert "--target-geo county" in payload["message"]

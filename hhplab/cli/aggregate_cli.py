@@ -89,6 +89,13 @@ def aggregate_covariate(
         Path | None,
         typer.Option("--output-dir", "-o", help="Output directory for panel artifact."),
     ] = None,
+    target_geo: Annotated[
+        str,
+        typer.Option(
+            "--target-geo",
+            help="Target geography for pass-through covariate output: coc, county, or state.",
+        ),
+    ] = "coc",
     force: Annotated[
         bool,
         typer.Option("--force", "-f", help="Rebuild even if output already exists."),
@@ -111,6 +118,7 @@ def aggregate_covariate(
             curated_path=curated_path,
             output_dir=output_dir,
             years=parsed_years,
+            target_geo=target_geo,
             force=force,
         )
         row_count = len(pd.read_parquet(result_path))
@@ -126,6 +134,7 @@ def aggregate_covariate(
         "dataset": "covariate",
         "source_id": source,
         "align": align,
+        "target_geo": target_geo,
         "years": parsed_years,
         "output_path": str(result_path),
         "row_count": row_count,
