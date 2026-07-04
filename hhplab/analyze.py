@@ -1,0 +1,400 @@
+"""Agent-facing analysis helpers for panel Parquet artifacts."""
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Any
+
+import numpy as np
+import pandas as pd
+
+from hhplab.provenance import ProvenanceBlock, read_provenance, write_parquet_with_provenance
+from hhplab.schema.measures import PANEL_MEASURE_DICTIONARY_BY_COLUMN
+
+
+class AnalysisError(ValueError):
+    """Raised when an analysis request is invalid for the input panel."""
+
+
+@dataclass(frozen=True)
+class AnalysisResult:
+    """A persisted analysis result plus JSON-ready summary metadata."""
+
+    table: pd.DataFrame
+    output_path: Path
+    metadata: dict[str, Any]
+
+    def to_payload(self) -> dict[str, Any]:
+        return {
+            "status": "ok",
+            "output_path": str(self.output_path),
+            **self.metadata,
+            "records": self.table.to_dict(orient="records"),
+        }
+
+
+def _default_output_path(panel_path: Path, analysis_type: str) -> Path:
+    return panel_path.with_name(f"{panel_path.stem}__analysis_{analysis_type}.parquet")
+
+
+def _read_panel(panel_path: Path) -> pd.DataFrame:
+    if not panel_path.exists():
+        raise AnalysisError(f"Panel parquet not found: {panel_path}")
+    return pd.read_parquet(panel_path)
+
+
+def _require_columns(df: pd.DataFrame, columns: list[str], *, context: str) -> None:
+    missing = [column for column in columns if column not in df.columns]
+    if missing:
+        raise AnalysisError(
+            f"{context} references missing panel columns {missing}. "
+            f"Available columns: {sorted(df.columns.tolist())}"
+        )
+
+
+def _numeric_columns(df: pd.DataFrame, requested: list[str] | None) -> list[str]:
+    if requested:
+        _require_columns(df, requested, context="analysis")
+        return requested
+    return [
+        column
+        for column in df.columns
+        if pd.api.types.is_numeric_dtype(df[column]) and column != "year"
+    ]
+
+
+def _measure_semantics(column: str) -> dict[str, Any]:
+    entry = PANEL_MEASURE_DICTIONARY_BY_COLUMN.get(column)
+    if entry is None:
+        return {}
+    return {
+        "definition": entry.definition,
+        "units": entry.units,
+        "source_provider": entry.source_provider,
+        "source_product": entry.source_product,
+        "native_geometry": entry.native_geometry,
+        "role_hint": entry.role_hint,
+    }
+
+
+def _analysis_provenance(
+    *,
+    analysis_type: str,
+    panel_path: Path,
+    parameters: dict[str, Any],
+) -> ProvenanceBlock:
+    input_provenance = read_provenance(panel_path)
+    return ProvenanceBlock(
+        extra={
+            "dataset_type": "analysis_result",
+            "analysis_type": analysis_type,
+            "input_panel": str(panel_path),
+            "input_panel_provenance": (
+                input_provenance.to_dict() if input_provenance is not None else None
+            ),
+            "parameters": parameters,
+        }
+    )
+
+
+def _persist_result(
+    table: pd.DataFrame,
+    *,
+    panel_path: Path,
+    output_path: Path | None,
+    analysis_type: str,
+    parameters: dict[str, Any],
+    metadata: dict[str, Any],
+) -> AnalysisResult:
+    resolved_output = output_path or _default_output_path(panel_path, analysis_type)
+    provenance = _analysis_provenance(
+        analysis_type=analysis_type,
+        panel_path=panel_path,
+        parameters=parameters,
+    )
+    write_parquet_with_provenance(table, resolved_output, provenance)
+    return AnalysisResult(table=table, output_path=resolved_output, metadata=metadata)
+
+
+def describe_panel(
+    panel_path: Path,
+    *,
+    columns: list[str] | None = None,
+    output_path: Path | None = None,
+) -> AnalysisResult:
+    """Summarize numeric panel columns with semantics and missingness."""
+    df = _read_panel(panel_path)
+    measure_columns = _numeric_columns(df, columns)
+    rows: list[dict[str, Any]] = []
+    for column in measure_columns:
+        series = pd.to_numeric(df[column], errors="coerce")
+        non_null = series.dropna()
+        row = {
+            "column": column,
+            "n": int(non_null.shape[0]),
+            "missing": int(series.isna().sum()),
+            "missing_rate": float(series.isna().mean()) if len(series) else 0.0,
+            "mean": float(non_null.mean()) if not non_null.empty else np.nan,
+            "std": float(non_null.std(ddof=1)) if len(non_null) > 1 else np.nan,
+            "min": float(non_null.min()) if not non_null.empty else np.nan,
+            "p25": float(non_null.quantile(0.25)) if not non_null.empty else np.nan,
+            "median": float(non_null.median()) if not non_null.empty else np.nan,
+            "p75": float(non_null.quantile(0.75)) if not non_null.empty else np.nan,
+            "max": float(non_null.max()) if not non_null.empty else np.nan,
+        }
+        row.update(_measure_semantics(column))
+        rows.append(row)
+    table = pd.DataFrame(rows)
+    return _persist_result(
+        table,
+        panel_path=panel_path,
+        output_path=output_path,
+        analysis_type="describe",
+        parameters={"columns": measure_columns},
+        metadata={"analysis_type": "describe", "column_count": len(measure_columns)},
+    )
+
+
+def _residualize(values: pd.Series, controls: pd.DataFrame) -> pd.Series:
+    design = controls.apply(pd.to_numeric, errors="coerce")
+    design = design.assign(__intercept=1.0)
+    combined = pd.concat([values.rename("__value"), design], axis=1).dropna()
+    if combined.empty:
+        return pd.Series(dtype=float)
+    y = combined["__value"].to_numpy(dtype=float)
+    x = combined.drop(columns=["__value"]).to_numpy(dtype=float)
+    beta, *_ = np.linalg.lstsq(x, y, rcond=None)
+    resid = y - x @ beta
+    return pd.Series(resid, index=combined.index)
+
+
+def correlate_panel(
+    panel_path: Path,
+    *,
+    columns: list[str],
+    partial_controls: list[str] | None = None,
+    output_path: Path | None = None,
+) -> AnalysisResult:
+    """Compute pairwise Pearson and optional partial correlations."""
+    df = _read_panel(panel_path)
+    controls = partial_controls or []
+    _require_columns(df, [*columns, *controls], context="correlate")
+    rows: list[dict[str, Any]] = []
+    for left_index, left in enumerate(columns):
+        for right in columns[left_index + 1 :]:
+            pair = df[[left, right, *controls]].apply(pd.to_numeric, errors="coerce").dropna()
+            if pair.empty:
+                corr = np.nan
+                partial_corr = np.nan
+            else:
+                corr = float(pair[left].corr(pair[right]))
+                if controls:
+                    left_resid = _residualize(pair[left], pair[controls])
+                    right_resid = _residualize(pair[right], pair[controls])
+                    aligned = pd.concat([left_resid, right_resid], axis=1).dropna()
+                    partial_corr = (
+                        float(aligned.iloc[:, 0].corr(aligned.iloc[:, 1]))
+                        if len(aligned) > 1
+                        else np.nan
+                    )
+                else:
+                    partial_corr = np.nan
+            rows.append(
+                {
+                    "left": left,
+                    "right": right,
+                    "n": int(len(pair)),
+                    "correlation": corr,
+                    "partial_correlation": partial_corr,
+                    "partial_controls": ",".join(controls),
+                }
+            )
+    table = pd.DataFrame(rows)
+    return _persist_result(
+        table,
+        panel_path=panel_path,
+        output_path=output_path,
+        analysis_type="correlate",
+        parameters={"columns": columns, "partial_controls": controls},
+        metadata={
+            "analysis_type": "correlate",
+            "pair_count": len(rows),
+            "partial_controls": controls,
+        },
+    )
+
+
+def _fixed_effect_dummies(df: pd.DataFrame, column: str, prefix: str) -> pd.DataFrame:
+    return pd.get_dummies(df[column].astype("string"), prefix=prefix, drop_first=True, dtype=float)
+
+
+def _clustered_standard_errors(
+    x: np.ndarray,
+    residuals: np.ndarray,
+    clusters: pd.Series,
+) -> np.ndarray:
+    xtx_inv = np.linalg.pinv(x.T @ x)
+    meat = np.zeros((x.shape[1], x.shape[1]))
+    for cluster in clusters.dropna().unique():
+        mask = clusters == cluster
+        xg = x[mask.to_numpy()]
+        eg = residuals[mask.to_numpy()]
+        score = xg.T @ eg
+        meat += np.outer(score, score)
+    variance = xtx_inv @ meat @ xtx_inv
+    return np.sqrt(np.clip(np.diag(variance), 0, None))
+
+
+def regress_panel(
+    panel_path: Path,
+    *,
+    outcome: str,
+    predictors: list[str],
+    entity_column: str = "geo_id",
+    year_column: str = "year",
+    entity_fe: bool = True,
+    year_fe: bool = True,
+    cluster_by: str | None = "geo_id",
+    output_path: Path | None = None,
+) -> AnalysisResult:
+    """Run OLS with optional entity/year fixed effects and clustered standard errors."""
+    df = _read_panel(panel_path)
+    needed = [outcome, *predictors]
+    if entity_fe:
+        needed.append(entity_column)
+    if year_fe:
+        needed.append(year_column)
+    if cluster_by is not None:
+        needed.append(cluster_by)
+    _require_columns(df, list(dict.fromkeys(needed)), context="regress")
+
+    model_df = df[list(dict.fromkeys(needed))].copy()
+    numeric_cols = [outcome, *predictors]
+    for column in numeric_cols:
+        model_df[column] = pd.to_numeric(model_df[column], errors="coerce")
+    model_df = model_df.dropna(subset=numeric_cols)
+    if len(model_df) <= len(predictors):
+        raise AnalysisError("regress has too few complete rows for the requested model.")
+
+    x_parts = [pd.Series(1.0, index=model_df.index, name="Intercept"), model_df[predictors]]
+    if entity_fe:
+        x_parts.append(_fixed_effect_dummies(model_df, entity_column, "entity"))
+    if year_fe:
+        x_parts.append(_fixed_effect_dummies(model_df, year_column, "year"))
+    design = pd.concat(x_parts, axis=1).astype(float)
+    y = model_df[outcome].to_numpy(dtype=float)
+    x = design.to_numpy(dtype=float)
+    beta, *_ = np.linalg.lstsq(x, y, rcond=None)
+    fitted = x @ beta
+    residuals = y - fitted
+    dof = max(len(y) - np.linalg.matrix_rank(x), 1)
+    sigma2 = float((residuals @ residuals) / dof)
+    naive_se = np.sqrt(np.clip(np.diag(np.linalg.pinv(x.T @ x)) * sigma2, 0, None))
+    if cluster_by is not None:
+        std_errors = _clustered_standard_errors(x, residuals, model_df[cluster_by])
+        std_error_type = f"clustered:{cluster_by}"
+    else:
+        std_errors = naive_se
+        std_error_type = "ols"
+    coef = pd.DataFrame(
+        {
+            "term": design.columns,
+            "estimate": beta,
+            "std_error": std_errors,
+        }
+    )
+    coef["t_stat"] = coef["estimate"] / coef["std_error"].replace(0, np.nan)
+    coef["outcome"] = outcome
+    coef["n"] = int(len(y))
+    coef["r_squared"] = float(1 - (residuals @ residuals) / np.sum((y - y.mean()) ** 2))
+    coef["std_error_type"] = std_error_type
+    return _persist_result(
+        coef,
+        panel_path=panel_path,
+        output_path=output_path,
+        analysis_type="regress",
+        parameters={
+            "outcome": outcome,
+            "predictors": predictors,
+            "entity_column": entity_column,
+            "year_column": year_column,
+            "entity_fe": entity_fe,
+            "year_fe": year_fe,
+            "cluster_by": cluster_by,
+        },
+        metadata={
+            "analysis_type": "regress",
+            "outcome": outcome,
+            "predictors": predictors,
+            "n": int(len(y)),
+            "r_squared": float(coef["r_squared"].iloc[0]),
+            "std_error_type": std_error_type,
+        },
+    )
+
+
+def lagged_associations_panel(
+    panel_path: Path,
+    *,
+    outcome: str,
+    predictors: list[str],
+    lags: list[int],
+    entity_column: str = "geo_id",
+    year_column: str = "year",
+    output_path: Path | None = None,
+) -> AnalysisResult:
+    """Correlate an outcome with lagged predictor values by entity-year."""
+    if not lags or any(lag < 1 for lag in lags):
+        raise AnalysisError("lagged associations require one or more positive lags.")
+    df = _read_panel(panel_path)
+    _require_columns(
+        df,
+        [outcome, *predictors, entity_column, year_column],
+        context="lagged",
+    )
+    work = df[[outcome, *predictors, entity_column, year_column]].copy()
+    for column in [outcome, *predictors]:
+        work[column] = pd.to_numeric(work[column], errors="coerce")
+    work = work.sort_values([entity_column, year_column])
+
+    rows: list[dict[str, Any]] = []
+    for predictor in predictors:
+        for lag in sorted(set(lags)):
+            lagged_column = f"__{predictor}_lag_{lag}"
+            work[lagged_column] = work.groupby(entity_column, dropna=False)[predictor].shift(lag)
+            pair = work[[outcome, lagged_column]].dropna()
+            rows.append(
+                {
+                    "outcome": outcome,
+                    "predictor": predictor,
+                    "lag": lag,
+                    "n": int(len(pair)),
+                    "correlation": (
+                        float(pair[outcome].corr(pair[lagged_column]))
+                        if len(pair) > 1
+                        else np.nan
+                    ),
+                }
+            )
+    table = pd.DataFrame(rows)
+    return _persist_result(
+        table,
+        panel_path=panel_path,
+        output_path=output_path,
+        analysis_type="lagged",
+        parameters={
+            "outcome": outcome,
+            "predictors": predictors,
+            "lags": sorted(set(lags)),
+            "entity_column": entity_column,
+            "year_column": year_column,
+        },
+        metadata={
+            "analysis_type": "lagged",
+            "outcome": outcome,
+            "predictors": predictors,
+            "lags": sorted(set(lags)),
+            "association_count": len(rows),
+        },
+    )

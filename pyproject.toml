@@ -31,6 +31,10 @@ dev = [
     "pytest-httpx>=0.30.0",
     "ruff>=0.4.0",
 ]
+analysis = [
+    "scipy>=1.12.0",
+    "statsmodels>=0.14.0",
+]
 
 [tool.ruff]
 line-length = 100

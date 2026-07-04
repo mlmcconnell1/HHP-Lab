@@ -13,6 +13,7 @@ from hhplab.cli import show as show_commands
 from hhplab.cli import validate as validate_commands
 from hhplab.cli.agents import agents
 from hhplab.cli.aggregate_cli import aggregate_app
+from hhplab.cli.analyze import analyze_app
 from hhplab.cli.build_cmds.recipe import recipe_init_cmd
 from hhplab.cli.status import status_cmd
 
@@ -47,6 +48,7 @@ def register_commands(
     app.add_typer(aggregate_app, name="aggregate")
     app.add_typer(show_app, name="show")
     app.add_typer(registry_app, name="registry")
+    app.add_typer(analyze_app, name="analyze")
     app.add_typer(migrate_app, name="migrate")
 
     ingest_commands.register_commands(ingest_app)
