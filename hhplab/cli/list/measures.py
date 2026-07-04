@@ -10,6 +10,7 @@ import typer
 
 from hhplab.naming import expand_acs_vintage
 from hhplab.paths import curated_dir
+from hhplab.schema.measures import panel_measure_dictionary
 
 
 def format_file_size(size_bytes: int) -> str:
@@ -82,6 +83,13 @@ def list_measures(
             help="Output machine-readable JSON instead of human text.",
         ),
     ] = False,
+    dictionary: Annotated[
+        bool,
+        typer.Option(
+            "--dictionary",
+            help="List the machine-readable panel measure data dictionary.",
+        ),
+    ] = False,
 ) -> None:
     """List available CoC measure files.
 
@@ -94,8 +102,39 @@ def list_measures(
 
         hhplab list measures
 
+        hhplab list measures --dictionary --json
+
         hhplab list measures --dir /path/to/measures
     """
+    if dictionary:
+        entries = panel_measure_dictionary()
+        if json_output:
+            typer.echo(
+                json.dumps(
+                    {
+                        "status": "ok",
+                        "count": len(entries),
+                        "measures": entries,
+                    },
+                    indent=2,
+                )
+            )
+            return
+
+        typer.echo("Panel Measure Dictionary:\n")
+        typer.echo(
+            f"{'Column':<42} {'Provider':<10} {'Product':<14} {'Units':<24} {'Role'}"
+        )
+        typer.echo("-" * 110)
+        for entry in entries:
+            typer.echo(
+                f"{entry['column']:<42} {entry['source_provider']:<10} "
+                f"{entry['source_product']:<14} {entry['units']:<24} {entry['role_hint']}"
+            )
+        typer.echo("")
+        typer.echo(f"Total: {len(entries)} measure definition(s)")
+        return
+
     if dir is None:
         dir = curated_dir("measures")
     measures_dir = Path(dir)

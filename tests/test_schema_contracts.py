@@ -68,6 +68,8 @@ from hhplab.schema import (
     MSA_COC_PANEL_CONTRACT,
     MSA_FRACTIONAL_ROLLUP_COLUMNS,
     MSA_FRACTIONAL_ROLLUP_CONTRACT,
+    PANEL_MEASURE_DICTIONARY,
+    PANEL_MEASURE_DICTIONARY_BY_COLUMN,
     PL_BLOCK_POPULATION_COLUMNS,
     PL_BLOCK_POPULATION_CONTRACT,
     SAE_OUTPUT_CONTRACT,
@@ -75,6 +77,7 @@ from hhplab.schema import (
     URBAN_AREA_GEOMETRY_CONTRACT,
     ACS1ImputationMeasureSpec,
     acs1_imputation_output_columns,
+    panel_measure_dictionary,
     validate_artifact_contract,
 )
 from hhplab.schema import columns as schema_columns
@@ -697,6 +700,69 @@ def test_acs1_imputation_count_spec_has_single_output_without_rate_fields() -> N
     assert spec.numerator_source_columns == ()
     assert spec.denominator_source_column is None
     assert spec.zero_denominator_policy == "zero_count"
+
+
+PANEL_MEASURE_DICTIONARY_COVERAGE_GROUPS = {
+    "acs5": schema_columns.ACS_MEASURE_COLUMNS,
+    "acs1": schema_columns.ACS1_MEASURE_COLUMNS,
+    "laus": schema_columns.LAUS_MEASURE_COLUMNS,
+    "sae": schema_columns.SAE_MEASURE_COLUMNS,
+    "zori": schema_columns.ZORI_COLUMNS,
+    "hic": schema_columns.HIC_PANEL_MEASURE_COLUMNS,
+    "pit": ["pit_total", "pit_sheltered", "pit_unsheltered"],
+    "pep": ["population"],
+}
+
+
+@pytest.mark.parametrize(
+    "group_name",
+    list(PANEL_MEASURE_DICTIONARY_COVERAGE_GROUPS),
+    ids=list(PANEL_MEASURE_DICTIONARY_COVERAGE_GROUPS),
+)
+def test_panel_measure_dictionary_covers_panel_measure_groups(group_name: str) -> None:
+    missing = [
+        column
+        for column in PANEL_MEASURE_DICTIONARY_COVERAGE_GROUPS[group_name]
+        if column not in PANEL_MEASURE_DICTIONARY_BY_COLUMN
+    ]
+
+    assert missing == []
+
+
+def test_panel_measure_dictionary_entries_are_machine_readable() -> None:
+    columns = [entry.column for entry in PANEL_MEASURE_DICTIONARY]
+
+    assert len(columns) == len(set(columns))
+    for entry in PANEL_MEASURE_DICTIONARY:
+        assert entry.definition
+        assert entry.units
+        assert entry.source_provider
+        assert entry.source_product
+        assert entry.native_geometry
+        assert entry.first_year <= 2026
+        assert entry.role_hint in {
+            "outcome",
+            "candidate_driver",
+            "control",
+            "denominator",
+            "diagnostic",
+        }
+
+
+def test_panel_measure_dictionary_json_shape_includes_required_semantics() -> None:
+    by_column = {entry["column"]: entry for entry in panel_measure_dictionary()}
+
+    assert by_column["pit_total"]["definition"].startswith("Total people")
+    assert by_column["pit_total"]["role_hint"] == "outcome"
+    assert by_column["pit_total"]["coverage_years"] == {
+        "first": 2007,
+        "last": None,
+        "last_is_ongoing": True,
+    }
+    assert by_column["median_household_income"]["units"] == "nominal_usd"
+    assert by_column["median_household_income"]["source_provider"] == "census"
+    assert by_column["median_household_income"]["source_product"] == "acs5"
+    assert by_column["zori_coc"]["coverage_years"]["first"] == 2015
 
 
 def test_acs1_imputation_output_columns_are_declared_from_specs() -> None:

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from typing import Literal
 
 from hhplab.schema.columns import (
@@ -11,7 +11,10 @@ from hhplab.schema.columns import (
     ACS1_IMPUTATION_LINEAGE_COLUMNS,
     ACS1_MEASURE_COLUMNS,
     ACS_MEASURE_COLUMNS,
+    HIC_EXPANDED_MEASURE_SCHEMA,
+    HIC_PANEL_MEASURE_COLUMNS,
     LAUS_MEASURE_COLUMNS,
+    POPULATION_DENSITY_COLUMN,
     SAE_MEASURE_COLUMNS,
     TOTAL_POPULATION,
 )
@@ -25,6 +28,37 @@ class MeasureDefinition:
     family: Literal["population", "pit", "rent", "labor", "demographic"]
     unit: str
     default_aggregation: Literal["sum", "mean", "weighted_mean"]
+
+
+MeasureRole = Literal["outcome", "candidate_driver", "control", "denominator", "diagnostic"]
+
+
+@dataclass(frozen=True)
+class PanelMeasureDictionaryEntry:
+    """Machine-readable semantics for a panel measure column."""
+
+    column: str
+    definition: str
+    units: str
+    source_provider: str
+    source_product: str
+    native_geometry: str
+    first_year: int
+    last_year: int | None
+    role_hint: MeasureRole
+    caveats: tuple[str, ...] = ()
+
+    def to_dict(self) -> dict[str, object]:
+        """Return a JSON-serializable representation."""
+        data = asdict(self)
+        data["coverage_years"] = {
+            "first": self.first_year,
+            "last": self.last_year,
+            "last_is_ongoing": self.last_year is None,
+        }
+        del data["first_year"]
+        del data["last_year"]
+        return data
 
 
 @dataclass(frozen=True)
@@ -205,3 +239,372 @@ ACS5_MEASURES: tuple[str, ...] = tuple(ACS_MEASURE_COLUMNS)
 ACS1_MEASURES: tuple[str, ...] = tuple(ACS1_MEASURE_COLUMNS)
 LAUS_MEASURES: tuple[str, ...] = tuple(LAUS_MEASURE_COLUMNS)
 SAE_MEASURES: tuple[str, ...] = tuple(SAE_MEASURE_COLUMNS)
+
+
+def _entry(
+    column: str,
+    definition: str,
+    units: str,
+    source_provider: str,
+    source_product: str,
+    native_geometry: str,
+    first_year: int,
+    role_hint: MeasureRole,
+    *caveats: str,
+    last_year: int | None = None,
+) -> PanelMeasureDictionaryEntry:
+    return PanelMeasureDictionaryEntry(
+        column=column,
+        definition=definition,
+        units=units,
+        source_provider=source_provider,
+        source_product=source_product,
+        native_geometry=native_geometry,
+        first_year=first_year,
+        last_year=last_year,
+        role_hint=role_hint,
+        caveats=tuple(caveats),
+    )
+
+
+ACS5_PANEL_MEASURE_DICTIONARY: tuple[PanelMeasureDictionaryEntry, ...] = (
+    _entry(
+        TOTAL_POPULATION,
+        "Total resident population apportioned from ACS 5-year tract estimates.",
+        "persons",
+        "census",
+        "acs5",
+        "tract",
+        2009,
+        "denominator",
+        "ACS vintage follows the PIT lag convention: PIT year Y uses ACS vintage Y-1.",
+        "Tract-to-target allocation assumes the selected crosswalk denominator is representative.",
+    ),
+    _entry(
+        POPULATION_DENSITY_COLUMN,
+        "Population per square kilometer for the analysis geography.",
+        "persons_per_square_kilometer",
+        "census",
+        "acs5",
+        "tract",
+        2009,
+        "control",
+        "Depends on target geography area and the ACS population vintage used in the panel.",
+    ),
+    _entry(
+        "adult_population",
+        "Population age 18 and older derived from ACS age-by-sex counts.",
+        "persons",
+        "census",
+        "acs5",
+        "tract",
+        2009,
+        "denominator",
+        "Derived from B01001 components before target-geography apportionment.",
+    ),
+    _entry(
+        "population_below_poverty",
+        "Population below the federal poverty threshold.",
+        "persons",
+        "census",
+        "acs5",
+        "tract",
+        2009,
+        "candidate_driver",
+        "ACS poverty status excludes some group-quarter populations.",
+    ),
+    _entry(
+        "poverty_rate",
+        "Share of the poverty-universe population below the federal poverty threshold.",
+        "share",
+        "census",
+        "acs5",
+        "tract",
+        2009,
+        "candidate_driver",
+        "Derived as population_below_poverty / poverty_universe after aggregation.",
+    ),
+    _entry(
+        "median_household_income",
+        "Median household income in nominal dollars.",
+        "nominal_usd",
+        "census",
+        "acs5",
+        "tract",
+        2009,
+        "candidate_driver",
+        "Nominal dollars are not inflation-adjusted; use CPI-derived transforms for real dollars.",
+    ),
+    _entry(
+        "median_gross_rent",
+        "Median monthly gross rent for renter-occupied units paying cash rent.",
+        "nominal_usd_per_month",
+        "census",
+        "acs5",
+        "tract",
+        2009,
+        "candidate_driver",
+        "Nominal dollars are not inflation-adjusted.",
+    ),
+    _entry(
+        "vacancy_rate",
+        "Vacant housing units divided by total housing units.",
+        "share",
+        "census",
+        "acs5",
+        "tract",
+        2009,
+        "candidate_driver",
+        "Derived after ACS tract measures are allocated to the target geography.",
+    ),
+    _entry(
+        "rent_burden_30_plus",
+        "Share of renter households with gross rent at least 30 percent of income.",
+        "share",
+        "census",
+        "acs5",
+        "tract",
+        2009,
+        "candidate_driver",
+        "Excludes rent-burden rows where income percentage is not computed.",
+    ),
+    _entry(
+        "unemployment_rate",
+        "Unemployed civilian labor force divided by civilian labor force.",
+        "share",
+        "census",
+        "acs5",
+        "tract",
+        2009,
+        "candidate_driver",
+        "When LAUS is also present, prefer provenance fields to distinguish ACS5 and LAUS rates.",
+    ),
+)
+
+PIT_PANEL_MEASURE_DICTIONARY: tuple[PanelMeasureDictionaryEntry, ...] = (
+    _entry(
+        "pit_total",
+        "Total people experiencing homelessness counted in the annual January PIT count.",
+        "persons",
+        "hud",
+        "pit",
+        "coc",
+        2007,
+        "outcome",
+        "PIT is a point-in-time count and is known to undercount unsheltered homelessness.",
+        "The 2021 PIT count was disrupted by COVID-19 and is not fully comparable everywhere.",
+    ),
+    _entry(
+        "pit_sheltered",
+        "Sheltered people experiencing homelessness counted in the annual January PIT count.",
+        "persons",
+        "hud",
+        "pit",
+        "coc",
+        2007,
+        "outcome",
+        "HUD methodology and local enumeration practices can change across years.",
+    ),
+    _entry(
+        "pit_unsheltered",
+        "Unsheltered people experiencing homelessness counted in the annual January PIT count.",
+        "persons",
+        "hud",
+        "pit",
+        "coc",
+        2007,
+        "outcome",
+        "Unsheltered counts are especially sensitive to weather, outreach coverage, "
+        "and methodology.",
+    ),
+)
+
+ACS1_PANEL_MEASURE_DICTIONARY: tuple[PanelMeasureDictionaryEntry, ...] = (
+    _entry(
+        "unemployment_rate_acs1",
+        "ACS 1-year unemployment rate for metro-native analysis.",
+        "share",
+        "census",
+        "acs1",
+        "metro",
+        2005,
+        "candidate_driver",
+        "ACS1 is available only for geographies meeting Census population thresholds.",
+    ),
+)
+
+LAUS_PANEL_MEASURE_DICTIONARY: tuple[PanelMeasureDictionaryEntry, ...] = (
+    _entry(
+        "labor_force",
+        "Annual-average civilian labor force.",
+        "persons",
+        "bls",
+        "laus",
+        "metro",
+        1990,
+        "denominator",
+        "LAUS metro definitions and series availability can change across vintages.",
+    ),
+    _entry(
+        "employed",
+        "Annual-average employed civilian labor force.",
+        "persons",
+        "bls",
+        "laus",
+        "metro",
+        1990,
+        "candidate_driver",
+        "Use with labor_force to interpret employment scale across differently sized metros.",
+    ),
+    _entry(
+        "unemployed",
+        "Annual-average unemployed civilian labor force.",
+        "persons",
+        "bls",
+        "laus",
+        "metro",
+        1990,
+        "candidate_driver",
+        "Use with labor_force to interpret unemployment scale across differently sized metros.",
+    ),
+    _entry(
+        "unemployment_rate",
+        "Annual-average LAUS unemployment rate.",
+        "share",
+        "bls",
+        "laus",
+        "metro",
+        1990,
+        "candidate_driver",
+        "Column name can also appear in ACS5 contexts; inspect provenance and panel geography.",
+    ),
+)
+
+PEP_PANEL_MEASURE_DICTIONARY: tuple[PanelMeasureDictionaryEntry, ...] = (
+    _entry(
+        "population",
+        "County postcensal population estimate aggregated to the analysis geography.",
+        "persons",
+        "census",
+        "pep",
+        "county",
+        2010,
+        "denominator",
+        "PEP vintages are revised; record the source vintage when comparing outputs.",
+    ),
+)
+
+ZORI_PANEL_MEASURE_DICTIONARY: tuple[PanelMeasureDictionaryEntry, ...] = (
+    _entry(
+        "zori_coc",
+        "Zillow Observed Rent Index aggregated from counties to the CoC analysis geography.",
+        "nominal_usd_per_month",
+        "zillow",
+        "zori",
+        "county",
+        2015,
+        "candidate_driver",
+        "ZORI All Homes starts in January 2015.",
+        "Panel PIT alignment usually uses January observations or a declared annual alignment.",
+    ),
+    _entry(
+        "zori_coverage_ratio",
+        "Share of target-geography rent weight covered by available ZORI counties.",
+        "share",
+        "zillow",
+        "zori",
+        "county",
+        2015,
+        "diagnostic",
+        "Low coverage means zori_coc may be missing or should be interpreted cautiously.",
+    ),
+    _entry(
+        "zori_is_eligible",
+        "Whether the CoC-year passes the configured ZORI coverage threshold.",
+        "boolean",
+        "zillow",
+        "zori",
+        "county",
+        2015,
+        "diagnostic",
+        "Eligibility depends on the configured zori_min_coverage threshold.",
+    ),
+    _entry(
+        "zori_excluded_reason",
+        "Reason ZORI was excluded for an otherwise requested CoC-year.",
+        "category",
+        "zillow",
+        "zori",
+        "county",
+        2015,
+        "diagnostic",
+        "Null or empty values indicate no ZORI exclusion reason was applied.",
+    ),
+    _entry(
+        "rent_to_income",
+        "Monthly ZORI divided by monthly median household income.",
+        "ratio",
+        "derived",
+        "zori_acs5",
+        "mixed",
+        2015,
+        "candidate_driver",
+        "Combines ZORI county rents with ACS5 income; inflation and ACS lag "
+        "conventions still apply.",
+    ),
+)
+
+SAE_PANEL_MEASURE_DICTIONARY: tuple[PanelMeasureDictionaryEntry, ...] = tuple(
+    _entry(
+        column,
+        f"Small-area-estimated ACS-derived measure: {column}.",
+        "varies",
+        "census",
+        "acs1_acs5_sae",
+        "tract",
+        2009,
+        "candidate_driver",
+        "SAE measures combine ACS1 controls with ACS5 tract support; inspect SAE lineage columns.",
+    )
+    for column in SAE_MEASURE_COLUMNS
+)
+
+HIC_PANEL_MEASURE_DICTIONARY: tuple[PanelMeasureDictionaryEntry, ...] = tuple(
+    _entry(
+        str(spec["column"]),
+        str(spec["semantics"]),
+        str(spec["unit"]),
+        "hud",
+        "hic",
+        "coc",
+        2007,
+        "candidate_driver",
+        str(spec["historical_missing"]),
+    )
+    for spec in HIC_EXPANDED_MEASURE_SCHEMA
+    if str(spec["column"]) in HIC_PANEL_MEASURE_COLUMNS
+)
+
+_PANEL_MEASURE_DICTIONARY_CANDIDATES: tuple[PanelMeasureDictionaryEntry, ...] = (
+    *PIT_PANEL_MEASURE_DICTIONARY,
+    *ACS5_PANEL_MEASURE_DICTIONARY,
+    *ACS1_PANEL_MEASURE_DICTIONARY,
+    *LAUS_PANEL_MEASURE_DICTIONARY,
+    *PEP_PANEL_MEASURE_DICTIONARY,
+    *ZORI_PANEL_MEASURE_DICTIONARY,
+    *SAE_PANEL_MEASURE_DICTIONARY,
+    *HIC_PANEL_MEASURE_DICTIONARY,
+)
+
+PANEL_MEASURE_DICTIONARY_BY_COLUMN: dict[str, PanelMeasureDictionaryEntry] = {
+    entry.column: entry for entry in reversed(_PANEL_MEASURE_DICTIONARY_CANDIDATES)
+}
+
+PANEL_MEASURE_DICTIONARY: tuple[PanelMeasureDictionaryEntry, ...] = tuple(
+    sorted(PANEL_MEASURE_DICTIONARY_BY_COLUMN.values(), key=lambda entry: entry.column)
+)
+
+
+def panel_measure_dictionary() -> list[dict[str, object]]:
+    """Return the canonical machine-readable panel measure dictionary."""
+    return [entry.to_dict() for entry in PANEL_MEASURE_DICTIONARY]

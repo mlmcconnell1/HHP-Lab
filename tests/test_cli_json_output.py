@@ -84,6 +84,31 @@ class TestListMeasuresJson:
         payload = json.loads(result.output)
         assert payload == {"status": "ok", "count": 0, "measures": []}
 
+    def test_dictionary_json_output(self):
+        result = runner.invoke(app, ["list", "measures", "--dictionary", "--json"])
+
+        assert result.exit_code == 0
+        payload = json.loads(result.output)
+        assert payload["status"] == "ok"
+        assert payload["count"] == len(payload["measures"])
+
+        by_column = {entry["column"]: entry for entry in payload["measures"]}
+        pit_total = by_column["pit_total"]
+        assert pit_total["role_hint"] == "outcome"
+        assert pit_total["source_provider"] == "hud"
+        assert pit_total["source_product"] == "pit"
+        assert pit_total["native_geometry"] == "coc"
+        assert pit_total["coverage_years"] == {
+            "first": 2007,
+            "last": None,
+            "last_is_ongoing": True,
+        }
+
+        zori = by_column["zori_coc"]
+        assert zori["source_provider"] == "zillow"
+        assert zori["coverage_years"]["first"] == 2015
+        assert any("starts in January 2015" in caveat for caveat in zori["caveats"])
+
 
 class TestListCensusJson:
 

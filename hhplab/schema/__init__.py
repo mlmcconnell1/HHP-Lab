@@ -94,12 +94,16 @@ from hhplab.schema.measures import (
     ACS1_MEASURES,
     ACS5_MEASURES,
     LAUS_MEASURES,
+    PANEL_MEASURE_DICTIONARY,
+    PANEL_MEASURE_DICTIONARY_BY_COLUMN,
     PIT_MEASURES,
     SAE_MEASURES,
     TOTAL_POPULATION_MEASURE,
     ACS1ImputationMeasureSpec,
     MeasureDefinition,
+    PanelMeasureDictionaryEntry,
     acs1_imputation_output_columns,
+    panel_measure_dictionary,
 )
 
 __all__ = [
@@ -150,6 +154,8 @@ __all__ = [
     "LAUS_MEASURES",
     "LAUS_METRO_CONTRACT",
     "LAUS_METRO_OUTPUT_COLUMNS",
+    "PANEL_MEASURE_DICTIONARY",
+    "PANEL_MEASURE_DICTIONARY_BY_COLUMN",
     "METRO_PANEL_COLUMNS",
     "MSA_COC_COVERAGE_COLUMNS",
     "MSA_COC_COVERAGE_CONTRACT",
@@ -179,6 +185,7 @@ __all__ = [
     "PopulationMethod",
     "PopulationSource",
     "MeasureDefinition",
+    "PanelMeasureDictionaryEntry",
     "TOTAL_POPULATION",
     "TOTAL_POPULATION_MEASURE",
     "TRACT_MEDIATED_COUNTY_XWALK_COLUMNS",
@@ -196,4 +203,5 @@ __all__ = [
     "population_lineage_columns",
     "validate_artifact_contract",
     "acs1_imputation_output_columns",
+    "panel_measure_dictionary",
 ]
