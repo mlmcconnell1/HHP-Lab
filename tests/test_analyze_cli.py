@@ -303,6 +303,7 @@ class TestAnalyzeCli:
         )
         assert describe_result.exit_code == 0
         assert correlate_result.exit_code == 0
+        (tmp_path / "malformed.manifest.json").write_text("{not-json", encoding="utf-8")
 
         list_result = runner.invoke(
             app,

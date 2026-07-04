@@ -232,7 +232,10 @@ def list_analysis_manifests(
         raise AnalysisError(f"Analysis manifest directory not found: {directory}")
     rows: list[dict[str, Any]] = []
     for manifest_path in sorted(directory.rglob("*.manifest.json")):
-        manifest = read_analysis_manifest(manifest_path)
+        try:
+            manifest = read_analysis_manifest(manifest_path)
+        except AnalysisError:
+            continue
         if manifest.get("manifest_version") != 1 or "analysis_type" not in manifest:
             continue
         manifest_type = str(manifest.get("analysis_type"))
