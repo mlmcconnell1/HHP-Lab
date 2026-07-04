@@ -23,9 +23,11 @@ import pytest
 from shapely.geometry import box
 
 from hhplab.recipe.executor import execute_recipe
+from hhplab.recipe.executor.panel import _apply_derived_measures
 from hhplab.recipe.executor.panel_policies import collect_conformance_flags
 from hhplab.recipe.loader import RecipeLoadError, load_recipe
 from hhplab.recipe.manifest import read_manifest
+from hhplab.recipe.recipe_schema import PanelPolicy
 from hhplab.xwalks.county import ALBERS_EQUAL_AREA_CRS
 
 # ---------------------------------------------------------------------------
@@ -1391,6 +1393,86 @@ class TestCocPanelParity:
 
         with pytest.raises(RecipeLoadError, match="type='per_10k' requires denominator"):
             load_recipe(data)
+
+    def test_inflation_adjustment_uses_acs5_vintage_for_acs_dollar_measures(
+        self,
+        tmp_path: Path,
+    ):
+        data = _coc_recipe_dict()
+        data["targets"][0]["panel_policy"] = {
+            "inflation_adjustment": {
+                "base_year": 2021,
+                "columns": ["median_household_income"],
+                "cpi_path": "data/cpi.parquet",
+                "factor_column": "cpi_adjustment_factor",
+            },
+        }
+        _setup_coc_parity_fixtures(tmp_path)
+        pd.DataFrame(
+            {
+                "year": [2019, 2020, 2021],
+                "cpi_u": [100.0, 125.0, 200.0],
+            }
+        ).to_parquet(tmp_path / "data" / "cpi.parquet")
+
+        recipe = load_recipe(data)
+        execute_recipe(recipe, project_root=tmp_path)
+
+        panel_path = _find_panel_output(tmp_path)
+        panel = pd.read_parquet(panel_path).sort_values(["coc_id", "year"])
+        coc1_2020 = panel[(panel["coc_id"] == "COC1") & (panel["year"] == 2020)].iloc[0]
+        coc1_2021 = panel[(panel["coc_id"] == "COC1") & (panel["year"] == 2021)].iloc[0]
+
+        assert coc1_2020["acs5_vintage_used"] == "2019"
+        assert coc1_2020["cpi_adjustment_factor"] == pytest.approx(2.0)
+        assert coc1_2020["median_household_income_2021_dollars"] == pytest.approx(
+            120_000.0
+        )
+        assert coc1_2021["acs5_vintage_used"] == "2020"
+        assert coc1_2021["cpi_adjustment_factor"] == pytest.approx(1.6)
+        assert coc1_2021["median_household_income_2021_dollars"] == pytest.approx(
+            99_200.0
+        )
+
+        metadata = pq.read_metadata(panel_path)
+        provenance = json.loads(metadata.schema.to_arrow_schema().metadata[b"hhplab_provenance"])
+        assert provenance["inflation_adjustment"]["column_year_columns"] == {
+            "median_household_income": "acs5_vintage_used",
+        }
+
+    def test_lag_and_difference_derived_measures_do_not_cross_year_gaps(self):
+        panel = pd.DataFrame(
+            {
+                "geo_id": ["A", "A", "A", "B"],
+                "year": [2020, 2022, 2023, 2021],
+                "pit_total": [10.0, 20.0, 25.0, 5.0],
+            }
+        )
+        policy = PanelPolicy(
+            derived_measures=[
+                {
+                    "type": "lag",
+                    "column": "pit_total",
+                    "output_column": "pit_total_lag_1",
+                },
+                {
+                    "type": "difference",
+                    "column": "pit_total",
+                    "output_column": "pit_total_change",
+                },
+            ],
+        )
+
+        derived, summary = _apply_derived_measures(panel, policy=policy)
+        row_a_2022 = derived[(derived["geo_id"] == "A") & (derived["year"] == 2022)].iloc[0]
+        row_a_2023 = derived[(derived["geo_id"] == "A") & (derived["year"] == 2023)].iloc[0]
+
+        assert pd.isna(row_a_2022["pit_total_lag_1"])
+        assert pd.isna(row_a_2022["pit_total_change"])
+        assert row_a_2023["pit_total_lag_1"] == pytest.approx(20.0)
+        assert row_a_2023["pit_total_change"] == pytest.approx(5.0)
+        assert summary is not None
+        assert summary["count"] == 2
 
 
 class TestMetroPanelParity:

@@ -330,6 +330,14 @@ class InflationAdjustmentPolicy(BaseModel):
         default="year",
         description="Panel column containing the value year.",
     )
+    column_year_columns: dict[str, str] = Field(
+        default_factory=dict,
+        description=(
+            "Optional per-adjusted-column value-year columns. Use when a column's "
+            "dollar vintage differs from the panel year, for example ACS5 "
+            "measures that should deflate by acs5_vintage_used."
+        ),
+    )
     cpi_year_column: str = Field(
         default="year",
         description="CPI artifact column containing index years.",
@@ -351,6 +359,16 @@ class InflationAdjustmentPolicy(BaseModel):
             raise ValueError("InflationAdjustmentPolicy.columns may not contain blank names.")
         if len(set(normalized)) != len(normalized):
             raise ValueError("InflationAdjustmentPolicy.columns may not contain duplicate names.")
+        return normalized
+
+    @field_validator("column_year_columns")
+    @classmethod
+    def _validate_column_year_columns(cls, value: dict[str, str]) -> dict[str, str]:
+        normalized = {column.strip(): year_column.strip() for column, year_column in value.items()}
+        if any(not column or not year_column for column, year_column in normalized.items()):
+            raise ValueError(
+                "InflationAdjustmentPolicy.column_year_columns may not contain blank names."
+            )
         return normalized
 
     @field_validator(
@@ -381,6 +399,12 @@ class InflationAdjustmentPolicy(BaseModel):
         if self.cpi_dataset is not None and self.cpi_path is not None:
             raise ValueError(
                 "InflationAdjustmentPolicy may set cpi_dataset or cpi_path, not both."
+            )
+        unknown_overrides = sorted(set(self.column_year_columns) - set(self.columns))
+        if unknown_overrides:
+            raise ValueError(
+                "InflationAdjustmentPolicy.column_year_columns references columns not "
+                f"listed in columns: {unknown_overrides}."
             )
         return self
 

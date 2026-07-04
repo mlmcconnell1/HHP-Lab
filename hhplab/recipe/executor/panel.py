@@ -896,6 +896,30 @@ def _load_inflation_index(
     return series, cpi_path
 
 
+ACS5_INFLATION_YEAR_COLUMNS: frozenset[str] = frozenset(
+    {
+        "median_household_income",
+        "median_gross_rent",
+        "msa_income",
+        "msa_median_rent",
+    }
+)
+
+
+def _inflation_year_column_for(
+    column: str,
+    *,
+    adjustment: InflationAdjustmentPolicy,
+    panel: pd.DataFrame,
+) -> str:
+    override = adjustment.column_year_columns.get(column)
+    if override is not None:
+        return override
+    if column in ACS5_INFLATION_YEAR_COLUMNS and "acs5_vintage_used" in panel.columns:
+        return "acs5_vintage_used"
+    return adjustment.year_column
+
+
 def _apply_inflation_adjustment(
     panel: pd.DataFrame,
     *,
@@ -906,7 +930,11 @@ def _apply_inflation_adjustment(
         return panel, None
 
     adjustment = policy.inflation_adjustment
-    inflation_columns = [adjustment.year_column, *adjustment.columns]
+    column_year_columns = {
+        column: _inflation_year_column_for(column, adjustment=adjustment, panel=panel)
+        for column in adjustment.columns
+    }
+    inflation_columns = [*column_year_columns.values(), *adjustment.columns]
     missing = [column for column in inflation_columns if column not in panel.columns]
     if missing:
         raise ExecutorError(
@@ -915,30 +943,39 @@ def _apply_inflation_adjustment(
         )
 
     cpi, cpi_path = _load_inflation_index(adjustment, ctx)
-    year_values = pd.to_numeric(panel[adjustment.year_column], errors="coerce")
-    missing_year_rows = panel[year_values.isna()]
-    if not missing_year_rows.empty:
-        raise ExecutorError(
-            f"Inflation adjustment year column '{adjustment.year_column}' contains "
-            f"{len(missing_year_rows)} non-numeric row(s)."
-        )
-    years = year_values.astype(int)
-    missing_cpi_years = sorted(set(years.unique().tolist()) - set(cpi.index.astype(int)))
-    if missing_cpi_years:
-        raise ExecutorError(
-            f"CPI-U artifact {cpi_path} is missing panel year(s) {missing_cpi_years}. "
-            "Ingest CPI-U for the full recipe universe or provide a complete cpi_path."
-        )
 
     result = panel.copy()
     base_cpi = float(cpi.loc[adjustment.base_year])
-    factors = years.map(lambda year: base_cpi / float(cpi.loc[int(year)]))
+    factor_year_column: str | None = None
     if adjustment.factor_column is not None:
-        result[adjustment.factor_column] = factors.astype(float)
+        distinct_year_columns = set(column_year_columns.values())
+        if len(distinct_year_columns) != 1:
+            raise ExecutorError(
+                "target.panel_policy.inflation_adjustment.factor_column is ambiguous "
+                "because adjusted columns use multiple value-year columns. Use separate "
+                "policies or omit factor_column."
+            )
+        [factor_year_column] = list(distinct_year_columns)
 
     suffix = adjustment.output_suffix.format(base_year=adjustment.base_year)
     output_columns: list[str] = []
+    missing_cpi_years_by_column: dict[str, list[int]] = {}
+    factor_values: pd.Series | None = None
     for column in adjustment.columns:
+        year_column = column_year_columns[column]
+        year_values = pd.to_numeric(panel[year_column], errors="coerce")
+        missing_year_rows = panel[year_values.isna()]
+        if not missing_year_rows.empty:
+            raise ExecutorError(
+                f"Inflation adjustment year column '{year_column}' for '{column}' "
+                f"contains {len(missing_year_rows)} non-numeric row(s)."
+            )
+        years = year_values.astype(int)
+        missing_cpi_years = sorted(set(years.unique().tolist()) - set(cpi.index.astype(int)))
+        if missing_cpi_years:
+            missing_cpi_years_by_column[column] = missing_cpi_years
+            continue
+        factors = years.map(lambda year: base_cpi / float(cpi.loc[int(year)]))
         output_column = f"{column}{suffix}"
         if output_column in result.columns and output_column not in adjustment.columns:
             raise ExecutorError(
@@ -947,11 +984,23 @@ def _apply_inflation_adjustment(
             )
         result[output_column] = pd.to_numeric(result[column], errors="coerce") * factors
         output_columns.append(output_column)
+        if factor_year_column == year_column:
+            factor_values = factors.astype(float)
+    if missing_cpi_years_by_column:
+        raise ExecutorError(
+            f"CPI-U artifact {cpi_path} is missing panel year/value year(s) "
+            "by adjusted column: "
+            f"{missing_cpi_years_by_column}. Ingest CPI-U for the full recipe universe "
+            "or provide a complete cpi_path."
+        )
+    if adjustment.factor_column is not None and factor_values is not None:
+        result[adjustment.factor_column] = factor_values
 
     _record_panel_policy_asset(ctx, cpi_path, role="inflation_adjustment_cpi")
     summary = {
         "base_year": adjustment.base_year,
         "columns": list(adjustment.columns),
+        "column_year_columns": column_year_columns,
         "output_columns": output_columns,
         "factor_column": adjustment.factor_column,
         "cpi_path": str(cpi_path),
@@ -1002,7 +1051,13 @@ def _apply_lagged_derived_measure(
     work["__value"] = values
     work["__original_index"] = panel.index
     work = work.sort_values([*spec.group_by, spec.order_by, "__original_index"])
-    shifted = work.groupby(spec.group_by, dropna=False)["__value"].shift(spec.periods)
+    grouped = work.groupby(spec.group_by, dropna=False)
+    shifted = grouped["__value"].shift(spec.periods)
+    shifted_order = grouped[spec.order_by].shift(spec.periods)
+    order_values = pd.to_numeric(work[spec.order_by], errors="coerce")
+    previous_order_values = pd.to_numeric(shifted_order, errors="coerce")
+    continuous = (order_values - previous_order_values) == spec.periods
+    shifted = shifted.where(continuous)
     if spec.type == "lag":
         derived = shifted
     else:
