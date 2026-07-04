@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+import hashlib
+import json
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -23,12 +26,14 @@ class AnalysisResult:
 
     table: pd.DataFrame
     output_path: Path
+    manifest_path: Path
     metadata: dict[str, Any]
 
     def to_payload(self) -> dict[str, Any]:
         return {
             "status": "ok",
             "output_path": str(self.output_path),
+            "manifest_path": str(self.manifest_path),
             **self.metadata,
             "records": self.table.to_dict(orient="records"),
         }
@@ -36,6 +41,18 @@ class AnalysisResult:
 
 def _default_output_path(panel_path: Path, analysis_type: str) -> Path:
     return panel_path.with_name(f"{panel_path.stem}__analysis_{analysis_type}.parquet")
+
+
+def _manifest_path_for_output(output_path: Path) -> Path:
+    return output_path.with_suffix(".manifest.json")
+
+
+def _sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
 
 
 def _read_panel(panel_path: Path) -> pd.DataFrame:
@@ -98,6 +115,64 @@ def _analysis_provenance(
     )
 
 
+def _json_safe(value: Any) -> Any:
+    if isinstance(value, Path):
+        return str(value)
+    if isinstance(value, dict):
+        return {str(key): _json_safe(item) for key, item in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [_json_safe(item) for item in value]
+    if pd.isna(value) and not isinstance(value, (list, tuple, dict)):
+        return None
+    if hasattr(value, "item"):
+        return value.item()
+    return value
+
+
+def _result_summary(table: pd.DataFrame, metadata: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "row_count": int(len(table)),
+        "columns": [str(column) for column in table.columns],
+        "metadata": _json_safe(metadata),
+    }
+
+
+def _write_analysis_manifest(
+    *,
+    panel_path: Path,
+    output_path: Path,
+    analysis_type: str,
+    parameters: dict[str, Any],
+    metadata: dict[str, Any],
+    table: pd.DataFrame,
+) -> Path:
+    input_provenance = read_provenance(panel_path)
+    manifest_path = _manifest_path_for_output(output_path)
+    manifest = {
+        "manifest_version": 1,
+        "created_at": datetime.now(UTC).isoformat(),
+        "analysis_type": analysis_type,
+        "specification": {
+            "analysis_type": analysis_type,
+            "parameters": _json_safe(parameters),
+        },
+        "panel": {
+            "path": str(panel_path),
+            "name": panel_path.stem,
+            "sha256": _sha256(panel_path),
+            "provenance": input_provenance.to_dict() if input_provenance else None,
+        },
+        "output": {
+            "path": str(output_path),
+            "manifest_path": str(manifest_path),
+            "sha256": _sha256(output_path),
+        },
+        "result_summary": _result_summary(table, metadata),
+    }
+    manifest_path.write_text(json.dumps(manifest, indent=2, sort_keys=True), encoding="utf-8")
+    return manifest_path
+
+
 def _persist_result(
     table: pd.DataFrame,
     *,
@@ -114,7 +189,66 @@ def _persist_result(
         parameters=parameters,
     )
     write_parquet_with_provenance(table, resolved_output, provenance)
-    return AnalysisResult(table=table, output_path=resolved_output, metadata=metadata)
+    manifest_path = _write_analysis_manifest(
+        panel_path=panel_path,
+        output_path=resolved_output,
+        analysis_type=analysis_type,
+        parameters=parameters,
+        metadata=metadata,
+        table=table,
+    )
+    return AnalysisResult(
+        table=table,
+        output_path=resolved_output,
+        manifest_path=manifest_path,
+        metadata=metadata,
+    )
+
+
+def read_analysis_manifest(path: Path) -> dict[str, Any]:
+    """Read an analysis manifest sidecar."""
+    try:
+        return json.loads(Path(path).read_text(encoding="utf-8"))
+    except OSError as exc:
+        raise AnalysisError(f"Analysis manifest not found: {path}") from exc
+    except json.JSONDecodeError as exc:
+        raise AnalysisError(f"Invalid analysis manifest JSON: {path}") from exc
+
+
+def list_analysis_manifests(
+    directory: Path,
+    *,
+    analysis_type: str | None = None,
+    panel: str | None = None,
+) -> list[dict[str, Any]]:
+    """List analysis manifest summaries under a directory."""
+    if not directory.exists():
+        raise AnalysisError(f"Analysis manifest directory not found: {directory}")
+    rows: list[dict[str, Any]] = []
+    for manifest_path in sorted(directory.rglob("*.manifest.json")):
+        manifest = read_analysis_manifest(manifest_path)
+        if manifest.get("manifest_version") != 1 or "analysis_type" not in manifest:
+            continue
+        manifest_type = str(manifest.get("analysis_type"))
+        panel_path = str(manifest.get("panel", {}).get("path", ""))
+        panel_name = str(manifest.get("panel", {}).get("name", ""))
+        if analysis_type is not None and manifest_type != analysis_type:
+            continue
+        if panel is not None and panel not in {panel_path, panel_name}:
+            continue
+        rows.append(
+            {
+                "manifest_path": str(manifest_path),
+                "created_at": manifest.get("created_at"),
+                "analysis_type": manifest_type,
+                "panel_path": panel_path,
+                "panel_name": panel_name,
+                "output_path": manifest.get("output", {}).get("path"),
+                "parameters": manifest.get("specification", {}).get("parameters", {}),
+                "result_summary": manifest.get("result_summary", {}),
+            }
+        )
+    return rows
 
 
 def describe_panel(

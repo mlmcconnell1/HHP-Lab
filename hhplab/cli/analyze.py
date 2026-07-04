@@ -13,6 +13,8 @@ from hhplab.analyze import (
     correlate_panel,
     describe_panel,
     lagged_associations_panel,
+    list_analysis_manifests,
+    read_analysis_manifest,
     regress_panel,
 )
 
@@ -21,6 +23,12 @@ analyze_app = typer.Typer(
     help="Run statistical analyses on panel parquet files",
     no_args_is_help=True,
 )
+ledger_app = typer.Typer(
+    name="ledger",
+    help="List and inspect analysis manifest sidecars.",
+    no_args_is_help=True,
+)
+analyze_app.add_typer(ledger_app, name="ledger")
 
 
 def _parse_columns(value: str | None, *, option: str, required: bool = False) -> list[str] | None:
@@ -50,7 +58,15 @@ def _emit(result, *, json_output: bool) -> None:
         typer.echo(json.dumps(payload, indent=2, default=str))
         return
     typer.echo(f"Wrote {payload['analysis_type']} analysis: {payload['output_path']}")
+    typer.echo(f"Manifest: {payload['manifest_path']}")
     typer.echo(f"Rows: {len(payload['records'])}")
+
+
+def _emit_payload(payload: dict, *, json_output: bool) -> None:
+    if json_output:
+        typer.echo(json.dumps(payload, indent=2, default=str))
+        return
+    typer.echo(json.dumps(payload, indent=2, default=str))
 
 
 @analyze_app.command("describe")
@@ -236,3 +252,68 @@ def analyze_lagged(
     except AnalysisError as exc:
         raise typer.BadParameter(str(exc)) from exc
     _emit(result, json_output=json_output)
+
+
+@ledger_app.command("list")
+def ledger_list(
+    directory: Annotated[
+        Path,
+        typer.Option(
+            "--directory",
+            "-d",
+            help="Directory to recursively scan for *.manifest.json analysis sidecars.",
+            exists=True,
+            file_okay=False,
+            dir_okay=True,
+        ),
+    ] = Path("."),
+    analysis_type: Annotated[
+        str | None,
+        typer.Option("--analysis-type", help="Filter to one analysis type."),
+    ] = None,
+    panel: Annotated[
+        str | None,
+        typer.Option("--panel", help="Filter by exact panel path or panel name."),
+    ] = None,
+    json_output: Annotated[
+        bool,
+        typer.Option("--json", help="Output machine-readable JSON."),
+    ] = False,
+) -> None:
+    """List previous analysis invocations recorded as manifest sidecars."""
+    try:
+        analyses = list_analysis_manifests(
+            directory,
+            analysis_type=analysis_type,
+            panel=panel,
+        )
+    except AnalysisError as exc:
+        raise typer.BadParameter(str(exc)) from exc
+    _emit_payload(
+        {
+            "status": "ok",
+            "directory": str(directory),
+            "analysis_count": len(analyses),
+            "analyses": analyses,
+        },
+        json_output=json_output,
+    )
+
+
+@ledger_app.command("show")
+def ledger_show(
+    manifest: Annotated[
+        Path,
+        typer.Option("--manifest", "-m", help="Analysis manifest path.", exists=True),
+    ],
+    json_output: Annotated[
+        bool,
+        typer.Option("--json", help="Output machine-readable JSON."),
+    ] = False,
+) -> None:
+    """Show one analysis invocation manifest."""
+    try:
+        payload = read_analysis_manifest(manifest)
+    except AnalysisError as exc:
+        raise typer.BadParameter(str(exc)) from exc
+    _emit_payload({"status": "ok", "manifest": payload}, json_output=json_output)
