@@ -818,6 +818,16 @@ ACS5_EXPANDED_COVARIATE_COLUMNS: tuple[str, ...] = tuple(
 )
 
 
+def acs5_registry_tables() -> list[str]:
+    """Return ACS5 table IDs represented by the covariate registry."""
+    return list(dict.fromkeys(spec.table for spec in ACS5_COVARIATE_REGISTRY))
+
+
+def acs5_registry_measure_names() -> list[str]:
+    """Return human-readable ACS5 covariate names from the registry."""
+    return [spec.name for spec in ACS5_COVARIATE_REGISTRY if spec.recipe_selectable]
+
+
 def acs5_covariate_spec_for_output(column: str) -> ACS5CovariateSpec:
     """Return the aggregation registry entry that owns an ACS5 output column."""
     try:

@@ -23,6 +23,7 @@ from hhplab.acs.variables_acs1 import (
     ACS1_COUNTY_OUTPUT_COLUMNS,
     ACS1_SAE_SOURCE_OUTPUT_COLUMNS,
     ACS1_VARIABLES_BY_TABLE,
+    acs1_measure_names,
     acs1_tables_for_vintage,
     acs1_variables_by_table_for_vintage,
 )
@@ -352,3 +353,16 @@ def test_county_cli_json_output(httpx_mock, tmp_path, monkeypatch) -> None:
     assert payload["output_path"] == "data/curated/acs/acs1_county__A2023.parquet"
     assert payload["row_count"] == 2
     assert payload["unemployment_summary"]["mean"] == pytest.approx(0.055)
+    assert payload["supported_acs_tables"] == acs1_tables_for_vintage(2023)
+    assert payload["supported_measures"] == acs1_measure_names()
+    assert "B25056" in payload["supported_acs_tables"]
+    assert "contract_rent_distribution_total" in payload["supported_measures"]
+
+
+def test_county_cli_help_reports_registry_tables_and_measures() -> None:
+    result = CliRunner().invoke(app, ["ingest", "acs1-county", "--help"])
+
+    assert result.exit_code == 0
+    assert "B25056" in result.output
+    assert "B25063" in result.output
+    assert "contract_rent_distribution_total" in result.output

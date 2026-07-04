@@ -9,6 +9,43 @@ import typer
 from hhplab.cli.shared.output import JsonOutput, cli_error, emit_result
 
 
+def _acs1_county_command_help() -> str:
+    from hhplab.acs.variables_acs1 import ACS1_TABLES, acs1_measure_names
+
+    tables = ", ".join(ACS1_TABLES)
+    registry_measures = acs1_measure_names()
+    featured_measures = [
+        measure
+        for measure in (
+            "pop_16_plus",
+            "civilian_labor_force",
+            "unemployed_count",
+            "median_gross_rent",
+            "median_contract_rent",
+            "gross_rent_distribution_total",
+            "contract_rent_distribution_total",
+            "gross_rent_pct_income_total",
+            "owner_costs_pct_income_total",
+            "unemployment_rate_acs1",
+        )
+        if measure in registry_measures
+    ]
+    measures = ", ".join(featured_measures)
+    return f"""Ingest ACS 1-year detailed-table data at county geography.
+
+Fetches the ACS 1-year table set declared in hhplab.acs.variables_acs1:
+
+    {tables}
+
+Output measure columns are derived from that registry and include:
+
+    {measures}
+
+Availability is vintage-specific; JSON output reports the exact tables
+available for the requested vintage and the full supported measure list.
+"""
+
+
 def ingest_acs1_county(
     vintage: Annotated[
         int,
@@ -31,6 +68,11 @@ def ingest_acs1_county(
     import pandas as pd
 
     from hhplab.acs.ingest.county_acs1 import ingest_county_acs1
+    from hhplab.acs.variables_acs1 import (
+        acs1_measure_names,
+        acs1_tables_for_vintage,
+        acs1_unavailable_tables_for_vintage,
+    )
 
     if not json_output:
         typer.echo("Ingesting ACS 1-year county data...")
@@ -60,6 +102,9 @@ def ingest_acs1_county(
             "counties": len(df),
             "row_count": len(df),
             "columns": list(df.columns),
+            "supported_acs_tables": acs1_tables_for_vintage(vintage),
+            "unavailable_acs_tables": acs1_unavailable_tables_for_vintage(vintage),
+            "supported_measures": acs1_measure_names(),
         }
         if "unemployment_rate_acs1" in df.columns:
             rates = df["unemployment_rate_acs1"].dropna()
@@ -84,3 +129,6 @@ def ingest_acs1_county(
             typer.echo(f"            {rates.min():.1%} - {rates.max():.1%} (range)")
     typer.echo("")
     typer.echo("Ingest complete!")
+
+
+ingest_acs1_county.__doc__ = _acs1_county_command_help()

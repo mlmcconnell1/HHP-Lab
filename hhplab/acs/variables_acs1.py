@@ -612,3 +612,8 @@ def acs1_variable_names_for_vintage(vintage: int | str | None = None) -> dict[st
     if vintage is not None and 2012 <= int(vintage) <= 2014:
         variable_names.update(EARLY_ACS1_VARIABLE_OVERRIDES)
     return variable_names
+
+
+def acs1_measure_names() -> list[str]:
+    """Return ACS1 source and derived measure column names."""
+    return [*ACS1_METRO_MEASURE_COLUMNS]

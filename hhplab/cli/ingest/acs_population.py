@@ -5,6 +5,42 @@ from typing import Annotated
 import typer
 
 from hhplab.acs.ingest.tract_population import get_output_path
+from hhplab.acs.variables import acs5_registry_measure_names, acs5_registry_tables
+
+
+def _acs5_registry_metadata() -> dict[str, list[str]]:
+    """Return registry-derived ACS5 command metadata."""
+    return {
+        "supported_acs_tables": acs5_registry_tables(),
+        "supported_measures": acs5_registry_measure_names(),
+    }
+
+
+def _acs5_command_help() -> str:
+    tables = ", ".join(acs5_registry_tables())
+    measures = ", ".join(acs5_registry_measure_names())
+    return f"""Ingest tract-level ACS 5-year estimates.
+
+Downloads tract data from the Census Bureau API for the ACS5 tables declared
+in hhplab.acs.variables.ACS5_COVARIATE_REGISTRY:
+
+    {tables}
+
+Measures are derived from the same registry and include:
+
+    {measures}
+
+The output Parquet file includes provenance metadata and derived columns such
+as adult_population and population_below_poverty.
+
+Examples:
+
+    hhplab ingest acs5-tract --acs 2019-2023 --tracts 2023
+
+    hhplab ingest acs5-tract --acs 2015-2019 --tracts 2023
+
+    hhplab ingest acs5-tract --acs 2019-2023 --tracts 2023 --json
+"""
 
 
 def ingest_acs_population(
@@ -39,33 +75,34 @@ def ingest_acs_population(
         ),
     ] = False,
 ) -> None:
-    """Ingest tract-level ACS 5-year estimates.
-
-    Downloads tract data from the Census Bureau API (tables B01003, B01001,
-    B19013, B25064, C17002) and saves as a Parquet file with provenance
-    metadata.
-
-    Variables fetched: total population, adult population (derived 18+),
-    median household income, median gross rent, poverty universe, poverty
-    counts (below 50% and 50-99%), and margin of error for total population.
-
-    Examples:
-
-        hhplab ingest acs5-tract --acs 2019-2023 --tracts 2023
-
-        hhplab ingest acs5-tract --acs 2015-2019 --tracts 2023
-    """
+    """Ingest tract-level ACS 5-year estimates."""
     import pandas as pd
 
     from hhplab.acs.ingest.tract_population import ingest_tract_data
     from hhplab.acs.translate import get_source_tract_vintage, needs_translation
     from hhplab.acs.variables import ACS_TABLES
 
+    registry_metadata = _acs5_registry_metadata()
+
     # Check if cached file exists
     output_path = get_output_path(acs, tracts)
     if output_path.exists() and not force:
-        typer.echo(f"Cached file found: {output_path}")
         df = pd.read_parquet(output_path)
+        if output_json:
+            import json
+
+            result = {
+                "status": "ok",
+                "cached": True,
+                "acs_vintage": acs,
+                "tract_vintage": tracts,
+                "output_path": str(output_path),
+                "total_tracts": len(df),
+                **registry_metadata,
+            }
+            typer.echo(json.dumps(result, indent=2))
+            return
+        typer.echo(f"Cached file found: {output_path}")
         typer.echo(f"Rows: {len(df)}")
         typer.echo("")
         typer.echo("Use --force to re-ingest.")
@@ -75,16 +112,17 @@ def ingest_acs_population(
     source_tract_vintage = get_source_tract_vintage(acs)
     translation_needed = needs_translation(acs, tracts)
 
-    typer.echo("Ingesting ACS tract data...")
-    typer.echo(f"  ACS vintage:     {acs}")
-    typer.echo(f"  Tables:          {', '.join(ACS_TABLES)}")
-    typer.echo(f"  Source tracts:   {source_tract_vintage} (Census API geography)")
-    typer.echo(f"  Target tracts:   {tracts}")
-    if translation_needed:
-        typer.echo("  Translation:     needed")
-    else:
-        typer.echo("  Translation:     not needed")
-    typer.echo("")
+    if not output_json:
+        typer.echo("Ingesting ACS tract data...")
+        typer.echo(f"  ACS vintage:     {acs}")
+        typer.echo(f"  Tables:          {', '.join(ACS_TABLES)}")
+        typer.echo(f"  Source tracts:   {source_tract_vintage} (Census API geography)")
+        typer.echo(f"  Target tracts:   {tracts}")
+        if translation_needed:
+            typer.echo("  Translation:     needed")
+        else:
+            typer.echo("  Translation:     not needed")
+        typer.echo("")
 
     try:
         path = ingest_tract_data(
@@ -115,11 +153,13 @@ def ingest_acs_population(
 
         result = {
             "status": "ok",
+            "cached": False,
             "acs_vintage": acs,
             "tract_vintage": tracts,
             "output_path": str(path),
             "total_tracts": len(df),
             "total_population": int(df["total_population"].sum()),
+            **registry_metadata,
         }
         if "adult_population" in df.columns:
             result["adult_population"] = int(df["adult_population"].sum())
@@ -162,3 +202,6 @@ def ingest_acs_population(
     typer.echo("")
     typer.echo("=" * 60)
     typer.echo("Ingest complete!")
+
+
+ingest_acs_population.__doc__ = _acs5_command_help()

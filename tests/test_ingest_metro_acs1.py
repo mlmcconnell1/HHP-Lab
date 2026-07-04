@@ -3,11 +3,14 @@
 from __future__ import annotations
 
 import inspect
+import json
 import re
 from typing import Any
+from unittest.mock import patch
 
 import pandas as pd
 import pytest
+from typer.testing import CliRunner
 
 from hhplab.acs.ingest.metro_acs1 import (
     CBSA_GEO_PARAM,
@@ -18,10 +21,12 @@ from hhplab.acs.variables_acs1 import (
     ACS1_METRO_OUTPUT_COLUMNS,
     ACS1_UNAVAILABLE_VINTAGES,
     ACS1_VARIABLES_BY_TABLE,
+    acs1_measure_names,
     acs1_tables_for_vintage,
     acs1_variables_by_table_for_vintage,
 )
 from hhplab.cli.ingest.acs1_metro import ingest_acs1_metro as ingest_acs1_metro_cli
+from hhplab.cli.main import app
 from hhplab.metro.metro_definitions import CANONICAL_UNIVERSE_DEFINITION_VERSION
 from hhplab.provenance import read_provenance
 
@@ -271,6 +276,39 @@ class TestCbsaToMetroMapping:
             inspect.signature(ingest_acs1_metro_cli).parameters["definition_version"].default
             == CANONICAL_UNIVERSE_DEFINITION_VERSION
         )
+
+    def test_cli_help_reports_registry_tables_and_measures(self):
+        result = CliRunner().invoke(app, ["ingest", "acs1-metro", "--help"])
+
+        assert result.exit_code == 0
+        assert "B25056" in result.output
+        assert "B25063" in result.output
+        assert "contract_rent_distribution_total" in result.output
+
+    @patch("hhplab.acs.ingest.metro_acs1.ingest_metro_acs1")
+    @patch("pandas.read_parquet")
+    def test_cli_json_reports_registry_metadata(self, mock_read_parquet, mock_ingest, tmp_path):
+        output_path = tmp_path / "acs1_metro.parquet"
+        mock_ingest.return_value = output_path
+        mock_read_parquet.return_value = pd.DataFrame(
+            {
+                "metro_id": ["35620"],
+                "metro_name": ["New York-Newark-Jersey City, NY-NJ-PA"],
+                "unemployment_rate_acs1": [0.05],
+            }
+        )
+
+        result = CliRunner().invoke(
+            app,
+            ["ingest", "acs1-metro", "--vintage", "2023", "--json"],
+        )
+
+        assert result.exit_code == 0
+        payload = json.loads(result.output)
+        assert payload["supported_acs_tables"] == acs1_tables_for_vintage(2023)
+        assert payload["supported_measures"] == acs1_measure_names()
+        assert "B25056" in payload["supported_acs_tables"]
+        assert "contract_rent_distribution_total" in payload["supported_measures"]
 
 
 class TestUnemploymentRateCalculation:
