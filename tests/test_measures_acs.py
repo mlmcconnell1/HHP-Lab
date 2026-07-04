@@ -93,6 +93,17 @@ ROW_WISE_MEDIAN_DENOMINATOR_FALLBACK_CASES = {
     },
 }
 
+CONTRACT_RENT_P25_DISTRIBUTION = {
+    "contract_rent_distribution_with_cash_rent": [100.0, 100.0],
+    "contract_rent_distribution_cash_rent_lt_100": [10.0, 0.0],
+    "contract_rent_distribution_cash_rent_100_to_149": [20.0, 0.0],
+    "contract_rent_distribution_cash_rent_150_to_199": [0.0, 0.0],
+    "contract_rent_distribution_cash_rent_200_to_249": [0.0, 0.0],
+    "contract_rent_distribution_cash_rent_250_to_299": [0.0, 100.0],
+}
+CONTRACT_RENT_P25_EXPECTED = 260.0
+NON_NATIVE_SHARE_EXPECTED = (100.0 + 30.0 + 300.0 + 70.0) / (1000.0 + 2000.0)
+
 
 class TestAggregateToCoC:
     """Tests for aggregate_to_coc function."""
@@ -181,6 +192,32 @@ class TestAggregateToCoC:
         assert abs(co500["median_household_income"] - expected_income) < 0.01
 
         assert co500["weighting_method"] == "population"
+
+    def test_derives_non_native_share_and_contract_rent_p25_after_rollup(self):
+        acs_data = pd.DataFrame(
+            {
+                "GEOID": ["08001000100", "08001000200"],
+                "total_population": [1000.0, 2000.0],
+                "citizenship_total": [1000.0, 2000.0],
+                "naturalized_citizen": [100.0, 300.0],
+                "not_us_citizen": [30.0, 70.0],
+                **CONTRACT_RENT_P25_DISTRIBUTION,
+            }
+        )
+        crosswalk = pd.DataFrame(
+            {
+                "tract_geoid": ["08001000100", "08001000200"],
+                "coc_id": ["CO-500", "CO-500"],
+                "area_share": [1.0, 1.0],
+                "pop_share": [0.5, 0.5],
+            }
+        )
+
+        result = aggregate_to_coc(acs_data, crosswalk, weighting="area")
+
+        row = result.iloc[0]
+        assert row["non_native_share"] == pytest.approx(NON_NATIVE_SHARE_EXPECTED)
+        assert row["contract_rent_p25"] == pytest.approx(CONTRACT_RENT_P25_EXPECTED)
 
     def test_count_vars_always_use_area_share(self):
         """Test that count variables use area_share regardless of weighting parameter.

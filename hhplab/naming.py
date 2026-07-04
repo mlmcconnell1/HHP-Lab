@@ -1467,6 +1467,22 @@ def metro_measures_filename(
     return f"measures__metro__A{acs_year}@D{defn}.parquet"
 
 
+def msa_measures_filename(
+    acs_vintage: str,
+    definition_version: str,
+    tract_vintage: str | int | None = None,
+) -> str:
+    """Generate filename for MSA-scoped ACS5 measures.
+
+    Pattern: ``measures__msa__A{acs}@M{def}xT{tract}.parquet``.
+    """
+    acs_year = _normalize_acs_vintage(acs_vintage)
+    defn = _normalize_definition_version(definition_version)
+    if tract_vintage is not None:
+        return f"measures__msa__A{acs_year}@M{defn}xT{tract_vintage}.parquet"
+    return f"measures__msa__A{acs_year}@M{defn}.parquet"
+
+
 def metro_panel_filename(
     start_year: int,
     end_year: int,

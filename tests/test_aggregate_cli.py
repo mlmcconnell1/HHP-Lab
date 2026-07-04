@@ -332,6 +332,46 @@ def _create_fake_acs_cache(acs_vintage: str, tract_vintage: str | int) -> None:
     ).to_parquet(cache_path)
 
 
+def _create_fake_expanded_acs_cache(acs_vintage: str, tract_vintage: str | int) -> None:
+    from hhplab.acs.ingest.tract_population import get_output_path
+
+    cache_path = get_output_path(acs_vintage, str(tract_vintage))
+    cache_path.parent.mkdir(parents=True, exist_ok=True)
+    pd.DataFrame(
+        {
+            "tract_geoid": ["01001020100", "01003010100"],
+            "total_population": [100.0, 300.0],
+            "adult_population": [80.0, 240.0],
+            "citizenship_total": [100.0, 300.0],
+            "naturalized_citizen": [10.0, 30.0],
+            "not_us_citizen": [5.0, 15.0],
+            "median_household_income": [50000.0, 60000.0],
+            "median_gross_rent": [1200.0, 1400.0],
+            "contract_rent_distribution_with_cash_rent": [40.0, 60.0],
+            "contract_rent_distribution_cash_rent_lt_100": [0.0, 0.0],
+            "contract_rent_distribution_cash_rent_100_to_149": [0.0, 0.0],
+            "contract_rent_distribution_cash_rent_150_to_199": [0.0, 0.0],
+            "contract_rent_distribution_cash_rent_200_to_249": [0.0, 0.0],
+            "contract_rent_distribution_cash_rent_250_to_299": [40.0, 60.0],
+        }
+    ).to_parquet(cache_path)
+
+
+def _create_fake_msa_membership(definition_version: str) -> None:
+    from hhplab.naming import msa_county_membership_path
+
+    path = msa_county_membership_path(definition_version)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    pd.DataFrame(
+        {
+            "msa_id": ["12345", "12345"],
+            "cbsa_code": ["12345", "12345"],
+            "county_fips": ["01001", "01003"],
+            "definition_version": [definition_version, definition_version],
+        }
+    ).to_parquet(path)
+
+
 def test_aggregate_acs_missing_crosswalk_suggests_decennial():
     with runner.isolated_filesystem():
         _create_fake_acs_cache("2011-2015", 2010)
@@ -350,6 +390,41 @@ def test_aggregate_acs_missing_crosswalk_no_decennial_hint():
         assert "Crosswalk not found" in result.output
         assert "Did you mean to request" not in result.output
         assert "Run: hhplab generate xwalks --boundary 2020 --tracts 2020" in result.output
+
+
+def test_aggregate_acs_to_msa_writes_expanded_panel_ready_output():
+    with runner.isolated_filesystem():
+        _create_fake_expanded_acs_cache("2019-2023", 2020)
+        _create_fake_msa_membership("census_msa_2023")
+
+        result = runner.invoke(
+            app,
+            [
+                "aggregate",
+                "acs",
+                "--years",
+                "2023",
+                "--tracts",
+                "2020",
+                "--target-geo",
+                "msa",
+                "--json",
+            ],
+        )
+
+        assert result.exit_code == 0, result.output
+        payload = json.loads(result.output.splitlines()[-1])
+        assert payload["status"] == "ok"
+        assert payload["target_geo"] == "msa"
+        assert payload["geo_count"] == 1
+
+        out_path = payload["outputs"][0]
+        assert out_path.endswith("measures__msa__A2023@Mcensusmsa2023xT2020.parquet")
+        output = pd.read_parquet(out_path)
+        assert output.loc[0, "msa_id"] == "12345"
+        assert output.loc[0, "non_native_share"] == pytest.approx(0.15)
+        assert output.loc[0, "contract_rent_p25"] == pytest.approx(262.5)
+        assert "msa_contract_rent_p25" in output.columns
 
 
 def test_aggregate_pit_collects_data(tmp_path):

@@ -112,6 +112,7 @@ RENT_BURDEN_30_PLUS_COLUMNS: tuple[str, ...] = (
 
 MSA_ACS5_COVARIATE_ALIASES: dict[str, str] = {
     "median_gross_rent": "msa_median_rent",
+    "contract_rent_p25": "msa_contract_rent_p25",
     "vacancy_rate": "msa_vacancy_rate",
     "poverty_rate": "msa_poverty_rate",
     "median_household_income": "msa_income",
@@ -129,6 +130,38 @@ AVERAGE_WEIGHT_DENOMINATORS: dict[str, tuple[str, ...]] = {
     "median_owner_occupied_home_value": ("owner_households", "total_population"),
     "gini_index": ("total_population",),
 }
+
+CONTRACT_RENT_BINS: tuple[tuple[str, float, float | None], ...] = (
+    ("contract_rent_distribution_cash_rent_lt_100", 0.0, 100.0),
+    ("contract_rent_distribution_cash_rent_100_to_149", 100.0, 150.0),
+    ("contract_rent_distribution_cash_rent_150_to_199", 150.0, 200.0),
+    ("contract_rent_distribution_cash_rent_200_to_249", 200.0, 250.0),
+    ("contract_rent_distribution_cash_rent_250_to_299", 250.0, 300.0),
+    ("contract_rent_distribution_cash_rent_300_to_349", 300.0, 350.0),
+    ("contract_rent_distribution_cash_rent_350_to_399", 350.0, 400.0),
+    ("contract_rent_distribution_cash_rent_400_to_449", 400.0, 450.0),
+    ("contract_rent_distribution_cash_rent_450_to_499", 450.0, 500.0),
+    ("contract_rent_distribution_cash_rent_500_to_549", 500.0, 550.0),
+    ("contract_rent_distribution_cash_rent_550_to_599", 550.0, 600.0),
+    ("contract_rent_distribution_cash_rent_600_to_649", 600.0, 650.0),
+    ("contract_rent_distribution_cash_rent_650_to_699", 650.0, 700.0),
+    ("contract_rent_distribution_cash_rent_700_to_749", 700.0, 750.0),
+    ("contract_rent_distribution_cash_rent_750_to_799", 750.0, 800.0),
+    ("contract_rent_distribution_cash_rent_800_to_899", 800.0, 900.0),
+    ("contract_rent_distribution_cash_rent_900_to_999", 900.0, 1000.0),
+    ("contract_rent_distribution_cash_rent_1000_to_1249", 1000.0, 1250.0),
+    ("contract_rent_distribution_cash_rent_1250_to_1499", 1250.0, 1500.0),
+    ("contract_rent_distribution_cash_rent_1500_to_1999", 1500.0, 2000.0),
+    ("contract_rent_distribution_cash_rent_2000_to_2499", 2000.0, 2500.0),
+    ("contract_rent_distribution_cash_rent_2500_to_2999", 2500.0, 3000.0),
+    ("contract_rent_distribution_cash_rent_3000_to_3499", 3000.0, 3500.0),
+    ("contract_rent_distribution_cash_rent_3500_plus", 3500.0, None),
+)
+
+CONTRACT_RENT_BINS_EARLY: tuple[tuple[str, float, float | None], ...] = (
+    *CONTRACT_RENT_BINS[:20],
+    ("contract_rent_distribution_cash_rent_2000_plus", 2000.0, None),
+)
 
 
 def _maybe_remap_ct_planning_regions(
@@ -481,6 +514,16 @@ def aggregate_to_geo(
 
 def _derive_acs5_covariates(result_df: pd.DataFrame) -> None:
     """Derive canonical ACS5 rates from aggregated numerator/denominator columns."""
+    if "citizenship_total" in result_df.columns and {
+        "naturalized_citizen",
+        "not_us_citizen",
+    } <= set(result_df.columns):
+        denominator = pd.to_numeric(result_df["citizenship_total"], errors="coerce")
+        numerator = pd.to_numeric(result_df["naturalized_citizen"], errors="coerce").fillna(
+            0.0
+        ) + pd.to_numeric(result_df["not_us_citizen"], errors="coerce").fillna(0.0)
+        result_df["non_native_share"] = numerator / denominator.where(denominator > 0)
+
     if "population_below_poverty" in result_df.columns and "poverty_universe" in result_df.columns:
         denominator = pd.to_numeric(result_df["poverty_universe"], errors="coerce")
         numerator = pd.to_numeric(result_df["population_below_poverty"], errors="coerce")
@@ -501,6 +544,66 @@ def _derive_acs5_covariates(result_df: pd.DataFrame) -> None:
         )
         numerator = numerator.where(denominator.notna())
         result_df["rent_burden_30_plus"] = numerator / denominator.where(denominator > 0)
+
+    _derive_contract_rent_p25(result_df)
+
+
+def _derive_contract_rent_p25(result_df: pd.DataFrame) -> None:
+    """Derive lower-quartile contract rent from aggregated B25056 bin counts."""
+    if "contract_rent_distribution_with_cash_rent" not in result_df.columns:
+        return
+
+    bins = _available_contract_rent_bins(result_df)
+    if not bins:
+        return
+
+    values: list[object] = []
+    for _, row in result_df.iterrows():
+        values.append(
+            _quantile_from_distribution_row(
+                row,
+                total_column="contract_rent_distribution_with_cash_rent",
+                bins=bins,
+                quantile=0.25,
+            )
+        )
+    result_df["contract_rent_p25"] = values
+
+
+def _available_contract_rent_bins(
+    result_df: pd.DataFrame,
+) -> tuple[tuple[str, float, float | None], ...]:
+    if any(column in result_df.columns for column, _, _ in CONTRACT_RENT_BINS):
+        return tuple(column for column in CONTRACT_RENT_BINS if column[0] in result_df.columns)
+    return tuple(column for column in CONTRACT_RENT_BINS_EARLY if column[0] in result_df.columns)
+
+
+def _quantile_from_distribution_row(
+    row: pd.Series,
+    *,
+    total_column: str,
+    bins: tuple[tuple[str, float, float | None], ...],
+    quantile: float,
+) -> object:
+    total = pd.to_numeric(pd.Series([row.get(total_column)]), errors="coerce").iloc[0]
+    if pd.isna(total) or total <= 0:
+        return pd.NA
+
+    target = float(total) * quantile
+    cumulative = 0.0
+    for column, lower, upper in bins:
+        count = pd.to_numeric(pd.Series([row.get(column)]), errors="coerce").iloc[0]
+        if pd.isna(count) or count <= 0:
+            continue
+        next_cumulative = cumulative + float(count)
+        if target <= next_cumulative:
+            if upper is None:
+                return pd.NA
+            fraction = (target - cumulative) / float(count)
+            return lower + fraction * (upper - lower)
+        cumulative = next_cumulative
+
+    return pd.NA
 
 
 def _apply_msa_acs5_covariate_aliases(result_df: pd.DataFrame) -> None:

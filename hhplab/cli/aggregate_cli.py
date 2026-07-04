@@ -698,6 +698,20 @@ def aggregate_acs(
             ),
         ),
     ] = None,
+    target_geo: Annotated[
+        str,
+        typer.Option(
+            "--target-geo",
+            help="Target geography. One of: coc, msa.",
+        ),
+    ] = "coc",
+    definition_version: Annotated[
+        str,
+        typer.Option(
+            "--definition-version",
+            help="MSA definition version to use when --target-geo=msa.",
+        ),
+    ] = "census_msa_2023",
     output_json: Annotated[
         bool,
         typer.Option(
@@ -706,10 +720,10 @@ def aggregate_acs(
         ),
     ] = False,
 ) -> None:
-    """Aggregate cached ACS tract data into CoC artifacts.
+    """Aggregate cached ACS tract data into analysis-geography artifacts.
 
-    Reads pre-ingested ACS tract files from disk and aggregates to CoC
-    level using crosswalks.  No Census API calls are made.  If cached
+    Reads pre-ingested ACS tract files from disk and aggregates to CoC or MSA
+    level using curated crosswalks/membership.  No Census API calls are made.  If cached
     ingest files are missing, the command fails with instructions to
     run ``hhplab ingest acs5-tract`` first.
 
@@ -732,21 +746,74 @@ def aggregate_acs(
             err=True,
         )
         raise typer.Exit(2)
+    if target_geo not in ("coc", "msa"):
+        if output_json:
+            import json
+
+            msg = f"Invalid --target-geo '{target_geo}'. Use one of: coc, msa."
+            typer.echo(json.dumps({"status": "error", "message": msg}))
+            raise typer.Exit(2)
+        typer.echo(
+            f"Error: Invalid --target-geo '{target_geo}'. Use one of: coc, msa.",
+            err=True,
+        )
+        raise typer.Exit(2)
 
     curated_dir = curated_root()
     output_dir = curated_dir / "measures"
-    typer.echo(f"Aggregating ACS to CoC (curated output, align '{align}')...")
+    geo_label = "MSA" if target_geo == "msa" else "CoC"
+    typer.echo(f"Aggregating ACS to {geo_label} (curated output, align '{align}')...")
 
     import pandas as pd
 
     from hhplab.acs.acs_aggregate import (
         _maybe_remap_ct_planning_regions,
         aggregate_to_coc,
+        aggregate_to_geo,
     )
     from hhplab.acs.ingest.tract_population import get_output_path
     from hhplab.acs.translate import default_tract_vintage_for_acs
-    from hhplab.naming import measures_filename, tract_xwalk_filename
+    from hhplab.msa.msa_io import read_msa_county_membership
+    from hhplab.naming import measures_filename, msa_measures_filename, tract_xwalk_filename
     from hhplab.provenance import ProvenanceBlock, write_parquet_with_provenance
+
+    def build_msa_tract_crosswalk(
+        acs_data: pd.DataFrame,
+        membership: pd.DataFrame,
+    ) -> pd.DataFrame:
+        required = {"msa_id", "county_fips"}
+        missing = sorted(required - set(membership.columns))
+        if missing:
+            raise ValueError(
+                "MSA county membership is missing required columns "
+                f"{missing}. Available columns: {list(membership.columns)}"
+            )
+        tracts = acs_data[["GEOID"]].drop_duplicates().copy()
+        tracts["GEOID"] = tracts["GEOID"].astype(str).str.zfill(11)
+        tracts["county_fips"] = tracts["GEOID"].str[:5]
+        selected_membership = membership[["msa_id", "county_fips"]].drop_duplicates().copy()
+        selected_membership["msa_id"] = selected_membership["msa_id"].astype(str).str.zfill(5)
+        selected_membership["county_fips"] = (
+            selected_membership["county_fips"].astype(str).str.zfill(5)
+        )
+        xwalk = selected_membership.merge(tracts, on="county_fips", how="inner")
+        xwalk["area_share"] = 1.0
+        if weighting == "population" and "total_population" in acs_data.columns:
+            tract_pop = acs_data[["GEOID", "total_population"]].copy()
+            tract_pop["GEOID"] = tract_pop["GEOID"].astype(str).str.zfill(11)
+            xwalk = xwalk.merge(tract_pop, on="GEOID", how="left")
+            totals = xwalk.groupby("msa_id")["total_population"].transform("sum")
+            xwalk["pop_share"] = xwalk["total_population"] / totals.where(totals > 0)
+            xwalk["pop_share"] = xwalk["pop_share"].fillna(0.0)
+            xwalk = xwalk.drop(columns=["total_population"])
+        elif weighting == "population":
+            raise ValueError(
+                "Population weighting requires total_population in the cached ACS tract file."
+            )
+        return xwalk.rename(columns={"GEOID": "tract_geoid"})[
+            ["msa_id", "tract_geoid", "area_share"]
+            + (["pop_share"] if weighting == "population" else [])
+        ]
 
     def decennial_floor(year: int) -> int:
         return year - (year % 10)
@@ -799,10 +866,11 @@ def aggregate_acs(
             )
             raise typer.Exit(1)
 
-        # --- Resolve crosswalk ---
+        # --- Resolve target geography mapping ---
         xwalk_path = curated_dir / "xwalks" / tract_xwalk_filename(boundary_vintage, tract_vintage)
+        msa_membership_path = None
 
-        if not xwalk_path.exists():
+        if target_geo == "coc" and not xwalk_path.exists():
             if output_json:
                 import json
 
@@ -841,42 +909,97 @@ def aggregate_acs(
             )
             raise typer.Exit(1)
 
+        if target_geo == "msa":
+            from hhplab.naming import msa_county_membership_path
+
+            msa_membership_path = msa_county_membership_path(definition_version)
+            if not msa_membership_path.exists():
+                if output_json:
+                    import json
+
+                    typer.echo(
+                        json.dumps(
+                            {
+                                "status": "error",
+                                "message": (
+                                    "MSA county membership artifact not found: "
+                                    f"{msa_membership_path}"
+                                ),
+                                "definition_version": definition_version,
+                                "remedy": (
+                                    "hhplab generate msa"
+                                    f" --definition-version {definition_version}"
+                                ),
+                            }
+                        )
+                    )
+                    raise typer.Exit(1)
+                typer.echo(
+                    f"Error: MSA county membership artifact not found: {msa_membership_path}",
+                    err=True,
+                )
+                typer.echo(
+                    f"Run: hhplab generate msa --definition-version {definition_version}",
+                    err=True,
+                )
+                raise typer.Exit(1)
+
         typer.echo(f"  B{build_year}: ACS {acs_vintage} (tracts {tract_vintage})...")
         try:
             # Load cached data and crosswalk
             acs_data = pd.read_parquet(acs_cache_path)
-            crosswalk = pd.read_parquet(xwalk_path)
 
             # Rename tract_geoid → GEOID for aggregate_to_coc compatibility
             if "tract_geoid" in acs_data.columns and "GEOID" not in acs_data.columns:
                 acs_data = acs_data.rename(columns={"tract_geoid": "GEOID"})
+            if "GEOID" in acs_data.columns:
+                acs_data["GEOID"] = acs_data["GEOID"].astype(str).str.zfill(11)
 
-            # Handle CT planning region GEOID remapping
-            acs_data = _maybe_remap_ct_planning_regions(acs_data, crosswalk, acs_vintage)
-
-            # Aggregate to CoC level
-            coc_measures = aggregate_to_coc(acs_data, crosswalk, weighting=weighting)
+            if target_geo == "coc":
+                crosswalk = pd.read_parquet(xwalk_path)
+                # Handle CT planning region GEOID remapping
+                acs_data = _maybe_remap_ct_planning_regions(acs_data, crosswalk, acs_vintage)
+                measures = aggregate_to_coc(acs_data, crosswalk, weighting=weighting)
+                id_col = "coc_id"
+                provenance_extra = {
+                    "dataset_type": "coc_measures",
+                    "source": "cached_ingest",
+                    "crosswalk_path": str(xwalk_path),
+                    "acs_cache_path": str(acs_cache_path),
+                }
+            else:
+                membership = read_msa_county_membership(definition_version)
+                crosswalk = build_msa_tract_crosswalk(acs_data, membership)
+                measures = aggregate_to_geo(
+                    acs_data,
+                    crosswalk,
+                    weighting=weighting,
+                    geo_id_col="msa_id",
+                )
+                measures["definition_version"] = definition_version
+                id_col = "msa_id"
+                provenance_extra = {
+                    "dataset_type": "msa_measures",
+                    "source": "cached_ingest",
+                    "definition_version": definition_version,
+                    "msa_membership_path": str(msa_membership_path),
+                    "acs_cache_path": str(acs_cache_path),
+                }
 
             # Add vintage columns
-            coc_measures["boundary_vintage"] = boundary_vintage
-            coc_measures["acs_vintage"] = acs_vintage
+            measures["boundary_vintage"] = boundary_vintage
+            measures["acs_vintage"] = acs_vintage
 
             # Reorder columns
             col_order = [
-                "coc_id",
+                id_col,
                 "boundary_vintage",
                 "acs_vintage",
+                "definition_version",
                 "weighting_method",
-                "total_population",
-                "adult_population",
-                "population_below_poverty",
-                "median_household_income",
-                "median_gross_rent",
-                "coverage_ratio",
-                "source",
             ]
-            col_order = [c for c in col_order if c in coc_measures.columns]
-            coc_measures = coc_measures[col_order]
+            col_order = [c for c in col_order if c in measures.columns]
+            measures = measures[col_order + [c for c in measures.columns if c not in col_order]]
 
             # Write output
             output_dir.mkdir(parents=True, exist_ok=True)
@@ -885,7 +1008,10 @@ def aggregate_acs(
             if "tract_vintage" in crosswalk.columns:
                 tv_str = str(crosswalk["tract_vintage"].iloc[0])
 
-            filename = measures_filename(acs_vintage, boundary_vintage, tv_str)
+            if target_geo == "msa":
+                filename = msa_measures_filename(acs_vintage, definition_version, tv_str)
+            else:
+                filename = measures_filename(acs_vintage, boundary_vintage, tv_str)
             out_path = output_dir / filename
 
             provenance = ProvenanceBlock(
@@ -893,20 +1019,17 @@ def aggregate_acs(
                 tract_vintage=tv_str,
                 acs_vintage=acs_vintage,
                 weighting=weighting,
-                extra={
-                    "dataset_type": "coc_measures",
-                    "source": "cached_ingest",
-                    "crosswalk_path": str(xwalk_path),
-                    "acs_cache_path": str(acs_cache_path),
-                },
+                geo_type=target_geo,
+                definition_version=definition_version if target_geo == "msa" else None,
+                extra=provenance_extra,
             )
-            write_parquet_with_provenance(coc_measures, out_path, provenance)
+            write_parquet_with_provenance(measures, out_path, provenance)
 
             all_outputs.append(str(out_path))
             materialized.append(build_year)
-            total_row_count += len(coc_measures)
-            if "coc_id" in coc_measures.columns:
-                total_coc_count = coc_measures["coc_id"].nunique()
+            total_row_count += len(measures)
+            if id_col in measures.columns:
+                total_coc_count = measures[id_col].nunique()
             typer.echo(f"    Wrote: {out_path.name}")
 
         except Exception as exc:
@@ -936,10 +1059,13 @@ def aggregate_acs(
                     "status": "ok",
                     "alignment": align,
                     "weighting": weighting,
+                    "target_geo": target_geo,
+                    "definition_version": definition_version if target_geo == "msa" else None,
                     "years_requested": parsed_years,
                     "years_materialized": materialized,
                     "output_path": str(output_dir),
-                    "coc_count": total_coc_count,
+                    "coc_count": total_coc_count if target_geo == "coc" else None,
+                    "geo_count": total_coc_count,
                     "row_count": total_row_count,
                     "outputs": all_outputs,
                 }

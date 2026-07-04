@@ -21,6 +21,7 @@ from hhplab.naming import (
     msa_definitions_path,
     msa_fractional_rollup_filename,
     msa_fractional_rollup_path,
+    msa_measures_filename,
     msa_pit_filename,
     pl_block_population_filename,
     pl_block_population_path,
@@ -65,6 +66,13 @@ def test_msa_county_membership_path():
 def test_msa_boundaries_path():
     assert str(msa_boundaries_path("census_msa_2023")).endswith(
         "data/curated/msa/msa_boundaries__census_msa_2023.parquet"
+    )
+
+
+def test_msa_measures_filename():
+    assert (
+        msa_measures_filename("2019-2023", "census_msa_2023", 2020)
+        == "measures__msa__A2023@Mcensusmsa2023xT2020.parquet"
     )
 
 
