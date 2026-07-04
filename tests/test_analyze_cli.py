@@ -62,6 +62,7 @@ def _panel_fixture(path: Path) -> Path:
                 0.049,
                 0.048,
             ],
+            "policy_indicator": [0, 0, 1, 1, 0, 1, 1, 1, 0, 0, 0, 1],
         }
     )
     write_parquet_with_provenance(
@@ -194,6 +195,55 @@ class TestAnalyzeCli:
         assert (regression["dof"] > 0).all()
         assert "p_value" in regression.columns
         assert payload["dof"] > 0
+
+    def test_regress_standardizes_predictors_and_flags_binary_terms(self, tmp_path: Path):
+        panel = _panel_fixture(tmp_path / "panel.parquet")
+        output = tmp_path / "regress_standardized.parquet"
+
+        result = runner.invoke(
+            app,
+            [
+                "analyze",
+                "regress",
+                "--panel",
+                str(panel),
+                "--outcome",
+                "pit_total",
+                "--predictors",
+                "median_gross_rent,policy_indicator",
+                "--no-entity-fe",
+                "--no-year-fe",
+                "--cluster-by",
+                "",
+                "--standardize",
+                "predictors",
+                "--output",
+                str(output),
+                "--json",
+            ],
+        )
+
+        assert result.exit_code == 0
+        payload = json.loads(result.output)
+        assert payload["standardize"] == "predictors"
+        assert payload["standardized_terms"] == ["median_gross_rent"]
+        assert payload["unstandardized_terms"] == ["policy_indicator"]
+
+        regression = pd.read_parquet(output).set_index("term")
+        rent = regression.loc["median_gross_rent"]
+        policy = regression.loc["policy_indicator"]
+        assert bool(rent["standardized"])
+        assert rent["standardization"] == "predictors"
+        assert rent["standardization_std"] > 0
+        assert not bool(policy["standardized"])
+        assert policy["standardization_note"] == "binary_indicator_not_standardized"
+
+        provenance = read_provenance(output)
+        assert provenance is not None
+        assert provenance.extra["parameters"]["standardize"] == "predictors"
+        assert provenance.extra["parameters"]["standardization"]["policy_indicator"][
+            "note"
+        ] == "binary_indicator_not_standardized"
 
     def test_regress_rejects_saturated_fixed_effect_model(self, tmp_path: Path):
         panel = _saturated_panel_fixture(tmp_path / "panel.parquet")

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Annotated
+from typing import Annotated, Literal
 
 import typer
 
@@ -177,6 +177,13 @@ def analyze_regress(
             help="Cluster standard errors by this column. Use empty string to disable.",
         ),
     ] = "geo_id",
+    standardize: Annotated[
+        Literal["none", "predictors", "all"],
+        typer.Option(
+            "--standardize",
+            help="Z-score model columns before fitting. One of: none, predictors, all.",
+        ),
+    ] = "none",
     output: Annotated[
         Path | None,
         typer.Option("--output", "-o", help="Output parquet path for analysis results."),
@@ -197,6 +204,7 @@ def analyze_regress(
             entity_fe=entity_fe,
             year_fe=year_fe,
             cluster_by=cluster_by or None,
+            standardize=standardize,
             output_path=output,
         )
     except AnalysisError as exc:

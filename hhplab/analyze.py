@@ -400,6 +400,43 @@ def _two_sided_p_value(t_stat: float, dof: int) -> float:
         return float(2.0 * (1.0 - NormalDist().cdf(abs(t_stat))))
 
 
+def _is_binary_indicator(series: pd.Series) -> bool:
+    values = set(pd.to_numeric(series.dropna(), errors="coerce").dropna().unique().tolist())
+    return bool(values) and values <= {0, 1}
+
+
+def _standardize_model_columns(
+    model_df: pd.DataFrame,
+    columns: list[str],
+) -> dict[str, dict[str, Any]]:
+    metadata: dict[str, dict[str, Any]] = {}
+    for column in columns:
+        values = pd.to_numeric(model_df[column], errors="coerce")
+        if _is_binary_indicator(values):
+            metadata[column] = {
+                "standardized": False,
+                "mean": float(values.mean()),
+                "std": float(values.std(ddof=0)),
+                "note": "binary_indicator_not_standardized",
+            }
+            continue
+        mean = float(values.mean())
+        std = float(values.std(ddof=0))
+        if not math.isfinite(std) or std <= 0:
+            raise AnalysisError(
+                f"Cannot standardize column '{column}' because its model-sample "
+                "standard deviation is zero or undefined."
+            )
+        model_df[column] = (values - mean) / std
+        metadata[column] = {
+            "standardized": True,
+            "mean": mean,
+            "std": std,
+            "note": "",
+        }
+    return metadata
+
+
 def regress_panel(
     panel_path: Path,
     *,
@@ -410,9 +447,12 @@ def regress_panel(
     entity_fe: bool = True,
     year_fe: bool = True,
     cluster_by: str | None = "geo_id",
+    standardize: str = "none",
     output_path: Path | None = None,
 ) -> AnalysisResult:
     """Run OLS with optional entity/year fixed effects and clustered standard errors."""
+    if standardize not in {"none", "predictors", "all"}:
+        raise AnalysisError("--standardize must be one of: none, predictors, all.")
     df = _read_panel(panel_path)
     needed = [outcome, *predictors]
     if entity_fe:
@@ -433,6 +473,13 @@ def regress_panel(
     model_df = model_df.dropna(subset=drop_subset)
     if len(model_df) <= len(predictors):
         raise AnalysisError("regress has too few complete rows for the requested model.")
+
+    standardize_columns: list[str] = []
+    if standardize in {"predictors", "all"}:
+        standardize_columns.extend(predictors)
+    if standardize == "all":
+        standardize_columns.append(outcome)
+    standardization = _standardize_model_columns(model_df, standardize_columns)
 
     x_parts = [pd.Series(1.0, index=model_df.index, name="Intercept"), model_df[predictors]]
     if entity_fe:
@@ -478,6 +525,19 @@ def regress_panel(
     coef["dof"] = dof
     coef["r_squared"] = float(1 - (residuals @ residuals) / np.sum((y - y.mean()) ** 2))
     coef["std_error_type"] = std_error_type
+    coef["standardization"] = standardize
+    coef["standardized"] = coef["term"].map(
+        lambda term: bool(standardization.get(str(term), {}).get("standardized", False))
+    )
+    coef["standardization_mean"] = coef["term"].map(
+        lambda term: standardization.get(str(term), {}).get("mean", pd.NA)
+    )
+    coef["standardization_std"] = coef["term"].map(
+        lambda term: standardization.get(str(term), {}).get("std", pd.NA)
+    )
+    coef["standardization_note"] = coef["term"].map(
+        lambda term: standardization.get(str(term), {}).get("note", "")
+    )
     return _persist_result(
         coef,
         panel_path=panel_path,
@@ -491,6 +551,8 @@ def regress_panel(
             "entity_fe": entity_fe,
             "year_fe": year_fe,
             "cluster_by": cluster_by,
+            "standardize": standardize,
+            "standardization": standardization,
         },
         metadata={
             "analysis_type": "regress",
@@ -501,6 +563,13 @@ def regress_panel(
             "dof": dof,
             "r_squared": float(coef["r_squared"].iloc[0]),
             "std_error_type": std_error_type,
+            "standardize": standardize,
+            "standardized_terms": [
+                term for term, spec in standardization.items() if spec["standardized"]
+            ],
+            "unstandardized_terms": [
+                term for term, spec in standardization.items() if not spec["standardized"]
+            ],
         },
     )
 
