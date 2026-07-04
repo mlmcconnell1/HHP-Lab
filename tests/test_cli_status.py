@@ -3,9 +3,11 @@
 import json
 from pathlib import Path
 
+import pandas as pd
 import pytest
 from typer.testing import CliRunner
 
+from hhplab.acs.variables import TRACT_OUTPUT_COLUMNS
 from hhplab.cli.main import app
 
 runner = CliRunner()
@@ -98,7 +100,9 @@ def _scaffold_curated(tmp_path: Path) -> Path:
 
     adir = curated / "acs"
     adir.mkdir(parents=True)
-    pd.DataFrame({"geoid": ["08001"]}).to_parquet(adir / "acs5_tracts__A2023xT2023.parquet")
+    pd.DataFrame({column: [None] for column in TRACT_OUTPUT_COLUMNS}).to_parquet(
+        adir / "acs5_tracts__A2023xT2023.parquet"
+    )
 
     mdir = curated / "measures"
     mdir.mkdir(parents=True)
@@ -286,9 +290,32 @@ class TestStatusJSON:
         assert payload["recipe_outputs"]["diagnostics_count"] == 1
         assert payload["recipe_outputs"]["map_count"] == 1
         assert payload["recipe_outputs"]["recipes"][0]["name"] == "demo-recipe"
+        assert payload["assets"]["acs"]["schema_staleness_count"] == 0
         assert payload["guidance"]["recipe_preflight"] == RECIPE_PREFLIGHT_CMD
         assert payload["guidance"]["recipe_execute"] == RECIPE_EXECUTE_CMD
         assert payload["issues"] == []
+
+    def test_status_json_warns_on_stale_acs_schema(self, tmp_path):
+        data_dir = _scaffold_curated(tmp_path)
+        acs_dir = data_dir / "curated" / "acs"
+        for path in acs_dir.glob("*.parquet"):
+            path.unlink()
+        pd.DataFrame(
+            {
+                "tract_geoid": ["08001000100"],
+                "acs_vintage": ["2019-2023"],
+                "tract_vintage": ["2020"],
+                "total_population": [100],
+            }
+        ).to_parquet(acs_dir / "acs5_tracts__A2023xT2020.parquet")
+
+        result = runner.invoke(app, ["status", "--json", "--data-dir", str(data_dir)])
+
+        assert result.exit_code == 0
+        payload = json.loads(result.output)
+        assert payload["assets"]["acs"]["schema_staleness_count"] == 1
+        assert payload["assets"]["acs"]["schema_staleness"][0]["artifact_family"] == "acs5_tracts"
+        assert any(issue["area"] == "curated_schema" for issue in payload["issues"])
 
     def test_status_json_empty(self, tmp_path):
         data_dir = tmp_path / "data"

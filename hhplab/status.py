@@ -10,6 +10,7 @@ from hhplab.census.api import (
     probe_census_api_reachability,
 )
 from hhplab.config import load_config
+from hhplab.curated_schema import validate_curated_schemas
 
 STATUS_GUIDANCE = {
     "recipe_preflight": "hhplab build recipe-preflight --recipe <file> --json",
@@ -305,7 +306,13 @@ def _scan_acs(curated: Path) -> dict:
             m = re.match(r"^acs5_tracts__A(\d{4})xT(\d{4})\.parquet$", p.name)
             if m:
                 items.append(f"A{m.group(1)}xT{m.group(2)}")
-    return {"count": len(items), "items": items}
+    schema_issues = validate_curated_schemas(curated)
+    return {
+        "count": len(items),
+        "items": items,
+        "schema_staleness_count": len(schema_issues),
+        "schema_staleness": [issue.to_dict() for issue in schema_issues],
+    }
 
 
 def _scan_zori(curated: Path) -> dict:
@@ -652,6 +659,18 @@ def collect_status_report(
         credentials["census_api_key"]["reachability"] = probe_census_api_reachability()
     recipe_outputs = _scan_recipe_outputs(resolved_output_root)
     issues = check_prerequisites(assets)
+    if assets["acs"]["schema_staleness_count"]:
+        issues.append(
+            {
+                "severity": "warning",
+                "area": "curated_schema",
+                "message": (
+                    f"{assets['acs']['schema_staleness_count']} curated ACS artifact(s) "
+                    "have stale schemas."
+                ),
+                "hint": "Run `hhplab validate curated-layout --json` for rebuild commands.",
+            }
+        )
     if not credentials["census_api_key"]["present"]:
         issues.append({
             "severity": "error",

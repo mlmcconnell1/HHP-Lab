@@ -14,9 +14,11 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import pandas as pd
 import pytest
 from typer.testing import CliRunner
 
+from hhplab.acs.variables import TRACT_OUTPUT_COLUMNS
 from hhplab.cli.main import app
 from hhplab.curated_policy import (
     CANONICAL_PATTERNS,
@@ -336,6 +338,51 @@ class TestCLI:
         assert result.exit_code == 1, f"Exit {result.exit_code}:\n{result.output}"
         assert "bad_file.parquet" in result.output
         assert "Total violations:" in result.output
+
+    def test_json_reports_stale_acs_schema(self, tmp_path: Path) -> None:
+        curated = tmp_path / "curated"
+        acs_path = curated / "acs" / "acs5_tracts__A2023xT2020.parquet"
+        acs_path.parent.mkdir(parents=True)
+        pd.DataFrame(
+            {
+                "tract_geoid": ["08001000100"],
+                "acs_vintage": ["2019-2023"],
+                "tract_vintage": ["2020"],
+                "total_population": [100],
+            }
+        ).to_parquet(acs_path)
+
+        result = CliRunner().invoke(
+            app,
+            ["validate", "curated-layout", "--dir", str(curated), "--json"],
+        )
+
+        assert result.exit_code == 1
+        payload = json.loads(result.output)
+        assert payload["status"] == "error"
+        stale = payload["schema_staleness"][0]
+        assert stale["artifact_family"] == "acs5_tracts"
+        assert "citizenship_total" in stale["missing_columns"]
+        assert (
+            stale["remediation"]
+            == "hhplab ingest acs5-tract --acs 2019-2023 --tracts 2020 --force"
+        )
+        assert "stale_schema" in payload["by_category"]
+
+    def test_current_acs_schema_passes(self, tmp_path: Path) -> None:
+        curated = tmp_path / "curated"
+        acs_path = curated / "acs" / "acs5_tracts__A2023xT2020.parquet"
+        acs_path.parent.mkdir(parents=True)
+        pd.DataFrame({column: [None] for column in TRACT_OUTPUT_COLUMNS}).to_parquet(acs_path)
+
+        result = CliRunner().invoke(
+            app,
+            ["validate", "curated-layout", "--dir", str(curated), "--json"],
+        )
+
+        assert result.exit_code == 0
+        payload = json.loads(result.output)
+        assert payload == {"status": "ok", "violations": [], "schema_staleness": []}
 
 
 # ---------------------------------------------------------------------------

@@ -156,7 +156,10 @@ def status_cmd(
 
     # ACS
     a = assets["acs"]
-    typer.echo(f"ACS Tracts: {a['count']} file(s)  {', '.join(a['items']) if a['items'] else '-'}")
+    typer.echo(
+        f"ACS Tracts: {a['count']} file(s)  {', '.join(a['items']) if a['items'] else '-'}"
+        f"  stale schemas: {a['schema_staleness_count']}"
+    )
 
     # Measures
     m = assets["measures"]

@@ -7,6 +7,7 @@ import typer
 
 from hhplab.cli.shared.output import JsonOutput, emit_result
 from hhplab.curated_policy import validate_curated_layout
+from hhplab.curated_schema import validate_curated_schemas
 from hhplab.paths import curated_root
 
 
@@ -26,25 +27,32 @@ def validate_curated_layout_cmd(
         base_dir = curated_root()
 
     violations = validate_curated_layout(base_dir)
+    schema_issues = validate_curated_schemas(base_dir)
 
     if json_output:
-        if not violations:
-            emit_result({"status": "ok", "violations": []}, json_output)
+        if not violations and not schema_issues:
+            emit_result(
+                {"status": "ok", "violations": [], "schema_staleness": []},
+                json_output,
+            )
             return
         by_category: dict[str, list[str]] = {}
         for v in violations:
             by_category.setdefault(v.category, []).append(v.message)
+        if schema_issues:
+            by_category["stale_schema"] = [issue.message for issue in schema_issues]
         emit_result(
             {
                 "status": "error",
-                "total_violations": len(violations),
+                "total_violations": len(violations) + len(schema_issues),
                 "by_category": by_category,
+                "schema_staleness": [issue.to_dict() for issue in schema_issues],
             },
             json_output,
         )
         raise typer.Exit(code=1)
 
-    if not violations:
+    if not violations and not schema_issues:
         typer.echo("Curated layout validation passed: no violations found.")
         return
 
@@ -59,5 +67,10 @@ def validate_curated_layout_cmd(
         for v in items:
             typer.echo(f"  {v.message}")
 
-    typer.echo(f"\nTotal violations: {len(violations)}")
+    if schema_issues:
+        typer.echo(f"\nStale Schema ({len(schema_issues)}):")
+        for issue in schema_issues:
+            typer.echo(f"  {issue.message}")
+
+    typer.echo(f"\nTotal violations: {len(violations) + len(schema_issues)}")
     raise typer.Exit(code=1)
