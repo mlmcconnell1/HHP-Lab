@@ -5,6 +5,16 @@ from typing import Annotated
 
 import typer
 
+from hhplab.metro.metro_definitions import METRO_COUNT
+
+APPROX_COC_COUNT = 380
+SMALL_N_GUIDANCE = (
+    f"Treat estimates from {METRO_COUNT} Glynn/Fox metros or roughly "
+    f"{APPROX_COC_COUNT} CoCs as screening evidence. Report sample size, "
+    "avoid overfit models, and prefer confidence intervals or robustness "
+    "checks over point estimate ranking."
+)
+
 AGENTS_GUIDANCE = {
     "automation_defaults": {
         "prefer_json": [
@@ -84,12 +94,7 @@ AGENTS_GUIDANCE = {
             "id": "small_n",
             "risk": "Small samples make noisy correlations look stronger than they are.",
             "applies_to": ["metro panels", "coc panels"],
-            "guidance": (
-                "Treat estimates from roughly 50 metros or roughly 380 CoCs as "
-                "screening evidence. Report sample size, avoid overfit models, "
-                "and prefer confidence intervals or robustness checks over point "
-                "estimate ranking."
-            ),
+            "guidance": SMALL_N_GUIDANCE,
         },
         {
             "id": "pit_2021_disruption",
@@ -134,7 +139,7 @@ AGENTS_GUIDANCE = {
     ],
 }
 
-AGENTS_INFO_TEXT = """# HHP-Lab Agent Quick Reference
+AGENTS_INFO_TEXT = f"""# HHP-Lab Agent Quick Reference
 
 ## Automation Defaults
 
@@ -188,9 +193,10 @@ of the crosswalk. The rules below govern which vintage to use for each source.
 
 ## Inference Guardrails
 
-- **Small N:** Treat correlations from roughly 50 metros or roughly 380 CoCs as
-  screening evidence. Report sample size, avoid overfit models, and prefer
-  confidence intervals or robustness checks over point estimate ranking.
+- **Small N:** Treat correlations from {METRO_COUNT} Glynn/Fox metros or roughly
+  {APPROX_COC_COUNT} CoCs as screening evidence. Report sample size, avoid
+  overfit models, and prefer confidence intervals or robustness checks over
+  point estimate ranking.
 - **2021 PIT disruption:** Flag the COVID-era 2021 PIT count separately. Consider
   excluding 2021, adding a 2021 indicator, or reporting sensitivity results with
   and without that year.

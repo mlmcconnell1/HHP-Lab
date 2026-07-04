@@ -8,6 +8,7 @@ from typer.testing import CliRunner
 
 from hhplab import __version__
 from hhplab.cli.main import app
+from hhplab.metro.metro_definitions import METRO_COUNT
 
 runner = CliRunner()
 
@@ -629,6 +630,8 @@ class TestRetiredCommandRegression:
         assert result.exit_code == 0
         assert "Inference Guardrails" in result.output
         assert "Small N" in result.output
+        assert f"{METRO_COUNT} Glynn/Fox metros" in result.output
+        assert "50 metros" not in result.output
         assert "2021 PIT disruption" in result.output
         assert "Spatial autocorrelation" in result.output
         assert "ACS lag causal ordering" in result.output
@@ -655,5 +658,6 @@ class TestRetiredCommandRegression:
             for guardrail in payload["inference_guardrails"]
             if guardrail["id"] == "small_n"
         )
-        assert "50 metros" in small_n["guidance"]
+        assert f"{METRO_COUNT} Glynn/Fox metros" in small_n["guidance"]
+        assert "50 metros" not in small_n["guidance"]
         assert "380 CoCs" in small_n["guidance"]
