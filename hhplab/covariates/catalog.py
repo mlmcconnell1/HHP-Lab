@@ -5,6 +5,17 @@ from __future__ import annotations
 from dataclasses import asdict, dataclass
 from typing import Literal
 
+from hhplab.covariates.mpi_contract import (
+    MPI_MEASURE_COLUMNS,
+    MPI_METHODOLOGY_NOTE,
+    MPI_PRODUCT,
+    MPI_PROVIDER,
+    MPI_REQUIRED_CURATED_COLUMNS,
+    MPI_SOURCE_ID,
+    MPI_SOURCE_PAGE,
+    MPI_SOURCE_URL,
+)
+
 GeoType = Literal["county", "coc", "state"]
 
 
@@ -168,6 +179,24 @@ COVARIATE_SOURCE_SPECS: dict[str, CovariateSourceSpec] = {
         notes=(
             "January county PRISM minimum temperature in Celsius, with policy-threshold "
             "hinge basis columns at freezing and common 40F Code Blue activation."
+        ),
+    ),
+    MPI_SOURCE_ID: CovariateSourceSpec(
+        source_id=MPI_SOURCE_ID,
+        provider=MPI_PROVIDER,
+        product=MPI_PRODUCT,
+        topic="immigration_status",
+        native_geo="county",
+        first_year=2023,
+        last_year=2023,
+        source_page=MPI_SOURCE_PAGE,
+        source_url=MPI_SOURCE_URL,
+        required_columns=MPI_REQUIRED_CURATED_COLUMNS,
+        measure_columns=MPI_MEASURE_COLUMNS,
+        recommended_align="point_in_time_mid_year",
+        notes=(
+            "Migration Policy Institute mid-2023 estimates for unauthorized "
+            f"immigrant populations. {MPI_METHODOLOGY_NOTE}"
         ),
     ),
 }

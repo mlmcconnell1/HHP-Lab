@@ -17,6 +17,22 @@ from hhplab.covariates.aggregate import (
 )
 from hhplab.covariates.catalog import COVARIATE_SOURCE_SPECS
 from hhplab.covariates.ingest import ingest_covariate_source
+from hhplab.covariates.mpi_contract import (
+    MPI_COUNTY_HEADERS,
+    MPI_COUNTY_SHEET,
+    MPI_CURATED_COUNTY_COLUMNS,
+    MPI_ESTIMATE_YEAR,
+    MPI_GEOGRAPHY_RULES,
+    MPI_MEASURE_COLUMNS,
+    MPI_RAW_COUNTY_COLUMNS,
+    MPI_RAW_STATE_COLUMNS,
+    MPI_REQUIRED_SHEETS,
+    MPI_SOURCE_ID,
+    MPI_STATE_HEADERS,
+    MPI_STATE_SHEET,
+    MPI_WORKBOOK_GLOB,
+    validate_mpi_workbook_contract,
+)
 from hhplab.curated_policy import validate_curated_layout
 from hhplab.provenance import read_provenance
 
@@ -30,6 +46,7 @@ EXPECTED_COVARIATE_SOURCES = {
     "hud_spm": ("coc", "spm_first_time_homeless"),
     "kff_medicaid_expansion": ("state", "medicaid_expansion_adopted"),
     "prism_tmin_january": ("county", "tmin_c"),
+    MPI_SOURCE_ID: ("county", "unauthorized_immigrant_population"),
 }
 
 BRANCH_ROUNDTRIP_CASES = [
@@ -84,6 +101,36 @@ BRANCH_ROUNDTRIP_CASES = [
 ]
 
 
+def _write_mpi_contract_workbook(
+    tmp_path: Path,
+    *,
+    state_headers: tuple[str, ...] = MPI_STATE_HEADERS,
+    county_headers: tuple[str, ...] = MPI_COUNTY_HEADERS,
+) -> Path:
+    from openpyxl import Workbook
+
+    workbook = Workbook()
+    state_sheet = workbook.active
+    state_sheet.title = MPI_STATE_SHEET
+    county_sheet = workbook.create_sheet(MPI_COUNTY_SHEET)
+
+    state_sheet.append([])
+    state_sheet.append(["National and State Estimates of the Unauthorized Immigrant Population"])
+    state_sheet.append(list(state_headers))
+    state_sheet.append(["United States", 13_738_000, 1.0])
+
+    county_sheet.append([])
+    county_sheet.append(["National and County Estimates of the Unauthorized Immigrant Population"])
+    county_sheet.append(list(county_headers))
+    county_sheet.append([None, "United States", 13_738_000, 1.0])
+
+    workbook_path = tmp_path / (
+        "MPI-2023_Unauthorized_Profiles-State-County-Topline_Estimates-FINAL.xlsx"
+    )
+    workbook.save(workbook_path)
+    return workbook_path
+
+
 def test_covariate_catalog_declares_hidden_cause_sources() -> None:
     """The expanded source catalog should cover all bead-requested families."""
     assert set(COVARIATE_SOURCE_SPECS) == set(EXPECTED_COVARIATE_SOURCES)
@@ -93,6 +140,48 @@ def test_covariate_catalog_declares_hidden_cause_sources() -> None:
         assert measure in spec.measure_columns
         assert spec.source_page.startswith("https://")
         assert spec.recommended_align
+
+
+def test_mpi_contract_declares_workbook_schema_and_geography_rules() -> None:
+    """MPI ingest has a written contract before parser implementation."""
+    assert MPI_WORKBOOK_GLOB.endswith("*.xlsx")
+    assert MPI_REQUIRED_SHEETS == (MPI_STATE_SHEET, MPI_COUNTY_SHEET)
+    assert MPI_MEASURE_COLUMNS == (
+        "unauthorized_immigrant_population",
+        "unauthorized_immigrant_share_of_us_total",
+    )
+    assert "county_fips" in MPI_CURATED_COUNTY_COLUMNS
+    assert "exclusion_reason" in MPI_RAW_COUNTY_COLUMNS
+    assert "is_us_total" in MPI_RAW_STATE_COLUMNS
+    assert any("MSAs" in rule for rule in MPI_GEOGRAPHY_RULES)
+    assert any("independent city" in rule for rule in MPI_GEOGRAPHY_RULES)
+    assert any("Alaska municipality" in rule for rule in MPI_GEOGRAPHY_RULES)
+    spec = COVARIATE_SOURCE_SPECS[MPI_SOURCE_ID]
+    assert spec.first_year == MPI_ESTIMATE_YEAR
+    assert spec.last_year == MPI_ESTIMATE_YEAR
+    assert set(MPI_MEASURE_COLUMNS) <= set(spec.measure_columns)
+
+
+def test_mpi_workbook_contract_accepts_expected_layout(tmp_path: Path) -> None:
+    """Workbook validation checks the stable MPI sheet and header contract."""
+    workbook_path = _write_mpi_contract_workbook(tmp_path)
+
+    contract = validate_mpi_workbook_contract(workbook_path)
+
+    assert contract.source_id == MPI_SOURCE_ID
+    assert contract.required_sheets == MPI_REQUIRED_SHEETS
+    assert contract.curated_county_columns == MPI_CURATED_COUNTY_COLUMNS
+
+
+def test_mpi_workbook_contract_rejects_unsupported_layout(tmp_path: Path) -> None:
+    """Workbook drift should fail with an actionable contract update message."""
+    workbook_path = _write_mpi_contract_workbook(
+        tmp_path,
+        county_headers=("State", "County", "Unexpected Estimate", "Share"),
+    )
+
+    with pytest.raises(ValueError, match="Update the MPI source contract"):
+        validate_mpi_workbook_contract(workbook_path)
 
 
 @pytest.mark.parametrize(
