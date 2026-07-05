@@ -609,6 +609,10 @@ def acs1_variables_by_table_for_vintage(vintage: int) -> dict[str, list[str]]:
 def acs1_variable_names_for_vintage(vintage: int | str | None = None) -> dict[str, str]:
     """Return ACS1 API variable renames with vintage-specific semantics."""
     variable_names = dict(ACS1_VARIABLE_NAMES)
+    if vintage is not None:
+        unavailable = UNAVAILABLE_ACS1_API_VARS_BY_YEAR.get(int(vintage), set())
+        for variable_code in unavailable:
+            variable_names.pop(variable_code, None)
     if vintage is not None and 2012 <= int(vintage) <= 2014:
         variable_names.update(EARLY_ACS1_VARIABLE_OVERRIDES)
     return variable_names

@@ -1193,3 +1193,41 @@ def test_aggregate_pit_to_msa_missing_block_population_crosswalk_is_actionable(t
     assert result.exit_code == 1
     assert "--allocation-basis block_population --boundary 2020" in result.output
     assert "--blocks 2020 --decennial 2020" in result.output
+
+
+def test_aggregate_pit_json_summary_for_coc_output(tmp_path):
+    """PIT aggregate should support machine-readable JSON output."""
+    import os
+
+    import pandas as pd
+
+    pit_dir = tmp_path / "data" / "curated" / "pit"
+    pit_dir.mkdir(parents=True)
+    pd.DataFrame(
+        {
+            "coc_id": ["CO-100", "CO-101"],
+            "pit_year": [2020, 2020],
+            "pit_total": [100.0, 200.0],
+        }
+    ).to_parquet(pit_dir / "pit__P2020.parquet", index=False)
+
+    old_cwd = os.getcwd()
+    try:
+        os.chdir(tmp_path)
+        result = runner.invoke(
+            app,
+            ["aggregate", "pit", "--years", "2020", "--geo-type", "coc", "--json"],
+            catch_exceptions=False,
+        )
+    finally:
+        os.chdir(old_cwd)
+
+    assert result.exit_code == 0, result.output
+    payload = json.loads(result.output.strip().splitlines()[-1])
+    assert payload["status"] == "ok"
+    assert payload["geo_type"] == "coc"
+    assert payload["years_requested"] == [2020]
+    assert payload["years_materialized"] == [2020]
+    assert payload["source_coc_count"] == 2
+    assert payload["source_record_count"] == 2
+    assert payload["file_count"] == 1

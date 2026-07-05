@@ -483,6 +483,9 @@ def _download_and_extract_zip(
     shp_files = list(output_dir.glob("*.shp"))
     if shp_files:
         return shp_files[0]
+    nested_shp_files = list(output_dir.rglob("*.shp"))
+    if nested_shp_files:
+        return output_dir
     return output_dir
 
 
@@ -519,7 +522,7 @@ def _download_per_state_shapefiles(
             failed.append(state)
             continue
         try:
-            gdf = gpd.read_file(result)
+            gdf = read_coc_boundaries(result)
             gdfs.append(gdf)
         except Exception:
             logger.warning("Failed to read shapefile for state %s", state)
@@ -684,7 +687,7 @@ def read_coc_boundaries(path: Path | str) -> gpd.GeoDataFrame:
 
     path = Path(path)
 
-    if path.suffix == ".gdb" or path.is_dir():
+    if path.suffix == ".gdb":
         # For geodatabases, we need to find the layer
         import fiona
 
@@ -701,6 +704,27 @@ def read_coc_boundaries(path: Path | str) -> gpd.GeoDataFrame:
         if coc_layer:
             return gpd.read_file(path, layer=coc_layer)
         raise ValueError(f"No suitable layer found in geodatabase: {path}")
+
+    if path.is_dir():
+        gdb_dirs = sorted(path.glob("*.gdb"))
+        if gdb_dirs:
+            return read_coc_boundaries(gdb_dirs[0])
+
+        shp_files = sorted(path.rglob("*.shp"))
+        if not shp_files:
+            raise ValueError(f"No .gdb or .shp found in {path}")
+        boundary_shp_files = [
+            shp_path
+            for shp_path in shp_files
+            if not any("_CDBG" in part.upper() for part in shp_path.parts)
+        ]
+        if boundary_shp_files:
+            shp_files = boundary_shp_files
+
+        frames = [gpd.read_file(shp_path) for shp_path in shp_files]
+        crs = next((frame.crs for frame in frames if frame.crs is not None), None)
+        merged = gpd.pd.concat(frames, ignore_index=True)
+        return gpd.GeoDataFrame(merged, geometry="geometry", crs=crs)
 
     # Regular shapefile
     return gpd.read_file(path)
@@ -852,9 +876,9 @@ def ingest_hud_exchange(
         else:
             raw_dir = Path(raw_dir)
 
-        if url is None:
-            url = HUD_EXCHANGE_GDB_URL_TEMPLATE.format(vintage=boundary_vintage)
-        source_url = url
+        source_url = url or HUD_EXCHANGE_NATIONAL_BOUNDARY_TEMPLATE.format(
+            vintage=boundary_vintage,
+        )
 
         if not skip_download:
             data_path = download_hud_exchange_gdb(
@@ -881,7 +905,7 @@ def ingest_hud_exchange(
                 raise ValueError(f"No .gdb or .shp found in {raw_dir}")
 
         gdf = read_coc_boundaries(data_path)
-        gdf = map_to_canonical_schema(gdf, boundary_vintage, url)
+        gdf = map_to_canonical_schema(gdf, boundary_vintage, source_url)
 
         if content_sha256 is None or content_size is None:
             content_sha256, content_size = _hash_local_path(Path(data_path))

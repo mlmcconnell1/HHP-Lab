@@ -765,6 +765,10 @@ def aggregate_pit(
             help="Decennial population vintage for --allocation-basis block_population.",
         ),
     ] = 2020,
+    output_json: Annotated[
+        bool,
+        typer.Option("--json", help="Emit structured JSON."),
+    ] = False,
 ) -> None:
     """Aggregate PIT counts into curated CoC or MSA artifacts.
 
@@ -775,23 +779,32 @@ def aggregate_pit(
     _validate_align(align, PIT_ALIGN_MODES, "pit")
     parsed_years = _resolve_years(years)
     if geo_type not in {"coc", "msa"}:
-        typer.echo(
-            "Error: --geo-type must be one of: coc, msa",
-            err=True,
-        )
+        message = "--geo-type must be one of: coc, msa"
+        if output_json:
+            import json
+
+            typer.echo(json.dumps({"status": "error", "message": message}))
+        else:
+            typer.echo(f"Error: {message}", err=True)
         raise typer.Exit(2)
     try:
         boundary_map = _resolve_boundary_vintage_map(parsed_years, boundary_vintages)
     except ValueError as exc:
-        typer.echo(f"Error: {exc}", err=True)
+        if output_json:
+            import json
+
+            typer.echo(json.dumps({"status": "error", "message": str(exc)}))
+        else:
+            typer.echo(f"Error: {exc}", err=True)
         raise typer.Exit(2) from exc
 
     output_dir = curated_root() / "pit"
     output_dir.mkdir(parents=True, exist_ok=True)
 
     target_label = "CoC" if geo_type == "coc" else "MSA"
-    typer.echo(f"Aggregating PIT to {target_label} (curated output, align '{align}')...")
-    typer.echo(f"  Years: {parsed_years}")
+    if not output_json:
+        typer.echo(f"Aggregating PIT to {target_label} (curated output, align '{align}')...")
+        typer.echo(f"  Years: {parsed_years}")
 
     from hhplab.msa import read_coc_msa_crosswalk
     from hhplab.naming import (
@@ -838,7 +851,8 @@ def aggregate_pit(
             if not available:
                 continue
 
-            typer.echo(f"  Using vintage P{vintage} for years: {sorted(available)}")
+            if not output_json:
+                typer.echo(f"  Using vintage P{vintage} for years: {sorted(available)}")
 
             for year in sorted(available):
                 ydf = vdf[vdf["pit_year"] == year].copy()
@@ -850,13 +864,29 @@ def aggregate_pit(
         missing = sorted(still_missing)
 
     if missing:
-        typer.echo(
-            f"Warning: PIT data missing for years: {missing}",
-            err=True,
-        )
+        if not output_json:
+            typer.echo(
+                f"Warning: PIT data missing for years: {missing}",
+                err=True,
+            )
 
     if not collected:
-        typer.echo("Error: No PIT data found for any requested year.", err=True)
+        message = "No PIT data found for any requested year."
+        if output_json:
+            import json
+
+            typer.echo(
+                json.dumps(
+                    {
+                        "status": "error",
+                        "message": message,
+                        "years_requested": parsed_years,
+                        "missing_years": missing,
+                    }
+                )
+            )
+        else:
+            typer.echo(f"Error: {message}", err=True)
         raise typer.Exit(1)
 
     # --- Write one file per boundary year ---
@@ -881,7 +911,12 @@ def aggregate_pit(
                     decennial_vintage=str(decennial),
                 )
             except FileNotFoundError as exc:
-                typer.echo(f"Error: {exc}", err=True)
+                if output_json:
+                    import json
+
+                    typer.echo(json.dumps({"status": "error", "message": str(exc)}))
+                else:
+                    typer.echo(f"Error: {exc}", err=True)
                 raise typer.Exit(1) from exc
 
             try:
@@ -893,7 +928,12 @@ def aggregate_pit(
                     county_vintage=county_vintage,
                 )
             except ValueError as exc:
-                typer.echo(f"Error: {exc}", err=True)
+                if output_json:
+                    import json
+
+                    typer.echo(json.dumps({"status": "error", "message": str(exc)}))
+                else:
+                    typer.echo(f"Error: {exc}", err=True)
                 raise typer.Exit(1) from exc
 
             out_name = msa_pit_filename(
@@ -918,6 +958,30 @@ def aggregate_pit(
     total_records = sum(len(df) for df in collected.values())
     sample_df = next(iter(collected.values()))
     source_coc_count = sample_df["coc_id"].nunique() if "coc_id" in sample_df.columns else "n/a"
+    payload = {
+        "status": "ok",
+        "alignment": align,
+        "geo_type": geo_type,
+        "target_label": target_label,
+        "years_requested": parsed_years,
+        "years_materialized": materialized,
+        "missing_years": missing,
+        "output_dir": str(output_dir),
+        "outputs": all_outputs,
+        "file_count": len(materialized),
+        "source_coc_count": int(source_coc_count) if source_coc_count != "n/a" else source_coc_count,
+        "source_record_count": int(total_records),
+        "boundary_vintages": {str(year): boundary_map[year] for year in materialized},
+        "allocation_basis": allocation_basis if geo_type == "msa" else None,
+        "definition_version": definition_version if geo_type == "msa" else None,
+        "county_vintage": str(counties) if geo_type == "msa" and counties is not None else None,
+    }
+    if output_json:
+        import json
+
+        typer.echo(json.dumps(payload))
+        return
+
     typer.echo(f"Wrote PIT aggregate: {len(materialized)} files to {output_dir}")
     if geo_type == "coc":
         typer.echo(f"  CoCs: {source_coc_count}, Records: {total_records:,}")
@@ -1710,7 +1774,10 @@ def aggregate_zori(
             from hhplab.pep.pep_aggregate import load_pep_county
             from hhplab.provenance import ProvenanceBlock, write_parquet_with_provenance
             from hhplab.rents.zori_aggregate import load_zori
-            from hhplab.rents.zori_metro import aggregate_yearly_zori_to_msa
+            from hhplab.rents.zori_metro import (
+                aggregate_yearly_zori_to_msa,
+                to_msa_zori_yearly_artifact,
+            )
 
             membership_path = msa_county_membership_path(msa_definition_version)
             if not membership_path.exists():
@@ -1743,6 +1810,7 @@ def aggregate_zori(
                 min_coverage=min_coverage_ratio,
                 balanced_composition=balanced_composition,
             )
+            msa_zori_artifact = to_msa_zori_yearly_artifact(msa_zori)
             output_dir.mkdir(parents=True, exist_ok=True)
             out_path = output_dir / msa_zori_yearly_filename(
                 parsed_years[0],
@@ -1771,7 +1839,7 @@ def aggregate_zori(
                     "min_coverage_ratio": min_coverage_ratio,
                 },
             )
-            write_parquet_with_provenance(msa_zori, out_path, provenance)
+            write_parquet_with_provenance(msa_zori_artifact, out_path, provenance)
         except Exception as exc:
             if output_json:
                 import json
@@ -1784,6 +1852,18 @@ def aggregate_zori(
         if output_json:
             import json
 
+            non_null_zori_by_year = {
+                str(year): int(count)
+                for year, count in (
+                    msa_zori.assign(_has_zori=msa_zori["zori_coc"].notna())
+                    .groupby("year")["_has_zori"]
+                    .sum()
+                    .items()
+                )
+            }
+            non_null_zori_by_year = {
+                str(year): non_null_zori_by_year.get(str(year), 0) for year in parsed_years
+            }
             typer.echo(
                 json.dumps(
                     {
@@ -1795,7 +1875,8 @@ def aggregate_zori(
                         "years_materialized": parsed_years,
                         "output_path": str(out_path),
                         "row_count": len(msa_zori),
-                        "geo_count": int(msa_zori["msa_id"].nunique()),
+                        "geo_count": int(msa_zori_artifact["msa_id"].nunique()),
+                        "non_null_zori_by_year": non_null_zori_by_year,
                         "min_coverage_ratio": min_coverage_ratio,
                         "balanced_composition": balanced_composition,
                     }

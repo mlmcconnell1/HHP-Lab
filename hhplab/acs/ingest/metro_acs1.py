@@ -102,7 +102,9 @@ def _load_metro_targets(
                 metro_definition_version=CANONICAL_UNIVERSE_DEFINITION_VERSION,
                 base_dir=base_dir,
             )
-            return subset_df.rename(
+            return subset_df[
+                ["profile_metro_id", "cbsa_code", "profile_metro_name"]
+            ].rename(
                 columns={
                     "profile_metro_id": "metro_id",
                     "profile_metro_name": "metro_name",
@@ -121,7 +123,9 @@ def _load_metro_targets(
             metro_definition_version=CANONICAL_UNIVERSE_DEFINITION_VERSION,
             base_dir=base_dir,
         )
-        return subset_df.rename(
+        return subset_df[
+            ["profile_metro_id", "cbsa_code", "profile_metro_name"]
+        ].rename(
             columns={
                 "profile_metro_id": "metro_id",
                 "profile_metro_name": "metro_name",

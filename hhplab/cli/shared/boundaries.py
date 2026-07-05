@@ -53,11 +53,19 @@ def ingest_boundaries(
             help="Force re-ingest even if vintage already exists",
         ),
     ] = False,
+    json_output: Annotated[
+        bool,
+        typer.Option("--json", help="Output machine-readable JSON."),
+    ] = False,
 ) -> None:
     """Ingest CoC boundary data from HUD sources."""
     if source == "hud_exchange":
         if vintage is None:
-            typer.echo("Error: --vintage is required for hud_exchange source", err=True)
+            message = "--vintage is required for hud_exchange source"
+            if json_output:
+                typer.echo(json.dumps({"status": "error", "message": message}))
+            else:
+                typer.echo(f"Error: {message}", err=True)
             raise typer.Exit(1)
 
         from hhplab.geo.geo_io import curated_boundary_path
@@ -70,46 +78,97 @@ def ingest_boundaries(
         in_registry = vintage in registered_vintages
 
         if file_exists and in_registry and not force:
-            typer.echo(f"Vintage {vintage} already exists at: {output_path}")
-            typer.echo("Use --force to re-ingest.")
+            if json_output:
+                typer.echo(
+                    json.dumps(
+                        {
+                            "status": "ok",
+                            "skipped": True,
+                            "reason": "already_exists",
+                            "source": source,
+                            "vintage": vintage,
+                            "output_path": str(output_path),
+                        }
+                    )
+                )
+            else:
+                typer.echo(f"Vintage {vintage} already exists at: {output_path}")
+                typer.echo("Use --force to re-ingest.")
             raise typer.Exit(0)
         if file_exists and not in_registry and not force:
-            typer.echo(
-                f"Warning: File exists at {output_path} but not in registry.",
-                err=True,
-            )
-            typer.echo("Re-ingesting to ensure proper registration...")
+            if not json_output:
+                typer.echo(
+                    f"Warning: File exists at {output_path} but not in registry.",
+                    err=True,
+                )
+                typer.echo("Re-ingesting to ensure proper registration...")
         if not file_exists and in_registry:
-            typer.echo(
-                f"Warning: Vintage {vintage} is in registry but file is missing.",
-                err=True,
-            )
-            typer.echo("Re-ingesting...")
+            if not json_output:
+                typer.echo(
+                    f"Warning: Vintage {vintage} is in registry but file is missing.",
+                    err=True,
+                )
+                typer.echo("Re-ingesting...")
 
-        typer.echo(f"Ingesting HUD Exchange CoC boundaries for vintage {vintage}...")
+        if not json_output:
+            typer.echo(f"Ingesting HUD Exchange CoC boundaries for vintage {vintage}...")
         try:
-            output_path = ingest_hud_exchange(vintage, show_progress=True)
-            typer.echo(f"Successfully ingested to: {output_path}")
+            output_path = ingest_hud_exchange(vintage, show_progress=not json_output)
+            if json_output:
+                typer.echo(
+                    json.dumps(
+                        {
+                            "status": "ok",
+                            "source": source,
+                            "vintage": vintage,
+                            "output_path": str(output_path),
+                            "skipped": False,
+                        }
+                    )
+                )
+            else:
+                typer.echo(f"Successfully ingested to: {output_path}")
         except Exception as e:
-            typer.echo(f"Error: {e}", err=True)
+            if json_output:
+                typer.echo(json.dumps({"status": "error", "message": str(e)}))
+            else:
+                typer.echo(f"Error: {e}", err=True)
             raise typer.Exit(1) from e
 
     elif source == "hud_opendata":
         from hhplab.hud import ingest_hud_opendata
 
-        typer.echo(f"Ingesting HUD Open Data CoC boundaries (snapshot: {snapshot})...")
+        if not json_output:
+            typer.echo(f"Ingesting HUD Open Data CoC boundaries (snapshot: {snapshot})...")
         try:
             output_path = ingest_hud_opendata(snapshot_tag=snapshot)
-            typer.echo(f"Successfully ingested to: {output_path}")
+            if json_output:
+                typer.echo(
+                    json.dumps(
+                        {
+                            "status": "ok",
+                            "source": source,
+                            "snapshot": snapshot,
+                            "output_path": str(output_path),
+                            "skipped": False,
+                        }
+                    )
+                )
+            else:
+                typer.echo(f"Successfully ingested to: {output_path}")
         except Exception as e:
-            typer.echo(f"Error: {e}", err=True)
+            if json_output:
+                typer.echo(json.dumps({"status": "error", "message": str(e)}))
+            else:
+                typer.echo(f"Error: {e}", err=True)
             raise typer.Exit(1) from e
 
     else:
-        typer.echo(
-            f"Error: Unknown source '{source}'. Use 'hud_exchange' or 'hud_opendata'.",
-            err=True,
-        )
+        message = f"Unknown source '{source}'. Use 'hud_exchange' or 'hud_opendata'."
+        if json_output:
+            typer.echo(json.dumps({"status": "error", "message": message}))
+        else:
+            typer.echo(f"Error: {message}", err=True)
         raise typer.Exit(1)
 
 

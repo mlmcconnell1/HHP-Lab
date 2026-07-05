@@ -273,6 +273,27 @@ class TestReadCocBoundaries:
             assert len(gdf) == 2
             assert "COCNUM" in gdf.columns
 
+    def test_reads_nested_shapefile_collection(self, tmp_path):
+        """Extracted HUD per-state ZIPs can contain one nested shapefile per CoC."""
+        _create_test_shapefile(tmp_path / "Maryland" / "MD_508")
+        _create_test_shapefile(tmp_path / "Maryland" / "MD_512")
+
+        gdf = read_coc_boundaries(tmp_path)
+
+        assert len(gdf) == 4
+        assert "COCNUM" in gdf.columns
+
+    def test_nested_collection_ignores_cdbg_companion_shapefiles(self, tmp_path):
+        """HUD per-state ZIPs can include non-boundary CDBG companions."""
+        _create_test_shapefile(tmp_path / "California" / "CA_520")
+        cdbg_path = _create_test_shapefile(tmp_path / "California" / "CA_520_CDBG")
+        for component in cdbg_path.parent.glob("test_coc.*"):
+            component.rename(component.with_name(f"CA_520_CDBG{component.suffix}"))
+
+        gdf = read_coc_boundaries(tmp_path)
+
+        assert len(gdf) == 2
+
 
 class TestIngestHudExchange:
     """Integration tests for the full ingestion pipeline."""
@@ -428,8 +449,8 @@ class TestIngestHudExchange:
 
         assert result.exists()
         assert observed["boundary_vintage"] == "2019"
-        assert "2019" in str(observed["url"])
-        assert observed["source_url"] == observed["url"]
+        assert observed["url"] is None
+        assert "National_Boundary_2019" in str(observed["source_url"])
 
 
 class TestPerStateFallbackCompleteness:

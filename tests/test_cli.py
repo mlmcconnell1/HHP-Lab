@@ -48,6 +48,34 @@ class TestNestedIngestCommand:
         assert "Successfully ingested" in result.output
         mock_ingest.assert_called_once_with("2025", show_progress=True)
 
+    @patch("hhplab.hud.ingest_hud_exchange")
+    def test_ingest_boundaries_nested_hud_exchange_json(self, mock_ingest):
+        """JSON mode should emit only a machine-readable payload."""
+        output_path = Path("data/curated/coc_boundaries/coc__B2025.parquet")
+        mock_ingest.return_value = output_path
+
+        result = runner.invoke(
+            app,
+            [
+                "ingest",
+                "boundaries",
+                "--source",
+                "hud_exchange",
+                "--vintage",
+                "2025",
+                "--force",
+                "--json",
+            ],
+        )
+
+        assert result.exit_code == 0
+        payload = json.loads(result.output)
+        assert payload["status"] == "ok"
+        assert payload["source"] == "hud_exchange"
+        assert payload["vintage"] == "2025"
+        assert payload["output_path"] == str(output_path)
+        mock_ingest.assert_called_once_with("2025", show_progress=False)
+
     def test_ingest_medsl_presidential_help(self):
         result = runner.invoke(app, ["ingest", "medsl-presidential", "--help"])
 

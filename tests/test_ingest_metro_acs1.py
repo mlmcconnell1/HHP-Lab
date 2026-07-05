@@ -14,6 +14,7 @@ from typer.testing import CliRunner
 
 from hhplab.acs.ingest.metro_acs1 import (
     CBSA_GEO_PARAM,
+    _load_metro_targets,
     fetch_acs1_cbsa_data,
     ingest_metro_acs1,
 )
@@ -276,6 +277,27 @@ class TestCbsaToMetroMapping:
             inspect.signature(ingest_acs1_metro_cli).parameters["definition_version"].default
             == CANONICAL_UNIVERSE_DEFINITION_VERSION
         )
+
+    def test_subset_profile_targets_do_not_duplicate_labels(self, monkeypatch):
+        subset = pd.DataFrame(
+            {
+                "profile_metro_id": ["GF01"],
+                "metro_id": ["35620"],
+                "cbsa_code": ["35620"],
+                "profile_metro_name": ["New York"],
+                "metro_name": ["New York-Newark-Jersey City, NY-NJ-PA"],
+            }
+        )
+        monkeypatch.setattr(
+            "hhplab.acs.ingest.metro_acs1.read_metro_subset_membership",
+            lambda **kwargs: subset,
+        )
+
+        targets = _load_metro_targets("glynn_fox_v1", base_dir=None)
+
+        assert targets.columns.tolist() == ["metro_id", "cbsa_code", "metro_name"]
+        assert targets.columns.is_unique
+        assert targets.loc[0, "metro_id"] == "GF01"
 
     def test_cli_help_reports_registry_tables_and_measures(self):
         result = CliRunner().invoke(app, ["ingest", "acs1-metro", "--help"])

@@ -18,6 +18,7 @@ from hhplab.schema.columns import (
     MSA_COC_COVERAGE_COLUMNS,
     MSA_COC_PANEL_COLUMNS,
     MSA_FRACTIONAL_ROLLUP_COLUMNS,
+    MSA_ZORI_YEARLY_COLUMNS,
     PEP_COUNTY_OUTPUT_COLUMNS,
     PIT_CANONICAL_COLUMNS,
     PL_BLOCK_POPULATION_COLUMNS,
@@ -152,6 +153,13 @@ ZORI_INGEST_CONTRACT = ArtifactContract(
     required_columns=tuple(ZORI_INGEST_OUTPUT_COLUMNS),
 )
 
+MSA_ZORI_YEARLY_CONTRACT = ArtifactContract(
+    name="msa_zori_yearly",
+    required_columns=tuple(MSA_ZORI_YEARLY_COLUMNS),
+    canonical_measures=("zori",),
+    drift_prone_columns=(),
+)
+
 LAUS_METRO_CONTRACT = ArtifactContract(
     name="laus_metro",
     required_columns=tuple(LAUS_METRO_OUTPUT_COLUMNS),
@@ -193,6 +201,7 @@ ARTIFACT_CONTRACTS: dict[str, ArtifactContract] = {
         MSA_COC_COVERAGE_CONTRACT,
         MSA_COC_PANEL_CONTRACT,
         MSA_FRACTIONAL_ROLLUP_CONTRACT,
+        MSA_ZORI_YEARLY_CONTRACT,
         PEP_COUNTY_CONTRACT,
         PIT_CONTRACT,
         BLOCK_GEOMETRY_CONTRACT,

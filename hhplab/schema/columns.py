@@ -1047,6 +1047,24 @@ ZORI_COLUMNS: list[str] = [
     "rent_to_income",
 ]
 
+MSA_ZORI_YEARLY_COLUMNS: tuple[str, ...] = (
+    "geo_type",
+    "geo_id",
+    "msa_id",
+    "year",
+    "zori",
+    "coverage_ratio",
+    "covered_population",
+    "total_population",
+    "population_weight_denominator",
+    "county_count",
+    "membership_county_count",
+    "missing_counties",
+    "max_geo_contribution",
+    "definition_version",
+    "balanced_composition",
+)
+
 ZORI_PROVENANCE_COLUMNS: list[str] = [
     "rent_metric",
     "rent_alignment",

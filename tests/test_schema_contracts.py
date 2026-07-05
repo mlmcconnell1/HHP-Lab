@@ -577,11 +577,14 @@ def test_contract_rent_acs1_early_vintage_uses_top_bin_override() -> None:
     assert "B25056_026E" not in early_variables["B25056"]
     assert "B25056_027E" not in early_variables["B25056"]
     assert "B25063_025E" not in early_variables["B25063"]
+    assert "B25056_027E" not in early_names
+    assert "B25063_027E" not in early_names
     assert "B25056_025E" in modern_variables["B25056"]
     assert "B25063_025E" in modern_variables["B25063"]
 
     assert early_names["B25056_023E"] == "contract_rent_distribution_cash_rent_2000_plus"
     assert early_names["B25063_023E"] == "gross_rent_distribution_cash_rent_2000_plus"
+    assert len(early_names.values()) == len(set(early_names.values()))
     assert modern_names["B25056_023E"] == "contract_rent_distribution_cash_rent_2000_to_2499"
     assert modern_names["B25063_023E"] == "gross_rent_distribution_cash_rent_2000_to_2499"
 
@@ -729,6 +732,14 @@ def test_acs1_imputation_count_spec_has_single_output_without_rate_fields() -> N
     assert spec.numerator_source_columns == ()
     assert spec.denominator_source_column is None
     assert spec.zero_denominator_policy == "zero_count"
+
+
+def test_msa_zori_yearly_contract_uses_native_measure_name() -> None:
+    contract = schema_columns.MSA_ZORI_YEARLY_COLUMNS
+
+    assert "zori" in contract
+    assert "zori_coc" not in contract
+    assert "msa_zori_yearly" in ARTIFACT_CONTRACTS
 
 
 PANEL_MEASURE_DICTIONARY_COVERAGE_GROUPS = {

@@ -17,7 +17,9 @@ from hhplab.rents import (
     aggregate_yearly_zori_to_msa,
     aggregate_zori_to_metro,
     collapse_zori_to_yearly,
+    to_msa_zori_yearly_artifact,
 )
+from hhplab.schema import MSA_ZORI_YEARLY_COLUMNS
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -701,3 +703,48 @@ class TestYearlyMsaPopulationWeighted:
         assert result["zori_coc"].isna().all()
         assert result["coverage_ratio"].tolist() == pytest.approx([0.25, 0.25])
         assert result["population_weight_denominator"].tolist() == pytest.approx([100.0, 100.0])
+
+    def test_requested_year_missing_population_raises_actionable_error(
+        self, msa_membership, msa_population
+    ):
+        zori = pd.DataFrame(
+            {
+                "county_fips": ["99001", "99001", "99002"],
+                "year": [2020, 2021, 2025],
+                "zori": [1000.0, 1100.0, 5000.0],
+            }
+        )
+
+        with pytest.raises(ValueError, match="missing for requested year\\(s\\): 2025"):
+            aggregate_yearly_zori_to_msa(
+                zori,
+                msa_population,
+                county_membership_df=msa_membership,
+                years=[2020, 2021, 2025],
+                balanced_composition=True,
+            )
+
+    def test_msa_zori_artifact_uses_native_zori_column(
+        self, msa_membership, msa_population
+    ):
+        zori = pd.DataFrame(
+            {
+                "county_fips": ["99001", "99001"],
+                "year": [2020, 2021],
+                "zori": [1000.0, 1100.0],
+            }
+        )
+        result = aggregate_yearly_zori_to_msa(
+            zori,
+            msa_population,
+            county_membership_df=msa_membership,
+            years=[2020, 2021],
+            balanced_composition=True,
+        )
+
+        artifact = to_msa_zori_yearly_artifact(result)
+
+        assert list(artifact.columns) == list(MSA_ZORI_YEARLY_COLUMNS)
+        assert "zori" in artifact.columns
+        assert "zori_coc" not in artifact.columns
+        assert artifact["zori"].tolist() == pytest.approx([1000.0, 1100.0])

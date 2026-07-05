@@ -286,6 +286,19 @@ def aggregate_yearly_zori_to_msa(
         requested_years = sorted(set(zori["year"].unique()) & set(population["year"].unique()))
     if not requested_years:
         raise ValueError("No overlapping ZORI/population years are available for MSA rollup.")
+    population_years = set(population["year"].unique())
+    missing_population_years = [
+        year for year in requested_years if year not in population_years
+    ]
+    if missing_population_years:
+        missing = ", ".join(str(year) for year in missing_population_years)
+        available = ", ".join(str(year) for year in sorted(population_years)) or "none"
+        raise ValueError(
+            "County population weights are missing for requested year(s): "
+            f"{missing}. Available population years: {available}. "
+            "Refresh PEP county population data or request only covered years before "
+            "running MSA ZORI aggregation."
+        )
     zori = zori[zori["year"].isin(requested_years)]
     population = population[population["year"].isin(requested_years)]
 
@@ -385,3 +398,24 @@ def aggregate_yearly_zori_to_msa(
             )
 
     return pd.DataFrame(rows).sort_values(["msa_id", "year"]).reset_index(drop=True)
+
+
+def to_msa_zori_yearly_artifact(msa_zori: pd.DataFrame) -> pd.DataFrame:
+    """Convert internal MSA ZORI rollup output to the curated artifact schema."""
+    from hhplab.schema import (
+        MSA_ZORI_YEARLY_COLUMNS,
+        MSA_ZORI_YEARLY_CONTRACT,
+        validate_artifact_contract,
+    )
+
+    if "zori_coc" not in msa_zori.columns:
+        raise ValueError("MSA ZORI rollup is missing internal column 'zori_coc'.")
+
+    artifact = msa_zori.rename(columns={"zori_coc": "zori"}).copy()
+    findings = validate_artifact_contract(artifact, MSA_ZORI_YEARLY_CONTRACT)
+    errors = [finding for finding in findings if finding.severity == "error"]
+    if errors:
+        details = "; ".join(finding.message for finding in errors)
+        raise ValueError(f"MSA ZORI yearly artifact schema validation failed: {details}")
+
+    return artifact.loc[:, list(MSA_ZORI_YEARLY_COLUMNS)]
