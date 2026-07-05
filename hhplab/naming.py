@@ -696,6 +696,30 @@ def zori_yearly_filename(
     )
 
 
+def msa_zori_yearly_filename(
+    start_year: str | int,
+    end_year: str | int,
+    definition_version: str,
+    county_vintage: str | int,
+    weighting: str,
+    yearly_method: str,
+    *,
+    balanced_composition: bool = True,
+) -> str:
+    """Generate filename for MSA-scoped yearly ZORI panels.
+
+    Pattern:
+    ``zori__msa__Y{start}-{end}@M{def}xC{county}__w{weight}__m{method}__balanced.parquet``
+    """
+    defn = _normalize_definition_version(definition_version)
+    weight_abbrev = _abbreviate_weighting(weighting)
+    balance_token = "__balanced" if balanced_composition else ""
+    return (
+        f"zori__msa__Y{start_year}-{end_year}@M{defn}xC{county_vintage}"
+        f"__w{weight_abbrev}__m{yearly_method}{balance_token}.parquet"
+    )
+
+
 # =============================================================================
 # ACS tract population files
 # =============================================================================

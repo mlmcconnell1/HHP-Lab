@@ -1552,6 +1552,53 @@ def aggregate_zori(
             help="Weighting: renter_households (default), housing_units, population, equal.",
         ),
     ] = "renter_households",
+    target_geo: Annotated[
+        str,
+        typer.Option("--target-geo", help="Target geography: coc or msa."),
+    ] = "coc",
+    msa_definition_version: Annotated[
+        str,
+        typer.Option(
+            "--msa-definition-version",
+            help="MSA definition version for --target-geo msa.",
+        ),
+    ] = "census_msa_2023",
+    county_population_path: Annotated[
+        Path | None,
+        typer.Option(
+            "--county-population-path",
+            help="PEP county population parquet used as weights for --target-geo msa.",
+        ),
+    ] = None,
+    zori_path: Annotated[
+        Path | None,
+        typer.Option("--zori-path", help="County ZORI parquet path. Defaults to curated ZORI."),
+    ] = None,
+    county_vintage: Annotated[
+        str,
+        typer.Option("--counties", help="County vintage token for MSA output naming."),
+    ] = "2023",
+    min_coverage_ratio: Annotated[
+        float | None,
+        typer.Option(
+            "--min-coverage-ratio",
+            help="Optional minimum MSA covered-population share; below-threshold ZORI is null.",
+        ),
+    ] = None,
+    balanced_composition: Annotated[
+        bool,
+        typer.Option(
+            "--balanced-composition/--expanding-composition",
+            help=(
+                "For MSA panels, fix county composition to counties present in "
+                "all requested years."
+            ),
+        ),
+    ] = True,
+    output_json: Annotated[
+        bool,
+        typer.Option("--json", help="Emit structured JSON."),
+    ] = False,
 ) -> None:
     """Aggregate ZORI rent indices into CoC artifacts.
 
@@ -1562,6 +1609,15 @@ def aggregate_zori(
     """
     _validate_align(align, ZORI_ALIGN_MODES, "zori")
     parsed_years = _resolve_years(years)
+    if target_geo not in {"coc", "msa"}:
+        message = f"Invalid --target-geo '{target_geo}'. Use one of: coc, msa."
+        if output_json:
+            import json
+
+            typer.echo(json.dumps({"status": "error", "message": message}))
+        else:
+            typer.echo(f"Error: {message}", err=True)
+        raise typer.Exit(2)
 
     # Map alignment mode to pipeline parameters
     to_yearly = align != "monthly_native"
@@ -1572,6 +1628,120 @@ def aggregate_zori(
     yearly_method = yearly_method_map.get(align, "pit_january")
 
     output_dir = curated_root() / "zori"
+    if target_geo == "msa":
+        if align == "monthly_native":
+            message = (
+                "MSA ZORI aggregation produces yearly panel rows. Use "
+                "--align pit_january or --align calendar_year_average."
+            )
+            if output_json:
+                import json
+
+                typer.echo(json.dumps({"status": "error", "message": message}))
+            else:
+                typer.echo(f"Error: {message}", err=True)
+            raise typer.Exit(2)
+
+        try:
+            from hhplab.naming import msa_county_membership_path, msa_zori_yearly_filename
+            from hhplab.pep.pep_aggregate import load_pep_county
+            from hhplab.provenance import ProvenanceBlock, write_parquet_with_provenance
+            from hhplab.rents.zori_aggregate import load_zori
+            from hhplab.rents.zori_metro import aggregate_yearly_zori_to_msa
+
+            membership_path = msa_county_membership_path(msa_definition_version)
+            if not membership_path.exists():
+                raise FileNotFoundError(
+                    "MSA county membership artifact not found: "
+                    f"{membership_path}. Run: hhplab generate msa --definition-version "
+                    f"{msa_definition_version}"
+                )
+            zori_df = load_zori("county", zori_path=zori_path, output_dir=output_dir)
+            zori_df = zori_df.copy()
+            zori_df["date"] = pd.to_datetime(zori_df["date"])
+            zori_df["year"] = zori_df["date"].dt.year
+            zori_df = zori_df[zori_df["year"].isin(parsed_years)]
+            if yearly_method == "pit_january":
+                zori_yearly = zori_df[zori_df["date"].dt.month == 1][
+                    ["geo_id", "year", "zori"]
+                ].rename(columns={"geo_id": "county_fips"})
+            else:
+                zori_yearly = (
+                    zori_df.groupby(["geo_id", "year"], as_index=False)["zori"]
+                    .mean()
+                    .rename(columns={"geo_id": "county_fips"})
+                )
+            county_population = load_pep_county(county_population_path)
+            msa_zori = aggregate_yearly_zori_to_msa(
+                zori_yearly,
+                county_population,
+                msa_definition_version=msa_definition_version,
+                years=parsed_years,
+                min_coverage=min_coverage_ratio,
+                balanced_composition=balanced_composition,
+            )
+            output_dir.mkdir(parents=True, exist_ok=True)
+            out_path = output_dir / msa_zori_yearly_filename(
+                parsed_years[0],
+                parsed_years[-1],
+                msa_definition_version,
+                county_vintage,
+                "population",
+                yearly_method,
+                balanced_composition=balanced_composition,
+            )
+            provenance = ProvenanceBlock(
+                geo_type="msa",
+                definition_version=msa_definition_version,
+                weighting="population",
+                extra={
+                    "dataset": "msa_zori_yearly",
+                    "target_geo": "msa",
+                    "alignment": align,
+                    "yearly_method": yearly_method,
+                    "balanced_composition": balanced_composition,
+                    "msa_membership_path": str(membership_path),
+                    "county_population_path": (
+                        str(county_population_path) if county_population_path else None
+                    ),
+                    "zori_path": str(zori_path) if zori_path else None,
+                    "min_coverage_ratio": min_coverage_ratio,
+                },
+            )
+            write_parquet_with_provenance(msa_zori, out_path, provenance)
+        except Exception as exc:
+            if output_json:
+                import json
+
+                typer.echo(json.dumps({"status": "error", "message": str(exc)}))
+            else:
+                typer.echo(f"Error: {exc}", err=True)
+            raise typer.Exit(1) from exc
+
+        if output_json:
+            import json
+
+            typer.echo(
+                json.dumps(
+                    {
+                        "status": "ok",
+                        "alignment": align,
+                        "target_geo": "msa",
+                        "definition_version": msa_definition_version,
+                        "years_requested": parsed_years,
+                        "years_materialized": parsed_years,
+                        "output_path": str(out_path),
+                        "row_count": len(msa_zori),
+                        "geo_count": int(msa_zori["msa_id"].nunique()),
+                        "min_coverage_ratio": min_coverage_ratio,
+                        "balanced_composition": balanced_composition,
+                    }
+                )
+            )
+        else:
+            typer.echo(f"MSA ZORI aggregation complete. Wrote: {out_path}")
+        return
+
     typer.echo(f"Aggregating ZORI to CoC (curated output, align '{align}')...")
 
     from hhplab.rents.zori_aggregate import aggregate_zori_to_coc

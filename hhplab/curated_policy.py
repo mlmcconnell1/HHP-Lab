@@ -108,6 +108,7 @@ CANONICAL_PATTERNS: dict[str, list[re.Pattern[str]]] = {
             r"(xT\d{4})?\.parquet$"
         ),
         re.compile(r"^measures__metro__A\d{4}@D\w+(xT\d{4})?\.parquet$"),
+        re.compile(r"^measures__msa__A\d{4}@M\w+(xT\d{4})?\.parquet$"),
         re.compile(r"^measures__metro__acs1__A\d{4}@D\w+\.parquet$"),
         re.compile(
             rf"^coc_urban_fraction__N\d{{4}}@{COC_BOUNDARY_TOKEN}"
@@ -123,6 +124,9 @@ CANONICAL_PATTERNS: dict[str, list[re.Pattern[str]]] = {
         re.compile(r"^zori_yearly__A\d{4}@B\d{4}xC\d{4}__w\w+__m\w+\.parquet$"),
         re.compile(r"^zori__\w+__Z\d{4}\.parquet$"),  # ingest files
         re.compile(r"^zori__metro__A\d{4}@D\w+xC\d{4}__w\w+\.parquet$"),
+        re.compile(
+            r"^zori__msa__Y\d{4}-\d{4}@M\w+xC\d{4}__w\w+__m\w+(__balanced)?\.parquet$"
+        ),
     ],
     "pep": [
         re.compile(r"^pep_county__v\d{4}\.parquet$"),

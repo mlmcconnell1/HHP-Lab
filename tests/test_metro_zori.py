@@ -14,6 +14,7 @@ from hhplab.metro.metro_definitions import (
 )
 from hhplab.rents import (
     aggregate_yearly_zori_to_metro,
+    aggregate_yearly_zori_to_msa,
     aggregate_zori_to_metro,
     collapse_zori_to_yearly,
 )
@@ -527,9 +528,7 @@ class TestYearlyPopulationWeighted:
         assert pd.isna(result.loc[0, "zori"])
 
     def test_partial_missing_population_yields_null_zori(self):
-        """Regression test for coclab-2bj8: when some (not all) county
-        populations are missing for a metro-year, result must be null to
-        avoid silently renormalizing weights over a subset of counties."""
+        """Regression test for coclab-2bj8: partial missing population nulls the result."""
         membership = pd.DataFrame(
             {
                 "metro_id": ["M1", "M1"],
@@ -543,7 +542,6 @@ class TestYearlyPopulationWeighted:
                 "zori": [1000.0, 2000.0],
             }
         )
-        # Only 99001 has population; 99002 is missing.
         pop = pd.DataFrame(
             {
                 "county_fips": ["99001"],
@@ -580,16 +578,13 @@ class TestYearlyPopulationWeighted:
         assert result["zori"].tolist() == pytest.approx([1500.0] * METRO_COUNT)
 
     def test_incomplete_county_zori_coverage_yields_null(self):
-        """Regression test for coclab-n1bp: when a member county has no ZORI
-        row at all, the metro-year result must be null — not renormalized
-        over the remaining counties."""
+        """Regression test for coclab-n1bp: missing member county ZORI nulls the result."""
         membership = pd.DataFrame(
             {
                 "metro_id": ["M1", "M1"],
                 "county_fips": ["99001", "99002"],
             }
         )
-        # Only county 99001 has ZORI data; 99002 is entirely absent.
         zori = pd.DataFrame(
             {
                 "county_fips": ["99001"],
@@ -611,3 +606,98 @@ class TestYearlyPopulationWeighted:
         )
         assert len(result) == 1
         assert pd.isna(result.loc[0, "zori"])
+
+
+class TestYearlyMsaPopulationWeighted:
+    """Tests for Census MSA ZORI aggregation with coverage diagnostics."""
+
+    @pytest.fixture
+    def msa_membership(self):
+        return pd.DataFrame(
+            {
+                "msa_id": ["11111", "11111"],
+                "county_fips": ["99001", "99002"],
+            }
+        )
+
+    @pytest.fixture
+    def msa_population(self):
+        return pd.DataFrame(
+            {
+                "county_fips": ["99001", "99002", "99001", "99002"],
+                "year": [2020, 2020, 2021, 2021],
+                "population": [100.0, 300.0, 100.0, 300.0],
+            }
+        )
+
+    def test_balanced_composition_uses_counties_present_in_all_years(
+        self, msa_membership, msa_population
+    ):
+        zori = pd.DataFrame(
+            {
+                "county_fips": ["99001", "99001", "99002"],
+                "year": [2020, 2021, 2021],
+                "zori": [1000.0, 1100.0, 5000.0],
+            }
+        )
+
+        result = aggregate_yearly_zori_to_msa(
+            zori,
+            msa_population,
+            county_membership_df=msa_membership,
+            years=[2020, 2021],
+            balanced_composition=True,
+        )
+
+        assert result["zori_coc"].tolist() == pytest.approx([1000.0, 1100.0])
+        assert result["coverage_ratio"].tolist() == pytest.approx([0.25, 0.25])
+        assert result["missing_counties"].tolist() == ["99002", "99002"]
+        assert result["balanced_composition"].tolist() == [True, True]
+
+    def test_expanding_composition_uses_each_year_available_counties(
+        self, msa_membership, msa_population
+    ):
+        zori = pd.DataFrame(
+            {
+                "county_fips": ["99001", "99001", "99002"],
+                "year": [2020, 2021, 2021],
+                "zori": [1000.0, 1100.0, 5000.0],
+            }
+        )
+
+        result = aggregate_yearly_zori_to_msa(
+            zori,
+            msa_population,
+            county_membership_df=msa_membership,
+            years=[2020, 2021],
+            balanced_composition=False,
+        )
+
+        expected_2021 = (1100.0 * 100.0 + 5000.0 * 300.0) / 400.0
+        assert result["zori_coc"].tolist() == pytest.approx([1000.0, expected_2021])
+        assert result["coverage_ratio"].tolist() == pytest.approx([0.25, 1.0])
+        assert result["missing_counties"].tolist() == ["99002", ""]
+        assert result["balanced_composition"].tolist() == [False, False]
+
+    def test_min_coverage_nulls_zori_but_keeps_diagnostics(
+        self, msa_membership, msa_population
+    ):
+        zori = pd.DataFrame(
+            {
+                "county_fips": ["99001", "99001"],
+                "year": [2020, 2021],
+                "zori": [1000.0, 1100.0],
+            }
+        )
+
+        result = aggregate_yearly_zori_to_msa(
+            zori,
+            msa_population,
+            county_membership_df=msa_membership,
+            years=[2020, 2021],
+            min_coverage=0.5,
+        )
+
+        assert result["zori_coc"].isna().all()
+        assert result["coverage_ratio"].tolist() == pytest.approx([0.25, 0.25])
+        assert result["population_weight_denominator"].tolist() == pytest.approx([100.0, 100.0])

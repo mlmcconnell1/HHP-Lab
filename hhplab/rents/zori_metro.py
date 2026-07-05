@@ -24,6 +24,7 @@ from hhplab.metro.metro_definitions import (
     DEFINITION_VERSION,
     build_county_membership_df,
 )
+from hhplab.msa.msa_io import read_msa_county_membership
 from hhplab.rents.zori_aggregate import (
     YearlyMethod,
     aggregate_monthly,
@@ -215,3 +216,172 @@ def aggregate_yearly_zori_to_metro(
         .rename(columns={"weighted_zori": "zori"})
     )
     return result.sort_values(["metro_id", "year"]).reset_index(drop=True)
+
+
+def aggregate_yearly_zori_to_msa(
+    zori_yearly: pd.DataFrame,
+    county_population: pd.DataFrame,
+    *,
+    msa_definition_version: str = "census_msa_2023",
+    county_membership_df: pd.DataFrame | None = None,
+    data_root: str | None = None,
+    years: list[int] | None = None,
+    min_coverage: float | None = None,
+    balanced_composition: bool = True,
+) -> pd.DataFrame:
+    """Aggregate county-year ZORI to Census MSA-year rows.
+
+    ZORI is an intensive rent index, so member counties are combined with a
+    population-weighted mean.  In balanced-composition mode, each MSA's
+    contributing county set is fixed to counties with both ZORI and population
+    data in every requested year.  Coverage diagnostics still compare that fixed
+    set with the full MSA county membership for each year.
+    """
+    required_zori = {"county_fips", "year", "zori"}
+    missing_zori = sorted(required_zori - set(zori_yearly.columns))
+    if missing_zori:
+        raise ValueError(f"Yearly ZORI data missing required columns: {missing_zori}")
+    required_population = {"county_fips", "year", "population"}
+    missing_population = sorted(required_population - set(county_population.columns))
+    if missing_population:
+        raise ValueError(
+            "County population weights are missing required columns: "
+            f"{missing_population}. Provide county_fips, year, population."
+        )
+
+    if min_coverage is not None and not 0 <= min_coverage <= 1:
+        raise ValueError("min_coverage must be between 0 and 1 when provided.")
+
+    membership = (
+        county_membership_df.copy()
+        if county_membership_df is not None
+        else read_msa_county_membership(msa_definition_version, data_root)
+    )
+    missing_membership = sorted({"msa_id", "county_fips"} - set(membership.columns))
+    if missing_membership:
+        raise ValueError(
+            "MSA county membership is missing required columns: "
+            f"{missing_membership}."
+        )
+    membership = membership[["msa_id", "county_fips"]].drop_duplicates().copy()
+    membership["msa_id"] = membership["msa_id"].astype("string")
+    membership["county_fips"] = membership["county_fips"].astype("string").str.zfill(5)
+
+    zori = zori_yearly[["county_fips", "year", "zori"]].copy()
+    zori["county_fips"] = zori["county_fips"].astype("string").str.zfill(5)
+    zori["year"] = pd.to_numeric(zori["year"], errors="coerce").astype("Int64")
+    zori["zori"] = pd.to_numeric(zori["zori"], errors="coerce")
+    zori = zori[zori["year"].notna()].copy()
+    zori["year"] = zori["year"].astype(int)
+
+    population = county_population[["county_fips", "year", "population"]].copy()
+    population["county_fips"] = population["county_fips"].astype("string").str.zfill(5)
+    population["year"] = pd.to_numeric(population["year"], errors="coerce").astype("Int64")
+    population["population"] = pd.to_numeric(population["population"], errors="coerce")
+    population = population[population["year"].notna()].copy()
+    population["year"] = population["year"].astype(int)
+
+    requested_years = sorted(set(int(year) for year in years)) if years is not None else None
+    if requested_years is None:
+        requested_years = sorted(set(zori["year"].unique()) & set(population["year"].unique()))
+    if not requested_years:
+        raise ValueError("No overlapping ZORI/population years are available for MSA rollup.")
+    zori = zori[zori["year"].isin(requested_years)]
+    population = population[population["year"].isin(requested_years)]
+
+    member_counties_by_msa = (
+        membership.groupby("msa_id")["county_fips"]
+        .agg(lambda values: set(values.dropna().astype(str)))
+        .to_dict()
+    )
+    membership_county_count = {
+        msa_id: len(counties) for msa_id, counties in member_counties_by_msa.items()
+    }
+
+    county_year = membership.merge(zori, on="county_fips", how="left").merge(
+        population,
+        on=["county_fips", "year"],
+        how="left",
+    )
+    county_year = county_year[county_year["year"].isin(requested_years)].copy()
+    county_year["has_zori"] = county_year["zori"].notna()
+    county_year["has_population"] = county_year["population"].notna() & (
+        county_year["population"] > 0
+    )
+    county_year["usable"] = county_year["has_zori"] & county_year["has_population"]
+
+    if balanced_composition:
+        usable_year_counts = (
+            county_year[county_year["usable"]]
+            .groupby(["msa_id", "county_fips"])["year"]
+            .nunique()
+        )
+        complete_keys = {
+            key for key, count in usable_year_counts.items() if count == len(requested_years)
+        }
+    else:
+        complete_keys = set()
+
+    rows: list[dict[str, object]] = []
+    for msa_id in sorted(member_counties_by_msa):
+        msa_counties = member_counties_by_msa[msa_id]
+        for year in requested_years:
+            current_msa_id = msa_id
+            group = county_year[
+                (county_year["msa_id"] == current_msa_id) & (county_year["year"] == year)
+            ].copy()
+            if balanced_composition:
+                balanced_mask = group["county_fips"].map(
+                    lambda county, msa=current_msa_id: (msa, county) in complete_keys
+                )
+                group = group.loc[balanced_mask.astype(bool)].copy()
+            else:
+                group = group[group["usable"]]
+
+            total_pop_rows = population[
+                (population["year"] == year) & (population["county_fips"].isin(msa_counties))
+            ]
+            total_population = float(total_pop_rows["population"].sum())
+            covered_population = float(group["population"].sum())
+            coverage_ratio = (
+                covered_population / total_population if total_population > 0 else pd.NA
+            )
+            zori_value = (
+                float((group["zori"] * group["population"]).sum() / covered_population)
+                if covered_population > 0
+                else pd.NA
+            )
+            if min_coverage is not None and pd.notna(coverage_ratio):
+                if float(coverage_ratio) < min_coverage:
+                    zori_value = pd.NA
+
+            county_count = int(group["county_fips"].nunique())
+            covered_counties = set(group["county_fips"].dropna().astype(str))
+            contribution_shares = (
+                group["population"] / covered_population
+                if covered_population > 0
+                else pd.Series([])
+            )
+            rows.append(
+                {
+                    "geo_type": "msa",
+                    "geo_id": str(current_msa_id),
+                    "msa_id": str(current_msa_id),
+                    "year": int(year),
+                    "zori_coc": zori_value,
+                    "coverage_ratio": coverage_ratio,
+                    "covered_population": covered_population,
+                    "total_population": total_population,
+                    "population_weight_denominator": covered_population,
+                    "county_count": county_count,
+                    "membership_county_count": int(membership_county_count[msa_id]),
+                    "missing_counties": ",".join(sorted(msa_counties - covered_counties)),
+                    "max_geo_contribution": (
+                        float(contribution_shares.max()) if not contribution_shares.empty else pd.NA
+                    ),
+                    "definition_version": msa_definition_version,
+                    "balanced_composition": bool(balanced_composition),
+                }
+            )
+
+    return pd.DataFrame(rows).sort_values(["msa_id", "year"]).reset_index(drop=True)

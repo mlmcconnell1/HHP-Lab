@@ -54,8 +54,22 @@ def aggregate_yearly_zori_to_metro(
     )
 
 
+def aggregate_yearly_zori_to_msa(
+    zori_yearly: pd.DataFrame,
+    county_population: pd.DataFrame,
+    **kwargs: object,
+) -> pd.DataFrame:
+    """Delegate to ``hhplab.rents.zori_metro.aggregate_yearly_zori_to_msa``."""
+    return _impl().aggregate_yearly_zori_to_msa(
+        zori_yearly,
+        county_population,
+        **kwargs,
+    )
+
+
 __all__ = [
     "aggregate_yearly_zori_to_metro",
+    "aggregate_yearly_zori_to_msa",
     "aggregate_zori_to_metro",
     "collapse_zori_to_yearly",
 ]

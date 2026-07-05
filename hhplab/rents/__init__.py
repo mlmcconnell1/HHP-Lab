@@ -54,6 +54,7 @@ from hhplab.rents.zori_diagnostics import (
     summarize_coc_zori,
 )
 from hhplab.rents.zori_metro import (
+    aggregate_yearly_zori_to_msa,
     aggregate_yearly_zori_to_metro,
     aggregate_zori_to_metro,
     collapse_zori_to_yearly,
@@ -72,6 +73,7 @@ __all__ = [
     "aggregate_monthly",
     "collapse_to_yearly",
     "aggregate_zori_to_metro",
+    "aggregate_yearly_zori_to_msa",
     "aggregate_yearly_zori_to_metro",
     "collapse_zori_to_yearly",
     "compute_coc_county_weights",

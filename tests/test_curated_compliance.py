@@ -154,6 +154,7 @@ class TestCanonicalFilenamesAccepted:
             ("measures", "measures__A2023@B2025.parquet"),
             ("measures", "measures__A2020@B2020_non_pr.parquet"),
             ("measures", "measures__A2015(2013)@B2013xT2010.parquet"),
+            ("measures", "measures__msa__A2024@Mcensusmsa2023xT2020.parquet"),
             ("measures", "coc_urban_fraction__N2020@B2025xU2020xK2020.parquet"),
             ("measures", "coc_urban_fraction__N2020@B2020_non_prxU2020xK2020.parquet"),
             ("measures", "coc_urban_area_detail__N2010@B2025xU2010xK2010.parquet"),
@@ -164,6 +165,11 @@ class TestCanonicalFilenamesAccepted:
             ("zori", "zori__A2023@B2025xC2023__wrenter.parquet"),
             ("zori", "zori_yearly__A2023@B2025xC2023__wrenter__mpit_january.parquet"),
             ("zori", "zori__county__Z2026.parquet"),
+            (
+                "zori",
+                "zori__msa__Y2015-2016@Mcensusmsa2023xC2023__wpopulation"
+                "__mpit_january__balanced.parquet",
+            ),
             ("pep", "pep_county__v2024.parquet"),
             ("pep", "coc_pep__B2024xC2024__warea_share__2010_2024.parquet"),
             ("pit", "pit__P2024.parquet"),

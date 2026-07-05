@@ -23,6 +23,7 @@ from hhplab.naming import (
     msa_fractional_rollup_path,
     msa_measures_filename,
     msa_pit_filename,
+    msa_zori_yearly_filename,
     pl_block_population_filename,
     pl_block_population_path,
     urban_area_filename,
@@ -73,6 +74,20 @@ def test_msa_measures_filename():
     assert (
         msa_measures_filename("2019-2023", "census_msa_2023", 2020)
         == "measures__msa__A2023@Mcensusmsa2023xT2020.parquet"
+    )
+
+
+def test_msa_zori_yearly_filename_balanced():
+    assert (
+        msa_zori_yearly_filename(
+            2015,
+            2025,
+            "census_msa_2023",
+            2023,
+            "population",
+            "pit_january",
+        )
+        == "zori__msa__Y2015-2025@Mcensusmsa2023xC2023__wpopulation__mpit_january__balanced.parquet"
     )
 
 
