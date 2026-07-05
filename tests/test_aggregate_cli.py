@@ -11,6 +11,7 @@ from hhplab.acs.acs_aggregate import (
     _available_contract_rent_bins,
     _derive_acs5_covariates,
 )
+from hhplab.cli.aggregate_cli import _resolve_boundary_vintage_map
 from hhplab.cli.main import app
 from hhplab.pep.pep_aggregate import build_lagged_pep_series
 
@@ -62,6 +63,20 @@ def test_aggregate_pep_requires_years():
 def test_aggregate_pep_with_invalid_years():
     result = runner.invoke(app, ["aggregate", "pep", "--years", "bad"])
     assert result.exit_code == 2
+
+
+def test_boundary_vintage_map_supports_ranges_and_singletons():
+    result = _resolve_boundary_vintage_map(
+        [2015, 2016, 2020, 2022],
+        "2015-2016:2019,2020,2022:2020",
+    )
+
+    assert result == {2015: "2019", 2016: "2019", 2020: "2020", 2022: "2020"}
+
+
+def test_boundary_vintage_map_requires_complete_coverage():
+    with pytest.raises(ValueError, match="Missing years: \\[2022\\]"):
+        _resolve_boundary_vintage_map([2020, 2022], "2020:2020")
 
 
 @patch("hhplab.cdc.overdose.ingest_and_aggregate_overdose_to_msa")
@@ -650,6 +665,75 @@ def test_aggregate_pit_to_msa_materializes_weighted_outputs(tmp_path):
     msa_df = pd.read_parquet(out_file).sort_values("msa_id").reset_index(drop=True)
     assert list(msa_df["msa_id"]) == ["35620", "41180"]
     assert list(msa_df["pit_total"].astype(float)) == pytest.approx([140.0, 100.0])
+
+
+def test_aggregate_pit_to_msa_uses_boundary_vintage_map(tmp_path):
+    """MSA PIT aggregate can use an era boundary different from PIT year."""
+    import os
+
+    from hhplab.naming import msa_coc_xwalk_filename, msa_pit_filename
+
+    pit_dir = tmp_path / "data" / "curated" / "pit"
+    xwalk_dir = tmp_path / "data" / "curated" / "xwalks"
+    pit_dir.mkdir(parents=True)
+    xwalk_dir.mkdir(parents=True)
+
+    pd.DataFrame(
+        {
+            "coc_id": ["CO-100"],
+            "pit_year": [2018],
+            "pit_total": [100.0],
+            "pit_sheltered": [60.0],
+            "pit_unsheltered": [40.0],
+        }
+    ).to_parquet(pit_dir / "pit__P2018.parquet", index=False)
+    pd.DataFrame(
+        {
+            "coc_id": ["CO-100"],
+            "msa_id": ["35620"],
+            "cbsa_code": ["35620"],
+            "boundary_vintage": ["2020"],
+            "county_vintage": ["2023"],
+            "definition_version": ["census_msa_2023"],
+            "allocation_method": ["area"],
+            "share_column": ["allocation_share"],
+            "allocation_share": [1.0],
+        }
+    ).to_parquet(
+        xwalk_dir / msa_coc_xwalk_filename("2020", "census_msa_2023", 2023),
+        index=False,
+    )
+
+    old_cwd = os.getcwd()
+    try:
+        os.chdir(tmp_path)
+        result = runner.invoke(
+            app,
+            [
+                "aggregate",
+                "pit",
+                "--years",
+                "2018",
+                "--geo-type",
+                "msa",
+                "--definition-version",
+                "census_msa_2023",
+                "--counties",
+                "2023",
+                "--boundary-vintages",
+                "2018:2020",
+            ],
+            catch_exceptions=False,
+        )
+    finally:
+        os.chdir(old_cwd)
+
+    assert result.exit_code == 0, result.output
+    out_file = pit_dir / msa_pit_filename(2018, "census_msa_2023", 2020, 2023)
+    assert out_file.exists()
+    msa_df = pd.read_parquet(out_file)
+    assert msa_df.loc[0, "boundary_vintage"] == "2020"
+    assert msa_df.loc[0, "pit_total"] == pytest.approx(100.0)
 
 
 def test_aggregate_pit_to_msa_uses_block_population_crosswalk(tmp_path):

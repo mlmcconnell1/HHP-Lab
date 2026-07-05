@@ -78,6 +78,53 @@ def _parse_column_list(columns: str) -> tuple[str, ...]:
     return parsed
 
 
+def _resolve_boundary_vintage_map(
+    years: list[int],
+    boundary_vintages: str | None,
+) -> dict[int, str]:
+    """Resolve PIT year -> CoC boundary vintage mapping."""
+    if boundary_vintages is None:
+        return {year: str(year) for year in years}
+
+    resolved: dict[int, str] = {}
+    requested = set(years)
+    for raw_token in boundary_vintages.split(","):
+        token = raw_token.strip()
+        if not token:
+            continue
+        if ":" in token:
+            year_spec, boundary = token.split(":", maxsplit=1)
+            boundary = boundary.strip()
+        else:
+            year_spec = token
+            boundary = token
+        if not boundary:
+            raise ValueError(
+                f"Invalid --boundary-vintages token {token!r}: boundary vintage is empty."
+            )
+        try:
+            token_years = parse_year_spec(year_spec.strip())
+        except ValueError as exc:
+            raise ValueError(
+                f"Invalid --boundary-vintages token {token!r}: {exc}"
+            ) from exc
+        for year in token_years:
+            if year not in requested:
+                continue
+            if year in resolved:
+                raise ValueError(
+                    f"Year {year} appears in multiple --boundary-vintages tokens."
+                )
+            resolved[year] = boundary
+    missing = sorted(requested - set(resolved))
+    if missing:
+        raise ValueError(
+            "--boundary-vintages must cover every requested year. "
+            f"Missing years: {missing}."
+        )
+    return resolved
+
+
 def _resolve_source_dataset_id(source: Path, source_dataset_id: str | None) -> str:
     if source_dataset_id:
         return source_dataset_id
@@ -687,6 +734,16 @@ def aggregate_pit(
             help="County geometry vintage for the CoC-to-MSA crosswalk. Defaults to the PIT year.",
         ),
     ] = None,
+    boundary_vintages: Annotated[
+        str | None,
+        typer.Option(
+            "--boundary-vintages",
+            help=(
+                "Optional PIT-year to CoC-boundary map for --geo-type=msa, e.g. "
+                "'2015-2019:2019,2020,2022-2025:2020'. Defaults to each PIT year."
+            ),
+        ),
+    ] = None,
     allocation_basis: Annotated[
         Literal["area", "block_population"],
         typer.Option(
@@ -723,6 +780,11 @@ def aggregate_pit(
             err=True,
         )
         raise typer.Exit(2)
+    try:
+        boundary_map = _resolve_boundary_vintage_map(parsed_years, boundary_vintages)
+    except ValueError as exc:
+        typer.echo(f"Error: {exc}", err=True)
+        raise typer.Exit(2) from exc
 
     output_dir = curated_root() / "pit"
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -802,11 +864,12 @@ def aggregate_pit(
     for year in sorted(collected):
         df = collected[year]
         if geo_type == "coc":
-            out_name = coc_pit_filename(year, year)
+            boundary_vintage = boundary_map[year]
+            out_name = coc_pit_filename(year, boundary_vintage)
             out_path = output_dir / out_name
             df.to_parquet(out_path, index=False)
         else:
-            boundary_vintage = str(year)
+            boundary_vintage = boundary_map[year]
             county_vintage = str(counties if counties is not None else year)
             try:
                 crosswalk = read_coc_msa_crosswalk(
