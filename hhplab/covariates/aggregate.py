@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from hhplab.covariates.catalog import covariate_source_spec
+from hhplab.covariates.catalog import MeasureAggregation, covariate_source_spec
 from hhplab.covariates.ingest import default_covariate_output_path
 from hhplab.covariates.mpi_contract import MPI_ESTIMATE_YEAR, MPI_SOURCE_ID
 from hhplab.msa import DEFINITION_VERSION as DEFAULT_MSA_DEFINITION_VERSION
@@ -47,6 +47,8 @@ def aggregate_covariate_source(
     msa_definition_version: str = DEFAULT_MSA_DEFINITION_VERSION,
     county_population_path: Path | str | None = None,
     data_root: Path | str | None = None,
+    min_coverage_ratio: float | None = 1.0,
+    drop_below_min_coverage: bool = False,
     force: bool = False,
 ) -> Path:
     """Materialize a panel-ready covariate table from curated source data.
@@ -74,6 +76,12 @@ def aggregate_covariate_source(
             f"Covariate source '{source_id}' is native to {spec.native_geo} geography. "
             "Only county-native covariates can be population-weighted to --target-geo msa."
         )
+    if min_coverage_ratio is not None and not 0 <= min_coverage_ratio <= 1:
+        raise ValueError("--min-coverage-ratio must be between 0 and 1.")
+    if drop_below_min_coverage and target_geo != "msa":
+        raise ValueError("--drop-below-min-coverage is only supported with --target-geo msa.")
+    if drop_below_min_coverage and min_coverage_ratio is None:
+        raise ValueError("--drop-below-min-coverage requires --min-coverage-ratio.")
     input_path = (
         Path(curated_path)
         if curated_path is not None
@@ -113,21 +121,43 @@ def aggregate_covariate_source(
             "target_years": list(years),
         }
 
+    input_provenance = read_provenance(input_path)
     if target_geo == "msa":
+        mpi_multi_county_rows = (
+            input_provenance.extra.get("multi_county_rows")
+            if source_id == MPI_SOURCE_ID and input_provenance is not None
+            else None
+        )
+        if mpi_multi_county_rows and years is not None:
+            mpi_multi_county_rows = _expand_mpi_multi_county_rows(
+                mpi_multi_county_rows,
+                years=years,
+            )
         result = aggregate_county_covariate_to_msa(
             df,
             measure_columns=list(spec.measure_columns),
+            measure_aggregations=spec.measure_aggregations,
             msa_definition_version=msa_definition_version,
             county_population_path=county_population_path,
             data_root=data_root,
+            mpi_multi_county_rows=mpi_multi_county_rows,
         )
     else:
         result = df[required].copy()
     if years is not None:
         result = result[result["year"].isin(years)].copy()
+    coverage_policy = _coverage_policy(
+        result,
+        target_geo=target_geo,
+        min_coverage_ratio=min_coverage_ratio,
+        drop_below_min_coverage=drop_below_min_coverage,
+    )
+    if drop_below_min_coverage and coverage_policy["below_threshold_count"]:
+        result = result[
+            pd.to_numeric(result["coverage_ratio"], errors="coerce") >= min_coverage_ratio
+        ].copy()
     result = result.sort_values(["geo_id", "year"]).reset_index(drop=True)
 
-    input_provenance = read_provenance(input_path)
     provenance = ProvenanceBlock(
         geo_type=target_geo,
         extra={
@@ -144,6 +174,8 @@ def aggregate_covariate_source(
             "years": years,
             "static_year_policy": static_year_policy,
             "measure_columns": list(spec.measure_columns),
+            "measure_aggregations": dict(spec.measure_aggregations),
+            "coverage_policy": coverage_policy,
             "input_path": str(input_path),
             "input_provenance": input_provenance.to_dict() if input_provenance else None,
             "coverage_diagnostics": _coverage_diagnostics(result),
@@ -194,23 +226,55 @@ def expand_static_covariate_years(
     return pd.concat(expanded, ignore_index=True)
 
 
+def _expand_mpi_multi_county_rows(
+    rows: list[dict[str, object]],
+    *,
+    years: list[int],
+) -> list[dict[str, object]]:
+    expanded: list[dict[str, object]] = []
+    for row in rows:
+        for year in years:
+            yearly = dict(row)
+            yearly["year"] = int(year)
+            yearly["source_estimate_year"] = MPI_ESTIMATE_YEAR
+            yearly["static_year_policy"] = "carry_forward"
+            expanded.append(yearly)
+    return expanded
+
+
 def aggregate_county_covariate_to_msa(
     df: pd.DataFrame,
     *,
     measure_columns: list[str],
+    measure_aggregations: dict[str, MeasureAggregation] | None = None,
     msa_definition_version: str = DEFAULT_MSA_DEFINITION_VERSION,
     county_population_path: Path | str | None = None,
     data_root: Path | str | None = None,
     msa_county_membership: pd.DataFrame | None = None,
     county_population: pd.DataFrame | None = None,
+    mpi_multi_county_rows: list[dict[str, object]] | None = None,
 ) -> pd.DataFrame:
-    """Population-weight county-native covariates to MSA-year rows."""
+    """Aggregate county-native covariates to MSA-year rows."""
     required = {"county_fips", "year", *measure_columns}
     missing = sorted(required - set(df.columns))
     if missing:
         raise ValueError(
             f"County covariate data missing required columns for MSA rollup: {missing}"
         )
+    aggregations: dict[str, MeasureAggregation] = {
+        column: "intensive_pop_weighted_mean" for column in measure_columns
+    }
+    if measure_aggregations is not None:
+        aggregations.update(measure_aggregations)
+    unsupported = sorted(
+        {
+            aggregation
+            for aggregation in aggregations.values()
+            if aggregation not in {"extensive_sum", "intensive_pop_weighted_mean", "rate"}
+        }
+    )
+    if unsupported:
+        raise ValueError(f"Unsupported covariate MSA aggregation method(s): {unsupported}")
 
     membership = (
         msa_county_membership.copy()
@@ -270,18 +334,21 @@ def aggregate_county_covariate_to_msa(
         )
 
     rows: list[dict[str, object]] = []
+    row_by_key: dict[tuple[str, int], dict[str, object]] = {}
     grouped = county.groupby(["msa_id", "year"], dropna=False, sort=True)
     for (msa_id, year), group in grouped:
+        key = (str(msa_id), int(year))
         row: dict[str, object] = {
             "geo_type": "msa",
-            "geo_id": str(msa_id),
-            "msa_id": str(msa_id),
-            "year": int(year),
+            "geo_id": key[0],
+            "msa_id": key[0],
+            "year": key[1],
             "population_weight_denominator": float(group["population"].sum()),
             "county_count": int(group["county_fips"].nunique()),
             "membership_county_count": int(membership_counts.get(str(msa_id), 0)),
             "definition_version": msa_definition_version,
             "unmatched_source_county_count": len(unmatched_source_counties),
+            "mpi_multi_county_source_row_count": 0,
         }
         for column in optional_lineage_columns:
             values = list(group[column].dropna().unique())
@@ -297,14 +364,101 @@ def aggregate_county_covariate_to_msa(
             values = pd.to_numeric(group[column], errors="coerce")
             valid = values.notna()
             denominator = group.loc[valid, "population"].sum()
-            row[column] = (
-                float((values[valid] * group.loc[valid, "population"]).sum() / denominator)
-                if denominator > 0
-                else pd.NA
-            )
+            aggregation = aggregations[column]
+            if aggregation == "extensive_sum":
+                row[column] = float(values[valid].sum()) if valid.any() else pd.NA
+            elif aggregation == "rate":
+                row[column] = (
+                    float(values[valid].sum() / denominator) if denominator > 0 else pd.NA
+                )
+            else:
+                row[column] = (
+                    float((values[valid] * group.loc[valid, "population"]).sum() / denominator)
+                    if denominator > 0
+                    else pd.NA
+                )
         rows.append(row)
+        row_by_key[key] = row
+
+    _apply_mpi_multi_county_msa_rows(
+        row_by_key,
+        rows,
+        mpi_multi_county_rows=mpi_multi_county_rows or [],
+        measure_columns=measure_columns,
+        membership=membership,
+        membership_counts=membership_counts,
+        population=population,
+        source_counties=source_counties,
+        msa_definition_version=msa_definition_version,
+    )
 
     return pd.DataFrame(rows)
+
+
+def _apply_mpi_multi_county_msa_rows(
+    row_by_key: dict[tuple[str, int], dict[str, object]],
+    rows: list[dict[str, object]],
+    *,
+    mpi_multi_county_rows: list[dict[str, object]],
+    measure_columns: list[str],
+    membership: pd.DataFrame,
+    membership_counts: dict[str, int],
+    population: pd.DataFrame,
+    source_counties: set[str],
+    msa_definition_version: str,
+) -> None:
+    if not mpi_multi_county_rows:
+        return
+    county_to_msa = membership.set_index("county_fips")["msa_id"].astype(str).to_dict()
+    population_lookup = population.set_index(["county_fips", "year"])["population"].to_dict()
+    for source_row in mpi_multi_county_rows:
+        member_counties = [
+            str(value).zfill(5) for value in source_row.get("member_county_fips", [])
+        ]
+        if not member_counties or any(county in source_counties for county in member_counties):
+            continue
+        msa_ids = {county_to_msa.get(county) for county in member_counties}
+        msa_ids.discard(None)
+        if len(msa_ids) != 1:
+            continue
+        year = int(source_row.get("year", MPI_ESTIMATE_YEAR))
+        msa_id = next(iter(msa_ids))
+        key = (msa_id, year)
+        row = row_by_key.get(key)
+        if row is None:
+            row = {
+                "geo_type": "msa",
+                "geo_id": msa_id,
+                "msa_id": msa_id,
+                "year": year,
+                "population_weight_denominator": 0.0,
+                "county_count": 0,
+                "membership_county_count": int(membership_counts.get(msa_id, 0)),
+                "definition_version": msa_definition_version,
+                "unmatched_source_county_count": 0,
+                "coverage_ratio": pd.NA,
+                "mpi_multi_county_source_row_count": 0,
+            }
+            for column in measure_columns:
+                row[column] = 0.0
+            rows.append(row)
+            row_by_key[key] = row
+        for column in measure_columns:
+            row[column] = float(row.get(column) or 0.0) + float(source_row[column])
+        row["population_weight_denominator"] = float(
+            row.get("population_weight_denominator") or 0.0
+        ) + float(
+            sum(population_lookup.get((county, year), 0.0) for county in member_counties)
+        )
+        row["county_count"] = int(row.get("county_count") or 0) + len(member_counties)
+        row["mpi_multi_county_source_row_count"] = int(
+            row.get("mpi_multi_county_source_row_count") or 0
+        ) + 1
+        row["coverage_ratio"] = (
+            row["county_count"] / row["membership_county_count"]
+            if row["membership_county_count"]
+            else pd.NA
+        )
 
 
 def _coverage_diagnostics(df: pd.DataFrame) -> dict[str, object]:
@@ -322,3 +476,33 @@ def _coverage_diagnostics(df: pd.DataFrame) -> dict[str, object]:
             pd.to_numeric(df["unmatched_source_county_count"], errors="coerce").max()
         )
     return diagnostics
+
+
+def _coverage_policy(
+    df: pd.DataFrame,
+    *,
+    target_geo: str,
+    min_coverage_ratio: float | None,
+    drop_below_min_coverage: bool,
+) -> dict[str, object] | None:
+    if target_geo != "msa" or "coverage_ratio" not in df.columns:
+        return None
+    if min_coverage_ratio is None:
+        return {
+            "min_coverage_ratio": None,
+            "action": "keep",
+            "below_threshold_count": 0,
+            "dropped_row_count": 0,
+        }
+    coverage = pd.to_numeric(df["coverage_ratio"], errors="coerce")
+    below_threshold = coverage < min_coverage_ratio
+    below_count = int(below_threshold.sum())
+    return {
+        "min_coverage_ratio": float(min_coverage_ratio),
+        "action": "drop" if drop_below_min_coverage else "warn",
+        "below_threshold_count": below_count,
+        "dropped_row_count": below_count if drop_below_min_coverage else 0,
+        "min_observed_coverage_ratio": (
+            float(coverage.min()) if coverage.notna().any() else None
+        ),
+    }

@@ -12,10 +12,13 @@ import pandas as pd
 
 from hhplab.covariates.catalog import CovariateSourceSpec, covariate_source_spec
 from hhplab.covariates.mpi_contract import (
+    MPI_ALLOWED_COUNTY_EQUIVALENT_LABELS,
     MPI_COUNTY_SHEET,
     MPI_CURATED_COUNTY_COLUMNS,
     MPI_ESTIMATE_PERIOD,
     MPI_ESTIMATE_YEAR,
+    MPI_FIRST_DATA_ROW,
+    MPI_HEADER_ROW,
     MPI_PRODUCT,
     MPI_PROVIDER,
     MPI_PUBLICATION_YEAR,
@@ -25,7 +28,7 @@ from hhplab.covariates.mpi_contract import (
 )
 from hhplab.metro.metro_definitions import STATE_ABBREV_TO_FIPS
 from hhplab.naming import covariate_curated_filename
-from hhplab.paths import curated_dir
+from hhplab.paths import curated_dir, raw_root
 from hhplab.provenance import ProvenanceBlock, write_parquet_with_provenance
 from hhplab.source_registry import register_source
 
@@ -274,7 +277,7 @@ def _ingest_mpi_unauthorized_immigrants(
         else _default_county_reference_paths()
     )
     county_reference = _load_county_references(reference_paths)
-    raw = pd.read_excel(source_path, sheet_name=MPI_COUNTY_SHEET, header=2)
+    raw = pd.read_excel(source_path, sheet_name=MPI_COUNTY_SHEET, header=MPI_HEADER_ROW - 1)
     rows, skipped_rows = _normalize_mpi_county_rows(raw, county_reference=county_reference)
     if rows.empty:
         raise ValueError(
@@ -288,7 +291,6 @@ def _ingest_mpi_unauthorized_immigrants(
     rows["source_id"] = spec.source_id
     rows["provider"] = spec.provider
     rows["product"] = spec.product
-    rows["topic"] = spec.topic
     rows["data_source"] = spec.provider
     rows["source_url"] = spec.source_url
     rows["raw_sha256"] = raw_sha256
@@ -296,6 +298,13 @@ def _ingest_mpi_unauthorized_immigrants(
     rows = rows[list(MPI_CURATED_COUNTY_COLUMNS)]
 
     skipped_preview = skipped_rows.head(20).to_dict(orient="records")
+    multi_county_rows = (
+        skipped_rows[
+            skipped_rows.get("member_county_fips", pd.Series(dtype=object)).notna()
+        ].to_dict(orient="records")
+        if not skipped_rows.empty
+        else []
+    )
     provenance = ProvenanceBlock(
         geo_type=spec.native_geo,
         extra={
@@ -317,6 +326,7 @@ def _ingest_mpi_unauthorized_immigrants(
             "skipped_rows": int(len(skipped_rows)),
             "skipped_reasons": _value_counts(skipped_rows, "exclusion_reason"),
             "skipped_preview": skipped_preview,
+            "multi_county_rows": multi_county_rows,
         },
     )
     write_parquet_with_provenance(rows, destination, provenance)
@@ -356,7 +366,7 @@ def _normalize_mpi_county_rows(
     written: list[dict[str, Any]] = []
     skipped: list[dict[str, Any]] = []
     for source_row, row in raw.reset_index(drop=True).iterrows():
-        excel_row = int(source_row) + 4
+        excel_row = int(source_row) + MPI_FIRST_DATA_ROW
         state_name = _clean_mpi_value(row.get("State"))
         county_label = _clean_mpi_value(row.get("County"))
         if not county_label:
@@ -364,12 +374,21 @@ def _normalize_mpi_county_rows(
         population = row.get("Number of Unauthorized Immigrants")
         share = row.get("County Share of the Total Unauthorized Immigrant Population")
         county_name, exclusion_reason = _mpi_county_name_from_label(county_label, state_name)
+        member_county_fips: list[str] | None = None
         if exclusion_reason is None:
             match = lookup.get(
                 (_normalize_county_key(state_name), _normalize_county_key(county_name))
             )
             if match is None:
                 exclusion_reason = "unmatched_county_reference"
+                if county_name is not None and "-" in county_name:
+                    exclusion_reason = "hyphenated_unresolved"
+        elif exclusion_reason == "multi_county_row":
+            member_county_fips = _mpi_multi_county_fips_from_label(
+                county_label,
+                state_name,
+                lookup,
+            )
         if exclusion_reason is not None:
             skipped.append(
                 {
@@ -377,6 +396,10 @@ def _normalize_mpi_county_rows(
                     "source_row": excel_row,
                     "state_name": state_name,
                     "county_label": county_label,
+                    "year": MPI_ESTIMATE_YEAR,
+                    "unauthorized_immigrant_population": population,
+                    "unauthorized_immigrant_share_of_us_total": share,
+                    "member_county_fips": member_county_fips,
                     "exclusion_reason": exclusion_reason,
                 }
             )
@@ -430,18 +453,49 @@ def _mpi_county_name_from_label(
     if not county_label.endswith(suffix):
         return None, "state_suffix_mismatch"
     county_name = county_label[: -len(suffix)].strip()
-    if "-" in county_name:
-        return None, "multi_county_row"
+    if not county_name.endswith(MPI_ALLOWED_COUNTY_EQUIVALENT_LABELS):
+        return None, "unsupported_county_equivalent"
     return county_name, None
 
 
+def _mpi_multi_county_fips_from_label(
+    county_label: str,
+    state_name: str,
+    lookup: dict[tuple[str, str], tuple[str, str]],
+) -> list[str] | None:
+    if not state_name:
+        return None
+    suffix = f", {state_name}"
+    if not county_label.endswith(suffix):
+        return None
+    county_part = county_label[: -len(suffix)].strip()
+    if county_part.endswith(" Counties"):
+        county_part = county_part[: -len(" Counties")]
+        county_suffix = " County"
+    elif county_part.endswith(" Parishes"):
+        county_part = county_part[: -len(" Parishes")]
+        county_suffix = " Parish"
+    else:
+        return None
+    county_fips: list[str] = []
+    for name_part in county_part.split("-"):
+        county_name = f"{name_part.strip()}{county_suffix}"
+        match = lookup.get(
+            (_normalize_county_key(state_name), _normalize_county_key(county_name))
+        )
+        if match is None:
+            return None
+        county_fips.append(match[0])
+    return county_fips
+
+
 def _default_county_reference_paths() -> tuple[Path, ...]:
-    candidates = sorted(Path("data/raw/pep").glob("pep_county__v*__*.csv"))
+    candidates = sorted((raw_root() / "pep").glob("pep_county__v*__*.csv"))
     if candidates:
         return tuple(candidates)
     raise FileNotFoundError(
         "No default county reference found for MPI ingest. Expected a Census PEP "
-        "county raw CSV under data/raw/pep, or pass --county-reference-path with "
+        f"county raw CSV under {raw_root() / 'pep'}, or pass --county-reference-path with "
         "columns STNAME/CTYNAME/STATE/COUNTY or state_name/county_name/county_fips."
     )
 

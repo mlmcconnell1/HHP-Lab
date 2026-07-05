@@ -159,6 +159,31 @@ def _resolve_rollup_boundary_vintage(
     )
 
 
+def _covariate_coverage_warnings(
+    coverage_policy: dict[str, object] | None,
+) -> list[dict[str, object]]:
+    if not coverage_policy:
+        return []
+    below_count = int(coverage_policy.get("below_threshold_count") or 0)
+    if below_count == 0 or coverage_policy.get("action") != "warn":
+        return []
+    return [
+        {
+            "code": "covariate_msa_partial_coverage",
+            "message": (
+                f"{below_count} MSA covariate row(s) have coverage_ratio below "
+                f"{coverage_policy.get('min_coverage_ratio')}; inspect or filter before "
+                "interpreting cross-MSA comparisons."
+            ),
+            "below_threshold_count": below_count,
+            "min_coverage_ratio": coverage_policy.get("min_coverage_ratio"),
+            "min_observed_coverage_ratio": coverage_policy.get(
+                "min_observed_coverage_ratio"
+            ),
+        }
+    ]
+
+
 @aggregate_app.command("covariate")
 def aggregate_covariate(
     source: Annotated[
@@ -206,6 +231,24 @@ def aggregate_covariate(
         Path | None,
         typer.Option("--data-root", help="Data root containing curated MSA/PEP artifacts."),
     ] = None,
+    min_coverage_ratio: Annotated[
+        float | None,
+        typer.Option(
+            "--min-coverage-ratio",
+            help=(
+                "Minimum acceptable coverage_ratio for --target-geo msa. "
+                "Defaults to 1.0 for warning/reporting; pass null from API callers "
+                "or omit dropping to keep all rows."
+            ),
+        ),
+    ] = 1.0,
+    drop_below_min_coverage: Annotated[
+        bool,
+        typer.Option(
+            "--drop-below-min-coverage",
+            help="Drop MSA covariate rows whose coverage_ratio is below --min-coverage-ratio.",
+        ),
+    ] = False,
     force: Annotated[
         bool,
         typer.Option("--force", "-f", help="Rebuild even if output already exists."),
@@ -219,6 +262,7 @@ def aggregate_covariate(
     import json
 
     from hhplab.covariates.aggregate import aggregate_covariate_source
+    from hhplab.provenance import read_provenance
 
     _validate_align(align, COVARIATE_ALIGN_MODES, "covariate")
     parsed_years = parse_year_spec(years) if years is not None else None
@@ -232,9 +276,15 @@ def aggregate_covariate(
             msa_definition_version=msa_definition_version,
             county_population_path=county_population_path,
             data_root=data_root,
+            min_coverage_ratio=min_coverage_ratio,
+            drop_below_min_coverage=drop_below_min_coverage,
             force=force,
         )
         row_count = len(pd.read_parquet(result_path))
+        provenance = read_provenance(result_path)
+        provenance_extra = provenance.extra if provenance is not None else {}
+        coverage_policy = provenance_extra.get("coverage_policy")
+        coverage_diagnostics = provenance_extra.get("coverage_diagnostics")
     except (FileNotFoundError, KeyError, ValueError) as exc:
         if output_json:
             typer.echo(json.dumps({"status": "error", "message": str(exc)}))
@@ -255,6 +305,9 @@ def aggregate_covariate(
         "years": parsed_years,
         "output_path": str(result_path),
         "row_count": row_count,
+        "coverage_policy": coverage_policy,
+        "coverage_diagnostics": coverage_diagnostics,
+        "warnings": _covariate_coverage_warnings(coverage_policy),
     }
     if output_json:
         typer.echo(json.dumps(payload))

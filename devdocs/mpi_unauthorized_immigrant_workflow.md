@@ -34,10 +34,12 @@ County-native curated rows include `county_fips`, `geo_id`, `state_fips`,
 fields, and the measure columns above.
 
 The parser writes only rows that resolve to a unique county or county-equivalent
-FIPS. It skips the U.S. total, MPI multi-county rows, and MPI MSA rows; skipped
-row counts and reasons are written to parquet provenance and JSON CLI output.
-State totals remain source context only and are not emitted as county-native
-panel rows.
+FIPS. It skips the U.S. total, MPI MSA rows, and MPI multi-county rows that
+cannot be resolved to member counties. Resolved multi-county rows are retained
+in parquet provenance so MSA aggregation can allocate rows whose member counties
+all belong to one MSA. Skipped row counts and reasons are written to parquet
+provenance and JSON CLI output. State totals remain source context only and are
+not emitted as county-native panel rows.
 
 ## Commands
 
@@ -90,6 +92,11 @@ hhplab aggregate covariate \
 MPI is a static mid-2023 estimate. When `--years` is supplied, the aggregator
 carries the 2023 estimate to the requested panel year(s), records
 `source_estimate_year`, and writes a `static_year_policy` provenance block.
+For MSA output, the aggregate command also reports `coverage_policy`,
+`coverage_diagnostics`, and `warnings` in JSON. By default, MSA rows below full
+county-membership coverage are kept but warned on. Use
+`--min-coverage-ratio` to set the warning threshold and
+`--drop-below-min-coverage` to filter rows below that threshold.
 
 The panel-ready output path is:
 
@@ -126,9 +133,16 @@ MPI estimates are model-based estimates built from ACS, SIPP, DHS administrative
 benchmarks, and MPI legal-status assignment methodology. Treat them as estimated
 stock measures for mid-2023, not observed counts or migration flows.
 
-County-to-MSA aggregation uses population-weighted county rollups. Coverage
-diagnostics in provenance report partial MSA coverage and source counties that
-do not belong to the selected MSA definition.
+County-to-MSA aggregation sums MPI count/share measures across covered counties
+and recoverable same-MSA multi-county rows. Coverage diagnostics in CLI JSON and
+provenance report partial MSA coverage and source counties that do not belong to
+the selected MSA definition.
+
+Coverage must be inspected before interpreting cross-MSA comparisons. MPI does
+not publish every county as a standalone row, and many MSA rows can be
+substantially below full county-membership coverage. Treat low-coverage rows as
+biased partial estimates unless they are filtered out or the missing geography
+is explicitly resolved.
 
 Exploratory correlations involving MPI estimates are descriptive screening
 results. They are not causal evidence and should be interpreted with the usual

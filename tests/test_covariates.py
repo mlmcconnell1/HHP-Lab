@@ -62,6 +62,10 @@ MPI_XLSX_ROW_TRUTH_TABLE = {
         "row": ["Florida", "Miami-Dade-Monroe Counties, Florida", 356_000, 0.025903],
         "expected": "skipped:multi_county_row",
     },
+    "hyphenated_county": {
+        "row": ["Florida", "Miami-Dade County, Florida", 135_000, 0.009827],
+        "expected": "written:12086",
+    },
     "unmapped_county": {
         "row": ["Atlantis", "Poseidon County, Atlantis", 5_000, 0.0001],
         "expected": "error:no_resolved_county_fips",
@@ -216,16 +220,17 @@ def test_mpi_xlsx_ingest_writes_resolved_counties_with_provenance(
         county_rows=[
             MPI_XLSX_ROW_TRUTH_TABLE["us_total"]["row"],
             MPI_XLSX_ROW_TRUTH_TABLE["resolved_county"]["row"],
+            MPI_XLSX_ROW_TRUTH_TABLE["hyphenated_county"]["row"],
             MPI_XLSX_ROW_TRUTH_TABLE["multi_county"]["row"],
         ],
     )
     county_reference = tmp_path / "pep_county_reference.csv"
     pd.DataFrame(
         {
-            "STNAME": ["California"],
-            "CTYNAME": ["Los Angeles County"],
-            "STATE": [6],
-            "COUNTY": [37],
+            "STNAME": ["California", "Florida"],
+            "CTYNAME": ["Los Angeles County", "Miami-Dade County"],
+            "STATE": [6, 12],
+            "COUNTY": [37, 86],
         }
     ).to_csv(county_reference, index=False)
 
@@ -239,15 +244,15 @@ def test_mpi_xlsx_ingest_writes_resolved_counties_with_provenance(
 
     result = pd.read_parquet(curated)
     assert curated.name == "covariate__mpi_unauthorized_immigrants__Y2023-2023.parquet"
-    assert result["county_fips"].tolist() == ["06037"]
-    assert result["geo_id"].tolist() == ["06037"]
-    assert result["state_fips"].tolist() == ["06"]
-    assert result["unauthorized_immigrant_population"].tolist() == [1_101_000]
-    assert result["source_sheet"].tolist() == [MPI_COUNTY_SHEET]
+    assert result["county_fips"].tolist() == ["06037", "12086"]
+    assert result["geo_id"].tolist() == ["06037", "12086"]
+    assert result["state_fips"].tolist() == ["06", "12"]
+    assert result["unauthorized_immigrant_population"].tolist() == [1_101_000, 135_000]
+    assert result["source_sheet"].tolist() == [MPI_COUNTY_SHEET, MPI_COUNTY_SHEET]
     provenance = read_provenance(curated)
     assert provenance is not None
     assert provenance.extra["source_id"] == MPI_SOURCE_ID
-    assert provenance.extra["rows_written"] == 1
+    assert provenance.extra["rows_written"] == 2
     assert provenance.extra["skipped_rows"] == 2
     assert provenance.extra["skipped_reasons"] == {"us_total": 1, "multi_county_row": 1}
 
@@ -277,6 +282,48 @@ def test_mpi_xlsx_ingest_rejects_unmapped_counties(tmp_path: Path, monkeypatch) 
             county_reference_path=county_reference,
             force=True,
         )
+
+
+def test_mpi_default_county_reference_uses_configured_raw_root(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    """Default MPI county references should not depend on the process CWD."""
+    monkeypatch.setattr("hhplab.covariates.ingest.register_source", lambda **_: None)
+    asset_root = tmp_path / "assets"
+    pep_raw = asset_root / "raw" / "pep"
+    pep_raw.mkdir(parents=True)
+    pd.DataFrame(
+        {
+            "STNAME": ["California"],
+            "CTYNAME": ["Los Angeles County"],
+            "STATE": [6],
+            "COUNTY": [37],
+        }
+    ).to_csv(pep_raw / "pep_county__v2020__fixture.csv", index=False)
+    workbook_path = _write_mpi_contract_workbook(
+        tmp_path,
+        county_rows=[MPI_XLSX_ROW_TRUTH_TABLE["resolved_county"]["row"]],
+    )
+    cwd = tmp_path / "elsewhere"
+    cwd.mkdir()
+    monkeypatch.setenv("HHPLAB_ASSET_STORE_ROOT", str(asset_root))
+    monkeypatch.chdir(cwd)
+
+    curated = ingest_covariate_source(
+        MPI_SOURCE_ID,
+        workbook_path,
+        output_dir=tmp_path,
+        force=True,
+    )
+
+    result = pd.read_parquet(curated)
+    assert result["county_fips"].tolist() == ["06037"]
+    provenance = read_provenance(curated)
+    assert provenance is not None
+    assert provenance.extra["county_reference_path"] == [
+        str(pep_raw / "pep_county__v2020__fixture.csv")
+    ]
 
 
 def test_cli_ingests_mpi_xlsx_with_json_warnings(tmp_path: Path, monkeypatch) -> None:
@@ -563,20 +610,20 @@ def test_mpi_static_county_covariate_aggregates_to_msa_with_coverage_diagnostics
     curated = tmp_path / "covariate__mpi_unauthorized_immigrants__Y2023-2023.parquet"
     pd.DataFrame(
         {
-            "geo_type": ["county"],
-            "geo_id": ["01001"],
-            "county_fips": ["01001"],
-            "year": [2023],
-            "unauthorized_immigrant_population": [1_000],
-            "unauthorized_immigrant_share_of_us_total": [0.01],
+            "geo_type": ["county", "county"],
+            "geo_id": ["01001", "01003"],
+            "county_fips": ["01001", "01003"],
+            "year": [2023, 2023],
+            "unauthorized_immigrant_population": [1_000, 300],
+            "unauthorized_immigrant_share_of_us_total": [0.01, 0.003],
         }
     ).to_parquet(curated)
     population = tmp_path / "pep_county__v2024.parquet"
     pd.DataFrame(
         {
-            "county_fips": ["01001", "01003"],
-            "year": [2024, 2024],
-            "population": [100.0, 300.0],
+            "county_fips": ["01001", "01003", "01005"],
+            "year": [2024, 2024, 2024],
+            "population": [100.0, 300.0, 600.0],
         }
     ).to_parquet(population)
     data_root = tmp_path / "data"
@@ -584,8 +631,8 @@ def test_mpi_static_county_covariate_aggregates_to_msa_with_coverage_diagnostics
     msa_dir.mkdir(parents=True)
     pd.DataFrame(
         {
-            "msa_id": ["11111", "11111"],
-            "county_fips": ["01001", "01003"],
+            "msa_id": ["11111", "11111", "11111"],
+            "county_fips": ["01001", "01003", "01005"],
         }
     ).to_parquet(msa_dir / "msa_county_membership__test_msa_v1.parquet")
 
@@ -603,19 +650,121 @@ def test_mpi_static_county_covariate_aggregates_to_msa_with_coverage_diagnostics
 
     result = pd.read_parquet(panel)
     assert result["year"].tolist() == [2024]
-    assert result["unauthorized_immigrant_population"].tolist() == pytest.approx([1_000.0])
+    assert result["unauthorized_immigrant_population"].tolist() == pytest.approx([1_300.0])
+    assert result["unauthorized_immigrant_share_of_us_total"].tolist() == pytest.approx([0.013])
     assert result["source_estimate_year"].tolist() == [2023]
-    assert result["coverage_ratio"].tolist() == pytest.approx([0.5])
-    assert result["county_count"].tolist() == [1]
-    assert result["membership_county_count"].tolist() == [2]
+    assert result["coverage_ratio"].tolist() == pytest.approx([2 / 3])
+    assert result["population_weight_denominator"].tolist() == pytest.approx([400.0])
+    assert result["county_count"].tolist() == [2]
+    assert result["membership_county_count"].tolist() == [3]
     provenance = read_provenance(panel)
     assert provenance is not None
+    assert provenance.extra["measure_aggregations"] == {
+        "unauthorized_immigrant_population": "extensive_sum",
+        "unauthorized_immigrant_share_of_us_total": "extensive_sum",
+    }
     assert provenance.extra["static_year_policy"] == {
         "policy": "carry_forward_static_estimate_to_requested_years",
         "source_year": 2023,
         "target_years": [2024],
     }
     assert provenance.extra["coverage_diagnostics"]["partial_target_count"] == 1
+
+    filtered_panel = aggregate_covariate_source(
+        MPI_SOURCE_ID,
+        curated_path=curated,
+        output_dir=tmp_path,
+        years=[2024],
+        target_geo="msa",
+        msa_definition_version="test_msa_v1",
+        county_population_path=population,
+        data_root=data_root,
+        min_coverage_ratio=0.75,
+        drop_below_min_coverage=True,
+        force=True,
+    )
+    assert pd.read_parquet(filtered_panel).empty
+    filtered_provenance = read_provenance(filtered_panel)
+    assert filtered_provenance is not None
+    assert filtered_provenance.extra["coverage_policy"]["dropped_row_count"] == 1
+
+
+def test_mpi_same_msa_multi_county_rows_are_allocated_to_msa(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    """Recoverable MPI multi-county rows can contribute to MSA aggregation."""
+    monkeypatch.setattr("hhplab.covariates.ingest.register_source", lambda **_: None)
+    workbook_path = _write_mpi_contract_workbook(
+        tmp_path,
+        county_rows=[
+            ["California", "Los Angeles County, California", 1_101_000, 0.080176],
+            ["Colorado", "El Paso-Teller Counties, Colorado", 20_000, 0.001456],
+        ],
+    )
+    county_reference = tmp_path / "pep_county_reference.csv"
+    pd.DataFrame(
+        {
+            "STNAME": ["California", "Colorado", "Colorado"],
+            "CTYNAME": ["Los Angeles County", "El Paso County", "Teller County"],
+            "STATE": [6, 8, 8],
+            "COUNTY": [37, 41, 119],
+        }
+    ).to_csv(county_reference, index=False)
+    curated = ingest_covariate_source(
+        MPI_SOURCE_ID,
+        workbook_path,
+        output_dir=tmp_path,
+        county_reference_path=county_reference,
+        force=True,
+    )
+    ingest_provenance = read_provenance(curated)
+    assert ingest_provenance is not None
+    assert ingest_provenance.extra["skipped_reasons"] == {"multi_county_row": 1}
+    assert ingest_provenance.extra["multi_county_rows"][0]["member_county_fips"] == [
+        "08041",
+        "08119",
+    ]
+
+    population = tmp_path / "pep_county__v2024.parquet"
+    pd.DataFrame(
+        {
+            "county_fips": ["06037", "08041", "08119"],
+            "year": [2024, 2024, 2024],
+            "population": [9_700_000.0, 750_000.0, 25_000.0],
+        }
+    ).to_parquet(population)
+    data_root = tmp_path / "data"
+    msa_dir = data_root / "curated" / "msa"
+    msa_dir.mkdir(parents=True)
+    pd.DataFrame(
+        {
+            "msa_id": ["31080", "17820", "17820"],
+            "county_fips": ["06037", "08041", "08119"],
+        }
+    ).to_parquet(msa_dir / "msa_county_membership__test_msa_v1.parquet")
+
+    panel = aggregate_covariate_source(
+        MPI_SOURCE_ID,
+        curated_path=curated,
+        output_dir=tmp_path,
+        years=[2024],
+        target_geo="msa",
+        msa_definition_version="test_msa_v1",
+        county_population_path=population,
+        data_root=data_root,
+        force=True,
+    )
+
+    result = pd.read_parquet(panel).set_index("msa_id")
+    assert set(result.index) == {"17820", "31080"}
+    assert result.loc["17820", "unauthorized_immigrant_population"] == pytest.approx(20_000)
+    assert result.loc["17820", "unauthorized_immigrant_share_of_us_total"] == pytest.approx(
+        0.001456
+    )
+    assert result.loc["17820", "county_count"] == 2
+    assert result.loc["17820", "coverage_ratio"] == pytest.approx(1.0)
+    assert result.loc["17820", "mpi_multi_county_source_row_count"] == 1
 
 
 def test_mpi_county_covariate_rejects_unsupported_coc_target(tmp_path: Path) -> None:
@@ -779,9 +928,9 @@ def test_cli_aggregate_prism_covariate_to_msa(tmp_path: Path) -> None:
     population = tmp_path / "pep.parquet"
     pd.DataFrame(
         {
-            "county_fips": ["01001", "01003"],
-            "year": [2024, 2024],
-            "population": [25.0, 75.0],
+            "county_fips": ["01001", "01003", "01005"],
+            "year": [2024, 2024, 2024],
+            "population": [25.0, 75.0, 50.0],
         }
     ).to_parquet(population)
     data_root = tmp_path / "data"
@@ -789,8 +938,8 @@ def test_cli_aggregate_prism_covariate_to_msa(tmp_path: Path) -> None:
     msa_dir.mkdir(parents=True)
     pd.DataFrame(
         {
-            "msa_id": ["11111", "11111"],
-            "county_fips": ["01001", "01003"],
+            "msa_id": ["11111", "11111", "11111"],
+            "county_fips": ["01001", "01003", "01005"],
         }
     ).to_parquet(msa_dir / "msa_county_membership__test_msa_v1.parquet")
 
@@ -825,5 +974,9 @@ def test_cli_aggregate_prism_covariate_to_msa(tmp_path: Path) -> None:
     assert payload["status"] == "ok"
     assert payload["target_geo"] == "msa"
     assert payload["msa_definition_version"] == "test_msa_v1"
+    assert payload["coverage_policy"]["below_threshold_count"] == 1
+    assert payload["coverage_diagnostics"]["partial_target_count"] == 1
+    assert payload["warnings"][0]["code"] == "covariate_msa_partial_coverage"
     panel = pd.read_parquet(payload["output_path"])
     assert panel.loc[0, "tmin_c"] == pytest.approx(4.0)
+    assert panel.loc[0, "coverage_ratio"] == pytest.approx(2 / 3)

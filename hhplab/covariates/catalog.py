@@ -17,6 +17,11 @@ from hhplab.covariates.mpi_contract import (
 )
 
 GeoType = Literal["county", "coc", "state"]
+MeasureAggregation = Literal[
+    "extensive_sum",
+    "intensive_pop_weighted_mean",
+    "rate",
+]
 
 
 @dataclass(frozen=True)
@@ -34,6 +39,7 @@ class CovariateSourceSpec:
     source_url: str
     required_columns: tuple[str, ...]
     measure_columns: tuple[str, ...]
+    measure_aggregations: dict[str, MeasureAggregation]
     recommended_align: str
     notes: str
 
@@ -55,6 +61,10 @@ COVARIATE_SOURCE_SPECS: dict[str, CovariateSourceSpec] = {
         source_url="https://evictionlab.org/map/",
         required_columns=("county_fips", "year"),
         measure_columns=("eviction_filings", "eviction_rate"),
+        measure_aggregations={
+            "eviction_filings": "extensive_sum",
+            "eviction_rate": "intensive_pop_weighted_mean",
+        },
         recommended_align="calendar_year",
         notes=(
             "County-year eviction filings/rates are useful housing-instability "
@@ -73,6 +83,10 @@ COVARIATE_SOURCE_SPECS: dict[str, CovariateSourceSpec] = {
         source_url="https://www.census.gov/permits",
         required_columns=("county_fips", "year"),
         measure_columns=("permitted_units", "permitted_buildings"),
+        measure_aggregations={
+            "permitted_units": "extensive_sum",
+            "permitted_buildings": "extensive_sum",
+        },
         recommended_align="calendar_year",
         notes=(
             "Census Building Permits Survey county annual files measure newly "
@@ -91,6 +105,13 @@ COVARIATE_SOURCE_SPECS: dict[str, CovariateSourceSpec] = {
         source_url="https://www.huduser.gov/portal/datasets/fmr.html",
         required_columns=("county_fips", "year"),
         measure_columns=("fmr_0br", "fmr_1br", "fmr_2br", "fmr_3br", "fmr_4br"),
+        measure_aggregations={
+            "fmr_0br": "intensive_pop_weighted_mean",
+            "fmr_1br": "intensive_pop_weighted_mean",
+            "fmr_2br": "intensive_pop_weighted_mean",
+            "fmr_3br": "intensive_pop_weighted_mean",
+            "fmr_4br": "intensive_pop_weighted_mean",
+        },
         recommended_align="fiscal_year",
         notes=(
             "HUD Fair Market Rents are fiscal-year rent ceilings used by voucher "
@@ -109,6 +130,10 @@ COVARIATE_SOURCE_SPECS: dict[str, CovariateSourceSpec] = {
         source_url="https://www.huduser.gov/portal/datasets/assthsg.html",
         required_columns=("county_fips", "year"),
         measure_columns=("subsidized_households", "housing_choice_vouchers"),
+        measure_aggregations={
+            "subsidized_households": "extensive_sum",
+            "housing_choice_vouchers": "extensive_sum",
+        },
         recommended_align="calendar_year",
         notes=(
             "Picture of Subsidized Households reports HUD-assisted housing "
@@ -131,6 +156,11 @@ COVARIATE_SOURCE_SPECS: dict[str, CovariateSourceSpec] = {
             "spm_returns_to_homelessness",
             "spm_successful_exits",
         ),
+        measure_aggregations={
+            "spm_first_time_homeless": "extensive_sum",
+            "spm_returns_to_homelessness": "extensive_sum",
+            "spm_successful_exits": "extensive_sum",
+        },
         recommended_align="fiscal_year",
         notes=(
             "HUD System Performance Measures are CoC-native annual HMIS system "
@@ -149,6 +179,9 @@ COVARIATE_SOURCE_SPECS: dict[str, CovariateSourceSpec] = {
         source_url="https://www.kff.org/medicaid/status-of-state-medicaid-expansion-decisions/",
         required_columns=("state", "year"),
         measure_columns=("medicaid_expansion_adopted",),
+        measure_aggregations={
+            "medicaid_expansion_adopted": "intensive_pop_weighted_mean",
+        },
         recommended_align="effective_year",
         notes=(
             "State policy indicator for ACA Medicaid expansion adoption; agents "
@@ -175,6 +208,12 @@ COVARIATE_SOURCE_SPECS: dict[str, CovariateSourceSpec] = {
             "tmin_code_blue_band",
             "tmin_above_code_blue",
         ),
+        measure_aggregations={
+            "tmin_c": "intensive_pop_weighted_mean",
+            "tmin_below_freezing": "intensive_pop_weighted_mean",
+            "tmin_code_blue_band": "intensive_pop_weighted_mean",
+            "tmin_above_code_blue": "intensive_pop_weighted_mean",
+        },
         recommended_align="point_in_time_jan",
         notes=(
             "January county PRISM minimum temperature in Celsius, with policy-threshold "
@@ -193,6 +232,10 @@ COVARIATE_SOURCE_SPECS: dict[str, CovariateSourceSpec] = {
         source_url=MPI_SOURCE_URL,
         required_columns=MPI_REQUIRED_CURATED_COLUMNS,
         measure_columns=MPI_MEASURE_COLUMNS,
+        measure_aggregations={
+            "unauthorized_immigrant_population": "extensive_sum",
+            "unauthorized_immigrant_share_of_us_total": "extensive_sum",
+        },
         recommended_align="point_in_time_mid_year",
         notes=(
             "Migration Policy Institute mid-2023 estimates for unauthorized "
