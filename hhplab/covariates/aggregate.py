@@ -8,7 +8,7 @@ from pathlib import Path
 import pandas as pd
 
 from hhplab.covariates.catalog import MeasureAggregation, covariate_source_spec
-from hhplab.covariates.ingest import default_covariate_output_path
+from hhplab.covariates.ingest import STATE_NAME_TO_ABBREV, default_covariate_output_path
 from hhplab.covariates.mpi_contract import MPI_ESTIMATE_YEAR, MPI_SOURCE_ID
 from hhplab.msa import DEFINITION_VERSION as DEFAULT_MSA_DEFINITION_VERSION
 from hhplab.msa.msa_io import read_msa_county_membership, read_msa_definitions
@@ -256,13 +256,18 @@ def _expand_mpi_multi_county_rows(
 
 def _mpi_msa_rows_from_provenance(provenance: ProvenanceBlock) -> list[dict[str, object]]:
     rows = provenance.extra.get("msa_rows")
-    if rows:
+    if rows is not None:
         return list(rows)
-    return [
-        row
-        for row in provenance.extra.get("skipped_preview", [])
-        if row.get("exclusion_reason") == "msa_row"
-    ]
+    skipped_reasons = provenance.extra.get("skipped_reasons") or {}
+    msa_row_count = int(skipped_reasons.get("msa_row") or 0)
+    if msa_row_count:
+        raise ValueError(
+            "MPI curated covariate provenance is missing full `msa_rows` metadata "
+            f"for {msa_row_count} skipped native MSA row(s). Re-ingest the MPI covariate "
+            "with `hhplab ingest covariate --source mpi_unauthorized_immigrants --force` "
+            "before aggregating to --target-geo msa."
+        )
+    return []
 
 
 def aggregate_county_covariate_to_msa(
@@ -548,10 +553,8 @@ def _apply_mpi_msa_rows(
     msa_lookup = _unique_msa_name_lookup(definitions)
     population_lookup = population.set_index(["county_fips", "year"])["population"].to_dict()
     for source_row in mpi_msa_rows:
-        name_key = _mpi_msa_label_key(str(source_row.get("county_label") or ""))
-        if not name_key:
-            continue
-        msa_id = msa_lookup.get(name_key)
+        lookup_keys = _mpi_msa_label_lookup_keys(str(source_row.get("county_label") or ""))
+        msa_id = next((msa_lookup[key] for key in lookup_keys if key in msa_lookup), None)
         if msa_id is None:
             continue
         year = int(source_row.get("year", MPI_ESTIMATE_YEAR))
@@ -590,21 +593,67 @@ def _unique_msa_name_lookup(definitions: pd.DataFrame) -> dict[str, str]:
         return {}
     keyed = definitions[["msa_id", "msa_name"]].dropna().copy()
     keyed["name_key"] = keyed["msa_name"].map(_msa_definition_name_key)
+    keyed["state_keys"] = keyed["msa_name"].map(_msa_definition_state_keys)
     counts = keyed["name_key"].value_counts()
     unique = keyed[keyed["name_key"].map(counts) == 1]
-    return dict(zip(unique["name_key"], unique["msa_id"].astype(str), strict=False))
+    lookup = dict(zip(unique["name_key"], unique["msa_id"].astype(str), strict=False))
+    state_key_rows = [
+        {"name_key": state_key, "msa_id": row.msa_id}
+        for row in keyed.itertuples(index=False)
+        for state_key in row.state_keys
+    ]
+    if state_key_rows:
+        state_keyed = pd.DataFrame(state_key_rows)
+        state_counts = state_keyed["name_key"].value_counts()
+        state_unique = state_keyed[state_keyed["name_key"].map(state_counts) == 1]
+        lookup.update(
+            dict(zip(state_unique["name_key"], state_unique["msa_id"].astype(str), strict=False))
+        )
+    return lookup
 
 
-def _mpi_msa_label_key(label: str) -> str | None:
+def _mpi_msa_label_lookup_keys(label: str) -> list[str]:
     marker = " MSA"
     if marker not in label:
-        return None
-    return _normalize_msa_name_key(label.split(marker, 1)[0])
+        return []
+    base, suffix = label.split(marker, 1)
+    name_key = _normalize_msa_name_key(base)
+    state_keys = [
+        _msa_state_name_key(name_key, state_abbrev)
+        for state_abbrev in _state_abbrevs_from_mpi_label_suffix(suffix)
+    ]
+    return [*state_keys, name_key]
 
 
 def _msa_definition_name_key(name: str) -> str:
     base = name.split(",", 1)[0]
     return _normalize_msa_name_key(base)
+
+
+def _msa_definition_state_keys(name: str) -> list[str]:
+    if "," not in name:
+        return []
+    name_key = _msa_definition_name_key(name)
+    state_suffix = name.rsplit(",", 1)[1]
+    return [
+        _msa_state_name_key(name_key, state_abbrev)
+        for state_abbrev in re.findall(r"\b[A-Z]{2}\b", state_suffix.upper())
+    ]
+
+
+def _state_abbrevs_from_mpi_label_suffix(suffix: str) -> list[str]:
+    cleaned = suffix.replace(",++", " ").replace("++", " ")
+    state_abbrevs: list[str] = []
+    for state_name in re.split(r"[-/;,]", cleaned):
+        normalized = " ".join(state_name.upper().replace(".", "").split())
+        state_abbrev = STATE_NAME_TO_ABBREV.get(normalized)
+        if state_abbrev is not None:
+            state_abbrevs.append(state_abbrev)
+    return state_abbrevs
+
+
+def _msa_state_name_key(name_key: str, state_abbrev: str) -> str:
+    return f"{name_key}__state_{state_abbrev}"
 
 
 def _normalize_msa_name_key(value: str) -> str:

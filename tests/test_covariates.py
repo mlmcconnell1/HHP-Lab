@@ -35,7 +35,7 @@ from hhplab.covariates.mpi_contract import (
     validate_mpi_workbook_contract,
 )
 from hhplab.curated_policy import validate_curated_layout
-from hhplab.provenance import read_provenance
+from hhplab.provenance import ProvenanceBlock, read_provenance, write_parquet_with_provenance
 
 runner = CliRunner()
 
@@ -880,6 +880,109 @@ def test_mpi_native_msa_rows_fill_missing_msa_covariate_rows() -> None:
     assert by_msa.loc["14460", "static_year_policy"] == "carry_forward"
 
 
+def test_mpi_native_msa_rows_use_state_qualifier_for_duplicate_names() -> None:
+    """MPI state-qualified native MSA labels should disambiguate duplicate MSA names."""
+    county = pd.DataFrame(
+        {
+            "county_fips": ["06037"],
+            "year": [2024],
+            "unauthorized_immigrant_population": [1_101_000],
+        }
+    )
+    membership = pd.DataFrame(
+        {
+            "msa_id": ["31080", "44140", "44100"],
+            "county_fips": ["06037", "25013", "17167"],
+        }
+    )
+    definitions = pd.DataFrame(
+        {
+            "msa_id": ["31080", "44140", "44100"],
+            "msa_name": [
+                "Los Angeles-Long Beach-Anaheim, CA",
+                "Springfield, MA",
+                "Springfield, IL",
+            ],
+        }
+    )
+    population = pd.DataFrame(
+        {
+            "county_fips": ["06037", "25013", "17167"],
+            "year": [2024, 2024, 2024],
+            "population": [9_700_000.0, 465_000.0, 190_000.0],
+        }
+    )
+
+    result = aggregate_county_covariate_to_msa(
+        county,
+        measure_columns=["unauthorized_immigrant_population"],
+        measure_aggregations={"unauthorized_immigrant_population": "extensive_sum"},
+        msa_definition_version="test_msa_v1",
+        msa_county_membership=membership,
+        msa_definitions=definitions,
+        county_population=population,
+        mpi_msa_rows=[
+            {
+                "year": 2024,
+                "county_label": "Springfield MSA,++ Massachusetts",
+                "unauthorized_immigrant_population": 11_000,
+            }
+        ],
+    )
+
+    by_msa = result.set_index("msa_id")
+    assert set(by_msa.index) == {"31080", "44140"}
+    assert "44100" not in by_msa.index
+    assert by_msa.loc["44140", "unauthorized_immigrant_population"] == pytest.approx(11_000)
+    assert by_msa.loc["44140", "population_weight_denominator"] == pytest.approx(465_000)
+    assert by_msa.loc["44140", "coverage_ratio"] == pytest.approx(1.0)
+    assert by_msa.loc["44140", "mpi_msa_source_row_count"] == 1
+
+
+def test_mpi_msa_aggregate_rejects_stale_preview_only_msa_provenance(
+    tmp_path: Path,
+) -> None:
+    """Stale MPI artifacts must not recover native MSA rows from capped previews."""
+    curated = tmp_path / "covariate__mpi_unauthorized_immigrants__Y2023-2023.parquet"
+    write_parquet_with_provenance(
+        pd.DataFrame(
+            {
+                "geo_type": ["county"],
+                "geo_id": ["06037"],
+                "county_fips": ["06037"],
+                "year": [MPI_ESTIMATE_YEAR],
+                **{column: [1.0] for column in MPI_MEASURE_COLUMNS},
+            }
+        ),
+        curated,
+        ProvenanceBlock(
+            geo_type="county",
+            extra={
+                "dataset_type": "expanded_covariate",
+                "source_id": MPI_SOURCE_ID,
+                "native_geo": "county",
+                "measure_columns": list(MPI_MEASURE_COLUMNS),
+                "skipped_reasons": {"msa_row": 5},
+                "skipped_preview": [
+                    {
+                        "county_label": "Boston-Cambridge-Newton MSA,++ Massachusetts-New Hampshire",
+                        "exclusion_reason": "msa_row",
+                    }
+                ],
+            },
+        ),
+    )
+
+    with pytest.raises(ValueError, match="Re-ingest the MPI covariate"):
+        aggregate_covariate_source(
+            MPI_SOURCE_ID,
+            curated_path=curated,
+            output_path=tmp_path / "mpi_msa.parquet",
+            target_geo="msa",
+            force=True,
+        )
+
+
 def test_mpi_county_covariate_rejects_unsupported_coc_target(tmp_path: Path) -> None:
     """MPI county-native estimates require explicit crosswalk support for CoC output."""
     curated = tmp_path / "covariate__mpi_unauthorized_immigrants__Y2023-2023.parquet"
@@ -975,7 +1078,35 @@ def test_cli_ingest_and_aggregate_covariate(tmp_path: Path, monkeypatch) -> None
     aggregate_payload = json.loads(aggregate_result.output)
     assert aggregate_payload["status"] == "ok"
     assert aggregate_payload["target_geo"] == "county"
+    assert aggregate_payload["rebuilt"] is True
+    assert aggregate_payload["skipped_existing_output"] is False
     assert aggregate_payload["row_count"] == 1
+
+    cached_result = runner.invoke(
+        app,
+        [
+            "aggregate",
+            "covariate",
+            "--source",
+            "hud_fmr",
+            "--curated-path",
+            ingest_payload["output_path"],
+            "--output-dir",
+            str(tmp_path),
+            "--years",
+            "2024",
+            "--target-geo",
+            "county",
+            "--json",
+        ],
+    )
+    assert cached_result.exit_code == 0
+    cached_payload = json.loads(cached_result.output)
+    assert cached_payload["status"] == "ok"
+    assert cached_payload["rebuilt"] is False
+    assert cached_payload["skipped_existing_output"] is True
+    assert cached_payload["output_path"] == aggregate_payload["output_path"]
+    assert cached_payload["row_count"] == 1
 
 
 def test_cli_aggregate_county_covariate_rejects_default_coc_target(

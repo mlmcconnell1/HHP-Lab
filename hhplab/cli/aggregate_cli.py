@@ -261,12 +261,17 @@ def aggregate_covariate(
     """Validate and materialize an expanded covariate source as panel-ready parquet."""
     import json
 
-    from hhplab.covariates.aggregate import aggregate_covariate_source
+    from hhplab.covariates.aggregate import (
+        aggregate_covariate_source,
+        default_covariate_panel_path,
+    )
     from hhplab.provenance import read_provenance
 
     _validate_align(align, COVARIATE_ALIGN_MODES, "covariate")
     parsed_years = parse_year_spec(years) if years is not None else None
     try:
+        expected_output_path = default_covariate_panel_path(source, output_dir=output_dir)
+        skipped_existing_output = expected_output_path.exists() and not force
         result_path = aggregate_covariate_source(
             source,
             curated_path=curated_path,
@@ -304,6 +309,8 @@ def aggregate_covariate(
         ),
         "years": parsed_years,
         "output_path": str(result_path),
+        "rebuilt": not skipped_existing_output,
+        "skipped_existing_output": skipped_existing_output,
         "row_count": row_count,
         "coverage_policy": coverage_policy,
         "coverage_diagnostics": coverage_diagnostics,
@@ -311,6 +318,12 @@ def aggregate_covariate(
     }
     if output_json:
         typer.echo(json.dumps(payload))
+        return
+    if skipped_existing_output:
+        typer.echo(
+            "Covariate aggregation skipped existing output; pass --force to rebuild: "
+            f"{result_path}"
+        )
         return
     typer.echo(f"Covariate aggregation complete: {result_path}")
 
