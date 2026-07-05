@@ -9,6 +9,8 @@ import pandas as pd
 from typer.testing import CliRunner
 
 from hhplab.cli.main import app
+from hhplab.covariates.mpi_contract import MPI_MEASURE_COLUMNS
+from hhplab.panel.conformance import PanelRequest, run_conformance
 from hhplab.provenance import ProvenanceBlock, read_provenance, write_parquet_with_provenance
 
 runner = CliRunner()
@@ -164,6 +166,80 @@ class TestAnalyzeCli:
         provenance = read_provenance(output)
         assert provenance is not None
         assert provenance.extra["parameters"]["partial_controls"] == ["unemployment_rate"]
+
+    def test_correlate_accepts_mpi_covariates_with_existing_panel_series(
+        self,
+        tmp_path: Path,
+    ):
+        panel = tmp_path / "mpi_panel.parquet"
+        write_parquet_with_provenance(
+            pd.DataFrame(
+                {
+                    "geo_type": ["msa", "msa", "msa"],
+                    "geo_id": ["11111", "22222", "33333"],
+                    "year": [2024, 2024, 2024],
+                    "pit_total": [10.0, 20.0, 30.0],
+                    "unauthorized_immigrant_population": [1000.0, 2500.0, 3600.0],
+                    "unauthorized_immigrant_share_of_us_total": [0.01, 0.02, 0.03],
+                }
+            ),
+            panel,
+            ProvenanceBlock(
+                geo_type="msa",
+                extra={"recipe": "mpi-panel"},
+            ),
+        )
+        output = tmp_path / "mpi_correlate.parquet"
+
+        result = runner.invoke(
+            app,
+            [
+                "analyze",
+                "correlate",
+                "--panel",
+                str(panel),
+                "--columns",
+                "pit_total,unauthorized_immigrant_population",
+                "--output",
+                str(output),
+                "--json",
+            ],
+        )
+
+        assert result.exit_code == 0
+        payload = json.loads(result.output)
+        assert payload["analysis_type"] == "correlate"
+        records = pd.read_parquet(output)
+        assert records.loc[0, "left"] == "pit_total"
+        assert records.loc[0, "right"] == "unauthorized_immigrant_population"
+        assert records.loc[0, "n"] == 3
+
+        conformance = run_conformance(
+            pd.read_parquet(panel),
+            PanelRequest(
+                start_year=2024,
+                end_year=2024,
+                geo_type="msa",
+                measure_columns=list(MPI_MEASURE_COLUMNS),
+            ),
+        )
+        assert conformance.passed
+
+        missing_result = runner.invoke(
+            app,
+            [
+                "analyze",
+                "correlate",
+                "--panel",
+                str(panel),
+                "--columns",
+                "pit_total,missing_mpi_measure",
+                "--json",
+            ],
+        )
+        assert missing_result.exit_code != 0
+        assert "correlate references missing panel columns" in missing_result.output
+        assert "missing_mpi_measure" in missing_result.output
 
     def test_regress_outputs_fixed_effect_coefficients(self, tmp_path: Path):
         panel = _panel_fixture(tmp_path / "panel.parquet")
