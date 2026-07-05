@@ -719,7 +719,12 @@ ACS5_COVARIATE_REGISTRY: tuple[ACS5CovariateSpec, ...] = (
         source_variables=_source_variables_for_outputs(
             _columns_with_prefix("contract_rent_distribution_")
         ),
-        output_columns=_columns_with_prefix("contract_rent_distribution_"),
+        output_columns=(
+            *_columns_with_prefix("contract_rent_distribution_"),
+            "contract_rent_p10",
+            "contract_rent_p25",
+            "contract_rent_p50",
+        ),
         measure_kind="distribution",
         denominator_column="contract_rent_distribution_total",
         weight_column="area_share",

@@ -112,7 +112,9 @@ RENT_BURDEN_30_PLUS_COLUMNS: tuple[str, ...] = (
 
 MSA_ACS5_COVARIATE_ALIASES: dict[str, str] = {
     "median_gross_rent": "msa_median_rent",
+    "contract_rent_p10": "msa_contract_rent_p10",
     "contract_rent_p25": "msa_contract_rent_p25",
+    "contract_rent_p50": "msa_contract_rent_p50",
     "vacancy_rate": "msa_vacancy_rate",
     "poverty_rate": "msa_poverty_rate",
     "median_household_income": "msa_income",
@@ -545,11 +547,18 @@ def _derive_acs5_covariates(result_df: pd.DataFrame) -> None:
         numerator = numerator.where(denominator.notna())
         result_df["rent_burden_30_plus"] = numerator / denominator.where(denominator > 0)
 
-    _derive_contract_rent_p25(result_df)
+    _derive_contract_rent_quantiles(result_df)
 
 
-def _derive_contract_rent_p25(result_df: pd.DataFrame) -> None:
-    """Derive lower-quartile contract rent from aggregated B25056 bin counts."""
+CONTRACT_RENT_QUANTILES: tuple[tuple[str, float], ...] = (
+    ("contract_rent_p10", 0.10),
+    ("contract_rent_p25", 0.25),
+    ("contract_rent_p50", 0.50),
+)
+
+
+def _derive_contract_rent_quantiles(result_df: pd.DataFrame) -> None:
+    """Derive contract-rent quantiles from aggregated B25056 bin counts."""
     if "contract_rent_distribution_with_cash_rent" not in result_df.columns:
         return
 
@@ -557,17 +566,18 @@ def _derive_contract_rent_p25(result_df: pd.DataFrame) -> None:
     if not bins:
         return
 
-    values: list[object] = []
-    for _, row in result_df.iterrows():
-        values.append(
-            _quantile_from_distribution_row(
-                row,
-                total_column="contract_rent_distribution_with_cash_rent",
-                bins=bins,
-                quantile=0.25,
+    for output_column, quantile in CONTRACT_RENT_QUANTILES:
+        values: list[object] = []
+        for _, row in result_df.iterrows():
+            values.append(
+                _quantile_from_distribution_row(
+                    row,
+                    total_column="contract_rent_distribution_with_cash_rent",
+                    bins=bins,
+                    quantile=quantile,
+                )
             )
-        )
-    result_df["contract_rent_p25"] = values
+        result_df[output_column] = values
 
 
 def _available_contract_rent_bins(

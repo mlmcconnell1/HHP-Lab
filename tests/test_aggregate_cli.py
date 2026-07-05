@@ -442,8 +442,12 @@ def test_aggregate_acs_to_msa_writes_expanded_panel_ready_output():
         output = pd.read_parquet(out_path)
         assert output.loc[0, "msa_id"] == "12345"
         assert output.loc[0, "non_native_share"] == pytest.approx(0.15)
+        assert output.loc[0, "contract_rent_p10"] == pytest.approx(255.0)
         assert output.loc[0, "contract_rent_p25"] == pytest.approx(262.5)
+        assert output.loc[0, "contract_rent_p50"] == pytest.approx(275.0)
+        assert "msa_contract_rent_p10" in output.columns
         assert "msa_contract_rent_p25" in output.columns
+        assert "msa_contract_rent_p50" in output.columns
 
 
 def test_derive_acs5_covariates_propagates_missing_non_native_component():

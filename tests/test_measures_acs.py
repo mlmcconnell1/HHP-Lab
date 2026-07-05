@@ -101,7 +101,9 @@ CONTRACT_RENT_P25_DISTRIBUTION = {
     "contract_rent_distribution_cash_rent_200_to_249": [0.0, 0.0],
     "contract_rent_distribution_cash_rent_250_to_299": [0.0, 100.0],
 }
+CONTRACT_RENT_P10_EXPECTED = 125.0
 CONTRACT_RENT_P25_EXPECTED = 260.0
+CONTRACT_RENT_P50_EXPECTED = 285.0
 NON_NATIVE_SHARE_EXPECTED = (100.0 + 30.0 + 300.0 + 70.0) / (1000.0 + 2000.0)
 
 
@@ -193,7 +195,7 @@ class TestAggregateToCoC:
 
         assert co500["weighting_method"] == "population"
 
-    def test_derives_non_native_share_and_contract_rent_p25_after_rollup(self):
+    def test_derives_non_native_share_and_contract_rent_quantiles_after_rollup(self):
         acs_data = pd.DataFrame(
             {
                 "GEOID": ["08001000100", "08001000200"],
@@ -217,7 +219,9 @@ class TestAggregateToCoC:
 
         row = result.iloc[0]
         assert row["non_native_share"] == pytest.approx(NON_NATIVE_SHARE_EXPECTED)
+        assert row["contract_rent_p10"] == pytest.approx(CONTRACT_RENT_P10_EXPECTED)
         assert row["contract_rent_p25"] == pytest.approx(CONTRACT_RENT_P25_EXPECTED)
+        assert row["contract_rent_p50"] == pytest.approx(CONTRACT_RENT_P50_EXPECTED)
 
     def test_count_vars_always_use_area_share(self):
         """Test that count variables use area_share regardless of weighting parameter.
@@ -408,6 +412,7 @@ class TestMsaAcs5Covariates:
                 "gross_rent_pct_income_35_to_39_9": [30.0, 70.0],
                 "gross_rent_pct_income_40_to_49_9": [20.0, 60.0],
                 "gross_rent_pct_income_50_plus": [10.0, 50.0],
+                **CONTRACT_RENT_P25_DISTRIBUTION,
             }
         )
         crosswalk = pd.DataFrame(
@@ -431,6 +436,9 @@ class TestMsaAcs5Covariates:
         assert row["poverty_rate"] == pytest.approx(450.0 / 2700.0)
         assert row["vacancy_rate"] == pytest.approx(300.0 / 1500.0)
         assert row["rent_burden_30_plus"] == pytest.approx(360.0 / 1200.0)
+        assert row["msa_contract_rent_p10"] == pytest.approx(row["contract_rent_p10"])
+        assert row["msa_contract_rent_p25"] == pytest.approx(row["contract_rent_p25"])
+        assert row["msa_contract_rent_p50"] == pytest.approx(row["contract_rent_p50"])
         assert row["msa_poverty_rate"] == pytest.approx(row["poverty_rate"])
         assert row["msa_vacancy_rate"] == pytest.approx(row["vacancy_rate"])
         assert row["msa_rent_burden"] == pytest.approx(row["rent_burden_30_plus"])
