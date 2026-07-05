@@ -279,9 +279,11 @@ class TestDataFrameBuilders:
             "note",
         ]
 
-    def test_los_angeles_2012_alias_normalizes_to_canonical_cbsa(self):
+    def test_historical_cbsa_aliases_normalize_to_canonical_cbsa(self):
         assert canonicalize_cbsa_code("31100", year=2012) == "31080"
         assert canonicalize_cbsa_code("31100", year=2013) == "31100"
+        assert canonicalize_cbsa_code("17460", year=2022) == "17410"
+        assert canonicalize_cbsa_code("17460", year=2023) == "17460"
 
     def test_principal_state_fips_uses_first_state_in_msa_name(self):
         assert (

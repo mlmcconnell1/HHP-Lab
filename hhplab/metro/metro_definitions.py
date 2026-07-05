@@ -122,6 +122,15 @@ CBSA_ALIAS_RULES: list[tuple[str, str, int, int, str, str]] = [
         "Census ACS1 2012 returns Los Angeles under legacy CBSA 31100; "
         "normalize to canonical CBSA 31080.",
     ),
+    (
+        "17410",
+        "17460",
+        2012,
+        2022,
+        "Cleveland-Elyria, OH Metro Area",
+        "Census ACS1 2012-2022 returns Cleveland, OH under legacy CBSA 17460; "
+        "normalize to canonical CBSA 17410.",
+    ),
 ]
 
 # ---------------------------------------------------------------------------
