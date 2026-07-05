@@ -688,3 +688,53 @@ class TestPepDiagnosticsProvenance:
         out = tmp_path / "diag.parquet"
         run_pep_diagnostics(src, output_path=out)
         assert has_provenance(out)
+
+
+class TestLoadPepCountyDiscovery:
+    """load_pep_county discovers every pep_county__v*.parquet vintage file.
+
+    Truth table for the fixture directory below:
+    - pep_county__v2020.parquet          -> years 2015-2020, population 100
+    - pep_county__v2025__y2020-2025.parquet -> years 2020-2025, population 200
+    Expected combined coverage: 2015-2025, with the later vintage (200)
+    winning for the overlapping year 2020.
+    """
+
+    PLAIN_VINTAGE_YEARS = list(range(2015, 2021))
+    SUFFIXED_VINTAGE_YEARS = list(range(2020, 2026))
+    PLAIN_POPULATION = 100.0
+    SUFFIXED_POPULATION = 200.0
+
+    @pytest.fixture
+    def pep_dir(self, tmp_path: Path) -> Path:
+        plain = pd.DataFrame(
+            {
+                "county_fips": ["01001"] * len(self.PLAIN_VINTAGE_YEARS),
+                "year": self.PLAIN_VINTAGE_YEARS,
+                "population": [self.PLAIN_POPULATION] * len(self.PLAIN_VINTAGE_YEARS),
+            }
+        )
+        suffixed = pd.DataFrame(
+            {
+                "county_fips": ["01001"] * len(self.SUFFIXED_VINTAGE_YEARS),
+                "year": self.SUFFIXED_VINTAGE_YEARS,
+                "population": [self.SUFFIXED_POPULATION] * len(self.SUFFIXED_VINTAGE_YEARS),
+            }
+        )
+        plain.to_parquet(tmp_path / "pep_county__v2020.parquet", index=False)
+        suffixed.to_parquet(tmp_path / "pep_county__v2025__y2020-2025.parquet", index=False)
+        return tmp_path
+
+    def test_discovers_year_suffixed_vintage_files(self, pep_dir: Path) -> None:
+        from hhplab.pep.pep_aggregate import load_pep_county
+
+        combined = load_pep_county(pep_dir=pep_dir)
+        expected_years = sorted(set(self.PLAIN_VINTAGE_YEARS) | set(self.SUFFIXED_VINTAGE_YEARS))
+        assert sorted(combined["year"].unique()) == expected_years
+
+    def test_latest_vintage_wins_on_overlap(self, pep_dir: Path) -> None:
+        from hhplab.pep.pep_aggregate import load_pep_county
+
+        combined = load_pep_county(pep_dir=pep_dir)
+        overlap_year = combined[combined["year"] == 2020]
+        assert overlap_year["population"].tolist() == [self.SUFFIXED_POPULATION]

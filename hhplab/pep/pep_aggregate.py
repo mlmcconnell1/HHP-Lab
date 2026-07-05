@@ -226,9 +226,11 @@ def load_pep_county(
     else:
         pep_dir = Path(pep_dir)
 
-    # Discover vintage files, sorted descending so latest vintage wins on overlap
+    # Discover vintage files, sorted descending so latest vintage wins on overlap.
+    # Matches both plain vintages (pep_county__v2024.parquet) and year-suffixed
+    # exports (pep_county__v2025__y2020-2025.parquet).
     vintage_files = sorted(
-        pep_dir.glob("pep_county__v[0-9][0-9][0-9][0-9].parquet"),
+        pep_dir.glob("pep_county__v[0-9][0-9][0-9][0-9]*.parquet"),
         reverse=True,
     )
 
