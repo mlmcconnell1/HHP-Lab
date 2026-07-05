@@ -49,6 +49,25 @@ EXPECTED_COVARIATE_SOURCES = {
     MPI_SOURCE_ID: ("county", "unauthorized_immigrant_population"),
 }
 
+MPI_XLSX_ROW_TRUTH_TABLE = {
+    "us_total": {
+        "row": [None, "United States", 13_738_000, 1.0],
+        "expected": "skipped:us_total",
+    },
+    "resolved_county": {
+        "row": ["California", "Los Angeles County, California", 1_101_000, 0.080176],
+        "expected": "written:06037",
+    },
+    "multi_county": {
+        "row": ["Florida", "Miami-Dade-Monroe Counties, Florida", 356_000, 0.025903],
+        "expected": "skipped:multi_county_row",
+    },
+    "unmapped_county": {
+        "row": ["Atlantis", "Poseidon County, Atlantis", 5_000, 0.0001],
+        "expected": "error:no_resolved_county_fips",
+    },
+}
+
 BRANCH_ROUNDTRIP_CASES = [
     pytest.param(
         "census_bps",
@@ -195,9 +214,9 @@ def test_mpi_xlsx_ingest_writes_resolved_counties_with_provenance(
     workbook_path = _write_mpi_contract_workbook(
         tmp_path,
         county_rows=[
-            [None, "United States", 13_738_000, 1.0],
-            ["California", "Los Angeles County, California", 1_101_000, 0.080176],
-            ["Florida", "Miami-Dade-Monroe Counties, Florida", 356_000, 0.025903],
+            MPI_XLSX_ROW_TRUTH_TABLE["us_total"]["row"],
+            MPI_XLSX_ROW_TRUTH_TABLE["resolved_county"]["row"],
+            MPI_XLSX_ROW_TRUTH_TABLE["multi_county"]["row"],
         ],
     )
     county_reference = tmp_path / "pep_county_reference.csv"
@@ -233,14 +252,41 @@ def test_mpi_xlsx_ingest_writes_resolved_counties_with_provenance(
     assert provenance.extra["skipped_reasons"] == {"us_total": 1, "multi_county_row": 1}
 
 
+def test_mpi_xlsx_ingest_rejects_unmapped_counties(tmp_path: Path, monkeypatch) -> None:
+    """Unmapped source county labels fail before writing empty curated artifacts."""
+    monkeypatch.setattr("hhplab.covariates.ingest.register_source", lambda **_: None)
+    workbook_path = _write_mpi_contract_workbook(
+        tmp_path,
+        county_rows=[MPI_XLSX_ROW_TRUTH_TABLE["unmapped_county"]["row"]],
+    )
+    county_reference = tmp_path / "pep_county_reference.csv"
+    pd.DataFrame(
+        {
+            "STNAME": ["California"],
+            "CTYNAME": ["Los Angeles County"],
+            "STATE": [6],
+            "COUNTY": [37],
+        }
+    ).to_csv(county_reference, index=False)
+
+    with pytest.raises(ValueError, match="no county rows with resolved county_fips"):
+        ingest_covariate_source(
+            MPI_SOURCE_ID,
+            workbook_path,
+            output_dir=tmp_path,
+            county_reference_path=county_reference,
+            force=True,
+        )
+
+
 def test_cli_ingests_mpi_xlsx_with_json_warnings(tmp_path: Path, monkeypatch) -> None:
     """CLI reports MPI output path, measures, and skipped workbook rows as JSON."""
     monkeypatch.setattr("hhplab.covariates.ingest.register_source", lambda **_: None)
     workbook_path = _write_mpi_contract_workbook(
         tmp_path,
         county_rows=[
-            [None, "United States", 13_738_000, 1.0],
-            ["California", "Los Angeles County, California", 1_101_000, 0.080176],
+            MPI_XLSX_ROW_TRUTH_TABLE["us_total"]["row"],
+            MPI_XLSX_ROW_TRUTH_TABLE["resolved_county"]["row"],
         ],
     )
     county_reference = tmp_path / "pep_county_reference.csv"
@@ -570,6 +616,30 @@ def test_mpi_static_county_covariate_aggregates_to_msa_with_coverage_diagnostics
         "target_years": [2024],
     }
     assert provenance.extra["coverage_diagnostics"]["partial_target_count"] == 1
+
+
+def test_mpi_county_covariate_rejects_unsupported_coc_target(tmp_path: Path) -> None:
+    """MPI county-native estimates require explicit crosswalk support for CoC output."""
+    curated = tmp_path / "covariate__mpi_unauthorized_immigrants__Y2023-2023.parquet"
+    pd.DataFrame(
+        {
+            "geo_type": ["county"],
+            "geo_id": ["01001"],
+            "county_fips": ["01001"],
+            "year": [2023],
+            "unauthorized_immigrant_population": [1_000],
+            "unauthorized_immigrant_share_of_us_total": [0.01],
+        }
+    ).to_parquet(curated)
+
+    with pytest.raises(ValueError, match="cannot be emitted as coc panel-ready data"):
+        aggregate_covariate_source(
+            MPI_SOURCE_ID,
+            curated_path=curated,
+            output_dir=tmp_path,
+            target_geo="coc",
+            force=True,
+        )
 
 
 def test_cli_lists_covariate_sources_as_json() -> None:
