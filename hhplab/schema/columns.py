@@ -371,6 +371,8 @@ ACS5_DERIVED_COLUMNS: list[str] = [
     "unemployment_rate",
     "vacancy_rate",
     "rent_burden_30_plus",
+    "rent_burden_40_plus",
+    "rent_burden_50_plus",
     "contract_rent_p10",
     "contract_rent_p25",
     "contract_rent_p50",

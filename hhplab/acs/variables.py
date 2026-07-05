@@ -755,7 +755,12 @@ ACS5_COVARIATE_REGISTRY: tuple[ACS5CovariateSpec, ...] = (
         source_variables=_source_variables_for_outputs(
             _columns_with_prefix("gross_rent_pct_income_")
         ),
-        output_columns=(*_columns_with_prefix("gross_rent_pct_income_"), "rent_burden_30_plus"),
+        output_columns=(
+            *_columns_with_prefix("gross_rent_pct_income_"),
+            "rent_burden_30_plus",
+            "rent_burden_40_plus",
+            "rent_burden_50_plus",
+        ),
         measure_kind="rate",
         denominator_column="gross_rent_pct_income_total",
         weight_column="area_share",
@@ -763,7 +768,9 @@ ACS5_COVARIATE_REGISTRY: tuple[ACS5CovariateSpec, ...] = (
         canonical_measure=True,
         caveats=(
             "rent_burden_30_plus excludes households where gross rent as a "
-            "percentage of income is not computed."
+            "percentage of income is not computed. rent_burden_40_plus and "
+            "rent_burden_50_plus use a computed denominator that subtracts "
+            "gross_rent_pct_income_not_computed from the total."
         ),
     ),
     ACS5CovariateSpec(

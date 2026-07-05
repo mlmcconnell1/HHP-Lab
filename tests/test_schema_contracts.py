@@ -627,6 +627,8 @@ def test_acs5_expanded_covariates_remain_outside_default_canonical_measures() ->
     assert "contract_rent_p10" in ACS5_EXPANDED_COVARIATE_COLUMNS
     assert "contract_rent_p25" in ACS5_EXPANDED_COVARIATE_COLUMNS
     assert "contract_rent_p50" in ACS5_EXPANDED_COVARIATE_COLUMNS
+    assert "rent_burden_40_plus" in ACS5_EXPANDED_COVARIATE_COLUMNS
+    assert "rent_burden_50_plus" in ACS5_EXPANDED_COVARIATE_COLUMNS
     assert "median_contract_rent" in ACS5_EXPANDED_COVARIATE_COLUMNS
     assert "owner_costs_pct_income_total" in ACS5_EXPANDED_COVARIATE_COLUMNS
     assert "not_us_citizen" in ACS5_EXPANDED_COVARIATE_COLUMNS
@@ -641,6 +643,8 @@ def test_recipe_selectable_acs5_measures_include_expanded_without_changing_defau
     assert "contract_rent_p10" in ACS5_RECIPE_SELECTABLE_MEASURES
     assert "contract_rent_p25" in ACS5_RECIPE_SELECTABLE_MEASURES
     assert "contract_rent_p50" in ACS5_RECIPE_SELECTABLE_MEASURES
+    assert "rent_burden_40_plus" in ACS5_RECIPE_SELECTABLE_MEASURES
+    assert "rent_burden_50_plus" in ACS5_RECIPE_SELECTABLE_MEASURES
     assert "median_contract_rent" in ACS5_RECIPE_SELECTABLE_MEASURES
     assert "naturalized_citizen" in ACS5_RECIPE_SELECTABLE_MEASURES
     assert "per_capita_income" not in ACS5_RECIPE_DEFAULT_MEASURES
@@ -648,8 +652,12 @@ def test_recipe_selectable_acs5_measures_include_expanded_without_changing_defau
     assert set(ACS5_RECIPE_DEFAULT_MEASURES) < set(ACS5_RECIPE_SELECTABLE_MEASURES)
 
 
-def test_acs5_covariate_output_lookup_returns_owning_registry_entry() -> None:
-    spec = acs5_covariate_spec_for_output("rent_burden_30_plus")
+@pytest.mark.parametrize(
+    "column",
+    ["rent_burden_30_plus", "rent_burden_40_plus", "rent_burden_50_plus"],
+)
+def test_acs5_covariate_output_lookup_returns_rent_burden_entry(column: str) -> None:
+    spec = acs5_covariate_spec_for_output(column)
 
     assert spec.name == "rent_burden"
     assert spec.table == "B25070"

@@ -412,6 +412,7 @@ class TestMsaAcs5Covariates:
                 "gross_rent_pct_income_35_to_39_9": [30.0, 70.0],
                 "gross_rent_pct_income_40_to_49_9": [20.0, 60.0],
                 "gross_rent_pct_income_50_plus": [10.0, 50.0],
+                "gross_rent_pct_income_not_computed": [20.0, 100.0],
                 **CONTRACT_RENT_P25_DISTRIBUTION,
             }
         )
@@ -436,12 +437,16 @@ class TestMsaAcs5Covariates:
         assert row["poverty_rate"] == pytest.approx(450.0 / 2700.0)
         assert row["vacancy_rate"] == pytest.approx(300.0 / 1500.0)
         assert row["rent_burden_30_plus"] == pytest.approx(360.0 / 1200.0)
+        assert row["rent_burden_40_plus"] == pytest.approx(140.0 / 1080.0)
+        assert row["rent_burden_50_plus"] == pytest.approx(60.0 / 1080.0)
         assert row["msa_contract_rent_p10"] == pytest.approx(row["contract_rent_p10"])
         assert row["msa_contract_rent_p25"] == pytest.approx(row["contract_rent_p25"])
         assert row["msa_contract_rent_p50"] == pytest.approx(row["contract_rent_p50"])
         assert row["msa_poverty_rate"] == pytest.approx(row["poverty_rate"])
         assert row["msa_vacancy_rate"] == pytest.approx(row["vacancy_rate"])
         assert row["msa_rent_burden"] == pytest.approx(row["rent_burden_30_plus"])
+        assert row["msa_rent_burden_40_plus"] == pytest.approx(row["rent_burden_40_plus"])
+        assert row["msa_rent_burden_50_plus"] == pytest.approx(row["rent_burden_50_plus"])
         assert row["msa_median_rent"] == pytest.approx(row["median_gross_rent"])
         assert row["msa_income"] == pytest.approx(row["median_household_income"])
 
@@ -459,6 +464,7 @@ class TestMsaAcs5Covariates:
                 "gross_rent_pct_income_35_to_39_9": [1.0],
                 "gross_rent_pct_income_40_to_49_9": [1.0],
                 "gross_rent_pct_income_50_plus": [1.0],
+                "gross_rent_pct_income_not_computed": [0.0],
             }
         )
         crosswalk = pd.DataFrame(
@@ -476,6 +482,8 @@ class TestMsaAcs5Covariates:
         assert pd.isna(row["poverty_rate"])
         assert pd.isna(row["vacancy_rate"])
         assert pd.isna(row["rent_burden_30_plus"])
+        assert pd.isna(row["rent_burden_40_plus"])
+        assert pd.isna(row["rent_burden_50_plus"])
 
 
 class TestExpandedAcs5AggregationSemantics:
