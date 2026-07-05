@@ -106,6 +106,7 @@ def _write_mpi_contract_workbook(
     *,
     state_headers: tuple[str, ...] = MPI_STATE_HEADERS,
     county_headers: tuple[str, ...] = MPI_COUNTY_HEADERS,
+    county_rows: list[list[object]] | None = None,
 ) -> Path:
     from openpyxl import Workbook
 
@@ -122,7 +123,8 @@ def _write_mpi_contract_workbook(
     county_sheet.append([])
     county_sheet.append(["National and County Estimates of the Unauthorized Immigrant Population"])
     county_sheet.append(list(county_headers))
-    county_sheet.append([None, "United States", 13_738_000, 1.0])
+    for row in county_rows or [[None, "United States", 13_738_000, 1.0]]:
+        county_sheet.append(row)
 
     workbook_path = tmp_path / (
         "MPI-2023_Unauthorized_Profiles-State-County-Topline_Estimates-FINAL.xlsx"
@@ -182,6 +184,101 @@ def test_mpi_workbook_contract_rejects_unsupported_layout(tmp_path: Path) -> Non
 
     with pytest.raises(ValueError, match="Update the MPI source contract"):
         validate_mpi_workbook_contract(workbook_path)
+
+
+def test_mpi_xlsx_ingest_writes_resolved_counties_with_provenance(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    """MPI XLSX ingest writes canonical county rows and records skipped rows."""
+    monkeypatch.setattr("hhplab.covariates.ingest.register_source", lambda **_: None)
+    workbook_path = _write_mpi_contract_workbook(
+        tmp_path,
+        county_rows=[
+            [None, "United States", 13_738_000, 1.0],
+            ["California", "Los Angeles County, California", 1_101_000, 0.080176],
+            ["Florida", "Miami-Dade-Monroe Counties, Florida", 356_000, 0.025903],
+        ],
+    )
+    county_reference = tmp_path / "pep_county_reference.csv"
+    pd.DataFrame(
+        {
+            "STNAME": ["California"],
+            "CTYNAME": ["Los Angeles County"],
+            "STATE": [6],
+            "COUNTY": [37],
+        }
+    ).to_csv(county_reference, index=False)
+
+    curated = ingest_covariate_source(
+        MPI_SOURCE_ID,
+        workbook_path,
+        output_dir=tmp_path,
+        county_reference_path=county_reference,
+        force=True,
+    )
+
+    result = pd.read_parquet(curated)
+    assert curated.name == "covariate__mpi_unauthorized_immigrants__Y2023-2023.parquet"
+    assert result["county_fips"].tolist() == ["06037"]
+    assert result["geo_id"].tolist() == ["06037"]
+    assert result["state_fips"].tolist() == ["06"]
+    assert result["unauthorized_immigrant_population"].tolist() == [1_101_000]
+    assert result["source_sheet"].tolist() == [MPI_COUNTY_SHEET]
+    provenance = read_provenance(curated)
+    assert provenance is not None
+    assert provenance.extra["source_id"] == MPI_SOURCE_ID
+    assert provenance.extra["rows_written"] == 1
+    assert provenance.extra["skipped_rows"] == 2
+    assert provenance.extra["skipped_reasons"] == {"us_total": 1, "multi_county_row": 1}
+
+
+def test_cli_ingests_mpi_xlsx_with_json_warnings(tmp_path: Path, monkeypatch) -> None:
+    """CLI reports MPI output path, measures, and skipped workbook rows as JSON."""
+    monkeypatch.setattr("hhplab.covariates.ingest.register_source", lambda **_: None)
+    workbook_path = _write_mpi_contract_workbook(
+        tmp_path,
+        county_rows=[
+            [None, "United States", 13_738_000, 1.0],
+            ["California", "Los Angeles County, California", 1_101_000, 0.080176],
+        ],
+    )
+    county_reference = tmp_path / "pep_county_reference.csv"
+    pd.DataFrame(
+        {
+            "STNAME": ["California"],
+            "CTYNAME": ["Los Angeles County"],
+            "STATE": [6],
+            "COUNTY": [37],
+        }
+    ).to_csv(county_reference, index=False)
+
+    result = runner.invoke(
+        app,
+        [
+            "ingest",
+            "covariate",
+            "--source",
+            MPI_SOURCE_ID,
+            "--raw-path",
+            str(workbook_path),
+            "--county-reference-path",
+            str(county_reference),
+            "--output-dir",
+            str(tmp_path),
+            "--force",
+            "--json",
+        ],
+    )
+
+    assert result.exit_code == 0
+    payload = json.loads(result.output)
+    assert payload["status"] == "ok"
+    assert payload["source_id"] == MPI_SOURCE_ID
+    assert payload["row_count"] == 1
+    assert payload["measure_columns"] == list(MPI_MEASURE_COLUMNS)
+    assert payload["skipped_rows"] == 1
+    assert payload["warnings"] == {"us_total": 1}
 
 
 @pytest.mark.parametrize(
