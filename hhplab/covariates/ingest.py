@@ -305,6 +305,13 @@ def _ingest_mpi_unauthorized_immigrants(
         if not skipped_rows.empty
         else []
     )
+    msa_rows = (
+        skipped_rows[skipped_rows.get("exclusion_reason") == "msa_row"].to_dict(
+            orient="records"
+        )
+        if not skipped_rows.empty
+        else []
+    )
     provenance = ProvenanceBlock(
         geo_type=spec.native_geo,
         extra={
@@ -327,6 +334,7 @@ def _ingest_mpi_unauthorized_immigrants(
             "skipped_reasons": _value_counts(skipped_rows, "exclusion_reason"),
             "skipped_preview": skipped_preview,
             "multi_county_rows": multi_county_rows,
+            "msa_rows": msa_rows,
         },
     )
     write_parquet_with_provenance(rows, destination, provenance)

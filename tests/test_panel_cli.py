@@ -402,3 +402,91 @@ class TestPanelCli:
 
         assert result.exit_code != 0
         assert "Source rows are not unique by join keys" in result.output
+
+    def test_panel_enrich_renames_source_columns_before_collision_check(
+        self, tmp_path: Path
+    ):
+        panel = tmp_path / "panel.parquet"
+        source = tmp_path / "source.parquet"
+        output = tmp_path / "enriched.parquet"
+        pd.DataFrame(
+            {
+                "msa_id": ["10100", "10200"],
+                "year": [2024, 2024],
+                "coverage_ratio": [0.95, 0.90],
+            }
+        ).to_parquet(panel)
+        pd.DataFrame(
+            {
+                "msa_id": ["10100", "10200"],
+                "year": [2024, 2024],
+                "coverage_ratio": [1.0, 0.5],
+                "unauthorized_immigrant_population": [1000.0, 500.0],
+            }
+        ).to_parquet(source)
+
+        result = runner.invoke(
+            app,
+            [
+                "panel",
+                "enrich",
+                "--panel",
+                str(panel),
+                "--source",
+                str(source),
+                "--columns",
+                "coverage_ratio:mpi_coverage_ratio,unauthorized_immigrant_population",
+                "--output",
+                str(output),
+                "--json",
+            ],
+        )
+
+        assert result.exit_code == 0
+        payload = json.loads(result.output)
+        assert payload["source_columns"] == [
+            "mpi_coverage_ratio",
+            "unauthorized_immigrant_population",
+        ]
+        assert payload["source_column_renames"] == {
+            "coverage_ratio": "mpi_coverage_ratio"
+        }
+        enriched = pd.read_parquet(output)
+        assert enriched["coverage_ratio"].tolist() == [0.95, 0.90]
+        assert enriched["mpi_coverage_ratio"].tolist() == [1.0, 0.5]
+        provenance = read_provenance(output)
+        assert provenance is not None
+        assert provenance.extra["source_column_renames"] == {
+            "coverage_ratio": "mpi_coverage_ratio"
+        }
+
+    def test_panel_enrich_rejects_duplicate_source_rename_specs(self, tmp_path: Path):
+        panel = _panel_fixture(tmp_path / "panel.parquet")
+        source = tmp_path / "source.parquet"
+        pd.DataFrame(
+            {
+                "geo_id": ["A", "B"],
+                "year": [2020, 2020],
+                "extra_covariate": [1.0, 2.0],
+            }
+        ).to_parquet(source)
+
+        result = runner.invoke(
+            app,
+            [
+                "panel",
+                "enrich",
+                "--panel",
+                str(panel),
+                "--source",
+                str(source),
+                "--columns",
+                "extra_covariate:first,extra_covariate:second",
+                "--output",
+                str(tmp_path / "enriched.parquet"),
+                "--json",
+            ],
+        )
+
+        assert result.exit_code != 0
+        assert "duplicate input columns" in result.output

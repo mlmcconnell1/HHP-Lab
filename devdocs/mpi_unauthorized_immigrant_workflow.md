@@ -34,10 +34,11 @@ County-native curated rows include `county_fips`, `geo_id`, `state_fips`,
 fields, and the measure columns above.
 
 The parser writes only rows that resolve to a unique county or county-equivalent
-FIPS. It skips the U.S. total, MPI MSA rows, and MPI multi-county rows that
-cannot be resolved to member counties. Resolved multi-county rows are retained
-in parquet provenance so MSA aggregation can allocate rows whose member counties
-all belong to one MSA. Skipped row counts and reasons are written to parquet
+FIPS. It skips the U.S. total and county labels that cannot be resolved to a
+county-equivalent row. Resolved multi-county rows and native MPI MSA rows are
+retained in parquet provenance so MSA aggregation can recover source rows whose
+member counties all belong to one MSA or whose MSA name uniquely matches the
+selected MSA definition. Skipped row counts and reasons are written to parquet
 provenance and JSON CLI output. State totals remain source context only and are
 not emitted as county-native panel rows.
 
@@ -134,9 +135,11 @@ benchmarks, and MPI legal-status assignment methodology. Treat them as estimated
 stock measures for mid-2023, not observed counts or migration flows.
 
 County-to-MSA aggregation sums MPI count/share measures across covered counties
-and recoverable same-MSA multi-county rows. Coverage diagnostics in CLI JSON and
-provenance report partial MSA coverage and source counties that do not belong to
-the selected MSA definition.
+and recoverable same-MSA multi-county rows. When MPI publishes a native MSA row
+whose name uniquely matches the selected MSA definition, that native MSA estimate
+is used for the MSA output row and marked with `mpi_msa_source_row_count`.
+Coverage diagnostics in CLI JSON and provenance report partial MSA coverage and
+source counties that do not belong to the selected MSA definition.
 
 Coverage must be inspected before interpreting cross-MSA comparisons. MPI does
 not publish every county as a standalone row, and many MSA rows can be

@@ -76,12 +76,70 @@ def _source_value_columns(
     *,
     source_key_columns: list[str],
     columns: list[str] | None,
-) -> list[str]:
+) -> tuple[list[str], list[str], dict[str, str]]:
     if columns is not None:
-        _validate_columns(source_df, columns, label="source")
+        parsed = [_parse_source_column_spec(column) for column in columns]
+        source_columns = [source for source, _ in parsed]
+        _validate_columns(source_df, source_columns, label="source")
         key_set = set(source_key_columns)
-        return [column for column in columns if column not in key_set]
-    return [column for column in source_df.columns if column not in set(source_key_columns)]
+        value_specs = [
+            (source, destination) for source, destination in parsed if source not in key_set
+        ]
+    else:
+        value_specs = [
+            (column, column)
+            for column in source_df.columns
+            if column not in set(source_key_columns)
+        ]
+    source_value_columns = [source for source, _ in value_specs]
+    output_value_columns = [destination for _, destination in value_specs]
+    duplicate_sources = sorted(
+        {
+            column
+            for column in source_value_columns
+            if source_value_columns.count(column) > 1
+        }
+    )
+    if duplicate_sources:
+        raise PanelEnrichError(
+            f"Source column selections include duplicate input columns: {duplicate_sources}."
+        )
+    duplicate_outputs = sorted(
+        {
+            column
+            for column in output_value_columns
+            if output_value_columns.count(column) > 1
+        }
+    )
+    if duplicate_outputs:
+        raise PanelEnrichError(
+            f"Source column selections produce duplicate output columns: {duplicate_outputs}."
+        )
+    key_name_collisions = [
+        column for column in output_value_columns if column in source_key_columns
+    ]
+    if key_name_collisions:
+        raise PanelEnrichError(
+            "Source column renames cannot target join key columns: "
+            f"{key_name_collisions}."
+        )
+    rename_map = {
+        source: destination
+        for source, destination in value_specs
+        if source != destination
+    }
+    return source_value_columns, output_value_columns, rename_map
+
+
+def _parse_source_column_spec(spec: str) -> tuple[str, str]:
+    source, separator, destination = spec.partition(":")
+    source = source.strip()
+    destination = destination.strip() if separator else source
+    if not source or not destination:
+        raise PanelEnrichError(
+            "Invalid source column selection. Use `column` or `source:destination`."
+        )
+    return source, destination
 
 
 def _copy_provenance_fields(source: ProvenanceBlock | None) -> dict[str, Any]:
@@ -134,24 +192,25 @@ def enrich_panel_file(
         panel_key_columns.append("year")
         source_key_columns.append("year")
 
-    value_columns = _source_value_columns(
+    source_value_columns, output_value_columns, rename_map = _source_value_columns(
         source_df,
         source_key_columns=source_key_columns,
         columns=columns,
     )
-    if not value_columns:
+    if not output_value_columns:
         raise PanelEnrichError(
             "No source value columns selected for enrichment. "
             "Pass --columns with at least one non-key source column."
         )
-    existing = [column for column in value_columns if column in panel_df.columns]
+    existing = [column for column in output_value_columns if column in panel_df.columns]
     if existing:
         raise PanelEnrichError(
             f"Source columns would overwrite existing panel columns: {existing}. "
-            "Select or rename source columns before enrichment."
+            "Pass --columns with source:destination rename syntax before enrichment."
         )
 
-    source_subset = source_df.loc[:, source_key_columns + value_columns].copy()
+    source_subset = source_df.loc[:, source_key_columns + source_value_columns].copy()
+    source_subset = source_subset.rename(columns=rename_map)
     duplicates = source_subset.duplicated(subset=source_key_columns, keep=False)
     if duplicates.any():
         sample = source_subset.loc[duplicates, source_key_columns].head(5).to_dict(orient="records")
@@ -212,11 +271,13 @@ def enrich_panel_file(
                 "panel_key_columns": panel_key_columns,
                 "source_key_columns": source_key_columns,
             },
-            "source_columns": value_columns,
+            "source_columns": output_value_columns,
+            "source_column_renames": rename_map,
+            "input_source_columns": source_value_columns,
             "derived_rates": derived_rates,
             "input_row_count": int(len(panel_df)),
             "source_row_count": int(len(source_df)),
-            "matched_row_count": int(enriched[value_columns].notna().any(axis=1).sum()),
+            "matched_row_count": int(enriched[output_value_columns].notna().any(axis=1).sum()),
             "output_row_count": int(len(enriched)),
             "output_columns": list(enriched.columns),
         },
@@ -230,7 +291,9 @@ def enrich_panel_file(
         "row_count": int(len(enriched)),
         "columns": list(enriched.columns),
         "join": provenance.extra["join"],
-        "source_columns": value_columns,
+        "source_columns": output_value_columns,
+        "source_column_renames": rename_map,
+        "input_source_columns": source_value_columns,
         "derived_rates": derived_rates,
         "matched_row_count": provenance.extra["matched_row_count"],
     }

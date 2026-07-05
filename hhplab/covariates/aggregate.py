@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 import pandas as pd
@@ -10,7 +11,7 @@ from hhplab.covariates.catalog import MeasureAggregation, covariate_source_spec
 from hhplab.covariates.ingest import default_covariate_output_path
 from hhplab.covariates.mpi_contract import MPI_ESTIMATE_YEAR, MPI_SOURCE_ID
 from hhplab.msa import DEFINITION_VERSION as DEFAULT_MSA_DEFINITION_VERSION
-from hhplab.msa.msa_io import read_msa_county_membership
+from hhplab.msa.msa_io import read_msa_county_membership, read_msa_definitions
 from hhplab.naming import covariate_panel_filename
 from hhplab.paths import curated_dir
 from hhplab.pep.pep_aggregate import load_pep_county
@@ -128,9 +129,19 @@ def aggregate_covariate_source(
             if source_id == MPI_SOURCE_ID and input_provenance is not None
             else None
         )
+        mpi_msa_rows = (
+            _mpi_msa_rows_from_provenance(input_provenance)
+            if source_id == MPI_SOURCE_ID and input_provenance is not None
+            else None
+        )
         if mpi_multi_county_rows and years is not None:
             mpi_multi_county_rows = _expand_mpi_multi_county_rows(
                 mpi_multi_county_rows,
+                years=years,
+            )
+        if mpi_msa_rows and years is not None:
+            mpi_msa_rows = _expand_mpi_multi_county_rows(
+                mpi_msa_rows,
                 years=years,
             )
         result = aggregate_county_covariate_to_msa(
@@ -141,6 +152,7 @@ def aggregate_covariate_source(
             county_population_path=county_population_path,
             data_root=data_root,
             mpi_multi_county_rows=mpi_multi_county_rows,
+            mpi_msa_rows=mpi_msa_rows,
         )
     else:
         result = df[required].copy()
@@ -242,6 +254,17 @@ def _expand_mpi_multi_county_rows(
     return expanded
 
 
+def _mpi_msa_rows_from_provenance(provenance: ProvenanceBlock) -> list[dict[str, object]]:
+    rows = provenance.extra.get("msa_rows")
+    if rows:
+        return list(rows)
+    return [
+        row
+        for row in provenance.extra.get("skipped_preview", [])
+        if row.get("exclusion_reason") == "msa_row"
+    ]
+
+
 def aggregate_county_covariate_to_msa(
     df: pd.DataFrame,
     *,
@@ -251,8 +274,10 @@ def aggregate_county_covariate_to_msa(
     county_population_path: Path | str | None = None,
     data_root: Path | str | None = None,
     msa_county_membership: pd.DataFrame | None = None,
+    msa_definitions: pd.DataFrame | None = None,
     county_population: pd.DataFrame | None = None,
     mpi_multi_county_rows: list[dict[str, object]] | None = None,
+    mpi_msa_rows: list[dict[str, object]] | None = None,
 ) -> pd.DataFrame:
     """Aggregate county-native covariates to MSA-year rows."""
     required = {"county_fips", "year", *measure_columns}
@@ -292,6 +317,18 @@ def aggregate_county_covariate_to_msa(
     membership["county_fips"] = membership["county_fips"].astype("string").str.zfill(5)
     membership["msa_id"] = membership["msa_id"].astype("string")
     membership_counts = membership.groupby("msa_id")["county_fips"].nunique().to_dict()
+    membership_counties_by_msa = (
+        membership.groupby("msa_id")["county_fips"]
+        .agg(lambda values: set(values.dropna().astype(str)))
+        .to_dict()
+    )
+    definitions = (
+        msa_definitions.copy()
+        if msa_definitions is not None
+        else read_msa_definitions(msa_definition_version, data_root)
+        if mpi_msa_rows
+        else None
+    )
 
     population = (
         county_population.copy()
@@ -344,12 +381,15 @@ def aggregate_county_covariate_to_msa(
             "msa_id": key[0],
             "year": key[1],
             "population_weight_denominator": float(group["population"].sum()),
-            "county_count": int(group["county_fips"].nunique()),
+            "_covered_county_fips": set(group["county_fips"].dropna().astype(str))
+            & membership_counties_by_msa.get(str(msa_id), set()),
             "membership_county_count": int(membership_counts.get(str(msa_id), 0)),
             "definition_version": msa_definition_version,
             "unmatched_source_county_count": len(unmatched_source_counties),
             "mpi_multi_county_source_row_count": 0,
+            "mpi_msa_source_row_count": 0,
         }
+        row["county_count"] = len(row["_covered_county_fips"])
         for column in optional_lineage_columns:
             values = list(group[column].dropna().unique())
             row[column] = (
@@ -387,11 +427,25 @@ def aggregate_county_covariate_to_msa(
         measure_columns=measure_columns,
         membership=membership,
         membership_counts=membership_counts,
+        membership_counties_by_msa=membership_counties_by_msa,
         population=population,
         source_counties=source_counties,
         msa_definition_version=msa_definition_version,
     )
+    _apply_mpi_msa_rows(
+        row_by_key,
+        rows,
+        mpi_msa_rows=mpi_msa_rows or [],
+        measure_columns=measure_columns,
+        definitions=definitions,
+        membership_counts=membership_counts,
+        membership_counties_by_msa=membership_counties_by_msa,
+        population=population,
+        msa_definition_version=msa_definition_version,
+    )
 
+    for row in rows:
+        row.pop("_covered_county_fips", None)
     return pd.DataFrame(rows)
 
 
@@ -403,6 +457,7 @@ def _apply_mpi_multi_county_msa_rows(
     measure_columns: list[str],
     membership: pd.DataFrame,
     membership_counts: dict[str, int],
+    membership_counties_by_msa: dict[str, set[str]],
     population: pd.DataFrame,
     source_counties: set[str],
     msa_definition_version: str,
@@ -412,9 +467,9 @@ def _apply_mpi_multi_county_msa_rows(
     county_to_msa = membership.set_index("county_fips")["msa_id"].astype(str).to_dict()
     population_lookup = population.set_index(["county_fips", "year"])["population"].to_dict()
     for source_row in mpi_multi_county_rows:
-        member_counties = [
-            str(value).zfill(5) for value in source_row.get("member_county_fips", [])
-        ]
+        member_counties = sorted(
+            {str(value).zfill(5) for value in source_row.get("member_county_fips", [])}
+        )
         if not member_counties or any(county in source_counties for county in member_counties):
             continue
         msa_ids = {county_to_msa.get(county) for county in member_counties}
@@ -433,11 +488,13 @@ def _apply_mpi_multi_county_msa_rows(
                 "year": year,
                 "population_weight_denominator": 0.0,
                 "county_count": 0,
+                "_covered_county_fips": set(),
                 "membership_county_count": int(membership_counts.get(msa_id, 0)),
                 "definition_version": msa_definition_version,
                 "unmatched_source_county_count": 0,
                 "coverage_ratio": pd.NA,
                 "mpi_multi_county_source_row_count": 0,
+                "mpi_msa_source_row_count": 0,
             }
             for column in measure_columns:
                 row[column] = 0.0
@@ -445,20 +502,113 @@ def _apply_mpi_multi_county_msa_rows(
             row_by_key[key] = row
         for column in measure_columns:
             row[column] = float(row.get(column) or 0.0) + float(source_row[column])
+        covered_counties = row.setdefault("_covered_county_fips", set())
+        if not isinstance(covered_counties, set):
+            covered_counties = set()
+            row["_covered_county_fips"] = covered_counties
+        eligible_counties = [
+            county
+            for county in member_counties
+            if county in membership_counties_by_msa.get(msa_id, set())
+        ]
+        newly_covered_counties = [
+            county for county in eligible_counties if county not in covered_counties
+        ]
         row["population_weight_denominator"] = float(
             row.get("population_weight_denominator") or 0.0
         ) + float(
-            sum(population_lookup.get((county, year), 0.0) for county in member_counties)
+            sum(population_lookup.get((county, year), 0.0) for county in newly_covered_counties)
         )
-        row["county_count"] = int(row.get("county_count") or 0) + len(member_counties)
+        covered_counties.update(newly_covered_counties)
+        row["county_count"] = len(covered_counties)
         row["mpi_multi_county_source_row_count"] = int(
             row.get("mpi_multi_county_source_row_count") or 0
         ) + 1
         row["coverage_ratio"] = (
-            row["county_count"] / row["membership_county_count"]
+            min(row["county_count"] / row["membership_county_count"], 1.0)
             if row["membership_county_count"]
             else pd.NA
         )
+
+
+def _apply_mpi_msa_rows(
+    row_by_key: dict[tuple[str, int], dict[str, object]],
+    rows: list[dict[str, object]],
+    *,
+    mpi_msa_rows: list[dict[str, object]],
+    measure_columns: list[str],
+    definitions: pd.DataFrame | None,
+    membership_counts: dict[str, int],
+    membership_counties_by_msa: dict[str, set[str]],
+    population: pd.DataFrame,
+    msa_definition_version: str,
+) -> None:
+    if not mpi_msa_rows or definitions is None:
+        return
+    msa_lookup = _unique_msa_name_lookup(definitions)
+    population_lookup = population.set_index(["county_fips", "year"])["population"].to_dict()
+    for source_row in mpi_msa_rows:
+        name_key = _mpi_msa_label_key(str(source_row.get("county_label") or ""))
+        if not name_key:
+            continue
+        msa_id = msa_lookup.get(name_key)
+        if msa_id is None:
+            continue
+        year = int(source_row.get("year", MPI_ESTIMATE_YEAR))
+        key = (msa_id, year)
+        member_counties = membership_counties_by_msa.get(msa_id, set())
+        row = row_by_key.get(key)
+        if row is None:
+            row = {
+                "geo_type": "msa",
+                "geo_id": msa_id,
+                "msa_id": msa_id,
+                "year": year,
+                "definition_version": msa_definition_version,
+                "unmatched_source_county_count": 0,
+                "mpi_multi_county_source_row_count": 0,
+            }
+            rows.append(row)
+            row_by_key[key] = row
+        for column in measure_columns:
+            row[column] = float(source_row[column])
+        for column in ("source_estimate_year", "static_year_policy"):
+            if column in source_row:
+                row[column] = source_row[column]
+        row["_covered_county_fips"] = set(member_counties)
+        row["population_weight_denominator"] = float(
+            sum(population_lookup.get((county, year), 0.0) for county in member_counties)
+        )
+        row["county_count"] = len(member_counties)
+        row["membership_county_count"] = int(membership_counts.get(msa_id, 0))
+        row["coverage_ratio"] = 1.0 if row["membership_county_count"] else pd.NA
+        row["mpi_msa_source_row_count"] = int(row.get("mpi_msa_source_row_count") or 0) + 1
+
+
+def _unique_msa_name_lookup(definitions: pd.DataFrame) -> dict[str, str]:
+    if "msa_id" not in definitions.columns or "msa_name" not in definitions.columns:
+        return {}
+    keyed = definitions[["msa_id", "msa_name"]].dropna().copy()
+    keyed["name_key"] = keyed["msa_name"].map(_msa_definition_name_key)
+    counts = keyed["name_key"].value_counts()
+    unique = keyed[keyed["name_key"].map(counts) == 1]
+    return dict(zip(unique["name_key"], unique["msa_id"].astype(str), strict=False))
+
+
+def _mpi_msa_label_key(label: str) -> str | None:
+    marker = " MSA"
+    if marker not in label:
+        return None
+    return _normalize_msa_name_key(label.split(marker, 1)[0])
+
+
+def _msa_definition_name_key(name: str) -> str:
+    base = name.split(",", 1)[0]
+    return _normalize_msa_name_key(base)
+
+
+def _normalize_msa_name_key(value: str) -> str:
+    return re.sub(r"[^a-z0-9]+", "", value.lower())
 
 
 def _coverage_diagnostics(df: pd.DataFrame) -> dict[str, object]:

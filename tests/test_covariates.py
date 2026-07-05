@@ -12,6 +12,7 @@ from typer.testing import CliRunner
 from hhplab.cli.main import app
 from hhplab.covariates.aggregate import (
     EMERGENCY_SHELTER_ACTIVATION_C,
+    aggregate_county_covariate_to_msa,
     aggregate_covariate_source,
     derive_prism_temperature_basis,
 )
@@ -765,6 +766,118 @@ def test_mpi_same_msa_multi_county_rows_are_allocated_to_msa(
     assert result.loc["17820", "county_count"] == 2
     assert result.loc["17820", "coverage_ratio"] == pytest.approx(1.0)
     assert result.loc["17820", "mpi_multi_county_source_row_count"] == 1
+
+
+def test_mpi_multi_county_rows_count_distinct_covered_msa_counties() -> None:
+    """MPI multi-county diagnostics count distinct member counties, not source-row width."""
+    county = pd.DataFrame(
+        {
+            "county_fips": ["01001"],
+            "year": [2024],
+            "unauthorized_immigrant_population": [1_000],
+        }
+    )
+    membership = pd.DataFrame(
+        {
+            "msa_id": ["11111", "11111"],
+            "county_fips": ["01001", "01003"],
+        }
+    )
+    population = pd.DataFrame(
+        {
+            "county_fips": ["01001", "01003"],
+            "year": [2024, 2024],
+            "population": [100.0, 300.0],
+        }
+    )
+
+    result = aggregate_county_covariate_to_msa(
+        county,
+        measure_columns=["unauthorized_immigrant_population"],
+        measure_aggregations={"unauthorized_immigrant_population": "extensive_sum"},
+        msa_definition_version="test_msa_v1",
+        msa_county_membership=membership,
+        county_population=population,
+        mpi_multi_county_rows=[
+            {
+                "year": 2024,
+                "member_county_fips": ["01003", "01003"],
+                "unauthorized_immigrant_population": 500,
+            }
+        ],
+    )
+
+    row = result.set_index("msa_id").loc["11111"]
+    assert row["unauthorized_immigrant_population"] == pytest.approx(1_500)
+    assert row["population_weight_denominator"] == pytest.approx(400.0)
+    assert row["county_count"] == 2
+    assert row["membership_county_count"] == 2
+    assert row["coverage_ratio"] == pytest.approx(1.0)
+    assert row["mpi_multi_county_source_row_count"] == 1
+    assert "_covered_county_fips" not in result.columns
+
+
+def test_mpi_native_msa_rows_fill_missing_msa_covariate_rows() -> None:
+    """Recover MPI native MSA rows when they uniquely match the MSA definition name."""
+    county = pd.DataFrame(
+        {
+            "county_fips": ["06037"],
+            "year": [2024],
+            "unauthorized_immigrant_population": [1_101_000],
+        }
+    )
+    membership = pd.DataFrame(
+        {
+            "msa_id": ["31080", "14460", "14460"],
+            "county_fips": ["06037", "25025", "25017"],
+        }
+    )
+    definitions = pd.DataFrame(
+        {
+            "msa_id": ["31080", "14460"],
+            "msa_name": [
+                "Los Angeles-Long Beach-Anaheim, CA",
+                "Boston-Cambridge-Newton, MA-NH",
+            ],
+        }
+    )
+    population = pd.DataFrame(
+        {
+            "county_fips": ["06037", "25025", "25017"],
+            "year": [2024, 2024, 2024],
+            "population": [9_700_000.0, 700_000.0, 1_600_000.0],
+        }
+    )
+
+    result = aggregate_county_covariate_to_msa(
+        county,
+        measure_columns=["unauthorized_immigrant_population"],
+        measure_aggregations={"unauthorized_immigrant_population": "extensive_sum"},
+        msa_definition_version="test_msa_v1",
+        msa_county_membership=membership,
+        msa_definitions=definitions,
+        county_population=population,
+        mpi_msa_rows=[
+            {
+                "year": 2024,
+                "county_label": "Boston-Cambridge-Newton MSA,++ Massachusetts-New Hampshire",
+                "unauthorized_immigrant_population": 301_000,
+                "source_estimate_year": 2023,
+                "static_year_policy": "carry_forward",
+            }
+        ],
+    )
+
+    by_msa = result.set_index("msa_id")
+    assert set(by_msa.index) == {"14460", "31080"}
+    assert by_msa.loc["14460", "unauthorized_immigrant_population"] == pytest.approx(301_000)
+    assert by_msa.loc["14460", "county_count"] == 2
+    assert by_msa.loc["14460", "membership_county_count"] == 2
+    assert by_msa.loc["14460", "coverage_ratio"] == pytest.approx(1.0)
+    assert by_msa.loc["14460", "population_weight_denominator"] == pytest.approx(2_300_000)
+    assert by_msa.loc["14460", "mpi_msa_source_row_count"] == 1
+    assert by_msa.loc["14460", "source_estimate_year"] == 2023
+    assert by_msa.loc["14460", "static_year_policy"] == "carry_forward"
 
 
 def test_mpi_county_covariate_rejects_unsupported_coc_target(tmp_path: Path) -> None:

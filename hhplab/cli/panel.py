@@ -251,7 +251,10 @@ def panel_enrich(
     ],
     columns: Annotated[
         str | None,
-        typer.Option("--columns", help="Comma-separated source columns to join."),
+        typer.Option(
+            "--columns",
+            help="Comma-separated source columns to join; use source:destination to rename.",
+        ),
     ] = None,
     panel_geo_column: Annotated[
         str | None,
