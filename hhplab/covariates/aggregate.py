@@ -8,6 +8,7 @@ import pandas as pd
 
 from hhplab.covariates.catalog import covariate_source_spec
 from hhplab.covariates.ingest import default_covariate_output_path
+from hhplab.covariates.mpi_contract import MPI_ESTIMATE_YEAR, MPI_SOURCE_ID
 from hhplab.msa import DEFINITION_VERSION as DEFAULT_MSA_DEFINITION_VERSION
 from hhplab.msa.msa_io import read_msa_county_membership
 from hhplab.naming import covariate_panel_filename
@@ -98,6 +99,20 @@ def aggregate_covariate_source(
     missing = [column for column in required if column not in df.columns]
     if missing:
         raise ValueError(f"Curated covariate file missing required columns: {missing}")
+    static_year_policy = None
+    if source_id == MPI_SOURCE_ID and years is not None:
+        df = expand_static_covariate_years(
+            df,
+            years=years,
+            source_year=MPI_ESTIMATE_YEAR,
+            source_id=source_id,
+        )
+        static_year_policy = {
+            "policy": "carry_forward_static_estimate_to_requested_years",
+            "source_year": MPI_ESTIMATE_YEAR,
+            "target_years": list(years),
+        }
+
     if target_geo == "msa":
         result = aggregate_county_covariate_to_msa(
             df,
@@ -127,9 +142,11 @@ def aggregate_covariate_source(
                 str(county_population_path) if county_population_path is not None else None
             ),
             "years": years,
+            "static_year_policy": static_year_policy,
             "measure_columns": list(spec.measure_columns),
             "input_path": str(input_path),
             "input_provenance": input_provenance.to_dict() if input_provenance else None,
+            "coverage_diagnostics": _coverage_diagnostics(result),
         },
     )
     write_parquet_with_provenance(result, destination, provenance)
@@ -149,6 +166,32 @@ def derive_prism_temperature_basis(df: pd.DataFrame) -> pd.DataFrame:
     )
     result["tmin_above_code_blue"] = (tmin - EMERGENCY_SHELTER_ACTIVATION_C).clip(lower=0.0)
     return result
+
+
+def expand_static_covariate_years(
+    df: pd.DataFrame,
+    *,
+    years: list[int],
+    source_year: int,
+    source_id: str,
+) -> pd.DataFrame:
+    """Carry a static source estimate to explicit requested panel years."""
+    if "year" not in df.columns:
+        raise ValueError(f"{source_id} static-year expansion requires a 'year' column.")
+    source_rows = df[pd.to_numeric(df["year"], errors="coerce") == source_year].copy()
+    if source_rows.empty:
+        raise ValueError(
+            f"{source_id} static-year expansion expected source year {source_year}, "
+            "but no matching rows were found."
+        )
+    expanded = []
+    for year in years:
+        yearly = source_rows.copy()
+        yearly["year"] = int(year)
+        yearly["source_estimate_year"] = int(source_year)
+        yearly["static_year_policy"] = "carry_forward"
+        expanded.append(yearly)
+    return pd.concat(expanded, ignore_index=True)
 
 
 def aggregate_county_covariate_to_msa(
@@ -184,6 +227,7 @@ def aggregate_county_covariate_to_msa(
     membership = membership[["msa_id", "county_fips"]].drop_duplicates().copy()
     membership["county_fips"] = membership["county_fips"].astype("string").str.zfill(5)
     membership["msa_id"] = membership["msa_id"].astype("string")
+    membership_counts = membership.groupby("msa_id")["county_fips"].nunique().to_dict()
 
     population = (
         county_population.copy()
@@ -202,9 +246,15 @@ def aggregate_county_covariate_to_msa(
     population["year"] = pd.to_numeric(population["year"], errors="coerce").astype("Int64")
     population["population"] = pd.to_numeric(population["population"], errors="coerce")
 
-    county = df[["county_fips", "year", *measure_columns]].copy()
+    optional_lineage_columns = [
+        column for column in ("source_estimate_year", "static_year_policy") if column in df.columns
+    ]
+    county = df[["county_fips", "year", *measure_columns, *optional_lineage_columns]].copy()
     county["county_fips"] = county["county_fips"].astype("string").str.zfill(5)
     county["year"] = pd.to_numeric(county["year"], errors="coerce").astype("Int64")
+    source_counties = set(county["county_fips"].dropna().astype(str))
+    member_counties = set(membership["county_fips"].dropna().astype(str))
+    unmatched_source_counties = sorted(source_counties - member_counties)
     county = county.merge(membership, on="county_fips", how="inner")
     county = county.merge(population, on=["county_fips", "year"], how="left")
     if county["population"].isna().any():
@@ -229,8 +279,20 @@ def aggregate_county_covariate_to_msa(
             "year": int(year),
             "population_weight_denominator": float(group["population"].sum()),
             "county_count": int(group["county_fips"].nunique()),
+            "membership_county_count": int(membership_counts.get(str(msa_id), 0)),
             "definition_version": msa_definition_version,
+            "unmatched_source_county_count": len(unmatched_source_counties),
         }
+        for column in optional_lineage_columns:
+            values = list(group[column].dropna().unique())
+            row[column] = (
+                values[0] if len(values) == 1 else ",".join(str(value) for value in values)
+            )
+        row["coverage_ratio"] = (
+            row["county_count"] / row["membership_county_count"]
+            if row["membership_county_count"]
+            else pd.NA
+        )
         for column in measure_columns:
             values = pd.to_numeric(group[column], errors="coerce")
             valid = values.notna()
@@ -243,3 +305,20 @@ def aggregate_county_covariate_to_msa(
         rows.append(row)
 
     return pd.DataFrame(rows)
+
+
+def _coverage_diagnostics(df: pd.DataFrame) -> dict[str, object]:
+    if df.empty:
+        return {"row_count": 0}
+    diagnostics: dict[str, object] = {"row_count": int(len(df))}
+    if "coverage_ratio" in df.columns:
+        coverage = pd.to_numeric(df["coverage_ratio"], errors="coerce")
+        diagnostics["min_coverage_ratio"] = (
+            float(coverage.min()) if coverage.notna().any() else None
+        )
+        diagnostics["partial_target_count"] = int((coverage < 1.0).sum())
+    if "unmatched_source_county_count" in df.columns:
+        diagnostics["unmatched_source_county_count"] = int(
+            pd.to_numeric(df["unmatched_source_county_count"], errors="coerce").max()
+        )
+    return diagnostics

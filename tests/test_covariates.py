@@ -510,6 +510,68 @@ def test_prism_county_covariate_aggregates_to_msa_with_population_weights(
     assert provenance.extra["msa_definition_version"] == "test_msa_v1"
 
 
+def test_mpi_static_county_covariate_aggregates_to_msa_with_coverage_diagnostics(
+    tmp_path: Path,
+) -> None:
+    """MPI county estimates can be carried to panel years and rolled up to MSA."""
+    curated = tmp_path / "covariate__mpi_unauthorized_immigrants__Y2023-2023.parquet"
+    pd.DataFrame(
+        {
+            "geo_type": ["county"],
+            "geo_id": ["01001"],
+            "county_fips": ["01001"],
+            "year": [2023],
+            "unauthorized_immigrant_population": [1_000],
+            "unauthorized_immigrant_share_of_us_total": [0.01],
+        }
+    ).to_parquet(curated)
+    population = tmp_path / "pep_county__v2024.parquet"
+    pd.DataFrame(
+        {
+            "county_fips": ["01001", "01003"],
+            "year": [2024, 2024],
+            "population": [100.0, 300.0],
+        }
+    ).to_parquet(population)
+    data_root = tmp_path / "data"
+    msa_dir = data_root / "curated" / "msa"
+    msa_dir.mkdir(parents=True)
+    pd.DataFrame(
+        {
+            "msa_id": ["11111", "11111"],
+            "county_fips": ["01001", "01003"],
+        }
+    ).to_parquet(msa_dir / "msa_county_membership__test_msa_v1.parquet")
+
+    panel = aggregate_covariate_source(
+        MPI_SOURCE_ID,
+        curated_path=curated,
+        output_dir=tmp_path,
+        years=[2024],
+        target_geo="msa",
+        msa_definition_version="test_msa_v1",
+        county_population_path=population,
+        data_root=data_root,
+        force=True,
+    )
+
+    result = pd.read_parquet(panel)
+    assert result["year"].tolist() == [2024]
+    assert result["unauthorized_immigrant_population"].tolist() == pytest.approx([1_000.0])
+    assert result["source_estimate_year"].tolist() == [2023]
+    assert result["coverage_ratio"].tolist() == pytest.approx([0.5])
+    assert result["county_count"].tolist() == [1]
+    assert result["membership_county_count"].tolist() == [2]
+    provenance = read_provenance(panel)
+    assert provenance is not None
+    assert provenance.extra["static_year_policy"] == {
+        "policy": "carry_forward_static_estimate_to_requested_years",
+        "source_year": 2023,
+        "target_years": [2024],
+    }
+    assert provenance.extra["coverage_diagnostics"]["partial_target_count"] == 1
+
+
 def test_cli_lists_covariate_sources_as_json() -> None:
     """Agents can discover expanded covariate support without scraping text."""
     result = runner.invoke(app, ["list", "covariates", "--json"])
