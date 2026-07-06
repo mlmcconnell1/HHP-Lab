@@ -8,7 +8,16 @@ from pathlib import Path
 import pandas as pd
 
 from hhplab.covariates.catalog import MeasureAggregation, covariate_source_spec
-from hhplab.covariates.ingest import STATE_NAME_TO_ABBREV, default_covariate_output_path
+from hhplab.covariates.ingest import (
+    STATE_NAME_TO_ABBREV,
+    default_covariate_output_path,
+    default_covariate_pair_output_path,
+)
+from hhplab.covariates.irs_soi_contract import (
+    IRS_SOI_MSA_MEASURE_COLUMNS,
+    IRS_SOI_PAIR_MEASURE_COLUMNS,
+    IRS_SOI_SOURCE_ID,
+)
 from hhplab.covariates.mpi_contract import MPI_ESTIMATE_YEAR, MPI_SOURCE_ID
 from hhplab.msa import DEFINITION_VERSION as DEFAULT_MSA_DEFINITION_VERSION
 from hhplab.msa.msa_io import read_msa_county_membership, read_msa_definitions
@@ -124,36 +133,44 @@ def aggregate_covariate_source(
 
     input_provenance = read_provenance(input_path)
     if target_geo == "msa":
-        mpi_multi_county_rows = (
-            input_provenance.extra.get("multi_county_rows")
-            if source_id == MPI_SOURCE_ID and input_provenance is not None
-            else None
-        )
-        mpi_msa_rows = (
-            _mpi_msa_rows_from_provenance(input_provenance)
-            if source_id == MPI_SOURCE_ID and input_provenance is not None
-            else None
-        )
-        if mpi_multi_county_rows and years is not None:
-            mpi_multi_county_rows = _expand_mpi_multi_county_rows(
-                mpi_multi_county_rows,
-                years=years,
+        if source_id == IRS_SOI_SOURCE_ID:
+            result = aggregate_irs_soi_migration_to_msa(
+                county_marginals=df,
+                pair_path=_irs_soi_pair_path(input_path, input_provenance, output_dir),
+                msa_definition_version=msa_definition_version,
+                data_root=data_root,
             )
-        if mpi_msa_rows and years is not None:
-            mpi_msa_rows = _expand_mpi_multi_county_rows(
-                mpi_msa_rows,
-                years=years,
+        else:
+            mpi_multi_county_rows = (
+                input_provenance.extra.get("multi_county_rows")
+                if source_id == MPI_SOURCE_ID and input_provenance is not None
+                else None
             )
-        result = aggregate_county_covariate_to_msa(
-            df,
-            measure_columns=list(spec.measure_columns),
-            measure_aggregations=spec.measure_aggregations,
-            msa_definition_version=msa_definition_version,
-            county_population_path=county_population_path,
-            data_root=data_root,
-            mpi_multi_county_rows=mpi_multi_county_rows,
-            mpi_msa_rows=mpi_msa_rows,
-        )
+            mpi_msa_rows = (
+                _mpi_msa_rows_from_provenance(input_provenance)
+                if source_id == MPI_SOURCE_ID and input_provenance is not None
+                else None
+            )
+            if mpi_multi_county_rows and years is not None:
+                mpi_multi_county_rows = _expand_mpi_multi_county_rows(
+                    mpi_multi_county_rows,
+                    years=years,
+                )
+            if mpi_msa_rows and years is not None:
+                mpi_msa_rows = _expand_mpi_multi_county_rows(
+                    mpi_msa_rows,
+                    years=years,
+                )
+            result = aggregate_county_covariate_to_msa(
+                df,
+                measure_columns=list(spec.measure_columns),
+                measure_aggregations=spec.measure_aggregations,
+                msa_definition_version=msa_definition_version,
+                county_population_path=county_population_path,
+                data_root=data_root,
+                mpi_multi_county_rows=mpi_multi_county_rows,
+                mpi_msa_rows=mpi_msa_rows,
+            )
     else:
         result = df[required].copy()
     if years is not None:
@@ -185,7 +202,11 @@ def aggregate_covariate_source(
             ),
             "years": years,
             "static_year_policy": static_year_policy,
-            "measure_columns": list(spec.measure_columns),
+            "measure_columns": (
+                list(IRS_SOI_MSA_MEASURE_COLUMNS)
+                if source_id == IRS_SOI_SOURCE_ID and target_geo == "msa"
+                else list(spec.measure_columns)
+            ),
             "measure_aggregations": dict(spec.measure_aggregations),
             "coverage_policy": coverage_policy,
             "input_path": str(input_path),
@@ -268,6 +289,203 @@ def _mpi_msa_rows_from_provenance(provenance: ProvenanceBlock) -> list[dict[str,
             "before aggregating to --target-geo msa."
         )
     return []
+
+
+def _irs_soi_pair_path(
+    county_path: Path,
+    provenance: ProvenanceBlock | None,
+    output_dir: Path | str | None,
+) -> Path:
+    if provenance is not None:
+        pair_output_path = provenance.extra.get("pair_output_path")
+        if pair_output_path:
+            return Path(str(pair_output_path))
+    if output_dir is not None:
+        return default_covariate_pair_output_path(IRS_SOI_SOURCE_ID, output_dir=output_dir)
+    return county_path.with_name(
+        default_covariate_pair_output_path(IRS_SOI_SOURCE_ID).name
+    )
+
+
+def aggregate_irs_soi_migration_to_msa(
+    *,
+    county_marginals: pd.DataFrame,
+    pair_path: Path | str,
+    msa_definition_version: str = DEFAULT_MSA_DEFINITION_VERSION,
+    data_root: Path | str | None = None,
+    msa_county_membership: pd.DataFrame | None = None,
+) -> pd.DataFrame:
+    """Aggregate IRS SOI county-pair migration flows to MSA-year rows."""
+    pair_path = Path(pair_path)
+    if not pair_path.exists():
+        raise FileNotFoundError(
+            f"IRS SOI pair-level covariate file not found: {pair_path}. "
+            "Re-run `hhplab ingest covariate --source irs_soi_migration --force` "
+            "so the companion covariate_pairs artifact is written."
+        )
+    pairs = pd.read_parquet(pair_path)
+    required_pairs = {
+        "year",
+        "origin_county_fips",
+        "destination_county_fips",
+        *IRS_SOI_PAIR_MEASURE_COLUMNS,
+    }
+    missing_pairs = sorted(required_pairs - set(pairs.columns))
+    if missing_pairs:
+        raise ValueError(f"IRS SOI pair-level covariate file missing columns: {missing_pairs}")
+    required_county = {
+        "county_fips",
+        "year",
+        "other_flows_inflow_returns",
+        "other_flows_inflow_exemptions",
+        "other_flows_inflow_agi_thousands",
+        "other_flows_outflow_returns",
+        "other_flows_outflow_exemptions",
+        "other_flows_outflow_agi_thousands",
+    }
+    missing_county = sorted(required_county - set(county_marginals.columns))
+    if missing_county:
+        raise ValueError(f"IRS SOI county covariate file missing columns: {missing_county}")
+
+    membership = (
+        msa_county_membership.copy()
+        if msa_county_membership is not None
+        else read_msa_county_membership(msa_definition_version, data_root)
+    )
+    missing_membership = sorted({"msa_id", "county_fips"} - set(membership.columns))
+    if missing_membership:
+        raise ValueError(
+            "MSA county membership is missing required columns: "
+            f"{missing_membership}. Run `hhplab generate msa --definition-version "
+            f"{msa_definition_version}`."
+        )
+    membership = membership[["msa_id", "county_fips"]].drop_duplicates().copy()
+    membership["msa_id"] = membership["msa_id"].astype("string")
+    membership["county_fips"] = membership["county_fips"].astype("string").str.zfill(5)
+    county_to_msa = membership.set_index("county_fips")["msa_id"].astype(str).to_dict()
+    membership_counts = membership.groupby("msa_id")["county_fips"].nunique().to_dict()
+
+    pairs = pairs.copy()
+    pairs["year"] = pd.to_numeric(pairs["year"], errors="raise").astype(int)
+    pairs["origin_county_fips"] = pairs["origin_county_fips"].astype("string").str.zfill(5)
+    pairs["destination_county_fips"] = (
+        pairs["destination_county_fips"].astype("string").str.zfill(5)
+    )
+    for column in IRS_SOI_PAIR_MEASURE_COLUMNS:
+        pairs[column] = pd.to_numeric(pairs[column], errors="coerce").fillna(0)
+
+    rows_by_key: dict[tuple[str, int], dict[str, object]] = {}
+    for pair in pairs.itertuples(index=False):
+        year = int(pair.year)
+        origin_msa = county_to_msa.get(str(pair.origin_county_fips))
+        destination_msa = county_to_msa.get(str(pair.destination_county_fips))
+        values = {
+            "returns": float(pair.migration_returns),
+            "exemptions": float(pair.migration_exemptions),
+            "agi_thousands": float(pair.migration_agi_thousands),
+        }
+        if destination_msa is not None and origin_msa != destination_msa:
+            row = _irs_soi_msa_row(rows_by_key, destination_msa, year, membership_counts)
+            _irs_soi_add_values(row, "inflow", values)
+        if origin_msa is not None and destination_msa != origin_msa:
+            row = _irs_soi_msa_row(rows_by_key, origin_msa, year, membership_counts)
+            _irs_soi_add_values(row, "outflow", values)
+        if origin_msa is not None and origin_msa == destination_msa:
+            row = _irs_soi_msa_row(rows_by_key, origin_msa, year, membership_counts)
+            _irs_soi_add_values(row, "intra_msa", values)
+
+    _irs_soi_add_suppressed_unallocated(
+        rows_by_key,
+        county_marginals=county_marginals,
+        county_to_msa=county_to_msa,
+        membership_counts=membership_counts,
+    )
+    rows = list(rows_by_key.values())
+    for row in rows:
+        row["net_returns"] = float(row["inflow_returns"]) - float(row["outflow_returns"])
+        row["net_exemptions"] = float(row["inflow_exemptions"]) - float(
+            row["outflow_exemptions"]
+        )
+        row["net_agi_thousands"] = float(row["inflow_agi_thousands"]) - float(
+            row["outflow_agi_thousands"]
+        )
+        known_external = float(row["inflow_returns"]) + float(row["outflow_returns"])
+        suppressed = float(row["suppressed_unallocated_inflow_returns"]) + float(
+            row["suppressed_unallocated_outflow_returns"]
+        )
+        denominator = known_external + suppressed
+        row["coverage_ratio"] = known_external / denominator if denominator else 1.0
+        row["suppressed_unallocated_returns"] = suppressed
+        row["definition_version"] = msa_definition_version
+    return pd.DataFrame(rows)
+
+
+def _irs_soi_msa_row(
+    rows_by_key: dict[tuple[str, int], dict[str, object]],
+    msa_id: str,
+    year: int,
+    membership_counts: dict[str, int],
+) -> dict[str, object]:
+    key = (str(msa_id), int(year))
+    row = rows_by_key.get(key)
+    if row is not None:
+        return row
+    row = {
+        "geo_type": "msa",
+        "geo_id": key[0],
+        "msa_id": key[0],
+        "year": key[1],
+        "membership_county_count": int(membership_counts.get(key[0], 0)),
+    }
+    for column in IRS_SOI_MSA_MEASURE_COLUMNS:
+        row[column] = 0.0
+    rows_by_key[key] = row
+    return row
+
+
+def _irs_soi_add_values(
+    row: dict[str, object],
+    prefix: str,
+    values: dict[str, float],
+) -> None:
+    row[f"{prefix}_returns"] = float(row[f"{prefix}_returns"]) + values["returns"]
+    row[f"{prefix}_exemptions"] = (
+        float(row[f"{prefix}_exemptions"]) + values["exemptions"]
+    )
+    row[f"{prefix}_agi_thousands"] = (
+        float(row[f"{prefix}_agi_thousands"]) + values["agi_thousands"]
+    )
+
+
+def _irs_soi_add_suppressed_unallocated(
+    rows_by_key: dict[tuple[str, int], dict[str, object]],
+    *,
+    county_marginals: pd.DataFrame,
+    county_to_msa: dict[str, str],
+    membership_counts: dict[str, int],
+) -> None:
+    county = county_marginals.copy()
+    county["county_fips"] = county["county_fips"].astype("string").str.zfill(5)
+    county["year"] = pd.to_numeric(county["year"], errors="raise").astype(int)
+    suppressed_map = {
+        "suppressed_unallocated_inflow_returns": "other_flows_inflow_returns",
+        "suppressed_unallocated_inflow_exemptions": "other_flows_inflow_exemptions",
+        "suppressed_unallocated_inflow_agi_thousands": "other_flows_inflow_agi_thousands",
+        "suppressed_unallocated_outflow_returns": "other_flows_outflow_returns",
+        "suppressed_unallocated_outflow_exemptions": "other_flows_outflow_exemptions",
+        "suppressed_unallocated_outflow_agi_thousands": "other_flows_outflow_agi_thousands",
+    }
+    for source_column in suppressed_map.values():
+        county[source_column] = pd.to_numeric(county[source_column], errors="coerce").fillna(0)
+    for row in county.itertuples(index=False):
+        msa_id = county_to_msa.get(str(row.county_fips))
+        if msa_id is None:
+            continue
+        target = _irs_soi_msa_row(rows_by_key, msa_id, int(row.year), membership_counts)
+        for target_column, source_column in suppressed_map.items():
+            target[target_column] = float(target[target_column]) + float(
+                getattr(row, source_column)
+            )
 
 
 def aggregate_county_covariate_to_msa(
@@ -674,6 +892,34 @@ def _coverage_diagnostics(df: pd.DataFrame) -> dict[str, object]:
         diagnostics["unmatched_source_county_count"] = int(
             pd.to_numeric(df["unmatched_source_county_count"], errors="coerce").max()
         )
+    if "year" in df.columns:
+        metadata_columns = {
+            "geo_type",
+            "geo_id",
+            "msa_id",
+            "year",
+            "definition_version",
+            "coverage_ratio",
+            "membership_county_count",
+            "county_count",
+            "population_weight_denominator",
+            "unmatched_source_county_count",
+            "mpi_multi_county_source_row_count",
+            "mpi_msa_source_row_count",
+        }
+        value_columns = [
+            column
+            for column in df.columns
+            if column not in metadata_columns
+            and pd.api.types.is_numeric_dtype(pd.to_numeric(df[column], errors="coerce"))
+        ]
+        if value_columns:
+            per_year_counts: dict[str, dict[str, int]] = {}
+            for year, group in df.groupby("year", dropna=True):
+                per_year_counts[str(int(year))] = {
+                    column: int(group[column].notna().sum()) for column in value_columns
+                }
+            diagnostics["per_year_non_null_counts"] = per_year_counts
     return diagnostics
 
 

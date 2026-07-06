@@ -20,6 +20,7 @@ from hhplab.covariates.catalog import COVARIATE_SOURCE_SPECS
 from hhplab.covariates.ingest import ingest_covariate_source
 from hhplab.covariates.irs_soi_contract import (
     IRS_SOI_COUNTY_MEASURE_COLUMNS,
+    IRS_SOI_MSA_MEASURE_COLUMNS,
     IRS_SOI_PAIR_MEASURE_COLUMNS,
     IRS_SOI_SOURCE_ID,
 )
@@ -166,6 +167,24 @@ IRS_SOI_ROW_TRUTH_TABLE = {
     },
 }
 
+IRS_SOI_MSA_TRUTH_TABLE = {
+    "outside_to_msa_11111": "03001->01001 contributes 10 inflow returns to MSA 11111",
+    "msa_11111_to_outside": "01001->03001 contributes 4 outflow returns from MSA 11111",
+    "intra_msa_11111": "01001->01003 contributes 2 intra_msa returns only",
+    "msa_11111_to_22222": (
+        "01003->02001 contributes 5 outflow returns from MSA 11111 and 5 inflow "
+        "returns to MSA 22222"
+    ),
+    "msa_22222_to_11111": (
+        "02001->01003 contributes 7 outflow returns from MSA 22222 and 7 inflow "
+        "returns to MSA 11111"
+    ),
+    "suppressed_unallocated": (
+        "County marginal other-flow buckets are summed to suppressed_unallocated "
+        "MSA columns and reduce coverage_ratio"
+    ),
+}
+
 BRANCH_ROUNDTRIP_CASES = [
     pytest.param(
         "census_bps",
@@ -278,6 +297,58 @@ def _write_irs_soi_fixture_dir(tmp_path: Path) -> Path:
     pd.DataFrame(inflow_rows).to_csv(raw_dir / "countyinflow2122.csv", index=False)
     pd.DataFrame(outflow_rows).to_csv(raw_dir / "countyoutflow2122.csv", index=False)
     return raw_dir
+
+
+def _write_irs_soi_msa_fixture(tmp_path: Path) -> tuple[Path, Path, Path]:
+    curated = tmp_path / "covariate__irs_soi_migration__Y2011-ongoing.parquet"
+    pairs = tmp_path / "covariate_pairs__irs_soi_migration__Y2011-ongoing.parquet"
+    data_root = tmp_path / "data"
+    msa_dir = data_root / "curated" / "msa"
+    msa_dir.mkdir(parents=True)
+    pd.DataFrame(
+        {
+            "msa_id": ["11111", "11111", "22222"],
+            "county_fips": ["01001", "01003", "02001"],
+        }
+    ).to_parquet(msa_dir / "msa_county_membership__test_msa_v1.parquet")
+    pd.DataFrame(
+        {
+            "geo_type": ["county", "county", "county", "county"],
+            "geo_id": ["01001", "01003", "02001", "03001"],
+            "county_fips": ["01001", "01003", "02001", "03001"],
+            "year": [2022, 2022, 2022, 2022],
+            "inflow_returns": [17, 9, 8, 0],
+            "inflow_exemptions": [34, 18, 16, 0],
+            "inflow_agi_thousands": [170, 90, 80, 0],
+            "outflow_returns": [6, 12, 7, 13],
+            "outflow_exemptions": [12, 24, 14, 26],
+            "outflow_agi_thousands": [60, 120, 70, 130],
+            "other_flows_inflow_returns": [1, 0, 4, 99],
+            "other_flows_inflow_exemptions": [2, 0, 8, 198],
+            "other_flows_inflow_agi_thousands": [10, 0, 40, 990],
+            "other_flows_outflow_returns": [2, 0, 0, 88],
+            "other_flows_outflow_exemptions": [4, 0, 0, 176],
+            "other_flows_outflow_agi_thousands": [20, 0, 0, 880],
+        }
+    ).to_parquet(curated)
+    pd.DataFrame(
+        {
+            "year": [2022, 2022, 2022, 2022, 2022, 2022],
+            "origin_county_fips": ["03001", "01001", "01001", "01003", "02001", "03001"],
+            "destination_county_fips": [
+                "01001",
+                "03001",
+                "01003",
+                "02001",
+                "01003",
+                "02001",
+            ],
+            "migration_returns": [10, 4, 2, 5, 7, 3],
+            "migration_exemptions": [20, 8, 4, 10, 14, 6],
+            "migration_agi_thousands": [100, 40, 20, 50, 70, 30],
+        }
+    ).to_parquet(pairs)
+    return curated, pairs, data_root
 
 
 def test_covariate_catalog_declares_hidden_cause_sources() -> None:
@@ -870,6 +941,92 @@ def test_prism_county_covariate_aggregates_to_msa_with_population_weights(
     assert provenance.geo_type == "msa"
     assert provenance.extra["target_geo"] == "msa"
     assert provenance.extra["msa_definition_version"] == "test_msa_v1"
+
+
+def test_irs_soi_pair_flows_aggregate_to_msa_without_internal_churn(
+    tmp_path: Path,
+) -> None:
+    """IRS SOI MSA aggregation follows the documented pair-flow truth table."""
+    assert "intra_msa_11111" in IRS_SOI_MSA_TRUTH_TABLE
+    curated, _pairs, data_root = _write_irs_soi_msa_fixture(tmp_path)
+
+    panel = aggregate_covariate_source(
+        IRS_SOI_SOURCE_ID,
+        curated_path=curated,
+        output_dir=tmp_path,
+        years=[2022],
+        target_geo="msa",
+        msa_definition_version="test_msa_v1",
+        data_root=data_root,
+        min_coverage_ratio=0.8,
+        force=True,
+    )
+
+    assert panel.name == "covariate_panel__irs_soi_migration__Y2011-ongoing.parquet"
+    result = pd.read_parquet(panel).set_index("msa_id")
+    assert set(IRS_SOI_MSA_MEASURE_COLUMNS) <= set(result.columns)
+    assert result.loc["11111", "inflow_returns"] == pytest.approx(17.0)
+    assert result.loc["11111", "outflow_returns"] == pytest.approx(9.0)
+    assert result.loc["11111", "net_returns"] == pytest.approx(8.0)
+    assert result.loc["11111", "intra_msa_returns"] == pytest.approx(2.0)
+    assert result.loc["11111", "suppressed_unallocated_inflow_returns"] == pytest.approx(1.0)
+    assert result.loc["11111", "suppressed_unallocated_outflow_returns"] == pytest.approx(2.0)
+    assert result.loc["11111", "coverage_ratio"] == pytest.approx(26.0 / 29.0)
+    assert result.loc["22222", "inflow_returns"] == pytest.approx(8.0)
+    assert result.loc["22222", "outflow_returns"] == pytest.approx(7.0)
+    assert result.loc["22222", "net_returns"] == pytest.approx(1.0)
+    assert result.loc["22222", "suppressed_unallocated_inflow_returns"] == pytest.approx(4.0)
+    assert result.loc["22222", "coverage_ratio"] == pytest.approx(15.0 / 19.0)
+
+    provenance = read_provenance(panel)
+    assert provenance is not None
+    assert provenance.extra["measure_columns"] == list(IRS_SOI_MSA_MEASURE_COLUMNS)
+    assert provenance.extra["coverage_policy"]["below_threshold_count"] == 1
+    assert provenance.extra["coverage_diagnostics"]["per_year_non_null_counts"]["2022"][
+        "inflow_returns"
+    ] == 2
+
+
+def test_cli_aggregates_irs_soi_to_msa_with_json_coverage_warning(
+    tmp_path: Path,
+) -> None:
+    curated, _pairs, data_root = _write_irs_soi_msa_fixture(tmp_path)
+
+    result = runner.invoke(
+        app,
+        [
+            "aggregate",
+            "covariate",
+            "--source",
+            IRS_SOI_SOURCE_ID,
+            "--curated-path",
+            str(curated),
+            "--output-dir",
+            str(tmp_path),
+            "--target-geo",
+            "msa",
+            "--msa-definition-version",
+            "test_msa_v1",
+            "--data-root",
+            str(data_root),
+            "--min-coverage-ratio",
+            "0.8",
+            "--force",
+            "--json",
+        ],
+    )
+
+    assert result.exit_code == 0
+    payload = json.loads(result.output)
+    assert payload["status"] == "ok"
+    assert payload["source_id"] == IRS_SOI_SOURCE_ID
+    assert payload["target_geo"] == "msa"
+    assert payload["row_count"] == 2
+    assert payload["coverage_policy"]["below_threshold_count"] == 1
+    assert payload["coverage_diagnostics"]["per_year_non_null_counts"]["2022"][
+        "net_returns"
+    ] == 2
+    assert payload["warnings"][0]["code"] == "covariate_msa_partial_coverage"
 
 
 def test_mpi_static_county_covariate_aggregates_to_msa_with_coverage_diagnostics(

@@ -32,6 +32,27 @@ IRS_SOI_PAIR_MEASURE_COLUMNS: Final = (
     "migration_agi_thousands",
 )
 
+IRS_SOI_MSA_MEASURE_COLUMNS: Final = (
+    "inflow_returns",
+    "inflow_exemptions",
+    "inflow_agi_thousands",
+    "outflow_returns",
+    "outflow_exemptions",
+    "outflow_agi_thousands",
+    "net_returns",
+    "net_exemptions",
+    "net_agi_thousands",
+    "intra_msa_returns",
+    "intra_msa_exemptions",
+    "intra_msa_agi_thousands",
+    "suppressed_unallocated_inflow_returns",
+    "suppressed_unallocated_inflow_exemptions",
+    "suppressed_unallocated_inflow_agi_thousands",
+    "suppressed_unallocated_outflow_returns",
+    "suppressed_unallocated_outflow_exemptions",
+    "suppressed_unallocated_outflow_agi_thousands",
+)
+
 IRS_SOI_REQUIRED_RAW_COLUMNS: Final = (
     "y2_statefips",
     "y2_countyfips",
