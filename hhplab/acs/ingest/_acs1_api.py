@@ -228,6 +228,17 @@ def normalize_acs1_measures(
             total=denominator,
         )
 
+    for tenure, prefix in (("renter", "renter"), ("owner", "owner")):
+        total_column = f"mobility_{tenure}_total"
+        same_house_column = f"mobility_same_house_{tenure}"
+        share_column = f"{prefix}_moved_share"
+        result[share_column] = pd.NA
+        if {total_column, same_house_column} <= set(result.columns):
+            total = pd.to_numeric(result[total_column], errors="coerce")
+            same_house = pd.to_numeric(result[same_house_column], errors="coerce")
+            movers = (total - same_house).where(total.notna() & same_house.notna())
+            result[share_column] = movers / total.where(total > 0)
+
     for col in ACS1_INTEGER_COLUMNS:
         if col in result.columns:
             result[col] = result[col].astype("Int64")

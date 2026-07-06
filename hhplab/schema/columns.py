@@ -31,6 +31,8 @@ ACS1_MEASURE_COLUMNS: list[str] = [
     "rent_burden_40_plus",
     "rent_burden_50_plus",
     "unemployment_rate_acs1",
+    "renter_moved_share",
+    "owner_moved_share",
 ]
 
 LAUS_MEASURE_COLUMNS: list[str] = [
@@ -914,6 +916,8 @@ METRO_PANEL_COLUMNS: list[str] = [
     "rent_burden_40_plus",
     "rent_burden_50_plus",
     "unemployment_rate_acs1",
+    "renter_moved_share",
+    "owner_moved_share",
     "labor_force",
     "employed",
     "unemployed",

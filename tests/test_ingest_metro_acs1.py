@@ -418,6 +418,51 @@ class TestRentBurdenCalculation:
         assert pd.isna(df.iloc[0]["rent_burden_40_plus"])
         assert pd.isna(df.iloc[0]["rent_burden_50_plus"])
 
+    def test_moved_share_calculation(self, httpx_mock, tmp_path):
+        """Tenure moved-shares are (tenure total - same house) / tenure total.
+
+        Fixture truth table: renter total 200 with 120 in the same house
+        -> renter_moved_share 80/200 = 0.40; owner total 400 with 360 in the
+        same house -> owner_moved_share 40/400 = 0.10.
+        """
+        cbsas = [
+            {
+                "cbsa_code": "35620",
+                "B07013_002E": "400",
+                "B07013_003E": "200",
+                "B07013_005E": "360",
+                "B07013_006E": "120",
+            },
+        ]
+        queue_acs1_group_responses(httpx_mock, cbsas, vintage=2023)
+
+        path = ingest_metro_acs1(vintage=2023, project_root=tmp_path)
+        df = pd.read_parquet(path)
+
+        row = df.iloc[0]
+        assert row["renter_moved_share"] == pytest.approx(80 / 200)
+        assert row["owner_moved_share"] == pytest.approx(40 / 400)
+        assert df["renter_moved_share"].dtype == "Float64"
+        assert df["owner_moved_share"].dtype == "Float64"
+
+    def test_moved_share_zero_tenure_total_is_null(self, httpx_mock, tmp_path):
+        cbsas = [
+            {
+                "cbsa_code": "35620",
+                "B07013_002E": "0",
+                "B07013_003E": "0",
+                "B07013_005E": "0",
+                "B07013_006E": "0",
+            },
+        ]
+        queue_acs1_group_responses(httpx_mock, cbsas, vintage=2023)
+
+        path = ingest_metro_acs1(vintage=2023, project_root=tmp_path)
+        df = pd.read_parquet(path)
+
+        assert pd.isna(df.iloc[0]["renter_moved_share"])
+        assert pd.isna(df.iloc[0]["owner_moved_share"])
+
 
 class TestOutputSchema:
     """Test that output matches canonical schema."""

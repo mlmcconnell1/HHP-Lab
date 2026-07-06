@@ -31,6 +31,33 @@ ACS1_TABLE_COLUMN_NAMES: dict[str, dict[str, str]] = {
         "B23025_003E": "civilian_labor_force",
         "B23025_005E": "unemployed_count",
     },
+    # Geographical Mobility in the Past Year by Tenure for Current Residence.
+    # Universe: population 1 year and over living in housing units, classified
+    # by the tenure of the current householder. Cell order verified against
+    # api.census.gov/data/2023/acs/acs1/groups/B07013.json.
+    "B07013": _dense_estimate_map(
+        "B07013",
+        [
+            "mobility_universe_total",
+            "mobility_owner_total",
+            "mobility_renter_total",
+            "mobility_same_house_total",
+            "mobility_same_house_owner",
+            "mobility_same_house_renter",
+            "mobility_moved_within_county_total",
+            "mobility_moved_within_county_owner",
+            "mobility_moved_within_county_renter",
+            "mobility_moved_diff_county_same_state_total",
+            "mobility_moved_diff_county_same_state_owner",
+            "mobility_moved_diff_county_same_state_renter",
+            "mobility_moved_diff_state_total",
+            "mobility_moved_diff_state_owner",
+            "mobility_moved_diff_state_renter",
+            "mobility_moved_from_abroad_total",
+            "mobility_moved_from_abroad_owner",
+            "mobility_moved_from_abroad_renter",
+        ],
+    ),
     "B19001": _dense_estimate_map(
         "B19001",
         [
@@ -448,6 +475,16 @@ DERIVED_ACS1_MEASURES: dict[str, str] = {
     "unemployment_rate_acs1": (
         "Unemployment rate from ACS 1-year (B23025_005E / B23025_003E)"
     ),
+    "renter_moved_share": (
+        "Share of the renter-housed population (1 year and over) that moved in "
+        "the past year, any origin including within-county "
+        "((B07013_003E - B07013_006E) / B07013_003E)"
+    ),
+    "owner_moved_share": (
+        "Share of the owner-housed population (1 year and over) that moved in "
+        "the past year, any origin including within-county "
+        "((B07013_002E - B07013_005E) / B07013_002E)"
+    ),
 }
 
 ACS1_FLOAT_COLUMNS: list[str] = [
@@ -463,6 +500,8 @@ ACS1_FLOAT_COLUMNS: list[str] = [
     "rent_burden_40_plus",
     "rent_burden_50_plus",
     "unemployment_rate_acs1",
+    "renter_moved_share",
+    "owner_moved_share",
 ]
 
 ACS1_INTEGER_COLUMNS: list[str] = [

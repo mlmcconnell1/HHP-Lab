@@ -252,4 +252,6 @@ def test_acs1_measure_columns_content() -> None:
         "rent_burden_40_plus",
         "rent_burden_50_plus",
         "unemployment_rate_acs1",
+        "renter_moved_share",
+        "owner_moved_share",
     ]

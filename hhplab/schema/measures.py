@@ -487,6 +487,32 @@ ACS1_PANEL_MEASURE_DICTIONARY: tuple[PanelMeasureDictionaryEntry, ...] = (
         "candidate_driver",
         "ACS1 is available only for geographies meeting Census population thresholds.",
     ),
+    _entry(
+        "renter_moved_share",
+        "ACS 1-year share of the renter-housed population that moved in the past "
+        "year, including within-county moves (B07013).",
+        "share",
+        "census",
+        "acs1",
+        "metro",
+        2010,
+        "candidate_driver",
+        "Universe is population 1 year and over in housing units classified by "
+        "current householder tenure; person-weighted, not household-weighted.",
+    ),
+    _entry(
+        "owner_moved_share",
+        "ACS 1-year share of the owner-housed population that moved in the past "
+        "year, including within-county moves (B07013).",
+        "share",
+        "census",
+        "acs1",
+        "metro",
+        2010,
+        "candidate_driver",
+        "Universe is population 1 year and over in housing units classified by "
+        "current householder tenure; person-weighted, not household-weighted.",
+    ),
 )
 
 LAUS_PANEL_MEASURE_DICTIONARY: tuple[PanelMeasureDictionaryEntry, ...] = (
