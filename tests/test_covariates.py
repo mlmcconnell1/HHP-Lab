@@ -18,6 +18,11 @@ from hhplab.covariates.aggregate import (
 )
 from hhplab.covariates.catalog import COVARIATE_SOURCE_SPECS
 from hhplab.covariates.ingest import ingest_covariate_source
+from hhplab.covariates.irs_soi_contract import (
+    IRS_SOI_COUNTY_MEASURE_COLUMNS,
+    IRS_SOI_PAIR_MEASURE_COLUMNS,
+    IRS_SOI_SOURCE_ID,
+)
 from hhplab.covariates.mpi_contract import (
     MPI_COUNTY_HEADERS,
     MPI_COUNTY_SHEET,
@@ -48,6 +53,7 @@ EXPECTED_COVARIATE_SOURCES = {
     "kff_medicaid_expansion": ("state", "medicaid_expansion_adopted"),
     "prism_tmin_january": ("county", "tmin_c"),
     MPI_SOURCE_ID: ("county", "unauthorized_immigrant_population"),
+    IRS_SOI_SOURCE_ID: ("county", "inflow_returns"),
 }
 
 MPI_XLSX_ROW_TRUTH_TABLE = {
@@ -70,6 +76,93 @@ MPI_XLSX_ROW_TRUTH_TABLE = {
     "unmapped_county": {
         "row": ["Atlantis", "Poseidon County, Atlantis", 5_000, 0.0001],
         "expected": "error:no_resolved_county_fips",
+    },
+}
+
+IRS_SOI_ROW_TRUTH_TABLE = {
+    "inflow_flow": {
+        "row": {
+            "y2_statefips": "06",
+            "y2_countyfips": "037",
+            "y1_statefips": "12",
+            "y1_countyfips": "086",
+            "y1_state": "FL",
+            "y1_countyname": "Miami-Dade County",
+            "n1": "11",
+            "n2": "22",
+            "agi": "330",
+        },
+        "expected": "pair:12086->06037 and inflow:06037",
+    },
+    "outflow_flow": {
+        "row": {
+            "y2_statefips": "12",
+            "y2_countyfips": "086",
+            "y1_statefips": "06",
+            "y1_countyfips": "037",
+            "y1_state": "CA",
+            "y1_countyname": "Los Angeles County",
+            "n1": "7",
+            "n2": "14",
+            "agi": "210",
+        },
+        "expected": "pair:06037->12086 and outflow:06037",
+    },
+    "state_total": {
+        "row": {
+            "y2_statefips": "06",
+            "y2_countyfips": "000",
+            "y1_statefips": "12",
+            "y1_countyfips": "086",
+            "y1_state": "FL",
+            "y1_countyname": "Miami-Dade County",
+            "n1": "99",
+            "n2": "198",
+            "agi": "999",
+        },
+        "expected": "skipped:state_total_row",
+    },
+    "summary_total": {
+        "row": {
+            "y2_statefips": "06",
+            "y2_countyfips": "037",
+            "y1_statefips": "97",
+            "y1_countyfips": "000",
+            "y1_state": "US",
+            "y1_countyname": "Total Migration - US",
+            "n1": "200",
+            "n2": "400",
+            "agi": "5000",
+        },
+        "expected": "skipped:summary_pseudo_state_row not other-flow",
+    },
+    "other_flow": {
+        "row": {
+            "y2_statefips": "06",
+            "y2_countyfips": "037",
+            "y1_statefips": "57",
+            "y1_countyfips": "000",
+            "y1_state": "Other",
+            "y1_countyname": "Other flows",
+            "n1": "3",
+            "n2": "6",
+            "agi": "90",
+        },
+        "expected": "skipped:summary_pseudo_state_row and other_flows_inflow:06037",
+    },
+    "same_county": {
+        "row": {
+            "y2_statefips": "06",
+            "y2_countyfips": "037",
+            "y1_statefips": "06",
+            "y1_countyfips": "037",
+            "y1_state": "CA",
+            "y1_countyname": "Los Angeles County",
+            "n1": "50",
+            "n2": "100",
+            "agi": "1000",
+        },
+        "expected": "skipped:same_county_non_migrant",
     },
 }
 
@@ -157,6 +250,36 @@ def _write_mpi_contract_workbook(
     return workbook_path
 
 
+def _write_irs_soi_fixture_dir(tmp_path: Path) -> Path:
+    raw_dir = tmp_path / "irs_soi"
+    raw_dir.mkdir()
+    inflow_rows = [
+        IRS_SOI_ROW_TRUTH_TABLE["inflow_flow"]["row"],
+        IRS_SOI_ROW_TRUTH_TABLE["state_total"]["row"],
+        IRS_SOI_ROW_TRUTH_TABLE["summary_total"]["row"],
+        IRS_SOI_ROW_TRUTH_TABLE["other_flow"]["row"],
+        IRS_SOI_ROW_TRUTH_TABLE["same_county"]["row"],
+    ]
+    outflow_rows = [
+        IRS_SOI_ROW_TRUTH_TABLE["inflow_flow"]["row"],
+        IRS_SOI_ROW_TRUTH_TABLE["outflow_flow"]["row"],
+        {
+            **IRS_SOI_ROW_TRUTH_TABLE["other_flow"]["row"],
+            "y2_statefips": "58",
+            "y2_countyfips": "000",
+            "y1_statefips": "06",
+            "y1_countyfips": "037",
+            "n1": "4",
+            "n2": "8",
+            "agi": "120",
+        },
+        IRS_SOI_ROW_TRUTH_TABLE["same_county"]["row"],
+    ]
+    pd.DataFrame(inflow_rows).to_csv(raw_dir / "countyinflow2122.csv", index=False)
+    pd.DataFrame(outflow_rows).to_csv(raw_dir / "countyoutflow2122.csv", index=False)
+    return raw_dir
+
+
 def test_covariate_catalog_declares_hidden_cause_sources() -> None:
     """The expanded source catalog should cover all bead-requested families."""
     assert set(COVARIATE_SOURCE_SPECS) == set(EXPECTED_COVARIATE_SOURCES)
@@ -186,6 +309,112 @@ def test_mpi_contract_declares_workbook_schema_and_geography_rules() -> None:
     assert spec.first_year == MPI_ESTIMATE_YEAR
     assert spec.last_year == MPI_ESTIMATE_YEAR
     assert set(MPI_MEASURE_COLUMNS) <= set(spec.measure_columns)
+
+
+def test_irs_soi_catalog_declares_county_migration_contract() -> None:
+    spec = COVARIATE_SOURCE_SPECS[IRS_SOI_SOURCE_ID]
+
+    assert spec.first_year == 2011
+    assert spec.last_year is None
+    assert spec.native_geo == "county"
+    assert spec.measure_columns == IRS_SOI_COUNTY_MEASURE_COLUMNS
+    assert set(spec.measure_aggregations) == set(IRS_SOI_COUNTY_MEASURE_COLUMNS)
+    assert set(spec.measure_aggregations.values()) == {"extensive_sum"}
+
+
+def test_irs_soi_ingest_writes_county_and_pair_artifacts_with_provenance(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    monkeypatch.setattr("hhplab.covariates.ingest.register_source", lambda **_: None)
+    raw_dir = _write_irs_soi_fixture_dir(tmp_path)
+
+    curated = ingest_covariate_source(
+        IRS_SOI_SOURCE_ID,
+        raw_dir,
+        output_dir=tmp_path,
+        force=True,
+    )
+
+    assert curated.name == "covariate__irs_soi_migration__Y2011-ongoing.parquet"
+    county = pd.read_parquet(curated)
+    la = county.set_index("county_fips").loc["06037"]
+    assert la["year"] == 2022
+    assert la["inflow_returns"] == 11
+    assert la["inflow_exemptions"] == 22
+    assert la["inflow_agi_thousands"] == 330
+    assert la["outflow_returns"] == 7
+    assert la["outflow_exemptions"] == 14
+    assert la["outflow_agi_thousands"] == 210
+    assert la["other_flows_inflow_returns"] == 3
+    assert la["other_flows_outflow_returns"] == 4
+
+    provenance = read_provenance(curated)
+    assert provenance is not None
+    assert provenance.extra["source_id"] == IRS_SOI_SOURCE_ID
+    assert provenance.extra["year_convention"].startswith("later filing year")
+    assert provenance.extra["skipped_reasons"] == {
+        "summary_pseudo_state_row": 3,
+        "same_county_non_migrant": 2,
+        "state_total_row": 1,
+    }
+    pair_path = Path(provenance.extra["pair_output_path"])
+    assert pair_path.name == "covariate_pairs__irs_soi_migration__Y2011-ongoing.parquet"
+    pairs = pd.read_parquet(pair_path)
+    assert set(IRS_SOI_PAIR_MEASURE_COLUMNS) <= set(pairs.columns)
+    assert pairs[
+        ["year", "origin_county_fips", "destination_county_fips", "migration_returns"]
+    ].to_dict(orient="records") == [
+        {
+            "year": 2022,
+            "origin_county_fips": "06037",
+            "destination_county_fips": "12086",
+            "migration_returns": 7,
+        },
+        {
+            "year": 2022,
+            "origin_county_fips": "12086",
+            "destination_county_fips": "06037",
+            "migration_returns": 11,
+        },
+    ]
+    pair_provenance = read_provenance(pair_path)
+    assert pair_provenance is not None
+    assert pair_provenance.extra["dataset_type"] == "expanded_covariate_pair"
+    assert pair_provenance.extra["county_output_path"] == str(curated)
+
+
+def test_irs_soi_ingest_rejects_missing_or_renamed_columns(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    monkeypatch.setattr("hhplab.covariates.ingest.register_source", lambda **_: None)
+    raw_dir = tmp_path / "irs_soi"
+    raw_dir.mkdir()
+    pd.DataFrame(
+        [
+            {
+                "y2_statefips": "06",
+                "y2_countyfips": "037",
+                "y1_statefips": "12",
+                "y1_countyfips": "086",
+                "n1": "1",
+                "n2": "2",
+            }
+        ]
+    ).to_csv(raw_dir / "countyinflow2122.csv", index=False)
+    pd.DataFrame([IRS_SOI_ROW_TRUTH_TABLE["outflow_flow"]["row"]]).to_csv(
+        raw_dir / "countyoutflow2122.csv",
+        index=False,
+    )
+
+    with pytest.raises(ValueError, match="missing required columns"):
+        ingest_covariate_source(
+            IRS_SOI_SOURCE_ID,
+            raw_dir,
+            output_dir=tmp_path,
+            force=True,
+        )
 
 
 def test_mpi_workbook_contract_accepts_expected_layout(tmp_path: Path) -> None:
@@ -373,6 +602,45 @@ def test_cli_ingests_mpi_xlsx_with_json_warnings(tmp_path: Path, monkeypatch) ->
     assert payload["measure_columns"] == list(MPI_MEASURE_COLUMNS)
     assert payload["skipped_rows"] == 1
     assert payload["warnings"] == {"us_total": 1}
+
+
+def test_cli_ingests_irs_soi_directory_with_json_pair_path(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    monkeypatch.setattr("hhplab.covariates.ingest.register_source", lambda **_: None)
+    raw_dir = _write_irs_soi_fixture_dir(tmp_path)
+
+    result = runner.invoke(
+        app,
+        [
+            "ingest",
+            "covariate",
+            "--source",
+            IRS_SOI_SOURCE_ID,
+            "--raw-path",
+            str(raw_dir),
+            "--output-dir",
+            str(tmp_path),
+            "--force",
+            "--json",
+        ],
+    )
+
+    assert result.exit_code == 0
+    payload = json.loads(result.output)
+    assert payload["status"] == "ok"
+    assert payload["source_id"] == IRS_SOI_SOURCE_ID
+    assert payload["row_count"] == 2
+    assert payload["pair_rows"] == 2
+    assert payload["pair_output_path"].endswith(
+        "covariate_pairs__irs_soi_migration__Y2011-ongoing.parquet"
+    )
+    assert payload["warnings"] == {
+        "summary_pseudo_state_row": 3,
+        "same_county_non_migrant": 2,
+        "state_total_row": 1,
+    }
 
 
 @pytest.mark.parametrize(
@@ -965,7 +1233,9 @@ def test_mpi_msa_aggregate_rejects_stale_preview_only_msa_provenance(
                 "skipped_reasons": {"msa_row": 5},
                 "skipped_preview": [
                     {
-                        "county_label": "Boston-Cambridge-Newton MSA,++ Massachusetts-New Hampshire",
+                        "county_label": (
+                            "Boston-Cambridge-Newton MSA,++ Massachusetts-New Hampshire"
+                        ),
                         "exclusion_reason": "msa_row",
                     }
                 ],

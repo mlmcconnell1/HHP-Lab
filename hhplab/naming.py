@@ -162,6 +162,17 @@ def covariate_curated_filename(
     return f"covariate__{source}__{year_range}.parquet"
 
 
+def covariate_pair_filename(
+    source_id: str,
+    first_year: str | int,
+    last_year: str | int | None,
+) -> str:
+    """Generate filename for normalized pair-level expanded covariate data."""
+    source = _normalize_covariate_source_id(source_id)
+    year_range = _covariate_year_range_token(first_year, last_year)
+    return f"covariate_pairs__{source}__{year_range}.parquet"
+
+
 def covariate_panel_filename(
     source_id: str,
     first_year: str | int,

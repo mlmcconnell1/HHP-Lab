@@ -61,6 +61,8 @@ def ingest_covariate(
         "output_path": str(result_path),
         "row_count": row_count,
         "measure_columns": list(spec.measure_columns),
+        "pair_output_path": extra.get("pair_output_path"),
+        "pair_rows": extra.get("pair_rows_written", 0),
         "skipped_rows": extra.get("skipped_rows", 0),
         "warnings": extra.get("skipped_reasons", {}),
     }

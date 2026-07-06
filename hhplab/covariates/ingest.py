@@ -11,6 +11,17 @@ from typing import Any
 import pandas as pd
 
 from hhplab.covariates.catalog import CovariateSourceSpec, covariate_source_spec
+from hhplab.covariates.irs_soi_contract import (
+    IRS_SOI_COUNTY_CURATED_COLUMNS,
+    IRS_SOI_OTHER_FLOW_STATE_FIPS,
+    IRS_SOI_PAIR_CURATED_COLUMNS,
+    IRS_SOI_PRODUCT,
+    IRS_SOI_PROVIDER,
+    IRS_SOI_REQUIRED_RAW_COLUMNS,
+    IRS_SOI_SOURCE_ID,
+    IRS_SOI_STATE_TOTAL_COUNTY_FIPS,
+    IRS_SOI_SUMMARY_STATE_FIPS,
+)
 from hhplab.covariates.mpi_contract import (
     MPI_ALLOWED_COUNTY_EQUIVALENT_LABELS,
     MPI_COUNTY_SHEET,
@@ -27,7 +38,7 @@ from hhplab.covariates.mpi_contract import (
     validate_mpi_workbook_contract,
 )
 from hhplab.metro.metro_definitions import STATE_ABBREV_TO_FIPS
-from hhplab.naming import covariate_curated_filename
+from hhplab.naming import covariate_curated_filename, covariate_pair_filename
 from hhplab.paths import curated_dir, raw_root
 from hhplab.provenance import ProvenanceBlock, write_parquet_with_provenance
 from hhplab.source_registry import register_source
@@ -144,6 +155,12 @@ def ingest_covariate_source(
             destination=destination,
             county_reference_path=county_reference_path,
         )
+    if source_id == IRS_SOI_SOURCE_ID:
+        return _ingest_irs_soi_migration(
+            source_path,
+            spec=spec,
+            destination=destination,
+        )
 
     raw = _read_tabular(source_path)
     result = normalize_covariate_frame(raw, spec=spec)
@@ -206,6 +223,17 @@ def ingest_covariate_source(
     return destination
 
 
+def default_covariate_pair_output_path(
+    source_id: str,
+    *,
+    output_dir: Path | str | None = None,
+) -> Path:
+    """Return the deterministic curated output path for a pair-level covariate."""
+    spec = covariate_source_spec(source_id)
+    base = curated_dir("covariates") if output_dir is None else Path(output_dir)
+    return base / covariate_pair_filename(source_id, spec.first_year, spec.last_year)
+
+
 def normalize_covariate_frame(
     df: pd.DataFrame,
     *,
@@ -261,6 +289,448 @@ def normalize_covariate_frame(
     for column in spec.measure_columns:
         result[column] = pd.to_numeric(rows[column], errors="coerce")
     return result.dropna(subset=["geo_id"]).sort_values(["geo_id", "year"]).reset_index(drop=True)
+
+
+def _ingest_irs_soi_migration(
+    source_path: Path,
+    *,
+    spec: CovariateSourceSpec,
+    destination: Path,
+) -> Path:
+    if not source_path.is_dir():
+        raise ValueError(
+            "IRS SOI migration ingest expects --raw-path to be a staging directory "
+            "containing countyinflowYYZZ.csv and countyoutflowYYZZ.csv files. "
+            f"Stage IRS files under {raw_root() / 'irs_soi'} or pass that directory."
+        )
+
+    file_pairs = _irs_soi_file_pairs(source_path)
+    if not file_pairs:
+        raise ValueError(
+            "No matched IRS SOI county migration CSV pairs found. Expected files named "
+            "countyinflowYYZZ.csv and countyoutflowYYZZ.csv, for example "
+            "countyinflow2122.csv and countyoutflow2122.csv."
+        )
+
+    county_frames: list[pd.DataFrame] = []
+    pair_frames: list[pd.DataFrame] = []
+    skipped_frames: list[pd.DataFrame] = []
+    for year_token, paths in sorted(file_pairs.items()):
+        year = _irs_soi_later_year(year_token)
+        inflow_raw = _read_irs_soi_csv(paths["inflow"], source_label="inflow")
+        outflow_raw = _read_irs_soi_csv(paths["outflow"], source_label="outflow")
+        inflow_flows, inflow_skipped = _normalize_irs_soi_flow_rows(
+            inflow_raw,
+            year=year,
+            perspective="inflow",
+            raw_file=paths["inflow"],
+        )
+        outflow_flows, outflow_skipped = _normalize_irs_soi_flow_rows(
+            outflow_raw,
+            year=year,
+            perspective="outflow",
+            raw_file=paths["outflow"],
+        )
+        county_frames.append(
+            _irs_soi_county_marginals(
+                inflow_flows=inflow_flows,
+                outflow_flows=outflow_flows,
+                inflow_skipped=inflow_skipped,
+                outflow_skipped=outflow_skipped,
+                year=year,
+            )
+        )
+        pair_frames.append(_irs_soi_pair_table(inflow_flows, outflow_flows))
+        skipped_frames.extend([inflow_skipped, outflow_skipped])
+
+    county_rows = pd.concat(county_frames, ignore_index=True)
+    pair_rows = pd.concat(pair_frames, ignore_index=True)
+    skipped_rows = pd.concat(skipped_frames, ignore_index=True)
+    if county_rows.empty:
+        raise ValueError(
+            "IRS SOI migration files produced no county-year rows. Check that the "
+            "CSV files use IRS county-to-county layouts and include non-summary rows."
+        )
+    if pair_rows.empty:
+        raise ValueError(
+            "IRS SOI migration files produced no pair-level county flows. Check that "
+            "the files are not only state totals, pseudo-state summaries, or same-county "
+            "non-migrant rows."
+        )
+
+    raw_sha256 = _sha256_tree(source_path)
+    ingested_at = datetime.now(UTC)
+    for rows in (county_rows, pair_rows):
+        rows["source_id"] = spec.source_id
+        rows["provider"] = spec.provider
+        rows["product"] = spec.product
+        rows["topic"] = spec.topic
+        rows["data_source"] = spec.provider
+        rows["source_url"] = spec.source_url
+        rows["raw_sha256"] = raw_sha256
+        rows["ingested_at"] = ingested_at
+
+    county_rows = county_rows[list(IRS_SOI_COUNTY_CURATED_COLUMNS)]
+    pair_rows = pair_rows[list(IRS_SOI_PAIR_CURATED_COLUMNS)]
+    pair_destination = destination.with_name(
+        covariate_pair_filename(spec.source_id, spec.first_year, spec.last_year)
+    )
+
+    skipped_preview = skipped_rows.head(50).to_dict(orient="records")
+    summary_rows = (
+        skipped_rows[
+            skipped_rows["exclusion_reason"].isin(
+                ["state_total_row", "summary_pseudo_state_row", "same_county_non_migrant"]
+            )
+        ].to_dict(orient="records")
+        if "exclusion_reason" in skipped_rows.columns
+        else []
+    )
+    provenance_extra = {
+        "dataset_type": "expanded_covariate",
+        "source_id": spec.source_id,
+        "provider": spec.provider,
+        "product": spec.product,
+        "native_geo": spec.native_geo,
+        "measure_columns": list(spec.measure_columns),
+        "raw_path": str(source_path),
+        "raw_sha256": raw_sha256,
+        "year_convention": "later filing year; countyinflow2122.csv maps to year 2022",
+        "rows_written": int(len(county_rows)),
+        "pair_rows_written": int(len(pair_rows)),
+        "pair_output_path": str(pair_destination),
+        "skipped_rows": int(len(skipped_rows)),
+        "skipped_reasons": _value_counts(skipped_rows, "exclusion_reason"),
+        "skipped_preview": skipped_preview,
+        "summary_rows": summary_rows,
+    }
+    write_parquet_with_provenance(
+        county_rows,
+        destination,
+        ProvenanceBlock(geo_type=spec.native_geo, extra=provenance_extra),
+    )
+    write_parquet_with_provenance(
+        pair_rows,
+        pair_destination,
+        ProvenanceBlock(
+            geo_type="county_pair",
+            extra={
+                **provenance_extra,
+                "dataset_type": "expanded_covariate_pair",
+                "row_grain": "origin_county_fips x destination_county_fips x year",
+                "county_output_path": str(destination),
+                "measure_columns": [
+                    "migration_returns",
+                    "migration_exemptions",
+                    "migration_agi_thousands",
+                ],
+            },
+        ),
+    )
+    register_source(
+        source_type="other",
+        source_url=spec.source_url,
+        raw_sha256=raw_sha256,
+        source_name=f"{IRS_SOI_PROVIDER}:{IRS_SOI_PRODUCT}",
+        file_size=sum(
+            path.stat().st_size
+            for pair in file_pairs.values()
+            for path in pair.values()
+        ),
+        local_path=source_path,
+        metadata={
+            "source_id": spec.source_id,
+            "curated_path": str(destination),
+            "pair_curated_path": str(pair_destination),
+            "native_geo": spec.native_geo,
+            "measure_columns": list(spec.measure_columns),
+            "rows_written": int(len(county_rows)),
+            "pair_rows_written": int(len(pair_rows)),
+            "skipped_rows": int(len(skipped_rows)),
+        },
+    )
+    return destination
+
+
+def _irs_soi_file_pairs(source_dir: Path) -> dict[str, dict[str, Path]]:
+    pairs: dict[str, dict[str, Path]] = {}
+    for path in sorted(source_dir.glob("county*flow*.csv")):
+        match = re.fullmatch(r"county(inflow|outflow)(\d{4})\.csv", path.name.lower())
+        if match is None:
+            continue
+        perspective, year_token = match.groups()
+        pairs.setdefault(year_token, {})[perspective] = path
+    return {
+        year_token: paths
+        for year_token, paths in pairs.items()
+        if {"inflow", "outflow"} <= set(paths)
+    }
+
+
+def _irs_soi_later_year(year_token: str) -> int:
+    later_two_digit = int(year_token[2:])
+    return 2000 + later_two_digit
+
+
+def _read_irs_soi_csv(path: Path, *, source_label: str) -> pd.DataFrame:
+    try:
+        rows = pd.read_csv(path, dtype=str)
+    except UnicodeDecodeError:
+        rows = pd.read_csv(path, dtype=str, encoding="latin1")
+    rows.columns = [_clean_column(column) for column in rows.columns]
+    missing = [column for column in IRS_SOI_REQUIRED_RAW_COLUMNS if column not in rows.columns]
+    if missing:
+        raise ValueError(
+            f"IRS SOI {source_label} file {path} is missing required columns {missing}. "
+            "Expected IRS county migration CSV columns including y2_statefips, "
+            "y2_countyfips, y1_statefips, y1_countyfips, n1, n2, and agi. "
+            "Check the file-year users guide and record layout."
+        )
+    return rows
+
+
+def _normalize_irs_soi_flow_rows(
+    raw: pd.DataFrame,
+    *,
+    year: int,
+    perspective: str,
+    raw_file: Path,
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+    flows: list[dict[str, Any]] = []
+    skipped: list[dict[str, Any]] = []
+    for source_row, row in raw.reset_index(drop=True).iterrows():
+        origin_state = _irs_soi_fips(row["y1_statefips"], width=2)
+        origin_county = _irs_soi_fips(row["y1_countyfips"], width=3)
+        destination_state = _irs_soi_fips(row["y2_statefips"], width=2)
+        destination_county = _irs_soi_fips(row["y2_countyfips"], width=3)
+        origin_fips = f"{origin_state}{origin_county}"
+        destination_fips = f"{destination_state}{destination_county}"
+        values = {
+            "returns": _irs_soi_number(row["n1"]),
+            "exemptions": _irs_soi_number(row["n2"]),
+            "agi_thousands": _irs_soi_number(row["agi"]),
+        }
+        exclusion_reason = _irs_soi_exclusion_reason(
+            origin_state=origin_state,
+            origin_county=origin_county,
+            destination_state=destination_state,
+            destination_county=destination_county,
+        )
+        record = {
+            "year": year,
+            "perspective": perspective,
+            "raw_file": str(raw_file),
+            "source_row": int(source_row) + 2,
+            "origin_county_fips": origin_fips,
+            "destination_county_fips": destination_fips,
+            **values,
+        }
+        if exclusion_reason is not None:
+            skipped.append({**record, "exclusion_reason": exclusion_reason})
+            continue
+        flows.append(record)
+    flow_columns = [
+        "year",
+        "perspective",
+        "raw_file",
+        "source_row",
+        "origin_county_fips",
+        "destination_county_fips",
+        "returns",
+        "exemptions",
+        "agi_thousands",
+    ]
+    skipped_columns = [*flow_columns, "exclusion_reason"]
+    return pd.DataFrame(flows, columns=flow_columns), pd.DataFrame(
+        skipped,
+        columns=skipped_columns,
+    )
+
+
+def _irs_soi_exclusion_reason(
+    *,
+    origin_state: str,
+    origin_county: str,
+    destination_state: str,
+    destination_county: str,
+) -> str | None:
+    if (
+        origin_state in IRS_SOI_SUMMARY_STATE_FIPS
+        or destination_state in IRS_SOI_SUMMARY_STATE_FIPS
+    ):
+        return "summary_pseudo_state_row"
+    if (
+        origin_county == IRS_SOI_STATE_TOTAL_COUNTY_FIPS
+        or destination_county == IRS_SOI_STATE_TOTAL_COUNTY_FIPS
+    ):
+        return "state_total_row"
+    if origin_state == destination_state and origin_county == destination_county:
+        return "same_county_non_migrant"
+    return None
+
+
+def _irs_soi_county_marginals(
+    *,
+    inflow_flows: pd.DataFrame,
+    outflow_flows: pd.DataFrame,
+    inflow_skipped: pd.DataFrame,
+    outflow_skipped: pd.DataFrame,
+    year: int,
+) -> pd.DataFrame:
+    inflows = _irs_soi_group_flows(
+        inflow_flows,
+        county_column="destination_county_fips",
+        prefix="inflow",
+    )
+    outflows = _irs_soi_group_flows(
+        outflow_flows,
+        county_column="origin_county_fips",
+        prefix="outflow",
+    )
+    other_inflows = _irs_soi_group_other_flows(
+        inflow_skipped,
+        county_column="destination_county_fips",
+        prefix="other_flows_inflow",
+    )
+    other_outflows = _irs_soi_group_other_flows(
+        outflow_skipped,
+        county_column="origin_county_fips",
+        prefix="other_flows_outflow",
+    )
+    county_fips = sorted(
+        set(inflows.index)
+        | set(outflows.index)
+        | set(other_inflows.index)
+        | set(other_outflows.index)
+    )
+    result = pd.DataFrame({"county_fips": county_fips})
+    result["geo_type"] = "county"
+    result["geo_id"] = result["county_fips"]
+    result["year"] = year
+    for grouped in (inflows, outflows, other_inflows, other_outflows):
+        result = result.merge(grouped, left_on="county_fips", right_index=True, how="left")
+    for column in (
+        "inflow_returns",
+        "inflow_exemptions",
+        "inflow_agi_thousands",
+        "outflow_returns",
+        "outflow_exemptions",
+        "outflow_agi_thousands",
+        "other_flows_inflow_returns",
+        "other_flows_inflow_exemptions",
+        "other_flows_inflow_agi_thousands",
+        "other_flows_outflow_returns",
+        "other_flows_outflow_exemptions",
+        "other_flows_outflow_agi_thousands",
+    ):
+        result[column] = (
+            pd.to_numeric(result[column], errors="coerce").fillna(0).astype("int64")
+        )
+    return result.sort_values(["county_fips", "year"]).reset_index(drop=True)
+
+
+def _irs_soi_group_flows(
+    flows: pd.DataFrame,
+    *,
+    county_column: str,
+    prefix: str,
+) -> pd.DataFrame:
+    if flows.empty:
+        return pd.DataFrame(
+            columns=[f"{prefix}_returns", f"{prefix}_exemptions", f"{prefix}_agi_thousands"]
+        )
+    grouped = flows.groupby(county_column, as_index=True)[
+        ["returns", "exemptions", "agi_thousands"]
+    ].sum()
+    return grouped.rename(
+        columns={
+            "returns": f"{prefix}_returns",
+            "exemptions": f"{prefix}_exemptions",
+            "agi_thousands": f"{prefix}_agi_thousands",
+        }
+    )
+
+
+def _irs_soi_group_other_flows(
+    skipped: pd.DataFrame,
+    *,
+    county_column: str,
+    prefix: str,
+) -> pd.DataFrame:
+    if skipped.empty:
+        return pd.DataFrame(
+            columns=[f"{prefix}_returns", f"{prefix}_exemptions", f"{prefix}_agi_thousands"]
+        )
+    rows = skipped[skipped["exclusion_reason"] == "summary_pseudo_state_row"]
+    other_state_column = (
+        "origin_county_fips"
+        if county_column == "destination_county_fips"
+        else "destination_county_fips"
+    )
+    rows = rows[rows[other_state_column].str[:2].isin(IRS_SOI_OTHER_FLOW_STATE_FIPS)]
+    rows = rows[
+        (rows[county_column].str.len() == 5)
+        & (~rows[county_column].str[:2].isin(IRS_SOI_SUMMARY_STATE_FIPS))
+        & (~rows[county_column].str.endswith(IRS_SOI_STATE_TOTAL_COUNTY_FIPS))
+    ]
+    return _irs_soi_group_flows(rows, county_column=county_column, prefix=prefix)
+
+
+def _irs_soi_pair_table(inflow_flows: pd.DataFrame, outflow_flows: pd.DataFrame) -> pd.DataFrame:
+    combined = pd.concat([inflow_flows, outflow_flows], ignore_index=True)
+    if combined.empty:
+        return pd.DataFrame(
+            columns=[
+                "year",
+                "origin_county_fips",
+                "destination_county_fips",
+                "migration_returns",
+                "migration_exemptions",
+                "migration_agi_thousands",
+            ]
+        )
+    combined["perspective_rank"] = combined["perspective"].map({"inflow": 0, "outflow": 1})
+    combined = combined.sort_values("perspective_rank").drop_duplicates(
+        ["year", "origin_county_fips", "destination_county_fips"],
+        keep="first",
+    )
+    return (
+        combined[
+            [
+                "year",
+                "origin_county_fips",
+                "destination_county_fips",
+                "returns",
+                "exemptions",
+                "agi_thousands",
+            ]
+        ]
+        .rename(
+            columns={
+                "returns": "migration_returns",
+                "exemptions": "migration_exemptions",
+                "agi_thousands": "migration_agi_thousands",
+            }
+        )
+        .sort_values(["year", "origin_county_fips", "destination_county_fips"])
+        .reset_index(drop=True)
+    )
+
+
+def _irs_soi_fips(value: Any, *, width: int) -> str:
+    text = str(value).strip()
+    if text.endswith(".0"):
+        text = text[:-2]
+    return text.zfill(width)
+
+
+def _irs_soi_number(value: Any) -> int:
+    if pd.isna(value):
+        return 0
+    text = str(value).strip().replace(",", "")
+    if text in {"", ".", "-"}:
+        return 0
+    return int(float(text))
 
 
 def _ingest_mpi_unauthorized_immigrants(
@@ -621,4 +1091,16 @@ def _sha256(path: Path) -> str:
     with path.open("rb") as handle:
         for chunk in iter(lambda: handle.read(1024 * 1024), b""):
             digest.update(chunk)
+    return digest.hexdigest()
+
+
+def _sha256_tree(path: Path) -> str:
+    if path.is_file():
+        return _sha256(path)
+    digest = hashlib.sha256()
+    for child in sorted(child for child in path.rglob("*") if child.is_file()):
+        digest.update(str(child.relative_to(path)).encode("utf-8"))
+        with child.open("rb") as handle:
+            for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+                digest.update(chunk)
     return digest.hexdigest()

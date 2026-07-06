@@ -199,6 +199,7 @@ CANONICAL_PATTERNS: dict[str, list[re.Pattern[str]]] = {
     ],
     "covariates": [
         re.compile(r"^covariate__[a-z0-9_]+__Y\d{4}-(?:\d{4}|ongoing)\.parquet$"),
+        re.compile(r"^covariate_pairs__[a-z0-9_]+__Y\d{4}-(?:\d{4}|ongoing)\.parquet$"),
         re.compile(r"^covariate_panel__[a-z0-9_]+__Y\d{4}-(?:\d{4}|ongoing)\.parquet$"),
     ],
     "maps": [

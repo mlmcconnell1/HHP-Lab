@@ -5,6 +5,15 @@ from __future__ import annotations
 from dataclasses import asdict, dataclass
 from typing import Literal
 
+from hhplab.covariates.irs_soi_contract import (
+    IRS_SOI_COUNTY_MEASURE_COLUMNS,
+    IRS_SOI_FIRST_YEAR,
+    IRS_SOI_PRODUCT,
+    IRS_SOI_PROVIDER,
+    IRS_SOI_SOURCE_ID,
+    IRS_SOI_SOURCE_PAGE,
+    IRS_SOI_SOURCE_URL,
+)
 from hhplab.covariates.mpi_contract import (
     MPI_MEASURE_COLUMNS,
     MPI_METHODOLOGY_NOTE,
@@ -240,6 +249,29 @@ COVARIATE_SOURCE_SPECS: dict[str, CovariateSourceSpec] = {
         notes=(
             "Migration Policy Institute mid-2023 estimates for unauthorized "
             f"immigrant populations. {MPI_METHODOLOGY_NOTE}"
+        ),
+    ),
+    IRS_SOI_SOURCE_ID: CovariateSourceSpec(
+        source_id=IRS_SOI_SOURCE_ID,
+        provider=IRS_SOI_PROVIDER,
+        product=IRS_SOI_PRODUCT,
+        topic="migration",
+        native_geo="county",
+        first_year=IRS_SOI_FIRST_YEAR,
+        last_year=None,
+        source_page=IRS_SOI_SOURCE_PAGE,
+        source_url=IRS_SOI_SOURCE_URL,
+        required_columns=("county_fips", "year"),
+        measure_columns=IRS_SOI_COUNTY_MEASURE_COLUMNS,
+        measure_aggregations={
+            column: "extensive_sum" for column in IRS_SOI_COUNTY_MEASURE_COLUMNS
+        },
+        recommended_align="filing_year_later_year",
+        notes=(
+            "IRS Statistics of Income county-to-county migration flows. Curated "
+            "county-year measures use the later filing year, keep gross inflows "
+            "and outflows separate, and retain suppressed/other-flow remainder "
+            "columns for coverage diagnostics."
         ),
     ),
 }
