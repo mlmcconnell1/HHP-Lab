@@ -1,6 +1,6 @@
 # HHP-Lab
 
-HHP-Lab is a Python toolkit and CLI for building analysis-ready homelessness panels from HUD Continuum of Care data, Census geography and population products, ACS tract measures, and Zillow rent data.
+HHP-Lab is a Python toolkit and CLI for building analysis-ready homelessness panels from HUD Continuum of Care data, Census geography and population products, ACS measures, Zillow rent data, and a growing catalog of labor-market, housing, policy, climate, and health covariate sources.
 
 The repository was renamed from CoC-Lab to HHP-Lab to better reflect the
 current scope. Historical references to CoC-Lab are still preserved where they
@@ -25,10 +25,11 @@ Full operational documentation lives in [HHP-Lab-manual/HHP-Lab-Manual.md](HHP-L
 
 ## What HHP-Lab Does
 
-- Ingests curated source data for CoC boundaries, TIGER tracts and counties, ACS, PEP, PIT, HIC, and ZORI
-- Builds tract-to-CoC and county-to-CoC crosswalks
-- Aggregates ACS, PIT, HIC, PEP, and ZORI inputs into analysis-ready outputs
+- Ingests curated source data for CoC boundaries, Census geometry (TIGER, NHGIS, urban areas, blocks), ACS 5-year and 1-year estimates, PEP, PIT, HIC, ZORI, BLS labor-market series, and a registry of external covariate sources
+- Builds tract-to-CoC, county-to-CoC, and CoC-to-MSA crosswalks
+- Aggregates source inputs into analysis-ready outputs at CoC, metro, and MSA geographies
 - Assembles panel datasets across years with provenance metadata embedded in parquet artifacts
+- Runs panel statistics directly from the CLI (`hhplab analyze describe|correlate|regress|lagged`) with manifest sidecars for reproducibility
 - Supports recipe-driven builds, export bundles, curated-layout validation, and machine-readable CLI output for automation
 
 ## Package Boundaries
@@ -42,13 +43,61 @@ source-specific aggregation helpers should not be added there.
 
 ## Supported Inputs
 
+HHP-Lab supports every source below regardless of whether it has proven
+statistically significant in homelessness models — the package's job is to
+make sources available and reproducible, not to pre-filter them.
+
+### Core panel sources
+
 | Provider | Product | Native geometry | Coverage |
 | --- | --- | --- | --- |
-| HUD | PIT | CoC | 2007-ongoing |
-| HUD | HIC | CoC | 2007-ongoing |
-| Census | ACS 5-year | tract | 2009-ongoing |
-| Census | PEP | county | 2010-ongoing |
-| Zillow | ZORI | county | 2015-ongoing |
+| HUD | PIT (point-in-time counts) | CoC | 2007-ongoing |
+| HUD | HIC (housing inventory counts) | CoC | 2007-ongoing |
+| Census | ACS 5-year estimates | tract | 2009-ongoing |
+| Census | ACS 1-year detailed tables | metro (CBSA) and county | 2005-ongoing |
+| Census | PEP population estimates | county | 2010-ongoing |
+| Zillow | ZORI rent index | county | 2015-ongoing |
+
+### Labor market and prices
+
+| Provider | Product | Native geometry | Coverage |
+| --- | --- | --- | --- |
+| BLS | LAUS annual-average labor force / unemployment | metro (CBSA) | annual averages via BLS API |
+| BLS | CPI-U annual-average index (inflation adjustment) | national | annual averages via BLS API |
+
+### Registered covariate sources
+
+These are declared in `hhplab/covariates/catalog.py` and discoverable with
+`hhplab list covariates`. Each spec carries its canonical schema, native
+geography, coverage window, and aggregation rules.
+
+| Source id | Provider | Product | Native geometry | Coverage |
+| --- | --- | --- | --- | --- |
+| `eviction_lab` | Eviction Lab | eviction filings and rates | county | 2000-ongoing |
+| `census_bps` | Census | Building Permits Survey | county | 1980-ongoing |
+| `hud_fmr` | HUD | Fair Market Rents | county | 2000-ongoing |
+| `hud_psh` | HUD | Picture of Subsidized Households | county | 2000-ongoing |
+| `hud_spm` | HUD | System Performance Measures | CoC | 2015-ongoing |
+| `kff_medicaid_expansion` | KFF | Medicaid expansion status | state | 2014-ongoing |
+| `prism_tmin_january` | PRISM | January minimum temperature | county | 1895-ongoing |
+| `mpi_unauthorized_immigrants` | Migration Policy Institute | unauthorized immigrant estimates | county | 2023 snapshot |
+| `irs_soi_migration` | IRS | county-to-county migration flows | county | 2011-ongoing (~2-year lag) |
+
+### Other curated sources
+
+| Provider | Product | Native geometry | Coverage |
+| --- | --- | --- | --- |
+| MEDSL | county presidential election returns | county | presidential years 2000-2024 |
+| Vera Institute | incarceration trends (jail and prison) | county | jail 1970-2026, prison through 2019 |
+| CDC | provisional drug overdose deaths (VSRR), with MSA rollup | county | provisional monthly series |
+| DOJ | sanctuary jurisdiction designations, matched to MSAs with population-weighted exposure | city/county to MSA | current designation snapshot |
+
+### Geometry and denominator inputs
+
+CoC boundaries (HUD Exchange / HUD Open Data), TIGER tracts and counties,
+NHGIS historical shapefiles, Census tract relationship files (2010-2020),
+urban-area geometry, MSA boundary polygons, decennial tract population
+denominators, and PL 94-171 block populations.
 
 Important temporal rules:
 
@@ -56,6 +105,8 @@ Important temporal rules:
 - ACS tract geography follows decennial vintages: 2000-era, 2010-era, then 2020-era
 - HIC is annual CoC-native inventory data aligned to the same January survey year as PIT counts
 - ZORI support starts in January 2015, so metro panels that require rent data cannot cover 2011-2014 with the current curated Zillow artifact
+- IRS SOI migration years refer to the later filing year of each flow pair
+- A year outside a source's coverage window means the data does not exist upstream — it is not a build failure
 
 ## Installation
 
@@ -66,17 +117,26 @@ uv sync --extra dev
 uv run hhplab --help
 ```
 
+Ingest commands that call the Census API require a free API key: get one at
+<https://api.census.gov/data/key_signup.html> and export it as
+`CENSUS_API_KEY` (some commands also accept `--api-key`).
+
 ## CLI Highlights
 
 Common entry points:
 
 - `hhplab status --json`: scan curated assets, recipe outputs, and prerequisite gaps
-- `hhplab aggregate {acs|pit|pep|zori}`: produce standalone CoC aggregate artifacts
+- `hhplab aggregate {acs|pit|pep|zori|covariate|cdc-overdose|coc-measure}`: produce standalone aggregate artifacts at CoC or MSA geography
+- `hhplab analyze {describe|correlate|regress|lagged|ledger}`: run statistics on panel parquet files with manifest sidecars
+- `hhplab panel`: inspect built panel parquet files
 - `hhplab build recipe --recipe <file>`: run a recipe build (validation + preflight included)
 - `hhplab build recipe-preflight --recipe <file> --json`: readiness report without execution
 - `hhplab build recipe-plan --recipe <file> --json`: inspect the resolved task graph while authoring/debugging
+- `hhplab generate {sanctuary-msa|sanctuary-msa-panel}`: build DOJ sanctuary MSA covariates
 - `hhplab validate curated-layout`: check naming and layout policy
 - `hhplab list curated`: discover curated data assets
+- `hhplab list covariates`: list registered external covariate source specs
+- `hhplab list acs-variables`: list supported ACS tables and output columns by ingest path
 
 Automation features:
 
