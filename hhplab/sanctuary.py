@@ -38,6 +38,10 @@ SANCTUARY_MSA_PANEL_COLUMNS: tuple[str, ...] = (
     "cbsa_code",
     "msa_name",
     "doj_sanctuary_msa",
+    "doj_sanctuary_population_share",
+    "doj_sanctuary_population",
+    "doj_sanctuary_population_denominator",
+    "doj_sanctuary_population_year",
     "match_basis",
     "state_match",
     "county_match",
@@ -178,6 +182,74 @@ def _build_city_designation_lookup() -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
+def _build_county_exposure(
+    msa_county_membership: pd.DataFrame,
+    county_population: pd.DataFrame,
+    *,
+    population_year: int,
+) -> pd.DataFrame:
+    """Return one row per MSA with population-weighted sanctuary exposure."""
+    required_membership = {"msa_id", "county_fips", "state_name"}
+    missing_membership = sorted(required_membership - set(msa_county_membership.columns))
+    if missing_membership:
+        raise ValueError(
+            "MSA county membership missing required column(s): "
+            f"{', '.join(missing_membership)}."
+        )
+
+    required_population = {"county_fips", "year", "population"}
+    missing_population = sorted(required_population - set(county_population.columns))
+    if missing_population:
+        raise ValueError(
+            "County population data missing required column(s): "
+            f"{', '.join(missing_population)}."
+        )
+
+    membership = msa_county_membership.loc[:, ["msa_id", "county_fips", "state_name"]].copy()
+    membership["msa_id"] = membership["msa_id"].astype(str).str.zfill(5)
+    membership["county_fips"] = membership["county_fips"].astype(str).str.zfill(5)
+    membership["state_name"] = membership["state_name"].astype(str)
+
+    population = county_population.loc[
+        county_population["year"].astype("int64") == population_year,
+        ["county_fips", "population"],
+    ].copy()
+    population["county_fips"] = population["county_fips"].astype(str).str.zfill(5)
+    population["population"] = pd.to_numeric(population["population"], errors="coerce")
+    population = population.dropna(subset=["population"])
+
+    county_designations = set(_build_county_designation_lookup()["county_fips"].tolist())
+    city_designations = set(_build_city_designation_lookup()["county_fips"].tolist())
+    membership["state_sanctuary_county"] = membership["state_name"].isin(DOJ_LISTED_STATES)
+    membership["county_sanctuary_county"] = membership["county_fips"].isin(county_designations)
+    membership["city_sanctuary_county"] = membership["county_fips"].isin(city_designations)
+    membership["sanctuary_county"] = membership[
+        ["state_sanctuary_county", "county_sanctuary_county", "city_sanctuary_county"]
+    ].any(axis=1)
+
+    weighted = membership.merge(population, on="county_fips", how="left")
+    weighted["population"] = weighted["population"].fillna(0.0)
+    weighted["sanctuary_population"] = weighted["population"].where(
+        weighted["sanctuary_county"],
+        0.0,
+    )
+    exposure = (
+        weighted.groupby("msa_id", as_index=False)
+        .agg(
+            doj_sanctuary_population=("sanctuary_population", "sum"),
+            doj_sanctuary_population_denominator=("population", "sum"),
+        )
+        .sort_values("msa_id")
+    )
+    denominator = exposure["doj_sanctuary_population_denominator"]
+    exposure["doj_sanctuary_population_share"] = (
+        exposure["doj_sanctuary_population"].where(denominator > 0, 0.0)
+        / denominator.where(denominator > 0, 1.0)
+    )
+    exposure["doj_sanctuary_population_year"] = population_year
+    return exposure
+
+
 def build_sanctuary_msa_matches(
     msa_definitions: pd.DataFrame,
     msa_county_membership: pd.DataFrame,
@@ -262,9 +334,12 @@ def build_sanctuary_msa_matches(
 
 def build_sanctuary_msa_panel_covariate(
     msa_definitions: pd.DataFrame,
+    msa_county_membership: pd.DataFrame,
+    county_population: pd.DataFrame,
     sanctuary_msa_matches: pd.DataFrame,
     *,
     source_date: str = DOJ_SANCTUARY_SOURCE_DATE,
+    population_year: int = 2020,
 ) -> pd.DataFrame:
     """Build a one-row-per-MSA panel covariate from DOJ sanctuary matches."""
     required_definitions = {"msa_id", "cbsa_code", "msa_name"}
@@ -286,12 +361,17 @@ def build_sanctuary_msa_panel_covariate(
     definitions["cbsa_code"] = definitions["cbsa_code"].astype(str).str.zfill(5)
     matches = sanctuary_msa_matches.loc[:, SANCTUARY_MSA_MATCH_COLUMNS].copy()
     matches["cbsa_code"] = matches["cbsa_code"].astype(str).str.zfill(5)
+    exposure = _build_county_exposure(
+        msa_county_membership,
+        county_population,
+        population_year=population_year,
+    )
 
     result = definitions.merge(
         matches.drop(columns=["msa_name"]),
         on="cbsa_code",
         how="left",
-    )
+    ).merge(exposure, on="msa_id", how="left")
     for column in ("state_match", "county_match", "city_match"):
         result[column] = result[column].map(
             lambda value: bool(value) if pd.notna(value) else False
@@ -301,6 +381,12 @@ def build_sanctuary_msa_panel_covariate(
     result["doj_sanctuary_msa"] = (
         result[["state_match", "county_match", "city_match"]].any(axis=1).astype("int64")
     )
+    for column in ("doj_sanctuary_population", "doj_sanctuary_population_denominator"):
+        result[column] = result[column].fillna(0.0)
+    result["doj_sanctuary_population_share"] = (
+        result["doj_sanctuary_population_share"].fillna(0.0)
+    )
+    result["doj_sanctuary_population_year"] = population_year
     result["doj_sanctuary_source_date"] = source_date
     return result.loc[:, SANCTUARY_MSA_PANEL_COLUMNS].sort_values("msa_id").reset_index(drop=True)
 
@@ -365,9 +451,19 @@ def write_sanctuary_msa_panel_covariate(
     """Build and persist a panel-ready DOJ sanctuary MSA covariate artifact."""
     definitions = read_msa_definitions(msa_definition_version, base_dir=base_dir)
     membership = read_msa_county_membership(msa_definition_version, base_dir=base_dir)
+    resolved_base_dir = Path("data") if base_dir is None else Path(base_dir)
+    county_population_path = resolved_base_dir / "curated" / "pep" / "pep_county__v2020.parquet"
+    if not county_population_path.exists():
+        raise FileNotFoundError(
+            "County PEP population artifact is required for sanctuary intensity: "
+            f"{county_population_path}. Run `hhplab aggregate pep --geography county` first."
+        )
+    county_population = pd.read_parquet(county_population_path)
     matches = build_sanctuary_msa_matches(definitions, membership)
     covariate = build_sanctuary_msa_panel_covariate(
         definitions,
+        membership,
+        county_population,
         matches,
         source_date=source_date,
     )
@@ -386,11 +482,17 @@ def write_sanctuary_msa_panel_covariate(
             "source_date": source_date,
             "row_grain": "msa_id",
             "indicator_column": "doj_sanctuary_msa",
+            "intensity_column": "doj_sanctuary_population_share",
+            "intensity_population_year": 2020,
+            "county_population_path": str(county_population_path),
             "match_basis_column": "match_basis",
             "methodology": (
                 "Panel covariate expands the conservative match-only sanctuary MSA "
                 "artifact to every MSA in the definition file; matched MSAs receive "
-                "doj_sanctuary_msa=1 and all other MSAs receive 0."
+                "doj_sanctuary_msa=1 and all other MSAs receive 0. Continuous "
+                "intensity is the share of reference-year MSA county population in "
+                "counties covered by a DOJ-listed state, county, or conservatively "
+                "mapped city designation."
             ),
         },
     )

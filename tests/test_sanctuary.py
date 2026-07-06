@@ -48,6 +48,14 @@ MEMBERSHIP = pd.DataFrame(
     }
 )
 
+COUNTY_POPULATION = pd.DataFrame(
+    {
+        "county_fips": ["06001", "48059", "17031", "36061", "36047", "48441"],
+        "year": [2020, 2020, 2020, 2020, 2020, 2020],
+        "population": [100.0, 300.0, 500.0, 200.0, 800.0, 700.0],
+    }
+)
+
 
 def test_build_sanctuary_msa_matches_is_conservative_and_transparent() -> None:
     result = build_sanctuary_msa_matches(DEFINITIONS, MEMBERSHIP)
@@ -78,6 +86,8 @@ def test_build_sanctuary_msa_panel_covariate_has_binary_indicator_for_all_msas()
     matches = build_sanctuary_msa_matches(DEFINITIONS, MEMBERSHIP)
     result = build_sanctuary_msa_panel_covariate(
         DEFINITIONS,
+        MEMBERSHIP,
+        COUNTY_POPULATION,
         matches,
         source_date="2025-08-05",
     )
@@ -85,6 +95,15 @@ def test_build_sanctuary_msa_panel_covariate_has_binary_indicator_for_all_msas()
     assert tuple(result.columns) == SANCTUARY_MSA_PANEL_COLUMNS
     assert result["msa_id"].tolist() == ["11111", "22222", "33333", "44444"]
     assert result["doj_sanctuary_msa"].tolist() == [1, 1, 1, 0]
+    assert result["doj_sanctuary_population_share"].tolist() == [0.25, 1.0, 1.0, 0.0]
+    assert result["doj_sanctuary_population"].tolist() == [100.0, 500.0, 1000.0, 0.0]
+    assert result["doj_sanctuary_population_denominator"].tolist() == [
+        400.0,
+        500.0,
+        1000.0,
+        700.0,
+    ]
+    assert result["doj_sanctuary_population_year"].tolist() == [2020, 2020, 2020, 2020]
     assert result["doj_sanctuary_source_date"].unique().tolist() == ["2025-08-05"]
 
     no_match = result.loc[result["msa_id"] == "44444"].iloc[0]
@@ -144,6 +163,7 @@ def test_generate_sanctuary_msa_panel_json(monkeypatch, tmp_path: Path) -> None:
             {
                 "msa_id": ["11111", "22222"],
                 "doj_sanctuary_msa": [1, 0],
+                "doj_sanctuary_population_share": [0.4, 0.0],
                 "match_basis": ["state", ""],
             }
         ).to_parquet(output, index=False)
@@ -167,6 +187,7 @@ def test_generate_sanctuary_msa_panel_json(monkeypatch, tmp_path: Path) -> None:
     assert payload["row_count"] == 2
     assert payload["matched_msa_count"] == 1
     assert payload["indicator_column"] == "doj_sanctuary_msa"
+    assert payload["intensity_column"] == "doj_sanctuary_population_share"
     assert payload["match_basis_column"] == "match_basis"
     assert payload["artifact"].endswith(
         "sanctuary_msa_panel__D20250805xMcensus_msa_2023.parquet"

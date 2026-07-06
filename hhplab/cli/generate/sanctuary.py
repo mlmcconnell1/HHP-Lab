@@ -159,8 +159,12 @@ def generate_sanctuary_msa_panel(
             "msa_definition_version": msa_definition_version,
             "row_count": len(covariate),
             "matched_msa_count": int(covariate["doj_sanctuary_msa"].sum()),
+            "mean_population_weighted_intensity": float(
+                covariate["doj_sanctuary_population_share"].mean()
+            ),
             "artifact": str(written_path),
             "indicator_column": "doj_sanctuary_msa",
+            "intensity_column": "doj_sanctuary_population_share",
             "match_basis_column": "match_basis",
         },
         json_output,
