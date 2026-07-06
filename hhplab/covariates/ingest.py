@@ -382,9 +382,9 @@ def _ingest_irs_soi_migration(
             skipped_rows["exclusion_reason"].isin(
                 ["state_total_row", "summary_pseudo_state_row", "same_county_non_migrant"]
             )
-        ].to_dict(orient="records")
+        ]
         if "exclusion_reason" in skipped_rows.columns
-        else []
+        else pd.DataFrame()
     )
     provenance_extra = {
         "dataset_type": "expanded_covariate",
@@ -402,7 +402,8 @@ def _ingest_irs_soi_migration(
         "skipped_rows": int(len(skipped_rows)),
         "skipped_reasons": _value_counts(skipped_rows, "exclusion_reason"),
         "skipped_preview": skipped_preview,
-        "summary_rows": summary_rows,
+        "summary_row_counts": _irs_soi_summary_row_counts(summary_rows),
+        "summary_rows_preview": summary_rows.head(50).to_dict(orient="records"),
     }
     write_parquet_with_provenance(
         county_rows,
@@ -674,6 +675,18 @@ def _irs_soi_group_other_flows(
         & (~rows[county_column].str.endswith(IRS_SOI_STATE_TOTAL_COUNTY_FIPS))
     ]
     return _irs_soi_group_flows(rows, county_column=county_column, prefix=prefix)
+
+
+def _irs_soi_summary_row_counts(summary_rows: pd.DataFrame) -> list[dict[str, object]]:
+    if summary_rows.empty:
+        return []
+    grouped = (
+        summary_rows.groupby(["year", "perspective", "exclusion_reason"], dropna=False)
+        .size()
+        .reset_index(name="row_count")
+        .sort_values(["year", "perspective", "exclusion_reason"])
+    )
+    return grouped.to_dict(orient="records")
 
 
 def _irs_soi_pair_table(inflow_flows: pd.DataFrame, outflow_flows: pd.DataFrame) -> pd.DataFrame:

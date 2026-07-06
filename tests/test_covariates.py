@@ -429,6 +429,40 @@ def test_irs_soi_ingest_writes_county_and_pair_artifacts_with_provenance(
         "same_county_non_migrant": 2,
         "state_total_row": 1,
     }
+    assert "summary_rows" not in provenance.extra
+    assert len(provenance.extra["summary_rows_preview"]) == 6
+    assert provenance.extra["summary_row_counts"] == [
+        {
+            "year": 2022,
+            "perspective": "inflow",
+            "exclusion_reason": "same_county_non_migrant",
+            "row_count": 1,
+        },
+        {
+            "year": 2022,
+            "perspective": "inflow",
+            "exclusion_reason": "state_total_row",
+            "row_count": 1,
+        },
+        {
+            "year": 2022,
+            "perspective": "inflow",
+            "exclusion_reason": "summary_pseudo_state_row",
+            "row_count": 2,
+        },
+        {
+            "year": 2022,
+            "perspective": "outflow",
+            "exclusion_reason": "same_county_non_migrant",
+            "row_count": 1,
+        },
+        {
+            "year": 2022,
+            "perspective": "outflow",
+            "exclusion_reason": "summary_pseudo_state_row",
+            "row_count": 1,
+        },
+    ]
     pair_path = Path(provenance.extra["pair_output_path"])
     assert pair_path.name == "covariate_pairs__irs_soi_migration__Y2011-ongoing.parquet"
     pairs = pd.read_parquet(pair_path)
