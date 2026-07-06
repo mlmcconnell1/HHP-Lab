@@ -31,3 +31,6 @@ wheels/
 .beads-backup/
 # br doctor per-run artifacts
 .doctor/
+
+# Analysis outputs (regenerable via hhplab CLI; provenance in manifests)
+outputs/
