@@ -39,13 +39,13 @@ AGENTS_GUIDANCE = {
                 "source": "ACS5",
                 "where": "hhplab/acs/variables.py",
                 "registry": "ACS5_COVARIATE_REGISTRY",
-                "future_cli": "hhplab list acs-variables",
+                "cli": "hhplab list acs-variables",
             },
             {
                 "source": "ACS1",
                 "where": "hhplab/acs/variables_acs1.py",
                 "registry": "DERIVED_ACS1_MEASURES and ACS1_*_MEASURE_COLUMNS",
-                "future_cli": "hhplab list acs-variables",
+                "cli": "hhplab list acs-variables",
             },
             {
                 "source": "External covariates",
@@ -200,10 +200,10 @@ AGENTS_INFO_TEXT = f"""# HHP-Lab Agent Quick Reference
 - Before calling external APIs or writing a one-off script, check the package
   registries for existing support:
   - ACS5 tract-derived measures: `hhplab/acs/variables.py`
-    (`ACS5_COVARIATE_REGISTRY`) or `hhplab list acs-variables` once available.
+    (`ACS5_COVARIATE_REGISTRY`) or `hhplab list acs-variables`.
   - ACS1 metro/county-native measures: `hhplab/acs/variables_acs1.py`
     (`DERIVED_ACS1_MEASURES` and `ACS1_*_MEASURE_COLUMNS`) or
-    `hhplab list acs-variables` once available.
+    `hhplab list acs-variables`.
   - External covariate sources: `hhplab list covariates`
     (`hhplab/covariates/catalog.py`).
 - Curated parquet files on disk may predate the current schema. Absence of a

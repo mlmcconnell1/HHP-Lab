@@ -80,6 +80,28 @@ COVARIATE_SOURCE_SPECS: dict[str, CovariateSourceSpec] = {
             "covariates; verify local coverage before causal interpretation."
         ),
     ),
+    "eviction_lab_national": CovariateSourceSpec(
+        source_id="eviction_lab_national",
+        provider="eviction_lab",
+        product="national_eviction_map",
+        topic="evictions",
+        native_geo="county",
+        first_year=2000,
+        last_year=2018,
+        source_page="https://evictionlab.org/map/",
+        source_url="https://evictionlab.org/map/",
+        required_columns=("county_fips", "year"),
+        measure_columns=("eviction_filings", "eviction_rate"),
+        measure_aggregations={
+            "eviction_filings": "extensive_sum",
+            "eviction_rate": "intensive_pop_weighted_mean",
+        },
+        recommended_align="calendar_year",
+        notes=(
+            "National county-year Eviction Lab map data cover 2000-2018 and "
+            "can be population-weighted to MSA panels for historical mechanism tests."
+        ),
+    ),
     "census_bps": CovariateSourceSpec(
         source_id="census_bps",
         provider="census",

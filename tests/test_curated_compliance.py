@@ -19,6 +19,7 @@ import pytest
 from typer.testing import CliRunner
 
 from hhplab.acs.variables import TRACT_OUTPUT_COLUMNS
+from hhplab.acs.variables_acs1 import ACS1_METRO_OUTPUT_COLUMNS
 from hhplab.cli.main import app
 from hhplab.curated_policy import (
     CANONICAL_PATTERNS,
@@ -390,6 +391,28 @@ class TestCLI:
         assert "Re-run: hhplab ingest acs5-tract --acs 2019-2023 --tracts 2020 --force" in (
             human_result.output
         )
+
+    def test_stale_acs1_metro_remediation_uses_canonical_definition(self, tmp_path: Path) -> None:
+        curated = tmp_path / "curated"
+        acs_path = curated / "acs" / "acs1_metro__A2023@Dcensusmsa2023.parquet"
+        acs_path.parent.mkdir(parents=True)
+        stale_columns = [column for column in ACS1_METRO_OUTPUT_COLUMNS if column != "metro_name"]
+        pd.DataFrame({column: [None] for column in stale_columns}).to_parquet(acs_path)
+
+        result = CliRunner().invoke(
+            app,
+            ["validate", "curated-layout", "--dir", str(curated), "--json"],
+        )
+
+        assert result.exit_code == 1
+        payload = json.loads(result.output)
+        stale = payload["schema_staleness"][0]
+        assert stale["artifact_family"] == "acs1_metro"
+        assert stale["remediation"] == (
+            "hhplab ingest acs1-metro --vintage 2023 "
+            "--definition-version census_msa_2023"
+        )
+        assert "censusmsa2023" not in stale["remediation"]
 
     def test_current_acs_schema_passes(self, tmp_path: Path) -> None:
         curated = tmp_path / "curated"

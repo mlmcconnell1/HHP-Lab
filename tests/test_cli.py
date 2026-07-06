@@ -659,6 +659,8 @@ class TestRetiredCommandRegression:
         assert "Measure Discovery" in result.output
         assert "hhplab/acs/variables.py" in result.output
         assert "ACS5_COVARIATE_REGISTRY" in result.output
+        assert "hhplab list acs-variables" in result.output
+        assert "once available" not in result.output
         assert "hhplab/acs/variables_acs1.py" in result.output
         assert "DERIVED_ACS1_MEASURES" in result.output
         assert "ACS1_*_MEASURE_COLUMNS" in result.output
@@ -717,5 +719,14 @@ class TestRetiredCommandRegression:
             "DERIVED_ACS1_MEASURES and ACS1_*_MEASURE_COLUMNS",
             "COVARIATE_SOURCE_SPECS",
         }
+        acs_registries = [
+            registry
+            for registry in discovery["registries"]
+            if registry["source"] in {"ACS5", "ACS1"}
+        ]
+        assert {registry["cli"] for registry in acs_registries} == {
+            "hhplab list acs-variables",
+        }
+        assert all("future_cli" not in registry for registry in acs_registries)
         assert "re-ingest with --force" in discovery["stale_curated_artifacts"]
         assert "file a bead to add registry support" in discovery["rule"]

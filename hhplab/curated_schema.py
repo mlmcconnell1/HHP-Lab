@@ -10,6 +10,17 @@ import pyarrow.parquet as pq
 
 from hhplab.acs.variables import TRACT_OUTPUT_COLUMNS
 from hhplab.acs.variables_acs1 import ACS1_COUNTY_OUTPUT_COLUMNS, ACS1_METRO_OUTPUT_COLUMNS
+from hhplab.metro.metro_definitions import (
+    CANONICAL_UNIVERSE_DEFINITION_VERSION,
+)
+from hhplab.metro.metro_definitions import (
+    DEFINITION_VERSION as GLYNN_FOX_DEFINITION_VERSION,
+)
+
+CANONICAL_DEFINITION_BY_COMPACT_TOKEN = {
+    "censusmsa2023": CANONICAL_UNIVERSE_DEFINITION_VERSION,
+    "glynnfoxv1": GLYNN_FOX_DEFINITION_VERSION,
+}
 
 
 @dataclass(frozen=True)
@@ -71,6 +82,11 @@ class CuratedSchemaContract:
         if "acs_end" in values:
             acs_end = int(values["acs_end"])
             values["acs_range"] = f"{acs_end - 4}-{acs_end}"
+        if "definition_version" in values:
+            values["definition_version"] = CANONICAL_DEFINITION_BY_COMPACT_TOKEN.get(
+                values["definition_version"],
+                values["definition_version"],
+            )
         return self.remediation_template.format(**values)
 
 

@@ -574,10 +574,20 @@ def aggregate_pep_counties(
         columns=[geo_id_col, "year"],
     )
     agg_df = scaffold.merge(agg_df, on=[geo_id_col, "year"], how="left")
-    agg_df["population"] = agg_df["population"].fillna(0.0)
-    agg_df["covered_weight"] = agg_df["covered_weight"].fillna(0.0)
-    agg_df["county_count"] = agg_df["county_count"].fillna(0).astype(int)
-    agg_df["max_weighted_pop"] = agg_df["max_weighted_pop"].fillna(0.0)
+    agg_df["population"] = pd.to_numeric(agg_df["population"], errors="coerce").fillna(
+        0.0
+    )
+    agg_df["covered_weight"] = pd.to_numeric(
+        agg_df["covered_weight"],
+        errors="coerce",
+    ).fillna(0.0)
+    agg_df["county_count"] = (
+        pd.to_numeric(agg_df["county_count"], errors="coerce").fillna(0).astype(int)
+    )
+    agg_df["max_weighted_pop"] = pd.to_numeric(
+        agg_df["max_weighted_pop"],
+        errors="coerce",
+    ).fillna(0.0)
 
     # Coverage ratio: covered weight / total weight for the geography
     agg_df["total_weight"] = agg_df[geo_id_col].map(total_weight_per_geo)

@@ -4,6 +4,8 @@ Verifies PEP rollup from county-native counts to Glynn/Fox metros,
 covering single-county, multi-county, missing-county, and truth-table cases.
 """
 
+import warnings
+
 import pandas as pd
 import pytest
 
@@ -224,6 +226,24 @@ class TestMissingCountyHandling:
         assert len(gf04) == 1
         assert pd.isna(gf04.iloc[0]["population"])
         assert gf04.iloc[0]["coverage_ratio"] == 0.0
+
+    def test_zero_coverage_fillna_is_future_warning_clean(self):
+        """Zero-coverage rows should not depend on pandas silent downcasting."""
+        pep = pd.DataFrame(
+            {
+                "county_fips": ["99999"],
+                "year": [2020],
+                "population": [100],
+            }
+        )
+
+        with warnings.catch_warnings():
+            warnings.filterwarnings(
+                "error",
+                message="Downcasting object dtype arrays on .fillna",
+                category=FutureWarning,
+            )
+            aggregate_pep_to_metro(pep)
 
     def test_full_coverage_has_no_missing(self):
         """Full coverage should have empty missing_counties."""

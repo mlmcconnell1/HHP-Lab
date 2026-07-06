@@ -49,6 +49,7 @@ runner = CliRunner()
 
 EXPECTED_COVARIATE_SOURCES = {
     "eviction_lab": ("county", "eviction_filings"),
+    "eviction_lab_national": ("county", "eviction_filings"),
     "census_bps": ("county", "permitted_units"),
     "hud_fmr": ("county", "fmr_2br"),
     "hud_psh": ("county", "subsidized_households"),
@@ -1825,3 +1826,95 @@ def test_cli_aggregate_prism_covariate_to_msa(tmp_path: Path) -> None:
     panel = pd.read_parquet(payload["output_path"])
     assert panel.loc[0, "tmin_c"] == pytest.approx(4.0)
     assert panel.loc[0, "coverage_ratio"] == pytest.approx(2 / 3)
+
+
+def test_cli_ingests_national_eviction_lab_and_aggregates_to_msa(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    """National county-year eviction inputs can feed MSA mechanism tests."""
+    monkeypatch.setattr("hhplab.covariates.ingest.register_source", lambda **_: None)
+    raw = tmp_path / "eviction_lab_national.csv"
+    pd.DataFrame(
+        {
+            "county_fips": ["01001", "01003"],
+            "year": [2018, 2018],
+            "eviction_filings": [100, 300],
+            "eviction_rate": [2.0, 6.0],
+        }
+    ).to_csv(raw, index=False)
+    population = tmp_path / "pep.parquet"
+    pd.DataFrame(
+        {
+            "county_fips": ["01001", "01003"],
+            "year": [2018, 2018],
+            "population": [25.0, 75.0],
+        }
+    ).to_parquet(population)
+    data_root = tmp_path / "data"
+    msa_dir = data_root / "curated" / "msa"
+    msa_dir.mkdir(parents=True)
+    pd.DataFrame(
+        {
+            "msa_id": ["11111", "11111"],
+            "county_fips": ["01001", "01003"],
+        }
+    ).to_parquet(msa_dir / "msa_county_membership__test_msa_v1.parquet")
+
+    ingest_result = runner.invoke(
+        app,
+        [
+            "ingest",
+            "covariate",
+            "--source",
+            "eviction_lab_national",
+            "--raw-path",
+            str(raw),
+            "--output-dir",
+            str(tmp_path),
+            "--force",
+            "--json",
+        ],
+    )
+    assert ingest_result.exit_code == 0
+    ingest_payload = json.loads(ingest_result.output)
+    assert Path(ingest_payload["output_path"]).name == (
+        "covariate__eviction_lab_national__Y2000-2018.parquet"
+    )
+
+    aggregate_result = runner.invoke(
+        app,
+        [
+            "aggregate",
+            "covariate",
+            "--source",
+            "eviction_lab_national",
+            "--curated-path",
+            ingest_payload["output_path"],
+            "--output-dir",
+            str(tmp_path),
+            "--years",
+            "2018",
+            "--target-geo",
+            "msa",
+            "--msa-definition-version",
+            "test_msa_v1",
+            "--county-population-path",
+            str(population),
+            "--data-root",
+            str(data_root),
+            "--force",
+            "--json",
+        ],
+    )
+
+    assert aggregate_result.exit_code == 0
+    aggregate_payload = json.loads(aggregate_result.output)
+    assert aggregate_payload["status"] == "ok"
+    assert aggregate_payload["source_id"] == "eviction_lab_national"
+    assert aggregate_payload["target_geo"] == "msa"
+    panel = pd.read_parquet(aggregate_payload["output_path"])
+    assert panel.loc[0, "msa_id"] == "11111"
+    assert panel.loc[0, "eviction_filings"] == pytest.approx(400.0)
+    assert panel.loc[0, "eviction_rate"] == pytest.approx(5.0)
+    assert panel.loc[0, "coverage_ratio"] == pytest.approx(1.0)
