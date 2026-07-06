@@ -86,6 +86,7 @@ from hhplab.pit.ingest.hud_exchange import MIN_PIT_YEAR as MIN_PIT_VINTAGE_YEAR
 from hhplab.pit.pit_registry import get_pit_path
 from hhplab.provenance import ProvenanceBlock, read_provenance, write_parquet_with_provenance
 from hhplab.schema.columns import (
+    ACS1_MEASURE_COLUMNS,
     COC_PANEL_COLUMNS,
     HIC_PANEL_MEASURE_COLUMNS,
     POPULATION_DENSITY_COLUMN,
@@ -698,7 +699,7 @@ def _load_acs1_metro_measures(
     Returns
     -------
     pd.DataFrame or None
-        DataFrame with metro_id and unemployment_rate_acs1, or None if
+        DataFrame with metro_id and available ACS1 measure columns, or None if
         no ACS1 artifact is found.
     """
     if measures_dir is None:
@@ -724,15 +725,12 @@ def _load_acs1_metro_measures(
         logger.warning(f"ACS1 metro artifact {artifact_path.name} missing 'metro_id' column")
         return None
 
-    result_cols = ["metro_id"]
-    if "unemployment_rate_acs1" in df.columns:
-        result_cols.append("unemployment_rate_acs1")
-    else:
-        logger.warning(
-            f"ACS1 metro artifact {artifact_path.name} missing 'unemployment_rate_acs1' column"
-        )
+    available_measure_cols = [column for column in ACS1_MEASURE_COLUMNS if column in df.columns]
+    if not available_measure_cols:
+        logger.warning(f"ACS1 metro artifact {artifact_path.name} missing ACS1 measure columns")
         return None
 
+    result_cols = ["metro_id", *available_measure_cols]
     df = df[result_cols].copy()
     df["metro_id"] = df["metro_id"].astype(str)
     return df
@@ -1358,16 +1356,27 @@ def build_panel(
             if acs1_df is not None and not acs1_df.empty:
                 year_df = year_df.merge(acs1_df, on="metro_id", how="left")
                 year_df["acs1_vintage_used"] = acs1_vintage
+                matched_measure = next(
+                    (column for column in ACS1_MEASURE_COLUMNS if column in year_df.columns),
+                    None,
+                )
+                matched_count = (
+                    year_df[matched_measure].notna().sum()
+                    if matched_measure is not None
+                    else 0
+                )
                 logger.info(
                     f"Year {year}: merged ACS1 data (vintage {acs1_vintage}), "
-                    f"{year_df['unemployment_rate_acs1'].notna().sum()} matched"
+                    f"{matched_count} matched"
                 )
             else:
                 logger.warning(f"Year {year}: no ACS1 metro artifact for vintage {acs1_vintage}")
-                year_df["unemployment_rate_acs1"] = np.nan
+                for column in ACS1_MEASURE_COLUMNS:
+                    year_df[column] = np.nan
                 year_df["acs1_vintage_used"] = pd.NA
         elif geo_type == GEO_TYPE_METRO:
-            year_df["unemployment_rate_acs1"] = np.nan
+            for column in ACS1_MEASURE_COLUMNS:
+                year_df[column] = np.nan
             year_df["acs1_vintage_used"] = pd.NA
 
         # -----------------------------------------------------------------

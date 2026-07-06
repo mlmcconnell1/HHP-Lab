@@ -375,6 +375,50 @@ class TestUnemploymentRateCalculation:
         assert pd.isna(df.iloc[0]["unemployment_rate_acs1"])
 
 
+class TestRentBurdenCalculation:
+    """Test ACS1 renter burden derivation."""
+
+    def test_rent_burden_calculation(self, httpx_mock, tmp_path):
+        """ACS1 burden rates use a computed denominator excluding not-computed rows."""
+        cbsas = [
+            {
+                "cbsa_code": "35620",
+                "B25070_001E": "100",
+                "B25070_009E": "20",
+                "B25070_010E": "30",
+                "B25070_011E": "10",
+            },
+        ]
+        queue_acs1_group_responses(httpx_mock, cbsas, vintage=2023)
+
+        path = ingest_metro_acs1(vintage=2023, project_root=tmp_path)
+        df = pd.read_parquet(path)
+
+        row = df.iloc[0]
+        assert row["rent_burden_40_plus"] == pytest.approx(50 / 90)
+        assert row["rent_burden_50_plus"] == pytest.approx(30 / 90)
+        assert df["rent_burden_40_plus"].dtype == "Float64"
+        assert df["rent_burden_50_plus"].dtype == "Float64"
+
+    def test_rent_burden_zero_computed_denominator_is_null(self, httpx_mock, tmp_path):
+        cbsas = [
+            {
+                "cbsa_code": "35620",
+                "B25070_001E": "10",
+                "B25070_009E": "1",
+                "B25070_010E": "1",
+                "B25070_011E": "10",
+            },
+        ]
+        queue_acs1_group_responses(httpx_mock, cbsas, vintage=2023)
+
+        path = ingest_metro_acs1(vintage=2023, project_root=tmp_path)
+        df = pd.read_parquet(path)
+
+        assert pd.isna(df.iloc[0]["rent_burden_40_plus"])
+        assert pd.isna(df.iloc[0]["rent_burden_50_plus"])
+
+
 class TestOutputSchema:
     """Test that output matches canonical schema."""
 

@@ -103,6 +103,8 @@ def metro_base_dir(tmp_path):
     # ACS 1-year metro artifact for vintage 2019 ONLY (not 2020)
     pd.DataFrame({
         "metro_id": ["GF01", "GF02", "GF03"],
+        "rent_burden_40_plus": [0.22, 0.18, 0.31],
+        "rent_burden_50_plus": [0.12, 0.08, 0.19],
         "unemployment_rate_acs1": [0.05, 0.03, 0.08],
         "acs1_vintage": ["2019", "2019", "2019"],
         "metro_name": ["Metro A", "Metro B", "Metro C"],
@@ -155,7 +157,11 @@ class TestMetroPanelWithoutAcs1:
         )
 
         assert "unemployment_rate_acs1" in result.columns
+        assert "rent_burden_40_plus" in result.columns
+        assert "rent_burden_50_plus" in result.columns
         assert result["unemployment_rate_acs1"].isna().all()
+        assert result["rent_burden_40_plus"].isna().all()
+        assert result["rent_burden_50_plus"].isna().all()
         assert "acs5_vintage_used" in result.columns
         assert (result["acs5_vintage_used"] == "2019").all()
         assert "acs1_vintage_used" in result.columns
@@ -179,10 +185,16 @@ class TestMetroPanelWithAcs1:
             acs1_dir=metro_base_dir["acs_dir"],
         )
 
+        assert "rent_burden_40_plus" in result.columns
+        assert "rent_burden_50_plus" in result.columns
         assert "unemployment_rate_acs1" in result.columns
+        assert result["rent_burden_40_plus"].notna().all()
+        assert result["rent_burden_50_plus"].notna().all()
         assert result["unemployment_rate_acs1"].notna().all()
         # Check specific values
         gf01 = result[result["metro_id"] == "GF01"]
+        assert float(gf01["rent_burden_40_plus"].iloc[0]) == pytest.approx(0.22)
+        assert float(gf01["rent_burden_50_plus"].iloc[0]) == pytest.approx(0.12)
         assert float(gf01["unemployment_rate_acs1"].iloc[0]) == pytest.approx(0.05)
         gf02 = result[result["metro_id"] == "GF02"]
         assert float(gf02["unemployment_rate_acs1"].iloc[0]) == pytest.approx(0.03)
@@ -222,11 +234,15 @@ class TestMetroPanelPartialAcs1:
 
         # Year 2020 (ACS vintage 2019) should have ACS1 data
         year_2020 = result[result["year"] == 2020]
+        assert year_2020["rent_burden_40_plus"].notna().all()
+        assert year_2020["rent_burden_50_plus"].notna().all()
         assert year_2020["unemployment_rate_acs1"].notna().all()
         assert (year_2020["acs5_vintage_used"] == "2019").all()
 
         # Year 2021 (ACS vintage 2020) should NOT have ACS1 data
         year_2021 = result[result["year"] == 2021]
+        assert year_2021["rent_burden_40_plus"].isna().all()
+        assert year_2021["rent_burden_50_plus"].isna().all()
         assert year_2021["unemployment_rate_acs1"].isna().all()
         assert (year_2021["acs5_vintage_used"] == "2020").all()
 

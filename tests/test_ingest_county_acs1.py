@@ -107,6 +107,10 @@ SAMPLE_COUNTIES = [
         "B25056_026E": "205000",
         "B25056_027E": "50000",
         "B25058_001E": "1375",
+        "B25070_001E": "100",
+        "B25070_009E": "20",
+        "B25070_010E": "30",
+        "B25070_011E": "10",
     },
     {
         "NAME": "Kings County, New York",
@@ -126,6 +130,10 @@ SAMPLE_COUNTIES = [
         "B25056_026E": "60000",
         "B25056_027E": "20000",
         "B25058_001E": "1280",
+        "B25070_001E": "80",
+        "B25070_009E": "8",
+        "B25070_010E": "12",
+        "B25070_011E": "0",
     },
 ]
 
@@ -175,8 +183,12 @@ def test_ingest_county_writes_schema_and_provenance(httpx_mock, tmp_path) -> Non
     assert list(df["county_fips"]) == ["06037", "36047"]
     assert list(df["geo_id"]) == ["06037", "36047"]
     assert df["unemployment_rate_acs1"].tolist() == pytest.approx([0.05, 0.06])
+    assert df["rent_burden_40_plus"].tolist() == pytest.approx([50 / 90, 20 / 80])
+    assert df["rent_burden_50_plus"].tolist() == pytest.approx([30 / 90, 12 / 80])
     assert df["civilian_labor_force"].dtype == "Int64"
     assert df["unemployment_rate_acs1"].dtype == "Float64"
+    assert df["rent_burden_40_plus"].dtype == "Float64"
+    assert df["rent_burden_50_plus"].dtype == "Float64"
     assert df["household_income_total"].tolist() == [3300000, 1000000]
     assert df["gross_rent_distribution_cash_rent_3500_plus"].tolist() == [
         220000,
@@ -310,6 +322,26 @@ def test_normalize_acs1_measures_adds_missing_columns_without_fragmentation_warn
     assert result["civilian_labor_force"].dtype == "Int64"
     assert result["unemployment_rate_acs1"].dtype == "Float64"
     assert result["unemployment_rate_acs1"].tolist() == pytest.approx([0.05])
+
+
+def test_normalize_acs1_measures_derives_rent_burden_rates() -> None:
+    result = normalize_acs1_measures(
+        pd.DataFrame(
+            {
+                "B25070_001E": [100, 10],
+                "B25070_009E": [20, 1],
+                "B25070_010E": [30, 1],
+                "B25070_011E": [10, 10],
+            }
+        )
+    )
+
+    assert result.loc[0, "rent_burden_40_plus"] == pytest.approx(50 / 90)
+    assert result.loc[0, "rent_burden_50_plus"] == pytest.approx(30 / 90)
+    assert pd.isna(result.loc[1, "rent_burden_40_plus"])
+    assert pd.isna(result.loc[1, "rent_burden_50_plus"])
+    assert result["rent_burden_40_plus"].dtype == "Float64"
+    assert result["rent_burden_50_plus"].dtype == "Float64"
 
 
 @pytest.mark.parametrize(

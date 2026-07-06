@@ -436,6 +436,15 @@ ACS1_UNEMPLOYMENT_VARIABLES: list[str] = ACS1_VARIABLES_BY_TABLE["B23025"]
 # ---------------------------------------------------------------------------
 
 DERIVED_ACS1_MEASURES: dict[str, str] = {
+    "rent_burden_40_plus": (
+        "Share of ACS 1-year renter households with computed gross rent at least "
+        "40% of income (B25070_009E + B25070_010E over B25070_001E minus "
+        "B25070_011E)"
+    ),
+    "rent_burden_50_plus": (
+        "Share of ACS 1-year renter households with computed gross rent at least "
+        "50% of income (B25070_010E over B25070_001E minus B25070_011E)"
+    ),
     "unemployment_rate_acs1": (
         "Unemployment rate from ACS 1-year (B23025_005E / B23025_003E)"
     ),
@@ -451,6 +460,8 @@ ACS1_FLOAT_COLUMNS: list[str] = [
     "average_household_size_total",
     "average_household_size_owner_occupied",
     "average_household_size_renter_occupied",
+    "rent_burden_40_plus",
+    "rent_burden_50_plus",
     "unemployment_rate_acs1",
 ]
 

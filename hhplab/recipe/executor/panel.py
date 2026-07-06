@@ -321,6 +321,8 @@ _RECIPE_METRO_COLUMN_ORDER: list[str] = [
     "median_household_income",
     "median_gross_rent",
     "population",
+    "rent_burden_40_plus",
+    "rent_burden_50_plus",
     "unemployment_rate_acs1",
     "labor_force",
     "employed",

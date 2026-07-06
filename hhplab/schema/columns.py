@@ -28,6 +28,8 @@ ACS_MEASURE_COLUMNS: list[str] = [
 ]
 
 ACS1_MEASURE_COLUMNS: list[str] = [
+    "rent_burden_40_plus",
+    "rent_burden_50_plus",
     "unemployment_rate_acs1",
 ]
 
@@ -909,6 +911,8 @@ METRO_PANEL_COLUMNS: list[str] = [
     "population_below_poverty",
     "median_household_income",
     "median_gross_rent",
+    "rent_burden_40_plus",
+    "rent_burden_50_plus",
     "unemployment_rate_acs1",
     "labor_force",
     "employed",

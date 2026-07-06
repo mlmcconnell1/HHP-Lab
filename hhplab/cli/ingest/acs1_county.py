@@ -26,6 +26,8 @@ def _acs1_county_command_help() -> str:
             "contract_rent_distribution_total",
             "gross_rent_pct_income_total",
             "owner_costs_pct_income_total",
+            "rent_burden_40_plus",
+            "rent_burden_50_plus",
             "unemployment_rate_acs1",
         )
         if measure in registry_measures

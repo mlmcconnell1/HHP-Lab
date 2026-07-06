@@ -383,7 +383,8 @@ ACS5_PANEL_MEASURE_DICTIONARY: tuple[PanelMeasureDictionaryEntry, ...] = (
         "tract",
         2009,
         "candidate_driver",
-        "Uses a computed denominator that excludes rent-burden rows where income percentage is not computed.",
+        "Uses a computed denominator that excludes rent-burden rows where income "
+        "percentage is not computed.",
     ),
     _entry(
         "rent_burden_50_plus",
@@ -394,7 +395,8 @@ ACS5_PANEL_MEASURE_DICTIONARY: tuple[PanelMeasureDictionaryEntry, ...] = (
         "tract",
         2009,
         "candidate_driver",
-        "Uses a computed denominator that excludes rent-burden rows where income percentage is not computed.",
+        "Uses a computed denominator that excludes rent-burden rows where income "
+        "percentage is not computed.",
     ),
     _entry(
         "unemployment_rate",
@@ -450,6 +452,30 @@ PIT_PANEL_MEASURE_DICTIONARY: tuple[PanelMeasureDictionaryEntry, ...] = (
 )
 
 ACS1_PANEL_MEASURE_DICTIONARY: tuple[PanelMeasureDictionaryEntry, ...] = (
+    _entry(
+        "rent_burden_40_plus",
+        "ACS 1-year share of renter households with computed gross rent at least 40% of income.",
+        "share",
+        "census",
+        "acs1",
+        "metro",
+        2005,
+        "candidate_driver",
+        "Denominator excludes renter households where gross rent as a percentage of "
+        "income is not computed.",
+    ),
+    _entry(
+        "rent_burden_50_plus",
+        "ACS 1-year share of renter households with computed gross rent at least 50% of income.",
+        "share",
+        "census",
+        "acs1",
+        "metro",
+        2005,
+        "candidate_driver",
+        "Denominator excludes renter households where gross rent as a percentage of "
+        "income is not computed.",
+    ),
     _entry(
         "unemployment_rate_acs1",
         "ACS 1-year unemployment rate for metro-native analysis.",
@@ -607,7 +633,8 @@ MSA_COC_PANEL_MEASURE_DICTIONARY: tuple[PanelMeasureDictionaryEntry, ...] = (
         "msa",
         2009,
         "candidate_driver",
-        "Uses a computed denominator that excludes rent-burden rows where income percentage is not computed.",
+        "Uses a computed denominator that excludes rent-burden rows where income "
+        "percentage is not computed.",
         panel_contexts=("msa_coc",),
     ),
     _entry(
@@ -619,7 +646,8 @@ MSA_COC_PANEL_MEASURE_DICTIONARY: tuple[PanelMeasureDictionaryEntry, ...] = (
         "msa",
         2009,
         "candidate_driver",
-        "Uses a computed denominator that excludes rent-burden rows where income percentage is not computed.",
+        "Uses a computed denominator that excludes rent-burden rows where income "
+        "percentage is not computed.",
         panel_contexts=("msa_coc",),
     ),
     _entry(

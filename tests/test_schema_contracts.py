@@ -794,6 +794,8 @@ PANEL_MEASURE_COLUMNS_BY_PANEL = {
             "population_below_poverty",
             "median_household_income",
             "median_gross_rent",
+            "rent_burden_40_plus",
+            "rent_burden_50_plus",
             "unemployment_rate_acs1",
             "labor_force",
             "employed",

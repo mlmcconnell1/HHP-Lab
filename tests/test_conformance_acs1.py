@@ -209,7 +209,9 @@ def test_schema_measure_columns_override_still_works() -> None:
 
 
 def test_metro_panel_columns_includes_acs1_measure() -> None:
-    """METRO_PANEL_COLUMNS includes the ACS1 unemployment rate column."""
+    """METRO_PANEL_COLUMNS includes ACS1-native derived measures."""
+    assert "rent_burden_40_plus" in METRO_PANEL_COLUMNS
+    assert "rent_burden_50_plus" in METRO_PANEL_COLUMNS
     assert "unemployment_rate_acs1" in METRO_PANEL_COLUMNS
 
 
@@ -246,4 +248,8 @@ def test_metro_panel_columns_provenance_before_source() -> None:
 
 def test_acs1_measure_columns_content() -> None:
     """ACS1_MEASURE_COLUMNS contains the expected columns."""
-    assert ACS1_MEASURE_COLUMNS == ["unemployment_rate_acs1"]
+    assert ACS1_MEASURE_COLUMNS == [
+        "rent_burden_40_plus",
+        "rent_burden_50_plus",
+        "unemployment_rate_acs1",
+    ]

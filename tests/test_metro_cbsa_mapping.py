@@ -153,10 +153,18 @@ class TestACS1VariableDefinitions:
         assert "unemployed_count" in friendly
 
     def test_derived_measures_defined(self):
+        assert "rent_burden_40_plus" in DERIVED_ACS1_MEASURES
+        assert "rent_burden_50_plus" in DERIVED_ACS1_MEASURES
         assert "unemployment_rate_acs1" in DERIVED_ACS1_MEASURES
 
     def test_output_columns_complete(self):
-        required = {"metro_id", "cbsa_code", "unemployment_rate_acs1"}
+        required = {
+            "metro_id",
+            "cbsa_code",
+            "rent_burden_40_plus",
+            "rent_burden_50_plus",
+            "unemployment_rate_acs1",
+        }
         assert required.issubset(set(ACS1_METRO_OUTPUT_COLUMNS))
 
     def test_first_reliable_year(self):

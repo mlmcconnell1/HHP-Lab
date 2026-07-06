@@ -47,6 +47,12 @@ ACS1_COUNTY_GEOGRAPHY = Acs1GeographySpec(
     response_columns={"state": "state", "county": "county"},
 )
 
+RENT_BURDEN_40_PLUS_COLUMNS: tuple[str, ...] = (
+    "gross_rent_pct_income_40_to_49_9",
+    "gross_rent_pct_income_50_plus",
+)
+RENT_BURDEN_50_PLUS_COLUMNS: tuple[str, ...] = ("gross_rent_pct_income_50_plus",)
+
 
 def _validate_acs1_vintage(vintage: int) -> None:
     if vintage in ACS1_UNAVAILABLE_VINTAGES:
@@ -198,6 +204,30 @@ def normalize_acs1_measures(
             / result.loc[valid_denom, "civilian_labor_force"]
         )
 
+    if {
+        "gross_rent_pct_income_total",
+        "gross_rent_pct_income_not_computed",
+        *RENT_BURDEN_40_PLUS_COLUMNS,
+    } <= set(result.columns):
+        denominator = pd.to_numeric(result["gross_rent_pct_income_total"], errors="coerce")
+        not_computed = pd.to_numeric(
+            result["gross_rent_pct_income_not_computed"],
+            errors="coerce",
+        ).fillna(0.0)
+        computed_denominator = denominator - not_computed
+        result["rent_burden_40_plus"] = _acs1_rent_burden_rate(
+            result,
+            numerator_columns=RENT_BURDEN_40_PLUS_COLUMNS,
+            denominator=computed_denominator,
+            total=denominator,
+        )
+        result["rent_burden_50_plus"] = _acs1_rent_burden_rate(
+            result,
+            numerator_columns=RENT_BURDEN_50_PLUS_COLUMNS,
+            denominator=computed_denominator,
+            total=denominator,
+        )
+
     for col in ACS1_INTEGER_COLUMNS:
         if col in result.columns:
             result[col] = result[col].astype("Int64")
@@ -207,3 +237,18 @@ def normalize_acs1_measures(
             result[col] = result[col].astype("Float64")
 
     return result
+
+
+def _acs1_rent_burden_rate(
+    result: pd.DataFrame,
+    *,
+    numerator_columns: tuple[str, ...],
+    denominator: pd.Series,
+    total: pd.Series,
+) -> pd.Series:
+    numerator = sum(
+        pd.to_numeric(result[column], errors="coerce").fillna(0.0)
+        for column in numerator_columns
+    )
+    numerator = numerator.where(total.notna())
+    return numerator / denominator.where(denominator > 0)
