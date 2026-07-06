@@ -10,6 +10,7 @@ import typer
 import yaml
 
 from hhplab.config import load_config
+from hhplab.naming import msa_zori_yearly_filename
 from hhplab.recipe.adapters import (
     dataset_registry,
     geometry_registry,
@@ -375,8 +376,15 @@ def _longitudinal_msa_panel_recipe_dict(
                 "year_column": "year",
                 "path": (
                     "data/curated/zori/"
-                    f"zori__msa__Y{zori_start}-{zori_end}@M{definition_token}"
-                    f"xC{county_vintage}__wpopulation__mpit_january__balanced.parquet"
+                    + msa_zori_yearly_filename(
+                        zori_start,
+                        zori_end,
+                        msa_definition_version,
+                        county_vintage,
+                        "population",
+                        "pit_january",
+                        balanced_composition=True,
+                    )
                 ),
             },
             "pep_msa": {

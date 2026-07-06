@@ -1633,8 +1633,11 @@ def save_panel(
             boundary_vintage=boundary_vintage,
         )
     else:
-        # Fallback if no boundary vintage can be determined
-        filename = f"panel__Y{start_year}-{end_year}.parquet"
+        raise ValueError(
+            "boundary_vintage is required to save a CoC or county panel with a "
+            "canonical filename. Include a single boundary_vintage_used value in "
+            "the panel or pass a supported geography with its required definition."
+        )
     output_path = output_dir / filename
 
     # Build provenance

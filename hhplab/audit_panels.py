@@ -16,6 +16,7 @@ import numpy as np
 import pandas as pd
 
 import hhplab.naming as naming
+from hhplab.acs.translate import default_tract_vintage_for_acs
 from hhplab.provenance import ProvenanceBlock, write_parquet_with_provenance
 
 METRO_DEFINITION_VERSION = "glynn_fox_v1"
@@ -213,13 +214,13 @@ def _load_source_panel(
 def _acs_path_for_year(project_root: Path, year: int) -> Path:
     # ACS lag rule: vintage for PIT year Y is Y-1
     acs_vintage = year - 1
-    tract_vintage = 2010 if acs_vintage <= 2019 else 2020
+    tract_vintage = default_tract_vintage_for_acs(str(acs_vintage))
     return (
         project_root
         / "data"
         / "curated"
         / "acs"
-        / f"acs5_tracts__A{acs_vintage}xT{tract_vintage}.parquet"
+        / naming.acs5_tracts_filename(str(acs_vintage), tract_vintage)
     )
 
 

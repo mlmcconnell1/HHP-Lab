@@ -4403,8 +4403,15 @@ class TestMaterialize:
         ]
         recipe = load_recipe(data)
         path = _resolve_transform_path("coc_to_metro", recipe, tmp_path)
+        from hhplab.naming import recipe_transform_filename
+
         assert ".recipe_cache/transforms" in str(path)
-        assert "coc_to_metro__coc_2025__glynn_fox_v1.parquet" in str(path)
+        assert path.name == recipe_transform_filename(
+            "coc_to_metro",
+            "coc",
+            "glynn_fox_v1",
+            base_vintage=2025,
+        )
 
     def test_resolve_coc_to_msa_crosswalk_path(self, tmp_path: Path):
         data = _recipe_with_pipeline()
@@ -4429,8 +4436,15 @@ class TestMaterialize:
         ]
         recipe = load_recipe(data)
         path = _resolve_transform_path("coc_to_msa", recipe, tmp_path)
+        from hhplab.naming import recipe_transform_filename
+
         assert ".recipe_cache/transforms" in str(path)
-        assert "coc_to_msa__coc_2025__census_msa_2023.parquet" in str(path)
+        assert path.name == recipe_transform_filename(
+            "coc_to_msa",
+            "coc",
+            "census_msa_2023",
+            base_vintage=2025,
+        )
 
     def test_resolve_msa_coc_transform_uses_definition_county_vintage(
         self, tmp_path: Path
@@ -8888,6 +8902,20 @@ class TestRecipeInitCmd:
         assert any(
             measure.type == "lead" and measure.output_column == "zori_lead_1"
             for measure in target.panel_policy.derived_measures
+        )
+        from hhplab.naming import msa_zori_yearly_filename
+
+        assert recipe.datasets["zori_msa"].path == (
+            "data/curated/zori/"
+            + msa_zori_yearly_filename(
+                2019,
+                2023,
+                "census_msa_2023",
+                2023,
+                "population",
+                "pit_january",
+                balanced_composition=True,
+            )
         )
 
         pit_tasks = [task for task in plan.resample_tasks if task.dataset_id == "pit_msa"]

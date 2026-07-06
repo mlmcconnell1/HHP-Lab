@@ -23,6 +23,7 @@ from hhplab.geo.ct_planning_regions import (
 from hhplab.naming import (
     county_xwalk_path,
     msa_coc_xwalk_path,
+    recipe_transform_filename,
     tract_mediated_county_xwalk_path,
     tract_path,
     tract_xwalk_path,
@@ -167,12 +168,13 @@ def _generated_metro_transform_path(
     """Return the recipe-cache path for a generated metro transform."""
     definition = metro_ref.source or "unknown_definition"
     subset_definition = metro_ref.subset_profile_definition_version
-    base_suffix = base_ref.type
-    if base_ref.vintage is not None:
-        base_suffix = f"{base_suffix}_{base_ref.vintage}"
-    if subset_definition:
-        definition = f"{definition}__subset_{subset_definition}"
-    filename = f"{transform_id}__{base_suffix}__{definition}.parquet"
+    filename = recipe_transform_filename(
+        transform_id,
+        base_ref.type,
+        definition,
+        base_vintage=base_ref.vintage,
+        subset_definition_version=subset_definition,
+    )
     return project_root / _RECIPE_TRANSFORM_DIR / filename
 
 
@@ -224,10 +226,12 @@ def _generated_msa_transform_path(
 ) -> Path:
     """Return the recipe-cache path for a generated MSA transform."""
     definition = msa_ref.source or "unknown_definition"
-    base_suffix = base_ref.type
-    if base_ref.vintage is not None:
-        base_suffix = f"{base_suffix}_{base_ref.vintage}"
-    filename = f"{transform_id}__{base_suffix}__{definition}.parquet"
+    filename = recipe_transform_filename(
+        transform_id,
+        base_ref.type,
+        definition,
+        base_vintage=base_ref.vintage,
+    )
     return project_root / _RECIPE_TRANSFORM_DIR / filename
 
 

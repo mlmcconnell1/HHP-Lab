@@ -10,6 +10,12 @@ from typer.testing import CliRunner
 
 from hhplab.cli.main import app
 from hhplab.covariates.mpi_contract import MPI_MEASURE_COLUMNS
+from hhplab.naming import (
+    analysis_manifest_filename,
+    analysis_manifest_path,
+    analysis_output_filename,
+    analysis_output_path,
+)
 from hhplab.panel.conformance import PanelRequest, run_conformance
 from hhplab.provenance import ProvenanceBlock, read_provenance, write_parquet_with_provenance
 
@@ -136,6 +142,40 @@ class TestAnalyzeCli:
         assert manifest_payload["result_summary"]["row_count"] == 2
         assert set(manifest_payload["result_summary"]["columns"]) >= {"column", "mean"}
         assert payload["manifest_path"] == str(manifest)
+
+    def test_default_analysis_paths_round_trip_through_naming_helpers(self, tmp_path: Path):
+        panel = _panel_fixture(tmp_path / "panel__Y2020-2023@B2025.parquet")
+        expected_output = analysis_output_path(panel, "describe")
+        expected_manifest = analysis_manifest_path(expected_output)
+
+        assert (
+            analysis_output_filename(panel.name, "describe")
+            == "panel__Y2020-2023@B2025__analysis_describe.parquet"
+        )
+        assert (
+            analysis_manifest_filename(expected_output.name)
+            == "panel__Y2020-2023@B2025__analysis_describe.manifest.json"
+        )
+
+        result = runner.invoke(
+            app,
+            [
+                "analyze",
+                "describe",
+                "--panel",
+                str(panel),
+                "--columns",
+                "pit_total",
+                "--json",
+            ],
+        )
+
+        assert result.exit_code == 0
+        payload = json.loads(result.output)
+        assert Path(payload["output_path"]) == expected_output
+        assert Path(payload["manifest_path"]) == expected_manifest
+        assert expected_output.exists()
+        assert expected_manifest.exists()
 
     def test_correlate_outputs_pairwise_and_partial_correlations(self, tmp_path: Path):
         panel = _panel_fixture(tmp_path / "panel.parquet")

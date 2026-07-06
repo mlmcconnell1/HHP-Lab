@@ -739,6 +739,53 @@ def acs5_tracts_filename(acs_vintage: str, tract_vintage: str | int) -> str:
     return f"acs5_tracts__A{acs_year}xT{tract_vintage}.parquet"
 
 
+def acs5_tracts_glob_pattern(acs_vintage: str | None = None) -> str:
+    """Return the canonical glob pattern for ACS 5-year tract artifacts."""
+    acs_token = "*" if acs_vintage is None else _normalize_acs_vintage(acs_vintage)
+    return f"acs5_tracts__A{acs_token}xT*.parquet"
+
+
+def recipe_transform_filename(
+    transform_id: str,
+    base_geo_type: str,
+    definition_version: str,
+    *,
+    base_vintage: str | int | None = None,
+    subset_definition_version: str | None = None,
+) -> str:
+    """Return the filename for recipe-cache generated transform artifacts."""
+    base_suffix = base_geo_type
+    if base_vintage is not None:
+        base_suffix = f"{base_suffix}_{base_vintage}"
+    definition = definition_version
+    if subset_definition_version:
+        definition = f"{definition}__subset_{subset_definition_version}"
+    return f"{transform_id}__{base_suffix}__{definition}.parquet"
+
+
+def analysis_output_filename(panel_filename: str, analysis_type: str) -> str:
+    """Return the canonical filename for an analysis artifact derived from a panel."""
+    panel_path = Path(panel_filename)
+    return f"{panel_path.stem}__analysis_{analysis_type}.parquet"
+
+
+def analysis_output_path(panel_path: Path | str, analysis_type: str) -> Path:
+    """Return the canonical analysis artifact path beside the source panel."""
+    panel_path = Path(panel_path)
+    return panel_path.with_name(analysis_output_filename(panel_path.name, analysis_type))
+
+
+def analysis_manifest_filename(output_filename: str) -> str:
+    """Return the manifest sidecar filename for an analysis artifact."""
+    return Path(output_filename).with_suffix(".manifest.json").name
+
+
+def analysis_manifest_path(output_path: Path | str) -> Path:
+    """Return the manifest sidecar path for an analysis artifact."""
+    output_path = Path(output_path)
+    return output_path.with_name(analysis_manifest_filename(output_path.name))
+
+
 def decennial_tracts_filename(
     decennial_vintage: str | int,
     tract_vintage: str | int | None = None,

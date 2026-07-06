@@ -1,6 +1,7 @@
 """Tests for MSA definition naming helpers."""
 
 from hhplab.naming import (
+    acs5_tracts_glob_pattern,
     block_geometry_path,
     coc_urban_area_detail_filename,
     coc_urban_area_detail_path,
@@ -28,9 +29,37 @@ from hhplab.naming import (
     msa_zori_yearly_filename,
     pl_block_population_filename,
     pl_block_population_path,
+    recipe_transform_filename,
     urban_area_filename,
     urban_area_path,
 )
+
+
+def test_acs5_tracts_glob_pattern():
+    assert acs5_tracts_glob_pattern() == "acs5_tracts__A*xT*.parquet"
+    assert acs5_tracts_glob_pattern("2019-2023") == "acs5_tracts__A2023xT*.parquet"
+
+
+def test_recipe_transform_filename():
+    assert (
+        recipe_transform_filename(
+            "coc_to_metro",
+            "coc",
+            "glynn_fox_v1",
+            base_vintage=2025,
+        )
+        == "coc_to_metro__coc_2025__glynn_fox_v1.parquet"
+    )
+    assert (
+        recipe_transform_filename(
+            "coc_to_metro",
+            "coc",
+            "census_msa_2023",
+            base_vintage=2025,
+            subset_definition_version="glynn_fox_v1",
+        )
+        == "coc_to_metro__coc_2025__census_msa_2023__subset_glynn_fox_v1.parquet"
+    )
 
 
 def test_msa_definitions_filename():

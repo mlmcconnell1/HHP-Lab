@@ -903,14 +903,12 @@ class TestSavePanel:
         assert "policy" in provenance.extra
         assert provenance.extra["policy"]["weighting_method"] == "population"
 
-    def test_save_empty_panel(self, tmp_path):
-        """Test saving an empty panel."""
+    def test_save_empty_coc_panel_requires_boundary_vintage(self, tmp_path):
+        """Empty CoC panels must not write non-canonical fallback filenames."""
         empty_df = pd.DataFrame(columns=PANEL_COLUMNS)
-        result_path = save_panel(empty_df, 2023, 2024, output_dir=tmp_path)
 
-        assert result_path.exists()
-        df = pd.read_parquet(result_path)
-        assert len(df) == 0
+        with pytest.raises(ValueError, match="boundary_vintage is required"):
+            save_panel(empty_df, 2023, 2024, output_dir=tmp_path)
 
 
 class TestPanelColumns:

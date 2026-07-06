@@ -14,6 +14,7 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
+from hhplab.naming import analysis_manifest_path, analysis_output_path
 from hhplab.provenance import ProvenanceBlock, read_provenance, write_parquet_with_provenance
 from hhplab.schema.measures import resolve_panel_measure_entry
 
@@ -41,14 +42,6 @@ class AnalysisResult:
                 "records": self.table.to_dict(orient="records"),
             }
         )
-
-
-def _default_output_path(panel_path: Path, analysis_type: str) -> Path:
-    return panel_path.with_name(f"{panel_path.stem}__analysis_{analysis_type}.parquet")
-
-
-def _manifest_path_for_output(output_path: Path) -> Path:
-    return output_path.with_suffix(".manifest.json")
 
 
 def _sha256(path: Path) -> str:
@@ -153,7 +146,7 @@ def _write_analysis_manifest(
     table: pd.DataFrame,
 ) -> Path:
     input_provenance = read_provenance(panel_path)
-    manifest_path = _manifest_path_for_output(output_path)
+    manifest_path = analysis_manifest_path(output_path)
     manifest = {
         "manifest_version": 1,
         "created_at": datetime.now(UTC).isoformat(),
@@ -188,7 +181,7 @@ def _persist_result(
     parameters: dict[str, Any],
     metadata: dict[str, Any],
 ) -> AnalysisResult:
-    resolved_output = output_path or _default_output_path(panel_path, analysis_type)
+    resolved_output = output_path or analysis_output_path(panel_path, analysis_type)
     provenance = _analysis_provenance(
         analysis_type=analysis_type,
         panel_path=panel_path,

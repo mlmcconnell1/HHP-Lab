@@ -25,6 +25,7 @@ from hhplab.geo.geo_io import resolve_curated_boundary_path
 from hhplab.naming import (
     acs5_tracts_filename,
     block_geometry_path,
+    coc_base_filename,
     coc_base_path,
     coc_urban_fraction_path,
     county_path,
@@ -871,7 +872,7 @@ def _check_map_artifacts(
                     artifact_path = resolve_curated_boundary_path(str(vintage), base_dir=base_dir)
                 except FileNotFoundError:
                     artifact_path = (
-                        base_dir / "curated" / "coc_boundaries" / f"coc__B{vintage}.parquet"
+                        base_dir / "curated" / "coc_boundaries" / coc_base_filename(str(vintage))
                     )
             elif geo_type == "msa" and source is not None and vintage is not None:
                 artifact_path = msa_boundaries_path(source, base_dir)

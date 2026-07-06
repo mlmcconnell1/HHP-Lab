@@ -5,6 +5,7 @@ from typing import Annotated
 
 import typer
 
+from hhplab.naming import acs5_tracts_glob_pattern
 from hhplab.paths import curated_dir
 from hhplab.xwalks.diagnostics import PopulationValidationResult, validate_population_crosswalk
 
@@ -122,8 +123,8 @@ def _run_population_validation(
 
     # Find ACS tract population file
     if acs is None:
-        # Find the latest ACS file (new naming: acs5_tracts__A{year}xT{tract}.parquet)
-        acs_files = sorted(acs_dir.glob("acs5_tracts__A*xT*.parquet"), reverse=True)
+        # Find the latest ACS file using the canonical naming pattern.
+        acs_files = sorted(acs_dir.glob(acs5_tracts_glob_pattern()), reverse=True)
         if not acs_files:
             typer.echo(f"Error: No ACS tract files found in {acs_dir}", err=True)
             raise typer.Exit(1)
@@ -134,8 +135,7 @@ def _run_population_validation(
         acs_vintage = f"{int(acs_end_year) - 4}-{acs_end_year}"
     else:
         # Find matching ACS file by vintage end year
-        acs_end_year = acs.split("-")[-1] if "-" in acs else acs
-        pattern = f"acs5_tracts__A{acs_end_year}xT*.parquet"
+        pattern = acs5_tracts_glob_pattern(acs)
         matches = list(acs_dir.glob(pattern))
         if not matches:
             typer.echo(f"Error: No ACS file found matching {pattern}", err=True)
@@ -354,4 +354,3 @@ def validate_population(
         by_state=by_state,
         warn_threshold=warn_threshold,
     )
-
