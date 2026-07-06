@@ -576,18 +576,35 @@ def aggregate_pep(
         float,
         typer.Option(
             "--min-coverage",
-            help="Minimum coverage ratio for valid CoC-year (default 0.95).",
+            help="Minimum coverage ratio for valid output row.",
         ),
     ] = 0.95,
+    target_geo: Annotated[
+        str,
+        typer.Option("--target-geo", help="Target geography: coc or msa."),
+    ] = "coc",
+    msa_definition_version: Annotated[
+        str,
+        typer.Option(
+            "--msa-definition-version",
+            help="MSA definition version for --target-geo msa.",
+        ),
+    ] = "census_msa_2023",
+    county_vintage: Annotated[
+        str | None,
+        typer.Option("--counties", help="County vintage token for MSA output naming."),
+    ] = None,
 ) -> None:
-    """Aggregate PEP population estimates into curated CoC artifacts.
+    """Aggregate PEP population estimates into curated geography artifacts.
 
-    Produces one file per boundary year (hub). County vintage matches
-    boundary year by default. These CoC outputs can then feed CoC panels
-    directly or metro workflows that resample county-native sources.
+    CoC outputs use one file per boundary year. MSA outputs sum county
+    membership into one canonical PEP MSA file per requested year.
     """
     _validate_align(align, PEP_ALIGN_MODES, "pep")
     parsed_years = _resolve_years(years)
+    if target_geo not in {"coc", "msa"}:
+        typer.echo(f"Error: Invalid --target-geo '{target_geo}'. Use one of: coc, msa.", err=True)
+        raise typer.Exit(2)
 
     if lag_months < 0 or lag_months > 12:
         typer.echo(
@@ -603,11 +620,12 @@ def aggregate_pep(
         raise typer.Exit(2)
 
     output_dir = curated_root() / "pep"
-    typer.echo(f"Aggregating PEP to CoC (curated output, align '{align}')...")
+    typer.echo(f"Aggregating PEP to {target_geo.upper()} (curated output, align '{align}')...")
 
     from hhplab.pep.pep_aggregate import (
         DIRECT_COUNTY_AREA_DEPRECATION_NOTICE,
         aggregate_pep_to_coc_many,
+        aggregate_pep_to_msa,
         build_lagged_pep_series,
         is_deprecated_direct_county_area_weighting,
         load_pep_county,
@@ -615,7 +633,9 @@ def aggregate_pep(
 
     pep_source_df = pd.DataFrame()
     selected_weightings = weightings or ["area_share"]
-    if any(is_deprecated_direct_county_area_weighting(w) for w in selected_weightings):
+    if target_geo == "coc" and any(
+        is_deprecated_direct_county_area_weighting(w) for w in selected_weightings
+    ):
         typer.echo(f"Warning: {DIRECT_COUNTY_AREA_DEPRECATION_NOTICE}", err=True)
     if align == "lagged":
         try:
@@ -629,7 +649,10 @@ def aggregate_pep(
 
     for build_year in parsed_years:
         boundary_vintage = str(build_year)
-        county_vintage = str(build_year)
+        resolved_county_vintage = str(
+            county_vintage or (2023 if target_geo == "msa" else build_year)
+        )
+        display_weightings = ["population"] if target_geo == "msa" else selected_weightings
         pep_path: Path | None = None
         pep_year = build_year
 
@@ -639,7 +662,7 @@ def aggregate_pep(
                 typer.echo(
                     f"  B{build_year}: lag {lag_months} months "
                     f"(w_current={1.0 - weight_prev:.3f}, w_previous={weight_prev:.3f}), "
-                    f"counties {county_vintage}, weights {', '.join(selected_weightings)}"
+                    f"counties {resolved_county_vintage}, weights {', '.join(display_weightings)}"
                 )
                 if lag_months > 0:
                     lagged_series = build_lagged_pep_series(
@@ -656,21 +679,41 @@ def aggregate_pep(
                     lagged_series.to_parquet(pep_path, index=False)
             else:
                 typer.echo(
-                    f"  B{build_year}: PEP year {pep_year}, counties {county_vintage}, "
-                    f"weights {', '.join(selected_weightings)}"
+                    f"  Y{build_year}: PEP year {pep_year}, counties {resolved_county_vintage}, "
+                    f"weights {', '.join(display_weightings)}"
                 )
 
-            result_paths = aggregate_pep_to_coc_many(
-                boundary_vintage=boundary_vintage,
-                county_vintage=county_vintage,
-                weightings=selected_weightings,
-                pep_path=pep_path,
-                start_year=pep_year,
-                end_year=pep_year,
-                min_coverage=min_coverage,
-                output_dir=output_dir,
-                force=True,
-            )
+            if target_geo == "msa":
+                if selected_weightings != ["area_share"]:
+                    typer.echo(
+                        "Error: --target-geo msa uses county membership sums and does "
+                        "not support --weighting.",
+                        err=True,
+                    )
+                    raise typer.Exit(2)
+                result_paths = {
+                    "population": aggregate_pep_to_msa(
+                        year=pep_year,
+                        definition_version=msa_definition_version,
+                        county_vintage=resolved_county_vintage,
+                        pep_path=pep_path,
+                        min_coverage=min_coverage,
+                        output_dir=output_dir,
+                        force=True,
+                    )
+                }
+            else:
+                result_paths = aggregate_pep_to_coc_many(
+                    boundary_vintage=boundary_vintage,
+                    county_vintage=resolved_county_vintage,
+                    weightings=selected_weightings,
+                    pep_path=pep_path,
+                    start_year=pep_year,
+                    end_year=pep_year,
+                    min_coverage=min_coverage,
+                    output_dir=output_dir,
+                    force=True,
+                )
 
             for result_path in result_paths.values():
                 all_outputs.append(str(result_path))
@@ -969,7 +1012,9 @@ def aggregate_pit(
         "output_dir": str(output_dir),
         "outputs": all_outputs,
         "file_count": len(materialized),
-        "source_coc_count": int(source_coc_count) if source_coc_count != "n/a" else source_coc_count,
+        "source_coc_count": (
+            int(source_coc_count) if source_coc_count != "n/a" else source_coc_count
+        ),
         "source_record_count": int(total_records),
         "boundary_vintages": {str(year): boundary_map[year] for year in materialized},
         "allocation_basis": allocation_basis if geo_type == "msa" else None,

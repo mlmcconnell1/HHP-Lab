@@ -8895,6 +8895,11 @@ class TestRecipeInitCmd:
         assert pit_tasks[0].input_path.endswith("xB2018xC2023.parquet")
         assert pit_tasks[1].input_path.endswith("xB2020xC2023.parquet")
         assert pit_tasks[2].input_path.endswith("xB2024xC2023.parquet")
+        pep_tasks = [task for task in plan.resample_tasks if task.dataset_id == "pep_msa"]
+        assert [task.year for task in pep_tasks] == [2019, 2020, 2022, 2023]
+        assert pep_tasks[0].input_path.endswith(
+            "pep__msa__Y2019@Mcensusmsa2023xC2023__wpopulation.parquet"
+        )
         assert tuple(plan.join_tasks[0].datasets) == ("pit_msa", "zori_msa", "pep_msa")
 
     def test_recipe_init_longitudinal_msa_panel_executes_with_materialized_artifacts(

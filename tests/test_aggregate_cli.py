@@ -1,6 +1,7 @@
 """Tests for the ``hhplab aggregate`` CLI command group."""
 
 import json
+from pathlib import Path
 from unittest.mock import patch
 
 import pandas as pd
@@ -448,6 +449,61 @@ def test_aggregate_acs_to_msa_writes_expanded_panel_ready_output():
         assert "msa_contract_rent_p10" in output.columns
         assert "msa_contract_rent_p25" in output.columns
         assert "msa_contract_rent_p50" in output.columns
+
+
+def test_aggregate_pep_to_msa_materializes_canonical_outputs():
+    from hhplab.naming import msa_county_membership_filename, msa_pep_filename
+    from hhplab.provenance import read_provenance
+
+    with runner.isolated_filesystem():
+        pep_dir = Path("data/curated/pep")
+        msa_dir = Path("data/curated/msa")
+        pep_dir.mkdir(parents=True, exist_ok=True)
+        msa_dir.mkdir(parents=True, exist_ok=True)
+        pd.DataFrame(
+            {
+                "county_fips": ["01001", "01003", "01005"],
+                "year": [2024, 2024, 2024],
+                "population": [100.0, 200.0, 50.0],
+            }
+        ).to_parquet(pep_dir / "pep_county__v2024.parquet", index=False)
+        pd.DataFrame(
+            {
+                "msa_id": ["12345", "12345", "67890"],
+                "cbsa_code": ["12345", "12345", "67890"],
+                "county_fips": ["01001", "01003", "01005"],
+                "definition_version": ["census_msa_2023"] * 3,
+            }
+        ).to_parquet(msa_dir / msa_county_membership_filename("census_msa_2023"), index=False)
+
+        result = runner.invoke(
+            app,
+            [
+                "aggregate",
+                "pep",
+                "--target-geo",
+                "msa",
+                "--years",
+                "2024",
+                "--counties",
+                "2023",
+            ],
+            catch_exceptions=False,
+        )
+
+        assert result.exit_code == 0, result.output
+        assert "Aggregating PEP to MSA" in result.output
+        out_file = pep_dir / msa_pep_filename(2024, "census_msa_2023", 2023)
+        assert out_file.exists()
+        output = pd.read_parquet(out_file).sort_values("msa_id").reset_index(drop=True)
+        assert list(output["msa_id"]) == ["12345", "67890"]
+        assert list(output["population"]) == pytest.approx([300.0, 50.0])
+        assert list(output["coverage_ratio"]) == pytest.approx([1.0, 1.0])
+
+        provenance = read_provenance(out_file)
+        assert provenance.geo_type == "msa"
+        assert provenance.extra["dataset"] == "msa_pep_population"
+        assert provenance.extra["aggregation_method"] == "county_membership_sum"
 
 
 def test_derive_acs5_covariates_propagates_missing_non_native_component():

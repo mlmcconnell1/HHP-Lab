@@ -505,6 +505,23 @@ def _dataset_remediation(ds_id: str, ds, *, years: list[int] | None = None) -> R
                 command=command,
             )
 
+    if provider == "census" and product == "pep":
+        native_type = getattr(ds.native_geometry, "type", None)
+        if native_type == "msa":
+            source = getattr(ds.native_geometry, "source", None) or "census_msa_2023"
+            year_arg = _format_years_for_command(years)
+            return Remediation(
+                hint=(
+                    f"Materialize MSA-level Census PEP population artifacts for "
+                    f"dataset '{ds_id}' from county PEP estimates and the MSA "
+                    "county membership table."
+                ),
+                command=(
+                    "hhplab aggregate pep --target-geo msa "
+                    f"--msa-definition-version {source} --counties 2023 --years {year_arg}"
+                ),
+            )
+
     if provider == "medsl" and product == "president":
         return Remediation(
             hint=(
@@ -612,6 +629,16 @@ def _dataset_remediation(ds_id: str, ds, *, years: list[int] | None = None) -> R
         hint=(f"Ingest {provider}/{product} data for dataset '{ds_id}'."),
         command=f"hhplab ingest {product}" if product else None,
     )
+
+
+def _format_years_for_command(years: list[int] | None) -> str:
+    """Return a compact year spec for remediation commands."""
+    if not years:
+        return "<years>"
+    unique_years = sorted(set(years))
+    if unique_years == list(range(unique_years[0], unique_years[-1] + 1)):
+        return f"{unique_years[0]}-{unique_years[-1]}"
+    return ",".join(str(year) for year in unique_years)
 
 
 def _msa_transform_remediation(

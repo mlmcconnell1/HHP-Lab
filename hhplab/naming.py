@@ -1663,6 +1663,40 @@ def metro_pep_filename(
     return f"pep__metro__D{defn}xC{county_vintage}__w{weighting}__{start_year}_{end_year}.parquet"
 
 
+def msa_pep_filename(
+    year: int | str,
+    definition_version: str,
+    county_vintage: int | str,
+    weighting: str = "population",
+) -> str:
+    """Canonical filename for one MSA-level PEP aggregate output.
+
+    Pattern: ``pep__msa__Y{year}@M{def}xC{county}__w{weighting}.parquet``.
+    """
+    defn = _normalize_definition_version(definition_version)
+    return f"pep__msa__Y{year}@M{defn}xC{county_vintage}__w{weighting}.parquet"
+
+
+def msa_pep_path(
+    year: int | str,
+    definition_version: str,
+    county_vintage: int | str,
+    weighting: str = "population",
+    base_dir: Path | str | None = None,
+) -> Path:
+    """Get canonical path for one MSA-level PEP aggregate output."""
+    if base_dir is None:
+        base_dir = Path("data")
+    else:
+        base_dir = Path(base_dir)
+    return (
+        base_dir
+        / "curated"
+        / "pep"
+        / msa_pep_filename(year, definition_version, county_vintage, weighting)
+    )
+
+
 def acs1_metro_filename(acs1_vintage: int, definition_version: str) -> str:
     """Generate filename for curated ACS 1-year metro-level ingest artifact.
 

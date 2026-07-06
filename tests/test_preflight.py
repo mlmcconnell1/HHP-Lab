@@ -483,6 +483,71 @@ def test_vera_missing_dataset_remediation_uses_ingest_command(tmp_path: Path) ->
     assert "derive incarceration rates" in findings[0].remediation.hint
 
 
+def test_pep_msa_missing_dataset_remediation_uses_aggregate_command(tmp_path: Path) -> None:
+    recipe = load_recipe(
+        {
+            "version": 1,
+            "name": "pep-msa-missing",
+            "universe": {"range": "2021-2022"},
+            "targets": [
+                {"id": "msa_panel", "geometry": {"type": "msa", "source": "census_msa_2023"}},
+            ],
+            "datasets": {
+                "pep_msa": {
+                    "provider": "census",
+                    "product": "pep",
+                    "version": 1,
+                    "native_geometry": {"type": "msa", "source": "census_msa_2023"},
+                    "geo_column": "msa_id",
+                    "year_column": "year",
+                    "file_set": {
+                        "path_template": (
+                            "data/curated/pep/"
+                            "pep__msa__Y{year}@Mcensusmsa2023xC2023__wpopulation.parquet"
+                        ),
+                        "segments": [
+                            {
+                                "years": {"range": "2021-2022"},
+                                "geometry": {"type": "msa", "source": "census_msa_2023"},
+                            }
+                        ],
+                    },
+                }
+            },
+            "pipelines": [
+                {
+                    "id": "main",
+                    "target": "msa_panel",
+                    "steps": [
+                        {
+                            "resample": {
+                                "dataset": "pep_msa",
+                                "to_geometry": {"type": "msa", "source": "census_msa_2023"},
+                                "method": "identity",
+                                "measures": ["population"],
+                            }
+                        }
+                    ],
+                }
+            ],
+        }
+    )
+
+    report = run_preflight(recipe, project_root=tmp_path)
+    findings = [
+        finding
+        for finding in report.findings
+        if finding.kind == FindingKind.MISSING_DATASET and finding.dataset_id == "pep_msa"
+    ]
+
+    assert len(findings) == 1
+    assert findings[0].remediation is not None
+    assert findings[0].remediation.command == (
+        "hhplab aggregate pep --target-geo msa --msa-definition-version "
+        "census_msa_2023 --counties 2023 --years 2021-2022"
+    )
+
+
 def test_medsl_county_recipe_preflight_joins_with_acs_measures(
     tmp_path: Path,
 ) -> None:

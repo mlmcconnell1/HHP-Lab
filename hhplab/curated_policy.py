@@ -133,6 +133,7 @@ CANONICAL_PATTERNS: dict[str, list[re.Pattern[str]]] = {
         re.compile(r"^pep_county__v\d{4}__y\d{4}-\d{4}\.parquet$"),
         re.compile(r"^coc_pep__B\d{4}xC\d{4}__w\w+__\d{4}_\d{4}\.parquet$"),
         re.compile(r"^pep__metro__D\w+xC\d{4}__w\w+__\d{4}_\d{4}\.parquet$"),
+        re.compile(r"^pep__msa__Y\d{4}@M\w+xC\d{4}__w\w+\.parquet$"),
     ],
     "pit": [
         re.compile(r"^pit__P\d{4}(@B\d{4})?\.parquet$"),

@@ -389,7 +389,8 @@ def _longitudinal_msa_panel_recipe_dict(
                 "file_set": {
                     "path_template": (
                         "data/curated/pep/"
-                        f"pep_msa__Y{{year}}@M{msa_definition_version}.parquet"
+                        f"pep__msa__Y{{year}}@M{definition_token}"
+                        f"xC{county_vintage}__wpopulation.parquet"
                     ),
                     "segments": [
                         {
@@ -678,9 +679,14 @@ def recipe_init_cmd(
 
     recipe_name = name or f"msa_coc_coverage_{year}"
     resolved_ranking_year = ranking_reference_year or year
+    definition_token = "".join(c for c in msa_definition_version.lower() if c.isalnum())
     resolved_pep_path = (
         pep_msa_path
-        or f"data/curated/pep/pep_msa__Y{resolved_ranking_year}@M{msa_definition_version}.parquet"
+        or (
+            "data/curated/pep/"
+            f"pep__msa__Y{resolved_ranking_year}@M{definition_token}"
+            f"xC{county_vintage}__wpopulation.parquet"
+        )
     )
     recipe_data = _msa_coc_coverage_recipe_dict(
         name=recipe_name,

@@ -40,7 +40,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from hhplab.naming import coc_pep_filename, county_xwalk_path
+from hhplab.naming import coc_pep_filename, county_xwalk_path, msa_pep_filename
 from hhplab.paths import curated_dir
 from hhplab.provenance import ProvenanceBlock, read_provenance, write_parquet_with_provenance
 from hhplab.xwalks import apply_crosswalk
@@ -297,6 +297,21 @@ def get_output_path(
         end_year,
     )
     return output_dir / filename
+
+
+def get_msa_output_path(
+    year: int,
+    definition_version: str,
+    county_vintage: str,
+    weighting: str = "population",
+    output_dir: Path | str | None = None,
+) -> Path:
+    """Get canonical output path for one MSA-level PEP artifact."""
+    if output_dir is None:
+        output_dir = curated_dir("pep")
+    else:
+        output_dir = Path(output_dir)
+    return output_dir / msa_pep_filename(year, definition_version, county_vintage, weighting)
 
 
 def _decennial_population_baseline_year(
@@ -851,4 +866,160 @@ def aggregate_pep_to_coc(
         f"{valid_rows}/{len(result_df)} CoC-years with valid population"
     )
 
+    return output_path
+
+
+def aggregate_pep_to_msa(
+    year: int,
+    definition_version: str = "census_msa_2023",
+    county_vintage: str = "2023",
+    pep_path: Path | str | None = None,
+    msa_membership_path: Path | str | None = None,
+    min_coverage: float = 1.0,
+    output_dir: Path | str | None = None,
+    force: bool = False,
+) -> Path:
+    """Aggregate PEP county estimates to Census MSA geography for one year."""
+    from hhplab.msa.msa_io import read_msa_county_membership, read_msa_definitions
+    from hhplab.naming import msa_county_membership_path
+
+    output_path = get_msa_output_path(
+        year,
+        definition_version,
+        county_vintage,
+        "population",
+        output_dir,
+    )
+    if output_path.exists() and not force:
+        logger.info(f"Using cached file: {output_path}")
+        return output_path
+
+    pep_df = load_pep_county(pep_path)
+    year_pep = pep_df.loc[
+        pep_df["year"] == year,
+        ["county_fips", "year", "population"],
+    ].copy()
+    if year_pep.empty:
+        available_start = int(pep_df["year"].min())
+        available_end = int(pep_df["year"].max())
+        raise ValueError(
+            f"No PEP data found for year {year}. Available years in the loaded data: "
+            f"{available_start}-{available_end}. Ingest an older PEP vintage or adjust --years."
+        )
+
+    if msa_membership_path is not None:
+        membership_path = Path(msa_membership_path)
+        membership = pd.read_parquet(membership_path)
+    else:
+        membership_path = msa_county_membership_path(definition_version)
+        membership = read_msa_county_membership(definition_version)
+
+    required_membership = {"msa_id", "county_fips"}
+    missing_membership = sorted(required_membership - set(membership.columns))
+    if missing_membership:
+        raise ValueError(
+            "MSA county membership is missing required column(s): "
+            f"{missing_membership}. Run: hhplab generate msa --definition-version "
+            f"{definition_version}"
+        )
+
+    membership = membership.copy()
+    membership["msa_id"] = membership["msa_id"].astype(str)
+    membership["county_fips"] = membership["county_fips"].astype(str).str.zfill(5)
+    if "cbsa_code" not in membership.columns:
+        membership["cbsa_code"] = membership["msa_id"]
+    membership["cbsa_code"] = membership["cbsa_code"].astype(str).str.zfill(5)
+
+    year_pep["county_fips"] = year_pep["county_fips"].astype(str).str.zfill(5)
+    joined = membership.merge(year_pep, on="county_fips", how="left")
+    joined["has_population"] = joined["population"].notna()
+    joined["population_for_sum"] = joined["population"].fillna(0.0)
+
+    grouped = joined.groupby("msa_id", as_index=False).agg(
+        cbsa_code=("cbsa_code", "first"),
+        population=("population_for_sum", "sum"),
+        county_count=("has_population", "sum"),
+        county_expected=("county_fips", "count"),
+        max_county_population=("population_for_sum", "max"),
+    )
+    grouped["year"] = year
+    grouped["reference_date"] = pd.Timestamp(f"{year}-07-01")
+    grouped["coverage_ratio"] = grouped["county_count"] / grouped["county_expected"]
+    grouped["max_county_contribution"] = (
+        grouped["max_county_population"] / grouped["population"]
+    ).fillna(0.0)
+    grouped.loc[grouped["population"] == 0, "max_county_contribution"] = 0.0
+
+    missing_by_msa = (
+        joined.loc[~joined["has_population"]]
+        .groupby("msa_id")["county_fips"]
+        .apply(lambda values: ",".join(sorted(set(values))))
+    )
+    grouped["missing_counties"] = grouped["msa_id"].map(missing_by_msa).fillna("")
+    grouped["definition_version"] = definition_version
+    grouped["county_vintage"] = str(county_vintage)
+    grouped["weighting_method"] = "population"
+    grouped["aggregation_method"] = "county_membership_sum"
+    grouped.loc[grouped["coverage_ratio"] < min_coverage, "population"] = pd.NA
+
+    try:
+        definitions = read_msa_definitions(definition_version)
+    except FileNotFoundError:
+        definitions = pd.DataFrame()
+    if not definitions.empty and {"msa_id", "msa_name"}.issubset(definitions.columns):
+        grouped = grouped.merge(
+            definitions[["msa_id", "msa_name"]].drop_duplicates(),
+            on="msa_id",
+            how="left",
+        )
+    else:
+        grouped["msa_name"] = pd.NA
+
+    result_df = grouped[
+        [
+            "msa_id",
+            "cbsa_code",
+            "msa_name",
+            "year",
+            "reference_date",
+            "population",
+            "coverage_ratio",
+            "county_count",
+            "county_expected",
+            "max_county_contribution",
+            "missing_counties",
+            "definition_version",
+            "county_vintage",
+            "weighting_method",
+            "aggregation_method",
+        ]
+    ].sort_values("msa_id").reset_index(drop=True)
+
+    pep_provenance = read_provenance(pep_path) if pep_path else None
+    membership_provenance = read_provenance(membership_path) if membership_path.exists() else None
+    low_coverage_count = int((result_df["coverage_ratio"] < min_coverage).sum())
+    provenance = ProvenanceBlock(
+        geo_type="msa",
+        definition_version=definition_version,
+        county_vintage=str(county_vintage),
+        weighting="population",
+        extra={
+            "dataset": "msa_pep_population",
+            "source": "Derived from Census PEP county estimates",
+            "pep_source": pep_provenance.to_dict() if pep_provenance else None,
+            "msa_membership_source": (
+                membership_provenance.to_dict() if membership_provenance else None
+            ),
+            "msa_membership_path": str(membership_path),
+            "aggregation_method": "county_membership_sum",
+            "min_coverage_threshold": min_coverage,
+            "year": year,
+            "msa_count": result_df["msa_id"].nunique(),
+            "row_count": len(result_df),
+            "low_coverage_nulled": low_coverage_count,
+        },
+    )
+
+    write_parquet_with_provenance(result_df, output_path, provenance)
+    logger.info(f"Wrote MSA-level PEP data to {output_path}")
     return output_path

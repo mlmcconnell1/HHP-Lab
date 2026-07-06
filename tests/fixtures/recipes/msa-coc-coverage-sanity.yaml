@@ -37,7 +37,7 @@ datasets:
       years: [2024]
     year_column: year
     geo_column: msa_id
-    path: data/curated/pep/pep_msa__Y2024@Mcensus_msa_2023.parquet
+    path: data/curated/pep/pep__msa__Y2024@Mcensusmsa2023xC2023__wpopulation.parquet
 
 pipelines:
   - id: coverage

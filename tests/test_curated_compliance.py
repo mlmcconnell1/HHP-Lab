@@ -172,6 +172,7 @@ class TestCanonicalFilenamesAccepted:
             ),
             ("pep", "pep_county__v2024.parquet"),
             ("pep", "coc_pep__B2024xC2024__warea_share__2010_2024.parquet"),
+            ("pep", "pep__msa__Y2024@Mcensusmsa2023xC2023__wpopulation.parquet"),
             ("pit", "pit__P2024.parquet"),
             ("pit", "pit__P2024@B2024.parquet"),
             ("pit", "pit__msa__P2024@Mcensusmsa2023xB2024xC2024.parquet"),
