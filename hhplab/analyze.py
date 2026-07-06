@@ -9,7 +9,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 from statistics import NormalDist
-from typing import Any
+from typing import Any, Literal
 
 import numpy as np
 import pandas as pd
@@ -42,6 +42,21 @@ class AnalysisResult:
                 "records": self.table.to_dict(orient="records"),
             }
         )
+
+
+InferenceMethod = Literal["none", "wild-cluster", "permutation"]
+
+
+@dataclass(frozen=True)
+class _RegressionFit:
+    beta: np.ndarray
+    fitted: np.ndarray
+    residuals: np.ndarray
+    std_errors: np.ndarray
+    std_error_type: str
+    t_stats: np.ndarray
+    p_values: np.ndarray
+    r_squared: float
 
 
 def _sha256(path: Path) -> str:
@@ -393,6 +408,130 @@ def _two_sided_p_value(t_stat: float, dof: int) -> float:
         return float(2.0 * (1.0 - NormalDist().cdf(abs(t_stat))))
 
 
+def _fit_ols(
+    *,
+    x: np.ndarray,
+    y: np.ndarray,
+    dof: int,
+    clusters: pd.Series | None,
+) -> _RegressionFit:
+    beta, *_ = np.linalg.lstsq(x, y, rcond=None)
+    fitted = x @ beta
+    residuals = y - fitted
+    sigma2 = float((residuals @ residuals) / dof)
+    naive_se = np.sqrt(np.clip(np.diag(np.linalg.pinv(x.T @ x)) * sigma2, 0, None))
+    if clusters is not None:
+        std_errors = _clustered_standard_errors(x, residuals, clusters)
+        std_error_type = f"clustered:{clusters.name}"
+    else:
+        std_errors = naive_se
+        std_error_type = "ols"
+    t_stats = beta / pd.Series(std_errors).replace(0, np.nan).to_numpy(dtype=float)
+    p_values = np.array([_two_sided_p_value(float(t_stat), dof) for t_stat in t_stats])
+    denom = np.sum((y - y.mean()) ** 2)
+    r_squared = float(1 - (residuals @ residuals) / denom) if denom > 0 else np.nan
+    return _RegressionFit(
+        beta=beta,
+        fitted=fitted,
+        residuals=residuals,
+        std_errors=std_errors,
+        std_error_type=std_error_type,
+        t_stats=t_stats,
+        p_values=p_values,
+        r_squared=r_squared,
+    )
+
+
+def _parse_inference_terms(terms: list[str] | None, design_columns: pd.Index) -> list[str]:
+    requested = terms or []
+    if not requested:
+        return []
+    missing = [term for term in requested if term not in set(design_columns)]
+    if missing:
+        raise AnalysisError(
+            f"--inference-terms references model terms not in the regression design: {missing}. "
+            f"Available terms: {list(design_columns)}"
+        )
+    return requested
+
+
+def _wild_cluster_bootstrap_p_values(
+    *,
+    x: np.ndarray,
+    fit: _RegressionFit,
+    dof: int,
+    clusters: pd.Series,
+    terms: list[str],
+    design_columns: pd.Index,
+    reps: int,
+    seed: int,
+) -> dict[str, float]:
+    if reps < 1:
+        raise AnalysisError("--inference-reps must be positive for wild-cluster bootstrap.")
+    cluster_values = clusters.dropna().unique().tolist()
+    if len(cluster_values) < 2:
+        raise AnalysisError("wild-cluster bootstrap requires at least two non-null clusters.")
+    rng = np.random.default_rng(seed)
+    term_indices = {term: int(design_columns.get_loc(term)) for term in terms}
+    exceed = {term: 0 for term in terms}
+    observed = {
+        term: abs(float(fit.t_stats[index])) for term, index in term_indices.items()
+    }
+    cluster_array = clusters.to_numpy()
+    for _ in range(reps):
+        weights_by_cluster = {
+            cluster: rng.choice(np.array([-1.0, 1.0])) for cluster in cluster_values
+        }
+        weights = np.array([weights_by_cluster.get(cluster, 0.0) for cluster in cluster_array])
+        y_star = fit.fitted + fit.residuals * weights
+        boot_fit = _fit_ols(x=x, y=y_star, dof=dof, clusters=clusters)
+        for term, index in term_indices.items():
+            boot_se = boot_fit.std_errors[index]
+            boot_t = (
+                abs(float((boot_fit.beta[index] - fit.beta[index]) / boot_se))
+                if boot_se > 0
+                else np.nan
+            )
+            if math.isfinite(boot_t) and boot_t >= observed[term]:
+                exceed[term] += 1
+    return {term: float((exceed[term] + 1) / (reps + 1)) for term in terms}
+
+
+def _permutation_p_values(
+    *,
+    model_df: pd.DataFrame,
+    y: np.ndarray,
+    design: pd.DataFrame,
+    dof: int,
+    clusters: pd.Series | None,
+    terms: list[str],
+    fit: _RegressionFit,
+    reps: int,
+    seed: int,
+) -> dict[str, float]:
+    if reps < 1:
+        raise AnalysisError("--inference-reps must be positive for permutation inference.")
+    rng = np.random.default_rng(seed)
+    exceed = {term: 0 for term in terms}
+    term_indices = {term: int(design.columns.get_loc(term)) for term in terms}
+    observed = {term: abs(float(fit.beta[index])) for term, index in term_indices.items()}
+    for _ in range(reps):
+        permuted_design = design.copy()
+        for term in terms:
+            permuted_design[term] = rng.permutation(model_df[term].to_numpy(dtype=float))
+        permuted_fit = _fit_ols(
+            x=permuted_design.to_numpy(dtype=float),
+            y=y,
+            dof=dof,
+            clusters=clusters,
+        )
+        for term, index in term_indices.items():
+            statistic = abs(float(permuted_fit.beta[index]))
+            if math.isfinite(statistic) and statistic >= observed[term]:
+                exceed[term] += 1
+    return {term: float((exceed[term] + 1) / (reps + 1)) for term in terms}
+
+
 def _is_binary_indicator(series: pd.Series) -> bool:
     values = set(pd.to_numeric(series.dropna(), errors="coerce").dropna().unique().tolist())
     return bool(values) and values <= {0, 1}
@@ -441,11 +580,19 @@ def regress_panel(
     year_fe: bool = True,
     cluster_by: str | None = "geo_id",
     standardize: str = "none",
+    inference: InferenceMethod = "none",
+    inference_reps: int = 999,
+    inference_seed: int = 0,
+    inference_terms: list[str] | None = None,
     output_path: Path | None = None,
 ) -> AnalysisResult:
     """Run OLS with optional entity/year fixed effects and clustered standard errors."""
     if standardize not in {"none", "predictors", "all"}:
         raise AnalysisError("--standardize must be one of: none, predictors, all.")
+    if inference not in {"none", "wild-cluster", "permutation"}:
+        raise AnalysisError("--inference must be one of: none, wild-cluster, permutation.")
+    if inference_reps < 1:
+        raise AnalysisError("--inference-reps must be positive.")
     df = _read_panel(panel_path)
     needed = [outcome, *predictors]
     if entity_fe:
@@ -490,32 +637,70 @@ def regress_panel(
             f"n={len(y)}, design_columns={x.shape[1]}, rank={rank}, residual_dof={dof}. "
             "Use fewer predictors/fixed effects or a larger panel."
         )
-    beta, *_ = np.linalg.lstsq(x, y, rcond=None)
-    fitted = x @ beta
-    residuals = y - fitted
-    sigma2 = float((residuals @ residuals) / dof)
-    naive_se = np.sqrt(np.clip(np.diag(np.linalg.pinv(x.T @ x)) * sigma2, 0, None))
-    if cluster_by is not None:
-        std_errors = _clustered_standard_errors(x, residuals, model_df[cluster_by])
-        std_error_type = f"clustered:{cluster_by}"
-    else:
-        std_errors = naive_se
-        std_error_type = "ols"
+    clusters = model_df[cluster_by].rename(cluster_by) if cluster_by is not None else None
+    fit = _fit_ols(x=x, y=y, dof=dof, clusters=clusters)
+    selected_inference_terms = _parse_inference_terms(inference_terms, design.columns)
+    if inference != "none" and not selected_inference_terms:
+        selected_inference_terms = [term for term in predictors if term in set(design.columns)]
+    inference_p_values: dict[str, float] = {}
+    if inference == "wild-cluster":
+        if clusters is None:
+            raise AnalysisError("wild-cluster inference requires --cluster-by.")
+        inference_p_values = _wild_cluster_bootstrap_p_values(
+            x=x,
+            fit=fit,
+            dof=dof,
+            clusters=clusters,
+            terms=selected_inference_terms,
+            design_columns=design.columns,
+            reps=inference_reps,
+            seed=inference_seed,
+        )
+    elif inference == "permutation":
+        if entity_fe or year_fe:
+            raise AnalysisError(
+                "permutation inference is currently supported for cross-sectional models "
+                "without fixed effects."
+            )
+        inference_p_values = _permutation_p_values(
+            model_df=model_df,
+            y=y,
+            design=design,
+            dof=dof,
+            clusters=clusters,
+            terms=selected_inference_terms,
+            fit=fit,
+            reps=inference_reps,
+            seed=inference_seed,
+        )
     coef = pd.DataFrame(
         {
             "term": design.columns,
-            "estimate": beta,
-            "std_error": std_errors,
+            "estimate": fit.beta,
+            "std_error": fit.std_errors,
         }
     )
-    coef["t_stat"] = coef["estimate"] / coef["std_error"].replace(0, np.nan)
-    coef["p_value"] = [_two_sided_p_value(float(t_stat), dof) for t_stat in coef["t_stat"].tolist()]
+    coef["t_stat"] = fit.t_stats
+    coef["asymptotic_p_value"] = fit.p_values
+    if inference_p_values:
+        coef["p_value"] = coef["term"].map(
+            lambda term: inference_p_values.get(str(term), pd.NA)
+        )
+        coef["p_value"] = pd.to_numeric(coef["p_value"], errors="coerce").fillna(
+            coef["asymptotic_p_value"]
+        )
+    else:
+        coef["p_value"] = coef["asymptotic_p_value"]
+    coef["inference_method"] = inference
+    coef["inference_reps"] = inference_reps if inference != "none" else 0
+    coef["inference_seed"] = inference_seed if inference != "none" else pd.NA
+    coef["inference_term"] = coef["term"].isin(selected_inference_terms)
     coef["outcome"] = outcome
     coef["n"] = int(len(y))
     coef["design_rank"] = rank
     coef["dof"] = dof
-    coef["r_squared"] = float(1 - (residuals @ residuals) / np.sum((y - y.mean()) ** 2))
-    coef["std_error_type"] = std_error_type
+    coef["r_squared"] = fit.r_squared
+    coef["std_error_type"] = fit.std_error_type
     coef["standardization"] = standardize
     coef["standardized"] = coef["term"].map(
         lambda term: bool(standardization.get(str(term), {}).get("standardized", False))
@@ -544,6 +729,10 @@ def regress_panel(
             "cluster_by": cluster_by,
             "standardize": standardize,
             "standardization": standardization,
+            "inference": inference,
+            "inference_reps": inference_reps,
+            "inference_seed": inference_seed,
+            "inference_terms": selected_inference_terms,
         },
         metadata={
             "analysis_type": "regress",
@@ -553,8 +742,12 @@ def regress_panel(
             "design_rank": rank,
             "dof": dof,
             "r_squared": float(coef["r_squared"].iloc[0]),
-            "std_error_type": std_error_type,
+            "std_error_type": fit.std_error_type,
             "standardize": standardize,
+            "inference": inference,
+            "inference_reps": inference_reps if inference != "none" else 0,
+            "inference_seed": inference_seed if inference != "none" else None,
+            "inference_terms": selected_inference_terms,
             "standardized_terms": [
                 term for term, spec in standardization.items() if spec["standardized"]
             ],

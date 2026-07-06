@@ -184,6 +184,31 @@ def analyze_regress(
             help="Z-score model columns before fitting. One of: none, predictors, all.",
         ),
     ] = "none",
+    inference: Annotated[
+        Literal["none", "wild-cluster", "permutation"],
+        typer.Option(
+            "--inference",
+            help=(
+                "Small-sample inference method. Use wild-cluster with --cluster-by, "
+                "or permutation for cross-sectional treatment terms."
+            ),
+        ),
+    ] = "none",
+    inference_reps: Annotated[
+        int,
+        typer.Option("--inference-reps", help="Bootstrap/permutation repetitions."),
+    ] = 999,
+    inference_seed: Annotated[
+        int,
+        typer.Option("--inference-seed", help="Random seed for small-sample inference."),
+    ] = 0,
+    inference_terms: Annotated[
+        str | None,
+        typer.Option(
+            "--inference-terms",
+            help="Comma-separated model terms to test; defaults to predictors.",
+        ),
+    ] = None,
     output: Annotated[
         Path | None,
         typer.Option("--output", "-o", help="Output parquet path for analysis results."),
@@ -205,6 +230,10 @@ def analyze_regress(
             year_fe=year_fe,
             cluster_by=cluster_by or None,
             standardize=standardize,
+            inference=inference,
+            inference_reps=inference_reps,
+            inference_seed=inference_seed,
+            inference_terms=_parse_columns(inference_terms, option="--inference-terms"),
             output_path=output,
         )
     except AnalysisError as exc:

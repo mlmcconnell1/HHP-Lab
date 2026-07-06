@@ -363,6 +363,131 @@ class TestAnalyzeCli:
             == "binary_indicator_not_standardized"
         )
 
+    def test_regress_wild_cluster_bootstrap_p_values_are_recorded(self, tmp_path: Path):
+        panel = _panel_fixture(tmp_path / "panel.parquet")
+        output = tmp_path / "regress_wild_cluster.parquet"
+
+        result = runner.invoke(
+            app,
+            [
+                "analyze",
+                "regress",
+                "--panel",
+                str(panel),
+                "--outcome",
+                "pit_total",
+                "--predictors",
+                "median_gross_rent,unemployment_rate",
+                "--cluster-by",
+                "geo_id",
+                "--inference",
+                "wild-cluster",
+                "--inference-reps",
+                "19",
+                "--inference-seed",
+                "123",
+                "--inference-terms",
+                "median_gross_rent",
+                "--output",
+                str(output),
+                "--json",
+            ],
+        )
+
+        assert result.exit_code == 0
+        payload = json.loads(result.output)
+        assert payload["inference"] == "wild-cluster"
+        assert payload["inference_reps"] == 19
+        assert payload["inference_terms"] == ["median_gross_rent"]
+
+        regression = pd.read_parquet(output).set_index("term")
+        rent = regression.loc["median_gross_rent"]
+        unemployment = regression.loc["unemployment_rate"]
+        assert rent["inference_method"] == "wild-cluster"
+        assert bool(rent["inference_term"])
+        assert 0 <= rent["p_value"] <= 1
+        assert rent["asymptotic_p_value"] != rent["p_value"]
+        assert not bool(unemployment["inference_term"])
+        assert unemployment["p_value"] == unemployment["asymptotic_p_value"]
+
+        provenance = read_provenance(output)
+        assert provenance is not None
+        assert provenance.extra["parameters"]["inference"] == "wild-cluster"
+        assert provenance.extra["parameters"]["inference_terms"] == ["median_gross_rent"]
+
+    def test_regress_permutation_inference_p_values_are_recorded(self, tmp_path: Path):
+        panel = _panel_fixture(tmp_path / "panel.parquet")
+        output = tmp_path / "regress_permutation.parquet"
+
+        result = runner.invoke(
+            app,
+            [
+                "analyze",
+                "regress",
+                "--panel",
+                str(panel),
+                "--outcome",
+                "pit_total",
+                "--predictors",
+                "median_gross_rent,policy_indicator",
+                "--no-entity-fe",
+                "--no-year-fe",
+                "--cluster-by",
+                "",
+                "--inference",
+                "permutation",
+                "--inference-reps",
+                "19",
+                "--inference-seed",
+                "456",
+                "--inference-terms",
+                "policy_indicator",
+                "--output",
+                str(output),
+                "--json",
+            ],
+        )
+
+        assert result.exit_code == 0
+        payload = json.loads(result.output)
+        assert payload["inference"] == "permutation"
+        assert payload["inference_terms"] == ["policy_indicator"]
+
+        regression = pd.read_parquet(output).set_index("term")
+        policy = regression.loc["policy_indicator"]
+        rent = regression.loc["median_gross_rent"]
+        assert policy["inference_method"] == "permutation"
+        assert bool(policy["inference_term"])
+        assert 0 <= policy["p_value"] <= 1
+        assert policy["asymptotic_p_value"] != policy["p_value"]
+        assert not bool(rent["inference_term"])
+        assert rent["p_value"] == rent["asymptotic_p_value"]
+
+    def test_regress_permutation_rejects_fixed_effect_models(self, tmp_path: Path):
+        panel = _panel_fixture(tmp_path / "panel.parquet")
+
+        result = runner.invoke(
+            app,
+            [
+                "analyze",
+                "regress",
+                "--panel",
+                str(panel),
+                "--outcome",
+                "pit_total",
+                "--predictors",
+                "policy_indicator",
+                "--inference",
+                "permutation",
+                "--inference-reps",
+                "9",
+                "--json",
+            ],
+        )
+
+        assert result.exit_code != 0
+        assert "without fixed effects" in result.output
+
     def test_regress_standardize_rejects_constant_binary_predictor(self, tmp_path: Path):
         panel = _panel_fixture(tmp_path / "panel.parquet")
 
