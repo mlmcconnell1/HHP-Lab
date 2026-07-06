@@ -573,6 +573,47 @@ class TestIngestWritesParquet:
         assert "B25056_023E" in provenance.extra["variables"]
         assert "B25056_025E" not in provenance.extra["variables"]
 
+    def test_pre_2011_metro_ingest_fetches_rent_tables_without_unemployment(
+        self,
+        httpx_mock,
+        tmp_path,
+    ):
+        cbsas = [
+            {
+                "cbsa_code": "35620",
+                "B25064_001E": "1295",
+                "B25070_001E": "720000",
+                "B25058_001E": "1175",
+                "B25063_001E": "720000",
+                "B25063_002E": "700000",
+                "B25063_023E": "65000",
+                "B25063_024E": "20000",
+                "B25056_001E": "700000",
+                "B25056_002E": "680000",
+                "B25056_023E": "60000",
+                "B25056_024E": "20000",
+            },
+        ]
+        queue_acs1_group_responses(httpx_mock, cbsas, vintage=2010)
+
+        path = ingest_metro_acs1(vintage=2010, project_root=tmp_path)
+        df = pd.read_parquet(path)
+        row = df.iloc[0]
+
+        assert row["median_gross_rent"] == 1295
+        assert row["gross_rent_pct_income_total"] == 720000
+        assert row["median_contract_rent"] == 1175
+        assert pd.isna(row["pop_16_plus"])
+        assert pd.isna(row["civilian_labor_force"])
+        assert pd.isna(row["unemployed_count"])
+        assert pd.isna(row["unemployment_rate_acs1"])
+
+        provenance = read_provenance(path)
+        assert "B23025" not in provenance.extra["tables_fetched"]
+        assert "B25064" in provenance.extra["tables_fetched"]
+        assert "B25070" in provenance.extra["tables_fetched"]
+        assert "B25058" in provenance.extra["tables_fetched"]
+
     def test_utility_tables_backfill_na_before_2021(self, httpx_mock, tmp_path):
         """Utility-cost tables are absent before 2021 and should backfill as NA."""
         cbsas = [

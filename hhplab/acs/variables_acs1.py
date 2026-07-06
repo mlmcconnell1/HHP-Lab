@@ -419,7 +419,7 @@ UNAVAILABLE_ACS1_API_VARS_BY_YEAR: dict[int, set[str]] = {
         "B25056_026E",
         "B25056_027E",
     }
-    for year in range(2012, 2015)
+    for year in range(2005, 2015)
 }
 
 ACS1_EARLY_RENT_TOP_BIN_COLUMNS_BY_TABLE: dict[str, tuple[str, ...]] = {
@@ -559,7 +559,7 @@ ACS1_SAE_SOURCE_OUTPUT_COLUMNS: list[str] = [
 # ACS 1-year availability
 # ---------------------------------------------------------------------------
 
-ACS1_FIRST_RELIABLE_YEAR: int = 2012
+ACS1_FIRST_RELIABLE_YEAR: int = 2005
 
 ACS1_UNAVAILABLE_VINTAGES: set[int] = {2020}
 
@@ -571,6 +571,10 @@ ACS1_TABLE_FIRST_YEAR: dict[str, int] = {
 }
 ACS1_TABLE_FIRST_YEAR.update(
     {
+        "B23025": 2011,
+        "B19080": 2006,
+        "B19081": 2006,
+        "B19082": 2006,
         "B25132": 2021,
         "B25133": 2021,
         "B25134": 2021,

@@ -179,16 +179,6 @@ def normalize_acs1_measures(
     resolved_vintage = vintage if vintage is not None else df.attrs.get("acs1_vintage")
     result = df.rename(columns=acs1_variable_names_for_vintage(resolved_vintage)).copy()
 
-    result["unemployment_rate_acs1"] = pd.NA
-    valid_denom = (
-        result["civilian_labor_force"].notna()
-        & (result["civilian_labor_force"] > 0)
-    )
-    result.loc[valid_denom, "unemployment_rate_acs1"] = (
-        result.loc[valid_denom, "unemployed_count"]
-        / result.loc[valid_denom, "civilian_labor_force"]
-    )
-
     expected_measure_columns = list(dict.fromkeys(ACS1_INTEGER_COLUMNS + ACS1_FLOAT_COLUMNS))
     missing_measure_columns = [
         col for col in expected_measure_columns if col not in result.columns
@@ -196,6 +186,17 @@ def normalize_acs1_measures(
     result = result.reindex(
         columns=[*result.columns, *missing_measure_columns],
     )
+
+    result["unemployment_rate_acs1"] = pd.NA
+    if {"civilian_labor_force", "unemployed_count"}.issubset(result.columns):
+        valid_denom = (
+            result["civilian_labor_force"].notna()
+            & (result["civilian_labor_force"] > 0)
+        )
+        result.loc[valid_denom, "unemployment_rate_acs1"] = (
+            result.loc[valid_denom, "unemployed_count"]
+            / result.loc[valid_denom, "civilian_labor_force"]
+        )
 
     for col in ACS1_INTEGER_COLUMNS:
         if col in result.columns:

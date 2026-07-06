@@ -13,6 +13,7 @@ from hhplab.acs.variables_acs1 import (
     ACS1_UNEMPLOYMENT_VARIABLES,
     ACS1_VARIABLE_NAMES,
     DERIVED_ACS1_MEASURES,
+    acs1_tables_for_vintage,
 )
 from hhplab.metro.metro_definitions import (
     _CBSA_METRO_NAMES,
@@ -159,4 +160,24 @@ class TestACS1VariableDefinitions:
         assert required.issubset(set(ACS1_METRO_OUTPUT_COLUMNS))
 
     def test_first_reliable_year(self):
-        assert ACS1_FIRST_RELIABLE_YEAR == 2012
+        assert ACS1_FIRST_RELIABLE_YEAR == 2005
+
+    def test_pre_2012_table_availability_reflects_census_api(self):
+        tables_2005 = acs1_tables_for_vintage(2005)
+        tables_2006 = acs1_tables_for_vintage(2006)
+        tables_2009 = acs1_tables_for_vintage(2009)
+        tables_2010 = acs1_tables_for_vintage(2010)
+        tables_2011 = acs1_tables_for_vintage(2011)
+
+        assert "B25064" in tables_2005
+        assert "B25070" in tables_2005
+        assert "B25058" in tables_2005
+        assert "B19080" not in tables_2005
+        assert "B19080" in tables_2006
+        assert "B25064" in tables_2009
+        assert "B25070" in tables_2009
+        assert "B25058" in tables_2009
+        assert "B23025" not in tables_2009
+        assert "B23025" not in tables_2010
+        assert "B23025" in tables_2011
+        assert "B25132" not in tables_2011
