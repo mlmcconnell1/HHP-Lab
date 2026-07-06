@@ -140,6 +140,15 @@ def ingest_covariate_source(
             f"from {spec.source_page} and pass --raw-path."
         )
 
+    if source_id == IRS_SOI_SOURCE_ID:
+        return _ingest_irs_soi_migration(
+            source_path,
+            spec=spec,
+            destination=Path(output_path) if output_path is not None else None,
+            output_dir=output_dir,
+            force=force,
+        )
+
     destination = (
         Path(output_path)
         if output_path is not None
@@ -154,12 +163,6 @@ def ingest_covariate_source(
             spec=spec,
             destination=destination,
             county_reference_path=county_reference_path,
-        )
-    if source_id == IRS_SOI_SOURCE_ID:
-        return _ingest_irs_soi_migration(
-            source_path,
-            spec=spec,
-            destination=destination,
         )
 
     raw = _read_tabular(source_path)
@@ -295,7 +298,9 @@ def _ingest_irs_soi_migration(
     source_path: Path,
     *,
     spec: CovariateSourceSpec,
-    destination: Path,
+    destination: Path | None,
+    output_dir: Path | str | None,
+    force: bool,
 ) -> Path:
     if not source_path.is_dir():
         raise ValueError(
@@ -312,9 +317,21 @@ def _ingest_irs_soi_migration(
             "countyinflow2122.csv and countyoutflow2122.csv."
         )
 
+    years_present = sorted(_irs_soi_later_year(year_token) for year_token in file_pairs)
+    if destination is None:
+        base = curated_dir("covariates") if output_dir is None else Path(output_dir)
+        destination = base / covariate_curated_filename(
+            spec.source_id,
+            min(years_present),
+            max(years_present),
+        )
+    if destination.exists() and not force:
+        return destination
+
     county_frames: list[pd.DataFrame] = []
     pair_frames: list[pd.DataFrame] = []
     skipped_frames: list[pd.DataFrame] = []
+    pair_reconciliation_diagnostics: list[dict[str, object]] = []
     for year_token, paths in sorted(file_pairs.items()):
         year = _irs_soi_later_year(year_token)
         inflow_raw = _read_irs_soi_csv(paths["inflow"], source_label="inflow")
@@ -340,7 +357,9 @@ def _ingest_irs_soi_migration(
                 year=year,
             )
         )
-        pair_frames.append(_irs_soi_pair_table(inflow_flows, outflow_flows))
+        pair_table, reconciliation = _irs_soi_pair_table(inflow_flows, outflow_flows)
+        pair_frames.append(pair_table)
+        pair_reconciliation_diagnostics.extend(reconciliation)
         skipped_frames.extend([inflow_skipped, outflow_skipped])
 
     county_rows = pd.concat(county_frames, ignore_index=True)
@@ -373,7 +392,7 @@ def _ingest_irs_soi_migration(
     county_rows = county_rows[list(IRS_SOI_COUNTY_CURATED_COLUMNS)]
     pair_rows = pair_rows[list(IRS_SOI_PAIR_CURATED_COLUMNS)]
     pair_destination = destination.with_name(
-        covariate_pair_filename(spec.source_id, spec.first_year, spec.last_year)
+        covariate_pair_filename(spec.source_id, min(years_present), max(years_present))
     )
 
     skipped_preview = skipped_rows.head(50).to_dict(orient="records")
@@ -398,12 +417,16 @@ def _ingest_irs_soi_migration(
         "year_convention": "later filing year; countyinflow2122.csv maps to year 2022",
         "rows_written": int(len(county_rows)),
         "pair_rows_written": int(len(pair_rows)),
+        "years_present": years_present,
+        "year_range_token_policy": "derived_from_staged_file_years",
         "pair_output_path": str(pair_destination),
         "skipped_rows": int(len(skipped_rows)),
         "skipped_reasons": _value_counts(skipped_rows, "exclusion_reason"),
         "skipped_preview": skipped_preview,
         "summary_row_counts": _irs_soi_summary_row_counts(summary_rows),
         "summary_rows_preview": summary_rows.head(50).to_dict(orient="records"),
+        "pair_reconciliation_mismatch_count": len(pair_reconciliation_diagnostics),
+        "pair_reconciliation_mismatches_preview": pair_reconciliation_diagnostics[:50],
     }
     write_parquet_with_provenance(
         county_rows,
@@ -689,25 +712,32 @@ def _irs_soi_summary_row_counts(summary_rows: pd.DataFrame) -> list[dict[str, ob
     return grouped.to_dict(orient="records")
 
 
-def _irs_soi_pair_table(inflow_flows: pd.DataFrame, outflow_flows: pd.DataFrame) -> pd.DataFrame:
+def _irs_soi_pair_table(
+    inflow_flows: pd.DataFrame,
+    outflow_flows: pd.DataFrame,
+) -> tuple[pd.DataFrame, list[dict[str, object]]]:
     combined = pd.concat([inflow_flows, outflow_flows], ignore_index=True)
     if combined.empty:
-        return pd.DataFrame(
-            columns=[
-                "year",
-                "origin_county_fips",
-                "destination_county_fips",
-                "migration_returns",
-                "migration_exemptions",
-                "migration_agi_thousands",
-            ]
+        return (
+            pd.DataFrame(
+                columns=[
+                    "year",
+                    "origin_county_fips",
+                    "destination_county_fips",
+                    "migration_returns",
+                    "migration_exemptions",
+                    "migration_agi_thousands",
+                ]
+            ),
+            [],
         )
+    reconciliation = _irs_soi_pair_reconciliation_mismatches(combined)
     combined["perspective_rank"] = combined["perspective"].map({"inflow": 0, "outflow": 1})
     combined = combined.sort_values("perspective_rank").drop_duplicates(
         ["year", "origin_county_fips", "destination_county_fips"],
         keep="first",
     )
-    return (
+    result = (
         combined[
             [
                 "year",
@@ -728,6 +758,46 @@ def _irs_soi_pair_table(inflow_flows: pd.DataFrame, outflow_flows: pd.DataFrame)
         .sort_values(["year", "origin_county_fips", "destination_county_fips"])
         .reset_index(drop=True)
     )
+    return result, reconciliation
+
+
+def _irs_soi_pair_reconciliation_mismatches(
+    combined: pd.DataFrame,
+) -> list[dict[str, object]]:
+    keys = ["year", "origin_county_fips", "destination_county_fips"]
+    value_columns = ["returns", "exemptions", "agi_thousands"]
+    rows: list[dict[str, object]] = []
+    for key, group in combined.groupby(keys, sort=True, dropna=False):
+        perspectives = set(group["perspective"].dropna().astype(str))
+        if not {"inflow", "outflow"} <= perspectives:
+            continue
+        by_perspective = group.set_index("perspective")
+        inflow = by_perspective.loc["inflow"]
+        outflow = by_perspective.loc["outflow"]
+        if isinstance(inflow, pd.DataFrame):
+            inflow = inflow.iloc[0]
+        if isinstance(outflow, pd.DataFrame):
+            outflow = outflow.iloc[0]
+        mismatch_fields = [
+            column
+            for column in value_columns
+            if int(inflow[column]) != int(outflow[column])
+        ]
+        if not mismatch_fields:
+            continue
+        year, origin, destination = key
+        row: dict[str, object] = {
+            "year": int(year),
+            "origin_county_fips": str(origin),
+            "destination_county_fips": str(destination),
+            "mismatch_fields": mismatch_fields,
+            "preferred_perspective": "inflow",
+        }
+        for column in value_columns:
+            row[f"inflow_{column}"] = int(inflow[column])
+            row[f"outflow_{column}"] = int(outflow[column])
+        rows.append(row)
+    return rows
 
 
 def _irs_soi_fips(value: Any, *, width: int) -> str:

@@ -14,6 +14,7 @@ from hhplab.covariates.aggregate import (
     EMERGENCY_SHELTER_ACTIVATION_C,
     aggregate_county_covariate_to_msa,
     aggregate_covariate_source,
+    aggregate_irs_soi_migration_to_msa,
     derive_prism_temperature_basis,
 )
 from hhplab.covariates.catalog import COVARIATE_SOURCE_SPECS
@@ -41,6 +42,7 @@ from hhplab.covariates.mpi_contract import (
     validate_mpi_workbook_contract,
 )
 from hhplab.curated_policy import validate_curated_layout
+from hhplab.geo.ct_planning_regions import CtPlanningRegionCrosswalk
 from hhplab.provenance import ProvenanceBlock, read_provenance, write_parquet_with_provenance
 
 runner = CliRunner()
@@ -407,7 +409,7 @@ def test_irs_soi_ingest_writes_county_and_pair_artifacts_with_provenance(
         force=True,
     )
 
-    assert curated.name == "covariate__irs_soi_migration__Y2011-ongoing.parquet"
+    assert curated.name == "covariate__irs_soi_migration__Y2022-2022.parquet"
     county = pd.read_parquet(curated)
     la = county.set_index("county_fips").loc["06037"]
     assert la["year"] == 2022
@@ -464,7 +466,7 @@ def test_irs_soi_ingest_writes_county_and_pair_artifacts_with_provenance(
         },
     ]
     pair_path = Path(provenance.extra["pair_output_path"])
-    assert pair_path.name == "covariate_pairs__irs_soi_migration__Y2011-ongoing.parquet"
+    assert pair_path.name == "covariate_pairs__irs_soi_migration__Y2022-2022.parquet"
     pairs = pd.read_parquet(pair_path)
     assert set(IRS_SOI_PAIR_MEASURE_COLUMNS) <= set(pairs.columns)
     assert pairs[
@@ -487,6 +489,56 @@ def test_irs_soi_ingest_writes_county_and_pair_artifacts_with_provenance(
     assert pair_provenance is not None
     assert pair_provenance.extra["dataset_type"] == "expanded_covariate_pair"
     assert pair_provenance.extra["county_output_path"] == str(curated)
+    assert pair_provenance.extra["years_present"] == [2022]
+    assert pair_provenance.extra["year_range_token_policy"] == "derived_from_staged_file_years"
+    assert pair_provenance.extra["pair_reconciliation_mismatch_count"] == 0
+
+
+def test_irs_soi_ingest_reports_pair_reconciliation_mismatches(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    """Duplicate pair rows with differing perspective values are preserved in provenance."""
+    monkeypatch.setattr("hhplab.covariates.ingest.register_source", lambda **_: None)
+    raw_dir = tmp_path / "irs_soi"
+    raw_dir.mkdir()
+    inflow_row = IRS_SOI_ROW_TRUTH_TABLE["inflow_flow"]["row"]
+    outflow_row = {
+        **IRS_SOI_ROW_TRUTH_TABLE["inflow_flow"]["row"],
+        "n1": "12",
+        "n2": "24",
+        "agi": "360",
+    }
+    pd.DataFrame([inflow_row]).to_csv(raw_dir / "countyinflow2122.csv", index=False)
+    pd.DataFrame([outflow_row]).to_csv(raw_dir / "countyoutflow2122.csv", index=False)
+
+    curated = ingest_covariate_source(
+        IRS_SOI_SOURCE_ID,
+        raw_dir,
+        output_dir=tmp_path,
+        force=True,
+    )
+
+    provenance = read_provenance(curated)
+    assert provenance is not None
+    assert provenance.extra["pair_reconciliation_mismatch_count"] == 1
+    assert provenance.extra["pair_reconciliation_mismatches_preview"] == [
+        {
+            "year": 2022,
+            "origin_county_fips": "12086",
+            "destination_county_fips": "06037",
+            "mismatch_fields": ["returns", "exemptions", "agi_thousands"],
+            "preferred_perspective": "inflow",
+            "inflow_returns": 11,
+            "outflow_returns": 12,
+            "inflow_exemptions": 22,
+            "outflow_exemptions": 24,
+            "inflow_agi_thousands": 330,
+            "outflow_agi_thousands": 360,
+        }
+    ]
+    pairs = pd.read_parquet(Path(provenance.extra["pair_output_path"]))
+    assert pairs.loc[0, "migration_returns"] == 11
 
 
 def test_irs_soi_ingest_rejects_missing_or_renamed_columns(
@@ -739,7 +791,7 @@ def test_cli_ingests_irs_soi_directory_with_json_pair_path(
     assert payload["row_count"] == 2
     assert payload["pair_rows"] == 2
     assert payload["pair_output_path"].endswith(
-        "covariate_pairs__irs_soi_migration__Y2011-ongoing.parquet"
+        "covariate_pairs__irs_soi_migration__Y2022-2022.parquet"
     )
     assert payload["warnings"] == {
         "summary_pseudo_state_row": 3,
@@ -1019,6 +1071,73 @@ def test_irs_soi_pair_flows_aggregate_to_msa_without_internal_churn(
     assert provenance.extra["coverage_diagnostics"]["per_year_non_null_counts"]["2022"][
         "inflow_returns"
     ] == 2
+
+
+def test_irs_soi_msa_aggregation_aligns_legacy_ct_counties_to_planning_regions(
+    tmp_path: Path,
+) -> None:
+    """Legacy CT IRS counties are area-allocated to planning-region MSA membership."""
+    pair_path = tmp_path / "ct_pairs.parquet"
+    pd.DataFrame(
+        {
+            "year": [2021, 2021, 2022],
+            "origin_county_fips": ["01001", "09003", "01001"],
+            "destination_county_fips": ["09001", "09001", "09110"],
+            "migration_returns": [100.0, 40.0, 12.0],
+            "migration_exemptions": [200.0, 80.0, 24.0],
+            "migration_agi_thousands": [1000.0, 400.0, 120.0],
+        }
+    ).to_parquet(pair_path)
+    county_marginals = pd.DataFrame(
+        {
+            "county_fips": ["09001", "09110"],
+            "year": [2021, 2022],
+            "other_flows_inflow_returns": [8.0, 2.0],
+            "other_flows_inflow_exemptions": [16.0, 4.0],
+            "other_flows_inflow_agi_thousands": [80.0, 20.0],
+            "other_flows_outflow_returns": [0.0, 0.0],
+            "other_flows_outflow_exemptions": [0.0, 0.0],
+            "other_flows_outflow_agi_thousands": [0.0, 0.0],
+        }
+    )
+    membership = pd.DataFrame(
+        {
+            "msa_id": ["25540", "25540"],
+            "county_fips": ["09110", "09120"],
+        }
+    )
+    ct_crosswalk = CtPlanningRegionCrosswalk(
+        mapping=pd.DataFrame(
+            {
+                "legacy_county_fips": ["09001", "09001", "09003"],
+                "planning_region_fips": ["09110", "09120", "09120"],
+                "legacy_share": [0.75, 0.25, 1.0],
+                "planning_share": [1.0, 0.5, 0.5],
+            }
+        ),
+        legacy_vintage=2020,
+        planning_vintage=2023,
+    )
+
+    result = aggregate_irs_soi_migration_to_msa(
+        county_marginals=county_marginals,
+        pair_path=pair_path,
+        msa_definition_version="test_msa_v1",
+        msa_county_membership=membership,
+        ct_county_crosswalk=ct_crosswalk,
+    ).set_index(["msa_id", "year"])
+
+    ct_2021 = result.loc[("25540", 2021)]
+    assert ct_2021["inflow_returns"] == pytest.approx(100.0)
+    assert ct_2021["intra_msa_returns"] == pytest.approx(40.0)
+    assert ct_2021["suppressed_unallocated_inflow_returns"] == pytest.approx(8.0)
+    assert ct_2021["coverage_ratio"] == pytest.approx(100.0 / 108.0)
+    assert ct_2021["unmatched_source_county_count"] == 0
+
+    ct_2022 = result.loc[("25540", 2022)]
+    assert ct_2022["inflow_returns"] == pytest.approx(12.0)
+    assert ct_2022["suppressed_unallocated_inflow_returns"] == pytest.approx(2.0)
+    assert ct_2022["coverage_ratio"] == pytest.approx(12.0 / 14.0)
 
 
 def test_cli_aggregates_irs_soi_to_msa_with_json_coverage_warning(

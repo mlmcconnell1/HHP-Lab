@@ -19,6 +19,14 @@ from hhplab.covariates.irs_soi_contract import (
     IRS_SOI_SOURCE_ID,
 )
 from hhplab.covariates.mpi_contract import MPI_ESTIMATE_YEAR, MPI_SOURCE_ID
+from hhplab.geo.ct_planning_regions import (
+    CT_LEGACY_COUNTY_VINTAGE,
+    CT_PLANNING_REGION_VINTAGE,
+    CtPlanningRegionCrosswalk,
+    build_ct_county_planning_region_crosswalk,
+    is_ct_legacy_county_fips,
+    is_ct_planning_region_fips,
+)
 from hhplab.msa import DEFINITION_VERSION as DEFAULT_MSA_DEFINITION_VERSION
 from hhplab.msa.msa_io import read_msa_county_membership, read_msa_definitions
 from hhplab.naming import covariate_panel_filename
@@ -105,6 +113,12 @@ def aggregate_covariate_source(
     destination = (
         Path(output_path)
         if output_path is not None
+        else _irs_soi_panel_path_from_input(
+            source_id=source_id,
+            input_path=input_path,
+            output_dir=output_dir,
+        )
+        if source_id == IRS_SOI_SOURCE_ID
         else default_covariate_panel_path(source_id, output_dir=output_dir)
     )
     if destination.exists() and not force:
@@ -307,6 +321,22 @@ def _irs_soi_pair_path(
     )
 
 
+def _irs_soi_panel_path_from_input(
+    *,
+    source_id: str,
+    input_path: Path,
+    output_dir: Path | str | None,
+) -> Path:
+    base = curated_dir("covariates") if output_dir is None else Path(output_dir)
+    match = re.search(r"__Y(\d{4})-(\d{4}|ongoing)\.parquet$", input_path.name)
+    if match is None:
+        return default_covariate_panel_path(source_id, output_dir=output_dir)
+    first_year = int(match.group(1))
+    last_token = match.group(2)
+    last_year = None if last_token == "ongoing" else int(last_token)
+    return base / covariate_panel_filename(source_id, first_year, last_year)
+
+
 def aggregate_irs_soi_migration_to_msa(
     *,
     county_marginals: pd.DataFrame,
@@ -314,6 +344,7 @@ def aggregate_irs_soi_migration_to_msa(
     msa_definition_version: str = DEFAULT_MSA_DEFINITION_VERSION,
     data_root: Path | str | None = None,
     msa_county_membership: pd.DataFrame | None = None,
+    ct_county_crosswalk: CtPlanningRegionCrosswalk | pd.DataFrame | None = None,
 ) -> pd.DataFrame:
     """Aggregate IRS SOI county-pair migration flows to MSA-year rows."""
     pair_path = Path(pair_path)
@@ -364,6 +395,13 @@ def aggregate_irs_soi_migration_to_msa(
     membership["county_fips"] = membership["county_fips"].astype("string").str.zfill(5)
     county_to_msa = membership.set_index("county_fips")["msa_id"].astype(str).to_dict()
     membership_counts = membership.groupby("msa_id")["county_fips"].nunique().to_dict()
+    ct_alignment = _irs_soi_ct_alignment_map(
+        membership=membership,
+        pairs=pairs,
+        county_marginals=county_marginals,
+        data_root=data_root,
+        ct_county_crosswalk=ct_county_crosswalk,
+    )
 
     pairs = pairs.copy()
     pairs["year"] = pd.to_numeric(pairs["year"], errors="raise").astype(int)
@@ -375,32 +413,59 @@ def aggregate_irs_soi_migration_to_msa(
         pairs[column] = pd.to_numeric(pairs[column], errors="coerce").fillna(0)
 
     rows_by_key: dict[tuple[str, int], dict[str, object]] = {}
+    unmatched_source_counties: set[str] = set()
     for pair in pairs.itertuples(index=False):
         year = int(pair.year)
-        origin_msa = county_to_msa.get(str(pair.origin_county_fips))
-        destination_msa = county_to_msa.get(str(pair.destination_county_fips))
+        origin_options = _irs_soi_msa_county_options(
+            str(pair.origin_county_fips),
+            county_to_msa=county_to_msa,
+            ct_alignment=ct_alignment,
+            unmatched_source_counties=unmatched_source_counties,
+        )
+        destination_options = _irs_soi_msa_county_options(
+            str(pair.destination_county_fips),
+            county_to_msa=county_to_msa,
+            ct_alignment=ct_alignment,
+            unmatched_source_counties=unmatched_source_counties,
+        )
         values = {
             "returns": float(pair.migration_returns),
             "exemptions": float(pair.migration_exemptions),
             "agi_thousands": float(pair.migration_agi_thousands),
         }
-        if destination_msa is not None and origin_msa != destination_msa:
-            row = _irs_soi_msa_row(rows_by_key, destination_msa, year, membership_counts)
-            _irs_soi_add_values(row, "inflow", values)
-        if origin_msa is not None and destination_msa != origin_msa:
-            row = _irs_soi_msa_row(rows_by_key, origin_msa, year, membership_counts)
-            _irs_soi_add_values(row, "outflow", values)
-        if origin_msa is not None and origin_msa == destination_msa:
-            row = _irs_soi_msa_row(rows_by_key, origin_msa, year, membership_counts)
-            _irs_soi_add_values(row, "intra_msa", values)
+        for origin_county, origin_weight in origin_options:
+            origin_msa = county_to_msa.get(origin_county)
+            for destination_county, destination_weight in destination_options:
+                destination_msa = county_to_msa.get(destination_county)
+                weighted_values = {
+                    name: value * origin_weight * destination_weight
+                    for name, value in values.items()
+                }
+                if destination_msa is not None and origin_msa != destination_msa:
+                    row = _irs_soi_msa_row(
+                        rows_by_key,
+                        destination_msa,
+                        year,
+                        membership_counts,
+                    )
+                    _irs_soi_add_values(row, "inflow", weighted_values)
+                if origin_msa is not None and destination_msa != origin_msa:
+                    row = _irs_soi_msa_row(rows_by_key, origin_msa, year, membership_counts)
+                    _irs_soi_add_values(row, "outflow", weighted_values)
+                if origin_msa is not None and origin_msa == destination_msa:
+                    row = _irs_soi_msa_row(rows_by_key, origin_msa, year, membership_counts)
+                    _irs_soi_add_values(row, "intra_msa", weighted_values)
 
     _irs_soi_add_suppressed_unallocated(
         rows_by_key,
         county_marginals=county_marginals,
         county_to_msa=county_to_msa,
         membership_counts=membership_counts,
+        ct_alignment=ct_alignment,
+        unmatched_source_counties=unmatched_source_counties,
     )
     rows = list(rows_by_key.values())
+    unmatched_source_county_count = len(unmatched_source_counties)
     for row in rows:
         row["net_returns"] = float(row["inflow_returns"]) - float(row["outflow_returns"])
         row["net_exemptions"] = float(row["inflow_exemptions"]) - float(
@@ -417,7 +482,85 @@ def aggregate_irs_soi_migration_to_msa(
         row["coverage_ratio"] = known_external / denominator if denominator else 1.0
         row["suppressed_unallocated_returns"] = suppressed
         row["definition_version"] = msa_definition_version
+        row["unmatched_source_county_count"] = unmatched_source_county_count
     return pd.DataFrame(rows)
+
+
+def _irs_soi_ct_alignment_map(
+    *,
+    membership: pd.DataFrame,
+    pairs: pd.DataFrame,
+    county_marginals: pd.DataFrame,
+    data_root: Path | str | None,
+    ct_county_crosswalk: CtPlanningRegionCrosswalk | pd.DataFrame | None,
+) -> dict[str, list[tuple[str, float]]]:
+    """Return legacy CT county -> planning-region allocation alternatives."""
+    if not membership["county_fips"].dropna().astype(str).map(is_ct_planning_region_fips).any():
+        return {}
+    source_counties = set(
+        pairs["origin_county_fips"].dropna().astype("string").str.zfill(5).astype(str)
+    )
+    source_counties.update(
+        pairs["destination_county_fips"].dropna().astype("string").str.zfill(5).astype(str)
+    )
+    if "county_fips" in county_marginals.columns:
+        source_counties.update(
+            county_marginals["county_fips"].dropna().astype("string").str.zfill(5).astype(str)
+        )
+    legacy_ct_counties = sorted(
+        county for county in source_counties if is_ct_legacy_county_fips(county)
+    )
+    if not legacy_ct_counties:
+        return {}
+
+    if ct_county_crosswalk is None:
+        ct_county_crosswalk = build_ct_county_planning_region_crosswalk(
+            legacy_county_vintage=CT_LEGACY_COUNTY_VINTAGE,
+            planning_region_vintage=CT_PLANNING_REGION_VINTAGE,
+            base_dir=data_root,
+        )
+    mapping = (
+        ct_county_crosswalk.mapping.copy()
+        if isinstance(ct_county_crosswalk, CtPlanningRegionCrosswalk)
+        else ct_county_crosswalk.copy()
+    )
+    required = {"legacy_county_fips", "planning_region_fips", "legacy_share"}
+    missing = sorted(required - set(mapping.columns))
+    if missing:
+        raise ValueError(f"CT county alignment crosswalk missing columns: {missing}")
+    mapping["legacy_county_fips"] = mapping["legacy_county_fips"].astype("string").str.zfill(5)
+    mapping["planning_region_fips"] = (
+        mapping["planning_region_fips"].astype("string").str.zfill(5)
+    )
+    mapping["legacy_share"] = pd.to_numeric(mapping["legacy_share"], errors="coerce").fillna(0)
+
+    alignment: dict[str, list[tuple[str, float]]] = {}
+    for legacy_county, group in mapping.groupby("legacy_county_fips"):
+        options = [
+            (str(row.planning_region_fips), float(row.legacy_share))
+            for row in group.itertuples(index=False)
+            if float(row.legacy_share) > 0
+        ]
+        if options:
+            alignment[str(legacy_county)] = options
+    return alignment
+
+
+def _irs_soi_msa_county_options(
+    county_fips: str,
+    *,
+    county_to_msa: dict[str, str],
+    ct_alignment: dict[str, list[tuple[str, float]]],
+    unmatched_source_counties: set[str],
+) -> list[tuple[str, float]]:
+    if county_fips in county_to_msa:
+        return [(county_fips, 1.0)]
+    aligned = ct_alignment.get(county_fips)
+    if aligned:
+        return aligned
+    if is_ct_legacy_county_fips(county_fips):
+        unmatched_source_counties.add(county_fips)
+    return [(county_fips, 1.0)]
 
 
 def _irs_soi_msa_row(
@@ -463,6 +606,8 @@ def _irs_soi_add_suppressed_unallocated(
     county_marginals: pd.DataFrame,
     county_to_msa: dict[str, str],
     membership_counts: dict[str, int],
+    ct_alignment: dict[str, list[tuple[str, float]]],
+    unmatched_source_counties: set[str],
 ) -> None:
     county = county_marginals.copy()
     county["county_fips"] = county["county_fips"].astype("string").str.zfill(5)
@@ -478,14 +623,21 @@ def _irs_soi_add_suppressed_unallocated(
     for source_column in suppressed_map.values():
         county[source_column] = pd.to_numeric(county[source_column], errors="coerce").fillna(0)
     for row in county.itertuples(index=False):
-        msa_id = county_to_msa.get(str(row.county_fips))
-        if msa_id is None:
-            continue
-        target = _irs_soi_msa_row(rows_by_key, msa_id, int(row.year), membership_counts)
-        for target_column, source_column in suppressed_map.items():
-            target[target_column] = float(target[target_column]) + float(
-                getattr(row, source_column)
-            )
+        county_options = _irs_soi_msa_county_options(
+            str(row.county_fips),
+            county_to_msa=county_to_msa,
+            ct_alignment=ct_alignment,
+            unmatched_source_counties=unmatched_source_counties,
+        )
+        for county_fips, weight in county_options:
+            msa_id = county_to_msa.get(county_fips)
+            if msa_id is None:
+                continue
+            target = _irs_soi_msa_row(rows_by_key, msa_id, int(row.year), membership_counts)
+            for target_column, source_column in suppressed_map.items():
+                target[target_column] = float(target[target_column]) + (
+                    float(getattr(row, source_column)) * weight
+                )
 
 
 def aggregate_county_covariate_to_msa(
