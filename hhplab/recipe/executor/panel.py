@@ -1052,13 +1052,17 @@ def _apply_lagged_derived_measure(
     work["__original_index"] = panel.index
     work = work.sort_values([*spec.group_by, spec.order_by, "__original_index"])
     grouped = work.groupby(spec.group_by, dropna=False)
-    shifted = grouped["__value"].shift(spec.periods)
-    shifted_order = grouped[spec.order_by].shift(spec.periods)
+    shift_periods = -spec.periods if spec.type == "lead" else spec.periods
+    shifted = grouped["__value"].shift(shift_periods)
+    shifted_order = grouped[spec.order_by].shift(shift_periods)
     order_values = pd.to_numeric(work[spec.order_by], errors="coerce")
-    previous_order_values = pd.to_numeric(shifted_order, errors="coerce")
-    continuous = (order_values - previous_order_values) == spec.periods
+    paired_order_values = pd.to_numeric(shifted_order, errors="coerce")
+    if spec.type == "lead":
+        continuous = (paired_order_values - order_values) == spec.periods
+    else:
+        continuous = (order_values - paired_order_values) == spec.periods
     shifted = shifted.where(continuous)
-    if spec.type == "lag":
+    if spec.type in {"lag", "lead"}:
         derived = shifted
     else:
         derived = work["__value"] - shifted
@@ -1087,7 +1091,7 @@ def _apply_single_derived_measure(
         if spec.log_base == "10":
             return np.log10(positive_values)
         return np.log(positive_values)
-    if spec.type in {"lag", "difference"}:
+    if spec.type in {"lag", "lead", "difference"}:
         return _apply_lagged_derived_measure(panel, spec=spec, values=values)
     raise ExecutorError(f"Unsupported derived measure type: {spec.type}")
 

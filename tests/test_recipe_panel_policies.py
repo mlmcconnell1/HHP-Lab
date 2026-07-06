@@ -1342,6 +1342,11 @@ class TestCocPanelParity:
                     "output_column": "pit_total_lag_1",
                 },
                 {
+                    "type": "lead",
+                    "column": "pit_total",
+                    "output_column": "pit_total_lead_1",
+                },
+                {
                     "type": "difference",
                     "column": "pit_total",
                     "output_column": "pit_total_change",
@@ -1361,13 +1366,15 @@ class TestCocPanelParity:
         assert coc1_2020["pit_population_ratio"] == pytest.approx(100 / 50_000)
         assert coc1_2020["log_median_household_income"] == pytest.approx(math.log(60_000.0))
         assert pd.isna(coc1_2020["pit_total_lag_1"])
+        assert coc1_2020["pit_total_lead_1"] == pytest.approx(110.0)
         assert pd.isna(coc1_2020["pit_total_change"])
         assert coc1_2021["pit_total_lag_1"] == pytest.approx(100.0)
+        assert pd.isna(coc1_2021["pit_total_lead_1"])
         assert coc1_2021["pit_total_change"] == pytest.approx(10.0)
 
         metadata = pq.read_metadata(_find_panel_output(tmp_path))
         provenance = json.loads(metadata.schema.to_arrow_schema().metadata[b"hhplab_provenance"])
-        assert provenance["derived_measures"]["count"] == 5
+        assert provenance["derived_measures"]["count"] == 6
         assert {
             measure["output_column"]
             for measure in provenance["derived_measures"]["measures"]
@@ -1376,6 +1383,7 @@ class TestCocPanelParity:
             "pit_population_ratio",
             "log_median_household_income",
             "pit_total_lag_1",
+            "pit_total_lead_1",
             "pit_total_change",
         }
 
@@ -1456,6 +1464,11 @@ class TestCocPanelParity:
                     "output_column": "pit_total_lag_1",
                 },
                 {
+                    "type": "lead",
+                    "column": "pit_total",
+                    "output_column": "pit_total_lead_1",
+                },
+                {
                     "type": "difference",
                     "column": "pit_total",
                     "output_column": "pit_total_change",
@@ -1468,11 +1481,13 @@ class TestCocPanelParity:
         row_a_2023 = derived[(derived["geo_id"] == "A") & (derived["year"] == 2023)].iloc[0]
 
         assert pd.isna(row_a_2022["pit_total_lag_1"])
+        assert row_a_2022["pit_total_lead_1"] == pytest.approx(25.0)
         assert pd.isna(row_a_2022["pit_total_change"])
         assert row_a_2023["pit_total_lag_1"] == pytest.approx(20.0)
+        assert pd.isna(row_a_2023["pit_total_lead_1"])
         assert row_a_2023["pit_total_change"] == pytest.approx(5.0)
         assert summary is not None
-        assert summary["count"] == 2
+        assert summary["count"] == 3
 
 
 class TestMetroPanelParity:

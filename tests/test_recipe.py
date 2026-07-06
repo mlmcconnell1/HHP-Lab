@@ -8845,6 +8845,170 @@ class TestRecipeInitCmd:
         assert payload["artifact_exists"] is True
         assert "allow-existing-artifact" in payload["error"]
 
+    def test_recipe_init_longitudinal_msa_panel_writes_plannable_recipe(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ):
+        _make_project_root(tmp_path)
+        monkeypatch.chdir(tmp_path)
+        output = tmp_path / "recipes" / "longitudinal-msa.yaml"
+
+        result = runner.invoke(
+            app,
+            [
+                "recipe",
+                "init",
+                "longitudinal-msa-panel",
+                "--output",
+                str(output),
+                "--start-year",
+                "2019",
+                "--end-year",
+                "2023",
+                "--top-n",
+                "50",
+                "--json",
+            ],
+        )
+
+        assert result.exit_code == 0
+        payload = json.loads(result.output)
+        assert payload["status"] == "ok"
+        assert payload["included_years"] == [2019, 2020, 2022, 2023]
+        assert output.exists()
+
+        recipe = load_recipe(output)
+        plan = resolve_plan(recipe, "longitudinal")
+        target = recipe.targets[0]
+        assert target.cohort is not None
+        assert target.cohort.n == 50
+        assert target.panel_policy is not None
+        assert "zori_lead_1" in target.panel_policy.output_columns
+        assert any(
+            measure.type == "lead" and measure.output_column == "zori_lead_1"
+            for measure in target.panel_policy.derived_measures
+        )
+
+        pit_tasks = [task for task in plan.resample_tasks if task.dataset_id == "pit_msa"]
+        assert [task.year for task in pit_tasks] == [2019, 2020, 2022, 2023]
+        assert pit_tasks[0].input_path.endswith("xB2018xC2023.parquet")
+        assert pit_tasks[1].input_path.endswith("xB2020xC2023.parquet")
+        assert pit_tasks[2].input_path.endswith("xB2024xC2023.parquet")
+        assert tuple(plan.join_tasks[0].datasets) == ("pit_msa", "zori_msa", "pep_msa")
+
+    def test_recipe_init_longitudinal_msa_panel_executes_with_materialized_artifacts(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ):
+        from hhplab.naming import msa_definitions_path
+        from hhplab.recipe.executor import resolve_pipeline_artifacts
+
+        _make_project_root(tmp_path)
+        monkeypatch.chdir(tmp_path)
+        output = tmp_path / "recipes" / "longitudinal-msa.yaml"
+
+        result = runner.invoke(
+            app,
+            [
+                "recipe",
+                "init",
+                "longitudinal-msa-panel",
+                "--output",
+                str(output),
+                "--start-year",
+                "2019",
+                "--end-year",
+                "2023",
+                "--top-n",
+                "50",
+                "--json",
+            ],
+        )
+        assert result.exit_code == 0
+
+        recipe = load_recipe(output)
+        plan = resolve_plan(recipe, "longitudinal")
+        years = [2019, 2020, 2022, 2023]
+        pit_rows = pd.DataFrame(
+            {
+                "msa_id": ["35620", "41180"],
+                "year": [0, 0],
+                "pit_total": [100, 200],
+                "pit_sheltered": [70, 150],
+                "pit_unsheltered": [30, 50],
+            }
+        )
+        for task in [task for task in plan.resample_tasks if task.dataset_id == "pit_msa"]:
+            df = pit_rows.copy()
+            df["year"] = task.year
+            df["pit_total"] = df["pit_total"] + (task.year - 2019) * 10
+            df["pit_unsheltered"] = df["pit_unsheltered"] + (task.year - 2019) * 5
+            path = tmp_path / task.input_path
+            path.parent.mkdir(parents=True, exist_ok=True)
+            df.to_parquet(path)
+
+        zori_task = next(task for task in plan.resample_tasks if task.dataset_id == "zori_msa")
+        zori = pd.DataFrame(
+            {
+                "msa_id": [msa for year in years for msa in ("35620", "41180")],
+                "year": [year for year in years for _ in range(2)],
+                "zori": [
+                    1000 + (year - 2019) * 100 + idx * 50
+                    for year in years
+                    for idx in range(2)
+                ],
+                "coverage_ratio": [0.95, 0.92] * len(years),
+            }
+        )
+        zori_path = tmp_path / zori_task.input_path
+        zori_path.parent.mkdir(parents=True, exist_ok=True)
+        zori.to_parquet(zori_path)
+
+        for task in [task for task in plan.resample_tasks if task.dataset_id == "pep_msa"]:
+            pep = pd.DataFrame(
+                {
+                    "msa_id": ["35620", "41180"],
+                    "year": [task.year, task.year],
+                    "population": [1_000_000 + task.year, 2_000_000 + task.year],
+                }
+            )
+            path = tmp_path / task.input_path
+            path.parent.mkdir(parents=True, exist_ok=True)
+            pep.to_parquet(path)
+
+        msa_path = msa_definitions_path("census_msa_2023", tmp_path / "data")
+        msa_path.parent.mkdir(parents=True, exist_ok=True)
+        pd.DataFrame(
+            {
+                "msa_id": ["35620", "41180"],
+                "msa_name": ["New York-Newark-Jersey City, NY-NJ-PA", "St. Louis, MO-IL"],
+                "cbsa_code": ["35620", "41180"],
+                "area_type": ["Metropolitan Statistical Area", "Metropolitan Statistical Area"],
+                "definition_version": ["census_msa_2023", "census_msa_2023"],
+            }
+        ).to_parquet(msa_path)
+
+        results = execute_recipe(recipe, project_root=tmp_path)
+        assert results[0].success
+
+        artifacts = resolve_pipeline_artifacts(recipe, "longitudinal")
+        panel = pd.read_parquet(tmp_path / artifacts["panel_path"]).sort_values(
+            ["msa_id", "year"]
+        )
+        ny_2019 = panel[(panel["msa_id"] == "35620") & (panel["year"] == 2019)].iloc[0]
+        ny_2020 = panel[(panel["msa_id"] == "35620") & (panel["year"] == 2020)].iloc[0]
+        ny_2022 = panel[(panel["msa_id"] == "35620") & (panel["year"] == 2022)].iloc[0]
+
+        assert ny_2019["unshelt_per_1000"] == pytest.approx(30 / 1_002_019 * 1000)
+        assert ny_2019["zori_lead_1"] == pytest.approx(1100)
+        assert ny_2020["d_zori"] == pytest.approx(100)
+        assert pd.isna(ny_2020["zori_lead_1"])
+        assert pd.isna(ny_2022["d_zori"])
+        assert ny_2022["zori_lead_1"] == pytest.approx(1400)
+        assert set(panel["year"]) == {2019, 2020, 2022, 2023}
+
 
 class TestExecutionPlanToDict:
     def test_plan_to_dict(self):

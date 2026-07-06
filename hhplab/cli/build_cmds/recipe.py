@@ -143,11 +143,313 @@ def _msa_coc_coverage_recipe_dict(
     }
 
 
+def _filename_definition_token(definition_version: str) -> str:
+    return "".join(c for c in definition_version.lower() if c.isalnum())
+
+
+def _year_segment(start_year: int, end_year: int, *, exclude_years: set[int]) -> list[int]:
+    return [
+        year
+        for year in range(start_year, end_year + 1)
+        if year not in exclude_years
+    ]
+
+
+def _pit_msa_file_set_segments(
+    *,
+    start_year: int,
+    end_year: int,
+    msa_definition_version: str,
+    county_vintage: int,
+    exclude_years: set[int],
+) -> list[dict[str, object]]:
+    eras = [
+        (start_year, min(end_year, 2019), 2018),
+        (max(start_year, 2020), min(end_year, 2020), 2020),
+        (max(start_year, 2022), end_year, 2024),
+    ]
+    segments: list[dict[str, object]] = []
+    for era_start, era_end, boundary_vintage in eras:
+        years = _year_segment(era_start, era_end, exclude_years=exclude_years)
+        if not years:
+            continue
+        segments.append(
+            {
+                "years": {"years": years},
+                "geometry": {"type": "msa", "source": msa_definition_version},
+                "constants": {
+                    "boundary": boundary_vintage,
+                    "county": county_vintage,
+                },
+            }
+        )
+    return segments
+
+
+def _longitudinal_msa_panel_recipe_dict(
+    *,
+    name: str,
+    start_year: int,
+    end_year: int,
+    exclude_years: set[int],
+    top_n: int,
+    msa_definition_version: str,
+    county_vintage: int,
+) -> dict:
+    years = _year_segment(start_year, end_year, exclude_years=exclude_years)
+    if not years:
+        raise ValueError(
+            "longitudinal-msa-panel requires at least one included year after "
+            "applying --start-year, --end-year, and --exclude-year."
+        )
+    if start_year < 2015:
+        raise ValueError(
+            "longitudinal-msa-panel starts at 2015 because the canonical MSA "
+            "ZORI yearly artifact starts in 2015. Use --start-year 2015 or later."
+        )
+    definition_token = _filename_definition_token(msa_definition_version)
+    pit_segments = _pit_msa_file_set_segments(
+        start_year=start_year,
+        end_year=end_year,
+        msa_definition_version=msa_definition_version,
+        county_vintage=county_vintage,
+        exclude_years=exclude_years,
+    )
+    if not pit_segments:
+        raise ValueError(
+            "longitudinal-msa-panel PIT MSA eras currently cover years through "
+            "2019, 2020, and 2022 onward. Adjust years or add an explicit "
+            "pit_msa file_set segment for the missing era."
+        )
+    covered_pit_years = {
+        year
+        for segment in pit_segments
+        for year in segment["years"]["years"]  # type: ignore[index]
+    }
+    missing_pit_years = sorted(set(years) - covered_pit_years)
+    if missing_pit_years:
+        raise ValueError(
+            "longitudinal-msa-panel has no canonical PIT MSA file_set era for "
+            f"year(s) {missing_pit_years}. Exclude 2021 with --exclude-year 2021 "
+            "or add an explicit pit_msa segment to the generated recipe."
+        )
+
+    zori_start = max(start_year, 2015)
+    zori_end = end_year
+    return {
+        "version": 1,
+        "name": name,
+        "description": (
+            "Longitudinal MSA panel from pre-materialized PIT MSA yearly rollups, "
+            "MSA ZORI yearly panel, and MSA PEP population artifacts."
+        ),
+        "universe": {"years": years},
+        "targets": [
+            {
+                "id": "msa_longitudinal_panel",
+                "geometry": {"type": "msa", "source": msa_definition_version},
+                "outputs": ["panel"],
+                "cohort": {
+                    "method": "top_n",
+                    "n": top_n,
+                    "rank_by": "population",
+                    "reference_year": 2020 if 2020 in years else years[0],
+                },
+                "panel_policy": {
+                    "source_label": name,
+                    "column_aliases": {
+                        "coverage_ratio": "zori_coverage_ratio",
+                    },
+                    "derived_measures": [
+                        {
+                            "type": "ratio",
+                            "numerator": "pit_unsheltered",
+                            "denominator": "population",
+                            "scale": 1000.0,
+                            "output_column": "unshelt_per_1000",
+                        },
+                        {
+                            "type": "log",
+                            "column": "pit_unsheltered",
+                            "output_column": "log_pit_unsheltered",
+                        },
+                        {
+                            "type": "log",
+                            "column": "unshelt_per_1000",
+                            "output_column": "log_unshelt_per_1000",
+                        },
+                        {
+                            "type": "log",
+                            "column": "zori",
+                            "output_column": "log_zori",
+                        },
+                        {
+                            "type": "difference",
+                            "column": "pit_unsheltered",
+                            "output_column": "d_pit_unsheltered",
+                        },
+                        {
+                            "type": "difference",
+                            "column": "unshelt_per_1000",
+                            "output_column": "d_unshelt_per_1000",
+                        },
+                        {
+                            "type": "difference",
+                            "column": "log_unshelt_per_1000",
+                            "output_column": "d_log_unshelt_per_1000",
+                        },
+                        {
+                            "type": "difference",
+                            "column": "zori",
+                            "output_column": "d_zori",
+                        },
+                        {
+                            "type": "difference",
+                            "column": "log_zori",
+                            "output_column": "d_log_zori",
+                        },
+                        {
+                            "type": "lag",
+                            "column": "zori",
+                            "output_column": "zori_lag_1",
+                        },
+                        {
+                            "type": "lead",
+                            "column": "zori",
+                            "output_column": "zori_lead_1",
+                        },
+                    ],
+                    "output_columns": [
+                        "msa_id",
+                        "msa_name",
+                        "cbsa_code",
+                        "geo_type",
+                        "geo_id",
+                        "year",
+                        "pit_total",
+                        "pit_sheltered",
+                        "pit_unsheltered",
+                        "population",
+                        "zori",
+                        "zori_coverage_ratio",
+                        "unshelt_per_1000",
+                        "log_pit_unsheltered",
+                        "log_unshelt_per_1000",
+                        "log_zori",
+                        "d_pit_unsheltered",
+                        "d_unshelt_per_1000",
+                        "d_log_unshelt_per_1000",
+                        "d_zori",
+                        "d_log_zori",
+                        "zori_lag_1",
+                        "zori_lead_1",
+                        "definition_version_used",
+                        "source",
+                    ],
+                },
+            }
+        ],
+        "datasets": {
+            "pit_msa": {
+                "provider": "hhplab",
+                "product": "msa_pit_rollup",
+                "version": 1,
+                "native_geometry": {"type": "msa", "source": msa_definition_version},
+                "geo_column": "msa_id",
+                "year_column": "year",
+                "file_set": {
+                    "path_template": (
+                        "data/curated/pit/pit__msa__P{year}@M"
+                        f"{definition_token}xB{{boundary}}xC{{county}}.parquet"
+                    ),
+                    "segments": pit_segments,
+                },
+            },
+            "zori_msa": {
+                "provider": "zillow",
+                "product": "zori",
+                "version": 1,
+                "native_geometry": {"type": "msa", "source": msa_definition_version},
+                "years": {"years": years},
+                "geo_column": "msa_id",
+                "year_column": "year",
+                "path": (
+                    "data/curated/zori/"
+                    f"zori__msa__Y{zori_start}-{zori_end}@M{definition_token}"
+                    f"xC{county_vintage}__wpopulation__mpit_january__balanced.parquet"
+                ),
+            },
+            "pep_msa": {
+                "provider": "census",
+                "product": "pep",
+                "version": 1,
+                "native_geometry": {"type": "msa", "source": msa_definition_version},
+                "geo_column": "msa_id",
+                "year_column": "year",
+                "file_set": {
+                    "path_template": (
+                        "data/curated/pep/"
+                        f"pep_msa__Y{{year}}@M{msa_definition_version}.parquet"
+                    ),
+                    "segments": [
+                        {
+                            "years": {"years": years},
+                            "geometry": {"type": "msa", "source": msa_definition_version},
+                        }
+                    ],
+                },
+            },
+        },
+        "transforms": [],
+        "pipelines": [
+            {
+                "id": "longitudinal",
+                "target": "msa_longitudinal_panel",
+                "steps": [
+                    {
+                        "resample": {
+                            "dataset": "pit_msa",
+                            "to_geometry": {"type": "msa", "source": msa_definition_version},
+                            "method": "identity",
+                            "measures": ["pit_total", "pit_sheltered", "pit_unsheltered"],
+                        }
+                    },
+                    {
+                        "resample": {
+                            "dataset": "zori_msa",
+                            "to_geometry": {"type": "msa", "source": msa_definition_version},
+                            "method": "identity",
+                            "measures": ["zori", "coverage_ratio"],
+                        }
+                    },
+                    {
+                        "resample": {
+                            "dataset": "pep_msa",
+                            "to_geometry": {"type": "msa", "source": msa_definition_version},
+                            "method": "identity",
+                            "measures": ["population"],
+                        }
+                    },
+                    {
+                        "join": {
+                            "datasets": ["pit_msa", "zori_msa", "pep_msa"],
+                            "join_on": ["geo_id", "year"],
+                        }
+                    },
+                ],
+            }
+        ],
+    }
+
+
 def recipe_init_cmd(
     template: Annotated[
         str,
         typer.Argument(
-            help="Recipe template to scaffold. Supported: msa-coc-overlap, msa-coc-coverage.",
+            help=(
+                "Recipe template to scaffold. Supported: msa-coc-overlap, "
+                "msa-coc-coverage, longitudinal-msa-panel."
+            ),
         ),
     ],
     output: Annotated[
@@ -159,6 +461,21 @@ def recipe_init_cmd(
         ),
     ],
     year: Annotated[int, typer.Option("--year", help="Coverage artifact year.")] = 2024,
+    start_year: Annotated[
+        int,
+        typer.Option("--start-year", help="First year for longitudinal panel templates."),
+    ] = 2015,
+    end_year: Annotated[
+        int,
+        typer.Option("--end-year", help="Last year for longitudinal panel templates."),
+    ] = 2025,
+    exclude_year: Annotated[
+        list[int] | None,
+        typer.Option(
+            "--exclude-year",
+            help="Analysis year to exclude from longitudinal panel templates. Repeatable.",
+        ),
+    ] = None,
     top_n: Annotated[int, typer.Option("--top-n", help="Number of MSAs to retain.")] = 100,
     ranking_population_source: Annotated[
         str,
@@ -244,14 +561,96 @@ def recipe_init_cmd(
 ) -> None:
     """Scaffold recipe-first workflow files for common HHP-Lab outputs."""
     register_defaults()
-    if template not in {"msa-coc-overlap", "msa-coc-coverage"}:
+    supported_templates = {
+        "msa-coc-overlap",
+        "msa-coc-coverage",
+        "longitudinal-msa-panel",
+    }
+    if template not in supported_templates:
         message = (
             f"Unsupported recipe template '{template}'. "
-            "Supported templates: msa-coc-overlap, msa-coc-coverage."
+            "Supported templates: longitudinal-msa-panel, msa-coc-overlap, "
+            "msa-coc-coverage."
         )
         if use_json:
             _json_error(message, code=2)
         raise typer.BadParameter(message, param_hint="template")
+
+    if template == "longitudinal-msa-panel":
+        if start_year > end_year:
+            message = "--start-year must be less than or equal to --end-year."
+            if use_json:
+                _json_error(message, code=2)
+            raise typer.BadParameter(message, param_hint="--start-year")
+        excluded_years = set(exclude_year or [2021])
+        recipe_name = name or f"top{top_n}_msa_longitudinal_{start_year}_{end_year}"
+        try:
+            recipe_data = _longitudinal_msa_panel_recipe_dict(
+                name=recipe_name,
+                start_year=start_year,
+                end_year=end_year,
+                exclude_years=excluded_years,
+                top_n=top_n,
+                msa_definition_version=msa_definition_version,
+                county_vintage=county_vintage,
+            )
+            parsed = load_recipe(recipe_data)
+            artifacts = resolve_pipeline_artifacts(parsed, "longitudinal")
+        except (RecipeLoadError, ExecutorError, PlannerError, ValueError) as exc:
+            if use_json:
+                _json_error(str(exc), code=2)
+            typer.echo(f"Error: {exc}", err=True)
+            raise typer.Exit(code=2) from exc
+
+        recipe_exists = output.exists()
+        if recipe_exists and not force and not dry_run:
+            payload = {
+                "status": "error",
+                "error": f"Recipe file already exists: {output}. Use --force to overwrite.",
+                "recipe_path": str(output),
+                "recipe_exists": True,
+                "artifacts": artifacts,
+            }
+            if use_json:
+                _json_out(payload)
+            else:
+                typer.echo(payload["error"], err=True)
+            raise typer.Exit(code=1)
+
+        if not dry_run:
+            output.parent.mkdir(parents=True, exist_ok=True)
+            output.write_text(
+                yaml.safe_dump(recipe_data, sort_keys=False, default_flow_style=False),
+                encoding="utf-8",
+            )
+
+        payload = {
+            "status": "ok",
+            "template": template,
+            "recipe_path": str(output),
+            "written": not dry_run,
+            "recipe_exists": recipe_exists,
+            "artifacts": artifacts,
+            "included_years": _year_segment(
+                start_year,
+                end_year,
+                exclude_years=excluded_years,
+            ),
+            "next_commands": {
+                "preflight": f"hhplab build recipe-preflight --recipe {output} --json",
+                "plan": f"hhplab build recipe-plan --recipe {output} --json",
+                "execute": f"hhplab build recipe --recipe {output} --json",
+            },
+        }
+        if use_json:
+            _json_out(payload)
+            return
+
+        action = "Would write" if dry_run else "Wrote"
+        typer.echo(f"{action} {output}")
+        typer.echo(f"Panel artifact: {artifacts.get('panel_path')}")
+        typer.echo(f"Next: {payload['next_commands']['preflight']}")
+        return
 
     bases = list(overlap_basis or ["area"])
     invalid_bases = sorted(set(bases) - {"area", "population"})

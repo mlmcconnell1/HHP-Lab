@@ -415,6 +415,7 @@ DerivedMeasureKind = Literal[
     "per_10k",
     "log",
     "lag",
+    "lead",
     "difference",
 ]
 
@@ -508,7 +509,7 @@ class DerivedMeasureSpec(BaseModel):
                 )
             return self
 
-        if self.type in {"log", "lag", "difference"}:
+        if self.type in {"log", "lag", "lead", "difference"}:
             if self.column is None:
                 raise ValueError(f"DerivedMeasureSpec type='{self.type}' requires column.")
             if self.numerator is not None or self.denominator is not None:
