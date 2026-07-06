@@ -89,6 +89,7 @@ When authoring recipes, selecting year ranges, or debugging missing data, use th
 | hud | hic | 2007 | ongoing | coc | Annual January housing inventory count aligned to PIT years |
 | census | acs5 | 2009 | ongoing | tract | 5-year estimates; vintage = end year (e.g., vintage 2023 = 2019-2023) |
 | census | pep | 2010 | ongoing | county | Postcensal estimates; intercensal 2010-2020 also available |
+| irs | soi_migration | 2011 | ongoing (~2 year lag) | county | County-to-county tax-return address-change flows; year = later filing year |
 | zillow | zori | 2015 | ongoing | county | ZORI All Homes begins Jan 2015; monthly, filter to January for PIT alignment |
 
 - **ACS lag rule:** ACS vintage for PIT year Y is Y−1 (released ~Dec of year Y−1).
