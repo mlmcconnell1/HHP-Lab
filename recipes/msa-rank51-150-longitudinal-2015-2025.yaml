@@ -1,0 +1,210 @@
+version: 1
+name: msa_rank51_150_longitudinal_2015_2025_source_top150
+description: Longitudinal MSA panel from pre-materialized PIT MSA yearly rollups,
+  MSA ZORI yearly panel, and MSA PEP population artifacts.
+universe:
+  years: &id001
+  - 2015
+  - 2016
+  - 2017
+  - 2018
+  - 2019
+  - 2020
+  - 2022
+  - 2023
+  - 2024
+  - 2025
+targets:
+- id: msa_longitudinal_panel
+  geometry:
+    type: msa
+    source: census_msa_2023
+  outputs:
+  - panel
+  cohort:
+    method: top_n
+    n: 150
+    rank_by: population
+    reference_year: 2020
+  panel_policy:
+    source_label: msa_rank51_150_longitudinal_2015_2025_source_top150
+    column_aliases:
+      coverage_ratio: zori_coverage_ratio
+    derived_measures:
+    - type: ratio
+      numerator: pit_unsheltered
+      denominator: population
+      scale: 1000.0
+      output_column: unshelt_per_1000
+    - type: log
+      column: pit_unsheltered
+      output_column: log_pit_unsheltered
+    - type: log
+      column: unshelt_per_1000
+      output_column: log_unshelt_per_1000
+    - type: log
+      column: zori
+      output_column: log_zori
+    - type: difference
+      column: pit_unsheltered
+      output_column: d_pit_unsheltered
+    - type: difference
+      column: unshelt_per_1000
+      output_column: d_unshelt_per_1000
+    - type: difference
+      column: log_unshelt_per_1000
+      output_column: d_log_unshelt_per_1000
+    - type: difference
+      column: zori
+      output_column: d_zori
+    - type: difference
+      column: log_zori
+      output_column: d_log_zori
+    - type: lag
+      column: zori
+      output_column: zori_lag_1
+    - type: lead
+      column: zori
+      output_column: zori_lead_1
+    output_columns:
+    - msa_id
+    - msa_name
+    - cbsa_code
+    - geo_type
+    - geo_id
+    - year
+    - pit_total
+    - pit_sheltered
+    - pit_unsheltered
+    - population
+    - zori
+    - zori_coverage_ratio
+    - unshelt_per_1000
+    - log_pit_unsheltered
+    - log_unshelt_per_1000
+    - log_zori
+    - d_pit_unsheltered
+    - d_unshelt_per_1000
+    - d_log_unshelt_per_1000
+    - d_zori
+    - d_log_zori
+    - zori_lag_1
+    - zori_lead_1
+    - definition_version_used
+    - source
+datasets:
+  pit_msa:
+    provider: hhplab
+    product: msa_pit_rollup
+    version: 1
+    native_geometry:
+      type: msa
+      source: census_msa_2023
+    geo_column: msa_id
+    year_column: year
+    file_set:
+      path_template: data/curated/pit/pit__msa__P{year}@Mcensusmsa2023xB{boundary}xC{county}.parquet
+      segments:
+      - years:
+          years:
+          - 2015
+          - 2016
+          - 2017
+          - 2018
+          - 2019
+        geometry:
+          type: msa
+          source: census_msa_2023
+        constants:
+          boundary: 2018
+          county: 2023
+      - years:
+          years:
+          - 2020
+        geometry:
+          type: msa
+          source: census_msa_2023
+        constants:
+          boundary: 2020
+          county: 2023
+      - years:
+          years:
+          - 2022
+          - 2023
+          - 2024
+          - 2025
+        geometry:
+          type: msa
+          source: census_msa_2023
+        constants:
+          boundary: 2024
+          county: 2023
+  zori_msa:
+    provider: zillow
+    product: zori
+    version: 1
+    native_geometry:
+      type: msa
+      source: census_msa_2023
+    years:
+      years: *id001
+    geo_column: msa_id
+    year_column: year
+    path: data/curated/zori/zori__msa__Y2015-2025@Mcensusmsa2023xC2023__wpopulation__mpit_january__balanced.parquet
+  pep_msa:
+    provider: census
+    product: pep
+    version: 1
+    native_geometry:
+      type: msa
+      source: census_msa_2023
+    geo_column: msa_id
+    year_column: year
+    file_set:
+      path_template: data/curated/pep/pep__msa__Y{year}@Mcensusmsa2023xC2023__wpopulation.parquet
+      segments:
+      - years:
+          years: *id001
+        geometry:
+          type: msa
+          source: census_msa_2023
+transforms: []
+pipelines:
+- id: longitudinal
+  target: msa_longitudinal_panel
+  steps:
+  - resample:
+      dataset: pit_msa
+      to_geometry:
+        type: msa
+        source: census_msa_2023
+      method: identity
+      measures:
+      - pit_total
+      - pit_sheltered
+      - pit_unsheltered
+  - resample:
+      dataset: zori_msa
+      to_geometry:
+        type: msa
+        source: census_msa_2023
+      method: identity
+      measures:
+      - zori
+      - coverage_ratio
+  - resample:
+      dataset: pep_msa
+      to_geometry:
+        type: msa
+        source: census_msa_2023
+      method: identity
+      measures:
+      - population
+  - join:
+      datasets:
+      - pit_msa
+      - zori_msa
+      - pep_msa
+      join_on:
+      - geo_id
+      - year
