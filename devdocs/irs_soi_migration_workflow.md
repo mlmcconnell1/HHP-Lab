@@ -45,10 +45,11 @@ provenance. The `57`, `58`, and `59` pseudo-state rows feed the
 
 ## Curated Contracts
 
-County-year curated output:
+County-year curated output. The year token is derived from the staged file
+years actually ingested; for the current staged post-2011 series:
 
 ```text
-data/curated/covariates/covariate__irs_soi_migration__Y2011-ongoing.parquet
+data/curated/covariates/covariate__irs_soi_migration__Y2012-2023.parquet
 ```
 
 | Column group | Columns |
@@ -62,7 +63,7 @@ data/curated/covariates/covariate__irs_soi_migration__Y2011-ongoing.parquet
 Pair-level companion output:
 
 ```text
-data/curated/covariates/covariate_pairs__irs_soi_migration__Y2011-ongoing.parquet
+data/curated/covariates/covariate_pairs__irs_soi_migration__Y2012-2023.parquet
 ```
 
 | Column | Meaning |
@@ -81,7 +82,7 @@ moves must not be counted as MSA in-migration or out-migration.
 MSA panel output:
 
 ```text
-data/curated/covariates/covariate_panel__irs_soi_migration__Y2011-ongoing.parquet
+data/curated/covariates/covariate_panel__irs_soi_migration__Y2012-2023.parquet
 ```
 
 | Column group | Columns |
@@ -127,7 +128,9 @@ hhplab aggregate covariate \
 ```
 
 MSA aggregation uses the pair-level artifact recorded in the county parquet
-provenance. If that companion parquet is missing, re-run ingest with `--force`.
+provenance. If that companion parquet is missing, the aggregator looks for a
+pair artifact with the same data-derived year token as the county artifact. If
+neither exists, re-run ingest with `--force`.
 
 The MSA semantics are:
 
@@ -149,7 +152,7 @@ Join the MSA migration covariates to a panel:
 ```bash
 hhplab panel enrich \
   --panel outputs/top50_msa_longitudinal_2010_2025.parquet \
-  --source data/curated/covariates/covariate_panel__irs_soi_migration__Y2011-ongoing.parquet \
+  --source data/curated/covariates/covariate_panel__irs_soi_migration__Y2012-2023.parquet \
   --columns inflow_returns,outflow_returns,net_returns,intra_msa_returns,coverage_ratio \
   --panel-geo-column msa_id \
   --source-geo-column msa_id \
@@ -214,6 +217,15 @@ Intra-MSA county moves are internal churn. They are excluded from external MSA
 inflow/outflow and emitted separately as `intra_msa_*`. This is intentional:
 counting them as external migration would overstate gross MSA movement in
 multi-county metros.
+
+Connecticut changed from legacy county FIPS to planning-region county
+equivalents in the IRS SOI window. For pre-2022 CT rows, HHP-Lab crosswalks
+legacy counties to planning regions before MSA aggregation using the
+area-share bridge in `hhplab/geo/ct_planning_regions.py`. This preserves
+external MSA inflow/outflow coverage for CT-inclusive MSAs, but the
+`intra_msa_*` series has an era break at 2022 because old counties and larger
+planning regions observe different within-metro moves. Do not use CT
+intra-MSA churn in change designs that cross the 2021-to-2022 transition.
 
 AGI is aggregate thousands of dollars. AGI per return can be derived, but it is
 composition-sensitive and should not be read as a stable wage or income measure

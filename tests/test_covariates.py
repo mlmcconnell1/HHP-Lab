@@ -302,8 +302,8 @@ def _write_irs_soi_fixture_dir(tmp_path: Path) -> Path:
 
 
 def _write_irs_soi_msa_fixture(tmp_path: Path) -> tuple[Path, Path, Path]:
-    curated = tmp_path / "covariate__irs_soi_migration__Y2011-ongoing.parquet"
-    pairs = tmp_path / "covariate_pairs__irs_soi_migration__Y2011-ongoing.parquet"
+    curated = tmp_path / "covariate__irs_soi_migration__Y2022-2022.parquet"
+    pairs = tmp_path / "covariate_pairs__irs_soi_migration__Y2022-2022.parquet"
     data_root = tmp_path / "data"
     msa_dir = data_root / "curated" / "msa"
     msa_dir.mkdir(parents=True)
@@ -1048,7 +1048,7 @@ def test_irs_soi_pair_flows_aggregate_to_msa_without_internal_churn(
         force=True,
     )
 
-    assert panel.name == "covariate_panel__irs_soi_migration__Y2011-ongoing.parquet"
+    assert panel.name == "covariate_panel__irs_soi_migration__Y2022-2022.parquet"
     result = pd.read_parquet(panel).set_index("msa_id")
     assert set(IRS_SOI_MSA_MEASURE_COLUMNS) <= set(result.columns)
     assert result.loc["11111", "inflow_returns"] == pytest.approx(17.0)
@@ -1071,6 +1071,27 @@ def test_irs_soi_pair_flows_aggregate_to_msa_without_internal_churn(
     assert provenance.extra["coverage_diagnostics"]["per_year_non_null_counts"]["2022"][
         "inflow_returns"
     ] == 2
+
+
+def test_irs_soi_msa_aggregation_discovers_data_driven_year_token(
+    tmp_path: Path,
+) -> None:
+    """IRS MSA aggregation should not fall back to the catalog Y2011-ongoing token."""
+    _curated, _pairs, data_root = _write_irs_soi_msa_fixture(tmp_path)
+
+    panel = aggregate_covariate_source(
+        IRS_SOI_SOURCE_ID,
+        output_dir=tmp_path,
+        years=[2022],
+        target_geo="msa",
+        msa_definition_version="test_msa_v1",
+        data_root=data_root,
+        force=True,
+    )
+
+    assert panel.name == "covariate_panel__irs_soi_migration__Y2022-2022.parquet"
+    result = pd.read_parquet(panel)
+    assert sorted(result["msa_id"].unique()) == ["11111", "22222"]
 
 
 def test_irs_soi_msa_aggregation_aligns_legacy_ct_counties_to_planning_regions(

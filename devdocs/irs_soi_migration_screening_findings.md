@@ -9,7 +9,7 @@ out-migration helps explain rent growth and unsheltered PIT changes.
 ## Inputs
 
 - Base panel: `outputs/top50_msa_longitudinal_2010_2025.parquet`
-- IRS MSA covariates: `data/curated/covariates/covariate_panel__irs_soi_migration__Y2011-ongoing.parquet`
+- IRS MSA covariates: `data/curated/covariates/covariate_panel__irs_soi_migration__Y2012-2023.parquet`
 - PIT-aligned IRS exposure file: `outputs/top50_msa_irs_soi_migration_pit_aligned.parquet`
 - Enriched analysis panel: `outputs/top50_msa_longitudinal_irs_soi_pit_aligned_enriched.parquet`
 

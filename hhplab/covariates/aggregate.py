@@ -103,6 +103,8 @@ def aggregate_covariate_source(
     input_path = (
         Path(curated_path)
         if curated_path is not None
+        else _default_irs_soi_curated_path(output_dir=output_dir)
+        if source_id == IRS_SOI_SOURCE_ID
         else default_covariate_output_path(source_id, output_dir=output_dir)
     )
     if not input_path.exists():
@@ -315,9 +317,38 @@ def _irs_soi_pair_path(
         if pair_output_path:
             return Path(str(pair_output_path))
     if output_dir is not None:
+        derived = _irs_soi_pair_path_from_county_path(county_path)
+        if derived.exists():
+            return derived
         return default_covariate_pair_output_path(IRS_SOI_SOURCE_ID, output_dir=output_dir)
+    derived = _irs_soi_pair_path_from_county_path(county_path)
+    if derived.exists():
+        return derived
     return county_path.with_name(
         default_covariate_pair_output_path(IRS_SOI_SOURCE_ID).name
+    )
+
+
+def _default_irs_soi_curated_path(*, output_dir: Path | str | None) -> Path:
+    base = curated_dir("covariates") if output_dir is None else Path(output_dir)
+    candidates = sorted(base.glob("covariate__irs_soi_migration__Y*.parquet"))
+    data_driven = [
+        path
+        for path in candidates
+        if not path.name.endswith("__Y2011-ongoing.parquet")
+    ]
+    if data_driven:
+        return data_driven[-1]
+    return default_covariate_output_path(IRS_SOI_SOURCE_ID, output_dir=output_dir)
+
+
+def _irs_soi_pair_path_from_county_path(county_path: Path) -> Path:
+    return county_path.with_name(
+        county_path.name.replace(
+            "covariate__irs_soi_migration__",
+            "covariate_pairs__irs_soi_migration__",
+            1,
+        )
     )
 
 
