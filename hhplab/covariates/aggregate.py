@@ -704,10 +704,13 @@ def _expand_ct_legacy_covariates_to_planning(
         for column in measure_columns
         if aggregations[column] == "intensive_pop_weighted_mean"
     ]
-    if intensive_columns and expanded["population"].isna().any():
+    ct_source_counties = set(ct_alignment)
+    ct_expanded = expanded["_ct_source_county_fips"].astype(str).isin(ct_source_counties)
+    missing_ct_population = ct_expanded & expanded["population"].isna()
+    if intensive_columns and missing_ct_population.any():
         sample = (
             expanded.loc[
-                expanded["population"].isna(),
+                missing_ct_population,
                 ["_ct_source_county_fips", "year"],
             ]
             .rename(columns={"_ct_source_county_fips": "county_fips"})

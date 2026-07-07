@@ -1918,6 +1918,58 @@ def test_county_covariate_msa_rollup_rejects_missing_ct_intensive_population() -
         )
 
 
+def test_county_covariate_msa_rollup_non_ct_population_gap_uses_general_error() -> None:
+    """Non-CT population gaps should not be reported as CT expansion failures."""
+    county = pd.DataFrame(
+        {
+            "county_fips": ["09001", "06037"],
+            "year": [2020, 2020],
+            "fmr_2br": [1_200.0, 1_800.0],
+        }
+    )
+    membership = pd.DataFrame(
+        {
+            "msa_id": ["14860", "31080"],
+            "county_fips": ["09120", "06037"],
+        }
+    )
+    population = pd.DataFrame(
+        {
+            "county_fips": ["09001", "06037"],
+            "year": [2020, 2020],
+            "population": [1_000.0, pd.NA],
+        }
+    )
+    ct_crosswalk = CtPlanningRegionCrosswalk(
+        mapping=pd.DataFrame(
+            {
+                "legacy_county_fips": ["09001"],
+                "planning_region_fips": ["09120"],
+                "legacy_share": [1.0],
+                "planning_share": [1.0],
+            }
+        ),
+        legacy_vintage=2020,
+        planning_vintage=2023,
+    )
+
+    with pytest.raises(ValueError) as exc_info:
+        aggregate_county_covariate_to_msa(
+            county,
+            measure_columns=["fmr_2br"],
+            measure_aggregations={"fmr_2br": "intensive_pop_weighted_mean"},
+            msa_definition_version="test_msa_v1",
+            msa_county_membership=membership,
+            county_population=population,
+            ct_county_crosswalk=ct_crosswalk,
+        )
+
+    message = str(exc_info.value)
+    assert "County population weights are missing for covariate county-years" in message
+    assert "06037" in message
+    assert "CT legacy county-years" not in message
+
+
 def test_mpi_native_msa_rows_fill_missing_msa_covariate_rows() -> None:
     """Recover MPI native MSA rows when they uniquely match the MSA definition name."""
     county = pd.DataFrame(
