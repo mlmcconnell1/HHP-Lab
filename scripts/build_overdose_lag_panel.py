@@ -34,6 +34,30 @@ CDC_MSA = (
     / "cdc"
     / "cdc_overdose__msa__Y2020-2025@Mcensusmsa2023xC2023.parquet"
 )
+# Built by the `hhplab aggregate coc-measure` loop documented in
+# devdocs/overdose_homelessness_lag_screen.md (era-matched boundaries:
+# B2020 for 2020, B2024 for 2022-2025; county vintage 2023 for CT planning
+# region coverage), then concatenated across years.
+HIC_BY_CATEGORY = OUT / "hic_by_category_pooled.parquet"
+
+HIC_BED_COLUMNS = [
+    "hic_es_year_round_beds",
+    "hic_th_year_round_beds",
+    "hic_sh_year_round_beds",
+    "hic_rrh_year_round_beds",
+    "hic_psh_year_round_beds",
+    "hic_oph_year_round_beds",
+    "hic_total_beds",
+]
+HIC_CATEGORY_LABEL = {
+    "es": "Emergency Shelter",
+    "th": "Transitional Housing",
+    "sh": "Safe Haven",
+    "rrh": "Rapid Re-Housing",
+    "psh": "Permanent Supportive Housing",
+    "oph": "Other Permanent Housing",
+    "total_beds": "All HIC beds",
+}
 
 # Both PIT 2021 (COVID enumeration disruption) and CDC 2021 (national
 # fentanyl-driven overdose spike, not a local-homelessness-driven signal)
@@ -114,11 +138,30 @@ def add_diffs(levels: pd.DataFrame) -> pd.DataFrame:
     return levels
 
 
+def merge_hic_categories(levels: pd.DataFrame) -> pd.DataFrame:
+    """Attach per-1000 HIC bed-category rates. Requires HIC_BY_CATEGORY to
+    already exist (see the `hhplab aggregate coc-measure` loop documented in
+    devdocs/overdose_homelessness_lag_screen.md)."""
+    if not HIC_BY_CATEGORY.exists():
+        return levels
+    hic = pd.read_parquet(HIC_BY_CATEGORY)
+    merged = levels.merge(
+        hic[["msa_id", "year", "coc_population_coverage_ratio"] + HIC_BED_COLUMNS],
+        on=["msa_id", "year"],
+        how="left",
+    )
+    for col in HIC_BED_COLUMNS:
+        rate_col = col.replace("hic_", "").replace("_year_round_beds", "") + "_per_1000"
+        merged[rate_col] = merged[col] / merged["population"] * 1000
+    return merged
+
+
 def main() -> None:
     OUT.mkdir(parents=True, exist_ok=True)
     pooled = load_pooled_base_panel()
     merged = merge_overdose(pooled)
     merged = add_diffs(merged)
+    merged = merge_hic_categories(merged)
 
     levels_path = OUT / "overdose_lag_levels.parquet"
     merged.to_parquet(levels_path, index=False)

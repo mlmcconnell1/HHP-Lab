@@ -160,10 +160,95 @@ separated from any true local relationship.
   the HIC bed-count confirmation in the main findings record) are the
   closest available stock proxy if this is revisited.
 
+## HIC Bed-Category Contemporaneous Correlations (2026-07-07)
+
+Follow-up: instead of the entity+year-FE lag specs above, compute simple
+same-year Pearson correlations between each HIC bed *category* per capita and
+overdose deaths per capita, across MSAs. This is a materially weaker design
+than the specs above -- **no fixed effects, no lag, no rent control** -- so a
+positive correlation here is consistent with (not evidence for) any causal
+story, including the trivial one that bigger/denser metros have more of
+everything. Included a population-partialled version as a partial check.
+
+HIC beds by project type rolled up to MSA via `hhplab aggregate coc-measure`
+per year, era-matched CoC boundaries (B2020 for 2020, B2024 for 2022-2025)
+and county vintage 2023 (for CT planning-region coverage, matching the fix in
+bead `coclab-2a508`):
+
+```bash
+for year in 2020 2022 2023 2024 2025; do
+  BV=2020; [ "$year" != 2020 ] && BV=2024
+  hhplab aggregate coc-measure \
+    --source data/curated/hic/hic__H${year}.parquet \
+    --columns hic_es_year_round_beds,hic_th_year_round_beds,hic_sh_year_round_beds,hic_rrh_year_round_beds,hic_psh_year_round_beds,hic_oph_year_round_beds,hic_total_beds \
+    --geo-type msa --boundary-vintage $BV --counties 2023 \
+    --definition-version census_msa_2023 \
+    --output-dir outputs/overdose_lag/hic_by_category --json
+done
+```
+
+Concatenated and merged into the levels panel by `build_overdose_lag_panel.py`
+(`merge_hic_categories`); `coc_population_coverage_ratio` was >=0.86 for
+every MSA-year (mean 0.9997), so no additional coverage filter was needed on
+the HIC side. Correlations computed by
+`scripts/overdose_hic_category_correlations.py`.
+
+| Category | Pooled log-log r | p | Partial r (\|log_pop) | p | n |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Permanent Supportive Housing | **+0.386** | <0.0001 | **+0.434** | <0.0001 | 483 |
+| All HIC beds | +0.364 | <0.0001 | +0.397 | <0.0001 | 483 |
+| Emergency Shelter | +0.284 | <0.0001 | +0.310 | <0.0001 | 483 |
+| Rapid Re-Housing | +0.278 | <0.0001 | +0.303 | <0.0001 | 483 |
+| Transitional Housing | +0.231 | <0.0001 | +0.237 | <0.0001 | 479 |
+| Other Permanent Housing | +0.134 | 0.0054 | +0.152 | 0.0017 | 428 |
+| Safe Haven | +0.045 | 0.495 | +0.056 | 0.396 | 233 |
+
+By year (log-log r; `*` = p<0.05):
+
+| Category | 2020 | 2022 | 2023 | 2024 | 2025 |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Permanent Supportive Housing | +0.41* | +0.37* | +0.42* | +0.40* | +0.49* |
+| All HIC beds | +0.38* | +0.35* | +0.38* | +0.40* | +0.45* |
+| Rapid Re-Housing | +0.30* | +0.28* | +0.33* | +0.32* | +0.31* |
+| Transitional Housing | +0.24* | +0.20* | +0.24* | +0.30* | +0.36* |
+| Emergency Shelter | +0.23* | +0.25* | +0.31* | +0.33* | +0.39* |
+| Other Permanent Housing | -0.01 | +0.06 | +0.11 | +0.20 | +0.18 |
+| Safe Haven | +0.06 | -0.04 | -0.08 | -0.12 | -0.06 |
+
+**PSH is the single strongest bed-category correlate of overdose deaths --
+stronger than total beds, stronger than emergency shelter -- in every year,
+and the correlation strengthens over time (+0.41 in 2020 to +0.49 in 2025).**
+It survives partialling out log population (+0.386 -> +0.434, i.e. it is not
+purely a "bigger cities have more of everything" artifact, at least not one
+captured by population size alone). Safe Haven and Other Permanent Housing
+are the only categories without a robust positive correlation.
+
+This is the most direct piece of evidence in this whole screen consistent
+with the motivating Boulder County anecdote (formerly-homeless PSH residents
+as a large share of overdose decedents): metros with more PSH capacity per
+capita have systematically higher overdose death rates, and PSH beats every
+other bed category including plain shelter capacity at explaining that
+variation. It is still only a same-year, no-FE, no-lag cross-sectional
+correlation -- it cannot separate "PSH capacity causes/reflects overdose
+risk" from "the same underlying local drug-market or poverty-concentration
+conditions drive both PSH need and overdose deaths," and metros build PSH in
+direct response to their homelessness population, so reverse causation
+(more homelessness/addiction -> more PSH built -> both correlate with
+overdose) is at least as plausible as any protective- or risk-conferring
+story. The natural next step, not done here, would be running PSH beds
+specifically through the same entity+year-FE lag design used for
+unsheltered/total/sheltered above -- that would test whether *within-MSA
+growth* in PSH capacity predicts *subsequent* overdose growth, a much
+stronger test than this cross-sectional correlation.
+
 ## Artifacts
 
 `outputs/overdose_lag/` (gitignored): `overdose_lag_levels.parquet`,
 `overdose_lag_fd.parquet`, `spec_{a,b,b1,c,d}_{unshelt,total,shelt}*.parquet`
 + `{A,B,B1,C,D}_{unshelt,total,shelt}_*_result.{parquet,json}`,
-`key_coefficients_by_margin.csv`. Build script:
-`scripts/build_overdose_lag_panel.py`.
+`key_coefficients_by_margin.csv`, `hic_by_category/panel__msa-rollup-hic__*.parquet`
+(per-year `aggregate coc-measure` outputs), `hic_by_category_pooled.parquet`,
+`overdose_hic_by_category.parquet`, `hic_category_correlations_pooled.csv`,
+`hic_category_correlations_by_year.csv`. Build scripts:
+`scripts/build_overdose_lag_panel.py`,
+`scripts/overdose_hic_category_correlations.py`.
