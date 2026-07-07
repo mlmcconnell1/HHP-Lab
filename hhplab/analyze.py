@@ -494,6 +494,49 @@ def _fit_2sls(
     )
 
 
+def _restricted_iv_fitted_and_residuals(
+    *,
+    x: np.ndarray,
+    z: np.ndarray,
+    y: np.ndarray,
+    restricted_index: int,
+    null_value: float = 0.0,
+) -> tuple[np.ndarray, np.ndarray]:
+    """Constrained 2SLS fit under H0: beta[restricted_index] == null_value."""
+    keep = [index for index in range(x.shape[1]) if index != restricted_index]
+    restricted_beta = np.zeros(x.shape[1], dtype=float)
+    restricted_beta[restricted_index] = null_value
+    adjusted_y = y - x[:, restricted_index] * null_value
+    if keep:
+        x_keep = x[:, keep]
+        ztz_inv = np.linalg.pinv(z.T @ z)
+        projected_x_keep = z @ (ztz_inv @ (z.T @ x_keep))
+        restricted_beta[keep] = np.linalg.pinv(projected_x_keep.T @ x_keep) @ (
+            projected_x_keep.T @ adjusted_y
+        )
+    fitted = x @ restricted_beta
+    return fitted, y - fitted
+
+
+def _restricted_ols_fitted_and_residuals(
+    *,
+    x: np.ndarray,
+    y: np.ndarray,
+    restricted_index: int,
+    null_value: float = 0.0,
+) -> tuple[np.ndarray, np.ndarray]:
+    """Constrained OLS fit under H0: beta[restricted_index] == null_value."""
+    keep = [index for index in range(x.shape[1]) if index != restricted_index]
+    restricted_beta = np.zeros(x.shape[1], dtype=float)
+    restricted_beta[restricted_index] = null_value
+    adjusted_y = y - x[:, restricted_index] * null_value
+    if keep:
+        x_keep = x[:, keep]
+        restricted_beta[keep] = np.linalg.pinv(x_keep.T @ x_keep) @ (x_keep.T @ adjusted_y)
+    fitted = x @ restricted_beta
+    return fitted, y - fitted
+
+
 def _first_stage_f_statistic(
     *,
     fit: _RegressionFit,
@@ -546,6 +589,7 @@ def _parse_inference_terms(terms: list[str] | None, design_columns: pd.Index) ->
 def _wild_cluster_bootstrap_p_values(
     *,
     x: np.ndarray,
+    y: np.ndarray,
     z: np.ndarray | None = None,
     fit: _RegressionFit,
     dof: int,
@@ -566,22 +610,37 @@ def _wild_cluster_bootstrap_p_values(
     observed = {
         term: abs(float(fit.t_stats[index])) for term, index in term_indices.items()
     }
+    restricted_sources: dict[str, tuple[np.ndarray, np.ndarray]] = {}
+    for term, index in term_indices.items():
+        if z is not None:
+            restricted_sources[term] = _restricted_iv_fitted_and_residuals(
+                x=x,
+                z=z,
+                y=y,
+                restricted_index=index,
+            )
+        else:
+            restricted_sources[term] = _restricted_ols_fitted_and_residuals(
+                x=x,
+                y=y,
+                restricted_index=index,
+            )
     cluster_array = clusters.to_numpy()
     for _ in range(reps):
         weights_by_cluster = {
             cluster: rng.choice(np.array([-1.0, 1.0])) for cluster in cluster_values
         }
         weights = np.array([weights_by_cluster.get(cluster, 0.0) for cluster in cluster_array])
-        y_star = fit.fitted + fit.residuals * weights
-        boot_fit = (
-            _fit_2sls(x=x, z=z, y=y_star, dof=dof, clusters=clusters)
-            if z is not None
-            else _fit_ols(x=x, y=y_star, dof=dof, clusters=clusters)
-        )
         for term, index in term_indices.items():
+            restricted_fitted, restricted_residuals = restricted_sources[term]
+            y_star = restricted_fitted + restricted_residuals * weights
+            if z is not None:
+                boot_fit = _fit_2sls(x=x, z=z, y=y_star, dof=dof, clusters=clusters)
+            else:
+                boot_fit = _fit_ols(x=x, y=y_star, dof=dof, clusters=clusters)
             boot_se = boot_fit.std_errors[index]
             boot_t = (
-                abs(float((boot_fit.beta[index] - fit.beta[index]) / boot_se))
+                abs(float(boot_fit.beta[index] / boot_se))
                 if boot_se > 0
                 else np.nan
             )
@@ -1043,6 +1102,7 @@ def regress_panel(
             raise AnalysisError("wild-cluster inference requires --cluster-by.")
         inference_p_values = _wild_cluster_bootstrap_p_values(
             x=x,
+            y=y,
             z=z if endogenous is not None else None,
             fit=fit,
             dof=dof,

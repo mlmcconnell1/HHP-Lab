@@ -15,6 +15,7 @@ from the same constants rather than hard-coded.
 from __future__ import annotations
 
 import json
+import math
 from pathlib import Path
 
 import numpy as np
@@ -22,7 +23,13 @@ import pandas as pd
 import pytest
 from typer.testing import CliRunner
 
-from hhplab.analyze import AnalysisError, regress_panel
+from hhplab.analyze import (
+    AnalysisError,
+    _fit_2sls,
+    _restricted_iv_fitted_and_residuals,
+    _wild_cluster_bootstrap_p_values,
+    regress_panel,
+)
 from hhplab.cli.main import app
 from hhplab.provenance import ProvenanceBlock, write_parquet_with_provenance
 
@@ -41,6 +48,18 @@ EXPECTED_OLS_BETA = STRUCTURAL_BETA + CONFOUND_GAMMA * float(
     (ENDOGENOUS - ENDOGENOUS.mean()) @ CONFOUNDER
     / ((ENDOGENOUS - ENDOGENOUS.mean()) @ (ENDOGENOUS - ENDOGENOUS.mean()))
 )
+
+WRE_OUTCOME = np.array([1.2, 2.6, 2.2, 3.1, 3.6, 4.9, 4.1, 5.4, 6.2, 6.9, 7.4, 8.8])
+WRE_ENDOGENOUS = np.array(
+    [-1.3, -0.4, -0.2, 0.4, 0.9, 1.4, 1.1, 2.0, 2.5, 2.8, 3.3, 3.9]
+)
+WRE_INSTRUMENT = np.array(
+    [-2.0, -1.5, -1.0, -0.5, 0.0, 0.4, 0.7, 1.2, 1.6, 2.0, 2.3, 2.8]
+)
+WRE_CLUSTERS = ["A", "A", "B", "B", "C", "C", "D", "D", "E", "E", "F", "F"]
+WRE_REPS = 11
+# This seed makes the restricted WRE count differ from the old unrestricted WCU count.
+WRE_SEED = 1
 
 
 def _iv_panel(path: Path) -> Path:
@@ -237,6 +256,85 @@ def test_2sls_wild_cluster_bootstrap_records_inference_p_value(tmp_path: Path) -
     assert 0 <= structural["p_value"].iloc[0] <= 1
     assert iv.metadata["inference"] == "wild-cluster"
     assert iv.metadata["inference_terms"] == ["x"]
+
+
+def test_2sls_wild_cluster_bootstrap_imposes_null_restriction() -> None:
+    """Regression test for WRE: draw residuals from beta_x = 0, not unrestricted IV."""
+    y = WRE_OUTCOME
+    endogenous = WRE_ENDOGENOUS
+    instrument = WRE_INSTRUMENT
+    x = np.column_stack([np.ones_like(y), endogenous])
+    z = np.column_stack([np.ones_like(y), instrument])
+    clusters = pd.Series(WRE_CLUSTERS, name="geo_id")
+    design_columns = pd.Index(["Intercept", "x"])
+    fit = _fit_2sls(x=x, z=z, y=y, dof=len(y) - np.linalg.matrix_rank(x), clusters=clusters)
+
+    actual = _wild_cluster_bootstrap_p_values(
+        x=x,
+        y=y,
+        z=z,
+        fit=fit,
+        dof=len(y) - np.linalg.matrix_rank(x),
+        clusters=clusters,
+        terms=["x"],
+        design_columns=design_columns,
+        reps=WRE_REPS,
+        seed=WRE_SEED,
+    )
+
+    term_index = 1
+    observed = abs(float(fit.t_stats[term_index]))
+    restricted_fitted, restricted_residuals = _restricted_iv_fitted_and_residuals(
+        x=x,
+        z=z,
+        y=y,
+        restricted_index=term_index,
+    )
+    rng = np.random.default_rng(WRE_SEED)
+    expected_exceed = 0
+    unrestricted_exceed = 0
+    cluster_values = clusters.dropna().unique().tolist()
+    cluster_array = clusters.to_numpy()
+    for _ in range(WRE_REPS):
+        weights_by_cluster = {
+            cluster: rng.choice(np.array([-1.0, 1.0])) for cluster in cluster_values
+        }
+        weights = np.array([weights_by_cluster[cluster] for cluster in cluster_array])
+        restricted_y_star = restricted_fitted + restricted_residuals * weights
+        restricted_boot_fit = _fit_2sls(
+            x=x,
+            z=z,
+            y=restricted_y_star,
+            dof=len(y) - np.linalg.matrix_rank(x),
+            clusters=clusters,
+        )
+        restricted_t = abs(
+            float(restricted_boot_fit.beta[term_index] / restricted_boot_fit.std_errors[term_index])
+        )
+        if math.isfinite(restricted_t) and restricted_t >= observed:
+            expected_exceed += 1
+
+        unrestricted_y_star = fit.fitted + fit.residuals * weights
+        unrestricted_boot_fit = _fit_2sls(
+            x=x,
+            z=z,
+            y=unrestricted_y_star,
+            dof=len(y) - np.linalg.matrix_rank(x),
+            clusters=clusters,
+        )
+        unrestricted_t = abs(
+            float(
+                (unrestricted_boot_fit.beta[term_index] - fit.beta[term_index])
+                / unrestricted_boot_fit.std_errors[term_index]
+            )
+        )
+        if math.isfinite(unrestricted_t) and unrestricted_t >= observed:
+            unrestricted_exceed += 1
+
+    expected = (expected_exceed + 1) / (WRE_REPS + 1)
+    old_unrestricted = (unrestricted_exceed + 1) / (WRE_REPS + 1)
+    assert actual == {"x": pytest.approx(expected)}
+    assert old_unrestricted != pytest.approx(expected)
 
 
 def test_cli_regress_2sls_emits_first_stage_in_json(tmp_path: Path) -> None:
