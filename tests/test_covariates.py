@@ -1154,6 +1154,67 @@ def test_irs_soi_msa_aggregation_discovers_data_driven_year_token(
     assert sorted(result["msa_id"].unique()) == ["11111", "22222"]
 
 
+def test_covariate_aggregation_requires_curated_path_when_year_tokens_are_ambiguous(
+    tmp_path: Path,
+) -> None:
+    """Multi-candidate discovery should fail instead of silently picking stale data."""
+    _curated, _pairs, data_root = _write_irs_soi_msa_fixture(tmp_path)
+    pd.DataFrame({"x": [1]}).to_parquet(
+        tmp_path / "covariate__irs_soi_migration__Y2021-2021.parquet"
+    )
+
+    with pytest.raises(ValueError, match="Pass --curated-path"):
+        aggregate_covariate_source(
+            IRS_SOI_SOURCE_ID,
+            output_dir=tmp_path,
+            years=[2022],
+            target_geo="msa",
+            msa_definition_version="test_msa_v1",
+            data_root=data_root,
+            force=True,
+        )
+
+
+def test_irs_soi_msa_zero_external_flow_has_missing_coverage_ratio(tmp_path: Path) -> None:
+    """Zero denominator means coverage is unknown, not perfectly observed."""
+    county_marginals = pd.DataFrame(
+        {
+            "county_fips": ["01001"],
+            "year": [2022],
+            "other_flows_inflow_returns": [0.0],
+            "other_flows_inflow_exemptions": [0.0],
+            "other_flows_inflow_agi_thousands": [0.0],
+            "other_flows_outflow_returns": [0.0],
+            "other_flows_outflow_exemptions": [0.0],
+            "other_flows_outflow_agi_thousands": [0.0],
+        }
+    )
+    pairs = pd.DataFrame(
+        columns=[
+            "year",
+            "origin_county_fips",
+            "destination_county_fips",
+            "migration_returns",
+            "migration_exemptions",
+            "migration_agi_thousands",
+        ]
+    )
+    pair_path = tmp_path / "covariate_pairs__irs_soi_migration__Y2022-2022.parquet"
+    pairs.to_parquet(pair_path)
+    membership = pd.DataFrame({"msa_id": ["11111"], "county_fips": ["01001"]})
+
+    result = aggregate_irs_soi_migration_to_msa(
+        county_marginals=county_marginals,
+        pair_path=pair_path,
+        msa_definition_version="test_msa_v1",
+        msa_county_membership=membership,
+    )
+
+    assert len(result) == 1
+    assert pd.isna(result.loc[0, "coverage_ratio"])
+    assert result.loc[0, "suppressed_unallocated_returns"] == pytest.approx(0.0)
+
+
 def test_irs_soi_msa_aggregation_aligns_legacy_ct_counties_to_planning_regions(
     tmp_path: Path,
 ) -> None:

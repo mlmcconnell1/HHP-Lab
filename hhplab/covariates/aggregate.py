@@ -353,8 +353,14 @@ def _default_covariate_curated_path(
         for path in candidates
         if path.name != catalog_default.name and filename_pattern.fullmatch(path.name)
     ]
+    if len(data_driven) > 1:
+        candidate_names = ", ".join(path.name for path in data_driven)
+        raise ValueError(
+            f"Multiple curated covariate files found for source '{source_id}': "
+            f"{candidate_names}. Pass --curated-path to choose the intended input."
+        )
     if data_driven:
-        return data_driven[-1]
+        return data_driven[0]
     return catalog_default
 
 
@@ -526,7 +532,7 @@ def aggregate_irs_soi_migration_to_msa(
             row["suppressed_unallocated_outflow_returns"]
         )
         denominator = known_external + suppressed
-        row["coverage_ratio"] = known_external / denominator if denominator else 1.0
+        row["coverage_ratio"] = known_external / denominator if denominator else pd.NA
         row["suppressed_unallocated_returns"] = suppressed
         row["definition_version"] = msa_definition_version
         row["unmatched_source_county_count"] = unmatched_source_county_count

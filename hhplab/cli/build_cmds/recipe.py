@@ -10,7 +10,7 @@ import typer
 import yaml
 
 from hhplab.config import load_config
-from hhplab.naming import msa_zori_yearly_filename
+from hhplab.naming import msa_pep_filename, msa_pit_filename, msa_zori_yearly_filename
 from hhplab.recipe.adapters import (
     dataset_registry,
     geometry_registry,
@@ -144,10 +144,6 @@ def _msa_coc_coverage_recipe_dict(
     }
 
 
-def _filename_definition_token(definition_version: str) -> str:
-    return "".join(c for c in definition_version.lower() if c.isalnum())
-
-
 def _year_segment(start_year: int, end_year: int, *, exclude_years: set[int]) -> list[int]:
     return [
         year
@@ -208,7 +204,6 @@ def _longitudinal_msa_panel_recipe_dict(
             "longitudinal-msa-panel starts at 2015 because the canonical MSA "
             "ZORI yearly artifact starts in 2015. Use --start-year 2015 or later."
         )
-    definition_token = _filename_definition_token(msa_definition_version)
     pit_segments = _pit_msa_file_set_segments(
         start_year=start_year,
         end_year=end_year,
@@ -360,8 +355,13 @@ def _longitudinal_msa_panel_recipe_dict(
                 "year_column": "year",
                 "file_set": {
                     "path_template": (
-                        "data/curated/pit/pit__msa__P{year}@M"
-                        f"{definition_token}xB{{boundary}}xC{{county}}.parquet"
+                        "data/curated/pit/"
+                        + msa_pit_filename(
+                            "{year}",
+                            msa_definition_version,
+                            "{boundary}",
+                            "{county}",
+                        )
                     ),
                     "segments": pit_segments,
                 },
@@ -397,8 +397,11 @@ def _longitudinal_msa_panel_recipe_dict(
                 "file_set": {
                     "path_template": (
                         "data/curated/pep/"
-                        f"pep__msa__Y{{year}}@M{definition_token}"
-                        f"xC{county_vintage}__wpopulation.parquet"
+                        + msa_pep_filename(
+                            "{year}",
+                            msa_definition_version,
+                            county_vintage,
+                        )
                     ),
                     "segments": [
                         {
@@ -687,13 +690,15 @@ def recipe_init_cmd(
 
     recipe_name = name or f"msa_coc_coverage_{year}"
     resolved_ranking_year = ranking_reference_year or year
-    definition_token = "".join(c for c in msa_definition_version.lower() if c.isalnum())
     resolved_pep_path = (
         pep_msa_path
         or (
             "data/curated/pep/"
-            f"pep__msa__Y{resolved_ranking_year}@M{definition_token}"
-            f"xC{county_vintage}__wpopulation.parquet"
+            + msa_pep_filename(
+                resolved_ranking_year,
+                msa_definition_version,
+                county_vintage,
+            )
         )
     )
     recipe_data = _msa_coc_coverage_recipe_dict(

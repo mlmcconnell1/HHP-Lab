@@ -503,8 +503,10 @@ def _first_stage_f_statistic(
     clusters: pd.Series | None,
 ) -> tuple[float, float]:
     """Wald F on the excluded instruments in the first-stage regression."""
+    denominator_dof = dof
     if clusters is not None:
         covariance = _clustered_covariance(z, fit.residuals, clusters)
+        denominator_dof = int(clusters.dropna().nunique() - 1)
     else:
         sigma2 = float((fit.residuals @ fit.residuals) / dof)
         covariance = np.linalg.pinv(z.T @ z) * sigma2
@@ -517,10 +519,12 @@ def _first_stage_f_statistic(
         return np.nan, np.nan
     k = len(instrument_indices)
     f_stat = wald / k
+    if denominator_dof < 1:
+        return f_stat, np.nan
     try:
         from scipy import stats  # type: ignore[import-not-found]
 
-        p_value = float(stats.f.sf(f_stat, k, dof))
+        p_value = float(stats.f.sf(f_stat, k, denominator_dof))
     except Exception:
         p_value = np.nan
     return f_stat, p_value

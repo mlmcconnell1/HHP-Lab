@@ -116,6 +116,31 @@ def test_2sls_reports_first_stage_rows_and_f_diagnostic(tmp_path: Path) -> None:
     assert iv.metadata["estimator"] == "2sls"
 
 
+def test_2sls_clustered_first_stage_p_value_uses_cluster_degrees_of_freedom(
+    tmp_path: Path,
+) -> None:
+    from scipy import stats  # type: ignore[import-not-found]
+
+    panel = _iv_panel(tmp_path / "panel.parquet")
+    iv = regress_panel(
+        panel,
+        outcome="y",
+        predictors=["x"],
+        entity_fe=False,
+        year_fe=False,
+        cluster_by="geo_id",
+        endogenous="x",
+        instruments=["z"],
+        output_path=tmp_path / "iv.parquet",
+    )
+
+    first_stage = iv.metadata["first_stage"]
+    cluster_dof = len(INSTRUMENT) - 1
+    assert first_stage["f_p_value"] == pytest.approx(
+        float(stats.f.sf(first_stage["f_statistic"], 1, cluster_dof))
+    )
+
+
 IV_VALIDATION_CASES = [
     pytest.param(
         {"endogenous": "x"},

@@ -8903,7 +8903,7 @@ class TestRecipeInitCmd:
             measure.type == "lead" and measure.output_column == "zori_lead_1"
             for measure in target.panel_policy.derived_measures
         )
-        from hhplab.naming import msa_zori_yearly_filename
+        from hhplab.naming import msa_pep_filename, msa_zori_yearly_filename
 
         assert recipe.datasets["zori_msa"].path == (
             "data/curated/zori/"
@@ -8926,9 +8926,48 @@ class TestRecipeInitCmd:
         pep_tasks = [task for task in plan.resample_tasks if task.dataset_id == "pep_msa"]
         assert [task.year for task in pep_tasks] == [2019, 2020, 2022, 2023]
         assert pep_tasks[0].input_path.endswith(
-            "pep__msa__Y2019@Mcensusmsa2023xC2023__wpopulation.parquet"
+            msa_pep_filename(2019, "census_msa_2023", 2023)
         )
         assert tuple(plan.join_tasks[0].datasets) == ("pit_msa", "zori_msa", "pep_msa")
+
+    def test_recipe_init_pep_msa_paths_use_naming_helper(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ):
+        from hhplab.naming import msa_pep_filename
+
+        _make_project_root(tmp_path)
+        monkeypatch.chdir(tmp_path)
+        output = tmp_path / "recipes" / "longitudinal-msa.yaml"
+
+        result = runner.invoke(
+            app,
+            [
+                "recipe",
+                "init",
+                "longitudinal-msa-panel",
+                "--output",
+                str(output),
+                "--start-year",
+                "2019",
+                "--end-year",
+                "2019",
+                "--msa-definition-version",
+                "census_msa_2023",
+                "--county-vintage",
+                "2020",
+                "--json",
+            ],
+        )
+
+        assert result.exit_code == 0
+        recipe = load_recipe(output)
+        path_template = recipe.datasets["pep_msa"].file_set.path_template
+        assert path_template == (
+            "data/curated/pep/"
+            + msa_pep_filename("{year}", "census_msa_2023", 2020)
+        )
 
     def test_recipe_init_longitudinal_msa_panel_executes_with_materialized_artifacts(
         self,

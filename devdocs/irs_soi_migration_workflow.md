@@ -204,6 +204,9 @@ bounds on vulnerable-population churn, not full mobility counts.
 IRS suppresses county pairs below roughly 20 returns into `other flows`
 summary buckets. Always inspect MSA `coverage_ratio`, JSON warnings, and
 `suppressed_unallocated_*` columns before interpreting cross-MSA differences.
+When an MSA-year has no known external flow and no suppressed external-flow
+denominator, `coverage_ratio` is missing rather than 1.0 because the aggregate
+cannot distinguish true zero migration from an absent flow record.
 
 Do not mix pre-2011 and post-2011 IRS SOI migration data in change analyses.
 HHP-Lab starts this source at 2011 because IRS identifies 2011-2012 as a new

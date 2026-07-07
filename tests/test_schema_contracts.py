@@ -42,6 +42,7 @@ from hhplab.panel.conformance import PanelRequest, run_conformance
 from hhplab.pep.ingest import PEP_COUNTY_OUTPUT_COLUMNS as PEP_INGEST_COLUMNS
 from hhplab.pit.ingest.parser import CANONICAL_COLUMNS as PIT_PARSER_COLUMNS
 from hhplab.recipe.executor import ExecutorError, _normalize_recipe_population_measure
+from hhplab.recipe.executor.panel import _RECIPE_METRO_COLUMN_ORDER
 from hhplab.recipe.executor.panel import _resolve_canonical_population
 from hhplab.recipe.planner import ResampleTask
 from hhplab.recipe.recipe_schema import (
@@ -797,6 +798,8 @@ PANEL_MEASURE_COLUMNS_BY_PANEL = {
             "rent_burden_40_plus",
             "rent_burden_50_plus",
             "unemployment_rate_acs1",
+            "renter_moved_share",
+            "owner_moved_share",
             "labor_force",
             "employed",
             "unemployed",
@@ -868,6 +871,15 @@ def test_panel_measure_dictionary_covers_real_panel_measure_columns(panel_name: 
     ]
 
     assert missing == []
+
+
+def test_recipe_metro_column_order_includes_acs1_mobility_measures() -> None:
+    unemployment_index = _RECIPE_METRO_COLUMN_ORDER.index("unemployment_rate_acs1")
+    labor_index = _RECIPE_METRO_COLUMN_ORDER.index("labor_force")
+
+    assert _RECIPE_METRO_COLUMN_ORDER.index("renter_moved_share") == unemployment_index + 1
+    assert _RECIPE_METRO_COLUMN_ORDER.index("owner_moved_share") == unemployment_index + 2
+    assert _RECIPE_METRO_COLUMN_ORDER.index("owner_moved_share") < labor_index
 
 
 def test_panel_measure_dictionary_entries_are_machine_readable() -> None:
