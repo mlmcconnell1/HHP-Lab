@@ -514,6 +514,35 @@ class TestMsaAcs5Covariates:
         assert pd.isna(row["rent_burden_40_plus"])
         assert pd.isna(row["rent_burden_50_plus"])
 
+    def test_rent_burden_40_50_rates_are_null_for_missing_not_computed_count(self):
+        acs_data = pd.DataFrame(
+            {
+                "GEOID": ["08001000100"],
+                "total_population": [1000],
+                "gross_rent_pct_income_total": [100.0],
+                "gross_rent_pct_income_30_to_34_9": [10.0],
+                "gross_rent_pct_income_35_to_39_9": [10.0],
+                "gross_rent_pct_income_40_to_49_9": [20.0],
+                "gross_rent_pct_income_50_plus": [30.0],
+                "gross_rent_pct_income_not_computed": [pd.NA],
+            }
+        )
+        crosswalk = pd.DataFrame(
+            {
+                "tract_geoid": ["08001000100"],
+                "msa_id": ["19740"],
+                "area_share": [1.0],
+                "pop_share": [1.0],
+            }
+        )
+
+        result = aggregate_to_geo(acs_data, crosswalk, geo_id_col="msa_id")
+        row = result.iloc[0]
+
+        assert row["rent_burden_30_plus"] == pytest.approx(70.0 / 100.0)
+        assert pd.isna(row["rent_burden_40_plus"])
+        assert pd.isna(row["rent_burden_50_plus"])
+
 
 class TestExpandedAcs5AggregationSemantics:
     """Tests for explicit ACS5 covariate rollup semantics."""

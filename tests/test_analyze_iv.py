@@ -25,8 +25,10 @@ from typer.testing import CliRunner
 
 from hhplab.analyze import (
     AnalysisError,
+    _fit_ols,
     _fit_2sls,
     _restricted_iv_fitted_and_residuals,
+    _restricted_ols_fitted_and_residuals,
     _wild_cluster_bootstrap_p_values,
     regress_panel,
 )
@@ -158,6 +160,39 @@ def test_2sls_clustered_first_stage_p_value_uses_cluster_degrees_of_freedom(
     assert first_stage["f_p_value"] == pytest.approx(
         float(stats.f.sf(first_stage["f_statistic"], 1, cluster_dof))
     )
+
+
+def test_clustered_ols_coefficient_p_value_uses_cluster_degrees_of_freedom() -> None:
+    from scipy import stats  # type: ignore[import-not-found]
+
+    x = np.column_stack([np.ones(len(WRE_OUTCOME)), WRE_INSTRUMENT])
+    clusters = pd.Series(WRE_CLUSTERS, name="geo_id")
+    residual_dof = int(len(WRE_OUTCOME) - np.linalg.matrix_rank(x))
+    cluster_dof = clusters.nunique() - 1
+
+    fit = _fit_ols(x=x, y=WRE_OUTCOME, dof=residual_dof, clusters=clusters)
+
+    expected = float(stats.t.sf(abs(fit.t_stats[1]), cluster_dof) * 2.0)
+    old_residual_dof_value = float(stats.t.sf(abs(fit.t_stats[1]), residual_dof) * 2.0)
+    assert fit.p_values[1] == pytest.approx(expected)
+    assert fit.p_values[1] != pytest.approx(old_residual_dof_value)
+
+
+def test_clustered_2sls_coefficient_p_value_uses_cluster_degrees_of_freedom() -> None:
+    from scipy import stats  # type: ignore[import-not-found]
+
+    x = np.column_stack([np.ones(len(WRE_OUTCOME)), WRE_ENDOGENOUS])
+    z = np.column_stack([np.ones(len(WRE_OUTCOME)), WRE_INSTRUMENT])
+    clusters = pd.Series(WRE_CLUSTERS, name="geo_id")
+    residual_dof = int(len(WRE_OUTCOME) - np.linalg.matrix_rank(x))
+    cluster_dof = clusters.nunique() - 1
+
+    fit = _fit_2sls(x=x, z=z, y=WRE_OUTCOME, dof=residual_dof, clusters=clusters)
+
+    expected = float(stats.t.sf(abs(fit.t_stats[1]), cluster_dof) * 2.0)
+    old_residual_dof_value = float(stats.t.sf(abs(fit.t_stats[1]), residual_dof) * 2.0)
+    assert fit.p_values[1] == pytest.approx(expected)
+    assert fit.p_values[1] != pytest.approx(old_residual_dof_value)
 
 
 IV_VALIDATION_CASES = [
@@ -335,6 +370,24 @@ def test_2sls_wild_cluster_bootstrap_imposes_null_restriction() -> None:
     old_unrestricted = (unrestricted_exceed + 1) / (WRE_REPS + 1)
     assert actual == {"x": pytest.approx(expected)}
     assert old_unrestricted != pytest.approx(expected)
+
+
+def test_restricted_ols_fitted_values_impose_null_restriction() -> None:
+    x = np.column_stack([np.ones(len(WRE_OUTCOME)), WRE_INSTRUMENT])
+    null_value = 0.5
+
+    fitted, residuals = _restricted_ols_fitted_and_residuals(
+        x=x,
+        y=WRE_OUTCOME,
+        restricted_index=1,
+        null_value=null_value,
+    )
+
+    adjusted_y = WRE_OUTCOME - WRE_INSTRUMENT * null_value
+    expected_intercept = float(adjusted_y.mean())
+    expected_fitted = expected_intercept + WRE_INSTRUMENT * null_value
+    assert fitted == pytest.approx(expected_fitted)
+    assert residuals == pytest.approx(WRE_OUTCOME - expected_fitted)
 
 
 def test_cli_regress_2sls_emits_first_stage_in_json(tmp_path: Path) -> None:

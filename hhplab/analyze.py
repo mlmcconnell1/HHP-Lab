@@ -417,6 +417,12 @@ def _two_sided_p_value(t_stat: float, dof: int) -> float:
         return float(2.0 * (1.0 - NormalDist().cdf(abs(t_stat))))
 
 
+def _cluster_denominator_dof(clusters: pd.Series | None, fallback_dof: int) -> int:
+    if clusters is None:
+        return fallback_dof
+    return int(clusters.dropna().nunique() - 1)
+
+
 def _fit_ols(
     *,
     x: np.ndarray,
@@ -436,7 +442,10 @@ def _fit_ols(
         std_errors = naive_se
         std_error_type = "ols"
     t_stats = beta / pd.Series(std_errors).replace(0, np.nan).to_numpy(dtype=float)
-    p_values = np.array([_two_sided_p_value(float(t_stat), dof) for t_stat in t_stats])
+    p_value_dof = _cluster_denominator_dof(clusters, dof)
+    p_values = np.array(
+        [_two_sided_p_value(float(t_stat), p_value_dof) for t_stat in t_stats]
+    )
     denom = np.sum((y - y.mean()) ** 2)
     r_squared = float(1 - (residuals @ residuals) / denom) if denom > 0 else np.nan
     return _RegressionFit(
@@ -480,7 +489,10 @@ def _fit_2sls(
         std_errors = naive_se
         std_error_type = "iv_homoskedastic"
     t_stats = beta / pd.Series(std_errors).replace(0, np.nan).to_numpy(dtype=float)
-    p_values = np.array([_two_sided_p_value(float(t_stat), dof) for t_stat in t_stats])
+    p_value_dof = _cluster_denominator_dof(clusters, dof)
+    p_values = np.array(
+        [_two_sided_p_value(float(t_stat), p_value_dof) for t_stat in t_stats]
+    )
     denom = np.sum((y - y.mean()) ** 2)
     r_squared = float(1 - (residuals @ residuals) / denom) if denom > 0 else np.nan
     return _RegressionFit(
@@ -550,7 +562,7 @@ def _first_stage_f_statistic(
     denominator_dof = dof
     if clusters is not None:
         covariance = _clustered_covariance(z, fit.residuals, clusters)
-        denominator_dof = int(clusters.dropna().nunique() - 1)
+        denominator_dof = _cluster_denominator_dof(clusters, dof)
     else:
         sigma2 = float((fit.residuals @ fit.residuals) / dof)
         covariance = np.linalg.pinv(z.T @ z) * sigma2

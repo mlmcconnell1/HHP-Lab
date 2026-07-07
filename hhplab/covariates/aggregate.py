@@ -699,6 +699,27 @@ def _expand_ct_legacy_covariates_to_planning(
         how="left",
         suffixes=("", "_source"),
     )
+    intensive_columns = [
+        column
+        for column in measure_columns
+        if aggregations[column] == "intensive_pop_weighted_mean"
+    ]
+    if intensive_columns and expanded["population"].isna().any():
+        sample = (
+            expanded.loc[
+                expanded["population"].isna(),
+                ["_ct_source_county_fips", "year"],
+            ]
+            .rename(columns={"_ct_source_county_fips": "county_fips"})
+            .drop_duplicates()
+            .head(10)
+            .to_dict(orient="records")
+        )
+        raise ValueError(
+            "County population weights are missing for CT legacy county-years needed "
+            "to expand intensive covariates to planning regions; "
+            f"sample: {sample}. Provide --county-population-path with matching PEP rows."
+        )
     expanded["_ct_allocated_population"] = (
         expanded["population"] * expanded["_ct_allocation_weight"]
     )

@@ -1223,6 +1223,25 @@ def test_burden_rate_derivation_handles_zero_denominators_explicitly() -> None:
     assert diagnostics["not_computed_excluded"] is True
 
 
+def test_burden_rate_derivation_preserves_missing_not_computed_denominators() -> None:
+    components = BURDEN_COMPONENTS.copy()
+    components["sae_gross_rent_pct_income_not_computed"] = pd.NA
+    components["sae_owner_costs_pct_income_with_mortgage_not_computed"] = pd.NA
+    components["sae_owner_costs_pct_income_without_mortgage_not_computed"] = pd.NA
+
+    result = derive_sae_burden_measures(components)
+    row = result.iloc[0]
+
+    assert pd.isna(row["sae_rent_burden_not_computed_count"])
+    assert pd.isna(row["sae_rent_burden_denominator"])
+    assert pd.isna(row["sae_rent_burden_30_plus"])
+    assert pd.isna(row["sae_rent_burden_50_plus"])
+    assert pd.isna(row["sae_owner_cost_burden_not_computed_count"])
+    assert pd.isna(row["sae_owner_cost_burden_denominator"])
+    assert pd.isna(row["sae_owner_cost_burden_30_plus"])
+    assert pd.isna(row["sae_owner_cost_burden_50_plus"])
+
+
 def test_burden_rate_derivation_requires_allocated_bins() -> None:
     with pytest.raises(ValueError, match="missing required columns"):
         derive_sae_burden_measures(pd.DataFrame({"coc_id": ["COC-A"]}))

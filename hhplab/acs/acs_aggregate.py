@@ -572,7 +572,7 @@ def _derive_acs5_covariates(result_df: pd.DataFrame) -> None:
         not_computed = pd.to_numeric(
             result_df["gross_rent_pct_income_not_computed"],
             errors="coerce",
-        ).fillna(0.0)
+        )
         computed_denominator = denominator - not_computed
         result_df["rent_burden_40_plus"] = _rent_burden_rate(
             result_df,

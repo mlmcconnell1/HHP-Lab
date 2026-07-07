@@ -2330,7 +2330,7 @@ def derive_sae_burden_measures(df: pd.DataFrame) -> pd.DataFrame:
     ).astype("Float64")
     rent_total = pd.to_numeric(result["sae_gross_rent_pct_income_total"], errors="coerce")
     result["sae_rent_burden_denominator"] = (
-        rent_total - result["sae_rent_burden_not_computed_count"].fillna(0)
+        rent_total - result["sae_rent_burden_not_computed_count"]
     ).astype("Float64")
     result["sae_rent_burden_30_plus_count"] = _sum_columns(
         result,
@@ -2365,7 +2365,7 @@ def derive_sae_burden_measures(df: pd.DataFrame) -> pd.DataFrame:
     )
     result["sae_owner_cost_burden_not_computed_count"] = owner_not_computed
     result["sae_owner_cost_burden_denominator"] = (
-        owner_total - owner_not_computed.fillna(0)
+        owner_total - owner_not_computed
     ).astype("Float64")
     result["sae_owner_cost_burden_30_plus_count"] = _sum_columns(
         result,

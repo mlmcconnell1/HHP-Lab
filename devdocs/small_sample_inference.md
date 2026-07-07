@@ -1,6 +1,6 @@
 # Small-Sample Inference Rerun
 
-Date: 2026-07-06
+Date: 2026-07-07
 
 ## Implementation
 
@@ -55,20 +55,21 @@ the accepted confidence-set intervals at `--alpha` (default 0.05).
 
 ## Headline Reruns
 
+Wild-cluster reruns were regenerated after the restricted-bootstrap WRE fix.
 All reruns used `--inference-reps 999 --inference-seed 20260706`.
 
 | Spec | Term | Estimate | SE | Asymptotic p | Small-sample p | n |
 | --- | --- | ---: | ---: | ---: | ---: | ---: |
-| Top-50 FD ZORI elasticity | `d_log_zori` | 1.580 | 0.545 | 0.0039 | 0.003 | 400 |
-| Top-50 lag/lead | `d_log_zori` | 2.279 | 0.759 | 0.0029 | 0.005 | 300 |
-| Top-50 lag/lead | `d_log_zori_lag1` | 0.476 | 0.341 | 0.1630 | 0.185 | 300 |
-| Top-50 lag/lead | `d_log_zori_lead1` | -0.223 | 0.469 | 0.6340 | 0.621 | 300 |
-| Top-50 sanctuary interaction | `d_log_zori` | 1.289 | 0.673 | 0.0561 | 0.066 | 400 |
-| Top-50 sanctuary interaction | `d_log_zori_x_sanctuary` | 0.776 | 1.025 | 0.4494 | 0.483 | 400 |
-| IRS outflow churn interaction | `d_log_zori` | 3.661 | 1.700 | 0.0321 | 0.040 | 350 |
-| IRS outflow churn interaction | `d_log_zori_x_irs_outflow_returns_per_1000` | -0.203 | 0.120 | 0.0915 | 0.106 | 350 |
-| IRS low-AGI outflow interaction | `d_log_zori` | 1.349 | 0.733 | 0.0667 | 0.082 | 350 |
-| IRS low-AGI outflow interaction | `d_log_zori_x_irs_low_agi_outflow_signature` | -0.021 | 0.018 | 0.2405 | 0.264 | 350 |
+| Top-50 FD ZORI elasticity | `d_log_zori` | 1.580 | 0.545 | 0.0055 | 0.005 | 400 |
+| Top-50 lag/lead | `d_log_zori` | 2.279 | 0.759 | 0.0042 | 0.004 | 300 |
+| Top-50 lag/lead | `d_log_zori_lag1` | 0.476 | 0.341 | 0.1682 | 0.201 | 300 |
+| Top-50 lag/lead | `d_log_zori_lead1` | -0.223 | 0.469 | 0.6358 | 0.636 | 300 |
+| Top-50 sanctuary interaction | `d_log_zori` | 1.289 | 0.673 | 0.0612 | 0.077 | 400 |
+| Top-50 sanctuary interaction | `d_log_zori_x_sanctuary` | 0.776 | 1.025 | 0.4526 | 0.484 | 400 |
+| IRS outflow churn interaction | `d_log_zori` | 3.661 | 1.700 | 0.0363 | 0.050 | 350 |
+| IRS outflow churn interaction | `d_log_zori_x_irs_outflow_returns_per_1000` | -0.203 | 0.120 | 0.0968 | 0.108 | 350 |
+| IRS low-AGI outflow interaction | `d_log_zori` | 1.349 | 0.733 | 0.0717 | 0.089 | 350 |
+| IRS low-AGI outflow interaction | `d_log_zori_x_irs_low_agi_outflow_signature` | -0.021 | 0.018 | 0.2452 | 0.262 | 350 |
 | Cross-sectional sanctuary level | `sanctuary` | 0.638 | 0.265 | 0.0205 | 0.004 | 50 |
 
 ## Interpretation
@@ -77,9 +78,10 @@ The top-50 first-difference rent-shock result survives wild-cluster inference
 with 50 MSA clusters. In the lag/lead specification, the contemporaneous ZORI
 shock also survives; lag and lead terms do not. The sanctuary interaction does
 not survive small-sample inference. The corrected IRS outflow churn interaction
-also does not survive: its p-value moves from `0.0915` to `0.106`. The
-low-AGI outflow interaction remains non-significant. The cross-sectional
-sanctuary level effect remains strong under permutation inference.
+also does not survive: its restricted-bootstrap p-value is `0.108`. The
+low-AGI outflow interaction remains non-significant with p-value `0.262`. The
+cross-sectional sanctuary level effect remains strong under permutation
+inference.
 
 Generated ignored artifacts:
 
