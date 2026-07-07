@@ -24,17 +24,28 @@ Primary models use complete cases with non-null ZORI. Sensitivity models apply t
 
 ## Key Results
 
+**p-values below corrected 2026-07-07 (bead coclab-zxtit): this table was originally
+built 2026-07-06 via `hhplab analyze regress`, one day before that command's
+clustered-SE p-values were fixed to use cluster-count dof (G-1, ~99 MSA clusters
+here) instead of residual dof (n-k, in the 600-800 range for these specs).
+Estimates/SEs/t-stats are unchanged; rerun directly against fixed `regress_panel`
+on the same panel files (not hand-computed). No significance conclusion flips --
+the long-difference and levels-FE-all-ZORI models were already non-significant
+and stay that way; every FD/levels-FE-coverage80 model that was significant
+stays significant, though the levels-FE-coverage80 result (0.0158 -> 0.0189)
+moved closer to the 0.05 line worth flagging.**
+
 | Model | Term | Estimate | SE | p | n |
 | --- | --- | ---: | ---: | ---: | ---: |
-| FD unsheltered, all non-null ZORI | `d_log_zori` | 1.956 | 0.540 | 0.0003 | 690 |
-| FD total, all non-null ZORI | `d_log_zori` | 1.125 | 0.365 | 0.0020 | 691 |
-| Levels FE unsheltered, all non-null ZORI | `log_zori` | 0.655 | 0.537 | 0.2227 | 864 |
-| FD unsheltered, ZORI coverage >= 0.8 rows | `d_log_zori` | 2.381 | 0.646 | 0.0002 | 459 |
-| FD total, ZORI coverage >= 0.8 rows | `d_log_zori` | 1.172 | 0.242 | 0.000001 | 459 |
-| Levels FE unsheltered, ZORI coverage >= 0.8 rows | `log_zori` | 1.508 | 0.625 | 0.0158 | 575 |
-| Long difference unsheltered 2015-2025 | `d_log_zori_15_25` | -0.144 | 0.769 | 0.8518 | 86 |
-| Long difference sanctuary -> unsheltered | `sanctuary` | 0.036 | 0.180 | 0.8395 | 95 |
-| Long difference sanctuary -> sheltered | `sanctuary` | 0.423 | 0.080 | 0.0000001 | 95 |
+| FD unsheltered, all non-null ZORI | `d_log_zori` | 1.956 | 0.540 | 0.0005 | 690 |
+| FD total, all non-null ZORI | `d_log_zori` | 1.125 | 0.365 | 0.0028 | 691 |
+| Levels FE unsheltered, all non-null ZORI | `log_zori` | 0.655 | 0.537 | 0.2260 | 864 |
+| FD unsheltered, ZORI coverage >= 0.8 rows | `d_log_zori` | 2.381 | 0.646 | 0.0005 | 459 |
+| FD total, ZORI coverage >= 0.8 rows | `d_log_zori` | 1.172 | 0.242 | 0.00001 | 459 |
+| Levels FE unsheltered, ZORI coverage >= 0.8 rows | `log_zori` | 1.508 | 0.625 | 0.0189 | 575 |
+| Long difference unsheltered 2015-2025 | `d_log_zori_15_25` | -0.144 | 0.769 | 0.8522 | 86 |
+| Long difference sanctuary -> unsheltered | `sanctuary` | 0.036 | 0.180 | 0.8399 | 95 |
+| Long difference sanctuary -> sheltered | `sanctuary` | 0.423 | 0.080 | 0.0000008 | 95 |
 
 ## Interpretation
 
