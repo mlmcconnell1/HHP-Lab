@@ -213,7 +213,7 @@ def normalize_acs1_measures(
         not_computed = pd.to_numeric(
             result["gross_rent_pct_income_not_computed"],
             errors="coerce",
-        ).fillna(0.0)
+        )
         computed_denominator = denominator - not_computed
         result["rent_burden_40_plus"] = _acs1_rent_burden_rate(
             result,
@@ -257,9 +257,10 @@ def _acs1_rent_burden_rate(
     denominator: pd.Series,
     total: pd.Series,
 ) -> pd.Series:
-    numerator = sum(
-        pd.to_numeric(result[column], errors="coerce").fillna(0.0)
-        for column in numerator_columns
+    numerator_components = pd.concat(
+        [pd.to_numeric(result[column], errors="coerce") for column in numerator_columns],
+        axis=1,
     )
+    numerator = numerator_components.sum(axis=1, min_count=len(numerator_columns))
     numerator = numerator.where(total.notna())
     return numerator / denominator.where(denominator > 0)

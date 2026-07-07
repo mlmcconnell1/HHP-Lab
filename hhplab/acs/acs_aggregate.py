@@ -549,9 +549,16 @@ def _derive_acs5_covariates(result_df: pd.DataFrame) -> None:
         column in result_df.columns for column in RENT_BURDEN_30_PLUS_COLUMNS
     ):
         denominator = pd.to_numeric(result_df["gross_rent_pct_income_total"], errors="coerce")
-        numerator = sum(
-            pd.to_numeric(result_df[column], errors="coerce").fillna(0.0)
-            for column in RENT_BURDEN_30_PLUS_COLUMNS
+        numerator_components = pd.concat(
+            [
+                pd.to_numeric(result_df[column], errors="coerce")
+                for column in RENT_BURDEN_30_PLUS_COLUMNS
+            ],
+            axis=1,
+        )
+        numerator = numerator_components.sum(
+            axis=1,
+            min_count=len(RENT_BURDEN_30_PLUS_COLUMNS),
         )
         numerator = numerator.where(denominator.notna())
         result_df["rent_burden_30_plus"] = numerator / denominator.where(denominator > 0)
@@ -590,10 +597,11 @@ def _rent_burden_rate(
     denominator: pd.Series,
     total: pd.Series,
 ) -> pd.Series:
-    numerator = sum(
-        pd.to_numeric(result_df[column], errors="coerce").fillna(0.0)
-        for column in numerator_columns
+    numerator_components = pd.concat(
+        [pd.to_numeric(result_df[column], errors="coerce") for column in numerator_columns],
+        axis=1,
     )
+    numerator = numerator_components.sum(axis=1, min_count=len(numerator_columns))
     numerator = numerator.where(total.notna())
     return numerator / denominator.where(denominator > 0)
 

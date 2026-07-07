@@ -418,6 +418,24 @@ class TestRentBurdenCalculation:
         assert pd.isna(df.iloc[0]["rent_burden_40_plus"])
         assert pd.isna(df.iloc[0]["rent_burden_50_plus"])
 
+    def test_rent_burden_suppressed_numerator_is_null(self, httpx_mock, tmp_path):
+        cbsas = [
+            {
+                "cbsa_code": "35620",
+                "B25070_001E": "100",
+                "B25070_009E": "20",
+                "B25070_010E": "-666666666",
+                "B25070_011E": "10",
+            },
+        ]
+        queue_acs1_group_responses(httpx_mock, cbsas, vintage=2023)
+
+        path = ingest_metro_acs1(vintage=2023, project_root=tmp_path)
+        df = pd.read_parquet(path)
+
+        assert pd.isna(df.iloc[0]["rent_burden_40_plus"])
+        assert pd.isna(df.iloc[0]["rent_burden_50_plus"])
+
     def test_moved_share_calculation(self, httpx_mock, tmp_path):
         """Tenure moved-shares are (tenure total - same house) / tenure total.
 

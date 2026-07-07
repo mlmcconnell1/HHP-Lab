@@ -328,10 +328,10 @@ def test_normalize_acs1_measures_derives_rent_burden_rates() -> None:
     result = normalize_acs1_measures(
         pd.DataFrame(
             {
-                "B25070_001E": [100, 10],
-                "B25070_009E": [20, 1],
-                "B25070_010E": [30, 1],
-                "B25070_011E": [10, 10],
+                "B25070_001E": [100, 10, 100],
+                "B25070_009E": [20, 1, 20],
+                "B25070_010E": [30, 1, pd.NA],
+                "B25070_011E": [10, 10, 10],
             }
         )
     )
@@ -340,6 +340,8 @@ def test_normalize_acs1_measures_derives_rent_burden_rates() -> None:
     assert result.loc[0, "rent_burden_50_plus"] == pytest.approx(30 / 90)
     assert pd.isna(result.loc[1, "rent_burden_40_plus"])
     assert pd.isna(result.loc[1, "rent_burden_50_plus"])
+    assert pd.isna(result.loc[2, "rent_burden_40_plus"])
+    assert pd.isna(result.loc[2, "rent_burden_50_plus"])
     assert result["rent_burden_40_plus"].dtype == "Float64"
     assert result["rent_burden_50_plus"].dtype == "Float64"
 
