@@ -710,6 +710,12 @@ class TestIngestWritesParquet:
         assert row["median_gross_rent"] == 1295
         assert row["gross_rent_pct_income_total"] == 720000
         assert row["median_contract_rent"] == 1175
+        assert row["gross_rent_distribution_cash_rent_2000_plus"] == 65000
+        assert row["gross_rent_distribution_no_cash_rent"] == 20000
+        assert row["contract_rent_distribution_cash_rent_2000_plus"] == 60000
+        assert row["contract_rent_distribution_no_cash_rent"] == 20000
+        assert pd.isna(row["gross_rent_distribution_cash_rent_2500_to_2999"])
+        assert pd.isna(row["contract_rent_distribution_cash_rent_2500_to_2999"])
         assert pd.isna(row["pop_16_plus"])
         assert pd.isna(row["civilian_labor_force"])
         assert pd.isna(row["unemployed_count"])

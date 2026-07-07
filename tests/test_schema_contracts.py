@@ -570,8 +570,10 @@ def test_contract_rent_acs1_variable_mappings_use_acs5_column_names() -> None:
 
 def test_contract_rent_acs1_early_vintage_uses_top_bin_override() -> None:
     early_variables = acs1_variables_by_table_for_vintage(2014)
+    pre_2012_variables = acs1_variables_by_table_for_vintage(2010)
     modern_variables = acs1_variables_by_table_for_vintage(2015)
     early_names = acs1_variable_names_for_vintage(2014)
+    pre_2012_names = acs1_variable_names_for_vintage(2010)
     modern_names = acs1_variable_names_for_vintage(2015)
 
     assert "B25056_025E" not in early_variables["B25056"]
@@ -582,10 +584,21 @@ def test_contract_rent_acs1_early_vintage_uses_top_bin_override() -> None:
     assert "B25063_027E" not in early_names
     assert "B25056_025E" in modern_variables["B25056"]
     assert "B25063_025E" in modern_variables["B25063"]
+    assert "B25056_025E" not in pre_2012_variables["B25056"]
+    assert "B25063_025E" not in pre_2012_variables["B25063"]
 
     assert early_names["B25056_023E"] == "contract_rent_distribution_cash_rent_2000_plus"
     assert early_names["B25063_023E"] == "gross_rent_distribution_cash_rent_2000_plus"
+    assert pre_2012_names["B25056_023E"] == (
+        "contract_rent_distribution_cash_rent_2000_plus"
+    )
+    assert pre_2012_names["B25056_024E"] == "contract_rent_distribution_no_cash_rent"
+    assert pre_2012_names["B25063_023E"] == (
+        "gross_rent_distribution_cash_rent_2000_plus"
+    )
+    assert pre_2012_names["B25063_024E"] == "gross_rent_distribution_no_cash_rent"
     assert len(early_names.values()) == len(set(early_names.values()))
+    assert len(pre_2012_names.values()) == len(set(pre_2012_names.values()))
     assert modern_names["B25056_023E"] == "contract_rent_distribution_cash_rent_2000_to_2499"
     assert modern_names["B25063_023E"] == "gross_rent_distribution_cash_rent_2000_to_2499"
 

@@ -667,7 +667,7 @@ def acs1_variable_names_for_vintage(vintage: int | str | None = None) -> dict[st
         unavailable = UNAVAILABLE_ACS1_API_VARS_BY_YEAR.get(int(vintage), set())
         for variable_code in unavailable:
             variable_names.pop(variable_code, None)
-    if vintage is not None and 2012 <= int(vintage) <= 2014:
+    if vintage is not None and int(vintage) in UNAVAILABLE_ACS1_API_VARS_BY_YEAR:
         variable_names.update(EARLY_ACS1_VARIABLE_OVERRIDES)
     return variable_names
 
