@@ -504,6 +504,31 @@ def test_saiz_static_msa_covariate_ingests_and_aggregates(
     }
 
 
+def test_saiz_ingest_rejects_wrong_extension_before_stata_read(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    monkeypatch.setattr("hhplab.covariates.ingest.register_source", lambda **_: None)
+    raw = tmp_path / "saiz.csv"
+    raw.write_text("msaname,elasticity\nAtlanta,2.55\n")
+
+    def read_stata_should_not_run(*args, **kwargs):
+        raise AssertionError("Saiz extension validation should run before read_stata")
+
+    monkeypatch.setattr(pd, "read_stata", read_stata_should_not_run)
+
+    with pytest.raises(
+        ValueError,
+        match=r"Unsupported Saiz source type '\.csv'",
+    ):
+        ingest_covariate_source(
+            SAIZ_SOURCE_ID,
+            raw,
+            output_dir=tmp_path,
+            force=True,
+        )
+
+
 def test_mpi_contract_declares_workbook_schema_and_geography_rules() -> None:
     """MPI ingest has a written contract before parser implementation."""
     assert MPI_WORKBOOK_GLOB.endswith("*.xlsx")

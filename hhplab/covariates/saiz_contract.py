@@ -51,12 +51,8 @@ class SaizSourceContract:
 SAIZ_SOURCE_CONTRACT: Final = SaizSourceContract()
 
 
-def validate_saiz_source_contract(
-    path: Path | str,
-    *,
-    raw_columns: Iterable[str] | None = None,
-) -> SaizSourceContract:
-    """Validate the staged Saiz Stata file needed by the ingest implementation."""
+def validate_saiz_source_path(path: Path | str) -> Path:
+    """Validate the cheap path-shape contract for the staged Saiz source file."""
     source_path = Path(path)
     if not source_path.exists():
         raise FileNotFoundError(
@@ -68,6 +64,16 @@ def validate_saiz_source_contract(
             f"Unsupported Saiz source type '{source_path.suffix}'. Expected the "
             "staged Saiz (2010) supply elasticity .dta file."
         )
+    return source_path
+
+
+def validate_saiz_source_contract(
+    path: Path | str,
+    *,
+    raw_columns: Iterable[str] | None = None,
+) -> SaizSourceContract:
+    """Validate the staged Saiz Stata file needed by the ingest implementation."""
+    source_path = validate_saiz_source_path(path)
 
     if raw_columns is None:
         try:

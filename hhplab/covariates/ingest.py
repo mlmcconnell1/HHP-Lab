@@ -53,6 +53,7 @@ from hhplab.covariates.saiz_contract import (
     SAIZ_MATCH_DIAGNOSTIC_COLUMNS,
     SAIZ_SOURCE_ID,
     validate_saiz_source_contract,
+    validate_saiz_source_path,
 )
 from hhplab.metro.metro_definitions import STATE_ABBREV_TO_FIPS
 from hhplab.msa import DEFINITION_VERSION as DEFAULT_MSA_DEFINITION_VERSION
@@ -479,6 +480,7 @@ def _ingest_saiz_supply_elasticity(
     spec: CovariateSourceSpec,
     destination: Path,
 ) -> Path:
+    validate_saiz_source_path(source_path)
     raw = pd.read_stata(source_path)
     validate_saiz_source_contract(source_path, raw_columns=raw.columns)
 
