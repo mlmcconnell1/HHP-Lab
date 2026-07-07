@@ -635,11 +635,12 @@ def _irs_soi_msa_county_options(
 def _expand_ct_legacy_covariates_to_planning(
     county: pd.DataFrame,
     *,
+    population: pd.DataFrame,
     measure_columns: list[str],
     aggregations: dict[str, MeasureAggregation],
     ct_alignment: dict[str, list[tuple[str, float]]],
 ) -> pd.DataFrame:
-    """Replace legacy CT county rows with area-allocated planning-region rows."""
+    """Replace legacy CT county rows with planning-region rows."""
     if not ct_alignment:
         return county
     rows: list[pd.Series] = []
@@ -647,10 +648,15 @@ def _expand_ct_legacy_covariates_to_planning(
         county_fips = str(row["county_fips"])
         options = ct_alignment.get(county_fips)
         if not options:
-            rows.append(row)
+            preserved = row.copy()
+            preserved["_ct_source_county_fips"] = county_fips
+            preserved["_ct_allocation_weight"] = 1.0
+            rows.append(preserved)
             continue
         for planning_region_fips, weight in options:
             allocated = row.copy()
+            allocated["_ct_source_county_fips"] = county_fips
+            allocated["_ct_allocation_weight"] = weight
             allocated["county_fips"] = planning_region_fips
             for column in measure_columns:
                 if aggregations[column] in {"extensive_sum", "rate"}:
@@ -658,21 +664,61 @@ def _expand_ct_legacy_covariates_to_planning(
                     allocated[column] = value * weight if pd.notna(value) else pd.NA
             rows.append(allocated)
     expanded = pd.DataFrame(rows).reset_index(drop=True)
+    population_lookup = population[["county_fips", "year", "population"]].copy()
+    population_lookup["county_fips"] = (
+        population_lookup["county_fips"].astype("string").str.zfill(5)
+    )
+    population_lookup["year"] = pd.to_numeric(
+        population_lookup["year"], errors="coerce"
+    ).astype("Int64")
+    population_lookup["population"] = pd.to_numeric(
+        population_lookup["population"], errors="coerce"
+    )
+    expanded = expanded.merge(
+        population_lookup,
+        left_on=["_ct_source_county_fips", "year"],
+        right_on=["county_fips", "year"],
+        how="left",
+        suffixes=("", "_source"),
+    )
+    expanded["_ct_allocated_population"] = (
+        expanded["population"] * expanded["_ct_allocation_weight"]
+    )
     group_columns = [
         column
         for column in expanded.columns
-        if column not in {*measure_columns}
+        if column
+        not in {
+            *measure_columns,
+            "_ct_source_county_fips",
+            "_ct_allocation_weight",
+            "county_fips_source",
+            "population",
+            "_ct_allocated_population",
+        }
     ]
-    aggregators: dict[str, str] = {}
-    for column in measure_columns:
-        aggregators[column] = (
-            "sum" if aggregations[column] in {"extensive_sum", "rate"} else "mean"
-        )
-    return (
-        expanded.groupby(group_columns, as_index=False, dropna=False)
-        .agg(aggregators)
-        .reset_index(drop=True)
-    )
+    output_rows: list[dict[str, object]] = []
+    for group_key, group in expanded.groupby(group_columns, as_index=False, dropna=False):
+        if not isinstance(group_key, tuple):
+            group_key = (group_key,)
+        output_row = dict(zip(group_columns, group_key, strict=True))
+        for column in measure_columns:
+            values = pd.to_numeric(group[column], errors="coerce")
+            valid = values.notna()
+            if aggregations[column] in {"extensive_sum", "rate"}:
+                output_row[column] = float(values[valid].sum()) if valid.any() else pd.NA
+                continue
+            weights = pd.to_numeric(
+                group.loc[valid, "_ct_allocated_population"], errors="coerce"
+            )
+            weight_denominator = weights.sum()
+            output_row[column] = (
+                float((values[valid] * weights).sum() / weight_denominator)
+                if weight_denominator > 0
+                else pd.NA
+            )
+        output_rows.append(output_row)
+    return pd.DataFrame(output_rows)
 
 
 def _expand_ct_legacy_population_to_planning(
@@ -893,6 +939,7 @@ def aggregate_county_covariate_to_msa(
     if ct_alignment:
         county = _expand_ct_legacy_covariates_to_planning(
             county,
+            population=population,
             measure_columns=measure_columns,
             aggregations=aggregations,
             ct_alignment=ct_alignment,

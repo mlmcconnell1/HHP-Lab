@@ -1635,6 +1635,64 @@ def test_county_covariate_msa_rollup_allocates_legacy_ct_to_planning_regions() -
     assert row["unmatched_source_county_count"] == 0
 
 
+def test_county_covariate_msa_rollup_pop_weights_intensive_ct_planning_regions() -> None:
+    """Intensive CT covariates use allocated population when legacy counties merge."""
+    county = pd.DataFrame(
+        {
+            "county_fips": ["09001", "09003"],
+            "year": [2020, 2020],
+            "fmr_2br": [1_200.0, 1_500.0],
+        }
+    )
+    membership = pd.DataFrame(
+        {
+            "msa_id": ["14860"],
+            "county_fips": ["09120"],
+        }
+    )
+    population = pd.DataFrame(
+        {
+            "county_fips": ["09001", "09003"],
+            "year": [2020, 2020],
+            "population": [1_000.0, 500.0],
+        }
+    )
+    ct_crosswalk = CtPlanningRegionCrosswalk(
+        mapping=pd.DataFrame(
+            {
+                "legacy_county_fips": ["09001", "09001", "09003"],
+                "planning_region_fips": ["09110", "09120", "09120"],
+                "legacy_share": [0.25, 0.75, 1.0],
+                "planning_share": [1.0, 0.5, 0.5],
+            }
+        ),
+        legacy_vintage=2020,
+        planning_vintage=2023,
+    )
+
+    result = aggregate_county_covariate_to_msa(
+        county,
+        measure_columns=["fmr_2br"],
+        measure_aggregations={"fmr_2br": "intensive_pop_weighted_mean"},
+        msa_definition_version="test_msa_v1",
+        msa_county_membership=membership,
+        county_population=population,
+        ct_county_crosswalk=ct_crosswalk,
+    )
+
+    row = result.set_index("msa_id").loc["14860"]
+    expected_09120_population = 1_000.0 * 0.75 + 500.0
+    expected_fmr = ((1_200.0 * 1_000.0 * 0.75) + (1_500.0 * 500.0)) / (
+        expected_09120_population
+    )
+    assert row["fmr_2br"] == pytest.approx(expected_fmr)
+    assert row["fmr_2br"] != pytest.approx(1_350.0)
+    assert row["population_weight_denominator"] == pytest.approx(expected_09120_population)
+    assert row["county_count"] == 1
+    assert row["membership_county_count"] == 1
+    assert row["coverage_ratio"] == pytest.approx(1.0)
+
+
 def test_mpi_native_msa_rows_fill_missing_msa_covariate_rows() -> None:
     """Recover MPI native MSA rows when they uniquely match the MSA definition name."""
     county = pd.DataFrame(
