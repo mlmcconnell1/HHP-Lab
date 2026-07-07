@@ -23,6 +23,15 @@ Wild-cluster inference uses Rademacher cluster weights and bootstrap-t p-values.
 Permutation inference shuffles the requested cross-sectional term(s) and refits
 the same design; it is restricted to models without fixed effects.
 
+Permutation inference in this implementation is a raw-column permutation test:
+the requested term is shuffled while the rest of the design is held fixed. Treat
+those p-values as design-valid only when the permuted predictor is independent of
+the other regressors, such as a single-predictor cross-section or a literally
+randomized treatment. In multi-predictor models with correlated covariates, this
+test can be anti-conservative. Prefer `--inference-terms` to name one focal
+randomized term, and use wild-cluster or conventional sensitivity checks for
+observational multi-covariate specifications.
+
 For 2SLS models, `--inference wild-cluster` refits the full IV design in each
 bootstrap draw and can be used with `--endogenous` and `--instruments`.
 Permutation inference remains OLS-only.

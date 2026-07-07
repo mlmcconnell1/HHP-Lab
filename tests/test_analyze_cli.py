@@ -100,6 +100,14 @@ def _saturated_panel_fixture(path: Path) -> Path:
 
 
 class TestAnalyzeCli:
+    def test_regress_help_documents_permutation_limitations(self):
+        result = runner.invoke(app, ["analyze", "regress", "--help"])
+
+        assert result.exit_code == 0
+        assert "single-predictor" in result.output
+        assert "correlated" in result.output
+        assert "controls" in result.output
+
     def test_describe_writes_json_and_provenance(self, tmp_path: Path):
         panel = _panel_fixture(tmp_path / "panel.parquet")
         output = tmp_path / "describe.parquet"

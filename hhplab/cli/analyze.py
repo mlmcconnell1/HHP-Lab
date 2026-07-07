@@ -283,7 +283,8 @@ def analyze_regress(
             "--inference",
             help=(
                 "Small-sample inference method. Use wild-cluster with --cluster-by, "
-                "or permutation for cross-sectional treatment terms."
+                "or permutation only for single-predictor/literal-randomization "
+                "cross-sectional designs."
             ),
         ),
     ] = "none",
@@ -299,7 +300,11 @@ def analyze_regress(
         str | None,
         typer.Option(
             "--inference-terms",
-            help="Comma-separated model terms to test; defaults to predictors.",
+            help=(
+                "Comma-separated model terms to test; defaults to predictors. "
+                "With permutation, specify the randomized focal term and avoid "
+                "correlated controls."
+            ),
         ),
     ] = None,
     endogenous: Annotated[
