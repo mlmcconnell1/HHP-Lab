@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import json
 import math
+import warnings
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
@@ -684,6 +685,26 @@ def _permutation_p_values(
     return {term: float((exceed[term] + 1) / (reps + 1)) for term in terms}
 
 
+def _warn_if_permutation_model_has_correlated_controls(
+    *,
+    predictors: list[str],
+    selected_inference_terms: list[str],
+) -> None:
+    predictor_terms = set(predictors)
+    tested_terms = set(selected_inference_terms)
+    if len(tested_terms) <= 1 and not (predictor_terms - tested_terms):
+        return
+    warnings.warn(
+        "Permutation inference is calibrated for single-predictor or literal-randomization "
+        "designs. Testing multiple terms, or testing one term while retaining additional "
+        "correlated predictor controls, can be anti-conservative; simulations documented "
+        "false-positive rates as high as roughly 30% at a nominal 5%. Prefer wild-cluster "
+        "inference for observational multi-predictor regressions.",
+        RuntimeWarning,
+        stacklevel=2,
+    )
+
+
 def _is_binary_indicator(series: pd.Series) -> bool:
     values = set(pd.to_numeric(series.dropna(), errors="coerce").dropna().unique().tolist())
     return bool(values) and values <= {0, 1}
@@ -1118,6 +1139,10 @@ def regress_panel(
                 "permutation inference is currently supported for cross-sectional models "
                 "without fixed effects."
             )
+        _warn_if_permutation_model_has_correlated_controls(
+            predictors=predictors,
+            selected_inference_terms=selected_inference_terms,
+        )
         inference_p_values = _permutation_p_values(
             model_df=model_df,
             y=y,

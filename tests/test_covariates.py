@@ -18,6 +18,7 @@ from hhplab.covariates.aggregate import (
     derive_prism_temperature_basis,
 )
 from hhplab.covariates.catalog import COVARIATE_SOURCE_SPECS
+from hhplab.covariates.census_bps_contract import CENSUS_BPS_SOURCE_ID
 from hhplab.covariates.ingest import ingest_covariate_source
 from hhplab.covariates.irs_soi_contract import (
     IRS_SOI_COUNTY_MEASURE_COLUMNS,
@@ -189,6 +190,31 @@ IRS_SOI_MSA_TRUTH_TABLE = {
         "MSA columns and reduce coverage_ratio"
     ),
 }
+
+CT_BPS_BACKFILL_MSA_IDS = ("14860", "25540", "35300", "47930")
+CT_BPS_BACKFILL_YEARS = tuple(range(2010, 2015))
+CT_BPS_BACKFILL_MSA_MEMBERSHIP = (
+    ("14860", "09120"),
+    ("14860", "09190"),
+    ("25540", "09110"),
+    ("25540", "09130"),
+    ("35300", "09170"),
+    ("47930", "09140"),
+)
+CT_BPS_LEGACY_TO_PLANNING_ALLOCATIONS = (
+    ("09001", "09120", 1.0),
+    ("09005", "09190", 1.0),
+    ("09003", "09110", 1.0),
+    ("09007", "09130", 1.0),
+    ("09009", "09170", 0.5),
+    ("09009", "09140", 0.5),
+)
+CT_BPS_LEGACY_SOURCE_COUNTIES = tuple(
+    dict.fromkeys(
+        legacy_county
+        for legacy_county, _, _ in CT_BPS_LEGACY_TO_PLANNING_ALLOCATIONS
+    )
+)
 
 BRANCH_ROUNDTRIP_CASES = [
     pytest.param(
@@ -1633,6 +1659,91 @@ def test_county_covariate_msa_rollup_allocates_legacy_ct_to_planning_regions() -
     assert row["membership_county_count"] == 2
     assert row["coverage_ratio"] == pytest.approx(1.0)
     assert row["unmatched_source_county_count"] == 0
+
+
+def test_census_bps_msa_aggregation_backfills_named_ct_msas_2010_2014(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    """BPS MSA aggregation covers the four CT planning-region MSAs across 2010-2014."""
+    curated_rows = []
+    population_rows = []
+    for county_index, county_fips in enumerate(CT_BPS_LEGACY_SOURCE_COUNTIES, start=1):
+        for year in CT_BPS_BACKFILL_YEARS:
+            permitted_units = (year - 2000) * 100 + county_index
+            curated_rows.append(
+                {
+                    "geo_type": "county",
+                    "geo_id": county_fips,
+                    "county_fips": county_fips,
+                    "year": year,
+                    "permitted_units": permitted_units,
+                    "permitted_buildings": permitted_units // 10,
+                }
+            )
+            population_rows.append(
+                {
+                    "county_fips": county_fips,
+                    "year": year,
+                    "population": 10_000.0 + county_index * 100 + year,
+                }
+            )
+    curated = tmp_path / "covariate__census_bps__Y2010-2014.parquet"
+    write_parquet_with_provenance(
+        pd.DataFrame(curated_rows),
+        curated,
+        ProvenanceBlock(
+            geo_type="county",
+            extra={"source_id": CENSUS_BPS_SOURCE_ID},
+        ),
+    )
+    membership = pd.DataFrame(
+        CT_BPS_BACKFILL_MSA_MEMBERSHIP,
+        columns=["msa_id", "county_fips"],
+    )
+    ct_crosswalk = CtPlanningRegionCrosswalk(
+        mapping=pd.DataFrame(
+            CT_BPS_LEGACY_TO_PLANNING_ALLOCATIONS,
+            columns=["legacy_county_fips", "planning_region_fips", "legacy_share"],
+        ).assign(planning_share=1.0),
+        legacy_vintage=2020,
+        planning_vintage=2023,
+    )
+    monkeypatch.setattr(
+        "hhplab.covariates.aggregate.read_msa_county_membership",
+        lambda _definition_version, _data_root=None: membership,
+    )
+    monkeypatch.setattr(
+        "hhplab.covariates.aggregate.load_pep_county",
+        lambda _county_population_path=None: pd.DataFrame(population_rows),
+    )
+    monkeypatch.setattr(
+        "hhplab.covariates.aggregate.build_ct_county_planning_region_crosswalk",
+        lambda *_, **__: ct_crosswalk,
+    )
+
+    panel = aggregate_covariate_source(
+        CENSUS_BPS_SOURCE_ID,
+        curated_path=curated,
+        output_path=tmp_path / "bps_msa.parquet",
+        years=list(CT_BPS_BACKFILL_YEARS),
+        target_geo="msa",
+        force=True,
+    )
+
+    result = pd.read_parquet(panel).set_index(["msa_id", "year"]).sort_index()
+    expected_index = pd.MultiIndex.from_product(
+        [CT_BPS_BACKFILL_MSA_IDS, CT_BPS_BACKFILL_YEARS],
+        names=["msa_id", "year"],
+    )
+    assert expected_index.difference(result.index).empty
+    ct_rows = result.loc[expected_index]
+    assert ct_rows["permitted_units"].notna().all()
+    assert ct_rows["permitted_buildings"].notna().all()
+    assert (ct_rows["permitted_units"] > 0).all()
+    assert ct_rows["coverage_ratio"].tolist() == pytest.approx(
+        [1.0] * len(expected_index)
+    )
 
 
 def test_county_covariate_msa_rollup_pop_weights_intensive_ct_planning_regions() -> None:

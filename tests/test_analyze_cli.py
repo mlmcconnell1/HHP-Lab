@@ -6,6 +6,7 @@ import json
 from pathlib import Path
 
 import pandas as pd
+import pytest
 from typer.testing import CliRunner
 
 from hhplab.cli.main import app
@@ -423,38 +424,45 @@ class TestAnalyzeCli:
         assert provenance.extra["parameters"]["inference"] == "wild-cluster"
         assert provenance.extra["parameters"]["inference_terms"] == ["median_gross_rent"]
 
-    def test_regress_permutation_inference_p_values_are_recorded(self, tmp_path: Path):
+    def test_regress_permutation_warns_when_control_predictors_are_retained(
+        self,
+        tmp_path: Path,
+    ):
         panel = _panel_fixture(tmp_path / "panel.parquet")
         output = tmp_path / "regress_permutation.parquet"
 
-        result = runner.invoke(
-            app,
-            [
-                "analyze",
-                "regress",
-                "--panel",
-                str(panel),
-                "--outcome",
-                "pit_total",
-                "--predictors",
-                "median_gross_rent,policy_indicator",
-                "--no-entity-fe",
-                "--no-year-fe",
-                "--cluster-by",
-                "",
-                "--inference",
-                "permutation",
-                "--inference-reps",
-                "19",
-                "--inference-seed",
-                "456",
-                "--inference-terms",
-                "policy_indicator",
-                "--output",
-                str(output),
-                "--json",
-            ],
-        )
+        with pytest.warns(
+            RuntimeWarning,
+            match="Permutation inference is calibrated for single-predictor",
+        ):
+            result = runner.invoke(
+                app,
+                [
+                    "analyze",
+                    "regress",
+                    "--panel",
+                    str(panel),
+                    "--outcome",
+                    "pit_total",
+                    "--predictors",
+                    "median_gross_rent,policy_indicator",
+                    "--no-entity-fe",
+                    "--no-year-fe",
+                    "--cluster-by",
+                    "",
+                    "--inference",
+                    "permutation",
+                    "--inference-reps",
+                    "19",
+                    "--inference-seed",
+                    "456",
+                    "--inference-terms",
+                    "policy_indicator",
+                    "--output",
+                    str(output),
+                    "--json",
+                ],
+            )
 
         assert result.exit_code == 0
         payload = json.loads(result.output)
