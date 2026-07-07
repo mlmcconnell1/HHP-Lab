@@ -63,6 +63,14 @@ WRE_REPS = 11
 # This seed makes the restricted WRE count differ from the old unrestricted WCU count.
 WRE_SEED = 1
 
+CLUSTERED_INFERENCE_CLUSTER_CASES = [
+    pytest.param(pd.Series(["A"] * len(WRE_OUTCOME), name="geo_id"), id="one-cluster"),
+    pytest.param(pd.Series([None] * len(WRE_OUTCOME), name="geo_id"), id="zero-clusters"),
+]
+CLUSTERED_INFERENCE_CLUSTER_ERROR = (
+    "clustered standard errors require at least two non-null clusters"
+)
+
 
 def _iv_panel(path: Path) -> Path:
     df = pd.DataFrame(
@@ -178,6 +186,17 @@ def test_clustered_ols_coefficient_p_value_uses_cluster_degrees_of_freedom() -> 
     assert fit.p_values[1] != pytest.approx(old_residual_dof_value)
 
 
+@pytest.mark.parametrize("clusters", CLUSTERED_INFERENCE_CLUSTER_CASES)
+def test_clustered_ols_rejects_too_few_non_null_clusters(
+    clusters: pd.Series,
+) -> None:
+    x = np.column_stack([np.ones(len(WRE_OUTCOME)), WRE_INSTRUMENT])
+    residual_dof = int(len(WRE_OUTCOME) - np.linalg.matrix_rank(x))
+
+    with pytest.raises(AnalysisError, match=CLUSTERED_INFERENCE_CLUSTER_ERROR):
+        _fit_ols(x=x, y=WRE_OUTCOME, dof=residual_dof, clusters=clusters)
+
+
 def test_clustered_2sls_coefficient_p_value_uses_cluster_degrees_of_freedom() -> None:
     from scipy import stats  # type: ignore[import-not-found]
 
@@ -193,6 +212,18 @@ def test_clustered_2sls_coefficient_p_value_uses_cluster_degrees_of_freedom() ->
     old_residual_dof_value = float(stats.t.sf(abs(fit.t_stats[1]), residual_dof) * 2.0)
     assert fit.p_values[1] == pytest.approx(expected)
     assert fit.p_values[1] != pytest.approx(old_residual_dof_value)
+
+
+@pytest.mark.parametrize("clusters", CLUSTERED_INFERENCE_CLUSTER_CASES)
+def test_clustered_2sls_rejects_too_few_non_null_clusters(
+    clusters: pd.Series,
+) -> None:
+    x = np.column_stack([np.ones(len(WRE_OUTCOME)), WRE_ENDOGENOUS])
+    z = np.column_stack([np.ones(len(WRE_OUTCOME)), WRE_INSTRUMENT])
+    residual_dof = int(len(WRE_OUTCOME) - np.linalg.matrix_rank(x))
+
+    with pytest.raises(AnalysisError, match=CLUSTERED_INFERENCE_CLUSTER_ERROR):
+        _fit_2sls(x=x, z=z, y=WRE_OUTCOME, dof=residual_dof, clusters=clusters)
 
 
 IV_VALIDATION_CASES = [

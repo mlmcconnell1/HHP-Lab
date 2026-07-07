@@ -386,6 +386,7 @@ def _clustered_covariance(
     residuals: np.ndarray,
     clusters: pd.Series,
 ) -> np.ndarray:
+    _require_clustered_inference_clusters(clusters)
     xtx_inv = np.linalg.pinv(x.T @ x)
     meat = np.zeros((x.shape[1], x.shape[1]))
     for cluster in clusters.dropna().unique():
@@ -417,10 +418,23 @@ def _two_sided_p_value(t_stat: float, dof: int) -> float:
         return float(2.0 * (1.0 - NormalDist().cdf(abs(t_stat))))
 
 
+def _require_clustered_inference_clusters(clusters: pd.Series) -> int:
+    cluster_count = int(clusters.dropna().nunique())
+    if cluster_count < 2:
+        cluster_column = clusters.name or "cluster column"
+        raise AnalysisError(
+            "clustered standard errors require at least two non-null clusters "
+            f"in {cluster_column}; found {cluster_count}. "
+            "Use --cluster-by '' for non-clustered standard errors or broaden "
+            "the analysis sample."
+        )
+    return cluster_count
+
+
 def _cluster_denominator_dof(clusters: pd.Series | None, fallback_dof: int) -> int:
     if clusters is None:
         return fallback_dof
-    return int(clusters.dropna().nunique() - 1)
+    return _require_clustered_inference_clusters(clusters) - 1
 
 
 def _fit_ols(
