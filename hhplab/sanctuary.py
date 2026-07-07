@@ -11,6 +11,7 @@ import pandas as pd
 import hhplab.naming as naming
 from hhplab.msa import DEFINITION_VERSION as MSA_DEFINITION_VERSION
 from hhplab.msa import read_msa_county_membership, read_msa_definitions
+from hhplab.pep.pep_aggregate import load_pep_county
 from hhplab.provenance import ProvenanceBlock, write_parquet_with_provenance
 from hhplab.raw_snapshot import persist_file_snapshot
 
@@ -452,13 +453,8 @@ def write_sanctuary_msa_panel_covariate(
     definitions = read_msa_definitions(msa_definition_version, base_dir=base_dir)
     membership = read_msa_county_membership(msa_definition_version, base_dir=base_dir)
     resolved_base_dir = Path("data") if base_dir is None else Path(base_dir)
-    county_population_path = resolved_base_dir / "curated" / "pep" / "pep_county__v2020.parquet"
-    if not county_population_path.exists():
-        raise FileNotFoundError(
-            "County PEP population artifact is required for sanctuary intensity: "
-            f"{county_population_path}. Run `hhplab aggregate pep --geography county` first."
-        )
-    county_population = pd.read_parquet(county_population_path)
+    county_population_path = resolved_base_dir / "curated" / "pep"
+    county_population = load_pep_county(pep_dir=county_population_path)
     matches = build_sanctuary_msa_matches(definitions, membership)
     covariate = build_sanctuary_msa_panel_covariate(
         definitions,

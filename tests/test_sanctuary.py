@@ -6,6 +6,7 @@ import json
 from pathlib import Path
 
 import pandas as pd
+import pytest
 from typer.testing import CliRunner
 
 from hhplab.cli.main import app
@@ -14,6 +15,7 @@ from hhplab.sanctuary import (
     SANCTUARY_MSA_PANEL_COLUMNS,
     build_sanctuary_msa_matches,
     build_sanctuary_msa_panel_covariate,
+    write_sanctuary_msa_panel_covariate,
 )
 
 runner = CliRunner()
@@ -111,6 +113,52 @@ def test_build_sanctuary_msa_panel_covariate_has_binary_indicator_for_all_msas()
     assert not bool(no_match["state_match"])
     assert not bool(no_match["county_match"])
     assert not bool(no_match["city_match"])
+
+
+def test_write_sanctuary_msa_panel_discovers_pep_county_vintage(
+    monkeypatch, tmp_path: Path
+) -> None:
+    pep_dir = tmp_path / "curated" / "pep"
+    pep_dir.mkdir(parents=True)
+    COUNTY_POPULATION.to_parquet(
+        pep_dir / "pep_county__v2024__y2020-2024.parquet",
+        index=False,
+    )
+
+    monkeypatch.setattr(
+        "hhplab.sanctuary.read_msa_definitions",
+        lambda msa_definition_version, base_dir=None: DEFINITIONS,
+    )
+    monkeypatch.setattr(
+        "hhplab.sanctuary.read_msa_county_membership",
+        lambda msa_definition_version, base_dir=None: MEMBERSHIP,
+    )
+
+    result, output_path = write_sanctuary_msa_panel_covariate(base_dir=tmp_path)
+
+    assert output_path.exists()
+    assert result["doj_sanctuary_population_share"].tolist() == [0.25, 1.0, 1.0, 0.0]
+    assert result["doj_sanctuary_population_year"].tolist() == [2020, 2020, 2020, 2020]
+
+
+def test_write_sanctuary_msa_panel_missing_pep_county_error_is_actionable(
+    monkeypatch, tmp_path: Path
+) -> None:
+    monkeypatch.setattr(
+        "hhplab.sanctuary.read_msa_definitions",
+        lambda msa_definition_version, base_dir=None: DEFINITIONS,
+    )
+    monkeypatch.setattr(
+        "hhplab.sanctuary.read_msa_county_membership",
+        lambda msa_definition_version, base_dir=None: MEMBERSHIP,
+    )
+
+    with pytest.raises(FileNotFoundError) as excinfo:
+        write_sanctuary_msa_panel_covariate(base_dir=tmp_path)
+
+    message = str(excinfo.value)
+    assert "Run: hhplab ingest pep" in message
+    assert "--geography county" not in message
 
 
 def test_generate_sanctuary_msa_json(monkeypatch, tmp_path: Path) -> None:
