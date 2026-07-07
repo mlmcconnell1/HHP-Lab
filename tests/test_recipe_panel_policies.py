@@ -24,7 +24,7 @@ from shapely.geometry import box
 
 from hhplab.recipe.executor import execute_recipe
 from hhplab.recipe.executor.panel import _apply_derived_measures
-from hhplab.recipe.executor.panel_policies import collect_conformance_flags
+from hhplab.recipe.executor.panel_policies import Acs1PolicyApplier, collect_conformance_flags
 from hhplab.recipe.loader import RecipeLoadError, load_recipe
 from hhplab.recipe.manifest import read_manifest
 from hhplab.recipe.recipe_schema import PanelPolicy
@@ -1122,6 +1122,28 @@ class TestAcs1PanelPolicy:
             "acs1_vintage_used should match the resolved ACS1 input "
             "vintage (2023), not the year-1 lag heuristic (2022)"
         )
+
+    def test_acs1_vintage_used_preserved_for_early_non_unemployment_measures(self):
+        """Early ACS1 rent/mobility measures prove ACS1 data even without unemployment."""
+        panel = pd.DataFrame(
+            {
+                "metro_id": ["GF01", "GF02"],
+                "year": [2010, 2010],
+                "acs1_vintage": [2009, 2009],
+                "unemployment_rate_acs1": [pd.NA, pd.NA],
+                "rent_burden_40_plus": [0.42, pd.NA],
+                "renter_moved_share": [0.18, pd.NA],
+            }
+        )
+
+        result = Acs1PolicyApplier().apply(
+            panel,
+            policy=PanelPolicy(),
+            target_geo_type="metro",
+        )
+
+        assert result.panel.loc[0, "acs1_vintage_used"] == "2009"
+        assert pd.isna(result.panel.loc[1, "acs1_vintage_used"])
 
 
 # ===========================================================================

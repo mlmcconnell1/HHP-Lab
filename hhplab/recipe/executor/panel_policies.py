@@ -210,8 +210,11 @@ class Acs1PolicyApplier:
 
         vintage_source = "acs1_vintage" if "acs1_vintage" in panel.columns else "year"
         panel["acs1_vintage_used"] = panel[vintage_source].astype("string")
-        if "unemployment_rate_acs1" in panel.columns:
-            acs1_missing = panel["unemployment_rate_acs1"].isna()
+        acs1_measure_columns = [
+            column for column in ACS1_METRO_MEASURE_COLUMNS if column in panel.columns
+        ]
+        if acs1_measure_columns:
+            acs1_missing = panel[acs1_measure_columns].isna().all(axis=1)
             if acs1_missing.any():
                 panel.loc[acs1_missing, "acs1_vintage_used"] = pd.NA
         if "acs1_vintage" in panel.columns:
