@@ -42,7 +42,13 @@ from hhplab.covariates.mpi_contract import (
     MPI_WORKBOOK_GLOB,
     validate_mpi_workbook_contract,
 )
-from hhplab.covariates.saiz_contract import SAIZ_MEASURE_COLUMNS, SAIZ_SOURCE_ID
+from hhplab.covariates.saiz_contract import (
+    SAIZ_ESTIMATE_YEAR,
+    SAIZ_MEASURE_COLUMNS,
+    SAIZ_REQUIRED_RAW_COLUMNS,
+    SAIZ_SOURCE_ID,
+    validate_saiz_source_contract,
+)
 from hhplab.curated_policy import validate_curated_layout
 from hhplab.geo.ct_planning_regions import CtPlanningRegionCrosswalk
 from hhplab.provenance import ProvenanceBlock, read_provenance, write_parquet_with_provenance
@@ -215,6 +221,12 @@ CT_BPS_LEGACY_SOURCE_COUNTIES = tuple(
         for legacy_county, _, _ in CT_BPS_LEGACY_TO_PLANNING_ALLOCATIONS
     )
 )
+CT_BPS_BACKFILL_EXPECTED_ALLOCATION_TRUTH_TABLE = {
+    "14860": ((1, 1.0), (2, 1.0)),
+    "25540": ((3, 1.0), (4, 1.0)),
+    "35300": ((5, 0.5),),
+    "47930": ((5, 0.5),),
+}
 
 BRANCH_ROUNDTRIP_CASES = [
     pytest.param(
@@ -424,6 +436,9 @@ def test_saiz_static_msa_covariate_ingests_and_aggregates(
         }
     ).to_stata(raw, write_index=False)
 
+    contract = validate_saiz_source_contract(raw)
+    assert contract.required_raw_columns == SAIZ_REQUIRED_RAW_COLUMNS
+
     curated = ingest_covariate_source(
         SAIZ_SOURCE_ID,
         raw,
@@ -448,6 +463,34 @@ def test_saiz_static_msa_covariate_ingests_and_aggregates(
     assert provenance is not None
     assert provenance.extra["matched_msa_count"] == 1
     assert provenance.extra["unmatched_msa_count"] == 1
+
+    research_years = list(range(2015, 2026))
+    research_panel = aggregate_covariate_source(
+        SAIZ_SOURCE_ID,
+        curated_path=curated,
+        output_dir=tmp_path,
+        years=research_years,
+        target_geo="msa",
+        force=True,
+    )
+    assert research_panel.name == "covariate_panel__saiz_supply_elasticity__Y2015-2025.parquet"
+
+    research = pd.read_parquet(research_panel).set_index(["msa_id", "year"])
+    expected_index = pd.MultiIndex.from_product(
+        [["12060"], research_years],
+        names=["msa_id", "year"],
+    )
+    assert list(research.index) == list(expected_index)
+    assert research["saiz_elasticity"].tolist() == pytest.approx([2.55] * 11)
+    assert research["source_estimate_year"].tolist() == [SAIZ_ESTIMATE_YEAR] * 11
+    assert research["static_year_policy"].tolist() == ["carry_forward"] * 11
+    research_provenance = read_provenance(research_panel)
+    assert research_provenance is not None
+    assert research_provenance.extra["static_year_policy"] == {
+        "policy": "carry_forward_static_estimate_to_requested_years",
+        "source_year": SAIZ_ESTIMATE_YEAR,
+        "target_years": research_years,
+    }
 
 
 def test_mpi_contract_declares_workbook_schema_and_geography_rules() -> None:
@@ -1738,9 +1781,22 @@ def test_census_bps_msa_aggregation_backfills_named_ct_msas_2010_2014(
     )
     assert expected_index.difference(result.index).empty
     ct_rows = result.loc[expected_index]
-    assert ct_rows["permitted_units"].notna().all()
-    assert ct_rows["permitted_buildings"].notna().all()
-    assert (ct_rows["permitted_units"] > 0).all()
+    expected_units = []
+    expected_buildings = []
+    for msa_id, year in expected_index:
+        source_shares = CT_BPS_BACKFILL_EXPECTED_ALLOCATION_TRUTH_TABLE[msa_id]
+        source_units = [
+            ((year - 2000) * 100 + county_index, share)
+            for county_index, share in source_shares
+        ]
+        expected_units.append(sum(units * share for units, share in source_units))
+        expected_buildings.append(
+            sum((units // 10) * share for units, share in source_units)
+        )
+    assert ct_rows["permitted_units"].tolist() == pytest.approx(expected_units)
+    assert ct_rows["permitted_buildings"].tolist() == pytest.approx(
+        expected_buildings
+    )
     assert ct_rows["coverage_ratio"].tolist() == pytest.approx(
         [1.0] * len(expected_index)
     )

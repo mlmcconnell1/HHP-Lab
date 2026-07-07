@@ -48,7 +48,13 @@ from hhplab.covariates.mpi_contract import (
     MPI_SOURCE_ID,
     validate_mpi_workbook_contract,
 )
-from hhplab.covariates.saiz_contract import SAIZ_ESTIMATE_YEAR, SAIZ_SOURCE_ID
+from hhplab.covariates.saiz_contract import (
+    SAIZ_ESTIMATE_YEAR,
+    SAIZ_MATCH_DIAGNOSTIC_COLUMNS,
+    SAIZ_REQUIRED_RAW_COLUMNS,
+    SAIZ_SOURCE_ID,
+    validate_saiz_source_contract,
+)
 from hhplab.metro.metro_definitions import STATE_ABBREV_TO_FIPS
 from hhplab.msa import DEFINITION_VERSION as DEFAULT_MSA_DEFINITION_VERSION
 from hhplab.msa.msa_io import read_msa_definitions
@@ -474,11 +480,9 @@ def _ingest_saiz_supply_elasticity(
     spec: CovariateSourceSpec,
     destination: Path,
 ) -> Path:
-    if source_path.suffix.lower() != ".dta":
-        raise ValueError("Saiz supply elasticity ingest expects the staged .dta source file.")
+    validate_saiz_source_contract(source_path)
     raw = pd.read_stata(source_path)
-    required = {"msanecma", "population", "msaname", "WRLURI", "unaval", "elasticity"}
-    missing = sorted(required - set(raw.columns))
+    missing = sorted(set(SAIZ_REQUIRED_RAW_COLUMNS) - set(raw.columns))
     if missing:
         raise ValueError(f"Saiz raw data is missing required columns: {missing}")
 
@@ -542,7 +546,7 @@ def _ingest_saiz_supply_elasticity(
     matched = pd.DataFrame(rows)
     matched_rows = matched[matched["saiz_name"].notna()].copy()
     normalized = normalize_covariate_frame(matched_rows, spec=spec)
-    diagnostic_columns = ["msa_id", "msa_name", "saiz_msanecma", "saiz_name", "saiz_match_rule"]
+    diagnostic_columns = list(SAIZ_MATCH_DIAGNOSTIC_COLUMNS)
     diagnostics = matched[diagnostic_columns].to_dict(orient="records")
     raw_sha256 = _sha256(source_path)
     return _finalize_covariate_curated(

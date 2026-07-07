@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import warnings
 from pathlib import Path
 
 import pandas as pd
@@ -478,6 +479,56 @@ class TestAnalyzeCli:
         assert policy["asymptotic_p_value"] != policy["p_value"]
         assert not bool(rent["inference_term"])
         assert rent["p_value"] == rent["asymptotic_p_value"]
+
+    def test_regress_permutation_single_predictor_does_not_warn(
+        self,
+        tmp_path: Path,
+    ):
+        panel = _panel_fixture(tmp_path / "panel.parquet")
+        output = tmp_path / "regress_permutation.parquet"
+
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter("always")
+            result = runner.invoke(
+                app,
+                [
+                    "analyze",
+                    "regress",
+                    "--panel",
+                    str(panel),
+                    "--outcome",
+                    "pit_total",
+                    "--predictors",
+                    "policy_indicator",
+                    "--no-entity-fe",
+                    "--no-year-fe",
+                    "--cluster-by",
+                    "",
+                    "--inference",
+                    "permutation",
+                    "--inference-reps",
+                    "19",
+                    "--inference-seed",
+                    "456",
+                    "--inference-terms",
+                    "policy_indicator",
+                    "--output",
+                    str(output),
+                    "--json",
+                ],
+            )
+
+        runtime_warnings = [
+            warning
+            for warning in caught
+            if issubclass(warning.category, RuntimeWarning)
+        ]
+        assert runtime_warnings == []
+        assert result.exit_code == 0
+
+        payload = json.loads(result.output)
+        assert payload["inference"] == "permutation"
+        assert payload["inference_terms"] == ["policy_indicator"]
 
     def test_regress_permutation_rejects_fixed_effect_models(self, tmp_path: Path):
         panel = _panel_fixture(tmp_path / "panel.parquet")

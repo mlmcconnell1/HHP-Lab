@@ -19,6 +19,7 @@ from hhplab.covariates.irs_soi_contract import (
     IRS_SOI_SOURCE_ID,
 )
 from hhplab.covariates.mpi_contract import MPI_ESTIMATE_YEAR, MPI_SOURCE_ID
+from hhplab.covariates.saiz_contract import SAIZ_ESTIMATE_YEAR, SAIZ_SOURCE_ID
 from hhplab.geo.ct_planning_regions import (
     CT_LEGACY_COUNTY_VINTAGE,
     CT_PLANNING_REGION_VINTAGE,
@@ -37,6 +38,10 @@ from hhplab.provenance import ProvenanceBlock, read_provenance, write_parquet_wi
 FREEZING_C = 0.0
 EMERGENCY_SHELTER_ACTIVATION_C = 4.4
 PRISM_TMIN_SOURCE_ID = "prism_tmin_january"
+STATIC_COVARIATE_SOURCE_YEARS = {
+    MPI_SOURCE_ID: MPI_ESTIMATE_YEAR,
+    SAIZ_SOURCE_ID: SAIZ_ESTIMATE_YEAR,
+}
 
 
 def default_covariate_panel_path(
@@ -111,15 +116,23 @@ def aggregate_covariate_source(
             f"Curated covariate file not found: {input_path}. "
             f"Run `hhplab ingest covariate --source {source_id}` first."
         )
-    destination = (
-        Path(output_path)
-        if output_path is not None
-        else _covariate_panel_path_from_input(
+    requested_years = list(years) if years is not None else None
+    static_source_year = STATIC_COVARIATE_SOURCE_YEARS.get(source_id)
+    if output_path is not None:
+        destination = Path(output_path)
+    elif requested_years and static_source_year is not None:
+        base = curated_dir("covariates") if output_dir is None else Path(output_dir)
+        destination = base / covariate_panel_filename(
+            source_id,
+            min(requested_years),
+            max(requested_years),
+        )
+    else:
+        destination = _covariate_panel_path_from_input(
             source_id=source_id,
             input_path=input_path,
             output_dir=output_dir,
         )
-    )
     if destination.exists() and not force:
         return destination
 
@@ -137,17 +150,17 @@ def aggregate_covariate_source(
     if missing:
         raise ValueError(f"Curated covariate file missing required columns: {missing}")
     static_year_policy = None
-    if source_id == MPI_SOURCE_ID and years is not None:
+    if static_source_year is not None and years is not None:
         df = expand_static_covariate_years(
             df,
             years=years,
-            source_year=MPI_ESTIMATE_YEAR,
+            source_year=static_source_year,
             source_id=source_id,
         )
         static_year_policy = {
             "policy": "carry_forward_static_estimate_to_requested_years",
-            "source_year": MPI_ESTIMATE_YEAR,
-            "target_years": list(years),
+            "source_year": static_source_year,
+            "target_years": requested_years,
         }
 
     if years is not None and source_id != IRS_SOI_SOURCE_ID:
@@ -196,7 +209,12 @@ def aggregate_covariate_source(
                 mpi_msa_rows=mpi_msa_rows,
             )
     else:
-        result = df[required].copy()
+        passthrough_columns = [
+            column
+            for column in ("source_estimate_year", "static_year_policy")
+            if column in df.columns
+        ]
+        result = df[[*required, *passthrough_columns]].copy()
     if years is not None:
         result = result[result["year"].isin(years)].copy()
     coverage_policy = _coverage_policy(
