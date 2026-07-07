@@ -43,7 +43,8 @@ national January ZORI growth over all 393 MSAs (`bartik_*`). Long-difference
 instruments use the static exposures directly.
 
 Panels: `outputs/supply_iv/top50_msa_supply_iv_fd.parquet` (400 rows),
-`..._longdiff.parquet` (n=50), built by `outputs/supply_iv/build_supply_iv_panel.py`.
+`..._longdiff.parquet` (n=50), built by tracked script
+`scripts/build_supply_iv_panel.py`.
 
 ## Results
 
@@ -163,8 +164,9 @@ sample.
 
 ## Artifacts
 
-All under `outputs/supply_iv/` (gitignored): `build_supply_iv_panel.py`,
+Panel/regression outputs remain under `outputs/supply_iv/` (gitignored):
 `top50_msa_supply_iv_fd.parquet`, `top50_msa_supply_iv_fd_precovid.parquet`,
 `top50_msa_supply_iv_longdiff.parquet`, `saiz_match_audit.csv`, and one
-`<spec>.parquet` + `<spec>.json` + manifest per regression named
-`fd_*` / `ld_*` as in the tables above.
+`<spec>.parquet` + `<spec>.json` + manifest per regression named `fd_*` /
+`ld_*` as in the tables above. The panel-construction script is tracked at
+`scripts/build_supply_iv_panel.py`.
