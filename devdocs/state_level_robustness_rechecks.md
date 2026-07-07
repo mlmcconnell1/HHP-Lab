@@ -96,11 +96,48 @@ the edge (p=0.0028->0.0511) too, though the point estimates don't collapse
 toward zero (if anything the base effect gets larger). Given the thin
 top-50-only identification (mirroring the jail check's finding that the
 top-50 cohort's state x year FE is a much weaker instrument than the pooled
-cohort's), this result should be treated with real caution either way -- not
-confidently reversed, but not confidently defended either. A pooled
-top-150 version of the migration panel (not built; IRS SOI migration work
-was top-50-only in this project to date) would be the way to actually
-resolve it, mirroring how pooling helped the core rent elasticity check.
+cohort's), this result was treated as inconclusive pending a pooled version.
+
+### 4b. Pooled top-150 rebuild (2026-07-07, resolves the ambiguity)
+
+Built `scripts/build_irs_migration_pooled_panel.py`: reuses the already-
+registered `irs_soi_migration` covariate's existing MSA-level curated panel
+(`covariate_panel__irs_soi_migration__Y2012-2023.parquet`, already covers
+all 387 MSAs including the full rank-51-150 cohort -- no new aggregation
+needed), applies the documented irs_year=pit_year-1 alignment (verified
+exactly against the existing top-50 file: its year==2023 row's
+`inflow_returns` matches the raw IRS panel's year==2022 value bit for bit),
+and reconstructs `churn_rate`/`net_rate`/the interaction term (all verified
+exact matches to the existing file's formulas). Rebuilding the top-50-only
+subset from this pipeline reproduces the original result exactly
+(b=-0.0903, p=0.0574, n=350) -- the pipeline is faithful.
+
+Pooled (n=953, 137 MSAs, 123 of 137 in multi-MSA states -- well-identified,
+same power class as the other pooled checks):
+
+| Term | Plain year FE | State x year FE |
+| --- | ---: | ---: |
+| `d_log_zori` (base rent effect) | b=+1.488, p=0.199 | b=+1.669, p=0.369 |
+| `d_log_zori x churn_rate` (interaction) | b=+0.015, p=0.715 | b=+0.011, p=0.861 |
+
+**The interaction doesn't just lose significance, it disappears and flips
+toward zero-positive from the original -0.090.** This resolves the earlier
+"thin identification, inconclusive" verdict more decisively than expected --
+and not primarily via the state-level channel this whole audit was built
+around. Diagnosis: on the identical n=953 complete-case sample, dropping the
+interaction term entirely (keeping `churn_rate` only as a plain control)
+leaves the base rent effect strong and stable (b=+1.86, p=0.0002); adding the
+interaction term is what destabilizes the base coefficient (p=0.0002->0.199).
+That is a classic multicollinearity signature (the interaction term and its
+main effect competing for the same variance), not a state-policy confound --
+confirmed by checking the base-only (no churn) spec under state x year FE on
+the same restricted sample: it holds up fine (b=+1.963, p=0.012), consistent
+with finding 2 above. **The churn-buffering interaction, specifically, does
+not replicate outside the top-50 cohort it was found in.** Whether that
+means it's a genuine large-metro-specific phenomenon or was a small-sample
+artifact from the start isn't resolved here, but it should not be treated as
+an established finding going forward -- upgrade from "inconclusive" to "did
+not replicate."
 
 ## Summary
 
@@ -109,16 +146,19 @@ resolve it, mirroring how pooling helped the core rent elasticity check.
 | Sanctuary -> sheltered/beds growth | Strong | **Confirmed** (survives state-clustered SE and CA exclusion, ~25% attenuation) |
 | Core rent-shock elasticity (~1.6-1.9) | Strong | **Confirmed** (barely moves under state x year FE) |
 | Overdose deaths vs PSH beds | Marginal | **Explained away** (state x year FE erases it) |
-| IRS migration churn x rent-shock | Marginal | **Weakened, unresolved** (thin top-50 identification; pooling would help) |
+| IRS migration churn x rent-shock | Marginal | **Did not replicate** (pooled top-150 rebuild: b flips from -0.090 to +0.015/+0.011, null under both plain and state x year FE) |
 
-The two flagship findings (sanctuary, core elasticity) hold up. The two
+The two flagship findings (sanctuary, core elasticity) hold up. Both
 findings that were already marginal before this pass get materially weaker
-evidence, one decisively (overdose/PSH) and one inconclusively due to sample
-thinness (IRS churn). No finding flipped sign or reversed direction the way
-the jail-vs-unsheltered correlation did in the original Vera work -- this
-pass didn't find a new "looked real, was actually a state artifact"
-surprise, just confirmed two strong results and further weakened two that
-were already flagged as marginal.
+evidence, and both now have a clear verdict: overdose/PSH is explained away
+by state x year FE directly, and IRS churn simply doesn't replicate once
+pooled to 150 MSAs (a multicollinearity issue in the interaction
+specification itself, not primarily a state-level confound -- see section
+4b). No finding flipped sign or reversed direction the way the
+jail-vs-unsheltered correlation did in the original Vera work -- this pass
+confirmed two strong results and closed out two marginal ones, one via the
+state-FE channel this audit was built around and one via a pooling check
+that turned out to be the more decisive test.
 
 ## Artifacts
 
