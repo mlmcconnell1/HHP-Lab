@@ -483,7 +483,11 @@ def test_vera_missing_dataset_remediation_uses_ingest_command(tmp_path: Path) ->
     assert "derive incarceration rates" in findings[0].remediation.hint
 
 
-def test_pep_msa_missing_dataset_remediation_uses_aggregate_command(tmp_path: Path) -> None:
+@pytest.mark.parametrize("county_vintage", [2023, 2020], ids=["default-county", "recipe-county"])
+def test_pep_msa_missing_dataset_remediation_uses_aggregate_command(
+    tmp_path: Path,
+    county_vintage: int,
+) -> None:
     recipe = load_recipe(
         {
             "version": 1,
@@ -503,7 +507,8 @@ def test_pep_msa_missing_dataset_remediation_uses_aggregate_command(tmp_path: Pa
                     "file_set": {
                         "path_template": (
                             "data/curated/pep/"
-                            "pep__msa__Y{year}@Mcensusmsa2023xC2023__wpopulation.parquet"
+                            "pep__msa__Y{year}@Mcensusmsa2023"
+                            f"xC{county_vintage}__wpopulation.parquet"
                         ),
                         "segments": [
                             {
@@ -544,7 +549,7 @@ def test_pep_msa_missing_dataset_remediation_uses_aggregate_command(tmp_path: Pa
     assert findings[0].remediation is not None
     assert findings[0].remediation.command == (
         "hhplab aggregate pep --target-geo msa --msa-definition-version "
-        "census_msa_2023 --counties 2023 --years 2021-2022"
+        f"census_msa_2023 --counties {county_vintage} --years 2021-2022"
     )
 
 

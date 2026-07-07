@@ -510,6 +510,7 @@ def _dataset_remediation(ds_id: str, ds, *, years: list[int] | None = None) -> R
         native_type = getattr(ds.native_geometry, "type", None)
         if native_type == "msa":
             source = getattr(ds.native_geometry, "source", None) or "census_msa_2023"
+            county_vintage = _pep_msa_county_vintage_for_remediation(ds)
             year_arg = _format_years_for_command(years)
             return Remediation(
                 hint=(
@@ -519,7 +520,8 @@ def _dataset_remediation(ds_id: str, ds, *, years: list[int] | None = None) -> R
                 ),
                 command=(
                     "hhplab aggregate pep --target-geo msa "
-                    f"--msa-definition-version {source} --counties 2023 --years {year_arg}"
+                    f"--msa-definition-version {source} --counties {county_vintage} "
+                    f"--years {year_arg}"
                 ),
             )
 
@@ -640,6 +642,55 @@ def _format_years_for_command(years: list[int] | None) -> str:
     if unique_years == list(range(unique_years[0], unique_years[-1] + 1)):
         return f"{unique_years[0]}-{unique_years[-1]}"
     return ",".join(str(year) for year in unique_years)
+
+
+def _pep_msa_county_vintage_for_remediation(ds) -> str:
+    """Return the county vintage needed to build a PEP MSA recipe artifact."""
+    county_vintage = ds.params.get("county_vintage")
+    if county_vintage is not None:
+        return str(county_vintage)
+
+    native_vintage = getattr(ds.native_geometry, "vintage", None)
+    if native_vintage is not None:
+        return str(native_vintage)
+
+    if ds.path is not None:
+        path_vintage = _county_vintage_from_encoded_path(ds.path)
+        if path_vintage is not None:
+            return path_vintage
+
+    if ds.file_set is not None:
+        for seg in ds.file_set.segments:
+            for override_path in seg.overrides.values():
+                override_vintage = _county_vintage_from_encoded_path(override_path)
+                if override_vintage is not None:
+                    return override_vintage
+
+            years = sorted(expand_year_spec(seg.years))
+            if not years:
+                continue
+            sample_year = years[0]
+            render_ctx: dict[str, object] = {"year": sample_year}
+            render_ctx.update(seg.constants)
+            render_ctx.update(
+                {key: sample_year + offset for key, offset in seg.year_offsets.items()}
+            )
+            try:
+                rendered_path = ds.file_set.path_template.format(**render_ctx)
+            except (KeyError, IndexError, ValueError):
+                rendered_path = ds.file_set.path_template
+            template_vintage = _county_vintage_from_encoded_path(rendered_path)
+            if template_vintage is not None:
+                return template_vintage
+
+    return "<county-vintage>"
+
+
+def _county_vintage_from_encoded_path(path: str) -> str | None:
+    match = re.search(r"xC(?P<vintage>[A-Za-z0-9-]+)(?=__|[./@]|$)", path)
+    if match is None:
+        return None
+    return match.group("vintage")
 
 
 def _msa_transform_remediation(
