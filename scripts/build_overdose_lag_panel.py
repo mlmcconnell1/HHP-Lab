@@ -156,12 +156,31 @@ def merge_hic_categories(levels: pd.DataFrame) -> pd.DataFrame:
     return merged
 
 
+def add_psh_diffs(levels: pd.DataFrame) -> pd.DataFrame:
+    """PSH log-rate, first difference, and lag terms, mirroring the
+    unshelt/total/shelt treatment in add_diffs. Requires merge_hic_categories
+    to have already run (needs psh_per_1000) and add_diffs to have already
+    run (needs year_gap)."""
+    if "psh_per_1000" not in levels.columns:
+        return levels
+    levels = levels.sort_values(["msa_id", "year"]).copy()
+    levels["log_psh_rate"] = np.where(
+        levels["psh_per_1000"] > 0, np.log(levels["psh_per_1000"]), np.nan
+    )
+    grouped = levels.groupby("msa_id")
+    levels["d_log_psh_rate"] = grouped["log_psh_rate"].diff()
+    levels["log_psh_rate_lag1"] = grouped["log_psh_rate"].shift(1)
+    levels["d_log_psh_rate_lag1"] = levels.groupby("msa_id")["d_log_psh_rate"].shift(1)
+    return levels
+
+
 def main() -> None:
     OUT.mkdir(parents=True, exist_ok=True)
     pooled = load_pooled_base_panel()
     merged = merge_overdose(pooled)
     merged = add_diffs(merged)
     merged = merge_hic_categories(merged)
+    merged = add_psh_diffs(merged)
 
     levels_path = OUT / "overdose_lag_levels.parquet"
     merged.to_parquet(levels_path, index=False)

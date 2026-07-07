@@ -241,6 +241,61 @@ unsheltered/total/sheltered above -- that would test whether *within-MSA
 growth* in PSH capacity predicts *subsequent* overdose growth, a much
 stronger test than this cross-sectional correlation.
 
+## PSH Entity+Year-FE Lag Design (2026-07-07)
+
+Ran PSH beds/capita through the identical 5-spec design used for
+unsheltered/total/sheltered above (`log_psh_rate`, `d_log_psh_rate`, and
+their lag-1 counterparts, added to `build_overdose_lag_panel.py`). This
+removes between-MSA level differences (city size, baseline drug-market
+conditions, homelessness-system scale) that the raw correlation above cannot
+-- it isolates whether a metro's *own* PSH capacity moving up or down
+predicts its *own* subsequent overdose deaths moving up or down.
+
+| Spec | Term | Estimate | SE | p | n |
+| --- | --- | ---: | ---: | ---: | ---: |
+| A: levels, contemporaneous | `log_psh_rate` | +0.065 | 0.058 | 0.260 | 455 |
+| B: levels, lag1 (mixed 1/2-yr gap) | `log_psh_rate_lag1` | +0.094 | 0.053 | 0.081 | 372 |
+| B1: levels, lag1 (strict 1-yr gap) | `log_psh_rate_lag1` | +0.053 | 0.044 | 0.227 | 175 |
+| C: FD, contemporaneous | `d_log_psh_rate` | -0.031 | 0.051 | 0.538 | 274 |
+| D: FD, with lag1 (lag term) | `d_log_psh_rate_lag1` | +0.102 | 0.054 | 0.066 | 175 |
+| D: FD, with lag1 (contemp term) | `d_log_psh_rate` | +0.024 | 0.051 | 0.641 | 175 |
+
+**The signal shrinks a lot once fixed effects strip out between-MSA
+differences, but doesn't fully disappear.** PSH's pooled cross-sectional
+correlation was the strongest of any category (r=+0.386-0.434). Here, the
+two lag-oriented specs (B, D) are directionally consistent and positive
+(as hypothesized: more PSH now -> more overdose next year) at marginal
+significance (p=0.066-0.081), while the two contemporaneous specs (A, C)
+are null. That's a materially weaker result than the raw correlation
+suggested -- most of what made PSH stand out cross-sectionally is between-MSA
+variation (bigger PSH systems sit in bigger/denser metros with more overdose
+deaths for other reasons), not a clean within-MSA lag relationship.
+
+The lag signal is also **not robust to the same strict-gap check applied
+throughout this doc**: restricting to observations with an exact 1-year lag
+(B1) weakens it from p=0.081 to p=0.227 (b: +0.094 -> +0.053) -- the
+opposite pattern from sheltered's B/B1 pair earlier in this doc, where the
+strict-gap restriction *strengthened* the signal. That inconsistency (some
+margins get stronger, PSH gets weaker, under the identical sample-restriction
+choice) is itself evidence this whole family of estimates is dominated by
+sampling noise at n=175-372, not a stable underlying relationship in any
+direction.
+
+**Bottom line on the anecdote**: the entity+year-FE test -- the right test
+for "does more PSH capacity precede more overdose deaths in the same
+metro" -- gives a directionally consistent but only marginally significant
+and non-robust positive result. It neither confirms nor cleanly refutes the
+mechanism your Boulder review suggests; it says the cross-sectional PSH-
+overdose association is mostly a between-metro pattern, with at most a weak,
+fragile within-metro echo of it. This is not a place to stop if the question
+matters to you -- the measurement gap noted throughout this doc (PIT/HIC data
+cannot see individual formerly-homeless decedents, only aggregate
+metro-year capacity and death counts) means no aggregate panel design can
+really adjudicate a claim that's fundamentally about individual histories.
+Person-level or cohort linkage (e.g., matching PSH tenancy records to
+coroner/ME data, which is what the Boulder autopsy review effectively did at
+n=1 county) would be the only design that directly tests it.
+
 ## Artifacts
 
 `outputs/overdose_lag/` (gitignored): `overdose_lag_levels.parquet`,
@@ -249,6 +304,7 @@ stronger test than this cross-sectional correlation.
 `key_coefficients_by_margin.csv`, `hic_by_category/panel__msa-rollup-hic__*.parquet`
 (per-year `aggregate coc-measure` outputs), `hic_by_category_pooled.parquet`,
 `overdose_hic_by_category.parquet`, `hic_category_correlations_pooled.csv`,
-`hic_category_correlations_by_year.csv`. Build scripts:
+`hic_category_correlations_by_year.csv`, `spec_{a,b,b1,c,d}_psh_*.parquet` +
+`{A,B,B1,C,D}_psh_*_result.{parquet,json}`. Build scripts:
 `scripts/build_overdose_lag_panel.py`,
 `scripts/overdose_hic_category_correlations.py`.
