@@ -601,6 +601,50 @@ def test_irs_soi_ingest_reports_pair_reconciliation_mismatches(
     assert pairs.loc[0, "migration_returns"] == 11
 
 
+def test_irs_soi_ingest_sums_duplicate_pair_rows_within_perspective(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    monkeypatch.setattr("hhplab.covariates.ingest.register_source", lambda **_: None)
+    raw_dir = tmp_path / "irs_soi"
+    raw_dir.mkdir()
+    duplicate_inflow_row = {
+        **IRS_SOI_ROW_TRUTH_TABLE["inflow_flow"]["row"],
+        "n1": "5",
+        "n2": "10",
+        "agi": "50",
+    }
+    pd.DataFrame(
+        [IRS_SOI_ROW_TRUTH_TABLE["inflow_flow"]["row"], duplicate_inflow_row]
+    ).to_csv(raw_dir / "countyinflow2122.csv", index=False)
+    pd.DataFrame([IRS_SOI_ROW_TRUTH_TABLE["outflow_flow"]["row"]]).to_csv(
+        raw_dir / "countyoutflow2122.csv",
+        index=False,
+    )
+
+    curated = ingest_covariate_source(
+        IRS_SOI_SOURCE_ID,
+        raw_dir,
+        output_dir=tmp_path,
+        force=True,
+    )
+
+    county = pd.read_parquet(curated).set_index("county_fips")
+    assert county.loc["06037", "inflow_returns"] == 16
+    assert county.loc["06037", "inflow_exemptions"] == 32
+    assert county.loc["06037", "inflow_agi_thousands"] == 380
+
+    provenance = read_provenance(curated)
+    assert provenance is not None
+    pairs = pd.read_parquet(Path(provenance.extra["pair_output_path"]))
+    inflow_pair = pairs.set_index(
+        ["origin_county_fips", "destination_county_fips"]
+    ).loc[("12086", "06037")]
+    assert inflow_pair["migration_returns"] == 16
+    assert inflow_pair["migration_exemptions"] == 32
+    assert inflow_pair["migration_agi_thousands"] == 380
+
+
 def test_irs_soi_ingest_rejects_missing_or_renamed_columns(
     tmp_path: Path,
     monkeypatch,

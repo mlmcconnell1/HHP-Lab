@@ -999,6 +999,14 @@ def _irs_soi_pair_table(
             ),
             [],
         )
+    keys = ["year", "origin_county_fips", "destination_county_fips", "perspective"]
+    combined = (
+        combined.groupby(keys, as_index=False, dropna=False)[
+            ["returns", "exemptions", "agi_thousands"]
+        ]
+        .sum()
+        .reset_index(drop=True)
+    )
     reconciliation = _irs_soi_pair_reconciliation_mismatches(combined)
     combined["perspective_rank"] = combined["perspective"].map({"inflow": 0, "outflow": 1})
     combined = combined.sort_values("perspective_rank").drop_duplicates(
