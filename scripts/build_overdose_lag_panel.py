@@ -89,19 +89,28 @@ def merge_overdose(pooled: pd.DataFrame) -> pd.DataFrame:
     return merged
 
 
+HOMELESS_MARGINS = ("unshelt", "total", "shelt")
+MARGIN_LOG_COLUMN = {
+    "unshelt": "log_unshelt_rate",
+    "total": "log_total_rate",
+    "shelt": "log_shelt_rate",
+}
+
+
 def add_diffs(levels: pd.DataFrame) -> pd.DataFrame:
     levels = levels.sort_values(["msa_id", "year"]).copy()
     grouped = levels.groupby("msa_id")
     levels["year_gap"] = grouped["year"].diff()
     levels["d_log_overdose_rate"] = grouped["log_overdose_rate"].diff()
-    levels["d_log_unshelt_rate"] = grouped["log_unshelt_rate"].diff()
-    levels["d_log_total_rate"] = grouped["log_total_rate"].diff()
     levels["d_log_zori"] = grouped["log_zori"].diff()
     levels["d_log_pop"] = grouped["log_pop"].diff()
-    levels["log_unshelt_rate_lag1"] = grouped["log_unshelt_rate"].shift(1)
     levels["overdose_coverage_ratio_lag1"] = grouped["overdose_coverage_ratio"].shift(1)
-    levels["d_log_unshelt_rate_lag1"] = grouped["d_log_unshelt_rate"].shift(1)
     levels["lag1_year_gap"] = grouped["year_gap"].shift(1)
+    for margin, log_col in MARGIN_LOG_COLUMN.items():
+        d_col = f"d_log_{margin}_rate"
+        levels[d_col] = grouped[log_col].diff()
+        levels[f"{log_col}_lag1"] = grouped[log_col].shift(1)
+        levels[f"{d_col}_lag1"] = levels.groupby("msa_id")[d_col].shift(1)
     return levels
 
 

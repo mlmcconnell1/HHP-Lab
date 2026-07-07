@@ -1,12 +1,28 @@
-# Unsheltered Homelessness -> Overdose Deaths: Lag Screen (pooled top-150)
+# Homelessness -> Overdose Deaths: Lag Screen (pooled top-150)
 
-Date: 2026-07-07
+Date: 2026-07-07 (extended to total/sheltered margins same day)
 
 ## Question
 
-Does an increase in unsheltered homelessness predict an increase in drug
-overdose deaths with a time lag, using the pooled top-50 + rank-51-150 MSA
-cohort (150 MSAs) to get more power than the top-50 cohort alone offers?
+Does an increase in homelessness predict an increase in drug overdose deaths
+with a time lag, using the pooled top-50 + rank-51-150 MSA cohort (150 MSAs)
+to get more power than the top-50 cohort alone offers? Run across all three
+PIT margins (unsheltered, total, sheltered) for completeness, prompted by an
+anecdotal observation (Boulder County, CO autopsy-report review, 2023: ~50%
+of overdose decedents were homeless or formerly homeless in permanent
+supportive housing).
+
+**Measurement mismatch with the anecdote, stated up front**: HUD's PIT
+taxonomy does not count Permanent Supportive Housing (PSH) residents as
+homeless once housed -- PSH is tracked as permanent housing inventory (HIC),
+not a PIT sheltered/unsheltered category. Neither margin in this panel can
+see the "formerly homeless, now in PSH" population the anecdote describes.
+`sheltered` here means emergency shelter + transitional housing + Safe Haven
+on a single January night, not PSH tenure. This screen can only test whether
+*current* PIT homelessness levels predict *subsequent* overdose deaths in the
+same metro -- a different, weaker test than the anecdote's within-population
+claim, and one that would silently understate any real relationship running
+through the PSH-exit pathway.
 
 ## Data and Construction
 
@@ -45,45 +61,70 @@ transition would need an unavailable 2021-22 lag.
 ## Specs and Results
 
 All models: entity+year FE for levels, year FE for first differences;
-clustered SEs by `msa_id`; `overdose_coverage_ratio >= 0.8` applied.
+clustered SEs by `msa_id`; `overdose_coverage_ratio >= 0.8` applied. Run
+identically across all three PIT margins (`unshelt`, `total`, `shelt`).
 
-| Spec | Term | Estimate | SE | p | n | MSAs |
-| --- | --- | ---: | ---: | ---: | ---: | ---: |
-| A: levels, contemporaneous | `log_unshelt_rate` | -0.003 | 0.046 | 0.953 | 455 | 113 |
-| A: levels, contemporaneous | `log_zori` | -0.758 | 0.275 | 0.007 | 455 | 113 |
-| B: levels, unsheltered lag1 (mixed 1/2-yr gap) | `log_unshelt_rate_lag1` | -0.064 | 0.037 | 0.082 | 371 | 113 |
-| B: levels, unsheltered lag1 (mixed 1/2-yr gap) | `log_zori` | -0.975 | 0.499 | 0.053 | 371 | 113 |
-| B1: levels, unsheltered lag1 (strict 1-yr gap only) | `log_unshelt_rate_lag1` | -0.122 | 0.056 | 0.033 | 175 | 97 |
-| B1: levels, unsheltered lag1 (strict 1-yr gap only) | `log_zori` | +0.445 | 0.944 | 0.638 | 175 | 97 |
-| C: FD, contemporaneous | `d_log_unshelt_rate` | +0.038 | 0.032 | 0.240 | 274 | 104 |
-| C: FD, contemporaneous | `d_log_zori` | -0.673 | 0.435 | 0.125 | 274 | 104 |
-| D: FD, with lag1 | `d_log_unshelt_rate_lag1` | -0.071 | 0.038 | 0.068 | 175 | 97 |
-| D: FD, with lag1 | `d_log_unshelt_rate` (contemp) | +0.041 | 0.040 | 0.306 | 175 | 97 |
-| D: FD, with lag1 | `d_log_zori` | -0.747 | 0.667 | 0.265 | 175 | 97 |
+| Spec | Margin | Term | Estimate | SE | p | n |
+| --- | --- | --- | ---: | ---: | ---: | ---: |
+| A: levels, contemporaneous | unsheltered | `log_unshelt_rate` | -0.003 | 0.046 | 0.953 | 455 |
+| A: levels, contemporaneous | total | `log_total_rate` | +0.128 | 0.071 | 0.076 | 455 |
+| A: levels, contemporaneous | sheltered | `log_shelt_rate` | +0.081 | 0.065 | 0.210 | 455 |
+| B: levels, lag1 (mixed 1/2-yr gap) | unsheltered | `log_unshelt_rate_lag1` | -0.064 | 0.037 | 0.082 | 371 |
+| B: levels, lag1 (mixed 1/2-yr gap) | total | `log_total_rate_lag1` | +0.041 | 0.069 | 0.559 | 372 |
+| B: levels, lag1 (mixed 1/2-yr gap) | sheltered | `log_shelt_rate_lag1` | +0.126 | 0.064 | 0.053 | 372 |
+| B1: levels, lag1 (strict 1-yr gap) | unsheltered | `log_unshelt_rate_lag1` | -0.122 | 0.056 | 0.033 | 175 |
+| B1: levels, lag1 (strict 1-yr gap) | total | `log_total_rate_lag1` | -0.148 | 0.100 | 0.141 | 175 |
+| B1: levels, lag1 (strict 1-yr gap) | sheltered | `log_shelt_rate_lag1` | +0.165 | 0.112 | 0.145 | 175 |
+| C: FD, contemporaneous | unsheltered | `d_log_unshelt_rate` | +0.038 | 0.032 | 0.240 | 274 |
+| C: FD, contemporaneous | total | `d_log_total_rate` | +0.070 | 0.061 | 0.251 | 274 |
+| C: FD, contemporaneous | sheltered | `d_log_shelt_rate` | -0.046 | 0.055 | 0.402 | 274 |
+| D: FD, with lag1 (lag term) | unsheltered | `d_log_unshelt_rate_lag1` | -0.071 | 0.038 | 0.068 | 175 |
+| D: FD, with lag1 (lag term) | total | `d_log_total_rate_lag1` | -0.099 | 0.068 | 0.153 | 175 |
+| D: FD, with lag1 (lag term) | sheltered | `d_log_shelt_rate_lag1` | -0.017 | 0.078 | 0.827 | 175 |
+
+`log_zori` and FD-contemp coefficients for each spec/margin are in the full
+result files; omitted here for brevity since the rent coefficient's pattern
+(negative, sometimes marginal, flips sign in B1) is materially the same
+across all three margins and discussed once below.
 
 ## Interpretation
 
-**No evidence supports the hypothesized direction (more unsheltered
-homelessness -> more overdose deaths with a lag).** Every spec's lagged or
-contemporaneous unsheltered term is either indistinguishable from zero
-(spec A, C) or negative (spec B, B1, D) -- the opposite sign from the
-hypothesis. None of this should be read as "homelessness reduces overdose
-deaths" either: the one place the negative coefficient reaches conventional
-significance (B1, p=0.033) is **not stable** -- it moves from -0.064
-(p=0.082) to -0.122 (p=0.033) simply by dropping the 99 rows that used a
-2-year instead of 1-year lag gap, a sample-definition choice that shouldn't
-matter for a real effect. That instability, combined with n=175-274 and only
-2-3 usable annual transitions total, reads as underpowered/noisy rather than
-a genuine relationship in either direction.
+**No margin, at any lag structure, supports "more homelessness -> more
+overdose deaths" at conventional significance and with stability.** The
+closest thing to a positive, hypothesis-consistent signal is **sheltered**
+homelessness in the levels-lag1 spec (B: +0.126, p=0.053) -- directionally
+positive and just short of significance, unlike unsheltered's negative
+-0.064 (p=0.082) in the identical spec. But it doesn't hold up as evidence:
+it weakens (not flips) to +0.165, p=0.145 in the strict 1-year-gap
+subsample (B1) -- same direction, lost significance, small n=175. Total
+tracks between the two (weak positive in levels-contemp, p=0.076; flips
+negative under the strict-lag filter, p=0.141) -- the least stable of the
+three, as expected for a sum of two series pointing different directions.
+Unsheltered's B1 result (-0.122, p=0.033) is the only nominally-significant
+coefficient across all 15 term/margin combinations, and it's negative --
+opposite the hypothesis -- and itself unstable (see prior write-up: moves
+from p=0.082 to p=0.033 just by dropping 99 rows with a 2-year instead of
+1-year lag gap).
+
+Reading all three margins together: there is a consistent *directional*
+split -- sheltered leans positive across every levels spec (+0.081, +0.126,
++0.165), unsheltered leans negative across every levels-lag spec (-0.064,
+-0.122) -- but none of it clears the bar of significance *and* stability
+simultaneously. Given the measurement mismatch noted above (PSH residents
+invisible to both margins), if the sheltered-margin lean is a faint echo of
+the anecdote's mechanism (shelter/transitional-housing stays as a marker of
+the same population later at PSH-overdose risk), this design is not built to
+confirm or reject that -- it would need PSH stock (HIC has PSH bed counts)
+or ideally person-level linkage, neither of which this panel has.
 
 The unexpected negative, sometimes-significant `log_zori` coefficient in the
 levels specs (rent *down* predicting overdose *up*, controlling for entity+year
-FE) is also not something to over-read: with only 3-5 years of within-MSA
-variation and FE absorbing most cross-sectional signal, this is likely
-soaking up residual national-timing effects (e.g., 2020's COVID rent dip
-coinciding with elevated overdose deaths nationally) rather than a real local
-economic relationship -- it flips sign and loses significance in the
-strict-lag subsample (B1).
+FE) recurs identically across all three margins and is also not something to
+over-read: with only 3-5 years of within-MSA variation and FE absorbing most
+cross-sectional signal, this is likely soaking up residual national-timing
+effects (e.g., 2020's COVID rent dip coinciding with elevated overdose deaths
+nationally) rather than a real local economic relationship -- it flips sign
+and loses significance in every strict-lag (B1) subsample.
 
 **Biggest threat not addressed by this design**: national fentanyl/synthetic-
 opioid supply shocks are a dominant, time-varying driver of overdose deaths
@@ -111,9 +152,18 @@ separated from any true local relationship.
   an explicit control (e.g., a national or regional synthetic-opioid
   exposure proxy), not just year FE.
 
+## Caveats (continued)
+
+- PSH measurement gap (see Question section): this panel cannot see
+  formerly-homeless PSH residents, the population the motivating anecdote is
+  about. HIC PSH bed counts (already used elsewhere in this project, see
+  the HIC bed-count confirmation in the main findings record) are the
+  closest available stock proxy if this is revisited.
+
 ## Artifacts
 
 `outputs/overdose_lag/` (gitignored): `overdose_lag_levels.parquet`,
-`overdose_lag_fd.parquet`, `spec_{a,b,b1,c,d}_*.parquet` +
-`spec_{a,b,c,d}_*_result.{parquet,json}`. Build script:
+`overdose_lag_fd.parquet`, `spec_{a,b,b1,c,d}_{unshelt,total,shelt}*.parquet`
++ `{A,B,B1,C,D}_{unshelt,total,shelt}_*_result.{parquet,json}`,
+`key_coefficients_by_margin.csv`. Build script:
 `scripts/build_overdose_lag_panel.py`.
