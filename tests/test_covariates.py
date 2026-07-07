@@ -41,6 +41,7 @@ from hhplab.covariates.mpi_contract import (
     MPI_WORKBOOK_GLOB,
     validate_mpi_workbook_contract,
 )
+from hhplab.covariates.saiz_contract import SAIZ_MEASURE_COLUMNS, SAIZ_SOURCE_ID
 from hhplab.curated_policy import validate_curated_layout
 from hhplab.geo.ct_planning_regions import CtPlanningRegionCrosswalk
 from hhplab.provenance import ProvenanceBlock, read_provenance, write_parquet_with_provenance
@@ -58,6 +59,7 @@ EXPECTED_COVARIATE_SOURCES = {
     "prism_tmin_january": ("county", "tmin_c"),
     MPI_SOURCE_ID: ("county", "unauthorized_immigrant_population"),
     IRS_SOI_SOURCE_ID: ("county", "inflow_returns"),
+    SAIZ_SOURCE_ID: ("msa", "saiz_elasticity"),
 }
 
 MPI_XLSX_ROW_TRUTH_TABLE = {
@@ -363,6 +365,63 @@ def test_covariate_catalog_declares_hidden_cause_sources() -> None:
         assert measure in spec.measure_columns
         assert spec.source_page.startswith("https://")
         assert spec.recommended_align
+
+
+def test_saiz_static_msa_covariate_ingests_and_aggregates(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    monkeypatch.setattr("hhplab.covariates.ingest.register_source", lambda **_: None)
+    monkeypatch.setattr(
+        "hhplab.covariates.ingest.read_msa_definitions",
+        lambda _definition_version: pd.DataFrame(
+            {
+                "msa_id": ["12060", "99999"],
+                "msa_name": ["Atlanta-Sandy Springs-Roswell, GA", "No Match, ZZ"],
+            }
+        ),
+    )
+    raw = tmp_path / "saiz.dta"
+    pd.DataFrame(
+        {
+            "msanecma": [520.0],
+            "population": [4_112_000],
+            "msaname": ["Atlanta, GA (MSA)"],
+            "WRLURI": [0.0349],
+            "FLAT_SHARE_50_15": [99.0],
+            "S_LAND_50": [100.0],
+            "lu11": [0.01],
+            "lu91": [0.02],
+            "lu92": [0.03],
+            "unaval": [0.0408],
+            "elasticity": [2.55],
+        }
+    ).to_stata(raw, write_index=False)
+
+    curated = ingest_covariate_source(
+        SAIZ_SOURCE_ID,
+        raw,
+        output_dir=tmp_path,
+        force=True,
+    )
+    panel = aggregate_covariate_source(
+        SAIZ_SOURCE_ID,
+        output_dir=tmp_path,
+        target_geo="msa",
+        force=True,
+    )
+
+    assert curated.name == "covariate__saiz_supply_elasticity__Y2010-2010.parquet"
+    assert panel.name == "covariate_panel__saiz_supply_elasticity__Y2010-2010.parquet"
+    result = pd.read_parquet(panel).set_index("msa_id")
+    assert result.index.tolist() == ["12060"]
+    assert set(SAIZ_MEASURE_COLUMNS) <= set(result.columns)
+    assert result.loc["12060", "saiz_elasticity"] == pytest.approx(2.55)
+    assert result.loc["12060", "saiz_inverse_elasticity"] == pytest.approx(1 / 2.55)
+    provenance = read_provenance(curated)
+    assert provenance is not None
+    assert provenance.extra["matched_msa_count"] == 1
+    assert provenance.extra["unmatched_msa_count"] == 1
 
 
 def test_mpi_contract_declares_workbook_schema_and_geography_rules() -> None:
@@ -1415,6 +1474,60 @@ def test_mpi_multi_county_rows_count_distinct_covered_msa_counties() -> None:
     assert row["coverage_ratio"] == pytest.approx(1.0)
     assert row["mpi_multi_county_source_row_count"] == 1
     assert "_covered_county_fips" not in result.columns
+
+
+def test_county_covariate_msa_rollup_allocates_legacy_ct_to_planning_regions() -> None:
+    """Generic county covariates bridge legacy CT counties to planning-region MSAs."""
+    county = pd.DataFrame(
+        {
+            "county_fips": ["09001", "09003"],
+            "year": [2020, 2020],
+            "permitted_units": [100.0, 50.0],
+        }
+    )
+    membership = pd.DataFrame(
+        {
+            "msa_id": ["14860", "14860"],
+            "county_fips": ["09110", "09120"],
+        }
+    )
+    population = pd.DataFrame(
+        {
+            "county_fips": ["09001", "09003"],
+            "year": [2020, 2020],
+            "population": [1_000.0, 500.0],
+        }
+    )
+    ct_crosswalk = CtPlanningRegionCrosswalk(
+        mapping=pd.DataFrame(
+            {
+                "legacy_county_fips": ["09001", "09001", "09003"],
+                "planning_region_fips": ["09110", "09120", "09120"],
+                "legacy_share": [0.75, 0.25, 1.0],
+                "planning_share": [1.0, 0.5, 0.5],
+            }
+        ),
+        legacy_vintage=2020,
+        planning_vintage=2023,
+    )
+
+    result = aggregate_county_covariate_to_msa(
+        county,
+        measure_columns=["permitted_units"],
+        measure_aggregations={"permitted_units": "extensive_sum"},
+        msa_definition_version="test_msa_v1",
+        msa_county_membership=membership,
+        county_population=population,
+        ct_county_crosswalk=ct_crosswalk,
+    )
+
+    row = result.set_index("msa_id").loc["14860"]
+    assert row["permitted_units"] == pytest.approx(150.0)
+    assert row["population_weight_denominator"] == pytest.approx(1_500.0)
+    assert row["county_count"] == 2
+    assert row["membership_county_count"] == 2
+    assert row["coverage_ratio"] == pytest.approx(1.0)
+    assert row["unmatched_source_county_count"] == 0
 
 
 def test_mpi_native_msa_rows_fill_missing_msa_covariate_rows() -> None:

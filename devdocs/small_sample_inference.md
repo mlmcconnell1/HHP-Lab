@@ -23,6 +23,27 @@ Wild-cluster inference uses Rademacher cluster weights and bootstrap-t p-values.
 Permutation inference shuffles the requested cross-sectional term(s) and refits
 the same design; it is restricted to models without fixed effects.
 
+For 2SLS models, `--inference wild-cluster` refits the full IV design in each
+bootstrap draw and can be used with `--endogenous` and `--instruments`.
+Permutation inference remains OLS-only.
+
+Anderson-Rubin confidence sets for one-endogenous-variable IV designs are
+available as a separate grid-inversion helper:
+
+```bash
+hhplab analyze iv-ar \
+  --panel <panel.parquet> \
+  --outcome <outcome> \
+  --predictors <endogenous,controls> \
+  --endogenous <endogenous> \
+  --instruments <excluded_instrument[,instrument...]> \
+  --grid-min -5 --grid-max 5 --grid-step 0.25 \
+  --json
+```
+
+The JSON payload reports the 2SLS point estimate, per-grid AR p-values, and
+the accepted confidence-set intervals at `--alpha` (default 0.05).
+
 ## Headline Reruns
 
 All reruns used `--inference-reps 999 --inference-seed 20260706`.

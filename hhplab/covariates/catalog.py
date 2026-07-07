@@ -24,8 +24,18 @@ from hhplab.covariates.mpi_contract import (
     MPI_SOURCE_PAGE,
     MPI_SOURCE_URL,
 )
+from hhplab.covariates.saiz_contract import (
+    SAIZ_ESTIMATE_YEAR,
+    SAIZ_MEASURE_COLUMNS,
+    SAIZ_PRODUCT,
+    SAIZ_PROVIDER,
+    SAIZ_REQUIRED_CURATED_COLUMNS,
+    SAIZ_SOURCE_ID,
+    SAIZ_SOURCE_PAGE,
+    SAIZ_SOURCE_URL,
+)
 
-GeoType = Literal["county", "coc", "state"]
+GeoType = Literal["county", "coc", "state", "msa"]
 MeasureAggregation = Literal[
     "extensive_sum",
     "intensive_pop_weighted_mean",
@@ -294,6 +304,29 @@ COVARIATE_SOURCE_SPECS: dict[str, CovariateSourceSpec] = {
             "county-year measures use the later filing year, keep gross inflows "
             "and outflows separate, and retain suppressed/other-flow remainder "
             "columns for coverage diagnostics."
+        ),
+    ),
+    SAIZ_SOURCE_ID: CovariateSourceSpec(
+        source_id=SAIZ_SOURCE_ID,
+        provider=SAIZ_PROVIDER,
+        product=SAIZ_PRODUCT,
+        topic="housing_supply",
+        native_geo="msa",
+        first_year=SAIZ_ESTIMATE_YEAR,
+        last_year=SAIZ_ESTIMATE_YEAR,
+        source_page=SAIZ_SOURCE_PAGE,
+        source_url=SAIZ_SOURCE_URL,
+        required_columns=SAIZ_REQUIRED_CURATED_COLUMNS,
+        measure_columns=SAIZ_MEASURE_COLUMNS,
+        measure_aggregations={
+            column: "intensive_pop_weighted_mean" for column in SAIZ_MEASURE_COLUMNS
+        },
+        recommended_align="static_cross_section",
+        notes=(
+            "Saiz (2010) metro housing supply elasticity and land-unavailability "
+            "measures, matched from 1999 MSA/NECMA names to current MSA definitions. "
+            "Use as a descriptive static MSA covariate, not as a strong 2015-2025 "
+            "rent-growth instrument without first-stage validation."
         ),
     ),
 }

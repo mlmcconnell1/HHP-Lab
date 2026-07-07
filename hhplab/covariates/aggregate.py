@@ -89,10 +89,11 @@ def aggregate_covariate_source(
             f"{spec.native_geo} for native output, or add a recipe resample/crosswalk step "
             "before joining it to the target panel."
         )
-    if target_geo == "msa" and spec.native_geo != "county":
+    if target_geo == "msa" and spec.native_geo not in {"county", "msa"}:
         raise ValueError(
             f"Covariate source '{source_id}' is native to {spec.native_geo} geography. "
-            "Only county-native covariates can be population-weighted to --target-geo msa."
+            "Only county-native covariates can be population-weighted to --target-geo msa, "
+            "and native-MSA covariates can be emitted directly."
         )
     if min_coverage_ratio is not None and not 0 <= min_coverage_ratio <= 1:
         raise ValueError("--min-coverage-ratio must be between 0 and 1.")
@@ -103,9 +104,7 @@ def aggregate_covariate_source(
     input_path = (
         Path(curated_path)
         if curated_path is not None
-        else _default_irs_soi_curated_path(output_dir=output_dir)
-        if source_id == IRS_SOI_SOURCE_ID
-        else default_covariate_output_path(source_id, output_dir=output_dir)
+        else _default_covariate_curated_path(source_id, output_dir=output_dir)
     )
     if not input_path.exists():
         raise FileNotFoundError(
@@ -115,13 +114,11 @@ def aggregate_covariate_source(
     destination = (
         Path(output_path)
         if output_path is not None
-        else _irs_soi_panel_path_from_input(
+        else _covariate_panel_path_from_input(
             source_id=source_id,
             input_path=input_path,
             output_dir=output_dir,
         )
-        if source_id == IRS_SOI_SOURCE_ID
-        else default_covariate_panel_path(source_id, output_dir=output_dir)
     )
     if destination.exists() and not force:
         return destination
@@ -129,7 +126,13 @@ def aggregate_covariate_source(
     df = pd.read_parquet(input_path)
     if source_id == PRISM_TMIN_SOURCE_ID:
         df = derive_prism_temperature_basis(df)
-    required = ["geo_type", "geo_id", "year", *spec.measure_columns]
+    required = [
+        "geo_type",
+        "geo_id",
+        *(["msa_id"] if spec.native_geo == "msa" else []),
+        "year",
+        *spec.measure_columns,
+    ]
     missing = [column for column in required if column not in df.columns]
     if missing:
         raise ValueError(f"Curated covariate file missing required columns: {missing}")
@@ -153,7 +156,7 @@ def aggregate_covariate_source(
         df = df[df["year"].isin(years)].copy()
 
     input_provenance = read_provenance(input_path)
-    if target_geo == "msa":
+    if target_geo == "msa" and spec.native_geo == "county":
         if source_id == IRS_SOI_SOURCE_ID:
             result = aggregate_irs_soi_migration_to_msa(
                 county_marginals=df,
@@ -334,17 +337,25 @@ def _irs_soi_pair_path(
     )
 
 
-def _default_irs_soi_curated_path(*, output_dir: Path | str | None) -> Path:
+def _default_covariate_curated_path(
+    source_id: str,
+    *,
+    output_dir: Path | str | None,
+) -> Path:
     base = curated_dir("covariates") if output_dir is None else Path(output_dir)
-    candidates = sorted(base.glob("covariate__irs_soi_migration__Y*.parquet"))
+    catalog_default = default_covariate_output_path(source_id, output_dir=output_dir)
+    candidates = sorted(base.glob(f"covariate__{source_id}__Y*.parquet"))
+    filename_pattern = re.compile(
+        rf"covariate__{re.escape(source_id)}__Y\d{{4}}-(?:\d{{4}}|ongoing)\.parquet"
+    )
     data_driven = [
         path
         for path in candidates
-        if not path.name.endswith("__Y2011-ongoing.parquet")
+        if path.name != catalog_default.name and filename_pattern.fullmatch(path.name)
     ]
     if data_driven:
         return data_driven[-1]
-    return default_covariate_output_path(IRS_SOI_SOURCE_ID, output_dir=output_dir)
+    return catalog_default
 
 
 def _irs_soi_pair_path_from_county_path(county_path: Path) -> Path:
@@ -357,7 +368,7 @@ def _irs_soi_pair_path_from_county_path(county_path: Path) -> Path:
     )
 
 
-def _irs_soi_panel_path_from_input(
+def _covariate_panel_path_from_input(
     *,
     source_id: str,
     input_path: Path,
@@ -531,8 +542,6 @@ def _irs_soi_ct_alignment_map(
     ct_county_crosswalk: CtPlanningRegionCrosswalk | pd.DataFrame | None,
 ) -> dict[str, list[tuple[str, float]]]:
     """Return legacy CT county -> planning-region allocation alternatives."""
-    if not membership["county_fips"].dropna().astype(str).map(is_ct_planning_region_fips).any():
-        return {}
     source_counties = set(
         pairs["origin_county_fips"].dropna().astype("string").str.zfill(5).astype(str)
     )
@@ -543,6 +552,24 @@ def _irs_soi_ct_alignment_map(
         source_counties.update(
             county_marginals["county_fips"].dropna().astype("string").str.zfill(5).astype(str)
         )
+    return _ct_legacy_to_planning_alignment_map(
+        membership=membership,
+        source_counties=source_counties,
+        data_root=data_root,
+        ct_county_crosswalk=ct_county_crosswalk,
+    )
+
+
+def _ct_legacy_to_planning_alignment_map(
+    *,
+    membership: pd.DataFrame,
+    source_counties: set[str],
+    data_root: Path | str | None,
+    ct_county_crosswalk: CtPlanningRegionCrosswalk | pd.DataFrame | None,
+) -> dict[str, list[tuple[str, float]]]:
+    """Return legacy CT county -> planning-region area-share alternatives."""
+    if not membership["county_fips"].dropna().astype(str).map(is_ct_planning_region_fips).any():
+        return {}
     legacy_ct_counties = sorted(
         county for county in source_counties if is_ct_legacy_county_fips(county)
     )
@@ -597,6 +624,91 @@ def _irs_soi_msa_county_options(
     if is_ct_legacy_county_fips(county_fips):
         unmatched_source_counties.add(county_fips)
     return [(county_fips, 1.0)]
+
+
+def _expand_ct_legacy_covariates_to_planning(
+    county: pd.DataFrame,
+    *,
+    measure_columns: list[str],
+    aggregations: dict[str, MeasureAggregation],
+    ct_alignment: dict[str, list[tuple[str, float]]],
+) -> pd.DataFrame:
+    """Replace legacy CT county rows with area-allocated planning-region rows."""
+    if not ct_alignment:
+        return county
+    rows: list[pd.Series] = []
+    for _, row in county.iterrows():
+        county_fips = str(row["county_fips"])
+        options = ct_alignment.get(county_fips)
+        if not options:
+            rows.append(row)
+            continue
+        for planning_region_fips, weight in options:
+            allocated = row.copy()
+            allocated["county_fips"] = planning_region_fips
+            for column in measure_columns:
+                if aggregations[column] in {"extensive_sum", "rate"}:
+                    value = pd.to_numeric(pd.Series([allocated[column]]), errors="coerce").iloc[0]
+                    allocated[column] = value * weight if pd.notna(value) else pd.NA
+            rows.append(allocated)
+    expanded = pd.DataFrame(rows).reset_index(drop=True)
+    group_columns = [
+        column
+        for column in expanded.columns
+        if column not in {*measure_columns}
+    ]
+    aggregators: dict[str, str] = {}
+    for column in measure_columns:
+        aggregators[column] = (
+            "sum" if aggregations[column] in {"extensive_sum", "rate"} else "mean"
+        )
+    return (
+        expanded.groupby(group_columns, as_index=False, dropna=False)
+        .agg(aggregators)
+        .reset_index(drop=True)
+    )
+
+
+def _expand_ct_legacy_population_to_planning(
+    population: pd.DataFrame,
+    *,
+    ct_alignment: dict[str, list[tuple[str, float]]],
+) -> pd.DataFrame:
+    """Add area-allocated planning-region PEP rows for legacy CT county years."""
+    if not ct_alignment:
+        return population
+    planning_rows: list[pd.Series] = []
+    for _, row in population.iterrows():
+        county_fips = str(row["county_fips"])
+        options = ct_alignment.get(county_fips)
+        if not options:
+            continue
+        for planning_region_fips, weight in options:
+            allocated = row.copy()
+            allocated["county_fips"] = planning_region_fips
+            value = pd.to_numeric(pd.Series([allocated["population"]]), errors="coerce").iloc[0]
+            allocated["population"] = value * weight if pd.notna(value) else pd.NA
+            planning_rows.append(allocated)
+    if not planning_rows:
+        return population
+    planning = pd.DataFrame(planning_rows)
+    planning["population"] = pd.to_numeric(planning["population"], errors="coerce")
+    planning = (
+        planning.groupby(["county_fips", "year"], as_index=False)["population"]
+        .sum(min_count=1)
+        .reset_index(drop=True)
+    )
+    existing_keys = set(
+        population[["county_fips", "year"]].drop_duplicates().itertuples(index=False, name=None)
+    )
+    planning = planning[
+        ~planning[["county_fips", "year"]]
+        .apply(tuple, axis=1)
+        .isin(existing_keys)
+    ].copy()
+    if planning.empty:
+        return population
+    return pd.concat([population, planning], ignore_index=True)
 
 
 def _irs_soi_msa_row(
@@ -689,6 +801,7 @@ def aggregate_county_covariate_to_msa(
     county_population: pd.DataFrame | None = None,
     mpi_multi_county_rows: list[dict[str, object]] | None = None,
     mpi_msa_rows: list[dict[str, object]] | None = None,
+    ct_county_crosswalk: CtPlanningRegionCrosswalk | pd.DataFrame | None = None,
 ) -> pd.DataFrame:
     """Aggregate county-native covariates to MSA-year rows."""
     required = {"county_fips", "year", *measure_columns}
@@ -765,6 +878,24 @@ def aggregate_county_covariate_to_msa(
     county["county_fips"] = county["county_fips"].astype("string").str.zfill(5)
     county["year"] = pd.to_numeric(county["year"], errors="coerce").astype("Int64")
     source_counties = set(county["county_fips"].dropna().astype(str))
+    ct_alignment = _ct_legacy_to_planning_alignment_map(
+        membership=membership,
+        source_counties=source_counties,
+        data_root=data_root,
+        ct_county_crosswalk=ct_county_crosswalk,
+    )
+    if ct_alignment:
+        county = _expand_ct_legacy_covariates_to_planning(
+            county,
+            measure_columns=measure_columns,
+            aggregations=aggregations,
+            ct_alignment=ct_alignment,
+        )
+        population = _expand_ct_legacy_population_to_planning(
+            population,
+            ct_alignment=ct_alignment,
+        )
+        source_counties = set(county["county_fips"].dropna().astype(str))
     member_counties = set(membership["county_fips"].dropna().astype(str))
     unmatched_source_counties = sorted(source_counties - member_counties)
     county = county.merge(membership, on="county_fips", how="inner")

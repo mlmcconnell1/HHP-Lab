@@ -11,6 +11,7 @@ import typer
 from hhplab.analyze import (
     AnalysisError,
     _json_safe,
+    anderson_rubin_confidence_set,
     correlate_panel,
     describe_panel,
     lagged_associations_panel,
@@ -138,6 +139,98 @@ def analyze_correlate(
     except AnalysisError as exc:
         raise typer.BadParameter(str(exc)) from exc
     _emit(result, json_output=json_output)
+
+
+@analyze_app.command("iv-ar")
+def analyze_iv_ar(
+    panel: Annotated[
+        Path,
+        typer.Option("--panel", "-p", help="Input panel parquet path.", exists=True),
+    ],
+    outcome: Annotated[
+        str,
+        typer.Option("--outcome", help="Outcome column."),
+    ],
+    predictors: Annotated[
+        str,
+        typer.Option(
+            "--predictors",
+            help="Comma-separated structural predictors including --endogenous.",
+        ),
+    ],
+    endogenous: Annotated[
+        str,
+        typer.Option("--endogenous", help="Endogenous predictor to test over the beta grid."),
+    ],
+    instruments: Annotated[
+        str,
+        typer.Option("--instruments", help="Comma-separated excluded instrument columns."),
+    ],
+    entity_column: Annotated[
+        str,
+        typer.Option("--entity-column", help="Entity/geography identifier column."),
+    ] = "geo_id",
+    year_column: Annotated[
+        str,
+        typer.Option("--year-column", help="Year column."),
+    ] = "year",
+    entity_fe: Annotated[
+        bool,
+        typer.Option("--entity-fe/--no-entity-fe", help="Include entity fixed effects."),
+    ] = True,
+    year_fe: Annotated[
+        bool,
+        typer.Option("--year-fe/--no-year-fe", help="Include year fixed effects."),
+    ] = True,
+    cluster_by: Annotated[
+        str | None,
+        typer.Option(
+            "--cluster-by",
+            help="Cluster AR test standard errors by this column. Use empty string to disable.",
+        ),
+    ] = "geo_id",
+    alpha: Annotated[
+        float,
+        typer.Option("--alpha", help="Test size for the inverted confidence set."),
+    ] = 0.05,
+    grid_min: Annotated[
+        float,
+        typer.Option("--grid-min", help="Minimum beta value to test."),
+    ] = -10.0,
+    grid_max: Annotated[
+        float,
+        typer.Option("--grid-max", help="Maximum beta value to test."),
+    ] = 10.0,
+    grid_step: Annotated[
+        float,
+        typer.Option("--grid-step", help="Beta grid spacing."),
+    ] = 0.05,
+    json_output: Annotated[
+        bool,
+        typer.Option("--json", help="Output machine-readable JSON."),
+    ] = False,
+) -> None:
+    """Invert Anderson-Rubin tests for a one-endogenous-variable IV design."""
+    try:
+        payload = anderson_rubin_confidence_set(
+            panel,
+            outcome=outcome,
+            predictors=_parse_columns(predictors, option="--predictors", required=True) or [],
+            endogenous=endogenous,
+            instruments=_parse_columns(instruments, option="--instruments", required=True) or [],
+            entity_column=entity_column,
+            year_column=year_column,
+            entity_fe=entity_fe,
+            year_fe=year_fe,
+            cluster_by=cluster_by or None,
+            alpha=alpha,
+            grid_min=grid_min,
+            grid_max=grid_max,
+            grid_step=grid_step,
+        )
+    except AnalysisError as exc:
+        raise typer.BadParameter(str(exc)) from exc
+    _emit_payload(payload, json_output=json_output)
 
 
 @analyze_app.command("regress")

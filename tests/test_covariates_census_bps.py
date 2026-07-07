@@ -19,6 +19,7 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
+from hhplab.covariates.aggregate import aggregate_covariate_source
 from hhplab.covariates.census_bps_contract import (
     CENSUS_BPS_MEASURE_COLUMNS,
     CENSUS_BPS_SOURCE_ID,
@@ -133,6 +134,29 @@ def test_census_bps_single_raw_file_ingest(bps_raw_dir: Path, tmp_path: Path) ->
     assert curated_df["permitted_units"].tolist() == [
         EXPECTED_BPS_MEASURES[("01001", 2021)]["permitted_units"]
     ]
+
+
+def test_census_bps_aggregation_discovers_data_driven_year_token(
+    bps_raw_dir: Path, tmp_path: Path
+) -> None:
+    """BPS aggregation should not fall back to the catalog Y1980-ongoing token."""
+    ingest_covariate_source(
+        CENSUS_BPS_SOURCE_ID,
+        bps_raw_dir,
+        output_dir=tmp_path,
+        force=True,
+    )
+
+    panel = aggregate_covariate_source(
+        CENSUS_BPS_SOURCE_ID,
+        output_dir=tmp_path,
+        target_geo="county",
+        force=True,
+    )
+
+    assert panel.name == "covariate_panel__census_bps__Y2020-2021.parquet"
+    panel_df = pd.read_parquet(panel)
+    assert sorted(panel_df["year"].unique().tolist()) == [2020, 2021]
 
 
 def test_census_bps_staged_canonical_csv_still_uses_generic_ingest(

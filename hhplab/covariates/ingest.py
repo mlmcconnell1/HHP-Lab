@@ -48,7 +48,10 @@ from hhplab.covariates.mpi_contract import (
     MPI_SOURCE_ID,
     validate_mpi_workbook_contract,
 )
+from hhplab.covariates.saiz_contract import SAIZ_ESTIMATE_YEAR, SAIZ_SOURCE_ID
 from hhplab.metro.metro_definitions import STATE_ABBREV_TO_FIPS
+from hhplab.msa import DEFINITION_VERSION as DEFAULT_MSA_DEFINITION_VERSION
+from hhplab.msa.msa_io import read_msa_definitions
 from hhplab.naming import covariate_curated_filename, covariate_pair_filename
 from hhplab.paths import curated_dir, raw_root
 from hhplab.provenance import ProvenanceBlock, write_parquet_with_provenance
@@ -58,6 +61,7 @@ COMMON_COLUMN_ALIASES: dict[str, tuple[str, ...]] = {
     "county_fips": ("county_fips", "fips", "countyfips", "geoid", "geo_id"),
     "coc_number": ("coc_number", "coc", "cocnum", "geo_id"),
     "state": ("state", "state_abbr", "state_po", "stusps", "geo_id"),
+    "msa_id": ("msa_id", "cbsa_code", "geoid", "geo_id"),
     "year": ("year", "data_year", "fy", "fiscal_year"),
 }
 
@@ -183,6 +187,13 @@ def ingest_covariate_source(
             spec=spec,
             destination=destination,
             county_reference_path=county_reference_path,
+        )
+
+    if source_id == SAIZ_SOURCE_ID:
+        return _ingest_saiz_supply_elasticity(
+            source_path,
+            spec=spec,
+            destination=destination,
         )
 
     raw = _read_tabular(source_path)
@@ -439,12 +450,116 @@ def normalize_covariate_frame(
         )
         result["state_fips"] = result["state"].map(STATE_ABBREV_TO_FIPS)
         result["geo_id"] = result["state"]
+    elif spec.native_geo == "msa":
+        result["msa_id"] = result["msa_id"].astype("string").str.strip().str.zfill(5)
+        result["geo_id"] = result["msa_id"]
     else:
         raise ValueError(f"Unsupported covariate native geography: {spec.native_geo}")
 
     for column in spec.measure_columns:
         result[column] = pd.to_numeric(rows[column], errors="coerce")
     return result.dropna(subset=["geo_id"]).sort_values(["geo_id", "year"]).reset_index(drop=True)
+
+
+SAIZ_NAME_OVERRIDES: dict[str, str] = {
+    "Virginia Beach-Chesapeake-Norfolk, VA-NC": "Norfolk-Virginia Beach-Newport News, VA-NC",
+    "Urban Honolulu, HI": "Honolulu, HI",
+    "Louisville/Jefferson County, KY-IN": "Louisville, KY-IN",
+}
+
+
+def _ingest_saiz_supply_elasticity(
+    source_path: Path,
+    *,
+    spec: CovariateSourceSpec,
+    destination: Path,
+) -> Path:
+    if source_path.suffix.lower() != ".dta":
+        raise ValueError("Saiz supply elasticity ingest expects the staged .dta source file.")
+    raw = pd.read_stata(source_path)
+    required = {"msanecma", "population", "msaname", "WRLURI", "unaval", "elasticity"}
+    missing = sorted(required - set(raw.columns))
+    if missing:
+        raise ValueError(f"Saiz raw data is missing required columns: {missing}")
+
+    saiz = raw.copy()
+    saiz["saiz_name"] = saiz["msaname"].astype(str).str.strip()
+    definitions = read_msa_definitions(DEFAULT_MSA_DEFINITION_VERSION)
+    definitions = definitions[["msa_id", "msa_name"]].drop_duplicates().copy()
+    definitions["msa_id"] = definitions["msa_id"].astype("string").str.zfill(5)
+
+    rows: list[dict[str, object]] = []
+    for definition in definitions.itertuples(index=False):
+        msa_name = str(definition.msa_name)
+        title = SAIZ_NAME_OVERRIDES.get(msa_name, msa_name)
+        city_part, _, state_part = title.partition(",")
+        primary_city = city_part.split("-")[0].strip()
+        primary_state = state_part.strip().split("-")[0][:2]
+        candidates = saiz[
+            saiz["saiz_name"].str.startswith(primary_city)
+            & saiz["saiz_name"].str.contains(primary_state)
+        ]
+        match_rule = "city_state"
+        if candidates.empty:
+            candidates = saiz[saiz["saiz_name"].str.startswith(primary_city)]
+            match_rule = "city"
+        best = (
+            candidates.sort_values("population", ascending=False).iloc[0]
+            if not candidates.empty
+            else None
+        )
+        rows.append(
+            {
+                "msa_id": str(definition.msa_id),
+                "msa_name": msa_name,
+                "year": SAIZ_ESTIMATE_YEAR,
+                "saiz_msanecma": (
+                    float(best["msanecma"]) if best is not None else pd.NA
+                ),
+                "saiz_name": best["saiz_name"] if best is not None else pd.NA,
+                "saiz_match_rule": (
+                    "override"
+                    if msa_name in SAIZ_NAME_OVERRIDES
+                    else match_rule
+                    if best is not None
+                    else "unmatched"
+                ),
+                "saiz_elasticity": (
+                    float(best["elasticity"]) if best is not None else pd.NA
+                ),
+                "saiz_inverse_elasticity": (
+                    float(1.0 / best["elasticity"])
+                    if best is not None and float(best["elasticity"]) != 0
+                    else pd.NA
+                ),
+                "saiz_undevelopable_share": (
+                    float(best["unaval"]) if best is not None else pd.NA
+                ),
+                "saiz_wrluri": float(best["WRLURI"]) if best is not None else pd.NA,
+            }
+        )
+
+    matched = pd.DataFrame(rows)
+    matched_rows = matched[matched["saiz_name"].notna()].copy()
+    normalized = normalize_covariate_frame(matched_rows, spec=spec)
+    diagnostic_columns = ["msa_id", "msa_name", "saiz_msanecma", "saiz_name", "saiz_match_rule"]
+    diagnostics = matched[diagnostic_columns].to_dict(orient="records")
+    raw_sha256 = _sha256(source_path)
+    return _finalize_covariate_curated(
+        normalized,
+        spec=spec,
+        source_path=source_path,
+        destination=destination,
+        raw_sha256=raw_sha256,
+        file_size=source_path.stat().st_size,
+        provenance_extra={
+            "msa_definition_version": DEFAULT_MSA_DEFINITION_VERSION,
+            "match_diagnostics": diagnostics,
+            "matched_msa_count": int(matched["saiz_name"].notna().sum()),
+            "unmatched_msa_count": int(matched["saiz_name"].isna().sum()),
+            "static_year_policy": "source_cross_section",
+        },
+    )
 
 
 def _ingest_irs_soi_migration(

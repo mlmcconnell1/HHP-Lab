@@ -138,9 +138,9 @@ IV_VALIDATION_CASES = [
         id="instrument-in-structural-equation",
     ),
     pytest.param(
-        {"endogenous": "x", "instruments": ["z"], "inference": "wild-cluster"},
-        "not supported with 2SLS",
-        id="small-sample-inference-with-iv",
+        {"endogenous": "x", "instruments": ["z"], "inference": "permutation"},
+        "Permutation --inference is not supported with 2SLS",
+        id="permutation-inference-with-iv",
     ),
 ]
 
@@ -187,6 +187,33 @@ def test_2sls_rejects_underidentified_design(tmp_path: Path) -> None:
         )
 
 
+def test_2sls_wild_cluster_bootstrap_records_inference_p_value(tmp_path: Path) -> None:
+    panel = _iv_panel(tmp_path / "panel.parquet")
+    iv = regress_panel(
+        panel,
+        outcome="y",
+        predictors=["x"],
+        entity_fe=False,
+        year_fe=False,
+        cluster_by="geo_id",
+        endogenous="x",
+        instruments=["z"],
+        inference="wild-cluster",
+        inference_reps=19,
+        inference_seed=123,
+        inference_terms=["x"],
+        output_path=tmp_path / "iv_wild.parquet",
+    )
+
+    structural = iv.table[(iv.table["stage"] == "structural") & (iv.table["term"] == "x")]
+    assert structural["inference_method"].tolist() == ["wild-cluster"]
+    assert structural["inference_reps"].tolist() == [19]
+    assert structural["inference_term"].tolist() == [True]
+    assert 0 <= structural["p_value"].iloc[0] <= 1
+    assert iv.metadata["inference"] == "wild-cluster"
+    assert iv.metadata["inference_terms"] == ["x"]
+
+
 def test_cli_regress_2sls_emits_first_stage_in_json(tmp_path: Path) -> None:
     panel = _iv_panel(tmp_path / "panel.parquet")
     result = runner.invoke(
@@ -218,3 +245,44 @@ def test_cli_regress_2sls_emits_first_stage_in_json(tmp_path: Path) -> None:
     assert payload["estimator"] == "2sls"
     assert payload["first_stage"]["instruments"] == ["z"]
     assert payload["first_stage"]["f_statistic"] > 10.0
+
+
+def test_cli_iv_ar_confidence_set_includes_structural_coefficient(tmp_path: Path) -> None:
+    panel = _iv_panel(tmp_path / "panel.parquet")
+    result = runner.invoke(
+        app,
+        [
+            "analyze",
+            "iv-ar",
+            "--panel",
+            str(panel),
+            "--outcome",
+            "y",
+            "--predictors",
+            "x",
+            "--endogenous",
+            "x",
+            "--instruments",
+            "z",
+            "--no-entity-fe",
+            "--no-year-fe",
+            "--cluster-by",
+            "",
+            "--grid-min",
+            "1.0",
+            "--grid-max",
+            "3.0",
+            "--grid-step",
+            "0.5",
+            "--json",
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    payload = json.loads(result.output)
+    assert payload["analysis_type"] == "anderson_rubin"
+    assert payload["iv_estimate"] == pytest.approx(STRUCTURAL_BETA)
+    assert any(
+        interval["lower"] <= STRUCTURAL_BETA <= interval["upper"]
+        for interval in payload["confidence_set"]
+    )

@@ -76,6 +76,49 @@ Anderson-Rubin 95% confidence set for the long-difference IV elasticity
 (inverting the reduced form): **[-3.45, +4.80]**; AR p-value at beta=0 is
 0.61 and at the OLS 1.605 is 0.72.
 
+### Top-150 Long-Difference Extension
+
+Bead `coclab-bof1y` extends the permits-constraint long-difference design to
+the available top-150 replication cohort. The generated artifacts are:
+
+- `outputs/supply_iv/top150_msa_supply_iv_fd_completecase.parquet`
+- `outputs/supply_iv/top150_msa_supply_iv_longdiff_completecase.parquet`
+- `outputs/supply_iv/top150_msa_supply_iv_completecase_manifest.json`
+- `outputs/supply_iv/top150_ld_ols_completecase.parquet`
+- `outputs/supply_iv/top150_ld_iv_bps_completecase.parquet`
+- `outputs/supply_iv/top150_ld_reduced_bps_completecase.parquet`
+- `outputs/supply_iv/top150_msa_supply_iv_fd.parquet`
+- `outputs/supply_iv/top150_msa_supply_iv_longdiff.parquet`
+- `outputs/supply_iv/top150_msa_supply_iv_manifest.json`
+- `outputs/supply_iv/top150_ld_ols.parquet`
+- `outputs/supply_iv/top150_ld_iv_bps.parquet`
+- `outputs/supply_iv/top150_ld_reduced_bps.parquet`
+
+The initial top-150 build exposed a Connecticut planning-region backfill gap in
+generic county-to-MSA covariate aggregation. Bead `coclab-2a508` fixed that
+path by area-allocating legacy CT county covariates and PEP population weights
+to planning-region county equivalents before MSA rollup. The regenerated
+`covariate_panel__census_bps__Y2000-2024.parquet` has BPS rows for all 387 MSAs
+in every 2010-2024 year, including the four CT MSAs that were previously
+missing from 2010-2022. The full generated top-150 supply-IV panel therefore
+contains all 150 requested MSAs before model-wise non-null filtering.
+
+2015 -> 2025 long differences, complete-case top-150 extension:
+
+| Spec | Term | Estimate | SE | p | n | First-stage F |
+| --- | --- | ---: | ---: | ---: | ---: | ---: |
+| OLS | `d_log_zori_15_25` | 0.589 | 0.652 | 0.368 | 136 | - |
+| 2SLS supply_constraint_bps | `d_log_zori_15_25` | -1.329 | 1.447 | 0.360 | 136 | 36.7 |
+| Reduced form | `supply_constraint_bps` | -0.028 | 0.086 | 0.743 | 145 | - |
+
+The Anderson-Rubin 95% grid confidence set from `hhplab analyze iv-ar
+--grid-min -5 --grid-max 5 --grid-step 0.25` is **[-4.50, +1.25]**.
+
+The top-150 extension strengthens the first stage, but it does not produce a
+confirming reduced form: the permits constraint predicts rent growth, while its
+direct association with unsheltered growth is essentially zero in this expanded
+sample.
+
 ## Interpretation
 
 1. **The IV program neither overturns nor confirms the OLS elasticity.** The
