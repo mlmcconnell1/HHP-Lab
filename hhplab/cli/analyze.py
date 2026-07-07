@@ -209,6 +209,24 @@ def analyze_regress(
             help="Comma-separated model terms to test; defaults to predictors.",
         ),
     ] = None,
+    endogenous: Annotated[
+        str | None,
+        typer.Option(
+            "--endogenous",
+            help=(
+                "Predictor to instrument with 2SLS. Requires --instruments; the "
+                "result includes first-stage instrument coefficients and a "
+                "first-stage F diagnostic."
+            ),
+        ),
+    ] = None,
+    instruments: Annotated[
+        str | None,
+        typer.Option(
+            "--instruments",
+            help="Comma-separated excluded-instrument columns for --endogenous.",
+        ),
+    ] = None,
     output: Annotated[
         Path | None,
         typer.Option("--output", "-o", help="Output parquet path for analysis results."),
@@ -218,7 +236,7 @@ def analyze_regress(
         typer.Option("--json", help="Output machine-readable JSON."),
     ] = False,
 ) -> None:
-    """Run OLS with optional entity/year fixed effects and clustered standard errors."""
+    """Run OLS or 2SLS with optional entity/year fixed effects and clustered errors."""
     try:
         result = regress_panel(
             panel,
@@ -234,6 +252,8 @@ def analyze_regress(
             inference_reps=inference_reps,
             inference_seed=inference_seed,
             inference_terms=_parse_columns(inference_terms, option="--inference-terms"),
+            endogenous=endogenous,
+            instruments=_parse_columns(instruments, option="--instruments"),
             output_path=output,
         )
     except AnalysisError as exc:

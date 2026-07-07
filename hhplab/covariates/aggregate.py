@@ -147,6 +147,11 @@ def aggregate_covariate_source(
             "target_years": list(years),
         }
 
+    if years is not None and source_id != IRS_SOI_SOURCE_ID:
+        # Subset before aggregation so population weights are only required for
+        # the requested years (PEP county coverage starts in 2010).
+        df = df[df["year"].isin(years)].copy()
+
     input_provenance = read_provenance(input_path)
     if target_geo == "msa":
         if source_id == IRS_SOI_SOURCE_ID:

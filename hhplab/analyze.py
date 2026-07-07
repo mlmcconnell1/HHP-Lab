@@ -380,7 +380,7 @@ def _fixed_effect_dummies(df: pd.DataFrame, column: str, prefix: str) -> pd.Data
     return pd.get_dummies(df[column].astype("string"), prefix=prefix, drop_first=True, dtype=float)
 
 
-def _clustered_standard_errors(
+def _clustered_covariance(
     x: np.ndarray,
     residuals: np.ndarray,
     clusters: pd.Series,
@@ -393,7 +393,15 @@ def _clustered_standard_errors(
         eg = residuals[mask.to_numpy()]
         score = xg.T @ eg
         meat += np.outer(score, score)
-    variance = xtx_inv @ meat @ xtx_inv
+    return xtx_inv @ meat @ xtx_inv
+
+
+def _clustered_standard_errors(
+    x: np.ndarray,
+    residuals: np.ndarray,
+    clusters: pd.Series,
+) -> np.ndarray:
+    variance = _clustered_covariance(x, residuals, clusters)
     return np.sqrt(np.clip(np.diag(variance), 0, None))
 
 
@@ -440,6 +448,82 @@ def _fit_ols(
         p_values=p_values,
         r_squared=r_squared,
     )
+
+
+def _fit_2sls(
+    *,
+    x: np.ndarray,
+    z: np.ndarray,
+    y: np.ndarray,
+    dof: int,
+    clusters: pd.Series | None,
+) -> _RegressionFit:
+    """Two-stage least squares via the projected design X-hat = P_Z X.
+
+    Standard errors use the structural residuals y - X @ beta (not the
+    second-stage OLS residuals) with the projected design as the score matrix,
+    which is the conventional 2SLS sandwich.
+    """
+    zz_inv = np.linalg.pinv(z.T @ z)
+    x_hat = z @ (zz_inv @ (z.T @ x))
+    beta = np.linalg.pinv(x_hat.T @ x) @ (x_hat.T @ y)
+    fitted = x @ beta
+    residuals = y - fitted
+    sigma2 = float((residuals @ residuals) / dof)
+    bread = np.linalg.pinv(x_hat.T @ x_hat)
+    naive_se = np.sqrt(np.clip(np.diag(bread) * sigma2, 0, None))
+    if clusters is not None:
+        std_errors = _clustered_standard_errors(x_hat, residuals, clusters)
+        std_error_type = f"clustered:{clusters.name}"
+    else:
+        std_errors = naive_se
+        std_error_type = "iv_homoskedastic"
+    t_stats = beta / pd.Series(std_errors).replace(0, np.nan).to_numpy(dtype=float)
+    p_values = np.array([_two_sided_p_value(float(t_stat), dof) for t_stat in t_stats])
+    denom = np.sum((y - y.mean()) ** 2)
+    r_squared = float(1 - (residuals @ residuals) / denom) if denom > 0 else np.nan
+    return _RegressionFit(
+        beta=beta,
+        fitted=fitted,
+        residuals=residuals,
+        std_errors=std_errors,
+        std_error_type=std_error_type,
+        t_stats=t_stats,
+        p_values=p_values,
+        r_squared=r_squared,
+    )
+
+
+def _first_stage_f_statistic(
+    *,
+    fit: _RegressionFit,
+    z: np.ndarray,
+    instrument_indices: list[int],
+    dof: int,
+    clusters: pd.Series | None,
+) -> tuple[float, float]:
+    """Wald F on the excluded instruments in the first-stage regression."""
+    if clusters is not None:
+        covariance = _clustered_covariance(z, fit.residuals, clusters)
+    else:
+        sigma2 = float((fit.residuals @ fit.residuals) / dof)
+        covariance = np.linalg.pinv(z.T @ z) * sigma2
+    subset = np.ix_(instrument_indices, instrument_indices)
+    beta_sub = fit.beta[instrument_indices]
+    cov_sub = covariance[subset]
+    try:
+        wald = float(beta_sub @ np.linalg.solve(cov_sub, beta_sub))
+    except np.linalg.LinAlgError:
+        return np.nan, np.nan
+    k = len(instrument_indices)
+    f_stat = wald / k
+    try:
+        from scipy import stats  # type: ignore[import-not-found]
+
+        p_value = float(stats.f.sf(f_stat, k, dof))
+    except Exception:
+        p_value = np.nan
+    return f_stat, p_value
 
 
 def _parse_inference_terms(terms: list[str] | None, design_columns: pd.Index) -> list[str]:
@@ -584,17 +668,41 @@ def regress_panel(
     inference_reps: int = 999,
     inference_seed: int = 0,
     inference_terms: list[str] | None = None,
+    endogenous: str | None = None,
+    instruments: list[str] | None = None,
     output_path: Path | None = None,
 ) -> AnalysisResult:
-    """Run OLS with optional entity/year fixed effects and clustered standard errors."""
+    """Run OLS (or 2SLS with --endogenous/--instruments) with optional fixed effects."""
     if standardize not in {"none", "predictors", "all"}:
         raise AnalysisError("--standardize must be one of: none, predictors, all.")
     if inference not in {"none", "wild-cluster", "permutation"}:
         raise AnalysisError("--inference must be one of: none, wild-cluster, permutation.")
     if inference_reps < 1:
         raise AnalysisError("--inference-reps must be positive.")
+    instruments = instruments or []
+    if (endogenous is None) != (len(instruments) == 0):
+        raise AnalysisError(
+            "2SLS requires both --endogenous and --instruments. Provide the endogenous "
+            "predictor plus at least one excluded instrument column, or neither for OLS."
+        )
+    if endogenous is not None:
+        if endogenous not in predictors:
+            raise AnalysisError(
+                f"--endogenous '{endogenous}' must be one of the model predictors: {predictors}."
+            )
+        overlapping = sorted(set(instruments) & {outcome, *predictors})
+        if overlapping:
+            raise AnalysisError(
+                f"--instruments must be excluded from the structural equation; remove "
+                f"{overlapping} from the outcome/predictors or choose different instruments."
+            )
+        if inference != "none":
+            raise AnalysisError(
+                "Small-sample --inference is not supported with 2SLS yet. Run the "
+                "reduced form (outcome on instruments) with --inference instead."
+            )
     df = _read_panel(panel_path)
-    needed = [outcome, *predictors]
+    needed = [outcome, *predictors, *instruments]
     if entity_fe:
         needed.append(entity_column)
     if year_fe:
@@ -604,7 +712,7 @@ def regress_panel(
     _require_columns(df, list(dict.fromkeys(needed)), context="regress")
 
     model_df = df[list(dict.fromkeys(needed))].copy()
-    numeric_cols = [outcome, *predictors]
+    numeric_cols = [outcome, *predictors, *instruments]
     for column in numeric_cols:
         model_df[column] = pd.to_numeric(model_df[column], errors="coerce")
     drop_subset = list(numeric_cols)
@@ -638,7 +746,67 @@ def regress_panel(
             "Use fewer predictors/fixed effects or a larger panel."
         )
     clusters = model_df[cluster_by].rename(cluster_by) if cluster_by is not None else None
-    fit = _fit_ols(x=x, y=y, dof=dof, clusters=clusters)
+    first_stage: dict[str, Any] | None = None
+    first_stage_table: pd.DataFrame | None = None
+    if endogenous is not None:
+        z_design = design.drop(columns=[endogenous]).copy()
+        for instrument in instruments:
+            z_design[instrument] = model_df[instrument].astype(float)
+        z = z_design.to_numpy(dtype=float)
+        z_rank = int(np.linalg.matrix_rank(z))
+        if z_rank < rank:
+            raise AnalysisError(
+                "2SLS instrument matrix has lower rank than the structural design "
+                f"(rank {z_rank} < {rank}); the model is underidentified. Add "
+                "instruments or drop collinear columns."
+            )
+        first_stage_dof = int(len(y) - z_rank)
+        if first_stage_dof < 1:
+            raise AnalysisError(
+                "2SLS first stage is saturated or rank-deficient: "
+                f"n={len(y)}, instrument_design_rank={z_rank}."
+            )
+        fit = _fit_2sls(x=x, z=z, y=y, dof=dof, clusters=clusters)
+        endog_values = model_df[endogenous].to_numpy(dtype=float)
+        first_stage_fit = _fit_ols(
+            x=z, y=endog_values, dof=first_stage_dof, clusters=clusters
+        )
+        instrument_indices = [int(z_design.columns.get_loc(name)) for name in instruments]
+        f_stat, f_p_value = _first_stage_f_statistic(
+            fit=first_stage_fit,
+            z=z,
+            instrument_indices=instrument_indices,
+            dof=first_stage_dof,
+            clusters=clusters,
+        )
+        first_stage = {
+            "endogenous": endogenous,
+            "instruments": list(instruments),
+            "f_statistic": f_stat,
+            "f_p_value": f_p_value,
+            "r_squared": first_stage_fit.r_squared,
+            "dof": first_stage_dof,
+        }
+        first_stage_table = pd.DataFrame(
+            {
+                "term": z_design.columns,
+                "estimate": first_stage_fit.beta,
+                "std_error": first_stage_fit.std_errors,
+                "t_stat": first_stage_fit.t_stats,
+                "asymptotic_p_value": first_stage_fit.p_values,
+            }
+        )
+        first_stage_table = first_stage_table[
+            first_stage_table["term"].isin(instruments)
+        ].reset_index(drop=True)
+        first_stage_table["p_value"] = first_stage_table["asymptotic_p_value"]
+        first_stage_table["stage"] = "first_stage"
+        first_stage_table["outcome"] = endogenous
+        first_stage_table["r_squared"] = first_stage_fit.r_squared
+        first_stage_table["dof"] = first_stage_dof
+        first_stage_table["std_error_type"] = first_stage_fit.std_error_type
+    else:
+        fit = _fit_ols(x=x, y=y, dof=dof, clusters=clusters)
     selected_inference_terms = _parse_inference_terms(inference_terms, design.columns)
     if inference != "none" and not selected_inference_terms:
         selected_inference_terms = [term for term in predictors if term in set(design.columns)]
@@ -695,12 +863,21 @@ def regress_panel(
     coef["inference_reps"] = inference_reps if inference != "none" else 0
     coef["inference_seed"] = inference_seed if inference != "none" else pd.NA
     coef["inference_term"] = coef["term"].isin(selected_inference_terms)
+    coef["stage"] = "structural"
+    coef["estimator"] = "2sls" if endogenous is not None else "ols"
     coef["outcome"] = outcome
     coef["n"] = int(len(y))
     coef["design_rank"] = rank
     coef["dof"] = dof
     coef["r_squared"] = fit.r_squared
     coef["std_error_type"] = fit.std_error_type
+    if first_stage_table is not None:
+        first_stage_table["estimator"] = "2sls"
+        first_stage_table["n"] = int(len(y))
+        first_stage_table["inference_method"] = "none"
+        first_stage_table["inference_reps"] = 0
+        first_stage_table["inference_term"] = False
+        coef = pd.concat([coef, first_stage_table], ignore_index=True)
     coef["standardization"] = standardize
     coef["standardized"] = coef["term"].map(
         lambda term: bool(standardization.get(str(term), {}).get("standardized", False))
@@ -733,11 +910,15 @@ def regress_panel(
             "inference_reps": inference_reps,
             "inference_seed": inference_seed,
             "inference_terms": selected_inference_terms,
+            "endogenous": endogenous,
+            "instruments": list(instruments),
         },
         metadata={
             "analysis_type": "regress",
             "outcome": outcome,
             "predictors": predictors,
+            "estimator": "2sls" if endogenous is not None else "ols",
+            "first_stage": first_stage,
             "n": int(len(y)),
             "design_rank": rank,
             "dof": dof,

@@ -11,6 +11,17 @@ from typing import Any
 import pandas as pd
 
 from hhplab.covariates.catalog import CovariateSourceSpec, covariate_source_spec
+from hhplab.covariates.census_bps_contract import (
+    CENSUS_BPS_ANNUAL_FILE_GLOB,
+    CENSUS_BPS_BUILDING_COLUMNS,
+    CENSUS_BPS_COUNTY_FIPS3_COLUMN,
+    CENSUS_BPS_HEADER_ROWS,
+    CENSUS_BPS_RAW_URL_TEMPLATE,
+    CENSUS_BPS_SOURCE_ID,
+    CENSUS_BPS_STATE_FIPS_COLUMN,
+    CENSUS_BPS_SURVEY_YEAR_COLUMN,
+    CENSUS_BPS_UNIT_COLUMNS,
+)
 from hhplab.covariates.irs_soi_contract import (
     IRS_SOI_COUNTY_CURATED_COLUMNS,
     IRS_SOI_OTHER_FLOW_STATE_FIPS,
@@ -149,6 +160,15 @@ def ingest_covariate_source(
             force=force,
         )
 
+    if source_id == CENSUS_BPS_SOURCE_ID and _is_census_bps_raw_path(source_path):
+        return _ingest_census_bps(
+            source_path,
+            spec=spec,
+            destination=Path(output_path) if output_path is not None else None,
+            output_dir=output_dir,
+            force=force,
+        )
+
     destination = (
         Path(output_path)
         if output_path is not None
@@ -167,9 +187,29 @@ def ingest_covariate_source(
 
     raw = _read_tabular(source_path)
     result = normalize_covariate_frame(raw, spec=spec)
-    raw_sha256 = _sha256(source_path)
+    return _finalize_covariate_curated(
+        result,
+        spec=spec,
+        source_path=source_path,
+        destination=destination,
+        raw_sha256=_sha256(source_path),
+        file_size=source_path.stat().st_size,
+    )
+
+
+def _finalize_covariate_curated(
+    result: pd.DataFrame,
+    *,
+    spec: CovariateSourceSpec,
+    source_path: Path,
+    destination: Path,
+    raw_sha256: str,
+    file_size: int,
+    provenance_extra: dict[str, Any] | None = None,
+) -> Path:
+    """Annotate, order, and persist a normalized covariate frame with provenance."""
     ingested_at = datetime.now(UTC)
-    result["source_id"] = source_id
+    result["source_id"] = spec.source_id
     result["provider"] = spec.provider
     result["product"] = spec.product
     result["topic"] = spec.topic
@@ -199,13 +239,14 @@ def ingest_covariate_source(
         geo_type=spec.native_geo,
         extra={
             "dataset_type": "expanded_covariate",
-            "source_id": source_id,
+            "source_id": spec.source_id,
             "provider": spec.provider,
             "product": spec.product,
             "native_geo": spec.native_geo,
             "measure_columns": list(spec.measure_columns),
             "raw_path": str(source_path),
             "raw_sha256": raw_sha256,
+            **(provenance_extra or {}),
         },
     )
     write_parquet_with_provenance(result, destination, provenance)
@@ -214,16 +255,128 @@ def ingest_covariate_source(
         source_url=spec.source_url,
         raw_sha256=raw_sha256,
         source_name=f"{spec.provider}:{spec.product}",
-        file_size=source_path.stat().st_size,
+        file_size=file_size,
         local_path=source_path,
         metadata={
-            "source_id": source_id,
+            "source_id": spec.source_id,
             "curated_path": str(destination),
             "native_geo": spec.native_geo,
             "measure_columns": list(spec.measure_columns),
         },
     )
     return destination
+
+
+def _is_census_bps_raw_path(source_path: Path) -> bool:
+    """True when the path is raw BPS annual county data rather than a staged file.
+
+    Raw input is either a directory of ``co{YYYY}a.txt`` files or a single such
+    file; anything else falls through to the generic staged-tabular ingest.
+    """
+    if source_path.is_dir():
+        return True
+    return re.fullmatch(r"co\d{4}a\.txt", source_path.name) is not None
+
+
+def _ingest_census_bps(
+    source_path: Path,
+    *,
+    spec: CovariateSourceSpec,
+    destination: Path | None,
+    output_dir: Path | str | None,
+    force: bool,
+) -> Path:
+    paths = (
+        sorted(source_path.glob(CENSUS_BPS_ANNUAL_FILE_GLOB))
+        if source_path.is_dir()
+        else [source_path]
+    )
+    if not paths:
+        raise ValueError(
+            "No Census BPS county annual files found. Expected files named "
+            f"co{{YYYY}}a.txt under {source_path}. Download them from "
+            f"{CENSUS_BPS_RAW_URL_TEMPLATE} (one file per year)."
+        )
+    raw = pd.concat(
+        [_read_census_bps_annual_file(path) for path in paths],
+        ignore_index=True,
+    )
+    result = normalize_covariate_frame(raw, spec=spec)
+    years_present = sorted(result["year"].unique().tolist())
+    if destination is None:
+        base = curated_dir("covariates") if output_dir is None else Path(output_dir)
+        destination = base / covariate_curated_filename(
+            spec.source_id,
+            min(years_present),
+            max(years_present),
+        )
+    if destination.exists() and not force:
+        return destination
+    raw_sha256 = _sha256_tree(source_path) if source_path.is_dir() else _sha256(source_path)
+    file_size = sum(path.stat().st_size for path in paths)
+    return _finalize_covariate_curated(
+        result,
+        spec=spec,
+        source_path=source_path,
+        destination=destination,
+        raw_sha256=raw_sha256,
+        file_size=file_size,
+        provenance_extra={
+            "years_present": years_present,
+            "year_range_token_policy": "derived_from_staged_file_years",
+            "raw_files": [path.name for path in paths],
+            "structure_class_policy": (
+                "permitted_units/permitted_buildings sum the estimates-with-imputation "
+                "series across 1-unit, 2-unit, 3-4-unit, and 5+-unit structure classes; "
+                "reporting-places-only columns are excluded"
+            ),
+        },
+    )
+
+
+def _read_census_bps_annual_file(path: Path) -> pd.DataFrame:
+    """Read one BPS county annual co{YYYY}a.txt into canonical covariate columns."""
+    raw = pd.read_csv(
+        path,
+        skiprows=CENSUS_BPS_HEADER_ROWS,
+        header=None,
+        dtype=str,
+        skip_blank_lines=True,
+    )
+    year = pd.to_numeric(raw[CENSUS_BPS_SURVEY_YEAR_COLUMN], errors="coerce")
+    state = raw[CENSUS_BPS_STATE_FIPS_COLUMN].astype("string").str.strip()
+    county3 = raw[CENSUS_BPS_COUNTY_FIPS3_COLUMN].astype("string").str.strip()
+    valid = (
+        year.notna()
+        & state.str.fullmatch(r"\d{1,2}").fillna(False)
+        & county3.str.fullmatch(r"\d{1,3}").fillna(False)
+    )
+    if not valid.any():
+        raise ValueError(
+            f"Census BPS file {path} produced no county rows. Expected the positional "
+            "annual county layout with survey year, state FIPS, and county FIPS columns."
+        )
+    rows = pd.DataFrame(
+        {
+            "year": year[valid].astype(int),
+            "county_fips": state[valid].str.zfill(2) + county3[valid].str.zfill(3),
+        }
+    )
+    unit_values = raw.loc[valid, list(CENSUS_BPS_UNIT_COLUMNS)].apply(
+        pd.to_numeric, errors="coerce"
+    )
+    building_values = raw.loc[valid, list(CENSUS_BPS_BUILDING_COLUMNS)].apply(
+        pd.to_numeric, errors="coerce"
+    )
+    rows["permitted_units"] = unit_values.sum(axis=1, min_count=1)
+    rows["permitted_buildings"] = building_values.sum(axis=1, min_count=1)
+    return (
+        rows.groupby(["county_fips", "year"], as_index=False)[
+            ["permitted_units", "permitted_buildings"]
+        ]
+        .sum(min_count=1)
+        .reset_index(drop=True)
+    )
 
 
 def default_covariate_pair_output_path(
