@@ -1,0 +1,135 @@
+"""Build a pooled top-150 MSA panel joining unsheltered homelessness to CDC
+provisional overdose deaths, for screening a homelessness -> overdose lag
+relationship.
+
+Pools the top-50 longitudinal panel with the rank-51-150 replication panel
+(150 distinct MSAs, no overlap), merges CDC's January-aligned MSA overdose
+rollup, and emits both a levels panel and an annual first-difference panel
+restricted to CDC's actual coverage window (2020-2025, excluding 2021 on both
+sides: PIT 2021 is COVID-disrupted and CDC 2021 is a national fentanyl-driven
+outlier year).
+"""
+
+from __future__ import annotations
+
+from pathlib import Path
+
+import numpy as np
+import pandas as pd
+
+ROOT = Path(__file__).resolve().parents[1]
+OUT = ROOT / "outputs" / "overdose_lag"
+
+TOP50_PANEL = ROOT / "outputs" / "top50_msa_longitudinal_2010_2025.parquet"
+RANK51_150_PANEL = (
+    ROOT
+    / "outputs"
+    / "msa_rank51_150_replication"
+    / "panel__msa_rank51_150__Y2015-2025@Mcensusmsa2023.parquet"
+)
+CDC_MSA = (
+    ROOT
+    / "data"
+    / "curated"
+    / "cdc"
+    / "cdc_overdose__msa__Y2020-2025@Mcensusmsa2023xC2023.parquet"
+)
+
+# Both PIT 2021 (COVID enumeration disruption) and CDC 2021 (national
+# fentanyl-driven overdose spike, not a local-homelessness-driven signal)
+# are excluded from this analysis.
+EXCLUDED_YEARS = {2021}
+CDC_YEARS = {2020, 2022, 2023, 2024, 2025}
+MIN_OVERDOSE_COVERAGE = 0.8
+
+CORE_COLUMNS = [
+    "msa_id",
+    "msa_name",
+    "year",
+    "population",
+    "sanctuary",
+    "pit_unsheltered",
+    "pit_sheltered",
+    "pit_total",
+    "unshelt_per_1000",
+    "zori",
+    "log_zori",
+    "log_unshelt_rate",
+    "log_total_rate",
+    "log_shelt_rate",
+    "log_pop",
+]
+
+
+def load_pooled_base_panel() -> pd.DataFrame:
+    top50 = pd.read_parquet(TOP50_PANEL)[CORE_COLUMNS].copy()
+    top50["cohort"] = "top50"
+    rank51_150 = pd.read_parquet(RANK51_150_PANEL)[CORE_COLUMNS].copy()
+    rank51_150["cohort"] = "rank51_150"
+    overlap = set(top50.msa_id) & set(rank51_150.msa_id)
+    if overlap:
+        raise ValueError(f"Unexpected msa_id overlap between cohorts: {overlap}")
+    pooled = pd.concat([top50, rank51_150], ignore_index=True)
+    pooled = pooled[~pooled.year.isin(EXCLUDED_YEARS)].sort_values(["msa_id", "year"])
+    return pooled.reset_index(drop=True)
+
+
+def merge_overdose(pooled: pd.DataFrame) -> pd.DataFrame:
+    cdc = pd.read_parquet(CDC_MSA)
+    cdc = cdc[cdc.year.isin(CDC_YEARS)][
+        ["msa_id", "year", "overdose_deaths_12mo", "coverage_ratio"]
+    ].rename(columns={"coverage_ratio": "overdose_coverage_ratio"})
+    merged = pooled.merge(cdc, on=["msa_id", "year"], how="inner")
+    merged["overdose_per_1000"] = (
+        merged["overdose_deaths_12mo"] / merged["population"] * 1000
+    )
+    merged["log_overdose_rate"] = np.where(
+        merged["overdose_per_1000"] > 0, np.log(merged["overdose_per_1000"]), np.nan
+    )
+    return merged
+
+
+def add_diffs(levels: pd.DataFrame) -> pd.DataFrame:
+    levels = levels.sort_values(["msa_id", "year"]).copy()
+    grouped = levels.groupby("msa_id")
+    levels["year_gap"] = grouped["year"].diff()
+    levels["d_log_overdose_rate"] = grouped["log_overdose_rate"].diff()
+    levels["d_log_unshelt_rate"] = grouped["log_unshelt_rate"].diff()
+    levels["d_log_total_rate"] = grouped["log_total_rate"].diff()
+    levels["d_log_zori"] = grouped["log_zori"].diff()
+    levels["d_log_pop"] = grouped["log_pop"].diff()
+    levels["log_unshelt_rate_lag1"] = grouped["log_unshelt_rate"].shift(1)
+    levels["overdose_coverage_ratio_lag1"] = grouped["overdose_coverage_ratio"].shift(1)
+    levels["d_log_unshelt_rate_lag1"] = grouped["d_log_unshelt_rate"].shift(1)
+    levels["lag1_year_gap"] = grouped["year_gap"].shift(1)
+    return levels
+
+
+def main() -> None:
+    OUT.mkdir(parents=True, exist_ok=True)
+    pooled = load_pooled_base_panel()
+    merged = merge_overdose(pooled)
+    merged = add_diffs(merged)
+
+    levels_path = OUT / "overdose_lag_levels.parquet"
+    merged.to_parquet(levels_path, index=False)
+
+    fd = merged[merged.year_gap == 1].copy()
+    fd_path = OUT / "overdose_lag_fd.parquet"
+    fd.to_parquet(fd_path, index=False)
+
+    print(f"pooled cohorts: {merged.cohort.value_counts().to_dict()}")
+    print(f"levels rows: {len(merged)} -> {levels_path}")
+    print(f"fd (year_gap==1) rows: {len(fd)} -> {fd_path}")
+    print("rows per year (levels):")
+    print(merged.groupby("year").size())
+    print("rows per year meeting overdose_coverage_ratio>=0.8 (levels):")
+    print(
+        merged[merged.overdose_coverage_ratio >= MIN_OVERDOSE_COVERAGE]
+        .groupby("year")
+        .size()
+    )
+
+
+if __name__ == "__main__":
+    main()
