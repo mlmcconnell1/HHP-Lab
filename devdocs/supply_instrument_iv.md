@@ -50,17 +50,26 @@ Panels: `outputs/supply_iv/top50_msa_supply_iv_fd.parquet` (400 rows),
 
 First differences, year FE, MSA-clustered (outcome `d_log_unshelt_rate`):
 
+**p-values below corrected 2026-07-07 (bead coclab-zxtit): `hhplab analyze regress`
+was computing clustered-SE p-values off residual dof (n-k, e.g. 390) instead of
+cluster-count dof (G-1 = 49 MSA clusters, or 48 for the two Saiz specs missing
+Sacramento). Point estimates, SEs, t-stats, and first-stage F are unchanged --
+only p rose slightly toward the fatter-tailed 49-dof t-distribution. Rerun
+directly against `regress_panel` on the same panel files; matches to 4
+decimals. One threshold crossing: the no-main-effect 2SLS variant (already
+flagged as an invalid design) moves from p=0.045 to p=0.050.**
+
 | Spec | Term | Estimate | SE | p | n | First-stage F |
 | --- | --- | ---: | ---: | ---: | ---: | ---: |
-| OLS baseline | `d_log_zori` | 1.580 | 0.545 | 0.004 | 400 | - |
-| 2SLS bartik_bps (+constraint main) | `d_log_zori` | -11.43 | 7.94 | 0.151 | 400 | 13.3 |
-| 2SLS bartik_bps (no main; invalid design) | `d_log_zori` | 4.86 | 2.42 | 0.045 | 400 | 26.7 |
-| 2SLS bartik_bps_long | `d_log_zori` | -18.60 | 15.36 | 0.227 | 400 | 1.9 |
+| OLS baseline | `d_log_zori` | 1.580 | 0.545 | 0.006 | 400 | - |
+| 2SLS bartik_bps (+constraint main) | `d_log_zori` | -11.43 | 7.94 | 0.156 | 400 | 13.3 |
+| 2SLS bartik_bps (no main; invalid design) | `d_log_zori` | 4.86 | 2.42 | 0.050 | 400 | 26.7 |
+| 2SLS bartik_bps_long | `d_log_zori` | -18.60 | 15.36 | 0.232 | 400 | 1.9 |
 | 2SLS bartik_saiz | `d_log_zori` | 1.05 | 11.83 | 0.930 | 392 | 1.3 |
-| 2SLS bartik_unaval | `d_log_zori` | 6.23 | 11.62 | 0.592 | 392 | 2.0 |
-| Reduced form | `bartik_bps` | 2.78 | 2.03 | 0.172 | 400 | - |
-| Pre-COVID (<=2020) OLS | `d_log_zori` | 1.09 | 0.74 | 0.144 | 250 | - |
-| Pre-COVID 2SLS bartik_bps | `d_log_zori` | -5.29 | 17.12 | 0.757 | 250 | 2.6 |
+| 2SLS bartik_unaval | `d_log_zori` | 6.23 | 11.62 | 0.594 | 392 | 2.0 |
+| Reduced form | `bartik_bps` | 2.78 | 2.03 | 0.178 | 400 | - |
+| Pre-COVID (<=2020) OLS | `d_log_zori` | 1.09 | 0.74 | 0.149 | 250 | - |
+| Pre-COVID 2SLS bartik_bps | `d_log_zori` | -5.29 | 17.12 | 0.759 | 250 | 2.6 |
 
 2015 -> 2025 long differences (n=50, homoskedastic SEs):
 
@@ -137,7 +146,7 @@ sample.
    simultaneously undermining the exclusion restriction (the same migration
    directly moves homelessness risk). The wrong-signed 2SLS estimates
    (-11 to -19) should not be read causally. The no-main-effect variant
-   (+4.9, p=0.045) is reported only to show sensitivity - omitting the
+   (+4.9, p=0.050) is reported only to show sensitivity - omitting the
    exposure main effect is not a defensible design.
 3. **Saiz (2010) elasticities are dead as instruments for this window**: raw
    correlation with 2015-2025 rent growth is -0.03; first-stage F <= 1.3 in
