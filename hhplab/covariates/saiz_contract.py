@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Final
+from typing import Final, Iterable
 
 SAIZ_SOURCE_ID: Final = "saiz_supply_elasticity"
 SAIZ_PROVIDER: Final = "saiz"
@@ -51,7 +51,11 @@ class SaizSourceContract:
 SAIZ_SOURCE_CONTRACT: Final = SaizSourceContract()
 
 
-def validate_saiz_source_contract(path: Path | str) -> SaizSourceContract:
+def validate_saiz_source_contract(
+    path: Path | str,
+    *,
+    raw_columns: Iterable[str] | None = None,
+) -> SaizSourceContract:
     """Validate the staged Saiz Stata file needed by the ingest implementation."""
     source_path = Path(path)
     if not source_path.exists():
@@ -65,16 +69,20 @@ def validate_saiz_source_contract(path: Path | str) -> SaizSourceContract:
             "staged Saiz (2010) supply elasticity .dta file."
         )
 
-    try:
-        import pandas as pd
-    except ImportError as exc:  # pragma: no cover - dependency is present in project env
-        raise RuntimeError(
-            "pandas is required to inspect the Saiz source file; install the "
-            "project dependencies with `uv sync --extra dev`."
-        ) from exc
+    if raw_columns is None:
+        try:
+            import pandas as pd
+        except ImportError as exc:  # pragma: no cover - dependency is present in project env
+            raise RuntimeError(
+                "pandas is required to inspect the Saiz source file; install the "
+                "project dependencies with `uv sync --extra dev`."
+            ) from exc
 
-    raw_columns = tuple(pd.read_stata(source_path).columns)
-    missing = [column for column in SAIZ_REQUIRED_RAW_COLUMNS if column not in raw_columns]
+        raw_columns = pd.read_stata(source_path).columns
+    available_columns = tuple(raw_columns)
+    missing = [
+        column for column in SAIZ_REQUIRED_RAW_COLUMNS if column not in available_columns
+    ]
     if missing:
         raise ValueError(
             f"Saiz raw data is missing required columns {missing}. Update the "

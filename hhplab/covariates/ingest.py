@@ -51,7 +51,6 @@ from hhplab.covariates.mpi_contract import (
 from hhplab.covariates.saiz_contract import (
     SAIZ_ESTIMATE_YEAR,
     SAIZ_MATCH_DIAGNOSTIC_COLUMNS,
-    SAIZ_REQUIRED_RAW_COLUMNS,
     SAIZ_SOURCE_ID,
     validate_saiz_source_contract,
 )
@@ -480,11 +479,8 @@ def _ingest_saiz_supply_elasticity(
     spec: CovariateSourceSpec,
     destination: Path,
 ) -> Path:
-    validate_saiz_source_contract(source_path)
     raw = pd.read_stata(source_path)
-    missing = sorted(set(SAIZ_REQUIRED_RAW_COLUMNS) - set(raw.columns))
-    if missing:
-        raise ValueError(f"Saiz raw data is missing required columns: {missing}")
+    validate_saiz_source_contract(source_path, raw_columns=raw.columns)
 
     saiz = raw.copy()
     saiz["saiz_name"] = saiz["msaname"].astype(str).str.strip()

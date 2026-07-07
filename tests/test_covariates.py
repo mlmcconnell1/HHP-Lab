@@ -439,12 +439,23 @@ def test_saiz_static_msa_covariate_ingests_and_aggregates(
     contract = validate_saiz_source_contract(raw)
     assert contract.required_raw_columns == SAIZ_REQUIRED_RAW_COLUMNS
 
+    read_stata_calls: list[Path] = []
+    original_read_stata = pd.read_stata
+
+    def read_stata_spy(path, *args, **kwargs):
+        read_stata_calls.append(Path(path))
+        return original_read_stata(path, *args, **kwargs)
+
+    monkeypatch.setattr(pd, "read_stata", read_stata_spy)
+
     curated = ingest_covariate_source(
         SAIZ_SOURCE_ID,
         raw,
         output_dir=tmp_path,
         force=True,
     )
+    assert read_stata_calls == [raw]
+
     panel = aggregate_covariate_source(
         SAIZ_SOURCE_ID,
         output_dir=tmp_path,
