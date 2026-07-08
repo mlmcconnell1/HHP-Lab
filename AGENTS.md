@@ -14,6 +14,10 @@ Use `$BR` (or just the resolved command) for all beads operations below. Prefer 
 
 **Bead namespace note:** even though the project/runtime name is now HHP-Lab/`hhplab`, bead IDs intentionally remain in the historical `coclab-*` namespace. Do not migrate existing bead slugs and do not switch new issues to an `hhplab-*` prefix.
 
+**Reproducibility:** the project/runtime will be used in the future for replication of any reported results.  It is acceptable to write one-off scripts to test ideas, but scripts that result in some kind of learning should be noted in a bead so that they are made accessible through the CLI and results can be easily checked and the code tracked by version control.
+
+****
+
 ## Quick Reference
 
 | Action | br (preferred) | bd (fallback) |
@@ -328,7 +332,7 @@ git push                # Push to remote
    # bd sync              # (commits and pushes automatically)
    git push
    git status  # MUST show "up to date with origin"
-   ```
+  ```
 5. **Clean up** - Clear stashes, prune remote branches
 6. **Verify** - All changes committed AND pushed
 7. **Hand off** - Provide context for next session
