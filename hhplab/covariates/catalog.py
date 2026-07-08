@@ -5,6 +5,16 @@ from __future__ import annotations
 from dataclasses import asdict, dataclass
 from typing import Literal
 
+from hhplab.cdc.overdose_contract import (
+    CDC_OVERDOSE_FIRST_YEAR,
+    CDC_OVERDOSE_MEASURE_COLUMNS,
+    CDC_OVERDOSE_PRODUCT,
+    CDC_OVERDOSE_PROVIDER,
+    CDC_OVERDOSE_REQUIRED_COLUMNS,
+    CDC_OVERDOSE_SOURCE_ID,
+    CDC_OVERDOSE_SOURCE_PAGE,
+    CDC_OVERDOSE_SOURCE_URL,
+)
 from hhplab.covariates.irs_soi_contract import (
     IRS_SOI_COUNTY_MEASURE_COLUMNS,
     IRS_SOI_FIRST_YEAR,
@@ -259,6 +269,29 @@ COVARIATE_SOURCE_SPECS: dict[str, CovariateSourceSpec] = {
         notes=(
             "January county PRISM minimum temperature in Celsius, with policy-threshold "
             "hinge basis columns at freezing and common 40F Code Blue activation."
+        ),
+    ),
+    CDC_OVERDOSE_SOURCE_ID: CovariateSourceSpec(
+        source_id=CDC_OVERDOSE_SOURCE_ID,
+        provider=CDC_OVERDOSE_PROVIDER,
+        product=CDC_OVERDOSE_PRODUCT,
+        topic="substance_use",
+        native_geo="county",
+        first_year=CDC_OVERDOSE_FIRST_YEAR,
+        last_year=None,
+        source_page=CDC_OVERDOSE_SOURCE_PAGE,
+        source_url=CDC_OVERDOSE_SOURCE_URL,
+        required_columns=CDC_OVERDOSE_REQUIRED_COLUMNS,
+        measure_columns=CDC_OVERDOSE_MEASURE_COLUMNS,
+        measure_aggregations={
+            "overdose_deaths_12mo": "extensive_sum",
+        },
+        recommended_align="point_in_time_jan_trailing_12_months",
+        notes=(
+            "CDC NCHS VSRR county-residence provisional drug overdose death "
+            "counts for 12-month-ending periods. HHP-Lab curated artifacts use "
+            "January rows for PIT alignment; recent periods are provisional and "
+            "subject to reporting lag and suppression."
         ),
     ),
     MPI_SOURCE_ID: CovariateSourceSpec(

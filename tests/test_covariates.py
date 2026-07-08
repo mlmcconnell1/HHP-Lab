@@ -9,6 +9,11 @@ import pandas as pd
 import pytest
 from typer.testing import CliRunner
 
+from hhplab.cdc.overdose_contract import (
+    CDC_OVERDOSE_FIRST_YEAR,
+    CDC_OVERDOSE_MEASURE_COLUMNS,
+    CDC_OVERDOSE_SOURCE_ID,
+)
 from hhplab.cli.main import app
 from hhplab.covariates.aggregate import (
     EMERGENCY_SHELTER_ACTIVATION_C,
@@ -64,6 +69,7 @@ EXPECTED_COVARIATE_SOURCES = {
     "hud_spm": ("coc", "spm_first_time_homeless"),
     "kff_medicaid_expansion": ("state", "medicaid_expansion_adopted"),
     "prism_tmin_january": ("county", "tmin_c"),
+    CDC_OVERDOSE_SOURCE_ID: ("county", "overdose_deaths_12mo"),
     MPI_SOURCE_ID: ("county", "unauthorized_immigrant_population"),
     IRS_SOI_SOURCE_ID: ("county", "inflow_returns"),
     SAIZ_SOURCE_ID: ("msa", "saiz_elasticity"),
@@ -403,6 +409,22 @@ def test_covariate_catalog_declares_hidden_cause_sources() -> None:
         assert measure in spec.measure_columns
         assert spec.source_page.startswith("https://")
         assert spec.recommended_align
+
+
+def test_cdc_overdose_catalog_entry_documents_provisional_county_coverage() -> None:
+    spec = COVARIATE_SOURCE_SPECS[CDC_OVERDOSE_SOURCE_ID]
+
+    assert spec.provider == "cdc"
+    assert spec.product == "vsrr_provisional_county_overdose"
+    assert spec.topic == "substance_use"
+    assert spec.native_geo == "county"
+    assert spec.first_year == CDC_OVERDOSE_FIRST_YEAR
+    assert spec.last_year is None
+    assert spec.measure_columns == CDC_OVERDOSE_MEASURE_COLUMNS
+    assert spec.measure_aggregations == {"overdose_deaths_12mo": "extensive_sum"}
+    assert spec.recommended_align == "point_in_time_jan_trailing_12_months"
+    assert "provisional" in spec.notes.lower()
+    assert "January rows" in spec.notes
 
 
 def test_saiz_static_msa_covariate_ingests_and_aggregates(
