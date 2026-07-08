@@ -5,14 +5,15 @@
 The three household-composition screens do not support a positive
 composition-driven explanation for rent growth independent of population
 growth. Renter tenure share is negatively associated with rent growth under
-plain year FE, but that result does not survive a state x year FE check
-(see addendum below) and is null for unsheltered-rate growth either way;
-renter household size is null; and recent-mover income ratios are null. None
-of the three compositional channels tested here explain the earlier finding
-that population growth and rent growth are nearly orthogonal across the
-pooled top-150 MSA design -- whatever is driving rent up independent of
-headcount, it is not simply "more renters," "smaller/larger renter
-households," or "richer people moving in."
+plain year FE and under pooled MSA+year levels FE, but the first-difference
+rent result does not survive a state x year FE check (see addenda below) and
+the unsheltered-rate result is null either way; renter household size is null;
+and recent-mover income ratios are null. None of the three compositional
+channels tested here support a positive composition-driven explanation for
+the earlier finding that population growth and rent growth are nearly
+orthogonal across the pooled top-150 MSA design -- whatever is driving rent up
+independent of headcount, it is not simply "more renters,"
+"smaller/larger renter households," or "richer people moving in."
 
 ## Renter Household Share (ACS5 B25003)
 
@@ -86,8 +87,10 @@ that a plain-entity+year-FE result evaporates under state x year FE (after
 the jail-vs-unsheltered flip and the migration-churn non-replication) --
 strong enough repetition to treat state x year FE as a standard, not
 optional, check for this class of MSA panel, not a check that only
-sometimes matters. Net effect: renter tenure share does not survive as an
-independent predictor of rent growth under any specification tested.
+sometimes matters. Net effect: renter tenure share does not survive as a
+first-difference rent-growth predictor once state x year confounding is
+absorbed, although the later tracked levels-FE check below finds a strong
+negative pooled levels association.
 
 ## Renter Household Size (ACS1 B25010)
 
@@ -214,15 +217,39 @@ just a handful of spot-checked years. No correctness bugs found.
 
 Two completeness gaps found, neither of which changes any conclusion:
 
-1. **No levels-FE (entity+year) robustness spec was run**, unlike the
-   paired FD+levels-FE convention this project uses elsewhere (the poverty,
-   Vera jail, and overdose checks all report both forms). Ran it here as a
-   check: all three composition terms stay null under levels FE too
-   (`renter_household_share` b=+3.97, p=0.231, n=1364;
-   `average_household_size_renter_occupied` b=+0.102, p=0.679, n=1351;
-   `moved_diff_state_income_ratio_total` b=+0.042, p=0.572, n=1351). The
-   missing spec was a real gap relative to project convention, but it
-   didn't hide a signal.
+1. **The levels-FE (entity+year) robustness spec needed to be tracked, and
+   the original prose-only check was wrong for renter tenure share.** The
+   committed robustness script now runs the paired levels-FE convention used
+   elsewhere in this project:
+
+   ```bash
+   uv run python scripts/analyze_composition_rent_population_robustness.py
+   ```
+
+   The tracked pooled-MSA levels-FE check on the current
+   `renter_household_share_composition_levels.parquet` complete-case sample
+   is `log_zori ~ log_pop + renter_household_share + msa FE + year FE`,
+   clustered by `msa_id`, with n=1370 (137 MSAs x 10 ZORI-covered years).
+   It estimates `renter_household_share` b=-2.018, SE=0.446, p=5.97e-06.
+   This is the opposite sign and significance from the earlier unsaved
+   addendum number (`b=+3.97, p=0.231, n=1364`), which could not be
+   reproduced from the committed panel artifacts. A from-scratch LSDV
+   replication matches the tracked script, and plausible alternative specs
+   do not recover the old number. The closest diagnostic clue is that using
+   the complementary `owner_household_share` reverses the sign, and a
+   top-50-only owner-share analogue is near the old magnitude, but the old
+   ad hoc check was not committed and cannot be audited beyond that.
+
+   The six-row n difference also appears to be a symptom of the old ad hoc
+   calculation rather than a current sample-construction rule: the current
+   renter-share levels sample is exactly balanced over 137 MSAs and 10
+   years. The ACS1 levels-FE samples are n=1357, not the old n=1351, because
+   the same 137 ZORI-covered MSAs are narrowed only by ACS1 measure coverage
+   (`average_household_size_renter_occupied` b=+0.058, p=0.091;
+   `moved_diff_state_income_ratio_total` b=+0.016, p=0.183). Those two
+   ACS1 levels checks remain conventionally null, but renter tenure share
+   does not: it is a strong negative levels association with rent after
+   MSA and year fixed effects.
 2. **No test coverage for any of the three scripts**, despite this
    project's established precedent for testing exactly this class of
    tracked analysis script end to end with synthetic fixtures
