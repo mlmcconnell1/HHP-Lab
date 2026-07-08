@@ -171,3 +171,50 @@ def test_recent_mover_income_panel_uses_acs1_lag_and_safe_ratios(
     assert levels.loc[2020, "moved_diff_state_income_ratio_total"] == pytest.approx(1.1)
     assert pd.isna(levels.loc[2020, "moved_diff_state_income_ratio_same_house"])
     assert pd.isna(levels.loc[2021, "median_income_moved_diff_state"])
+
+
+def _robustness_fixture() -> pd.DataFrame:
+    rows = []
+    for msa_index, (msa_id, state) in enumerate(
+        [("10000", "AA"), ("20000", "AA"), ("30000", "BB"), ("40000", "BB")]
+    ):
+        for year_index, year in enumerate([2019, 2020, 2022]):
+            rows.append(
+                {
+                    "msa_id": msa_id,
+                    "primary_state": state,
+                    "year": year,
+                    "log_zori": 1.0 + 0.2 * year_index + 0.03 * msa_index,
+                    "d_log_zori": 0.1 + 0.01 * year_index + 0.02 * msa_index,
+                    "log_pop": 10.0 + 0.05 * year_index + 0.01 * msa_index,
+                    "d_log_pop": 0.02 + 0.01 * year_index,
+                    "renter_household_share": 0.35 + 0.02 * year_index + 0.01 * msa_index,
+                    "d_renter_household_share": 0.01 * year_index + 0.005 * msa_index,
+                    "average_household_size_renter_occupied": 2.0 + 0.03 * year_index,
+                    "moved_diff_state_income_ratio_total": 1.1 + 0.02 * msa_index,
+                }
+            )
+    return pd.DataFrame(rows)
+
+
+def test_composition_robustness_runs_state_year_and_levels_fe_specs() -> None:
+    robustness = _load_script("analyze_composition_rent_population_robustness")
+    frame = _robustness_fixture()
+
+    state_year = robustness.fit_spec(frame, robustness.FD_RENTER_SHARE_SPECS[1])
+    levels = robustness.fit_spec(frame, robustness.LEVEL_FE_SPECS[0])
+
+    assert state_year["fixed_effects"].unique().tolist() == ["primary_state_year"]
+    assert levels["fixed_effects"].unique().tolist() == ["msa_id+year"]
+    assert set(state_year["term"]) == {"d_log_pop", "d_renter_household_share"}
+    assert set(levels["term"]) == {"log_pop", "renter_household_share"}
+    assert state_year["nobs"].unique().tolist() == [len(frame)]
+    assert levels["clusters"].unique().tolist() == [frame["msa_id"].nunique()]
+
+
+def test_composition_robustness_requires_state_for_state_year_fe() -> None:
+    robustness = _load_script("analyze_composition_rent_population_robustness")
+    frame = _robustness_fixture().drop(columns=["primary_state"])
+
+    with pytest.raises(ValueError, match="primary_state_year fixed effects require"):
+        robustness.fit_spec(frame, robustness.FD_RENTER_SHARE_SPECS[1])

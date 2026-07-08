@@ -194,14 +194,15 @@ def _validate_supply_model_sample(spec: ModelSpec, sample: pd.DataFrame) -> None
     overlap = sorted(
         int(year)
         for year in sample["year"].dropna().unique()
-        if int(year) <= SUPPLY_EXPOSURE_END_YEAR
+        if int(year) <= SUPPLY_EXPOSURE_END_YEAR + 1
     )
     if overlap:
         raise ValueError(
             f"{spec.name} supply-constraint sample overlaps the "
             f"{min(BPS_SHORT_WINDOW)}-{SUPPLY_EXPOSURE_END_YEAR} BPS exposure window "
-            f"in analysis year(s) {overlap}. Restrict supply-constraint outcomes to "
-            f"years after {SUPPLY_EXPOSURE_END_YEAR} so the exposure is pre-sample."
+            f"in first-difference analysis year(s) {overlap}. Restrict supply-constraint "
+            f"outcomes to years after {SUPPLY_EXPOSURE_END_YEAR + 1} so the exposure "
+            "is pre-sample."
         )
 
 

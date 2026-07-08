@@ -280,11 +280,6 @@ def aggregate_county_overdose_to_msa(
             ]
             population_counties = set(population_rows["county_fips"])
             missing_population = sorted(expected_counties - population_counties)
-            if missing_population:
-                raise ValueError(
-                    "County population weights are missing for CDC overdose MSA "
-                    f"coverage in {msa_id} year {year}: {', '.join(missing_population)}."
-                )
 
             total_population = float(population_rows["population"].sum())
             covered_population = float(
@@ -293,11 +288,13 @@ def aggregate_county_overdose_to_msa(
                 ].sum()
             )
             coverage_ratio = (
-                covered_population / total_population if total_population > 0 else pd.NA
+                0.0
+                if missing_population or total_population <= 0
+                else covered_population / total_population
             )
             county_coverage_ratio = len(available) / expected_count if expected_count else 0.0
             deaths = group["overdose_deaths_12mo"].sum(min_count=1)
-            if pd.notna(coverage_ratio) and coverage_ratio < min_coverage:
+            if missing_population or coverage_ratio < min_coverage:
                 deaths = pd.NA
 
             rows.append(
@@ -318,7 +315,7 @@ def aggregate_county_overdose_to_msa(
                     "population_weight_denominator": total_population,
                     "county_count": len(available),
                     "county_expected": expected_count,
-                    "missing_counties": ",".join(sorted(missing)),
+                    "missing_counties": ",".join(sorted(missing | set(missing_population))),
                     "suppressed_counties": ",".join(sorted(suppressed)),
                     "definition_version": definition_version,
                 }

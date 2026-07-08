@@ -119,6 +119,25 @@ def test_aggregate_county_overdose_to_msa_applies_min_coverage() -> None:
     assert pd.isna(value)
 
 
+def test_aggregate_county_overdose_to_msa_zero_population_fails_min_coverage() -> None:
+    county = normalize_county_overdose(RAW_OVERDOSE_FIXTURE, years=[2024])
+    zero_population = COUNTY_POPULATION_FIXTURE.assign(population=0.0)
+
+    result = aggregate_county_overdose_to_msa(
+        county,
+        MSA_MEMBERSHIP_FIXTURE,
+        zero_population,
+        definition_version="census_msa_2023",
+        min_coverage=0.8,
+    )
+
+    row = result.loc[result["msa_id"] == "12345"].iloc[0]
+    assert pd.isna(row["overdose_deaths_12mo"])
+    assert row["coverage_ratio"] == pytest.approx(0.0)
+    assert row["covered_population"] == pytest.approx(0.0)
+    assert row["total_population"] == pytest.approx(0.0)
+
+
 def test_aggregate_county_overdose_to_msa_requires_population_weights() -> None:
     county = normalize_county_overdose(RAW_OVERDOSE_FIXTURE, years=[2024])
 
@@ -128,3 +147,25 @@ def test_aggregate_county_overdose_to_msa_requires_population_weights() -> None:
             MSA_MEMBERSHIP_FIXTURE,
             definition_version="census_msa_2023",
         )
+
+
+def test_aggregate_county_overdose_to_msa_limits_missing_population_blast_radius() -> None:
+    county = normalize_county_overdose(RAW_OVERDOSE_FIXTURE, years=[2024])
+    partial_population = COUNTY_POPULATION_FIXTURE[
+        COUNTY_POPULATION_FIXTURE["county_fips"].ne("01005")
+    ].copy()
+
+    result = aggregate_county_overdose_to_msa(
+        county,
+        MSA_MEMBERSHIP_FIXTURE,
+        partial_population,
+        definition_version="census_msa_2023",
+    )
+
+    populated_row = result.loc[result["msa_id"] == "12345"].iloc[0]
+    missing_population_row = result.loc[result["msa_id"] == "67890"].iloc[0]
+    assert populated_row["overdose_deaths_12mo"] == pytest.approx(1308)
+    assert populated_row["coverage_ratio"] == pytest.approx(0.9)
+    assert pd.isna(missing_population_row["overdose_deaths_12mo"])
+    assert missing_population_row["coverage_ratio"] == pytest.approx(0.0)
+    assert missing_population_row["missing_counties"] == "01005"

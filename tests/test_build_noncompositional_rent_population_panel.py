@@ -106,10 +106,13 @@ def test_supply_model_sample_rejects_exposure_window_overlap() -> None:
         family="supply_constraint",
     )
     overlapping_sample = pd.DataFrame({"year": [2014, 2015], "msa_id": ["10000", "10000"]})
+    boundary_sample = pd.DataFrame({"year": [2015], "msa_id": ["10000"]})
     valid_sample = pd.DataFrame({"year": [2016, 2017], "msa_id": ["10000", "10000"]})
 
     with pytest.raises(ValueError, match="overlaps the 2010-2014 BPS exposure window"):
         builder._validate_supply_model_sample(spec, overlapping_sample)
+    with pytest.raises(ValueError, match="first-difference analysis year\\(s\\) \\[2015\\]"):
+        builder._validate_supply_model_sample(spec, boundary_sample)
 
     builder._validate_supply_model_sample(spec, valid_sample)
 
