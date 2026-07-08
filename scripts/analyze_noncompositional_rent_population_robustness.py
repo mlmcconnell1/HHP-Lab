@@ -14,7 +14,11 @@ from pathlib import Path
 
 import pandas as pd
 import statsmodels.api as sm
-from build_noncompositional_rent_population_panel import NONCOMPOSITIONAL_OUT
+from build_noncompositional_rent_population_panel import (
+    BPS_SHORT_WINDOW,
+    NONCOMPOSITIONAL_OUT,
+    SUPPLY_EXPOSURE_END_YEAR,
+)
 
 FD_INPUT = NONCOMPOSITIONAL_OUT / "noncompositional_rent_population_fd.parquet"
 
@@ -40,6 +44,14 @@ class RegressionSpec:
 
 
 STATE_YEAR_FE_SPECS = (
+    RegressionSpec(
+        family="supply_constraint",
+        model="rent_fd_population_x_supply_constraint_bps_state_year_fe",
+        outcome="d_log_zori",
+        predictors=("d_log_pop", "supply_constraint_bps", "d_log_pop_x_supply_constraint_bps"),
+        fixed_effects=("primary_state_year",),
+        sample_filter="fd_year_gap_1",
+    ),
     RegressionSpec(
         family="short_term_rental_proxy",
         model="rent_fd_seasonal_recreational_vacancy_share_state_year_fe",
@@ -78,6 +90,27 @@ def _design_matrix(sample: pd.DataFrame, spec: RegressionSpec) -> pd.DataFrame:
     return sm.add_constant(pd.concat(x_parts, axis=1), has_constant="add")
 
 
+def _validate_supply_model_sample(spec: RegressionSpec, sample: pd.DataFrame) -> None:
+    if spec.family != "supply_constraint" or sample.empty:
+        return
+    if "year" not in sample.columns:
+        raise ValueError(f"Regression spec '{spec.model}' requires a year column.")
+
+    overlap = sorted(
+        int(year)
+        for year in sample["year"].dropna().unique()
+        if int(year) <= SUPPLY_EXPOSURE_END_YEAR + 1
+    )
+    if overlap:
+        raise ValueError(
+            f"{spec.model} supply-constraint sample overlaps the "
+            f"{min(BPS_SHORT_WINDOW)}-{SUPPLY_EXPOSURE_END_YEAR} BPS exposure window "
+            f"in first-difference analysis year(s) {overlap}. Restrict supply-constraint "
+            f"outcomes to years after {SUPPLY_EXPOSURE_END_YEAR + 1} so the exposure "
+            "is pre-sample."
+        )
+
+
 def fit_spec(frame: pd.DataFrame, spec: RegressionSpec) -> pd.DataFrame:
     required = [spec.outcome, *spec.predictors, "msa_id", *spec.fixed_effects]
     if "primary_state_year" in spec.fixed_effects:
@@ -96,6 +129,7 @@ def fit_spec(frame: pd.DataFrame, spec: RegressionSpec) -> pd.DataFrame:
     sample = frame.dropna(subset=required).copy()
     if sample.empty:
         return pd.DataFrame()
+    _validate_supply_model_sample(spec, sample)
 
     x = _design_matrix(sample, spec)
     y = sample[spec.outcome].astype("float64")
@@ -148,7 +182,7 @@ def run_robustness_checks() -> pd.DataFrame:
 def summarize_regressions(regressions: pd.DataFrame) -> dict[str, object]:
     if regressions.empty:
         return {"regression_rows": 0, "models": []}
-    focal_terms = {"d_seasonal_recreational_vacancy_share"}
+    focal_terms = {"supply_constraint_bps", "d_seasonal_recreational_vacancy_share"}
     focal = regressions[regressions["term"].isin(focal_terms)].copy()
     return {
         "regression_rows": int(len(regressions)),

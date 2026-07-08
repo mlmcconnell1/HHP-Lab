@@ -4,6 +4,7 @@ Generated with:
 
 ```bash
 uv run python scripts/build_noncompositional_rent_population_panel.py
+uv run python scripts/analyze_noncompositional_rent_population_robustness.py
 ```
 
 This screen follows the pooled top-50 plus rank-51-150 MSA first-difference
@@ -18,6 +19,9 @@ Generated, ignored artifacts:
 - `outputs/noncompositional_rent_population/noncompositional_rent_population_fd_regressions.parquet`
 - `outputs/noncompositional_rent_population/noncompositional_rent_population_fd_regressions.csv`
 - `outputs/noncompositional_rent_population/noncompositional_rent_population_summary.json`
+- `outputs/noncompositional_rent_population/noncompositional_rent_population_robustness_regressions.parquet`
+- `outputs/noncompositional_rent_population/noncompositional_rent_population_robustness_regressions.csv`
+- `outputs/noncompositional_rent_population/noncompositional_rent_population_robustness_summary.json`
 
 ## Measure Discovery
 
@@ -244,11 +248,27 @@ candidate. **Housing supply constraint remains the only FD (growth-on-growth)
 result, and renter household share in levels the only cross-sectional
 result, to survive a state x year FE check across both epics.**
 
-**Known gap, not yet closed:** the supply-constraint state x year FE result
-(+0.0055 -> +0.0029, p=0.012, cited above) that motivated this addendum was
-itself never implemented as a tracked, re-runnable script -- it exists only
-as prose, the same failure mode that turned out to be wrong for the
-composition epic's renter-share levels check (see
-`devdocs/composition_rent_population_findings.md`'s 2026-07-08 discrepancy
-addendum). It has not yet been independently re-verified from scratch the
-way the STR check above was. Filed as a follow-up (see beads).
+## 2026-07-08 Addendum: supply constraint robustness is now tracked
+
+Closed the reproducibility gap noted above by adding the headline supply
+constraint state x year FE check to
+`scripts/analyze_noncompositional_rent_population_robustness.py`. The tracked
+spec matches the primary year-FE supply model: `d_log_zori ~ d_log_pop +
+supply_constraint_bps + d_log_pop_x_supply_constraint_bps`, replacing year FE
+with `primary_state x year` FE and preserving MSA-clustered standard errors.
+The script now also enforces that supply-constraint complete-case samples do
+not overlap the 2010-2014 BPS exposure window.
+
+Tracked output:
+
+| Model term | Estimate | SE | p-value | N |
+| --- | ---: | ---: | ---: | ---: |
+| `supply_constraint_bps` (year FE) | 0.0055 | 0.0009 | <0.001 | 1,096 |
+| `supply_constraint_bps` (state x year FE) | 0.0029 | 0.0012 | 0.012 | 1,096 |
+| `d_log_pop x supply_constraint_bps` (state x year FE) | 0.1308 | 0.0712 | 0.066 | 1,096 |
+
+Independently re-verified from scratch with a separate statsmodels formula
+construction on the same input parquet:
+`supply_constraint_bps` b=0.002912331262, SE=0.001161385601,
+p=0.012154211949, n=1,096, 137 MSA clusters, analysis years 2016-2025.
+This confirms the earlier prose claim while making the check re-runnable.
