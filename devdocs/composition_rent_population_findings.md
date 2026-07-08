@@ -192,3 +192,42 @@ independently predict rent growth or unsheltered-rate growth. This is broadly
 consistent with the earlier IRS SOI screen's low mover-income signal
 (approximately 0.73x), while using a different income concept: Census
 individual median income by mobility origin rather than IRS AGI per return.
+
+## 2026-07-08 Code Review Addendum
+
+Requested review of correctness, completeness, corner cases, and test
+coverage for all four closed beads under this epic. Reread all three
+scripts and independently reran each one end to end, reproducing every
+reported coefficient in this document exactly (to the reported decimal
+places). Also checked: `_safe_ratio`/`_safe_log` correctly guard
+divide-by-zero and log-of-nonpositive by producing NaN rather than
+inf/warnings; the ACS5/ACS1 lag alignment (vintage end year `E` -> PIT year
+`E + 1`) is applied consistently and matches the project convention used
+elsewhere; the glob patterns correctly scope to a single MSA definition
+version (`Dcensusmsa2023` / `Mcensusmsa2023`) with no duplicate-vintage
+fan-out into the merge; B25003's `total_households` equals
+`owner_households + renter_households` exactly in every row (zero mismatch
+across 1,750 levels rows); B07011's cell order was re-verified byte-for-byte
+against the live Census API (`api.census.gov/data/2023/acs/acs1/groups/B07011.json`)
+and confirmed non-null (98-99%) across the full 2009-2024 ingestion, not
+just a handful of spot-checked years. No correctness bugs found.
+
+Two completeness gaps found, neither of which changes any conclusion:
+
+1. **No levels-FE (entity+year) robustness spec was run**, unlike the
+   paired FD+levels-FE convention this project uses elsewhere (the poverty,
+   Vera jail, and overdose checks all report both forms). Ran it here as a
+   check: all three composition terms stay null under levels FE too
+   (`renter_household_share` b=+3.97, p=0.231, n=1364;
+   `average_household_size_renter_occupied` b=+0.102, p=0.679, n=1351;
+   `moved_diff_state_income_ratio_total` b=+0.042, p=0.572, n=1351). The
+   missing spec was a real gap relative to project convention, but it
+   didn't hide a signal.
+2. **No test coverage for any of the three scripts**, despite this
+   project's established precedent for testing exactly this class of
+   tracked analysis script end to end with synthetic fixtures
+   (`tests/test_build_supply_iv_panel.py`). Filed as
+   `coclab-composition-panel-test-coverage` (P3) rather than fixed here --
+   real engineering work, not a quick addendum. The safe_ratio/safe_log
+   guards and the ACS-lag merge are the two places a silent bug would most
+   plausibly hide and should be the first things covered.
