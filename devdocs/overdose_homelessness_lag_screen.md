@@ -40,14 +40,9 @@ through the PSH-exit pathway.
   panel's own PEP population, for consistency with `unshelt_per_1000` etc.
   elsewhere in this project.
 - Quality filter: `overdose_coverage_ratio >= 0.8` (same threshold convention
-  as ZORI). **Caveat: this ratio is the fraction of an MSA's *counties* with
-  non-suppressed CDC data, not population-weighted** (see
-  `aggregate_county_overdose_to_msa` in `hhplab/cdc/overdose.py`) -- unlike
-  the population-weighted coverage ratios used elsewhere (ZORI, IRS SOI). A
-  large multi-county metro with one small suppressed suburb and a two-county
-  metro with one suppressed half its population both move the ratio by a
-  similar amount. Treat the filter as a coarse quality screen, not a precise
-  population-coverage guarantee.
+  as ZORI). `aggregate_county_overdose_to_msa` now computes this ratio as the
+  share of MSA county population with non-suppressed CDC data; the older raw
+  county-count fraction is retained separately as `county_coverage_ratio`.
 - Build script: `scripts/build_overdose_lag_panel.py` (tracked, reproducible).
   Panel/regression outputs under `outputs/overdose_lag/` (gitignored).
 

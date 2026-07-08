@@ -40,6 +40,14 @@ MSA_MEMBERSHIP_FIXTURE = pd.DataFrame(
     }
 )
 
+COUNTY_POPULATION_FIXTURE = pd.DataFrame(
+    {
+        "county_fips": ["01001", "01003", "01005", "01001"],
+        "year": [2024, 2024, 2024, 2025],
+        "population": [900.0, 100.0, 50.0, 910.0],
+    }
+)
+
 
 def test_normalize_county_overdose_uses_january_rows_for_requested_year() -> None:
     result = normalize_county_overdose(RAW_OVERDOSE_FIXTURE, years=[2024])
@@ -69,13 +77,18 @@ def test_aggregate_county_overdose_to_msa_sums_available_county_counts() -> None
     result = aggregate_county_overdose_to_msa(
         county,
         MSA_MEMBERSHIP_FIXTURE,
+        COUNTY_POPULATION_FIXTURE,
         definition_version="census_msa_2023",
     )
 
     assert tuple(result.columns) == CDC_OVERDOSE_MSA_COLUMNS
     row = result.loc[result["msa_id"] == "12345"].iloc[0]
     assert row["overdose_deaths_12mo"] == pytest.approx(1308)
-    assert row["coverage_ratio"] == pytest.approx(0.5)
+    assert row["coverage_ratio"] == pytest.approx(0.9)
+    assert row["county_coverage_ratio"] == pytest.approx(0.5)
+    assert row["covered_population"] == pytest.approx(900.0)
+    assert row["total_population"] == pytest.approx(1000.0)
+    assert row["population_weight_denominator"] == pytest.approx(1000.0)
     assert row["county_count"] == 1
     assert row["county_expected"] == 2
     assert row["suppressed_counties"] == "01003"
@@ -84,6 +97,7 @@ def test_aggregate_county_overdose_to_msa_sums_available_county_counts() -> None
     single_county_row = result.loc[result["msa_id"] == "67890"].iloc[0]
     assert single_county_row["overdose_deaths_12mo"] == pytest.approx(6)
     assert single_county_row["coverage_ratio"] == pytest.approx(1.0)
+    assert single_county_row["county_coverage_ratio"] == pytest.approx(1.0)
     assert single_county_row["county_count"] == 1
     assert single_county_row["county_expected"] == 1
     assert single_county_row["missing_counties"] == ""
@@ -96,9 +110,21 @@ def test_aggregate_county_overdose_to_msa_applies_min_coverage() -> None:
     result = aggregate_county_overdose_to_msa(
         county,
         MSA_MEMBERSHIP_FIXTURE,
+        COUNTY_POPULATION_FIXTURE,
         definition_version="census_msa_2023",
-        min_coverage=0.75,
+        min_coverage=0.95,
     )
 
     value = result.loc[result["msa_id"] == "12345", "overdose_deaths_12mo"].iloc[0]
     assert pd.isna(value)
+
+
+def test_aggregate_county_overdose_to_msa_requires_population_weights() -> None:
+    county = normalize_county_overdose(RAW_OVERDOSE_FIXTURE, years=[2024])
+
+    with pytest.raises(ValueError, match="requires county population weights"):
+        aggregate_county_overdose_to_msa(
+            county,
+            MSA_MEMBERSHIP_FIXTURE,
+            definition_version="census_msa_2023",
+        )

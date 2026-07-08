@@ -49,6 +49,10 @@ CDC_OVERDOSE_MSA_COLUMNS: tuple[str, ...] = (
     "reference_date",
     "overdose_deaths_12mo",
     "coverage_ratio",
+    "county_coverage_ratio",
+    "covered_population",
+    "total_population",
+    "population_weight_denominator",
     "county_count",
     "county_expected",
     "missing_counties",
@@ -203,9 +207,27 @@ def _normalize_msa_membership(msa_county_membership: pd.DataFrame) -> pd.DataFra
     return membership
 
 
+def _normalize_county_population(county_population: pd.DataFrame) -> pd.DataFrame:
+    required = ("county_fips", "year", "population")
+    _validate_required_columns(county_population, required, "County population weights")
+    population = county_population.loc[:, required].drop_duplicates().copy()
+    population["county_fips"] = _normalize_county_fips(population["county_fips"])
+    population["year"] = population["year"].astype(int)
+    population["population"] = pd.to_numeric(population["population"], errors="coerce")
+    if population["population"].isna().any():
+        sample = (
+            population.loc[population["population"].isna(), ["county_fips", "year"]]
+            .head(10)
+            .to_dict(orient="records")
+        )
+        raise ValueError(f"County population weights contain non-numeric values; sample: {sample}.")
+    return population
+
+
 def aggregate_county_overdose_to_msa(
     county_df: pd.DataFrame,
     msa_county_membership: pd.DataFrame | None = None,
+    county_population: pd.DataFrame | None = None,
     *,
     definition_version: str = DEFINITION_VERSION,
     min_coverage: float = DEFAULT_MIN_COVERAGE,
@@ -213,6 +235,12 @@ def aggregate_county_overdose_to_msa(
     """Aggregate additive county overdose counts to MSAs by county membership."""
     if min_coverage < 0 or min_coverage > 1:
         raise ValueError("min_coverage must be between 0 and 1.")
+    if county_population is None:
+        raise ValueError(
+            "CDC MSA overdose coverage_ratio requires county population weights. "
+            "Provide county_population with county_fips, year, population columns "
+            "or use hhplab aggregate cdc-overdose with PEP county population available."
+        )
     _validate_required_columns(
         county_df,
         ("county_fips", "year", "reference_month", "reference_date", "overdose_deaths_12mo"),
@@ -224,6 +252,7 @@ def aggregate_county_overdose_to_msa(
         if msa_county_membership is not None
         else _normalize_msa_membership(read_msa_county_membership(definition_version))
     )
+    population = _normalize_county_population(county_population)
     county = county_df.copy()
     county["county_fips"] = _normalize_county_fips(county["county_fips"])
     county["year"] = county["year"].astype(int)
@@ -245,9 +274,30 @@ def aggregate_county_overdose_to_msa(
             present = set(group["county_fips"])
             missing = expected_counties - present
             suppressed = present - available
-            coverage_ratio = len(available) / expected_count if expected_count else 0.0
+            population_rows = population.loc[
+                (population["year"] == year)
+                & (population["county_fips"].isin(expected_counties))
+            ]
+            population_counties = set(population_rows["county_fips"])
+            missing_population = sorted(expected_counties - population_counties)
+            if missing_population:
+                raise ValueError(
+                    "County population weights are missing for CDC overdose MSA "
+                    f"coverage in {msa_id} year {year}: {', '.join(missing_population)}."
+                )
+
+            total_population = float(population_rows["population"].sum())
+            covered_population = float(
+                population_rows.loc[
+                    population_rows["county_fips"].isin(available), "population"
+                ].sum()
+            )
+            coverage_ratio = (
+                covered_population / total_population if total_population > 0 else pd.NA
+            )
+            county_coverage_ratio = len(available) / expected_count if expected_count else 0.0
             deaths = group["overdose_deaths_12mo"].sum(min_count=1)
-            if coverage_ratio < min_coverage:
+            if pd.notna(coverage_ratio) and coverage_ratio < min_coverage:
                 deaths = pd.NA
 
             rows.append(
@@ -262,6 +312,10 @@ def aggregate_county_overdose_to_msa(
                     else pd.NA,
                     "overdose_deaths_12mo": deaths,
                     "coverage_ratio": coverage_ratio,
+                    "county_coverage_ratio": county_coverage_ratio,
+                    "covered_population": covered_population,
+                    "total_population": total_population,
+                    "population_weight_denominator": total_population,
                     "county_count": len(available),
                     "county_expected": expected_count,
                     "missing_counties": ",".join(sorted(missing)),
@@ -305,6 +359,7 @@ def write_msa_overdose(
             "row_grain": "msa_id x year",
             "aggregation": "sum_county_member_january_trailing_12_month_counts",
             "min_coverage": min_coverage,
+            "coverage_ratio_basis": "county_population",
             "measure_columns": ["overdose_deaths_12mo"],
             "input_artifacts": input_artifacts or {},
         },
@@ -320,9 +375,14 @@ def ingest_and_aggregate_overdose_to_msa(
     definition_version: str = DEFINITION_VERSION,
     county_vintage: str | int = "2023",
     min_coverage: float = DEFAULT_MIN_COVERAGE,
+    county_population: pd.DataFrame | None = None,
     output_dir: Path | str | None = None,
 ) -> tuple[pd.DataFrame, pd.DataFrame, Path, Path]:
     """Normalize CDC county data and write county plus MSA artifacts."""
+    if county_population is None:
+        from hhplab.pep.pep_aggregate import load_pep_county
+
+        county_population = load_pep_county()
     county_df, county_path = ingest_county_overdose(
         raw_path=raw_path,
         years=years,
@@ -334,6 +394,7 @@ def ingest_and_aggregate_overdose_to_msa(
     msa_df = aggregate_county_overdose_to_msa(
         county_df,
         membership,
+        county_population,
         definition_version=definition_version,
         min_coverage=min_coverage,
     )

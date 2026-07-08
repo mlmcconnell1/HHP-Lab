@@ -421,9 +421,19 @@ def aggregate_cdc_overdose(
         float,
         typer.Option(
             "--min-coverage",
-            help="Minimum county-count coverage ratio for valid MSA-year output.",
+            help="Minimum population-weighted coverage ratio for valid MSA-year output.",
         ),
     ] = 0.0,
+    county_population_path: Annotated[
+        Path | None,
+        typer.Option(
+            "--county-population-path",
+            help=(
+                "Optional PEP county population parquet for MSA coverage weights. "
+                "If omitted, curated PEP county files are discovered."
+            ),
+        ),
+    ] = None,
     raw_path: Annotated[
         Path,
         typer.Option(
@@ -466,6 +476,7 @@ def aggregate_cdc_overdose(
         ingest_and_aggregate_overdose_to_msa,
         ingest_county_overdose,
     )
+    from hhplab.pep.pep_aggregate import load_pep_county
 
     output_dir = curated_root() / "cdc"
     try:
@@ -488,6 +499,11 @@ def aggregate_cdc_overdose(
                 definition_version=definition_version,
                 county_vintage=counties,
                 min_coverage=min_coverage,
+                county_population=(
+                    None
+                    if county_population_path is None
+                    else load_pep_county(county_population_path)
+                ),
                 output_dir=output_dir,
             )
             outputs = {"county": str(county_path), "msa": str(msa_path)}
@@ -516,6 +532,9 @@ def aggregate_cdc_overdose(
                     "definition_version": definition_version if geo_type == "msa" else None,
                     "county_vintage": counties,
                     "min_coverage": min_coverage if geo_type == "msa" else None,
+                    "county_population_path": str(county_population_path)
+                    if county_population_path is not None
+                    else None,
                     "row_counts": row_counts,
                     "msa_count": msa_count,
                     "outputs": outputs,
