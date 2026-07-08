@@ -204,7 +204,9 @@ def load_required_parquet(path: Path) -> pd.DataFrame:
     if not path.exists():
         raise FileNotFoundError(
             f"Required composition panel artifact not found: {path}. "
-            "Run the corresponding scripts/build_*_composition_panel.py first."
+            "Run `uv run hhplab build result composition-rent-population --json` "
+            "or the corresponding `python -m hhplab.results.workflows.build_*` "
+            "module first."
         )
     return pd.read_parquet(path)
 

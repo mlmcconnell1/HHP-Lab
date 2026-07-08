@@ -276,7 +276,8 @@ p=5.97e-06, msa+year FE) had not yet been run through the full three-tier
 fixed-effect ladder described above. Added
 `rent_levels_renter_household_share_msa_region_year_fe` and
 `rent_levels_renter_household_share_msa_state_year_fe` to
-`scripts/analyze_composition_rent_population_robustness.py` and re-ran:
+`uv run python -m hhplab.results.workflows.analyze_composition_rent_population_robustness`
+and re-ran:
 
 | Model term | Estimate | SE | p-value | N |
 | --- | ---: | ---: | ---: | ---: |

@@ -227,7 +227,7 @@ result.
 The STR (seasonal/recreational vacancy share) FD result above (b=+0.0305,
 p=0.029, plain year FE) had never been re-run with the full three-tier FE
 ladder. Added `region_year` and `primary_state_year` specs to
-`scripts/analyze_noncompositional_rent_population_robustness.py` and re-ran
+`uv run python -m hhplab.results.workflows.analyze_noncompositional_rent_population_robustness` and re-ran
 on the identical n=1,070 sample:
 
 | Model term | Estimate | SE | p-value | N |
@@ -251,7 +251,7 @@ result, to survive the full three-tier FE ladder across both epics.**
 
 Closed the reproducibility gap noted above by adding the headline supply
 constraint state x year FE check to
-`scripts/analyze_noncompositional_rent_population_robustness.py`. The tracked
+`uv run python -m hhplab.results.workflows.analyze_noncompositional_rent_population_robustness`. The tracked
 spec matches the primary year-FE supply model: `d_log_zori ~ d_log_pop +
 supply_constraint_bps + d_log_pop_x_supply_constraint_bps`, replacing year FE
 with `primary_state x year` FE and preserving MSA-clustered standard errors.

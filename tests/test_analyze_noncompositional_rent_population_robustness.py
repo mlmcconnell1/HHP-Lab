@@ -151,9 +151,31 @@ def test_noncompositional_robustness_requires_state_for_region_year_fe() -> None
         robustness.fit_spec(frame, spec)
 
 
+@pytest.mark.parametrize(
+    "model",
+    [
+        "rent_fd_population_x_supply_constraint_bps_region_year_fe",
+        "rent_fd_seasonal_recreational_vacancy_share_region_year_fe",
+    ],
+)
+def test_noncompositional_robustness_rejects_unmapped_state_for_region_year(
+    model: str,
+) -> None:
+    robustness = _load_script("analyze_noncompositional_rent_population_robustness")
+    frame = _fd_fixture()
+    frame.loc[0, "primary_state"] = "PR"
+    spec = next(spec for spec in robustness.STATE_YEAR_FE_SPECS if spec.model == model)
+
+    with pytest.raises(ValueError, match="Unknown Census state abbreviation"):
+        robustness.fit_spec(frame, spec)
+
+
 def test_noncompositional_robustness_requires_panel_artifact(tmp_path, monkeypatch) -> None:
     robustness = _load_script("analyze_noncompositional_rent_population_robustness")
     missing_path = tmp_path / "does_not_exist.parquet"
 
-    with pytest.raises(FileNotFoundError, match="Run scripts/build_noncompositional"):
+    with pytest.raises(
+        FileNotFoundError,
+        match="hhplab build result noncompositional-rent-population",
+    ):
         robustness.load_required_parquet(missing_path)

@@ -9,6 +9,8 @@ import numpy as np
 import pandas as pd
 import pytest
 
+from hhplab.census_regions import census_region
+
 BASE_ROWS = [
     {
         "msa_id": "10000",
@@ -242,6 +244,35 @@ def test_composition_robustness_requires_state_for_region_year_fe() -> None:
     )
 
     with pytest.raises(ValueError, match="region_year fixed effects require"):
+        robustness.fit_spec(frame, spec)
+
+
+@pytest.mark.parametrize("value, expected", [("ct", "Northeast"), (" ny ", "Northeast")])
+def test_census_region_normalizes_valid_state_codes(value: str, expected: str) -> None:
+    assert census_region(value) == expected
+
+
+def test_census_region_rejects_unmapped_state_codes() -> None:
+    with pytest.raises(ValueError, match="Unknown Census state abbreviation"):
+        census_region("PR")
+
+
+@pytest.mark.parametrize(
+    "model",
+    [
+        "rent_fd_renter_household_share_region_year_fe",
+        "rent_levels_renter_household_share_msa_region_year_fe",
+    ],
+)
+def test_composition_robustness_rejects_unmapped_state_for_region_year(model: str) -> None:
+    robustness = _load_script("analyze_composition_rent_population_robustness")
+    frame = _robustness_fixture()
+    frame.loc[0, "primary_state"] = "PR"
+    spec = _spec_by_model(robustness.FD_RENTER_SHARE_SPECS, model) if model.startswith(
+        "rent_fd"
+    ) else _spec_by_model(robustness.LEVEL_FE_SPECS, model)
+
+    with pytest.raises(ValueError, match="Unknown Census state abbreviation"):
         robustness.fit_spec(frame, spec)
 
 

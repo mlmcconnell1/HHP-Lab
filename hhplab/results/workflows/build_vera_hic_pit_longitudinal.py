@@ -86,6 +86,11 @@ def primary_state(msa_name: str) -> str:
     return msa_name.rsplit(",", 1)[-1].strip().split("-")[0]
 
 
+def _safe_log(series: pd.Series) -> pd.Series:
+    values = series.astype("float64").where(series > 0)
+    return pd.Series(np.log(values), index=series.index)
+
+
 def load_base_panel() -> pd.DataFrame:
     df = pd.read_parquet(TOP50_PANEL)[CORE_COLUMNS].copy()
     df = df[df.year.isin(PANEL_YEARS)].sort_values(["msa_id", "year"])
@@ -167,14 +172,10 @@ def main() -> None:
     vera_msa = aggregate_vera_to_msa()
     merged = base.merge(vera_msa, on=["msa_id", "year"], how="left")
     merged["jail_per_1000"] = merged["total_jail_pop"] / merged["population"] * 1000
-    merged["log_jail_rate"] = np.where(
-        merged["jail_per_1000"] > 0, np.log(merged["jail_per_1000"]), np.nan
-    )
+    merged["log_jail_rate"] = _safe_log(merged["jail_per_1000"])
     for key in HIC_BED_COLUMNS:
         col = f"{key}_per_1000"
-        merged[f"log_{key}_rate"] = np.where(
-            merged[col] > 0, np.log(merged[col]), np.nan
-        )
+        merged[f"log_{key}_rate"] = _safe_log(merged[col])
 
     merged = add_diffs(merged)
 
