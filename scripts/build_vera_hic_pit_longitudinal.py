@@ -146,7 +146,7 @@ def add_diffs(levels: pd.DataFrame) -> pd.DataFrame:
 
     log_cols = dict(PIT_LOG_COLUMN)
     log_cols["jail"] = "log_jail_rate"
-    for key, col in HIC_BED_COLUMNS.items():
+    for key in HIC_BED_COLUMNS:
         log_cols[key] = f"log_{key}_rate"
 
     for key, log_col in log_cols.items():

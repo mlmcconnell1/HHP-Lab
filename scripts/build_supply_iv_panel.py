@@ -9,9 +9,9 @@ from __future__ import annotations
 
 import argparse
 import json
+from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterable
 
 import numpy as np
 import pandas as pd
@@ -31,7 +31,8 @@ BPS_COUNTY = ROOT / "data/curated/covariates/covariate__census_bps__Y2000-2024.p
 MEMBERSHIP = ROOT / "data/curated/msa/msa_county_membership__census_msa_2023.parquet"
 ZORI_MSA = (
     ROOT
-    / "data/curated/zori/zori__msa__Y2015-2025@Mcensusmsa2023xC2023__wpopulation__mpit_january__balanced.parquet"
+    / "data/curated/zori/"
+    "zori__msa__Y2015-2025@Mcensusmsa2023xC2023__wpopulation__mpit_january__balanced.parquet"
 )
 SAIZ = ROOT / "data/raw/saiz_elasticity/saiz2010_supply_elasticity.dta"
 SANCTUARY_PANEL = (
@@ -65,6 +66,9 @@ class InputPaths:
     zori_msa: Path = ZORI_MSA
     saiz: Path = SAIZ
     sanctuary_panel: Path = SANCTUARY_PANEL
+
+
+DEFAULT_INPUT_PATHS = InputPaths()
 
 
 @dataclass(frozen=True)
@@ -152,10 +156,11 @@ def _normalize_base_panel(base: pd.DataFrame, *, paths: InputPaths) -> pd.DataFr
 def build_bps_exposures(
     cohort: pd.DataFrame,
     *,
-    paths: InputPaths = InputPaths(),
+    paths: InputPaths | None = None,
     include_long_bps: bool = False,
 ) -> pd.DataFrame:
     """Pre-sample permits intensity per MSA."""
+    paths = DEFAULT_INPUT_PATHS if paths is None else paths
     bps = pd.read_parquet(paths.bps_msa)
     bps["msa_id"] = bps["msa_id"].astype(str)
     cohort_ids = set(cohort["msa_id"])
@@ -206,8 +211,14 @@ def build_bps_exposures(
     return frame[columns].reset_index()
 
 
-def match_saiz(cohort: pd.DataFrame, *, paths: InputPaths = InputPaths(), audit_path: Path) -> pd.DataFrame:
+def match_saiz(
+    cohort: pd.DataFrame,
+    *,
+    paths: InputPaths | None = None,
+    audit_path: Path,
+) -> pd.DataFrame:
     """Join Saiz (2010) supply measures onto CBSAs by principal city."""
+    paths = DEFAULT_INPUT_PATHS if paths is None else paths
     saiz = pd.read_stata(paths.saiz)
     saiz["saiz_name"] = saiz["msaname"].astype(str).str.strip()
     rows = []
@@ -251,8 +262,13 @@ def match_saiz(cohort: pd.DataFrame, *, paths: InputPaths = InputPaths(), audit_
     return matched
 
 
-def leave_one_out_shift(cohort_ids: pd.Series, *, paths: InputPaths = InputPaths()) -> pd.DataFrame:
+def leave_one_out_shift(
+    cohort_ids: pd.Series,
+    *,
+    paths: InputPaths | None = None,
+) -> pd.DataFrame:
     """Population-weighted leave-one-out national ZORI growth per MSA-year."""
+    paths = DEFAULT_INPUT_PATHS if paths is None else paths
     zori = pd.read_parquet(paths.zori_msa)
     zori["msa_id"] = zori["msa_id"].astype(str)
     zori = zori.sort_values(["msa_id", "year"])
@@ -282,11 +298,12 @@ def leave_one_out_shift(cohort_ids: pd.Series, *, paths: InputPaths = InputPaths
 def build_supply_iv_panel(
     spec: CohortSpec,
     *,
-    paths: InputPaths = InputPaths(),
+    paths: InputPaths | None = None,
     out_dir: Path = OUT,
     suffix: str = "",
     exclude_msa_ids: Iterable[str] = (),
 ) -> tuple[pd.DataFrame, pd.DataFrame, dict[str, object]]:
+    paths = DEFAULT_INPUT_PATHS if paths is None else paths
     _require_files([spec.base_panel, paths.bps_msa, paths.zori_msa, paths.sanctuary_panel])
     if spec.include_long_bps:
         _require_files([paths.bps_county, paths.membership])
@@ -381,7 +398,12 @@ def build_supply_iv_panel(
     return fd, longdiff, manifest
 
 
-def build_top150_outputs(*, paths: InputPaths = InputPaths(), out_dir: Path = OUT) -> None:
+def build_top150_outputs(
+    *,
+    paths: InputPaths | None = None,
+    out_dir: Path = OUT,
+) -> None:
+    paths = DEFAULT_INPUT_PATHS if paths is None else paths
     build_supply_iv_panel(TOP150_SPEC, paths=paths, out_dir=out_dir)
     build_supply_iv_panel(
         TOP150_SPEC,

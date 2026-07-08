@@ -53,7 +53,7 @@ def partial_corr_controlling_pop(x: np.ndarray, y: np.ndarray, pop: np.ndarray):
 
 
 def run_family(df: pd.DataFrame, keys: tuple, labels: dict, rate_col_fn, log_source_fn):
-    print(f"\n=== POOLED (all years) ===")
+    print("\n=== POOLED (all years) ===")
     pooled_rows = []
     for key in keys:
         col = rate_col_fn(key)
@@ -84,7 +84,9 @@ def run_family(df: pd.DataFrame, keys: tuple, labels: dict, rate_col_fn, log_sou
                 line += f"{'n/a':>10s}"
                 continue
             r, p = stats.pearsonr(np.log(sub[col]), np.log(sub["jail_per_1000"]))
-            by_year_rows.append({"category": labels[key], "year": year, "r": r, "p": p, "n": len(sub)})
+            by_year_rows.append(
+                {"category": labels[key], "year": year, "r": r, "p": p, "n": len(sub)}
+            )
             marker = "*" if p < 0.05 else ""
             line += f"{r:+.2f}{marker}".rjust(10)
         print(line)
