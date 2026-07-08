@@ -258,3 +258,47 @@ Two completeness gaps found, neither of which changes any conclusion:
    real engineering work, not a quick addendum. The safe_ratio/safe_log
    guards and the ACS-lag merge are the two places a silent bug would most
    plausibly hide and should be the first things covered.
+
+## 2026-07-08 Addendum: renter tenure share's levels result survives state x year FE
+
+The corrected `renter_household_share` levels-FE result above (b=-2.018,
+p=5.97e-06, msa+year FE) had not yet been run through this project's
+strictest check: replacing plain year FE with `primary_state x year` FE,
+the test that has caught every other significant MSA-panel result in this
+project's record except housing supply constraint (see
+`devdocs/noncompositional_rent_population_findings.md`). Added
+`rent_levels_renter_household_share_msa_state_year_fe` to
+`scripts/analyze_composition_rent_population_robustness.py`
+(`fixed_effects=("msa_id", "primary_state_year")`) and re-ran:
+
+| Model term | Estimate | SE | p-value | N |
+| --- | ---: | ---: | ---: | ---: |
+| `renter_household_share` (msa + year FE) | -2.018 | 0.446 | 5.97e-06 | 1,370 |
+| `renter_household_share` (msa + state x year FE) | -1.756 | 0.581 | 0.0025 | 1,370 |
+
+**This survives.** The coefficient attenuates by about 13% but stays
+significant at p=0.0025. The design matrix is rank-deficient (568 columns,
+rank 526) because 14 of 43 states have only one MSA -- for those, the MSA
+dummy and the state-year dummies are collinear and the pseudo-inverse
+solution assigns them zero marginal contribution. Verified this isn't a
+numerical artifact: restricting to only the 29 states with 2+ MSAs (123
+MSAs, n=1,230) gives the identical coefficient to 10 decimal places
+(-1.7563115377808844 vs -1.7563115377813843), just a smaller-cluster p-value
+(0.0013). So the identifying variation is entirely the well-identified
+multi-MSA-state subsample, and the result is not an artifact of the
+singleton-state collinearity.
+
+**This makes renter household share (in levels, not first-differenced) the
+second result in this whole two-epic investigation to survive a state x
+year FE check**, after housing supply constraint. Net reading: MSAs with a
+structurally higher renter share have persistently lower rent levels after
+controlling for population, MSA fixed effects, and state-specific year
+shocks -- a real, robust cross-sectional/levels association, even though the
+corresponding first-differenced (growth-on-growth) version of the same
+variable does not survive the same check (see the 2026-07-08 addendum
+above). This does not change the overall "no compositional channel explains
+rent *growth* independent of population growth" conclusion, since the FD
+spec is the one that speaks to growth; it does mean renter tenure share is
+not simply a null variable overall -- it has a real, level-effect
+relationship with rent that a future analysis of *why* rents differ across
+metros (as opposed to why they're *rising*) should not ignore.

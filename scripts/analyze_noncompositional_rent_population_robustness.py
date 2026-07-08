@@ -1,8 +1,9 @@
-"""Run tracked robustness checks for composition-rent-population screens.
+"""Run tracked robustness checks for non-compositional rent-population screens.
 
-This script consumes the panel artifacts created by the composition builder
-scripts and reproduces the follow-up fixed-effect checks documented in
-devdocs/composition_rent_population_findings.md.
+This script consumes the panel artifact created by
+build_noncompositional_rent_population_panel.py and reproduces the
+state x year fixed-effects robustness check documented in
+devdocs/noncompositional_rent_population_findings.md.
 """
 
 from __future__ import annotations
@@ -13,20 +14,19 @@ from pathlib import Path
 
 import pandas as pd
 import statsmodels.api as sm
-from build_household_size_composition_panel import OUT
+from build_noncompositional_rent_population_panel import NONCOMPOSITIONAL_OUT
 
-FD_INPUTS = {
-    "renter_household_share": OUT / "renter_household_share_composition_fd.parquet",
-}
-LEVEL_INPUTS = {
-    "renter_household_share": OUT / "renter_household_share_composition_levels.parquet",
-    "household_size": OUT / "household_size_composition_levels.parquet",
-    "recent_mover_income": OUT / "recent_mover_income_composition_levels.parquet",
-}
+FD_INPUT = NONCOMPOSITIONAL_OUT / "noncompositional_rent_population_fd.parquet"
 
-ROBUSTNESS_PARQUET = OUT / "composition_rent_population_robustness_regressions.parquet"
-ROBUSTNESS_CSV = OUT / "composition_rent_population_robustness_regressions.csv"
-ROBUSTNESS_SUMMARY = OUT / "composition_rent_population_robustness_summary.json"
+ROBUSTNESS_PARQUET = (
+    NONCOMPOSITIONAL_OUT / "noncompositional_rent_population_robustness_regressions.parquet"
+)
+ROBUSTNESS_CSV = (
+    NONCOMPOSITIONAL_OUT / "noncompositional_rent_population_robustness_regressions.csv"
+)
+ROBUSTNESS_SUMMARY = (
+    NONCOMPOSITIONAL_OUT / "noncompositional_rent_population_robustness_summary.json"
+)
 
 
 @dataclass(frozen=True)
@@ -39,57 +39,14 @@ class RegressionSpec:
     sample_filter: str
 
 
-FD_RENTER_SHARE_SPECS = (
+STATE_YEAR_FE_SPECS = (
     RegressionSpec(
-        family="renter_household_share",
-        model="rent_fd_renter_household_share_year_fe",
+        family="short_term_rental_proxy",
+        model="rent_fd_seasonal_recreational_vacancy_share_state_year_fe",
         outcome="d_log_zori",
-        predictors=("d_log_pop", "d_renter_household_share"),
-        fixed_effects=("year",),
-        sample_filter="fd_year_gap_1",
-    ),
-    RegressionSpec(
-        family="renter_household_share",
-        model="rent_fd_renter_household_share_state_year_fe",
-        outcome="d_log_zori",
-        predictors=("d_log_pop", "d_renter_household_share"),
+        predictors=("d_log_pop", "d_seasonal_recreational_vacancy_share"),
         fixed_effects=("primary_state_year",),
         sample_filter="fd_year_gap_1",
-    ),
-)
-
-LEVEL_FE_SPECS = (
-    RegressionSpec(
-        family="renter_household_share",
-        model="rent_levels_renter_household_share_msa_year_fe",
-        outcome="log_zori",
-        predictors=("log_pop", "renter_household_share"),
-        fixed_effects=("msa_id", "year"),
-        sample_filter="levels_complete_case",
-    ),
-    RegressionSpec(
-        family="renter_household_share",
-        model="rent_levels_renter_household_share_msa_state_year_fe",
-        outcome="log_zori",
-        predictors=("log_pop", "renter_household_share"),
-        fixed_effects=("msa_id", "primary_state_year"),
-        sample_filter="levels_complete_case",
-    ),
-    RegressionSpec(
-        family="household_size",
-        model="rent_levels_renter_household_size_msa_year_fe",
-        outcome="log_zori",
-        predictors=("log_pop", "average_household_size_renter_occupied"),
-        fixed_effects=("msa_id", "year"),
-        sample_filter="levels_complete_case",
-    ),
-    RegressionSpec(
-        family="recent_mover_income",
-        model="rent_levels_moved_diff_state_income_ratio_msa_year_fe",
-        outcome="log_zori",
-        predictors=("log_pop", "moved_diff_state_income_ratio_total"),
-        fixed_effects=("msa_id", "year"),
-        sample_filter="levels_complete_case",
     ),
 )
 
@@ -100,7 +57,7 @@ def _effect_series(sample: pd.DataFrame, effect: str) -> pd.Series:
         if missing:
             raise ValueError(
                 "primary_state_year fixed effects require columns "
-                f"{sorted(missing)}. Rebuild the composition panels from the base panel."
+                f"{sorted(missing)}. Rebuild the noncompositional panel from the base panel."
             )
         return sample["primary_state"].astype("string") + "_" + sample["year"].astype("string")
     if effect not in sample.columns:
@@ -131,7 +88,7 @@ def fit_spec(frame: pd.DataFrame, spec: RegressionSpec) -> pd.DataFrame:
         if "primary_state" in missing_required:
             raise ValueError(
                 "primary_state_year fixed effects require columns "
-                f"{missing_required}. Rebuild the composition panels from the base panel."
+                f"{missing_required}. Rebuild the noncompositional panel from the base panel."
             )
         raise ValueError(
             f"Regression spec '{spec.model}' requires missing column(s) {missing_required}."
@@ -173,22 +130,15 @@ def fit_spec(frame: pd.DataFrame, spec: RegressionSpec) -> pd.DataFrame:
 def load_required_parquet(path: Path) -> pd.DataFrame:
     if not path.exists():
         raise FileNotFoundError(
-            f"Required composition panel artifact not found: {path}. "
-            "Run the corresponding scripts/build_*_composition_panel.py first."
+            f"Required non-compositional panel artifact not found: {path}. "
+            "Run scripts/build_noncompositional_rent_population_panel.py first."
         )
     return pd.read_parquet(path)
 
 
 def run_robustness_checks() -> pd.DataFrame:
-    frames: list[pd.DataFrame] = []
-    renter_fd = load_required_parquet(FD_INPUTS["renter_household_share"])
-    for spec in FD_RENTER_SHARE_SPECS:
-        frames.append(fit_spec(renter_fd, spec))
-
-    for spec in LEVEL_FE_SPECS:
-        levels = load_required_parquet(LEVEL_INPUTS[spec.family])
-        frames.append(fit_spec(levels, spec))
-
+    fd = load_required_parquet(FD_INPUT)
+    frames = [fit_spec(fd, spec) for spec in STATE_YEAR_FE_SPECS]
     non_empty = [frame for frame in frames if not frame.empty]
     if not non_empty:
         return pd.DataFrame()
@@ -198,12 +148,7 @@ def run_robustness_checks() -> pd.DataFrame:
 def summarize_regressions(regressions: pd.DataFrame) -> dict[str, object]:
     if regressions.empty:
         return {"regression_rows": 0, "models": []}
-    focal_terms = {
-        "d_renter_household_share",
-        "renter_household_share",
-        "average_household_size_renter_occupied",
-        "moved_diff_state_income_ratio_total",
-    }
+    focal_terms = {"d_seasonal_recreational_vacancy_share"}
     focal = regressions[regressions["term"].isin(focal_terms)].copy()
     return {
         "regression_rows": int(len(regressions)),
@@ -213,7 +158,7 @@ def summarize_regressions(regressions: pd.DataFrame) -> dict[str, object]:
 
 
 def write_outputs(regressions: pd.DataFrame) -> dict[str, object]:
-    OUT.mkdir(parents=True, exist_ok=True)
+    NONCOMPOSITIONAL_OUT.mkdir(parents=True, exist_ok=True)
     regressions.to_parquet(ROBUSTNESS_PARQUET, index=False)
     regressions.to_csv(ROBUSTNESS_CSV, index=False)
     summary = summarize_regressions(regressions)

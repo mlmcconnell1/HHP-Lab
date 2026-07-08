@@ -218,3 +218,26 @@ def test_composition_robustness_requires_state_for_state_year_fe() -> None:
 
     with pytest.raises(ValueError, match="primary_state_year fixed effects require"):
         robustness.fit_spec(frame, robustness.FD_RENTER_SHARE_SPECS[1])
+
+
+def _spec_by_model(specs, model: str):
+    for spec in specs:
+        if spec.model == model:
+            return spec
+    raise AssertionError(f"no spec named {model!r}")
+
+
+def test_composition_robustness_runs_msa_state_year_fe_levels_spec() -> None:
+    robustness = _load_script("analyze_composition_rent_population_robustness")
+    frame = _robustness_fixture()
+    spec = _spec_by_model(
+        robustness.LEVEL_FE_SPECS,
+        "rent_levels_renter_household_share_msa_state_year_fe",
+    )
+
+    result = robustness.fit_spec(frame, spec)
+
+    assert result["fixed_effects"].unique().tolist() == ["msa_id+primary_state_year"]
+    assert set(result["term"]) == {"log_pop", "renter_household_share"}
+    assert result["nobs"].unique().tolist() == [len(frame)]
+    assert result["clusters"].unique().tolist() == [frame["msa_id"].nunique()]

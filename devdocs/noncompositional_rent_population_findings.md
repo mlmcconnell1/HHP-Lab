@@ -217,3 +217,38 @@ subsequently completed after the same ACS1 refresh with B08301**: the
 work-from-home share proxy is now loaded into the non-compositional panel and
 tested directly against rent growth net of population growth, with a null
 result.
+
+## 2026-07-08 Addendum: STR proxy does not survive state x year FE
+
+The STR (seasonal/recreational vacancy share) FD result above (b=+0.0305,
+p=0.029, plain year FE) had never been re-run with `primary_state x year`
+FE, the check that has already caught renter household share (FD) and every
+other significant plain-FE MSA-panel result in this project except supply
+constraint and, as of the addendum above, renter household share in levels.
+Added `scripts/analyze_noncompositional_rent_population_robustness.py`
+(mirrors `analyze_composition_rent_population_robustness.py`'s pattern:
+`fixed_effects=("primary_state_year",)`) and re-ran on the identical n=1,070
+sample:
+
+| Model term | Estimate | SE | p-value | N |
+| --- | ---: | ---: | ---: | ---: |
+| `d_seasonal_recreational_vacancy_share` (year FE) | 0.0305 | 0.0140 | 0.029 | 1,070 |
+| `d_seasonal_recreational_vacancy_share` (state x year FE) | 0.0157 | 0.0116 | 0.176 | 1,070 |
+
+**Does not survive.** The coefficient roughly halves and loses significance
+entirely. Independently re-verified with a from-scratch replication
+(separate design-matrix construction, same input parquet) -- matches
+exactly. Net effect: the STR/vacation-rental proxy joins renter household
+size, recent-mover income, and remote-work as a non-surviving or null
+candidate. **Housing supply constraint remains the only FD (growth-on-growth)
+result, and renter household share in levels the only cross-sectional
+result, to survive a state x year FE check across both epics.**
+
+**Known gap, not yet closed:** the supply-constraint state x year FE result
+(+0.0055 -> +0.0029, p=0.012, cited above) that motivated this addendum was
+itself never implemented as a tracked, re-runnable script -- it exists only
+as prose, the same failure mode that turned out to be wrong for the
+composition epic's renter-share levels check (see
+`devdocs/composition_rent_population_findings.md`'s 2026-07-08 discrepancy
+addendum). It has not yet been independently re-verified from scratch the
+way the STR check above was. Filed as a follow-up (see beads).
