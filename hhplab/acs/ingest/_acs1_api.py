@@ -186,19 +186,14 @@ def normalize_acs1_measures(
     result = df.rename(columns=acs1_variable_names_for_vintage(resolved_vintage)).copy()
 
     expected_measure_columns = list(dict.fromkeys(ACS1_INTEGER_COLUMNS + ACS1_FLOAT_COLUMNS))
-    missing_measure_columns = [
-        col for col in expected_measure_columns if col not in result.columns
-    ]
+    missing_measure_columns = [col for col in expected_measure_columns if col not in result.columns]
     result = result.reindex(
         columns=[*result.columns, *missing_measure_columns],
     )
 
     result["unemployment_rate_acs1"] = pd.NA
     if {"civilian_labor_force", "unemployed_count"}.issubset(result.columns):
-        valid_denom = (
-            result["civilian_labor_force"].notna()
-            & (result["civilian_labor_force"] > 0)
-        )
+        valid_denom = result["civilian_labor_force"].notna() & (result["civilian_labor_force"] > 0)
         result.loc[valid_denom, "unemployment_rate_acs1"] = (
             result.loc[valid_denom, "unemployed_count"]
             / result.loc[valid_denom, "civilian_labor_force"]
@@ -238,6 +233,26 @@ def normalize_acs1_measures(
             same_house = pd.to_numeric(result[same_house_column], errors="coerce")
             movers = (total - same_house).where(total.notna() & same_house.notna())
             result[share_column] = movers / total.where(total > 0)
+
+    result["work_from_home_share"] = pd.NA
+    if {"commute_workers_total", "commute_worked_from_home"} <= set(result.columns):
+        denominator = pd.to_numeric(result["commute_workers_total"], errors="coerce")
+        numerator = pd.to_numeric(result["commute_worked_from_home"], errors="coerce")
+        result["work_from_home_share"] = numerator / denominator.where(denominator > 0)
+
+    result["seasonal_recreational_vacancy_share"] = pd.NA
+    if {
+        "vacancy_status_total",
+        "vacant_seasonal_recreational_occasional",
+    } <= set(result.columns):
+        denominator = pd.to_numeric(result["vacancy_status_total"], errors="coerce")
+        numerator = pd.to_numeric(
+            result["vacant_seasonal_recreational_occasional"],
+            errors="coerce",
+        )
+        result["seasonal_recreational_vacancy_share"] = numerator / denominator.where(
+            denominator > 0
+        )
 
     for col in ACS1_INTEGER_COLUMNS:
         if col in result.columns:

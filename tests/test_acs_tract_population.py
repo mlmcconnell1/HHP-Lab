@@ -698,10 +698,7 @@ class TestB05001NativityCitizenshipIngest:
 
     @pytest.mark.parametrize(
         "column",
-        [
-            pytest.param(column, id=column)
-            for column in B05001_EXPECTED_COLUMNS.values()
-        ],
+        [pytest.param(column, id=column) for column in B05001_EXPECTED_COLUMNS.values()],
     )
     def test_b05001_negative_sentinel_values_become_na(self, httpx_mock, column):
         """Negative Census sentinels for B05001 counts become nullable values."""
@@ -1664,6 +1661,7 @@ def test_sae_required_tract_tables_are_in_provenance_order() -> None:
         "B25058",
         "B25077",
         "B25002",
+        "B25004",
         "B25003",
         "C17002",
         "B23025",

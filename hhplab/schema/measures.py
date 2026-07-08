@@ -513,6 +513,30 @@ ACS1_PANEL_MEASURE_DICTIONARY: tuple[PanelMeasureDictionaryEntry, ...] = (
         "Universe is population 1 year and over in housing units classified by "
         "current householder tenure; person-weighted, not household-weighted.",
     ),
+    _entry(
+        "work_from_home_share",
+        "ACS 1-year share of workers 16 years and over who worked from home (B08301).",
+        "share",
+        "census",
+        "acs1",
+        "metro",
+        2005,
+        "candidate_driver",
+        "Commute mode is worker-weighted and does not directly measure housing-space demand.",
+    ),
+    _entry(
+        "seasonal_recreational_vacancy_share",
+        "ACS 1-year share of vacant housing units for seasonal, recreational, "
+        "or occasional use (B25004).",
+        "share",
+        "census",
+        "acs1",
+        "metro",
+        2005,
+        "candidate_driver",
+        "Denominator is vacant housing units, not all housing units; interpret "
+        "as a free proxy for vacation-home or STR-adjacent stock.",
+    ),
 )
 
 LAUS_PANEL_MEASURE_DICTIONARY: tuple[PanelMeasureDictionaryEntry, ...] = (

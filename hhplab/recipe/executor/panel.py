@@ -326,6 +326,8 @@ _RECIPE_METRO_COLUMN_ORDER: list[str] = [
     "unemployment_rate_acs1",
     "renter_moved_share",
     "owner_moved_share",
+    "work_from_home_share",
+    "seasonal_recreational_vacancy_share",
     "labor_force",
     "employed",
     "unemployed",
@@ -426,9 +428,7 @@ def _add_recipe_coc_population_density(
 _POPULATION_LINEAGE_SUFFIXES = tuple(
     column.removeprefix(TOTAL_POPULATION) for column in population_lineage_columns()
 )
-_POPULATION_LINEAGE_NAMES = {
-    suffix.lstrip("_") for suffix in _POPULATION_LINEAGE_SUFFIXES
-}
+_POPULATION_LINEAGE_NAMES = {suffix.lstrip("_") for suffix in _POPULATION_LINEAGE_SUFFIXES}
 _KNOWN_POPULATION_SOURCE_TOKENS = {source.value for source in PopulationSource}
 
 
@@ -502,9 +502,7 @@ def _resolve_canonical_population(
         return panel
 
     selected_source = policy.canonical_population_source if policy else None
-    ambiguous_population_source = len(source_specific) > 1 or (
-        has_canonical and source_specific
-    )
+    ambiguous_population_source = len(source_specific) > 1 or (has_canonical and source_specific)
     if selected_source is None and ambiguous_population_source:
         available_sources = sorted(
             {
@@ -983,8 +981,7 @@ def _apply_inflation_adjustment(
         output_column = f"{column}{suffix}"
         if output_column in result.columns and output_column not in adjustment.columns:
             raise ExecutorError(
-                "Inflation adjustment output column collision: "
-                f"'{output_column}' already exists."
+                f"Inflation adjustment output column collision: '{output_column}' already exists."
             )
         result[output_column] = pd.to_numeric(result[column], errors="coerce") * factors
         output_columns.append(output_column)
@@ -1040,11 +1037,7 @@ def _apply_lagged_derived_measure(
     spec: DerivedMeasureSpec,
     values: pd.Series,
 ) -> pd.Series:
-    missing = [
-        column
-        for column in [*spec.group_by, spec.order_by]
-        if column not in panel.columns
-    ]
+    missing = [column for column in [*spec.group_by, spec.order_by] if column not in panel.columns]
     if missing:
         raise ExecutorError(
             "target.panel_policy.derived_measures references missing lag/difference "
@@ -1077,9 +1070,7 @@ def _apply_single_derived_measure(
     panel: pd.DataFrame,
     spec: DerivedMeasureSpec,
 ) -> pd.Series:
-    policy_path = (
-        f"target.panel_policy.derived_measures[{spec.output_column}]"
-    )
+    policy_path = f"target.panel_policy.derived_measures[{spec.output_column}]"
     if spec.type in {"ratio", "per_capita", "per_10k"}:
         assert spec.numerator is not None
         assert spec.denominator is not None
@@ -1148,8 +1139,7 @@ def _primary_msa_population_reference_year(primary_policy) -> int:
     if primary_policy.population_source == "decennial":
         return int(primary_policy.decennial_population_vintage)
     return int(
-        primary_policy.acs5_population_reference_year
-        or primary_policy.acs5_population_vintage
+        primary_policy.acs5_population_reference_year or primary_policy.acs5_population_vintage
     )
 
 
@@ -1195,8 +1185,7 @@ def _read_primary_msa_population_overlap(
 ) -> tuple[pd.DataFrame, list]:
     if primary_policy.tract_vintage is None:
         raise ExecutorError(
-            "target.panel_policy.primary_msa overlap_basis='population' requires "
-            "tract_vintage."
+            "target.panel_policy.primary_msa overlap_basis='population' requires tract_vintage."
         )
 
     membership_file = msa_county_membership_path(primary_policy.definition_version, data_root)

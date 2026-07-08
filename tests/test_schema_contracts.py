@@ -436,16 +436,12 @@ def test_hic_expanded_schema_defines_canonical_project_type_columns() -> None:
 
 
 def test_hic_expanded_schema_documents_total_semantics_and_missing_values() -> None:
-    by_column = {
-        str(spec["column"]): spec for spec in schema_columns.HIC_EXPANDED_MEASURE_SCHEMA
-    }
+    by_column = {str(spec["column"]): spec for spec in schema_columns.HIC_EXPANDED_MEASURE_SCHEMA}
 
     assert by_column["hic_shelter_year_round_beds"]["project_type"] == "es_th_sh"
     assert "ES + TH + SH" in str(by_column["hic_shelter_year_round_beds"]["semantics"])
     assert by_column["hic_total_beds"]["project_type"] == "all_programs"
-    assert "ES + TH + SH + RRH + PSH + OPH" in str(
-        by_column["hic_total_beds"]["semantics"]
-    )
+    assert "ES + TH + SH + RRH + PSH + OPH" in str(by_column["hic_total_beds"]["semantics"])
     for column in schema_columns.HIC_EXPANDED_MEASURE_COLUMNS:
         assert "historical_missing" in by_column[column]
         assert by_column[column]["aggregation"] == "sum"
@@ -462,9 +458,7 @@ def test_hic_expanded_schema_documents_total_semantics_and_missing_values() -> N
 def test_hic_expanded_schema_truth_table_covers_historical_header_shapes(
     case: dict[str, object],
 ) -> None:
-    by_column = {
-        str(spec["column"]): spec for spec in schema_columns.HIC_EXPANDED_MEASURE_SCHEMA
-    }
+    by_column = {str(spec["column"]): spec for spec in schema_columns.HIC_EXPANDED_MEASURE_SCHEMA}
     year = int(case["year"])
     present = set(case["present_project_types"])
     absent = set(case["historically_absent_project_types"])
@@ -475,15 +469,11 @@ def test_hic_expanded_schema_truth_table_covers_historical_header_shapes(
     assert case["source_headers"]
 
     for project_type in present:
-        first_year = by_column[f"hic_{project_type}_year_round_beds"][
-            "first_distinct_hud_year"
-        ]
+        first_year = by_column[f"hic_{project_type}_year_round_beds"]["first_distinct_hud_year"]
         assert int(first_year) <= year
 
     for project_type in absent:
-        first_year = by_column[f"hic_{project_type}_year_round_beds"][
-            "first_distinct_hud_year"
-        ]
+        first_year = by_column[f"hic_{project_type}_year_round_beds"]["first_distinct_hud_year"]
         assert int(first_year) > year or project_type in {"es", "th", "sh"}
 
 
@@ -555,10 +545,7 @@ def test_contract_rent_acs5_variable_mappings_include_current_and_early_bins() -
 
 def test_contract_rent_acs1_variable_mappings_use_acs5_column_names() -> None:
     assert ACS1_TABLE_COLUMN_NAMES["B25058"]["B25058_001E"] == "median_contract_rent"
-    assert (
-        ACS1_TABLE_COLUMN_NAMES["B25056"]["B25056_001E"]
-        == "contract_rent_distribution_total"
-    )
+    assert ACS1_TABLE_COLUMN_NAMES["B25056"]["B25056_001E"] == "contract_rent_distribution_total"
     assert (
         ACS1_TABLE_COLUMN_NAMES["B25056"]["B25056_026E"]
         == "contract_rent_distribution_cash_rent_3500_plus"
@@ -603,13 +590,9 @@ def test_contract_rent_acs1_early_vintage_uses_top_bin_override() -> None:
 
     assert early_names["B25056_023E"] == "contract_rent_distribution_cash_rent_2000_plus"
     assert early_names["B25063_023E"] == "gross_rent_distribution_cash_rent_2000_plus"
-    assert pre_2012_names["B25056_023E"] == (
-        "contract_rent_distribution_cash_rent_2000_plus"
-    )
+    assert pre_2012_names["B25056_023E"] == ("contract_rent_distribution_cash_rent_2000_plus")
     assert pre_2012_names["B25056_024E"] == "contract_rent_distribution_no_cash_rent"
-    assert pre_2012_names["B25063_023E"] == (
-        "gross_rent_distribution_cash_rent_2000_plus"
-    )
+    assert pre_2012_names["B25063_023E"] == ("gross_rent_distribution_cash_rent_2000_plus")
     assert pre_2012_names["B25063_024E"] == "gross_rent_distribution_no_cash_rent"
     assert len(early_names.values()) == len(set(early_names.values()))
     assert len(pre_2012_names.values()) == len(set(pre_2012_names.values()))
@@ -660,6 +643,7 @@ def test_acs5_expanded_covariates_remain_outside_default_canonical_measures() ->
     assert "contract_rent_p50" in ACS5_EXPANDED_COVARIATE_COLUMNS
     assert "rent_burden_40_plus" in ACS5_EXPANDED_COVARIATE_COLUMNS
     assert "rent_burden_50_plus" in ACS5_EXPANDED_COVARIATE_COLUMNS
+    assert "seasonal_recreational_vacancy_share" in ACS5_EXPANDED_COVARIATE_COLUMNS
     assert "median_contract_rent" in ACS5_EXPANDED_COVARIATE_COLUMNS
     assert "owner_costs_pct_income_total" in ACS5_EXPANDED_COVARIATE_COLUMNS
     assert "not_us_citizen" in ACS5_EXPANDED_COVARIATE_COLUMNS
@@ -676,6 +660,7 @@ def test_recipe_selectable_acs5_measures_include_expanded_without_changing_defau
     assert "contract_rent_p50" in ACS5_RECIPE_SELECTABLE_MEASURES
     assert "rent_burden_40_plus" in ACS5_RECIPE_SELECTABLE_MEASURES
     assert "rent_burden_50_plus" in ACS5_RECIPE_SELECTABLE_MEASURES
+    assert "seasonal_recreational_vacancy_share" in ACS5_RECIPE_SELECTABLE_MEASURES
     assert "median_contract_rent" in ACS5_RECIPE_SELECTABLE_MEASURES
     assert "naturalized_citizen" in ACS5_RECIPE_SELECTABLE_MEASURES
     assert "per_capita_income" not in ACS5_RECIPE_DEFAULT_MEASURES
@@ -693,6 +678,15 @@ def test_acs5_covariate_output_lookup_returns_rent_burden_entry(column: str) -> 
     assert spec.name == "rent_burden"
     assert spec.table == "B25070"
     assert spec.denominator_column == "gross_rent_pct_income_total"
+    assert spec.rollup_method == "ratio_of_area_weighted_sums"
+
+
+def test_acs5_covariate_output_lookup_returns_vacancy_status_entry() -> None:
+    spec = acs5_covariate_spec_for_output("seasonal_recreational_vacancy_share")
+
+    assert spec.name == "vacancy_status"
+    assert spec.table == "B25004"
+    assert spec.denominator_column == "vacancy_status_total"
     assert spec.rollup_method == "ratio_of_area_weighted_sums"
 
 
@@ -906,7 +900,12 @@ def test_recipe_metro_column_order_includes_acs1_mobility_measures() -> None:
 
     assert _RECIPE_METRO_COLUMN_ORDER.index("renter_moved_share") == unemployment_index + 1
     assert _RECIPE_METRO_COLUMN_ORDER.index("owner_moved_share") == unemployment_index + 2
-    assert _RECIPE_METRO_COLUMN_ORDER.index("owner_moved_share") < labor_index
+    assert _RECIPE_METRO_COLUMN_ORDER.index("work_from_home_share") == unemployment_index + 3
+    assert (
+        _RECIPE_METRO_COLUMN_ORDER.index("seasonal_recreational_vacancy_share")
+        == unemployment_index + 4
+    )
+    assert _RECIPE_METRO_COLUMN_ORDER.index("seasonal_recreational_vacancy_share") < labor_index
 
 
 def test_panel_measure_dictionary_entries_are_machine_readable() -> None:
@@ -953,13 +952,9 @@ def test_panel_measure_dictionary_preserves_shared_column_semantics() -> None:
 
 def test_sae_labor_force_dictionary_role_matches_laus_denominator() -> None:
     assert PANEL_MEASURE_DICTIONARY_BY_COLUMN["labor_force"].role_hint == "denominator"
+    assert PANEL_MEASURE_DICTIONARY_BY_COLUMN["sae_civilian_labor_force"].role_hint == "denominator"
     assert (
-        PANEL_MEASURE_DICTIONARY_BY_COLUMN["sae_civilian_labor_force"].role_hint
-        == "denominator"
-    )
-    assert (
-        PANEL_MEASURE_DICTIONARY_BY_COLUMN["sae_unemployed_count"].role_hint
-        == "candidate_driver"
+        PANEL_MEASURE_DICTIONARY_BY_COLUMN["sae_unemployed_count"].role_hint == "candidate_driver"
     )
 
 
@@ -990,9 +985,7 @@ def test_core_source_coverage_matches_panel_measure_dictionary(source_id: str) -
         for entry in PANEL_MEASURE_DICTIONARY
         if entry.source_provider == spec.provider and entry.source_product == spec.product
     ]
-    native_entries = [
-        entry for entry in entries if entry.native_geometry == spec.native_geo
-    ]
+    native_entries = [entry for entry in entries if entry.native_geometry == spec.native_geo]
 
     assert native_entries
     assert {entry.first_year for entry in native_entries} == {spec.first_year}
@@ -1028,9 +1021,7 @@ def test_msa_coc_coverage_contract_declares_output_columns() -> None:
 
 
 def test_msa_fractional_rollup_contract_declares_output_columns() -> None:
-    assert tuple(MSA_FRACTIONAL_ROLLUP_COLUMNS) == (
-        MSA_FRACTIONAL_ROLLUP_CONTRACT.required_columns
-    )
+    assert tuple(MSA_FRACTIONAL_ROLLUP_COLUMNS) == (MSA_FRACTIONAL_ROLLUP_CONTRACT.required_columns)
     assert MSA_FRACTIONAL_ROLLUP_CONTRACT.name == "msa_fractional_rollup"
     assert ARTIFACT_CONTRACTS["msa_fractional_rollup"] is MSA_FRACTIONAL_ROLLUP_CONTRACT
 

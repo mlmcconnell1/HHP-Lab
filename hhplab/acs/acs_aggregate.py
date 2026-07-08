@@ -545,6 +545,19 @@ def _derive_acs5_covariates(result_df: pd.DataFrame) -> None:
         numerator = pd.to_numeric(result_df["vacant_housing_units"], errors="coerce")
         result_df["vacancy_rate"] = numerator / denominator.where(denominator > 0)
 
+    if {
+        "vacancy_status_total",
+        "vacant_seasonal_recreational_occasional",
+    } <= set(result_df.columns):
+        denominator = pd.to_numeric(result_df["vacancy_status_total"], errors="coerce")
+        numerator = pd.to_numeric(
+            result_df["vacant_seasonal_recreational_occasional"],
+            errors="coerce",
+        )
+        result_df["seasonal_recreational_vacancy_share"] = numerator / denominator.where(
+            denominator > 0
+        )
+
     if "gross_rent_pct_income_total" in result_df.columns and all(
         column in result_df.columns for column in RENT_BURDEN_30_PLUS_COLUMNS
     ):

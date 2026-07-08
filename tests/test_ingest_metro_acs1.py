@@ -481,6 +481,42 @@ class TestRentBurdenCalculation:
         assert pd.isna(df.iloc[0]["renter_moved_share"])
         assert pd.isna(df.iloc[0]["owner_moved_share"])
 
+    def test_work_from_home_share_calculation(self, httpx_mock, tmp_path):
+        cbsas = [
+            {
+                "cbsa_code": "35620",
+                "B08301_001E": "1000",
+                "B08301_021E": "240",
+            },
+        ]
+        queue_acs1_group_responses(httpx_mock, cbsas, vintage=2023)
+
+        path = ingest_metro_acs1(vintage=2023, project_root=tmp_path)
+        df = pd.read_parquet(path)
+
+        assert df.iloc[0]["work_from_home_share"] == pytest.approx(240 / 1000)
+        assert df["work_from_home_share"].dtype == "Float64"
+
+    def test_seasonal_recreational_vacancy_share_calculation(
+        self,
+        httpx_mock,
+        tmp_path,
+    ):
+        cbsas = [
+            {
+                "cbsa_code": "35620",
+                "B25004_001E": "200",
+                "B25004_006E": "50",
+            },
+        ]
+        queue_acs1_group_responses(httpx_mock, cbsas, vintage=2023)
+
+        path = ingest_metro_acs1(vintage=2023, project_root=tmp_path)
+        df = pd.read_parquet(path)
+
+        assert df.iloc[0]["seasonal_recreational_vacancy_share"] == pytest.approx(50 / 200)
+        assert df["seasonal_recreational_vacancy_share"].dtype == "Float64"
+
 
 class TestOutputSchema:
     """Test that output matches canonical schema."""

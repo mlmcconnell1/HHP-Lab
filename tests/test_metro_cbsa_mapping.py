@@ -156,6 +156,8 @@ class TestACS1VariableDefinitions:
         assert "rent_burden_40_plus" in DERIVED_ACS1_MEASURES
         assert "rent_burden_50_plus" in DERIVED_ACS1_MEASURES
         assert "unemployment_rate_acs1" in DERIVED_ACS1_MEASURES
+        assert "work_from_home_share" in DERIVED_ACS1_MEASURES
+        assert "seasonal_recreational_vacancy_share" in DERIVED_ACS1_MEASURES
 
     def test_output_columns_complete(self):
         required = {
@@ -164,6 +166,8 @@ class TestACS1VariableDefinitions:
             "rent_burden_40_plus",
             "rent_burden_50_plus",
             "unemployment_rate_acs1",
+            "work_from_home_share",
+            "seasonal_recreational_vacancy_share",
         }
         assert required.issubset(set(ACS1_METRO_OUTPUT_COLUMNS))
 

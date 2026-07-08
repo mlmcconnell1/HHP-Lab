@@ -254,4 +254,6 @@ def test_acs1_measure_columns_content() -> None:
         "unemployment_rate_acs1",
         "renter_moved_share",
         "owner_moved_share",
+        "work_from_home_share",
+        "seasonal_recreational_vacancy_share",
     ]

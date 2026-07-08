@@ -51,6 +51,15 @@ ACS_VARIABLES: dict[str, str] = {
     "B25002_001E": "total_housing_units",
     "B25002_002E": "occupied_housing_units",
     "B25002_003E": "vacant_housing_units",
+    # B25004 — Vacancy Status
+    "B25004_001E": "vacancy_status_total",
+    "B25004_002E": "vacant_for_rent",
+    "B25004_003E": "vacant_rented_not_occupied",
+    "B25004_004E": "vacant_for_sale_only",
+    "B25004_005E": "vacant_sold_not_occupied",
+    "B25004_006E": "vacant_seasonal_recreational_occasional",
+    "B25004_007E": "vacant_for_migrant_workers",
+    "B25004_008E": "vacant_other",
     # B25003 — Tenure
     "B25003_001E": "total_households",
     "B25003_002E": "owner_households",
@@ -399,6 +408,7 @@ ACS_TABLES: list[str] = [
     "B25058",
     "B25077",
     "B25002",
+    "B25004",
     "B25003",
     "C17002",
     "B23025",
@@ -625,6 +635,41 @@ ACS5_COVARIATE_REGISTRY: tuple[ACS5CovariateSpec, ...] = (
         caveats=(
             "Vacancy rate is derived after count rollup as vacant_housing_units / "
             "total_housing_units."
+        ),
+    ),
+    ACS5CovariateSpec(
+        name="vacancy_status",
+        table="B25004",
+        source_variables=_source_variables_for_outputs(
+            (
+                "vacancy_status_total",
+                "vacant_for_rent",
+                "vacant_rented_not_occupied",
+                "vacant_for_sale_only",
+                "vacant_sold_not_occupied",
+                "vacant_seasonal_recreational_occasional",
+                "vacant_for_migrant_workers",
+                "vacant_other",
+            )
+        ),
+        output_columns=(
+            "vacancy_status_total",
+            "vacant_for_rent",
+            "vacant_rented_not_occupied",
+            "vacant_for_sale_only",
+            "vacant_sold_not_occupied",
+            "vacant_seasonal_recreational_occasional",
+            "vacant_for_migrant_workers",
+            "vacant_other",
+            "seasonal_recreational_vacancy_share",
+        ),
+        measure_kind="rate",
+        denominator_column="vacancy_status_total",
+        weight_column="area_share",
+        rollup_method="ratio_of_area_weighted_sums",
+        caveats=(
+            "seasonal_recreational_vacancy_share is derived after count rollup "
+            "as vacant_seasonal_recreational_occasional / vacancy_status_total."
         ),
     ),
     ACS5CovariateSpec(

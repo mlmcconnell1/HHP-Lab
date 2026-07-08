@@ -16,8 +16,7 @@ from __future__ import annotations
 def _dense_estimate_map(table: str, column_names: list[str]) -> dict[str, str]:
     """Return ``{Bxxxx_001E: name1, ...}`` for contiguous estimate tables."""
     return {
-        f"{table}_{idx:03d}E": column_name
-        for idx, column_name in enumerate(column_names, start=1)
+        f"{table}_{idx:03d}E": column_name for idx, column_name in enumerate(column_names, start=1)
     }
 
 
@@ -31,6 +30,34 @@ ACS1_TABLE_COLUMN_NAMES: dict[str, dict[str, str]] = {
         "B23025_003E": "civilian_labor_force",
         "B23025_005E": "unemployed_count",
     },
+    # Means of Transportation to Work. Universe: workers 16 years and over.
+    # Cell order verified against api.census.gov/data/2023/acs/acs1/groups/B08301.json.
+    "B08301": _dense_estimate_map(
+        "B08301",
+        [
+            "commute_workers_total",
+            "commute_car_truck_van",
+            "commute_drove_alone",
+            "commute_carpooled",
+            "commute_carpool_2_person",
+            "commute_carpool_3_person",
+            "commute_carpool_4_person",
+            "commute_carpool_5_6_person",
+            "commute_carpool_7plus_person",
+            "commute_public_transportation",
+            "commute_bus",
+            "commute_subway_elevated_rail",
+            "commute_long_distance_or_commuter_rail",
+            "commute_light_rail_streetcar_trolley",
+            "commute_ferryboat",
+            "commute_taxicab",
+            "commute_motorcycle",
+            "commute_bicycle",
+            "commute_walked",
+            "commute_other_means",
+            "commute_worked_from_home",
+        ],
+    ),
     # Geographical Mobility in the Past Year by Tenure for Current Residence.
     # Universe: population 1 year and over living in housing units, classified
     # by the tenure of the current householder. Cell order verified against
@@ -134,6 +161,19 @@ ACS1_TABLE_COLUMN_NAMES: dict[str, dict[str, str]] = {
     "B25058": _dense_estimate_map(
         "B25058",
         ["median_contract_rent"],
+    ),
+    "B25004": _dense_estimate_map(
+        "B25004",
+        [
+            "vacancy_status_total",
+            "vacant_for_rent",
+            "vacant_rented_not_occupied",
+            "vacant_for_sale_only",
+            "vacant_sold_not_occupied",
+            "vacant_seasonal_recreational_occasional",
+            "vacant_for_migrant_workers",
+            "vacant_other",
+        ],
     ),
     "B25063": _dense_estimate_map(
         "B25063",
@@ -429,8 +469,7 @@ ACS1_TABLE_COLUMN_NAMES: dict[str, dict[str, str]] = {
 ACS1_TABLES: list[str] = list(ACS1_TABLE_COLUMN_NAMES)
 
 ACS1_VARIABLES_BY_TABLE: dict[str, list[str]] = {
-    table: list(column_names)
-    for table, column_names in ACS1_TABLE_COLUMN_NAMES.items()
+    table: list(column_names) for table, column_names in ACS1_TABLE_COLUMN_NAMES.items()
 }
 
 ACS1_VARIABLE_NAMES: dict[str, str] = {
@@ -440,9 +479,7 @@ ACS1_VARIABLE_NAMES: dict[str, str] = {
 }
 
 ACS1_VARIABLES: list[str] = [
-    variable_code
-    for table in ACS1_TABLES
-    for variable_code in ACS1_VARIABLES_BY_TABLE[table]
+    variable_code for table in ACS1_TABLES for variable_code in ACS1_VARIABLES_BY_TABLE[table]
 ]
 
 EARLY_ACS1_VARIABLE_OVERRIDES: dict[str, str] = {
@@ -487,9 +524,7 @@ DERIVED_ACS1_MEASURES: dict[str, str] = {
         "Share of ACS 1-year renter households with computed gross rent at least "
         "50% of income (B25070_010E over B25070_001E minus B25070_011E)"
     ),
-    "unemployment_rate_acs1": (
-        "Unemployment rate from ACS 1-year (B23025_005E / B23025_003E)"
-    ),
+    "unemployment_rate_acs1": ("Unemployment rate from ACS 1-year (B23025_005E / B23025_003E)"),
     "renter_moved_share": (
         "Share of the renter-housed population (1 year and over) that moved in "
         "the past year, any origin including within-county "
@@ -499,6 +534,14 @@ DERIVED_ACS1_MEASURES: dict[str, str] = {
         "Share of the owner-housed population (1 year and over) that moved in "
         "the past year, any origin including within-county "
         "((B07013_002E - B07013_005E) / B07013_002E)"
+    ),
+    "work_from_home_share": (
+        "Share of ACS 1-year workers 16 years and over who worked from home "
+        "(B08301_021E / B08301_001E)"
+    ),
+    "seasonal_recreational_vacancy_share": (
+        "Share of ACS 1-year vacant housing units for seasonal, recreational, "
+        "or occasional use (B25004_006E / B25004_001E)"
     ),
 }
 
@@ -517,6 +560,8 @@ ACS1_FLOAT_COLUMNS: list[str] = [
     "unemployment_rate_acs1",
     "renter_moved_share",
     "owner_moved_share",
+    "work_from_home_share",
+    "seasonal_recreational_vacancy_share",
 ]
 
 ACS1_INTEGER_COLUMNS: list[str] = [
@@ -630,10 +675,7 @@ ACS1_UNAVAILABLE_VINTAGES: set[int] = {2020}
 
 # Utility-cost detailed tables were added to ACS1 in 2021. Keep the output
 # schema stable across vintages by backfilling these columns as NA earlier.
-ACS1_TABLE_FIRST_YEAR: dict[str, int] = {
-    table: ACS1_FIRST_RELIABLE_YEAR
-    for table in ACS1_TABLES
-}
+ACS1_TABLE_FIRST_YEAR: dict[str, int] = {table: ACS1_FIRST_RELIABLE_YEAR for table in ACS1_TABLES}
 ACS1_TABLE_FIRST_YEAR.update(
     {
         "B23025": 2011,
@@ -666,11 +708,7 @@ def acs1_variables_by_table_for_vintage(vintage: int) -> dict[str, list[str]]:
     """Return ACS1 API variables supported by a specific vintage."""
     unavailable = UNAVAILABLE_ACS1_API_VARS_BY_YEAR.get(vintage, set())
     return {
-        table: [
-            variable_code
-            for variable_code in variables
-            if variable_code not in unavailable
-        ]
+        table: [variable_code for variable_code in variables if variable_code not in unavailable]
         for table, variables in ACS1_VARIABLES_BY_TABLE.items()
     }
 
