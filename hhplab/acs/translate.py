@@ -315,25 +315,34 @@ def translate_tracts_2010_to_2020(
     # area-weighted above with other count columns before they are used here.
     # Use per-column valid masks: only tracts with non-null medians contribute
     # their denominator weight to that column's denominator.
+    median_helpers: dict[str, pd.Series] = {}
     for col in median_cols:
         valid = translated[col].notna()
         col_weight = _translation_median_weights(translated, col, population_column).where(
             valid,
             0,
         )
-        translated[f"__{col}_wt"] = col_weight
-        translated[f"__{col}_pw"] = (
+        median_helpers[f"__{col}_wt"] = col_weight
+        median_helpers[f"__{col}_pw"] = (
             pd.to_numeric(translated[col], errors="coerce").fillna(0) * col_weight
         )
 
     # Handle margin of error columns with proper error propagation
     # For weighted sums: MOE = sqrt(sum(weight^2 * moe^2))
+    moe_helpers: dict[str, pd.Series] = {}
     for moe_col in moe_columns:
         if moe_col in translated.columns:
-            translated[f"__{moe_col}_weighted_sq"] = (
+            moe_helpers[f"__{moe_col}_weighted_sq"] = (
                 translated["area_2010_to_2020_weight"] ** 2
                 * translated[moe_col].fillna(0) ** 2
             )
+    helper_frames = [
+        pd.DataFrame(helper_columns, index=translated.index)
+        for helper_columns in (median_helpers, moe_helpers)
+        if helper_columns
+    ]
+    if helper_frames:
+        translated = pd.concat([translated, *helper_frames], axis=1)
 
     # Build aggregation dict
     agg_funcs: dict[str, str] = {}
@@ -378,11 +387,20 @@ def translate_tracts_2010_to_2020(
             result = result.drop(columns=[pw_col, wt_col])
 
     # Compute final MOE from squared sums
+    final_moe_columns: dict[str, pd.Series] = {}
+    squared_moe_columns: list[str] = []
     for moe_col in moe_columns:
         sq_col = f"__{moe_col}_weighted_sq"
         if sq_col in result.columns:
-            result[moe_col] = result[sq_col].pow(0.5)
-            result = result.drop(columns=[sq_col])
+            final_moe_columns[moe_col] = result[sq_col].pow(0.5)
+            squared_moe_columns.append(sq_col)
+    if squared_moe_columns:
+        result = result.drop(columns=squared_moe_columns)
+    if final_moe_columns:
+        result = pd.concat(
+            [result, pd.DataFrame(final_moe_columns, index=result.index)],
+            axis=1,
+        )
 
     # Rename GEOID column to match input schema
     result = result.rename(columns={"tract_geoid_2020": geoid_column})

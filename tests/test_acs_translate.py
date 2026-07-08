@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
+import warnings
+
 import pandas as pd
 import pytest
+from pandas.errors import PerformanceWarning
 
 from hhplab.acs.translate import (
     TranslationStats,
@@ -342,6 +345,28 @@ class TestTranslateTracts2010To2020:
         result = result.sort_values("tract_geoid").reset_index(drop=True)
         assert result.iloc[0]["moe_total_population"] == pytest.approx(60, rel=0.01)
         assert result.iloc[1]["moe_total_population"] == pytest.approx(40, rel=0.01)
+
+    def test_many_moe_columns_do_not_fragment_dataframe(self, mock_relationship_file):
+        """Many MOE helper columns should be concatenated without fragmentation warnings."""
+        moe_columns = {f"moe_measure_{i}": [100.0 + i] for i in range(120)}
+        df = pd.DataFrame(
+            {
+                "tract_geoid": ["01001020200"],
+                "total_population": [1000],
+                **moe_columns,
+            }
+        )
+
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter("always", PerformanceWarning)
+            result, _ = translate_tracts_2010_to_2020(df)
+
+        fragmentation_warnings = [
+            warning for warning in caught if issubclass(warning.category, PerformanceWarning)
+        ]
+        assert fragmentation_warnings == []
+        assert len(result) == 2
+        assert "moe_measure_119" in result.columns
 
     def test_missing_geoid_column_raises(self, mock_relationship_file):
         """Test that missing geoid column raises ValueError."""
