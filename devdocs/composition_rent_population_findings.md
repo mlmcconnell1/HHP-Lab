@@ -75,22 +75,32 @@ households are renters, after controlling for population growth and year
 effects.
 
 **2026-07-08 addendum: the one significant result here (`d_renter_household_share`
-on rent, p=0.026) does not survive a state x year FE check.** Following the
-same state-level-confound audit already applied to several other findings
-this project has made (see `devdocs/state_level_robustness_rechecks.md` and
-the Vera jail work), re-ran this spec with `primary_state x year` fixed
-effects instead of plain year FE, on the identical n=1096 sample (137 MSAs,
-29 of 43 states with 2+ MSAs -- well-identified). The coefficient shrinks by
-more than half (-0.401 -> -0.177) and loses significance entirely
-(p=0.026 -> 0.415). This is now the **third** time in this project's record
-that a plain-entity+year-FE result evaporates under state x year FE (after
-the jail-vs-unsheltered flip and the migration-churn non-replication) --
-strong enough repetition to treat state x year FE as a standard, not
-optional, check for this class of MSA panel, not a check that only
-sometimes matters. Net effect: renter tenure share does not survive as a
-first-difference rent-growth predictor once state x year confounding is
-absorbed, although the later tracked levels-FE check below finds a strong
-negative pooled levels association.
+on rent, p=0.026) weakens under region x year FE and does not survive a
+state x year FE check.** Following the same state-level-confound audit
+already applied to several other findings this project has made (see
+`devdocs/state_level_robustness_rechecks.md` and the Vera jail work), re-ran
+this spec with both `region x year` and `primary_state x year` fixed effects
+instead of plain year FE, on the identical n=1096 sample:
+
+| Model term | Estimate | SE | p-value | N |
+| --- | ---: | ---: | ---: | ---: |
+| `d_renter_household_share` (year FE) | -0.401 | 0.180 | 0.026 | 1,096 |
+| `d_renter_household_share` (region x year FE) | -0.290 | 0.165 | 0.079 | 1,096 |
+| `d_renter_household_share` (state x year FE) | -0.177 | 0.218 | 0.415 | 1,096 |
+
+The region x year tier absorbs shocks common to an entire multi-state Census
+region in a given year; the state x year tier absorbs state-specific shocks
+and policy confounds, while identifying only from within-state, cross-MSA
+variation. These are complementary diagnostics, not one loose and one strict
+version of the same test. Read the ladder as follows: surviving all three is
+the strongest pattern; surviving region x year but dying under state x year
+points toward a state-specific confound; dying even under region x year
+points toward a broader multi-state regional confound. Here the coefficient
+attenuates under region x year and evaporates under state x year, so renter
+tenure share does not survive as a first-difference rent-growth predictor
+once regional and state-year confounding are checked, although the later
+tracked levels-FE check below finds a strong negative pooled levels
+association.
 
 ## Renter Household Size (ACS1 B25010)
 
@@ -259,21 +269,19 @@ Two completeness gaps found, neither of which changes any conclusion:
    guards and the ACS-lag merge are the two places a silent bug would most
    plausibly hide and should be the first things covered.
 
-## 2026-07-08 Addendum: renter tenure share's levels result survives state x year FE
+## 2026-07-08 Addendum: renter tenure share's levels result survives region and state x year FE
 
 The corrected `renter_household_share` levels-FE result above (b=-2.018,
-p=5.97e-06, msa+year FE) had not yet been run through this project's
-strictest check: replacing plain year FE with `primary_state x year` FE,
-the test that has caught every other significant MSA-panel result in this
-project's record except housing supply constraint (see
-`devdocs/noncompositional_rent_population_findings.md`). Added
+p=5.97e-06, msa+year FE) had not yet been run through the full three-tier
+fixed-effect ladder described above. Added
+`rent_levels_renter_household_share_msa_region_year_fe` and
 `rent_levels_renter_household_share_msa_state_year_fe` to
-`scripts/analyze_composition_rent_population_robustness.py`
-(`fixed_effects=("msa_id", "primary_state_year")`) and re-ran:
+`scripts/analyze_composition_rent_population_robustness.py` and re-ran:
 
 | Model term | Estimate | SE | p-value | N |
 | --- | ---: | ---: | ---: | ---: |
 | `renter_household_share` (msa + year FE) | -2.018 | 0.446 | 5.97e-06 | 1,370 |
+| `renter_household_share` (msa + region x year FE) | -2.053 | 0.469 | 1.21e-05 | 1,370 |
 | `renter_household_share` (msa + state x year FE) | -1.756 | 0.581 | 0.0025 | 1,370 |
 
 **This survives.** The coefficient attenuates by about 13% but stays

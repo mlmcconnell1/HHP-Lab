@@ -173,14 +173,15 @@ code paths.
 
 **One result is genuinely new and worth highlighting: `supply_constraint_bps`
 is the first result in this whole rent/population investigation (both this
-epic and the sibling compositional one) to survive a state x year FE
-check**, the robustness test that has caught three other significant
-MSA-panel results in this project's record. Re-ran with `primary_state x
-year` fixed effects instead of plain year FE on the identical n=1096 sample:
-the coefficient attenuates by about half (+0.0055 -> +0.0029) but stays
-significant (p<0.0001 -> p=0.012). Housing supply constraint is the one
-candidate mechanism, across both epics, that holds up under the strictest
-check available.
+epic and the sibling compositional one) to survive the full year / region x
+year / state x year FE ladder**, the robustness framing introduced in
+`devdocs/composition_rent_population_findings.md`. Re-ran with `region x
+year` and `primary_state x year` fixed effects instead of plain year FE on
+the identical n=1096 sample: the coefficient is stable under region x year
+and attenuates by about half under state x year (+0.0055 -> +0.0042 ->
++0.0029) but stays significant (p<0.0001 -> p<0.0001 -> p=0.012). Housing
+supply constraint is the one FD candidate mechanism, across both epics, that
+holds up under the strictest check available.
 
 **One corner case worth flagging, not currently causing wrong numbers but a
 latent risk**: `supply_constraint_bps`/`supply_constraint_bps_long` are
@@ -221,31 +222,30 @@ work-from-home share proxy is now loaded into the non-compositional panel and
 tested directly against rent growth net of population growth, with a null
 result.
 
-## 2026-07-08 Addendum: STR proxy does not survive state x year FE
+## 2026-07-08 Addendum: STR proxy survives region x year but not state x year FE
 
 The STR (seasonal/recreational vacancy share) FD result above (b=+0.0305,
-p=0.029, plain year FE) had never been re-run with `primary_state x year`
-FE, the check that has already caught renter household share (FD) and every
-other significant plain-FE MSA-panel result in this project except supply
-constraint and, as of the addendum above, renter household share in levels.
-Added `scripts/analyze_noncompositional_rent_population_robustness.py`
-(mirrors `analyze_composition_rent_population_robustness.py`'s pattern:
-`fixed_effects=("primary_state_year",)`) and re-ran on the identical n=1,070
-sample:
+p=0.029, plain year FE) had never been re-run with the full three-tier FE
+ladder. Added `region_year` and `primary_state_year` specs to
+`scripts/analyze_noncompositional_rent_population_robustness.py` and re-ran
+on the identical n=1,070 sample:
 
 | Model term | Estimate | SE | p-value | N |
 | --- | ---: | ---: | ---: | ---: |
 | `d_seasonal_recreational_vacancy_share` (year FE) | 0.0305 | 0.0140 | 0.029 | 1,070 |
+| `d_seasonal_recreational_vacancy_share` (region x year FE) | 0.0249 | 0.0124 | 0.045 | 1,070 |
 | `d_seasonal_recreational_vacancy_share` (state x year FE) | 0.0157 | 0.0116 | 0.176 | 1,070 |
 
-**Does not survive.** The coefficient roughly halves and loses significance
-entirely. Independently re-verified with a from-scratch replication
-(separate design-matrix construction, same input parquet) -- matches
-exactly. Net effect: the STR/vacation-rental proxy joins renter household
+**This survives region x year but not state x year.** The region x year
+result argues against a broad multi-state regional shock as the whole story,
+but the coefficient roughly halves and loses significance under state x
+year. That is the signature pattern for a possible state-specific policy or
+institutional confound, not merely power loss from adding coarser regional
+controls. Net effect: the STR/vacation-rental proxy joins renter household
 size, recent-mover income, and remote-work as a non-surviving or null
 candidate. **Housing supply constraint remains the only FD (growth-on-growth)
 result, and renter household share in levels the only cross-sectional
-result, to survive a state x year FE check across both epics.**
+result, to survive the full three-tier FE ladder across both epics.**
 
 ## 2026-07-08 Addendum: supply constraint robustness is now tracked
 
@@ -263,6 +263,7 @@ Tracked output:
 | Model term | Estimate | SE | p-value | N |
 | --- | ---: | ---: | ---: | ---: |
 | `supply_constraint_bps` (year FE) | 0.0055 | 0.0009 | <0.001 | 1,096 |
+| `supply_constraint_bps` (region x year FE) | 0.0042 | 0.0009 | 5.2e-06 | 1,096 |
 | `supply_constraint_bps` (state x year FE) | 0.0029 | 0.0012 | 0.012 | 1,096 |
 | `d_log_pop x supply_constraint_bps` (state x year FE) | 0.1308 | 0.0712 | 0.066 | 1,096 |
 

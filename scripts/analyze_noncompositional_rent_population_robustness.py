@@ -20,6 +20,8 @@ from build_noncompositional_rent_population_panel import (
     SUPPLY_EXPOSURE_END_YEAR,
 )
 
+from hhplab.census_regions import census_region
+
 FD_INPUT = NONCOMPOSITIONAL_OUT / "noncompositional_rent_population_fd.parquet"
 
 ROBUSTNESS_PARQUET = (
@@ -53,11 +55,27 @@ STATE_YEAR_FE_SPECS = (
         sample_filter="fd_year_gap_1",
     ),
     RegressionSpec(
+        family="supply_constraint",
+        model="rent_fd_population_x_supply_constraint_bps_region_year_fe",
+        outcome="d_log_zori",
+        predictors=("d_log_pop", "supply_constraint_bps", "d_log_pop_x_supply_constraint_bps"),
+        fixed_effects=("region_year",),
+        sample_filter="fd_year_gap_1",
+    ),
+    RegressionSpec(
         family="short_term_rental_proxy",
         model="rent_fd_seasonal_recreational_vacancy_share_state_year_fe",
         outcome="d_log_zori",
         predictors=("d_log_pop", "d_seasonal_recreational_vacancy_share"),
         fixed_effects=("primary_state_year",),
+        sample_filter="fd_year_gap_1",
+    ),
+    RegressionSpec(
+        family="short_term_rental_proxy",
+        model="rent_fd_seasonal_recreational_vacancy_share_region_year_fe",
+        outcome="d_log_zori",
+        predictors=("d_log_pop", "d_seasonal_recreational_vacancy_share"),
+        fixed_effects=("region_year",),
         sample_filter="fd_year_gap_1",
     ),
 )
@@ -72,6 +90,15 @@ def _effect_series(sample: pd.DataFrame, effect: str) -> pd.Series:
                 f"{sorted(missing)}. Rebuild the noncompositional panel from the base panel."
             )
         return sample["primary_state"].astype("string") + "_" + sample["year"].astype("string")
+    if effect == "region_year":
+        missing = {"primary_state", "year"} - set(sample.columns)
+        if missing:
+            raise ValueError(
+                "region_year fixed effects require columns "
+                f"{sorted(missing)}. Rebuild the noncompositional panel from the base panel."
+            )
+        regions = sample["primary_state"].map(census_region)
+        return regions.astype("string") + "_" + sample["year"].astype("string")
     if effect not in sample.columns:
         raise ValueError(f"Fixed effect column '{effect}' is missing from the regression sample.")
     return sample[effect].astype("string")
@@ -113,14 +140,17 @@ def _validate_supply_model_sample(spec: RegressionSpec, sample: pd.DataFrame) ->
 
 def fit_spec(frame: pd.DataFrame, spec: RegressionSpec) -> pd.DataFrame:
     required = [spec.outcome, *spec.predictors, "msa_id", *spec.fixed_effects]
-    if "primary_state_year" in spec.fixed_effects:
-        required.remove("primary_state_year")
-        required.extend(["primary_state", "year"])
+    for derived_effect in ("primary_state_year", "region_year"):
+        if derived_effect in required:
+            required.remove(derived_effect)
+            required.extend(["primary_state", "year"])
     missing_required = sorted(set(required) - set(frame.columns))
     if missing_required:
-        if "primary_state" in missing_required:
+        if "primary_state" in missing_required and any(
+            effect in spec.fixed_effects for effect in ("primary_state_year", "region_year")
+        ):
             raise ValueError(
-                "primary_state_year fixed effects require columns "
+                f"{'+'.join(spec.fixed_effects)} fixed effects require columns "
                 f"{missing_required}. Rebuild the noncompositional panel from the base panel."
             )
         raise ValueError(

@@ -14,6 +14,7 @@ from pathlib import Path
 import pandas as pd
 import statsmodels.api as sm
 
+from hhplab.census_regions import census_region
 from hhplab.results.workflows.build_household_size_composition_panel import OUT
 
 FD_INPUTS = {
@@ -57,6 +58,14 @@ FD_RENTER_SHARE_SPECS = (
         fixed_effects=("primary_state_year",),
         sample_filter="fd_year_gap_1",
     ),
+    RegressionSpec(
+        family="renter_household_share",
+        model="rent_fd_renter_household_share_region_year_fe",
+        outcome="d_log_zori",
+        predictors=("d_log_pop", "d_renter_household_share"),
+        fixed_effects=("region_year",),
+        sample_filter="fd_year_gap_1",
+    ),
 )
 
 LEVEL_FE_SPECS = (
@@ -74,6 +83,14 @@ LEVEL_FE_SPECS = (
         outcome="log_zori",
         predictors=("log_pop", "renter_household_share"),
         fixed_effects=("msa_id", "primary_state_year"),
+        sample_filter="levels_complete_case",
+    ),
+    RegressionSpec(
+        family="renter_household_share",
+        model="rent_levels_renter_household_share_msa_region_year_fe",
+        outcome="log_zori",
+        predictors=("log_pop", "renter_household_share"),
+        fixed_effects=("msa_id", "region_year"),
         sample_filter="levels_complete_case",
     ),
     RegressionSpec(
@@ -104,6 +121,15 @@ def _effect_series(sample: pd.DataFrame, effect: str) -> pd.Series:
                 f"{sorted(missing)}. Rebuild the composition panels from the base panel."
             )
         return sample["primary_state"].astype("string") + "_" + sample["year"].astype("string")
+    if effect == "region_year":
+        missing = {"primary_state", "year"} - set(sample.columns)
+        if missing:
+            raise ValueError(
+                "region_year fixed effects require columns "
+                f"{sorted(missing)}. Rebuild the composition panels from the base panel."
+            )
+        regions = sample["primary_state"].map(census_region)
+        return regions.astype("string") + "_" + sample["year"].astype("string")
     if effect not in sample.columns:
         raise ValueError(f"Fixed effect column '{effect}' is missing from the regression sample.")
     return sample[effect].astype("string")
@@ -124,14 +150,17 @@ def _design_matrix(sample: pd.DataFrame, spec: RegressionSpec) -> pd.DataFrame:
 
 def fit_spec(frame: pd.DataFrame, spec: RegressionSpec) -> pd.DataFrame:
     required = [spec.outcome, *spec.predictors, "msa_id", *spec.fixed_effects]
-    if "primary_state_year" in spec.fixed_effects:
-        required.remove("primary_state_year")
-        required.extend(["primary_state", "year"])
+    for derived_effect in ("primary_state_year", "region_year"):
+        if derived_effect in required:
+            required.remove(derived_effect)
+            required.extend(["primary_state", "year"])
     missing_required = sorted(set(required) - set(frame.columns))
     if missing_required:
-        if "primary_state" in missing_required:
+        if "primary_state" in missing_required and any(
+            effect in spec.fixed_effects for effect in ("primary_state_year", "region_year")
+        ):
             raise ValueError(
-                "primary_state_year fixed effects require columns "
+                f"{'+'.join(spec.fixed_effects)} fixed effects require columns "
                 f"{missing_required}. Rebuild the composition panels from the base panel."
             )
         raise ValueError(

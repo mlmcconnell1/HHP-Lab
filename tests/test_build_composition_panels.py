@@ -166,7 +166,7 @@ def test_recent_mover_income_panel_uses_acs1_lag_and_safe_ratios(
 def _robustness_fixture() -> pd.DataFrame:
     rows = []
     for msa_index, (msa_id, state) in enumerate(
-        [("10000", "AA"), ("20000", "AA"), ("30000", "BB"), ("40000", "BB")]
+        [("10000", "CT"), ("20000", "NY"), ("30000", "IL"), ("40000", "OH")]
     ):
         for year_index, year in enumerate([2019, 2020, 2022]):
             rows.append(
@@ -208,6 +208,41 @@ def test_composition_robustness_requires_state_for_state_year_fe() -> None:
 
     with pytest.raises(ValueError, match="primary_state_year fixed effects require"):
         robustness.fit_spec(frame, robustness.FD_RENTER_SHARE_SPECS[1])
+
+
+def test_composition_robustness_runs_region_year_specs() -> None:
+    robustness = _load_script("analyze_composition_rent_population_robustness")
+    frame = _robustness_fixture()
+    fd_spec = _spec_by_model(
+        robustness.FD_RENTER_SHARE_SPECS,
+        "rent_fd_renter_household_share_region_year_fe",
+    )
+    levels_spec = _spec_by_model(
+        robustness.LEVEL_FE_SPECS,
+        "rent_levels_renter_household_share_msa_region_year_fe",
+    )
+
+    fd_result = robustness.fit_spec(frame, fd_spec)
+    levels_result = robustness.fit_spec(frame, levels_spec)
+
+    assert fd_result["fixed_effects"].unique().tolist() == ["region_year"]
+    assert levels_result["fixed_effects"].unique().tolist() == ["msa_id+region_year"]
+    assert set(fd_result["term"]) == {"d_log_pop", "d_renter_household_share"}
+    assert set(levels_result["term"]) == {"log_pop", "renter_household_share"}
+    assert fd_result["nobs"].unique().tolist() == [len(frame)]
+    assert levels_result["clusters"].unique().tolist() == [frame["msa_id"].nunique()]
+
+
+def test_composition_robustness_requires_state_for_region_year_fe() -> None:
+    robustness = _load_script("analyze_composition_rent_population_robustness")
+    frame = _robustness_fixture().drop(columns=["primary_state"])
+    spec = _spec_by_model(
+        robustness.FD_RENTER_SHARE_SPECS,
+        "rent_fd_renter_household_share_region_year_fe",
+    )
+
+    with pytest.raises(ValueError, match="region_year fixed effects require"):
+        robustness.fit_spec(frame, spec)
 
 
 def _spec_by_model(specs, model: str):
