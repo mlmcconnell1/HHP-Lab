@@ -29,10 +29,9 @@ Generated, ignored artifacts:
   category, is now included in the refreshed ACS1 metro artifacts and is
   tested below as a vacation-home/STR-adjacent proxy.
 - ACS work-from-home commute table B08301 now has registry support and is
-  available in the refreshed ACS1 metro artifacts, but this screen has not
-  yet wired that direct measure into the models. The available fallback here
-  is ACS1 B25068 bedroom mix among gross-rent units, used as a weak proxy for
-  demand for more rental space rather than a direct remote-work measure.
+  available in the refreshed ACS1 metro artifacts. It is tested below as the
+  direct remote-work demand proxy. ACS1 B25068 bedroom mix among gross-rent
+  units remains as a weaker fallback proxy for rental-space demand.
 
 ## Coverage
 
@@ -43,6 +42,7 @@ Generated, ignored artifacts:
 - ACS1 vintages used for bedroom-mix proxy: 2009-2019 and 2021-2024
 - Complete supply-constraint FD rows: 1,096
 - Complete short-term-rental proxy FD rows: 1,070
+- Complete remote-work proxy FD rows: 1,046
 - Complete space-demand-proxy FD rows: 1,074
 
 Median level bedroom mix among ACS1 gross-rent units:
@@ -57,6 +57,12 @@ Median level ACS1 B25004 seasonal/recreational/occasional vacancy share:
 | Measure | Median |
 | --- | ---: |
 | Seasonal/recreational vacancy share | 0.151 |
+
+Median level ACS1 B08301 work-from-home share:
+
+| Measure | Median |
+| --- | ---: |
+| Work-from-home share | 0.057 |
 
 ## Housing Supply Constraints
 
@@ -105,11 +111,21 @@ This should be treated as proxy evidence, not as a direct STR-platform result.
 
 ## Space-Demand Proxy
 
-ACS work-from-home commute table B08301 is now registered and present in the
-refreshed ACS1 metro artifacts, but this screen has not yet wired it into the
-model set. This screen therefore uses ACS1 B25068 bedroom mix among gross-rent
-units as the currently available fallback proxy for rental space demand.
-Models use MSA-clustered standard errors and year fixed effects:
+The direct remote-work proxy is ACS1 B08301 work-from-home share. The
+secondary fallback proxy remains ACS1 B25068 bedroom mix among gross-rent
+units, which can detect shifts toward larger rental units but is not a direct
+remote-work measure. Models use MSA-clustered standard errors and year fixed
+effects:
+
+| Model | Proxy term | Estimate | SE | p-value | N |
+| --- | --- | ---: | ---: | ---: | ---: |
+| `d_log_zori ~ d_log_pop + proxy + year FE` | `d_work_from_home_share` | 0.0506 | 0.0648 | 0.435 | 1,046 |
+
+Interpretation: the direct B08301 work-from-home proxy does not explain rent
+growth net of population growth in this pooled FD screen. The coefficient is
+positive, but it is imprecise and statistically null.
+
+The bedroom-mix fallback results remain:
 
 | Model | Proxy term | Estimate | SE | p-value | N |
 | --- | --- | ---: | ---: | ---: | ---: |
@@ -118,12 +134,13 @@ Models use MSA-clustered standard errors and year fixed effects:
 | `d_log_zori ~ d_log_pop + proxy + year FE` | `d_gross_rent_3plus_bedroom_share` | -0.0639 | 0.0199 | 0.001 | 1,080 |
 | `d_log_unshelt_rate ~ d_log_zori + d_log_pop + proxy + year FE` | `d_gross_rent_3plus_bedroom_share` | -0.0726 | 0.5730 | 0.899 | 1,074 |
 
-Interpretation: this fallback does not support a positive rental-space-demand
-explanation for rent rising independent of population. The rent coefficients
-are negative, and the 3+ bedroom share coefficient is statistically
-significant in the opposite direction. The positive 2+ bedroom-share
-coefficient in the unsheltered-rate model is exploratory and does not pair
-with higher rent growth, so it is not evidence for the proposed rent channel.
+Interpretation: the fallback also does not support a positive
+rental-space-demand explanation for rent rising independent of population.
+The rent coefficients are negative, and the 3+ bedroom share coefficient is
+statistically significant in the opposite direction. The positive 2+
+bedroom-share coefficient in the unsheltered-rate model is exploratory and
+does not pair with higher rent growth, so it is not evidence for the proposed
+rent channel.
 
 ## Interpretation
 
@@ -135,9 +152,8 @@ channel directionally and statistically in the pooled FD design. Together
 these results directly weaken the idea that population changes alone should
 explain rent changes.
 
-The current script still cannot test remote-work share directly until B08301
-is wired into the screen. The B25068 bedroom-mix fallback is negative/null for
-rent growth, so it should not be treated as confirming a space-demand channel.
+The remote-work/space-demand channel is not supported in either its direct
+B08301 work-from-home form or the weaker B25068 bedroom-mix fallback.
 
 ## 2026-07-08 Code Review Addendum
 
@@ -196,6 +212,8 @@ broadcast merge of the static supply exposure) is untested. Filed as
 **STR (bead .2) was subsequently completed after reingesting the ACS1 metro
 artifacts with B25004**: the seasonal/recreational/occasional vacancy-share
 proxy is now loaded into the non-compositional panel and tested directly
-against rent growth net of population growth. **Remote-work (bead .3) remains
-untested against its actual target measure** until B08301 or another direct
-work-from-home/space-demand proxy is wired into the screen.
+against rent growth net of population growth. **Remote-work (bead .3) was
+subsequently completed after the same ACS1 refresh with B08301**: the
+work-from-home share proxy is now loaded into the non-compositional panel and
+tested directly against rent growth net of population growth, with a null
+result.

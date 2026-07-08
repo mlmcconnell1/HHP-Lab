@@ -7,6 +7,7 @@ matching headcount increase:
 * housing supply constraints interacting with population growth
 * ACS1 seasonal/recreational/occasional vacancy share as a free proxy for
   short-term-rental or vacation-home conversion out of long-term stock
+* ACS1 work-from-home share as a direct remote-work demand proxy
 * ACS1 bedroom-mix shifts as an available proxy for non-headcount space demand
 """
 
@@ -43,6 +44,9 @@ SPACE_DEMAND_SHARE_COLUMNS = [
 STR_PROXY_COLUMNS = [
     "seasonal_recreational_vacancy_share",
 ]
+REMOTE_WORK_PROXY_COLUMNS = [
+    "work_from_home_share",
+]
 SUPPLY_COLUMNS = [
     "supply_constraint_bps",
     "supply_constraint_bps_long",
@@ -76,6 +80,7 @@ def load_acs1_space_demand_panel(acs1_glob: str = ACS1_METRO_GLOB) -> pd.DataFra
                 "acs1_vintage",
                 *SPACE_DEMAND_COLUMNS,
                 *STR_PROXY_COLUMNS,
+                *REMOTE_WORK_PROXY_COLUMNS,
             ],
         )
         frame["msa_id"] = _as_msa_id(frame["metro_id"])
@@ -89,6 +94,7 @@ def load_acs1_space_demand_panel(acs1_glob: str = ACS1_METRO_GLOB) -> pd.DataFra
                     "acs1_vintage_used",
                     *SPACE_DEMAND_COLUMNS,
                     *STR_PROXY_COLUMNS,
+                    *REMOTE_WORK_PROXY_COLUMNS,
                 ]
             ]
         )
@@ -120,6 +126,8 @@ def add_first_differences(levels: pd.DataFrame) -> pd.DataFrame:
     for column in SPACE_DEMAND_SHARE_COLUMNS:
         levels[f"d_{column}"] = grouped[column].diff()
     for column in STR_PROXY_COLUMNS:
+        levels[f"d_{column}"] = grouped[column].diff()
+    for column in REMOTE_WORK_PROXY_COLUMNS:
         levels[f"d_{column}"] = grouped[column].diff()
     for column in SUPPLY_COLUMNS:
         levels[f"d_log_pop_x_{column}"] = levels["d_log_pop"] * levels[column]
@@ -154,6 +162,13 @@ def _model_specs() -> Iterable[ModelSpec]:
             outcome="d_log_zori",
             predictors=("d_log_pop", f"d_{column}"),
             family="short_term_rental_proxy",
+        )
+    for column in REMOTE_WORK_PROXY_COLUMNS:
+        yield ModelSpec(
+            name=f"rent_fd_{column}",
+            outcome="d_log_zori",
+            predictors=("d_log_pop", f"d_{column}"),
+            family="remote_work_proxy",
         )
     for column in SPACE_DEMAND_SHARE_COLUMNS:
         diff_column = f"d_{column}"
@@ -231,6 +246,13 @@ def summarize_panel(levels: pd.DataFrame, fd: pd.DataFrame) -> dict[str, object]
             "d_seasonal_recreational_vacancy_share",
         ]
     )
+    remote_work_complete = fd.dropna(
+        subset=[
+            "d_log_zori",
+            "d_log_pop",
+            "d_work_from_home_share",
+        ]
+    )
     space_summary = (
         levels[SPACE_DEMAND_SHARE_COLUMNS]
         .agg(["mean", "median", "count"])
@@ -243,6 +265,12 @@ def summarize_panel(levels: pd.DataFrame, fd: pd.DataFrame) -> dict[str, object]
         .transpose()
         .round({"mean": 6, "median": 6})
     )
+    remote_work_summary = (
+        levels[REMOTE_WORK_PROXY_COLUMNS]
+        .agg(["mean", "median", "count"])
+        .transpose()
+        .round({"mean": 6, "median": 6})
+    )
     correlations = (
         space_complete[
             [
@@ -251,6 +279,7 @@ def summarize_panel(levels: pd.DataFrame, fd: pd.DataFrame) -> dict[str, object]
                 "d_log_pop",
                 *[f"d_{column}" for column in SPACE_DEMAND_SHARE_COLUMNS],
                 *[f"d_{column}" for column in STR_PROXY_COLUMNS],
+                *[f"d_{column}" for column in REMOTE_WORK_PROXY_COLUMNS],
             ]
         ]
         .corr()
@@ -266,8 +295,10 @@ def summarize_panel(levels: pd.DataFrame, fd: pd.DataFrame) -> dict[str, object]
         ],
         "complete_fd_rows_for_supply_constraint": int(len(supply_complete)),
         "complete_fd_rows_for_short_term_rental_proxy": int(len(str_complete)),
+        "complete_fd_rows_for_remote_work_proxy": int(len(remote_work_complete)),
         "complete_fd_rows_for_space_demand_proxy": int(len(space_complete)),
         "short_term_rental_proxy_level_summary": json.loads(str_summary.to_json()),
+        "remote_work_proxy_level_summary": json.loads(remote_work_summary.to_json()),
         "space_demand_level_summary": json.loads(space_summary.to_json()),
         "levels_missing_supply": {
             column: int(levels[column].isna().sum()) for column in SUPPLY_COLUMNS
@@ -275,12 +306,19 @@ def summarize_panel(levels: pd.DataFrame, fd: pd.DataFrame) -> dict[str, object]
         "levels_missing_short_term_rental_proxy": {
             column: int(levels[column].isna().sum()) for column in STR_PROXY_COLUMNS
         },
+        "levels_missing_remote_work_proxy": {
+            column: int(levels[column].isna().sum()) for column in REMOTE_WORK_PROXY_COLUMNS
+        },
         "levels_missing_space_demand": {
             column: int(levels[column].isna().sum())
             for column in [*SPACE_DEMAND_COLUMNS, *SPACE_DEMAND_SHARE_COLUMNS]
         },
         "fd_missing_short_term_rental_proxy_diff": {
             f"d_{column}": int(fd[f"d_{column}"].isna().sum()) for column in STR_PROXY_COLUMNS
+        },
+        "fd_missing_remote_work_proxy_diff": {
+            f"d_{column}": int(fd[f"d_{column}"].isna().sum())
+            for column in REMOTE_WORK_PROXY_COLUMNS
         },
         "fd_missing_space_demand_diff": {
             f"d_{column}": int(fd[f"d_{column}"].isna().sum())
@@ -298,7 +336,7 @@ def summarize_panel(levels: pd.DataFrame, fd: pd.DataFrame) -> dict[str, object]
                 ),
             },
             "remote_work_proxy": {
-                "status": "registry_supported_not_wired",
+                "status": "tested_with_acs1_b08301_proxy",
                 "registry_tables": ["B08301"],
                 "fallback_used_in_current_artifacts": "ACS1 B25068 gross-rent bedroom mix",
             },
