@@ -44,6 +44,22 @@ from hhplab.covariates.saiz_contract import (
     SAIZ_SOURCE_PAGE,
     SAIZ_SOURCE_URL,
 )
+from hhplab.vera.incarceration_contract import (
+    VERA_JAIL_MEASURE_COLUMNS,
+    VERA_JAIL_PRODUCT,
+    VERA_JAIL_RELIABLE_FIRST_YEAR,
+    VERA_JAIL_RELIABLE_LAST_YEAR,
+    VERA_JAIL_SOURCE_ID,
+    VERA_PRISON_LAST_YEAR,
+    VERA_PRISON_MEASURE_COLUMNS,
+    VERA_PRISON_PRODUCT,
+    VERA_PRISON_RELIABLE_FIRST_YEAR,
+    VERA_PRISON_SOURCE_ID,
+    VERA_PROVIDER,
+    VERA_REQUIRED_CURATED_COLUMNS,
+    VERA_SOURCE_PAGE,
+    VERA_SOURCE_URL,
+)
 
 GeoType = Literal["county", "coc", "state", "msa"]
 MeasureAggregation = Literal[
@@ -292,6 +308,52 @@ COVARIATE_SOURCE_SPECS: dict[str, CovariateSourceSpec] = {
             "counts for 12-month-ending periods. HHP-Lab curated artifacts use "
             "January rows for PIT alignment; recent periods are provisional and "
             "subject to reporting lag and suppression."
+        ),
+    ),
+    VERA_JAIL_SOURCE_ID: CovariateSourceSpec(
+        source_id=VERA_JAIL_SOURCE_ID,
+        provider=VERA_PROVIDER,
+        product=VERA_JAIL_PRODUCT,
+        topic="criminal_legal_system",
+        native_geo="county",
+        first_year=VERA_JAIL_RELIABLE_FIRST_YEAR,
+        last_year=VERA_JAIL_RELIABLE_LAST_YEAR,
+        source_page=VERA_SOURCE_PAGE,
+        source_url=VERA_SOURCE_URL,
+        required_columns=VERA_REQUIRED_CURATED_COLUMNS,
+        measure_columns=VERA_JAIL_MEASURE_COLUMNS,
+        measure_aggregations={
+            column: "extensive_sum" for column in VERA_JAIL_MEASURE_COLUMNS
+        },
+        recommended_align="calendar_year",
+        notes=(
+            "Vera county jail measures from Incarceration Trends. The raw file "
+            "contains earlier census/sample years and 2024-2026 rows, but "
+            "1999-2023 is the dependable annual county coverage window; "
+            "Connecticut county jail coverage is structurally absent because "
+            "jails are state-run."
+        ),
+    ),
+    VERA_PRISON_SOURCE_ID: CovariateSourceSpec(
+        source_id=VERA_PRISON_SOURCE_ID,
+        provider=VERA_PROVIDER,
+        product=VERA_PRISON_PRODUCT,
+        topic="criminal_legal_system",
+        native_geo="county",
+        first_year=VERA_PRISON_RELIABLE_FIRST_YEAR,
+        last_year=VERA_PRISON_LAST_YEAR,
+        source_page=VERA_SOURCE_PAGE,
+        source_url=VERA_SOURCE_URL,
+        required_columns=VERA_REQUIRED_CURATED_COLUMNS,
+        measure_columns=VERA_PRISON_MEASURE_COLUMNS,
+        measure_aggregations={
+            column: "extensive_sum" for column in VERA_PRISON_MEASURE_COLUMNS
+        },
+        recommended_align="calendar_year",
+        notes=(
+            "Vera county prison measures from Incarceration Trends. Prison "
+            "coverage is present through 2019; pre-1984 rows are sparse enough "
+            "that the catalog advertises 1984-2019 as the usable coverage window."
         ),
     ),
     MPI_SOURCE_ID: CovariateSourceSpec(

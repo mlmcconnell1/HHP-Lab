@@ -57,6 +57,16 @@ from hhplab.covariates.saiz_contract import (
 from hhplab.curated_policy import validate_curated_layout
 from hhplab.geo.ct_planning_regions import CtPlanningRegionCrosswalk
 from hhplab.provenance import ProvenanceBlock, read_provenance, write_parquet_with_provenance
+from hhplab.vera.incarceration_contract import (
+    VERA_JAIL_MEASURE_COLUMNS,
+    VERA_JAIL_RELIABLE_FIRST_YEAR,
+    VERA_JAIL_RELIABLE_LAST_YEAR,
+    VERA_JAIL_SOURCE_ID,
+    VERA_PRISON_LAST_YEAR,
+    VERA_PRISON_MEASURE_COLUMNS,
+    VERA_PRISON_RELIABLE_FIRST_YEAR,
+    VERA_PRISON_SOURCE_ID,
+)
 
 runner = CliRunner()
 
@@ -70,6 +80,8 @@ EXPECTED_COVARIATE_SOURCES = {
     "kff_medicaid_expansion": ("state", "medicaid_expansion_adopted"),
     "prism_tmin_january": ("county", "tmin_c"),
     CDC_OVERDOSE_SOURCE_ID: ("county", "overdose_deaths_12mo"),
+    VERA_JAIL_SOURCE_ID: ("county", "total_jail_pop"),
+    VERA_PRISON_SOURCE_ID: ("county", "total_prison_pop"),
     MPI_SOURCE_ID: ("county", "unauthorized_immigrant_population"),
     IRS_SOI_SOURCE_ID: ("county", "inflow_returns"),
     SAIZ_SOURCE_ID: ("msa", "saiz_elasticity"),
@@ -425,6 +437,27 @@ def test_cdc_overdose_catalog_entry_documents_provisional_county_coverage() -> N
     assert spec.recommended_align == "point_in_time_jan_trailing_12_months"
     assert "provisional" in spec.notes.lower()
     assert "January rows" in spec.notes
+
+
+def test_vera_catalog_entries_document_distinct_jail_and_prison_windows() -> None:
+    jail = COVARIATE_SOURCE_SPECS[VERA_JAIL_SOURCE_ID]
+    prison = COVARIATE_SOURCE_SPECS[VERA_PRISON_SOURCE_ID]
+
+    assert jail.provider == "vera"
+    assert jail.product == "incarceration_trends_jail"
+    assert jail.first_year == VERA_JAIL_RELIABLE_FIRST_YEAR
+    assert jail.last_year == VERA_JAIL_RELIABLE_LAST_YEAR
+    assert jail.measure_columns == VERA_JAIL_MEASURE_COLUMNS
+    assert "1999-2023" in jail.notes
+    assert "Connecticut" in jail.notes
+
+    assert prison.provider == "vera"
+    assert prison.product == "incarceration_trends_prison"
+    assert prison.first_year == VERA_PRISON_RELIABLE_FIRST_YEAR
+    assert prison.last_year == VERA_PRISON_LAST_YEAR
+    assert prison.measure_columns == VERA_PRISON_MEASURE_COLUMNS
+    assert "1984-2019" in prison.notes
+    assert "pre-1984" in prison.notes
 
 
 def test_saiz_static_msa_covariate_ingests_and_aggregates(
