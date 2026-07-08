@@ -97,6 +97,23 @@ def test_model_specs_cover_supply_and_space_families() -> None:
     assert any("d_gross_rent_2plus_bedroom_share" in spec.predictors for spec in specs)
 
 
+def test_supply_model_sample_rejects_exposure_window_overlap() -> None:
+    builder = _load_builder()
+    spec = builder.ModelSpec(
+        name="rent_fd_population_x_supply_constraint_bps",
+        outcome="d_log_zori",
+        predictors=("d_log_pop", "supply_constraint_bps", "d_log_pop_x_supply_constraint_bps"),
+        family="supply_constraint",
+    )
+    overlapping_sample = pd.DataFrame({"year": [2014, 2015], "msa_id": ["10000", "10000"]})
+    valid_sample = pd.DataFrame({"year": [2016, 2017], "msa_id": ["10000", "10000"]})
+
+    with pytest.raises(ValueError, match="overlaps the 2010-2014 BPS exposure window"):
+        builder._validate_supply_model_sample(spec, overlapping_sample)
+
+    builder._validate_supply_model_sample(spec, valid_sample)
+
+
 def test_load_acs1_space_demand_panel_includes_str_proxy_lag(
     tmp_path,
 ) -> None:

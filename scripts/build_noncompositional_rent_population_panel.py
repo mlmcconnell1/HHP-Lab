@@ -27,7 +27,7 @@ from build_household_size_composition_panel import (
     _vintage_from_acs1_path,
     load_pooled_base_panel,
 )
-from build_supply_iv_panel import DEFAULT_INPUT_PATHS, build_bps_exposures
+from build_supply_iv_panel import BPS_SHORT_WINDOW, DEFAULT_INPUT_PATHS, build_bps_exposures
 
 NONCOMPOSITIONAL_OUT = OUT.parent / "noncompositional_rent_population"
 
@@ -51,6 +51,7 @@ SUPPLY_COLUMNS = [
     "supply_constraint_bps",
     "supply_constraint_bps_long",
 ]
+SUPPLY_EXPOSURE_END_YEAR = max(BPS_SHORT_WINDOW)
 
 
 @dataclass(frozen=True)
@@ -186,6 +187,24 @@ def _model_specs() -> Iterable[ModelSpec]:
         )
 
 
+def _validate_supply_model_sample(spec: ModelSpec, sample: pd.DataFrame) -> None:
+    if spec.family != "supply_constraint" or sample.empty:
+        return
+
+    overlap = sorted(
+        int(year)
+        for year in sample["year"].dropna().unique()
+        if int(year) <= SUPPLY_EXPOSURE_END_YEAR
+    )
+    if overlap:
+        raise ValueError(
+            f"{spec.name} supply-constraint sample overlaps the "
+            f"{min(BPS_SHORT_WINDOW)}-{SUPPLY_EXPOSURE_END_YEAR} BPS exposure window "
+            f"in analysis year(s) {overlap}. Restrict supply-constraint outcomes to "
+            f"years after {SUPPLY_EXPOSURE_END_YEAR} so the exposure is pre-sample."
+        )
+
+
 def fit_clustered_fd_models(fd: pd.DataFrame) -> pd.DataFrame:
     rows: list[dict[str, object]] = []
     for spec in _model_specs():
@@ -193,6 +212,7 @@ def fit_clustered_fd_models(fd: pd.DataFrame) -> pd.DataFrame:
         sample = fd.dropna(subset=required).copy()
         if sample.empty:
             continue
+        _validate_supply_model_sample(spec, sample)
 
         year_fe = pd.get_dummies(
             sample["year"].astype("string"),
