@@ -26,6 +26,7 @@ from hhplab.acs.variables import (
 )
 from hhplab.acs.variables_acs1 import (
     ACS1_TABLE_COLUMN_NAMES,
+    ACS1_VARIABLE_NAMES,
     ACS1_VARIABLES_BY_TABLE,
     acs1_variable_names_for_vintage,
     acs1_variables_by_table_for_vintage,
@@ -566,6 +567,19 @@ def test_contract_rent_acs1_variable_mappings_use_acs5_column_names() -> None:
         "contract_rent_distribution_no_cash_rent"
     )
     assert ACS1_VARIABLES_BY_TABLE["B25056"] == list(ACS1_TABLE_COLUMN_NAMES["B25056"])
+
+
+def test_recent_mover_income_acs1_variable_mappings_use_b07011() -> None:
+    assert ACS1_TABLE_COLUMN_NAMES["B07011"] == {
+        "B07011_001E": "median_income_mobility_total",
+        "B07011_002E": "median_income_same_house_1_year_ago",
+        "B07011_003E": "median_income_moved_within_county",
+        "B07011_004E": "median_income_moved_diff_county_same_state",
+        "B07011_005E": "median_income_moved_diff_state",
+        "B07011_006E": "median_income_moved_from_abroad",
+    }
+    assert ACS1_VARIABLES_BY_TABLE["B07011"] == list(ACS1_TABLE_COLUMN_NAMES["B07011"])
+    assert "median_income_moved_diff_state" in ACS1_VARIABLE_NAMES.values()
 
 
 def test_contract_rent_acs1_early_vintage_uses_top_bin_override() -> None:

@@ -621,6 +621,12 @@ class TestIngestWritesParquet:
                 "B25035_001E": "1960",
                 "B25024_009E": "150000",
                 "B25010_001E": "2.61",
+                "B07011_001E": "45210",
+                "B07011_002E": "47400",
+                "B07011_003E": "41125",
+                "B07011_004E": "43890",
+                "B07011_005E": "52980",
+                "B07011_006E": "38750",
                 "B23025_001E": "16000000",
                 "B23025_003E": "10000000",
                 "B23025_005E": "500000",
@@ -643,6 +649,12 @@ class TestIngestWritesParquet:
         assert row["median_year_structure_built"] == 1960
         assert row["units_in_structure_50_plus"] == 150000
         assert float(row["average_household_size_total"]) == pytest.approx(2.61)
+        assert row["median_income_mobility_total"] == 45210
+        assert row["median_income_same_house_1_year_ago"] == 47400
+        assert row["median_income_moved_within_county"] == 41125
+        assert row["median_income_moved_diff_county_same_state"] == 43890
+        assert row["median_income_moved_diff_state"] == 52980
+        assert row["median_income_moved_from_abroad"] == 38750
 
     def test_early_rent_top_bins_are_preserved(self, httpx_mock, tmp_path):
         cbsas = [

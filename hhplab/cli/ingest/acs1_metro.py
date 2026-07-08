@@ -23,6 +23,7 @@ def _acs1_command_help(*, geography: str) -> str:
             "unemployed_count",
             "median_gross_rent",
             "median_contract_rent",
+            "median_income_moved_diff_state",
             "gross_rent_distribution_total",
             "contract_rent_distribution_total",
             "gross_rent_pct_income_total",

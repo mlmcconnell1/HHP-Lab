@@ -58,6 +58,21 @@ ACS1_TABLE_COLUMN_NAMES: dict[str, dict[str, str]] = {
             "mobility_moved_from_abroad_renter",
         ],
     ),
+    # Median Income in the Past 12 Months by Geographical Mobility in the
+    # Past Year for Current Residence in the United States. Universe:
+    # population 15 years and over in the United States with income. Cell order
+    # verified against api.census.gov/data/2023/acs/acs1/groups/B07011.json.
+    "B07011": _dense_estimate_map(
+        "B07011",
+        [
+            "median_income_mobility_total",
+            "median_income_same_house_1_year_ago",
+            "median_income_moved_within_county",
+            "median_income_moved_diff_county_same_state",
+            "median_income_moved_diff_state",
+            "median_income_moved_from_abroad",
+        ],
+    ),
     "B19001": _dense_estimate_map(
         "B19001",
         [
