@@ -4,12 +4,15 @@
 
 The three household-composition screens do not support a positive
 composition-driven explanation for rent growth independent of population
-growth. Renter tenure share is negatively associated with rent growth in the
-pooled FD screen and null for unsheltered-rate growth; renter household size
-is null; and recent-mover income ratios are null. The compositional channels
-tested here therefore do not explain the earlier finding that population
-growth and rent growth are nearly orthogonal across the pooled top-150 MSA
-design.
+growth. Renter tenure share is negatively associated with rent growth under
+plain year FE, but that result does not survive a state x year FE check
+(see addendum below) and is null for unsheltered-rate growth either way;
+renter household size is null; and recent-mover income ratios are null. None
+of the three compositional channels tested here explain the earlier finding
+that population growth and rent growth are nearly orthogonal across the
+pooled top-150 MSA design -- whatever is driving rent up independent of
+headcount, it is not simply "more renters," "smaller/larger renter
+households," or "richer people moving in."
 
 ## Renter Household Share (ACS5 B25003)
 
@@ -69,6 +72,22 @@ are imprecise and null. This rejects the simple tenure-mix channel: MSAs do
 not appear to experience higher rent growth because a larger share of their
 households are renters, after controlling for population growth and year
 effects.
+
+**2026-07-08 addendum: the one significant result here (`d_renter_household_share`
+on rent, p=0.026) does not survive a state x year FE check.** Following the
+same state-level-confound audit already applied to several other findings
+this project has made (see `devdocs/state_level_robustness_rechecks.md` and
+the Vera jail work), re-ran this spec with `primary_state x year` fixed
+effects instead of plain year FE, on the identical n=1096 sample (137 MSAs,
+29 of 43 states with 2+ MSAs -- well-identified). The coefficient shrinks by
+more than half (-0.401 -> -0.177) and loses significance entirely
+(p=0.026 -> 0.415). This is now the **third** time in this project's record
+that a plain-entity+year-FE result evaporates under state x year FE (after
+the jail-vs-unsheltered flip and the migration-churn non-replication) --
+strong enough repetition to treat state x year FE as a standard, not
+optional, check for this class of MSA panel, not a check that only
+sometimes matters. Net effect: renter tenure share does not survive as an
+independent predictor of rent growth under any specification tested.
 
 ## Renter Household Size (ACS1 B25010)
 
