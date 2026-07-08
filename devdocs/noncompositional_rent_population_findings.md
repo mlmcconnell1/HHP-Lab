@@ -26,14 +26,13 @@ Generated, ignored artifacts:
   pre-sample permit scarcity from the Census Building Permits Survey.
 - A true short-term-rental source is not registered. The plausible free ACS
   fallback, B25004 vacancy status with the seasonal/recreational/occasional
-  category, now has registry support from this change, but the current
-  curated ACS1/ACS5 MSA artifacts used by this run predate that support and
-  must be reingested before claiming a direct STR/vacation-home test.
-- ACS work-from-home commute table B08301 now has registry support from this
-  change, but the current curated ACS1 artifacts used by this run predate
-  that support. The available fallback here is ACS1 B25068 bedroom mix among
-  gross-rent units, used as a weak proxy for demand for more rental space
-  rather than a direct remote-work measure.
+  category, is now included in the refreshed ACS1 metro artifacts and is
+  tested below as a vacation-home/STR-adjacent proxy.
+- ACS work-from-home commute table B08301 now has registry support and is
+  available in the refreshed ACS1 metro artifacts, but this screen has not
+  yet wired that direct measure into the models. The available fallback here
+  is ACS1 B25068 bedroom mix among gross-rent units, used as a weak proxy for
+  demand for more rental space rather than a direct remote-work measure.
 
 ## Coverage
 
@@ -43,6 +42,7 @@ Generated, ignored artifacts:
 - Analysis years: 2010-2020 and 2022-2025
 - ACS1 vintages used for bedroom-mix proxy: 2009-2019 and 2021-2024
 - Complete supply-constraint FD rows: 1,096
+- Complete short-term-rental proxy FD rows: 1,070
 - Complete space-demand-proxy FD rows: 1,074
 
 Median level bedroom mix among ACS1 gross-rent units:
@@ -51,6 +51,12 @@ Median level bedroom mix among ACS1 gross-rent units:
 | --- | ---: |
 | 2+ bedroom share | 0.717 |
 | 3+ bedroom share | 0.325 |
+
+Median level ACS1 B25004 seasonal/recreational/occasional vacancy share:
+
+| Measure | Median |
+| --- | ---: |
+| Seasonal/recreational vacancy share | 0.151 |
 
 ## Housing Supply Constraints
 
@@ -74,13 +80,36 @@ therefore more consistent with a supply-constraint level channel -- persistent
 rent pressure in constrained places independent of headcount changes -- than
 with a sharply different population/rent elasticity by constraint level.
 
+## Short-Term/Vacation-Rental Proxy
+
+No commercial STR-platform source is registered in the project. The free proxy
+tested here is the ACS1 B25004 share of vacant housing units marked for
+seasonal, recreational, or occasional use. This is not a direct Airbnb/VRBO
+measure, but it is the closest currently supported public proxy for housing
+stock being held outside regular long-term occupancy.
+
+The pooled top-150 first-difference model asks whether growth in that share
+predicts rent growth net of population growth and common year shocks, with
+MSA-clustered standard errors:
+
+| Model term | Estimate | SE | p-value | N |
+| --- | ---: | ---: | ---: | ---: |
+| `d_seasonal_recreational_vacancy_share` | 0.0305 | 0.0140 | 0.029 | 1,070 |
+
+Interpretation: metros with rising seasonal/recreational/occasional vacancy
+share have higher ZORI rent growth net of population growth in this screen.
+The magnitude is moderate because the proxy is a share change, but the sign
+matches the proposed mechanism: more stock held for seasonal or occasional use
+is associated with rent growth not explained by registered population growth.
+This should be treated as proxy evidence, not as a direct STR-platform result.
+
 ## Space-Demand Proxy
 
-ACS work-from-home commute table B08301 is now registered, but existing
-curated ACS1 artifacts need reingest before it can be tested directly. This
-screen therefore uses ACS1 B25068 bedroom mix among gross-rent units as the
-currently available fallback proxy for rental space demand. Models use
-MSA-clustered standard errors and year fixed effects:
+ACS work-from-home commute table B08301 is now registered and present in the
+refreshed ACS1 metro artifacts, but this screen has not yet wired it into the
+model set. This screen therefore uses ACS1 B25068 bedroom mix among gross-rent
+units as the currently available fallback proxy for rental space demand.
+Models use MSA-clustered standard errors and year fixed effects:
 
 | Model | Proxy term | Estimate | SE | p-value | N |
 | --- | --- | ---: | ---: | ---: | ---: |
@@ -98,20 +127,17 @@ with higher rent growth, so it is not evidence for the proposed rent channel.
 
 ## Interpretation
 
-Among the non-compositional candidates that can be tested with current
-curated data, supply constraints are the only one that materially improves
-the story: constrained MSAs have higher rent growth even after controlling
-for population growth. This directly weakens the idea that population changes
-alone should explain rent changes, but it does not prove that constrained and
-unconstrained metros have statistically different population/rent slopes.
+Among the non-compositional candidates tested here, supply constraints remain
+the strongest mechanism: constrained MSAs have higher rent growth even after
+controlling for population growth. The refreshed ACS1 B25004
+seasonal/recreational vacancy proxy now also supports the vacation-home/STR
+channel directionally and statistically in the pooled FD design. Together
+these results directly weaken the idea that population changes alone should
+explain rent changes.
 
-The current artifacts cannot complete a real short-term-rental/vacation-home
-test yet: commercial STR data are not registered, and the curated ACS1/ACS5
-artifacts need reingest to include newly supported ACS B25004
-seasonal/recreational vacancy status. The current artifacts also cannot test
-remote-work share directly until ACS1 is reingested with newly supported
-B08301. The B25068 bedroom-mix fallback is negative/null for rent growth, so
-it should not be treated as confirming a space-demand channel.
+The current script still cannot test remote-work share directly until B08301
+is wired into the screen. The B25068 bedroom-mix fallback is negative/null for
+rent growth, so it should not be treated as confirming a space-demand channel.
 
 ## 2026-07-08 Code Review Addendum
 
@@ -167,9 +193,9 @@ only cover the pure-function helpers (`add_space_demand_columns`,
 broadcast merge of the static supply exposure) is untested. Filed as
 `coclab-noncompositional-rent-population-epic-t6lo8.5` (P3).
 
-**STR (bead .2) and remote-work (bead .3) mechanisms remain untested against
-their actual target measures**, not just against fallback proxies -- both
-beads were closed with the registry-prep work done but the real analysis
-still blocked on a reingest step. Reopened both rather than filing new
-beads, since their stated goal (does this mechanism explain rent growth)
-has not yet been answered.
+**STR (bead .2) was subsequently completed after reingesting the ACS1 metro
+artifacts with B25004**: the seasonal/recreational/occasional vacancy-share
+proxy is now loaded into the non-compositional panel and tested directly
+against rent growth net of population growth. **Remote-work (bead .3) remains
+untested against its actual target measure** until B08301 or another direct
+work-from-home/space-demand proxy is wired into the screen.

@@ -5,11 +5,9 @@ the composition work. They cover mechanisms that can move rents without a
 matching headcount increase:
 
 * housing supply constraints interacting with population growth
+* ACS1 seasonal/recreational/occasional vacancy share as a free proxy for
+  short-term-rental or vacation-home conversion out of long-term stock
 * ACS1 bedroom-mix shifts as an available proxy for non-headcount space demand
-
-The short-term/vacation-rental candidate needs ACS B25004 or commercial STR
-data. Neither is currently registered in the package, so this script records
-that as discovery evidence instead of doing an unsupported one-off fetch.
 """
 
 from __future__ import annotations
@@ -41,6 +39,9 @@ SPACE_DEMAND_COLUMNS = [
 SPACE_DEMAND_SHARE_COLUMNS = [
     "gross_rent_2plus_bedroom_share",
     "gross_rent_3plus_bedroom_share",
+]
+STR_PROXY_COLUMNS = [
+    "seasonal_recreational_vacancy_share",
 ]
 SUPPLY_COLUMNS = [
     "supply_constraint_bps",
@@ -74,12 +75,23 @@ def load_acs1_space_demand_panel(acs1_glob: str = ACS1_METRO_GLOB) -> pd.DataFra
                 "metro_id",
                 "acs1_vintage",
                 *SPACE_DEMAND_COLUMNS,
+                *STR_PROXY_COLUMNS,
             ],
         )
         frame["msa_id"] = _as_msa_id(frame["metro_id"])
         frame["acs1_vintage_used"] = vintage
         frame["year"] = vintage + 1
-        frames.append(frame[["msa_id", "year", "acs1_vintage_used", *SPACE_DEMAND_COLUMNS]])
+        frames.append(
+            frame[
+                [
+                    "msa_id",
+                    "year",
+                    "acs1_vintage_used",
+                    *SPACE_DEMAND_COLUMNS,
+                    *STR_PROXY_COLUMNS,
+                ]
+            ]
+        )
 
     return pd.concat(frames, ignore_index=True)
 
@@ -107,6 +119,8 @@ def add_first_differences(levels: pd.DataFrame) -> pd.DataFrame:
     levels["d_log_pop"] = grouped["log_pop"].diff()
     for column in SPACE_DEMAND_SHARE_COLUMNS:
         levels[f"d_{column}"] = grouped[column].diff()
+    for column in STR_PROXY_COLUMNS:
+        levels[f"d_{column}"] = grouped[column].diff()
     for column in SUPPLY_COLUMNS:
         levels[f"d_log_pop_x_{column}"] = levels["d_log_pop"] * levels[column]
     return levels
@@ -133,6 +147,13 @@ def _model_specs() -> Iterable[ModelSpec]:
             outcome="d_log_zori",
             predictors=("d_log_pop", column, f"d_log_pop_x_{column}"),
             family="supply_constraint",
+        )
+    for column in STR_PROXY_COLUMNS:
+        yield ModelSpec(
+            name=f"rent_fd_{column}",
+            outcome="d_log_zori",
+            predictors=("d_log_pop", f"d_{column}"),
+            family="short_term_rental_proxy",
         )
     for column in SPACE_DEMAND_SHARE_COLUMNS:
         diff_column = f"d_{column}"
@@ -203,8 +224,21 @@ def summarize_panel(levels: pd.DataFrame, fd: pd.DataFrame) -> dict[str, object]
             "d_gross_rent_2plus_bedroom_share",
         ]
     )
+    str_complete = fd.dropna(
+        subset=[
+            "d_log_zori",
+            "d_log_pop",
+            "d_seasonal_recreational_vacancy_share",
+        ]
+    )
     space_summary = (
         levels[SPACE_DEMAND_SHARE_COLUMNS]
+        .agg(["mean", "median", "count"])
+        .transpose()
+        .round({"mean": 6, "median": 6})
+    )
+    str_summary = (
+        levels[STR_PROXY_COLUMNS]
         .agg(["mean", "median", "count"])
         .transpose()
         .round({"mean": 6, "median": 6})
@@ -216,6 +250,7 @@ def summarize_panel(levels: pd.DataFrame, fd: pd.DataFrame) -> dict[str, object]
                 "d_log_unshelt_rate",
                 "d_log_pop",
                 *[f"d_{column}" for column in SPACE_DEMAND_SHARE_COLUMNS],
+                *[f"d_{column}" for column in STR_PROXY_COLUMNS],
             ]
         ]
         .corr()
@@ -230,14 +265,22 @@ def summarize_panel(levels: pd.DataFrame, fd: pd.DataFrame) -> dict[str, object]
             int(vintage) for vintage in sorted(levels["acs1_vintage_used"].dropna().unique())
         ],
         "complete_fd_rows_for_supply_constraint": int(len(supply_complete)),
+        "complete_fd_rows_for_short_term_rental_proxy": int(len(str_complete)),
         "complete_fd_rows_for_space_demand_proxy": int(len(space_complete)),
+        "short_term_rental_proxy_level_summary": json.loads(str_summary.to_json()),
         "space_demand_level_summary": json.loads(space_summary.to_json()),
         "levels_missing_supply": {
             column: int(levels[column].isna().sum()) for column in SUPPLY_COLUMNS
         },
+        "levels_missing_short_term_rental_proxy": {
+            column: int(levels[column].isna().sum()) for column in STR_PROXY_COLUMNS
+        },
         "levels_missing_space_demand": {
             column: int(levels[column].isna().sum())
             for column in [*SPACE_DEMAND_COLUMNS, *SPACE_DEMAND_SHARE_COLUMNS]
+        },
+        "fd_missing_short_term_rental_proxy_diff": {
+            f"d_{column}": int(fd[f"d_{column}"].isna().sum()) for column in STR_PROXY_COLUMNS
         },
         "fd_missing_space_demand_diff": {
             f"d_{column}": int(fd[f"d_{column}"].isna().sum())
@@ -246,18 +289,16 @@ def summarize_panel(levels: pd.DataFrame, fd: pd.DataFrame) -> dict[str, object]
         "fd_correlations": json.loads(correlations.to_json()),
         "measure_discovery": {
             "short_term_rental_proxy": {
-                "status": "registry_supported_reingest_required",
+                "status": "tested_with_acs1_b25004_proxy",
                 "registry_tables": ["B25004"],
                 "note": (
-                    "ACS vacancy-status seasonal/recreational/occasional-use "
-                    "counts now have registry support, but the current curated "
-                    "ACS1 and ACS5 MSA artifacts used by this screen were built "
-                    "before that support and must be reingested before a direct "
-                    "STR/vacation-home proxy test."
+                    "No commercial STR-platform source is registered. This run "
+                    "uses ACS1 B25004 seasonal/recreational/occasional-use "
+                    "vacancy share as the free vacation-home/STR-adjacent proxy."
                 ),
             },
             "remote_work_proxy": {
-                "status": "registry_supported_reingest_required",
+                "status": "registry_supported_not_wired",
                 "registry_tables": ["B08301"],
                 "fallback_used_in_current_artifacts": "ACS1 B25068 gross-rent bedroom mix",
             },
