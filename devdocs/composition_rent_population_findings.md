@@ -20,7 +20,7 @@ independent of headcount, it is not simply "more renters,"
 Generated with:
 
 ```bash
-uv run python scripts/build_renter_household_share_composition_panel.py
+uv run hhplab build result renter-household-share-composition --json
 ```
 
 This screen uses the pooled top-50 plus rank-51-150 MSA first-difference
@@ -97,7 +97,7 @@ negative pooled levels association.
 Generated with:
 
 ```bash
-uv run python scripts/build_household_size_composition_panel.py
+uv run hhplab build result household-size-composition --json
 ```
 
 This screen uses the pooled top-50 plus rank-51-150 MSA first-difference
@@ -144,7 +144,7 @@ growth is flat or falling.
 Generated with:
 
 ```bash
-uv run python scripts/build_recent_mover_income_composition_panel.py
+uv run hhplab build result recent-mover-income-composition --json
 ```
 
 B07011 reports median income by mobility origin, but not a single all-movers
@@ -223,7 +223,7 @@ Two completeness gaps found, neither of which changes any conclusion:
    elsewhere in this project:
 
    ```bash
-   uv run python scripts/analyze_composition_rent_population_robustness.py
+   uv run hhplab build result composition-rent-population-robustness --json
    ```
 
    The tracked pooled-MSA levels-FE check on the current

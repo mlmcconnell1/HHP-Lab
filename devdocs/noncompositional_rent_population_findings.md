@@ -3,8 +3,7 @@
 Generated with:
 
 ```bash
-uv run python scripts/build_noncompositional_rent_population_panel.py
-uv run python scripts/analyze_noncompositional_rent_population_robustness.py
+uv run hhplab build result noncompositional-rent-population --json
 ```
 
 This screen follows the pooled top-50 plus rank-51-150 MSA first-difference

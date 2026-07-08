@@ -11,12 +11,14 @@ from hhplab.cli.build_cmds.recipe import (
     recipe_preflight_cmd,
     recipe_provenance_cmd,
 )
+from hhplab.cli.build_cmds.results import build_result_cmd
 from hhplab.cli.build_cmds.urban_fraction import build_urban_fraction
 
 
 def register_commands(app: typer.Typer) -> None:
     """Register build commands."""
     app.command("recipe")(recipe_cmd)
+    app.command("result")(build_result_cmd)
     app.command("urban-fraction")(build_urban_fraction)
     app.command("prism-county")(build_prism_county)
     app.command("medsl-president-county")(build_medsl_president_county)
