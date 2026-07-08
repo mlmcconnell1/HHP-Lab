@@ -23,14 +23,14 @@ Bridgeport-Stamford-Norwalk, and New Haven MSAs will have zero Vera coverage.
 from __future__ import annotations
 
 import glob
-from pathlib import Path
 
 import numpy as np
 import pandas as pd
 
 from hhplab.msa import read_msa_county_membership
+from hhplab.results.workflows._paths import REPO_ROOT
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = REPO_ROOT
 OUT = ROOT / "outputs" / "vera_hic_pit"
 HIC_BY_CATEGORY_DIR = ROOT / "outputs" / "overdose_lag" / "hic_by_category"
 

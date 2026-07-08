@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 from unittest.mock import patch
 
+import pandas as pd
 from typer.testing import CliRunner
 
 from hhplab.cli.main import app
@@ -59,3 +60,24 @@ def test_build_result_unknown_workflow_json_is_actionable() -> None:
     assert "Unknown result workflow" in payload["error"]
     assert "all-documented-results" in payload["available_workflows"]
     assert "composition-rent-population" in payload["available_workflows"]
+
+
+def test_build_result_supply_iv_ignores_outer_cli_args() -> None:
+    with (
+        patch(
+            "hhplab.results.workflows.build_supply_iv_panel.build_supply_iv_panel",
+            return_value=(pd.DataFrame([{"row": 1}]), pd.DataFrame([{"row": 2}]), {}),
+        ) as build_panel,
+        patch(
+            "hhplab.results.workflows.build_supply_iv_panel.build_top150_outputs"
+        ) as build_top150,
+    ):
+        result = runner.invoke(app, ["build", "result", "supply-iv", "--json"])
+
+    assert result.exit_code == 0, result.output
+    payload = json.loads(result.output)
+    assert payload["status"] == "ok"
+    assert payload["workflow"] == "supply-iv"
+    assert payload["steps"][0]["module"] == "hhplab.results.workflows.build_supply_iv_panel"
+    build_panel.assert_called_once()
+    build_top150.assert_called_once_with()

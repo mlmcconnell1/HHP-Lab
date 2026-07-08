@@ -12,11 +12,12 @@ for PIT year E+1. Built via `data/curated/measures/measures__msa__A*.parquet`
 from __future__ import annotations
 
 import glob
-from pathlib import Path
 
 import pandas as pd
 
-ROOT = Path(__file__).resolve().parents[1]
+from hhplab.results.workflows._paths import REPO_ROOT
+
+ROOT = REPO_ROOT
 OUT = ROOT / "outputs" / "poverty_longitudinal"
 
 TOP50_PANEL = ROOT / "outputs" / "top50_msa_longitudinal_2010_2025.parquet"

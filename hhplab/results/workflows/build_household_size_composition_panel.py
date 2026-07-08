@@ -17,7 +17,9 @@ from pathlib import Path
 import pandas as pd
 import statsmodels.api as sm
 
-ROOT = Path(__file__).resolve().parents[1]
+from hhplab.results.workflows._paths import REPO_ROOT
+
+ROOT = REPO_ROOT
 OUT = ROOT / "outputs" / "composition_rent_population"
 
 TOP50_PANEL = ROOT / "outputs" / "top50_msa_longitudinal_2010_2025.parquet"

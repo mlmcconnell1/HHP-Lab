@@ -9,8 +9,9 @@ import pandas as pd
 import pyarrow.parquet as pq
 
 from hhplab.provenance import ProvenanceBlock, write_parquet_with_provenance
+from hhplab.results.workflows._paths import REPO_ROOT
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = REPO_ROOT
 OUTPUT_DIR = ROOT / "outputs" / "top50_msa_nonpr_coc_pit_contract_rent_2010_2020"
 
 YEARS = (2010, 2020)

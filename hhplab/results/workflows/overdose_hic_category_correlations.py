@@ -11,13 +11,13 @@ more of both). Run after build_overdose_lag_panel.py.
 
 from __future__ import annotations
 
-from pathlib import Path
-
 import numpy as np
 import pandas as pd
 from scipy import stats
 
-ROOT = Path(__file__).resolve().parents[1]
+from hhplab.results.workflows._paths import REPO_ROOT
+
+ROOT = REPO_ROOT
 LEVELS_PANEL = ROOT / "outputs" / "overdose_lag" / "overdose_lag_levels.parquet"
 
 CATEGORIES = ("es", "th", "sh", "rrh", "psh", "oph", "total_beds")

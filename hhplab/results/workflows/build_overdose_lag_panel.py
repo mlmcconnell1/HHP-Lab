@@ -12,12 +12,12 @@ outlier year).
 
 from __future__ import annotations
 
-from pathlib import Path
-
 import numpy as np
 import pandas as pd
 
-ROOT = Path(__file__).resolve().parents[1]
+from hhplab.results.workflows._paths import REPO_ROOT
+
+ROOT = REPO_ROOT
 OUT = ROOT / "outputs" / "overdose_lag"
 
 TOP50_PANEL = ROOT / "outputs" / "top50_msa_longitudinal_2010_2025.parquet"

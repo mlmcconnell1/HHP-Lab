@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import sys
 from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
@@ -16,7 +17,9 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-ROOT = Path(__file__).resolve().parents[1]
+from hhplab.results.workflows._paths import REPO_ROOT
+
+ROOT = REPO_ROOT
 OUT = ROOT / "outputs" / "supply_iv"
 
 TOP50_BASE_PANEL = ROOT / "outputs" / "top50_msa_longitudinal_2015_2025.parquet"
@@ -422,7 +425,7 @@ def main(argv: list[str] | None = None) -> None:
         default="all",
         help="MSA cohort to build. Default builds both tracked supply-IV cohorts.",
     )
-    args = parser.parse_args(argv)
+    args = parser.parse_args([] if argv is None else argv)
 
     if args.msa_count in {"50", "all"}:
         fd, longdiff, _manifest = build_supply_iv_panel(TOP50_SPEC)
@@ -433,4 +436,4 @@ def main(argv: list[str] | None = None) -> None:
 
 
 if __name__ == "__main__":
-    main()
+    main(sys.argv[1:])
