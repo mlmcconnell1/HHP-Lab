@@ -46,3 +46,60 @@ point estimate for renter household size is close to zero in the rent model
 and negative but imprecise in the unsheltered model. This does not support the
 household-size channel as an explanation for rent increases when population
 growth is flat or falling.
+
+## Recent-Mover Income (ACS1 B07011)
+
+Generated with:
+
+```bash
+uv run python scripts/build_recent_mover_income_composition_panel.py
+```
+
+B07011 reports median income by mobility origin, but not a single all-movers
+median. This screen therefore keeps origin-specific ratios explicit. The main
+gentrification-pressure proxy is:
+
+```text
+median_income_moved_diff_state / median_income_mobility_total
+```
+
+Generated, ignored artifacts:
+
+- `outputs/composition_rent_population/recent_mover_income_composition_levels.parquet`
+- `outputs/composition_rent_population/recent_mover_income_composition_fd.parquet`
+- `outputs/composition_rent_population/recent_mover_income_composition_fd_regressions.parquet`
+- `outputs/composition_rent_population/recent_mover_income_composition_fd_regressions.csv`
+- `outputs/composition_rent_population/recent_mover_income_composition_summary.json`
+
+Coverage:
+
+- Levels rows: 1,750
+- First-difference rows with 1-year gaps: 1,450
+- MSAs: 150
+- Complete different-state mover-income-ratio FD rows: 1,078
+
+Median level ratios to total ACS1 mobility-universe median income:
+
+| Mobility origin | Median ratio |
+| --- | ---: |
+| Moved within county | 0.859 |
+| Moved from different county, same state | 0.817 |
+| Moved from different state | 0.880 |
+| Moved from abroad | 0.616 |
+
+Key FD models:
+
+| Model | Composition term | Estimate | SE | p-value | N |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| `d_log_zori ~ d_log_pop + composition + year FE` | `d_moved_diff_state_income_ratio_total` | 0.0001 | 0.0026 | 0.984 | 1,084 |
+| `d_log_unshelt_rate ~ d_log_zori + d_log_pop + composition + year FE` | `d_moved_diff_state_income_ratio_total` | -0.0207 | 0.0561 | 0.712 | 1,078 |
+| `d_log_zori ~ d_log_pop + composition + year FE` | `d_moved_diff_county_same_state_income_ratio_total` | 0.0045 | 0.0032 | 0.153 | 1,084 |
+| `d_log_unshelt_rate ~ d_log_zori + d_log_pop + composition + year FE` | `d_moved_diff_county_same_state_income_ratio_total` | -0.0688 | 0.0646 | 0.286 | 1,078 |
+
+Interpretation: B07011 does not support the "incoming residents richer than
+standing population" channel in this pooled FD design. Different-state movers
+have a median income ratio below 1 in levels, and changes in that ratio do not
+independently predict rent growth or unsheltered-rate growth. This is broadly
+consistent with the earlier IRS SOI screen's low mover-income signal
+(approximately 0.73x), while using a different income concept: Census
+individual median income by mobility origin rather than IRS AGI per return.
