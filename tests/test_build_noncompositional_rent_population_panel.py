@@ -139,3 +139,63 @@ def test_load_acs1_space_demand_panel_includes_str_proxy_lag(
     assert result.loc[0, "acs1_vintage_used"] == 2019
     assert result.loc[0, "seasonal_recreational_vacancy_share"] == pytest.approx(0.125)
     assert result.loc[0, "work_from_home_share"] == pytest.approx(0.085)
+
+
+def test_build_levels_panel_broadcasts_static_supply_and_preserves_missing(
+    monkeypatch,
+) -> None:
+    builder = _load_builder()
+    base = pd.DataFrame(
+        {
+            "msa_id": ["10000", "10000", "20000", "20000"],
+            "msa_name": ["Alpha, AA", "Alpha, AA", "Beta, BB", "Beta, BB"],
+            "year": [2019, 2020, 2019, 2020],
+            "log_zori": [1.0, 1.1, 2.0, 2.2],
+            "log_unshelt_rate": [0.1, 0.2, 0.3, 0.5],
+            "log_pop": [10.0, 10.1, 11.0, 11.1],
+        }
+    )
+    supply = pd.DataFrame(
+        {
+            "msa_id": ["10000"],
+            "supply_constraint_bps": [1.5],
+            "supply_constraint_bps_long": [2.5],
+        }
+    )
+    acs1 = pd.DataFrame(
+        {
+            "msa_id": ["10000", "20000"],
+            "year": [2020, 2020],
+            "acs1_vintage_used": [2019, 2019],
+            "gross_rent_bedrooms_total": [100, 80],
+            "gross_rent_1_bedroom_total": [40, 30],
+            "gross_rent_2_bedrooms_total": [35, 30],
+            "gross_rent_3plus_bedrooms_total": [25, 20],
+            "seasonal_recreational_vacancy_share": [0.12, 0.04],
+            "work_from_home_share": [0.08, 0.05],
+        }
+    )
+
+    def fake_build_bps_exposures(cohort, paths, include_long_bps):
+        assert include_long_bps is True
+        assert sorted(cohort["msa_id"].tolist()) == ["10000", "20000"]
+        return supply
+
+    monkeypatch.setattr(builder, "load_pooled_base_panel", lambda: base)
+    monkeypatch.setattr(builder, "build_bps_exposures", fake_build_bps_exposures)
+    monkeypatch.setattr(builder, "load_acs1_space_demand_panel", lambda: acs1)
+
+    result = builder.build_levels_panel().sort_values(["msa_id", "year"]).reset_index(drop=True)
+    alpha = result[result["msa_id"].eq("10000")].set_index("year")
+    beta = result[result["msa_id"].eq("20000")].set_index("year")
+
+    assert alpha.loc[2019, "supply_constraint_bps"] == pytest.approx(1.5)
+    assert alpha.loc[2020, "supply_constraint_bps"] == pytest.approx(1.5)
+    assert alpha.loc[2020, "supply_constraint_bps_long"] == pytest.approx(2.5)
+    assert pd.isna(beta.loc[2019, "supply_constraint_bps"])
+    assert pd.isna(beta.loc[2020, "supply_constraint_bps_long"])
+    assert alpha.loc[2020, "gross_rent_2plus_bedroom_share"] == pytest.approx(0.60)
+    assert beta.loc[2020, "gross_rent_3plus_bedroom_share"] == pytest.approx(0.25)
+    assert pd.isna(alpha.loc[2019, "gross_rent_bedrooms_total"])
+    assert alpha.loc[2020, "year_gap"] == 1
+    assert alpha.loc[2020, "d_log_pop_x_supply_constraint_bps"] == pytest.approx(0.15)
