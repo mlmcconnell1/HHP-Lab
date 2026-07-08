@@ -2,15 +2,13 @@
 
 from __future__ import annotations
 
-import importlib.util
+import importlib
 import json
-import sys
 from pathlib import Path
 
 import numpy as np
 import pandas as pd
 
-SCRIPT_PATH = Path(__file__).resolve().parents[1] / "scripts" / "build_supply_iv_panel.py"
 YEARS = (2015, 2016, 2017, 2018, 2019, 2020, 2022, 2023, 2024, 2025)
 MSAS = (
     ("10000", "Alpha, AA", 0),
@@ -20,13 +18,7 @@ MSAS = (
 
 
 def _load_builder():
-    spec = importlib.util.spec_from_file_location("build_supply_iv_panel", SCRIPT_PATH)
-    assert spec is not None
-    module = importlib.util.module_from_spec(spec)
-    assert spec.loader is not None
-    sys.modules[spec.name] = module
-    spec.loader.exec_module(module)
-    return module
+    return importlib.import_module("hhplab.results.workflows.build_supply_iv_panel")
 
 
 def _write_base_panel(path: Path) -> None:

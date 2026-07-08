@@ -2,26 +2,14 @@
 
 from __future__ import annotations
 
-import importlib.util
-import sys
-from pathlib import Path
+import importlib
 
 import pandas as pd
 import pytest
 
-SCRIPTS_DIR = Path(__file__).resolve().parents[1] / "scripts"
-
 
 def _load_script(name: str):
-    if str(SCRIPTS_DIR) not in sys.path:
-        sys.path.insert(0, str(SCRIPTS_DIR))
-    spec = importlib.util.spec_from_file_location(name, SCRIPTS_DIR / f"{name}.py")
-    assert spec is not None
-    module = importlib.util.module_from_spec(spec)
-    assert spec.loader is not None
-    sys.modules[spec.name] = module
-    spec.loader.exec_module(module)
-    return module
+    return importlib.import_module(f"hhplab.results.workflows.{name}")
 
 
 def _fd_fixture() -> pd.DataFrame:

@@ -15,11 +15,18 @@ runner = CliRunner()
 def test_build_result_composition_workflow_json() -> None:
     calls: list[str] = []
 
-    def fake_run_script(script_name: str) -> dict[str, object]:
-        calls.append(script_name)
-        return {"script": f"scripts/{script_name}", "stdout": [f"ran {script_name}"]}
+    def fake_run_workflow_module(module_name: str) -> dict[str, object]:
+        calls.append(module_name)
+        return {
+            "script": f"scripts/{module_name}.py",
+            "module": f"hhplab.results.workflows.{module_name}",
+            "stdout": [f"ran {module_name}"],
+        }
 
-    with patch("hhplab.cli.build_cmds.results._run_script", side_effect=fake_run_script):
+    with patch(
+        "hhplab.cli.build_cmds.results._run_workflow_module",
+        side_effect=fake_run_workflow_module,
+    ):
         result = runner.invoke(
             app,
             ["build", "result", "composition-rent-population", "--json"],
@@ -30,13 +37,16 @@ def test_build_result_composition_workflow_json() -> None:
     assert payload["status"] == "ok"
     assert payload["workflow"] == "composition-rent-population"
     assert calls == [
-        "build_renter_household_share_composition_panel.py",
-        "build_household_size_composition_panel.py",
-        "build_recent_mover_income_composition_panel.py",
-        "analyze_composition_rent_population_robustness.py",
+        "build_renter_household_share_composition_panel",
+        "build_household_size_composition_panel",
+        "build_recent_mover_income_composition_panel",
+        "analyze_composition_rent_population_robustness",
     ]
     assert [step["script"] for step in payload["steps"]] == [
-        f"scripts/{script_name}" for script_name in calls
+        f"scripts/{module_name}.py" for module_name in calls
+    ]
+    assert [step["module"] for step in payload["steps"]] == [
+        f"hhplab.results.workflows.{module_name}" for module_name in calls
     ]
 
 

@@ -2,34 +2,16 @@
 
 from __future__ import annotations
 
-import importlib.util
-import sys
-from pathlib import Path
+import importlib
 
 import pandas as pd
 import pytest
 
-SCRIPT_PATH = (
-    Path(__file__).resolve().parents[1]
-    / "scripts"
-    / "build_noncompositional_rent_population_panel.py"
-)
-SCRIPTS_DIR = SCRIPT_PATH.parent
-
 
 def _load_builder():
-    if str(SCRIPTS_DIR) not in sys.path:
-        sys.path.insert(0, str(SCRIPTS_DIR))
-    spec = importlib.util.spec_from_file_location(
-        "build_noncompositional_rent_population_panel",
-        SCRIPT_PATH,
+    return importlib.import_module(
+        "hhplab.results.workflows.build_noncompositional_rent_population_panel"
     )
-    assert spec is not None
-    module = importlib.util.module_from_spec(spec)
-    assert spec.loader is not None
-    sys.modules[spec.name] = module
-    spec.loader.exec_module(module)
-    return module
 
 
 def test_add_space_demand_columns_derives_named_shares() -> None:

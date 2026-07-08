@@ -3,154 +3,151 @@
 from __future__ import annotations
 
 import contextlib
+import importlib
 import io
 import json
-import runpy
-import sys
 from dataclasses import dataclass
-from pathlib import Path
 from typing import Annotated
 
 import typer
 
-REPO_ROOT = Path(__file__).resolve().parents[3]
-SCRIPTS_DIR = REPO_ROOT / "scripts"
+WORKFLOW_MODULE_PREFIX = "hhplab.results.workflows"
 
 
 @dataclass(frozen=True)
 class ResultWorkflow:
     name: str
     description: str
-    scripts: tuple[str, ...]
+    modules: tuple[str, ...]
 
 
 RESULT_WORKFLOWS: dict[str, ResultWorkflow] = {
     "top50-msa-coc-pit-contract-rent-2010-2020": ResultWorkflow(
         name="top50-msa-coc-pit-contract-rent-2010-2020",
         description="Generate the top-50 MSA/CoC PIT contract-rent 2010-2020 panel.",
-        scripts=("generate_top50_msa_coc_pit_contract_rent_2010_2020.py",),
+        modules=("generate_top50_msa_coc_pit_contract_rent_2010_2020",),
     ),
     "poverty-longitudinal": ResultWorkflow(
         name="poverty-longitudinal",
         description="Build the pooled MSA poverty longitudinal panel.",
-        scripts=("build_poverty_longitudinal_panel.py",),
+        modules=("build_poverty_longitudinal_panel",),
     ),
     "irs-migration-pooled": ResultWorkflow(
         name="irs-migration-pooled",
         description="Build the pooled MSA IRS migration panel.",
-        scripts=("build_irs_migration_pooled_panel.py",),
+        modules=("build_irs_migration_pooled_panel",),
     ),
     "supply-iv": ResultWorkflow(
         name="supply-iv",
         description="Build the housing-supply IV analysis panel with default inputs.",
-        scripts=("build_supply_iv_panel.py",),
+        modules=("build_supply_iv_panel",),
     ),
     "vera-hic-pit-panel": ResultWorkflow(
         name="vera-hic-pit-panel",
         description="Build the pooled Vera/HIC/PIT panel.",
-        scripts=("build_vera_hic_pit_panel.py",),
+        modules=("build_vera_hic_pit_panel",),
     ),
     "vera-hic-pit-longitudinal": ResultWorkflow(
         name="vera-hic-pit-longitudinal",
         description="Build the top-50 Vera/HIC/PIT longitudinal panel.",
-        scripts=("build_vera_hic_pit_longitudinal.py",),
+        modules=("build_vera_hic_pit_longitudinal",),
     ),
     "vera-hic-pit-longitudinal-pooled": ResultWorkflow(
         name="vera-hic-pit-longitudinal-pooled",
         description="Build the pooled top-150 Vera/HIC/PIT longitudinal panel.",
-        scripts=("build_vera_hic_pit_longitudinal_pooled.py",),
+        modules=("build_vera_hic_pit_longitudinal_pooled",),
     ),
     "vera-hic-pit-correlations": ResultWorkflow(
         name="vera-hic-pit-correlations",
         description="Run Vera/HIC/PIT correlation summaries from the built panel.",
-        scripts=("vera_hic_pit_correlations.py",),
+        modules=("vera_hic_pit_correlations",),
     ),
     "vera-hic-pit": ResultWorkflow(
         name="vera-hic-pit",
         description="Reproduce documented Vera/HIC/PIT panel and correlation artifacts.",
-        scripts=(
-            "build_vera_hic_pit_panel.py",
-            "build_vera_hic_pit_longitudinal.py",
-            "build_vera_hic_pit_longitudinal_pooled.py",
-            "vera_hic_pit_correlations.py",
+        modules=(
+            "build_vera_hic_pit_panel",
+            "build_vera_hic_pit_longitudinal",
+            "build_vera_hic_pit_longitudinal_pooled",
+            "vera_hic_pit_correlations",
         ),
     ),
     "overdose-lag": ResultWorkflow(
         name="overdose-lag",
         description="Build the overdose lag panel.",
-        scripts=("build_overdose_lag_panel.py",),
+        modules=("build_overdose_lag_panel",),
     ),
     "overdose-hic-category-correlations": ResultWorkflow(
         name="overdose-hic-category-correlations",
         description="Run overdose/HIC category correlation summaries.",
-        scripts=("overdose_hic_category_correlations.py",),
+        modules=("overdose_hic_category_correlations",),
     ),
     "overdose-hic": ResultWorkflow(
         name="overdose-hic",
         description="Reproduce documented overdose/HIC panel and correlation artifacts.",
-        scripts=(
-            "build_overdose_lag_panel.py",
-            "overdose_hic_category_correlations.py",
+        modules=(
+            "build_overdose_lag_panel",
+            "overdose_hic_category_correlations",
         ),
     ),
     "renter-household-share-composition": ResultWorkflow(
         name="renter-household-share-composition",
         description="Build the renter-household-share composition panel and regressions.",
-        scripts=("build_renter_household_share_composition_panel.py",),
+        modules=("build_renter_household_share_composition_panel",),
     ),
     "household-size-composition": ResultWorkflow(
         name="household-size-composition",
         description="Build the household-size composition panel and regressions.",
-        scripts=("build_household_size_composition_panel.py",),
+        modules=("build_household_size_composition_panel",),
     ),
     "recent-mover-income-composition": ResultWorkflow(
         name="recent-mover-income-composition",
         description="Build the recent-mover-income composition panel and regressions.",
-        scripts=("build_recent_mover_income_composition_panel.py",),
+        modules=("build_recent_mover_income_composition_panel",),
     ),
     "composition-rent-population-robustness": ResultWorkflow(
         name="composition-rent-population-robustness",
         description="Run tracked robustness checks for composition rent-population screens.",
-        scripts=("analyze_composition_rent_population_robustness.py",),
+        modules=("analyze_composition_rent_population_robustness",),
     ),
     "composition-rent-population": ResultWorkflow(
         name="composition-rent-population",
         description="Reproduce all documented composition rent-population result artifacts.",
-        scripts=(
-            "build_renter_household_share_composition_panel.py",
-            "build_household_size_composition_panel.py",
-            "build_recent_mover_income_composition_panel.py",
-            "analyze_composition_rent_population_robustness.py",
+        modules=(
+            "build_renter_household_share_composition_panel",
+            "build_household_size_composition_panel",
+            "build_recent_mover_income_composition_panel",
+            "analyze_composition_rent_population_robustness",
         ),
     ),
     "noncompositional-rent-population": ResultWorkflow(
         name="noncompositional-rent-population",
         description="Reproduce documented non-compositional rent-population result artifacts.",
-        scripts=(
-            "build_noncompositional_rent_population_panel.py",
-            "analyze_noncompositional_rent_population_robustness.py",
+        modules=(
+            "build_noncompositional_rent_population_panel",
+            "analyze_noncompositional_rent_population_robustness",
         ),
     ),
     "all-documented-results": ResultWorkflow(
         name="all-documented-results",
         description="Run every current package-cataloged result workflow in dependency order.",
-        scripts=(
-            "generate_top50_msa_coc_pit_contract_rent_2010_2020.py",
-            "build_poverty_longitudinal_panel.py",
-            "build_irs_migration_pooled_panel.py",
-            "build_supply_iv_panel.py",
-            "build_vera_hic_pit_panel.py",
-            "build_vera_hic_pit_longitudinal.py",
-            "build_vera_hic_pit_longitudinal_pooled.py",
-            "vera_hic_pit_correlations.py",
-            "build_overdose_lag_panel.py",
-            "overdose_hic_category_correlations.py",
-            "build_renter_household_share_composition_panel.py",
-            "build_household_size_composition_panel.py",
-            "build_recent_mover_income_composition_panel.py",
-            "analyze_composition_rent_population_robustness.py",
-            "build_noncompositional_rent_population_panel.py",
-            "analyze_noncompositional_rent_population_robustness.py",
+        modules=(
+            "generate_top50_msa_coc_pit_contract_rent_2010_2020",
+            "build_poverty_longitudinal_panel",
+            "build_irs_migration_pooled_panel",
+            "build_supply_iv_panel",
+            "build_vera_hic_pit_panel",
+            "build_vera_hic_pit_longitudinal",
+            "build_vera_hic_pit_longitudinal_pooled",
+            "vera_hic_pit_correlations",
+            "build_overdose_lag_panel",
+            "overdose_hic_category_correlations",
+            "build_renter_household_share_composition_panel",
+            "build_household_size_composition_panel",
+            "build_recent_mover_income_composition_panel",
+            "analyze_composition_rent_population_robustness",
+            "build_noncompositional_rent_population_panel",
+            "analyze_noncompositional_rent_population_robustness",
         ),
     ),
 }
@@ -160,29 +157,25 @@ def _workflow_choices() -> str:
     return ", ".join(sorted(RESULT_WORKFLOWS))
 
 
-def _run_script(script_name: str) -> dict[str, object]:
-    script_path = SCRIPTS_DIR / script_name
-    if not script_path.exists():
-        raise FileNotFoundError(
-            f"Result workflow script not found: {script_path}. "
-            "Restore the tracked script or update RESULT_WORKFLOWS."
-        )
+def _script_label(module_name: str) -> str:
+    return f"scripts/{module_name}.py"
 
+
+def _run_workflow_module(module_name: str) -> dict[str, object]:
+    module = importlib.import_module(f"{WORKFLOW_MODULE_PREFIX}.{module_name}")
+    main = getattr(module, "main", None)
+    if main is None:
+        raise AttributeError(
+            f"Result workflow module {module.__name__} has no main() function. "
+            "Add main() or update RESULT_WORKFLOWS."
+        )
     stdout = io.StringIO()
-    inserted = False
-    script_dir = str(SCRIPTS_DIR)
-    if script_dir not in sys.path:
-        sys.path.insert(0, script_dir)
-        inserted = True
-    try:
-        with contextlib.redirect_stdout(stdout):
-            runpy.run_path(str(script_path), run_name="__main__")
-    finally:
-        if inserted:
-            sys.path.remove(script_dir)
+    with contextlib.redirect_stdout(stdout):
+        main()
 
     return {
-        "script": str(script_path.relative_to(REPO_ROOT)),
+        "script": _script_label(module_name),
+        "module": module.__name__,
         "stdout": stdout.getvalue().splitlines(),
     }
 
@@ -219,8 +212,8 @@ def build_result_cmd(
         raise typer.Exit(2)
 
     steps: list[dict[str, object]] = []
-    for script_name in workflow.scripts:
-        steps.append(_run_script(script_name))
+    for module_name in workflow.modules:
+        steps.append(_run_workflow_module(module_name))
 
     payload = {
         "status": "ok",
