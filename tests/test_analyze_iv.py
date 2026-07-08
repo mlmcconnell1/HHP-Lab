@@ -25,8 +25,8 @@ from typer.testing import CliRunner
 
 from hhplab.analyze import (
     AnalysisError,
-    _fit_ols,
     _fit_2sls,
+    _fit_ols,
     _restricted_iv_fitted_and_residuals,
     _restricted_ols_fitted_and_residuals,
     _wild_cluster_bootstrap_p_values,

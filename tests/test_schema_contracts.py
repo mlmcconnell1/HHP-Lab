@@ -42,8 +42,7 @@ from hhplab.panel.conformance import PanelRequest, run_conformance
 from hhplab.pep.ingest import PEP_COUNTY_OUTPUT_COLUMNS as PEP_INGEST_COLUMNS
 from hhplab.pit.ingest.parser import CANONICAL_COLUMNS as PIT_PARSER_COLUMNS
 from hhplab.recipe.executor import ExecutorError, _normalize_recipe_population_measure
-from hhplab.recipe.executor.panel import _RECIPE_METRO_COLUMN_ORDER
-from hhplab.recipe.executor.panel import _resolve_canonical_population
+from hhplab.recipe.executor.panel import _RECIPE_METRO_COLUMN_ORDER, _resolve_canonical_population
 from hhplab.recipe.planner import ResampleTask
 from hhplab.recipe.recipe_schema import (
     ACS5_RECIPE_DEFAULT_MEASURES,
@@ -93,6 +92,7 @@ from hhplab.schema.lineage import (
     PopulationSource,
     normalize_population_measure,
 )
+from hhplab.source_coverage import CORE_SOURCE_COVERAGE_SPECS
 from hhplab.xwalks.tract_mediated import (
     DENOMINATOR_COLUMNS as XWALK_DENOMINATOR_COLUMNS,
 )
@@ -966,6 +966,23 @@ def test_panel_measure_dictionary_json_shape_includes_required_semantics() -> No
     assert by_column["zori_coc"]["coverage_years"]["first"] == 2015
     assert by_id["laus:unemployment_rate"]["source_provider"] == "bls"
     assert by_id["acs5:unemployment_rate"]["source_provider"] == "census"
+
+
+@pytest.mark.parametrize("source_id", ["acs5", "pep", "pit", "zori"])
+def test_core_source_coverage_matches_panel_measure_dictionary(source_id: str) -> None:
+    spec = CORE_SOURCE_COVERAGE_SPECS[source_id]
+    entries = [
+        entry
+        for entry in PANEL_MEASURE_DICTIONARY
+        if entry.source_provider == spec.provider and entry.source_product == spec.product
+    ]
+    native_entries = [
+        entry for entry in entries if entry.native_geometry == spec.native_geo
+    ]
+
+    assert native_entries
+    assert {entry.first_year for entry in native_entries} == {spec.first_year}
+    assert {entry.last_year for entry in native_entries} == {spec.last_year}
 
 
 def test_acs1_imputation_output_columns_are_declared_from_specs() -> None:

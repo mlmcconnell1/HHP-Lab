@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Final, Iterable
+from typing import Final
 
 SAIZ_SOURCE_ID: Final = "saiz_supply_elasticity"
 SAIZ_PROVIDER: Final = "saiz"

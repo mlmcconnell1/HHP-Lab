@@ -159,6 +159,39 @@ class TestListAcsVariablesJson:
             )
 
 
+class TestListSourcesJson:
+    """Tests for core source temporal coverage inventory output."""
+
+    def test_json_output_lists_core_panel_sources(self):
+        result = runner.invoke(app, ["list", "sources", "--json"])
+
+        assert result.exit_code == 0
+        payload = json.loads(result.output)
+        assert payload["status"] == "ok"
+        assert payload["source_count"] == len(payload["sources"])
+
+        by_id = {source["source_id"]: source for source in payload["sources"]}
+        assert set(by_id) == {"acs1", "acs5", "hic", "pep", "pit", "zori"}
+        assert by_id["pit"] == {
+            "source_id": "pit",
+            "provider": "hud",
+            "product": "pit",
+            "native_geo": "coc",
+            "first_year": 2007,
+            "last_year": None,
+            "notes": (
+                "Annual January point-in-time count. HUD workbooks are cumulative "
+                "by vintage."
+            ),
+        }
+        assert by_id["acs5"]["native_geo"] == "tract"
+        assert by_id["acs5"]["first_year"] == 2009
+        assert by_id["acs1"]["native_geo"] == "metro_county"
+        assert by_id["acs1"]["first_year"] == 2005
+        assert by_id["pep"]["first_year"] == 2010
+        assert by_id["zori"]["first_year"] == 2015
+
+
 class TestListCensusJson:
 
     def test_json_output(self, tmp_path):
