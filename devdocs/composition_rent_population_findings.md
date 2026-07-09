@@ -7,13 +7,17 @@ composition-driven explanation for rent growth independent of population
 growth. Renter tenure share is negatively associated with rent growth under
 plain year FE and under pooled MSA+year levels FE, but the first-difference
 rent result does not survive a state x year FE check (see addenda below) and
-the unsheltered-rate result is null either way; renter household size is null;
-and recent-mover income ratios are null. None of the three compositional
-channels tested here support a positive composition-driven explanation for
+the unsheltered-rate result is null either way; the direct household-formation
+proxy (`d_log_total_households - d_log_pop`, implemented as
+`d_log_total_households_per_panel_person`) is also negative under plain year FE
+and goes null under region/state x year FE; renter household size is null; and
+recent-mover income ratios are null. None of the compositional or
+household-formation channels tested here support a positive explanation for
 the earlier finding that population growth and rent growth are nearly
 orthogonal across the pooled top-150 MSA design -- whatever is driving rent up
 independent of headcount, it is not simply "more renters,"
-"smaller/larger renter households," or "richer people moving in."
+"more households per person," "smaller/larger renter households," or "richer
+people moving in."
 
 ## Renter Household Share (ACS5 B25003)
 
@@ -57,7 +61,7 @@ Median level composition:
 
 Key FD models:
 
-| Model | Composition term | Estimate | SE | p-value | N |
+| Model | Screen term | Estimate | SE | p-value | N |
 | --- | ---: | ---: | ---: | ---: | ---: |
 | `d_log_zori ~ d_log_pop + composition + year FE` | `d_renter_household_share` | -0.4011 | 0.1800 | 0.026 | 1,096 |
 | `d_log_unshelt_rate ~ d_log_zori + d_log_pop + composition + year FE` | `d_renter_household_share` | -0.4427 | 2.4536 | 0.857 | 1,090 |
@@ -65,6 +69,8 @@ Key FD models:
 | `d_log_unshelt_rate ~ d_log_zori + d_log_pop + composition + year FE` | `d_renter_households_per_acs_person` | 0.1050 | 5.8306 | 0.986 | 1,090 |
 | `d_log_zori ~ d_log_pop + composition + year FE` | `d_renter_households_per_panel_person` | -1.5965 | 0.5714 | 0.005 | 1,096 |
 | `d_log_unshelt_rate ~ d_log_zori + d_log_pop + composition + year FE` | `d_renter_households_per_panel_person` | -3.2731 | 6.4402 | 0.611 | 1,090 |
+| `d_log_zori ~ d_log_pop + composition + year FE` | `d_log_total_households_per_panel_person` | -0.3577 | 0.1619 | 0.027 | 1,096 |
+| `d_log_unshelt_rate ~ d_log_zori + d_log_pop + composition + year FE` | `d_log_total_households_per_panel_person` | -1.1013 | 1.5358 | 0.473 | 1,090 |
 
 Interpretation: rising renter tenure share does not explain rent increases
 when population is flat or falling. In this pooled FD screen the rent
@@ -101,6 +107,27 @@ tenure share does not survive as a first-difference rent-growth predictor
 once regional and state-year confounding are checked, although the later
 tracked levels-FE check below finds a strong negative pooled levels
 association.
+
+**2026-07-09 addendum: the direct household-formation proxy also fails the
+same regional/state-year robustness ladder.** This proxy is
+`d_log_total_households - d_log_pop`, implemented in the tracked workflow as
+`d_log_total_households_per_panel_person`, and directly tests whether more
+households are forming per person even when headcount growth is flat. On the
+same pooled first-difference sample (n=1096), the year-FE coefficient is
+negative and nominally significant, but it attenuates and goes null once the
+same confound audit is applied:
+
+| Model term | Estimate | SE | p-value | N |
+| --- | ---: | ---: | ---: | ---: |
+| `d_log_total_households_per_panel_person` (year FE) | -0.358 | 0.162 | 0.027 | 1,096 |
+| `d_log_total_households_per_panel_person` (region x year FE) | -0.135 | 0.170 | 0.427 | 1,096 |
+| `d_log_total_households_per_panel_person` (state x year FE) | -0.094 | 0.183 | 0.609 | 1,096 |
+
+So the data do not support the story that faster household formation per
+person is a positive independent driver of MSA rent growth in this design.
+If anything, the raw pooled year-FE association points in the wrong direction,
+and even that disappears once regional and state-year confounding are
+absorbed.
 
 ## Renter Household Size (ACS1 B25010)
 

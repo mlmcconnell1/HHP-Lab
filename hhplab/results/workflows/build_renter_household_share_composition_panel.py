@@ -36,6 +36,14 @@ COMPOSITION_COLUMNS = [
     "renter_households_per_panel_person",
     "renter_household_share",
 ]
+HOUSEHOLD_FORMATION_COLUMNS = [
+    "total_households_per_panel_person",
+    "log_total_households_per_panel_person",
+]
+SCREEN_COLUMNS = [
+    *COMPOSITION_COLUMNS,
+    "log_total_households_per_panel_person",
+]
 LEVEL_SUMMARY_COLUMNS = [
     *COMPOSITION_COLUMNS,
     "owner_household_share",
@@ -105,6 +113,10 @@ def add_composition_columns(levels: pd.DataFrame) -> pd.DataFrame:
         levels["renter_households"],
         levels["total_households"],
     )
+    levels["total_households_per_panel_person"] = _safe_ratio(
+        levels["total_households"],
+        levels["population"],
+    )
     levels["owner_household_share"] = _safe_ratio(
         levels["owner_households"],
         levels["total_households"],
@@ -115,6 +127,9 @@ def add_composition_columns(levels: pd.DataFrame) -> pd.DataFrame:
     )
     levels["log_renter_households"] = _safe_log(levels["renter_households"])
     levels["log_total_households"] = _safe_log(levels["total_households"])
+    levels["log_total_households_per_panel_person"] = _safe_log(
+        levels["total_households_per_panel_person"]
+    )
     return levels
 
 
@@ -127,10 +142,13 @@ def add_first_differences(levels: pd.DataFrame) -> pd.DataFrame:
     levels["d_log_total_rate"] = grouped["log_total_rate"].diff()
     levels["d_log_shelt_rate"] = grouped["log_shelt_rate"].diff()
     levels["d_log_pop"] = grouped["log_pop"].diff()
-    for column in [*ACS5_COUNT_COLUMNS, *LEVEL_SUMMARY_COLUMNS]:
+    for column in [*ACS5_COUNT_COLUMNS, *LEVEL_SUMMARY_COLUMNS, "total_households_per_panel_person"]:
         levels[f"d_{column}"] = grouped[column].diff()
     levels["d_log_renter_households"] = grouped["log_renter_households"].diff()
     levels["d_log_total_households"] = grouped["log_total_households"].diff()
+    levels["d_log_total_households_per_panel_person"] = grouped[
+        "log_total_households_per_panel_person"
+    ].diff()
     return levels
 
 
@@ -142,7 +160,7 @@ def build_levels_panel() -> pd.DataFrame:
     return add_first_differences(merged)
 
 
-def _model_specs(composition_columns: Iterable[str] = COMPOSITION_COLUMNS) -> Iterable[ModelSpec]:
+def _model_specs(composition_columns: Iterable[str] = SCREEN_COLUMNS) -> Iterable[ModelSpec]:
     for column in composition_columns:
         diff_column = f"d_{column}"
         yield ModelSpec(
@@ -201,8 +219,12 @@ def fit_clustered_fd_models(fd: pd.DataFrame) -> pd.DataFrame:
 
 def summarize_panel(levels: pd.DataFrame, fd: pd.DataFrame) -> dict[str, object]:
     main = "renter_household_share"
+    household_formation = "d_log_total_households_per_panel_person"
     complete_fd = fd.dropna(
         subset=["d_log_zori", "d_log_unshelt_rate", "d_log_pop", f"d_{main}"]
+    )
+    complete_fd_household_formation = fd.dropna(
+        subset=["d_log_zori", "d_log_pop", household_formation]
     )
     level_summary = (
         levels[LEVEL_SUMMARY_COLUMNS]
@@ -217,6 +239,7 @@ def summarize_panel(levels: pd.DataFrame, fd: pd.DataFrame) -> dict[str, object]
                 "d_log_unshelt_rate",
                 "d_log_pop",
                 *[f"d_{column}" for column in COMPOSITION_COLUMNS],
+                household_formation,
             ]
         ]
         .corr()
@@ -231,6 +254,7 @@ def summarize_panel(levels: pd.DataFrame, fd: pd.DataFrame) -> dict[str, object]
             int(vintage) for vintage in sorted(levels["acs5_vintage_used"].dropna().unique())
         ],
         "complete_fd_rows_for_renter_household_share": int(len(complete_fd)),
+        "complete_fd_rows_for_household_formation": int(len(complete_fd_household_formation)),
         "level_composition_summary": json.loads(level_summary.to_json()),
         "levels_missing_acs5_counts": {
             column: int(levels[column].isna().sum()) for column in ACS5_COUNT_COLUMNS
@@ -238,6 +262,9 @@ def summarize_panel(levels: pd.DataFrame, fd: pd.DataFrame) -> dict[str, object]
         "fd_missing_composition_diff": {
             f"d_{column}": int(fd[f"d_{column}"].isna().sum())
             for column in COMPOSITION_COLUMNS
+        },
+        "fd_missing_household_formation_diff": {
+            household_formation: int(fd[household_formation].isna().sum())
         },
         "fd_correlations": json.loads(correlations.to_json()),
     }

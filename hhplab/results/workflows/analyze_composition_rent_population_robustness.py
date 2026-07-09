@@ -165,6 +165,33 @@ FD_RENTER_SHARE_SPECS = (
         derived_columns=RENTER_SHARE_INTERACTION_COLUMNS,
         focal_terms=("d_log_zori", "renter_household_share_c", "d_log_zori_x_renter_share_c"),
     ),
+    RegressionSpec(
+        family="household_formation",
+        model="rent_fd_household_formation_year_fe",
+        outcome="d_log_zori",
+        predictors=("d_log_pop", "d_log_total_households_per_panel_person"),
+        fixed_effects=("year",),
+        sample_filter="fd_year_gap_1",
+        focal_terms=("d_log_total_households_per_panel_person",),
+    ),
+    RegressionSpec(
+        family="household_formation",
+        model="rent_fd_household_formation_state_year_fe",
+        outcome="d_log_zori",
+        predictors=("d_log_pop", "d_log_total_households_per_panel_person"),
+        fixed_effects=("primary_state_year",),
+        sample_filter="fd_year_gap_1",
+        focal_terms=("d_log_total_households_per_panel_person",),
+    ),
+    RegressionSpec(
+        family="household_formation",
+        model="rent_fd_household_formation_region_year_fe",
+        outcome="d_log_zori",
+        predictors=("d_log_pop", "d_log_total_households_per_panel_person"),
+        fixed_effects=("region_year",),
+        sample_filter="fd_year_gap_1",
+        focal_terms=("d_log_total_households_per_panel_person",),
+    ),
 )
 
 LEVEL_FE_SPECS = (

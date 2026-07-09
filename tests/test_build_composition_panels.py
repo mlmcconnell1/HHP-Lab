@@ -114,6 +114,38 @@ def test_renter_panel_uses_acs5_vintage_end_year_plus_one_and_preserves_identity
     assert pd.isna(levels.loc[2021, "renter_households"])
 
 
+def test_renter_panel_builds_household_formation_proxy(monkeypatch, tmp_path: Path) -> None:
+    renter = _load_script("build_renter_household_share_composition_panel")
+    vintage_rows = [
+        (2019, 100, 60, 40),
+        (2020, 102, 61, 41),
+    ]
+    for vintage, total_households, owner_households, renter_households in vintage_rows:
+        measures_path = tmp_path / f"measures__msa__A{vintage}@Mcensusmsa2023xT2010.parquet"
+        pd.DataFrame(
+            {
+                "msa_id": ["10000"],
+                "acs_vintage": [f"{vintage - 4}-{vintage}"],
+                "total_population": [100_000],
+                "total_households": [total_households],
+                "owner_households": [owner_households],
+                "renter_households": [renter_households],
+            }
+        ).to_parquet(measures_path, index=False)
+    monkeypatch.setattr(renter, "MEASURES_GLOB", str(tmp_path / "measures__msa__A*.parquet"))
+    monkeypatch.setattr(renter, "load_pooled_base_panel", _base_panel)
+
+    levels = renter.build_levels_panel().set_index("year")
+
+    assert levels.loc[2020, "total_households_per_panel_person"] == pytest.approx(100 / 101_000)
+    assert levels.loc[2021, "log_total_households_per_panel_person"] == pytest.approx(
+        np.log(102 / 102_000)
+    )
+    assert levels.loc[2021, "d_log_total_households_per_panel_person"] == pytest.approx(
+        levels.loc[2021, "d_log_total_households"] - levels.loc[2021, "d_log_pop"]
+    )
+
+
 def test_household_size_panel_uses_acs1_vintage_plus_one(monkeypatch, tmp_path: Path) -> None:
     household = _load_script("build_household_size_composition_panel")
     acs1_path = tmp_path / "acs1_metro__A2019@Dcensusmsa2023.parquet"
@@ -184,6 +216,11 @@ def _robustness_fixture() -> pd.DataFrame:
                     "d_log_pop": 0.02 + 0.01 * year_index,
                     "renter_household_share": 0.35 + 0.02 * year_index + 0.01 * msa_index,
                     "d_renter_household_share": 0.01 * year_index + 0.005 * msa_index,
+                    "log_total_households_per_panel_person": -6.9
+                    + 0.02 * year_index
+                    + 0.01 * msa_index,
+                    "d_log_total_households_per_panel_person": 0.004 * year_index
+                    + 0.002 * msa_index,
                     "average_household_size_renter_occupied": 2.0 + 0.03 * year_index,
                     "moved_diff_state_income_ratio_total": 1.1 + 0.02 * msa_index,
                 }
@@ -213,6 +250,78 @@ def test_composition_robustness_runs_state_year_and_levels_fe_specs() -> None:
     assert set(levels["term"]) == {"log_pop", "renter_household_share"}
     assert state_year["nobs"].unique().tolist() == [len(frame)]
     assert levels["clusters"].unique().tolist() == [frame["msa_id"].nunique()]
+
+
+def test_renter_fd_models_include_household_formation_screen() -> None:
+    renter = _load_script("build_renter_household_share_composition_panel")
+    rows = []
+    for msa_index, msa_id in enumerate(["10000", "20000", "30000", "40000"], start=1):
+        for year_index, year in enumerate([2020, 2022], start=1):
+            rows.append(
+                {
+                    "msa_id": msa_id,
+                    "year": year,
+                    "d_log_zori": 0.02 * year_index + 0.01 * msa_index,
+                    "d_log_unshelt_rate": 0.03 * year_index + 0.01 * msa_index,
+                    "d_log_pop": 0.01 * year_index,
+                    "d_renter_households_per_acs_person": 0.002 * msa_index,
+                    "d_renter_households_per_panel_person": 0.003 * msa_index,
+                    "d_renter_household_share": 0.004 * msa_index,
+                    "d_log_total_households_per_panel_person": 0.005 * msa_index,
+                }
+            )
+    fd = pd.DataFrame(rows)
+
+    regressions = renter.fit_clustered_fd_models(fd)
+
+    rent_terms = regressions.loc[
+        regressions["model"] == "rent_fd_log_total_households_per_panel_person",
+        "term",
+    ].tolist()
+    unsheltered_terms = regressions.loc[
+        regressions["model"] == "unsheltered_fd_log_total_households_per_panel_person",
+        "term",
+    ].tolist()
+
+    assert rent_terms == ["d_log_pop", "d_log_total_households_per_panel_person"]
+    assert unsheltered_terms == [
+        "d_log_zori",
+        "d_log_pop",
+        "d_log_total_households_per_panel_person",
+    ]
+
+
+def test_composition_robustness_runs_household_formation_fe_specs() -> None:
+    robustness = _load_script("analyze_composition_rent_population_robustness")
+    frame = _robustness_fixture()
+    year_spec = _spec_by_model(
+        robustness.FD_RENTER_SHARE_SPECS,
+        "rent_fd_household_formation_year_fe",
+    )
+    state_spec = _spec_by_model(
+        robustness.FD_RENTER_SHARE_SPECS,
+        "rent_fd_household_formation_state_year_fe",
+    )
+    region_spec = _spec_by_model(
+        robustness.FD_RENTER_SHARE_SPECS,
+        "rent_fd_household_formation_region_year_fe",
+    )
+
+    year_result = robustness.fit_spec(frame, year_spec)
+    state_result = robustness.fit_spec(frame, state_spec)
+    region_result = robustness.fit_spec(frame, region_spec)
+
+    assert year_result["fixed_effects"].unique().tolist() == ["year"]
+    assert state_result["fixed_effects"].unique().tolist() == ["primary_state_year"]
+    assert region_result["fixed_effects"].unique().tolist() == ["region_year"]
+    assert set(year_result["term"]) == {
+        "d_log_pop",
+        "d_log_total_households_per_panel_person",
+    }
+    assert state_result.loc[
+        state_result["term"] == "d_log_total_households_per_panel_person",
+        "focal_term",
+    ].tolist() == [True]
 
 
 def test_composition_robustness_requires_state_for_state_year_fe() -> None:
