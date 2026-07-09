@@ -28,11 +28,7 @@ RANK51_150_PANEL = (
     / "panel__msa_rank51_150__Y2015-2025@Mcensusmsa2023.parquet"
 )
 CDC_MSA = (
-    ROOT
-    / "data"
-    / "curated"
-    / "cdc"
-    / "cdc_overdose__msa__Y2020-2025@Mcensusmsa2023xC2023.parquet"
+    ROOT / "data" / "curated" / "cdc" / "cdc_overdose__msa__Y2020-2025@Mcensusmsa2023xC2023.parquet"
 )
 # Built by the `hhplab aggregate coc-measure` loop documented in
 # devdocs/overdose_homelessness_lag_screen.md (era-matched boundaries:
@@ -104,9 +100,7 @@ def merge_overdose(pooled: pd.DataFrame) -> pd.DataFrame:
         ["msa_id", "year", "overdose_deaths_12mo", "coverage_ratio"]
     ].rename(columns={"coverage_ratio": "overdose_coverage_ratio"})
     merged = pooled.merge(cdc, on=["msa_id", "year"], how="inner")
-    merged["overdose_per_1000"] = (
-        merged["overdose_deaths_12mo"] / merged["population"] * 1000
-    )
+    merged["overdose_per_1000"] = merged["overdose_deaths_12mo"] / merged["population"] * 1000
     merged["log_overdose_rate"] = np.where(
         merged["overdose_per_1000"] > 0, np.log(merged["overdose_per_1000"]), np.nan
     )
@@ -194,7 +188,9 @@ def run() -> dict[str, object]:
         "pooled_cohorts": merged.cohort.value_counts().to_dict(),
         "levels_rows": int(len(merged)),
         "fd_rows_year_gap_1": int(len(fd)),
-        "rows_by_year": {int(year): int(count) for year, count in merged.groupby("year").size().items()},
+        "rows_by_year": {
+            int(year): int(count) for year, count in merged.groupby("year").size().items()
+        },
         "rows_by_year_meeting_overdose_coverage": {
             int(year): int(count) for year, count in covered.groupby("year").size().items()
         },

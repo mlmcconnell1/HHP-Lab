@@ -40,11 +40,7 @@ RANK51_150_PANEL = (
     / "panel__msa_rank51_150__Y2015-2025@Mcensusmsa2023.parquet"
 )
 VERA_COUNTY = (
-    ROOT
-    / "data"
-    / "curated"
-    / "vera"
-    / "vera_incarceration_county__Y1970-2026@C2020.parquet"
+    ROOT / "data" / "curated" / "vera" / "vera_incarceration_county__Y1970-2026@C2020.parquet"
 )
 
 EXCLUDED_YEARS = {2021}
@@ -126,9 +122,7 @@ def aggregate_vera_to_msa(definition_version: str = "census_msa_2023") -> pd.Dat
     ].drop_duplicates()
     membership["county_fips"] = membership["county_fips"].astype(str).str.zfill(5)
 
-    vera = pd.read_parquet(
-        VERA_COUNTY, columns=["county_fips", "year", "total_jail_pop"]
-    )
+    vera = pd.read_parquet(VERA_COUNTY, columns=["county_fips", "year", "total_jail_pop"])
     vera["county_fips"] = vera["county_fips"].astype(str).str.zfill(5)
     vera = vera[vera.year.isin(PANEL_YEARS)]
 
@@ -196,10 +190,15 @@ def run() -> dict[str, object]:
         "pooled_cohorts": merged.cohort.value_counts().to_dict(),
         "levels_rows": int(len(merged)),
         "fd_rows_year_gap_1": int(len(fd)),
-        "rows_by_year": {int(year): int(count) for year, count in merged.groupby("year").size().items()},
+        "rows_by_year": {
+            int(year): int(count) for year, count in merged.groupby("year").size().items()
+        },
         "non_null_jail_per_1000_rows_by_year": {
             int(year): int(count)
-            for year, count in merged.dropna(subset=["jail_per_1000"]).groupby("year").size().items()
+            for year, count in merged.dropna(subset=["jail_per_1000"])
+            .groupby("year")
+            .size()
+            .items()
         },
         "distinct_primary_state_count": int(merged.primary_state.nunique()),
         "outputs": {

@@ -60,15 +60,24 @@ def run_family(df: pd.DataFrame, keys: tuple, labels: dict, rate_col_fn, log_sou
         sub = _clean_pair(df, col, "jail_per_1000")
         r_log, p_log = stats.pearsonr(np.log(sub[col]), np.log(sub["jail_per_1000"]))
         r_partial, p_partial = partial_corr_controlling_pop(
-            np.log(sub[col]).to_numpy(), np.log(sub["jail_per_1000"]).to_numpy(),
+            np.log(sub[col]).to_numpy(),
+            np.log(sub["jail_per_1000"]).to_numpy(),
             sub["log_pop"].to_numpy(),
         )
         pooled_rows.append(
-            {"category": labels[key], "r_log_log": r_log, "p_log_log": p_log,
-             "r_partial_pop": r_partial, "p_partial_pop": p_partial, "n": len(sub)}
+            {
+                "category": labels[key],
+                "r_log_log": r_log,
+                "p_log_log": p_log,
+                "r_partial_pop": r_partial,
+                "p_partial_pop": p_partial,
+                "n": len(sub),
+            }
         )
-        print(f"{labels[key]:30s} log-log r={r_log:+.3f} (p={p_log:.4f})  "
-              f"partial-r|pop={r_partial:+.3f} (p={p_partial:.4f})  n={len(sub)}")
+        print(
+            f"{labels[key]:30s} log-log r={r_log:+.3f} (p={p_log:.4f})  "
+            f"partial-r|pop={r_partial:+.3f} (p={p_partial:.4f})  n={len(sub)}"
+        )
 
     print("\n=== BY YEAR (log-log r) ===")
     years = sorted(df.year.unique())

@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import json
-from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
 
@@ -387,9 +386,7 @@ def test_registered_result_workflows_have_structured_result_contract() -> None:
             )
             if callable(getattr(module, "run", None)):
                 continue
-            source = Path(module.__file__).read_text(encoding="utf-8")
-            if "summary ->" not in source:
-                missing_contract.append(module_name)
+            missing_contract.append(module_name)
 
     assert missing_contract == []
 

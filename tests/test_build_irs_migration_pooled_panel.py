@@ -95,7 +95,11 @@ IRS_PANEL_ROWS = [
     },
 ]
 EXPECTED_DIRECT_INCOME_MODELS = {
-    ("rent_fd_inflow_agi_per_return_k_year_fe", ("d_log_pop", "inflow_agi_per_return_k"), ("year",)),
+    (
+        "rent_fd_inflow_agi_per_return_k_year_fe",
+        ("d_log_pop", "inflow_agi_per_return_k"),
+        ("year",),
+    ),
     (
         "rent_fd_inflow_agi_per_return_k_region_year_fe",
         ("d_log_pop", "inflow_agi_per_return_k"),
@@ -163,7 +167,6 @@ def test_model_specs_cover_direct_income_predictors_across_fe_variants() -> None
         if spec.name.startswith("rent_fd_inflow_agi_per_return_k_")
     } == EXPECTED_DIRECT_INCOME_MODELS
     assert any(
-        (spec.name, spec.predictors, spec.fixed_effects) == EXPECTED_JOINT_MODEL
-        for spec in specs
+        (spec.name, spec.predictors, spec.fixed_effects) == EXPECTED_JOINT_MODEL for spec in specs
     )
     assert len(specs) == len(builder.DIRECT_INCOME_COLUMNS) * 3 + 3

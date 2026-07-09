@@ -138,3 +138,61 @@ def test_model_specs_cover_employment_and_real_wage_channels_across_fe_tiers() -
     assert all(spec.outcome in {"d_log_zori", "d_log_unshelt_rate"} for spec in specs)
     # 3 channels x 3 FE tiers x 2 outcome families
     assert len(specs) == 18
+
+
+def test_run_returns_structured_regression_records_and_outputs(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    builder = _load_builder()
+    monkeypatch.setenv("HHPLAB_QCEW_PANEL_PATH", str(_qcew_panel(tmp_path)))
+    monkeypatch.setattr(builder, "CPI_U_PATH", _cpi_index(tmp_path))
+    monkeypatch.setattr(builder, "OUT", tmp_path / "qcew_outputs")
+    monkeypatch.setattr(builder, "load_pooled_base_panel", _base_panel)
+    monkeypatch.setattr(
+        builder,
+        "fit_clustered_fd_models",
+        lambda fd: pd.DataFrame(
+            [
+                {
+                    "family": "qcew_labor_market",
+                    "model": "rent_fd_qcew_employment_year_fe",
+                    "outcome": "d_log_zori",
+                    "fixed_effects": "year",
+                    "term": "d_log_qcew_annual_avg_emplvl",
+                    "estimate": 0.5,
+                    "std_error": 0.1,
+                    "t_stat": 5.0,
+                    "p_value": 0.01,
+                    "nobs": len(fd),
+                    "clusters": 1,
+                    "r_squared": 0.2,
+                    "std_error_type": "clustered:msa_id",
+                }
+            ]
+        ),
+    )
+
+    result = builder.run()
+
+    assert result["summary"]["regression_count"] == 1
+    assert result["regressions"] == [
+        {
+            "family": "qcew_labor_market",
+            "model": "rent_fd_qcew_employment_year_fe",
+            "outcome": "d_log_zori",
+            "fixed_effects": "year",
+            "term": "d_log_qcew_annual_avg_emplvl",
+            "estimate": 0.5,
+            "std_error": 0.1,
+            "t_stat": 5.0,
+            "p_value": 0.01,
+            "nobs": 2,
+            "clusters": 1,
+            "r_squared": 0.2,
+            "std_error_type": "clustered:msa_id",
+        }
+    ]
+    assert Path(result["outputs"]["regressions_parquet"]).exists()
+    assert Path(result["outputs"]["regressions_csv"]).exists()
+    assert Path(result["outputs"]["summary_json"]).exists()

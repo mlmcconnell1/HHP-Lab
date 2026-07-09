@@ -67,8 +67,7 @@ def load_pooled_base_panel() -> pd.DataFrame:
 def load_poverty_panel() -> pd.DataFrame:
     files = sorted(glob.glob(MEASURES_GLOB))
     frames = [
-        pd.read_parquet(f, columns=["msa_id", "acs_vintage", "msa_poverty_rate"])
-        for f in files
+        pd.read_parquet(f, columns=["msa_id", "acs_vintage", "msa_poverty_rate"]) for f in files
     ]
     poverty = pd.concat(frames, ignore_index=True)
     poverty["acs_end_year"] = poverty["acs_vintage"].str.split("-").str[-1].astype(int)

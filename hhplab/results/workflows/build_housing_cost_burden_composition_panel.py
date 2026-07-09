@@ -133,19 +133,17 @@ def load_acs5_housing_cost_burden_panel() -> pd.DataFrame:
             pd.to_numeric(frame["median_household_income"], errors="coerce") / 12.0,
         )
 
-        with_mortgage_denominator = (
-            pd.to_numeric(frame["owner_costs_pct_income_with_mortgage_total"], errors="coerce")
-            - pd.to_numeric(
-                frame["owner_costs_pct_income_with_mortgage_not_computed"],
-                errors="coerce",
-            )
+        with_mortgage_denominator = pd.to_numeric(
+            frame["owner_costs_pct_income_with_mortgage_total"], errors="coerce"
+        ) - pd.to_numeric(
+            frame["owner_costs_pct_income_with_mortgage_not_computed"],
+            errors="coerce",
         )
-        without_mortgage_denominator = (
-            pd.to_numeric(frame["owner_costs_pct_income_without_mortgage_total"], errors="coerce")
-            - pd.to_numeric(
-                frame["owner_costs_pct_income_without_mortgage_not_computed"],
-                errors="coerce",
-            )
+        without_mortgage_denominator = pd.to_numeric(
+            frame["owner_costs_pct_income_without_mortgage_total"], errors="coerce"
+        ) - pd.to_numeric(
+            frame["owner_costs_pct_income_without_mortgage_not_computed"],
+            errors="coerce",
         )
         with_mortgage_30_plus = _sum_columns(
             frame,
@@ -229,10 +227,14 @@ def add_timing_columns(levels: pd.DataFrame) -> pd.DataFrame:
     if "primary_state" in levels.columns:
         levels["region"] = levels["primary_state"].map(_census_region_or_na)
         levels["primary_state_year"] = (
-            levels["primary_state"].astype("string") + "_" + levels["year"].astype("Int64").astype("string")
+            levels["primary_state"].astype("string")
+            + "_"
+            + levels["year"].astype("Int64").astype("string")
         )
         levels["region_year"] = (
-            levels["region"].astype("string") + "_" + levels["year"].astype("Int64").astype("string")
+            levels["region"].astype("string")
+            + "_"
+            + levels["year"].astype("Int64").astype("string")
         )
     grouped = levels.groupby("msa_id", sort=False)
     levels["year_gap"] = grouped["year"].diff()
@@ -340,9 +342,7 @@ def fit_clustered_fd_models(fd: pd.DataFrame) -> pd.DataFrame:
 def summarize_panel(levels: pd.DataFrame, fd: pd.DataFrame) -> dict[str, object]:
     main_column = "acs5_rent_burden_30_plus"
     main_lag_column = f"{main_column}_lag1"
-    complete_lagged = fd.dropna(
-        subset=["d_log_zori", "d_log_pop", main_lag_column]
-    )
+    complete_lagged = fd.dropna(subset=["d_log_zori", "d_log_pop", main_lag_column])
     complete_same_year = fd.dropna(
         subset=["d_log_zori", "d_log_unshelt_rate", "d_log_pop", f"d_{main_column}"]
     )
@@ -365,7 +365,9 @@ def summarize_panel(levels: pd.DataFrame, fd: pd.DataFrame) -> dict[str, object]
         .round(6)
     )
     sample_sizes = {
-        spec.name: int(len(fd.dropna(subset=[spec.outcome, *spec.predictors, *spec.fixed_effects, "msa_id"])))
+        spec.name: int(
+            len(fd.dropna(subset=[spec.outcome, *spec.predictors, *spec.fixed_effects, "msa_id"]))
+        )
         for spec in _model_specs()
     }
     return {
@@ -389,7 +391,8 @@ def summarize_panel(levels: pd.DataFrame, fd: pd.DataFrame) -> dict[str, object]
             column: int(levels[column].isna().sum()) for column in SCREEN_COLUMNS
         },
         "levels_missing_affordability_lag_columns": {
-            f"{column}_lag1": int(levels[f"{column}_lag1"].isna().sum()) for column in SCREEN_COLUMNS
+            f"{column}_lag1": int(levels[f"{column}_lag1"].isna().sum())
+            for column in SCREEN_COLUMNS
         },
         "fd_missing_affordability_diff_columns": {
             f"d_{column}": int(fd[f"d_{column}"].isna().sum()) for column in SCREEN_COLUMNS
@@ -398,7 +401,7 @@ def summarize_panel(levels: pd.DataFrame, fd: pd.DataFrame) -> dict[str, object]
     }
 
 
-def main() -> None:
+def run() -> dict[str, object]:
     OUT.mkdir(parents=True, exist_ok=True)
     levels = build_levels_panel()
     fd = levels[levels["year_gap"] == 1].copy()
@@ -417,10 +420,29 @@ def main() -> None:
     regressions.to_csv(regression_csv_path, index=False)
     summary_path.write_text(json.dumps(summary, indent=2) + "\n", encoding="utf-8")
 
-    print(f"levels rows: {len(levels)} -> {levels_path}")
-    print(f"fd rows: {len(fd)} -> {fd_path}")
-    print(f"regression rows: {len(regressions)} -> {regression_path}")
-    print(f"summary -> {summary_path}")
+    return {
+        "summary": summary,
+        "regressions": json.loads(regressions.to_json(orient="records")),
+        "outputs": {
+            "levels_parquet": str(levels_path),
+            "fd_parquet": str(fd_path),
+            "regressions_parquet": str(regression_path),
+            "regressions_csv": str(regression_csv_path),
+            "summary_json": str(summary_path),
+        },
+    }
+
+
+def main() -> None:
+    result = run()
+    summary = result["summary"]
+    outputs = result["outputs"]
+    regressions = pd.DataFrame(result["regressions"])
+
+    print(f"levels rows: {summary['levels_rows']} -> {outputs['levels_parquet']}")
+    print(f"fd rows: {summary['fd_rows_year_gap_1']} -> {outputs['fd_parquet']}")
+    print(f"regression rows: {len(regressions)} -> {outputs['regressions_parquet']}")
+    print(f"summary -> {outputs['summary_json']}")
     if not regressions.empty:
         print(regressions[regressions["term"].str.contains("burden|rent_to_income")])
 

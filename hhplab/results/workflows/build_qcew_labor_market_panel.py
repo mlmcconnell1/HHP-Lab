@@ -49,13 +49,20 @@ QCEW_MIN_COVERAGE_RATIO = 1.0
 
 CPI_U_PATH = REPO_ROOT / "data" / "curated" / "cpi" / "cpi_u__Aall.parquet"
 
-QCEW_LEVEL_COLUMNS = ("qcew_annual_avg_emplvl", "qcew_total_annual_wages", "qcew_annual_avg_weekly_wage")
+QCEW_LEVEL_COLUMNS = (
+    "qcew_annual_avg_emplvl",
+    "qcew_total_annual_wages",
+    "qcew_annual_avg_weekly_wage",
+)
 # Nominal counterparts are computed (needed to derive the real columns) but not modeled
 # separately: CPI-U has no cross-MSA variation, so under any spec that already includes
 # year (or state x year / region x year) fixed effects, subtracting it from the outcome
 # is absorbed exactly by the fixed effects and cannot change the wage-growth coefficient.
 NOMINAL_GROWTH_COLUMNS = ("d_log_qcew_total_annual_wages", "d_log_qcew_annual_avg_weekly_wage")
-REAL_GROWTH_COLUMNS = ("d_log_qcew_total_annual_wages_real", "d_log_qcew_annual_avg_weekly_wage_real")
+REAL_GROWTH_COLUMNS = (
+    "d_log_qcew_total_annual_wages_real",
+    "d_log_qcew_annual_avg_weekly_wage_real",
+)
 EMPLOYMENT_GROWTH_COLUMN = "d_log_qcew_annual_avg_emplvl"
 
 PRIMARY_CHANNEL_COLUMNS = (EMPLOYMENT_GROWTH_COLUMN, *REAL_GROWTH_COLUMNS)
@@ -240,7 +247,11 @@ def _design_matrix(sample: pd.DataFrame, spec: RegressionSpec) -> pd.DataFrame:
 
 def _model_specs() -> Iterable[RegressionSpec]:
     fe_tiers = (("year",), ("primary_state_year",), ("region_year",))
-    fe_suffix = {"year": "year_fe", "primary_state_year": "state_year_fe", "region_year": "region_year_fe"}
+    fe_suffix = {
+        "year": "year_fe",
+        "primary_state_year": "state_year_fe",
+        "region_year": "region_year_fe",
+    }
 
     for column in PRIMARY_CHANNEL_COLUMNS:
         for fixed_effects in fe_tiers:
@@ -345,7 +356,7 @@ def summarize_panel(
     }
 
 
-def main() -> None:
+def run() -> dict[str, object]:
     OUT.mkdir(parents=True, exist_ok=True)
     levels, dropped_partial_coverage = build_levels_panel()
     fd = levels[levels["year_gap"] == 1].copy()
@@ -364,10 +375,29 @@ def main() -> None:
     regressions.to_csv(regression_csv_path, index=False)
     summary_path.write_text(json.dumps(summary, indent=2) + "\n", encoding="utf-8")
 
-    print(f"levels rows: {len(levels)} -> {levels_path}")
-    print(f"fd rows: {len(fd)} -> {fd_path}")
-    print(f"regression rows: {len(regressions)} -> {regression_path}")
-    print(f"summary -> {summary_path}")
+    return {
+        "summary": summary,
+        "regressions": json.loads(regressions.to_json(orient="records")),
+        "outputs": {
+            "levels_parquet": str(levels_path),
+            "fd_parquet": str(fd_path),
+            "regressions_parquet": str(regression_path),
+            "regressions_csv": str(regression_csv_path),
+            "summary_json": str(summary_path),
+        },
+    }
+
+
+def main() -> None:
+    result = run()
+    summary = result["summary"]
+    outputs = result["outputs"]
+    regressions = pd.DataFrame(result["regressions"])
+
+    print(f"levels rows: {summary['levels_rows']} -> {outputs['levels_parquet']}")
+    print(f"fd rows: {summary['fd_rows_year_gap_1']} -> {outputs['fd_parquet']}")
+    print(f"regression rows: {len(regressions)} -> {outputs['regressions_parquet']}")
+    print(f"summary -> {outputs['summary_json']}")
     if not regressions.empty:
         print(regressions[regressions["outcome"] == "d_log_zori"].to_string(index=False))
 

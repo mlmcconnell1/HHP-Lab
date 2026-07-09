@@ -752,12 +752,27 @@ def write_outputs(regressions: pd.DataFrame) -> dict[str, object]:
     return summary
 
 
-def main() -> None:
+def run() -> dict[str, object]:
     regressions = run_robustness_checks()
     summary = write_outputs(regressions)
-    print(f"regression rows: {len(regressions)} -> {ROBUSTNESS_PARQUET}")
-    print(f"csv -> {ROBUSTNESS_CSV}")
-    print(f"summary -> {ROBUSTNESS_SUMMARY}")
+    return {
+        "summary": summary,
+        "regressions": json.loads(regressions.to_json(orient="records")),
+        "outputs": {
+            "regressions_parquet": str(ROBUSTNESS_PARQUET),
+            "regressions_csv": str(ROBUSTNESS_CSV),
+            "summary_json": str(ROBUSTNESS_SUMMARY),
+        },
+    }
+
+
+def main() -> None:
+    result = run()
+    summary = result["summary"]
+    outputs = result["outputs"]
+    print(f"regression rows: {summary['regression_rows']} -> {outputs['regressions_parquet']}")
+    print(f"csv -> {outputs['regressions_csv']}")
+    print(f"summary -> {outputs['summary_json']}")
     if summary["regression_rows"]:
         print(pd.DataFrame(summary["focal_terms"]))
 

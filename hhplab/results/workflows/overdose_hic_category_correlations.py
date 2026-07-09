@@ -54,9 +54,7 @@ def run() -> dict[str, object]:
     for cat in CATEGORIES:
         col = f"{cat}_per_1000"
         sub = _clean_pair(df, col)
-        r_log, p_log = stats.pearsonr(
-            np.log(sub[col]), np.log(sub["overdose_per_1000"])
-        )
+        r_log, p_log = stats.pearsonr(np.log(sub[col]), np.log(sub["overdose_per_1000"]))
         r_partial, p_partial = partial_corr_controlling_pop(
             np.log(sub[col]).to_numpy(),
             np.log(sub["overdose_per_1000"]).to_numpy(),

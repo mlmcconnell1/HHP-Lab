@@ -142,7 +142,11 @@ def add_first_differences(levels: pd.DataFrame) -> pd.DataFrame:
     levels["d_log_total_rate"] = grouped["log_total_rate"].diff()
     levels["d_log_shelt_rate"] = grouped["log_shelt_rate"].diff()
     levels["d_log_pop"] = grouped["log_pop"].diff()
-    for column in [*ACS5_COUNT_COLUMNS, *LEVEL_SUMMARY_COLUMNS, "total_households_per_panel_person"]:
+    for column in [
+        *ACS5_COUNT_COLUMNS,
+        *LEVEL_SUMMARY_COLUMNS,
+        "total_households_per_panel_person",
+    ]:
         levels[f"d_{column}"] = grouped[column].diff()
     levels["d_log_renter_households"] = grouped["log_renter_households"].diff()
     levels["d_log_total_households"] = grouped["log_total_households"].diff()
@@ -220,9 +224,7 @@ def fit_clustered_fd_models(fd: pd.DataFrame) -> pd.DataFrame:
 def summarize_panel(levels: pd.DataFrame, fd: pd.DataFrame) -> dict[str, object]:
     main = "renter_household_share"
     household_formation = "d_log_total_households_per_panel_person"
-    complete_fd = fd.dropna(
-        subset=["d_log_zori", "d_log_unshelt_rate", "d_log_pop", f"d_{main}"]
-    )
+    complete_fd = fd.dropna(subset=["d_log_zori", "d_log_unshelt_rate", "d_log_pop", f"d_{main}"])
     complete_fd_household_formation = fd.dropna(
         subset=["d_log_zori", "d_log_pop", household_formation]
     )
@@ -260,8 +262,7 @@ def summarize_panel(levels: pd.DataFrame, fd: pd.DataFrame) -> dict[str, object]
             column: int(levels[column].isna().sum()) for column in ACS5_COUNT_COLUMNS
         },
         "fd_missing_composition_diff": {
-            f"d_{column}": int(fd[f"d_{column}"].isna().sum())
-            for column in COMPOSITION_COLUMNS
+            f"d_{column}": int(fd[f"d_{column}"].isna().sum()) for column in COMPOSITION_COLUMNS
         },
         "fd_missing_household_formation_diff": {
             household_formation: int(fd[household_formation].isna().sum())
@@ -270,7 +271,7 @@ def summarize_panel(levels: pd.DataFrame, fd: pd.DataFrame) -> dict[str, object]
     }
 
 
-def main() -> None:
+def run() -> dict[str, object]:
     OUT.mkdir(parents=True, exist_ok=True)
     levels = build_levels_panel()
     fd = levels[levels["year_gap"] == 1].copy()
@@ -289,10 +290,29 @@ def main() -> None:
     regressions.to_csv(regression_csv_path, index=False)
     summary_path.write_text(json.dumps(summary, indent=2) + "\n", encoding="utf-8")
 
-    print(f"levels rows: {len(levels)} -> {levels_path}")
-    print(f"fd rows: {len(fd)} -> {fd_path}")
-    print(f"regression rows: {len(regressions)} -> {regression_path}")
-    print(f"summary -> {summary_path}")
+    return {
+        "summary": summary,
+        "regressions": json.loads(regressions.to_json(orient="records")),
+        "outputs": {
+            "levels_parquet": str(levels_path),
+            "fd_parquet": str(fd_path),
+            "regressions_parquet": str(regression_path),
+            "regressions_csv": str(regression_csv_path),
+            "summary_json": str(summary_path),
+        },
+    }
+
+
+def main() -> None:
+    result = run()
+    summary = result["summary"]
+    outputs = result["outputs"]
+    regressions = pd.DataFrame(result["regressions"])
+
+    print(f"levels rows: {summary['levels_rows']} -> {outputs['levels_parquet']}")
+    print(f"fd rows: {summary['fd_rows_year_gap_1']} -> {outputs['fd_parquet']}")
+    print(f"regression rows: {len(regressions)} -> {outputs['regressions_parquet']}")
+    print(f"summary -> {outputs['summary_json']}")
     if not regressions.empty:
         print(regressions[regressions["term"].str.contains("renter_household")])
 

@@ -42,11 +42,7 @@ RANK51_150_PANEL = (
     / "panel__msa_rank51_150__Y2015-2025@Mcensusmsa2023.parquet"
 )
 VERA_COUNTY = (
-    ROOT
-    / "data"
-    / "curated"
-    / "vera"
-    / "vera_incarceration_county__Y1970-2026@C2020.parquet"
+    ROOT / "data" / "curated" / "vera" / "vera_incarceration_county__Y1970-2026@C2020.parquet"
 )
 
 EXCLUDED_YEARS = {2021}
@@ -103,9 +99,7 @@ def aggregate_vera_to_msa(definition_version: str = "census_msa_2023") -> pd.Dat
     ].drop_duplicates()
     membership["county_fips"] = membership["county_fips"].astype(str).str.zfill(5)
 
-    vera = pd.read_parquet(
-        VERA_COUNTY, columns=["county_fips", "year", "total_jail_pop"]
-    )
+    vera = pd.read_parquet(VERA_COUNTY, columns=["county_fips", "year", "total_jail_pop"])
     vera["county_fips"] = vera["county_fips"].astype(str).str.zfill(5)
     vera = vera[vera.year.isin(PANEL_YEARS)]
 
@@ -115,9 +109,7 @@ def aggregate_vera_to_msa(definition_version: str = "census_msa_2023") -> pd.Dat
     # of expected MSA population), unlike CDC's county-count-weighted ratio.
     pep = pd.read_parquet(TOP50_PANEL, columns=["msa_id", "year", "population"])
     pep_r150 = pd.read_parquet(RANK51_150_PANEL, columns=["msa_id", "year", "population"])
-    msa_pop = pd.concat([pep, pep_r150], ignore_index=True).drop_duplicates(
-        ["msa_id", "year"]
-    )
+    msa_pop = pd.concat([pep, pep_r150], ignore_index=True).drop_duplicates(["msa_id", "year"])
 
     rows = []
     for (msa_id, year), group in joined.groupby(["msa_id", "year"]):
@@ -172,10 +164,15 @@ def run() -> dict[str, object]:
     return {
         "pooled_cohorts": merged.cohort.value_counts().to_dict(),
         "rows": int(len(merged)),
-        "rows_by_year": {int(year): int(count) for year, count in merged.groupby("year").size().items()},
+        "rows_by_year": {
+            int(year): int(count) for year, count in merged.groupby("year").size().items()
+        },
         "non_null_jail_per_1000_rows_by_year": {
             int(year): int(count)
-            for year, count in merged.dropna(subset=["jail_per_1000"]).groupby("year").size().items()
+            for year, count in merged.dropna(subset=["jail_per_1000"])
+            .groupby("year")
+            .size()
+            .items()
         },
         "ct_msas_expected_all_null_jail_coverage": [str(msa) for msa in ct_msas],
         "outputs": {"levels_parquet": str(out_path)},

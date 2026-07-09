@@ -102,9 +102,7 @@ def load_hud_psh_msa_panel(*, years: list[int]) -> pd.DataFrame:
     required = {"msa_id", "year", *HUD_PSH_COLUMNS}
     missing = sorted(required - set(frame.columns))
     if missing:
-        raise ValueError(
-            f"HUD PSH MSA panel {panel_path} is missing required columns: {missing}"
-        )
+        raise ValueError(f"HUD PSH MSA panel {panel_path} is missing required columns: {missing}")
 
     frame["msa_id"] = _as_msa_id(frame["msa_id"])
     frame["year"] = pd.to_numeric(frame["year"], errors="coerce").astype("Int64")
@@ -257,7 +255,7 @@ def summarize_panel(levels: pd.DataFrame, fd: pd.DataFrame) -> dict[str, object]
     }
 
 
-def main() -> None:
+def run() -> dict[str, object]:
     OUT.mkdir(parents=True, exist_ok=True)
     levels = build_levels_panel()
     fd = levels[levels["year_gap"] == 1].copy()
@@ -276,10 +274,29 @@ def main() -> None:
     regressions.to_csv(regression_csv_path, index=False)
     summary_path.write_text(json.dumps(summary, indent=2) + "\n", encoding="utf-8")
 
-    print(f"levels rows: {len(levels)} -> {levels_path}")
-    print(f"fd rows: {len(fd)} -> {fd_path}")
-    print(f"regression rows: {len(regressions)} -> {regression_path}")
-    print(f"summary -> {summary_path}")
+    return {
+        "summary": summary,
+        "regressions": json.loads(regressions.to_json(orient="records")),
+        "outputs": {
+            "levels_parquet": str(levels_path),
+            "fd_parquet": str(fd_path),
+            "regressions_parquet": str(regression_path),
+            "regressions_csv": str(regression_csv_path),
+            "summary_json": str(summary_path),
+        },
+    }
+
+
+def main() -> None:
+    result = run()
+    summary = result["summary"]
+    outputs = result["outputs"]
+    regressions = pd.DataFrame(result["regressions"])
+
+    print(f"levels rows: {summary['levels_rows']} -> {outputs['levels_parquet']}")
+    print(f"fd rows: {summary['fd_rows_year_gap_1']} -> {outputs['fd_parquet']}")
+    print(f"regression rows: {len(regressions)} -> {outputs['regressions_parquet']}")
+    print(f"summary -> {outputs['summary_json']}")
     if not regressions.empty:
         print(regressions[regressions["term"].str.contains("subsidized|voucher")])
 

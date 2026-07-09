@@ -33,8 +33,7 @@ BPS_MSA = ROOT / "data/curated/covariates/covariate_panel__census_bps__Y1980-ong
 BPS_COUNTY = ROOT / "data/curated/covariates/covariate__census_bps__Y2000-2024.parquet"
 MEMBERSHIP = ROOT / "data/curated/msa/msa_county_membership__census_msa_2023.parquet"
 ZORI_MSA = (
-    ROOT
-    / "data/curated/zori/"
+    ROOT / "data/curated/zori/"
     "zori__msa__Y2015-2025@Mcensusmsa2023xC2023__wpopulation__mpit_january__balanced.parquet"
 )
 SAIZ = ROOT / "data/raw/saiz_elasticity/saiz2010_supply_elasticity.dta"

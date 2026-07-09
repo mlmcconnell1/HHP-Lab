@@ -132,7 +132,11 @@ def _design_matrix(sample: pd.DataFrame, spec: RegressionSpec) -> pd.DataFrame:
 
 
 FE_TIERS = ("year", "primary_state_year", "region_year")
-FE_SUFFIX = {"year": "year_fe", "primary_state_year": "state_year_fe", "region_year": "region_year_fe"}
+FE_SUFFIX = {
+    "year": "year_fe",
+    "primary_state_year": "state_year_fe",
+    "region_year": "region_year_fe",
+}
 
 
 def _model_specs() -> Iterable[RegressionSpec]:
