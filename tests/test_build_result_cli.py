@@ -179,6 +179,37 @@ def test_build_result_eviction_rate_timing_workflow_json() -> None:
     )
 
 
+def test_build_result_bps_valuation_benchmark_workflow_json() -> None:
+    calls: list[str] = []
+
+    def fake_run_workflow_module(module_name: str) -> dict[str, object]:
+        calls.append(module_name)
+        return {
+            "script": f"scripts/{module_name}.py",
+            "module": f"hhplab.results.workflows.{module_name}",
+            "stdout": [f"ran {module_name}"],
+        }
+
+    with patch(
+        "hhplab.cli.build_cmds.results._run_workflow_module",
+        side_effect=fake_run_workflow_module,
+    ):
+        result = runner.invoke(
+            app,
+            ["build", "result", "bps-valuation-benchmark", "--json"],
+        )
+
+    assert result.exit_code == 0, result.output
+    payload = json.loads(result.output)
+    assert payload["status"] == "ok"
+    assert payload["workflow"] == "bps-valuation-benchmark"
+    assert calls == ["build_bps_valuation_benchmark"]
+    assert payload["steps"][0]["script"] == "scripts/build_bps_valuation_benchmark.py"
+    assert payload["steps"][0]["module"] == (
+        "hhplab.results.workflows.build_bps_valuation_benchmark"
+    )
+
+
 def test_build_result_qcew_labor_market_workflow_json() -> None:
     calls: list[str] = []
 

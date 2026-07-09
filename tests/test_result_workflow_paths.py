@@ -16,6 +16,11 @@ WORKFLOW_PATH_CASES = [
         REPO_ROOT / "outputs" / "eviction_rate_timing",
     ),
     (
+        "build_bps_valuation_benchmark",
+        "OUT",
+        REPO_ROOT / "outputs" / "bps_valuation_benchmark",
+    ),
+    (
         "build_employment_labor_force_composition_panel",
         "OUT",
         REPO_ROOT / "outputs" / "composition_rent_population",

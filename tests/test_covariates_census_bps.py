@@ -57,6 +57,12 @@ EXPECTED_BPS_MEASURES: dict[tuple[str, int], dict[str, int]] = {
     for year, state, county3, classes in CENSUS_BPS_FIXTURE_ROWS
 }
 
+BPS_REQUIRED_CLASS_DROPS_TRUTH_TABLE = {
+    2020: "non-null: base year weights 1-unit and 2-unit classes equally",
+    2021: "null: 2-unit class has positive base weight but no current units",
+    2022: "non-null: 1-unit and 2-unit classes remain available; new 3-4 unit class is ignored",
+}
+
 
 def _write_bps_annual_file(directory: Path, year: int) -> Path:
     rows = [row for row in CENSUS_BPS_FIXTURE_ROWS if row[0] == year]
@@ -260,3 +266,44 @@ def test_census_bps_msa_aggregation_derives_fixed_mix_value_per_unit(
     assert result.loc[2021, CENSUS_BPS_MIX_ADJUSTED_VALUE_PER_UNIT_COLUMN] == pytest.approx(210.0)
     naive_2021 = result.loc[2021, "permit_value_thousands"] / result.loc[2021, "permitted_units"]
     assert naive_2021 == pytest.approx(156.0)
+
+
+def test_census_bps_mix_adjusted_value_masks_when_required_class_drops(
+    tmp_path: Path,
+) -> None:
+    rows = []
+    cases = [
+        (2020, [10, 10, 0, 0], [1000, 2000, 0, 0]),
+        (2021, [20, 0, 0, 0], [3000, 0, 0, 0]),
+        (2022, [20, 5, 7, 0], [3200, 900, 7000, 0]),
+    ]
+    for year, class_units, class_values in cases:
+        rows.append(
+            {
+                "geo_type": "county",
+                "geo_id": "01001",
+                "county_fips": "01001",
+                "year": year,
+                "permitted_units": sum(class_units),
+                "permitted_buildings": sum(class_units),
+                "permit_value_thousands": sum(class_values),
+                **dict(zip(CENSUS_BPS_CLASS_UNIT_COLUMNS, class_units, strict=True)),
+                **dict(zip(CENSUS_BPS_CLASS_VALUE_COLUMNS, class_values, strict=True)),
+            }
+        )
+    curated = tmp_path / "covariate__census_bps__Y2020-2022.parquet"
+    pd.DataFrame(rows).to_parquet(curated, index=False)
+
+    panel = aggregate_covariate_source(
+        CENSUS_BPS_SOURCE_ID,
+        curated_path=curated,
+        output_path=tmp_path / "bps_county_panel.parquet",
+        target_geo="county",
+        force=True,
+    )
+
+    result = pd.read_parquet(panel).set_index("year")
+    assert set(BPS_REQUIRED_CLASS_DROPS_TRUTH_TABLE) == set(result.index)
+    assert result.loc[2020, CENSUS_BPS_MIX_ADJUSTED_VALUE_PER_UNIT_COLUMN] == pytest.approx(150.0)
+    assert pd.isna(result.loc[2021, CENSUS_BPS_MIX_ADJUSTED_VALUE_PER_UNIT_COLUMN])
+    assert result.loc[2022, CENSUS_BPS_MIX_ADJUSTED_VALUE_PER_UNIT_COLUMN] == pytest.approx(170.0)
