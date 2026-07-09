@@ -122,7 +122,7 @@ RESULT_WORKFLOWS: dict[str, ResultWorkflow] = {
     ),
     "housing-cost-burden-composition": ResultWorkflow(
         name="housing-cost-burden-composition",
-        description="Build the housing-cost-burden composition panel and regressions.",
+        description="Build the housing-cost-burden composition panel and timing-aware regressions.",
         modules=("build_housing_cost_burden_composition_panel",),
     ),
     "subsidized-housing-stock": ResultWorkflow(

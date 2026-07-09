@@ -1,8 +1,13 @@
-"""Build pooled top-150 housing-cost-burden panels and rent-growth screens.
+"""Build pooled top-150 housing-cost-burden panels and timing-aware rent screens.
 
 This workflow combines ACS5 tract-derived MSA affordability measures with ACS1
 metro-native rent burden. ACS vintages follow the standard lag convention:
 ACS vintage end year E is aligned to PIT year E + 1.
+
+The primary modeled question is whether prior-year affordability burden levels
+predict subsequent rent growth. Same-year first-difference screens are retained
+as secondary descriptive checks and are labeled separately in the regression
+output.
 """
 
 from __future__ import annotations
@@ -15,10 +20,12 @@ from dataclasses import dataclass
 import pandas as pd
 import statsmodels.api as sm
 
+from hhplab.census_regions import census_region
 from hhplab.results.workflows.build_household_size_composition_panel import (
     ACS1_METRO_GLOB,
     OUT,
     _as_msa_id,
+    _primary_state,
     load_pooled_base_panel,
 )
 from hhplab.results.workflows.build_renter_household_share_composition_panel import (
@@ -72,6 +79,8 @@ class ModelSpec:
     name: str
     outcome: str
     predictors: tuple[str, ...]
+    family: str
+    fixed_effects: tuple[str, ...]
 
 
 def _safe_ratio(numerator: pd.Series, denominator: pd.Series) -> pd.Series:
@@ -82,6 +91,13 @@ def _safe_ratio(numerator: pd.Series, denominator: pd.Series) -> pd.Series:
 
 def _sum_columns(frame: pd.DataFrame, columns: list[str]) -> pd.Series:
     return frame[columns].apply(pd.to_numeric, errors="coerce").sum(axis=1, min_count=1)
+
+
+def _census_region_or_na(state: object) -> object:
+    try:
+        return census_region(state)
+    except ValueError:
+        return pd.NA
 
 
 def load_acs5_housing_cost_burden_panel() -> pd.DataFrame:
@@ -206,8 +222,18 @@ def load_acs1_housing_cost_burden_panel() -> pd.DataFrame:
     return pd.concat(frames, ignore_index=True)
 
 
-def add_first_differences(levels: pd.DataFrame) -> pd.DataFrame:
+def add_timing_columns(levels: pd.DataFrame) -> pd.DataFrame:
     levels = levels.sort_values(["msa_id", "year"]).copy()
+    if "primary_state" not in levels.columns and "msa_name" in levels.columns:
+        levels["primary_state"] = levels["msa_name"].map(_primary_state)
+    if "primary_state" in levels.columns:
+        levels["region"] = levels["primary_state"].map(_census_region_or_na)
+        levels["primary_state_year"] = (
+            levels["primary_state"].astype("string") + "_" + levels["year"].astype("Int64").astype("string")
+        )
+        levels["region_year"] = (
+            levels["region"].astype("string") + "_" + levels["year"].astype("Int64").astype("string")
+        )
     grouped = levels.groupby("msa_id", sort=False)
     levels["year_gap"] = grouped["year"].diff()
     levels["d_log_zori"] = grouped["log_zori"].diff()
@@ -217,6 +243,8 @@ def add_first_differences(levels: pd.DataFrame) -> pd.DataFrame:
     levels["d_log_pop"] = grouped["log_pop"].diff()
     for column in SCREEN_COLUMNS:
         levels[f"d_{column}"] = grouped[column].diff()
+        levels[f"{column}_lag1"] = grouped[column].shift(1)
+        levels.loc[levels["year_gap"] != 1, f"{column}_lag1"] = pd.NA
     return levels
 
 
@@ -226,39 +254,60 @@ def build_levels_panel() -> pd.DataFrame:
     acs1 = load_acs1_housing_cost_burden_panel()
     merged = base.merge(acs5, on=["msa_id", "year"], how="left")
     merged = merged.merge(acs1, on=["msa_id", "year"], how="left")
-    return add_first_differences(merged)
+    return add_timing_columns(merged)
 
 
 def _model_specs() -> Iterable[ModelSpec]:
+    rent_fixed_effects = (
+        ("year", "year_fe"),
+        ("region_year", "region_year_fe"),
+        ("primary_state_year", "state_year_fe"),
+    )
     for column in SCREEN_COLUMNS:
         diff_column = f"d_{column}"
+        lag_column = f"{column}_lag1"
+        for fixed_effect, label in rent_fixed_effects:
+            yield ModelSpec(
+                name=f"rent_lag1_{column}_{label}",
+                outcome="d_log_zori",
+                predictors=("d_log_pop", lag_column),
+                family="lagged_level_channel",
+                fixed_effects=(fixed_effect,),
+            )
+            yield ModelSpec(
+                name=f"rent_fd_same_year_{column}_{label}",
+                outcome="d_log_zori",
+                predictors=("d_log_pop", diff_column),
+                family="same_year_screen",
+                fixed_effects=(fixed_effect,),
+            )
         yield ModelSpec(
-            name=f"rent_fd_{column}",
-            outcome="d_log_zori",
-            predictors=("d_log_pop", diff_column),
-        )
-        yield ModelSpec(
-            name=f"unsheltered_fd_{column}",
+            name=f"unsheltered_fd_same_year_{column}",
             outcome="d_log_unshelt_rate",
             predictors=("d_log_zori", "d_log_pop", diff_column),
+            family="same_year_unsheltered_screen",
+            fixed_effects=("year",),
         )
 
 
 def fit_clustered_fd_models(fd: pd.DataFrame) -> pd.DataFrame:
     rows: list[dict[str, object]] = []
     for spec in _model_specs():
-        required = [spec.outcome, *spec.predictors, "year", "msa_id"]
+        required = [spec.outcome, *spec.predictors, *spec.fixed_effects, "msa_id"]
         sample = fd.dropna(subset=required).copy()
         if sample.empty:
             continue
 
-        year_fe = pd.get_dummies(
-            sample["year"].astype("string"),
-            prefix="year",
-            drop_first=True,
-            dtype=float,
-        )
-        x = pd.concat([sample[list(spec.predictors)].astype(float), year_fe], axis=1)
+        fe_parts = [
+            pd.get_dummies(
+                sample[fixed_effect].astype("string"),
+                prefix=fixed_effect,
+                drop_first=True,
+                dtype=float,
+            )
+            for fixed_effect in spec.fixed_effects
+        ]
+        x = pd.concat([sample[list(spec.predictors)].astype(float), *fe_parts], axis=1)
         x = sm.add_constant(x, has_constant="add")
         y = sample[spec.outcome].astype(float)
         result = sm.OLS(y, x).fit(
@@ -269,6 +318,7 @@ def fit_clustered_fd_models(fd: pd.DataFrame) -> pd.DataFrame:
         for term in spec.predictors:
             rows.append(
                 {
+                    "family": spec.family,
                     "model": spec.name,
                     "outcome": spec.outcome,
                     "term": term,
@@ -279,6 +329,7 @@ def fit_clustered_fd_models(fd: pd.DataFrame) -> pd.DataFrame:
                     "nobs": int(result.nobs),
                     "clusters": int(sample["msa_id"].nunique()),
                     "r_squared": float(result.rsquared),
+                    "fixed_effects": "+".join(spec.fixed_effects),
                     "year_fixed_effects": True,
                     "std_error_type": "clustered:msa_id",
                 }
@@ -288,7 +339,11 @@ def fit_clustered_fd_models(fd: pd.DataFrame) -> pd.DataFrame:
 
 def summarize_panel(levels: pd.DataFrame, fd: pd.DataFrame) -> dict[str, object]:
     main_column = "acs5_rent_burden_30_plus"
-    complete_fd = fd.dropna(
+    main_lag_column = f"{main_column}_lag1"
+    complete_lagged = fd.dropna(
+        subset=["d_log_zori", "d_log_pop", main_lag_column]
+    )
+    complete_same_year = fd.dropna(
         subset=["d_log_zori", "d_log_unshelt_rate", "d_log_pop", f"d_{main_column}"]
     )
     level_summary = (
@@ -298,7 +353,7 @@ def summarize_panel(levels: pd.DataFrame, fd: pd.DataFrame) -> dict[str, object]
         .round({"mean": 6, "median": 6})
     )
     correlations = (
-        complete_fd[
+        complete_same_year[
             [
                 "d_log_zori",
                 "d_log_unshelt_rate",
@@ -309,10 +364,16 @@ def summarize_panel(levels: pd.DataFrame, fd: pd.DataFrame) -> dict[str, object]
         .corr()
         .round(6)
     )
+    sample_sizes = {
+        spec.name: int(len(fd.dropna(subset=[spec.outcome, *spec.predictors, *spec.fixed_effects, "msa_id"])))
+        for spec in _model_specs()
+    }
     return {
         "levels_rows": int(len(levels)),
         "fd_rows_year_gap_1": int(len(fd)),
         "msa_count": int(levels["msa_id"].nunique()),
+        "primary_model_family": "lagged_level_channel",
+        "rent_model_fixed_effects": ["year", "region_year", "primary_state_year"],
         "years": [int(year) for year in sorted(levels["year"].dropna().unique())],
         "acs5_vintages_used": [
             int(vintage) for vintage in sorted(levels["acs5_vintage_used"].dropna().unique())
@@ -320,10 +381,15 @@ def summarize_panel(levels: pd.DataFrame, fd: pd.DataFrame) -> dict[str, object]
         "acs1_vintages_used": [
             int(vintage) for vintage in sorted(levels["acs1_vintage_used"].dropna().unique())
         ],
-        "complete_fd_rows_for_acs5_rent_burden_30_plus": int(len(complete_fd)),
+        "lagged_level_rows_for_acs5_rent_burden_30_plus": int(len(complete_lagged)),
+        "same_year_complete_fd_rows_for_acs5_rent_burden_30_plus": int(len(complete_same_year)),
+        "timing_sample_sizes": sample_sizes,
         "level_housing_cost_burden_summary": json.loads(level_summary.to_json()),
         "levels_missing_affordability_columns": {
             column: int(levels[column].isna().sum()) for column in SCREEN_COLUMNS
+        },
+        "levels_missing_affordability_lag_columns": {
+            f"{column}_lag1": int(levels[f"{column}_lag1"].isna().sum()) for column in SCREEN_COLUMNS
         },
         "fd_missing_affordability_diff_columns": {
             f"d_{column}": int(fd[f"d_{column}"].isna().sum()) for column in SCREEN_COLUMNS

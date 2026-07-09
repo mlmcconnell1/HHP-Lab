@@ -388,9 +388,42 @@ def test_housing_cost_burden_panel_uses_acs_lags_and_derives_burden_rates(
     assert levels.loc[2020, "acs5_owner_cost_burden_50_plus"] == pytest.approx(0.13)
     assert levels.loc[2020, "acs5_rent_to_income"] == pytest.approx(1200 / (60_000 / 12))
     assert levels.loc[2020, "acs1_rent_to_income"] == pytest.approx(1250 / (62_000 / 12))
+    assert pd.isna(levels.loc[2020, "acs5_rent_burden_30_plus_lag1"])
+    assert levels.loc[2021, "acs5_rent_burden_30_plus_lag1"] == pytest.approx(0.40)
+    assert levels.loc[2021, "acs1_rent_to_income_lag1"] == pytest.approx(1250 / (62_000 / 12))
     assert levels.loc[2021, "d_acs5_rent_burden_30_plus"] == pytest.approx(0.04)
     assert levels.loc[2021, "d_acs1_rent_burden_50_plus"] == pytest.approx(0.02)
     assert pd.isna(levels.loc[2019, "acs5_rent_burden_30_plus"])
+
+
+def test_housing_cost_burden_models_treat_lagged_levels_as_primary_channel() -> None:
+    burden = _load_script("build_housing_cost_burden_composition_panel")
+
+    specs = list(burden._model_specs())
+
+    assert {spec.family for spec in specs} == {
+        "lagged_level_channel",
+        "same_year_screen",
+        "same_year_unsheltered_screen",
+    }
+    assert any(
+        spec.name == "rent_lag1_acs5_rent_burden_30_plus_state_year_fe"
+        and spec.predictors == ("d_log_pop", "acs5_rent_burden_30_plus_lag1")
+        and spec.fixed_effects == ("primary_state_year",)
+        for spec in specs
+    )
+    assert any(
+        spec.name == "rent_fd_same_year_acs5_rent_burden_30_plus_region_year_fe"
+        and spec.predictors == ("d_log_pop", "d_acs5_rent_burden_30_plus")
+        and spec.fixed_effects == ("region_year",)
+        for spec in specs
+    )
+    assert any(
+        spec.name == "unsheltered_fd_same_year_acs5_rent_burden_30_plus"
+        and spec.predictors == ("d_log_zori", "d_log_pop", "d_acs5_rent_burden_30_plus")
+        and spec.fixed_effects == ("year",)
+        for spec in specs
+    )
 
 
 def _robustness_fixture() -> pd.DataFrame:
