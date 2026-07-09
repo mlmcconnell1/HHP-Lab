@@ -3,15 +3,48 @@
 from __future__ import annotations
 
 import json
+from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import patch
 
 import pandas as pd
 from typer.testing import CliRunner
 
-from hhplab.cli.build_cmds.results import RESULT_WORKFLOWS
+from hhplab.cli.build_cmds.results import RESULT_WORKFLOWS, _run_workflow_module
 from hhplab.cli.main import app
 
 runner = CliRunner()
+
+
+def test_run_workflow_module_uses_structured_run_contract() -> None:
+    module = SimpleNamespace(
+        __name__="hhplab.results.workflows.example",
+        run=lambda: {"row_count": 3, "models": [{"term": "x"}]},
+        main=lambda: None,
+    )
+
+    with patch("hhplab.cli.build_cmds.results.importlib.import_module", return_value=module):
+        payload = _run_workflow_module("example")
+
+    assert payload["module"] == "hhplab.results.workflows.example"
+    assert payload["stdout"] == []
+    assert payload["result"] == {"row_count": 3, "models": [{"term": "x"}]}
+
+
+def test_run_workflow_module_reads_legacy_summary_stdout(tmp_path) -> None:
+    summary_path = tmp_path / "summary.json"
+    summary_path.write_text(json.dumps({"row_count": 2}) + "\n", encoding="utf-8")
+
+    def main() -> None:
+        print(f"summary -> {summary_path}")
+
+    module = SimpleNamespace(__name__="hhplab.results.workflows.legacy", main=main)
+
+    with patch("hhplab.cli.build_cmds.results.importlib.import_module", return_value=module):
+        payload = _run_workflow_module("legacy")
+
+    assert payload["stdout"] == [f"summary -> {summary_path}"]
+    assert payload["result"] == {"row_count": 2}
 
 
 def test_build_result_composition_workflow_json() -> None:
@@ -280,6 +313,24 @@ def test_all_documented_results_includes_eviction_timing_before_qcew() -> None:
     assert modules.index("build_eviction_rate_timing_panel") < modules.index(
         "build_qcew_labor_market_panel"
     )
+
+
+def test_registered_result_workflows_have_structured_result_contract() -> None:
+    missing_contract: list[str] = []
+
+    for workflow in RESULT_WORKFLOWS.values():
+        for module_name in workflow.modules:
+            module = __import__(
+                f"hhplab.results.workflows.{module_name}",
+                fromlist=["run", "__file__"],
+            )
+            if callable(getattr(module, "run", None)):
+                continue
+            source = Path(module.__file__).read_text(encoding="utf-8")
+            if "summary ->" not in source:
+                missing_contract.append(module_name)
+
+    assert missing_contract == []
 
 
 def test_build_result_workflow_failure_json_is_actionable() -> None:

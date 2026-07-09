@@ -242,7 +242,7 @@ def summarize(levels: pd.DataFrame, regressions: pd.DataFrame) -> dict[str, obje
     }
 
 
-def main() -> None:
+def run() -> dict[str, object]:
     OUT.mkdir(parents=True, exist_ok=True)
     levels = build_levels_panel()
     regressions = fit_clustered_fd_models(levels)
@@ -258,11 +258,26 @@ def main() -> None:
     regressions.to_csv(regression_csv_path, index=False)
     summary_path.write_text(json.dumps(summary, indent=2) + "\n", encoding="utf-8")
 
-    print(f"levels rows: {len(levels)} -> {levels_path}")
-    print(f"regression rows: {len(regressions)} -> {regression_path}")
-    print(f"summary -> {summary_path}")
-    if not regressions.empty:
-        print(regressions.to_string(index=False))
+    return {
+        **summary,
+        "outputs": {
+            "levels_parquet": str(levels_path),
+            "regressions_parquet": str(regression_path),
+            "regressions_csv": str(regression_csv_path),
+            "summary_json": str(summary_path),
+        },
+    }
+
+
+def main() -> None:
+    result = run()
+    outputs = result["outputs"]
+
+    print(f"levels rows: {result['levels_rows']} -> {outputs['levels_parquet']}")
+    print(f"regression rows: {result['regression_count']} -> {outputs['regressions_parquet']}")
+    print(f"summary -> {outputs['summary_json']}")
+    if result["regressions"]:
+        print(pd.DataFrame(result["regressions"]).to_string(index=False))
 
 
 if __name__ == "__main__":

@@ -174,7 +174,7 @@ def add_psh_diffs(levels: pd.DataFrame) -> pd.DataFrame:
     return levels
 
 
-def main() -> None:
+def run() -> dict[str, object]:
     OUT.mkdir(parents=True, exist_ok=True)
     pooled = load_pooled_base_panel()
     merged = merge_overdose(pooled)
@@ -189,17 +189,34 @@ def main() -> None:
     fd_path = OUT / "overdose_lag_fd.parquet"
     fd.to_parquet(fd_path, index=False)
 
-    print(f"pooled cohorts: {merged.cohort.value_counts().to_dict()}")
-    print(f"levels rows: {len(merged)} -> {levels_path}")
-    print(f"fd (year_gap==1) rows: {len(fd)} -> {fd_path}")
+    covered = merged[merged.overdose_coverage_ratio >= MIN_OVERDOSE_COVERAGE]
+    return {
+        "pooled_cohorts": merged.cohort.value_counts().to_dict(),
+        "levels_rows": int(len(merged)),
+        "fd_rows_year_gap_1": int(len(fd)),
+        "rows_by_year": {int(year): int(count) for year, count in merged.groupby("year").size().items()},
+        "rows_by_year_meeting_overdose_coverage": {
+            int(year): int(count) for year, count in covered.groupby("year").size().items()
+        },
+        "minimum_overdose_coverage": MIN_OVERDOSE_COVERAGE,
+        "outputs": {
+            "levels_parquet": str(levels_path),
+            "fd_parquet": str(fd_path),
+        },
+    }
+
+
+def main() -> None:
+    result = run()
+    outputs = result["outputs"]
+
+    print(f"pooled cohorts: {result['pooled_cohorts']}")
+    print(f"levels rows: {result['levels_rows']} -> {outputs['levels_parquet']}")
+    print(f"fd (year_gap==1) rows: {result['fd_rows_year_gap_1']} -> {outputs['fd_parquet']}")
     print("rows per year (levels):")
-    print(merged.groupby("year").size())
+    print(result["rows_by_year"])
     print("rows per year meeting overdose_coverage_ratio>=0.8 (levels):")
-    print(
-        merged[merged.overdose_coverage_ratio >= MIN_OVERDOSE_COVERAGE]
-        .groupby("year")
-        .size()
-    )
+    print(result["rows_by_year_meeting_overdose_coverage"])
 
 
 if __name__ == "__main__":

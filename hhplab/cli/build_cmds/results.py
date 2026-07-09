@@ -7,6 +7,7 @@ import importlib
 import io
 import json
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Annotated
 
 import typer
@@ -220,23 +221,47 @@ def _script_label(module_name: str) -> str:
     return f"scripts/{module_name}.py"
 
 
+def _load_summary_from_stdout(stdout_lines: list[str]) -> dict[str, object] | None:
+    for line in stdout_lines:
+        prefix = "summary -> "
+        if not line.startswith(prefix):
+            continue
+        path = Path(line.removeprefix(prefix).strip())
+        if not path.exists():
+            continue
+        with path.open(encoding="utf-8") as handle:
+            payload = json.load(handle)
+        if isinstance(payload, dict):
+            return payload
+    return None
+
+
 def _run_workflow_module(module_name: str) -> dict[str, object]:
     module = importlib.import_module(f"{WORKFLOW_MODULE_PREFIX}.{module_name}")
+    run = getattr(module, "run", None)
     main = getattr(module, "main", None)
-    if main is None:
+    callable_entrypoint = run if callable(run) else main
+    if callable_entrypoint is None:
         raise AttributeError(
-            f"Result workflow module {module.__name__} has no main() function. "
-            "Add main() or update RESULT_WORKFLOWS."
+            f"Result workflow module {module.__name__} has no run() or main() function. "
+            "Add run()/main() or update RESULT_WORKFLOWS."
         )
     stdout = io.StringIO()
     with contextlib.redirect_stdout(stdout):
-        main()
+        result = callable_entrypoint()
 
-    return {
+    stdout_lines = stdout.getvalue().splitlines()
+    if result is None:
+        result = _load_summary_from_stdout(stdout_lines)
+
+    payload: dict[str, object] = {
         "script": _script_label(module_name),
         "module": module.__name__,
-        "stdout": stdout.getvalue().splitlines(),
+        "stdout": stdout_lines,
     }
+    if result is not None:
+        payload["result"] = result
+    return payload
 
 
 def build_result_cmd(

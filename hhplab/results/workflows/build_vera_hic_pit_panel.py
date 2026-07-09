@@ -153,7 +153,7 @@ def merge_hic_categories(base: pd.DataFrame) -> pd.DataFrame:
     return merged
 
 
-def main() -> None:
+def run() -> dict[str, object]:
     OUT.mkdir(parents=True, exist_ok=True)
     pooled = load_pooled_base_panel()
     pooled = merge_hic_categories(pooled)
@@ -168,14 +168,33 @@ def main() -> None:
     out_path = OUT / "vera_hic_pit_levels.parquet"
     merged.to_parquet(out_path, index=False)
 
-    print(f"pooled cohorts: {merged.cohort.value_counts().to_dict()}")
-    print(f"rows: {len(merged)} -> {out_path}")
-    print("rows per year:")
-    print(merged.groupby("year").size())
-    print("non-null jail_per_1000 rows per year:")
-    print(merged.dropna(subset=["jail_per_1000"]).groupby("year").size())
     ct_msas = merged.loc[merged.msa_name.str.contains("CT", na=False), "msa_name"].unique()
-    print(f"CT MSAs in cohort (expect all-null jail coverage): {list(ct_msas)}")
+    return {
+        "pooled_cohorts": merged.cohort.value_counts().to_dict(),
+        "rows": int(len(merged)),
+        "rows_by_year": {int(year): int(count) for year, count in merged.groupby("year").size().items()},
+        "non_null_jail_per_1000_rows_by_year": {
+            int(year): int(count)
+            for year, count in merged.dropna(subset=["jail_per_1000"]).groupby("year").size().items()
+        },
+        "ct_msas_expected_all_null_jail_coverage": [str(msa) for msa in ct_msas],
+        "outputs": {"levels_parquet": str(out_path)},
+    }
+
+
+def main() -> None:
+    result = run()
+
+    print(f"pooled cohorts: {result['pooled_cohorts']}")
+    print(f"rows: {result['rows']} -> {result['outputs']['levels_parquet']}")
+    print("rows per year:")
+    print(result["rows_by_year"])
+    print("non-null jail_per_1000 rows per year:")
+    print(result["non_null_jail_per_1000_rows_by_year"])
+    print(
+        "CT MSAs in cohort (expect all-null jail coverage): "
+        f"{result['ct_msas_expected_all_null_jail_coverage']}"
+    )
 
 
 if __name__ == "__main__":

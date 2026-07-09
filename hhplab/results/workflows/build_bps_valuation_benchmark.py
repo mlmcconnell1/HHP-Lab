@@ -329,6 +329,24 @@ def run_benchmark(
     }
 
 
+def run() -> dict[str, object]:
+    result = run_benchmark(
+        bps_county_path=os.environ.get(BPS_COUNTY_PATH_ENV),
+        bps_msa_panel_path=os.environ.get(BPS_MSA_PANEL_PATH_ENV),
+        fetch_live_ppi=os.environ.get(BPS_FETCH_LIVE_PPI_ENV) == "1",
+    )
+    return {
+        **result["summary"],
+        "outputs": {
+            "ppi_benchmark_parquet": result["ppi_benchmark_path"],
+            "ppi_benchmark_csv": result["ppi_benchmark_csv_path"],
+            "distinctness_parquet": result["distinctness_path"],
+            "distinctness_csv": result["distinctness_csv_path"],
+            "summary_json": result["summary_path"],
+        },
+    }
+
+
 def main() -> None:
     result = run_benchmark(
         bps_county_path=os.environ.get(BPS_COUNTY_PATH_ENV),

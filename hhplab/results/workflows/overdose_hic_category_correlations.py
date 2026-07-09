@@ -45,7 +45,7 @@ def partial_corr_controlling_pop(x: np.ndarray, y: np.ndarray, pop: np.ndarray):
     return stats.pearsonr(x - design @ bx, y - design @ by)
 
 
-def main() -> None:
+def run() -> dict[str, object]:
     df = pd.read_parquet(LEVELS_PANEL)
     df = df[df.overdose_coverage_ratio >= MIN_OVERDOSE_COVERAGE].copy()
 
@@ -99,10 +99,25 @@ def main() -> None:
         print(line)
 
     out_dir = ROOT / "outputs" / "overdose_lag"
-    pd.DataFrame(rows).to_csv(out_dir / "hic_category_correlations_pooled.csv", index=False)
-    pd.DataFrame(by_year_rows).to_csv(
-        out_dir / "hic_category_correlations_by_year.csv", index=False
-    )
+    pooled_path = out_dir / "hic_category_correlations_pooled.csv"
+    by_year_path = out_dir / "hic_category_correlations_by_year.csv"
+    pd.DataFrame(rows).to_csv(pooled_path, index=False)
+    pd.DataFrame(by_year_rows).to_csv(by_year_path, index=False)
+    return {
+        "minimum_overdose_coverage": MIN_OVERDOSE_COVERAGE,
+        "pooled_rows": len(rows),
+        "by_year_rows": len(by_year_rows),
+        "pooled": rows,
+        "by_year": by_year_rows,
+        "outputs": {
+            "pooled_csv": str(pooled_path),
+            "by_year_csv": str(by_year_path),
+        },
+    }
+
+
+def main() -> None:
+    run()
 
 
 if __name__ == "__main__":

@@ -264,7 +264,7 @@ def _build_panel() -> pd.DataFrame:
     return panel.loc[:, OUTPUT_COLUMNS]
 
 
-def _write_outputs(panel: pd.DataFrame) -> None:
+def _write_outputs(panel: pd.DataFrame) -> dict[str, object]:
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     stem = (
         "panel__top50_msa_nonpr_coc_pit_contract_rent_2010_2020__"
@@ -369,12 +369,17 @@ Allocation notes:
 - Puerto Rico MSAs are excluded before selecting the top 50.
 """
     (OUTPUT_DIR / "README.md").write_text(readme, encoding="utf-8")
+    return summary
+
+
+def run() -> dict[str, object]:
+    panel = _build_panel()
+    return _write_outputs(panel)
 
 
 def main() -> None:
-    panel = _build_panel()
-    _write_outputs(panel)
-    print(f"Wrote {len(panel)} rows to {OUTPUT_DIR.relative_to(ROOT)}")
+    result = run()
+    print(f"Wrote {result['row_count']} rows to {OUTPUT_DIR.relative_to(ROOT)}")
 
 
 if __name__ == "__main__":

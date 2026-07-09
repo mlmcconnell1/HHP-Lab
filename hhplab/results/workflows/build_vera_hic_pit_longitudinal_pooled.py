@@ -171,7 +171,7 @@ def add_diffs(levels: pd.DataFrame) -> pd.DataFrame:
     return levels
 
 
-def main() -> None:
+def run() -> dict[str, object]:
     OUT.mkdir(parents=True, exist_ok=True)
     pooled = load_pooled_base_panel()
     pooled = merge_hic_categories(pooled)
@@ -192,14 +192,35 @@ def main() -> None:
     fd_path = OUT / "vera_hic_pit_longitudinal_pooled_fd.parquet"
     fd.to_parquet(fd_path, index=False)
 
-    print(f"pooled cohorts: {merged.cohort.value_counts().to_dict()}")
-    print(f"levels rows: {len(merged)} -> {out_path}")
-    print(f"fd (year_gap==1) rows: {len(fd)} -> {fd_path}")
+    return {
+        "pooled_cohorts": merged.cohort.value_counts().to_dict(),
+        "levels_rows": int(len(merged)),
+        "fd_rows_year_gap_1": int(len(fd)),
+        "rows_by_year": {int(year): int(count) for year, count in merged.groupby("year").size().items()},
+        "non_null_jail_per_1000_rows_by_year": {
+            int(year): int(count)
+            for year, count in merged.dropna(subset=["jail_per_1000"]).groupby("year").size().items()
+        },
+        "distinct_primary_state_count": int(merged.primary_state.nunique()),
+        "outputs": {
+            "levels_parquet": str(out_path),
+            "fd_parquet": str(fd_path),
+        },
+    }
+
+
+def main() -> None:
+    result = run()
+    outputs = result["outputs"]
+
+    print(f"pooled cohorts: {result['pooled_cohorts']}")
+    print(f"levels rows: {result['levels_rows']} -> {outputs['levels_parquet']}")
+    print(f"fd (year_gap==1) rows: {result['fd_rows_year_gap_1']} -> {outputs['fd_parquet']}")
     print("rows per year:")
-    print(merged.groupby("year").size())
+    print(result["rows_by_year"])
     print("non-null jail_per_1000 rows per year:")
-    print(merged.dropna(subset=["jail_per_1000"]).groupby("year").size())
-    print("distinct primary_state count:", merged.primary_state.nunique())
+    print(result["non_null_jail_per_1000_rows_by_year"])
+    print("distinct primary_state count:", result["distinct_primary_state_count"])
 
 
 if __name__ == "__main__":

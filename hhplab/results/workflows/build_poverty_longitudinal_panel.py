@@ -79,7 +79,7 @@ def load_poverty_panel() -> pd.DataFrame:
     )
 
 
-def main() -> None:
+def run() -> dict[str, object]:
     OUT.mkdir(parents=True, exist_ok=True)
     pooled = load_pooled_base_panel()
     poverty = load_poverty_panel()
@@ -99,14 +99,36 @@ def main() -> None:
     fd_path = OUT / "poverty_longitudinal_fd.parquet"
     fd.to_parquet(fd_path, index=False)
 
-    print(f"pooled cohorts: {merged.cohort.value_counts().to_dict()}")
-    print(f"levels rows: {len(merged)} -> {out_path}")
-    print(f"fd (year_gap==1) rows: {len(fd)} -> {fd_path}")
+    return {
+        "pooled_cohorts": merged.cohort.value_counts().to_dict(),
+        "levels_rows": int(len(merged)),
+        "fd_rows_year_gap_1": int(len(fd)),
+        "non_null_poverty_rate_rows_by_year": {
+            int(year): int(count)
+            for year, count in merged.dropna(subset=["poverty_rate"]).groupby("year").size().items()
+        },
+        "complete_case_fd_rows": int(
+            fd.dropna(subset=["d_log_unshelt_rate", "d_log_zori", "d_poverty_rate"]).shape[0]
+        ),
+        "outputs": {
+            "levels_parquet": str(out_path),
+            "fd_parquet": str(fd_path),
+        },
+    }
+
+
+def main() -> None:
+    result = run()
+    outputs = result["outputs"]
+
+    print(f"pooled cohorts: {result['pooled_cohorts']}")
+    print(f"levels rows: {result['levels_rows']} -> {outputs['levels_parquet']}")
+    print(f"fd (year_gap==1) rows: {result['fd_rows_year_gap_1']} -> {outputs['fd_parquet']}")
     print("non-null poverty_rate rows per year (levels):")
-    print(merged.dropna(subset=["poverty_rate"]).groupby("year").size())
+    print(result["non_null_poverty_rate_rows_by_year"])
     print(
         "fd rows with complete case (unshelt, zori, poverty):",
-        fd.dropna(subset=["d_log_unshelt_rate", "d_log_zori", "d_poverty_rate"]).shape[0],
+        result["complete_case_fd_rows"],
     )
 
 

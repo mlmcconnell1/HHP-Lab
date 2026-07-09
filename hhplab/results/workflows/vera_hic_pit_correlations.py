@@ -93,7 +93,7 @@ def run_family(df: pd.DataFrame, keys: tuple, labels: dict, rate_col_fn, log_sou
     return pooled_rows, by_year_rows
 
 
-def main() -> None:
+def run() -> dict[str, object]:
     df = pd.read_parquet(PANEL)
 
     print("############ Vera jail vs HIC bed categories ############")
@@ -111,10 +111,38 @@ def main() -> None:
     )
 
     out_dir = ROOT / "outputs" / "vera_hic_pit"
-    pd.DataFrame(hic_pooled).to_csv(out_dir / "vera_hic_correlations_pooled.csv", index=False)
-    pd.DataFrame(hic_by_year).to_csv(out_dir / "vera_hic_correlations_by_year.csv", index=False)
-    pd.DataFrame(pit_pooled).to_csv(out_dir / "vera_pit_correlations_pooled.csv", index=False)
-    pd.DataFrame(pit_by_year).to_csv(out_dir / "vera_pit_correlations_by_year.csv", index=False)
+    hic_pooled_path = out_dir / "vera_hic_correlations_pooled.csv"
+    hic_by_year_path = out_dir / "vera_hic_correlations_by_year.csv"
+    pit_pooled_path = out_dir / "vera_pit_correlations_pooled.csv"
+    pit_by_year_path = out_dir / "vera_pit_correlations_by_year.csv"
+    pd.DataFrame(hic_pooled).to_csv(hic_pooled_path, index=False)
+    pd.DataFrame(hic_by_year).to_csv(hic_by_year_path, index=False)
+    pd.DataFrame(pit_pooled).to_csv(pit_pooled_path, index=False)
+    pd.DataFrame(pit_by_year).to_csv(pit_by_year_path, index=False)
+    return {
+        "hic": {
+            "pooled_rows": len(hic_pooled),
+            "by_year_rows": len(hic_by_year),
+            "pooled": hic_pooled,
+            "by_year": hic_by_year,
+        },
+        "pit": {
+            "pooled_rows": len(pit_pooled),
+            "by_year_rows": len(pit_by_year),
+            "pooled": pit_pooled,
+            "by_year": pit_by_year,
+        },
+        "outputs": {
+            "hic_pooled_csv": str(hic_pooled_path),
+            "hic_by_year_csv": str(hic_by_year_path),
+            "pit_pooled_csv": str(pit_pooled_path),
+            "pit_by_year_csv": str(pit_by_year_path),
+        },
+    }
+
+
+def main() -> None:
+    run()
 
 
 if __name__ == "__main__":

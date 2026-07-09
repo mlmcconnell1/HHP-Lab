@@ -405,19 +405,20 @@ def build_top150_outputs(
     *,
     paths: InputPaths | None = None,
     out_dir: Path = OUT,
-) -> None:
+) -> list[dict[str, object]]:
     paths = DEFAULT_INPUT_PATHS if paths is None else paths
-    build_supply_iv_panel(TOP150_SPEC, paths=paths, out_dir=out_dir)
-    build_supply_iv_panel(
+    _, _, standard_manifest = build_supply_iv_panel(TOP150_SPEC, paths=paths, out_dir=out_dir)
+    _, _, complete_case_manifest = build_supply_iv_panel(
         TOP150_SPEC,
         paths=paths,
         out_dir=out_dir,
         suffix="_completecase",
         exclude_msa_ids=TOP150_SPEC.complete_case_exclusions,
     )
+    return [standard_manifest, complete_case_manifest]
 
 
-def main(argv: list[str] | None = None) -> None:
+def run(argv: list[str] | None = None) -> dict[str, object]:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "--msa-count",
@@ -427,12 +428,26 @@ def main(argv: list[str] | None = None) -> None:
     )
     args = parser.parse_args([] if argv is None else argv)
 
+    manifests: list[dict[str, object]] = []
     if args.msa_count in {"50", "all"}:
-        fd, longdiff, _manifest = build_supply_iv_panel(TOP50_SPEC)
-        print("top50 fd rows:", len(fd), "| longdiff rows:", len(longdiff))
+        _fd, _longdiff, manifest = build_supply_iv_panel(TOP50_SPEC)
+        manifests.append(manifest)
     if args.msa_count in {"150", "all"}:
-        build_top150_outputs()
-        print("top150 outputs written")
+        manifests.extend(build_top150_outputs())
+    return {
+        "msa_count": args.msa_count,
+        "cohort_count": len(manifests),
+        "manifests": manifests,
+    }
+
+
+def main(argv: list[str] | None = None) -> None:
+    result = run(argv)
+    for manifest in result["manifests"]:
+        print(
+            f"msa_count={manifest['requested_msa_count']} fd rows: "
+            f"{manifest['fd_rows']} | longdiff rows: {manifest['longdiff_rows']}"
+        )
 
 
 if __name__ == "__main__":
