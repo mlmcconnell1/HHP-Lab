@@ -145,6 +145,13 @@ RESULT_WORKFLOWS: dict[str, ResultWorkflow] = {
         description="Reproduce BPS mix-adjusted permit valuation benchmark checks.",
         modules=("build_bps_valuation_benchmark",),
     ),
+    "bps-valuation-rent-channel": ResultWorkflow(
+        name="bps-valuation-rent-channel",
+        description=(
+            "Test whether BPS mix-adjusted permit valuation growth leads MSA rent growth."
+        ),
+        modules=("build_bps_valuation_rent_channel",),
+    ),
     "composition-rent-population-robustness": ResultWorkflow(
         name="composition-rent-population-robustness",
         description="Run tracked robustness checks for composition rent-population screens.",
@@ -198,6 +205,7 @@ RESULT_WORKFLOWS: dict[str, ResultWorkflow] = {
             "analyze_noncompositional_rent_population_robustness",
             "build_qcew_labor_market_panel",
             "build_bps_valuation_benchmark",
+            "build_bps_valuation_rent_channel",
         ),
     ),
 }

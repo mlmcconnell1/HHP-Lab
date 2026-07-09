@@ -16,6 +16,7 @@ WRAPPER_CASES = [
     "analyze_noncompositional_rent_population_robustness",
     "build_eviction_rate_timing_panel",
     "build_bps_valuation_benchmark",
+    "build_bps_valuation_rent_channel",
     "build_household_size_composition_panel",
     "build_employment_labor_force_composition_panel",
     "build_income_inequality_composition_panel",
