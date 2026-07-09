@@ -13,6 +13,8 @@ from typing import Annotated
 import numpy as np
 import typer
 
+from hhplab.results.findings import write_finding_sidecar_from_result
+
 WORKFLOW_MODULE_PREFIX = "hhplab.results.workflows"
 
 
@@ -256,7 +258,7 @@ def _load_summary_from_stdout(stdout_lines: list[str]) -> dict[str, object] | No
     return None
 
 
-def _run_workflow_module(module_name: str) -> dict[str, object]:
+def _run_workflow_module(module_name: str, *, workflow_id: str | None = None) -> dict[str, object]:
     module = importlib.import_module(f"{WORKFLOW_MODULE_PREFIX}.{module_name}")
     run = getattr(module, "run", None)
     main = getattr(module, "main", None)
@@ -280,8 +282,35 @@ def _run_workflow_module(module_name: str) -> dict[str, object]:
         "stdout": stdout_lines,
     }
     if result is not None:
-        payload["result"] = _json_safe(result)
+        safe_result = _json_safe(result)
+        payload["result"] = safe_result
+        if workflow_id is not None and isinstance(safe_result, dict):
+            finding_path = write_finding_sidecar_from_result(
+                workflow_id=workflow_id,
+                module_name=module_name,
+                result=safe_result,
+            )
+            if finding_path is not None:
+                payload["finding_sidecar"] = str(finding_path)
     return payload
+
+
+def _attach_finding_sidecar(
+    step: dict[str, object],
+    *,
+    workflow_id: str,
+    module_name: str,
+) -> None:
+    result = step.get("result")
+    if not isinstance(result, dict) or "finding_sidecar" in step:
+        return
+    finding_path = write_finding_sidecar_from_result(
+        workflow_id=workflow_id,
+        module_name=module_name,
+        result=result,
+    )
+    if finding_path is not None:
+        step["finding_sidecar"] = str(finding_path)
 
 
 def build_result_cmd(
@@ -318,7 +347,9 @@ def build_result_cmd(
     steps: list[dict[str, object]] = []
     for module_name in workflow.modules:
         try:
-            steps.append(_run_workflow_module(module_name))
+            step = _run_workflow_module(module_name)
+            _attach_finding_sidecar(step, workflow_id=workflow.name, module_name=module_name)
+            steps.append(step)
         except Exception as exc:
             payload = {
                 "status": "error",

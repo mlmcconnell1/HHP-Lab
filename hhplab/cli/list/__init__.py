@@ -4,6 +4,7 @@ import typer
 
 from hhplab.cli.list.acs_variables import list_acs_variables
 from hhplab.cli.list.census import list_census
+from hhplab.cli.list.covariate_findings import list_covariate_findings
 from hhplab.cli.list.covariates import list_covariates
 from hhplab.cli.list.curated import list_curated
 from hhplab.cli.list.measures import list_measures
@@ -18,6 +19,7 @@ def register_commands(app: typer.Typer) -> None:
     app.command("boundaries")(list_boundaries_cmd)
     app.command("census")(list_census)
     app.command("curated")(list_curated)
+    app.command("covariate-findings")(list_covariate_findings)
     app.command("covariates")(list_covariates)
     app.command("measures")(list_measures)
     app.command("sources")(list_sources)
