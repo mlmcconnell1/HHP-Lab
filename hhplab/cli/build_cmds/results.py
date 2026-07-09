@@ -34,7 +34,7 @@ RESULT_WORKFLOWS: dict[str, ResultWorkflow] = {
     ),
     "irs-migration-pooled": ResultWorkflow(
         name="irs-migration-pooled",
-        description="Build the pooled MSA IRS migration panel.",
+        description="Build the pooled MSA IRS migration panel and direct-income rent screens.",
         modules=("build_irs_migration_pooled_panel",),
     ),
     "supply-iv": ResultWorkflow(
