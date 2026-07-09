@@ -311,3 +311,99 @@ spec is the one that speaks to growth; it does mean renter tenure share is
 not simply a null variable overall -- it has a real, level-effect
 relationship with rent that a future analysis of *why* rents differ across
 metros (as opposed to why they're *rising*) should not ignore.
+
+## 2026-07-09 Addendum: renter tenure share's homelessness link is purely cross-sectional
+
+The exploratory pass behind `coclab-1m4ev` found a strong positive raw
+correlation between `renter_household_share` and unsheltered homelessness on
+the same committed levels panel now used by the tracked robustness workflow:
+pooled MSA-year rows give `r=0.442` (`n=1716`), and collapsing to one row per
+MSA by averaging over time still gives `r=0.488` (`n=150`). That makes the
+question worth keeping, but the tracked within-MSA checks are completely null.
+
+Tracked with:
+
+```bash
+uv run python -m hhplab.results.workflows.analyze_composition_rent_population_robustness
+```
+
+Levels, clustered by `msa_id`:
+
+| Model term | Estimate | SE | p-value | N |
+| --- | ---: | ---: | ---: | ---: |
+| `renter_household_share` (msa + year FE) | -1.020 | 2.909 | 0.726 | 1,716 |
+| `renter_household_share` (msa + region x year FE) | +0.179 | 2.822 | 0.949 | 1,716 |
+| `renter_household_share` (msa + state x year FE) | -0.176 | 4.242 | 0.967 | 1,716 |
+
+First differences, clustered by `msa_id`:
+
+| Model term | Estimate | SE | p-value | N |
+| --- | ---: | ---: | ---: | ---: |
+| `d_renter_household_share` (year FE) | -3.298 | 2.334 | 0.158 | 1,420 |
+| `d_renter_household_share` (region x year FE) | -3.669 | 2.463 | 0.136 | 1,420 |
+| `d_renter_household_share` (state x year FE) | -1.427 | 3.333 | 0.668 | 1,420 |
+
+This is a clean between-versus-within split. Metros that are structurally more
+renter-heavy also tend to have structurally higher unsheltered rates, but the
+relationship vanishes once each metro is compared to itself over time. The
+same variable that has a robust levels association with rent does **not** have
+any detectable within-MSA relationship with unsheltered homelessness, either
+in levels-with-MSA-FE or in first differences.
+
+## 2026-07-09 Addendum: rent levels do not robustly bridge renter share to homelessness
+
+Because renter share's real signal sits in rent *levels* while the project's
+headline rent result sits in homelessness *growth*, the missing bridge is a
+levels-to-levels rent check: does `log_zori` predict `log_unshelt_rate` on the
+same levels panel?
+
+Without `log_pop`:
+
+| Model term | Estimate | SE | p-value | N |
+| --- | ---: | ---: | ---: | ---: |
+| `log_zori` (msa + year FE) | +0.835 | 0.467 | 0.074 | 1,364 |
+| `log_zori` (msa + region x year FE) | +0.552 | 0.471 | 0.242 | 1,364 |
+| `log_zori` (msa + state x year FE) | +1.030 | 0.633 | 0.104 | 1,364 |
+
+With `log_pop` added:
+
+| Model term | Estimate | SE | p-value | N |
+| --- | ---: | ---: | ---: | ---: |
+| `log_zori` (msa + year FE) | +0.936 | 0.441 | 0.034 | 1,364 |
+| `log_zori` (msa + region x year FE) | +0.450 | 0.457 | 0.326 | 1,364 |
+| `log_zori` (msa + state x year FE) | +0.976 | 0.629 | 0.121 | 1,364 |
+
+This stays positive-signed throughout and is the same rough order of magnitude
+as the tracked growth elasticity, but it only clears conventional significance
+under plain `msa + year` FE with `log_pop` added. Once region x year or state
+x year shocks are absorbed, the levels-based rent-to-homelessness link becomes
+too noisy to count as a robust bridge. So there is still no well-supported
+empirical chain connecting renter share to homelessness through rent in this
+dataset: renter share predicts rent levels, rent growth predicts homelessness
+growth, but the direct levels-to-levels bridge is weak and non-robust.
+
+## 2026-07-09 Addendum: renter tenure share does not moderate the rent-growth elasticity
+
+`coclab-u25pu` asked whether higher-renter-share metros are "more fertile
+ground" for rent shocks to pass through into unsheltered homelessness growth.
+The tracked workflow now fits the interaction on the same complete-case sample
+as the core elasticity spec (`n=1090`, `137` MSAs), centering
+`renter_household_share` at the sample mean `0.355` before interacting it with
+`d_log_zori`.
+
+| FE tier | `d_log_zori` | SE | p-value | `d_log_zori x renter_share_c` | SE | p-value | N |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| year FE | 1.935 | 0.435 | 8.5e-06 | -2.556 | 6.086 | 0.674 | 1,090 |
+| region x year FE | 1.137 | 0.495 | 0.022 | -5.738 | 6.266 | 0.360 | 1,090 |
+| state x year FE | 1.789 | 0.716 | 0.012 | -2.186 | 8.987 | 0.808 | 1,090 |
+
+The interaction is null in every tier, and the sign leans opposite the
+hypothesis. Under the state x year FE coefficients, the implied rent-growth
+elasticity is `1.870` at the 25th percentile of renter share (`0.318`),
+`1.800` at the median (`0.350`), and `1.715` at the 75th percentile
+(`0.389`) -- a small, non-significant decline rather than amplification.
+
+Combined with the direct null above, this closes off renter share as a live
+mechanism in the rent-growth-to-homelessness story in this dataset. It does
+not independently predict within-MSA homelessness changes, and it does not
+change how strongly rent growth predicts those changes either.

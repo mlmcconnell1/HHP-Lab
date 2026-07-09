@@ -178,6 +178,8 @@ def _robustness_fixture() -> pd.DataFrame:
                     "year": year,
                     "log_zori": 1.0 + 0.2 * year_index + 0.03 * msa_index,
                     "d_log_zori": 0.1 + 0.01 * year_index + 0.02 * msa_index,
+                    "log_unshelt_rate": -1.5 + 0.08 * year_index + 0.04 * msa_index,
+                    "d_log_unshelt_rate": 0.03 + 0.015 * year_index + 0.01 * msa_index,
                     "log_pop": 10.0 + 0.05 * year_index + 0.01 * msa_index,
                     "d_log_pop": 0.02 + 0.01 * year_index,
                     "renter_household_share": 0.35 + 0.02 * year_index + 0.01 * msa_index,
@@ -193,8 +195,17 @@ def test_composition_robustness_runs_state_year_and_levels_fe_specs() -> None:
     robustness = _load_script("analyze_composition_rent_population_robustness")
     frame = _robustness_fixture()
 
-    state_year = robustness.fit_spec(frame, robustness.FD_RENTER_SHARE_SPECS[1])
-    levels = robustness.fit_spec(frame, robustness.LEVEL_FE_SPECS[0])
+    state_year = robustness.fit_spec(
+        frame,
+        _spec_by_model(robustness.FD_RENTER_SHARE_SPECS, "rent_fd_renter_household_share_state_year_fe"),
+    )
+    levels = robustness.fit_spec(
+        frame,
+        _spec_by_model(
+            robustness.LEVEL_FE_SPECS,
+            "rent_levels_renter_household_share_msa_year_fe",
+        ),
+    )
 
     assert state_year["fixed_effects"].unique().tolist() == ["primary_state_year"]
     assert levels["fixed_effects"].unique().tolist() == ["msa_id+year"]
@@ -209,7 +220,13 @@ def test_composition_robustness_requires_state_for_state_year_fe() -> None:
     frame = _robustness_fixture().drop(columns=["primary_state"])
 
     with pytest.raises(ValueError, match="primary_state_year fixed effects require"):
-        robustness.fit_spec(frame, robustness.FD_RENTER_SHARE_SPECS[1])
+        robustness.fit_spec(
+            frame,
+            _spec_by_model(
+                robustness.FD_RENTER_SHARE_SPECS,
+                "rent_fd_renter_household_share_state_year_fe",
+            ),
+        )
 
 
 def test_composition_robustness_runs_region_year_specs() -> None:
@@ -297,3 +314,55 @@ def test_composition_robustness_runs_msa_state_year_fe_levels_spec() -> None:
     assert set(result["term"]) == {"log_pop", "renter_household_share"}
     assert result["nobs"].unique().tolist() == [len(frame)]
     assert result["clusters"].unique().tolist() == [frame["msa_id"].nunique()]
+
+
+def test_composition_robustness_runs_direct_unsheltered_specs() -> None:
+    robustness = _load_script("analyze_composition_rent_population_robustness")
+    frame = _robustness_fixture()
+    fd_spec = _spec_by_model(
+        robustness.FD_RENTER_SHARE_SPECS,
+        "unsheltered_fd_renter_household_share_state_year_fe",
+    )
+    levels_spec = _spec_by_model(
+        robustness.LEVEL_FE_SPECS,
+        "unsheltered_levels_renter_household_share_msa_year_fe",
+    )
+
+    fd_result = robustness.fit_spec(frame, fd_spec)
+    levels_result = robustness.fit_spec(frame, levels_spec)
+
+    assert fd_result["fixed_effects"].unique().tolist() == ["primary_state_year"]
+    assert levels_result["fixed_effects"].unique().tolist() == ["msa_id+year"]
+    assert set(fd_result["term"]) == {"d_renter_household_share"}
+    assert set(levels_result["term"]) == {"renter_household_share"}
+    assert fd_result["focal_term"].unique().tolist() == [True]
+    assert levels_result["focal_term"].unique().tolist() == [True]
+
+
+def test_composition_robustness_builds_centered_interaction_terms() -> None:
+    robustness = _load_script("analyze_composition_rent_population_robustness")
+    frame = _robustness_fixture()
+    spec = _spec_by_model(
+        robustness.FD_RENTER_SHARE_SPECS,
+        "unsheltered_fd_renter_household_share_interaction_year_fe",
+    )
+
+    sample = robustness._prepare_sample(frame, spec)
+    result = robustness.fit_spec(frame, spec)
+
+    assert sample["renter_household_share_c"].mean() == pytest.approx(0.0)
+    assert sample["d_log_zori_x_renter_share_c"].equals(
+        sample["d_log_zori"] * sample["renter_household_share_c"]
+    )
+    assert set(result["term"]) == {
+        "d_log_zori",
+        "d_log_pop",
+        "renter_household_share_c",
+        "d_log_zori_x_renter_share_c",
+    }
+    focal_terms = result.loc[result["focal_term"], "term"].tolist()
+    assert focal_terms == [
+        "d_log_zori",
+        "renter_household_share_c",
+        "d_log_zori_x_renter_share_c",
+    ]

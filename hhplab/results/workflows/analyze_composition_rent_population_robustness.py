@@ -22,6 +22,7 @@ FD_INPUTS = {
 }
 LEVEL_INPUTS = {
     "renter_household_share": OUT / "renter_household_share_composition_levels.parquet",
+    "rent_levels_bridge": OUT / "renter_household_share_composition_levels.parquet",
     "household_size": OUT / "household_size_composition_levels.parquet",
     "recent_mover_income": OUT / "recent_mover_income_composition_levels.parquet",
 }
@@ -32,6 +33,13 @@ ROBUSTNESS_SUMMARY = OUT / "composition_rent_population_robustness_summary.json"
 
 
 @dataclass(frozen=True)
+class DerivedColumnSpec:
+    name: str
+    kind: str
+    source_columns: tuple[str, ...]
+
+
+@dataclass(frozen=True)
 class RegressionSpec:
     family: str
     model: str
@@ -39,6 +47,22 @@ class RegressionSpec:
     predictors: tuple[str, ...]
     fixed_effects: tuple[str, ...]
     sample_filter: str
+    derived_columns: tuple[DerivedColumnSpec, ...] = ()
+    focal_terms: tuple[str, ...] = ()
+
+
+RENTER_SHARE_INTERACTION_COLUMNS = (
+    DerivedColumnSpec(
+        name="renter_household_share_c",
+        kind="center",
+        source_columns=("renter_household_share",),
+    ),
+    DerivedColumnSpec(
+        name="d_log_zori_x_renter_share_c",
+        kind="interaction",
+        source_columns=("d_log_zori", "renter_household_share_c"),
+    ),
+)
 
 
 FD_RENTER_SHARE_SPECS = (
@@ -49,6 +73,7 @@ FD_RENTER_SHARE_SPECS = (
         predictors=("d_log_pop", "d_renter_household_share"),
         fixed_effects=("year",),
         sample_filter="fd_year_gap_1",
+        focal_terms=("d_renter_household_share",),
     ),
     RegressionSpec(
         family="renter_household_share",
@@ -57,6 +82,7 @@ FD_RENTER_SHARE_SPECS = (
         predictors=("d_log_pop", "d_renter_household_share"),
         fixed_effects=("primary_state_year",),
         sample_filter="fd_year_gap_1",
+        focal_terms=("d_renter_household_share",),
     ),
     RegressionSpec(
         family="renter_household_share",
@@ -65,6 +91,79 @@ FD_RENTER_SHARE_SPECS = (
         predictors=("d_log_pop", "d_renter_household_share"),
         fixed_effects=("region_year",),
         sample_filter="fd_year_gap_1",
+        focal_terms=("d_renter_household_share",),
+    ),
+    RegressionSpec(
+        family="renter_household_share",
+        model="unsheltered_fd_renter_household_share_year_fe",
+        outcome="d_log_unshelt_rate",
+        predictors=("d_renter_household_share",),
+        fixed_effects=("year",),
+        sample_filter="fd_unsheltered_direct_year_gap_1",
+        focal_terms=("d_renter_household_share",),
+    ),
+    RegressionSpec(
+        family="renter_household_share",
+        model="unsheltered_fd_renter_household_share_state_year_fe",
+        outcome="d_log_unshelt_rate",
+        predictors=("d_renter_household_share",),
+        fixed_effects=("primary_state_year",),
+        sample_filter="fd_unsheltered_direct_year_gap_1",
+        focal_terms=("d_renter_household_share",),
+    ),
+    RegressionSpec(
+        family="renter_household_share",
+        model="unsheltered_fd_renter_household_share_region_year_fe",
+        outcome="d_log_unshelt_rate",
+        predictors=("d_renter_household_share",),
+        fixed_effects=("region_year",),
+        sample_filter="fd_unsheltered_direct_year_gap_1",
+        focal_terms=("d_renter_household_share",),
+    ),
+    RegressionSpec(
+        family="renter_household_share",
+        model="unsheltered_fd_renter_household_share_interaction_year_fe",
+        outcome="d_log_unshelt_rate",
+        predictors=(
+            "d_log_zori",
+            "d_log_pop",
+            "renter_household_share_c",
+            "d_log_zori_x_renter_share_c",
+        ),
+        fixed_effects=("year",),
+        sample_filter="fd_unsheltered_interaction_year_gap_1",
+        derived_columns=RENTER_SHARE_INTERACTION_COLUMNS,
+        focal_terms=("d_log_zori", "renter_household_share_c", "d_log_zori_x_renter_share_c"),
+    ),
+    RegressionSpec(
+        family="renter_household_share",
+        model="unsheltered_fd_renter_household_share_interaction_state_year_fe",
+        outcome="d_log_unshelt_rate",
+        predictors=(
+            "d_log_zori",
+            "d_log_pop",
+            "renter_household_share_c",
+            "d_log_zori_x_renter_share_c",
+        ),
+        fixed_effects=("primary_state_year",),
+        sample_filter="fd_unsheltered_interaction_year_gap_1",
+        derived_columns=RENTER_SHARE_INTERACTION_COLUMNS,
+        focal_terms=("d_log_zori", "renter_household_share_c", "d_log_zori_x_renter_share_c"),
+    ),
+    RegressionSpec(
+        family="renter_household_share",
+        model="unsheltered_fd_renter_household_share_interaction_region_year_fe",
+        outcome="d_log_unshelt_rate",
+        predictors=(
+            "d_log_zori",
+            "d_log_pop",
+            "renter_household_share_c",
+            "d_log_zori_x_renter_share_c",
+        ),
+        fixed_effects=("region_year",),
+        sample_filter="fd_unsheltered_interaction_year_gap_1",
+        derived_columns=RENTER_SHARE_INTERACTION_COLUMNS,
+        focal_terms=("d_log_zori", "renter_household_share_c", "d_log_zori_x_renter_share_c"),
     ),
 )
 
@@ -76,6 +175,7 @@ LEVEL_FE_SPECS = (
         predictors=("log_pop", "renter_household_share"),
         fixed_effects=("msa_id", "year"),
         sample_filter="levels_complete_case",
+        focal_terms=("renter_household_share",),
     ),
     RegressionSpec(
         family="renter_household_share",
@@ -84,6 +184,7 @@ LEVEL_FE_SPECS = (
         predictors=("log_pop", "renter_household_share"),
         fixed_effects=("msa_id", "primary_state_year"),
         sample_filter="levels_complete_case",
+        focal_terms=("renter_household_share",),
     ),
     RegressionSpec(
         family="renter_household_share",
@@ -92,6 +193,88 @@ LEVEL_FE_SPECS = (
         predictors=("log_pop", "renter_household_share"),
         fixed_effects=("msa_id", "region_year"),
         sample_filter="levels_complete_case",
+        focal_terms=("renter_household_share",),
+    ),
+    RegressionSpec(
+        family="renter_household_share",
+        model="unsheltered_levels_renter_household_share_msa_year_fe",
+        outcome="log_unshelt_rate",
+        predictors=("renter_household_share",),
+        fixed_effects=("msa_id", "year"),
+        sample_filter="levels_unsheltered_direct_complete_case",
+        focal_terms=("renter_household_share",),
+    ),
+    RegressionSpec(
+        family="renter_household_share",
+        model="unsheltered_levels_renter_household_share_msa_state_year_fe",
+        outcome="log_unshelt_rate",
+        predictors=("renter_household_share",),
+        fixed_effects=("msa_id", "primary_state_year"),
+        sample_filter="levels_unsheltered_direct_complete_case",
+        focal_terms=("renter_household_share",),
+    ),
+    RegressionSpec(
+        family="renter_household_share",
+        model="unsheltered_levels_renter_household_share_msa_region_year_fe",
+        outcome="log_unshelt_rate",
+        predictors=("renter_household_share",),
+        fixed_effects=("msa_id", "region_year"),
+        sample_filter="levels_unsheltered_direct_complete_case",
+        focal_terms=("renter_household_share",),
+    ),
+    RegressionSpec(
+        family="rent_levels_bridge",
+        model="unsheltered_levels_log_zori_msa_year_fe",
+        outcome="log_unshelt_rate",
+        predictors=("log_zori",),
+        fixed_effects=("msa_id", "year"),
+        sample_filter="levels_unsheltered_rent_complete_case",
+        focal_terms=("log_zori",),
+    ),
+    RegressionSpec(
+        family="rent_levels_bridge",
+        model="unsheltered_levels_log_zori_msa_state_year_fe",
+        outcome="log_unshelt_rate",
+        predictors=("log_zori",),
+        fixed_effects=("msa_id", "primary_state_year"),
+        sample_filter="levels_unsheltered_rent_complete_case",
+        focal_terms=("log_zori",),
+    ),
+    RegressionSpec(
+        family="rent_levels_bridge",
+        model="unsheltered_levels_log_zori_msa_region_year_fe",
+        outcome="log_unshelt_rate",
+        predictors=("log_zori",),
+        fixed_effects=("msa_id", "region_year"),
+        sample_filter="levels_unsheltered_rent_complete_case",
+        focal_terms=("log_zori",),
+    ),
+    RegressionSpec(
+        family="rent_levels_bridge",
+        model="unsheltered_levels_log_zori_log_pop_msa_year_fe",
+        outcome="log_unshelt_rate",
+        predictors=("log_zori", "log_pop"),
+        fixed_effects=("msa_id", "year"),
+        sample_filter="levels_unsheltered_rent_pop_complete_case",
+        focal_terms=("log_zori",),
+    ),
+    RegressionSpec(
+        family="rent_levels_bridge",
+        model="unsheltered_levels_log_zori_log_pop_msa_state_year_fe",
+        outcome="log_unshelt_rate",
+        predictors=("log_zori", "log_pop"),
+        fixed_effects=("msa_id", "primary_state_year"),
+        sample_filter="levels_unsheltered_rent_pop_complete_case",
+        focal_terms=("log_zori",),
+    ),
+    RegressionSpec(
+        family="rent_levels_bridge",
+        model="unsheltered_levels_log_zori_log_pop_msa_region_year_fe",
+        outcome="log_unshelt_rate",
+        predictors=("log_zori", "log_pop"),
+        fixed_effects=("msa_id", "region_year"),
+        sample_filter="levels_unsheltered_rent_pop_complete_case",
+        focal_terms=("log_zori",),
     ),
     RegressionSpec(
         family="household_size",
@@ -100,6 +283,7 @@ LEVEL_FE_SPECS = (
         predictors=("log_pop", "average_household_size_renter_occupied"),
         fixed_effects=("msa_id", "year"),
         sample_filter="levels_complete_case",
+        focal_terms=("average_household_size_renter_occupied",),
     ),
     RegressionSpec(
         family="recent_mover_income",
@@ -108,6 +292,7 @@ LEVEL_FE_SPECS = (
         predictors=("log_pop", "moved_diff_state_income_ratio_total"),
         fixed_effects=("msa_id", "year"),
         sample_filter="levels_complete_case",
+        focal_terms=("moved_diff_state_income_ratio_total",),
     ),
 )
 
@@ -148,8 +333,17 @@ def _design_matrix(sample: pd.DataFrame, spec: RegressionSpec) -> pd.DataFrame:
     return sm.add_constant(pd.concat(x_parts, axis=1), has_constant="add")
 
 
-def fit_spec(frame: pd.DataFrame, spec: RegressionSpec) -> pd.DataFrame:
-    required = [spec.outcome, *spec.predictors, "msa_id", *spec.fixed_effects]
+def _required_columns(spec: RegressionSpec) -> list[str]:
+    derived_names = {column.name for column in spec.derived_columns}
+    required = [spec.outcome, "msa_id", *spec.fixed_effects]
+    required.extend(predictor for predictor in spec.predictors if predictor not in derived_names)
+    for column in spec.derived_columns:
+        required.extend(source for source in column.source_columns if source not in derived_names)
+    return required
+
+
+def _prepare_sample(frame: pd.DataFrame, spec: RegressionSpec) -> pd.DataFrame:
+    required = _required_columns(spec)
     for derived_effect in ("primary_state_year", "region_year"):
         if derived_effect in required:
             required.remove(derived_effect)
@@ -167,6 +361,24 @@ def fit_spec(frame: pd.DataFrame, spec: RegressionSpec) -> pd.DataFrame:
             f"Regression spec '{spec.model}' requires missing column(s) {missing_required}."
         )
     sample = frame.dropna(subset=required).copy()
+    if sample.empty:
+        return sample
+
+    for column in spec.derived_columns:
+        if column.kind == "center":
+            source = column.source_columns[0]
+            sample[column.name] = sample[source] - sample[source].mean()
+            continue
+        if column.kind == "interaction":
+            left, right = column.source_columns
+            sample[column.name] = sample[left] * sample[right]
+            continue
+        raise ValueError(f"Unknown derived column kind '{column.kind}' in spec '{spec.model}'.")
+    return sample
+
+
+def fit_spec(frame: pd.DataFrame, spec: RegressionSpec) -> pd.DataFrame:
+    sample = _prepare_sample(frame, spec)
     if sample.empty:
         return pd.DataFrame()
 
@@ -194,6 +406,7 @@ def fit_spec(frame: pd.DataFrame, spec: RegressionSpec) -> pd.DataFrame:
                 "r_squared": float(result.rsquared),
                 "fixed_effects": "+".join(spec.fixed_effects),
                 "sample_filter": spec.sample_filter,
+                "focal_term": term in (spec.focal_terms or spec.predictors),
                 "std_error_type": "clustered:msa_id",
             }
         )
@@ -230,13 +443,7 @@ def run_robustness_checks() -> pd.DataFrame:
 def summarize_regressions(regressions: pd.DataFrame) -> dict[str, object]:
     if regressions.empty:
         return {"regression_rows": 0, "models": []}
-    focal_terms = {
-        "d_renter_household_share",
-        "renter_household_share",
-        "average_household_size_renter_occupied",
-        "moved_diff_state_income_ratio_total",
-    }
-    focal = regressions[regressions["term"].isin(focal_terms)].copy()
+    focal = regressions[regressions["focal_term"]].copy()
     return {
         "regression_rows": int(len(regressions)),
         "models": sorted(regressions["model"].unique().tolist()),
