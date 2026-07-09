@@ -8,6 +8,7 @@ from unittest.mock import patch
 import pandas as pd
 from typer.testing import CliRunner
 
+from hhplab.cli.build_cmds.results import RESULT_WORKFLOWS
 from hhplab.cli.main import app
 
 runner = CliRunner()
@@ -269,6 +270,15 @@ def test_build_result_qcew_labor_market_workflow_json() -> None:
     assert payload["steps"][0]["script"] == "scripts/build_qcew_labor_market_panel.py"
     assert payload["steps"][0]["module"] == (
         "hhplab.results.workflows.build_qcew_labor_market_panel"
+    )
+
+
+def test_all_documented_results_includes_eviction_timing_before_qcew() -> None:
+    modules = RESULT_WORKFLOWS["all-documented-results"].modules
+
+    assert "build_eviction_rate_timing_panel" in modules
+    assert modules.index("build_eviction_rate_timing_panel") < modules.index(
+        "build_qcew_labor_market_panel"
     )
 
 

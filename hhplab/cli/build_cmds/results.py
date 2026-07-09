@@ -203,6 +203,7 @@ RESULT_WORKFLOWS: dict[str, ResultWorkflow] = {
             "analyze_composition_rent_population_robustness",
             "build_noncompositional_rent_population_panel",
             "analyze_noncompositional_rent_population_robustness",
+            "build_eviction_rate_timing_panel",
             "build_qcew_labor_market_panel",
             "build_bps_valuation_benchmark",
             "build_bps_valuation_rent_channel",
