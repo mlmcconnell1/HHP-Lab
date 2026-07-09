@@ -2,7 +2,7 @@
 
 ## Overall Result
 
-The four composition and direct-demand screens do not support a positive,
+The five composition and direct-demand screens do not support a positive,
 state-year-robust explanation for rent growth independent of population
 growth. Renter tenure share is negatively associated with rent growth under
 plain year FE and under pooled MSA+year levels FE, but the first-difference
@@ -14,11 +14,14 @@ and goes null under region/state x year FE; renter household size is null;
 recent-mover income ratios are null; and the new direct local-income screen
 finds positive ACS1 median-income growth coefficients under plain year FE and,
 for renter income, region x year FE, but both growth coefficients collapse
-under state x year FE. Income levels themselves do line up strongly with rent
-levels even after MSA and state-year fixed effects, especially renter median
-income, so richer metros are more expensive. What is *not* supported is the
-claim that within-state annual local income growth independently explains
-year-to-year rent growth.
+under state x year FE. The new ACS5 income-inequality (`gini_index`) screen
+leans negative rather than positive in first differences and also goes null
+once region/state x year shocks are absorbed, while inequality levels are null
+throughout. Income levels themselves do line up strongly with rent levels even
+after MSA and state-year fixed effects, especially renter median income, so
+richer metros are more expensive. What is *not* supported is the claim that
+within-state annual local income growth or rising local inequality
+independently explains year-to-year rent growth.
 
 ## Renter Household Share (ACS5 B25003)
 
@@ -320,6 +323,74 @@ Interpretation: richer metros, and metros whose renters are richer, do have
 higher rent levels in a robust within-MSA levels design. What this screen does
 *not* show is that year-to-year local income growth is a robust independent
 driver of year-to-year rent growth once state-specific shocks are absorbed.
+
+## Income Inequality (ACS5 B19083)
+
+Generated with:
+
+```bash
+uv run hhplab build result income-inequality-composition --json
+uv run hhplab build result composition-rent-population-robustness --json
+```
+
+This screen uses the tract-derived ACS5 `gini_index` already present in the
+curated MSA measures. As documented in
+`devdocs/acs5_expanded_covariates.md`, this is a population-weighted average
+of tract Gini estimates, so it should be read as an inequality proxy rather
+than a true pooled-geography Gini. The workflow uses the standard ACS5 lag
+rule (`E -> E + 1`) and the same pooled top-150 MSA design as the other
+composition channels.
+
+Generated, ignored artifacts:
+
+- `outputs/composition_rent_population/income_inequality_composition_levels.parquet`
+- `outputs/composition_rent_population/income_inequality_composition_fd.parquet`
+- `outputs/composition_rent_population/income_inequality_composition_fd_regressions.parquet`
+- `outputs/composition_rent_population/income_inequality_composition_fd_regressions.csv`
+- `outputs/composition_rent_population/income_inequality_composition_summary.json`
+
+Coverage:
+
+- Levels rows: 1,750
+- First-difference rows with 1-year gaps: 1,450
+- MSAs: 150
+- Analysis years: 2010-2020 and 2022-2025
+- ACS5 vintages used: 2009-2019 and 2021-2024
+- Complete FD rows for `gini_index`: 1,090
+- Median level `gini_index`: 0.4086
+
+Key year-FE first-difference models:
+
+| Model | Inequality term | Estimate | SE | p-value | N |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| `d_log_zori ~ d_log_pop + d_gini_index + year FE` | `d_gini_index` | -0.5406 | 0.2503 | 0.0308 | 1,096 |
+| `d_log_unshelt_rate ~ d_log_zori + d_log_pop + d_gini_index + year FE` | `d_gini_index` | -7.8369 | 3.9482 | 0.0472 | 1,090 |
+
+The raw year-FE read is already opposite the motivating "barbell" story:
+metros with faster increases in local inequality show *slower* rent growth on
+average, not faster. And that negative sign does not survive tighter spatial
+confound absorption:
+
+| Model term | Estimate | SE | p-value | N |
+| --- | ---: | ---: | ---: | ---: |
+| `d_gini_index` (year FE) | -0.5406 | 0.2503 | 0.0308 | 1,096 |
+| `d_gini_index` (region x year FE) | -0.3840 | 0.2184 | 0.0787 | 1,096 |
+| `d_gini_index` (state x year FE) | -0.2901 | 0.2151 | 0.1775 | 1,096 |
+
+Inequality *levels* also fail to line up with rent levels in the tracked
+within-MSA checks:
+
+| Model term | Estimate | SE | p-value | N |
+| --- | ---: | ---: | ---: | ---: |
+| `gini_index` (msa + year FE) | -0.434 | 0.598 | 0.468 | 1,370 |
+| `gini_index` (msa + region x year FE) | -0.457 | 0.604 | 0.449 | 1,370 |
+| `gini_index` (msa + state x year FE) | -0.192 | 0.666 | 0.773 | 1,370 |
+
+Interpretation: this ACS5 inequality proxy does **not** support the claim that
+rising local inequality is a positive, independent rent-growth channel in the
+pooled top-150 MSA design. If anything, the raw association points in the
+wrong direction, and even that disappears once the same regional/state-year
+confound ladder used elsewhere in the project is applied.
 
 ## 2026-07-08 Code Review Addendum
 

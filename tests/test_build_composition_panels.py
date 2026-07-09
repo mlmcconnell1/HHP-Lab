@@ -240,6 +240,31 @@ def test_local_income_panel_uses_acs1_lag_and_log_growth(
     assert pd.isna(levels.loc[2019, "median_household_income_by_tenure_total"])
 
 
+def test_income_inequality_panel_uses_acs5_lag_and_differences(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    inequality = _load_script("build_income_inequality_composition_panel")
+    for vintage, gini_index in [(2019, 0.41), (2020, 0.44)]:
+        measures_path = tmp_path / f"measures__msa__A{vintage}@Mcensusmsa2023xT2010.parquet"
+        pd.DataFrame(
+            {
+                "msa_id": ["10000"],
+                "acs_vintage": [f"{vintage - 4}-{vintage}"],
+                "gini_index": [gini_index],
+            }
+        ).to_parquet(measures_path, index=False)
+    monkeypatch.setattr(inequality, "MEASURES_GLOB", str(tmp_path / "measures__msa__A*.parquet"))
+    monkeypatch.setattr(inequality, "load_pooled_base_panel", _base_panel)
+
+    levels = inequality.build_levels_panel().set_index("year")
+
+    assert levels.loc[2020, "acs5_vintage_used"] == 2019
+    assert levels.loc[2020, "gini_index"] == pytest.approx(0.41)
+    assert levels.loc[2021, "d_gini_index"] == pytest.approx(0.03)
+    assert pd.isna(levels.loc[2019, "gini_index"])
+
+
 def _robustness_fixture() -> pd.DataFrame:
     rows = []
     for msa_index, (msa_id, state) in enumerate(
@@ -269,6 +294,8 @@ def _robustness_fixture() -> pd.DataFrame:
                     + 0.018 * msa_index,
                     "d_log_median_household_income_renter_occupied": 0.01 * year_index
                     + 0.003 * msa_index,
+                    "gini_index": 0.44 + 0.005 * year_index + 0.01 * msa_index,
+                    "d_gini_index": 0.003 * year_index + 0.001 * msa_index,
                     "log_total_households_per_panel_person": -6.9
                     + 0.02 * year_index
                     + 0.01 * msa_index,
@@ -404,6 +431,60 @@ def test_composition_robustness_runs_local_income_specs() -> None:
         levels_result["term"] == "log_median_household_income_by_tenure_total",
         "focal_term",
     ].tolist() == [True]
+
+
+def test_income_inequality_fd_models_include_gini_screen() -> None:
+    inequality = _load_script("build_income_inequality_composition_panel")
+    rows = []
+    for msa_index, msa_id in enumerate(["10000", "20000", "30000", "40000"], start=1):
+        for year_index, year in enumerate([2020, 2022], start=1):
+            rows.append(
+                {
+                    "msa_id": msa_id,
+                    "year": year,
+                    "d_log_zori": 0.02 * year_index + 0.01 * msa_index,
+                    "d_log_unshelt_rate": 0.03 * year_index + 0.01 * msa_index,
+                    "d_log_pop": 0.01 * year_index,
+                    "d_gini_index": 0.002 * year_index + 0.001 * msa_index,
+                }
+            )
+    fd = pd.DataFrame(rows)
+
+    regressions = inequality.fit_clustered_fd_models(fd)
+
+    rent_terms = regressions.loc[regressions["model"] == "rent_fd_gini_index", "term"].tolist()
+    unsheltered_terms = regressions.loc[
+        regressions["model"] == "unsheltered_fd_gini_index",
+        "term",
+    ].tolist()
+
+    assert rent_terms == ["d_log_pop", "d_gini_index"]
+    assert unsheltered_terms == ["d_log_zori", "d_log_pop", "d_gini_index"]
+
+
+def test_composition_robustness_runs_income_inequality_specs() -> None:
+    robustness = _load_script("analyze_composition_rent_population_robustness")
+    frame = _robustness_fixture()
+    fd_spec = _spec_by_model(
+        robustness.FD_INCOME_INEQUALITY_SPECS,
+        "rent_fd_gini_index_region_year_fe",
+    )
+    levels_spec = _spec_by_model(
+        robustness.LEVEL_FE_SPECS,
+        "rent_levels_gini_index_msa_state_year_fe",
+    )
+
+    fd_result = robustness.fit_spec(frame, fd_spec)
+    levels_result = robustness.fit_spec(frame, levels_spec)
+
+    assert fd_result["fixed_effects"].unique().tolist() == ["region_year"]
+    assert levels_result["fixed_effects"].unique().tolist() == ["msa_id+primary_state_year"]
+    assert set(fd_result["term"]) == {"d_log_pop", "d_gini_index"}
+    assert set(levels_result["term"]) == {"log_pop", "gini_index"}
+    assert fd_result.loc[fd_result["term"] == "d_gini_index", "focal_term"].tolist() == [True]
+    assert levels_result.loc[levels_result["term"] == "gini_index", "focal_term"].tolist() == [
+        True
+    ]
 
 
 def test_composition_robustness_requires_state_for_state_year_fe() -> None:

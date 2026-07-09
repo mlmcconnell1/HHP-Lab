@@ -20,6 +20,7 @@ from hhplab.results.workflows.build_household_size_composition_panel import OUT
 FD_INPUTS = {
     "renter_household_share": OUT / "renter_household_share_composition_fd.parquet",
     "local_income": OUT / "local_income_composition_fd.parquet",
+    "income_inequality": OUT / "income_inequality_composition_fd.parquet",
 }
 LEVEL_INPUTS = {
     "renter_household_share": OUT / "renter_household_share_composition_levels.parquet",
@@ -27,6 +28,7 @@ LEVEL_INPUTS = {
     "household_size": OUT / "household_size_composition_levels.parquet",
     "recent_mover_income": OUT / "recent_mover_income_composition_levels.parquet",
     "local_income": OUT / "local_income_composition_levels.parquet",
+    "income_inequality": OUT / "income_inequality_composition_levels.parquet",
 }
 
 ROBUSTNESS_PARQUET = OUT / "composition_rent_population_robustness_regressions.parquet"
@@ -253,6 +255,36 @@ FD_LOCAL_INCOME_SPECS = (
     ),
 )
 
+FD_INCOME_INEQUALITY_SPECS = (
+    RegressionSpec(
+        family="income_inequality",
+        model="rent_fd_gini_index_year_fe",
+        outcome="d_log_zori",
+        predictors=("d_log_pop", "d_gini_index"),
+        fixed_effects=("year",),
+        sample_filter="fd_year_gap_1",
+        focal_terms=("d_gini_index",),
+    ),
+    RegressionSpec(
+        family="income_inequality",
+        model="rent_fd_gini_index_region_year_fe",
+        outcome="d_log_zori",
+        predictors=("d_log_pop", "d_gini_index"),
+        fixed_effects=("region_year",),
+        sample_filter="fd_year_gap_1",
+        focal_terms=("d_gini_index",),
+    ),
+    RegressionSpec(
+        family="income_inequality",
+        model="rent_fd_gini_index_state_year_fe",
+        outcome="d_log_zori",
+        predictors=("d_log_pop", "d_gini_index"),
+        fixed_effects=("primary_state_year",),
+        sample_filter="fd_year_gap_1",
+        focal_terms=("d_gini_index",),
+    ),
+)
+
 LEVEL_FE_SPECS = (
     RegressionSpec(
         family="renter_household_share",
@@ -434,6 +466,33 @@ LEVEL_FE_SPECS = (
         sample_filter="levels_complete_case",
         focal_terms=("log_median_household_income_renter_occupied",),
     ),
+    RegressionSpec(
+        family="income_inequality",
+        model="rent_levels_gini_index_msa_year_fe",
+        outcome="log_zori",
+        predictors=("log_pop", "gini_index"),
+        fixed_effects=("msa_id", "year"),
+        sample_filter="levels_complete_case",
+        focal_terms=("gini_index",),
+    ),
+    RegressionSpec(
+        family="income_inequality",
+        model="rent_levels_gini_index_msa_region_year_fe",
+        outcome="log_zori",
+        predictors=("log_pop", "gini_index"),
+        fixed_effects=("msa_id", "region_year"),
+        sample_filter="levels_complete_case",
+        focal_terms=("gini_index",),
+    ),
+    RegressionSpec(
+        family="income_inequality",
+        model="rent_levels_gini_index_msa_state_year_fe",
+        outcome="log_zori",
+        predictors=("log_pop", "gini_index"),
+        fixed_effects=("msa_id", "primary_state_year"),
+        sample_filter="levels_complete_case",
+        focal_terms=("gini_index",),
+    ),
 )
 
 
@@ -573,6 +632,10 @@ def run_robustness_checks() -> pd.DataFrame:
     local_income_fd = load_required_parquet(FD_INPUTS["local_income"])
     for spec in FD_LOCAL_INCOME_SPECS:
         frames.append(fit_spec(local_income_fd, spec))
+
+    income_inequality_fd = load_required_parquet(FD_INPUTS["income_inequality"])
+    for spec in FD_INCOME_INEQUALITY_SPECS:
+        frames.append(fit_spec(income_inequality_fd, spec))
 
     for spec in LEVEL_FE_SPECS:
         levels = load_required_parquet(LEVEL_INPUTS[spec.family])
