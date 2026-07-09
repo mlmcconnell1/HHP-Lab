@@ -21,6 +21,11 @@ WORKFLOW_PATH_CASES = [
         REPO_ROOT / "outputs" / "irs_migration_pooled",
     ),
     (
+        "build_local_income_composition_panel",
+        "OUT",
+        REPO_ROOT / "outputs" / "composition_rent_population",
+    ),
+    (
         "build_overdose_lag_panel",
         "OUT",
         REPO_ROOT / "outputs" / "overdose_lag",

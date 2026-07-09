@@ -2,22 +2,23 @@
 
 ## Overall Result
 
-The three household-composition screens do not support a positive
-composition-driven explanation for rent growth independent of population
+The four composition and direct-demand screens do not support a positive,
+state-year-robust explanation for rent growth independent of population
 growth. Renter tenure share is negatively associated with rent growth under
 plain year FE and under pooled MSA+year levels FE, but the first-difference
 rent result does not survive a state x year FE check (see addenda below) and
 the unsheltered-rate result is null either way; the direct household-formation
 proxy (`d_log_total_households - d_log_pop`, implemented as
 `d_log_total_households_per_panel_person`) is also negative under plain year FE
-and goes null under region/state x year FE; renter household size is null; and
-recent-mover income ratios are null. None of the compositional or
-household-formation channels tested here support a positive explanation for
-the earlier finding that population growth and rent growth are nearly
-orthogonal across the pooled top-150 MSA design -- whatever is driving rent up
-independent of headcount, it is not simply "more renters,"
-"more households per person," "smaller/larger renter households," or "richer
-people moving in."
+and goes null under region/state x year FE; renter household size is null;
+recent-mover income ratios are null; and the new direct local-income screen
+finds positive ACS1 median-income growth coefficients under plain year FE and,
+for renter income, region x year FE, but both growth coefficients collapse
+under state x year FE. Income levels themselves do line up strongly with rent
+levels even after MSA and state-year fixed effects, especially renter median
+income, so richer metros are more expensive. What is *not* supported is the
+claim that within-state annual local income growth independently explains
+year-to-year rent growth.
 
 ## Renter Household Share (ACS5 B25003)
 
@@ -232,6 +233,93 @@ independently predict rent growth or unsheltered-rate growth. This is broadly
 consistent with the earlier IRS SOI screen's low mover-income signal
 (approximately 0.73x), while using a different income concept: Census
 individual median income by mobility origin rather than IRS AGI per return.
+
+## Local Income (ACS1 B25119)
+
+Generated with:
+
+```bash
+uv run hhplab build result local-income-composition --json
+uv run hhplab build result composition-rent-population-robustness --json
+```
+
+Rather than falling back to ACS5 `median_household_income` or
+`per_capita_income`, this screen uses the metro-native annual ACS1 B25119
+medians already present in the curated ACS1 artifacts:
+
+- `median_household_income_by_tenure_total`
+- `median_household_income_renter_occupied`
+
+These are converted to logs and tested as direct local-income growth screens
+against `d_log_zori`, with the usual pooled top-150 MSA design, clustered
+standard errors by `msa_id`, and the standard ACS1 lag rule (`E -> E + 1`).
+
+Generated, ignored artifacts:
+
+- `outputs/composition_rent_population/local_income_composition_levels.parquet`
+- `outputs/composition_rent_population/local_income_composition_fd.parquet`
+- `outputs/composition_rent_population/local_income_composition_fd_regressions.parquet`
+- `outputs/composition_rent_population/local_income_composition_fd_regressions.csv`
+- `outputs/composition_rent_population/local_income_composition_summary.json`
+
+Coverage:
+
+- Levels rows: 1,750
+- First-difference rows with 1-year gaps: 1,450
+- MSAs: 150
+- Analysis years: 2010-2020 and 2022-2025
+- ACS1 vintages used: 2009-2019 and 2021-2024
+- Complete FD rows for total median-income growth: 1,078
+- Median ACS1 level income: total household income = 61,876; renter household income = 38,720
+
+Key year-FE first-difference models:
+
+| Model | Income term | Estimate | SE | p-value | N |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| `d_log_zori ~ d_log_pop + income_growth + year FE` | `d_log_median_household_income_by_tenure_total` | 0.0319 | 0.0180 | 0.076 | 1,084 |
+| `d_log_zori ~ d_log_pop + income_growth + year FE` | `d_log_median_household_income_renter_occupied` | 0.0233 | 0.0081 | 0.0039 | 1,084 |
+| `d_log_unshelt_rate ~ d_log_zori + d_log_pop + income_growth + year FE` | `d_log_median_household_income_by_tenure_total` | 0.2650 | 0.3516 | 0.451 | 1,078 |
+| `d_log_unshelt_rate ~ d_log_zori + d_log_pop + income_growth + year FE` | `d_log_median_household_income_renter_occupied` | -0.0247 | 0.1763 | 0.889 | 1,078 |
+
+The raw year-FE read is suggestive: metros with faster renter-income growth
+also show faster rent growth, with a smaller and only marginal total-income
+growth coefficient.
+
+But the robustness ladder says that signal is not stable to tighter spatial
+confound absorption:
+
+| Model term | Estimate | SE | p-value | N |
+| --- | ---: | ---: | ---: | ---: |
+| `d_log_median_household_income_by_tenure_total` (year FE) | 0.0319 | 0.0180 | 0.076 | 1,084 |
+| `d_log_median_household_income_by_tenure_total` (region x year FE) | 0.0290 | 0.0182 | 0.110 | 1,084 |
+| `d_log_median_household_income_by_tenure_total` (state x year FE) | 0.0056 | 0.0179 | 0.753 | 1,084 |
+| `d_log_median_household_income_renter_occupied` (year FE) | 0.0233 | 0.0081 | 0.0039 | 1,084 |
+| `d_log_median_household_income_renter_occupied` (region x year FE) | 0.0166 | 0.0075 | 0.0266 | 1,084 |
+| `d_log_median_household_income_renter_occupied` (state x year FE) | 0.0080 | 0.0083 | 0.337 | 1,084 |
+
+So the direct local-income-growth story does **not** survive the same
+state-year robustness check used elsewhere in this project. Renter income
+growth survives the intermediate region-year tier, but once identification is
+restricted to within-state, cross-MSA variation in the same year, the effect
+shrinks by roughly two-thirds and becomes null.
+
+Income *levels* are a different story. On the balanced ZORI-covered levels
+sample (`n=1357`, `137` MSAs), both annual ACS1 income measures are strongly
+positive predictors of rent levels even after MSA fixed effects:
+
+| Model term | Estimate | SE | p-value | N |
+| --- | ---: | ---: | ---: | ---: |
+| `log_median_household_income_by_tenure_total` (msa + year FE) | 0.533 | 0.083 | 1.49e-10 | 1,357 |
+| `log_median_household_income_by_tenure_total` (msa + region x year FE) | 0.532 | 0.087 | 8.72e-10 | 1,357 |
+| `log_median_household_income_by_tenure_total` (msa + state x year FE) | 0.209 | 0.066 | 0.0015 | 1,357 |
+| `log_median_household_income_renter_occupied` (msa + year FE) | 0.237 | 0.048 | 7.52e-07 | 1,357 |
+| `log_median_household_income_renter_occupied` (msa + region x year FE) | 0.200 | 0.049 | 4.70e-05 | 1,357 |
+| `log_median_household_income_renter_occupied` (msa + state x year FE) | 0.0927 | 0.0409 | 0.0234 | 1,357 |
+
+Interpretation: richer metros, and metros whose renters are richer, do have
+higher rent levels in a robust within-MSA levels design. What this screen does
+*not* show is that year-to-year local income growth is a robust independent
+driver of year-to-year rent growth once state-specific shocks are absorbed.
 
 ## 2026-07-08 Code Review Addendum
 

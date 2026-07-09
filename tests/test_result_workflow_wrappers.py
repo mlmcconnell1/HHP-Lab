@@ -16,6 +16,7 @@ WRAPPER_CASES = [
     "analyze_noncompositional_rent_population_robustness",
     "build_household_size_composition_panel",
     "build_irs_migration_pooled_panel",
+    "build_local_income_composition_panel",
     "build_noncompositional_rent_population_panel",
     "build_overdose_lag_panel",
     "build_poverty_longitudinal_panel",

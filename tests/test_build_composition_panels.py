@@ -85,6 +85,16 @@ def test_renter_safe_ratio_and_log_guard_invalid_values() -> None:
     assert pd.isna(logged.iloc[2])
 
 
+def test_local_income_safe_log_invalid_values() -> None:
+    local_income = _load_script("build_local_income_composition_panel")
+
+    logged = local_income._safe_log(pd.Series([4, 0, -2]))
+
+    assert logged.iloc[0] == pytest.approx(np.log(4))
+    assert pd.isna(logged.iloc[1])
+    assert pd.isna(logged.iloc[2])
+
+
 def test_renter_panel_uses_acs5_vintage_end_year_plus_one_and_preserves_identity(
     monkeypatch,
     tmp_path: Path,
@@ -197,6 +207,39 @@ def test_recent_mover_income_panel_uses_acs1_lag_and_safe_ratios(
     assert pd.isna(levels.loc[2021, "median_income_moved_diff_state"])
 
 
+def test_local_income_panel_uses_acs1_lag_and_log_growth(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    local_income = _load_script("build_local_income_composition_panel")
+    for vintage, total_income, renter_income in [
+        (2019, 50_000, 40_000),
+        (2020, 55_000, 44_000),
+    ]:
+        acs1_path = tmp_path / f"acs1_metro__A{vintage}@Dcensusmsa2023.parquet"
+        pd.DataFrame(
+            {
+                "metro_id": ["10000"],
+                "acs1_vintage": [str(vintage)],
+                "median_household_income_by_tenure_total": [total_income],
+                "median_household_income_renter_occupied": [renter_income],
+            }
+        ).to_parquet(acs1_path, index=False)
+    monkeypatch.setattr(local_income, "ACS1_METRO_GLOB", str(tmp_path / "acs1_metro__A*.parquet"))
+    monkeypatch.setattr(local_income, "load_pooled_base_panel", _base_panel)
+
+    levels = local_income.build_levels_panel().set_index("year")
+
+    assert levels.loc[2020, "acs1_vintage_used"] == 2019
+    assert levels.loc[2020, "log_median_household_income_by_tenure_total"] == pytest.approx(
+        np.log(50_000)
+    )
+    assert levels.loc[2021, "d_log_median_household_income_renter_occupied"] == pytest.approx(
+        np.log(44_000) - np.log(40_000)
+    )
+    assert pd.isna(levels.loc[2019, "median_household_income_by_tenure_total"])
+
+
 def _robustness_fixture() -> pd.DataFrame:
     rows = []
     for msa_index, (msa_id, state) in enumerate(
@@ -216,6 +259,16 @@ def _robustness_fixture() -> pd.DataFrame:
                     "d_log_pop": 0.02 + 0.01 * year_index,
                     "renter_household_share": 0.35 + 0.02 * year_index + 0.01 * msa_index,
                     "d_renter_household_share": 0.01 * year_index + 0.005 * msa_index,
+                    "log_median_household_income_by_tenure_total": 10.8
+                    + 0.03 * year_index
+                    + 0.02 * msa_index,
+                    "d_log_median_household_income_by_tenure_total": 0.012 * year_index
+                    + 0.004 * msa_index,
+                    "log_median_household_income_renter_occupied": 10.5
+                    + 0.025 * year_index
+                    + 0.018 * msa_index,
+                    "d_log_median_household_income_renter_occupied": 0.01 * year_index
+                    + 0.003 * msa_index,
                     "log_total_households_per_panel_person": -6.9
                     + 0.02 * year_index
                     + 0.01 * msa_index,
@@ -320,6 +373,35 @@ def test_composition_robustness_runs_household_formation_fe_specs() -> None:
     }
     assert state_result.loc[
         state_result["term"] == "d_log_total_households_per_panel_person",
+        "focal_term",
+    ].tolist() == [True]
+
+
+def test_composition_robustness_runs_local_income_specs() -> None:
+    robustness = _load_script("analyze_composition_rent_population_robustness")
+    frame = _robustness_fixture()
+    fd_spec = _spec_by_model(
+        robustness.FD_LOCAL_INCOME_SPECS,
+        "rent_fd_log_median_household_income_renter_occupied_region_year_fe",
+    )
+    levels_spec = _spec_by_model(
+        robustness.LEVEL_FE_SPECS,
+        "rent_levels_log_median_household_income_by_tenure_total_msa_state_year_fe",
+    )
+
+    fd_result = robustness.fit_spec(frame, fd_spec)
+    levels_result = robustness.fit_spec(frame, levels_spec)
+
+    assert fd_result["fixed_effects"].unique().tolist() == ["region_year"]
+    assert levels_result["fixed_effects"].unique().tolist() == ["msa_id+primary_state_year"]
+    assert set(fd_result["term"]) == {"d_log_pop", "d_log_median_household_income_renter_occupied"}
+    assert set(levels_result["term"]) == {"log_pop", "log_median_household_income_by_tenure_total"}
+    assert fd_result.loc[
+        fd_result["term"] == "d_log_median_household_income_renter_occupied",
+        "focal_term",
+    ].tolist() == [True]
+    assert levels_result.loc[
+        levels_result["term"] == "log_median_household_income_by_tenure_total",
         "focal_term",
     ].tolist() == [True]
 

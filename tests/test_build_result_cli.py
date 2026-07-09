@@ -41,6 +41,7 @@ def test_build_result_composition_workflow_json() -> None:
         "build_renter_household_share_composition_panel",
         "build_household_size_composition_panel",
         "build_recent_mover_income_composition_panel",
+        "build_local_income_composition_panel",
         "analyze_composition_rent_population_robustness",
     ]
     assert [step["script"] for step in payload["steps"]] == [

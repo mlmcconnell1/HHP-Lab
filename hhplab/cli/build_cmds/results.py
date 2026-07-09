@@ -105,6 +105,11 @@ RESULT_WORKFLOWS: dict[str, ResultWorkflow] = {
         description="Build the recent-mover-income composition panel and regressions.",
         modules=("build_recent_mover_income_composition_panel",),
     ),
+    "local-income-composition": ResultWorkflow(
+        name="local-income-composition",
+        description="Build the local-income composition panel and regressions.",
+        modules=("build_local_income_composition_panel",),
+    ),
     "composition-rent-population-robustness": ResultWorkflow(
         name="composition-rent-population-robustness",
         description="Run tracked robustness checks for composition rent-population screens.",
@@ -117,6 +122,7 @@ RESULT_WORKFLOWS: dict[str, ResultWorkflow] = {
             "build_renter_household_share_composition_panel",
             "build_household_size_composition_panel",
             "build_recent_mover_income_composition_panel",
+            "build_local_income_composition_panel",
             "analyze_composition_rent_population_robustness",
         ),
     ),
@@ -145,6 +151,7 @@ RESULT_WORKFLOWS: dict[str, ResultWorkflow] = {
             "build_renter_household_share_composition_panel",
             "build_household_size_composition_panel",
             "build_recent_mover_income_composition_panel",
+            "build_local_income_composition_panel",
             "analyze_composition_rent_population_robustness",
             "build_noncompositional_rent_population_panel",
             "analyze_noncompositional_rent_population_robustness",
