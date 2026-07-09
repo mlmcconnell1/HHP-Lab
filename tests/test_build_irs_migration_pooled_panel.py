@@ -116,6 +116,14 @@ EXPECTED_JOINT_MODEL = (
     ("d_log_pop", "inflow_agi_per_return_k", "outflow_agi_per_return_k"),
     ("primary_state_year",),
 )
+OUTFLOW_ROBUSTNESS_FILTER_EXPECTATIONS = {
+    "full_sample": 7,
+    "drop_negative_outflow_agi": 6,
+    "trim_outflow_agi_1_99": 5,
+    "exclude_2020": 5,
+    "exclude_sf_san_jose": 5,
+    "exclude_2020_and_sf_san_jose": 4,
+}
 
 
 def _load_builder():
@@ -170,3 +178,96 @@ def test_model_specs_cover_direct_income_predictors_across_fe_variants() -> None
         (spec.name, spec.predictors, spec.fixed_effects) == EXPECTED_JOINT_MODEL for spec in specs
     )
     assert len(specs) == len(builder.DIRECT_INCOME_COLUMNS) * 3 + 3
+
+
+def _outflow_robustness_sample() -> pd.DataFrame:
+    return pd.DataFrame(
+        {
+            "msa_id": ["10000", "20000", "30000", "40000", "50000", "60000", "70000"],
+            "msa_name": [
+                "Alpha, CT",
+                "Beta, TX",
+                "San Francisco-Oakland-Berkeley, CA",
+                "San Jose-Sunnyvale-Santa Clara, CA",
+                "Gamma, OH",
+                "Delta, FL",
+                "Epsilon, WA",
+            ],
+            "year": [2019, 2020, 2020, 2023, 2024, 2024, 2024],
+            "primary_state_year": [
+                "CT_2019",
+                "TX_2020",
+                "CA_2020",
+                "CA_2023",
+                "OH_2024",
+                "FL_2024",
+                "WA_2024",
+            ],
+            "d_log_zori": [0.01, 0.02, 0.03, 0.04, 0.05, 0.06, 0.07],
+            "d_log_pop": [0.001, 0.002, 0.003, 0.004, 0.005, 0.006, 0.007],
+            "outflow_agi_per_return_k": [-1.0, 40.0, 80.0, 230.0, 55.0, 65.0, 75.0],
+        }
+    )
+
+
+@pytest.mark.parametrize(
+    ("filter_name", "expected_rows"),
+    sorted(OUTFLOW_ROBUSTNESS_FILTER_EXPECTATIONS.items()),
+    ids=[
+        f"{name}-{expected}"
+        for name, expected in sorted(OUTFLOW_ROBUSTNESS_FILTER_EXPECTATIONS.items())
+    ],
+)
+def test_outflow_robustness_filters_encode_documented_sample_cuts(
+    filter_name: str,
+    expected_rows: int,
+) -> None:
+    builder = _load_builder()
+    sample = _outflow_robustness_sample()
+    sample_filter = next(
+        candidate
+        for candidate in builder.OUTFLOW_ROBUSTNESS_FILTERS
+        if candidate.name == filter_name
+    )
+
+    filtered = builder.apply_outflow_robustness_filter(sample, sample_filter)
+
+    assert len(filtered) == expected_rows
+
+
+def test_outflow_robustness_models_cover_all_requested_filters(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    builder = _load_builder()
+    sample = _outflow_robustness_sample()
+
+    captured_filters = []
+
+    def fake_fit_model_rows(
+        sample: pd.DataFrame,
+        *,
+        spec,
+        sample_filter,
+    ) -> list[dict[str, object]]:
+        captured_filters.append((sample_filter.name, len(sample), spec.name))
+        return [
+            {
+                "family": spec.family,
+                "model": spec.name,
+                "term": "outflow_agi_per_return_k",
+                "sample_filter": sample_filter.name,
+                "nobs": len(sample),
+            }
+        ]
+
+    monkeypatch.setattr(builder, "_fit_model_rows", fake_fit_model_rows)
+
+    result = builder.fit_outflow_robustness_models(sample)
+
+    assert result["sample_filter"].tolist() == [name for name, _rows, _model in captured_filters]
+    assert set(result["sample_filter"]) == set(OUTFLOW_ROBUSTNESS_FILTER_EXPECTATIONS)
+    assert {
+        (name, rows)
+        for name, rows, model in captured_filters
+        if model == "rent_fd_outflow_agi_per_return_k_state_year_fe"
+    } == set(OUTFLOW_ROBUSTNESS_FILTER_EXPECTATIONS.items())

@@ -13,6 +13,7 @@ Tracked output files:
 - `outputs/irs_migration_pooled/irs_migration_pooled_levels.parquet`
 - `outputs/irs_migration_pooled/irs_migration_pooled_fd.parquet`
 - `outputs/irs_migration_pooled/irs_migration_pooled_regressions.parquet`
+- `outputs/irs_migration_pooled/irs_migration_pooled_outflow_robustness.parquet`
 - `outputs/irs_migration_pooled/irs_migration_pooled_summary.json`
 
 ## Question
@@ -93,24 +94,31 @@ while the separate inflow/outflow coefficients are.
 
 ## Robustness note
 
-The state-year outflow result is not a single-row artifact:
+The state-year outflow result now has a tracked robustness artifact:
+`irs_migration_pooled_outflow_robustness.parquet`. The result is not a
+single-row artifact and is not purely a pandemic-year or Bay Area artifact, but
+the joint pandemic-year/Bay Area exclusion weakens it below conventional
+significance.
 
-- Dropping the lone negative `outflow_agi_per_return_k` row leaves the estimate
-  essentially unchanged (`-0.000144`, `p=0.000080`, `n=958`).
-- Trimming the 1st and 99th percentiles strengthens rather than weakens it
-  (`-0.000196`, `p=0.000112`, `n=939`).
-
-These were quick follow-up checks run against the built FD panel, not separate
-tracked workflow artifacts.
+| sample filter | estimate | p-value | n |
+|---|---:|---:|---:|
+| full sample | `-0.000143` | `0.000073` | 959 |
+| drop negative outflow AGI row | `-0.000144` | `0.000080` | 958 |
+| trim outflow AGI 1st/99th percentiles | `-0.000196` | `0.000112` | 939 |
+| exclude 2020 | `-0.000130` | `0.00133` | 822 |
+| exclude San Francisco/San Jose | `-0.000132` | `0.0188` | 945 |
+| exclude 2020 and San Francisco/San Jose | `-0.000122` | `0.0615` | 810 |
 
 ## Bottom line
 
 The pooled top-150 IRS migration screen does not support a broad "migrant income
 in general explains rent growth" story. Inflow AGI per return alone is null,
 and the average churn-income measure is weak. But the outflow side is not dead:
-higher-income out-migration is consistently associated with slower later rent
-growth, and in joint models the pattern looks like richer inflows plus poorer
-outflows predicting stronger subsequent rent growth.
+higher-income out-migration is generally associated with slower later rent
+growth, including when excluding either 2020 or the San Francisco/San Jose MSAs
+alone. The result is less stable when both are excluded at once, so it should be
+treated as a real but fragile descriptive channel rather than a settled robust
+mechanism.
 
 That is more signal than the earlier churn-interaction bead found, but it is
 still a modest descriptive channel, not a dominant explanation for the larger

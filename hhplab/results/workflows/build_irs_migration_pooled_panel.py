@@ -82,6 +82,51 @@ class ModelSpec:
     fixed_effects: tuple[str, ...]
 
 
+@dataclass(frozen=True)
+class SampleFilter:
+    name: str
+    description: str
+
+
+OUTFLOW_ROBUSTNESS_FILTERS = (
+    SampleFilter(
+        name="full_sample",
+        description="Unfiltered state-year FE outflow AGI-per-return sample.",
+    ),
+    SampleFilter(
+        name="drop_negative_outflow_agi",
+        description="Drop rows with negative outflow AGI per return.",
+    ),
+    SampleFilter(
+        name="trim_outflow_agi_1_99",
+        description=(
+            "Keep rows between the sample 1st and 99th percentiles of outflow AGI per return."
+        ),
+    ),
+    SampleFilter(
+        name="exclude_2020",
+        description="Exclude PIT/ZORI year 2020.",
+    ),
+    SampleFilter(
+        name="exclude_sf_san_jose",
+        description="Exclude San Francisco-Oakland and San Jose-Sunnyvale-Santa Clara MSAs.",
+    ),
+    SampleFilter(
+        name="exclude_2020_and_sf_san_jose",
+        description="Exclude PIT/ZORI year 2020 and the San Francisco/San Jose MSAs.",
+    ),
+)
+
+
+OUTFLOW_ROBUSTNESS_MODEL = ModelSpec(
+    name="rent_fd_outflow_agi_per_return_k_state_year_fe",
+    outcome="d_log_zori",
+    predictors=("d_log_pop", "outflow_agi_per_return_k"),
+    family="direct_income_outflow_robustness",
+    fixed_effects=("primary_state_year",),
+)
+
+
 def primary_state(msa_name: str) -> str:
     return msa_name.rsplit(",", 1)[-1].strip().split("-")[0]
 
@@ -223,49 +268,111 @@ def _model_specs() -> Iterable[ModelSpec]:
         )
 
 
+def _fit_model_rows(
+    sample: pd.DataFrame,
+    *,
+    spec: ModelSpec,
+    sample_filter: SampleFilter | None = None,
+) -> list[dict[str, object]]:
+    fe_parts = [
+        pd.get_dummies(
+            sample[fixed_effect].astype("string"),
+            prefix=fixed_effect,
+            drop_first=True,
+            dtype=float,
+        )
+        for fixed_effect in spec.fixed_effects
+    ]
+    x = pd.concat([sample[list(spec.predictors)].astype("float64"), *fe_parts], axis=1)
+    x = sm.add_constant(x, has_constant="add")
+    y = sample[spec.outcome].astype("float64")
+    result = sm.OLS(y, x).fit(
+        cov_type="cluster",
+        cov_kwds={"groups": sample["msa_id"].astype(str)},
+    )
+
+    rows: list[dict[str, object]] = []
+    for term in spec.predictors:
+        row = {
+            "family": spec.family,
+            "model": spec.name,
+            "outcome": spec.outcome,
+            "fixed_effects": "+".join(spec.fixed_effects),
+            "term": term,
+            "estimate": float(result.params[term]),
+            "std_error": float(result.bse[term]),
+            "t_stat": float(result.tvalues[term]),
+            "p_value": float(result.pvalues[term]),
+            "nobs": int(result.nobs),
+            "clusters": int(sample["msa_id"].nunique()),
+            "r_squared": float(result.rsquared),
+            "std_error_type": "clustered:msa_id",
+        }
+        if sample_filter is not None:
+            row["sample_filter"] = sample_filter.name
+            row["sample_filter_description"] = sample_filter.description
+        rows.append(row)
+    return rows
+
+
+def _complete_model_sample(fd: pd.DataFrame, spec: ModelSpec) -> pd.DataFrame:
+    required = [spec.outcome, *spec.predictors, *spec.fixed_effects, "msa_id"]
+    return fd.dropna(subset=required).copy()
+
+
 def fit_clustered_models(fd: pd.DataFrame) -> pd.DataFrame:
     rows: list[dict[str, object]] = []
     for spec in _model_specs():
-        required = [spec.outcome, *spec.predictors, *spec.fixed_effects, "msa_id"]
-        sample = fd.dropna(subset=required).copy()
+        sample = _complete_model_sample(fd, spec)
         if sample.empty:
             continue
+        rows.extend(_fit_model_rows(sample, spec=spec))
+    return pd.DataFrame(rows)
 
-        fe_parts = [
-            pd.get_dummies(
-                sample[fixed_effect].astype("string"),
-                prefix=fixed_effect,
-                drop_first=True,
-                dtype=float,
+
+def _is_sf_or_san_jose(sample: pd.DataFrame) -> pd.Series:
+    msa_name = sample["msa_name"].astype("string").str.lower()
+    return msa_name.str.contains("san francisco-oakland", na=False) | msa_name.str.contains(
+        "san jose-sunnyvale-santa clara",
+        na=False,
+    )
+
+
+def apply_outflow_robustness_filter(
+    sample: pd.DataFrame,
+    sample_filter: SampleFilter,
+) -> pd.DataFrame:
+    if sample_filter.name == "full_sample":
+        return sample.copy()
+    if sample_filter.name == "drop_negative_outflow_agi":
+        return sample[sample["outflow_agi_per_return_k"] >= 0].copy()
+    if sample_filter.name == "trim_outflow_agi_1_99":
+        lower = sample["outflow_agi_per_return_k"].quantile(0.01)
+        upper = sample["outflow_agi_per_return_k"].quantile(0.99)
+        return sample[sample["outflow_agi_per_return_k"].between(lower, upper)].copy()
+    if sample_filter.name == "exclude_2020":
+        return sample[sample["year"] != 2020].copy()
+    if sample_filter.name == "exclude_sf_san_jose":
+        return sample[~_is_sf_or_san_jose(sample)].copy()
+    if sample_filter.name == "exclude_2020_and_sf_san_jose":
+        return sample[(sample["year"] != 2020) & ~_is_sf_or_san_jose(sample)].copy()
+    raise ValueError(f"Unknown IRS outflow robustness sample filter: {sample_filter.name}")
+
+
+def fit_outflow_robustness_models(fd: pd.DataFrame) -> pd.DataFrame:
+    base_sample = _complete_model_sample(fd, OUTFLOW_ROBUSTNESS_MODEL)
+    rows: list[dict[str, object]] = []
+    for sample_filter in OUTFLOW_ROBUSTNESS_FILTERS:
+        sample = apply_outflow_robustness_filter(base_sample, sample_filter)
+        if sample.empty:
+            continue
+        rows.extend(
+            _fit_model_rows(
+                sample,
+                spec=OUTFLOW_ROBUSTNESS_MODEL,
+                sample_filter=sample_filter,
             )
-            for fixed_effect in spec.fixed_effects
-        ]
-        x = pd.concat([sample[list(spec.predictors)].astype("float64"), *fe_parts], axis=1)
-        x = sm.add_constant(x, has_constant="add")
-        y = sample[spec.outcome].astype("float64")
-        result = sm.OLS(y, x).fit(
-            cov_type="cluster",
-            cov_kwds={"groups": sample["msa_id"].astype(str)},
         )
-
-        for term in spec.predictors:
-            rows.append(
-                {
-                    "family": spec.family,
-                    "model": spec.name,
-                    "outcome": spec.outcome,
-                    "fixed_effects": "+".join(spec.fixed_effects),
-                    "term": term,
-                    "estimate": float(result.params[term]),
-                    "std_error": float(result.bse[term]),
-                    "t_stat": float(result.tvalues[term]),
-                    "p_value": float(result.pvalues[term]),
-                    "nobs": int(result.nobs),
-                    "clusters": int(sample["msa_id"].nunique()),
-                    "r_squared": float(result.rsquared),
-                    "std_error_type": "clustered:msa_id",
-                }
-            )
     return pd.DataFrame(rows)
 
 
@@ -308,29 +415,37 @@ def run() -> dict[str, object]:
     levels = build_levels_panel()
     fd = levels[levels["year_gap"] == 1].copy()
     regressions = fit_clustered_models(fd)
+    robustness = fit_outflow_robustness_models(fd)
     summary = summarize_panel(levels, fd)
 
     levels_path = OUT / "irs_migration_pooled_levels.parquet"
     fd_path = OUT / "irs_migration_pooled_fd.parquet"
     regression_path = OUT / "irs_migration_pooled_regressions.parquet"
     regression_csv_path = OUT / "irs_migration_pooled_regressions.csv"
+    robustness_path = OUT / "irs_migration_pooled_outflow_robustness.parquet"
+    robustness_csv_path = OUT / "irs_migration_pooled_outflow_robustness.csv"
     summary_path = OUT / "irs_migration_pooled_summary.json"
 
     levels.to_parquet(levels_path, index=False)
     fd.to_parquet(fd_path, index=False)
     regressions.to_parquet(regression_path, index=False)
     regressions.to_csv(regression_csv_path, index=False)
+    robustness.to_parquet(robustness_path, index=False)
+    robustness.to_csv(robustness_csv_path, index=False)
     summary_path.write_text(json.dumps(summary, indent=2) + "\n", encoding="utf-8")
 
     return {
         "pooled_cohorts": levels.cohort.value_counts().to_dict(),
         "summary": summary,
         "regressions": json.loads(regressions.to_json(orient="records")),
+        "outflow_robustness": json.loads(robustness.to_json(orient="records")),
         "outputs": {
             "levels_parquet": str(levels_path),
             "fd_parquet": str(fd_path),
             "regressions_parquet": str(regression_path),
             "regressions_csv": str(regression_csv_path),
+            "outflow_robustness_parquet": str(robustness_path),
+            "outflow_robustness_csv": str(robustness_csv_path),
             "summary_json": str(summary_path),
         },
     }
@@ -346,6 +461,10 @@ def main() -> None:
     print(f"levels rows: {summary['levels_rows']} -> {outputs['levels_parquet']}")
     print(f"fd rows: {summary['fd_rows_year_gap_1']} -> {outputs['fd_parquet']}")
     print(f"regression rows: {len(regressions)} -> {outputs['regressions_parquet']}")
+    print(
+        "outflow robustness rows: "
+        f"{len(result['outflow_robustness'])} -> {outputs['outflow_robustness_parquet']}"
+    )
     print(f"summary -> {outputs['summary_json']}")
     if not regressions.empty:
         print(regressions[regressions["term"].isin(DIRECT_INCOME_COLUMNS)])
