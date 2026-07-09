@@ -20,6 +20,7 @@ from hhplab.results.workflows.build_household_size_composition_panel import OUT
 FD_INPUTS = {
     "renter_household_share": OUT / "renter_household_share_composition_fd.parquet",
     "local_income": OUT / "local_income_composition_fd.parquet",
+    "employment_labor_force": OUT / "employment_labor_force_composition_fd.parquet",
     "income_inequality": OUT / "income_inequality_composition_fd.parquet",
 }
 LEVEL_INPUTS = {
@@ -28,6 +29,7 @@ LEVEL_INPUTS = {
     "household_size": OUT / "household_size_composition_levels.parquet",
     "recent_mover_income": OUT / "recent_mover_income_composition_levels.parquet",
     "local_income": OUT / "local_income_composition_levels.parquet",
+    "employment_labor_force": OUT / "employment_labor_force_composition_levels.parquet",
     "income_inequality": OUT / "income_inequality_composition_levels.parquet",
 }
 
@@ -255,6 +257,47 @@ FD_LOCAL_INCOME_SPECS = (
     ),
 )
 
+EMPLOYMENT_LABOR_FORCE_FD_COLUMNS = (
+    "d_log_civilian_labor_force_per_panel_person",
+    "d_log_employed_count_per_panel_person",
+    "d_labor_force_participation_rate",
+    "d_employment_to_population_16_plus",
+    "d_unemployment_rate_acs1",
+)
+EMPLOYMENT_LABOR_FORCE_LEVEL_COLUMNS = (
+    "log_civilian_labor_force_per_panel_person",
+    "log_employed_count_per_panel_person",
+    "labor_force_participation_rate",
+    "employment_to_population_16_plus",
+    "unemployment_rate_acs1",
+)
+
+
+def _employment_labor_force_fd_specs() -> tuple[RegressionSpec, ...]:
+    specs: list[RegressionSpec] = []
+    for column in EMPLOYMENT_LABOR_FORCE_FD_COLUMNS:
+        base_name = column.removeprefix("d_")
+        for suffix, fixed_effect in (
+            ("year_fe", "year"),
+            ("region_year_fe", "region_year"),
+            ("state_year_fe", "primary_state_year"),
+        ):
+            specs.append(
+                RegressionSpec(
+                    family="employment_labor_force",
+                    model=f"rent_fd_{base_name}_{suffix}",
+                    outcome="d_log_zori",
+                    predictors=("d_log_pop", column),
+                    fixed_effects=(fixed_effect,),
+                    sample_filter="fd_year_gap_1",
+                    focal_terms=(column,),
+                )
+            )
+    return tuple(specs)
+
+
+FD_EMPLOYMENT_LABOR_FORCE_SPECS = _employment_labor_force_fd_specs()
+
 FD_INCOME_INEQUALITY_SPECS = (
     RegressionSpec(
         family="income_inequality",
@@ -284,6 +327,44 @@ FD_INCOME_INEQUALITY_SPECS = (
         focal_terms=("d_gini_index",),
     ),
 )
+
+
+def _employment_labor_force_level_specs() -> tuple[RegressionSpec, ...]:
+    specs: list[RegressionSpec] = []
+    for column in EMPLOYMENT_LABOR_FORCE_LEVEL_COLUMNS:
+        specs.extend(
+            (
+                RegressionSpec(
+                    family="employment_labor_force",
+                    model=f"rent_levels_{column}_msa_year_fe",
+                    outcome="log_zori",
+                    predictors=("log_pop", column),
+                    fixed_effects=("msa_id", "year"),
+                    sample_filter="levels_complete_case",
+                    focal_terms=(column,),
+                ),
+                RegressionSpec(
+                    family="employment_labor_force",
+                    model=f"rent_levels_{column}_msa_region_year_fe",
+                    outcome="log_zori",
+                    predictors=("log_pop", column),
+                    fixed_effects=("msa_id", "region_year"),
+                    sample_filter="levels_complete_case",
+                    focal_terms=(column,),
+                ),
+                RegressionSpec(
+                    family="employment_labor_force",
+                    model=f"rent_levels_{column}_msa_state_year_fe",
+                    outcome="log_zori",
+                    predictors=("log_pop", column),
+                    fixed_effects=("msa_id", "primary_state_year"),
+                    sample_filter="levels_complete_case",
+                    focal_terms=(column,),
+                ),
+            )
+        )
+    return tuple(specs)
+
 
 LEVEL_FE_SPECS = (
     RegressionSpec(
@@ -493,7 +574,7 @@ LEVEL_FE_SPECS = (
         sample_filter="levels_complete_case",
         focal_terms=("gini_index",),
     ),
-)
+) + _employment_labor_force_level_specs()
 
 
 def _effect_series(sample: pd.DataFrame, effect: str) -> pd.Series:
@@ -632,6 +713,10 @@ def run_robustness_checks() -> pd.DataFrame:
     local_income_fd = load_required_parquet(FD_INPUTS["local_income"])
     for spec in FD_LOCAL_INCOME_SPECS:
         frames.append(fit_spec(local_income_fd, spec))
+
+    employment_labor_force_fd = load_required_parquet(FD_INPUTS["employment_labor_force"])
+    for spec in FD_EMPLOYMENT_LABOR_FORCE_SPECS:
+        frames.append(fit_spec(employment_labor_force_fd, spec))
 
     income_inequality_fd = load_required_parquet(FD_INPUTS["income_inequality"])
     for spec in FD_INCOME_INEQUALITY_SPECS:

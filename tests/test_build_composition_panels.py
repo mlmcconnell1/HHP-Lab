@@ -95,6 +95,19 @@ def test_local_income_safe_log_invalid_values() -> None:
     assert pd.isna(logged.iloc[2])
 
 
+def test_employment_labor_force_helpers_guard_invalid_values() -> None:
+    employment = _load_script("build_employment_labor_force_composition_panel")
+
+    ratio = employment._safe_ratio(pd.Series([10, 10]), pd.Series([2, 0]))
+    logged = employment._safe_log(pd.Series([4, 0, -2]))
+
+    assert ratio.iloc[0] == pytest.approx(5)
+    assert pd.isna(ratio.iloc[1])
+    assert logged.iloc[0] == pytest.approx(np.log(4))
+    assert pd.isna(logged.iloc[1])
+    assert pd.isna(logged.iloc[2])
+
+
 def test_renter_panel_uses_acs5_vintage_end_year_plus_one_and_preserves_identity(
     monkeypatch,
     tmp_path: Path,
@@ -240,6 +253,43 @@ def test_local_income_panel_uses_acs1_lag_and_log_growth(
     assert pd.isna(levels.loc[2019, "median_household_income_by_tenure_total"])
 
 
+def test_employment_labor_force_panel_uses_acs1_lag_and_derives_tightness(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    employment = _load_script("build_employment_labor_force_composition_panel")
+    for vintage, pop_16_plus, labor_force, unemployed in [
+        (2019, 80_000, 50_000, 5_000),
+        (2020, 82_000, 52_000, 4_000),
+    ]:
+        acs1_path = tmp_path / f"acs1_metro__A{vintage}@Dcensusmsa2023.parquet"
+        pd.DataFrame(
+            {
+                "metro_id": ["10000"],
+                "acs1_vintage": [str(vintage)],
+                "pop_16_plus": [pop_16_plus],
+                "civilian_labor_force": [labor_force],
+                "unemployed_count": [unemployed],
+                "unemployment_rate_acs1": [unemployed / labor_force],
+            }
+        ).to_parquet(acs1_path, index=False)
+    monkeypatch.setattr(employment, "ACS1_METRO_GLOB", str(tmp_path / "acs1_metro__A*.parquet"))
+    monkeypatch.setattr(employment, "load_pooled_base_panel", _base_panel)
+
+    levels = employment.build_levels_panel().set_index("year")
+
+    assert levels.loc[2020, "acs1_vintage_used"] == 2019
+    assert levels.loc[2020, "employed_count"] == pytest.approx(45_000)
+    assert levels.loc[2020, "labor_force_participation_rate"] == pytest.approx(50_000 / 80_000)
+    assert levels.loc[2020, "employment_to_population_16_plus"] == pytest.approx(45_000 / 80_000)
+    assert levels.loc[2021, "d_log_employed_count_per_panel_person"] == pytest.approx(
+        (np.log(48_000) - np.log(102_000)) - (np.log(45_000) - np.log(101_000))
+    )
+    assert levels.loc[2021, "d_unemployment_rate_acs1"] == pytest.approx(
+        (4_000 / 52_000) - (5_000 / 50_000)
+    )
+
+
 def test_income_inequality_panel_uses_acs5_lag_and_differences(
     monkeypatch,
     tmp_path: Path,
@@ -294,6 +344,23 @@ def _robustness_fixture() -> pd.DataFrame:
                     + 0.018 * msa_index,
                     "d_log_median_household_income_renter_occupied": 0.01 * year_index
                     + 0.003 * msa_index,
+                    "log_civilian_labor_force_per_panel_person": -0.35
+                    + 0.02 * year_index
+                    + 0.01 * msa_index,
+                    "d_log_civilian_labor_force_per_panel_person": 0.006 * year_index
+                    + 0.002 * msa_index,
+                    "log_employed_count_per_panel_person": -0.45
+                    + 0.02 * year_index
+                    + 0.012 * msa_index,
+                    "d_log_employed_count_per_panel_person": 0.007 * year_index + 0.002 * msa_index,
+                    "labor_force_participation_rate": 0.60 + 0.01 * year_index + 0.005 * msa_index,
+                    "d_labor_force_participation_rate": 0.002 * year_index + 0.001 * msa_index,
+                    "employment_to_population_16_plus": 0.55
+                    + 0.01 * year_index
+                    + 0.004 * msa_index,
+                    "d_employment_to_population_16_plus": 0.0025 * year_index + 0.001 * msa_index,
+                    "unemployment_rate_acs1": 0.05 - 0.002 * year_index + 0.001 * msa_index,
+                    "d_unemployment_rate_acs1": -0.001 * year_index + 0.0003 * msa_index,
                     "gini_index": 0.44 + 0.005 * year_index + 0.01 * msa_index,
                     "d_gini_index": 0.003 * year_index + 0.001 * msa_index,
                     "log_total_households_per_panel_person": -6.9
@@ -314,7 +381,9 @@ def test_composition_robustness_runs_state_year_and_levels_fe_specs() -> None:
 
     state_year = robustness.fit_spec(
         frame,
-        _spec_by_model(robustness.FD_RENTER_SHARE_SPECS, "rent_fd_renter_household_share_state_year_fe"),
+        _spec_by_model(
+            robustness.FD_RENTER_SHARE_SPECS, "rent_fd_renter_household_share_state_year_fe"
+        ),
     )
     levels = robustness.fit_spec(
         frame,
@@ -462,6 +531,46 @@ def test_income_inequality_fd_models_include_gini_screen() -> None:
     assert unsheltered_terms == ["d_log_zori", "d_log_pop", "d_gini_index"]
 
 
+def test_employment_labor_force_fd_models_include_tightness_screens() -> None:
+    employment = _load_script("build_employment_labor_force_composition_panel")
+    rows = []
+    for msa_index, msa_id in enumerate(["10000", "20000", "30000", "40000"], start=1):
+        for year_index, year in enumerate([2020, 2022], start=1):
+            rows.append(
+                {
+                    "msa_id": msa_id,
+                    "year": year,
+                    "d_log_zori": 0.02 * year_index + 0.01 * msa_index,
+                    "d_log_unshelt_rate": 0.03 * year_index + 0.01 * msa_index,
+                    "d_log_pop": 0.01 * year_index,
+                    "d_log_civilian_labor_force_per_panel_person": 0.004 * msa_index,
+                    "d_log_employed_count_per_panel_person": 0.005 * msa_index,
+                    "d_labor_force_participation_rate": 0.002 * msa_index,
+                    "d_employment_to_population_16_plus": 0.003 * msa_index,
+                    "d_unemployment_rate_acs1": -0.001 * msa_index,
+                }
+            )
+    fd = pd.DataFrame(rows)
+
+    regressions = employment.fit_clustered_fd_models(fd)
+
+    rent_terms = regressions.loc[
+        regressions["model"] == "rent_fd_unemployment_rate_acs1",
+        "term",
+    ].tolist()
+    unsheltered_terms = regressions.loc[
+        regressions["model"] == "unsheltered_fd_log_employed_count_per_panel_person",
+        "term",
+    ].tolist()
+
+    assert rent_terms == ["d_log_pop", "d_unemployment_rate_acs1"]
+    assert unsheltered_terms == [
+        "d_log_zori",
+        "d_log_pop",
+        "d_log_employed_count_per_panel_person",
+    ]
+
+
 def test_composition_robustness_runs_income_inequality_specs() -> None:
     robustness = _load_script("analyze_composition_rent_population_robustness")
     frame = _robustness_fixture()
@@ -482,9 +591,35 @@ def test_composition_robustness_runs_income_inequality_specs() -> None:
     assert set(fd_result["term"]) == {"d_log_pop", "d_gini_index"}
     assert set(levels_result["term"]) == {"log_pop", "gini_index"}
     assert fd_result.loc[fd_result["term"] == "d_gini_index", "focal_term"].tolist() == [True]
-    assert levels_result.loc[levels_result["term"] == "gini_index", "focal_term"].tolist() == [
-        True
-    ]
+    assert levels_result.loc[levels_result["term"] == "gini_index", "focal_term"].tolist() == [True]
+
+
+def test_composition_robustness_runs_employment_labor_force_specs() -> None:
+    robustness = _load_script("analyze_composition_rent_population_robustness")
+    frame = _robustness_fixture()
+    fd_spec = _spec_by_model(
+        robustness.FD_EMPLOYMENT_LABOR_FORCE_SPECS,
+        "rent_fd_unemployment_rate_acs1_state_year_fe",
+    )
+    levels_spec = _spec_by_model(
+        robustness.LEVEL_FE_SPECS,
+        "rent_levels_employment_to_population_16_plus_msa_state_year_fe",
+    )
+
+    fd_result = robustness.fit_spec(frame, fd_spec)
+    levels_result = robustness.fit_spec(frame, levels_spec)
+
+    assert fd_result["fixed_effects"].unique().tolist() == ["primary_state_year"]
+    assert levels_result["fixed_effects"].unique().tolist() == ["msa_id+primary_state_year"]
+    assert set(fd_result["term"]) == {"d_log_pop", "d_unemployment_rate_acs1"}
+    assert set(levels_result["term"]) == {"log_pop", "employment_to_population_16_plus"}
+    assert fd_result.loc[
+        fd_result["term"] == "d_unemployment_rate_acs1", "focal_term"
+    ].tolist() == [True]
+    assert levels_result.loc[
+        levels_result["term"] == "employment_to_population_16_plus",
+        "focal_term",
+    ].tolist() == [True]
 
 
 def test_composition_robustness_requires_state_for_state_year_fe() -> None:
@@ -557,9 +692,11 @@ def test_composition_robustness_rejects_unmapped_state_for_region_year(model: st
     robustness = _load_script("analyze_composition_rent_population_robustness")
     frame = _robustness_fixture()
     frame.loc[0, "primary_state"] = "PR"
-    spec = _spec_by_model(robustness.FD_RENTER_SHARE_SPECS, model) if model.startswith(
-        "rent_fd"
-    ) else _spec_by_model(robustness.LEVEL_FE_SPECS, model)
+    spec = (
+        _spec_by_model(robustness.FD_RENTER_SHARE_SPECS, model)
+        if model.startswith("rent_fd")
+        else _spec_by_model(robustness.LEVEL_FE_SPECS, model)
+    )
 
     with pytest.raises(ValueError, match="Unknown Census state abbreviation"):
         robustness.fit_spec(frame, spec)

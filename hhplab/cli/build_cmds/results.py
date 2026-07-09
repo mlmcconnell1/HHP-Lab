@@ -110,6 +110,11 @@ RESULT_WORKFLOWS: dict[str, ResultWorkflow] = {
         description="Build the local-income composition panel and regressions.",
         modules=("build_local_income_composition_panel",),
     ),
+    "employment-labor-force-composition": ResultWorkflow(
+        name="employment-labor-force-composition",
+        description="Build the ACS1 employment and labor-force composition panel and regressions.",
+        modules=("build_employment_labor_force_composition_panel",),
+    ),
     "income-inequality-composition": ResultWorkflow(
         name="income-inequality-composition",
         description="Build the income-inequality composition panel and regressions.",
@@ -128,6 +133,7 @@ RESULT_WORKFLOWS: dict[str, ResultWorkflow] = {
             "build_household_size_composition_panel",
             "build_recent_mover_income_composition_panel",
             "build_local_income_composition_panel",
+            "build_employment_labor_force_composition_panel",
             "build_income_inequality_composition_panel",
             "analyze_composition_rent_population_robustness",
         ),
@@ -158,6 +164,7 @@ RESULT_WORKFLOWS: dict[str, ResultWorkflow] = {
             "build_household_size_composition_panel",
             "build_recent_mover_income_composition_panel",
             "build_local_income_composition_panel",
+            "build_employment_labor_force_composition_panel",
             "build_income_inequality_composition_panel",
             "analyze_composition_rent_population_robustness",
             "build_noncompositional_rent_population_panel",

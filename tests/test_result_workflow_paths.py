@@ -11,6 +11,11 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 
 WORKFLOW_PATH_CASES = [
     (
+        "build_employment_labor_force_composition_panel",
+        "OUT",
+        REPO_ROOT / "outputs" / "composition_rent_population",
+    ),
+    (
         "build_household_size_composition_panel",
         "OUT",
         REPO_ROOT / "outputs" / "composition_rent_population",

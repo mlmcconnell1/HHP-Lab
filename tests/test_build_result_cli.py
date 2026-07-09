@@ -42,6 +42,7 @@ def test_build_result_composition_workflow_json() -> None:
         "build_household_size_composition_panel",
         "build_recent_mover_income_composition_panel",
         "build_local_income_composition_panel",
+        "build_employment_labor_force_composition_panel",
         "build_income_inequality_composition_panel",
         "analyze_composition_rent_population_robustness",
     ]

@@ -2,7 +2,7 @@
 
 ## Overall Result
 
-The five composition and direct-demand screens do not support a positive,
+The six composition and direct-demand screens do not support a positive,
 state-year-robust explanation for rent growth independent of population
 growth. Renter tenure share is negatively associated with rent growth under
 plain year FE and under pooled MSA+year levels FE, but the first-difference
@@ -14,14 +14,19 @@ and goes null under region/state x year FE; renter household size is null;
 recent-mover income ratios are null; and the new direct local-income screen
 finds positive ACS1 median-income growth coefficients under plain year FE and,
 for renter income, region x year FE, but both growth coefficients collapse
-under state x year FE. The new ACS5 income-inequality (`gini_index`) screen
-leans negative rather than positive in first differences and also goes null
-once region/state x year shocks are absorbed, while inequality levels are null
-throughout. Income levels themselves do line up strongly with rent levels even
-after MSA and state-year fixed effects, especially renter median income, so
-richer metros are more expensive. What is *not* supported is the claim that
-within-state annual local income growth or rising local inequality
-independently explains year-to-year rent growth.
+under state x year FE. The new ACS1 labor-market screen also fails as a
+positive rent-growth channel: employment growth, labor-force growth,
+participation, and employment-to-working-age-population shifts are all null
+in first differences, while unemployment changes are if anything negative and
+weaken toward null under state x year FE. The new ACS5 income-inequality
+(`gini_index`) screen leans negative rather than positive in first
+differences and also goes null once region/state x year shocks are absorbed,
+while inequality levels are null throughout. Income levels themselves do line
+up strongly with rent levels even after MSA and state-year fixed effects,
+especially renter median income, and tighter labor-market levels likewise line
+up with higher rent levels. What is *not* supported is the claim that
+within-state annual local income growth, labor-market tightening, or rising
+local inequality independently explains year-to-year rent growth.
 
 ## Renter Household Share (ACS5 B25003)
 
@@ -323,6 +328,113 @@ Interpretation: richer metros, and metros whose renters are richer, do have
 higher rent levels in a robust within-MSA levels design. What this screen does
 *not* show is that year-to-year local income growth is a robust independent
 driver of year-to-year rent growth once state-specific shocks are absorbed.
+
+## Employment and Labor-Force Tightness (ACS1 B23025)
+
+Generated with:
+
+```bash
+uv run hhplab build result employment-labor-force-composition --json
+uv run hhplab build result composition-rent-population-robustness --json
+```
+
+This screen uses the metro-native ACS1 B23025 employment-status fields already
+present in the curated ACS1 artifacts:
+
+- `pop_16_plus`
+- `civilian_labor_force`
+- `unemployed_count`
+- `unemployment_rate_acs1`
+
+From those columns the tracked workflow derives both net-of-headcount growth
+screens and tighter status ratios:
+
+- `d_log_civilian_labor_force_per_panel_person`
+- `d_log_employed_count_per_panel_person`
+- `d_labor_force_participation_rate`
+- `d_employment_to_population_16_plus`
+- `d_unemployment_rate_acs1`
+
+Generated, ignored artifacts:
+
+- `outputs/composition_rent_population/employment_labor_force_composition_levels.parquet`
+- `outputs/composition_rent_population/employment_labor_force_composition_fd.parquet`
+- `outputs/composition_rent_population/employment_labor_force_composition_fd_regressions.parquet`
+- `outputs/composition_rent_population/employment_labor_force_composition_fd_regressions.csv`
+- `outputs/composition_rent_population/employment_labor_force_composition_summary.json`
+
+Coverage:
+
+- Levels rows: 1,750
+- First-difference rows with 1-year gaps: 1,450
+- MSAs: 150
+- Analysis years: 2010-2020 and 2022-2025
+- ACS1 vintages used: 2009-2019 and 2021-2024
+- Complete FD rows for the full labor-market screen set: 1,078
+- Complete levels rows for the full labor-market screen set: 1,357 across 137 MSAs
+
+Median labor-market levels on the complete ACS1 sample:
+
+| Measure | Median |
+| --- | ---: |
+| Labor-force participation rate | 0.635 |
+| Employment / population age 16+ | 0.598 |
+| Unemployment rate | 0.053 |
+| `log_civilian_labor_force_per_panel_person` | -0.685 |
+| `log_employed_count_per_panel_person` | -0.742 |
+
+Key year-FE first-difference rent models:
+
+| Model | Labor-market term | Estimate | SE | p-value | N |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| `d_log_zori ~ d_log_pop + labor_market + year FE` | `d_log_civilian_labor_force_per_panel_person` | 0.0168 | 0.0284 | 0.554 | 1,084 |
+| `d_log_zori ~ d_log_pop + labor_market + year FE` | `d_log_employed_count_per_panel_person` | 0.0283 | 0.0276 | 0.305 | 1,084 |
+| `d_log_zori ~ d_log_pop + labor_market + year FE` | `d_labor_force_participation_rate` | 0.0086 | 0.0634 | 0.893 | 1,084 |
+| `d_log_zori ~ d_log_pop + labor_market + year FE` | `d_employment_to_population_16_plus` | 0.0706 | 0.0661 | 0.285 | 1,084 |
+| `d_log_zori ~ d_log_pop + labor_market + year FE` | `d_unemployment_rate_acs1` | -0.2057 | 0.0915 | 0.0246 | 1,084 |
+
+Only the unemployment-rate change is nominally non-null, and it points in the
+opposite direction from the motivating "tighter labor market bids up rents"
+story: metros with falling unemployment tend to have faster rent growth, so
+metros with rising unemployment tend to have slower rent growth. The other
+four first-difference labor-market screens are near zero even under plain year
+fixed effects. The paired unsheltered-rate models are all null; for example,
+`d_unemployment_rate_acs1` enters at -0.5349 (SE 1.4324, p = 0.709, n = 1,078).
+
+The robustness ladder says that the one nominal signal does not become a
+positive rent-growth channel under tighter confound absorption:
+
+| Model term | Estimate | SE | p-value | N |
+| --- | ---: | ---: | ---: | ---: |
+| `d_unemployment_rate_acs1` (year FE) | -0.2057 | 0.0915 | 0.0246 | 1,084 |
+| `d_unemployment_rate_acs1` (region x year FE) | -0.2085 | 0.0820 | 0.0110 | 1,084 |
+| `d_unemployment_rate_acs1` (state x year FE) | -0.1447 | 0.0828 | 0.0806 | 1,084 |
+
+So this ACS1 labor-market screen does **not** support a positive,
+state-year-robust story in which employment growth or labor-force tightening
+independently drives year-to-year rent growth net of population growth. If
+anything, the only visible first-difference signal is a negative unemployment
+coefficient, and even that attenuates once identification is restricted to
+within-state, cross-MSA variation in the same year.
+
+Labor-market *levels* are more informative than labor-market *changes*. On the
+within-MSA levels sample (`n = 1,357`, `137` MSAs), tighter labor markets line
+up with higher rent levels even after MSA and state-year fixed effects:
+
+| Model term | Estimate | SE | p-value | N |
+| --- | ---: | ---: | ---: | ---: |
+| `log_civilian_labor_force_per_panel_person` (msa + state x year FE) | 0.0276 | 0.0664 | 0.677 | 1,357 |
+| `log_employed_count_per_panel_person` (msa + state x year FE) | 0.0829 | 0.0740 | 0.263 | 1,357 |
+| `labor_force_participation_rate` (msa + state x year FE) | 0.2973 | 0.2881 | 0.302 | 1,357 |
+| `employment_to_population_16_plus` (msa + state x year FE) | 0.6486 | 0.3246 | 0.0457 | 1,357 |
+| `unemployment_rate_acs1` (msa + state x year FE) | -1.3698 | 0.4393 | 0.0018 | 1,357 |
+
+Interpretation: expensive metros do tend to be tighter labor markets in levels
+terms, especially when measured as employment/population-16+ or unemployment.
+But this is a levels association, not a tracked first-difference rent-growth
+channel. The data do not show that annual labor-market tightening within a
+state causes faster annual rent growth once the same regional/state-year
+confound ladder used elsewhere in the project is applied.
 
 ## Income Inequality (ACS5 B19083)
 
