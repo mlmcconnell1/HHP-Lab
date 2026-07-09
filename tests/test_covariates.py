@@ -330,6 +330,32 @@ def _write_mpi_contract_workbook(
     return workbook_path
 
 
+def _write_hud_psh_workbook(
+    tmp_path: Path,
+    *,
+    year: int,
+    workbook_name: str,
+    include_quarter: bool,
+    county_rows: list[list[object]] | None = None,
+) -> Path:
+    from openpyxl import Workbook
+
+    base_headers = ["gsl", "program_label", "code", "total_units"]
+    headers = ["Quarter", *base_headers] if include_quarter else base_headers
+    workbook = Workbook()
+    sheet = workbook.active
+    sheet.title = "County_Extract31DEC2023" if include_quarter else "stcnty"
+    sheet.append(headers)
+    for row in county_rows or []:
+        if include_quarter:
+            sheet.append([f"{year}-12-31", *row])
+        else:
+            sheet.append(row)
+    workbook_path = tmp_path / workbook_name
+    workbook.save(workbook_path)
+    return workbook_path
+
+
 def _write_irs_soi_fixture_dir(tmp_path: Path) -> Path:
     raw_dir = tmp_path / "irs_soi"
     raw_dir.mkdir()
@@ -1023,6 +1049,124 @@ def test_cli_ingests_mpi_xlsx_with_json_warnings(tmp_path: Path, monkeypatch) ->
     assert payload["measure_columns"] == list(MPI_MEASURE_COLUMNS)
     assert payload["skipped_rows"] == 1
     assert payload["warnings"] == {"us_total": 1}
+
+
+def test_hud_psh_xlsx_ingest_reads_official_workbook_layout(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    """HUD PSH ingest should accept the official county workbook layout directly."""
+    monkeypatch.setattr("hhplab.covariates.ingest.register_source", lambda **_: None)
+    workbook_path = _write_hud_psh_workbook(
+        tmp_path,
+        year=2023,
+        workbook_name="COUNTY_2023_2020census.xlsx",
+        include_quarter=True,
+        county_rows=[
+            ["County", "Summary of All HUD Programs", 1001, 248],
+            ["County", "Housing Choice Vouchers", 1001, 90],
+            ["County", "Public Housing", 1001, 106],
+            ["County", "Summary of All HUD Programs", 72003, 425],
+            ["County", "Housing Choice Vouchers", 72003, 124],
+        ],
+    )
+
+    curated = ingest_covariate_source("hud_psh", workbook_path, output_dir=tmp_path, force=True)
+
+    result = pd.read_parquet(curated).sort_values(["county_fips", "year"]).reset_index(drop=True)
+    assert curated.name == "covariate__hud_psh__Y2000-ongoing.parquet"
+    assert result["county_fips"].tolist() == ["01001", "72003"]
+    assert result["geo_id"].tolist() == ["01001", "72003"]
+    assert result["state_fips"].tolist() == ["01", "72"]
+    assert result["year"].tolist() == [2023, 2023]
+    assert result["subsidized_households"].tolist() == pytest.approx([248.0, 425.0])
+    assert result["housing_choice_vouchers"].tolist() == pytest.approx([90.0, 124.0])
+    provenance = read_provenance(curated)
+    assert provenance is not None
+    assert provenance.extra["years_present"] == [2023]
+    assert provenance.extra["raw_files"] == ["COUNTY_2023_2020census.xlsx"]
+    assert provenance.extra["source_layout_policy"] == "official_hud_psh_county_workbook"
+
+
+def test_hud_psh_directory_ingest_combines_multiple_workbooks(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    """HUD PSH directory ingest should combine multiple annual county workbooks."""
+    monkeypatch.setattr("hhplab.covariates.ingest.register_source", lambda **_: None)
+    raw_dir = tmp_path / "hud_psh"
+    raw_dir.mkdir()
+    _write_hud_psh_workbook(
+        raw_dir,
+        year=2010,
+        workbook_name="COUNTY_2010.xlsx",
+        include_quarter=False,
+        county_rows=[
+            ["County", "Summary of All HUD Programs", 1001, 200],
+            ["County", "Housing Choice Vouchers", 1001, 80],
+        ],
+    )
+    _write_hud_psh_workbook(
+        raw_dir,
+        year=2023,
+        workbook_name="COUNTY_2023_2020census.xlsx",
+        include_quarter=True,
+        county_rows=[
+            ["County", "Summary of All HUD Programs", 1001, 248],
+            ["County", "Housing Choice Vouchers", 1001, 90],
+        ],
+    )
+
+    curated = ingest_covariate_source("hud_psh", raw_dir, output_dir=tmp_path, force=True)
+
+    result = pd.read_parquet(curated).sort_values(["county_fips", "year"]).reset_index(drop=True)
+    assert result["year"].tolist() == [2010, 2023]
+    assert result["subsidized_households"].tolist() == pytest.approx([200.0, 248.0])
+    assert result["housing_choice_vouchers"].tolist() == pytest.approx([80.0, 90.0])
+    provenance = read_provenance(curated)
+    assert provenance is not None
+    assert provenance.extra["years_present"] == [2010, 2023]
+    assert provenance.extra["raw_files"] == ["COUNTY_2010.xlsx", "COUNTY_2023_2020census.xlsx"]
+
+
+def test_cli_ingests_hud_psh_xlsx_with_json_payload(tmp_path: Path, monkeypatch) -> None:
+    """CLI should report canonical HUD PSH workbook ingest results as JSON."""
+    monkeypatch.setattr("hhplab.covariates.ingest.register_source", lambda **_: None)
+    workbook_path = _write_hud_psh_workbook(
+        tmp_path,
+        year=2022,
+        workbook_name="COUNTY_2022_2020census.xlsx",
+        include_quarter=True,
+        county_rows=[
+            ["County", "Summary of All HUD Programs", 1001, 248],
+            ["County", "Housing Choice Vouchers", 1001, 90],
+        ],
+    )
+
+    result = runner.invoke(
+        app,
+        [
+            "ingest",
+            "covariate",
+            "--source",
+            "hud_psh",
+            "--raw-path",
+            str(workbook_path),
+            "--output-dir",
+            str(tmp_path),
+            "--force",
+            "--json",
+        ],
+    )
+
+    assert result.exit_code == 0
+    payload = json.loads(result.output)
+    assert payload["status"] == "ok"
+    assert payload["source_id"] == "hud_psh"
+    assert payload["row_count"] == 1
+    assert payload["measure_columns"] == ["subsidized_households", "housing_choice_vouchers"]
+    assert payload["skipped_rows"] == 0
+    assert payload["warnings"] == {}
 
 
 def test_cli_ingests_irs_soi_directory_with_json_pair_path(
@@ -2048,6 +2192,45 @@ def test_county_covariate_msa_rollup_non_ct_population_gap_uses_general_error() 
     assert "County population weights are missing for covariate county-years" in message
     assert "06037" in message
     assert "CT legacy county-years" not in message
+
+
+def test_county_covariate_msa_rollup_allows_missing_population_for_extensive_sum() -> None:
+    """Pure extensive-sum county covariates should not fail on missing PR population rows."""
+    county = pd.DataFrame(
+        {
+            "county_fips": ["72003", "72005"],
+            "year": [2023, 2023],
+            "subsidized_households": [425.0, 575.0],
+            "housing_choice_vouchers": [124.0, 176.0],
+        }
+    )
+    membership = pd.DataFrame(
+        {
+            "msa_id": ["10380", "10380"],
+            "county_fips": ["72003", "72005"],
+        }
+    )
+    population = pd.DataFrame(columns=["county_fips", "year", "population"])
+
+    result = aggregate_county_covariate_to_msa(
+        county,
+        measure_columns=["subsidized_households", "housing_choice_vouchers"],
+        measure_aggregations={
+            "subsidized_households": "extensive_sum",
+            "housing_choice_vouchers": "extensive_sum",
+        },
+        msa_definition_version="test_msa_v1",
+        msa_county_membership=membership,
+        county_population=population,
+    )
+
+    row = result.set_index("msa_id").loc["10380"]
+    assert row["subsidized_households"] == pytest.approx(1_000.0)
+    assert row["housing_choice_vouchers"] == pytest.approx(300.0)
+    assert row["population_weight_denominator"] == pytest.approx(0.0)
+    assert row["county_count"] == 2
+    assert row["membership_county_count"] == 2
+    assert row["coverage_ratio"] == pytest.approx(1.0)
 
 
 def test_mpi_native_msa_rows_fill_missing_msa_covariate_rows() -> None:

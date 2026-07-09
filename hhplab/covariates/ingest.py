@@ -71,6 +71,18 @@ COMMON_COLUMN_ALIASES: dict[str, tuple[str, ...]] = {
     "year": ("year", "data_year", "fy", "fiscal_year"),
 }
 
+HUD_PSH_WORKBOOK_GLOB = "COUNTY_*.xlsx"
+HUD_PSH_FILENAME_RE = re.compile(
+    r"COUNTY_(?P<year>\d{4})(?:_(?P<census>2020census))?\.xlsx$",
+    re.IGNORECASE,
+)
+HUD_PSH_REQUIRED_RAW_COLUMNS = ("gsl", "program_label", "code", "total_units")
+HUD_PSH_COUNTY_LEVEL = "county"
+HUD_PSH_PROGRAM_MEASURES: dict[str, str] = {
+    "Summary of All HUD Programs": "subsidized_households",
+    "Housing Choice Vouchers": "housing_choice_vouchers",
+}
+
 STATE_NAME_TO_ABBREV: dict[str, str] = {
     "ALABAMA": "AL",
     "ALASKA": "AK",
@@ -172,6 +184,15 @@ def ingest_covariate_source(
 
     if source_id == CENSUS_BPS_SOURCE_ID and _is_census_bps_raw_path(source_path):
         return _ingest_census_bps(
+            source_path,
+            spec=spec,
+            destination=Path(output_path) if output_path is not None else None,
+            output_dir=output_dir,
+            force=force,
+        )
+
+    if source_id == "hud_psh" and _is_hud_psh_raw_path(source_path):
+        return _ingest_hud_psh(
             source_path,
             spec=spec,
             destination=Path(output_path) if output_path is not None else None,
@@ -394,6 +415,166 @@ def _read_census_bps_annual_file(path: Path) -> pd.DataFrame:
         .sum(min_count=1)
         .reset_index(drop=True)
     )
+
+
+def _is_hud_psh_raw_path(source_path: Path) -> bool:
+    """True when the path is an official HUD PSH county workbook or directory."""
+    if source_path.is_dir():
+        return True
+    return HUD_PSH_FILENAME_RE.fullmatch(source_path.name) is not None
+
+
+def _ingest_hud_psh(
+    source_path: Path,
+    *,
+    spec: CovariateSourceSpec,
+    destination: Path | None,
+    output_dir: Path | str | None,
+    force: bool,
+) -> Path:
+    paths = _hud_psh_workbook_paths(source_path)
+    years_present = [_hud_psh_workbook_year(path) for path in paths]
+    duplicate_years = sorted({year for year in years_present if years_present.count(year) > 1})
+    if duplicate_years:
+        raise ValueError(
+            "HUD PSH workbook input contains duplicate county files for year(s) "
+            f"{duplicate_years}. Keep one COUNTY_YYYY workbook per year."
+        )
+    if destination is None:
+        destination = default_covariate_output_path(spec.source_id, output_dir=output_dir)
+    if destination.exists() and not force:
+        return destination
+
+    result = pd.concat(
+        [_read_hud_psh_workbook(path, spec=spec) for path in paths],
+        ignore_index=True,
+    ).sort_values(["county_fips", "year"])
+    raw_sha256 = _sha256_tree(source_path) if source_path.is_dir() else _sha256(source_path)
+    file_size = sum(path.stat().st_size for path in paths)
+    return _finalize_covariate_curated(
+        result,
+        spec=spec,
+        source_path=source_path,
+        destination=destination,
+        raw_sha256=raw_sha256,
+        file_size=file_size,
+        provenance_extra={
+            "years_present": sorted(years_present),
+            "raw_files": [path.name for path in paths],
+            "source_layout_policy": "official_hud_psh_county_workbook",
+            "program_measure_map": dict(HUD_PSH_PROGRAM_MEASURES),
+        },
+    )
+
+
+def _hud_psh_workbook_paths(source_path: Path) -> list[Path]:
+    """Resolve one or more official HUD PSH county workbooks."""
+    if source_path.is_dir():
+        paths = sorted(
+            path
+            for path in source_path.glob(HUD_PSH_WORKBOOK_GLOB)
+            if HUD_PSH_FILENAME_RE.fullmatch(path.name) is not None
+        )
+        if not paths:
+            raise ValueError(
+                "No HUD PSH county workbooks found. Expected files named "
+                "COUNTY_YYYY.xlsx or COUNTY_YYYY_2020census.xlsx."
+            )
+        return paths
+    if HUD_PSH_FILENAME_RE.fullmatch(source_path.name) is None:
+        raise ValueError(
+            f"Unsupported HUD PSH raw file name {source_path.name!r}. Expected "
+            "COUNTY_YYYY.xlsx or COUNTY_YYYY_2020census.xlsx."
+        )
+    return [source_path]
+
+
+def _read_hud_psh_workbook(
+    path: Path,
+    *,
+    spec: CovariateSourceSpec,
+) -> pd.DataFrame:
+    """Read one official HUD PSH county workbook into canonical covariate rows."""
+    year = _hud_psh_workbook_year(path)
+    raw = pd.read_excel(path, sheet_name=0)
+    raw.columns = [_clean_column(column) for column in raw.columns]
+    missing = sorted(set(HUD_PSH_REQUIRED_RAW_COLUMNS) - set(raw.columns))
+    if missing:
+        raise ValueError(
+            f"HUD PSH workbook {path.name} is missing required columns {missing}. "
+            "Expected the official county workbook layout with gsl/program_label/"
+            "code/total_units columns."
+        )
+    quarter_years = _hud_psh_quarter_years(raw)
+    if quarter_years and quarter_years != {year}:
+        raise ValueError(
+            f"HUD PSH workbook {path.name} filename implies year {year}, but Quarter "
+            f"column contains {sorted(quarter_years)}."
+        )
+
+    county_rows = raw[
+        raw["gsl"].astype("string").str.strip().str.casefold().eq(HUD_PSH_COUNTY_LEVEL)
+    ].copy()
+    county_rows["program_label"] = county_rows["program_label"].astype("string").str.strip()
+    county_rows = county_rows[county_rows["program_label"].isin(HUD_PSH_PROGRAM_MEASURES)].copy()
+    if county_rows.empty:
+        raise ValueError(
+            f"HUD PSH workbook {path.name} produced no county rows for "
+            f"{sorted(HUD_PSH_PROGRAM_MEASURES)}."
+        )
+
+    county_rows["county_fips"] = county_rows["code"].map(_hud_psh_county_fips)
+    county_rows["year"] = year
+    county_rows["measure"] = county_rows["program_label"].map(HUD_PSH_PROGRAM_MEASURES)
+    county_rows["value"] = pd.to_numeric(county_rows["total_units"], errors="coerce")
+    grouped = (
+        county_rows.dropna(subset=["county_fips"])
+        .groupby(["county_fips", "year", "measure"], as_index=False)["value"]
+        .sum(min_count=1)
+    )
+    if grouped.empty:
+        raise ValueError(
+            f"HUD PSH workbook {path.name} produced no rows with county_fips and "
+            "program totals."
+        )
+    result = grouped.pivot(index=["county_fips", "year"], columns="measure", values="value")
+    result = result.reset_index()
+    result.columns.name = None
+    for column in spec.measure_columns:
+        if column not in result.columns:
+            result[column] = pd.NA
+    result["geo_type"] = spec.native_geo
+    result["geo_id"] = result["county_fips"].astype("string").str.zfill(5)
+    result["state_fips"] = result["county_fips"].astype("string").str[:2]
+    return result[
+        ["geo_type", "geo_id", "county_fips", "state_fips", "year", *spec.measure_columns]
+    ]
+
+
+def _hud_psh_workbook_year(path: Path) -> int:
+    match = HUD_PSH_FILENAME_RE.fullmatch(path.name)
+    if match is None:
+        raise ValueError(
+            f"Unsupported HUD PSH workbook name {path.name!r}. Expected "
+            "COUNTY_YYYY.xlsx or COUNTY_YYYY_2020census.xlsx."
+        )
+    return int(match.group("year"))
+
+
+def _hud_psh_county_fips(value: Any) -> str | None:
+    if pd.isna(value):
+        return None
+    digits = re.sub(r"\D", "", str(value))
+    if not digits:
+        return None
+    return digits.zfill(5)[-5:]
+
+
+def _hud_psh_quarter_years(raw: pd.DataFrame) -> set[int]:
+    if "quarter" not in raw.columns:
+        return set()
+    parsed = pd.to_datetime(raw["quarter"], errors="coerce")
+    return {int(year) for year in parsed.dt.year.dropna().unique()}
 
 
 def default_covariate_pair_output_path(
@@ -1415,8 +1596,10 @@ def _read_tabular(path: Path) -> pd.DataFrame:
         return pd.read_parquet(path)
     if suffix in {".csv", ".txt"}:
         return pd.read_csv(path)
+    if suffix in {".xlsx", ".xls"}:
+        return pd.read_excel(path)
     raise ValueError(
-        f"Unsupported covariate raw file type '{suffix}'. Use CSV, TXT, or Parquet."
+        f"Unsupported covariate raw file type '{suffix}'. Use CSV, TXT, Parquet, or Excel."
     )
 
 

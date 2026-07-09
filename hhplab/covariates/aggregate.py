@@ -996,16 +996,22 @@ def aggregate_county_covariate_to_msa(
     county = county.merge(membership, on="county_fips", how="inner")
     county = county.merge(population, on=["county_fips", "year"], how="left")
     if county["population"].isna().any():
-        sample = (
-            county.loc[county["population"].isna(), ["county_fips", "year"]]
-            .drop_duplicates()
-            .head(10)
-            .to_dict(orient="records")
+        all_extensive_sum = all(
+            aggregations[column] == "extensive_sum" for column in measure_columns
         )
-        raise ValueError(
-            "County population weights are missing for covariate county-years; "
-            f"sample: {sample}. Provide --county-population-path with matching PEP rows."
-        )
+        if all_extensive_sum:
+            county["population"] = county["population"].fillna(0.0)
+        else:
+            sample = (
+                county.loc[county["population"].isna(), ["county_fips", "year"]]
+                .drop_duplicates()
+                .head(10)
+                .to_dict(orient="records")
+            )
+            raise ValueError(
+                "County population weights are missing for covariate county-years; "
+                f"sample: {sample}. Provide --county-population-path with matching PEP rows."
+            )
 
     rows: list[dict[str, object]] = []
     row_by_key: dict[tuple[str, int], dict[str, object]] = {}
