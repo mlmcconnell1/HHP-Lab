@@ -7,6 +7,7 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
 
+import numpy as np
 import pandas as pd
 from typer.testing import CliRunner
 
@@ -45,6 +46,66 @@ def test_run_workflow_module_reads_legacy_summary_stdout(tmp_path) -> None:
 
     assert payload["stdout"] == [f"summary -> {summary_path}"]
     assert payload["result"] == {"row_count": 2}
+
+
+def test_run_workflow_module_coerces_numpy_scalars_so_json_dumps_succeeds() -> None:
+    # Regression test: vera_hic_pit_correlations.py and
+    # overdose_hic_category_correlations.py returned `year` from
+    # `Series.unique()` (numpy.int64) directly in their result dicts, which
+    # crashed `hhplab build result <name> --json` with an uncaught
+    # `TypeError: Object of type int64 is not JSON serializable` at the final
+    # json.dumps in build_result_cmd -- not caught by the per-module
+    # try/except, so it surfaced as a raw traceback instead of a clean error.
+    module = SimpleNamespace(
+        __name__="hhplab.results.workflows.example",
+        run=lambda: {
+            "year": np.int64(2020),
+            "r": np.float64(0.5),
+            "flag": np.bool_(True),
+            "years": np.array([2019, 2020]),
+            "rows": [{"year": np.int64(2021), "n": 5}],
+        },
+        main=lambda: None,
+    )
+
+    with patch("hhplab.cli.build_cmds.results.importlib.import_module", return_value=module):
+        payload = _run_workflow_module("example")
+
+    result = payload["result"]
+    assert result == {
+        "year": 2020,
+        "r": 0.5,
+        "flag": True,
+        "years": [2019, 2020],
+        "rows": [{"year": 2021, "n": 5}],
+    }
+    assert not isinstance(result["year"], np.generic)
+    # Must not raise -- this is what actually broke before the fix.
+    json.dumps(payload)
+
+
+def test_build_result_cmd_prints_result_when_run_only_contract_has_no_stdout() -> None:
+    # Regression test: modules migrated to run()-only (main() delegates to
+    # run() and prints from its return value, but the CLI calls run()
+    # directly and never calls main()) produce empty stdout, so plain-text
+    # `hhplab build result <name>` (no --json) silently showed nothing but
+    # the script name.
+    def fake_run_workflow_module(module_name: str) -> dict[str, object]:
+        return {
+            "script": f"scripts/{module_name}.py",
+            "module": f"hhplab.results.workflows.{module_name}",
+            "stdout": [],
+            "result": {"row_count": 42},
+        }
+
+    with patch(
+        "hhplab.cli.build_cmds.results._run_workflow_module",
+        side_effect=fake_run_workflow_module,
+    ):
+        result = runner.invoke(app, ["build", "result", "subsidized-housing-stock"])
+
+    assert result.exit_code == 0, result.output
+    assert '"row_count": 42' in result.output
 
 
 def test_build_result_composition_workflow_json() -> None:

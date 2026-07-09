@@ -10,6 +10,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Annotated
 
+import numpy as np
 import typer
 
 WORKFLOW_MODULE_PREFIX = "hhplab.results.workflows"
@@ -221,6 +222,25 @@ def _script_label(module_name: str) -> str:
     return f"scripts/{module_name}.py"
 
 
+def _json_safe(value: object) -> object:
+    """Recursively coerce numpy scalars/arrays into plain JSON-serializable values.
+
+    Workflow `run()` results are built from pandas/numpy computations, which
+    routinely carry numpy scalar types (e.g. int64 from `Series.unique()`)
+    that the stdlib `json` module cannot serialize. This is applied once at
+    the CLI boundary so no workflow module has to remember to cast values.
+    """
+    if isinstance(value, dict):
+        return {key: _json_safe(item) for key, item in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [_json_safe(item) for item in value]
+    if isinstance(value, np.generic):
+        return value.item()
+    if isinstance(value, np.ndarray):
+        return _json_safe(value.tolist())
+    return value
+
+
 def _load_summary_from_stdout(stdout_lines: list[str]) -> dict[str, object] | None:
     for line in stdout_lines:
         prefix = "summary -> "
@@ -260,7 +280,7 @@ def _run_workflow_module(module_name: str) -> dict[str, object]:
         "stdout": stdout_lines,
     }
     if result is not None:
-        payload["result"] = result
+        payload["result"] = _json_safe(result)
     return payload
 
 
@@ -334,3 +354,8 @@ def build_result_cmd(
         typer.echo(f"- {step['script']}")
         for line in step["stdout"]:
             typer.echo(f"  {line}")
+        if not step["stdout"] and step.get("result") is not None:
+            # Workflows migrated to the run()-only contract print nothing to
+            # stdout (main() is bypassed); fall back to the structured result
+            # so plain-text mode isn't silently empty for those modules.
+            typer.echo(json.dumps(step["result"], indent=2))
