@@ -120,6 +120,11 @@ RESULT_WORKFLOWS: dict[str, ResultWorkflow] = {
         description="Build the income-inequality composition panel and regressions.",
         modules=("build_income_inequality_composition_panel",),
     ),
+    "housing-cost-burden-composition": ResultWorkflow(
+        name="housing-cost-burden-composition",
+        description="Build the housing-cost-burden composition panel and regressions.",
+        modules=("build_housing_cost_burden_composition_panel",),
+    ),
     "subsidized-housing-stock": ResultWorkflow(
         name="subsidized-housing-stock",
         description="Build the HUD subsidized-housing stock panel and rent-growth regressions.",
@@ -140,6 +145,7 @@ RESULT_WORKFLOWS: dict[str, ResultWorkflow] = {
             "build_local_income_composition_panel",
             "build_employment_labor_force_composition_panel",
             "build_income_inequality_composition_panel",
+            "build_housing_cost_burden_composition_panel",
             "analyze_composition_rent_population_robustness",
         ),
     ),
@@ -171,6 +177,7 @@ RESULT_WORKFLOWS: dict[str, ResultWorkflow] = {
             "build_local_income_composition_panel",
             "build_employment_labor_force_composition_panel",
             "build_income_inequality_composition_panel",
+            "build_housing_cost_burden_composition_panel",
             "analyze_composition_rent_population_robustness",
             "build_noncompositional_rent_population_panel",
             "analyze_noncompositional_rent_population_robustness",

@@ -315,6 +315,84 @@ def test_income_inequality_panel_uses_acs5_lag_and_differences(
     assert pd.isna(levels.loc[2019, "gini_index"])
 
 
+def test_housing_cost_burden_panel_uses_acs_lags_and_derives_burden_rates(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    burden = _load_script("build_housing_cost_burden_composition_panel")
+    burden_rows = [
+        (2019, 0.40, 60, 18, 9, 40, 8, 4, 60_000, 1_200),
+        (2020, 0.44, 64, 20, 10, 44, 10, 5, 66_000, 1_320),
+    ]
+    for (
+        vintage,
+        rent_burden,
+        owner_with_total,
+        owner_with_30,
+        owner_with_50,
+        owner_without_total,
+        owner_without_30,
+        owner_without_50,
+        median_income,
+        median_rent,
+    ) in burden_rows:
+        measures_path = tmp_path / f"measures__msa__A{vintage}@Mcensusmsa2023xT2010.parquet"
+        pd.DataFrame(
+            {
+                "msa_id": ["10000"],
+                "acs_vintage": [f"{vintage - 4}-{vintage}"],
+                "median_household_income": [median_income],
+                "median_gross_rent": [median_rent],
+                "msa_rent_burden": [rent_burden],
+                "msa_rent_burden_40_plus": [rent_burden - 0.10],
+                "msa_rent_burden_50_plus": [rent_burden - 0.20],
+                "owner_costs_pct_income_with_mortgage_total": [owner_with_total],
+                "owner_costs_pct_income_with_mortgage_30_to_34_9": [owner_with_30 / 3],
+                "owner_costs_pct_income_with_mortgage_35_to_39_9": [owner_with_30 / 3],
+                "owner_costs_pct_income_with_mortgage_40_to_49_9": [owner_with_30 / 3],
+                "owner_costs_pct_income_with_mortgage_50_plus": [owner_with_50],
+                "owner_costs_pct_income_with_mortgage_not_computed": [0],
+                "owner_costs_pct_income_without_mortgage_total": [owner_without_total],
+                "owner_costs_pct_income_without_mortgage_30_to_34_9": [owner_without_30 / 3],
+                "owner_costs_pct_income_without_mortgage_35_to_39_9": [owner_without_30 / 3],
+                "owner_costs_pct_income_without_mortgage_40_to_49_9": [owner_without_30 / 3],
+                "owner_costs_pct_income_without_mortgage_50_plus": [owner_without_50],
+                "owner_costs_pct_income_without_mortgage_not_computed": [0],
+            }
+        ).to_parquet(measures_path, index=False)
+    for vintage, income, rent40, rent50, median_rent in [
+        (2019, 62_000, 0.30, 0.18, 1_250),
+        (2020, 68_000, 0.32, 0.20, 1_340),
+    ]:
+        acs1_path = tmp_path / f"acs1_metro__A{vintage}@Dcensusmsa2023.parquet"
+        pd.DataFrame(
+            {
+                "metro_id": ["10000"],
+                "acs1_vintage": [str(vintage)],
+                "median_household_income_by_tenure_total": [income],
+                "median_gross_rent": [median_rent],
+                "rent_burden_40_plus": [rent40],
+                "rent_burden_50_plus": [rent50],
+            }
+        ).to_parquet(acs1_path, index=False)
+    monkeypatch.setattr(burden, "MEASURES_GLOB", str(tmp_path / "measures__msa__A*.parquet"))
+    monkeypatch.setattr(burden, "ACS1_METRO_GLOB", str(tmp_path / "acs1_metro__A*.parquet"))
+    monkeypatch.setattr(burden, "load_pooled_base_panel", _base_panel)
+
+    levels = burden.build_levels_panel().set_index("year")
+
+    assert levels.loc[2020, "acs5_vintage_used"] == 2019
+    assert levels.loc[2020, "acs1_vintage_used"] == 2019
+    assert levels.loc[2020, "acs5_rent_burden_30_plus"] == pytest.approx(0.40)
+    assert levels.loc[2020, "acs5_owner_cost_burden_30_plus"] == pytest.approx(0.39)
+    assert levels.loc[2020, "acs5_owner_cost_burden_50_plus"] == pytest.approx(0.13)
+    assert levels.loc[2020, "acs5_rent_to_income"] == pytest.approx(1200 / (60_000 / 12))
+    assert levels.loc[2020, "acs1_rent_to_income"] == pytest.approx(1250 / (62_000 / 12))
+    assert levels.loc[2021, "d_acs5_rent_burden_30_plus"] == pytest.approx(0.04)
+    assert levels.loc[2021, "d_acs1_rent_burden_50_plus"] == pytest.approx(0.02)
+    assert pd.isna(levels.loc[2019, "acs5_rent_burden_30_plus"])
+
+
 def _robustness_fixture() -> pd.DataFrame:
     rows = []
     for msa_index, (msa_id, state) in enumerate(

@@ -44,6 +44,7 @@ def test_build_result_composition_workflow_json() -> None:
         "build_local_income_composition_panel",
         "build_employment_labor_force_composition_panel",
         "build_income_inequality_composition_panel",
+        "build_housing_cost_burden_composition_panel",
         "analyze_composition_rent_population_robustness",
     ]
     assert [step["script"] for step in payload["steps"]] == [
@@ -82,6 +83,37 @@ def test_build_result_subsidized_housing_stock_workflow_json() -> None:
     assert payload["steps"][0]["script"] == "scripts/build_subsidized_housing_stock_panel.py"
     assert payload["steps"][0]["module"] == (
         "hhplab.results.workflows.build_subsidized_housing_stock_panel"
+    )
+
+
+def test_build_result_housing_cost_burden_workflow_json() -> None:
+    calls: list[str] = []
+
+    def fake_run_workflow_module(module_name: str) -> dict[str, object]:
+        calls.append(module_name)
+        return {
+            "script": f"scripts/{module_name}.py",
+            "module": f"hhplab.results.workflows.{module_name}",
+            "stdout": [f"ran {module_name}"],
+        }
+
+    with patch(
+        "hhplab.cli.build_cmds.results._run_workflow_module",
+        side_effect=fake_run_workflow_module,
+    ):
+        result = runner.invoke(
+            app,
+            ["build", "result", "housing-cost-burden-composition", "--json"],
+        )
+
+    assert result.exit_code == 0, result.output
+    payload = json.loads(result.output)
+    assert payload["status"] == "ok"
+    assert payload["workflow"] == "housing-cost-burden-composition"
+    assert calls == ["build_housing_cost_burden_composition_panel"]
+    assert payload["steps"][0]["script"] == "scripts/build_housing_cost_burden_composition_panel.py"
+    assert payload["steps"][0]["module"] == (
+        "hhplab.results.workflows.build_housing_cost_burden_composition_panel"
     )
 
 
