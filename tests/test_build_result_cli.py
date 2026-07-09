@@ -54,6 +54,57 @@ def test_build_result_composition_workflow_json() -> None:
     ]
 
 
+def test_build_result_subsidized_housing_stock_workflow_json() -> None:
+    calls: list[str] = []
+
+    def fake_run_workflow_module(module_name: str) -> dict[str, object]:
+        calls.append(module_name)
+        return {
+            "script": f"scripts/{module_name}.py",
+            "module": f"hhplab.results.workflows.{module_name}",
+            "stdout": [f"ran {module_name}"],
+        }
+
+    with patch(
+        "hhplab.cli.build_cmds.results._run_workflow_module",
+        side_effect=fake_run_workflow_module,
+    ):
+        result = runner.invoke(
+            app,
+            ["build", "result", "subsidized-housing-stock", "--json"],
+        )
+
+    assert result.exit_code == 0, result.output
+    payload = json.loads(result.output)
+    assert payload["status"] == "ok"
+    assert payload["workflow"] == "subsidized-housing-stock"
+    assert calls == ["build_subsidized_housing_stock_panel"]
+    assert payload["steps"][0]["script"] == "scripts/build_subsidized_housing_stock_panel.py"
+    assert payload["steps"][0]["module"] == (
+        "hhplab.results.workflows.build_subsidized_housing_stock_panel"
+    )
+
+
+def test_build_result_workflow_failure_json_is_actionable() -> None:
+    with patch(
+        "hhplab.cli.build_cmds.results._run_workflow_module",
+        side_effect=FileNotFoundError("missing curated source"),
+    ):
+        result = runner.invoke(
+            app,
+            ["build", "result", "subsidized-housing-stock", "--json"],
+        )
+
+    assert result.exit_code == 1
+    payload = json.loads(result.output)
+    assert payload["status"] == "error"
+    assert payload["workflow"] == "subsidized-housing-stock"
+    assert payload["failed_module"] == "build_subsidized_housing_stock_panel"
+    assert payload["failed_script"] == "scripts/build_subsidized_housing_stock_panel.py"
+    assert payload["error"] == "missing curated source"
+    assert payload["completed_steps"] == []
+
+
 def test_build_result_unknown_workflow_json_is_actionable() -> None:
     result = runner.invoke(app, ["build", "result", "missing-workflow", "--json"])
 

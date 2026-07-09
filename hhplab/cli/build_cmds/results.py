@@ -120,6 +120,11 @@ RESULT_WORKFLOWS: dict[str, ResultWorkflow] = {
         description="Build the income-inequality composition panel and regressions.",
         modules=("build_income_inequality_composition_panel",),
     ),
+    "subsidized-housing-stock": ResultWorkflow(
+        name="subsidized-housing-stock",
+        description="Build the HUD subsidized-housing stock panel and rent-growth regressions.",
+        modules=("build_subsidized_housing_stock_panel",),
+    ),
     "composition-rent-population-robustness": ResultWorkflow(
         name="composition-rent-population-robustness",
         description="Run tracked robustness checks for composition rent-population screens.",
@@ -234,7 +239,27 @@ def build_result_cmd(
 
     steps: list[dict[str, object]] = []
     for module_name in workflow.modules:
-        steps.append(_run_workflow_module(module_name))
+        try:
+            steps.append(_run_workflow_module(module_name))
+        except Exception as exc:
+            payload = {
+                "status": "error",
+                "workflow": workflow.name,
+                "description": workflow.description,
+                "failed_module": module_name,
+                "failed_script": _script_label(module_name),
+                "error": str(exc),
+                "completed_steps": steps,
+            }
+            if use_json:
+                typer.echo(json.dumps(payload, indent=2))
+            else:
+                typer.echo(
+                    f"Error running result workflow '{workflow.name}' at "
+                    f"{_script_label(module_name)}: {exc}",
+                    err=True,
+                )
+            raise typer.Exit(1) from exc
 
     payload = {
         "status": "ok",
