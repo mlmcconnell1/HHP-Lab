@@ -135,6 +135,11 @@ RESULT_WORKFLOWS: dict[str, ResultWorkflow] = {
         description="Build the Eviction Lab timing-aware rent-growth panel and regressions.",
         modules=("build_eviction_rate_timing_panel",),
     ),
+    "qcew-labor-market": ResultWorkflow(
+        name="qcew-labor-market",
+        description="Build the QCEW labor-market panel and rent-growth regressions.",
+        modules=("build_qcew_labor_market_panel",),
+    ),
     "composition-rent-population-robustness": ResultWorkflow(
         name="composition-rent-population-robustness",
         description="Run tracked robustness checks for composition rent-population screens.",
@@ -186,6 +191,7 @@ RESULT_WORKFLOWS: dict[str, ResultWorkflow] = {
             "analyze_composition_rent_population_robustness",
             "build_noncompositional_rent_population_panel",
             "analyze_noncompositional_rent_population_robustness",
+            "build_qcew_labor_market_panel",
         ),
     ),
 }

@@ -23,6 +23,7 @@ WRAPPER_CASES = [
     "build_noncompositional_rent_population_panel",
     "build_overdose_lag_panel",
     "build_poverty_longitudinal_panel",
+    "build_qcew_labor_market_panel",
     "build_recent_mover_income_composition_panel",
     "build_renter_household_share_composition_panel",
     "build_vera_hic_pit_longitudinal",

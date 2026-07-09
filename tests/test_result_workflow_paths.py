@@ -51,6 +51,11 @@ WORKFLOW_PATH_CASES = [
         REPO_ROOT / "outputs" / "poverty_longitudinal",
     ),
     (
+        "build_qcew_labor_market_panel",
+        "OUT",
+        REPO_ROOT / "outputs" / "qcew_labor_market",
+    ),
+    (
         "build_supply_iv_panel",
         "OUT",
         REPO_ROOT / "outputs" / "supply_iv",
