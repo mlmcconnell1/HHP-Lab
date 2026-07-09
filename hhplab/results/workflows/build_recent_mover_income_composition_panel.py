@@ -17,6 +17,7 @@ from dataclasses import dataclass
 import pandas as pd
 import statsmodels.api as sm
 
+from hhplab.results.workflows._paths import write_result_parquet
 from hhplab.results.workflows.build_household_size_composition_panel import (
     ACS1_METRO_GLOB,
     OUT,
@@ -229,9 +230,9 @@ def run() -> dict[str, object]:
     regression_csv_path = OUT / "recent_mover_income_composition_fd_regressions.csv"
     summary_path = OUT / "recent_mover_income_composition_summary.json"
 
-    levels.to_parquet(levels_path, index=False)
-    fd.to_parquet(fd_path, index=False)
-    regressions.to_parquet(regression_path, index=False)
+    write_result_parquet(levels, levels_path, index=False)
+    write_result_parquet(fd, fd_path, index=False)
+    write_result_parquet(regressions, regression_path, index=False)
     regressions.to_csv(regression_csv_path, index=False)
     summary_path.write_text(json.dumps(summary, indent=2) + "\n", encoding="utf-8")
 

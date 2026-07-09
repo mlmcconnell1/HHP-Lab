@@ -21,7 +21,7 @@ import pandas as pd
 import statsmodels.api as sm
 
 from hhplab.census_regions import census_region
-from hhplab.results.workflows._paths import REPO_ROOT
+from hhplab.results.workflows._paths import REPO_ROOT, write_result_parquet
 
 ROOT = REPO_ROOT
 OUT = ROOT / "outputs" / "irs_migration_pooled"
@@ -426,11 +426,11 @@ def run() -> dict[str, object]:
     robustness_csv_path = OUT / "irs_migration_pooled_outflow_robustness.csv"
     summary_path = OUT / "irs_migration_pooled_summary.json"
 
-    levels.to_parquet(levels_path, index=False)
-    fd.to_parquet(fd_path, index=False)
-    regressions.to_parquet(regression_path, index=False)
+    write_result_parquet(levels, levels_path, index=False)
+    write_result_parquet(fd, fd_path, index=False)
+    write_result_parquet(regressions, regression_path, index=False)
     regressions.to_csv(regression_csv_path, index=False)
-    robustness.to_parquet(robustness_path, index=False)
+    write_result_parquet(robustness, robustness_path, index=False)
     robustness.to_csv(robustness_csv_path, index=False)
     summary_path.write_text(json.dumps(summary, indent=2) + "\n", encoding="utf-8")
 

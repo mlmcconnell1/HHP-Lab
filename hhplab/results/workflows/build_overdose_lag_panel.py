@@ -15,7 +15,7 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
-from hhplab.results.workflows._paths import REPO_ROOT
+from hhplab.results.workflows._paths import REPO_ROOT, write_result_parquet
 
 ROOT = REPO_ROOT
 OUT = ROOT / "outputs" / "overdose_lag"
@@ -177,11 +177,11 @@ def run() -> dict[str, object]:
     merged = add_psh_diffs(merged)
 
     levels_path = OUT / "overdose_lag_levels.parquet"
-    merged.to_parquet(levels_path, index=False)
+    write_result_parquet(merged, levels_path, index=False)
 
     fd = merged[merged.year_gap == 1].copy()
     fd_path = OUT / "overdose_lag_fd.parquet"
-    fd.to_parquet(fd_path, index=False)
+    write_result_parquet(fd, fd_path, index=False)
 
     covered = merged[merged.overdose_coverage_ratio >= MIN_OVERDOSE_COVERAGE]
     return {

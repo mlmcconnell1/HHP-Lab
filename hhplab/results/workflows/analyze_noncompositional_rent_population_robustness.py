@@ -16,6 +16,7 @@ import pandas as pd
 import statsmodels.api as sm
 
 from hhplab.census_regions import census_region
+from hhplab.results.workflows._paths import write_result_parquet
 from hhplab.results.workflows.build_noncompositional_rent_population_panel import (
     BPS_SHORT_WINDOW,
     NONCOMPOSITIONAL_OUT,
@@ -225,7 +226,7 @@ def summarize_regressions(regressions: pd.DataFrame) -> dict[str, object]:
 
 def write_outputs(regressions: pd.DataFrame) -> dict[str, object]:
     NONCOMPOSITIONAL_OUT.mkdir(parents=True, exist_ok=True)
-    regressions.to_parquet(ROBUSTNESS_PARQUET, index=False)
+    write_result_parquet(regressions, ROBUSTNESS_PARQUET, index=False)
     regressions.to_csv(ROBUSTNESS_CSV, index=False)
     summary = summarize_regressions(regressions)
     ROBUSTNESS_SUMMARY.write_text(json.dumps(summary, indent=2) + "\n", encoding="utf-8")

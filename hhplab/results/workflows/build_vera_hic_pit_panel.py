@@ -28,7 +28,7 @@ import numpy as np
 import pandas as pd
 
 from hhplab.msa import read_msa_county_membership
-from hhplab.results.workflows._paths import REPO_ROOT
+from hhplab.results.workflows._paths import REPO_ROOT, write_result_parquet
 
 ROOT = REPO_ROOT
 OUT = ROOT / "outputs" / "vera_hic_pit"
@@ -158,7 +158,7 @@ def run() -> dict[str, object]:
     )
 
     out_path = OUT / "vera_hic_pit_levels.parquet"
-    merged.to_parquet(out_path, index=False)
+    write_result_parquet(merged, out_path, index=False)
 
     ct_msas = merged.loc[merged.msa_name.str.contains("CT", na=False), "msa_name"].unique()
     return {

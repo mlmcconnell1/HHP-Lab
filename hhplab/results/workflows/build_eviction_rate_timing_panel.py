@@ -28,7 +28,7 @@ from hhplab.covariates.aggregate import (
     default_covariate_panel_path,
 )
 from hhplab.covariates.ingest import default_covariate_output_path
-from hhplab.results.workflows._paths import OUTPUTS_ROOT, REPO_ROOT
+from hhplab.results.workflows._paths import OUTPUTS_ROOT, REPO_ROOT, write_result_parquet
 from hhplab.results.workflows.build_household_size_composition_panel import (
     _as_msa_id,
     load_pooled_base_panel,
@@ -305,9 +305,9 @@ def run() -> dict[str, object]:
     regression_csv_path = OUT / "eviction_rate_timing_regressions.csv"
     summary_path = OUT / "eviction_rate_timing_summary.json"
 
-    levels.to_parquet(levels_path, index=False)
-    fd.to_parquet(fd_path, index=False)
-    regressions.to_parquet(regression_path, index=False)
+    write_result_parquet(levels, levels_path, index=False)
+    write_result_parquet(fd, fd_path, index=False)
+    write_result_parquet(regressions, regression_path, index=False)
     regressions.to_csv(regression_csv_path, index=False)
     summary_path.write_text(json.dumps(summary, indent=2) + "\n", encoding="utf-8")
 

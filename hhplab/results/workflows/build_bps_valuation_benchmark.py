@@ -24,7 +24,7 @@ from hhplab.covariates.census_bps_contract import (
     CENSUS_BPS_CLASS_VALUE_COLUMNS,
     CENSUS_BPS_MIX_ADJUSTED_VALUE_PER_UNIT_COLUMN,
 )
-from hhplab.results.workflows._paths import OUTPUTS_ROOT, REPO_ROOT
+from hhplab.results.workflows._paths import OUTPUTS_ROOT, REPO_ROOT, write_result_parquet
 
 ROOT = REPO_ROOT
 OUT = OUTPUTS_ROOT / "bps_valuation_benchmark"
@@ -313,9 +313,9 @@ def run_benchmark(
     distinctness_csv_path = OUT / "bps_valuation_distinctness.csv"
     summary_path = OUT / "bps_valuation_benchmark_summary.json"
 
-    ppi_benchmark.to_parquet(ppi_path, index=False)
+    write_result_parquet(ppi_benchmark, ppi_path, index=False)
     ppi_benchmark.to_csv(ppi_csv_path, index=False)
-    distinctness.to_parquet(distinctness_path, index=False)
+    write_result_parquet(distinctness, distinctness_path, index=False)
     distinctness.to_csv(distinctness_csv_path, index=False)
     summary_path.write_text(json.dumps(summary, indent=2) + "\n", encoding="utf-8")
 

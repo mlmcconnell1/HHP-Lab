@@ -17,7 +17,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from hhplab.results.workflows._paths import REPO_ROOT
+from hhplab.results.workflows._paths import REPO_ROOT, write_result_parquet
 
 ROOT = REPO_ROOT
 OUT = ROOT / "outputs" / "supply_iv"
@@ -380,8 +380,8 @@ def build_supply_iv_panel(
     fd_path = out_dir / f"{spec.output_prefix}_fd{suffix}.parquet"
     longdiff_path = out_dir / f"{spec.output_prefix}_longdiff{suffix}.parquet"
     manifest_path = out_dir / f"{spec.output_prefix}{suffix}_manifest.json"
-    fd.to_parquet(fd_path, index=False)
-    longdiff.to_parquet(longdiff_path, index=False)
+    write_result_parquet(fd, fd_path, index=False)
+    write_result_parquet(longdiff, longdiff_path, index=False)
     manifest: dict[str, object] = {
         "requested_msa_count": spec.requested_msa_count,
         "included_msa_count": int(cohort["msa_id"].nunique()),

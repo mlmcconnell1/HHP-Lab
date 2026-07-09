@@ -15,7 +15,7 @@ import glob
 
 import pandas as pd
 
-from hhplab.results.workflows._paths import REPO_ROOT
+from hhplab.results.workflows._paths import REPO_ROOT, write_result_parquet
 
 ROOT = REPO_ROOT
 OUT = ROOT / "outputs" / "poverty_longitudinal"
@@ -93,10 +93,10 @@ def run() -> dict[str, object]:
     merged["d_poverty_rate"] = grouped["poverty_rate"].diff()
 
     out_path = OUT / "poverty_longitudinal_levels.parquet"
-    merged.to_parquet(out_path, index=False)
+    write_result_parquet(merged, out_path, index=False)
     fd = merged[merged.year_gap == 1].copy()
     fd_path = OUT / "poverty_longitudinal_fd.parquet"
-    fd.to_parquet(fd_path, index=False)
+    write_result_parquet(fd, fd_path, index=False)
 
     return {
         "pooled_cohorts": merged.cohort.value_counts().to_dict(),

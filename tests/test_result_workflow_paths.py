@@ -5,7 +5,11 @@ from __future__ import annotations
 import importlib
 from pathlib import Path
 
+import pandas as pd
 import pytest
+
+from hhplab.provenance import read_provenance
+from hhplab.results.workflows._paths import write_result_parquet
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 
@@ -119,3 +123,21 @@ def test_result_workflow_modules_resolve_repo_root(
 
     assert module.ROOT == REPO_ROOT
     assert getattr(module, path_attr) == expected_path
+
+
+def test_result_workflow_parquet_writer_embeds_representative_provenance(
+    tmp_path: Path,
+) -> None:
+    output_path = tmp_path / "example_result_workflow" / "example_levels.parquet"
+    frame = pd.DataFrame({"msa_id": ["10000"], "year": [2024], "value": [1.5]})
+
+    write_result_parquet(frame, output_path, index=False)
+
+    provenance = read_provenance(output_path)
+    assert provenance is not None
+    assert provenance.extra["dataset_type"] == "result_workflow_artifact"
+    assert provenance.extra["workflow_id"] == "example_result_workflow"
+    assert provenance.extra["artifact_name"] == "example_levels"
+    assert provenance.extra["artifact_role"] == "levels"
+    assert provenance.extra["row_count"] == 1
+    assert provenance.extra["columns"] == ["msa_id", "year", "value"]

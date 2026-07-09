@@ -28,7 +28,7 @@ import numpy as np
 import pandas as pd
 
 from hhplab.msa import read_msa_county_membership
-from hhplab.results.workflows._paths import REPO_ROOT
+from hhplab.results.workflows._paths import REPO_ROOT, write_result_parquet
 
 ROOT = REPO_ROOT
 OUT = ROOT / "outputs" / "vera_hic_pit_longitudinal"
@@ -174,10 +174,10 @@ def run() -> dict[str, object]:
     merged = add_diffs(merged)
 
     out_path = OUT / "vera_hic_pit_longitudinal_levels.parquet"
-    merged.to_parquet(out_path, index=False)
+    write_result_parquet(merged, out_path, index=False)
     fd = merged[merged.year_gap == 1].copy()
     fd_path = OUT / "vera_hic_pit_longitudinal_fd.parquet"
-    fd.to_parquet(fd_path, index=False)
+    write_result_parquet(fd, fd_path, index=False)
 
     return {
         "levels_rows": int(len(merged)),
