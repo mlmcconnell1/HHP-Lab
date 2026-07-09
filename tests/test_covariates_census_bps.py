@@ -2,11 +2,11 @@
 
 Fixture truth table (derived from CENSUS_BPS_FIXTURE_ROWS below):
 
-| county_fips | year | permitted_units | permitted_buildings |
-| ----------- | ---- | --------------- | ------------------- |
-| 01001       | 2020 | 10+2+3+50 = 65  | 10+1+1+1 = 13       |
-| 01003       | 2020 | 20              | 20                  |
-| 01001       | 2021 | 12              | 12                  |
+| county_fips | year | permitted_units | permitted_buildings | permit_value_thousands |
+| ----------- | ---- | --------------- | ------------------- | ---------------------- |
+| 01001       | 2020 | 10+2+3+50 = 65  | 10+1+1+1 = 13       | 1000+200+300+5000=6500 |
+| 01003       | 2020 | 20              | 20                  | 2000                   |
+| 01001       | 2021 | 12              | 12                  | 1200                   |
 
 Reporting-places-only ("rep") columns are filled with a poison value so any
 accidental inclusion breaks the sums.
@@ -21,7 +21,9 @@ import pytest
 
 from hhplab.covariates.aggregate import aggregate_covariate_source
 from hhplab.covariates.census_bps_contract import (
-    CENSUS_BPS_MEASURE_COLUMNS,
+    CENSUS_BPS_CLASS_UNIT_COLUMNS,
+    CENSUS_BPS_CLASS_VALUE_COLUMNS,
+    CENSUS_BPS_MIX_ADJUSTED_VALUE_PER_UNIT_COLUMN,
     CENSUS_BPS_SOURCE_ID,
 )
 from hhplab.covariates.ingest import ingest_covariate_source
@@ -50,6 +52,7 @@ EXPECTED_BPS_MEASURES: dict[tuple[str, int], dict[str, int]] = {
     (state + county3.zfill(3), year): {
         "permitted_units": sum(units for _, units, _ in classes),
         "permitted_buildings": sum(bldgs for bldgs, _, _ in classes),
+        "permit_value_thousands": sum(value for _, _, value in classes),
     }
     for year, state, county3, classes in CENSUS_BPS_FIXTURE_ROWS
 }
@@ -97,11 +100,20 @@ def test_census_bps_raw_directory_ingest_matches_truth_table(
     assert set(curated_df["geo_type"]) == {"county"}
     observed = {
         (row.county_fips, row.year): {
-            column: int(getattr(row, column)) for column in CENSUS_BPS_MEASURE_COLUMNS
+            column: int(getattr(row, column))
+            for column in ("permitted_units", "permitted_buildings", "permit_value_thousands")
         }
         for row in curated_df.itertuples()
     }
     assert observed == EXPECTED_BPS_MEASURES
+    autauga_2020 = curated_df.set_index(["county_fips", "year"]).loc[("01001", 2020)]
+    assert autauga_2020[list(CENSUS_BPS_CLASS_UNIT_COLUMNS)].tolist() == [10, 2, 3, 50]
+    assert autauga_2020[list(CENSUS_BPS_CLASS_VALUE_COLUMNS)].tolist() == [
+        1000,
+        200,
+        300,
+        5000,
+    ]
 
 
 def test_census_bps_raw_ingest_records_provenance_policies(
@@ -157,6 +169,7 @@ def test_census_bps_aggregation_discovers_data_driven_year_token(
     assert panel.name == "covariate_panel__census_bps__Y2020-2021.parquet"
     panel_df = pd.read_parquet(panel)
     assert sorted(panel_df["year"].unique().tolist()) == [2020, 2021]
+    assert CENSUS_BPS_MIX_ADJUSTED_VALUE_PER_UNIT_COLUMN in panel_df.columns
 
 
 def test_census_bps_staged_canonical_csv_still_uses_generic_ingest(
@@ -170,6 +183,9 @@ def test_census_bps_staged_canonical_csv_still_uses_generic_ingest(
             "year": [2020],
             "permitted_units": [100],
             "permitted_buildings": [8],
+            "permit_value_thousands": [12_500],
+            **{column: [0] for column in CENSUS_BPS_CLASS_UNIT_COLUMNS},
+            **{column: [0] for column in CENSUS_BPS_CLASS_VALUE_COLUMNS},
         }
     ).to_csv(staged, index=False)
     curated = ingest_covariate_source(
@@ -181,3 +197,66 @@ def test_census_bps_staged_canonical_csv_still_uses_generic_ingest(
     curated_df = pd.read_parquet(curated)
     assert curated_df["permitted_units"].tolist() == [100]
     assert curated_df["permitted_buildings"].tolist() == [8]
+    assert curated_df["permit_value_thousands"].tolist() == [12_500]
+
+
+def test_census_bps_msa_aggregation_derives_fixed_mix_value_per_unit(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        "hhplab.covariates.aggregate.read_msa_county_membership",
+        lambda _definition_version, _data_root=None: pd.DataFrame(
+            {
+                "msa_id": ["11111", "11111"],
+                "county_fips": ["01001", "01003"],
+            }
+        ),
+    )
+    monkeypatch.setattr(
+        "hhplab.covariates.aggregate.load_pep_county",
+        lambda _county_population_path=None: pd.DataFrame(
+            {
+                "county_fips": ["01001", "01003", "01001", "01003"],
+                "year": [2020, 2020, 2021, 2021],
+                "population": [1.0, 1.0, 1.0, 1.0],
+            }
+        ),
+    )
+    rows = []
+    cases = [
+        ("01001", 2020, [10, 0, 0, 0], [1000, 0, 0, 0]),
+        ("01003", 2020, [0, 10, 0, 0], [0, 2000, 0, 0]),
+        ("01001", 2021, [20, 0, 0, 0], [2400, 0, 0, 0]),
+        ("01003", 2021, [0, 5, 0, 0], [0, 1500, 0, 0]),
+    ]
+    for county_fips, year, class_units, class_values in cases:
+        rows.append(
+            {
+                "geo_type": "county",
+                "geo_id": county_fips,
+                "county_fips": county_fips,
+                "year": year,
+                "permitted_units": sum(class_units),
+                "permitted_buildings": sum(class_units),
+                "permit_value_thousands": sum(class_values),
+                **dict(zip(CENSUS_BPS_CLASS_UNIT_COLUMNS, class_units, strict=True)),
+                **dict(zip(CENSUS_BPS_CLASS_VALUE_COLUMNS, class_values, strict=True)),
+            }
+        )
+    curated = tmp_path / "covariate__census_bps__Y2020-2021.parquet"
+    pd.DataFrame(rows).to_parquet(curated, index=False)
+
+    panel = aggregate_covariate_source(
+        CENSUS_BPS_SOURCE_ID,
+        curated_path=curated,
+        output_path=tmp_path / "bps_msa.parquet",
+        target_geo="msa",
+        force=True,
+    )
+
+    result = pd.read_parquet(panel).set_index("year")
+    assert result.loc[2020, CENSUS_BPS_MIX_ADJUSTED_VALUE_PER_UNIT_COLUMN] == pytest.approx(150.0)
+    assert result.loc[2021, CENSUS_BPS_MIX_ADJUSTED_VALUE_PER_UNIT_COLUMN] == pytest.approx(210.0)
+    naive_2021 = result.loc[2021, "permit_value_thousands"] / result.loc[2021, "permitted_units"]
+    assert naive_2021 == pytest.approx(156.0)

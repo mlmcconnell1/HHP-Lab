@@ -30,11 +30,36 @@ CENSUS_BPS_SURVEY_YEAR_COLUMN: Final = 0
 CENSUS_BPS_STATE_FIPS_COLUMN: Final = 1
 CENSUS_BPS_COUNTY_FIPS3_COLUMN: Final = 2
 
-# Estimates-with-imputation (Bldgs, Units) column indices by structure class.
+# Estimates-with-imputation (Bldgs, Units, Value) column indices by structure class.
 CENSUS_BPS_BUILDING_COLUMNS: Final[tuple[int, ...]] = (6, 9, 12, 15)
 CENSUS_BPS_UNIT_COLUMNS: Final[tuple[int, ...]] = (7, 10, 13, 16)
+CENSUS_BPS_VALUE_COLUMNS: Final[tuple[int, ...]] = (8, 11, 14, 17)
+
+CENSUS_BPS_STRUCTURE_CLASS_IDS: Final[tuple[str, ...]] = (
+    "1_unit",
+    "2_units",
+    "3_4_units",
+    "5_plus_units",
+)
+CENSUS_BPS_CLASS_UNIT_COLUMNS: Final[tuple[str, ...]] = tuple(
+    f"permitted_units_{structure_class}"
+    for structure_class in CENSUS_BPS_STRUCTURE_CLASS_IDS
+)
+CENSUS_BPS_CLASS_VALUE_COLUMNS: Final[tuple[str, ...]] = tuple(
+    f"permit_value_thousands_{structure_class}"
+    for structure_class in CENSUS_BPS_STRUCTURE_CLASS_IDS
+)
+CENSUS_BPS_MIX_ADJUSTED_VALUE_PER_UNIT_COLUMN: Final = (
+    "bps_mix_adjusted_permit_value_per_unit_thousands"
+)
+CENSUS_BPS_DERIVED_MEASURE_COLUMNS: Final[tuple[str, ...]] = (
+    CENSUS_BPS_MIX_ADJUSTED_VALUE_PER_UNIT_COLUMN,
+)
 
 CENSUS_BPS_MEASURE_COLUMNS: Final[tuple[str, ...]] = (
     "permitted_units",
     "permitted_buildings",
+    "permit_value_thousands",
+    *CENSUS_BPS_CLASS_UNIT_COLUMNS,
+    *CENSUS_BPS_CLASS_VALUE_COLUMNS,
 )

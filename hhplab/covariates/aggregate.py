@@ -8,6 +8,13 @@ from pathlib import Path
 import pandas as pd
 
 from hhplab.covariates.catalog import MeasureAggregation, covariate_source_spec
+from hhplab.covariates.census_bps_contract import (
+    CENSUS_BPS_CLASS_UNIT_COLUMNS,
+    CENSUS_BPS_CLASS_VALUE_COLUMNS,
+    CENSUS_BPS_DERIVED_MEASURE_COLUMNS,
+    CENSUS_BPS_MIX_ADJUSTED_VALUE_PER_UNIT_COLUMN,
+    CENSUS_BPS_SOURCE_ID,
+)
 from hhplab.covariates.ingest import (
     STATE_NAME_TO_ABBREV,
     default_covariate_output_path,
@@ -256,7 +263,11 @@ def aggregate_covariate_source(
             ),
             "measure_aggregations": dict(spec.measure_aggregations),
             "derived_measure_columns": (
-                list(QCEW_DERIVED_MEASURE_COLUMNS) if source_id == QCEW_SOURCE_ID else []
+                list(QCEW_DERIVED_MEASURE_COLUMNS)
+                if source_id == QCEW_SOURCE_ID
+                else list(CENSUS_BPS_DERIVED_MEASURE_COLUMNS)
+                if source_id == CENSUS_BPS_SOURCE_ID
+                else []
             ),
             "coverage_policy": coverage_policy,
             "input_path": str(input_path),
@@ -287,6 +298,8 @@ def _apply_source_specific_derived_columns(
     source_id: str,
     df: pd.DataFrame,
 ) -> pd.DataFrame:
+    if source_id == CENSUS_BPS_SOURCE_ID:
+        return _derive_census_bps_mix_adjusted_value_per_unit(df)
     if source_id != QCEW_SOURCE_ID:
         return df
     result = df.copy()
@@ -296,6 +309,61 @@ def _apply_source_specific_derived_columns(
     result["annual_avg_weekly_wage"] = wages / (employment_positive * 52.0)
     result["avg_annual_pay"] = wages / employment_positive
     return result
+
+
+def _derive_census_bps_mix_adjusted_value_per_unit(df: pd.DataFrame) -> pd.DataFrame:
+    """Derive a fixed-structure-mix BPS permit valuation-per-unit series."""
+    required = {*CENSUS_BPS_CLASS_UNIT_COLUMNS, *CENSUS_BPS_CLASS_VALUE_COLUMNS}
+    if not required.issubset(df.columns):
+        return df
+    result = df.copy()
+    group_column = (
+        "msa_id"
+        if "msa_id" in result.columns
+        else "geo_id"
+        if "geo_id" in result.columns
+        else None
+    )
+    if group_column is None:
+        result[CENSUS_BPS_MIX_ADJUSTED_VALUE_PER_UNIT_COLUMN] = pd.NA
+        return result
+
+    derived = pd.Series(pd.NA, index=result.index, dtype="Float64")
+    sort_columns = [group_column, "year"] if "year" in result.columns else [group_column]
+    for _, group in result.sort_values(sort_columns).groupby(group_column, sort=False):
+        class_units = group.loc[:, list(CENSUS_BPS_CLASS_UNIT_COLUMNS)].apply(
+            pd.to_numeric, errors="coerce"
+        )
+        class_values = group.loc[:, list(CENSUS_BPS_CLASS_VALUE_COLUMNS)].apply(
+            pd.to_numeric, errors="coerce"
+        )
+        base_units = _first_positive_bps_class_units(class_units)
+        base_total = base_units.sum()
+        if not base_total or pd.isna(base_total):
+            continue
+        base_weights = base_units / base_total
+        denominator = class_units.where(class_units > 0)
+        value_per_unit = pd.DataFrame(
+            class_values.to_numpy() / denominator.to_numpy(),
+            index=group.index,
+            columns=CENSUS_BPS_CLASS_UNIT_COLUMNS,
+        )
+        required_class_available = value_per_unit.loc[:, base_weights > 0].notna().all(axis=1)
+        weighted_value = value_per_unit.multiply(base_weights.to_numpy()).sum(
+            axis=1,
+            min_count=1,
+        )
+        derived.loc[group.index] = weighted_value.where(required_class_available)
+    result[CENSUS_BPS_MIX_ADJUSTED_VALUE_PER_UNIT_COLUMN] = derived
+    return result
+
+
+def _first_positive_bps_class_units(class_units: pd.DataFrame) -> pd.Series:
+    positive_totals = class_units.sum(axis=1, min_count=1)
+    candidates = class_units[positive_totals > 0]
+    if candidates.empty:
+        return pd.Series(0.0, index=class_units.columns)
+    return candidates.iloc[0].fillna(0.0)
 
 
 def expand_static_covariate_years(

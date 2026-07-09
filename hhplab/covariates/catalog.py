@@ -15,6 +15,13 @@ from hhplab.cdc.overdose_contract import (
     CDC_OVERDOSE_SOURCE_PAGE,
     CDC_OVERDOSE_SOURCE_URL,
 )
+from hhplab.covariates.census_bps_contract import (
+    CENSUS_BPS_MEASURE_COLUMNS,
+    CENSUS_BPS_PRODUCT,
+    CENSUS_BPS_PROVIDER,
+    CENSUS_BPS_SOURCE_ID,
+    CENSUS_BPS_SOURCE_PAGE,
+)
 from hhplab.covariates.irs_soi_contract import (
     IRS_SOI_COUNTY_MEASURE_COLUMNS,
     IRS_SOI_FIRST_YEAR,
@@ -147,26 +154,28 @@ COVARIATE_SOURCE_SPECS: dict[str, CovariateSourceSpec] = {
             "can be population-weighted to MSA panels for historical mechanism tests."
         ),
     ),
-    "census_bps": CovariateSourceSpec(
-        source_id="census_bps",
-        provider="census",
-        product="building_permits_survey",
+    CENSUS_BPS_SOURCE_ID: CovariateSourceSpec(
+        source_id=CENSUS_BPS_SOURCE_ID,
+        provider=CENSUS_BPS_PROVIDER,
+        product=CENSUS_BPS_PRODUCT,
         topic="housing_supply",
         native_geo="county",
         first_year=1980,
         last_year=None,
-        source_page="https://www.census.gov/permits",
-        source_url="https://www.census.gov/permits",
+        source_page=CENSUS_BPS_SOURCE_PAGE,
+        source_url=CENSUS_BPS_SOURCE_PAGE,
         required_columns=("county_fips", "year"),
-        measure_columns=("permitted_units", "permitted_buildings"),
+        measure_columns=CENSUS_BPS_MEASURE_COLUMNS,
         measure_aggregations={
-            "permitted_units": "extensive_sum",
-            "permitted_buildings": "extensive_sum",
+            column: "extensive_sum" for column in CENSUS_BPS_MEASURE_COLUMNS
         },
         recommended_align="calendar_year",
         notes=(
             "Census Building Permits Survey county annual files measure newly "
-            "authorized privately owned housing supply."
+            "authorized privately owned housing supply. HHP-Lab retains class-level "
+            "unit and permit-valuation totals so MSA panels can derive "
+            "bps_mix_adjusted_permit_value_per_unit_thousands using fixed base-year "
+            "structure-class unit weights."
         ),
     ),
     QCEW_SOURCE_ID: CovariateSourceSpec(

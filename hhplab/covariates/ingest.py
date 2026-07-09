@@ -14,6 +14,8 @@ from hhplab.covariates.catalog import CovariateSourceSpec, covariate_source_spec
 from hhplab.covariates.census_bps_contract import (
     CENSUS_BPS_ANNUAL_FILE_GLOB,
     CENSUS_BPS_BUILDING_COLUMNS,
+    CENSUS_BPS_CLASS_UNIT_COLUMNS,
+    CENSUS_BPS_CLASS_VALUE_COLUMNS,
     CENSUS_BPS_COUNTY_FIPS3_COLUMN,
     CENSUS_BPS_HEADER_ROWS,
     CENSUS_BPS_RAW_URL_TEMPLATE,
@@ -21,6 +23,7 @@ from hhplab.covariates.census_bps_contract import (
     CENSUS_BPS_STATE_FIPS_COLUMN,
     CENSUS_BPS_SURVEY_YEAR_COLUMN,
     CENSUS_BPS_UNIT_COLUMNS,
+    CENSUS_BPS_VALUE_COLUMNS,
 )
 from hhplab.covariates.irs_soi_contract import (
     IRS_SOI_COUNTY_CURATED_COLUMNS,
@@ -417,9 +420,11 @@ def _ingest_census_bps(
             "year_range_token_policy": "derived_from_staged_file_years",
             "raw_files": [path.name for path in paths],
             "structure_class_policy": (
-                "permitted_units/permitted_buildings sum the estimates-with-imputation "
-                "series across 1-unit, 2-unit, 3-4-unit, and 5+-unit structure classes; "
-                "reporting-places-only columns are excluded"
+                "permitted_units, permitted_buildings, and permit_value_thousands sum "
+                "the estimates-with-imputation series across 1-unit, 2-unit, 3-4-unit, "
+                "and 5+-unit structure classes; class-level unit and value columns are "
+                "retained for fixed-mix value-per-unit derivation; reporting-places-only "
+                "columns are excluded"
             ),
         },
     )
@@ -459,12 +464,33 @@ def _read_census_bps_annual_file(path: Path) -> pd.DataFrame:
     building_values = raw.loc[valid, list(CENSUS_BPS_BUILDING_COLUMNS)].apply(
         pd.to_numeric, errors="coerce"
     )
+    value_values = raw.loc[valid, list(CENSUS_BPS_VALUE_COLUMNS)].apply(
+        pd.to_numeric, errors="coerce"
+    )
     rows["permitted_units"] = unit_values.sum(axis=1, min_count=1)
     rows["permitted_buildings"] = building_values.sum(axis=1, min_count=1)
+    rows["permit_value_thousands"] = value_values.sum(axis=1, min_count=1)
+    for source_column, output_column in zip(
+        unit_values.columns,
+        CENSUS_BPS_CLASS_UNIT_COLUMNS,
+        strict=True,
+    ):
+        rows[output_column] = unit_values[source_column]
+    for source_column, output_column in zip(
+        value_values.columns,
+        CENSUS_BPS_CLASS_VALUE_COLUMNS,
+        strict=True,
+    ):
+        rows[output_column] = value_values[source_column]
+    measure_columns = [
+        "permitted_units",
+        "permitted_buildings",
+        "permit_value_thousands",
+        *CENSUS_BPS_CLASS_UNIT_COLUMNS,
+        *CENSUS_BPS_CLASS_VALUE_COLUMNS,
+    ]
     return (
-        rows.groupby(["county_fips", "year"], as_index=False)[
-            ["permitted_units", "permitted_buildings"]
-        ]
+        rows.groupby(["county_fips", "year"], as_index=False)[measure_columns]
         .sum(min_count=1)
         .reset_index(drop=True)
     )

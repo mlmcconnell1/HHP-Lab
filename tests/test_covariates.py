@@ -23,7 +23,11 @@ from hhplab.covariates.aggregate import (
     derive_prism_temperature_basis,
 )
 from hhplab.covariates.catalog import COVARIATE_SOURCE_SPECS
-from hhplab.covariates.census_bps_contract import CENSUS_BPS_SOURCE_ID
+from hhplab.covariates.census_bps_contract import (
+    CENSUS_BPS_CLASS_UNIT_COLUMNS,
+    CENSUS_BPS_CLASS_VALUE_COLUMNS,
+    CENSUS_BPS_SOURCE_ID,
+)
 from hhplab.covariates.ingest import ingest_covariate_source
 from hhplab.covariates.irs_soi_contract import (
     IRS_SOI_COUNTY_MEASURE_COLUMNS,
@@ -328,6 +332,9 @@ BRANCH_ROUNDTRIP_CASES = [
             "year": [2020],
             "permitted_units": [100],
             "permitted_buildings": [8],
+            "permit_value_thousands": [12_500],
+            **{column: [0] for column in CENSUS_BPS_CLASS_UNIT_COLUMNS},
+            **{column: [0] for column in CENSUS_BPS_CLASS_VALUE_COLUMNS},
         },
         "county",
         ["01001"],
@@ -2156,6 +2163,15 @@ def test_census_bps_msa_aggregation_backfills_named_ct_msas_2010_2014(
                     "year": year,
                     "permitted_units": permitted_units,
                     "permitted_buildings": permitted_units // 10,
+                    "permit_value_thousands": permitted_units * 100,
+                    **{
+                        column: permitted_units if index == 0 else 0
+                        for index, column in enumerate(CENSUS_BPS_CLASS_UNIT_COLUMNS)
+                    },
+                    **{
+                        column: permitted_units * 100 if index == 0 else 0
+                        for index, column in enumerate(CENSUS_BPS_CLASS_VALUE_COLUMNS)
+                    },
                 }
             )
             population_rows.append(
