@@ -34,6 +34,15 @@ from hhplab.covariates.mpi_contract import (
     MPI_SOURCE_PAGE,
     MPI_SOURCE_URL,
 )
+from hhplab.covariates.qcew_contract import (
+    QCEW_FIRST_YEAR,
+    QCEW_MEASURE_COLUMNS,
+    QCEW_PRODUCT,
+    QCEW_PROVIDER,
+    QCEW_SOURCE_ID,
+    QCEW_SOURCE_PAGE,
+    QCEW_SOURCE_URL,
+)
 from hhplab.covariates.saiz_contract import (
     SAIZ_ESTIMATE_YEAR,
     SAIZ_MEASURE_COLUMNS,
@@ -158,6 +167,30 @@ COVARIATE_SOURCE_SPECS: dict[str, CovariateSourceSpec] = {
         notes=(
             "Census Building Permits Survey county annual files measure newly "
             "authorized privately owned housing supply."
+        ),
+    ),
+    QCEW_SOURCE_ID: CovariateSourceSpec(
+        source_id=QCEW_SOURCE_ID,
+        provider=QCEW_PROVIDER,
+        product=QCEW_PRODUCT,
+        topic="labor_market",
+        native_geo="county",
+        first_year=QCEW_FIRST_YEAR,
+        last_year=None,
+        source_page=QCEW_SOURCE_PAGE,
+        source_url=QCEW_SOURCE_URL,
+        required_columns=("county_fips", "year"),
+        measure_columns=QCEW_MEASURE_COLUMNS,
+        measure_aggregations={
+            "annual_avg_emplvl": "extensive_sum",
+            "total_annual_wages": "extensive_sum",
+            "annual_avg_estabs": "extensive_sum",
+        },
+        recommended_align="calendar_year",
+        notes=(
+            "BLS QCEW county high-level annual files should be filtered to Total Covered "
+            "(Own=0) and total all-industries (NAICS=10) rows. MSA wage-per-worker "
+            "measures should be derived after summing county employment and wage totals."
         ),
     ),
     "hud_fmr": CovariateSourceSpec(

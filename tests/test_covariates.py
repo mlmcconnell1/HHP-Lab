@@ -47,6 +47,12 @@ from hhplab.covariates.mpi_contract import (
     MPI_WORKBOOK_GLOB,
     validate_mpi_workbook_contract,
 )
+from hhplab.covariates.qcew_contract import (
+    QCEW_DERIVED_MEASURE_COLUMNS,
+    QCEW_FIRST_YEAR,
+    QCEW_MEASURE_COLUMNS,
+    QCEW_SOURCE_ID,
+)
 from hhplab.covariates.saiz_contract import (
     SAIZ_ESTIMATE_YEAR,
     SAIZ_MEASURE_COLUMNS,
@@ -74,6 +80,7 @@ EXPECTED_COVARIATE_SOURCES = {
     "eviction_lab": ("county", "eviction_filings"),
     "eviction_lab_national": ("county", "eviction_filings"),
     "census_bps": ("county", "permitted_units"),
+    QCEW_SOURCE_ID: ("county", "annual_avg_emplvl"),
     "hud_fmr": ("county", "fmr_2br"),
     "hud_psh": ("county", "subsidized_households"),
     "hud_spm": ("coc", "spm_first_time_homeless"),
@@ -213,6 +220,73 @@ IRS_SOI_MSA_TRUTH_TABLE = {
         "County marginal other-flow buckets are summed to suppressed_unallocated "
         "MSA columns and reduce coverage_ratio"
     ),
+}
+
+QCEW_HIGH_LEVEL_ROW_TRUTH_TABLE = {
+    "county_total_covered_all_industries": {
+        "row": {
+            "Area Code": "01001",
+            "St": "01",
+            "Cnty": "001",
+            "Own": "0",
+            "NAICS": "10",
+            "Year": 2022,
+            "Qtr": "A",
+            "Area Type": "County",
+            "Annual Average Establishment Count": 10,
+            "Annual Average Employment": 100,
+            "Annual Total Wages": 5_200_000,
+        },
+        "expected": "written:01001",
+    },
+    "private_row": {
+        "row": {
+            "Area Code": "01001",
+            "St": "01",
+            "Cnty": "001",
+            "Own": "5",
+            "NAICS": "10",
+            "Year": 2022,
+            "Qtr": "A",
+            "Area Type": "County",
+            "Annual Average Establishment Count": 99,
+            "Annual Average Employment": 999,
+            "Annual Total Wages": 99_900_000,
+        },
+        "expected": "skipped:own_code_not_total_covered",
+    },
+    "other_industry_row": {
+        "row": {
+            "Area Code": "01001",
+            "St": "01",
+            "Cnty": "001",
+            "Own": "0",
+            "NAICS": "31-33",
+            "Year": 2022,
+            "Qtr": "A",
+            "Area Type": "County",
+            "Annual Average Establishment Count": 25,
+            "Annual Average Employment": 250,
+            "Annual Total Wages": 12_000_000,
+        },
+        "expected": "skipped:industry_not_all_industries",
+    },
+    "state_total_row": {
+        "row": {
+            "Area Code": "01000",
+            "St": "01",
+            "Cnty": "000",
+            "Own": "0",
+            "NAICS": "10",
+            "Year": 2022,
+            "Qtr": "A",
+            "Area Type": "State",
+            "Annual Average Establishment Count": 111,
+            "Annual Average Employment": 11_100,
+            "Annual Total Wages": 577_200_000,
+        },
+        "expected": "skipped:not_county_row",
+    },
 }
 
 CT_BPS_BACKFILL_MSA_IDS = ("14860", "25540", "35300", "47930")
@@ -438,6 +512,31 @@ def _write_irs_soi_msa_fixture(tmp_path: Path) -> tuple[Path, Path, Path]:
     return curated, pairs, data_root
 
 
+def _write_qcew_fixture_dir(tmp_path: Path) -> Path:
+    raw_dir = tmp_path / "qcew"
+    raw_dir.mkdir()
+    pd.DataFrame(
+        [
+            QCEW_HIGH_LEVEL_ROW_TRUTH_TABLE["county_total_covered_all_industries"]["row"],
+            QCEW_HIGH_LEVEL_ROW_TRUTH_TABLE["private_row"]["row"],
+            QCEW_HIGH_LEVEL_ROW_TRUTH_TABLE["other_industry_row"]["row"],
+            QCEW_HIGH_LEVEL_ROW_TRUTH_TABLE["state_total_row"]["row"],
+        ]
+    ).to_csv(raw_dir / "qcew_2022.csv", index=False)
+    pd.DataFrame(
+        [
+            {
+                **QCEW_HIGH_LEVEL_ROW_TRUTH_TABLE["county_total_covered_all_industries"]["row"],
+                "Year": 2023,
+                "Annual Average Establishment Count": 12,
+                "Annual Average Employment": 120,
+                "Annual Total Wages": 6_240_000,
+            }
+        ]
+    ).to_csv(raw_dir / "qcew_2023.csv", index=False)
+    return raw_dir
+
+
 def test_covariate_catalog_declares_hidden_cause_sources() -> None:
     """The expanded source catalog should cover all bead-requested families."""
     assert set(COVARIATE_SOURCE_SPECS) == set(EXPECTED_COVARIATE_SOURCES)
@@ -463,6 +562,26 @@ def test_cdc_overdose_catalog_entry_documents_provisional_county_coverage() -> N
     assert spec.recommended_align == "point_in_time_jan_trailing_12_months"
     assert "provisional" in spec.notes.lower()
     assert "January rows" in spec.notes
+
+
+def test_qcew_catalog_entry_declares_county_annual_totals_contract() -> None:
+    spec = COVARIATE_SOURCE_SPECS[QCEW_SOURCE_ID]
+
+    assert spec.provider == "bls"
+    assert spec.product == "quarterly_census_of_employment_and_wages"
+    assert spec.topic == "labor_market"
+    assert spec.native_geo == "county"
+    assert spec.first_year == QCEW_FIRST_YEAR
+    assert spec.last_year is None
+    assert spec.measure_columns == QCEW_MEASURE_COLUMNS
+    assert spec.measure_aggregations == {
+        "annual_avg_emplvl": "extensive_sum",
+        "total_annual_wages": "extensive_sum",
+        "annual_avg_estabs": "extensive_sum",
+    }
+    assert spec.recommended_align == "calendar_year"
+    assert "Own=0" in spec.notes
+    assert "NAICS=10" in spec.notes
 
 
 def test_vera_catalog_entries_document_distinct_jail_and_prison_windows() -> None:
@@ -639,6 +758,44 @@ def test_irs_soi_catalog_declares_county_migration_contract() -> None:
     assert spec.measure_columns == IRS_SOI_COUNTY_MEASURE_COLUMNS
     assert set(spec.measure_aggregations) == set(IRS_SOI_COUNTY_MEASURE_COLUMNS)
     assert set(spec.measure_aggregations.values()) == {"extensive_sum"}
+
+
+def test_qcew_ingest_filters_official_county_rows_and_derives_year_token(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    monkeypatch.setattr("hhplab.covariates.ingest.register_source", lambda **_: None)
+    raw_dir = _write_qcew_fixture_dir(tmp_path)
+
+    curated = ingest_covariate_source(
+        QCEW_SOURCE_ID,
+        raw_dir,
+        output_dir=tmp_path,
+        force=True,
+    )
+
+    assert curated.name == "covariate__qcew__Y2022-2023.parquet"
+    county = pd.read_parquet(curated).set_index(["county_fips", "year"])
+    assert set(QCEW_MEASURE_COLUMNS) <= set(county.columns)
+    assert set(QCEW_DERIVED_MEASURE_COLUMNS) <= set(county.columns)
+    assert list(county.index) == [("01001", 2022), ("01001", 2023)]
+    assert county.loc[("01001", 2022), "annual_avg_emplvl"] == pytest.approx(100.0)
+    assert county.loc[("01001", 2022), "total_annual_wages"] == pytest.approx(5_200_000.0)
+    assert county.loc[("01001", 2022), "annual_avg_estabs"] == pytest.approx(10.0)
+    assert county.loc[("01001", 2022), "annual_avg_weekly_wage"] == pytest.approx(1_000.0)
+    assert county.loc[("01001", 2022), "avg_annual_pay"] == pytest.approx(52_000.0)
+    provenance = read_provenance(curated)
+    assert provenance is not None
+    assert provenance.extra["years_present"] == [2022, 2023]
+    assert provenance.extra["year_range_token_policy"] == "derived_from_staged_file_years"
+    assert provenance.extra["source_layout_policy"] == "bls_qcew_county_high_level_annual"
+    assert provenance.extra["filters"] == {
+        "own_code": "0",
+        "industry_code": "10",
+        "qtr": "A",
+        "county_selector": {"agglvl_code": "70", "or_area_type": "county"},
+    }
+    assert provenance.extra["raw_files"] == ["qcew_2022.csv", "qcew_2023.csv"]
 
 
 def test_irs_soi_ingest_writes_county_and_pair_artifacts_with_provenance(
@@ -2684,6 +2841,66 @@ def test_cli_aggregate_prism_covariate_to_msa(tmp_path: Path) -> None:
     panel = pd.read_parquet(payload["output_path"])
     assert panel.loc[0, "tmin_c"] == pytest.approx(4.0)
     assert panel.loc[0, "coverage_ratio"] == pytest.approx(2 / 3)
+
+
+def test_qcew_county_covariate_aggregates_to_msa_with_post_sum_wage_metrics(
+    tmp_path: Path,
+) -> None:
+    curated = tmp_path / "covariate__qcew__Y2024-2024.parquet"
+    pd.DataFrame(
+        {
+            "geo_type": ["county", "county"],
+            "geo_id": ["01001", "01003"],
+            "county_fips": ["01001", "01003"],
+            "year": [2024, 2024],
+            "annual_avg_emplvl": [100.0, 50.0],
+            "total_annual_wages": [5_200_000.0, 1_300_000.0],
+            "annual_avg_estabs": [10.0, 5.0],
+        }
+    ).to_parquet(curated)
+    population = tmp_path / "pep.parquet"
+    pd.DataFrame(
+        {
+            "county_fips": ["01001", "01003", "01005"],
+            "year": [2024, 2024, 2024],
+            "population": [1_000.0, 100.0, 500.0],
+        }
+    ).to_parquet(population)
+    data_root = tmp_path / "data"
+    msa_dir = data_root / "curated" / "msa"
+    msa_dir.mkdir(parents=True)
+    pd.DataFrame(
+        {
+            "msa_id": ["11111", "11111", "11111"],
+            "county_fips": ["01001", "01003", "01005"],
+        }
+    ).to_parquet(msa_dir / "msa_county_membership__test_msa_v1.parquet")
+
+    panel = aggregate_covariate_source(
+        QCEW_SOURCE_ID,
+        curated_path=curated,
+        output_dir=tmp_path,
+        years=[2024],
+        target_geo="msa",
+        msa_definition_version="test_msa_v1",
+        county_population_path=population,
+        data_root=data_root,
+        force=True,
+    )
+
+    result = pd.read_parquet(panel).set_index("msa_id")
+    assert result.loc["11111", "annual_avg_emplvl"] == pytest.approx(150.0)
+    assert result.loc["11111", "total_annual_wages"] == pytest.approx(6_500_000.0)
+    assert result.loc["11111", "annual_avg_estabs"] == pytest.approx(15.0)
+    assert result.loc["11111", "annual_avg_weekly_wage"] == pytest.approx(
+        6_500_000.0 / (52.0 * 150.0)
+    )
+    assert result.loc["11111", "avg_annual_pay"] == pytest.approx(6_500_000.0 / 150.0)
+    assert result.loc["11111", "coverage_ratio"] == pytest.approx(2 / 3)
+    provenance = read_provenance(panel)
+    assert provenance is not None
+    assert provenance.extra["measure_columns"] == list(QCEW_MEASURE_COLUMNS)
+    assert provenance.extra["derived_measure_columns"] == list(QCEW_DERIVED_MEASURE_COLUMNS)
 
 
 def test_cli_ingests_national_eviction_lab_and_aggregates_to_msa(

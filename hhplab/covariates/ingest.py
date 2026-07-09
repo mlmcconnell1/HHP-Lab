@@ -48,6 +48,16 @@ from hhplab.covariates.mpi_contract import (
     MPI_SOURCE_ID,
     validate_mpi_workbook_contract,
 )
+from hhplab.covariates.qcew_contract import (
+    QCEW_ALL_INDUSTRY_CODE,
+    QCEW_COUNTY_AREA_TYPE,
+    QCEW_COUNTY_TOTAL_COVERED_AGGLVL,
+    QCEW_DERIVED_MEASURE_COLUMNS,
+    QCEW_MEASURE_COLUMNS,
+    QCEW_REQUIRED_RAW_COLUMNS,
+    QCEW_SOURCE_ID,
+    QCEW_TOTAL_COVERED_OWN_CODE,
+)
 from hhplab.covariates.saiz_contract import (
     SAIZ_ESTIMATE_YEAR,
     SAIZ_MATCH_DIAGNOSTIC_COLUMNS,
@@ -81,6 +91,35 @@ HUD_PSH_COUNTY_LEVEL = "county"
 HUD_PSH_PROGRAM_MEASURES: dict[str, str] = {
     "Summary of All HUD Programs": "subsidized_households",
     "Housing Choice Vouchers": "housing_choice_vouchers",
+}
+QCEW_RAW_SUFFIXES = {".csv", ".txt", ".xlsx", ".xls"}
+QCEW_HIGH_LEVEL_ALIASES: dict[str, tuple[str, ...]] = {
+    "area_fips": ("area_fips", "area_code"),
+    "state_fips": ("state_fips", "st"),
+    "county_fips3": ("county_fips3", "cnty"),
+    "own_code": ("own_code", "own"),
+    "industry_code": ("industry_code", "naics"),
+    "agglvl_code": ("agglvl_code",),
+    "year": ("year",),
+    "qtr": ("qtr",),
+    "area_type": ("area_type",),
+    "annual_avg_estabs": (
+        "annual_avg_estabs",
+        "annual_average_establishment_count",
+    ),
+    "annual_avg_emplvl": (
+        "annual_avg_emplvl",
+        "annual_average_employment",
+    ),
+    "total_annual_wages": (
+        "total_annual_wages",
+        "annual_total_wages",
+    ),
+    "annual_avg_wkly_wage": (
+        "annual_avg_wkly_wage",
+        "annual_average_weekly_wage",
+    ),
+    "avg_annual_pay": ("avg_annual_pay", "annual_average_pay"),
 }
 
 STATE_NAME_TO_ABBREV: dict[str, str] = {
@@ -200,6 +239,15 @@ def ingest_covariate_source(
             force=force,
         )
 
+    if source_id == QCEW_SOURCE_ID and _is_qcew_raw_path(source_path):
+        return _ingest_qcew(
+            source_path,
+            spec=spec,
+            destination=Path(output_path) if output_path is not None else None,
+            output_dir=output_dir,
+            force=force,
+        )
+
     destination = (
         Path(output_path)
         if output_path is not None
@@ -261,6 +309,7 @@ def _finalize_covariate_curated(
         "geo_id",
         *spec.required_columns,
         *spec.measure_columns,
+        *[column for column in QCEW_DERIVED_MEASURE_COLUMNS if column in result.columns],
         "source_id",
         "provider",
         "product",
@@ -271,6 +320,10 @@ def _finalize_covariate_curated(
         "raw_sha256",
         "ingested_at",
     ]
+    extra_columns = [
+        column for column in result.columns if column not in ordered_columns
+    ]
+    ordered_columns = [*ordered_columns, *extra_columns]
     result = result[[column for column in ordered_columns if column in result.columns]]
 
     provenance = ProvenanceBlock(
@@ -487,6 +540,259 @@ def _hud_psh_workbook_paths(source_path: Path) -> list[Path]:
             "COUNTY_YYYY.xlsx or COUNTY_YYYY_2020census.xlsx."
         )
     return [source_path]
+
+
+def _is_qcew_raw_path(source_path: Path) -> bool:
+    """True when the path points to official BLS QCEW county annual files."""
+    if source_path.is_dir():
+        return True
+    return source_path.suffix.lower() in QCEW_RAW_SUFFIXES
+
+
+def _ingest_qcew(
+    source_path: Path,
+    *,
+    spec: CovariateSourceSpec,
+    destination: Path | None,
+    output_dir: Path | str | None,
+    force: bool,
+) -> Path:
+    paths = _qcew_raw_paths(source_path)
+    frames: list[pd.DataFrame] = []
+    year_to_paths: dict[int, list[str]] = {}
+    for path in paths:
+        frame = _read_qcew_raw_file(path)
+        if frame.empty:
+            continue
+        years_in_file = sorted({int(year) for year in frame["year"].unique().tolist()})
+        for year in years_in_file:
+            year_to_paths.setdefault(year, []).append(path.name)
+        frames.append(frame)
+    duplicate_years = {
+        year: names for year, names in year_to_paths.items() if len(names) > 1
+    }
+    if duplicate_years:
+        duplicates = ", ".join(
+            f"{year}: {sorted(names)}" for year, names in sorted(duplicate_years.items())
+        )
+        raise ValueError(
+            "QCEW staged input contains duplicate annual county files for the same year(s): "
+            f"{duplicates}. Keep one official county annual file per year."
+        )
+    if not frames:
+        raise ValueError(
+            "QCEW input produced no county rows after filtering to county Total Covered "
+            "(Own=0), total all-industries (NAICS=10), annual rows."
+        )
+    result = pd.concat(frames, ignore_index=True).sort_values(["county_fips", "year"])
+    result = _derive_qcew_wage_columns(result)
+    years_present = sorted(int(year) for year in result["year"].unique().tolist())
+    if destination is None:
+        base = curated_dir("covariates") if output_dir is None else Path(output_dir)
+        destination = base / covariate_curated_filename(
+            spec.source_id,
+            min(years_present),
+            max(years_present),
+        )
+    if destination.exists() and not force:
+        return destination
+    raw_sha256 = _sha256_tree(source_path) if source_path.is_dir() else _sha256(source_path)
+    file_size = sum(path.stat().st_size for path in paths)
+    return _finalize_covariate_curated(
+        result,
+        spec=spec,
+        source_path=source_path,
+        destination=destination,
+        raw_sha256=raw_sha256,
+        file_size=file_size,
+        provenance_extra={
+            "years_present": years_present,
+            "year_range_token_policy": "derived_from_staged_file_years",
+            "raw_files": [path.name for path in paths],
+            "source_layout_policy": "bls_qcew_county_high_level_annual",
+            "filters": {
+                "own_code": QCEW_TOTAL_COVERED_OWN_CODE,
+                "industry_code": QCEW_ALL_INDUSTRY_CODE,
+                "qtr": "A",
+                "county_selector": {
+                    "agglvl_code": QCEW_COUNTY_TOTAL_COVERED_AGGLVL,
+                    "or_area_type": QCEW_COUNTY_AREA_TYPE,
+                },
+            },
+            "derived_measure_columns": list(QCEW_DERIVED_MEASURE_COLUMNS),
+            "derived_measure_policy": (
+                "annual_avg_weekly_wage and avg_annual_pay are derived from "
+                "total_annual_wages and annual_avg_emplvl"
+            ),
+        },
+    )
+
+
+def _qcew_raw_paths(source_path: Path) -> list[Path]:
+    """Resolve one or more staged QCEW annual county files."""
+    if source_path.is_dir():
+        paths = sorted(
+            path
+            for path in source_path.iterdir()
+            if path.is_file() and path.suffix.lower() in QCEW_RAW_SUFFIXES
+        )
+        if not paths:
+            raise ValueError(
+                "No QCEW county annual files found. Stage the official BLS county "
+                "high-level annual CSV/TXT/XLSX files under the directory and pass "
+                "--raw-path to that directory."
+            )
+        return paths
+    if source_path.suffix.lower() not in QCEW_RAW_SUFFIXES:
+        raise ValueError(
+            f"Unsupported QCEW raw file type '{source_path.suffix}'. Use CSV, TXT, or Excel."
+        )
+    return [source_path]
+
+
+def _read_qcew_raw_file(path: Path) -> pd.DataFrame:
+    """Read one staged QCEW annual county file into canonical county rows."""
+    if path.suffix.lower() in {".xlsx", ".xls"}:
+        workbook = pd.ExcelFile(path)
+        frames = [
+            _normalize_qcew_frame(workbook.parse(sheet_name))
+            for sheet_name in workbook.sheet_names
+        ]
+        frames = [frame for frame in frames if not frame.empty]
+        if not frames:
+            raise ValueError(
+                f"QCEW workbook {path.name} produced no county rows with the expected "
+                "annual county layout."
+            )
+        return pd.concat(frames, ignore_index=True)
+    return _normalize_qcew_frame(_read_tabular(path))
+
+
+def _normalize_qcew_frame(raw: pd.DataFrame) -> pd.DataFrame:
+    """Normalize QCEW annual county rows from high-level or full annual layouts."""
+    rows = raw.copy()
+    rows.columns = [_clean_column(column) for column in rows.columns]
+    rename = _rename_columns(rows.columns, aliases=QCEW_HIGH_LEVEL_ALIASES)
+    rows = rows.rename(columns=rename)
+    if "area_fips" not in rows.columns and {"state_fips", "county_fips3"} <= set(rows.columns):
+        rows["area_fips"] = (
+            rows["state_fips"].map(_qcew_code)
+            + rows["county_fips3"].map(lambda value: _qcew_code(value, width=3))
+        )
+    missing = [column for column in QCEW_REQUIRED_RAW_COLUMNS if column not in rows.columns]
+    if missing:
+        raise ValueError(
+            f"QCEW raw data is missing required columns {missing}. Expected the official "
+            "county high-level annual layout or the annual CSV field layout."
+        )
+    if "area_type" not in rows.columns and "agglvl_code" not in rows.columns:
+        raise ValueError(
+            "QCEW raw data must include either area_type (county high-level layout) "
+            "or agglvl_code (annual CSV layout) to identify county rows."
+        )
+    own_code = rows["own_code"].map(lambda value: _qcew_code(value, width=1))
+    industry_code = rows["industry_code"].map(_qcew_industry_code)
+    quarter = rows["qtr"].astype("string").str.strip().str.upper()
+    if "agglvl_code" in rows.columns:
+        county_selector = rows["agglvl_code"].map(_qcew_code).eq(
+            QCEW_COUNTY_TOTAL_COVERED_AGGLVL
+        )
+    else:
+        county_selector = rows["area_type"].astype("string").str.strip().str.casefold().eq(
+            QCEW_COUNTY_AREA_TYPE
+        )
+    filtered = rows[
+        county_selector
+        & own_code.eq(QCEW_TOTAL_COVERED_OWN_CODE)
+        & industry_code.eq(QCEW_ALL_INDUSTRY_CODE)
+        & quarter.eq("A")
+    ].copy()
+    if filtered.empty:
+        return pd.DataFrame(
+            columns=[
+                "geo_type",
+                "geo_id",
+                "county_fips",
+                "state_fips",
+                "year",
+                *QCEW_MEASURE_COLUMNS,
+            ]
+        )
+    filtered["year"] = pd.to_numeric(filtered["year"], errors="coerce").astype("Int64")
+    filtered["state_fips"] = (
+        filtered.get(
+            "state_fips",
+            filtered["area_fips"].map(lambda value: _qcew_code(value, width=5)[:2]),
+        ).map(_qcew_code)
+    )
+    filtered["county_fips"] = filtered["area_fips"].map(lambda value: _qcew_code(value, width=5))
+    result = pd.DataFrame(
+        {
+            "geo_type": "county",
+            "geo_id": filtered["county_fips"],
+            "county_fips": filtered["county_fips"],
+            "state_fips": filtered["state_fips"],
+            "year": filtered["year"].astype(int),
+            "annual_avg_emplvl": pd.to_numeric(
+                filtered["annual_avg_emplvl"], errors="coerce"
+            ),
+            "total_annual_wages": pd.to_numeric(
+                filtered["total_annual_wages"], errors="coerce"
+            ),
+            "annual_avg_estabs": pd.to_numeric(
+                filtered["annual_avg_estabs"], errors="coerce"
+            ),
+        }
+    )
+    return (
+        result.groupby(
+            ["geo_type", "geo_id", "county_fips", "state_fips", "year"],
+            as_index=False,
+        )[
+            list(QCEW_MEASURE_COLUMNS)
+        ]
+        .sum(min_count=1)
+        .reset_index(drop=True)
+    )
+
+
+def _derive_qcew_wage_columns(df: pd.DataFrame) -> pd.DataFrame:
+    """Derive county/MSA wage-per-worker columns from primitive QCEW totals."""
+    result = df.copy()
+    employment = pd.to_numeric(result["annual_avg_emplvl"], errors="coerce")
+    wages = pd.to_numeric(result["total_annual_wages"], errors="coerce")
+    employment_positive = employment.where(employment > 0)
+    result["annual_avg_weekly_wage"] = wages / (employment_positive * 52.0)
+    result["avg_annual_pay"] = wages / employment_positive
+    return result
+
+
+def _rename_columns(columns: pd.Index, *, aliases: dict[str, tuple[str, ...]]) -> dict[str, str]:
+    renames: dict[str, str] = {}
+    for canonical, alias_options in aliases.items():
+        match = next((column for column in columns if column in alias_options), None)
+        if match is not None:
+            renames[match] = canonical
+    return renames
+
+
+def _qcew_code(value: Any, *, width: int = 2) -> str:
+    if pd.isna(value):
+        return ""
+    text = str(value).strip()
+    if text.endswith(".0"):
+        text = text[:-2]
+    digits = re.sub(r"\D", "", text)
+    return digits.zfill(width)[-width:]
+
+
+def _qcew_industry_code(value: Any) -> str:
+    if pd.isna(value):
+        return ""
+    text = str(value).strip()
+    if text.endswith(".0"):
+        text = text[:-2]
+    return text.replace("_", "-")
 
 
 def _read_hud_psh_workbook(

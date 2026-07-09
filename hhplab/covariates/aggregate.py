@@ -19,6 +19,10 @@ from hhplab.covariates.irs_soi_contract import (
     IRS_SOI_SOURCE_ID,
 )
 from hhplab.covariates.mpi_contract import MPI_ESTIMATE_YEAR, MPI_SOURCE_ID
+from hhplab.covariates.qcew_contract import (
+    QCEW_DERIVED_MEASURE_COLUMNS,
+    QCEW_SOURCE_ID,
+)
 from hhplab.covariates.saiz_contract import SAIZ_ESTIMATE_YEAR, SAIZ_SOURCE_ID
 from hhplab.geo.ct_planning_regions import (
     CT_LEGACY_COUNTY_VINTAGE,
@@ -217,6 +221,7 @@ def aggregate_covariate_source(
         result = df[[*required, *passthrough_columns]].copy()
     if years is not None:
         result = result[result["year"].isin(years)].copy()
+    result = _apply_source_specific_derived_columns(source_id, result)
     coverage_policy = _coverage_policy(
         result,
         target_geo=target_geo,
@@ -250,6 +255,9 @@ def aggregate_covariate_source(
                 else list(spec.measure_columns)
             ),
             "measure_aggregations": dict(spec.measure_aggregations),
+            "derived_measure_columns": (
+                list(QCEW_DERIVED_MEASURE_COLUMNS) if source_id == QCEW_SOURCE_ID else []
+            ),
             "coverage_policy": coverage_policy,
             "input_path": str(input_path),
             "input_provenance": input_provenance.to_dict() if input_provenance else None,
@@ -272,6 +280,21 @@ def derive_prism_temperature_basis(df: pd.DataFrame) -> pd.DataFrame:
         upper=EMERGENCY_SHELTER_ACTIVATION_C,
     )
     result["tmin_above_code_blue"] = (tmin - EMERGENCY_SHELTER_ACTIVATION_C).clip(lower=0.0)
+    return result
+
+
+def _apply_source_specific_derived_columns(
+    source_id: str,
+    df: pd.DataFrame,
+) -> pd.DataFrame:
+    if source_id != QCEW_SOURCE_ID:
+        return df
+    result = df.copy()
+    employment = pd.to_numeric(result["annual_avg_emplvl"], errors="coerce")
+    wages = pd.to_numeric(result["total_annual_wages"], errors="coerce")
+    employment_positive = employment.where(employment > 0)
+    result["annual_avg_weekly_wage"] = wages / (employment_positive * 52.0)
+    result["avg_annual_pay"] = wages / employment_positive
     return result
 
 
