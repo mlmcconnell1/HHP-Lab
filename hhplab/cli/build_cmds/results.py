@@ -130,6 +130,11 @@ RESULT_WORKFLOWS: dict[str, ResultWorkflow] = {
         description="Build the HUD subsidized-housing stock panel and rent-growth regressions.",
         modules=("build_subsidized_housing_stock_panel",),
     ),
+    "eviction-rate-timing": ResultWorkflow(
+        name="eviction-rate-timing",
+        description="Build the Eviction Lab timing-aware rent-growth panel and regressions.",
+        modules=("build_eviction_rate_timing_panel",),
+    ),
     "composition-rent-population-robustness": ResultWorkflow(
         name="composition-rent-population-robustness",
         description="Run tracked robustness checks for composition rent-population screens.",

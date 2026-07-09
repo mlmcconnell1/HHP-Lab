@@ -14,6 +14,7 @@ SCRIPTS_DIR = REPO_ROOT / "scripts"
 WRAPPER_CASES = [
     "analyze_composition_rent_population_robustness",
     "analyze_noncompositional_rent_population_robustness",
+    "build_eviction_rate_timing_panel",
     "build_household_size_composition_panel",
     "build_employment_labor_force_composition_panel",
     "build_income_inequality_composition_panel",

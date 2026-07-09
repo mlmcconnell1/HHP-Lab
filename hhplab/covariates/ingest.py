@@ -64,7 +64,7 @@ from hhplab.provenance import ProvenanceBlock, write_parquet_with_provenance
 from hhplab.source_registry import register_source
 
 COMMON_COLUMN_ALIASES: dict[str, tuple[str, ...]] = {
-    "county_fips": ("county_fips", "fips", "countyfips", "geoid", "geo_id"),
+    "county_fips": ("county_fips", "fips", "countyfips", "fips_county", "geoid", "geo_id"),
     "coc_number": ("coc_number", "coc", "cocnum", "geo_id"),
     "state": ("state", "state_abbr", "state_po", "stusps", "geo_id"),
     "msa_id": ("msa_id", "cbsa_code", "geoid", "geo_id"),
@@ -596,6 +596,8 @@ def normalize_covariate_frame(
     """Normalize provider tabular data to canonical geography/year columns."""
     rows = df.copy()
     rows.columns = [_clean_column(column) for column in rows.columns]
+    if spec.source_id == "eviction_lab_national":
+        rows = _normalize_eviction_lab_national_public_extract(rows)
     rename = _canonical_renames(rows.columns, spec=spec)
     rows = rows.rename(columns=rename)
     missing = [column for column in spec.required_columns if column not in rows.columns]
@@ -646,6 +648,23 @@ def normalize_covariate_frame(
     for column in spec.measure_columns:
         result[column] = pd.to_numeric(rows[column], errors="coerce")
     return result.dropna(subset=["geo_id"]).sort_values(["geo_id", "year"]).reset_index(drop=True)
+
+
+def _normalize_eviction_lab_national_public_extract(rows: pd.DataFrame) -> pd.DataFrame:
+    """Map Eviction Lab's public county-estimate extract to this package's schema."""
+    normalized = rows.copy()
+    if "eviction_filings" not in normalized.columns and "filings_estimate" in normalized.columns:
+        normalized["eviction_filings"] = normalized["filings_estimate"]
+    if "eviction_rate" not in normalized.columns and {
+        "filings_estimate",
+        "renting_hh",
+    }.issubset(normalized.columns):
+        filings = pd.to_numeric(normalized["filings_estimate"], errors="coerce")
+        renting_households = pd.to_numeric(normalized["renting_hh"], errors="coerce")
+        normalized["eviction_rate"] = (
+            filings / renting_households.where(renting_households > 0) * 100.0
+        )
+    return normalized
 
 
 SAIZ_NAME_OVERRIDES: dict[str, str] = {

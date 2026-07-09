@@ -1322,6 +1322,48 @@ def test_ingest_and_aggregate_county_covariate_roundtrip(tmp_path: Path, monkeyp
     assert panel_provenance.extra["target_geo"] == "county"
 
 
+def test_ingest_eviction_lab_national_public_estimate_schema(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    """The official Eviction Lab county-estimate file should ingest without a pre-clean step."""
+    monkeypatch.setattr("hhplab.covariates.ingest.register_source", lambda **_: None)
+    raw = tmp_path / "county_eviction_estimates_2000_2018.csv"
+    pd.DataFrame(
+        {
+            "state": ["Alabama", "Alabama"],
+            "county": ["Autauga County", "Baldwin County"],
+            "FIPS_state": ["01", "01"],
+            "FIPS_county": ["01001", "01003"],
+            "year": [2000, 2000],
+            "renting_hh": [3074, 5000],
+            "filings_estimate": [109, 300],
+            "filings_ci_95_lower": [109, 280],
+            "filings_ci_95_upper": [109, 320],
+            "ind_filings_court_issued": [1, 1],
+            "ind_filings_court_issued_LT": [0, 0],
+            "hh_threat_estimate": [106, 250],
+            "hh_threat_95_lower": [106, 240],
+            "hh_threat_95_upper": [106, 260],
+            "ind_hht_observed": [1, 1],
+        }
+    ).to_csv(raw, index=False)
+
+    curated = ingest_covariate_source(
+        "eviction_lab_national",
+        raw,
+        output_dir=tmp_path,
+        force=True,
+    )
+    curated_df = pd.read_parquet(curated)
+
+    assert curated_df["county_fips"].tolist() == ["01001", "01003"]
+    assert curated_df["eviction_filings"].tolist() == [109, 300]
+    assert curated_df["eviction_rate"].tolist() == pytest.approx(
+        [109 / 3074 * 100, 300 / 5000 * 100]
+    )
+
+
 def test_covariate_outputs_pass_curated_layout_policy(tmp_path: Path, monkeypatch) -> None:
     """Covariate artifacts should use canonical names in a registered curated subdir."""
     monkeypatch.setattr("hhplab.covariates.ingest.register_source", lambda **_: None)
@@ -2653,10 +2695,21 @@ def test_cli_ingests_national_eviction_lab_and_aggregates_to_msa(
     raw = tmp_path / "eviction_lab_national.csv"
     pd.DataFrame(
         {
-            "county_fips": ["01001", "01003"],
+            "state": ["Alabama", "Alabama"],
+            "county": ["Autauga County", "Baldwin County"],
+            "FIPS_state": ["01", "01"],
+            "FIPS_county": ["01001", "01003"],
             "year": [2018, 2018],
-            "eviction_filings": [100, 300],
-            "eviction_rate": [2.0, 6.0],
+            "renting_hh": [5000, 5000],
+            "filings_estimate": [100, 300],
+            "filings_ci_95_lower": [90, 280],
+            "filings_ci_95_upper": [110, 320],
+            "ind_filings_court_issued": [1, 1],
+            "ind_filings_court_issued_LT": [0, 0],
+            "hh_threat_estimate": [95, 260],
+            "hh_threat_95_lower": [85, 240],
+            "hh_threat_95_upper": [105, 280],
+            "ind_hht_observed": [1, 1],
         }
     ).to_csv(raw, index=False)
     population = tmp_path / "pep.parquet"
