@@ -21,6 +21,7 @@ import numpy as np
 import pandas as pd
 import statsmodels.api as sm
 
+from hhplab.census_regions import census_region
 from hhplab.covariates.aggregate import (
     aggregate_covariate_source,
     default_covariate_panel_path,
@@ -53,6 +54,7 @@ class ModelSpec:
     name: str
     outcome: str
     predictors: tuple[str, ...]
+    fixed_effects: str
 
 
 def _safe_log(values: pd.Series) -> pd.Series:
@@ -156,28 +158,45 @@ def build_levels_panel() -> pd.DataFrame:
 
 def _model_specs() -> Iterable[ModelSpec]:
     for column in HUD_PSH_COLUMNS:
-        yield ModelSpec(
-            name=f"rent_fd_log_{column}_per_1000",
-            outcome="d_log_zori",
-            predictors=("d_log_pop", f"d_log_{column}_per_1000"),
-        )
+        for fixed_effects, suffix in (
+            ("year", ""),
+            ("region_year", "_region_year_fe"),
+            ("primary_state_year", "_state_year_fe"),
+        ):
+            yield ModelSpec(
+                name=f"rent_fd_log_{column}_per_1000{suffix}",
+                outcome="d_log_zori",
+                predictors=("d_log_pop", f"d_log_{column}_per_1000"),
+                fixed_effects=fixed_effects,
+            )
+
+
+def _effect_series(sample: pd.DataFrame, effect: str) -> pd.Series:
+    if effect == "year":
+        return sample["year"].astype("string")
+    if effect == "primary_state_year":
+        return sample["primary_state"].astype("string") + "_" + sample["year"].astype("string")
+    if effect == "region_year":
+        regions = sample["primary_state"].map(census_region)
+        return regions.astype("string") + "_" + sample["year"].astype("string")
+    raise ValueError(f"Unsupported fixed effect: {effect}")
 
 
 def fit_clustered_fd_models(fd: pd.DataFrame) -> pd.DataFrame:
     rows: list[dict[str, object]] = []
     for spec in _model_specs():
-        required = [spec.outcome, *spec.predictors, "year", "msa_id"]
+        required = [spec.outcome, *spec.predictors, "year", "msa_id", "primary_state"]
         sample = fd.dropna(subset=required).copy()
         if sample.empty:
             continue
 
-        year_fe = pd.get_dummies(
-            sample["year"].astype("string"),
-            prefix="year",
+        fixed_effect_dummies = pd.get_dummies(
+            _effect_series(sample, spec.fixed_effects),
+            prefix=spec.fixed_effects,
             drop_first=True,
             dtype=float,
         )
-        x = pd.concat([sample[list(spec.predictors)].astype(float), year_fe], axis=1)
+        x = pd.concat([sample[list(spec.predictors)].astype(float), fixed_effect_dummies], axis=1)
         x = sm.add_constant(x, has_constant="add")
         y = sample[spec.outcome].astype(float)
         result = sm.OLS(y, x).fit(
@@ -199,6 +218,7 @@ def fit_clustered_fd_models(fd: pd.DataFrame) -> pd.DataFrame:
                     "clusters": int(sample["msa_id"].nunique()),
                     "r_squared": float(result.rsquared),
                     "year_fixed_effects": True,
+                    "fixed_effects": spec.fixed_effects,
                     "std_error_type": "clustered:msa_id",
                 }
             )

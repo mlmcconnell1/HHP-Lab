@@ -131,12 +131,23 @@ def test_subsidized_housing_panel_merges_and_derives_per_1000(monkeypatch) -> No
 def test_subsidized_housing_fd_models_include_both_stock_predictors() -> None:
     builder = _load_builder()
     rows = []
-    for msa_index, msa_id in enumerate(["10000", "20000", "30000", "40000"], start=1):
+    msas = [
+        ("10000", "CT"),
+        ("11000", "CT"),
+        ("20000", "NY"),
+        ("21000", "NY"),
+        ("30000", "IL"),
+        ("31000", "IL"),
+        ("40000", "OH"),
+        ("41000", "OH"),
+    ]
+    for msa_index, (msa_id, state) in enumerate(msas, start=1):
         for year_index, year in enumerate([2020, 2022], start=1):
             rows.append(
                 {
                     "msa_id": msa_id,
                     "year": year,
+                    "primary_state": state,
                     "d_log_zori": 0.02 * year_index + 0.01 * msa_index,
                     "d_log_pop": 0.01 * year_index,
                     "d_log_subsidized_households_per_1000": 0.004 * msa_index,
@@ -158,3 +169,8 @@ def test_subsidized_housing_fd_models_include_both_stock_predictors() -> None:
 
     assert subsidized_terms == ["d_log_pop", "d_log_subsidized_households_per_1000"]
     assert voucher_terms == ["d_log_pop", "d_log_housing_choice_vouchers_per_1000"]
+    assert set(regressions["fixed_effects"]) == {
+        "year",
+        "region_year",
+        "primary_state_year",
+    }
