@@ -53,7 +53,7 @@ def test_build_levels_panel_aligns_lagged_and_lead_eviction_rate_diffs(
         }
     ).to_parquet(panel_path, index=False)
     monkeypatch.setenv("HHPLAB_EVICTION_NATIONAL_PANEL_PATH", str(panel_path))
-    monkeypatch.setattr(builder, "load_pooled_base_panel", _base_panel)
+    monkeypatch.setattr(builder, "load_eviction_base_panel", _base_panel)
 
     levels = builder.build_levels_panel().set_index("year")
 
@@ -66,6 +66,23 @@ def test_build_levels_panel_aligns_lagged_and_lead_eviction_rate_diffs(
     assert levels.loc[2017, "d_log_eviction_rate_lead1"] == pytest.approx(diff_2018)
     assert levels.loc[2018, "d_log_eviction_rate_lag1"] == pytest.approx(diff_2017)
     assert pd.isna(levels.loc[2018, "d_log_eviction_rate_lead1"])
+
+
+def test_eviction_base_adds_pre_2015_top50_history(monkeypatch, tmp_path: Path) -> None:
+    builder = _load_builder()
+    base = _base_panel().copy()
+    base["cohort"] = "top50"
+    base["primary_state"] = "AA"
+    history = base.iloc[[0]].copy()
+    history["year"] = 2014
+    history_path = tmp_path / "top50_history.parquet"
+    history.drop(columns=["cohort", "primary_state"]).to_parquet(history_path, index=False)
+    monkeypatch.setattr(builder, "load_pooled_base_panel", lambda: base)
+
+    result = builder.load_eviction_base_panel(history_path)
+
+    assert result["year"].tolist() == [2014, 2015, 2016, 2017, 2018]
+    assert result.loc[result["year"] == 2014, "cohort"].item() == "top50"
 
 
 def test_model_specs_cover_lag_same_year_lead_and_reverse_directions() -> None:
@@ -82,3 +99,52 @@ def test_model_specs_cover_lag_same_year_lead_and_reverse_directions() -> None:
     assert any("d_log_eviction_rate_lag1" in spec.predictors for spec in specs)
     assert any("d_log_eviction_rate_lead1" in spec.predictors for spec in specs)
     assert any(spec.outcome == "d_log_eviction_rate_lead1" for spec in specs)
+    assert {spec.fixed_effects for spec in specs} == {
+        "year",
+        "region_year",
+        "primary_state_year",
+    }
+    assert len(specs) == 12
+
+
+def test_eviction_models_run_full_fixed_effect_ladder() -> None:
+    builder = _load_builder()
+    rows = []
+    msas = [
+        ("10000", "CT"),
+        ("11000", "CT"),
+        ("20000", "NY"),
+        ("21000", "NY"),
+        ("30000", "IL"),
+        ("31000", "IL"),
+        ("40000", "OH"),
+        ("41000", "OH"),
+    ]
+    for msa_index, (msa_id, state) in enumerate(msas):
+        for year_index, year in enumerate((2016, 2017, 2018)):
+            rows.append(
+                {
+                    "msa_id": msa_id,
+                    "primary_state": state,
+                    "year": year,
+                    "d_log_zori": 0.02 + 0.003 * msa_index + 0.002 * year_index,
+                    "d_log_pop": 0.01 + 0.001 * year_index,
+                    "d_log_eviction_rate": 0.03 + 0.002 * msa_index,
+                    "d_log_eviction_rate_lag1": 0.02 + 0.001 * msa_index,
+                    "d_log_eviction_rate_lead1": 0.04 + 0.001 * year_index,
+                }
+            )
+
+    result = builder.fit_clustered_fd_models(pd.DataFrame(rows))
+
+    assert set(result["fixed_effects"]) == {
+        "year",
+        "region_year",
+        "primary_state_year",
+    }
+    assert set(result["family"]) == {
+        "same_year_screen",
+        "lagged_channel",
+        "lead_placebo",
+        "reverse_causality",
+    }

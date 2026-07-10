@@ -23,6 +23,7 @@ import numpy as np
 import pandas as pd
 import statsmodels.api as sm
 
+from hhplab.census_regions import census_region
 from hhplab.covariates.aggregate import (
     aggregate_covariate_source,
     default_covariate_panel_path,
@@ -45,6 +46,8 @@ EVICTION_DOWNLOAD_URL = (
     "estimating-eviction-prevalance-across-us/county_eviction_estimates_2000_2018.csv"
 )
 EVICTION_END_YEAR = 2018
+HISTORICAL_TOP50_PANEL = REPO_ROOT / "outputs" / "top50_msa_longitudinal_2010_2025.parquet"
+HISTORY_END_YEAR = 2014
 
 
 @dataclass(frozen=True)
@@ -53,6 +56,7 @@ class ModelSpec:
     outcome: str
     predictors: tuple[str, ...]
     family: str
+    fixed_effects: str
 
 
 def _safe_log1p(values: pd.Series) -> pd.Series:
@@ -151,8 +155,33 @@ def add_timing_columns(levels: pd.DataFrame) -> pd.DataFrame:
     return levels
 
 
-def build_levels_panel() -> pd.DataFrame:
+def load_eviction_base_panel(history_path: Path = HISTORICAL_TOP50_PANEL) -> pd.DataFrame:
     base = load_pooled_base_panel()
+    if not history_path.exists():
+        raise FileNotFoundError(
+            f"Eviction timing history is missing: {history_path}. Restore the top-50 "
+            "longitudinal report artifact so lagged changes include 2014 history."
+        )
+    history = pd.read_parquet(history_path)
+    history = history.loc[history["year"] <= HISTORY_END_YEAR].copy()
+    history["msa_id"] = _as_msa_id(history["msa_id"])
+    history["cohort"] = "top50"
+    history["primary_state"] = (
+        history["msa_name"].str.rsplit(",", n=1).str[-1].str.strip().str.split("-").str[0]
+    )
+    columns = [column for column in base.columns if column in history.columns]
+    missing = sorted(set(base.columns) - set(columns))
+    if missing:
+        raise ValueError(f"Historical top-50 eviction base is missing columns {missing}.")
+    return (
+        pd.concat([history[columns], base], ignore_index=True)
+        .sort_values(["msa_id", "year"])
+        .reset_index(drop=True)
+    )
+
+
+def build_levels_panel() -> pd.DataFrame:
+    base = load_eviction_base_panel()
     base = base[base["year"] <= EVICTION_END_YEAR].copy()
     years = [int(year) for year in sorted(base["year"].dropna().unique())]
     eviction = load_eviction_msa_panel(years=years)
@@ -161,47 +190,73 @@ def build_levels_panel() -> pd.DataFrame:
 
 
 def _model_specs() -> Iterable[ModelSpec]:
-    yield ModelSpec(
-        name="rent_fd_eviction_rate_same_year",
-        outcome="d_log_zori",
-        predictors=("d_log_pop", "d_log_eviction_rate"),
-        family="same_year_screen",
+    base_specs = (
+        (
+            "rent_fd_eviction_rate_same_year",
+            "d_log_zori",
+            ("d_log_pop", "d_log_eviction_rate"),
+            "same_year_screen",
+        ),
+        (
+            "rent_fd_eviction_rate_lag1",
+            "d_log_zori",
+            ("d_log_pop", "d_log_eviction_rate_lag1"),
+            "lagged_channel",
+        ),
+        (
+            "rent_fd_eviction_rate_lead1_placebo",
+            "d_log_zori",
+            ("d_log_pop", "d_log_eviction_rate_lead1"),
+            "lead_placebo",
+        ),
+        (
+            "future_eviction_rate_fd_on_rent",
+            "d_log_eviction_rate_lead1",
+            ("d_log_pop", "d_log_zori"),
+            "reverse_causality",
+        ),
     )
-    yield ModelSpec(
-        name="rent_fd_eviction_rate_lag1",
-        outcome="d_log_zori",
-        predictors=("d_log_pop", "d_log_eviction_rate_lag1"),
-        family="lagged_channel",
-    )
-    yield ModelSpec(
-        name="rent_fd_eviction_rate_lead1_placebo",
-        outcome="d_log_zori",
-        predictors=("d_log_pop", "d_log_eviction_rate_lead1"),
-        family="lead_placebo",
-    )
-    yield ModelSpec(
-        name="future_eviction_rate_fd_on_rent",
-        outcome="d_log_eviction_rate_lead1",
-        predictors=("d_log_pop", "d_log_zori"),
-        family="reverse_causality",
-    )
+    for name, outcome, predictors, family in base_specs:
+        for fixed_effects, suffix in (
+            ("year", ""),
+            ("region_year", "_region_year_fe"),
+            ("primary_state_year", "_state_year_fe"),
+        ):
+            yield ModelSpec(
+                name=f"{name}{suffix}",
+                outcome=outcome,
+                predictors=predictors,
+                family=family,
+                fixed_effects=fixed_effects,
+            )
+
+
+def _effect_series(sample: pd.DataFrame, effect: str) -> pd.Series:
+    if effect == "year":
+        return sample["year"].astype("string")
+    if effect == "primary_state_year":
+        return sample["primary_state"].astype("string") + "_" + sample["year"].astype("string")
+    if effect == "region_year":
+        regions = sample["primary_state"].map(census_region)
+        return regions.astype("string") + "_" + sample["year"].astype("string")
+    raise ValueError(f"Unsupported fixed effect: {effect}")
 
 
 def fit_clustered_fd_models(fd: pd.DataFrame) -> pd.DataFrame:
     rows: list[dict[str, object]] = []
     for spec in _model_specs():
-        required = [spec.outcome, *spec.predictors, "year", "msa_id"]
+        required = [spec.outcome, *spec.predictors, "year", "msa_id", "primary_state"]
         sample = fd.dropna(subset=required).copy()
         if sample.empty:
             continue
 
-        year_fe = pd.get_dummies(
-            sample["year"].astype("string"),
-            prefix="year",
+        fixed_effect_dummies = pd.get_dummies(
+            _effect_series(sample, spec.fixed_effects),
+            prefix=spec.fixed_effects,
             drop_first=True,
             dtype=float,
         )
-        x = pd.concat([sample[list(spec.predictors)].astype(float), year_fe], axis=1)
+        x = pd.concat([sample[list(spec.predictors)].astype(float), fixed_effect_dummies], axis=1)
         x = sm.add_constant(x, has_constant="add")
         y = sample[spec.outcome].astype(float)
         result = sm.OLS(y, x).fit(
@@ -224,6 +279,7 @@ def fit_clustered_fd_models(fd: pd.DataFrame) -> pd.DataFrame:
                     "clusters": int(sample["msa_id"].nunique()),
                     "r_squared": float(result.rsquared),
                     "year_fixed_effects": True,
+                    "fixed_effects": spec.fixed_effects,
                     "std_error_type": "clustered:msa_id",
                 }
             )
@@ -264,7 +320,13 @@ def summarize_panel(levels: pd.DataFrame, fd: pd.DataFrame) -> dict[str, object]
         else {"count": 0}
     )
     sample_sizes = {
-        spec.name: int(len(fd.dropna(subset=[spec.outcome, *spec.predictors, "year", "msa_id"])))
+        spec.name: int(
+            len(
+                fd.dropna(
+                    subset=[spec.outcome, *spec.predictors, "year", "msa_id", "primary_state"]
+                )
+            )
+        )
         for spec in _model_specs()
     }
     return {
