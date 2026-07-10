@@ -9,7 +9,7 @@ from unittest.mock import patch
 from typer.testing import CliRunner
 
 import hhplab.results.findings as findings_module
-from hhplab.cli.build_cmds.results import _run_workflow_module
+from hhplab.cli.build_cmds.results import _attach_finding_sidecar, _run_workflow_module
 from hhplab.cli.main import app
 from hhplab.results.findings import finding_from_result
 
@@ -67,7 +67,7 @@ def test_finding_from_result_derives_standard_contract() -> None:
     assert payload["coverage_notes"]["levels_rows"] == 2
 
 
-def test_run_workflow_module_writes_finding_sidecar(tmp_path) -> None:
+def test_workflow_result_path_attaches_finding_sidecar(tmp_path) -> None:
     module = SimpleNamespace(
         __name__="hhplab.results.workflows.build_irs_migration_pooled_panel",
         run=_workflow_result,
@@ -78,9 +78,11 @@ def test_run_workflow_module_writes_finding_sidecar(tmp_path) -> None:
         patch.object(findings_module, "FINDINGS_DIR", tmp_path),
         patch("hhplab.cli.build_cmds.results.importlib.import_module", return_value=module),
     ):
-        payload = _run_workflow_module(
-            "build_irs_migration_pooled_panel",
+        payload = _run_workflow_module("build_irs_migration_pooled_panel")
+        _attach_finding_sidecar(
+            payload,
             workflow_id="irs-migration-pooled",
+            module_name="build_irs_migration_pooled_panel",
         )
 
     sidecar = tmp_path / "irs-migration-pooled__build_irs_migration_pooled_panel.finding.json"

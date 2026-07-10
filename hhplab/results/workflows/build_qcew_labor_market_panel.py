@@ -30,7 +30,7 @@ from hhplab.census_regions import census_region
 from hhplab.covariates.aggregate import aggregate_covariate_source
 from hhplab.covariates.ingest import default_covariate_output_path
 from hhplab.naming import covariate_panel_filename
-from hhplab.results.workflows._paths import OUTPUTS_ROOT, REPO_ROOT, write_result_parquet
+from hhplab.results.workflows._paths import DATA_ROOT, OUTPUTS_ROOT, REPO_ROOT, write_result_parquet
 from hhplab.results.workflows.build_household_size_composition_panel import (
     _as_msa_id,
     load_pooled_base_panel,
@@ -47,7 +47,7 @@ QCEW_CURATED_PATH_ENV = "HHPLAB_QCEW_CURATED_PATH"
 QCEW_DOWNLOAD_URL_TEMPLATE = "https://data.bls.gov/cew/data/api/{year}/a/industry/10.csv"
 QCEW_MIN_COVERAGE_RATIO = 1.0
 
-CPI_U_PATH = REPO_ROOT / "data" / "curated" / "cpi" / "cpi_u__Aall.parquet"
+CPI_U_PATH = DATA_ROOT / "curated" / "cpi" / "cpi_u__Aall.parquet"
 
 QCEW_LEVEL_COLUMNS = (
     "qcew_annual_avg_emplvl",

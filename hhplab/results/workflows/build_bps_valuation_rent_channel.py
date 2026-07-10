@@ -44,7 +44,7 @@ from hhplab.covariates.census_bps_contract import (
     CENSUS_BPS_MIX_ADJUSTED_VALUE_PER_UNIT_COLUMN,
     CENSUS_BPS_SOURCE_ID,
 )
-from hhplab.results.workflows._paths import OUTPUTS_ROOT, REPO_ROOT, write_result_parquet
+from hhplab.results.workflows._paths import DATA_ROOT, OUTPUTS_ROOT, REPO_ROOT, write_result_parquet
 from hhplab.results.workflows.build_household_size_composition_panel import (
     _as_msa_id,
     load_pooled_base_panel,
@@ -54,7 +54,7 @@ ROOT = REPO_ROOT
 OUT = OUTPUTS_ROOT / "bps_valuation_rent_channel"
 
 BPS_MSA_PANEL_PATH = (
-    REPO_ROOT / "data/curated/covariates/covariate_panel__census_bps__Y2000-2024.parquet"
+    DATA_ROOT / "curated/covariates/covariate_panel__census_bps__Y2000-2024.parquet"
 )
 
 BPS_VALUATION_COLUMN = CENSUS_BPS_MIX_ADJUSTED_VALUE_PER_UNIT_COLUMN

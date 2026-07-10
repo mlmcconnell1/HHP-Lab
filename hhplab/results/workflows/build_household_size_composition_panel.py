@@ -17,19 +17,18 @@ from pathlib import Path
 import pandas as pd
 import statsmodels.api as sm
 
-from hhplab.results.workflows._paths import REPO_ROOT, write_result_parquet
+from hhplab.results.workflows._paths import DATA_ROOT, OUTPUTS_ROOT, REPO_ROOT, write_result_parquet
 
 ROOT = REPO_ROOT
-OUT = ROOT / "outputs" / "composition_rent_population"
+OUT = OUTPUTS_ROOT / "composition_rent_population"
 
-TOP50_PANEL = ROOT / "outputs" / "top50_msa_longitudinal_2010_2025.parquet"
+TOP50_PANEL = OUTPUTS_ROOT / "top50_msa_longitudinal_2010_2025.parquet"
 RANK51_150_PANEL = (
-    ROOT
-    / "outputs"
+    OUTPUTS_ROOT
     / "msa_rank51_150_replication"
     / "panel__msa_rank51_150__Y2015-2025@Mcensusmsa2023.parquet"
 )
-ACS1_METRO_GLOB = str(ROOT / "data" / "curated" / "acs" / "acs1_metro__A*@Dcensusmsa2023.parquet")
+ACS1_METRO_GLOB = str(DATA_ROOT / "curated" / "acs" / "acs1_metro__A*@Dcensusmsa2023.parquet")
 
 EXCLUDED_YEARS = {2021}
 HOUSEHOLD_SIZE_COLUMNS = [

@@ -26,21 +26,23 @@ import numpy as np
 import pandas as pd
 
 from hhplab.msa import read_msa_county_membership
-from hhplab.results.workflows._paths import REPO_ROOT, write_result_parquet
+from hhplab.results.workflows._paths import DATA_ROOT, OUTPUTS_ROOT, REPO_ROOT, write_result_parquet
 
 ROOT = REPO_ROOT
-OUT = ROOT / "outputs" / "vera_hic_pit_longitudinal_pooled"
-HIC_BY_CATEGORY_DIR = ROOT / "outputs" / "overdose_lag" / "hic_by_category"
+OUT = OUTPUTS_ROOT / "vera_hic_pit_longitudinal_pooled"
+HIC_BY_CATEGORY_DIR = OUTPUTS_ROOT / "overdose_lag" / "hic_by_category"
 
-TOP50_PANEL = ROOT / "outputs" / "top50_msa_longitudinal_2010_2025.parquet"
+TOP50_PANEL = OUTPUTS_ROOT / "top50_msa_longitudinal_2010_2025.parquet"
 RANK51_150_PANEL = (
-    ROOT
-    / "outputs"
+    OUTPUTS_ROOT
     / "msa_rank51_150_replication"
     / "panel__msa_rank51_150__Y2015-2025@Mcensusmsa2023.parquet"
 )
 VERA_COUNTY = (
-    ROOT / "data" / "curated" / "vera" / "vera_incarceration_county__Y1970-2026@C2020.parquet"
+    DATA_ROOT
+    / "curated"
+    / "vera"
+    / "vera_incarceration_county__Y1970-2026@C2020.parquet"
 )
 
 EXCLUDED_YEARS = {2021}

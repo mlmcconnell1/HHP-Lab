@@ -12,10 +12,10 @@ import numpy as np
 import pandas as pd
 from scipy import stats
 
-from hhplab.results.workflows._paths import REPO_ROOT
+from hhplab.results.workflows._paths import OUTPUTS_ROOT, REPO_ROOT
 
 ROOT = REPO_ROOT
-PANEL = ROOT / "outputs" / "vera_hic_pit" / "vera_hic_pit_levels.parquet"
+PANEL = OUTPUTS_ROOT / "vera_hic_pit" / "vera_hic_pit_levels.parquet"
 
 HIC_CATEGORIES = ("es", "th", "sh", "rrh", "psh", "oph", "total_beds")
 HIC_LABELS = {
@@ -119,7 +119,7 @@ def run() -> dict[str, object]:
         df_pit, PIT_MARGINS, PIT_LABELS, lambda k: f"{k}_pit_per_1000", None
     )
 
-    out_dir = ROOT / "outputs" / "vera_hic_pit"
+    out_dir = OUTPUTS_ROOT / "vera_hic_pit"
     hic_pooled_path = out_dir / "vera_hic_correlations_pooled.csv"
     hic_by_year_path = out_dir / "vera_hic_correlations_by_year.csv"
     pit_pooled_path = out_dir / "vera_pit_correlations_pooled.csv"

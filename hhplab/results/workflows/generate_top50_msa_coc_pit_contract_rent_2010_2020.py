@@ -9,10 +9,10 @@ import pandas as pd
 import pyarrow.parquet as pq
 
 from hhplab.provenance import ProvenanceBlock, write_parquet_with_provenance
-from hhplab.results.workflows._paths import REPO_ROOT
+from hhplab.results.workflows._paths import DATA_ROOT, OUTPUTS_ROOT, REPO_ROOT, display_path
 
 ROOT = REPO_ROOT
-OUTPUT_DIR = ROOT / "outputs" / "top50_msa_nonpr_coc_pit_contract_rent_2010_2020"
+OUTPUT_DIR = OUTPUTS_ROOT / "top50_msa_nonpr_coc_pit_contract_rent_2010_2020"
 
 YEARS = (2010, 2020)
 PIT_VINTAGE = 2020
@@ -20,15 +20,15 @@ COC_BOUNDARY_VINTAGE = 2020
 COUNTY_VINTAGE = 2023
 MSA_DEFINITION_VERSION = "census_msa_2023"
 
-PIT_PATH = ROOT / "data/curated/pit/pit_vintage__P2020.parquet"
+PIT_PATH = DATA_ROOT / "curated/pit/pit_vintage__P2020.parquet"
 MSA_COC_XWALK_PATH = (
-    ROOT / "data/curated/xwalks/msa_coc_xwalk__B2020xMcensus_msa_2023xC2023.parquet"
+    DATA_ROOT / "curated/xwalks/msa_coc_xwalk__B2020xMcensus_msa_2023xC2023.parquet"
 )
-MSA_DEFINITIONS_PATH = ROOT / "data/curated/msa/msa_definitions__census_msa_2023.parquet"
-MSA_MEMBERSHIP_PATH = ROOT / "data/curated/msa/msa_county_membership__census_msa_2023.parquet"
-PL_BLOCKS_PATH = ROOT / "data/curated/census/pl_blocks__N2020xK2020.parquet"
+MSA_DEFINITIONS_PATH = DATA_ROOT / "curated/msa/msa_definitions__census_msa_2023.parquet"
+MSA_MEMBERSHIP_PATH = DATA_ROOT / "curated/msa/msa_county_membership__census_msa_2023.parquet"
+PL_BLOCKS_PATH = DATA_ROOT / "curated/census/pl_blocks__N2020xK2020.parquet"
 ACS_CONTRACT_RENT_TEMPLATE = (
-    ROOT / "data/curated/acs_contract_rent_cache/acs5_contract_rent_tracts__A{year}.parquet"
+    DATA_ROOT / "curated/acs_contract_rent_cache/acs5_contract_rent_tracts__A{year}.parquet"
 )
 
 PIT_MEASURES = ("pit_total", "pit_sheltered", "pit_unsheltered")
@@ -216,7 +216,7 @@ def _aggregate_contract_rent(year: int, selected: pd.DataFrame) -> pd.DataFrame:
                 "contract_rent_cash_renter_households": float(weights.sum()),
                 "acs5_vintage": year,
                 "tract_vintage": 2010 if year == 2010 else 2020,
-                "rent_source": str(path.relative_to(ROOT)),
+                "rent_source": display_path(path),
             }
         )
     medians_df = pd.DataFrame(rows)
@@ -288,20 +288,20 @@ def _write_outputs(panel: pd.DataFrame) -> dict[str, object]:
             "years": list(YEARS),
             "ranking": "top 50 Census MSAs by 2020 PL block population, excluding Puerto Rico MSAs",
             "input_artifacts": {
-                "pit": str(PIT_PATH.relative_to(ROOT)),
-                "msa_coc_xwalk": str(MSA_COC_XWALK_PATH.relative_to(ROOT)),
-                "msa_definitions": str(MSA_DEFINITIONS_PATH.relative_to(ROOT)),
-                "msa_membership": str(MSA_MEMBERSHIP_PATH.relative_to(ROOT)),
-                "pl_blocks": str(PL_BLOCKS_PATH.relative_to(ROOT)),
-                "acs_contract_rent_2010": str(
+                "pit": display_path(PIT_PATH),
+                "msa_coc_xwalk": display_path(MSA_COC_XWALK_PATH),
+                "msa_definitions": display_path(MSA_DEFINITIONS_PATH),
+                "msa_membership": display_path(MSA_MEMBERSHIP_PATH),
+                "pl_blocks": display_path(PL_BLOCKS_PATH),
+                "acs_contract_rent_2010": display_path(
                     ACS_CONTRACT_RENT_TEMPLATE.with_name(
                         ACS_CONTRACT_RENT_TEMPLATE.name.format(year=2010),
-                    ).relative_to(ROOT),
+                    ),
                 ),
-                "acs_contract_rent_2020": str(
+                "acs_contract_rent_2020": display_path(
                     ACS_CONTRACT_RENT_TEMPLATE.with_name(
                         ACS_CONTRACT_RENT_TEMPLATE.name.format(year=2020),
-                    ).relative_to(ROOT),
+                    ),
                 ),
             },
         },
@@ -316,10 +316,10 @@ def _write_outputs(panel: pd.DataFrame) -> dict[str, object]:
         "years": list(YEARS),
         "contains_pr_msa": bool(panel["msa_name"].str.endswith(", PR", na=False).any()),
         "outputs": {
-            "parquet": str(parquet_path.relative_to(ROOT)),
-            "csv": str(csv_path.relative_to(ROOT)),
-            "preview_csv": str(preview_path.relative_to(ROOT)),
-            "summary_json": str(summary_path.relative_to(ROOT)),
+            "parquet": display_path(parquet_path),
+            "csv": display_path(csv_path),
+            "preview_csv": display_path(preview_path),
+            "summary_json": display_path(summary_path),
         },
         "top_10": panel.loc[
             panel["year"].eq(2020),
@@ -346,10 +346,10 @@ membership for the population ranking.
 
 Files:
 
-- `{parquet_path.relative_to(ROOT)}`
-- `{csv_path.relative_to(ROOT)}`
-- `{preview_path.relative_to(ROOT)}`
-- `{summary_path.relative_to(ROOT)}`
+- `{display_path(parquet_path)}`
+- `{display_path(csv_path)}`
+- `{display_path(preview_path)}`
+- `{display_path(summary_path)}`
 
 Panel grain: one row per `msa_id` and `year` for 2010 and 2020.
 
@@ -363,7 +363,7 @@ Included measures:
 Allocation notes:
 
 - PIT uses the existing 2020 CoC boundary to Census MSA 2023 area allocation:
-  `{MSA_COC_XWALK_PATH.relative_to(ROOT)}`.
+  `{display_path(MSA_COC_XWALK_PATH)}`.
 - ACS uses Census MSA 2023 county membership; tracts are assigned to MSAs by
   their county FIPS because Census MSAs are county-defined.
 - Puerto Rico MSAs are excluded before selecting the top 50.
@@ -379,7 +379,7 @@ def run() -> dict[str, object]:
 
 def main() -> None:
     result = run()
-    print(f"Wrote {result['row_count']} rows to {OUTPUT_DIR.relative_to(ROOT)}")
+    print(f"Wrote {result['row_count']} rows to {display_path(OUTPUT_DIR)}")
 
 
 if __name__ == "__main__":

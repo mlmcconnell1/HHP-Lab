@@ -16,15 +16,14 @@ import numpy as np
 import pandas as pd
 import statsmodels.api as sm
 
-from hhplab.results.workflows._paths import write_result_parquet
+from hhplab.results.workflows._paths import DATA_ROOT, write_result_parquet
 from hhplab.results.workflows.build_household_size_composition_panel import (
     OUT,
-    ROOT,
     _as_msa_id,
     load_pooled_base_panel,
 )
 
-MEASURES_GLOB = str(ROOT / "data" / "curated" / "measures" / "measures__msa__A*.parquet")
+MEASURES_GLOB = str(DATA_ROOT / "curated" / "measures" / "measures__msa__A*.parquet")
 
 ACS5_COUNT_COLUMNS = [
     "acs_total_population",

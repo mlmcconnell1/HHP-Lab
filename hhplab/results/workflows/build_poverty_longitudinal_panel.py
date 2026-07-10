@@ -15,19 +15,18 @@ import glob
 
 import pandas as pd
 
-from hhplab.results.workflows._paths import REPO_ROOT, write_result_parquet
+from hhplab.results.workflows._paths import DATA_ROOT, OUTPUTS_ROOT, REPO_ROOT, write_result_parquet
 
 ROOT = REPO_ROOT
-OUT = ROOT / "outputs" / "poverty_longitudinal"
+OUT = OUTPUTS_ROOT / "poverty_longitudinal"
 
-TOP50_PANEL = ROOT / "outputs" / "top50_msa_longitudinal_2010_2025.parquet"
+TOP50_PANEL = OUTPUTS_ROOT / "top50_msa_longitudinal_2010_2025.parquet"
 RANK51_150_PANEL = (
-    ROOT
-    / "outputs"
+    OUTPUTS_ROOT
     / "msa_rank51_150_replication"
     / "panel__msa_rank51_150__Y2015-2025@Mcensusmsa2023.parquet"
 )
-MEASURES_GLOB = str(ROOT / "data" / "curated" / "measures" / "measures__msa__A*.parquet")
+MEASURES_GLOB = str(DATA_ROOT / "curated" / "measures" / "measures__msa__A*.parquet")
 
 EXCLUDED_YEARS = {2021}
 

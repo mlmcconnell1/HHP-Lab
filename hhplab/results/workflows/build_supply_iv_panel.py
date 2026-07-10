@@ -17,28 +17,28 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from hhplab.results.workflows._paths import REPO_ROOT, write_result_parquet
+from hhplab.results.workflows._paths import DATA_ROOT, OUTPUTS_ROOT, REPO_ROOT, write_result_parquet
 
 ROOT = REPO_ROOT
-OUT = ROOT / "outputs" / "supply_iv"
+OUT = OUTPUTS_ROOT / "supply_iv"
 
-TOP50_BASE_PANEL = ROOT / "outputs" / "top50_msa_longitudinal_2015_2025.parquet"
+TOP50_BASE_PANEL = OUTPUTS_ROOT / "top50_msa_longitudinal_2015_2025.parquet"
 TOP150_BASE_PANEL = (
     ROOT.parent
     / "HHP-Data"
     / "msa_rank51_150_longitudinal_2015_2025_source_top150"
     / "panel__msa__Y2015-2025@Mcensusmsa2023.parquet"
 )
-BPS_MSA = ROOT / "data/curated/covariates/covariate_panel__census_bps__Y1980-ongoing.parquet"
-BPS_COUNTY = ROOT / "data/curated/covariates/covariate__census_bps__Y2000-2024.parquet"
-MEMBERSHIP = ROOT / "data/curated/msa/msa_county_membership__census_msa_2023.parquet"
+BPS_MSA = DATA_ROOT / "curated/covariates/covariate_panel__census_bps__Y1980-ongoing.parquet"
+BPS_COUNTY = DATA_ROOT / "curated/covariates/covariate__census_bps__Y2000-2024.parquet"
+MEMBERSHIP = DATA_ROOT / "curated/msa/msa_county_membership__census_msa_2023.parquet"
 ZORI_MSA = (
-    ROOT / "data/curated/zori/"
+    DATA_ROOT / "curated/zori/"
     "zori__msa__Y2015-2025@Mcensusmsa2023xC2023__wpopulation__mpit_january__balanced.parquet"
 )
-SAIZ = ROOT / "data/raw/saiz_elasticity/saiz2010_supply_elasticity.dta"
+SAIZ = DATA_ROOT / "raw/saiz_elasticity/saiz2010_supply_elasticity.dta"
 SANCTUARY_PANEL = (
-    ROOT / "data/curated/sanctuary/sanctuary_msa_panel__D20250805xMcensus_msa_2023.parquet"
+    DATA_ROOT / "curated/sanctuary/sanctuary_msa_panel__D20250805xMcensus_msa_2023.parquet"
 )
 
 # Pre-sample exposure windows. The FD estimation sample starts with the

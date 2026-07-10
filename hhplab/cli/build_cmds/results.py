@@ -258,7 +258,7 @@ def _load_summary_from_stdout(stdout_lines: list[str]) -> dict[str, object] | No
     return None
 
 
-def _run_workflow_module(module_name: str, *, workflow_id: str | None = None) -> dict[str, object]:
+def _run_workflow_module(module_name: str) -> dict[str, object]:
     module = importlib.import_module(f"{WORKFLOW_MODULE_PREFIX}.{module_name}")
     run = getattr(module, "run", None)
     main = getattr(module, "main", None)
@@ -282,16 +282,7 @@ def _run_workflow_module(module_name: str, *, workflow_id: str | None = None) ->
         "stdout": stdout_lines,
     }
     if result is not None:
-        safe_result = _json_safe(result)
-        payload["result"] = safe_result
-        if workflow_id is not None and isinstance(safe_result, dict):
-            finding_path = write_finding_sidecar_from_result(
-                workflow_id=workflow_id,
-                module_name=module_name,
-                result=safe_result,
-            )
-            if finding_path is not None:
-                payload["finding_sidecar"] = str(finding_path)
+        payload["result"] = _json_safe(result)
     return payload
 
 

@@ -24,14 +24,14 @@ from hhplab.covariates.census_bps_contract import (
     CENSUS_BPS_CLASS_VALUE_COLUMNS,
     CENSUS_BPS_MIX_ADJUSTED_VALUE_PER_UNIT_COLUMN,
 )
-from hhplab.results.workflows._paths import OUTPUTS_ROOT, REPO_ROOT, write_result_parquet
+from hhplab.results.workflows._paths import DATA_ROOT, OUTPUTS_ROOT, REPO_ROOT, write_result_parquet
 
 ROOT = REPO_ROOT
 OUT = OUTPUTS_ROOT / "bps_valuation_benchmark"
 
-BPS_COUNTY_PATH = REPO_ROOT / "data/curated/covariates/covariate__census_bps__Y2000-2024.parquet"
+BPS_COUNTY_PATH = DATA_ROOT / "curated/covariates/covariate__census_bps__Y2000-2024.parquet"
 BPS_MSA_PANEL_PATH = (
-    REPO_ROOT / "data/curated/covariates/covariate_panel__census_bps__Y2000-2024.parquet"
+    DATA_ROOT / "curated/covariates/covariate_panel__census_bps__Y2000-2024.parquet"
 )
 BPS_COUNTY_PATH_ENV = "HHPLAB_BPS_COUNTY_PATH"
 BPS_MSA_PANEL_PATH_ENV = "HHPLAB_BPS_MSA_PANEL_PATH"

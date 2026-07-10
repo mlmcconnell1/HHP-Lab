@@ -1,4 +1,4 @@
-"""Shared repository-relative paths for result workflow modules."""
+"""Shared root-aware paths for result workflow modules."""
 
 from __future__ import annotations
 
@@ -7,11 +7,31 @@ from typing import Any
 
 import pandas as pd
 
+from hhplab.paths import asset_store_root, output_root
 from hhplab.provenance import ProvenanceBlock, write_parquet_with_provenance
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
-DATA_ROOT = REPO_ROOT / "data"
-OUTPUTS_ROOT = REPO_ROOT / "outputs"
+DATA_ROOT = asset_store_root()
+OUTPUTS_ROOT = output_root()
+
+
+def display_path(path: Path | str) -> str:
+    """Return a stable path label relative to a known storage root when possible."""
+    resolved = Path(path)
+    roots = (
+        (OUTPUTS_ROOT, Path("outputs")),
+        (DATA_ROOT, Path("data")),
+        (REPO_ROOT, Path(".")),
+    )
+    for root, label in roots:
+        try:
+            relative = resolved.relative_to(root)
+        except ValueError:
+            continue
+        if label == Path("."):
+            return str(relative)
+        return str(label / relative)
+    return str(resolved)
 
 
 def _infer_result_artifact_role(path: Path) -> str:
@@ -39,10 +59,6 @@ def result_workflow_provenance(
 ) -> ProvenanceBlock:
     """Build canonical provenance for result workflow parquet artifacts."""
     path = Path(path)
-    try:
-        relative_output_path = str(path.relative_to(REPO_ROOT))
-    except ValueError:
-        relative_output_path = str(path)
     payload: dict[str, Any] = {
         "dataset_type": "result_workflow_artifact",
         "workflow_id": path.parent.name,
@@ -50,7 +66,7 @@ def result_workflow_provenance(
         "artifact_role": artifact_role or _infer_result_artifact_role(path),
         "row_count": int(len(df)),
         "columns": list(df.columns),
-        "relative_output_path": relative_output_path,
+        "relative_output_path": display_path(path),
     }
     if extra:
         payload.update(extra)
@@ -81,6 +97,7 @@ __all__ = [
     "DATA_ROOT",
     "OUTPUTS_ROOT",
     "REPO_ROOT",
+    "display_path",
     "result_workflow_provenance",
     "write_result_parquet",
 ]

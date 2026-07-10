@@ -26,7 +26,7 @@ from hhplab.covariates.aggregate import (
     default_covariate_panel_path,
 )
 from hhplab.covariates.ingest import default_covariate_output_path
-from hhplab.results.workflows._paths import write_result_parquet
+from hhplab.results.workflows._paths import OUTPUTS_ROOT, write_result_parquet
 from hhplab.results.workflows.build_household_size_composition_panel import (
     ROOT as _ROOT,
 )
@@ -36,7 +36,7 @@ from hhplab.results.workflows.build_household_size_composition_panel import (
 )
 
 ROOT = _ROOT
-OUT = ROOT / "outputs" / "subsidized_housing_stock"
+OUT = OUTPUTS_ROOT / "subsidized_housing_stock"
 
 HUD_PSH_SOURCE_ID = "hud_psh"
 HUD_PSH_COLUMNS = [

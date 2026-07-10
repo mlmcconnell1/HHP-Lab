@@ -15,10 +15,10 @@ import numpy as np
 import pandas as pd
 from scipy import stats
 
-from hhplab.results.workflows._paths import REPO_ROOT
+from hhplab.results.workflows._paths import OUTPUTS_ROOT, REPO_ROOT
 
 ROOT = REPO_ROOT
-LEVELS_PANEL = ROOT / "outputs" / "overdose_lag" / "overdose_lag_levels.parquet"
+LEVELS_PANEL = OUTPUTS_ROOT / "overdose_lag" / "overdose_lag_levels.parquet"
 
 CATEGORIES = ("es", "th", "sh", "rrh", "psh", "oph", "total_beds")
 LABELS = {
@@ -96,7 +96,7 @@ def run() -> dict[str, object]:
             line += f"{r:+.2f}{marker}".rjust(10)
         print(line)
 
-    out_dir = ROOT / "outputs" / "overdose_lag"
+    out_dir = OUTPUTS_ROOT / "overdose_lag"
     pooled_path = out_dir / "hic_category_correlations_pooled.csv"
     by_year_path = out_dir / "hic_category_correlations_by_year.csv"
     pd.DataFrame(rows).to_csv(pooled_path, index=False)

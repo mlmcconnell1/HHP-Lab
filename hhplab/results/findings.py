@@ -7,7 +7,7 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any
 
-from hhplab.results.workflows._paths import OUTPUTS_ROOT, REPO_ROOT
+from hhplab.results.workflows._paths import OUTPUTS_ROOT, display_path
 
 FINDINGS_DIR = OUTPUTS_ROOT / "result_findings"
 CONTROL_TERMS = {"const", "d_log_pop", "log_pop", "population", "year"}
@@ -68,11 +68,7 @@ class CovariateFinding:
 
 
 def _relative_path(value: object) -> str:
-    path = Path(str(value))
-    try:
-        return str(path.relative_to(REPO_ROOT))
-    except ValueError:
-        return str(path)
+    return display_path(Path(str(value)))
 
 
 def _candidate_rows(result: dict[str, Any]) -> list[dict[str, Any]]:

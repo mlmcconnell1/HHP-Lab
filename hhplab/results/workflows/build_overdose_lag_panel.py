@@ -15,20 +15,22 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
-from hhplab.results.workflows._paths import REPO_ROOT, write_result_parquet
+from hhplab.results.workflows._paths import DATA_ROOT, OUTPUTS_ROOT, REPO_ROOT, write_result_parquet
 
 ROOT = REPO_ROOT
-OUT = ROOT / "outputs" / "overdose_lag"
+OUT = OUTPUTS_ROOT / "overdose_lag"
 
-TOP50_PANEL = ROOT / "outputs" / "top50_msa_longitudinal_2010_2025.parquet"
+TOP50_PANEL = OUTPUTS_ROOT / "top50_msa_longitudinal_2010_2025.parquet"
 RANK51_150_PANEL = (
-    ROOT
-    / "outputs"
+    OUTPUTS_ROOT
     / "msa_rank51_150_replication"
     / "panel__msa_rank51_150__Y2015-2025@Mcensusmsa2023.parquet"
 )
 CDC_MSA = (
-    ROOT / "data" / "curated" / "cdc" / "cdc_overdose__msa__Y2020-2025@Mcensusmsa2023xC2023.parquet"
+    DATA_ROOT
+    / "curated"
+    / "cdc"
+    / "cdc_overdose__msa__Y2020-2025@Mcensusmsa2023xC2023.parquet"
 )
 # Built by the `hhplab aggregate coc-measure` loop documented in
 # devdocs/overdose_homelessness_lag_screen.md (era-matched boundaries:
