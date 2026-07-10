@@ -46,8 +46,6 @@ EVICTION_DOWNLOAD_URL = (
     "estimating-eviction-prevalance-across-us/county_eviction_estimates_2000_2018.csv"
 )
 EVICTION_END_YEAR = 2018
-HISTORICAL_TOP50_PANEL = REPO_ROOT / "outputs" / "top50_msa_longitudinal_2010_2025.parquet"
-HISTORY_END_YEAR = 2014
 
 
 @dataclass(frozen=True)
@@ -155,29 +153,9 @@ def add_timing_columns(levels: pd.DataFrame) -> pd.DataFrame:
     return levels
 
 
-def load_eviction_base_panel(history_path: Path = HISTORICAL_TOP50_PANEL) -> pd.DataFrame:
-    base = load_pooled_base_panel()
-    if not history_path.exists():
-        raise FileNotFoundError(
-            f"Eviction timing history is missing: {history_path}. Restore the top-50 "
-            "longitudinal report artifact so lagged changes include 2014 history."
-        )
-    history = pd.read_parquet(history_path)
-    history = history.loc[history["year"] <= HISTORY_END_YEAR].copy()
-    history["msa_id"] = _as_msa_id(history["msa_id"])
-    history["cohort"] = "top50"
-    history["primary_state"] = (
-        history["msa_name"].str.rsplit(",", n=1).str[-1].str.strip().str.split("-").str[0]
-    )
-    columns = [column for column in base.columns if column in history.columns]
-    missing = sorted(set(base.columns) - set(columns))
-    if missing:
-        raise ValueError(f"Historical top-50 eviction base is missing columns {missing}.")
-    return (
-        pd.concat([history[columns], base], ignore_index=True)
-        .sort_values(["msa_id", "year"])
-        .reset_index(drop=True)
-    )
+def load_eviction_base_panel() -> pd.DataFrame:
+    """Use the canonical 2015-2025 panel; valid lag models begin in 2017."""
+    return load_pooled_base_panel()
 
 
 def build_levels_panel() -> pd.DataFrame:

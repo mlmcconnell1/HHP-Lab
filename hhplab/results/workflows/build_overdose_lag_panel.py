@@ -12,6 +12,8 @@ outlier year).
 
 from __future__ import annotations
 
+import glob
+
 import numpy as np
 import pandas as pd
 
@@ -29,8 +31,10 @@ CDC_MSA = (
 # Built by the `hhplab aggregate coc-measure` loop documented in
 # devdocs/overdose_homelessness_lag_screen.md (era-matched boundaries:
 # B2020 for 2020, B2024 for 2022-2025; county vintage 2023 for CT planning
-# region coverage), then concatenated across years.
-HIC_BY_CATEGORY = REPO_ROOT / "outputs" / "overdose_lag" / "hic_by_category_pooled.parquet"
+# region coverage). This workflow pools those per-year artifacts directly.
+HIC_BY_CATEGORY_GLOB = str(
+    REPO_ROOT / "outputs/overdose_lag/hic_by_category/panel__msa-rollup-hic__*.parquet"
+)
 
 HIC_BED_COLUMNS = [
     "hic_es_year_round_beds",
@@ -121,12 +125,15 @@ def add_diffs(levels: pd.DataFrame) -> pd.DataFrame:
 
 
 def merge_hic_categories(levels: pd.DataFrame) -> pd.DataFrame:
-    """Attach per-1000 HIC bed-category rates. Requires HIC_BY_CATEGORY to
-    already exist (see the `hhplab aggregate coc-measure` loop documented in
-    devdocs/overdose_homelessness_lag_screen.md)."""
-    if not HIC_BY_CATEGORY.exists():
-        return levels
-    hic = pd.read_parquet(HIC_BY_CATEGORY)
+    """Attach rates by pooling the tracked per-year HIC rollup outputs."""
+    files = sorted(glob.glob(HIC_BY_CATEGORY_GLOB))
+    if not files:
+        raise FileNotFoundError(
+            f"No HIC MSA rollups matched {HIC_BY_CATEGORY_GLOB}. Build the required years "
+            "with `uv run hhplab aggregate coc-measure --help`; the workflow pools the "
+            "resulting per-year artifacts automatically."
+        )
+    hic = pd.concat([pd.read_parquet(path) for path in files], ignore_index=True)
     merged = levels.merge(
         hic[["msa_id", "year", "coc_population_coverage_ratio"] + HIC_BED_COLUMNS],
         on=["msa_id", "year"],

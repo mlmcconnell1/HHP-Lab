@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import numpy as np
 import pandas as pd
 import pytest
 
@@ -52,3 +53,44 @@ def test_add_primary_state_rejects_missing_mapping() -> None:
 
     with pytest.raises(ValueError, match="missing msa_id"):
         analysis.add_primary_state(frame, reference)
+
+
+def test_build_longdiff_inputs_uses_canonical_panel_and_hic_rollups(
+    monkeypatch: pytest.MonkeyPatch, tmp_path
+) -> None:
+    base = pd.DataFrame(
+        {
+            "msa_id": ["10000", "10000", "20000", "20000"],
+            "msa_name": ["Alpha, AA", "Alpha, AA", "Beta, BB", "Beta, BB"],
+            "year": [2015, 2025, 2015, 2025],
+            "cohort": ["top50"] * 4,
+            "population": [1000, 1100, 2000, 2200],
+            "pit_sheltered": [10, 22, 40, 44],
+            "log_unshelt_rate": [0.0, 0.2, 0.1, 0.4],
+        }
+    )
+    sanctuary_path = tmp_path / "sanctuary.parquet"
+    pd.DataFrame(
+        {"msa_id": ["10000", "20000"], "doj_sanctuary_msa": [1, 0]}
+    ).to_parquet(sanctuary_path, index=False)
+    hic_path = tmp_path / "panel__msa-rollup-hic__Y2015-2025.parquet"
+    pd.DataFrame(
+        {
+            "msa_id": ["10000", "10000", "20000", "20000"],
+            "year": [2015, 2025, 2015, 2025],
+            "hic_total_beds": [20, 44, 80, 88],
+        }
+    ).to_parquet(hic_path, index=False)
+    monkeypatch.setattr(analysis, "load_pooled_base_panel", lambda: base)
+    monkeypatch.setattr(analysis, "SANCTUARY_INPUT", sanctuary_path)
+    monkeypatch.setattr(analysis, "HIC_ROLLUP_GLOB", str(tmp_path / "panel__*.parquet"))
+
+    homelessness, beds, sources = analysis.build_longdiff_inputs()
+
+    assert homelessness.set_index("msa_id").loc[
+        "10000", "d_log_unshelt_rate_15_25"
+    ] == pytest.approx(0.2)
+    assert beds.set_index("msa_id").loc["10000", "d_log_beds_15_25"] == pytest.approx(
+        np.log(2.0)
+    )
+    assert str(hic_path) in sources

@@ -11,8 +11,30 @@ import pytest
 
 from hhplab.config import load_config
 from hhplab.provenance import read_provenance
+from hhplab.results.workflows import build_overdose_lag_panel
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
+
+
+def test_overdose_hic_categories_pool_per_year_rollups(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    levels = pd.DataFrame({"msa_id": ["10000"], "year": [2025], "population": [1000]})
+    rollup = tmp_path / "panel__msa-rollup-hic__Y2025-2025.parquet"
+    row = {
+        "msa_id": "10000",
+        "year": 2025,
+        "coc_population_coverage_ratio": 1.0,
+        **{column: 10 for column in build_overdose_lag_panel.HIC_BED_COLUMNS},
+    }
+    pd.DataFrame([row]).to_parquet(rollup, index=False)
+    monkeypatch.setattr(
+        build_overdose_lag_panel, "HIC_BY_CATEGORY_GLOB", str(tmp_path / "panel__*.parquet")
+    )
+
+    result = build_overdose_lag_panel.merge_hic_categories(levels)
+
+    assert result.loc[0, "psh_per_1000"] == pytest.approx(10.0)
 
 WORKFLOW_PATH_CASES = [
     (

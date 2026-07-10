@@ -2,21 +2,28 @@
 
 from __future__ import annotations
 
+import glob
 import json
 from dataclasses import dataclass
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 import statsmodels.api as sm
 
-from hhplab.results.workflows._paths import OUTPUTS_ROOT, REPO_ROOT, write_result_parquet
+from hhplab.results.workflows._paths import DATA_ROOT, OUTPUTS_ROOT, REPO_ROOT, write_result_parquet
+from hhplab.results.workflows.build_household_size_composition_panel import load_pooled_base_panel
 
-HOMELESSNESS_INPUT = REPO_ROOT / "outputs" / "tot_longdiff.parquet"
-BEDS_INPUT = REPO_ROOT / "outputs" / "top50_msa_beds_longdiff.parquet"
 MSA_PANEL_INPUT = (
     OUTPUTS_ROOT
     / "msa_rank51_150_longitudinal_2015_2025_source_top150"
     / "panel__msa__Y2015-2025@Mcensusmsa2023.parquet"
+)
+HIC_ROLLUP_GLOB = str(
+    REPO_ROOT / "outputs/overdose_lag/hic_by_category/panel__msa-rollup-hic__*.parquet"
+)
+SANCTUARY_INPUT = (
+    DATA_ROOT / "curated/sanctuary/sanctuary_msa_panel__D20250805xMcensus_msa_2023.parquet"
 )
 OUT = OUTPUTS_ROOT / "sanctuary_longdiff_robustness"
 RESULTS_PARQUET = OUT / "sanctuary_longdiff_robustness_regressions.parquet"
@@ -36,6 +43,57 @@ OUTCOMES = (
     OutcomeSpec("beds_growth", "d_log_beds_15_25", "beds"),
 )
 SPECIFICATIONS = ("hc1", "state_clustered", "exclude_california_hc1")
+LONGDIFF_YEARS = (2015, 2025)
+
+
+def _safe_log(values: pd.Series) -> pd.Series:
+    numeric = pd.to_numeric(values, errors="coerce").astype("float64")
+    return pd.Series(np.log(numeric.where(numeric > 0)), index=values.index)
+
+
+def build_longdiff_inputs() -> tuple[pd.DataFrame, pd.DataFrame, list[str]]:
+    """Build the two report long-difference inputs from reproducible artifacts."""
+    base = load_pooled_base_panel()
+    base = base.loc[
+        base["cohort"].eq("top50") & base["year"].isin(LONGDIFF_YEARS)
+    ].copy()
+    sanctuary = load_required(
+        SANCTUARY_INPUT,
+        "Run `uv run hhplab generate sanctuary-msa-panel --json` first.",
+    )[["msa_id", "doj_sanctuary_msa"]].rename(columns={"doj_sanctuary_msa": "sanctuary"})
+    sanctuary["msa_id"] = sanctuary["msa_id"].astype("string").str.zfill(5)
+
+    base["log_shelt_rate"] = _safe_log(base["pit_sheltered"] / base["population"] * 1000)
+    wide = base.pivot(index=["msa_id", "msa_name"], columns="year")
+    homelessness = pd.DataFrame(
+        {
+            "d_log_unshelt_rate_15_25": wide["log_unshelt_rate"][2025]
+            - wide["log_unshelt_rate"][2015],
+            "d_log_shelt_rate_15_25": wide["log_shelt_rate"][2025]
+            - wide["log_shelt_rate"][2015],
+        }
+    ).reset_index().merge(sanctuary, on="msa_id", how="left", validate="one_to_one")
+
+    hic_files = sorted(glob.glob(HIC_ROLLUP_GLOB))
+    if not hic_files:
+        raise FileNotFoundError(
+            f"No HIC MSA rollups matched {HIC_ROLLUP_GLOB}. Build the 2015 and 2025 "
+            "`hhplab aggregate coc-measure` artifacts first."
+        )
+    hic = pd.concat([pd.read_parquet(path) for path in hic_files], ignore_index=True)
+    hic = hic.loc[hic["year"].isin(LONGDIFF_YEARS), ["msa_id", "year", "hic_total_beds"]]
+    hic["msa_id"] = hic["msa_id"].astype("string").str.zfill(5)
+    bed_levels = base[["msa_id", "msa_name", "year", "population"]].merge(
+        hic, on=["msa_id", "year"], how="left", validate="one_to_one"
+    )
+    bed_levels["log_beds_rate"] = _safe_log(
+        bed_levels["hic_total_beds"] / bed_levels["population"] * 1000
+    )
+    bed_wide = bed_levels.pivot(index=["msa_id", "msa_name"], columns="year")
+    beds = pd.DataFrame(
+        {"d_log_beds_15_25": bed_wide["log_beds_rate"][2025] - bed_wide["log_beds_rate"][2015]}
+    ).reset_index().merge(sanctuary, on="msa_id", how="left", validate="one_to_one")
+    return homelessness, beds, [*hic_files, str(SANCTUARY_INPUT), str(MSA_PANEL_INPUT)]
 
 
 def primary_state(msa_name: str) -> str:
@@ -110,10 +168,7 @@ def load_required(path: Path, remediation: str) -> pd.DataFrame:
 
 
 def run() -> dict[str, object]:
-    homelessness = load_required(
-        HOMELESSNESS_INPUT, "Restore the tracked report long-difference artifacts."
-    )
-    beds = load_required(BEDS_INPUT, "Restore the tracked report long-difference artifacts.")
+    homelessness, beds, source_artifacts = build_longdiff_inputs()
     msa_panel = load_required(
         MSA_PANEL_INPUT,
         "Run `uv run hhplab build recipe --recipe "
@@ -133,7 +188,7 @@ def run() -> dict[str, object]:
         RESULTS_PARQUET,
         index=False,
         extra={
-            "source_artifacts": [str(HOMELESSNESS_INPUT), str(BEDS_INPUT), str(MSA_PANEL_INPUT)]
+            "source_artifacts": source_artifacts
         },
     )
     summary = {

@@ -68,21 +68,16 @@ def test_build_levels_panel_aligns_lagged_and_lead_eviction_rate_diffs(
     assert pd.isna(levels.loc[2018, "d_log_eviction_rate_lead1"])
 
 
-def test_eviction_base_adds_pre_2015_top50_history(monkeypatch, tmp_path: Path) -> None:
+def test_eviction_base_uses_canonical_panel_without_untracked_history(monkeypatch) -> None:
     builder = _load_builder()
     base = _base_panel().copy()
     base["cohort"] = "top50"
     base["primary_state"] = "AA"
-    history = base.iloc[[0]].copy()
-    history["year"] = 2014
-    history_path = tmp_path / "top50_history.parquet"
-    history.drop(columns=["cohort", "primary_state"]).to_parquet(history_path, index=False)
     monkeypatch.setattr(builder, "load_pooled_base_panel", lambda: base)
 
-    result = builder.load_eviction_base_panel(history_path)
+    result = builder.load_eviction_base_panel()
 
-    assert result["year"].tolist() == [2014, 2015, 2016, 2017, 2018]
-    assert result.loc[result["year"] == 2014, "cohort"].item() == "top50"
+    pd.testing.assert_frame_equal(result, base)
 
 
 def test_model_specs_cover_lag_same_year_lead_and_reverse_directions() -> None:
