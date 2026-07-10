@@ -14,9 +14,13 @@ Eviction Lab national coverage ends in 2018.
 | Timing specification | Year FE p | Region x year p | State x year p |
 | --- | ---: | ---: | ---: |
 | Same year | 0.028 | 0.108 | 0.910 |
-| Lag 1 channel | 0.097 | 0.229 | 0.869 |
+| Lag 1 channel | 0.119 | 0.327 | 0.695 |
 | Lead 1 placebo | 0.299 | 0.373 | 0.588 |
 | Reverse causality | 0.254 | 0.348 | 0.618 |
+
+The reproducible input begins in 2015; an earlier run included unversioned
+2010--2014 top-50 history and reported 324 lagged observations. Removing that
+history leaves 274 lagged observations and does not change the null conclusion.
 
 The only conventional year-FE signal is the descriptive same-year model. It
 weakens monotonically and becomes null under state-by-year fixed effects.

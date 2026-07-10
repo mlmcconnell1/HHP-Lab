@@ -8,6 +8,10 @@ import numpy as np
 import pandas as pd
 import statsmodels.formula.api as smf
 
+from hhplab.results.workflows.analyze_sanctuary_longdiff_robustness import (
+    build_longdiff_inputs,
+)
+
 OUT = "outputs"
 
 # ---------- 1. Capacity: beds vs sheltered PIT, 2024 cross-section ----------
@@ -49,7 +53,7 @@ for t in ["d_log_acs1_rent", "d_log_acs1_rent_lag1", "d_log_acs1_rent_lead1"]:
 
 # ---------- 6. Sanctuary long-diff margins (expect unshelt ~0 p~1.0; shelt +0.53; beds +0.54) ----------
 ld = pd.read_parquet(f"{OUT}/tot_longdiff.parquet")
-bl = pd.read_parquet(f"{OUT}/top50_msa_beds_longdiff.parquet")
+_, bl, _ = build_longdiff_inputs()
 for name, frame, dep in [("unsheltered", ld, "d_log_unshelt_rate_15_25"),
                          ("sheltered", ld, "d_log_shelt_rate_15_25"),
                          ("beds", bl, "d_log_beds_15_25")]:

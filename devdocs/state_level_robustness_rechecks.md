@@ -30,15 +30,22 @@ silently drop every single-MSA state as a zero-residual passenger observation
 | --- | ---: | ---: | ---: |
 | Unsheltered growth | b=-0.016, p=0.932 | p=0.938 | b=-0.057, p=0.805 |
 | Sheltered growth | b=+0.512, p<0.0001 | p<0.0001 | **b=+0.395, p=0.0001** |
-| Beds growth | b=+0.526, p<0.0001 | p<0.0001 | **b=+0.398, p=0.0001** |
+| All-program beds growth | b=+0.429, p<0.0001 | p<0.0001 | **b=+0.319, p=0.0003** |
+
+The bed row uses `hic_total_beds`, the current package-wide HIC construct:
+emergency shelter, transitional housing, safe haven, rapid rehousing,
+permanent supportive housing, and other permanent housing. It supersedes an
+earlier report artifact based on shelter-only year-round beds; the construct
+change lowers the full-sample estimate from 0.526 to 0.429 but does not change
+the conclusion.
 
 **Result: reassuring.** State-clustering SE (which properly accounts for
 sanctuary status being correlated within state) barely moves the p-values --
 the sheltered/beds effect was never a borderline result, so the wider SE
 doesn't threaten it. More importantly, **excluding California entirely --
 removing the single state that could most plausibly be driving this on its
-own -- shrinks the effect by about 22-24% (0.51->0.40, 0.53->0.40) but it
-stays highly significant (p=0.0001) on the remaining 43 MSAs.** This is not
+own -- shrinks sheltered growth from 0.51 to 0.40 and all-program bed growth
+from 0.43 to 0.32, but both stay highly significant on the remaining 43 MSAs.** This is not
 purely a California story. Unsheltered stays null throughout, as originally
 found.
 
@@ -164,7 +171,8 @@ that turned out to be the more decisive test.
 
 Most checks remain ad hoc, not saved as tracked parquet outputs except where noted -- these
 were direct `statsmodels`/`regress_panel` comparisons against existing
-panels (`outputs/tot_longdiff.parquet`, `outputs/top50_msa_beds_longdiff.parquet`,
+panels (`outputs/tot_longdiff.parquet`; the beds long difference is rebuilt from
+the current HIC category rollups by the tracked sanctuary workflow,
 pooled FD panel built inline from `outputs/top50_msa_longitudinal_2010_2025.parquet`
 + `outputs/msa_rank51_150_replication/fd__msa_rank51_150__Y2015-2025.parquet`,
 `outputs/overdose_lag/spec_{b,d}_psh_stateyear_fe.parquet` (saved),

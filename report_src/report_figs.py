@@ -8,6 +8,10 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
+from hhplab.results.workflows.analyze_sanctuary_longdiff_robustness import (
+    build_longdiff_inputs,
+)
+
 OUT = "outputs"
 FIGDIR = os.path.join(OUT, "report_src", "figs")
 os.makedirs(FIGDIR, exist_ok=True)
@@ -173,11 +177,11 @@ fig.tight_layout(); fig.savefig(f"{FIGDIR}/fig4_laglead.svg"); plt.close(fig)
 print("fig4 n =", int(mll.nobs))
 
 # ---------- Figure 5: sanctuary margins coefficient plot ----------
-bl = pd.read_parquet(f"{OUT}/top50_msa_beds_longdiff.parquet")
+_, bl, _ = build_longdiff_inputs()
 specs = [
     ("Unsheltered growth", ld, "d_log_unshelt_rate_15_25"),
     ("Sheltered growth", ld, "d_log_shelt_rate_15_25"),
-    ("Shelter-bed growth", bl, "d_log_beds_15_25"),
+    ("All-program bed growth", bl, "d_log_beds_15_25"),
 ]
 fig, ax = plt.subplots(figsize=(6.2, 2.9))
 for i, (label, frame, dep) in enumerate(specs):
