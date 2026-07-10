@@ -186,3 +186,9 @@ The sanctuary long-difference checks in section 1 are now tracked by
 `hhplab build result sanctuary-longdiff-robustness --json`. The output
 contains the HC1 baseline, state-clustered standard errors, and
 leave-California-out estimates for all three outcomes.
+
+The PSH-to-overdose lag checks in section 3 are now tracked by
+`scripts/analyze_overdose_psh_state_year_robustness.py` and
+`hhplab build result overdose-psh-state-year-robustness --json`. The workflow
+builds the overdose/HIC panel and writes the year-FE and state-by-year-FE
+comparisons with their inference settings recorded explicitly.

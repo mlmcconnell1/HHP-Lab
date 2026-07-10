@@ -14,6 +14,7 @@ SCRIPTS_DIR = REPO_ROOT / "scripts"
 WRAPPER_CASES = [
     "analyze_core_rent_shock_state_year_fe",
     "analyze_rent_growth_r2_decomposition",
+    "analyze_overdose_psh_state_year_robustness",
     "analyze_sanctuary_longdiff_robustness",
     "analyze_composition_rent_population_robustness",
     "analyze_noncompositional_rent_population_robustness",

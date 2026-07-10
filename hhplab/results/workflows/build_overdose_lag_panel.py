@@ -16,27 +16,21 @@ import numpy as np
 import pandas as pd
 
 from hhplab.results.workflows._paths import DATA_ROOT, OUTPUTS_ROOT, REPO_ROOT, write_result_parquet
+from hhplab.results.workflows.build_household_size_composition_panel import (
+    load_pooled_base_panel as load_shared_pooled_base_panel,
+)
 
 ROOT = REPO_ROOT
 OUT = OUTPUTS_ROOT / "overdose_lag"
 
-TOP50_PANEL = OUTPUTS_ROOT / "top50_msa_longitudinal_2010_2025.parquet"
-RANK51_150_PANEL = (
-    OUTPUTS_ROOT
-    / "msa_rank51_150_replication"
-    / "panel__msa_rank51_150__Y2015-2025@Mcensusmsa2023.parquet"
-)
 CDC_MSA = (
-    DATA_ROOT
-    / "curated"
-    / "cdc"
-    / "cdc_overdose__msa__Y2020-2025@Mcensusmsa2023xC2023.parquet"
+    DATA_ROOT / "curated" / "cdc" / "cdc_overdose__msa__Y2020-2025@Mcensusmsa2023xC2023.parquet"
 )
 # Built by the `hhplab aggregate coc-measure` loop documented in
 # devdocs/overdose_homelessness_lag_screen.md (era-matched boundaries:
 # B2020 for 2020, B2024 for 2022-2025; county vintage 2023 for CT planning
 # region coverage), then concatenated across years.
-HIC_BY_CATEGORY = OUT / "hic_by_category_pooled.parquet"
+HIC_BY_CATEGORY = REPO_ROOT / "outputs" / "overdose_lag" / "hic_by_category_pooled.parquet"
 
 HIC_BED_COLUMNS = [
     "hic_es_year_round_beds",
@@ -69,7 +63,6 @@ CORE_COLUMNS = [
     "msa_name",
     "year",
     "population",
-    "sanctuary",
     "pit_unsheltered",
     "pit_sheltered",
     "pit_total",
@@ -84,16 +77,9 @@ CORE_COLUMNS = [
 
 
 def load_pooled_base_panel() -> pd.DataFrame:
-    top50 = pd.read_parquet(TOP50_PANEL)[CORE_COLUMNS].copy()
-    top50["cohort"] = "top50"
-    rank51_150 = pd.read_parquet(RANK51_150_PANEL)[CORE_COLUMNS].copy()
-    rank51_150["cohort"] = "rank51_150"
-    overlap = set(top50.msa_id) & set(rank51_150.msa_id)
-    if overlap:
-        raise ValueError(f"Unexpected msa_id overlap between cohorts: {overlap}")
-    pooled = pd.concat([top50, rank51_150], ignore_index=True)
+    pooled = load_shared_pooled_base_panel()
     pooled = pooled[~pooled.year.isin(EXCLUDED_YEARS)].sort_values(["msa_id", "year"])
-    return pooled.reset_index(drop=True)
+    return pooled[[*CORE_COLUMNS, "cohort"]].reset_index(drop=True)
 
 
 def merge_overdose(pooled: pd.DataFrame) -> pd.DataFrame:

@@ -198,6 +198,11 @@ RESULT_WORKFLOWS: dict[str, ResultWorkflow] = {
         description="Reproduce sanctuary long-difference state and California robustness checks.",
         modules=("analyze_sanctuary_longdiff_robustness",),
     ),
+    "overdose-psh-state-year-robustness": ResultWorkflow(
+        name="overdose-psh-state-year-robustness",
+        description="Track PSH-to-overdose lag checks under year and state-year FE.",
+        modules=("build_overdose_lag_panel", "analyze_overdose_psh_state_year_robustness"),
+    ),
     "all-documented-results": ResultWorkflow(
         name="all-documented-results",
         description="Run every current package-cataloged result workflow in dependency order.",
@@ -225,6 +230,7 @@ RESULT_WORKFLOWS: dict[str, ResultWorkflow] = {
             "analyze_core_rent_shock_state_year_fe",
             "analyze_rent_growth_r2_decomposition",
             "analyze_sanctuary_longdiff_robustness",
+            "analyze_overdose_psh_state_year_robustness",
             "build_eviction_rate_timing_panel",
             "build_qcew_labor_market_panel",
             "build_bps_valuation_benchmark",
