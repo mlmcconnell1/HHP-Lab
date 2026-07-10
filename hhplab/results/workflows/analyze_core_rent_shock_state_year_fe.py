@@ -6,6 +6,7 @@ import json
 from dataclasses import dataclass
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 import statsmodels.api as sm
 
@@ -21,6 +22,7 @@ OUT = OUTPUTS_ROOT / "core_rent_shock_state_year_fe"
 REGRESSIONS_PARQUET = OUT / "core_rent_shock_state_year_fe_regressions.parquet"
 REGRESSIONS_CSV = OUT / "core_rent_shock_state_year_fe_regressions.csv"
 SUMMARY_JSON = OUT / "core_rent_shock_state_year_fe_summary.json"
+ASYMMETRY_PARQUET = OUT / "core_rent_shock_asymmetry_regressions.parquet"
 
 ANALYSIS_START_YEAR = 2016
 COHORT_REFERENCE_YEAR = 2020
@@ -45,6 +47,8 @@ REGRESSION_SPECS = (
     RegressionSpec(model="rent_shock_year_fe", fixed_effect="year"),
     RegressionSpec(model="rent_shock_state_year_fe", fixed_effect="primary_state_year"),
 )
+ASYMMETRY_COHORTS = ("top50", "rank51_150", "pooled")
+ASYMMETRY_COVERAGE_SAMPLES = ("all", "zori_coverage_80")
 
 DOCUMENTED_BENCHMARKS = {
     "rent_shock_year_fe": {"estimate": 1.921, "std_error": 0.425, "p_value": 0.0001},
@@ -81,6 +85,10 @@ def _normalize_columns(frame: pd.DataFrame) -> pd.DataFrame:
 
 def build_pooled_fd_panel(top150: pd.DataFrame) -> pd.DataFrame:
     top150 = _normalize_columns(top150)
+    top150 = top150.sort_values(["msa_id", "year"])
+    top150["d_log_population"] = top150.groupby("msa_id")["population"].transform(
+        lambda values: np.log(pd.to_numeric(values, errors="coerce")).diff()
+    )
     reference = top150.loc[top150["year"] == COHORT_REFERENCE_YEAR].dropna(subset=["population"])
     if reference["msa_id"].nunique() < TOP50_SIZE:
         raise ValueError(
@@ -157,6 +165,67 @@ def fit_spec(frame: pd.DataFrame, spec: RegressionSpec) -> dict[str, object]:
     }
 
 
+def fit_asymmetry_spec(
+    frame: pd.DataFrame,
+    spec: RegressionSpec,
+    *,
+    cohort: str,
+    coverage_sample: str,
+) -> dict[str, object]:
+    """Estimate separate slopes for positive and negative annual rent changes."""
+    sample = frame if cohort == "pooled" else frame.loc[frame["cohort"] == cohort]
+    if coverage_sample == "zori_coverage_80":
+        sample = sample.loc[sample["zori_coverage_ratio"] >= 0.8]
+    elif coverage_sample != "all":
+        raise ValueError(f"Unsupported coverage sample: {coverage_sample}")
+    required = [
+        "msa_id",
+        "year",
+        "primary_state",
+        "d_log_unsheltered_rate",
+        "d_log_zori",
+        "d_log_population",
+    ]
+    sample = sample.dropna(subset=required).copy()
+    sample["rent_increase"] = sample["d_log_zori"].clip(lower=0)
+    sample["rent_decrease"] = sample["d_log_zori"].clip(upper=0)
+    dummies = pd.get_dummies(
+        _fixed_effect(sample, spec.fixed_effect),
+        prefix=spec.fixed_effect,
+        drop_first=True,
+        dtype=float,
+    )
+    design = sm.add_constant(
+        pd.concat(
+            [sample[["rent_increase", "rent_decrease", "d_log_population"]], dummies],
+            axis=1,
+        ).astype("float64"),
+        has_constant="add",
+    )
+    result = sm.OLS(sample["d_log_unsheltered_rate"].astype("float64"), design).fit(
+        cov_type="cluster", cov_kwds={"groups": sample["msa_id"].astype(str)}
+    )
+    equality_p = float(result.wald_test("rent_increase = rent_decrease", scalar=True).pvalue)
+    return {
+        "model": f"rent_asymmetry_{cohort}_{coverage_sample}_{spec.fixed_effect}",
+        "cohort": cohort,
+        "coverage_sample": coverage_sample,
+        "fixed_effects": spec.fixed_effect,
+        "nobs": int(result.nobs),
+        "clusters": int(sample["msa_id"].nunique()),
+        "rent_decrease_rows": int(sample["d_log_zori"].lt(0).sum()),
+        "rent_decrease_msas": int(sample.loc[sample["d_log_zori"].lt(0), "msa_id"].nunique()),
+        "rent_increase_estimate": float(result.params["rent_increase"]),
+        "rent_increase_std_error": float(result.bse["rent_increase"]),
+        "rent_increase_p_value": float(result.pvalues["rent_increase"]),
+        "rent_decrease_estimate": float(result.params["rent_decrease"]),
+        "rent_decrease_std_error": float(result.bse["rent_decrease"]),
+        "rent_decrease_p_value": float(result.pvalues["rent_decrease"]),
+        "slope_equality_p_value": equality_p,
+        "std_error_type": "clustered:msa_id",
+    }
+
+
 def load_required_parquet(path: Path, build_command: str) -> pd.DataFrame:
     if not path.exists():
         raise FileNotFoundError(
@@ -173,6 +242,19 @@ def run() -> dict[str, object]:
     )
     pooled = build_pooled_fd_panel(top150)
     regressions = pd.DataFrame([fit_spec(pooled, spec) for spec in REGRESSION_SPECS])
+    asymmetry = pd.DataFrame(
+        [
+            fit_asymmetry_spec(
+                pooled,
+                spec,
+                cohort=cohort,
+                coverage_sample=coverage_sample,
+            )
+            for cohort in ASYMMETRY_COHORTS
+            for coverage_sample in ASYMMETRY_COVERAGE_SAMPLES
+            for spec in REGRESSION_SPECS
+        ]
+    )
     complete = pooled.dropna(
         subset=["d_log_unsheltered_rate", "d_log_zori", "msa_id", "year", "primary_state"]
     )
@@ -188,9 +270,11 @@ def run() -> dict[str, object]:
         },
         "all_exact_rounded_reproductions": bool(regressions["exact_rounded_reproduction"].all()),
         "models": json.loads(regressions.to_json(orient="records")),
+        "rent_change_asymmetry": json.loads(asymmetry.to_json(orient="records")),
     }
     OUT.mkdir(parents=True, exist_ok=True)
     write_result_parquet(regressions, REGRESSIONS_PARQUET, index=False)
+    write_result_parquet(asymmetry, ASYMMETRY_PARQUET, index=False)
     regressions.to_csv(REGRESSIONS_CSV, index=False)
     SUMMARY_JSON.write_text(json.dumps(summary, indent=2) + "\n", encoding="utf-8")
     return {
@@ -199,6 +283,7 @@ def run() -> dict[str, object]:
             "regressions_parquet": str(REGRESSIONS_PARQUET),
             "regressions_csv": str(REGRESSIONS_CSV),
             "summary_json": str(SUMMARY_JSON),
+            "asymmetry_parquet": str(ASYMMETRY_PARQUET),
         },
     }
 

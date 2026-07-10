@@ -34,6 +34,7 @@ def _cohort_frame(msas: tuple[tuple[str, str], ...]) -> pd.DataFrame:
                     "population": 1_000_000 - 10_000 * msa_index,
                     "d_log_zori": rent_change,
                     "d_log_unshelt_rate": 1.8 * rent_change + 0.002 * msa_index,
+                    "zori_coverage_ratio": 1.0,
                 }
             )
     return pd.DataFrame(rows)
@@ -51,6 +52,7 @@ def test_build_pooled_fd_panel_normalizes_schema_and_labels_cohorts() -> None:
     assert "d_log_unsheltered_rate" in result.columns
     assert set(result["cohort"]) == {"top50", "rank51_150"}
     assert set(result["primary_state"]) == {"AA", "BB", "CC", "DD"}
+    assert "d_log_population" in result
 
 
 @pytest.mark.parametrize("spec", analysis.REGRESSION_SPECS, ids=lambda spec: spec.model)
@@ -83,3 +85,26 @@ def test_load_required_parquet_gives_actionable_command(tmp_path) -> None:
         analysis.load_required_parquet(
             tmp_path / "missing.parquet", "uv run hhplab build result example --json"
         )
+
+
+@pytest.mark.parametrize("spec", analysis.REGRESSION_SPECS, ids=lambda spec: spec.model)
+def test_fit_asymmetry_spec_reports_both_rent_slopes(spec: analysis.RegressionSpec) -> None:
+    frame = _cohort_frame(MSA_FIXTURES)
+    frame.loc[frame.index[::5], "d_log_zori"] *= -1
+    frame["d_log_unshelt_rate"] = 1.8 * frame["d_log_zori"]
+    original_size = analysis.TOP50_SIZE
+    analysis.TOP50_SIZE = 4
+    try:
+        pooled = analysis.build_pooled_fd_panel(frame)
+    finally:
+        analysis.TOP50_SIZE = original_size
+
+    result = analysis.fit_asymmetry_spec(
+        pooled, spec, cohort="pooled", coverage_sample="all"
+    )
+
+    assert result["rent_decrease_rows"] > 0
+    assert result["rent_decrease_msas"] > 0
+    assert result["rent_increase_estimate"] == pytest.approx(1.8)
+    assert result["rent_decrease_estimate"] == pytest.approx(1.8)
+    assert result["slope_equality_p_value"] > 0.05
