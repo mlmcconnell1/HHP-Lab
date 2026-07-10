@@ -22,21 +22,18 @@ import statsmodels.api as sm
 
 from hhplab.census_regions import census_region
 from hhplab.results.workflows._paths import DATA_ROOT, OUTPUTS_ROOT, REPO_ROOT, write_result_parquet
+from hhplab.results.workflows.build_household_size_composition_panel import (
+    load_pooled_base_panel as load_shared_pooled_base_panel,
+)
 
 ROOT = REPO_ROOT
 OUT = OUTPUTS_ROOT / "irs_migration_pooled"
 
-TOP50_PANEL = OUTPUTS_ROOT / "top50_msa_longitudinal_2010_2025.parquet"
-RANK51_150_PANEL = (
-    OUTPUTS_ROOT
-    / "msa_rank51_150_replication"
-    / "panel__msa_rank51_150__Y2015-2025@Mcensusmsa2023.parquet"
-)
 IRS_COVARIATE_PANEL = (
-    DATA_ROOT
-    / "curated"
-    / "covariates"
-    / "covariate_panel__irs_soi_migration__Y2012-2023.parquet"
+    DATA_ROOT / "curated" / "covariates" / "covariate_panel__irs_soi_migration__Y2012-2023.parquet"
+)
+SANCTUARY_PANEL = (
+    DATA_ROOT / "curated/sanctuary/sanctuary_msa_panel__D20250805xMcensus_msa_2023.parquet"
 )
 
 # PIT years usable given rank-51-150 starts 2015 and IRS (shifted +1) tops
@@ -151,17 +148,15 @@ def _census_region_or_na(state: object) -> object:
 
 
 def load_pooled_base_panel() -> pd.DataFrame:
-    top50 = pd.read_parquet(TOP50_PANEL)[CORE_COLUMNS].copy()
-    top50["cohort"] = "top50"
-    rank51_150 = pd.read_parquet(RANK51_150_PANEL)[CORE_COLUMNS].copy()
-    rank51_150["cohort"] = "rank51_150"
-    overlap = set(top50.msa_id) & set(rank51_150.msa_id)
-    if overlap:
-        raise ValueError(f"Unexpected msa_id overlap between cohorts: {overlap}")
-    pooled = pd.concat([top50, rank51_150], ignore_index=True)
+    pooled = load_shared_pooled_base_panel()
+    sanctuary = pd.read_parquet(SANCTUARY_PANEL, columns=["msa_id", "doj_sanctuary_msa"])
+    sanctuary["msa_id"] = sanctuary["msa_id"].astype("string").str.zfill(5)
+    sanctuary = sanctuary.rename(columns={"doj_sanctuary_msa": "sanctuary"})
+    pooled = pooled.merge(sanctuary, on="msa_id", how="left", validate="many_to_one")
+    pooled["sanctuary"] = pooled["sanctuary"].fillna(0).astype("int64")
     pooled = pooled[pooled.year.isin(PANEL_YEARS)].sort_values(["msa_id", "year"])
     pooled["primary_state"] = pooled["msa_name"].map(primary_state)
-    return pooled.reset_index(drop=True)
+    return pooled[[*CORE_COLUMNS, "cohort", "primary_state"]].reset_index(drop=True)
 
 
 def merge_irs_migration(base: pd.DataFrame) -> pd.DataFrame:

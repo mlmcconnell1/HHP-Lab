@@ -14,6 +14,7 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 import statsmodels.api as sm
 
@@ -22,15 +23,16 @@ from hhplab.results.workflows._paths import DATA_ROOT, OUTPUTS_ROOT, REPO_ROOT, 
 ROOT = REPO_ROOT
 OUT = OUTPUTS_ROOT / "composition_rent_population"
 
-TOP50_PANEL = OUTPUTS_ROOT / "top50_msa_longitudinal_2010_2025.parquet"
-RANK51_150_PANEL = (
+TOP150_PANEL = (
     OUTPUTS_ROOT
-    / "msa_rank51_150_replication"
-    / "panel__msa_rank51_150__Y2015-2025@Mcensusmsa2023.parquet"
+    / "msa_rank51_150_longitudinal_2015_2025_source_top150"
+    / "panel__msa__Y2015-2025@Mcensusmsa2023.parquet"
 )
 ACS1_METRO_GLOB = str(DATA_ROOT / "curated" / "acs" / "acs1_metro__A*@Dcensusmsa2023.parquet")
 
 EXCLUDED_YEARS = {2021}
+COHORT_REFERENCE_YEAR = 2020
+TOP50_SIZE = 50
 HOUSEHOLD_SIZE_COLUMNS = [
     "average_household_size_total",
     "average_household_size_owner_occupied",
@@ -69,26 +71,39 @@ def _primary_state(msa_name: str) -> str:
     return msa_name.rsplit(",", 1)[-1].strip().split("-")[0]
 
 
-def load_pooled_base_panel() -> pd.DataFrame:
-    top50 = pd.read_parquet(TOP50_PANEL)
-    top50 = top50[[column for column in CORE_COLUMNS if column in top50.columns]].copy()
-    top50["cohort"] = "top50"
+def _safe_log(series: pd.Series) -> pd.Series:
+    numeric = pd.to_numeric(series, errors="coerce").astype("float64")
+    return pd.Series(np.log(numeric.where(numeric > 0)), index=series.index)
 
-    rank51_150 = pd.read_parquet(RANK51_150_PANEL)
-    rank51_150 = rank51_150[
-        [column for column in CORE_COLUMNS if column in rank51_150.columns]
-    ].copy()
-    rank51_150["cohort"] = "rank51_150"
 
-    overlap = set(_as_msa_id(top50["msa_id"])) & set(_as_msa_id(rank51_150["msa_id"]))
-    if overlap:
-        raise ValueError(f"Unexpected msa_id overlap between cohorts: {sorted(overlap)[:5]}")
-
-    pooled = pd.concat([top50, rank51_150], ignore_index=True)
+def load_pooled_base_panel(path: Path = TOP150_PANEL) -> pd.DataFrame:
+    pooled = pd.read_parquet(path).copy()
     pooled["msa_id"] = _as_msa_id(pooled["msa_id"])
+    reference = pooled.loc[pooled["year"] == COHORT_REFERENCE_YEAR].dropna(subset=["population"])
+    if reference["msa_id"].nunique() < TOP50_SIZE:
+        raise ValueError(
+            f"Pooled base panel requires at least {TOP50_SIZE} populated MSAs in "
+            f"reference year {COHORT_REFERENCE_YEAR}."
+        )
+    top50_ids = set(reference.nlargest(TOP50_SIZE, "population")["msa_id"])
+    pooled["cohort"] = pooled["msa_id"].map(
+        lambda msa_id: "top50" if msa_id in top50_ids else "rank51_150"
+    )
+    pooled["unshelt_per_1000"] = pooled["pit_unsheltered"] / pooled["population"] * 1000
+    pooled["total_per_1000"] = pooled["pit_total"] / pooled["population"] * 1000
+    pooled["shelt_per_1000"] = pooled["pit_sheltered"] / pooled["population"] * 1000
+    pooled["log_zori"] = _safe_log(pooled["zori"])
+    pooled["log_unshelt_rate"] = _safe_log(pooled["unshelt_per_1000"])
+    pooled["log_total_rate"] = _safe_log(pooled["total_per_1000"])
+    pooled["log_shelt_rate"] = _safe_log(pooled["shelt_per_1000"])
+    pooled["log_pop"] = _safe_log(pooled["population"])
     pooled = pooled[~pooled["year"].isin(EXCLUDED_YEARS)].copy()
     pooled["primary_state"] = pooled["msa_name"].map(_primary_state)
-    return pooled.sort_values(["msa_id", "year"]).reset_index(drop=True)
+    return (
+        pooled[list(CORE_COLUMNS) + ["cohort", "primary_state"]]
+        .sort_values(["msa_id", "year"])
+        .reset_index(drop=True)
+    )
 
 
 def _vintage_from_acs1_path(path: str | Path) -> int:

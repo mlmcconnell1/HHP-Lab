@@ -28,7 +28,6 @@ import statsmodels.api as sm
 
 from hhplab.census_regions import census_region
 from hhplab.covariates.aggregate import aggregate_covariate_source
-from hhplab.covariates.ingest import default_covariate_output_path
 from hhplab.naming import covariate_panel_filename
 from hhplab.results.workflows._paths import DATA_ROOT, OUTPUTS_ROOT, REPO_ROOT, write_result_parquet
 from hhplab.results.workflows.build_household_size_composition_panel import (
@@ -46,6 +45,18 @@ QCEW_PANEL_PATH_ENV = "HHPLAB_QCEW_PANEL_PATH"
 QCEW_CURATED_PATH_ENV = "HHPLAB_QCEW_CURATED_PATH"
 QCEW_DOWNLOAD_URL_TEMPLATE = "https://data.bls.gov/cew/data/api/{year}/a/industry/10.csv"
 QCEW_MIN_COVERAGE_RATIO = 1.0
+QCEW_PANEL_PATH = (
+    DATA_ROOT
+    / "curated"
+    / "covariates"
+    / covariate_panel_filename(QCEW_SOURCE_ID, QCEW_START_YEAR, QCEW_END_YEAR)
+)
+QCEW_CURATED_PATH = (
+    DATA_ROOT
+    / "curated"
+    / "covariates"
+    / f"covariate__qcew__Y{QCEW_START_YEAR}-{QCEW_END_YEAR}.parquet"
+)
 
 CPI_U_PATH = DATA_ROOT / "curated" / "cpi" / "cpi_u__Aall.parquet"
 
@@ -85,24 +96,12 @@ def _safe_log(values: pd.Series) -> pd.Series:
 
 def ensure_qcew_msa_panel(years: list[int]) -> Path:
     panel_override = os.environ.get(QCEW_PANEL_PATH_ENV)
-    panel_path = (
-        Path(panel_override)
-        if panel_override
-        else REPO_ROOT
-        / "data"
-        / "curated"
-        / "covariates"
-        / covariate_panel_filename(QCEW_SOURCE_ID, min(years), max(years))
-    )
+    panel_path = Path(panel_override) if panel_override else QCEW_PANEL_PATH
     if panel_path.exists():
         return panel_path
 
     curated_override = os.environ.get(QCEW_CURATED_PATH_ENV)
-    curated_path = (
-        Path(curated_override)
-        if curated_override
-        else default_covariate_output_path(QCEW_SOURCE_ID)
-    )
+    curated_path = Path(curated_override) if curated_override else QCEW_CURATED_PATH
     if not curated_path.exists():
         sample_url = QCEW_DOWNLOAD_URL_TEMPLATE.format(year=max(years))
         raise FileNotFoundError(

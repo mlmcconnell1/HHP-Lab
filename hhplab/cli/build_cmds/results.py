@@ -188,6 +188,11 @@ RESULT_WORKFLOWS: dict[str, ResultWorkflow] = {
         description="Reproduce the pooled top-150 core rent-shock fixed-effects check.",
         modules=("analyze_core_rent_shock_state_year_fe",),
     ),
+    "rent-growth-r2-decomposition": ResultWorkflow(
+        name="rent-growth-r2-decomposition",
+        description="Decompose rent-growth R-squared across all tracked covariate channels.",
+        modules=("analyze_rent_growth_r2_decomposition",),
+    ),
     "all-documented-results": ResultWorkflow(
         name="all-documented-results",
         description="Run every current package-cataloged result workflow in dependency order.",
@@ -213,6 +218,7 @@ RESULT_WORKFLOWS: dict[str, ResultWorkflow] = {
             "build_noncompositional_rent_population_panel",
             "analyze_noncompositional_rent_population_robustness",
             "analyze_core_rent_shock_state_year_fe",
+            "analyze_rent_growth_r2_decomposition",
             "build_eviction_rate_timing_panel",
             "build_qcew_labor_market_panel",
             "build_bps_valuation_benchmark",

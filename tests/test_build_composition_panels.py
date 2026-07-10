@@ -486,6 +486,37 @@ def _robustness_fixture() -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
+def test_load_pooled_base_panel_derives_ranked_cohorts(tmp_path, monkeypatch) -> None:
+    household = _load_script("build_household_size_composition_panel")
+    rows = []
+    for msa_index in range(4):
+        for year in (2019, 2020):
+            rows.append(
+                {
+                    "msa_id": str(msa_index),
+                    "msa_name": f"Metro {msa_index}, AA",
+                    "year": year,
+                    "population": 1000 - 100 * msa_index,
+                    "pit_total": 20 + msa_index,
+                    "pit_sheltered": 12 + msa_index,
+                    "pit_unsheltered": 8,
+                    "zori": 1000 + 10 * msa_index,
+                }
+            )
+    path = tmp_path / "top150.parquet"
+    pd.DataFrame(rows).to_parquet(path, index=False)
+    monkeypatch.setattr(household, "TOP50_SIZE", 2)
+
+    result = household.load_pooled_base_panel(path)
+
+    assert set(result.loc[result["cohort"] == "top50", "msa_id"]) == {"00000", "00001"}
+    assert set(result.loc[result["cohort"] == "rank51_150", "msa_id"]) == {
+        "00002",
+        "00003",
+    }
+    assert result[["log_zori", "log_unshelt_rate", "log_pop"]].notna().all().all()
+
+
 def test_composition_robustness_runs_state_year_and_levels_fe_specs() -> None:
     robustness = _load_script("analyze_composition_rent_population_robustness")
     frame = _robustness_fixture()
