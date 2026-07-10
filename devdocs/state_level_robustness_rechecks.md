@@ -180,3 +180,9 @@ The core rent-shock check in section 2 is now tracked by
 observations but produced slightly different estimates (plain year FE 1.915;
 state x year FE 1.787, p=0.0102), so the output records the historical
 benchmarks and whether each rounded value reproduces exactly.
+
+The sanctuary long-difference checks in section 1 are now tracked by
+`scripts/analyze_sanctuary_longdiff_robustness.py` and
+`hhplab build result sanctuary-longdiff-robustness --json`. The output
+contains the HC1 baseline, state-clustered standard errors, and
+leave-California-out estimates for all three outcomes.

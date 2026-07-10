@@ -193,6 +193,11 @@ RESULT_WORKFLOWS: dict[str, ResultWorkflow] = {
         description="Decompose rent-growth R-squared across all tracked covariate channels.",
         modules=("analyze_rent_growth_r2_decomposition",),
     ),
+    "sanctuary-longdiff-robustness": ResultWorkflow(
+        name="sanctuary-longdiff-robustness",
+        description="Reproduce sanctuary long-difference state and California robustness checks.",
+        modules=("analyze_sanctuary_longdiff_robustness",),
+    ),
     "all-documented-results": ResultWorkflow(
         name="all-documented-results",
         description="Run every current package-cataloged result workflow in dependency order.",
@@ -219,6 +224,7 @@ RESULT_WORKFLOWS: dict[str, ResultWorkflow] = {
             "analyze_noncompositional_rent_population_robustness",
             "analyze_core_rent_shock_state_year_fe",
             "analyze_rent_growth_r2_decomposition",
+            "analyze_sanctuary_longdiff_robustness",
             "build_eviction_rate_timing_panel",
             "build_qcew_labor_market_panel",
             "build_bps_valuation_benchmark",
