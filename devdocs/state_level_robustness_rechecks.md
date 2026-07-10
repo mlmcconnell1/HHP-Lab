@@ -162,7 +162,7 @@ that turned out to be the more decisive test.
 
 ## Artifacts
 
-Ad hoc, not saved as tracked parquet outputs except where noted -- these
+Most checks remain ad hoc, not saved as tracked parquet outputs except where noted -- these
 were direct `statsmodels`/`regress_panel` comparisons against existing
 panels (`outputs/tot_longdiff.parquet`, `outputs/top50_msa_beds_longdiff.parquet`,
 pooled FD panel built inline from `outputs/top50_msa_longitudinal_2010_2025.parquet`
@@ -172,3 +172,11 @@ pooled FD panel built inline from `outputs/top50_msa_longitudinal_2010_2025.parq
 `primary_state`/`state_year` columns inline per the pattern in
 `scripts/build_vera_hic_pit_longitudinal_pooled.py` if this needs to be
 reproduced.
+
+The core rent-shock check in section 2 is now tracked by
+`scripts/analyze_core_rent_shock_state_year_fe.py` and the
+`hhplab build result core-rent-shock-state-year-fe --json` workflow. A July
+2026 rerun against the current panel artifacts retained the documented 1,090
+observations but produced slightly different estimates (plain year FE 1.915;
+state x year FE 1.787, p=0.0102), so the output records the historical
+benchmarks and whether each rounded value reproduces exactly.
