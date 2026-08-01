@@ -216,100 +216,115 @@ git push                # Push to remote
 
 <!-- end-bv-agent-instructions -->
 
-<!-- archv-agent-instructions-v1 -->
+<!-- goals-agent-instructions-v1 -->
 
 ---
-## Architecture Workflow Integration
 
-  This project uses [arch-viewer](https://github.com/Dicklesworthstone/arch-viewer) (`archv`) as a terminal-first architecture explorer for source repositories. It loads deterministic scaffold data from `.arch/arch.scaffold.jsonl`, overlays AI enrichment from `.arch/
-  arch.enriched.jsonl`, and exposes stable machine-readable outputs for agents.
+## Goals Workflow Integration
 
-  ### Using archv as an AI sidecar
+This project uses goals-rust to preserve functional intent, append-only result
+evidence, and evidence-backed fulfillment assessments across agent sessions.
 
-  `archv` is the architecture-context tool for this repo. Use it when you need to understand:
+`goals-rust` is the command-line provider. Agents should prefer its read-only
+`--robot-*` facade, discovered with `goals-rust --robot-help`; use `--format json`
+or `--format toon` as needed. Authoring and other ordinary commands use `--output
+json`. Both interfaces preserve versioned response envelopes, stable operation
+IDs, errors, and bounded collections.
 
-  - top-level structure
-  - file and package relationships
-  - dependency edges and reverse dependencies
-  - architectural layers
-  - cycles, hotspots, and graph shape
-  - which tracked nodes still need enrichment
+**Scope boundary:** Goals owns durable Goals, positive and negative intent,
+acceptance criteria, native Goal relations, evidence history, applicability, and
+derived fulfillment assessment.
 
-  **Scope boundary:** `archv` helps with repository structure and architecture context. It does not replace source reading, tests, or issue tracking.
+`br` owns work requests, priority, assignment, dependencies, readiness, and closure.
+`elements-rust` owns repository architecture and exact implementation-change
+provenance. Goals must not infer either system's facts from paths, Git state, names,
+or completion labels.
 
-  **CRITICAL: Use ONLY `--robot-*` flags in agent workflows.** Bare `archv` launches an interactive TUI and can block your session.
+Goal evidence may preserve typed `work_provenance` to identify Beads issues whose
+execution produced observations or authored the evidence. This is a
+non-authoritative evidence-to-work association: it never imports Bead status,
+creates a Goal relation, or contributes to fulfillment.
 
-  ### The Workflow: Start With Orientation
+### What goals-rust provides
 
-  **`archv --robot-summary` is the default entry point.** Run it first to get repo stats, major components, top-level directories, and scaffold freshness status.
+`goals-rust` maintains a local SQLite authority under `.goals/` and exposes
+deterministic progressive queries for understanding intended behavior, constraints,
+prior approaches, evidence, relationships, and remaining fulfillment gaps. It keeps
+declared intent, observed evidence, applicability, and derived assessment separate;
+later success never erases an unsuccessful, stale, corrected, invalidated, or
+superseded attempt.
 
-  ```bash
-  archv --robot-summary
-  archv --robot-node file:path/to/file.go
-  archv --robot-graph
-  archv --robot-cycles
-  archv --robot-hotspots
-  archv --robot-layers
-  archv --robot-search "query"
+A typical agent workflow is:
 
-  ### Common archv Commands
+1. Discover the read-only agent surface with `goals-rust --robot-help` and broader
+   provider capabilities with `goals-rust --output json capabilities`.
+2. Orient with `--robot-summary` or task-focused `--robot-search`, then inspect a
+   relevant Goal with `--robot-detail` and `--robot-gaps`.
+3. Review its declared constraints, criteria, evidence ledger, prior approaches,
+   and native relations before proposing or evaluating work.
+4. Derive a current assessment with explicit context using `assess`; add
+   `--persist` only when intentionally updating the rebuildable projection.
+5. When authorized to record results, append canonical evidence with identified
+   producer, exact applicable Element changes, and typed managed-work provenance
+   when available. Use action-specific amendment commands instead of rewriting
+   history.
 
-  # Refresh deterministic architecture facts
-  archv scaffold --repo . --out .arch/arch.scaffold.jsonl
+Treat `.goals/goals.db` as the local authority. `.goals/goals.jsonl` is a canonical
+interchange snapshot only after an explicit export. Do not hand-edit the database,
+copy it without its live WAL state, overwrite interchange data without the required
+explicit flag, or assume that a read command refreshes an external provider.
 
-  # Find records still missing enrichment
-  archv enrich pending --summary
-  archv enrich pending --jsonl
+### Agent command quick reference
 
-  # Prepare context for enrichment work
-  archv enrich request --pending
-  archv enrich request --id file:path/to/file.go
+- Discover robot routes with `goals-rust --robot-help`; discover broader operations
+  and schemas with `goals-rust --output json capabilities`, `schema list`, and
+  `schema show <SCHEMA_ID>`.
+- Orient progressively with `--robot-summary`, `--robot-search <TEXT>`,
+  `--robot-detail <GOAL_ID>`, and `--robot-gaps <GOAL_ID>`. Robot output defaults
+  to JSON and accepts `--format toon`.
+- Inspect intent and history with `intent list`, `criterion list`, `evidence list`,
+  `evidence show`, `query negative-intent`, and `query prior-approaches`.
+- Inspect the native graph with `relation list`, `relation tree`, and `query
+  relations`; Goals relations are not Bead dependencies or arbitrary cross-domain
+  links.
+- Derive fulfillment with `assess <GOAL_ID> --context-json <JSON>`. Assessment is
+  read-only unless `--persist` is explicit, and omitted context remains unknown.
+- Inspect recorded Elements contributions with `query element-changes`; request
+  external observation only with the explicit `--resolve --project-id <PROJECT_ID>`
+  pair or standalone `reference resolve`.
+- Author Goals, intent, criteria, and relations with canonical JSON input and use
+  `--dry-run` where supported before applying a mutation.
+- Append observations with `evidence append`; preserve history with `evidence
+  correct|invalidate|mark-stale|supersede` rather than changing an earlier record.
+- Review interchange with `interchange validate` and dry-run `interchange import`.
+  Export, `import --apply`, and rebuild are explicit writes and never invoke Git.
+- Keep reads bounded with `--limit` and opaque `--continuation` cursors. Branch on
+  `ok`, `operation`, `error.code`, and advertised capabilities, never human prose or
+  the binary version.
 
-  # Add or import enrichment
-  archv enrich upsert --id file:path/to/file.go --summary "..." --layer domain --confidence 0.90
-  archv enrich import --stdin < generated.enriched.jsonl
+<!-- end-goals-agent-instructions -->
 
-  ### Workflow Pattern
+<!-- elr-agent-instructions-v1 -->
 
-  1. Orient: Run archv --robot-summary
-  2. Inspect: Use --robot-node, --robot-graph, --robot-cycles, --robot-hotspots, and --robot-layers
-  3. Refresh facts: If the repo structure changed, regenerate the scaffold with archv scaffold
-  4. Maintain enrichment: Use archv enrich pending, archv enrich request, and archv enrich upsert / archv enrich import
-  5. Verify: Re-run the relevant archv --robot-* commands after updating artifacts
+---
 
-  ### Enrichment Maintenance Requirements
+## Elements Workflow Integration
 
-  If you add a new source file, test file, or package, you MUST update the repo's archv artifacts in the same change.
+`elr` is the installed command alias for `elements-rust`; both names invoke the same architecture engine. Examples below use `elements-rust` for portability.
+Goals owns desired functionality, Elements owns reviewed architecture and structural facts, and Beads owns realization work.
+Use `rg` or repository-native search to select an exact ID, path, or symbol before asking Elements for structure or impact:
 
-  Minimum required workflow:
+```bash
+elements-rust node <ID_OR_PATH>
+elements-rust impact
+elements-rust scaffold --repo .
+```
 
-  # 1. Refresh scaffold facts
-  archv scaffold --repo . --out .arch/arch.scaffold.jsonl
+Task-prose interpretation and cross-provider orientation belong to the agent or Rosetta; Elements answers deterministic structural questions about explicit anchors.
+Rosetta reads Goals, Elements, and Beads without becoming their authority.
+Treat `.elements/elements.scaffold.jsonl` as generated facts and `.elements/elements.registry.jsonl` as persistent identity; never hand-edit either file.
 
-  # 2. Check what still needs enrichment
-  archv enrich pending --summary
-  archv enrich pending --jsonl
-
-  # 3. Add enrichment for the new or changed nodes
-  archv enrich upsert --id file:path/to/new_file.go --summary "..." --layer ... --confidence ...
-  # or generate/import a batch:
-  archv enrich import --stdin < generated.enriched.jsonl
-
-  Agent expectations:
-
-  - If you add a new production file, add enrichment for it.
-  - If you add a new test file or package and the repo tracks enrichment for those nodes, update that enrichment too.
-  - Do not leave newly introduced tracked nodes in a permanently pending enrichment state without noting it.
-  - Commit the updated .arch/ artifacts alongside the code change.
-
-  ### Best Practices
-
-  - Prefer archv output over guessing architecture from filenames or imports alone.
-  - Treat scaffold data as deterministic facts and enrichment as AI-owned semantic overlay.
-  - Use archv enrich pending to detect coverage gaps instead of assuming tracked artifacts are current.
-  - If adjacent enrichment exists, assume archv will overlay it automatically when loading the scaffold.
-
-<!-- end-archv-agent-instructions -->
+<!-- end-elr-agent-instructions -->
 
 ## Landing the Plane (Session Completion)
 
