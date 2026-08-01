@@ -1,0 +1,70 @@
+[layers]
+# Higher layers may depend on lower layers. The quality gate rejects dependencies
+# in the opposite direction unless the exact edge is temporarily allowlisted.
+order = ["contracts", "infrastructure", "domain", "application", "interface"]
+
+[packages]
+"hhplab.cli" = "interface"
+
+"hhplab.panel" = "application"
+"hhplab.recipe" = "application"
+"hhplab.results" = "application"
+"hhplab.viz" = "application"
+
+"hhplab.acs" = "domain"
+"hhplab.bls" = "domain"
+"hhplab.cdc" = "domain"
+"hhplab.census" = "domain"
+"hhplab.covariates" = "domain"
+"hhplab.geo" = "domain"
+"hhplab.hic" = "domain"
+"hhplab.hud" = "domain"
+"hhplab.measures" = "domain"
+"hhplab.medsl" = "domain"
+"hhplab.metro" = "domain"
+"hhplab.msa" = "domain"
+"hhplab.nhgis" = "domain"
+"hhplab.pep" = "domain"
+"hhplab.pit" = "domain"
+"hhplab.prism" = "domain"
+"hhplab.rents" = "domain"
+"hhplab.vera" = "domain"
+"hhplab.xwalks" = "domain"
+
+"hhplab.registry" = "infrastructure"
+
+"hhplab.schema" = "contracts"
+
+[modules]
+"hhplab" = "contracts"
+"hhplab.analysis_geo" = "domain"
+"hhplab.analyze" = "application"
+"hhplab.audit_panels" = "application"
+"hhplab.census_regions" = "contracts"
+"hhplab.config" = "contracts"
+"hhplab.coverage_diagnostics" = "application"
+"hhplab.curated_migrate" = "application"
+"hhplab.curated_policy" = "contracts"
+"hhplab.curated_schema" = "contracts"
+"hhplab.naming" = "contracts"
+"hhplab.paths" = "contracts"
+"hhplab.provenance" = "infrastructure"
+"hhplab.raw_snapshot" = "infrastructure"
+"hhplab.sanctuary" = "domain"
+"hhplab.source_coverage" = "contracts"
+"hhplab.source_registry" = "infrastructure"
+"hhplab.sources" = "contracts"
+"hhplab.status" = "application"
+"hhplab.year_spec" = "contracts"
+
+[exceptions]
+# Exact upward edges present when the policy was introduced. Remove entries as
+# ownership is corrected; new upward dependencies must never be added here merely
+# to make the quality gate pass.
+upward_edges = [
+  "hhplab.curated_schema -> hhplab.acs.variables",
+  "hhplab.curated_schema -> hhplab.acs.variables_acs1",
+  "hhplab.curated_schema -> hhplab.metro.metro_definitions",
+  "hhplab.pep.pep_diagnostics -> hhplab.coverage_diagnostics",
+  "hhplab.rents.zori_diagnostics -> hhplab.coverage_diagnostics",
+]
