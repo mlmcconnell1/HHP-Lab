@@ -47,6 +47,7 @@ order = ["contracts", "infrastructure", "domain", "application", "interface"]
 "hhplab.curated_policy" = "contracts"
 "hhplab.curated_schema" = "application"
 "hhplab.naming" = "contracts"
+"hhplab.naming_covariates" = "contracts"
 "hhplab.paths" = "contracts"
 "hhplab.provenance" = "infrastructure"
 "hhplab.raw_snapshot" = "infrastructure"
@@ -70,7 +71,8 @@ upward_edges = [
 # Exact internal dependencies make ownership changes reviewable. High fan-in is
 # expected here; new responsibilities and dependencies are not.
 "hhplab.paths" = ["hhplab.config"]
-"hhplab.naming" = ["hhplab.paths"]
+"hhplab.naming" = ["hhplab.naming_covariates", "hhplab.paths"]
+"hhplab.naming_covariates" = []
 "hhplab.schema.columns" = []
 "hhplab.metro.metro_definitions" = ["hhplab.msa.msa_definitions"]
 "hhplab.msa.msa_definitions" = []
