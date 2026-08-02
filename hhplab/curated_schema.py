@@ -1,4 +1,10 @@
-"""Schema freshness checks for curated artifacts."""
+"""Coordinate schema-freshness checks for curated artifacts.
+
+This application-level validator consumes source-owned output schemas and
+geography definitions. Canonical column and filename policy remains in
+``hhplab.schema`` and ``hhplab.naming``; this module only matches artifacts,
+compares their physical schemas, and supplies rebuild guidance.
+"""
 
 from __future__ import annotations
 

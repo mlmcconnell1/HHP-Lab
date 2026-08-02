@@ -45,7 +45,7 @@ order = ["contracts", "infrastructure", "domain", "application", "interface"]
 "hhplab.coverage_diagnostics" = "application"
 "hhplab.curated_migrate" = "application"
 "hhplab.curated_policy" = "contracts"
-"hhplab.curated_schema" = "contracts"
+"hhplab.curated_schema" = "application"
 "hhplab.naming" = "contracts"
 "hhplab.paths" = "contracts"
 "hhplab.provenance" = "infrastructure"
@@ -62,9 +62,35 @@ order = ["contracts", "infrastructure", "domain", "application", "interface"]
 # ownership is corrected; new upward dependencies must never be added here merely
 # to make the quality gate pass.
 upward_edges = [
-  "hhplab.curated_schema -> hhplab.acs.variables",
-  "hhplab.curated_schema -> hhplab.acs.variables_acs1",
-  "hhplab.curated_schema -> hhplab.metro.metro_definitions",
   "hhplab.pep.pep_diagnostics -> hhplab.coverage_diagnostics",
   "hhplab.rents.zori_diagnostics -> hhplab.coverage_diagnostics",
+]
+
+[contracts.high_fan_in_modules]
+# Exact internal dependencies make ownership changes reviewable. High fan-in is
+# expected here; new responsibilities and dependencies are not.
+"hhplab.paths" = ["hhplab.config"]
+"hhplab.naming" = ["hhplab.paths"]
+"hhplab.schema.columns" = []
+"hhplab.metro.metro_definitions" = ["hhplab.msa.msa_definitions"]
+"hhplab.msa.msa_definitions" = []
+
+[facades]
+# These package initializers may re-export stable APIs, but implementation must
+# stay in owned submodules. Lazy compatibility hooks are the only functions
+# permitted directly in these files.
+passive_or_reexport_only = [
+  "hhplab",
+  "hhplab.acs",
+  "hhplab.census",
+  "hhplab.cli",
+  "hhplab.covariates",
+  "hhplab.geo",
+  "hhplab.metro",
+  "hhplab.msa",
+  "hhplab.panel",
+  "hhplab.recipe",
+  "hhplab.registry",
+  "hhplab.schema",
+  "hhplab.xwalks",
 ]

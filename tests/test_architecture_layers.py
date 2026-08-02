@@ -23,6 +23,12 @@ LAYER_ORDER = tuple(POLICY["layers"]["order"])
 PACKAGE_LAYERS = POLICY["packages"]
 MODULE_LAYERS = POLICY["modules"]
 ALLOWED_UPWARD_EDGES = frozenset(POLICY["exceptions"]["upward_edges"])
+HIGH_FAN_IN_CONTRACTS = {
+    module: frozenset(dependencies)
+    for module, dependencies in POLICY["contracts"]["high_fan_in_modules"].items()
+}
+PASSIVE_FACADES = frozenset(POLICY["facades"]["passive_or_reexport_only"])
+LAZY_FACADE_HOOKS = frozenset({"__getattr__", "__dir__"})
 
 
 def _module_name(path: Path) -> str:
@@ -91,3 +97,22 @@ def test_no_unreviewed_upward_dependencies() -> None:
                 violations.add(f"{source} -> {target}")
 
     assert violations == ALLOWED_UPWARD_EDGES
+
+
+@pytest.mark.parametrize("module", sorted(HIGH_FAN_IN_CONTRACTS))
+def test_high_fan_in_contract_dependencies_are_narrow(module: str) -> None:
+    path = REPO_ROOT.joinpath(*module.split(".")).with_suffix(".py")
+    assert _imports(path) == HIGH_FAN_IN_CONTRACTS[module]
+
+
+@pytest.mark.parametrize("module", sorted(PASSIVE_FACADES))
+def test_package_facades_do_not_own_implementation(module: str) -> None:
+    path = REPO_ROOT.joinpath(*module.split("."), "__init__.py")
+    tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+    owned_definitions = {
+        node.name
+        for node in tree.body
+        if isinstance(node, (ast.ClassDef, ast.FunctionDef, ast.AsyncFunctionDef))
+        and node.name not in LAZY_FACADE_HOOKS
+    }
+    assert owned_definitions == set()
