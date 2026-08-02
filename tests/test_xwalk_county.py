@@ -347,6 +347,26 @@ class TestCountyCrosswalkWithOverlap:
 
         assert xwalk.empty
 
+    def test_boundary_only_contact_is_not_a_crosswalk_relationship(self):
+        coc_gdf = gpd.GeoDataFrame(
+            {
+                "coc_id": ["COC-001"],
+                "geometry": [box(-105, 39, -104, 40)],
+            },
+            crs="EPSG:4326",
+        )
+        county_gdf = gpd.GeoDataFrame(
+            {
+                "GEOID": ["08001"],
+                "geometry": [box(-104, 39, -103, 40)],
+            },
+            crs="EPSG:4326",
+        )
+
+        xwalk = build_coc_county_crosswalk(coc_gdf, county_gdf, "2024")
+
+        assert xwalk.empty
+
 
 class TestCountyCrosswalkIntegration:
     """Integration tests using real crosswalk files (if available)."""

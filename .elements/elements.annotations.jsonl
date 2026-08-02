@@ -101,7 +101,7 @@
 {"id":"el:file-contracts-py-ekndme2836jz","summary":"Stable shared schema, naming, or policy contract.","ai":{"architectural_layer":"contracts","confidence":0.98}}
 {"id":"el:file-core-py-gdkx1afa6cpr","summary":"Application workflow and orchestration implementation.","ai":{"architectural_layer":"application","confidence":0.98}}
 {"id":"el:file-county-acs1-py-tfm9epccn642","summary":"Source and geography domain implementation.","ai":{"architectural_layer":"domain","confidence":0.98}}
-{"id":"el:file-county-py-x1cya9dnm5p3","summary":"Source and geography domain implementation.","ai":{"architectural_layer":"domain","confidence":0.98}}
+{"id":"el:file-county-py-x1cya9dnm5p3","summary":"Builds positive-area county-to-analysis-geography crosswalk relationships and persists them with provenance.","ai":{"architectural_layer":"domain","confidence":0.99}}
 {"id":"el:file-covariate-findings-py-daff4pwwv05c","summary":"Presentation and command-line entry point.","ai":{"architectural_layer":"interface","confidence":0.98}}
 {"id":"el:file-covariate-findings-py-k4awjcrt1bza","summary":"Presentation and command-line entry point.","ai":{"architectural_layer":"interface","confidence":0.98}}
 {"id":"el:file-covariates-py-ghc7tk2c2fmm","summary":"Presentation and command-line entry point.","ai":{"architectural_layer":"interface","confidence":0.98}}
@@ -308,3 +308,4 @@
 {"id":"el:file-zori-eligibility-py-r8y1qc16a8sh","summary":"Application workflow and orchestration implementation.","ai":{"architectural_layer":"application","confidence":0.98}}
 {"id":"el:file-zori-metro-py-fm6hsss4jr00","summary":"Source and geography domain implementation.","ai":{"architectural_layer":"domain","confidence":0.98}}
 {"id":"el:file-zori-py-peszwwb2kkm3","summary":"Presentation and command-line entry point.","ai":{"architectural_layer":"interface","confidence":0.98}}
+{"id":"el:file-test-xwalk-county-py-hq73csjbkk7y","summary":"Validates county crosswalk construction, degenerate-contact filtering, persistence, and curated artifacts.","ai":{"architectural_layer":"tests","confidence":0.99}}
