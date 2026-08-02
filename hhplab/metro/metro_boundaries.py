@@ -16,7 +16,6 @@ from hhplab.metro.metro_definitions import (
     build_county_membership_df,
     build_definitions_df,
 )
-from hhplab.metro.metro_io import read_metro_county_membership, read_metro_definitions
 from hhplab.metro.metro_validate import validate_metro_boundaries
 from hhplab.provenance import ProvenanceBlock
 
@@ -58,12 +57,14 @@ def _load_expected_artifacts(
     definition_version: str,
     base_dir: Path | str | None = None,
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
+    definitions_path = naming.metro_definitions_path(definition_version, base_dir)
+    membership_path = naming.metro_county_membership_path(definition_version, base_dir)
     try:
-        definitions = read_metro_definitions(definition_version, base_dir)
+        definitions = pd.read_parquet(definitions_path)
     except FileNotFoundError:
         definitions = build_definitions_df()
     try:
-        membership = read_metro_county_membership(definition_version, base_dir)
+        membership = pd.read_parquet(membership_path)
     except FileNotFoundError:
         membership = build_county_membership_df()
     return definitions, membership

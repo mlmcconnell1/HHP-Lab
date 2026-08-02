@@ -31,6 +31,11 @@ from hhplab.covariates.qcew_contract import (
     QCEW_SOURCE_ID,
 )
 from hhplab.covariates.saiz_contract import SAIZ_ESTIMATE_YEAR, SAIZ_SOURCE_ID
+from hhplab.covariates.temperature import (
+    EMERGENCY_SHELTER_ACTIVATION_C,
+    FREEZING_C,
+    derive_prism_temperature_basis,
+)
 from hhplab.geo.ct_planning_regions import (
     CT_LEGACY_COUNTY_VINTAGE,
     CT_PLANNING_REGION_VINTAGE,
@@ -46,8 +51,12 @@ from hhplab.paths import curated_dir
 from hhplab.pep.pep_aggregate import load_pep_county
 from hhplab.provenance import ProvenanceBlock, read_provenance, write_parquet_with_provenance
 
-FREEZING_C = 0.0
-EMERGENCY_SHELTER_ACTIVATION_C = 4.4
+__all__ = [
+    "EMERGENCY_SHELTER_ACTIVATION_C",
+    "FREEZING_C",
+    "derive_prism_temperature_basis",
+]
+
 PRISM_TMIN_SOURCE_ID = "prism_tmin_january"
 STATIC_COVARIATE_SOURCE_YEARS = {
     MPI_SOURCE_ID: MPI_ESTIMATE_YEAR,
@@ -277,21 +286,6 @@ def aggregate_covariate_source(
     )
     write_parquet_with_provenance(result, destination, provenance)
     return destination
-
-
-def derive_prism_temperature_basis(df: pd.DataFrame) -> pd.DataFrame:
-    """Add policy-threshold PRISM tmin basis columns when ``tmin_c`` is present."""
-    if "tmin_c" not in df.columns:
-        return df
-    result = df.copy()
-    tmin = pd.to_numeric(result["tmin_c"], errors="coerce")
-    result["tmin_below_freezing"] = tmin.clip(upper=FREEZING_C)
-    result["tmin_code_blue_band"] = tmin.clip(
-        lower=FREEZING_C,
-        upper=EMERGENCY_SHELTER_ACTIVATION_C,
-    )
-    result["tmin_above_code_blue"] = (tmin - EMERGENCY_SHELTER_ACTIVATION_C).clip(lower=0.0)
-    return result
 
 
 def _apply_source_specific_derived_columns(

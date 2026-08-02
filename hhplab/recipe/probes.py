@@ -461,8 +461,8 @@ def probe_transform_path(
         metro_county_membership_path,
         tract_path,
     )
-    from hhplab.recipe.executor import (
-        ExecutorError,
+    from hhplab.recipe.executor.core import ExecutorError
+    from hhplab.recipe.executor.transforms import (
         _identify_metro_and_base,
         _identify_msa_and_base,
         _resolve_transform_path,

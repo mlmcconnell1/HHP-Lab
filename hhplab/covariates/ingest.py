@@ -68,6 +68,7 @@ from hhplab.covariates.saiz_contract import (
     validate_saiz_source_contract,
     validate_saiz_source_path,
 )
+from hhplab.covariates.temperature import derive_prism_temperature_basis
 from hhplab.metro.metro_definitions import STATE_ABBREV_TO_FIPS
 from hhplab.msa import DEFINITION_VERSION as DEFAULT_MSA_DEFINITION_VERSION
 from hhplab.msa.msa_io import read_msa_definitions
@@ -940,8 +941,6 @@ def normalize_covariate_frame(
         )
     missing_measures = [column for column in spec.measure_columns if column not in rows.columns]
     if spec.source_id == "prism_tmin_january" and "tmin_c" in rows.columns:
-        from hhplab.covariates.aggregate import derive_prism_temperature_basis
-
         rows = derive_prism_temperature_basis(rows)
         missing_measures = [column for column in spec.measure_columns if column not in rows.columns]
     if missing_measures:

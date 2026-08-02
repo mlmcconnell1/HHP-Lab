@@ -2,15 +2,15 @@
 
 import typer
 
-from hhplab.cli import build_cmds as build_commands
-from hhplab.cli import diagnostics as diagnostics_commands
-from hhplab.cli import generate as generate_commands
-from hhplab.cli import ingest as ingest_commands
-from hhplab.cli import list as list_commands
-from hhplab.cli import migrate as migrate_commands
-from hhplab.cli import registry as registry_commands
-from hhplab.cli import show as show_commands
-from hhplab.cli import validate as validate_commands
+import hhplab.cli.build_cmds as build_commands
+import hhplab.cli.diagnostics as diagnostics_commands
+import hhplab.cli.generate as generate_commands
+import hhplab.cli.ingest as ingest_commands
+import hhplab.cli.list as list_commands
+import hhplab.cli.migrate as migrate_commands
+import hhplab.cli.registry as registry_commands
+import hhplab.cli.show as show_commands
+import hhplab.cli.validate as validate_commands
 from hhplab.cli.agents import agents
 from hhplab.cli.aggregate_cli import aggregate_app
 from hhplab.cli.analyze import analyze_app
