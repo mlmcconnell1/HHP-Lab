@@ -25,6 +25,7 @@ from hhplab.covariates.census_bps_contract import (
     CENSUS_BPS_UNIT_COLUMNS,
     CENSUS_BPS_VALUE_COLUMNS,
 )
+from hhplab.covariates.frame_adapters import covariate_frame_adapter
 from hhplab.covariates.irs_soi_contract import (
     IRS_SOI_COUNTY_CURATED_COLUMNS,
     IRS_SOI_OTHER_FLOW_STATE_FIPS,
@@ -68,7 +69,6 @@ from hhplab.covariates.saiz_contract import (
     validate_saiz_source_contract,
     validate_saiz_source_path,
 )
-from hhplab.covariates.temperature import derive_prism_temperature_basis
 from hhplab.metro.metro_definitions import STATE_ABBREV_TO_FIPS
 from hhplab.msa import DEFINITION_VERSION as DEFAULT_MSA_DEFINITION_VERSION
 from hhplab.msa.msa_io import read_msa_definitions
@@ -929,8 +929,8 @@ def normalize_covariate_frame(
     """Normalize provider tabular data to canonical geography/year columns."""
     rows = df.copy()
     rows.columns = [_clean_column(column) for column in rows.columns]
-    if spec.source_id == "eviction_lab_national":
-        rows = _normalize_eviction_lab_national_public_extract(rows)
+    adapter = covariate_frame_adapter(spec.source_id)
+    rows = adapter.prepare_raw(rows)
     rename = _canonical_renames(rows.columns, spec=spec)
     rows = rows.rename(columns=rename)
     missing = [column for column in spec.required_columns if column not in rows.columns]
@@ -939,10 +939,8 @@ def normalize_covariate_frame(
             f"{spec.source_id} raw data is missing required columns {missing}. "
             f"Expected canonical columns or aliases: {COMMON_COLUMN_ALIASES}"
         )
+    rows = adapter.derive_measures(rows)
     missing_measures = [column for column in spec.measure_columns if column not in rows.columns]
-    if spec.source_id == "prism_tmin_january" and "tmin_c" in rows.columns:
-        rows = derive_prism_temperature_basis(rows)
-        missing_measures = [column for column in spec.measure_columns if column not in rows.columns]
     if missing_measures:
         raise ValueError(
             f"{spec.source_id} raw data is missing measure columns {missing_measures}. "
@@ -979,23 +977,6 @@ def normalize_covariate_frame(
     for column in spec.measure_columns:
         result[column] = pd.to_numeric(rows[column], errors="coerce")
     return result.dropna(subset=["geo_id"]).sort_values(["geo_id", "year"]).reset_index(drop=True)
-
-
-def _normalize_eviction_lab_national_public_extract(rows: pd.DataFrame) -> pd.DataFrame:
-    """Map Eviction Lab's public county-estimate extract to this package's schema."""
-    normalized = rows.copy()
-    if "eviction_filings" not in normalized.columns and "filings_estimate" in normalized.columns:
-        normalized["eviction_filings"] = normalized["filings_estimate"]
-    if "eviction_rate" not in normalized.columns and {
-        "filings_estimate",
-        "renting_hh",
-    }.issubset(normalized.columns):
-        filings = pd.to_numeric(normalized["filings_estimate"], errors="coerce")
-        renting_households = pd.to_numeric(normalized["renting_hh"], errors="coerce")
-        normalized["eviction_rate"] = (
-            filings / renting_households.where(renting_households > 0) * 100.0
-        )
-    return normalized
 
 
 SAIZ_NAME_OVERRIDES: dict[str, str] = {

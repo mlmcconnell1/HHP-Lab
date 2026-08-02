@@ -28,6 +28,7 @@ from hhplab.covariates.census_bps_contract import (
     CENSUS_BPS_CLASS_VALUE_COLUMNS,
     CENSUS_BPS_SOURCE_ID,
 )
+from hhplab.covariates.frame_adapters import registered_covariate_frame_adapters
 from hhplab.covariates.ingest import ingest_covariate_source
 from hhplab.covariates.irs_soi_contract import (
     IRS_SOI_COUNTY_MEASURE_COLUMNS,
@@ -97,6 +98,15 @@ EXPECTED_COVARIATE_SOURCES = {
     IRS_SOI_SOURCE_ID: ("county", "inflow_returns"),
     SAIZ_SOURCE_ID: ("msa", "saiz_elasticity"),
 }
+
+EXPECTED_SOURCE_FRAME_ADAPTERS = (
+    "eviction_lab_national",
+    "prism_tmin_january",
+)
+
+
+def test_source_specific_frame_adapters_are_explicit() -> None:
+    assert registered_covariate_frame_adapters() == EXPECTED_SOURCE_FRAME_ADAPTERS
 
 MPI_XLSX_ROW_TRUTH_TABLE = {
     "us_total": {
