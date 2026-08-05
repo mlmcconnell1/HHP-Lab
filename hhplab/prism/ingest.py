@@ -14,7 +14,7 @@ import httpx
 
 from hhplab.raw_snapshot import hash_zip_contents, persist_file_snapshot
 from hhplab.source_registry import check_source_changed, register_source
-from hhplab.sources import PRISM_WEB_SERVICE_TEMPLATE
+from hhplab.source_urls import PRISM_WEB_SERVICE_TEMPLATE
 
 PRISM_TEMPERATURE_VARIABLES: tuple[str, ...] = ("tmin", "tmean", "tmax")
 MIN_PRISM_MONTHLY_YEAR = 1895

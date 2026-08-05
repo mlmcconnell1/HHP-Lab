@@ -26,7 +26,7 @@ from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
-from hhplab.acs.variables import (
+from hhplab.sources.acs.variables import (
     ACS5_COVARIATE_REGISTRY,
     ACS5_EXPANDED_COVARIATE_COLUMNS,
 )

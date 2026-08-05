@@ -9,7 +9,7 @@ population_below_poverty).
 
 Usage
 -----
-    from hhplab.acs.ingest.tract_population import ingest_tract_data
+    from hhplab.sources.acs.ingest.tract_population import ingest_tract_data
 
     path = ingest_tract_data(
         acs_vintage="2019-2023",
@@ -61,12 +61,12 @@ import pandas as pd
 import pyarrow.parquet as pq
 
 import hhplab.naming as naming
-from hhplab.acs.translate import (
+from hhplab.sources.acs.translate import (
     get_source_tract_vintage,
     needs_translation,
     translate_acs_to_target_vintage,
 )
-from hhplab.acs.variables import (
+from hhplab.sources.acs.variables import (
     ACS5_SAE_DENOMINATOR_COLUMNS,
     ACS5_SAE_SUPPORT_COLUMNS,
     ACS5_SAE_SUPPORT_COLUMNS_BY_TABLE,
@@ -91,7 +91,7 @@ from hhplab.provenance import (
 )
 from hhplab.raw_snapshot import write_api_snapshot
 from hhplab.source_registry import check_source_changed, register_source
-from hhplab.sources import CENSUS_API_ACS5
+from hhplab.source_urls import CENSUS_API_ACS5
 
 logger = logging.getLogger(__name__)
 

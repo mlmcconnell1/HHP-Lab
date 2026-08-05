@@ -24,7 +24,7 @@ from hhplab.provenance import PROVENANCE_KEY, ProvenanceBlock
 from hhplab.raw_snapshot import persist_file_snapshot, raw_dir, raw_path
 from hhplab.schema.columns import BLOCK_GEOMETRY_COLUMNS
 from hhplab.source_registry import check_source_changed, register_source
-from hhplab.sources import CENSUS_TIGER_BASE
+from hhplab.source_urls import CENSUS_TIGER_BASE
 
 logger = logging.getLogger(__name__)
 

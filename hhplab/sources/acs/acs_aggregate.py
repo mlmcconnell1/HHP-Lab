@@ -99,7 +99,7 @@ from typing import Literal
 
 import pandas as pd
 
-from hhplab.acs.variables import COUNT_COLUMNS, MEDIAN_COLUMNS, MOE_COLUMNS
+from hhplab.sources.acs.variables import COUNT_COLUMNS, MEDIAN_COLUMNS, MOE_COLUMNS
 from hhplab.geo.ct_planning_regions import CT_STATE_FIPS
 from hhplab.xwalks.apply import apply_crosswalk
 

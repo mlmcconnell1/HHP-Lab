@@ -15,7 +15,7 @@ import warnings
 import numpy as np
 import pandas as pd
 
-from hhplab.acs.sae import (
+from hhplab.sources.acs.sae import (
     CONTRACT_RENT_BINS,
     CONTRACT_RENT_BINS_EARLY,
     HOUSEHOLD_INCOME_BINS,

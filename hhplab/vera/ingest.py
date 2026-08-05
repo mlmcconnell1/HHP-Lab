@@ -14,7 +14,7 @@ from hhplab.paths import raw_root
 from hhplab.provenance import ProvenanceBlock, write_parquet_with_provenance
 from hhplab.schema.columns import VERA_INCARCERATION_COUNTY_MEASURE_COLUMNS
 from hhplab.source_registry import register_source
-from hhplab.sources import (
+from hhplab.source_urls import (
     VERA_INCARCERATION_TRENDS_COUNTY_CSV,
     VERA_INCARCERATION_TRENDS_REPO,
 )

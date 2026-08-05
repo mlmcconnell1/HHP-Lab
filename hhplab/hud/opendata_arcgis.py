@@ -21,7 +21,7 @@ from hhplab.geo import normalize_boundaries, validate_boundaries
 from hhplab.geo.geo_io import curated_boundary_path, write_geoparquet
 from hhplab.raw_snapshot import make_run_id, write_api_snapshot
 from hhplab.source_registry import check_source_changed, register_source
-from hhplab.sources import HUD_ARCGIS_COC_FEATURE_SERVICE, HUD_ARCGIS_COC_SOURCE_REF
+from hhplab.source_urls import HUD_ARCGIS_COC_FEATURE_SERVICE, HUD_ARCGIS_COC_SOURCE_REF
 
 logger = logging.getLogger(__name__)
 

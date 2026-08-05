@@ -8,8 +8,8 @@ from pathlib import Path
 import pandas as pd
 import pyarrow.parquet as pq
 
-from hhplab.acs.variables import ACS5_SAE_SUPPORT_COLUMNS
-from hhplab.acs.variables_acs1 import (
+from hhplab.sources.acs.variables import ACS5_SAE_SUPPORT_COLUMNS
+from hhplab.sources.acs.variables_acs1 import (
     ACS1_SAE_SOURCE_COLUMNS,
     ACS1_UNAVAILABLE_VINTAGES,
 )
@@ -416,7 +416,7 @@ def _check_acs5_tract_schema_contracts(
 
 def _dataset_remediation(ds_id: str, ds, *, years: list[int] | None = None) -> Remediation:
     """Build a remediation hint for a missing dataset."""
-    from hhplab.acs.variables_acs1 import ACS1_UNAVAILABLE_VINTAGES
+    from hhplab.sources.acs.variables_acs1 import ACS1_UNAVAILABLE_VINTAGES
 
     provider = ds.provider
     product = ds.product

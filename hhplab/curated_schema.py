@@ -14,8 +14,8 @@ from pathlib import Path
 
 import pyarrow.parquet as pq
 
-from hhplab.acs.variables import TRACT_OUTPUT_COLUMNS
-from hhplab.acs.variables_acs1 import ACS1_COUNTY_OUTPUT_COLUMNS, ACS1_METRO_OUTPUT_COLUMNS
+from hhplab.sources.acs.variables import TRACT_OUTPUT_COLUMNS
+from hhplab.sources.acs.variables_acs1 import ACS1_COUNTY_OUTPUT_COLUMNS, ACS1_METRO_OUTPUT_COLUMNS
 from hhplab.metro.metro_definitions import (
     CANONICAL_UNIVERSE_DEFINITION_VERSION,
 )

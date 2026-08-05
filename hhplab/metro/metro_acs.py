@@ -11,7 +11,7 @@ import pandas as pd
 
 @lru_cache(maxsize=1)
 def _impl() -> ModuleType:
-    return import_module("hhplab.acs.acs_metro")
+    return import_module("hhplab.sources.acs.acs_metro")
 
 
 def build_metro_tract_crosswalk(
@@ -19,7 +19,7 @@ def build_metro_tract_crosswalk(
     *,
     county_membership_df: pd.DataFrame | None = None,
 ) -> pd.DataFrame:
-    """Delegate to ``hhplab.acs.acs_metro.build_metro_tract_crosswalk``."""
+    """Delegate to ``hhplab.sources.acs.acs_metro.build_metro_tract_crosswalk``."""
     return _impl().build_metro_tract_crosswalk(
         acs_data,
         county_membership_df=county_membership_df,
@@ -33,7 +33,7 @@ def aggregate_acs_to_metro(
     definition_version: str = "glynn_fox_v1",
     county_membership_df: pd.DataFrame | None = None,
 ) -> pd.DataFrame:
-    """Delegate to ``hhplab.acs.acs_metro.aggregate_acs_to_metro``."""
+    """Delegate to ``hhplab.sources.acs.acs_metro.aggregate_acs_to_metro``."""
     return _impl().aggregate_acs_to_metro(
         acs_data,
         weighting=weighting,

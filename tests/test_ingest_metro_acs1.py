@@ -12,13 +12,13 @@ import pandas as pd
 import pytest
 from typer.testing import CliRunner
 
-from hhplab.acs.ingest.metro_acs1 import (
+from hhplab.sources.acs.ingest.metro_acs1 import (
     CBSA_GEO_PARAM,
     _load_metro_targets,
     fetch_acs1_cbsa_data,
     ingest_metro_acs1,
 )
-from hhplab.acs.variables_acs1 import (
+from hhplab.sources.acs.variables_acs1 import (
     ACS1_METRO_OUTPUT_COLUMNS,
     ACS1_UNAVAILABLE_VINTAGES,
     ACS1_VARIABLES_BY_TABLE,
@@ -258,7 +258,7 @@ class TestCbsaToMetroMapping:
     def test_canonical_universe_definition_keeps_cbsa_ids(self, httpx_mock, tmp_path, monkeypatch):
         queue_acs1_group_responses(httpx_mock, SAMPLE_CBSAS[:3], vintage=2023)
         monkeypatch.setattr(
-            "hhplab.acs.ingest.metro_acs1.read_metro_universe",
+            "hhplab.sources.acs.ingest.metro_acs1.read_metro_universe",
             lambda definition_version, base_dir=None: build_canonical_metro_universe_fixture(),
         )
 
@@ -289,7 +289,7 @@ class TestCbsaToMetroMapping:
             }
         )
         monkeypatch.setattr(
-            "hhplab.acs.ingest.metro_acs1.read_metro_subset_membership",
+            "hhplab.sources.acs.ingest.metro_acs1.read_metro_subset_membership",
             lambda **kwargs: subset,
         )
 
@@ -307,7 +307,7 @@ class TestCbsaToMetroMapping:
         assert "B25063" in result.output
         assert "contract_rent_distribution_total" in result.output
 
-    @patch("hhplab.acs.ingest.metro_acs1.ingest_metro_acs1")
+    @patch("hhplab.sources.acs.ingest.metro_acs1.ingest_metro_acs1")
     @patch("pandas.read_parquet")
     def test_cli_json_reports_registry_metadata(self, mock_read_parquet, mock_ingest, tmp_path):
         output_path = tmp_path / "acs1_metro.parquet"

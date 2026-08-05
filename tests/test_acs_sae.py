@@ -7,7 +7,7 @@ import json
 import pandas as pd
 import pytest
 
-from hhplab.acs.sae import (
+from hhplab.sources.acs.sae import (
     ACS1_HYBRID_CONTROL_SELECTION_POLICY_ID,
     ACS1_IMPUTATION_METHOD,
     CONTRACT_RENT_BINS,

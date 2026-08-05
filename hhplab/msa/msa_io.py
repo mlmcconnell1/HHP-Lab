@@ -22,7 +22,7 @@ from hhplab.msa.msa_validate import MSAValidationResult, validate_msa_artifacts
 from hhplab.provenance import ProvenanceBlock, write_parquet_with_provenance
 from hhplab.raw_snapshot import persist_file_snapshot
 from hhplab.source_registry import check_source_changed, register_source
-from hhplab.sources import CENSUS_MSA_DELINEATION_FILE_2023
+from hhplab.source_urls import CENSUS_MSA_DELINEATION_FILE_2023
 
 
 def download_delineation_rows(

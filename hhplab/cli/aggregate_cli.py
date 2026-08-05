@@ -1403,13 +1403,13 @@ def aggregate_acs(
 
     import pandas as pd
 
-    from hhplab.acs.acs_aggregate import (
+    from hhplab.sources.acs.acs_aggregate import (
         _maybe_remap_ct_planning_regions,
         aggregate_to_coc,
         aggregate_to_geo,
     )
-    from hhplab.acs.ingest.tract_population import get_output_path
-    from hhplab.acs.translate import default_tract_vintage_for_acs
+    from hhplab.sources.acs.ingest.tract_population import get_output_path
+    from hhplab.sources.acs.translate import default_tract_vintage_for_acs
     from hhplab.msa.msa_io import read_msa_county_membership
     from hhplab.naming import measures_filename, msa_measures_filename, tract_xwalk_filename
     from hhplab.provenance import ProvenanceBlock, write_parquet_with_provenance

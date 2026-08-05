@@ -8,7 +8,7 @@ import pandas as pd
 import pytest
 from typer.testing import CliRunner
 
-from hhplab.acs.acs_aggregate import (
+from hhplab.sources.acs.acs_aggregate import (
     _available_contract_rent_bins,
     _derive_acs5_covariates,
 )
@@ -333,7 +333,7 @@ def _create_fake_acs_cache(acs_vintage: str, tract_vintage: str | int) -> None:
     """Create a minimal fake ACS cache file so aggregate reaches crosswalk check."""
     import pandas as pd
 
-    from hhplab.acs.ingest.tract_population import get_output_path
+    from hhplab.sources.acs.ingest.tract_population import get_output_path
 
     cache_path = get_output_path(acs_vintage, str(tract_vintage))
     cache_path.parent.mkdir(parents=True, exist_ok=True)
@@ -353,7 +353,7 @@ def _create_fake_acs_cache(acs_vintage: str, tract_vintage: str | int) -> None:
 
 
 def _create_fake_expanded_acs_cache(acs_vintage: str, tract_vintage: str | int) -> None:
-    from hhplab.acs.ingest.tract_population import get_output_path
+    from hhplab.sources.acs.ingest.tract_population import get_output_path
 
     cache_path = get_output_path(acs_vintage, str(tract_vintage))
     cache_path.parent.mkdir(parents=True, exist_ok=True)

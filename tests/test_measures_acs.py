@@ -5,11 +5,11 @@ from __future__ import annotations
 import pandas as pd
 import pytest
 
-from hhplab.acs.acs_aggregate import (
+from hhplab.sources.acs.acs_aggregate import (
     aggregate_to_coc,
     aggregate_to_geo,
 )
-from hhplab.acs.variables import ACS5_COVARIATE_REGISTRY
+from hhplab.sources.acs.variables import ACS5_COVARIATE_REGISTRY
 
 B05001_CITIZENSHIP_COLUMNS = next(
     spec.output_columns
@@ -889,7 +889,7 @@ class TestCtRemapFailurePaths:
         import sys
         import warnings
 
-        from hhplab.acs.acs_aggregate import _maybe_remap_ct_planning_regions
+        from hhplab.sources.acs.acs_aggregate import _maybe_remap_ct_planning_regions
 
         real_import = builtins.__import__
 
@@ -937,7 +937,7 @@ class TestCtRemapFailurePaths:
         """When geometry files are missing, aggregation continues with a warning."""
         import warnings
 
-        from hhplab.acs.acs_aggregate import _maybe_remap_ct_planning_regions
+        from hhplab.sources.acs.acs_aggregate import _maybe_remap_ct_planning_regions
 
         monkeypatch.setattr(
             "hhplab.geo.ct_planning_regions.build_ct_tract_planning_region_map",
@@ -973,7 +973,7 @@ class TestCtRemapFailurePaths:
         """When mapping raises ValueError, aggregation continues with a warning."""
         import warnings
 
-        from hhplab.acs.acs_aggregate import _maybe_remap_ct_planning_regions
+        from hhplab.sources.acs.acs_aggregate import _maybe_remap_ct_planning_regions
 
         monkeypatch.setattr(
             "hhplab.geo.ct_planning_regions.build_ct_tract_planning_region_map",

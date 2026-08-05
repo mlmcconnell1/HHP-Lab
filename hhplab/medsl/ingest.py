@@ -13,7 +13,7 @@ from hhplab.paths import curated_dir, raw_root
 from hhplab.provenance import ProvenanceBlock, write_parquet_with_provenance
 from hhplab.schema.columns import MEDSL_COUNTY_PRESIDENTIAL_OUTPUT_COLUMNS
 from hhplab.source_registry import register_source
-from hhplab.sources import (
+from hhplab.source_urls import (
     MEDSL_COUNTY_PRESIDENTIAL_RETURNS_DATAVERSE_API,
     MEDSL_COUNTY_PRESIDENTIAL_RETURNS_DOI,
 )

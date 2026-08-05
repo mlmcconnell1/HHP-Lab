@@ -11,7 +11,7 @@ order = ["contracts", "infrastructure", "domain", "application", "interface"]
 "hhplab.results" = "application"
 "hhplab.viz" = "application"
 
-"hhplab.acs" = "domain"
+"hhplab.sources.acs" = "domain"
 "hhplab.bls" = "domain"
 "hhplab.cdc" = "domain"
 "hhplab.census" = "domain"
@@ -54,6 +54,7 @@ order = ["contracts", "infrastructure", "domain", "application", "interface"]
 "hhplab.sanctuary" = "domain"
 "hhplab.source_coverage" = "contracts"
 "hhplab.source_registry" = "infrastructure"
+"hhplab.source_urls" = "contracts"
 "hhplab.sources" = "contracts"
 "hhplab.status" = "application"
 "hhplab.year_spec" = "contracts"
@@ -83,7 +84,7 @@ upward_edges = [
 # permitted directly in these files.
 passive_or_reexport_only = [
   "hhplab",
-  "hhplab.acs",
+  "hhplab.sources.acs",
   "hhplab.census",
   "hhplab.cli",
   "hhplab.covariates",

@@ -41,7 +41,7 @@ from hhplab.provenance import ProvenanceBlock, write_parquet_with_provenance
 from hhplab.raw_snapshot import raw_dir as canonical_raw_dir
 from hhplab.schema.columns import PEP_COUNTY_OUTPUT_COLUMNS
 from hhplab.source_registry import check_source_changed, register_source
-from hhplab.sources import CENSUS_PEP_DATASETS_BASE
+from hhplab.source_urls import CENSUS_PEP_DATASETS_BASE
 
 logger = logging.getLogger(__name__)
 

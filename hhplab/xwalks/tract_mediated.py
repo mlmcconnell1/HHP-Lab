@@ -108,7 +108,7 @@ def tract_mediated_paths(
     denominator_vintage: str | int,
 ) -> dict[str, Path]:
     """Resolve all input and output paths for a tract-mediated county crosswalk."""
-    from hhplab.acs.ingest.tract_population import get_output_path as acs_tract_path
+    from hhplab.sources.acs.ingest.tract_population import get_output_path as acs_tract_path
     from hhplab.census.ingest.decennial_tract_population import (
         get_output_path as decennial_tract_path,
     )

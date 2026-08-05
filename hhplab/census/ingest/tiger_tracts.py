@@ -16,7 +16,7 @@ import pandas as pd
 from hhplab.paths import curated_dir
 from hhplab.raw_snapshot import hash_zip_contents, persist_file_snapshot
 from hhplab.source_registry import check_source_changed, register_source
-from hhplab.sources import CENSUS_TIGER_BASE
+from hhplab.source_urls import CENSUS_TIGER_BASE
 
 logger = logging.getLogger(__name__)
 

@@ -8,7 +8,7 @@ coverage/weighting cases.
 import pandas as pd
 import pytest
 
-from hhplab.acs import aggregate_acs_to_metro, build_metro_tract_crosswalk
+from hhplab.sources.acs import aggregate_acs_to_metro, build_metro_tract_crosswalk
 from hhplab.metro.metro_definitions import (
     METRO_COUNT,
     METRO_COUNTY_MEMBERSHIP,

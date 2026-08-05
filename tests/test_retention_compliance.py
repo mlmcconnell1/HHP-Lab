@@ -23,7 +23,7 @@ INGEST_MODULES = [
     "hhplab/census/ingest/tiger_counties.py",
     "hhplab/census/ingest/tract_relationship.py",
     "hhplab/nhgis/ingest.py",
-    "hhplab/acs/ingest/tract_population.py",
+    "hhplab/sources/acs/ingest/tract_population.py",
     "hhplab/rents/weights.py",
 ]
 
@@ -31,7 +31,7 @@ INGEST_MODULES = [
 API_INGEST_MODULES = [
     "hhplab/hud/opendata_arcgis.py",
     "hhplab/hud/exchange_gis.py",
-    "hhplab/acs/ingest/tract_population.py",
+    "hhplab/sources/acs/ingest/tract_population.py",
     "hhplab/rents/weights.py",
 ]
 

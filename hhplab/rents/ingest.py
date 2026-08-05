@@ -43,7 +43,7 @@ from hhplab.provenance import ProvenanceBlock, write_parquet_with_provenance
 from hhplab.raw_snapshot import raw_dir
 from hhplab.schema.columns import ZORI_INGEST_OUTPUT_COLUMNS
 from hhplab.source_registry import check_source_changed, register_source
-from hhplab.sources import ZILLOW_ZORI_COUNTY, ZILLOW_ZORI_ZIP
+from hhplab.source_urls import ZILLOW_ZORI_COUNTY, ZILLOW_ZORI_ZIP
 
 # Pattern for ZORI date columns (YYYY-MM-DD or YYYY-MM)
 _DATE_COL_RE = re.compile(r"^\d{4}-\d{2}(-\d{2})?$")

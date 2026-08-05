@@ -28,7 +28,7 @@ import httpx
 
 from hhplab.paths import raw_root
 from hhplab.source_registry import check_source_changed, register_source
-from hhplab.sources import HUD_USER_PIT_BASE as HUD_USER_PIT_BASE_URL
+from hhplab.source_urls import HUD_USER_PIT_BASE as HUD_USER_PIT_BASE_URL
 
 logger = logging.getLogger(__name__)
 

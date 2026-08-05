@@ -72,7 +72,7 @@ from hhplab.metro.metro_definitions import (
 )
 from hhplab.metro.metro_io import read_metro_subset_membership, read_metro_universe
 from hhplab.provenance import ProvenanceBlock, write_parquet_with_provenance
-from hhplab.sources import BLS_API_REGISTRATION_URL, BLS_API_V2, BLS_LAUS_SOURCE_REF
+from hhplab.source_urls import BLS_API_REGISTRATION_URL, BLS_API_V2, BLS_LAUS_SOURCE_REF
 
 logger = logging.getLogger(__name__)
 

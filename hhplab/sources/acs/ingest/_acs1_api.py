@@ -8,7 +8,7 @@ from dataclasses import dataclass
 import httpx
 import pandas as pd
 
-from hhplab.acs.variables_acs1 import (
+from hhplab.sources.acs.variables_acs1 import (
     ACS1_FIRST_RELIABLE_YEAR,
     ACS1_FLOAT_COLUMNS,
     ACS1_INTEGER_COLUMNS,
@@ -19,7 +19,7 @@ from hhplab.acs.variables_acs1 import (
     acs1_variables_by_table_for_vintage,
 )
 from hhplab.census.api import get_census_api_key, raise_for_census_api_status
-from hhplab.sources import CENSUS_API_ACS1
+from hhplab.source_urls import CENSUS_API_ACS1
 
 logger = logging.getLogger(__name__)
 

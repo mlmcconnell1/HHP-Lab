@@ -26,7 +26,7 @@ from shapely.geometry import shape
 from hhplab.paths import raw_root
 from hhplab.raw_snapshot import make_run_id, write_api_snapshot
 from hhplab.source_registry import check_source_changed, register_source
-from hhplab.sources import (
+from hhplab.source_urls import (
     HUD_ARCGIS_COC_FEATURE_SERVICE,
     HUD_ARCGIS_COC_SOURCE_REF,
     HUD_EXCHANGE_COC_GDB_TEMPLATE,

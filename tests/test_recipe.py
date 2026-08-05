@@ -13,7 +13,7 @@ from pydantic import ValidationError
 from shapely.geometry import Polygon, box
 from typer.testing import CliRunner
 
-from hhplab.acs.sae import CONTRACT_RENT_BINS, HOUSEHOLD_INCOME_BINS
+from hhplab.sources.acs.sae import CONTRACT_RENT_BINS, HOUSEHOLD_INCOME_BINS
 from hhplab.cli.main import app
 from hhplab.geo.ct_planning_regions import CtPlanningRegionCrosswalk
 from hhplab.panel.assemble import _load_coc_areas

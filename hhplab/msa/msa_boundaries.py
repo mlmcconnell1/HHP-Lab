@@ -19,7 +19,7 @@ from hhplab.msa.msa_validate import validate_msa_boundaries
 from hhplab.provenance import ProvenanceBlock
 from hhplab.raw_snapshot import persist_file_snapshot
 from hhplab.source_registry import check_source_changed, register_source
-from hhplab.sources import CENSUS_TIGER_CBSA_TEMPLATE
+from hhplab.source_urls import CENSUS_TIGER_CBSA_TEMPLATE
 
 logger = logging.getLogger(__name__)
 

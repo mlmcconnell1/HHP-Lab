@@ -11,7 +11,7 @@ import httpx
 
 from hhplab.paths import raw_root
 from hhplab.source_registry import check_source_changed, register_source
-from hhplab.sources import HUD_USER_HIC_COUNTS_BY_STATE_TEMPLATE
+from hhplab.source_urls import HUD_USER_HIC_COUNTS_BY_STATE_TEMPLATE
 
 DOWNLOAD_TIMEOUT = 120.0
 MIN_HIC_YEAR = 2007

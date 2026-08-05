@@ -8,7 +8,7 @@ import pandas as pd
 import pytest
 from pandas.errors import PerformanceWarning
 
-from hhplab.acs.translate import (
+from hhplab.sources.acs.translate import (
     TranslationStats,
     default_tract_vintage_for_acs,
     get_source_tract_vintage,
@@ -179,7 +179,7 @@ class TestTranslateTracts2010To2020:
             return pd.read_parquet(rel_path)
 
         monkeypatch.setattr(
-            "hhplab.acs.translate.load_tract_relationship",
+            "hhplab.sources.acs.translate.load_tract_relationship",
             mock_load,
         )
 
@@ -625,7 +625,7 @@ class TestTranslateTracts2010To2020:
     def test_pre_2010_acs_to_2020_target_raises(self):
         """Regression test for coclab-i2fj.5.21: pre-2010 ACS vintages must
         not silently pass when targeting 2020+ geography."""
-        from hhplab.acs.translate import needs_translation
+        from hhplab.sources.acs.translate import needs_translation
 
         with pytest.raises(ValueError, match="not supported"):
             needs_translation("2005-2009", 2023)
@@ -655,7 +655,7 @@ class TestTranslateAcsToTargetVintage:
             return pd.read_parquet(rel_path)
 
         monkeypatch.setattr(
-            "hhplab.acs.translate.load_tract_relationship",
+            "hhplab.sources.acs.translate.load_tract_relationship",
             mock_load,
         )
 
@@ -705,7 +705,7 @@ class TestTranslateAcsToTargetVintage:
             raise TractRelationshipNotFoundError()
 
         monkeypatch.setattr(
-            "hhplab.acs.translate.load_tract_relationship",
+            "hhplab.sources.acs.translate.load_tract_relationship",
             mock_load,
         )
 

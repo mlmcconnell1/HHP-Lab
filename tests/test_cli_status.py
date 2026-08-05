@@ -7,7 +7,7 @@ import pandas as pd
 import pytest
 from typer.testing import CliRunner
 
-from hhplab.acs.variables import TRACT_OUTPUT_COLUMNS
+from hhplab.sources.acs.variables import TRACT_OUTPUT_COLUMNS
 from hhplab.cli.main import app
 
 runner = CliRunner()

@@ -16,8 +16,8 @@ from pathlib import Path
 import pandas as pd
 import pyarrow.parquet as pq
 
-from hhplab.acs.translate import get_source_tract_vintage, needs_translation
-from hhplab.acs.variables import TRACT_OUTPUT_COLUMNS
+from hhplab.sources.acs.translate import get_source_tract_vintage, needs_translation
+from hhplab.sources.acs.variables import TRACT_OUTPUT_COLUMNS
 from hhplab.provenance import read_provenance
 from hhplab.recipe.recipe_schema import (
     CrosswalkTransform,

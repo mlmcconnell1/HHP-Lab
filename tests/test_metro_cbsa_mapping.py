@@ -6,7 +6,7 @@ and ACS1 unemployment variable completeness.
 
 import pytest
 
-from hhplab.acs.variables_acs1 import (
+from hhplab.sources.acs.variables_acs1 import (
     ACS1_FIRST_RELIABLE_YEAR,
     ACS1_METRO_OUTPUT_COLUMNS,
     ACS1_UNEMPLOYMENT_TABLE,

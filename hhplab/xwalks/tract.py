@@ -270,7 +270,7 @@ def load_tract_population_for_weights(
     auto_fetch: bool = False,
 ) -> tuple[pd.DataFrame | None, Path, bool]:
     """Load or optionally fetch ACS tract population used for crosswalk weights."""
-    from hhplab.acs.ingest.tract_population import get_output_path, ingest_tract_data
+    from hhplab.sources.acs.ingest.tract_population import get_output_path, ingest_tract_data
 
     acs_vintage = f"{tract_vintage - 4}-{tract_vintage}"
     pop_path = get_output_path(acs_vintage, str(tract_vintage))

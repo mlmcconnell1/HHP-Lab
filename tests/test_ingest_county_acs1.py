@@ -12,14 +12,14 @@ import pytest
 from pandas.errors import PerformanceWarning
 from typer.testing import CliRunner
 
-from hhplab.acs.ingest._acs1_api import ACS1_COUNTY_GEOGRAPHY, normalize_acs1_measures
-from hhplab.acs.ingest.county_acs1 import (
+from hhplab.sources.acs.ingest._acs1_api import ACS1_COUNTY_GEOGRAPHY, normalize_acs1_measures
+from hhplab.sources.acs.ingest.county_acs1 import (
     fetch_acs1_county_data,
     ingest_county_acs1,
     load_acs1_county_sae_source,
     normalize_acs1_county_sae_source,
 )
-from hhplab.acs.variables_acs1 import (
+from hhplab.sources.acs.variables_acs1 import (
     ACS1_COUNTY_OUTPUT_COLUMNS,
     ACS1_SAE_SOURCE_OUTPUT_COLUMNS,
     ACS1_VARIABLES_BY_TABLE,

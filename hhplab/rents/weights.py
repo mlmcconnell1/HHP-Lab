@@ -51,7 +51,7 @@ from hhplab.paths import curated_dir
 from hhplab.provenance import ProvenanceBlock, write_parquet_with_provenance
 from hhplab.raw_snapshot import write_api_snapshot
 from hhplab.source_registry import check_source_changed, register_source
-from hhplab.sources import CENSUS_API_ACS5
+from hhplab.source_urls import CENSUS_API_ACS5
 
 logger = logging.getLogger(__name__)
 

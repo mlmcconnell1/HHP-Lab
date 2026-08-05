@@ -47,7 +47,7 @@ This chapter is an orientation map of active modules in the current codebase.
 - `hhplab/census/ingest/`: TIGER and tract-relationship ingestion
 - `hhplab/xwalks/`: tract and county crosswalk construction
 - `hhplab/measures/`: compatibility facade for legacy ACS aggregation imports plus reusable crosswalk/measure diagnostics
-- `hhplab/acs/`: ACS ingest, translation, source-owned aggregation, ACS1 imputation, and SAE support (including `ingest/metro_acs1.py` and `ingest/county_acs1.py` for ACS 1-year native data, `variables_acs1.py` for ACS1 detailed-table definitions, and `sae.py` for allocation, diagnostics, and provenance helpers)
+- `hhplab/sources/acs/`: ACS ingest, translation, source-owned aggregation, ACS1 imputation, and SAE support (including `ingest/metro_acs1.py` and `ingest/county_acs1.py` for ACS 1-year native data, `variables_acs1.py` for ACS1 detailed-table definitions, and `sae.py` for allocation, diagnostics, and provenance helpers)
 - `hhplab/pit/`: PIT ingest, registry, QA
 - `hhplab/pep/`: PEP ingest, aggregation, and diagnostics
 - `hhplab/prism/`: PRISM monthly temperature download and county raster materialization helpers

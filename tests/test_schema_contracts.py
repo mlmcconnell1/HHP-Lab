@@ -9,8 +9,8 @@ import pandas as pd
 import pytest
 from typer.testing import CliRunner
 
-from hhplab.acs.acs_aggregate import AVERAGE_WEIGHT_DENOMINATORS
-from hhplab.acs.variables import (
+from hhplab.sources.acs.acs_aggregate import AVERAGE_WEIGHT_DENOMINATORS
+from hhplab.sources.acs.variables import (
     ACS5_COVARIATE_REGISTRY,
     ACS5_COVARIATE_REGISTRY_BY_OUTPUT,
     ACS5_EXPANDED_COVARIATE_COLUMNS,
@@ -24,7 +24,7 @@ from hhplab.acs.variables import (
     acs5_covariate_spec_for_output,
     acs_variables_for_year,
 )
-from hhplab.acs.variables_acs1 import (
+from hhplab.sources.acs.variables_acs1 import (
     ACS1_TABLE_COLUMN_NAMES,
     ACS1_VARIABLE_NAMES,
     ACS1_VARIABLES_BY_TABLE,

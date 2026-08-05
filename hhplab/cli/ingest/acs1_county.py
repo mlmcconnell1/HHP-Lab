@@ -10,7 +10,7 @@ from hhplab.cli.shared.output import JsonOutput, cli_error, emit_result
 
 
 def _acs1_county_command_help() -> str:
-    from hhplab.acs.variables_acs1 import ACS1_TABLES, acs1_measure_names
+    from hhplab.sources.acs.variables_acs1 import ACS1_TABLES, acs1_measure_names
 
     tables = ", ".join(ACS1_TABLES)
     registry_measures = acs1_measure_names()
@@ -35,7 +35,7 @@ def _acs1_county_command_help() -> str:
     measures = ", ".join(featured_measures)
     return f"""Ingest ACS 1-year detailed-table data at county geography.
 
-Fetches the ACS 1-year table set declared in hhplab.acs.variables_acs1:
+Fetches the ACS 1-year table set declared in hhplab.sources.acs.variables_acs1:
 
     {tables}
 
@@ -69,8 +69,8 @@ def ingest_acs1_county(
     """Ingest ACS 1-year detailed-table data at county geography."""
     import pandas as pd
 
-    from hhplab.acs.ingest.county_acs1 import ingest_county_acs1
-    from hhplab.acs.variables_acs1 import (
+    from hhplab.sources.acs.ingest.county_acs1 import ingest_county_acs1
+    from hhplab.sources.acs.variables_acs1 import (
         acs1_measure_names,
         acs1_tables_for_vintage,
         acs1_unavailable_tables_for_vintage,
