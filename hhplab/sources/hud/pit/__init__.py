@@ -8,7 +8,7 @@ This package provides modules for:
 - Quality assurance and validation
 """
 
-from hhplab.pit.ingest import (
+from hhplab.sources.hud.pit.ingest import (
     CANONICAL_COLUMNS,
     DownloadResult,
     InvalidCoCIdError,
@@ -28,9 +28,9 @@ from hhplab.pit.ingest import (
     parse_pit_vintage,
     write_pit_parquet,
 )
-from hhplab.pit.msa import aggregate_pit_to_msa, save_msa_pit
-from hhplab.pit.pit_metro import aggregate_pit_to_metro
-from hhplab.pit.pit_registry import (
+from hhplab.sources.hud.pit.msa import aggregate_pit_to_msa, save_msa_pit
+from hhplab.sources.hud.pit.pit_metro import aggregate_pit_to_metro
+from hhplab.sources.hud.pit.pit_registry import (
     PitRegistryEntry,
     compute_file_hash,
     get_pit_path,
@@ -38,8 +38,8 @@ from hhplab.pit.pit_registry import (
     list_pit_years,
     register_pit_year,
 )
-from hhplab.pit.qa import QAIssue, QAReport, Severity, validate_pit_data
-from hhplab.pit.vintage_compare import (
+from hhplab.sources.hud.pit.qa import QAIssue, QAReport, Severity, validate_pit_data
+from hhplab.sources.hud.pit.vintage_compare import (
     PitVintageComparisonResult,
     compare_pit_vintages,
 )

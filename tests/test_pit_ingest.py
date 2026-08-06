@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from hhplab.pit.ingest.hud_exchange import (
+from hhplab.sources.hud.pit.ingest.hud_exchange import (
     DownloadResult,
     HudUserWafChallengeError,
     download_pit_data,

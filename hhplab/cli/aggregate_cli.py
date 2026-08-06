@@ -876,7 +876,7 @@ def aggregate_pit(
         pit_path,
         pit_vintage_path,
     )
-    from hhplab.pit import aggregate_pit_to_msa, save_msa_pit
+    from hhplab.sources.hud.pit import aggregate_pit_to_msa, save_msa_pit
 
     # --- Load all available PIT data for requested years ---
     collected: dict[int, pd.DataFrame] = {}

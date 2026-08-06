@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from hhplab.pit.pit_registry import (
+from hhplab.sources.hud.pit.pit_registry import (
     PitRegistryEntry,
     get_pit_path,
     latest_pit_year,

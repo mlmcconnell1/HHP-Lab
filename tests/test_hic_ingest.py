@@ -11,19 +11,19 @@ import pytest
 from typer.testing import CliRunner
 
 from hhplab.cli.main import app
-from hhplab.hic.hud_user import (
+from hhplab.provenance import read_provenance
+from hhplab.sources.hud.hic.hud_user import (
     HICManualDownloadRequired,
     discover_local_hic_file,
     download_hic_data,
     get_hic_source_url,
 )
-from hhplab.hic.parser import (
+from hhplab.sources.hud.hic.parser import (
     HICParseError,
     normalize_column_name,
     parse_hic_file,
     write_hic_parquet,
 )
-from hhplab.provenance import read_provenance
 
 runner = CliRunner()
 
@@ -579,8 +579,10 @@ def test_download_hic_writes_raw_file(tmp_path: Path, httpx_mock, monkeypatch) -
     url = get_hic_source_url(2020)
     content = b"CocState,CoC,Coc\\ID,year,Total Beds,Total Units\nCO,Denver,CO-500,2020,1,1\n"
     httpx_mock.add_response(url=url, content=content)
-    monkeypatch.setattr("hhplab.hic.hud_user.check_source_changed", lambda **_kw: (False, {}))
-    monkeypatch.setattr("hhplab.hic.hud_user.register_source", lambda **_kw: None)
+    monkeypatch.setattr(
+        "hhplab.sources.hud.hic.hud_user.check_source_changed", lambda **_kw: (False, {})
+    )
+    monkeypatch.setattr("hhplab.sources.hud.hic.hud_user.register_source", lambda **_kw: None)
 
     result = download_hic_data(2020, output_dir=tmp_path)
 

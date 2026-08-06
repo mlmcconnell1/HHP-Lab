@@ -6,8 +6,8 @@ from typing import Annotated
 import pandas as pd
 import typer
 
-from hhplab.pit.pit_registry import get_pit_vintage_path, list_pit_vintages
-from hhplab.pit.vintage_compare import (
+from hhplab.sources.hud.pit.pit_registry import get_pit_vintage_path, list_pit_vintages
+from hhplab.sources.hud.pit.vintage_compare import (
     PIT_DELTA_COLUMNS,
     PitVintageComparisonResult,
     compare_pit_vintages,

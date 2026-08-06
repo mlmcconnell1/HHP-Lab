@@ -9,8 +9,11 @@ import pandas as pd
 from typer.testing import CliRunner
 
 from hhplab.cli.main import app
-from hhplab.hic.coverage import validate_expanded_hic_artifacts, validate_hic_pit_coverage
 from hhplab.schema.columns import HIC_PROJECT_TYPES
+from hhplab.sources.hud.hic.coverage import (
+    validate_expanded_hic_artifacts,
+    validate_hic_pit_coverage,
+)
 
 runner = CliRunner()
 

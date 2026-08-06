@@ -7,7 +7,7 @@ from typing import Annotated
 import typer
 
 from hhplab.paths import raw_root
-from hhplab.pit.ingest import get_vintage_output_path
+from hhplab.sources.hud.pit.ingest import get_vintage_output_path
 
 # Configure logging to show INFO messages from PIT parser
 logging.basicConfig(
@@ -15,7 +15,7 @@ logging.basicConfig(
     level=logging.WARNING,
 )
 # Show INFO for PIT ingest to see CoC ID mapping messages
-logging.getLogger("hhplab.pit.ingest.parser").setLevel(logging.INFO)
+logging.getLogger("hhplab.sources.hud.pit.ingest.parser").setLevel(logging.INFO)
 
 
 def _find_existing_pit_vintage_file(
@@ -80,14 +80,14 @@ def ingest_pit_vintage(
 
         hhplab ingest pit-vintage --vintage 2024 --parse-only
     """
-    from hhplab.pit.ingest import (
+    from hhplab.sources.hud.pit.ingest import (
         download_pit_data,
         get_pit_source_url,
         parse_pit_vintage,
         pit_source_url_candidates,
         write_pit_parquet,
     )
-    from hhplab.pit.pit_registry import register_pit_vintage
+    from hhplab.sources.hud.pit.pit_registry import register_pit_vintage
 
     typer.echo(f"Ingesting PIT vintage {vintage} (all years)...")
 
@@ -166,7 +166,7 @@ def ingest_pit_vintage(
         raise typer.Exit(1) from e
 
     # Step 5: Run QA validation (per-year)
-    from hhplab.pit.qa import validate_pit_data
+    from hhplab.sources.hud.pit.qa import validate_pit_data
 
     typer.echo("Running QA validation...")
     try:

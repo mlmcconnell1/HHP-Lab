@@ -81,9 +81,6 @@ from hhplab.panel.zori_eligibility import (
     summarize_zori_eligibility,
 )
 from hhplab.paths import curated_dir, raw_root
-from hhplab.pit.ingest import parse_pit_file
-from hhplab.pit.ingest.hud_exchange import MIN_PIT_YEAR as MIN_PIT_VINTAGE_YEAR
-from hhplab.pit.pit_registry import get_pit_path
 from hhplab.provenance import ProvenanceBlock, read_provenance, write_parquet_with_provenance
 from hhplab.schema.columns import (
     ACS1_MEASURE_COLUMNS,
@@ -101,6 +98,9 @@ from hhplab.schema.columns import (
 from hhplab.schema.columns import (
     ZORI_PROVENANCE_COLUMNS as ZORI_PROVENANCE_COLUMNS,
 )
+from hhplab.sources.hud.pit.ingest import parse_pit_file
+from hhplab.sources.hud.pit.ingest.hud_exchange import MIN_PIT_YEAR as MIN_PIT_VINTAGE_YEAR
+from hhplab.sources.hud.pit.pit_registry import get_pit_path
 
 if TYPE_CHECKING:
     from hhplab.panel.conformance import ConformanceReport

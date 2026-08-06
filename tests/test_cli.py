@@ -26,7 +26,7 @@ class TestRootCommand:
 class TestNestedIngestCommand:
     """Tests for the nested 'ingest boundaries' command."""
 
-    @patch("hhplab.hud.ingest_hud_exchange")
+    @patch("hhplab.sources.hud.hud.ingest_hud_exchange")
     def test_ingest_boundaries_nested_hud_exchange(self, mock_ingest):
         """Nested ingest boundaries should call ingest_hud_exchange."""
         mock_ingest.return_value = Path("data/curated/coc_boundaries/coc_boundaries__2025.parquet")
@@ -48,7 +48,7 @@ class TestNestedIngestCommand:
         assert "Successfully ingested" in result.output
         mock_ingest.assert_called_once_with("2025", show_progress=True)
 
-    @patch("hhplab.hud.ingest_hud_exchange")
+    @patch("hhplab.sources.hud.hud.ingest_hud_exchange")
     def test_ingest_boundaries_nested_hud_exchange_json(self, mock_ingest):
         """JSON mode should emit only a machine-readable payload."""
         output_path = Path("data/curated/coc_boundaries/coc__B2025.parquet")

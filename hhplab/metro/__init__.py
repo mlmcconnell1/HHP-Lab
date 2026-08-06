@@ -1,7 +1,8 @@
 """Shared metro-universe, subset-profile, IO, and validation utilities.
 
 Source-specific metro aggregations live under their owning source packages
-(``hhplab.sources.census.acs``, ``hhplab.sources.census.pep``, ``hhplab.pit``,
+(``hhplab.sources.census.acs``, ``hhplab.sources.census.pep``,
+``hhplab.sources.hud.pit``,
 ``hhplab.rents``). This
 package is limited to shared geography artifacts and validation helpers.
 """

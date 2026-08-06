@@ -18,7 +18,7 @@ import pytest
 
 # All ingest modules that must comply with the retention policy
 INGEST_MODULES = [
-    "hhplab/hud/opendata_arcgis.py",
+    "hhplab/sources/hud/hud/opendata_arcgis.py",
     "hhplab/sources/census/census/ingest/tiger_tracts.py",
     "hhplab/sources/census/census/ingest/tiger_counties.py",
     "hhplab/sources/census/census/ingest/tract_relationship.py",
@@ -29,8 +29,8 @@ INGEST_MODULES = [
 
 # API ingest modules must use year+variant (not legacy snapshot_id)
 API_INGEST_MODULES = [
-    "hhplab/hud/opendata_arcgis.py",
-    "hhplab/hud/exchange_gis.py",
+    "hhplab/sources/hud/hud/opendata_arcgis.py",
+    "hhplab/sources/hud/hud/exchange_gis.py",
     "hhplab/sources/census/acs/ingest/tract_population.py",
     "hhplab/rents/weights.py",
 ]

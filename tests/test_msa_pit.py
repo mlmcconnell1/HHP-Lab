@@ -7,8 +7,8 @@ import json
 import pandas as pd
 import pytest
 
-from hhplab.pit import aggregate_pit_to_msa, save_msa_pit
 from hhplab.provenance import read_provenance
+from hhplab.sources.hud.pit import aggregate_pit_to_msa, save_msa_pit
 
 CROSSWALK_ROWS = [
     {
@@ -216,7 +216,7 @@ class TestAggregatePitToMsa:
                 raise ValueError("pd.isna called on tuple")
             return real_isna(value)
 
-        monkeypatch.setattr("hhplab.pit.msa.pd.isna", strict_isna)
+        monkeypatch.setattr("hhplab.sources.hud.pit.msa.pd.isna", strict_isna)
 
         result = aggregate_pit_to_msa(coc_pit, msa_crosswalk)
 

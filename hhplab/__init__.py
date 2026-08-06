@@ -21,6 +21,7 @@ _LAZY_EXPORTS = frozenset(
         "builds",
         "cdc",
         "census",
+        "hic",
         "cli",
         "config",
         "curated_migrate",
@@ -56,7 +57,10 @@ _LAZY_MODULES = {
     "bls": "hhplab.sources.bls",
     "cdc": "hhplab.sources.cdc",
     "census": "hhplab.sources.census.census",
+    "hic": "hhplab.sources.hud.hic",
+    "hud": "hhplab.sources.hud.hud",
     "pep": "hhplab.sources.census.pep",
+    "pit": "hhplab.sources.hud.pit",
 }
 
 __all__ = sorted(_LAZY_EXPORTS | {"__version__"})

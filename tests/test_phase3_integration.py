@@ -42,14 +42,14 @@ from hhplab.panel import (
     save_panel,
 )
 from hhplab.panel.assemble import PANEL_COLUMNS
-from hhplab.pit.ingest import normalize_coc_id, parse_pit_file, write_pit_parquet
-from hhplab.pit.pit_registry import (
+from hhplab.provenance import read_provenance
+from hhplab.sources.hud.pit.ingest import normalize_coc_id, parse_pit_file, write_pit_parquet
+from hhplab.sources.hud.pit.pit_registry import (
     PitRegistryEntry,
     list_pit_years,
     register_pit_year,
 )
-from hhplab.pit.qa import validate_pit_data
-from hhplab.provenance import read_provenance
+from hhplab.sources.hud.pit.qa import validate_pit_data
 
 # ============================================================================
 # Fixtures for creating realistic test data

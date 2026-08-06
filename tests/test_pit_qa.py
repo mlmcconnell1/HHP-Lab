@@ -15,7 +15,7 @@ import geopandas as gpd
 import pandas as pd
 from shapely.geometry import Polygon
 
-from hhplab.pit.qa import (
+from hhplab.sources.hud.pit.qa import (
     QAIssue,
     QAReport,
     Severity,

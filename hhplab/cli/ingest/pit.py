@@ -6,7 +6,7 @@ from typing import Annotated
 import typer
 
 from hhplab.paths import raw_root
-from hhplab.pit.ingest import get_canonical_output_path
+from hhplab.sources.hud.pit.ingest import get_canonical_output_path
 
 # Configure logging to show INFO messages from PIT parser
 logging.basicConfig(
@@ -14,7 +14,7 @@ logging.basicConfig(
     level=logging.WARNING,
 )
 # Show INFO for PIT ingest to see CoC ID mapping messages
-logging.getLogger("hhplab.pit.ingest.parser").setLevel(logging.INFO)
+logging.getLogger("hhplab.sources.hud.pit.ingest.parser").setLevel(logging.INFO)
 
 
 def ingest_pit(
@@ -57,14 +57,14 @@ def ingest_pit(
 
         hhplab ingest pit --year 2024 --parse-only
     """
-    from hhplab.pit.ingest import (
+    from hhplab.sources.hud.pit.ingest import (
         download_pit_data,
         get_pit_source_url,
         parse_pit_file,
         write_pit_parquet,
     )
-    from hhplab.pit.pit_registry import register_pit_year
-    from hhplab.pit.qa import validate_pit_data
+    from hhplab.sources.hud.pit.pit_registry import register_pit_year
+    from hhplab.sources.hud.pit.qa import validate_pit_data
 
     typer.echo(f"Ingesting PIT data for year {year}...")
 

@@ -1,11 +1,11 @@
 """HUD Housing Inventory Count support."""
 
-from hhplab.hic.coverage import (
+from hhplab.sources.hud.hic.coverage import (
     HICCoverageResult,
     validate_expanded_hic_artifacts,
     validate_hic_pit_coverage,
 )
-from hhplab.hic.parser import (
+from hhplab.sources.hud.hic.parser import (
     CANONICAL_COLUMNS,
     HICParseError,
     HICParseResult,

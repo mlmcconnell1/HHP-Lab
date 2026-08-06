@@ -14,7 +14,7 @@ Truth table:
 import pandas as pd
 import pytest
 
-from hhplab.pit.vintage_compare import compare_pit_vintages
+from hhplab.sources.hud.pit.vintage_compare import compare_pit_vintages
 
 VINTAGE1_ROWS = (
     (2020, "CO-500", 100, 70, 30),

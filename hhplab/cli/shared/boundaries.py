@@ -69,8 +69,8 @@ def ingest_boundaries(
             raise typer.Exit(1)
 
         from hhplab.geo.geo_io import curated_boundary_path
-        from hhplab.hud import ingest_hud_exchange
         from hhplab.registry.boundary_registry import list_boundaries
+        from hhplab.sources.hud.hud import ingest_hud_exchange
 
         output_path = curated_boundary_path(vintage)
         registered_vintages = [v.boundary_vintage for v in list_boundaries()]
@@ -136,7 +136,7 @@ def ingest_boundaries(
             raise typer.Exit(1) from e
 
     elif source == "hud_opendata":
-        from hhplab.hud import ingest_hud_opendata
+        from hhplab.sources.hud.hud import ingest_hud_opendata
 
         if not json_output:
             typer.echo(f"Ingesting HUD Open Data CoC boundaries (snapshot: {snapshot})...")

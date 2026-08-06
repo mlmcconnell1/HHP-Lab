@@ -8,7 +8,7 @@ from typing import Annotated
 
 import typer
 
-from hhplab.hic.coverage import validate_hic_pit_coverage
+from hhplab.sources.hud.hic.coverage import validate_hic_pit_coverage
 from hhplab.year_spec import parse_year_spec
 
 

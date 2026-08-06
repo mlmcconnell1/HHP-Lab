@@ -10,9 +10,7 @@ import pytest
 from typer.testing import CliRunner
 
 from hhplab.cli.main import app
-from hhplab.hic.parser import CANONICAL_COLUMNS as HIC_PARSER_COLUMNS
 from hhplab.panel.conformance import PanelRequest, run_conformance
-from hhplab.pit.ingest.parser import CANONICAL_COLUMNS as PIT_PARSER_COLUMNS
 from hhplab.recipe.executor import ExecutorError, _normalize_recipe_population_measure
 from hhplab.recipe.executor.panel import _RECIPE_METRO_COLUMN_ORDER, _resolve_canonical_population
 from hhplab.recipe.planner import ResampleTask
@@ -94,6 +92,8 @@ from hhplab.sources.census.acs.variables_acs1 import (
     acs1_variables_by_table_for_vintage,
 )
 from hhplab.sources.census.pep.ingest import PEP_COUNTY_OUTPUT_COLUMNS as PEP_INGEST_COLUMNS
+from hhplab.sources.hud.hic.parser import CANONICAL_COLUMNS as HIC_PARSER_COLUMNS
+from hhplab.sources.hud.pit.ingest.parser import CANONICAL_COLUMNS as PIT_PARSER_COLUMNS
 from hhplab.xwalks.tract_mediated import (
     DENOMINATOR_COLUMNS as XWALK_DENOMINATOR_COLUMNS,
 )

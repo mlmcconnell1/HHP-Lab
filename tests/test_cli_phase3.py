@@ -40,11 +40,11 @@ class TestIngestPitCommand:
         # Typer shows error for missing required option
         assert result.exit_code != 0
 
-    @patch("hhplab.pit.ingest.download_pit_data")
-    @patch("hhplab.pit.ingest.parse_pit_file")
-    @patch("hhplab.pit.ingest.write_pit_parquet")
-    @patch("hhplab.pit.pit_registry.register_pit_year")
-    @patch("hhplab.pit.qa.validate_pit_data")
+    @patch("hhplab.sources.hud.pit.ingest.download_pit_data")
+    @patch("hhplab.sources.hud.pit.ingest.parse_pit_file")
+    @patch("hhplab.sources.hud.pit.ingest.write_pit_parquet")
+    @patch("hhplab.sources.hud.pit.pit_registry.register_pit_year")
+    @patch("hhplab.sources.hud.pit.qa.validate_pit_data")
     def test_ingest_pit_success(
         self,
         mock_validate,
@@ -56,9 +56,9 @@ class TestIngestPitCommand:
         """Full ingestion workflow should succeed."""
         from datetime import UTC, datetime
 
-        from hhplab.pit.ingest import DownloadResult
-        from hhplab.pit.pit_registry import PitRegistryEntry
-        from hhplab.pit.qa import QAReport
+        from hhplab.sources.hud.pit.ingest import DownloadResult
+        from hhplab.sources.hud.pit.pit_registry import PitRegistryEntry
+        from hhplab.sources.hud.pit.qa import QAReport
 
         # Mock download result
         mock_download.return_value = DownloadResult(
@@ -69,7 +69,7 @@ class TestIngestPitCommand:
         )
 
         # Mock parsed result (PITParseResult with df attribute)
-        from hhplab.pit.ingest import PITParseResult
+        from hhplab.sources.hud.pit.ingest import PITParseResult
 
         mock_df = pd.DataFrame(
             {
@@ -108,7 +108,7 @@ class TestIngestPitCommand:
         assert "Parsed 2 CoC records" in result.output
         assert "PIT ingestion complete" in result.output
 
-    @patch("hhplab.pit.ingest.download_pit_data")
+    @patch("hhplab.sources.hud.pit.ingest.download_pit_data")
     def test_ingest_pit_download_failure(self, mock_download):
         """Should handle download failure gracefully."""
         mock_download.side_effect = Exception("Network error")
@@ -118,13 +118,13 @@ class TestIngestPitCommand:
         assert result.exit_code == 1
         assert "Error downloading PIT data" in result.output
 
-    @patch("hhplab.pit.ingest.download_pit_data")
-    @patch("hhplab.pit.ingest.parse_pit_file")
+    @patch("hhplab.sources.hud.pit.ingest.download_pit_data")
+    @patch("hhplab.sources.hud.pit.ingest.parse_pit_file")
     def test_ingest_pit_parse_failure(self, mock_parse, mock_download):
         """Should handle parse failure gracefully."""
         from datetime import UTC, datetime
 
-        from hhplab.pit.ingest import DownloadResult
+        from hhplab.sources.hud.pit.ingest import DownloadResult
 
         mock_download.return_value = DownloadResult(
             path=Path("data/raw/pit/2024/pit.xlsx"),
@@ -161,8 +161,8 @@ class TestIngestPitVintageCommand:
             }
         )
 
-        from hhplab.pit.ingest import PITVintageParseResult
-        from hhplab.pit.qa import QAReport
+        from hhplab.sources.hud.pit.ingest import PITVintageParseResult
+        from hhplab.sources.hud.pit.qa import QAReport
 
         download = MagicMock()
         parse = MagicMock(
@@ -181,11 +181,15 @@ class TestIngestPitVintageCommand:
         )
 
         monkeypatch.setattr("hhplab.cli.ingest.pit_vintage.raw_root", lambda: raw_root)
-        monkeypatch.setattr("hhplab.pit.ingest.download_pit_data", download)
-        monkeypatch.setattr("hhplab.pit.ingest.parse_pit_vintage", parse)
-        monkeypatch.setattr("hhplab.pit.ingest.write_pit_parquet", write)
-        monkeypatch.setattr("hhplab.pit.pit_registry.register_pit_vintage", register)
-        monkeypatch.setattr("hhplab.pit.qa.validate_pit_data", lambda df: QAReport())
+        monkeypatch.setattr("hhplab.sources.hud.pit.ingest.download_pit_data", download)
+        monkeypatch.setattr("hhplab.sources.hud.pit.ingest.parse_pit_vintage", parse)
+        monkeypatch.setattr("hhplab.sources.hud.pit.ingest.write_pit_parquet", write)
+        monkeypatch.setattr(
+            "hhplab.sources.hud.pit.pit_registry.register_pit_vintage", register
+        )
+        monkeypatch.setattr(
+            "hhplab.sources.hud.pit.qa.validate_pit_data", lambda df: QAReport()
+        )
 
         result = runner.invoke(
             app,

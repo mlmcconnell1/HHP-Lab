@@ -12,7 +12,7 @@ from hhplab.metro.metro_definitions import (
     METRO_COUNT,
     build_coc_membership_df,
 )
-from hhplab.pit import aggregate_pit_to_metro
+from hhplab.sources.hud.pit import aggregate_pit_to_metro
 
 # ---------------------------------------------------------------------------
 # Fixtures

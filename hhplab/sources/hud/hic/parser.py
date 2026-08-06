@@ -12,9 +12,9 @@ import pandas as pd
 
 from hhplab.naming import hic_filename
 from hhplab.paths import curated_dir
-from hhplab.pit.ingest.parser import normalize_coc_id
 from hhplab.provenance import ProvenanceBlock, write_parquet_with_provenance
 from hhplab.schema.columns import HIC_CANONICAL_COLUMNS, HIC_PROJECT_TYPES
+from hhplab.sources.hud.pit.ingest.parser import normalize_coc_id
 
 CANONICAL_COLUMNS: list[str] = HIC_CANONICAL_COLUMNS
 

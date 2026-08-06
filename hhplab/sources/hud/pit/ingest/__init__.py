@@ -10,7 +10,7 @@ WP-3B deliverables:
 - write_pit_parquet(): Write curated Parquet with provenance
 """
 
-from hhplab.pit.ingest.hud_exchange import (
+from hhplab.sources.hud.pit.ingest.hud_exchange import (
     DownloadResult,
     HudUserWafChallengeError,
     check_pit_availability,
@@ -21,7 +21,7 @@ from hhplab.pit.ingest.hud_exchange import (
     list_available_years,
     pit_source_url_candidates,
 )
-from hhplab.pit.ingest.parser import (
+from hhplab.sources.hud.pit.ingest.parser import (
     CANONICAL_COLUMNS,
     InvalidCoCIdError,
     PITParseError,
