@@ -472,11 +472,11 @@ def aggregate_cdc_overdose(
         typer.echo(f"Error: {msg}", err=True)
         raise typer.Exit(2)
 
-    from hhplab.cdc.overdose import (
+    from hhplab.pep.pep_aggregate import load_pep_county
+    from hhplab.sources.cdc.overdose import (
         ingest_and_aggregate_overdose_to_msa,
         ingest_county_overdose,
     )
-    from hhplab.pep.pep_aggregate import load_pep_county
 
     output_dir = curated_root() / "cdc"
     try:
@@ -1403,6 +1403,9 @@ def aggregate_acs(
 
     import pandas as pd
 
+    from hhplab.msa.msa_io import read_msa_county_membership
+    from hhplab.naming import measures_filename, msa_measures_filename, tract_xwalk_filename
+    from hhplab.provenance import ProvenanceBlock, write_parquet_with_provenance
     from hhplab.sources.acs.acs_aggregate import (
         _maybe_remap_ct_planning_regions,
         aggregate_to_coc,
@@ -1410,9 +1413,6 @@ def aggregate_acs(
     )
     from hhplab.sources.acs.ingest.tract_population import get_output_path
     from hhplab.sources.acs.translate import default_tract_vintage_for_acs
-    from hhplab.msa.msa_io import read_msa_county_membership
-    from hhplab.naming import measures_filename, msa_measures_filename, tract_xwalk_filename
-    from hhplab.provenance import ProvenanceBlock, write_parquet_with_provenance
 
     def build_msa_tract_crosswalk(
         acs_data: pd.DataFrame,

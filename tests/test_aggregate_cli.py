@@ -8,13 +8,13 @@ import pandas as pd
 import pytest
 from typer.testing import CliRunner
 
+from hhplab.cli.aggregate_cli import _resolve_boundary_vintage_map
+from hhplab.cli.main import app
+from hhplab.pep.pep_aggregate import build_lagged_pep_series
 from hhplab.sources.acs.acs_aggregate import (
     _available_contract_rent_bins,
     _derive_acs5_covariates,
 )
-from hhplab.cli.aggregate_cli import _resolve_boundary_vintage_map
-from hhplab.cli.main import app
-from hhplab.pep.pep_aggregate import build_lagged_pep_series
 
 runner = CliRunner()
 
@@ -80,7 +80,7 @@ def test_boundary_vintage_map_requires_complete_coverage():
         _resolve_boundary_vintage_map([2020, 2022], "2020:2020")
 
 
-@patch("hhplab.cdc.overdose.ingest_and_aggregate_overdose_to_msa")
+@patch("hhplab.sources.cdc.overdose.ingest_and_aggregate_overdose_to_msa")
 def test_aggregate_cdc_overdose_json_summary(mock_aggregate, tmp_path):
     county_df = pd.DataFrame({"county_fips": ["01001"], "year": [2024]})
     msa_df = pd.DataFrame({"msa_id": ["12345"], "year": [2024]})
@@ -111,7 +111,7 @@ def test_aggregate_cdc_overdose_json_summary(mock_aggregate, tmp_path):
     mock_aggregate.assert_called_once()
 
 
-@patch("hhplab.cdc.overdose.ingest_county_overdose")
+@patch("hhplab.sources.cdc.overdose.ingest_county_overdose")
 def test_aggregate_cdc_overdose_county_json_summary(mock_ingest, tmp_path):
     county_df = pd.DataFrame({"county_fips": ["01001", "01003"], "year": [2024, 2024]})
     county_path = tmp_path / "county.parquet"
@@ -182,7 +182,7 @@ def test_aggregate_cdc_overdose_json_rejects_invalid_min_coverage():
     assert "--min-coverage must be between 0 and 1" in payload["message"]
 
 
-@patch("hhplab.cdc.overdose.ingest_and_aggregate_overdose_to_msa")
+@patch("hhplab.sources.cdc.overdose.ingest_and_aggregate_overdose_to_msa")
 def test_aggregate_cdc_overdose_json_reports_source_errors(mock_aggregate):
     mock_aggregate.side_effect = FileNotFoundError(
         "CDC overdose CSV not found: data/raw/cdc/missing.csv"

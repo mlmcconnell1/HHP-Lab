@@ -9,11 +9,6 @@ import pandas as pd
 import pytest
 from typer.testing import CliRunner
 
-from hhplab.cdc.overdose_contract import (
-    CDC_OVERDOSE_FIRST_YEAR,
-    CDC_OVERDOSE_MEASURE_COLUMNS,
-    CDC_OVERDOSE_SOURCE_ID,
-)
 from hhplab.cli.main import app
 from hhplab.covariates.aggregate import (
     EMERGENCY_SHELTER_ACTIVATION_C,
@@ -67,6 +62,11 @@ from hhplab.sources.bls.qcew.contract import (
     QCEW_FIRST_YEAR,
     QCEW_MEASURE_COLUMNS,
     QCEW_SOURCE_ID,
+)
+from hhplab.sources.cdc.overdose_contract import (
+    CDC_OVERDOSE_FIRST_YEAR,
+    CDC_OVERDOSE_MEASURE_COLUMNS,
+    CDC_OVERDOSE_SOURCE_ID,
 )
 from hhplab.vera.incarceration_contract import (
     VERA_JAIL_MEASURE_COLUMNS,

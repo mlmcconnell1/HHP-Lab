@@ -5,16 +5,6 @@ from __future__ import annotations
 from dataclasses import asdict, dataclass
 from typing import Literal
 
-from hhplab.cdc.overdose_contract import (
-    CDC_OVERDOSE_FIRST_YEAR,
-    CDC_OVERDOSE_MEASURE_COLUMNS,
-    CDC_OVERDOSE_PRODUCT,
-    CDC_OVERDOSE_PROVIDER,
-    CDC_OVERDOSE_REQUIRED_COLUMNS,
-    CDC_OVERDOSE_SOURCE_ID,
-    CDC_OVERDOSE_SOURCE_PAGE,
-    CDC_OVERDOSE_SOURCE_URL,
-)
 from hhplab.covariates.census_bps_contract import (
     CENSUS_BPS_MEASURE_COLUMNS,
     CENSUS_BPS_PRODUCT,
@@ -59,6 +49,16 @@ from hhplab.sources.bls.qcew.contract import (
     QCEW_SOURCE_ID,
     QCEW_SOURCE_PAGE,
     QCEW_SOURCE_URL,
+)
+from hhplab.sources.cdc.overdose_contract import (
+    CDC_OVERDOSE_FIRST_YEAR,
+    CDC_OVERDOSE_MEASURE_COLUMNS,
+    CDC_OVERDOSE_PRODUCT,
+    CDC_OVERDOSE_PROVIDER,
+    CDC_OVERDOSE_REQUIRED_COLUMNS,
+    CDC_OVERDOSE_SOURCE_ID,
+    CDC_OVERDOSE_SOURCE_PAGE,
+    CDC_OVERDOSE_SOURCE_URL,
 )
 from hhplab.vera.incarceration_contract import (
     VERA_JAIL_MEASURE_COLUMNS,

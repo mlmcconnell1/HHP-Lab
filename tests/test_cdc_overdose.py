@@ -5,7 +5,7 @@ from __future__ import annotations
 import pandas as pd
 import pytest
 
-from hhplab.cdc.overdose import (
+from hhplab.sources.cdc.overdose import (
     CDC_OVERDOSE_COUNTY_COLUMNS,
     CDC_OVERDOSE_MSA_COLUMNS,
     aggregate_county_overdose_to_msa,

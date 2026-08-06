@@ -51,6 +51,11 @@ _LAZY_EXPORTS = frozenset(
     }
 )
 
+_LAZY_MODULES = {
+    "bls": "hhplab.sources.bls",
+    "cdc": "hhplab.sources.cdc",
+}
+
 __all__ = sorted(_LAZY_EXPORTS | {"__version__"})
 
 
@@ -58,7 +63,7 @@ def __getattr__(name: str) -> object:
     """Lazily import common subpackages and shared modules."""
     if name not in _LAZY_EXPORTS:
         raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
-    module = import_module(f"{__name__}.{name}")
+    module = import_module(_LAZY_MODULES.get(name, f"{__name__}.{name}"))
     globals()[name] = module
     return module
 

@@ -13,7 +13,7 @@ order = ["contracts", "infrastructure", "domain", "application", "interface"]
 
 "hhplab.sources.acs" = "domain"
 "hhplab.sources.bls" = "domain"
-"hhplab.cdc" = "domain"
+"hhplab.sources.cdc" = "domain"
 "hhplab.census" = "domain"
 "hhplab.covariates" = "domain"
 "hhplab.geo" = "domain"
