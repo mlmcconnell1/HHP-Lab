@@ -27,8 +27,8 @@ def ingest_cpi_u(
     """Ingest BLS CPI-U annual-average index values for inflation adjustment."""
     import pandas as pd
 
-    from hhplab.bls import BlsQuotaExhausted
-    from hhplab.bls import ingest_cpi_u as _ingest
+    from hhplab.sources.bls import BlsQuotaExhausted
+    from hhplab.sources.bls import ingest_cpi_u as _ingest
 
     try:
         path = _ingest(start_year=start_year, end_year=end_year, api_key=api_key)

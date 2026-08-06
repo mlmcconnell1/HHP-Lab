@@ -26,10 +26,6 @@ from hhplab.covariates.irs_soi_contract import (
     IRS_SOI_SOURCE_ID,
 )
 from hhplab.covariates.mpi_contract import MPI_ESTIMATE_YEAR, MPI_SOURCE_ID
-from hhplab.covariates.qcew_contract import (
-    QCEW_DERIVED_MEASURE_COLUMNS,
-    QCEW_SOURCE_ID,
-)
 from hhplab.covariates.saiz_contract import SAIZ_ESTIMATE_YEAR, SAIZ_SOURCE_ID
 from hhplab.covariates.temperature import (
     EMERGENCY_SHELTER_ACTIVATION_C,
@@ -50,6 +46,10 @@ from hhplab.naming import covariate_panel_filename
 from hhplab.paths import curated_dir
 from hhplab.pep.pep_aggregate import load_pep_county
 from hhplab.provenance import ProvenanceBlock, read_provenance, write_parquet_with_provenance
+from hhplab.sources.bls.qcew.contract import (
+    QCEW_DERIVED_MEASURE_COLUMNS,
+    QCEW_SOURCE_ID,
+)
 
 __all__ = [
     "EMERGENCY_SHELTER_ACTIVATION_C",

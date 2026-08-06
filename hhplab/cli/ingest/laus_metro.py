@@ -82,8 +82,8 @@ def ingest_laus_metro(
     """
     import pandas as pd
 
-    from hhplab.bls import BlsQuotaExhausted
-    from hhplab.bls import ingest_laus_metro as _ingest
+    from hhplab.sources.bls import BlsQuotaExhausted
+    from hhplab.sources.bls import ingest_laus_metro as _ingest
 
     # Resolve years to process
     if year is not None and (start_year is not None or end_year is not None):

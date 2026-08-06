@@ -52,12 +52,6 @@ from hhplab.covariates.mpi_contract import (
     MPI_WORKBOOK_GLOB,
     validate_mpi_workbook_contract,
 )
-from hhplab.covariates.qcew_contract import (
-    QCEW_DERIVED_MEASURE_COLUMNS,
-    QCEW_FIRST_YEAR,
-    QCEW_MEASURE_COLUMNS,
-    QCEW_SOURCE_ID,
-)
 from hhplab.covariates.saiz_contract import (
     SAIZ_ESTIMATE_YEAR,
     SAIZ_MEASURE_COLUMNS,
@@ -68,6 +62,12 @@ from hhplab.covariates.saiz_contract import (
 from hhplab.curated_policy import validate_curated_layout
 from hhplab.geo.ct_planning_regions import CtPlanningRegionCrosswalk
 from hhplab.provenance import ProvenanceBlock, read_provenance, write_parquet_with_provenance
+from hhplab.sources.bls.qcew.contract import (
+    QCEW_DERIVED_MEASURE_COLUMNS,
+    QCEW_FIRST_YEAR,
+    QCEW_MEASURE_COLUMNS,
+    QCEW_SOURCE_ID,
+)
 from hhplab.vera.incarceration_contract import (
     VERA_JAIL_MEASURE_COLUMNS,
     VERA_JAIL_RELIABLE_FIRST_YEAR,

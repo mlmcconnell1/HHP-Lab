@@ -26,19 +26,6 @@ from unittest.mock import patch
 import pandas as pd
 import pytest
 
-from hhplab.bls import (
-    LAUS_MEASURE_CODES,
-    build_all_series_ids,
-    build_laus_series_id,
-)
-from hhplab.bls.ingest.laus import (
-    BlsQuotaExhausted,
-    _build_metro_series_map,
-    _chunked,
-    _load_metro_targets,
-    fetch_laus_annual_averages,
-    ingest_laus_metro,
-)
 from hhplab.cli.ingest.laus_metro import ingest_laus_metro as ingest_laus_metro_cli
 from hhplab.metro.metro_definitions import (
     CANONICAL_UNIVERSE_DEFINITION_VERSION,
@@ -52,6 +39,19 @@ from hhplab.panel.conformance import (
     LAUS_MEASURE_COLUMNS,
     PanelRequest,
     _effective_measure_columns,
+)
+from hhplab.sources.bls import (
+    LAUS_MEASURE_CODES,
+    build_all_series_ids,
+    build_laus_series_id,
+)
+from hhplab.sources.bls.laus.ingest import (
+    BlsQuotaExhausted,
+    _build_metro_series_map,
+    _chunked,
+    _load_metro_targets,
+    fetch_laus_annual_averages,
+    ingest_laus_metro,
 )
 
 # ---------------------------------------------------------------------------
@@ -208,7 +208,7 @@ class TestMetroSeriesMap:
 
     def test_canonical_universe_series_map_uses_cbsa_ids(self, monkeypatch):
         monkeypatch.setattr(
-            "hhplab.bls.ingest.laus.read_metro_universe",
+            "hhplab.sources.bls.laus.ingest.read_metro_universe",
             lambda definition_version, base_dir=None: build_canonical_metro_targets_fixture()[
                 ["metro_id", "cbsa_code", "metro_name"]
             ],
@@ -276,7 +276,7 @@ class TestFetchLausAnnualAverages:
         sid = NY_SERIES_IDS["unemployment_rate"]
         mock_response = _make_bls_response({sid: 4.2})
 
-        with patch("hhplab.bls.ingest.laus.httpx.Client") as mock_client:
+        with patch("hhplab.sources.bls.laus.ingest.httpx.Client") as mock_client:
             post_rv = mock_client.return_value.__enter__.return_value.post.return_value
             post_rv.json.return_value = mock_response
             post_rv.raise_for_status.return_value = None
@@ -301,7 +301,7 @@ class TestFetchLausAnnualAverages:
                 ]
             },
         }
-        with patch("hhplab.bls.ingest.laus.httpx.Client") as mock_client:
+        with patch("hhplab.sources.bls.laus.ingest.httpx.Client") as mock_client:
             post_rv = mock_client.return_value.__enter__.return_value.post.return_value
             post_rv.json.return_value = monthly_only_response
             post_rv.raise_for_status.return_value = None
@@ -315,7 +315,7 @@ class TestFetchLausAnnualAverages:
             "status": "REQUEST_FAILED",
             "message": ["Bad request"],
         }
-        with patch("hhplab.bls.ingest.laus.httpx.Client") as mock_client:
+        with patch("hhplab.sources.bls.laus.ingest.httpx.Client") as mock_client:
             post_rv = mock_client.return_value.__enter__.return_value.post.return_value
             post_rv.json.return_value = failed_response
             post_rv.raise_for_status.return_value = None
@@ -329,7 +329,7 @@ class TestFetchLausAnnualAverages:
         sids = [f"LAUMT36{i:05d}00000003" for i in range(60)]
         empty_response = {"status": "REQUEST_SUCCEEDED", "Results": {"series": []}}
 
-        with patch("hhplab.bls.ingest.laus.httpx.Client") as mock_client:
+        with patch("hhplab.sources.bls.laus.ingest.httpx.Client") as mock_client:
             mock_post = mock_client.return_value.__enter__.return_value.post
             mock_post.return_value.json.return_value = empty_response
             mock_post.return_value.raise_for_status.return_value = None
@@ -344,7 +344,7 @@ class TestFetchLausAnnualAverages:
         sids = [f"LAUMT36{i:05d}00000003" for i in range(60)]
         empty_response = {"status": "REQUEST_SUCCEEDED", "Results": {"series": []}}
 
-        with patch("hhplab.bls.ingest.laus.httpx.Client") as mock_client:
+        with patch("hhplab.sources.bls.laus.ingest.httpx.Client") as mock_client:
             mock_post = mock_client.return_value.__enter__.return_value.post
             mock_post.return_value.json.return_value = empty_response
             mock_post.return_value.raise_for_status.return_value = None
@@ -396,7 +396,7 @@ class TestBlsQuotaExhausted:
         quota_response = {"status": status, "message": message}
         sid = NY_SERIES_IDS["unemployment_rate"]
 
-        with patch("hhplab.bls.ingest.laus.httpx.Client") as mock_client:
+        with patch("hhplab.sources.bls.laus.ingest.httpx.Client") as mock_client:
             post_rv = mock_client.return_value.__enter__.return_value.post.return_value
             post_rv.json.return_value = quota_response
             post_rv.raise_for_status.return_value = None
@@ -417,7 +417,7 @@ class TestBlsQuotaExhausted:
         }
         sid = NY_SERIES_IDS["unemployment_rate"]
 
-        with patch("hhplab.bls.ingest.laus.httpx.Client") as mock_client:
+        with patch("hhplab.sources.bls.laus.ingest.httpx.Client") as mock_client:
             post_rv = mock_client.return_value.__enter__.return_value.post.return_value
             post_rv.json.return_value = quota_response
             post_rv.raise_for_status.return_value = None
@@ -440,7 +440,7 @@ class TestBlsQuotaExhausted:
         bad_request = {"status": "REQUEST_FAILED", "message": ["Invalid series id"]}
         sid = NY_SERIES_IDS["unemployment_rate"]
 
-        with patch("hhplab.bls.ingest.laus.httpx.Client") as mock_client:
+        with patch("hhplab.sources.bls.laus.ingest.httpx.Client") as mock_client:
             post_rv = mock_client.return_value.__enter__.return_value.post.return_value
             post_rv.json.return_value = bad_request
             post_rv.raise_for_status.return_value = None
@@ -535,7 +535,7 @@ def _mock_ingest(tmp_path: Path, year: int) -> Path:
 
         return FakeResp()
 
-    with patch("hhplab.bls.ingest.laus.httpx.Client") as mock_client:
+    with patch("hhplab.sources.bls.laus.ingest.httpx.Client") as mock_client:
         mock_client.return_value.__enter__.return_value.post = mock_post
         return ingest_laus_metro(year=year, project_root=tmp_path)
 
@@ -586,13 +586,13 @@ class TestIngestLausMetro:
         response = _make_bls_response_for_targets(targets, year=2023)
 
         monkeypatch.setattr(
-            "hhplab.bls.ingest.laus.read_metro_universe",
+            "hhplab.sources.bls.laus.ingest.read_metro_universe",
             lambda definition_version, base_dir=None: targets[
                 ["metro_id", "cbsa_code", "metro_name"]
             ],
         )
 
-        with patch("hhplab.bls.ingest.laus.httpx.Client") as mock_client:
+        with patch("hhplab.sources.bls.laus.ingest.httpx.Client") as mock_client:
             mock_post = mock_client.return_value.__enter__.return_value.post
             mock_post.return_value.json.return_value = response
             mock_post.return_value.raise_for_status.return_value = None
@@ -625,7 +625,7 @@ class TestIngestLausMetro:
         """Ingest must fail fast rather than write an all-null parquet."""
         empty_response = {"status": "REQUEST_SUCCEEDED", "Results": {"series": []}}
 
-        with patch("hhplab.bls.ingest.laus.httpx.Client") as mock_client:
+        with patch("hhplab.sources.bls.laus.ingest.httpx.Client") as mock_client:
             mock_post = mock_client.return_value.__enter__.return_value.post
             mock_post.return_value.json.return_value = empty_response
             mock_post.return_value.raise_for_status.return_value = None
@@ -642,7 +642,7 @@ class TestIngestLausMetro:
         The remaining 12 metros have all-null measures.
         Expected: ValueError — partial output must not be written silently.
         """
-        from hhplab.bls.ingest.laus import _build_metro_series_map
+        from hhplab.sources.bls.laus.ingest import _build_metro_series_map
 
         # Build values for only the first 13 metros (sorted order)
         metro_series = _build_metro_series_map()
@@ -655,7 +655,7 @@ class TestIngestLausMetro:
         def _partial_fetch(series_ids, year, api_key=None):
             return {sid: v for sid, v in partial_values.items() if sid in series_ids}
 
-        with patch("hhplab.bls.ingest.laus.fetch_laus_annual_averages", _partial_fetch):
+        with patch("hhplab.sources.bls.laus.ingest.fetch_laus_annual_averages", _partial_fetch):
             with pytest.raises(ValueError, match="metro\\(s\\) have no data for any measure"):
                 ingest_laus_metro(year=2023, project_root=tmp_path)
 
@@ -670,8 +670,8 @@ class TestIngestLausMetro:
         measures), but the parquet would be silently written with 25 null rates.
         Expected: ValueError naming the missing measure.
         """
-        from hhplab.bls import LAUS_MEASURE_CODES
-        from hhplab.bls.ingest.laus import _build_metro_series_map
+        from hhplab.sources.bls import LAUS_MEASURE_CODES
+        from hhplab.sources.bls.laus.ingest import _build_metro_series_map
 
         # Collect series IDs for every measure except unemployment_rate
         metro_series = _build_metro_series_map()
@@ -686,7 +686,7 @@ class TestIngestLausMetro:
         def _no_rate_fetch(series_ids, year, api_key=None):
             return {sid: v for sid, v in non_rate_values.items() if sid in series_ids}
 
-        with patch("hhplab.bls.ingest.laus.fetch_laus_annual_averages", _no_rate_fetch):
+        with patch("hhplab.sources.bls.laus.ingest.fetch_laus_annual_averages", _no_rate_fetch):
             with pytest.raises(ValueError, match="unemployment_rate"):
                 ingest_laus_metro(year=2023, project_root=tmp_path)
 
@@ -702,7 +702,7 @@ class TestIngestLausMetro:
         written with a null rate.
         Expected: ValueError naming GF01 and unemployment_rate.
         """
-        from hhplab.bls.ingest.laus import _build_metro_series_map
+        from hhplab.sources.bls.laus.ingest import _build_metro_series_map
 
         metro_series = _build_metro_series_map()
         skip_metro = sorted(metro_series)[0]  # GF01
@@ -719,7 +719,7 @@ class TestIngestLausMetro:
         def _one_missing_fetch(series_ids, year, api_key=None):
             return {sid: v for sid, v in all_values.items() if sid in series_ids}
 
-        with patch("hhplab.bls.ingest.laus.fetch_laus_annual_averages", _one_missing_fetch):
+        with patch("hhplab.sources.bls.laus.ingest.fetch_laus_annual_averages", _one_missing_fetch):
             with pytest.raises(ValueError, match="partial measure data"):
                 ingest_laus_metro(year=2023, project_root=tmp_path)
 
@@ -937,7 +937,7 @@ class TestLausPanelIntegration:
 
 
 def _make_mock_ingest_fn(tmp_path: Path, year_override: int | None = None) -> Any:
-    """Return a mock for hhplab.bls.ingest_laus_metro that writes a
+    """Return a mock for hhplab.sources.bls.ingest_laus_metro that writes a
     minimal parquet and returns the path."""
     import pandas as pd
 
@@ -994,7 +994,7 @@ class TestCliLausMetro:
     def test_single_year_exits_zero(self, tmp_path):
         mock_fn = _make_mock_ingest_fn(tmp_path)
         with (
-            patch("hhplab.bls.ingest_laus_metro", mock_fn),
+            patch("hhplab.sources.bls.ingest_laus_metro", mock_fn),
             patch("hhplab.cli.main._check_working_directory"),
         ):
             result = self._runner().invoke(self._app(), ["ingest", "laus-metro", "--year", "2023"])
@@ -1003,7 +1003,7 @@ class TestCliLausMetro:
     def test_single_year_output_mentions_metros(self, tmp_path):
         mock_fn = _make_mock_ingest_fn(tmp_path)
         with (
-            patch("hhplab.bls.ingest_laus_metro", mock_fn),
+            patch("hhplab.sources.bls.ingest_laus_metro", mock_fn),
             patch("hhplab.cli.main._check_working_directory"),
         ):
             result = self._runner().invoke(self._app(), ["ingest", "laus-metro", "--year", "2023"])
@@ -1013,7 +1013,7 @@ class TestCliLausMetro:
     def test_json_output_flag(self, tmp_path):
         mock_fn = _make_mock_ingest_fn(tmp_path)
         with (
-            patch("hhplab.bls.ingest_laus_metro", mock_fn),
+            patch("hhplab.sources.bls.ingest_laus_metro", mock_fn),
             patch("hhplab.cli.main._check_working_directory"),
         ):
             result = self._runner().invoke(
@@ -1030,7 +1030,7 @@ class TestCliLausMetro:
     def test_year_range_backfill(self, tmp_path):
         mock_fn = _make_mock_ingest_fn(tmp_path)
         with (
-            patch("hhplab.bls.ingest_laus_metro", mock_fn),
+            patch("hhplab.sources.bls.ingest_laus_metro", mock_fn),
             patch("hhplab.cli.main._check_working_directory"),
         ):
             result = self._runner().invoke(
@@ -1041,7 +1041,7 @@ class TestCliLausMetro:
     def test_year_range_json_output(self, tmp_path):
         mock_fn = _make_mock_ingest_fn(tmp_path)
         with (
-            patch("hhplab.bls.ingest_laus_metro", mock_fn),
+            patch("hhplab.sources.bls.ingest_laus_metro", mock_fn),
             patch("hhplab.cli.main._check_working_directory"),
         ):
             result = self._runner().invoke(
@@ -1077,7 +1077,7 @@ class TestCliLausMetro:
             raise ValueError("BLS API down")
 
         with (
-            patch("hhplab.bls.ingest_laus_metro", _failing_ingest),
+            patch("hhplab.sources.bls.ingest_laus_metro", _failing_ingest),
             patch("hhplab.cli.main._check_working_directory"),
         ):
             result = self._runner().invoke(self._app(), ["ingest", "laus-metro", "--year", "2023"])
@@ -1101,7 +1101,7 @@ class TestCliLausMetro:
             return mock_fn(year=year, **kwargs)
 
         with (
-            patch("hhplab.bls.ingest_laus_metro", _partial_ingest),
+            patch("hhplab.sources.bls.ingest_laus_metro", _partial_ingest),
             patch("hhplab.cli.main._check_working_directory"),
         ):
             result = self._runner().invoke(
@@ -1122,7 +1122,7 @@ class TestCliLausMetro:
             raise ValueError("BLS API unavailable")
 
         with (
-            patch("hhplab.bls.ingest_laus_metro", _failing_ingest),
+            patch("hhplab.sources.bls.ingest_laus_metro", _failing_ingest),
             patch("hhplab.cli.main._check_working_directory"),
         ):
             result = self._runner().invoke(
@@ -1143,7 +1143,7 @@ class TestCliLausMetro:
     def test_quota_exhausted_single_year_text_includes_actionable_hint(self, tmp_path):
         """Single-year ingest must surface the BlsQuotaExhausted message verbatim
         so the user immediately sees how to recover (API key or wait)."""
-        from hhplab.bls import BlsQuotaExhausted
+        from hhplab.sources.bls import BlsQuotaExhausted
 
         actionable = (
             "The anonymous BLS API daily threshold has been reached. "
@@ -1156,7 +1156,7 @@ class TestCliLausMetro:
             raise BlsQuotaExhausted(actionable)
 
         with (
-            patch("hhplab.bls.ingest_laus_metro", _quota_ingest),
+            patch("hhplab.sources.bls.ingest_laus_metro", _quota_ingest),
             patch("hhplab.cli.main._check_working_directory"),
         ):
             result = self._runner().invoke(self._app(), ["ingest", "laus-metro", "--year", "2023"])
@@ -1169,7 +1169,7 @@ class TestCliLausMetro:
         assert "wait" in combined.lower()
 
     def test_quota_exhausted_single_year_json_carries_reason(self, tmp_path):
-        from hhplab.bls import BlsQuotaExhausted
+        from hhplab.sources.bls import BlsQuotaExhausted
 
         def _quota_ingest(**kwargs):
             raise BlsQuotaExhausted(
@@ -1178,7 +1178,7 @@ class TestCliLausMetro:
             )
 
         with (
-            patch("hhplab.bls.ingest_laus_metro", _quota_ingest),
+            patch("hhplab.sources.bls.ingest_laus_metro", _quota_ingest),
             patch("hhplab.cli.main._check_working_directory"),
         ):
             result = self._runner().invoke(
@@ -1197,7 +1197,7 @@ class TestCliLausMetro:
         must NOT be retried (they would all fail with the same condition).  All
         years should be reported as failed and the JSON payload must carry the
         bls_quota_exhausted reason."""
-        from hhplab.bls import BlsQuotaExhausted
+        from hhplab.sources.bls import BlsQuotaExhausted
 
         call_log: list[int] = []
 
@@ -1209,7 +1209,7 @@ class TestCliLausMetro:
             )
 
         with (
-            patch("hhplab.bls.ingest_laus_metro", _quota_ingest),
+            patch("hhplab.sources.bls.ingest_laus_metro", _quota_ingest),
             patch("hhplab.cli.main._check_working_directory"),
         ):
             result = self._runner().invoke(
@@ -1231,7 +1231,7 @@ class TestCliLausMetro:
         """If some early years succeed and a later year hits the quota, the
         backfill must report status=partial, mark only the unattempted years
         as failed, and tag the payload with bls_quota_exhausted."""
-        from hhplab.bls import BlsQuotaExhausted
+        from hhplab.sources.bls import BlsQuotaExhausted
 
         mock_fn = _make_mock_ingest_fn(tmp_path)
         call_log: list[int] = []
@@ -1246,7 +1246,7 @@ class TestCliLausMetro:
             return mock_fn(year=year, **kwargs)
 
         with (
-            patch("hhplab.bls.ingest_laus_metro", _mixed_ingest),
+            patch("hhplab.sources.bls.ingest_laus_metro", _mixed_ingest),
             patch("hhplab.cli.main._check_working_directory"),
         ):
             result = self._runner().invoke(

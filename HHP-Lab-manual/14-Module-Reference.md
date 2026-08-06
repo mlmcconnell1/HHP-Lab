@@ -43,7 +43,7 @@ This chapter is an orientation map of active modules in the current codebase.
 ## Data-Domain Modules
 
 - `hhplab/hud/`: HUD boundary ingesters
-- `hhplab/bls/`: BLS LAUS helpers and metro-native ingest
+- `hhplab/sources/bls/`: BLS LAUS helpers and metro-native ingest
 - `hhplab/census/ingest/`: TIGER and tract-relationship ingestion
 - `hhplab/xwalks/`: tract and county crosswalk construction
 - `hhplab/measures/`: compatibility facade for legacy ACS aggregation imports plus reusable crosswalk/measure diagnostics

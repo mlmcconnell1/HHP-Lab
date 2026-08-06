@@ -41,15 +41,6 @@ from hhplab.covariates.mpi_contract import (
     MPI_SOURCE_PAGE,
     MPI_SOURCE_URL,
 )
-from hhplab.covariates.qcew_contract import (
-    QCEW_FIRST_YEAR,
-    QCEW_MEASURE_COLUMNS,
-    QCEW_PRODUCT,
-    QCEW_PROVIDER,
-    QCEW_SOURCE_ID,
-    QCEW_SOURCE_PAGE,
-    QCEW_SOURCE_URL,
-)
 from hhplab.covariates.saiz_contract import (
     SAIZ_ESTIMATE_YEAR,
     SAIZ_MEASURE_COLUMNS,
@@ -59,6 +50,15 @@ from hhplab.covariates.saiz_contract import (
     SAIZ_SOURCE_ID,
     SAIZ_SOURCE_PAGE,
     SAIZ_SOURCE_URL,
+)
+from hhplab.sources.bls.qcew.contract import (
+    QCEW_FIRST_YEAR,
+    QCEW_MEASURE_COLUMNS,
+    QCEW_PRODUCT,
+    QCEW_PROVIDER,
+    QCEW_SOURCE_ID,
+    QCEW_SOURCE_PAGE,
+    QCEW_SOURCE_URL,
 )
 from hhplab.vera.incarceration_contract import (
     VERA_JAIL_MEASURE_COLUMNS,
