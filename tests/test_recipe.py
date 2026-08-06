@@ -14,7 +14,7 @@ from shapely.geometry import Polygon, box
 from typer.testing import CliRunner
 
 from hhplab.cli.main import app
-from hhplab.geo.ct_planning_regions import CtPlanningRegionCrosswalk
+from hhplab.geographies.coc.ct_planning_regions import CtPlanningRegionCrosswalk
 from hhplab.panel.assemble import _load_coc_areas
 from hhplab.provenance import ProvenanceBlock, read_provenance, write_parquet_with_provenance
 from hhplab.recipe.adapters import (
@@ -2341,7 +2341,7 @@ def _setup_metro_pipeline_fixtures(tmp_path: Path) -> None:
 
 def _setup_curated_metro_artifacts(tmp_path: Path) -> None:
     """Write the curated Glynn/Fox metro definition artifacts for tests."""
-    from hhplab.metro.metro_io import write_metro_artifacts
+    from hhplab.geographies.gf_metro.metro_io import write_metro_artifacts
 
     write_metro_artifacts(base_dir=tmp_path / "data")
 

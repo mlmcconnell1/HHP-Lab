@@ -51,27 +51,27 @@ This chapter is an orientation map of active modules in the current codebase.
 - `hhplab/sources/hud/pit/`: PIT ingest, registry, QA
 - `hhplab/sources/census/pep/`: PEP ingest, aggregation, and diagnostics
 - `hhplab/prism/`: PRISM monthly temperature download and county raster materialization helpers
-- `hhplab/medsl/`: MEDSL county presidential returns parsing, ingest, and county-year political measure materialization
+- `hhplab/sources/medsl/medsl/`: MEDSL county presidential returns parsing, ingest, and county-year political measure materialization
 - `hhplab/rents/`: ZORI ingest, weighting, aggregation, diagnostics
 - `hhplab/panel/`: panel diagnostics and assembly internals
-- `hhplab/metro/`: metro analysis geography module
-  - `hhplab/metro/metro_definitions.py`: canonical metro-universe definitions plus the Glynn/Fox subset profile
-  - `hhplab/metro/pit.py`: PIT aggregation from CoC to metro via CoC membership
-  - `hhplab/metro/metro_acs.py`: ACS aggregation from tracts to metro via county membership
-  - `hhplab/metro/metro_pep.py`: PEP aggregation from counties to metro via county membership
-  - `hhplab/metro/metro_zori.py`: ZORI aggregation from counties to metro via county membership
-  - `hhplab/metro/metro_validate.py`: metro artifact validation (ID formats, referential integrity, counts)
-  - `hhplab/metro/metro_io.py`: read/write curated metro definition artifacts
-- `hhplab/msa/`: MSA-specific utilities
-  - `hhplab/msa/selectors.py`: population-ranked MSA selection helpers
-  - `hhplab/msa/coverage.py`: MSA-CoC area/population overlap coverage builder,
+- `hhplab/geographies/gf_metro/`: metro analysis geography module
+  - `hhplab/geographies/gf_metro/metro_definitions.py`: canonical metro-universe definitions plus the Glynn/Fox subset profile
+  - `hhplab/geographies/gf_metro/pit.py`: PIT aggregation from CoC to metro via CoC membership
+  - `hhplab/geographies/gf_metro/metro_acs.py`: ACS aggregation from tracts to metro via county membership
+  - `hhplab/geographies/gf_metro/metro_pep.py`: PEP aggregation from counties to metro via county membership
+  - `hhplab/geographies/gf_metro/metro_zori.py`: ZORI aggregation from counties to metro via county membership
+  - `hhplab/geographies/gf_metro/metro_validate.py`: metro artifact validation (ID formats, referential integrity, counts)
+  - `hhplab/geographies/gf_metro/metro_io.py`: read/write curated metro definition artifacts
+- `hhplab/geographies/msa/`: MSA-specific utilities
+  - `hhplab/geographies/msa/selectors.py`: population-ranked MSA selection helpers
+  - `hhplab/geographies/msa/coverage.py`: MSA-CoC area/population overlap coverage builder,
     reader, and provenance-aware writer
 
 ## Utilities and Supporting Modules
 
-- `hhplab/geo/`: GeoParquet I/O (`read_geoparquet`, `write_geoparquet`), boundary validation, CRS normalization, geometry hashing, CT planning regions
+- `hhplab/geographies/coc/`: GeoParquet I/O (`read_geoparquet`, `write_geoparquet`), boundary validation, CRS normalization, geometry hashing, CT planning regions
 - `hhplab/viz/`: Folium-based interactive map rendering (`render_coc_map`)
-- `hhplab/nhgis/`: NHGIS extraction support for pre-2020 tract data
+- `hhplab/geographies/nhgis/`: NHGIS extraction support for pre-2020 tract data
 - `hhplab/source_registry.py`: external source tracking with SHA-256 hashes (`register_source`, `check_source_changed`, `list_sources`)
 - `hhplab/year_spec.py`: year-spec parser for ranges/lists used throughout CLI (e.g., `2018-2024`, `2018,2020,2022`)
 - `hhplab/raw_snapshot.py`: raw data snapshot retention utilities

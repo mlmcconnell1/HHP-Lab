@@ -7,7 +7,7 @@ from typing import Annotated
 import typer
 
 from hhplab.cli.shared.output import JsonOutput, cli_error, emit_result
-from hhplab.msa.msa_definitions import DEFINITION_VERSION
+from hhplab.geographies.msa.msa_definitions import DEFINITION_VERSION
 
 
 def generate_msa(
@@ -30,7 +30,7 @@ def generate_msa(
 ) -> None:
     """Generate curated MSA definition parquet files from the Census workbook."""
     import hhplab.naming as naming
-    from hhplab.msa.msa_io import write_msa_artifacts
+    from hhplab.geographies.msa.msa_io import write_msa_artifacts
 
     paths_to_write = [
         naming.msa_definitions_path(definition_version),

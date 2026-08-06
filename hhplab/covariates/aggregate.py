@@ -13,18 +13,13 @@ from hhplab.covariates.ingest import (
     default_covariate_output_path,
     default_covariate_pair_output_path,
 )
-from hhplab.covariates.irs_soi_contract import (
-    IRS_SOI_MSA_MEASURE_COLUMNS,
-    IRS_SOI_PAIR_MEASURE_COLUMNS,
-    IRS_SOI_SOURCE_ID,
-)
 from hhplab.covariates.saiz_contract import SAIZ_ESTIMATE_YEAR, SAIZ_SOURCE_ID
 from hhplab.covariates.temperature import (
     EMERGENCY_SHELTER_ACTIVATION_C,
     FREEZING_C,
     derive_prism_temperature_basis,
 )
-from hhplab.geo.ct_planning_regions import (
+from hhplab.geographies.coc.ct_planning_regions import (
     CT_LEGACY_COUNTY_VINTAGE,
     CT_PLANNING_REGION_VINTAGE,
     CtPlanningRegionCrosswalk,
@@ -32,8 +27,8 @@ from hhplab.geo.ct_planning_regions import (
     is_ct_legacy_county_fips,
     is_ct_planning_region_fips,
 )
-from hhplab.msa import DEFINITION_VERSION as DEFAULT_MSA_DEFINITION_VERSION
-from hhplab.msa.msa_io import read_msa_county_membership, read_msa_definitions
+from hhplab.geographies.msa import DEFINITION_VERSION as DEFAULT_MSA_DEFINITION_VERSION
+from hhplab.geographies.msa.msa_io import read_msa_county_membership, read_msa_definitions
 from hhplab.naming import covariate_panel_filename
 from hhplab.paths import curated_dir
 from hhplab.provenance import ProvenanceBlock, read_provenance, write_parquet_with_provenance
@@ -49,6 +44,11 @@ from hhplab.sources.census.bps.census_bps_contract import (
     CENSUS_BPS_SOURCE_ID,
 )
 from hhplab.sources.census.pep.pep_aggregate import load_pep_county
+from hhplab.sources.irs.irs_soi_contract import (
+    IRS_SOI_MSA_MEASURE_COLUMNS,
+    IRS_SOI_PAIR_MEASURE_COLUMNS,
+    IRS_SOI_SOURCE_ID,
+)
 from hhplab.sources.mpi.mpi_contract import MPI_ESTIMATE_YEAR, MPI_SOURCE_ID
 
 __all__ = [

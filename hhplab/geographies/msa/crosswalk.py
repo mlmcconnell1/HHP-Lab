@@ -9,7 +9,7 @@ from pathlib import Path
 import geopandas as gpd
 import pandas as pd
 
-from hhplab.geo.ct_planning_regions import (
+from hhplab.geographies.coc.ct_planning_regions import (
     CT_LEGACY_COUNTY_CODES,
     CT_PLANNING_REGION_CODES,
     CT_STATE_FIPS,

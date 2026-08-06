@@ -9,8 +9,8 @@ import httpx
 import pandas as pd
 
 import hhplab.naming as naming
-from hhplab.msa import DEFINITION_VERSION as MSA_DEFINITION_VERSION
-from hhplab.msa import read_msa_county_membership, read_msa_definitions
+from hhplab.geographies.msa import DEFINITION_VERSION as MSA_DEFINITION_VERSION
+from hhplab.geographies.msa import read_msa_county_membership, read_msa_definitions
 from hhplab.provenance import ProvenanceBlock, write_parquet_with_provenance
 from hhplab.raw_snapshot import persist_file_snapshot
 from hhplab.sources.census.pep.pep_aggregate import load_pep_county

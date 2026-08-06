@@ -15,14 +15,14 @@ from shapely.geometry import (
     Polygon,
 )
 
-from hhplab.geo.geo_io import (
+from hhplab.geographies.coc.coc_io import (
     curated_boundary_path,
     read_geoparquet,
     registry_path,
     resolve_curated_boundary_path,
     write_geoparquet,
 )
-from hhplab.geo.normalize import (
+from hhplab.geographies.coc.normalize import (
     compute_geom_hash,
     ensure_polygon_type,
     fix_geometry,

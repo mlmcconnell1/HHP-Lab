@@ -11,7 +11,7 @@ from dataclasses import dataclass
 
 import pandas as pd
 
-from hhplab.metro.metro_definitions import (
+from hhplab.geographies.gf_metro.metro_definitions import (
     CANONICAL_UNIVERSE_DEFINITION_VERSION,
     DEFINITION_VERSION,
     METRO_COUNT,

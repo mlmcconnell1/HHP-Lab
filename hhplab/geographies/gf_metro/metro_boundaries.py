@@ -9,14 +9,14 @@ import geopandas as gpd
 import pandas as pd
 
 import hhplab.naming as naming
-from hhplab.geo.geo_io import write_geoparquet
-from hhplab.metro.metro_definitions import (
+from hhplab.geographies.coc.coc_io import write_geoparquet
+from hhplab.geographies.gf_metro.metro_definitions import (
     DEFINITION_VERSION,
     SOURCE_REF,
     build_county_membership_df,
     build_definitions_df,
 )
-from hhplab.metro.metro_validate import validate_metro_boundaries
+from hhplab.geographies.gf_metro.metro_validate import validate_metro_boundaries
 from hhplab.provenance import ProvenanceBlock
 
 DERIVATION_SOURCE = "derived_metro_county_union"

@@ -868,7 +868,7 @@ def aggregate_pit(
         typer.echo(f"Aggregating PIT to {target_label} (curated output, align '{align}')...")
         typer.echo(f"  Years: {parsed_years}")
 
-    from hhplab.msa import read_coc_msa_crosswalk
+    from hhplab.geographies.msa import read_coc_msa_crosswalk
     from hhplab.naming import (
         coc_pit_filename,
         discover_pit_vintages,
@@ -1202,7 +1202,10 @@ def aggregate_coc_measure(
         _emit_coc_measure_error(str(exc), output_json=output_json, exit_code=2)
     resolved_county = str(counties if counties is not None else resolved_boundary)
 
-    from hhplab.msa import aggregate_coc_to_msa_fractional_rollup, read_coc_msa_crosswalk
+    from hhplab.geographies.msa import (
+        aggregate_coc_to_msa_fractional_rollup,
+        read_coc_msa_crosswalk,
+    )
     from hhplab.naming import msa_fractional_rollup_filename
     from hhplab.provenance import (
         msa_fractional_rollup_provenance,
@@ -1403,7 +1406,7 @@ def aggregate_acs(
 
     import pandas as pd
 
-    from hhplab.msa.msa_io import read_msa_county_membership
+    from hhplab.geographies.msa.msa_io import read_msa_county_membership
     from hhplab.naming import measures_filename, msa_measures_filename, tract_xwalk_filename
     from hhplab.provenance import ProvenanceBlock, write_parquet_with_provenance
     from hhplab.sources.census.acs.acs_aggregate import (

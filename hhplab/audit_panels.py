@@ -147,7 +147,7 @@ def _acs_module() -> Any:
 
 @lru_cache(maxsize=1)
 def _metro_io_module() -> Any:
-    return import_module("hhplab.metro.metro_io")
+    return import_module("hhplab.geographies.gf_metro.metro_io")
 
 
 @lru_cache(maxsize=1)

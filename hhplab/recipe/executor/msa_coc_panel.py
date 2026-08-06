@@ -9,8 +9,8 @@ from typing import Any
 import geopandas as gpd
 import pandas as pd
 
-from hhplab.msa.selectors import select_top_msa_ids_by_population
-from hhplab.msa.unemployment import resolve_msa_unemployment
+from hhplab.geographies.msa.selectors import select_top_msa_ids_by_population
+from hhplab.geographies.msa.unemployment import resolve_msa_unemployment
 from hhplab.recipe.executor.containment import build_msa_coc_membership
 from hhplab.recipe.executor.core import ExecutionContext, ExecutorError
 from hhplab.recipe.planner import ExecutionPlan

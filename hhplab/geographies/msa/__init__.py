@@ -1,13 +1,13 @@
 """Shared Census MSA definitions, IO, and validation utilities."""
 
-from hhplab.msa.coverage import (
+from hhplab.geographies.msa.coverage import (
     MSA_COC_COVERAGE_COLUMNS,
     build_msa_coc_coverage,
     read_msa_coc_coverage,
     save_msa_coc_coverage,
     select_primary_msa_for_cocs,
 )
-from hhplab.msa.crosswalk import (
+from hhplab.geographies.msa.crosswalk import (
     ALLOCATION_SHARE_TOLERANCE,
     COC_MSA_BLOCK_POPULATION_CROSSWALK_COLUMNS,
     COC_MSA_CROSSWALK_COLUMNS,
@@ -21,14 +21,14 @@ from hhplab.msa.crosswalk import (
     save_coc_msa_crosswalk,
     summarize_coc_msa_allocation,
 )
-from hhplab.msa.msa_boundaries import (
+from hhplab.geographies.msa.msa_boundaries import (
     download_msa_boundaries,
     ingest_msa_boundaries,
     read_msa_boundaries,
     validate_curated_msa_boundaries,
     write_msa_boundaries,
 )
-from hhplab.msa.msa_definitions import (
+from hhplab.geographies.msa.msa_definitions import (
     DEFINITION_VERSION,
     DELINEATION_FILE_YEAR,
     MSA_AREA_TYPE,
@@ -39,25 +39,25 @@ from hhplab.msa.msa_definitions import (
     build_definitions_df,
     parse_delineation_workbook,
 )
-from hhplab.msa.msa_io import (
+from hhplab.geographies.msa.msa_io import (
     download_delineation_rows,
     read_msa_county_membership,
     read_msa_definitions,
     validate_curated_msa,
     write_msa_artifacts,
 )
-from hhplab.msa.msa_validate import (
+from hhplab.geographies.msa.msa_validate import (
     MSAValidationResult,
     validate_msa_artifacts,
     validate_msa_boundaries,
 )
-from hhplab.msa.selectors import (
+from hhplab.geographies.msa.selectors import (
     TopMsaSelection,
     TopMsaSelectionDiagnostics,
     select_top_msa_ids_by_population,
     select_top_msa_ids_for_panel_spec,
 )
-from hhplab.msa.unemployment import (
+from hhplab.geographies.msa.unemployment import (
     MSA_ACS5_UNEMPLOYMENT_COLUMNS,
     MSA_LAUS_UNEMPLOYMENT_COLUMNS,
     MSA_UNEMPLOYMENT_COMMON_COLUMNS,

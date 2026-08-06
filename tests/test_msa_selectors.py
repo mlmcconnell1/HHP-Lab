@@ -20,7 +20,7 @@ from __future__ import annotations
 import pandas as pd
 import pytest
 
-from hhplab.msa.selectors import (
+from hhplab.geographies.msa.selectors import (
     TopMsaSelection,
     select_top_msa_ids_by_population,
     select_top_msa_ids_for_panel_spec,

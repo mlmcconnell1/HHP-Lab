@@ -17,7 +17,7 @@ import logging
 
 import pandas as pd
 
-from hhplab.metro.metro_definitions import (
+from hhplab.geographies.gf_metro.metro_definitions import (
     DEFINITION_VERSION,
     build_county_membership_df,
 )
@@ -43,7 +43,7 @@ def build_metro_tract_crosswalk(
         Tract-level ACS data with a ``GEOID`` column (11-digit tract codes).
     county_membership_df : pd.DataFrame, optional
         Override metro-county membership table.  If None, uses the
-        built-in membership from ``hhplab.metro.metro_definitions``.
+        built-in membership from ``hhplab.geographies.gf_metro.metro_definitions``.
 
     Returns
     -------

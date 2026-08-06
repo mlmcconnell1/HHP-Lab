@@ -16,7 +16,7 @@ from shapely.geometry import MultiPolygon, Polygon
 from typer.testing import CliRunner
 
 from hhplab.cli.main import app
-from hhplab.geo.normalize import normalize_boundaries
+from hhplab.geographies.coc.normalize import normalize_boundaries
 from hhplab.registry import latest_vintage, list_boundaries, register_vintage
 from hhplab.viz import render_coc_map
 

@@ -42,17 +42,17 @@ from pathlib import Path
 import pandas as pd
 
 import hhplab.naming as naming
-from hhplab.metro.metro_definitions import (
+from hhplab.geographies.gf_metro.metro_definitions import (
     CANONICAL_UNIVERSE_DEFINITION_VERSION,
     METRO_CBSA_MAPPING,
     build_cbsa_alias_df,
     canonicalize_cbsa_code,
     metro_name_for_id,
 )
-from hhplab.metro.metro_definitions import (
+from hhplab.geographies.gf_metro.metro_definitions import (
     DEFINITION_VERSION as GLYNN_FOX_DEFINITION_VERSION,
 )
-from hhplab.metro.metro_io import read_metro_subset_membership, read_metro_universe
+from hhplab.geographies.gf_metro.metro_io import read_metro_subset_membership, read_metro_universe
 from hhplab.provenance import ProvenanceBlock, write_parquet_with_provenance
 from hhplab.source_urls import CENSUS_API_ACS1
 from hhplab.sources.census.acs.ingest._acs1_api import (

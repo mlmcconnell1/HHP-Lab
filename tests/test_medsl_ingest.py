@@ -22,12 +22,12 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
-from hhplab.medsl.ingest import (
+from hhplab.provenance import read_provenance
+from hhplab.sources.medsl.medsl.ingest import (
     MEDSL_COUNTY_PRESIDENTIAL_COLUMNS,
     ingest_county_presidential_returns,
     parse_county_presidential_returns,
 )
-from hhplab.provenance import read_provenance
 
 FIXTURE_YEARS = (2000, 2004)
 MEDSL_FIXTURE_ROWS = [
@@ -301,7 +301,9 @@ class TestIngestCountyPresidentialReturns:
         def fake_register_source(**kwargs: object) -> None:
             registered.append(kwargs)
 
-        monkeypatch.setattr("hhplab.medsl.ingest.register_source", fake_register_source)
+        monkeypatch.setattr(
+            "hhplab.sources.medsl.medsl.ingest.register_source", fake_register_source
+        )
 
         output = ingest_county_presidential_returns(
             raw_path,

@@ -65,7 +65,7 @@ from hhplab.analysis_geo import (
     ensure_canonical_geo_columns,
     resolve_geo_col,
 )
-from hhplab.metro.metro_definitions import metro_name_for_id
+from hhplab.geographies.gf_metro.metro_definitions import metro_name_for_id
 from hhplab.panel.finalize import (
     detect_boundary_changes,
     determine_alignment_type,
@@ -956,7 +956,7 @@ def _load_coc_areas(
         )
         return pd.DataFrame(columns=["coc_id", "boundary_vintage_used", "coc_area_sq_km"])
 
-    from hhplab.geo.geo_io import read_geoparquet
+    from hhplab.geographies.coc.coc_io import read_geoparquet
 
     gdf = read_geoparquet(boundary_path)
     if "coc_id" not in gdf.columns or "geometry" not in gdf.columns:

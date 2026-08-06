@@ -8,7 +8,7 @@ from typer.testing import CliRunner
 
 from hhplab import __version__
 from hhplab.cli.main import app
-from hhplab.metro.metro_definitions import METRO_COUNT
+from hhplab.geographies.gf_metro.metro_definitions import METRO_COUNT
 
 runner = CliRunner()
 

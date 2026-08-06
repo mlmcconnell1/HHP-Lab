@@ -7,7 +7,7 @@ from pathlib import Path
 import pandas as pd
 
 import hhplab.naming as naming
-from hhplab.metro.metro_definitions import (
+from hhplab.geographies.gf_metro.metro_definitions import (
     CANONICAL_UNIVERSE_DEFINITION_VERSION,
     DEFINITION_VERSION,
     PROFILE_NAME,
@@ -17,7 +17,7 @@ from hhplab.metro.metro_definitions import (
     build_glynn_fox_subset_profile_df,
     build_metro_universe_df,
 )
-from hhplab.metro.metro_validate import (
+from hhplab.geographies.gf_metro.metro_validate import (
     MetroValidationResult,
     validate_metro_artifacts,
     validate_metro_universe_artifacts,
@@ -128,7 +128,7 @@ def write_metro_universe_artifacts(
 ) -> tuple[Path, Path]:
     """Generate and write canonical metro-universe and subset-profile artifacts."""
     if msa_definitions_df is None:
-        from hhplab.msa.msa_io import read_msa_definitions
+        from hhplab.geographies.msa.msa_io import read_msa_definitions
 
         try:
             msa_definitions_df = read_msa_definitions(metro_definition_version, base_dir)
@@ -250,7 +250,7 @@ def read_metro_boundaries(
     base_dir: Path | str | None = None,
 ):
     """Read materialized metro boundary polygons from the curated artifact."""
-    from hhplab.metro.metro_boundaries import read_metro_boundaries as _read
+    from hhplab.geographies.gf_metro.metro_boundaries import read_metro_boundaries as _read
 
     return _read(
         definition_version=definition_version,
@@ -266,7 +266,9 @@ def validate_curated_metro_boundaries(
     base_dir: Path | str | None = None,
 ):
     """Load curated metro boundaries and validate them."""
-    from hhplab.metro.metro_boundaries import validate_curated_metro_boundaries as _validate
+    from hhplab.geographies.gf_metro.metro_boundaries import (
+        validate_curated_metro_boundaries as _validate,
+    )
 
     return _validate(
         definition_version=definition_version,

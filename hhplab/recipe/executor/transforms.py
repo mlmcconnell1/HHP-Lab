@@ -14,7 +14,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from hhplab.geo.ct_planning_regions import (
+from hhplab.geographies.coc.ct_planning_regions import (
     build_ct_county_planning_region_crosswalk,
     build_ct_tract_planning_region_map,
     is_ct_legacy_county_fips,
@@ -197,7 +197,7 @@ def _metro_subset_membership(
     if profile_definition_version is None:
         return None
 
-    from hhplab.metro.metro_io import read_metro_subset_membership
+    from hhplab.geographies.gf_metro.metro_io import read_metro_subset_membership
 
     metro_definition_version = metro_ref.resolved_metro_definition_version()
     if metro_definition_version is None:
@@ -252,7 +252,7 @@ def _resolve_metro_transform_df(
     definition_version = metro_ref.source
 
     if _metro_uses_legacy_membership(metro_ref):
-        from hhplab.metro.metro_io import (
+        from hhplab.geographies.gf_metro.metro_io import (
             read_metro_coc_membership,
             read_metro_county_membership,
         )
@@ -351,8 +351,8 @@ def _resolve_msa_transform_df(
             "definition version (for example 'census_msa_2023')."
         )
 
-    from hhplab.msa.crosswalk import build_coc_msa_crosswalk
-    from hhplab.msa.msa_io import read_msa_county_membership
+    from hhplab.geographies.msa.crosswalk import build_coc_msa_crosswalk
+    from hhplab.geographies.msa.msa_io import read_msa_county_membership
     from hhplab.naming import coc_base_path, county_path
 
     data_root = project_root / "data"
@@ -591,7 +591,7 @@ def _generated_msa_transform_is_stale(
         return False
 
     data_root = project_root / "data"
-    from hhplab.msa.msa_io import read_msa_county_membership
+    from hhplab.geographies.msa.msa_io import read_msa_county_membership
     from hhplab.naming import county_path, tract_path
 
     try:

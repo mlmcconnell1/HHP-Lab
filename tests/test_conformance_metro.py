@@ -7,7 +7,7 @@ uses metro_id instead of coc_id, proving metro is a first-class target.
 import pandas as pd
 import pytest
 
-from hhplab.metro.metro_definitions import METRO_COUNT
+from hhplab.geographies.gf_metro.metro_definitions import METRO_COUNT
 from hhplab.panel.conformance import (
     PanelRequest,
     check_coc_count,

@@ -54,17 +54,17 @@ import httpx
 import pandas as pd
 
 import hhplab.naming as naming
-from hhplab.metro.metro_definitions import (
+from hhplab.geographies.gf_metro.metro_definitions import (
     CANONICAL_UNIVERSE_DEFINITION_VERSION,
     METRO_CBSA_MAPPING,
     METRO_STATE_FIPS,
     metro_name_for_id,
     principal_state_fips_for_metro_name,
 )
-from hhplab.metro.metro_definitions import (
+from hhplab.geographies.gf_metro.metro_definitions import (
     DEFINITION_VERSION as GLYNN_FOX_DEFINITION_VERSION,
 )
-from hhplab.metro.metro_io import read_metro_subset_membership, read_metro_universe
+from hhplab.geographies.gf_metro.metro_io import read_metro_subset_membership, read_metro_universe
 from hhplab.provenance import ProvenanceBlock, write_parquet_with_provenance
 from hhplab.source_urls import BLS_API_REGISTRATION_URL, BLS_API_V2, BLS_LAUS_SOURCE_REF
 from hhplab.sources.bls.laus.series import (

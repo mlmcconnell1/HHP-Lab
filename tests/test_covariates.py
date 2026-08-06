@@ -20,12 +20,6 @@ from hhplab.covariates.aggregate import (
 from hhplab.covariates.catalog import COVARIATE_SOURCE_SPECS
 from hhplab.covariates.frame_adapters import registered_covariate_frame_adapters
 from hhplab.covariates.ingest import ingest_covariate_source
-from hhplab.covariates.irs_soi_contract import (
-    IRS_SOI_COUNTY_MEASURE_COLUMNS,
-    IRS_SOI_MSA_MEASURE_COLUMNS,
-    IRS_SOI_PAIR_MEASURE_COLUMNS,
-    IRS_SOI_SOURCE_ID,
-)
 from hhplab.covariates.saiz_contract import (
     SAIZ_ESTIMATE_YEAR,
     SAIZ_MEASURE_COLUMNS,
@@ -34,7 +28,7 @@ from hhplab.covariates.saiz_contract import (
     validate_saiz_source_contract,
 )
 from hhplab.curated_policy import validate_curated_layout
-from hhplab.geo.ct_planning_regions import CtPlanningRegionCrosswalk
+from hhplab.geographies.coc.ct_planning_regions import CtPlanningRegionCrosswalk
 from hhplab.provenance import ProvenanceBlock, read_provenance, write_parquet_with_provenance
 from hhplab.sources.bls.qcew.contract import (
     QCEW_DERIVED_MEASURE_COLUMNS,
@@ -51,6 +45,12 @@ from hhplab.sources.census.bps.census_bps_contract import (
     CENSUS_BPS_CLASS_UNIT_COLUMNS,
     CENSUS_BPS_CLASS_VALUE_COLUMNS,
     CENSUS_BPS_SOURCE_ID,
+)
+from hhplab.sources.irs.irs_soi_contract import (
+    IRS_SOI_COUNTY_MEASURE_COLUMNS,
+    IRS_SOI_MSA_MEASURE_COLUMNS,
+    IRS_SOI_PAIR_MEASURE_COLUMNS,
+    IRS_SOI_SOURCE_ID,
 )
 from hhplab.sources.mpi.mpi_contract import (
     MPI_COUNTY_HEADERS,

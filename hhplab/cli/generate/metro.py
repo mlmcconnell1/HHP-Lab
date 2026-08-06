@@ -6,7 +6,7 @@ from typing import Annotated
 
 import typer
 
-from hhplab.metro.metro_definitions import (
+from hhplab.geographies.gf_metro.metro_definitions import (
     CANONICAL_UNIVERSE_DEFINITION_VERSION,
     DEFINITION_VERSION,
 )
@@ -52,7 +52,7 @@ def generate_metro(
     import json as json_mod
 
     import hhplab.naming as naming
-    from hhplab.metro.metro_io import write_metro_artifacts
+    from hhplab.geographies.gf_metro.metro_io import write_metro_artifacts
 
     # Check for existing artifacts unless --force
     paths_to_write = [
@@ -158,7 +158,7 @@ def generate_metro_universe(
     import json as json_mod
 
     import hhplab.naming as naming
-    from hhplab.metro.metro_io import write_metro_universe_artifacts
+    from hhplab.geographies.gf_metro.metro_io import write_metro_universe_artifacts
 
     paths_to_write = [
         naming.metro_universe_path(definition_version),

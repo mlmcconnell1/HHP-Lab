@@ -65,7 +65,7 @@ from typing import Literal
 
 import pandas as pd
 
-from hhplab.geo.ct_planning_regions import (
+from hhplab.geographies.coc.ct_planning_regions import (
     CT_LEGACY_COUNTY_VINTAGE,
     CT_PLANNING_REGION_VINTAGE,
     build_ct_county_planning_region_crosswalk,

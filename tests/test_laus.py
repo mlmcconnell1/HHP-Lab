@@ -27,7 +27,7 @@ import pandas as pd
 import pytest
 
 from hhplab.cli.ingest.laus_metro import ingest_laus_metro as ingest_laus_metro_cli
-from hhplab.metro.metro_definitions import (
+from hhplab.geographies.gf_metro.metro_definitions import (
     CANONICAL_UNIVERSE_DEFINITION_VERSION,
     METRO_CBSA_MAPPING,
     METRO_STATE_FIPS,
@@ -861,7 +861,10 @@ class TestLausPanelIntegration:
 
     def _write_laus_artifact(self, tmp_path: Path, year: int) -> Path:
         """Write a minimal valid LAUS artifact for testing panel integration."""
-        from hhplab.metro.metro_definitions import METRO_CBSA_MAPPING, METRO_STATE_FIPS
+        from hhplab.geographies.gf_metro.metro_definitions import (
+            METRO_CBSA_MAPPING,
+            METRO_STATE_FIPS,
+        )
         from hhplab.naming import laus_metro_path
 
         rows = []

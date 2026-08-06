@@ -12,10 +12,10 @@ import geopandas as gpd
 import httpx
 
 import hhplab.naming as naming
-from hhplab.geo.geo_io import write_geoparquet
-from hhplab.msa.msa_definitions import DEFINITION_VERSION, SOURCE_REF
-from hhplab.msa.msa_io import download_delineation_rows, read_msa_definitions
-from hhplab.msa.msa_validate import validate_msa_boundaries
+from hhplab.geographies.coc.coc_io import write_geoparquet
+from hhplab.geographies.msa.msa_definitions import DEFINITION_VERSION, SOURCE_REF
+from hhplab.geographies.msa.msa_io import download_delineation_rows, read_msa_definitions
+from hhplab.geographies.msa.msa_validate import validate_msa_boundaries
 from hhplab.provenance import ProvenanceBlock
 from hhplab.raw_snapshot import persist_file_snapshot
 from hhplab.source_registry import check_source_changed, register_source
@@ -44,7 +44,7 @@ def _load_expected_definitions(
         return read_msa_definitions(definition_version, base_dir)
     except FileNotFoundError:
         delineation_df, _, _, _ = download_delineation_rows(raw_root=raw_root)
-        from hhplab.msa.msa_definitions import build_definitions_df
+        from hhplab.geographies.msa.msa_definitions import build_definitions_df
 
         return build_definitions_df(delineation_df)
 

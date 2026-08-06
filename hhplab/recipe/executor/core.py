@@ -32,7 +32,7 @@ from hhplab.recipe.recipe_schema import RecipeV1
 if TYPE_CHECKING:
     import pandas as pd
 
-    from hhplab.geo.ct_planning_regions import CtPlanningRegionCrosswalk
+    from hhplab.geographies.coc.ct_planning_regions import CtPlanningRegionCrosswalk
 
 
 class ExecutorError(Exception):

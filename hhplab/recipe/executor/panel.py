@@ -22,9 +22,9 @@ import pandas as pd
 
 import hhplab.naming as naming
 from hhplab.config import load_config
-from hhplab.msa.coverage import select_primary_msa_for_cocs
-from hhplab.msa.crosswalk import read_coc_msa_crosswalk
-from hhplab.msa.msa_io import read_msa_county_membership, read_msa_definitions
+from hhplab.geographies.msa.coverage import select_primary_msa_for_cocs
+from hhplab.geographies.msa.crosswalk import read_coc_msa_crosswalk
+from hhplab.geographies.msa.msa_io import read_msa_county_membership, read_msa_definitions
 from hhplab.naming import (
     acs5_tracts_filename,
     decennial_tracts_filename,
@@ -94,7 +94,7 @@ def canonicalize_panel_for_target(
             if "metro_id" not in result.columns:
                 result["metro_id"] = result["geo_id"]
             if "metro_name" not in result.columns or result["metro_name"].isna().any():
-                from hhplab.metro.metro_definitions import metro_name_for_id
+                from hhplab.geographies.gf_metro.metro_definitions import metro_name_for_id
 
                 result["metro_name"] = result["metro_id"].map(metro_name_for_id)
             if definition_version is not None and "definition_version_used" not in result.columns:
@@ -558,7 +558,7 @@ def _add_recipe_coc_names(
     if "coc_id" not in panel.columns or "boundary_vintage_used" not in panel.columns:
         return panel
 
-    from hhplab.geo.geo_io import read_geoparquet
+    from hhplab.geographies.coc.coc_io import read_geoparquet
     from hhplab.panel.assemble import _resolve_boundary_file
 
     result = panel.copy()
@@ -626,7 +626,10 @@ def _add_recipe_metro_metadata(
     ):
         return panel
 
-    from hhplab.metro.metro_io import read_metro_subset_membership, read_metro_universe
+    from hhplab.geographies.gf_metro.metro_io import (
+        read_metro_subset_membership,
+        read_metro_universe,
+    )
 
     result = panel.copy()
     geo_col = "metro_id" if "metro_id" in result.columns else "geo_id"
@@ -701,7 +704,7 @@ def _add_recipe_msa_metadata(
     if target_geometry.source is None:
         return panel
 
-    from hhplab.msa.msa_io import read_msa_definitions
+    from hhplab.geographies.msa.msa_io import read_msa_definitions
 
     result = panel.copy()
     geo_col = "msa_id" if "msa_id" in result.columns else "geo_id"

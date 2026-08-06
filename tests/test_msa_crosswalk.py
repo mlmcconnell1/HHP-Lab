@@ -9,7 +9,7 @@ import pandas as pd
 import pytest
 from shapely.geometry import box
 
-from hhplab.msa.crosswalk import (
+from hhplab.geographies.msa.crosswalk import (
     ALLOCATION_SHARE_TOLERANCE,
     COC_MSA_BLOCK_POPULATION_CROSSWALK_COLUMNS,
     COC_MSA_CROSSWALK_COLUMNS,
@@ -1264,7 +1264,7 @@ def test_invalid_allocation_share_raises_clear_error(monkeypatch: pytest.MonkeyP
     )
 
     monkeypatch.setattr(
-        "hhplab.msa.crosswalk.build_county_crosswalk",
+        "hhplab.geographies.msa.crosswalk.build_county_crosswalk",
         lambda *args, **kwargs: invalid_county_crosswalk,
     )
 
@@ -1299,7 +1299,7 @@ def test_inconsistent_coc_area_raises_clear_error(monkeypatch: pytest.MonkeyPatc
     )
 
     monkeypatch.setattr(
-        "hhplab.msa.crosswalk.build_county_crosswalk",
+        "hhplab.geographies.msa.crosswalk.build_county_crosswalk",
         lambda *args, **kwargs: inconsistent_county_crosswalk,
     )
 

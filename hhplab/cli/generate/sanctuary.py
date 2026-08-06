@@ -7,7 +7,7 @@ from typing import Annotated
 import typer
 
 from hhplab.cli.shared.output import JsonOutput, cli_error, emit_result
-from hhplab.msa import DEFINITION_VERSION as MSA_DEFINITION_VERSION
+from hhplab.geographies.msa import DEFINITION_VERSION as MSA_DEFINITION_VERSION
 from hhplab.sanctuary import DOJ_SANCTUARY_SOURCE_DATE
 
 

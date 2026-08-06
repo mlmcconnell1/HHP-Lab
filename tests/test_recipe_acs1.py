@@ -182,7 +182,7 @@ def _make_county_acs1_parquet(path: Path) -> None:
 
 def _setup_committed_recipe_execution_fixtures(tmp_path: Path) -> None:
     """Create the lagged ACS1 inputs needed to execute the committed recipe."""
-    from hhplab.metro.metro_io import write_metro_artifacts
+    from hhplab.geographies.gf_metro.metro_io import write_metro_artifacts
 
     write_metro_artifacts(base_dir=tmp_path / "data")
 

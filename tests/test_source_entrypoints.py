@@ -2,7 +2,7 @@
 
 import hhplab.sources.census.census.ingest as census_ingest
 from hhplab import cdc, census, medsl, nhgis, vera
-from hhplab.nhgis.ingest import ingest_nhgis_counties, ingest_nhgis_tracts
+from hhplab.geographies.nhgis.ingest import ingest_nhgis_counties, ingest_nhgis_tracts
 from hhplab.sources.cdc import aggregate_county_overdose_to_msa, ingest_county_overdose
 from hhplab.sources.census.census.ingest import (
     ingest_tiger_counties,
@@ -22,8 +22,8 @@ def test_package_root_lazy_exports() -> None:
     assert hhplab.sources.cdc is cdc
     assert hhplab.census is census
     assert hhplab.hud is hud
-    assert hhplab.medsl is medsl
-    assert hhplab.nhgis is nhgis
+    assert hhplab.sources.medsl.medsl is medsl
+    assert hhplab.geographies.nhgis is nhgis
     assert hhplab.pit is pit
     assert hhplab.vera is vera
 

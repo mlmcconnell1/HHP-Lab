@@ -9,8 +9,8 @@ import geopandas as gpd
 import pandas as pd
 import typer
 
-from hhplab.geo.geo_io import resolve_curated_boundary_path
-from hhplab.msa.msa_definitions import DEFINITION_VERSION, DELINEATION_FILE_YEAR
+from hhplab.geographies.coc.coc_io import resolve_curated_boundary_path
+from hhplab.geographies.msa.msa_definitions import DEFINITION_VERSION, DELINEATION_FILE_YEAR
 from hhplab.naming import (
     block_geometry_path,
     county_path,
@@ -131,7 +131,7 @@ def generate_msa_xwalk(
     """Generate the auditable CoC-to-MSA allocation crosswalk used for PIT."""
     import json
 
-    from hhplab.msa.crosswalk import (
+    from hhplab.geographies.msa.crosswalk import (
         FULL_ALLOCATION_THRESHOLD,
         build_coc_msa_block_population_crosswalk,
         build_coc_msa_crosswalk,
@@ -139,7 +139,7 @@ def generate_msa_xwalk(
         save_coc_msa_crosswalk,
         summarize_coc_msa_allocation,
     )
-    from hhplab.msa.msa_io import read_msa_county_membership
+    from hhplab.geographies.msa.msa_io import read_msa_county_membership
 
     try:
         resolved_boundary = _resolve_boundary_vintage(boundary)
@@ -399,7 +399,7 @@ def _build_block_population_state_shards(
     output_path,
     reuse_shards: bool,
 ) -> pd.DataFrame:
-    from hhplab.msa.crosswalk import (
+    from hhplab.geographies.msa.crosswalk import (
         COC_MSA_BLOCK_POPULATION_CROSSWALK_COLUMNS,
         build_coc_msa_block_population_crosswalk,
     )
@@ -530,7 +530,7 @@ def _cocs_intersecting_state(
 
 
 def _concat_block_population_state_shards(shards: list[pd.DataFrame]) -> pd.DataFrame:
-    from hhplab.msa.crosswalk import (
+    from hhplab.geographies.msa.crosswalk import (
         COC_MSA_BLOCK_POPULATION_CROSSWALK_COLUMNS,
         FULL_ALLOCATION_THRESHOLD,
         _coverage_share_from_denominator,

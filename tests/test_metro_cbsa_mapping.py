@@ -6,7 +6,7 @@ and ACS1 unemployment variable completeness.
 
 import pytest
 
-from hhplab.metro.metro_definitions import (
+from hhplab.geographies.gf_metro.metro_definitions import (
     _CBSA_METRO_NAMES,
     _CBSA_TO_METRO,
     METRO_CBSA_MAPPING,

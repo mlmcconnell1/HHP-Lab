@@ -7,7 +7,7 @@ import pandas as pd
 import pytest
 from shapely.geometry import box
 
-from hhplab.msa.coverage import (
+from hhplab.geographies.msa.coverage import (
     MSA_COC_COVERAGE_COLUMNS,
     build_msa_coc_coverage,
     read_msa_coc_coverage,

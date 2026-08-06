@@ -27,7 +27,7 @@ import glob
 import numpy as np
 import pandas as pd
 
-from hhplab.msa import read_msa_county_membership
+from hhplab.geographies.msa import read_msa_county_membership
 from hhplab.results.workflows._paths import DATA_ROOT, OUTPUTS_ROOT, REPO_ROOT, write_result_parquet
 
 ROOT = REPO_ROOT

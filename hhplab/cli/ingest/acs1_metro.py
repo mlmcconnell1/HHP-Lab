@@ -7,7 +7,7 @@ from typing import Annotated
 import typer
 
 from hhplab.cli.shared.output import JsonOutput, cli_error, emit_result
-from hhplab.metro.metro_definitions import CANONICAL_UNIVERSE_DEFINITION_VERSION
+from hhplab.geographies.gf_metro.metro_definitions import CANONICAL_UNIVERSE_DEFINITION_VERSION
 
 
 def _acs1_command_help(*, geography: str) -> str:

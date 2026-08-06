@@ -7,7 +7,7 @@ from pathlib import Path
 import pandas as pd
 
 from hhplab.analysis_geo import MSA_ID_COL
-from hhplab.msa import aggregate_coc_to_msa_fractional_rollup
+from hhplab.geographies.msa import aggregate_coc_to_msa_fractional_rollup
 from hhplab.paths import curated_dir
 from hhplab.provenance import ProvenanceBlock, write_parquet_with_provenance
 

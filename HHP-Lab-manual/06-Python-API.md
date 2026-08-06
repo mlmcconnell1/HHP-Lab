@@ -34,7 +34,7 @@ from hhplab.prism import (
     materialize_prism_monthly_counties,
     prism_county_monthly_columns,
 )
-from hhplab.medsl import (
+from hhplab.sources.medsl.medsl import (
     ingest_county_presidential_returns,
     materialize_county_political_leaning,
     parse_county_presidential_returns,

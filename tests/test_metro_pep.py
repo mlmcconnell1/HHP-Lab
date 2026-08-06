@@ -9,7 +9,7 @@ import warnings
 import pandas as pd
 import pytest
 
-from hhplab.metro.metro_definitions import (
+from hhplab.geographies.gf_metro.metro_definitions import (
     METRO_COUNT,
     METRO_COUNTY_MEMBERSHIP,
     build_county_membership_df,

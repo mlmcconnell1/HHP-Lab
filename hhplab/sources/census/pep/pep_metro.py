@@ -18,7 +18,7 @@ import logging
 
 import pandas as pd
 
-from hhplab.metro.metro_definitions import (
+from hhplab.geographies.gf_metro.metro_definitions import (
     DEFINITION_VERSION,
     build_county_membership_df,
 )
@@ -65,7 +65,7 @@ def aggregate_pep_to_metro(
         population set to null.  Default 0.0 (allow partial coverage).
     county_membership_df : pd.DataFrame, optional
         Override metro-county membership table.  If None, uses the
-        built-in membership from ``hhplab.metro.metro_definitions``.
+        built-in membership from ``hhplab.geographies.gf_metro.metro_definitions``.
 
     Returns
     -------

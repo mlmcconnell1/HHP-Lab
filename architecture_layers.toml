@@ -16,13 +16,11 @@ order = ["contracts", "infrastructure", "domain", "application", "interface"]
 "hhplab.sources.census" = "domain"
 "hhplab.sources.mpi" = "domain"
 "hhplab.covariates" = "domain"
-"hhplab.geo" = "domain"
+"hhplab.geographies" = "domain"
 "hhplab.measures" = "domain"
-"hhplab.medsl" = "domain"
-"hhplab.metro" = "domain"
-"hhplab.msa" = "domain"
-"hhplab.nhgis" = "domain"
+"hhplab.sources.medsl" = "domain"
 "hhplab.sources.hud" = "domain"
+"hhplab.sources.irs" = "domain"
 "hhplab.prism" = "domain"
 "hhplab.rents" = "domain"
 "hhplab.vera" = "domain"
@@ -72,8 +70,8 @@ upward_edges = [
 "hhplab.naming" = ["hhplab.naming_covariates", "hhplab.paths"]
 "hhplab.naming_covariates" = []
 "hhplab.schema.columns" = []
-"hhplab.metro.metro_definitions" = ["hhplab.msa.msa_definitions"]
-"hhplab.msa.msa_definitions" = []
+"hhplab.geographies.gf_metro.metro_definitions" = ["hhplab.geographies.msa.msa_definitions"]
+"hhplab.geographies.msa.msa_definitions" = []
 
 [facades]
 # These package initializers may re-export stable APIs, but implementation must
@@ -84,11 +82,12 @@ passive_or_reexport_only = [
   "hhplab.sources.census.acs",
   "hhplab.sources.census.census",
   "hhplab.sources.census.pep",
+  "hhplab.geographies",
   "hhplab.cli",
   "hhplab.covariates",
-  "hhplab.geo",
-  "hhplab.metro",
-  "hhplab.msa",
+  "hhplab.geographies.coc",
+  "hhplab.geographies.gf_metro",
+  "hhplab.geographies.msa",
   "hhplab.panel",
   "hhplab.recipe",
   "hhplab.registry",

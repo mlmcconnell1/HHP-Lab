@@ -24,8 +24,8 @@ import pyarrow as pa
 import pyarrow.parquet as pq
 
 from hhplab.config import load_config
-from hhplab.msa.coverage import build_msa_coc_coverage, save_msa_coc_coverage
-from hhplab.msa.crosswalk import aggregate_coc_to_msa_fractional_rollup
+from hhplab.geographies.msa.coverage import build_msa_coc_coverage, save_msa_coc_coverage
+from hhplab.geographies.msa.crosswalk import aggregate_coc_to_msa_fractional_rollup
 from hhplab.naming import (
     acs5_tracts_filename,
     coc_base_path,

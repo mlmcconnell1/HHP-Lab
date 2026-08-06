@@ -6,7 +6,7 @@ from typing import Annotated
 
 import typer
 
-from hhplab.msa.msa_definitions import DEFINITION_VERSION
+from hhplab.geographies.msa.msa_definitions import DEFINITION_VERSION
 
 
 def validate_msa(
@@ -29,8 +29,8 @@ def validate_msa(
     """Validate curated MSA definitions, membership, and boundary polygons."""
     import json as json_mod
 
-    from hhplab.msa.msa_boundaries import validate_curated_msa_boundaries
-    from hhplab.msa.msa_io import validate_curated_msa
+    from hhplab.geographies.msa.msa_boundaries import validate_curated_msa_boundaries
+    from hhplab.geographies.msa.msa_io import validate_curated_msa
 
     try:
         definitions_result = validate_curated_msa(definition_version)

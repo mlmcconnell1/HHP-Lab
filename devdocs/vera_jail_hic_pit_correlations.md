@@ -24,7 +24,7 @@ capita, in the same year," not a causal or timing claim.
   2020/2022/2023 rollups (2024-2025 excluded here, see below).
 - Vera: `data/curated/vera/vera_incarceration_county__Y1970-2026@C2020.parquet`,
   `total_jail_pop`, rolled up to MSA by hand (not yet a registered covariate
-  source) via `hhplab.msa.read_msa_county_membership`, simple sum (additive
+  source) via `hhplab.geographies.msa.read_msa_county_membership`, simple sum (additive
   stock measure), population-weighted coverage tracked via
   `vera_county_count`/`vera_county_expected`. Unlike CDC overdose's
   county-count-weighted ratio (a known gap, bead

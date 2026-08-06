@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from hhplab.msa import DEFINITION_VERSION, read_msa_county_membership
+from hhplab.geographies.msa import DEFINITION_VERSION, read_msa_county_membership
 from hhplab.naming import cdc_overdose_county_filename, cdc_overdose_msa_filename
 from hhplab.paths import curated_dir
 from hhplab.provenance import ProvenanceBlock, write_parquet_with_provenance

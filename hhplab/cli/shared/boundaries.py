@@ -68,7 +68,7 @@ def ingest_boundaries(
                 typer.echo(f"Error: {message}", err=True)
             raise typer.Exit(1)
 
-        from hhplab.geo.geo_io import curated_boundary_path
+        from hhplab.geographies.coc.coc_io import curated_boundary_path
         from hhplab.registry.boundary_registry import list_boundaries
         from hhplab.sources.hud.hud import ingest_hud_exchange
 

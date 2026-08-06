@@ -5,7 +5,7 @@ from __future__ import annotations
 import geopandas as gpd
 import pandas as pd
 
-from hhplab.msa.crosswalk import build_coc_msa_crosswalk
+from hhplab.geographies.msa.crosswalk import build_coc_msa_crosswalk
 from hhplab.recipe.recipe_schema import ContainmentSpec
 from hhplab.xwalks.county import ALBERS_EQUAL_AREA_CRS, build_coc_county_crosswalk
 

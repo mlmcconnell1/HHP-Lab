@@ -9,7 +9,7 @@ import logging
 
 import pandas as pd
 
-from hhplab.geo.ct_planning_regions import CT_STATE_FIPS, CtPlanningRegionCrosswalk
+from hhplab.geographies.coc.ct_planning_regions import CT_STATE_FIPS, CtPlanningRegionCrosswalk
 from hhplab.rents.zori_aggregate import _align_ct_geographies
 
 

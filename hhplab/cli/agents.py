@@ -5,7 +5,7 @@ from typing import Annotated
 
 import typer
 
-from hhplab.metro.metro_definitions import METRO_COUNT
+from hhplab.geographies.gf_metro.metro_definitions import METRO_COUNT
 
 APPROX_COC_COUNT = 380
 SMALL_N_GUIDANCE = (

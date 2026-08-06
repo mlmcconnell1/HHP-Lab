@@ -20,11 +20,11 @@ import logging
 
 import pandas as pd
 
-from hhplab.metro.metro_definitions import (
+from hhplab.geographies.gf_metro.metro_definitions import (
     DEFINITION_VERSION,
     build_county_membership_df,
 )
-from hhplab.msa.msa_io import read_msa_county_membership
+from hhplab.geographies.msa.msa_io import read_msa_county_membership
 from hhplab.rents.zori_aggregate import (
     YearlyMethod,
     aggregate_monthly,
@@ -73,7 +73,7 @@ def aggregate_zori_to_metro(
         zori_coc set to null.  Default 0.90.
     county_membership_df : pd.DataFrame, optional
         Override metro-county membership table.  If None, uses the
-        built-in membership from ``hhplab.metro.metro_definitions``.
+        built-in membership from ``hhplab.geographies.gf_metro.metro_definitions``.
 
     Returns
     -------

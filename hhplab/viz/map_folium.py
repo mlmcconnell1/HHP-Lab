@@ -87,7 +87,7 @@ def _normalize_coc_id(coc_id: str) -> str:
 
 def _find_coc_boundary_file(vintage: str, *, base_dir: Path) -> Path:
     """Find the GeoParquet file for a given vintage."""
-    from hhplab.geo.geo_io import resolve_curated_boundary_path
+    from hhplab.geographies.coc.coc_io import resolve_curated_boundary_path
 
     return resolve_curated_boundary_path(vintage, base_dir)
 
@@ -110,7 +110,7 @@ def _load_msa_boundaries(
     county_vintage: str | int,
     base_dir: Path,
 ) -> gpd.GeoDataFrame:
-    from hhplab.msa.msa_boundaries import read_msa_boundaries
+    from hhplab.geographies.msa.msa_boundaries import read_msa_boundaries
 
     gdf = read_msa_boundaries(definition_version, base_dir)
     if "geometry_vintage" in gdf.columns:
@@ -131,7 +131,7 @@ def _load_metro_boundaries(
     county_vintage: str | int,
     base_dir: Path,
 ) -> gpd.GeoDataFrame:
-    from hhplab.metro.metro_boundaries import read_metro_boundaries
+    from hhplab.geographies.gf_metro.metro_boundaries import read_metro_boundaries
 
     return read_metro_boundaries(
         definition_version=definition_version,

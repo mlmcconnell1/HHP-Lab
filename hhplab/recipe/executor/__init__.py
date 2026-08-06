@@ -14,7 +14,7 @@ import pyarrow as pa
 import typer
 
 from hhplab.config import StorageConfig
-from hhplab.geo.ct_planning_regions import CT_LEGACY_COUNTY_VINTAGE
+from hhplab.geographies.coc.ct_planning_regions import CT_LEGACY_COUNTY_VINTAGE
 from hhplab.recipe.cache import RecipeCache
 from hhplab.recipe.executor import population as population_execution
 from hhplab.recipe.executor.core import (

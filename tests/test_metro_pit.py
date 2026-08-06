@@ -7,7 +7,7 @@ covering single-CoC, multi-CoC, missing-CoC, and truth-table cases.
 import pandas as pd
 import pytest
 
-from hhplab.metro.metro_definitions import (
+from hhplab.geographies.gf_metro.metro_definitions import (
     METRO_COC_MEMBERSHIP,
     METRO_COUNT,
     build_coc_membership_df,

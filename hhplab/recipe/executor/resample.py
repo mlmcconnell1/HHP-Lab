@@ -15,7 +15,7 @@ import warnings
 import numpy as np
 import pandas as pd
 
-from hhplab.geo.ct_planning_regions import (
+from hhplab.geographies.coc.ct_planning_regions import (
     CT_LEGACY_COUNTY_VINTAGE,
     CT_PLANNING_REGION_VINTAGE,
     CtPlanningRegionCrosswalk,

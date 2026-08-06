@@ -14,10 +14,10 @@ from pathlib import Path
 
 import pyarrow.parquet as pq
 
-from hhplab.metro.metro_definitions import (
+from hhplab.geographies.gf_metro.metro_definitions import (
     CANONICAL_UNIVERSE_DEFINITION_VERSION,
 )
-from hhplab.metro.metro_definitions import (
+from hhplab.geographies.gf_metro.metro_definitions import (
     DEFINITION_VERSION as GLYNN_FOX_DEFINITION_VERSION,
 )
 from hhplab.sources.census.acs.variables import TRACT_OUTPUT_COLUMNS

@@ -7,7 +7,7 @@ from dataclasses import dataclass
 
 import pandas as pd
 
-from hhplab.msa.msa_definitions import DEFINITION_VERSION, MSA_AREA_TYPE
+from hhplab.geographies.msa.msa_definitions import DEFINITION_VERSION, MSA_AREA_TYPE
 
 
 @dataclass

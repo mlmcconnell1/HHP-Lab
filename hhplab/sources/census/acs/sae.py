@@ -11,7 +11,7 @@ from typing import Any, Literal
 import pandas as pd
 
 from hhplab import naming
-from hhplab.geo.ct_planning_regions import (
+from hhplab.geographies.coc.ct_planning_regions import (
     is_ct_legacy_county_fips,
     is_ct_planning_region_fips,
 )

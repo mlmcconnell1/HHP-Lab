@@ -890,7 +890,7 @@ def aggregate_pep_to_msa(
     force: bool = False,
 ) -> Path:
     """Aggregate PEP county estimates to Census MSA geography for one year."""
-    from hhplab.msa.msa_io import read_msa_county_membership, read_msa_definitions
+    from hhplab.geographies.msa.msa_io import read_msa_county_membership, read_msa_definitions
     from hhplab.naming import msa_county_membership_path
 
     output_path = get_msa_output_path(

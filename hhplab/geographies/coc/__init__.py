@@ -1,8 +1,8 @@
 """Geospatial utilities for CoC boundary processing."""
 
-from hhplab.geo.geo_io import read_geoparquet, write_geoparquet
-from hhplab.geo.geo_validate import ValidationResult, validate_boundaries
-from hhplab.geo.normalize import (
+from hhplab.geographies.coc.coc_io import read_geoparquet, write_geoparquet
+from hhplab.geographies.coc.coc_validate import ValidationResult, validate_boundaries
+from hhplab.geographies.coc.normalize import (
     compute_geom_hash,
     ensure_polygon_type,
     fix_geometry,

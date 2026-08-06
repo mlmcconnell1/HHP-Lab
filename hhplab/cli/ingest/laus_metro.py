@@ -7,7 +7,7 @@ from typing import Annotated
 
 import typer
 
-from hhplab.metro.metro_definitions import CANONICAL_UNIVERSE_DEFINITION_VERSION
+from hhplab.geographies.gf_metro.metro_definitions import CANONICAL_UNIVERSE_DEFINITION_VERSION
 
 
 def ingest_laus_metro(

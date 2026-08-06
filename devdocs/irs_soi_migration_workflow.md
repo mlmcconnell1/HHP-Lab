@@ -224,7 +224,7 @@ multi-county metros.
 Connecticut changed from legacy county FIPS to planning-region county
 equivalents in the IRS SOI window. For pre-2022 CT rows, HHP-Lab crosswalks
 legacy counties to planning regions before MSA aggregation using the
-area-share bridge in `hhplab/geo/ct_planning_regions.py`. This preserves
+area-share bridge in `hhplab/geographies/coc/ct_planning_regions.py`. This preserves
 external MSA inflow/outflow coverage for CT-inclusive MSAs, but the
 `intra_msa_*` series has an era break at 2022 because old counties and larger
 planning regions observe different within-metro moves. Do not use CT

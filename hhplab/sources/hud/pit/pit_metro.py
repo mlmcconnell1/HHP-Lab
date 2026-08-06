@@ -17,7 +17,7 @@ from __future__ import annotations
 
 import pandas as pd
 
-from hhplab.metro.metro_definitions import (
+from hhplab.geographies.gf_metro.metro_definitions import (
     DEFINITION_VERSION,
     build_coc_membership_df,
 )
@@ -45,7 +45,7 @@ def aggregate_pit_to_metro(
         canonical version (``glynn_fox_v1``).
     coc_membership_df : pd.DataFrame, optional
         Override metro-CoC membership table.  If None, uses the
-        built-in membership from ``hhplab.metro.metro_definitions``.
+        built-in membership from ``hhplab.geographies.gf_metro.metro_definitions``.
 
     Returns
     -------

@@ -99,7 +99,7 @@ from typing import Literal
 
 import pandas as pd
 
-from hhplab.geo.ct_planning_regions import CT_STATE_FIPS
+from hhplab.geographies.coc.ct_planning_regions import CT_STATE_FIPS
 from hhplab.sources.census.acs.variables import COUNT_COLUMNS, MEDIAN_COLUMNS, MOE_COLUMNS
 from hhplab.xwalks.apply import apply_crosswalk
 
@@ -201,7 +201,7 @@ def _maybe_remap_ct_planning_regions(
         return acs_data
 
     try:
-        from hhplab.geo.ct_planning_regions import (
+        from hhplab.geographies.coc.ct_planning_regions import (
             build_ct_tract_planning_region_map,
             remap_ct_planning_region_geoids,
         )

@@ -7,7 +7,7 @@ from typing import Annotated
 import typer
 
 from hhplab.cli.shared.output import JsonOutput, cli_error, emit_result
-from hhplab.msa.msa_definitions import DEFINITION_VERSION, DELINEATION_FILE_YEAR
+from hhplab.geographies.msa.msa_definitions import DEFINITION_VERSION, DELINEATION_FILE_YEAR
 
 
 def ingest_msa_boundaries(
@@ -38,8 +38,8 @@ def ingest_msa_boundaries(
 ) -> None:
     """Ingest official MSA boundary polygons to curated GeoParquet."""
     import hhplab.naming as naming
-    from hhplab.msa.msa_boundaries import ingest_msa_boundaries as ingest_impl
-    from hhplab.msa.msa_boundaries import read_msa_boundaries
+    from hhplab.geographies.msa.msa_boundaries import ingest_msa_boundaries as ingest_impl
+    from hhplab.geographies.msa.msa_boundaries import read_msa_boundaries
 
     output_path = naming.msa_boundaries_path(definition_version)
     if output_path.exists() and not force:

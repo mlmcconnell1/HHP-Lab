@@ -132,10 +132,10 @@ class GeometryRef(BaseModel):
         if self.source is None:
             return None
 
-        from hhplab.metro.metro_definitions import (
+        from hhplab.geographies.gf_metro.metro_definitions import (
             CANONICAL_UNIVERSE_DEFINITION_VERSION,
         )
-        from hhplab.metro.metro_definitions import (
+        from hhplab.geographies.gf_metro.metro_definitions import (
             DEFINITION_VERSION as GLYNN_FOX_DEFINITION_VERSION,
         )
 
@@ -154,10 +154,10 @@ class GeometryRef(BaseModel):
         if self.subset_profile is not None:
             return self.subset_profile
 
-        from hhplab.metro.metro_definitions import (
+        from hhplab.geographies.gf_metro.metro_definitions import (
             DEFINITION_VERSION as GLYNN_FOX_DEFINITION_VERSION,
         )
-        from hhplab.metro.metro_definitions import (
+        from hhplab.geographies.gf_metro.metro_definitions import (
             PROFILE_NAME,
         )
 
@@ -175,7 +175,7 @@ class GeometryRef(BaseModel):
         if self.subset_profile_definition_version is not None:
             return self.subset_profile_definition_version
 
-        from hhplab.metro.metro_definitions import (
+        from hhplab.geographies.gf_metro.metro_definitions import (
             DEFINITION_VERSION as GLYNN_FOX_DEFINITION_VERSION,
         )
 

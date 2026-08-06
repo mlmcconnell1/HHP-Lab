@@ -1,4 +1,4 @@
-"""Tests for hhplab.metro definitions and validation.
+"""Tests for hhplab.geographies.gf_metro definitions and validation.
 
 Covers the metro definition data integrity (coclab-djrh.2), including
 truth-table consistency, identifier formats, and validation logic.
@@ -14,7 +14,7 @@ Truth table for metro definition structure
 
 import pytest
 
-from hhplab.metro.metro_definitions import (
+from hhplab.geographies.gf_metro.metro_definitions import (
     CANONICAL_UNIVERSE_DEFINITION_VERSION,
     CBSA_ALIAS_RULES,
     DEFINITION_VERSION,
@@ -31,7 +31,7 @@ from hhplab.metro.metro_definitions import (
     canonicalize_cbsa_code,
     principal_state_fips_for_metro_name,
 )
-from hhplab.metro.metro_validate import (
+from hhplab.geographies.gf_metro.metro_validate import (
     validate_metro_artifacts,
     validate_metro_universe_artifacts,
 )

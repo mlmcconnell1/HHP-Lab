@@ -14,7 +14,7 @@ from typer.testing import CliRunner
 
 from hhplab.cli.ingest.acs1_metro import ingest_acs1_metro as ingest_acs1_metro_cli
 from hhplab.cli.main import app
-from hhplab.metro.metro_definitions import CANONICAL_UNIVERSE_DEFINITION_VERSION
+from hhplab.geographies.gf_metro.metro_definitions import CANONICAL_UNIVERSE_DEFINITION_VERSION
 from hhplab.provenance import read_provenance
 from hhplab.sources.census.acs.ingest.metro_acs1 import (
     CBSA_GEO_PARAM,

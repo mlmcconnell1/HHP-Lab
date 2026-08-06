@@ -29,7 +29,7 @@ from __future__ import annotations
 
 import pandas as pd
 
-from hhplab.msa.msa_definitions import DEFINITION_VERSION as MSA_DEFINITION_VERSION
+from hhplab.geographies.msa.msa_definitions import DEFINITION_VERSION as MSA_DEFINITION_VERSION
 
 # ---------------------------------------------------------------------------
 # Constants

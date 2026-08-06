@@ -39,11 +39,11 @@ def test_generate_metro_boundaries_json(monkeypatch, tmp_path: Path):
         return artifact
 
     monkeypatch.setattr(
-        "hhplab.metro.metro_boundaries.generate_metro_boundaries",
+        "hhplab.geographies.gf_metro.metro_boundaries.generate_metro_boundaries",
         fake_generate,
     )
     monkeypatch.setattr(
-        "hhplab.metro.metro_boundaries.read_metro_boundaries",
+        "hhplab.geographies.gf_metro.metro_boundaries.read_metro_boundaries",
         lambda definition_version, county_vintage: gpd.read_parquet(artifact),
     )
 
@@ -64,10 +64,10 @@ def test_generate_metro_boundaries_json(monkeypatch, tmp_path: Path):
 
 def test_validate_metro_json(monkeypatch, tmp_path: Path):
     monkeypatch.chdir(tmp_path)
-    from hhplab.metro.metro_validate import MetroValidationResult
+    from hhplab.geographies.gf_metro.metro_validate import MetroValidationResult
 
     monkeypatch.setattr(
-        "hhplab.metro.metro_io.validate_curated_metro",
+        "hhplab.geographies.gf_metro.metro_io.validate_curated_metro",
         lambda definition_version: MetroValidationResult(
             passed=True,
             errors=[],
@@ -75,7 +75,7 @@ def test_validate_metro_json(monkeypatch, tmp_path: Path):
         ),
     )
     monkeypatch.setattr(
-        "hhplab.metro.metro_boundaries.validate_curated_metro_boundaries",
+        "hhplab.geographies.gf_metro.metro_boundaries.validate_curated_metro_boundaries",
         lambda definition_version, county_vintage: MetroValidationResult(
             passed=True,
             errors=[],
@@ -120,7 +120,7 @@ def test_generate_metro_universe_json(monkeypatch, tmp_path: Path):
         return universe, subset
 
     monkeypatch.setattr(
-        "hhplab.metro.metro_io.write_metro_universe_artifacts",
+        "hhplab.geographies.gf_metro.metro_io.write_metro_universe_artifacts",
         fake_write,
     )
 
@@ -142,10 +142,10 @@ def test_generate_metro_universe_json(monkeypatch, tmp_path: Path):
 
 def test_validate_metro_universe_json(monkeypatch, tmp_path: Path):
     monkeypatch.chdir(tmp_path)
-    from hhplab.metro.metro_validate import MetroValidationResult
+    from hhplab.geographies.gf_metro.metro_validate import MetroValidationResult
 
     monkeypatch.setattr(
-        "hhplab.metro.metro_io.validate_curated_metro_universe",
+        "hhplab.geographies.gf_metro.metro_io.validate_curated_metro_universe",
         lambda metro_definition_version, profile_definition_version: MetroValidationResult(
             passed=True,
             errors=[],

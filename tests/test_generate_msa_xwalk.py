@@ -15,11 +15,11 @@ from typer.testing import CliRunner
 
 from hhplab.cli.generate.msa_xwalk import _concat_block_population_state_shards, generate_msa_xwalk
 from hhplab.cli.main import app
-from hhplab.msa.crosswalk import (
+from hhplab.geographies.msa.crosswalk import (
     ALLOCATION_SHARE_TOLERANCE,
     COC_MSA_BLOCK_POPULATION_CROSSWALK_COLUMNS,
 )
-from hhplab.msa.msa_definitions import DELINEATION_FILE_YEAR
+from hhplab.geographies.msa.msa_definitions import DELINEATION_FILE_YEAR
 from hhplab.registry.schema import RegistryEntry
 
 runner = CliRunner()
@@ -555,7 +555,7 @@ def test_generate_msa_xwalk_uses_shared_partial_allocation_tolerance(
         lambda: "2025",
     )
     monkeypatch.setattr(
-        "hhplab.msa.crosswalk.build_coc_msa_crosswalk",
+        "hhplab.geographies.msa.crosswalk.build_coc_msa_crosswalk",
         lambda *args, **kwargs: pd.DataFrame(
             {
                 "coc_id": ["CO-100"],
@@ -565,7 +565,7 @@ def test_generate_msa_xwalk_uses_shared_partial_allocation_tolerance(
         ),
     )
     monkeypatch.setattr(
-        "hhplab.msa.crosswalk.summarize_coc_msa_allocation",
+        "hhplab.geographies.msa.crosswalk.summarize_coc_msa_allocation",
         lambda crosswalk: pd.DataFrame(
             {
                 "coc_id": ["CO-100", "CO-200"],

@@ -7,7 +7,7 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
-from hhplab.msa.unemployment import (
+from hhplab.geographies.msa.unemployment import (
     MSA_ACS5_UNEMPLOYMENT_COLUMNS,
     MSA_LAUS_UNEMPLOYMENT_COLUMNS,
     load_laus_msa_unemployment,

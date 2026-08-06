@@ -9,14 +9,14 @@ import pandas as pd
 import pyarrow.parquet as pq
 
 from hhplab.config import load_config
-from hhplab.geo.ct_planning_regions import (
+from hhplab.geographies.coc.coc_io import resolve_curated_boundary_path
+from hhplab.geographies.coc.ct_planning_regions import (
     CT_LEGACY_COUNTY_VINTAGE,
     CT_PLANNING_REGION_VINTAGE,
     build_ct_county_planning_region_crosswalk,
     is_ct_legacy_county_fips,
     is_ct_planning_region_fips,
 )
-from hhplab.geo.geo_io import resolve_curated_boundary_path
 from hhplab.naming import (
     acs5_tracts_filename,
     block_geometry_path,

@@ -10,7 +10,7 @@ from __future__ import annotations
 import pandas as pd
 import pytest
 
-from hhplab.geo.ct_planning_regions import (
+from hhplab.geographies.coc.ct_planning_regions import (
     CT_LEGACY_COUNTY_CODES,
     CT_PLANNING_REGION_CODES,
     CT_STATE_FIPS,

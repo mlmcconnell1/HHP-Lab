@@ -5,15 +5,6 @@ from __future__ import annotations
 from dataclasses import asdict, dataclass
 from typing import Literal
 
-from hhplab.covariates.irs_soi_contract import (
-    IRS_SOI_COUNTY_MEASURE_COLUMNS,
-    IRS_SOI_FIRST_YEAR,
-    IRS_SOI_PRODUCT,
-    IRS_SOI_PROVIDER,
-    IRS_SOI_SOURCE_ID,
-    IRS_SOI_SOURCE_PAGE,
-    IRS_SOI_SOURCE_URL,
-)
 from hhplab.covariates.saiz_contract import (
     SAIZ_ESTIMATE_YEAR,
     SAIZ_MEASURE_COLUMNS,
@@ -49,6 +40,15 @@ from hhplab.sources.census.bps.census_bps_contract import (
     CENSUS_BPS_PROVIDER,
     CENSUS_BPS_SOURCE_ID,
     CENSUS_BPS_SOURCE_PAGE,
+)
+from hhplab.sources.irs.irs_soi_contract import (
+    IRS_SOI_COUNTY_MEASURE_COLUMNS,
+    IRS_SOI_FIRST_YEAR,
+    IRS_SOI_PRODUCT,
+    IRS_SOI_PROVIDER,
+    IRS_SOI_SOURCE_ID,
+    IRS_SOI_SOURCE_PAGE,
+    IRS_SOI_SOURCE_URL,
 )
 from hhplab.sources.mpi.mpi_contract import (
     MPI_MEASURE_COLUMNS,

@@ -12,17 +12,6 @@ import pandas as pd
 
 from hhplab.covariates.catalog import CovariateSourceSpec, covariate_source_spec
 from hhplab.covariates.frame_adapters import covariate_frame_adapter
-from hhplab.covariates.irs_soi_contract import (
-    IRS_SOI_COUNTY_CURATED_COLUMNS,
-    IRS_SOI_OTHER_FLOW_STATE_FIPS,
-    IRS_SOI_PAIR_CURATED_COLUMNS,
-    IRS_SOI_PRODUCT,
-    IRS_SOI_PROVIDER,
-    IRS_SOI_REQUIRED_RAW_COLUMNS,
-    IRS_SOI_SOURCE_ID,
-    IRS_SOI_STATE_TOTAL_COUNTY_FIPS,
-    IRS_SOI_SUMMARY_STATE_FIPS,
-)
 from hhplab.covariates.saiz_contract import (
     SAIZ_ESTIMATE_YEAR,
     SAIZ_MATCH_DIAGNOSTIC_COLUMNS,
@@ -30,9 +19,9 @@ from hhplab.covariates.saiz_contract import (
     validate_saiz_source_contract,
     validate_saiz_source_path,
 )
-from hhplab.metro.metro_definitions import STATE_ABBREV_TO_FIPS
-from hhplab.msa import DEFINITION_VERSION as DEFAULT_MSA_DEFINITION_VERSION
-from hhplab.msa.msa_io import read_msa_definitions
+from hhplab.geographies.gf_metro.metro_definitions import STATE_ABBREV_TO_FIPS
+from hhplab.geographies.msa import DEFINITION_VERSION as DEFAULT_MSA_DEFINITION_VERSION
+from hhplab.geographies.msa.msa_io import read_msa_definitions
 from hhplab.naming import covariate_curated_filename, covariate_pair_filename
 from hhplab.paths import curated_dir, raw_root
 from hhplab.provenance import ProvenanceBlock, write_parquet_with_provenance
@@ -60,6 +49,17 @@ from hhplab.sources.census.bps.census_bps_contract import (
     CENSUS_BPS_SURVEY_YEAR_COLUMN,
     CENSUS_BPS_UNIT_COLUMNS,
     CENSUS_BPS_VALUE_COLUMNS,
+)
+from hhplab.sources.irs.irs_soi_contract import (
+    IRS_SOI_COUNTY_CURATED_COLUMNS,
+    IRS_SOI_OTHER_FLOW_STATE_FIPS,
+    IRS_SOI_PAIR_CURATED_COLUMNS,
+    IRS_SOI_PRODUCT,
+    IRS_SOI_PROVIDER,
+    IRS_SOI_REQUIRED_RAW_COLUMNS,
+    IRS_SOI_SOURCE_ID,
+    IRS_SOI_STATE_TOTAL_COUNTY_FIPS,
+    IRS_SOI_SUMMARY_STATE_FIPS,
 )
 from hhplab.sources.mpi.mpi_contract import (
     MPI_ALLOWED_COUNTY_EQUIVALENT_LABELS,
