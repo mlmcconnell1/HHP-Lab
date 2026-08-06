@@ -3,7 +3,7 @@
 Provides functions for fetching and caching ACS data from the Census Bureau API.
 """
 
-from hhplab.sources.acs.ingest.tract_population import (
+from hhplab.sources.census.acs.ingest.tract_population import (
     fetch_state_tract_data,
     fetch_tract_data,
     get_output_path,

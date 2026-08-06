@@ -16,7 +16,7 @@ Data Sources
 
 Usage
 -----
-    from hhplab.pep.ingest import ingest_pep_county
+    from hhplab.sources.census.pep.ingest import ingest_pep_county
 
     # Ingest best-available PEP county estimates (postcensal)
     path = ingest_pep_county()

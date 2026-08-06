@@ -8,13 +8,6 @@ from pathlib import Path
 import pandas as pd
 
 from hhplab.covariates.catalog import MeasureAggregation, covariate_source_spec
-from hhplab.covariates.census_bps_contract import (
-    CENSUS_BPS_CLASS_UNIT_COLUMNS,
-    CENSUS_BPS_CLASS_VALUE_COLUMNS,
-    CENSUS_BPS_DERIVED_MEASURE_COLUMNS,
-    CENSUS_BPS_MIX_ADJUSTED_VALUE_PER_UNIT_COLUMN,
-    CENSUS_BPS_SOURCE_ID,
-)
 from hhplab.covariates.ingest import (
     STATE_NAME_TO_ABBREV,
     default_covariate_output_path,
@@ -44,12 +37,19 @@ from hhplab.msa import DEFINITION_VERSION as DEFAULT_MSA_DEFINITION_VERSION
 from hhplab.msa.msa_io import read_msa_county_membership, read_msa_definitions
 from hhplab.naming import covariate_panel_filename
 from hhplab.paths import curated_dir
-from hhplab.pep.pep_aggregate import load_pep_county
 from hhplab.provenance import ProvenanceBlock, read_provenance, write_parquet_with_provenance
 from hhplab.sources.bls.qcew.contract import (
     QCEW_DERIVED_MEASURE_COLUMNS,
     QCEW_SOURCE_ID,
 )
+from hhplab.sources.census.bps.census_bps_contract import (
+    CENSUS_BPS_CLASS_UNIT_COLUMNS,
+    CENSUS_BPS_CLASS_VALUE_COLUMNS,
+    CENSUS_BPS_DERIVED_MEASURE_COLUMNS,
+    CENSUS_BPS_MIX_ADJUSTED_VALUE_PER_UNIT_COLUMN,
+    CENSUS_BPS_SOURCE_ID,
+)
+from hhplab.sources.census.pep.pep_aggregate import load_pep_county
 
 __all__ = [
     "EMERGENCY_SHELTER_ACTIVATION_C",

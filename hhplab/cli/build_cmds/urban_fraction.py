@@ -14,9 +14,9 @@ import pyarrow.parquet as pq
 import typer
 
 import hhplab.naming as naming
-from hhplab.census.ingest.decennial_tract_population import STATE_FIPS_CODES
 from hhplab.paths import curated_dir
 from hhplab.provenance import ProvenanceBlock, write_parquet_with_provenance
+from hhplab.sources.census.census.ingest.decennial_tract_population import STATE_FIPS_CODES
 from hhplab.xwalks.urban_fraction import (
     DEFAULT_ALLOCATION_METHOD,
     DEFAULT_CLASSIFICATION_METHOD,

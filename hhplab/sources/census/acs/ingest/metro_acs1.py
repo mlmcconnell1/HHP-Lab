@@ -10,7 +10,7 @@ CBSA geography -- no crosswalk or tract aggregation is needed.
 
 Usage
 -----
-    from hhplab.sources.acs.ingest.metro_acs1 import ingest_metro_acs1
+    from hhplab.sources.census.acs.ingest.metro_acs1 import ingest_metro_acs1
 
     path = ingest_metro_acs1(vintage=2023)
 
@@ -42,19 +42,6 @@ from pathlib import Path
 import pandas as pd
 
 import hhplab.naming as naming
-from hhplab.sources.acs.ingest._acs1_api import (
-    ACS1_CBSA_GEOGRAPHY,
-    fetch_acs1_api_data,
-    normalize_acs1_measures,
-)
-from hhplab.sources.acs.ingest._acs1_api import (
-    CBSA_GEO_PARAM as _CBSA_GEO_PARAM,
-)
-from hhplab.sources.acs.variables_acs1 import (
-    ACS1_METRO_OUTPUT_COLUMNS,
-    ACS1_TABLES,
-    acs1_variables_by_table_for_vintage,
-)
 from hhplab.metro.metro_definitions import (
     CANONICAL_UNIVERSE_DEFINITION_VERSION,
     METRO_CBSA_MAPPING,
@@ -68,6 +55,19 @@ from hhplab.metro.metro_definitions import (
 from hhplab.metro.metro_io import read_metro_subset_membership, read_metro_universe
 from hhplab.provenance import ProvenanceBlock, write_parquet_with_provenance
 from hhplab.source_urls import CENSUS_API_ACS1
+from hhplab.sources.census.acs.ingest._acs1_api import (
+    ACS1_CBSA_GEOGRAPHY,
+    fetch_acs1_api_data,
+    normalize_acs1_measures,
+)
+from hhplab.sources.census.acs.ingest._acs1_api import (
+    CBSA_GEO_PARAM as _CBSA_GEO_PARAM,
+)
+from hhplab.sources.census.acs.variables_acs1 import (
+    ACS1_METRO_OUTPUT_COLUMNS,
+    ACS1_TABLES,
+    acs1_variables_by_table_for_vintage,
+)
 
 logger = logging.getLogger(__name__)
 

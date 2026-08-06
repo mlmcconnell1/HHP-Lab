@@ -11,7 +11,7 @@ import pandas as pd
 
 @lru_cache(maxsize=1)
 def _impl() -> ModuleType:
-    return import_module("hhplab.pep.pep_metro")
+    return import_module("hhplab.sources.census.pep.pep_metro")
 
 
 def aggregate_pep_to_metro(
@@ -22,7 +22,7 @@ def aggregate_pep_to_metro(
     min_coverage: float = 0.0,
     county_membership_df: pd.DataFrame | None = None,
 ) -> pd.DataFrame:
-    """Delegate to ``hhplab.pep.pep_metro.aggregate_pep_to_metro``."""
+    """Delegate to ``hhplab.sources.census.pep.pep_metro.aggregate_pep_to_metro``."""
     return _impl().aggregate_pep_to_metro(
         pep_df,
         definition_version=definition_version,

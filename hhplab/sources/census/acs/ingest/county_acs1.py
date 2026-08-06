@@ -11,12 +11,14 @@ from pathlib import Path
 import pandas as pd
 
 import hhplab.naming as naming
-from hhplab.sources.acs.ingest._acs1_api import (
+from hhplab.provenance import ProvenanceBlock, write_parquet_with_provenance
+from hhplab.source_urls import CENSUS_API_ACS1
+from hhplab.sources.census.acs.ingest._acs1_api import (
     ACS1_COUNTY_GEOGRAPHY,
     fetch_acs1_api_data,
     normalize_acs1_measures,
 )
-from hhplab.sources.acs.variables_acs1 import (
+from hhplab.sources.census.acs.variables_acs1 import (
     ACS1_COUNTY_OUTPUT_COLUMNS,
     ACS1_SAE_SOURCE_COLUMNS,
     ACS1_SAE_SOURCE_COLUMNS_BY_TABLE,
@@ -27,8 +29,6 @@ from hhplab.sources.acs.variables_acs1 import (
     acs1_unavailable_tables_for_vintage,
     acs1_variables_by_table_for_vintage,
 )
-from hhplab.provenance import ProvenanceBlock, write_parquet_with_provenance
-from hhplab.source_urls import CENSUS_API_ACS1
 
 logger = logging.getLogger(__name__)
 

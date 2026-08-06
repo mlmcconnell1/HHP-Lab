@@ -14,7 +14,8 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
-from hhplab.pep.ingest import (
+from hhplab.provenance import read_provenance
+from hhplab.sources.census.pep.ingest import (
     PEP_URLS,
     POSTCENSAL_SERIES,
     VINTAGE_YEARS,
@@ -22,7 +23,6 @@ from hhplab.pep.ingest import (
     ingest_pep_county,
     parse_pep_county,
 )
-from hhplab.provenance import read_provenance
 
 # Sample Census PEP CSV data in wide format (mimics co-est2024-alldata.csv structure)
 # Note: Census files use STATE and COUNTY as separate columns, SUMLEV to indicate geography level
@@ -255,7 +255,7 @@ class TestPepIngest:
             assert vintage == 2025
             return raw_path, "abc123"
 
-        monkeypatch.setattr("hhplab.pep.ingest.download_pep", fake_download)
+        monkeypatch.setattr("hhplab.sources.census.pep.ingest.download_pep", fake_download)
 
         output = ingest_pep_county(
             series=POSTCENSAL_SERIES,

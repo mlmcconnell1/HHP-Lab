@@ -12,7 +12,12 @@ import httpx
 import pandas as pd
 import pytest
 
-from hhplab.sources.acs.ingest.tract_population import (
+from hhplab.provenance import (
+    ProvenanceBlock,
+    read_provenance,
+    write_parquet_with_provenance,
+)
+from hhplab.sources.census.acs.ingest.tract_population import (
     fetch_state_tract_data,
     fetch_tract_data,
     get_output_path,
@@ -22,7 +27,7 @@ from hhplab.sources.acs.ingest.tract_population import (
     normalize_geoid,
     parse_acs_vintage,
 )
-from hhplab.sources.acs.variables import (
+from hhplab.sources.census.acs.variables import (
     ACS5_SAE_SUPPORT_OUTPUT_COLUMNS,
     ACS5_SAE_SUPPORT_TABLES,
     ALL_API_VARS,
@@ -30,11 +35,6 @@ from hhplab.sources.acs.variables import (
     acs_variables_for_year,
     api_vars_for_year,
     tables_for_api_vars,
-)
-from hhplab.provenance import (
-    ProvenanceBlock,
-    read_provenance,
-    write_parquet_with_provenance,
 )
 
 pytestmark = pytest.mark.httpx_mock(can_send_already_matched_responses=True)
@@ -936,7 +936,7 @@ class TestFetchTractPopulation:
             return translated, object()
 
         monkeypatch.setattr(
-            "hhplab.sources.acs.ingest.tract_population.translate_acs_to_target_vintage",
+            "hhplab.sources.census.acs.ingest.tract_population.translate_acs_to_target_vintage",
             fake_translate,
         )
 
@@ -1047,7 +1047,7 @@ class TestIngestTractPopulation:
             ]
         )
         monkeypatch.setattr(
-            "hhplab.sources.acs.ingest.tract_population.fetch_tract_data",
+            "hhplab.sources.census.acs.ingest.tract_population.fetch_tract_data",
             lambda *args, **kwargs: (fetched, "schema-refresh", 123, None),
         )
 
@@ -1121,7 +1121,7 @@ class TestIngestTractPopulation:
             return translated, object()
 
         monkeypatch.setattr(
-            "hhplab.sources.acs.ingest.tract_population.translate_acs_to_target_vintage",
+            "hhplab.sources.census.acs.ingest.tract_population.translate_acs_to_target_vintage",
             fake_translate,
         )
 

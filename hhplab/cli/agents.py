@@ -37,13 +37,13 @@ AGENTS_GUIDANCE = {
         "registries": [
             {
                 "source": "ACS5",
-                "where": "hhplab/sources/acs/variables.py",
+                "where": "hhplab/sources/census/acs/variables.py",
                 "registry": "ACS5_COVARIATE_REGISTRY",
                 "cli": "hhplab list acs-variables",
             },
             {
                 "source": "ACS1",
-                "where": "hhplab/sources/acs/variables_acs1.py",
+                "where": "hhplab/sources/census/acs/variables_acs1.py",
                 "registry": "DERIVED_ACS1_MEASURES and ACS1_*_MEASURE_COLUMNS",
                 "cli": "hhplab list acs-variables",
             },
@@ -199,9 +199,9 @@ AGENTS_INFO_TEXT = f"""# HHP-Lab Agent Quick Reference
 
 - Before calling external APIs or writing a one-off script, check the package
   registries for existing support:
-  - ACS5 tract-derived measures: `hhplab/sources/acs/variables.py`
+  - ACS5 tract-derived measures: `hhplab/sources/census/acs/variables.py`
     (`ACS5_COVARIATE_REGISTRY`) or `hhplab list acs-variables`.
-  - ACS1 metro/county-native measures: `hhplab/sources/acs/variables_acs1.py`
+  - ACS1 metro/county-native measures: `hhplab/sources/census/acs/variables_acs1.py`
     (`DERIVED_ACS1_MEASURES` and `ACS1_*_MEASURE_COLUMNS`) or
     `hhplab list acs-variables`.
   - External covariate sources: `hhplab list covariates`

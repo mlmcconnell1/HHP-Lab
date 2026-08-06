@@ -7,7 +7,12 @@ import json
 import pandas as pd
 import pytest
 
-from hhplab.sources.acs.sae import (
+from hhplab.provenance import read_provenance
+from hhplab.schema import (
+    ACS1_IMPUTED_POVERTY_SPEC,
+    ACS1_IMPUTED_TOTAL_HOUSEHOLDS_SPEC,
+)
+from hhplab.sources.census.acs.sae import (
     ACS1_HYBRID_CONTROL_SELECTION_POLICY_ID,
     ACS1_IMPUTATION_METHOD,
     CONTRACT_RENT_BINS,
@@ -36,11 +41,6 @@ from hhplab.sources.acs.sae import (
     select_hybrid_acs1_controls,
     write_acs1_poverty_tract_artifact,
     write_sae_parquet_with_provenance,
-)
-from hhplab.provenance import read_provenance
-from hhplab.schema import (
-    ACS1_IMPUTED_POVERTY_SPEC,
-    ACS1_IMPUTED_TOTAL_HOUSEHOLDS_SPEC,
 )
 
 COUNTY_SOURCE = pd.DataFrame(

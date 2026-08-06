@@ -10,11 +10,11 @@ import pandas as pd
 import pytest
 from shapely.geometry import box
 
-from hhplab.sources.acs.acs_aggregate import aggregate_to_coc
 from hhplab.measures.measures_diagnostics import (
     compute_crosswalk_diagnostics,
     summarize_diagnostics,
 )
+from hhplab.sources.census.acs.acs_aggregate import aggregate_to_coc
 from hhplab.xwalks.county import build_coc_county_crosswalk
 from hhplab.xwalks.tract import (
     add_population_weights,

@@ -141,7 +141,7 @@ def resample_pep_decennial_tract_mediated_population(
     task: ResampleTask,
 ) -> pd.DataFrame:
     """Use PEP's baseline-scaling semantics for decennial tract-mediated weights."""
-    from hhplab.pep.pep_aggregate import aggregate_pep_counties
+    from hhplab.sources.census.pep.pep_aggregate import aggregate_pep_counties
 
     geo_col = _resolve_geo_column(source_df, task.geo_column)
     _validate_columns(source_df, ["population"], task.dataset_id, task.year)

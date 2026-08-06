@@ -4,7 +4,9 @@ from __future__ import annotations
 
 import pytest
 
-from hhplab.census.ingest.decennial_tract_population import fetch_decennial_tract_population
+from hhplab.sources.census.census.ingest.decennial_tract_population import (
+    fetch_decennial_tract_population,
+)
 
 DECENNIAL_TRACT_RESPONSE_2020 = [
     ["NAME", "P1_001N", "state", "county", "tract"],

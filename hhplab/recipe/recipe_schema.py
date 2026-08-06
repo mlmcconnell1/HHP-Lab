@@ -26,10 +26,6 @@ from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
-from hhplab.sources.acs.variables import (
-    ACS5_COVARIATE_REGISTRY,
-    ACS5_EXPANDED_COVARIATE_COLUMNS,
-)
 from hhplab.recipe.schema_common import (
     GeometryRef,
     VintageSetSpec,
@@ -37,6 +33,10 @@ from hhplab.recipe.schema_common import (
     expand_year_spec,
 )
 from hhplab.schema.columns import ACS_MEASURE_COLUMNS
+from hhplab.sources.census.acs.variables import (
+    ACS5_COVARIATE_REGISTRY,
+    ACS5_EXPANDED_COVARIATE_COLUMNS,
+)
 
 ACS5_RECIPE_DEFAULT_MEASURES: tuple[str, ...] = tuple(ACS_MEASURE_COLUMNS)
 ACS5_RECIPE_SELECTABLE_MEASURES: tuple[str, ...] = tuple(

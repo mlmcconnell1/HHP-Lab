@@ -5,13 +5,6 @@ from __future__ import annotations
 from dataclasses import asdict, dataclass
 from typing import Literal
 
-from hhplab.covariates.census_bps_contract import (
-    CENSUS_BPS_MEASURE_COLUMNS,
-    CENSUS_BPS_PRODUCT,
-    CENSUS_BPS_PROVIDER,
-    CENSUS_BPS_SOURCE_ID,
-    CENSUS_BPS_SOURCE_PAGE,
-)
 from hhplab.covariates.irs_soi_contract import (
     IRS_SOI_COUNTY_MEASURE_COLUMNS,
     IRS_SOI_FIRST_YEAR,
@@ -59,6 +52,13 @@ from hhplab.sources.cdc.overdose_contract import (
     CDC_OVERDOSE_SOURCE_ID,
     CDC_OVERDOSE_SOURCE_PAGE,
     CDC_OVERDOSE_SOURCE_URL,
+)
+from hhplab.sources.census.bps.census_bps_contract import (
+    CENSUS_BPS_MEASURE_COLUMNS,
+    CENSUS_BPS_PRODUCT,
+    CENSUS_BPS_PROVIDER,
+    CENSUS_BPS_SOURCE_ID,
+    CENSUS_BPS_SOURCE_PAGE,
 )
 from hhplab.vera.incarceration_contract import (
     VERA_JAIL_MEASURE_COLUMNS,

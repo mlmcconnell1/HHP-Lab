@@ -1,6 +1,6 @@
 """Census geometry and tract-relationship entrypoints."""
 
-from hhplab.census.ingest import (
+from hhplab.sources.census.census.ingest import (
     TractRelationshipNotFoundError,
     download_tiger_counties,
     download_tiger_tracts,

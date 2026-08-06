@@ -18,13 +18,13 @@ import pandas as pd
 import pyarrow.parquet as pq
 
 import hhplab.naming as naming
-from hhplab.census.ingest.decennial_tract_population import STATE_FIPS_CODES
 from hhplab.paths import curated_dir
 from hhplab.provenance import PROVENANCE_KEY, ProvenanceBlock
 from hhplab.raw_snapshot import persist_file_snapshot, raw_dir, raw_path
 from hhplab.schema.columns import BLOCK_GEOMETRY_COLUMNS
 from hhplab.source_registry import check_source_changed, register_source
 from hhplab.source_urls import CENSUS_TIGER_BASE
+from hhplab.sources.census.census.ingest.decennial_tract_population import STATE_FIPS_CODES
 
 logger = logging.getLogger(__name__)
 

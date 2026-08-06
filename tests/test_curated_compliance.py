@@ -18,8 +18,6 @@ import pandas as pd
 import pytest
 from typer.testing import CliRunner
 
-from hhplab.sources.acs.variables import TRACT_OUTPUT_COLUMNS
-from hhplab.sources.acs.variables_acs1 import ACS1_METRO_OUTPUT_COLUMNS
 from hhplab.cli.main import app
 from hhplab.curated_policy import (
     CANONICAL_PATTERNS,
@@ -27,6 +25,8 @@ from hhplab.curated_policy import (
     IGNORED_SUBDIRS,
     validate_curated_layout,
 )
+from hhplab.sources.census.acs.variables import TRACT_OUTPUT_COLUMNS
+from hhplab.sources.census.acs.variables_acs1 import ACS1_METRO_OUTPUT_COLUMNS
 
 # ---------------------------------------------------------------------------
 # Helpers

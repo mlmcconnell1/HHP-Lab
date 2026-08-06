@@ -12,7 +12,6 @@ from typer.testing import CliRunner
 from hhplab.cli.main import app
 from hhplab.hic.parser import CANONICAL_COLUMNS as HIC_PARSER_COLUMNS
 from hhplab.panel.conformance import PanelRequest, run_conformance
-from hhplab.pep.ingest import PEP_COUNTY_OUTPUT_COLUMNS as PEP_INGEST_COLUMNS
 from hhplab.pit.ingest.parser import CANONICAL_COLUMNS as PIT_PARSER_COLUMNS
 from hhplab.recipe.executor import ExecutorError, _normalize_recipe_population_measure
 from hhplab.recipe.executor.panel import _RECIPE_METRO_COLUMN_ORDER, _resolve_canonical_population
@@ -66,8 +65,14 @@ from hhplab.schema.lineage import (
     normalize_population_measure,
 )
 from hhplab.source_coverage import CORE_SOURCE_COVERAGE_SPECS
-from hhplab.sources.acs.acs_aggregate import AVERAGE_WEIGHT_DENOMINATORS
-from hhplab.sources.acs.variables import (
+from hhplab.sources.bls.laus.series import (
+    LAUS_MEASURE_CODES as BLS_LAUS_MEASURE_CODES,
+)
+from hhplab.sources.bls.laus.series import (
+    LAUS_METRO_OUTPUT_COLUMNS as BLS_LAUS_METRO_OUTPUT_COLUMNS,
+)
+from hhplab.sources.census.acs.acs_aggregate import AVERAGE_WEIGHT_DENOMINATORS
+from hhplab.sources.census.acs.variables import (
     ACS5_COVARIATE_REGISTRY,
     ACS5_COVARIATE_REGISTRY_BY_OUTPUT,
     ACS5_EXPANDED_COVARIATE_COLUMNS,
@@ -81,19 +86,14 @@ from hhplab.sources.acs.variables import (
     acs5_covariate_spec_for_output,
     acs_variables_for_year,
 )
-from hhplab.sources.acs.variables_acs1 import (
+from hhplab.sources.census.acs.variables_acs1 import (
     ACS1_TABLE_COLUMN_NAMES,
     ACS1_VARIABLE_NAMES,
     ACS1_VARIABLES_BY_TABLE,
     acs1_variable_names_for_vintage,
     acs1_variables_by_table_for_vintage,
 )
-from hhplab.sources.bls.laus.series import (
-    LAUS_MEASURE_CODES as BLS_LAUS_MEASURE_CODES,
-)
-from hhplab.sources.bls.laus.series import (
-    LAUS_METRO_OUTPUT_COLUMNS as BLS_LAUS_METRO_OUTPUT_COLUMNS,
-)
+from hhplab.sources.census.pep.ingest import PEP_COUNTY_OUTPUT_COLUMNS as PEP_INGEST_COLUMNS
 from hhplab.xwalks.tract_mediated import (
     DENOMINATOR_COLUMNS as XWALK_DENOMINATOR_COLUMNS,
 )

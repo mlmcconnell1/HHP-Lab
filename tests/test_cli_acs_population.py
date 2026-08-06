@@ -6,8 +6,8 @@ from unittest.mock import patch
 import pandas as pd
 from typer.testing import CliRunner
 
-from hhplab.sources.acs.variables import acs5_registry_measure_names, acs5_registry_tables
 from hhplab.cli.main import app
+from hhplab.sources.census.acs.variables import acs5_registry_measure_names, acs5_registry_tables
 
 runner = CliRunner()
 
@@ -16,7 +16,7 @@ class TestIngestAcs5TractCommand:
     """Tests for ingest acs5-tract CLI command."""
 
     @patch("hhplab.cli.ingest.acs_population.get_output_path")
-    @patch("hhplab.sources.acs.ingest.tract_population.ingest_tract_data")
+    @patch("hhplab.sources.census.acs.ingest.tract_population.ingest_tract_data")
     @patch("pandas.read_parquet")
     def test_ingest_acs5_tract_uses_cache(
         self,
@@ -42,7 +42,7 @@ class TestIngestAcs5TractCommand:
         mock_ingest.assert_not_called()
 
     @patch("hhplab.cli.ingest.acs_population.get_output_path")
-    @patch("hhplab.sources.acs.ingest.tract_population.ingest_tract_data")
+    @patch("hhplab.sources.census.acs.ingest.tract_population.ingest_tract_data")
     @patch("pandas.read_parquet")
     def test_ingest_acs5_tract_success(
         self,
@@ -83,7 +83,7 @@ class TestIngestAcs5TractCommand:
         mock_ingest.assert_called_once()
 
     @patch("hhplab.cli.ingest.acs_population.get_output_path")
-    @patch("hhplab.sources.acs.ingest.tract_population.ingest_tract_data")
+    @patch("hhplab.sources.census.acs.ingest.tract_population.ingest_tract_data")
     @patch("pandas.read_parquet")
     def test_ingest_acs5_tract_json_reports_registry_metadata(
         self,
@@ -131,7 +131,7 @@ class TestIngestAcs5TractCommand:
         assert "nativity_citizenship" in payload["supported_measures"]
 
     @patch("hhplab.cli.ingest.acs_population.get_output_path")
-    @patch("hhplab.sources.acs.ingest.tract_population.ingest_tract_data")
+    @patch("hhplab.sources.census.acs.ingest.tract_population.ingest_tract_data")
     @patch("pandas.read_parquet")
     def test_ingest_acs5_tract_cached_json_is_machine_readable(
         self,

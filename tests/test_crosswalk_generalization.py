@@ -9,19 +9,19 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from hhplab.sources.acs.acs_aggregate import aggregate_to_coc, aggregate_to_geo
 from hhplab.measures.measures_diagnostics import (
     compute_crosswalk_diagnostics,
     compute_measure_diagnostics,
     identify_problem_cocs,
     identify_problem_geos,
 )
-from hhplab.pep.pep_aggregate import aggregate_pep_counties
 from hhplab.rents.zori_aggregate import (
     collapse_to_yearly,
     compute_coc_county_weights,
     compute_geo_county_weights,
 )
+from hhplab.sources.census.acs.acs_aggregate import aggregate_to_coc, aggregate_to_geo
+from hhplab.sources.census.pep.pep_aggregate import aggregate_pep_counties
 from hhplab.xwalks.tract import (
     add_population_weights,
     validate_population_shares,

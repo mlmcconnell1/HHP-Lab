@@ -16,8 +16,6 @@ from pathlib import Path
 import pandas as pd
 import pyarrow.parquet as pq
 
-from hhplab.sources.acs.translate import get_source_tract_vintage, needs_translation
-from hhplab.sources.acs.variables import TRACT_OUTPUT_COLUMNS
 from hhplab.provenance import read_provenance
 from hhplab.recipe.recipe_schema import (
     CrosswalkTransform,
@@ -26,6 +24,8 @@ from hhplab.recipe.recipe_schema import (
     TemporalFilter,
 )
 from hhplab.recipe.schema_common import GeometryRef
+from hhplab.sources.census.acs.translate import get_source_tract_vintage, needs_translation
+from hhplab.sources.census.acs.variables import TRACT_OUTPUT_COLUMNS
 
 # Auto-detect candidates for geo-ID and year columns.
 GEO_CANDIDATES: list[str] = [

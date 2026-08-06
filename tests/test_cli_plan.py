@@ -22,8 +22,8 @@ class TestTigerIngestCommand:
         assert result.exit_code == 1
         assert "Invalid type" in result.output
 
-    @patch("hhplab.census.ingest.ingest_tiger_tracts")
-    @patch("hhplab.census.ingest.ingest_tiger_counties")
+    @patch("hhplab.sources.census.census.ingest.ingest_tiger_tracts")
+    @patch("hhplab.sources.census.census.ingest.ingest_tiger_counties")
     def test_ingest_tiger_cached_skips_downloads(
         self,
         mock_counties,
@@ -233,9 +233,9 @@ class TestBuildXwalksCommand:
         """Tract-mediated crosswalk preflight reports deterministic inputs and output."""
         from datetime import UTC, datetime
 
-        from hhplab.sources.acs.ingest.tract_population import get_output_path
         from hhplab.naming import tract_xwalk_path
         from hhplab.registry.schema import RegistryEntry
+        from hhplab.sources.census.acs.ingest.tract_population import get_output_path
 
         with runner.isolated_filesystem(temp_dir=tmp_path):
             Path("pyproject.toml").touch()
@@ -304,9 +304,9 @@ class TestBuildXwalksCommand:
         """Decennial tract-mediated preflight resolves fixed denominator artifacts."""
         from datetime import UTC, datetime
 
-        from hhplab.census.ingest.decennial_tract_population import get_output_path
         from hhplab.naming import tract_xwalk_path
         from hhplab.registry.schema import RegistryEntry
+        from hhplab.sources.census.census.ingest.decennial_tract_population import get_output_path
 
         with runner.isolated_filesystem(temp_dir=tmp_path):
             Path("pyproject.toml").touch()
@@ -369,9 +369,9 @@ class TestBuildXwalksCommand:
         """Tract-mediated generation writes the artifact and reports validation summary."""
         from datetime import UTC, datetime
 
-        from hhplab.sources.acs.ingest.tract_population import get_output_path
         from hhplab.naming import tract_xwalk_path
         from hhplab.registry.schema import RegistryEntry
+        from hhplab.sources.census.acs.ingest.tract_population import get_output_path
 
         with runner.isolated_filesystem(temp_dir=tmp_path):
             Path("pyproject.toml").touch()

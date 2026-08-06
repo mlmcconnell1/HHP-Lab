@@ -4,8 +4,8 @@ from typing import Annotated
 
 import typer
 
-from hhplab.sources.acs.ingest.tract_population import get_output_path
-from hhplab.sources.acs.variables import acs5_registry_measure_names, acs5_registry_tables
+from hhplab.sources.census.acs.ingest.tract_population import get_output_path
+from hhplab.sources.census.acs.variables import acs5_registry_measure_names, acs5_registry_tables
 
 
 def _acs5_registry_metadata() -> dict[str, list[str]]:
@@ -22,7 +22,7 @@ def _acs5_command_help() -> str:
     return f"""Ingest tract-level ACS 5-year estimates.
 
 Downloads tract data from the Census Bureau API for the ACS5 tables declared
-in hhplab.sources.acs.variables.ACS5_COVARIATE_REGISTRY:
+in hhplab.sources.census.acs.variables.ACS5_COVARIATE_REGISTRY:
 
     {tables}
 
@@ -78,9 +78,9 @@ def ingest_acs_population(
     """Ingest tract-level ACS 5-year estimates."""
     import pandas as pd
 
-    from hhplab.sources.acs.ingest.tract_population import ingest_tract_data
-    from hhplab.sources.acs.translate import get_source_tract_vintage, needs_translation
-    from hhplab.sources.acs.variables import ACS_TABLES
+    from hhplab.sources.census.acs.ingest.tract_population import ingest_tract_data
+    from hhplab.sources.census.acs.translate import get_source_tract_vintage, needs_translation
+    from hhplab.sources.census.acs.variables import ACS_TABLES
 
     registry_metadata = _acs5_registry_metadata()
 

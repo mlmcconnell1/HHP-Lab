@@ -1,27 +1,27 @@
 # Census ingestion modules
-from hhplab.census.ingest.pl_block_population import (
+from hhplab.sources.census.census.ingest.pl_block_population import (
     fetch_pl_block_population,
     get_pl_block_population_output_path,
     ingest_pl_block_population,
 )
-from hhplab.census.ingest.tiger_blocks import (
+from hhplab.sources.census.census.ingest.tiger_blocks import (
     get_block_geometry_output_path,
     ingest_block_geometry,
     normalize_block_geometry,
     save_block_geometry,
     save_block_geometry_from_parts,
 )
-from hhplab.census.ingest.tiger_counties import (
+from hhplab.sources.census.census.ingest.tiger_counties import (
     download_tiger_counties,
     ingest_tiger_counties,
     save_counties,
 )
-from hhplab.census.ingest.tiger_tracts import (
+from hhplab.sources.census.census.ingest.tiger_tracts import (
     download_tiger_tracts,
     ingest_tiger_tracts,
     save_tracts,
 )
-from hhplab.census.ingest.tract_relationship import (
+from hhplab.sources.census.census.ingest.tract_relationship import (
     TractRelationshipNotFoundError,
     download_tract_relationship,
     get_tract_relationship_path,
@@ -29,7 +29,7 @@ from hhplab.census.ingest.tract_relationship import (
     load_tract_relationship,
     save_tract_relationship,
 )
-from hhplab.census.ingest.urban_areas import (
+from hhplab.sources.census.census.ingest.urban_areas import (
     download_urban_areas,
     get_urban_area_output_path,
     ingest_urban_areas,

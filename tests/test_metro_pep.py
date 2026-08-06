@@ -14,7 +14,7 @@ from hhplab.metro.metro_definitions import (
     METRO_COUNTY_MEMBERSHIP,
     build_county_membership_df,
 )
-from hhplab.pep import aggregate_pep_to_metro
+from hhplab.sources.census.pep import aggregate_pep_to_metro
 
 # ---------------------------------------------------------------------------
 # Fixtures

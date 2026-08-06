@@ -4,9 +4,9 @@ Provides functions for downloading, normalizing, and aggregating
 Census Bureau Population Estimates Program county-level data.
 """
 
-from hhplab.pep.ingest import ingest_pep_county
-from hhplab.pep.pep_aggregate import aggregate_pep_counties, aggregate_pep_to_coc
-from hhplab.pep.pep_metro import aggregate_pep_to_metro
+from hhplab.sources.census.pep.ingest import ingest_pep_county
+from hhplab.sources.census.pep.pep_aggregate import aggregate_pep_counties, aggregate_pep_to_coc
+from hhplab.sources.census.pep.pep_metro import aggregate_pep_to_metro
 
 __all__ = [
     "ingest_pep_county",

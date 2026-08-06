@@ -52,8 +52,11 @@ _LAZY_EXPORTS = frozenset(
 )
 
 _LAZY_MODULES = {
+    "acs": "hhplab.sources.census.acs",
     "bls": "hhplab.sources.bls",
     "cdc": "hhplab.sources.cdc",
+    "census": "hhplab.sources.census.census",
+    "pep": "hhplab.sources.census.pep",
 }
 
 __all__ = sorted(_LAZY_EXPORTS | {"__version__"})

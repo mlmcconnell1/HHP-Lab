@@ -99,8 +99,8 @@ from typing import Literal
 
 import pandas as pd
 
-from hhplab.sources.acs.variables import COUNT_COLUMNS, MEDIAN_COLUMNS, MOE_COLUMNS
 from hhplab.geo.ct_planning_regions import CT_STATE_FIPS
+from hhplab.sources.census.acs.variables import COUNT_COLUMNS, MEDIAN_COLUMNS, MOE_COLUMNS
 from hhplab.xwalks.apply import apply_crosswalk
 
 RENT_BURDEN_30_PLUS_COLUMNS: tuple[str, ...] = (

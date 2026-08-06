@@ -8,7 +8,9 @@ from typing import Annotated
 import pandas as pd
 import typer
 
-from hhplab.census.ingest.pl_block_population import get_pl_block_population_output_path
+from hhplab.sources.census.census.ingest.pl_block_population import (
+    get_pl_block_population_output_path,
+)
 
 
 def ingest_pl_block_population(
@@ -49,7 +51,9 @@ def ingest_pl_block_population(
     ] = False,
 ) -> None:
     """Ingest block-level PL 94-171 total population denominators."""
-    from hhplab.census.ingest.pl_block_population import ingest_pl_block_population as ingest
+    from hhplab.sources.census.census.ingest.pl_block_population import (
+        ingest_pl_block_population as ingest,
+    )
 
     output_path = get_pl_block_population_output_path(decennial, blocks)
     if output_path.exists() and not force:

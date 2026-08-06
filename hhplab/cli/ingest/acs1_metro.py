@@ -11,7 +11,7 @@ from hhplab.metro.metro_definitions import CANONICAL_UNIVERSE_DEFINITION_VERSION
 
 
 def _acs1_command_help(*, geography: str) -> str:
-    from hhplab.sources.acs.variables_acs1 import ACS1_TABLES, acs1_measure_names
+    from hhplab.sources.census.acs.variables_acs1 import ACS1_TABLES, acs1_measure_names
 
     tables = ", ".join(ACS1_TABLES)
     registry_measures = acs1_measure_names()
@@ -37,7 +37,7 @@ def _acs1_command_help(*, geography: str) -> str:
     measures = ", ".join(featured_measures)
     return f"""Ingest ACS 1-year detailed-table data at {geography} geography.
 
-Fetches the ACS 1-year table set declared in hhplab.sources.acs.variables_acs1:
+Fetches the ACS 1-year table set declared in hhplab.sources.census.acs.variables_acs1:
 
     {tables}
 
@@ -79,8 +79,8 @@ def ingest_acs1_metro(
     """Ingest ACS 1-year detailed-table data at CBSA geography for metros."""
     import pandas as pd
 
-    from hhplab.sources.acs.ingest.metro_acs1 import ingest_metro_acs1
-    from hhplab.sources.acs.variables_acs1 import (
+    from hhplab.sources.census.acs.ingest.metro_acs1 import ingest_metro_acs1
+    from hhplab.sources.census.acs.variables_acs1 import (
         acs1_measure_names,
         acs1_tables_for_vintage,
         acs1_unavailable_tables_for_vintage,

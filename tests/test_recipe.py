@@ -13,7 +13,6 @@ from pydantic import ValidationError
 from shapely.geometry import Polygon, box
 from typer.testing import CliRunner
 
-from hhplab.sources.acs.sae import CONTRACT_RENT_BINS, HOUSEHOLD_INCOME_BINS
 from hhplab.cli.main import app
 from hhplab.geo.ct_planning_regions import CtPlanningRegionCrosswalk
 from hhplab.panel.assemble import _load_coc_areas
@@ -83,6 +82,7 @@ from hhplab.recipe.recipe_schema import (
     expand_year_spec,
 )
 from hhplab.schema.columns import MSA_COC_COVERAGE_COLUMNS
+from hhplab.sources.census.acs.sae import CONTRACT_RENT_BINS, HOUSEHOLD_INCOME_BINS
 from hhplab.xwalks.county import ALBERS_EQUAL_AREA_CRS
 
 runner = CliRunner()
@@ -5359,7 +5359,7 @@ class TestResampleAggregate:
         self,
         tmp_path: Path,
     ):
-        from hhplab.pep.pep_aggregate import aggregate_pep_counties
+        from hhplab.sources.census.pep.pep_aggregate import aggregate_pep_counties
 
         ds_path = tmp_path / "data" / "pep.parquet"
         ds_path.parent.mkdir(parents=True, exist_ok=True)

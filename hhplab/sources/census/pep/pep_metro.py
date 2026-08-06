@@ -22,7 +22,7 @@ from hhplab.metro.metro_definitions import (
     DEFINITION_VERSION,
     build_county_membership_df,
 )
-from hhplab.pep.pep_aggregate import aggregate_pep_counties
+from hhplab.sources.census.pep.pep_aggregate import aggregate_pep_counties
 
 logger = logging.getLogger(__name__)
 

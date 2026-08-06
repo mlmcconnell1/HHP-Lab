@@ -7,7 +7,7 @@ import importlib
 import pandas as pd
 import pytest
 
-from hhplab.covariates.census_bps_contract import (
+from hhplab.sources.census.bps.census_bps_contract import (
     CENSUS_BPS_CLASS_UNIT_COLUMNS,
     CENSUS_BPS_CLASS_VALUE_COLUMNS,
     CENSUS_BPS_MIX_ADJUSTED_VALUE_PER_UNIT_COLUMN,

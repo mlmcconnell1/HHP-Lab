@@ -12,14 +12,19 @@ import pytest
 from pandas.errors import PerformanceWarning
 from typer.testing import CliRunner
 
-from hhplab.sources.acs.ingest._acs1_api import ACS1_COUNTY_GEOGRAPHY, normalize_acs1_measures
-from hhplab.sources.acs.ingest.county_acs1 import (
+from hhplab.cli.main import app
+from hhplab.provenance import read_provenance
+from hhplab.sources.census.acs.ingest._acs1_api import (
+    ACS1_COUNTY_GEOGRAPHY,
+    normalize_acs1_measures,
+)
+from hhplab.sources.census.acs.ingest.county_acs1 import (
     fetch_acs1_county_data,
     ingest_county_acs1,
     load_acs1_county_sae_source,
     normalize_acs1_county_sae_source,
 )
-from hhplab.sources.acs.variables_acs1 import (
+from hhplab.sources.census.acs.variables_acs1 import (
     ACS1_COUNTY_OUTPUT_COLUMNS,
     ACS1_SAE_SOURCE_OUTPUT_COLUMNS,
     ACS1_VARIABLES_BY_TABLE,
@@ -27,8 +32,6 @@ from hhplab.sources.acs.variables_acs1 import (
     acs1_tables_for_vintage,
     acs1_variables_by_table_for_vintage,
 )
-from hhplab.cli.main import app
-from hhplab.provenance import read_provenance
 
 CENSUS_API_URL_PATTERN = re.compile(r"https://api\.census\.gov/data/\d{4}/acs/acs1.*")
 

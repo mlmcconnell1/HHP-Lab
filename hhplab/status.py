@@ -4,13 +4,13 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from hhplab.census.api import (
+from hhplab.config import load_config
+from hhplab.curated_schema import validate_curated_schemas
+from hhplab.sources.census.census.api import (
     CENSUS_API_KEY_MISSING_MESSAGE,
     census_api_credentials_status,
     probe_census_api_reachability,
 )
-from hhplab.config import load_config
-from hhplab.curated_schema import validate_curated_schemas
 
 STATUS_GUIDANCE = {
     "recipe_preflight": "hhplab build recipe-preflight --recipe <file> --json",

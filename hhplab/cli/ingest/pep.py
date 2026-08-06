@@ -102,14 +102,14 @@ def ingest_pep(
     if raw_dir is None:
         raw_dir = raw_root() / "pep"
 
-    from hhplab.pep.ingest import (
+    from hhplab.provenance import read_provenance
+    from hhplab.sources.census.pep.ingest import (
         AUTO_SERIES,
         PEP_URLS,
         POSTCENSAL_SERIES,
         get_output_path,
         ingest_pep_county,
     )
-    from hhplab.provenance import read_provenance
 
     if start is not None and end is not None and start > end:
         typer.echo("Error: --start must be <= --end.", err=True)

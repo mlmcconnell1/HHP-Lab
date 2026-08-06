@@ -8,11 +8,6 @@ from pathlib import Path
 import pandas as pd
 import pyarrow.parquet as pq
 
-from hhplab.sources.acs.variables import ACS5_SAE_SUPPORT_COLUMNS
-from hhplab.sources.acs.variables_acs1 import (
-    ACS1_SAE_SOURCE_COLUMNS,
-    ACS1_UNAVAILABLE_VINTAGES,
-)
 from hhplab.config import load_config
 from hhplab.geo.ct_planning_regions import (
     CT_LEGACY_COUNTY_VINTAGE,
@@ -83,6 +78,11 @@ from hhplab.recipe.recipe_schema import (
     TemporalFilter,
 )
 from hhplab.recipe.schema_common import expand_year_spec
+from hhplab.sources.census.acs.variables import ACS5_SAE_SUPPORT_COLUMNS
+from hhplab.sources.census.acs.variables_acs1 import (
+    ACS1_SAE_SOURCE_COLUMNS,
+    ACS1_UNAVAILABLE_VINTAGES,
+)
 
 
 def _check_dataset_paths(
@@ -416,7 +416,7 @@ def _check_acs5_tract_schema_contracts(
 
 def _dataset_remediation(ds_id: str, ds, *, years: list[int] | None = None) -> Remediation:
     """Build a remediation hint for a missing dataset."""
-    from hhplab.sources.acs.variables_acs1 import ACS1_UNAVAILABLE_VINTAGES
+    from hhplab.sources.census.acs.variables_acs1 import ACS1_UNAVAILABLE_VINTAGES
 
     provider = ds.provider
     product = ds.product

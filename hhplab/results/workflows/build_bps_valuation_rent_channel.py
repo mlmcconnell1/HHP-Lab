@@ -40,14 +40,14 @@ import pandas as pd
 import statsmodels.api as sm
 
 from hhplab.census_regions import census_region
-from hhplab.covariates.census_bps_contract import (
-    CENSUS_BPS_MIX_ADJUSTED_VALUE_PER_UNIT_COLUMN,
-    CENSUS_BPS_SOURCE_ID,
-)
 from hhplab.results.workflows._paths import DATA_ROOT, OUTPUTS_ROOT, REPO_ROOT, write_result_parquet
 from hhplab.results.workflows.build_household_size_composition_panel import (
     _as_msa_id,
     load_pooled_base_panel,
+)
+from hhplab.sources.census.bps.census_bps_contract import (
+    CENSUS_BPS_MIX_ADJUSTED_VALUE_PER_UNIT_COLUMN,
+    CENSUS_BPS_SOURCE_ID,
 )
 
 ROOT = REPO_ROOT

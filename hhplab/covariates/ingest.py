@@ -11,20 +11,6 @@ from typing import Any
 import pandas as pd
 
 from hhplab.covariates.catalog import CovariateSourceSpec, covariate_source_spec
-from hhplab.covariates.census_bps_contract import (
-    CENSUS_BPS_ANNUAL_FILE_GLOB,
-    CENSUS_BPS_BUILDING_COLUMNS,
-    CENSUS_BPS_CLASS_UNIT_COLUMNS,
-    CENSUS_BPS_CLASS_VALUE_COLUMNS,
-    CENSUS_BPS_COUNTY_FIPS3_COLUMN,
-    CENSUS_BPS_HEADER_ROWS,
-    CENSUS_BPS_RAW_URL_TEMPLATE,
-    CENSUS_BPS_SOURCE_ID,
-    CENSUS_BPS_STATE_FIPS_COLUMN,
-    CENSUS_BPS_SURVEY_YEAR_COLUMN,
-    CENSUS_BPS_UNIT_COLUMNS,
-    CENSUS_BPS_VALUE_COLUMNS,
-)
 from hhplab.covariates.frame_adapters import covariate_frame_adapter
 from hhplab.covariates.irs_soi_contract import (
     IRS_SOI_COUNTY_CURATED_COLUMNS,
@@ -75,6 +61,20 @@ from hhplab.sources.bls.qcew.contract import (
     QCEW_REQUIRED_RAW_COLUMNS,
     QCEW_SOURCE_ID,
     QCEW_TOTAL_COVERED_OWN_CODE,
+)
+from hhplab.sources.census.bps.census_bps_contract import (
+    CENSUS_BPS_ANNUAL_FILE_GLOB,
+    CENSUS_BPS_BUILDING_COLUMNS,
+    CENSUS_BPS_CLASS_UNIT_COLUMNS,
+    CENSUS_BPS_CLASS_VALUE_COLUMNS,
+    CENSUS_BPS_COUNTY_FIPS3_COLUMN,
+    CENSUS_BPS_HEADER_ROWS,
+    CENSUS_BPS_RAW_URL_TEMPLATE,
+    CENSUS_BPS_SOURCE_ID,
+    CENSUS_BPS_STATE_FIPS_COLUMN,
+    CENSUS_BPS_SURVEY_YEAR_COLUMN,
+    CENSUS_BPS_UNIT_COLUMNS,
+    CENSUS_BPS_VALUE_COLUMNS,
 )
 
 COMMON_COLUMN_ALIASES: dict[str, tuple[str, ...]] = {

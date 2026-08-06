@@ -22,8 +22,6 @@ from typing import Protocol
 
 import pandas as pd
 
-from hhplab.sources.acs.variables import ACS5_EXPANDED_COVARIATE_COLUMNS
-from hhplab.sources.acs.variables_acs1 import ACS1_METRO_MEASURE_COLUMNS
 from hhplab.recipe.recipe_schema import PanelPolicy, RecipeV1
 from hhplab.schema.columns import (
     ACS1_MEASURE_COLUMNS,
@@ -31,6 +29,8 @@ from hhplab.schema.columns import (
     HIC_PANEL_MEASURE_COLUMNS,
     LAUS_MEASURE_COLUMNS,
 )
+from hhplab.sources.census.acs.variables import ACS5_EXPANDED_COVARIATE_COLUMNS
+from hhplab.sources.census.acs.variables_acs1 import ACS1_METRO_MEASURE_COLUMNS
 
 
 @dataclass(frozen=True)

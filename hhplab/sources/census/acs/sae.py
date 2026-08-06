@@ -11,8 +11,6 @@ from typing import Any, Literal
 import pandas as pd
 
 from hhplab import naming
-from hhplab.sources.acs.variables import ACS5_SAE_SUPPORT_COLUMNS
-from hhplab.sources.acs.variables_acs1 import ACS1_SAE_SOURCE_COLUMNS, ACS1_UNAVAILABLE_VINTAGES
 from hhplab.geo.ct_planning_regions import (
     is_ct_legacy_county_fips,
     is_ct_planning_region_fips,
@@ -24,6 +22,11 @@ from hhplab.schema.measures import (
     ACS1_IMPUTED_POVERTY_SPEC,
     ACS1ImputationMeasureSpec,
     acs1_imputation_output_columns,
+)
+from hhplab.sources.census.acs.variables import ACS5_SAE_SUPPORT_COLUMNS
+from hhplab.sources.census.acs.variables_acs1 import (
+    ACS1_SAE_SOURCE_COLUMNS,
+    ACS1_UNAVAILABLE_VINTAGES,
 )
 
 SAE_ALLOCATION_METHOD = "tract_share_within_county"

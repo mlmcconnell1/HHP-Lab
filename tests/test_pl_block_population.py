@@ -8,15 +8,15 @@ import pandas as pd
 import pytest
 from typer.testing import CliRunner
 
-from hhplab.census.ingest.pl_block_population import (
+from hhplab.cli.main import app
+from hhplab.provenance import read_provenance
+from hhplab.schema.columns import PL_BLOCK_POPULATION_COLUMNS
+from hhplab.sources.census.census.ingest.pl_block_population import (
     PL_BLOCK_API_SPECS,
     fetch_pl_block_population,
     get_pl_block_population_output_path,
     ingest_pl_block_population,
 )
-from hhplab.cli.main import app
-from hhplab.provenance import read_provenance
-from hhplab.schema.columns import PL_BLOCK_POPULATION_COLUMNS
 
 pytestmark = pytest.mark.httpx_mock(can_send_already_matched_responses=True)
 
@@ -119,7 +119,7 @@ def test_ingest_pl_block_population_writes_schema_and_provenance(monkeypatch, tm
         columns=PL_BLOCK_POPULATION_COLUMNS,
     )
     monkeypatch.setattr(
-        "hhplab.census.ingest.pl_block_population.fetch_pl_block_population",
+        "hhplab.sources.census.census.ingest.pl_block_population.fetch_pl_block_population",
         lambda decennial_vintage, api_key=None: (frame, "abc123", 123),
     )
 
@@ -204,7 +204,7 @@ def test_pl_blocks_cli_fresh_json(monkeypatch, tmp_path) -> None:
         lambda decennial, blocks=None: tmp_path / "missing.parquet",
     )
     monkeypatch.setattr(
-        "hhplab.census.ingest.pl_block_population.ingest_pl_block_population",
+        "hhplab.sources.census.census.ingest.pl_block_population.ingest_pl_block_population",
         lambda decennial, block_vintage=None, force=False, api_key=None: output_path,
     )
 

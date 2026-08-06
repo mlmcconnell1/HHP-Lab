@@ -19,11 +19,11 @@ import pytest
 # All ingest modules that must comply with the retention policy
 INGEST_MODULES = [
     "hhplab/hud/opendata_arcgis.py",
-    "hhplab/census/ingest/tiger_tracts.py",
-    "hhplab/census/ingest/tiger_counties.py",
-    "hhplab/census/ingest/tract_relationship.py",
+    "hhplab/sources/census/census/ingest/tiger_tracts.py",
+    "hhplab/sources/census/census/ingest/tiger_counties.py",
+    "hhplab/sources/census/census/ingest/tract_relationship.py",
     "hhplab/nhgis/ingest.py",
-    "hhplab/sources/acs/ingest/tract_population.py",
+    "hhplab/sources/census/acs/ingest/tract_population.py",
     "hhplab/rents/weights.py",
 ]
 
@@ -31,15 +31,15 @@ INGEST_MODULES = [
 API_INGEST_MODULES = [
     "hhplab/hud/opendata_arcgis.py",
     "hhplab/hud/exchange_gis.py",
-    "hhplab/sources/acs/ingest/tract_population.py",
+    "hhplab/sources/census/acs/ingest/tract_population.py",
     "hhplab/rents/weights.py",
 ]
 
 # File ingest modules that use persist_file_snapshot with subdirs
 FILE_INGEST_MODULES = [
-    "hhplab/census/ingest/tiger_tracts.py",
-    "hhplab/census/ingest/tiger_counties.py",
-    "hhplab/census/ingest/tract_relationship.py",
+    "hhplab/sources/census/census/ingest/tiger_tracts.py",
+    "hhplab/sources/census/census/ingest/tiger_counties.py",
+    "hhplab/sources/census/census/ingest/tract_relationship.py",
     "hhplab/nhgis/ingest.py",
 ]
 

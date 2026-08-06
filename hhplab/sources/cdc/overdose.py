@@ -377,7 +377,7 @@ def ingest_and_aggregate_overdose_to_msa(
 ) -> tuple[pd.DataFrame, pd.DataFrame, Path, Path]:
     """Normalize CDC county data and write county plus MSA artifacts."""
     if county_population is None:
-        from hhplab.pep.pep_aggregate import load_pep_county
+        from hhplab.sources.census.pep.pep_aggregate import load_pep_county
 
         county_population = load_pep_county()
     county_df, county_path = ingest_county_overdose(

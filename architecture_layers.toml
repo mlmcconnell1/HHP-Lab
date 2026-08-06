@@ -11,10 +11,9 @@ order = ["contracts", "infrastructure", "domain", "application", "interface"]
 "hhplab.results" = "application"
 "hhplab.viz" = "application"
 
-"hhplab.sources.acs" = "domain"
 "hhplab.sources.bls" = "domain"
 "hhplab.sources.cdc" = "domain"
-"hhplab.census" = "domain"
+"hhplab.sources.census" = "domain"
 "hhplab.covariates" = "domain"
 "hhplab.geo" = "domain"
 "hhplab.hic" = "domain"
@@ -24,7 +23,6 @@ order = ["contracts", "infrastructure", "domain", "application", "interface"]
 "hhplab.metro" = "domain"
 "hhplab.msa" = "domain"
 "hhplab.nhgis" = "domain"
-"hhplab.pep" = "domain"
 "hhplab.pit" = "domain"
 "hhplab.prism" = "domain"
 "hhplab.rents" = "domain"
@@ -64,7 +62,7 @@ order = ["contracts", "infrastructure", "domain", "application", "interface"]
 # ownership is corrected; new upward dependencies must never be added here merely
 # to make the quality gate pass.
 upward_edges = [
-  "hhplab.pep.pep_diagnostics -> hhplab.coverage_diagnostics",
+  "hhplab.sources.census.pep.pep_diagnostics -> hhplab.coverage_diagnostics",
   "hhplab.rents.zori_diagnostics -> hhplab.coverage_diagnostics",
 ]
 
@@ -84,8 +82,9 @@ upward_edges = [
 # permitted directly in these files.
 passive_or_reexport_only = [
   "hhplab",
-  "hhplab.sources.acs",
-  "hhplab.census",
+  "hhplab.sources.census.acs",
+  "hhplab.sources.census.census",
+  "hhplab.sources.census.pep",
   "hhplab.cli",
   "hhplab.covariates",
   "hhplab.geo",

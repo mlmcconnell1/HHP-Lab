@@ -15,9 +15,9 @@ import httpx
 import pandas as pd
 
 import hhplab.naming as naming
-from hhplab.census.api import get_census_api_key, raise_for_census_api_status
 from hhplab.paths import curated_dir
 from hhplab.provenance import ProvenanceBlock, write_parquet_with_provenance
+from hhplab.sources.census.census.api import get_census_api_key, raise_for_census_api_status
 
 STATE_FIPS_CODES: tuple[str, ...] = (
     "01",

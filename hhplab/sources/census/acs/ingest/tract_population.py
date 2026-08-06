@@ -9,7 +9,7 @@ population_below_poverty).
 
 Usage
 -----
-    from hhplab.sources.acs.ingest.tract_population import ingest_tract_data
+    from hhplab.sources.census.acs.ingest.tract_population import ingest_tract_data
 
     path = ingest_tract_data(
         acs_vintage="2019-2023",
@@ -61,12 +61,21 @@ import pandas as pd
 import pyarrow.parquet as pq
 
 import hhplab.naming as naming
-from hhplab.sources.acs.translate import (
+from hhplab.paths import curated_dir
+from hhplab.provenance import (
+    ProvenanceBlock,
+    read_provenance,
+    write_parquet_with_provenance,
+)
+from hhplab.raw_snapshot import write_api_snapshot
+from hhplab.source_registry import check_source_changed, register_source
+from hhplab.source_urls import CENSUS_API_ACS5
+from hhplab.sources.census.acs.translate import (
     get_source_tract_vintage,
     needs_translation,
     translate_acs_to_target_vintage,
 )
-from hhplab.sources.acs.variables import (
+from hhplab.sources.census.acs.variables import (
     ACS5_SAE_DENOMINATOR_COLUMNS,
     ACS5_SAE_SUPPORT_COLUMNS,
     ACS5_SAE_SUPPORT_COLUMNS_BY_TABLE,
@@ -82,16 +91,7 @@ from hhplab.sources.acs.variables import (
     api_vars_for_year,
     tables_for_api_vars,
 )
-from hhplab.census.api import get_census_api_key, raise_for_census_api_status
-from hhplab.paths import curated_dir
-from hhplab.provenance import (
-    ProvenanceBlock,
-    read_provenance,
-    write_parquet_with_provenance,
-)
-from hhplab.raw_snapshot import write_api_snapshot
-from hhplab.source_registry import check_source_changed, register_source
-from hhplab.source_urls import CENSUS_API_ACS5
+from hhplab.sources.census.census.api import get_census_api_key, raise_for_census_api_status
 
 logger = logging.getLogger(__name__)
 

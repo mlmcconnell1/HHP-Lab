@@ -15,12 +15,6 @@ import warnings
 import numpy as np
 import pandas as pd
 
-from hhplab.sources.acs.sae import (
-    CONTRACT_RENT_BINS,
-    CONTRACT_RENT_BINS_EARLY,
-    HOUSEHOLD_INCOME_BINS,
-    _quantile_from_bins,
-)
 from hhplab.geo.ct_planning_regions import (
     CT_LEGACY_COUNTY_VINTAGE,
     CT_PLANNING_REGION_VINTAGE,
@@ -47,6 +41,12 @@ from hhplab.recipe.probes import get_weighted_transform_requirements
 from hhplab.schema.columns import (
     ACS1_IMPUTATION_FLAG_COLUMNS,
     ACS1_IMPUTATION_LINEAGE_COLUMNS,
+)
+from hhplab.sources.census.acs.sae import (
+    CONTRACT_RENT_BINS,
+    CONTRACT_RENT_BINS_EARLY,
+    HOUSEHOLD_INCOME_BINS,
+    _quantile_from_bins,
 )
 
 

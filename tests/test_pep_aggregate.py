@@ -14,7 +14,8 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
-from hhplab.pep.pep_aggregate import (
+from hhplab.provenance import read_provenance
+from hhplab.sources.census.pep.pep_aggregate import (
     CURRENT_TRACT_MEDIATED_STATUS,
     DEPRECATED_DIRECT_COUNTY_AREA_STATUS,
     DIRECT_COUNTY_AREA_ALLOCATION,
@@ -23,7 +24,6 @@ from hhplab.pep.pep_aggregate import (
     aggregate_pep_to_coc,
     aggregate_pep_to_coc_many,
 )
-from hhplab.provenance import read_provenance
 
 
 class TestAggregationIntegration:
@@ -670,8 +670,8 @@ class TestPepDiagnosticsProvenance:
 
     def test_run_pep_diagnostics_embeds_provenance(self, tmp_path):
         """Output parquet from run_pep_diagnostics must have provenance."""
-        from hhplab.pep.pep_diagnostics import run_pep_diagnostics
         from hhplab.provenance import has_provenance
+        from hhplab.sources.census.pep.pep_diagnostics import run_pep_diagnostics
 
         # Create a minimal PEP CoC parquet as input.
         pep_df = pd.DataFrame(
@@ -726,14 +726,14 @@ class TestLoadPepCountyDiscovery:
         return tmp_path
 
     def test_discovers_year_suffixed_vintage_files(self, pep_dir: Path) -> None:
-        from hhplab.pep.pep_aggregate import load_pep_county
+        from hhplab.sources.census.pep.pep_aggregate import load_pep_county
 
         combined = load_pep_county(pep_dir=pep_dir)
         expected_years = sorted(set(self.PLAIN_VINTAGE_YEARS) | set(self.SUFFIXED_VINTAGE_YEARS))
         assert sorted(combined["year"].unique()) == expected_years
 
     def test_latest_vintage_wins_on_overlap(self, pep_dir: Path) -> None:
-        from hhplab.pep.pep_aggregate import load_pep_county
+        from hhplab.sources.census.pep.pep_aggregate import load_pep_county
 
         combined = load_pep_county(pep_dir=pep_dir)
         overlap_year = combined[combined["year"] == 2020]

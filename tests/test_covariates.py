@@ -18,11 +18,6 @@ from hhplab.covariates.aggregate import (
     derive_prism_temperature_basis,
 )
 from hhplab.covariates.catalog import COVARIATE_SOURCE_SPECS
-from hhplab.covariates.census_bps_contract import (
-    CENSUS_BPS_CLASS_UNIT_COLUMNS,
-    CENSUS_BPS_CLASS_VALUE_COLUMNS,
-    CENSUS_BPS_SOURCE_ID,
-)
 from hhplab.covariates.frame_adapters import registered_covariate_frame_adapters
 from hhplab.covariates.ingest import ingest_covariate_source
 from hhplab.covariates.irs_soi_contract import (
@@ -67,6 +62,11 @@ from hhplab.sources.cdc.overdose_contract import (
     CDC_OVERDOSE_FIRST_YEAR,
     CDC_OVERDOSE_MEASURE_COLUMNS,
     CDC_OVERDOSE_SOURCE_ID,
+)
+from hhplab.sources.census.bps.census_bps_contract import (
+    CENSUS_BPS_CLASS_UNIT_COLUMNS,
+    CENSUS_BPS_CLASS_VALUE_COLUMNS,
+    CENSUS_BPS_SOURCE_ID,
 )
 from hhplab.vera.incarceration_contract import (
     VERA_JAIL_MEASURE_COLUMNS,

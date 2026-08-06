@@ -5,7 +5,7 @@ from typing import Annotated
 import pandas as pd
 import typer
 
-from hhplab.census.ingest.decennial_tract_population import get_output_path
+from hhplab.sources.census.census.ingest.decennial_tract_population import get_output_path
 
 
 def ingest_decennial_tract_population(
@@ -48,7 +48,7 @@ def ingest_decennial_tract_population(
     """Ingest tract-level decennial total population denominators."""
     import json
 
-    from hhplab.census.ingest.decennial_tract_population import (
+    from hhplab.sources.census.census.ingest.decennial_tract_population import (
         ingest_decennial_tract_population as ingest,
     )
 

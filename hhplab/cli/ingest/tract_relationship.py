@@ -29,7 +29,7 @@ def ingest_tract_relationship(
 
         hhplab ingest-tract-relationship
     """
-    from hhplab.census.ingest import ingest_tract_relationship as do_ingest
+    from hhplab.sources.census.census.ingest import ingest_tract_relationship as do_ingest
 
     if force:
         typer.echo("Forcing re-download of tract relationship file...")

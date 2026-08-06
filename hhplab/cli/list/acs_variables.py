@@ -7,12 +7,12 @@ from typing import Annotated, Any
 
 import typer
 
-from hhplab.sources.acs.variables import (
+from hhplab.sources.census.acs.variables import (
     ACS5_COVARIATE_REGISTRY,
     ACS_VARIABLES,
     acs5_registry_tables,
 )
-from hhplab.sources.acs.variables_acs1 import (
+from hhplab.sources.census.acs.variables_acs1 import (
     ACS1_TABLES,
     ACS1_VARIABLE_NAMES,
     DERIVED_ACS1_MEASURES,

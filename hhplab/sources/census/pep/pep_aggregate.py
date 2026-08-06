@@ -23,7 +23,7 @@ decennial count.
 
 Usage
 -----
-    from hhplab.pep.pep_aggregate import aggregate_pep_to_coc
+    from hhplab.sources.census.pep.pep_aggregate import aggregate_pep_to_coc
 
     path = aggregate_pep_to_coc(
         boundary_vintage="2024",

@@ -1,14 +1,18 @@
 """Tests for source-owned package entrypoints."""
 
-import hhplab.census.ingest as census_ingest
+import hhplab.sources.census.census.ingest as census_ingest
 from hhplab import cdc, census, hud, medsl, nhgis, pit, vera
-from hhplab.census.ingest import ingest_tiger_counties, ingest_tiger_tracts, load_tract_relationship
 from hhplab.hud.exchange_gis import ingest_hud_exchange
 from hhplab.hud.opendata_arcgis import ingest_hud_opendata
 from hhplab.nhgis.ingest import ingest_nhgis_counties, ingest_nhgis_tracts
 from hhplab.pit.ingest import download_pit_data, parse_pit_file
 from hhplab.pit.qa import validate_pit_data
 from hhplab.sources.cdc import aggregate_county_overdose_to_msa, ingest_county_overdose
+from hhplab.sources.census.census.ingest import (
+    ingest_tiger_counties,
+    ingest_tiger_tracts,
+    load_tract_relationship,
+)
 
 
 def test_package_root_lazy_exports() -> None:

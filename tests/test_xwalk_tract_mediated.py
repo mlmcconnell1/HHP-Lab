@@ -19,9 +19,9 @@ from __future__ import annotations
 import pandas as pd
 import pytest
 
-from hhplab.census.ingest.decennial_tract_population import STATE_FIPS_CODES
 from hhplab.naming import tract_mediated_county_xwalk_filename
 from hhplab.provenance import read_provenance
+from hhplab.sources.census.census.ingest.decennial_tract_population import STATE_FIPS_CODES
 from hhplab.xwalks.tract_mediated import (
     COUNTY_VINTAGE_SEMANTICS,
     build_tract_mediated_county_crosswalk,

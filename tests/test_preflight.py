@@ -9,7 +9,6 @@ import pandas as pd
 import pytest
 from typer.testing import CliRunner
 
-from hhplab.sources.acs.variables import TRACT_OUTPUT_COLUMNS
 from hhplab.cli.main import app
 from hhplab.naming import (
     county_xwalk_path,
@@ -35,6 +34,7 @@ from hhplab.recipe.probes import (
     probe_year_column,
 )
 from hhplab.recipe.recipe_schema import DatasetSpec, GeometryRef, TemporalFilter
+from hhplab.sources.census.acs.variables import TRACT_OUTPUT_COLUMNS
 
 runner = CliRunner()
 

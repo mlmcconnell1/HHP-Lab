@@ -10,11 +10,11 @@ import httpx
 import pandas as pd
 
 import hhplab.naming as naming
-from hhplab.census.api import get_census_api_key, raise_for_census_api_status
-from hhplab.census.ingest.decennial_tract_population import STATE_FIPS_CODES
 from hhplab.paths import curated_dir
 from hhplab.provenance import ProvenanceBlock, write_parquet_with_provenance
 from hhplab.schema.columns import PL_BLOCK_POPULATION_COLUMNS
+from hhplab.sources.census.census.api import get_census_api_key, raise_for_census_api_status
+from hhplab.sources.census.census.ingest.decennial_tract_population import STATE_FIPS_CODES
 
 PL_BLOCK_API_SPECS: dict[str, tuple[str, str]] = {
     "2010": ("https://api.census.gov/data/2010/dec/pl", "P001001"),

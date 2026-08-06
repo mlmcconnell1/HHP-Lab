@@ -19,12 +19,12 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from hhplab.covariates.census_bps_contract import (
+from hhplab.results.workflows._paths import DATA_ROOT, OUTPUTS_ROOT, REPO_ROOT, write_result_parquet
+from hhplab.sources.census.bps.census_bps_contract import (
     CENSUS_BPS_CLASS_UNIT_COLUMNS,
     CENSUS_BPS_CLASS_VALUE_COLUMNS,
     CENSUS_BPS_MIX_ADJUSTED_VALUE_PER_UNIT_COLUMN,
 )
-from hhplab.results.workflows._paths import DATA_ROOT, OUTPUTS_ROOT, REPO_ROOT, write_result_parquet
 
 ROOT = REPO_ROOT
 OUT = OUTPUTS_ROOT / "bps_valuation_benchmark"

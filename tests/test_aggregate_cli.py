@@ -10,11 +10,11 @@ from typer.testing import CliRunner
 
 from hhplab.cli.aggregate_cli import _resolve_boundary_vintage_map
 from hhplab.cli.main import app
-from hhplab.pep.pep_aggregate import build_lagged_pep_series
-from hhplab.sources.acs.acs_aggregate import (
+from hhplab.sources.census.acs.acs_aggregate import (
     _available_contract_rent_bins,
     _derive_acs5_covariates,
 )
+from hhplab.sources.census.pep.pep_aggregate import build_lagged_pep_series
 
 runner = CliRunner()
 
@@ -199,7 +199,7 @@ def test_aggregate_cdc_overdose_json_reports_source_errors(mock_aggregate):
     assert "CDC overdose CSV not found" in payload["message"]
 
 
-@patch("hhplab.pep.pep_aggregate.aggregate_pep_to_coc_many")
+@patch("hhplab.sources.census.pep.pep_aggregate.aggregate_pep_to_coc_many")
 def test_aggregate_pep_accepts_repeated_weighting(mock_aggregate, tmp_path):
     """PEP CLI passes repeated weighting requests to one multi-output workflow."""
     mock_aggregate.return_value = {
@@ -333,7 +333,7 @@ def _create_fake_acs_cache(acs_vintage: str, tract_vintage: str | int) -> None:
     """Create a minimal fake ACS cache file so aggregate reaches crosswalk check."""
     import pandas as pd
 
-    from hhplab.sources.acs.ingest.tract_population import get_output_path
+    from hhplab.sources.census.acs.ingest.tract_population import get_output_path
 
     cache_path = get_output_path(acs_vintage, str(tract_vintage))
     cache_path.parent.mkdir(parents=True, exist_ok=True)
@@ -353,7 +353,7 @@ def _create_fake_acs_cache(acs_vintage: str, tract_vintage: str | int) -> None:
 
 
 def _create_fake_expanded_acs_cache(acs_vintage: str, tract_vintage: str | int) -> None:
-    from hhplab.sources.acs.ingest.tract_population import get_output_path
+    from hhplab.sources.census.acs.ingest.tract_population import get_output_path
 
     cache_path = get_output_path(acs_vintage, str(tract_vintage))
     cache_path.parent.mkdir(parents=True, exist_ok=True)

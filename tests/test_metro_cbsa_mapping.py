@@ -6,7 +6,14 @@ and ACS1 unemployment variable completeness.
 
 import pytest
 
-from hhplab.sources.acs.variables_acs1 import (
+from hhplab.metro.metro_definitions import (
+    _CBSA_METRO_NAMES,
+    _CBSA_TO_METRO,
+    METRO_CBSA_MAPPING,
+    build_cbsa_mapping_df,
+    cbsa_to_metro_id,
+)
+from hhplab.sources.census.acs.variables_acs1 import (
     ACS1_FIRST_RELIABLE_YEAR,
     ACS1_METRO_OUTPUT_COLUMNS,
     ACS1_UNEMPLOYMENT_TABLE,
@@ -14,13 +21,6 @@ from hhplab.sources.acs.variables_acs1 import (
     ACS1_VARIABLE_NAMES,
     DERIVED_ACS1_MEASURES,
     acs1_tables_for_vintage,
-)
-from hhplab.metro.metro_definitions import (
-    _CBSA_METRO_NAMES,
-    _CBSA_TO_METRO,
-    METRO_CBSA_MAPPING,
-    build_cbsa_mapping_df,
-    cbsa_to_metro_id,
 )
 
 # ---------------------------------------------------------------------------

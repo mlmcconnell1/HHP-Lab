@@ -14,13 +14,16 @@ from pathlib import Path
 
 import pyarrow.parquet as pq
 
-from hhplab.sources.acs.variables import TRACT_OUTPUT_COLUMNS
-from hhplab.sources.acs.variables_acs1 import ACS1_COUNTY_OUTPUT_COLUMNS, ACS1_METRO_OUTPUT_COLUMNS
 from hhplab.metro.metro_definitions import (
     CANONICAL_UNIVERSE_DEFINITION_VERSION,
 )
 from hhplab.metro.metro_definitions import (
     DEFINITION_VERSION as GLYNN_FOX_DEFINITION_VERSION,
+)
+from hhplab.sources.census.acs.variables import TRACT_OUTPUT_COLUMNS
+from hhplab.sources.census.acs.variables_acs1 import (
+    ACS1_COUNTY_OUTPUT_COLUMNS,
+    ACS1_METRO_OUTPUT_COLUMNS,
 )
 
 CANONICAL_DEFINITION_BY_COMPACT_TOKEN = {

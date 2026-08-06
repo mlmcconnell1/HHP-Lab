@@ -4,7 +4,7 @@ ACS (American Community Survey) data is available at the census tract
 level. Metro ACS measures are derived by building a metro-tract crosswalk from
 the metro-county membership table (since tracts nest perfectly within
 counties, every tract in a member county has ``area_share=1.0``), then
-aggregating using :func:`hhplab.sources.acs.acs_aggregate.aggregate_to_geo`.
+aggregating using :func:`hhplab.sources.census.acs.acs_aggregate.aggregate_to_geo`.
 
 For multi-county metros (e.g., NYC with 5 boroughs, Denver with 7 counties),
 all tracts from all member counties contribute.  For single-county metros,
@@ -17,11 +17,11 @@ import logging
 
 import pandas as pd
 
-from hhplab.sources.acs.acs_aggregate import aggregate_to_geo
 from hhplab.metro.metro_definitions import (
     DEFINITION_VERSION,
     build_county_membership_df,
 )
+from hhplab.sources.census.acs.acs_aggregate import aggregate_to_geo
 
 logger = logging.getLogger(__name__)
 

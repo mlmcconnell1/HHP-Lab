@@ -30,9 +30,9 @@ from dataclasses import dataclass
 
 import pandas as pd
 
-from hhplab.sources.acs.acs_aggregate import AVERAGE_WEIGHT_DENOMINATORS
-from hhplab.sources.acs.variables import COUNT_COLUMNS, MEDIAN_COLUMNS
-from hhplab.census.ingest.tract_relationship import load_tract_relationship
+from hhplab.sources.census.acs.acs_aggregate import AVERAGE_WEIGHT_DENOMINATORS
+from hhplab.sources.census.acs.variables import COUNT_COLUMNS, MEDIAN_COLUMNS
+from hhplab.sources.census.census.ingest.tract_relationship import load_tract_relationship
 
 logger = logging.getLogger(__name__)
 

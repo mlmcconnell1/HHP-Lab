@@ -657,11 +657,11 @@ class TestRetiredCommandRegression:
         result = runner.invoke(app, ["agents"])
         assert result.exit_code == 0
         assert "Measure Discovery" in result.output
-        assert "hhplab/sources/acs/variables.py" in result.output
+        assert "hhplab/sources/census/acs/variables.py" in result.output
         assert "ACS5_COVARIATE_REGISTRY" in result.output
         assert "hhplab list acs-variables" in result.output
         assert "once available" not in result.output
-        assert "hhplab/sources/acs/variables_acs1.py" in result.output
+        assert "hhplab/sources/census/acs/variables_acs1.py" in result.output
         assert "DERIVED_ACS1_MEASURES" in result.output
         assert "ACS1_*_MEASURE_COLUMNS" in result.output
         assert "hhplab list covariates" in result.output
