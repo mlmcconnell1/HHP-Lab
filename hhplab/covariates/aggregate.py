@@ -18,7 +18,6 @@ from hhplab.covariates.irs_soi_contract import (
     IRS_SOI_PAIR_MEASURE_COLUMNS,
     IRS_SOI_SOURCE_ID,
 )
-from hhplab.covariates.mpi_contract import MPI_ESTIMATE_YEAR, MPI_SOURCE_ID
 from hhplab.covariates.saiz_contract import SAIZ_ESTIMATE_YEAR, SAIZ_SOURCE_ID
 from hhplab.covariates.temperature import (
     EMERGENCY_SHELTER_ACTIVATION_C,
@@ -50,6 +49,7 @@ from hhplab.sources.census.bps.census_bps_contract import (
     CENSUS_BPS_SOURCE_ID,
 )
 from hhplab.sources.census.pep.pep_aggregate import load_pep_county
+from hhplab.sources.mpi.mpi_contract import MPI_ESTIMATE_YEAR, MPI_SOURCE_ID
 
 __all__ = [
     "EMERGENCY_SHELTER_ACTIVATION_C",

@@ -23,21 +23,6 @@ from hhplab.covariates.irs_soi_contract import (
     IRS_SOI_STATE_TOTAL_COUNTY_FIPS,
     IRS_SOI_SUMMARY_STATE_FIPS,
 )
-from hhplab.covariates.mpi_contract import (
-    MPI_ALLOWED_COUNTY_EQUIVALENT_LABELS,
-    MPI_COUNTY_SHEET,
-    MPI_CURATED_COUNTY_COLUMNS,
-    MPI_ESTIMATE_PERIOD,
-    MPI_ESTIMATE_YEAR,
-    MPI_FIRST_DATA_ROW,
-    MPI_HEADER_ROW,
-    MPI_PRODUCT,
-    MPI_PROVIDER,
-    MPI_PUBLICATION_YEAR,
-    MPI_SOURCE_CITATION,
-    MPI_SOURCE_ID,
-    validate_mpi_workbook_contract,
-)
 from hhplab.covariates.saiz_contract import (
     SAIZ_ESTIMATE_YEAR,
     SAIZ_MATCH_DIAGNOSTIC_COLUMNS,
@@ -75,6 +60,21 @@ from hhplab.sources.census.bps.census_bps_contract import (
     CENSUS_BPS_SURVEY_YEAR_COLUMN,
     CENSUS_BPS_UNIT_COLUMNS,
     CENSUS_BPS_VALUE_COLUMNS,
+)
+from hhplab.sources.mpi.mpi_contract import (
+    MPI_ALLOWED_COUNTY_EQUIVALENT_LABELS,
+    MPI_COUNTY_SHEET,
+    MPI_CURATED_COUNTY_COLUMNS,
+    MPI_ESTIMATE_PERIOD,
+    MPI_ESTIMATE_YEAR,
+    MPI_FIRST_DATA_ROW,
+    MPI_HEADER_ROW,
+    MPI_PRODUCT,
+    MPI_PROVIDER,
+    MPI_PUBLICATION_YEAR,
+    MPI_SOURCE_CITATION,
+    MPI_SOURCE_ID,
+    validate_mpi_workbook_contract,
 )
 
 COMMON_COLUMN_ALIASES: dict[str, tuple[str, ...]] = {

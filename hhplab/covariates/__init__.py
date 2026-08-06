@@ -6,7 +6,7 @@ from hhplab.covariates.catalog import (
     covariate_source_spec,
 )
 from hhplab.covariates.ingest import ingest_covariate_source
-from hhplab.covariates.mpi_contract import (
+from hhplab.sources.mpi.mpi_contract import (
     MPI_WORKBOOK_CONTRACT,
     MpiWorkbookContract,
     validate_mpi_workbook_contract,

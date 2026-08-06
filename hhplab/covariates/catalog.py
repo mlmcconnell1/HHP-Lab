@@ -14,16 +14,6 @@ from hhplab.covariates.irs_soi_contract import (
     IRS_SOI_SOURCE_PAGE,
     IRS_SOI_SOURCE_URL,
 )
-from hhplab.covariates.mpi_contract import (
-    MPI_MEASURE_COLUMNS,
-    MPI_METHODOLOGY_NOTE,
-    MPI_PRODUCT,
-    MPI_PROVIDER,
-    MPI_REQUIRED_CURATED_COLUMNS,
-    MPI_SOURCE_ID,
-    MPI_SOURCE_PAGE,
-    MPI_SOURCE_URL,
-)
 from hhplab.covariates.saiz_contract import (
     SAIZ_ESTIMATE_YEAR,
     SAIZ_MEASURE_COLUMNS,
@@ -59,6 +49,16 @@ from hhplab.sources.census.bps.census_bps_contract import (
     CENSUS_BPS_PROVIDER,
     CENSUS_BPS_SOURCE_ID,
     CENSUS_BPS_SOURCE_PAGE,
+)
+from hhplab.sources.mpi.mpi_contract import (
+    MPI_MEASURE_COLUMNS,
+    MPI_METHODOLOGY_NOTE,
+    MPI_PRODUCT,
+    MPI_PROVIDER,
+    MPI_REQUIRED_CURATED_COLUMNS,
+    MPI_SOURCE_ID,
+    MPI_SOURCE_PAGE,
+    MPI_SOURCE_URL,
 )
 from hhplab.vera.incarceration_contract import (
     VERA_JAIL_MEASURE_COLUMNS,

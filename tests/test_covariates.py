@@ -26,22 +26,6 @@ from hhplab.covariates.irs_soi_contract import (
     IRS_SOI_PAIR_MEASURE_COLUMNS,
     IRS_SOI_SOURCE_ID,
 )
-from hhplab.covariates.mpi_contract import (
-    MPI_COUNTY_HEADERS,
-    MPI_COUNTY_SHEET,
-    MPI_CURATED_COUNTY_COLUMNS,
-    MPI_ESTIMATE_YEAR,
-    MPI_GEOGRAPHY_RULES,
-    MPI_MEASURE_COLUMNS,
-    MPI_RAW_COUNTY_COLUMNS,
-    MPI_RAW_STATE_COLUMNS,
-    MPI_REQUIRED_SHEETS,
-    MPI_SOURCE_ID,
-    MPI_STATE_HEADERS,
-    MPI_STATE_SHEET,
-    MPI_WORKBOOK_GLOB,
-    validate_mpi_workbook_contract,
-)
 from hhplab.covariates.saiz_contract import (
     SAIZ_ESTIMATE_YEAR,
     SAIZ_MEASURE_COLUMNS,
@@ -67,6 +51,22 @@ from hhplab.sources.census.bps.census_bps_contract import (
     CENSUS_BPS_CLASS_UNIT_COLUMNS,
     CENSUS_BPS_CLASS_VALUE_COLUMNS,
     CENSUS_BPS_SOURCE_ID,
+)
+from hhplab.sources.mpi.mpi_contract import (
+    MPI_COUNTY_HEADERS,
+    MPI_COUNTY_SHEET,
+    MPI_CURATED_COUNTY_COLUMNS,
+    MPI_ESTIMATE_YEAR,
+    MPI_GEOGRAPHY_RULES,
+    MPI_MEASURE_COLUMNS,
+    MPI_RAW_COUNTY_COLUMNS,
+    MPI_RAW_STATE_COLUMNS,
+    MPI_REQUIRED_SHEETS,
+    MPI_SOURCE_ID,
+    MPI_STATE_HEADERS,
+    MPI_STATE_SHEET,
+    MPI_WORKBOOK_GLOB,
+    validate_mpi_workbook_contract,
 )
 from hhplab.vera.incarceration_contract import (
     VERA_JAIL_MEASURE_COLUMNS,
