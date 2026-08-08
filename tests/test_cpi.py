@@ -16,7 +16,7 @@ from unittest.mock import patch
 import pandas as pd
 import pytest
 
-from hhplab.naming import cpi_u_filename, cpi_u_path
+from hhplab.artifacts.naming.naming import cpi_u_filename, cpi_u_path
 from hhplab.recipe.executor.core import ExecutionContext
 from hhplab.recipe.executor.panel import _apply_inflation_adjustment
 from hhplab.recipe.recipe_schema import InflationAdjustmentPolicy, PanelPolicy

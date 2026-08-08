@@ -40,7 +40,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from hhplab.coverage_diagnostics import coverage_diagnostics
+from hhplab.diagnostics.coverage import coverage_diagnostics
 
 logger = logging.getLogger(__name__)
 

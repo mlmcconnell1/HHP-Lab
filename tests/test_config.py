@@ -1,4 +1,4 @@
-"""Tests for hhplab.config — layered storage root configuration.
+"""Tests for hhplab.storage.config — layered storage root configuration.
 
 Precedence (highest to lowest):
 1. CLI keyword arguments
@@ -14,7 +14,7 @@ from pathlib import Path
 
 import pytest
 
-from hhplab.config import (
+from hhplab.storage.config import (
     ENV_ASSET_STORE_ROOT,
     ENV_OUTPUT_ROOT,
     REPO_CONFIG_FILENAME,
@@ -176,7 +176,7 @@ class TestRepoConfig:
 
         (tmp_path / REPO_CONFIG_FILENAME).write_text("asset_store_root: /repo/assets\n")
 
-        import hhplab.config as config_mod
+        import hhplab.storage.config as config_mod
 
         original = config_mod.USER_CONFIG_PATH
         config_mod.USER_CONFIG_PATH = user_cfg_path
@@ -201,7 +201,7 @@ class TestUserConfig:
         user_cfg_path = user_dir / "config.yaml"
         user_cfg_path.write_text("output_root: /user/outputs\n")
 
-        import hhplab.config as config_mod
+        import hhplab.storage.config as config_mod
 
         original = config_mod.USER_CONFIG_PATH
         config_mod.USER_CONFIG_PATH = user_cfg_path
@@ -223,7 +223,7 @@ class TestUserConfig:
         off_repo_dir.mkdir()
         monkeypatch.chdir(off_repo_dir)
 
-        import hhplab.config as config_mod
+        import hhplab.storage.config as config_mod
 
         original = config_mod.USER_CONFIG_PATH
         config_mod.USER_CONFIG_PATH = user_cfg_path

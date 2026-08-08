@@ -12,7 +12,7 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from hhplab.paths import curated_root
+from hhplab.storage.paths import curated_root
 
 
 @dataclass
@@ -72,7 +72,7 @@ def scan_curated_for_migration(
         return plan
 
     # Import canonical patterns for reference
-    from hhplab.curated_policy import CANONICAL_PATTERNS, CURATED_SUBDIRS, IGNORED_FILES
+    from hhplab.artifacts.curated.policy import CANONICAL_PATTERNS, CURATED_SUBDIRS, IGNORED_FILES
 
     for entry in sorted(base_dir.iterdir()):
         if not entry.is_dir():

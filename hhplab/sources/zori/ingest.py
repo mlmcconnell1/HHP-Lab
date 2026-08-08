@@ -38,12 +38,12 @@ from typing import Literal
 import httpx
 import pandas as pd
 
-from hhplab.paths import curated_dir
-from hhplab.provenance import ProvenanceBlock, write_parquet_with_provenance
-from hhplab.raw_snapshot import raw_dir
+from hhplab.registry.source_registry import check_source_changed, register_source
 from hhplab.schema.columns import ZORI_INGEST_OUTPUT_COLUMNS
-from hhplab.source_registry import check_source_changed, register_source
-from hhplab.source_urls import ZILLOW_ZORI_COUNTY, ZILLOW_ZORI_ZIP
+from hhplab.sources.urls import ZILLOW_ZORI_COUNTY, ZILLOW_ZORI_ZIP
+from hhplab.storage.paths import curated_dir
+from hhplab.storage.provenance import ProvenanceBlock, write_parquet_with_provenance
+from hhplab.storage.raw_snapshot import raw_dir
 
 # Pattern for ZORI date columns (YYYY-MM-DD or YYYY-MM)
 _DATE_COL_RE = re.compile(r"^\d{4}-\d{2}(-\d{2})?$")
@@ -369,7 +369,7 @@ def get_output_path(
     else:
         output_dir = Path(output_dir)
     if max_year is not None:
-        from hhplab.naming import zori_ingest_filename
+        from hhplab.artifacts.naming.naming import zori_ingest_filename
 
         return output_dir / zori_ingest_filename(geography, max_year)
     return output_dir / f"zori__{geography}.parquet"
@@ -416,7 +416,7 @@ def ingest_zori(
     ValueError
         If parsing/validation fails (exit code 2).
     """
-    from hhplab.naming import discover_zori_ingest
+    from hhplab.artifacts.naming.naming import discover_zori_ingest
 
     resolved_output_dir = Path(output_dir) if output_dir is not None else curated_dir("zori")
 

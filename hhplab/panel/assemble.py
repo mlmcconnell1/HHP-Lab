@@ -57,7 +57,7 @@ from typing import TYPE_CHECKING, Literal
 import numpy as np
 import pandas as pd
 
-import hhplab.naming as naming
+import hhplab.artifacts.naming.naming as naming
 from hhplab.analysis_geo import (
     GEO_ID_COL,
     GEO_TYPE_COC,
@@ -80,8 +80,6 @@ from hhplab.panel.zori_eligibility import (
     compute_rent_to_income,
     summarize_zori_eligibility,
 )
-from hhplab.paths import curated_dir, raw_root
-from hhplab.provenance import ProvenanceBlock, read_provenance, write_parquet_with_provenance
 from hhplab.schema.columns import (
     ACS1_MEASURE_COLUMNS,
     COC_PANEL_COLUMNS,
@@ -101,6 +99,12 @@ from hhplab.schema.columns import (
 from hhplab.sources.hud.pit.ingest import parse_pit_file
 from hhplab.sources.hud.pit.ingest.hud_exchange import MIN_PIT_YEAR as MIN_PIT_VINTAGE_YEAR
 from hhplab.sources.hud.pit.pit_registry import get_pit_path
+from hhplab.storage.paths import curated_dir, raw_root
+from hhplab.storage.provenance import (
+    ProvenanceBlock,
+    read_provenance,
+    write_parquet_with_provenance,
+)
 
 if TYPE_CHECKING:
     from hhplab.panel.conformance import ConformanceReport
@@ -340,7 +344,7 @@ def _load_pit_for_year(
 
     # If pit_dir is explicitly provided, use it directly (skip registry and fallback)
     # This supports testing with isolated data directories
-    from hhplab.naming import pit_filename
+    from hhplab.artifacts.naming.naming import pit_filename
 
     if pit_dir is not None:
         use_fallback = False  # Explicit pit_dir disables fallback
@@ -911,7 +915,7 @@ def _resolve_boundary_file(
     measures_dir: Path | None = None,
 ) -> Path | None:
     """Resolve a CoC boundary GeoParquet for a boundary vintage."""
-    from hhplab.naming import boundary_filename, coc_base_filename
+    from hhplab.artifacts.naming.naming import boundary_filename, coc_base_filename
 
     candidate_dirs: list[Path] = []
     if boundaries_dir is not None:

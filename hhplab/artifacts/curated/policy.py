@@ -16,7 +16,7 @@ import re
 from dataclasses import dataclass
 from pathlib import Path
 
-from hhplab.paths import curated_root
+from hhplab.storage.paths import curated_root
 
 
 @dataclass

@@ -8,7 +8,7 @@ Usage
 -----
 Writing provenance:
 
-    from hhplab.provenance import ProvenanceBlock, write_parquet_with_provenance
+    from hhplab.storage.provenance import ProvenanceBlock, write_parquet_with_provenance
 
     provenance = ProvenanceBlock(
         boundary_vintage="2025",
@@ -20,7 +20,7 @@ Writing provenance:
 
 Reading provenance:
 
-    from hhplab.provenance import read_provenance
+    from hhplab.storage.provenance import read_provenance
 
     provenance = read_provenance(path)
     print(provenance)  # ProvenanceBlock(boundary_vintage='2025', ...)

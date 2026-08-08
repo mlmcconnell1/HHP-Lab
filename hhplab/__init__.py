@@ -59,6 +59,7 @@ _LAZY_EXPORTS = frozenset(
 
 _LAZY_MODULES = {
     "acs": "hhplab.sources.census.acs",
+    "audit_panels": "hhplab.results.workflows.audit_panels",
     "bls": "hhplab.sources.bls",
     "cdc": "hhplab.sources.cdc",
     "census": "hhplab.sources.census.census",
@@ -70,13 +71,23 @@ _LAZY_MODULES = {
     "metro": "hhplab.geographies.gf_metro",
     "medsl": "hhplab.sources.medsl.medsl",
     "msa": "hhplab.geographies.msa",
-    "nhgis": "hhplab.geographies.nhgis",
+    "nhgis": "hhplab.geographies.boundaries.census.nhgis",
+    "config": "hhplab.storage.config",
+    "curated_migrate": "hhplab.artifacts.curated.migrate",
+    "curated_policy": "hhplab.artifacts.curated.policy",
+    "naming": "hhplab.artifacts.naming.naming",
+    "paths": "hhplab.storage.paths",
+    "provenance": "hhplab.storage.provenance",
+    "raw_snapshot": "hhplab.storage.raw_snapshot",
     "pep": "hhplab.sources.census.pep",
     "pit": "hhplab.sources.hud.pit",
     "prism": "hhplab.sources.prism",
     "rents": "hhplab.sources.zori",
+    "source_registry": "hhplab.registry.source_registry",
+    "xwalks": "hhplab.geographies.xwalks",
     "vera": "hhplab.sources.vera",
     "zori": "hhplab.sources.zori",
+    "year_spec": "hhplab.recipe.year_spec",
 }
 
 __all__ = sorted(_LAZY_EXPORTS | {"__version__"})

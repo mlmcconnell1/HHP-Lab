@@ -8,10 +8,10 @@ from typing import Annotated
 import pandas as pd
 import typer
 
-from hhplab.paths import curated_root
-from hhplab.source_registry import (
+from hhplab.registry.source_registry import (
     REGISTRY_COLUMNS,
 )
+from hhplab.storage.paths import curated_root
 
 logger = logging.getLogger(__name__)
 
@@ -20,12 +20,12 @@ def _compute_file_hash(filepath: Path) -> str:
     """Compute SHA-256 hash of a file.
 
     For ZIP files, hashes the decompressed contents (via
-    :func:`~hhplab.raw_snapshot.hash_zip_contents`) so the hash is
+    :func:`~hhplab.storage.raw_snapshot.hash_zip_contents`) so the hash is
     stable across re-compression by upstream servers.
     """
     content = filepath.read_bytes()
     if filepath.suffix.lower() == ".zip":
-        from hhplab.raw_snapshot import hash_zip_contents
+        from hhplab.storage.raw_snapshot import hash_zip_contents
 
         return hash_zip_contents(content)
     return hashlib.sha256(content).hexdigest()

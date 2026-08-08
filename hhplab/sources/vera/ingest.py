@@ -9,15 +9,18 @@ from urllib.request import urlretrieve
 
 import pandas as pd
 
-from hhplab.naming import vera_incarceration_county_filename, vera_incarceration_county_path
-from hhplab.paths import raw_root
-from hhplab.provenance import ProvenanceBlock, write_parquet_with_provenance
+from hhplab.artifacts.naming.naming import (
+    vera_incarceration_county_filename,
+    vera_incarceration_county_path,
+)
+from hhplab.registry.source_registry import register_source
 from hhplab.schema.columns import VERA_INCARCERATION_COUNTY_MEASURE_COLUMNS
-from hhplab.source_registry import register_source
-from hhplab.source_urls import (
+from hhplab.sources.urls import (
     VERA_INCARCERATION_TRENDS_COUNTY_CSV,
     VERA_INCARCERATION_TRENDS_REPO,
 )
+from hhplab.storage.paths import raw_root
+from hhplab.storage.provenance import ProvenanceBlock, write_parquet_with_provenance
 
 VERA_COUNTY_FIRST_YEAR = 1970
 VERA_COUNTY_JAIL_LAST_YEAR = 2026

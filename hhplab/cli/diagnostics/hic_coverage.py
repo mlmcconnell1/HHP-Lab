@@ -8,8 +8,8 @@ from typing import Annotated
 
 import typer
 
+from hhplab.recipe.year_spec import parse_year_spec
 from hhplab.sources.hud.hic.coverage import validate_hic_pit_coverage
-from hhplab.year_spec import parse_year_spec
 
 
 def hic_coverage_diagnostics(

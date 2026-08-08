@@ -8,8 +8,8 @@ import pandas as pd
 
 from hhplab.analysis_geo import MSA_ID_COL
 from hhplab.geographies.msa import aggregate_coc_to_msa_fractional_rollup
-from hhplab.paths import curated_dir
-from hhplab.provenance import ProvenanceBlock, write_parquet_with_provenance
+from hhplab.storage.paths import curated_dir
+from hhplab.storage.provenance import ProvenanceBlock, write_parquet_with_provenance
 
 MSA_PIT_COLUMNS: tuple[str, ...] = (
     "msa_id",
@@ -202,7 +202,7 @@ def save_msa_pit(
     output_dir: Path | str | None = None,
 ) -> Path:
     """Persist MSA-level PIT output with provenance."""
-    from hhplab.naming import msa_pit_filename
+    from hhplab.artifacts.naming.naming import msa_pit_filename
 
     if output_dir is None:
         output_dir = curated_dir("pit")

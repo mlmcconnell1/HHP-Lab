@@ -38,7 +38,7 @@ from typing import Any
 import pandas as pd
 
 from hhplab.analysis_geo import infer_geo_type, resolve_geo_col
-from hhplab.coverage_diagnostics import coverage_group_summary
+from hhplab.diagnostics.coverage import coverage_group_summary
 
 logger = logging.getLogger(__name__)
 

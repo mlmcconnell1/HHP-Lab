@@ -44,7 +44,7 @@ def generate_metro_boundaries(
     """Generate a curated metro boundary artifact from county geometries."""
     import json as json_mod
 
-    import hhplab.naming as naming
+    import hhplab.artifacts.naming.naming as naming
     from hhplab.geographies.gf_metro.metro_boundaries import (
         generate_metro_boundaries as generate_impl,
     )

@@ -9,8 +9,8 @@ import pandas as pd
 import typer
 
 from hhplab.cli.shared.output import JsonOutput, cli_error, emit_result
-from hhplab.paths import curated_dir
 from hhplab.sources.medsl.medsl.materialize import materialize_county_political_leaning
+from hhplab.storage.paths import curated_dir
 
 
 def build_medsl_president_county(

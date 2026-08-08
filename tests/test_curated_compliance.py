@@ -18,13 +18,13 @@ import pandas as pd
 import pytest
 from typer.testing import CliRunner
 
-from hhplab.cli.main import app
-from hhplab.curated_policy import (
+from hhplab.artifacts.curated.policy import (
     CANONICAL_PATTERNS,
     CURATED_SUBDIRS,
     IGNORED_SUBDIRS,
     validate_curated_layout,
 )
+from hhplab.cli.main import app
 from hhplab.sources.census.acs.variables import TRACT_OUTPUT_COLUMNS
 from hhplab.sources.census.acs.variables_acs1 import ACS1_METRO_OUTPUT_COLUMNS
 
@@ -452,7 +452,7 @@ class TestCuratedMigration:
     """Tests for the curated data migration utility."""
 
     def test_empty_dir_returns_empty_plan(self, tmp_path: Path) -> None:
-        from hhplab.curated_migrate import scan_curated_for_migration
+        from hhplab.artifacts.curated.migrate import scan_curated_for_migration
 
         plan = scan_curated_for_migration(tmp_path)
         assert plan.renames == []
@@ -460,7 +460,7 @@ class TestCuratedMigration:
         assert plan.unknown == []
 
     def test_canonical_files_not_flagged(self, tmp_path: Path) -> None:
-        from hhplab.curated_migrate import scan_curated_for_migration
+        from hhplab.artifacts.curated.migrate import scan_curated_for_migration
 
         (tmp_path / "coc_boundaries").mkdir()
         (tmp_path / "coc_boundaries" / "coc__B2025.parquet").touch()
@@ -469,7 +469,7 @@ class TestCuratedMigration:
         assert plan.unknown == []
 
     def test_legacy_boundary_rename_proposed(self, tmp_path: Path) -> None:
-        from hhplab.curated_migrate import scan_curated_for_migration
+        from hhplab.artifacts.curated.migrate import scan_curated_for_migration
 
         (tmp_path / "coc_boundaries").mkdir()
         (tmp_path / "coc_boundaries" / "boundaries__B2025.parquet").touch()
@@ -478,7 +478,7 @@ class TestCuratedMigration:
         assert plan.renames == []
 
     def test_legacy_measures_rename_proposed(self, tmp_path: Path) -> None:
-        from hhplab.curated_migrate import scan_curated_for_migration
+        from hhplab.artifacts.curated.migrate import scan_curated_for_migration
 
         (tmp_path / "measures").mkdir()
         (tmp_path / "measures" / "coc_measures__2025__2023.parquet").touch()
@@ -488,7 +488,7 @@ class TestCuratedMigration:
         assert "measures__A2023@B2025" in str(plan.renames[0].target)
 
     def test_duplicate_detected(self, tmp_path: Path) -> None:
-        from hhplab.curated_migrate import scan_curated_for_migration
+        from hhplab.artifacts.curated.migrate import scan_curated_for_migration
 
         (tmp_path / "measures").mkdir()
         # Both legacy and canonical exist
@@ -499,7 +499,7 @@ class TestCuratedMigration:
         assert plan.duplicates[0].action == "duplicate"
 
     def test_apply_dry_run_does_not_rename(self, tmp_path: Path) -> None:
-        from hhplab.curated_migrate import apply_migration, scan_curated_for_migration
+        from hhplab.artifacts.curated.migrate import apply_migration, scan_curated_for_migration
 
         (tmp_path / "measures").mkdir()
         src = tmp_path / "measures" / "coc_measures__2025__2023.parquet"
@@ -511,7 +511,7 @@ class TestCuratedMigration:
         assert "[DRY-RUN]" in log[0]
 
     def test_apply_executes_rename(self, tmp_path: Path) -> None:
-        from hhplab.curated_migrate import apply_migration, scan_curated_for_migration
+        from hhplab.artifacts.curated.migrate import apply_migration, scan_curated_for_migration
 
         (tmp_path / "measures").mkdir()
         src = tmp_path / "measures" / "coc_measures__2025__2023.parquet"
@@ -532,13 +532,13 @@ class TestPepNaming:
     """Tests for the PEP canonical naming helper."""
 
     def test_coc_pep_filename(self) -> None:
-        from hhplab.naming import coc_pep_filename
+        from hhplab.artifacts.naming.naming import coc_pep_filename
 
         result = coc_pep_filename(2024, 2024, "area_share", 2020, 2024)
         assert result == "coc_pep__B2024xC2024__warea_share__2020_2024.parquet"
 
     def test_coc_pep_filename_string_vintages(self) -> None:
-        from hhplab.naming import coc_pep_filename
+        from hhplab.artifacts.naming.naming import coc_pep_filename
 
         result = coc_pep_filename("2025", "2020", "pop", 2018, 2024)
         assert result == "coc_pep__B2025xC2020__wpop__2018_2024.parquet"

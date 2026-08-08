@@ -24,7 +24,7 @@ import zipfile
 from datetime import UTC, datetime
 from pathlib import Path
 
-from hhplab.paths import raw_root as _raw_root
+from hhplab.storage.paths import raw_root as _raw_root
 
 logger = logging.getLogger(__name__)
 

@@ -502,7 +502,7 @@ class TestRegistryDeleteEntry:
         assert result.exit_code == 1
         assert "No entry found" in result.output
 
-    @patch("hhplab.source_registry.delete_by_local_path")
+    @patch("hhplab.registry.source_registry.delete_by_local_path")
     @patch("hhplab.registry.boundary_registry.delete_vintage")
     @patch("hhplab.registry.boundary_registry.list_boundaries")
     def test_registry_delete_entry_success(self, mock_list, mock_delete, mock_delete_src):

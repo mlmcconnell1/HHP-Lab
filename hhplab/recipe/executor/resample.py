@@ -15,6 +15,7 @@ import warnings
 import numpy as np
 import pandas as pd
 
+from hhplab.artifacts.naming.naming import county_path
 from hhplab.geographies.coc.ct_planning_regions import (
     CT_LEGACY_COUNTY_VINTAGE,
     CT_PLANNING_REGION_VINTAGE,
@@ -24,7 +25,6 @@ from hhplab.geographies.coc.ct_planning_regions import (
     is_ct_planning_region_fips,
     translate_weights_planning_to_legacy,
 )
-from hhplab.naming import county_path
 from hhplab.recipe.executor.core import (
     ExecutionContext,
     ExecutorError,

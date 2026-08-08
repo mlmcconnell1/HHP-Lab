@@ -5,8 +5,8 @@ from __future__ import annotations
 import geopandas as gpd
 import pandas as pd
 
+from hhplab.geographies.xwalks.county import ALBERS_EQUAL_AREA_CRS
 from hhplab.schema.columns import COC_URBAN_AREA_DETAIL_COLUMNS, COC_URBAN_FRACTION_COLUMNS
-from hhplab.xwalks.county import ALBERS_EQUAL_AREA_CRS
 
 DEFAULT_ALLOCATION_METHOD = "block_area_intersection"
 DEFAULT_CLASSIFICATION_METHOD = "block_representative_point_in_urban_area"

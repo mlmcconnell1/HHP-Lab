@@ -7,8 +7,8 @@ import pandas as pd
 import typer
 
 from hhplab.cli.shared.output import JsonOutput, cli_error, emit_result
-from hhplab.paths import curated_dir
 from hhplab.sources.medsl.medsl.ingest import ingest_county_presidential_returns
+from hhplab.storage.paths import curated_dir
 
 
 def ingest_medsl_presidential(

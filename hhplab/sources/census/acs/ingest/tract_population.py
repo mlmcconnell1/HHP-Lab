@@ -60,16 +60,8 @@ import httpx
 import pandas as pd
 import pyarrow.parquet as pq
 
-import hhplab.naming as naming
-from hhplab.paths import curated_dir
-from hhplab.provenance import (
-    ProvenanceBlock,
-    read_provenance,
-    write_parquet_with_provenance,
-)
-from hhplab.raw_snapshot import write_api_snapshot
-from hhplab.source_registry import check_source_changed, register_source
-from hhplab.source_urls import CENSUS_API_ACS5
+import hhplab.artifacts.naming.naming as naming
+from hhplab.registry.source_registry import check_source_changed, register_source
 from hhplab.sources.census.acs.translate import (
     get_source_tract_vintage,
     needs_translation,
@@ -92,6 +84,14 @@ from hhplab.sources.census.acs.variables import (
     tables_for_api_vars,
 )
 from hhplab.sources.census.census.api import get_census_api_key, raise_for_census_api_status
+from hhplab.sources.urls import CENSUS_API_ACS5
+from hhplab.storage.paths import curated_dir
+from hhplab.storage.provenance import (
+    ProvenanceBlock,
+    read_provenance,
+    write_parquet_with_provenance,
+)
+from hhplab.storage.raw_snapshot import write_api_snapshot
 
 logger = logging.getLogger(__name__)
 

@@ -9,6 +9,7 @@ import pandas as pd
 import pytest
 from typer.testing import CliRunner
 
+from hhplab.artifacts.curated.policy import validate_curated_layout
 from hhplab.cli.main import app
 from hhplab.covariates.aggregate import (
     EMERGENCY_SHELTER_ACTIVATION_C,
@@ -20,9 +21,7 @@ from hhplab.covariates.aggregate import (
 from hhplab.covariates.catalog import COVARIATE_SOURCE_SPECS
 from hhplab.covariates.frame_adapters import registered_covariate_frame_adapters
 from hhplab.covariates.ingest import ingest_covariate_source
-from hhplab.curated_policy import validate_curated_layout
 from hhplab.geographies.coc.ct_planning_regions import CtPlanningRegionCrosswalk
-from hhplab.provenance import ProvenanceBlock, read_provenance, write_parquet_with_provenance
 from hhplab.sources.bls.qcew.contract import (
     QCEW_DERIVED_MEASURE_COLUMNS,
     QCEW_FIRST_YEAR,
@@ -77,6 +76,11 @@ from hhplab.sources.vera.incarceration_contract import (
     VERA_PRISON_MEASURE_COLUMNS,
     VERA_PRISON_RELIABLE_FIRST_YEAR,
     VERA_PRISON_SOURCE_ID,
+)
+from hhplab.storage.provenance import (
+    ProvenanceBlock,
+    read_provenance,
+    write_parquet_with_provenance,
 )
 
 runner = CliRunner()

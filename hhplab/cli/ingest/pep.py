@@ -12,7 +12,7 @@ from typing import Annotated
 import httpx
 import typer
 
-from hhplab.paths import curated_dir, raw_root
+from hhplab.storage.paths import curated_dir, raw_root
 
 
 def ingest_pep(
@@ -102,7 +102,6 @@ def ingest_pep(
     if raw_dir is None:
         raw_dir = raw_root() / "pep"
 
-    from hhplab.provenance import read_provenance
     from hhplab.sources.census.pep.ingest import (
         AUTO_SERIES,
         PEP_URLS,
@@ -110,6 +109,7 @@ def ingest_pep(
         get_output_path,
         ingest_pep_county,
     )
+    from hhplab.storage.provenance import read_provenance
 
     if start is not None and end is not None and start > end:
         typer.echo("Error: --start must be <= --end.", err=True)

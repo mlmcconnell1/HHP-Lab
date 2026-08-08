@@ -15,7 +15,6 @@ from hhplab.geographies.coc.ct_planning_regions import (
     is_ct_legacy_county_fips,
     is_ct_planning_region_fips,
 )
-from hhplab.provenance import ProvenanceBlock, write_parquet_with_provenance
 from hhplab.schema.contracts import ArtifactContract, validate_artifact_contract
 from hhplab.schema.measures import (
     ACS1_IMPUTATION_MEASURE_SPECS,
@@ -28,6 +27,7 @@ from hhplab.sources.census.acs.variables_acs1 import (
     ACS1_SAE_SOURCE_COLUMNS,
     ACS1_UNAVAILABLE_VINTAGES,
 )
+from hhplab.storage.provenance import ProvenanceBlock, write_parquet_with_provenance
 
 SAE_ALLOCATION_METHOD = "tract_share_within_county"
 ACS1_IMPUTATION_METHOD = "acs1_controlled_acs5_tract_share"

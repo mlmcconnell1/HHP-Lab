@@ -15,15 +15,15 @@ from rasterio.features import geometry_mask, geometry_window
 from rasterio.windows import WindowError
 from shapely.geometry import mapping
 
-from hhplab.naming import county_path, prism_county_monthly_path
-from hhplab.paths import asset_store_root, raw_root
-from hhplab.provenance import ProvenanceBlock, write_parquet_with_provenance
-from hhplab.raw_snapshot import hash_zip_contents
+from hhplab.artifacts.naming.naming import county_path, prism_county_monthly_path
 from hhplab.sources.prism.ingest import (
     default_prism_monthly_filename,
     get_prism_monthly_source_url,
     validate_prism_monthly_request,
 )
+from hhplab.storage.paths import asset_store_root, raw_root
+from hhplab.storage.provenance import ProvenanceBlock, write_parquet_with_provenance
+from hhplab.storage.raw_snapshot import hash_zip_contents
 
 PRISM_COUNTY_MONTHLY_BASE_COLUMNS: list[str] = [
     "geo_type",

@@ -9,9 +9,9 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
-from hhplab.config import load_config
-from hhplab.provenance import read_provenance
 from hhplab.results.workflows import build_overdose_lag_panel
+from hhplab.storage.config import load_config
+from hhplab.storage.provenance import read_provenance
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 

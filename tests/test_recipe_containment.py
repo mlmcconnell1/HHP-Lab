@@ -20,7 +20,7 @@ import pyarrow.parquet as pq
 import pytest
 from shapely.geometry import box
 
-from hhplab.naming import (
+from hhplab.artifacts.naming.naming import (
     coc_base_path,
     county_path,
     msa_coc_block_population_xwalk_path,

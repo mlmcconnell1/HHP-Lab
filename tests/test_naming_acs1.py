@@ -2,7 +2,7 @@
 
 from pathlib import Path
 
-from hhplab.naming import (
+from hhplab.artifacts.naming.naming import (
     acs1_county_filename,
     acs1_county_path,
     acs1_metro_filename,

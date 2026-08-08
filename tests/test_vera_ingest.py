@@ -16,13 +16,13 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
-from hhplab.provenance import read_provenance
 from hhplab.schema.columns import VERA_INCARCERATION_COUNTY_MEASURE_COLUMNS
 from hhplab.sources.vera.ingest import (
     VERA_REQUIRED_COLUMNS,
     ingest_county_incarceration_trends,
     parse_county_incarceration_trends,
 )
+from hhplab.storage.provenance import read_provenance
 
 FIXTURE_YEARS = (2023, 2024)
 VERA_FIXTURE_ROWS: tuple[dict[str, object], ...] = (

@@ -21,12 +21,12 @@ import pytest
 from shapely.geometry import MultiPolygon, box
 from typer.testing import CliRunner
 
-import hhplab.naming as naming
+import hhplab.artifacts.naming.naming as naming
 from hhplab.cli.main import app
-from hhplab.provenance import read_provenance
+from hhplab.geographies.xwalks.county import ALBERS_EQUAL_AREA_CRS
+from hhplab.geographies.xwalks.urban_fraction import build_coc_urban_fraction
 from hhplab.schema.columns import COC_URBAN_AREA_DETAIL_COLUMNS, COC_URBAN_FRACTION_COLUMNS
-from hhplab.xwalks.county import ALBERS_EQUAL_AREA_CRS
-from hhplab.xwalks.urban_fraction import build_coc_urban_fraction
+from hhplab.storage.provenance import read_provenance
 
 runner = CliRunner()
 
@@ -179,7 +179,7 @@ def test_build_coc_urban_fraction_matches_truth_table(coc_id: str) -> None:
 
 def test_build_coc_urban_fraction_uses_spatial_index_candidate_pairs(monkeypatch) -> None:
     """Block/CoC intersections should not route through full GeoPandas overlay."""
-    from hhplab.xwalks import urban_fraction
+    from hhplab.geographies.xwalks import urban_fraction
 
     monkeypatch.setattr(
         urban_fraction.gpd,
@@ -197,7 +197,7 @@ def test_build_coc_urban_fraction_uses_spatial_index_candidate_pairs(monkeypatch
 
 def test_build_coc_urban_fraction_skips_intersections_for_covered_blocks(monkeypatch) -> None:
     """Blocks wholly covered by one CoC should not pay polygon intersection cost."""
-    from hhplab.xwalks import urban_fraction
+    from hhplab.geographies.xwalks import urban_fraction
 
     coc = gpd.GeoDataFrame(
         {"coc_id": ["ALL"], "geometry": [box(-1, -1, 41, 11)]},

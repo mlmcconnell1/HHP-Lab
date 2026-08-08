@@ -40,10 +40,14 @@ from pathlib import Path
 
 import pandas as pd
 
-from hhplab.naming import coc_pep_filename, county_xwalk_path, msa_pep_filename
-from hhplab.paths import curated_dir
-from hhplab.provenance import ProvenanceBlock, read_provenance, write_parquet_with_provenance
-from hhplab.xwalks import apply_crosswalk
+from hhplab.artifacts.naming.naming import coc_pep_filename, county_xwalk_path, msa_pep_filename
+from hhplab.geographies.xwalks import apply_crosswalk
+from hhplab.storage.paths import curated_dir
+from hhplab.storage.provenance import (
+    ProvenanceBlock,
+    read_provenance,
+    write_parquet_with_provenance,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -890,8 +894,8 @@ def aggregate_pep_to_msa(
     force: bool = False,
 ) -> Path:
     """Aggregate PEP county estimates to Census MSA geography for one year."""
+    from hhplab.artifacts.naming.naming import msa_county_membership_path
     from hhplab.geographies.msa.msa_io import read_msa_county_membership, read_msa_definitions
-    from hhplab.naming import msa_county_membership_path
 
     output_path = get_msa_output_path(
         year,

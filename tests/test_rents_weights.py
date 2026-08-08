@@ -11,7 +11,6 @@ from typing import Any
 import pandas as pd
 import pytest
 
-from hhplab.provenance import read_provenance
 from hhplab.sources.zori.weights import (
     ACS_WEIGHT_VARS,
     build_county_weights,
@@ -23,6 +22,7 @@ from hhplab.sources.zori.weights import (
     parse_acs_vintage,
 )
 from hhplab.sources.zori.zori_aggregate import compute_geo_county_weights
+from hhplab.storage.provenance import read_provenance
 
 
 def make_census_county_response(

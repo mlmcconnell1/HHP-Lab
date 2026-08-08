@@ -12,7 +12,7 @@ critical for data pipeline integrity and reproducibility.
 
 Usage
 -----
-    from hhplab.source_registry import (
+    from hhplab.registry.source_registry import (
         register_source,
         check_source_changed,
         list_sources,
@@ -53,7 +53,7 @@ from typing import Literal
 
 import pandas as pd
 
-from hhplab.paths import curated_root
+from hhplab.storage.paths import curated_root
 
 logger = logging.getLogger(__name__)
 
@@ -162,7 +162,7 @@ def _load_registry(registry_path: Path | None = None) -> pd.DataFrame:
 
 def _save_registry(df: pd.DataFrame, registry_path: Path | None = None) -> None:
     """Save the source registry to disk with embedded provenance."""
-    from hhplab.provenance import ProvenanceBlock, write_parquet_with_provenance
+    from hhplab.storage.provenance import ProvenanceBlock, write_parquet_with_provenance
 
     if registry_path is None:
         registry_path = curated_root() / "source_registry.parquet"

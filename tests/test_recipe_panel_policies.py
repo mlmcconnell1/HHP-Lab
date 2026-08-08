@@ -22,13 +22,13 @@ import pyarrow.parquet as pq
 import pytest
 from shapely.geometry import box
 
+from hhplab.geographies.xwalks.county import ALBERS_EQUAL_AREA_CRS
 from hhplab.recipe.executor import execute_recipe
 from hhplab.recipe.executor.panel import _apply_derived_measures
 from hhplab.recipe.executor.panel_policies import Acs1PolicyApplier, collect_conformance_flags
 from hhplab.recipe.loader import RecipeLoadError, load_recipe
 from hhplab.recipe.manifest import read_manifest
 from hhplab.recipe.recipe_schema import PanelPolicy
-from hhplab.xwalks.county import ALBERS_EQUAL_AREA_CRS
 
 # ---------------------------------------------------------------------------
 # ZORI recipe and fixture helpers
@@ -1684,7 +1684,7 @@ def _msa_recipe_dict() -> dict:
 
 def _setup_msa_recipe_fixtures(tmp_path: Path) -> None:
     """Create synthetic datasets and materialized MSA transforms."""
-    from hhplab.naming import msa_definitions_path
+    from hhplab.artifacts.naming.naming import msa_definitions_path
 
     data_dir = tmp_path / "data"
     data_dir.mkdir(parents=True, exist_ok=True)

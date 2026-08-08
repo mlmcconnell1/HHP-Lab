@@ -8,16 +8,7 @@ from pathlib import Path
 import pandas as pd
 import pyarrow.parquet as pq
 
-from hhplab.config import load_config
-from hhplab.geographies.coc.coc_io import resolve_curated_boundary_path
-from hhplab.geographies.coc.ct_planning_regions import (
-    CT_LEGACY_COUNTY_VINTAGE,
-    CT_PLANNING_REGION_VINTAGE,
-    build_ct_county_planning_region_crosswalk,
-    is_ct_legacy_county_fips,
-    is_ct_planning_region_fips,
-)
-from hhplab.naming import (
+from hhplab.artifacts.naming.naming import (
     acs5_tracts_filename,
     block_geometry_path,
     coc_base_filename,
@@ -34,6 +25,14 @@ from hhplab.naming import (
     pl_block_population_path,
     tract_path,
     tract_xwalk_path,
+)
+from hhplab.geographies.coc.coc_io import resolve_curated_boundary_path
+from hhplab.geographies.coc.ct_planning_regions import (
+    CT_LEGACY_COUNTY_VINTAGE,
+    CT_PLANNING_REGION_VINTAGE,
+    build_ct_county_planning_region_crosswalk,
+    is_ct_legacy_county_fips,
+    is_ct_planning_region_fips,
 )
 from hhplab.recipe.adapters import (
     dataset_registry,
@@ -83,6 +82,7 @@ from hhplab.sources.census.acs.variables_acs1 import (
     ACS1_SAE_SOURCE_COLUMNS,
     ACS1_UNAVAILABLE_VINTAGES,
 )
+from hhplab.storage.config import load_config
 
 
 def _check_dataset_paths(

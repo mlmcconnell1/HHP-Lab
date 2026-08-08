@@ -47,7 +47,7 @@ from hhplab.panel.zori_eligibility import (
     get_zori_panel_columns,
     summarize_zori_eligibility,
 )
-from hhplab.provenance import read_provenance
+from hhplab.storage.provenance import read_provenance
 
 # =============================================================================
 # Unit Tests: rent_to_income Math

@@ -26,13 +26,13 @@ from unittest.mock import patch
 import pandas as pd
 import pytest
 
+from hhplab.artifacts.naming.naming import laus_metro_filename, laus_metro_path
 from hhplab.cli.ingest.laus_metro import ingest_laus_metro as ingest_laus_metro_cli
 from hhplab.geographies.gf_metro.metro_definitions import (
     CANONICAL_UNIVERSE_DEFINITION_VERSION,
     METRO_CBSA_MAPPING,
     METRO_STATE_FIPS,
 )
-from hhplab.naming import laus_metro_filename, laus_metro_path
 from hhplab.panel.conformance import (
     ACS1_MEASURE_COLUMNS,
     ACS_MEASURE_COLUMNS,
@@ -861,11 +861,11 @@ class TestLausPanelIntegration:
 
     def _write_laus_artifact(self, tmp_path: Path, year: int) -> Path:
         """Write a minimal valid LAUS artifact for testing panel integration."""
+        from hhplab.artifacts.naming.naming import laus_metro_path
         from hhplab.geographies.gf_metro.metro_definitions import (
             METRO_CBSA_MAPPING,
             METRO_STATE_FIPS,
         )
-        from hhplab.naming import laus_metro_path
 
         rows = []
         for metro_id, cbsa in METRO_CBSA_MAPPING.items():
@@ -944,7 +944,7 @@ def _make_mock_ingest_fn(tmp_path: Path, year_override: int | None = None) -> An
     minimal parquet and returns the path."""
     import pandas as pd
 
-    from hhplab.naming import laus_metro_path
+    from hhplab.artifacts.naming.naming import laus_metro_path
 
     def _mock_ingest(
         year: int,

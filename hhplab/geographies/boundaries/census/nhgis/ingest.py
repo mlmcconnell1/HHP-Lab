@@ -16,9 +16,9 @@ from typing import TYPE_CHECKING
 
 import geopandas as gpd
 
-from hhplab.paths import curated_dir
-from hhplab.raw_snapshot import persist_file_snapshot
-from hhplab.source_registry import register_source
+from hhplab.registry.source_registry import register_source
+from hhplab.storage.paths import curated_dir
+from hhplab.storage.raw_snapshot import persist_file_snapshot
 
 if TYPE_CHECKING:
     from ipumspy import IpumsApiClient
@@ -375,7 +375,7 @@ def ingest_nhgis_tracts(
 
     # Save to output
     curated_dir("tiger").mkdir(parents=True, exist_ok=True)
-    from hhplab.naming import tract_filename
+    from hhplab.artifacts.naming.naming import tract_filename
 
     output_path = curated_dir("tiger") / tract_filename(year)
     gdf.to_parquet(output_path, index=False)
@@ -499,7 +499,7 @@ def ingest_nhgis_counties(
     """
     from ipumspy import IpumsApiClient
 
-    from hhplab.naming import county_filename
+    from hhplab.artifacts.naming.naming import county_filename
 
     if year not in SUPPORTED_YEARS:
         supported = ", ".join(str(y) for y in sorted(SUPPORTED_YEARS))

@@ -15,9 +15,9 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
-import hhplab.naming as naming
-from hhplab.provenance import ProvenanceBlock, write_parquet_with_provenance
+import hhplab.artifacts.naming.naming as naming
 from hhplab.sources.census.acs.translate import default_tract_vintage_for_acs
+from hhplab.storage.provenance import ProvenanceBlock, write_parquet_with_provenance
 
 METRO_DEFINITION_VERSION = "glynn_fox_v1"
 

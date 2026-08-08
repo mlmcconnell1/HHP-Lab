@@ -13,8 +13,7 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-from hhplab.config import StorageConfig, load_config
-from hhplab.naming import (
+from hhplab.artifacts.naming.naming import (
     containment_filename,
     geo_map_filename,
     geo_panel_filename,
@@ -35,6 +34,7 @@ from hhplab.recipe.recipe_schema import (
     RecipeV1,
 )
 from hhplab.recipe.schema_common import GeometryRef, expand_year_spec
+from hhplab.storage.config import StorageConfig, load_config
 
 
 def _deduplicate_assets(

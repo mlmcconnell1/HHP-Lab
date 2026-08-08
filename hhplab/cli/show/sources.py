@@ -32,7 +32,7 @@ def source_status(
     ] = False,
 ) -> None:
     """Show status of tracked external data sources."""
-    from hhplab.source_registry import (
+    from hhplab.registry.source_registry import (
         _load_registry,
         detect_upstream_changes,
         summarize_registry,

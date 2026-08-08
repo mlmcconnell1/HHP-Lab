@@ -8,9 +8,9 @@ from typing import Annotated
 import pandas as pd
 import typer
 
-from hhplab.naming import expand_acs_vintage
-from hhplab.paths import curated_dir
+from hhplab.artifacts.naming.naming import expand_acs_vintage
 from hhplab.schema.measures import panel_measure_dictionary
+from hhplab.storage.paths import curated_dir
 
 
 def format_file_size(size_bytes: int) -> str:

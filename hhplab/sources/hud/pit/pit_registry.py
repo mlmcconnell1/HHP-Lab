@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from hhplab.paths import curated_dir
+from hhplab.storage.paths import curated_dir
 
 # Registry column names for Parquet serialization
 PIT_REGISTRY_COLUMNS = [

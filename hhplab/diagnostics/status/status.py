@@ -4,13 +4,13 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from hhplab.config import load_config
-from hhplab.curated_schema import validate_curated_schemas
+from hhplab.artifacts.curated.schema import validate_curated_schemas
 from hhplab.sources.census.census.api import (
     CENSUS_API_KEY_MISSING_MESSAGE,
     census_api_credentials_status,
     probe_census_api_reachability,
 )
+from hhplab.storage.config import load_config
 
 STATUS_GUIDANCE = {
     "recipe_preflight": "hhplab build recipe-preflight --recipe <file> --json",
@@ -332,7 +332,7 @@ def _scan_zori(curated: Path) -> dict:
 def _scan_laus(curated: Path) -> dict:
     """Scan curated BLS LAUS metro yearly files.
 
-    Matches the canonical naming from hhplab.naming.laus_metro_filename
+    Matches the canonical naming from hhplab.artifacts.naming.naming.laus_metro_filename
     (``laus_metro__A<year>@D<definition>.parquet``) and reports unique
     (year, definition_version) pairs sorted by year then definition.
     """

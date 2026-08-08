@@ -53,7 +53,7 @@ from pathlib import Path
 import httpx
 import pandas as pd
 
-import hhplab.naming as naming
+import hhplab.artifacts.naming.naming as naming
 from hhplab.geographies.gf_metro.metro_definitions import (
     CANONICAL_UNIVERSE_DEFINITION_VERSION,
     METRO_CBSA_MAPPING,
@@ -65,14 +65,14 @@ from hhplab.geographies.gf_metro.metro_definitions import (
     DEFINITION_VERSION as GLYNN_FOX_DEFINITION_VERSION,
 )
 from hhplab.geographies.gf_metro.metro_io import read_metro_subset_membership, read_metro_universe
-from hhplab.provenance import ProvenanceBlock, write_parquet_with_provenance
-from hhplab.source_urls import BLS_API_REGISTRATION_URL, BLS_API_V2, BLS_LAUS_SOURCE_REF
 from hhplab.sources.bls.laus.series import (
     BLS_ANNUAL_AVERAGE_PERIOD,
     LAUS_MEASURE_CODES,
     LAUS_METRO_OUTPUT_COLUMNS,
     build_laus_series_id,
 )
+from hhplab.sources.urls import BLS_API_REGISTRATION_URL, BLS_API_V2, BLS_LAUS_SOURCE_REF
+from hhplab.storage.provenance import ProvenanceBlock, write_parquet_with_provenance
 
 logger = logging.getLogger(__name__)
 

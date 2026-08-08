@@ -14,8 +14,8 @@ from typing import Annotated, Literal
 import httpx
 import typer
 
-from hhplab.paths import curated_dir as _curated_dir
-from hhplab.paths import raw_root
+from hhplab.storage.paths import curated_dir as _curated_dir
+from hhplab.storage.paths import raw_root
 
 # Weighting method choices
 WeightingChoice = Literal["renter_households", "housing_units", "population", "equal"]
@@ -112,7 +112,7 @@ def ingest_zori(
         )
         raise typer.Exit(2)
 
-    from hhplab.naming import discover_zori_ingest
+    from hhplab.artifacts.naming.naming import discover_zori_ingest
     from hhplab.sources.zori.ingest import ingest_zori as do_ingest
 
     # Check for existing output via discovery

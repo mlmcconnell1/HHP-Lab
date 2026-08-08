@@ -72,14 +72,14 @@ class TestRetentionPolicyImports:
 
     @pytest.mark.parametrize("module_path", INGEST_MODULES)
     def test_imports_raw_snapshot_utility(self, module_path: str):
-        """Each ingester must import from hhplab.raw_snapshot."""
+        """Each ingester must import from hhplab.storage.raw_snapshot."""
         source = _module_source(module_path)
         imports = _module_imports(source)
         has_persist = "persist_file_snapshot" in imports
         has_api = "write_api_snapshot" in imports
         assert has_persist or has_api, (
             f"{module_path} does not import persist_file_snapshot "
-            f"or write_api_snapshot from hhplab.raw_snapshot"
+            f"or write_api_snapshot from hhplab.storage.raw_snapshot"
         )
 
 

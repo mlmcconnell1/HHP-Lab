@@ -19,15 +19,15 @@ from __future__ import annotations
 import pandas as pd
 import pytest
 
-from hhplab.naming import tract_mediated_county_xwalk_filename
-from hhplab.provenance import read_provenance
-from hhplab.sources.census.census.ingest.decennial_tract_population import STATE_FIPS_CODES
-from hhplab.xwalks.tract_mediated import (
+from hhplab.artifacts.naming.naming import tract_mediated_county_xwalk_filename
+from hhplab.geographies.xwalks.tract_mediated import (
     COUNTY_VINTAGE_SEMANTICS,
     build_tract_mediated_county_crosswalk,
     save_tract_mediated_county_crosswalk,
     summarize_tract_mediated_crosswalk,
 )
+from hhplab.sources.census.census.ingest.decennial_tract_population import STATE_FIPS_CODES
+from hhplab.storage.provenance import read_provenance
 
 TRACT_CROSSWALK = pd.DataFrame(
     {

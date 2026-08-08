@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Final
 
-from hhplab.source_urls import (
+from hhplab.sources.urls import (
     VERA_INCARCERATION_TRENDS_COUNTY_CSV,
     VERA_INCARCERATION_TRENDS_REPO,
 )

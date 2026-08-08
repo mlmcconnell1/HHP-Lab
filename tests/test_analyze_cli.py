@@ -10,16 +10,20 @@ import pandas as pd
 import pytest
 from typer.testing import CliRunner
 
-from hhplab.cli.main import app
-from hhplab.naming import (
+from hhplab.artifacts.naming.naming import (
     analysis_manifest_filename,
     analysis_manifest_path,
     analysis_output_filename,
     analysis_output_path,
 )
+from hhplab.cli.main import app
 from hhplab.panel.conformance import PanelRequest, run_conformance
-from hhplab.provenance import ProvenanceBlock, read_provenance, write_parquet_with_provenance
 from hhplab.sources.mpi.mpi_contract import MPI_MEASURE_COLUMNS
+from hhplab.storage.provenance import (
+    ProvenanceBlock,
+    read_provenance,
+    write_parquet_with_provenance,
+)
 
 runner = CliRunner()
 

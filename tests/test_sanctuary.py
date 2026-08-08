@@ -10,7 +10,7 @@ import pytest
 from typer.testing import CliRunner
 
 from hhplab.cli.main import app
-from hhplab.sanctuary import (
+from hhplab.sources.doj.sanctuary import (
     SANCTUARY_MSA_MATCH_COLUMNS,
     SANCTUARY_MSA_PANEL_COLUMNS,
     build_sanctuary_msa_matches,
@@ -126,11 +126,11 @@ def test_write_sanctuary_msa_panel_discovers_pep_county_vintage(
     )
 
     monkeypatch.setattr(
-        "hhplab.sanctuary.read_msa_definitions",
+        "hhplab.sources.doj.sanctuary.read_msa_definitions",
         lambda msa_definition_version, base_dir=None: DEFINITIONS,
     )
     monkeypatch.setattr(
-        "hhplab.sanctuary.read_msa_county_membership",
+        "hhplab.sources.doj.sanctuary.read_msa_county_membership",
         lambda msa_definition_version, base_dir=None: MEMBERSHIP,
     )
 
@@ -145,11 +145,11 @@ def test_write_sanctuary_msa_panel_missing_pep_county_error_is_actionable(
     monkeypatch, tmp_path: Path
 ) -> None:
     monkeypatch.setattr(
-        "hhplab.sanctuary.read_msa_definitions",
+        "hhplab.sources.doj.sanctuary.read_msa_definitions",
         lambda msa_definition_version, base_dir=None: DEFINITIONS,
     )
     monkeypatch.setattr(
-        "hhplab.sanctuary.read_msa_county_membership",
+        "hhplab.sources.doj.sanctuary.read_msa_county_membership",
         lambda msa_definition_version, base_dir=None: MEMBERSHIP,
     )
 
@@ -176,7 +176,7 @@ def test_generate_sanctuary_msa_json(monkeypatch, tmp_path: Path) -> None:
         return pd.DataFrame({"cbsa_code": ["11111"]}), output, None
 
     monkeypatch.setattr(
-        "hhplab.sanctuary.write_sanctuary_msa_matches",
+        "hhplab.sources.doj.sanctuary.write_sanctuary_msa_matches",
         fake_write_sanctuary_msa_matches,
     )
 
@@ -218,7 +218,7 @@ def test_generate_sanctuary_msa_panel_json(monkeypatch, tmp_path: Path) -> None:
         return pd.read_parquet(output), output
 
     monkeypatch.setattr(
-        "hhplab.sanctuary.write_sanctuary_msa_panel_covariate",
+        "hhplab.sources.doj.sanctuary.write_sanctuary_msa_panel_covariate",
         fake_write_sanctuary_msa_panel_covariate,
     )
 

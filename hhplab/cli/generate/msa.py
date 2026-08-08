@@ -29,7 +29,7 @@ def generate_msa(
     json_output: JsonOutput = False,
 ) -> None:
     """Generate curated MSA definition parquet files from the Census workbook."""
-    import hhplab.naming as naming
+    import hhplab.artifacts.naming.naming as naming
     from hhplab.geographies.msa.msa_io import write_msa_artifacts
 
     paths_to_write = [

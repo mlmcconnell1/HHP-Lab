@@ -5,10 +5,10 @@ from typing import Annotated
 
 import typer
 
+from hhplab.artifacts.curated.policy import validate_curated_layout
+from hhplab.artifacts.curated.schema import validate_curated_schemas
 from hhplab.cli.shared.output import JsonOutput, emit_result
-from hhplab.curated_policy import validate_curated_layout
-from hhplab.curated_schema import validate_curated_schemas
-from hhplab.paths import curated_root
+from hhplab.storage.paths import curated_root
 
 
 def validate_curated_layout_cmd(

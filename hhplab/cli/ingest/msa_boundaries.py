@@ -37,7 +37,7 @@ def ingest_msa_boundaries(
     json_output: JsonOutput = False,
 ) -> None:
     """Ingest official MSA boundary polygons to curated GeoParquet."""
-    import hhplab.naming as naming
+    import hhplab.artifacts.naming.naming as naming
     from hhplab.geographies.msa.msa_boundaries import ingest_msa_boundaries as ingest_impl
     from hhplab.geographies.msa.msa_boundaries import read_msa_boundaries
 

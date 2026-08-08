@@ -6,8 +6,8 @@ from typing import Annotated
 
 import typer
 
-from hhplab.curated_migrate import apply_migration, scan_curated_for_migration
-from hhplab.paths import curated_root
+from hhplab.artifacts.curated.migrate import apply_migration, scan_curated_for_migration
+from hhplab.storage.paths import curated_root
 
 
 def migrate_curated_cmd(

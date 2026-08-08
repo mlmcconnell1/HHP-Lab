@@ -7,11 +7,11 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
-from hhplab.provenance import read_provenance
 from hhplab.sources.medsl.medsl.materialize import (
     build_county_political_leaning_measures,
     materialize_county_political_leaning,
 )
+from hhplab.storage.provenance import read_provenance
 from tests.test_medsl_ingest import FIXTURE_YEARS, write_medsl_fixture
 
 

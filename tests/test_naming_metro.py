@@ -2,7 +2,7 @@
 
 import pytest
 
-from hhplab.naming import (
+from hhplab.artifacts.naming.naming import (
     geo_map_filename,
     geo_panel_filename,
     metro_boundaries_filename,

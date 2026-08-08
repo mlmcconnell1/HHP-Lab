@@ -8,7 +8,7 @@ from pathlib import Path
 import geopandas as gpd
 import pandas as pd
 
-import hhplab.naming as naming
+import hhplab.artifacts.naming.naming as naming
 from hhplab.geographies.coc.coc_io import write_geoparquet
 from hhplab.geographies.gf_metro.metro_definitions import (
     DEFINITION_VERSION,
@@ -17,7 +17,7 @@ from hhplab.geographies.gf_metro.metro_definitions import (
     build_definitions_df,
 )
 from hhplab.geographies.gf_metro.metro_validate import validate_metro_boundaries
-from hhplab.provenance import ProvenanceBlock
+from hhplab.storage.provenance import ProvenanceBlock
 
 DERIVATION_SOURCE = "derived_metro_county_union"
 

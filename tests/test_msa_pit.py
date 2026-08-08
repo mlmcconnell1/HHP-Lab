@@ -7,8 +7,8 @@ import json
 import pandas as pd
 import pytest
 
-from hhplab.provenance import read_provenance
 from hhplab.sources.hud.pit import aggregate_pit_to_msa, save_msa_pit
+from hhplab.storage.provenance import read_provenance
 
 CROSSWALK_ROWS = [
     {

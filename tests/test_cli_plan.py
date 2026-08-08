@@ -233,7 +233,7 @@ class TestBuildXwalksCommand:
         """Tract-mediated crosswalk preflight reports deterministic inputs and output."""
         from datetime import UTC, datetime
 
-        from hhplab.naming import tract_xwalk_path
+        from hhplab.artifacts.naming.naming import tract_xwalk_path
         from hhplab.registry.schema import RegistryEntry
         from hhplab.sources.census.acs.ingest.tract_population import get_output_path
 
@@ -304,7 +304,7 @@ class TestBuildXwalksCommand:
         """Decennial tract-mediated preflight resolves fixed denominator artifacts."""
         from datetime import UTC, datetime
 
-        from hhplab.naming import tract_xwalk_path
+        from hhplab.artifacts.naming.naming import tract_xwalk_path
         from hhplab.registry.schema import RegistryEntry
         from hhplab.sources.census.census.ingest.decennial_tract_population import get_output_path
 
@@ -369,7 +369,7 @@ class TestBuildXwalksCommand:
         """Tract-mediated generation writes the artifact and reports validation summary."""
         from datetime import UTC, datetime
 
-        from hhplab.naming import tract_xwalk_path
+        from hhplab.artifacts.naming.naming import tract_xwalk_path
         from hhplab.registry.schema import RegistryEntry
         from hhplab.sources.census.acs.ingest.tract_population import get_output_path
 

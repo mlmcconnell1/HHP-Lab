@@ -18,8 +18,8 @@ from typing import Annotated, Literal
 import pandas as pd
 import typer
 
-from hhplab.paths import curated_root
-from hhplab.year_spec import parse_year_spec
+from hhplab.recipe.year_spec import parse_year_spec
+from hhplab.storage.paths import curated_root
 
 aggregate_app = typer.Typer(
     name="aggregate",
@@ -312,7 +312,7 @@ def aggregate_covariate(
         aggregate_covariate_source,
         default_covariate_panel_path,
     )
-    from hhplab.provenance import read_provenance
+    from hhplab.storage.provenance import read_provenance
 
     _validate_align(align, COVARIATE_ALIGN_MODES, "covariate")
     parsed_years = parse_year_spec(years) if years is not None else None
@@ -868,14 +868,14 @@ def aggregate_pit(
         typer.echo(f"Aggregating PIT to {target_label} (curated output, align '{align}')...")
         typer.echo(f"  Years: {parsed_years}")
 
-    from hhplab.geographies.msa import read_coc_msa_crosswalk
-    from hhplab.naming import (
+    from hhplab.artifacts.naming.naming import (
         coc_pit_filename,
         discover_pit_vintages,
         msa_pit_filename,
         pit_path,
         pit_vintage_path,
     )
+    from hhplab.geographies.msa import read_coc_msa_crosswalk
     from hhplab.sources.hud.pit import aggregate_pit_to_msa, save_msa_pit
 
     # --- Load all available PIT data for requested years ---
@@ -1202,12 +1202,12 @@ def aggregate_coc_measure(
         _emit_coc_measure_error(str(exc), output_json=output_json, exit_code=2)
     resolved_county = str(counties if counties is not None else resolved_boundary)
 
+    from hhplab.artifacts.naming.naming import msa_fractional_rollup_filename
     from hhplab.geographies.msa import (
         aggregate_coc_to_msa_fractional_rollup,
         read_coc_msa_crosswalk,
     )
-    from hhplab.naming import msa_fractional_rollup_filename
-    from hhplab.provenance import (
+    from hhplab.storage.provenance import (
         msa_fractional_rollup_provenance,
         write_parquet_with_provenance,
     )
@@ -1406,9 +1406,12 @@ def aggregate_acs(
 
     import pandas as pd
 
+    from hhplab.artifacts.naming.naming import (
+        measures_filename,
+        msa_measures_filename,
+        tract_xwalk_filename,
+    )
     from hhplab.geographies.msa.msa_io import read_msa_county_membership
-    from hhplab.naming import measures_filename, msa_measures_filename, tract_xwalk_filename
-    from hhplab.provenance import ProvenanceBlock, write_parquet_with_provenance
     from hhplab.sources.census.acs.acs_aggregate import (
         _maybe_remap_ct_planning_regions,
         aggregate_to_coc,
@@ -1416,6 +1419,7 @@ def aggregate_acs(
     )
     from hhplab.sources.census.acs.ingest.tract_population import get_output_path
     from hhplab.sources.census.acs.translate import default_tract_vintage_for_acs
+    from hhplab.storage.provenance import ProvenanceBlock, write_parquet_with_provenance
 
     def build_msa_tract_crosswalk(
         acs_data: pd.DataFrame,
@@ -1550,7 +1554,7 @@ def aggregate_acs(
             raise typer.Exit(1)
 
         if target_geo == "msa":
-            from hhplab.naming import msa_county_membership_path
+            from hhplab.artifacts.naming.naming import msa_county_membership_path
 
             msa_membership_path = msa_county_membership_path(definition_version)
             if not msa_membership_path.exists():
@@ -1837,14 +1841,17 @@ def aggregate_zori(
             raise typer.Exit(2)
 
         try:
-            from hhplab.naming import msa_county_membership_path, msa_zori_yearly_filename
-            from hhplab.provenance import ProvenanceBlock, write_parquet_with_provenance
+            from hhplab.artifacts.naming.naming import (
+                msa_county_membership_path,
+                msa_zori_yearly_filename,
+            )
             from hhplab.sources.census.pep.pep_aggregate import load_pep_county
             from hhplab.sources.zori.zori_aggregate import load_zori
             from hhplab.sources.zori.zori_metro import (
                 aggregate_yearly_zori_to_msa,
                 to_msa_zori_yearly_artifact,
             )
+            from hhplab.storage.provenance import ProvenanceBlock, write_parquet_with_provenance
 
             membership_path = msa_county_membership_path(msa_definition_version)
             if not membership_path.exists():

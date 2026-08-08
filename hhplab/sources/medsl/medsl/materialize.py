@@ -6,14 +6,18 @@ from pathlib import Path
 
 import pandas as pd
 
-from hhplab.naming import county_path, medsl_president_county_filename, medsl_president_county_path
-from hhplab.provenance import ProvenanceBlock, write_parquet_with_provenance
+from hhplab.artifacts.naming.naming import (
+    county_path,
+    medsl_president_county_filename,
+    medsl_president_county_path,
+)
 from hhplab.schema.columns import MEDSL_PRESIDENT_COUNTY_MEASURE_COLUMNS
 from hhplab.sources.medsl.medsl.ingest import (
     EXPECTED_PRESIDENTIAL_YEARS,
     default_raw_path,
     parse_county_presidential_returns,
 )
+from hhplab.storage.provenance import ProvenanceBlock, write_parquet_with_provenance
 
 COUNTY_VINTAGE_MISMATCH_SAMPLE_SIZE = 20
 

@@ -8,7 +8,7 @@ from typing import Annotated, Literal
 
 import typer
 
-from hhplab.analyze import (
+from hhplab.analysis.analyze import (
     AnalysisError,
     _json_safe,
     anderson_rubin_confidence_set,

@@ -7,8 +7,12 @@ from typing import Any
 
 import pandas as pd
 
-from hhplab.provenance import ProvenanceBlock, read_provenance, write_parquet_with_provenance
 from hhplab.schema.measures import resolve_panel_measure_entry
+from hhplab.storage.provenance import (
+    ProvenanceBlock,
+    read_provenance,
+    write_parquet_with_provenance,
+)
 
 
 class PanelInspectError(ValueError):

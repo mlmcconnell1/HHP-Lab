@@ -2,7 +2,7 @@
 
 from pathlib import Path
 
-from hhplab.naming import hic_filename, hic_path
+from hhplab.artifacts.naming.naming import hic_filename, hic_path
 
 
 def test_hic_filename_uses_inventory_year_token() -> None:

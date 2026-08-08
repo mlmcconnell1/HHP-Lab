@@ -19,12 +19,12 @@ import httpx
 import numpy as np
 import pandas as pd
 
-from hhplab.naming import tract_relationship_filename
-from hhplab.paths import curated_dir
-from hhplab.provenance import ProvenanceBlock, write_parquet_with_provenance
-from hhplab.raw_snapshot import persist_file_snapshot
-from hhplab.source_registry import check_source_changed, register_source
-from hhplab.source_urls import CENSUS_TRACT_RELATIONSHIP_URL
+from hhplab.artifacts.naming.naming import tract_relationship_filename
+from hhplab.registry.source_registry import check_source_changed, register_source
+from hhplab.sources.urls import CENSUS_TRACT_RELATIONSHIP_URL
+from hhplab.storage.paths import curated_dir
+from hhplab.storage.provenance import ProvenanceBlock, write_parquet_with_provenance
+from hhplab.storage.raw_snapshot import persist_file_snapshot
 
 logger = logging.getLogger(__name__)
 

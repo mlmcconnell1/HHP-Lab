@@ -13,7 +13,7 @@ import warnings
 import pandas as pd
 import pytest
 
-from hhplab.coverage_diagnostics import coverage_group_summary
+from hhplab.diagnostics.coverage import coverage_group_summary
 from hhplab.sources.zori.zori_diagnostics import (
     compute_coc_diagnostics,
     generate_text_summary,

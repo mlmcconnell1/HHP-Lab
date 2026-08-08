@@ -1,6 +1,9 @@
 """Tests for MEDSL naming helpers."""
 
-from hhplab.naming import medsl_president_county_filename, medsl_president_county_path
+from hhplab.artifacts.naming.naming import (
+    medsl_president_county_filename,
+    medsl_president_county_path,
+)
 
 
 def test_medsl_president_county_filename() -> None:

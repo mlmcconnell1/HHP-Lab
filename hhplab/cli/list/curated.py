@@ -8,8 +8,8 @@ from typing import Annotated
 import pyarrow.parquet as pq
 import typer
 
-from hhplab.curated_policy import CURATED_SUBDIRS
-from hhplab.paths import curated_root
+from hhplab.artifacts.curated.policy import CURATED_SUBDIRS
+from hhplab.storage.paths import curated_root
 
 
 def _format_size(size_bytes: int) -> str:

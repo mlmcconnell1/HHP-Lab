@@ -8,12 +8,12 @@ from pathlib import Path
 import httpx
 import pandas as pd
 
-import hhplab.naming as naming
+import hhplab.artifacts.naming.naming as naming
 from hhplab.geographies.msa import DEFINITION_VERSION as MSA_DEFINITION_VERSION
 from hhplab.geographies.msa import read_msa_county_membership, read_msa_definitions
-from hhplab.provenance import ProvenanceBlock, write_parquet_with_provenance
-from hhplab.raw_snapshot import persist_file_snapshot
 from hhplab.sources.census.pep.pep_aggregate import load_pep_county
+from hhplab.storage.provenance import ProvenanceBlock, write_parquet_with_provenance
+from hhplab.storage.raw_snapshot import persist_file_snapshot
 
 DOJ_SANCTUARY_URL = (
     "https://www.justice.gov/opa/pr/"

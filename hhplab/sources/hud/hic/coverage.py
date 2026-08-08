@@ -8,9 +8,9 @@ from pathlib import Path
 
 import pandas as pd
 
-from hhplab.paths import curated_dir
 from hhplab.schema.columns import HIC_PANEL_MEASURE_COLUMNS, HIC_PROJECT_TYPES
 from hhplab.sources.hud.pit.qa import QAReport
+from hhplab.storage.paths import curated_dir
 
 _PIT_FILE_RE = re.compile(
     r"^(?:pit__P(?P<year>\d{4})(?:@B\d{4})?|pit_vintage__P(?P<vintage>\d{4}))\.parquet$"

@@ -15,7 +15,7 @@ National total is 1,000. CoC total is 100 + 150 + 240 = 490.
 import pandas as pd
 import pytest
 
-from hhplab.xwalks.diagnostics import validate_population_crosswalk
+from hhplab.geographies.xwalks.diagnostics import validate_population_crosswalk
 
 TRACT_ROWS = (
     ("01001000100", 100),

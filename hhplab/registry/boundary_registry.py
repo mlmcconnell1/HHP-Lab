@@ -9,8 +9,8 @@ from pathlib import Path
 
 import pandas as pd
 
-from hhplab.paths import curated_root
 from hhplab.registry.schema import REGISTRY_COLUMNS, RegistryEntry
+from hhplab.storage.paths import curated_root
 
 # Known temp directory patterns (platform-specific)
 TEMP_DIR_PATTERNS = (
@@ -109,7 +109,7 @@ def _prepare_for_save(df: pd.DataFrame) -> pd.DataFrame:
 
 def _save_registry(df: pd.DataFrame, registry_path: Path) -> None:
     """Save registry to disk as Parquet with embedded provenance."""
-    from hhplab.provenance import ProvenanceBlock, write_parquet_with_provenance
+    from hhplab.storage.provenance import ProvenanceBlock, write_parquet_with_provenance
 
     registry_path.parent.mkdir(parents=True, exist_ok=True)
     df = _prepare_for_save(df)

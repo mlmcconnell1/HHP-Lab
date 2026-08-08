@@ -8,7 +8,7 @@ import typer
 
 from hhplab.cli.shared.output import JsonOutput, cli_error, emit_result
 from hhplab.geographies.msa import DEFINITION_VERSION as MSA_DEFINITION_VERSION
-from hhplab.sanctuary import DOJ_SANCTUARY_SOURCE_DATE
+from hhplab.sources.doj.sanctuary import DOJ_SANCTUARY_SOURCE_DATE
 
 
 def generate_sanctuary_msa(
@@ -44,8 +44,8 @@ def generate_sanctuary_msa(
     json_output: JsonOutput = False,
 ) -> None:
     """Generate a regression-ready MSA file from DOJ sanctuary designations."""
-    import hhplab.naming as naming
-    from hhplab.sanctuary import write_sanctuary_msa_matches
+    import hhplab.artifacts.naming.naming as naming
+    from hhplab.sources.doj.sanctuary import write_sanctuary_msa_matches
 
     output_path = naming.sanctuary_msa_matches_path(source_date, msa_definition_version)
     if output_path.exists() and not force:
@@ -119,8 +119,8 @@ def generate_sanctuary_msa_panel(
     json_output: JsonOutput = False,
 ) -> None:
     """Generate a panel-joinable MSA sanctuary policy covariate."""
-    import hhplab.naming as naming
-    from hhplab.sanctuary import write_sanctuary_msa_panel_covariate
+    import hhplab.artifacts.naming.naming as naming
+    from hhplab.sources.doj.sanctuary import write_sanctuary_msa_panel_covariate
 
     output_path = naming.sanctuary_msa_panel_covariate_path(
         source_date,

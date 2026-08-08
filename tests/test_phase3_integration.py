@@ -42,7 +42,6 @@ from hhplab.panel import (
     save_panel,
 )
 from hhplab.panel.assemble import PANEL_COLUMNS
-from hhplab.provenance import read_provenance
 from hhplab.sources.hud.pit.ingest import normalize_coc_id, parse_pit_file, write_pit_parquet
 from hhplab.sources.hud.pit.pit_registry import (
     PitRegistryEntry,
@@ -50,6 +49,7 @@ from hhplab.sources.hud.pit.pit_registry import (
     register_pit_year,
 )
 from hhplab.sources.hud.pit.qa import validate_pit_data
+from hhplab.storage.provenance import read_provenance
 
 # ============================================================================
 # Fixtures for creating realistic test data

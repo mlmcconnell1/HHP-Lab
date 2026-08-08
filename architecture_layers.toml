@@ -25,51 +25,51 @@ order = ["contracts", "infrastructure", "domain", "application", "interface"]
 "hhplab.sources.saiz" = "domain"
 "hhplab.sources.zori" = "domain"
 "hhplab.sources.vera" = "domain"
-"hhplab.xwalks" = "domain"
+"hhplab.geographies.xwalks" = "domain"
 
 "hhplab.registry" = "infrastructure"
+"hhplab.storage" = "infrastructure"
+"hhplab.artifacts" = "contracts"
+"hhplab.diagnostics" = "application"
 
 "hhplab.schema" = "contracts"
 
 [modules]
 "hhplab" = "contracts"
 "hhplab.analysis_geo" = "domain"
-"hhplab.analyze" = "application"
-"hhplab.audit_panels" = "application"
-"hhplab.census_regions" = "contracts"
-"hhplab.config" = "contracts"
-"hhplab.coverage_diagnostics" = "application"
-"hhplab.curated_migrate" = "application"
-"hhplab.curated_policy" = "contracts"
-"hhplab.curated_schema" = "application"
-"hhplab.naming" = "contracts"
-"hhplab.naming_covariates" = "contracts"
-"hhplab.paths" = "contracts"
-"hhplab.provenance" = "infrastructure"
-"hhplab.raw_snapshot" = "infrastructure"
-"hhplab.sanctuary" = "domain"
-"hhplab.source_coverage" = "contracts"
-"hhplab.source_registry" = "infrastructure"
-"hhplab.source_urls" = "contracts"
+"hhplab.analysis.analyze" = "application"
+"hhplab.artifacts.curated.migrate" = "application"
+"hhplab.artifacts.curated.policy" = "contracts"
+"hhplab.artifacts.curated.schema" = "application"
+"hhplab.artifacts.naming.naming" = "contracts"
+"hhplab.artifacts.naming.covariates" = "contracts"
+"hhplab.diagnostics.coverage" = "application"
+"hhplab.diagnostics.status.status" = "application"
+"hhplab.geographies.census.regions" = "contracts"
+"hhplab.sources.coverage" = "contracts"
+"hhplab.sources.doj.sanctuary" = "domain"
+"hhplab.sources.urls" = "contracts"
+"hhplab.storage.config" = "contracts"
+"hhplab.storage.paths" = "contracts"
+"hhplab.storage.provenance" = "infrastructure"
+"hhplab.storage.raw_snapshot" = "infrastructure"
 "hhplab.sources" = "contracts"
-"hhplab.status" = "application"
-"hhplab.year_spec" = "contracts"
 
 [exceptions]
 # Exact upward edges present when the policy was introduced. Remove entries as
 # ownership is corrected; new upward dependencies must never be added here merely
 # to make the quality gate pass.
 upward_edges = [
-  "hhplab.sources.census.pep.pep_diagnostics -> hhplab.coverage_diagnostics",
-  "hhplab.sources.zori.zori_diagnostics -> hhplab.coverage_diagnostics",
+  "hhplab.sources.census.pep.pep_diagnostics -> hhplab.diagnostics.coverage",
+  "hhplab.sources.zori.zori_diagnostics -> hhplab.diagnostics.coverage",
 ]
 
 [contracts.high_fan_in_modules]
 # Exact internal dependencies make ownership changes reviewable. High fan-in is
 # expected here; new responsibilities and dependencies are not.
-"hhplab.paths" = ["hhplab.config"]
-"hhplab.naming" = ["hhplab.naming_covariates", "hhplab.paths"]
-"hhplab.naming_covariates" = []
+"hhplab.storage.paths" = ["hhplab.storage.config"]
+"hhplab.artifacts.naming.naming" = ["hhplab.artifacts.naming.covariates", "hhplab.storage.paths"]
+"hhplab.artifacts.naming.covariates" = []
 "hhplab.schema.columns" = []
 "hhplab.geographies.gf_metro.metro_definitions" = ["hhplab.geographies.msa.msa_definitions"]
 "hhplab.geographies.msa.msa_definitions" = []
@@ -93,5 +93,6 @@ passive_or_reexport_only = [
   "hhplab.recipe",
   "hhplab.registry",
   "hhplab.schema",
-  "hhplab.xwalks",
+  "hhplab.geographies.xwalks",
+  "hhplab.geographies.census",
 ]

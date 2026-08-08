@@ -4,26 +4,26 @@ Provides geometry-neutral crosswalk builders (``build_tract_crosswalk``,
 ``build_county_crosswalk``) and backward-compatible CoC-specific wrappers.
 """
 
-from hhplab.xwalks.apply import apply_crosswalk
-from hhplab.xwalks.county import build_coc_county_crosswalk, build_county_crosswalk
-from hhplab.xwalks.diagnostics import (
+from hhplab.geographies.xwalks.apply import apply_crosswalk
+from hhplab.geographies.xwalks.county import build_coc_county_crosswalk, build_county_crosswalk
+from hhplab.geographies.xwalks.diagnostics import (
     AreaShareValidation,
     PopulationValidationResult,
     StatePopulationComparison,
     validate_population_crosswalk,
 )
-from hhplab.xwalks.tract import (
+from hhplab.geographies.xwalks.tract import (
     add_population_weights,
     build_coc_tract_crosswalk,
     build_tract_crosswalk,
     save_crosswalk,
     validate_population_shares,
 )
-from hhplab.xwalks.tract_mediated import (
+from hhplab.geographies.xwalks.tract_mediated import (
     build_tract_mediated_county_crosswalk,
     save_tract_mediated_county_crosswalk,
 )
-from hhplab.xwalks.urban_fraction import build_coc_urban_fraction
+from hhplab.geographies.xwalks.urban_fraction import build_coc_urban_fraction
 
 __all__ = [
     "apply_crosswalk",

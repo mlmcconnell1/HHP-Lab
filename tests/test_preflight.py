@@ -9,14 +9,13 @@ import pandas as pd
 import pytest
 from typer.testing import CliRunner
 
-from hhplab.cli.main import app
-from hhplab.naming import (
+from hhplab.artifacts.naming.naming import (
     county_xwalk_path,
     medsl_president_county_path,
     msa_county_membership_path,
     vera_incarceration_county_path,
 )
-from hhplab.provenance import ProvenanceBlock, write_parquet_with_provenance
+from hhplab.cli.main import app
 from hhplab.recipe.loader import load_recipe
 from hhplab.recipe.preflight import (
     FindingKind,
@@ -35,6 +34,7 @@ from hhplab.recipe.probes import (
 )
 from hhplab.recipe.recipe_schema import DatasetSpec, GeometryRef, TemporalFilter
 from hhplab.sources.census.acs.variables import TRACT_OUTPUT_COLUMNS
+from hhplab.storage.provenance import ProvenanceBlock, write_parquet_with_provenance
 
 runner = CliRunner()
 

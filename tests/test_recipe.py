@@ -15,8 +15,8 @@ from typer.testing import CliRunner
 
 from hhplab.cli.main import app
 from hhplab.geographies.coc.ct_planning_regions import CtPlanningRegionCrosswalk
+from hhplab.geographies.xwalks.county import ALBERS_EQUAL_AREA_CRS
 from hhplab.panel.assemble import _load_coc_areas
-from hhplab.provenance import ProvenanceBlock, read_provenance, write_parquet_with_provenance
 from hhplab.recipe.adapters import (
     DatasetAdapterRegistry,
     GeometryAdapterRegistry,
@@ -83,7 +83,11 @@ from hhplab.recipe.recipe_schema import (
 )
 from hhplab.schema.columns import MSA_COC_COVERAGE_COLUMNS
 from hhplab.sources.census.acs.sae import CONTRACT_RENT_BINS, HOUSEHOLD_INCOME_BINS
-from hhplab.xwalks.county import ALBERS_EQUAL_AREA_CRS
+from hhplab.storage.provenance import (
+    ProvenanceBlock,
+    read_provenance,
+    write_parquet_with_provenance,
+)
 
 runner = CliRunner()
 
@@ -2348,7 +2352,7 @@ def _setup_curated_metro_artifacts(tmp_path: Path) -> None:
 
 def _setup_curated_metro_universe_subset_artifacts(tmp_path: Path) -> None:
     """Write minimal canonical-metro and subset artifacts for recipe tests."""
-    from hhplab.naming import (
+    from hhplab.artifacts.naming.naming import (
         metro_subset_membership_path,
         metro_universe_path,
         msa_county_membership_path,
@@ -4403,7 +4407,7 @@ class TestMaterialize:
         ]
         recipe = load_recipe(data)
         path = _resolve_transform_path("coc_to_metro", recipe, tmp_path)
-        from hhplab.naming import recipe_transform_filename
+        from hhplab.artifacts.naming.naming import recipe_transform_filename
 
         assert ".recipe_cache/transforms" in str(path)
         assert path.name == recipe_transform_filename(
@@ -4436,7 +4440,7 @@ class TestMaterialize:
         ]
         recipe = load_recipe(data)
         path = _resolve_transform_path("coc_to_msa", recipe, tmp_path)
-        from hhplab.naming import recipe_transform_filename
+        from hhplab.artifacts.naming.naming import recipe_transform_filename
 
         assert ".recipe_cache/transforms" in str(path)
         assert path.name == recipe_transform_filename(
@@ -4449,7 +4453,7 @@ class TestMaterialize:
     def test_resolve_msa_coc_transform_uses_definition_county_vintage(
         self, tmp_path: Path
     ):
-        from hhplab.naming import msa_coc_xwalk_path
+        from hhplab.artifacts.naming.naming import msa_coc_xwalk_path
         from hhplab.recipe.executor.transforms import _resolve_msa_transform_df
 
         xwalk_path = msa_coc_xwalk_path("2020", "census_msa_2023", 2023, tmp_path / "data")
@@ -4475,7 +4479,7 @@ class TestMaterialize:
     def test_resolve_msa_county_transform_bridges_ct_planning_regions(
         self, tmp_path: Path
     ):
-        from hhplab.naming import county_path, msa_county_membership_path
+        from hhplab.artifacts.naming.naming import county_path, msa_county_membership_path
         from hhplab.recipe.executor.transforms import _resolve_msa_transform_df
 
         data_root = tmp_path / "data"
@@ -4515,7 +4519,7 @@ class TestMaterialize:
     def test_materialize_msa_county_transform_refreshes_stale_ct_cache(
         self, tmp_path: Path
     ):
-        from hhplab.naming import county_path, msa_county_membership_path
+        from hhplab.artifacts.naming.naming import county_path, msa_county_membership_path
         from hhplab.recipe.executor.transforms import (
             _generated_msa_transform_path,
             _materialize_generated_msa_transform,
@@ -4583,7 +4587,11 @@ class TestMaterialize:
     def test_resolve_msa_tract_transform_bridges_ct_planning_regions(
         self, tmp_path: Path
     ):
-        from hhplab.naming import county_path, msa_county_membership_path, tract_path
+        from hhplab.artifacts.naming.naming import (
+            county_path,
+            msa_county_membership_path,
+            tract_path,
+        )
         from hhplab.recipe.executor.transforms import _resolve_msa_transform_df
 
         data_root = tmp_path / "data"
@@ -8903,7 +8911,7 @@ class TestRecipeInitCmd:
             measure.type == "lead" and measure.output_column == "zori_lead_1"
             for measure in target.panel_policy.derived_measures
         )
-        from hhplab.naming import msa_pep_filename, msa_zori_yearly_filename
+        from hhplab.artifacts.naming.naming import msa_pep_filename, msa_zori_yearly_filename
 
         assert recipe.datasets["zori_msa"].path == (
             "data/curated/zori/"
@@ -8935,7 +8943,7 @@ class TestRecipeInitCmd:
         tmp_path: Path,
         monkeypatch: pytest.MonkeyPatch,
     ):
-        from hhplab.naming import msa_pep_filename
+        from hhplab.artifacts.naming.naming import msa_pep_filename
 
         _make_project_root(tmp_path)
         monkeypatch.chdir(tmp_path)
@@ -8974,7 +8982,7 @@ class TestRecipeInitCmd:
         tmp_path: Path,
         monkeypatch: pytest.MonkeyPatch,
     ):
-        from hhplab.naming import msa_definitions_path
+        from hhplab.artifacts.naming.naming import msa_definitions_path
         from hhplab.recipe.executor import resolve_pipeline_artifacts
 
         _make_project_root(tmp_path)

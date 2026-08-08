@@ -10,6 +10,12 @@ import pytest
 from typer.testing import CliRunner
 
 from hhplab.cli.main import app
+from hhplab.geographies.xwalks.tract_mediated import (
+    DENOMINATOR_COLUMNS as XWALK_DENOMINATOR_COLUMNS,
+)
+from hhplab.geographies.xwalks.tract_mediated import (
+    WEIGHT_COLUMNS as XWALK_WEIGHT_COLUMNS,
+)
 from hhplab.panel.conformance import PanelRequest, run_conformance
 from hhplab.recipe.executor import ExecutorError, _normalize_recipe_population_measure
 from hhplab.recipe.executor.panel import _RECIPE_METRO_COLUMN_ORDER, _resolve_canonical_population
@@ -61,7 +67,6 @@ from hhplab.schema.lineage import (
     PopulationSource,
     normalize_population_measure,
 )
-from hhplab.source_coverage import CORE_SOURCE_COVERAGE_SPECS
 from hhplab.sources.bls.laus.series import (
     LAUS_MEASURE_CODES as BLS_LAUS_MEASURE_CODES,
 )
@@ -91,15 +96,10 @@ from hhplab.sources.census.acs.variables_acs1 import (
     acs1_variables_by_table_for_vintage,
 )
 from hhplab.sources.census.pep.ingest import PEP_COUNTY_OUTPUT_COLUMNS as PEP_INGEST_COLUMNS
+from hhplab.sources.coverage import CORE_SOURCE_COVERAGE_SPECS
 from hhplab.sources.hud.hic.parser import CANONICAL_COLUMNS as HIC_PARSER_COLUMNS
 from hhplab.sources.hud.pit.ingest.parser import CANONICAL_COLUMNS as PIT_PARSER_COLUMNS
 from hhplab.sources.zori.ingest import ZORI_INGEST_OUTPUT_COLUMNS as ZORI_INGEST_COLUMNS
-from hhplab.xwalks.tract_mediated import (
-    DENOMINATOR_COLUMNS as XWALK_DENOMINATOR_COLUMNS,
-)
-from hhplab.xwalks.tract_mediated import (
-    WEIGHT_COLUMNS as XWALK_WEIGHT_COLUMNS,
-)
 
 runner = CliRunner()
 

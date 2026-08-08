@@ -15,13 +15,13 @@ from typing import Literal
 
 import pandas as pd
 
-from hhplab.paths import curated_dir
-from hhplab.provenance import ProvenanceBlock, write_parquet_with_provenance
 from hhplab.schema.columns import (
     TRACT_MEDIATED_COUNTY_XWALK_COLUMNS,
     TRACT_MEDIATED_DENOMINATOR_COLUMNS,
     TRACT_MEDIATED_WEIGHT_COLUMNS,
 )
+from hhplab.storage.paths import curated_dir
+from hhplab.storage.provenance import ProvenanceBlock, write_parquet_with_provenance
 
 DENOMINATOR_COLUMNS: dict[str, str] = TRACT_MEDIATED_DENOMINATOR_COLUMNS
 
@@ -108,7 +108,7 @@ def tract_mediated_paths(
     denominator_vintage: str | int,
 ) -> dict[str, Path]:
     """Resolve all input and output paths for a tract-mediated county crosswalk."""
-    from hhplab.naming import (
+    from hhplab.artifacts.naming.naming import (
         county_path,
         tract_mediated_county_xwalk_path,
         tract_xwalk_path,
@@ -573,7 +573,7 @@ def save_tract_mediated_county_crosswalk(
     geo_type: str = "coc",
 ) -> Path:
     """Save a tract-mediated county crosswalk with embedded provenance."""
-    from hhplab.naming import tract_mediated_county_xwalk_filename
+    from hhplab.artifacts.naming.naming import tract_mediated_county_xwalk_filename
 
     if output_dir is None:
         output_dir = curated_dir("xwalks")

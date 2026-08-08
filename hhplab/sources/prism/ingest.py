@@ -12,9 +12,9 @@ from typing import Literal
 
 import httpx
 
-from hhplab.raw_snapshot import hash_zip_contents, persist_file_snapshot
-from hhplab.source_registry import check_source_changed, register_source
-from hhplab.source_urls import PRISM_WEB_SERVICE_TEMPLATE
+from hhplab.registry.source_registry import check_source_changed, register_source
+from hhplab.sources.urls import PRISM_WEB_SERVICE_TEMPLATE
+from hhplab.storage.raw_snapshot import hash_zip_contents, persist_file_snapshot
 
 PRISM_TEMPERATURE_VARIABLES: tuple[str, ...] = ("tmin", "tmean", "tmax")
 MIN_PRISM_MONTHLY_YEAR = 1895
@@ -174,7 +174,7 @@ def download_prism_monthly(
 
 def _raw_path(variable: str, year: int, filename: str, *, raw_root: Path | None) -> Path:
     if raw_root is None:
-        from hhplab.paths import raw_root as configured_raw_root
+        from hhplab.storage.paths import raw_root as configured_raw_root
 
         base = configured_raw_root()
     else:

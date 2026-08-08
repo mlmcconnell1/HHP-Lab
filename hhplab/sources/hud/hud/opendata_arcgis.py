@@ -19,9 +19,9 @@ from shapely.geometry import shape
 
 from hhplab.geographies.coc import normalize_boundaries, validate_boundaries
 from hhplab.geographies.coc.coc_io import curated_boundary_path, write_geoparquet
-from hhplab.raw_snapshot import make_run_id, write_api_snapshot
-from hhplab.source_registry import check_source_changed, register_source
-from hhplab.source_urls import HUD_ARCGIS_COC_FEATURE_SERVICE, HUD_ARCGIS_COC_SOURCE_REF
+from hhplab.registry.source_registry import check_source_changed, register_source
+from hhplab.sources.urls import HUD_ARCGIS_COC_FEATURE_SERVICE, HUD_ARCGIS_COC_SOURCE_REF
+from hhplab.storage.raw_snapshot import make_run_id, write_api_snapshot
 
 logger = logging.getLogger(__name__)
 

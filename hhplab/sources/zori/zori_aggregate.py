@@ -65,6 +65,7 @@ from typing import Literal
 
 import pandas as pd
 
+from hhplab.artifacts.naming.naming import county_xwalk_path, discover_zori_ingest
 from hhplab.geographies.coc.ct_planning_regions import (
     CT_LEGACY_COUNTY_VINTAGE,
     CT_PLANNING_REGION_VINTAGE,
@@ -74,20 +75,19 @@ from hhplab.geographies.coc.ct_planning_regions import (
     translate_weights_planning_to_legacy,
     translate_zori_legacy_to_planning,
 )
-from hhplab.naming import county_xwalk_path, discover_zori_ingest
-from hhplab.paths import curated_dir
-from hhplab.provenance import (
-    ProvenanceBlock,
-    read_provenance,
-    write_parquet_with_provenance,
-)
+from hhplab.geographies.xwalks import apply_crosswalk
 from hhplab.sources.zori.ingest import ZILLOW_ATTRIBUTION
 from hhplab.sources.zori.weights import (
     WeightingMethod,
     build_county_weights,
     get_county_weights_path,
 )
-from hhplab.xwalks import apply_crosswalk
+from hhplab.storage.paths import curated_dir
+from hhplab.storage.provenance import (
+    ProvenanceBlock,
+    read_provenance,
+    write_parquet_with_provenance,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -219,7 +219,7 @@ def get_xwalk_path(
     Path
         Path like 'data/curated/xwalks/xwalk__B2025xC2023.parquet'.
     """
-    # Use the canonical naming function from hhplab.naming
+    # Use the canonical naming function from hhplab.artifacts.naming.naming
     # county_xwalk_path expects base_dir to be the data root (e.g., "data")
     # so we need to extract it from xwalk_dir if provided
     if xwalk_dir is None:
@@ -648,7 +648,7 @@ def get_coc_zori_path(
     Note:
         New format uses temporal shorthand: zori__A2023@B2025xC2023__wrenter.parquet
     """
-    from hhplab.naming import zori_filename as _zori_filename
+    from hhplab.artifacts.naming.naming import zori_filename as _zori_filename
 
     if output_dir is None:
         output_dir = curated_dir("zori")
@@ -697,7 +697,7 @@ def get_coc_zori_yearly_path(
         New format uses temporal shorthand:
         zori_yearly__A2023@B2025xC2023__wrenter__mpit_january.parquet
     """
-    from hhplab.naming import zori_yearly_filename as _zori_yearly_filename
+    from hhplab.artifacts.naming.naming import zori_yearly_filename as _zori_yearly_filename
 
     if output_dir is None:
         output_dir = curated_dir("zori")

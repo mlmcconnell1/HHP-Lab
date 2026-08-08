@@ -6,8 +6,8 @@ import geopandas as gpd
 import pandas as pd
 
 from hhplab.geographies.msa.crosswalk import build_coc_msa_crosswalk
+from hhplab.geographies.xwalks.county import ALBERS_EQUAL_AREA_CRS, build_coc_county_crosswalk
 from hhplab.recipe.recipe_schema import ContainmentSpec
-from hhplab.xwalks.county import ALBERS_EQUAL_AREA_CRS, build_coc_county_crosswalk
 
 CONTAINMENT_COLUMNS: tuple[str, ...] = (
     "container_type",

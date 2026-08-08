@@ -47,11 +47,11 @@ from typing import Literal
 import httpx
 import pandas as pd
 
-from hhplab.paths import curated_dir
-from hhplab.provenance import ProvenanceBlock, write_parquet_with_provenance
-from hhplab.raw_snapshot import write_api_snapshot
-from hhplab.source_registry import check_source_changed, register_source
-from hhplab.source_urls import CENSUS_API_ACS5
+from hhplab.registry.source_registry import check_source_changed, register_source
+from hhplab.sources.urls import CENSUS_API_ACS5
+from hhplab.storage.paths import curated_dir
+from hhplab.storage.provenance import ProvenanceBlock, write_parquet_with_provenance
+from hhplab.storage.raw_snapshot import write_api_snapshot
 
 logger = logging.getLogger(__name__)
 
@@ -429,7 +429,7 @@ def get_county_weights_path(
         Output path like 'data/curated/acs/county_weights__A2023__wrenter.parquet' (new)
         or 'data/curated/acs/county_weights__2019-2023__renter_households.parquet' (legacy).
     """
-    import hhplab.naming as naming
+    import hhplab.artifacts.naming.naming as naming
 
     using_default = base_dir is None
     if base_dir is None:
@@ -499,7 +499,7 @@ def build_county_weights(
     Notes
     -----
     The output file includes embedded provenance metadata with dataset lineage
-    information following the hhplab.provenance conventions.
+    information following the hhplab.storage.provenance conventions.
 
     Examples
     --------

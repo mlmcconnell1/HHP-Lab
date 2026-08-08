@@ -8,7 +8,11 @@ from typing import Any
 
 import pandas as pd
 
-from hhplab.provenance import ProvenanceBlock, read_provenance, write_parquet_with_provenance
+from hhplab.storage.provenance import (
+    ProvenanceBlock,
+    read_provenance,
+    write_parquet_with_provenance,
+)
 
 
 class PanelEnrichError(ValueError):

@@ -12,9 +12,9 @@ import folium
 import geopandas as gpd
 import pandas as pd
 
-from hhplab.naming import county_path, tract_path
-from hhplab.paths import curated_dir
+from hhplab.artifacts.naming.naming import county_path, tract_path
 from hhplab.registry import latest_vintage
+from hhplab.storage.paths import curated_dir
 
 if TYPE_CHECKING:
     from hhplab.recipe.recipe_schema import MapLayerSpec, MapViewportSpec, TargetSpec

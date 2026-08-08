@@ -14,10 +14,10 @@ from hhplab.geographies.coc.ct_planning_regions import (
     CT_PLANNING_REGION_CODES,
     CT_STATE_FIPS,
 )
-from hhplab.paths import curated_dir
-from hhplab.provenance import ProvenanceBlock, write_parquet_with_provenance
+from hhplab.geographies.xwalks.county import ALBERS_EQUAL_AREA_CRS, build_county_crosswalk
 from hhplab.schema.columns import MSA_FRACTIONAL_ROLLUP_COLUMNS
-from hhplab.xwalks.county import ALBERS_EQUAL_AREA_CRS, build_county_crosswalk
+from hhplab.storage.paths import curated_dir
+from hhplab.storage.provenance import ProvenanceBlock, write_parquet_with_provenance
 
 REQUIRED_MSA_MEMBERSHIP_COLUMNS: tuple[str, ...] = (
     "msa_id",
@@ -1479,7 +1479,7 @@ def save_coc_msa_crosswalk(
     output_dir: Path | str | None = None,
 ) -> Path:
     """Persist a CoC-to-MSA crosswalk with embedded provenance."""
-    from hhplab.naming import msa_coc_xwalk_filename
+    from hhplab.artifacts.naming.naming import msa_coc_xwalk_filename
 
     if output_dir is None:
         output_dir = curated_dir("xwalks")
@@ -1520,7 +1520,7 @@ def save_coc_msa_block_population_crosswalk(
     output_dir: Path | str | None = None,
 ) -> Path:
     """Persist a block-population CoC-to-MSA crosswalk with provenance."""
-    from hhplab.naming import msa_coc_block_population_xwalk_filename
+    from hhplab.artifacts.naming.naming import msa_coc_block_population_xwalk_filename
 
     if output_dir is None:
         output_dir = curated_dir("xwalks")
@@ -1567,7 +1567,10 @@ def read_coc_msa_crosswalk(
     base_dir: Path | str | None = None,
 ) -> pd.DataFrame:
     """Read a curated CoC-to-MSA crosswalk from disk."""
-    from hhplab.naming import msa_coc_block_population_xwalk_path, msa_coc_xwalk_path
+    from hhplab.artifacts.naming.naming import (
+        msa_coc_block_population_xwalk_path,
+        msa_coc_xwalk_path,
+    )
 
     if allocation_basis == "area":
         path = msa_coc_xwalk_path(
@@ -1620,7 +1623,7 @@ def read_coc_msa_block_population_crosswalk(
     base_dir: Path | str | None = None,
 ) -> pd.DataFrame:
     """Read a curated block-population CoC-to-MSA crosswalk from disk."""
-    from hhplab.naming import msa_coc_block_population_xwalk_path
+    from hhplab.artifacts.naming.naming import msa_coc_block_population_xwalk_path
 
     path = msa_coc_block_population_xwalk_path(
         boundary_vintage,

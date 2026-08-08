@@ -9,8 +9,8 @@ import typer
 from hhplab.cli.shared.output import JsonOutput, cli_error, emit_result
 from hhplab.covariates.catalog import covariate_source_spec
 from hhplab.covariates.ingest import ingest_covariate_source
-from hhplab.paths import curated_dir
-from hhplab.provenance import read_provenance
+from hhplab.storage.paths import curated_dir
+from hhplab.storage.provenance import read_provenance
 
 
 def ingest_covariate(

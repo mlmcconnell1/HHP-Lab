@@ -9,7 +9,6 @@ import pytest
 from typer.testing import CliRunner
 
 from hhplab.cli.main import app
-from hhplab.provenance import read_provenance
 from hhplab.schema.columns import PL_BLOCK_POPULATION_COLUMNS
 from hhplab.sources.census.census.ingest.pl_block_population import (
     PL_BLOCK_API_SPECS,
@@ -17,6 +16,7 @@ from hhplab.sources.census.census.ingest.pl_block_population import (
     get_pl_block_population_output_path,
     ingest_pl_block_population,
 )
+from hhplab.storage.provenance import read_provenance
 
 pytestmark = pytest.mark.httpx_mock(can_send_already_matched_responses=True)
 

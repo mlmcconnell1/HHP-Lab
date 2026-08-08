@@ -6,15 +6,15 @@ from typing import Annotated
 import pyarrow.parquet as pq
 import typer
 
-from hhplab.naming import (
+from hhplab.artifacts.naming.naming import (
     block_geometry_filename,
     county_filename,
     tract_filename,
     urban_area_filename,
 )
-from hhplab.paths import curated_dir
 from hhplab.sources.census.census.ingest.tiger_blocks import get_block_geometry_output_path
 from hhplab.sources.census.census.ingest.urban_areas import get_urban_area_output_path
+from hhplab.storage.paths import curated_dir
 
 
 def _parquet_row_count(path) -> int:

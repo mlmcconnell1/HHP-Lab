@@ -15,7 +15,6 @@ from typer.testing import CliRunner
 from hhplab.cli.ingest.acs1_metro import ingest_acs1_metro as ingest_acs1_metro_cli
 from hhplab.cli.main import app
 from hhplab.geographies.gf_metro.metro_definitions import CANONICAL_UNIVERSE_DEFINITION_VERSION
-from hhplab.provenance import read_provenance
 from hhplab.sources.census.acs.ingest.metro_acs1 import (
     CBSA_GEO_PARAM,
     _load_metro_targets,
@@ -30,6 +29,7 @@ from hhplab.sources.census.acs.variables_acs1 import (
     acs1_tables_for_vintage,
     acs1_variables_by_table_for_vintage,
 )
+from hhplab.storage.provenance import read_provenance
 
 # ---------------------------------------------------------------------------
 # Fixtures and helpers

@@ -12,7 +12,7 @@ from hhplab.sources.census.census.ingest import (
     ingest_tiger_counties,
     ingest_tract_relationship,
 )
-from hhplab.xwalks import (
+from hhplab.geographies.xwalks import (
     build_coc_tract_crosswalk,
     build_coc_county_crosswalk,
     build_tract_crosswalk,
@@ -46,8 +46,8 @@ from hhplab.sources.medsl.medsl import (
 ```python
 from pathlib import Path
 
-from hhplab.config import StorageConfig, load_config
-from hhplab.paths import curated_dir, output_root
+from hhplab.storage.config import StorageConfig, load_config
+from hhplab.storage.paths import curated_dir, output_root
 from hhplab.recipe.loader import load_recipe
 from hhplab.recipe.executor import execute_recipe, resolve_pipeline_artifacts
 from hhplab.recipe.default_adapters import register_defaults
@@ -86,8 +86,8 @@ legacy named-build helpers.
 ```python
 from pathlib import Path
 
-from hhplab.config import load_config
-from hhplab.paths import curated_dir, output_root
+from hhplab.storage.config import load_config
+from hhplab.storage.paths import curated_dir, output_root
 from hhplab.recipe.manifest import read_manifest
 
 cfg = load_config()
@@ -99,7 +99,7 @@ manifest = read_manifest(recipe_outputs / "panel__Y2020-2021@B2025.manifest.json
 ## Provenance Helpers
 
 ```python
-from hhplab.provenance import ProvenanceBlock, read_provenance, write_parquet_with_provenance
+from hhplab.storage.provenance import ProvenanceBlock, read_provenance, write_parquet_with_provenance
 
 prov = ProvenanceBlock(
     boundary_vintage="2025",

@@ -9,7 +9,6 @@ from shapely.geometry import Point
 from typer.testing import CliRunner
 
 from hhplab.cli.main import app
-from hhplab.provenance import read_provenance
 from hhplab.sources.census.census.ingest import tiger_blocks
 from hhplab.sources.census.census.ingest.tiger_blocks import (
     STATE_DOWNLOAD_ATTEMPTS,
@@ -38,6 +37,7 @@ from hhplab.sources.census.census.ingest.urban_areas import (
     save_urban_areas,
     urban_area_source,
 )
+from hhplab.storage.provenance import read_provenance
 
 runner = CliRunner()
 

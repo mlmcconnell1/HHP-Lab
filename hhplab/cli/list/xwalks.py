@@ -9,7 +9,7 @@ from typing import Annotated
 import pyarrow.parquet as pq
 import typer
 
-from hhplab.paths import curated_dir
+from hhplab.storage.paths import curated_dir
 
 
 def _format_size(size_bytes: int) -> str:

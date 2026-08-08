@@ -20,7 +20,7 @@ from pathlib import Path
 
 import pytest
 
-from hhplab.source_registry import (
+from hhplab.registry.source_registry import (
     SourceRegistryEntry,
     check_source_changed,
     detect_upstream_changes,
@@ -427,14 +427,14 @@ class TestProvenance:
     """Registry file has embedded provenance after write."""
 
     def test_registry_file_has_provenance(self, registry_path: Path) -> None:
-        from hhplab.provenance import has_provenance
+        from hhplab.storage.provenance import has_provenance
 
         register_source(**ENTRY_A, registry_path=registry_path)
         assert registry_path.exists()
         assert has_provenance(registry_path)
 
     def test_provenance_includes_dataset_type(self, registry_path: Path) -> None:
-        from hhplab.provenance import read_provenance
+        from hhplab.storage.provenance import read_provenance
 
         register_source(**ENTRY_A, registry_path=registry_path)
         prov = read_provenance(registry_path)
@@ -442,7 +442,7 @@ class TestProvenance:
         assert prov.extra["dataset_type"] == "source_registry"
 
     def test_provenance_entry_count_updates(self, registry_path: Path) -> None:
-        from hhplab.provenance import read_provenance
+        from hhplab.storage.provenance import read_provenance
 
         register_source(**ENTRY_A, registry_path=registry_path)
         prov1 = read_provenance(registry_path)

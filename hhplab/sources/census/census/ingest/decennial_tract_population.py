@@ -14,10 +14,10 @@ from pathlib import Path
 import httpx
 import pandas as pd
 
-import hhplab.naming as naming
-from hhplab.paths import curated_dir
-from hhplab.provenance import ProvenanceBlock, write_parquet_with_provenance
+import hhplab.artifacts.naming.naming as naming
 from hhplab.sources.census.census.api import get_census_api_key, raise_for_census_api_status
+from hhplab.storage.paths import curated_dir
+from hhplab.storage.provenance import ProvenanceBlock, write_parquet_with_provenance
 
 STATE_FIPS_CODES: tuple[str, ...] = (
     "01",

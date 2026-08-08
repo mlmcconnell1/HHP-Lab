@@ -23,12 +23,12 @@ import numpy as np
 import pandas as pd
 import statsmodels.api as sm
 
-from hhplab.census_regions import census_region
 from hhplab.covariates.aggregate import (
     aggregate_covariate_source,
     default_covariate_panel_path,
 )
 from hhplab.covariates.ingest import default_covariate_output_path
+from hhplab.geographies.census.regions import census_region
 from hhplab.results.workflows._paths import OUTPUTS_ROOT, REPO_ROOT, write_result_parquet
 from hhplab.results.workflows.build_household_size_composition_panel import (
     _as_msa_id,

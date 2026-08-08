@@ -17,7 +17,7 @@ from pathlib import Path
 
 import pytest
 
-from hhplab.raw_snapshot import (
+from hhplab.storage.raw_snapshot import (
     hash_directory,
     hash_file,
     hash_zip_contents,

@@ -10,11 +10,11 @@ from pathlib import Path
 
 import pandas as pd
 
-from hhplab.naming import hic_filename
-from hhplab.paths import curated_dir
-from hhplab.provenance import ProvenanceBlock, write_parquet_with_provenance
+from hhplab.artifacts.naming.naming import hic_filename
 from hhplab.schema.columns import HIC_CANONICAL_COLUMNS, HIC_PROJECT_TYPES
 from hhplab.sources.hud.pit.ingest.parser import normalize_coc_id
+from hhplab.storage.paths import curated_dir
+from hhplab.storage.provenance import ProvenanceBlock, write_parquet_with_provenance
 
 CANONICAL_COLUMNS: list[str] = HIC_CANONICAL_COLUMNS
 

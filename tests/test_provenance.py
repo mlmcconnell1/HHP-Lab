@@ -7,7 +7,7 @@ import pyarrow.parquet as pq
 import pytest
 
 from hhplab import __version__
-from hhplab.provenance import (
+from hhplab.storage.provenance import (
     PROVENANCE_KEY,
     ProvenanceBlock,
     has_provenance,

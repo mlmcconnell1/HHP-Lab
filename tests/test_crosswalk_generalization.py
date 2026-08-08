@@ -9,6 +9,10 @@ import numpy as np
 import pandas as pd
 import pytest
 
+from hhplab.geographies.xwalks.tract import (
+    add_population_weights,
+    validate_population_shares,
+)
 from hhplab.measures.measures_diagnostics import (
     compute_crosswalk_diagnostics,
     compute_measure_diagnostics,
@@ -21,10 +25,6 @@ from hhplab.sources.zori.zori_aggregate import (
     collapse_to_yearly,
     compute_coc_county_weights,
     compute_geo_county_weights,
-)
-from hhplab.xwalks.tract import (
-    add_population_weights,
-    validate_population_shares,
 )
 
 # ---------------------------------------------------------------------------

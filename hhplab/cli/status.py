@@ -8,7 +8,7 @@ from typing import Annotated
 
 import typer
 
-from hhplab.status import collect_status_report
+from hhplab.diagnostics.status.status import collect_status_report
 
 
 def status_cmd(

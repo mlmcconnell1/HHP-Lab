@@ -5,7 +5,12 @@ from pathlib import Path
 
 import pandas as pd
 
-from hhplab.audit_panels import (
+from hhplab.artifacts.naming.naming import (
+    metro_coc_membership_filename,
+    metro_county_membership_filename,
+    metro_definitions_filename,
+)
+from hhplab.results.workflows.audit_panels import (
     AUDIT_PANEL_SPECS,
     COC_SOURCE_PATH,
     METRO_DEFINITION_VERSION,
@@ -18,11 +23,6 @@ from hhplab.audit_panels import (
     _validate_modeling_ready,
     _validate_raw_panel,
     build_audit_panels,
-)
-from hhplab.naming import (
-    metro_coc_membership_filename,
-    metro_county_membership_filename,
-    metro_definitions_filename,
 )
 
 

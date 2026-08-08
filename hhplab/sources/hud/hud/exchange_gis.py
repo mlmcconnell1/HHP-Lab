@@ -23,16 +23,16 @@ from typing import TYPE_CHECKING, Any
 import httpx
 from shapely.geometry import shape
 
-from hhplab.paths import raw_root
-from hhplab.raw_snapshot import make_run_id, write_api_snapshot
-from hhplab.source_registry import check_source_changed, register_source
-from hhplab.source_urls import (
+from hhplab.registry.source_registry import check_source_changed, register_source
+from hhplab.sources.urls import (
     HUD_ARCGIS_COC_FEATURE_SERVICE,
     HUD_ARCGIS_COC_SOURCE_REF,
     HUD_EXCHANGE_COC_GDB_TEMPLATE,
     HUD_EXCHANGE_COC_NATIONAL_BOUNDARY_TEMPLATE,
     HUD_EXCHANGE_COC_STATE_SHAPEFILE_TEMPLATE,
 )
+from hhplab.storage.paths import raw_root
+from hhplab.storage.raw_snapshot import make_run_id, write_api_snapshot
 
 if TYPE_CHECKING:
     import geopandas as gpd
@@ -888,7 +888,7 @@ def ingest_hud_exchange(
             )
             zip_path = raw_dir / f"CoC_GIS_{boundary_vintage}.zip"
             if zip_path.exists():
-                from hhplab.raw_snapshot import hash_zip_contents
+                from hhplab.storage.raw_snapshot import hash_zip_contents
 
                 raw_bytes = zip_path.read_bytes()
                 content_sha256 = hash_zip_contents(raw_bytes)

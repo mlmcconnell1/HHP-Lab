@@ -12,11 +12,11 @@ import geopandas as gpd
 import httpx
 import pyarrow.parquet as pq
 
-import hhplab.naming as naming
-from hhplab.paths import curated_dir
-from hhplab.provenance import PROVENANCE_KEY, ProvenanceBlock
-from hhplab.raw_snapshot import hash_zip_contents, persist_file_snapshot
-from hhplab.source_registry import check_source_changed, register_source
+import hhplab.artifacts.naming.naming as naming
+from hhplab.registry.source_registry import check_source_changed, register_source
+from hhplab.storage.paths import curated_dir
+from hhplab.storage.provenance import PROVENANCE_KEY, ProvenanceBlock
+from hhplab.storage.raw_snapshot import hash_zip_contents, persist_file_snapshot
 
 logger = logging.getLogger(__name__)
 

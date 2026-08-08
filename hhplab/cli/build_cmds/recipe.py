@@ -9,8 +9,11 @@ from typing import Annotated
 import typer
 import yaml
 
-from hhplab.config import load_config
-from hhplab.naming import msa_pep_filename, msa_pit_filename, msa_zori_yearly_filename
+from hhplab.artifacts.naming.naming import (
+    msa_pep_filename,
+    msa_pit_filename,
+    msa_zori_yearly_filename,
+)
 from hhplab.recipe.adapters import (
     dataset_registry,
     geometry_registry,
@@ -29,6 +32,7 @@ from hhplab.recipe.manifest import read_manifest
 from hhplab.recipe.planner import PlannerError, resolve_plan
 from hhplab.recipe.preflight import PreflightReport, Severity, run_preflight
 from hhplab.recipe.recipe_schema import RecipeV1
+from hhplab.storage.config import load_config
 
 # Common --json flag definition
 _JSON_OPTION = Annotated[

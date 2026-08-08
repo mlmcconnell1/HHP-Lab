@@ -1,6 +1,6 @@
 """Tests for MSA definition naming helpers."""
 
-from hhplab.naming import (
+from hhplab.artifacts.naming.naming import (
     acs5_tracts_glob_pattern,
     block_geometry_path,
     coc_urban_area_detail_filename,

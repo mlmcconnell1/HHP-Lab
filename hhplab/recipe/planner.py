@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from hhplab.naming import (
+from hhplab.artifacts.naming.naming import (
     coc_urban_fraction_path,
     medsl_president_county_path,
     vera_incarceration_county_path,

@@ -14,13 +14,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from hhplab.geographies.coc.ct_planning_regions import (
-    build_ct_county_planning_region_crosswalk,
-    build_ct_tract_planning_region_map,
-    is_ct_legacy_county_fips,
-    is_ct_planning_region_fips,
-)
-from hhplab.naming import (
+from hhplab.artifacts.naming.naming import (
     county_xwalk_path,
     msa_coc_xwalk_path,
     recipe_transform_filename,
@@ -28,10 +22,16 @@ from hhplab.naming import (
     tract_path,
     tract_xwalk_path,
 )
-from hhplab.provenance import ProvenanceBlock, write_parquet_with_provenance
+from hhplab.geographies.coc.ct_planning_regions import (
+    build_ct_county_planning_region_crosswalk,
+    build_ct_tract_planning_region_map,
+    is_ct_legacy_county_fips,
+    is_ct_planning_region_fips,
+)
 from hhplab.recipe.executor.core import ExecutorError, _get_transform
 from hhplab.recipe.recipe_schema import RecipeV1
 from hhplab.recipe.schema_common import GeometryRef
+from hhplab.storage.provenance import ProvenanceBlock, write_parquet_with_provenance
 
 _RECIPE_TRANSFORM_DIR = Path(".recipe_cache") / "transforms"
 
@@ -351,9 +351,9 @@ def _resolve_msa_transform_df(
             "definition version (for example 'census_msa_2023')."
         )
 
+    from hhplab.artifacts.naming.naming import coc_base_path, county_path
     from hhplab.geographies.msa.crosswalk import build_coc_msa_crosswalk
     from hhplab.geographies.msa.msa_io import read_msa_county_membership
-    from hhplab.naming import coc_base_path, county_path
 
     data_root = project_root / "data"
     definition_version = msa_ref.source
@@ -456,7 +456,7 @@ def _resolve_msa_county_transform_df(
     if base_ref.vintage is None or not _has_ct_planning_membership(xwalk):
         return xwalk
 
-    from hhplab.naming import county_path
+    from hhplab.artifacts.naming.naming import county_path
 
     counties_path = county_path(base_ref.vintage, data_root)
     if not counties_path.exists():
@@ -591,8 +591,8 @@ def _generated_msa_transform_is_stale(
         return False
 
     data_root = project_root / "data"
+    from hhplab.artifacts.naming.naming import county_path, tract_path
     from hhplab.geographies.msa.msa_io import read_msa_county_membership
-    from hhplab.naming import county_path, tract_path
 
     try:
         membership = read_msa_county_membership(msa_ref.source, data_root)

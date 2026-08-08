@@ -12,8 +12,8 @@ from pathlib import Path
 import geopandas as gpd
 import pandas as pd
 
-from hhplab.paths import curated_dir
-from hhplab.provenance import ProvenanceBlock, write_parquet_with_provenance
+from hhplab.storage.paths import curated_dir
+from hhplab.storage.provenance import ProvenanceBlock, write_parquet_with_provenance
 
 # ESRI:102003 - USA Contiguous Albers Equal Area Conic
 ALBERS_EQUAL_AREA_CRS = "ESRI:102003"
@@ -315,7 +315,7 @@ def save_crosswalk(
     Path
         Path to saved parquet file (e.g., xwalk__B2025xT2023.parquet).
     """
-    from hhplab.naming import tract_xwalk_filename
+    from hhplab.artifacts.naming.naming import tract_xwalk_filename
 
     if output_dir is None:
         output_dir = curated_dir("xwalks")

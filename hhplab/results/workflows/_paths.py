@@ -7,8 +7,8 @@ from typing import Any
 
 import pandas as pd
 
-from hhplab.paths import asset_store_root, output_root
-from hhplab.provenance import ProvenanceBlock, write_parquet_with_provenance
+from hhplab.storage.paths import asset_store_root, output_root
+from hhplab.storage.provenance import ProvenanceBlock, write_parquet_with_provenance
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 DATA_ROOT = asset_store_root()

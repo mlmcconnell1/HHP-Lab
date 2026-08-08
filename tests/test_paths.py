@@ -1,11 +1,11 @@
-"""Tests for hhplab.paths — centralized path resolution helpers."""
+"""Tests for hhplab.storage.paths — centralized path resolution helpers."""
 
 from __future__ import annotations
 
 from pathlib import Path
 
-from hhplab.config import StorageConfig
-from hhplab.paths import (
+from hhplab.storage.config import StorageConfig
+from hhplab.storage.paths import (
     asset_store_root,
     curated_dir,
     curated_root,

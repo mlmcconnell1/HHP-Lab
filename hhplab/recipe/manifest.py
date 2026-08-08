@@ -25,7 +25,7 @@ from dataclasses import asdict, dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
 
-from hhplab.config import StorageConfig, load_config
+from hhplab.storage.config import StorageConfig, load_config
 
 logger = logging.getLogger(__name__)
 

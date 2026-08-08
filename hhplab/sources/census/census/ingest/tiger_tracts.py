@@ -13,10 +13,10 @@ import geopandas as gpd
 import httpx
 import pandas as pd
 
-from hhplab.paths import curated_dir
-from hhplab.raw_snapshot import hash_zip_contents, persist_file_snapshot
-from hhplab.source_registry import check_source_changed, register_source
-from hhplab.source_urls import CENSUS_TIGER_BASE
+from hhplab.registry.source_registry import check_source_changed, register_source
+from hhplab.sources.urls import CENSUS_TIGER_BASE
+from hhplab.storage.paths import curated_dir
+from hhplab.storage.raw_snapshot import hash_zip_contents, persist_file_snapshot
 
 logger = logging.getLogger(__name__)
 
@@ -367,7 +367,7 @@ def save_tracts(gdf: gpd.GeoDataFrame, year: int = 2023) -> Path:
     Returns:
         Path to saved parquet file (e.g., tracts__T2023.parquet)
     """
-    from hhplab.naming import tract_filename
+    from hhplab.artifacts.naming.naming import tract_filename
 
     curated_dir("tiger").mkdir(parents=True, exist_ok=True)
     output_path = curated_dir("tiger") / tract_filename(year)

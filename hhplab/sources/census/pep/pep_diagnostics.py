@@ -19,8 +19,8 @@ from pathlib import Path
 
 import pandas as pd
 
-from hhplab.coverage_diagnostics import coverage_diagnostics
-from hhplab.provenance import ProvenanceBlock, write_parquet_with_provenance
+from hhplab.diagnostics.coverage import coverage_diagnostics
+from hhplab.storage.provenance import ProvenanceBlock, write_parquet_with_provenance
 
 logger = logging.getLogger(__name__)
 

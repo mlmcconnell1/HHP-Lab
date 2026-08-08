@@ -996,7 +996,7 @@ The `notation` field uses the shorthand from [[08-Temporal-Terminology|Temporal 
 ### Reading Provenance
 
 ```python
-from hhplab.provenance import read_provenance
+from hhplab.storage.provenance import read_provenance
 
 provenance = read_provenance("data/curated/measures/measures__A2022@B2025.parquet")
 print(provenance.boundary_vintage)  # "2025"
@@ -1048,7 +1048,7 @@ PIT count Parquet files include additional provenance fields tracking data linea
 **Reading PIT Provenance:**
 
 ```python
-from hhplab.provenance import read_provenance
+from hhplab.storage.provenance import read_provenance
 
 provenance = read_provenance("data/curated/pit/pit__P2024.parquet")
 print(provenance.extra["pit_year"])           # 2024

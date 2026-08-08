@@ -10,17 +10,17 @@ import pandas as pd
 import pytest
 from shapely.geometry import box
 
+from hhplab.geographies.xwalks.county import build_coc_county_crosswalk
+from hhplab.geographies.xwalks.tract import (
+    add_population_weights,
+    build_coc_tract_crosswalk,
+    validate_population_shares,
+)
 from hhplab.measures.measures_diagnostics import (
     compute_crosswalk_diagnostics,
     summarize_diagnostics,
 )
 from hhplab.sources.census.acs.acs_aggregate import aggregate_to_coc
-from hhplab.xwalks.county import build_coc_county_crosswalk
-from hhplab.xwalks.tract import (
-    add_population_weights,
-    build_coc_tract_crosswalk,
-    validate_population_shares,
-)
 
 # =============================================================================
 # Fixtures: Synthetic GeoDataFrames with known geometry properties

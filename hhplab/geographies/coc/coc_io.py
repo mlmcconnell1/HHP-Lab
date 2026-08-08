@@ -58,7 +58,7 @@ def write_geoparquet(
     path.parent.mkdir(parents=True, exist_ok=True)
 
     if provenance is not None:
-        from hhplab.provenance import PROVENANCE_KEY, ProvenanceBlock
+        from hhplab.storage.provenance import PROVENANCE_KEY, ProvenanceBlock
 
         # Write GeoParquet first, then append provenance to metadata
         gdf.to_parquet(path, compression=compression)
@@ -92,7 +92,7 @@ def curated_boundary_path(boundary_vintage: str, base_dir: Path | str | None = N
     Returns:
         Path like data/curated/coc_boundaries/coc__B2025.parquet
     """
-    from hhplab.naming import coc_base_path
+    from hhplab.artifacts.naming.naming import coc_base_path
 
     return coc_base_path(boundary_vintage, base_dir)
 
@@ -107,7 +107,7 @@ def resolve_curated_boundary_path(
     2. boundaries__B{vintage}.parquet
     3. coc_boundaries__{vintage}.parquet (legacy)
     """
-    from hhplab.naming import boundary_filename, coc_base_filename
+    from hhplab.artifacts.naming.naming import boundary_filename, coc_base_filename
 
     if base_dir is None:
         base_dir = Path("data")

@@ -378,7 +378,7 @@ def _create_fake_expanded_acs_cache(acs_vintage: str, tract_vintage: str | int) 
 
 
 def _create_fake_msa_membership(definition_version: str) -> None:
-    from hhplab.naming import msa_county_membership_path
+    from hhplab.artifacts.naming.naming import msa_county_membership_path
 
     path = msa_county_membership_path(definition_version)
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -452,8 +452,8 @@ def test_aggregate_acs_to_msa_writes_expanded_panel_ready_output():
 
 
 def test_aggregate_pep_to_msa_materializes_canonical_outputs():
-    from hhplab.naming import msa_county_membership_filename, msa_pep_filename
-    from hhplab.provenance import read_provenance
+    from hhplab.artifacts.naming.naming import msa_county_membership_filename, msa_pep_filename
+    from hhplab.storage.provenance import read_provenance
 
     with runner.isolated_filesystem():
         pep_dir = Path("data/curated/pep")
@@ -661,7 +661,7 @@ def test_aggregate_pit_to_msa_materializes_weighted_outputs(tmp_path):
 
     import pandas as pd
 
-    from hhplab.naming import msa_coc_xwalk_filename, msa_pit_filename
+    from hhplab.artifacts.naming.naming import msa_coc_xwalk_filename, msa_pit_filename
 
     pit_dir = tmp_path / "data" / "curated" / "pit"
     xwalk_dir = tmp_path / "data" / "curated" / "xwalks"
@@ -731,7 +731,7 @@ def test_aggregate_pit_to_msa_uses_boundary_vintage_map(tmp_path):
     """MSA PIT aggregate can use an era boundary different from PIT year."""
     import os
 
-    from hhplab.naming import msa_coc_xwalk_filename, msa_pit_filename
+    from hhplab.artifacts.naming.naming import msa_coc_xwalk_filename, msa_pit_filename
 
     pit_dir = tmp_path / "data" / "curated" / "pit"
     xwalk_dir = tmp_path / "data" / "curated" / "xwalks"
@@ -802,8 +802,11 @@ def test_aggregate_pit_to_msa_uses_block_population_crosswalk(tmp_path):
 
     import pandas as pd
 
-    from hhplab.naming import msa_coc_block_population_xwalk_filename, msa_pit_filename
-    from hhplab.provenance import read_provenance
+    from hhplab.artifacts.naming.naming import (
+        msa_coc_block_population_xwalk_filename,
+        msa_pit_filename,
+    )
+    from hhplab.storage.provenance import read_provenance
 
     pit_dir = tmp_path / "data" / "curated" / "pit"
     xwalk_dir = tmp_path / "data" / "curated" / "xwalks"
@@ -891,8 +894,11 @@ def test_aggregate_coc_measure_to_msa_materializes_hic_rollup(tmp_path):
 
     import pandas as pd
 
-    from hhplab.naming import msa_coc_xwalk_filename, msa_fractional_rollup_filename
-    from hhplab.provenance import read_provenance
+    from hhplab.artifacts.naming.naming import (
+        msa_coc_xwalk_filename,
+        msa_fractional_rollup_filename,
+    )
+    from hhplab.storage.provenance import read_provenance
 
     hic_dir = tmp_path / "data" / "curated" / "hic"
     xwalk_dir = tmp_path / "data" / "curated" / "xwalks"

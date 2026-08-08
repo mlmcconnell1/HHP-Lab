@@ -31,7 +31,7 @@ from hhplab.panel.conformance import (
     PanelRequest,
     run_conformance,
 )
-from hhplab.provenance import read_provenance
+from hhplab.storage.provenance import read_provenance
 
 # ---------------------------------------------------------------------------
 # Minimal panel fixture

@@ -30,8 +30,8 @@ from hhplab.geographies.msa.crosswalk import (
     save_coc_msa_crosswalk,
     summarize_coc_msa_allocation,
 )
-from hhplab.provenance import read_provenance
-from hhplab.xwalks.county import ALBERS_EQUAL_AREA_CRS
+from hhplab.geographies.xwalks.county import ALBERS_EQUAL_AREA_CRS
+from hhplab.storage.provenance import read_provenance
 
 COUNTY_GEOMETRY_ROWS = [
     ("36061", box(0, 0, 10, 10)),

@@ -5,8 +5,8 @@ from typing import Annotated
 
 import typer
 
-from hhplab.paths import raw_root
 from hhplab.sources.hud.pit.ingest import get_canonical_output_path
+from hhplab.storage.paths import raw_root
 
 # Configure logging to show INFO messages from PIT parser
 logging.basicConfig(

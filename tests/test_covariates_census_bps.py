@@ -21,13 +21,13 @@ import pytest
 
 from hhplab.covariates.aggregate import aggregate_covariate_source
 from hhplab.covariates.ingest import ingest_covariate_source
-from hhplab.provenance import read_provenance
 from hhplab.sources.census.bps.census_bps_contract import (
     CENSUS_BPS_CLASS_UNIT_COLUMNS,
     CENSUS_BPS_CLASS_VALUE_COLUMNS,
     CENSUS_BPS_MIX_ADJUSTED_VALUE_PER_UNIT_COLUMN,
     CENSUS_BPS_SOURCE_ID,
 )
+from hhplab.storage.provenance import read_provenance
 
 BPS_HEADER_LINES = (
     "Survey,FIPS,FIPS,Region,Division,County,,1-unit,,,2-units,,,3-4 units,,,5+ units,,,"

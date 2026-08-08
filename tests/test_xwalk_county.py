@@ -18,8 +18,8 @@ import pandas as pd
 import pytest
 from shapely.geometry import box
 
-from hhplab.xwalks import apply_crosswalk
-from hhplab.xwalks.county import build_coc_county_crosswalk
+from hhplab.geographies.xwalks import apply_crosswalk
+from hhplab.geographies.xwalks.county import build_coc_county_crosswalk
 
 
 class TestApplyCrosswalk:

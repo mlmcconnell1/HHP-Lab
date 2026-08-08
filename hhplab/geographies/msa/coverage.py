@@ -12,9 +12,9 @@ from hhplab.geographies.msa.selectors import (
     PopulationRankingSource,
     select_top_msa_ids_by_population,
 )
-from hhplab.provenance import ProvenanceBlock, write_parquet_with_provenance
+from hhplab.geographies.xwalks.county import ALBERS_EQUAL_AREA_CRS
 from hhplab.schema.columns import MSA_COC_COVERAGE_COLUMNS, PRIMARY_MSA_ANNOTATION_COLUMNS
-from hhplab.xwalks.county import ALBERS_EQUAL_AREA_CRS
+from hhplab.storage.provenance import ProvenanceBlock, write_parquet_with_provenance
 
 OverlapBasis = Literal["area", "population"]
 

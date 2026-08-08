@@ -9,15 +9,15 @@ import geopandas as gpd
 import pandas as pd
 import typer
 
-from hhplab.geographies.coc.coc_io import resolve_curated_boundary_path
-from hhplab.geographies.msa.msa_definitions import DEFINITION_VERSION, DELINEATION_FILE_YEAR
-from hhplab.naming import (
+from hhplab.artifacts.naming.naming import (
     block_geometry_path,
     county_path,
     msa_coc_block_population_xwalk_path,
     msa_coc_xwalk_path,
     pl_block_population_path,
 )
+from hhplab.geographies.coc.coc_io import resolve_curated_boundary_path
+from hhplab.geographies.msa.msa_definitions import DEFINITION_VERSION, DELINEATION_FILE_YEAR
 from hhplab.registry.boundary_registry import latest_vintage, list_boundaries
 
 

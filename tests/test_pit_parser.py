@@ -12,7 +12,6 @@ from datetime import UTC, datetime
 import pandas as pd
 import pytest
 
-from hhplab.provenance import read_provenance
 from hhplab.sources.hud.pit.ingest.parser import (
     CANONICAL_COLUMNS,
     InvalidCoCIdError,
@@ -21,6 +20,7 @@ from hhplab.sources.hud.pit.ingest.parser import (
     parse_pit_file,
     write_pit_parquet,
 )
+from hhplab.storage.provenance import read_provenance
 
 
 class TestNormalizeCocId:

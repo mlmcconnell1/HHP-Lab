@@ -35,7 +35,7 @@ from hhplab.panel.assemble import (
     save_panel,
 )
 from hhplab.panel.policies import DEFAULT_POLICY, AlignmentPolicy
-from hhplab.provenance import read_provenance
+from hhplab.storage.provenance import read_provenance
 
 
 class TestLoadPitForYear:

@@ -5,9 +5,12 @@ from typing import Annotated
 
 import typer
 
-from hhplab.naming import acs5_tracts_glob_pattern
-from hhplab.paths import curated_dir
-from hhplab.xwalks.diagnostics import PopulationValidationResult, validate_population_crosswalk
+from hhplab.artifacts.naming.naming import acs5_tracts_glob_pattern
+from hhplab.geographies.xwalks.diagnostics import (
+    PopulationValidationResult,
+    validate_population_crosswalk,
+)
+from hhplab.storage.paths import curated_dir
 
 
 def _run_population_validation(

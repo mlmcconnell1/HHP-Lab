@@ -12,7 +12,6 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from hhplab.config import StorageConfig, load_config
 from hhplab.recipe.manifest import (
     ROOT_ASSET_STORE,
     ROOT_OUTPUT,
@@ -20,6 +19,7 @@ from hhplab.recipe.manifest import (
     RecipeManifest,
     export_bundle,
 )
+from hhplab.storage.config import StorageConfig, load_config
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -233,7 +233,7 @@ class TestConfigIntegrationWithPaths:
 
     def test_custom_asset_store_root(self, tmp_path: Path):
         """Custom asset_store_root is used by path helpers."""
-        from hhplab.paths import curated_dir, raw_root
+        from hhplab.storage.paths import curated_dir, raw_root
 
         cfg = StorageConfig(
             asset_store_root=tmp_path / "my-assets",
@@ -244,7 +244,7 @@ class TestConfigIntegrationWithPaths:
 
     def test_custom_output_root(self, tmp_path: Path):
         """Custom output_root is used by path helpers."""
-        from hhplab.paths import output_root
+        from hhplab.storage.paths import output_root
 
         cfg = StorageConfig(
             asset_store_root=tmp_path / "my-assets",

@@ -24,7 +24,7 @@ from pathlib import Path
 import geopandas as gpd
 import pandas as pd
 
-from hhplab.naming import county_path, tract_path
+from hhplab.artifacts.naming.naming import county_path, tract_path
 
 # ---------------------------------------------------------------------------
 # Connecticut FIPS code constants

@@ -15,7 +15,7 @@ from pathlib import Path
 import pandas as pd
 import statsmodels.api as sm
 
-from hhplab.census_regions import census_region
+from hhplab.geographies.census.regions import census_region
 from hhplab.results.workflows._paths import write_result_parquet
 from hhplab.results.workflows.build_noncompositional_rent_population_panel import (
     BPS_SHORT_WINDOW,

@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pandas as pd
 
-import hhplab.naming as naming
+import hhplab.artifacts.naming.naming as naming
 from hhplab.geographies.gf_metro.metro_definitions import (
     CANONICAL_UNIVERSE_DEFINITION_VERSION,
     DEFINITION_VERSION,
@@ -22,7 +22,7 @@ from hhplab.geographies.gf_metro.metro_validate import (
     validate_metro_artifacts,
     validate_metro_universe_artifacts,
 )
-from hhplab.provenance import ProvenanceBlock, write_parquet_with_provenance
+from hhplab.storage.provenance import ProvenanceBlock, write_parquet_with_provenance
 
 
 def write_metro_artifacts(

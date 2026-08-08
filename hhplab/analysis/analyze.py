@@ -15,9 +15,13 @@ from typing import Any, Literal
 import numpy as np
 import pandas as pd
 
-from hhplab.naming import analysis_manifest_path, analysis_output_path
-from hhplab.provenance import ProvenanceBlock, read_provenance, write_parquet_with_provenance
+from hhplab.artifacts.naming.naming import analysis_manifest_path, analysis_output_path
 from hhplab.schema.measures import resolve_panel_measure_entry
+from hhplab.storage.provenance import (
+    ProvenanceBlock,
+    read_provenance,
+    write_parquet_with_provenance,
+)
 
 
 class AnalysisError(ValueError):

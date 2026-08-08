@@ -31,7 +31,7 @@ See background/temporal-terminology.md for full specification.
 import re
 from pathlib import Path
 
-from hhplab.naming_covariates import (
+from hhplab.artifacts.naming.covariates import (
     covariate_curated_filename,  # noqa: F401 (public compatibility re-export)
     covariate_pair_filename,  # noqa: F401 (public compatibility re-export)
     covariate_panel_filename,  # noqa: F401 (public compatibility re-export)
@@ -1088,7 +1088,7 @@ def hic_path(hic_year: str | int, base_dir: Path | str | None = None) -> Path:
         Path like data/curated/hic/hic__H2024.parquet
     """
     if base_dir is None:
-        from hhplab.paths import asset_store_root
+        from hhplab.storage.paths import asset_store_root
 
         base_dir = asset_store_root()
     else:
@@ -1206,7 +1206,7 @@ def discover_zori_ingest(
         Path to the most recent file, or None if no file exists.
     """
     if output_dir is None:
-        from hhplab.paths import curated_dir
+        from hhplab.storage.paths import curated_dir
 
         output_dir = curated_dir("zori")
     else:

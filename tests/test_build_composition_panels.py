@@ -9,7 +9,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from hhplab.census_regions import census_region
+from hhplab.geographies.census.regions import census_region
 
 BASE_ROWS = [
     {

@@ -1,7 +1,7 @@
 """Centralized path resolution for storage roots.
 
 Provides typed directory helpers that resolve against a
-:class:`~hhplab.config.StorageConfig`.  All code that needs a data
+:class:`~hhplab.storage.config.StorageConfig`.  All code that needs a data
 directory should call these helpers instead of constructing
 ``Path("data/...")`` directly.
 
@@ -35,7 +35,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from hhplab.config import StorageConfig, load_config
+from hhplab.storage.config import StorageConfig, load_config
 
 # ---------------------------------------------------------------------------
 # Asset store helpers

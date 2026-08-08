@@ -13,7 +13,6 @@ from pathlib import Path
 import pandas as pd
 import pyarrow.parquet as pq
 
-from hhplab.provenance import PROVENANCE_KEY, ProvenanceBlock
 from hhplab.sources.hud.pit.ingest.parser import (
     PITParseResult,
     PITVintageParseResult,
@@ -25,6 +24,7 @@ from hhplab.sources.hud.pit.pit_registry import (
     list_pit_vintages,
     register_pit_vintage,
 )
+from hhplab.storage.provenance import PROVENANCE_KEY, ProvenanceBlock
 
 # ---------------------------------------------------------------------------
 # Helpers

@@ -22,12 +22,12 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
-from hhplab.provenance import read_provenance
 from hhplab.sources.medsl.medsl.ingest import (
     MEDSL_COUNTY_PRESIDENTIAL_COLUMNS,
     ingest_county_presidential_returns,
     parse_county_presidential_returns,
 )
+from hhplab.storage.provenance import read_provenance
 
 FIXTURE_YEARS = (2000, 2004)
 MEDSL_FIXTURE_ROWS = [

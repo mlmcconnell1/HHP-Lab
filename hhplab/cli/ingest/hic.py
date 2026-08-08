@@ -8,7 +8,6 @@ from typing import Annotated
 import typer
 
 from hhplab.cli.shared.output import JsonOutput, cli_error, emit_result
-from hhplab.paths import raw_root
 from hhplab.sources.hud.hic import get_canonical_output_path, parse_hic_file, write_hic_parquet
 from hhplab.sources.hud.hic.hud_user import (
     HICManualDownloadRequired,
@@ -16,6 +15,7 @@ from hhplab.sources.hud.hic.hud_user import (
     download_hic_data,
     get_hic_source_url,
 )
+from hhplab.storage.paths import raw_root
 
 
 def ingest_hic(

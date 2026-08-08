@@ -20,12 +20,8 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-import hhplab.naming as naming
-from hhplab.config import load_config
-from hhplab.geographies.msa.coverage import select_primary_msa_for_cocs
-from hhplab.geographies.msa.crosswalk import read_coc_msa_crosswalk
-from hhplab.geographies.msa.msa_io import read_msa_county_membership, read_msa_definitions
-from hhplab.naming import (
+import hhplab.artifacts.naming.naming as naming
+from hhplab.artifacts.naming.naming import (
     acs5_tracts_filename,
     decennial_tracts_filename,
     msa_coc_xwalk_path,
@@ -33,6 +29,9 @@ from hhplab.naming import (
     msa_definitions_path,
     tract_xwalk_path,
 )
+from hhplab.geographies.msa.coverage import select_primary_msa_for_cocs
+from hhplab.geographies.msa.crosswalk import read_coc_msa_crosswalk
+from hhplab.geographies.msa.msa_io import read_msa_county_membership, read_msa_definitions
 from hhplab.panel.finalize import (
     ZORI_COLUMNS,
     ZORI_PROVENANCE_COLUMNS,
@@ -72,6 +71,7 @@ from hhplab.schema.lineage import (
     PopulationSource,
     population_lineage_columns,
 )
+from hhplab.storage.config import load_config
 
 
 def canonicalize_panel_for_target(

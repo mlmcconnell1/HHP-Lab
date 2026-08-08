@@ -7,8 +7,8 @@ from typing import Literal
 
 import pandas as pd
 
-import hhplab.naming as naming
-from hhplab.paths import curated_dir
+import hhplab.artifacts.naming.naming as naming
+from hhplab.storage.paths import curated_dir
 
 MsaUnemploymentSource = Literal["acs5", "laus"]
 

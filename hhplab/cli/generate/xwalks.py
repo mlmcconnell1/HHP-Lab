@@ -9,21 +9,15 @@ import geopandas as gpd
 import pandas as pd
 import typer
 
-from hhplab.measures.measures_diagnostics import (
-    compute_crosswalk_diagnostics,
-    summarize_diagnostics,
-)
-from hhplab.paths import curated_dir
-from hhplab.registry.boundary_registry import latest_vintage, list_boundaries
-from hhplab.xwalks.county import build_coc_county_crosswalk, save_county_crosswalk
-from hhplab.xwalks.tract import (
+from hhplab.geographies.xwalks.county import build_coc_county_crosswalk, save_county_crosswalk
+from hhplab.geographies.xwalks.tract import (
     add_population_weights,
     build_coc_tract_crosswalk,
     load_tract_population_for_weights,
     save_crosswalk,
     validate_population_shares,
 )
-from hhplab.xwalks.tract_mediated import (
+from hhplab.geographies.xwalks.tract_mediated import (
     DenominatorSource,
     WeightingMode,
     build_tract_mediated_county_crosswalk,
@@ -33,6 +27,12 @@ from hhplab.xwalks.tract_mediated import (
     summarize_tract_mediated_crosswalk,
     tract_mediated_preflight_payload,
 )
+from hhplab.measures.measures_diagnostics import (
+    compute_crosswalk_diagnostics,
+    summarize_diagnostics,
+)
+from hhplab.registry.boundary_registry import latest_vintage, list_boundaries
+from hhplab.storage.paths import curated_dir
 
 XwalkType = Literal["tracts", "counties", "tract-mediated", "all"]
 
@@ -282,7 +282,7 @@ def build_xwalks(
         raise typer.Exit(1) from e
 
     # Guard against overwriting existing crosswalks unless --force is provided
-    from hhplab.naming import county_xwalk_filename, tract_xwalk_filename
+    from hhplab.artifacts.naming.naming import county_xwalk_filename, tract_xwalk_filename
 
     existing_outputs: list[Path] = []
     if build_tracts:
@@ -305,7 +305,7 @@ def build_xwalks(
     # Build tract crosswalk if requested
     if build_tracts:
         # Load tract geometries (try new naming, then legacy)
-        from hhplab.naming import tract_filename
+        from hhplab.artifacts.naming.naming import tract_filename
 
         tract_path = curated_dir("tiger") / tract_filename(tracts)
         legacy_tract_path = curated_dir("tiger") / f"tracts__{tracts}.parquet"
@@ -385,7 +385,7 @@ def build_xwalks(
         return
 
     # Load county geometries (try new naming, then legacy)
-    from hhplab.naming import county_filename
+    from hhplab.artifacts.naming.naming import county_filename
 
     county_path = curated_dir("tiger") / county_filename(county_vintage)
     legacy_county_path = curated_dir("tiger") / f"counties__{county_vintage}.parquet"

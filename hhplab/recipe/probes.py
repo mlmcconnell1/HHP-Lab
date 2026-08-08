@@ -16,7 +16,6 @@ from pathlib import Path
 import pandas as pd
 import pyarrow.parquet as pq
 
-from hhplab.provenance import read_provenance
 from hhplab.recipe.recipe_schema import (
     CrosswalkTransform,
     DatasetSpec,
@@ -26,6 +25,7 @@ from hhplab.recipe.recipe_schema import (
 from hhplab.recipe.schema_common import GeometryRef
 from hhplab.sources.census.acs.translate import get_source_tract_vintage, needs_translation
 from hhplab.sources.census.acs.variables import TRACT_OUTPUT_COLUMNS
+from hhplab.storage.provenance import read_provenance
 
 # Auto-detect candidates for geo-ID and year columns.
 GEO_CANDIDATES: list[str] = [
@@ -456,7 +456,7 @@ def probe_transform_path(
     ProbeResult
         ok=True if the file exists, ok=False with the expected path.
     """
-    from hhplab.naming import (
+    from hhplab.artifacts.naming.naming import (
         metro_coc_membership_path,
         metro_county_membership_path,
         tract_path,
@@ -523,12 +523,15 @@ def probe_transform_path(
                 if base_ref.vintage is not None:
                     prereq_paths.append(tract_path(base_ref.vintage, data_root))
         else:
-            from hhplab.naming import metro_subset_membership_path, msa_county_membership_path
+            from hhplab.artifacts.naming.naming import (
+                metro_subset_membership_path,
+                msa_county_membership_path,
+            )
 
             metro_definition_version = metro_ref.resolved_metro_definition_version()
             if metro_definition_version is not None:
                 if base_ref.type == "coc" and base_ref.vintage is not None:
-                    from hhplab.naming import coc_base_path, county_path
+                    from hhplab.artifacts.naming.naming import coc_base_path, county_path
 
                     boundary_vintage = str(base_ref.vintage)
                     county_vintage = boundary_vintage
@@ -569,7 +572,11 @@ def probe_transform_path(
         data_root = project_root / "data"
         prereq_paths = []
         if msa_base_ref.type == "coc" and msa_base_ref.vintage is not None:
-            from hhplab.naming import coc_base_path, county_path, msa_county_membership_path
+            from hhplab.artifacts.naming.naming import (
+                coc_base_path,
+                county_path,
+                msa_county_membership_path,
+            )
 
             boundary_vintage = str(msa_base_ref.vintage)
             county_vintage = boundary_vintage
@@ -581,11 +588,11 @@ def probe_transform_path(
                 ]
             )
         elif msa_base_ref.type == "county":
-            from hhplab.naming import msa_county_membership_path
+            from hhplab.artifacts.naming.naming import msa_county_membership_path
 
             prereq_paths.append(msa_county_membership_path(msa_ref.source, data_root))
         elif msa_base_ref.type == "tract" and msa_base_ref.vintage is not None:
-            from hhplab.naming import msa_county_membership_path, tract_path
+            from hhplab.artifacts.naming.naming import msa_county_membership_path, tract_path
 
             prereq_paths.extend(
                 [

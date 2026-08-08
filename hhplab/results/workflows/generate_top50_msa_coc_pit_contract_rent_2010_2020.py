@@ -8,8 +8,8 @@ from pathlib import Path
 import pandas as pd
 import pyarrow.parquet as pq
 
-from hhplab.provenance import ProvenanceBlock, write_parquet_with_provenance
 from hhplab.results.workflows._paths import DATA_ROOT, OUTPUTS_ROOT, REPO_ROOT, display_path
+from hhplab.storage.provenance import ProvenanceBlock, write_parquet_with_provenance
 
 ROOT = REPO_ROOT
 OUTPUT_DIR = OUTPUTS_ROOT / "top50_msa_nonpr_coc_pit_contract_rent_2010_2020"

@@ -15,14 +15,14 @@ from pathlib import Path
 import httpx
 import pandas as pd
 
-import hhplab.naming as naming
-from hhplab.provenance import ProvenanceBlock, write_parquet_with_provenance
-from hhplab.source_urls import BLS_API_V2, BLS_CPI_SOURCE_REF
+import hhplab.artifacts.naming.naming as naming
 from hhplab.sources.bls.laus.ingest import (
     BlsQuotaExhausted,
     _bls_quota_message,
     _is_bls_quota_response,
 )
+from hhplab.sources.urls import BLS_API_V2, BLS_CPI_SOURCE_REF
+from hhplab.storage.provenance import ProvenanceBlock, write_parquet_with_provenance
 
 logger = logging.getLogger(__name__)
 

@@ -41,7 +41,7 @@ from pathlib import Path
 
 import pandas as pd
 
-import hhplab.naming as naming
+import hhplab.artifacts.naming.naming as naming
 from hhplab.geographies.gf_metro.metro_definitions import (
     CANONICAL_UNIVERSE_DEFINITION_VERSION,
     METRO_CBSA_MAPPING,
@@ -53,8 +53,6 @@ from hhplab.geographies.gf_metro.metro_definitions import (
     DEFINITION_VERSION as GLYNN_FOX_DEFINITION_VERSION,
 )
 from hhplab.geographies.gf_metro.metro_io import read_metro_subset_membership, read_metro_universe
-from hhplab.provenance import ProvenanceBlock, write_parquet_with_provenance
-from hhplab.source_urls import CENSUS_API_ACS1
 from hhplab.sources.census.acs.ingest._acs1_api import (
     ACS1_CBSA_GEOGRAPHY,
     fetch_acs1_api_data,
@@ -68,6 +66,8 @@ from hhplab.sources.census.acs.variables_acs1 import (
     ACS1_TABLES,
     acs1_variables_by_table_for_vintage,
 )
+from hhplab.sources.urls import CENSUS_API_ACS1
+from hhplab.storage.provenance import ProvenanceBlock, write_parquet_with_provenance
 
 logger = logging.getLogger(__name__)
 

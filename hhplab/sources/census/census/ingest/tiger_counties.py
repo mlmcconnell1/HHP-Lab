@@ -9,10 +9,10 @@ from pathlib import Path
 import geopandas as gpd
 import httpx
 
-from hhplab.paths import curated_dir
-from hhplab.raw_snapshot import persist_file_snapshot
-from hhplab.source_registry import check_source_changed, register_source
-from hhplab.source_urls import CENSUS_TIGER_BASE
+from hhplab.registry.source_registry import check_source_changed, register_source
+from hhplab.sources.urls import CENSUS_TIGER_BASE
+from hhplab.storage.paths import curated_dir
+from hhplab.storage.raw_snapshot import persist_file_snapshot
 
 logger = logging.getLogger(__name__)
 
@@ -132,7 +132,7 @@ def save_counties(gdf: gpd.GeoDataFrame, year: int = 2023) -> Path:
     Returns:
         Path to saved parquet file (e.g., counties__C2023.parquet)
     """
-    from hhplab.naming import county_filename
+    from hhplab.artifacts.naming.naming import county_filename
 
     curated_dir("tiger").mkdir(parents=True, exist_ok=True)
     output_path = curated_dir("tiger") / county_filename(year)

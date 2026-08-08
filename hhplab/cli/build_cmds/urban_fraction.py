@@ -13,16 +13,16 @@ import pyarrow as pa
 import pyarrow.parquet as pq
 import typer
 
-import hhplab.naming as naming
-from hhplab.paths import curated_dir
-from hhplab.provenance import ProvenanceBlock, write_parquet_with_provenance
-from hhplab.sources.census.census.ingest.decennial_tract_population import STATE_FIPS_CODES
-from hhplab.xwalks.urban_fraction import (
+import hhplab.artifacts.naming.naming as naming
+from hhplab.geographies.xwalks.urban_fraction import (
     DEFAULT_ALLOCATION_METHOD,
     DEFAULT_CLASSIFICATION_METHOD,
     build_coc_urban_fraction_intersections,
     summarize_coc_urban_fraction_intersections,
 )
+from hhplab.sources.census.census.ingest.decennial_tract_population import STATE_FIPS_CODES
+from hhplab.storage.paths import curated_dir
+from hhplab.storage.provenance import ProvenanceBlock, write_parquet_with_provenance
 
 MISSING_GEOPARQUET_METADATA_MESSAGE = "Missing geo metadata in Parquet/Feather file."
 

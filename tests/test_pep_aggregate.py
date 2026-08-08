@@ -14,7 +14,6 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
-from hhplab.provenance import read_provenance
 from hhplab.sources.census.pep.pep_aggregate import (
     CURRENT_TRACT_MEDIATED_STATUS,
     DEPRECATED_DIRECT_COUNTY_AREA_STATUS,
@@ -24,6 +23,7 @@ from hhplab.sources.census.pep.pep_aggregate import (
     aggregate_pep_to_coc,
     aggregate_pep_to_coc_many,
 )
+from hhplab.storage.provenance import read_provenance
 
 
 class TestAggregationIntegration:
@@ -670,8 +670,8 @@ class TestPepDiagnosticsProvenance:
 
     def test_run_pep_diagnostics_embeds_provenance(self, tmp_path):
         """Output parquet from run_pep_diagnostics must have provenance."""
-        from hhplab.provenance import has_provenance
         from hhplab.sources.census.pep.pep_diagnostics import run_pep_diagnostics
+        from hhplab.storage.provenance import has_provenance
 
         # Create a minimal PEP CoC parquet as input.
         pep_df = pd.DataFrame(

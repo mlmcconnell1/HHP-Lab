@@ -51,7 +51,7 @@ def generate_metro(
     """
     import json as json_mod
 
-    import hhplab.naming as naming
+    import hhplab.artifacts.naming.naming as naming
     from hhplab.geographies.gf_metro.metro_io import write_metro_artifacts
 
     # Check for existing artifacts unless --force
@@ -157,7 +157,7 @@ def generate_metro_universe(
     """Generate canonical metro-universe and Glynn/Fox subset-profile artifacts."""
     import json as json_mod
 
-    import hhplab.naming as naming
+    import hhplab.artifacts.naming.naming as naming
     from hhplab.geographies.gf_metro.metro_io import write_metro_universe_artifacts
 
     paths_to_write = [

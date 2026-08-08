@@ -36,12 +36,12 @@ from typing import Literal
 import httpx
 import pandas as pd
 
-from hhplab.paths import curated_dir
-from hhplab.provenance import ProvenanceBlock, write_parquet_with_provenance
-from hhplab.raw_snapshot import raw_dir as canonical_raw_dir
+from hhplab.registry.source_registry import check_source_changed, register_source
 from hhplab.schema.columns import PEP_COUNTY_OUTPUT_COLUMNS
-from hhplab.source_registry import check_source_changed, register_source
-from hhplab.source_urls import CENSUS_PEP_DATASETS_BASE
+from hhplab.sources.urls import CENSUS_PEP_DATASETS_BASE
+from hhplab.storage.paths import curated_dir
+from hhplab.storage.provenance import ProvenanceBlock, write_parquet_with_provenance
+from hhplab.storage.raw_snapshot import raw_dir as canonical_raw_dir
 
 logger = logging.getLogger(__name__)
 

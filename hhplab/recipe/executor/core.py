@@ -20,7 +20,6 @@ from typing import TYPE_CHECKING
 
 import typer
 
-from hhplab.config import StorageConfig, load_config
 from hhplab.recipe.cache import RecipeCache
 from hhplab.recipe.manifest import (
     ROOT_ASSET_STORE,
@@ -28,6 +27,7 @@ from hhplab.recipe.manifest import (
     AssetRecord,
 )
 from hhplab.recipe.recipe_schema import RecipeV1
+from hhplab.storage.config import StorageConfig, load_config
 
 if TYPE_CHECKING:
     import pandas as pd

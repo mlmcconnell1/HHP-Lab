@@ -23,7 +23,7 @@ import pandas as pd
 import pytest
 from typer.testing import CliRunner
 
-from hhplab.analyze import (
+from hhplab.analysis.analyze import (
     AnalysisError,
     _fit_2sls,
     _fit_ols,
@@ -33,7 +33,7 @@ from hhplab.analyze import (
     regress_panel,
 )
 from hhplab.cli.main import app
-from hhplab.provenance import ProvenanceBlock, write_parquet_with_provenance
+from hhplab.storage.provenance import ProvenanceBlock, write_parquet_with_provenance
 
 runner = CliRunner()
 

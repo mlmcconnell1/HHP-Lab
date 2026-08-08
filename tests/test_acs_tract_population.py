@@ -12,11 +12,6 @@ import httpx
 import pandas as pd
 import pytest
 
-from hhplab.provenance import (
-    ProvenanceBlock,
-    read_provenance,
-    write_parquet_with_provenance,
-)
 from hhplab.sources.census.acs.ingest.tract_population import (
     fetch_state_tract_data,
     fetch_tract_data,
@@ -35,6 +30,11 @@ from hhplab.sources.census.acs.variables import (
     acs_variables_for_year,
     api_vars_for_year,
     tables_for_api_vars,
+)
+from hhplab.storage.provenance import (
+    ProvenanceBlock,
+    read_provenance,
+    write_parquet_with_provenance,
 )
 
 pytestmark = pytest.mark.httpx_mock(can_send_already_matched_responses=True)

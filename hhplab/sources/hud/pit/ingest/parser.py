@@ -38,8 +38,8 @@ import pandas as pd
 import pyarrow as pa
 import pyarrow.parquet as pq
 
-from hhplab.paths import curated_dir
 from hhplab.schema.columns import PIT_CANONICAL_COLUMNS
+from hhplab.storage.paths import curated_dir
 
 logger = logging.getLogger(__name__)
 
@@ -552,7 +552,7 @@ def write_pit_parquet(
     """Write parsed PIT data to Parquet format with provenance metadata.
 
     Embeds provenance metadata in the Parquet file following the
-    hhplab.provenance conventions.
+    hhplab.storage.provenance conventions.
 
     Parameters
     ----------
@@ -580,7 +580,7 @@ def write_pit_parquet(
     ValueError
         If required columns are missing from the DataFrame.
     """
-    from hhplab.provenance import PROVENANCE_KEY, ProvenanceBlock
+    from hhplab.storage.provenance import PROVENANCE_KEY, ProvenanceBlock
 
     output_path = Path(output_path)
     output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -668,7 +668,7 @@ def get_canonical_output_path(year: int, base_dir: Path | str | None = None) -> 
     Path
         Path like 'data/curated/pit/pit__P2024.parquet'.
     """
-    from hhplab.naming import pit_filename
+    from hhplab.artifacts.naming.naming import pit_filename
 
     if base_dir is None:
         base_dir = curated_dir("pit")
@@ -693,7 +693,7 @@ def get_vintage_output_path(vintage: int, base_dir: Path | str | None = None) ->
     Path
         Path like 'data/curated/pit/pit_vintage__P2024.parquet'.
     """
-    from hhplab.naming import pit_vintage_filename
+    from hhplab.artifacts.naming.naming import pit_vintage_filename
 
     if base_dir is None:
         base_dir = curated_dir("pit")

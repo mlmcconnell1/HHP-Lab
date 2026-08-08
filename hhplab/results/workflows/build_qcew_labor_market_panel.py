@@ -26,9 +26,9 @@ import numpy as np
 import pandas as pd
 import statsmodels.api as sm
 
-from hhplab.census_regions import census_region
+from hhplab.artifacts.naming.naming import covariate_panel_filename
 from hhplab.covariates.aggregate import aggregate_covariate_source
-from hhplab.naming import covariate_panel_filename
+from hhplab.geographies.census.regions import census_region
 from hhplab.results.workflows._paths import DATA_ROOT, OUTPUTS_ROOT, REPO_ROOT, write_result_parquet
 from hhplab.results.workflows.build_household_size_composition_panel import (
     _as_msa_id,

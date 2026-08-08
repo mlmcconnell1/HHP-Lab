@@ -13,7 +13,6 @@ import pandas as pd
 import pyarrow as pa
 import typer
 
-from hhplab.config import StorageConfig
 from hhplab.geographies.coc.ct_planning_regions import CT_LEGACY_COUNTY_VINTAGE
 from hhplab.recipe.cache import RecipeCache
 from hhplab.recipe.executor import population as population_execution
@@ -118,6 +117,7 @@ from hhplab.recipe.recipe_schema import (
     RecipeV1,
     TemporalFilter,
 )
+from hhplab.storage.config import StorageConfig
 
 # Re-export the core primitives so ``from hhplab.recipe.executor import
 # ExecutorError`` (and similar imports used by tests, the CLI, and third-

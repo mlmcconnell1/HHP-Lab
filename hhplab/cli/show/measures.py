@@ -7,7 +7,7 @@ from typing import Annotated
 import pandas as pd
 import typer
 
-from hhplab.paths import curated_dir
+from hhplab.storage.paths import curated_dir
 
 
 def _find_latest_measures_file(measures_dir: Path) -> Path | None:

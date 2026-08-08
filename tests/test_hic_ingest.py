@@ -11,7 +11,6 @@ import pytest
 from typer.testing import CliRunner
 
 from hhplab.cli.main import app
-from hhplab.provenance import read_provenance
 from hhplab.sources.hud.hic.hud_user import (
     HICManualDownloadRequired,
     discover_local_hic_file,
@@ -24,6 +23,7 @@ from hhplab.sources.hud.hic.parser import (
     parse_hic_file,
     write_hic_parquet,
 )
+from hhplab.storage.provenance import read_provenance
 
 runner = CliRunner()
 

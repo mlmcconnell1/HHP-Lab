@@ -7,7 +7,7 @@ from typing import Annotated
 
 import typer
 
-from hhplab.source_coverage import list_core_source_coverage
+from hhplab.sources.coverage import list_core_source_coverage
 
 
 def build_sources_inventory() -> dict[str, object]:

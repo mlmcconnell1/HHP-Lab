@@ -7,6 +7,7 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
+from hhplab.artifacts.naming.naming import laus_metro_path
 from hhplab.geographies.msa.unemployment import (
     MSA_ACS5_UNEMPLOYMENT_COLUMNS,
     MSA_LAUS_UNEMPLOYMENT_COLUMNS,
@@ -14,7 +15,6 @@ from hhplab.geographies.msa.unemployment import (
     resolve_msa_unemployment,
     validate_laus_years_available,
 )
-from hhplab.naming import laus_metro_path
 
 ACS5_MSA_UNEMPLOYMENT_FIXTURE = pd.DataFrame(
     {

@@ -14,8 +14,8 @@ from hhplab.geographies.msa.coverage import (
     save_msa_coc_coverage,
     select_primary_msa_for_cocs,
 )
-from hhplab.provenance import read_provenance
-from hhplab.xwalks.county import ALBERS_EQUAL_AREA_CRS
+from hhplab.geographies.xwalks.county import ALBERS_EQUAL_AREA_CRS
+from hhplab.storage.provenance import read_provenance
 
 COUNTY_ROWS = [
     ("36061", box(0, 0, 10, 10)),

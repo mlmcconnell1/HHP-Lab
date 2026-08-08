@@ -9,7 +9,7 @@ import pandas as pd
 from typer.testing import CliRunner
 
 from hhplab.cli.main import app
-from hhplab.provenance import read_provenance
+from hhplab.storage.provenance import read_provenance
 
 runner = CliRunner()
 

@@ -8,7 +8,6 @@ import geopandas as gpd
 import httpx
 import pytest
 
-from hhplab.raw_snapshot import make_run_id
 from hhplab.sources.hud.hud.opendata_arcgis import (
     FEATURE_SERVICE_URL,
     PAGE_SIZE,
@@ -18,6 +17,7 @@ from hhplab.sources.hud.hud.opendata_arcgis import (
     _map_to_canonical_schema,
     ingest_hud_opendata,
 )
+from hhplab.storage.raw_snapshot import make_run_id
 
 # Sample polygon coordinates (kept short for readability)
 SAMPLE_COORDS_1 = [

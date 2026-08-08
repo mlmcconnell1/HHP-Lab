@@ -9,14 +9,14 @@ from pathlib import Path
 
 import pandas as pd
 
-from hhplab.paths import curated_dir, raw_root
-from hhplab.provenance import ProvenanceBlock, write_parquet_with_provenance
+from hhplab.registry.source_registry import register_source
 from hhplab.schema.columns import MEDSL_COUNTY_PRESIDENTIAL_OUTPUT_COLUMNS
-from hhplab.source_registry import register_source
-from hhplab.source_urls import (
+from hhplab.sources.urls import (
     MEDSL_COUNTY_PRESIDENTIAL_RETURNS_DATAVERSE_API,
     MEDSL_COUNTY_PRESIDENTIAL_RETURNS_DOI,
 )
+from hhplab.storage.paths import curated_dir, raw_root
+from hhplab.storage.provenance import ProvenanceBlock, write_parquet_with_provenance
 
 logger = logging.getLogger(__name__)
 

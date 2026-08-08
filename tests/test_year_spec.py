@@ -2,7 +2,7 @@
 
 import pytest
 
-from hhplab.year_spec import parse_year_spec
+from hhplab.recipe.year_spec import parse_year_spec
 
 
 class TestParseYearSpec:

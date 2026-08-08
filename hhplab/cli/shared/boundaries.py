@@ -193,7 +193,7 @@ def delete_boundaries(
 ) -> None:
     """Delete a boundary vintage from the registry."""
     from hhplab.registry.boundary_registry import delete_vintage, list_boundaries
-    from hhplab.source_registry import delete_by_local_path
+    from hhplab.registry.source_registry import delete_by_local_path
 
     vintages = list_boundaries()
     matching = [v for v in vintages if v.boundary_vintage == vintage and v.source == source]
@@ -220,7 +220,7 @@ def delete_boundaries(
     if delete_vintage(vintage, source):
         typer.echo(f"Deleted registry entry for vintage '{vintage}' from source '{source}'")
         source_deleted = delete_by_local_path(str(entry.path))
-        from hhplab.source_registry import delete_by_curated_path
+        from hhplab.registry.source_registry import delete_by_curated_path
 
         source_deleted += delete_by_curated_path(str(entry.path))
         if source_deleted > 0:

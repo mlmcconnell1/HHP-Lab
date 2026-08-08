@@ -6,10 +6,10 @@ from pathlib import Path
 
 import pandas as pd
 
+from hhplab.artifacts.naming.naming import cdc_overdose_county_filename, cdc_overdose_msa_filename
 from hhplab.geographies.msa import DEFINITION_VERSION, read_msa_county_membership
-from hhplab.naming import cdc_overdose_county_filename, cdc_overdose_msa_filename
-from hhplab.paths import curated_dir
-from hhplab.provenance import ProvenanceBlock, write_parquet_with_provenance
+from hhplab.storage.paths import curated_dir
+from hhplab.storage.provenance import ProvenanceBlock, write_parquet_with_provenance
 
 DEFAULT_RAW_OVERDOSE_CSV = (
     Path("data")

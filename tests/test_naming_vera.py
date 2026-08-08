@@ -1,6 +1,9 @@
 """Tests for Vera naming helpers."""
 
-from hhplab.naming import vera_incarceration_county_filename, vera_incarceration_county_path
+from hhplab.artifacts.naming.naming import (
+    vera_incarceration_county_filename,
+    vera_incarceration_county_path,
+)
 
 
 def test_vera_incarceration_county_filename() -> None:
