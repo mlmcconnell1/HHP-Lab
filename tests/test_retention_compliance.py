@@ -24,7 +24,7 @@ INGEST_MODULES = [
     "hhplab/sources/census/census/ingest/tract_relationship.py",
     "hhplab/geographies/nhgis/ingest.py",
     "hhplab/sources/census/acs/ingest/tract_population.py",
-    "hhplab/rents/weights.py",
+    "hhplab/sources/zori/weights.py",
 ]
 
 # API ingest modules must use year+variant (not legacy snapshot_id)
@@ -32,7 +32,7 @@ API_INGEST_MODULES = [
     "hhplab/sources/hud/hud/opendata_arcgis.py",
     "hhplab/sources/hud/hud/exchange_gis.py",
     "hhplab/sources/census/acs/ingest/tract_population.py",
-    "hhplab/rents/weights.py",
+    "hhplab/sources/zori/weights.py",
 ]
 
 # File ingest modules that use persist_file_snapshot with subdirs

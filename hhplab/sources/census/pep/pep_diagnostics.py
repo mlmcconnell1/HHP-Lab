@@ -1,7 +1,7 @@
 """Diagnostics and reporting for CoC-level PEP population data.
 
 Provides per-CoC diagnostic summaries for PEP aggregation results,
-analogous to ``hhplab.rents.zori_diagnostics`` for ZORI.
+analogous to ``hhplab.sources.zori.zori_diagnostics`` for ZORI.
 
 Diagnostics Output Schema
 -------------------------

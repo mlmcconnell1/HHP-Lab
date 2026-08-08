@@ -18,7 +18,7 @@ import pytest
 
 from hhplab.provenance import read_provenance
 from hhplab.schema.columns import VERA_INCARCERATION_COUNTY_MEASURE_COLUMNS
-from hhplab.vera.ingest import (
+from hhplab.sources.vera.ingest import (
     VERA_REQUIRED_COLUMNS,
     ingest_county_incarceration_trends,
     parse_county_incarceration_trends,

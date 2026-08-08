@@ -5,7 +5,7 @@ canonical long-format schema for downstream aggregation.
 
 Usage
 -----
-    from hhplab.rents.ingest import ingest_zori
+    from hhplab.sources.zori.ingest import ingest_zori
 
     # Ingest county-level ZORI data
     path = ingest_zori(geography="county")

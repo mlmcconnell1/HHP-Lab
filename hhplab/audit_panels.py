@@ -152,7 +152,7 @@ def _metro_io_module() -> Any:
 
 @lru_cache(maxsize=1)
 def _rents_module() -> Any:
-    return import_module("hhplab.rents")
+    return import_module("hhplab.sources.zori")
 
 
 def aggregate_acs_to_metro(*args: Any, **kwargs: Any) -> Any:

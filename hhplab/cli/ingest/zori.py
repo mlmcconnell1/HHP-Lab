@@ -113,7 +113,7 @@ def ingest_zori(
         raise typer.Exit(2)
 
     from hhplab.naming import discover_zori_ingest
-    from hhplab.rents.ingest import ingest_zori as do_ingest
+    from hhplab.sources.zori.ingest import ingest_zori as do_ingest
 
     # Check for existing output via discovery
     existing = discover_zori_ingest(geography, output_dir)
@@ -288,10 +288,10 @@ def aggregate_zori(
         )
         raise typer.Exit(2)
 
-    from hhplab.rents.zori_aggregate import (
+    from hhplab.sources.zori.zori_aggregate import (
         aggregate_zori_to_coc as do_aggregate,
     )
-    from hhplab.rents.zori_aggregate import (
+    from hhplab.sources.zori.zori_aggregate import (
         get_coc_zori_path,
     )
 
@@ -328,7 +328,7 @@ def aggregate_zori(
         typer.echo(f"Successfully wrote CoC ZORI data to: {result_path}")
 
         if to_yearly:
-            from hhplab.rents.zori_aggregate import get_coc_zori_yearly_path
+            from hhplab.sources.zori.zori_aggregate import get_coc_zori_yearly_path
 
             yearly_path = get_coc_zori_yearly_path(
                 geography, boundary, counties, acs, weighting, yearly_method, output_dir
@@ -409,7 +409,7 @@ def zori_diagnostics(
     typer.echo(f"Loading CoC ZORI data from: {coc_zori}")
 
     try:
-        from hhplab.rents.zori_diagnostics import summarize_coc_zori
+        from hhplab.sources.zori.zori_diagnostics import summarize_coc_zori
 
         summary_text, diag_df = summarize_coc_zori(
             coc_zori,

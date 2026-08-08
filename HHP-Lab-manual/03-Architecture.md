@@ -46,7 +46,7 @@ flowchart TB
 - `hhplab/recipe/`: schema, adapters, planner, executor, small-area-estimation steps, recipe manifests
 - `hhplab/builds.py`: build directory and manifest helpers
 - `hhplab/xwalks/`: tract/county crosswalk generation (geography-neutral via `geo_id_col` parameter)
-- `hhplab/measures/`, `hhplab/rents/`, `hhplab/sources/census/pep/`, `hhplab/sources/hud/pit/`: dataset-specific ingestion and aggregation (generalized to arbitrary target geographies)
+- `hhplab/measures/`, `hhplab/sources/zori/`, `hhplab/sources/census/pep/`, `hhplab/sources/hud/pit/`: dataset-specific ingestion and aggregation (generalized to arbitrary target geographies)
 - `hhplab/geographies/gf_metro/`: metro definition data, PIT/ACS/PEP/ZORI aggregation to metro, validation, I/O
 - `hhplab/sources/census/acs/ingest/metro_acs1.py` and `hhplab/sources/census/acs/ingest/county_acs1.py`: ACS 1-year detailed-table ingestion for metro- and county-native measures
 - `hhplab/sources/census/acs/sae.py`: ACS1-controlled ACS5-share imputation and small-area-estimation helpers for modeled tract and CoC measures

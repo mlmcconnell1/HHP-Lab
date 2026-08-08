@@ -13,12 +13,6 @@ from hhplab.covariates.ingest import (
     default_covariate_output_path,
     default_covariate_pair_output_path,
 )
-from hhplab.covariates.saiz_contract import SAIZ_ESTIMATE_YEAR, SAIZ_SOURCE_ID
-from hhplab.covariates.temperature import (
-    EMERGENCY_SHELTER_ACTIVATION_C,
-    FREEZING_C,
-    derive_prism_temperature_basis,
-)
 from hhplab.geographies.coc.ct_planning_regions import (
     CT_LEGACY_COUNTY_VINTAGE,
     CT_PLANNING_REGION_VINTAGE,
@@ -50,6 +44,12 @@ from hhplab.sources.irs.irs_soi_contract import (
     IRS_SOI_SOURCE_ID,
 )
 from hhplab.sources.mpi.mpi_contract import MPI_ESTIMATE_YEAR, MPI_SOURCE_ID
+from hhplab.sources.prism.temperature import (
+    EMERGENCY_SHELTER_ACTIVATION_C,
+    FREEZING_C,
+    derive_prism_temperature_basis,
+)
+from hhplab.sources.saiz.saiz_contract import SAIZ_ESTIMATE_YEAR, SAIZ_SOURCE_ID
 
 __all__ = [
     "EMERGENCY_SHELTER_ACTIVATION_C",

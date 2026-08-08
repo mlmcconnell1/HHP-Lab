@@ -12,7 +12,7 @@ import pandas as pd
 import pytest
 
 from hhplab.provenance import read_provenance
-from hhplab.rents.weights import (
+from hhplab.sources.zori.weights import (
     ACS_WEIGHT_VARS,
     build_county_weights,
     fetch_county_acs_totals,
@@ -22,7 +22,7 @@ from hhplab.rents.weights import (
     normalize_county_fips,
     parse_acs_vintage,
 )
-from hhplab.rents.zori_aggregate import compute_geo_county_weights
+from hhplab.sources.zori.zori_aggregate import compute_geo_county_weights
 
 
 def make_census_county_response(
@@ -641,7 +641,7 @@ class TestComputeGeoCountyWeightsMissingACS:
             ]
         )
 
-        with caplog.at_level(logging.WARNING, logger="hhplab.rents.zori_aggregate"):
+        with caplog.at_level(logging.WARNING, logger="hhplab.sources.zori.zori_aggregate"):
             result = compute_geo_county_weights(xwalk, weights)
 
         # Only the county with a weight should survive

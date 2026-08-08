@@ -11,7 +11,7 @@ import pandas as pd
 
 @lru_cache(maxsize=1)
 def _impl() -> ModuleType:
-    return import_module("hhplab.rents.zori_metro")
+    return import_module("hhplab.sources.zori.zori_metro")
 
 
 def aggregate_zori_to_metro(
@@ -22,7 +22,7 @@ def aggregate_zori_to_metro(
     min_coverage: float = 0.90,
     county_membership_df: pd.DataFrame | None = None,
 ) -> pd.DataFrame:
-    """Delegate to ``hhplab.rents.zori_metro.aggregate_zori_to_metro``."""
+    """Delegate to ``hhplab.sources.zori.zori_metro.aggregate_zori_to_metro``."""
     return _impl().aggregate_zori_to_metro(
         zori_df,
         weights_df,
@@ -36,7 +36,7 @@ def collapse_zori_to_yearly(
     monthly_df: pd.DataFrame,
     method: str = "pit_january",
 ) -> pd.DataFrame:
-    """Delegate to ``hhplab.rents.zori_metro.collapse_zori_to_yearly``."""
+    """Delegate to ``hhplab.sources.zori.zori_metro.collapse_zori_to_yearly``."""
     return _impl().collapse_zori_to_yearly(monthly_df, method)
 
 
@@ -46,7 +46,7 @@ def aggregate_yearly_zori_to_metro(
     *,
     county_membership_df: pd.DataFrame | None = None,
 ) -> pd.DataFrame:
-    """Delegate to ``hhplab.rents.zori_metro.aggregate_yearly_zori_to_metro``."""
+    """Delegate to ``hhplab.sources.zori.zori_metro.aggregate_yearly_zori_to_metro``."""
     return _impl().aggregate_yearly_zori_to_metro(
         zori_yearly,
         county_population,
@@ -59,7 +59,7 @@ def aggregate_yearly_zori_to_msa(
     county_population: pd.DataFrame,
     **kwargs: object,
 ) -> pd.DataFrame:
-    """Delegate to ``hhplab.rents.zori_metro.aggregate_yearly_zori_to_msa``."""
+    """Delegate to ``hhplab.sources.zori.zori_metro.aggregate_yearly_zori_to_msa``."""
     return _impl().aggregate_yearly_zori_to_msa(
         zori_yearly,
         county_population,

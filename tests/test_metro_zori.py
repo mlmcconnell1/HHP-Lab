@@ -12,14 +12,14 @@ from hhplab.geographies.gf_metro.metro_definitions import (
     METRO_COUNTY_MEMBERSHIP,
     build_county_membership_df,
 )
-from hhplab.rents import (
+from hhplab.schema import MSA_ZORI_YEARLY_COLUMNS
+from hhplab.sources.zori import (
     aggregate_yearly_zori_to_metro,
     aggregate_yearly_zori_to_msa,
     aggregate_zori_to_metro,
     collapse_zori_to_yearly,
     to_msa_zori_yearly_artifact,
 )
-from hhplab.schema import MSA_ZORI_YEARLY_COLUMNS
 
 # ---------------------------------------------------------------------------
 # Fixtures

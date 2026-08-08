@@ -10,7 +10,7 @@ import logging
 import pandas as pd
 
 from hhplab.geographies.coc.ct_planning_regions import CT_STATE_FIPS, CtPlanningRegionCrosswalk
-from hhplab.rents.zori_aggregate import _align_ct_geographies
+from hhplab.sources.zori.zori_aggregate import _align_ct_geographies
 
 
 def _synthetic_crosswalk() -> CtPlanningRegionCrosswalk:
@@ -38,7 +38,7 @@ def _synthetic_crosswalk() -> CtPlanningRegionCrosswalk:
 def _patch_build_crosswalk(monkeypatch):
     """Patch build_ct_county_planning_region_crosswalk to return the synthetic crosswalk."""
     monkeypatch.setattr(
-        "hhplab.rents.zori_aggregate.build_ct_county_planning_region_crosswalk",
+        "hhplab.sources.zori.zori_aggregate.build_ct_county_planning_region_crosswalk",
         lambda **kwargs: _synthetic_crosswalk(),
     )
 
@@ -145,7 +145,7 @@ class TestAlignCtGeographies:
             raise FileNotFoundError("geometry file missing")
 
         monkeypatch.setattr(
-            "hhplab.rents.zori_aggregate.build_ct_county_planning_region_crosswalk",
+            "hhplab.sources.zori.zori_aggregate.build_ct_county_planning_region_crosswalk",
             _raise,
         )
 
@@ -170,7 +170,7 @@ class TestAlignCtGeographies:
             }
         )
 
-        with caplog.at_level(logging.WARNING, logger="hhplab.rents.zori_aggregate"):
+        with caplog.at_level(logging.WARNING, logger="hhplab.sources.zori.zori_aggregate"):
             result_zori, result_weights = _align_ct_geographies(
                 zori_df, xwalk_df, weights_df, county_vintage=2023
             )
@@ -190,7 +190,7 @@ class TestAlignCtGeographies:
             raise ValueError("empty geometries")
 
         monkeypatch.setattr(
-            "hhplab.rents.zori_aggregate.build_ct_county_planning_region_crosswalk",
+            "hhplab.sources.zori.zori_aggregate.build_ct_county_planning_region_crosswalk",
             _raise,
         )
 
@@ -215,7 +215,7 @@ class TestAlignCtGeographies:
             }
         )
 
-        with caplog.at_level(logging.WARNING, logger="hhplab.rents.zori_aggregate"):
+        with caplog.at_level(logging.WARNING, logger="hhplab.sources.zori.zori_aggregate"):
             result_zori, result_weights = _align_ct_geographies(
                 zori_df, xwalk_df, weights_df, county_vintage=2020
             )

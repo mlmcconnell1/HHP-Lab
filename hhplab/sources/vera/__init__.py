@@ -1,6 +1,6 @@
 """Vera Institute source support."""
 
-from hhplab.vera.ingest import (
+from hhplab.sources.vera.ingest import (
     VERA_COUNTY_FIRST_YEAR,
     VERA_COUNTY_JAIL_LAST_YEAR,
     VERA_COUNTY_PRISON_LAST_YEAR,

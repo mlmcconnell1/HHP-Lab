@@ -8,7 +8,7 @@ import typer
 
 from hhplab.cli.shared.output import JsonOutput, cli_error, emit_result
 from hhplab.paths import curated_dir
-from hhplab.vera.ingest import ingest_county_incarceration_trends
+from hhplab.sources.vera.ingest import ingest_county_incarceration_trends
 
 
 def ingest_vera_incarceration(

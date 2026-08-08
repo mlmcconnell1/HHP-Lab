@@ -20,7 +20,6 @@ from hhplab.recipe.recipe_schema import (
     PanelPolicy,
 )
 from hhplab.recipe.schema_common import GeometryRef
-from hhplab.rents.ingest import ZORI_INGEST_OUTPUT_COLUMNS as ZORI_INGEST_COLUMNS
 from hhplab.schema import (
     ACS1_IMPUTATION_MEASURE_SPECS,
     ACS1_IMPUTATION_OUTPUT_COLUMNS,
@@ -94,6 +93,7 @@ from hhplab.sources.census.acs.variables_acs1 import (
 from hhplab.sources.census.pep.ingest import PEP_COUNTY_OUTPUT_COLUMNS as PEP_INGEST_COLUMNS
 from hhplab.sources.hud.hic.parser import CANONICAL_COLUMNS as HIC_PARSER_COLUMNS
 from hhplab.sources.hud.pit.ingest.parser import CANONICAL_COLUMNS as PIT_PARSER_COLUMNS
+from hhplab.sources.zori.ingest import ZORI_INGEST_OUTPUT_COLUMNS as ZORI_INGEST_COLUMNS
 from hhplab.xwalks.tract_mediated import (
     DENOMINATOR_COLUMNS as XWALK_DENOMINATOR_COLUMNS,
 )

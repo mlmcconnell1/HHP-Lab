@@ -3,7 +3,7 @@
 Source-specific metro aggregations live under their owning source packages
 (``hhplab.sources.census.acs``, ``hhplab.sources.census.pep``,
 ``hhplab.sources.hud.pit``,
-``hhplab.rents``). This
+``hhplab.sources.zori``). This
 package is limited to shared geography artifacts and validation helpers.
 """
 

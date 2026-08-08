@@ -9,7 +9,7 @@ import pandas as pd
 import typer
 
 from hhplab.cli.shared.output import JsonOutput, cli_error, emit_result
-from hhplab.prism import materialize_prism_monthly_counties
+from hhplab.sources.prism import materialize_prism_monthly_counties
 
 
 def build_prism_county(

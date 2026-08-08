@@ -22,7 +22,7 @@ Diagnostics Output Schema (per spec section 4.3):
 
 Usage
 -----
-    from hhplab.rents.zori_diagnostics import summarize_coc_zori
+    from hhplab.sources.zori.zori_diagnostics import summarize_coc_zori
 
     # Generate diagnostics from a DataFrame or file path
     text_summary, diagnostics_df = summarize_coc_zori(
@@ -351,7 +351,7 @@ def summarize_coc_zori(
 
     Examples
     --------
-    >>> from hhplab.rents.zori_diagnostics import summarize_coc_zori
+    >>> from hhplab.sources.zori.zori_diagnostics import summarize_coc_zori
     >>> path = "data/curated/zori/coc_zori__county__b2025.parquet"
     >>> text, df = summarize_coc_zori(path)
     >>> print(text)

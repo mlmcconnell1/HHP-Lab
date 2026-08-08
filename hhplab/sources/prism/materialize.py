@@ -17,13 +17,13 @@ from shapely.geometry import mapping
 
 from hhplab.naming import county_path, prism_county_monthly_path
 from hhplab.paths import asset_store_root, raw_root
-from hhplab.prism.ingest import (
+from hhplab.provenance import ProvenanceBlock, write_parquet_with_provenance
+from hhplab.raw_snapshot import hash_zip_contents
+from hhplab.sources.prism.ingest import (
     default_prism_monthly_filename,
     get_prism_monthly_source_url,
     validate_prism_monthly_request,
 )
-from hhplab.provenance import ProvenanceBlock, write_parquet_with_provenance
-from hhplab.raw_snapshot import hash_zip_contents
 
 PRISM_COUNTY_MONTHLY_BASE_COLUMNS: list[str] = [
     "geo_type",

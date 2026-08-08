@@ -50,9 +50,9 @@ This chapter is an orientation map of active modules in the current codebase.
 - `hhplab/sources/census/acs/`: ACS ingest, translation, source-owned aggregation, ACS1 imputation, and SAE support (including `ingest/metro_acs1.py` and `ingest/county_acs1.py` for ACS 1-year native data, `variables_acs1.py` for ACS1 detailed-table definitions, and `sae.py` for allocation, diagnostics, and provenance helpers)
 - `hhplab/sources/hud/pit/`: PIT ingest, registry, QA
 - `hhplab/sources/census/pep/`: PEP ingest, aggregation, and diagnostics
-- `hhplab/prism/`: PRISM monthly temperature download and county raster materialization helpers
+- `hhplab/sources/prism/`: PRISM monthly temperature download and county raster materialization helpers
 - `hhplab/sources/medsl/medsl/`: MEDSL county presidential returns parsing, ingest, and county-year political measure materialization
-- `hhplab/rents/`: ZORI ingest, weighting, aggregation, diagnostics
+- `hhplab/sources/zori/`: ZORI ingest, weighting, aggregation, diagnostics
 - `hhplab/panel/`: panel diagnostics and assembly internals
 - `hhplab/geographies/gf_metro/`: metro analysis geography module
   - `hhplab/geographies/gf_metro/metro_definitions.py`: canonical metro-universe definitions plus the Glynn/Fox subset profile

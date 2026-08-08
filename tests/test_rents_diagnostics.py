@@ -14,7 +14,7 @@ import pandas as pd
 import pytest
 
 from hhplab.coverage_diagnostics import coverage_group_summary
-from hhplab.rents.zori_diagnostics import (
+from hhplab.sources.zori.zori_diagnostics import (
     compute_coc_diagnostics,
     generate_text_summary,
     identify_problem_cocs,

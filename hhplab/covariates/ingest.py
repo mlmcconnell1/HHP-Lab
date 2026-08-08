@@ -12,13 +12,6 @@ import pandas as pd
 
 from hhplab.covariates.catalog import CovariateSourceSpec, covariate_source_spec
 from hhplab.covariates.frame_adapters import covariate_frame_adapter
-from hhplab.covariates.saiz_contract import (
-    SAIZ_ESTIMATE_YEAR,
-    SAIZ_MATCH_DIAGNOSTIC_COLUMNS,
-    SAIZ_SOURCE_ID,
-    validate_saiz_source_contract,
-    validate_saiz_source_path,
-)
 from hhplab.geographies.gf_metro.metro_definitions import STATE_ABBREV_TO_FIPS
 from hhplab.geographies.msa import DEFINITION_VERSION as DEFAULT_MSA_DEFINITION_VERSION
 from hhplab.geographies.msa.msa_io import read_msa_definitions
@@ -75,6 +68,13 @@ from hhplab.sources.mpi.mpi_contract import (
     MPI_SOURCE_CITATION,
     MPI_SOURCE_ID,
     validate_mpi_workbook_contract,
+)
+from hhplab.sources.saiz.saiz_contract import (
+    SAIZ_ESTIMATE_YEAR,
+    SAIZ_MATCH_DIAGNOSTIC_COLUMNS,
+    SAIZ_SOURCE_ID,
+    validate_saiz_source_contract,
+    validate_saiz_source_path,
 )
 
 COMMON_COLUMN_ALIASES: dict[str, tuple[str, ...]] = {

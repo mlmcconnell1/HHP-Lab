@@ -11,7 +11,7 @@ Supported weighting methods:
 
 Usage
 -----
-    from hhplab.rents.weights import build_county_weights
+    from hhplab.sources.zori.weights import build_county_weights
 
     # Build county weights using renter households
     weights_df = build_county_weights(

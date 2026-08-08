@@ -5,16 +5,6 @@ from __future__ import annotations
 from dataclasses import asdict, dataclass
 from typing import Literal
 
-from hhplab.covariates.saiz_contract import (
-    SAIZ_ESTIMATE_YEAR,
-    SAIZ_MEASURE_COLUMNS,
-    SAIZ_PRODUCT,
-    SAIZ_PROVIDER,
-    SAIZ_REQUIRED_CURATED_COLUMNS,
-    SAIZ_SOURCE_ID,
-    SAIZ_SOURCE_PAGE,
-    SAIZ_SOURCE_URL,
-)
 from hhplab.sources.bls.qcew.contract import (
     QCEW_FIRST_YEAR,
     QCEW_MEASURE_COLUMNS,
@@ -60,7 +50,17 @@ from hhplab.sources.mpi.mpi_contract import (
     MPI_SOURCE_PAGE,
     MPI_SOURCE_URL,
 )
-from hhplab.vera.incarceration_contract import (
+from hhplab.sources.saiz.saiz_contract import (
+    SAIZ_ESTIMATE_YEAR,
+    SAIZ_MEASURE_COLUMNS,
+    SAIZ_PRODUCT,
+    SAIZ_PROVIDER,
+    SAIZ_REQUIRED_CURATED_COLUMNS,
+    SAIZ_SOURCE_ID,
+    SAIZ_SOURCE_PAGE,
+    SAIZ_SOURCE_URL,
+)
+from hhplab.sources.vera.incarceration_contract import (
     VERA_JAIL_MEASURE_COLUMNS,
     VERA_JAIL_PRODUCT,
     VERA_JAIL_RELIABLE_FIRST_YEAR,

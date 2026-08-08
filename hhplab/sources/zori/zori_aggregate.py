@@ -41,7 +41,7 @@ Output Schema (per spec section 4.2):
 
 Usage
 -----
-    from hhplab.rents.zori_aggregate import aggregate_zori_to_coc
+    from hhplab.sources.zori.zori_aggregate import aggregate_zori_to_coc
 
     # Aggregate ZORI to CoC
     output_path = aggregate_zori_to_coc(
@@ -52,7 +52,7 @@ Usage
     )
 
     # Or use the lower-level function
-    from hhplab.rents.zori_aggregate import aggregate_monthly
+    from hhplab.sources.zori.zori_aggregate import aggregate_monthly
     coc_zori_df = aggregate_monthly(zori_df, xwalk_df, weights_df, min_coverage=0.90)
 """
 
@@ -81,8 +81,8 @@ from hhplab.provenance import (
     read_provenance,
     write_parquet_with_provenance,
 )
-from hhplab.rents.ingest import ZILLOW_ATTRIBUTION
-from hhplab.rents.weights import (
+from hhplab.sources.zori.ingest import ZILLOW_ATTRIBUTION
+from hhplab.sources.zori.weights import (
     WeightingMethod,
     build_county_weights,
     get_county_weights_path,

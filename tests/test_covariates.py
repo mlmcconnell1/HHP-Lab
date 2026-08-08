@@ -20,13 +20,6 @@ from hhplab.covariates.aggregate import (
 from hhplab.covariates.catalog import COVARIATE_SOURCE_SPECS
 from hhplab.covariates.frame_adapters import registered_covariate_frame_adapters
 from hhplab.covariates.ingest import ingest_covariate_source
-from hhplab.covariates.saiz_contract import (
-    SAIZ_ESTIMATE_YEAR,
-    SAIZ_MEASURE_COLUMNS,
-    SAIZ_REQUIRED_RAW_COLUMNS,
-    SAIZ_SOURCE_ID,
-    validate_saiz_source_contract,
-)
 from hhplab.curated_policy import validate_curated_layout
 from hhplab.geographies.coc.ct_planning_regions import CtPlanningRegionCrosswalk
 from hhplab.provenance import ProvenanceBlock, read_provenance, write_parquet_with_provenance
@@ -68,7 +61,14 @@ from hhplab.sources.mpi.mpi_contract import (
     MPI_WORKBOOK_GLOB,
     validate_mpi_workbook_contract,
 )
-from hhplab.vera.incarceration_contract import (
+from hhplab.sources.saiz.saiz_contract import (
+    SAIZ_ESTIMATE_YEAR,
+    SAIZ_MEASURE_COLUMNS,
+    SAIZ_REQUIRED_RAW_COLUMNS,
+    SAIZ_SOURCE_ID,
+    validate_saiz_source_contract,
+)
+from hhplab.sources.vera.incarceration_contract import (
     VERA_JAIL_MEASURE_COLUMNS,
     VERA_JAIL_RELIABLE_FIRST_YEAR,
     VERA_JAIL_RELIABLE_LAST_YEAR,

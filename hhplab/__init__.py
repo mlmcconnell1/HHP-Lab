@@ -41,6 +41,7 @@ _LAZY_EXPORTS = frozenset(
         "paths",
         "pep",
         "pit",
+        "prism",
         "provenance",
         "raw_snapshot",
         "recipe",
@@ -52,6 +53,7 @@ _LAZY_EXPORTS = frozenset(
         "viz",
         "xwalks",
         "year_spec",
+        "zori",
     }
 )
 
@@ -71,6 +73,10 @@ _LAZY_MODULES = {
     "nhgis": "hhplab.geographies.nhgis",
     "pep": "hhplab.sources.census.pep",
     "pit": "hhplab.sources.hud.pit",
+    "prism": "hhplab.sources.prism",
+    "rents": "hhplab.sources.zori",
+    "vera": "hhplab.sources.vera",
+    "zori": "hhplab.sources.zori",
 }
 
 __all__ = sorted(_LAZY_EXPORTS | {"__version__"})

@@ -12,7 +12,7 @@ from dataclasses import dataclass
 
 import pandas as pd
 
-from hhplab.covariates.temperature import derive_prism_temperature_basis
+from hhplab.sources.prism.temperature import derive_prism_temperature_basis
 
 FrameTransform = Callable[[pd.DataFrame], pd.DataFrame]
 

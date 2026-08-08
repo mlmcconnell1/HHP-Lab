@@ -36,7 +36,7 @@ Full operational documentation lives in [HHP-Lab-manual/HHP-Lab-Manual.md](HHP-L
 
 Source-owned aggregation code lives with its provider package, such as
 `hhplab.sources.census.acs`, `hhplab.sources.census.pep`, `hhplab.sources.hud.pit`, and
-`hhplab.rents`. The
+`hhplab.sources.zori`. The
 `hhplab.measures` package is intentionally narrower: it is a compatibility
 facade for legacy ACS measure imports plus the home for reusable
 crosswalk/measure attribution diagnostics used by CLI commands and tests. New

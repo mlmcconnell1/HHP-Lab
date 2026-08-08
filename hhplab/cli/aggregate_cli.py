@@ -1839,12 +1839,12 @@ def aggregate_zori(
         try:
             from hhplab.naming import msa_county_membership_path, msa_zori_yearly_filename
             from hhplab.provenance import ProvenanceBlock, write_parquet_with_provenance
-            from hhplab.rents.zori_aggregate import load_zori
-            from hhplab.rents.zori_metro import (
+            from hhplab.sources.census.pep.pep_aggregate import load_pep_county
+            from hhplab.sources.zori.zori_aggregate import load_zori
+            from hhplab.sources.zori.zori_metro import (
                 aggregate_yearly_zori_to_msa,
                 to_msa_zori_yearly_artifact,
             )
-            from hhplab.sources.census.pep.pep_aggregate import load_pep_county
 
             membership_path = msa_county_membership_path(msa_definition_version)
             if not membership_path.exists():
@@ -1955,7 +1955,7 @@ def aggregate_zori(
 
     typer.echo(f"Aggregating ZORI to CoC (curated output, align '{align}')...")
 
-    from hhplab.rents.zori_aggregate import aggregate_zori_to_coc
+    from hhplab.sources.zori.zori_aggregate import aggregate_zori_to_coc
 
     all_outputs: list[str] = []
     materialized: list[int] = []

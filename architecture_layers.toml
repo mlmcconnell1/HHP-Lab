@@ -21,9 +21,10 @@ order = ["contracts", "infrastructure", "domain", "application", "interface"]
 "hhplab.sources.medsl" = "domain"
 "hhplab.sources.hud" = "domain"
 "hhplab.sources.irs" = "domain"
-"hhplab.prism" = "domain"
-"hhplab.rents" = "domain"
-"hhplab.vera" = "domain"
+"hhplab.sources.prism" = "domain"
+"hhplab.sources.saiz" = "domain"
+"hhplab.sources.zori" = "domain"
+"hhplab.sources.vera" = "domain"
 "hhplab.xwalks" = "domain"
 
 "hhplab.registry" = "infrastructure"
@@ -60,7 +61,7 @@ order = ["contracts", "infrastructure", "domain", "application", "interface"]
 # to make the quality gate pass.
 upward_edges = [
   "hhplab.sources.census.pep.pep_diagnostics -> hhplab.coverage_diagnostics",
-  "hhplab.rents.zori_diagnostics -> hhplab.coverage_diagnostics",
+  "hhplab.sources.zori.zori_diagnostics -> hhplab.coverage_diagnostics",
 ]
 
 [contracts.high_fan_in_modules]

@@ -25,7 +25,7 @@ def test_package_root_lazy_exports() -> None:
     assert hhplab.sources.medsl.medsl is medsl
     assert hhplab.geographies.nhgis is nhgis
     assert hhplab.pit is pit
-    assert hhplab.vera is vera
+    assert hhplab.sources.vera is vera
 
 
 def test_census_root_reexports_ingest_helpers() -> None:

@@ -25,7 +25,7 @@ from hhplab.geographies.gf_metro.metro_definitions import (
     build_county_membership_df,
 )
 from hhplab.geographies.msa.msa_io import read_msa_county_membership
-from hhplab.rents.zori_aggregate import (
+from hhplab.sources.zori.zori_aggregate import (
     YearlyMethod,
     aggregate_monthly,
     collapse_to_yearly,
@@ -117,7 +117,7 @@ def collapse_zori_to_yearly(
 ) -> pd.DataFrame:
     """Collapse monthly metro ZORI to yearly values.
 
-    Thin wrapper around :func:`hhplab.rents.zori_aggregate.collapse_to_yearly`
+    Thin wrapper around :func:`hhplab.sources.zori.zori_aggregate.collapse_to_yearly`
     with ``geo_id_col="metro_id"``.
 
     Parameters
