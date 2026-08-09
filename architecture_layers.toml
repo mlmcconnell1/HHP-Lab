@@ -86,7 +86,17 @@ upward_edges = [
 # Exact internal dependencies make ownership changes reviewable. High fan-in is
 # expected here; new responsibilities and dependencies are not.
 "hhplab.storage.paths" = ["hhplab.storage.config"]
-"hhplab.artifacts.naming.naming" = ["hhplab.artifacts.naming.covariates", "hhplab.storage.paths"]
+"hhplab.artifacts.naming.naming" = [
+  "hhplab.artifacts.naming.analysis",
+  "hhplab.artifacts.naming.covariates",
+  "hhplab.artifacts.naming.crosswalks",
+  "hhplab.artifacts.naming.definitions",
+  "hhplab.artifacts.naming.geography",
+  "hhplab.artifacts.naming.panels",
+  "hhplab.artifacts.naming.rents",
+  "hhplab.artifacts.naming.shared",
+  "hhplab.artifacts.naming.sources",
+]
 "hhplab.artifacts.naming.covariates" = []
 "hhplab.schema.columns" = []
 "hhplab.geographies.gf_metro.metro_definitions" = ["hhplab.geographies.msa.msa_definitions"]

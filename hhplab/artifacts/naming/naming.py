@@ -1,2297 +1,292 @@
-"""Centralized filename generation using temporal shorthand notation.
+"""Stable compatibility facade for canonical artifact naming.
 
-This module provides canonical filename generation for all HHP-Lab datasets.
-All filenames follow the pattern: {dataset}__{temporal-notation}.parquet
-
-Temporal notation uses single-letter prefixes:
-- B{year}: CoC boundary version (e.g., B2025)
-- T{year}: Census tract geometry (e.g., T2023)
-- C{year}: Census county geometry (e.g., C2023)
-- K{year}: Census block geometry (e.g., K2020)
-- U{year}: Census Urban Area vintage (e.g., U2020)
-- A{year}: ACS vintage end year (e.g., A2023)
-- N{year}: Decennial census denominator vintage (e.g., N2020)
-- P{year}: PIT count year (e.g., P2024)
-- H{year}: HIC inventory year (e.g., H2024)
-- Y{year}: Panel year (e.g., Y2023)
-- D{version}: Synthetic geography definition version (e.g., Dglynnfoxv1)
-
-Compound notation:
-- @ means "analyzed using" (e.g., A2023@B2025 = ACS 2023 on 2025 boundaries)
-- x means crosswalk join (e.g., B2025xT2023 = boundaries crossed with tracts)
-
-Geography-scoped naming:
-- Metro outputs include a ``metro`` geography segment to avoid collision
-  with CoC outputs. Example: ``measures__metro__A2023@Dglynnfoxv1xT2020.parquet``
-- CoC outputs retain their existing names for backward compatibility.
-
-See background/temporal-terminology.md for full specification.
+Naming implementations are organized by artifact family; this module keeps
+all historical imports from `hhplab.artifacts.naming.naming` working.
 """
 
-import re
-from pathlib import Path
+from __future__ import annotations
 
-from hhplab.artifacts.naming.covariates import (
-    covariate_curated_filename,  # noqa: F401 (public compatibility re-export)
-    covariate_pair_filename,  # noqa: F401 (public compatibility re-export)
-    covariate_panel_filename,  # noqa: F401 (public compatibility re-export)
+# Explicit imports preserve the complete historical surface, including private
+# token helpers used by older downstream code.
+# ruff: noqa: F401
+from .analysis import (
+    analysis_manifest_filename,
+    analysis_manifest_path,
+    analysis_output_filename,
+    analysis_output_path,
+)
+from .covariates import (
+    covariate_curated_filename,
+    covariate_pair_filename,
+    covariate_panel_filename,
+)
+from .crosswalks import (
+    _containment_geometry_token,
+    _overlap_basis_token,
+    _slug_output_id,
+    _tract_mediated_denominator_token,
+    coc_urban_area_detail_filename,
+    coc_urban_area_detail_path,
+    coc_urban_fraction_filename,
+    coc_urban_fraction_path,
+    containment_filename,
+    county_weights_filename,
+    county_weights_path,
+    county_xwalk_filename,
+    county_xwalk_path,
+    msa_coc_block_population_xwalk_filename,
+    msa_coc_block_population_xwalk_path,
+    msa_coc_coverage_filename,
+    msa_coc_coverage_path,
+    msa_coc_xwalk_filename,
+    msa_coc_xwalk_path,
+    msa_fractional_rollup_filename,
+    msa_fractional_rollup_path,
+    tract_mediated_county_xwalk_filename,
+    tract_mediated_county_xwalk_path,
+    tract_relationship_filename,
+    tract_xwalk_filename,
+    tract_xwalk_path,
+)
+from .definitions import (
+    metro_boundaries_filename,
+    metro_boundaries_path,
+    metro_coc_membership_filename,
+    metro_coc_membership_path,
+    metro_county_membership_filename,
+    metro_county_membership_path,
+    metro_definitions_filename,
+    metro_definitions_path,
+    metro_subset_membership_filename,
+    metro_subset_membership_path,
+    metro_universe_filename,
+    metro_universe_path,
+    msa_boundaries_filename,
+    msa_boundaries_path,
+    msa_county_membership_filename,
+    msa_county_membership_path,
+    msa_definitions_filename,
+    msa_definitions_path,
+)
+from .geography import (
+    block_geometry_filename,
+    block_geometry_path,
+    boundary_filename,
+    boundary_path,
+    coc_base_filename,
+    coc_base_path,
+    county_filename,
+    county_path,
+    tract_filename,
+    tract_path,
+    urban_area_filename,
+    urban_area_path,
+)
+from .panels import (
+    county_panel_filename,
+    geo_map_filename,
+    geo_panel_filename,
+    measures_filename,
+    measures_path,
+    metro_measures_acs1_filename,
+    metro_measures_acs1_path,
+    metro_measures_filename,
+    metro_panel_filename,
+    msa_coc_panel_filename,
+    msa_measures_filename,
+    msa_panel_filename,
+    panel_filename,
+    panel_path,
+    recipe_transform_filename,
+    sanctuary_msa_panel_covariate_filename,
+    sanctuary_msa_panel_covariate_path,
+)
+from .rents import (
+    discover_zori_ingest,
+    metro_zori_filename,
+    msa_zori_yearly_filename,
+    zori_filename,
+    zori_ingest_filename,
+    zori_ingest_path,
+    zori_yearly_filename,
+)
+from .shared import (
+    _abbreviate_weighting,
+    _normalize_acs_vintage,
+    _normalize_definition_version,
+    expand_acs_vintage,
+)
+from .sources import (
+    acs1_county_filename,
+    acs1_county_path,
+    acs1_metro_filename,
+    acs1_metro_path,
+    acs1_poverty_tracts_filename,
+    acs1_poverty_tracts_path,
+    acs5_tracts_filename,
+    acs5_tracts_glob_pattern,
+    cdc_overdose_county_filename,
+    cdc_overdose_msa_filename,
+    coc_pep_filename,
+    coc_pit_filename,
+    cpi_u_filename,
+    cpi_u_path,
+    decennial_tracts_filename,
+    discover_pit_vintages,
+    hic_filename,
+    hic_path,
+    laus_metro_filename,
+    laus_metro_path,
+    medsl_president_county_filename,
+    medsl_president_county_path,
+    metro_pep_filename,
+    metro_pit_filename,
+    msa_pep_filename,
+    msa_pep_path,
+    msa_pit_filename,
+    pit_filename,
+    pit_path,
+    pit_vintage_filename,
+    pit_vintage_path,
+    pl_block_population_filename,
+    pl_block_population_path,
+    prism_county_monthly_filename,
+    prism_county_monthly_path,
+    sanctuary_msa_matches_filename,
+    sanctuary_msa_matches_path,
+    vera_incarceration_county_filename,
+    vera_incarceration_county_path,
 )
 
-# =============================================================================
-# Simple datasets (single vintage)
-# =============================================================================
-
-
-def boundary_filename(boundary_vintage: str) -> str:
-    """Generate filename for CoC boundary data.
-
-    Args:
-        boundary_vintage: Boundary vintage year (e.g., "2025")
-
-    Returns:
-        Filename like 'boundaries__B2025.parquet'
-    """
-    return f"boundaries__B{boundary_vintage}.parquet"
-
-
-def coc_base_filename(boundary_vintage: str) -> str:
-    """Generate filename for CoC base boundary data.
-
-    Args:
-        boundary_vintage: Boundary vintage year (e.g., "2025")
-
-    Returns:
-        Filename like 'coc__B2025.parquet'
-    """
-    return f"coc__B{boundary_vintage}.parquet"
-
-
-def tract_filename(tract_vintage: str | int) -> str:
-    """Generate filename for census tract geometry.
-
-    Args:
-        tract_vintage: TIGER tract vintage year (e.g., 2023 or "2023")
-
-    Returns:
-        Filename like 'tracts__T2023.parquet'
-    """
-    return f"tracts__T{tract_vintage}.parquet"
-
-
-def county_filename(county_vintage: str | int) -> str:
-    """Generate filename for census county geometry.
-
-    Args:
-        county_vintage: TIGER county vintage year (e.g., 2023 or "2023")
-
-    Returns:
-        Filename like 'counties__C2023.parquet'
-    """
-    return f"counties__C{county_vintage}.parquet"
-
-
-def prism_county_monthly_filename(
-    variable: str,
-    year: str | int,
-    month: str | int,
-    county_vintage: str | int,
-) -> str:
-    """Generate filename for curated PRISM county-month temperature artifacts."""
-    month_int = int(month)
-    return f"prism_county_monthly__{variable}__Y{year}M{month_int:02d}@C{county_vintage}.parquet"
-
-
-def medsl_president_county_filename(
-    start_year: str | int,
-    end_year: str | int,
-    county_vintage: str | int,
-) -> str:
-    """Generate filename for MEDSL county presidential leaning measures."""
-    return f"medsl_president_county__Y{start_year}-{end_year}@C{county_vintage}.parquet"
-
-
-def medsl_president_county_path(
-    start_year: str | int,
-    end_year: str | int,
-    county_vintage: str | int,
-    base_dir: Path | str | None = None,
-) -> Path:
-    """Get canonical path for MEDSL county presidential leaning measures."""
-    if base_dir is None:
-        base_dir = Path("data")
-    else:
-        base_dir = Path(base_dir)
-    return (
-        base_dir
-        / "curated"
-        / "medsl"
-        / medsl_president_county_filename(start_year, end_year, county_vintage)
-    )
-
-
-def vera_incarceration_county_filename(
-    start_year: str | int,
-    end_year: str | int,
-    county_vintage: str | int,
-) -> str:
-    """Generate filename for Vera county incarceration trends measures."""
-    return f"vera_incarceration_county__Y{start_year}-{end_year}@C{county_vintage}.parquet"
-
-
-def vera_incarceration_county_path(
-    start_year: str | int,
-    end_year: str | int,
-    county_vintage: str | int,
-    base_dir: Path | str | None = None,
-) -> Path:
-    """Get canonical path for Vera county incarceration trends measures."""
-    if base_dir is None:
-        base_dir = Path("data")
-    else:
-        base_dir = Path(base_dir)
-    return (
-        base_dir
-        / "curated"
-        / "vera"
-        / vera_incarceration_county_filename(start_year, end_year, county_vintage)
-    )
-
-
-def urban_area_filename(urban_area_vintage: str | int) -> str:
-    """Generate filename for Census Urban Area geometry.
-
-    Args:
-        urban_area_vintage: Urban Area vintage year (e.g., 2010 or 2020)
-
-    Returns:
-        Filename like ``urban_areas__U2020.parquet``
-    """
-    return f"urban_areas__U{urban_area_vintage}.parquet"
-
-
-def block_geometry_filename(block_vintage: str | int) -> str:
-    """Generate filename for Census tabulation block geometry.
-
-    Args:
-        block_vintage: Census block geometry vintage (e.g., 2020)
-
-    Returns:
-        Filename like ``blocks__K2020.parquet``
-    """
-    return f"blocks__K{block_vintage}.parquet"
-
-
-def pl_block_population_filename(
-    decennial_vintage: str | int,
-    block_vintage: str | int | None = None,
-) -> str:
-    """Generate filename for PL 94-171 block population denominators.
-
-    Args:
-        decennial_vintage: Decennial census vintage, currently 2010 or 2020.
-        block_vintage: Block geometry vintage. Defaults to the decennial vintage.
-
-    Returns:
-        Filename like ``pl_blocks__N2020xK2020.parquet``.
-    """
-    resolved_block_vintage = decennial_vintage if block_vintage is None else block_vintage
-    return f"pl_blocks__N{decennial_vintage}xK{resolved_block_vintage}.parquet"
-
-
-def pit_filename(pit_year: str | int) -> str:
-    """Generate filename for PIT count data.
-
-    Args:
-        pit_year: PIT count year (e.g., 2024 or "2024")
-
-    Returns:
-        Filename like 'pit__P2024.parquet'
-    """
-    return f"pit__P{pit_year}.parquet"
-
-
-def hic_filename(hic_year: str | int) -> str:
-    """Generate filename for HUD HIC count data.
-
-    Args:
-        hic_year: Housing Inventory Count year (e.g., 2024 or "2024")
-
-    Returns:
-        Filename like 'hic__H2024.parquet'
-    """
-    return f"hic__H{hic_year}.parquet"
-
-
-def coc_pit_filename(pit_year: str | int, boundary_vintage: str | int) -> str:
-    """Generate filename for PIT data aligned to a boundary vintage.
-
-    Args:
-        pit_year: PIT count year (e.g., 2024)
-        boundary_vintage: CoC boundary vintage (e.g., 2024)
-
-    Returns:
-        Filename like 'pit__P2024@B2024.parquet'
-    """
-    return f"pit__P{pit_year}@B{boundary_vintage}.parquet"
-
-
-def pit_vintage_filename(vintage: str | int) -> str:
-    """Generate filename for PIT vintage file (containing all years from one release).
-
-    Args:
-        vintage: PIT release vintage year (e.g., 2024)
-
-    Returns:
-        Filename like 'pit_vintage__P2024.parquet'
-    """
-    return f"pit_vintage__P{vintage}.parquet"
-
-
-def coc_urban_fraction_filename(
-    boundary_vintage: str | int,
-    urban_area_vintage: str | int,
-    block_vintage: str | int,
-    decennial_vintage: str | int,
-) -> str:
-    """Generate filename for CoC-level urban population fractions.
-
-    The ``U`` Urban Area token keeps this artifact distinct from ``B`` CoC
-    boundary files while the ``N`` and ``K`` tokens name the population and
-    block vintages used in the denominator.
-    """
-    return (
-        f"coc_urban_fraction__N{decennial_vintage}@B{boundary_vintage}"
-        f"xU{urban_area_vintage}xK{block_vintage}.parquet"
-    )
-
-
-def coc_urban_area_detail_filename(
-    boundary_vintage: str | int,
-    urban_area_vintage: str | int,
-    block_vintage: str | int,
-    decennial_vintage: str | int,
-) -> str:
-    """Generate filename for optional CoC-by-Urban-Area detail artifacts."""
-    return (
-        f"coc_urban_area_detail__N{decennial_vintage}@B{boundary_vintage}"
-        f"xU{urban_area_vintage}xK{block_vintage}.parquet"
-    )
-
-
-# =============================================================================
-# Crosswalks (join two geometry vintages)
-# =============================================================================
-
-
-def tract_xwalk_filename(boundary_vintage: str, tract_vintage: str | int) -> str:
-    """Generate filename for CoC-to-tract crosswalk.
-
-    Args:
-        boundary_vintage: CoC boundary vintage (e.g., "2025")
-        tract_vintage: Tract geometry vintage (e.g., 2023)
-
-    Returns:
-        Filename like 'xwalk__B2025xT2023.parquet'
-    """
-    return f"xwalk__B{boundary_vintage}xT{tract_vintage}.parquet"
-
-
-def county_xwalk_filename(boundary_vintage: str, county_vintage: str | int) -> str:
-    """Generate filename for CoC-to-county crosswalk.
-
-    Args:
-        boundary_vintage: CoC boundary vintage (e.g., "2025")
-        county_vintage: County geometry vintage (e.g., 2023)
-
-    Returns:
-        Filename like 'xwalk__B2025xC2023.parquet'
-    """
-    return f"xwalk__B{boundary_vintage}xC{county_vintage}.parquet"
-
-
-def tract_mediated_county_xwalk_filename(
-    boundary_vintage: str | int,
-    county_vintage: str | int,
-    tract_vintage: str | int,
-    acs_vintage: str | int | None = None,
-    *,
-    denominator_source: str = "acs",
-    denominator_vintage: str | int | None = None,
-) -> str:
-    """Generate filename for tract-mediated county-to-CoC weights.
-
-    Args:
-        boundary_vintage: CoC boundary vintage (e.g., "2025")
-        county_vintage: County geometry vintage represented by county FIPS
-        tract_vintage: Census tract geometry vintage used by the tract crosswalk
-        acs_vintage: ACS denominator vintage (range or end year). Retained for
-            backward-compatible callers using ACS denominators.
-        denominator_source: Denominator source, either ``"acs"`` or ``"decennial"``.
-        denominator_vintage: Explicit denominator vintage. Required for decennial
-            denominators and optional for ACS denominators.
-
-    Returns:
-        Filename like ``xwalk_tract_mediated_county__A2023@B2025xC2023xT2020.parquet``
-    """
-    denominator_token = _tract_mediated_denominator_token(
-        acs_vintage=acs_vintage,
-        denominator_source=denominator_source,
-        denominator_vintage=denominator_vintage,
-    )
-    return (
-        f"xwalk_tract_mediated_county__{denominator_token}@B{boundary_vintage}"
-        f"xC{county_vintage}xT{tract_vintage}.parquet"
-    )
-
-
-def _tract_mediated_denominator_token(
-    *,
-    acs_vintage: str | int | None,
-    denominator_source: str,
-    denominator_vintage: str | int | None,
-) -> str:
-    """Return the filename token for a tract-mediated denominator artifact."""
-    if denominator_source == "acs":
-        vintage = denominator_vintage if denominator_vintage is not None else acs_vintage
-        if vintage is None:
-            raise ValueError("ACS tract-mediated denominators require acs_vintage.")
-        return f"A{_normalize_acs_vintage(str(vintage))}"
-    if denominator_source == "decennial":
-        if denominator_vintage is None:
-            raise ValueError("Decennial tract-mediated denominators require denominator_vintage.")
-        return f"N{denominator_vintage}"
-    raise ValueError(
-        "Unsupported tract-mediated denominator_source "
-        f"{denominator_source!r}; expected 'acs' or 'decennial'."
-    )
-
-
-def tract_mediated_county_xwalk_path(
-    boundary_vintage: str | int,
-    county_vintage: str | int,
-    tract_vintage: str | int,
-    acs_vintage: str | int | None = None,
-    base_dir: Path | str | None = None,
-    *,
-    denominator_source: str = "acs",
-    denominator_vintage: str | int | None = None,
-) -> Path:
-    """Get canonical path for tract-mediated county-to-CoC weights.
-
-    Args:
-        boundary_vintage: CoC boundary vintage
-        county_vintage: County vintage encoded by county FIPS
-        tract_vintage: Tract geometry vintage used by the tract crosswalk
-        acs_vintage: ACS denominator vintage or range
-        base_dir: Base data directory (defaults to "data")
-        denominator_source: Denominator source, either ``"acs"`` or ``"decennial"``.
-        denominator_vintage: Explicit denominator vintage.
-
-    Returns:
-        Path like
-        data/curated/xwalks/xwalk_tract_mediated_county__A2023@B2025xC2020xT2020.parquet
-    """
-    if base_dir is None:
-        base_dir = Path("data")
-    else:
-        base_dir = Path(base_dir)
-    return (
-        base_dir
-        / "curated"
-        / "xwalks"
-        / tract_mediated_county_xwalk_filename(
-            boundary_vintage,
-            county_vintage,
-            tract_vintage,
-            acs_vintage,
-            denominator_source=denominator_source,
-            denominator_vintage=denominator_vintage,
-        )
-    )
-
-
-def msa_coc_xwalk_filename(
-    boundary_vintage: str,
-    definition_version: str,
-    county_vintage: str | int,
-) -> str:
-    """Generate filename for CoC-to-MSA crosswalk.
-
-    Args:
-        boundary_vintage: CoC boundary vintage (e.g., "2025")
-        definition_version: MSA definition version (e.g., "census_msa_2023")
-        county_vintage: County geometry vintage used to derive the overlap
-
-    Returns:
-        Filename like
-        ``msa_coc_xwalk__B2025xMcensus_msa_2023xC2023.parquet``
-    """
-    return f"msa_coc_xwalk__B{boundary_vintage}xM{definition_version}xC{county_vintage}.parquet"
-
-
-def msa_coc_block_population_xwalk_filename(
-    boundary_vintage: str | int,
-    definition_version: str,
-    county_vintage: str | int,
-    block_vintage: str | int,
-    decennial_vintage: str | int,
-) -> str:
-    """Generate filename for a block-population CoC-to-MSA crosswalk."""
-    return (
-        f"msa_coc_xwalk__N{decennial_vintage}@B{boundary_vintage}"
-        f"xM{definition_version}xC{county_vintage}xK{block_vintage}"
-        "__basis-block_population.parquet"
-    )
-
-
-def msa_coc_coverage_filename(
-    year: str | int,
-    boundary_vintage: str | int,
-    definition_version: str,
-    county_vintage: str | int,
-    top_n: str | int,
-    overlap_bases: str | list[str] | tuple[str, ...],
-) -> str:
-    """Generate filename for MSA-CoC overlap coverage artifacts.
-
-    The basis token is explicit so area-only and population-enabled artifacts
-    cannot be confused during agent discovery.
-    """
-    basis_token = _overlap_basis_token(overlap_bases)
-    return (
-        f"msa_coc_coverage__Y{year}@B{boundary_vintage}xM{definition_version}"
-        f"xC{county_vintage}__top{top_n}__basis-{basis_token}.parquet"
-    )
-
-
-def _overlap_basis_token(overlap_bases: str | list[str] | tuple[str, ...]) -> str:
-    if isinstance(overlap_bases, str):
-        bases = [part for part in re.split(r"[-,+]", overlap_bases) if part]
-    else:
-        bases = list(overlap_bases)
-    if not bases:
-        raise ValueError("MSA-CoC coverage filenames require at least one overlap basis.")
-    invalid = sorted(set(bases) - {"area", "population"})
-    if invalid:
-        raise ValueError(
-            f"Unsupported MSA-CoC overlap basis values {invalid}; expected area and/or population."
-        )
-    ordered = [basis for basis in ("area", "population") if basis in set(bases)]
-    return "-".join(ordered)
-
-
-def containment_filename(
-    *,
-    container_type: str,
-    candidate_type: str,
-    output_id: str,
-    container_vintage: str | int | None = None,
-    candidate_vintage: str | int | None = None,
-    definition_version: str | None = None,
-) -> str:
-    """Generate filename for a recipe containment-list output."""
-    container_token = _containment_geometry_token(
-        container_type,
-        vintage=container_vintage,
-        definition_version=definition_version,
-    )
-    candidate_token = _containment_geometry_token(
-        candidate_type,
-        vintage=candidate_vintage,
-        definition_version=None,
-    )
-    return f"containment__{container_token}x{candidate_token}__{_slug_output_id(output_id)}.parquet"
-
-
-def _containment_geometry_token(
-    geometry_type: str,
-    *,
-    vintage: str | int | None,
-    definition_version: str | None,
-) -> str:
-    if geometry_type == "coc":
-        if vintage is None:
-            raise ValueError("CoC containment filenames require a boundary vintage.")
-        return f"B{vintage}"
-    if geometry_type == "county":
-        if vintage is None:
-            raise ValueError("County containment filenames require a county vintage.")
-        return f"C{vintage}"
-    if geometry_type == "msa":
-        if definition_version:
-            return f"M{definition_version}"
-        if vintage is None:
-            raise ValueError("MSA containment filenames require a definition version or vintage.")
-        return f"M{vintage}"
-    raise ValueError(
-        f"Unsupported containment geometry type '{geometry_type}'. "
-        "Supported types: coc, county, msa."
-    )
-
-
-def _slug_output_id(output_id: str) -> str:
-    normalized = re.sub(r"[^A-Za-z0-9._-]+", "-", output_id.strip().lower())
-    normalized = re.sub(r"-{2,}", "-", normalized).strip("-.")
-    return normalized or "containment"
-
-
-def tract_relationship_filename(
-    from_vintage: str | int = 2010,
-    to_vintage: str | int = 2020,
-) -> str:
-    """Generate filename for Census tract relationship file.
-
-    Args:
-        from_vintage: Source tract vintage (e.g., 2010)
-        to_vintage: Target tract vintage (e.g., 2020)
-
-    Returns:
-        Filename like 'tract_relationship__T2010xT2020.parquet'
-    """
-    return f"tract_relationship__T{from_vintage}xT{to_vintage}.parquet"
-
-
-# =============================================================================
-# Derived datasets (compound notation)
-# =============================================================================
-
-
-def measures_filename(
-    acs_vintage: str,
-    boundary_vintage: str,
-    tract_vintage: str | int | None = None,
-    alignment_year: int | None = None,
-) -> str:
-    """Generate filename for CoC measures dataset.
-
-    Args:
-        acs_vintage: ACS vintage (e.g., "2019-2023" or "2023")
-        boundary_vintage: CoC boundary vintage (e.g., "2025")
-        tract_vintage: Optional tract vintage used in crosswalk
-        alignment_year: Optional alignment year for window_center_year mode.
-            When the ACS end year differs from the boundary year, shows
-            which hub year the ACS vintage was aligned to.
-            E.g., ``measures__A2015(2013)@B2013xT2010.parquet``
-
-    Returns:
-        Filename like 'measures__A2023@B2025.parquet' or
-        'measures__A2023@B2025xT2023.parquet' if tract_vintage specified
-
-    Note:
-        The ACS vintage is normalized to just the end year (e.g., "2019-2023" -> "A2023")
-    """
-    # Normalize ACS vintage to end year
-    acs_year = _normalize_acs_vintage(acs_vintage)
-
-    acs_part = f"A{acs_year}"
-    if alignment_year is not None:
-        acs_part += f"({alignment_year})"
-
-    if tract_vintage is not None:
-        return f"measures__{acs_part}@B{boundary_vintage}xT{tract_vintage}.parquet"
-    return f"measures__{acs_part}@B{boundary_vintage}.parquet"
-
-
-def panel_filename(
-    start_year: int,
-    end_year: int,
-    boundary_vintage: str,
-) -> str:
-    """Generate filename for CoC panel dataset.
-
-    Args:
-        start_year: First year in panel (e.g., 2015)
-        end_year: Last year in panel (e.g., 2024)
-        boundary_vintage: Target CoC boundary vintage (e.g., "2025")
-
-    Returns:
-        Filename like 'panel__Y2015-2024@B2025.parquet'
-    """
-    return f"panel__Y{start_year}-{end_year}@B{boundary_vintage}.parquet"
-
-
-def zori_filename(
-    acs_vintage: str,
-    boundary_vintage: str,
-    county_vintage: str | int,
-    weighting: str,
-) -> str:
-    """Generate filename for CoC ZORI dataset.
-
-    Args:
-        acs_vintage: ACS vintage for weights (e.g., "2019-2023" or "2023")
-        boundary_vintage: CoC boundary vintage (e.g., "2025")
-        county_vintage: County geometry vintage (e.g., 2023)
-        weighting: Weighting method (e.g., "renter_households")
-
-    Returns:
-        Filename like 'zori__A2023@B2025xC2023__wrenter.parquet'
-
-    Note:
-        Weighting is abbreviated: "renter_households" -> "renter"
-    """
-    acs_year = _normalize_acs_vintage(acs_vintage)
-    weight_abbrev = _abbreviate_weighting(weighting)
-    return f"zori__A{acs_year}@B{boundary_vintage}xC{county_vintage}__w{weight_abbrev}.parquet"
-
-
-def zori_yearly_filename(
-    acs_vintage: str,
-    boundary_vintage: str,
-    county_vintage: str | int,
-    weighting: str,
-    yearly_method: str,
-) -> str:
-    """Generate filename for yearly CoC ZORI dataset.
-
-    Args:
-        acs_vintage: ACS vintage for weights (e.g., "2019-2023" or "2023")
-        boundary_vintage: CoC boundary vintage (e.g., "2025")
-        county_vintage: County geometry vintage (e.g., 2023)
-        weighting: Weighting method (e.g., "renter_households")
-        yearly_method: Yearly collapse method (e.g., "pit_january")
-
-    Returns:
-        Filename like 'zori_yearly__A2023@B2025xC2023__wrenter__mpit_january.parquet'
-    """
-    acs_year = _normalize_acs_vintage(acs_vintage)
-    weight_abbrev = _abbreviate_weighting(weighting)
-    return (
-        f"zori_yearly__A{acs_year}@B{boundary_vintage}xC{county_vintage}"
-        f"__w{weight_abbrev}__m{yearly_method}.parquet"
-    )
-
-
-def msa_zori_yearly_filename(
-    start_year: str | int,
-    end_year: str | int,
-    definition_version: str,
-    county_vintage: str | int,
-    weighting: str,
-    yearly_method: str,
-    *,
-    balanced_composition: bool = True,
-) -> str:
-    """Generate filename for MSA-scoped yearly ZORI panels.
-
-    Pattern:
-    ``zori__msa__Y{start}-{end}@M{def}xC{county}__w{weight}__m{method}__balanced.parquet``
-    """
-    defn = _normalize_definition_version(definition_version)
-    weight_abbrev = _abbreviate_weighting(weighting)
-    balance_token = "__balanced" if balanced_composition else ""
-    return (
-        f"zori__msa__Y{start_year}-{end_year}@M{defn}xC{county_vintage}"
-        f"__w{weight_abbrev}__m{yearly_method}{balance_token}.parquet"
-    )
-
-
-# =============================================================================
-# ACS tract population files
-# =============================================================================
-
-
-def acs5_tracts_filename(acs_vintage: str, tract_vintage: str | int) -> str:
-    """Generate filename for ACS 5-year tract population data.
-
-    Args:
-        acs_vintage: ACS vintage (e.g., "2019-2023" or "2023")
-        tract_vintage: Tract geometry vintage (e.g., 2023)
-
-    Returns:
-        Filename like 'acs5_tracts__A2023xT2023.parquet'
-    """
-    acs_year = _normalize_acs_vintage(acs_vintage)
-    return f"acs5_tracts__A{acs_year}xT{tract_vintage}.parquet"
-
-
-def acs5_tracts_glob_pattern(acs_vintage: str | None = None) -> str:
-    """Return the canonical glob pattern for ACS 5-year tract artifacts."""
-    acs_token = "*" if acs_vintage is None else _normalize_acs_vintage(acs_vintage)
-    return f"acs5_tracts__A{acs_token}xT*.parquet"
-
-
-def recipe_transform_filename(
-    transform_id: str,
-    base_geo_type: str,
-    definition_version: str,
-    *,
-    base_vintage: str | int | None = None,
-    subset_definition_version: str | None = None,
-) -> str:
-    """Return the filename for recipe-cache generated transform artifacts."""
-    base_suffix = base_geo_type
-    if base_vintage is not None:
-        base_suffix = f"{base_suffix}_{base_vintage}"
-    definition = definition_version
-    if subset_definition_version:
-        definition = f"{definition}__subset_{subset_definition_version}"
-    return f"{transform_id}__{base_suffix}__{definition}.parquet"
-
-
-def analysis_output_filename(panel_filename: str, analysis_type: str) -> str:
-    """Return the canonical filename for an analysis artifact derived from a panel."""
-    panel_path = Path(panel_filename)
-    return f"{panel_path.stem}__analysis_{analysis_type}.parquet"
-
-
-def analysis_output_path(panel_path: Path | str, analysis_type: str) -> Path:
-    """Return the canonical analysis artifact path beside the source panel."""
-    panel_path = Path(panel_path)
-    return panel_path.with_name(analysis_output_filename(panel_path.name, analysis_type))
-
-
-def analysis_manifest_filename(output_filename: str) -> str:
-    """Return the manifest sidecar filename for an analysis artifact."""
-    return Path(output_filename).with_suffix(".manifest.json").name
-
-
-def analysis_manifest_path(output_path: Path | str) -> Path:
-    """Return the manifest sidecar path for an analysis artifact."""
-    output_path = Path(output_path)
-    return output_path.with_name(analysis_manifest_filename(output_path.name))
-
-
-def decennial_tracts_filename(
-    decennial_vintage: str | int,
-    tract_vintage: str | int | None = None,
-) -> str:
-    """Generate filename for decennial tract population denominators.
-
-    Args:
-        decennial_vintage: Decennial census year, currently 2010 or 2020.
-        tract_vintage: Target tract geometry vintage. Defaults to the decennial
-            vintage because decennial denominators are native to their era.
-
-    Returns:
-        Filename like ``decennial_tracts__N2020xT2020.parquet``.
-    """
-    resolved_tract_vintage = decennial_vintage if tract_vintage is None else tract_vintage
-    return f"decennial_tracts__N{decennial_vintage}xT{resolved_tract_vintage}.parquet"
-
-
-def county_weights_filename(acs_vintage: str, weighting: str) -> str:
-    """Generate filename for county-level ACS weights.
-
-    Args:
-        acs_vintage: ACS vintage (e.g., "2019-2023" or "2023")
-        weighting: Weighting method (e.g., "renter_households")
-
-    Returns:
-        Filename like 'county_weights__A2023__wrenter.parquet'
-    """
-    acs_year = _normalize_acs_vintage(acs_vintage)
-    weight_abbrev = _abbreviate_weighting(weighting)
-    return f"county_weights__A{acs_year}__w{weight_abbrev}.parquet"
-
-
-# =============================================================================
-# Path helpers (combine filename with directory)
-# =============================================================================
-
-
-def boundary_path(boundary_vintage: str, base_dir: Path | str | None = None) -> Path:
-    """Get canonical path for curated boundary file.
-
-    .. deprecated::
-        Use :func:`coc_base_path` instead. This function uses the legacy
-        ``boundaries__B`` naming convention.
-
-    Args:
-        boundary_vintage: Boundary vintage year
-        base_dir: Base data directory (defaults to "data")
-
-    Returns:
-        Path like data/curated/coc_boundaries/boundaries__B2025.parquet
-    """
-    if base_dir is None:
-        base_dir = Path("data")
-    else:
-        base_dir = Path(base_dir)
-    return base_dir / "curated" / "coc_boundaries" / boundary_filename(boundary_vintage)
-
-
-def coc_base_path(boundary_vintage: str, base_dir: Path | str | None = None) -> Path:
-    """Get canonical path for curated CoC boundary file using preferred naming.
-
-    Args:
-        boundary_vintage: Boundary vintage year (e.g., "2025")
-        base_dir: Base data directory (defaults to "data")
-
-    Returns:
-        Path like data/curated/coc_boundaries/coc__B2025.parquet
-    """
-    if base_dir is None:
-        base_dir = Path("data")
-    else:
-        base_dir = Path(base_dir)
-    return base_dir / "curated" / "coc_boundaries" / coc_base_filename(boundary_vintage)
-
-
-def tract_path(tract_vintage: str | int, base_dir: Path | str | None = None) -> Path:
-    """Get canonical path for census tract file.
-
-    Args:
-        tract_vintage: TIGER tract vintage year
-        base_dir: Base data directory (defaults to "data")
-
-    Returns:
-        Path like data/curated/tiger/tracts__T2023.parquet
-    """
-    if base_dir is None:
-        base_dir = Path("data")
-    else:
-        base_dir = Path(base_dir)
-    return base_dir / "curated" / "tiger" / tract_filename(tract_vintage)
-
-
-def county_path(county_vintage: str | int, base_dir: Path | str | None = None) -> Path:
-    """Get canonical path for census county file.
-
-    Args:
-        county_vintage: TIGER county vintage year
-        base_dir: Base data directory (defaults to "data")
-
-    Returns:
-        Path like data/curated/tiger/counties__C2023.parquet
-    """
-    if base_dir is None:
-        base_dir = Path("data")
-    else:
-        base_dir = Path(base_dir)
-    return base_dir / "curated" / "tiger" / county_filename(county_vintage)
-
-
-def prism_county_monthly_path(
-    variable: str,
-    year: str | int,
-    month: str | int,
-    county_vintage: str | int,
-    base_dir: Path | str | None = None,
-) -> Path:
-    """Get canonical path for curated PRISM county-month temperature artifacts."""
-    if base_dir is None:
-        base_dir = Path("data")
-    else:
-        base_dir = Path(base_dir)
-    return (
-        base_dir
-        / "curated"
-        / "prism"
-        / prism_county_monthly_filename(variable, year, month, county_vintage)
-    )
-
-
-def block_geometry_path(
-    block_vintage: str | int,
-    base_dir: Path | str | None = None,
-) -> Path:
-    """Get canonical path for Census block geometry."""
-    if base_dir is None:
-        base_dir = Path("data")
-    else:
-        base_dir = Path(base_dir)
-    return base_dir / "curated" / "tiger" / block_geometry_filename(block_vintage)
-
-
-def urban_area_path(
-    urban_area_vintage: str | int,
-    base_dir: Path | str | None = None,
-) -> Path:
-    """Get canonical path for Census Urban Area geometry."""
-    if base_dir is None:
-        base_dir = Path("data")
-    else:
-        base_dir = Path(base_dir)
-    return base_dir / "curated" / "tiger" / urban_area_filename(urban_area_vintage)
-
-
-def pl_block_population_path(
-    decennial_vintage: str | int,
-    block_vintage: str | int | None = None,
-    base_dir: Path | str | None = None,
-) -> Path:
-    """Get canonical path for PL 94-171 block population denominators."""
-    if base_dir is None:
-        base_dir = Path("data")
-    else:
-        base_dir = Path(base_dir)
-    return (
-        base_dir
-        / "curated"
-        / "census"
-        / pl_block_population_filename(decennial_vintage, block_vintage)
-    )
-
-
-def coc_urban_fraction_path(
-    boundary_vintage: str | int,
-    urban_area_vintage: str | int,
-    block_vintage: str | int,
-    decennial_vintage: str | int,
-    base_dir: Path | str | None = None,
-) -> Path:
-    """Get canonical path for CoC-level urban population fractions."""
-    if base_dir is None:
-        base_dir = Path("data")
-    else:
-        base_dir = Path(base_dir)
-    return (
-        base_dir
-        / "curated"
-        / "measures"
-        / coc_urban_fraction_filename(
-            boundary_vintage,
-            urban_area_vintage,
-            block_vintage,
-            decennial_vintage,
-        )
-    )
-
-
-def coc_urban_area_detail_path(
-    boundary_vintage: str | int,
-    urban_area_vintage: str | int,
-    block_vintage: str | int,
-    decennial_vintage: str | int,
-    base_dir: Path | str | None = None,
-) -> Path:
-    """Get canonical path for optional CoC-by-Urban-Area detail artifacts."""
-    if base_dir is None:
-        base_dir = Path("data")
-    else:
-        base_dir = Path(base_dir)
-    return (
-        base_dir
-        / "curated"
-        / "measures"
-        / coc_urban_area_detail_filename(
-            boundary_vintage,
-            urban_area_vintage,
-            block_vintage,
-            decennial_vintage,
-        )
-    )
-
-
-def msa_coc_xwalk_path(
-    boundary_vintage: str,
-    definition_version: str,
-    county_vintage: str | int,
-    base_dir: Path | str | None = None,
-) -> Path:
-    """Get canonical path for CoC-to-MSA crosswalk file.
-
-    Args:
-        boundary_vintage: CoC boundary vintage
-        definition_version: MSA definition version
-        county_vintage: County geometry vintage used to derive the overlap
-        base_dir: Base data directory (defaults to ``data``)
-
-    Returns:
-        Path like
-        ``data/curated/xwalks/msa_coc_xwalk__B2025xMcensus_msa_2023xC2023.parquet``
-    """
-    if base_dir is None:
-        base_dir = Path("data")
-    else:
-        base_dir = Path(base_dir)
-    return (
-        base_dir
-        / "curated"
-        / "xwalks"
-        / msa_coc_xwalk_filename(boundary_vintage, definition_version, county_vintage)
-    )
-
-
-def msa_coc_block_population_xwalk_path(
-    boundary_vintage: str | int,
-    definition_version: str,
-    county_vintage: str | int,
-    block_vintage: str | int,
-    decennial_vintage: str | int,
-    base_dir: Path | str | None = None,
-) -> Path:
-    """Get canonical path for a block-population CoC-to-MSA crosswalk."""
-    if base_dir is None:
-        base_dir = Path("data")
-    else:
-        base_dir = Path(base_dir)
-    return (
-        base_dir
-        / "curated"
-        / "xwalks"
-        / msa_coc_block_population_xwalk_filename(
-            boundary_vintage,
-            definition_version,
-            county_vintage,
-            block_vintage,
-            decennial_vintage,
-        )
-    )
-
-
-def msa_coc_coverage_path(
-    year: str | int,
-    boundary_vintage: str | int,
-    definition_version: str,
-    county_vintage: str | int,
-    top_n: str | int,
-    overlap_bases: str | list[str] | tuple[str, ...],
-    base_dir: Path | str | None = None,
-) -> Path:
-    """Get canonical path for an MSA-CoC overlap coverage artifact."""
-    if base_dir is None:
-        base_dir = Path("data")
-    else:
-        base_dir = Path(base_dir)
-    return (
-        base_dir
-        / "curated"
-        / "msa"
-        / msa_coc_coverage_filename(
-            year,
-            boundary_vintage,
-            definition_version,
-            county_vintage,
-            top_n,
-            overlap_bases,
-        )
-    )
-
-
-def pit_path(pit_year: str | int, base_dir: Path | str | None = None) -> Path:
-    """Get canonical path for PIT count file.
-
-    Args:
-        pit_year: PIT count year
-        base_dir: Base data directory (defaults to "data")
-
-    Returns:
-        Path like data/curated/pit/pit__P2024.parquet
-    """
-    if base_dir is None:
-        base_dir = Path("data")
-    else:
-        base_dir = Path(base_dir)
-    return base_dir / "curated" / "pit" / pit_filename(pit_year)
-
-
-def hic_path(hic_year: str | int, base_dir: Path | str | None = None) -> Path:
-    """Generate full path for HIC count data.
-
-    Args:
-        hic_year: HIC inventory year
-        base_dir: Base data directory. If None, uses config asset store root.
-
-    Returns:
-        Path like data/curated/hic/hic__H2024.parquet
-    """
-    if base_dir is None:
-        from hhplab.storage.paths import asset_store_root
-
-        base_dir = asset_store_root()
-    else:
-        base_dir = Path(base_dir)
-    return base_dir / "curated" / "hic" / hic_filename(hic_year)
-
-
-def pit_vintage_path(vintage: str | int, base_dir: Path | str | None = None) -> Path:
-    """Get canonical path for PIT vintage file.
-
-    Args:
-        vintage: PIT release vintage year (e.g., 2024)
-        base_dir: Base data directory (defaults to "data")
-
-    Returns:
-        Path like data/curated/pit/pit_vintage__P2024.parquet
-    """
-    if base_dir is None:
-        base_dir = Path("data")
-    else:
-        base_dir = Path(base_dir)
-    return base_dir / "curated" / "pit" / pit_vintage_filename(vintage)
-
-
-def discover_pit_vintages(base_dir: Path | str | None = None) -> list[int]:
-    """Discover available PIT vintage files, sorted descending by year.
-
-    Scans the curated PIT directory for files matching
-    ``pit_vintage__P{year}.parquet`` and returns the vintage years
-    found, with the latest vintage first.
-
-    Args:
-        base_dir: Base data directory (defaults to "data")
-
-    Returns:
-        List of vintage years (ints) sorted descending, e.g. [2024, 2023].
-        Empty list if no vintage files are found.
-    """
-    if base_dir is None:
-        base_dir = Path("data")
-    else:
-        base_dir = Path(base_dir)
-
-    pit_dir = base_dir / "curated" / "pit"
-    if not pit_dir.is_dir():
-        return []
-
-    vintages: list[int] = []
-    for p in pit_dir.glob("pit_vintage__P*.parquet"):
-        stem = p.stem  # e.g. "pit_vintage__P2024"
-        suffix = stem.removeprefix("pit_vintage__P")
-        if suffix.isdigit():
-            vintages.append(int(suffix))
-
-    return sorted(vintages, reverse=True)
-
-
-# =============================================================================
-# ZORI ingest (single-geography, pre-aggregation)
-# =============================================================================
-
-
-def zori_ingest_filename(geography: str, max_year: int | str) -> str:
-    """Generate filename for ZORI ingest data.
-
-    Args:
-        geography: Geography level ("county" or "zip")
-        max_year: Maximum year in the ZORI series (e.g., 2026)
-
-    Returns:
-        Filename like 'zori__county__Z2026.parquet'
-    """
-    return f"zori__{geography}__Z{max_year}.parquet"
-
-
-def zori_ingest_path(
-    geography: str,
-    max_year: int | str,
-    base_dir: Path | str | None = None,
-) -> Path:
-    """Get canonical path for ZORI ingest file.
-
-    Args:
-        geography: Geography level ("county" or "zip")
-        max_year: Maximum year in the ZORI series
-        base_dir: Base data directory (defaults to "data")
-
-    Returns:
-        Path like data/curated/zori/zori__county__Z2026.parquet
-    """
-    if base_dir is None:
-        base_dir = Path("data")
-    else:
-        base_dir = Path(base_dir)
-    return base_dir / "curated" / "zori" / zori_ingest_filename(geography, max_year)
-
-
-def discover_zori_ingest(
-    geography: str,
-    output_dir: Path | str | None = None,
-) -> Path | None:
-    """Discover the most recent ZORI ingest file for a geography.
-
-    Scans the ZORI output directory for files matching the temporal
-    pattern ``zori__{geography}__Z{year}.parquet``. If multiple Z-year
-    files exist, returns the one with the highest year. Falls back to
-    the legacy name ``zori__{geography}.parquet`` if no temporal file
-    is found.
-
-    Args:
-        geography: Geography level ("county" or "zip")
-        output_dir: ZORI output directory (defaults to "data/curated/zori")
-
-    Returns:
-        Path to the most recent file, or None if no file exists.
-    """
-    if output_dir is None:
-        from hhplab.storage.paths import curated_dir
-
-        output_dir = curated_dir("zori")
-    else:
-        output_dir = Path(output_dir)
-
-    if not output_dir.is_dir():
-        return None
-
-    # Look for temporal-named files first
-    candidates: list[tuple[int, Path]] = []
-    for p in output_dir.glob(f"zori__{geography}__Z*.parquet"):
-        stem = p.stem  # e.g. "zori__county__Z2026"
-        z_suffix = stem.split("__Z")[-1]
-        if z_suffix.isdigit():
-            candidates.append((int(z_suffix), p))
-
-    if candidates:
-        candidates.sort(reverse=True)
-        return candidates[0][1]
-
-    # Fall back to legacy name
-    legacy = output_dir / f"zori__{geography}.parquet"
-    if legacy.exists():
-        return legacy
-
-    return None
-
-
-def tract_xwalk_path(
-    boundary_vintage: str,
-    tract_vintage: str | int,
-    base_dir: Path | str | None = None,
-) -> Path:
-    """Get canonical path for tract crosswalk file.
-
-    Args:
-        boundary_vintage: CoC boundary vintage
-        tract_vintage: Tract geometry vintage
-        base_dir: Base data directory (defaults to "data")
-
-    Returns:
-        Path like data/curated/xwalks/xwalk__B2025xT2023.parquet
-    """
-    if base_dir is None:
-        base_dir = Path("data")
-    else:
-        base_dir = Path(base_dir)
-    return base_dir / "curated" / "xwalks" / tract_xwalk_filename(boundary_vintage, tract_vintage)
-
-
-def county_xwalk_path(
-    boundary_vintage: str,
-    county_vintage: str | int,
-    base_dir: Path | str | None = None,
-) -> Path:
-    """Get canonical path for county crosswalk file.
-
-    Args:
-        boundary_vintage: CoC boundary vintage
-        county_vintage: County geometry vintage
-        base_dir: Base data directory (defaults to "data")
-
-    Returns:
-        Path like data/curated/xwalks/xwalk__B2025xC2023.parquet
-    """
-    if base_dir is None:
-        base_dir = Path("data")
-    else:
-        base_dir = Path(base_dir)
-    return base_dir / "curated" / "xwalks" / county_xwalk_filename(boundary_vintage, county_vintage)
-
-
-def measures_path(
-    acs_vintage: str,
-    boundary_vintage: str,
-    tract_vintage: str | int | None = None,
-    base_dir: Path | str | None = None,
-) -> Path:
-    """Get canonical path for measures file.
-
-    Args:
-        acs_vintage: ACS vintage
-        boundary_vintage: CoC boundary vintage
-        tract_vintage: Optional tract vintage
-        base_dir: Base data directory (defaults to "data")
-
-    Returns:
-        Path like data/curated/measures/measures__A2023@B2025.parquet
-    """
-    if base_dir is None:
-        base_dir = Path("data")
-    else:
-        base_dir = Path(base_dir)
-    return (
-        base_dir
-        / "curated"
-        / "measures"
-        / measures_filename(acs_vintage, boundary_vintage, tract_vintage)
-    )
-
-
-def panel_path(
-    start_year: int,
-    end_year: int,
-    boundary_vintage: str,
-    base_dir: Path | str | None = None,
-) -> Path:
-    """Get canonical path for panel file.
-
-    Args:
-        start_year: First panel year
-        end_year: Last panel year
-        boundary_vintage: Target CoC boundary vintage
-        base_dir: Base data directory (defaults to "data")
-
-    Returns:
-        Path like data/curated/panel/panel__Y2015-2024@B2025.parquet
-    """
-    if base_dir is None:
-        base_dir = Path("data")
-    else:
-        base_dir = Path(base_dir)
-    return base_dir / "curated" / "panel" / panel_filename(start_year, end_year, boundary_vintage)
-
-
-def msa_fractional_rollup_path(
-    start_year: int,
-    end_year: int,
-    measure_set_id: str,
-    allocation_basis: str,
-    coc_boundary_vintage: str | int,
-    msa_definition_version: str,
-    county_vintage: str | int,
-    block_vintage: str | int | None = None,
-    decennial_vintage: str | int | None = None,
-    base_dir: Path | str | None = None,
-) -> Path:
-    """Get canonical path for a CoC-to-MSA fractional rollup panel."""
-    if base_dir is None:
-        base_dir = Path("data")
-    else:
-        base_dir = Path(base_dir)
-    return (
-        base_dir
-        / "curated"
-        / "panel"
-        / msa_fractional_rollup_filename(
-            start_year,
-            end_year,
-            measure_set_id,
-            allocation_basis,
-            coc_boundary_vintage,
-            msa_definition_version,
-            county_vintage,
-            block_vintage,
-            decennial_vintage,
-        )
-    )
-
-
-def county_weights_path(
-    acs_vintage: str,
-    weighting: str,
-    base_dir: Path | str | None = None,
-) -> Path:
-    """Get canonical path for county weights file.
-
-    Args:
-        acs_vintage: ACS vintage (e.g., "2019-2023" or "2023")
-        weighting: Weighting method (e.g., "renter_households")
-        base_dir: Base data directory (defaults to "data")
-
-    Returns:
-        Path like data/curated/acs/county_weights__A2023__wrenter.parquet
-    """
-    if base_dir is None:
-        base_dir = Path("data")
-    else:
-        base_dir = Path(base_dir)
-    return base_dir / "curated" / "acs" / county_weights_filename(acs_vintage, weighting)
-
-
-# =============================================================================
-# Helper functions
-# =============================================================================
-
-
-def _normalize_acs_vintage(acs_vintage: str) -> str:
-    """Normalize ACS vintage to just the end year.
-
-    Args:
-        acs_vintage: ACS vintage like "2019-2023" or "2023"
-
-    Returns:
-        End year as string, e.g., "2023"
-    """
-    if "-" in acs_vintage:
-        # Format like "2019-2023", extract end year
-        return acs_vintage.split("-")[1]
-    return acs_vintage
-
-
-def expand_acs_vintage(acs_vintage: str) -> str:
-    """Expand ACS end year to full 5-year range for display.
-
-    Args:
-        acs_vintage: ACS vintage as end year ("2023") or range ("2019-2023")
-
-    Returns:
-        Full 5-year range, e.g., "2019-2023"
-    """
-    if "-" in acs_vintage:
-        # Already a range
-        return acs_vintage
-    # Single year - expand to 5-year range
-    end_year = int(acs_vintage)
-    start_year = end_year - 4
-    return f"{start_year}-{end_year}"
-
-
-def _abbreviate_weighting(weighting: str) -> str:
-    """Abbreviate weighting method for filename.
-
-    Args:
-        weighting: Full weighting name like "renter_households"
-
-    Returns:
-        Abbreviated form like "renter"
-    """
-    # Common abbreviations
-    abbreviations = {
-        "renter_households": "renter",
-        "total_population": "pop",
-        "area": "area",
-    }
-    return abbreviations.get(weighting, weighting)
-
-
-# ---------------------------------------------------------------------------
-# PEP (Population Estimates Program) filenames
-# ---------------------------------------------------------------------------
-
-
-def coc_pep_filename(
-    boundary_vintage: int | str,
-    county_vintage: int | str,
-    weighting: str,
-    start_year: int,
-    end_year: int,
-) -> str:
-    """Canonical filename for CoC-level PEP aggregate output.
-
-    Pattern: ``coc_pep__B{boundary}xC{county}__w{weighting}__{start}_{end}.parquet``
-    """
-    return (
-        f"coc_pep__B{boundary_vintage}xC{county_vintage}"
-        f"__w{weighting}__{start_year}_{end_year}.parquet"
-    )
-
-
-# =============================================================================
-# Definition-version token helper
-# =============================================================================
-
-
-def _normalize_definition_version(definition_version: str) -> str:
-    """Normalize a definition version string for use in filenames.
-
-    Strips non-alphanumeric characters (except underscores) and
-    lowercases. Example: ``"glynn_fox_v1"`` -> ``"glynnfoxv1"``.
-    """
-    return "".join(c for c in definition_version.lower() if c.isalnum())
-
-
-# =============================================================================
-# Metro (geography-scoped) filenames
-# =============================================================================
-
-
-def metro_measures_filename(
-    acs_vintage: str,
-    definition_version: str,
-    tract_vintage: str | int | None = None,
-) -> str:
-    """Generate filename for metro-scoped ACS measures.
-
-    Pattern: ``measures__metro__A{acs}@D{def}xT{tract}.parquet``
-
-    The ``metro`` segment prevents collision with CoC measures files.
-    """
-    acs_year = _normalize_acs_vintage(acs_vintage)
-    defn = _normalize_definition_version(definition_version)
-    if tract_vintage is not None:
-        return f"measures__metro__A{acs_year}@D{defn}xT{tract_vintage}.parquet"
-    return f"measures__metro__A{acs_year}@D{defn}.parquet"
-
-
-def msa_measures_filename(
-    acs_vintage: str,
-    definition_version: str,
-    tract_vintage: str | int | None = None,
-) -> str:
-    """Generate filename for MSA-scoped ACS5 measures.
-
-    Pattern: ``measures__msa__A{acs}@M{def}xT{tract}.parquet``.
-    """
-    acs_year = _normalize_acs_vintage(acs_vintage)
-    defn = _normalize_definition_version(definition_version)
-    if tract_vintage is not None:
-        return f"measures__msa__A{acs_year}@M{defn}xT{tract_vintage}.parquet"
-    return f"measures__msa__A{acs_year}@M{defn}.parquet"
-
-
-def metro_panel_filename(
-    start_year: int,
-    end_year: int,
-    definition_version: str,
-    profile_definition_version: str | None = None,
-) -> str:
-    """Generate filename for metro-scoped panel.
-
-    Pattern: ``panel__metro__Y{start}-{end}@D{def}[xS{subset}].parquet``
-    """
-    defn = _normalize_definition_version(definition_version)
-    subset = ""
-    if profile_definition_version is not None:
-        subset = f"xS{_normalize_definition_version(profile_definition_version)}"
-    return f"panel__metro__Y{start_year}-{end_year}@D{defn}{subset}.parquet"
-
-
-def msa_panel_filename(
-    start_year: int,
-    end_year: int,
-    definition_version: str,
-) -> str:
-    """Generate filename for MSA-scoped panel.
-
-    Pattern: ``panel__msa__Y{start}-{end}@M{def}.parquet``
-    """
-    defn = _normalize_definition_version(definition_version)
-    return f"panel__msa__Y{start_year}-{end_year}@M{defn}.parquet"
-
-
-def county_panel_filename(
-    start_year: int,
-    end_year: int,
-    county_vintage: str | int,
-) -> str:
-    """Generate filename for county-scoped panel.
-
-    Pattern: ``panel__county__Y{start}-{end}@C{county}.parquet``
-    """
-    return f"panel__county__Y{start_year}-{end_year}@C{county_vintage}.parquet"
-
-
-def cdc_overdose_county_filename(
-    start_year: int,
-    end_year: int,
-    county_vintage: str | int,
-) -> str:
-    """Canonical filename for CDC county overdose annual January extracts.
-
-    Pattern: ``cdc_overdose__county__Y{start}-{end}@C{county}.parquet``
-    """
-    return f"cdc_overdose__county__Y{start_year}-{end_year}@C{county_vintage}.parquet"
-
-
-def cdc_overdose_msa_filename(
-    start_year: int,
-    end_year: int,
-    definition_version: str,
-    county_vintage: str | int,
-) -> str:
-    """Canonical filename for CDC overdose MSA rollups.
-
-    Pattern: ``cdc_overdose__msa__Y{start}-{end}@M{def}xC{county}.parquet``
-    """
-    defn = _normalize_definition_version(definition_version)
-    return (
-        f"cdc_overdose__msa__Y{start_year}-{end_year}"
-        f"@M{defn}xC{county_vintage}.parquet"
-    )
-
-
-def msa_coc_panel_filename(
-    start_year: int,
-    end_year: int,
-    coc_boundary_vintage: str | int,
-    msa_definition_version: str,
-) -> str:
-    """Generate filename for MSA-to-CoC containment panels.
-
-    Pattern: ``panel__msa-coc__Y{start}-{end}@B{boundary}xM{def}.parquet``
-    """
-    defn = _normalize_definition_version(msa_definition_version)
-    return f"panel__msa-coc__Y{start_year}-{end_year}@B{coc_boundary_vintage}xM{defn}.parquet"
-
-
-def msa_fractional_rollup_filename(
-    start_year: int,
-    end_year: int,
-    measure_set_id: str,
-    allocation_basis: str,
-    coc_boundary_vintage: str | int,
-    msa_definition_version: str,
-    county_vintage: str | int,
-    block_vintage: str | int | None = None,
-    decennial_vintage: str | int | None = None,
-) -> str:
-    """Generate filename for CoC-to-MSA fractional rollup panels.
-
-    Pattern:
-    ``panel__msa-rollup-{measures}__Y{start}-{end}__basis-{basis}@B{boundary}xM{def}xC{county}[xK{block}xN{decennial}].parquet``
-    """
-    defn = _normalize_definition_version(msa_definition_version)
-    measure_token = _normalize_definition_version(measure_set_id)
-    basis_token = allocation_basis.replace("_", "-")
-    suffix = f"@B{coc_boundary_vintage}xM{defn}xC{county_vintage}"
-    if block_vintage is not None:
-        suffix += f"xK{block_vintage}"
-    if decennial_vintage is not None:
-        suffix += f"xN{decennial_vintage}"
-    return (
-        f"panel__msa-rollup-{measure_token}__Y{start_year}-{end_year}"
-        f"__basis-{basis_token}{suffix}.parquet"
-    )
-
-
-def metro_pit_filename(
-    pit_year: str | int,
-    definition_version: str,
-) -> str:
-    """Generate filename for metro-scoped PIT aggregate.
-
-    Pattern: ``pit__metro__P{year}@D{def}.parquet``
-    """
-    defn = _normalize_definition_version(definition_version)
-    return f"pit__metro__P{pit_year}@D{defn}.parquet"
-
-
-def msa_pit_filename(
-    pit_year: str | int,
-    definition_version: str,
-    boundary_vintage: str | int,
-    county_vintage: str | int,
-) -> str:
-    """Generate filename for MSA-scoped PIT aggregate.
-
-    Pattern: ``pit__msa__P{year}@M{def}xB{boundary}xC{county}.parquet``
-    """
-    defn = _normalize_definition_version(definition_version)
-    return f"pit__msa__P{pit_year}@M{defn}xB{boundary_vintage}xC{county_vintage}.parquet"
-
-
-def metro_pep_filename(
-    definition_version: str,
-    county_vintage: int | str,
-    weighting: str,
-    start_year: int,
-    end_year: int,
-) -> str:
-    """Canonical filename for metro-level PEP aggregate output.
-
-    Pattern: ``pep__metro__D{def}xC{county}__w{weighting}__{start}_{end}.parquet``
-    """
-    defn = _normalize_definition_version(definition_version)
-    return f"pep__metro__D{defn}xC{county_vintage}__w{weighting}__{start_year}_{end_year}.parquet"
-
-
-def msa_pep_filename(
-    year: int | str,
-    definition_version: str,
-    county_vintage: int | str,
-    weighting: str = "population",
-) -> str:
-    """Canonical filename for one MSA-level PEP aggregate output.
-
-    Pattern: ``pep__msa__Y{year}@M{def}xC{county}__w{weighting}.parquet``.
-    """
-    defn = _normalize_definition_version(definition_version)
-    return f"pep__msa__Y{year}@M{defn}xC{county_vintage}__w{weighting}.parquet"
-
-
-def msa_pep_path(
-    year: int | str,
-    definition_version: str,
-    county_vintage: int | str,
-    weighting: str = "population",
-    base_dir: Path | str | None = None,
-) -> Path:
-    """Get canonical path for one MSA-level PEP aggregate output."""
-    if base_dir is None:
-        base_dir = Path("data")
-    else:
-        base_dir = Path(base_dir)
-    return (
-        base_dir
-        / "curated"
-        / "pep"
-        / msa_pep_filename(year, definition_version, county_vintage, weighting)
-    )
-
-
-def acs1_metro_filename(acs1_vintage: int, definition_version: str) -> str:
-    """Generate filename for curated ACS 1-year metro-level ingest artifact.
-
-    Args:
-        acs1_vintage: ACS 1-year vintage end year (e.g., 2023)
-        definition_version: Synthetic geography definition version (e.g., "glynn_fox_v1")
-
-    Returns:
-        Filename like 'acs1_metro__A2023@Dglynnfoxv1.parquet'
-    """
-    defn = _normalize_definition_version(definition_version)
-    return f"acs1_metro__A{acs1_vintage}@D{defn}.parquet"
-
-
-def acs1_metro_path(
-    acs1_vintage: int,
-    definition_version: str,
-    base_dir: Path | str | None = None,
-) -> Path:
-    """Get canonical path for ACS 1-year metro ingest artifact.
-
-    Args:
-        acs1_vintage: ACS 1-year vintage end year (e.g., 2023)
-        definition_version: Synthetic geography definition version (e.g., "glynn_fox_v1")
-        base_dir: Base data directory (defaults to "data")
-
-    Returns:
-        Path like data/curated/acs/acs1_metro__A2023@Dglynnfoxv1.parquet
-    """
-    if base_dir is None:
-        base_dir = Path("data")
-    else:
-        base_dir = Path(base_dir)
-    return base_dir / "curated" / "acs" / acs1_metro_filename(acs1_vintage, definition_version)
-
-
-def acs1_county_filename(acs1_vintage: int) -> str:
-    """Generate filename for curated ACS 1-year county-level ingest artifact.
-
-    Args:
-        acs1_vintage: ACS 1-year vintage end year (e.g., 2023)
-
-    Returns:
-        Filename like 'acs1_county__A2023.parquet'
-    """
-    return f"acs1_county__A{acs1_vintage}.parquet"
-
-
-def acs1_county_path(
-    acs1_vintage: int,
-    base_dir: Path | str | None = None,
-) -> Path:
-    """Get canonical path for ACS 1-year county ingest artifact."""
-    if base_dir is None:
-        base_dir = Path("data")
-    else:
-        base_dir = Path(base_dir)
-    return base_dir / "curated" / "acs" / acs1_county_filename(acs1_vintage)
-
-
-def acs1_poverty_tracts_filename(acs1_vintage: int, tract_vintage: str | int) -> str:
-    """Generate filename for curated ACS 1-year tract poverty-rate artifacts."""
-    return f"acs1_poverty_tracts__A{acs1_vintage}xT{tract_vintage}.parquet"
-
-
-def acs1_poverty_tracts_path(
-    acs1_vintage: int,
-    tract_vintage: str | int,
-    base_dir: Path | str | None = None,
-) -> Path:
-    """Get canonical path for ACS 1-year tract poverty-rate artifacts."""
-    if base_dir is None:
-        base_dir = Path("data")
-    else:
-        base_dir = Path(base_dir)
-    return (
-        base_dir
-        / "curated"
-        / "acs"
-        / acs1_poverty_tracts_filename(
-            acs1_vintage,
-            tract_vintage,
-        )
-    )
-
-
-def metro_measures_acs1_filename(
-    acs1_vintage: int,
-    definition_version: str,
-) -> str:
-    """Generate filename for metro ACS1 measures artifact (post-aggregation).
-
-    The ``__acs1__`` segment prevents collision with ACS5 metro measures files.
-
-    Args:
-        acs1_vintage: ACS 1-year vintage end year (e.g., 2023)
-        definition_version: Synthetic geography definition version (e.g., "glynn_fox_v1")
-
-    Returns:
-        Filename like 'measures__metro__acs1__A2023@Dglynnfoxv1.parquet'
-    """
-    defn = _normalize_definition_version(definition_version)
-    return f"measures__metro__acs1__A{acs1_vintage}@D{defn}.parquet"
-
-
-def metro_measures_acs1_path(
-    acs1_vintage: int,
-    definition_version: str,
-    base_dir: Path | str | None = None,
-) -> Path:
-    """Get canonical path for metro ACS1 measures artifact.
-
-    Args:
-        acs1_vintage: ACS 1-year vintage end year (e.g., 2023)
-        definition_version: Synthetic geography definition version (e.g., "glynn_fox_v1")
-        base_dir: Base data directory (defaults to "data")
-
-    Returns:
-        Path like data/curated/measures/measures__metro__acs1__A2023@Dglynnfoxv1.parquet
-    """
-    if base_dir is None:
-        base_dir = Path("data")
-    else:
-        base_dir = Path(base_dir)
-    return (
-        base_dir
-        / "curated"
-        / "measures"
-        / metro_measures_acs1_filename(acs1_vintage, definition_version)
-    )
-
-
-def metro_zori_filename(
-    acs_vintage: str,
-    definition_version: str,
-    county_vintage: str | int,
-    weighting: str,
-) -> str:
-    """Generate filename for metro-scoped ZORI dataset.
-
-    Pattern: ``zori__metro__A{acs}@D{def}xC{county}__w{weight}.parquet``
-    """
-    acs_year = _normalize_acs_vintage(acs_vintage)
-    defn = _normalize_definition_version(definition_version)
-    weight_abbrev = _abbreviate_weighting(weighting)
-    return f"zori__metro__A{acs_year}@D{defn}xC{county_vintage}__w{weight_abbrev}.parquet"
-
-
-# =============================================================================
-# Metro definition artifact filenames
-# =============================================================================
-
-
-def metro_definitions_filename(definition_version: str) -> str:
-    """Filename for metro definitions table.
-
-    Pattern: ``metro_definitions__{version}.parquet``
-
-    Note: definition/membership filenames preserve the raw version string
-    (e.g., ``glynn_fox_v1``) for human readability. Data artifact filenames
-    (PIT, ACS, ZORI, panels) normalize to alphanumeric (``glynnfoxv1``).
-    """
-    return f"metro_definitions__{definition_version}.parquet"
-
-
-def metro_coc_membership_filename(definition_version: str) -> str:
-    """Filename for metro-to-CoC membership table.
-
-    Pattern: ``metro_coc_membership__{version}.parquet``
-
-    See :func:`metro_definitions_filename` for normalization note.
-    """
-    return f"metro_coc_membership__{definition_version}.parquet"
-
-
-def metro_county_membership_filename(definition_version: str) -> str:
-    """Filename for metro-to-county membership table.
-
-    Pattern: ``metro_county_membership__{version}.parquet``
-
-    See :func:`metro_definitions_filename` for normalization note.
-    """
-    return f"metro_county_membership__{definition_version}.parquet"
-
-
-def metro_universe_filename(definition_version: str) -> str:
-    """Filename for canonical metro-universe definitions."""
-    return f"metro_universe__{definition_version}.parquet"
-
-
-def metro_subset_membership_filename(
-    profile_definition_version: str,
-    metro_definition_version: str,
-) -> str:
-    """Filename for a subset-profile over the canonical metro universe."""
-    return (
-        f"metro_subset_membership__{profile_definition_version}xM{metro_definition_version}.parquet"
-    )
-
-
-def metro_boundaries_filename(
-    definition_version: str,
-    county_vintage: str | int,
-) -> str:
-    """Filename for materialized metro boundary polygons.
-
-    Pattern: ``metro_boundaries__{version}xC{county}.parquet``
-
-    See :func:`metro_definitions_filename` for normalization note.
-    """
-    return f"metro_boundaries__{definition_version}xC{county_vintage}.parquet"
-
-
-# =============================================================================
-# Metro definition artifact paths
-# =============================================================================
-
-
-def metro_definitions_path(
-    definition_version: str,
-    base_dir: Path | str | None = None,
-) -> Path:
-    """Canonical path for metro definitions file.
-
-    Returns:
-        Path like data/curated/metro/metro_definitions__glynn_fox_v1.parquet
-    """
-    if base_dir is None:
-        base_dir = Path("data")
-    else:
-        base_dir = Path(base_dir)
-    return base_dir / "curated" / "metro" / metro_definitions_filename(definition_version)
-
-
-def metro_coc_membership_path(
-    definition_version: str,
-    base_dir: Path | str | None = None,
-) -> Path:
-    """Canonical path for metro-to-CoC membership file.
-
-    Returns:
-        Path like data/curated/metro/metro_coc_membership__glynn_fox_v1.parquet
-    """
-    if base_dir is None:
-        base_dir = Path("data")
-    else:
-        base_dir = Path(base_dir)
-    return base_dir / "curated" / "metro" / metro_coc_membership_filename(definition_version)
-
-
-def metro_county_membership_path(
-    definition_version: str,
-    base_dir: Path | str | None = None,
-) -> Path:
-    """Canonical path for metro-to-county membership file.
-
-    Returns:
-        Path like data/curated/metro/metro_county_membership__glynn_fox_v1.parquet
-    """
-    if base_dir is None:
-        base_dir = Path("data")
-    else:
-        base_dir = Path(base_dir)
-    return base_dir / "curated" / "metro" / metro_county_membership_filename(definition_version)
-
-
-def metro_boundaries_path(
-    definition_version: str,
-    county_vintage: str | int,
-    base_dir: Path | str | None = None,
-) -> Path:
-    """Canonical path for metro boundary polygons file.
-
-    Returns:
-        Path like data/curated/metro/metro_boundaries__glynn_fox_v1xC2025.parquet
-    """
-    if base_dir is None:
-        base_dir = Path("data")
-    else:
-        base_dir = Path(base_dir)
-    return (
-        base_dir
-        / "curated"
-        / "metro"
-        / metro_boundaries_filename(definition_version, county_vintage)
-    )
-
-
-def metro_universe_path(
-    definition_version: str,
-    base_dir: Path | str | None = None,
-) -> Path:
-    """Canonical path for the metro-universe file."""
-    if base_dir is None:
-        base_dir = Path("data")
-    else:
-        base_dir = Path(base_dir)
-    return base_dir / "curated" / "metro" / metro_universe_filename(definition_version)
-
-
-def metro_subset_membership_path(
-    profile_definition_version: str,
-    metro_definition_version: str,
-    base_dir: Path | str | None = None,
-) -> Path:
-    """Canonical path for the metro subset-profile file."""
-    if base_dir is None:
-        base_dir = Path("data")
-    else:
-        base_dir = Path(base_dir)
-    return (
-        base_dir
-        / "curated"
-        / "metro"
-        / metro_subset_membership_filename(
-            profile_definition_version,
-            metro_definition_version,
-        )
-    )
-
-
-# =============================================================================
-# MSA definition artifact filenames
-# =============================================================================
-
-
-def msa_definitions_filename(definition_version: str) -> str:
-    """Filename for MSA definitions table.
-
-    Pattern: ``msa_definitions__{version}.parquet``.
-    """
-    return f"msa_definitions__{definition_version}.parquet"
-
-
-def msa_county_membership_filename(definition_version: str) -> str:
-    """Filename for MSA-to-county membership table.
-
-    Pattern: ``msa_county_membership__{version}.parquet``.
-    """
-    return f"msa_county_membership__{definition_version}.parquet"
-
-
-def msa_boundaries_filename(definition_version: str) -> str:
-    """Filename for curated MSA boundary polygons.
-
-    Pattern: ``msa_boundaries__{version}.parquet``.
-    """
-    return f"msa_boundaries__{definition_version}.parquet"
-
-
-# =============================================================================
-# MSA definition artifact paths
-# =============================================================================
-
-
-def msa_definitions_path(
-    definition_version: str,
-    base_dir: Path | str | None = None,
-) -> Path:
-    """Canonical path for MSA definitions file."""
-    if base_dir is None:
-        base_dir = Path("data")
-    else:
-        base_dir = Path(base_dir)
-    return base_dir / "curated" / "msa" / msa_definitions_filename(definition_version)
-
-
-def msa_county_membership_path(
-    definition_version: str,
-    base_dir: Path | str | None = None,
-) -> Path:
-    """Canonical path for MSA-to-county membership file."""
-    if base_dir is None:
-        base_dir = Path("data")
-    else:
-        base_dir = Path(base_dir)
-    return base_dir / "curated" / "msa" / msa_county_membership_filename(definition_version)
-
-
-def msa_boundaries_path(
-    definition_version: str,
-    base_dir: Path | str | None = None,
-) -> Path:
-    """Canonical path for curated MSA boundary polygons."""
-    if base_dir is None:
-        base_dir = Path("data")
-    else:
-        base_dir = Path(base_dir)
-    return base_dir / "curated" / "msa" / msa_boundaries_filename(definition_version)
-
-
-# =============================================================================
-# Sanctuary jurisdiction regression artifact paths
-# =============================================================================
-
-
-def sanctuary_msa_matches_filename(
-    source_date: str,
-    msa_definition_version: str,
-) -> str:
-    """Canonical filename for DOJ sanctuary jurisdiction MSA matches."""
-    compact_date = source_date.replace("-", "")
-    return f"sanctuary_msa_matches__D{compact_date}xM{msa_definition_version}.parquet"
-
-
-def sanctuary_msa_matches_path(
-    source_date: str,
-    msa_definition_version: str,
-    base_dir: Path | str | None = None,
-) -> Path:
-    """Canonical path for DOJ sanctuary jurisdiction MSA matches."""
-    if base_dir is None:
-        base_dir = Path("data")
-    else:
-        base_dir = Path(base_dir)
-    return (
-        base_dir
-        / "curated"
-        / "sanctuary"
-        / sanctuary_msa_matches_filename(source_date, msa_definition_version)
-    )
-
-
-def sanctuary_msa_panel_covariate_filename(
-    source_date: str,
-    msa_definition_version: str,
-) -> str:
-    """Canonical filename for panel-ready DOJ sanctuary MSA covariates."""
-    compact_date = source_date.replace("-", "")
-    return f"sanctuary_msa_panel__D{compact_date}xM{msa_definition_version}.parquet"
-
-
-def sanctuary_msa_panel_covariate_path(
-    source_date: str,
-    msa_definition_version: str,
-    base_dir: Path | str | None = None,
-) -> Path:
-    """Canonical path for panel-ready DOJ sanctuary MSA covariates."""
-    if base_dir is None:
-        base_dir = Path("data")
-    else:
-        base_dir = Path(base_dir)
-    return (
-        base_dir
-        / "curated"
-        / "sanctuary"
-        / sanctuary_msa_panel_covariate_filename(source_date, msa_definition_version)
-    )
-
-
-# =============================================================================
-# BLS LAUS metro artifact filenames
-# =============================================================================
-
-
-def laus_metro_filename(year: int | str, definition_version: str) -> str:
-    """Generate filename for a curated BLS LAUS metro yearly ingest artifact.
-
-    Args:
-        year: Reference year for the annual-average LAUS data (e.g., 2023).
-        definition_version: Synthetic geography definition version (e.g., "glynn_fox_v1").
-
-    Returns:
-        Filename like 'laus_metro__A2023@Dglynnfoxv1.parquet'
-    """
-    defn = _normalize_definition_version(definition_version)
-    return f"laus_metro__A{year}@D{defn}.parquet"
-
-
-def laus_metro_path(
-    year: int | str,
-    definition_version: str,
-    base_dir: Path | str | None = None,
-) -> Path:
-    """Get canonical path for a curated BLS LAUS metro yearly ingest artifact.
-
-    Args:
-        year: Reference year for the annual-average LAUS data (e.g., 2023).
-        definition_version: Synthetic geography definition version (e.g., "glynn_fox_v1").
-        base_dir: Base data directory (defaults to "data").
-
-    Returns:
-        Path like data/curated/laus/laus_metro__A2023@Dglynnfoxv1.parquet
-    """
-    if base_dir is None:
-        base_dir = Path("data")
-    else:
-        base_dir = Path(base_dir)
-    return base_dir / "curated" / "laus" / laus_metro_filename(year, definition_version)
-
-
-# =============================================================================
-# BLS CPI-U artifact filenames
-# =============================================================================
-
-
-def cpi_u_filename() -> str:
-    """Generate filename for the curated annual CPI-U index artifact.
-
-    Returns:
-        Filename ``cpi_u__Aall.parquet``.
-    """
-    return "cpi_u__Aall.parquet"
-
-
-def cpi_u_path(base_dir: Path | str | None = None) -> Path:
-    """Get canonical path for the curated annual CPI-U index artifact.
-
-    Args:
-        base_dir: Base data directory (defaults to "data").
-
-    Returns:
-        Path like ``data/curated/cpi/cpi_u__Aall.parquet``.
-    """
-    if base_dir is None:
-        base_dir = Path("data")
-    else:
-        base_dir = Path(base_dir)
-    return base_dir / "curated" / "cpi" / cpi_u_filename()
-
-
-# =============================================================================
-# Geography-aware filename dispatcher
-# =============================================================================
-
-
-def geo_panel_filename(
-    start_year: int,
-    end_year: int,
-    *,
-    geo_type: str = "coc",
-    boundary_vintage: str | None = None,
-    definition_version: str | None = None,
-    profile_definition_version: str | None = None,
-) -> str:
-    """Return the panel filename for any supported analysis geography.
-
-    For ``geo_type="coc"``, delegates to :func:`panel_filename`.
-    For ``geo_type="metro"``, delegates to :func:`metro_panel_filename`.
-    For ``geo_type="msa"``, delegates to :func:`msa_panel_filename`.
-    For ``geo_type="county"``, delegates to :func:`county_panel_filename`.
-    """
-    if geo_type == "coc":
-        if boundary_vintage is None:
-            raise ValueError("boundary_vintage is required for geo_type='coc'")
-        return panel_filename(start_year, end_year, boundary_vintage)
-    if geo_type == "metro":
-        if definition_version is None:
-            raise ValueError("definition_version is required for geo_type='metro'")
-        return metro_panel_filename(
-            start_year,
-            end_year,
-            definition_version,
-            profile_definition_version=profile_definition_version,
-        )
-    if geo_type == "msa":
-        if definition_version is None:
-            raise ValueError("definition_version is required for geo_type='msa'")
-        return msa_panel_filename(start_year, end_year, definition_version)
-    if geo_type == "county":
-        if boundary_vintage is None:
-            raise ValueError("boundary_vintage is required for geo_type='county'")
-        return county_panel_filename(start_year, end_year, boundary_vintage)
-    raise ValueError(f"Unsupported geo_type: {geo_type!r}")
-
-
-def geo_map_filename(
-    start_year: int,
-    end_year: int,
-    *,
-    geo_type: str = "coc",
-    boundary_vintage: str | None = None,
-    definition_version: str | None = None,
-    profile_definition_version: str | None = None,
-) -> str:
-    """Return the HTML map filename for any supported analysis geography."""
-    panel_name = geo_panel_filename(
-        start_year,
-        end_year,
-        geo_type=geo_type,
-        boundary_vintage=boundary_vintage,
-        definition_version=definition_version,
-        profile_definition_version=profile_definition_version,
-    )
-    return panel_name.replace("panel__", "map__", 1).replace(".parquet", ".html")
+__all__ = [
+    "_abbreviate_weighting",
+    "_containment_geometry_token",
+    "_normalize_acs_vintage",
+    "_normalize_definition_version",
+    "_overlap_basis_token",
+    "_slug_output_id",
+    "_tract_mediated_denominator_token",
+    "acs1_county_filename",
+    "acs1_county_path",
+    "acs1_metro_filename",
+    "acs1_metro_path",
+    "acs1_poverty_tracts_filename",
+    "acs1_poverty_tracts_path",
+    "acs5_tracts_filename",
+    "acs5_tracts_glob_pattern",
+    "analysis_manifest_filename",
+    "analysis_manifest_path",
+    "analysis_output_filename",
+    "analysis_output_path",
+    "block_geometry_filename",
+    "block_geometry_path",
+    "boundary_filename",
+    "boundary_path",
+    "cdc_overdose_county_filename",
+    "cdc_overdose_msa_filename",
+    "coc_base_filename",
+    "coc_base_path",
+    "coc_pep_filename",
+    "coc_pit_filename",
+    "coc_urban_area_detail_filename",
+    "coc_urban_area_detail_path",
+    "coc_urban_fraction_filename",
+    "coc_urban_fraction_path",
+    "containment_filename",
+    "county_filename",
+    "county_panel_filename",
+    "county_path",
+    "county_weights_filename",
+    "county_weights_path",
+    "county_xwalk_filename",
+    "county_xwalk_path",
+    "covariate_curated_filename",
+    "covariate_pair_filename",
+    "covariate_panel_filename",
+    "cpi_u_filename",
+    "cpi_u_path",
+    "decennial_tracts_filename",
+    "discover_pit_vintages",
+    "discover_zori_ingest",
+    "expand_acs_vintage",
+    "geo_map_filename",
+    "geo_panel_filename",
+    "hic_filename",
+    "hic_path",
+    "laus_metro_filename",
+    "laus_metro_path",
+    "measures_filename",
+    "measures_path",
+    "medsl_president_county_filename",
+    "medsl_president_county_path",
+    "metro_boundaries_filename",
+    "metro_boundaries_path",
+    "metro_coc_membership_filename",
+    "metro_coc_membership_path",
+    "metro_county_membership_filename",
+    "metro_county_membership_path",
+    "metro_definitions_filename",
+    "metro_definitions_path",
+    "metro_measures_acs1_filename",
+    "metro_measures_acs1_path",
+    "metro_measures_filename",
+    "metro_panel_filename",
+    "metro_pep_filename",
+    "metro_pit_filename",
+    "metro_subset_membership_filename",
+    "metro_subset_membership_path",
+    "metro_universe_filename",
+    "metro_universe_path",
+    "metro_zori_filename",
+    "msa_boundaries_filename",
+    "msa_boundaries_path",
+    "msa_coc_block_population_xwalk_filename",
+    "msa_coc_block_population_xwalk_path",
+    "msa_coc_coverage_filename",
+    "msa_coc_coverage_path",
+    "msa_coc_panel_filename",
+    "msa_coc_xwalk_filename",
+    "msa_coc_xwalk_path",
+    "msa_county_membership_filename",
+    "msa_county_membership_path",
+    "msa_definitions_filename",
+    "msa_definitions_path",
+    "msa_fractional_rollup_filename",
+    "msa_fractional_rollup_path",
+    "msa_measures_filename",
+    "msa_panel_filename",
+    "msa_pep_filename",
+    "msa_pep_path",
+    "msa_pit_filename",
+    "msa_zori_yearly_filename",
+    "panel_filename",
+    "panel_path",
+    "pit_filename",
+    "pit_path",
+    "pit_vintage_filename",
+    "pit_vintage_path",
+    "pl_block_population_filename",
+    "pl_block_population_path",
+    "prism_county_monthly_filename",
+    "prism_county_monthly_path",
+    "recipe_transform_filename",
+    "sanctuary_msa_matches_filename",
+    "sanctuary_msa_matches_path",
+    "sanctuary_msa_panel_covariate_filename",
+    "sanctuary_msa_panel_covariate_path",
+    "tract_filename",
+    "tract_mediated_county_xwalk_filename",
+    "tract_mediated_county_xwalk_path",
+    "tract_path",
+    "tract_relationship_filename",
+    "tract_xwalk_filename",
+    "tract_xwalk_path",
+    "urban_area_filename",
+    "urban_area_path",
+    "vera_incarceration_county_filename",
+    "vera_incarceration_county_path",
+    "zori_filename",
+    "zori_ingest_filename",
+    "zori_ingest_path",
+    "zori_yearly_filename",
+]
