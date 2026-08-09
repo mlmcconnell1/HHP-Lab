@@ -26,6 +26,7 @@ order = ["contracts", "infrastructure", "domain", "application", "interface"]
 "hhplab.sources.saiz" = "domain"
 "hhplab.sources.zori" = "domain"
 "hhplab.sources.vera" = "domain"
+"hhplab.sources.doj" = "domain"
 "hhplab.geographies.xwalks" = "domain"
 
 "hhplab.registry" = "infrastructure"
