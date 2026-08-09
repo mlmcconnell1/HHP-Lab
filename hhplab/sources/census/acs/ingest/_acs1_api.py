@@ -18,7 +18,7 @@ from hhplab.sources.census.acs.variables_acs1 import (
     acs1_variable_names_for_vintage,
     acs1_variables_by_table_for_vintage,
 )
-from hhplab.sources.census.census.api import get_census_api_key, raise_for_census_api_status
+from hhplab.sources.census.api import get_census_api_key, raise_for_census_api_status
 from hhplab.sources.census.urls import CENSUS_API_ACS1
 
 logger = logging.getLogger(__name__)

@@ -83,7 +83,7 @@ from hhplab.sources.census.acs.variables import (
     api_vars_for_year,
     tables_for_api_vars,
 )
-from hhplab.sources.census.census.api import get_census_api_key, raise_for_census_api_status
+from hhplab.sources.census.api import get_census_api_key, raise_for_census_api_status
 from hhplab.sources.census.urls import CENSUS_API_ACS5
 from hhplab.storage.paths import curated_dir
 from hhplab.storage.provenance import (

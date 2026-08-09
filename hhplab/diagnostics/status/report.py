@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from hhplab.sources.census.census.api import (
+from hhplab.sources.census.api import (
     CENSUS_API_KEY_MISSING_MESSAGE,
     census_api_credentials_status,
     probe_census_api_reachability,

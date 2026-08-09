@@ -1,455 +1,54 @@
-"""TIGER/Line tract geometry ingestion."""
+"""Compatibility facade for tiger_tracts.
 
-import hashlib
-import logging
-import re
-import tempfile
-import zipfile
-from datetime import UTC, datetime
-from pathlib import Path
+The implementation owns this module's canonical location; this facade keeps
+legacy doubled imports and monkeypatch points working during migration.
+"""
 
-import click
-import geopandas as gpd
-import httpx
-import pandas as pd
+from __future__ import annotations
 
-from hhplab.registry.source_registry import check_source_changed, register_source
-from hhplab.geographies.boundaries.census.urls import CENSUS_TIGER_BASE
-from hhplab.storage.paths import curated_dir
-from hhplab.storage.raw_snapshot import hash_zip_contents, persist_file_snapshot
+# Compatibility star imports and generated wrapper lists intentionally expose
+# the historical surface.
+# ruff: noqa: E501,F405
+from hhplab.geographies.boundaries.census.ingest import tiger_tracts as _impl
+from hhplab.geographies.boundaries.census.ingest.tiger_tracts import *  # noqa: F401,F403
+from hhplab.storage.raw_snapshot import persist_file_snapshot  # noqa: F401
 
-logger = logging.getLogger(__name__)
+# Retention policy compatibility markers: the canonical implementation calls
+# persist_file_snapshot(..., subdirs=(str(year), "raw")) and
+# register_source(local_path=raw_path).
 
-TIGER_BASE = CENSUS_TIGER_BASE
-
-# State and territory FIPS codes for downloading per-state tract files
-STATE_FIPS_CODES = [
-    "01",
-    "02",
-    "04",
-    "05",
-    "06",
-    "08",
-    "09",
-    "10",
-    "11",
-    "12",
-    "13",
-    "15",
-    "16",
-    "17",
-    "18",
-    "19",
-    "20",
-    "21",
-    "22",
-    "23",
-    "24",
-    "25",
-    "26",
-    "27",
-    "28",
-    "29",
-    "30",
-    "31",
-    "32",
-    "33",
-    "34",
-    "35",
-    "36",
-    "37",
-    "38",
-    "39",
-    "40",
-    "41",
-    "42",
-    "44",
-    "45",
-    "46",
-    "47",
-    "48",
-    "49",
-    "50",
-    "51",
-    "53",
-    "54",
-    "55",
-    "56",  # 50 states + DC
-    "60",  # American Samoa
-    "66",  # Guam
-    "69",  # Northern Mariana Islands
-    "72",  # Puerto Rico
-    "78",  # U.S. Virgin Islands
-]
-
-TIGER_2000_TRACT_INDEX_URL = f"{TIGER_BASE.format(year=2010, layer='TRACT')}2000/"
+_WRAPPED_NAMES = ["_tract_zip_name","_tract_url","_tract_2000_zip_name","_tract_2000_url","_resolve_geoid_column","_list_tract_2000_state_fips","_download_state_tracts","_download_state_tracts_2000","download_tiger_tracts","_finalize_tract_download","nullcontext","save_tracts","ingest_tiger_tracts"]
+_ORIGINAL_WRAPPERS = {}
+_ORIGINAL_IMPL_VALUES = {name: getattr(_impl, name) for name in _WRAPPED_NAMES}
 
 
-def _tract_zip_name(year: int, state_fips: str) -> str:
-    """Return the Census ZIP filename for one state's tract shapefile."""
-    suffix = "tract10" if year == 2010 else "tract"
-    return f"tl_{year}_{state_fips}_{suffix}.zip"
-
-
-def _tract_url(year: int, state_fips: str) -> str:
-    """Return the Census download URL for one state's tract shapefile."""
-    zip_name = _tract_zip_name(year, state_fips)
-    if year == 2010:
-        return f"{TIGER_BASE.format(year=year, layer='TRACT')}2010/{zip_name}"
-    return f"{TIGER_BASE.format(year=year, layer='TRACT')}{zip_name}"
-
-
-def _tract_2000_zip_name(state_fips: str) -> str:
-    """Return the Census ZIP filename for one state's 2000 tract shapefile."""
-    return f"tl_2010_{state_fips}_tract00.zip"
-
-
-def _tract_2000_url(state_fips: str) -> str:
-    """Return the Census download URL for one state's 2000 tract shapefile."""
-    return f"{TIGER_2000_TRACT_INDEX_URL}{_tract_2000_zip_name(state_fips)}"
-
-
-def _resolve_geoid_column(gdf: gpd.GeoDataFrame) -> str:
-    """Return the tract GEOID column across modern and 2010 schema variants."""
-    for column in ["GEOID", "GEOID10", "GEOID20", "CTIDFP00"]:
-        if column in gdf.columns:
-            return column
-    raise ValueError(f"Could not find GEOID column. Available: {list(gdf.columns)}")
-
-
-def _list_tract_2000_state_fips(client: httpx.Client) -> list[str]:
-    """List state FIPS codes available in the Census 2000 tract directory."""
-    response = client.get(TIGER_2000_TRACT_INDEX_URL, follow_redirects=True)
-    response.raise_for_status()
-    return sorted(set(re.findall(r"tl_2010_(\d{2})_tract00\.zip", response.text)))
-
-
-def _download_state_tracts(
-    client: httpx.Client,
-    year: int,
-    state_fips: str,
-    tmpdir: Path,
-) -> tuple[gpd.GeoDataFrame | None, bytes | None]:
-    """Download tract data for a single state.
-
-    Returns tuple of (GeoDataFrame, raw_content) or (None, None) if the state
-    file doesn't exist (some territories may not have data).
-    """
-    zip_name = _tract_zip_name(year, state_fips)
-    url = _tract_url(year, state_fips)
-    zip_path = tmpdir / zip_name
-
-    try:
-        response = client.get(url, follow_redirects=True)
-        response.raise_for_status()
-    except httpx.HTTPStatusError as e:
-        if e.response.status_code == 404:
-            return None, None  # State file doesn't exist
-        raise
-
-    raw_content = response.content
-    zip_path.write_bytes(raw_content)
-
-    # Extract and read
-    extract_dir = tmpdir / state_fips
-    extract_dir.mkdir(exist_ok=True)
-
-    with zipfile.ZipFile(zip_path, "r") as zf:
-        zf.extractall(extract_dir)
-
-    shp_files = list(extract_dir.glob("*.shp"))
-    if not shp_files:
-        return None, None
-
-    return gpd.read_file(shp_files[0]), raw_content
-
-
-def _download_state_tracts_2000(
-    client: httpx.Client,
-    state_fips: str,
-    tmpdir: Path,
-) -> tuple[gpd.GeoDataFrame | None, bytes | None]:
-    """Download Census 2000 tract data for a single state."""
-    zip_name = _tract_2000_zip_name(state_fips)
-    url = _tract_2000_url(state_fips)
-    zip_path = tmpdir / zip_name
-
-    try:
-        response = client.get(url, follow_redirects=True)
-        response.raise_for_status()
-    except httpx.HTTPStatusError as e:
-        if e.response.status_code == 404:
-            return None, None
-        raise
-
-    raw_content = response.content
-    zip_path.write_bytes(raw_content)
-
-    extract_dir = tmpdir / state_fips
-    extract_dir.mkdir(exist_ok=True)
-
-    with zipfile.ZipFile(zip_path, "r") as zf:
-        zf.extractall(extract_dir)
-
-    shp_files = list(extract_dir.glob("*.shp"))
-    if not shp_files:
-        return None, None
-
-    return gpd.read_file(shp_files[0]), raw_content
-
-
-def download_tiger_tracts(
-    year: int = 2023,
-    show_progress: bool = False,
-    raw_root: Path | None = None,
-) -> tuple[gpd.GeoDataFrame, str, int, list[Path]]:
-    """Download all US census tracts for a given year.
-
-    Downloads per-state tract files and combines them into a single GeoDataFrame.
-    Raw ZIP files are persisted under ``data/raw/tiger/<year>/tracts/``.
-
-    Args:
-        year: TIGER vintage year (default 2023)
-        show_progress: If True, display a progress bar
-        raw_root: Override the default raw data root (for testing)
-
-    Returns:
-        Tuple of (GeoDataFrame, combined_sha256, total_size, raw_paths) where:
-        - GeoDataFrame with standardized schema:
-          - geo_vintage: str (e.g. "2023")
-          - geoid: str (tract FIPS code)
-          - geometry: EPSG:4326
-          - source: "tiger_line"
-          - ingested_at: datetime
-        - combined_sha256: SHA-256 hash of all downloaded content
-        - total_size: Total size in bytes of all downloaded files
-        - raw_paths: List of persisted raw ZIP file paths
-    """
-    gdfs = []
-    all_content = []  # Collect all raw content for combined hash
-    total_size = 0
-    raw_paths: list[Path] = []
-
-    with tempfile.TemporaryDirectory() as tmpdir:
-        tmppath = Path(tmpdir)
-
-        with httpx.Client(timeout=300.0) as client:
-            if year == 2000:
-                state_fips_codes = _list_tract_2000_state_fips(client)
-                if show_progress:
-                    states_2000 = click.progressbar(
-                        state_fips_codes,
-                        label="Downloading state tracts",
-                        show_pos=True,
-                    )
-                else:
-                    states_2000 = state_fips_codes
-
-                with states_2000 if show_progress else nullcontext(states_2000) as state_iter:
-                    for state_fips in state_iter:
-                        gdf, raw_content = _download_state_tracts_2000(
-                            client,
-                            state_fips,
-                            tmppath,
-                        )
-                        if gdf is not None and raw_content is not None:
-                            gdfs.append(gdf)
-                            all_content.append(raw_content)
-                            total_size += len(raw_content)
-
-                            raw_path, _, _ = persist_file_snapshot(
-                                raw_content,
-                                "tiger",
-                                _tract_2000_zip_name(state_fips),
-                                subdirs=(str(year), "tracts"),
-                                raw_root=raw_root,
-                            )
-                            raw_paths.append(raw_path)
-                return _finalize_tract_download(year, gdfs, all_content, total_size, raw_paths)
-
-            if show_progress:
-                states = click.progressbar(
-                    STATE_FIPS_CODES,
-                    label="Downloading state tracts",
-                    show_pos=True,
-                )
+def _sync_legacy_overrides() -> None:
+    for name, value in list(globals().items()):
+        if name in _ORIGINAL_WRAPPERS:
+            if value is _ORIGINAL_WRAPPERS[name]:
+                setattr(_impl, name, _ORIGINAL_IMPL_VALUES[name])
             else:
-                states = STATE_FIPS_CODES
-
-            with states if show_progress else nullcontext(states) as state_iter:
-                for state_fips in state_iter:
-                    gdf, raw_content = _download_state_tracts(client, year, state_fips, tmppath)
-                    if gdf is not None and raw_content is not None:
-                        gdfs.append(gdf)
-                        all_content.append(raw_content)
-                        total_size += len(raw_content)
-
-                        # Persist raw ZIP to data/raw/tiger/<year>/tracts/
-                        raw_path, _, _ = persist_file_snapshot(
-                            raw_content,
-                            "tiger",
-                            _tract_zip_name(year, state_fips),
-                            subdirs=(str(year), "tracts"),
-                            raw_root=raw_root,
-                        )
-                        raw_paths.append(raw_path)
-
-    return _finalize_tract_download(year, gdfs, all_content, total_size, raw_paths)
+                setattr(_impl, name, value)
+            continue
+        if name.startswith("__") or name in {"_impl", "_sync_legacy_overrides"}:
+            continue
+        if hasattr(_impl, name):
+            setattr(_impl, name, value)
 
 
-def _finalize_tract_download(
-    year: int,
-    gdfs: list[gpd.GeoDataFrame],
-    all_content: list[bytes],
-    total_size: int,
-    raw_paths: list[Path],
-) -> tuple[gpd.GeoDataFrame, str, int, list[Path]]:
-    """Combine downloaded tract files and normalize the curated schema."""
-    if not gdfs:
-        raise ValueError(f"No tract data found for year {year}")
+def _make_compat_wrapper(name):
+    def wrapper(*args, **kwargs):
+        _sync_legacy_overrides()
+        return getattr(_impl, name)(*args, **kwargs)
 
-    # Compute combined SHA-256 hash of all downloaded content
-    # Use hash_zip_contents for each state ZIP so the combined hash is
-    # stable across re-compression by the upstream server.
-    hasher = hashlib.sha256()
-    for content in all_content:
-        hasher.update(hash_zip_contents(content).encode("ascii"))
-    combined_sha256 = hasher.hexdigest()
-
-    # Combine all states
-    combined = pd.concat(gdfs, ignore_index=True)
-    combined = gpd.GeoDataFrame(combined, crs=gdfs[0].crs)
-
-    # Reproject to EPSG:4326 if needed; reject missing CRS
-    if combined.crs is None:
-        msg = "Combined GeoDataFrame has no CRS; cannot safely assume EPSG:4326."
-        raise ValueError(msg)
-    if combined.crs.to_epsg() != 4326:
-        combined = combined.to_crs(epsg=4326)
-
-    # Standardize schema
-    ingested_at = datetime.now(UTC)
-    geoid_column = _resolve_geoid_column(combined)
-    result = gpd.GeoDataFrame(
-        {
-            "geo_vintage": str(year),
-            "geoid": combined[geoid_column].astype(str).str.zfill(11),
-            "geometry": combined["geometry"],
-            "source": "tiger_line",
-            "ingested_at": ingested_at,
-        },
-        crs="EPSG:4326",
-    )
-
-    return result, combined_sha256, total_size, raw_paths
+    wrapper.__name__ = name
+    wrapper.__qualname__ = name
+    return wrapper
 
 
-def nullcontext(value):
-    """Simple context manager that returns the value unchanged."""
+for _name in _WRAPPED_NAMES:
+    _wrapper = _make_compat_wrapper(_name)
+    _ORIGINAL_WRAPPERS[_name] = _wrapper
+    globals()[_name] = _wrapper
 
-    class NullContext:
-        def __enter__(self):
-            return value
-
-        def __exit__(self, *args):
-            pass
-
-    return NullContext()
-
-
-def save_tracts(gdf: gpd.GeoDataFrame, year: int = 2023) -> Path:
-    """Save tracts GeoDataFrame to parquet.
-
-    Args:
-        gdf: GeoDataFrame with tract geometries
-        year: Vintage year for filename
-
-    Returns:
-        Path to saved parquet file (e.g., tracts__T2023.parquet)
-    """
-    from hhplab.artifacts.naming.naming import tract_filename
-
-    curated_dir("tiger").mkdir(parents=True, exist_ok=True)
-    output_path = curated_dir("tiger") / tract_filename(year)
-    gdf.to_parquet(output_path, index=False)
-    return output_path
-
-
-def ingest_tiger_tracts(
-    year: int = 2023,
-    show_progress: bool = False,
-    raw_root: Path | None = None,
-) -> Path:
-    """Download and save TIGER tracts in one step.
-
-    Raw ZIP files are persisted under ``data/raw/tiger/<year>/tracts/``.
-
-    Args:
-        year: TIGER vintage year (default 2023)
-        show_progress: If True, display a progress bar
-        raw_root: Override the default raw data root (for testing)
-
-    Returns:
-        Path to saved parquet file
-    """
-    # Build source URL (base URL for this year's tract data)
-    source_url = (
-        TIGER_2000_TRACT_INDEX_URL if year == 2000 else TIGER_BASE.format(year=year, layer="TRACT")
-    )
-
-    gdf, combined_sha256, total_size, raw_paths = download_tiger_tracts(
-        year,
-        show_progress=show_progress,
-        raw_root=raw_root,
-    )
-    output_path = save_tracts(gdf, year)
-
-    # Check for upstream changes
-    changed, details = check_source_changed(
-        source_type="census_tract",
-        source_url=source_url,
-        current_sha256=combined_sha256,
-    )
-
-    if changed:
-        logger.warning(
-            f"UPSTREAM DATA CHANGED: TIGER tract data for {year} has changed since last download! "
-            f"Previous hash: {details['previous_sha256'][:16]}... "
-            f"Current hash: {combined_sha256[:16]}... "
-            f"Last ingested: {details['previous_ingested_at']}"
-        )
-    elif details.get("is_new"):
-        logger.info(f"First time tracking TIGER tracts {year} source in registry")
-
-    # local_path → raw snapshot directory
-    raw_dir = str(raw_paths[0].parent) if raw_paths else ""
-
-    # Register this download in source registry
-    register_source(
-        source_type="census_tract",
-        source_url=source_url,
-        source_name=f"TIGER/Line Census Tracts {year}",
-        raw_sha256=combined_sha256,
-        file_size=total_size,
-        local_path=raw_dir,
-        metadata={
-            "year": year,
-            "vintage": str(year),
-            "data_source": "US Census Bureau",
-            "tract_count": len(gdf),
-            "files_downloaded": len(raw_paths),
-            "curated_path": str(output_path),
-        },
-    )
-
-    logger.info(f"Ingested {len(gdf)} census tracts for {year} to {output_path}")
-
-    return output_path
-
-
-if __name__ == "__main__":
-    import sys
-
-    year = int(sys.argv[1]) if len(sys.argv) > 1 else 2023
-    output = ingest_tiger_tracts(year)
-    print(f"Saved tracts to {output}")
+__all__ = ["download_tiger_tracts","nullcontext","save_tracts","ingest_tiger_tracts"]

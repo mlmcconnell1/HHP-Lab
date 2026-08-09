@@ -114,7 +114,7 @@ def tract_mediated_paths(
         tract_xwalk_path,
     )
     from hhplab.sources.census.acs.ingest.tract_population import get_output_path as acs_tract_path
-    from hhplab.sources.census.census.ingest.decennial_tract_population import (
+    from hhplab.sources.census.ingest.decennial_tract_population import (
         get_output_path as decennial_tract_path,
     )
 
