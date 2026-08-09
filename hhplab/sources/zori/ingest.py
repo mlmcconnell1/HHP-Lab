@@ -40,7 +40,7 @@ import pandas as pd
 
 from hhplab.registry.source_registry import check_source_changed, register_source
 from hhplab.schema.columns import ZORI_INGEST_OUTPUT_COLUMNS
-from hhplab.sources.urls import ZILLOW_ZORI_COUNTY, ZILLOW_ZORI_ZIP
+from hhplab.sources.zori.urls import ZILLOW_ZORI_COUNTY, ZILLOW_ZORI_ZIP
 from hhplab.storage.paths import curated_dir
 from hhplab.storage.provenance import ProvenanceBlock, write_parquet_with_provenance
 from hhplab.storage.raw_snapshot import raw_dir

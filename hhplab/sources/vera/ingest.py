@@ -15,7 +15,7 @@ from hhplab.artifacts.naming.naming import (
 )
 from hhplab.registry.source_registry import register_source
 from hhplab.schema.columns import VERA_INCARCERATION_COUNTY_MEASURE_COLUMNS
-from hhplab.sources.urls import (
+from hhplab.sources.vera.urls import (
     VERA_INCARCERATION_TRENDS_COUNTY_CSV,
     VERA_INCARCERATION_TRENDS_REPO,
 )

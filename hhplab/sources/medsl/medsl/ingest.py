@@ -11,7 +11,7 @@ import pandas as pd
 
 from hhplab.registry.source_registry import register_source
 from hhplab.schema.columns import MEDSL_COUNTY_PRESIDENTIAL_OUTPUT_COLUMNS
-from hhplab.sources.urls import (
+from hhplab.sources.medsl.urls import (
     MEDSL_COUNTY_PRESIDENTIAL_RETURNS_DATAVERSE_API,
     MEDSL_COUNTY_PRESIDENTIAL_RETURNS_DOI,
 )

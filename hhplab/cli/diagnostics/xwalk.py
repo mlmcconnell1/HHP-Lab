@@ -7,7 +7,7 @@ from typing import Annotated
 import pandas as pd
 import typer
 
-from hhplab.measures.measures_diagnostics import (
+from hhplab.geographies.xwalks.diagnostics import (
     compute_crosswalk_diagnostics,
     identify_problem_cocs,
     summarize_diagnostics,

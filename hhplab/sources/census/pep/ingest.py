@@ -38,7 +38,7 @@ import pandas as pd
 
 from hhplab.registry.source_registry import check_source_changed, register_source
 from hhplab.schema.columns import PEP_COUNTY_OUTPUT_COLUMNS
-from hhplab.sources.urls import CENSUS_PEP_DATASETS_BASE
+from hhplab.sources.census.urls import CENSUS_PEP_DATASETS_BASE
 from hhplab.storage.paths import curated_dir
 from hhplab.storage.provenance import ProvenanceBlock, write_parquet_with_provenance
 from hhplab.storage.raw_snapshot import raw_dir as canonical_raw_dir

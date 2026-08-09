@@ -13,7 +13,7 @@ from typing import Literal
 import httpx
 
 from hhplab.registry.source_registry import check_source_changed, register_source
-from hhplab.sources.urls import PRISM_WEB_SERVICE_TEMPLATE
+from hhplab.sources.prism.urls import PRISM_WEB_SERVICE_TEMPLATE
 from hhplab.storage.raw_snapshot import hash_zip_contents, persist_file_snapshot
 
 PRISM_TEMPERATURE_VARIABLES: tuple[str, ...] = ("tmin", "tmean", "tmax")

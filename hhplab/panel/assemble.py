@@ -58,7 +58,7 @@ import numpy as np
 import pandas as pd
 
 import hhplab.artifacts.naming.naming as naming
-from hhplab.analysis_geo import (
+from hhplab.geographies.analysis import (
     GEO_ID_COL,
     GEO_TYPE_COC,
     GEO_TYPE_METRO,
@@ -121,6 +121,7 @@ PANEL_COLUMNS = COC_PANEL_COLUMNS
 METRO_PANEL_COLUMNS = SCHEMA_METRO_PANEL_COLUMNS
 
 HIC_PANEL_JOIN_COLUMNS = ["coc_id", "year", *HIC_PANEL_MEASURE_COLUMNS]
+
 
 def _panel_geo_id_col(geo_type: str) -> str:
     """Return the native identifier column for a panel geo type."""
@@ -1365,9 +1366,7 @@ def build_panel(
                     None,
                 )
                 matched_count = (
-                    year_df[matched_measure].notna().sum()
-                    if matched_measure is not None
-                    else 0
+                    year_df[matched_measure].notna().sum() if matched_measure is not None else 0
                 )
                 logger.info(
                     f"Year {year}: merged ACS1 data (vintage {acs1_vintage}), "

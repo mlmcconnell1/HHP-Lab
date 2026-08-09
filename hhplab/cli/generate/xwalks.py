@@ -10,6 +10,10 @@ import pandas as pd
 import typer
 
 from hhplab.geographies.xwalks.county import build_coc_county_crosswalk, save_county_crosswalk
+from hhplab.geographies.xwalks.diagnostics import (
+    compute_crosswalk_diagnostics,
+    summarize_diagnostics,
+)
 from hhplab.geographies.xwalks.tract import (
     add_population_weights,
     build_coc_tract_crosswalk,
@@ -26,10 +30,6 @@ from hhplab.geographies.xwalks.tract_mediated import (
     save_tract_mediated_county_crosswalk,
     summarize_tract_mediated_crosswalk,
     tract_mediated_preflight_payload,
-)
-from hhplab.measures.measures_diagnostics import (
-    compute_crosswalk_diagnostics,
-    summarize_diagnostics,
 )
 from hhplab.registry.boundary_registry import latest_vintage, list_boundaries
 from hhplab.storage.paths import curated_dir

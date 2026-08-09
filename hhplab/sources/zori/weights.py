@@ -48,7 +48,7 @@ import httpx
 import pandas as pd
 
 from hhplab.registry.source_registry import check_source_changed, register_source
-from hhplab.sources.urls import CENSUS_API_ACS5
+from hhplab.sources.census.urls import CENSUS_API_ACS5
 from hhplab.storage.paths import curated_dir
 from hhplab.storage.provenance import ProvenanceBlock, write_parquet_with_provenance
 from hhplab.storage.raw_snapshot import write_api_snapshot

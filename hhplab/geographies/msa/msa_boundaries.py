@@ -12,12 +12,12 @@ import geopandas as gpd
 import httpx
 
 import hhplab.artifacts.naming.naming as naming
+from hhplab.geographies.boundaries.census.urls import CENSUS_TIGER_CBSA_TEMPLATE
 from hhplab.geographies.coc.coc_io import write_geoparquet
 from hhplab.geographies.msa.msa_definitions import DEFINITION_VERSION, SOURCE_REF
 from hhplab.geographies.msa.msa_io import download_delineation_rows, read_msa_definitions
 from hhplab.geographies.msa.msa_validate import validate_msa_boundaries
 from hhplab.registry.source_registry import check_source_changed, register_source
-from hhplab.sources.urls import CENSUS_TIGER_CBSA_TEMPLATE
 from hhplab.storage.provenance import ProvenanceBlock
 from hhplab.storage.raw_snapshot import persist_file_snapshot
 

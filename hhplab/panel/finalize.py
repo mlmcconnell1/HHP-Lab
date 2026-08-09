@@ -18,7 +18,7 @@ import logging
 
 import pandas as pd
 
-from hhplab.analysis_geo import GEO_TYPE_METRO, GEO_TYPE_MSA
+from hhplab.geographies.analysis import GEO_TYPE_METRO, GEO_TYPE_MSA
 from hhplab.schema.columns import (
     COC_PANEL_COLUMNS,
     METRO_PANEL_COLUMNS,
@@ -99,6 +99,7 @@ _PANEL_DTYPE_SPEC: dict[str, str | type] = {
 # Boundary-change detection
 # ---------------------------------------------------------------------------
 
+
 def detect_boundary_changes(
     df: pd.DataFrame,
     *,
@@ -129,6 +130,7 @@ def detect_boundary_changes(
 # Alignment-type classification
 # ---------------------------------------------------------------------------
 
+
 def determine_alignment_type(pit_year: int, boundary_vintage: str) -> str:
     """Classify alignment type for a PIT year and boundary vintage.
 
@@ -149,6 +151,7 @@ def determine_alignment_type(pit_year: int, boundary_vintage: str) -> str:
 # ---------------------------------------------------------------------------
 # Panel finalization
 # ---------------------------------------------------------------------------
+
 
 def _resolve_column_order(
     geo_type: str,
@@ -271,7 +274,9 @@ def finalize_panel(
     # 1. Boundary-change detection
     if add_boundary_changed and "boundary_changed" not in result.columns:
         result["boundary_changed"] = detect_boundary_changes(
-            result, geo_col=geo_col, vintage_col=vintage_col,
+            result,
+            geo_col=geo_col,
+            vintage_col=vintage_col,
         )
 
     # 2. Source labeling

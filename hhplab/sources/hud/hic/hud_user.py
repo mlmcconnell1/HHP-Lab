@@ -10,7 +10,7 @@ from pathlib import Path
 import httpx
 
 from hhplab.registry.source_registry import check_source_changed, register_source
-from hhplab.sources.urls import HUD_USER_HIC_COUNTS_BY_STATE_TEMPLATE
+from hhplab.sources.hud.urls import HUD_USER_HIC_COUNTS_BY_STATE_TEMPLATE
 from hhplab.storage.paths import raw_root
 
 DOWNLOAD_TIMEOUT = 120.0

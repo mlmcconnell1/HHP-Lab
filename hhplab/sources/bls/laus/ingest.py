@@ -71,7 +71,7 @@ from hhplab.sources.bls.laus.series import (
     LAUS_METRO_OUTPUT_COLUMNS,
     build_laus_series_id,
 )
-from hhplab.sources.urls import BLS_API_REGISTRATION_URL, BLS_API_V2, BLS_LAUS_SOURCE_REF
+from hhplab.sources.bls.urls import BLS_API_REGISTRATION_URL, BLS_API_V2, BLS_LAUS_SOURCE_REF
 from hhplab.storage.provenance import ProvenanceBlock, write_parquet_with_provenance
 
 logger = logging.getLogger(__name__)

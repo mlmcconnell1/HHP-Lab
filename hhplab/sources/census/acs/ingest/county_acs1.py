@@ -27,7 +27,7 @@ from hhplab.sources.census.acs.variables_acs1 import (
     acs1_unavailable_tables_for_vintage,
     acs1_variables_by_table_for_vintage,
 )
-from hhplab.sources.urls import CENSUS_API_ACS1
+from hhplab.sources.census.urls import CENSUS_API_ACS1
 from hhplab.storage.provenance import ProvenanceBlock, write_parquet_with_provenance
 
 logger = logging.getLogger(__name__)

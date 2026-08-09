@@ -41,7 +41,7 @@ from typing import Any, Literal
 
 import pandas as pd
 
-from hhplab.analysis_geo import resolve_geo_col as _resolve_geo_col
+from hhplab.geographies.analysis import resolve_geo_col as _resolve_geo_col
 from hhplab.schema.columns import (
     ACS1_MEASURE_COLUMNS,
     ACS_MEASURE_COLUMNS,
@@ -236,9 +236,7 @@ class ConformanceReport:
         warning_count = len(self.warnings)
 
         lines: list[str] = []
-        lines.append(
-            f"Conformance: {error_count} error(s), {warning_count} warning(s)"
-        )
+        lines.append(f"Conformance: {error_count} error(s), {warning_count} warning(s)")
 
         for result in self.results:
             icon = "\u2717" if result.severity == "error" else "\u26a0"
@@ -306,9 +304,7 @@ def register_check(fn: CheckFn) -> CheckFn:
 # ---------------------------------------------------------------------------
 
 
-def run_conformance(
-    panel_df: pd.DataFrame, request: PanelRequest
-) -> ConformanceReport:
+def run_conformance(panel_df: pd.DataFrame, request: PanelRequest) -> ConformanceReport:
     """Run all registered conformance checks and collect results.
 
     Parameters
@@ -445,10 +441,7 @@ def check_schema_measures(
             ConformanceResult(
                 check_name="check_schema_measures",
                 severity="error",
-                message=(
-                    "None of the expected measure columns are present "
-                    "in the panel schema"
-                ),
+                message=("None of the expected measure columns are present in the panel schema"),
                 details={
                     "expected_columns": list(expected),
                     "present_columns": present,
@@ -462,8 +455,7 @@ def check_schema_measures(
                 check_name="check_schema_measures",
                 severity="warning",
                 message=(
-                    f"Missing {len(missing)} of {len(expected)} expected "
-                    f"measure columns: {missing}"
+                    f"Missing {len(missing)} of {len(expected)} expected measure columns: {missing}"
                 ),
                 details={
                     "expected_columns": list(expected),
@@ -532,19 +524,14 @@ def check_schema_zori(
             )
         ]
 
-    missing_provenance = [
-        c for c in ZORI_PROVENANCE_COLUMNS if c not in panel_df.columns
-    ]
+    missing_provenance = [c for c in ZORI_PROVENANCE_COLUMNS if c not in panel_df.columns]
 
     if missing_provenance:
         return [
             ConformanceResult(
                 check_name="check_schema_zori",
                 severity="warning",
-                message=(
-                    f"ZORI provenance columns missing: "
-                    f"{', '.join(missing_provenance)}"
-                ),
+                message=(f"ZORI provenance columns missing: {', '.join(missing_provenance)}"),
                 details={
                     "expected_columns": list(ZORI_COLUMNS + ZORI_PROVENANCE_COLUMNS),
                     "present_columns": present_data
@@ -563,9 +550,7 @@ def check_schema_zori(
 
 
 @register_check
-def check_temporal_variation(
-    df: pd.DataFrame, request: PanelRequest
-) -> list[ConformanceResult]:
+def check_temporal_variation(df: pd.DataFrame, request: PanelRequest) -> list[ConformanceResult]:
     """Detect suspiciously static year-over-year values in the panel.
 
     For measures that should normally vary across years (population, PIT
@@ -645,9 +630,7 @@ def check_temporal_variation(
 
 
 @register_check
-def check_column_null_rates(
-    df: pd.DataFrame, request: PanelRequest
-) -> list[ConformanceResult]:
+def check_column_null_rates(df: pd.DataFrame, request: PanelRequest) -> list[ConformanceResult]:
     """Flag measure columns with high null rates."""
     results: list[ConformanceResult] = []
     total_count = len(df)
@@ -679,10 +662,7 @@ def check_column_null_rates(
                 ConformanceResult(
                     check_name="column_high_null_rate",
                     severity="warning",
-                    message=(
-                        f"{col} is {null_rate:.0%} null "
-                        f"({null_count}/{total_count} rows)"
-                    ),
+                    message=(f"{col} is {null_rate:.0%} null ({null_count}/{total_count} rows)"),
                     details={
                         "column": col,
                         "null_rate": null_rate,
@@ -697,9 +677,7 @@ def check_column_null_rates(
 
 
 @register_check
-def check_per_year_completeness(
-    df: pd.DataFrame, request: PanelRequest
-) -> list[ConformanceResult]:
+def check_per_year_completeness(df: pd.DataFrame, request: PanelRequest) -> list[ConformanceResult]:
     """Flag years where measure columns have a high overall null rate."""
     results: list[ConformanceResult] = []
 
@@ -723,9 +701,7 @@ def check_per_year_completeness(
         null_rate = null_cells / total_cells
 
         if null_rate > request.null_rate_threshold:
-            null_columns = [
-                c for c in present_cols if year_df[c].isna().any()
-            ]
+            null_columns = [c for c in present_cols if year_df[c].isna().any()]
             results.append(
                 ConformanceResult(
                     check_name="year_high_null_rate",
@@ -749,9 +725,7 @@ def check_per_year_completeness(
 
 
 @register_check
-def check_zori_eligibility_rate(
-    df: pd.DataFrame, request: PanelRequest
-) -> list[ConformanceResult]:
+def check_zori_eligibility_rate(df: pd.DataFrame, request: PanelRequest) -> list[ConformanceResult]:
     """Warn when ZORI eligibility rate is below the minimum threshold."""
     if not request.include_zori:
         return []
@@ -821,19 +795,14 @@ def check_pit_exceeds_population(
 
     bad_count = len(bad)
     examples = (
-        bad[[geo_col, "year", "pit_total", "total_population"]]
-        .head(5)
-        .to_dict(orient="records")
+        bad[[geo_col, "year", "pit_total", "total_population"]].head(5).to_dict(orient="records")
     )
 
     return [
         ConformanceResult(
             check_name="pit_exceeds_population",
             severity="error",
-            message=(
-                f"{bad_count} geo-year row(s) have pit_total > "
-                f"total_population"
-            ),
+            message=(f"{bad_count} geo-year row(s) have pit_total > total_population"),
             details={
                 "bad_row_count": bad_count,
                 "total_comparable_rows": len(comparable),
@@ -849,9 +818,7 @@ def check_pit_exceeds_population(
 
 
 @register_check
-def check_coc_count(
-    panel_df: pd.DataFrame, request: PanelRequest
-) -> list[ConformanceResult]:
+def check_coc_count(panel_df: pd.DataFrame, request: PanelRequest) -> list[ConformanceResult]:
     """Check whether the panel has the expected number of unique geo units."""
     expected = request.expected_geo_count or request.expected_coc_count
     if expected is None:
@@ -881,9 +848,7 @@ def check_coc_count(
 
 
 @register_check
-def check_panel_balance(
-    panel_df: pd.DataFrame, request: PanelRequest
-) -> list[ConformanceResult]:
+def check_panel_balance(panel_df: pd.DataFrame, request: PanelRequest) -> list[ConformanceResult]:
     """Check whether the panel is balanced (all CoCs in all years)."""
     try:
         geo_col = _resolve_geo_col(panel_df)
@@ -930,9 +895,7 @@ def check_panel_balance(
 
 
 @register_check
-def check_coc_year_gaps(
-    panel_df: pd.DataFrame, request: PanelRequest
-) -> list[ConformanceResult]:
+def check_coc_year_gaps(panel_df: pd.DataFrame, request: PanelRequest) -> list[ConformanceResult]:
     """Check for CoCs with non-contiguous year coverage (internal gaps).
 
     A gap means a CoC is present in year Y, absent in Y+1, present again
@@ -955,11 +918,13 @@ def check_coc_year_gaps(
         internal_missing = sorted(full_range - actual)
 
         if internal_missing:
-            gap_examples.append({
-                "geo_id": geo_id,
-                "present_years": present_years,
-                "missing_years": internal_missing,
-            })
+            gap_examples.append(
+                {
+                    "geo_id": geo_id,
+                    "present_years": present_years,
+                    "missing_years": internal_missing,
+                }
+            )
 
     if not gap_examples:
         return []

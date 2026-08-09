@@ -24,7 +24,7 @@ import httpx
 from shapely.geometry import shape
 
 from hhplab.registry.source_registry import check_source_changed, register_source
-from hhplab.sources.urls import (
+from hhplab.geographies.boundaries.hud.urls import (
     HUD_ARCGIS_COC_FEATURE_SERVICE,
     HUD_ARCGIS_COC_SOURCE_REF,
     HUD_EXCHANGE_COC_GDB_TEMPLATE,

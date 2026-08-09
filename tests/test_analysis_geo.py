@@ -17,6 +17,26 @@ from hhplab.analysis_geo import (
     infer_geo_type,
     resolve_geo_col,
 )
+from hhplab.geographies.analysis import (
+    AnalysisGeometryRef as CanonicalAnalysisGeometryRef,
+)
+from hhplab.geographies.analysis import (
+    ensure_canonical_geo_columns as canonical_ensure_canonical_geo_columns,
+)
+from hhplab.geographies.analysis import (
+    infer_geo_type as canonical_infer_geo_type,
+)
+from hhplab.geographies.analysis import (
+    resolve_geo_col as canonical_resolve_geo_col,
+)
+
+
+def test_analysis_geo_facade_reexports_canonical_contracts():
+    assert AnalysisGeometryRef is CanonicalAnalysisGeometryRef
+    assert ensure_canonical_geo_columns is canonical_ensure_canonical_geo_columns
+    assert infer_geo_type is canonical_infer_geo_type
+    assert resolve_geo_col is canonical_resolve_geo_col
+
 
 # ---------------------------------------------------------------------------
 # AnalysisGeometryRef
@@ -148,10 +168,12 @@ class TestInferGeoType:
 
     def test_all_null_geo_type_falls_back_to_heuristic(self):
         """geo_type column present but all-null → fall back to column heuristic."""
-        df = pd.DataFrame({
-            "geo_type": [None, None],
-            "coc_id": ["NY-600", "CA-600"],
-        })
+        df = pd.DataFrame(
+            {
+                "geo_type": [None, None],
+                "coc_id": ["NY-600", "CA-600"],
+            }
+        )
         assert infer_geo_type(df) == "coc"
 
 
@@ -173,9 +195,7 @@ class TestEnsureCanonicalGeoColumns:
 
     def test_metro_with_explicit_source_col(self):
         df = pd.DataFrame({"metro_id": ["GF01"], "year": [2020]})
-        result = ensure_canonical_geo_columns(
-            df, "metro", geo_id_source_col="metro_id"
-        )
+        result = ensure_canonical_geo_columns(df, "metro", geo_id_source_col="metro_id")
         assert list(result["geo_id"]) == ["GF01"]
         assert list(result["geo_type"]) == ["metro"]
 

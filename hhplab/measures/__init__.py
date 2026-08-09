@@ -1,9 +1,4 @@
-"""Measure diagnostics package.
-
-Source-specific aggregation code lives with its owning source package
-(for example ``hhplab.sources.census.acs``).  This package owns crosswalk and measure
-diagnostics used by CLI commands and tests.
-"""
+"""Compatibility facade for the retired measures diagnostics package."""
 
 from hhplab.measures.measures_diagnostics import (
     compute_crosswalk_diagnostics,

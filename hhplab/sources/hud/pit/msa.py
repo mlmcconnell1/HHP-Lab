@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from hhplab.analysis_geo import MSA_ID_COL
+from hhplab.geographies.analysis import MSA_ID_COL
 from hhplab.geographies.msa import aggregate_coc_to_msa_fractional_rollup
 from hhplab.storage.paths import curated_dir
 from hhplab.storage.provenance import ProvenanceBlock, write_parquet_with_provenance
@@ -53,22 +53,17 @@ def _normalize_pit_year_column(pit_df: pd.DataFrame) -> pd.DataFrame:
         df = df.rename(columns={"pit_year": "year"})
     if "year" not in df.columns:
         raise ValueError(
-            "PIT data must have 'year' or 'pit_year' column. "
-            f"Available: {list(df.columns)}"
+            f"PIT data must have 'year' or 'pit_year' column. Available: {list(df.columns)}"
         )
     return df
 
 
 def _validate_inputs(pit_df: pd.DataFrame, crosswalk_df: pd.DataFrame) -> None:
     if "coc_id" not in pit_df.columns:
-        raise ValueError(
-            "PIT data must have 'coc_id' column. "
-            f"Available: {list(pit_df.columns)}"
-        )
+        raise ValueError(f"PIT data must have 'coc_id' column. Available: {list(pit_df.columns)}")
     if "pit_total" not in pit_df.columns:
         raise ValueError(
-            "PIT data must have 'pit_total' column. "
-            f"Available: {list(pit_df.columns)}"
+            f"PIT data must have 'pit_total' column. Available: {list(pit_df.columns)}"
         )
 
     missing = [col for col in REQUIRED_CROSSWALK_COLUMNS if col not in crosswalk_df.columns]
@@ -82,9 +77,7 @@ def _validate_inputs(pit_df: pd.DataFrame, crosswalk_df: pd.DataFrame) -> None:
 def _resolve_single_value(series: pd.Series, field_name: str) -> str:
     values = sorted({str(value) for value in series.dropna().unique()})
     if len(values) != 1:
-        raise ValueError(
-            f"Crosswalk must have exactly one {field_name} value, found {values}"
-        )
+        raise ValueError(f"Crosswalk must have exactly one {field_name} value, found {values}")
     return values[0]
 
 
@@ -124,15 +117,11 @@ def aggregate_pit_to_msa(
     resolved_county = county_vintage or _resolve_single_value(
         crosswalk["county_vintage"], "county_vintage"
     )
-    allocation_method = _resolve_single_value(
-        crosswalk["allocation_method"], "allocation_method"
-    )
+    allocation_method = _resolve_single_value(crosswalk["allocation_method"], "allocation_method")
     share_column = _resolve_single_value(crosswalk["share_column"], "share_column")
 
     if share_column != "allocation_share":
-        raise ValueError(
-            f"Unsupported share_column '{share_column}'. Expected 'allocation_share'."
-        )
+        raise ValueError(f"Unsupported share_column '{share_column}'. Expected 'allocation_share'.")
     additive_columns = [
         column
         for column in ("pit_total", "pit_sheltered", "pit_unsheltered")

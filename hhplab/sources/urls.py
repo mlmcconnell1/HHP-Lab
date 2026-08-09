@@ -1,79 +1,48 @@
-"""Centralized source URLs and templates for ingest modules."""
+"""Compatibility facade for provider-owned source URLs.
 
-from __future__ import annotations
+New code should import URLs from the owning provider or geography boundary
+module. This facade preserves the historical ``hhplab.sources.urls`` API.
+"""
 
-from typing import Final
+from hhplab.geographies.boundaries.census.urls import (  # noqa: F401
+    CENSUS_MSA_DELINEATION_FILE_2023,
+    CENSUS_TIGER_BASE,
+    CENSUS_TIGER_CBSA_TEMPLATE,
+    CENSUS_TRACT_RELATIONSHIP_URL,
+)
+from hhplab.geographies.boundaries.hud.urls import (  # noqa: F401
+    HUD_ARCGIS_BASE,
+    HUD_ARCGIS_COC_FEATURE_SERVICE,
+    HUD_ARCGIS_COC_SOURCE_REF,
+    HUD_EXCHANGE_COC_GDB_TEMPLATE,
+    HUD_EXCHANGE_COC_NATIONAL_BOUNDARY_TEMPLATE,
+    HUD_EXCHANGE_COC_STATE_SHAPEFILE_TEMPLATE,
+)
+from hhplab.sources.bls.urls import (  # noqa: F401
+    BLS_API_REGISTRATION_URL,
+    BLS_API_V2,
+    BLS_CPI_SOURCE_REF,
+    BLS_LAUS_SOURCE_REF,
+)
+from hhplab.sources.census.urls import (  # noqa: F401
+    CENSUS_API_ACS1,
+    CENSUS_API_ACS5,
+    CENSUS_PEP_DATASETS_BASE,
+)
+from hhplab.sources.hud.urls import (  # noqa: F401
+    HUD_USER_HIC_BASE,
+    HUD_USER_HIC_COUNTS_BY_STATE_TEMPLATE,
+    HUD_USER_PIT_BASE,
+)
+from hhplab.sources.medsl.urls import (  # noqa: F401
+    MEDSL_COUNTY_PRESIDENTIAL_RETURNS_DATAVERSE_API,
+    MEDSL_COUNTY_PRESIDENTIAL_RETURNS_DOI,
+)
+from hhplab.sources.prism.urls import PRISM_WEB_SERVICE_TEMPLATE  # noqa: F401
+from hhplab.sources.vera.urls import (  # noqa: F401
+    VERA_INCARCERATION_TRENDS_COUNTY_CSV,
+    VERA_INCARCERATION_TRENDS_REPO,
+)
+from hhplab.sources.zori.urls import ZILLOW_ZORI_COUNTY, ZILLOW_ZORI_ZIP  # noqa: F401
 
-# Census Bureau
-CENSUS_API_ACS5: Final = "https://api.census.gov/data/{year}/acs/acs5"
-CENSUS_API_ACS1: Final = "https://api.census.gov/data/{year}/acs/acs1"
-CENSUS_TIGER_BASE: Final = "https://www2.census.gov/geo/tiger/TIGER{year}/{layer}/"
-CENSUS_TIGER_CBSA_TEMPLATE: Final = (
-    "https://www2.census.gov/geo/tiger/TIGER{year}/CBSA/tl_{year}_us_cbsa.zip"
-)
-CENSUS_TRACT_RELATIONSHIP_URL: Final = (
-    "https://www2.census.gov/geo/docs/maps-data/data/rel2020/tract/tab20_tract20_tract10_natl.txt"
-)
-CENSUS_MSA_DELINEATION_FILE_2023: Final = (
-    "https://www2.census.gov/programs-surveys/metro-micro/"
-    "geographies/reference-files/2023/delineation-files/list1_2023.xlsx"
-)
-
-# Census PEP
-CENSUS_PEP_DATASETS_BASE: Final = "https://www2.census.gov/programs-surveys/popest/datasets"
-
-# HUD (CoC boundaries + PIT)
-HUD_ARCGIS_BASE: Final = "https://services.arcgis.com/VTyQ9soqVukalItT/ArcGIS/rest/services"
-HUD_ARCGIS_COC_FEATURE_SERVICE: Final = (
-    f"{HUD_ARCGIS_BASE}/Continuum_of_Care_Grantee_Areas/FeatureServer/0/query"
-)
-HUD_ARCGIS_COC_SOURCE_REF: Final = (
-    "https://hudgis-hud.opendata.arcgis.com/datasets/HUD::continuum-of-care-coc-grantee-areas"
-)
-HUD_EXCHANGE_COC_GDB_TEMPLATE: Final = (
-    "https://files.hudexchange.info/resources/documents/CoC_GIS_NatlTerrDC_Shapefile_{vintage}.zip"
-)
-HUD_EXCHANGE_COC_NATIONAL_BOUNDARY_TEMPLATE: Final = (
-    "https://files.hudexchange.info/resources/documents/CoC_GIS_National_Boundary_{vintage}.zip"
-)
-HUD_EXCHANGE_COC_STATE_SHAPEFILE_TEMPLATE: Final = (
-    "https://files.hudexchange.info/reports/published/CoC_GIS_State_Shapefile_{state}_{vintage}.zip"
-)
-HUD_USER_PIT_BASE: Final = "https://www.huduser.gov/portal/sites/default/files/xls/"
-HUD_USER_HIC_BASE: Final = "https://www.huduser.gov/portal/sites/default/files/xls/"
-HUD_USER_HIC_COUNTS_BY_STATE_TEMPLATE: Final = (
-    f"{HUD_USER_HIC_BASE}{{year}}-HIC-Counts-by-State.csv"
-)
-
-# BLS (Bureau of Labor Statistics)
-BLS_API_V2: Final = "https://api.bls.gov/publicAPI/v2/timeseries/data/"
-BLS_LAUS_SOURCE_REF: Final = "https://www.bls.gov/lau/home.htm"
-BLS_CPI_SOURCE_REF: Final = "https://www.bls.gov/cpi/"
-BLS_API_REGISTRATION_URL: Final = "https://data.bls.gov/registrationEngine/"
-
-# Zillow
-ZILLOW_ZORI_COUNTY: Final = "https://files.zillowstatic.com/research/public_csvs/zori/County_zori_uc_sfrcondomfr_sm_month.csv"
-ZILLOW_ZORI_ZIP: Final = (
-    "https://files.zillowstatic.com/research/public_csvs/zori/Zip_zori_uc_sfrcondomfr_sm_month.csv"
-)
-
-# PRISM Climate Group
-PRISM_WEB_SERVICE_TEMPLATE: Final = (
-    "https://data.prism.oregonstate.edu/time_series/us/an/4km/"
-    "{variable}/monthly/{year}/prism_{variable}_us_25m_{year}{month:02d}.zip"
-)
-
-# MIT Election Data and Science Lab (MEDSL)
-MEDSL_COUNTY_PRESIDENTIAL_RETURNS_DOI: Final = "https://doi.org/10.7910/DVN/VOQCHQ"
-MEDSL_COUNTY_PRESIDENTIAL_RETURNS_DATAVERSE_API: Final = (
-    "https://dataverse.harvard.edu/api/access/datafile/13573089"
-)
-
-# Vera Institute of Justice
-VERA_INCARCERATION_TRENDS_REPO: Final = (
-    "https://github.com/vera-institute/incarceration-trends"
-)
-VERA_INCARCERATION_TRENDS_COUNTY_CSV: Final = (
-    "https://raw.githubusercontent.com/vera-institute/incarceration-trends/"
-    "main/incarceration_trends_county.csv"
-)
+__all__ = [name for name in globals() if name.isupper()]

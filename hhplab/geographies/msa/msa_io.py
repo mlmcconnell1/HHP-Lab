@@ -8,6 +8,7 @@ import httpx
 import pandas as pd
 
 import hhplab.artifacts.naming.naming as naming
+from hhplab.geographies.boundaries.census.urls import CENSUS_MSA_DELINEATION_FILE_2023
 from hhplab.geographies.msa.msa_definitions import (
     DEFINITION_VERSION,
     DELINEATION_FILE_YEAR,
@@ -20,7 +21,6 @@ from hhplab.geographies.msa.msa_definitions import (
 )
 from hhplab.geographies.msa.msa_validate import MSAValidationResult, validate_msa_artifacts
 from hhplab.registry.source_registry import check_source_changed, register_source
-from hhplab.sources.urls import CENSUS_MSA_DELINEATION_FILE_2023
 from hhplab.storage.provenance import ProvenanceBlock, write_parquet_with_provenance
 from hhplab.storage.raw_snapshot import persist_file_snapshot
 

@@ -6,7 +6,7 @@ import os
 
 import httpx
 
-from hhplab.sources.urls import CENSUS_API_ACS5
+from hhplab.sources.census.urls import CENSUS_API_ACS5
 
 CENSUS_API_KEY_ENV = "CENSUS_API_KEY"
 CENSUS_API_KEY_SIGNUP_URL = "https://api.census.gov/data/key_signup.html"
