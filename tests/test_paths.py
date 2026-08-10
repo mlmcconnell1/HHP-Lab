@@ -98,3 +98,11 @@ class TestDefaultFallback:
         monkeypatch.chdir(tmp_path)
         result = output_root()
         assert result == tmp_path / "outputs"
+
+    def test_repo_package_working_directory_uses_external_roots(self, monkeypatch) -> None:
+        package_root = Path(__file__).resolve().parents[1] / "hhplab"
+        monkeypatch.chdir(package_root)
+
+        resolved_roots = (asset_store_root().resolve(), output_root().resolve())
+
+        assert all(package_root.resolve() not in root.parents for root in resolved_roots)

@@ -109,7 +109,9 @@ def load_config(
         Explicit override (highest precedence), typically from a CLI flag.
     project_root : Path, optional
         Repository root used for locating ``hhplab.yaml`` and computing
-        built-in defaults.  Defaults to the current working directory.
+        built-in defaults.  When omitted, the nearest current-directory
+        ancestor containing ``hhplab.yaml`` is used; otherwise defaults to
+        the current working directory.
 
     Returns
     -------
@@ -117,7 +119,7 @@ def load_config(
         Fully resolved storage configuration.
     """
     if project_root is None:
-        project_root = Path.cwd()
+        project_root = _discover_project_root(Path.cwd())
     project_root = Path(project_root).resolve()
 
     # Layer 4 — user config (~/.config/hhplab/config.yaml)
@@ -162,6 +164,22 @@ def load_config(
         asset_store_root=Path(resolved_asset),
         output_root=Path(resolved_output),
     )
+
+
+def _discover_project_root(start: Path) -> Path:
+    """Return the nearest configured project root for implicit resolution.
+
+    Commands are sometimes launched from a package subdirectory (for example,
+    ``<repo>/hhplab``).  Searching parents for the repository configuration
+    prevents those invocations from creating runtime ``data/`` or ``outputs/``
+    directories inside the importable package.  Unconfigured working
+    directories retain the historical current-directory defaults.
+    """
+    resolved_start = start.resolve()
+    for candidate in (resolved_start, *resolved_start.parents):
+        if (candidate / REPO_CONFIG_FILENAME).is_file():
+            return candidate
+    return resolved_start
 
 
 def _resolve_value(

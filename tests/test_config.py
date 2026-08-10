@@ -43,6 +43,22 @@ class TestDefaults:
         with pytest.raises(AttributeError):
             cfg.asset_store_root = tmp_path / "other"  # type: ignore[misc]
 
+    def test_discovers_repo_config_from_package_subdirectory(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        repo_root = tmp_path / "repo"
+        package_dir = repo_root / "hhplab" / "sources"
+        package_dir.mkdir(parents=True)
+        (repo_root / REPO_CONFIG_FILENAME).write_text(
+            "asset_store_root: ../assets\noutput_root: ../products\n"
+        )
+        monkeypatch.chdir(package_dir)
+
+        cfg = load_config()
+
+        assert cfg.asset_store_root == tmp_path / "assets"
+        assert cfg.output_root == tmp_path / "products"
+
 
 # ---------------------------------------------------------------------------
 # CLI flags (layer 1 — highest precedence)
@@ -96,23 +112,17 @@ class TestCLIFlags:
 class TestEnvVars:
     """Environment variables override config files but not CLI."""
 
-    def test_env_asset_store_root(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
+    def test_env_asset_store_root(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setenv(ENV_ASSET_STORE_ROOT, "/env/assets")
         cfg = load_config(project_root=tmp_path)
         assert cfg.asset_store_root == Path("/env/assets")
 
-    def test_env_output_root(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
+    def test_env_output_root(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setenv(ENV_OUTPUT_ROOT, "/env/outputs")
         cfg = load_config(project_root=tmp_path)
         assert cfg.output_root == Path("/env/outputs")
 
-    def test_env_overrides_repo_yaml(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
+    def test_env_overrides_repo_yaml(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         (tmp_path / REPO_CONFIG_FILENAME).write_text("asset_store_root: /repo/assets\n")
         monkeypatch.setenv(ENV_ASSET_STORE_ROOT, "/env/assets")
         cfg = load_config(project_root=tmp_path)
@@ -275,9 +285,7 @@ class TestYAMLLoading:
 class TestFullPrecedence:
     """Multiple layers active at once resolve correctly."""
 
-    def test_all_layers_cli_wins(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
+    def test_all_layers_cli_wins(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         # Set up all layers
         monkeypatch.setenv(ENV_ASSET_STORE_ROOT, "/env/assets")
         (tmp_path / REPO_CONFIG_FILENAME).write_text("asset_store_root: /repo/assets\n")
@@ -285,9 +293,7 @@ class TestFullPrecedence:
         cfg = load_config(asset_store_root="/cli/assets", project_root=tmp_path)
         assert cfg.asset_store_root == Path("/cli/assets")
 
-    def test_mixed_sources(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
+    def test_mixed_sources(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         """asset_store_root from env, output_root from repo yaml."""
         monkeypatch.setenv(ENV_ASSET_STORE_ROOT, "/env/assets")
         (tmp_path / REPO_CONFIG_FILENAME).write_text("output_root: /repo/outputs\n")
