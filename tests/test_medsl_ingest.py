@@ -22,7 +22,7 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
-from hhplab.sources.medsl.medsl.ingest import (
+from hhplab.sources.medsl.ingest import (
     MEDSL_COUNTY_PRESIDENTIAL_COLUMNS,
     ingest_county_presidential_returns,
     parse_county_presidential_returns,
@@ -211,10 +211,13 @@ class TestParseCountyPresidentialReturns:
         assert set(result["geo_type"]) == {"county"}
         assert {"01001", "01003", "01005", "11001"} == set(result["county_fips"])
         assert not (result["candidatevotes"] == 30).any()
-        assert result.loc[
-            (result["county_fips"] == "01005") & (result["candidate"] == "MODE ONLY DEMOCRAT"),
-            "candidatevotes",
-        ].iloc[0] == 4300
+        assert (
+            result.loc[
+                (result["county_fips"] == "01005") & (result["candidate"] == "MODE ONLY DEMOCRAT"),
+                "candidatevotes",
+            ].iloc[0]
+            == 4300
+        )
         assert "02001" not in set(result["county_fips"])
         assert result.attrs["missing_county_fips_dropped"] == 1
         assert result.attrs["invalid_county_fips_dropped"] == 1
@@ -301,9 +304,7 @@ class TestIngestCountyPresidentialReturns:
         def fake_register_source(**kwargs: object) -> None:
             registered.append(kwargs)
 
-        monkeypatch.setattr(
-            "hhplab.sources.medsl.medsl.ingest.register_source", fake_register_source
-        )
+        monkeypatch.setattr("hhplab.sources.medsl.ingest.register_source", fake_register_source)
 
         output = ingest_county_presidential_returns(
             raw_path,

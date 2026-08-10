@@ -26,7 +26,7 @@ class TestRootCommand:
 class TestNestedIngestCommand:
     """Tests for the nested 'ingest boundaries' command."""
 
-    @patch("hhplab.sources.hud.hud.ingest_hud_exchange")
+    @patch("hhplab.geographies.boundaries.hud.ingest_hud_exchange")
     def test_ingest_boundaries_nested_hud_exchange(self, mock_ingest):
         """Nested ingest boundaries should call ingest_hud_exchange."""
         mock_ingest.return_value = Path("data/curated/coc_boundaries/coc_boundaries__2025.parquet")
@@ -48,7 +48,7 @@ class TestNestedIngestCommand:
         assert "Successfully ingested" in result.output
         mock_ingest.assert_called_once_with("2025", show_progress=True)
 
-    @patch("hhplab.sources.hud.hud.ingest_hud_exchange")
+    @patch("hhplab.geographies.boundaries.hud.ingest_hud_exchange")
     def test_ingest_boundaries_nested_hud_exchange_json(self, mock_ingest):
         """JSON mode should emit only a machine-readable payload."""
         output_path = Path("data/curated/coc_boundaries/coc__B2025.parquet")
@@ -131,9 +131,7 @@ class TestNestedIngestCommand:
         assert "Vera county incarceration trends" in result.output
 
     def test_ingest_vera_incarceration_json(self):
-        output_path = Path(
-            "data/curated/vera/vera_incarceration_county__Y1970-2026@C2020.parquet"
-        )
+        output_path = Path("data/curated/vera/vera_incarceration_county__Y1970-2026@C2020.parquet")
         with (
             patch(
                 "hhplab.cli.ingest.vera.ingest_county_incarceration_trends",
@@ -687,9 +685,7 @@ class TestRetiredCommandRegression:
         assert result.exit_code == 0
         payload = json.loads(result.output)
 
-        guardrail_ids = {
-            guardrail["id"] for guardrail in payload["inference_guardrails"]
-        }
+        guardrail_ids = {guardrail["id"] for guardrail in payload["inference_guardrails"]}
         assert guardrail_ids == {
             "small_n",
             "pit_2021_disruption",

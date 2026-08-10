@@ -8,6 +8,9 @@ import pandas as pd
 import pytest
 from pandas.errors import PerformanceWarning
 
+from hhplab.geographies.boundaries.census.ingest.tract_relationship import (
+    TractRelationshipNotFoundError,
+)
 from hhplab.sources.census.acs.translate import (
     TranslationStats,
     default_tract_vintage_for_acs,
@@ -16,7 +19,6 @@ from hhplab.sources.census.acs.translate import (
     translate_acs_to_target_vintage,
     translate_tracts_2010_to_2020,
 )
-from hhplab.sources.census.census.ingest.tract_relationship import TractRelationshipNotFoundError
 
 TRANSLATION_MEDIAN_DENOMINATOR_CASES = {
     "gross_rent": {
@@ -733,7 +735,7 @@ class TestIntegrationWithRealRelationshipFile:
     def _relationship_file_available(self) -> bool:
         """Check if the relationship file is available."""
         try:
-            from hhplab.sources.census.census.ingest.tract_relationship import (
+            from hhplab.geographies.boundaries.census.ingest.tract_relationship import (
                 get_tract_relationship_path,
             )
 

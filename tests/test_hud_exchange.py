@@ -10,7 +10,7 @@ import geopandas as gpd
 import pytest
 from shapely.geometry import Polygon
 
-from hhplab.sources.hud.hud.exchange_gis import (
+from hhplab.geographies.boundaries.hud.exchange_gis import (
     _HUD_STATE_ABBREVIATIONS,
     COC_ID_FIELDS,
     _download_per_state_shapefiles,
@@ -236,7 +236,7 @@ class TestDownloadHudExchangeGdb:
         )
         # Stub per-state fallback to avoid 55 HTTP requests in test
         monkeypatch.setattr(
-            "hhplab.sources.hud.hud.exchange_gis._download_per_state_shapefiles",
+            "hhplab.geographies.boundaries.hud.exchange_gis._download_per_state_shapefiles",
             lambda *a, **kw: None,
         )
 
@@ -306,11 +306,11 @@ class TestIngestHudExchange:
             lambda **kwargs: None,
         )
         monkeypatch.setattr(
-            "hhplab.sources.hud.hud.exchange_gis.check_source_changed",
+            "hhplab.geographies.boundaries.hud.exchange_gis.check_source_changed",
             lambda **kwargs: (False, {"is_new": True, "previous_sha256": None}),
         )
         monkeypatch.setattr(
-            "hhplab.sources.hud.hud.exchange_gis.register_source",
+            "hhplab.geographies.boundaries.hud.exchange_gis.register_source",
             lambda **kwargs: None,
         )
 
@@ -391,7 +391,7 @@ class TestIngestHudExchange:
 
     def test_arcgis_path_uses_make_run_id(self):
         """hud_exchange_gis should import and use make_run_id for collision-resistant run_ids."""
-        import hhplab.sources.hud.hud.exchange_gis as mod
+        import hhplab.geographies.boundaries.hud.exchange_gis as mod
 
         assert hasattr(mod, "make_run_id"), "hud_exchange_gis should import make_run_id"
         # Verify make_run_id produces timestamp format, not date-only
@@ -419,7 +419,7 @@ class TestIngestHudExchange:
 
     def test_historical_vintage_uses_legacy_source_by_default(self, tmp_path, monkeypatch):
         """Historical year ingests should not relabel the current ArcGIS layer."""
-        import hhplab.sources.hud.hud.exchange_gis as mod
+        import hhplab.geographies.boundaries.hud.exchange_gis as mod
 
         raw_dir = tmp_path / "raw"
         curated_dir = tmp_path / "curated"
@@ -470,7 +470,7 @@ class TestPerStateFallbackCompleteness:
             return None
 
         monkeypatch.setattr(
-            "hhplab.sources.hud.hud.exchange_gis._download_and_extract_zip",
+            "hhplab.geographies.boundaries.hud.exchange_gis._download_and_extract_zip",
             fake_download_and_extract,
         )
 
@@ -485,7 +485,7 @@ class TestPerStateFallbackCompleteness:
             return shp_path
 
         monkeypatch.setattr(
-            "hhplab.sources.hud.hud.exchange_gis._download_and_extract_zip",
+            "hhplab.geographies.boundaries.hud.exchange_gis._download_and_extract_zip",
             fake_download_and_extract,
         )
 

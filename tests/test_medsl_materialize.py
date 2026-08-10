@@ -7,7 +7,7 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
-from hhplab.sources.medsl.medsl.materialize import (
+from hhplab.sources.medsl.materialize import (
     build_county_political_leaning_measures,
     materialize_county_political_leaning,
 )

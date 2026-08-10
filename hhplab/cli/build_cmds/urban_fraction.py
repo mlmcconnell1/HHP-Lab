@@ -20,7 +20,7 @@ from hhplab.geographies.xwalks.urban_fraction import (
     build_coc_urban_fraction_intersections,
     summarize_coc_urban_fraction_intersections,
 )
-from hhplab.sources.census.census.ingest.decennial_tract_population import STATE_FIPS_CODES
+from hhplab.sources.census.ingest.decennial_tract_population import STATE_FIPS_CODES
 from hhplab.storage.paths import curated_dir
 from hhplab.storage.provenance import ProvenanceBlock, write_parquet_with_provenance
 
@@ -332,8 +332,7 @@ def _load_block_inputs(pl_blocks_path: Path, block_geometry_path: Path | None) -
     missing_columns = sorted({"block_geoid", "geometry"} - set(block_geometry.columns))
     if missing_columns:
         raise ValueError(
-            "Block geometry artifact missing required column(s): "
-            f"{', '.join(missing_columns)}."
+            f"Block geometry artifact missing required column(s): {', '.join(missing_columns)}."
         )
     merged = pl_blocks.merge(
         block_geometry[["block_geoid", "geometry"]],
@@ -369,10 +368,7 @@ def _build_coc_urban_fraction_chunked(
     """Build urban fractions one state at a time to bound peak memory."""
     states = _available_block_states(pl_blocks_path)
     if progress:
-        typer.echo(
-            f"Processing {len(states)} state/territory block chunk(s): "
-            f"{', '.join(states)}"
-        )
+        typer.echo(f"Processing {len(states)} state/territory block chunk(s): {', '.join(states)}")
     intersection_parts: list[pd.DataFrame] = []
     processed_chunks = 0
 
@@ -422,9 +418,7 @@ def _build_coc_urban_fraction_chunked(
             "block/CoC intersection row(s)..."
         )
     all_intersections = (
-        pd.concat(intersection_parts, ignore_index=True)
-        if intersection_parts
-        else pd.DataFrame()
+        pd.concat(intersection_parts, ignore_index=True) if intersection_parts else pd.DataFrame()
     )
     summary, detail = summarize_coc_urban_fraction_intersections(
         all_intersections,
@@ -476,11 +470,7 @@ def _missing_summary_coc_ids(
     expected = coc_gdf["coc_id"].dropna().astype(str)
     if expected.empty:
         return []
-    observed = (
-        set(summary["coc_id"].dropna().astype(str))
-        if "coc_id" in summary.columns
-        else set()
-    )
+    observed = set(summary["coc_id"].dropna().astype(str)) if "coc_id" in summary.columns else set()
     return sorted(set(expected) - observed)
 
 
@@ -560,8 +550,7 @@ def _load_block_inputs_for_state(
     missing_columns = sorted({"block_geoid", "geometry"} - set(block_geometry.columns))
     if missing_columns:
         raise ValueError(
-            "Block geometry artifact missing required column(s): "
-            f"{', '.join(missing_columns)}."
+            f"Block geometry artifact missing required column(s): {', '.join(missing_columns)}."
         )
     merged = pl_blocks.merge(
         block_geometry[["block_geoid", "geometry"]],
@@ -591,9 +580,7 @@ def _missing_input_commands(
     missing_inputs: list[str],
 ) -> dict[str, str]:
     commands = {
-        "coc_boundaries": (
-            f"hhplab ingest boundaries --source hud_exchange --vintage {boundary}"
-        ),
+        "coc_boundaries": (f"hhplab ingest boundaries --source hud_exchange --vintage {boundary}"),
         "urban_areas": f"hhplab ingest urban-areas --year {urban_area_vintage}",
         "pl_blocks": f"hhplab ingest pl-blocks --decennial {decennial} --blocks {block_vintage}",
         "block_geometry": (
@@ -617,9 +604,7 @@ def _block_geometry_status(
     if block_geometry_path is not None:
         status = _path_status(block_geometry_path)
         status["has_geometry"] = (
-            _geoparquet_has_geometry(block_geometry_path)
-            if block_geometry_path.exists()
-            else False
+            _geoparquet_has_geometry(block_geometry_path) if block_geometry_path.exists() else False
         )
         return status
     return {"path": "", "exists": False}

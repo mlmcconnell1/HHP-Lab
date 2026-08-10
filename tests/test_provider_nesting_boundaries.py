@@ -41,15 +41,19 @@ CANONICAL_OWNER_CASES = [
 
 
 @pytest.mark.parametrize(("module_name", "symbol"), CANONICAL_OWNER_CASES)
-def test_provider_implementation_lives_at_canonical_location(
-    module_name: str, symbol: str
-) -> None:
+def test_provider_implementation_lives_at_canonical_location(module_name: str, symbol: str) -> None:
     implementation = getattr(import_module(module_name), symbol)
 
     assert implementation.__module__ == module_name
 
 
 LEGACY_FACADE_CASES = [
+    pytest.param(
+        "hhplab.analysis_geo",
+        "hhplab.geographies.analysis",
+        "resolve_geo_col",
+        id="analysis-geography-facade",
+    ),
     pytest.param(
         "hhplab.sources.census.census.api",
         "hhplab.sources.census.api",
@@ -67,6 +71,18 @@ LEGACY_FACADE_CASES = [
         "hhplab.sources.medsl.ingest",
         "ingest_county_presidential_returns",
         id="medsl-facade",
+    ),
+    pytest.param(
+        "hhplab.sources.census.census.ingest.pl_block_population",
+        "hhplab.sources.census.ingest.pl_block_population",
+        "ingest_pl_block_population",
+        id="census-data-product-facade",
+    ),
+    pytest.param(
+        "hhplab.sources.census.census.ingest.tiger_tracts",
+        "hhplab.geographies.boundaries.census.ingest.tiger_tracts",
+        "ingest_tiger_tracts",
+        id="census-boundary-facade",
     ),
 ]
 

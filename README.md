@@ -257,6 +257,24 @@ Remaining compatibility shims are intentionally narrow:
   `metro_county_membership__glynn_fox_v1` still exist for regression coverage
   and migration safety
 
+Python import compatibility follows the same rule. Repository-owned code uses
+the canonical paths below; the old paths remain supported for the `0.x` release
+series so existing notebooks and downstream packages have a defined migration
+window.
+
+| Transitional import | Canonical import |
+| --- | --- |
+| `hhplab.analysis_geo` | `hhplab.geographies.analysis` |
+| `hhplab.sources.census.census.api` | `hhplab.sources.census.api` |
+| `hhplab.sources.census.census.ingest.{decennial_tract_population,pl_block_population}` | `hhplab.sources.census.ingest.{decennial_tract_population,pl_block_population}` |
+| `hhplab.sources.census.census.ingest.{tiger_blocks,tiger_counties,tiger_tracts,tract_relationship,urban_areas}` | `hhplab.geographies.boundaries.census.ingest.{tiger_blocks,tiger_counties,tiger_tracts,tract_relationship,urban_areas}` |
+| `hhplab.sources.hud.hud.{exchange_gis,opendata_arcgis}` | `hhplab.geographies.boundaries.hud.{exchange_gis,opendata_arcgis}` |
+| `hhplab.sources.medsl.medsl.{ingest,materialize}` | `hhplab.sources.medsl.{ingest,materialize}` |
+
+The transitional modules preserve historical monkeypatch seams as well as
+imports. Remove them only in a post-`0.x` breaking release, after release notes
+announce the change and compatibility tests show no repository-owned consumers.
+
 Removal path:
 
 - keep the shim while committed recipes, examples, and downstream users still

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from hhplab.sources.census.census.ingest.decennial_tract_population import (
+from hhplab.sources.census.ingest.decennial_tract_population import (
     fetch_decennial_tract_population,
 )
 

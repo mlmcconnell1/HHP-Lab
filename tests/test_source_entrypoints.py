@@ -1,19 +1,15 @@
 """Tests for source-owned package entrypoints."""
 
-import hhplab.sources.census.census.ingest as census_ingest
+import hhplab.geographies.boundaries.census.ingest as census_ingest
+import hhplab.geographies.boundaries.hud as hud
 from hhplab import cdc, census, medsl, nhgis, vera
 from hhplab.geographies.boundaries.census.nhgis.ingest import (
     ingest_nhgis_counties,
     ingest_nhgis_tracts,
 )
+from hhplab.geographies.boundaries.hud import ingest_hud_exchange, ingest_hud_opendata
 from hhplab.sources.cdc import aggregate_county_overdose_to_msa, ingest_county_overdose
-from hhplab.sources.census.census.ingest import (
-    ingest_tiger_counties,
-    ingest_tiger_tracts,
-    load_tract_relationship,
-)
-from hhplab.sources.hud import hud, pit
-from hhplab.sources.hud.hud import ingest_hud_exchange, ingest_hud_opendata
+from hhplab.sources.hud import pit
 from hhplab.sources.hud.pit.ingest import download_pit_data, parse_pit_file
 from hhplab.sources.hud.pit.qa import validate_pit_data
 
@@ -25,17 +21,17 @@ def test_package_root_lazy_exports() -> None:
     assert hhplab.sources.cdc is cdc
     assert hhplab.census is census
     assert hhplab.hud is hud
-    assert hhplab.sources.medsl.medsl is medsl
+    assert hhplab.sources.medsl is medsl
     assert hhplab.geographies.boundaries.census.nhgis is nhgis
     assert hhplab.pit is pit
     assert hhplab.sources.vera is vera
 
 
 def test_census_root_reexports_ingest_helpers() -> None:
-    """Census root should expose its canonical ingest surface."""
-    assert census.ingest_tiger_counties is ingest_tiger_counties
-    assert census.ingest_tiger_tracts is ingest_tiger_tracts
-    assert census.load_tract_relationship is load_tract_relationship
+    """The compatibility root should keep its historical ingest surface callable."""
+    assert callable(census.ingest_tiger_counties)
+    assert callable(census.ingest_tiger_tracts)
+    assert callable(census.load_tract_relationship)
 
 
 def test_cdc_root_reexports_overdose_helpers() -> None:

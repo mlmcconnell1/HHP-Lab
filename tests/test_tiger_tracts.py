@@ -9,8 +9,8 @@ from shapely.geometry import Point
 from typer.testing import CliRunner
 
 from hhplab.cli.main import app
-from hhplab.sources.census.census.ingest import tiger_blocks
-from hhplab.sources.census.census.ingest.tiger_blocks import (
+from hhplab.geographies.boundaries.census.ingest import tiger_blocks
+from hhplab.geographies.boundaries.census.ingest.tiger_blocks import (
     STATE_DOWNLOAD_ATTEMPTS,
     _block_geometry_parts_dir,
     _block_url,
@@ -24,14 +24,14 @@ from hhplab.sources.census.census.ingest.tiger_blocks import (
     save_block_geometry,
     save_block_geometry_from_parts,
 )
-from hhplab.sources.census.census.ingest.tiger_tracts import (
+from hhplab.geographies.boundaries.census.ingest.tiger_tracts import (
     _resolve_geoid_column,
     _tract_2000_url,
     _tract_2000_zip_name,
     _tract_url,
     _tract_zip_name,
 )
-from hhplab.sources.census.census.ingest.urban_areas import (
+from hhplab.geographies.boundaries.census.ingest.urban_areas import (
     get_urban_area_output_path,
     normalize_urban_areas,
     save_urban_areas,
@@ -339,7 +339,7 @@ def test_stream_state_block_parts_writes_one_part_per_state(monkeypatch, tmp_pat
         )
 
     monkeypatch.setattr(
-        "hhplab.sources.census.census.ingest.tiger_blocks._fetch_or_load_state_blocks",
+        "hhplab.geographies.boundaries.census.ingest.tiger_blocks._fetch_or_load_state_blocks",
         fake_fetch_or_load_state_blocks,
     )
     parts_dir = _block_geometry_parts_dir(2020, tmp_path)
@@ -377,7 +377,7 @@ def test_stream_state_block_parts_errors_when_all_states_are_missing(
         return None, None, None
 
     monkeypatch.setattr(
-        "hhplab.sources.census.census.ingest.tiger_blocks._fetch_or_load_state_blocks",
+        "hhplab.geographies.boundaries.census.ingest.tiger_blocks._fetch_or_load_state_blocks",
         fake_fetch_or_load_state_blocks,
     )
 
@@ -403,7 +403,7 @@ def test_download_state_blocks_retries_transient_http_errors(monkeypatch, tmp_pa
             raise httpx.ReadError("peer closed connection")
 
     monkeypatch.setattr(
-        "hhplab.sources.census.census.ingest.tiger_blocks.time.sleep", lambda _seconds: None
+        "hhplab.geographies.boundaries.census.ingest.tiger_blocks.time.sleep", lambda _seconds: None
     )
 
     with pytest.raises(httpx.ReadError, match="peer closed connection"):
@@ -436,7 +436,7 @@ def test_download_state_blocks_retries_non_404_http_status_errors(
             raise _http_status_error(503)
 
     monkeypatch.setattr(
-        "hhplab.sources.census.census.ingest.tiger_blocks.time.sleep", lambda _seconds: None
+        "hhplab.geographies.boundaries.census.ingest.tiger_blocks.time.sleep", lambda _seconds: None
     )
 
     with pytest.raises(httpx.HTTPStatusError, match="HTTP 503"):
@@ -459,7 +459,7 @@ def test_download_state_blocks_returns_missing_for_404_without_retry(
             raise _http_status_error(404)
 
     monkeypatch.setattr(
-        "hhplab.sources.census.census.ingest.tiger_blocks.time.sleep", lambda _seconds: None
+        "hhplab.geographies.boundaries.census.ingest.tiger_blocks.time.sleep", lambda _seconds: None
     )
 
     assert _download_state_blocks(MissingClient(), 2020, "20", tmp_path) == (
@@ -486,7 +486,7 @@ def test_stream_state_block_parts_resumes_completed_parts(monkeypatch, tmp_path)
         raise AssertionError("completed state should not be fetched again")
 
     monkeypatch.setattr(
-        "hhplab.sources.census.census.ingest.tiger_blocks._fetch_or_load_state_blocks",
+        "hhplab.geographies.boundaries.census.ingest.tiger_blocks._fetch_or_load_state_blocks",
         fail_fetch_or_load_state_blocks,
     )
 
@@ -687,7 +687,7 @@ def test_ingest_urban_areas_cli_fresh_json(monkeypatch, tmp_path) -> None:
         lambda year: tmp_path / "missing.parquet",
     )
     monkeypatch.setattr(
-        "hhplab.sources.census.census.ingest.urban_areas.ingest_urban_areas",
+        "hhplab.geographies.boundaries.census.ingest.urban_areas.ingest_urban_areas",
         lambda year, force=False: output_path,
     )
 
@@ -711,7 +711,7 @@ def test_ingest_urban_areas_cli_fresh_json_uses_parquet_metadata(
         lambda year: tmp_path / "missing.parquet",
     )
     monkeypatch.setattr(
-        "hhplab.sources.census.census.ingest.urban_areas.ingest_urban_areas",
+        "hhplab.geographies.boundaries.census.ingest.urban_areas.ingest_urban_areas",
         lambda year, force=False: output_path,
     )
     monkeypatch.setattr("hhplab.cli.ingest.census._parquet_row_count", lambda path: 9)
@@ -748,7 +748,7 @@ def test_ingest_block_geometry_cli_fresh_json(monkeypatch, tmp_path) -> None:
         lambda year: tmp_path / "missing.parquet",
     )
     monkeypatch.setattr(
-        "hhplab.sources.census.census.ingest.tiger_blocks.ingest_block_geometry",
+        "hhplab.geographies.boundaries.census.ingest.tiger_blocks.ingest_block_geometry",
         lambda year, force=False: output_path,
     )
 

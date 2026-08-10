@@ -12,8 +12,8 @@ from hhplab.artifacts.naming.naming import (
     tract_filename,
     urban_area_filename,
 )
-from hhplab.sources.census.census.ingest.tiger_blocks import get_block_geometry_output_path
-from hhplab.sources.census.census.ingest.urban_areas import get_urban_area_output_path
+from hhplab.geographies.boundaries.census.ingest.tiger_blocks import get_block_geometry_output_path
+from hhplab.geographies.boundaries.census.ingest.urban_areas import get_urban_area_output_path
 from hhplab.storage.paths import curated_dir
 
 
@@ -36,7 +36,7 @@ def ingest_tiger(
         typer.Option(
             "--type",
             "-t",
-        help="What to download: 'tracts', 'counties', 'blocks', 'urban-areas', or 'all'.",
+            help="What to download: 'tracts', 'counties', 'blocks', 'urban-areas', or 'all'.",
         ),
     ] = "all",
     force: Annotated[
@@ -99,7 +99,7 @@ def ingest_tiger(
                 typer.echo(f"Forcing rebuild: removing existing {tracts_path}")
             typer.echo(f"Downloading TIGER tracts for {year}...")
             try:
-                from hhplab.sources.census.census.ingest import ingest_tiger_tracts
+                from hhplab.geographies.boundaries.census.ingest import ingest_tiger_tracts
 
                 output_path = ingest_tiger_tracts(year, show_progress=True)
                 typer.echo(f"Saved tracts to: {output_path}")
@@ -121,7 +121,7 @@ def ingest_tiger(
                 typer.echo(f"Forcing rebuild: removing existing {counties_path}")
             typer.echo(f"Downloading TIGER counties for {year}...")
             try:
-                from hhplab.sources.census.census.ingest import ingest_tiger_counties
+                from hhplab.geographies.boundaries.census.ingest import ingest_tiger_counties
 
                 output_path = ingest_tiger_counties(year)
                 typer.echo(f"Saved counties to: {output_path}")
@@ -140,7 +140,7 @@ def ingest_tiger(
                 typer.echo(f"Forcing rebuild: removing existing {blocks_path}")
             typer.echo(f"Downloading TIGER tabulation blocks for {year}...")
             try:
-                from hhplab.sources.census.census.ingest import ingest_block_geometry
+                from hhplab.geographies.boundaries.census.ingest import ingest_block_geometry
 
                 output_path = ingest_block_geometry(year, force=force)
                 typer.echo(f"Saved block geometry to: {output_path}")
@@ -159,7 +159,7 @@ def ingest_tiger(
                 typer.echo(f"Forcing rebuild: removing existing {urban_areas_path}")
             typer.echo(f"Downloading Census Urban Areas for {year}...")
             try:
-                from hhplab.sources.census.census.ingest import ingest_urban_areas
+                from hhplab.geographies.boundaries.census.ingest import ingest_urban_areas
 
                 output_path = ingest_urban_areas(year, force=force)
                 typer.echo(f"Saved Urban Areas to: {output_path}")
@@ -209,7 +209,7 @@ def ingest_block_geometry_cmd(
     ] = False,
 ) -> None:
     """Ingest Census tabulation block geometry."""
-    from hhplab.sources.census.census.ingest.tiger_blocks import ingest_block_geometry
+    from hhplab.geographies.boundaries.census.ingest.tiger_blocks import ingest_block_geometry
 
     output_path = get_block_geometry_output_path(year)
     if output_path.exists() and not force:
@@ -283,7 +283,7 @@ def ingest_urban_areas_cmd(
     ] = False,
 ) -> None:
     """Ingest Census Urban Area geometry for 2010 or 2020."""
-    from hhplab.sources.census.census.ingest.urban_areas import ingest_urban_areas
+    from hhplab.geographies.boundaries.census.ingest.urban_areas import ingest_urban_areas
 
     output_path = get_urban_area_output_path(year)
     if output_path.exists() and not force:

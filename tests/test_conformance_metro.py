@@ -63,14 +63,14 @@ def metro_panel():
 class TestResolveGeoCol:
     def test_metro_id_resolved(self):
         """resolve_geo_col should recognize metro_id."""
-        from hhplab.analysis_geo import resolve_geo_col
+        from hhplab.geographies.analysis import resolve_geo_col
 
         df = pd.DataFrame({"metro_id": ["GF01"], "year": [2020]})
         assert resolve_geo_col(df) == "metro_id"
 
     def test_coc_id_preferred_over_metro_id(self):
         """If both coc_id and metro_id exist, coc_id wins (backward compat)."""
-        from hhplab.analysis_geo import resolve_geo_col
+        from hhplab.geographies.analysis import resolve_geo_col
 
         df = pd.DataFrame(
             {

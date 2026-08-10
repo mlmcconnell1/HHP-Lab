@@ -26,7 +26,7 @@ from hhplab.geographies.xwalks.tract_mediated import (
     save_tract_mediated_county_crosswalk,
     summarize_tract_mediated_crosswalk,
 )
-from hhplab.sources.census.census.ingest.decennial_tract_population import STATE_FIPS_CODES
+from hhplab.sources.census.ingest.decennial_tract_population import STATE_FIPS_CODES
 from hhplab.storage.provenance import read_provenance
 
 TRACT_CROSSWALK = pd.DataFrame(
@@ -276,10 +276,7 @@ class TestTractMediatedCountyCrosswalk:
     def test_missing_required_denominator_rows_raise_actionable_error(self):
         with pytest.raises(
             ValueError,
-            match=(
-                "Tract-mediated denominator coverage is incomplete: "
-                "B/01001: 1 of 2 tract"
-            ),
+            match=("Tract-mediated denominator coverage is incomplete: B/01001: 1 of 2 tract"),
         ):
             build_tract_mediated_county_crosswalk(
                 TRACT_CROSSWALK,

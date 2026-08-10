@@ -22,8 +22,8 @@ class TestTigerIngestCommand:
         assert result.exit_code == 1
         assert "Invalid type" in result.output
 
-    @patch("hhplab.sources.census.census.ingest.ingest_tiger_tracts")
-    @patch("hhplab.sources.census.census.ingest.ingest_tiger_counties")
+    @patch("hhplab.geographies.boundaries.census.ingest.ingest_tiger_tracts")
+    @patch("hhplab.geographies.boundaries.census.ingest.ingest_tiger_counties")
     def test_ingest_tiger_cached_skips_downloads(
         self,
         mock_counties,
@@ -306,7 +306,7 @@ class TestBuildXwalksCommand:
 
         from hhplab.artifacts.naming.naming import tract_xwalk_path
         from hhplab.registry.schema import RegistryEntry
-        from hhplab.sources.census.census.ingest.decennial_tract_population import get_output_path
+        from hhplab.sources.census.ingest.decennial_tract_population import get_output_path
 
         with runner.isolated_filesystem(temp_dir=tmp_path):
             Path("pyproject.toml").touch()
