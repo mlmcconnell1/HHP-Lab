@@ -14,3 +14,6 @@ The figure scripts write generated SVGs to ignored output files under
 `outputs/report_src/figs/`. The HTML uses relative links to those generated
 figures so it can be opened directly from `report_src/report.html` after the
 figure scripts run.
+
+The inventory, input/output contract, and retention decision are documented in
+[`devdocs/report-source-reproducibility.md`](../devdocs/report-source-reproducibility.md).
