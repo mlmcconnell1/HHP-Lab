@@ -1,0 +1,61 @@
+schema = 1
+
+[management]
+state_file = ".agentenv/state.toml"
+lock_file = "agentenv.lock"
+generated_header = true
+generated_files = "commit"
+
+# Using config.toml in ~/.config/agentenv
+
+[[guidance]]
+root = "guidance_loc"
+source = "preamble.md"
+priority = 100
+
+[[guidance]]
+root = "guidance_loc"
+source = "beads_rust.md"
+priority = 90
+
+[[guidance]]
+root = "guidance_loc"
+source = "beads_viewer.md"
+priority = 80
+
+[[guidance]]
+root = "guidance_loc"
+source = "elements.md"
+priority = 70
+
+[[guidance]]
+source = "agentenv/HHP-Lab guidance.md"
+priority = 50
+
+[[guidance]]
+root = "guidance_loc"
+source = "landing_the_plane.md"
+priority = 10
+
+# Optional shared repository ignore rules:
+[[gitignore]]
+root = "gitignore_loc"
+source = "common.gitignore"
+
+[[gitignore]]
+source = "agentenv/hhp-lab.gitignore"
+
+# Optional shared skill; uncomment and enable only when this skill is useful:
+[[skills]]
+root = "skills_loc"
+source = "pty-subagents"
+
+[targets.codex]
+enabled = true
+guidance_output = "AGENTS.md"
+skills_output = ".agents/skills"
+
+[checks]
+fail_on_drift = true
+reject_absolute_sources = true
+reject_secrets = true

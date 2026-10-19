@@ -1,0 +1,18 @@
+schema = 1
+
+[[managed_files]]
+  path = ".gitignore"
+  sha256 = "41cc487a19a28bc188a700fa9e4c3ac4a5412619cdcbcadf8dbdb70c38f7204e"
+  target = "gitignore"
+  source_kind = "gitignore"
+
+[[managed_files]]
+  path = "AGENTS.md"
+  sha256 = "14316ad4b24d7333975f5291270a258400f70f6c9b4b7d83b496070470968b99"
+  target = "codex"
+  source_kind = "guidance"
+
+[[managed_directories]]
+  path = ".agents/skills/pty-subagents"
+  tree_sha256 = "6d8fddb88503f896ab546a1ea4c0b0bec6ad7f5bae62bd048dbe7012687263de"
+  target = "codex"

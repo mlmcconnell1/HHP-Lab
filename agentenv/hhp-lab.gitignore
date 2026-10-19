@@ -1,0 +1,37 @@
+# Data files (downloaded/generated)
+data/
+exports/
+/builds/
+
+# Python-generated files
+__pycache__/
+*.py[oc]
+/build/
+dist/
+wheels/
+*.egg-info
+
+# Pdf background documents
+*.pdf
+
+# Virtual environments
+.venv
+
+# macOS
+.DS_Store
+
+# Obsidian
+.obsidian/
+
+# bv (beads viewer) local config and caches
+.bv/
+.beads/.bv.lock
+
+# Local agent/generated caches
+.recipe_cache/
+.beads-backup/
+# br doctor per-run artifacts
+.doctor/
+
+# Analysis outputs (regenerable via hhplab CLI; provenance in manifests)
+outputs/

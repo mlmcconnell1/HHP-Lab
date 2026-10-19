@@ -1,0 +1,116 @@
+#!/usr/bin/perl
+# ptycrunch - clean and deduplicate a PTY output stream before logging.
+#   pty-source | ptycrunch >> agent.log
+# 1. resolves \r overwrites (keeps only the final state of progress lines)
+# 2. strips ANSI escapes (CSI, OSC, charset shifts)
+# 3. drops any line already emitted within the last WINDOW distinct lines,
+#    which collapses full-screen TUI repaints to their new content only
+# Input is consumed in bounded chunks. A newline-free stream is emitted as
+# bounded records rather than retained until EOF, so it cannot grow memory
+# without limit. Escape-sequence state is retained across chunk boundaries.
+use strict; use warnings;
+use Errno qw(EINTR);
+$| = 1;
+
+my $WINDOW = $ENV{PTYCRUNCH_WINDOW} // 250;
+$WINDOW = 250 unless $WINDOW =~ /^\d+$/ && $WINDOW > 0;
+my $MAX_PENDING = $ENV{PTYCRUNCH_MAX_PENDING} // 65536;
+$MAX_PENDING = 65536 unless $MAX_PENDING =~ /^\d+$/ && $MAX_PENDING > 0;
+my (@ring, %seen);
+
+sub emit {
+    my ($line) = @_;
+    $line =~ s/\s+$//;
+    return if $line eq '' || $seen{$line};
+    print "$line\n";
+    push @ring, $line;
+    $seen{$line} = 1;
+    delete $seen{ shift @ring } while @ring > $WINDOW;
+}
+
+my $line = '';
+my $escape = '';
+my $carriage_return = 0;
+
+sub finish_line {
+    emit($line);
+    $line = '';
+    $carriage_return = 0;
+}
+
+sub consume {
+    my ($byte) = @_;
+
+    # A CR immediately followed by LF terminates the current line. A CR
+    # followed by text overwrites it, matching a terminal progress update.
+    if ($carriage_return) {
+        if ($byte eq "\n") {
+            finish_line();
+            return;
+        }
+        $line = '';
+        $carriage_return = 0;
+    }
+
+    if ($escape eq 'osc') {
+        if ($byte eq "\a") {
+            $escape = '';
+        } elsif ($byte eq "\e") {
+            $escape = 'osc-esc';
+        }
+        return;
+    }
+    if ($escape eq 'osc-esc') {
+        $escape = $byte eq '\\' ? '' : 'osc';
+        return;
+    }
+    if ($escape eq 'csi') {
+        $escape = '' if ord($byte) >= 0x40 && ord($byte) <= 0x7e;
+        return;
+    }
+    if ($escape eq 'esc') {
+        $escape = $byte eq '[' ? 'csi'
+          : ($byte eq ']' ? 'osc'
+          : ((ord($byte) >= 0x20 && ord($byte) <= 0x2f) ? 'esc-intermediate' : ''));
+        return;
+    }
+    if ($escape eq 'esc-intermediate') {
+        $escape = (ord($byte) >= 0x20 && ord($byte) <= 0x2f) ? 'esc-intermediate' : '';
+        return;
+    }
+
+    if ($byte eq "\e") {
+        $escape = 'esc';
+    } elsif ($byte eq "\r") {
+        $carriage_return = 1;
+    } elsif ($byte eq "\n") {
+        finish_line();
+    } elsif (ord($byte) >= 0x20 || $byte eq "\t") {
+        $line .= $byte;
+        # Flush a bounded record for a long newline-free stream. This is
+        # deliberately a record boundary, not a claim that the input line
+        # ended; subsequent bytes continue in a fresh bounded record.
+        if (length($line) >= $MAX_PENDING) {
+            emit($line);
+            $line = '';
+        }
+    }
+}
+
+my $buffer = '';
+while (1) {
+    my $bytes = sysread(STDIN, $buffer, 4096);
+    if (!defined $bytes) {
+        next if $! == EINTR;
+        die "ptycrunch: read failed: $!\n";
+    }
+    last if $bytes == 0;
+    for my $index (0 .. $bytes - 1) {
+        consume(substr($buffer, $index, 1));
+    }
+}
+
+# A final CR overwrites the current record, as it does for an unterminated
+# progress line. Otherwise preserve a final line that lacks a newline.
+$line = '' if $carriage_return;
+emit($line) if $line ne '';
