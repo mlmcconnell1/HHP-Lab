@@ -117,6 +117,7 @@ class BundlePayload:
     tolerance: Tolerance = field(default_factory=Tolerance)
     private: bool = False
     allow_unknown_aggregates: bool = False
+    site_universes: Mapping[str, Mapping[str, Any]] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
@@ -325,6 +326,10 @@ class BundleWriter:
         else:
             from hhplab.results.report import render_readme, render_report
 
+            # A restricted run still publishes a status-only report. It contains
+            # no protected analysis values, so its path is included even when
+            # the full report is withheld by lineage policy.
+            withheld = [item for item in withheld if item.get("path") != "report/index.html"]
             report_payload = _status_only_report_payload(payload, withheld)
             report_html = render_report(report_payload).encode("utf-8")
             _write_new_file(self.bundle_dir, "report/index.html", report_html)
@@ -378,6 +383,7 @@ class BundleWriter:
             input_identities=payload.input_identities,
             private=payload.private,
             files=tuple(file_records),
+            site_universes=_included_site_universe_index(payload, included),
         )
         manifest_bytes = canonical_bytes(manifest.to_dict())
         _write_new_file(self.bundle_dir, "manifest.json", manifest_bytes)
@@ -568,6 +574,7 @@ def _validate_payload(payload: BundlePayload) -> None:
             "lineage supplied for unknown result table(s): "
             f"{sorted(set(payload.result_table_lineage) - set(RESULT_TABLE_NAMES))}"
         )
+    _validate_site_universe_payload(payload)
     for name, rows in payload.result_tables.items():
         validate_result_rows(name, rows)
     if not isinstance(payload.report_payload, Mapping):
@@ -598,6 +605,52 @@ def _validate_payload(payload: BundlePayload) -> None:
     if not isinstance(payload.tolerance, Tolerance):
         raise BundleError("tolerance must be a Tolerance value")
     _validate_relative_path("recipe/original.yaml")
+
+
+def _validate_site_universe_payload(payload: BundlePayload) -> None:
+    if not isinstance(payload.site_universes, Mapping):
+        raise BundleError("site_universes must be a mapping")
+    artifacts = {artifact.path for artifact in payload.artifacts}
+    seen_paths: set[str] = set()
+    for artifact_id, entry in payload.site_universes.items():
+        if not isinstance(artifact_id, str) or not artifact_id.strip():
+            raise BundleError("site-universes artifact IDs must be non-empty strings")
+        if not isinstance(entry, Mapping):
+            raise BundleError(f"site-universe index for {artifact_id!r} must be a mapping")
+        required = {"schema_version", "sites", "memberships", "summary", "boundary_evidence"}
+        optional = set()
+        if set(entry) - required - optional or required - set(entry):
+            raise BundleError(f"site-universe index for {artifact_id!r} has invalid fields")
+        if entry["schema_version"] != "msa_coc_sites/1":
+            raise BundleError(f"site-universe index for {artifact_id!r} has unsupported schema")
+        for key, path in entry.items():
+            if key == "schema_version":
+                continue
+            if not isinstance(path, str) or path not in artifacts:
+                raise BundleError(
+                    f"site-universe index {artifact_id!r}.{key} must name a bundle artifact"
+                )
+            if path in seen_paths:
+                raise BundleError(f"site-universe artifact path is indexed more than once: {path}")
+            seen_paths.add(path)
+
+
+def _included_site_universe_index(
+    payload: BundlePayload, included: set[str]
+) -> dict[str, dict[str, Any]]:
+    result: dict[str, dict[str, Any]] = {}
+    for artifact_id, entry in payload.site_universes.items():
+        paths = {value for key, value in entry.items() if key != "schema_version"}
+        selected = paths & included
+        if selected and selected != paths:
+            raise BundleError(
+                f"site-universe inputs for {artifact_id!r} were only partly included"
+            )
+        indexed = dict(entry)
+        if paths and not selected:
+            indexed["withheld"] = True
+        result[artifact_id] = indexed
+    return result
 
 
 def _execution_mapping(payload: BundlePayload, included: set[str]) -> dict[str, Any]:

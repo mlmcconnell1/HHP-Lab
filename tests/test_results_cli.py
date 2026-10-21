@@ -68,6 +68,100 @@ def test_static_commands_json(recipe_path, command):
     assert json.loads(response.output)["status"] in {"ok", "ready"}
 
 
+def test_build_plan_and_preflight_resolve_recipe_output_root(recipe_path, tmp_path):
+    data = deepcopy(RECIPE)
+    data["output_root"] = "recipe-output"
+    recipe_path.write_text(yaml.safe_dump(data))
+    for command in (("build", "recipe-plan"), ("build", "recipe-preflight")):
+        response = RUNNER.invoke(
+            app,
+            [*command, "--recipe", str(recipe_path), "--json"],
+        )
+        assert response.exit_code == 0, response.output
+        payload = json.loads(response.output)
+        assert payload["output_root"] == str(recipe_path.parent / "recipe-output")
+        assert payload["output_destinations"]["results_bundle"].startswith(
+            str(recipe_path.parent / "recipe-output")
+        )
+
+
+def test_build_plan_explicit_cli_root_beats_recipe_root(recipe_path, tmp_path):
+    data = deepcopy(RECIPE)
+    data["output_root"] = "recipe-output"
+    recipe_path.write_text(yaml.safe_dump(data))
+    cli_root = tmp_path / "cli-output"
+    response = RUNNER.invoke(
+        app,
+        [
+            "build",
+            "recipe-plan",
+            "--recipe",
+            str(recipe_path),
+            "--output-root",
+            str(cli_root),
+            "--json",
+        ],
+    )
+    assert response.exit_code == 0, response.output
+    assert json.loads(response.output)["output_root"] == str(cli_root)
+
+
+def test_recipe_plan_discovers_project_output_root_from_subdirectory(
+    recipe_path, tmp_path, monkeypatch
+):
+    project_root = tmp_path / "project"
+    subdirectory = project_root / "nested"
+    subdirectory.mkdir(parents=True)
+    (project_root / "hhplab.yaml").write_text("output_root: configured-output\n")
+    monkeypatch.chdir(subdirectory)
+
+    response = RUNNER.invoke(
+        app,
+        ["build", "recipe-plan", "--recipe", str(recipe_path), "--json"],
+    )
+
+    assert response.exit_code == 0, response.output
+    assert "may not be the HHP-Lab project root" in response.stderr
+    assert json.loads(response.stdout)["output_root"] == str(project_root / "configured-output")
+
+
+def test_v1_plan_routes_panel_and_manifest_to_recipe_output_root(tmp_path):
+    recipe_path = tmp_path / "recipes" / "panel.yaml"
+    recipe_path.parent.mkdir()
+    recipe_path.write_text(
+        yaml.safe_dump(
+            {
+                "version": 1,
+                "name": "rooted-panel",
+                "output_root": "published",
+                "universe": {"years": [2020]},
+                "targets": [
+                    {
+                        "id": "panel",
+                        "geometry": {"type": "coc", "vintage": 2025},
+                        "outputs": ["panel"],
+                    }
+                ],
+                "datasets": {},
+                "pipelines": [{"id": "build", "target": "panel", "steps": []}],
+            }
+        )
+    )
+
+    response = RUNNER.invoke(
+        app,
+        ["build", "recipe-plan", "--recipe", str(recipe_path), "--json"],
+    )
+
+    assert response.exit_code == 0, response.output
+    payload = json.loads(response.output)
+    destinations = payload["output_destinations"]["build"]
+    expected_root = recipe_path.parent / "published"
+    assert payload["output_root"] == str(expected_root)
+    assert destinations["panel_path"].startswith(str(expected_root))
+    assert destinations["manifest_path"].startswith(str(expected_root))
+
+
 def test_lock_export_and_history(recipe_path, tmp_path):
     export = tmp_path / "lock.json"
     response = RUNNER.invoke(
@@ -116,6 +210,18 @@ def test_lock_export_and_history(recipe_path, tmp_path):
         ],
     )
     assert duplicate.exit_code == 2
+
+
+def test_results_lock_uses_recipe_output_root_when_cli_root_is_absent(recipe_path, tmp_path):
+    data = deepcopy(RECIPE)
+    data["output_root"] = "recipe-output"
+    recipe_path.write_text(yaml.safe_dump(data))
+    response = RUNNER.invoke(
+        app,
+        ["results", "lock", "--recipe", str(recipe_path), "--json"],
+    )
+    assert response.exit_code == 0, response.output
+    assert (recipe_path.parent / "recipe-output" / "ledger" / "runs.jsonl").exists()
 
 
 def test_unresolved_lock_refuses_before_ledger(tmp_path):
@@ -190,6 +296,47 @@ def test_run_status_json(monkeypatch, recipe_path, tmp_path, execution, exit_cod
     )
     assert result.exit_code == exit_code, result.output
     assert json.loads(result.output)["lock_status"]["components"] == ["samples"]
+
+
+def test_results_run_uses_recipe_root_and_preserves_cli_override(
+    monkeypatch, recipe_path, tmp_path
+):
+    data = deepcopy(RECIPE)
+    data["output_root"] = "recipe-output"
+    recipe_path.write_text(yaml.safe_dump(data))
+    resolved_roots = []
+
+    def fake_run_results(*args, **kwargs):
+        resolved_roots.append(kwargs["outputs_root"])
+        return {
+            "statuses": {"execution_status": "complete"},
+            "lock_status": {"status": "modified", "components": []},
+            "run_id": "test-run",
+            "bundle_path": "bundle",
+        }
+
+    monkeypatch.setattr("hhplab.results.runner.run_results", fake_run_results)
+    recipe_root_result = RUNNER.invoke(
+        app,
+        ["results", "run", "--recipe", str(recipe_path), "--json"],
+    )
+    cli_root = tmp_path / "cli-output"
+    cli_root_result = RUNNER.invoke(
+        app,
+        [
+            "results",
+            "run",
+            "--recipe",
+            str(recipe_path),
+            "--outputs-root",
+            str(cli_root),
+            "--json",
+        ],
+    )
+
+    assert recipe_root_result.exit_code == 0, recipe_root_result.output
+    assert cli_root_result.exit_code == 0, cli_root_result.output
+    assert resolved_roots == [recipe_path.parent / "recipe-output", cli_root]
 
 
 def test_history_filters_active_runs(tmp_path):

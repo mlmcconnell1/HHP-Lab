@@ -56,6 +56,41 @@ def _json_error(message: str, *, code: int = 1) -> None:
     raise typer.Exit(code=code)
 
 
+def _recipe_storage_config(
+    recipe: RecipeV1,
+    *,
+    output_root: Path | None = None,
+    asset_store_root: Path | None = None,
+    project_root: Path | None = None,
+):
+    """Resolve CLI, environment, recipe, and configured storage roots once."""
+    return load_config(
+        asset_store_root=asset_store_root,
+        output_root=output_root,
+        recipe_output_root=recipe.output_root,
+        recipe_base_dir=recipe.source_base_dir,
+        project_root=project_root,
+    )
+
+
+def _recipe_output_destinations(
+    recipe: RecipeV1,
+    storage_config,
+    *,
+    project_root: Path,
+) -> dict[str, dict[str, str]]:
+    """Resolve declared pipeline outputs for machine-readable planning."""
+    return {
+        pipeline.id: resolve_pipeline_artifacts(
+            recipe,
+            pipeline.id,
+            project_root=project_root,
+            storage_config=storage_config,
+        )
+        for pipeline in recipe.pipelines
+    }
+
+
 def _msa_coc_coverage_recipe_dict(
     *,
     name: str,
@@ -963,22 +998,32 @@ def recipe_cmd(
         from hhplab.results.runner import check_results, run_results
 
         try:
+            storage_cfg = _recipe_storage_config(
+                parsed,
+                output_root=output_root,
+            )
             if asset_store_root is not None or no_cache or skip_preflight:
                 raise ValueError(
                     "RecipeV2 does not support legacy cache/preflight overrides; "
                     "use hhplab results run with declared inputs."
                 )
             if dry_run:
-                payload = check_results(parsed, original_recipe_bytes=recipe.read_bytes())
+                payload = check_results(
+                    parsed,
+                    original_recipe_bytes=recipe.read_bytes(),
+                    outputs_root=storage_cfg.output_root,
+                    project_root=Path.cwd(),
+                )
                 failed = payload.get("status") not in {"ok", "ready"}
             else:
                 payload = run_results(
                     parsed,
                     original_recipe_bytes=recipe.read_bytes(),
-                    outputs_root=output_root or load_config().output_root,
+                    outputs_root=storage_cfg.output_root,
                     project_root=Path.cwd(),
                 )
                 failed = payload.get("statuses", {}).get("execution_status") != "complete"
+            payload["output_root"] = str(storage_cfg.output_root)
         except Exception as exc:
             _json_error(str(exc), code=2)
         _json_out(payload)
@@ -1022,6 +1067,12 @@ def recipe_cmd(
             err=True,
         )
         raise typer.Exit(code=1)
+
+    storage_cfg = _recipe_storage_config(
+        parsed,
+        asset_store_root=asset_store_root,
+        output_root=output_root,
+    )
 
     if not use_json:
         if all_warnings:
@@ -1089,16 +1140,18 @@ def recipe_cmd(
                         "errors": [],
                     },
                     "dry_run": True,
+                    "output_root": str(storage_cfg.output_root),
+                    "output_destinations": _recipe_output_destinations(
+                        parsed,
+                        storage_cfg,
+                        project_root=Path.cwd(),
+                    ),
                 }
             )
         return
 
     # 3. Execute the build pipeline
     cache = RecipeCache(enabled=not no_cache)
-    storage_cfg = load_config(
-        asset_store_root=asset_store_root,
-        output_root=output_root,
-    )
     try:
         results = execute_recipe(
             parsed,
@@ -1165,6 +1218,10 @@ def recipe_plan_cmd(
             help="Path to a YAML recipe file.",
         ),
     ],
+    output_root: Annotated[
+        Path | None,
+        typer.Option("--output-root", help="Override the resolved artifact output root."),
+    ] = None,
     use_json: _JSON_OPTION = False,
 ) -> None:
     """Resolve the execution plan without executing.
@@ -1198,9 +1255,25 @@ def recipe_plan_cmd(
 
         try:
             plan = plan_results(parsed, original_recipe_bytes=recipe.read_bytes())
+            storage_cfg = _recipe_storage_config(
+                parsed,
+                output_root=output_root,
+            )
         except Exception as exc:
             _json_error(str(exc), code=2)
-        _json_out({"status": "ok", **plan.to_dict()})
+        bundle_template = parsed.results.bundle_dir.format(
+            id=parsed.id,
+            run_id="{run_id}",
+        )
+        bundle_path = storage_cfg.output_root / bundle_template
+        _json_out(
+            {
+                "status": "ok",
+                **plan.to_dict(),
+                "output_root": str(storage_cfg.output_root),
+                "output_destinations": {"results_bundle": str(bundle_path)},
+            }
+        )
         return
 
     all_warnings, all_errors = _validate_recipe(parsed, use_json=use_json)
@@ -1236,7 +1309,10 @@ def recipe_plan_cmd(
         plans.append(plan)
 
     if use_json:
-        storage_cfg = load_config()
+        storage_cfg = _recipe_storage_config(
+            parsed,
+            output_root=output_root,
+        )
         pipeline_payloads = []
         for plan in plans:
             payload = plan.to_dict()
@@ -1256,6 +1332,12 @@ def recipe_plan_cmd(
                     "errors": [],
                 },
                 "pipelines": pipeline_payloads,
+                "output_root": str(storage_cfg.output_root),
+                "output_destinations": _recipe_output_destinations(
+                    parsed,
+                    storage_cfg,
+                    project_root=Path.cwd(),
+                ),
             }
         )
         return
@@ -1501,6 +1583,10 @@ def recipe_preflight_cmd(
             help="Path to a YAML recipe file.",
         ),
     ],
+    output_root: Annotated[
+        Path | None,
+        typer.Option("--output-root", help="Override the resolved artifact output root."),
+    ] = None,
     use_json: _JSON_OPTION = False,
     gaps: Annotated[
         bool,
@@ -1556,16 +1642,48 @@ def recipe_preflight_cmd(
         from hhplab.results.runner import check_results
 
         try:
-            payload = check_results(parsed, original_recipe_bytes=recipe.read_bytes())
+            storage_cfg = _recipe_storage_config(
+                parsed,
+                output_root=output_root,
+            )
+            payload = check_results(
+                parsed,
+                original_recipe_bytes=recipe.read_bytes(),
+                outputs_root=storage_cfg.output_root,
+                project_root=Path.cwd(),
+            )
+            bundle_template = parsed.results.bundle_dir.format(
+                id=parsed.id,
+                run_id="{run_id}",
+            )
+            payload["output_root"] = str(storage_cfg.output_root)
+            payload["output_destinations"] = {
+                "results_bundle": str(storage_cfg.output_root / bundle_template)
+            }
         except Exception as exc:
             _json_error(str(exc), code=2)
         _json_out(payload)
         raise typer.Exit(0 if payload.get("status") in {"ok", "ready"} else 1)
 
+    storage_cfg = _recipe_storage_config(
+        parsed,
+        output_root=output_root,
+    )
     report = run_preflight(parsed)
 
     if gaps:
-        _json_out({"status": "ok", **report.gaps_manifest()})
+        _json_out(
+            {
+                "status": "ok",
+                **report.gaps_manifest(),
+                "output_root": str(storage_cfg.output_root),
+                "output_destinations": _recipe_output_destinations(
+                    parsed,
+                    storage_cfg,
+                    project_root=Path.cwd(),
+                ),
+            }
+        )
         raise typer.Exit(code=1 if report.blocking_count > 0 else 0)
 
     if use_json:
@@ -1573,6 +1691,12 @@ def recipe_preflight_cmd(
             {
                 "status": "ok" if report.is_ready else "blocked",
                 **report.to_dict(),
+                "output_root": str(storage_cfg.output_root),
+                "output_destinations": _recipe_output_destinations(
+                    parsed,
+                    storage_cfg,
+                    project_root=Path.cwd(),
+                ),
             }
         )
         raise typer.Exit(code=1 if not report.is_ready else 0)

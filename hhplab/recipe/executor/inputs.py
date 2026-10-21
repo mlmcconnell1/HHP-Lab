@@ -10,10 +10,17 @@ in the resample step (and the test file's direct imports) keep working.
 
 from __future__ import annotations
 
+import hashlib
+import json
 import re
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Any
 
 import numpy as np
 import pandas as pd
+import pyarrow as pa
+import pyarrow.parquet as pq
 
 from hhplab.recipe.executor.core import (
     ExecutionContext,
@@ -38,6 +45,294 @@ from hhplab.recipe.recipe_schema import (
 from hhplab.recipe.schema_common import expand_year_spec
 
 _ACS_PATH_VINTAGE_RE = re.compile(r"__A(\d{4})")
+
+
+@dataclass(frozen=True)
+class SiteUniverseResolution:
+    """Validated identity and source files for a frozen overlap-site universe."""
+
+    artifact_id: str
+    threshold: float
+    schema_version: str
+    boundary_vintage: str
+    membership_identity: str
+    selected_msa_ids: tuple[str, ...]
+    memberships: tuple[tuple[str, str], ...]
+    eligible_site_count: int
+    excluded_site_count: int
+    paths: tuple[Path, Path, Path]
+    fingerprints: tuple[str, str, str]
+    manifest_fingerprint: str | None = None
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "artifact_id": self.artifact_id,
+            "threshold": self.threshold,
+            "schema_version": self.schema_version,
+            "boundary_vintage": self.boundary_vintage,
+            "membership_identity": self.membership_identity,
+            "selected_msa_ids": list(self.selected_msa_ids),
+            "memberships": [list(pair) for pair in self.memberships],
+            "eligible_site_count": self.eligible_site_count,
+            "excluded_site_count": self.excluded_site_count,
+            "paths": [str(path) for path in self.paths],
+            "fingerprints": list(self.fingerprints),
+            "manifest_fingerprint": self.manifest_fingerprint,
+        }
+
+
+def resolve_site_universe_files(
+    *, artifact_id: str, threshold: float, sites_path: Path, memberships_path: Path,
+    summary_path: Path | None = None,
+    expected_fingerprints: tuple[str, str, str] | None = None,
+) -> SiteUniverseResolution:
+    """Read and validate the producer's canonical paired site artifacts."""
+    from hhplab.artifacts.naming.naming import msa_coc_sites_filename
+    from hhplab.recipe.executor.core import ExecutorError
+    from hhplab.storage.provenance import PROVENANCE_KEY
+
+    expected_names = (
+        msa_coc_sites_filename(artifact_id, "sites"),
+        msa_coc_sites_filename(artifact_id, "memberships"),
+        msa_coc_sites_filename(artifact_id, "summary"),
+    )
+    summary_path = summary_path or sites_path.parent / expected_names[2]
+    paths = (sites_path, memberships_path, summary_path)
+    if (
+        (sites_path.name, memberships_path.name) != expected_names[:2]
+        or summary_path.name != expected_names[2]
+    ):
+        raise ExecutorError(
+            f"site_universe artifact {artifact_id!r} paths must use canonical producer "
+            f"filenames {expected_names[0]!r} and {expected_names[1]!r}."
+        )
+    if any(not path.is_file() for path in paths):
+        missing = [str(path) for path in paths if not path.is_file()]
+        raise ExecutorError(
+            "Missing site-universe source files: " + ", ".join(missing)
+            + ". Rebuild the MSA-CoC sites producer or correct the recipe paths."
+        )
+    try:
+        file_bytes = tuple(path.read_bytes() for path in paths)
+        fingerprints = tuple(hashlib.sha256(contents).hexdigest() for contents in file_bytes)
+        if expected_fingerprints is not None and fingerprints != expected_fingerprints:
+            raise ValueError("site-universe input fingerprints changed since the plan was recorded")
+        summary = json.loads(file_bytes[2])
+        if summary.get("schema_version") != "msa_coc_sites/1":
+            raise ValueError(f"unsupported schema_version {summary.get('schema_version')!r}")
+        parameters = summary["parameters"]
+        thresholds = [float(value) for value in parameters["thresholds"]]
+        if threshold not in thresholds:
+            raise ValueError(f"requested threshold {threshold:g} is absent from producer summary")
+        boundary_vintage = str(parameters["coc_boundary_vintage"])
+        if not boundary_vintage:
+            raise ValueError("producer summary has an empty CoC boundary vintage")
+        frames: list[pd.DataFrame] = []
+        provenance_blocks: list[dict[str, Any]] = []
+        for path, contents in zip(paths[:2], file_bytes[:2], strict=True):
+            metadata = pq.read_schema(pa.BufferReader(contents)).metadata or {}
+            raw = metadata.get(PROVENANCE_KEY)
+            if raw is None:
+                raise ValueError(f"{path.name} lacks HHP-Lab provenance metadata")
+            provenance = json.loads(raw.decode("utf-8"))
+            extra = provenance.get("extra", {})
+            if extra.get("dataset_type") != "msa_coc_sites":
+                raise ValueError(f"{path.name} is not an msa_coc_sites producer artifact")
+            if extra.get("parameters") != parameters:
+                raise ValueError(f"{path.name} parameters disagree with the summary")
+            if str(provenance.get("boundary_vintage")) != boundary_vintage:
+                raise ValueError(f"{path.name} boundary vintage disagrees with the summary")
+            if provenance.get("definition_version") != parameters.get("msa_definition_version"):
+                raise ValueError(f"{path.name} MSA definition version disagrees with the summary")
+            provenance_blocks.append(provenance)
+            frames.append(pq.read_table(pa.BufferReader(contents)).to_pandas())
+        def provenance_identity(provenance: dict[str, Any]) -> dict[str, Any]:
+            return {
+                key: provenance.get(key)
+                for key in ("boundary_vintage", "definition_version", "geo_type", "extra")
+            }
+
+        if provenance_identity(provenance_blocks[0]) != provenance_identity(
+            provenance_blocks[1]
+        ):
+            raise ValueError("sites and memberships Parquet provenance blocks disagree")
+        sites, memberships = frames
+        required_sites = {"threshold", "msa_id", "eligible"}
+        required_memberships = {"threshold", "msa_id", "coc_id", "site_eligible"}
+        if not required_sites <= set(sites.columns) or not required_memberships <= set(
+            memberships.columns
+        ):
+            raise ValueError("site tables are missing required identity and eligibility columns")
+        sites = sites.loc[sites.threshold.astype(float) == threshold].copy()
+        memberships = memberships.loc[memberships.threshold.astype(float) == threshold].copy()
+        if sites.empty:
+            raise ValueError(f"producer tables have no site rows for threshold {threshold:g}")
+        for label, frame, columns in (
+            ("sites", sites, ("msa_id",)),
+            ("memberships", memberships, ("msa_id", "coc_id")),
+        ):
+            for column in columns:
+                values = frame[column]
+                if values.isna().any() or not values.map(
+                    lambda item: isinstance(item, str) and bool(item.strip())
+                ).all():
+                    raise ValueError(f"{label} {column} identifiers must be nonempty strings")
+        for label, frame, column in (
+            ("sites", sites, "eligible"),
+            ("memberships", memberships, "site_eligible"),
+        ):
+            if frame[column].isna().any() or not pd.api.types.is_bool_dtype(frame[column].dtype):
+                raise ValueError(f"{label} {column} flags must be nonmissing booleans")
+        sites["msa_id"] = sites.msa_id.astype(str)
+        memberships["msa_id"] = memberships.msa_id.astype(str)
+        memberships["coc_id"] = memberships.coc_id.astype(str)
+        if sites.duplicated(["threshold", "msa_id"]).any():
+            raise ValueError("duplicate site key (threshold, msa_id)")
+        if memberships.duplicated(["threshold", "msa_id", "coc_id"]).any():
+            raise ValueError("duplicate membership key (threshold, msa_id, coc_id)")
+        eligible_mask = sites["eligible"].astype(bool)
+        eligible_ids = tuple(sorted(sites.loc[eligible_mask, "msa_id"].astype(str)))
+        eligibility_by_msa = dict(zip(sites.msa_id, sites.eligible, strict=True))
+        if not memberships.msa_id.isin(eligibility_by_msa).all():
+            raise ValueError("membership rows reference MSA IDs absent from the site table")
+        expected_flags = memberships.msa_id.map(eligibility_by_msa)
+        if not memberships.site_eligible.eq(expected_flags).all():
+            raise ValueError("membership eligibility flags disagree with their site rows")
+        selected = memberships.loc[memberships.site_eligible.astype(bool)].copy()
+        pairs = tuple(
+            sorted(set(zip(selected.msa_id.astype(str), selected.coc_id.astype(str), strict=True)))
+        )
+        if not pairs and eligible_ids:
+            raise ValueError("eligible site rows have no eligible membership rows")
+        if set(eligible_ids) != {msa_id for msa_id, _ in pairs}:
+            raise ValueError("eligible site and membership MSA IDs disagree")
+        coc_ids = [coc_id for _, coc_id in pairs]
+        if len(coc_ids) != len(set(coc_ids)):
+            raise ValueError("a CoC belongs to multiple selected MSAs; counts would be duplicated")
+        membership_payload = {
+            "schema_version": "msa_coc_sites/1",
+            "artifact_id": artifact_id,
+            "threshold": threshold,
+            "site_key": "msa_id",
+            "memberships": [list(pair) for pair in pairs],
+        }
+        from hhplab.schema.results import canonical_bytes
+
+        membership_identity = hashlib.sha256(canonical_bytes(membership_payload)).hexdigest()
+        return SiteUniverseResolution(
+            artifact_id=artifact_id,
+            threshold=threshold,
+            schema_version="msa_coc_sites/1",
+            boundary_vintage=boundary_vintage,
+            membership_identity=membership_identity,
+            selected_msa_ids=eligible_ids,
+            memberships=pairs,
+            eligible_site_count=len(eligible_ids),
+            excluded_site_count=int((~eligible_mask).sum()),
+            paths=paths,
+            fingerprints=fingerprints,
+        )
+    except (OSError, KeyError, TypeError, ValueError, json.JSONDecodeError) as exc:
+        raise ExecutorError(
+            f"Invalid site-universe artifact {artifact_id!r}: {exc}. "
+            "Use matching canonical sites, memberships, and summary outputs from one producer run."
+        ) from exc
+
+
+def resolve_site_universe_source(
+    *, source: Any, threshold: float, source_base_dir: Path | None
+) -> SiteUniverseResolution:
+    """Resolve local or portable-bundle artifact paths and validate their contents."""
+    from hhplab.artifacts.naming.naming import msa_coc_sites_filename
+    from hhplab.recipe.executor.core import ExecutorError
+
+    def resolve_locator(raw: str) -> Path:
+        path = Path(raw).expanduser()
+        if not path.is_absolute():
+            if source_base_dir is None:
+                raise ExecutorError(
+                    "Relative site_universe paths in an in-memory recipe require an explicit "
+                    "source_base_dir."
+                )
+            path = source_base_dir / path
+        return path.resolve()
+
+    if source.bundle_path is None:
+        sites_path = resolve_locator(source.sites_path)
+        memberships_path = resolve_locator(source.memberships_path)
+        return resolve_site_universe_files(
+            artifact_id=source.artifact_id,
+            threshold=threshold,
+            sites_path=sites_path,
+            memberships_path=memberships_path,
+        )
+
+    bundle_root = resolve_locator(source.bundle_path)
+    manifest_path = bundle_root / "manifest.json"
+    sidecar_path = bundle_root / "manifest.sha256"
+    try:
+        manifest_bytes = manifest_path.read_bytes()
+        manifest_digest = hashlib.sha256(manifest_bytes).hexdigest()
+        sidecar = sidecar_path.read_text(encoding="utf-8").strip().split()
+        if len(sidecar) != 2 or sidecar != [manifest_digest, "manifest.json"]:
+            raise ValueError("bundle manifest checksum does not match manifest.sha256")
+        manifest = json.loads(manifest_bytes)
+        artifact = manifest["site_universes"][source.artifact_id]
+        if artifact.get("schema_version") != "msa_coc_sites/1":
+            raise ValueError("bundle site-universe index has an unsupported schema version")
+        file_map = {
+            "sites": artifact["sites"],
+            "memberships": artifact["memberships"],
+            "summary": artifact["summary"],
+        }
+        inventory = {item["path"]: item for item in manifest["files"]}
+        paths: dict[str, Path] = {}
+        for key, relative in file_map.items():
+            rel = Path(relative)
+            if rel.is_absolute() or ".." in rel.parts:
+                raise ValueError(f"bundle {key} path must stay inside the bundle")
+            path = (bundle_root / rel).resolve()
+            if bundle_root.resolve() not in path.parents:
+                raise ValueError(f"bundle {key} path escapes the bundle root")
+            record = inventory.get(rel.as_posix())
+            if record is None:
+                raise ValueError(f"bundle {key} path is absent from the verified inventory")
+            contents = path.read_bytes()
+            if (
+                len(contents) != record["bytes"]
+                or hashlib.sha256(contents).hexdigest() != record["sha256"]
+            ):
+                raise ValueError(f"bundle {key} file differs from the manifest inventory")
+            paths[key] = path
+        expected_names = (
+            msa_coc_sites_filename(source.artifact_id, "sites"),
+            msa_coc_sites_filename(source.artifact_id, "memberships"),
+            msa_coc_sites_filename(source.artifact_id, "summary"),
+        )
+        if (
+            paths["sites"].name != expected_names[0]
+            or paths["memberships"].name != expected_names[1]
+        ):
+            raise ValueError("bundle site-universe files do not match canonical artifact names")
+        result = resolve_site_universe_files(
+            artifact_id=source.artifact_id,
+            threshold=threshold,
+            sites_path=paths["sites"],
+            memberships_path=paths["memberships"],
+            summary_path=paths["summary"],
+        )
+        return SiteUniverseResolution(
+            **{
+                **result.__dict__,
+                "paths": (paths["sites"], paths["memberships"], paths["summary"]),
+                "manifest_fingerprint": manifest_digest,
+            }
+        )
+    except (OSError, KeyError, TypeError, ValueError, json.JSONDecodeError) as exc:
+        raise ExecutorError(
+            f"Invalid site-universe bundle {bundle_root}: {exc}. Use a verified results bundle "
+            "that indexes this artifact under manifest.json.site_universes."
+        ) from exc
 
 
 def _resolve_year_column(

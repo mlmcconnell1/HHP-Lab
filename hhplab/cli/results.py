@@ -30,8 +30,12 @@ def _load(path: Path):
     return recipe, original
 
 
-def _root(path: Path | None) -> Path:
-    return path if path is not None else load_config().output_root
+def _root(path: Path | None, recipe: RecipeV2 | None = None) -> Path:
+    return load_config(
+        output_root=path,
+        recipe_output_root=recipe.output_root if recipe is not None else None,
+        recipe_base_dir=recipe.source_base_dir if recipe is not None else None,
+    ).output_root
 
 
 def _emit(payload, use_json: bool) -> None:
@@ -58,6 +62,7 @@ def _error(exc: Exception, use_json: bool) -> None:
 def check_cmd(
     recipe: RecipeOption,
     use_json: JsonOption = False,
+    outputs_root: RootOption = None,
     readiness: Annotated[bool, typer.Option("--readiness")] = False,
     non_interactive: NonInteractive = False,
 ) -> None:
@@ -65,9 +70,15 @@ def check_cmd(
 
     try:
         parsed, original = _load(recipe)
+        resolved_root = _root(outputs_root, parsed)
         payload = check_results(
-            parsed, original_recipe_bytes=original, readiness=readiness, project_root=Path.cwd()
+            parsed,
+            original_recipe_bytes=original,
+            readiness=readiness,
+            project_root=Path.cwd(),
+            outputs_root=resolved_root,
         )
+        payload["output_root"] = str(resolved_root)
     except Exception as exc:
         _error(exc, use_json)
     _emit(payload, use_json)
@@ -91,7 +102,7 @@ def run_cmd(
         payload = run_results(
             parsed,
             original_recipe_bytes=original,
-            outputs_root=_root(outputs_root),
+            outputs_root=_root(outputs_root, parsed),
             project_root=Path.cwd(),
             private=private,
             allow_unknown_aggregates=allow_unknown_aggregates,
@@ -115,7 +126,7 @@ def lock_cmd(
     try:
         parsed, original = _load(recipe)
         plan = plan_results(parsed, original_recipe_bytes=original)
-        record = RunLedger(_root(outputs_root)).create_lock(
+        record = RunLedger(_root(outputs_root, parsed)).create_lock(
             recipe_id=parsed.id,
             recipe_sha256=hashlib.sha256(original).hexdigest(),
             components=plan.component_hashes,

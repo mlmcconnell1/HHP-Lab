@@ -1,0 +1,102 @@
+{
+  "schema_version": "elements.working-intent.import.request/1.0",
+  "elements": [
+    {
+      "schema_version": "elements.intent-element/8.0",
+      "record_type": "intent_element",
+      "intent_element_id": "intent:results-v2:result_planner",
+      "revision_id": "revision:results-v2:result_planner:4",
+      "lifecycle": "working",
+      "project_id": "project:HHP-Lab",
+      "parent_id": "intent:results-v2:recipe",
+      "kind": "semantic/module",
+      "observed_kind": "file",
+      "name": "result_planner",
+      "repo_relative_path": "hhplab/recipe/results_plan.py",
+      "language": "python",
+      "scope": {},
+      "tombstone": false,
+      "recorded_at": "2026-10-21T20:37:14.375677856Z",
+      "content": {
+        "acceptance_policy": "results-v2-architecture-conformance-v1",
+        "change": "new",
+        "dependency_allowlist": [
+          "hhplab.recipe",
+          "hhplab.schema",
+          "hhplab.results.bands",
+          "hhplab.geographies.coc.coc_validate"
+        ],
+        "layer": "application",
+        "phase": 1,
+        "plan": "results-recipe-v2",
+        "responsibility": "Resolve panel refs, overrides, substitutions, groups, dependency graph, component identities and static preflight; numerical readiness delegated.",
+        "source_spec": "docs/results-recipe-spec_2.md",
+        "extension_specs": ["docs/recipe-site-universe-contract.md"]
+      }
+    },
+    {
+      "schema_version": "elements.intent-element/8.0",
+      "record_type": "intent_element",
+      "intent_element_id": "intent:site-universe:input_resolver",
+      "revision_id": "revision:site-universe:input_resolver:3",
+      "lifecycle": "working",
+      "project_id": "project:HHP-Lab",
+      "parent_id": "intent:results-v2:executor",
+      "kind": "semantic/module",
+      "observed_kind": "file",
+      "name": "input_resolver",
+      "repo_relative_path": "hhplab/recipe/executor/inputs.py",
+      "language": "python",
+      "scope": {},
+      "tombstone": false,
+      "recorded_at": "2026-10-21T20:37:14.375677856Z",
+      "content": {
+        "acceptance_policy": "results-v2-architecture-conformance-v1",
+        "change": "extend",
+        "dependency_allowlist": [
+          "hhplab.recipe",
+          "hhplab.schema",
+          "hhplab.storage",
+          "hhplab.artifacts.naming.naming"
+        ],
+        "layer": "application",
+        "phase": 1,
+        "plan": "results-recipe-v2",
+        "responsibility": "Resolve and validate the paired site and membership tables, schema, artifact identity, explicit threshold, row uniqueness and fingerprints for RecipeV2 inputs.",
+        "source_spec": "docs/recipe-site-universe-contract.md"
+      }
+    },
+    {
+      "schema_version": "elements.intent-element/8.0",
+      "record_type": "intent_element",
+      "intent_element_id": "intent:site-universe:site_year_aggregation",
+      "revision_id": "revision:site-universe:site_year_aggregation:3",
+      "lifecycle": "working",
+      "project_id": "project:HHP-Lab",
+      "parent_id": "intent:results-v2:executor",
+      "kind": "semantic/module",
+      "observed_kind": "file",
+      "name": "site_year_aggregation",
+      "repo_relative_path": "hhplab/recipe/executor/msa_coc_panel.py",
+      "language": "python",
+      "scope": {},
+      "tombstone": false,
+      "recorded_at": "2026-10-21T20:37:14.375677856Z",
+      "content": {
+        "acceptance_policy": "results-v2-architecture-conformance-v1",
+        "change": "extend",
+        "dependency_allowlist": [
+          "hhplab.recipe",
+          "hhplab.analysis",
+          "hhplab.schema",
+          "hhplab.geographies.coc.coc_validate"
+        ],
+        "layer": "application",
+        "phase": 1,
+        "plan": "results-recipe-v2",
+        "responsibility": "Aggregate whole-CoC outcomes over frozen MSA memberships into unique MSA-year rows; reject shared CoCs and preserve explicit incomplete status without partial sums or allocation.",
+        "source_spec": "docs/recipe-site-universe-contract.md"
+      }
+    }
+  ]
+}

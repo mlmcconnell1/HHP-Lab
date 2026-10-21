@@ -6,9 +6,10 @@ precedence order (highest wins):
 
 1. Explicit keyword arguments (CLI flags)
 2. Environment variables (``HHPLAB_ASSET_STORE_ROOT``, ``HHPLAB_OUTPUT_ROOT``)
-3. Repo-local config file (``<project_root>/hhplab.yaml``)
-4. User config file (``~/.config/hhplab/config.yaml``)
-5. Built-in defaults
+3. Recipe-level ``output_root`` override
+4. Repo-local config file (``<project_root>/hhplab.yaml``)
+5. User config file (``~/.config/hhplab/config.yaml``)
+6. Built-in defaults
 
 Built-in defaults:
 
@@ -20,6 +21,7 @@ Relative path semantics:
 - CLI flags and environment variables resolve relative to the current
   working directory.
 - Repo-local ``hhplab.yaml`` values resolve relative to ``project_root``.
+- Recipe ``output_root`` values resolve relative to the recipe source directory.
 - User config values resolve relative to ``~/.config/hhplab``.
 """
 
@@ -97,6 +99,8 @@ def load_config(
     *,
     asset_store_root: Path | str | None = None,
     output_root: Path | str | None = None,
+    recipe_output_root: Path | str | None = None,
+    recipe_base_dir: Path | str | None = None,
     project_root: Path | None = None,
 ) -> StorageConfig:
     """Load storage configuration with layered precedence.
@@ -107,6 +111,12 @@ def load_config(
         Explicit override (highest precedence), typically from a CLI flag.
     output_root : Path or str, optional
         Explicit override (highest precedence), typically from a CLI flag.
+    recipe_output_root : Path or str, optional
+        Recipe-level output override. It applies after CLI and environment
+        configuration and before repository and user configuration.
+    recipe_base_dir : Path, optional
+        Directory containing the recipe source. Required when
+        ``recipe_output_root`` is relative.
     project_root : Path, optional
         Repository root used for locating ``hhplab.yaml`` and computing
         built-in defaults.  When omitted, the nearest current-directory
@@ -121,6 +131,8 @@ def load_config(
     if project_root is None:
         project_root = _discover_project_root(Path.cwd())
     project_root = Path(project_root).resolve()
+    if recipe_base_dir is not None:
+        recipe_base_dir = Path(recipe_base_dir).expanduser().resolve()
 
     # Layer 4 — user config (~/.config/hhplab/config.yaml)
     user_cfg = _load_yaml_file(USER_CONFIG_PATH)
@@ -153,10 +165,12 @@ def load_config(
     resolved_output = _resolve_value(
         cli=output_root,
         env=env_output,
+        recipe=recipe_output_root,
         repo=repo_cfg.get("output_root"),
         user=user_cfg.get("output_root"),
         repo_base=project_root,
         user_base=user_config_dir,
+        recipe_base=recipe_base_dir,
         default=default_output,
     )
 
@@ -191,11 +205,22 @@ def _resolve_value(
     repo_base: Path,
     user_base: Path,
     default: Path,
+    recipe: Path | str | None = None,
+    recipe_base: Path | None = None,
 ) -> Path:
     """Pick the highest-precedence non-None value and return as Path."""
+    if cli is None and env is None and recipe is not None:
+        recipe_path = Path(recipe).expanduser()
+        if not recipe_path.is_absolute() and recipe_base is None:
+            raise ValueError(
+                "Recipe output_root is relative, but the recipe has no source base. "
+                "Load the in-memory recipe with an explicit source_base_dir."
+            )
+
     candidates = (
         (cli, None),
         (env, None),
+        (recipe, recipe_base),
         (repo, repo_base),
         (user, user_base),
     )

@@ -24,13 +24,20 @@ class RecipeLoadError(Exception):
     """Raised when a recipe file cannot be loaded or validated."""
 
 
-def load_recipe(source: str | Path | dict) -> Recipe:
+def load_recipe(
+    source: str | Path | dict,
+    *,
+    source_base_dir: Path | str | None = None,
+) -> Recipe:
     """Load and validate a recipe from a YAML file path or pre-parsed dict.
 
     Parameters
     ----------
     source : str | Path | dict
         Path to a YAML file, or a pre-parsed dict (e.g. from tests).
+    source_base_dir : Path or str, optional
+        Base directory for recipe-relative paths when ``source`` is an in-memory
+        mapping. File-backed recipes always use the directory containing the file.
 
     Returns
     -------
@@ -43,11 +50,30 @@ def load_recipe(source: str | Path | dict) -> Recipe:
         If the file can't be read, YAML is malformed, version is missing/unsupported,
         or schema validation fails.
     """
+    if isinstance(source, dict):
+        resolved_source_base = (
+            Path(source_base_dir).expanduser().resolve()
+            if source_base_dir is not None
+            else None
+        )
+    else:
+        if source_base_dir is not None:
+            raise RecipeLoadError(
+                "source_base_dir is only valid for in-memory recipes; "
+                "file-backed recipes use the recipe file's directory."
+            )
+        if isinstance(source, (str, Path)):
+            resolved_source_base = Path(source).expanduser().resolve().parent
+        else:
+            resolved_source_base = None
+
     data = _read_source(source)
     _check_mapping(data)
     version = _extract_version(data)
     model_cls = _resolve_version(version)
-    return _validate(data, model_cls)
+    recipe = _validate(data, model_cls)
+    recipe._source_base_dir = resolved_source_base
+    return recipe
 
 
 def _read_source(source: str | Path | dict) -> object:
@@ -59,7 +85,7 @@ def _read_source(source: str | Path | dict) -> object:
         # Non-dict, non-path input — return as-is for _check_mapping to reject.
         return source
 
-    path = Path(source)
+    path = Path(source).expanduser()
     if not path.exists():
         raise RecipeLoadError(f"Recipe file not found: {path}")
 

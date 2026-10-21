@@ -2,13 +2,17 @@
 
 from __future__ import annotations
 
+import math
 import re
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
+from numbers import Integral, Real
 from typing import Any
 
 import geopandas as gpd
 import pandas as pd
 
+from hhplab.geographies.coc.coc_validate import BoundaryCompatibilityValidation
 from hhplab.geographies.msa.selectors import select_top_msa_ids_by_population
 from hhplab.geographies.msa.unemployment import resolve_msa_unemployment
 from hhplab.recipe.executor.containment import build_msa_coc_membership
@@ -16,7 +20,24 @@ from hhplab.recipe.executor.core import ExecutionContext, ExecutorError
 from hhplab.recipe.planner import ExecutionPlan
 from hhplab.recipe.recipe_schema import ContainmentSpec
 from hhplab.recipe.schema_common import GeometryRef, expand_year_spec
-from hhplab.schema.columns import MSA_COC_PANEL_COLUMNS
+from hhplab.schema.columns import HIC_PANEL_MEASURE_COLUMNS, MSA_COC_PANEL_COLUMNS
+
+SITE_YEAR_DIAGNOSTIC_SUFFIXES = (
+    "expected_coc_count",
+    "observed_coc_count",
+    "missing_coc_ids",
+    "unknown_boundary_coc_ids",
+    "incompatible_boundary_coc_ids",
+    "status",
+)
+SITE_YEAR_STATUSES = frozenset(
+    {"complete", "incomplete", "source_limited", "incomplete_source_limited"}
+)
+PIT_SITE_YEAR_LIMITED_MEASURES = frozenset({"pit_total", "pit_unsheltered"})
+SITE_YEAR_ALLOWED_MEASURES = {
+    "pit": frozenset({"pit_total", "pit_sheltered", "pit_unsheltered"}),
+    "hic": frozenset(HIC_PANEL_MEASURE_COLUMNS),
+}
 
 
 @dataclass(frozen=True)
@@ -28,12 +49,447 @@ class MsaCocPanelAssembly:
 
 
 @dataclass(frozen=True)
+class SiteYearSourceBinding:
+    """One named CoC/year panel and the measures selected from it."""
+
+    panel: str
+    measures: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class SiteYearPanelAssembly:
+    """Site-year result and the lineage needed by result persistence."""
+
+    panel: pd.DataFrame
+    provenance: dict[str, object]
+
+
+def site_year_panel_columns(measures: Sequence[str]) -> tuple[str, ...]:
+    """Return canonical output columns for declared measures in input order."""
+    columns = ["msa_id", "year"]
+    for measure in measures:
+        columns.append(measure)
+        columns.extend(f"{measure}__{suffix}" for suffix in SITE_YEAR_DIAGNOSTIC_SUFFIXES)
+    return tuple(columns)
+
+
+def assemble_site_year_panel(
+    *,
+    frozen_memberships: Sequence[tuple[str, str]],
+    requested_years: Sequence[int],
+    source_panels: Mapping[str, pd.DataFrame],
+    outcome_bindings: Mapping[str, SiteYearSourceBinding],
+    boundary_compatibility: BoundaryCompatibilityValidation,
+    artifact_id: str,
+    threshold: float,
+    membership_identity: str,
+    frozen_boundary_vintage: str | int,
+    source_panel_fingerprints: Mapping[str, str],
+) -> SiteYearPanelAssembly:
+    """Build one complete-or-null row per frozen MSA site and requested year.
+
+    This builder is pure: callers resolve paths, load frames, and provide the
+    fingerprints that are preserved in the returned provenance block.
+    """
+    sites_by_coc = _validate_site_year_memberships(frozen_memberships)
+    years = _validate_site_year_years(requested_years)
+    bindings = _normalize_site_year_bindings(outcome_bindings)
+    if not bindings:
+        raise ExecutorError("site-year aggregation needs at least one outcome binding.")
+    measures = tuple(
+        measure
+        for binding in bindings.values()
+        for measure in binding.measures
+    )
+    if len(set(measures)) != len(measures):
+        raise ExecutorError("site-year outcome measure names must be unique across bindings.")
+
+    frozen_vintage = str(frozen_boundary_vintage).strip()
+    if not frozen_vintage:
+        raise ExecutorError("Frozen CoC boundary vintage must be non-empty.")
+    if (
+        boundary_compatibility.artifact_id != artifact_id
+        or boundary_compatibility.threshold != float(threshold)
+        or boundary_compatibility.membership_identity != membership_identity
+        or boundary_compatibility.frozen_boundary_vintage != frozen_vintage
+    ):
+        raise ExecutorError(
+            "Boundary compatibility evidence does not match the selected site-universe identity."
+        )
+
+    panel_ids = tuple(dict.fromkeys(binding.panel for binding in bindings.values()))
+    missing_panels = sorted(set(panel_ids) - set(source_panels))
+    if missing_panels:
+        raise ExecutorError(
+            f"Missing source panel frames for site-year aggregation: {missing_panels}."
+        )
+    missing_fingerprints = sorted(set(panel_ids) - set(source_panel_fingerprints))
+    if missing_fingerprints:
+        raise ExecutorError(
+            f"Missing source panel fingerprints for site-year aggregation: {missing_fingerprints}."
+        )
+    invalid_fingerprints = sorted(
+        panel_id
+        for panel_id in panel_ids
+        if not isinstance(source_panel_fingerprints[panel_id], str)
+        or not source_panel_fingerprints[panel_id].strip()
+    )
+    if invalid_fingerprints:
+        raise ExecutorError(
+            f"Source panel fingerprints must be non-empty strings: {invalid_fingerprints}."
+        )
+
+    source_lookups = {
+        panel_id: _site_year_source_lookup(
+            panel_id,
+            source_panels[panel_id],
+            required_measures=tuple(
+                measure
+                for binding in bindings.values()
+                if binding.panel == panel_id
+                for measure in binding.measures
+            ),
+        )
+        for panel_id in panel_ids
+    }
+    evidence = _index_site_year_boundary_evidence(
+        boundary_compatibility,
+        panel_ids=panel_ids,
+        coc_ids=tuple(sites_by_coc),
+        years=years,
+        sites_by_coc=sites_by_coc,
+    )
+
+    site_ids = tuple(sorted(set(sites_by_coc.values())))
+    rows: list[dict[str, object]] = []
+    for msa_id in site_ids:
+        coc_ids = tuple(
+            sorted(
+                coc_id
+                for coc_id, site_id in sites_by_coc.items()
+                if site_id == msa_id
+            )
+        )
+        for year in years:
+            row: dict[str, object] = {"msa_id": msa_id, "year": year}
+            for outcome_name, binding in bindings.items():
+                panel_id = binding.panel
+                source_lookup = source_lookups[panel_id]
+                for measure in binding.measures:
+                    observed_cocs: set[str] = set()
+                    missing_cocs: set[str] = set()
+                    unknown_cocs: set[str] = set()
+                    incompatible_cocs: set[str] = set()
+                    values: list[int] = []
+
+                    for coc_id in coc_ids:
+                        compatibility = evidence[(panel_id, coc_id, year)]
+                        if compatibility.status == "unknown":
+                            unknown_cocs.add(coc_id)
+                        elif compatibility.status == "incompatible":
+                            incompatible_cocs.add(coc_id)
+
+                        # For unknown/incompatible rows, the frozen ID can be
+                        # inspected for presence diagnostics only; it is never
+                        # used to include a value in the site outcome.
+                        source_coc_id = compatibility.source_coc_id or coc_id
+                        value = source_lookup.get((source_coc_id, year), {}).get(measure)
+                        parsed_value = _valid_site_year_count(value)
+                        if parsed_value is None:
+                            missing_cocs.add(coc_id)
+                        else:
+                            observed_cocs.add(coc_id)
+                            if compatibility.status in {"compatible", "mapped"}:
+                                values.append(parsed_value)
+
+                    limited = (
+                        outcome_name == "pit"
+                        and year == 2021
+                        and measure in PIT_SITE_YEAR_LIMITED_MEASURES
+                    )
+                    complete = (
+                        len(observed_cocs) == len(coc_ids)
+                        and not unknown_cocs
+                        and not incompatible_cocs
+                    )
+                    if limited:
+                        status = "source_limited" if complete else "incomplete_source_limited"
+                        aggregate: int | None = None
+                    else:
+                        status = "complete" if complete else "incomplete"
+                        aggregate = sum(values) if complete else None
+
+                    row[measure] = aggregate
+                    row[f"{measure}__expected_coc_count"] = len(coc_ids)
+                    row[f"{measure}__observed_coc_count"] = len(observed_cocs)
+                    row[f"{measure}__missing_coc_ids"] = sorted(missing_cocs)
+                    row[f"{measure}__unknown_boundary_coc_ids"] = sorted(unknown_cocs)
+                    row[f"{measure}__incompatible_boundary_coc_ids"] = sorted(
+                        incompatible_cocs
+                    )
+                    row[f"{measure}__status"] = status
+            rows.append(row)
+
+    columns = site_year_panel_columns(measures)
+    panel = pd.DataFrame(rows, columns=columns, dtype=object)
+    panel["year"] = panel["year"].astype("int64")
+    for measure in measures:
+        try:
+            panel[measure] = pd.array(panel[measure], dtype="Int64")
+            for suffix in ("expected_coc_count", "observed_coc_count"):
+                column = f"{measure}__{suffix}"
+                panel[column] = pd.array(panel[column], dtype="Int64")
+        except (TypeError, ValueError, OverflowError) as exc:
+            raise ExecutorError(
+                f"Aggregated measure '{measure}' is outside the supported nullable integer range."
+            ) from exc
+    if panel.duplicated(["msa_id", "year"]).any():
+        raise ExecutorError("Site-year aggregation produced duplicate (msa_id, year) keys.")
+    provenance = {
+        "site_year_panel": {
+            "schema_version": "site_year_panel/1",
+            "artifact_id": artifact_id,
+            "threshold": float(threshold),
+            "membership_identity": membership_identity,
+            "frozen_boundary_vintage": frozen_vintage,
+            "requested_years": list(years),
+            "selected_sites": list(site_ids),
+            "selected_membership_count": len(sites_by_coc),
+            "source_panels": {
+                panel_id: {
+                    "fingerprint": source_panel_fingerprints[panel_id],
+                    "measures": [
+                        measure
+                        for binding in bindings.values()
+                        if binding.panel == panel_id
+                        for measure in binding.measures
+                    ],
+                }
+                for panel_id in panel_ids
+            },
+            "boundary_evidence": {
+                "evidence_id": boundary_compatibility.evidence_id,
+                "fingerprint": boundary_compatibility.evidence_fingerprint,
+            },
+            "measures": list(measures),
+            "row_count": len(panel),
+        }
+    }
+    return SiteYearPanelAssembly(panel=panel, provenance=provenance)
+
+
+@dataclass(frozen=True)
 class _FrameRecord:
     dataset_id: str
     source_token: str
     geo_type: str
     year: int
     frame: pd.DataFrame
+
+
+def _validate_site_year_memberships(
+    memberships: Sequence[tuple[str, str]],
+) -> dict[str, str]:
+    if not memberships:
+        raise ExecutorError("Site-year aggregation requires selected CoC memberships.")
+    sites_by_coc: dict[str, str] = {}
+    for pair in memberships:
+        if not isinstance(pair, tuple) or len(pair) != 2:
+            raise ExecutorError("Frozen memberships must be (msa_id, coc_id) pairs.")
+        msa_value, coc_value = pair
+        if not isinstance(msa_value, str) or not isinstance(coc_value, str):
+            raise ExecutorError("Frozen membership msa_id and coc_id values must be strings.")
+        msa_id, coc_id = msa_value.strip(), coc_value.strip()
+        if not msa_id or not coc_id:
+            raise ExecutorError("Frozen membership msa_id and coc_id values must be non-empty.")
+        if coc_id in sites_by_coc:
+            raise ExecutorError(
+                f"Frozen CoC '{coc_id}' appears more than once in selected site memberships."
+            )
+        sites_by_coc[coc_id] = msa_id
+    return sites_by_coc
+
+
+def _validate_site_year_years(years: Sequence[int]) -> tuple[int, ...]:
+    normalized: list[int] = []
+    for year in years:
+        if isinstance(year, bool) or not isinstance(year, Integral):
+            raise ExecutorError("Requested site-year values must be integer years.")
+        normalized.append(int(year))
+    if not normalized:
+        raise ExecutorError("Site-year aggregation requires at least one requested year.")
+    if len(set(normalized)) != len(normalized):
+        raise ExecutorError("Requested site-year values must be unique.")
+    return tuple(sorted(normalized))
+
+
+def _normalize_site_year_bindings(
+    bindings: Mapping[str, SiteYearSourceBinding],
+) -> dict[str, SiteYearSourceBinding]:
+    if not isinstance(bindings, Mapping) or set(bindings) != {"pit", "hic"}:
+        raise ExecutorError("Site-year outcome bindings must declare exactly 'pit' and 'hic'.")
+    normalized: dict[str, SiteYearSourceBinding] = {}
+    for outcome_name in ("pit", "hic"):
+        binding = bindings[outcome_name]
+        if isinstance(binding, Mapping):
+            panel = binding.get("panel")
+            measures = binding.get("measures")
+        else:
+            panel = getattr(binding, "panel", None)
+            measures = getattr(binding, "measures", None)
+        if not isinstance(panel, str) or not panel.strip():
+            raise ExecutorError(f"site-year {outcome_name} binding needs a panel name.")
+        if not isinstance(measures, Sequence) or isinstance(measures, str) or not measures:
+            raise ExecutorError(f"site-year {outcome_name} binding needs explicit measures.")
+        normalized_measures = tuple(str(measure).strip() for measure in measures)
+        if any(not measure for measure in normalized_measures):
+            raise ExecutorError(f"site-year {outcome_name} measure names must be non-empty.")
+        if len(set(normalized_measures)) != len(normalized_measures):
+            raise ExecutorError(f"site-year {outcome_name} measure names must be unique.")
+        unsupported_measures = sorted(
+            set(normalized_measures) - SITE_YEAR_ALLOWED_MEASURES[outcome_name]
+        )
+        if unsupported_measures:
+            raise ExecutorError(
+                f"site-year {outcome_name} measures are not registered additive counts: "
+                f"{unsupported_measures}."
+            )
+        normalized[outcome_name] = SiteYearSourceBinding(
+            panel=panel.strip(), measures=normalized_measures
+        )
+    return normalized
+
+
+def _site_year_source_lookup(
+    panel_id: str,
+    frame: pd.DataFrame,
+    *,
+    required_measures: tuple[str, ...],
+) -> dict[tuple[str, int], dict[str, object]]:
+    required_columns = {"coc_id", "year", *required_measures}
+    missing_columns = sorted(required_columns - set(frame.columns))
+    if missing_columns:
+        raise ExecutorError(
+            f"Site-year source panel '{panel_id}' is missing required columns {missing_columns}."
+        )
+    lookup: dict[tuple[str, int], dict[str, object]] = {}
+    for row in frame.loc[:, ["coc_id", "year", *required_measures]].to_dict(orient="records"):
+        coc_value = row["coc_id"]
+        if pd.isna(coc_value) or not str(coc_value).strip():
+            raise ExecutorError(f"Site-year source panel '{panel_id}' has a null or empty coc_id.")
+        coc_id = str(coc_value).strip()
+        try:
+            year_numeric = pd.to_numeric(row["year"], errors="raise")
+        except (TypeError, ValueError) as exc:
+            raise ExecutorError(
+                f"Site-year source panel '{panel_id}' has a non-numeric year key {row['year']!r}."
+            ) from exc
+        if isinstance(year_numeric, bool) or pd.isna(year_numeric):
+            raise ExecutorError(
+                f"Site-year source panel '{panel_id}' has a non-integer year key {row['year']!r}."
+            )
+        if isinstance(year_numeric, Integral):
+            normalized_year = int(year_numeric)
+        elif isinstance(year_numeric, Real) and math.isfinite(float(year_numeric)):
+            if not float(year_numeric).is_integer():
+                raise ExecutorError(
+                    "Site-year source panel "
+                    f"'{panel_id}' has a non-integer year key {row['year']!r}."
+                )
+            normalized_year = int(year_numeric)
+        else:
+            raise ExecutorError(
+                f"Site-year source panel '{panel_id}' has a non-integer year key {row['year']!r}."
+            )
+        key = (coc_id, normalized_year)
+        if key in lookup:
+            raise ExecutorError(
+                f"Site-year source panel '{panel_id}' has duplicate normalized key {key!r}."
+            )
+        lookup[key] = {measure: row[measure] for measure in required_measures}
+    return lookup
+
+
+def _index_site_year_boundary_evidence(
+    validation: BoundaryCompatibilityValidation,
+    *,
+    panel_ids: Sequence[str],
+    coc_ids: Sequence[str],
+    years: Sequence[int],
+    sites_by_coc: Mapping[str, str],
+) -> dict[tuple[str, str, int], Any]:
+    expected_keys = {
+        (panel_id, coc_id, year)
+        for panel_id in panel_ids
+        for coc_id in coc_ids
+        for year in years
+    }
+    indexed: dict[tuple[str, str, int], Any] = {}
+    mapped_sources: dict[tuple[str, int], dict[str, str]] = {}
+    for record in validation.records:
+        key = (record.source_panel, record.frozen_coc_id, record.year)
+        if key not in expected_keys:
+            raise ExecutorError(
+                "Boundary compatibility evidence contains a row outside the selected "
+                f"universe: {key!r}."
+            )
+        if key in indexed:
+            raise ExecutorError(f"Boundary compatibility evidence repeats key {key!r}.")
+        if record.msa_id != sites_by_coc[record.frozen_coc_id]:
+            raise ExecutorError(
+                f"Boundary compatibility evidence assigns CoC '{record.frozen_coc_id}' "
+                "to a different MSA than the selected membership."
+            )
+        if record.status not in {"compatible", "mapped", "incompatible", "unknown"}:
+            raise ExecutorError(
+                f"Boundary compatibility evidence has unsupported status {record.status!r}."
+            )
+        if record.status == "compatible" and record.source_coc_id != record.frozen_coc_id:
+            raise ExecutorError(
+                f"Compatible evidence for CoC '{record.frozen_coc_id}' must retain its source ID."
+            )
+        if record.status == "mapped" and not record.source_coc_id:
+            raise ExecutorError(
+                f"Mapped evidence for CoC '{record.frozen_coc_id}' needs a source CoC ID."
+            )
+        if record.status in {"unknown", "incompatible"} and record.source_coc_id is not None:
+            raise ExecutorError(
+                f"{record.status.title()} evidence for CoC '{record.frozen_coc_id}' "
+                "cannot resolve a source ID."
+            )
+        if record.source_coc_id is not None:
+            panel_year = (record.source_panel, record.year)
+            source_map = mapped_sources.setdefault(panel_year, {})
+            previous_frozen = source_map.get(record.source_coc_id)
+            if previous_frozen is not None:
+                raise ExecutorError(
+                    f"Boundary evidence maps both '{previous_frozen}' and "
+                    f"'{record.frozen_coc_id}' to '{record.source_coc_id}'."
+                )
+            source_map[record.source_coc_id] = record.frozen_coc_id
+        indexed[key] = record
+
+    missing_keys = sorted(expected_keys - set(indexed))
+    if missing_keys:
+        raise ExecutorError(
+            "Boundary compatibility validation is missing selected "
+            f"panel/member/year rows: {missing_keys}."
+        )
+    return indexed
+
+
+def _valid_site_year_count(value: object) -> int | None:
+    if value is None or pd.isna(value) or isinstance(value, bool):
+        return None
+    if isinstance(value, Integral):
+        count = int(value)
+    elif isinstance(value, Real):
+        if not math.isfinite(float(value)) or not float(value).is_integer():
+            return None
+        count = int(value)
+    else:
+        return None
+    return count if count >= 0 else None
 
 
 def build_msa_coc_containment_spec(

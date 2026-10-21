@@ -7,9 +7,11 @@ import importlib.metadata
 import json
 import os
 import platform
+import re
 import socket
 import uuid
 from collections.abc import Mapping
+from dataclasses import replace
 from datetime import UTC, datetime
 from pathlib import Path
 from types import SimpleNamespace
@@ -21,6 +23,11 @@ from hhplab.analysis.inspection import _json_group_value
 from hhplab.analysis.sample import resolve_sample
 from hhplab.recipe.derive import apply_masks, derive_panel
 from hhplab.recipe.executor.analyses import execute_analysis
+from hhplab.recipe.executor.inputs import SiteUniverseResolution, resolve_site_universe_files
+from hhplab.recipe.executor.msa_coc_panel import (
+    SiteYearSourceBinding,
+    assemble_site_year_panel,
+)
 from hhplab.recipe.results_plan import ResultsPlanningError, plan_results
 from hhplab.recipe.schema_results import RecipeV2
 from hhplab.results.bundle import BundleArtifact, BundlePayload, write_bundle
@@ -55,7 +62,7 @@ from hhplab.schema.results import (
     canonical_bytes,
     canonical_json,
 )
-from hhplab.storage.provenance import PROVENANCE_KEY, ProvenanceBlock
+from hhplab.storage.provenance import PROVENANCE_KEY, ProvenanceBlock, read_provenance
 from hhplab.storage.run_ledger import RunLedger
 
 
@@ -74,6 +81,7 @@ def check_results(
     original_recipe_bytes: bytes,
     readiness: bool = False,
     project_root: Path | None = None,
+    outputs_root: Path | None = None,
     panel_frames: Mapping[str, pd.DataFrame] | None = None,
 ) -> dict[str, Any]:
     """Run static preflight, and optionally frame readiness, without a ledger.
@@ -106,6 +114,7 @@ def check_results(
                 recipe,
                 plan,
                 project_root=project_root or Path.cwd(),
+                outputs_root=outputs_root,
             )
             issues.extend(
                 {"severity": "error", "message": message} for message in cache_errors
@@ -140,6 +149,9 @@ def replay_results(
     resolved_spec: Mapping[str, Any],
     execution: Mapping[str, Any],
     panel_frames: Mapping[str, pd.DataFrame],
+    *,
+    site_universe_resolution: SiteUniverseResolution | None = None,
+    boundary_evidence_payload: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Replay all analysis stages from panel frames, without builds or ledger I/O."""
     if not isinstance(resolved_spec, Mapping) or not isinstance(execution, Mapping):
@@ -154,7 +166,19 @@ def replay_results(
     original = canonical_bytes(
         recipe.model_dump(mode="json", by_alias=True, exclude_none=True)
     )
-    rebuilt = plan_results(recipe, original_recipe_bytes=original)
+    if expected_plan.get("site_universe") is not None:
+        if site_universe_resolution is None or boundary_evidence_payload is None:
+            site_universe_resolution, boundary_evidence_payload = (
+                _site_universe_inputs_from_plan(expected_plan["site_universe"])
+            )
+        else:
+            site_universe_resolution = replace(site_universe_resolution, paths=())
+    rebuilt = plan_results(
+        recipe,
+        original_recipe_bytes=original,
+        site_universe_resolution=site_universe_resolution,
+        boundary_evidence_payload=boundary_evidence_payload,
+    )
     plan_hash_payload = {
         key: expected_plan[key]
         for key in (
@@ -169,8 +193,17 @@ def replay_results(
         )
         if key in expected_plan
     }
+    if expected_plan.get("site_universe") is not None:
+        site_hash_data = dict(expected_plan["site_universe"])
+        site_hash_data.pop("paths", None)
+        site_hash_data.pop("manifest_fingerprint", None)
+        evidence = dict(site_hash_data.get("boundary_evidence", {}))
+        evidence.pop("path", None)
+        site_hash_data["boundary_evidence"] = evidence
+        plan_hash_payload["site_universe"] = site_hash_data
     plan_hash = hashlib.sha256(canonical_bytes(plan_hash_payload)).hexdigest()
-    if len(plan_hash_payload) != 8 or execution.get("spec_hash") != plan_hash:
+    expected_hash_keys = 9 if expected_plan.get("site_universe") is not None else 8
+    if len(plan_hash_payload) != expected_hash_keys or execution.get("spec_hash") != plan_hash:
         raise ValueError(
             "execution spec_hash does not match the canonical resolved plan"
         )
@@ -205,8 +238,56 @@ def replay_results(
     measures_by_panel = execution.get("input_measures", {})
     if not isinstance(measures_by_panel, Mapping):
         measures_by_panel = {}
+    materialized_panel_frames = dict(panel_frames)
+    site_panel_name = None
+    missing_sources: list[str] = []
+    source_panel_fingerprints: dict[str, str] = {}
+    if rebuilt.site_universe is not None:
+        if rebuilt.site_year_boundary_compatibility is None:
+            raise ValueError("validated site-year boundary compatibility is unavailable")
+        site_panel_name, site_binding = next(
+            (name, binding.site_year)
+            for name, binding in recipe.panels.items()
+            if binding.site_year is not None
+        )
+        assert site_binding is not None
+        required_sources = {
+            site_binding.outcomes.pit.panel,
+            site_binding.outcomes.hic.panel,
+        }
+        missing_sources = sorted(
+            name
+            for name in required_sources
+            if not isinstance(materialized_panel_frames.get(name), pd.DataFrame)
+        )
+        if not missing_sources:
+            assembly, source_panel_fingerprints = _assemble_site_year_panel(
+                recipe,
+                rebuilt,
+                materialized_panel_frames,
+            )
+            site_panel = assembly.panel
+            site_panel.attrs["results_panel_provenance"] = {
+                "dataset_type": "site_year_panel",
+                **assembly.provenance,
+            }
+            site_panel.attrs["site_year_provenance"] = assembly.provenance
+            site_panel.attrs["results_source_parquet_bytes"] = _parquet_bytes(
+                site_panel,
+                dataset_type="site_year_panel",
+                provenance=site_panel.attrs["results_panel_provenance"],
+            )
+            site_panel.attrs["results_content_sha256"] = hashlib.sha256(
+                site_panel.attrs["results_source_parquet_bytes"]
+            ).hexdigest()
+            materialized_panel_frames[site_panel_name] = site_panel
+        else:
+            panel_errors[site_panel_name] = (
+                "site-year source panel(s) are unavailable: " + ", ".join(missing_sources)
+            )
+
     for panel_name, panel_plan in panels.items():
-        frame = panel_frames.get(panel_name)
+        frame = materialized_panel_frames.get(panel_name)
         if not isinstance(frame, pd.DataFrame):
             panel_errors[panel_name] = "panel input is missing or is not a DataFrame"
             continue
@@ -351,6 +432,10 @@ def replay_results(
         "derived_measures": derived_measures,
         "input_measures": dict(measures_by_panel),
         "panel_errors": panel_errors,
+        "input_panels": materialized_panel_frames,
+        "site_year_source_panel_fingerprints": (
+            source_panel_fingerprints if rebuilt.site_universe is not None else {}
+        ),
         "sample_results": sample_results,
     }
 
@@ -418,12 +503,18 @@ def run_results(
             panel_frames=panel_frames,
             build_callable=build_callable,
         )
+        if plan.site_universe is not None:
+            # Re-read every pinned source immediately before execution. The plan
+            # identity is content based, so a changed source cannot silently
+            # produce a bundle under the old lock identity.
+            _site_universe_inputs_from_plan(plan.site_universe)
         lease.check_health()
         replay = replay_results(
             {"recipe": _recipe_dict(recipe), "plan": plan.to_dict()},
             {"spec_hash": plan.plan_sha256, "input_measures": _input_measures(frames)},
             frames,
         )
+        frames = replay["input_panels"]
         for panel_name, message in build_failures.items():
             replay["panel_errors"][panel_name] = message
             for item in plan.analyses:
@@ -732,6 +823,265 @@ def _recipe_dict(recipe: RecipeV2) -> dict[str, Any]:
     return recipe.model_dump(mode="json", by_alias=True, exclude_none=True)
 
 
+def _site_universe_inputs_from_plan(site_data):
+    """Re-read and fingerprint all local site inputs pinned by a results plan."""
+    if not isinstance(site_data, Mapping):
+        raise ValueError("resolved plan site_universe must be an object")
+    paths = site_data.get("paths")
+    fingerprints = site_data.get("fingerprints")
+    evidence = site_data.get("boundary_evidence")
+    if (
+        not isinstance(paths, list | tuple)
+        or len(paths) != 3
+        or not isinstance(fingerprints, list | tuple)
+        or len(fingerprints) != 3
+        or not isinstance(evidence, Mapping)
+    ):
+        raise ValueError("resolved plan is missing pinned site-universe input paths or hashes")
+    resolution = resolve_site_universe_files(
+        artifact_id=site_data["artifact_id"],
+        threshold=float(site_data["threshold"]),
+        sites_path=Path(paths[0]),
+        memberships_path=Path(paths[1]),
+        summary_path=Path(paths[2]),
+        expected_fingerprints=tuple(fingerprints),
+    )
+    evidence_path = Path(str(evidence.get("path", ""))).expanduser()
+    try:
+        evidence_bytes = evidence_path.read_bytes()
+    except OSError as exc:
+        raise ValueError(f"boundary evidence is unavailable: {evidence_path}") from exc
+    try:
+        evidence_payload = json.loads(evidence_bytes)
+    except json.JSONDecodeError as exc:
+        raise ValueError("pinned boundary evidence is not valid JSON") from exc
+    if not isinstance(evidence_payload, Mapping):
+        raise ValueError("pinned boundary evidence must contain a JSON object")
+    if _boundary_evidence_fingerprint(evidence_payload) != evidence.get("fingerprint"):
+        raise ValueError("boundary evidence changed since the results plan was recorded")
+    return resolution, evidence_payload
+
+
+def _site_universe_bundle_artifacts(site_data):
+    """Return portable, fingerprint-checked source files and their index."""
+    resolution, evidence_payload = _site_universe_inputs_from_plan(site_data)
+    del resolution, evidence_payload
+    paths = tuple(Path(path) for path in site_data["paths"])
+    evidence_path = Path(str(site_data["boundary_evidence"]["path"]))
+    artifact_slug = re.sub(
+        r"[^A-Za-z0-9._-]+", "-", str(site_data["artifact_id"]).strip().lower()
+    )
+    slug = re.sub(r"-{2,}", "-", artifact_slug).strip("-.") or "containment"
+    names = (
+        ("sites", f"msa_coc_sites__{slug}.parquet"),
+        ("memberships", f"msa_coc_memberships__{slug}.parquet"),
+        ("summary", f"msa_coc_summary__{slug}.json"),
+        ("boundary_evidence", f"boundary_evidence__{slug}.json"),
+    )
+    source_paths = (*paths, evidence_path)
+    result_artifacts = []
+    index = {"schema_version": str(site_data["schema_version"])}
+    for (key, basename), source_path in zip(names, source_paths, strict=True):
+        relative = f"site_universes/{basename}"
+        contents = source_path.read_bytes()
+        if key == "boundary_evidence":
+            expected = site_data["boundary_evidence"]["fingerprint"]
+            try:
+                evidence_payload = json.loads(contents)
+            except json.JSONDecodeError as exc:
+                raise ValueError(f"boundary evidence is not valid JSON: {source_path}") from exc
+            observed = _boundary_evidence_fingerprint(evidence_payload)
+        else:
+            expected = site_data["fingerprints"][("sites", "memberships", "summary").index(key)]
+            observed = hashlib.sha256(contents).hexdigest()
+        if observed != expected:
+            raise ValueError(f"pinned site-universe input changed before bundling: {source_path}")
+        result_artifacts.append(
+            BundleArtifact(
+                relative,
+                contents,
+                "site_universe_input",
+                ArtifactLineage(
+                    relative,
+                    (str(site_data["artifact_id"]),),
+                    ArtifactScope.ROW_LEVEL,
+                ),
+            )
+        )
+        index[key] = relative
+    return tuple(result_artifacts), {str(site_data["artifact_id"]): index}
+
+
+def site_universe_inputs_from_bundle(root: Path, index, expected_site_data):
+    """Load exact indexed site/evidence bytes from a verified portable bundle."""
+    if not isinstance(index, Mapping) or index.get("withheld", False):
+        raise ValueError("required site-universe inputs are withheld from this bundle")
+    required = ("sites", "memberships", "summary", "boundary_evidence")
+    if any(not isinstance(index.get(key), str) for key in required):
+        raise ValueError("bundle site-universe index is missing required input paths")
+    root = Path(root).resolve()
+    paths = {key: _contained_bundle_input(root, index[key]) for key in required}
+    expected_fingerprints = tuple(expected_site_data.get("fingerprints", ()))
+    if len(expected_fingerprints) != 3:
+        raise ValueError("resolved plan does not pin all site-universe input fingerprints")
+    resolution = resolve_site_universe_files(
+        artifact_id=expected_site_data["artifact_id"],
+        threshold=float(expected_site_data["threshold"]),
+        sites_path=paths["sites"],
+        memberships_path=paths["memberships"],
+        summary_path=paths["summary"],
+        expected_fingerprints=expected_fingerprints,
+    )
+    evidence_bytes = paths["boundary_evidence"].read_bytes()
+    expected_evidence_hash = expected_site_data.get("boundary_evidence", {}).get(
+        "fingerprint"
+    )
+    try:
+        evidence_payload = json.loads(evidence_bytes)
+    except json.JSONDecodeError as exc:
+        raise ValueError("bundled boundary evidence is not valid JSON") from exc
+    if not isinstance(evidence_payload, Mapping):
+        raise ValueError("bundled boundary evidence must contain a JSON object")
+    if _boundary_evidence_fingerprint(evidence_payload) != expected_evidence_hash:
+        raise ValueError("bundled boundary evidence differs from the resolved plan")
+    return replace(resolution, paths=()), evidence_payload
+
+
+def _boundary_evidence_fingerprint(payload):
+    return "sha256:" + hashlib.sha256(canonical_bytes(payload)).hexdigest()
+
+
+def _contained_bundle_input(root: Path, relative: str) -> Path:
+    from pathlib import PurePosixPath
+
+    path = PurePosixPath(relative)
+    if (
+        not relative
+        or path.is_absolute()
+        or path.as_posix() != relative
+        or any(part in {"", ".", ".."} for part in path.parts)
+    ):
+        raise ValueError(f"bundle input path is not normalized and relative: {relative!r}")
+    candidate = root
+    for part in path.parts:
+        candidate = candidate / part
+        if candidate.is_symlink():
+            raise ValueError(f"bundle input path contains a symlink: {relative!r}")
+    resolved = candidate.resolve()
+    if root not in resolved.parents or not resolved.is_file():
+        raise ValueError(f"bundle input is missing or escapes its root: {relative!r}")
+    return resolved
+
+
+def _assemble_site_year_panel(recipe, plan, frames):
+    site_panel_name, panel_binding = next(
+        (name, binding)
+        for name, binding in recipe.panels.items()
+        if binding.site_year is not None
+    )
+    site_spec = panel_binding.site_year
+    assert site_spec is not None
+    plan_site = plan.site_universe
+    if not isinstance(plan_site, Mapping):
+        raise ValueError("results plan is missing the resolved site-universe identity")
+    source_bindings = {
+        "pit": site_spec.outcomes.pit,
+        "hic": site_spec.outcomes.hic,
+    }
+    outcomes = {
+        name: SiteYearSourceBinding(panel=binding.panel, measures=tuple(binding.measures))
+        for name, binding in source_bindings.items()
+    }
+    source_names = tuple(dict.fromkeys(binding.panel for binding in outcomes.values()))
+    source_panels = {}
+    fingerprints = {}
+    for name in source_names:
+        frame = frames.get(name)
+        if not isinstance(frame, pd.DataFrame):
+            raise ValueError(f"site-year source panel {name!r} is unavailable")
+        _validate_site_source_panel_provenance(name, frame, plan_site)
+        source_bytes = _panel_input_bytes(frame, dataset_type="results_input_panel")
+        digest = hashlib.sha256(source_bytes).hexdigest()
+        claimed = frame.attrs.get("results_content_sha256")
+        if claimed is not None and claimed != digest:
+            raise ValueError(f"site-year source panel {name!r} content hash does not match bytes")
+        frame.attrs["results_source_parquet_bytes"] = source_bytes
+        frame.attrs["results_content_sha256"] = digest
+        source_panels[name] = frame
+        fingerprints[name] = digest
+    boundary_validation = plan.site_year_boundary_compatibility
+    if boundary_validation is None:
+        raise ValueError("validated boundary compatibility evidence is unavailable")
+    assembly = assemble_site_year_panel(
+        frozen_memberships=tuple(tuple(pair) for pair in plan_site["memberships"]),
+        requested_years=tuple(int(year) for year in plan_site["requested_years"]),
+        source_panels=source_panels,
+        outcome_bindings=outcomes,
+        boundary_compatibility=boundary_validation,
+        artifact_id=str(plan_site["artifact_id"]),
+        threshold=float(plan_site["threshold"]),
+        membership_identity=str(plan_site["membership_identity"]),
+        frozen_boundary_vintage=str(plan_site["boundary_vintage"]),
+        source_panel_fingerprints=fingerprints,
+    )
+    return assembly, fingerprints
+
+
+def _validate_site_source_panel_provenance(panel_name, frame, site_plan):
+    provenance = frame.attrs.get("results_panel_provenance")
+    if not isinstance(provenance, Mapping):
+        raise ValueError(
+            f"site-year source panel {panel_name!r} lacks embedded HHP-Lab provenance"
+        )
+    extra = provenance.get("extra", {})
+    target = provenance.get("target_geometry")
+    if not isinstance(target, Mapping) and isinstance(extra, Mapping):
+        target = extra.get("target_geometry")
+    target_vintage = target.get("vintage") if isinstance(target, Mapping) else None
+    geometry_type = target.get("type") if isinstance(target, Mapping) else None
+    if geometry_type is None:
+        geometry_type = provenance.get("geo_type")
+    if geometry_type is None and isinstance(extra, Mapping):
+        geometry_type = extra.get("geo_type")
+    if target_vintage is None:
+        target_vintage = provenance.get("boundary_vintage")
+    if target_vintage is None and isinstance(extra, Mapping):
+        target_vintage = extra.get("boundary_vintage")
+    if geometry_type != "coc":
+        raise ValueError(
+            f"site-year source panel {panel_name!r} provenance must identify CoC geometry"
+        )
+    expected_vintages = {
+        str(value)
+        for key, value in site_plan.get("source_panel_vintages", {}).items()
+        if key.rsplit(":", 1)[0] == panel_name
+    }
+    if not expected_vintages or str(target_vintage) not in expected_vintages:
+        raise ValueError(
+            f"site-year source panel {panel_name!r} provenance boundary vintage "
+            f"{target_vintage!r} does not match planned vintages {sorted(expected_vintages)}"
+        )
+    used_column = "boundary_vintage_used"
+    if used_column in frame.columns:
+        expected = expected_vintages
+        observed = {
+            str(value) for value in frame[used_column].dropna().unique().tolist()
+        }
+        if observed - expected:
+            raise ValueError(
+                f"site-year source panel {panel_name!r} rows use boundary vintages "
+                f"{sorted(observed - expected)} outside the planned source vintages"
+            )
+
+
+def _panel_input_bytes(frame, *, dataset_type):
+    existing = frame.attrs.get("results_source_parquet_bytes")
+    if isinstance(existing, bytes):
+        return existing
+    provenance = frame.attrs.get("results_panel_provenance")
+    return _parquet_bytes(frame, dataset_type=dataset_type, provenance=provenance)
+
+
 def _runtime_plan(value, rebuilt, plan_hash):
     """Rehydrate the hashed normalized plan used by portable replay."""
     panels = [SimpleNamespace(**item) for item in value["panels"]]
@@ -790,6 +1140,14 @@ def _recipe_plan_projection(value):
     projected["analyses"] = analyses
     projected["group_contexts"] = contexts
     projected["component_hashes"] = hashes
+    if isinstance(projected.get("site_universe"), Mapping):
+        site_data = dict(projected["site_universe"])
+        site_data.pop("paths", None)
+        site_data.pop("manifest_fingerprint", None)
+        evidence = dict(site_data.get("boundary_evidence", {}))
+        evidence.pop("path", None)
+        site_data["boundary_evidence"] = evidence
+        projected["site_universe"] = site_data
     return projected
 
 
@@ -838,6 +1196,8 @@ def _load_run_panels(
                 failures[item.name] = str(exc)
     frames = {}
     for item in plan.panels:
+        if item.pipeline_id is None:
+            continue
         if item.name in failures:
             continue
         result = pipeline_results.get(item.pipeline_id)
@@ -858,6 +1218,9 @@ def _load_run_panels(
                 raise FileNotFoundError(f"expected panel output is missing: {path}")
             source_bytes = path.read_bytes()
             frame = pd.read_parquet(path)
+            provenance = read_provenance(path)
+            if provenance is not None:
+                frame.attrs["results_panel_provenance"] = provenance.to_dict()
             frame.attrs["results_content_sha256"] = hashlib.sha256(source_bytes).hexdigest()
             frame.attrs["results_source_parquet_bytes"] = source_bytes
             frames[item.name] = frame
@@ -867,16 +1230,23 @@ def _load_run_panels(
     return frames, failures
 
 
-def _load_cached_panels(recipe, plan, *, project_root):
+def _load_cached_panels(recipe, plan, *, project_root, outputs_root=None):
     """Read canonical cached panels only when their embedded identity matches."""
     from hhplab.recipe.executor import _resolve_panel_output_file
     from hhplab.storage.config import load_config
     from hhplab.storage.provenance import read_provenance
 
-    storage = load_config(project_root=project_root)
+    storage = load_config(
+        output_root=outputs_root,
+        recipe_output_root=recipe.output_root,
+        recipe_base_dir=recipe.source_base_dir,
+        project_root=project_root,
+    )
     frames = {}
     errors = []
     for panel in plan.panels:
+        if panel.pipeline_id is None:
+            continue
         try:
             path = _resolve_panel_output_file(
                 recipe, panel.pipeline_id, project_root, storage
@@ -907,7 +1277,13 @@ def _load_cached_panels(recipe, plan, *, project_root):
                     f"cached panel {panel.name!r} has no matching build identity; "
                     "rebuild it with the current recipe before --readiness"
                 )
-            frames[panel.name] = pd.read_parquet(path)
+            frame = pd.read_parquet(path)
+            if provenance is not None:
+                frame.attrs["results_panel_provenance"] = provenance.to_dict()
+            source_bytes = path.read_bytes()
+            frame.attrs["results_source_parquet_bytes"] = source_bytes
+            frame.attrs["results_content_sha256"] = content_hash
+            frames[panel.name] = frame
         except Exception as exc:
             errors.append(f"panel {panel.name!r}: {type(exc).__name__}: {exc}")
     return frames, errors
@@ -1031,6 +1407,8 @@ def _bundle_payload(
     input_identities = []
     panel_lineage: dict[str, dict[str, tuple[str, ...]]] = {}
     source_ids = {source for panel in plan.panels for source in panel.source_ids}
+    if plan.site_universe is not None:
+        source_ids.add(str(plan.site_universe["artifact_id"]))
     source_terms = declared_source_terms(source_ids)
     content_hashes = {}
     for panel_plan in plan.panels:
@@ -1063,7 +1441,16 @@ def _bundle_payload(
         panel_lineage[panel_plan.name] = {
             column: tuple(sources) for column in frame.columns
         }
-        if panel_plan.name in recipe.results.include_panels:
+        site_source_names = {
+            source_binding.panel
+            for panel_binding in recipe.panels.values()
+            if panel_binding.site_year is not None
+            for source_binding in (
+                panel_binding.site_year.outcomes.pit,
+                panel_binding.site_year.outcomes.hic,
+            )
+        }
+        if panel_plan.name in recipe.results.include_panels or panel_plan.name in site_source_names:
             path = f"panels/{panel_plan.name}.parquet"
             artifacts.append(
                 BundleArtifact(
@@ -1116,6 +1503,11 @@ def _bundle_payload(
                 ArtifactLineage(path, (), ArtifactScope.SAMPLE),
             )
         )
+
+    site_universes = {}
+    if plan.site_universe is not None:
+        site_artifacts, site_universes = _site_universe_bundle_artifacts(plan.site_universe)
+        artifacts.extend(site_artifacts)
 
     all_lineage = {
         name: {**panel_lineage.get(name, {}), **derived_lineage.get(name, {})}
@@ -1249,6 +1641,7 @@ def _bundle_payload(
         tolerance=Tolerance(),
         private=private,
         allow_unknown_aggregates=allow_unknown_aggregates,
+        site_universes=site_universes,
     )
     return payload, content_hashes
 
@@ -1319,14 +1712,17 @@ def _derive_inputs(spec):
     return [data[key] for key in ("num", "den", "pop", "total") if key in data]
 
 
-def _parquet_bytes(frame, *, dataset_type):
+def _parquet_bytes(frame, *, dataset_type, provenance=None):
     import pyarrow as pa
     import pyarrow.parquet as pq
 
     table = pa.Table.from_pandas(frame, preserve_index=False)
     metadata = dict(table.schema.metadata or {})
+    extra = {"dataset_type": dataset_type, "row_count": len(frame)}
+    if isinstance(provenance, Mapping):
+        extra.update(provenance)
     metadata[PROVENANCE_KEY] = (
-        ProvenanceBlock(extra={"dataset_type": dataset_type, "row_count": len(frame)})
+        ProvenanceBlock(extra=extra)
         .to_json()
         .encode("utf-8")
     )

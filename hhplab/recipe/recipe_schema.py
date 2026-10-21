@@ -24,7 +24,7 @@ from pathlib import Path
 from string import Formatter
 from typing import Annotated, Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, PrivateAttr, field_validator, model_validator
 
 from hhplab.recipe.schema_common import (
     GeometryRef,
@@ -2396,9 +2396,19 @@ class RecipeV1(BaseModel):
 
     model_config = ConfigDict(extra="forbid", populate_by_name=True)
 
+    _source_base_dir: Path | None = PrivateAttr(default=None)
+
     version: Literal[1] = 1
     name: str
     description: str | None = None
+    output_root: str | None = Field(
+        default=None,
+        min_length=1,
+        description=(
+            "Optional output root for artifacts produced by this recipe. Relative paths "
+            "resolve against the recipe file's directory."
+        ),
+    )
 
     universe: YearSpec
 
@@ -2415,6 +2425,18 @@ class RecipeV1(BaseModel):
         default_factory=dict,
         description="Named vintage tuple sets for terse multi-year dataset resolution.",
     )
+
+    @property
+    def source_base_dir(self) -> Path | None:
+        """Directory used to resolve paths declared by the recipe source."""
+        return self._source_base_dir
+
+    @field_validator("output_root")
+    @classmethod
+    def _validate_output_root(cls, value: str | None) -> str | None:
+        if value is not None and not value.strip():
+            raise ValueError("output_root must be a non-empty path when provided.")
+        return value
 
     @model_validator(mode="after")
     def _validate_references(self) -> RecipeV1:

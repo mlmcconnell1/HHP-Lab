@@ -26,3 +26,7 @@
 {"key": "release", "id": "coclab-ff6fp.25", "depends_on": ["coclab-ff6fp.23", "coclab-ff6fp.24", "coclab-ff6fp.16", "coclab-ff6fp.2"], "intent_ids": ["intent:results-v2:hhplab", "intent:results-v2:schema", "intent:results-v2:storage", "intent:results-v2:recipe", "intent:results-v2:analysis", "intent:results-v2:results", "intent:results-v2:cli"]}
 {"key": "phase2", "id": "coclab-ga04o", "depends_on": ["coclab-ff6fp.25"], "intent_ids": ["intent:results-v2:hhplab", "intent:results-v2:analysis", "intent:results-v2:results", "intent:results-v2:recipe"]}
 {"key": "phase3", "id": "coclab-pjmfl", "depends_on": ["coclab-ga04o"], "intent_ids": ["intent:results-v2:hhplab", "intent:results-v2:analysis", "intent:results-v2:results", "intent:results-v2:recipe"]}
+{"key": "site-universe-inputs", "id": "coclab-ccwlh.2", "depends_on": ["coclab-ccwlh.1"], "intent_ids": ["intent:site-universe:input_resolver"]}
+{"key": "site-universe-boundaries", "id": "coclab-ccwlh.3", "depends_on": ["coclab-ccwlh.1"], "intent_ids": ["intent:site-universe:coc_boundary_compatibility"]}
+{"key": "site-universe-aggregation", "id": "coclab-ccwlh.4", "depends_on": ["coclab-ccwlh.1", "coclab-ccwlh.2", "coclab-ccwlh.3"], "intent_ids": ["intent:site-universe:site_year_aggregation"]}
+{"key": "site-universe-output-root", "id": "coclab-ccwlh.6", "depends_on": ["coclab-ccwlh.1"], "intent_ids": ["intent:site-universe:storage_config", "intent:site-universe:recipe_output_root_schema"]}

@@ -8,19 +8,24 @@ deterministic mappings for the sample resolver and result workflow.
 from __future__ import annotations
 
 import hashlib
+import json
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
+from pathlib import Path
 from types import MappingProxyType
 from typing import Any
 
 from pydantic import TypeAdapter
 
+from hhplab.recipe.executor.core import ExecutorError
+from hhplab.recipe.executor.inputs import SiteUniverseResolution, resolve_site_universe_source
 from hhplab.recipe.preflight.models import (
     FindingKind,
     PreflightFinding,
     Remediation,
     Severity,
 )
+from hhplab.recipe.schema_common import expand_year_spec
 from hhplab.recipe.schema_results import (
     AnalysisBase,
     AnalysisSpec,
@@ -243,18 +248,22 @@ class ResultsPlan:
     analysis_dependencies: Mapping[str, tuple[str, ...]]
     component_hashes: Mapping[str, str]
     preflight_findings: tuple[PreflightFinding, ...]
+    site_universe: Mapping[str, Any] | None = None
+    site_year_boundary_compatibility: Any | None = None
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "parameters", _deep_freeze(self.parameters))
         object.__setattr__(self, "analysis_dependencies", _deep_freeze(self.analysis_dependencies))
         object.__setattr__(self, "component_hashes", _deep_freeze(self.component_hashes))
+        if self.site_universe is not None:
+            object.__setattr__(self, "site_universe", _deep_freeze(self.site_universe))
 
     @property
     def is_ready(self) -> bool:
         return not any(finding.is_blocking for finding in self.preflight_findings)
 
     def to_dict(self) -> dict[str, Any]:
-        return {
+        result = {
             "recipe_id": self.recipe_id,
             "parameters": _deep_thaw(self.parameters),
             "panels": [panel.to_dict() for panel in self.panels],
@@ -267,6 +276,9 @@ class ResultsPlan:
             "component_hashes": _deep_thaw(self.component_hashes),
             "preflight_findings": [finding.to_dict() for finding in self.preflight_findings],
         }
+        if self.site_universe is not None:
+            result["site_universe"] = _deep_thaw(self.site_universe)
+        return result
 
 
 class ResultsPlanningError(ValueError):
@@ -281,6 +293,8 @@ def plan_results(
     recipe: RecipeV2,
     *,
     original_recipe_bytes: bytes,
+    site_universe_resolution: SiteUniverseResolution | None = None,
+    boundary_evidence_payload: Mapping[str, object] | None = None,
 ) -> ResultsPlan:
     """Resolve a RecipeV2 without reading panel data or performing a build."""
     if not isinstance(recipe, RecipeV2):
@@ -300,7 +314,67 @@ def plan_results(
             )
         )
 
-    panels = _resolve_panels(recipe)
+    universe_resolution = None
+    if recipe.site_universe is not None:
+        if site_universe_resolution is not None:
+            universe_resolution = site_universe_resolution
+            expected_membership_identity = hashlib.sha256(
+                canonical_bytes(
+                    {
+                        "schema_version": "msa_coc_sites/1",
+                        "artifact_id": universe_resolution.artifact_id,
+                        "threshold": universe_resolution.threshold,
+                        "site_key": "msa_id",
+                        "memberships": [list(pair) for pair in universe_resolution.memberships],
+                    }
+                )
+            ).hexdigest()
+            membership_msas = tuple(
+                sorted({msa_id for msa_id, _ in universe_resolution.memberships})
+            )
+            membership_cocs = tuple(coc_id for _, coc_id in universe_resolution.memberships)
+            if (
+                universe_resolution.artifact_id != recipe.site_universe.source.artifact_id
+                or universe_resolution.threshold != float(recipe.site_universe.threshold)
+                or universe_resolution.schema_version != "msa_coc_sites/1"
+                or universe_resolution.membership_identity != expected_membership_identity
+                or universe_resolution.selected_msa_ids != membership_msas
+                or len(membership_cocs) != len(set(membership_cocs))
+                or universe_resolution.eligible_site_count != len(membership_msas)
+                or universe_resolution.excluded_site_count < 0
+                or len(universe_resolution.fingerprints) != 3
+                or any(
+                    len(fingerprint) != 64
+                    or any(char not in "0123456789abcdef" for char in fingerprint)
+                    for fingerprint in universe_resolution.fingerprints
+                )
+            ):
+                _raise(
+                    "Injected site-universe resolution does not match the recipe artifact "
+                    "and threshold",
+                    hint=(
+                        "Supply the immutable validated resolution for this exact "
+                        "site_universe reference."
+                    ),
+                )
+        else:
+            try:
+                universe_resolution = resolve_site_universe_source(
+                    source=recipe.site_universe.source,
+                    threshold=float(recipe.site_universe.threshold),
+                    source_base_dir=recipe.source_base_dir,
+                )
+            except (ExecutorError, OSError, ValueError) as exc:
+                _raise(
+                    str(exc),
+                    hint="Correct the artifact locator or use matching canonical producer outputs.",
+                )
+    elif site_universe_resolution is not None or boundary_evidence_payload is not None:
+        _raise(
+            "Injected site-universe inputs require a recipe site_universe reference",
+            hint="Use a V2 recipe that declares the site-universe source and site-year panel.",
+        )
+    panels = _resolve_panels(recipe, universe_resolution=universe_resolution)
     panel_by_name = {panel.name: panel for panel in panels}
     parameter_values = _resolved_parameters(recipe)
     variants = {variant.id: variant for variant in recipe.variants}
@@ -378,6 +452,50 @@ def plan_results(
     dependencies = _build_dependencies(recipe, references, plan_by_key)
     components = _component_hashes(recipe, panels, analysis_plans, contexts)
     findings = _substitution_warnings(recipe)
+    site_universe_data: dict[str, Any] | None = None
+    site_year_boundary_compatibility = None
+    if universe_resolution is not None:
+        if universe_resolution.eligible_site_count == 0:
+            site_universe_data = universe_resolution.to_dict()
+            site_universe_data["requested_years"] = expand_year_spec(recipe.universe)
+        else:
+            (
+                site_universe_data,
+                site_year_boundary_compatibility,
+            ) = _resolve_site_year_contract(
+                recipe,
+                universe_resolution,
+                boundary_evidence_payload=boundary_evidence_payload,
+            )
+        site_universe_hash_data = _site_universe_hash_projection(site_universe_data)
+        components["site_universe"] = hashlib.sha256(
+            canonical_bytes(site_universe_hash_data)
+        ).hexdigest()
+        if universe_resolution.eligible_site_count == 0:
+            findings.append(
+                _finding(
+                    "site_universe selects zero eligible MSA sites at the requested threshold",
+                    hint=(
+                        "Choose a producer artifact and explicit threshold with at least one "
+                        "eligible site."
+                    ),
+                )
+            )
+        elif site_universe_data is not None:
+            for record in site_universe_data["boundary_evidence"]["validation"]["records"]:
+                if record["status"] in {"unknown", "incompatible"}:
+                    findings.append(
+                        _warning(
+                            "site-year boundary status "
+                            f"{record['status']} for MSA {record['msa_id']}, "
+                            f"CoC {record['frozen_coc_id']}, panel "
+                            f"{record['source_panel']}, year {record['year']}",
+                            hint=(
+                                "Add reviewed compatibility evidence for every selected "
+                                "site, panel, and requested year."
+                            ),
+                        )
+                    )
     payload = {
         "recipe_id": recipe.id,
         "panels": [panel.to_dict() for panel in panels],
@@ -388,6 +506,8 @@ def plan_results(
         "analysis_dependencies": {key: list(value) for key, value in sorted(dependencies.items())},
         "component_hashes": components,
     }
+    if site_universe_data is not None:
+        payload["site_universe"] = site_universe_hash_data
     canonical = canonical_bytes(payload)
     plan_sha256 = hashlib.sha256(canonical).hexdigest()
     return ResultsPlan(
@@ -403,6 +523,8 @@ def plan_results(
         analysis_dependencies=dependencies,
         component_hashes=components,
         preflight_findings=tuple(findings),
+        site_universe=site_universe_data,
+        site_year_boundary_compatibility=site_year_boundary_compatibility,
     )
 
 
@@ -461,11 +583,49 @@ def _json_model(value: Any) -> Any:
     return value
 
 
-def _resolve_panels(recipe: RecipeV2) -> list[PanelPlan]:
+def _resolve_panels(
+    recipe: RecipeV2,
+    *,
+    universe_resolution: SiteUniverseResolution | None = None,
+) -> list[PanelPlan]:
     targets = {target.id: target for target in recipe.targets}
     pipelines = {pipeline.id: pipeline for pipeline in recipe.pipelines}
     result: list[PanelPlan] = []
     for name, binding in recipe.panels.items():
+        if binding.site_year is not None:
+            if universe_resolution is None:
+                _raise(
+                    f"derived panel {name!r} requires site_universe resolution",
+                    hint="Declare a valid top-level site_universe source and threshold.",
+                )
+            binding_data = _json_model(binding.site_year)
+            build_hash = hashlib.sha256(canonical_bytes(binding_data)).hexdigest()
+            identity = hashlib.sha256(
+                canonical_bytes(
+                    {
+                        "build_spec_hash": build_hash,
+                        "membership_identity": universe_resolution.membership_identity,
+                        "site_key": recipe.site_universe.site_key,
+                        "boundary_vintage": universe_resolution.boundary_vintage,
+                    }
+                )
+            ).hexdigest()
+            result.append(
+                PanelPlan(
+                    name=name,
+                    pipeline_id=None,
+                    output="site_year",
+                    geo_key=binding.geo_key,
+                    time_key=binding.time_key,
+                    panel_identity=identity,
+                    build_spec_hash=build_hash,
+                    declared_vintages={
+                        "coc_boundary_vintage": universe_resolution.boundary_vintage
+                    },
+                    source_ids=(universe_resolution.artifact_id,),
+                )
+            )
+            continue
         ref = binding.ref
         if not hasattr(ref, "pipeline"):
             _raise(
@@ -547,6 +707,112 @@ def _resolve_panels(recipe: RecipeV2) -> list[PanelPlan]:
             )
         )
     return result
+
+
+def _resolve_site_year_contract(
+    recipe: RecipeV2,
+    resolution: SiteUniverseResolution,
+    *,
+    boundary_evidence_payload: Mapping[str, object] | None = None,
+) -> tuple[dict[str, Any], Any]:
+    """Bind the frozen membership identity to explicit source vintages and evidence."""
+    from hhplab.geographies.coc.coc_validate import (
+        BoundaryCompatibilityError,
+        validate_coc_boundary_compatibility,
+    )
+
+    derived = next(
+        binding.site_year for binding in recipe.panels.values() if binding.site_year is not None
+    )
+    assert derived is not None
+    years = expand_year_spec(recipe.universe)
+    source_vintages: dict[tuple[str, int], str | int] = {}
+    pipelines = {pipeline.id: pipeline for pipeline in recipe.pipelines}
+    targets = {target.id: target for target in recipe.targets}
+    for source_binding in (derived.outcomes.pit, derived.outcomes.hic):
+        source_panel = recipe.panels[source_binding.panel]
+        assert source_panel.ref is not None and hasattr(source_panel.ref, "pipeline")
+        pipeline = pipelines[source_panel.ref.pipeline]
+        target = targets[pipeline.target]
+        vintage = target.geometry.vintage
+        if vintage is None:
+            _raise(
+                f"site_year source panel {source_binding.panel!r} does not declare a "
+                "CoC boundary vintage",
+                hint=(
+                    "Set the source target geometry vintage so boundary evidence can be "
+                    "checked against it."
+                ),
+            )
+        for year in years:
+            source_vintages[(source_binding.panel, year)] = vintage
+
+    evidence_path_text = derived.boundary_evidence.path
+    if boundary_evidence_payload is None:
+        evidence_path = Path(evidence_path_text).expanduser()
+        if not evidence_path.is_absolute():
+            if recipe.source_base_dir is None:
+                _raise(
+                    "Relative boundary evidence path requires a recipe source directory",
+                    hint=(
+                        "Load the recipe from a file or supply source_base_dir for an "
+                        "in-memory recipe."
+                    ),
+                )
+            evidence_path = recipe.source_base_dir / evidence_path
+        evidence_path = evidence_path.resolve()
+        try:
+            evidence_payload = json.loads(evidence_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as exc:
+            _raise(
+                f"Invalid site-year boundary evidence {evidence_path}: {exc}",
+                hint="Provide a readable versioned boundary evidence JSON artifact.",
+            )
+        evidence_path_text = str(evidence_path)
+    else:
+        evidence_payload = dict(boundary_evidence_payload)
+    try:
+        validation = validate_coc_boundary_compatibility(
+            evidence_payload,
+            artifact_id=resolution.artifact_id,
+            threshold=resolution.threshold,
+            membership_identity=resolution.membership_identity,
+            frozen_boundary_vintage=resolution.boundary_vintage,
+            frozen_memberships=resolution.memberships,
+            requested_years=years,
+            source_panel_vintages=source_vintages,
+        )
+    except BoundaryCompatibilityError as exc:
+        _raise(
+            f"Invalid site-year boundary evidence {evidence_path_text}: {exc}",
+            hint=(
+                "Provide versioned compatibility evidence bound to this exact artifact, "
+                "threshold, membership, and source vintage."
+            ),
+        )
+    payload = resolution.to_dict()
+    payload["boundary_evidence"] = {
+        "path": evidence_path_text,
+        "fingerprint": validation.evidence_fingerprint,
+        "validation": asdict(validation),
+    }
+    payload["source_panel_vintages"] = {
+        f"{panel}:{year}": vintage
+        for (panel, year), vintage in sorted(source_vintages.items())
+    }
+    payload["requested_years"] = years
+    return payload, validation
+
+
+def _site_universe_hash_projection(value: Mapping[str, Any]) -> dict[str, Any]:
+    """Keep scientific identity content-based while leaving paths as routing metadata."""
+    projected = dict(value)
+    projected.pop("paths", None)
+    projected.pop("manifest_fingerprint", None)
+    boundary_evidence = dict(projected.get("boundary_evidence", {}))
+    boundary_evidence.pop("path", None)
+    projected["boundary_evidence"] = boundary_evidence
+    return projected
 
 
 def _referenced_dataset_ids(value: Any) -> set[str]:

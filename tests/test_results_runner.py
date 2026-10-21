@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import hashlib
+import shutil
+from pathlib import Path
 
 import pandas as pd
 import pytest
@@ -309,6 +311,33 @@ def test_readiness_uses_matching_cached_panel_receipt_without_building(tmp_path)
     assert result["issues"] == []
 
 
+def test_readiness_uses_resolved_outputs_root_for_cached_panels(tmp_path, monkeypatch):
+    from hhplab.results import runner
+
+    outputs_root = tmp_path / "selected-output-root"
+    received = {}
+
+    def load_cached_panels(_recipe, _plan, *, project_root, outputs_root):
+        received["project_root"] = project_root
+        received["outputs_root"] = outputs_root
+        return {"panel": PANEL}, []
+
+    monkeypatch.setattr(runner, "_load_cached_panels", load_cached_panels)
+    result = check_results(
+        _recipe(),
+        original_recipe_bytes=b"test recipe bytes",
+        readiness=True,
+        project_root=tmp_path / "project",
+        outputs_root=outputs_root,
+    )
+
+    assert result["status"] == "ready"
+    assert received == {
+        "project_root": tmp_path / "project",
+        "outputs_root": outputs_root,
+    }
+
+
 def test_run_packages_bundle_and_terminal_ledger_event(tmp_path):
     recipe = _recipe()
     result = run_results(
@@ -327,6 +356,47 @@ def test_run_packages_bundle_and_terminal_ledger_event(tmp_path):
     events = RunLedger(tmp_path).read()["events"]
     assert [event["event"] for event in events] == ["run_started", "run_finished"]
     assert events[-1]["run_id"] == result["run_id"]
+
+
+def test_relative_recipe_output_root_bundle_replays_without_origin_bundle(
+    tmp_path, monkeypatch
+):
+    from hhplab.results.verify import verify_bundle
+
+    recipe_base = tmp_path / "recipe-source"
+    recipe_base.mkdir()
+    recipe_data = _recipe().model_dump(
+        mode="json", by_alias=True, exclude_none=True
+    )
+    recipe_data["output_root"] = "relative-output"
+    recipe = load_recipe(recipe_data, source_base_dir=recipe_base)
+    outputs_root = recipe_base / "relative-output"
+
+    result = run_results(
+        recipe,
+        original_recipe_bytes=b"relative output root recipe",
+        outputs_root=outputs_root,
+        panel_frames={"panel": PANEL},
+        allow_unknown_aggregates=True,
+    )
+
+    origin_bundle = Path(result["bundle_path"])
+    portable_bundle = tmp_path / "portable-copy"
+    shutil.copytree(origin_bundle, portable_bundle)
+    original_read_bytes = Path.read_bytes
+
+    def refuse_origin_bundle_reads(path):
+        if path.resolve().is_relative_to(origin_bundle.resolve()):
+            raise AssertionError("portable replay read the origin bundle")
+        return original_read_bytes(path)
+
+    monkeypatch.setattr(Path, "read_bytes", refuse_origin_bundle_reads)
+    report = verify_bundle(portable_bundle)
+
+    assert report.integrity == "pass"
+    assert report.differences == ()
+    manifest = outputs_root / "results" / recipe.id / result["run_id"] / "manifest.json"
+    assert manifest.is_file()
 
 
 def test_executor_built_panel_bytes_verify_after_bundle_move(tmp_path, monkeypatch):
@@ -527,7 +597,12 @@ def test_small_group_descriptive_quantiles_are_withheld_even_when_aggregates_all
     withheld = json.loads((bundle / "withheld.json").read_text())
     withheld_paths = {item["path"] for item in withheld["withheld"]}
     assert "results/descriptive_stats.parquet" in withheld_paths
-    assert "report/index.html" in withheld_paths
+    assert "report/index.html" not in withheld_paths
+    manifest = json.loads((bundle / "manifest.json").read_text())
+    assert "report/index.html" in {item["path"] for item in manifest["files"]}
+    report = (bundle / "report" / "index.html").read_text()
+    assert "Report values and claims are withheld by redistribution policy." in report
+    assert "Withheld under source redistribution terms." in report
     assert not (bundle / "results" / "descriptive_stats.parquet").exists()
     if (bundle / "results" / "results.json").is_file():
         result_copy = json.loads((bundle / "results" / "results.json").read_text())

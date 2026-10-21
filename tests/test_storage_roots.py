@@ -12,6 +12,9 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+
+from hhplab.recipe.loader import load_recipe
 from hhplab.recipe.manifest import (
     ROOT_ASSET_STORE,
     ROOT_OUTPUT,
@@ -266,6 +269,133 @@ class TestConfigIntegrationWithPaths:
             project_root=tmp_path,
         )
         assert cfg.output_root == tmp_path / "cli-outputs"
+
+    def test_recipe_output_root_precedence_and_separate_asset_root(
+        self, tmp_path: Path, monkeypatch
+    ):
+        project_root = tmp_path / "project"
+        project_root.mkdir()
+        (project_root / "hhplab.yaml").write_text("output_root: repo-outputs\n")
+        recipe_dir = tmp_path / "recipes"
+        recipe_dir.mkdir()
+
+        monkeypatch.setenv("HHPLAB_OUTPUT_ROOT", "env-outputs")
+        env_config = load_config(
+            recipe_output_root="recipe-outputs",
+            recipe_base_dir=recipe_dir,
+            project_root=project_root,
+        )
+        assert env_config.output_root == Path.cwd() / "env-outputs"
+
+        monkeypatch.delenv("HHPLAB_OUTPUT_ROOT")
+        recipe_config = load_config(
+            recipe_output_root="recipe-outputs",
+            recipe_base_dir=recipe_dir,
+            project_root=project_root,
+        )
+        assert recipe_config.output_root == recipe_dir / "recipe-outputs"
+
+        cli_config = load_config(
+            output_root=tmp_path / "cli-outputs",
+            recipe_output_root="recipe-outputs",
+            recipe_base_dir=recipe_dir,
+            project_root=project_root,
+        )
+        assert cli_config.output_root == tmp_path / "cli-outputs"
+        assert cli_config.asset_store_root == project_root / "data"
+
+    def test_project_config_is_discovered_from_nested_working_directory(
+        self, tmp_path: Path, monkeypatch
+    ):
+        project_root = tmp_path / "project"
+        nested = project_root / "nested" / "command"
+        nested.mkdir(parents=True)
+        (project_root / "hhplab.yaml").write_text("output_root: configured-output\n")
+        monkeypatch.chdir(nested)
+
+        cfg = load_config()
+
+        assert cfg.output_root == project_root / "configured-output"
+
+    def test_relative_recipe_root_requires_source_base_unless_overridden(
+        self, tmp_path: Path, monkeypatch
+    ):
+        with pytest.raises(ValueError, match="explicit source_base_dir"):
+            load_config(recipe_output_root="relative-output", project_root=tmp_path)
+
+        monkeypatch.setenv("HHPLAB_OUTPUT_ROOT", str(tmp_path / "env-output"))
+        cfg = load_config(recipe_output_root="relative-output", project_root=tmp_path)
+        assert cfg.output_root == tmp_path / "env-output"
+
+    def test_recipe_relative_root_uses_loaded_recipe_origin_and_is_private(
+        self, tmp_path: Path, monkeypatch
+    ):
+        recipe_path = tmp_path / "recipes" / "example.yaml"
+        recipe_path.parent.mkdir()
+        recipe_path.write_text(
+            "version: 1\n"
+            "name: root-test\n"
+            "output_root: products\n"
+            "universe: {years: [2020]}\n"
+            "targets: []\n"
+            "datasets: {}\n"
+            "pipelines: []\n"
+        )
+        monkeypatch.chdir(tmp_path)
+        recipe = load_recipe(recipe_path)
+        cfg = load_config(
+            recipe_output_root=recipe.output_root,
+            recipe_base_dir=recipe.source_base_dir,
+            project_root=tmp_path,
+        )
+        assert recipe.source_base_dir == recipe_path.parent.resolve()
+        assert cfg.output_root == recipe_path.parent / "products"
+        assert "source_base_dir" not in recipe.model_dump()
+        assert "_source_base_dir" not in recipe.model_dump()
+
+    def test_in_memory_recipe_source_base_is_explicit(self, tmp_path: Path):
+        data = {
+            "version": 1,
+            "name": "memory-root-test",
+            "output_root": "products",
+            "universe": {"years": [2020]},
+            "targets": [],
+            "datasets": {},
+            "pipelines": [],
+        }
+        recipe = load_recipe(data, source_base_dir=tmp_path)
+        cfg = load_config(
+            recipe_output_root=recipe.output_root,
+            recipe_base_dir=recipe.source_base_dir,
+            project_root=tmp_path / "project",
+        )
+        assert recipe.source_base_dir == tmp_path.resolve()
+        assert cfg.output_root == tmp_path / "products"
+
+    def test_tilde_paths_expand_for_recipe_source_and_output_root(
+        self, tmp_path: Path, monkeypatch
+    ):
+        monkeypatch.setenv("HOME", str(tmp_path))
+        recipe_path = tmp_path / "recipes" / "example.yaml"
+        recipe_path.parent.mkdir()
+        recipe_path.write_text(
+            "version: 1\n"
+            "name: tilde-root-test\n"
+            "output_root: ~/published\n"
+            "universe: {years: [2020]}\n"
+            "targets: []\n"
+            "datasets: {}\n"
+            "pipelines: []\n"
+        )
+
+        recipe = load_recipe("~/recipes/example.yaml")
+        cfg = load_config(
+            recipe_output_root=recipe.output_root,
+            recipe_base_dir=recipe.source_base_dir,
+            project_root=tmp_path / "project",
+        )
+        assert recipe.source_base_dir == recipe_path.parent.resolve()
+        assert cfg.output_root == tmp_path / "published"
 
 
 # ---------------------------------------------------------------------------

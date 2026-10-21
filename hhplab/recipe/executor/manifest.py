@@ -190,7 +190,11 @@ def _resolve_panel_output_file(
     start_year = min(universe_years)
     end_year = max(universe_years)
 
-    cfg = storage_config or load_config(project_root=project_root)
+    cfg = storage_config or load_config(
+        project_root=project_root,
+        recipe_output_root=recipe.output_root,
+        recipe_base_dir=recipe.source_base_dir,
+    )
     recipe_dir = _recipe_output_dirname(recipe.name)
     if target.msa_coc_panel is not None:
         filename = msa_coc_panel_filename(
@@ -260,7 +264,11 @@ def _resolve_map_output_file(
     start_year = min(universe_years)
     end_year = max(universe_years)
 
-    cfg = storage_config or load_config(project_root=project_root)
+    cfg = storage_config or load_config(
+        project_root=project_root,
+        recipe_output_root=recipe.output_root,
+        recipe_base_dir=recipe.source_base_dir,
+    )
     recipe_dir = _recipe_output_dirname(recipe.name)
     return (
         cfg.output_root
@@ -299,7 +307,11 @@ def _resolve_containment_output_file(
             else None
         )
     )
-    cfg = storage_config or load_config(project_root=project_root)
+    cfg = storage_config or load_config(
+        project_root=project_root,
+        recipe_output_root=recipe.output_root,
+        recipe_base_dir=recipe.source_base_dir,
+    )
     recipe_dir = _recipe_output_dirname(recipe.name)
     return (
         cfg.output_root
@@ -325,7 +337,11 @@ def resolve_msa_coc_site_files(
     from hhplab.artifacts.naming.naming import msa_coc_sites_filename
 
     _, target = _resolve_pipeline_target(recipe, pipeline_id)
-    cfg = storage_config or load_config(project_root=project_root)
+    cfg = storage_config or load_config(
+        project_root=project_root,
+        recipe_output_root=recipe.output_root,
+        recipe_base_dir=recipe.source_base_dir,
+    )
     root = cfg.output_root / _recipe_output_dirname(recipe.name)
     return {
         kind: root / msa_coc_sites_filename(target.id, kind)
@@ -347,7 +363,11 @@ def _resolve_msa_coc_coverage_output_file(
         )
 
     spec = target.msa_coc_coverage
-    cfg = storage_config or load_config(project_root=project_root)
+    cfg = storage_config or load_config(
+        project_root=project_root,
+        recipe_output_root=recipe.output_root,
+        recipe_base_dir=recipe.source_base_dir,
+    )
     recipe_dir = _recipe_output_dirname(recipe.name)
     return (
         cfg.output_root

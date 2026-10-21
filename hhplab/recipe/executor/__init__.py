@@ -120,7 +120,7 @@ from hhplab.recipe.recipe_schema import (
     RecipeV1,
     TemporalFilter,
 )
-from hhplab.storage.config import StorageConfig
+from hhplab.storage.config import StorageConfig, load_config
 
 # Re-export the core primitives so ``from hhplab.recipe.executor import
 # ExecutorError`` (and similar imports used by tests, the CLI, and third-
@@ -931,6 +931,12 @@ def execute_recipe(
         project_root = Path.cwd()
     if cache is None:
         cache = RecipeCache()
+    if storage_config is None:
+        storage_config = load_config(
+            project_root=project_root,
+            recipe_output_root=recipe.output_root,
+            recipe_base_dir=recipe.source_base_dir,
+        )
 
     results: list[PipelineResult] = []
     errors: list[str] = []

@@ -278,7 +278,11 @@ def persist_msa_fractional_rollup(
             )
 
         source = _fractional_rollup_source_frame(plan, ctx, spec.provenance.source_dataset_id)
-        cfg = ctx.storage_config or load_config(project_root=ctx.project_root)
+        cfg = ctx.storage_config or load_config(
+            project_root=ctx.project_root,
+            recipe_output_root=ctx.recipe.output_root,
+            recipe_base_dir=ctx.recipe.source_base_dir,
+        )
         xwalk_file = _fractional_rollup_crosswalk_path(spec, cfg.asset_store_root)
         if not xwalk_file.exists():
             raise FileNotFoundError(
@@ -771,7 +775,11 @@ def persist_msa_coc_coverage(
                 f"Target '{target.id}' declares msa_coc_coverage output without msa_coc_coverage."
             )
         spec = target.msa_coc_coverage
-        cfg = ctx.storage_config or load_config(project_root=ctx.project_root)
+        cfg = ctx.storage_config or load_config(
+            project_root=ctx.project_root,
+            recipe_output_root=ctx.recipe.output_root,
+            recipe_base_dir=ctx.recipe.source_base_dir,
+        )
         data_root = cfg.asset_store_root
 
         output_file = _resolve_msa_coc_coverage_output_file(
@@ -1007,7 +1015,11 @@ def _load_containment_inputs(
     spec: ContainmentSpec,
     ctx: ExecutionContext,
 ) -> tuple[gpd.GeoDataFrame, gpd.GeoDataFrame, pd.DataFrame | None]:
-    cfg = ctx.storage_config or load_config(project_root=ctx.project_root)
+    cfg = ctx.storage_config or load_config(
+        project_root=ctx.project_root,
+        recipe_output_root=ctx.recipe.output_root,
+        recipe_base_dir=ctx.recipe.source_base_dir,
+    )
     data_root = cfg.asset_store_root
     pair = (spec.container.type, spec.candidate.type)
 

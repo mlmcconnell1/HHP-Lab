@@ -1,0 +1,133 @@
+# Synthetic syntax example only. The threshold, 2020–2021 years, and measures
+# are placeholders for demonstrating whole-CoC site-year aggregation. They do
+# not define a research sample, a causal design, or a recommended correlation.
+#
+# This template has no bundled data or boundary approval. Before running it,
+# place the canonical producer tables under recipes/site-inputs/ and provide a
+# reviewed evidence file at the declared path. The executable synthetic path
+# creates temporary inputs in the lifecycle integration test; see the contract
+# doc's usage section. These sample settings are examples, not research choices.
+
+version: 2
+id: site-pit-hic-correlation-demo
+title: Synthetic PIT and HIC site-year correlation example
+authors: [HHP-Lab]
+universe: {range: "2020-2021"}
+
+targets:
+  - id: coc-outcomes
+    geometry: {type: coc, vintage: 2024, source: hud_exchange}
+    outputs: [panel]
+    panel_policy:
+      output_columns:
+        - coc_id
+        - coc_name
+        - year
+        - pit_sheltered
+        - hic_total_beds
+
+datasets:
+  pit:
+    provider: hud
+    product: pit
+    version: 1
+    native_geometry: {type: coc}
+    years: "2010-2024"
+    year_column: pit_year
+    geo_column: coc_id
+    params: {vintage: 2024, align: point_in_time_jan}
+    path: data/curated/pit/pit_vintage__P2024.parquet
+  hic:
+    provider: hud
+    product: hic
+    version: 1
+    native_geometry: {type: coc}
+    year_column: hic_year
+    geo_column: coc_id
+    params: {align: point_in_time_jan}
+    file_set:
+      path_template: "data/curated/hic/hic__H{year}.parquet"
+      segments:
+        - years: "2010-2024"
+          geometry: {type: coc, source: hud_exchange}
+
+pipelines:
+  - id: build_coc_outcomes
+    target: coc-outcomes
+    steps:
+      - resample:
+          dataset: pit
+          to_geometry: {type: coc, vintage: 2024, source: hud_exchange}
+          method: identity
+          measures: [pit_sheltered]
+      - resample:
+          dataset: hic
+          to_geometry: {type: coc, vintage: 2024, source: hud_exchange}
+          method: identity
+          measures: [hic_total_beds]
+      - join:
+          datasets: [pit, hic]
+          join_on: [geo_id, year]
+
+panels:
+  coc_outcomes:
+    ref: {pipeline: build_coc_outcomes, output: panel}
+    geo_key: coc_id
+    time_key: year
+  site_year:
+    geo_key: msa_id
+    time_key: year
+    site_year:
+      universe: site_universe
+      boundary_evidence:
+        path: site-inputs/coc-boundary-compatibility.json
+      outcomes:
+        pit: {panel: coc_outcomes, measures: [pit_sheltered]}
+        hic: {panel: coc_outcomes, measures: [hic_total_beds]}
+
+site_universe:
+  source:
+    artifact_id: overlap_samples
+    sites_path: site-inputs/msa_coc_sites__overlap_samples.parquet
+    memberships_path: site-inputs/msa_coc_memberships__overlap_samples.parquet
+  threshold: 0.95
+  site_key: msa_id
+
+sample_groups:
+  pooled_site_years:
+    sample:
+      years: {from: 2020, to: 2021}
+      require: [pit_sheltered, hic_total_beds]
+  site_year_2020:
+    sample:
+      years: {from: 2020, to: 2020}
+      require: [pit_sheltered, hic_total_beds]
+  site_year_2021:
+    sample:
+      years: {from: 2021, to: 2021}
+      require: [pit_sheltered, hic_total_beds]
+
+analyses:
+  - id: pooled_correlation_demo
+    method: correlation
+    input: panels.site_year
+    sample: {group: pooled_site_years}
+    columns: [pit_sheltered, hic_total_beds]
+    kind: pearson
+  - id: correlation_2020_demo
+    method: correlation
+    input: panels.site_year
+    sample: {group: site_year_2020}
+    columns: [pit_sheltered, hic_total_beds]
+    kind: pearson
+  - id: correlation_2021_demo
+    method: correlation
+    input: panels.site_year
+    sample: {group: site_year_2021}
+    columns: [pit_sheltered, hic_total_beds]
+    kind: pearson
+
+results:
+  bundle_dir: results/{id}/{run_id}
+  include_panels: [coc_outcomes, site_year]
+  report: {title: Synthetic site-year correlation demonstration}

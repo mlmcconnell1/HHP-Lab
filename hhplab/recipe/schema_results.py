@@ -18,6 +18,12 @@ from pydantic import (
 )
 
 from hhplab.recipe.recipe_schema import RecipeV1
+from hhplab.schema.columns import HIC_PANEL_MEASURE_COLUMNS
+
+PIT_SITE_YEAR_MEASURE_COLUMNS = frozenset(
+    {"pit_total", "pit_sheltered", "pit_unsheltered"}
+)
+HIC_SITE_YEAR_MEASURE_COLUMNS = frozenset(HIC_PANEL_MEASURE_COLUMNS)
 
 
 class ClosedModel(BaseModel):
@@ -64,16 +70,109 @@ class PanelReference(ClosedModel):
     output: Literal["panel"] = "panel"
 
 
+class SiteUniverseSource(ClosedModel):
+    """One saved MSA/CoC site artifact, either local files or a portable bundle."""
+
+    artifact_id: StrictStr = Field(min_length=1)
+    bundle_path: StrictStr | None = Field(default=None, min_length=1)
+    sites_path: StrictStr | None = Field(default=None, min_length=1)
+    memberships_path: StrictStr | None = Field(default=None, min_length=1)
+
+    @model_validator(mode="after")
+    def validate_locator(self) -> SiteUniverseSource:
+        bundle = self.bundle_path is not None
+        files = self.sites_path is not None or self.memberships_path is not None
+        if bundle == files:
+            raise ValueError(
+                "site_universe.source must use bundle_path or both sites_path and "
+                "memberships_path, but not both"
+            )
+        if files and (self.sites_path is None or self.memberships_path is None):
+            raise ValueError(
+                "site_universe.source file form requires both sites_path and memberships_path"
+            )
+        return self
+
+
+class SiteUniverseSpec(ClosedModel):
+    """Explicit reference to one threshold-selected MSA/CoC artifact."""
+
+    source: SiteUniverseSource
+    threshold: FiniteNumber
+    site_key: Literal["msa_id"]
+
+    @field_validator("threshold")
+    @classmethod
+    def validate_threshold(cls, value: int | float) -> int | float:
+        numeric = float(value)
+        if not math.isfinite(numeric) or not 0.5 < numeric <= 1:
+            raise ValueError("site_universe.threshold must be finite and in (0.5, 1]")
+        return value
+
+
+class SiteYearOutcomeBinding(ClosedModel):
+    """One CoC/year source panel and its explicitly selected additive measures."""
+
+    panel: StrictStr = Field(min_length=1)
+    measures: list[StrictStr] = Field(min_length=1)
+
+    @field_validator("measures")
+    @classmethod
+    def validate_unique_measures(cls, values: list[str]) -> list[str]:
+        if len(set(values)) != len(values):
+            raise ValueError("site_year outcome measures must be unique")
+        return values
+
+
+class SiteYearOutcomes(ClosedModel):
+    pit: SiteYearOutcomeBinding
+    hic: SiteYearOutcomeBinding
+
+    @model_validator(mode="after")
+    def validate_measure_registry(self) -> SiteYearOutcomes:
+        for name, binding, allowed in (
+            ("pit", self.pit, PIT_SITE_YEAR_MEASURE_COLUMNS),
+            ("hic", self.hic, HIC_SITE_YEAR_MEASURE_COLUMNS),
+        ):
+            invalid = sorted(set(binding.measures) - allowed)
+            if invalid:
+                raise ValueError(
+                    f"site_year {name} measures are not registered additive columns: {invalid}"
+                )
+        return self
+
+
+class BoundaryEvidenceBinding(ClosedModel):
+    path: StrictStr = Field(min_length=1)
+
+
+class SiteYearPanelBinding(ClosedModel):
+    """Derived site-year panel sourced from frozen memberships and PIT/HIC panels."""
+
+    universe: Literal["site_universe"] = "site_universe"
+    boundary_evidence: BoundaryEvidenceBinding
+    outcomes: SiteYearOutcomes
+
+
 class PanelBinding(ClosedModel):
     """Named analysis panel and its required key-column contract."""
 
-    ref: PanelReference | UnresolvedMarker
+    ref: PanelReference | UnresolvedMarker | None = None
+    site_year: SiteYearPanelBinding | None = None
     geo_key: StrictStr | None = None
     time_key: StrictStr | None = None
 
     @model_validator(mode="after")
     def validate_keys(self) -> PanelBinding:
         if isinstance(self.ref, UnresolvedMarker):
+            if self.site_year is not None:
+                raise ValueError("unresolved panel refs cannot also declare site_year")
+            return self
+        if (self.ref is None) == (self.site_year is None):
+            raise ValueError("panel binding must declare exactly one of ref or site_year")
+        if self.site_year is not None:
+            if self.geo_key != "msa_id" or self.time_key != "year":
+                raise ValueError("site_year panels require geo_key=msa_id and time_key=year")
             return self
         if not self.geo_key or not self.time_key:
             raise ValueError("resolved panel references require geo_key and time_key")
@@ -579,6 +678,7 @@ class RecipeV2(RecipeV1):
     diagnostics: list[DiagnosticSpec] = Field(default_factory=list)
     findings: list[FindingSpec] = Field(default_factory=list)
     results: ResultsSpec
+    site_universe: SiteUniverseSpec | None = None
 
     @property
     def id(self) -> str:
@@ -602,8 +702,12 @@ class RecipeV2(RecipeV1):
         pipeline_by_id = {pipeline.id: pipeline for pipeline in self.pipelines}
         panel_refs: set[tuple[str, str]] = set()
         for panel_name, panel in self.panels.items():
+            if panel.site_year is not None:
+                continue
             if isinstance(panel.ref, UnresolvedMarker):
                 continue
+            if panel.ref is None:
+                raise ValueError(f"panel {panel_name!r} requires a build reference")
             pipeline = pipeline_by_id.get(panel.ref.pipeline)
             if pipeline is None:
                 raise ValueError(
@@ -620,6 +724,48 @@ class RecipeV2(RecipeV1):
             panel_refs.add(identity)
 
         panel_names = set(self.panels)
+        site_year_panels = [
+            (name, panel)
+            for name, panel in self.panels.items()
+            if panel.site_year is not None
+        ]
+        if self.site_universe is None and site_year_panels:
+            raise ValueError("site_year panel requires top-level site_universe")
+        if self.site_universe is not None and len(site_year_panels) != 1:
+            raise ValueError("site_universe requires exactly one derived site_year panel")
+        if self.site_universe is None and len(site_year_panels) > 1:
+            raise ValueError("only one derived site_year panel is supported")
+        for _panel_name, panel in site_year_panels:
+            assert panel.site_year is not None
+            outcome_panels = panel.site_year.outcomes
+            for source_name, binding in (
+                ("pit", outcome_panels.pit),
+                ("hic", outcome_panels.hic),
+            ):
+                source = self.panels.get(binding.panel)
+                if source is None or source.site_year is not None:
+                    raise ValueError(
+                        f"site_year {source_name} source references unknown or derived panel "
+                        f"{binding.panel!r}"
+                    )
+                if isinstance(source.ref, UnresolvedMarker):
+                    raise ValueError(
+                        f"site_year {source_name} source panel {binding.panel!r} is unresolved"
+                    )
+                if source.geo_key != "coc_id" or source.time_key != "year":
+                    raise ValueError(
+                        f"site_year {source_name} source panel {binding.panel!r} requires "
+                        "geo_key=coc_id and time_key=year"
+                    )
+                source_pipeline = pipeline_by_id[source.ref.pipeline]
+                source_target = next(
+                    target for target in self.targets if target.id == source_pipeline.target
+                )
+                if source_target.geometry.type != "coc":
+                    raise ValueError(
+                        f"site_year {source_name} source panel {binding.panel!r} "
+                        "must target CoC geometry"
+                    )
         analysis_ids = {analysis.id for analysis in self.analyses}
         variant_ids = {variant.id for variant in self.variants}
         group_ids = set(self.sample_groups)

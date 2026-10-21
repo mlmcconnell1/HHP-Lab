@@ -461,8 +461,7 @@ def test_top50_msa_coc_pit_acs5_poverty_2015_2025_recipe_loads_and_resolves() ->
     assert inflation_adjustment.factor_column == "cpi_u_adjustment_factor"
     assert [task.year for task in plan.join_tasks] == [2015, 2025]
     assert all(
-        tuple(task.datasets) == ("pit", "pep_county", "acs_tract")
-        for task in plan.join_tasks
+        tuple(task.datasets) == ("pit", "pep_county", "acs_tract") for task in plan.join_tasks
     )
 
     acs_tasks_by_year = {
@@ -799,3 +798,43 @@ def test_map_recipe_build_executes_map_only_pipeline(
     assert map_path.exists()
     assert map_path.parent.name == case.recipe_name
     assert map_path.name == "map__Y2025-2025@B2025.html"
+
+
+def test_site_pit_hic_correlation_demo_declares_sample_and_source_contract():
+    recipe = _load_repo_recipe("recipes/site-pit-hic-correlation-demo.yaml")
+
+    assert recipe.version == 2
+    assert recipe.site_universe is not None
+    assert recipe.site_universe.source.artifact_id == "overlap_samples"
+    assert recipe.site_universe.source.sites_path == (
+        "site-inputs/msa_coc_sites__overlap_samples.parquet"
+    )
+    assert recipe.site_universe.source.memberships_path == (
+        "site-inputs/msa_coc_memberships__overlap_samples.parquet"
+    )
+    assert recipe.site_universe.threshold == 0.95
+    assert recipe.site_universe.site_key == "msa_id"
+
+    site_year = recipe.panels["site_year"]
+    assert site_year.site_year is not None
+    assert site_year.site_year.boundary_evidence.path == (
+        "site-inputs/coc-boundary-compatibility.json"
+    )
+    assert site_year.site_year.outcomes.pit.panel == "coc_outcomes"
+    assert site_year.site_year.outcomes.pit.measures == ["pit_sheltered"]
+    assert site_year.site_year.outcomes.hic.panel == "coc_outcomes"
+    assert site_year.site_year.outcomes.hic.measures == ["hic_total_beds"]
+    assert recipe.results.include_panels == ["coc_outcomes", "site_year"]
+
+    expected_years = {
+        "pooled_correlation_demo": (2020, 2021),
+        "correlation_2020_demo": (2020, 2020),
+        "correlation_2021_demo": (2021, 2021),
+    }
+    assert {analysis.id for analysis in recipe.analyses} == set(expected_years)
+    for analysis in recipe.analyses:
+        sample = recipe.sample_groups[analysis.sample.group].sample
+        assert (sample.years.from_year, sample.years.to_year) == expected_years[analysis.id]
+        assert sample.require == ["pit_sheltered", "hic_total_beds"]
+        assert analysis.input == "panels.site_year"
+        assert analysis.columns == ["pit_sheltered", "hic_total_beds"]

@@ -102,6 +102,53 @@ def verify_bundle(
         unavailable, unavailable_errors = _unavailable_artifacts(root, inventory, manifest)
         if unavailable_errors:
             raise ValueError("; ".join(unavailable_errors))
+        resolved = _read_json(root / "recipe" / "resolved.json")
+        expected_site_data = _resolved_site_universe(resolved)
+        if expected_site_data is not None:
+            artifact_id = expected_site_data.get("artifact_id")
+            site_index = manifest.site_universes.get(artifact_id)
+            if not isinstance(site_index, Mapping):
+                unavailable.append(
+                    {
+                        "path": f"site_universes:{artifact_id}",
+                        "artifact_id": artifact_id,
+                        "reason": "required_site_universe_index_unavailable",
+                    }
+                )
+                unavailable.extend(
+                    _site_universe_dependency_unavailable(
+                        resolved, artifact_id, "required_site_universe_index_unavailable"
+                    )
+                )
+                return VerificationReport(
+                    integrity="pass",
+                    reproducibility="partial",
+                    unavailable=tuple(unavailable),
+                    partial_reasons=("site_universe_inputs_unavailable", "unavailable_inputs"),
+                )
+            if site_index.get("withheld", False):
+                unavailable.append(
+                    {
+                        "path": f"site_universes:{artifact_id}",
+                        "artifact_id": artifact_id,
+                        "reason": "required_site_universe_inputs_withheld",
+                    }
+                )
+                unavailable.extend(
+                    _site_universe_dependency_unavailable(
+                        resolved, artifact_id, "required_site_universe_inputs_withheld"
+                    )
+                )
+                return VerificationReport(
+                    integrity="pass",
+                    reproducibility="partial",
+                    unavailable=tuple(unavailable),
+                    partial_reasons=("site_universe_inputs_withheld", "unavailable_inputs"),
+                )
+        else:
+            site_index = None
+        if unavailable_errors:
+            raise ValueError("; ".join(unavailable_errors))
         environment_record = _read_optional_json(root / "environment" / "summary.json")
         current = dict(current_environment) if current_environment is not None else _environment()
     except (OSError, ValueError, TypeError, json.JSONDecodeError) as exc:
@@ -114,7 +161,6 @@ def verify_bundle(
         partial_reasons.append("environment_differs")
 
     try:
-        resolved = _read_json(root / "recipe" / "resolved.json")
         execution = _execution_with_measures(root)
         if execution.get("spec_hash") != manifest.spec_hash:
             raise ValueError("execution spec_hash does not match manifest spec_hash")
@@ -139,7 +185,21 @@ def verify_bundle(
 
     replayer = replay or _default_replay
     try:
-        replayed = replayer(resolved, execution, panels)
+        if replay is None and site_index is not None:
+            from hhplab.results.runner import site_universe_inputs_from_bundle
+
+            resolution, evidence_payload = site_universe_inputs_from_bundle(
+                root, site_index, expected_site_data
+            )
+            replayed = replayer(
+                resolved,
+                execution,
+                panels,
+                site_universe_resolution=resolution,
+                boundary_evidence_payload=evidence_payload,
+            )
+        else:
+            replayed = replayer(resolved, execution, panels)
     except (ImportError, ModuleNotFoundError) as exc:
         return VerificationReport(
             integrity="pass",
@@ -292,7 +352,18 @@ def _load_panels(
             raise ValueError(f"bundled panel content differs from its input identity: {name!r}")
         from io import BytesIO
 
-        frames[name] = pd.read_parquet(BytesIO(content))
+        frame = pd.read_parquet(BytesIO(content))
+        import pyarrow.parquet as pq
+
+        from hhplab.storage.provenance import PROVENANCE_KEY, ProvenanceBlock
+
+        metadata = pq.read_schema(BytesIO(content)).metadata or {}
+        if PROVENANCE_KEY in metadata:
+            provenance = ProvenanceBlock.from_json(metadata[PROVENANCE_KEY].decode("utf-8"))
+            frame.attrs["results_panel_provenance"] = provenance.to_dict()
+        frame.attrs["results_source_parquet_bytes"] = content
+        frame.attrs["results_content_sha256"] = hashlib.sha256(content).hexdigest()
+        frames[name] = frame
     return frames
 
 
@@ -343,6 +414,22 @@ def _unavailable_artifacts(
             continue
         if relative in inventory or (root / relative).exists() or (root / relative).is_symlink():
             errors.append(f"withheld artifact is present in bundle: {relative}")
+    withheld_paths = {
+        item.get("path") for item in unavailable if isinstance(item.get("path"), str)
+    }
+    for artifact_id, entry in manifest.site_universes.items():
+        if entry.get("withheld", False):
+            indexed = {
+                path
+                for key, path in entry.items()
+                if key not in {"schema_version", "withheld"}
+            }
+            missing_records = indexed - withheld_paths
+            if missing_records:
+                errors.append(
+                    f"withheld site-universe {artifact_id!r} lacks withheld.json records "
+                    f"for {sorted(missing_records)}"
+                )
     return unavailable, errors
 
 
@@ -388,6 +475,25 @@ def _dependency_exclusions(
         and isinstance(item.get("result_key"), str)
         and isinstance(item.get("panel_name"), str)
     }
+    site_source_dependencies: dict[str, set[str]] = {}
+    panel_bindings = recipe.get("panels", {})
+    if isinstance(panel_bindings, Mapping):
+        for panel_name, binding in panel_bindings.items():
+            if not isinstance(panel_name, str) or not isinstance(binding, Mapping):
+                continue
+            site_year = binding.get("site_year")
+            outcomes = site_year.get("outcomes") if isinstance(site_year, Mapping) else None
+            if not isinstance(outcomes, Mapping):
+                continue
+            source_names = {
+                value.get("panel")
+                for value in outcomes.values()
+                if isinstance(value, Mapping) and isinstance(value.get("panel"), str)
+            }
+            site_source_dependencies[panel_name] = source_names
+    for panel_name, sources in site_source_dependencies.items():
+        if sources & unavailable_panels:
+            unavailable_panels.add(panel_name)
     unavailable_analyses = {
         key for key, panel in analysis_panel.items() if panel in unavailable_panels
     }
@@ -397,8 +503,19 @@ def _dependency_exclusions(
             "panel": panel,
             "reason": "withheld_input",
         }
-        for panel in sorted(unavailable_panels)
+        for panel in sorted(unavailable_panels - set(site_source_dependencies))
     ]
+    for panel_name, sources in site_source_dependencies.items():
+        missing_sources = sources & unavailable_panels
+        if missing_sources:
+            records.append(
+                {
+                    "path": f"panels/{panel_name}.parquet",
+                    "panel": panel_name,
+                    "reason": "required_site_source_withheld",
+                    "sources": sorted(missing_sources),
+                }
+            )
     for result_key in sorted(unavailable_analyses):
         records.append(
             {
@@ -562,9 +679,76 @@ def _default_replay(
     resolved_spec: Mapping[str, Any],
     execution: Mapping[str, Any],
     panel_frames: Mapping[str, pd.DataFrame],
+    *,
+    site_universe_resolution=None,
+    boundary_evidence_payload=None,
 ) -> Mapping[str, Any]:
     replay_service = importlib.import_module("hhplab.results.runner").replay_results
-    return replay_service(resolved_spec, execution, panel_frames)
+    return replay_service(
+        resolved_spec,
+        execution,
+        panel_frames,
+        site_universe_resolution=site_universe_resolution,
+        boundary_evidence_payload=boundary_evidence_payload,
+    )
+
+
+def _resolved_site_universe(resolved):
+    plan = resolved.get("plan", {}) if isinstance(resolved, Mapping) else {}
+    site_data = plan.get("site_universe") if isinstance(plan, Mapping) else None
+    return site_data if isinstance(site_data, Mapping) else None
+
+
+def _site_universe_dependency_unavailable(resolved, artifact_id, reason):
+    """Name site-year panels and results that cannot be replayed without inputs."""
+    recipe = resolved.get("recipe", {}) if isinstance(resolved, Mapping) else {}
+    plan = resolved.get("plan", {}) if isinstance(resolved, Mapping) else {}
+    if not isinstance(recipe, Mapping) or not isinstance(plan, Mapping):
+        return []
+    bindings = recipe.get("panels", {})
+    site_panels = {
+        name
+        for name, binding in bindings.items()
+        if isinstance(name, str)
+        and isinstance(binding, Mapping)
+        and isinstance(binding.get("site_year"), Mapping)
+    } if isinstance(bindings, Mapping) else set()
+    records: list[Mapping[str, Any]] = []
+    for name in sorted(site_panels):
+        records.append(
+            {
+                "path": f"panels/{name}.parquet",
+                "panel": name,
+                "artifact_id": artifact_id,
+                "reason": reason,
+            }
+        )
+    analyses = plan.get("analyses", ())
+    if isinstance(analyses, Sequence) and not isinstance(analyses, (str, bytes)):
+        for item in analyses:
+            if (
+                isinstance(item, Mapping)
+                and item.get("panel_name") in site_panels
+                and isinstance(item.get("result_key"), str)
+            ):
+                result_key = item["result_key"]
+                records.extend(
+                    (
+                        {
+                            "path": f"analysis:{result_key}",
+                            "result_key": result_key,
+                            "artifact_id": artifact_id,
+                            "reason": reason,
+                        },
+                        {
+                            "path": f"samples/{result_key}.parquet",
+                            "result_key": result_key,
+                            "artifact_id": artifact_id,
+                            "reason": reason,
+                        },
+                    )
+                )
+    return records
 
 
 def _compare_replay(
@@ -700,6 +884,35 @@ def _compare_replay(
         unavailable_paths,
         exclusions.panels,
     )
+    plan = resolved.get("plan", {})
+    panel_plans = plan.get("panels", ()) if isinstance(plan, Mapping) else ()
+    replay_inputs = replayed.get("input_panels", {})
+    if _resolved_site_universe(resolved) is not None:
+        for panel_plan in panel_plans:
+            if not isinstance(panel_plan, Mapping) or panel_plan.get("pipeline_id") is not None:
+                continue
+            name = panel_plan.get("name")
+            if not isinstance(name, str) or name in exclusions.panels:
+                continue
+            expected_panel = (
+                replay_inputs.get(name) if isinstance(replay_inputs, Mapping) else None
+            )
+            relative_path = execution.get("panels", {}).get(name)
+            if not isinstance(relative_path, str) or relative_path in unavailable_paths:
+                continue
+            actual_panel = _read_parquet_frame(root, relative_path)
+            if not isinstance(expected_panel, pd.DataFrame):
+                differences.append(
+                    {"path": f"panels/{name}.parquet", "reason": "replay_output_missing"}
+                )
+            else:
+                _compare_at(
+                    expected_panel,
+                    actual_panel,
+                    f"panels/{name}.parquet",
+                    tolerance,
+                    differences,
+                )
     return differences
 
 

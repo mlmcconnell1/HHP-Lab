@@ -459,6 +459,7 @@ class ResultsManifest:
     input_identities: tuple[InputIdentity, ...]
     private: bool
     files: tuple[Mapping[str, Any], ...]
+    site_universes: Mapping[str, Mapping[str, Any]] = field(default_factory=dict)
     bundle_format_version: str = BUNDLE_FORMAT_VERSION
 
     def __post_init__(self) -> None:
@@ -507,9 +508,10 @@ class ResultsManifest:
         file_paths = [record["path"] for record in self.files]
         if len(file_paths) != len(set(file_paths)):
             raise ResultContractError("manifest file paths must be unique")
+        _validate_site_universe_index(self.site_universes, set(file_paths))
 
     def to_dict(self) -> dict[str, Any]:
-        return {
+        result = {
             "bundle_format_version": self.bundle_format_version,
             "recipe_id": self.recipe_id,
             "run_id": self.run_id,
@@ -525,6 +527,12 @@ class ResultsManifest:
             "private": self.private,
             "files": [dict(item) for item in self.files],
         }
+        if self.site_universes:
+            result["site_universes"] = {
+                artifact_id: dict(entry)
+                for artifact_id, entry in sorted(self.site_universes.items())
+            }
+        return result
 
     @classmethod
     def from_dict(cls, value: Mapping[str, Any]) -> ResultsManifest:
@@ -546,7 +554,12 @@ class ResultsManifest:
             "private",
             "files",
         }
-        _require_exact_keys(value, required=required, context="manifest")
+        _require_exact_keys(
+            value,
+            required=required,
+            optional={"site_universes"},
+            context="manifest",
+        )
         analysis_statuses = _require_mapping(
             value["analysis_statuses"], context="analysis_statuses"
         )
@@ -583,6 +596,7 @@ class ResultsManifest:
             input_identities=tuple(InputIdentity.from_dict(item) for item in identities),
             private=value["private"],
             files=tuple(files),
+            site_universes=value.get("site_universes", {}),
         )
 
 
@@ -625,6 +639,78 @@ def _validate_file_record(value: Mapping[str, Any]) -> None:
     ):
         raise ResultContractError("file.bytes must be a nonnegative integer")
     _require_string(value["role"], name="file.role")
+
+
+def _validate_site_universe_index(
+    value: Mapping[str, Mapping[str, Any]], inventory_paths: set[str]
+) -> None:
+    if not isinstance(value, Mapping):
+        raise ResultContractError("site_universes must be an object")
+    indexed_paths: set[str] = set()
+    for artifact_id, entry in value.items():
+        _require_string(artifact_id, name="site_universes artifact id")
+        entry = _require_mapping(entry, context=f"site_universes.{artifact_id}")
+        _require_exact_keys(
+            entry,
+            required={"schema_version", "sites", "memberships", "summary", "boundary_evidence"},
+            optional={"withheld"},
+            context=f"site_universes.{artifact_id}",
+        )
+        if entry["schema_version"] != "msa_coc_sites/1":
+            raise ResultContractError(
+                f"site_universes.{artifact_id}.schema_version is unsupported"
+            )
+        withheld = entry.get("withheld", False)
+        if not isinstance(withheld, bool):
+            raise ResultContractError(
+                f"site_universes.{artifact_id}.withheld must be boolean"
+            )
+        normalized_id = re.sub(r"[^A-Za-z0-9._-]+", "-", artifact_id.strip().lower())
+        artifact_slug = re.sub(r"-{2,}", "-", normalized_id).strip("-.") or "containment"
+        expected_names = {
+            "sites": f"msa_coc_sites__{artifact_slug}.parquet",
+            "memberships": f"msa_coc_memberships__{artifact_slug}.parquet",
+            "summary": f"msa_coc_summary__{artifact_slug}.json",
+            "boundary_evidence": f"boundary_evidence__{artifact_slug}.json",
+        }
+        for key, raw_path in entry.items():
+            if key in {"schema_version", "withheld"}:
+                continue
+            path = _require_string(
+                raw_path, name=f"site_universes.{artifact_id}.{key}"
+            )
+            posix_path = PurePosixPath(path)
+            windows_path = PureWindowsPath(path)
+            if (
+                posix_path.is_absolute()
+                or windows_path.is_absolute()
+                or windows_path.drive
+                or posix_path.as_posix() != path
+                or "\\" in path
+                or any(part in {"", ".", ".."} for part in posix_path.parts)
+            ):
+                raise ResultContractError(
+                    f"site_universes.{artifact_id}.{key} must be a normalized relative path"
+                )
+            if posix_path.name != expected_names[key]:
+                raise ResultContractError(
+                    f"site_universes.{artifact_id}.{key} must use canonical basename "
+                    f"{expected_names[key]!r}"
+                )
+            if path in indexed_paths:
+                raise ResultContractError(f"site-universe path is indexed more than once: {path}")
+            indexed_paths.add(path)
+        required_paths = {
+            path for key, path in entry.items() if key not in {"schema_version", "withheld"}
+        }
+        if withheld and required_paths & inventory_paths:
+            raise ResultContractError(
+                f"withheld site_universes.{artifact_id} paths must be absent from inventory"
+            )
+        if not withheld and not required_paths <= inventory_paths:
+            raise ResultContractError(
+                f"site_universes.{artifact_id} paths must be present in manifest.files"
+            )
 
 
 @dataclass(frozen=True)

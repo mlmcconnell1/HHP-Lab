@@ -126,7 +126,11 @@ def _classify_path(
     Returns ``(root, relative_path)`` where *root* is ``"asset_store"``,
     ``"output"``, or ``None`` (fallback to project-relative).
     """
-    cfg = ctx.storage_config or load_config(project_root=ctx.project_root)
+    cfg = ctx.storage_config or load_config(
+        project_root=ctx.project_root,
+        recipe_output_root=ctx.recipe.output_root,
+        recipe_base_dir=ctx.recipe.source_base_dir,
+    )
     resolved = file_path.resolve()
 
     # Check output root first (it may be nested inside asset store)

@@ -1310,7 +1310,11 @@ def _add_primary_msa_annotations(
     if "coc_id" not in panel.columns:
         raise ExecutorError("target.panel_policy.primary_msa requires a panel with 'coc_id'.")
 
-    cfg = ctx.storage_config or load_config(project_root=ctx.project_root)
+    cfg = ctx.storage_config or load_config(
+        project_root=ctx.project_root,
+        recipe_output_root=ctx.recipe.output_root,
+        recipe_base_dir=ctx.recipe.source_base_dir,
+    )
     data_root = cfg.asset_store_root
     xwalk_file = msa_coc_xwalk_path(
         str(boundary_vintage),

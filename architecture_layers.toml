@@ -158,7 +158,7 @@ plan = "results-recipe-v2"
 baseline_commit = "900a29f9891f949bef5aaae354f4055b01033497"
 intent_file = ".elements/elements.working-intent.jsonl"
 reconcile_request = ".elements/plans/results-recipe-v2.reconcile.json"
-final_pin = ".elements/plans/results-recipe-v2.pin-final.json"
+final_pin = ".elements/plans/site-universe.pin-receipt.json"
 bead_map = ".elements/plans/results-recipe-v2.bead-map.jsonl"
 bead_export = ".beads/issues.jsonl"
 
@@ -207,6 +207,11 @@ bead_export = ".beads/issues.jsonl"
 "intent:results-v2:stats" = { path = "hhplab/analysis/stats.py", kind = "semantic/module", parent = "intent:results-v2:analysis", layer = "application", change = "extend", bead = "coclab-ff6fp.10" }
 "intent:results-v2:v2_schema" = { path = "hhplab/recipe/schema_results.py", kind = "semantic/module", parent = "intent:results-v2:recipe", layer = "application", change = "new", bead = "coclab-ff6fp.4" }
 "intent:results-v2:verify" = { path = "hhplab/results/verify.py", kind = "semantic/module", parent = "intent:results-v2:results", layer = "application", change = "new", bead = "coclab-ff6fp.21" }
+"intent:site-universe:input_resolver" = { path = "hhplab/recipe/executor/inputs.py", kind = "semantic/module", parent = "intent:results-v2:executor", layer = "application", change = "extend", bead = "coclab-ccwlh.2" }
+"intent:site-universe:site_year_aggregation" = { path = "hhplab/recipe/executor/msa_coc_panel.py", kind = "semantic/module", parent = "intent:results-v2:executor", layer = "application", change = "extend", bead = "coclab-ccwlh.4" }
+"intent:site-universe:coc_boundary_compatibility" = { path = "hhplab/geographies/coc/coc_validate.py", kind = "semantic/module", parent = "intent:results-v2:hhplab", layer = "domain", change = "extend", bead = "coclab-ccwlh.3" }
+"intent:site-universe:storage_config" = { path = "hhplab/storage/config.py", kind = "semantic/module", parent = "intent:results-v2:storage", layer = "infrastructure", change = "extend", bead = "coclab-ccwlh.6" }
+"intent:site-universe:recipe_output_root_schema" = { path = "hhplab/recipe/recipe_schema.py", kind = "semantic/module", parent = "intent:results-v2:recipe", layer = "application", change = "extend", bead = "coclab-ccwlh.6" }
 
 [results_v2.import_prefixes]
 # Newly introduced modules may import only from these declared hhplab prefixes.
@@ -223,11 +228,16 @@ bead_export = ".beads/issues.jsonl"
 "intent:results-v2:redistribution_contracts" = ["hhplab.schema"]
 "intent:results-v2:report" = ["hhplab.schema"]
 "intent:results-v2:result_contracts" = ["hhplab.schema"]
-"intent:results-v2:result_planner" = ["hhplab.recipe", "hhplab.schema", "hhplab.results.bands"]
+"intent:results-v2:result_planner" = ["hhplab.recipe", "hhplab.schema", "hhplab.results.bands", "hhplab.geographies.coc.coc_validate"]
 "intent:results-v2:results_runner" = ["hhplab.recipe", "hhplab.analysis", "hhplab.results", "hhplab.storage", "hhplab.schema"]
 "intent:results-v2:samples" = ["hhplab.schema", "hhplab.analysis.contracts"]
 "intent:results-v2:v2_schema" = ["hhplab.recipe.recipe_schema", "hhplab.schema"]
 "intent:results-v2:verify" = ["hhplab.schema", "hhplab.recipe", "hhplab.analysis", "hhplab.results", "hhplab.storage"]
+"intent:site-universe:input_resolver" = ["hhplab.recipe", "hhplab.schema", "hhplab.storage", "hhplab.artifacts.naming.naming"]
+"intent:site-universe:site_year_aggregation" = ["hhplab.recipe", "hhplab.analysis", "hhplab.schema", "hhplab.geographies.coc.coc_validate"]
+"intent:site-universe:coc_boundary_compatibility" = ["hhplab.geographies.coc", "hhplab.schema"]
+"intent:site-universe:storage_config" = ["hhplab.storage"]
+"intent:site-universe:recipe_output_root_schema" = []
 
 [results_v2.responsibilities]
 "intent:results-v2:hhplab" = "Scoped root for results recipe implementation; not a replacement for whole-codebase legacy intent."
@@ -273,6 +283,11 @@ bead_export = ".beads/issues.jsonl"
 "intent:results-v2:stats" = "Classical, HC1, CR1 corrections and consistent t-based intervals/p-values; no recipe dependencies."
 "intent:results-v2:v2_schema" = "RecipeV2 and closed result sections, parameters, capability validation and v1 build composition; no statistical algorithms."
 "intent:results-v2:verify" = "Integrity-first replay using bundled panels only, shared execution services without upstream build/ledger side effects, exact sample comparison and tolerance/status precedence."
+"intent:site-universe:input_resolver" = "Resolve and validate the paired site and membership tables, schema, artifact identity, explicit threshold, row uniqueness and fingerprints for RecipeV2 inputs."
+"intent:site-universe:site_year_aggregation" = "Aggregate whole-CoC outcomes over frozen MSA memberships into unique MSA-year rows; reject shared CoCs and preserve explicit incomplete status without partial sums or allocation."
+"intent:site-universe:coc_boundary_compatibility" = "Own evidence-backed CoC boundary compatibility for historical site-year use, distinguishing compatible, approved rename mapping, incompatible and unknown cases; never infer compatibility from a persistent ID alone."
+"intent:site-universe:storage_config" = "Resolve one deterministic recipe output root across CLI, environment, recipe, repository, user and default configuration while keeping asset_store_root separate."
+"intent:site-universe:recipe_output_root_schema" = "Declare the shared RecipeV1 output_root field inherited by V2 while keeping site_universe input semantics V2-only."
 
 [results_v2.forbidden_imports]
 "hhplab.analysis" = ["hhplab.recipe", "hhplab.results", "hhplab.cli"]
