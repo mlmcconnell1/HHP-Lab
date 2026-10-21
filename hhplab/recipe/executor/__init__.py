@@ -77,6 +77,9 @@ from hhplab.recipe.executor.persistence import (
     persist_msa_coc_coverage as _persist_msa_coc_coverage,
 )
 from hhplab.recipe.executor.persistence import (
+    persist_msa_coc_sites as _persist_msa_coc_sites,
+)
+from hhplab.recipe.executor.persistence import (
     persist_outputs as _persist_outputs,
 )
 from hhplab.recipe.executor.resample import (
@@ -185,9 +188,7 @@ _is_pep_decennial_tract_mediated_population_task = (
     population_execution.is_pep_decennial_tract_mediated_population_task
 )
 _normalize_recipe_population_measure = population_execution.normalize_recipe_population_measure
-_rename_conflicting_population_columns = (
-    population_execution.rename_conflicting_population_columns
-)
+_rename_conflicting_population_columns = population_execution.rename_conflicting_population_columns
 _resample_pep_decennial_tract_mediated_population = (
     population_execution.resample_pep_decennial_tract_mediated_population
 )
@@ -847,9 +848,7 @@ def _execute_plan(
     declared_outputs = target.outputs if target is not None else ["panel"]
 
     has_msa_coc_panel = target is not None and target.msa_coc_panel is not None
-    has_msa_fractional_rollup = (
-        target is not None and target.msa_fractional_rollup is not None
-    )
+    has_msa_fractional_rollup = target is not None and target.msa_fractional_rollup is not None
     if plan.join_tasks or has_msa_coc_panel or has_msa_fractional_rollup:
         if "panel" in declared_outputs:
             step = _persist_outputs(plan, ctx)
@@ -871,6 +870,12 @@ def _execute_plan(
 
     if "containment" in declared_outputs:
         step = _persist_containment(plan, ctx)
+        result.steps.append(step)
+        if not step.success:
+            return result
+
+    if "msa_coc_sites" in declared_outputs:
+        step = _persist_msa_coc_sites(plan, ctx)
         result.steps.append(step)
         if not step.success:
             return result

@@ -1,0 +1,46 @@
+# Define candidate sites before introducing PIT/HIC or research outcomes.
+# Run with:
+#   hhplab build recipe-preflight --recipe recipes/msa-coc-overlap-sites-2024.yaml --json
+#   hhplab build recipe-plan --recipe recipes/msa-coc-overlap-sites-2024.yaml --json
+#   hhplab build recipe --recipe recipes/msa-coc-overlap-sites-2024.yaml --json
+#
+# At each threshold, select whole CoCs whose population is at least that
+# fraction inside an MSA; retain the site if those CoCs together cover at
+# least that fraction of the MSA population. No PIT/HIC allocation is used.
+# Includes the complete 393-MSA reference universe, including Puerto Rico.
+# Missing and rejected MSAs remain in the site table and summary denominator.
+# This is a fixed-boundary exploration, not a longitudinal comparability test.
+# Population intersections use the existing 2020 block-population crosswalk;
+# block fragments may be apportioned by area within a block.
+
+version: 1
+name: msa_coc_overlap_sites_2024
+description: >
+  Compare outcome-free CoC/MSA site universes at 90%, 95% and 99% two-way
+  population overlap. Export candidate eligibility and failure reasons,
+  selected whole-CoC memberships, population and overlap statistics.
+  Freeze 2024 CoCs, 2023 MSAs/counties and 2020 census block population.
+
+universe:
+  years: [2024]
+
+targets:
+  - id: overlap_samples
+    geometry: {type: msa, source: census_msa_2023}
+    outputs: [msa_coc_sites]
+    msa_coc_sites:
+      crosswalk_path: data/curated/xwalks/msa_coc_xwalk__N2020@B2024xMcensus_msa_2023xC2023xK2020__basis-block_population.parquet
+      msa_universe_path: data/curated/metro/metro_universe__census_msa_2023.parquet
+      coc_names_path: data/curated/coc_boundaries/coc__B2024.parquet
+      coc_boundary_vintage: 2024
+      msa_definition_version: census_msa_2023
+      county_vintage: 2023
+      block_vintage: 2020
+      decennial_vintage: 2020
+      thresholds: [0.90, 0.95, 0.99]
+
+datasets: {}
+pipelines:
+  - id: describe_overlap_samples
+    target: overlap_samples
+    steps: []

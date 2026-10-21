@@ -18,6 +18,214 @@ from hhplab.storage.provenance import ProvenanceBlock, write_parquet_with_proven
 
 OverlapBasis = Literal["area", "population"]
 
+SITE_COLUMNS = (
+    "threshold",
+    "msa_id",
+    "msa_name",
+    "msa_population",
+    "crosswalk_coverage_share",
+    "selected_coc_count",
+    "selected_population_inside_msa",
+    "selected_coc_population",
+    "selected_msa_coverage_share",
+    "selected_population_outside_msa",
+    "selected_coc_spillover_share",
+    "eligible",
+    "reason",
+)
+SITE_MEMBERSHIP_COLUMNS = (
+    "threshold",
+    "msa_id",
+    "coc_id",
+    "coc_name",
+    "coc_type",
+    "intersection_population",
+    "coc_population_denominator",
+    "coc_population_containment_share",
+    "msa_population_coverage_share",
+    "site_eligible",
+)
+# Small geometry slivers can produce shares slightly above one. Larger excess
+# is a data-quality failure, never evidence that a site passes coverage.
+SITE_SHARE_TOLERANCE = 0.001
+
+
+def build_msa_coc_sites(
+    crosswalk: pd.DataFrame,
+    universe: pd.DataFrame,
+    coc_names: pd.DataFrame,
+    *,
+    thresholds: list[float],
+    expected_metadata: dict[str, str],
+) -> tuple[pd.DataFrame, pd.DataFrame, list[dict[str, object]]]:
+    """Select whole CoCs by containment, then test their combined MSA coverage.
+
+    Every universe MSA remains in the site table, including failed/absent sites.
+    Population describes geographic fit; no outcome counts are allocated.
+    """
+    if (
+        not thresholds
+        or len(set(thresholds)) != len(thresholds)
+        or any(not 0.5 < t <= 1 for t in thresholds)
+    ):
+        raise ValueError("Provide unique site thresholds in (0.5, 1].")
+    required = {
+        "msa_id",
+        "coc_id",
+        "intersection_population",
+        "coc_population_denominator",
+        "msa_population_denominator",
+        "missing_population_block_count",
+        *expected_metadata,
+    }
+    missing = required - set(crosswalk.columns)
+    if missing:
+        raise ValueError(f"Block crosswalk is missing {sorted(missing)}; regenerate msa-xwalk.")
+    for column, value in expected_metadata.items():
+        if crosswalk[column].isna().any() or set(crosswalk[column].astype(str)) != {str(value)}:
+            raise ValueError(
+                f"Crosswalk {column} does not match {value}; use the pinned crosswalk."
+            )
+    u = universe.rename(columns={"metro_id": "msa_id", "metro_name": "msa_name"}).copy()
+    if not {"msa_id", "msa_name"} <= set(u.columns):
+        raise ValueError("MSA universe needs msa_id/msa_name or metro_id/metro_name.")
+    if u.msa_id.isna().any() or u.msa_id.duplicated().any():
+        raise ValueError("MSA universe IDs must be nonmissing and unique.")
+    x = crosswalk.copy()
+    if x[["msa_id", "coc_id"]].isna().any().any() or x.duplicated(["msa_id", "coc_id"]).any():
+        raise ValueError("Crosswalk requires one nonmissing row per MSA/CoC pair.")
+    u["msa_id"] = u.msa_id.astype(str)
+    x["msa_id"] = x.msa_id.astype(str)
+    x["coc_id"] = x.coc_id.astype(str)
+    if not {"coc_id", "coc_name"} <= set(coc_names.columns):
+        raise ValueError("CoC names input needs coc_id and coc_name.")
+    x = x.merge(coc_names[["coc_id", "coc_name"]], on="coc_id", how="left", validate="many_to_one")
+    if x.coc_name.isna().any():
+        raise ValueError("CoC names are missing for crosswalk IDs; use matching boundary vintage.")
+    x["coc_type"] = "local_or_regional"
+    x.loc[x.coc_name.str.contains("balance of state", case=False), "coc_type"] = "balance_of_state"
+    x.loc[x.coc_name.str.contains("statewide", case=False), "coc_type"] = "statewide"
+    numeric = [
+        "intersection_population",
+        "coc_population_denominator",
+        "msa_population_denominator",
+        "missing_population_block_count",
+    ]
+    for column in numeric:
+        x[column] = pd.to_numeric(x[column], errors="raise")
+    if (
+        x[numeric].isna().any().any()
+        or not x[numeric].map(lambda value: float("-inf") < value < float("inf")).all().all()
+    ):
+        raise ValueError("Crosswalk population values must be finite and nonmissing.")
+    if (x[numeric] < 0).any().any():
+        raise ValueError("Crosswalk population values must be nonnegative.")
+    if (x.msa_population_denominator <= 0).any():
+        raise ValueError("MSA population denominators must be positive.")
+    if (x.groupby("msa_id").msa_population_denominator.nunique() > 1).any() or (
+        x.groupby("coc_id").coc_population_denominator.nunique() > 1
+    ).any():
+        raise ValueError("Crosswalk population denominators disagree across pairs.")
+    x["coc_population_containment_share"] = x.intersection_population.div(
+        x.coc_population_denominator.where(x.coc_population_denominator > 0)
+    )
+    x["msa_population_coverage_share"] = x.intersection_population / x.msa_population_denominator
+    if (x.coc_population_containment_share > 1 + SITE_SHARE_TOLERANCE).any():
+        raise ValueError("Intersection population exceeds its CoC denominator; repair crosswalk.")
+    coc_totals = x.groupby("coc_id").coc_population_containment_share.sum()
+    if (coc_totals > 1 + SITE_SHARE_TOLERANCE).any():
+        raise ValueError("CoC population is duplicated across MSAs; repair crosswalk.")
+    site_rows: list[dict[str, object]] = []
+    memberships: list[pd.DataFrame] = []
+    for threshold in sorted(thresholds):
+        for msa in u.sort_values("msa_id").itertuples():
+            rows = x[x.msa_id == msa.msa_id]
+            population = float(rows.msa_population_denominator.iloc[0]) if len(rows) else None
+            coverage = float(rows.msa_population_coverage_share.sum()) if len(rows) else 0.0
+            selected = rows[rows.coc_population_containment_share >= threshold].copy()
+            inside = float(selected.intersection_population.sum())
+            total = float(selected.coc_population_denominator.sum())
+            selected_coverage = inside / population if population else 0.0
+            reason = "eligible"
+            if rows.empty:
+                reason = "missing_crosswalk"
+            elif rows.missing_population_block_count.sum() > 0:
+                reason = "missing_block_population"
+            elif coverage > 1 + SITE_SHARE_TOLERANCE:
+                reason = "overlapping_population_coverage"
+            elif selected.empty:
+                reason = "no_contained_cocs"
+            elif selected_coverage < threshold:
+                reason = "insufficient_selected_coverage"
+            eligible = reason == "eligible"
+            selected["threshold"] = threshold
+            selected["site_eligible"] = eligible
+            memberships.append(selected.loc[:, SITE_MEMBERSHIP_COLUMNS])
+            site_rows.append(
+                dict(
+                    zip(
+                        SITE_COLUMNS,
+                        (
+                            threshold,
+                            msa.msa_id,
+                            msa.msa_name,
+                            population,
+                            coverage,
+                            len(selected),
+                            inside,
+                            total,
+                            selected_coverage,
+                            max(0.0, total - inside),
+                            max(0.0, (total - inside) / total) if total else None,
+                            eligible,
+                            reason,
+                        ),
+                        strict=True,
+                    )
+                )
+            )
+    sites = pd.DataFrame(site_rows, columns=SITE_COLUMNS)
+    members = (
+        pd.concat(memberships, ignore_index=True)
+        if memberships
+        else pd.DataFrame(columns=SITE_MEMBERSHIP_COLUMNS)
+    )
+    members = members.sort_values(["threshold", "msa_id", "coc_id"]).reset_index(drop=True)
+    summaries: list[dict[str, object]] = []
+    for threshold in sorted(thresholds):
+        candidates = sites[sites.threshold == threshold]
+        accepted = candidates[candidates.eligible]
+        chosen = members[(members.threshold == threshold) & members.site_eligible]
+        stats: dict[str, object] = {}
+        for column in (
+            "msa_population",
+            "selected_coc_count",
+            "selected_msa_coverage_share",
+            "selected_coc_spillover_share",
+        ):
+            values = accepted[column].dropna()
+            stats[column] = {
+                "min": float(values.min()) if len(values) else None,
+                "median": float(values.median()) if len(values) else None,
+                "max": float(values.max()) if len(values) else None,
+            }
+        summaries.append(
+            {
+                "threshold": threshold,
+                "candidate_msa_count": len(candidates),
+                "eligible_site_count": len(accepted),
+                "eligible_unique_coc_count": chosen.coc_id.nunique(),
+                "eligible_msa_population": float(accepted.msa_population.sum()),
+                "eligible_coc_counts_by_name_type": chosen.drop_duplicates("coc_id")
+                .coc_type.value_counts()
+                .to_dict(),
+                "site_status_counts": candidates.reason.value_counts().to_dict(),
+                "eligible_site_statistics": stats,
+            }
+        )
+    return sites, members, summaries
+
+
 REQUIRED_MSA_MEMBERSHIP_COLUMNS: tuple[str, ...] = (
     "msa_id",
     "county_fips",
@@ -244,8 +452,7 @@ def select_primary_msa_for_cocs(
     rows["primary_msa_coc_contained_percent"] = _coc_contained_percent(rows)
     rows["primary_msa_covered_by_coc_percent"] = _msa_covered_percent(rows)
     rows = rows[
-        rows["primary_msa_coc_contained_percent"].fillna(-1.0)
-        >= min_coc_contained_share * 100.0
+        rows["primary_msa_coc_contained_percent"].fillna(-1.0) >= min_coc_contained_share * 100.0
     ].copy()
     if rows.empty:
         return _empty_primary_msa_annotations(universe)
@@ -283,9 +490,7 @@ def select_primary_msa_for_cocs(
         base = _empty_primary_msa_annotations(universe).drop(columns=selected.columns[1:])
         selected = base.merge(selected, on="coc_id", how="left")
     return (
-        selected.loc[:, PRIMARY_MSA_ANNOTATION_COLUMNS]
-        .sort_values("coc_id")
-        .reset_index(drop=True)
+        selected.loc[:, PRIMARY_MSA_ANNOTATION_COLUMNS].sort_values("coc_id").reset_index(drop=True)
     )
 
 
@@ -597,9 +802,7 @@ def _prepare_population_tracts(
         "GEOID",
     )
     if pop_id_col not in acs5_population_df.columns:
-        raise ValueError(
-            "ACS5 population rows must have 'tract_geoid', 'GEOID', or 'geoid' column"
-        )
+        raise ValueError("ACS5 population rows must have 'tract_geoid', 'GEOID', or 'geoid' column")
     if population_column not in acs5_population_df.columns:
         raise ValueError(
             f"ACS5 population rows are missing '{population_column}'. "
@@ -695,9 +898,7 @@ def _finalize_rows(
     if min_msa_coverage_share is not None:
         rows = rows[rows["msa_covered_by_coc_percent"] >= min_msa_coverage_share * 100].copy()
     if min_coc_containment_share is not None:
-        rows = rows[
-            rows["coc_contained_in_msa_percent"] >= min_coc_containment_share * 100
-        ].copy()
+        rows = rows[rows["coc_contained_in_msa_percent"] >= min_coc_containment_share * 100].copy()
     rows["year"] = int(year)
     rows["boundary_vintage"] = str(boundary_vintage)
     rows["county_vintage"] = str(county_vintage)

@@ -32,7 +32,11 @@ from hhplab.artifacts.naming.naming import (
     msa_county_membership_path,
     tract_path,
 )
-from hhplab.geographies.msa.coverage import build_msa_coc_coverage, save_msa_coc_coverage
+from hhplab.geographies.msa.coverage import (
+    build_msa_coc_coverage,
+    build_msa_coc_sites,
+    save_msa_coc_coverage,
+)
 from hhplab.geographies.msa.crosswalk import aggregate_coc_to_msa_fractional_rollup
 from hhplab.panel.conformance import PanelRequest, run_conformance
 from hhplab.panel.panel_diagnostics import generate_diagnostics_report
@@ -52,6 +56,7 @@ from hhplab.recipe.executor.manifest import (
     _resolve_msa_coc_coverage_output_file,
     _resolve_panel_output_file,
     _resolve_pipeline_target,
+    resolve_msa_coc_site_files,
 )
 from hhplab.recipe.executor.msa_coc_panel import (
     _collect_frame_records,
@@ -67,6 +72,7 @@ from hhplab.recipe.planner import ExecutionPlan
 from hhplab.recipe.recipe_schema import ContainmentSpec, MsaFractionalRollupSpec
 from hhplab.recipe.schema_common import expand_year_spec
 from hhplab.storage.config import load_config
+from hhplab.storage.provenance import ProvenanceBlock, write_parquet_with_provenance
 
 
 def persist_outputs(
@@ -658,6 +664,101 @@ def persist_containment(
     return StepResult(step_kind="persist_containment", detail=detail, success=True)
 
 
+def persist_msa_coc_sites(plan: ExecutionPlan, ctx: ExecutionContext) -> StepResult:
+    """Persist block-population sample tables and descriptive summary only."""
+    try:
+        _, target = _resolve_pipeline_target(ctx.recipe, plan.pipeline_id)
+        spec = target.msa_coc_sites
+        if spec is None:
+            raise ValueError("msa_coc_sites configuration is required.")
+        paths = {
+            key: ctx.project_root / getattr(spec, key)
+            for key in ("crosswalk_path", "msa_universe_path", "coc_names_path")
+        }
+        for path in paths.values():
+            _record_containment_asset(ctx, path)
+        metadata = {
+            "boundary_vintage": str(spec.coc_boundary_vintage),
+            "county_vintage": str(spec.county_vintage),
+            "block_vintage": str(spec.block_vintage),
+            "decennial_vintage": str(spec.decennial_vintage),
+            "definition_version": spec.msa_definition_version,
+            "allocation_method": "block_population",
+        }
+        universe = _read_parquet(paths["msa_universe_path"], "MSA universe")
+        names = _read_parquet(paths["coc_names_path"], "CoC names")
+        for frame, column, expected in (
+            (universe, "definition_version", spec.msa_definition_version),
+            (names, "boundary_vintage", str(spec.coc_boundary_vintage)),
+        ):
+            if column not in frame or set(frame[column].astype(str)) != {expected}:
+                raise ValueError(f"Site input {column} must match {expected}.")
+        sites, members, summary = build_msa_coc_sites(
+            _read_parquet(paths["crosswalk_path"], "block crosswalk"),
+            universe,
+            names,
+            thresholds=spec.thresholds,
+            expected_metadata=metadata,
+        )
+        outputs = resolve_msa_coc_site_files(
+            ctx.recipe, plan.pipeline_id, ctx.project_root, ctx.storage_config
+        )
+        if any(path in ctx._written_outputs for path in outputs.values()):
+            raise ValueError("Site output collision; give each target a unique output identity.")
+        provenance = ProvenanceBlock(
+            geo_type="msa",
+            boundary_vintage=str(spec.coc_boundary_vintage),
+            definition_version=spec.msa_definition_version,
+            extra={
+                "dataset_type": "msa_coc_sites",
+                "parameters": spec.model_dump(mode="json"),
+                "inputs": {key: _coverage_input_path(path, ctx) for key, path in paths.items()},
+                "rule": (
+                    "Each whole CoC containment >= threshold; "
+                    "their combined MSA coverage >= threshold."
+                ),
+            },
+        )
+        for kind, frame in (("sites", sites), ("memberships", members)):
+            outputs[kind].parent.mkdir(parents=True, exist_ok=True)
+            write_parquet_with_provenance(frame, outputs[kind], provenance)
+            frame.to_csv(outputs[kind].with_suffix(".csv"), index=False)
+        outputs["summary"].write_text(
+            json.dumps(
+                {
+                    "schema_version": "msa_coc_sites/1",
+                    "parameters": spec.model_dump(mode="json"),
+                    "notes": [
+                        "CoC types are provisional name-based labels, not eligibility criteria.",
+                        "Population overlap does not establish outcome-count comparability.",
+                        "Missing sites remain in the candidate denominator.",
+                    ],
+                    "samples": summary,
+                },
+                indent=2,
+                allow_nan=False,
+            )
+            + "\n"
+        )
+        manifest = _build_manifest(
+            ctx.recipe, plan.pipeline_id, ctx, output_path=str(outputs["sites"])
+        )
+        write_manifest(manifest, outputs["sites"].with_suffix(".manifest.json"))
+        ctx._written_outputs.update(outputs.values())
+        return StepResult(
+            step_kind="persist_msa_coc_sites",
+            success=True,
+            detail=f"persist site exploration: {len(sites)} candidate/threshold rows",
+        )
+    except (ExecutorError, FileNotFoundError, ValueError, KeyError) as exc:
+        return StepResult(
+            step_kind="persist_msa_coc_sites",
+            detail="persist site exploration",
+            success=False,
+            error=str(exc),
+        )
+
+
 def persist_msa_coc_coverage(
     plan: ExecutionPlan,
     ctx: ExecutionContext,
@@ -667,8 +768,7 @@ def persist_msa_coc_coverage(
         _pipeline, target = _resolve_pipeline_target(ctx.recipe, plan.pipeline_id)
         if target.msa_coc_coverage is None:
             raise ExecutorError(
-                f"Target '{target.id}' declares msa_coc_coverage output without "
-                "msa_coc_coverage."
+                f"Target '{target.id}' declares msa_coc_coverage output without msa_coc_coverage."
             )
         spec = target.msa_coc_coverage
         cfg = ctx.storage_config or load_config(project_root=ctx.project_root)

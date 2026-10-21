@@ -93,10 +93,7 @@ def _build_manifest(
             }
             for ds_id, ds in recipe.datasets.items()
         },
-        transforms={
-            tid: _classify_path(path, ctx)[1]
-            for tid, path in ctx.transform_paths.items()
-        },
+        transforms={tid: _classify_path(path, ctx)[1] for tid, path in ctx.transform_paths.items()},
         output_path=output_path,
     )
 
@@ -106,18 +103,10 @@ def _target_geometry_metadata(
 ) -> tuple[str, str | None, str | None, str | None]:
     """Return target geometry metadata for naming and panel provenance."""
     geo_type = target_geometry.type
-    boundary_vintage = (
-        str(target_geometry.vintage)
-        if target_geometry.vintage is not None
-        else None
-    )
-    definition_version = (
-        target_geometry.source if geo_type in {"metro", "msa"} else None
-    )
+    boundary_vintage = str(target_geometry.vintage) if target_geometry.vintage is not None else None
+    definition_version = target_geometry.source if geo_type in {"metro", "msa"} else None
     profile_definition_version = (
-        target_geometry.subset_profile_definition_version
-        if geo_type == "metro"
-        else None
+        target_geometry.subset_profile_definition_version if geo_type == "metro" else None
     )
     return (
         geo_type,
@@ -243,9 +232,7 @@ def _resolve_panel_output_file(
     if weighting_suffix:
         path = Path(filename)
         filename = f"{path.stem}{weighting_suffix}{path.suffix}"
-    return (
-        cfg.output_root / recipe_dir / filename
-    )
+    return cfg.output_root / recipe_dir / filename
 
 
 def _resolve_map_output_file(
@@ -276,7 +263,9 @@ def _resolve_map_output_file(
     cfg = storage_config or load_config(project_root=project_root)
     recipe_dir = _recipe_output_dirname(recipe.name)
     return (
-        cfg.output_root / recipe_dir / geo_map_filename(
+        cfg.output_root
+        / recipe_dir
+        / geo_map_filename(
             start_year,
             end_year,
             geo_type=target_geo_type,
@@ -326,6 +315,24 @@ def _resolve_containment_output_file(
     )
 
 
+def resolve_msa_coc_site_files(
+    recipe: RecipeV1,
+    pipeline_id: str,
+    project_root: Path,
+    storage_config: StorageConfig | None = None,
+) -> dict[str, Path]:
+    """Resolve all outcome-free site exploration outputs."""
+    from hhplab.artifacts.naming.naming import msa_coc_sites_filename
+
+    _, target = _resolve_pipeline_target(recipe, pipeline_id)
+    cfg = storage_config or load_config(project_root=project_root)
+    root = cfg.output_root / _recipe_output_dirname(recipe.name)
+    return {
+        kind: root / msa_coc_sites_filename(target.id, kind)
+        for kind in ("sites", "memberships", "summary")
+    }
+
+
 def _resolve_msa_coc_coverage_output_file(
     recipe: RecipeV1,
     pipeline_id: str,
@@ -336,8 +343,7 @@ def _resolve_msa_coc_coverage_output_file(
     _, target = _resolve_pipeline_target(recipe, pipeline_id)
     if target.msa_coc_coverage is None:
         raise ExecutorError(
-            f"Target '{target.id}' declares msa_coc_coverage output without "
-            "msa_coc_coverage."
+            f"Target '{target.id}' declares msa_coc_coverage output without msa_coc_coverage."
         )
 
     spec = target.msa_coc_coverage
@@ -374,7 +380,10 @@ def resolve_pipeline_artifacts(
 
     _, target = _resolve_pipeline_target(recipe, pipeline_id)
     panel_file = _resolve_panel_output_file(
-        recipe, pipeline_id, project_root, storage_config=storage_config,
+        recipe,
+        pipeline_id,
+        project_root,
+        storage_config=storage_config,
     )
     artifacts: dict[str, str] = {}
 
@@ -398,7 +407,10 @@ def resolve_pipeline_artifacts(
 
     if "map" in target.outputs:
         map_file = _resolve_map_output_file(
-            recipe, pipeline_id, project_root, storage_config=storage_config,
+            recipe,
+            pipeline_id,
+            project_root,
+            storage_config=storage_config,
         )
         artifacts["map_path"] = _display_path(map_file)
 
@@ -411,13 +423,20 @@ def resolve_pipeline_artifacts(
         )
         artifacts["containment_path"] = _display_path(containment_file)
         manifest_key = (
-            "manifest_path"
-            if "panel" not in target.outputs
-            else "containment_manifest_path"
+            "manifest_path" if "panel" not in target.outputs else "containment_manifest_path"
         )
         artifacts[manifest_key] = _display_path(
             containment_file.with_suffix(".manifest.json"),
         )
+
+    if "msa_coc_sites" in target.outputs:
+        for kind, path in resolve_msa_coc_site_files(
+            recipe, pipeline_id, project_root, storage_config
+        ).items():
+            artifacts[f"msa_coc_{kind}_path"] = _display_path(path)
+            if kind != "summary":
+                artifacts[f"msa_coc_{kind}_csv_path"] = _display_path(path.with_suffix(".csv"))
+        artifacts["msa_coc_sites_parameters"] = target.msa_coc_sites.model_dump(mode="json")
 
     if "msa_coc_coverage" in target.outputs:
         coverage_file = _resolve_msa_coc_coverage_output_file(

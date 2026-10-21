@@ -10,6 +10,7 @@ from shapely.geometry import box
 from hhplab.geographies.msa.coverage import (
     MSA_COC_COVERAGE_COLUMNS,
     build_msa_coc_coverage,
+    build_msa_coc_sites,
     read_msa_coc_coverage,
     save_msa_coc_coverage,
     select_primary_msa_for_cocs,
@@ -43,6 +44,93 @@ RANKING_ROWS = [
     ("35620", 2024, 100),
     ("41180", 2024, 100),
 ]
+
+# Site truth table: A has 96% coverage/containment, B is exactly covered by
+# two whole CoCs, C lies in a much larger CoC, D has no crosswalk rows.
+# Thus A passes .90/.95, B passes all thresholds, and C/D always fail.
+SITE_POPULATION = 100.0
+SITE_A_INSIDE = 96.0
+SITE_TEST_ROWS = [
+    ("A", "a", SITE_A_INSIDE, SITE_POPULATION, SITE_POPULATION),
+    ("B", "b1", SITE_POPULATION / 2, SITE_POPULATION / 2, SITE_POPULATION),
+    ("B", "b2", SITE_POPULATION / 2, SITE_POPULATION / 2, SITE_POPULATION),
+    ("C", "c", SITE_POPULATION, SITE_POPULATION * 10, SITE_POPULATION),
+]
+
+
+def _site_inputs():
+    x = pd.DataFrame(
+        SITE_TEST_ROWS,
+        columns=[
+            "msa_id",
+            "coc_id",
+            "intersection_population",
+            "coc_population_denominator",
+            "msa_population_denominator",
+        ],
+    )
+    x["missing_population_block_count"] = 0
+    x["allocation_method"] = "block_population"
+    u = pd.DataFrame({"msa_id": list("ABCD"), "msa_name": list("ABCD")})
+    names = pd.DataFrame(
+        {
+            "coc_id": ["a", "b1", "b2", "c"],
+            "coc_name": ["A CoC", "B1 CoC", "B2 CoC", "Balance of State"],
+        }
+    )
+    return x, u, names
+
+
+@pytest.mark.parametrize(
+    "threshold,expected",
+    [
+        pytest.param(0.90, {"A", "B"}, id="90-percent"),
+        pytest.param(0.95, {"A", "B"}, id="95-percent"),
+        pytest.param(0.99, {"B"}, id="99-percent"),
+        pytest.param(SITE_A_INSIDE / SITE_POPULATION, {"A", "B"}, id="inclusive-boundary"),
+    ],
+)
+def test_site_two_way_population_selection(threshold, expected):
+    sites, members, summary = build_msa_coc_sites(
+        *_site_inputs(),
+        thresholds=[threshold],
+        expected_metadata={"allocation_method": "block_population"},
+    )
+    assert set(sites.loc[sites.eligible, "msa_id"]) == expected
+    assert len(sites) == 4
+    assert sites.set_index("msa_id").loc["D", "reason"] == "missing_crosswalk"
+    assert sites.set_index("msa_id").loc["C", "reason"] == "no_contained_cocs"
+    assert members[members.msa_id == "B"].coc_id.tolist() == ["b1", "b2"]
+    assert summary[0]["eligible_msa_population"] == len(expected) * SITE_POPULATION
+
+
+@pytest.mark.parametrize("failure", ["duplicate", "wrong_basis", "negative", "nan"])
+def test_site_invalid_crosswalk_fails(failure):
+    x, u, names = _site_inputs()
+    if failure == "duplicate":
+        x = pd.concat([x, x.iloc[:1]], ignore_index=True)
+    elif failure == "wrong_basis":
+        x["allocation_method"] = "area"
+    elif failure == "negative":
+        x.loc[0, "intersection_population"] = -1
+    else:
+        x.loc[0, "intersection_population"] = float("nan")
+    with pytest.raises(ValueError):
+        build_msa_coc_sites(
+            x,
+            u,
+            names,
+            thresholds=[0.95],
+            expected_metadata={"allocation_method": "block_population"},
+        )
+
+
+def test_site_missing_blocks_excludes_instead_of_silently_passing():
+    x, u, names = _site_inputs()
+    x.loc[x.msa_id == "B", "missing_population_block_count"] = 1
+    sites, _, _ = build_msa_coc_sites(x, u, names, thresholds=[0.95], expected_metadata={})
+    assert sites.set_index("msa_id").loc["B", "reason"] == "missing_block_population"
+    assert not sites.set_index("msa_id").loc["B", "eligible"]
 
 
 def _county_gdf() -> gpd.GeoDataFrame:

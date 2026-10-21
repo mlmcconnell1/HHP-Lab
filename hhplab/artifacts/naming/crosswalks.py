@@ -24,6 +24,7 @@ __all__ = [
     "msa_coc_block_population_xwalk_filename",
     "msa_coc_block_population_xwalk_path",
     "msa_coc_coverage_filename",
+    "msa_coc_sites_filename",
     "msa_coc_coverage_path",
     "msa_coc_xwalk_filename",
     "msa_coc_xwalk_path",
@@ -35,6 +36,7 @@ __all__ = [
     "tract_xwalk_filename",
     "tract_xwalk_path",
 ]
+
 
 def _containment_geometry_token(
     geometry_type: str,
@@ -61,6 +63,7 @@ def _containment_geometry_token(
         "Supported types: coc, county, msa."
     )
 
+
 def _overlap_basis_token(overlap_bases: str | list[str] | tuple[str, ...]) -> str:
     if isinstance(overlap_bases, str):
         bases = [part for part in re.split(r"[-,+]", overlap_bases) if part]
@@ -76,10 +79,12 @@ def _overlap_basis_token(overlap_bases: str | list[str] | tuple[str, ...]) -> st
     ordered = [basis for basis in ("area", "population") if basis in set(bases)]
     return "-".join(ordered)
 
+
 def _slug_output_id(output_id: str) -> str:
     normalized = re.sub(r"[^A-Za-z0-9._-]+", "-", output_id.strip().lower())
     normalized = re.sub(r"-{2,}", "-", normalized).strip("-.")
     return normalized or "containment"
+
 
 def _tract_mediated_denominator_token(
     *,
@@ -102,6 +107,7 @@ def _tract_mediated_denominator_token(
         f"{denominator_source!r}; expected 'acs' or 'decennial'."
     )
 
+
 def coc_urban_area_detail_filename(
     boundary_vintage: str | int,
     urban_area_vintage: str | int,
@@ -118,6 +124,7 @@ def coc_urban_area_detail_filename(
 # =============================================================================
 # Crosswalks (join two geometry vintages)
 # =============================================================================
+
 
 def coc_urban_area_detail_path(
     boundary_vintage: str | int,
@@ -143,6 +150,7 @@ def coc_urban_area_detail_path(
         )
     )
 
+
 def coc_urban_fraction_filename(
     boundary_vintage: str | int,
     urban_area_vintage: str | int,
@@ -159,6 +167,7 @@ def coc_urban_fraction_filename(
         f"coc_urban_fraction__N{decennial_vintage}@B{boundary_vintage}"
         f"xU{urban_area_vintage}xK{block_vintage}.parquet"
     )
+
 
 def coc_urban_fraction_path(
     boundary_vintage: str | int,
@@ -184,6 +193,7 @@ def coc_urban_fraction_path(
         )
     )
 
+
 def containment_filename(
     *,
     container_type: str,
@@ -206,6 +216,7 @@ def containment_filename(
     )
     return f"containment__{container_token}x{candidate_token}__{_slug_output_id(output_id)}.parquet"
 
+
 def county_weights_filename(acs_vintage: str, weighting: str) -> str:
     """Generate filename for county-level ACS weights.
 
@@ -224,6 +235,7 @@ def county_weights_filename(acs_vintage: str, weighting: str) -> str:
 # =============================================================================
 # Path helpers (combine filename with directory)
 # =============================================================================
+
 
 def county_weights_path(
     acs_vintage: str,
@@ -251,6 +263,7 @@ def county_weights_path(
 # Helper functions
 # =============================================================================
 
+
 def county_xwalk_filename(boundary_vintage: str, county_vintage: str | int) -> str:
     """Generate filename for CoC-to-county crosswalk.
 
@@ -262,6 +275,7 @@ def county_xwalk_filename(boundary_vintage: str, county_vintage: str | int) -> s
         Filename like 'xwalk__B2025xC2023.parquet'
     """
     return f"xwalk__B{boundary_vintage}xC{county_vintage}.parquet"
+
 
 def county_xwalk_path(
     boundary_vintage: str,
@@ -284,6 +298,7 @@ def county_xwalk_path(
         base_dir = Path(base_dir)
     return base_dir / "curated" / "xwalks" / county_xwalk_filename(boundary_vintage, county_vintage)
 
+
 def msa_coc_block_population_xwalk_filename(
     boundary_vintage: str | int,
     definition_version: str,
@@ -297,6 +312,7 @@ def msa_coc_block_population_xwalk_filename(
         f"xM{definition_version}xC{county_vintage}xK{block_vintage}"
         "__basis-block_population.parquet"
     )
+
 
 def msa_coc_block_population_xwalk_path(
     boundary_vintage: str | int,
@@ -324,6 +340,15 @@ def msa_coc_block_population_xwalk_path(
         )
     )
 
+
+def msa_coc_sites_filename(output_id: str, artifact: str = "sites") -> str:
+    """Canonical recipe-local site exploration artifacts; manifest pins vintages."""
+    if artifact not in {"sites", "memberships", "summary"}:
+        raise ValueError("Site artifact must be sites, memberships, or summary.")
+    extension = "json" if artifact == "summary" else "parquet"
+    return f"msa_coc_{artifact}__{_slug_output_id(output_id)}.{extension}"
+
+
 def msa_coc_coverage_filename(
     year: str | int,
     boundary_vintage: str | int,
@@ -342,6 +367,7 @@ def msa_coc_coverage_filename(
         f"msa_coc_coverage__Y{year}@B{boundary_vintage}xM{definition_version}"
         f"xC{county_vintage}__top{top_n}__basis-{basis_token}.parquet"
     )
+
 
 def msa_coc_coverage_path(
     year: str | int,
@@ -371,6 +397,7 @@ def msa_coc_coverage_path(
         )
     )
 
+
 def msa_coc_xwalk_filename(
     boundary_vintage: str,
     definition_version: str,
@@ -388,6 +415,7 @@ def msa_coc_xwalk_filename(
         ``msa_coc_xwalk__B2025xMcensus_msa_2023xC2023.parquet``
     """
     return f"msa_coc_xwalk__B{boundary_vintage}xM{definition_version}xC{county_vintage}.parquet"
+
 
 def msa_coc_xwalk_path(
     boundary_vintage: str,
@@ -418,6 +446,7 @@ def msa_coc_xwalk_path(
         / msa_coc_xwalk_filename(boundary_vintage, definition_version, county_vintage)
     )
 
+
 def msa_fractional_rollup_filename(
     start_year: int,
     end_year: int,
@@ -446,6 +475,7 @@ def msa_fractional_rollup_filename(
         f"panel__msa-rollup-{measure_token}__Y{start_year}-{end_year}"
         f"__basis-{basis_token}{suffix}.parquet"
     )
+
 
 def msa_fractional_rollup_path(
     start_year: int,
@@ -481,6 +511,7 @@ def msa_fractional_rollup_path(
         )
     )
 
+
 def tract_mediated_county_xwalk_filename(
     boundary_vintage: str | int,
     county_vintage: str | int,
@@ -514,6 +545,7 @@ def tract_mediated_county_xwalk_filename(
         f"xwalk_tract_mediated_county__{denominator_token}@B{boundary_vintage}"
         f"xC{county_vintage}xT{tract_vintage}.parquet"
     )
+
 
 def tract_mediated_county_xwalk_path(
     boundary_vintage: str | int,
@@ -558,6 +590,7 @@ def tract_mediated_county_xwalk_path(
         )
     )
 
+
 def tract_relationship_filename(
     from_vintage: str | int = 2010,
     to_vintage: str | int = 2020,
@@ -578,6 +611,7 @@ def tract_relationship_filename(
 # Derived datasets (compound notation)
 # =============================================================================
 
+
 def tract_xwalk_filename(boundary_vintage: str, tract_vintage: str | int) -> str:
     """Generate filename for CoC-to-tract crosswalk.
 
@@ -589,6 +623,7 @@ def tract_xwalk_filename(boundary_vintage: str, tract_vintage: str | int) -> str
         Filename like 'xwalk__B2025xT2023.parquet'
     """
     return f"xwalk__B{boundary_vintage}xT{tract_vintage}.parquet"
+
 
 def tract_xwalk_path(
     boundary_vintage: str,
@@ -610,4 +645,3 @@ def tract_xwalk_path(
     else:
         base_dir = Path(base_dir)
     return base_dir / "curated" / "xwalks" / tract_xwalk_filename(boundary_vintage, tract_vintage)
-

@@ -216,7 +216,9 @@ FilterSpec = TemporalFilter  # Extensible: Union[TemporalFilter, ...] in future
 # Targets / outputs
 # -----------------------------
 
-OutputKind = Literal["panel", "diagnostics", "map", "containment", "msa_coc_coverage"]
+OutputKind = Literal[
+    "panel", "diagnostics", "map", "containment", "msa_coc_coverage", "msa_coc_sites"
+]
 
 CohortMethod = Literal["top_n", "bottom_n", "percentile", "predicate"]
 CohortPredicateOperator = Literal["gte", "lte", "gt", "lt", "eq"]
@@ -397,9 +399,7 @@ class InflationAdjustmentPolicy(BaseModel):
     @model_validator(mode="after")
     def _validate_cpi_source(self) -> InflationAdjustmentPolicy:
         if self.cpi_dataset is not None and self.cpi_path is not None:
-            raise ValueError(
-                "InflationAdjustmentPolicy may set cpi_dataset or cpi_path, not both."
-            )
+            raise ValueError("InflationAdjustmentPolicy may set cpi_dataset or cpi_path, not both.")
         unknown_overrides = sorted(set(self.column_year_columns) - set(self.columns))
         if unknown_overrides:
             raise ValueError(
@@ -500,13 +500,10 @@ class DerivedMeasureSpec(BaseModel):
             ]
             if missing:
                 raise ValueError(
-                    f"DerivedMeasureSpec type='{self.type}' requires "
-                    f"{', '.join(missing)}."
+                    f"DerivedMeasureSpec type='{self.type}' requires {', '.join(missing)}."
                 )
             if self.column is not None:
-                raise ValueError(
-                    f"DerivedMeasureSpec type='{self.type}' may not set column."
-                )
+                raise ValueError(f"DerivedMeasureSpec type='{self.type}' may not set column.")
             return self
 
         if self.type in {"log", "lag", "lead", "difference"}:
@@ -1055,6 +1052,31 @@ class MsaCocPanelSpec(BaseModel):
         return self
 
 
+class MsaCocSitesSpec(BaseModel):
+    """Outcome-free site selection from a pinned block-population crosswalk."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    crosswalk_path: str = Field(min_length=1)
+    msa_universe_path: str = Field(min_length=1)
+    coc_names_path: str = Field(min_length=1)
+    coc_boundary_vintage: int
+    msa_definition_version: str = Field(min_length=1)
+    county_vintage: int
+    block_vintage: int
+    decennial_vintage: int
+    thresholds: list[float] = Field(default_factory=lambda: [0.90, 0.95, 0.99], min_length=1)
+
+    @field_validator("thresholds")
+    @classmethod
+    def validate_thresholds(cls, values: list[float]) -> list[float]:
+        if any(not 0.5 < value <= 1 for value in values):
+            raise ValueError("Site thresholds must be finite and in (0.5, 1].")
+        if len(set(values)) != len(values):
+            raise ValueError("Site thresholds must be unique.")
+        return sorted(values)
+
+
 class MsaCocCoverageSpec(BaseModel):
     """Declarative MSA-CoC overlap coverage artifact contract."""
 
@@ -1513,6 +1535,7 @@ class TargetSpec(BaseModel):
             "msa_id x coc_id x overlap_basis for one year."
         ),
     )
+    msa_coc_sites: MsaCocSitesSpec | None = None
     msa_fractional_rollup: MsaFractionalRollupSpec | None = Field(
         default=None,
         description=(
@@ -1523,6 +1546,10 @@ class TargetSpec(BaseModel):
     @model_validator(mode="after")
     def _validate_output_policies(self) -> TargetSpec:
         outputs = set(self.outputs)
+        if ("msa_coc_sites" in outputs) != (self.msa_coc_sites is not None):
+            raise ValueError("msa_coc_sites output and configuration must be supplied together.")
+        if self.msa_coc_sites is not None and self.geometry.type != "msa":
+            raise ValueError("msa_coc_sites requires MSA target geometry.")
         if "map" in outputs and self.map_spec is None:
             raise ValueError("Target outputs including 'map' require 'map_spec'.")
         if "map" not in outputs and self.map_spec is not None:

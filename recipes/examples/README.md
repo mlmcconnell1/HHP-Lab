@@ -82,6 +82,46 @@ the output downstream.
 
 ## Recipes
 
+## Outcome-free MSA/CoC site exploration
+
+[`../msa-coc-overlap-sites-2024.yaml`](../msa-coc-overlap-sites-2024.yaml)
+compares 90%, 95%, and 99% two-way population overlap using the full MSA
+universe, 2024 CoC boundaries, 2023 MSA/county definitions, and 2020 census
+block population. It reads the existing block-population crosswalk and does
+not ingest or allocate PIT/HIC or other outcomes.
+
+For each threshold, first select whole CoCs whose population containment in
+an MSA meets the threshold. Then require the selected CoCs' combined
+intersection population to cover that fraction of the MSA population.
+Memberships of rejected sites remain available for inspection. CoC type
+labels are provisional classifications from names and do not affect selection.
+
+```bash
+HHPLAB_NON_INTERACTIVE=1 hhplab build recipe-preflight --recipe recipes/msa-coc-overlap-sites-2024.yaml --json
+HHPLAB_NON_INTERACTIVE=1 hhplab build recipe-plan --recipe recipes/msa-coc-overlap-sites-2024.yaml --json
+HHPLAB_NON_INTERACTIVE=1 hhplab build recipe --recipe recipes/msa-coc-overlap-sites-2024.yaml --json
+```
+
+The plan reports paths under the configured output root for:
+
+- `msa_coc_sites__overlap_samples.parquet` and CSV: all candidate MSAs at
+  each threshold, population, selected CoC count, coverage, spillover,
+  eligibility, and failure reason.
+- `msa_coc_memberships__overlap_samples.parquet` and CSV: selected whole-CoC
+  memberships, their overlap shares, and site eligibility.
+- `msa_coc_summary__overlap_samples.json`: sample and unique-CoC counts,
+  total eligible MSA population, CoC name classifications, exclusion counts,
+  and minimum/median/maximum population, membership count, coverage, and spillover.
+
+Parquet files carry provenance; the site manifest fingerprints input files.
+Missing crosswalk sites remain in the candidate denominator. Missing block
+population or materially excessive population coverage disqualifies a site.
+The crosswalk apportions population within split blocks; it does not locate
+individual people. Small geometric excesses up to 0.1 percentage point are
+tolerated, while larger inconsistencies are rejected or flagged. Reference
+population is 2020, even though the boundary snapshot is 2024. Historical
+CoC boundary comparability remains a separate check before using outcomes.
+
 ## RecipeV2 Results Example
 
 `shelter-capacity-results.yaml` records the shelter-capacity results workflow

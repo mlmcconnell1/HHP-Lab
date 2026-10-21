@@ -238,11 +238,7 @@ def _check_dataset_year_values(
 
         years = pd.to_numeric(df[year_column], errors="coerce")
         missing_years = sorted(
-            {
-                task.year
-                for task in tasks
-                if not bool((years == task.year).any())
-            }
+            {task.year for task in tasks if not bool((years == task.year).any())}
         )
         if not missing_years:
             continue
@@ -1286,6 +1282,26 @@ def _check_msa_coc_coverage_artifacts(
     data_root = load_config(project_root=project_root).asset_store_root
 
     for target in recipe.targets:
+        if target.msa_coc_sites is not None:
+            for key in ("crosswalk_path", "msa_universe_path", "coc_names_path"):
+                path = project_root / getattr(target.msa_coc_sites, key)
+                if not path.is_file():
+                    findings.append(
+                        PreflightFinding(
+                            severity=Severity.ERROR,
+                            kind=FindingKind.MISSING_MSA_COC_COVERAGE_ARTIFACT,
+                            message=f"Site target '{target.id}' requires {key}: {path}",
+                            geometry="msa",
+                            remediation=Remediation(
+                                hint=(
+                                "Supply the pinned MSA universe, CoC boundaries "
+                                "and block-population "
+                                    "crosswalk. Generate the latter with hhplab generate msa-xwalk "
+                                    "--allocation-basis block_population using the recipe vintages."
+                                )
+                            ),
+                        )
+                    )
         spec = target.msa_coc_coverage
         if "msa_coc_coverage" not in target.outputs or spec is None:
             continue
@@ -1358,8 +1374,7 @@ def _check_msa_coc_coverage_artifacts(
                     severity=Severity.ERROR,
                     kind=FindingKind.MISSING_MSA_COC_COVERAGE_ARTIFACT,
                     message=(
-                        f"MSA-CoC coverage target '{target.id}' requires missing "
-                        f"{label}: {path}"
+                        f"MSA-CoC coverage target '{target.id}' requires missing {label}: {path}"
                     ),
                     geometry=geo_type,
                     remediation=Remediation(
@@ -1602,8 +1617,7 @@ def _check_primary_msa_artifacts(
                 "coc",
                 str(boundary_vintage),
                 None,
-                "hhplab ingest boundaries --source hud_exchange "
-                f"--vintage {boundary_vintage}",
+                f"hhplab ingest boundaries --source hud_exchange --vintage {boundary_vintage}",
                 (("coc_id", "geo_id"),),
             ),
             "county geometry artifact": (

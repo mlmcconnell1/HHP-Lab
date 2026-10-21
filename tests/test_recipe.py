@@ -3938,6 +3938,103 @@ class TestMsaCocCoverageSpec:
         assert provenance.extra["overlap_bases"] == ["area", "population"]
 
 
+class TestMsaCocSites:
+    """The site recipe must execute with no outcome datasets or pipeline tasks."""
+
+    def test_outcome_free_recipe_roundtrip(self, tmp_path, monkeypatch):
+        _make_project_root(tmp_path)
+        spec = {
+            "crosswalk_path": "crosswalk.parquet",
+            "msa_universe_path": "universe.parquet",
+            "coc_names_path": "names.parquet",
+            "coc_boundary_vintage": 2024,
+            "msa_definition_version": "census_msa_2023",
+            "county_vintage": 2023,
+            "block_vintage": 2020,
+            "decennial_vintage": 2020,
+            "thresholds": [0.90, 0.95, 0.99],
+        }
+        recipe = load_recipe(
+            {
+                "version": 1,
+                "name": "sites-test",
+                "universe": {"years": [2024]},
+                "targets": [
+                    {
+                        "id": "samples",
+                        "geometry": {"type": "msa"},
+                        "outputs": ["msa_coc_sites"],
+                        "msa_coc_sites": spec,
+                    }
+                ],
+                "datasets": {},
+                "pipelines": [{"id": "sites", "target": "samples", "steps": []}],
+            }
+        )
+        missing = run_preflight(recipe, tmp_path)
+        assert sum("Site target" in f.message for f in missing.findings) == 3
+        population = 100
+        pd.DataFrame(
+            [
+                {
+                    "msa_id": "11111",
+                    "coc_id": "XX-500",
+                    "intersection_population": population,
+                    "coc_population_denominator": population,
+                    "msa_population_denominator": population,
+                    "missing_population_block_count": 0,
+                    "allocation_method": "block_population",
+                    "boundary_vintage": "2024",
+                    "county_vintage": "2023",
+                    "block_vintage": "2020",
+                    "decennial_vintage": "2020",
+                    "definition_version": "census_msa_2023",
+                }
+            ]
+        ).to_parquet(tmp_path / spec["crosswalk_path"])
+        pd.DataFrame(
+            {
+                "metro_id": ["11111", "22222"],
+                "metro_name": ["Present", "Absent"],
+                "definition_version": ["census_msa_2023"] * 2,
+            }
+        ).to_parquet(tmp_path / spec["msa_universe_path"])
+        pd.DataFrame(
+            {"coc_id": ["XX-500"], "coc_name": ["Example CoC"], "boundary_vintage": ["2024"]}
+        ).to_parquet(tmp_path / spec["coc_names_path"])
+        monkeypatch.chdir(tmp_path)
+        results = execute_recipe(recipe, project_root=tmp_path, quiet=True)
+        assert results[0].success, results[0].steps
+        output = tmp_path / "outputs/sites-test/msa_coc_sites__samples.parquet"
+        sites = pd.read_parquet(output)
+        assert len(sites) == 2 * len(spec["thresholds"])
+        assert sites.eligible.sum() == len(spec["thresholds"])
+        assert set(sites.loc[~sites.eligible, "reason"]) == {"missing_crosswalk"}
+        assert read_provenance(output).extra["parameters"] == spec
+        summary = json.loads((output.parent / "msa_coc_summary__samples.json").read_text())
+        assert summary["samples"][0]["eligible_msa_population"] == population
+        assert output.with_suffix(".csv").exists()
+        manifest = read_manifest(output.with_suffix(".manifest.json"))
+        assert len(manifest.assets) >= 3
+
+    @pytest.mark.parametrize("thresholds", [[0.5], [1.1], [float("nan")], [0.95, 0.95], []])
+    def test_invalid_thresholds(self, thresholds):
+        from hhplab.recipe.recipe_schema import MsaCocSitesSpec
+
+        with pytest.raises(ValueError):
+            MsaCocSitesSpec(
+                crosswalk_path="x",
+                msa_universe_path="u",
+                coc_names_path="c",
+                coc_boundary_vintage=2024,
+                msa_definition_version="census_msa_2023",
+                county_vintage=2023,
+                block_vintage=2020,
+                decennial_vintage=2020,
+                thresholds=thresholds,
+            )
+
+
 class TestSmallAreaEstimateSchema:
     """Schema tests for explicit ACS1/ACS5 small-area estimation steps."""
 
@@ -4450,9 +4547,7 @@ class TestMaterialize:
             base_vintage=2025,
         )
 
-    def test_resolve_msa_coc_transform_uses_definition_county_vintage(
-        self, tmp_path: Path
-    ):
+    def test_resolve_msa_coc_transform_uses_definition_county_vintage(self, tmp_path: Path):
         from hhplab.artifacts.naming.naming import msa_coc_xwalk_path
         from hhplab.recipe.executor.transforms import _resolve_msa_transform_df
 
@@ -4476,9 +4571,7 @@ class TestMaterialize:
 
         pd.testing.assert_frame_equal(result, expected)
 
-    def test_resolve_msa_county_transform_bridges_ct_planning_regions(
-        self, tmp_path: Path
-    ):
+    def test_resolve_msa_county_transform_bridges_ct_planning_regions(self, tmp_path: Path):
         from hhplab.artifacts.naming.naming import county_path, msa_county_membership_path
         from hhplab.recipe.executor.transforms import _resolve_msa_transform_df
 
@@ -4516,9 +4609,7 @@ class TestMaterialize:
         assert result["county_fips"].tolist() == ["09003", "09007", "09110"]
         assert result["area_share"].tolist() == pytest.approx([1.0, 0.5, 1.0])
 
-    def test_materialize_msa_county_transform_refreshes_stale_ct_cache(
-        self, tmp_path: Path
-    ):
+    def test_materialize_msa_county_transform_refreshes_stale_ct_cache(self, tmp_path: Path):
         from hhplab.artifacts.naming.naming import county_path, msa_county_membership_path
         from hhplab.recipe.executor.transforms import (
             _generated_msa_transform_path,
@@ -4584,9 +4675,7 @@ class TestMaterialize:
         assert "09003" in set(refreshed["county_fips"])
         assert "09110" in set(refreshed["county_fips"])
 
-    def test_resolve_msa_tract_transform_bridges_ct_planning_regions(
-        self, tmp_path: Path
-    ):
+    def test_resolve_msa_tract_transform_bridges_ct_planning_regions(self, tmp_path: Path):
         from hhplab.artifacts.naming.naming import (
             county_path,
             msa_county_membership_path,
@@ -8933,9 +9022,7 @@ class TestRecipeInitCmd:
         assert pit_tasks[2].input_path.endswith("xB2024xC2023.parquet")
         pep_tasks = [task for task in plan.resample_tasks if task.dataset_id == "pep_msa"]
         assert [task.year for task in pep_tasks] == [2019, 2020, 2022, 2023]
-        assert pep_tasks[0].input_path.endswith(
-            msa_pep_filename(2019, "census_msa_2023", 2023)
-        )
+        assert pep_tasks[0].input_path.endswith(msa_pep_filename(2019, "census_msa_2023", 2023))
         assert tuple(plan.join_tasks[0].datasets) == ("pit_msa", "zori_msa", "pep_msa")
 
     def test_recipe_init_pep_msa_paths_use_naming_helper(
@@ -8973,8 +9060,7 @@ class TestRecipeInitCmd:
         recipe = load_recipe(output)
         path_template = recipe.datasets["pep_msa"].file_set.path_template
         assert path_template == (
-            "data/curated/pep/"
-            + msa_pep_filename("{year}", "census_msa_2023", 2020)
+            "data/curated/pep/" + msa_pep_filename("{year}", "census_msa_2023", 2020)
         )
 
     def test_recipe_init_longitudinal_msa_panel_executes_with_materialized_artifacts(
@@ -9035,9 +9121,7 @@ class TestRecipeInitCmd:
                 "msa_id": [msa for year in years for msa in ("35620", "41180")],
                 "year": [year for year in years for _ in range(2)],
                 "zori": [
-                    1000 + (year - 2019) * 100 + idx * 50
-                    for year in years
-                    for idx in range(2)
+                    1000 + (year - 2019) * 100 + idx * 50 for year in years for idx in range(2)
                 ],
                 "coverage_ratio": [0.95, 0.92] * len(years),
             }
@@ -9074,9 +9158,7 @@ class TestRecipeInitCmd:
         assert results[0].success
 
         artifacts = resolve_pipeline_artifacts(recipe, "longitudinal")
-        panel = pd.read_parquet(tmp_path / artifacts["panel_path"]).sort_values(
-            ["msa_id", "year"]
-        )
+        panel = pd.read_parquet(tmp_path / artifacts["panel_path"]).sort_values(["msa_id", "year"])
         ny_2019 = panel[(panel["msa_id"] == "35620") & (panel["year"] == 2019)].iloc[0]
         ny_2020 = panel[(panel["msa_id"] == "35620") & (panel["year"] == 2020)].iloc[0]
         ny_2022 = panel[(panel["msa_id"] == "35620") & (panel["year"] == 2022)].iloc[0]
