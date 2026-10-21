@@ -2,6 +2,8 @@
 
 Audit date: 2026-10-21. This memo addresses CT-503 in the frozen 99% MSA–CoC site universe. It separates the HUD boundary vintage from HUD's reporting code crosswalk and from the geography actually used for each January PIT and HIC count.
 
+**Study-owner decision, 2026-10-21:** Hold CT-503 out of the prospective longitudinal universe because the missing reporting-footprint evidence is likely difficult to obtain. The dependent Bridgeport–Stamford–Danbury MSA (14860), whose sole selected constituent is CT-503, is excluded in `recipes/msa-coc-longitudinal-sites.yaml`. The revised 99% universe contains 63 MSAs and 83 CoCs. This resolves CT's blocker through an explicit exclusion, not a finding of compatible boundaries. The original three compatibility records remain `unknown`, and old result bundles remain historical records. Reintroducing CT-503 would require resolving the evidence gap below.
+
 ## Finding
 
 The frozen B2024 GIS polygon has a material footprint difference from the 2020, 2022, and 2023 HUD polygons. The older polygons follow Fairfield County's municipal territory; B2024 follows the 2023 Census/Connecticut planning-region units Greater Bridgeport and Western Connecticut. The town-level overlay isolates **Shelton moving out** and **Bridgewater and New Milford moving in**. This is a real GIS-vintage change, not a shoreline or projection artifact. It does **not** establish that CT-503 changed its service or PIT/HIC reporting jurisdiction in 2024.

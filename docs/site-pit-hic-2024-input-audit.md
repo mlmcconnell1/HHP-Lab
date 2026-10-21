@@ -1,5 +1,7 @@
 # 2024 PIT and HIC CoC input audit
 
+**Prospective longitudinal universe:** On 2026-10-21 the study owner directed holding out CT-503. The rebuilt 99% universe excludes its dependent MSA 14860 (Bridgeport–Stamford–Danbury), leaving **63 sites and 83 CoCs**. All other selected membership pairs are unchanged. The original cross-sectional runs below retain their original samples and limitations.
+
 **Updated finding:** CT-503's January 2024 PIT/HIC reporting footprint has not been verified against the frozen boundary. The original same-year compatibility conclusion is superseded for that CoC; existing results remain reproducible but are not fully geography-validated. See [the CT-503 reconciliation](ct503-historical-reconciliation.md) and follow-up bead `coclab-k34yp`.
 
 Audit date: 2026-10-21. This note supports a cross-sectional comparison of 2024 PIT and HIC measures over the frozen MSA–CoC memberships in `HHP-Output/msa_coc_overlap_sites_2024`. It documents the source-year geography match used for the evidence records. It does not claim that the local boundary file is an archived snapshot of the exact geometry in place on a particular day in 2024.
@@ -120,3 +122,13 @@ Archive provenance now records the actual successful national, legacy, or per-st
 The corrected CT-503 evidence passes static/readiness checks with an explicit unknown-boundary warning; `ready` is not a scientific compatibility approval. Current aggregation leaves that member's site outcome incomplete, and the evidence fingerprint differs from the original locks. No new result runs or automatic site exclusions were made after this correction.
 
 The complete 2023 pairwise polygon overlay is retained in `~/HHP-Output/site-boundary-history-audit/archives-boundaries-2023-full-overlay.json`. It covers all 84 selected CoCs in EPSG:6933, with source hashes and exact symmetric-difference measurements. Outside MA-505 and CT-503, the largest symmetric-difference/union ratios are TX-603 (0.016159%), HI-501 (0.012320%), and CA-613 (0.001620%). These improve on net-area screening, which can hide offsetting additions and removals; they are not automatic approvals of geography or count scope.
+
+## Owner-directed CT-503 holdout
+
+The prospective recipe is `recipes/msa-coc-longitudinal-sites.yaml`, with artifact ID `longitudinal_sites` and threshold 0.99. It uses the unchanged crosswalk, CoC names, vintages, and overlap rules, with MSA 14860 removed from the candidate MSA input before site production. This removes its entire site rather than computing a partial count or redefining its CoC coverage. No outcomes informed the exclusion.
+
+The filtered MSA input and its embedded exclusion provenance are at `~/HHP-Output/msa_coc_longitudinal_sites_inputs/metro_universe__census_msa_2023__exclude_CT503.parquet`; `exclusion-policy.json` in that directory records the source, hashes, and reason. The source universe has 393 rows and SHA-256 `5e72e881627d19f447c73766808b3d0631d84b7faeb606e9e9ea7211f38932ff`. The filtered input retains every row whose `metro_id` is not `14860`, producing 392 candidates and SHA-256 `8ca4dacbd9cbf2832de324549279d4b34af9354718621b1a5e1ac764e2fcccc8`. Both IDs and the exclusion rationale are independent of PIT/HIC values.
+
+Package preflight and build completed with no findings. The validated paired site/membership artifacts are under `~/HHP-Output/msa_coc_longitudinal_sites/`. Membership identity is `sha256:0ed7d40f8d75d761862ab3b8c1b8bc9f43853eebbecf3ce666c77942152f5a54`. `ct503-holdout-verification.json` records resolver output and verifies that the only removed selected pair is `(14860, CT-503)`, leaving 63 eligible MSAs and 83 CoCs. Curated-layout checks passed before and after the build.
+
+Future longitudinal recipes must use this new artifact and membership identity, with newly bound boundary evidence and locks. Existing 90/95/99 exploratory universes and six cross-sectional bundles are preserved. The holdout removes CT-503 as a study blocker; remaining historical geography checks still apply, and 2021 remains excluded from longitudinal outcomes.
