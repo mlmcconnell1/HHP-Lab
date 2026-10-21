@@ -267,6 +267,97 @@ def _outcome_panel() -> pd.DataFrame:
     return frame
 
 
+def test_predecessor_counts_replay_with_panel_specific_operations(tmp_path: Path) -> None:
+    """CO-1 PIT is preaggregated; HIC needs CO-1 + CO-2, even on replay."""
+    input_root = tmp_path / "site-inputs"
+    sites_path, memberships_path, _ = _write_site_artifact(input_root)
+    resolution = resolve_site_universe_files(
+        artifact_id=ARTIFACT_ID,
+        threshold=0.95,
+        sites_path=sites_path,
+        memberships_path=memberships_path,
+    )
+    evidence_path = _write_evidence(
+        input_root, threshold=0.95, membership_identity=resolution.membership_identity
+    )
+    evidence = json.loads(evidence_path.read_text())
+    records = []
+    for panel in ("pit_counts", "hic_counts"):
+        for original in evidence["records"]:
+            coc_id = original["frozen_coc_id"]
+            record = {
+                **original,
+                "source_panel": panel,
+                "source_coc_ids": [coc_id],
+                "count_operation": "single",
+                "geometry_status": "compatible",
+            }
+            if coc_id == "CO-1":
+                record.update(
+                    status="reconciled",
+                    count_operation="preaggregated" if panel == "pit_counts" else "sum",
+                    count_evidence_ref=f"audit://synthetic/{panel}/predecessor-counts",
+                    approval_ref="review://synthetic/predecessor-union",
+                    reconciliation_basis="administrative_predecessor_union",
+                    geometry_status="different_unresolved",
+                    geometry_evidence_ref="audit://synthetic/perimeter-difference",
+                    geometry_residual="Synthetic perimeter residual retained explicitly.",
+                )
+                if panel == "pit_counts":
+                    record["preaggregated_source_coc_ids"] = ["CO-1", "CO-2"]
+                else:
+                    record["source_coc_ids"] = ["CO-1", "CO-2"]
+            records.append(record)
+    evidence.update(schema_version="coc_boundary_compatibility/2", records=records)
+    evidence_path.write_text(json.dumps(evidence))
+
+    data = _recipe_data(threshold=0.95, recipe_id="predecessor-replay")
+    original_panel = data["panels"].pop("coc_outcomes")
+    data["panels"].update(pit_counts=original_panel, hic_counts=dict(original_panel))
+    data["pipelines"].append({"id": "build_hic_counts", "target": "coc-outcomes", "steps": []})
+    data["panels"]["hic_counts"]["ref"] = {"pipeline": "build_hic_counts", "output": "panel"}
+    outcomes = data["panels"]["site_year"]["site_year"]["outcomes"]
+    outcomes["pit"]["panel"] = "pit_counts"
+    outcomes["hic"]["panel"] = "hic_counts"
+    data["results"]["include_panels"] = ["pit_counts", "hic_counts", "site_year"]
+    recipe_path = tmp_path / "predecessor-replay.yaml"
+    recipe_bytes = yaml.safe_dump(data).encode()
+    recipe_path.write_bytes(recipe_bytes)
+    recipe = load_recipe(recipe_path)
+    plan = plan_results(recipe, original_recipe_bytes=recipe_bytes)
+    outputs_root = tmp_path / "outputs"
+    RunLedger(outputs_root).create_lock(
+        recipe_id=recipe.id,
+        recipe_sha256=hashlib.sha256(recipe_bytes).hexdigest(),
+        components=plan.component_hashes,
+        spec_hash=plan.plan_sha256,
+    )
+    run = run_results(
+        recipe,
+        original_recipe_bytes=recipe_bytes,
+        outputs_root=outputs_root,
+        panel_frames={"pit_counts": _outcome_panel(), "hic_counts": _outcome_panel()},
+        private=True,
+    )
+    assert run["lock_status"]["status"] == "matched"
+    assert run["statuses"]["execution_status"] == "complete"
+    bundle = Path(run["bundle_path"])
+    panel = pd.read_parquet(bundle / "panels/site_year.parquet").set_index(["msa_id", "year"])
+    source = _outcome_panel().set_index(["coc_id", "year"])
+    assert panel.loc[("MSA-A", 2020), "pit_sheltered"] == source.loc[
+        ("CO-1", 2020), "pit_sheltered"
+    ]
+    assert panel.loc[("MSA-A", 2020), "hic_total_beds"] == (
+        source.loc[("CO-1", 2020), "hic_total_beds"]
+        + source.loc[("CO-2", 2020), "hic_total_beds"]
+    )
+    input_root.rename(tmp_path / "unavailable-site-inputs")
+    replay = verify_bundle(bundle)
+    assert replay.integrity == "pass"
+    assert replay.reproducibility == "pass", replay.to_dict()
+    assert replay.differences == ()
+
+
 def test_site_year_bundle_replays_from_bundled_inputs_and_rejects_tampering(
     tmp_path: Path,
 ) -> None:

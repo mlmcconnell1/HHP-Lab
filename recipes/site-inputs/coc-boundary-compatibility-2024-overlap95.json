@@ -382,9 +382,9 @@
       "year": 2024,
       "frozen_boundary_vintage": "2024",
       "source_boundary_vintage": "2024",
-      "status": "compatible",
-      "reason": "Same-year FY2024 CoC correspondence: official HUD catalog identifies the snapshot service as FY2024 coverage; HUD PIT and HIC 2024 sheets identify this CoC. See audit for source hashes and snapshot-date limitation. No historical remapping or allocation.",
-      "evidence_ref": "docs/site-pit-hic-2024-input-audit.md"
+      "status": "unknown",
+      "reason": "CT-503's January 23, 2024 PIT is reported as Opening Doors Fairfield County, but no dated CoC/HMIS crosswalk pins PIT and HIC reporting to the frozen B2024 footprint. The pre-count Fairfield County CAN list includes Bridgewater and New Milford, assigns Shelton elsewhere, and also includes Roxbury outside B2024's planning-region geometry. B2024 is a live 2026 capture attributed to FY2024, not a January 2024 snapshot. Do not treat the town changes as proof of an operational boundary change or exact count-footprint match.",
+      "evidence_ref": "docs/ct503-historical-reconciliation.md"
     },
     {
       "source_panel": "coc_outcomes",

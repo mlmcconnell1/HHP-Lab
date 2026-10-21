@@ -1,0 +1,321 @@
+{
+  "scope": "coclab-7c0nt predecessor count reconciliation and coclab-fvu4y archive provenance",
+  "pin": {
+    "status": "pinned",
+    "pin_id": "intent-pin:0ba0bb3fa360b86c4e0069d03213022c229a0cd985dc3230f7270c36074bef4f",
+    "object_id": "intent-object:b0a21a5a5be7f33645a7aedc7c124fa7901605a864f6378cdfc446b345c8a5cf",
+    "view_witness": "sha256:8b067bc56464807ece8808ce8005b246e10e888dd3a2fb344d978f2c770dc202",
+    "pinned": true
+  },
+  "source_witness": "sha256:a2bbee35c5a904d0f132e8fbb78b13372fd9141a601f12d33166c6c8f0bc19cd",
+  "view_witness": "sha256:8b067bc56464807ece8808ce8005b246e10e888dd3a2fb344d978f2c770dc202",
+  "correspondence_count": 48,
+  "all_matched_exact": true,
+  "has_more": false,
+  "structure_findings": [],
+  "view_conflicts": 0,
+  "checked_correspondences": [
+    {
+      "id": "intent:results-v2:analysis",
+      "revision": "revision:results-v2:analysis:2",
+      "path": "hhplab/analysis",
+      "finding": "matched"
+    },
+    {
+      "id": "intent:results-v2:analysis_contracts",
+      "revision": "revision:results-v2:analysis_contracts:1",
+      "path": "hhplab/analysis/contracts.py",
+      "finding": "matched"
+    },
+    {
+      "id": "intent:results-v2:analysis_dispatch",
+      "revision": "revision:results-v2:analysis_dispatch:3",
+      "path": "hhplab/recipe/executor/analyses.py",
+      "finding": "matched"
+    },
+    {
+      "id": "intent:results-v2:bands",
+      "revision": "revision:results-v2:bands:1",
+      "path": "hhplab/results/bands.py",
+      "finding": "matched"
+    },
+    {
+      "id": "intent:results-v2:build_cmds",
+      "revision": "revision:results-v2:build_cmds:2",
+      "path": "hhplab/cli/build_cmds",
+      "finding": "matched"
+    },
+    {
+      "id": "intent:results-v2:bundle",
+      "revision": "revision:results-v2:bundle:4",
+      "path": "hhplab/results/bundle.py",
+      "finding": "matched"
+    },
+    {
+      "id": "intent:results-v2:cli",
+      "revision": "revision:results-v2:cli:2",
+      "path": "hhplab/cli",
+      "finding": "matched"
+    },
+    {
+      "id": "intent:results-v2:cli_commands",
+      "revision": "revision:results-v2:cli_commands:1",
+      "path": "hhplab/cli/commands.py",
+      "finding": "matched"
+    },
+    {
+      "id": "intent:results-v2:cli_recipe",
+      "revision": "revision:results-v2:cli_recipe:3",
+      "path": "hhplab/cli/build_cmds/recipe.py",
+      "finding": "matched"
+    },
+    {
+      "id": "intent:results-v2:cli_results",
+      "revision": "revision:results-v2:cli_results:1",
+      "path": "hhplab/cli/results.py",
+      "finding": "matched"
+    },
+    {
+      "id": "intent:results-v2:correlation",
+      "revision": "revision:results-v2:correlation:1",
+      "path": "hhplab/analysis/correlation.py",
+      "finding": "matched"
+    },
+    {
+      "id": "intent:results-v2:covariate_catalog",
+      "revision": "revision:results-v2:covariate_catalog:1",
+      "path": "hhplab/covariates/catalog.py",
+      "finding": "matched"
+    },
+    {
+      "id": "intent:results-v2:covariates",
+      "revision": "revision:results-v2:covariates:2",
+      "path": "hhplab/covariates",
+      "finding": "matched"
+    },
+    {
+      "id": "intent:results-v2:derive",
+      "revision": "revision:results-v2:derive:1",
+      "path": "hhplab/recipe/derive.py",
+      "finding": "matched"
+    },
+    {
+      "id": "intent:results-v2:diagnostics",
+      "revision": "revision:results-v2:diagnostics:1",
+      "path": "hhplab/results/diagnostics.py",
+      "finding": "matched"
+    },
+    {
+      "id": "intent:results-v2:estimation",
+      "revision": "revision:results-v2:estimation:1",
+      "path": "hhplab/analysis/estimation.py",
+      "finding": "matched"
+    },
+    {
+      "id": "intent:results-v2:executor",
+      "revision": "revision:results-v2:executor:2",
+      "path": "hhplab/recipe/executor",
+      "finding": "matched"
+    },
+    {
+      "id": "intent:results-v2:hhplab",
+      "revision": "revision:results-v2:hhplab:2",
+      "path": "hhplab",
+      "finding": "matched"
+    },
+    {
+      "id": "intent:results-v2:inspection",
+      "revision": "revision:results-v2:inspection:1",
+      "path": "hhplab/analysis/inspection.py",
+      "finding": "matched"
+    },
+    {
+      "id": "intent:results-v2:ledger",
+      "revision": "revision:results-v2:ledger:1",
+      "path": "hhplab/storage/run_ledger.py",
+      "finding": "matched"
+    },
+    {
+      "id": "intent:results-v2:lineage",
+      "revision": "revision:results-v2:lineage:1",
+      "path": "hhplab/results/lineage.py",
+      "finding": "matched"
+    },
+    {
+      "id": "intent:results-v2:loader",
+      "revision": "revision:results-v2:loader:3",
+      "path": "hhplab/recipe/loader.py",
+      "finding": "matched"
+    },
+    {
+      "id": "intent:results-v2:model",
+      "revision": "revision:results-v2:model:1",
+      "path": "hhplab/analysis/model.py",
+      "finding": "matched"
+    },
+    {
+      "id": "intent:results-v2:readiness",
+      "revision": "revision:results-v2:readiness:1",
+      "path": "hhplab/analysis/readiness.py",
+      "finding": "matched"
+    },
+    {
+      "id": "intent:results-v2:recipe",
+      "revision": "revision:results-v2:recipe:2",
+      "path": "hhplab/recipe",
+      "finding": "matched"
+    },
+    {
+      "id": "intent:results-v2:recipe_findings",
+      "revision": "revision:results-v2:recipe_findings:1",
+      "path": "hhplab/results/recipe_findings.py",
+      "finding": "matched"
+    },
+    {
+      "id": "intent:results-v2:redistribution_contracts",
+      "revision": "revision:results-v2:redistribution_contracts:1",
+      "path": "hhplab/schema/redistribution.py",
+      "finding": "matched"
+    },
+    {
+      "id": "intent:results-v2:registry",
+      "revision": "revision:results-v2:registry:2",
+      "path": "hhplab/registry",
+      "finding": "matched"
+    },
+    {
+      "id": "intent:results-v2:regression",
+      "revision": "revision:results-v2:regression:1",
+      "path": "hhplab/analysis/regression.py",
+      "finding": "matched"
+    },
+    {
+      "id": "intent:results-v2:report",
+      "revision": "revision:results-v2:report:1",
+      "path": "hhplab/results/report.py",
+      "finding": "matched"
+    },
+    {
+      "id": "intent:results-v2:result_contracts",
+      "revision": "revision:results-v2:result_contracts:1",
+      "path": "hhplab/schema/results.py",
+      "finding": "matched"
+    },
+    {
+      "id": "intent:results-v2:result_planner",
+      "revision": "revision:results-v2:result_planner:4",
+      "path": "hhplab/recipe/results_plan.py",
+      "finding": "matched"
+    },
+    {
+      "id": "intent:results-v2:results",
+      "revision": "revision:results-v2:results:2",
+      "path": "hhplab/results",
+      "finding": "matched"
+    },
+    {
+      "id": "intent:results-v2:results_runner",
+      "revision": "revision:results-v2:results_runner:1",
+      "path": "hhplab/results/runner.py",
+      "finding": "matched"
+    },
+    {
+      "id": "intent:results-v2:samples",
+      "revision": "revision:results-v2:samples:1",
+      "path": "hhplab/analysis/sample.py",
+      "finding": "matched"
+    },
+    {
+      "id": "intent:results-v2:schema",
+      "revision": "revision:results-v2:schema:2",
+      "path": "hhplab/schema",
+      "finding": "matched"
+    },
+    {
+      "id": "intent:results-v2:source_coverage",
+      "revision": "revision:results-v2:source_coverage:1",
+      "path": "hhplab/sources/coverage.py",
+      "finding": "matched"
+    },
+    {
+      "id": "intent:results-v2:source_registry",
+      "revision": "revision:results-v2:source_registry:1",
+      "path": "hhplab/registry/source_registry.py",
+      "finding": "matched"
+    },
+    {
+      "id": "intent:results-v2:sources",
+      "revision": "revision:results-v2:sources:2",
+      "path": "hhplab/sources",
+      "finding": "matched"
+    },
+    {
+      "id": "intent:results-v2:stats",
+      "revision": "revision:results-v2:stats:1",
+      "path": "hhplab/analysis/stats.py",
+      "finding": "matched"
+    },
+    {
+      "id": "intent:results-v2:storage",
+      "revision": "revision:results-v2:storage:4",
+      "path": "hhplab/storage",
+      "finding": "matched"
+    },
+    {
+      "id": "intent:results-v2:v2_schema",
+      "revision": "revision:results-v2:v2_schema:3",
+      "path": "hhplab/recipe/schema_results.py",
+      "finding": "matched"
+    },
+    {
+      "id": "intent:results-v2:verify",
+      "revision": "revision:results-v2:verify:4",
+      "path": "hhplab/results/verify.py",
+      "finding": "matched"
+    },
+    {
+      "id": "intent:site-universe:coc_boundary_compatibility",
+      "revision": "revision:site-universe:coc_boundary_compatibility:3",
+      "path": "hhplab/geographies/coc/coc_validate.py",
+      "finding": "matched"
+    },
+    {
+      "id": "intent:site-universe:input_resolver",
+      "revision": "revision:site-universe:input_resolver:3",
+      "path": "hhplab/recipe/executor/inputs.py",
+      "finding": "matched"
+    },
+    {
+      "id": "intent:site-universe:recipe_output_root_schema",
+      "revision": "revision:site-universe:recipe_output_root_schema:1",
+      "path": "hhplab/recipe/recipe_schema.py",
+      "finding": "matched"
+    },
+    {
+      "id": "intent:site-universe:site_year_aggregation",
+      "revision": "revision:site-universe:site_year_aggregation:4",
+      "path": "hhplab/recipe/executor/msa_coc_panel.py",
+      "finding": "matched"
+    },
+    {
+      "id": "intent:site-universe:storage_config",
+      "revision": "revision:site-universe:storage_config:2",
+      "path": "hhplab/storage/config.py",
+      "finding": "matched"
+    }
+  ],
+  "validation": {
+    "hud_related_tests": 200,
+    "site_tests_including_locked_offline_replay": 62,
+    "architecture_tests": 420,
+    "ruff": "pass",
+    "compileall": "pass",
+    "intent_validate": "48 valid records"
+  },
+  "review": "Reviewed declared dependencies, domain/application ownership, explicit panel/year count operations, predecessor non-overlap, all-or-none count completeness, v1 replay and embedded archive provenance. No new production modules or layer exceptions. Same-identity intent revisions retain prior pin receipts.",
+  "research_limits": [
+    "CT503 count footprint unresolved; current compatibility records superseded unknown.",
+    "Providence administrative count rule reviewed; 2020/2022 polygon residuals remain under coclab-k0hwb.",
+    "Full64site longitudinal analysis not approved; broader Phase1 scientific input and release gates remain open."
+  ]
+}

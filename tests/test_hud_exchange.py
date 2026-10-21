@@ -1,5 +1,6 @@
 """Tests for HUD Exchange GIS Tools ingester."""
 
+import hashlib
 import re
 import tempfile
 import zipfile
@@ -13,9 +14,11 @@ from shapely.geometry import Polygon
 from hhplab.geographies.boundaries.hud.exchange_gis import (
     _HUD_STATE_ABBREVIATIONS,
     COC_ID_FIELDS,
+    _ArchiveSource,
     _download_per_state_shapefiles,
     _extract_state_from_coc_id,
     _find_field,
+    _HudExchangeDownload,
     _should_use_arcgis_source,
     download_hud_exchange_gdb,
     fetch_from_arcgis,
@@ -198,8 +201,34 @@ class TestDownloadHudExchangeGdb:
             result = download_hud_exchange_gdb(
                 boundary_vintage="2020",
                 output_dir=output_dir,
+                return_provenance=True,
             )
-            assert result.exists()
+            assert result.path.exists()
+            assert "National_Boundary_2020.zip" in result.source_url
+            assert result.archive_sources[0].raw_sha256 == hashlib.sha256(zip_content).hexdigest()
+
+    def test_download_ignores_stale_shapefile_in_reused_output_directory(
+        self, httpx_mock, tmp_path
+    ):
+        output_dir = tmp_path / "raw"
+        stale_shp = _create_test_shapefile(output_dir)
+        stale_gdf = gpd.read_file(stale_shp)
+        stale_gdf["COCNUM"] = ["ZZ-999", "ZZ-998"]
+        stale_gdf.to_file(stale_shp)
+        httpx_mock.add_response(
+            url=re.compile(r".*National_Boundary.*"),
+            content=_create_test_shapefile_zip(),
+        )
+
+        download = download_hud_exchange_gdb(
+            boundary_vintage="2020",
+            output_dir=output_dir,
+            return_provenance=True,
+        )
+
+        assert download.path != stale_shp
+        assert download.path.is_relative_to(output_dir)
+        assert read_coc_boundaries(download.path)["COCNUM"].tolist() == ["CO-500", "CO-503"]
 
     def test_fallback_chain_national_fails_legacy_succeeds(self, httpx_mock):
         """National URL 404 → legacy URL succeeds."""
@@ -220,8 +249,11 @@ class TestDownloadHudExchangeGdb:
             result = download_hud_exchange_gdb(
                 boundary_vintage="2020",
                 output_dir=output_dir,
+                return_provenance=True,
             )
-            assert result.exists()
+            assert result.path.exists()
+            assert result.source_url.endswith("CoC_GIS_NatlTerrDC_Shapefile_2020.zip")
+            assert result.archive_sources[0].raw_sha256 == hashlib.sha256(zip_content).hexdigest()
 
     def test_all_downloads_fail_raises_runtime_error(self, httpx_mock, monkeypatch):
         """All URLs fail → RuntimeError with helpful message."""
@@ -347,6 +379,13 @@ class TestIngestHudExchange:
             assert "ingested_at" in gdf.columns
             assert "geom_hash" in gdf.columns
             assert "geometry" in gdf.columns
+            assert gdf["source_ref"].str.startswith("file://").all()
+
+            from hhplab.storage.provenance import read_provenance
+
+            provenance = read_provenance(result)
+            assert provenance.extra["source_type"] == "local_boundary_input"
+            assert provenance.extra["local_path"] == str((raw_dir / "test_coc.shp").resolve())
 
             # Verify canonical values
             assert all(gdf["source"] == "hud_exchange")
@@ -529,10 +568,16 @@ class TestIngestHudExchange:
         def fail_arcgis(*args, **kwargs):
             raise AssertionError("historical ingest should not call ArcGIS by default")
 
-        def fake_download(boundary_vintage, output_dir, url=None):
+        def fake_download(boundary_vintage, output_dir, url=None, return_provenance=False):
+            assert return_provenance
             observed["boundary_vintage"] = boundary_vintage
             observed["url"] = url
-            return _create_test_shapefile(output_dir)
+            data_path = _create_test_shapefile(output_dir)
+            source_url = f"https://example.com/actual-{boundary_vintage}.zip"
+            return _HudExchangeDownload(
+                data_path,
+                (_ArchiveSource(source_url, "a" * 64, 123),),
+            )
 
         def capture_check_source_changed(**kwargs):
             observed["source_url"] = kwargs["source_url"]
@@ -551,7 +596,62 @@ class TestIngestHudExchange:
         assert result.exists()
         assert observed["boundary_vintage"] == boundary_vintage
         assert observed["url"] is None
-        assert f"National_Boundary_{boundary_vintage}" in str(observed["source_url"])
+        assert observed["source_url"] == f"https://example.com/actual-{boundary_vintage}.zip"
+
+    def test_ingest_registers_per_state_archive_provenance(self, tmp_path, monkeypatch):
+        import hhplab.geographies.boundaries.hud.exchange_gis as mod
+
+        raw_dir = tmp_path / "raw"
+        curated_dir = tmp_path / "curated"
+        data_path = _create_test_shapefile(tmp_path / "downloaded")
+        archive_sources = (
+            _ArchiveSource("https://example.com/CO.zip", "a" * 64, 123),
+            _ArchiveSource("https://example.com/NY.zip", "b" * 64, 456),
+        )
+        observed: dict[str, object] = {}
+
+        monkeypatch.setattr(
+            mod,
+            "download_hud_exchange_gdb",
+            lambda **kwargs: _HudExchangeDownload(data_path, archive_sources),
+        )
+        monkeypatch.setattr(
+            mod,
+            "register_source",
+            lambda **kwargs: observed.update(kwargs),
+        )
+
+        result = ingest_hud_exchange(
+            boundary_vintage="2024",
+            raw_dir=raw_dir,
+            curated_dir=curated_dir,
+        )
+
+        expected_source_url = '["https://example.com/CO.zip","https://example.com/NY.zip"]'
+        combined_digests = bytes.fromhex("a" * 64) + bytes.fromhex("b" * 64)
+        expected_hash = hashlib.sha256(combined_digests).hexdigest()
+        saved = gpd.read_parquet(result)
+        assert set(saved["source_ref"]) == {expected_source_url}
+        assert observed["source_url"] == expected_source_url
+        assert observed["raw_sha256"] == expected_hash
+        assert observed["file_size"] == 579
+        assert observed["metadata"]["archive_sources"] == [
+            {
+                "source_url": source.url,
+                "raw_sha256": source.raw_sha256,
+                "file_size": source.file_size,
+            }
+            for source in archive_sources
+        ]
+
+        from hhplab.storage.provenance import read_provenance
+
+        provenance = read_provenance(result)
+        assert provenance.extra["archive_sources"] == observed["metadata"]["archive_sources"]
+        assert provenance.extra["raw_sha256"] == expected_hash
+        assert provenance.extra["raw_sha256_algorithm"] == (
+            "SHA-256 of concatenated binary component ZIP SHA-256 digests in download order"
+        )
 
     def test_numeric_archive_failure_does_not_fall_back_to_arcgis(self, tmp_path, monkeypatch):
         import hhplab.geographies.boundaries.hud.exchange_gis as mod
@@ -586,7 +686,7 @@ class TestPerStateFallbackCompleteness:
             state = sub_dir.name
             if state in succeed_states:
                 shp_path = _create_test_shapefile(sub_dir)
-                return shp_path
+                return shp_path, _ArchiveSource(url, "a" * 64, 123)
             return None
 
         monkeypatch.setattr(
@@ -602,7 +702,7 @@ class TestPerStateFallbackCompleteness:
 
         def fake_download_and_extract(url, sub_dir, filename):
             shp_path = _create_test_shapefile(sub_dir)
-            return shp_path
+            return shp_path, _ArchiveSource(url, "a" * 64, 123)
 
         monkeypatch.setattr(
             "hhplab.geographies.boundaries.hud.exchange_gis._download_and_extract_zip",
@@ -611,7 +711,8 @@ class TestPerStateFallbackCompleteness:
 
         result = _download_per_state_shapefiles("2020", tmp_path)
         assert result is not None
-        assert result.exists()
+        assert result.path.exists()
+        assert len(result.archive_sources) == len(_HUD_STATE_ABBREVIATIONS)
 
 
 # Helper functions for creating test data

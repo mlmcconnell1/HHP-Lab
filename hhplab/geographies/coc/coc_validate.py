@@ -131,9 +131,16 @@ REQUIRED_COLUMNS = {
 MIN_AREA_SQ_DEG = 1e-6
 
 
-COC_BOUNDARY_COMPATIBILITY_SCHEMA = "coc_boundary_compatibility/1"
+COC_BOUNDARY_COMPATIBILITY_SCHEMA = "coc_boundary_compatibility/2"
+_COC_BOUNDARY_COMPATIBILITY_SCHEMAS = frozenset(
+    {"coc_boundary_compatibility/1", COC_BOUNDARY_COMPATIBILITY_SCHEMA}
+)
 COC_BOUNDARY_COMPATIBILITY_STATUSES = frozenset(
-    {"compatible", "mapped", "incompatible", "unknown"}
+    {"compatible", "mapped", "reconciled", "incompatible", "unknown"}
+)
+_COUNT_OPERATIONS = frozenset({"single", "preaggregated", "sum"})
+_GEOMETRY_STATUSES = frozenset(
+    {"compatible", "near_equivalent", "different_unresolved", "unknown"}
 )
 
 
@@ -160,12 +167,21 @@ class BoundaryCompatibilityRecord:
     reason: str
     evidence_ref: str | None = None
     approval_ref: str | None = None
+    source_coc_ids: tuple[str, ...] = ()
+    count_operation: str | None = None
+    count_evidence_ref: str | None = None
+    reconciliation_basis: str | None = None
+    preaggregated_source_coc_ids: tuple[str, ...] = ()
+    geometry_status: str | None = None
+    geometry_evidence_ref: str | None = None
+    geometry_residual: str | None = None
 
 
 @dataclass(frozen=True)
 class BoundaryCompatibilityValidation:
     """Validated compatibility rows and a fingerprint of their source artifact."""
 
+    schema_version: str
     evidence_id: str
     artifact_id: str
     threshold: float
@@ -205,8 +221,22 @@ _COMPATIBILITY_RECORD_REQUIRED_FIELDS = frozenset(
         "reason",
     }
 )
-_COMPATIBILITY_RECORD_OPTIONAL_FIELDS = frozenset(
+_COMPATIBILITY_V1_RECORD_OPTIONAL_FIELDS = frozenset(
     {"evidence_ref", "source_coc_id", "approval_ref"}
+)
+_COMPATIBILITY_V2_RECORD_OPTIONAL_FIELDS = frozenset(
+    {
+        "evidence_ref",
+        "approval_ref",
+        "count_evidence_ref",
+        "reconciliation_basis",
+        "preaggregated_source_coc_ids",
+        "geometry_evidence_ref",
+        "geometry_residual",
+    }
+)
+_COMPATIBILITY_V2_RECORD_REQUIRED_FIELDS = frozenset(
+    {"source_coc_ids", "count_operation", "geometry_status"}
 )
 
 
@@ -233,12 +263,17 @@ def validate_coc_boundary_compatibility(
         label="Boundary compatibility header",
         code="invalid_header",
     )
-    if payload.get("schema_version") != COC_BOUNDARY_COMPATIBILITY_SCHEMA:
+    schema_version = payload.get("schema_version")
+    if (
+        not isinstance(schema_version, str)
+        or schema_version not in _COC_BOUNDARY_COMPATIBILITY_SCHEMAS
+    ):
         raise BoundaryCompatibilityError(
             "unknown_schema",
             "Unsupported CoC boundary evidence schema; expected "
-            f"'{COC_BOUNDARY_COMPATIBILITY_SCHEMA}'.",
+            f"one of {sorted(_COC_BOUNDARY_COMPATIBILITY_SCHEMAS)}.",
         )
+    is_v2 = schema_version == COC_BOUNDARY_COMPATIBILITY_SCHEMA
 
     evidence_id = _required_text(payload.get("evidence_id"), "evidence_id")
     declared_artifact_id = _required_text(payload.get("artifact_id"), "artifact_id")
@@ -332,11 +367,20 @@ def validate_coc_boundary_compatibility(
             )
         _require_allowed_fields(
             raw,
-            _COMPATIBILITY_RECORD_REQUIRED_FIELDS,
-            _COMPATIBILITY_RECORD_OPTIONAL_FIELDS,
+            _COMPATIBILITY_RECORD_REQUIRED_FIELDS
+            | (_COMPATIBILITY_V2_RECORD_REQUIRED_FIELDS if is_v2 else frozenset()),
+            _COMPATIBILITY_V2_RECORD_OPTIONAL_FIELDS
+            if is_v2
+            else _COMPATIBILITY_V1_RECORD_OPTIONAL_FIELDS,
             label=f"Boundary evidence record {row_number}",
             code="invalid_record_fields",
         )
+        if is_v2 and "source_coc_id" in raw:
+            raise BoundaryCompatibilityError(
+                "invalid_record_fields",
+                f"Boundary evidence record {row_number} uses v1 source_coc_id; "
+                "use the v2 source_coc_ids list.",
+            )
         panel_id = _required_text(raw.get("source_panel"), "source_panel")
         coc_id = _required_text(raw.get("frozen_coc_id"), "frozen_coc_id")
         year = _required_year(raw.get("year"), "year")
@@ -390,6 +434,151 @@ def validate_coc_boundary_compatibility(
         evidence_ref = _optional_text(raw.get("evidence_ref"), "evidence_ref")
         source_coc_id = _optional_text(raw.get("source_coc_id"), "source_coc_id")
         approval_ref = _optional_text(raw.get("approval_ref"), "approval_ref")
+        source_coc_ids: tuple[str, ...] = ()
+        count_operation: str | None = None
+        count_evidence_ref: str | None = None
+        reconciliation_basis: str | None = None
+        preaggregated_source_coc_ids: tuple[str, ...] = ()
+        geometry_status: str | None = None
+        geometry_evidence_ref: str | None = None
+        geometry_residual: str | None = None
+
+        if is_v2:
+            source_coc_ids = _required_text_list(raw.get("source_coc_ids"), "source_coc_ids")
+            if len(set(source_coc_ids)) != len(source_coc_ids):
+                raise BoundaryCompatibilityError(
+                    "duplicate_source_id",
+                    f"Boundary evidence record for CoC '{coc_id}' repeats a source CoC ID.",
+                )
+            if status == "mapped" and len(source_coc_ids) == 1:
+                source_coc_id = source_coc_ids[0]
+            raw_operation = raw.get("count_operation")
+            if raw_operation is not None and not isinstance(raw_operation, str):
+                raise BoundaryCompatibilityError(
+                    "invalid_count_operation", "count_operation must be text or null."
+                )
+            count_operation = raw_operation.strip() if isinstance(raw_operation, str) else None
+            if count_operation == "":
+                count_operation = None
+            geometry_status = _required_text(raw.get("geometry_status"), "geometry_status")
+            if geometry_status not in _GEOMETRY_STATUSES:
+                raise BoundaryCompatibilityError(
+                    "invalid_geometry_status",
+                    f"Geometry status '{geometry_status}' is unsupported; expected one of "
+                    f"{sorted(_GEOMETRY_STATUSES)}.",
+                )
+            count_evidence_ref = _optional_text(
+                raw.get("count_evidence_ref"), "count_evidence_ref"
+            )
+            reconciliation_basis = _optional_text(
+                raw.get("reconciliation_basis"), "reconciliation_basis"
+            )
+            raw_preaggregated_ids = raw.get("preaggregated_source_coc_ids", [])
+            if raw_preaggregated_ids is None:
+                raw_preaggregated_ids = []
+            preaggregated_source_coc_ids = _required_text_list(
+                raw_preaggregated_ids, "preaggregated_source_coc_ids"
+            )
+            if len(set(preaggregated_source_coc_ids)) != len(preaggregated_source_coc_ids):
+                raise BoundaryCompatibilityError(
+                    "duplicate_source_id",
+                    f"Boundary evidence record for CoC '{coc_id}' repeats a predecessor "
+                    "scope ID.",
+                )
+            geometry_evidence_ref = _optional_text(
+                raw.get("geometry_evidence_ref"), "geometry_evidence_ref"
+            )
+            geometry_residual = _optional_text(raw.get("geometry_residual"), "geometry_residual")
+
+            if status in {"compatible", "mapped"}:
+                expected_id = coc_id if status == "compatible" else source_coc_id
+                if (
+                    expected_id is None
+                    or source_coc_ids != (expected_id,)
+                    or count_operation != "single"
+                    or geometry_status != "compatible"
+                ):
+                    raise BoundaryCompatibilityError(
+                        "invalid_resolved_record",
+                        f"{status.title()} evidence must name one source ID, use single, "
+                        "and assert compatible geometry.",
+                    )
+                if count_evidence_ref or reconciliation_basis or preaggregated_source_coc_ids:
+                    raise BoundaryCompatibilityError(
+                        "invalid_resolved_record",
+                        f"{status.title()} evidence cannot declare predecessor count "
+                        "reconciliation fields.",
+                    )
+            elif status == "reconciled":
+                if not source_coc_ids or count_operation not in _COUNT_OPERATIONS:
+                    raise BoundaryCompatibilityError(
+                        "incomplete_reconciliation",
+                        f"Reconciled evidence for CoC '{coc_id}' needs source_coc_ids "
+                        "and a supported count_operation.",
+                    )
+                if (
+                    not evidence_ref
+                    or not count_evidence_ref
+                    or not approval_ref
+                    or not reconciliation_basis
+                ):
+                    raise BoundaryCompatibilityError(
+                        "incomplete_reconciliation",
+                        f"Reconciled evidence for CoC '{coc_id}' needs evidence_ref, "
+                        "count_evidence_ref, approval_ref, and reconciliation_basis.",
+                    )
+                if count_operation == "single" and len(source_coc_ids) != 1:
+                    raise BoundaryCompatibilityError(
+                        "invalid_count_operation", "single requires exactly one source CoC ID."
+                    )
+                if count_operation == "sum" and len(source_coc_ids) < 2:
+                    raise BoundaryCompatibilityError(
+                        "invalid_count_operation", "sum requires at least two source CoC IDs."
+                    )
+                if count_operation == "preaggregated":
+                    if len(source_coc_ids) != 1 or len(preaggregated_source_coc_ids) < 2:
+                        raise BoundaryCompatibilityError(
+                            "invalid_count_operation",
+                            "preaggregated requires one consumed source ID and at least "
+                            "two predecessor-scope IDs.",
+                        )
+                    if not set(source_coc_ids).issubset(preaggregated_source_coc_ids):
+                        raise BoundaryCompatibilityError(
+                            "invalid_count_operation",
+                            "preaggregated source IDs must be included in the declared "
+                            "predecessor scope.",
+                        )
+                elif preaggregated_source_coc_ids:
+                    raise BoundaryCompatibilityError(
+                        "invalid_count_operation",
+                        "preaggregated_source_coc_ids may be supplied only for "
+                        "preaggregated operations.",
+                    )
+                if geometry_status != "compatible" and not geometry_evidence_ref:
+                    raise BoundaryCompatibilityError(
+                        "missing_geometry_evidence",
+                        "A reconciled count with unresolved geometry needs "
+                        "geometry_evidence_ref.",
+                    )
+                if geometry_status == "different_unresolved" and not geometry_residual:
+                    raise BoundaryCompatibilityError(
+                        "missing_geometry_residual",
+                        "A different_unresolved geometry assessment needs a documented "
+                        "geometry_residual.",
+                    )
+            else:
+                if (
+                    source_coc_ids
+                    or count_operation is not None
+                    or count_evidence_ref is not None
+                    or reconciliation_basis is not None
+                    or preaggregated_source_coc_ids
+                ):
+                    raise BoundaryCompatibilityError(
+                        "invalid_unresolved_record",
+                        f"{status.title()} evidence cannot resolve source CoC IDs "
+                        "or count operations.",
+                    )
 
         if status == "compatible":
             if evidence_ref is None:
@@ -413,6 +602,12 @@ def validate_coc_boundary_compatibility(
                     "and approval_ref.",
                 )
             resolved_coc_id = source_coc_id
+        elif status == "reconciled":
+            if not is_v2:
+                raise BoundaryCompatibilityError(
+                    "invalid_status", "reconciled status requires coc_boundary_compatibility/2."
+                )
+            resolved_coc_id = source_coc_ids[0] if len(source_coc_ids) == 1 else None
         else:
             if source_coc_id is not None or approval_ref is not None:
                 raise BoundaryCompatibilityError(
@@ -439,23 +634,40 @@ def validate_coc_boundary_compatibility(
             reason=reason,
             evidence_ref=evidence_ref,
             approval_ref=approval_ref,
+            source_coc_ids=(
+                source_coc_ids
+                if is_v2
+                else ((resolved_coc_id,) if resolved_coc_id else ())
+            ),
+            count_operation=count_operation if is_v2 else ("single" if resolved_coc_id else None),
+            count_evidence_ref=count_evidence_ref,
+            reconciliation_basis=reconciliation_basis,
+            preaggregated_source_coc_ids=preaggregated_source_coc_ids,
+            geometry_status=geometry_status,
+            geometry_evidence_ref=geometry_evidence_ref,
+            geometry_residual=geometry_residual,
         )
 
     resolutions_by_panel_year: dict[tuple[str, int], dict[str, str]] = {}
     for record in declared.values():
-        if record.source_coc_id is None:
+        if not record.source_coc_ids:
             continue
         panel_year = (record.source_panel, record.year)
         resolved_ids = resolutions_by_panel_year.setdefault(panel_year, {})
-        previous_frozen_coc = resolved_ids.get(record.source_coc_id)
-        if previous_frozen_coc is not None:
-            raise BoundaryCompatibilityError(
-                "non_bijective_mapping",
-                f"Frozen CoCs '{previous_frozen_coc}' and '{record.frozen_coc_id}' both resolve "
-                f"to source CoC '{record.source_coc_id}' for panel "
-                f"'{record.source_panel}' in {record.year}.",
-            )
-        resolved_ids[record.source_coc_id] = record.frozen_coc_id
+        claimed_source_ids = set(record.source_coc_ids)
+        if record.count_operation == "preaggregated":
+            claimed_source_ids.update(record.preaggregated_source_coc_ids)
+        for source_coc_id in sorted(claimed_source_ids):
+            previous_frozen_coc = resolved_ids.get(source_coc_id)
+            if previous_frozen_coc is not None:
+                raise BoundaryCompatibilityError(
+                    "non_bijective_mapping",
+                    f"Frozen CoCs '{previous_frozen_coc}' and '{record.frozen_coc_id}' "
+                    "both resolve "
+                    f"to source CoC '{source_coc_id}' for panel "
+                    f"'{record.source_panel}' in {record.year}.",
+                )
+            resolved_ids[source_coc_id] = record.frozen_coc_id
 
     resolved_records: list[BoundaryCompatibilityRecord] = []
     for panel_id in panel_ids:
@@ -489,6 +701,7 @@ def validate_coc_boundary_compatibility(
         ) from exc
     fingerprint = "sha256:" + hashlib.sha256(canonical_payload.encode("utf-8")).hexdigest()
     return BoundaryCompatibilityValidation(
+        schema_version=str(schema_version),
         evidence_id=evidence_id,
         artifact_id=declared_artifact_id,
         threshold=float(threshold),
@@ -545,6 +758,15 @@ def _required_text(value: object, field_name: str) -> str:
             f"Boundary evidence field '{field_name}' must be a non-empty string.",
         )
     return value.strip()
+
+
+def _required_text_list(value: object, field_name: str) -> tuple[str, ...]:
+    if not isinstance(value, list):
+        raise BoundaryCompatibilityError(
+            "invalid_text_list",
+            f"Boundary evidence field '{field_name}' must be an array of non-empty strings.",
+        )
+    return tuple(_required_text(item, field_name) for item in value)
 
 
 def _optional_text(value: object, field_name: str) -> str | None:

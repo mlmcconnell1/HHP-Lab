@@ -189,18 +189,33 @@ def assemble_site_year_panel(
                         elif compatibility.status == "incompatible":
                             incompatible_cocs.add(coc_id)
 
-                        # For unknown/incompatible rows, the frozen ID can be
-                        # inspected for presence diagnostics only; it is never
-                        # used to include a value in the site outcome.
-                        source_coc_id = compatibility.source_coc_id or coc_id
-                        value = source_lookup.get((source_coc_id, year), {}).get(measure)
-                        parsed_value = _valid_site_year_count(value)
-                        if parsed_value is None:
+                        # V1's unresolved rows retain their old frozen-ID
+                        # presence diagnostic. V2 never infers a source join:
+                        # only IDs explicitly declared by the evidence are read.
+                        source_coc_ids = compatibility.source_coc_ids
+                        if not source_coc_ids and compatibility.count_operation is None:
+                            source_coc_ids = (
+                                (coc_id,)
+                                if boundary_compatibility.schema_version.endswith("/1")
+                                else ()
+                            )
+                        constituent_values = [
+                            _valid_site_year_count(
+                                source_lookup.get((source_coc_id, year), {}).get(measure)
+                            )
+                            for source_coc_id in source_coc_ids
+                        ]
+                        if not constituent_values or any(
+                            value is None for value in constituent_values
+                        ):
                             missing_cocs.add(coc_id)
                         else:
                             observed_cocs.add(coc_id)
-                            if compatibility.status in {"compatible", "mapped"}:
-                                values.append(parsed_value)
+                            if compatibility.status in {"compatible", "mapped", "reconciled"}:
+                                if compatibility.count_operation == "sum":
+                                    values.append(sum(constituent_values))
+                                elif compatibility.count_operation in {"single", "preaggregated"}:
+                                    values.append(constituent_values[0])
 
                     limited = (
                         outcome_name == "pit"
@@ -270,6 +285,7 @@ def assemble_site_year_panel(
             "boundary_evidence": {
                 "evidence_id": boundary_compatibility.evidence_id,
                 "fingerprint": boundary_compatibility.evidence_fingerprint,
+                "schema_version": boundary_compatibility.schema_version,
             },
             "measures": list(measures),
             "row_count": len(panel),
@@ -425,7 +441,7 @@ def _index_site_year_boundary_evidence(
         for year in years
     }
     indexed: dict[tuple[str, str, int], Any] = {}
-    mapped_sources: dict[tuple[str, int], dict[str, str]] = {}
+    resolved_sources: dict[tuple[str, int], dict[str, str]] = {}
     for record in validation.records:
         key = (record.source_panel, record.frozen_coc_id, record.year)
         if key not in expected_keys:
@@ -440,33 +456,64 @@ def _index_site_year_boundary_evidence(
                 f"Boundary compatibility evidence assigns CoC '{record.frozen_coc_id}' "
                 "to a different MSA than the selected membership."
             )
-        if record.status not in {"compatible", "mapped", "incompatible", "unknown"}:
+        if record.status not in {"compatible", "mapped", "reconciled", "incompatible", "unknown"}:
             raise ExecutorError(
                 f"Boundary compatibility evidence has unsupported status {record.status!r}."
             )
-        if record.status == "compatible" and record.source_coc_id != record.frozen_coc_id:
+        if record.status == "compatible" and record.source_coc_ids != (record.frozen_coc_id,):
             raise ExecutorError(
                 f"Compatible evidence for CoC '{record.frozen_coc_id}' must retain its source ID."
             )
-        if record.status == "mapped" and not record.source_coc_id:
+        if record.status == "mapped" and len(record.source_coc_ids) != 1:
             raise ExecutorError(
                 f"Mapped evidence for CoC '{record.frozen_coc_id}' needs a source CoC ID."
             )
-        if record.status in {"unknown", "incompatible"} and record.source_coc_id is not None:
+        if record.status == "reconciled" and (
+            not record.source_coc_ids
+            or record.count_operation not in {"single", "preaggregated", "sum"}
+            or not record.count_evidence_ref
+            or not record.approval_ref
+            or not record.reconciliation_basis
+        ):
+            raise ExecutorError(
+                f"Reconciled evidence for CoC '{record.frozen_coc_id}' is missing its "
+                "reviewed count resolution."
+            )
+        if record.status in {"unknown", "incompatible"} and record.source_coc_ids:
             raise ExecutorError(
                 f"{record.status.title()} evidence for CoC '{record.frozen_coc_id}' "
                 "cannot resolve a source ID."
             )
-        if record.source_coc_id is not None:
-            panel_year = (record.source_panel, record.year)
-            source_map = mapped_sources.setdefault(panel_year, {})
-            previous_frozen = source_map.get(record.source_coc_id)
-            if previous_frozen is not None:
-                raise ExecutorError(
-                    f"Boundary evidence maps both '{previous_frozen}' and "
-                    f"'{record.frozen_coc_id}' to '{record.source_coc_id}'."
+        if record.status == "reconciled":
+            if record.count_operation == "single" and len(record.source_coc_ids) != 1:
+                raise ExecutorError("single count operation requires exactly one source CoC ID.")
+            if record.count_operation == "sum" and len(record.source_coc_ids) < 2:
+                raise ExecutorError("sum count operation requires at least two source CoC IDs.")
+            if record.count_operation == "preaggregated" and (
+                len(record.source_coc_ids) != 1
+                or len(record.preaggregated_source_coc_ids) < 2
+                or not set(record.source_coc_ids).issubset(
+                    record.preaggregated_source_coc_ids
                 )
-            source_map[record.source_coc_id] = record.frozen_coc_id
+            ):
+                raise ExecutorError(
+                    "preaggregated count operation requires one consumed ID and its "
+                    "predecessor scope."
+                )
+        if record.source_coc_ids:
+            panel_year = (record.source_panel, record.year)
+            source_map = resolved_sources.setdefault(panel_year, {})
+            claimed_source_ids = set(record.source_coc_ids)
+            if record.count_operation == "preaggregated":
+                claimed_source_ids.update(record.preaggregated_source_coc_ids)
+            for source_coc_id in sorted(claimed_source_ids):
+                previous_frozen = source_map.get(source_coc_id)
+                if previous_frozen is not None:
+                    raise ExecutorError(
+                        f"Boundary evidence maps both '{previous_frozen}' and "
+                        f"'{record.frozen_coc_id}' to '{source_coc_id}'."
+                    )
+                source_map[source_coc_id] = record.frozen_coc_id
         indexed[key] = record
 
     missing_keys = sorted(expected_keys - set(indexed))

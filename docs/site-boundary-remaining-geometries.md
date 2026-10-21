@@ -1,0 +1,33 @@
+# Remaining CoC boundary geometry screen
+
+## Finding
+
+The remaining 82 selected CoCs are **not yet certified as compatible** for the 2020, 2022, and 2023 data vintages. The existing comparisons show broad convergence between the FY2023 HUD archive and the frozen FY2024 reference for most rows, but exact same-ID polygons still differ. More importantly, the paired annual CoC-to-geocode assignment sets needed to verify scope were not accessible in a complete, parseable form. A small area difference alone is not evidence that the assigned geography or service scope stayed the same.
+
+The full 82-row measurement screen is in [`remaining-geometry-screen.json`](/home/matt/HHP-Output/site-boundary-history-audit/remaining/remaining-geometry-screen.json). It retains the 2020 screening status, 2022 and 2023 area/bounds deltas, 2023 symmetric-difference area and fraction, and the geocode evidence status for every ID. The source-access findings are in [`assigned-geocode-source-audit.json`](/home/matt/HHP-Output/site-boundary-history-audit/remaining/assigned-geocode-source-audit.json). Neither artifact marks a site approved.
+
+## Strongest FY2023 residuals
+
+The source is HUD's FY2023 national CoC boundary ZIP, SHA-256 `502c5d1887c56ac2b5f4911acc7c4c1db8aa78aaee34fde3d5f663ea15befc2a`. The comparison reference is a frozen ArcGIS boundary snapshot, SHA-256 `93eec38a508d5faf9589edded506613851a14dd0112025314e5359e468f9d6ac`; it is attributed to FY2024 but is a live-endpoint snapshot captured in 2026, not the preserved FY2024 annual ZIP. The overlay uses EPSG:6933 and computes exact Shapely symmetric difference and union for same-ID polygons. The resulting fraction is useful for prioritizing review, not an acceptance threshold.
+
+| CoC | 2023 symmetric difference | Fraction of union | What the comparison supports |
+|---|---:|---:|---|
+| TX-603, El Paso City & County | 424,904 m² | 0.016159% | 1,356 disconnected pieces; largest pieces lie near El Paso (around -106.30°, 31.61°). This is a dense set of small local discrepancies, not a broad shifted extent. The available evidence does not identify their cause or prove scope equivalence. |
+| HI-501, Honolulu | 192,529 m² | 0.012320% | 2,630 pieces; the largest lie on Oʻahu. In the 2022 comparison, bounds omit the far-western and southeastern extent seen in the reference (maximum bounds delta about 1,935 km), consistent with incomplete island coverage in that archive. By 2023, bounds agree within about 0.51 m and area differs by about 0.000049% of the reference. The remaining Oʻahu slivers do not establish whether the difference is coastline/precision or a real local boundary change. |
+| CA-613, Imperial County | 188,037 m² | 0.001620% | 992 pieces; largest patches cluster along the Imperial County / Colorado River desert region. 2023 bounds differ by at most 0.040 m and area by 0.000734% of reference. No authoritative assignment record or jurisdictional evidence found here explains the patches, so this remains unresolved. |
+
+For contrast, CA-501 (San Francisco) has only 3.98 m² of 2023 symmetric difference (fraction `3.24e-8`), but its 2022 polygon differed substantially: area was 0.4686% below the reference and one bound differed by about 55.8 km. That is consistent with the historical concern about omitted offshore geometry, but the present archive comparison does not establish that the Farallon Islands are the specific cause. MA-515 (Fall River) had a 2.3248% area difference and a 535.6 m bound delta in 2022, then is effectively coincident with the reference in 2023 (1.15 m² symmetric difference). This suggests a year-specific geometry correction; it does not substitute for annual assigned-geocode verification. These rows are retained in the 82-row artifact.
+
+Across the 82, every 2023 pair is topologically unequal under the exact comparison. Most residual fractions are much smaller than the three above, but those rows remain individually listed and unapproved. The widespread 2020 local screen likewise labels differing geometry as “substantive boundary compatibility not established”; the local 2019 matches are explicitly from the same live endpoint and are not independent historic evidence.
+
+## Assigned-geocode evidence and consequence
+
+HUD's [FY2023 GeoCodes/PPRN report](https://www.hud.gov/sites/dfiles/CPD/documents/CoC/FY-2023-GeoCodes-PPRN-Report-Revised.pdf) is indexed as the annual report and exposes some rows, but its PDF was unavailable for a complete local parse during this audit. The [FY2024 GeoCodes report](https://www.hud.gov/sites/dfiles/CPD/documents/CoC/FY2024-GeoCodes-Report.pdf) was accessible and lists the year's geographic code inventory; it is not a complete CoC-to-code assignment table. HUD's [FY2024 registration and CoC review instructions](https://www.hud.gov/sites/dfiles/CPD/documents/CoC/FY2024-CoC-Program-Registration-and-CoC-Review-Instructions.pdf) direct Collaborative Applicants to review the selected geographic codes annually. Thus geometry overlay cannot answer whether each annual CoC selected the same code set.
+
+I did not find a complete machine-readable FY2023/FY2024 assignment table for these 82 IDs. A future comparison needs each CoC's actual annual selected code set (including AIAN geographies), preferably the submitted or finalized e-snaps records, and a same-vintage jurisdiction-to-code crosswalk. Until then, report the 2023 geometry as strongly convergent for most sites but do not certify the 64-site 2023 set as complete beyond the separately handled CT-503 and MA-505 cases. TX-603, HI-501, and CA-613 need particular review; other IDs remain unresolved individually rather than blanket-approved.
+
+## Reproduction and limits
+
+The underlying archive metrics are in `archives-boundaries-epsg6933.json`, the exact 2023 overlay is in `archives-boundaries-2023-full-overlay.json`, and local 2020/2022 statuses are in `local-boundaries.json`, all under `/home/matt/HHP-Output/site-boundary-history-audit/`. These inputs were prepared before this note. The 2023 overlay's selection rule is membership-parquet `threshold == 0.99` and `site_eligible == true`, yielding 84 distinct CoC IDs before removing the known CT-503 and MA-505 cases.
+
+Area and bounds comparisons only describe the shapes supplied to the overlay. They do not prove that annual CoC membership, HUD e-snaps code assignments, program eligibility, or local jurisdiction/service definitions stayed constant. No small-area difference is treated as automatic approval, and no unexplained residual has been attributed to coordinate rounding or coastline precision without direct supporting evidence.

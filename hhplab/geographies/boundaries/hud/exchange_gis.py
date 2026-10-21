@@ -18,6 +18,7 @@ import json
 import logging
 import re
 import zipfile
+from dataclasses import dataclass
 from datetime import UTC, date, datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -118,6 +119,49 @@ _HUD_STATE_ABBREVIATIONS = [
 # Smaller page size for more frequent progress updates
 ARCGIS_PAGE_SIZE = 50
 ARCGIS_REQUEST_TIMEOUT = 120.0
+
+
+@dataclass(frozen=True)
+class _ArchiveSource:
+    """One successfully downloaded HUD archive and its consumed-byte identity."""
+
+    url: str
+    raw_sha256: str
+    file_size: int
+
+
+@dataclass(frozen=True)
+class _HudExchangeDownload:
+    """Extracted data path plus provenance for the archive inputs it uses."""
+
+    path: Path
+    archive_sources: tuple[_ArchiveSource, ...]
+
+    @property
+    def source_url(self) -> str:
+        """Return a source reference that preserves every consumed archive URL."""
+        if len(self.archive_sources) == 1:
+            return self.archive_sources[0].url
+        return json.dumps([source.url for source in self.archive_sources], separators=(",", ":"))
+
+    @property
+    def raw_sha256(self) -> str:
+        """Return archive SHA-256 or a digest of ordered component digests.
+
+        One archive uses its raw ZIP SHA-256 directly. Multiple archives use
+        SHA-256 over the concatenated binary SHA-256 digests, in download
+        order; per-archive raw ZIP hashes remain available in archive_sources.
+        """
+        if len(self.archive_sources) == 1:
+            return self.archive_sources[0].raw_sha256
+        hasher = hashlib.sha256()
+        for source in self.archive_sources:
+            hasher.update(bytes.fromhex(source.raw_sha256))
+        return hasher.hexdigest()
+
+    @property
+    def file_size(self) -> int:
+        return sum(source.file_size for source in self.archive_sources)
 
 
 _ARCGIS_SNAPSHOT_LABEL = re.compile(r"^HUDOpenData_(\d{4}-\d{2}-\d{2})$")
@@ -490,7 +534,7 @@ def _download_and_extract_zip(
     url: str,
     output_dir: Path,
     zip_name: str,
-) -> Path | None:
+) -> tuple[Path, _ArchiveSource] | None:
     """Download a ZIP, extract it, and return the path to geo data inside.
 
     Returns ``None`` if the download fails with an HTTP error (e.g. 404).
@@ -500,6 +544,8 @@ def _download_and_extract_zip(
         with httpx.Client(follow_redirects=True, timeout=120.0) as client:
             response = client.get(url)
             response.raise_for_status()
+            raw_sha256 = hashlib.sha256(response.content).hexdigest()
+            file_size = len(response.content)
             with open(zip_path, "wb") as f:
                 f.write(response.content)
     except httpx.HTTPStatusError as exc:
@@ -514,25 +560,30 @@ def _download_and_extract_zip(
         logger.debug("Download failed for %s: %s", url, exc)
         return None
 
+    archive_source = _ArchiveSource(url=url, raw_sha256=raw_sha256, file_size=file_size)
+    # Isolate extraction by the bytes just downloaded so stale files already
+    # present in output_dir cannot be mistaken for members of this archive.
+    extract_dir = output_dir / f"{Path(zip_name).stem}_{raw_sha256[:12]}"
+    extract_dir.mkdir(parents=True, exist_ok=True)
     with zipfile.ZipFile(zip_path, "r") as zf:
-        zf.extractall(output_dir)
+        zf.extractall(extract_dir)
 
-    gdb_dirs = list(output_dir.glob("*.gdb"))
+    gdb_dirs = list(extract_dir.rglob("*.gdb"))
     if gdb_dirs:
-        return gdb_dirs[0]
-    shp_files = list(output_dir.glob("*.shp"))
+        return gdb_dirs[0], archive_source
+    shp_files = list(extract_dir.glob("*.shp"))
     if shp_files:
-        return shp_files[0]
-    nested_shp_files = list(output_dir.rglob("*.shp"))
+        return shp_files[0], archive_source
+    nested_shp_files = list(extract_dir.rglob("*.shp"))
     if nested_shp_files:
-        return output_dir
-    return output_dir
+        return extract_dir, archive_source
+    return extract_dir, archive_source
 
 
 def _download_per_state_shapefiles(
     boundary_vintage: str,
     output_dir: Path,
-) -> Path | None:
+) -> _HudExchangeDownload | None:
     """Download per-state shapefiles from HUD Exchange and merge them.
 
     Returns the path to the merged shapefile directory, or ``None`` if too
@@ -544,6 +595,7 @@ def _download_per_state_shapefiles(
     state_dir.mkdir(parents=True, exist_ok=True)
 
     gdfs: list[gpd.GeoDataFrame] = []
+    archive_sources: list[_ArchiveSource] = []
     failed: list[str] = []
 
     for state in _HUD_STATE_ABBREVIATIONS:
@@ -562,8 +614,10 @@ def _download_per_state_shapefiles(
             failed.append(state)
             continue
         try:
-            gdf = read_coc_boundaries(result)
+            data_path, archive_source = result
+            gdf = read_coc_boundaries(data_path)
             gdfs.append(gdf)
+            archive_sources.append(archive_source)
         except Exception:
             logger.warning("Failed to read shapefile for state %s", state)
             failed.append(state)
@@ -604,14 +658,16 @@ def _download_per_state_shapefiles(
     merged_gdf = gpd.GeoDataFrame(merged, geometry="geometry")
     merged_path = state_dir / f"merged_{boundary_vintage}.shp"
     merged_gdf.to_file(merged_path)
-    return merged_path
+    return _HudExchangeDownload(path=merged_path, archive_sources=tuple(archive_sources))
 
 
 def download_hud_exchange_gdb(
     boundary_vintage: str,
     output_dir: Path | str | None = None,
     url: str | None = None,
-) -> Path:
+    *,
+    return_provenance: bool = False,
+) -> Path | _HudExchangeDownload:
     """Download CoC GIS geodatabase/shapefile from HUD Exchange.
 
     Tries the following sources in order:
@@ -628,6 +684,8 @@ def download_hud_exchange_gdb(
         output_dir: Directory to save the downloaded file. Defaults to
             ``data/raw/hud_exchange/{vintage}/``
         url: Override URL for downloading. Skips the fallback chain.
+        return_provenance: If True, return archive source URL/hash metadata with
+            the extracted path. Defaults to the historical Path return value.
 
     Returns:
         Path to the extracted geodatabase/shapefile directory
@@ -650,7 +708,9 @@ def download_hud_exchange_gdb(
             f"CoC_GIS_{boundary_vintage}.zip",
         )
         if result is not None:
-            return result
+            data_path, archive_source = result
+            download = _HudExchangeDownload(data_path, (archive_source,))
+            return download if return_provenance else download.path
         raise RuntimeError(f"Download from explicit URL failed: {url}")
 
     # --- Fallback chain ---
@@ -667,7 +727,9 @@ def download_hud_exchange_gdb(
         f"CoC_GIS_National_Boundary_{boundary_vintage}.zip",
     )
     if result is not None:
-        return result
+        data_path, archive_source = result
+        download = _HudExchangeDownload(data_path, (archive_source,))
+        return download if return_provenance else download.path
     logger.info(
         "National boundary URL unavailable for vintage %s, trying legacy URL",
         boundary_vintage,
@@ -682,7 +744,9 @@ def download_hud_exchange_gdb(
         f"CoC_GIS_{boundary_vintage}.zip",
     )
     if result is not None:
-        return result
+        data_path, archive_source = result
+        download = _HudExchangeDownload(data_path, (archive_source,))
+        return download if return_provenance else download.path
     logger.info(
         "Legacy shapefile URL unavailable for vintage %s, trying per-state downloads",
         boundary_vintage,
@@ -697,7 +761,7 @@ def download_hud_exchange_gdb(
     )
     result = _download_per_state_shapefiles(boundary_vintage, output_dir)
     if result is not None:
-        return result
+        return result if return_provenance else result.path
 
     raise RuntimeError(
         f"All HUD Exchange download sources failed for vintage {boundary_vintage}.\n"
@@ -880,6 +944,7 @@ def ingest_hud_exchange(
     source_url: str | None = None
     content_sha256: str | None = None
     content_size: int | None = None
+    archive_sources: list[dict[str, str | int]] | None = None
 
     if use_arcgis:
         # Primary path: fetch from ArcGIS FeatureServer
@@ -917,33 +982,45 @@ def ingest_hud_exchange(
         else:
             raw_dir = Path(raw_dir)
 
-        source_url = url or HUD_EXCHANGE_NATIONAL_BOUNDARY_TEMPLATE.format(
-            vintage=boundary_vintage,
-        )
-
         if not skip_download:
-            data_path = download_hud_exchange_gdb(
+            download = download_hud_exchange_gdb(
                 boundary_vintage=boundary_vintage,
                 output_dir=raw_dir,
                 url=url,
+                return_provenance=True,
             )
-            zip_path = raw_dir / f"CoC_GIS_{boundary_vintage}.zip"
-            if zip_path.exists():
-                from hhplab.storage.raw_snapshot import hash_zip_contents
-
-                raw_bytes = zip_path.read_bytes()
-                content_sha256 = hash_zip_contents(raw_bytes)
-                content_size = len(raw_bytes)
+            data_path = download.path
+            source_url = download.source_url
+            content_sha256 = download.raw_sha256
+            content_size = download.file_size
+            archive_sources = [
+                {
+                    "source_url": source.url,
+                    "raw_sha256": source.raw_sha256,
+                    "file_size": source.file_size,
+                }
+                for source in download.archive_sources
+            ]
         else:
             # Find existing data in raw_dir
-            gdb_dirs = list(raw_dir.glob("*.gdb"))
-            shp_files = list(raw_dir.glob("*.shp"))
-            if gdb_dirs:
+            merged_path = raw_dir / "per_state" / f"merged_{boundary_vintage}.shp"
+            gdb_dirs = sorted(
+                path for path in raw_dir.rglob("*.gdb") if "per_state" not in path.parts
+            )
+            shp_files = sorted(
+                path for path in raw_dir.rglob("*.shp") if "per_state" not in path.parts
+            )
+            if merged_path.exists():
+                data_path = merged_path
+            elif gdb_dirs:
                 data_path = gdb_dirs[0]
             elif shp_files:
                 data_path = shp_files[0]
             else:
                 raise ValueError(f"No .gdb or .shp found in {raw_dir}")
+
+            local_path = Path(data_path).resolve()
+            source_url = local_path.as_uri()
 
         gdf = read_coc_boundaries(data_path)
         gdf = map_to_canonical_schema(gdf, boundary_vintage, source_url)
@@ -969,7 +1046,35 @@ def ingest_hud_exchange(
     if show_progress:
         click.echo("Writing GeoParquet file...")
     output_path = curated_boundary_path(boundary_vintage, base_dir=curated_dir)
-    write_geoparquet(gdf, output_path)
+    from hhplab.storage.provenance import ProvenanceBlock
+
+    provenance_extra: dict[str, Any] = {
+        "source_type": "hud_exchange_archive" if archive_sources is not None else (
+            "local_boundary_input" if not use_arcgis else "hud_arcgis_api"
+        ),
+        "source_url": source_url,
+        "raw_sha256": content_sha256,
+        "file_size": content_size,
+    }
+    if archive_sources is not None:
+        provenance_extra["archive_sources"] = archive_sources
+        provenance_extra["raw_sha256_algorithm"] = (
+            "single archive raw ZIP SHA-256"
+            if len(archive_sources) == 1
+            else "SHA-256 of concatenated binary component ZIP SHA-256 digests in download order"
+        )
+    elif not use_arcgis:
+        provenance_extra["local_path"] = str(Path(data_path).resolve())
+
+    write_geoparquet(
+        gdf,
+        output_path,
+        provenance=ProvenanceBlock(
+            boundary_vintage=boundary_vintage,
+            geo_type="coc",
+            extra=provenance_extra,
+        ),
+    )
 
     # Register in boundary registry
     from hhplab.registry import register_vintage
@@ -1014,6 +1119,10 @@ def ingest_hud_exchange(
             "feature_count": len(gdf),
             "source": source,
             "curated_path": str(output_path),
+            **({"archive_sources": archive_sources} if archive_sources is not None else {}),
+            "raw_sha256_algorithm": provenance_extra["raw_sha256_algorithm"]
+            if archive_sources is not None
+            else "SHA-256 of consumed local boundary files or persisted API snapshot",
         },
     )
 

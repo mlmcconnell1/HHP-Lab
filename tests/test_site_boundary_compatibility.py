@@ -109,6 +109,31 @@ def _evidence_payload(records=VALID_RECORDS):
     }
 
 
+def _v2_evidence_payload(records=VALID_RECORDS):
+    v2_records = []
+    for source_record in records:
+        record = deepcopy(source_record)
+        old_source_id = record.pop("source_coc_id", None)
+        status = record["status"]
+        record["source_coc_ids"] = (
+            [record["frozen_coc_id"]]
+            if status == "compatible"
+            else [old_source_id]
+            if status == "mapped"
+            else []
+        )
+        record["count_operation"] = "single" if record["source_coc_ids"] else None
+        record["geometry_status"] = (
+            "compatible" if status in {"compatible", "mapped"} else "unknown"
+        )
+        v2_records.append(record)
+    return {
+        **_evidence_payload([]),
+        "schema_version": "coc_boundary_compatibility/2",
+        "records": v2_records,
+    }
+
+
 def _validate(payload=None, **overrides):
     arguments = {
         "artifact_id": ARTIFACT_ID,
@@ -192,6 +217,137 @@ def test_evidence_fingerprint_changes_when_evidence_changes():
     changed = _validate(payload)
 
     assert changed.evidence_fingerprint != original.evidence_fingerprint
+
+
+def test_v2_reconciles_multiple_source_ids_without_claiming_geometry_equivalence():
+    payload = _v2_evidence_payload()
+    record = next(
+        row for row in payload["records"]
+        if (row["source_panel"], row["frozen_coc_id"], row["year"])
+        == ("pit_panel", "CO-1", 2020)
+    )
+    record.update(
+        {
+            "status": "reconciled",
+            "source_coc_ids": ["CO-1-PRE", "CO-1-OLD"],
+            "count_operation": "sum",
+            "evidence_ref": "audit://admin-reconciliation",
+            "count_evidence_ref": "audit://pit-source-counts",
+            "approval_ref": "review://providence/MA-505",
+            "reconciliation_basis": "administrative predecessor union",
+            "geometry_status": "different_unresolved",
+            "geometry_evidence_ref": "audit://geometry/2020",
+            "geometry_residual": "13.499083 km2 symmetric difference; cause unresolved",
+        }
+    )
+
+    result = _validate(payload)
+    resolved = next(
+        row for row in result.records
+        if (row.source_panel, row.frozen_coc_id, row.year)
+        == ("pit_panel", "CO-1", 2020)
+    )
+
+    assert resolved.status == "reconciled"
+    assert resolved.source_coc_ids == ("CO-1-PRE", "CO-1-OLD")
+    assert resolved.count_operation == "sum"
+    assert resolved.geometry_status == "different_unresolved"
+    assert resolved.geometry_residual.startswith("13.499083 km2")
+
+
+@pytest.mark.parametrize(
+    ("change", "error_code"),
+    [
+        pytest.param("duplicate-source-id", "duplicate_source_id", id="duplicate-source-id"),
+        pytest.param(
+            "missing-count-evidence", "incomplete_reconciliation", id="count-evidence-required"
+        ),
+        pytest.param(
+            "missing-geometry-residual", "missing_geometry_residual", id="residual-required"
+        ),
+        pytest.param("sum-one-id", "invalid_count_operation", id="sum-needs-two-ids"),
+        pytest.param(
+            "preaggregated-no-scope", "invalid_count_operation", id="preaggregated-scope-required"
+        ),
+        pytest.param(
+            "preaggregated-overlap",
+            "non_bijective_mapping",
+            id="predecessor-scope-cannot-cross-members",
+        ),
+        pytest.param(
+            "compatible-preaggregated",
+            "invalid_resolved_record",
+            id="compatible-cannot-be-preaggregated",
+        ),
+        pytest.param("source-reused", "non_bijective_mapping", id="source-cannot-cross-members"),
+    ],
+)
+def test_v2_reconciliation_requires_explicit_complete_evidence(change, error_code):
+    payload = _v2_evidence_payload()
+    row = payload["records"][0]
+    row.update(
+        {
+            "status": "reconciled",
+            "source_coc_ids": ["CO-1-PRE", "CO-1-OLD"],
+            "count_operation": "sum",
+            "evidence_ref": "audit://admin-reconciliation",
+            "count_evidence_ref": "audit://source-counts",
+            "approval_ref": "review://providence/MA-505",
+            "reconciliation_basis": "administrative predecessor union",
+            "geometry_status": "different_unresolved",
+            "geometry_evidence_ref": "audit://geometry/2020",
+            "geometry_residual": "documented residual",
+        }
+    )
+    if change == "duplicate-source-id":
+        row["source_coc_ids"] = ["CO-1", "CO-1"]
+    elif change == "missing-count-evidence":
+        row["count_evidence_ref"] = None
+    elif change == "missing-geometry-residual":
+        row["geometry_residual"] = None
+    elif change == "sum-one-id":
+        row["source_coc_ids"] = ["CO-1"]
+    elif change == "preaggregated-no-scope":
+        row["source_coc_ids"] = ["CO-1"]
+        row["count_operation"] = "preaggregated"
+    elif change == "preaggregated-overlap":
+        row["source_coc_ids"] = ["CO-1"]
+        row["count_operation"] = "preaggregated"
+        row["preaggregated_source_coc_ids"] = ["CO-1", "CO-2-OLD"]
+        row["geometry_status"] = "compatible"
+        row.pop("geometry_evidence_ref")
+        row.pop("geometry_residual")
+    elif change == "compatible-preaggregated":
+        row["status"] = "compatible"
+        row["source_coc_ids"] = ["CO-1"]
+        row["count_operation"] = "preaggregated"
+        row["preaggregated_source_coc_ids"] = ["CO-1", "CO-OLD"]
+        row["geometry_status"] = "compatible"
+        row.pop("count_evidence_ref")
+        row.pop("approval_ref")
+        row.pop("reconciliation_basis")
+        row.pop("geometry_evidence_ref")
+        row.pop("geometry_residual")
+    elif change == "source-reused":
+        row["source_coc_ids"] = ["CO-1", "CO-OLD"]
+        other = next(
+            item for item in payload["records"]
+            if (item["source_panel"], item["frozen_coc_id"], item["year"])
+            == ("pit_panel", "CO-2", 2020)
+        )
+        other["status"] = "reconciled"
+        other["source_coc_ids"] = ["CO-OLD"]
+        other["count_operation"] = "single"
+        other["evidence_ref"] = "audit://other"
+        other["count_evidence_ref"] = "audit://other-count"
+        other["approval_ref"] = "review://other"
+        other["reconciliation_basis"] = "documented"
+        other["geometry_status"] = "compatible"
+
+    with pytest.raises(BoundaryCompatibilityError) as error:
+        _validate(payload)
+
+    assert error.value.code == error_code
 
 
 @pytest.mark.parametrize(

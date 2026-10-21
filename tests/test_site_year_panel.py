@@ -86,6 +86,68 @@ def _compatibility_payload():
     }
 
 
+PROVIDENCE_MEMBERSHIPS = (("MSA-Providence", "MA-505"),)
+PROVIDENCE_PREDECESSORS = ("MA-505", "MA-519")
+
+
+def _providence_v2_evidence():
+    records = []
+    for panel_id in ("pit_coc", "hic_coc"):
+        record = {
+            "source_panel": panel_id,
+            "frozen_coc_id": "MA-505",
+            "year": 2020,
+            "frozen_boundary_vintage": FROZEN_VINTAGE,
+            "source_boundary_vintage": "2020",
+            "status": "reconciled",
+            "reason": "Reviewed administrative predecessor-union count reconciliation.",
+            "evidence_ref": "audit://providence/ma505-ma519-reconciliation",
+            "approval_ref": (
+                "docs/providence-historical-reconciliation.md#integration-review-"
+                "administrative-count-reconciliation"
+            ),
+            "reconciliation_basis": (
+                "The same named municipal membership is supported by the merger record "
+                "and jurisdiction cross-check."
+            ),
+            "geometry_status": "different_unresolved",
+            "geometry_evidence_ref": "audit://providence/geometry/2020",
+            "geometry_residual": "13.499083 km2 symmetric difference; cause unresolved.",
+            "source_coc_ids": ["MA-505"],
+            "count_operation": "preaggregated",
+            "preaggregated_source_coc_ids": list(PROVIDENCE_PREDECESSORS),
+            "count_evidence_ref": "audit://providence/pit-p2024-hic-2020-counts",
+        }
+        if panel_id == "hic_coc":
+            record.update(
+                {
+                    "source_coc_ids": list(PROVIDENCE_PREDECESSORS),
+                    "count_operation": "sum",
+                    "preaggregated_source_coc_ids": [],
+                }
+            )
+        records.append(record)
+    payload = {
+        "schema_version": "coc_boundary_compatibility/2",
+        "evidence_id": "providence-ma505-ma519-2020-review-candidate",
+        "artifact_id": ARTIFACT_ID,
+        "threshold": THRESHOLD,
+        "membership_identity": MEMBERSHIP_IDENTITY,
+        "frozen_boundary_vintage": FROZEN_VINTAGE,
+        "records": records,
+    }
+    return validate_coc_boundary_compatibility(
+        payload,
+        artifact_id=ARTIFACT_ID,
+        threshold=THRESHOLD,
+        membership_identity=MEMBERSHIP_IDENTITY,
+        frozen_boundary_vintage=FROZEN_VINTAGE,
+        frozen_memberships=PROVIDENCE_MEMBERSHIPS,
+        requested_years=(2020,),
+        source_panel_vintages={("pit_coc", 2020): "2020", ("hic_coc", 2020): "2020"},
+    )
+
+
 def _compatibility(memberships=MEMBERSHIPS):
     return validate_coc_boundary_compatibility(
         _compatibility_payload(),
@@ -160,6 +222,7 @@ def test_aggregation_sums_exact_whole_coc_values_and_emits_canonical_schema():
     assert result.provenance["site_year_panel"]["boundary_evidence"] == {
         "evidence_id": "boundary-audit-fixture",
         "fingerprint": _compatibility().evidence_fingerprint,
+        "schema_version": "coc_boundary_compatibility/1",
     }
     assert result.provenance["site_year_panel"]["row_count"] == 2
 
@@ -222,6 +285,54 @@ def test_missing_source_member_prevents_partial_sum():
     assert row_2020[f"{PIT_MEASURE}__observed_coc_count"] == 1
     assert row_2020[f"{PIT_MEASURE}__missing_coc_ids"] == ["CO-2"]
     assert row_2020[f"{PIT_MEASURE}__status"] == "incomplete"
+
+
+def test_v2_preaggregated_pit_and_hic_predecessor_sum_have_distinct_operations():
+    evidence = _providence_v2_evidence()
+    pit = pd.DataFrame(
+        [("MA-505", 2020, 76, 50, 26)],
+        columns=["coc_id", "year", PIT_MEASURE, PIT_SHELTERED, PIT_UNSHELTERED],
+    )
+    hic = pd.DataFrame(
+        [("MA-505", 2020, 300), ("MA-519", 2020, 378)],
+        columns=["coc_id", "year", HIC_MEASURE],
+    )
+    result = _assemble(
+        source_panels={"pit_coc": pit, "hic_coc": hic},
+        memberships=PROVIDENCE_MEMBERSHIPS,
+        evidence=evidence,
+        requested_years=(2020,),
+    )
+
+    row = result.panel.iloc[0]
+    assert row[PIT_MEASURE] == 76
+    assert row[HIC_MEASURE] == 678
+    assert row[f"{PIT_MEASURE}__status"] == "complete"
+    assert row[f"{HIC_MEASURE}__status"] == "complete"
+
+
+def test_v2_missing_hic_predecessor_prevents_partial_sum():
+    evidence = _providence_v2_evidence()
+    pit = pd.DataFrame(
+        [("MA-505", 2020, 76, 50, 26)],
+        columns=["coc_id", "year", PIT_MEASURE, PIT_SHELTERED, PIT_UNSHELTERED],
+    )
+    hic = pd.DataFrame(
+        [("MA-505", 2020, 300)],
+        columns=["coc_id", "year", HIC_MEASURE],
+    )
+    result = _assemble(
+        source_panels={"pit_coc": pit, "hic_coc": hic},
+        memberships=PROVIDENCE_MEMBERSHIPS,
+        evidence=evidence,
+        requested_years=(2020,),
+    )
+
+    row = result.panel.iloc[0]
+    assert pd.isna(row[HIC_MEASURE])
+    assert row[f"{HIC_MEASURE}__observed_coc_count"] == 0
+    assert row[f"{HIC_MEASURE}__missing_coc_ids"] == ["MA-505"]
+    assert row[f"{HIC_MEASURE}__status"] == "incomplete"
 
 
 @pytest.mark.parametrize(
