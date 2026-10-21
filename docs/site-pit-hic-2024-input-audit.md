@@ -46,6 +46,20 @@ All three bundles passed `hhplab results verify`: integrity and offline reproduc
 
 These are correlations of counts across differently sized sites. They do not estimate a causal effect of beds on homelessness or establish equal shelter utilization. The three thresholds also select different site sets. As an independent diagnostic, removing New York from the 90% sample lowers r to 0.972616; this diagnostic did not change any recipe's sample.
 
+## Unsheltered PIT comparison
+
+Matt requested the same comparison with `pit_unsheltered` on 2026-10-21. The three `recipes/site-unsheltered-pit-hic-2024-overlap{90,95,99}.yaml` recipes retain the same year, source files, shelter-bed definition, site memberships, and boundary evidence. All selected constituent values are present and non-null, so the samples have the same site counts as the sheltered runs. Independent whole-CoC aggregation reproduces the recipe results.
+
+| Threshold | Sites (n) | CoCs | Pearson r | Run ID |
+| --- | ---: | ---: | ---: | --- |
+| 90% | 87 | 144 | 0.322499189951 | `b289ff4a261e48378bd3cec8e5f49606` |
+| 95% | 72 | 107 | 0.324617337337 | `b1578791d63e4dc1ab6c18724dbea753` |
+| 99% | 64 | 84 | 0.981890760290 | `8d1f740060e446a39416dc33c612a317` |
+
+All runs matched their recipe locks and retain full local inputs in private bundles under `~/HHP-Output/results/<recipe-id>/<run-id>/`, using the same distribution policy as the sheltered runs. All three bundles passed integrity and full offline reproducibility verification, with no differences, errors, partial reasons, or unavailable inputs.
+
+The threshold comparison is sensitive to site composition. New York–Newark–Jersey City (MSA 35620) is included at 90% and 95%, but excluded at 99%. Its selected CoCs sum to 5,739 unsheltered people and 123,784 shelter beds. An independent leave-one-site-out diagnostic raises r to 0.784839 at 90% and 0.980923 at 95% when New York is removed. At 99%, removing Los Angeles (MSA 31080) lowers r to 0.933459. These diagnostics describe influence only; no site was removed from the recipe analyses.
+
 ## Boundary evidence artifact
 
 Use one `coc_boundary_compatibility/1` JSON artifact for each threshold, since its header binds one membership identity. The required header fields are `schema_version`, `evidence_id`, `artifact_id`, `threshold`, `membership_identity`, `frozen_boundary_vintage`, and `records`. Each record identifies `source_panel`, `frozen_coc_id`, `year`, `frozen_boundary_vintage`, `source_boundary_vintage`, `status`, and `reason`; `evidence_ref` is required for `compatible`. The records may use `status: compatible` for the 2024 same-year source join when they cite this audit and the HUD FY2024 catalog/service metadata, and state that the source CoC number directly matches the frozen B2024 CoC ID. Do not add `approval_ref` for a compatible record; that field is for an explicitly approved ID mapping. The evidence establishes the declared FY2024 source-to-geography match and direct ID resolution, not historical boundary stability.

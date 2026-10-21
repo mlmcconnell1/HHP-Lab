@@ -1,0 +1,108 @@
+# 2024 whole-CoC PIT unsheltered count and HIC shelter-bed correlation for
+# sites meeting the producer's 90% population-overlap threshold. This is a
+# descriptive Pearson correlation of aggregated 2024 counts.
+
+version: 2
+id: site-unsheltered-pit-hic-2024-overlap90
+title: 2024 PIT unsheltered count and HIC shelter beds at 90% MSA overlap
+authors: [HHP-Lab]
+universe: {range: "2024-2024"}
+
+targets:
+  - id: coc-outcomes
+    geometry: {type: coc, vintage: 2024, source: hud_exchange}
+    outputs: [panel]
+    panel_policy:
+      output_columns:
+        - coc_id
+        - coc_name
+        - year
+        - pit_unsheltered
+        - hic_shelter_year_round_beds
+
+datasets:
+  pit:
+    provider: hud
+    product: pit
+    version: 1
+    native_geometry: {type: coc}
+    years: "2024-2024"
+    year_column: pit_year
+    geo_column: coc_id
+    params: {vintage: 2024, align: point_in_time_jan}
+    path: data/curated/pit/pit__P2024@B2024.parquet
+  hic:
+    provider: hud
+    product: hic
+    version: 1
+    native_geometry: {type: coc}
+    years: "2024-2024"
+    year_column: hic_year
+    geo_column: coc_id
+    params: {align: point_in_time_jan}
+    file_set:
+      path_template: "data/curated/hic/hic__H{year}.parquet"
+      segments:
+        - years: "2024-2024"
+          geometry: {type: coc, vintage: 2024, source: hud_exchange}
+
+pipelines:
+  - id: build_coc_outcomes
+    target: coc-outcomes
+    steps:
+      - resample:
+          dataset: pit
+          to_geometry: {type: coc, vintage: 2024, source: hud_exchange}
+          method: identity
+          measures: [pit_unsheltered]
+      - resample:
+          dataset: hic
+          to_geometry: {type: coc, vintage: 2024, source: hud_exchange}
+          method: identity
+          measures: [hic_shelter_year_round_beds]
+      - join:
+          datasets: [pit, hic]
+          join_on: [geo_id, year]
+
+panels:
+  coc_outcomes:
+    ref: {pipeline: build_coc_outcomes, output: panel}
+    geo_key: coc_id
+    time_key: year
+  site_year:
+    geo_key: msa_id
+    time_key: year
+    site_year:
+      universe: site_universe
+      boundary_evidence:
+        path: site-inputs/coc-boundary-compatibility-2024-overlap90.json
+      outcomes:
+        pit: {panel: coc_outcomes, measures: [pit_unsheltered]}
+        hic: {panel: coc_outcomes, measures: [hic_shelter_year_round_beds]}
+
+site_universe:
+  source:
+    artifact_id: overlap_samples
+    sites_path: ../../../HHP-Output/msa_coc_overlap_sites_2024/msa_coc_sites__overlap_samples.parquet
+    memberships_path: ../../../HHP-Output/msa_coc_overlap_sites_2024/msa_coc_memberships__overlap_samples.parquet
+  threshold: 0.90
+  site_key: msa_id
+
+sample_groups:
+  site_year_2024:
+    sample:
+      years: {from: 2024, to: 2024}
+      require: [pit_unsheltered, hic_shelter_year_round_beds]
+
+analyses:
+  - id: correlation_2024
+    method: correlation
+    input: panels.site_year
+    sample: {group: site_year_2024}
+    columns: [pit_unsheltered, hic_shelter_year_round_beds]
+    kind: pearson
+
+results:
+  bundle_dir: results/{id}/{run_id}
+  include_panels: [coc_outcomes, site_year]
+  report: {title: 2024 PIT unsheltered and HIC shelter-bed correlation}
