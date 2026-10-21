@@ -1,0 +1,1080 @@
+{
+  "schema_version": "coc_boundary_compatibility/1",
+  "evidence_id": "hud-fy2024-same-year-overlap95",
+  "artifact_id": "overlap_samples",
+  "threshold": 0.95,
+  "membership_identity": "482174ce2976a17eedad0190e5038db5f24102c719f77364917a2034086c06eb",
+  "frozen_boundary_vintage": "2024",
+  "records": [
+    {
+      "source_panel": "coc_outcomes",
+      "frozen_coc_id": "AL-504",
+      "year": 2024,
+      "frozen_boundary_vintage": "2024",
+      "source_boundary_vintage": "2024",
+      "status": "compatible",
+      "reason": "Same-year FY2024 CoC correspondence: official HUD catalog identifies the snapshot service as FY2024 coverage; HUD PIT and HIC 2024 sheets identify this CoC. See audit for source hashes and snapshot-date limitation. No historical remapping or allocation.",
+      "evidence_ref": "docs/site-pit-hic-2024-input-audit.md"
+    },
+    {
+      "source_panel": "coc_outcomes",
+      "frozen_coc_id": "AR-501",
+      "year": 2024,
+      "frozen_boundary_vintage": "2024",
+      "source_boundary_vintage": "2024",
+      "status": "compatible",
+      "reason": "Same-year FY2024 CoC correspondence: official HUD catalog identifies the snapshot service as FY2024 coverage; HUD PIT and HIC 2024 sheets identify this CoC. See audit for source hashes and snapshot-date limitation. No historical remapping or allocation.",
+      "evidence_ref": "docs/site-pit-hic-2024-input-audit.md"
+    },
+    {
+      "source_panel": "coc_outcomes",
+      "frozen_coc_id": "AZ-501",
+      "year": 2024,
+      "frozen_boundary_vintage": "2024",
+      "source_boundary_vintage": "2024",
+      "status": "compatible",
+      "reason": "Same-year FY2024 CoC correspondence: official HUD catalog identifies the snapshot service as FY2024 coverage; HUD PIT and HIC 2024 sheets identify this CoC. See audit for source hashes and snapshot-date limitation. No historical remapping or allocation.",
+      "evidence_ref": "docs/site-pit-hic-2024-input-audit.md"
+    },
+    {
+      "source_panel": "coc_outcomes",
+      "frozen_coc_id": "CA-500",
+      "year": 2024,
+      "frozen_boundary_vintage": "2024",
+      "source_boundary_vintage": "2024",
+      "status": "compatible",
+      "reason": "Same-year FY2024 CoC correspondence: official HUD catalog identifies the snapshot service as FY2024 coverage; HUD PIT and HIC 2024 sheets identify this CoC. See audit for source hashes and snapshot-date limitation. No historical remapping or allocation.",
+      "evidence_ref": "docs/site-pit-hic-2024-input-audit.md"
+    },
+    {
+      "source_panel": "coc_outcomes",
+      "frozen_coc_id": "CA-501",
+      "year": 2024,
+      "frozen_boundary_vintage": "2024",
+      "source_boundary_vintage": "2024",
+      "status": "compatible",
+      "reason": "Same-year FY2024 CoC correspondence: official HUD catalog identifies the snapshot service as FY2024 coverage; HUD PIT and HIC 2024 sheets identify this CoC. See audit for source hashes and snapshot-date limitation. No historical remapping or allocation.",
+      "evidence_ref": "docs/site-pit-hic-2024-input-audit.md"
+    },
+    {
+      "source_panel": "coc_outcomes",
+      "frozen_coc_id": "CA-502",
+      "year": 2024,
+      "frozen_boundary_vintage": "2024",
+      "source_boundary_vintage": "2024",
+      "status": "compatible",
+      "reason": "Same-year FY2024 CoC correspondence: official HUD catalog identifies the snapshot service as FY2024 coverage; HUD PIT and HIC 2024 sheets identify this CoC. See audit for source hashes and snapshot-date limitation. No historical remapping or allocation.",
+      "evidence_ref": "docs/site-pit-hic-2024-input-audit.md"
+    },
+    {
+      "source_panel": "coc_outcomes",
+      "frozen_coc_id": "CA-503",
+      "year": 2024,
+      "frozen_boundary_vintage": "2024",
+      "source_boundary_vintage": "2024",
+      "status": "compatible",
+      "reason": "Same-year FY2024 CoC correspondence: official HUD catalog identifies the snapshot service as FY2024 coverage; HUD PIT and HIC 2024 sheets identify this CoC. See audit for source hashes and snapshot-date limitation. No historical remapping or allocation.",
+      "evidence_ref": "docs/site-pit-hic-2024-input-audit.md"
+    },
+    {
+      "source_panel": "coc_outcomes",
+      "frozen_coc_id": "CA-504",
+      "year": 2024,
+      "frozen_boundary_vintage": "2024",
+      "source_boundary_vintage": "2024",
+      "status": "compatible",
+      "reason": "Same-year FY2024 CoC correspondence: official HUD catalog identifies the snapshot service as FY2024 coverage; HUD PIT and HIC 2024 sheets identify this CoC. See audit for source hashes and snapshot-date limitation. No historical remapping or allocation.",
+      "evidence_ref": "docs/site-pit-hic-2024-input-audit.md"
+    },
+    {
+      "source_panel": "coc_outcomes",
+      "frozen_coc_id": "CA-505",
+      "year": 2024,
+      "frozen_boundary_vintage": "2024",
+      "source_boundary_vintage": "2024",
+      "status": "compatible",
+      "reason": "Same-year FY2024 CoC correspondence: official HUD catalog identifies the snapshot service as FY2024 coverage; HUD PIT and HIC 2024 sheets identify this CoC. See audit for source hashes and snapshot-date limitation. No historical remapping or allocation.",
+      "evidence_ref": "docs/site-pit-hic-2024-input-audit.md"
+    },
+    {
+      "source_panel": "coc_outcomes",
+      "frozen_coc_id": "CA-507",
+      "year": 2024,
+      "frozen_boundary_vintage": "2024",
+      "source_boundary_vintage": "2024",
+      "status": "compatible",
+      "reason": "Same-year FY2024 CoC correspondence: official HUD catalog identifies the snapshot service as FY2024 coverage; HUD PIT and HIC 2024 sheets identify this CoC. See audit for source hashes and snapshot-date limitation. No historical remapping or allocation.",
+      "evidence_ref": "docs/site-pit-hic-2024-input-audit.md"
+    },
+    {
+      "source_panel": "coc_outcomes",
+      "frozen_coc_id": "CA-508",
+      "year": 2024,
+      "frozen_boundary_vintage": "2024",
+      "source_boundary_vintage": "2024",
+      "status": "compatible",
+      "reason": "Same-year FY2024 CoC correspondence: official HUD catalog identifies the snapshot service as FY2024 coverage; HUD PIT and HIC 2024 sheets identify this CoC. See audit for source hashes and snapshot-date limitation. No historical remapping or allocation.",
+      "evidence_ref": "docs/site-pit-hic-2024-input-audit.md"
+    },
+    {
+      "source_panel": "coc_outcomes",
+      "frozen_coc_id": "CA-510",
+      "year": 2024,
+      "frozen_boundary_vintage": "2024",
+      "source_boundary_vintage": "2024",
+      "status": "compatible",
+      "reason": "Same-year FY2024 CoC correspondence: official HUD catalog identifies the snapshot service as FY2024 coverage; HUD PIT and HIC 2024 sheets identify this CoC. See audit for source hashes and snapshot-date limitation. No historical remapping or allocation.",
+      "evidence_ref": "docs/site-pit-hic-2024-input-audit.md"
+    },
+    {
+      "source_panel": "coc_outcomes",
+      "frozen_coc_id": "CA-511",
+      "year": 2024,
+      "frozen_boundary_vintage": "2024",
+      "source_boundary_vintage": "2024",
+      "status": "compatible",
+      "reason": "Same-year FY2024 CoC correspondence: official HUD catalog identifies the snapshot service as FY2024 coverage; HUD PIT and HIC 2024 sheets identify this CoC. See audit for source hashes and snapshot-date limitation. No historical remapping or allocation.",
+      "evidence_ref": "docs/site-pit-hic-2024-input-audit.md"
+    },
+    {
+      "source_panel": "coc_outcomes",
+      "frozen_coc_id": "CA-512",
+      "year": 2024,
+      "frozen_boundary_vintage": "2024",
+      "source_boundary_vintage": "2024",
+      "status": "compatible",
+      "reason": "Same-year FY2024 CoC correspondence: official HUD catalog identifies the snapshot service as FY2024 coverage; HUD PIT and HIC 2024 sheets identify this CoC. See audit for source hashes and snapshot-date limitation. No historical remapping or allocation.",
+      "evidence_ref": "docs/site-pit-hic-2024-input-audit.md"
+    },
+    {
+      "source_panel": "coc_outcomes",
+      "frozen_coc_id": "CA-514",
+      "year": 2024,
+      "frozen_boundary_vintage": "2024",
+      "source_boundary_vintage": "2024",
+      "status": "compatible",
+      "reason": "Same-year FY2024 CoC correspondence: official HUD catalog identifies the snapshot service as FY2024 coverage; HUD PIT and HIC 2024 sheets identify this CoC. See audit for source hashes and snapshot-date limitation. No historical remapping or allocation.",
+      "evidence_ref": "docs/site-pit-hic-2024-input-audit.md"
+    },
+    {
+      "source_panel": "coc_outcomes",
+      "frozen_coc_id": "CA-515",
+      "year": 2024,
+      "frozen_boundary_vintage": "2024",
+      "source_boundary_vintage": "2024",
+      "status": "compatible",
+      "reason": "Same-year FY2024 CoC correspondence: official HUD catalog identifies the snapshot service as FY2024 coverage; HUD PIT and HIC 2024 sheets identify this CoC. See audit for source hashes and snapshot-date limitation. No historical remapping or allocation.",
+      "evidence_ref": "docs/site-pit-hic-2024-input-audit.md"
+    },
+    {
+      "source_panel": "coc_outcomes",
+      "frozen_coc_id": "CA-517",
+      "year": 2024,
+      "frozen_boundary_vintage": "2024",
+      "source_boundary_vintage": "2024",
+      "status": "compatible",
+      "reason": "Same-year FY2024 CoC correspondence: official HUD catalog identifies the snapshot service as FY2024 coverage; HUD PIT and HIC 2024 sheets identify this CoC. See audit for source hashes and snapshot-date limitation. No historical remapping or allocation.",
+      "evidence_ref": "docs/site-pit-hic-2024-input-audit.md"
+    },
+    {
+      "source_panel": "coc_outcomes",
+      "frozen_coc_id": "CA-518",
+      "year": 2024,
+      "frozen_boundary_vintage": "2024",
+      "source_boundary_vintage": "2024",
+      "status": "compatible",
+      "reason": "Same-year FY2024 CoC correspondence: official HUD catalog identifies the snapshot service as FY2024 coverage; HUD PIT and HIC 2024 sheets identify this CoC. See audit for source hashes and snapshot-date limitation. No historical remapping or allocation.",
+      "evidence_ref": "docs/site-pit-hic-2024-input-audit.md"
+    },
+    {
+      "source_panel": "coc_outcomes",
+      "frozen_coc_id": "CA-519",
+      "year": 2024,
+      "frozen_boundary_vintage": "2024",
+      "source_boundary_vintage": "2024",
+      "status": "compatible",
+      "reason": "Same-year FY2024 CoC correspondence: official HUD catalog identifies the snapshot service as FY2024 coverage; HUD PIT and HIC 2024 sheets identify this CoC. See audit for source hashes and snapshot-date limitation. No historical remapping or allocation.",
+      "evidence_ref": "docs/site-pit-hic-2024-input-audit.md"
+    },
+    {
+      "source_panel": "coc_outcomes",
+      "frozen_coc_id": "CA-520",
+      "year": 2024,
+      "frozen_boundary_vintage": "2024",
+      "source_boundary_vintage": "2024",
+      "status": "compatible",
+      "reason": "Same-year FY2024 CoC correspondence: official HUD catalog identifies the snapshot service as FY2024 coverage; HUD PIT and HIC 2024 sheets identify this CoC. See audit for source hashes and snapshot-date limitation. No historical remapping or allocation.",
+      "evidence_ref": "docs/site-pit-hic-2024-input-audit.md"
+    },
+    {
+      "source_panel": "coc_outcomes",
+      "frozen_coc_id": "CA-521",
+      "year": 2024,
+      "frozen_boundary_vintage": "2024",
+      "source_boundary_vintage": "2024",
+      "status": "compatible",
+      "reason": "Same-year FY2024 CoC correspondence: official HUD catalog identifies the snapshot service as FY2024 coverage; HUD PIT and HIC 2024 sheets identify this CoC. See audit for source hashes and snapshot-date limitation. No historical remapping or allocation.",
+      "evidence_ref": "docs/site-pit-hic-2024-input-audit.md"
+    },
+    {
+      "source_panel": "coc_outcomes",
+      "frozen_coc_id": "CA-524",
+      "year": 2024,
+      "frozen_boundary_vintage": "2024",
+      "source_boundary_vintage": "2024",
+      "status": "compatible",
+      "reason": "Same-year FY2024 CoC correspondence: official HUD catalog identifies the snapshot service as FY2024 coverage; HUD PIT and HIC 2024 sheets identify this CoC. See audit for source hashes and snapshot-date limitation. No historical remapping or allocation.",
+      "evidence_ref": "docs/site-pit-hic-2024-input-audit.md"
+    },
+    {
+      "source_panel": "coc_outcomes",
+      "frozen_coc_id": "CA-525",
+      "year": 2024,
+      "frozen_boundary_vintage": "2024",
+      "source_boundary_vintage": "2024",
+      "status": "compatible",
+      "reason": "Same-year FY2024 CoC correspondence: official HUD catalog identifies the snapshot service as FY2024 coverage; HUD PIT and HIC 2024 sheets identify this CoC. See audit for source hashes and snapshot-date limitation. No historical remapping or allocation.",
+      "evidence_ref": "docs/site-pit-hic-2024-input-audit.md"
+    },
+    {
+      "source_panel": "coc_outcomes",
+      "frozen_coc_id": "CA-600",
+      "year": 2024,
+      "frozen_boundary_vintage": "2024",
+      "source_boundary_vintage": "2024",
+      "status": "compatible",
+      "reason": "Same-year FY2024 CoC correspondence: official HUD catalog identifies the snapshot service as FY2024 coverage; HUD PIT and HIC 2024 sheets identify this CoC. See audit for source hashes and snapshot-date limitation. No historical remapping or allocation.",
+      "evidence_ref": "docs/site-pit-hic-2024-input-audit.md"
+    },
+    {
+      "source_panel": "coc_outcomes",
+      "frozen_coc_id": "CA-601",
+      "year": 2024,
+      "frozen_boundary_vintage": "2024",
+      "source_boundary_vintage": "2024",
+      "status": "compatible",
+      "reason": "Same-year FY2024 CoC correspondence: official HUD catalog identifies the snapshot service as FY2024 coverage; HUD PIT and HIC 2024 sheets identify this CoC. See audit for source hashes and snapshot-date limitation. No historical remapping or allocation.",
+      "evidence_ref": "docs/site-pit-hic-2024-input-audit.md"
+    },
+    {
+      "source_panel": "coc_outcomes",
+      "frozen_coc_id": "CA-602",
+      "year": 2024,
+      "frozen_boundary_vintage": "2024",
+      "source_boundary_vintage": "2024",
+      "status": "compatible",
+      "reason": "Same-year FY2024 CoC correspondence: official HUD catalog identifies the snapshot service as FY2024 coverage; HUD PIT and HIC 2024 sheets identify this CoC. See audit for source hashes and snapshot-date limitation. No historical remapping or allocation.",
+      "evidence_ref": "docs/site-pit-hic-2024-input-audit.md"
+    },
+    {
+      "source_panel": "coc_outcomes",
+      "frozen_coc_id": "CA-603",
+      "year": 2024,
+      "frozen_boundary_vintage": "2024",
+      "source_boundary_vintage": "2024",
+      "status": "compatible",
+      "reason": "Same-year FY2024 CoC correspondence: official HUD catalog identifies the snapshot service as FY2024 coverage; HUD PIT and HIC 2024 sheets identify this CoC. See audit for source hashes and snapshot-date limitation. No historical remapping or allocation.",
+      "evidence_ref": "docs/site-pit-hic-2024-input-audit.md"
+    },
+    {
+      "source_panel": "coc_outcomes",
+      "frozen_coc_id": "CA-604",
+      "year": 2024,
+      "frozen_boundary_vintage": "2024",
+      "source_boundary_vintage": "2024",
+      "status": "compatible",
+      "reason": "Same-year FY2024 CoC correspondence: official HUD catalog identifies the snapshot service as FY2024 coverage; HUD PIT and HIC 2024 sheets identify this CoC. See audit for source hashes and snapshot-date limitation. No historical remapping or allocation.",
+      "evidence_ref": "docs/site-pit-hic-2024-input-audit.md"
+    },
+    {
+      "source_panel": "coc_outcomes",
+      "frozen_coc_id": "CA-606",
+      "year": 2024,
+      "frozen_boundary_vintage": "2024",
+      "source_boundary_vintage": "2024",
+      "status": "compatible",
+      "reason": "Same-year FY2024 CoC correspondence: official HUD catalog identifies the snapshot service as FY2024 coverage; HUD PIT and HIC 2024 sheets identify this CoC. See audit for source hashes and snapshot-date limitation. No historical remapping or allocation.",
+      "evidence_ref": "docs/site-pit-hic-2024-input-audit.md"
+    },
+    {
+      "source_panel": "coc_outcomes",
+      "frozen_coc_id": "CA-607",
+      "year": 2024,
+      "frozen_boundary_vintage": "2024",
+      "source_boundary_vintage": "2024",
+      "status": "compatible",
+      "reason": "Same-year FY2024 CoC correspondence: official HUD catalog identifies the snapshot service as FY2024 coverage; HUD PIT and HIC 2024 sheets identify this CoC. See audit for source hashes and snapshot-date limitation. No historical remapping or allocation.",
+      "evidence_ref": "docs/site-pit-hic-2024-input-audit.md"
+    },
+    {
+      "source_panel": "coc_outcomes",
+      "frozen_coc_id": "CA-608",
+      "year": 2024,
+      "frozen_boundary_vintage": "2024",
+      "source_boundary_vintage": "2024",
+      "status": "compatible",
+      "reason": "Same-year FY2024 CoC correspondence: official HUD catalog identifies the snapshot service as FY2024 coverage; HUD PIT and HIC 2024 sheets identify this CoC. See audit for source hashes and snapshot-date limitation. No historical remapping or allocation.",
+      "evidence_ref": "docs/site-pit-hic-2024-input-audit.md"
+    },
+    {
+      "source_panel": "coc_outcomes",
+      "frozen_coc_id": "CA-609",
+      "year": 2024,
+      "frozen_boundary_vintage": "2024",
+      "source_boundary_vintage": "2024",
+      "status": "compatible",
+      "reason": "Same-year FY2024 CoC correspondence: official HUD catalog identifies the snapshot service as FY2024 coverage; HUD PIT and HIC 2024 sheets identify this CoC. See audit for source hashes and snapshot-date limitation. No historical remapping or allocation.",
+      "evidence_ref": "docs/site-pit-hic-2024-input-audit.md"
+    },
+    {
+      "source_panel": "coc_outcomes",
+      "frozen_coc_id": "CA-611",
+      "year": 2024,
+      "frozen_boundary_vintage": "2024",
+      "source_boundary_vintage": "2024",
+      "status": "compatible",
+      "reason": "Same-year FY2024 CoC correspondence: official HUD catalog identifies the snapshot service as FY2024 coverage; HUD PIT and HIC 2024 sheets identify this CoC. See audit for source hashes and snapshot-date limitation. No historical remapping or allocation.",
+      "evidence_ref": "docs/site-pit-hic-2024-input-audit.md"
+    },
+    {
+      "source_panel": "coc_outcomes",
+      "frozen_coc_id": "CA-612",
+      "year": 2024,
+      "frozen_boundary_vintage": "2024",
+      "source_boundary_vintage": "2024",
+      "status": "compatible",
+      "reason": "Same-year FY2024 CoC correspondence: official HUD catalog identifies the snapshot service as FY2024 coverage; HUD PIT and HIC 2024 sheets identify this CoC. See audit for source hashes and snapshot-date limitation. No historical remapping or allocation.",
+      "evidence_ref": "docs/site-pit-hic-2024-input-audit.md"
+    },
+    {
+      "source_panel": "coc_outcomes",
+      "frozen_coc_id": "CA-613",
+      "year": 2024,
+      "frozen_boundary_vintage": "2024",
+      "source_boundary_vintage": "2024",
+      "status": "compatible",
+      "reason": "Same-year FY2024 CoC correspondence: official HUD catalog identifies the snapshot service as FY2024 coverage; HUD PIT and HIC 2024 sheets identify this CoC. See audit for source hashes and snapshot-date limitation. No historical remapping or allocation.",
+      "evidence_ref": "docs/site-pit-hic-2024-input-audit.md"
+    },
+    {
+      "source_panel": "coc_outcomes",
+      "frozen_coc_id": "CA-614",
+      "year": 2024,
+      "frozen_boundary_vintage": "2024",
+      "source_boundary_vintage": "2024",
+      "status": "compatible",
+      "reason": "Same-year FY2024 CoC correspondence: official HUD catalog identifies the snapshot service as FY2024 coverage; HUD PIT and HIC 2024 sheets identify this CoC. See audit for source hashes and snapshot-date limitation. No historical remapping or allocation.",
+      "evidence_ref": "docs/site-pit-hic-2024-input-audit.md"
+    },
+    {
+      "source_panel": "coc_outcomes",
+      "frozen_coc_id": "CO-504",
+      "year": 2024,
+      "frozen_boundary_vintage": "2024",
+      "source_boundary_vintage": "2024",
+      "status": "compatible",
+      "reason": "Same-year FY2024 CoC correspondence: official HUD catalog identifies the snapshot service as FY2024 coverage; HUD PIT and HIC 2024 sheets identify this CoC. See audit for source hashes and snapshot-date limitation. No historical remapping or allocation.",
+      "evidence_ref": "docs/site-pit-hic-2024-input-audit.md"
+    },
+    {
+      "source_panel": "coc_outcomes",
+      "frozen_coc_id": "CT-503",
+      "year": 2024,
+      "frozen_boundary_vintage": "2024",
+      "source_boundary_vintage": "2024",
+      "status": "compatible",
+      "reason": "Same-year FY2024 CoC correspondence: official HUD catalog identifies the snapshot service as FY2024 coverage; HUD PIT and HIC 2024 sheets identify this CoC. See audit for source hashes and snapshot-date limitation. No historical remapping or allocation.",
+      "evidence_ref": "docs/site-pit-hic-2024-input-audit.md"
+    },
+    {
+      "source_panel": "coc_outcomes",
+      "frozen_coc_id": "FL-500",
+      "year": 2024,
+      "frozen_boundary_vintage": "2024",
+      "source_boundary_vintage": "2024",
+      "status": "compatible",
+      "reason": "Same-year FY2024 CoC correspondence: official HUD catalog identifies the snapshot service as FY2024 coverage; HUD PIT and HIC 2024 sheets identify this CoC. See audit for source hashes and snapshot-date limitation. No historical remapping or allocation.",
+      "evidence_ref": "docs/site-pit-hic-2024-input-audit.md"
+    },
+    {
+      "source_panel": "coc_outcomes",
+      "frozen_coc_id": "FL-503",
+      "year": 2024,
+      "frozen_boundary_vintage": "2024",
+      "source_boundary_vintage": "2024",
+      "status": "compatible",
+      "reason": "Same-year FY2024 CoC correspondence: official HUD catalog identifies the snapshot service as FY2024 coverage; HUD PIT and HIC 2024 sheets identify this CoC. See audit for source hashes and snapshot-date limitation. No historical remapping or allocation.",
+      "evidence_ref": "docs/site-pit-hic-2024-input-audit.md"
+    },
+    {
+      "source_panel": "coc_outcomes",
+      "frozen_coc_id": "FL-504",
+      "year": 2024,
+      "frozen_boundary_vintage": "2024",
+      "source_boundary_vintage": "2024",
+      "status": "compatible",
+      "reason": "Same-year FY2024 CoC correspondence: official HUD catalog identifies the snapshot service as FY2024 coverage; HUD PIT and HIC 2024 sheets identify this CoC. See audit for source hashes and snapshot-date limitation. No historical remapping or allocation.",
+      "evidence_ref": "docs/site-pit-hic-2024-input-audit.md"
+    },
+    {
+      "source_panel": "coc_outcomes",
+      "frozen_coc_id": "FL-505",
+      "year": 2024,
+      "frozen_boundary_vintage": "2024",
+      "source_boundary_vintage": "2024",
+      "status": "compatible",
+      "reason": "Same-year FY2024 CoC correspondence: official HUD catalog identifies the snapshot service as FY2024 coverage; HUD PIT and HIC 2024 sheets identify this CoC. See audit for source hashes and snapshot-date limitation. No historical remapping or allocation.",
+      "evidence_ref": "docs/site-pit-hic-2024-input-audit.md"
+    },
+    {
+      "source_panel": "coc_outcomes",
+      "frozen_coc_id": "FL-510",
+      "year": 2024,
+      "frozen_boundary_vintage": "2024",
+      "source_boundary_vintage": "2024",
+      "status": "compatible",
+      "reason": "Same-year FY2024 CoC correspondence: official HUD catalog identifies the snapshot service as FY2024 coverage; HUD PIT and HIC 2024 sheets identify this CoC. See audit for source hashes and snapshot-date limitation. No historical remapping or allocation.",
+      "evidence_ref": "docs/site-pit-hic-2024-input-audit.md"
+    },
+    {
+      "source_panel": "coc_outcomes",
+      "frozen_coc_id": "FL-511",
+      "year": 2024,
+      "frozen_boundary_vintage": "2024",
+      "source_boundary_vintage": "2024",
+      "status": "compatible",
+      "reason": "Same-year FY2024 CoC correspondence: official HUD catalog identifies the snapshot service as FY2024 coverage; HUD PIT and HIC 2024 sheets identify this CoC. See audit for source hashes and snapshot-date limitation. No historical remapping or allocation.",
+      "evidence_ref": "docs/site-pit-hic-2024-input-audit.md"
+    },
+    {
+      "source_panel": "coc_outcomes",
+      "frozen_coc_id": "FL-512",
+      "year": 2024,
+      "frozen_boundary_vintage": "2024",
+      "source_boundary_vintage": "2024",
+      "status": "compatible",
+      "reason": "Same-year FY2024 CoC correspondence: official HUD catalog identifies the snapshot service as FY2024 coverage; HUD PIT and HIC 2024 sheets identify this CoC. See audit for source hashes and snapshot-date limitation. No historical remapping or allocation.",
+      "evidence_ref": "docs/site-pit-hic-2024-input-audit.md"
+    },
+    {
+      "source_panel": "coc_outcomes",
+      "frozen_coc_id": "FL-513",
+      "year": 2024,
+      "frozen_boundary_vintage": "2024",
+      "source_boundary_vintage": "2024",
+      "status": "compatible",
+      "reason": "Same-year FY2024 CoC correspondence: official HUD catalog identifies the snapshot service as FY2024 coverage; HUD PIT and HIC 2024 sheets identify this CoC. See audit for source hashes and snapshot-date limitation. No historical remapping or allocation.",
+      "evidence_ref": "docs/site-pit-hic-2024-input-audit.md"
+    },
+    {
+      "source_panel": "coc_outcomes",
+      "frozen_coc_id": "FL-514",
+      "year": 2024,
+      "frozen_boundary_vintage": "2024",
+      "source_boundary_vintage": "2024",
+      "status": "compatible",
+      "reason": "Same-year FY2024 CoC correspondence: official HUD catalog identifies the snapshot service as FY2024 coverage; HUD PIT and HIC 2024 sheets identify this CoC. See audit for source hashes and snapshot-date limitation. No historical remapping or allocation.",
+      "evidence_ref": "docs/site-pit-hic-2024-input-audit.md"
+    },
+    {
+      "source_panel": "coc_outcomes",
+      "frozen_coc_id": "FL-600",
+      "year": 2024,
+      "frozen_boundary_vintage": "2024",
+      "source_boundary_vintage": "2024",
+      "status": "compatible",
+      "reason": "Same-year FY2024 CoC correspondence: official HUD catalog identifies the snapshot service as FY2024 coverage; HUD PIT and HIC 2024 sheets identify this CoC. See audit for source hashes and snapshot-date limitation. No historical remapping or allocation.",
+      "evidence_ref": "docs/site-pit-hic-2024-input-audit.md"
+    },
+    {
+      "source_panel": "coc_outcomes",
+      "frozen_coc_id": "FL-601",
+      "year": 2024,
+      "frozen_boundary_vintage": "2024",
+      "source_boundary_vintage": "2024",
+      "status": "compatible",
+      "reason": "Same-year FY2024 CoC correspondence: official HUD catalog identifies the snapshot service as FY2024 coverage; HUD PIT and HIC 2024 sheets identify this CoC. See audit for source hashes and snapshot-date limitation. No historical remapping or allocation.",
+      "evidence_ref": "docs/site-pit-hic-2024-input-audit.md"
+    },
+    {
+      "source_panel": "coc_outcomes",
+      "frozen_coc_id": "FL-602",
+      "year": 2024,
+      "frozen_boundary_vintage": "2024",
+      "source_boundary_vintage": "2024",
+      "status": "compatible",
+      "reason": "Same-year FY2024 CoC correspondence: official HUD catalog identifies the snapshot service as FY2024 coverage; HUD PIT and HIC 2024 sheets identify this CoC. See audit for source hashes and snapshot-date limitation. No historical remapping or allocation.",
+      "evidence_ref": "docs/site-pit-hic-2024-input-audit.md"
+    },
+    {
+      "source_panel": "coc_outcomes",
+      "frozen_coc_id": "FL-603",
+      "year": 2024,
+      "frozen_boundary_vintage": "2024",
+      "source_boundary_vintage": "2024",
+      "status": "compatible",
+      "reason": "Same-year FY2024 CoC correspondence: official HUD catalog identifies the snapshot service as FY2024 coverage; HUD PIT and HIC 2024 sheets identify this CoC. See audit for source hashes and snapshot-date limitation. No historical remapping or allocation.",
+      "evidence_ref": "docs/site-pit-hic-2024-input-audit.md"
+    },
+    {
+      "source_panel": "coc_outcomes",
+      "frozen_coc_id": "FL-605",
+      "year": 2024,
+      "frozen_boundary_vintage": "2024",
+      "source_boundary_vintage": "2024",
+      "status": "compatible",
+      "reason": "Same-year FY2024 CoC correspondence: official HUD catalog identifies the snapshot service as FY2024 coverage; HUD PIT and HIC 2024 sheets identify this CoC. See audit for source hashes and snapshot-date limitation. No historical remapping or allocation.",
+      "evidence_ref": "docs/site-pit-hic-2024-input-audit.md"
+    },
+    {
+      "source_panel": "coc_outcomes",
+      "frozen_coc_id": "FL-606",
+      "year": 2024,
+      "frozen_boundary_vintage": "2024",
+      "source_boundary_vintage": "2024",
+      "status": "compatible",
+      "reason": "Same-year FY2024 CoC correspondence: official HUD catalog identifies the snapshot service as FY2024 coverage; HUD PIT and HIC 2024 sheets identify this CoC. See audit for source hashes and snapshot-date limitation. No historical remapping or allocation.",
+      "evidence_ref": "docs/site-pit-hic-2024-input-audit.md"
+    },
+    {
+      "source_panel": "coc_outcomes",
+      "frozen_coc_id": "HI-501",
+      "year": 2024,
+      "frozen_boundary_vintage": "2024",
+      "source_boundary_vintage": "2024",
+      "status": "compatible",
+      "reason": "Same-year FY2024 CoC correspondence: official HUD catalog identifies the snapshot service as FY2024 coverage; HUD PIT and HIC 2024 sheets identify this CoC. See audit for source hashes and snapshot-date limitation. No historical remapping or allocation.",
+      "evidence_ref": "docs/site-pit-hic-2024-input-audit.md"
+    },
+    {
+      "source_panel": "coc_outcomes",
+      "frozen_coc_id": "IL-516",
+      "year": 2024,
+      "frozen_boundary_vintage": "2024",
+      "source_boundary_vintage": "2024",
+      "status": "compatible",
+      "reason": "Same-year FY2024 CoC correspondence: official HUD catalog identifies the snapshot service as FY2024 coverage; HUD PIT and HIC 2024 sheets identify this CoC. See audit for source hashes and snapshot-date limitation. No historical remapping or allocation.",
+      "evidence_ref": "docs/site-pit-hic-2024-input-audit.md"
+    },
+    {
+      "source_panel": "coc_outcomes",
+      "frozen_coc_id": "MA-504",
+      "year": 2024,
+      "frozen_boundary_vintage": "2024",
+      "source_boundary_vintage": "2024",
+      "status": "compatible",
+      "reason": "Same-year FY2024 CoC correspondence: official HUD catalog identifies the snapshot service as FY2024 coverage; HUD PIT and HIC 2024 sheets identify this CoC. See audit for source hashes and snapshot-date limitation. No historical remapping or allocation.",
+      "evidence_ref": "docs/site-pit-hic-2024-input-audit.md"
+    },
+    {
+      "source_panel": "coc_outcomes",
+      "frozen_coc_id": "MA-505",
+      "year": 2024,
+      "frozen_boundary_vintage": "2024",
+      "source_boundary_vintage": "2024",
+      "status": "compatible",
+      "reason": "Same-year FY2024 CoC correspondence: official HUD catalog identifies the snapshot service as FY2024 coverage; HUD PIT and HIC 2024 sheets identify this CoC. See audit for source hashes and snapshot-date limitation. No historical remapping or allocation.",
+      "evidence_ref": "docs/site-pit-hic-2024-input-audit.md"
+    },
+    {
+      "source_panel": "coc_outcomes",
+      "frozen_coc_id": "MA-506",
+      "year": 2024,
+      "frozen_boundary_vintage": "2024",
+      "source_boundary_vintage": "2024",
+      "status": "compatible",
+      "reason": "Same-year FY2024 CoC correspondence: official HUD catalog identifies the snapshot service as FY2024 coverage; HUD PIT and HIC 2024 sheets identify this CoC. See audit for source hashes and snapshot-date limitation. No historical remapping or allocation.",
+      "evidence_ref": "docs/site-pit-hic-2024-input-audit.md"
+    },
+    {
+      "source_panel": "coc_outcomes",
+      "frozen_coc_id": "MA-515",
+      "year": 2024,
+      "frozen_boundary_vintage": "2024",
+      "source_boundary_vintage": "2024",
+      "status": "compatible",
+      "reason": "Same-year FY2024 CoC correspondence: official HUD catalog identifies the snapshot service as FY2024 coverage; HUD PIT and HIC 2024 sheets identify this CoC. See audit for source hashes and snapshot-date limitation. No historical remapping or allocation.",
+      "evidence_ref": "docs/site-pit-hic-2024-input-audit.md"
+    },
+    {
+      "source_panel": "coc_outcomes",
+      "frozen_coc_id": "MI-505",
+      "year": 2024,
+      "frozen_boundary_vintage": "2024",
+      "source_boundary_vintage": "2024",
+      "status": "compatible",
+      "reason": "Same-year FY2024 CoC correspondence: official HUD catalog identifies the snapshot service as FY2024 coverage; HUD PIT and HIC 2024 sheets identify this CoC. See audit for source hashes and snapshot-date limitation. No historical remapping or allocation.",
+      "evidence_ref": "docs/site-pit-hic-2024-input-audit.md"
+    },
+    {
+      "source_panel": "coc_outcomes",
+      "frozen_coc_id": "MI-507",
+      "year": 2024,
+      "frozen_boundary_vintage": "2024",
+      "source_boundary_vintage": "2024",
+      "status": "compatible",
+      "reason": "Same-year FY2024 CoC correspondence: official HUD catalog identifies the snapshot service as FY2024 coverage; HUD PIT and HIC 2024 sheets identify this CoC. See audit for source hashes and snapshot-date limitation. No historical remapping or allocation.",
+      "evidence_ref": "docs/site-pit-hic-2024-input-audit.md"
+    },
+    {
+      "source_panel": "coc_outcomes",
+      "frozen_coc_id": "MI-509",
+      "year": 2024,
+      "frozen_boundary_vintage": "2024",
+      "source_boundary_vintage": "2024",
+      "status": "compatible",
+      "reason": "Same-year FY2024 CoC correspondence: official HUD catalog identifies the snapshot service as FY2024 coverage; HUD PIT and HIC 2024 sheets identify this CoC. See audit for source hashes and snapshot-date limitation. No historical remapping or allocation.",
+      "evidence_ref": "docs/site-pit-hic-2024-input-audit.md"
+    },
+    {
+      "source_panel": "coc_outcomes",
+      "frozen_coc_id": "MI-510",
+      "year": 2024,
+      "frozen_boundary_vintage": "2024",
+      "source_boundary_vintage": "2024",
+      "status": "compatible",
+      "reason": "Same-year FY2024 CoC correspondence: official HUD catalog identifies the snapshot service as FY2024 coverage; HUD PIT and HIC 2024 sheets identify this CoC. See audit for source hashes and snapshot-date limitation. No historical remapping or allocation.",
+      "evidence_ref": "docs/site-pit-hic-2024-input-audit.md"
+    },
+    {
+      "source_panel": "coc_outcomes",
+      "frozen_coc_id": "MI-514",
+      "year": 2024,
+      "frozen_boundary_vintage": "2024",
+      "source_boundary_vintage": "2024",
+      "status": "compatible",
+      "reason": "Same-year FY2024 CoC correspondence: official HUD catalog identifies the snapshot service as FY2024 coverage; HUD PIT and HIC 2024 sheets identify this CoC. See audit for source hashes and snapshot-date limitation. No historical remapping or allocation.",
+      "evidence_ref": "docs/site-pit-hic-2024-input-audit.md"
+    },
+    {
+      "source_panel": "coc_outcomes",
+      "frozen_coc_id": "MI-515",
+      "year": 2024,
+      "frozen_boundary_vintage": "2024",
+      "source_boundary_vintage": "2024",
+      "status": "compatible",
+      "reason": "Same-year FY2024 CoC correspondence: official HUD catalog identifies the snapshot service as FY2024 coverage; HUD PIT and HIC 2024 sheets identify this CoC. See audit for source hashes and snapshot-date limitation. No historical remapping or allocation.",
+      "evidence_ref": "docs/site-pit-hic-2024-input-audit.md"
+    },
+    {
+      "source_panel": "coc_outcomes",
+      "frozen_coc_id": "MI-516",
+      "year": 2024,
+      "frozen_boundary_vintage": "2024",
+      "source_boundary_vintage": "2024",
+      "status": "compatible",
+      "reason": "Same-year FY2024 CoC correspondence: official HUD catalog identifies the snapshot service as FY2024 coverage; HUD PIT and HIC 2024 sheets identify this CoC. See audit for source hashes and snapshot-date limitation. No historical remapping or allocation.",
+      "evidence_ref": "docs/site-pit-hic-2024-input-audit.md"
+    },
+    {
+      "source_panel": "coc_outcomes",
+      "frozen_coc_id": "MI-517",
+      "year": 2024,
+      "frozen_boundary_vintage": "2024",
+      "source_boundary_vintage": "2024",
+      "status": "compatible",
+      "reason": "Same-year FY2024 CoC correspondence: official HUD catalog identifies the snapshot service as FY2024 coverage; HUD PIT and HIC 2024 sheets identify this CoC. See audit for source hashes and snapshot-date limitation. No historical remapping or allocation.",
+      "evidence_ref": "docs/site-pit-hic-2024-input-audit.md"
+    },
+    {
+      "source_panel": "coc_outcomes",
+      "frozen_coc_id": "NC-506",
+      "year": 2024,
+      "frozen_boundary_vintage": "2024",
+      "source_boundary_vintage": "2024",
+      "status": "compatible",
+      "reason": "Same-year FY2024 CoC correspondence: official HUD catalog identifies the snapshot service as FY2024 coverage; HUD PIT and HIC 2024 sheets identify this CoC. See audit for source hashes and snapshot-date limitation. No historical remapping or allocation.",
+      "evidence_ref": "docs/site-pit-hic-2024-input-audit.md"
+    },
+    {
+      "source_panel": "coc_outcomes",
+      "frozen_coc_id": "NH-501",
+      "year": 2024,
+      "frozen_boundary_vintage": "2024",
+      "source_boundary_vintage": "2024",
+      "status": "compatible",
+      "reason": "Same-year FY2024 CoC correspondence: official HUD catalog identifies the snapshot service as FY2024 coverage; HUD PIT and HIC 2024 sheets identify this CoC. See audit for source hashes and snapshot-date limitation. No historical remapping or allocation.",
+      "evidence_ref": "docs/site-pit-hic-2024-input-audit.md"
+    },
+    {
+      "source_panel": "coc_outcomes",
+      "frozen_coc_id": "NH-502",
+      "year": 2024,
+      "frozen_boundary_vintage": "2024",
+      "source_boundary_vintage": "2024",
+      "status": "compatible",
+      "reason": "Same-year FY2024 CoC correspondence: official HUD catalog identifies the snapshot service as FY2024 coverage; HUD PIT and HIC 2024 sheets identify this CoC. See audit for source hashes and snapshot-date limitation. No historical remapping or allocation.",
+      "evidence_ref": "docs/site-pit-hic-2024-input-audit.md"
+    },
+    {
+      "source_panel": "coc_outcomes",
+      "frozen_coc_id": "NJ-501",
+      "year": 2024,
+      "frozen_boundary_vintage": "2024",
+      "source_boundary_vintage": "2024",
+      "status": "compatible",
+      "reason": "Same-year FY2024 CoC correspondence: official HUD catalog identifies the snapshot service as FY2024 coverage; HUD PIT and HIC 2024 sheets identify this CoC. See audit for source hashes and snapshot-date limitation. No historical remapping or allocation.",
+      "evidence_ref": "docs/site-pit-hic-2024-input-audit.md"
+    },
+    {
+      "source_panel": "coc_outcomes",
+      "frozen_coc_id": "NJ-504",
+      "year": 2024,
+      "frozen_boundary_vintage": "2024",
+      "source_boundary_vintage": "2024",
+      "status": "compatible",
+      "reason": "Same-year FY2024 CoC correspondence: official HUD catalog identifies the snapshot service as FY2024 coverage; HUD PIT and HIC 2024 sheets identify this CoC. See audit for source hashes and snapshot-date limitation. No historical remapping or allocation.",
+      "evidence_ref": "docs/site-pit-hic-2024-input-audit.md"
+    },
+    {
+      "source_panel": "coc_outcomes",
+      "frozen_coc_id": "NJ-506",
+      "year": 2024,
+      "frozen_boundary_vintage": "2024",
+      "source_boundary_vintage": "2024",
+      "status": "compatible",
+      "reason": "Same-year FY2024 CoC correspondence: official HUD catalog identifies the snapshot service as FY2024 coverage; HUD PIT and HIC 2024 sheets identify this CoC. See audit for source hashes and snapshot-date limitation. No historical remapping or allocation.",
+      "evidence_ref": "docs/site-pit-hic-2024-input-audit.md"
+    },
+    {
+      "source_panel": "coc_outcomes",
+      "frozen_coc_id": "NJ-507",
+      "year": 2024,
+      "frozen_boundary_vintage": "2024",
+      "source_boundary_vintage": "2024",
+      "status": "compatible",
+      "reason": "Same-year FY2024 CoC correspondence: official HUD catalog identifies the snapshot service as FY2024 coverage; HUD PIT and HIC 2024 sheets identify this CoC. See audit for source hashes and snapshot-date limitation. No historical remapping or allocation.",
+      "evidence_ref": "docs/site-pit-hic-2024-input-audit.md"
+    },
+    {
+      "source_panel": "coc_outcomes",
+      "frozen_coc_id": "NJ-508",
+      "year": 2024,
+      "frozen_boundary_vintage": "2024",
+      "source_boundary_vintage": "2024",
+      "status": "compatible",
+      "reason": "Same-year FY2024 CoC correspondence: official HUD catalog identifies the snapshot service as FY2024 coverage; HUD PIT and HIC 2024 sheets identify this CoC. See audit for source hashes and snapshot-date limitation. No historical remapping or allocation.",
+      "evidence_ref": "docs/site-pit-hic-2024-input-audit.md"
+    },
+    {
+      "source_panel": "coc_outcomes",
+      "frozen_coc_id": "NJ-509",
+      "year": 2024,
+      "frozen_boundary_vintage": "2024",
+      "source_boundary_vintage": "2024",
+      "status": "compatible",
+      "reason": "Same-year FY2024 CoC correspondence: official HUD catalog identifies the snapshot service as FY2024 coverage; HUD PIT and HIC 2024 sheets identify this CoC. See audit for source hashes and snapshot-date limitation. No historical remapping or allocation.",
+      "evidence_ref": "docs/site-pit-hic-2024-input-audit.md"
+    },
+    {
+      "source_panel": "coc_outcomes",
+      "frozen_coc_id": "NJ-510",
+      "year": 2024,
+      "frozen_boundary_vintage": "2024",
+      "source_boundary_vintage": "2024",
+      "status": "compatible",
+      "reason": "Same-year FY2024 CoC correspondence: official HUD catalog identifies the snapshot service as FY2024 coverage; HUD PIT and HIC 2024 sheets identify this CoC. See audit for source hashes and snapshot-date limitation. No historical remapping or allocation.",
+      "evidence_ref": "docs/site-pit-hic-2024-input-audit.md"
+    },
+    {
+      "source_panel": "coc_outcomes",
+      "frozen_coc_id": "NJ-511",
+      "year": 2024,
+      "frozen_boundary_vintage": "2024",
+      "source_boundary_vintage": "2024",
+      "status": "compatible",
+      "reason": "Same-year FY2024 CoC correspondence: official HUD catalog identifies the snapshot service as FY2024 coverage; HUD PIT and HIC 2024 sheets identify this CoC. See audit for source hashes and snapshot-date limitation. No historical remapping or allocation.",
+      "evidence_ref": "docs/site-pit-hic-2024-input-audit.md"
+    },
+    {
+      "source_panel": "coc_outcomes",
+      "frozen_coc_id": "NJ-513",
+      "year": 2024,
+      "frozen_boundary_vintage": "2024",
+      "source_boundary_vintage": "2024",
+      "status": "compatible",
+      "reason": "Same-year FY2024 CoC correspondence: official HUD catalog identifies the snapshot service as FY2024 coverage; HUD PIT and HIC 2024 sheets identify this CoC. See audit for source hashes and snapshot-date limitation. No historical remapping or allocation.",
+      "evidence_ref": "docs/site-pit-hic-2024-input-audit.md"
+    },
+    {
+      "source_panel": "coc_outcomes",
+      "frozen_coc_id": "NJ-514",
+      "year": 2024,
+      "frozen_boundary_vintage": "2024",
+      "source_boundary_vintage": "2024",
+      "status": "compatible",
+      "reason": "Same-year FY2024 CoC correspondence: official HUD catalog identifies the snapshot service as FY2024 coverage; HUD PIT and HIC 2024 sheets identify this CoC. See audit for source hashes and snapshot-date limitation. No historical remapping or allocation.",
+      "evidence_ref": "docs/site-pit-hic-2024-input-audit.md"
+    },
+    {
+      "source_panel": "coc_outcomes",
+      "frozen_coc_id": "NJ-515",
+      "year": 2024,
+      "frozen_boundary_vintage": "2024",
+      "source_boundary_vintage": "2024",
+      "status": "compatible",
+      "reason": "Same-year FY2024 CoC correspondence: official HUD catalog identifies the snapshot service as FY2024 coverage; HUD PIT and HIC 2024 sheets identify this CoC. See audit for source hashes and snapshot-date limitation. No historical remapping or allocation.",
+      "evidence_ref": "docs/site-pit-hic-2024-input-audit.md"
+    },
+    {
+      "source_panel": "coc_outcomes",
+      "frozen_coc_id": "NV-500",
+      "year": 2024,
+      "frozen_boundary_vintage": "2024",
+      "source_boundary_vintage": "2024",
+      "status": "compatible",
+      "reason": "Same-year FY2024 CoC correspondence: official HUD catalog identifies the snapshot service as FY2024 coverage; HUD PIT and HIC 2024 sheets identify this CoC. See audit for source hashes and snapshot-date limitation. No historical remapping or allocation.",
+      "evidence_ref": "docs/site-pit-hic-2024-input-audit.md"
+    },
+    {
+      "source_panel": "coc_outcomes",
+      "frozen_coc_id": "NY-510",
+      "year": 2024,
+      "frozen_boundary_vintage": "2024",
+      "source_boundary_vintage": "2024",
+      "status": "compatible",
+      "reason": "Same-year FY2024 CoC correspondence: official HUD catalog identifies the snapshot service as FY2024 coverage; HUD PIT and HIC 2024 sheets identify this CoC. See audit for source hashes and snapshot-date limitation. No historical remapping or allocation.",
+      "evidence_ref": "docs/site-pit-hic-2024-input-audit.md"
+    },
+    {
+      "source_panel": "coc_outcomes",
+      "frozen_coc_id": "NY-600",
+      "year": 2024,
+      "frozen_boundary_vintage": "2024",
+      "source_boundary_vintage": "2024",
+      "status": "compatible",
+      "reason": "Same-year FY2024 CoC correspondence: official HUD catalog identifies the snapshot service as FY2024 coverage; HUD PIT and HIC 2024 sheets identify this CoC. See audit for source hashes and snapshot-date limitation. No historical remapping or allocation.",
+      "evidence_ref": "docs/site-pit-hic-2024-input-audit.md"
+    },
+    {
+      "source_panel": "coc_outcomes",
+      "frozen_coc_id": "NY-601",
+      "year": 2024,
+      "frozen_boundary_vintage": "2024",
+      "source_boundary_vintage": "2024",
+      "status": "compatible",
+      "reason": "Same-year FY2024 CoC correspondence: official HUD catalog identifies the snapshot service as FY2024 coverage; HUD PIT and HIC 2024 sheets identify this CoC. See audit for source hashes and snapshot-date limitation. No historical remapping or allocation.",
+      "evidence_ref": "docs/site-pit-hic-2024-input-audit.md"
+    },
+    {
+      "source_panel": "coc_outcomes",
+      "frozen_coc_id": "NY-602",
+      "year": 2024,
+      "frozen_boundary_vintage": "2024",
+      "source_boundary_vintage": "2024",
+      "status": "compatible",
+      "reason": "Same-year FY2024 CoC correspondence: official HUD catalog identifies the snapshot service as FY2024 coverage; HUD PIT and HIC 2024 sheets identify this CoC. See audit for source hashes and snapshot-date limitation. No historical remapping or allocation.",
+      "evidence_ref": "docs/site-pit-hic-2024-input-audit.md"
+    },
+    {
+      "source_panel": "coc_outcomes",
+      "frozen_coc_id": "NY-603",
+      "year": 2024,
+      "frozen_boundary_vintage": "2024",
+      "source_boundary_vintage": "2024",
+      "status": "compatible",
+      "reason": "Same-year FY2024 CoC correspondence: official HUD catalog identifies the snapshot service as FY2024 coverage; HUD PIT and HIC 2024 sheets identify this CoC. See audit for source hashes and snapshot-date limitation. No historical remapping or allocation.",
+      "evidence_ref": "docs/site-pit-hic-2024-input-audit.md"
+    },
+    {
+      "source_panel": "coc_outcomes",
+      "frozen_coc_id": "NY-604",
+      "year": 2024,
+      "frozen_boundary_vintage": "2024",
+      "source_boundary_vintage": "2024",
+      "status": "compatible",
+      "reason": "Same-year FY2024 CoC correspondence: official HUD catalog identifies the snapshot service as FY2024 coverage; HUD PIT and HIC 2024 sheets identify this CoC. See audit for source hashes and snapshot-date limitation. No historical remapping or allocation.",
+      "evidence_ref": "docs/site-pit-hic-2024-input-audit.md"
+    },
+    {
+      "source_panel": "coc_outcomes",
+      "frozen_coc_id": "NY-606",
+      "year": 2024,
+      "frozen_boundary_vintage": "2024",
+      "source_boundary_vintage": "2024",
+      "status": "compatible",
+      "reason": "Same-year FY2024 CoC correspondence: official HUD catalog identifies the snapshot service as FY2024 coverage; HUD PIT and HIC 2024 sheets identify this CoC. See audit for source hashes and snapshot-date limitation. No historical remapping or allocation.",
+      "evidence_ref": "docs/site-pit-hic-2024-input-audit.md"
+    },
+    {
+      "source_panel": "coc_outcomes",
+      "frozen_coc_id": "NY-608",
+      "year": 2024,
+      "frozen_boundary_vintage": "2024",
+      "source_boundary_vintage": "2024",
+      "status": "compatible",
+      "reason": "Same-year FY2024 CoC correspondence: official HUD catalog identifies the snapshot service as FY2024 coverage; HUD PIT and HIC 2024 sheets identify this CoC. See audit for source hashes and snapshot-date limitation. No historical remapping or allocation.",
+      "evidence_ref": "docs/site-pit-hic-2024-input-audit.md"
+    },
+    {
+      "source_panel": "coc_outcomes",
+      "frozen_coc_id": "OR-500",
+      "year": 2024,
+      "frozen_boundary_vintage": "2024",
+      "source_boundary_vintage": "2024",
+      "status": "compatible",
+      "reason": "Same-year FY2024 CoC correspondence: official HUD catalog identifies the snapshot service as FY2024 coverage; HUD PIT and HIC 2024 sheets identify this CoC. See audit for source hashes and snapshot-date limitation. No historical remapping or allocation.",
+      "evidence_ref": "docs/site-pit-hic-2024-input-audit.md"
+    },
+    {
+      "source_panel": "coc_outcomes",
+      "frozen_coc_id": "OR-502",
+      "year": 2024,
+      "frozen_boundary_vintage": "2024",
+      "source_boundary_vintage": "2024",
+      "status": "compatible",
+      "reason": "Same-year FY2024 CoC correspondence: official HUD catalog identifies the snapshot service as FY2024 coverage; HUD PIT and HIC 2024 sheets identify this CoC. See audit for source hashes and snapshot-date limitation. No historical remapping or allocation.",
+      "evidence_ref": "docs/site-pit-hic-2024-input-audit.md"
+    },
+    {
+      "source_panel": "coc_outcomes",
+      "frozen_coc_id": "OR-503",
+      "year": 2024,
+      "frozen_boundary_vintage": "2024",
+      "source_boundary_vintage": "2024",
+      "status": "compatible",
+      "reason": "Same-year FY2024 CoC correspondence: official HUD catalog identifies the snapshot service as FY2024 coverage; HUD PIT and HIC 2024 sheets identify this CoC. See audit for source hashes and snapshot-date limitation. No historical remapping or allocation.",
+      "evidence_ref": "docs/site-pit-hic-2024-input-audit.md"
+    },
+    {
+      "source_panel": "coc_outcomes",
+      "frozen_coc_id": "OR-504",
+      "year": 2024,
+      "frozen_boundary_vintage": "2024",
+      "source_boundary_vintage": "2024",
+      "status": "compatible",
+      "reason": "Same-year FY2024 CoC correspondence: official HUD catalog identifies the snapshot service as FY2024 coverage; HUD PIT and HIC 2024 sheets identify this CoC. See audit for source hashes and snapshot-date limitation. No historical remapping or allocation.",
+      "evidence_ref": "docs/site-pit-hic-2024-input-audit.md"
+    },
+    {
+      "source_panel": "coc_outcomes",
+      "frozen_coc_id": "PA-503",
+      "year": 2024,
+      "frozen_boundary_vintage": "2024",
+      "source_boundary_vintage": "2024",
+      "status": "compatible",
+      "reason": "Same-year FY2024 CoC correspondence: official HUD catalog identifies the snapshot service as FY2024 coverage; HUD PIT and HIC 2024 sheets identify this CoC. See audit for source hashes and snapshot-date limitation. No historical remapping or allocation.",
+      "evidence_ref": "docs/site-pit-hic-2024-input-audit.md"
+    },
+    {
+      "source_panel": "coc_outcomes",
+      "frozen_coc_id": "PA-506",
+      "year": 2024,
+      "frozen_boundary_vintage": "2024",
+      "source_boundary_vintage": "2024",
+      "status": "compatible",
+      "reason": "Same-year FY2024 CoC correspondence: official HUD catalog identifies the snapshot service as FY2024 coverage; HUD PIT and HIC 2024 sheets identify this CoC. See audit for source hashes and snapshot-date limitation. No historical remapping or allocation.",
+      "evidence_ref": "docs/site-pit-hic-2024-input-audit.md"
+    },
+    {
+      "source_panel": "coc_outcomes",
+      "frozen_coc_id": "PA-508",
+      "year": 2024,
+      "frozen_boundary_vintage": "2024",
+      "source_boundary_vintage": "2024",
+      "status": "compatible",
+      "reason": "Same-year FY2024 CoC correspondence: official HUD catalog identifies the snapshot service as FY2024 coverage; HUD PIT and HIC 2024 sheets identify this CoC. See audit for source hashes and snapshot-date limitation. No historical remapping or allocation.",
+      "evidence_ref": "docs/site-pit-hic-2024-input-audit.md"
+    },
+    {
+      "source_panel": "coc_outcomes",
+      "frozen_coc_id": "PA-510",
+      "year": 2024,
+      "frozen_boundary_vintage": "2024",
+      "source_boundary_vintage": "2024",
+      "status": "compatible",
+      "reason": "Same-year FY2024 CoC correspondence: official HUD catalog identifies the snapshot service as FY2024 coverage; HUD PIT and HIC 2024 sheets identify this CoC. See audit for source hashes and snapshot-date limitation. No historical remapping or allocation.",
+      "evidence_ref": "docs/site-pit-hic-2024-input-audit.md"
+    },
+    {
+      "source_panel": "coc_outcomes",
+      "frozen_coc_id": "PA-512",
+      "year": 2024,
+      "frozen_boundary_vintage": "2024",
+      "source_boundary_vintage": "2024",
+      "status": "compatible",
+      "reason": "Same-year FY2024 CoC correspondence: official HUD catalog identifies the snapshot service as FY2024 coverage; HUD PIT and HIC 2024 sheets identify this CoC. See audit for source hashes and snapshot-date limitation. No historical remapping or allocation.",
+      "evidence_ref": "docs/site-pit-hic-2024-input-audit.md"
+    },
+    {
+      "source_panel": "coc_outcomes",
+      "frozen_coc_id": "PA-605",
+      "year": 2024,
+      "frozen_boundary_vintage": "2024",
+      "source_boundary_vintage": "2024",
+      "status": "compatible",
+      "reason": "Same-year FY2024 CoC correspondence: official HUD catalog identifies the snapshot service as FY2024 coverage; HUD PIT and HIC 2024 sheets identify this CoC. See audit for source hashes and snapshot-date limitation. No historical remapping or allocation.",
+      "evidence_ref": "docs/site-pit-hic-2024-input-audit.md"
+    },
+    {
+      "source_panel": "coc_outcomes",
+      "frozen_coc_id": "RI-500",
+      "year": 2024,
+      "frozen_boundary_vintage": "2024",
+      "source_boundary_vintage": "2024",
+      "status": "compatible",
+      "reason": "Same-year FY2024 CoC correspondence: official HUD catalog identifies the snapshot service as FY2024 coverage; HUD PIT and HIC 2024 sheets identify this CoC. See audit for source hashes and snapshot-date limitation. No historical remapping or allocation.",
+      "evidence_ref": "docs/site-pit-hic-2024-input-audit.md"
+    },
+    {
+      "source_panel": "coc_outcomes",
+      "frozen_coc_id": "TX-603",
+      "year": 2024,
+      "frozen_boundary_vintage": "2024",
+      "source_boundary_vintage": "2024",
+      "status": "compatible",
+      "reason": "Same-year FY2024 CoC correspondence: official HUD catalog identifies the snapshot service as FY2024 coverage; HUD PIT and HIC 2024 sheets identify this CoC. See audit for source hashes and snapshot-date limitation. No historical remapping or allocation.",
+      "evidence_ref": "docs/site-pit-hic-2024-input-audit.md"
+    },
+    {
+      "source_panel": "coc_outcomes",
+      "frozen_coc_id": "VA-508",
+      "year": 2024,
+      "frozen_boundary_vintage": "2024",
+      "source_boundary_vintage": "2024",
+      "status": "compatible",
+      "reason": "Same-year FY2024 CoC correspondence: official HUD catalog identifies the snapshot service as FY2024 coverage; HUD PIT and HIC 2024 sheets identify this CoC. See audit for source hashes and snapshot-date limitation. No historical remapping or allocation.",
+      "evidence_ref": "docs/site-pit-hic-2024-input-audit.md"
+    },
+    {
+      "source_panel": "coc_outcomes",
+      "frozen_coc_id": "WA-500",
+      "year": 2024,
+      "frozen_boundary_vintage": "2024",
+      "source_boundary_vintage": "2024",
+      "status": "compatible",
+      "reason": "Same-year FY2024 CoC correspondence: official HUD catalog identifies the snapshot service as FY2024 coverage; HUD PIT and HIC 2024 sheets identify this CoC. See audit for source hashes and snapshot-date limitation. No historical remapping or allocation.",
+      "evidence_ref": "docs/site-pit-hic-2024-input-audit.md"
+    },
+    {
+      "source_panel": "coc_outcomes",
+      "frozen_coc_id": "WA-503",
+      "year": 2024,
+      "frozen_boundary_vintage": "2024",
+      "source_boundary_vintage": "2024",
+      "status": "compatible",
+      "reason": "Same-year FY2024 CoC correspondence: official HUD catalog identifies the snapshot service as FY2024 coverage; HUD PIT and HIC 2024 sheets identify this CoC. See audit for source hashes and snapshot-date limitation. No historical remapping or allocation.",
+      "evidence_ref": "docs/site-pit-hic-2024-input-audit.md"
+    },
+    {
+      "source_panel": "coc_outcomes",
+      "frozen_coc_id": "WA-504",
+      "year": 2024,
+      "frozen_boundary_vintage": "2024",
+      "source_boundary_vintage": "2024",
+      "status": "compatible",
+      "reason": "Same-year FY2024 CoC correspondence: official HUD catalog identifies the snapshot service as FY2024 coverage; HUD PIT and HIC 2024 sheets identify this CoC. See audit for source hashes and snapshot-date limitation. No historical remapping or allocation.",
+      "evidence_ref": "docs/site-pit-hic-2024-input-audit.md"
+    },
+    {
+      "source_panel": "coc_outcomes",
+      "frozen_coc_id": "WI-502",
+      "year": 2024,
+      "frozen_boundary_vintage": "2024",
+      "source_boundary_vintage": "2024",
+      "status": "compatible",
+      "reason": "Same-year FY2024 CoC correspondence: official HUD catalog identifies the snapshot service as FY2024 coverage; HUD PIT and HIC 2024 sheets identify this CoC. See audit for source hashes and snapshot-date limitation. No historical remapping or allocation.",
+      "evidence_ref": "docs/site-pit-hic-2024-input-audit.md"
+    }
+  ]
+}
