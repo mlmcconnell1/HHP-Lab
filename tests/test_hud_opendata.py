@@ -19,6 +19,11 @@ from hhplab.geographies.boundaries.hud.opendata_arcgis import (
 )
 from hhplab.storage.raw_snapshot import make_run_id
 
+
+def current_snapshot_tag() -> str:
+    """Return the valid live-source label for the current UTC date."""
+    return f"HUDOpenData_{datetime.now(UTC).date().isoformat()}"
+
 # Sample polygon coordinates (kept short for readability)
 SAMPLE_COORDS_1 = [
     [-105.0, 40.0],
@@ -234,15 +239,16 @@ class TestIngestHudOpendata:
 
     def test_ingest_creates_geoparquet(self, mock_http_client, tmp_path):
         """Test that ingestion creates a GeoParquet file."""
+        snapshot_tag = current_snapshot_tag()
         output_path = ingest_hud_opendata(
-            snapshot_tag="HUDOpenData_2025-01-04",
+            snapshot_tag=snapshot_tag,
             base_dir=tmp_path,
             http_client=mock_http_client,
         )
 
         assert output_path.exists()
         assert output_path.suffix == ".parquet"
-        assert "HUDOpenData_2025-01-04" in str(output_path)
+        assert snapshot_tag in str(output_path)
 
         # Read back and verify
         gdf = gpd.read_parquet(output_path)
@@ -262,6 +268,26 @@ class TestIngestHudOpendata:
         today = datetime.now(UTC).strftime("%Y-%m-%d")
         assert f"HUDOpenData_{today}" in str(output_path)
 
+    @pytest.mark.parametrize(
+        "snapshot_tag",
+        ["2020", "HUDOpenData_2020-01-01", "HUDOpenData_not-a-date", "test"],
+        ids=["numeric-year", "stale-date", "malformed-date", "arbitrary-label"],
+    )
+    def test_ingest_rejects_invalid_live_labels_before_network(
+        self, snapshot_tag, tmp_path
+    ):
+        """Historical or arbitrary labels cannot relabel the current live service."""
+        client = MagicMock(spec=httpx.Client)
+
+        with pytest.raises(ValueError, match="retrieval-date label|does not match"):
+            ingest_hud_opendata(
+                snapshot_tag=snapshot_tag,
+                base_dir=tmp_path,
+                http_client=client,
+            )
+
+        client.get.assert_not_called()
+
     def test_ingest_raises_on_empty_response(self, tmp_path):
         """Test that empty API response raises ValueError."""
         client = MagicMock(spec=httpx.Client)
@@ -272,7 +298,7 @@ class TestIngestHudOpendata:
 
         with pytest.raises(ValueError, match="No features returned"):
             ingest_hud_opendata(
-                snapshot_tag="test",
+                snapshot_tag=current_snapshot_tag(),
                 base_dir=tmp_path,
                 http_client=client,
             )
@@ -280,7 +306,7 @@ class TestIngestHudOpendata:
     def test_ingest_output_has_canonical_columns(self, mock_http_client, tmp_path):
         """Test that output contains all canonical schema columns."""
         output_path = ingest_hud_opendata(
-            snapshot_tag="test",
+            snapshot_tag=current_snapshot_tag(),
             base_dir=tmp_path,
             http_client=mock_http_client,
         )
@@ -303,31 +329,33 @@ class TestIngestHudOpendata:
     def test_raw_snapshot_uses_extracted_year(self, mock_http_client, tmp_path):
         """Raw snapshot year segment should be the 4-digit year, not the full vintage tag."""
         raw_root = tmp_path / "raw"
+        snapshot_tag = current_snapshot_tag()
         ingest_hud_opendata(
-            snapshot_tag="HUDOpenData_2025-01-04",
+            snapshot_tag=snapshot_tag,
             base_dir=tmp_path,
             http_client=mock_http_client,
             raw_root=raw_root,
         )
 
         # Year dir should be "2025", not "HUDOpenData_2025-01-04"
-        year_dir = raw_root / "hud_opendata" / "2025"
+        year_dir = raw_root / "hud_opendata" / snapshot_tag.removeprefix("HUDOpenData_")[:4]
         assert year_dir.is_dir(), f"Expected year dir at {year_dir}"
         # There should be no dir named after the full vintage tag
-        bad_dir = raw_root / "hud_opendata" / "HUDOpenData_2025-01-04"
+        bad_dir = raw_root / "hud_opendata" / snapshot_tag
         assert not bad_dir.exists(), "Full vintage tag should not be used as year dir"
 
     def test_raw_snapshot_uses_timestamp_run_id(self, mock_http_client, tmp_path):
         """Run-id should be a timestamp, not just a date."""
         raw_root = tmp_path / "raw"
+        snapshot_tag = current_snapshot_tag()
         ingest_hud_opendata(
-            snapshot_tag="HUDOpenData_2025-01-04",
+            snapshot_tag=snapshot_tag,
             base_dir=tmp_path,
             http_client=mock_http_client,
             raw_root=raw_root,
         )
 
-        year_dir = raw_root / "hud_opendata" / "2025"
+        year_dir = raw_root / "hud_opendata" / snapshot_tag.removeprefix("HUDOpenData_")[:4]
         run_dirs = list(year_dir.iterdir())
         assert len(run_dirs) == 1
         run_id = run_dirs[0].name

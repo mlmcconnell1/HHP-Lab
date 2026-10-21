@@ -3,8 +3,9 @@
 Downloads and processes year-specific CoC boundary shapefiles from HUD Exchange
 and outputs canonicalized GeoParquet files.
 
-Primary source: HUD ArcGIS Open Data (services.arcgis.com)
-Fallback source: https://www.hudexchange.info/programs/coc/gis-tools/
+Year-specific source: HUD Exchange national/per-state boundary archives.
+Current snapshot source: HUD ArcGIS Open Data (services.arcgis.com), labeled by
+the UTC retrieval date rather than an inferred fiscal year.
 
 Note: As of 2024, HUD Exchange no longer provides a single national shapefile.
 The ArcGIS FeatureServer is now the most reliable source for current data.
@@ -15,8 +16,9 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
+import re
 import zipfile
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -116,14 +118,47 @@ _HUD_STATE_ABBREVIATIONS = [
 # Smaller page size for more frequent progress updates
 ARCGIS_PAGE_SIZE = 50
 ARCGIS_REQUEST_TIMEOUT = 120.0
-ARCGIS_DEFAULT_FIRST_YEAR = 2024
+
+
+_ARCGIS_SNAPSHOT_LABEL = re.compile(r"^HUDOpenData_(\d{4}-\d{2}-\d{2})$")
 
 
 def _should_use_arcgis_source(boundary_vintage: str) -> bool:
-    """Return whether the current ArcGIS service is appropriate by default."""
-    if boundary_vintage.isdigit():
-        return int(boundary_vintage) >= ARCGIS_DEFAULT_FIRST_YEAR
-    return True
+    """Return whether a label explicitly requests a dated live ArcGIS snapshot.
+
+    Numeric labels always describe a year-specific boundary vintage and are
+    sourced from that year's archive. The live FeatureServer can only be used
+    with a retrieval-date label, which is validated again before the request.
+    """
+    return boundary_vintage.startswith("HUDOpenData_")
+
+
+def _validate_arcgis_snapshot_label(boundary_vintage: str) -> str:
+    """Validate and return the UTC retrieval date encoded in a snapshot label."""
+    match = _ARCGIS_SNAPSHOT_LABEL.fullmatch(boundary_vintage)
+    if match is None:
+        raise ValueError(
+            "Live HUD ArcGIS fetches require a retrieval-date label in the form "
+            "'HUDOpenData_YYYY-MM-DD'. Numeric boundary vintages use year-specific "
+            "HUD Exchange archives through ingest_hud_exchange()."
+        )
+
+    try:
+        requested_date = date.fromisoformat(match.group(1))
+    except ValueError as exc:
+        raise ValueError(
+            "Invalid HUD ArcGIS snapshot date; use a valid 'HUDOpenData_YYYY-MM-DD' "
+            "label matching the current UTC date."
+        ) from exc
+
+    current_date = datetime.now(UTC).date()
+    if requested_date != current_date:
+        raise ValueError(
+            f"HUD ArcGIS snapshot label {boundary_vintage!r} does not match today's "
+            f"UTC date ({current_date.isoformat()}); use 'HUDOpenData_{current_date.isoformat()}' "
+            "for a live snapshot or ingest a year-specific archive."
+        )
+    return requested_date.isoformat()
 
 # Known field name mappings across different vintage years
 # HUD has changed column names over time, so we map all known variants
@@ -356,12 +391,13 @@ def fetch_from_arcgis(
     boundary_vintage: str,
     show_progress: bool = False,
 ) -> tuple[gpd.GeoDataFrame, list[bytes]]:
-    """Fetch CoC boundaries from HUD ArcGIS FeatureServer.
+    """Fetch a same-day CoC snapshot from HUD ArcGIS FeatureServer.
 
-    This is the primary data source for current CoC boundary data.
+    This live service does not establish historical geometry for an arbitrary
+    year. Its retrieval date must be explicit and match today's UTC date.
 
     Args:
-        boundary_vintage: Version identifier (e.g., "2025" or "FY2024")
+        boundary_vintage: Current retrieval-date label, e.g. "HUDOpenData_2026-10-21".
         show_progress: If True, display a progress bar
 
     Returns:
@@ -372,6 +408,8 @@ def fetch_from_arcgis(
         ValueError: If no features are returned
     """
     import click
+
+    _validate_arcgis_snapshot_label(boundary_vintage)
 
     with httpx.Client() as client:
         if show_progress:
@@ -386,6 +424,8 @@ def fetch_from_arcgis(
                 )
         else:
             features, raw_content = _fetch_all_arcgis_features(client)
+
+    _validate_arcgis_snapshot_label(boundary_vintage)
 
     if not features:
         raise ValueError("No features returned from HUD ArcGIS API")
@@ -796,12 +836,14 @@ def ingest_hud_exchange(
 ) -> Path:
     """Ingest CoC boundaries from HUD data sources.
 
-    By default, fetches data from the HUD ArcGIS FeatureServer (most reliable).
-    Falls back to legacy HUD Exchange ZIP download if use_legacy_source=True
-    or if a specific URL is provided.
+    Numeric boundary vintages use year-specific HUD Exchange archives by
+    default. The live ArcGIS FeatureServer is used only when ``boundary_vintage``
+    is an explicit ``HUDOpenData_YYYY-MM-DD`` retrieval label matching today's
+    UTC date; it is never assigned an arbitrary year.
 
     Args:
-        boundary_vintage: Year of the boundary data (e.g., "2024", "2025")
+        boundary_vintage: Archived year (e.g., "2020") or today's explicit live
+            snapshot label (e.g., "HUDOpenData_2026-10-21").
         url: Override URL for downloading from HUD Exchange (implies legacy source)
         raw_dir: Directory for raw downloads (legacy source only)
         curated_dir: Base directory for curated output. Defaults to data/
@@ -826,9 +868,8 @@ def ingest_hud_exchange(
     else:
         curated_dir = Path(curated_dir)
 
-    # Determine which source to use. The ArcGIS service represents the current
-    # HUD boundary layer, so historical year vintages use the vintage-specific
-    # legacy downloads by default rather than relabeling current boundaries.
+    # Numeric vintages always use year-specific archives. The current ArcGIS
+    # layer is valid only under a same-day retrieval label, never an FY/year.
     use_arcgis = (
         not use_legacy_source
         and url is None

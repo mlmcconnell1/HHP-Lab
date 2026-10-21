@@ -1,5 +1,7 @@
 # 2024 PIT and HIC CoC input audit
 
+**Updated finding:** CT-503's January 2024 PIT/HIC reporting footprint has not been verified against the frozen boundary. The original same-year compatibility conclusion is superseded for that CoC; existing results remain reproducible but are not fully geography-validated. See [the CT-503 reconciliation](ct503-historical-reconciliation.md) and follow-up bead `coclab-k34yp`.
+
 Audit date: 2026-10-21. This note supports a cross-sectional comparison of 2024 PIT and HIC measures over the frozen MSA–CoC memberships in `HHP-Output/msa_coc_overlap_sites_2024`. It documents the source-year geography match used for the evidence records. It does not claim that the local boundary file is an archived snapshot of the exact geometry in place on a particular day in 2024.
 
 ## Evidence for the FY2024 CoC geography
@@ -91,6 +93,8 @@ The machine-readable `coverage.json`, `local-boundaries.json`, `archives-boundar
 
 ## Boundary evidence artifact
 
+**Review update, 2026-10-21:** The blanket same-year compatibility guidance below is superseded for CT-503 by the [Connecticut reconciliation audit](ct503-historical-reconciliation.md). Its frozen polygon removes Shelton and adds Bridgewater and New Milford, while the January 2024 count footprint remains unverified. The saved runs remain reproducible calculations, but their existing CT-503 compatibility records do not establish the required count-to-footprint correspondence. They must not be reused as resolved geographic evidence. No historical panel or longitudinal window is approved.
+
 Use one `coc_boundary_compatibility/1` JSON artifact for each threshold, since its header binds one membership identity. The required header fields are `schema_version`, `evidence_id`, `artifact_id`, `threshold`, `membership_identity`, `frozen_boundary_vintage`, and `records`. Each record identifies `source_panel`, `frozen_coc_id`, `year`, `frozen_boundary_vintage`, `source_boundary_vintage`, `status`, and `reason`; `evidence_ref` is required for `compatible`. The records may use `status: compatible` for the 2024 same-year source join when they cite this audit and the HUD FY2024 catalog/service metadata, and state that the source CoC number directly matches the frozen B2024 CoC ID. Do not add `approval_ref` for a compatible record; that field is for an explicitly approved ID mapping. The evidence establishes the declared FY2024 source-to-geography match and direct ID resolution, not historical boundary stability.
 
 For `artifact_id: overlap_samples` and `site_key: msa_id`, the selected membership identities are:
@@ -102,3 +106,13 @@ For `artifact_id: overlap_samples` and `site_key: msa_id`, the selected membersh
 | 0.99 | 84 | `sha256:a6f8f3e35c335d9c1877b2fff8fd6727d362fe89321f11dbfe2f80ef98f23338` |
 
 Each hash is SHA-256 over canonical JSON containing schema `msa_coc_sites/1`, artifact ID, numeric threshold, site key `msa_id`, and the sorted selected `(msa_id, coc_id)` pairs. For a shared CoC outcome panel containing both 2024 measures, supply one evidence record per selected CoC and the exact panel key used by the recipe. Use `frozen_boundary_vintage: "2024"` and `source_boundary_vintage: "2024"` only when the recipe's declared source-panel provenance is also pinned to the HUD FY2024 CoC layer. The official references above, workbook references, source ID, and this note provide the evidence reference; no historical remapping or boundary approval is asserted.
+
+## Follow-up reconciliation and ingestion safeguards
+
+The [Providence audit](providence-historical-reconciliation.md) identifies the official PIT workbook's merger mapping and documents why historical PIT and HIC need different aggregation rules. The [Connecticut audit](ct503-historical-reconciliation.md) explains the substantial CT-503 difference through town membership rather than cartographic precision. These findings supersede the earlier statement that Connecticut's administrative explanation is unresolved; count allocation and its effective date remain unresolved.
+
+Both live HUD ingestion entry points now require an actual UTC retrieval-date identity. Numeric boundary vintages use year-specific archives, and an unavailable archive does not authorize falling back to live geometry under that year. Explicit archive URLs and local archive ingestion remain available. Existing artifacts were preserved, not relabeled or regenerated.
+
+The affected-artifact review found seven local B2019-named parquets (boundary, one MSA–CoC population crosswalk, and five MSA PIT panels), six B2025-named parquets (boundary and five crosswalks), and eight B2024-named parquets (boundary, two MSA crosswalks, and five PIT products). These are an inventory of potentially affected dependencies, not a claim that every value is wrong. B2019 cannot substantiate historical geometry; B2025 cannot establish its claimed year from the shared live response; B2024 has official FY2024 catalog attribution but still requires source-count footprint reconciliation, particularly for CT-503. The existing saved site universe and result bundles retain their original inputs for auditability.
+
+Separate bead `coclab-fvu4y` tracks archive provenance that reports the national ZIP URL even when a per-state or legacy fallback supplied the bytes. That issue is independent of preventing live geometry from acquiring a historical-year label.

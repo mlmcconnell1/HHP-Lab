@@ -40,6 +40,39 @@ PAGE_SIZE = 1000
 # Request timeout in seconds
 REQUEST_TIMEOUT = 60.0
 
+_SNAPSHOT_LABEL = re.compile(r"^HUDOpenData_(\d{4}-\d{2}-\d{2})$")
+
+
+def _resolve_snapshot_label(snapshot_tag: str, captured_at: datetime) -> str:
+    """Return a valid same-day UTC snapshot label for a live API retrieval."""
+    if snapshot_tag == "latest":
+        return f"HUDOpenData_{captured_at.strftime('%Y-%m-%d')}"
+
+    match = _SNAPSHOT_LABEL.fullmatch(snapshot_tag)
+    if match is None:
+        raise ValueError(
+            "Live HUD Open Data fetches require 'latest' or a retrieval-date label "
+            "in the form 'HUDOpenData_YYYY-MM-DD'; year vintages must use HUD "
+            "Exchange archives."
+        )
+
+    try:
+        requested_date = datetime.strptime(match.group(1), "%Y-%m-%d").date()
+    except ValueError as exc:
+        raise ValueError(
+            "Invalid HUD Open Data snapshot date; use a valid 'HUDOpenData_YYYY-MM-DD' "
+            "label matching the current UTC date."
+        ) from exc
+
+    current_date = captured_at.date()
+    if requested_date != current_date:
+        raise ValueError(
+            f"HUD Open Data snapshot label {snapshot_tag!r} does not match today's "
+            f"UTC date ({current_date.isoformat()}); use 'latest' or "
+            f"'HUDOpenData_{current_date.isoformat()}'."
+        )
+    return snapshot_tag
+
 
 def _fetch_page(
     client: httpx.Client,
@@ -195,8 +228,9 @@ def ingest_hud_opendata(
     Raw API responses are persisted under ``data/raw/hud_opendata/``.
 
     Args:
-        snapshot_tag: Snapshot identifier. Use "latest" to generate a
-            date-based vintage like "HUDOpenData_2025-01-04".
+        snapshot_tag: Use "latest" to generate today's UTC retrieval-date label,
+            or provide today's exact label such as "HUDOpenData_2026-10-21".
+            Older year vintages must be sourced from HUD Exchange archives.
         base_dir: Base data directory (defaults to "data")
         http_client: Optional HTTP client for testing/injection
         raw_root: Override the default raw data root (for testing)
@@ -209,13 +243,7 @@ def ingest_hud_opendata(
         ValueError: If no features are returned or validation fails with errors
     """
     ingested_at = datetime.now(UTC)
-
-    # Generate boundary vintage from snapshot_tag
-    if snapshot_tag == "latest":
-        date_str = ingested_at.strftime("%Y-%m-%d")
-        boundary_vintage = f"HUDOpenData_{date_str}"
-    else:
-        boundary_vintage = snapshot_tag
+    boundary_vintage = _resolve_snapshot_label(snapshot_tag, ingested_at)
 
     # Fetch features from the API
     client = http_client or httpx.Client()
@@ -226,6 +254,9 @@ def ingest_hud_opendata(
     finally:
         if should_close:
             client.close()
+
+    # A retrieval that crosses UTC midnight cannot be labeled with its start date.
+    _resolve_snapshot_label(boundary_vintage, datetime.now(UTC))
 
     if not features:
         raise ValueError("No features returned from HUD Open Data API")

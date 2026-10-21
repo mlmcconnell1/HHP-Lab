@@ -3,7 +3,7 @@
 import re
 import tempfile
 import zipfile
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
 
 import geopandas as gpd
@@ -18,6 +18,7 @@ from hhplab.geographies.boundaries.hud.exchange_gis import (
     _find_field,
     _should_use_arcgis_source,
     download_hud_exchange_gdb,
+    fetch_from_arcgis,
     ingest_hud_exchange,
     map_to_canonical_schema,
     read_coc_boundaries,
@@ -405,20 +406,120 @@ class TestIngestHudExchange:
         [
             ("2019", False),
             ("2023", False),
-            ("2024", True),
-            ("2025", True),
+            ("2024", False),
+            ("2025", False),
             ("HUDOpenData_2025-01-04", True),
+            ("FY2024", False),
         ],
     )
-    def test_arcgis_default_policy_is_current_vintage_only(
+    def test_arcgis_default_policy_requires_explicit_snapshot_label(
         self,
         boundary_vintage: str,
         expected: bool,
     ):
         assert _should_use_arcgis_source(boundary_vintage) is expected
 
-    def test_historical_vintage_uses_legacy_source_by_default(self, tmp_path, monkeypatch):
-        """Historical year ingests should not relabel the current ArcGIS layer."""
+    def test_arcgis_fetch_rejects_numeric_year_label_before_network(self, monkeypatch):
+        import hhplab.geographies.boundaries.hud.exchange_gis as mod
+
+        fetched = False
+
+        def record_fetch(*args, **kwargs):
+            nonlocal fetched
+            fetched = True
+            raise AssertionError("invalid numeric labels must fail before network access")
+
+        monkeypatch.setattr(mod, "_fetch_all_arcgis_features", record_fetch)
+        with pytest.raises(ValueError, match="retrieval-date label"):
+            fetch_from_arcgis("2025")
+        assert not fetched
+
+    def test_arcgis_fetch_rejects_stale_snapshot_label_before_network(self, monkeypatch):
+        import hhplab.geographies.boundaries.hud.exchange_gis as mod
+
+        fetched = False
+
+        def record_fetch(*args, **kwargs):
+            nonlocal fetched
+            fetched = True
+            raise AssertionError("stale snapshot labels must fail before network access")
+
+        monkeypatch.setattr(mod, "_fetch_all_arcgis_features", record_fetch)
+        with pytest.raises(ValueError, match="does not match today's UTC date"):
+            fetch_from_arcgis("HUDOpenData_2025-01-04")
+        assert not fetched
+
+    def test_arcgis_fetch_records_today_snapshot_label(self, monkeypatch):
+        import hhplab.geographies.boundaries.hud.exchange_gis as mod
+
+        today_label = f"HUDOpenData_{datetime.now(UTC).date().isoformat()}"
+        feature = {
+            "properties": {
+                "COCNUM": "CO-500",
+                "COCNAME": "Colorado Balance of State CoC",
+                "STUSAB": "CO",
+            },
+            "geometry": {
+                "type": "Polygon",
+                "coordinates": [[[-105, 39], [-105, 40], [-104, 40], [-104, 39], [-105, 39]]],
+            },
+        }
+        monkeypatch.setattr(
+            mod,
+            "_fetch_all_arcgis_features",
+            lambda client: ([feature], [b"page"]),
+        )
+
+        result, raw_pages = fetch_from_arcgis(today_label)
+
+        assert result["boundary_vintage"].tolist() == [today_label]
+        assert result["source_ref"].tolist() == [mod.ARCGIS_SOURCE_REF]
+        assert raw_pages == [b"page"]
+
+    def test_ingest_current_snapshot_writes_dated_canonical_path(self, tmp_path, monkeypatch):
+        import hhplab.geographies.boundaries.hud.exchange_gis as mod
+
+        today_label = f"HUDOpenData_{datetime.now(UTC).date().isoformat()}"
+        raw_dir = tmp_path / "raw"
+        curated_dir = tmp_path / "curated"
+        polygon = Polygon([(-105, 39), (-105, 40), (-104, 40), (-104, 39), (-105, 39)])
+        source = gpd.GeoDataFrame(
+            {
+                "COCNUM": ["CO-500"],
+                "COCNAME": ["Colorado Balance of State CoC"],
+                "ST": ["CO"],
+            },
+            geometry=[polygon],
+            crs="EPSG:4326",
+        )
+
+        def fake_fetch(boundary_vintage, show_progress=False):
+            assert boundary_vintage == today_label
+            return map_to_canonical_schema(source, today_label, mod.ARCGIS_SOURCE_REF), [b"page"]
+
+        monkeypatch.setattr(mod, "fetch_from_arcgis", fake_fetch)
+        monkeypatch.setattr(
+            mod,
+            "write_api_snapshot",
+            lambda *args, **kwargs: (raw_dir / "snapshot", "a" * 64, 4),
+        )
+
+        result = ingest_hud_exchange(
+            boundary_vintage=today_label,
+            raw_dir=raw_dir,
+            curated_dir=curated_dir,
+        )
+
+        assert result.name == f"coc__B{today_label}.parquet"
+        saved = gpd.read_parquet(result)
+        assert saved["boundary_vintage"].tolist() == [today_label]
+        assert saved["source_ref"].tolist() == [mod.ARCGIS_SOURCE_REF]
+
+    @pytest.mark.parametrize("boundary_vintage", ["2019", "2024", "2025"])
+    def test_numeric_vintage_uses_year_archive_by_default(
+        self, boundary_vintage, tmp_path, monkeypatch
+    ):
+        """Numeric year ingests use year-specific archives, never the live layer."""
         import hhplab.geographies.boundaries.hud.exchange_gis as mod
 
         raw_dir = tmp_path / "raw"
@@ -442,15 +543,34 @@ class TestIngestHudExchange:
         monkeypatch.setattr(mod, "check_source_changed", capture_check_source_changed)
 
         result = ingest_hud_exchange(
-            boundary_vintage="2019",
+            boundary_vintage=boundary_vintage,
             raw_dir=raw_dir,
             curated_dir=curated_dir,
         )
 
         assert result.exists()
-        assert observed["boundary_vintage"] == "2019"
+        assert observed["boundary_vintage"] == boundary_vintage
         assert observed["url"] is None
-        assert "National_Boundary_2019" in str(observed["source_url"])
+        assert f"National_Boundary_{boundary_vintage}" in str(observed["source_url"])
+
+    def test_numeric_archive_failure_does_not_fall_back_to_arcgis(self, tmp_path, monkeypatch):
+        import hhplab.geographies.boundaries.hud.exchange_gis as mod
+
+        def fail_archive(*args, **kwargs):
+            raise RuntimeError("year-specific archive unavailable")
+
+        def fail_arcgis(*args, **kwargs):
+            raise AssertionError("numeric vintage must not call the live ArcGIS service")
+
+        monkeypatch.setattr(mod, "download_hud_exchange_gdb", fail_archive)
+        monkeypatch.setattr(mod, "fetch_from_arcgis", fail_arcgis)
+
+        with pytest.raises(RuntimeError, match="year-specific archive unavailable"):
+            ingest_hud_exchange(
+                boundary_vintage="2025",
+                raw_dir=tmp_path / "raw",
+                curated_dir=tmp_path / "curated",
+            )
 
 
 class TestPerStateFallbackCompleteness:
