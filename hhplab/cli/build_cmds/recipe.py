@@ -32,6 +32,7 @@ from hhplab.recipe.manifest import read_manifest
 from hhplab.recipe.planner import PlannerError, resolve_plan
 from hhplab.recipe.preflight import PreflightReport, Severity, run_preflight
 from hhplab.recipe.recipe_schema import RecipeV1
+from hhplab.recipe.schema_results import RecipeV2
 from hhplab.storage.config import load_config
 
 # Common --json flag definition
@@ -149,11 +150,7 @@ def _msa_coc_coverage_recipe_dict(
 
 
 def _year_segment(start_year: int, end_year: int, *, exclude_years: set[int]) -> list[int]:
-    return [
-        year
-        for year in range(start_year, end_year + 1)
-        if year not in exclude_years
-    ]
+    return [year for year in range(start_year, end_year + 1) if year not in exclude_years]
 
 
 def _pit_msa_file_set_segments(
@@ -694,15 +691,12 @@ def recipe_init_cmd(
 
     recipe_name = name or f"msa_coc_coverage_{year}"
     resolved_ranking_year = ranking_reference_year or year
-    resolved_pep_path = (
-        pep_msa_path
-        or (
-            "data/curated/pep/"
-            + msa_pep_filename(
-                resolved_ranking_year,
-                msa_definition_version,
-                county_vintage,
-            )
+    resolved_pep_path = pep_msa_path or (
+        "data/curated/pep/"
+        + msa_pep_filename(
+            resolved_ranking_year,
+            msa_definition_version,
+            county_vintage,
         )
     )
     recipe_data = _msa_coc_coverage_recipe_dict(
@@ -812,7 +806,9 @@ def _pipeline_payload(
             "pipeline_id": r.pipeline_id,
             "success": r.success,
             "artifacts": resolve_pipeline_artifacts(
-                parsed, r.pipeline_id, storage_config=storage_cfg,
+                parsed,
+                r.pipeline_id,
+                storage_config=storage_cfg,
             ),
             "steps": [
                 {
@@ -861,7 +857,9 @@ def _validate_recipe(
     """
     # Run adapter registry validation
     diagnostics = validate_recipe_adapters(
-        parsed, geometry_registry, dataset_registry,
+        parsed,
+        geometry_registry,
+        dataset_registry,
     )
     adapter_errors = [d for d in diagnostics if d.level == "error"]
     adapter_warnings = [d for d in diagnostics if d.level == "warning"]
@@ -961,20 +959,43 @@ def recipe_cmd(
         typer.echo(f"Error: {exc}", err=True)
         raise typer.Exit(code=2) from exc
 
+    if isinstance(parsed, RecipeV2):
+        from hhplab.results.runner import check_results, run_results
+
+        try:
+            if asset_store_root is not None or no_cache or skip_preflight:
+                raise ValueError(
+                    "RecipeV2 does not support legacy cache/preflight overrides; "
+                    "use hhplab results run with declared inputs."
+                )
+            if dry_run:
+                payload = check_results(parsed, original_recipe_bytes=recipe.read_bytes())
+                failed = payload.get("status") not in {"ok", "ready"}
+            else:
+                payload = run_results(
+                    parsed,
+                    original_recipe_bytes=recipe.read_bytes(),
+                    outputs_root=output_root or load_config().output_root,
+                    project_root=Path.cwd(),
+                )
+                failed = payload.get("statuses", {}).get("execution_status") != "complete"
+        except Exception as exc:
+            _json_error(str(exc), code=2)
+        _json_out(payload)
+        raise typer.Exit(1 if failed else 0)
+
     if not use_json:
         typer.echo(
             f"Loaded recipe: {parsed.name} (version {parsed.version})",
         )
         if not parsed.transforms:
             typer.echo(
-                "  Warning: No transforms defined; "
-                "no build output will be produced.",
+                "  Warning: No transforms defined; no build output will be produced.",
                 err=True,
             )
         if not parsed.pipelines:
             typer.echo(
-                "  Warning: No pipelines defined; "
-                "no build output will be produced.",
+                "  Warning: No pipelines defined; no build output will be produced.",
                 err=True,
             )
 
@@ -983,14 +1004,16 @@ def recipe_cmd(
 
     if all_errors:
         if use_json:
-            _json_out({
-                "status": "error",
-                "recipe_name": parsed.name,
-                "validation": {
-                    "warnings": all_warnings,
-                    "errors": all_errors,
-                },
-            })
+            _json_out(
+                {
+                    "status": "error",
+                    "recipe_name": parsed.name,
+                    "validation": {
+                        "warnings": all_warnings,
+                        "errors": all_errors,
+                    },
+                }
+            )
             raise typer.Exit(code=1)
         for e in all_errors:
             typer.echo(f"  Error: {e}", err=True)
@@ -1013,27 +1036,25 @@ def recipe_cmd(
         pf_report = run_preflight(parsed)
         if not use_json:
             if pf_report.is_ready:
-                typer.echo(
-                    f"Preflight: {len(pf_report.findings)} finding(s), "
-                    "all clear."
-                )
+                typer.echo(f"Preflight: {len(pf_report.findings)} finding(s), all clear.")
                 # Show warnings so users know about non-blocking issues
                 for f in pf_report.findings:
                     if f.severity == Severity.WARNING:
                         typer.echo(
-                            f"  Warning: {f.message}", err=True,
+                            f"  Warning: {f.message}",
+                            err=True,
                         )
             else:
                 typer.echo(
-                    f"\nPreflight found {pf_report.blocking_count} "
-                    "blocker(s):",
+                    f"\nPreflight found {pf_report.blocking_count} blocker(s):",
                     err=True,
                 )
                 for f in pf_report.blocking_findings():
                     typer.echo(f"  {f.message}", err=True)
                     if f.remediation:
                         typer.echo(
-                            f"    Fix: {f.remediation.hint}", err=True,
+                            f"    Fix: {f.remediation.hint}",
+                            err=True,
                         )
                         if f.remediation.command:
                             typer.echo(
@@ -1041,32 +1062,35 @@ def recipe_cmd(
                                 err=True,
                             )
                 typer.echo(
-                    "\nRun 'hhplab build recipe-preflight --recipe "
-                    f"{recipe}' for details.",
+                    f"\nRun 'hhplab build recipe-preflight --recipe {recipe}' for details.",
                     err=True,
                 )
 
         if not pf_report.is_ready:
             if use_json:
-                _json_out({
-                    "status": "blocked",
-                    "recipe_name": parsed.name,
-                    "preflight": pf_report.to_dict(),
-                })
+                _json_out(
+                    {
+                        "status": "blocked",
+                        "recipe_name": parsed.name,
+                        "preflight": pf_report.to_dict(),
+                    }
+                )
             raise typer.Exit(code=1)
 
     if dry_run:
         if use_json:
-            _json_out({
-                "status": "ok",
-                "recipe_name": parsed.name,
-                "recipe_version": parsed.version,
-                "validation": {
-                    "warnings": all_warnings,
-                    "errors": [],
-                },
-                "dry_run": True,
-            })
+            _json_out(
+                {
+                    "status": "ok",
+                    "recipe_name": parsed.name,
+                    "recipe_version": parsed.version,
+                    "validation": {
+                        "warnings": all_warnings,
+                        "errors": [],
+                    },
+                    "dry_run": True,
+                }
+            )
         return
 
     # 3. Execute the build pipeline
@@ -1077,7 +1101,9 @@ def recipe_cmd(
     )
     try:
         results = execute_recipe(
-            parsed, cache=cache, quiet=use_json,
+            parsed,
+            cache=cache,
+            quiet=use_json,
             storage_config=storage_cfg,
         )
     except ExecutorError as exc:
@@ -1167,18 +1193,30 @@ def recipe_plan_cmd(
         typer.echo(f"Error: {exc}", err=True)
         raise typer.Exit(code=2) from exc
 
+    if isinstance(parsed, RecipeV2):
+        from hhplab.recipe.results_plan import plan_results
+
+        try:
+            plan = plan_results(parsed, original_recipe_bytes=recipe.read_bytes())
+        except Exception as exc:
+            _json_error(str(exc), code=2)
+        _json_out({"status": "ok", **plan.to_dict()})
+        return
+
     all_warnings, all_errors = _validate_recipe(parsed, use_json=use_json)
 
     if all_errors:
         if use_json:
-            _json_out({
-                "status": "error",
-                "recipe_name": parsed.name,
-                "validation": {
-                    "warnings": all_warnings,
-                    "errors": all_errors,
-                },
-            })
+            _json_out(
+                {
+                    "status": "error",
+                    "recipe_name": parsed.name,
+                    "validation": {
+                        "warnings": all_warnings,
+                        "errors": all_errors,
+                    },
+                }
+            )
             raise typer.Exit(code=1)
         for e in all_errors:
             typer.echo(f"  Error: {e}", err=True)
@@ -1208,16 +1246,18 @@ def recipe_plan_cmd(
                 storage_config=storage_cfg,
             )
             pipeline_payloads.append(payload)
-        _json_out({
-            "status": "ok",
-            "recipe_name": parsed.name,
-            "recipe_version": parsed.version,
-            "validation": {
-                "warnings": all_warnings,
-                "errors": [],
-            },
-            "pipelines": pipeline_payloads,
-        })
+        _json_out(
+            {
+                "status": "ok",
+                "recipe_name": parsed.name,
+                "recipe_version": parsed.version,
+                "validation": {
+                    "warnings": all_warnings,
+                    "errors": [],
+                },
+                "pipelines": pipeline_payloads,
+            }
+        )
         return
 
     # Human-readable output
@@ -1264,8 +1304,7 @@ def recipe_plan_cmd(
 
         for jt in plan.join_tasks:
             typer.echo(
-                f"  [join] datasets={jt.datasets} "
-                f"year={jt.year} on={jt.join_on}",
+                f"  [join] datasets={jt.datasets} year={jt.year} on={jt.join_on}",
             )
 
 
@@ -1313,10 +1352,7 @@ def recipe_provenance_cmd(
         for a in m.assets:
             label = a.dataset_id or a.transform_id or ""
             size_kb = a.size / 1024
-            typer.echo(
-                f"  [{a.role}] {a.path}"
-                f"  ({size_kb:.1f} KB, sha256:{a.sha256[:12]}...)"
-            )
+            typer.echo(f"  [{a.role}] {a.path}  ({size_kb:.1f} KB, sha256:{a.sha256[:12]}...)")
             if label:
                 typer.echo(f"         id: {label}")
 
@@ -1380,20 +1416,21 @@ def recipe_export_cmd(
 
     if not use_json:
         typer.echo(
-            f"Exporting bundle for '{m.recipe_name}' "
-            f"pipeline '{m.pipeline_id}'...",
+            f"Exporting bundle for '{m.recipe_name}' pipeline '{m.pipeline_id}'...",
         )
 
     do_export_bundle(m, project_root, destination, storage_config=storage_cfg)
 
     if use_json:
-        _json_out({
-            "status": "ok",
-            "recipe_name": m.recipe_name,
-            "pipeline_id": m.pipeline_id,
-            "assets_copied": len(m.assets),
-            "bundle_path": str(destination),
-        })
+        _json_out(
+            {
+                "status": "ok",
+                "recipe_name": m.recipe_name,
+                "pipeline_id": m.pipeline_id,
+                "assets_copied": len(m.assets),
+                "bundle_path": str(destination),
+            }
+        )
         return
 
     typer.echo(f"  {len(m.assets)} asset(s) copied")
@@ -1403,9 +1440,7 @@ def recipe_export_cmd(
 
 def _render_preflight_human(report: PreflightReport) -> None:
     """Render a preflight report as human-readable text."""
-    typer.echo(
-        f"Recipe: {report.recipe_name} (version {report.recipe_version})"
-    )
+    typer.echo(f"Recipe: {report.recipe_name} (version {report.recipe_version})")
     typer.echo(
         f"Universe: {min(report.universe_years)}-"
         f"{max(report.universe_years)} "
@@ -1415,24 +1450,18 @@ def _render_preflight_human(report: PreflightReport) -> None:
     for ps in report.pipelines:
         if ps.plan_error:
             typer.echo(
-                f"\nPipeline '{ps.pipeline_id}': "
-                f"PLAN ERROR - {ps.plan_error}",
+                f"\nPipeline '{ps.pipeline_id}': PLAN ERROR - {ps.plan_error}",
                 err=True,
             )
         else:
-            typer.echo(
-                f"\nPipeline '{ps.pipeline_id}': "
-                f"{ps.task_count} tasks resolved"
-            )
+            typer.echo(f"\nPipeline '{ps.pipeline_id}': {ps.task_count} tasks resolved")
 
     if not report.findings:
         typer.echo("\nAll prerequisites satisfied. Ready to build.")
         return
 
     blockers = [f for f in report.findings if f.is_blocking]
-    warnings = [
-        f for f in report.findings if f.severity == Severity.WARNING
-    ]
+    warnings = [f for f in report.findings if f.severity == Severity.WARNING]
 
     if blockers:
         typer.echo(f"\nBlockers ({len(blockers)}):", err=True)
@@ -1440,11 +1469,13 @@ def _render_preflight_human(report: PreflightReport) -> None:
             typer.echo(f"  ERROR: {f.message}", err=True)
             if f.remediation:
                 typer.echo(
-                    f"    Fix: {f.remediation.hint}", err=True,
+                    f"    Fix: {f.remediation.hint}",
+                    err=True,
                 )
                 if f.remediation.command:
                     typer.echo(
-                        f"    Run: {f.remediation.command}", err=True,
+                        f"    Run: {f.remediation.command}",
+                        err=True,
                     )
 
     if warnings:
@@ -1454,15 +1485,11 @@ def _render_preflight_human(report: PreflightReport) -> None:
 
     if blockers:
         typer.echo(
-            f"\nPreflight FAILED: {len(blockers)} blocker(s), "
-            f"{len(warnings)} warning(s).",
+            f"\nPreflight FAILED: {len(blockers)} blocker(s), {len(warnings)} warning(s).",
             err=True,
         )
     else:
-        typer.echo(
-            f"\nPreflight passed with {len(warnings)} warning(s). "
-            "Ready to build."
-        )
+        typer.echo(f"\nPreflight passed with {len(warnings)} warning(s). Ready to build.")
 
 
 def recipe_preflight_cmd(
@@ -1525,6 +1552,16 @@ def recipe_preflight_cmd(
         typer.echo(f"Error: {exc}", err=True)
         raise typer.Exit(code=2) from exc
 
+    if isinstance(parsed, RecipeV2):
+        from hhplab.results.runner import check_results
+
+        try:
+            payload = check_results(parsed, original_recipe_bytes=recipe.read_bytes())
+        except Exception as exc:
+            _json_error(str(exc), code=2)
+        _json_out(payload)
+        raise typer.Exit(0 if payload.get("status") in {"ok", "ready"} else 1)
+
     report = run_preflight(parsed)
 
     if gaps:
@@ -1532,10 +1569,12 @@ def recipe_preflight_cmd(
         raise typer.Exit(code=1 if report.blocking_count > 0 else 0)
 
     if use_json:
-        _json_out({
-            "status": "ok" if report.is_ready else "blocked",
-            **report.to_dict(),
-        })
+        _json_out(
+            {
+                "status": "ok" if report.is_ready else "blocked",
+                **report.to_dict(),
+            }
+        )
         raise typer.Exit(code=1 if not report.is_ready else 0)
 
     _render_preflight_human(report)

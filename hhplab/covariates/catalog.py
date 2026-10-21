@@ -5,6 +5,12 @@ from __future__ import annotations
 from dataclasses import asdict, dataclass
 from typing import Literal
 
+from hhplab.schema.redistribution import (
+    PUBLIC_DATA_TERMS,
+    UNKNOWN_TERMS,
+    RedistributionEvidence,
+    SourceRedistribution,
+)
 from hhplab.sources.bls.qcew.contract import (
     QCEW_FIRST_YEAR,
     QCEW_MEASURE_COLUMNS,
@@ -31,6 +37,7 @@ from hhplab.sources.census.bps.census_bps_contract import (
     CENSUS_BPS_SOURCE_ID,
     CENSUS_BPS_SOURCE_PAGE,
 )
+from hhplab.sources.coverage import CENSUS_DATA_EVIDENCE
 from hhplab.sources.irs.irs_soi_contract import (
     IRS_SOI_COUNTY_MEASURE_COLUMNS,
     IRS_SOI_FIRST_YEAR,
@@ -77,6 +84,12 @@ from hhplab.sources.vera.incarceration_contract import (
     VERA_SOURCE_URL,
 )
 
+BLS_DATA_EVIDENCE = RedistributionEvidence(
+    "https://www.bls.gov/opub/copyright-information.htm",
+    "2026-10-20",
+    "Published BLS statistical data with BLS attribution; excludes images and trademarks.",
+)
+
 GeoType = Literal["county", "coc", "state", "msa"]
 MeasureAggregation = Literal[
     "extensive_sum",
@@ -103,6 +116,8 @@ class CovariateSourceSpec:
     measure_aggregations: dict[str, MeasureAggregation]
     recommended_align: str
     notes: str
+    redistribution: SourceRedistribution = UNKNOWN_TERMS
+    redistribution_evidence: tuple[RedistributionEvidence, ...] = ()
 
     def to_dict(self) -> dict:
         """Serialize to a JSON-ready dictionary."""
@@ -155,6 +170,8 @@ COVARIATE_SOURCE_SPECS: dict[str, CovariateSourceSpec] = {
         ),
     ),
     CENSUS_BPS_SOURCE_ID: CovariateSourceSpec(
+        redistribution=PUBLIC_DATA_TERMS,
+        redistribution_evidence=(CENSUS_DATA_EVIDENCE,),
         source_id=CENSUS_BPS_SOURCE_ID,
         provider=CENSUS_BPS_PROVIDER,
         product=CENSUS_BPS_PRODUCT,
@@ -166,9 +183,7 @@ COVARIATE_SOURCE_SPECS: dict[str, CovariateSourceSpec] = {
         source_url=CENSUS_BPS_SOURCE_PAGE,
         required_columns=("county_fips", "year"),
         measure_columns=CENSUS_BPS_MEASURE_COLUMNS,
-        measure_aggregations={
-            column: "extensive_sum" for column in CENSUS_BPS_MEASURE_COLUMNS
-        },
+        measure_aggregations={column: "extensive_sum" for column in CENSUS_BPS_MEASURE_COLUMNS},
         recommended_align="calendar_year",
         notes=(
             "Census Building Permits Survey county annual files measure newly "
@@ -179,6 +194,8 @@ COVARIATE_SOURCE_SPECS: dict[str, CovariateSourceSpec] = {
         ),
     ),
     QCEW_SOURCE_ID: CovariateSourceSpec(
+        redistribution=PUBLIC_DATA_TERMS,
+        redistribution_evidence=(BLS_DATA_EVIDENCE,),
         source_id=QCEW_SOURCE_ID,
         provider=QCEW_PROVIDER,
         product=QCEW_PRODUCT,
@@ -306,10 +323,7 @@ COVARIATE_SOURCE_SPECS: dict[str, CovariateSourceSpec] = {
         first_year=1895,
         last_year=None,
         source_page="https://prism.oregonstate.edu/",
-        source_url=(
-            "https://data.prism.oregonstate.edu/time_series/us/an/4km/"
-            "tmin/monthly/"
-        ),
+        source_url=("https://data.prism.oregonstate.edu/time_series/us/an/4km/tmin/monthly/"),
         required_columns=("county_fips", "year"),
         measure_columns=(
             "tmin_c",
@@ -364,9 +378,7 @@ COVARIATE_SOURCE_SPECS: dict[str, CovariateSourceSpec] = {
         source_url=VERA_SOURCE_URL,
         required_columns=VERA_REQUIRED_CURATED_COLUMNS,
         measure_columns=VERA_JAIL_MEASURE_COLUMNS,
-        measure_aggregations={
-            column: "extensive_sum" for column in VERA_JAIL_MEASURE_COLUMNS
-        },
+        measure_aggregations={column: "extensive_sum" for column in VERA_JAIL_MEASURE_COLUMNS},
         recommended_align="calendar_year",
         notes=(
             "Vera county jail measures from Incarceration Trends. The raw file "
@@ -388,9 +400,7 @@ COVARIATE_SOURCE_SPECS: dict[str, CovariateSourceSpec] = {
         source_url=VERA_SOURCE_URL,
         required_columns=VERA_REQUIRED_CURATED_COLUMNS,
         measure_columns=VERA_PRISON_MEASURE_COLUMNS,
-        measure_aggregations={
-            column: "extensive_sum" for column in VERA_PRISON_MEASURE_COLUMNS
-        },
+        measure_aggregations={column: "extensive_sum" for column in VERA_PRISON_MEASURE_COLUMNS},
         recommended_align="calendar_year",
         notes=(
             "Vera county prison measures from Incarceration Trends. Prison "
@@ -432,9 +442,7 @@ COVARIATE_SOURCE_SPECS: dict[str, CovariateSourceSpec] = {
         source_url=IRS_SOI_SOURCE_URL,
         required_columns=("county_fips", "year"),
         measure_columns=IRS_SOI_COUNTY_MEASURE_COLUMNS,
-        measure_aggregations={
-            column: "extensive_sum" for column in IRS_SOI_COUNTY_MEASURE_COLUMNS
-        },
+        measure_aggregations={column: "extensive_sum" for column in IRS_SOI_COUNTY_MEASURE_COLUMNS},
         recommended_align="filing_year_later_year",
         notes=(
             "IRS Statistics of Income county-to-county migration flows. Curated "

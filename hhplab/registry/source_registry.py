@@ -53,6 +53,11 @@ from typing import Literal
 
 import pandas as pd
 
+from hhplab.schema.redistribution import (
+    UNKNOWN_TERMS,
+    RedistributionEvidence,
+    SourceRedistribution,
+)
 from hhplab.storage.paths import curated_root
 
 logger = logging.getLogger(__name__)
@@ -114,6 +119,16 @@ class SourceRegistryEntry:
     file_size: int = 0
     local_path: str = ""
     metadata: dict = field(default_factory=dict)
+
+    @property
+    def redistribution(self) -> SourceRedistribution:
+        """Read explicit terms without guessing permissions from provider names."""
+        value = self.metadata.get("redistribution")
+        return UNKNOWN_TERMS if value is None else SourceRedistribution.from_dict(value)
+
+    @property
+    def redistribution_evidence(self) -> tuple[dict[str, str], ...]:
+        return tuple(self.metadata.get("redistribution_evidence", ()))
 
     def to_dict(self) -> dict:
         """Convert to dictionary for DataFrame row."""
@@ -192,6 +207,9 @@ def register_source(
     local_path: str | Path = "",
     metadata: dict | None = None,
     registry_path: Path | None = None,
+    *,
+    redistribution: SourceRedistribution | None = None,
+    redistribution_evidence: tuple[RedistributionEvidence, ...] = (),
 ) -> SourceRegistryEntry:
     """Register a new source data ingestion.
 
@@ -224,6 +242,15 @@ def register_source(
     SourceRegistryEntry
         The registered entry.
     """
+    source_metadata = dict(metadata or {})
+    if redistribution is not None:
+        source_metadata["redistribution"] = redistribution.to_dict()
+    if redistribution_evidence:
+        source_metadata["redistribution_evidence"] = [
+            item.to_dict() for item in redistribution_evidence
+        ]
+    if "redistribution" in source_metadata:
+        SourceRedistribution.from_dict(source_metadata["redistribution"])
     entry = SourceRegistryEntry(
         source_type=source_type,
         source_url=source_url,
@@ -232,7 +259,7 @@ def register_source(
         file_size=file_size,
         local_path=str(local_path) if local_path else "",
         ingested_at=datetime.now(UTC),
-        metadata=metadata or {},
+        metadata=source_metadata,
     )
 
     # Load existing registry

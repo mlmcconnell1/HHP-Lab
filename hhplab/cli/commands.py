@@ -16,6 +16,7 @@ from hhplab.cli.aggregate_cli import aggregate_app
 from hhplab.cli.analyze import analyze_app
 from hhplab.cli.build_cmds.recipe import recipe_init_cmd
 from hhplab.cli.panel import panel_app
+from hhplab.cli.results import results_app
 from hhplab.cli.status import status_cmd
 
 
@@ -51,6 +52,7 @@ def register_commands(
     app.add_typer(registry_app, name="registry")
     app.add_typer(analyze_app, name="analyze")
     app.add_typer(panel_app, name="panel")
+    app.add_typer(results_app, name="results")
     app.add_typer(migrate_app, name="migrate")
 
     ingest_commands.register_commands(ingest_app)

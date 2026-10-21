@@ -82,6 +82,38 @@ the output downstream.
 
 ## Recipes
 
+## RecipeV2 Results Example
+
+`shelter-capacity-results.yaml` records the shelter-capacity results workflow
+from §10 of `docs/results-recipe-spec_2.md`, including canonical HUD HIC
+columns (`hic_es_year_round_beds`, `hic_th_year_round_beds`, and
+`hic_sh_year_round_beds`), 2010 baselines, the 2021 mask, annual and biennial
+changes, and the planned variants. It includes real CBSA and CoC build
+pipeline references assembled from the supported Glynn/Fox LAUS and HUD
+PIT/HIC source recipes. Its four numerical research parameters, the
+right-to-shelter source, and the CoC unemployment source remain explicit
+unresolved recipe values; no research margins or source decisions have been
+invented. Those source markers continue to block lock and run even if the
+numerical parameters are supplied.
+
+The CBSA LAUS, PEP, and ACS5 inputs currently cover panel years 2015–2023,
+while the study range is 2010–2024. ACS tract vintages follow the ACS data
+year (panel year minus one): panel year 2020 uses ACS 2019 on 2010 tracts, and
+panel year 2021 uses ACS 2020 on 2020 tracts.
+The CoC build supplies PIT and HIC but no CoC-native unemployment measure, and
+the real `right_to_shelter` classification is also unresolved. Consequently,
+the available pipelines make the source graph concrete but do not make every
+analysis variant executable. In particular, `coc_geography` and
+`no_right_to_shelter` remain blocked on source/research work. Do not treat
+synthetic CoC frames in the offline acceptance fixture as evidence that real
+CoC LAUS or right-to-shelter inputs exist.
+
+Run the offline RecipeV2 integration acceptance suite with:
+
+```bash
+.venv/bin/pytest -q tests/test_results_integration.py
+```
+
 - `coc-base-pit-acs-zori-2016-2021.yaml`
   National CoC base panel for downstream top-N slicing. Includes PIT, PEP,
   lagged ACS5 demographics, and January ZORI.

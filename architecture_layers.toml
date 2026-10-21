@@ -149,3 +149,132 @@ passive_or_reexport_only = [
   "hhplab.geographies.xwalks",
   "hhplab.geographies.census",
 ]
+
+# Phase-1 results architecture expectations. These entries intentionally pin
+# the native intent identities to paths, kinds, parents, and layers. Updating
+# intent alone must not silently move an owned element or change its layer.
+[results_v2]
+plan = "results-recipe-v2"
+baseline_commit = "900a29f9891f949bef5aaae354f4055b01033497"
+intent_file = ".elements/elements.working-intent.jsonl"
+reconcile_request = ".elements/plans/results-recipe-v2.reconcile.json"
+final_pin = ".elements/plans/results-recipe-v2.pin-final.json"
+bead_map = ".elements/plans/results-recipe-v2.bead-map.jsonl"
+bead_export = ".beads/issues.jsonl"
+
+[results_v2.elements]
+# id = { path, kind, parent, layer, change, bead }
+"intent:results-v2:hhplab" = { path = "hhplab", kind = "semantic/package", parent = "", layer = "contracts", change = "retain", bead = "" }
+"intent:results-v2:schema" = { path = "hhplab/schema", kind = "semantic/package", parent = "intent:results-v2:hhplab", layer = "contracts", change = "extend", bead = "" }
+"intent:results-v2:storage" = { path = "hhplab/storage", kind = "semantic/package", parent = "intent:results-v2:hhplab", layer = "infrastructure", change = "extend", bead = "" }
+"intent:results-v2:recipe" = { path = "hhplab/recipe", kind = "semantic/package", parent = "intent:results-v2:hhplab", layer = "application", change = "extend", bead = "" }
+"intent:results-v2:analysis" = { path = "hhplab/analysis", kind = "semantic/package", parent = "intent:results-v2:hhplab", layer = "application", change = "extend", bead = "" }
+"intent:results-v2:results" = { path = "hhplab/results", kind = "semantic/package", parent = "intent:results-v2:hhplab", layer = "application", change = "extend", bead = "" }
+"intent:results-v2:cli" = { path = "hhplab/cli", kind = "semantic/package", parent = "intent:results-v2:hhplab", layer = "interface", change = "extend", bead = "" }
+"intent:results-v2:build_cmds" = { path = "hhplab/cli/build_cmds", kind = "semantic/package", parent = "intent:results-v2:cli", layer = "interface", change = "extend", bead = "coclab-ff6fp.22" }
+"intent:results-v2:covariates" = { path = "hhplab/covariates", kind = "semantic/package", parent = "intent:results-v2:hhplab", layer = "domain", change = "extend", bead = "coclab-ff6fp.16" }
+"intent:results-v2:executor" = { path = "hhplab/recipe/executor", kind = "semantic/package", parent = "intent:results-v2:recipe", layer = "application", change = "extend", bead = "coclab-ff6fp.13" }
+"intent:results-v2:registry" = { path = "hhplab/registry", kind = "semantic/package", parent = "intent:results-v2:hhplab", layer = "infrastructure", change = "extend", bead = "coclab-ff6fp.16" }
+"intent:results-v2:sources" = { path = "hhplab/sources", kind = "semantic/package", parent = "intent:results-v2:hhplab", layer = "contracts", change = "extend", bead = "coclab-ff6fp.16" }
+"intent:results-v2:analysis_contracts" = { path = "hhplab/analysis/contracts.py", kind = "semantic/module", parent = "intent:results-v2:analysis", layer = "application", change = "extend", bead = "coclab-ff6fp.3" }
+"intent:results-v2:analysis_dispatch" = { path = "hhplab/recipe/executor/analyses.py", kind = "semantic/module", parent = "intent:results-v2:executor", layer = "application", change = "new", bead = "coclab-ff6fp.13" }
+"intent:results-v2:bands" = { path = "hhplab/results/bands.py", kind = "semantic/module", parent = "intent:results-v2:results", layer = "application", change = "new", bead = "coclab-ff6fp.5" }
+"intent:results-v2:bundle" = { path = "hhplab/results/bundle.py", kind = "semantic/module", parent = "intent:results-v2:results", layer = "application", change = "new", bead = "coclab-ff6fp.19" }
+"intent:results-v2:cli_commands" = { path = "hhplab/cli/commands.py", kind = "semantic/module", parent = "intent:results-v2:cli", layer = "interface", change = "extend", bead = "coclab-ff6fp.22" }
+"intent:results-v2:cli_recipe" = { path = "hhplab/cli/build_cmds/recipe.py", kind = "semantic/module", parent = "intent:results-v2:build_cmds", layer = "interface", change = "extend", bead = "coclab-ff6fp.22" }
+"intent:results-v2:cli_results" = { path = "hhplab/cli/results.py", kind = "semantic/module", parent = "intent:results-v2:cli", layer = "interface", change = "new", bead = "coclab-ff6fp.22" }
+"intent:results-v2:correlation" = { path = "hhplab/analysis/correlation.py", kind = "semantic/module", parent = "intent:results-v2:analysis", layer = "application", change = "extend", bead = "coclab-ff6fp.12" }
+"intent:results-v2:covariate_catalog" = { path = "hhplab/covariates/catalog.py", kind = "semantic/module", parent = "intent:results-v2:covariates", layer = "domain", change = "extend", bead = "coclab-ff6fp.16" }
+"intent:results-v2:derive" = { path = "hhplab/recipe/derive.py", kind = "semantic/module", parent = "intent:results-v2:recipe", layer = "application", change = "new", bead = "coclab-ff6fp.7" }
+"intent:results-v2:diagnostics" = { path = "hhplab/results/diagnostics.py", kind = "semantic/module", parent = "intent:results-v2:results", layer = "application", change = "new", bead = "coclab-ff6fp.14" }
+"intent:results-v2:estimation" = { path = "hhplab/analysis/estimation.py", kind = "semantic/module", parent = "intent:results-v2:analysis", layer = "application", change = "extend", bead = "coclab-ff6fp.10" }
+"intent:results-v2:inspection" = { path = "hhplab/analysis/inspection.py", kind = "semantic/module", parent = "intent:results-v2:analysis", layer = "application", change = "extend", bead = "coclab-ff6fp.12" }
+"intent:results-v2:ledger" = { path = "hhplab/storage/run_ledger.py", kind = "semantic/module", parent = "intent:results-v2:storage", layer = "infrastructure", change = "new", bead = "coclab-ff6fp.17" }
+"intent:results-v2:lineage" = { path = "hhplab/results/lineage.py", kind = "semantic/module", parent = "intent:results-v2:results", layer = "application", change = "new", bead = "coclab-ff6fp.16" }
+"intent:results-v2:loader" = { path = "hhplab/recipe/loader.py", kind = "semantic/module", parent = "intent:results-v2:recipe", layer = "application", change = "extend", bead = "coclab-ff6fp.4" }
+"intent:results-v2:model" = { path = "hhplab/analysis/model.py", kind = "semantic/module", parent = "intent:results-v2:analysis", layer = "application", change = "extend", bead = "coclab-ff6fp.9" }
+"intent:results-v2:readiness" = { path = "hhplab/analysis/readiness.py", kind = "semantic/module", parent = "intent:results-v2:analysis", layer = "application", change = "new", bead = "coclab-ff6fp.9" }
+"intent:results-v2:recipe_findings" = { path = "hhplab/results/recipe_findings.py", kind = "semantic/module", parent = "intent:results-v2:results", layer = "application", change = "new", bead = "coclab-ff6fp.15" }
+"intent:results-v2:redistribution_contracts" = { path = "hhplab/schema/redistribution.py", kind = "semantic/module", parent = "intent:results-v2:schema", layer = "contracts", change = "new", bead = "coclab-ff6fp.3" }
+"intent:results-v2:regression" = { path = "hhplab/analysis/regression.py", kind = "semantic/module", parent = "intent:results-v2:analysis", layer = "application", change = "extend", bead = "coclab-ff6fp.11" }
+"intent:results-v2:report" = { path = "hhplab/results/report.py", kind = "semantic/module", parent = "intent:results-v2:results", layer = "application", change = "new", bead = "coclab-ff6fp.18" }
+"intent:results-v2:result_contracts" = { path = "hhplab/schema/results.py", kind = "semantic/module", parent = "intent:results-v2:schema", layer = "contracts", change = "new", bead = "coclab-ff6fp.3" }
+"intent:results-v2:result_planner" = { path = "hhplab/recipe/results_plan.py", kind = "semantic/module", parent = "intent:results-v2:recipe", layer = "application", change = "new", bead = "coclab-ff6fp.6" }
+"intent:results-v2:results_runner" = { path = "hhplab/results/runner.py", kind = "semantic/module", parent = "intent:results-v2:results", layer = "application", change = "new", bead = "coclab-ff6fp.20" }
+"intent:results-v2:samples" = { path = "hhplab/analysis/sample.py", kind = "semantic/module", parent = "intent:results-v2:analysis", layer = "application", change = "new", bead = "coclab-ff6fp.8" }
+"intent:results-v2:source_coverage" = { path = "hhplab/sources/coverage.py", kind = "semantic/module", parent = "intent:results-v2:sources", layer = "contracts", change = "extend", bead = "coclab-ff6fp.16" }
+"intent:results-v2:source_registry" = { path = "hhplab/registry/source_registry.py", kind = "semantic/module", parent = "intent:results-v2:registry", layer = "infrastructure", change = "extend", bead = "coclab-ff6fp.16" }
+"intent:results-v2:stats" = { path = "hhplab/analysis/stats.py", kind = "semantic/module", parent = "intent:results-v2:analysis", layer = "application", change = "extend", bead = "coclab-ff6fp.10" }
+"intent:results-v2:v2_schema" = { path = "hhplab/recipe/schema_results.py", kind = "semantic/module", parent = "intent:results-v2:recipe", layer = "application", change = "new", bead = "coclab-ff6fp.4" }
+"intent:results-v2:verify" = { path = "hhplab/results/verify.py", kind = "semantic/module", parent = "intent:results-v2:results", layer = "application", change = "new", bead = "coclab-ff6fp.21" }
+
+[results_v2.import_prefixes]
+# Newly introduced modules may import only from these declared hhplab prefixes.
+"intent:results-v2:analysis_dispatch" = ["hhplab.analysis", "hhplab.schema", "hhplab.recipe.results_plan"]
+"intent:results-v2:bands" = ["hhplab.schema"]
+"intent:results-v2:bundle" = ["hhplab.schema", "hhplab.storage", "hhplab.results.report", "hhplab.results.lineage"]
+"intent:results-v2:cli_results" = ["hhplab.results", "hhplab.recipe", "hhplab.storage", "hhplab.schema"]
+"intent:results-v2:derive" = ["hhplab.schema"]
+"intent:results-v2:diagnostics" = ["hhplab.schema"]
+"intent:results-v2:ledger" = ["hhplab.schema", "hhplab.storage"]
+"intent:results-v2:lineage" = ["hhplab.schema", "hhplab.covariates.catalog", "hhplab.registry.source_registry", "hhplab.sources.coverage"]
+"intent:results-v2:readiness" = ["hhplab.schema", "hhplab.analysis"]
+"intent:results-v2:recipe_findings" = ["hhplab.schema", "hhplab.results.bands"]
+"intent:results-v2:redistribution_contracts" = ["hhplab.schema"]
+"intent:results-v2:report" = ["hhplab.schema"]
+"intent:results-v2:result_contracts" = ["hhplab.schema"]
+"intent:results-v2:result_planner" = ["hhplab.recipe", "hhplab.schema", "hhplab.results.bands"]
+"intent:results-v2:results_runner" = ["hhplab.recipe", "hhplab.analysis", "hhplab.results", "hhplab.storage", "hhplab.schema"]
+"intent:results-v2:samples" = ["hhplab.schema", "hhplab.analysis.contracts"]
+"intent:results-v2:v2_schema" = ["hhplab.recipe.recipe_schema", "hhplab.schema"]
+"intent:results-v2:verify" = ["hhplab.schema", "hhplab.recipe", "hhplab.analysis", "hhplab.results", "hhplab.storage"]
+
+[results_v2.responsibilities]
+"intent:results-v2:hhplab" = "Scoped root for results recipe implementation; not a replacement for whole-codebase legacy intent."
+"intent:results-v2:schema" = "Retain canonical schema ownership and passive facade; new results functionality follows architecture_layers.toml."
+"intent:results-v2:storage" = "Retain canonical storage ownership and passive facade; new results functionality follows architecture_layers.toml."
+"intent:results-v2:recipe" = "Retain canonical recipe ownership and passive facade; new results functionality follows architecture_layers.toml."
+"intent:results-v2:analysis" = "Retain canonical analysis ownership and passive facade; new results functionality follows architecture_layers.toml."
+"intent:results-v2:results" = "Retain canonical results ownership and passive facade; new results functionality follows architecture_layers.toml."
+"intent:results-v2:cli" = "Retain canonical cli ownership and passive facade; new results functionality follows architecture_layers.toml."
+"intent:results-v2:build_cmds" = "CLI adapters including existing named result workflows; avoid business logic in command handlers."
+"intent:results-v2:covariates" = "Retain canonical covariates ownership and passive facade; new results functionality follows architecture_layers.toml."
+"intent:results-v2:executor" = "Dispatch build and analysis tasks; no estimators or result decision rules in executor."
+"intent:results-v2:registry" = "Retain canonical registry ownership and passive facade; new results functionality follows architecture_layers.toml."
+"intent:results-v2:sources" = "Retain canonical sources ownership and passive facade; new results functionality follows architecture_layers.toml."
+"intent:results-v2:analysis_contracts" = "Typed analysis result/frame interfaces and capability/undefined-result errors."
+"intent:results-v2:analysis_dispatch" = "Dispatch resolved analysis plans to analysis engine; persist sample/result outputs and enforce frame identity."
+"intent:results-v2:bands" = "Pure interval constraint validation, exact overlap witnesses and finding band evaluation; no recipe/CLI/runner imports."
+"intent:results-v2:bundle" = "Portable bundle writer, original/resolved/execution separation, manifest and hashes, partial/failure bundles; delegate report rendering."
+"intent:results-v2:cli_commands" = "Register new results group alongside existing commands without eager implementation ownership."
+"intent:results-v2:cli_recipe" = "Delegate v2 preflight appropriately; preserve v1 recipe build behavior."
+"intent:results-v2:cli_results" = "New results check/run/lock/history/verify group; JSON and exit codes; delegates application services."
+"intent:results-v2:correlation" = "Resolved-frame listwise Pearson/Spearman, no silent sample changes; preserve path API."
+"intent:results-v2:covariate_catalog" = "Declare reviewed redistribution terms and evidence for source specs; unknown default."
+"intent:results-v2:derive" = "Pure masks and closed derivation operations over full keyed panels; retain mask/baseline lineage; never silently drop rows."
+"intent:results-v2:diagnostics" = "Closed column/linear identity checks, per-variant applicability, same-design evidence and declared tolerances."
+"intent:results-v2:estimation" = "OLS/WLS numerical fitting and covariance inputs; retain existing 2SLS public behavior outside v2."
+"intent:results-v2:inspection" = "Resolved-frame grouped descriptives, type-7 quantiles and threshold shares; preserve path API."
+"intent:results-v2:ledger" = "Append-only run/lock events, leases, process identity, torn-write handling and durable concurrency; consumes wire contracts only."
+"intent:results-v2:lineage" = "Propagate source terms to columns, sample dependencies and result/report artifacts; produce packaging withholding decisions."
+"intent:results-v2:loader" = "Dispatch v1/v2 models without changing v1 semantics."
+"intent:results-v2:model" = "Weighted design/absorbed FE preparation, intercept, identification, full design rank and nested-FE correction rank."
+"intent:results-v2:readiness" = "Frame-level numeric, variation, rank and inference readiness checks with structured diagnostics; shared design preparation."
+"intent:results-v2:recipe_findings" = "Recipe-specific finding instances and robustness precedence, resolving base_term and undefined required criteria; separate from historical workflow sidecars."
+"intent:results-v2:redistribution_contracts" = "Shared row-level and aggregate redistribution enums, lineage contracts and conservative status combination; provider-neutral."
+"intent:results-v2:regression" = "Resolved-frame regression API; compatibility wrapper for path API; sample invariant, inference and result contracts."
+"intent:results-v2:report" = "Offline HTML/CSV and README rendering from structured result payloads; four statuses and failures first; no estimation."
+"intent:results-v2:result_contracts" = "Versioned bundle, result, status, sample and findings wire contracts; dependency-free of application modules."
+"intent:results-v2:result_planner" = "Resolve panel refs, overrides, substitutions, groups, dependency graph, component identities and static preflight; numerical readiness delegated."
+"intent:results-v2:results_runner" = "Own end-to-end lifecycle: build, masks/derive, samples, readiness, dispatch, diagnostics/findings, bundle and ledger; failure scope controls independent progress."
+"intent:results-v2:samples" = "Resolve exact membership and ordered exclusions, group unions, iterative removals and inference-only base reuse; readiness owns numerical validation."
+"intent:results-v2:source_coverage" = "Expose core source metadata and redistribution declarations using shared contracts."
+"intent:results-v2:source_registry" = "Store source redistribution metadata using shared contracts without importing domain catalog or application."
+"intent:results-v2:stats" = "Classical, HC1, CR1 corrections and consistent t-based intervals/p-values; no recipe dependencies."
+"intent:results-v2:v2_schema" = "RecipeV2 and closed result sections, parameters, capability validation and v1 build composition; no statistical algorithms."
+"intent:results-v2:verify" = "Integrity-first replay using bundled panels only, shared execution services without upstream build/ledger side effects, exact sample comparison and tolerance/status precedence."
+
+[results_v2.forbidden_imports]
+"hhplab.analysis" = ["hhplab.recipe", "hhplab.results", "hhplab.cli"]
+"hhplab.storage" = ["hhplab.panel", "hhplab.analysis", "hhplab.recipe", "hhplab.results", "hhplab.cli", "hhplab.sources", "hhplab.covariates", "hhplab.geographies", "hhplab.measures"]
+"hhplab.results.bands" = ["hhplab.recipe", "hhplab.results.runner", "hhplab.cli"]

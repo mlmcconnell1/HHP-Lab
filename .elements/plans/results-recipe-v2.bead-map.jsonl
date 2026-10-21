@@ -1,0 +1,28 @@
+{"key": "epic", "id": "coclab-ff6fp"}
+{"key": "spec", "id": "coclab-ff6fp.1", "depends_on": [], "intent_ids": ["intent:results-v2:v2_schema", "intent:results-v2:result_contracts", "intent:results-v2:samples", "intent:results-v2:recipe_findings", "intent:results-v2:ledger"]}
+{"key": "architecture", "id": "coclab-ff6fp.2", "depends_on": ["coclab-ff6fp.1"], "intent_ids": ["intent:results-v2:hhplab", "intent:results-v2:schema", "intent:results-v2:storage", "intent:results-v2:recipe", "intent:results-v2:analysis", "intent:results-v2:results", "intent:results-v2:cli"]}
+{"key": "contracts", "id": "coclab-ff6fp.3", "depends_on": ["coclab-ff6fp.2"], "intent_ids": ["intent:results-v2:result_contracts", "intent:results-v2:redistribution_contracts", "intent:results-v2:analysis_contracts"]}
+{"key": "schema", "id": "coclab-ff6fp.4", "depends_on": ["coclab-ff6fp.3"], "intent_ids": ["intent:results-v2:v2_schema", "intent:results-v2:loader"]}
+{"key": "bands", "id": "coclab-ff6fp.5", "depends_on": ["coclab-ff6fp.3"], "intent_ids": ["intent:results-v2:bands"]}
+{"key": "planner", "id": "coclab-ff6fp.6", "depends_on": ["coclab-ff6fp.4", "coclab-ff6fp.5"], "intent_ids": ["intent:results-v2:result_planner"]}
+{"key": "derive", "id": "coclab-ff6fp.7", "depends_on": ["coclab-ff6fp.3"], "intent_ids": ["intent:results-v2:derive"]}
+{"key": "samples", "id": "coclab-ff6fp.8", "depends_on": ["coclab-ff6fp.6", "coclab-ff6fp.7"], "intent_ids": ["intent:results-v2:samples"]}
+{"key": "design", "id": "coclab-ff6fp.9", "depends_on": ["coclab-ff6fp.3"], "intent_ids": ["intent:results-v2:model", "intent:results-v2:readiness"]}
+{"key": "inference", "id": "coclab-ff6fp.10", "depends_on": ["coclab-ff6fp.9"], "intent_ids": ["intent:results-v2:estimation", "intent:results-v2:stats"]}
+{"key": "regression", "id": "coclab-ff6fp.11", "depends_on": ["coclab-ff6fp.10", "coclab-ff6fp.8"], "intent_ids": ["intent:results-v2:regression", "intent:results-v2:analysis_contracts"]}
+{"key": "summaries", "id": "coclab-ff6fp.12", "depends_on": ["coclab-ff6fp.8"], "intent_ids": ["intent:results-v2:inspection", "intent:results-v2:correlation"]}
+{"key": "dispatch", "id": "coclab-ff6fp.13", "depends_on": ["coclab-ff6fp.6", "coclab-ff6fp.11", "coclab-ff6fp.12"], "intent_ids": ["intent:results-v2:analysis_dispatch", "intent:results-v2:executor"]}
+{"key": "diagnostics", "id": "coclab-ff6fp.14", "depends_on": ["coclab-ff6fp.13"], "intent_ids": ["intent:results-v2:diagnostics"]}
+{"key": "findings", "id": "coclab-ff6fp.15", "depends_on": ["coclab-ff6fp.5", "coclab-ff6fp.13"], "intent_ids": ["intent:results-v2:recipe_findings"]}
+{"key": "terms", "id": "coclab-ff6fp.16", "depends_on": ["coclab-ff6fp.3"], "intent_ids": ["intent:results-v2:redistribution_contracts", "intent:results-v2:covariate_catalog", "intent:results-v2:source_registry", "intent:results-v2:source_coverage", "intent:results-v2:lineage", "intent:results-v2:covariates", "intent:results-v2:registry", "intent:results-v2:sources"]}
+{"key": "ledger", "id": "coclab-ff6fp.17", "depends_on": ["coclab-ff6fp.3"], "intent_ids": ["intent:results-v2:ledger"]}
+{"key": "report", "id": "coclab-ff6fp.18", "depends_on": ["coclab-ff6fp.15", "coclab-ff6fp.14", "coclab-ff6fp.16"], "intent_ids": ["intent:results-v2:report"]}
+{"key": "bundle", "id": "coclab-ff6fp.19", "depends_on": ["coclab-ff6fp.18", "coclab-ff6fp.17"], "intent_ids": ["intent:results-v2:bundle"]}
+{"key": "runner", "id": "coclab-ff6fp.20", "depends_on": ["coclab-ff6fp.13", "coclab-ff6fp.14", "coclab-ff6fp.15", "coclab-ff6fp.19", "coclab-ff6fp.17"], "intent_ids": ["intent:results-v2:results_runner"]}
+{"key": "verify", "id": "coclab-ff6fp.21", "depends_on": ["coclab-ff6fp.20"], "intent_ids": ["intent:results-v2:verify"]}
+{"key": "cli", "id": "coclab-ff6fp.22", "depends_on": ["coclab-ff6fp.20", "coclab-ff6fp.21"], "intent_ids": ["intent:results-v2:cli_results", "intent:results-v2:cli_commands", "intent:results-v2:cli_recipe", "intent:results-v2:build_cmds"]}
+{"key": "fixture", "id": "coclab-ff6fp.23", "depends_on": ["coclab-ff6fp.22"], "intent_ids": ["intent:results-v2:v2_schema", "intent:results-v2:result_planner", "intent:results-v2:results_runner", "intent:results-v2:verify"]}
+{"key": "research", "id": "coclab-ff6fp.24", "depends_on": ["coclab-ff6fp.1"], "intent_ids": ["intent:results-v2:result_planner", "intent:results-v2:covariate_catalog", "intent:results-v2:source_coverage"]}
+{"key": "release", "id": "coclab-ff6fp.25", "depends_on": ["coclab-ff6fp.23", "coclab-ff6fp.24", "coclab-ff6fp.16", "coclab-ff6fp.2"], "intent_ids": ["intent:results-v2:hhplab", "intent:results-v2:schema", "intent:results-v2:storage", "intent:results-v2:recipe", "intent:results-v2:analysis", "intent:results-v2:results", "intent:results-v2:cli"]}
+{"key": "phase2", "id": "coclab-ga04o", "depends_on": ["coclab-ff6fp.25"], "intent_ids": ["intent:results-v2:hhplab", "intent:results-v2:analysis", "intent:results-v2:results", "intent:results-v2:recipe"]}
+{"key": "phase3", "id": "coclab-pjmfl", "depends_on": ["coclab-ga04o"], "intent_ids": ["intent:results-v2:hhplab", "intent:results-v2:analysis", "intent:results-v2:results", "intent:results-v2:recipe"]}

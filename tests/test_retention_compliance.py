@@ -18,37 +18,39 @@ import pytest
 
 # All ingest modules that must comply with the retention policy
 INGEST_MODULES = [
-    "hhplab/sources/hud/hud/opendata_arcgis.py",
-    "hhplab/sources/census/census/ingest/tiger_tracts.py",
-    "hhplab/sources/census/census/ingest/tiger_counties.py",
-    "hhplab/sources/census/census/ingest/tract_relationship.py",
-    "hhplab/geographies/nhgis/ingest.py",
+    "hhplab/geographies/boundaries/hud/opendata_arcgis.py",
+    "hhplab/geographies/boundaries/census/ingest/tiger_tracts.py",
+    "hhplab/geographies/boundaries/census/ingest/tiger_counties.py",
+    "hhplab/geographies/boundaries/census/ingest/tract_relationship.py",
+    "hhplab/geographies/boundaries/census/nhgis/ingest.py",
     "hhplab/sources/census/acs/ingest/tract_population.py",
     "hhplab/sources/zori/weights.py",
 ]
 
 # API ingest modules must use year+variant (not legacy snapshot_id)
 API_INGEST_MODULES = [
-    "hhplab/sources/hud/hud/opendata_arcgis.py",
-    "hhplab/sources/hud/hud/exchange_gis.py",
+    "hhplab/geographies/boundaries/hud/opendata_arcgis.py",
+    "hhplab/geographies/boundaries/hud/exchange_gis.py",
     "hhplab/sources/census/acs/ingest/tract_population.py",
     "hhplab/sources/zori/weights.py",
 ]
 
 # File ingest modules that use persist_file_snapshot with subdirs
 FILE_INGEST_MODULES = [
-    "hhplab/sources/census/census/ingest/tiger_tracts.py",
-    "hhplab/sources/census/census/ingest/tiger_counties.py",
-    "hhplab/sources/census/census/ingest/tract_relationship.py",
-    "hhplab/geographies/nhgis/ingest.py",
+    "hhplab/geographies/boundaries/census/ingest/tiger_tracts.py",
+    "hhplab/geographies/boundaries/census/ingest/tiger_counties.py",
+    "hhplab/geographies/boundaries/census/ingest/tract_relationship.py",
+    "hhplab/geographies/boundaries/census/nhgis/ingest.py",
 ]
+
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
 
 def _module_source(relpath: str) -> str:
     """Read a module's source from the project root."""
-    path = Path(relpath)
+    path = PROJECT_ROOT / relpath
     if not path.exists():
-        pytest.skip(f"Module not found: {relpath}")
+        pytest.fail(f"Declared retention-policy module not found: {relpath}")
     return path.read_text(encoding="utf-8")
 
 

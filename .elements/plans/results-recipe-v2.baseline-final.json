@@ -1,0 +1,2335 @@
+{
+  "schema_version": "elements.working-intent.reconcile.response/1.0",
+  "operation": "reconcile",
+  "report": {
+    "schema_version": "elements.intent-view/8.0",
+    "view_witness": "sha256:c721d82b18c216d811382ca26ad6ab2ab9c8451dca987dd036eb1b0ad274dff6",
+    "structure": {
+      "roots": [
+        {
+          "root_id": "intent:results-v2:hhplab",
+          "origin": "explicit",
+          "element_id": "intent:results-v2:hhplab"
+        }
+      ],
+      "root_binding": "exact",
+      "root_bindings": [
+        {
+          "intent_root_id": "intent:results-v2:hhplab",
+          "observed_root_id": "el:directory-hhplab-j7z92fqbqmck",
+          "confidence": "exact",
+          "source": "explicit"
+        }
+      ],
+      "evidence": [
+        {
+          "child_id": "intent:results-v2:analysis",
+          "raw_parent_id": "intent:results-v2:hhplab",
+          "normalized_parent_id": "intent:results-v2:hhplab",
+          "raw_path": "hhplab/analysis",
+          "normalized_path": "hhplab/analysis",
+          "source": "authored"
+        },
+        {
+          "child_id": "intent:results-v2:analysis_contracts",
+          "raw_parent_id": "intent:results-v2:analysis",
+          "normalized_parent_id": "intent:results-v2:analysis",
+          "raw_path": "hhplab/analysis/contracts.py",
+          "normalized_path": "hhplab/analysis/contracts.py",
+          "source": "authored"
+        },
+        {
+          "child_id": "intent:results-v2:analysis_dispatch",
+          "raw_parent_id": "intent:results-v2:executor",
+          "normalized_parent_id": "intent:results-v2:executor",
+          "raw_path": "hhplab/recipe/executor/analyses.py",
+          "normalized_path": "hhplab/recipe/executor/analyses.py",
+          "source": "authored"
+        },
+        {
+          "child_id": "intent:results-v2:bands",
+          "raw_parent_id": "intent:results-v2:results",
+          "normalized_parent_id": "intent:results-v2:results",
+          "raw_path": "hhplab/results/bands.py",
+          "normalized_path": "hhplab/results/bands.py",
+          "source": "authored"
+        },
+        {
+          "child_id": "intent:results-v2:build_cmds",
+          "raw_parent_id": "intent:results-v2:cli",
+          "normalized_parent_id": "intent:results-v2:cli",
+          "raw_path": "hhplab/cli/build_cmds",
+          "normalized_path": "hhplab/cli/build_cmds",
+          "source": "authored"
+        },
+        {
+          "child_id": "intent:results-v2:bundle",
+          "raw_parent_id": "intent:results-v2:results",
+          "normalized_parent_id": "intent:results-v2:results",
+          "raw_path": "hhplab/results/bundle.py",
+          "normalized_path": "hhplab/results/bundle.py",
+          "source": "authored"
+        },
+        {
+          "child_id": "intent:results-v2:cli",
+          "raw_parent_id": "intent:results-v2:hhplab",
+          "normalized_parent_id": "intent:results-v2:hhplab",
+          "raw_path": "hhplab/cli",
+          "normalized_path": "hhplab/cli",
+          "source": "authored"
+        },
+        {
+          "child_id": "intent:results-v2:cli_commands",
+          "raw_parent_id": "intent:results-v2:cli",
+          "normalized_parent_id": "intent:results-v2:cli",
+          "raw_path": "hhplab/cli/commands.py",
+          "normalized_path": "hhplab/cli/commands.py",
+          "source": "authored"
+        },
+        {
+          "child_id": "intent:results-v2:cli_recipe",
+          "raw_parent_id": "intent:results-v2:build_cmds",
+          "normalized_parent_id": "intent:results-v2:build_cmds",
+          "raw_path": "hhplab/cli/build_cmds/recipe.py",
+          "normalized_path": "hhplab/cli/build_cmds/recipe.py",
+          "source": "authored"
+        },
+        {
+          "child_id": "intent:results-v2:cli_results",
+          "raw_parent_id": "intent:results-v2:cli",
+          "normalized_parent_id": "intent:results-v2:cli",
+          "raw_path": "hhplab/cli/results.py",
+          "normalized_path": "hhplab/cli/results.py",
+          "source": "authored"
+        },
+        {
+          "child_id": "intent:results-v2:correlation",
+          "raw_parent_id": "intent:results-v2:analysis",
+          "normalized_parent_id": "intent:results-v2:analysis",
+          "raw_path": "hhplab/analysis/correlation.py",
+          "normalized_path": "hhplab/analysis/correlation.py",
+          "source": "authored"
+        },
+        {
+          "child_id": "intent:results-v2:covariate_catalog",
+          "raw_parent_id": "intent:results-v2:covariates",
+          "normalized_parent_id": "intent:results-v2:covariates",
+          "raw_path": "hhplab/covariates/catalog.py",
+          "normalized_path": "hhplab/covariates/catalog.py",
+          "source": "authored"
+        },
+        {
+          "child_id": "intent:results-v2:covariates",
+          "raw_parent_id": "intent:results-v2:hhplab",
+          "normalized_parent_id": "intent:results-v2:hhplab",
+          "raw_path": "hhplab/covariates",
+          "normalized_path": "hhplab/covariates",
+          "source": "authored"
+        },
+        {
+          "child_id": "intent:results-v2:derive",
+          "raw_parent_id": "intent:results-v2:recipe",
+          "normalized_parent_id": "intent:results-v2:recipe",
+          "raw_path": "hhplab/recipe/derive.py",
+          "normalized_path": "hhplab/recipe/derive.py",
+          "source": "authored"
+        },
+        {
+          "child_id": "intent:results-v2:diagnostics",
+          "raw_parent_id": "intent:results-v2:results",
+          "normalized_parent_id": "intent:results-v2:results",
+          "raw_path": "hhplab/results/diagnostics.py",
+          "normalized_path": "hhplab/results/diagnostics.py",
+          "source": "authored"
+        },
+        {
+          "child_id": "intent:results-v2:estimation",
+          "raw_parent_id": "intent:results-v2:analysis",
+          "normalized_parent_id": "intent:results-v2:analysis",
+          "raw_path": "hhplab/analysis/estimation.py",
+          "normalized_path": "hhplab/analysis/estimation.py",
+          "source": "authored"
+        },
+        {
+          "child_id": "intent:results-v2:executor",
+          "raw_parent_id": "intent:results-v2:recipe",
+          "normalized_parent_id": "intent:results-v2:recipe",
+          "raw_path": "hhplab/recipe/executor",
+          "normalized_path": "hhplab/recipe/executor",
+          "source": "authored"
+        },
+        {
+          "child_id": "intent:results-v2:hhplab",
+          "raw_parent_id": null,
+          "normalized_parent_id": null,
+          "raw_path": "hhplab",
+          "normalized_path": "hhplab",
+          "source": "authored"
+        },
+        {
+          "child_id": "intent:results-v2:inspection",
+          "raw_parent_id": "intent:results-v2:analysis",
+          "normalized_parent_id": "intent:results-v2:analysis",
+          "raw_path": "hhplab/analysis/inspection.py",
+          "normalized_path": "hhplab/analysis/inspection.py",
+          "source": "authored"
+        },
+        {
+          "child_id": "intent:results-v2:ledger",
+          "raw_parent_id": "intent:results-v2:storage",
+          "normalized_parent_id": "intent:results-v2:storage",
+          "raw_path": "hhplab/storage/run_ledger.py",
+          "normalized_path": "hhplab/storage/run_ledger.py",
+          "source": "authored"
+        },
+        {
+          "child_id": "intent:results-v2:lineage",
+          "raw_parent_id": "intent:results-v2:results",
+          "normalized_parent_id": "intent:results-v2:results",
+          "raw_path": "hhplab/results/lineage.py",
+          "normalized_path": "hhplab/results/lineage.py",
+          "source": "authored"
+        },
+        {
+          "child_id": "intent:results-v2:loader",
+          "raw_parent_id": "intent:results-v2:recipe",
+          "normalized_parent_id": "intent:results-v2:recipe",
+          "raw_path": "hhplab/recipe/loader.py",
+          "normalized_path": "hhplab/recipe/loader.py",
+          "source": "authored"
+        },
+        {
+          "child_id": "intent:results-v2:model",
+          "raw_parent_id": "intent:results-v2:analysis",
+          "normalized_parent_id": "intent:results-v2:analysis",
+          "raw_path": "hhplab/analysis/model.py",
+          "normalized_path": "hhplab/analysis/model.py",
+          "source": "authored"
+        },
+        {
+          "child_id": "intent:results-v2:readiness",
+          "raw_parent_id": "intent:results-v2:analysis",
+          "normalized_parent_id": "intent:results-v2:analysis",
+          "raw_path": "hhplab/analysis/readiness.py",
+          "normalized_path": "hhplab/analysis/readiness.py",
+          "source": "authored"
+        },
+        {
+          "child_id": "intent:results-v2:recipe",
+          "raw_parent_id": "intent:results-v2:hhplab",
+          "normalized_parent_id": "intent:results-v2:hhplab",
+          "raw_path": "hhplab/recipe",
+          "normalized_path": "hhplab/recipe",
+          "source": "authored"
+        },
+        {
+          "child_id": "intent:results-v2:recipe_findings",
+          "raw_parent_id": "intent:results-v2:results",
+          "normalized_parent_id": "intent:results-v2:results",
+          "raw_path": "hhplab/results/recipe_findings.py",
+          "normalized_path": "hhplab/results/recipe_findings.py",
+          "source": "authored"
+        },
+        {
+          "child_id": "intent:results-v2:redistribution_contracts",
+          "raw_parent_id": "intent:results-v2:schema",
+          "normalized_parent_id": "intent:results-v2:schema",
+          "raw_path": "hhplab/schema/redistribution.py",
+          "normalized_path": "hhplab/schema/redistribution.py",
+          "source": "authored"
+        },
+        {
+          "child_id": "intent:results-v2:registry",
+          "raw_parent_id": "intent:results-v2:hhplab",
+          "normalized_parent_id": "intent:results-v2:hhplab",
+          "raw_path": "hhplab/registry",
+          "normalized_path": "hhplab/registry",
+          "source": "authored"
+        },
+        {
+          "child_id": "intent:results-v2:regression",
+          "raw_parent_id": "intent:results-v2:analysis",
+          "normalized_parent_id": "intent:results-v2:analysis",
+          "raw_path": "hhplab/analysis/regression.py",
+          "normalized_path": "hhplab/analysis/regression.py",
+          "source": "authored"
+        },
+        {
+          "child_id": "intent:results-v2:report",
+          "raw_parent_id": "intent:results-v2:results",
+          "normalized_parent_id": "intent:results-v2:results",
+          "raw_path": "hhplab/results/report.py",
+          "normalized_path": "hhplab/results/report.py",
+          "source": "authored"
+        },
+        {
+          "child_id": "intent:results-v2:result_contracts",
+          "raw_parent_id": "intent:results-v2:schema",
+          "normalized_parent_id": "intent:results-v2:schema",
+          "raw_path": "hhplab/schema/results.py",
+          "normalized_path": "hhplab/schema/results.py",
+          "source": "authored"
+        },
+        {
+          "child_id": "intent:results-v2:result_planner",
+          "raw_parent_id": "intent:results-v2:recipe",
+          "normalized_parent_id": "intent:results-v2:recipe",
+          "raw_path": "hhplab/recipe/results_plan.py",
+          "normalized_path": "hhplab/recipe/results_plan.py",
+          "source": "authored"
+        },
+        {
+          "child_id": "intent:results-v2:results",
+          "raw_parent_id": "intent:results-v2:hhplab",
+          "normalized_parent_id": "intent:results-v2:hhplab",
+          "raw_path": "hhplab/results",
+          "normalized_path": "hhplab/results",
+          "source": "authored"
+        },
+        {
+          "child_id": "intent:results-v2:results_runner",
+          "raw_parent_id": "intent:results-v2:results",
+          "normalized_parent_id": "intent:results-v2:results",
+          "raw_path": "hhplab/results/runner.py",
+          "normalized_path": "hhplab/results/runner.py",
+          "source": "authored"
+        },
+        {
+          "child_id": "intent:results-v2:samples",
+          "raw_parent_id": "intent:results-v2:analysis",
+          "normalized_parent_id": "intent:results-v2:analysis",
+          "raw_path": "hhplab/analysis/sample.py",
+          "normalized_path": "hhplab/analysis/sample.py",
+          "source": "authored"
+        },
+        {
+          "child_id": "intent:results-v2:schema",
+          "raw_parent_id": "intent:results-v2:hhplab",
+          "normalized_parent_id": "intent:results-v2:hhplab",
+          "raw_path": "hhplab/schema",
+          "normalized_path": "hhplab/schema",
+          "source": "authored"
+        },
+        {
+          "child_id": "intent:results-v2:source_coverage",
+          "raw_parent_id": "intent:results-v2:sources",
+          "normalized_parent_id": "intent:results-v2:sources",
+          "raw_path": "hhplab/sources/coverage.py",
+          "normalized_path": "hhplab/sources/coverage.py",
+          "source": "authored"
+        },
+        {
+          "child_id": "intent:results-v2:source_registry",
+          "raw_parent_id": "intent:results-v2:registry",
+          "normalized_parent_id": "intent:results-v2:registry",
+          "raw_path": "hhplab/registry/source_registry.py",
+          "normalized_path": "hhplab/registry/source_registry.py",
+          "source": "authored"
+        },
+        {
+          "child_id": "intent:results-v2:sources",
+          "raw_parent_id": "intent:results-v2:hhplab",
+          "normalized_parent_id": "intent:results-v2:hhplab",
+          "raw_path": "hhplab/sources",
+          "normalized_path": "hhplab/sources",
+          "source": "authored"
+        },
+        {
+          "child_id": "intent:results-v2:stats",
+          "raw_parent_id": "intent:results-v2:analysis",
+          "normalized_parent_id": "intent:results-v2:analysis",
+          "raw_path": "hhplab/analysis/stats.py",
+          "normalized_path": "hhplab/analysis/stats.py",
+          "source": "authored"
+        },
+        {
+          "child_id": "intent:results-v2:storage",
+          "raw_parent_id": "intent:results-v2:hhplab",
+          "normalized_parent_id": "intent:results-v2:hhplab",
+          "raw_path": "hhplab/storage",
+          "normalized_path": "hhplab/storage",
+          "source": "authored"
+        },
+        {
+          "child_id": "intent:results-v2:v2_schema",
+          "raw_parent_id": "intent:results-v2:recipe",
+          "normalized_parent_id": "intent:results-v2:recipe",
+          "raw_path": "hhplab/recipe/schema_results.py",
+          "normalized_path": "hhplab/recipe/schema_results.py",
+          "source": "authored"
+        },
+        {
+          "child_id": "intent:results-v2:verify",
+          "raw_parent_id": "intent:results-v2:results",
+          "normalized_parent_id": "intent:results-v2:results",
+          "raw_path": "hhplab/results/verify.py",
+          "normalized_path": "hhplab/results/verify.py",
+          "source": "authored"
+        }
+      ],
+      "findings": [],
+      "total_findings": 0,
+      "findings_truncated": false
+    },
+    "batch": {
+      "schema_version": "elements.v8-reconciliation-batch/1.0",
+      "view_witness": "sha256:c721d82b18c216d811382ca26ad6ab2ab9c8451dca987dd036eb1b0ad274dff6",
+      "observation_witness": "sha256:b68b5f8264f24141c15c5a5a27f74765079033bfac9d8b864483b811a10be54a",
+      "counts": {
+        "total": 43,
+        "by_finding": {
+          "matched": 25,
+          "unknown": 18
+        },
+        "pinned": 0,
+        "unpinned": 43
+      },
+      "results": [
+        {
+          "schema_version": "elements.correspondence-result/8.0",
+          "intent_element_id": "intent:results-v2:analysis",
+          "intent_version_status": "working_unpinned",
+          "intent_lifecycle": "working",
+          "intent_revision_id": "revision:results-v2:analysis:2",
+          "finding": "matched",
+          "confidence": "exact",
+          "observation": {
+            "coverage": "partial",
+            "snapshot": {
+              "snapshot_id": "snapshot:15626544f1df4fa64f4d2d278cc851040422b687cd444dd9fd0515db2259a174",
+              "content_witness": "sha256:15626544f1df4fa64f4d2d278cc851040422b687cd444dd9fd0515db2259a174",
+              "observed_at": "content-addressed",
+              "provider_id": "elements.source-extractors",
+              "input_witnesses": [
+                "sha256:15626544f1df4fa64f4d2d278cc851040422b687cd444dd9fd0515db2259a174"
+              ]
+            },
+            "snapshot_id": "snapshot:15626544f1df4fa64f4d2d278cc851040422b687cd444dd9fd0515db2259a174",
+            "candidate_ids": [
+              "el:directory-analysis-m6617ypk3erb"
+            ],
+            "candidate_witnesses": [
+              "sha256:cc6cb07a59cc4ffae94304cd3eb2d29a877361b8808b44f5f464fb1022f99266"
+            ],
+            "scope": {
+              "project_id": "project:HHP-Lab"
+            }
+          },
+          "candidates": [
+            {
+              "element_id": "el:directory-analysis-m6617ypk3erb",
+              "revision_id": "observed-element:el:directory-analysis-m6617ypk3erb:snapshot:15626544f1df4fa64f4d2d278cc851040422b687cd444dd9fd0515db2259a174",
+              "content_witness": "sha256:cc6cb07a59cc4ffae94304cd3eb2d29a877361b8808b44f5f464fb1022f99266",
+              "repo_relative_path": "hhplab/analysis"
+            }
+          ],
+          "guardrail": {
+            "decision": "allow",
+            "policy": "informational",
+            "policy_profile": "elements.policy.specification-8.default/1.0",
+            "reason": "structured policy permits the operation"
+          },
+          "candidates_truncated": false,
+          "legacy_projection": {
+            "schema_version": "elements.correspondence-result/v7-projection/1.0",
+            "state": "satisfied",
+            "projection": "derived_v7_read_projection"
+          }
+        },
+        {
+          "schema_version": "elements.correspondence-result/8.0",
+          "intent_element_id": "intent:results-v2:analysis_contracts",
+          "intent_version_status": "working_unpinned",
+          "intent_lifecycle": "working",
+          "intent_revision_id": "revision:results-v2:analysis_contracts:1",
+          "finding": "matched",
+          "confidence": "exact",
+          "observation": {
+            "coverage": "partial",
+            "snapshot": {
+              "snapshot_id": "snapshot:15626544f1df4fa64f4d2d278cc851040422b687cd444dd9fd0515db2259a174",
+              "content_witness": "sha256:15626544f1df4fa64f4d2d278cc851040422b687cd444dd9fd0515db2259a174",
+              "observed_at": "content-addressed",
+              "provider_id": "elements.source-extractors",
+              "input_witnesses": [
+                "sha256:15626544f1df4fa64f4d2d278cc851040422b687cd444dd9fd0515db2259a174"
+              ]
+            },
+            "snapshot_id": "snapshot:15626544f1df4fa64f4d2d278cc851040422b687cd444dd9fd0515db2259a174",
+            "candidate_ids": [
+              "el:file-contracts-py-etf7h19v5zk9"
+            ],
+            "candidate_witnesses": [
+              "sha256:c53f0ad0bfb4aee538295b1feb0b832166e7d643a1777da20274615e705db91a"
+            ],
+            "scope": {
+              "project_id": "project:HHP-Lab"
+            }
+          },
+          "candidates": [
+            {
+              "element_id": "el:file-contracts-py-etf7h19v5zk9",
+              "revision_id": "observed-element:el:file-contracts-py-etf7h19v5zk9:snapshot:15626544f1df4fa64f4d2d278cc851040422b687cd444dd9fd0515db2259a174",
+              "content_witness": "sha256:c53f0ad0bfb4aee538295b1feb0b832166e7d643a1777da20274615e705db91a",
+              "repo_relative_path": "hhplab/analysis/contracts.py"
+            }
+          ],
+          "guardrail": {
+            "decision": "allow",
+            "policy": "informational",
+            "policy_profile": "elements.policy.specification-8.default/1.0",
+            "reason": "structured policy permits the operation"
+          },
+          "candidates_truncated": false,
+          "legacy_projection": {
+            "schema_version": "elements.correspondence-result/v7-projection/1.0",
+            "state": "satisfied",
+            "projection": "derived_v7_read_projection"
+          }
+        },
+        {
+          "schema_version": "elements.correspondence-result/8.0",
+          "intent_element_id": "intent:results-v2:analysis_dispatch",
+          "intent_version_status": "working_unpinned",
+          "intent_lifecycle": "working",
+          "intent_revision_id": "revision:results-v2:analysis_dispatch:1",
+          "finding": "unknown",
+          "confidence": "indeterminate",
+          "observation": {
+            "coverage": "partial",
+            "snapshot": {
+              "snapshot_id": "snapshot:15626544f1df4fa64f4d2d278cc851040422b687cd444dd9fd0515db2259a174",
+              "content_witness": "sha256:15626544f1df4fa64f4d2d278cc851040422b687cd444dd9fd0515db2259a174",
+              "observed_at": "content-addressed",
+              "provider_id": "elements.source-extractors",
+              "input_witnesses": [
+                "sha256:15626544f1df4fa64f4d2d278cc851040422b687cd444dd9fd0515db2259a174"
+              ]
+            },
+            "snapshot_id": "snapshot:15626544f1df4fa64f4d2d278cc851040422b687cd444dd9fd0515db2259a174",
+            "scope": {
+              "project_id": "project:HHP-Lab"
+            }
+          },
+          "guardrail": {
+            "decision": "allow",
+            "policy": "informational",
+            "policy_profile": "elements.policy.specification-8.default/1.0",
+            "reason": "structured policy permits the operation"
+          },
+          "candidates_truncated": false,
+          "legacy_projection": {
+            "schema_version": "elements.correspondence-result/v7-projection/1.0",
+            "state": "indeterminate",
+            "projection": "derived_v7_read_projection"
+          }
+        },
+        {
+          "schema_version": "elements.correspondence-result/8.0",
+          "intent_element_id": "intent:results-v2:bands",
+          "intent_version_status": "working_unpinned",
+          "intent_lifecycle": "working",
+          "intent_revision_id": "revision:results-v2:bands:1",
+          "finding": "unknown",
+          "confidence": "indeterminate",
+          "observation": {
+            "coverage": "partial",
+            "snapshot": {
+              "snapshot_id": "snapshot:15626544f1df4fa64f4d2d278cc851040422b687cd444dd9fd0515db2259a174",
+              "content_witness": "sha256:15626544f1df4fa64f4d2d278cc851040422b687cd444dd9fd0515db2259a174",
+              "observed_at": "content-addressed",
+              "provider_id": "elements.source-extractors",
+              "input_witnesses": [
+                "sha256:15626544f1df4fa64f4d2d278cc851040422b687cd444dd9fd0515db2259a174"
+              ]
+            },
+            "snapshot_id": "snapshot:15626544f1df4fa64f4d2d278cc851040422b687cd444dd9fd0515db2259a174",
+            "scope": {
+              "project_id": "project:HHP-Lab"
+            }
+          },
+          "guardrail": {
+            "decision": "allow",
+            "policy": "informational",
+            "policy_profile": "elements.policy.specification-8.default/1.0",
+            "reason": "structured policy permits the operation"
+          },
+          "candidates_truncated": false,
+          "legacy_projection": {
+            "schema_version": "elements.correspondence-result/v7-projection/1.0",
+            "state": "indeterminate",
+            "projection": "derived_v7_read_projection"
+          }
+        },
+        {
+          "schema_version": "elements.correspondence-result/8.0",
+          "intent_element_id": "intent:results-v2:build_cmds",
+          "intent_version_status": "working_unpinned",
+          "intent_lifecycle": "working",
+          "intent_revision_id": "revision:results-v2:build_cmds:2",
+          "finding": "matched",
+          "confidence": "exact",
+          "observation": {
+            "coverage": "partial",
+            "snapshot": {
+              "snapshot_id": "snapshot:15626544f1df4fa64f4d2d278cc851040422b687cd444dd9fd0515db2259a174",
+              "content_witness": "sha256:15626544f1df4fa64f4d2d278cc851040422b687cd444dd9fd0515db2259a174",
+              "observed_at": "content-addressed",
+              "provider_id": "elements.source-extractors",
+              "input_witnesses": [
+                "sha256:15626544f1df4fa64f4d2d278cc851040422b687cd444dd9fd0515db2259a174"
+              ]
+            },
+            "snapshot_id": "snapshot:15626544f1df4fa64f4d2d278cc851040422b687cd444dd9fd0515db2259a174",
+            "candidate_ids": [
+              "el:directory-build-cmds-g9rm9e7gxam7"
+            ],
+            "candidate_witnesses": [
+              "sha256:c80b786c615561cd4dae41fe30f5bd91e4df900e592b7f7b5c5ce0ceadd29fe2"
+            ],
+            "scope": {
+              "project_id": "project:HHP-Lab"
+            }
+          },
+          "candidates": [
+            {
+              "element_id": "el:directory-build-cmds-g9rm9e7gxam7",
+              "revision_id": "observed-element:el:directory-build-cmds-g9rm9e7gxam7:snapshot:15626544f1df4fa64f4d2d278cc851040422b687cd444dd9fd0515db2259a174",
+              "content_witness": "sha256:c80b786c615561cd4dae41fe30f5bd91e4df900e592b7f7b5c5ce0ceadd29fe2",
+              "repo_relative_path": "hhplab/cli/build_cmds"
+            }
+          ],
+          "guardrail": {
+            "decision": "allow",
+            "policy": "informational",
+            "policy_profile": "elements.policy.specification-8.default/1.0",
+            "reason": "structured policy permits the operation"
+          },
+          "candidates_truncated": false,
+          "legacy_projection": {
+            "schema_version": "elements.correspondence-result/v7-projection/1.0",
+            "state": "satisfied",
+            "projection": "derived_v7_read_projection"
+          }
+        },
+        {
+          "schema_version": "elements.correspondence-result/8.0",
+          "intent_element_id": "intent:results-v2:bundle",
+          "intent_version_status": "working_unpinned",
+          "intent_lifecycle": "working",
+          "intent_revision_id": "revision:results-v2:bundle:1",
+          "finding": "unknown",
+          "confidence": "indeterminate",
+          "observation": {
+            "coverage": "partial",
+            "snapshot": {
+              "snapshot_id": "snapshot:15626544f1df4fa64f4d2d278cc851040422b687cd444dd9fd0515db2259a174",
+              "content_witness": "sha256:15626544f1df4fa64f4d2d278cc851040422b687cd444dd9fd0515db2259a174",
+              "observed_at": "content-addressed",
+              "provider_id": "elements.source-extractors",
+              "input_witnesses": [
+                "sha256:15626544f1df4fa64f4d2d278cc851040422b687cd444dd9fd0515db2259a174"
+              ]
+            },
+            "snapshot_id": "snapshot:15626544f1df4fa64f4d2d278cc851040422b687cd444dd9fd0515db2259a174",
+            "scope": {
+              "project_id": "project:HHP-Lab"
+            }
+          },
+          "guardrail": {
+            "decision": "allow",
+            "policy": "informational",
+            "policy_profile": "elements.policy.specification-8.default/1.0",
+            "reason": "structured policy permits the operation"
+          },
+          "candidates_truncated": false,
+          "legacy_projection": {
+            "schema_version": "elements.correspondence-result/v7-projection/1.0",
+            "state": "indeterminate",
+            "projection": "derived_v7_read_projection"
+          }
+        },
+        {
+          "schema_version": "elements.correspondence-result/8.0",
+          "intent_element_id": "intent:results-v2:cli",
+          "intent_version_status": "working_unpinned",
+          "intent_lifecycle": "working",
+          "intent_revision_id": "revision:results-v2:cli:2",
+          "finding": "matched",
+          "confidence": "exact",
+          "observation": {
+            "coverage": "partial",
+            "snapshot": {
+              "snapshot_id": "snapshot:15626544f1df4fa64f4d2d278cc851040422b687cd444dd9fd0515db2259a174",
+              "content_witness": "sha256:15626544f1df4fa64f4d2d278cc851040422b687cd444dd9fd0515db2259a174",
+              "observed_at": "content-addressed",
+              "provider_id": "elements.source-extractors",
+              "input_witnesses": [
+                "sha256:15626544f1df4fa64f4d2d278cc851040422b687cd444dd9fd0515db2259a174"
+              ]
+            },
+            "snapshot_id": "snapshot:15626544f1df4fa64f4d2d278cc851040422b687cd444dd9fd0515db2259a174",
+            "candidate_ids": [
+              "el:directory-cli-ksx1j7awvw4g"
+            ],
+            "candidate_witnesses": [
+              "sha256:e24da3883eb512d88d270a96317425b4cc5e92d5bc5c5d0299309320730349a8"
+            ],
+            "scope": {
+              "project_id": "project:HHP-Lab"
+            }
+          },
+          "candidates": [
+            {
+              "element_id": "el:directory-cli-ksx1j7awvw4g",
+              "revision_id": "observed-element:el:directory-cli-ksx1j7awvw4g:snapshot:15626544f1df4fa64f4d2d278cc851040422b687cd444dd9fd0515db2259a174",
+              "content_witness": "sha256:e24da3883eb512d88d270a96317425b4cc5e92d5bc5c5d0299309320730349a8",
+              "repo_relative_path": "hhplab/cli"
+            }
+          ],
+          "guardrail": {
+            "decision": "allow",
+            "policy": "informational",
+            "policy_profile": "elements.policy.specification-8.default/1.0",
+            "reason": "structured policy permits the operation"
+          },
+          "candidates_truncated": false,
+          "legacy_projection": {
+            "schema_version": "elements.correspondence-result/v7-projection/1.0",
+            "state": "satisfied",
+            "projection": "derived_v7_read_projection"
+          }
+        },
+        {
+          "schema_version": "elements.correspondence-result/8.0",
+          "intent_element_id": "intent:results-v2:cli_commands",
+          "intent_version_status": "working_unpinned",
+          "intent_lifecycle": "working",
+          "intent_revision_id": "revision:results-v2:cli_commands:1",
+          "finding": "matched",
+          "confidence": "exact",
+          "observation": {
+            "coverage": "partial",
+            "snapshot": {
+              "snapshot_id": "snapshot:15626544f1df4fa64f4d2d278cc851040422b687cd444dd9fd0515db2259a174",
+              "content_witness": "sha256:15626544f1df4fa64f4d2d278cc851040422b687cd444dd9fd0515db2259a174",
+              "observed_at": "content-addressed",
+              "provider_id": "elements.source-extractors",
+              "input_witnesses": [
+                "sha256:15626544f1df4fa64f4d2d278cc851040422b687cd444dd9fd0515db2259a174"
+              ]
+            },
+            "snapshot_id": "snapshot:15626544f1df4fa64f4d2d278cc851040422b687cd444dd9fd0515db2259a174",
+            "candidate_ids": [
+              "el:file-commands-py-b63te2xe3761"
+            ],
+            "candidate_witnesses": [
+              "sha256:027a5e985188a33bed2f571202ed4baa710b1321b2d5ae42de30f3685ddd7768"
+            ],
+            "scope": {
+              "project_id": "project:HHP-Lab"
+            }
+          },
+          "candidates": [
+            {
+              "element_id": "el:file-commands-py-b63te2xe3761",
+              "revision_id": "observed-element:el:file-commands-py-b63te2xe3761:snapshot:15626544f1df4fa64f4d2d278cc851040422b687cd444dd9fd0515db2259a174",
+              "content_witness": "sha256:027a5e985188a33bed2f571202ed4baa710b1321b2d5ae42de30f3685ddd7768",
+              "repo_relative_path": "hhplab/cli/commands.py"
+            }
+          ],
+          "guardrail": {
+            "decision": "allow",
+            "policy": "informational",
+            "policy_profile": "elements.policy.specification-8.default/1.0",
+            "reason": "structured policy permits the operation"
+          },
+          "candidates_truncated": false,
+          "legacy_projection": {
+            "schema_version": "elements.correspondence-result/v7-projection/1.0",
+            "state": "satisfied",
+            "projection": "derived_v7_read_projection"
+          }
+        },
+        {
+          "schema_version": "elements.correspondence-result/8.0",
+          "intent_element_id": "intent:results-v2:cli_recipe",
+          "intent_version_status": "working_unpinned",
+          "intent_lifecycle": "working",
+          "intent_revision_id": "revision:results-v2:cli_recipe:1",
+          "finding": "matched",
+          "confidence": "exact",
+          "observation": {
+            "coverage": "partial",
+            "snapshot": {
+              "snapshot_id": "snapshot:15626544f1df4fa64f4d2d278cc851040422b687cd444dd9fd0515db2259a174",
+              "content_witness": "sha256:15626544f1df4fa64f4d2d278cc851040422b687cd444dd9fd0515db2259a174",
+              "observed_at": "content-addressed",
+              "provider_id": "elements.source-extractors",
+              "input_witnesses": [
+                "sha256:15626544f1df4fa64f4d2d278cc851040422b687cd444dd9fd0515db2259a174"
+              ]
+            },
+            "snapshot_id": "snapshot:15626544f1df4fa64f4d2d278cc851040422b687cd444dd9fd0515db2259a174",
+            "candidate_ids": [
+              "el:file-recipe-py-2h27p7hjycs9"
+            ],
+            "candidate_witnesses": [
+              "sha256:b517dced76780c7d45360c9c735bbd5ccbb422d7a8e3220aa857504b6cdb3d70"
+            ],
+            "scope": {
+              "project_id": "project:HHP-Lab"
+            }
+          },
+          "candidates": [
+            {
+              "element_id": "el:file-recipe-py-2h27p7hjycs9",
+              "revision_id": "observed-element:el:file-recipe-py-2h27p7hjycs9:snapshot:15626544f1df4fa64f4d2d278cc851040422b687cd444dd9fd0515db2259a174",
+              "content_witness": "sha256:b517dced76780c7d45360c9c735bbd5ccbb422d7a8e3220aa857504b6cdb3d70",
+              "repo_relative_path": "hhplab/cli/build_cmds/recipe.py"
+            }
+          ],
+          "guardrail": {
+            "decision": "allow",
+            "policy": "informational",
+            "policy_profile": "elements.policy.specification-8.default/1.0",
+            "reason": "structured policy permits the operation"
+          },
+          "candidates_truncated": false,
+          "legacy_projection": {
+            "schema_version": "elements.correspondence-result/v7-projection/1.0",
+            "state": "satisfied",
+            "projection": "derived_v7_read_projection"
+          }
+        },
+        {
+          "schema_version": "elements.correspondence-result/8.0",
+          "intent_element_id": "intent:results-v2:cli_results",
+          "intent_version_status": "working_unpinned",
+          "intent_lifecycle": "working",
+          "intent_revision_id": "revision:results-v2:cli_results:1",
+          "finding": "unknown",
+          "confidence": "indeterminate",
+          "observation": {
+            "coverage": "partial",
+            "snapshot": {
+              "snapshot_id": "snapshot:15626544f1df4fa64f4d2d278cc851040422b687cd444dd9fd0515db2259a174",
+              "content_witness": "sha256:15626544f1df4fa64f4d2d278cc851040422b687cd444dd9fd0515db2259a174",
+              "observed_at": "content-addressed",
+              "provider_id": "elements.source-extractors",
+              "input_witnesses": [
+                "sha256:15626544f1df4fa64f4d2d278cc851040422b687cd444dd9fd0515db2259a174"
+              ]
+            },
+            "snapshot_id": "snapshot:15626544f1df4fa64f4d2d278cc851040422b687cd444dd9fd0515db2259a174",
+            "scope": {
+              "project_id": "project:HHP-Lab"
+            }
+          },
+          "guardrail": {
+            "decision": "allow",
+            "policy": "informational",
+            "policy_profile": "elements.policy.specification-8.default/1.0",
+            "reason": "structured policy permits the operation"
+          },
+          "candidates_truncated": false,
+          "legacy_projection": {
+            "schema_version": "elements.correspondence-result/v7-projection/1.0",
+            "state": "indeterminate",
+            "projection": "derived_v7_read_projection"
+          }
+        },
+        {
+          "schema_version": "elements.correspondence-result/8.0",
+          "intent_element_id": "intent:results-v2:correlation",
+          "intent_version_status": "working_unpinned",
+          "intent_lifecycle": "working",
+          "intent_revision_id": "revision:results-v2:correlation:1",
+          "finding": "matched",
+          "confidence": "exact",
+          "observation": {
+            "coverage": "partial",
+            "snapshot": {
+              "snapshot_id": "snapshot:15626544f1df4fa64f4d2d278cc851040422b687cd444dd9fd0515db2259a174",
+              "content_witness": "sha256:15626544f1df4fa64f4d2d278cc851040422b687cd444dd9fd0515db2259a174",
+              "observed_at": "content-addressed",
+              "provider_id": "elements.source-extractors",
+              "input_witnesses": [
+                "sha256:15626544f1df4fa64f4d2d278cc851040422b687cd444dd9fd0515db2259a174"
+              ]
+            },
+            "snapshot_id": "snapshot:15626544f1df4fa64f4d2d278cc851040422b687cd444dd9fd0515db2259a174",
+            "candidate_ids": [
+              "el:file-correlation-py-weez42tdxyfm"
+            ],
+            "candidate_witnesses": [
+              "sha256:136e8b4b18b1eac128c18c6245250d17cf93dae9a85c6f433b44fc39504c756f"
+            ],
+            "scope": {
+              "project_id": "project:HHP-Lab"
+            }
+          },
+          "candidates": [
+            {
+              "element_id": "el:file-correlation-py-weez42tdxyfm",
+              "revision_id": "observed-element:el:file-correlation-py-weez42tdxyfm:snapshot:15626544f1df4fa64f4d2d278cc851040422b687cd444dd9fd0515db2259a174",
+              "content_witness": "sha256:136e8b4b18b1eac128c18c6245250d17cf93dae9a85c6f433b44fc39504c756f",
+              "repo_relative_path": "hhplab/analysis/correlation.py"
+            }
+          ],
+          "guardrail": {
+            "decision": "allow",
+            "policy": "informational",
+            "policy_profile": "elements.policy.specification-8.default/1.0",
+            "reason": "structured policy permits the operation"
+          },
+          "candidates_truncated": false,
+          "legacy_projection": {
+            "schema_version": "elements.correspondence-result/v7-projection/1.0",
+            "state": "satisfied",
+            "projection": "derived_v7_read_projection"
+          }
+        },
+        {
+          "schema_version": "elements.correspondence-result/8.0",
+          "intent_element_id": "intent:results-v2:covariate_catalog",
+          "intent_version_status": "working_unpinned",
+          "intent_lifecycle": "working",
+          "intent_revision_id": "revision:results-v2:covariate_catalog:1",
+          "finding": "matched",
+          "confidence": "exact",
+          "observation": {
+            "coverage": "partial",
+            "snapshot": {
+              "snapshot_id": "snapshot:15626544f1df4fa64f4d2d278cc851040422b687cd444dd9fd0515db2259a174",
+              "content_witness": "sha256:15626544f1df4fa64f4d2d278cc851040422b687cd444dd9fd0515db2259a174",
+              "observed_at": "content-addressed",
+              "provider_id": "elements.source-extractors",
+              "input_witnesses": [
+                "sha256:15626544f1df4fa64f4d2d278cc851040422b687cd444dd9fd0515db2259a174"
+              ]
+            },
+            "snapshot_id": "snapshot:15626544f1df4fa64f4d2d278cc851040422b687cd444dd9fd0515db2259a174",
+            "candidate_ids": [
+              "el:file-catalog-py-7wtv94ctfs4k"
+            ],
+            "candidate_witnesses": [
+              "sha256:41ae1c6759deae434b9bfe0a5f867ceb5a8731fc27a99af2d5e2ffde1c5998da"
+            ],
+            "scope": {
+              "project_id": "project:HHP-Lab"
+            }
+          },
+          "candidates": [
+            {
+              "element_id": "el:file-catalog-py-7wtv94ctfs4k",
+              "revision_id": "observed-element:el:file-catalog-py-7wtv94ctfs4k:snapshot:15626544f1df4fa64f4d2d278cc851040422b687cd444dd9fd0515db2259a174",
+              "content_witness": "sha256:41ae1c6759deae434b9bfe0a5f867ceb5a8731fc27a99af2d5e2ffde1c5998da",
+              "repo_relative_path": "hhplab/covariates/catalog.py"
+            }
+          ],
+          "guardrail": {
+            "decision": "allow",
+            "policy": "informational",
+            "policy_profile": "elements.policy.specification-8.default/1.0",
+            "reason": "structured policy permits the operation"
+          },
+          "candidates_truncated": false,
+          "legacy_projection": {
+            "schema_version": "elements.correspondence-result/v7-projection/1.0",
+            "state": "satisfied",
+            "projection": "derived_v7_read_projection"
+          }
+        },
+        {
+          "schema_version": "elements.correspondence-result/8.0",
+          "intent_element_id": "intent:results-v2:covariates",
+          "intent_version_status": "working_unpinned",
+          "intent_lifecycle": "working",
+          "intent_revision_id": "revision:results-v2:covariates:2",
+          "finding": "matched",
+          "confidence": "exact",
+          "observation": {
+            "coverage": "partial",
+            "snapshot": {
+              "snapshot_id": "snapshot:15626544f1df4fa64f4d2d278cc851040422b687cd444dd9fd0515db2259a174",
+              "content_witness": "sha256:15626544f1df4fa64f4d2d278cc851040422b687cd444dd9fd0515db2259a174",
+              "observed_at": "content-addressed",
+              "provider_id": "elements.source-extractors",
+              "input_witnesses": [
+                "sha256:15626544f1df4fa64f4d2d278cc851040422b687cd444dd9fd0515db2259a174"
+              ]
+            },
+            "snapshot_id": "snapshot:15626544f1df4fa64f4d2d278cc851040422b687cd444dd9fd0515db2259a174",
+            "candidate_ids": [
+              "el:directory-covariates-rztqrjffagaf"
+            ],
+            "candidate_witnesses": [
+              "sha256:148a86963f6da4838d845c4d1cffbb7228c5b461366b7a2898d4d20c70fb7646"
+            ],
+            "scope": {
+              "project_id": "project:HHP-Lab"
+            }
+          },
+          "candidates": [
+            {
+              "element_id": "el:directory-covariates-rztqrjffagaf",
+              "revision_id": "observed-element:el:directory-covariates-rztqrjffagaf:snapshot:15626544f1df4fa64f4d2d278cc851040422b687cd444dd9fd0515db2259a174",
+              "content_witness": "sha256:148a86963f6da4838d845c4d1cffbb7228c5b461366b7a2898d4d20c70fb7646",
+              "repo_relative_path": "hhplab/covariates"
+            }
+          ],
+          "guardrail": {
+            "decision": "allow",
+            "policy": "informational",
+            "policy_profile": "elements.policy.specification-8.default/1.0",
+            "reason": "structured policy permits the operation"
+          },
+          "candidates_truncated": false,
+          "legacy_projection": {
+            "schema_version": "elements.correspondence-result/v7-projection/1.0",
+            "state": "satisfied",
+            "projection": "derived_v7_read_projection"
+          }
+        },
+        {
+          "schema_version": "elements.correspondence-result/8.0",
+          "intent_element_id": "intent:results-v2:derive",
+          "intent_version_status": "working_unpinned",
+          "intent_lifecycle": "working",
+          "intent_revision_id": "revision:results-v2:derive:1",
+          "finding": "unknown",
+          "confidence": "indeterminate",
+          "observation": {
+            "coverage": "partial",
+            "snapshot": {
+              "snapshot_id": "snapshot:15626544f1df4fa64f4d2d278cc851040422b687cd444dd9fd0515db2259a174",
+              "content_witness": "sha256:15626544f1df4fa64f4d2d278cc851040422b687cd444dd9fd0515db2259a174",
+              "observed_at": "content-addressed",
+              "provider_id": "elements.source-extractors",
+              "input_witnesses": [
+                "sha256:15626544f1df4fa64f4d2d278cc851040422b687cd444dd9fd0515db2259a174"
+              ]
+            },
+            "snapshot_id": "snapshot:15626544f1df4fa64f4d2d278cc851040422b687cd444dd9fd0515db2259a174",
+            "scope": {
+              "project_id": "project:HHP-Lab"
+            }
+          },
+          "guardrail": {
+            "decision": "allow",
+            "policy": "informational",
+            "policy_profile": "elements.policy.specification-8.default/1.0",
+            "reason": "structured policy permits the operation"
+          },
+          "candidates_truncated": false,
+          "legacy_projection": {
+            "schema_version": "elements.correspondence-result/v7-projection/1.0",
+            "state": "indeterminate",
+            "projection": "derived_v7_read_projection"
+          }
+        },
+        {
+          "schema_version": "elements.correspondence-result/8.0",
+          "intent_element_id": "intent:results-v2:diagnostics",
+          "intent_version_status": "working_unpinned",
+          "intent_lifecycle": "working",
+          "intent_revision_id": "revision:results-v2:diagnostics:1",
+          "finding": "unknown",
+          "confidence": "indeterminate",
+          "observation": {
+            "coverage": "partial",
+            "snapshot": {
+              "snapshot_id": "snapshot:15626544f1df4fa64f4d2d278cc851040422b687cd444dd9fd0515db2259a174",
+              "content_witness": "sha256:15626544f1df4fa64f4d2d278cc851040422b687cd444dd9fd0515db2259a174",
+              "observed_at": "content-addressed",
+              "provider_id": "elements.source-extractors",
+              "input_witnesses": [
+                "sha256:15626544f1df4fa64f4d2d278cc851040422b687cd444dd9fd0515db2259a174"
+              ]
+            },
+            "snapshot_id": "snapshot:15626544f1df4fa64f4d2d278cc851040422b687cd444dd9fd0515db2259a174",
+            "scope": {
+              "project_id": "project:HHP-Lab"
+            }
+          },
+          "guardrail": {
+            "decision": "allow",
+            "policy": "informational",
+            "policy_profile": "elements.policy.specification-8.default/1.0",
+            "reason": "structured policy permits the operation"
+          },
+          "candidates_truncated": false,
+          "legacy_projection": {
+            "schema_version": "elements.correspondence-result/v7-projection/1.0",
+            "state": "indeterminate",
+            "projection": "derived_v7_read_projection"
+          }
+        },
+        {
+          "schema_version": "elements.correspondence-result/8.0",
+          "intent_element_id": "intent:results-v2:estimation",
+          "intent_version_status": "working_unpinned",
+          "intent_lifecycle": "working",
+          "intent_revision_id": "revision:results-v2:estimation:1",
+          "finding": "matched",
+          "confidence": "exact",
+          "observation": {
+            "coverage": "partial",
+            "snapshot": {
+              "snapshot_id": "snapshot:15626544f1df4fa64f4d2d278cc851040422b687cd444dd9fd0515db2259a174",
+              "content_witness": "sha256:15626544f1df4fa64f4d2d278cc851040422b687cd444dd9fd0515db2259a174",
+              "observed_at": "content-addressed",
+              "provider_id": "elements.source-extractors",
+              "input_witnesses": [
+                "sha256:15626544f1df4fa64f4d2d278cc851040422b687cd444dd9fd0515db2259a174"
+              ]
+            },
+            "snapshot_id": "snapshot:15626544f1df4fa64f4d2d278cc851040422b687cd444dd9fd0515db2259a174",
+            "candidate_ids": [
+              "el:file-estimation-py-e2vqszw9bbq9"
+            ],
+            "candidate_witnesses": [
+              "sha256:bc47e6aef0045e59b325d7e409ec769c0e0a8a1970237899f00b822f6d49447a"
+            ],
+            "scope": {
+              "project_id": "project:HHP-Lab"
+            }
+          },
+          "candidates": [
+            {
+              "element_id": "el:file-estimation-py-e2vqszw9bbq9",
+              "revision_id": "observed-element:el:file-estimation-py-e2vqszw9bbq9:snapshot:15626544f1df4fa64f4d2d278cc851040422b687cd444dd9fd0515db2259a174",
+              "content_witness": "sha256:bc47e6aef0045e59b325d7e409ec769c0e0a8a1970237899f00b822f6d49447a",
+              "repo_relative_path": "hhplab/analysis/estimation.py"
+            }
+          ],
+          "guardrail": {
+            "decision": "allow",
+            "policy": "informational",
+            "policy_profile": "elements.policy.specification-8.default/1.0",
+            "reason": "structured policy permits the operation"
+          },
+          "candidates_truncated": false,
+          "legacy_projection": {
+            "schema_version": "elements.correspondence-result/v7-projection/1.0",
+            "state": "satisfied",
+            "projection": "derived_v7_read_projection"
+          }
+        },
+        {
+          "schema_version": "elements.correspondence-result/8.0",
+          "intent_element_id": "intent:results-v2:executor",
+          "intent_version_status": "working_unpinned",
+          "intent_lifecycle": "working",
+          "intent_revision_id": "revision:results-v2:executor:2",
+          "finding": "matched",
+          "confidence": "exact",
+          "observation": {
+            "coverage": "partial",
+            "snapshot": {
+              "snapshot_id": "snapshot:15626544f1df4fa64f4d2d278cc851040422b687cd444dd9fd0515db2259a174",
+              "content_witness": "sha256:15626544f1df4fa64f4d2d278cc851040422b687cd444dd9fd0515db2259a174",
+              "observed_at": "content-addressed",
+              "provider_id": "elements.source-extractors",
+              "input_witnesses": [
+                "sha256:15626544f1df4fa64f4d2d278cc851040422b687cd444dd9fd0515db2259a174"
+              ]
+            },
+            "snapshot_id": "snapshot:15626544f1df4fa64f4d2d278cc851040422b687cd444dd9fd0515db2259a174",
+            "candidate_ids": [
+              "el:directory-executor-1r0ma3d7meqy"
+            ],
+            "candidate_witnesses": [
+              "sha256:c8010313b2ddec64c0c71590c5f159f59daa0cb7274f74a355e5d57f3dfab930"
+            ],
+            "scope": {
+              "project_id": "project:HHP-Lab"
+            }
+          },
+          "candidates": [
+            {
+              "element_id": "el:directory-executor-1r0ma3d7meqy",
+              "revision_id": "observed-element:el:directory-executor-1r0ma3d7meqy:snapshot:15626544f1df4fa64f4d2d278cc851040422b687cd444dd9fd0515db2259a174",
+              "content_witness": "sha256:c8010313b2ddec64c0c71590c5f159f59daa0cb7274f74a355e5d57f3dfab930",
+              "repo_relative_path": "hhplab/recipe/executor"
+            }
+          ],
+          "guardrail": {
+            "decision": "allow",
+            "policy": "informational",
+            "policy_profile": "elements.policy.specification-8.default/1.0",
+            "reason": "structured policy permits the operation"
+          },
+          "candidates_truncated": false,
+          "legacy_projection": {
+            "schema_version": "elements.correspondence-result/v7-projection/1.0",
+            "state": "satisfied",
+            "projection": "derived_v7_read_projection"
+          }
+        },
+        {
+          "schema_version": "elements.correspondence-result/8.0",
+          "intent_element_id": "intent:results-v2:hhplab",
+          "intent_version_status": "working_unpinned",
+          "intent_lifecycle": "working",
+          "intent_revision_id": "revision:results-v2:hhplab:2",
+          "finding": "matched",
+          "confidence": "exact",
+          "observation": {
+            "coverage": "partial",
+            "snapshot": {
+              "snapshot_id": "snapshot:15626544f1df4fa64f4d2d278cc851040422b687cd444dd9fd0515db2259a174",
+              "content_witness": "sha256:15626544f1df4fa64f4d2d278cc851040422b687cd444dd9fd0515db2259a174",
+              "observed_at": "content-addressed",
+              "provider_id": "elements.source-extractors",
+              "input_witnesses": [
+                "sha256:15626544f1df4fa64f4d2d278cc851040422b687cd444dd9fd0515db2259a174"
+              ]
+            },
+            "snapshot_id": "snapshot:15626544f1df4fa64f4d2d278cc851040422b687cd444dd9fd0515db2259a174",
+            "candidate_ids": [
+              "el:directory-hhplab-j7z92fqbqmck"
+            ],
+            "candidate_witnesses": [
+              "sha256:0a135e51859d5872b10d693e9b504bccf3d06e30a1ba637c73b74272931ceeee"
+            ],
+            "scope": {
+              "project_id": "project:HHP-Lab"
+            }
+          },
+          "candidates": [
+            {
+              "element_id": "el:directory-hhplab-j7z92fqbqmck",
+              "revision_id": "observed-element:el:directory-hhplab-j7z92fqbqmck:snapshot:15626544f1df4fa64f4d2d278cc851040422b687cd444dd9fd0515db2259a174",
+              "content_witness": "sha256:0a135e51859d5872b10d693e9b504bccf3d06e30a1ba637c73b74272931ceeee",
+              "repo_relative_path": "hhplab"
+            }
+          ],
+          "guardrail": {
+            "decision": "allow",
+            "policy": "informational",
+            "policy_profile": "elements.policy.specification-8.default/1.0",
+            "reason": "structured policy permits the operation"
+          },
+          "candidates_truncated": false,
+          "legacy_projection": {
+            "schema_version": "elements.correspondence-result/v7-projection/1.0",
+            "state": "satisfied",
+            "projection": "derived_v7_read_projection"
+          }
+        },
+        {
+          "schema_version": "elements.correspondence-result/8.0",
+          "intent_element_id": "intent:results-v2:inspection",
+          "intent_version_status": "working_unpinned",
+          "intent_lifecycle": "working",
+          "intent_revision_id": "revision:results-v2:inspection:1",
+          "finding": "matched",
+          "confidence": "exact",
+          "observation": {
+            "coverage": "partial",
+            "snapshot": {
+              "snapshot_id": "snapshot:15626544f1df4fa64f4d2d278cc851040422b687cd444dd9fd0515db2259a174",
+              "content_witness": "sha256:15626544f1df4fa64f4d2d278cc851040422b687cd444dd9fd0515db2259a174",
+              "observed_at": "content-addressed",
+              "provider_id": "elements.source-extractors",
+              "input_witnesses": [
+                "sha256:15626544f1df4fa64f4d2d278cc851040422b687cd444dd9fd0515db2259a174"
+              ]
+            },
+            "snapshot_id": "snapshot:15626544f1df4fa64f4d2d278cc851040422b687cd444dd9fd0515db2259a174",
+            "candidate_ids": [
+              "el:file-inspection-py-8he46sabps4b"
+            ],
+            "candidate_witnesses": [
+              "sha256:a962d7571d30563469f4da931cbfae5c8041100c678a4ef204f2f26cc9651198"
+            ],
+            "scope": {
+              "project_id": "project:HHP-Lab"
+            }
+          },
+          "candidates": [
+            {
+              "element_id": "el:file-inspection-py-8he46sabps4b",
+              "revision_id": "observed-element:el:file-inspection-py-8he46sabps4b:snapshot:15626544f1df4fa64f4d2d278cc851040422b687cd444dd9fd0515db2259a174",
+              "content_witness": "sha256:a962d7571d30563469f4da931cbfae5c8041100c678a4ef204f2f26cc9651198",
+              "repo_relative_path": "hhplab/analysis/inspection.py"
+            }
+          ],
+          "guardrail": {
+            "decision": "allow",
+            "policy": "informational",
+            "policy_profile": "elements.policy.specification-8.default/1.0",
+            "reason": "structured policy permits the operation"
+          },
+          "candidates_truncated": false,
+          "legacy_projection": {
+            "schema_version": "elements.correspondence-result/v7-projection/1.0",
+            "state": "satisfied",
+            "projection": "derived_v7_read_projection"
+          }
+        },
+        {
+          "schema_version": "elements.correspondence-result/8.0",
+          "intent_element_id": "intent:results-v2:ledger",
+          "intent_version_status": "working_unpinned",
+          "intent_lifecycle": "working",
+          "intent_revision_id": "revision:results-v2:ledger:1",
+          "finding": "unknown",
+          "confidence": "indeterminate",
+          "observation": {
+            "coverage": "partial",
+            "snapshot": {
+              "snapshot_id": "snapshot:15626544f1df4fa64f4d2d278cc851040422b687cd444dd9fd0515db2259a174",
+              "content_witness": "sha256:15626544f1df4fa64f4d2d278cc851040422b687cd444dd9fd0515db2259a174",
+              "observed_at": "content-addressed",
+              "provider_id": "elements.source-extractors",
+              "input_witnesses": [
+                "sha256:15626544f1df4fa64f4d2d278cc851040422b687cd444dd9fd0515db2259a174"
+              ]
+            },
+            "snapshot_id": "snapshot:15626544f1df4fa64f4d2d278cc851040422b687cd444dd9fd0515db2259a174",
+            "scope": {
+              "project_id": "project:HHP-Lab"
+            }
+          },
+          "guardrail": {
+            "decision": "allow",
+            "policy": "informational",
+            "policy_profile": "elements.policy.specification-8.default/1.0",
+            "reason": "structured policy permits the operation"
+          },
+          "candidates_truncated": false,
+          "legacy_projection": {
+            "schema_version": "elements.correspondence-result/v7-projection/1.0",
+            "state": "indeterminate",
+            "projection": "derived_v7_read_projection"
+          }
+        },
+        {
+          "schema_version": "elements.correspondence-result/8.0",
+          "intent_element_id": "intent:results-v2:lineage",
+          "intent_version_status": "working_unpinned",
+          "intent_lifecycle": "working",
+          "intent_revision_id": "revision:results-v2:lineage:1",
+          "finding": "unknown",
+          "confidence": "indeterminate",
+          "observation": {
+            "coverage": "partial",
+            "snapshot": {
+              "snapshot_id": "snapshot:15626544f1df4fa64f4d2d278cc851040422b687cd444dd9fd0515db2259a174",
+              "content_witness": "sha256:15626544f1df4fa64f4d2d278cc851040422b687cd444dd9fd0515db2259a174",
+              "observed_at": "content-addressed",
+              "provider_id": "elements.source-extractors",
+              "input_witnesses": [
+                "sha256:15626544f1df4fa64f4d2d278cc851040422b687cd444dd9fd0515db2259a174"
+              ]
+            },
+            "snapshot_id": "snapshot:15626544f1df4fa64f4d2d278cc851040422b687cd444dd9fd0515db2259a174",
+            "scope": {
+              "project_id": "project:HHP-Lab"
+            }
+          },
+          "guardrail": {
+            "decision": "allow",
+            "policy": "informational",
+            "policy_profile": "elements.policy.specification-8.default/1.0",
+            "reason": "structured policy permits the operation"
+          },
+          "candidates_truncated": false,
+          "legacy_projection": {
+            "schema_version": "elements.correspondence-result/v7-projection/1.0",
+            "state": "indeterminate",
+            "projection": "derived_v7_read_projection"
+          }
+        },
+        {
+          "schema_version": "elements.correspondence-result/8.0",
+          "intent_element_id": "intent:results-v2:loader",
+          "intent_version_status": "working_unpinned",
+          "intent_lifecycle": "working",
+          "intent_revision_id": "revision:results-v2:loader:1",
+          "finding": "matched",
+          "confidence": "exact",
+          "observation": {
+            "coverage": "partial",
+            "snapshot": {
+              "snapshot_id": "snapshot:15626544f1df4fa64f4d2d278cc851040422b687cd444dd9fd0515db2259a174",
+              "content_witness": "sha256:15626544f1df4fa64f4d2d278cc851040422b687cd444dd9fd0515db2259a174",
+              "observed_at": "content-addressed",
+              "provider_id": "elements.source-extractors",
+              "input_witnesses": [
+                "sha256:15626544f1df4fa64f4d2d278cc851040422b687cd444dd9fd0515db2259a174"
+              ]
+            },
+            "snapshot_id": "snapshot:15626544f1df4fa64f4d2d278cc851040422b687cd444dd9fd0515db2259a174",
+            "candidate_ids": [
+              "el:file-loader-py-5x7rcw8emy7p"
+            ],
+            "candidate_witnesses": [
+              "sha256:184bc2d997e83fd2ecf4ad087d3edf5d8fc5f22deaed07971536189940a57769"
+            ],
+            "scope": {
+              "project_id": "project:HHP-Lab"
+            }
+          },
+          "candidates": [
+            {
+              "element_id": "el:file-loader-py-5x7rcw8emy7p",
+              "revision_id": "observed-element:el:file-loader-py-5x7rcw8emy7p:snapshot:15626544f1df4fa64f4d2d278cc851040422b687cd444dd9fd0515db2259a174",
+              "content_witness": "sha256:184bc2d997e83fd2ecf4ad087d3edf5d8fc5f22deaed07971536189940a57769",
+              "repo_relative_path": "hhplab/recipe/loader.py"
+            }
+          ],
+          "guardrail": {
+            "decision": "allow",
+            "policy": "informational",
+            "policy_profile": "elements.policy.specification-8.default/1.0",
+            "reason": "structured policy permits the operation"
+          },
+          "candidates_truncated": false,
+          "legacy_projection": {
+            "schema_version": "elements.correspondence-result/v7-projection/1.0",
+            "state": "satisfied",
+            "projection": "derived_v7_read_projection"
+          }
+        },
+        {
+          "schema_version": "elements.correspondence-result/8.0",
+          "intent_element_id": "intent:results-v2:model",
+          "intent_version_status": "working_unpinned",
+          "intent_lifecycle": "working",
+          "intent_revision_id": "revision:results-v2:model:1",
+          "finding": "matched",
+          "confidence": "exact",
+          "observation": {
+            "coverage": "partial",
+            "snapshot": {
+              "snapshot_id": "snapshot:15626544f1df4fa64f4d2d278cc851040422b687cd444dd9fd0515db2259a174",
+              "content_witness": "sha256:15626544f1df4fa64f4d2d278cc851040422b687cd444dd9fd0515db2259a174",
+              "observed_at": "content-addressed",
+              "provider_id": "elements.source-extractors",
+              "input_witnesses": [
+                "sha256:15626544f1df4fa64f4d2d278cc851040422b687cd444dd9fd0515db2259a174"
+              ]
+            },
+            "snapshot_id": "snapshot:15626544f1df4fa64f4d2d278cc851040422b687cd444dd9fd0515db2259a174",
+            "candidate_ids": [
+              "el:file-model-py-7vmrbs8fctvv"
+            ],
+            "candidate_witnesses": [
+              "sha256:1635f5e6d581f4616c0f6c248fd1b23e4e9ca8962885d1e354e47807eb76e307"
+            ],
+            "scope": {
+              "project_id": "project:HHP-Lab"
+            }
+          },
+          "candidates": [
+            {
+              "element_id": "el:file-model-py-7vmrbs8fctvv",
+              "revision_id": "observed-element:el:file-model-py-7vmrbs8fctvv:snapshot:15626544f1df4fa64f4d2d278cc851040422b687cd444dd9fd0515db2259a174",
+              "content_witness": "sha256:1635f5e6d581f4616c0f6c248fd1b23e4e9ca8962885d1e354e47807eb76e307",
+              "repo_relative_path": "hhplab/analysis/model.py"
+            }
+          ],
+          "guardrail": {
+            "decision": "allow",
+            "policy": "informational",
+            "policy_profile": "elements.policy.specification-8.default/1.0",
+            "reason": "structured policy permits the operation"
+          },
+          "candidates_truncated": false,
+          "legacy_projection": {
+            "schema_version": "elements.correspondence-result/v7-projection/1.0",
+            "state": "satisfied",
+            "projection": "derived_v7_read_projection"
+          }
+        },
+        {
+          "schema_version": "elements.correspondence-result/8.0",
+          "intent_element_id": "intent:results-v2:readiness",
+          "intent_version_status": "working_unpinned",
+          "intent_lifecycle": "working",
+          "intent_revision_id": "revision:results-v2:readiness:1",
+          "finding": "unknown",
+          "confidence": "indeterminate",
+          "observation": {
+            "coverage": "partial",
+            "snapshot": {
+              "snapshot_id": "snapshot:15626544f1df4fa64f4d2d278cc851040422b687cd444dd9fd0515db2259a174",
+              "content_witness": "sha256:15626544f1df4fa64f4d2d278cc851040422b687cd444dd9fd0515db2259a174",
+              "observed_at": "content-addressed",
+              "provider_id": "elements.source-extractors",
+              "input_witnesses": [
+                "sha256:15626544f1df4fa64f4d2d278cc851040422b687cd444dd9fd0515db2259a174"
+              ]
+            },
+            "snapshot_id": "snapshot:15626544f1df4fa64f4d2d278cc851040422b687cd444dd9fd0515db2259a174",
+            "scope": {
+              "project_id": "project:HHP-Lab"
+            }
+          },
+          "guardrail": {
+            "decision": "allow",
+            "policy": "informational",
+            "policy_profile": "elements.policy.specification-8.default/1.0",
+            "reason": "structured policy permits the operation"
+          },
+          "candidates_truncated": false,
+          "legacy_projection": {
+            "schema_version": "elements.correspondence-result/v7-projection/1.0",
+            "state": "indeterminate",
+            "projection": "derived_v7_read_projection"
+          }
+        },
+        {
+          "schema_version": "elements.correspondence-result/8.0",
+          "intent_element_id": "intent:results-v2:recipe",
+          "intent_version_status": "working_unpinned",
+          "intent_lifecycle": "working",
+          "intent_revision_id": "revision:results-v2:recipe:2",
+          "finding": "matched",
+          "confidence": "exact",
+          "observation": {
+            "coverage": "partial",
+            "snapshot": {
+              "snapshot_id": "snapshot:15626544f1df4fa64f4d2d278cc851040422b687cd444dd9fd0515db2259a174",
+              "content_witness": "sha256:15626544f1df4fa64f4d2d278cc851040422b687cd444dd9fd0515db2259a174",
+              "observed_at": "content-addressed",
+              "provider_id": "elements.source-extractors",
+              "input_witnesses": [
+                "sha256:15626544f1df4fa64f4d2d278cc851040422b687cd444dd9fd0515db2259a174"
+              ]
+            },
+            "snapshot_id": "snapshot:15626544f1df4fa64f4d2d278cc851040422b687cd444dd9fd0515db2259a174",
+            "candidate_ids": [
+              "el:directory-recipe-1s3jmahnd66r"
+            ],
+            "candidate_witnesses": [
+              "sha256:fc3068217b0c7e1a18f80b9d5bc4d01541bf2302a0ab0bf3ecd70a50d9c37d66"
+            ],
+            "scope": {
+              "project_id": "project:HHP-Lab"
+            }
+          },
+          "candidates": [
+            {
+              "element_id": "el:directory-recipe-1s3jmahnd66r",
+              "revision_id": "observed-element:el:directory-recipe-1s3jmahnd66r:snapshot:15626544f1df4fa64f4d2d278cc851040422b687cd444dd9fd0515db2259a174",
+              "content_witness": "sha256:fc3068217b0c7e1a18f80b9d5bc4d01541bf2302a0ab0bf3ecd70a50d9c37d66",
+              "repo_relative_path": "hhplab/recipe"
+            }
+          ],
+          "guardrail": {
+            "decision": "allow",
+            "policy": "informational",
+            "policy_profile": "elements.policy.specification-8.default/1.0",
+            "reason": "structured policy permits the operation"
+          },
+          "candidates_truncated": false,
+          "legacy_projection": {
+            "schema_version": "elements.correspondence-result/v7-projection/1.0",
+            "state": "satisfied",
+            "projection": "derived_v7_read_projection"
+          }
+        },
+        {
+          "schema_version": "elements.correspondence-result/8.0",
+          "intent_element_id": "intent:results-v2:recipe_findings",
+          "intent_version_status": "working_unpinned",
+          "intent_lifecycle": "working",
+          "intent_revision_id": "revision:results-v2:recipe_findings:1",
+          "finding": "unknown",
+          "confidence": "indeterminate",
+          "observation": {
+            "coverage": "partial",
+            "snapshot": {
+              "snapshot_id": "snapshot:15626544f1df4fa64f4d2d278cc851040422b687cd444dd9fd0515db2259a174",
+              "content_witness": "sha256:15626544f1df4fa64f4d2d278cc851040422b687cd444dd9fd0515db2259a174",
+              "observed_at": "content-addressed",
+              "provider_id": "elements.source-extractors",
+              "input_witnesses": [
+                "sha256:15626544f1df4fa64f4d2d278cc851040422b687cd444dd9fd0515db2259a174"
+              ]
+            },
+            "snapshot_id": "snapshot:15626544f1df4fa64f4d2d278cc851040422b687cd444dd9fd0515db2259a174",
+            "scope": {
+              "project_id": "project:HHP-Lab"
+            }
+          },
+          "guardrail": {
+            "decision": "allow",
+            "policy": "informational",
+            "policy_profile": "elements.policy.specification-8.default/1.0",
+            "reason": "structured policy permits the operation"
+          },
+          "candidates_truncated": false,
+          "legacy_projection": {
+            "schema_version": "elements.correspondence-result/v7-projection/1.0",
+            "state": "indeterminate",
+            "projection": "derived_v7_read_projection"
+          }
+        },
+        {
+          "schema_version": "elements.correspondence-result/8.0",
+          "intent_element_id": "intent:results-v2:redistribution_contracts",
+          "intent_version_status": "working_unpinned",
+          "intent_lifecycle": "working",
+          "intent_revision_id": "revision:results-v2:redistribution_contracts:1",
+          "finding": "unknown",
+          "confidence": "indeterminate",
+          "observation": {
+            "coverage": "partial",
+            "snapshot": {
+              "snapshot_id": "snapshot:15626544f1df4fa64f4d2d278cc851040422b687cd444dd9fd0515db2259a174",
+              "content_witness": "sha256:15626544f1df4fa64f4d2d278cc851040422b687cd444dd9fd0515db2259a174",
+              "observed_at": "content-addressed",
+              "provider_id": "elements.source-extractors",
+              "input_witnesses": [
+                "sha256:15626544f1df4fa64f4d2d278cc851040422b687cd444dd9fd0515db2259a174"
+              ]
+            },
+            "snapshot_id": "snapshot:15626544f1df4fa64f4d2d278cc851040422b687cd444dd9fd0515db2259a174",
+            "scope": {
+              "project_id": "project:HHP-Lab"
+            }
+          },
+          "guardrail": {
+            "decision": "allow",
+            "policy": "informational",
+            "policy_profile": "elements.policy.specification-8.default/1.0",
+            "reason": "structured policy permits the operation"
+          },
+          "candidates_truncated": false,
+          "legacy_projection": {
+            "schema_version": "elements.correspondence-result/v7-projection/1.0",
+            "state": "indeterminate",
+            "projection": "derived_v7_read_projection"
+          }
+        },
+        {
+          "schema_version": "elements.correspondence-result/8.0",
+          "intent_element_id": "intent:results-v2:registry",
+          "intent_version_status": "working_unpinned",
+          "intent_lifecycle": "working",
+          "intent_revision_id": "revision:results-v2:registry:2",
+          "finding": "matched",
+          "confidence": "exact",
+          "observation": {
+            "coverage": "partial",
+            "snapshot": {
+              "snapshot_id": "snapshot:15626544f1df4fa64f4d2d278cc851040422b687cd444dd9fd0515db2259a174",
+              "content_witness": "sha256:15626544f1df4fa64f4d2d278cc851040422b687cd444dd9fd0515db2259a174",
+              "observed_at": "content-addressed",
+              "provider_id": "elements.source-extractors",
+              "input_witnesses": [
+                "sha256:15626544f1df4fa64f4d2d278cc851040422b687cd444dd9fd0515db2259a174"
+              ]
+            },
+            "snapshot_id": "snapshot:15626544f1df4fa64f4d2d278cc851040422b687cd444dd9fd0515db2259a174",
+            "candidate_ids": [
+              "el:directory-registry-4sapdcnxs5dw"
+            ],
+            "candidate_witnesses": [
+              "sha256:8763e1367c31df8da19a44e079bd481a85cf1c5cc4fbff2a03ab4b2216fcd9dc"
+            ],
+            "scope": {
+              "project_id": "project:HHP-Lab"
+            }
+          },
+          "candidates": [
+            {
+              "element_id": "el:directory-registry-4sapdcnxs5dw",
+              "revision_id": "observed-element:el:directory-registry-4sapdcnxs5dw:snapshot:15626544f1df4fa64f4d2d278cc851040422b687cd444dd9fd0515db2259a174",
+              "content_witness": "sha256:8763e1367c31df8da19a44e079bd481a85cf1c5cc4fbff2a03ab4b2216fcd9dc",
+              "repo_relative_path": "hhplab/registry"
+            }
+          ],
+          "guardrail": {
+            "decision": "allow",
+            "policy": "informational",
+            "policy_profile": "elements.policy.specification-8.default/1.0",
+            "reason": "structured policy permits the operation"
+          },
+          "candidates_truncated": false,
+          "legacy_projection": {
+            "schema_version": "elements.correspondence-result/v7-projection/1.0",
+            "state": "satisfied",
+            "projection": "derived_v7_read_projection"
+          }
+        },
+        {
+          "schema_version": "elements.correspondence-result/8.0",
+          "intent_element_id": "intent:results-v2:regression",
+          "intent_version_status": "working_unpinned",
+          "intent_lifecycle": "working",
+          "intent_revision_id": "revision:results-v2:regression:1",
+          "finding": "matched",
+          "confidence": "exact",
+          "observation": {
+            "coverage": "partial",
+            "snapshot": {
+              "snapshot_id": "snapshot:15626544f1df4fa64f4d2d278cc851040422b687cd444dd9fd0515db2259a174",
+              "content_witness": "sha256:15626544f1df4fa64f4d2d278cc851040422b687cd444dd9fd0515db2259a174",
+              "observed_at": "content-addressed",
+              "provider_id": "elements.source-extractors",
+              "input_witnesses": [
+                "sha256:15626544f1df4fa64f4d2d278cc851040422b687cd444dd9fd0515db2259a174"
+              ]
+            },
+            "snapshot_id": "snapshot:15626544f1df4fa64f4d2d278cc851040422b687cd444dd9fd0515db2259a174",
+            "candidate_ids": [
+              "el:file-regression-py-pqk1hg9xzg4z"
+            ],
+            "candidate_witnesses": [
+              "sha256:19713398a14f47c99c87131b5c11187ba85df862050d0059bca5af45915119b3"
+            ],
+            "scope": {
+              "project_id": "project:HHP-Lab"
+            }
+          },
+          "candidates": [
+            {
+              "element_id": "el:file-regression-py-pqk1hg9xzg4z",
+              "revision_id": "observed-element:el:file-regression-py-pqk1hg9xzg4z:snapshot:15626544f1df4fa64f4d2d278cc851040422b687cd444dd9fd0515db2259a174",
+              "content_witness": "sha256:19713398a14f47c99c87131b5c11187ba85df862050d0059bca5af45915119b3",
+              "repo_relative_path": "hhplab/analysis/regression.py"
+            }
+          ],
+          "guardrail": {
+            "decision": "allow",
+            "policy": "informational",
+            "policy_profile": "elements.policy.specification-8.default/1.0",
+            "reason": "structured policy permits the operation"
+          },
+          "candidates_truncated": false,
+          "legacy_projection": {
+            "schema_version": "elements.correspondence-result/v7-projection/1.0",
+            "state": "satisfied",
+            "projection": "derived_v7_read_projection"
+          }
+        },
+        {
+          "schema_version": "elements.correspondence-result/8.0",
+          "intent_element_id": "intent:results-v2:report",
+          "intent_version_status": "working_unpinned",
+          "intent_lifecycle": "working",
+          "intent_revision_id": "revision:results-v2:report:1",
+          "finding": "unknown",
+          "confidence": "indeterminate",
+          "observation": {
+            "coverage": "partial",
+            "snapshot": {
+              "snapshot_id": "snapshot:15626544f1df4fa64f4d2d278cc851040422b687cd444dd9fd0515db2259a174",
+              "content_witness": "sha256:15626544f1df4fa64f4d2d278cc851040422b687cd444dd9fd0515db2259a174",
+              "observed_at": "content-addressed",
+              "provider_id": "elements.source-extractors",
+              "input_witnesses": [
+                "sha256:15626544f1df4fa64f4d2d278cc851040422b687cd444dd9fd0515db2259a174"
+              ]
+            },
+            "snapshot_id": "snapshot:15626544f1df4fa64f4d2d278cc851040422b687cd444dd9fd0515db2259a174",
+            "scope": {
+              "project_id": "project:HHP-Lab"
+            }
+          },
+          "guardrail": {
+            "decision": "allow",
+            "policy": "informational",
+            "policy_profile": "elements.policy.specification-8.default/1.0",
+            "reason": "structured policy permits the operation"
+          },
+          "candidates_truncated": false,
+          "legacy_projection": {
+            "schema_version": "elements.correspondence-result/v7-projection/1.0",
+            "state": "indeterminate",
+            "projection": "derived_v7_read_projection"
+          }
+        },
+        {
+          "schema_version": "elements.correspondence-result/8.0",
+          "intent_element_id": "intent:results-v2:result_contracts",
+          "intent_version_status": "working_unpinned",
+          "intent_lifecycle": "working",
+          "intent_revision_id": "revision:results-v2:result_contracts:1",
+          "finding": "unknown",
+          "confidence": "indeterminate",
+          "observation": {
+            "coverage": "partial",
+            "snapshot": {
+              "snapshot_id": "snapshot:15626544f1df4fa64f4d2d278cc851040422b687cd444dd9fd0515db2259a174",
+              "content_witness": "sha256:15626544f1df4fa64f4d2d278cc851040422b687cd444dd9fd0515db2259a174",
+              "observed_at": "content-addressed",
+              "provider_id": "elements.source-extractors",
+              "input_witnesses": [
+                "sha256:15626544f1df4fa64f4d2d278cc851040422b687cd444dd9fd0515db2259a174"
+              ]
+            },
+            "snapshot_id": "snapshot:15626544f1df4fa64f4d2d278cc851040422b687cd444dd9fd0515db2259a174",
+            "scope": {
+              "project_id": "project:HHP-Lab"
+            }
+          },
+          "guardrail": {
+            "decision": "allow",
+            "policy": "informational",
+            "policy_profile": "elements.policy.specification-8.default/1.0",
+            "reason": "structured policy permits the operation"
+          },
+          "candidates_truncated": false,
+          "legacy_projection": {
+            "schema_version": "elements.correspondence-result/v7-projection/1.0",
+            "state": "indeterminate",
+            "projection": "derived_v7_read_projection"
+          }
+        },
+        {
+          "schema_version": "elements.correspondence-result/8.0",
+          "intent_element_id": "intent:results-v2:result_planner",
+          "intent_version_status": "working_unpinned",
+          "intent_lifecycle": "working",
+          "intent_revision_id": "revision:results-v2:result_planner:1",
+          "finding": "unknown",
+          "confidence": "indeterminate",
+          "observation": {
+            "coverage": "partial",
+            "snapshot": {
+              "snapshot_id": "snapshot:15626544f1df4fa64f4d2d278cc851040422b687cd444dd9fd0515db2259a174",
+              "content_witness": "sha256:15626544f1df4fa64f4d2d278cc851040422b687cd444dd9fd0515db2259a174",
+              "observed_at": "content-addressed",
+              "provider_id": "elements.source-extractors",
+              "input_witnesses": [
+                "sha256:15626544f1df4fa64f4d2d278cc851040422b687cd444dd9fd0515db2259a174"
+              ]
+            },
+            "snapshot_id": "snapshot:15626544f1df4fa64f4d2d278cc851040422b687cd444dd9fd0515db2259a174",
+            "scope": {
+              "project_id": "project:HHP-Lab"
+            }
+          },
+          "guardrail": {
+            "decision": "allow",
+            "policy": "informational",
+            "policy_profile": "elements.policy.specification-8.default/1.0",
+            "reason": "structured policy permits the operation"
+          },
+          "candidates_truncated": false,
+          "legacy_projection": {
+            "schema_version": "elements.correspondence-result/v7-projection/1.0",
+            "state": "indeterminate",
+            "projection": "derived_v7_read_projection"
+          }
+        },
+        {
+          "schema_version": "elements.correspondence-result/8.0",
+          "intent_element_id": "intent:results-v2:results",
+          "intent_version_status": "working_unpinned",
+          "intent_lifecycle": "working",
+          "intent_revision_id": "revision:results-v2:results:2",
+          "finding": "matched",
+          "confidence": "exact",
+          "observation": {
+            "coverage": "partial",
+            "snapshot": {
+              "snapshot_id": "snapshot:15626544f1df4fa64f4d2d278cc851040422b687cd444dd9fd0515db2259a174",
+              "content_witness": "sha256:15626544f1df4fa64f4d2d278cc851040422b687cd444dd9fd0515db2259a174",
+              "observed_at": "content-addressed",
+              "provider_id": "elements.source-extractors",
+              "input_witnesses": [
+                "sha256:15626544f1df4fa64f4d2d278cc851040422b687cd444dd9fd0515db2259a174"
+              ]
+            },
+            "snapshot_id": "snapshot:15626544f1df4fa64f4d2d278cc851040422b687cd444dd9fd0515db2259a174",
+            "candidate_ids": [
+              "el:directory-results-5kzve4yq18f1"
+            ],
+            "candidate_witnesses": [
+              "sha256:53c4cc6dee311d78041d4aed60e01210f7b9dbeb1b62465f2735d295175346e1"
+            ],
+            "scope": {
+              "project_id": "project:HHP-Lab"
+            }
+          },
+          "candidates": [
+            {
+              "element_id": "el:directory-results-5kzve4yq18f1",
+              "revision_id": "observed-element:el:directory-results-5kzve4yq18f1:snapshot:15626544f1df4fa64f4d2d278cc851040422b687cd444dd9fd0515db2259a174",
+              "content_witness": "sha256:53c4cc6dee311d78041d4aed60e01210f7b9dbeb1b62465f2735d295175346e1",
+              "repo_relative_path": "hhplab/results"
+            }
+          ],
+          "guardrail": {
+            "decision": "allow",
+            "policy": "informational",
+            "policy_profile": "elements.policy.specification-8.default/1.0",
+            "reason": "structured policy permits the operation"
+          },
+          "candidates_truncated": false,
+          "legacy_projection": {
+            "schema_version": "elements.correspondence-result/v7-projection/1.0",
+            "state": "satisfied",
+            "projection": "derived_v7_read_projection"
+          }
+        },
+        {
+          "schema_version": "elements.correspondence-result/8.0",
+          "intent_element_id": "intent:results-v2:results_runner",
+          "intent_version_status": "working_unpinned",
+          "intent_lifecycle": "working",
+          "intent_revision_id": "revision:results-v2:results_runner:1",
+          "finding": "unknown",
+          "confidence": "indeterminate",
+          "observation": {
+            "coverage": "partial",
+            "snapshot": {
+              "snapshot_id": "snapshot:15626544f1df4fa64f4d2d278cc851040422b687cd444dd9fd0515db2259a174",
+              "content_witness": "sha256:15626544f1df4fa64f4d2d278cc851040422b687cd444dd9fd0515db2259a174",
+              "observed_at": "content-addressed",
+              "provider_id": "elements.source-extractors",
+              "input_witnesses": [
+                "sha256:15626544f1df4fa64f4d2d278cc851040422b687cd444dd9fd0515db2259a174"
+              ]
+            },
+            "snapshot_id": "snapshot:15626544f1df4fa64f4d2d278cc851040422b687cd444dd9fd0515db2259a174",
+            "scope": {
+              "project_id": "project:HHP-Lab"
+            }
+          },
+          "guardrail": {
+            "decision": "allow",
+            "policy": "informational",
+            "policy_profile": "elements.policy.specification-8.default/1.0",
+            "reason": "structured policy permits the operation"
+          },
+          "candidates_truncated": false,
+          "legacy_projection": {
+            "schema_version": "elements.correspondence-result/v7-projection/1.0",
+            "state": "indeterminate",
+            "projection": "derived_v7_read_projection"
+          }
+        },
+        {
+          "schema_version": "elements.correspondence-result/8.0",
+          "intent_element_id": "intent:results-v2:samples",
+          "intent_version_status": "working_unpinned",
+          "intent_lifecycle": "working",
+          "intent_revision_id": "revision:results-v2:samples:1",
+          "finding": "unknown",
+          "confidence": "indeterminate",
+          "observation": {
+            "coverage": "partial",
+            "snapshot": {
+              "snapshot_id": "snapshot:15626544f1df4fa64f4d2d278cc851040422b687cd444dd9fd0515db2259a174",
+              "content_witness": "sha256:15626544f1df4fa64f4d2d278cc851040422b687cd444dd9fd0515db2259a174",
+              "observed_at": "content-addressed",
+              "provider_id": "elements.source-extractors",
+              "input_witnesses": [
+                "sha256:15626544f1df4fa64f4d2d278cc851040422b687cd444dd9fd0515db2259a174"
+              ]
+            },
+            "snapshot_id": "snapshot:15626544f1df4fa64f4d2d278cc851040422b687cd444dd9fd0515db2259a174",
+            "scope": {
+              "project_id": "project:HHP-Lab"
+            }
+          },
+          "guardrail": {
+            "decision": "allow",
+            "policy": "informational",
+            "policy_profile": "elements.policy.specification-8.default/1.0",
+            "reason": "structured policy permits the operation"
+          },
+          "candidates_truncated": false,
+          "legacy_projection": {
+            "schema_version": "elements.correspondence-result/v7-projection/1.0",
+            "state": "indeterminate",
+            "projection": "derived_v7_read_projection"
+          }
+        },
+        {
+          "schema_version": "elements.correspondence-result/8.0",
+          "intent_element_id": "intent:results-v2:schema",
+          "intent_version_status": "working_unpinned",
+          "intent_lifecycle": "working",
+          "intent_revision_id": "revision:results-v2:schema:2",
+          "finding": "matched",
+          "confidence": "exact",
+          "observation": {
+            "coverage": "partial",
+            "snapshot": {
+              "snapshot_id": "snapshot:15626544f1df4fa64f4d2d278cc851040422b687cd444dd9fd0515db2259a174",
+              "content_witness": "sha256:15626544f1df4fa64f4d2d278cc851040422b687cd444dd9fd0515db2259a174",
+              "observed_at": "content-addressed",
+              "provider_id": "elements.source-extractors",
+              "input_witnesses": [
+                "sha256:15626544f1df4fa64f4d2d278cc851040422b687cd444dd9fd0515db2259a174"
+              ]
+            },
+            "snapshot_id": "snapshot:15626544f1df4fa64f4d2d278cc851040422b687cd444dd9fd0515db2259a174",
+            "candidate_ids": [
+              "el:directory-schema-jrrba3vne7jx"
+            ],
+            "candidate_witnesses": [
+              "sha256:0aa0a499bf650edb2651c0d1d449e2d60cab719b5c7b3961550206625cd0b846"
+            ],
+            "scope": {
+              "project_id": "project:HHP-Lab"
+            }
+          },
+          "candidates": [
+            {
+              "element_id": "el:directory-schema-jrrba3vne7jx",
+              "revision_id": "observed-element:el:directory-schema-jrrba3vne7jx:snapshot:15626544f1df4fa64f4d2d278cc851040422b687cd444dd9fd0515db2259a174",
+              "content_witness": "sha256:0aa0a499bf650edb2651c0d1d449e2d60cab719b5c7b3961550206625cd0b846",
+              "repo_relative_path": "hhplab/schema"
+            }
+          ],
+          "guardrail": {
+            "decision": "allow",
+            "policy": "informational",
+            "policy_profile": "elements.policy.specification-8.default/1.0",
+            "reason": "structured policy permits the operation"
+          },
+          "candidates_truncated": false,
+          "legacy_projection": {
+            "schema_version": "elements.correspondence-result/v7-projection/1.0",
+            "state": "satisfied",
+            "projection": "derived_v7_read_projection"
+          }
+        },
+        {
+          "schema_version": "elements.correspondence-result/8.0",
+          "intent_element_id": "intent:results-v2:source_coverage",
+          "intent_version_status": "working_unpinned",
+          "intent_lifecycle": "working",
+          "intent_revision_id": "revision:results-v2:source_coverage:1",
+          "finding": "matched",
+          "confidence": "exact",
+          "observation": {
+            "coverage": "partial",
+            "snapshot": {
+              "snapshot_id": "snapshot:15626544f1df4fa64f4d2d278cc851040422b687cd444dd9fd0515db2259a174",
+              "content_witness": "sha256:15626544f1df4fa64f4d2d278cc851040422b687cd444dd9fd0515db2259a174",
+              "observed_at": "content-addressed",
+              "provider_id": "elements.source-extractors",
+              "input_witnesses": [
+                "sha256:15626544f1df4fa64f4d2d278cc851040422b687cd444dd9fd0515db2259a174"
+              ]
+            },
+            "snapshot_id": "snapshot:15626544f1df4fa64f4d2d278cc851040422b687cd444dd9fd0515db2259a174",
+            "candidate_ids": [
+              "el:file-coverage-py-j3szb4xc3t62"
+            ],
+            "candidate_witnesses": [
+              "sha256:5479c196945c95314c9f97c2a4e3df8a4a2f3d7e5579bc34c01cf1fddc4375c4"
+            ],
+            "scope": {
+              "project_id": "project:HHP-Lab"
+            }
+          },
+          "candidates": [
+            {
+              "element_id": "el:file-coverage-py-j3szb4xc3t62",
+              "revision_id": "observed-element:el:file-coverage-py-j3szb4xc3t62:snapshot:15626544f1df4fa64f4d2d278cc851040422b687cd444dd9fd0515db2259a174",
+              "content_witness": "sha256:5479c196945c95314c9f97c2a4e3df8a4a2f3d7e5579bc34c01cf1fddc4375c4",
+              "repo_relative_path": "hhplab/sources/coverage.py"
+            }
+          ],
+          "guardrail": {
+            "decision": "allow",
+            "policy": "informational",
+            "policy_profile": "elements.policy.specification-8.default/1.0",
+            "reason": "structured policy permits the operation"
+          },
+          "candidates_truncated": false,
+          "legacy_projection": {
+            "schema_version": "elements.correspondence-result/v7-projection/1.0",
+            "state": "satisfied",
+            "projection": "derived_v7_read_projection"
+          }
+        },
+        {
+          "schema_version": "elements.correspondence-result/8.0",
+          "intent_element_id": "intent:results-v2:source_registry",
+          "intent_version_status": "working_unpinned",
+          "intent_lifecycle": "working",
+          "intent_revision_id": "revision:results-v2:source_registry:1",
+          "finding": "matched",
+          "confidence": "exact",
+          "observation": {
+            "coverage": "partial",
+            "snapshot": {
+              "snapshot_id": "snapshot:15626544f1df4fa64f4d2d278cc851040422b687cd444dd9fd0515db2259a174",
+              "content_witness": "sha256:15626544f1df4fa64f4d2d278cc851040422b687cd444dd9fd0515db2259a174",
+              "observed_at": "content-addressed",
+              "provider_id": "elements.source-extractors",
+              "input_witnesses": [
+                "sha256:15626544f1df4fa64f4d2d278cc851040422b687cd444dd9fd0515db2259a174"
+              ]
+            },
+            "snapshot_id": "snapshot:15626544f1df4fa64f4d2d278cc851040422b687cd444dd9fd0515db2259a174",
+            "candidate_ids": [
+              "el:file-source-registry-py-hndqcxctm5tt"
+            ],
+            "candidate_witnesses": [
+              "sha256:c55e4069c1684b03c30dda54384024cd8ca2e623f6612b1eab78db7dcb93dee8"
+            ],
+            "scope": {
+              "project_id": "project:HHP-Lab"
+            }
+          },
+          "candidates": [
+            {
+              "element_id": "el:file-source-registry-py-hndqcxctm5tt",
+              "revision_id": "observed-element:el:file-source-registry-py-hndqcxctm5tt:snapshot:15626544f1df4fa64f4d2d278cc851040422b687cd444dd9fd0515db2259a174",
+              "content_witness": "sha256:c55e4069c1684b03c30dda54384024cd8ca2e623f6612b1eab78db7dcb93dee8",
+              "repo_relative_path": "hhplab/registry/source_registry.py"
+            }
+          ],
+          "guardrail": {
+            "decision": "allow",
+            "policy": "informational",
+            "policy_profile": "elements.policy.specification-8.default/1.0",
+            "reason": "structured policy permits the operation"
+          },
+          "candidates_truncated": false,
+          "legacy_projection": {
+            "schema_version": "elements.correspondence-result/v7-projection/1.0",
+            "state": "satisfied",
+            "projection": "derived_v7_read_projection"
+          }
+        },
+        {
+          "schema_version": "elements.correspondence-result/8.0",
+          "intent_element_id": "intent:results-v2:sources",
+          "intent_version_status": "working_unpinned",
+          "intent_lifecycle": "working",
+          "intent_revision_id": "revision:results-v2:sources:2",
+          "finding": "matched",
+          "confidence": "exact",
+          "observation": {
+            "coverage": "partial",
+            "snapshot": {
+              "snapshot_id": "snapshot:15626544f1df4fa64f4d2d278cc851040422b687cd444dd9fd0515db2259a174",
+              "content_witness": "sha256:15626544f1df4fa64f4d2d278cc851040422b687cd444dd9fd0515db2259a174",
+              "observed_at": "content-addressed",
+              "provider_id": "elements.source-extractors",
+              "input_witnesses": [
+                "sha256:15626544f1df4fa64f4d2d278cc851040422b687cd444dd9fd0515db2259a174"
+              ]
+            },
+            "snapshot_id": "snapshot:15626544f1df4fa64f4d2d278cc851040422b687cd444dd9fd0515db2259a174",
+            "candidate_ids": [
+              "el:directory-sources-5y7kdndybwtr"
+            ],
+            "candidate_witnesses": [
+              "sha256:e88c69a35daab5da78241a2c3509a5ae2a6e9aa8c8fd64c3198f2c33ed1e6414"
+            ],
+            "scope": {
+              "project_id": "project:HHP-Lab"
+            }
+          },
+          "candidates": [
+            {
+              "element_id": "el:directory-sources-5y7kdndybwtr",
+              "revision_id": "observed-element:el:directory-sources-5y7kdndybwtr:snapshot:15626544f1df4fa64f4d2d278cc851040422b687cd444dd9fd0515db2259a174",
+              "content_witness": "sha256:e88c69a35daab5da78241a2c3509a5ae2a6e9aa8c8fd64c3198f2c33ed1e6414",
+              "repo_relative_path": "hhplab/sources"
+            }
+          ],
+          "guardrail": {
+            "decision": "allow",
+            "policy": "informational",
+            "policy_profile": "elements.policy.specification-8.default/1.0",
+            "reason": "structured policy permits the operation"
+          },
+          "candidates_truncated": false,
+          "legacy_projection": {
+            "schema_version": "elements.correspondence-result/v7-projection/1.0",
+            "state": "satisfied",
+            "projection": "derived_v7_read_projection"
+          }
+        },
+        {
+          "schema_version": "elements.correspondence-result/8.0",
+          "intent_element_id": "intent:results-v2:stats",
+          "intent_version_status": "working_unpinned",
+          "intent_lifecycle": "working",
+          "intent_revision_id": "revision:results-v2:stats:1",
+          "finding": "matched",
+          "confidence": "exact",
+          "observation": {
+            "coverage": "partial",
+            "snapshot": {
+              "snapshot_id": "snapshot:15626544f1df4fa64f4d2d278cc851040422b687cd444dd9fd0515db2259a174",
+              "content_witness": "sha256:15626544f1df4fa64f4d2d278cc851040422b687cd444dd9fd0515db2259a174",
+              "observed_at": "content-addressed",
+              "provider_id": "elements.source-extractors",
+              "input_witnesses": [
+                "sha256:15626544f1df4fa64f4d2d278cc851040422b687cd444dd9fd0515db2259a174"
+              ]
+            },
+            "snapshot_id": "snapshot:15626544f1df4fa64f4d2d278cc851040422b687cd444dd9fd0515db2259a174",
+            "candidate_ids": [
+              "el:file-stats-py-ka72zg6h8twb"
+            ],
+            "candidate_witnesses": [
+              "sha256:b58e8ccc48ffab9e3b05689f51000389a914eaff59e2ac0dc95b7ea6add9011f"
+            ],
+            "scope": {
+              "project_id": "project:HHP-Lab"
+            }
+          },
+          "candidates": [
+            {
+              "element_id": "el:file-stats-py-ka72zg6h8twb",
+              "revision_id": "observed-element:el:file-stats-py-ka72zg6h8twb:snapshot:15626544f1df4fa64f4d2d278cc851040422b687cd444dd9fd0515db2259a174",
+              "content_witness": "sha256:b58e8ccc48ffab9e3b05689f51000389a914eaff59e2ac0dc95b7ea6add9011f",
+              "repo_relative_path": "hhplab/analysis/stats.py"
+            }
+          ],
+          "guardrail": {
+            "decision": "allow",
+            "policy": "informational",
+            "policy_profile": "elements.policy.specification-8.default/1.0",
+            "reason": "structured policy permits the operation"
+          },
+          "candidates_truncated": false,
+          "legacy_projection": {
+            "schema_version": "elements.correspondence-result/v7-projection/1.0",
+            "state": "satisfied",
+            "projection": "derived_v7_read_projection"
+          }
+        },
+        {
+          "schema_version": "elements.correspondence-result/8.0",
+          "intent_element_id": "intent:results-v2:storage",
+          "intent_version_status": "working_unpinned",
+          "intent_lifecycle": "working",
+          "intent_revision_id": "revision:results-v2:storage:2",
+          "finding": "matched",
+          "confidence": "exact",
+          "observation": {
+            "coverage": "partial",
+            "snapshot": {
+              "snapshot_id": "snapshot:15626544f1df4fa64f4d2d278cc851040422b687cd444dd9fd0515db2259a174",
+              "content_witness": "sha256:15626544f1df4fa64f4d2d278cc851040422b687cd444dd9fd0515db2259a174",
+              "observed_at": "content-addressed",
+              "provider_id": "elements.source-extractors",
+              "input_witnesses": [
+                "sha256:15626544f1df4fa64f4d2d278cc851040422b687cd444dd9fd0515db2259a174"
+              ]
+            },
+            "snapshot_id": "snapshot:15626544f1df4fa64f4d2d278cc851040422b687cd444dd9fd0515db2259a174",
+            "candidate_ids": [
+              "el:directory-storage-vnb8eas9r4ce"
+            ],
+            "candidate_witnesses": [
+              "sha256:41f95493395dd034b4f3b7d7adc0f2dc5b9f86bea05d14002f850e9233ef9454"
+            ],
+            "scope": {
+              "project_id": "project:HHP-Lab"
+            }
+          },
+          "candidates": [
+            {
+              "element_id": "el:directory-storage-vnb8eas9r4ce",
+              "revision_id": "observed-element:el:directory-storage-vnb8eas9r4ce:snapshot:15626544f1df4fa64f4d2d278cc851040422b687cd444dd9fd0515db2259a174",
+              "content_witness": "sha256:41f95493395dd034b4f3b7d7adc0f2dc5b9f86bea05d14002f850e9233ef9454",
+              "repo_relative_path": "hhplab/storage"
+            }
+          ],
+          "guardrail": {
+            "decision": "allow",
+            "policy": "informational",
+            "policy_profile": "elements.policy.specification-8.default/1.0",
+            "reason": "structured policy permits the operation"
+          },
+          "candidates_truncated": false,
+          "legacy_projection": {
+            "schema_version": "elements.correspondence-result/v7-projection/1.0",
+            "state": "satisfied",
+            "projection": "derived_v7_read_projection"
+          }
+        },
+        {
+          "schema_version": "elements.correspondence-result/8.0",
+          "intent_element_id": "intent:results-v2:v2_schema",
+          "intent_version_status": "working_unpinned",
+          "intent_lifecycle": "working",
+          "intent_revision_id": "revision:results-v2:v2_schema:1",
+          "finding": "unknown",
+          "confidence": "indeterminate",
+          "observation": {
+            "coverage": "partial",
+            "snapshot": {
+              "snapshot_id": "snapshot:15626544f1df4fa64f4d2d278cc851040422b687cd444dd9fd0515db2259a174",
+              "content_witness": "sha256:15626544f1df4fa64f4d2d278cc851040422b687cd444dd9fd0515db2259a174",
+              "observed_at": "content-addressed",
+              "provider_id": "elements.source-extractors",
+              "input_witnesses": [
+                "sha256:15626544f1df4fa64f4d2d278cc851040422b687cd444dd9fd0515db2259a174"
+              ]
+            },
+            "snapshot_id": "snapshot:15626544f1df4fa64f4d2d278cc851040422b687cd444dd9fd0515db2259a174",
+            "scope": {
+              "project_id": "project:HHP-Lab"
+            }
+          },
+          "guardrail": {
+            "decision": "allow",
+            "policy": "informational",
+            "policy_profile": "elements.policy.specification-8.default/1.0",
+            "reason": "structured policy permits the operation"
+          },
+          "candidates_truncated": false,
+          "legacy_projection": {
+            "schema_version": "elements.correspondence-result/v7-projection/1.0",
+            "state": "indeterminate",
+            "projection": "derived_v7_read_projection"
+          }
+        },
+        {
+          "schema_version": "elements.correspondence-result/8.0",
+          "intent_element_id": "intent:results-v2:verify",
+          "intent_version_status": "working_unpinned",
+          "intent_lifecycle": "working",
+          "intent_revision_id": "revision:results-v2:verify:1",
+          "finding": "unknown",
+          "confidence": "indeterminate",
+          "observation": {
+            "coverage": "partial",
+            "snapshot": {
+              "snapshot_id": "snapshot:15626544f1df4fa64f4d2d278cc851040422b687cd444dd9fd0515db2259a174",
+              "content_witness": "sha256:15626544f1df4fa64f4d2d278cc851040422b687cd444dd9fd0515db2259a174",
+              "observed_at": "content-addressed",
+              "provider_id": "elements.source-extractors",
+              "input_witnesses": [
+                "sha256:15626544f1df4fa64f4d2d278cc851040422b687cd444dd9fd0515db2259a174"
+              ]
+            },
+            "snapshot_id": "snapshot:15626544f1df4fa64f4d2d278cc851040422b687cd444dd9fd0515db2259a174",
+            "scope": {
+              "project_id": "project:HHP-Lab"
+            }
+          },
+          "guardrail": {
+            "decision": "allow",
+            "policy": "informational",
+            "policy_profile": "elements.policy.specification-8.default/1.0",
+            "reason": "structured policy permits the operation"
+          },
+          "candidates_truncated": false,
+          "legacy_projection": {
+            "schema_version": "elements.correspondence-result/v7-projection/1.0",
+            "state": "indeterminate",
+            "projection": "derived_v7_read_projection"
+          }
+        }
+      ],
+      "returned": 43,
+      "has_more": false,
+      "view_conflicts": 0
+    }
+  }
+}

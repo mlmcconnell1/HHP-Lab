@@ -1,0 +1,22 @@
+{
+  "policy_id": "results-v2-architecture-conformance-v1",
+  "phase": 1,
+  "source_spec": "docs/results-recipe-spec_2.md",
+  "current_pin": {
+    "status": "pinned",
+    "pin_id": "intent-pin:3e44dba06eaabb97429d1fdc995046c2d8fec8070b8f70d359f81521bca2a155",
+    "object_id": "intent-object:606e0d0aba30f9c9125b5c39ac2d238def05fa89b648909be9e2ce1c4a528ec1",
+    "view_witness": "sha256:c721d82b18c216d811382ca26ad6ab2ab9c8451dca987dd036eb1b0ad274dff6",
+    "pinned": true
+  },
+  "intent_source": ".elements/elements.working-intent.jsonl",
+  "reviewable_import": ".elements/plans/results-recipe-v2.intent.json",
+  "reconcile_request": ".elements/plans/results-recipe-v2.reconcile.json",
+  "baseline": {
+    "matched": 25,
+    "unknown_future_modules": 18,
+    "root_binding": "exact"
+  },
+  "closure_gate": "Architecture acceptance is mandatory, not advisory. Before closing this bead, run elr intent validate; refresh/check elr scaffold --repo .; reconcile with elr reconcile --working-intent --repo . --input .elements/plans/results-recipe-v2.reconcile.json; run tests/test_architecture_layers.py and the results architecture gate. Inspect ALL scoped correspondence rows (including pagination), current source/view witnesses, containment, layer/import direction and owned responsibilities. Native Elements content text is not automatic semantic enforcement: dependency/responsibility constraints require tests and review. Unimplemented modules belonging to other open beads are expected during incremental delivery, but all elements owned by this bead must match, and final release requires all planned Phase-1 modules to match.\n\nIf planned and implemented structure diverge, do not close the bead. Record exact IDs/paths/edges and cause; decide whether the implementation is wrong or intent needs a justified revision. Repair code or revise the same intent identity through dry-run/import, increment its revision, validate, repin, update the mapping and affected beads, then rerun reconciliation/tests. Preserve prior pin and evidence. Do not waive unknown/conflicting/ambiguous results, mask drift by deriving an automatic replacement intent, or add upward dependency exceptions merely to pass. Record final source witness, intent pin/view witness, checks and rationale in the bead closure evidence.",
+  "phase_scope": "Phase 2/3 require their own expanded intent pins before implementation; Phase-1 pin does not claim those structures."
+}

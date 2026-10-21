@@ -1,0 +1,377 @@
+version: 2
+id: shelter-capacity-substitution
+title: Shelter capacity and the PIT count
+authors: [Matt McConnell]
+universe: {range: "2010-2024"}
+
+# These build pipelines point to supported source adapters. The CBSA panel has
+# LAUS only for 2015–2023; the CoC panel has PIT and HIC but no CoC-native LAUS.
+# The CoC unemployment and right-to-shelter requirements therefore remain
+# research/source constraints even though the available CoC panel build is
+# described here.
+targets:
+  - id: cbsa
+    geometry: {type: metro, source: glynn_fox_v1}
+    outputs: [panel, diagnostics]
+    panel_policy:
+      laus: {include: true}
+      column_aliases:
+        total_population: total_population_acs5
+        adult_population: adult_population_acs5
+        population_below_poverty: population_below_poverty_acs5
+        median_household_income: median_household_income_acs5
+        median_gross_rent: median_gross_rent_acs5
+        population: pep_population
+  - id: coc
+    geometry: {type: coc, vintage: 2025, source: hud_exchange}
+    outputs: [panel]
+    panel_policy:
+      output_columns:
+        - coc_id
+        - coc_name
+        - year
+        - pit_total
+        - pit_sheltered
+        - pit_unsheltered
+        - hic_es_year_round_beds
+        - hic_th_year_round_beds
+        - hic_sh_year_round_beds
+
+datasets:
+  pit:
+    provider: hud
+    product: pit
+    version: 1
+    native_geometry: {type: coc}
+    years: "2010-2024"
+    year_column: pit_year
+    geo_column: coc_id
+    params: {vintage: 2024, align: point_in_time_jan}
+    path: data/curated/pit/pit_vintage__P2024.parquet
+  hic:
+    provider: hud
+    product: hic
+    version: 1
+    native_geometry: {type: coc}
+    years: "2010-2024"
+    year_column: hic_year
+    geo_column: coc_id
+    params: {align: point_in_time_jan}
+    file_set:
+      path_template: "data/curated/hic/hic__H{year}.parquet"
+      segments:
+        - years: "2010-2024"
+          geometry: {type: coc, source: hud_exchange}
+          constants: {}
+  pep_county:
+    provider: census
+    product: pep
+    version: 1
+    native_geometry: {type: county, vintage: 2020, source: tiger}
+    year_column: year
+    geo_column: county_fips
+    params: {series: postcensal}
+    file_set:
+      path_template: "data/curated/pep/pep_county__v{pep_vintage}.parquet"
+      segments:
+        - years: "2015-2020"
+          geometry: {type: county, vintage: 2020, source: tiger}
+          constants: {pep_vintage: 2020}
+        - years: "2021-2023"
+          geometry: {type: county, vintage: 2020, source: tiger}
+          constants: {pep_vintage: 2024}
+  laus_metro:
+    provider: bls
+    product: laus
+    version: 1
+    native_geometry: {type: metro, source: glynn_fox_v1}
+    year_column: year
+    geo_column: metro_id
+    file_set:
+      path_template: "data/curated/laus/laus_metro__A{year}@Dglynnfoxv1.parquet"
+      segments:
+        - years: "2015-2023"
+          geometry: {type: metro, source: glynn_fox_v1}
+          constants: {}
+  acs_tract:
+    provider: census
+    product: acs5
+    version: 1
+    native_geometry: {type: tract}
+    geo_column: tract_geoid
+    file_set:
+      path_template: "data/curated/acs/acs5_tracts__A{acs_end}xT{tract}.parquet"
+      segments:
+        - years: "2015-2020"
+          geometry: {type: tract, vintage: 2010}
+          constants: {tract: 2010}
+          year_offsets: {acs_end: -1}
+        - years: "2021-2023"
+          geometry: {type: tract, vintage: 2020}
+          constants: {tract: 2020}
+          year_offsets: {acs_end: -1}
+
+transforms:
+  - id: coc_to_metro
+    type: crosswalk
+    from: {type: coc, vintage: 2025, source: hud_exchange}
+    to: {type: metro, source: glynn_fox_v1}
+    spec: {weighting: {scheme: area}}
+  - id: county_to_metro
+    type: crosswalk
+    from: {type: county, vintage: 2020, source: tiger}
+    to: {type: metro, source: glynn_fox_v1}
+    spec:
+      weighting:
+        scheme: population
+        population_source: pep_county
+        population_field: population
+  - id: tract_to_metro_2020
+    type: crosswalk
+    from: {type: tract, vintage: 2020}
+    to: {type: metro, source: glynn_fox_v1}
+    spec: {weighting: {scheme: area}}
+  - id: tract_to_metro_2010
+    type: crosswalk
+    from: {type: tract, vintage: 2010}
+    to: {type: metro, source: glynn_fox_v1}
+    spec: {weighting: {scheme: area}}
+
+pipelines:
+  - id: build_coc_panel
+    target: coc
+    steps:
+      - resample:
+          dataset: pit
+          to_geometry: {type: coc, vintage: 2025, source: hud_exchange}
+          method: identity
+          measures: [pit_total, pit_sheltered, pit_unsheltered]
+      - resample:
+          dataset: hic
+          to_geometry: {type: coc, vintage: 2025, source: hud_exchange}
+          method: identity
+          measures:
+            - hic_es_year_round_beds
+            - hic_th_year_round_beds
+            - hic_sh_year_round_beds
+      - join:
+          datasets: [pit, hic]
+          join_on: [geo_id, year]
+  - id: build_cbsa_panel
+    target: cbsa
+    steps:
+      - materialize:
+          transforms: [coc_to_metro, county_to_metro, tract_to_metro_2010, tract_to_metro_2020]
+      - resample:
+          dataset: pit
+          to_geometry: {type: metro, source: glynn_fox_v1}
+          method: aggregate
+          via: coc_to_metro
+          measures: [pit_total, pit_sheltered, pit_unsheltered]
+          aggregation: sum
+      - resample:
+          dataset: hic
+          to_geometry: {type: metro, source: glynn_fox_v1}
+          method: aggregate
+          via: coc_to_metro
+          measures:
+            hic_es_year_round_beds: {aggregation: sum}
+            hic_th_year_round_beds: {aggregation: sum}
+            hic_sh_year_round_beds: {aggregation: sum}
+      - resample:
+          dataset: pep_county
+          to_geometry: {type: metro, source: glynn_fox_v1}
+          method: aggregate
+          via: county_to_metro
+          measures: [population]
+          aggregation: sum
+      - resample:
+          dataset: acs_tract
+          to_geometry: {type: metro, source: glynn_fox_v1}
+          method: aggregate
+          via: auto
+          measures:
+            total_population: {aggregation: sum}
+            adult_population: {aggregation: sum}
+            population_below_poverty: {aggregation: sum}
+            median_household_income: {aggregation: weighted_mean}
+            median_gross_rent: {aggregation: weighted_mean}
+      - resample:
+          dataset: laus_metro
+          to_geometry: {type: metro, source: glynn_fox_v1}
+          method: identity
+          measures:
+            labor_force: {aggregation: sum}
+            employed: {aggregation: sum}
+            unemployed: {aggregation: sum}
+            unemployment_rate: {aggregation: mean}
+      - join:
+          datasets: [pit, hic, pep_county, acs_tract, laus_metro]
+          join_on: [geo_id, year]
+
+filters:
+  pep_county:
+    type: temporal
+    column: reference_date
+    method: interpolate_to_month
+    month: 1
+panels:
+  cbsa:
+    ref: {pipeline: build_cbsa_panel, output: panel}
+    geo_key: geo_id
+    time_key: year
+  coc:
+    ref: {pipeline: build_coc_panel, output: panel}
+    geo_key: coc_id
+    time_key: year
+
+parameters:
+  delta_theta: {unresolved: "Researcher-supplied equivalence margin; require 0 < delta_theta < 0.5."}
+  delta_slope: {unresolved: "Researcher-supplied positive slope equivalence margin."}
+  fit_threshold: {unresolved: "Researcher-supplied minimum within R-squared."}
+  fit_floor: {unresolved: "Researcher-supplied contradicted within R-squared floor."}
+  right_to_shelter_source: {unresolved: "Identify and validate a real source for the right-to-shelter classification."}
+  coc_unemployment_source: {unresolved: "Establish a supported CoC-native unemployment source or remove CoC unemployment analyses."}
+
+masks:
+  - id: covid_unsheltered_2021
+    panels: [cbsa, coc]
+    columns: [pit_unsheltered, pit_total]
+    years: [2021]
+    reason: Many CoCs did not conduct a 2021 unsheltered count.
+
+derive:
+  - id: beds_shelter
+    op: sum
+    of: [hic_es_year_round_beds, hic_th_year_round_beds, hic_sh_year_round_beds]
+    require_all: true
+  - {id: utilization, op: ratio, num: pit_sheltered, den: beds_shelter, zero_den: "null"}
+  - {id: d_beds, op: diff, of: beds_shelter, years: 1}
+  - {id: d_sheltered, op: diff, of: pit_sheltered, years: 1}
+  - {id: d_unsheltered, op: diff, of: pit_unsheltered, years: 1}
+  - {id: d_total, op: diff, of: pit_total, years: 1}
+  - {id: d_population, op: diff, of: population, years: 1}
+  - {id: d_unemployment, op: diff, of: unemployment_rate, years: 1}
+  - {id: lag_d_beds, op: lag, of: d_beds, years: 1}
+  - {id: d2_beds, op: diff, of: beds_shelter, years: 2}
+  - {id: d2_sheltered, op: diff, of: pit_sheltered, years: 2}
+  - {id: d2_unsheltered, op: diff, of: pit_unsheltered, years: 2}
+  - {id: d2_total, op: diff, of: pit_total, years: 2}
+  - {id: d2_population, op: diff, of: population, years: 2}
+  - {id: d2_unemployment, op: diff, of: unemployment_rate, years: 2}
+
+sample_groups:
+  fd_main:
+    sample:
+      years: {from: 2011, to: 2024}
+
+analyses:
+  - id: levels_fit
+    method: regression
+    input: panels.cbsa
+    sample: {years: {from: 2010, to: 2024}}
+    outcome: pit_sheltered
+    predictors: [beds_shelter]
+    fixed_effects: [year]
+    inference: {method: clustered, cluster_by: geography}
+  - id: utilization_dist
+    method: descriptive
+    input: panels.cbsa
+    sample: {years: {from: 2010, to: 2024}}
+    columns: [utilization]
+    stats: [n, median, p10, p25, p75, p90, {share_gte: {utilization: 0.9}}]
+    by: [year]
+  - id: subst_fe
+    method: regression
+    input: panels.cbsa
+    sample: {years: {from: 2010, to: 2024}, min_obs_per_geography: 2}
+    outcome: pit_unsheltered
+    predictors: [beds_shelter]
+    controls: [population, unemployment_rate, median_gross_rent]
+    fixed_effects: [geography, year]
+    inference: {method: clustered, cluster_by: geography}
+  - id: subst_fd
+    method: regression
+    input: panels.cbsa
+    sample: {group: fd_main}
+    outcome: d_unsheltered
+    predictors: [d_beds]
+    controls: [d_population, d_unemployment]
+    fixed_effects: [year]
+    inference: {method: clustered, cluster_by: geography}
+  - id: sheltered_fd
+    method: regression
+    input: panels.cbsa
+    sample: {group: fd_main}
+    outcome: d_sheltered
+    predictors: [d_beds]
+    controls: [d_population, d_unemployment]
+    fixed_effects: [year]
+    inference: {method: clustered, cluster_by: geography}
+  - id: total_fd
+    method: regression
+    input: panels.cbsa
+    sample: {group: fd_main}
+    outcome: d_total
+    predictors: [d_beds]
+    controls: [d_population, d_unemployment]
+    fixed_effects: [year]
+    inference: {method: clustered, cluster_by: geography}
+
+variants:
+  - id: odd_years_fe
+    applies_to: [subst_fe]
+    override: {sample.years: {from: 2011, to: 2023, step: 2}}
+  - id: odd_years_fd
+    applies_to: [subst_fd, sheltered_fd, total_fd]
+    override: {sample.years: {from: 2013, to: 2023, step: 2}}
+    substitute:
+      d_beds: d2_beds
+      d_sheltered: d2_sheltered
+      d_unsheltered: d2_unsheltered
+      d_total: d2_total
+      d_population: d2_population
+      d_unemployment: d2_unemployment
+  - id: no_right_to_shelter
+    applies_to: [levels_fit, subst_fe, subst_fd, sheltered_fd, total_fd]
+    override: {sample.geographies: {exclude: {column: right_to_shelter, equals: 1}}}
+  - id: coc_geography
+    applies_to: [levels_fit, subst_fe, subst_fd, sheltered_fd, total_fd]
+    override: {input: panels.coc}
+  - id: pop_weighted
+    applies_to: [subst_fe, subst_fd, sheltered_fd, total_fd]
+    override: {weights: population}
+  - id: lagged_beds
+    applies_to: [subst_fd, sheltered_fd, total_fd]
+    substitute: {d_beds: lag_d_beds}
+  - id: hc1
+    applies_to: [subst_fd]
+    override: {inference: {method: hc1}}
+
+diagnostics:
+  - id: fd_additivity
+    op: linear_identity
+    terms:
+      - {analysis: sheltered_fd, term: d_beds, sign: 1}
+      - {analysis: subst_fd, term: d_beds, sign: 1}
+      - {analysis: total_fd, term: d_beds, sign: -1}
+    variants: all
+    require_same_design: true
+  - id: pit_components_cbsa
+    op: column_identity
+    panel: cbsa
+    lhs: pit_total
+    rhs: [pit_sheltered, pit_unsheltered]
+    rows: unmasked
+  - id: fd_components
+    op: column_identity
+    panel: cbsa
+    lhs: d_total
+    rhs: [d_sheltered, d_unsheltered]
+    rows: {group: fd_main}
+
+findings: []
+results:
+  bundle_dir: results/{id}/{run_id}
+  include_panels: [cbsa, coc]
+  report: {title: Shelter capacity and the PIT count}

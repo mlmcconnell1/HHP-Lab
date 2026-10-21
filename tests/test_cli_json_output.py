@@ -183,6 +183,32 @@ class TestListSourcesJson:
                 "Annual January point-in-time count. HUD workbooks are cumulative "
                 "by vintage."
             ),
+            "redistribution": {
+                "row_level": "allowed",
+                "aggregate": "allowed",
+            },
+            "redistribution_evidence": [
+                {
+                    "url": "https://www.hud.gov/sites/documents/webpubstandards.pdf",
+                    "reviewed_on": "2026-10-20",
+                    "scope": (
+                        "HUD-published PIT/HIC statistical workbooks on HUD User "
+                        "AHAR pages; section 1.D public-domain policy; excludes "
+                        "separately copyrighted material."
+                    ),
+                },
+                {
+                    "url": (
+                        "https://www.huduser.gov/portal/datasets/ahar/2024-ahar-"
+                        "part-1-pit-estimates-of-homelessness-in-the-us.html"
+                    ),
+                    "reviewed_on": "2026-10-20",
+                    "scope": (
+                        "Official 2007-2024 PIT and HIC counts by CoC/state, "
+                        "linked as HUD report data."
+                    ),
+                },
+            ],
         }
         assert by_id["acs5"]["native_geo"] == "tract"
         assert by_id["acs5"]["first_year"] == 2009

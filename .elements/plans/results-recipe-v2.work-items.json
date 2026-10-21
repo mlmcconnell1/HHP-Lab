@@ -1,0 +1,411 @@
+{
+  "source_spec": "docs/results-recipe-spec_2.md",
+  "items": [
+    {
+      "key": "spec",
+      "title": "Resolve remaining recipe-results contract contradictions",
+      "intents": [
+        "v2_schema",
+        "result_contracts",
+        "samples",
+        "recipe_findings",
+        "ledger"
+      ],
+      "deps": [],
+      "work": "Reconcile revision 3 with the latest review before freezing schemas. Define inference-only variants as retaining base sample requirements even if replacing inference removes cluster_by; base finding and each variant have independent dependencies. Define nonfinite/undefined criteria as not_evaluated with explicit reason and JSON null. Specify grouped FE exclusion compatibility (require identical FE exclusion policies or an explicitly defined union), preserve sample.require for all methods, and distinguish expected FE dummy redundancy from unidentified slope coefficients. Define fatal startup versus mid-run I/O failure and best-effort logging when ledger storage fails. Fix acceptance status naming and not_applicable diagnostics; separate synthetic acceptance from real-data diagnostic outcomes. Clarify NaN/missing/weight exclusion precedence, derivative zero/negative domains, null indicator/sum behavior, parameter constraints and simultaneous substitution collisions. Update the existing spec in place with rationale; do not silently change scientific thresholds.",
+      "tests": "Review examples against rules: hc1 subset variant, masked lag, failed robustness variant, undefined r2, constant correlation, duplicate keys, and bad weights. Every contradiction has one documented answer. Obtain human choices only for scientific parameters; synthetic fixtures use clearly named test-only values.",
+      "priority": 1
+    },
+    {
+      "key": "architecture",
+      "title": "Implement the intent-conformance gate and divergence procedure",
+      "intents": [
+        "hhplab",
+        "schema",
+        "storage",
+        "recipe",
+        "analysis",
+        "results",
+        "cli"
+      ],
+      "deps": [
+        "spec"
+      ],
+      "work": "Create scoped architecture tests in tests/test_results_architecture.py and extend architecture_layers.toml without new upward exceptions. Read native working intent and compare current planned paths/kinds/parent ownership, production-file inventory and allowed imports. Existing file dependency lists in intent scope new results-related responsibilities; preserve unrelated pre-existing imports unless separately reviewed. New modules use declared dependency prefixes. Explicitly prohibit analysis -> recipe/results/CLI, storage -> application/domain, bands -> recipe/runner, and any newly introduced import cycle. Inspect responsibilities as well as path existence; Elements content responsibility/dependency fields are authored policy, not native automatically enforced assertions. During incremental work permit only the recorded pending modules of uncompleted beads; final release permits none.",
+      "tests": "Gate rejects a synthetic moved module, unexpected new production file, forbidden import and stale/ambiguous correspondence. Demonstrate failures without changing real source ownership. Each bead records before/after reconcile witnesses and layer checks. Divergence workflow: classify missing/moved/wrong-layer/unexpected/dependency drift; analyze cause; repair implementation or revise the same intent IDs with new revision IDs and rationale; dry-run/import/validate/pin; update mapping/dependencies and rerun checks. Never weaken a gate or close a bead merely because filenames exist.",
+      "priority": 1
+    },
+    {
+      "key": "contracts",
+      "title": "Define versioned results, sample, status and redistribution contracts",
+      "intents": [
+        "result_contracts",
+        "redistribution_contracts",
+        "analysis_contracts"
+      ],
+      "deps": [
+        "architecture"
+      ],
+      "work": "Add schema/results.py and schema/redistribution.py as contract-layer modules. Define all artifact schemas, null encoding, base_term, sample_source, four status fields, errors, capabilities, input identities, tolerances and ledger event payloads. Define explicit per-analysis statuses including pending/skipped, and status precedence for diagnostics/findings/distribution. Keep datatypes independent of recipe/results implementations. Extend analysis/contracts.py to carry resolved-frame result/error types. Document serialization/canonical JSON and schema-version policy; reject NaN JSON and reserved-ID collisions.",
+      "tests": "Table-driven schema validation and round trips for success, partial, fatal startup, ambiguous findings, withheld/private, empty artifacts and undefined statistics. Canonicalization stable across dictionary order; component hashing distinguishes declared semantic changes. Contract modules import no application or provider modules.",
+      "priority": 1
+    },
+    {
+      "key": "schema",
+      "title": "Add RecipeV2 schema and preserve RecipeV1 loading",
+      "intents": [
+        "v2_schema",
+        "loader"
+      ],
+      "deps": [
+        "contracts"
+      ],
+      "work": "Add recipe/schema_results.py with closed models for panels, parameters/unresolved markers, masks, derivations, samples/groups, analyses, variants, diagnostics, findings and results. Compose current build model rather than copying it. Define concrete panel references against pipeline output identities; wire version dispatch in loader.py and type-facing callers. Enforce supported Phase-1 capabilities and field constraints. Reject unsupported bootstrap/lagged-association/2SLS at v2 preflight without removing existing standalone APIs.",
+      "tests": "All existing v1 recipes still parse and behave identically. Synthetic v2 accepts every Phase-1 section; rejects unknown keys, unresolved parameters, cycles, ambiguous panel refs, invalid confidence/margins, nonpositive year intervals and Phase-2 methods with named capability errors.",
+      "priority": 1
+    },
+    {
+      "key": "bands",
+      "title": "Implement exact finding-band validation and pure evaluation",
+      "intents": [
+        "bands"
+      ],
+      "deps": [
+        "contracts"
+      ],
+      "work": "Add results/bands.py independent of recipe/runner. Translate closed predicates to interval constraints, check per-band satisfiability and pairwise intersections including open/closed boundaries and ci_lo <= ci_hi. Produce overlap witnesses with stable numeric handling. Evaluate all bands, return compatible reference values separately, and handle missing/nonfinite criteria per corrected contract. No statistical fitting here.",
+      "tests": "Truth tables cover [-2,1] inconclusive, equivalence margins, touching open boundaries, overlap only at a closed endpoint, overlap narrower than 1e-9, contradictory bands, invalid margins and nonfinite inputs. Tests use declared fixture constants, not duplicated magic outcomes.",
+      "priority": 1
+    },
+    {
+      "key": "planner",
+      "title": "Resolve v2 plans, variants, panel identities and static preflight",
+      "intents": [
+        "result_planner"
+      ],
+      "deps": [
+        "schema",
+        "bands"
+      ],
+      "work": "Add recipe/results_plan.py. Resolve panel artifact refs/key contracts, aliases, parameters, defaults and DAGs; normalize overrides before simultaneous substitution. Resolve external diagnostic/finding/table references through base_term. Generate group contexts keyed by group/variant/panel; reject subset membership changes and mixed panels. Inference-only subset variants reuse base requirements and membership. Plan analysis dependencies and deterministic source/component hashes without building panels. Integrate static preflight using existing finding/remediation shapes.",
+      "tests": "Plan snapshots for base, biennial, lagged, geography, weighted and hc1 variants; all references resolve exactly once. Reject substitution collisions, undefined stat/term and robustness variants missing required sources. Component hashes record sample changes and preserve byte-exact original recipe separately from canonical plan.",
+      "priority": 1
+    },
+    {
+      "key": "derive",
+      "title": "Implement full-panel masks and derived-column lineage",
+      "intents": [
+        "derive"
+      ],
+      "deps": [
+        "contracts"
+      ],
+      "work": "Add recipe/derive.py as pure frame operations. Validate keys before temporal lookup; apply year/geography masks; topologically evaluate the complete closed op set once per full panel. Lag uses only prior cell; diff/growth use explicit calendar years. Preserve mask and baseline-loss reasons across chained operations. Add units, semantic validation and source lineage; never reaggregate derived columns or alter row identity. Guard name collisions and unknown columns.",
+      "tests": "Parametrized tests for every op, null/zero/negative domains, mask propagation, prior values outside sample, missing years, biennial differences, lag with missing current value, shuffled input rows and duplicate keys. Verify row-key preservation and deterministic derived artifacts.",
+      "priority": 1
+    },
+    {
+      "key": "samples",
+      "title": "Resolve exact samples and shared-group exclusions",
+      "intents": [
+        "samples"
+      ],
+      "deps": [
+        "planner",
+        "derive"
+      ],
+      "work": "Add analysis/sample.py. Infer all model/grouping/extra requirements, deterministically union group members, apply ordered exclusions and iterative min-observation/singleton rules. Resolve base and variant membership independently with inference-only reuse. Persist all panel keys with included/reason and sample_source; retain provenance for masked-derived nulls and baseline loss. Readiness receives nonnumeric contract errors rather than silently coerced exclusions.",
+      "tests": "Full inclusion truth tables cover every exclusion reason, ties in first-reason order, iterative removal cascades, group union, reordering, mask propagation and weights. hc1 uses exact base membership; geometry/weight/column changes require whole-group application. Retained frame identity equals membership record, not only row count.",
+      "priority": 1
+    },
+    {
+      "key": "design",
+      "title": "Add weighted FE design and numerical readiness contracts",
+      "intents": [
+        "model",
+        "readiness"
+      ],
+      "deps": [
+        "contracts"
+      ],
+      "work": "Extend analysis/model.py and add analysis/readiness.py. Prepare weighted design and arbitrary categorical FE with intercept policy; implement converged absorption and identify estimable requested coefficients. Compute full design_rank, nested-FE k_dof and df_resid separately. Reject unidentified slopes, no within-FE variation, invalid numeric roles and insufficient clusters/degrees of freedom. Do not mistake redundant dummy coding for unidentified requested coefficients. Readiness operates on a resolved frame and never drops rows.",
+      "tests": "Compare weighted/unweighted absorbed designs to explicit LSDV with atol+rtol, including exactly-zero coefficients, disconnected FE groups, nested clusters, no-FE intercept, rescaled weights and shuffled categories. Fixtures commit reference provenance. Invalid designs fail with named columns; no implicit column dropping.",
+      "priority": 1
+    },
+    {
+      "key": "inference",
+      "title": "Implement Phase-1 WLS, HC1, CR1 and confidence intervals",
+      "intents": [
+        "estimation",
+        "stats"
+      ],
+      "deps": [
+        "design"
+      ],
+      "work": "Extend focused numerical modules for analytic-weight OLS, scale-invariant covariance, classical/HC1/CR1 corrections, appropriate t degrees of freedom, Wald intervals and centered/within fit statistics. Use design_rank versus k_dof as specified. Preserve standalone 2SLS behavior and existing inference APIs outside v2. Record undefined statistics explicitly and retain warnings.",
+      "tests": "Reference fixtures verify coefficients, SEs, CIs, p-values, ranks, nested-FE corrections and fit statistics. Check weight-rescaling invariance, zero residual variance, constant outcome, small clusters and finite sample denominators. Regression tests for existing OLS/2SLS public behavior.",
+      "priority": 1
+    },
+    {
+      "key": "regression",
+      "title": "Expose resolved-frame regression with exact sample enforcement",
+      "intents": [
+        "regression",
+        "analysis_contracts"
+      ],
+      "deps": [
+        "inference",
+        "samples"
+      ],
+      "work": "Add a resolved-frame regression entry point and retain path-based public wrappers. Compose design, fitting and inference without filtering or rewriting keys. Compare used row identity with the sample contract, emit predictor/control/intercept roles and base_term, and attach complete fit metadata and warnings. Do not persist recipe-specific files inside numerical code.",
+      "tests": "Tests deliberately alter estimator row count/order/identity to enforce sample_contract_violation. Exercise all Phase-1 covariance methods and group variants; existing CLI/path API tests pass. Structured output validates against schema/results.py.",
+      "priority": 1
+    },
+    {
+      "key": "summaries",
+      "title": "Add resolved-frame descriptive and correlation analyses",
+      "intents": [
+        "inspection",
+        "correlation"
+      ],
+      "deps": [
+        "samples"
+      ],
+      "work": "Extend existing modules for grouped descriptive selections, type-7 quantiles, sample sd, threshold shares and listwise Pearson/Spearman. Include by and extra require columns in sample contracts. Keep Phase-1 weights unavailable for both methods. Preserve old path APIs and explicitly represent undefined results without silently changing samples.",
+      "tests": "Named fixtures cover ties, singleton groups, missing grouping values, threshold boundaries, zero variance, all-null input, listwise membership and stable group JSON. Verify legacy summary/correlation behavior and new result schemas.",
+      "priority": 1
+    },
+    {
+      "key": "dispatch",
+      "title": "Dispatch planned analyses into the existing analysis layer",
+      "intents": [
+        "analysis_dispatch"
+      ],
+      "deps": [
+        "planner",
+        "regression",
+        "summaries"
+      ],
+      "work": "Add recipe/executor/analyses.py with a closed capability dispatch table. Translate resolved specs and sample frames into analysis calls, map base_term for substitutions, collect structured results, and enforce sample identity. No estimators, band rules, global lifecycle or report rendering in dispatch.",
+      "tests": "Execute all methods and example variants against synthetic frames. Unsupported capability fails explicitly; one numerical failure returns a scoped error. Contract outputs carry correct variant, sample_source, terms and diagnostics.",
+      "priority": 1
+    },
+    {
+      "key": "diagnostics",
+      "title": "Implement declared algebraic and column identity diagnostics",
+      "intents": [
+        "diagnostics"
+      ],
+      "deps": [
+        "dispatch"
+      ],
+      "work": "Add results/diagnostics.py. Evaluate linear_identity only for base and variants applying to every referenced analysis; subset variants are not_applicable. Compare actual keys, regressors, FE and weights for same-design requirements. Evaluate column identities with declared unmasked/group scope; report residual, tolerance, discrepancies and bounded key examples. Keep discrepancy distinct from execution failure.",
+      "tests": "Additivity passes for all applicable shared-design variants; hc1 is not_applicable. Changed outcome totals fail despite matching sample/design. Mismatched design, missing analysis, masked cells and zero-near tolerance are covered. No sample or estimator logic duplicated.",
+      "priority": 1
+    },
+    {
+      "key": "findings",
+      "title": "Evaluate finding instances and robustness independently",
+      "intents": [
+        "recipe_findings"
+      ],
+      "deps": [
+        "bands",
+        "dispatch"
+      ],
+      "work": "Add results/recipe_findings.py separate from existing workflow-specific findings.py. Resolve base and each robustness finding independently through base_term, including auxiliary statistics. Apply exact band rules and compatible_with reporting. Missing required criteria or failed dependencies yield per-instance not_evaluated; failed variant preserves base outcome. Apply deterministic robustness precedence and keep claim text independent of evidence labels.",
+      "tests": "Tests cover substituted d2/lag terms, failed variant with successful base, failed base, inconclusive base plus failed variant, decisive disagreement, undefined r2 and defensive ambiguous_rule. Existing CovariateFinding workflows remain unchanged.",
+      "priority": 1
+    },
+    {
+      "key": "terms",
+      "title": "Declare source redistribution metadata and propagate artifact lineage",
+      "intents": [
+        "redistribution_contracts",
+        "covariate_catalog",
+        "source_registry",
+        "source_coverage",
+        "lineage"
+      ],
+      "deps": [
+        "contracts"
+      ],
+      "work": "Extend canonical core and covariate source metadata using contract-layer types; registry must not import domain catalog. Add results/lineage.py to propagate source terms through derivations, sample requirements, fitted results, tables, findings and reports. Audit actual provider terms and retain evidence URLs/date; default unknown. Enforce row/aggregate withholding and explicit private/unknown-aggregate overrides without leaking withheld values into companion files.",
+      "tests": "Synthetic restricted source propagates through derived columns and result renderers; withheld registry lists affected artifacts and replay dependencies. Fully reviewed shelter sources can ship. Unknown stays conservative; source-registry, coverage and covariate tests pass. Do not assert source permissions without evidence.",
+      "priority": 1
+    },
+    {
+      "key": "ledger",
+      "title": "Implement durable run ledger, locks, leases and history",
+      "intents": [
+        "ledger"
+      ],
+      "deps": [
+        "contracts"
+      ],
+      "work": "Add storage/run_ledger.py using shared wire contracts only. Persist start/finish/failure/lock/repair events with run IDs, atomic append locking/fsync, process identity and periodic leases. Distinguish running and abandoned; reconcile terminal event versus stale lease safely. Define lifecycle ordering and torn-line handling, and best-effort terminal evidence during I/O failures. Compute lock comparisons from supplied canonical components; ledger does not resolve recipes.",
+      "tests": "Temp-directory concurrency tests, injected short/torn writes, live process versus reused PID, missing/expired lease, killed run, failure to append, and component lock changes. Preserve previous bytes; report corruption instead of silently rewriting history. JSON history supports all states.",
+      "priority": 1
+    },
+    {
+      "key": "report",
+      "title": "Render standalone reports and tables with explicit statuses",
+      "intents": [
+        "report"
+      ],
+      "deps": [
+        "findings",
+        "diagnostics",
+        "terms"
+      ],
+      "work": "Add results/report.py. Render self-contained offline HTML, CSV/HTML tables and bundle README from structured payloads; show execution, diagnostics, findings, distribution and lock statuses before claims. List every variant, exclusion summary, errors, limitations, unsupported/undefined outputs and verification instructions. Honor withholding in all rendered artifacts and escape recipe text.",
+      "tests": "Snapshot small complete/partial/diagnostic-failed/private/withheld reports. No external network assets, absolute execution paths or hidden failures. Undefined and failed estimates do not render as zero or supported claims.",
+      "priority": 1
+    },
+    {
+      "key": "bundle",
+      "title": "Write portable results bundles and failure packages",
+      "intents": [
+        "bundle"
+      ],
+      "deps": [
+        "report",
+        "ledger"
+      ],
+      "work": "Add results/bundle.py for immutable per-run package output. Store original recipe bytes, resolved spec, execution mapping, unmasked base panels, derived columns, memberships, results, findings, diagnostics, environment and logs. Use provenance writers for parquet, relative internal paths, versioned manifests, manifest self-exclusion and sidecar hash. Package partial/failure states without claiming completeness; avoid overwriting another run. Distribution policy applies to every file.",
+      "tests": "Round-trip all artifact schemas and hashes; move directory without breaking references; failure bundle and partial panel build work; original YAML byte identity preserved. Manifest excludes itself/hash sidecar. Withheld outputs cannot leak into JSON/HTML/parquet; interrupted packaging is explicit.",
+      "priority": 1
+    },
+    {
+      "key": "runner",
+      "title": "Orchestrate build-to-results lifecycle and scoped failures",
+      "intents": [
+        "results_runner"
+      ],
+      "deps": [
+        "dispatch",
+        "diagnostics",
+        "findings",
+        "bundle",
+        "ledger"
+      ],
+      "work": "Add results/runner.py as application lifecycle owner. Start ledger before work, execute existing build/cache APIs, masks/derive, samples/readiness and analysis dispatch, then diagnostics/findings/package/terminal event. Panel failures affect only dependents; analysis failures permit independent progress; fatal mid-run failures retain completed evidence. Factor reusable post-build evaluation so verification can replay without upstream access or new run-ledger events.",
+      "tests": "Failure injection at static validation, one panel, one analysis, diagnostics, bundle I/O and ledger I/O. Test four independent statuses and inference-only base membership. Cached panels require matching identity; same spec with changed content is flagged.",
+      "priority": 1
+    },
+    {
+      "key": "verify",
+      "title": "Verify integrity and replay bundles without upstream access",
+      "intents": [
+        "verify"
+      ],
+      "deps": [
+        "runner"
+      ],
+      "work": "Add results/verify.py. Check manifest sidecar/files before replay; use bundled panel mapping only. Recompute masks, derivations, samples, estimation, diagnostics and findings through shared services, comparing all duplicated result representations. Apply exact discrete comparisons and configured atol+rtol, explicit null comparison, environment differences and unavailable-input propagation. Do not mutate input bundle or create normal run history; write diff reports separately.",
+      "tests": "Moved bundle passes offline. Tampered estimate plus updated manifest/sidecar passes integrity but fails reproducibility; unchanged hash fails integrity and skips replay. Partial environmental/withheld reasons combine with correct exit precedence. Compare near-zero values, undefined statistics and all JSON/parquet copies.",
+      "priority": 1
+    },
+    {
+      "key": "cli",
+      "title": "Expose results commands and integrate v2 preflight",
+      "intents": [
+        "cli_results",
+        "cli_commands",
+        "cli_recipe"
+      ],
+      "deps": [
+        "runner",
+        "verify"
+      ],
+      "work": "Add cli/results.py and registration in cli/commands.py; preserve existing cli/build_cmds/results.py named workflow surface. Implement check/run/lock/history/verify, --json and non-interactive behavior, output-root/private flags and documented exit codes. Delegate build recipe-preflight v2 to application checking services, not subprocess CLI calls; v1 remains unchanged. Validate lock/export paths and refuse unresolved research parameters.",
+      "tests": "Typer tests for all commands and JSON success/failure shapes; complete/partial/fatal verification exit codes, capability_unavailable, lock modified components and history running/abandoned. Existing result-workflow and recipe CLI tests remain green.",
+      "priority": 1
+    },
+    {
+      "key": "fixture",
+      "title": "Create executable shelter example and offline acceptance suite",
+      "intents": [
+        "v2_schema",
+        "result_planner",
+        "results_runner",
+        "verify"
+      ],
+      "deps": [
+        "cli"
+      ],
+      "work": "Turn section 10 into a runnable recipe with real pipeline references and canonical measure names. Add named synthetic panel fixtures and full expected inclusion/diagnostic truth tables covering baseline 2010, 2021 masks, annual/biennial changes, geometry/weights/lag/hc1 variants. Synthetic thresholds are test-only and explicitly distinct from research choices. Exercise all corrected acceptance criteria, including v1 compatibility and failure injection, without network access.",
+      "tests": "Run complete CLI pipeline and moved-bundle verification in temp directories. Every result/variant is accounted for; additivity passes only applicable variants. Deliberately inconsistent pit_total yields execution complete and diagnostics fail. Run affected package suites plus full suite with network-sensitive exclusions documented, not hidden.",
+      "priority": 1
+    },
+    {
+      "key": "research",
+      "title": "Resolve shelter research inputs and source availability for a real locked run",
+      "intents": [
+        "result_planner",
+        "covariate_catalog",
+        "source_coverage"
+      ],
+      "deps": [
+        "spec"
+      ],
+      "work": "Obtain human choices for right_to_shelter definition/source, positive delta_theta < 0.5, delta_slope, fit thresholds/floor, primary geography/year window and bed definition. Check core registries and geography/coverage contracts for HIC, PIT, population, ACS and LAUS at both target geographies; do not fabricate missing source support. Keep unresolved values until supplied. Audit provider redistribution evidence. Record any required data-source work as additional dependency beads and update intent before adding implementation modules.",
+      "tests": "Real example preflight lists all unresolved choices until resolved; then supported panel plan is demonstrably feasible. No live lock uses synthetic fixture parameters. Research-input confirmation and source evidence are attached. This bead may wait on user input without blocking generic synthetic implementation.",
+      "priority": 2
+    },
+    {
+      "key": "release",
+      "title": "Accept Phase-1 results only after implementation matches pinned intent",
+      "intents": [
+        "hhplab",
+        "schema",
+        "storage",
+        "recipe",
+        "analysis",
+        "results",
+        "cli"
+      ],
+      "deps": [
+        "fixture",
+        "research",
+        "terms",
+        "architecture"
+      ],
+      "work": "Final integrated acceptance gate for the Phase-1 epic. Pause concurrent writes. Refresh Elements scaffold and check freshness; reconcile all 43 scoped intent elements against current source and exact current pin. Require every intended module/owner to match, no unresolved/conflicting/ambiguous entries in delivered scope, no unplanned production modules and no new upward edges/cycles. Inspect all declared responsibilities/dependencies with architecture tests and review. Resolve every divergence by justified code repair or versioned intent amendment followed by new pin and rerun; never accept drift as a waiver. Preserve original/revised evidence and link changed beads.",
+      "tests": "Attach final pin/view/source witnesses, bounded complete reconciliation report, full module-to-bead mapping, dependency gate results and acceptance-suite evidence. All Phase-1 children closed with honest verification; real scientific inputs remain explicit. Record portability, source terms and four statuses. Functional success alone cannot close this bead or its epic.",
+      "priority": 1
+    },
+    {
+      "key": "phase2",
+      "title": "Plan and implement Phase-2 results capabilities after extending intent",
+      "intents": [
+        "hhplab",
+        "analysis",
+        "results",
+        "recipe"
+      ],
+      "deps": [
+        "release"
+      ],
+      "work": "Add bootstrap test-inversion CIs, lagged association, weighted descriptives and figures as separate child beads. Before code, inspect Phase-1 boundary stability, author exact new/changed Elements intent, validate and pin it. Bootstrap stays in analysis/resampling.py and focused analysis modules; rendering stays in results/report.py. Do not add a general expression language.",
+      "tests": "Phase-1 regression tests remain green; seeded WCR inversion handles absent/unbounded intervals and environment verification explicitly; every new module has reconciled intent and all Phase-2 source/figure lineage rules pass.",
+      "priority": 2
+    },
+    {
+      "key": "phase3",
+      "title": "Plan and implement advanced result graphs and workflow migration",
+      "intents": [
+        "hhplab",
+        "analysis",
+        "results",
+        "recipe"
+      ],
+      "deps": [
+        "phase2"
+      ],
+      "work": "After Phase 2, scope 2SLS recipe contracts, stacked variants/grids and analysis-on-analysis dependencies; inventory suitable results/workflows migrations individually. Record precise intent additions and child beads before implementation. Preserve specialized Python workflows where declarative vocabulary is insufficient.",
+      "tests": "Graph cycle/identity/sample semantics and IV inference have explicit contracts and tests; each migrated workflow matches approved references, all new structure reconciles, and no existing workflow is deleted without express permission.",
+      "priority": 2
+    }
+  ]
+}

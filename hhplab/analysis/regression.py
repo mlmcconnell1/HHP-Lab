@@ -3,23 +3,296 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 import numpy as np
 import pandas as pd
 
-from .contracts import AnalysisError, AnalysisResult, InferenceMethod
-from .estimation import _first_stage_f_statistic, _fit_2sls, _fit_ols, _parse_inference_terms
+from .contracts import (
+    AnalysisError,
+    AnalysisExecutionResult,
+    AnalysisResult,
+    InferenceMethod,
+    ResolvedRegressionResult,
+    ResolvedSampleFrame,
+)
+from .estimation import (
+    _first_stage_f_statistic,
+    _fit_2sls,
+    _fit_ols,
+    _fit_wls,
+    _parse_inference_terms,
+    _WeightedRegressionFit,
+)
 from .model import (
     _fixed_effect_dummies,
     _standardize_model_columns,
 )
 from .persistence import _persist_result, _read_panel, _require_columns
+from .readiness import check_regression_readiness
 from .resampling import (
     _permutation_p_values,
     _warn_if_permutation_model_has_correlated_controls,
     _wild_cluster_bootstrap_p_values,
 )
+
+
+def regress_resolved_frame(
+    sample: ResolvedSampleFrame,
+    *,
+    analysis: str,
+    variant: str = "base",
+    sample_group: str | None = None,
+    outcome: str,
+    predictors: list[str] | tuple[str, ...],
+    controls: list[str] | tuple[str, ...] = (),
+    fixed_effects: list[str] | tuple[str, ...] = (),
+    weights: str | None = None,
+    inference_method: Literal["classical", "hc1", "clustered"] = "classical",
+    cluster_by: str | None = None,
+    ci_level: float = 0.95,
+    base_term_by_effective_term: dict[str, str] | None = None,
+) -> ResolvedRegressionResult:
+    """Estimate regression on an exact resolved sample without filtering rows."""
+    if not isinstance(sample, ResolvedSampleFrame):
+        raise AnalysisError("regression requires a ResolvedSampleFrame")
+    if not isinstance(analysis, str) or not analysis.strip():
+        raise AnalysisError("analysis id must be a non-empty string")
+    if not isinstance(variant, str) or not variant.strip():
+        raise AnalysisError("variant id must be a non-empty string")
+    sample_key = f"{analysis}@{variant}"
+    sample_source = sample_group or sample_key
+    if not isinstance(sample_source, str) or not sample_source.strip():
+        raise AnalysisError("sample_group must be a non-empty string when supplied")
+    predictors = tuple(predictors)
+    controls = tuple(controls)
+    fixed_effects = tuple(fixed_effects)
+    terms = (*predictors, *controls)
+    if "(intercept)" in terms:
+        raise AnalysisError("'(intercept)' is reserved for the fitted intercept")
+    if base_term_by_effective_term is None:
+        base_terms = {term: term for term in terms}
+    else:
+        base_terms = dict(base_term_by_effective_term)
+        if set(base_terms) != set(terms):
+            raise AnalysisError(
+                "base_term_by_effective_term must map every effective predictor/control exactly"
+            )
+        if any(not isinstance(value, str) or not value for value in base_terms.values()):
+            raise AnalysisError("base terms must be non-empty strings")
+
+    try:
+        sample.validate_frame_identity()
+    except (TypeError, ValueError) as exc:
+        raise AnalysisError(f"sample_contract_violation: {exc}") from exc
+    expected_keys = sample.row_keys
+    try:
+        readiness = check_regression_readiness(
+            sample,
+            outcome=outcome,
+            predictors=predictors,
+            controls=controls,
+            fixed_effects=fixed_effects,
+            weights=weights,
+            cluster_by=cluster_by,
+            inference_method=inference_method,
+        )
+    except ValueError as exc:
+        if "row_keys must exactly match" in str(exc) or "missing key column" in str(exc):
+            raise AnalysisError(f"sample_contract_violation: {exc}") from exc
+        raise
+    _validate_regression_row_alignment(sample, readiness.design, expected_keys)
+    fit = _fit_wls(
+        design=readiness.design,
+        inference_method=inference_method,
+        clusters=sample.frame[cluster_by].rename(cluster_by) if cluster_by else None,
+        ci_level=ci_level,
+    )
+    _validate_fit_row_alignment(sample, fit, expected_keys)
+
+    estimate_rows = _regression_estimate_rows(
+        fit,
+        analysis=analysis,
+        variant=variant,
+        predictor_terms=set(predictors),
+        control_terms=set(controls),
+        base_terms=base_terms,
+        ci_level=ci_level,
+        inference_method=inference_method,
+    )
+    fit_row = {
+        "analysis": analysis,
+        "variant": variant,
+        "sample_source": sample_source,
+        "n": readiness.n,
+        "n_clusters": readiness.cluster_count,
+        "design_rank": readiness.design_rank,
+        "k_dof": readiness.k_dof,
+        "df_resid": readiness.df_resid,
+        "r2": fit.r2,
+        "r2_status": fit.r2_status,
+        "r2_reason": fit.r2_reason,
+        "r2_within": fit.r2_within,
+        "r2_within_status": fit.r2_within_status,
+        "r2_within_reason": fit.r2_within_reason,
+        "absorbed": list(fixed_effects),
+    }
+    design_evidence = _regression_design_evidence(
+        sample,
+        row_keys=expected_keys,
+        regressors=terms,
+        fixed_effects=fixed_effects,
+        normalized_weights=readiness.design.normalized_weights,
+        sample_group=sample_source,
+    )
+    execution = AnalysisExecutionResult(
+        status="complete",
+        consumed_row_keys=expected_keys,
+    )
+    try:
+        execution.validate_sample(sample)
+    except (TypeError, ValueError) as exc:
+        raise AnalysisError(f"sample_contract_violation: {exc}") from exc
+    return ResolvedRegressionResult(
+        regression_estimates=tuple(estimate_rows),
+        regression_fit=fit_row,
+        execution=execution,
+        warnings=readiness.warnings,
+        design_evidence={sample_key: design_evidence},
+    )
+
+
+def _validate_regression_row_alignment(sample, design, expected_keys) -> None:
+    try:
+        sample.validate_frame_identity()
+    except (TypeError, ValueError) as exc:
+        raise AnalysisError(f"sample_contract_violation: {exc}") from exc
+    n = len(expected_keys)
+    arrays = (design.outcome, design.regressors, design.normalized_weights)
+    if any(len(array) != n for array in arrays):
+        raise AnalysisError(
+            "sample_contract_violation: estimator design row count differs from resolved sample"
+        )
+    if sample.row_keys != expected_keys:
+        raise AnalysisError(
+            "sample_contract_violation: estimator changed resolved sample row identity or order"
+        )
+
+
+def _validate_fit_row_alignment(sample, fit: _WeightedRegressionFit, expected_keys) -> None:
+    try:
+        sample.validate_frame_identity()
+    except (TypeError, ValueError) as exc:
+        raise AnalysisError(f"sample_contract_violation: {exc}") from exc
+    if len(fit.residuals) != len(expected_keys):
+        raise AnalysisError(
+            "sample_contract_violation: estimator result row count differs from resolved sample"
+        )
+    if sample.row_keys != expected_keys:
+        raise AnalysisError(
+            "sample_contract_violation: estimator changed resolved sample row identity or order"
+        )
+
+
+def _regression_estimate_rows(
+    fit: _WeightedRegressionFit,
+    *,
+    analysis: str,
+    variant: str,
+    predictor_terms: set[str],
+    control_terms: set[str],
+    base_terms: dict[str, str],
+    ci_level: float,
+    inference_method: str,
+) -> list[dict[str, Any]]:
+    rows = []
+    for index, term in enumerate(fit.terms):
+        if term == "(intercept)":
+            role = "intercept"
+            base_term = "(intercept)"
+        elif term in predictor_terms:
+            role = "predictor"
+            base_term = base_terms[term]
+        elif term in control_terms:
+            role = "control"
+            base_term = base_terms[term]
+        else:
+            raise AnalysisError(
+                f"sample_contract_violation: estimator emitted unknown term {term!r}"
+            )
+        rows.append(
+            {
+                "analysis": analysis,
+                "variant": variant,
+                "term": term,
+                "base_term": base_term,
+                "role": role,
+                "estimate": float(fit.estimates[index]),
+                "se": float(fit.standard_errors[index]),
+                "df": fit.inference_df,
+                "ci_lo": float(fit.ci_lo[index]),
+                "ci_hi": float(fit.ci_hi[index]),
+                "ci_level": float(ci_level),
+                "ci_method": "wald",
+                "p": fit.p_values[index],
+                "p_status": fit.p_status[index],
+                "p_reason": fit.p_reasons[index],
+                "inference_method": inference_method,
+            }
+        )
+    return rows
+
+
+def _regression_design_evidence(
+    sample: ResolvedSampleFrame,
+    *,
+    row_keys,
+    regressors: tuple[str, ...],
+    fixed_effects: tuple[str, ...],
+    normalized_weights: np.ndarray,
+    sample_group: str,
+) -> dict[str, Any]:
+    try:
+        sample.validate_frame_identity()
+    except (TypeError, ValueError) as exc:
+        raise AnalysisError(f"sample_contract_violation: {exc}") from exc
+    if len(normalized_weights) != len(row_keys):
+        raise AnalysisError(
+            "sample_contract_violation: design evidence row count differs from resolved sample"
+        )
+    frame = sample.frame
+    rows = []
+    for position, (geo, time) in enumerate(row_keys):
+        rows.append(
+            {
+                "key": [_json_scalar(geo), _json_scalar(time)],
+                "regressors": [_json_scalar(frame[name].iloc[position]) for name in regressors],
+                "fixed_effects": [
+                    _json_scalar(frame[name].iloc[position]) for name in fixed_effects
+                ],
+                "weight": float(normalized_weights[position]),
+            }
+        )
+    return {
+        "sample_group": sample_group,
+        "regressors": list(regressors),
+        "fixed_effects": list(fixed_effects),
+        "rows": rows,
+    }
+
+
+def _json_scalar(value: Any) -> Any:
+    if isinstance(value, np.generic):
+        value = value.item()
+    if value is pd.NA or value is pd.NaT:
+        raise AnalysisError("sample_contract_violation: design evidence contains a null value")
+    if isinstance(value, float) and not np.isfinite(value):
+        raise AnalysisError("sample_contract_violation: design evidence contains a nonfinite value")
+    if not isinstance(value, (str, int, float, bool)) and value is not None:
+        raise AnalysisError(
+            f"sample_contract_violation: design evidence contains unsupported value {value!r}"
+        )
+    return value
 
 
 def regress_panel(
@@ -137,9 +410,7 @@ def regress_panel(
             )
         fit = _fit_2sls(x=x, z=z, y=y, dof=dof, clusters=clusters)
         endog_values = model_df[endogenous].to_numpy(dtype=float)
-        first_stage_fit = _fit_ols(
-            x=z, y=endog_values, dof=first_stage_dof, clusters=clusters
-        )
+        first_stage_fit = _fit_ols(x=z, y=endog_values, dof=first_stage_dof, clusters=clusters)
         instrument_indices = [int(z_design.columns.get_loc(name)) for name in instruments]
         f_stat, f_p_value = _first_stage_f_statistic(
             fit=first_stage_fit,
@@ -226,9 +497,7 @@ def regress_panel(
     coef["t_stat"] = fit.t_stats
     coef["asymptotic_p_value"] = fit.p_values
     if inference_p_values:
-        coef["p_value"] = coef["term"].map(
-            lambda term: inference_p_values.get(str(term), pd.NA)
-        )
+        coef["p_value"] = coef["term"].map(lambda term: inference_p_values.get(str(term), pd.NA))
         coef["p_value"] = pd.to_numeric(coef["p_value"], errors="coerce").fillna(
             coef["asymptotic_p_value"]
         )

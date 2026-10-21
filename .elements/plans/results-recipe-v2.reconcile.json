@@ -1,0 +1,20 @@
+{
+  "applicability": {
+    "project_id": "project:HHP-Lab"
+  },
+  "observation": {
+    "source": "repository_current"
+  },
+  "page": {
+    "limit": 128
+  },
+  "root_bindings": {
+    "explicit": [
+      {
+        "intent_root_id": "intent:results-v2:hhplab",
+        "observed_root_id": "el:directory-hhplab-j7z92fqbqmck"
+      }
+    ],
+    "observed_candidates": []
+  }
+}
