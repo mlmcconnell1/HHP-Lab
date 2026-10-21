@@ -60,6 +60,35 @@ All runs matched their recipe locks and retain full local inputs in private bund
 
 The threshold comparison is sensitive to site composition. New York–Newark–Jersey City (MSA 35620) is included at 90% and 95%, but excluded at 99%. Its selected CoCs sum to 5,739 unsheltered people and 123,784 shelter beds. An independent leave-one-site-out diagnostic raises r to 0.784839 at 90% and 0.980923 at 95% when New York is removed. At 99%, removing Los Angeles (MSA 31080) lowers r to 0.933459. These diagnostics describe influence only; no site was removed from the recipe analyses.
 
+## Historical audit of the frozen 99% universe
+
+On 2026-10-21 Matt requested verification of earlier years with both unsheltered PIT and ES + TH + SH beds, explicitly excluding 2021. The audit retains all 64 selected MSAs and their 84 frozen CoC memberships; it does not drop sites or silently map predecessor CoCs. It uses the same cumulative PIT vintage 2024 as the cross-sectional runs, plus the annual HIC files.
+
+| Earlier years | Sites with complete outcomes | Outcome-coverage conclusion |
+| --- | ---: | --- |
+| 2010 | 63 of 64 | PA-512 is missing in both sources; York-Hanover is incomplete. |
+| 2011–2019 | 63 of 64 | OR-504 is missing in both sources; Salem is incomplete. |
+| 2020, 2022, 2023 | 64 of 64 | All 84 CoCs have one non-null, finite, non-negative integer count in each source. |
+| 2021 | Not evaluated | Excluded by the study owner. |
+
+Data coverage is not boundary compatibility. The full frozen universe is **not cleared for an ID-only historical join** in any of the three complete-data years. MA-505 is a documented counterexample: the [Bristol County CoC's merger history](https://www.bristolcountycoc.com/about-us/) records the merger of New Bedford (MA-505) with Attleboro/Taunton/Bristol County (MA-519) in May–June 2024. Historical native MA-505 therefore covers less geography than the frozen 2024 MA-505. The official [2022](https://files.hudexchange.info/resources/documents/CoC_GIS_National_Boundary_2022.zip) and [2023](https://files.hudexchange.info/resources/documents/CoC_GIS_National_Boundary_2023.zip) national boundary archives independently show that change: historical MA-505 is about 52.5 km² versus 1,393.1 km² in the reference, with roughly 96.23% symmetric difference relative to their union in EPSG:5070.
+
+The source tables also treat this merger differently. For these years, cumulative PIT vintage 2024 has no MA-519 row and its MA-505 unsheltered value equals the sum of the two predecessor rows in PIT vintage 2025. Annual HIC files retain separate predecessor rows:
+
+| Year | PIT P2024 MA-505 | PIT P2025 MA-505 + MA-519 | HIC MA-505 beds | HIC MA-519 beds | Sum of predecessor beds |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| 2020 | 76 | 48 + 28 | 395 | 283 | 678 |
+| 2022 | 109 | 61 + 48 | 407 | 301 | 708 |
+| 2023 | 96 | 67 + 29 | 367 | 274 | 641 |
+
+These equalities establish a source-vintage difference that is consistent with retrospective PIT aggregation; they do not authorize adding MA-519 again to P2024 PIT or automatically treating a predecessor union as validated geometry. A historical panel needs source-specific reconciliation. Using only the historical HIC MA-505 row would omit the second predecessor's beds. The existing compatibility contract permits only one-to-one ID mappings, so a many-to-one predecessor rule needs an explicit extension and evidence review (`coclab-7c0nt`). No historical compatibility approvals or longitudinal model were produced by this audit.
+
+The local B2019 file is unsuitable as independent historical evidence: its raw live-service response has the same SHA-256 (`7e08bdb38e111dd542bdec6a2a9cdf12a6fd34e89dfcbc81e810e1f617d3dbab`) and byte length as the B2024 capture. That provenance issue is recorded in `coclab-zspyc`. Genuine geometric differences also remain to be classified separately from coastline, island, digitization, and reprojection differences; a small area difference is not automatically an approval, and a nonzero difference is not automatically an administrative change.
+
+The 2020 comparison has no topologically identical member polygons and a median symmetric-difference/union ratio of about 0.043%. Its largest difference is MA-505 (about 96.23%); CT-503 is also substantial (about 15.70%). The 2023 archive is much closer overall to the reference: its median absolute area difference is about 0.000000053% of reference area, but MA-505 and CT-503 remain prominent exceptions. CT-503's 2023 polygon is about 7.08% smaller in area than the reference; its administrative explanation remains unresolved. Area/bounds screening is not an exhaustive topological-equivalence test for 2022/2023. The detailed archive overlay was measured for MA-505; other differing members remain unapproved pending review (`coclab-k0hwb`).
+
+The machine-readable `coverage.json`, `local-boundaries.json`, `archives-boundaries.json`, and downloaded archives are retained under `~/HHP-Output/site-boundary-history-audit/`. Supplement `archives-boundaries-epsg6933.json` uses a global equal-area projection for the full universe, including Hawaii; EPSG:5070 is appropriate for the detailed Massachusetts comparison. `archives-boundaries-2023-precision-check.json` records a strict 1 cm snapped-geometry screen with no identical pairs among the 84 selected CoCs; failure of this numerical equality screen alone does not imply a material boundary change. The official ZIP SHA-256 values are `e96f8ec07750d623a75ccd20f92e072bfab6fba7f524054e09c31caeb5bc72f4` (2022) and `502c5d1887c56ac2b5f4911acc7c4c1db8aa78aaee34fde3d5f663ea15befc2a` (2023); source paths, reference hashes, comparison methods, and per-CoC measurements are recorded in the JSON reports. This audit does not establish a usable longitudinal window. Even after geography reconciliation, 2020, 2022, 2023, and the existing 2024 baseline provide a short, gapped series; 2020→2022 must not be treated as a one-year lag.
+
 ## Boundary evidence artifact
 
 Use one `coc_boundary_compatibility/1` JSON artifact for each threshold, since its header binds one membership identity. The required header fields are `schema_version`, `evidence_id`, `artifact_id`, `threshold`, `membership_identity`, `frozen_boundary_vintage`, and `records`. Each record identifies `source_panel`, `frozen_coc_id`, `year`, `frozen_boundary_vintage`, `source_boundary_vintage`, `status`, and `reason`; `evidence_ref` is required for `compatible`. The records may use `status: compatible` for the 2024 same-year source join when they cite this audit and the HUD FY2024 catalog/service metadata, and state that the source CoC number directly matches the frozen B2024 CoC ID. Do not add `approval_ref` for a compatible record; that field is for an explicitly approved ID mapping. The evidence establishes the declared FY2024 source-to-geography match and direct ID resolution, not historical boundary stability.
