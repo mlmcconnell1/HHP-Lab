@@ -1,5 +1,7 @@
 # Historical CoC reconciliation inventory (2010–2024)
 
+**Current-study update, 2026-10-22:** The owner selected a whole-Sacramento MSA 40900 holdout for an exploratory check. The active universe now has 60 sites and 77 CoCs; the 61-site inventory and membership-bound evidence below are retained as the audit trail. The active-study blocker in `coclab-fjcho` is closed by verified merger rules plus this explicit exclusion, not by recovering historical Placer-only counts. See [the exploratory results and current design](site-pit-hic-2024-input-audit.md#exploratory-longitudinal-check-without-sacramento--2026-10-22). Broader historical review remains open.
+
 **Scope:** the current frozen design has 61 sites and 81 CoCs, uses 2010–2024 except 2021, and excludes CT-503, OR-504, and PA-512. The 854 possible site-years have source rows in the current PIT/HIC coverage check. This inventory separates row coverage from historical geography compatibility.
 
 The detailed machine-readable membership, source-hash, archive, annual-coverage, and merger evidence is in `~/HHP-Output/site-boundary-history-audit/inventory/historical-reconciliation-inventory.json` (external artifact). The current membership and count-coverage inputs are under `~/HHP-Output/msa_coc_longitudinal_2010_2024_sites/`.
