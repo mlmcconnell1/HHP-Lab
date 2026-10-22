@@ -1,0 +1,2122 @@
+{
+  "schema_version": "coc_boundary_compatibility/2",
+  "evidence_id": "longitudinal-2010-2024-reviewed-merger-cases",
+  "artifact_id": "longitudinal_sites",
+  "threshold": 0.99,
+  "membership_identity": "4861b55cdb14c1e6dc14f270dc2d99a9952da4cd2aae844ee65163ce83771144",
+  "frozen_boundary_vintage": "2024",
+  "records": [
+    {
+      "source_panel": "pit_p2024",
+      "frozen_coc_id": "CA-601",
+      "year": 2010,
+      "frozen_boundary_vintage": "2024",
+      "source_boundary_vintage": "2024",
+      "status": "reconciled",
+      "reason": "Reviewed administrative scope and source-specific count operations; exact historical polygon identity is not asserted.",
+      "source_coc_ids": [
+        "CA-601"
+      ],
+      "count_operation": "preaggregated",
+      "geometry_status": "different_unresolved",
+      "evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/san-diego/san-diego-reconciliation.json#sha256=8952bd5abda68f20367ecc8737d393fb50431379acb739873fafba23a3685b66",
+      "geometry_evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/san-diego/san-diego-reconciliation.json#sha256=8952bd5abda68f20367ecc8737d393fb50431379acb739873fafba23a3685b66",
+      "count_evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/san-diego/san-diego-reconciliation.json#sha256=8952bd5abda68f20367ecc8737d393fb50431379acb739873fafba23a3685b66",
+      "approval_ref": "docs/site-historical-reconciliation-inventory.md#native-source-integration-review-for-coclab-fjcho",
+      "reconciliation_basis": "Administrative county scope supported by native HUD reports, merger/split evidence and jurisdiction records; preserve documented polygon limitations.",
+      "preaggregated_source_coc_ids": [
+        "CA-601",
+        "CA-610"
+      ],
+      "geometry_residual": "Frozen HUD versus Census county symmetric difference is 6.394% of county area. This is a current diagnostic, not an historical predecessor overlay; administrative union is reviewed separately."
+    },
+    {
+      "source_panel": "hic_annual",
+      "frozen_coc_id": "CA-601",
+      "year": 2010,
+      "frozen_boundary_vintage": "2024",
+      "source_boundary_vintage": "2010",
+      "status": "reconciled",
+      "reason": "Reviewed administrative scope and source-specific count operations; exact historical polygon identity is not asserted.",
+      "source_coc_ids": [
+        "CA-601",
+        "CA-610"
+      ],
+      "count_operation": "sum",
+      "geometry_status": "different_unresolved",
+      "evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/san-diego/san-diego-reconciliation.json#sha256=8952bd5abda68f20367ecc8737d393fb50431379acb739873fafba23a3685b66",
+      "geometry_evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/san-diego/san-diego-reconciliation.json#sha256=8952bd5abda68f20367ecc8737d393fb50431379acb739873fafba23a3685b66",
+      "count_evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/san-diego/san-diego-reconciliation.json#sha256=8952bd5abda68f20367ecc8737d393fb50431379acb739873fafba23a3685b66",
+      "approval_ref": "docs/site-historical-reconciliation-inventory.md#native-source-integration-review-for-coclab-fjcho",
+      "reconciliation_basis": "Administrative county scope supported by native HUD reports, merger/split evidence and jurisdiction records; preserve documented polygon limitations.",
+      "geometry_residual": "Frozen HUD versus Census county symmetric difference is 6.394% of county area. This is a current diagnostic, not an historical predecessor overlay; administrative union is reviewed separately."
+    },
+    {
+      "source_panel": "pit_p2024",
+      "frozen_coc_id": "CA-601",
+      "year": 2011,
+      "frozen_boundary_vintage": "2024",
+      "source_boundary_vintage": "2024",
+      "status": "reconciled",
+      "reason": "Reviewed administrative scope and source-specific count operations; exact historical polygon identity is not asserted.",
+      "source_coc_ids": [
+        "CA-601"
+      ],
+      "count_operation": "single",
+      "geometry_status": "different_unresolved",
+      "evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/san-diego/san-diego-reconciliation.json#sha256=8952bd5abda68f20367ecc8737d393fb50431379acb739873fafba23a3685b66",
+      "geometry_evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/san-diego/san-diego-reconciliation.json#sha256=8952bd5abda68f20367ecc8737d393fb50431379acb739873fafba23a3685b66",
+      "count_evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/san-diego/san-diego-reconciliation.json#sha256=8952bd5abda68f20367ecc8737d393fb50431379acb739873fafba23a3685b66",
+      "approval_ref": "docs/site-historical-reconciliation-inventory.md#native-source-integration-review-for-coclab-fjcho",
+      "reconciliation_basis": "Administrative county scope supported by native HUD reports, merger/split evidence and jurisdiction records; preserve documented polygon limitations.",
+      "geometry_residual": "Frozen HUD versus Census county symmetric difference is 6.394% of county area. This is a current diagnostic, not an historical predecessor overlay; administrative union is reviewed separately."
+    },
+    {
+      "source_panel": "hic_annual",
+      "frozen_coc_id": "CA-601",
+      "year": 2011,
+      "frozen_boundary_vintage": "2024",
+      "source_boundary_vintage": "2011",
+      "status": "reconciled",
+      "reason": "Reviewed administrative scope and source-specific count operations; exact historical polygon identity is not asserted.",
+      "source_coc_ids": [
+        "CA-601"
+      ],
+      "count_operation": "single",
+      "geometry_status": "different_unresolved",
+      "evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/san-diego/san-diego-reconciliation.json#sha256=8952bd5abda68f20367ecc8737d393fb50431379acb739873fafba23a3685b66",
+      "geometry_evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/san-diego/san-diego-reconciliation.json#sha256=8952bd5abda68f20367ecc8737d393fb50431379acb739873fafba23a3685b66",
+      "count_evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/san-diego/san-diego-reconciliation.json#sha256=8952bd5abda68f20367ecc8737d393fb50431379acb739873fafba23a3685b66",
+      "approval_ref": "docs/site-historical-reconciliation-inventory.md#native-source-integration-review-for-coclab-fjcho",
+      "reconciliation_basis": "Administrative county scope supported by native HUD reports, merger/split evidence and jurisdiction records; preserve documented polygon limitations.",
+      "geometry_residual": "Frozen HUD versus Census county symmetric difference is 6.394% of county area. This is a current diagnostic, not an historical predecessor overlay; administrative union is reviewed separately."
+    },
+    {
+      "source_panel": "pit_p2024",
+      "frozen_coc_id": "CA-601",
+      "year": 2012,
+      "frozen_boundary_vintage": "2024",
+      "source_boundary_vintage": "2024",
+      "status": "reconciled",
+      "reason": "Reviewed administrative scope and source-specific count operations; exact historical polygon identity is not asserted.",
+      "source_coc_ids": [
+        "CA-601"
+      ],
+      "count_operation": "single",
+      "geometry_status": "different_unresolved",
+      "evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/san-diego/san-diego-reconciliation.json#sha256=8952bd5abda68f20367ecc8737d393fb50431379acb739873fafba23a3685b66",
+      "geometry_evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/san-diego/san-diego-reconciliation.json#sha256=8952bd5abda68f20367ecc8737d393fb50431379acb739873fafba23a3685b66",
+      "count_evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/san-diego/san-diego-reconciliation.json#sha256=8952bd5abda68f20367ecc8737d393fb50431379acb739873fafba23a3685b66",
+      "approval_ref": "docs/site-historical-reconciliation-inventory.md#native-source-integration-review-for-coclab-fjcho",
+      "reconciliation_basis": "Administrative county scope supported by native HUD reports, merger/split evidence and jurisdiction records; preserve documented polygon limitations.",
+      "geometry_residual": "Frozen HUD versus Census county symmetric difference is 6.394% of county area. This is a current diagnostic, not an historical predecessor overlay; administrative union is reviewed separately."
+    },
+    {
+      "source_panel": "hic_annual",
+      "frozen_coc_id": "CA-601",
+      "year": 2012,
+      "frozen_boundary_vintage": "2024",
+      "source_boundary_vintage": "2012",
+      "status": "reconciled",
+      "reason": "Reviewed administrative scope and source-specific count operations; exact historical polygon identity is not asserted.",
+      "source_coc_ids": [
+        "CA-601"
+      ],
+      "count_operation": "single",
+      "geometry_status": "different_unresolved",
+      "evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/san-diego/san-diego-reconciliation.json#sha256=8952bd5abda68f20367ecc8737d393fb50431379acb739873fafba23a3685b66",
+      "geometry_evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/san-diego/san-diego-reconciliation.json#sha256=8952bd5abda68f20367ecc8737d393fb50431379acb739873fafba23a3685b66",
+      "count_evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/san-diego/san-diego-reconciliation.json#sha256=8952bd5abda68f20367ecc8737d393fb50431379acb739873fafba23a3685b66",
+      "approval_ref": "docs/site-historical-reconciliation-inventory.md#native-source-integration-review-for-coclab-fjcho",
+      "reconciliation_basis": "Administrative county scope supported by native HUD reports, merger/split evidence and jurisdiction records; preserve documented polygon limitations.",
+      "geometry_residual": "Frozen HUD versus Census county symmetric difference is 6.394% of county area. This is a current diagnostic, not an historical predecessor overlay; administrative union is reviewed separately."
+    },
+    {
+      "source_panel": "pit_p2024",
+      "frozen_coc_id": "CA-601",
+      "year": 2013,
+      "frozen_boundary_vintage": "2024",
+      "source_boundary_vintage": "2024",
+      "status": "reconciled",
+      "reason": "Reviewed administrative scope and source-specific count operations; exact historical polygon identity is not asserted.",
+      "source_coc_ids": [
+        "CA-601"
+      ],
+      "count_operation": "single",
+      "geometry_status": "different_unresolved",
+      "evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/san-diego/san-diego-reconciliation.json#sha256=8952bd5abda68f20367ecc8737d393fb50431379acb739873fafba23a3685b66",
+      "geometry_evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/san-diego/san-diego-reconciliation.json#sha256=8952bd5abda68f20367ecc8737d393fb50431379acb739873fafba23a3685b66",
+      "count_evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/san-diego/san-diego-reconciliation.json#sha256=8952bd5abda68f20367ecc8737d393fb50431379acb739873fafba23a3685b66",
+      "approval_ref": "docs/site-historical-reconciliation-inventory.md#native-source-integration-review-for-coclab-fjcho",
+      "reconciliation_basis": "Administrative county scope supported by native HUD reports, merger/split evidence and jurisdiction records; preserve documented polygon limitations.",
+      "geometry_residual": "Frozen HUD versus Census county symmetric difference is 6.394% of county area. This is a current diagnostic, not an historical predecessor overlay; administrative union is reviewed separately."
+    },
+    {
+      "source_panel": "hic_annual",
+      "frozen_coc_id": "CA-601",
+      "year": 2013,
+      "frozen_boundary_vintage": "2024",
+      "source_boundary_vintage": "2013",
+      "status": "reconciled",
+      "reason": "Reviewed administrative scope and source-specific count operations; exact historical polygon identity is not asserted.",
+      "source_coc_ids": [
+        "CA-601"
+      ],
+      "count_operation": "single",
+      "geometry_status": "different_unresolved",
+      "evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/san-diego/san-diego-reconciliation.json#sha256=8952bd5abda68f20367ecc8737d393fb50431379acb739873fafba23a3685b66",
+      "geometry_evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/san-diego/san-diego-reconciliation.json#sha256=8952bd5abda68f20367ecc8737d393fb50431379acb739873fafba23a3685b66",
+      "count_evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/san-diego/san-diego-reconciliation.json#sha256=8952bd5abda68f20367ecc8737d393fb50431379acb739873fafba23a3685b66",
+      "approval_ref": "docs/site-historical-reconciliation-inventory.md#native-source-integration-review-for-coclab-fjcho",
+      "reconciliation_basis": "Administrative county scope supported by native HUD reports, merger/split evidence and jurisdiction records; preserve documented polygon limitations.",
+      "geometry_residual": "Frozen HUD versus Census county symmetric difference is 6.394% of county area. This is a current diagnostic, not an historical predecessor overlay; administrative union is reviewed separately."
+    },
+    {
+      "source_panel": "pit_p2024",
+      "frozen_coc_id": "CA-601",
+      "year": 2014,
+      "frozen_boundary_vintage": "2024",
+      "source_boundary_vintage": "2024",
+      "status": "reconciled",
+      "reason": "Reviewed administrative scope and source-specific count operations; exact historical polygon identity is not asserted.",
+      "source_coc_ids": [
+        "CA-601"
+      ],
+      "count_operation": "single",
+      "geometry_status": "different_unresolved",
+      "evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/san-diego/san-diego-reconciliation.json#sha256=8952bd5abda68f20367ecc8737d393fb50431379acb739873fafba23a3685b66",
+      "geometry_evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/san-diego/san-diego-reconciliation.json#sha256=8952bd5abda68f20367ecc8737d393fb50431379acb739873fafba23a3685b66",
+      "count_evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/san-diego/san-diego-reconciliation.json#sha256=8952bd5abda68f20367ecc8737d393fb50431379acb739873fafba23a3685b66",
+      "approval_ref": "docs/site-historical-reconciliation-inventory.md#native-source-integration-review-for-coclab-fjcho",
+      "reconciliation_basis": "Administrative county scope supported by native HUD reports, merger/split evidence and jurisdiction records; preserve documented polygon limitations.",
+      "geometry_residual": "Frozen HUD versus Census county symmetric difference is 6.394% of county area. This is a current diagnostic, not an historical predecessor overlay; administrative union is reviewed separately."
+    },
+    {
+      "source_panel": "hic_annual",
+      "frozen_coc_id": "CA-601",
+      "year": 2014,
+      "frozen_boundary_vintage": "2024",
+      "source_boundary_vintage": "2014",
+      "status": "reconciled",
+      "reason": "Reviewed administrative scope and source-specific count operations; exact historical polygon identity is not asserted.",
+      "source_coc_ids": [
+        "CA-601"
+      ],
+      "count_operation": "single",
+      "geometry_status": "different_unresolved",
+      "evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/san-diego/san-diego-reconciliation.json#sha256=8952bd5abda68f20367ecc8737d393fb50431379acb739873fafba23a3685b66",
+      "geometry_evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/san-diego/san-diego-reconciliation.json#sha256=8952bd5abda68f20367ecc8737d393fb50431379acb739873fafba23a3685b66",
+      "count_evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/san-diego/san-diego-reconciliation.json#sha256=8952bd5abda68f20367ecc8737d393fb50431379acb739873fafba23a3685b66",
+      "approval_ref": "docs/site-historical-reconciliation-inventory.md#native-source-integration-review-for-coclab-fjcho",
+      "reconciliation_basis": "Administrative county scope supported by native HUD reports, merger/split evidence and jurisdiction records; preserve documented polygon limitations.",
+      "geometry_residual": "Frozen HUD versus Census county symmetric difference is 6.394% of county area. This is a current diagnostic, not an historical predecessor overlay; administrative union is reviewed separately."
+    },
+    {
+      "source_panel": "pit_p2024",
+      "frozen_coc_id": "CA-601",
+      "year": 2015,
+      "frozen_boundary_vintage": "2024",
+      "source_boundary_vintage": "2024",
+      "status": "reconciled",
+      "reason": "Reviewed administrative scope and source-specific count operations; exact historical polygon identity is not asserted.",
+      "source_coc_ids": [
+        "CA-601"
+      ],
+      "count_operation": "single",
+      "geometry_status": "different_unresolved",
+      "evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/san-diego/san-diego-reconciliation.json#sha256=8952bd5abda68f20367ecc8737d393fb50431379acb739873fafba23a3685b66",
+      "geometry_evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/san-diego/san-diego-reconciliation.json#sha256=8952bd5abda68f20367ecc8737d393fb50431379acb739873fafba23a3685b66",
+      "count_evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/san-diego/san-diego-reconciliation.json#sha256=8952bd5abda68f20367ecc8737d393fb50431379acb739873fafba23a3685b66",
+      "approval_ref": "docs/site-historical-reconciliation-inventory.md#native-source-integration-review-for-coclab-fjcho",
+      "reconciliation_basis": "Administrative county scope supported by native HUD reports, merger/split evidence and jurisdiction records; preserve documented polygon limitations.",
+      "geometry_residual": "Frozen HUD versus Census county symmetric difference is 6.394% of county area. This is a current diagnostic, not an historical predecessor overlay; administrative union is reviewed separately."
+    },
+    {
+      "source_panel": "hic_annual",
+      "frozen_coc_id": "CA-601",
+      "year": 2015,
+      "frozen_boundary_vintage": "2024",
+      "source_boundary_vintage": "2015",
+      "status": "reconciled",
+      "reason": "Reviewed administrative scope and source-specific count operations; exact historical polygon identity is not asserted.",
+      "source_coc_ids": [
+        "CA-601"
+      ],
+      "count_operation": "single",
+      "geometry_status": "different_unresolved",
+      "evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/san-diego/san-diego-reconciliation.json#sha256=8952bd5abda68f20367ecc8737d393fb50431379acb739873fafba23a3685b66",
+      "geometry_evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/san-diego/san-diego-reconciliation.json#sha256=8952bd5abda68f20367ecc8737d393fb50431379acb739873fafba23a3685b66",
+      "count_evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/san-diego/san-diego-reconciliation.json#sha256=8952bd5abda68f20367ecc8737d393fb50431379acb739873fafba23a3685b66",
+      "approval_ref": "docs/site-historical-reconciliation-inventory.md#native-source-integration-review-for-coclab-fjcho",
+      "reconciliation_basis": "Administrative county scope supported by native HUD reports, merger/split evidence and jurisdiction records; preserve documented polygon limitations.",
+      "geometry_residual": "Frozen HUD versus Census county symmetric difference is 6.394% of county area. This is a current diagnostic, not an historical predecessor overlay; administrative union is reviewed separately."
+    },
+    {
+      "source_panel": "pit_p2024",
+      "frozen_coc_id": "CA-601",
+      "year": 2016,
+      "frozen_boundary_vintage": "2024",
+      "source_boundary_vintage": "2024",
+      "status": "reconciled",
+      "reason": "Reviewed administrative scope and source-specific count operations; exact historical polygon identity is not asserted.",
+      "source_coc_ids": [
+        "CA-601"
+      ],
+      "count_operation": "single",
+      "geometry_status": "different_unresolved",
+      "evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/san-diego/san-diego-reconciliation.json#sha256=8952bd5abda68f20367ecc8737d393fb50431379acb739873fafba23a3685b66",
+      "geometry_evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/san-diego/san-diego-reconciliation.json#sha256=8952bd5abda68f20367ecc8737d393fb50431379acb739873fafba23a3685b66",
+      "count_evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/san-diego/san-diego-reconciliation.json#sha256=8952bd5abda68f20367ecc8737d393fb50431379acb739873fafba23a3685b66",
+      "approval_ref": "docs/site-historical-reconciliation-inventory.md#native-source-integration-review-for-coclab-fjcho",
+      "reconciliation_basis": "Administrative county scope supported by native HUD reports, merger/split evidence and jurisdiction records; preserve documented polygon limitations.",
+      "geometry_residual": "Frozen HUD versus Census county symmetric difference is 6.394% of county area. This is a current diagnostic, not an historical predecessor overlay; administrative union is reviewed separately."
+    },
+    {
+      "source_panel": "hic_annual",
+      "frozen_coc_id": "CA-601",
+      "year": 2016,
+      "frozen_boundary_vintage": "2024",
+      "source_boundary_vintage": "2016",
+      "status": "reconciled",
+      "reason": "Reviewed administrative scope and source-specific count operations; exact historical polygon identity is not asserted.",
+      "source_coc_ids": [
+        "CA-601"
+      ],
+      "count_operation": "single",
+      "geometry_status": "different_unresolved",
+      "evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/san-diego/san-diego-reconciliation.json#sha256=8952bd5abda68f20367ecc8737d393fb50431379acb739873fafba23a3685b66",
+      "geometry_evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/san-diego/san-diego-reconciliation.json#sha256=8952bd5abda68f20367ecc8737d393fb50431379acb739873fafba23a3685b66",
+      "count_evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/san-diego/san-diego-reconciliation.json#sha256=8952bd5abda68f20367ecc8737d393fb50431379acb739873fafba23a3685b66",
+      "approval_ref": "docs/site-historical-reconciliation-inventory.md#native-source-integration-review-for-coclab-fjcho",
+      "reconciliation_basis": "Administrative county scope supported by native HUD reports, merger/split evidence and jurisdiction records; preserve documented polygon limitations.",
+      "geometry_residual": "Frozen HUD versus Census county symmetric difference is 6.394% of county area. This is a current diagnostic, not an historical predecessor overlay; administrative union is reviewed separately."
+    },
+    {
+      "source_panel": "pit_p2024",
+      "frozen_coc_id": "CA-601",
+      "year": 2017,
+      "frozen_boundary_vintage": "2024",
+      "source_boundary_vintage": "2024",
+      "status": "reconciled",
+      "reason": "Reviewed administrative scope and source-specific count operations; exact historical polygon identity is not asserted.",
+      "source_coc_ids": [
+        "CA-601"
+      ],
+      "count_operation": "single",
+      "geometry_status": "different_unresolved",
+      "evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/san-diego/san-diego-reconciliation.json#sha256=8952bd5abda68f20367ecc8737d393fb50431379acb739873fafba23a3685b66",
+      "geometry_evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/san-diego/san-diego-reconciliation.json#sha256=8952bd5abda68f20367ecc8737d393fb50431379acb739873fafba23a3685b66",
+      "count_evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/san-diego/san-diego-reconciliation.json#sha256=8952bd5abda68f20367ecc8737d393fb50431379acb739873fafba23a3685b66",
+      "approval_ref": "docs/site-historical-reconciliation-inventory.md#native-source-integration-review-for-coclab-fjcho",
+      "reconciliation_basis": "Administrative county scope supported by native HUD reports, merger/split evidence and jurisdiction records; preserve documented polygon limitations.",
+      "geometry_residual": "Frozen HUD versus Census county symmetric difference is 6.394% of county area. This is a current diagnostic, not an historical predecessor overlay; administrative union is reviewed separately."
+    },
+    {
+      "source_panel": "hic_annual",
+      "frozen_coc_id": "CA-601",
+      "year": 2017,
+      "frozen_boundary_vintage": "2024",
+      "source_boundary_vintage": "2017",
+      "status": "reconciled",
+      "reason": "Reviewed administrative scope and source-specific count operations; exact historical polygon identity is not asserted.",
+      "source_coc_ids": [
+        "CA-601"
+      ],
+      "count_operation": "single",
+      "geometry_status": "different_unresolved",
+      "evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/san-diego/san-diego-reconciliation.json#sha256=8952bd5abda68f20367ecc8737d393fb50431379acb739873fafba23a3685b66",
+      "geometry_evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/san-diego/san-diego-reconciliation.json#sha256=8952bd5abda68f20367ecc8737d393fb50431379acb739873fafba23a3685b66",
+      "count_evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/san-diego/san-diego-reconciliation.json#sha256=8952bd5abda68f20367ecc8737d393fb50431379acb739873fafba23a3685b66",
+      "approval_ref": "docs/site-historical-reconciliation-inventory.md#native-source-integration-review-for-coclab-fjcho",
+      "reconciliation_basis": "Administrative county scope supported by native HUD reports, merger/split evidence and jurisdiction records; preserve documented polygon limitations.",
+      "geometry_residual": "Frozen HUD versus Census county symmetric difference is 6.394% of county area. This is a current diagnostic, not an historical predecessor overlay; administrative union is reviewed separately."
+    },
+    {
+      "source_panel": "pit_p2024",
+      "frozen_coc_id": "CA-601",
+      "year": 2018,
+      "frozen_boundary_vintage": "2024",
+      "source_boundary_vintage": "2024",
+      "status": "reconciled",
+      "reason": "Reviewed administrative scope and source-specific count operations; exact historical polygon identity is not asserted.",
+      "source_coc_ids": [
+        "CA-601"
+      ],
+      "count_operation": "single",
+      "geometry_status": "different_unresolved",
+      "evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/san-diego/san-diego-reconciliation.json#sha256=8952bd5abda68f20367ecc8737d393fb50431379acb739873fafba23a3685b66",
+      "geometry_evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/san-diego/san-diego-reconciliation.json#sha256=8952bd5abda68f20367ecc8737d393fb50431379acb739873fafba23a3685b66",
+      "count_evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/san-diego/san-diego-reconciliation.json#sha256=8952bd5abda68f20367ecc8737d393fb50431379acb739873fafba23a3685b66",
+      "approval_ref": "docs/site-historical-reconciliation-inventory.md#native-source-integration-review-for-coclab-fjcho",
+      "reconciliation_basis": "Administrative county scope supported by native HUD reports, merger/split evidence and jurisdiction records; preserve documented polygon limitations.",
+      "geometry_residual": "Frozen HUD versus Census county symmetric difference is 6.394% of county area. This is a current diagnostic, not an historical predecessor overlay; administrative union is reviewed separately."
+    },
+    {
+      "source_panel": "hic_annual",
+      "frozen_coc_id": "CA-601",
+      "year": 2018,
+      "frozen_boundary_vintage": "2024",
+      "source_boundary_vintage": "2018",
+      "status": "reconciled",
+      "reason": "Reviewed administrative scope and source-specific count operations; exact historical polygon identity is not asserted.",
+      "source_coc_ids": [
+        "CA-601"
+      ],
+      "count_operation": "single",
+      "geometry_status": "different_unresolved",
+      "evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/san-diego/san-diego-reconciliation.json#sha256=8952bd5abda68f20367ecc8737d393fb50431379acb739873fafba23a3685b66",
+      "geometry_evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/san-diego/san-diego-reconciliation.json#sha256=8952bd5abda68f20367ecc8737d393fb50431379acb739873fafba23a3685b66",
+      "count_evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/san-diego/san-diego-reconciliation.json#sha256=8952bd5abda68f20367ecc8737d393fb50431379acb739873fafba23a3685b66",
+      "approval_ref": "docs/site-historical-reconciliation-inventory.md#native-source-integration-review-for-coclab-fjcho",
+      "reconciliation_basis": "Administrative county scope supported by native HUD reports, merger/split evidence and jurisdiction records; preserve documented polygon limitations.",
+      "geometry_residual": "Frozen HUD versus Census county symmetric difference is 6.394% of county area. This is a current diagnostic, not an historical predecessor overlay; administrative union is reviewed separately."
+    },
+    {
+      "source_panel": "pit_p2024",
+      "frozen_coc_id": "CA-601",
+      "year": 2019,
+      "frozen_boundary_vintage": "2024",
+      "source_boundary_vintage": "2024",
+      "status": "reconciled",
+      "reason": "Reviewed administrative scope and source-specific count operations; exact historical polygon identity is not asserted.",
+      "source_coc_ids": [
+        "CA-601"
+      ],
+      "count_operation": "single",
+      "geometry_status": "different_unresolved",
+      "evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/san-diego/san-diego-reconciliation.json#sha256=8952bd5abda68f20367ecc8737d393fb50431379acb739873fafba23a3685b66",
+      "geometry_evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/san-diego/san-diego-reconciliation.json#sha256=8952bd5abda68f20367ecc8737d393fb50431379acb739873fafba23a3685b66",
+      "count_evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/san-diego/san-diego-reconciliation.json#sha256=8952bd5abda68f20367ecc8737d393fb50431379acb739873fafba23a3685b66",
+      "approval_ref": "docs/site-historical-reconciliation-inventory.md#native-source-integration-review-for-coclab-fjcho",
+      "reconciliation_basis": "Administrative county scope supported by native HUD reports, merger/split evidence and jurisdiction records; preserve documented polygon limitations.",
+      "geometry_residual": "Frozen HUD versus Census county symmetric difference is 6.394% of county area. This is a current diagnostic, not an historical predecessor overlay; administrative union is reviewed separately."
+    },
+    {
+      "source_panel": "hic_annual",
+      "frozen_coc_id": "CA-601",
+      "year": 2019,
+      "frozen_boundary_vintage": "2024",
+      "source_boundary_vintage": "2019",
+      "status": "reconciled",
+      "reason": "Reviewed administrative scope and source-specific count operations; exact historical polygon identity is not asserted.",
+      "source_coc_ids": [
+        "CA-601"
+      ],
+      "count_operation": "single",
+      "geometry_status": "different_unresolved",
+      "evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/san-diego/san-diego-reconciliation.json#sha256=8952bd5abda68f20367ecc8737d393fb50431379acb739873fafba23a3685b66",
+      "geometry_evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/san-diego/san-diego-reconciliation.json#sha256=8952bd5abda68f20367ecc8737d393fb50431379acb739873fafba23a3685b66",
+      "count_evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/san-diego/san-diego-reconciliation.json#sha256=8952bd5abda68f20367ecc8737d393fb50431379acb739873fafba23a3685b66",
+      "approval_ref": "docs/site-historical-reconciliation-inventory.md#native-source-integration-review-for-coclab-fjcho",
+      "reconciliation_basis": "Administrative county scope supported by native HUD reports, merger/split evidence and jurisdiction records; preserve documented polygon limitations.",
+      "geometry_residual": "Frozen HUD versus Census county symmetric difference is 6.394% of county area. This is a current diagnostic, not an historical predecessor overlay; administrative union is reviewed separately."
+    },
+    {
+      "source_panel": "pit_p2024",
+      "frozen_coc_id": "CA-601",
+      "year": 2020,
+      "frozen_boundary_vintage": "2024",
+      "source_boundary_vintage": "2024",
+      "status": "reconciled",
+      "reason": "Reviewed administrative scope and source-specific count operations; exact historical polygon identity is not asserted.",
+      "source_coc_ids": [
+        "CA-601"
+      ],
+      "count_operation": "single",
+      "geometry_status": "different_unresolved",
+      "evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/san-diego/san-diego-reconciliation.json#sha256=8952bd5abda68f20367ecc8737d393fb50431379acb739873fafba23a3685b66",
+      "geometry_evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/san-diego/san-diego-reconciliation.json#sha256=8952bd5abda68f20367ecc8737d393fb50431379acb739873fafba23a3685b66",
+      "count_evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/san-diego/san-diego-reconciliation.json#sha256=8952bd5abda68f20367ecc8737d393fb50431379acb739873fafba23a3685b66",
+      "approval_ref": "docs/site-historical-reconciliation-inventory.md#native-source-integration-review-for-coclab-fjcho",
+      "reconciliation_basis": "Administrative county scope supported by native HUD reports, merger/split evidence and jurisdiction records; preserve documented polygon limitations.",
+      "geometry_residual": "Frozen HUD versus Census county symmetric difference is 6.394% of county area. This is a current diagnostic, not an historical predecessor overlay; administrative union is reviewed separately."
+    },
+    {
+      "source_panel": "hic_annual",
+      "frozen_coc_id": "CA-601",
+      "year": 2020,
+      "frozen_boundary_vintage": "2024",
+      "source_boundary_vintage": "2020",
+      "status": "reconciled",
+      "reason": "Reviewed administrative scope and source-specific count operations; exact historical polygon identity is not asserted.",
+      "source_coc_ids": [
+        "CA-601"
+      ],
+      "count_operation": "single",
+      "geometry_status": "different_unresolved",
+      "evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/san-diego/san-diego-reconciliation.json#sha256=8952bd5abda68f20367ecc8737d393fb50431379acb739873fafba23a3685b66",
+      "geometry_evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/san-diego/san-diego-reconciliation.json#sha256=8952bd5abda68f20367ecc8737d393fb50431379acb739873fafba23a3685b66",
+      "count_evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/san-diego/san-diego-reconciliation.json#sha256=8952bd5abda68f20367ecc8737d393fb50431379acb739873fafba23a3685b66",
+      "approval_ref": "docs/site-historical-reconciliation-inventory.md#native-source-integration-review-for-coclab-fjcho",
+      "reconciliation_basis": "Administrative county scope supported by native HUD reports, merger/split evidence and jurisdiction records; preserve documented polygon limitations.",
+      "geometry_residual": "Frozen HUD versus Census county symmetric difference is 6.394% of county area. This is a current diagnostic, not an historical predecessor overlay; administrative union is reviewed separately."
+    },
+    {
+      "source_panel": "pit_p2024",
+      "frozen_coc_id": "CA-601",
+      "year": 2022,
+      "frozen_boundary_vintage": "2024",
+      "source_boundary_vintage": "2024",
+      "status": "reconciled",
+      "reason": "Reviewed administrative scope and source-specific count operations; exact historical polygon identity is not asserted.",
+      "source_coc_ids": [
+        "CA-601"
+      ],
+      "count_operation": "single",
+      "geometry_status": "different_unresolved",
+      "evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/san-diego/san-diego-reconciliation.json#sha256=8952bd5abda68f20367ecc8737d393fb50431379acb739873fafba23a3685b66",
+      "geometry_evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/san-diego/san-diego-reconciliation.json#sha256=8952bd5abda68f20367ecc8737d393fb50431379acb739873fafba23a3685b66",
+      "count_evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/san-diego/san-diego-reconciliation.json#sha256=8952bd5abda68f20367ecc8737d393fb50431379acb739873fafba23a3685b66",
+      "approval_ref": "docs/site-historical-reconciliation-inventory.md#native-source-integration-review-for-coclab-fjcho",
+      "reconciliation_basis": "Administrative county scope supported by native HUD reports, merger/split evidence and jurisdiction records; preserve documented polygon limitations.",
+      "geometry_residual": "Frozen HUD versus Census county symmetric difference is 6.394% of county area. This is a current diagnostic, not an historical predecessor overlay; administrative union is reviewed separately."
+    },
+    {
+      "source_panel": "hic_annual",
+      "frozen_coc_id": "CA-601",
+      "year": 2022,
+      "frozen_boundary_vintage": "2024",
+      "source_boundary_vintage": "2022",
+      "status": "reconciled",
+      "reason": "Reviewed administrative scope and source-specific count operations; exact historical polygon identity is not asserted.",
+      "source_coc_ids": [
+        "CA-601"
+      ],
+      "count_operation": "single",
+      "geometry_status": "different_unresolved",
+      "evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/san-diego/san-diego-reconciliation.json#sha256=8952bd5abda68f20367ecc8737d393fb50431379acb739873fafba23a3685b66",
+      "geometry_evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/san-diego/san-diego-reconciliation.json#sha256=8952bd5abda68f20367ecc8737d393fb50431379acb739873fafba23a3685b66",
+      "count_evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/san-diego/san-diego-reconciliation.json#sha256=8952bd5abda68f20367ecc8737d393fb50431379acb739873fafba23a3685b66",
+      "approval_ref": "docs/site-historical-reconciliation-inventory.md#native-source-integration-review-for-coclab-fjcho",
+      "reconciliation_basis": "Administrative county scope supported by native HUD reports, merger/split evidence and jurisdiction records; preserve documented polygon limitations.",
+      "geometry_residual": "Frozen HUD versus Census county symmetric difference is 6.394% of county area. This is a current diagnostic, not an historical predecessor overlay; administrative union is reviewed separately."
+    },
+    {
+      "source_panel": "pit_p2024",
+      "frozen_coc_id": "CA-601",
+      "year": 2023,
+      "frozen_boundary_vintage": "2024",
+      "source_boundary_vintage": "2024",
+      "status": "reconciled",
+      "reason": "Reviewed administrative scope and source-specific count operations; exact historical polygon identity is not asserted.",
+      "source_coc_ids": [
+        "CA-601"
+      ],
+      "count_operation": "single",
+      "geometry_status": "different_unresolved",
+      "evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/san-diego/san-diego-reconciliation.json#sha256=8952bd5abda68f20367ecc8737d393fb50431379acb739873fafba23a3685b66",
+      "geometry_evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/san-diego/san-diego-reconciliation.json#sha256=8952bd5abda68f20367ecc8737d393fb50431379acb739873fafba23a3685b66",
+      "count_evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/san-diego/san-diego-reconciliation.json#sha256=8952bd5abda68f20367ecc8737d393fb50431379acb739873fafba23a3685b66",
+      "approval_ref": "docs/site-historical-reconciliation-inventory.md#native-source-integration-review-for-coclab-fjcho",
+      "reconciliation_basis": "Administrative county scope supported by native HUD reports, merger/split evidence and jurisdiction records; preserve documented polygon limitations.",
+      "geometry_residual": "Frozen HUD versus Census county symmetric difference is 6.394% of county area. This is a current diagnostic, not an historical predecessor overlay; administrative union is reviewed separately."
+    },
+    {
+      "source_panel": "hic_annual",
+      "frozen_coc_id": "CA-601",
+      "year": 2023,
+      "frozen_boundary_vintage": "2024",
+      "source_boundary_vintage": "2023",
+      "status": "reconciled",
+      "reason": "Reviewed administrative scope and source-specific count operations; exact historical polygon identity is not asserted.",
+      "source_coc_ids": [
+        "CA-601"
+      ],
+      "count_operation": "single",
+      "geometry_status": "different_unresolved",
+      "evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/san-diego/san-diego-reconciliation.json#sha256=8952bd5abda68f20367ecc8737d393fb50431379acb739873fafba23a3685b66",
+      "geometry_evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/san-diego/san-diego-reconciliation.json#sha256=8952bd5abda68f20367ecc8737d393fb50431379acb739873fafba23a3685b66",
+      "count_evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/san-diego/san-diego-reconciliation.json#sha256=8952bd5abda68f20367ecc8737d393fb50431379acb739873fafba23a3685b66",
+      "approval_ref": "docs/site-historical-reconciliation-inventory.md#native-source-integration-review-for-coclab-fjcho",
+      "reconciliation_basis": "Administrative county scope supported by native HUD reports, merger/split evidence and jurisdiction records; preserve documented polygon limitations.",
+      "geometry_residual": "Frozen HUD versus Census county symmetric difference is 6.394% of county area. This is a current diagnostic, not an historical predecessor overlay; administrative union is reviewed separately."
+    },
+    {
+      "source_panel": "pit_p2024",
+      "frozen_coc_id": "CA-601",
+      "year": 2024,
+      "frozen_boundary_vintage": "2024",
+      "source_boundary_vintage": "2024",
+      "status": "reconciled",
+      "reason": "Reviewed administrative scope and source-specific count operations; exact historical polygon identity is not asserted.",
+      "source_coc_ids": [
+        "CA-601"
+      ],
+      "count_operation": "single",
+      "geometry_status": "different_unresolved",
+      "evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/san-diego/san-diego-reconciliation.json#sha256=8952bd5abda68f20367ecc8737d393fb50431379acb739873fafba23a3685b66",
+      "geometry_evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/san-diego/san-diego-reconciliation.json#sha256=8952bd5abda68f20367ecc8737d393fb50431379acb739873fafba23a3685b66",
+      "count_evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/san-diego/san-diego-reconciliation.json#sha256=8952bd5abda68f20367ecc8737d393fb50431379acb739873fafba23a3685b66",
+      "approval_ref": "docs/site-historical-reconciliation-inventory.md#native-source-integration-review-for-coclab-fjcho",
+      "reconciliation_basis": "Administrative county scope supported by native HUD reports, merger/split evidence and jurisdiction records; preserve documented polygon limitations.",
+      "geometry_residual": "Frozen HUD versus Census county symmetric difference is 6.394% of county area. This is a current diagnostic, not an historical predecessor overlay; administrative union is reviewed separately."
+    },
+    {
+      "source_panel": "hic_annual",
+      "frozen_coc_id": "CA-601",
+      "year": 2024,
+      "frozen_boundary_vintage": "2024",
+      "source_boundary_vintage": "2024",
+      "status": "reconciled",
+      "reason": "Reviewed administrative scope and source-specific count operations; exact historical polygon identity is not asserted.",
+      "source_coc_ids": [
+        "CA-601"
+      ],
+      "count_operation": "single",
+      "geometry_status": "different_unresolved",
+      "evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/san-diego/san-diego-reconciliation.json#sha256=8952bd5abda68f20367ecc8737d393fb50431379acb739873fafba23a3685b66",
+      "geometry_evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/san-diego/san-diego-reconciliation.json#sha256=8952bd5abda68f20367ecc8737d393fb50431379acb739873fafba23a3685b66",
+      "count_evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/san-diego/san-diego-reconciliation.json#sha256=8952bd5abda68f20367ecc8737d393fb50431379acb739873fafba23a3685b66",
+      "approval_ref": "docs/site-historical-reconciliation-inventory.md#native-source-integration-review-for-coclab-fjcho",
+      "reconciliation_basis": "Administrative county scope supported by native HUD reports, merger/split evidence and jurisdiction records; preserve documented polygon limitations.",
+      "geometry_residual": "Frozen HUD versus Census county symmetric difference is 6.394% of county area. This is a current diagnostic, not an historical predecessor overlay; administrative union is reviewed separately."
+    },
+    {
+      "source_panel": "pit_p2024",
+      "frozen_coc_id": "CA-611",
+      "year": 2010,
+      "frozen_boundary_vintage": "2024",
+      "source_boundary_vintage": "2024",
+      "status": "reconciled",
+      "reason": "Reviewed administrative scope and source-specific count operations; exact historical polygon identity is not asserted.",
+      "source_coc_ids": [
+        "CA-611"
+      ],
+      "count_operation": "preaggregated",
+      "geometry_status": "unknown",
+      "evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/ventura/ventura_ca605_ca611_reconciliation.json#sha256=c23012838b33e5ee8baa52d52ceb2fcd1d9aa21a57b91a91663ffe18647714de",
+      "geometry_evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/ventura/ventura_ca605_ca611_reconciliation.json#sha256=c23012838b33e5ee8baa52d52ceb2fcd1d9aa21a57b91a91663ffe18647714de",
+      "count_evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/ventura/ventura_ca605_ca611_reconciliation.json#sha256=c23012838b33e5ee8baa52d52ceb2fcd1d9aa21a57b91a91663ffe18647714de",
+      "approval_ref": "docs/site-historical-reconciliation-inventory.md#native-source-integration-review-for-coclab-fjcho",
+      "reconciliation_basis": "Administrative county scope supported by native HUD reports, merger/split evidence and jurisdiction records; preserve documented polygon limitations.",
+      "preaggregated_source_coc_ids": [
+        "CA-605",
+        "CA-611"
+      ]
+    },
+    {
+      "source_panel": "hic_annual",
+      "frozen_coc_id": "CA-611",
+      "year": 2010,
+      "frozen_boundary_vintage": "2024",
+      "source_boundary_vintage": "2010",
+      "status": "reconciled",
+      "reason": "Reviewed administrative scope and source-specific count operations; exact historical polygon identity is not asserted.",
+      "source_coc_ids": [
+        "CA-605",
+        "CA-611"
+      ],
+      "count_operation": "sum",
+      "geometry_status": "unknown",
+      "evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/ventura/ventura_ca605_ca611_reconciliation.json#sha256=c23012838b33e5ee8baa52d52ceb2fcd1d9aa21a57b91a91663ffe18647714de",
+      "geometry_evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/ventura/ventura_ca605_ca611_reconciliation.json#sha256=c23012838b33e5ee8baa52d52ceb2fcd1d9aa21a57b91a91663ffe18647714de",
+      "count_evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/ventura/ventura_ca605_ca611_reconciliation.json#sha256=c23012838b33e5ee8baa52d52ceb2fcd1d9aa21a57b91a91663ffe18647714de",
+      "approval_ref": "docs/site-historical-reconciliation-inventory.md#native-source-integration-review-for-coclab-fjcho",
+      "reconciliation_basis": "Administrative county scope supported by native HUD reports, merger/split evidence and jurisdiction records; preserve documented polygon limitations."
+    },
+    {
+      "source_panel": "pit_p2024",
+      "frozen_coc_id": "CA-611",
+      "year": 2011,
+      "frozen_boundary_vintage": "2024",
+      "source_boundary_vintage": "2024",
+      "status": "reconciled",
+      "reason": "Reviewed administrative scope and source-specific count operations; exact historical polygon identity is not asserted.",
+      "source_coc_ids": [
+        "CA-611"
+      ],
+      "count_operation": "preaggregated",
+      "geometry_status": "unknown",
+      "evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/ventura/ventura_ca605_ca611_reconciliation.json#sha256=c23012838b33e5ee8baa52d52ceb2fcd1d9aa21a57b91a91663ffe18647714de",
+      "geometry_evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/ventura/ventura_ca605_ca611_reconciliation.json#sha256=c23012838b33e5ee8baa52d52ceb2fcd1d9aa21a57b91a91663ffe18647714de",
+      "count_evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/ventura/ventura_ca605_ca611_reconciliation.json#sha256=c23012838b33e5ee8baa52d52ceb2fcd1d9aa21a57b91a91663ffe18647714de",
+      "approval_ref": "docs/site-historical-reconciliation-inventory.md#native-source-integration-review-for-coclab-fjcho",
+      "reconciliation_basis": "Administrative county scope supported by native HUD reports, merger/split evidence and jurisdiction records; preserve documented polygon limitations.",
+      "preaggregated_source_coc_ids": [
+        "CA-605",
+        "CA-611"
+      ]
+    },
+    {
+      "source_panel": "hic_annual",
+      "frozen_coc_id": "CA-611",
+      "year": 2011,
+      "frozen_boundary_vintage": "2024",
+      "source_boundary_vintage": "2011",
+      "status": "reconciled",
+      "reason": "Reviewed administrative scope and source-specific count operations; exact historical polygon identity is not asserted.",
+      "source_coc_ids": [
+        "CA-605",
+        "CA-611"
+      ],
+      "count_operation": "sum",
+      "geometry_status": "unknown",
+      "evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/ventura/ventura_ca605_ca611_reconciliation.json#sha256=c23012838b33e5ee8baa52d52ceb2fcd1d9aa21a57b91a91663ffe18647714de",
+      "geometry_evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/ventura/ventura_ca605_ca611_reconciliation.json#sha256=c23012838b33e5ee8baa52d52ceb2fcd1d9aa21a57b91a91663ffe18647714de",
+      "count_evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/ventura/ventura_ca605_ca611_reconciliation.json#sha256=c23012838b33e5ee8baa52d52ceb2fcd1d9aa21a57b91a91663ffe18647714de",
+      "approval_ref": "docs/site-historical-reconciliation-inventory.md#native-source-integration-review-for-coclab-fjcho",
+      "reconciliation_basis": "Administrative county scope supported by native HUD reports, merger/split evidence and jurisdiction records; preserve documented polygon limitations."
+    },
+    {
+      "source_panel": "pit_p2024",
+      "frozen_coc_id": "CA-611",
+      "year": 2012,
+      "frozen_boundary_vintage": "2024",
+      "source_boundary_vintage": "2024",
+      "status": "reconciled",
+      "reason": "Reviewed administrative scope and source-specific count operations; exact historical polygon identity is not asserted.",
+      "source_coc_ids": [
+        "CA-611"
+      ],
+      "count_operation": "preaggregated",
+      "geometry_status": "unknown",
+      "evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/ventura/ventura_ca605_ca611_reconciliation.json#sha256=c23012838b33e5ee8baa52d52ceb2fcd1d9aa21a57b91a91663ffe18647714de",
+      "geometry_evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/ventura/ventura_ca605_ca611_reconciliation.json#sha256=c23012838b33e5ee8baa52d52ceb2fcd1d9aa21a57b91a91663ffe18647714de",
+      "count_evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/ventura/ventura_ca605_ca611_reconciliation.json#sha256=c23012838b33e5ee8baa52d52ceb2fcd1d9aa21a57b91a91663ffe18647714de",
+      "approval_ref": "docs/site-historical-reconciliation-inventory.md#native-source-integration-review-for-coclab-fjcho",
+      "reconciliation_basis": "Administrative county scope supported by native HUD reports, merger/split evidence and jurisdiction records; preserve documented polygon limitations.",
+      "preaggregated_source_coc_ids": [
+        "CA-605",
+        "CA-611"
+      ]
+    },
+    {
+      "source_panel": "hic_annual",
+      "frozen_coc_id": "CA-611",
+      "year": 2012,
+      "frozen_boundary_vintage": "2024",
+      "source_boundary_vintage": "2012",
+      "status": "reconciled",
+      "reason": "Reviewed administrative scope and source-specific count operations; exact historical polygon identity is not asserted.",
+      "source_coc_ids": [
+        "CA-605",
+        "CA-611"
+      ],
+      "count_operation": "sum",
+      "geometry_status": "unknown",
+      "evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/ventura/ventura_ca605_ca611_reconciliation.json#sha256=c23012838b33e5ee8baa52d52ceb2fcd1d9aa21a57b91a91663ffe18647714de",
+      "geometry_evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/ventura/ventura_ca605_ca611_reconciliation.json#sha256=c23012838b33e5ee8baa52d52ceb2fcd1d9aa21a57b91a91663ffe18647714de",
+      "count_evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/ventura/ventura_ca605_ca611_reconciliation.json#sha256=c23012838b33e5ee8baa52d52ceb2fcd1d9aa21a57b91a91663ffe18647714de",
+      "approval_ref": "docs/site-historical-reconciliation-inventory.md#native-source-integration-review-for-coclab-fjcho",
+      "reconciliation_basis": "Administrative county scope supported by native HUD reports, merger/split evidence and jurisdiction records; preserve documented polygon limitations."
+    },
+    {
+      "source_panel": "pit_p2024",
+      "frozen_coc_id": "CA-611",
+      "year": 2013,
+      "frozen_boundary_vintage": "2024",
+      "source_boundary_vintage": "2024",
+      "status": "reconciled",
+      "reason": "Reviewed administrative scope and source-specific count operations; exact historical polygon identity is not asserted.",
+      "source_coc_ids": [
+        "CA-611"
+      ],
+      "count_operation": "single",
+      "geometry_status": "unknown",
+      "evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/ventura/ventura_ca605_ca611_reconciliation.json#sha256=c23012838b33e5ee8baa52d52ceb2fcd1d9aa21a57b91a91663ffe18647714de",
+      "geometry_evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/ventura/ventura_ca605_ca611_reconciliation.json#sha256=c23012838b33e5ee8baa52d52ceb2fcd1d9aa21a57b91a91663ffe18647714de",
+      "count_evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/ventura/ventura_ca605_ca611_reconciliation.json#sha256=c23012838b33e5ee8baa52d52ceb2fcd1d9aa21a57b91a91663ffe18647714de",
+      "approval_ref": "docs/site-historical-reconciliation-inventory.md#native-source-integration-review-for-coclab-fjcho",
+      "reconciliation_basis": "Administrative county scope supported by native HUD reports, merger/split evidence and jurisdiction records; preserve documented polygon limitations."
+    },
+    {
+      "source_panel": "hic_annual",
+      "frozen_coc_id": "CA-611",
+      "year": 2013,
+      "frozen_boundary_vintage": "2024",
+      "source_boundary_vintage": "2013",
+      "status": "reconciled",
+      "reason": "Reviewed administrative scope and source-specific count operations; exact historical polygon identity is not asserted.",
+      "source_coc_ids": [
+        "CA-605",
+        "CA-611"
+      ],
+      "count_operation": "sum",
+      "geometry_status": "unknown",
+      "evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/ventura/ventura_ca605_ca611_reconciliation.json#sha256=c23012838b33e5ee8baa52d52ceb2fcd1d9aa21a57b91a91663ffe18647714de",
+      "geometry_evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/ventura/ventura_ca605_ca611_reconciliation.json#sha256=c23012838b33e5ee8baa52d52ceb2fcd1d9aa21a57b91a91663ffe18647714de",
+      "count_evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/ventura/ventura_ca605_ca611_reconciliation.json#sha256=c23012838b33e5ee8baa52d52ceb2fcd1d9aa21a57b91a91663ffe18647714de",
+      "approval_ref": "docs/site-historical-reconciliation-inventory.md#native-source-integration-review-for-coclab-fjcho",
+      "reconciliation_basis": "Administrative county scope supported by native HUD reports, merger/split evidence and jurisdiction records; preserve documented polygon limitations."
+    },
+    {
+      "source_panel": "pit_p2024",
+      "frozen_coc_id": "CA-611",
+      "year": 2014,
+      "frozen_boundary_vintage": "2024",
+      "source_boundary_vintage": "2024",
+      "status": "reconciled",
+      "reason": "Reviewed administrative scope and source-specific count operations; exact historical polygon identity is not asserted.",
+      "source_coc_ids": [
+        "CA-611"
+      ],
+      "count_operation": "single",
+      "geometry_status": "unknown",
+      "evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/ventura/ventura_ca605_ca611_reconciliation.json#sha256=c23012838b33e5ee8baa52d52ceb2fcd1d9aa21a57b91a91663ffe18647714de",
+      "geometry_evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/ventura/ventura_ca605_ca611_reconciliation.json#sha256=c23012838b33e5ee8baa52d52ceb2fcd1d9aa21a57b91a91663ffe18647714de",
+      "count_evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/ventura/ventura_ca605_ca611_reconciliation.json#sha256=c23012838b33e5ee8baa52d52ceb2fcd1d9aa21a57b91a91663ffe18647714de",
+      "approval_ref": "docs/site-historical-reconciliation-inventory.md#native-source-integration-review-for-coclab-fjcho",
+      "reconciliation_basis": "Administrative county scope supported by native HUD reports, merger/split evidence and jurisdiction records; preserve documented polygon limitations."
+    },
+    {
+      "source_panel": "hic_annual",
+      "frozen_coc_id": "CA-611",
+      "year": 2014,
+      "frozen_boundary_vintage": "2024",
+      "source_boundary_vintage": "2014",
+      "status": "reconciled",
+      "reason": "Reviewed administrative scope and source-specific count operations; exact historical polygon identity is not asserted.",
+      "source_coc_ids": [
+        "CA-611"
+      ],
+      "count_operation": "single",
+      "geometry_status": "unknown",
+      "evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/ventura/ventura_ca605_ca611_reconciliation.json#sha256=c23012838b33e5ee8baa52d52ceb2fcd1d9aa21a57b91a91663ffe18647714de",
+      "geometry_evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/ventura/ventura_ca605_ca611_reconciliation.json#sha256=c23012838b33e5ee8baa52d52ceb2fcd1d9aa21a57b91a91663ffe18647714de",
+      "count_evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/ventura/ventura_ca605_ca611_reconciliation.json#sha256=c23012838b33e5ee8baa52d52ceb2fcd1d9aa21a57b91a91663ffe18647714de",
+      "approval_ref": "docs/site-historical-reconciliation-inventory.md#native-source-integration-review-for-coclab-fjcho",
+      "reconciliation_basis": "Administrative county scope supported by native HUD reports, merger/split evidence and jurisdiction records; preserve documented polygon limitations."
+    },
+    {
+      "source_panel": "pit_p2024",
+      "frozen_coc_id": "CA-611",
+      "year": 2015,
+      "frozen_boundary_vintage": "2024",
+      "source_boundary_vintage": "2024",
+      "status": "reconciled",
+      "reason": "Reviewed administrative scope and source-specific count operations; exact historical polygon identity is not asserted.",
+      "source_coc_ids": [
+        "CA-611"
+      ],
+      "count_operation": "single",
+      "geometry_status": "unknown",
+      "evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/ventura/ventura_ca605_ca611_reconciliation.json#sha256=c23012838b33e5ee8baa52d52ceb2fcd1d9aa21a57b91a91663ffe18647714de",
+      "geometry_evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/ventura/ventura_ca605_ca611_reconciliation.json#sha256=c23012838b33e5ee8baa52d52ceb2fcd1d9aa21a57b91a91663ffe18647714de",
+      "count_evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/ventura/ventura_ca605_ca611_reconciliation.json#sha256=c23012838b33e5ee8baa52d52ceb2fcd1d9aa21a57b91a91663ffe18647714de",
+      "approval_ref": "docs/site-historical-reconciliation-inventory.md#native-source-integration-review-for-coclab-fjcho",
+      "reconciliation_basis": "Administrative county scope supported by native HUD reports, merger/split evidence and jurisdiction records; preserve documented polygon limitations."
+    },
+    {
+      "source_panel": "hic_annual",
+      "frozen_coc_id": "CA-611",
+      "year": 2015,
+      "frozen_boundary_vintage": "2024",
+      "source_boundary_vintage": "2015",
+      "status": "reconciled",
+      "reason": "Reviewed administrative scope and source-specific count operations; exact historical polygon identity is not asserted.",
+      "source_coc_ids": [
+        "CA-611"
+      ],
+      "count_operation": "single",
+      "geometry_status": "unknown",
+      "evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/ventura/ventura_ca605_ca611_reconciliation.json#sha256=c23012838b33e5ee8baa52d52ceb2fcd1d9aa21a57b91a91663ffe18647714de",
+      "geometry_evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/ventura/ventura_ca605_ca611_reconciliation.json#sha256=c23012838b33e5ee8baa52d52ceb2fcd1d9aa21a57b91a91663ffe18647714de",
+      "count_evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/ventura/ventura_ca605_ca611_reconciliation.json#sha256=c23012838b33e5ee8baa52d52ceb2fcd1d9aa21a57b91a91663ffe18647714de",
+      "approval_ref": "docs/site-historical-reconciliation-inventory.md#native-source-integration-review-for-coclab-fjcho",
+      "reconciliation_basis": "Administrative county scope supported by native HUD reports, merger/split evidence and jurisdiction records; preserve documented polygon limitations."
+    },
+    {
+      "source_panel": "pit_p2024",
+      "frozen_coc_id": "CA-611",
+      "year": 2016,
+      "frozen_boundary_vintage": "2024",
+      "source_boundary_vintage": "2024",
+      "status": "reconciled",
+      "reason": "Reviewed administrative scope and source-specific count operations; exact historical polygon identity is not asserted.",
+      "source_coc_ids": [
+        "CA-611"
+      ],
+      "count_operation": "single",
+      "geometry_status": "unknown",
+      "evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/ventura/ventura_ca605_ca611_reconciliation.json#sha256=c23012838b33e5ee8baa52d52ceb2fcd1d9aa21a57b91a91663ffe18647714de",
+      "geometry_evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/ventura/ventura_ca605_ca611_reconciliation.json#sha256=c23012838b33e5ee8baa52d52ceb2fcd1d9aa21a57b91a91663ffe18647714de",
+      "count_evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/ventura/ventura_ca605_ca611_reconciliation.json#sha256=c23012838b33e5ee8baa52d52ceb2fcd1d9aa21a57b91a91663ffe18647714de",
+      "approval_ref": "docs/site-historical-reconciliation-inventory.md#native-source-integration-review-for-coclab-fjcho",
+      "reconciliation_basis": "Administrative county scope supported by native HUD reports, merger/split evidence and jurisdiction records; preserve documented polygon limitations."
+    },
+    {
+      "source_panel": "hic_annual",
+      "frozen_coc_id": "CA-611",
+      "year": 2016,
+      "frozen_boundary_vintage": "2024",
+      "source_boundary_vintage": "2016",
+      "status": "reconciled",
+      "reason": "Reviewed administrative scope and source-specific count operations; exact historical polygon identity is not asserted.",
+      "source_coc_ids": [
+        "CA-611"
+      ],
+      "count_operation": "single",
+      "geometry_status": "unknown",
+      "evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/ventura/ventura_ca605_ca611_reconciliation.json#sha256=c23012838b33e5ee8baa52d52ceb2fcd1d9aa21a57b91a91663ffe18647714de",
+      "geometry_evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/ventura/ventura_ca605_ca611_reconciliation.json#sha256=c23012838b33e5ee8baa52d52ceb2fcd1d9aa21a57b91a91663ffe18647714de",
+      "count_evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/ventura/ventura_ca605_ca611_reconciliation.json#sha256=c23012838b33e5ee8baa52d52ceb2fcd1d9aa21a57b91a91663ffe18647714de",
+      "approval_ref": "docs/site-historical-reconciliation-inventory.md#native-source-integration-review-for-coclab-fjcho",
+      "reconciliation_basis": "Administrative county scope supported by native HUD reports, merger/split evidence and jurisdiction records; preserve documented polygon limitations."
+    },
+    {
+      "source_panel": "pit_p2024",
+      "frozen_coc_id": "CA-611",
+      "year": 2017,
+      "frozen_boundary_vintage": "2024",
+      "source_boundary_vintage": "2024",
+      "status": "reconciled",
+      "reason": "Reviewed administrative scope and source-specific count operations; exact historical polygon identity is not asserted.",
+      "source_coc_ids": [
+        "CA-611"
+      ],
+      "count_operation": "single",
+      "geometry_status": "unknown",
+      "evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/ventura/ventura_ca605_ca611_reconciliation.json#sha256=c23012838b33e5ee8baa52d52ceb2fcd1d9aa21a57b91a91663ffe18647714de",
+      "geometry_evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/ventura/ventura_ca605_ca611_reconciliation.json#sha256=c23012838b33e5ee8baa52d52ceb2fcd1d9aa21a57b91a91663ffe18647714de",
+      "count_evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/ventura/ventura_ca605_ca611_reconciliation.json#sha256=c23012838b33e5ee8baa52d52ceb2fcd1d9aa21a57b91a91663ffe18647714de",
+      "approval_ref": "docs/site-historical-reconciliation-inventory.md#native-source-integration-review-for-coclab-fjcho",
+      "reconciliation_basis": "Administrative county scope supported by native HUD reports, merger/split evidence and jurisdiction records; preserve documented polygon limitations."
+    },
+    {
+      "source_panel": "hic_annual",
+      "frozen_coc_id": "CA-611",
+      "year": 2017,
+      "frozen_boundary_vintage": "2024",
+      "source_boundary_vintage": "2017",
+      "status": "reconciled",
+      "reason": "Reviewed administrative scope and source-specific count operations; exact historical polygon identity is not asserted.",
+      "source_coc_ids": [
+        "CA-611"
+      ],
+      "count_operation": "single",
+      "geometry_status": "unknown",
+      "evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/ventura/ventura_ca605_ca611_reconciliation.json#sha256=c23012838b33e5ee8baa52d52ceb2fcd1d9aa21a57b91a91663ffe18647714de",
+      "geometry_evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/ventura/ventura_ca605_ca611_reconciliation.json#sha256=c23012838b33e5ee8baa52d52ceb2fcd1d9aa21a57b91a91663ffe18647714de",
+      "count_evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/ventura/ventura_ca605_ca611_reconciliation.json#sha256=c23012838b33e5ee8baa52d52ceb2fcd1d9aa21a57b91a91663ffe18647714de",
+      "approval_ref": "docs/site-historical-reconciliation-inventory.md#native-source-integration-review-for-coclab-fjcho",
+      "reconciliation_basis": "Administrative county scope supported by native HUD reports, merger/split evidence and jurisdiction records; preserve documented polygon limitations."
+    },
+    {
+      "source_panel": "pit_p2024",
+      "frozen_coc_id": "CA-611",
+      "year": 2018,
+      "frozen_boundary_vintage": "2024",
+      "source_boundary_vintage": "2024",
+      "status": "reconciled",
+      "reason": "Reviewed administrative scope and source-specific count operations; exact historical polygon identity is not asserted.",
+      "source_coc_ids": [
+        "CA-611"
+      ],
+      "count_operation": "single",
+      "geometry_status": "unknown",
+      "evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/ventura/ventura_ca605_ca611_reconciliation.json#sha256=c23012838b33e5ee8baa52d52ceb2fcd1d9aa21a57b91a91663ffe18647714de",
+      "geometry_evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/ventura/ventura_ca605_ca611_reconciliation.json#sha256=c23012838b33e5ee8baa52d52ceb2fcd1d9aa21a57b91a91663ffe18647714de",
+      "count_evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/ventura/ventura_ca605_ca611_reconciliation.json#sha256=c23012838b33e5ee8baa52d52ceb2fcd1d9aa21a57b91a91663ffe18647714de",
+      "approval_ref": "docs/site-historical-reconciliation-inventory.md#native-source-integration-review-for-coclab-fjcho",
+      "reconciliation_basis": "Administrative county scope supported by native HUD reports, merger/split evidence and jurisdiction records; preserve documented polygon limitations."
+    },
+    {
+      "source_panel": "hic_annual",
+      "frozen_coc_id": "CA-611",
+      "year": 2018,
+      "frozen_boundary_vintage": "2024",
+      "source_boundary_vintage": "2018",
+      "status": "reconciled",
+      "reason": "Reviewed administrative scope and source-specific count operations; exact historical polygon identity is not asserted.",
+      "source_coc_ids": [
+        "CA-611"
+      ],
+      "count_operation": "single",
+      "geometry_status": "unknown",
+      "evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/ventura/ventura_ca605_ca611_reconciliation.json#sha256=c23012838b33e5ee8baa52d52ceb2fcd1d9aa21a57b91a91663ffe18647714de",
+      "geometry_evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/ventura/ventura_ca605_ca611_reconciliation.json#sha256=c23012838b33e5ee8baa52d52ceb2fcd1d9aa21a57b91a91663ffe18647714de",
+      "count_evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/ventura/ventura_ca605_ca611_reconciliation.json#sha256=c23012838b33e5ee8baa52d52ceb2fcd1d9aa21a57b91a91663ffe18647714de",
+      "approval_ref": "docs/site-historical-reconciliation-inventory.md#native-source-integration-review-for-coclab-fjcho",
+      "reconciliation_basis": "Administrative county scope supported by native HUD reports, merger/split evidence and jurisdiction records; preserve documented polygon limitations."
+    },
+    {
+      "source_panel": "pit_p2024",
+      "frozen_coc_id": "CA-611",
+      "year": 2019,
+      "frozen_boundary_vintage": "2024",
+      "source_boundary_vintage": "2024",
+      "status": "reconciled",
+      "reason": "Reviewed administrative scope and source-specific count operations; exact historical polygon identity is not asserted.",
+      "source_coc_ids": [
+        "CA-611"
+      ],
+      "count_operation": "single",
+      "geometry_status": "unknown",
+      "evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/ventura/ventura_ca605_ca611_reconciliation.json#sha256=c23012838b33e5ee8baa52d52ceb2fcd1d9aa21a57b91a91663ffe18647714de",
+      "geometry_evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/ventura/ventura_ca605_ca611_reconciliation.json#sha256=c23012838b33e5ee8baa52d52ceb2fcd1d9aa21a57b91a91663ffe18647714de",
+      "count_evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/ventura/ventura_ca605_ca611_reconciliation.json#sha256=c23012838b33e5ee8baa52d52ceb2fcd1d9aa21a57b91a91663ffe18647714de",
+      "approval_ref": "docs/site-historical-reconciliation-inventory.md#native-source-integration-review-for-coclab-fjcho",
+      "reconciliation_basis": "Administrative county scope supported by native HUD reports, merger/split evidence and jurisdiction records; preserve documented polygon limitations."
+    },
+    {
+      "source_panel": "hic_annual",
+      "frozen_coc_id": "CA-611",
+      "year": 2019,
+      "frozen_boundary_vintage": "2024",
+      "source_boundary_vintage": "2019",
+      "status": "reconciled",
+      "reason": "Reviewed administrative scope and source-specific count operations; exact historical polygon identity is not asserted.",
+      "source_coc_ids": [
+        "CA-611"
+      ],
+      "count_operation": "single",
+      "geometry_status": "unknown",
+      "evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/ventura/ventura_ca605_ca611_reconciliation.json#sha256=c23012838b33e5ee8baa52d52ceb2fcd1d9aa21a57b91a91663ffe18647714de",
+      "geometry_evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/ventura/ventura_ca605_ca611_reconciliation.json#sha256=c23012838b33e5ee8baa52d52ceb2fcd1d9aa21a57b91a91663ffe18647714de",
+      "count_evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/ventura/ventura_ca605_ca611_reconciliation.json#sha256=c23012838b33e5ee8baa52d52ceb2fcd1d9aa21a57b91a91663ffe18647714de",
+      "approval_ref": "docs/site-historical-reconciliation-inventory.md#native-source-integration-review-for-coclab-fjcho",
+      "reconciliation_basis": "Administrative county scope supported by native HUD reports, merger/split evidence and jurisdiction records; preserve documented polygon limitations."
+    },
+    {
+      "source_panel": "pit_p2024",
+      "frozen_coc_id": "CA-611",
+      "year": 2020,
+      "frozen_boundary_vintage": "2024",
+      "source_boundary_vintage": "2024",
+      "status": "reconciled",
+      "reason": "Reviewed administrative scope and source-specific count operations; exact historical polygon identity is not asserted.",
+      "source_coc_ids": [
+        "CA-611"
+      ],
+      "count_operation": "single",
+      "geometry_status": "unknown",
+      "evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/ventura/ventura_ca605_ca611_reconciliation.json#sha256=c23012838b33e5ee8baa52d52ceb2fcd1d9aa21a57b91a91663ffe18647714de",
+      "geometry_evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/ventura/ventura_ca605_ca611_reconciliation.json#sha256=c23012838b33e5ee8baa52d52ceb2fcd1d9aa21a57b91a91663ffe18647714de",
+      "count_evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/ventura/ventura_ca605_ca611_reconciliation.json#sha256=c23012838b33e5ee8baa52d52ceb2fcd1d9aa21a57b91a91663ffe18647714de",
+      "approval_ref": "docs/site-historical-reconciliation-inventory.md#native-source-integration-review-for-coclab-fjcho",
+      "reconciliation_basis": "Administrative county scope supported by native HUD reports, merger/split evidence and jurisdiction records; preserve documented polygon limitations."
+    },
+    {
+      "source_panel": "hic_annual",
+      "frozen_coc_id": "CA-611",
+      "year": 2020,
+      "frozen_boundary_vintage": "2024",
+      "source_boundary_vintage": "2020",
+      "status": "reconciled",
+      "reason": "Reviewed administrative scope and source-specific count operations; exact historical polygon identity is not asserted.",
+      "source_coc_ids": [
+        "CA-611"
+      ],
+      "count_operation": "single",
+      "geometry_status": "unknown",
+      "evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/ventura/ventura_ca605_ca611_reconciliation.json#sha256=c23012838b33e5ee8baa52d52ceb2fcd1d9aa21a57b91a91663ffe18647714de",
+      "geometry_evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/ventura/ventura_ca605_ca611_reconciliation.json#sha256=c23012838b33e5ee8baa52d52ceb2fcd1d9aa21a57b91a91663ffe18647714de",
+      "count_evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/ventura/ventura_ca605_ca611_reconciliation.json#sha256=c23012838b33e5ee8baa52d52ceb2fcd1d9aa21a57b91a91663ffe18647714de",
+      "approval_ref": "docs/site-historical-reconciliation-inventory.md#native-source-integration-review-for-coclab-fjcho",
+      "reconciliation_basis": "Administrative county scope supported by native HUD reports, merger/split evidence and jurisdiction records; preserve documented polygon limitations."
+    },
+    {
+      "source_panel": "pit_p2024",
+      "frozen_coc_id": "CA-611",
+      "year": 2022,
+      "frozen_boundary_vintage": "2024",
+      "source_boundary_vintage": "2024",
+      "status": "reconciled",
+      "reason": "Reviewed administrative scope and source-specific count operations; exact historical polygon identity is not asserted.",
+      "source_coc_ids": [
+        "CA-611"
+      ],
+      "count_operation": "single",
+      "geometry_status": "unknown",
+      "evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/ventura/ventura_ca605_ca611_reconciliation.json#sha256=c23012838b33e5ee8baa52d52ceb2fcd1d9aa21a57b91a91663ffe18647714de",
+      "geometry_evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/ventura/ventura_ca605_ca611_reconciliation.json#sha256=c23012838b33e5ee8baa52d52ceb2fcd1d9aa21a57b91a91663ffe18647714de",
+      "count_evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/ventura/ventura_ca605_ca611_reconciliation.json#sha256=c23012838b33e5ee8baa52d52ceb2fcd1d9aa21a57b91a91663ffe18647714de",
+      "approval_ref": "docs/site-historical-reconciliation-inventory.md#native-source-integration-review-for-coclab-fjcho",
+      "reconciliation_basis": "Administrative county scope supported by native HUD reports, merger/split evidence and jurisdiction records; preserve documented polygon limitations."
+    },
+    {
+      "source_panel": "hic_annual",
+      "frozen_coc_id": "CA-611",
+      "year": 2022,
+      "frozen_boundary_vintage": "2024",
+      "source_boundary_vintage": "2022",
+      "status": "reconciled",
+      "reason": "Reviewed administrative scope and source-specific count operations; exact historical polygon identity is not asserted.",
+      "source_coc_ids": [
+        "CA-611"
+      ],
+      "count_operation": "single",
+      "geometry_status": "unknown",
+      "evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/ventura/ventura_ca605_ca611_reconciliation.json#sha256=c23012838b33e5ee8baa52d52ceb2fcd1d9aa21a57b91a91663ffe18647714de",
+      "geometry_evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/ventura/ventura_ca605_ca611_reconciliation.json#sha256=c23012838b33e5ee8baa52d52ceb2fcd1d9aa21a57b91a91663ffe18647714de",
+      "count_evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/ventura/ventura_ca605_ca611_reconciliation.json#sha256=c23012838b33e5ee8baa52d52ceb2fcd1d9aa21a57b91a91663ffe18647714de",
+      "approval_ref": "docs/site-historical-reconciliation-inventory.md#native-source-integration-review-for-coclab-fjcho",
+      "reconciliation_basis": "Administrative county scope supported by native HUD reports, merger/split evidence and jurisdiction records; preserve documented polygon limitations."
+    },
+    {
+      "source_panel": "pit_p2024",
+      "frozen_coc_id": "CA-611",
+      "year": 2023,
+      "frozen_boundary_vintage": "2024",
+      "source_boundary_vintage": "2024",
+      "status": "reconciled",
+      "reason": "Reviewed administrative scope and source-specific count operations; exact historical polygon identity is not asserted.",
+      "source_coc_ids": [
+        "CA-611"
+      ],
+      "count_operation": "single",
+      "geometry_status": "unknown",
+      "evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/ventura/ventura_ca605_ca611_reconciliation.json#sha256=c23012838b33e5ee8baa52d52ceb2fcd1d9aa21a57b91a91663ffe18647714de",
+      "geometry_evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/ventura/ventura_ca605_ca611_reconciliation.json#sha256=c23012838b33e5ee8baa52d52ceb2fcd1d9aa21a57b91a91663ffe18647714de",
+      "count_evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/ventura/ventura_ca605_ca611_reconciliation.json#sha256=c23012838b33e5ee8baa52d52ceb2fcd1d9aa21a57b91a91663ffe18647714de",
+      "approval_ref": "docs/site-historical-reconciliation-inventory.md#native-source-integration-review-for-coclab-fjcho",
+      "reconciliation_basis": "Administrative county scope supported by native HUD reports, merger/split evidence and jurisdiction records; preserve documented polygon limitations."
+    },
+    {
+      "source_panel": "hic_annual",
+      "frozen_coc_id": "CA-611",
+      "year": 2023,
+      "frozen_boundary_vintage": "2024",
+      "source_boundary_vintage": "2023",
+      "status": "reconciled",
+      "reason": "Reviewed administrative scope and source-specific count operations; exact historical polygon identity is not asserted.",
+      "source_coc_ids": [
+        "CA-611"
+      ],
+      "count_operation": "single",
+      "geometry_status": "unknown",
+      "evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/ventura/ventura_ca605_ca611_reconciliation.json#sha256=c23012838b33e5ee8baa52d52ceb2fcd1d9aa21a57b91a91663ffe18647714de",
+      "geometry_evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/ventura/ventura_ca605_ca611_reconciliation.json#sha256=c23012838b33e5ee8baa52d52ceb2fcd1d9aa21a57b91a91663ffe18647714de",
+      "count_evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/ventura/ventura_ca605_ca611_reconciliation.json#sha256=c23012838b33e5ee8baa52d52ceb2fcd1d9aa21a57b91a91663ffe18647714de",
+      "approval_ref": "docs/site-historical-reconciliation-inventory.md#native-source-integration-review-for-coclab-fjcho",
+      "reconciliation_basis": "Administrative county scope supported by native HUD reports, merger/split evidence and jurisdiction records; preserve documented polygon limitations."
+    },
+    {
+      "source_panel": "pit_p2024",
+      "frozen_coc_id": "CA-611",
+      "year": 2024,
+      "frozen_boundary_vintage": "2024",
+      "source_boundary_vintage": "2024",
+      "status": "reconciled",
+      "reason": "Reviewed administrative scope and source-specific count operations; exact historical polygon identity is not asserted.",
+      "source_coc_ids": [
+        "CA-611"
+      ],
+      "count_operation": "single",
+      "geometry_status": "unknown",
+      "evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/ventura/ventura_ca605_ca611_reconciliation.json#sha256=c23012838b33e5ee8baa52d52ceb2fcd1d9aa21a57b91a91663ffe18647714de",
+      "geometry_evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/ventura/ventura_ca605_ca611_reconciliation.json#sha256=c23012838b33e5ee8baa52d52ceb2fcd1d9aa21a57b91a91663ffe18647714de",
+      "count_evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/ventura/ventura_ca605_ca611_reconciliation.json#sha256=c23012838b33e5ee8baa52d52ceb2fcd1d9aa21a57b91a91663ffe18647714de",
+      "approval_ref": "docs/site-historical-reconciliation-inventory.md#native-source-integration-review-for-coclab-fjcho",
+      "reconciliation_basis": "Administrative county scope supported by native HUD reports, merger/split evidence and jurisdiction records; preserve documented polygon limitations."
+    },
+    {
+      "source_panel": "hic_annual",
+      "frozen_coc_id": "CA-611",
+      "year": 2024,
+      "frozen_boundary_vintage": "2024",
+      "source_boundary_vintage": "2024",
+      "status": "reconciled",
+      "reason": "Reviewed administrative scope and source-specific count operations; exact historical polygon identity is not asserted.",
+      "source_coc_ids": [
+        "CA-611"
+      ],
+      "count_operation": "single",
+      "geometry_status": "unknown",
+      "evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/ventura/ventura_ca605_ca611_reconciliation.json#sha256=c23012838b33e5ee8baa52d52ceb2fcd1d9aa21a57b91a91663ffe18647714de",
+      "geometry_evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/ventura/ventura_ca605_ca611_reconciliation.json#sha256=c23012838b33e5ee8baa52d52ceb2fcd1d9aa21a57b91a91663ffe18647714de",
+      "count_evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/ventura/ventura_ca605_ca611_reconciliation.json#sha256=c23012838b33e5ee8baa52d52ceb2fcd1d9aa21a57b91a91663ffe18647714de",
+      "approval_ref": "docs/site-historical-reconciliation-inventory.md#native-source-integration-review-for-coclab-fjcho",
+      "reconciliation_basis": "Administrative county scope supported by native HUD reports, merger/split evidence and jurisdiction records; preserve documented polygon limitations."
+    },
+    {
+      "source_panel": "pit_p2024",
+      "frozen_coc_id": "FL-503",
+      "year": 2010,
+      "frozen_boundary_vintage": "2024",
+      "source_boundary_vintage": "2024",
+      "status": "reconciled",
+      "reason": "Reviewed administrative scope and source-specific count operations; exact historical polygon identity is not asserted.",
+      "source_coc_ids": [
+        "FL-503"
+      ],
+      "count_operation": "preaggregated",
+      "geometry_status": "near_equivalent",
+      "evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/polk-placer/reconciliation.json#sha256=f9976cdf50529cfc21ef6f3ed73c38f711ebea06b158ab1329e1143a5a9a2372",
+      "geometry_evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/san-diego/polk-geometry-assist/polk-geometry-reconciliation.json",
+      "count_evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/polk-placer/reconciliation.json#sha256=f9976cdf50529cfc21ef6f3ed73c38f711ebea06b158ab1329e1143a5a9a2372",
+      "approval_ref": "docs/site-historical-reconciliation-inventory.md#native-source-integration-review-for-coclab-fjcho",
+      "reconciliation_basis": "Administrative county scope supported by native HUD reports, merger/split evidence and jurisdiction records; preserve documented polygon limitations.",
+      "preaggregated_source_coc_ids": [
+        "FL-503",
+        "FL-516"
+      ]
+    },
+    {
+      "source_panel": "hic_annual",
+      "frozen_coc_id": "FL-503",
+      "year": 2010,
+      "frozen_boundary_vintage": "2024",
+      "source_boundary_vintage": "2010",
+      "status": "reconciled",
+      "reason": "Reviewed administrative scope and source-specific count operations; exact historical polygon identity is not asserted.",
+      "source_coc_ids": [
+        "FL-503",
+        "FL-516"
+      ],
+      "count_operation": "sum",
+      "geometry_status": "near_equivalent",
+      "evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/polk-placer/reconciliation.json#sha256=f9976cdf50529cfc21ef6f3ed73c38f711ebea06b158ab1329e1143a5a9a2372",
+      "geometry_evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/san-diego/polk-geometry-assist/polk-geometry-reconciliation.json",
+      "count_evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/polk-placer/reconciliation.json#sha256=f9976cdf50529cfc21ef6f3ed73c38f711ebea06b158ab1329e1143a5a9a2372",
+      "approval_ref": "docs/site-historical-reconciliation-inventory.md#native-source-integration-review-for-coclab-fjcho",
+      "reconciliation_basis": "Administrative county scope supported by native HUD reports, merger/split evidence and jurisdiction records; preserve documented polygon limitations."
+    },
+    {
+      "source_panel": "pit_p2024",
+      "frozen_coc_id": "FL-503",
+      "year": 2011,
+      "frozen_boundary_vintage": "2024",
+      "source_boundary_vintage": "2024",
+      "status": "reconciled",
+      "reason": "Reviewed administrative scope and source-specific count operations; exact historical polygon identity is not asserted.",
+      "source_coc_ids": [
+        "FL-503"
+      ],
+      "count_operation": "preaggregated",
+      "geometry_status": "near_equivalent",
+      "evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/polk-placer/reconciliation.json#sha256=f9976cdf50529cfc21ef6f3ed73c38f711ebea06b158ab1329e1143a5a9a2372",
+      "geometry_evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/san-diego/polk-geometry-assist/polk-geometry-reconciliation.json",
+      "count_evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/polk-placer/reconciliation.json#sha256=f9976cdf50529cfc21ef6f3ed73c38f711ebea06b158ab1329e1143a5a9a2372",
+      "approval_ref": "docs/site-historical-reconciliation-inventory.md#native-source-integration-review-for-coclab-fjcho",
+      "reconciliation_basis": "Administrative county scope supported by native HUD reports, merger/split evidence and jurisdiction records; preserve documented polygon limitations.",
+      "preaggregated_source_coc_ids": [
+        "FL-503",
+        "FL-516"
+      ]
+    },
+    {
+      "source_panel": "hic_annual",
+      "frozen_coc_id": "FL-503",
+      "year": 2011,
+      "frozen_boundary_vintage": "2024",
+      "source_boundary_vintage": "2011",
+      "status": "reconciled",
+      "reason": "Reviewed administrative scope and source-specific count operations; exact historical polygon identity is not asserted.",
+      "source_coc_ids": [
+        "FL-503",
+        "FL-516"
+      ],
+      "count_operation": "sum",
+      "geometry_status": "near_equivalent",
+      "evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/polk-placer/reconciliation.json#sha256=f9976cdf50529cfc21ef6f3ed73c38f711ebea06b158ab1329e1143a5a9a2372",
+      "geometry_evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/san-diego/polk-geometry-assist/polk-geometry-reconciliation.json",
+      "count_evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/polk-placer/reconciliation.json#sha256=f9976cdf50529cfc21ef6f3ed73c38f711ebea06b158ab1329e1143a5a9a2372",
+      "approval_ref": "docs/site-historical-reconciliation-inventory.md#native-source-integration-review-for-coclab-fjcho",
+      "reconciliation_basis": "Administrative county scope supported by native HUD reports, merger/split evidence and jurisdiction records; preserve documented polygon limitations."
+    },
+    {
+      "source_panel": "pit_p2024",
+      "frozen_coc_id": "FL-503",
+      "year": 2012,
+      "frozen_boundary_vintage": "2024",
+      "source_boundary_vintage": "2024",
+      "status": "reconciled",
+      "reason": "Reviewed administrative scope and source-specific count operations; exact historical polygon identity is not asserted.",
+      "source_coc_ids": [
+        "FL-503"
+      ],
+      "count_operation": "preaggregated",
+      "geometry_status": "near_equivalent",
+      "evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/polk-placer/reconciliation.json#sha256=f9976cdf50529cfc21ef6f3ed73c38f711ebea06b158ab1329e1143a5a9a2372",
+      "geometry_evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/san-diego/polk-geometry-assist/polk-geometry-reconciliation.json",
+      "count_evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/polk-placer/reconciliation.json#sha256=f9976cdf50529cfc21ef6f3ed73c38f711ebea06b158ab1329e1143a5a9a2372",
+      "approval_ref": "docs/site-historical-reconciliation-inventory.md#native-source-integration-review-for-coclab-fjcho",
+      "reconciliation_basis": "Administrative county scope supported by native HUD reports, merger/split evidence and jurisdiction records; preserve documented polygon limitations.",
+      "preaggregated_source_coc_ids": [
+        "FL-503",
+        "FL-516"
+      ]
+    },
+    {
+      "source_panel": "hic_annual",
+      "frozen_coc_id": "FL-503",
+      "year": 2012,
+      "frozen_boundary_vintage": "2024",
+      "source_boundary_vintage": "2012",
+      "status": "reconciled",
+      "reason": "Reviewed administrative scope and source-specific count operations; exact historical polygon identity is not asserted.",
+      "source_coc_ids": [
+        "FL-503",
+        "FL-516"
+      ],
+      "count_operation": "sum",
+      "geometry_status": "near_equivalent",
+      "evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/polk-placer/reconciliation.json#sha256=f9976cdf50529cfc21ef6f3ed73c38f711ebea06b158ab1329e1143a5a9a2372",
+      "geometry_evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/san-diego/polk-geometry-assist/polk-geometry-reconciliation.json",
+      "count_evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/polk-placer/reconciliation.json#sha256=f9976cdf50529cfc21ef6f3ed73c38f711ebea06b158ab1329e1143a5a9a2372",
+      "approval_ref": "docs/site-historical-reconciliation-inventory.md#native-source-integration-review-for-coclab-fjcho",
+      "reconciliation_basis": "Administrative county scope supported by native HUD reports, merger/split evidence and jurisdiction records; preserve documented polygon limitations."
+    },
+    {
+      "source_panel": "pit_p2024",
+      "frozen_coc_id": "FL-503",
+      "year": 2013,
+      "frozen_boundary_vintage": "2024",
+      "source_boundary_vintage": "2024",
+      "status": "reconciled",
+      "reason": "Reviewed administrative scope and source-specific count operations; exact historical polygon identity is not asserted.",
+      "source_coc_ids": [
+        "FL-503"
+      ],
+      "count_operation": "preaggregated",
+      "geometry_status": "near_equivalent",
+      "evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/polk-placer/reconciliation.json#sha256=f9976cdf50529cfc21ef6f3ed73c38f711ebea06b158ab1329e1143a5a9a2372",
+      "geometry_evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/san-diego/polk-geometry-assist/polk-geometry-reconciliation.json",
+      "count_evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/polk-placer/reconciliation.json#sha256=f9976cdf50529cfc21ef6f3ed73c38f711ebea06b158ab1329e1143a5a9a2372",
+      "approval_ref": "docs/site-historical-reconciliation-inventory.md#native-source-integration-review-for-coclab-fjcho",
+      "reconciliation_basis": "Administrative county scope supported by native HUD reports, merger/split evidence and jurisdiction records; preserve documented polygon limitations.",
+      "preaggregated_source_coc_ids": [
+        "FL-503",
+        "FL-516"
+      ]
+    },
+    {
+      "source_panel": "hic_annual",
+      "frozen_coc_id": "FL-503",
+      "year": 2013,
+      "frozen_boundary_vintage": "2024",
+      "source_boundary_vintage": "2013",
+      "status": "reconciled",
+      "reason": "Reviewed administrative scope and source-specific count operations; exact historical polygon identity is not asserted.",
+      "source_coc_ids": [
+        "FL-503",
+        "FL-516"
+      ],
+      "count_operation": "sum",
+      "geometry_status": "near_equivalent",
+      "evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/polk-placer/reconciliation.json#sha256=f9976cdf50529cfc21ef6f3ed73c38f711ebea06b158ab1329e1143a5a9a2372",
+      "geometry_evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/san-diego/polk-geometry-assist/polk-geometry-reconciliation.json",
+      "count_evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/polk-placer/reconciliation.json#sha256=f9976cdf50529cfc21ef6f3ed73c38f711ebea06b158ab1329e1143a5a9a2372",
+      "approval_ref": "docs/site-historical-reconciliation-inventory.md#native-source-integration-review-for-coclab-fjcho",
+      "reconciliation_basis": "Administrative county scope supported by native HUD reports, merger/split evidence and jurisdiction records; preserve documented polygon limitations."
+    },
+    {
+      "source_panel": "pit_p2024",
+      "frozen_coc_id": "FL-503",
+      "year": 2014,
+      "frozen_boundary_vintage": "2024",
+      "source_boundary_vintage": "2024",
+      "status": "reconciled",
+      "reason": "Reviewed administrative scope and source-specific count operations; exact historical polygon identity is not asserted.",
+      "source_coc_ids": [
+        "FL-503"
+      ],
+      "count_operation": "preaggregated",
+      "geometry_status": "near_equivalent",
+      "evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/polk-placer/reconciliation.json#sha256=f9976cdf50529cfc21ef6f3ed73c38f711ebea06b158ab1329e1143a5a9a2372",
+      "geometry_evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/san-diego/polk-geometry-assist/polk-geometry-reconciliation.json",
+      "count_evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/polk-placer/reconciliation.json#sha256=f9976cdf50529cfc21ef6f3ed73c38f711ebea06b158ab1329e1143a5a9a2372",
+      "approval_ref": "docs/site-historical-reconciliation-inventory.md#native-source-integration-review-for-coclab-fjcho",
+      "reconciliation_basis": "Administrative county scope supported by native HUD reports, merger/split evidence and jurisdiction records; preserve documented polygon limitations.",
+      "preaggregated_source_coc_ids": [
+        "FL-503",
+        "FL-516"
+      ]
+    },
+    {
+      "source_panel": "hic_annual",
+      "frozen_coc_id": "FL-503",
+      "year": 2014,
+      "frozen_boundary_vintage": "2024",
+      "source_boundary_vintage": "2014",
+      "status": "reconciled",
+      "reason": "Reviewed administrative scope and source-specific count operations; exact historical polygon identity is not asserted.",
+      "source_coc_ids": [
+        "FL-503",
+        "FL-516"
+      ],
+      "count_operation": "sum",
+      "geometry_status": "near_equivalent",
+      "evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/polk-placer/reconciliation.json#sha256=f9976cdf50529cfc21ef6f3ed73c38f711ebea06b158ab1329e1143a5a9a2372",
+      "geometry_evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/san-diego/polk-geometry-assist/polk-geometry-reconciliation.json",
+      "count_evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/polk-placer/reconciliation.json#sha256=f9976cdf50529cfc21ef6f3ed73c38f711ebea06b158ab1329e1143a5a9a2372",
+      "approval_ref": "docs/site-historical-reconciliation-inventory.md#native-source-integration-review-for-coclab-fjcho",
+      "reconciliation_basis": "Administrative county scope supported by native HUD reports, merger/split evidence and jurisdiction records; preserve documented polygon limitations."
+    },
+    {
+      "source_panel": "pit_p2024",
+      "frozen_coc_id": "FL-503",
+      "year": 2015,
+      "frozen_boundary_vintage": "2024",
+      "source_boundary_vintage": "2024",
+      "status": "reconciled",
+      "reason": "Reviewed administrative scope and source-specific count operations; exact historical polygon identity is not asserted.",
+      "source_coc_ids": [
+        "FL-503"
+      ],
+      "count_operation": "single",
+      "geometry_status": "unknown",
+      "evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/polk-placer/reconciliation.json#sha256=f9976cdf50529cfc21ef6f3ed73c38f711ebea06b158ab1329e1143a5a9a2372",
+      "geometry_evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/polk-placer/reconciliation.json#sha256=f9976cdf50529cfc21ef6f3ed73c38f711ebea06b158ab1329e1143a5a9a2372",
+      "count_evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/polk-placer/reconciliation.json#sha256=f9976cdf50529cfc21ef6f3ed73c38f711ebea06b158ab1329e1143a5a9a2372",
+      "approval_ref": "docs/site-historical-reconciliation-inventory.md#native-source-integration-review-for-coclab-fjcho",
+      "reconciliation_basis": "Administrative county scope supported by native HUD reports, merger/split evidence and jurisdiction records; preserve documented polygon limitations."
+    },
+    {
+      "source_panel": "hic_annual",
+      "frozen_coc_id": "FL-503",
+      "year": 2015,
+      "frozen_boundary_vintage": "2024",
+      "source_boundary_vintage": "2015",
+      "status": "reconciled",
+      "reason": "Reviewed administrative scope and source-specific count operations; exact historical polygon identity is not asserted.",
+      "source_coc_ids": [
+        "FL-503"
+      ],
+      "count_operation": "single",
+      "geometry_status": "unknown",
+      "evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/polk-placer/reconciliation.json#sha256=f9976cdf50529cfc21ef6f3ed73c38f711ebea06b158ab1329e1143a5a9a2372",
+      "geometry_evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/polk-placer/reconciliation.json#sha256=f9976cdf50529cfc21ef6f3ed73c38f711ebea06b158ab1329e1143a5a9a2372",
+      "count_evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/polk-placer/reconciliation.json#sha256=f9976cdf50529cfc21ef6f3ed73c38f711ebea06b158ab1329e1143a5a9a2372",
+      "approval_ref": "docs/site-historical-reconciliation-inventory.md#native-source-integration-review-for-coclab-fjcho",
+      "reconciliation_basis": "Administrative county scope supported by native HUD reports, merger/split evidence and jurisdiction records; preserve documented polygon limitations."
+    },
+    {
+      "source_panel": "pit_p2024",
+      "frozen_coc_id": "FL-503",
+      "year": 2016,
+      "frozen_boundary_vintage": "2024",
+      "source_boundary_vintage": "2024",
+      "status": "reconciled",
+      "reason": "Reviewed administrative scope and source-specific count operations; exact historical polygon identity is not asserted.",
+      "source_coc_ids": [
+        "FL-503"
+      ],
+      "count_operation": "single",
+      "geometry_status": "unknown",
+      "evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/polk-placer/reconciliation.json#sha256=f9976cdf50529cfc21ef6f3ed73c38f711ebea06b158ab1329e1143a5a9a2372",
+      "geometry_evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/polk-placer/reconciliation.json#sha256=f9976cdf50529cfc21ef6f3ed73c38f711ebea06b158ab1329e1143a5a9a2372",
+      "count_evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/polk-placer/reconciliation.json#sha256=f9976cdf50529cfc21ef6f3ed73c38f711ebea06b158ab1329e1143a5a9a2372",
+      "approval_ref": "docs/site-historical-reconciliation-inventory.md#native-source-integration-review-for-coclab-fjcho",
+      "reconciliation_basis": "Administrative county scope supported by native HUD reports, merger/split evidence and jurisdiction records; preserve documented polygon limitations."
+    },
+    {
+      "source_panel": "hic_annual",
+      "frozen_coc_id": "FL-503",
+      "year": 2016,
+      "frozen_boundary_vintage": "2024",
+      "source_boundary_vintage": "2016",
+      "status": "reconciled",
+      "reason": "Reviewed administrative scope and source-specific count operations; exact historical polygon identity is not asserted.",
+      "source_coc_ids": [
+        "FL-503"
+      ],
+      "count_operation": "single",
+      "geometry_status": "unknown",
+      "evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/polk-placer/reconciliation.json#sha256=f9976cdf50529cfc21ef6f3ed73c38f711ebea06b158ab1329e1143a5a9a2372",
+      "geometry_evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/polk-placer/reconciliation.json#sha256=f9976cdf50529cfc21ef6f3ed73c38f711ebea06b158ab1329e1143a5a9a2372",
+      "count_evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/polk-placer/reconciliation.json#sha256=f9976cdf50529cfc21ef6f3ed73c38f711ebea06b158ab1329e1143a5a9a2372",
+      "approval_ref": "docs/site-historical-reconciliation-inventory.md#native-source-integration-review-for-coclab-fjcho",
+      "reconciliation_basis": "Administrative county scope supported by native HUD reports, merger/split evidence and jurisdiction records; preserve documented polygon limitations."
+    },
+    {
+      "source_panel": "pit_p2024",
+      "frozen_coc_id": "FL-503",
+      "year": 2017,
+      "frozen_boundary_vintage": "2024",
+      "source_boundary_vintage": "2024",
+      "status": "reconciled",
+      "reason": "Reviewed administrative scope and source-specific count operations; exact historical polygon identity is not asserted.",
+      "source_coc_ids": [
+        "FL-503"
+      ],
+      "count_operation": "single",
+      "geometry_status": "unknown",
+      "evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/polk-placer/reconciliation.json#sha256=f9976cdf50529cfc21ef6f3ed73c38f711ebea06b158ab1329e1143a5a9a2372",
+      "geometry_evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/polk-placer/reconciliation.json#sha256=f9976cdf50529cfc21ef6f3ed73c38f711ebea06b158ab1329e1143a5a9a2372",
+      "count_evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/polk-placer/reconciliation.json#sha256=f9976cdf50529cfc21ef6f3ed73c38f711ebea06b158ab1329e1143a5a9a2372",
+      "approval_ref": "docs/site-historical-reconciliation-inventory.md#native-source-integration-review-for-coclab-fjcho",
+      "reconciliation_basis": "Administrative county scope supported by native HUD reports, merger/split evidence and jurisdiction records; preserve documented polygon limitations."
+    },
+    {
+      "source_panel": "hic_annual",
+      "frozen_coc_id": "FL-503",
+      "year": 2017,
+      "frozen_boundary_vintage": "2024",
+      "source_boundary_vintage": "2017",
+      "status": "reconciled",
+      "reason": "Reviewed administrative scope and source-specific count operations; exact historical polygon identity is not asserted.",
+      "source_coc_ids": [
+        "FL-503"
+      ],
+      "count_operation": "single",
+      "geometry_status": "unknown",
+      "evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/polk-placer/reconciliation.json#sha256=f9976cdf50529cfc21ef6f3ed73c38f711ebea06b158ab1329e1143a5a9a2372",
+      "geometry_evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/polk-placer/reconciliation.json#sha256=f9976cdf50529cfc21ef6f3ed73c38f711ebea06b158ab1329e1143a5a9a2372",
+      "count_evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/polk-placer/reconciliation.json#sha256=f9976cdf50529cfc21ef6f3ed73c38f711ebea06b158ab1329e1143a5a9a2372",
+      "approval_ref": "docs/site-historical-reconciliation-inventory.md#native-source-integration-review-for-coclab-fjcho",
+      "reconciliation_basis": "Administrative county scope supported by native HUD reports, merger/split evidence and jurisdiction records; preserve documented polygon limitations."
+    },
+    {
+      "source_panel": "pit_p2024",
+      "frozen_coc_id": "FL-503",
+      "year": 2018,
+      "frozen_boundary_vintage": "2024",
+      "source_boundary_vintage": "2024",
+      "status": "reconciled",
+      "reason": "Reviewed administrative scope and source-specific count operations; exact historical polygon identity is not asserted.",
+      "source_coc_ids": [
+        "FL-503"
+      ],
+      "count_operation": "single",
+      "geometry_status": "unknown",
+      "evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/polk-placer/reconciliation.json#sha256=f9976cdf50529cfc21ef6f3ed73c38f711ebea06b158ab1329e1143a5a9a2372",
+      "geometry_evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/polk-placer/reconciliation.json#sha256=f9976cdf50529cfc21ef6f3ed73c38f711ebea06b158ab1329e1143a5a9a2372",
+      "count_evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/polk-placer/reconciliation.json#sha256=f9976cdf50529cfc21ef6f3ed73c38f711ebea06b158ab1329e1143a5a9a2372",
+      "approval_ref": "docs/site-historical-reconciliation-inventory.md#native-source-integration-review-for-coclab-fjcho",
+      "reconciliation_basis": "Administrative county scope supported by native HUD reports, merger/split evidence and jurisdiction records; preserve documented polygon limitations."
+    },
+    {
+      "source_panel": "hic_annual",
+      "frozen_coc_id": "FL-503",
+      "year": 2018,
+      "frozen_boundary_vintage": "2024",
+      "source_boundary_vintage": "2018",
+      "status": "reconciled",
+      "reason": "Reviewed administrative scope and source-specific count operations; exact historical polygon identity is not asserted.",
+      "source_coc_ids": [
+        "FL-503"
+      ],
+      "count_operation": "single",
+      "geometry_status": "unknown",
+      "evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/polk-placer/reconciliation.json#sha256=f9976cdf50529cfc21ef6f3ed73c38f711ebea06b158ab1329e1143a5a9a2372",
+      "geometry_evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/polk-placer/reconciliation.json#sha256=f9976cdf50529cfc21ef6f3ed73c38f711ebea06b158ab1329e1143a5a9a2372",
+      "count_evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/polk-placer/reconciliation.json#sha256=f9976cdf50529cfc21ef6f3ed73c38f711ebea06b158ab1329e1143a5a9a2372",
+      "approval_ref": "docs/site-historical-reconciliation-inventory.md#native-source-integration-review-for-coclab-fjcho",
+      "reconciliation_basis": "Administrative county scope supported by native HUD reports, merger/split evidence and jurisdiction records; preserve documented polygon limitations."
+    },
+    {
+      "source_panel": "pit_p2024",
+      "frozen_coc_id": "FL-503",
+      "year": 2019,
+      "frozen_boundary_vintage": "2024",
+      "source_boundary_vintage": "2024",
+      "status": "reconciled",
+      "reason": "Reviewed administrative scope and source-specific count operations; exact historical polygon identity is not asserted.",
+      "source_coc_ids": [
+        "FL-503"
+      ],
+      "count_operation": "single",
+      "geometry_status": "unknown",
+      "evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/polk-placer/reconciliation.json#sha256=f9976cdf50529cfc21ef6f3ed73c38f711ebea06b158ab1329e1143a5a9a2372",
+      "geometry_evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/polk-placer/reconciliation.json#sha256=f9976cdf50529cfc21ef6f3ed73c38f711ebea06b158ab1329e1143a5a9a2372",
+      "count_evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/polk-placer/reconciliation.json#sha256=f9976cdf50529cfc21ef6f3ed73c38f711ebea06b158ab1329e1143a5a9a2372",
+      "approval_ref": "docs/site-historical-reconciliation-inventory.md#native-source-integration-review-for-coclab-fjcho",
+      "reconciliation_basis": "Administrative county scope supported by native HUD reports, merger/split evidence and jurisdiction records; preserve documented polygon limitations."
+    },
+    {
+      "source_panel": "hic_annual",
+      "frozen_coc_id": "FL-503",
+      "year": 2019,
+      "frozen_boundary_vintage": "2024",
+      "source_boundary_vintage": "2019",
+      "status": "reconciled",
+      "reason": "Reviewed administrative scope and source-specific count operations; exact historical polygon identity is not asserted.",
+      "source_coc_ids": [
+        "FL-503"
+      ],
+      "count_operation": "single",
+      "geometry_status": "unknown",
+      "evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/polk-placer/reconciliation.json#sha256=f9976cdf50529cfc21ef6f3ed73c38f711ebea06b158ab1329e1143a5a9a2372",
+      "geometry_evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/polk-placer/reconciliation.json#sha256=f9976cdf50529cfc21ef6f3ed73c38f711ebea06b158ab1329e1143a5a9a2372",
+      "count_evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/polk-placer/reconciliation.json#sha256=f9976cdf50529cfc21ef6f3ed73c38f711ebea06b158ab1329e1143a5a9a2372",
+      "approval_ref": "docs/site-historical-reconciliation-inventory.md#native-source-integration-review-for-coclab-fjcho",
+      "reconciliation_basis": "Administrative county scope supported by native HUD reports, merger/split evidence and jurisdiction records; preserve documented polygon limitations."
+    },
+    {
+      "source_panel": "pit_p2024",
+      "frozen_coc_id": "FL-503",
+      "year": 2020,
+      "frozen_boundary_vintage": "2024",
+      "source_boundary_vintage": "2024",
+      "status": "reconciled",
+      "reason": "Reviewed administrative scope and source-specific count operations; exact historical polygon identity is not asserted.",
+      "source_coc_ids": [
+        "FL-503"
+      ],
+      "count_operation": "single",
+      "geometry_status": "unknown",
+      "evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/polk-placer/reconciliation.json#sha256=f9976cdf50529cfc21ef6f3ed73c38f711ebea06b158ab1329e1143a5a9a2372",
+      "geometry_evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/polk-placer/reconciliation.json#sha256=f9976cdf50529cfc21ef6f3ed73c38f711ebea06b158ab1329e1143a5a9a2372",
+      "count_evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/polk-placer/reconciliation.json#sha256=f9976cdf50529cfc21ef6f3ed73c38f711ebea06b158ab1329e1143a5a9a2372",
+      "approval_ref": "docs/site-historical-reconciliation-inventory.md#native-source-integration-review-for-coclab-fjcho",
+      "reconciliation_basis": "Administrative county scope supported by native HUD reports, merger/split evidence and jurisdiction records; preserve documented polygon limitations."
+    },
+    {
+      "source_panel": "hic_annual",
+      "frozen_coc_id": "FL-503",
+      "year": 2020,
+      "frozen_boundary_vintage": "2024",
+      "source_boundary_vintage": "2020",
+      "status": "reconciled",
+      "reason": "Reviewed administrative scope and source-specific count operations; exact historical polygon identity is not asserted.",
+      "source_coc_ids": [
+        "FL-503"
+      ],
+      "count_operation": "single",
+      "geometry_status": "unknown",
+      "evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/polk-placer/reconciliation.json#sha256=f9976cdf50529cfc21ef6f3ed73c38f711ebea06b158ab1329e1143a5a9a2372",
+      "geometry_evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/polk-placer/reconciliation.json#sha256=f9976cdf50529cfc21ef6f3ed73c38f711ebea06b158ab1329e1143a5a9a2372",
+      "count_evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/polk-placer/reconciliation.json#sha256=f9976cdf50529cfc21ef6f3ed73c38f711ebea06b158ab1329e1143a5a9a2372",
+      "approval_ref": "docs/site-historical-reconciliation-inventory.md#native-source-integration-review-for-coclab-fjcho",
+      "reconciliation_basis": "Administrative county scope supported by native HUD reports, merger/split evidence and jurisdiction records; preserve documented polygon limitations."
+    },
+    {
+      "source_panel": "pit_p2024",
+      "frozen_coc_id": "FL-503",
+      "year": 2022,
+      "frozen_boundary_vintage": "2024",
+      "source_boundary_vintage": "2024",
+      "status": "reconciled",
+      "reason": "Reviewed administrative scope and source-specific count operations; exact historical polygon identity is not asserted.",
+      "source_coc_ids": [
+        "FL-503"
+      ],
+      "count_operation": "single",
+      "geometry_status": "unknown",
+      "evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/polk-placer/reconciliation.json#sha256=f9976cdf50529cfc21ef6f3ed73c38f711ebea06b158ab1329e1143a5a9a2372",
+      "geometry_evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/polk-placer/reconciliation.json#sha256=f9976cdf50529cfc21ef6f3ed73c38f711ebea06b158ab1329e1143a5a9a2372",
+      "count_evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/polk-placer/reconciliation.json#sha256=f9976cdf50529cfc21ef6f3ed73c38f711ebea06b158ab1329e1143a5a9a2372",
+      "approval_ref": "docs/site-historical-reconciliation-inventory.md#native-source-integration-review-for-coclab-fjcho",
+      "reconciliation_basis": "Administrative county scope supported by native HUD reports, merger/split evidence and jurisdiction records; preserve documented polygon limitations."
+    },
+    {
+      "source_panel": "hic_annual",
+      "frozen_coc_id": "FL-503",
+      "year": 2022,
+      "frozen_boundary_vintage": "2024",
+      "source_boundary_vintage": "2022",
+      "status": "reconciled",
+      "reason": "Reviewed administrative scope and source-specific count operations; exact historical polygon identity is not asserted.",
+      "source_coc_ids": [
+        "FL-503"
+      ],
+      "count_operation": "single",
+      "geometry_status": "unknown",
+      "evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/polk-placer/reconciliation.json#sha256=f9976cdf50529cfc21ef6f3ed73c38f711ebea06b158ab1329e1143a5a9a2372",
+      "geometry_evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/polk-placer/reconciliation.json#sha256=f9976cdf50529cfc21ef6f3ed73c38f711ebea06b158ab1329e1143a5a9a2372",
+      "count_evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/polk-placer/reconciliation.json#sha256=f9976cdf50529cfc21ef6f3ed73c38f711ebea06b158ab1329e1143a5a9a2372",
+      "approval_ref": "docs/site-historical-reconciliation-inventory.md#native-source-integration-review-for-coclab-fjcho",
+      "reconciliation_basis": "Administrative county scope supported by native HUD reports, merger/split evidence and jurisdiction records; preserve documented polygon limitations."
+    },
+    {
+      "source_panel": "pit_p2024",
+      "frozen_coc_id": "FL-503",
+      "year": 2023,
+      "frozen_boundary_vintage": "2024",
+      "source_boundary_vintage": "2024",
+      "status": "reconciled",
+      "reason": "Reviewed administrative scope and source-specific count operations; exact historical polygon identity is not asserted.",
+      "source_coc_ids": [
+        "FL-503"
+      ],
+      "count_operation": "single",
+      "geometry_status": "unknown",
+      "evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/polk-placer/reconciliation.json#sha256=f9976cdf50529cfc21ef6f3ed73c38f711ebea06b158ab1329e1143a5a9a2372",
+      "geometry_evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/polk-placer/reconciliation.json#sha256=f9976cdf50529cfc21ef6f3ed73c38f711ebea06b158ab1329e1143a5a9a2372",
+      "count_evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/polk-placer/reconciliation.json#sha256=f9976cdf50529cfc21ef6f3ed73c38f711ebea06b158ab1329e1143a5a9a2372",
+      "approval_ref": "docs/site-historical-reconciliation-inventory.md#native-source-integration-review-for-coclab-fjcho",
+      "reconciliation_basis": "Administrative county scope supported by native HUD reports, merger/split evidence and jurisdiction records; preserve documented polygon limitations."
+    },
+    {
+      "source_panel": "hic_annual",
+      "frozen_coc_id": "FL-503",
+      "year": 2023,
+      "frozen_boundary_vintage": "2024",
+      "source_boundary_vintage": "2023",
+      "status": "reconciled",
+      "reason": "Reviewed administrative scope and source-specific count operations; exact historical polygon identity is not asserted.",
+      "source_coc_ids": [
+        "FL-503"
+      ],
+      "count_operation": "single",
+      "geometry_status": "unknown",
+      "evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/polk-placer/reconciliation.json#sha256=f9976cdf50529cfc21ef6f3ed73c38f711ebea06b158ab1329e1143a5a9a2372",
+      "geometry_evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/polk-placer/reconciliation.json#sha256=f9976cdf50529cfc21ef6f3ed73c38f711ebea06b158ab1329e1143a5a9a2372",
+      "count_evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/polk-placer/reconciliation.json#sha256=f9976cdf50529cfc21ef6f3ed73c38f711ebea06b158ab1329e1143a5a9a2372",
+      "approval_ref": "docs/site-historical-reconciliation-inventory.md#native-source-integration-review-for-coclab-fjcho",
+      "reconciliation_basis": "Administrative county scope supported by native HUD reports, merger/split evidence and jurisdiction records; preserve documented polygon limitations."
+    },
+    {
+      "source_panel": "pit_p2024",
+      "frozen_coc_id": "FL-503",
+      "year": 2024,
+      "frozen_boundary_vintage": "2024",
+      "source_boundary_vintage": "2024",
+      "status": "reconciled",
+      "reason": "Reviewed administrative scope and source-specific count operations; exact historical polygon identity is not asserted.",
+      "source_coc_ids": [
+        "FL-503"
+      ],
+      "count_operation": "single",
+      "geometry_status": "unknown",
+      "evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/polk-placer/reconciliation.json#sha256=f9976cdf50529cfc21ef6f3ed73c38f711ebea06b158ab1329e1143a5a9a2372",
+      "geometry_evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/polk-placer/reconciliation.json#sha256=f9976cdf50529cfc21ef6f3ed73c38f711ebea06b158ab1329e1143a5a9a2372",
+      "count_evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/polk-placer/reconciliation.json#sha256=f9976cdf50529cfc21ef6f3ed73c38f711ebea06b158ab1329e1143a5a9a2372",
+      "approval_ref": "docs/site-historical-reconciliation-inventory.md#native-source-integration-review-for-coclab-fjcho",
+      "reconciliation_basis": "Administrative county scope supported by native HUD reports, merger/split evidence and jurisdiction records; preserve documented polygon limitations."
+    },
+    {
+      "source_panel": "hic_annual",
+      "frozen_coc_id": "FL-503",
+      "year": 2024,
+      "frozen_boundary_vintage": "2024",
+      "source_boundary_vintage": "2024",
+      "status": "reconciled",
+      "reason": "Reviewed administrative scope and source-specific count operations; exact historical polygon identity is not asserted.",
+      "source_coc_ids": [
+        "FL-503"
+      ],
+      "count_operation": "single",
+      "geometry_status": "unknown",
+      "evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/polk-placer/reconciliation.json#sha256=f9976cdf50529cfc21ef6f3ed73c38f711ebea06b158ab1329e1143a5a9a2372",
+      "geometry_evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/polk-placer/reconciliation.json#sha256=f9976cdf50529cfc21ef6f3ed73c38f711ebea06b158ab1329e1143a5a9a2372",
+      "count_evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/polk-placer/reconciliation.json#sha256=f9976cdf50529cfc21ef6f3ed73c38f711ebea06b158ab1329e1143a5a9a2372",
+      "approval_ref": "docs/site-historical-reconciliation-inventory.md#native-source-integration-review-for-coclab-fjcho",
+      "reconciliation_basis": "Administrative county scope supported by native HUD reports, merger/split evidence and jurisdiction records; preserve documented polygon limitations."
+    },
+    {
+      "source_panel": "pit_p2024",
+      "frozen_coc_id": "CA-515",
+      "year": 2010,
+      "frozen_boundary_vintage": "2024",
+      "source_boundary_vintage": "2024",
+      "status": "incompatible",
+      "reason": "Historical CA-515 includes Nevada County, outside frozen Placer-only footprint. No aligned county split is available; do not emit a partial Sacramento site count.",
+      "source_coc_ids": [],
+      "count_operation": null,
+      "geometry_status": "different_unresolved",
+      "evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/san-diego/polk-geometry-assist/ca515-geometry.json#sha256=17056bb49ef032d69c91cc9e5e6d0ae548576f5bc9e41facfc6ead0cb6469e0a",
+      "geometry_evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/san-diego/polk-geometry-assist/ca515-geometry.json#sha256=17056bb49ef032d69c91cc9e5e6d0ae548576f5bc9e41facfc6ead0cb6469e0a"
+    },
+    {
+      "source_panel": "hic_annual",
+      "frozen_coc_id": "CA-515",
+      "year": 2010,
+      "frozen_boundary_vintage": "2024",
+      "source_boundary_vintage": "2010",
+      "status": "incompatible",
+      "reason": "Historical CA-515 includes Nevada County, outside frozen Placer-only footprint. No aligned county split is available; do not emit a partial Sacramento site count.",
+      "source_coc_ids": [],
+      "count_operation": null,
+      "geometry_status": "different_unresolved",
+      "evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/san-diego/polk-geometry-assist/ca515-geometry.json#sha256=17056bb49ef032d69c91cc9e5e6d0ae548576f5bc9e41facfc6ead0cb6469e0a",
+      "geometry_evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/san-diego/polk-geometry-assist/ca515-geometry.json#sha256=17056bb49ef032d69c91cc9e5e6d0ae548576f5bc9e41facfc6ead0cb6469e0a"
+    },
+    {
+      "source_panel": "pit_p2024",
+      "frozen_coc_id": "CA-515",
+      "year": 2011,
+      "frozen_boundary_vintage": "2024",
+      "source_boundary_vintage": "2024",
+      "status": "incompatible",
+      "reason": "Historical CA-515 includes Nevada County, outside frozen Placer-only footprint. No aligned county split is available; do not emit a partial Sacramento site count.",
+      "source_coc_ids": [],
+      "count_operation": null,
+      "geometry_status": "different_unresolved",
+      "evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/san-diego/polk-geometry-assist/ca515-geometry.json#sha256=17056bb49ef032d69c91cc9e5e6d0ae548576f5bc9e41facfc6ead0cb6469e0a",
+      "geometry_evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/san-diego/polk-geometry-assist/ca515-geometry.json#sha256=17056bb49ef032d69c91cc9e5e6d0ae548576f5bc9e41facfc6ead0cb6469e0a"
+    },
+    {
+      "source_panel": "hic_annual",
+      "frozen_coc_id": "CA-515",
+      "year": 2011,
+      "frozen_boundary_vintage": "2024",
+      "source_boundary_vintage": "2011",
+      "status": "incompatible",
+      "reason": "Historical CA-515 includes Nevada County, outside frozen Placer-only footprint. No aligned county split is available; do not emit a partial Sacramento site count.",
+      "source_coc_ids": [],
+      "count_operation": null,
+      "geometry_status": "different_unresolved",
+      "evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/san-diego/polk-geometry-assist/ca515-geometry.json#sha256=17056bb49ef032d69c91cc9e5e6d0ae548576f5bc9e41facfc6ead0cb6469e0a",
+      "geometry_evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/san-diego/polk-geometry-assist/ca515-geometry.json#sha256=17056bb49ef032d69c91cc9e5e6d0ae548576f5bc9e41facfc6ead0cb6469e0a"
+    },
+    {
+      "source_panel": "pit_p2024",
+      "frozen_coc_id": "CA-515",
+      "year": 2012,
+      "frozen_boundary_vintage": "2024",
+      "source_boundary_vintage": "2024",
+      "status": "incompatible",
+      "reason": "Historical CA-515 includes Nevada County, outside frozen Placer-only footprint. No aligned county split is available; do not emit a partial Sacramento site count.",
+      "source_coc_ids": [],
+      "count_operation": null,
+      "geometry_status": "different_unresolved",
+      "evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/san-diego/polk-geometry-assist/ca515-geometry.json#sha256=17056bb49ef032d69c91cc9e5e6d0ae548576f5bc9e41facfc6ead0cb6469e0a",
+      "geometry_evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/san-diego/polk-geometry-assist/ca515-geometry.json#sha256=17056bb49ef032d69c91cc9e5e6d0ae548576f5bc9e41facfc6ead0cb6469e0a"
+    },
+    {
+      "source_panel": "hic_annual",
+      "frozen_coc_id": "CA-515",
+      "year": 2012,
+      "frozen_boundary_vintage": "2024",
+      "source_boundary_vintage": "2012",
+      "status": "incompatible",
+      "reason": "Historical CA-515 includes Nevada County, outside frozen Placer-only footprint. No aligned county split is available; do not emit a partial Sacramento site count.",
+      "source_coc_ids": [],
+      "count_operation": null,
+      "geometry_status": "different_unresolved",
+      "evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/san-diego/polk-geometry-assist/ca515-geometry.json#sha256=17056bb49ef032d69c91cc9e5e6d0ae548576f5bc9e41facfc6ead0cb6469e0a",
+      "geometry_evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/san-diego/polk-geometry-assist/ca515-geometry.json#sha256=17056bb49ef032d69c91cc9e5e6d0ae548576f5bc9e41facfc6ead0cb6469e0a"
+    },
+    {
+      "source_panel": "pit_p2024",
+      "frozen_coc_id": "CA-515",
+      "year": 2013,
+      "frozen_boundary_vintage": "2024",
+      "source_boundary_vintage": "2024",
+      "status": "incompatible",
+      "reason": "Historical CA-515 includes Nevada County, outside frozen Placer-only footprint. No aligned county split is available; do not emit a partial Sacramento site count.",
+      "source_coc_ids": [],
+      "count_operation": null,
+      "geometry_status": "different_unresolved",
+      "evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/san-diego/polk-geometry-assist/ca515-geometry.json#sha256=17056bb49ef032d69c91cc9e5e6d0ae548576f5bc9e41facfc6ead0cb6469e0a",
+      "geometry_evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/san-diego/polk-geometry-assist/ca515-geometry.json#sha256=17056bb49ef032d69c91cc9e5e6d0ae548576f5bc9e41facfc6ead0cb6469e0a"
+    },
+    {
+      "source_panel": "hic_annual",
+      "frozen_coc_id": "CA-515",
+      "year": 2013,
+      "frozen_boundary_vintage": "2024",
+      "source_boundary_vintage": "2013",
+      "status": "incompatible",
+      "reason": "Historical CA-515 includes Nevada County, outside frozen Placer-only footprint. No aligned county split is available; do not emit a partial Sacramento site count.",
+      "source_coc_ids": [],
+      "count_operation": null,
+      "geometry_status": "different_unresolved",
+      "evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/san-diego/polk-geometry-assist/ca515-geometry.json#sha256=17056bb49ef032d69c91cc9e5e6d0ae548576f5bc9e41facfc6ead0cb6469e0a",
+      "geometry_evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/san-diego/polk-geometry-assist/ca515-geometry.json#sha256=17056bb49ef032d69c91cc9e5e6d0ae548576f5bc9e41facfc6ead0cb6469e0a"
+    },
+    {
+      "source_panel": "pit_p2024",
+      "frozen_coc_id": "CA-515",
+      "year": 2014,
+      "frozen_boundary_vintage": "2024",
+      "source_boundary_vintage": "2024",
+      "status": "incompatible",
+      "reason": "Historical CA-515 includes Nevada County, outside frozen Placer-only footprint. No aligned county split is available; do not emit a partial Sacramento site count.",
+      "source_coc_ids": [],
+      "count_operation": null,
+      "geometry_status": "different_unresolved",
+      "evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/san-diego/polk-geometry-assist/ca515-geometry.json#sha256=17056bb49ef032d69c91cc9e5e6d0ae548576f5bc9e41facfc6ead0cb6469e0a",
+      "geometry_evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/san-diego/polk-geometry-assist/ca515-geometry.json#sha256=17056bb49ef032d69c91cc9e5e6d0ae548576f5bc9e41facfc6ead0cb6469e0a"
+    },
+    {
+      "source_panel": "hic_annual",
+      "frozen_coc_id": "CA-515",
+      "year": 2014,
+      "frozen_boundary_vintage": "2024",
+      "source_boundary_vintage": "2014",
+      "status": "incompatible",
+      "reason": "Historical CA-515 includes Nevada County, outside frozen Placer-only footprint. No aligned county split is available; do not emit a partial Sacramento site count.",
+      "source_coc_ids": [],
+      "count_operation": null,
+      "geometry_status": "different_unresolved",
+      "evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/san-diego/polk-geometry-assist/ca515-geometry.json#sha256=17056bb49ef032d69c91cc9e5e6d0ae548576f5bc9e41facfc6ead0cb6469e0a",
+      "geometry_evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/san-diego/polk-geometry-assist/ca515-geometry.json#sha256=17056bb49ef032d69c91cc9e5e6d0ae548576f5bc9e41facfc6ead0cb6469e0a"
+    },
+    {
+      "source_panel": "pit_p2024",
+      "frozen_coc_id": "CA-515",
+      "year": 2015,
+      "frozen_boundary_vintage": "2024",
+      "source_boundary_vintage": "2024",
+      "status": "incompatible",
+      "reason": "Historical CA-515 includes Nevada County, outside frozen Placer-only footprint. No aligned county split is available; do not emit a partial Sacramento site count.",
+      "source_coc_ids": [],
+      "count_operation": null,
+      "geometry_status": "different_unresolved",
+      "evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/san-diego/polk-geometry-assist/ca515-geometry.json#sha256=17056bb49ef032d69c91cc9e5e6d0ae548576f5bc9e41facfc6ead0cb6469e0a",
+      "geometry_evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/san-diego/polk-geometry-assist/ca515-geometry.json#sha256=17056bb49ef032d69c91cc9e5e6d0ae548576f5bc9e41facfc6ead0cb6469e0a"
+    },
+    {
+      "source_panel": "hic_annual",
+      "frozen_coc_id": "CA-515",
+      "year": 2015,
+      "frozen_boundary_vintage": "2024",
+      "source_boundary_vintage": "2015",
+      "status": "incompatible",
+      "reason": "Historical CA-515 includes Nevada County, outside frozen Placer-only footprint. No aligned county split is available; do not emit a partial Sacramento site count.",
+      "source_coc_ids": [],
+      "count_operation": null,
+      "geometry_status": "different_unresolved",
+      "evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/san-diego/polk-geometry-assist/ca515-geometry.json#sha256=17056bb49ef032d69c91cc9e5e6d0ae548576f5bc9e41facfc6ead0cb6469e0a",
+      "geometry_evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/san-diego/polk-geometry-assist/ca515-geometry.json#sha256=17056bb49ef032d69c91cc9e5e6d0ae548576f5bc9e41facfc6ead0cb6469e0a"
+    },
+    {
+      "source_panel": "pit_p2024",
+      "frozen_coc_id": "CA-515",
+      "year": 2016,
+      "frozen_boundary_vintage": "2024",
+      "source_boundary_vintage": "2024",
+      "status": "incompatible",
+      "reason": "Historical CA-515 includes Nevada County, outside frozen Placer-only footprint. No aligned county split is available; do not emit a partial Sacramento site count.",
+      "source_coc_ids": [],
+      "count_operation": null,
+      "geometry_status": "different_unresolved",
+      "evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/san-diego/polk-geometry-assist/ca515-geometry.json#sha256=17056bb49ef032d69c91cc9e5e6d0ae548576f5bc9e41facfc6ead0cb6469e0a",
+      "geometry_evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/san-diego/polk-geometry-assist/ca515-geometry.json#sha256=17056bb49ef032d69c91cc9e5e6d0ae548576f5bc9e41facfc6ead0cb6469e0a"
+    },
+    {
+      "source_panel": "hic_annual",
+      "frozen_coc_id": "CA-515",
+      "year": 2016,
+      "frozen_boundary_vintage": "2024",
+      "source_boundary_vintage": "2016",
+      "status": "incompatible",
+      "reason": "Historical CA-515 includes Nevada County, outside frozen Placer-only footprint. No aligned county split is available; do not emit a partial Sacramento site count.",
+      "source_coc_ids": [],
+      "count_operation": null,
+      "geometry_status": "different_unresolved",
+      "evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/san-diego/polk-geometry-assist/ca515-geometry.json#sha256=17056bb49ef032d69c91cc9e5e6d0ae548576f5bc9e41facfc6ead0cb6469e0a",
+      "geometry_evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/san-diego/polk-geometry-assist/ca515-geometry.json#sha256=17056bb49ef032d69c91cc9e5e6d0ae548576f5bc9e41facfc6ead0cb6469e0a"
+    },
+    {
+      "source_panel": "pit_p2024",
+      "frozen_coc_id": "CA-515",
+      "year": 2017,
+      "frozen_boundary_vintage": "2024",
+      "source_boundary_vintage": "2024",
+      "status": "incompatible",
+      "reason": "Historical CA-515 includes Nevada County, outside frozen Placer-only footprint. No aligned county split is available; do not emit a partial Sacramento site count.",
+      "source_coc_ids": [],
+      "count_operation": null,
+      "geometry_status": "different_unresolved",
+      "evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/san-diego/polk-geometry-assist/ca515-geometry.json#sha256=17056bb49ef032d69c91cc9e5e6d0ae548576f5bc9e41facfc6ead0cb6469e0a",
+      "geometry_evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/san-diego/polk-geometry-assist/ca515-geometry.json#sha256=17056bb49ef032d69c91cc9e5e6d0ae548576f5bc9e41facfc6ead0cb6469e0a"
+    },
+    {
+      "source_panel": "hic_annual",
+      "frozen_coc_id": "CA-515",
+      "year": 2017,
+      "frozen_boundary_vintage": "2024",
+      "source_boundary_vintage": "2017",
+      "status": "incompatible",
+      "reason": "Historical CA-515 includes Nevada County, outside frozen Placer-only footprint. No aligned county split is available; do not emit a partial Sacramento site count.",
+      "source_coc_ids": [],
+      "count_operation": null,
+      "geometry_status": "different_unresolved",
+      "evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/san-diego/polk-geometry-assist/ca515-geometry.json#sha256=17056bb49ef032d69c91cc9e5e6d0ae548576f5bc9e41facfc6ead0cb6469e0a",
+      "geometry_evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/san-diego/polk-geometry-assist/ca515-geometry.json#sha256=17056bb49ef032d69c91cc9e5e6d0ae548576f5bc9e41facfc6ead0cb6469e0a"
+    },
+    {
+      "source_panel": "pit_p2024",
+      "frozen_coc_id": "CA-515",
+      "year": 2018,
+      "frozen_boundary_vintage": "2024",
+      "source_boundary_vintage": "2024",
+      "status": "incompatible",
+      "reason": "Historical CA-515 includes Nevada County, outside frozen Placer-only footprint. No aligned county split is available; do not emit a partial Sacramento site count.",
+      "source_coc_ids": [],
+      "count_operation": null,
+      "geometry_status": "different_unresolved",
+      "evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/san-diego/polk-geometry-assist/ca515-geometry.json#sha256=17056bb49ef032d69c91cc9e5e6d0ae548576f5bc9e41facfc6ead0cb6469e0a",
+      "geometry_evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/san-diego/polk-geometry-assist/ca515-geometry.json#sha256=17056bb49ef032d69c91cc9e5e6d0ae548576f5bc9e41facfc6ead0cb6469e0a"
+    },
+    {
+      "source_panel": "hic_annual",
+      "frozen_coc_id": "CA-515",
+      "year": 2018,
+      "frozen_boundary_vintage": "2024",
+      "source_boundary_vintage": "2018",
+      "status": "incompatible",
+      "reason": "Historical CA-515 includes Nevada County, outside frozen Placer-only footprint. No aligned county split is available; do not emit a partial Sacramento site count.",
+      "source_coc_ids": [],
+      "count_operation": null,
+      "geometry_status": "different_unresolved",
+      "evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/san-diego/polk-geometry-assist/ca515-geometry.json#sha256=17056bb49ef032d69c91cc9e5e6d0ae548576f5bc9e41facfc6ead0cb6469e0a",
+      "geometry_evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/san-diego/polk-geometry-assist/ca515-geometry.json#sha256=17056bb49ef032d69c91cc9e5e6d0ae548576f5bc9e41facfc6ead0cb6469e0a"
+    },
+    {
+      "source_panel": "pit_p2024",
+      "frozen_coc_id": "CA-515",
+      "year": 2019,
+      "frozen_boundary_vintage": "2024",
+      "source_boundary_vintage": "2024",
+      "status": "reconciled",
+      "reason": "Nevada County is separately reported under CA-531 from2019. Consume Placer-only CA-515 once; no earlier combined-county row is substituted.",
+      "source_coc_ids": [
+        "CA-515"
+      ],
+      "count_operation": "single",
+      "geometry_status": "unknown",
+      "evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/san-diego/polk-geometry-assist/ca515-geometry.json#sha256=17056bb49ef032d69c91cc9e5e6d0ae548576f5bc9e41facfc6ead0cb6469e0a",
+      "geometry_evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/san-diego/polk-geometry-assist/ca515-geometry.json#sha256=17056bb49ef032d69c91cc9e5e6d0ae548576f5bc9e41facfc6ead0cb6469e0a",
+      "count_evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/polk-placer/reconciliation.json",
+      "approval_ref": "docs/site-historical-reconciliation-inventory.md#native-source-integration-review-for-coclab-fjcho",
+      "reconciliation_basis": "Administrative county scope supported by native HUD reports, merger/split evidence and jurisdiction records; preserve documented polygon limitations."
+    },
+    {
+      "source_panel": "hic_annual",
+      "frozen_coc_id": "CA-515",
+      "year": 2019,
+      "frozen_boundary_vintage": "2024",
+      "source_boundary_vintage": "2019",
+      "status": "reconciled",
+      "reason": "Nevada County is separately reported under CA-531 from2019. Consume Placer-only CA-515 once; no earlier combined-county row is substituted.",
+      "source_coc_ids": [
+        "CA-515"
+      ],
+      "count_operation": "single",
+      "geometry_status": "unknown",
+      "evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/san-diego/polk-geometry-assist/ca515-geometry.json#sha256=17056bb49ef032d69c91cc9e5e6d0ae548576f5bc9e41facfc6ead0cb6469e0a",
+      "geometry_evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/san-diego/polk-geometry-assist/ca515-geometry.json#sha256=17056bb49ef032d69c91cc9e5e6d0ae548576f5bc9e41facfc6ead0cb6469e0a",
+      "count_evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/polk-placer/reconciliation.json",
+      "approval_ref": "docs/site-historical-reconciliation-inventory.md#native-source-integration-review-for-coclab-fjcho",
+      "reconciliation_basis": "Administrative county scope supported by native HUD reports, merger/split evidence and jurisdiction records; preserve documented polygon limitations."
+    },
+    {
+      "source_panel": "pit_p2024",
+      "frozen_coc_id": "CA-515",
+      "year": 2020,
+      "frozen_boundary_vintage": "2024",
+      "source_boundary_vintage": "2024",
+      "status": "reconciled",
+      "reason": "Nevada County is separately reported under CA-531 from2019. Consume Placer-only CA-515 once; no earlier combined-county row is substituted.",
+      "source_coc_ids": [
+        "CA-515"
+      ],
+      "count_operation": "single",
+      "geometry_status": "unknown",
+      "evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/san-diego/polk-geometry-assist/ca515-geometry.json#sha256=17056bb49ef032d69c91cc9e5e6d0ae548576f5bc9e41facfc6ead0cb6469e0a",
+      "geometry_evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/san-diego/polk-geometry-assist/ca515-geometry.json#sha256=17056bb49ef032d69c91cc9e5e6d0ae548576f5bc9e41facfc6ead0cb6469e0a",
+      "count_evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/polk-placer/reconciliation.json",
+      "approval_ref": "docs/site-historical-reconciliation-inventory.md#native-source-integration-review-for-coclab-fjcho",
+      "reconciliation_basis": "Administrative county scope supported by native HUD reports, merger/split evidence and jurisdiction records; preserve documented polygon limitations."
+    },
+    {
+      "source_panel": "hic_annual",
+      "frozen_coc_id": "CA-515",
+      "year": 2020,
+      "frozen_boundary_vintage": "2024",
+      "source_boundary_vintage": "2020",
+      "status": "reconciled",
+      "reason": "Nevada County is separately reported under CA-531 from2019. Consume Placer-only CA-515 once; no earlier combined-county row is substituted.",
+      "source_coc_ids": [
+        "CA-515"
+      ],
+      "count_operation": "single",
+      "geometry_status": "unknown",
+      "evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/san-diego/polk-geometry-assist/ca515-geometry.json#sha256=17056bb49ef032d69c91cc9e5e6d0ae548576f5bc9e41facfc6ead0cb6469e0a",
+      "geometry_evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/san-diego/polk-geometry-assist/ca515-geometry.json#sha256=17056bb49ef032d69c91cc9e5e6d0ae548576f5bc9e41facfc6ead0cb6469e0a",
+      "count_evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/polk-placer/reconciliation.json",
+      "approval_ref": "docs/site-historical-reconciliation-inventory.md#native-source-integration-review-for-coclab-fjcho",
+      "reconciliation_basis": "Administrative county scope supported by native HUD reports, merger/split evidence and jurisdiction records; preserve documented polygon limitations."
+    },
+    {
+      "source_panel": "pit_p2024",
+      "frozen_coc_id": "CA-515",
+      "year": 2022,
+      "frozen_boundary_vintage": "2024",
+      "source_boundary_vintage": "2024",
+      "status": "reconciled",
+      "reason": "Nevada County is separately reported under CA-531 from2019. Consume Placer-only CA-515 once; no earlier combined-county row is substituted.",
+      "source_coc_ids": [
+        "CA-515"
+      ],
+      "count_operation": "single",
+      "geometry_status": "unknown",
+      "evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/san-diego/polk-geometry-assist/ca515-geometry.json#sha256=17056bb49ef032d69c91cc9e5e6d0ae548576f5bc9e41facfc6ead0cb6469e0a",
+      "geometry_evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/san-diego/polk-geometry-assist/ca515-geometry.json#sha256=17056bb49ef032d69c91cc9e5e6d0ae548576f5bc9e41facfc6ead0cb6469e0a",
+      "count_evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/polk-placer/reconciliation.json",
+      "approval_ref": "docs/site-historical-reconciliation-inventory.md#native-source-integration-review-for-coclab-fjcho",
+      "reconciliation_basis": "Administrative county scope supported by native HUD reports, merger/split evidence and jurisdiction records; preserve documented polygon limitations."
+    },
+    {
+      "source_panel": "hic_annual",
+      "frozen_coc_id": "CA-515",
+      "year": 2022,
+      "frozen_boundary_vintage": "2024",
+      "source_boundary_vintage": "2022",
+      "status": "reconciled",
+      "reason": "Nevada County is separately reported under CA-531 from2019. Consume Placer-only CA-515 once; no earlier combined-county row is substituted.",
+      "source_coc_ids": [
+        "CA-515"
+      ],
+      "count_operation": "single",
+      "geometry_status": "unknown",
+      "evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/san-diego/polk-geometry-assist/ca515-geometry.json#sha256=17056bb49ef032d69c91cc9e5e6d0ae548576f5bc9e41facfc6ead0cb6469e0a",
+      "geometry_evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/san-diego/polk-geometry-assist/ca515-geometry.json#sha256=17056bb49ef032d69c91cc9e5e6d0ae548576f5bc9e41facfc6ead0cb6469e0a",
+      "count_evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/polk-placer/reconciliation.json",
+      "approval_ref": "docs/site-historical-reconciliation-inventory.md#native-source-integration-review-for-coclab-fjcho",
+      "reconciliation_basis": "Administrative county scope supported by native HUD reports, merger/split evidence and jurisdiction records; preserve documented polygon limitations."
+    },
+    {
+      "source_panel": "pit_p2024",
+      "frozen_coc_id": "CA-515",
+      "year": 2023,
+      "frozen_boundary_vintage": "2024",
+      "source_boundary_vintage": "2024",
+      "status": "reconciled",
+      "reason": "Nevada County is separately reported under CA-531 from2019. Consume Placer-only CA-515 once; no earlier combined-county row is substituted.",
+      "source_coc_ids": [
+        "CA-515"
+      ],
+      "count_operation": "single",
+      "geometry_status": "unknown",
+      "evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/san-diego/polk-geometry-assist/ca515-geometry.json#sha256=17056bb49ef032d69c91cc9e5e6d0ae548576f5bc9e41facfc6ead0cb6469e0a",
+      "geometry_evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/san-diego/polk-geometry-assist/ca515-geometry.json#sha256=17056bb49ef032d69c91cc9e5e6d0ae548576f5bc9e41facfc6ead0cb6469e0a",
+      "count_evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/polk-placer/reconciliation.json",
+      "approval_ref": "docs/site-historical-reconciliation-inventory.md#native-source-integration-review-for-coclab-fjcho",
+      "reconciliation_basis": "Administrative county scope supported by native HUD reports, merger/split evidence and jurisdiction records; preserve documented polygon limitations."
+    },
+    {
+      "source_panel": "hic_annual",
+      "frozen_coc_id": "CA-515",
+      "year": 2023,
+      "frozen_boundary_vintage": "2024",
+      "source_boundary_vintage": "2023",
+      "status": "reconciled",
+      "reason": "Nevada County is separately reported under CA-531 from2019. Consume Placer-only CA-515 once; no earlier combined-county row is substituted.",
+      "source_coc_ids": [
+        "CA-515"
+      ],
+      "count_operation": "single",
+      "geometry_status": "unknown",
+      "evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/san-diego/polk-geometry-assist/ca515-geometry.json#sha256=17056bb49ef032d69c91cc9e5e6d0ae548576f5bc9e41facfc6ead0cb6469e0a",
+      "geometry_evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/san-diego/polk-geometry-assist/ca515-geometry.json#sha256=17056bb49ef032d69c91cc9e5e6d0ae548576f5bc9e41facfc6ead0cb6469e0a",
+      "count_evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/polk-placer/reconciliation.json",
+      "approval_ref": "docs/site-historical-reconciliation-inventory.md#native-source-integration-review-for-coclab-fjcho",
+      "reconciliation_basis": "Administrative county scope supported by native HUD reports, merger/split evidence and jurisdiction records; preserve documented polygon limitations."
+    },
+    {
+      "source_panel": "pit_p2024",
+      "frozen_coc_id": "CA-515",
+      "year": 2024,
+      "frozen_boundary_vintage": "2024",
+      "source_boundary_vintage": "2024",
+      "status": "reconciled",
+      "reason": "Nevada County is separately reported under CA-531 from2019. Consume Placer-only CA-515 once; no earlier combined-county row is substituted.",
+      "source_coc_ids": [
+        "CA-515"
+      ],
+      "count_operation": "single",
+      "geometry_status": "unknown",
+      "evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/san-diego/polk-geometry-assist/ca515-geometry.json#sha256=17056bb49ef032d69c91cc9e5e6d0ae548576f5bc9e41facfc6ead0cb6469e0a",
+      "geometry_evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/san-diego/polk-geometry-assist/ca515-geometry.json#sha256=17056bb49ef032d69c91cc9e5e6d0ae548576f5bc9e41facfc6ead0cb6469e0a",
+      "count_evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/polk-placer/reconciliation.json",
+      "approval_ref": "docs/site-historical-reconciliation-inventory.md#native-source-integration-review-for-coclab-fjcho",
+      "reconciliation_basis": "Administrative county scope supported by native HUD reports, merger/split evidence and jurisdiction records; preserve documented polygon limitations."
+    },
+    {
+      "source_panel": "hic_annual",
+      "frozen_coc_id": "CA-515",
+      "year": 2024,
+      "frozen_boundary_vintage": "2024",
+      "source_boundary_vintage": "2024",
+      "status": "reconciled",
+      "reason": "Nevada County is separately reported under CA-531 from2019. Consume Placer-only CA-515 once; no earlier combined-county row is substituted.",
+      "source_coc_ids": [
+        "CA-515"
+      ],
+      "count_operation": "single",
+      "geometry_status": "unknown",
+      "evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/san-diego/polk-geometry-assist/ca515-geometry.json#sha256=17056bb49ef032d69c91cc9e5e6d0ae548576f5bc9e41facfc6ead0cb6469e0a",
+      "geometry_evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/san-diego/polk-geometry-assist/ca515-geometry.json#sha256=17056bb49ef032d69c91cc9e5e6d0ae548576f5bc9e41facfc6ead0cb6469e0a",
+      "count_evidence_ref": "/home/matt/HHP-Output/site-boundary-history-audit/mergers/polk-placer/reconciliation.json",
+      "approval_ref": "docs/site-historical-reconciliation-inventory.md#native-source-integration-review-for-coclab-fjcho",
+      "reconciliation_basis": "Administrative county scope supported by native HUD reports, merger/split evidence and jurisdiction records; preserve documented polygon limitations."
+    }
+  ]
+}
