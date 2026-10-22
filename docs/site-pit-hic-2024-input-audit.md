@@ -221,3 +221,22 @@ Total homelessness shows a positive same-year association in both groups, with n
 These are conditional correlations of annual log1p changes, not causal effects or formal tests of differences between outcomes or bed-change groups. Including sheltered people can create a closer same-year association with shelter capacity and occupancy; this check cannot distinguish that explanation from other mechanisms. Intervals are not adjusted for the multiple exploratory comparisons, and historical geography remains provisional.
 
 The follow-up imports the unchanged split-check estimator and uses identical calendar joins, within-subset fixed effects, 1,999 site-bootstrap draws, and seed. All ten fixed-effect projections again match dummy-variable least squares, and bootstrap weights match explicitly duplicated site samples. Artifacts in [total-pit-bed-changes](</home/matt/HHP-Output/site-boundary-history-audit/exploratory-without-sacramento/total-pit-bed-changes/>) include `run_total_check.py`, the provenance-bearing total-PIT panel, `total_pit_provenance.json` with source and script hashes, `summary.json`, `correlations.csv`, and `paired_changes.csv`. Earlier outputs are preserved.
+
+### Sheltered homelessness follow-up — 2026-10-22
+
+The same analysis was repeated with `pit_sheltered` as the outcome. Shelter HIC remains ES+TH+SH, with the same 60 sites, 2010–2024 excluding 2021, 341 bed increases, 357 declines, and 22 excluded flat transitions. The validated panel from the total-PIT follow-up already contains sheltered counts; input and source hashes were rechecked, and all 840 sheltered site-year counts are nonnegative integers equal to total minus unsheltered PIT. Every predictor value and calendar pair exactly matches the total-PIT analysis.
+
+| Bed-change group | Timing | Pairs | Pearson r | 95% site-bootstrap interval |
+| --- | --- | ---: | ---: | ---: |
+| Increases | Beds precede PIT by one year | 267 | −0.103 | −0.256 to 0.072 |
+| Increases | Same year | 341 | 0.409 | 0.280 to 0.528 |
+| Increases | PIT precedes beds by one year | 265 | 0.010 | −0.138 to 0.155 |
+| Declines | Beds precede PIT by one year | 317 | −0.023 | −0.166 to 0.103 |
+| Declines | Same year | 357 | 0.323 | 0.183 to 0.480 |
+| Declines | PIT precedes beds by one year | 313 | −0.051 | −0.220 to 0.127 |
+
+Same-year associations are positive in both groups, with nominal 95% intervals excluding zero. They are numerically larger than the total-PIT and unsheltered-PIT estimates, but differences between outcomes have not been formally tested. All one- and two-year lead/lag intervals include zero. Before 2020, same-year correlations are 0.400 for increases and 0.310 for declines. Leaving out each site in turn yields full-period same-year ranges of 0.375–0.438 and 0.292–0.363. Declines remain signed; a positive coefficient associates more negative bed changes with more negative or less positive sheltered-count changes after adjustment.
+
+The stronger same-year relationship is consistent with shelter capacity and sheltered occupancy moving together; this diagnostic does not distinguish mechanisms or establish causality. Geography remains provisional, selection on bed-change sign restricts the range, and the exploratory intervals are not corrected for multiple comparisons.
+
+The unchanged split estimator again uses annual log1p changes, exact calendar joins, within-subset site/year fixed effects, and 1,999 whole-site bootstrap replicates with seed 20261022. The driver converts nullable sheltered-derived values to dense floats for numerical linear algebra without changing values. All ten projections match dummy-variable least squares; bootstrap frequency weights match explicitly duplicated site samples. [Sheltered-check artifacts](</home/matt/HHP-Output/site-boundary-history-audit/exploratory-without-sacramento/sheltered-pit-bed-changes/>) include `run_sheltered_check.py`, `sheltered_pit_provenance.json`, `summary.json`, `correlations.csv`, and `paired_changes.csv`; earlier outputs and the input panel are preserved.
