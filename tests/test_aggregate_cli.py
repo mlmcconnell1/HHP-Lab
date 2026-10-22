@@ -727,6 +727,144 @@ def test_aggregate_pit_to_msa_materializes_weighted_outputs(tmp_path):
     assert list(msa_df["pit_total"].astype(float)) == pytest.approx([140.0, 100.0])
 
 
+def test_aggregate_pit_json_reports_unknown_source_vintage_and_hashes(tmp_path):
+    import hashlib
+    import json
+    import os
+
+    from hhplab.artifacts.naming.naming import msa_coc_xwalk_filename
+    from hhplab.storage.provenance import read_provenance
+
+    pit_dir = tmp_path / "data" / "curated" / "pit"
+    xwalk_dir = tmp_path / "data" / "curated" / "xwalks"
+    pit_dir.mkdir(parents=True)
+    xwalk_dir.mkdir(parents=True)
+    source_path = pit_dir / "pit__P2024.parquet"
+    crosswalk_path = xwalk_dir / msa_coc_xwalk_filename("2020", "census_msa_2023", 2020)
+    pd.DataFrame(
+        {
+            "coc_id": ["CO-100"],
+            "pit_year": [2024],
+            "pit_total": [10.0],
+            "pit_sheltered": [5.0],
+            "pit_unsheltered": [5.0],
+        }
+    ).to_parquet(source_path, index=False)
+    pd.DataFrame(
+        {
+            "coc_id": ["CO-100"],
+            "msa_id": ["35620"],
+            "cbsa_code": ["35620"],
+            "boundary_vintage": ["2020"],
+            "county_vintage": ["2020"],
+            "definition_version": ["census_msa_2023"],
+            "allocation_method": ["area"],
+            "share_column": ["allocation_share"],
+            "allocation_share": [1.0],
+        }
+    ).to_parquet(crosswalk_path, index=False)
+
+    old_cwd = os.getcwd()
+    try:
+        os.chdir(tmp_path)
+        result = runner.invoke(
+            app,
+            [
+                "aggregate", "pit", "--years", "2024", "--geo-type", "msa",
+                "--definition-version", "census_msa_2023", "--counties", "2020", "--json",
+                "--boundary-vintages", "2024:2020",
+            ],
+            catch_exceptions=False,
+        )
+    finally:
+        os.chdir(old_cwd)
+
+    payload = json.loads(result.output.splitlines()[-1])
+    lineage = payload["source_lineage"]["2024"]
+    assert lineage["input_pit_vintage"] is None
+    assert lineage["input_vintage_basis"] == "unknown"
+    assert lineage["raw_workbook_sha256"] is None
+    assert lineage["input_parquet_sha256"] == hashlib.sha256(source_path.read_bytes()).hexdigest()
+    assert lineage["crosswalk_sha256"] == hashlib.sha256(crosswalk_path.read_bytes()).hexdigest()
+    output = next(tmp_path.glob("data/curated/pit/pit__msa__*.parquet"))
+    provenance = read_provenance(output)
+    assert provenance.extra["source_provenance"] == lineage
+
+
+def test_aggregate_pit_vintage_pin_selects_the_named_cumulative_input(tmp_path):
+    import json
+    import os
+
+    from hhplab.artifacts.naming.naming import (
+        msa_coc_xwalk_filename,
+        msa_pit_filename,
+        pit_vintage_filename,
+    )
+
+    pit_dir = tmp_path / "data" / "curated" / "pit"
+    xwalk_dir = tmp_path / "data" / "curated" / "xwalks"
+    pit_dir.mkdir(parents=True)
+    xwalk_dir.mkdir(parents=True)
+    for vintage, total in ((2024, 10.0), (2025, 90.0)):
+        pd.DataFrame(
+            {
+                "coc_id": ["CO-100"],
+                "pit_year": [2024],
+                "pit_total": [total],
+                "pit_sheltered": [total / 2],
+                "pit_unsheltered": [total / 2],
+            }
+        ).to_parquet(pit_dir / pit_vintage_filename(vintage), index=False)
+    crosswalk_path = xwalk_dir / msa_coc_xwalk_filename("2020", "census_msa_2023", 2020)
+    pd.DataFrame(
+        {
+            "coc_id": ["CO-100"],
+            "msa_id": ["35620"],
+            "cbsa_code": ["35620"],
+            "boundary_vintage": ["2020"],
+            "county_vintage": ["2020"],
+            "definition_version": ["census_msa_2023"],
+            "allocation_method": ["area"],
+            "share_column": ["allocation_share"],
+            "allocation_share": [1.0],
+        }
+    ).to_parquet(crosswalk_path, index=False)
+
+    old_cwd = os.getcwd()
+    try:
+        os.chdir(tmp_path)
+        coc_result = runner.invoke(
+            app,
+            [
+                "aggregate", "pit", "--years", "2024", "--geo-type", "coc",
+                "--boundary-vintages", "2024:2020", "--pit-vintage", "2024", "--json",
+            ],
+            catch_exceptions=False,
+        )
+        coc_output = json.loads(coc_result.output.splitlines()[-1])
+        result = runner.invoke(
+            app,
+            [
+                "aggregate", "pit", "--years", "2024", "--geo-type", "msa",
+                "--definition-version", "census_msa_2023", "--counties", "2020",
+                "--boundary-vintages", "2024:2020", "--json",
+            ],
+            catch_exceptions=False,
+        )
+    finally:
+        os.chdir(old_cwd)
+
+    payload = json.loads(result.output.splitlines()[-1])
+    output_path = pit_dir / msa_pit_filename(2024, "census_msa_2023", 2020, 2020)
+    output = pd.read_parquet(output_path)
+    assert output.pit_total.iloc[0] == pytest.approx(10.0)
+    lineage = payload["source_lineage"]["2024"]
+    assert lineage["input_pit_vintage"] == 2024
+    assert lineage["input_vintage_basis"] == "embedded_provenance"
+    assert lineage["input_path"].endswith("pit__P2024@B2020.parquet")
+    assert coc_output["source_lineage"]["2024"]["input_pit_vintage"] == 2024
+
+
 def test_aggregate_pit_to_msa_uses_boundary_vintage_map(tmp_path):
     """MSA PIT aggregate can use an era boundary different from PIT year."""
     import os

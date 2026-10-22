@@ -7,10 +7,14 @@ from pathlib import Path
 import pandas as pd
 
 from hhplab.geographies.analysis import MSA_ID_COL
-from hhplab.geographies.msa import aggregate_coc_to_msa_fractional_rollup
+from hhplab.geographies.msa import (
+    ALLOCATION_SHARE_TOLERANCE,
+    aggregate_coc_to_msa_fractional_rollup,
+)
 from hhplab.schema.columns import PIT_OBSERVATION_COLUMNS
 from hhplab.sources.hud.pit.observation import (
     PIT_BOOLEAN_OBSERVATION_COLUMNS,
+    PIT_SHELTERED_OBSERVED_COLUMN,
     aggregate_pit_count_metadata,
 )
 from hhplab.storage.paths import curated_dir
@@ -24,6 +28,7 @@ MSA_PIT_COLUMNS: tuple[str, ...] = (
     "pit_sheltered",
     "pit_unsheltered",
     *PIT_OBSERVATION_COLUMNS,
+    PIT_SHELTERED_OBSERVED_COLUMN,
     "covered_coc_count",
     "expected_coc_count",
     "allocation_share_sum",
@@ -146,7 +151,9 @@ def aggregate_pit_to_msa(
         if optional_column not in rollup.columns:
             rollup[optional_column] = pd.NA
     positive_membership = crosswalk.loc[
-        pd.to_numeric(crosswalk["allocation_share"], errors="raise").gt(0),
+        pd.to_numeric(crosswalk["allocation_share"], errors="raise").gt(
+            ALLOCATION_SHARE_TOLERANCE
+        ),
         ["coc_id", "msa_id"],
     ].drop_duplicates()
     positive_membership = positive_membership.astype({"coc_id": str, "msa_id": str})
@@ -159,9 +166,14 @@ def aggregate_pit_to_msa(
         ]
         contributing = df.loc[metadata_years.eq(row.year) & metadata_cocs.isin(members)]
         metadata_rows.append(
-            aggregate_pit_count_metadata(contributing, expected_coc_count=len(members))
+            aggregate_pit_count_metadata(
+                contributing,
+                expected_coc_count=len(members),
+                expected_coc_ids=set(members.astype(str)),
+            )
         )
-    metadata = pd.DataFrame(metadata_rows, index=rollup.index, columns=PIT_OBSERVATION_COLUMNS)
+    metadata_columns = [*PIT_OBSERVATION_COLUMNS, PIT_SHELTERED_OBSERVED_COLUMN]
+    metadata = pd.DataFrame(metadata_rows, index=rollup.index, columns=metadata_columns)
     result_df = pd.DataFrame(
         {
             "msa_id": rollup["msa_id"],
@@ -170,7 +182,7 @@ def aggregate_pit_to_msa(
             "pit_total": rollup["pit_total"],
             "pit_sheltered": rollup["pit_sheltered"],
             "pit_unsheltered": rollup["pit_unsheltered"],
-            **{column: metadata[column] for column in PIT_OBSERVATION_COLUMNS},
+            **{column: metadata[column] for column in metadata_columns},
             "covered_coc_count": rollup["covered_coc_count"],
             "expected_coc_count": rollup["coc_count"],
             "allocation_share_sum": rollup["allocation_share_sum"],
@@ -198,6 +210,9 @@ def aggregate_pit_to_msa(
     result_df["count_types"] = result_df["count_types"].astype("string")
     for column in PIT_BOOLEAN_OBSERVATION_COLUMNS:
         result_df[column] = result_df[column].astype("boolean")
+    result_df[PIT_SHELTERED_OBSERVED_COLUMN] = result_df[
+        PIT_SHELTERED_OBSERVED_COLUMN
+    ].astype("boolean")
     result_df["covered_coc_count"] = result_df["covered_coc_count"].astype(int)
     result_df["expected_coc_count"] = result_df["expected_coc_count"].astype(int)
     result_df["allocation_share_sum"] = result_df["allocation_share_sum"].astype(float)
@@ -215,9 +230,15 @@ def save_msa_pit(
     definition_version: str,
     boundary_vintage: str,
     county_vintage: str,
+    source_provenance: dict[str, object] | None = None,
     output_dir: Path | str | None = None,
 ) -> Path:
-    """Persist MSA-level PIT output with provenance."""
+    """Persist MSA-level PIT output with explicit source lineage when supplied.
+
+    ``source_provenance`` must be built by the caller from the selected input
+    artifacts. The writer intentionally does not infer workbook vintage or
+    hashes from output years or numeric values.
+    """
     from hhplab.artifacts.naming.naming import msa_pit_filename
 
     if output_dir is None:
@@ -244,6 +265,7 @@ def save_msa_pit(
             "source_geometry": "coc",
             "share_column": "allocation_share",
             "allocation_method": _single_optional_value(pit_df, "allocation_method", "area"),
+            "source_provenance": source_provenance,
         },
     )
     write_parquet_with_provenance(pit_df, output_path, provenance)

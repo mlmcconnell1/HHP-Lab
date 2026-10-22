@@ -11,6 +11,7 @@ the configured recipe output root.
 
 from __future__ import annotations
 
+import hashlib
 import tempfile
 from pathlib import Path
 from typing import Annotated, Literal
@@ -806,6 +807,16 @@ def aggregate_pit(
             ),
         ),
     ] = None,
+    pit_vintage: Annotated[
+        int | None,
+        typer.Option(
+            "--pit-vintage",
+            help=(
+                "Select this cumulative HUD input vintage for CoC or MSA aggregation; "
+                "bypasses annual and default-latest input selection."
+            ),
+        ),
+    ] = None,
     allocation_basis: Annotated[
         Literal["area", "block_population"],
         typer.Option(
@@ -871,32 +882,74 @@ def aggregate_pit(
     from hhplab.artifacts.naming.naming import (
         coc_pit_filename,
         discover_pit_vintages,
+        msa_coc_block_population_xwalk_path,
+        msa_coc_xwalk_path,
         msa_pit_filename,
         pit_path,
         pit_vintage_path,
     )
     from hhplab.geographies.msa import read_coc_msa_crosswalk
     from hhplab.sources.hud.pit import aggregate_pit_to_msa, save_msa_pit
+    from hhplab.storage.provenance import (
+        ProvenanceBlock,
+        read_provenance,
+        write_parquet_with_provenance,
+    )
 
     # --- Load all available PIT data for requested years ---
     collected: dict[int, pd.DataFrame] = {}
+    collected_sources: dict[int, Path] = {}
+    collected_vintages: dict[int, int | None] = {}
+    lineage_by_year: dict[int, dict[str, object]] = {}
     missing: list[int] = []
 
-    # Pass 1: try individual year files
-    for year in parsed_years:
-        src = pit_path(year)
-        if not Path(src).exists():
-            missing.append(year)
-            continue
-        df = pd.read_parquet(src)
-        if align == "to_calendar_year":
-            df = df.copy()
-            if "calendar_year" not in df.columns:
-                df["calendar_year"] = year
-        collected[year] = df
+    # An explicit release pin selects only that cumulative artifact.
+    if pit_vintage is not None:
+        vpath = pit_vintage_path(pit_vintage)
+        if Path(vpath).exists():
+            vdf = pd.read_parquet(vpath)
+            if "pit_year" in vdf.columns:
+                available = set(
+                    pd.to_numeric(vdf["pit_year"], errors="coerce")
+                    .dropna()
+                    .astype(int)
+                )
+                for year in parsed_years:
+                    if year not in available:
+                        missing.append(year)
+                        continue
+                    ydf = vdf[pd.to_numeric(vdf["pit_year"], errors="coerce").eq(year)].copy()
+                    if align == "to_calendar_year" and "calendar_year" not in ydf.columns:
+                        ydf["calendar_year"] = year
+                    collected[year] = ydf
+                    collected_sources[year] = Path(vpath)
+                    collected_vintages[year] = pit_vintage
+        else:
+            missing.extend(parsed_years)
+    else:
+        # Pass 1: use individual year files when no explicit workbook release was requested.
+        for year in parsed_years:
+            src = pit_path(year)
+            if geo_type == "msa":
+                coc_aligned_candidate = output_dir / coc_pit_filename(
+                    year, boundary_map[year]
+                )
+                if coc_aligned_candidate.exists():
+                    src = coc_aligned_candidate
+            if not Path(src).exists():
+                missing.append(year)
+                continue
+            df = pd.read_parquet(src)
+            if align == "to_calendar_year":
+                df = df.copy()
+                if "calendar_year" not in df.columns:
+                    df["calendar_year"] = year
+            collected[year] = df
+            collected_sources[year] = Path(src)
+            collected_vintages[year] = None
 
-    # Pass 2: fall back to vintage files for any missing years
-    if missing:
+    # Pass 2: fall back to cumulative files for missing years when release is not pinned.
+    if missing and pit_vintage is None:
         vintages = discover_pit_vintages()
         still_missing = set(missing)
 
@@ -921,6 +974,8 @@ def aggregate_pit(
                 if align == "to_calendar_year" and "calendar_year" not in ydf.columns:
                     ydf["calendar_year"] = year
                 collected[year] = ydf
+                collected_sources[year] = Path(vpath)
+                collected_vintages[year] = vintage
                 still_missing.discard(year)
 
         missing = sorted(still_missing)
@@ -959,7 +1014,60 @@ def aggregate_pit(
             boundary_vintage = boundary_map[year]
             out_name = coc_pit_filename(year, boundary_vintage)
             out_path = output_dir / out_name
-            df.to_parquet(out_path, index=False)
+            source_path = collected_sources[year]
+            input_provenance = read_provenance(source_path)
+            input_extra = input_provenance.extra if input_provenance is not None else {}
+            inherited_lineage = input_extra.get("source_provenance") or {}
+            embedded_vintage = input_extra.get(
+                "pit_vintage",
+                input_extra.get("source_vintage", inherited_lineage.get("input_pit_vintage")),
+            )
+            selected_vintage = collected_vintages.get(year)
+            resolved_pit_vintage = (
+                pit_vintage if pit_vintage is not None
+                else embedded_vintage if embedded_vintage is not None
+                else selected_vintage
+            )
+            if resolved_pit_vintage is not None and str(resolved_pit_vintage).isdigit():
+                resolved_pit_vintage = int(resolved_pit_vintage)
+            source_lineage = {
+                "input_path": str(source_path.resolve()),
+                "input_parquet_sha256": hashlib.sha256(source_path.read_bytes()).hexdigest(),
+                "input_pit_vintage": resolved_pit_vintage,
+                "input_vintage_basis": (
+                    "explicit_cli" if pit_vintage is not None
+                    else "embedded_provenance" if embedded_vintage is not None
+                    else "cumulative_filename" if collected_vintages.get(year) is not None
+                    else "unknown"
+                ),
+                "raw_workbook_path": input_extra.get(
+                    "raw_workbook_path", inherited_lineage.get("raw_workbook_path")
+                ),
+                "raw_workbook_sha256": input_extra.get(
+                    "raw_workbook_sha256",
+                    input_extra.get(
+                        "source_sha256", inherited_lineage.get("raw_workbook_sha256")
+                    ),
+                ),
+                "count_types_policy": input_extra.get(
+                    "count_types_policy", inherited_lineage.get("count_types_policy")
+                ),
+                "upstream_source_provenance": inherited_lineage or None,
+            }
+            lineage_by_year[year] = source_lineage
+            write_parquet_with_provenance(
+                df,
+                out_path,
+                ProvenanceBlock(
+                    boundary_vintage=boundary_vintage,
+                    geo_type="coc",
+                    extra={
+                        "dataset_type": "coc_pit",
+                        "pit_year": int(year),
+                        "source_provenance": source_lineage,
+                    },
+                ),
+            )
         else:
             boundary_vintage = boundary_map[year]
             county_vintage = str(counties if counties is not None else year)
@@ -980,6 +1088,77 @@ def aggregate_pit(
                 else:
                     typer.echo(f"Error: {exc}", err=True)
                 raise typer.Exit(1) from exc
+
+            if allocation_basis == "area":
+                crosswalk_path = msa_coc_xwalk_path(
+                    boundary_vintage, definition_version, county_vintage
+                )
+            else:
+                crosswalk_path = msa_coc_block_population_xwalk_path(
+                    boundary_vintage,
+                    definition_version,
+                    county_vintage,
+                    str(blocks),
+                    str(decennial),
+                )
+            source_path = collected_sources[year]
+            input_provenance = read_provenance(source_path)
+            input_extra = input_provenance.extra if input_provenance is not None else {}
+            inherited_lineage = input_extra.get("source_provenance") or {}
+            embedded_vintage = input_extra.get(
+                "pit_vintage",
+                input_extra.get("source_vintage", inherited_lineage.get("input_pit_vintage")),
+            )
+            selected_vintage = collected_vintages.get(year)
+            resolved_pit_vintage = (
+                pit_vintage if pit_vintage is not None
+                else embedded_vintage if embedded_vintage is not None
+                else selected_vintage
+            )
+            if resolved_pit_vintage is not None and str(resolved_pit_vintage).isdigit():
+                resolved_pit_vintage = int(resolved_pit_vintage)
+            vintage_basis = (
+                "explicit_cli" if pit_vintage is not None
+                else "embedded_provenance" if embedded_vintage is not None
+                else "cumulative_filename" if selected_vintage is not None
+                else "unknown"
+            )
+            source_lineage = {
+                "input_path": str(source_path.resolve()),
+                "input_parquet_sha256": hashlib.sha256(source_path.read_bytes()).hexdigest(),
+                "input_pit_vintage": resolved_pit_vintage,
+                "input_vintage_basis": vintage_basis,
+                "raw_workbook_path": input_extra.get(
+                    "raw_workbook_path", inherited_lineage.get("raw_workbook_path")
+                ),
+                "raw_workbook_sha256": input_extra.get(
+                    "raw_workbook_sha256",
+                    input_extra.get(
+                        "source_sha256", inherited_lineage.get("raw_workbook_sha256")
+                    ),
+                ),
+                "count_types_policy": input_extra.get(
+                    "count_types_policy", inherited_lineage.get("count_types_policy")
+                ),
+                "upstream_source_provenance": inherited_lineage or None,
+                "crosswalk_path": str(crosswalk_path.resolve()),
+                "crosswalk_sha256": hashlib.sha256(crosswalk_path.read_bytes()).hexdigest(),
+                "allocation_basis": allocation_basis,
+                "count_types_aggregation": {
+                    "policy": "all-positive-allocation-members-required",
+                    "observed": (
+                        "true only when every expected member declares an observed "
+                        "unsheltered count"
+                    ),
+                    "complete_unsheltered_sample": (
+                        "requires observed=true, partial=false, carried_forward=false"
+                    ),
+                    "carried_or_partial": "true if any included member has the flag",
+                    "unknown_or_missing_member": "nullable flags remain unknown",
+                    "zero_allocation_members": "excluded from expected contributors",
+                },
+            }
+            lineage_by_year[year] = source_lineage
 
             try:
                 msa_df = aggregate_pit_to_msa(
@@ -1011,6 +1190,7 @@ def aggregate_pit(
                 definition_version=definition_version,
                 boundary_vintage=boundary_vintage,
                 county_vintage=county_vintage,
+                source_provenance=source_lineage,
                 output_dir=output_dir,
             )
 
@@ -1039,6 +1219,8 @@ def aggregate_pit(
         "allocation_basis": allocation_basis if geo_type == "msa" else None,
         "definition_version": definition_version if geo_type == "msa" else None,
         "county_vintage": str(counties) if geo_type == "msa" and counties is not None else None,
+        "source_lineage": {str(year): lineage_by_year[year] for year in materialized
+                            if year in lineage_by_year},
     }
     if output_json:
         import json

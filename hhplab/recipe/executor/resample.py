@@ -49,6 +49,10 @@ from hhplab.sources.census.acs.sae import (
     HOUSEHOLD_INCOME_BINS,
     _quantile_from_bins,
 )
+from hhplab.sources.hud.pit.observation import (
+    PIT_SHELTERED_OBSERVED_COLUMN,
+    aggregate_pit_count_metadata,
+)
 
 
 def _ct_county_alignment_cache_key(legacy_vintage: int) -> tuple[int, int]:
@@ -427,10 +431,22 @@ def _resample_identity(
         task.dataset_id,
         task.year,
     )
+    observation_measures = set(task.measures).intersection(
+        {*PIT_OBSERVATION_COLUMNS, PIT_SHELTERED_OBSERVED_COLUMN}
+    )
+    if observation_measures:
+        raise ExecutorError(
+            "PIT observation metadata cannot be configured as numeric measures: "
+            f"{sorted(observation_measures)}. Keep these columns as metadata."
+        )
 
     passthrough_cols = [
         column
-        for column in (*_ACS1_IMPUTATION_PASSTHROUGH_COLUMNS, *PIT_OBSERVATION_COLUMNS)
+        for column in (
+            *_ACS1_IMPUTATION_PASSTHROUGH_COLUMNS,
+            *PIT_OBSERVATION_COLUMNS,
+            PIT_SHELTERED_OBSERVED_COLUMN,
+        )
         if column in df.columns and column not in task.measures
     ]
     cols = [geo_col] + task.measures + passthrough_cols
@@ -538,6 +554,54 @@ def _aggregate_acs1_imputation_passthrough(
     return pd.DataFrame(rows)
 
 
+def _aggregate_pit_observation_passthrough(
+    merged: pd.DataFrame,
+    xwalk: pd.DataFrame,
+    *,
+    target_col: str,
+    source_key: str,
+    weight_column: str,
+) -> pd.DataFrame | None:
+    """Carry PIT declarations through additive rollups using expected members."""
+    pit_metadata_columns = [*PIT_OBSERVATION_COLUMNS, PIT_SHELTERED_OBSERVED_COLUMN]
+    observation_columns = [column for column in pit_metadata_columns if column in merged]
+    if not observation_columns:
+        return None
+    if not any(column in {"pit_total", "pit_sheltered", "pit_unsheltered"} for column in merged):
+        return None
+
+    positive_members = xwalk.loc[
+        pd.to_numeric(xwalk[weight_column], errors="coerce").gt(0),
+        [target_col, source_key],
+    ].dropna().drop_duplicates()
+    expected_by_target = {
+        target: set(group[source_key].astype(str))
+        for target, group in positive_members.groupby(target_col)
+    }
+
+    rows: list[dict[str, object]] = []
+    for target, group in merged.groupby(target_col, sort=False):
+        expected = expected_by_target.get(target, set())
+        contributors = group.loc[
+            pd.to_numeric(group[weight_column], errors="coerce").gt(0)
+        ].copy()
+        contributors["coc_id"] = contributors[source_key].astype(str)
+        metadata = aggregate_pit_count_metadata(
+            contributors,
+            expected_coc_count=len(expected),
+            expected_coc_ids=expected,
+        )
+        rows.append({target_col: target, **metadata})
+    result = pd.DataFrame(rows, columns=[target_col, *pit_metadata_columns])
+    result["count_types"] = result["count_types"].astype("string")
+    for column in (
+        *PIT_OBSERVATION_COLUMNS[1:],
+        PIT_SHELTERED_OBSERVED_COLUMN,
+    ):
+        result[column] = result[column].astype("boolean")
+    return result
+
+
 def _resample_aggregate(
     df: pd.DataFrame,
     xwalk: pd.DataFrame,
@@ -562,6 +626,14 @@ def _resample_aggregate(
         task.dataset_id,
         task.year,
     )
+    observation_measures = set(task.measures).intersection(
+        {*PIT_OBSERVATION_COLUMNS, PIT_SHELTERED_OBSERVED_COLUMN}
+    )
+    if observation_measures:
+        raise ExecutorError(
+            "PIT observation metadata cannot be configured as numeric measures: "
+            f"{sorted(observation_measures)}. Keep these columns as metadata."
+        )
 
     # Determine join key in crosswalk based on effective geometry type
     geo_type = task.effective_geometry.type
@@ -588,6 +660,20 @@ def _resample_aggregate(
             "Crosswalk missing weight column for aggregate resampling. "
             f"Available: {sorted(xwalk.columns)}"
         )
+    pit_measure_columns = {"pit_total", "pit_sheltered", "pit_unsheltered"}
+    selected_pit_measures = pit_measure_columns.intersection(task.measures)
+    has_pit_source_metadata = bool(
+        {*PIT_OBSERVATION_COLUMNS, PIT_SHELTERED_OBSERVED_COLUMN}.intersection(df.columns)
+    )
+    if has_pit_source_metadata and selected_pit_measures:
+        crosswalk_weights = pd.to_numeric(xwalk[base_weight_col], errors="coerce").to_numpy(
+            dtype="float64"
+        )
+        if not np.isfinite(crosswalk_weights).all() or (crosswalk_weights < 0).any():
+            raise ExecutorError(
+                "PIT additive rollups require finite, nonnegative crosswalk weights "
+                f"in '{base_weight_col}' so contributor status matches the numeric sum."
+            )
     has_pop_share = "pop_share" in xwalk.columns and xwalk["pop_share"].notna().any()
 
     # Detect the target geography column in the crosswalk
@@ -613,6 +699,19 @@ def _resample_aggregate(
 
     # Resolve per-measure aggregation methods
     measure_aggs: dict[str, str] = task.measure_aggregations or {m: "sum" for m in task.measures}
+    has_pit_metadata = bool(
+        {*PIT_OBSERVATION_COLUMNS, PIT_SHELTERED_OBSERVED_COLUMN}.intersection(merged.columns)
+    )
+    if has_pit_metadata and selected_pit_measures:
+        unsupported = sorted(
+            measure for measure in selected_pit_measures
+            if measure_aggs.get(measure, "sum") != "sum"
+        )
+        if unsupported:
+            raise ExecutorError(
+                "PIT observation metadata can only accompany additive sum rollups; "
+                f"unsupported aggregation for {unsupported}."
+            )
 
     numeric_columns = list(dict.fromkeys([*task.measures, *derived_required_columns]))
 
@@ -630,7 +729,6 @@ def _resample_aggregate(
     merged[base_weight_col] = merged[base_weight_col].astype("float64")
     if "pop_share" in merged.columns:
         merged["pop_share"] = pd.to_numeric(merged["pop_share"], errors="coerce").astype("float64")
-
     # Group measures by aggregation method for efficient dispatch
     agg_groups: dict[str, list[str]] = {}
     for m, agg in measure_aggs.items():
@@ -751,6 +849,17 @@ def _resample_aggregate(
     if passthrough_part is not None:
         result_parts.append(passthrough_part)
 
+    if has_pit_metadata and selected_pit_measures:
+        pit_passthrough = _aggregate_pit_observation_passthrough(
+            merged,
+            xwalk,
+            target_col=target_col,
+            source_key=xwalk_key,
+            weight_column=base_weight_col,
+        )
+        if pit_passthrough is not None:
+            result_parts.append(pit_passthrough)
+
     # Merge all result parts on target column
     result = result_parts[0]
     for part in result_parts[1:]:
@@ -770,6 +879,19 @@ def _resample_allocate(
     """Allocate resample: few-to-many via crosswalk weights."""
     geo_col = _resolve_geo_column(df, task.geo_column)
     _validate_columns(df, task.measures, task.dataset_id, task.year)
+    observation_measures = set(task.measures).intersection(
+        {*PIT_OBSERVATION_COLUMNS, PIT_SHELTERED_OBSERVED_COLUMN}
+    )
+    if observation_measures:
+        raise ExecutorError(
+            "PIT observation metadata cannot be configured as numeric measures: "
+            f"{sorted(observation_measures)}. Keep these columns as metadata."
+        )
+    if {*PIT_OBSERVATION_COLUMNS, PIT_SHELTERED_OBSERVED_COLUMN}.intersection(df.columns):
+        raise ExecutorError(
+            "Recipe allocate resampling does not support contributor-aware PIT metadata. "
+            "Use identity or additive aggregate resampling for PIT inputs."
+        )
 
     # For allocate, the target geometry is finer-grained.
     # The crosswalk connects target (fine) <-> source (coarse).

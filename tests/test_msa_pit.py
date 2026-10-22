@@ -105,6 +105,30 @@ class TestAggregatePitToMsa:
             "CO-100": COUNT_TYPES_FULL, "CO-200": COUNT_TYPES_SHELTERED_ONLY,
         }
 
+    def test_tiny_allocation_sliver_is_excluded_from_effective_membership(
+        self, msa_crosswalk: pd.DataFrame
+    ):
+        crosswalk = msa_crosswalk.copy()
+        crosswalk.loc[crosswalk.coc_id.eq("CO-200") & crosswalk.msa_id.eq("35620"),
+                      "allocation_share"] = 0.0000001
+        crosswalk.loc[crosswalk.coc_id.eq("CO-200") & crosswalk.msa_id.eq("41180"),
+                      "allocation_share"] = 0.9999999
+        source = with_pit_count_metadata(pd.DataFrame({
+            "coc_id": ["CO-100", "CO-200", "CO-300"],
+            "pit_year": [2020, 2020, 2020],
+            "pit_total": [100.0, 80.0, 60.0],
+            "pit_sheltered": [60.0, 40.0, 30.0],
+            "pit_unsheltered": [40.0, 40.0, 30.0],
+            "count_types": [COUNT_TYPES_FULL, COUNT_TYPES_SHELTERED_ONLY, COUNT_TYPES_FULL],
+        }))
+
+        result = aggregate_pit_to_msa(source, crosswalk)
+        row = result.loc[result.msa_id.eq("35620") & result.year.eq(2020)].iloc[0]
+        assert row.pit_unsheltered == pytest.approx(40.0)
+        assert row.unsheltered_count_observed
+        assert not row.unsheltered_count_carried_forward
+        assert json.loads(row.count_types) == {"CO-100": COUNT_TYPES_FULL}
+
     def test_output_columns(self, coc_pit: pd.DataFrame, msa_crosswalk: pd.DataFrame):
         result = aggregate_pit_to_msa(coc_pit, msa_crosswalk)
         assert "msa_id" in result.columns
@@ -289,12 +313,19 @@ def test_save_msa_pit_embeds_expected_provenance(
     tmp_path,
 ):
     result = aggregate_pit_to_msa(coc_pit, msa_crosswalk)
+    source_provenance = {
+        "input_pit_vintage": 2024,
+        "raw_workbook_sha256": "abc123",
+        "crosswalk_sha256": "def456",
+        "count_types_policy": {"version": "hud_count_types/1"},
+    }
     written = save_msa_pit(
         result[result["year"] == 2020].reset_index(drop=True),
         pit_year=2020,
         definition_version="census_msa_2023",
         boundary_vintage="2020",
         county_vintage="2020",
+        source_provenance=source_provenance,
         output_dir=tmp_path,
     )
 
@@ -310,3 +341,4 @@ def test_save_msa_pit_embeds_expected_provenance(
     assert provenance.extra["source_geometry"] == "coc"
     assert provenance.extra["share_column"] == "allocation_share"
     assert provenance.extra["allocation_method"] == "area"
+    assert provenance.extra["source_provenance"] == source_provenance

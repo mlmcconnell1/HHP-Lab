@@ -21,6 +21,7 @@ COUNT_TYPES_POLICY_REF = (
     "https://www.huduser.gov/portal/sites/default/files/pdf/2024-AHAR-Part-1.pdf"
 )
 PIT_BOOLEAN_OBSERVATION_COLUMNS = PIT_OBSERVATION_COLUMNS[1:]
+PIT_SHELTERED_OBSERVED_COLUMN = "pit_sheltered_count_observed"
 _NO_COUNT = re.compile(r"^no (\d{4}) pit count$")
 
 
@@ -29,6 +30,34 @@ def _normalized_count_type(value: object) -> str:
         return ""
     text = str(value).casefold().strip()
     return re.sub(r"[\s\-\u2010-\u2015]+", " ", text)
+
+
+def _sheltered_declaration_status(value: object) -> object:
+    """Classify one declaration, including nested aggregate JSON maps."""
+    allowed = {
+        _normalized_count_type(item)
+        for item in (COUNT_TYPES_FULL, COUNT_TYPES_PARTIAL, COUNT_TYPES_SHELTERED_ONLY)
+    }
+    if value is None or pd.isna(value):
+        return pd.NA
+    text = str(value)
+    try:
+        declarations = json.loads(text)
+    except (TypeError, json.JSONDecodeError):
+        key = _normalized_count_type(text)
+        if key in allowed:
+            return True
+        if _NO_COUNT.fullmatch(key):
+            return False
+        return pd.NA
+    if not isinstance(declarations, dict) or not declarations:
+        return pd.NA
+    statuses = [_sheltered_declaration_status(item) for item in declarations.values()]
+    if any(status is False for status in statuses):
+        return False
+    if any(pd.isna(status) for status in statuses):
+        return pd.NA
+    return True
 
 
 def pit_count_metadata(
@@ -101,12 +130,11 @@ def observed_pit_mask(
         if require_value else pd.Series(True, index=frame.index)
     )
     if measure == "pit_sheltered":
+        declared_observed = frame.get(PIT_SHELTERED_OBSERVED_COLUMN)
+        if declared_observed is not None:
+            return (available & declared_observed.eq(True)).fillna(False)
         types = frame.get("count_types", pd.Series(pd.NA, index=frame.index))
-        allowed = {
-            _normalized_count_type(value)
-            for value in (COUNT_TYPES_FULL, COUNT_TYPES_PARTIAL, COUNT_TYPES_SHELTERED_ONLY)
-        }
-        return available & types.map(_normalized_count_type).isin(allowed)
+        return (available & types.map(_sheltered_declaration_status).eq(True)).fillna(False)
     observed = frame.get(
         "unsheltered_count_observed", pd.Series(pd.NA, index=frame.index, dtype="boolean")
     )
@@ -121,7 +149,10 @@ def observed_pit_mask(
 
 
 def aggregate_pit_count_metadata(
-    frame: pd.DataFrame, *, expected_coc_count: int
+    frame: pd.DataFrame,
+    *,
+    expected_coc_count: int,
+    expected_coc_ids: set[str] | None = None,
 ) -> dict[str, object]:
     """Describe a reported sum: all members observed, any carried/partial.
 
@@ -138,6 +169,13 @@ def aggregate_pit_count_metadata(
         str(coc): None if pd.isna(value) else str(value)
         for coc, value in zip(identifiers, raw, strict=True)
     }
+    unique_identifiers = len(declarations) == len(frame)
+    if expected_coc_ids is not None:
+        declarations = {
+            coc: declarations.get(coc)
+            for coc in sorted(expected_coc_ids)
+        }
+        unique_identifiers = unique_identifiers and set(identifiers.astype(str)) == expected_coc_ids
     result: dict[str, object] = {
         "count_types": json.dumps(declarations, sort_keys=True, ensure_ascii=False)
     }
@@ -146,7 +184,7 @@ def aggregate_pit_count_metadata(
         if column == "unsheltered_count_observed":
             if flags.eq(False).fillna(False).any():
                 value: object = False
-            elif not complete or flags.isna().any():
+            elif not complete or not unique_identifiers or flags.isna().any():
                 value = pd.NA
             elif "pit_unsheltered" not in frame or frame.pit_unsheltered.isna().any():
                 value = pd.NA
@@ -154,9 +192,25 @@ def aggregate_pit_count_metadata(
                 value = True
         elif flags.eq(True).fillna(False).any():
             value = True
-        elif not complete or flags.isna().any():
+        elif not complete or not unique_identifiers or flags.isna().any():
             value = pd.NA
         else:
             value = False
         result[column] = value
+    sheltered_flags = frame.get(PIT_SHELTERED_OBSERVED_COLUMN)
+    if sheltered_flags is None:
+        sheltered_flags = raw.map(_sheltered_declaration_status).astype("boolean")
+    if sheltered_flags.eq(False).fillna(False).any():
+        sheltered_value: object = False
+    elif (
+        not complete
+        or not unique_identifiers
+        or sheltered_flags.isna().any()
+        or "pit_sheltered" not in frame
+        or frame.pit_sheltered.isna().any()
+    ):
+        sheltered_value = pd.NA
+    else:
+        sheltered_value = True
+    result[PIT_SHELTERED_OBSERVED_COLUMN] = sheltered_value
     return result

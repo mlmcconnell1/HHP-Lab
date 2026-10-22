@@ -23,6 +23,7 @@ from hhplab.geographies.gf_metro.metro_definitions import (
 )
 from hhplab.sources.hud.pit.observation import (
     PIT_BOOLEAN_OBSERVATION_COLUMNS,
+    PIT_SHELTERED_OBSERVED_COLUMN,
     aggregate_pit_count_metadata,
 )
 
@@ -122,7 +123,9 @@ def aggregate_pit_to_metro(
                         "pit_sheltered": None,
                         "pit_unsheltered": None,
                         **aggregate_pit_count_metadata(
-                            metro_pit, expected_coc_count=n_expected
+                            metro_pit,
+                            expected_coc_count=n_expected,
+                            expected_coc_ids={str(coc) for coc in member_cocs},
                         ),
                         "coc_count": 0,
                         "coc_expected": n_expected,
@@ -154,7 +157,11 @@ def aggregate_pit_to_metro(
                     "pit_total": int(pit_total),
                     "pit_sheltered": pit_sheltered,
                     "pit_unsheltered": pit_unsheltered,
-                    **aggregate_pit_count_metadata(metro_pit, expected_coc_count=n_expected),
+                    **aggregate_pit_count_metadata(
+                        metro_pit,
+                        expected_coc_count=n_expected,
+                        expected_coc_ids={str(coc) for coc in member_cocs},
+                    ),
                     "coc_count": n_found,
                     "coc_expected": n_expected,
                     "coc_coverage_ratio": coverage,
@@ -175,6 +182,9 @@ def aggregate_pit_to_metro(
         result_df["count_types"] = result_df["count_types"].astype("string")
         for column in PIT_BOOLEAN_OBSERVATION_COLUMNS:
             result_df[column] = result_df[column].astype("boolean")
+        result_df[PIT_SHELTERED_OBSERVED_COLUMN] = result_df[
+            PIT_SHELTERED_OBSERVED_COLUMN
+        ].astype("boolean")
 
     result_df = result_df.sort_values(["metro_id", "year"]).reset_index(drop=True)
 

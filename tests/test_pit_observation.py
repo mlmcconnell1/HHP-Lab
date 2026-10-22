@@ -98,6 +98,45 @@ def test_observed_mask_excludes_carried_partial_unknown_and_missing_values(measu
     assert observed_pit_mask(frame, measure).tolist() == expected
 
 
+def test_sheltered_mask_accepts_complete_json_declaration_maps_only():
+    frame = pd.DataFrame(
+        {
+            "pit_sheltered": [5, 5, 5, 5],
+            "count_types": [
+                json.dumps({"CA-500": COUNT_TYPES_FULL, "CA-501": COUNT_TYPES_SHELTERED_ONLY}),
+                json.dumps({"CA-500": COUNT_TYPES_FULL, "CA-501": None}),
+                json.dumps({"CA-500": COUNT_TYPES_FULL, "CA-501": "No 2024 PIT Count"}),
+                json.dumps({"CA-500": COUNT_TYPES_FULL, "CA-501": COUNT_TYPES_PARTIAL}),
+            ],
+        }
+    )
+    assert observed_pit_mask(frame, "pit_sheltered").tolist() == [True, False, False, True]
+
+
+def test_sheltered_mask_fails_closed_for_missing_expected_or_numeric_members():
+    one_member = with_pit_count_metadata(pd.DataFrame({
+        "coc_id": ["CA-500"], "pit_year": [2024], "count_types": [COUNT_TYPES_FULL],
+        "pit_sheltered": [5], "pit_unsheltered": [2],
+    }))
+    metadata = aggregate_pit_count_metadata(one_member, expected_coc_count=2)
+    missing_expected = pd.DataFrame({"pit_sheltered": [5], **metadata})
+    assert not observed_pit_mask(missing_expected, "pit_sheltered").iloc[0]
+
+    missing_numeric = with_pit_count_metadata(pd.DataFrame({
+        "coc_id": ["CA-500", "CA-501"], "pit_year": [2024, 2024],
+        "count_types": [COUNT_TYPES_FULL, COUNT_TYPES_FULL],
+        "pit_sheltered": [5, None], "pit_unsheltered": [2, 3],
+    }))
+    aggregate = aggregate_pit_count_metadata(
+        missing_numeric,
+        expected_coc_count=2,
+        expected_coc_ids={"CA-500", "CA-501"},
+    )
+    partial_sum = pd.DataFrame({"pit_sheltered": [5], **aggregate})
+    assert pd.isna(partial_sum.pit_sheltered_count_observed.iloc[0])
+    assert not observed_pit_mask(partial_sum, "pit_sheltered").iloc[0]
+
+
 def test_missing_metadata_does_not_infer_observed_from_repeated_numbers():
     frame = with_pit_count_metadata(pd.DataFrame({
         "pit_year": [2023, 2024], "pit_unsheltered": [7, 7]
