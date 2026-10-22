@@ -403,7 +403,7 @@ def build_panel(
         pit_site.loc[pit_site.unsheltered_observed], ["pit_unsheltered"]
     )
     assert len(eligible_transitions) == impact["observed_annual_transitions"] == 508
-    
+
     hic_parts = []
     for year in YEARS:
         hic = pd.read_parquet(ROOT / f"data/curated/hic/hic__H{year}.parquet")
