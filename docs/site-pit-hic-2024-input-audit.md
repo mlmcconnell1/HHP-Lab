@@ -1,6 +1,6 @@
 # 2024 PIT and HIC CoC input audit
 
-**Prospective longitudinal universe:** On 2026-10-21 the study owner directed holding out CT-503. The rebuilt 99% universe excludes its dependent MSA 14860 (Bridgeport–Stamford–Danbury), leaving **63 sites and 83 CoCs**. All other selected membership pairs are unchanged. The original cross-sectional runs below retain their original samples and limitations.
+**Current longitudinal design:** The study owner selected **2010–2024 excluding 2021**, holding out CT-503, OR-504 (Salem), and PA-512 (York–Hanover) consistently across all years. The rebuilt 99% universe contains **61 sites and 81 frozen CoCs**. Required source counts are present across all 14 years, giving 854 potential site-year observations; historical geography clearance remains outstanding. This supersedes the earlier CT-only 63-site design. The original cross-sectional runs below retain their original samples and limitations.
 
 **Updated finding:** CT-503's January 2024 PIT/HIC reporting footprint has not been verified against the frozen boundary. The original same-year compatibility conclusion is superseded for that CoC; existing results remain reproducible but are not fully geography-validated. See [the CT-503 reconciliation](ct503-historical-reconciliation.md) and follow-up bead `coclab-k34yp`.
 
@@ -125,6 +125,8 @@ The complete 2023 pairwise polygon overlay is retained in `~/HHP-Output/site-bou
 
 ## Owner-directed CT-503 holdout
 
+This section records the earlier 63-site intermediate universe. The current design is recorded in the following section.
+
 The prospective recipe is `recipes/msa-coc-longitudinal-sites.yaml`, with artifact ID `longitudinal_sites` and threshold 0.99. It uses the unchanged crosswalk, CoC names, vintages, and overlap rules, with MSA 14860 removed from the candidate MSA input before site production. This removes its entire site rather than computing a partial count or redefining its CoC coverage. No outcomes informed the exclusion.
 
 The filtered MSA input and its embedded exclusion provenance are at `~/HHP-Output/msa_coc_longitudinal_sites_inputs/metro_universe__census_msa_2023__exclude_CT503.parquet`; `exclusion-policy.json` in that directory records the source, hashes, and reason. The source universe has 393 rows and SHA-256 `5e72e881627d19f447c73766808b3d0631d84b7faeb606e9e9ea7211f38932ff`. The filtered input retains every row whose `metro_id` is not `14860`, producing 392 candidates and SHA-256 `8ca4dacbd9cbf2832de324549279d4b34af9354718621b1a5e1ac764e2fcccc8`. Both IDs and the exclusion rationale are independent of PIT/HIC values.
@@ -132,3 +134,13 @@ The filtered MSA input and its embedded exclusion provenance are at `~/HHP-Outpu
 Package preflight and build completed with no findings. The validated paired site/membership artifacts are under `~/HHP-Output/msa_coc_longitudinal_sites/`. Membership identity is `sha256:0ed7d40f8d75d761862ab3b8c1b8bc9f43853eebbecf3ce666c77942152f5a54`. `ct503-holdout-verification.json` records resolver output and verifies that the only removed selected pair is `(14860, CT-503)`, leaving 63 eligible MSAs and 83 CoCs. Curated-layout checks passed before and after the build.
 
 Future longitudinal recipes must use this new artifact and membership identity, with newly bound boundary evidence and locks. Existing 90/95/99 exploratory universes and six cross-sectional bundles are preserved. The holdout removes CT-503 as a study blocker; remaining historical geography checks still apply, and 2021 remains excluded from longitudinal outcomes.
+
+## Selected 2010–2024 longitudinal design
+
+The study owner subsequently selected a 2010 start and consistent exclusions of Salem and York as well as CT-503. The excluded pairs are `(14860, CT-503)`, `(41420, OR-504)`, and `(49620, PA-512)`. Each excluded CoC is the sole selected constituent of its MSA. All other original 99% membership pairs are retained unchanged. The window is 2010–2024 excluding 2021: 14 annual observations per site, potentially 854 site-years. There are 12 consecutive one-year transitions per site; 2020–2022 is not a one-year lag.
+
+`recipes/msa-coc-longitudinal-sites.yaml` now produces `msa_coc_longitudinal_2010_2024_sites`, artifact ID `longitudinal_sites`, under `~/HHP-Output/msa_coc_longitudinal_2010_2024_sites/`. The recipe's production year remains 2024 because it produces frozen geography, not the longitudinal outcome panel. Its filtered MSA input is `~/HHP-Output/msa_coc_longitudinal_sites_inputs/metro_universe__census_msa_2023__exclude_CT503_OR504_PA512.parquet`, SHA-256 `f0b5691ee554aa135d933f106399a0e4b041393cb533c636f38f1d9d14e2d678`. It retains the original 393-candidate input except MSA IDs 14860, 41420, and 49620, leaving 390 candidates. The input embeds exclusion provenance; `exclusion-policy-2010-2024.json` beside it records the exact study years and source hash.
+
+The resulting 61-site/81-CoC membership identity is `sha256:4861b55cdb14c1e6dc14f270dc2d99a9952da4cd2aae844ee65163ce83771144`. Package preflight and build passed without findings, and the resolver verified that only the three named pairs were removed. The previous CT-only artifacts and all original results remain preserved in their existing directories.
+
+`membership-and-outcome-coverage.json` in the new output directory records the validated membership, source hashes, and annual count checks. All 81 required P2024 PIT rows have valid unsheltered counts in each selected year. Annual HIC has valid ES+TH+SH year-round bed counts for all 81 frozen IDs plus MA-519 in each pre-2024 year (82 source IDs); 2024 needs only the 81 frozen IDs. No required rows are missing, duplicated, null, negative, fractional, or nonfinite. This is source availability verification, not boundary validation or a completed historical panel. Future analysis must bind its evidence and locks to the new membership identity and apply the explicit source-specific MA-505 reconciliation. The historical checks in `coclab-k0hwb` now apply to this design.
