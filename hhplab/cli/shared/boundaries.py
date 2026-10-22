@@ -45,6 +45,20 @@ def ingest_boundaries(
             help="Snapshot tag for hud_opendata source (default: 'latest')",
         ),
     ] = "latest",
+    archive_dir: Annotated[
+        Path | None,
+        typer.Option(
+            "--archive-dir",
+            help="Local archive directory for an audited historical HUD state-archive ingest.",
+        ),
+    ] = None,
+    archive_manifest: Annotated[
+        Path | None,
+        typer.Option(
+            "--archive-manifest",
+            help="Acquisition manifest paired with --archive-dir.",
+        ),
+    ] = None,
     force: Annotated[
         bool,
         typer.Option(
@@ -59,6 +73,54 @@ def ingest_boundaries(
     ] = False,
 ) -> None:
     """Ingest CoC boundary data from HUD sources."""
+    if archive_dir is not None or archive_manifest is not None:
+        if source != "hud_exchange" or vintage is None:
+            message = (
+                "--archive-dir/--archive-manifest require --source hud_exchange and --vintage."
+            )
+            if json_output:
+                typer.echo(json.dumps({"status": "error", "message": message}))
+            else:
+                typer.echo(f"Error: {message}", err=True)
+            raise typer.Exit(1)
+        if archive_dir is None or archive_manifest is None:
+            message = "Both --archive-dir and --archive-manifest are required together."
+            if json_output:
+                typer.echo(json.dumps({"status": "error", "message": message}))
+            else:
+                typer.echo(f"Error: {message}", err=True)
+            raise typer.Exit(1)
+        from hhplab.geographies.boundaries.hud import ingest_hud_exchange_state_archives
+
+        try:
+            output_path = ingest_hud_exchange_state_archives(
+                vintage,
+                archive_dir,
+                archive_manifest,
+                force=force,
+            )
+            if json_output:
+                typer.echo(
+                    json.dumps(
+                        {
+                            "status": "ok",
+                            "source": source,
+                            "vintage": vintage,
+                            "output_path": str(output_path),
+                            "skipped": False,
+                        }
+                    )
+                )
+            else:
+                typer.echo(f"Successfully ingested to: {output_path}")
+        except Exception as e:
+            if json_output:
+                typer.echo(json.dumps({"status": "error", "message": str(e)}))
+            else:
+                typer.echo(f"Error: {e}", err=True)
+            raise typer.Exit(1) from e
+        return
+
     if source == "hud_exchange":
         if vintage is None:
             message = "--vintage is required for hud_exchange source"

@@ -28,14 +28,18 @@ from hhplab.storage.raw_snapshot import persist_file_snapshot, raw_dir, raw_path
 
 logger = logging.getLogger(__name__)
 
-SUPPORTED_BLOCK_VINTAGES: tuple[int, ...] = (2020,)
+SUPPORTED_BLOCK_VINTAGES: tuple[int, ...] = (2010, 2020)
 STATE_DOWNLOAD_ATTEMPTS = 3
+BLOCK_GEOMETRY_STATE_FIPS_2010 = tuple(
+    state for state in STATE_FIPS_CODES if state not in {"60", "66", "69", "78"}
+)
 
 
 def _block_zip_name(year: int, state_fips: str) -> str:
     """Return the Census ZIP filename for one state's tabulation blocks."""
-    if year == 2020:
-        return f"tl_{year}_{state_fips}_tabblock20.zip"
+    if year in SUPPORTED_BLOCK_VINTAGES:
+        suffix = str(year)[-2:]
+        return f"tl_{year}_{state_fips}_tabblock{suffix}.zip"
     supported = ", ".join(str(vintage) for vintage in SUPPORTED_BLOCK_VINTAGES)
     raise ValueError(
         f"Unsupported block geometry vintage {year!r}. Supported vintages: {supported}."
@@ -45,7 +49,17 @@ def _block_zip_name(year: int, state_fips: str) -> str:
 def _block_url(year: int, state_fips: str) -> str:
     """Return the Census download URL for one state's tabulation blocks."""
     zip_name = _block_zip_name(year, state_fips)
-    return f"{CENSUS_TIGER_BASE.format(year=year, layer='TABBLOCK20')}{zip_name}"
+    suffix = str(year)[-2:]
+    layer_url = _block_layer_url(year, suffix)
+    return f"{layer_url}{zip_name}"
+
+
+def _block_layer_url(year: int, suffix: str | None = None) -> str:
+    """Return the Census directory holding one block vintage's state ZIPs."""
+    resolved_suffix = suffix or str(year)[-2:]
+    if year == 2010:
+        return CENSUS_TIGER_BASE.format(year=year, layer="TABBLOCK") + "2010/"
+    return CENSUS_TIGER_BASE.format(year=year, layer=f"TABBLOCK{resolved_suffix}")
 
 
 def _resolve_block_column(
@@ -63,9 +77,7 @@ def normalize_block_geometry(gdf: gpd.GeoDataFrame, year: int) -> gpd.GeoDataFra
     """Normalize Census tabulation block geometry to the canonical schema."""
     _block_zip_name(year, "01")
     if gdf.crs is None:
-        raise ValueError(
-            "Source block GeoDataFrame has no CRS; cannot safely assume EPSG:4326."
-        )
+        raise ValueError("Source block GeoDataFrame has no CRS; cannot safely assume EPSG:4326.")
     if gdf.crs.to_epsg() != 4326:
         gdf = gdf.to_crs(epsg=4326)
 
@@ -87,7 +99,7 @@ def normalize_block_geometry(gdf: gpd.GeoDataFrame, year: int) -> gpd.GeoDataFra
             "tract_geoid": state + county + tract,
             "block_vintage": year,
             "data_source": "census_tiger_tabblock",
-            "source_ref": CENSUS_TIGER_BASE.format(year=year, layer="TABBLOCK20"),
+            "source_ref": _block_url(year, "*"),
             "ingested_at": ingested_at,
             "geometry": gdf.geometry,
         },
@@ -173,6 +185,15 @@ def _state_part_path(parts_dir: Path, state_fips: str) -> Path:
     return parts_dir / f"state_fips={state_fips}.parquet"
 
 
+def _state_part_matches_source(path: Path, year: int) -> bool:
+    """Check whether a cached part records the expected TIGER source URL."""
+    try:
+        source_refs = pq.read_table(path, columns=["source_ref"])["source_ref"].unique()
+    except (KeyError, OSError, ValueError):
+        return False
+    return source_refs.to_pylist() == [_block_url(year, "*")]
+
+
 def _write_state_part(gdf: gpd.GeoDataFrame, path: Path) -> Path:
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp_path = path.with_suffix(path.suffix + ".tmp")
@@ -235,7 +256,12 @@ def _stream_state_block_parts(
             raw_zip_path = _raw_block_zip_path(year, state_fips, raw_root)
             raw_content: bytes | None = None
 
-            if part_path.exists() and raw_zip_path.exists() and not force:
+            if (
+                part_path.exists()
+                and raw_zip_path.exists()
+                and not force
+                and _state_part_matches_source(part_path, year)
+            ):
                 row_counts[state_fips] = pq.read_metadata(part_path).num_rows
                 raw_content = raw_zip_path.read_bytes()
                 raw_paths.append(raw_zip_path)
@@ -450,6 +476,7 @@ def ingest_block_geometry(
     force: bool = False,
     output_dir: Path | str | None = None,
     raw_root: Path | None = None,
+    state_fips_codes: tuple[str, ...] | None = None,
 ) -> Path:
     """Download and cache Census tabulation block geometry."""
     output_path = get_block_geometry_output_path(year, output_dir)
@@ -457,10 +484,14 @@ def ingest_block_geometry(
         return output_path
 
     parts_dir = _block_geometry_parts_dir(year, output_dir, raw_root=raw_root)
+    resolved_state_fips_codes = state_fips_codes
+    if resolved_state_fips_codes is None and year == 2010:
+        resolved_state_fips_codes = BLOCK_GEOMETRY_STATE_FIPS_2010
     content_sha256, content_size, raw_paths, missing_state_fips, row_counts = (
         _stream_state_block_parts(
             year,
             parts_dir=parts_dir,
+            state_fips_codes=resolved_state_fips_codes or STATE_FIPS_CODES,
             raw_root=raw_root,
             force=force,
         )

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import io
 import json
 
 import pandas as pd
@@ -12,6 +13,7 @@ from hhplab.cli.main import app
 from hhplab.schema.columns import PL_BLOCK_POPULATION_COLUMNS
 from hhplab.sources.census.ingest.pl_block_population import (
     PL_BLOCK_API_SPECS,
+    _parse_pl_2010_geography_file,
     fetch_pl_block_population,
     get_pl_block_population_output_path,
     ingest_pl_block_population,
@@ -69,6 +71,64 @@ def test_fetch_pl_block_population_uses_2010_pl_variable(httpx_mock) -> None:
     assert df.loc[0, "block_geoid"] == "080310001000007"
     assert df.loc[0, "total_population"] == 37
     assert df.loc[0, "source_ref"] == f"{PL_BLOCK_API_SPECS['2010'][0]}:P001001"
+
+
+def test_parse_official_2010_pl_geography_rows_checks_state_and_county_totals() -> None:
+    """Bulk PL geography headers yield full block GEOIDs and validated POP100 counts."""
+
+    def record(summary_level: str, county: str, tract: str, block: str, population: int) -> bytes:
+        row = bytearray(b" " * 500)
+        row[8:11] = summary_level.encode("ascii")
+        row[11:13] = b"00"
+        row[27:29] = b"08"
+        row[29:32] = county.encode("ascii")
+        row[54:60] = tract.encode("ascii")
+        row[61:65] = block.encode("ascii")
+        row[318:327] = f"{population:9d}".encode("ascii")
+        return bytes(row) + b"\r\n"
+
+    source = b"".join(
+        [
+            record("040", "", "", "", 3),
+            record("050", "031", "", "", 3),
+            record("750", "031", "000100", "0001", 1),
+            record("750", "031", "000100", "0002", 2),
+            record("750", "031", "000100", "0003", 0),
+        ]
+    )
+
+    frame, state_population, county_totals = _parse_pl_2010_geography_file(
+        io.BytesIO(source),
+        "08",
+        "https://example.test/co2010.pl.zip",
+    )
+
+    assert frame["block_geoid"].tolist() == [
+        "080310001000001",
+        "080310001000002",
+        "080310001000003",
+    ]
+    assert frame["total_population"].tolist() == [1, 2, 0]
+    assert state_population == 3
+    assert county_totals == {"08031": 3}
+
+
+def test_parse_official_2010_pl_rejects_missing_population_instead_of_using_zero() -> None:
+    """Blank source POP100 values fail clearly while numeric zero remains valid."""
+    row = bytearray(b" " * 500)
+    row[8:11] = b"750"
+    row[11:13] = b"00"
+    row[27:29] = b"08"
+    row[29:32] = b"031"
+    row[54:60] = b"000100"
+    row[61:65] = b"0001"
+
+    with pytest.raises(ValueError, match="missing POP100.*cannot be interpreted as zero"):
+        _parse_pl_2010_geography_file(
+            io.BytesIO(bytes(row) + b"\r\n"),
+            "08",
+            "https://example.test/co2010.pl.zip",
+        )
 
 
 def test_fetch_pl_block_population_passes_api_key(httpx_mock, monkeypatch) -> None:
@@ -166,7 +226,7 @@ def test_pl_blocks_cli_cached_json(monkeypatch, tmp_path) -> None:
     ).to_parquet(cached_path, index=False)
     monkeypatch.setattr(
         "hhplab.cli.ingest.pl_block_population.get_pl_block_population_output_path",
-        lambda decennial, blocks=None: cached_path,
+        lambda decennial, blocks=None, base_dir=None: cached_path,
     )
 
     result = runner.invoke(app, ["ingest", "pl-blocks", "--decennial", "2020", "--json"])
@@ -201,11 +261,16 @@ def test_pl_blocks_cli_fresh_json(monkeypatch, tmp_path) -> None:
     ).to_parquet(output_path, index=False)
     monkeypatch.setattr(
         "hhplab.cli.ingest.pl_block_population.get_pl_block_population_output_path",
-        lambda decennial, blocks=None: tmp_path / "missing.parquet",
+        lambda decennial, blocks=None, base_dir=None: tmp_path / "missing.parquet",
     )
     monkeypatch.setattr(
         "hhplab.sources.census.ingest.pl_block_population.ingest_pl_block_population",
-        lambda decennial, block_vintage=None, force=False, api_key=None: output_path,
+        lambda decennial,
+        block_vintage=None,
+        force=False,
+        api_key=None,
+        output_dir=None,
+        raw_root=None: output_path,
     )
 
     result = runner.invoke(app, ["ingest", "pl-blocks", "--decennial", "2010", "--json"])

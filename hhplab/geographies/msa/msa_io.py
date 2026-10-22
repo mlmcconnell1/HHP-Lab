@@ -8,16 +8,15 @@ import httpx
 import pandas as pd
 
 import hhplab.artifacts.naming.naming as naming
-from hhplab.geographies.boundaries.census.urls import CENSUS_MSA_DELINEATION_FILE_2023
 from hhplab.geographies.msa.msa_definitions import (
     DEFINITION_VERSION,
-    DELINEATION_FILE_YEAR,
-    SOURCE_NAME,
-    SOURCE_REF,
-    WORKBOOK_FILENAME,
+    HISTORICAL_DEFINITION_VERSION,
+    HISTORICAL_OMB_REF,
+    HISTORICAL_STANDARDS_BASIS,
     build_county_membership_df,
     build_definitions_df,
-    parse_delineation_workbook,
+    get_msa_source_spec,
+    parse_delineation_source,
 )
 from hhplab.geographies.msa.msa_validate import MSAValidationResult, validate_msa_artifacts
 from hhplab.registry.source_registry import check_source_changed, register_source
@@ -26,25 +25,34 @@ from hhplab.storage.raw_snapshot import persist_file_snapshot
 
 
 def download_delineation_rows(
+    definition_version: str = DEFINITION_VERSION,
     raw_root: Path | None = None,
+    source_file: Path | str | None = None,
 ) -> tuple[pd.DataFrame, str, int, Path]:
-    """Download and parse the official Census July 2023 delineation workbook."""
-    with httpx.Client(timeout=300.0) as client:
-        response = client.get(CENSUS_MSA_DELINEATION_FILE_2023, follow_redirects=True)
-        response.raise_for_status()
-        raw_content = response.content
+    """Download or read and parse the selected Census MSA delineation source."""
+    spec = get_msa_source_spec(definition_version)
+    if source_file is not None:
+        source_path = Path(source_file)
+        raw_content = source_path.read_bytes()
+        source_url = spec.source_url
+    else:
+        source_url = spec.source_url
+        with httpx.Client(timeout=300.0) as client:
+            response = client.get(source_url, follow_redirects=True)
+            response.raise_for_status()
+            raw_content = response.content
 
     raw_path, content_sha256, content_size = persist_file_snapshot(
         raw_content,
         "census_cbsa",
-        WORKBOOK_FILENAME,
-        subdirs=(str(DELINEATION_FILE_YEAR),),
+        spec.workbook_filename,
+        subdirs=(str(spec.delineation_file_year),),
         raw_root=raw_root,
     )
 
     changed, details = check_source_changed(
         source_type="census_cbsa",
-        source_url=CENSUS_MSA_DELINEATION_FILE_2023,
+        source_url=source_url,
         current_sha256=content_sha256,
     )
     if changed:
@@ -59,7 +67,8 @@ def download_delineation_rows(
             details["previous_ingested_at"],
         )
 
-    return parse_delineation_workbook(raw_content), content_sha256, content_size, raw_path
+    delineation_rows = parse_delineation_source(str(raw_path), definition_version)
+    return delineation_rows, content_sha256, content_size, raw_path
 
 
 def write_msa_artifacts(
@@ -69,23 +78,27 @@ def write_msa_artifacts(
     validate: bool = True,
     raw_root: Path | None = None,
     delineation_df: pd.DataFrame | None = None,
+    source_file: Path | str | None = None,
 ) -> tuple[Path, Path]:
     """Generate and write curated MSA definition parquet files."""
     downloaded_source = delineation_df is None
     if downloaded_source:
         delineation_df, content_sha256, content_size, raw_path = download_delineation_rows(
-            raw_root=raw_root
+            definition_version=definition_version,
+            raw_root=raw_root,
+            source_file=source_file,
         )
     else:
         content_sha256 = ""
         content_size = 0
         raw_path = Path("")
 
-    defs_df = build_definitions_df(delineation_df)
-    county_df = build_county_membership_df(delineation_df)
+    spec = get_msa_source_spec(definition_version)
+    defs_df = build_definitions_df(delineation_df, definition_version)
+    county_df = build_county_membership_df(delineation_df, definition_version)
 
     if validate:
-        result = validate_msa_artifacts(defs_df, county_df)
+        result = validate_msa_artifacts(defs_df, county_df, definition_version)
         if not result.passed:
             raise ValueError(f"MSA definition validation failed:\n{result.summary()}")
 
@@ -94,8 +107,23 @@ def write_msa_artifacts(
         definition_version=definition_version,
         extra={
             "dataset_type": "msa_definition",
-            "source": "census_msa_delineation_2023",
-            "source_ref": SOURCE_REF,
+            "source": spec.source_slug,
+            "source_ref": spec.source_ref,
+            "source_url": spec.source_url,
+            "source_release_date": spec.source_release_date,
+            "definition_calendar_year": spec.geometry_vintage,
+            "county_boundary_vintage": spec.geometry_vintage,
+            "raw_sha256": content_sha256 or None,
+            "raw_file_size": content_size or None,
+            "raw_snapshot_path": str(raw_path) if downloaded_source else None,
+            **(
+                {
+                    "standards_basis": HISTORICAL_STANDARDS_BASIS,
+                    "omb_bulletin_ref": HISTORICAL_OMB_REF,
+                }
+                if definition_version == HISTORICAL_DEFINITION_VERSION
+                else {}
+            ),
         },
     )
 
@@ -107,13 +135,15 @@ def write_msa_artifacts(
     if downloaded_source:
         register_source(
             source_type="census_cbsa",
-            source_url=CENSUS_MSA_DELINEATION_FILE_2023,
-            source_name=SOURCE_NAME,
+            source_url=spec.source_url,
+            source_name=spec.source_name,
             raw_sha256=content_sha256,
             file_size=content_size,
             local_path=str(raw_path),
             metadata={
                 "definition_version": definition_version,
+                "source_release_date": spec.source_release_date,
+                "county_boundary_vintage": spec.geometry_vintage,
                 "curated_paths": [str(defs_path), str(county_path)],
                 "msa_count": len(defs_df),
                 "county_membership_rows": len(county_df),
@@ -160,4 +190,4 @@ def validate_curated_msa(
     """Load curated MSA artifacts and validate them."""
     defs_df = read_msa_definitions(definition_version, base_dir)
     county_df = read_msa_county_membership(definition_version, base_dir)
-    return validate_msa_artifacts(defs_df, county_df)
+    return validate_msa_artifacts(defs_df, county_df, definition_version)

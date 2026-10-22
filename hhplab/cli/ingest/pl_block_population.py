@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from pathlib import Path
 from typing import Annotated
 
 import pandas as pd
@@ -42,6 +43,23 @@ def ingest_pl_block_population(
             help="Census API key. Falls back to CENSUS_API_KEY env var.",
         ),
     ] = None,
+    output_dir: Annotated[
+        Path | None,
+        typer.Option(
+            "--output-dir",
+            help=(
+                "Directory for the curated Parquet output. Defaults to the project "
+                "census directory."
+            ),
+        ),
+    ] = None,
+    raw_root: Annotated[
+        Path | None,
+        typer.Option(
+            "--raw-root",
+            help="Directory for resumable raw Census ZIPs and their manifest.",
+        ),
+    ] = None,
     output_json: Annotated[
         bool,
         typer.Option(
@@ -55,31 +73,18 @@ def ingest_pl_block_population(
         ingest_pl_block_population as ingest,
     )
 
-    output_path = get_pl_block_population_output_path(decennial, blocks)
-    if output_path.exists() and not force:
-        df = pd.read_parquet(output_path)
-        if output_json:
-            typer.echo(
-                json.dumps(
-                    {
-                        "status": "ok",
-                        "cached": True,
-                        "decennial_vintage": decennial,
-                        "block_vintage": blocks or decennial,
-                        "output_path": str(output_path),
-                        "total_blocks": int(len(df)),
-                        "total_population": int(df["total_population"].sum()),
-                    }
-                )
-            )
-            return
-        typer.echo(f"Cached file found: {output_path}")
-        typer.echo(f"Rows: {len(df):,}")
-        typer.echo("Use --force to re-ingest.")
-        return
+    output_path = get_pl_block_population_output_path(decennial, blocks, output_dir)
+    cached = output_path.exists() and not force
 
     try:
-        path = ingest(decennial, block_vintage=blocks, force=force, api_key=api_key)
+        path = ingest(
+            decennial,
+            block_vintage=blocks,
+            force=force,
+            api_key=api_key,
+            output_dir=output_dir if output_dir is not None else output_path.parent,
+            raw_root=raw_root,
+        )
     except Exception as exc:
         typer.echo(f"Error: {exc}", err=True)
         raise typer.Exit(1) from exc
@@ -90,7 +95,7 @@ def ingest_pl_block_population(
             json.dumps(
                 {
                     "status": "ok",
-                    "cached": False,
+                    "cached": cached,
                     "decennial_vintage": decennial,
                     "block_vintage": blocks or decennial,
                     "output_path": str(path),
@@ -99,6 +104,12 @@ def ingest_pl_block_population(
                 }
             )
         )
+        return
+
+    if cached:
+        typer.echo(f"Cached file found: {path}")
+        typer.echo(f"Rows: {len(df):,}")
+        typer.echo("Use --force to re-ingest.")
         return
 
     typer.echo("Ingested PL 94-171 block population denominators.")

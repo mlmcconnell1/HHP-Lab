@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from io import BytesIO
+import csv
+from io import BytesIO, StringIO
 
 import geopandas as gpd
 import pandas as pd
@@ -11,10 +12,13 @@ from shapely.geometry import GeometryCollection, box
 
 from hhplab.geographies.msa.msa_definitions import (
     DEFINITION_VERSION,
+    HISTORICAL_CSV_COLUMNS,
+    HISTORICAL_DEFINITION_VERSION,
     MSA_AREA_TYPE,
     build_county_membership_df,
     build_definitions_df,
     parse_delineation_workbook,
+    parse_historical_delineation_csv,
 )
 from hhplab.geographies.msa.msa_io import read_msa_definitions
 from hhplab.geographies.msa.msa_validate import validate_msa_artifacts, validate_msa_boundaries
@@ -123,6 +127,66 @@ def _workbook_bytes() -> bytes:
     with pd.ExcelWriter(buffer, engine="openpyxl") as writer:
         data.to_excel(writer, index=False, startrow=2)
     return buffer.getvalue()
+
+
+def _historical_csv(status: str = "1") -> str:
+    rows = [
+        ["Table with row headers in column A and column headers in row 4"],
+        ["CORE BASED STATISTICAL AREAS (CBSAs) AND COMBINED STATISTICAL AREAS (CSAs),"],
+        ["DECEMBER 2009"],
+        list(HISTORICAL_CSV_COLUMNS),
+        [
+            "14460",
+            "14500",
+            "",
+            "Boston-Cambridge-Newton, MA-NH",
+            "Metropolitan Statistical Area",
+            status,
+            "Boston, MA",
+            "Boston-Worcester-Providence, MA-RI-NH-CT",
+            "Suffolk County",
+            "Massachusetts",
+            "25025",
+            "Central",
+        ],
+        [
+            "14460",
+            "14454",
+            "",
+            "Boston-Cambridge-Newton, MA-NH",
+            "Metropolitan Statistical Area",
+            status,
+            "Cambridge-Newton-Framingham, MA",
+            "Boston-Worcester-Providence, MA-RI-NH-CT",
+            "Middlesex County",
+            "Massachusetts",
+            "25017",
+            "Outlying",
+        ],
+    ]
+    buffer = StringIO()
+    csv.writer(buffer, lineterminator="\n").writerows(rows)
+    return buffer.getvalue()
+
+
+def test_parse_historical_delineation_csv_preserves_parent_msa_and_fips():
+    parsed = parse_historical_delineation_csv(_historical_csv())
+
+    assert parsed["cbsa_code"].tolist() == ["14460", "14460"]
+    assert parsed["county_fips"].tolist() == ["25025", "25017"]
+    assert parsed["area_type"].tolist() == [MSA_AREA_TYPE, MSA_AREA_TYPE]
+    assert parsed["central_outlying"].tolist() == ["Central", "Outlying"]
+    assert HISTORICAL_DEFINITION_VERSION == "census_msa_2010"
+
+
+@pytest.mark.parametrize(
+    ("status", "message"),
+    [("3", "unsupported status value"), ("2", "conflicts with Level of CBSA")],
+    ids=["unknown-status", "status-level-disagreement"],
+)
+def test_parse_historical_delineation_csv_rejects_invalid_area_class(status: str, message: str):
+    with pytest.raises(ValueError, match=message):
+        parse_historical_delineation_csv(_historical_csv(status))
 
 
 def _valid_msa_artifacts() -> tuple[pd.DataFrame, pd.DataFrame]:

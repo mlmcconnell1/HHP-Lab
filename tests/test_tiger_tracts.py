@@ -48,7 +48,9 @@ def test_tract_zip_name_uses_2010_suffix() -> None:
 
 
 def test_block_geometry_filename_uses_tabblock20_suffix() -> None:
-    """2020 tabulation block downloads use the TIGER TABBLOCK20 pattern."""
+    """2010 and 2020 tabulation blocks use their native TIGER URL patterns."""
+    assert _block_zip_name(2010, "51") == "tl_2010_51_tabblock10.zip"
+    assert _block_url(2010, "51").endswith("/TIGER2010/TABBLOCK/2010/tl_2010_51_tabblock10.zip")
     assert _block_zip_name(2020, "51") == "tl_2020_51_tabblock20.zip"
     assert _block_url(2020, "51").endswith("/TIGER2020/TABBLOCK20/tl_2020_51_tabblock20.zip")
 
@@ -204,7 +206,29 @@ def test_normalize_block_geometry_rejects_unsupported_vintage() -> None:
     )
 
     with pytest.raises(ValueError, match="Unsupported block geometry vintage"):
-        normalize_block_geometry(source, 2010)
+        normalize_block_geometry(source, 2000)
+
+
+def test_normalize_block_geometry_accepts_2010_schema() -> None:
+    """2010 TIGER blocks retain full decennial GEOIDs for direct PL joins."""
+    source = gpd.GeoDataFrame(
+        {
+            "GEOID10": ["510010901011234"],
+            "STATEFP10": ["51"],
+            "COUNTYFP10": ["001"],
+            "TRACTCE10": ["090101"],
+            "geometry": [Point(1, 1)],
+        },
+        geometry="geometry",
+        crs="EPSG:4326",
+    )
+
+    result = normalize_block_geometry(source, 2010)
+
+    assert result.loc[0, "block_geoid"] == "510010901011234"
+    assert result.loc[0, "county_fips"] == "51001"
+    assert result.loc[0, "tract_geoid"] == "51001090101"
+    assert result.loc[0, "block_vintage"] == 2010
 
 
 def test_save_urban_areas_writes_geoparquet_with_provenance(tmp_path) -> None:
@@ -653,7 +677,7 @@ def test_ingest_block_geometry_cli_cached_json(monkeypatch, tmp_path) -> None:
     gdf.to_parquet(cached_path, index=False)
     monkeypatch.setattr(
         "hhplab.cli.ingest.census.get_block_geometry_output_path",
-        lambda year: cached_path,
+        lambda year, base_dir=None: cached_path,
     )
 
     result = runner.invoke(app, ["ingest", "block-geometry", "--year", "2020", "--json"])
@@ -745,11 +769,11 @@ def test_ingest_block_geometry_cli_fresh_json(monkeypatch, tmp_path) -> None:
     gdf.to_parquet(output_path, index=False)
     monkeypatch.setattr(
         "hhplab.cli.ingest.census.get_block_geometry_output_path",
-        lambda year: tmp_path / "missing.parquet",
+        lambda year, base_dir=None: tmp_path / "missing.parquet",
     )
     monkeypatch.setattr(
         "hhplab.geographies.boundaries.census.ingest.tiger_blocks.ingest_block_geometry",
-        lambda year, force=False: output_path,
+        lambda year, force=False, output_dir=None, raw_root=None: output_path,
     )
 
     result = runner.invoke(app, ["ingest", "block-geometry", "--year", "2020", "--json"])

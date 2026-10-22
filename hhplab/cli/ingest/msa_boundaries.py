@@ -2,12 +2,13 @@
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Annotated
 
 import typer
 
 from hhplab.cli.shared.output import JsonOutput, cli_error, emit_result
-from hhplab.geographies.msa.msa_definitions import DEFINITION_VERSION, DELINEATION_FILE_YEAR
+from hhplab.geographies.msa.msa_definitions import DEFINITION_VERSION, get_msa_source_spec
 
 
 def ingest_msa_boundaries(
@@ -20,13 +21,13 @@ def ingest_msa_boundaries(
         ),
     ] = DEFINITION_VERSION,
     tiger_year: Annotated[
-        int,
+        int | None,
         typer.Option(
             "--year",
             "-y",
             help="TIGER/Line CBSA geometry year to ingest.",
         ),
-    ] = DELINEATION_FILE_YEAR,
+    ] = None,
     force: Annotated[
         bool,
         typer.Option(
@@ -34,6 +35,16 @@ def ingest_msa_boundaries(
             help="Overwrite an existing curated MSA boundary artifact.",
         ),
     ] = False,
+    source_file: Annotated[
+        Path | None,
+        typer.Option(
+            "--source-file",
+            help="Read a locally verified TIGER source archive instead of downloading it.",
+            exists=True,
+            dir_okay=False,
+            readable=True,
+        ),
+    ] = None,
     json_output: JsonOutput = False,
 ) -> None:
     """Ingest official MSA boundary polygons to curated GeoParquet."""
@@ -42,6 +53,8 @@ def ingest_msa_boundaries(
     from hhplab.geographies.msa.msa_boundaries import read_msa_boundaries
 
     output_path = naming.msa_boundaries_path(definition_version)
+    spec = get_msa_source_spec(definition_version)
+    tiger_year = tiger_year if tiger_year is not None else spec.geometry_vintage
     if output_path.exists() and not force:
         cli_error(
             f"MSA boundary artifact already exists at {output_path}. Use --force to overwrite.",
@@ -60,7 +73,14 @@ def ingest_msa_boundaries(
         )
 
     try:
-        written_path = ingest_impl(definition_version, tiger_year=tiger_year)
+        if source_file is None:
+            written_path = ingest_impl(definition_version, tiger_year=tiger_year)
+        else:
+            written_path = ingest_impl(
+                definition_version,
+                tiger_year=tiger_year,
+                source_file=source_file,
+            )
         boundaries = read_msa_boundaries(definition_version)
     except ValueError as exc:
         cli_error(
@@ -73,6 +93,7 @@ def ingest_msa_boundaries(
         "status": "ok",
         "definition_version": definition_version,
         "geometry_vintage": tiger_year,
+        "definition_source_release_date": spec.source_release_date,
         "artifact": str(written_path),
         "msa_count": len(boundaries),
     }

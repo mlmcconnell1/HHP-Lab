@@ -33,6 +33,7 @@ class MSAValidationResult:
 def validate_msa_artifacts(
     definitions_df: pd.DataFrame,
     county_membership_df: pd.DataFrame,
+    definition_version: str = DEFINITION_VERSION,
 ) -> MSAValidationResult:
     """Validate the curated MSA definitions and county membership tables."""
     errors: list[str] = []
@@ -145,10 +146,10 @@ def validate_msa_artifacts(
         if "definition_version" not in df.columns:
             continue
         versions = list(pd.Series(df["definition_version"]).dropna().unique())
-        if versions != [DEFINITION_VERSION]:
+        if versions != [definition_version]:
             errors.append(
                 f"{name}: definition_version mismatch; expected "
-                f"'{DEFINITION_VERSION}', found {versions}"
+                f"'{definition_version}', found {versions}"
             )
 
     if "msa_id" in definitions_df.columns:
@@ -173,6 +174,7 @@ def validate_msa_artifacts(
 def validate_msa_boundaries(
     boundaries_df: pd.DataFrame,
     definitions_df: pd.DataFrame,
+    definition_version: str = DEFINITION_VERSION,
 ) -> MSAValidationResult:
     """Validate curated MSA boundary polygons against definitions."""
     errors: list[str] = []
@@ -257,10 +259,10 @@ def validate_msa_boundaries(
         )
 
     definition_versions = list(pd.Series(boundaries_df["definition_version"]).dropna().unique())
-    if definition_versions != [DEFINITION_VERSION]:
+    if definition_versions != [definition_version]:
         errors.append(
             f"boundaries: definition_version mismatch; expected "
-            f"'{DEFINITION_VERSION}', found {definition_versions}"
+            f"'{definition_version}', found {definition_versions}"
         )
 
     return MSAValidationResult(

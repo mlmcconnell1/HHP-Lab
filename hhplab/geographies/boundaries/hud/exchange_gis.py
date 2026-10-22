@@ -1127,3 +1127,273 @@ def ingest_hud_exchange(
     )
 
     return output_path
+
+
+def ingest_hud_exchange_state_archives(
+    boundary_vintage: str,
+    archive_dir: Path | str,
+    manifest_path: Path | str,
+    *,
+    curated_dir: Path | str | None = None,
+    force: bool = False,
+) -> Path:
+    """Normalize an audited set of historical per-state HUD CoC archives.
+
+    This entry point is for the older state ZIP distribution, whose archive
+    structure differs from the current national and per-state downloader. It
+    reads the 51 state/DC ZIPs and available territory ZIPs named in the
+    acquisition manifest, checks their recorded hashes, and sends canonical
+    one-CoC layers through the same normalization, validation, provenance, and
+    registry path as other HUD Exchange boundaries.
+
+    Noncanonical layer IDs are quarantined in provenance. Duplicate canonical
+    IDs are rejected because choosing one would make geometry assignment
+    ambiguous. The manifest listing is recorded as a coverage reference, not
+    treated as proof that a geometry exists for each listed ID.
+    """
+    import geopandas as gpd
+
+    from hhplab.geographies.coc import normalize_boundaries, validate_boundaries
+    from hhplab.geographies.coc.coc_io import curated_boundary_path, write_geoparquet
+    from hhplab.storage.provenance import ProvenanceBlock
+
+    archive_dir = Path(archive_dir)
+    manifest_path = Path(manifest_path)
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    state_rows = manifest.get("state_dc_archives")
+    territory_rows = manifest.get("territory_archives")
+    if not isinstance(state_rows, list) or len(state_rows) != 51:
+        raise ValueError("Expected an acquisition manifest with exactly 51 state/DC archives.")
+    if not isinstance(territory_rows, list) or len(territory_rows) != 5:
+        raise ValueError("Expected an acquisition manifest with territory archive attempts.")
+    expected_state_codes = set(_HUD_STATE_ABBREVIATIONS) - {"GU", "MP", "PR", "VI"}
+    actual_state_codes = {str(row.get("code")) for row in state_rows}
+    if actual_state_codes != expected_state_codes:
+        raise ValueError(
+            "The acquisition manifest must contain exactly the 50 states and DC; "
+            f"missing={sorted(expected_state_codes - actual_state_codes)}, "
+            f"unexpected={sorted(actual_state_codes - expected_state_codes)}."
+        )
+    unavailable_territories = [
+        str(row["code"])
+        for row in territory_rows
+        if not row.get("sha256") or not row.get("size_bytes")
+    ]
+    available_territory_rows = [
+        row for row in territory_rows if row.get("sha256") and row.get("size_bytes")
+    ]
+    archive_rows = state_rows + available_territory_rows
+    expected_territory_codes = {"AS", "GU", "MP", "PR", "VI"}
+    actual_territory_codes = {str(row.get("code")) for row in territory_rows}
+    if actual_territory_codes != expected_territory_codes:
+        raise ValueError(
+            "The acquisition manifest must include territory attempts for AS, GU, MP, PR, and VI."
+        )
+    archive_years = {
+        match.group(1)
+        for row in archive_rows
+        if (match := re.search(r"_(\d{4})\.zip$", str(row.get("url", ""))))
+    }
+    if archive_years != {str(boundary_vintage)}:
+        raise ValueError(
+            f"Boundary vintage {boundary_vintage!r} does not match archive year(s) "
+            f"{sorted(archive_years)}."
+        )
+
+    native_ids = {
+        str(coc_id)
+        for coc_id in manifest.get("native_2010_listing", {}).get("coc_ids", [])
+    }
+    if not native_ids:
+        raise ValueError("Manifest has no native 2010 CoC IDs for coverage comparison.")
+
+    frames: list[gpd.GeoDataFrame] = []
+    archive_sources: list[dict[str, str | int]] = []
+    archive_ids: list[str] = []
+    quarantined_layers: list[dict[str, str]] = []
+    seen_ids: set[str] = set()
+
+    for archive in sorted(archive_rows, key=lambda row: str(row["code"])):
+        code = str(archive["code"])
+        zip_path = archive_dir / Path(str(archive["path"])).name
+        if not zip_path.is_file():
+            raise FileNotFoundError(f"Missing audited {code} archive: {zip_path}")
+        raw_sha256, file_size = _hash_file(zip_path)
+        if raw_sha256 != archive.get("sha256") or file_size != archive.get("size_bytes"):
+            raise ValueError(f"Audited archive identity changed for {code}: {zip_path}")
+        with zipfile.ZipFile(zip_path) as zf:
+            bad_member = zf.testzip()
+            if bad_member is not None:
+                raise ValueError(f"Archive {code} has a CRC failure in {bad_member}")
+            shp_members = sorted(
+                name for name in zf.namelist() if name.lower().endswith(".shp")
+            )
+            if len(shp_members) != int(archive.get("shapefile_layer_count", -1)):
+                raise ValueError(f"Shapefile layer count changed for {code}: {zip_path}")
+
+            layer_ids: set[str] = set()
+            for member in shp_members:
+                if "_CDBG" in member.upper():
+                    continue
+                source_path = f"/vsizip/{zip_path.resolve()}/{member}"
+                source_gdf = gpd.read_file(source_path)
+                if len(source_gdf) != 1:
+                    raise ValueError(
+                        f"Expected one geometry in {code}/{member}; found {len(source_gdf)}."
+                    )
+                id_field = _find_field(list(source_gdf.columns), COC_ID_FIELDS)
+                if id_field is None:
+                    raise ValueError(f"No CoC ID field in {code}/{member}.")
+                coc_id = str(source_gdf.iloc[0][id_field]).strip()
+                layer_ids.add(coc_id)
+                if not _is_canonical_historical_layer_id(coc_id):
+                    quarantined_layers.append(
+                        {"archive_code": code, "layer": member, "source_coc_id": coc_id}
+                    )
+                    continue
+                if coc_id.split("-", maxsplit=1)[0] != code:
+                    raise ValueError(
+                        f"Layer {code}/{member} contains out-of-jurisdiction ID {coc_id}."
+                    )
+                if coc_id in seen_ids:
+                    raise ValueError(f"Duplicate canonical CoC ID {coc_id} in state archives.")
+                seen_ids.add(coc_id)
+                archive_ids.append(coc_id)
+                mapped = map_to_canonical_schema(source_gdf, boundary_vintage, archive["url"])
+                frames.append(mapped)
+            if layer_ids != {str(coc_id) for coc_id in archive.get("coc_ids", [])}:
+                raise ValueError(f"CoC IDs changed in audited {code} archive: {zip_path}")
+
+        archive_sources.append(
+            {
+                "source_url": str(archive["url"]),
+                "raw_sha256": raw_sha256,
+                "file_size": file_size,
+                "archive_code": code,
+                "archive_scope": (
+                    "territory" if code in {"AS", "GU", "MP", "PR", "VI"} else "state_dc"
+                ),
+            }
+        )
+
+    if not frames:
+        raise ValueError("No canonical single-CoC polygons were found in the state archives.")
+
+    merged = gpd.GeoDataFrame(
+        gpd.pd.concat(frames, ignore_index=True),
+        geometry="geometry",
+        crs=frames[0].crs,
+    )
+    if any(frame.crs != merged.crs for frame in frames):
+        raise ValueError("Historical CoC archives have inconsistent coordinate systems.")
+    merged = normalize_boundaries(merged)
+    validation_result = validate_boundaries(merged)
+    if not validation_result.is_valid:
+        raise ValueError(f"Validation failed:\n{validation_result}")
+
+    observed_ids = set(archive_ids)
+    coverage = _historical_coverage_summary(native_ids, observed_ids)
+    provenance_extra: dict[str, Any] = {
+        "source_type": "hud_exchange_historical_state_archives",
+        "mapping_version": "hud_exchange_historical_state_archives/1",
+        "acquisition_manifest_sha256": _hash_file(manifest_path)[0],
+        "source_url": json.dumps(
+            [source["source_url"] for source in archive_sources], separators=(",", ":")
+        ),
+        "raw_sha256": hashlib.sha256(
+            b"".join(bytes.fromhex(str(source["raw_sha256"])) for source in archive_sources)
+        ).hexdigest(),
+        "raw_sha256_algorithm": (
+            "SHA-256 of concatenated binary component ZIP SHA-256 digests in archive-code order"
+        ),
+        "file_size": sum(int(source["file_size"]) for source in archive_sources),
+        "archive_sources": archive_sources,
+        **coverage,
+        "available_territory_archive_codes": sorted(
+            str(row["code"]) for row in available_territory_rows
+        ),
+        "unavailable_territory_archive_codes": sorted(unavailable_territories),
+        "quarantined_layers": quarantined_layers,
+        "geometry_repair_method": (
+            "hhplab.geographies.coc.normalize.normalize_boundaries "
+            "(shapely.make_valid only when invalid)"
+        ),
+    }
+
+    output_base = Path("data") if curated_dir is None else Path(curated_dir)
+    output_path = curated_boundary_path(boundary_vintage, base_dir=output_base)
+    if output_path.exists() and not force:
+        raise FileExistsError(
+            f"Refusing to overwrite existing curated boundary artifact: {output_path}"
+        )
+    write_geoparquet(
+        merged,
+        output_path,
+        provenance=ProvenanceBlock(
+            boundary_vintage=boundary_vintage,
+            geo_type="coc",
+            extra=provenance_extra,
+        ),
+    )
+
+    from hhplab.registry import register_vintage
+
+    register_vintage(
+        boundary_vintage=boundary_vintage,
+        source="hud_exchange",
+        path=output_path,
+        feature_count=len(merged),
+    )
+
+    source_url = str(provenance_extra["source_url"])
+    raw_sha256 = str(provenance_extra["raw_sha256"])
+    file_size = int(provenance_extra["file_size"])
+    changed, details = check_source_changed(
+        source_type="boundary",
+        source_url=source_url,
+        current_sha256=raw_sha256,
+    )
+    if changed:
+        logger.warning(
+            "UPSTREAM DATA CHANGED: historical HUD Exchange boundary archives changed; "
+            "previous hash %s, current hash %s",
+            details["previous_sha256"][:16],
+            raw_sha256[:16],
+        )
+    register_source(
+        source_type="boundary",
+        source_url=source_url,
+        source_name=f"HUD Exchange CoC Boundaries {boundary_vintage} historical state archives",
+        raw_sha256=raw_sha256,
+        file_size=file_size,
+        local_path=str(archive_dir.resolve()),
+        metadata={
+            "boundary_vintage": boundary_vintage,
+            "feature_count": len(merged),
+            "source": "hud_exchange",
+            "curated_path": str(output_path),
+            "coverage_status": coverage["coverage_status"],
+            "archive_sources": archive_sources,
+        },
+    )
+    return output_path
+
+
+def _historical_coverage_summary(
+    native_ids: set[str], observed_ids: set[str]
+) -> dict[str, Any]:
+    """Summarize historical archive coverage without treating the listing as ground truth."""
+    return {
+        "coverage_status": "partial_unresolved",
+        "coverage_reference": "native_2010_listing",
+        "native_listing_id_count": len(native_ids),
+        "observed_archive_id_count": len(observed_ids),
+        "shared_native_listing_id_count": len(native_ids & observed_ids),
+        "native_listing_missing_ids": sorted(native_ids - observed_ids),
+        "archive_only_ids": sorted(observed_ids - native_ids),
+    }
+
+
+def _is_canonical_historical_layer_id(coc_id: str) -> bool:
+    """Return whether a historic layer ID names exactly one canonical CoC."""
+    return re.fullmatch(r"[A-Z]{2}-\d{3}", coc_id) is not None

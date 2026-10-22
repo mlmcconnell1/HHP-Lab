@@ -147,6 +147,103 @@ def test_download_msa_boundaries_reprojects_to_epsg_4326(
     assert boundaries.crs.to_epsg() == 4326
 
 
+def test_download_historical_msa_boundaries_dissolves_2010_counties(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    from hhplab.geographies.msa.msa_boundaries import download_msa_boundaries
+
+    definitions = pd.DataFrame(
+        {
+            "msa_id": ["17410"],
+            "cbsa_code": ["17410"],
+            "msa_name": ["Cleveland, OH"],
+            "area_type": ["Metropolitan Statistical Area"],
+            "definition_version": ["census_msa_2010"],
+        }
+    )
+    membership = pd.DataFrame(
+        {
+            "msa_id": ["17410"],
+            "cbsa_code": ["17410"],
+            "county_fips": ["39035"],
+        }
+    )
+    source_gdf = gpd.GeoDataFrame(
+        {
+            "GEOID10": ["39035", "39049"],
+            "CBSAFP10": ["17410", "99999"],
+        },
+        geometry=[box(0, 0, 1, 1), box(2, 2, 3, 3)],
+        crs="EPSG:4326",
+    )
+    monkeypatch.setattr(
+        "hhplab.geographies.msa.msa_boundaries._load_expected_definitions",
+        lambda *_args, **_kwargs: definitions,
+    )
+    monkeypatch.setattr(
+        "hhplab.geographies.msa.msa_boundaries._load_expected_membership",
+        lambda *_args, **_kwargs: membership,
+    )
+    monkeypatch.setattr(
+        "hhplab.geographies.msa.msa_boundaries.persist_file_snapshot",
+        lambda raw_content, *_args, **_kwargs: (
+            Path("/tmp/fake-tiger.zip"),
+            "abc",
+            len(raw_content),
+        ),
+    )
+    monkeypatch.setattr(
+        "hhplab.geographies.msa.msa_boundaries.check_source_changed",
+        lambda **_kwargs: (False, {}),
+    )
+
+    class _FakeResponse:
+        content = b"zip-bytes"
+
+        def raise_for_status(self) -> None:
+            return None
+
+    class _FakeClient:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+        def get(self, url, follow_redirects=True):
+            assert "TIGER2010/COUNTY/2010" in url
+            return _FakeResponse()
+
+    class _FakeZipFile:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+        def extractall(self, path):
+            (Path(path) / "fake.shp").write_text("", encoding="utf-8")
+
+    monkeypatch.setattr("hhplab.geographies.msa.msa_boundaries.httpx.Client", _FakeClient)
+    monkeypatch.setattr("hhplab.geographies.msa.msa_boundaries.zipfile.ZipFile", _FakeZipFile)
+    monkeypatch.setattr(
+        "hhplab.geographies.msa.msa_boundaries.gpd.read_file", lambda _path: source_gdf
+    )
+
+    boundaries, _sha256, _size, _raw_path = download_msa_boundaries("census_msa_2010")
+
+    assert boundaries["msa_id"].tolist() == ["17410"]
+    assert boundaries["geometry_vintage"].tolist() == ["2010"]
+    assert boundaries["source"].tolist() == ["census_tiger_county10_dissolved_by_msa"]
+    assert boundaries.geometry.iloc[0].area == pytest.approx(1.0)
+
+
 def test_ingest_msa_boundaries_json(monkeypatch, tmp_path: Path):
     monkeypatch.chdir(tmp_path)
     artifact = tmp_path / "data" / "curated" / "msa" / "msa_boundaries__census_msa_2023.parquet"

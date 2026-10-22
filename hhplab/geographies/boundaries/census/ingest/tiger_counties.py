@@ -10,8 +10,10 @@ import geopandas as gpd
 import httpx
 
 from hhplab.geographies.boundaries.census.urls import CENSUS_TIGER_BASE
+from hhplab.geographies.coc.coc_io import write_geoparquet
 from hhplab.registry.source_registry import check_source_changed, register_source
 from hhplab.storage.paths import curated_dir
+from hhplab.storage.provenance import ProvenanceBlock
 from hhplab.storage.raw_snapshot import persist_file_snapshot
 
 logger = logging.getLogger(__name__)
@@ -99,6 +101,28 @@ def download_tiger_counties(
         # Read the shapefile
         gdf = gpd.read_file(shp_files[0])
 
+    result = normalize_county_geometry(gdf, year)
+    result.attrs["source_provenance"] = {
+        "source_url": url,
+        "raw_sha256": content_sha256,
+        "raw_path": str(raw_path),
+    }
+    return result, content_sha256, content_size, raw_path
+
+
+def normalize_county_geometry(gdf: gpd.GeoDataFrame, year: int) -> gpd.GeoDataFrame:
+    """Normalize county identifiers using the source's explicit TIGER vintage."""
+    geoid_column = "GEOID10" if year == 2010 else "GEOID"
+    if geoid_column not in gdf.columns:
+        raise ValueError(
+            f"TIGER {year} counties require {geoid_column}; found {list(gdf.columns)}. "
+            "Use the county source matching the requested vintage."
+        )
+    identifiers = gdf[geoid_column].astype("string")
+    if identifiers.isna().any() or not identifiers.str.fullmatch(r"\d{5}").all():
+        raise ValueError("County GEOIDs must be nonmissing five-digit FIPS strings.")
+    if identifiers.duplicated().any():
+        raise ValueError("County GEOIDs must be unique; inspect the source county layer.")
     # Reproject to EPSG:4326 if needed; reject missing CRS
     if gdf.crs is None:
         msg = "Source GeoDataFrame has no CRS; cannot safely assume EPSG:4326."
@@ -111,7 +135,7 @@ def download_tiger_counties(
     result = gpd.GeoDataFrame(
         {
             "geo_vintage": str(year),
-            "geoid": gdf["GEOID"].astype(str).str.zfill(5),
+            "geoid": identifiers.astype(str),
             "geometry": gdf["geometry"],
             "source": "tiger_line",
             "ingested_at": ingested_at,
@@ -119,7 +143,7 @@ def download_tiger_counties(
         crs="EPSG:4326",
     )
 
-    return result, content_sha256, content_size, raw_path
+    return result
 
 
 def save_counties(gdf: gpd.GeoDataFrame, year: int = 2023) -> Path:
@@ -136,7 +160,15 @@ def save_counties(gdf: gpd.GeoDataFrame, year: int = 2023) -> Path:
 
     curated_dir("tiger").mkdir(parents=True, exist_ok=True)
     output_path = curated_dir("tiger") / county_filename(year)
-    gdf.to_parquet(output_path, index=False)
+    write_geoparquet(
+        gdf,
+        output_path,
+        provenance=ProvenanceBlock(
+            geo_type="county",
+            county_vintage=str(year),
+            extra={"source": "census_tiger", **gdf.attrs.get("source_provenance", {})},
+        ),
+    )
     return output_path
 
 

@@ -1,6 +1,7 @@
 """CLI commands for ingesting Census geometries."""
 
 import json
+from pathlib import Path
 from typing import Annotated
 
 import pyarrow.parquet as pq
@@ -73,11 +74,12 @@ def ingest_tiger(
     # Determine what to download
     download_tracts = type_ in ("tracts", "all")
     download_counties = type_ in ("counties", "all")
-    download_blocks = type_ == "blocks" or (type_ == "all" and year == 2020)
+    download_blocks = type_ == "blocks" or (type_ == "all" and year in (2010, 2020))
     download_urban_areas = type_ == "urban-areas"
-    if type_ == "all" and year != 2020:
+    if type_ == "all" and year not in (2010, 2020):
         typer.echo(
-            f"Note: block geometry is only available for 2020; skipping blocks for year {year}."
+            "Note: block geometry is only available for 2010 and 2020; "
+            f"skipping blocks for year {year}."
         )
 
     # Define output paths using canonical naming helpers
@@ -190,7 +192,7 @@ def ingest_block_geometry_cmd(
         typer.Option(
             "--year",
             "-y",
-            help="Census tabulation block geometry vintage. Currently supports 2020.",
+            help="Census tabulation block geometry vintage: 2010 or 2020.",
         ),
     ] = 2020,
     force: Annotated[
@@ -200,6 +202,14 @@ def ingest_block_geometry_cmd(
             help="Re-ingest even if cached file exists.",
         ),
     ] = False,
+    output_dir: Annotated[
+        Path | None,
+        typer.Option("--output-dir", help="Directory for the curated GeoParquet output."),
+    ] = None,
+    raw_root: Annotated[
+        Path | None,
+        typer.Option("--raw-root", help="Directory for retained raw TIGER ZIPs."),
+    ] = None,
     output_json: Annotated[
         bool,
         typer.Option(
@@ -211,7 +221,7 @@ def ingest_block_geometry_cmd(
     """Ingest Census tabulation block geometry."""
     from hhplab.geographies.boundaries.census.ingest.tiger_blocks import ingest_block_geometry
 
-    output_path = get_block_geometry_output_path(year)
+    output_path = get_block_geometry_output_path(year, output_dir)
     if output_path.exists() and not force:
         block_count = _parquet_row_count(output_path)
         if output_json:
@@ -233,7 +243,7 @@ def ingest_block_geometry_cmd(
         return
 
     try:
-        path = ingest_block_geometry(year, force=force)
+        path = ingest_block_geometry(year, force=force, output_dir=output_dir, raw_root=raw_root)
     except Exception as exc:
         typer.echo(f"Error: {exc}", err=True)
         raise typer.Exit(1) from exc

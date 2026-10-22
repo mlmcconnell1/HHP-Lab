@@ -2,12 +2,13 @@
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Annotated
 
 import typer
 
 from hhplab.cli.shared.output import JsonOutput, cli_error, emit_result
-from hhplab.geographies.msa.msa_definitions import DEFINITION_VERSION
+from hhplab.geographies.msa.msa_definitions import DEFINITION_VERSION, get_msa_source_spec
 
 
 def generate_msa(
@@ -26,6 +27,16 @@ def generate_msa(
             help="Overwrite existing artifacts if they already exist.",
         ),
     ] = False,
+    source_file: Annotated[
+        Path | None,
+        typer.Option(
+            "--source-file",
+            help="Read a locally verified Census source file instead of downloading it.",
+            exists=True,
+            dir_okay=False,
+            readable=True,
+        ),
+    ] = None,
     json_output: JsonOutput = False,
 ) -> None:
     """Generate curated MSA definition parquet files from the Census workbook."""
@@ -53,7 +64,10 @@ def generate_msa(
         typer.echo(f"Generating MSA artifacts (version: {definition_version})...")
 
     try:
-        defs_path, county_path = write_msa_artifacts(definition_version=definition_version)
+        defs_path, county_path = write_msa_artifacts(
+            definition_version=definition_version,
+            source_file=source_file,
+        )
     except ValueError as exc:
         cli_error(
             exc,
@@ -61,10 +75,14 @@ def generate_msa(
             json_payload={"status": "error", "error": "validation_failed", "detail": str(exc)},
         )
 
+    spec = get_msa_source_spec(definition_version)
     if emit_result(
         {
             "status": "ok",
             "definition_version": definition_version,
+            "source_release_date": spec.source_release_date,
+            "definition_calendar_year": spec.geometry_vintage,
+            "county_boundary_vintage": spec.geometry_vintage,
             "artifacts": {
                 "definitions": str(defs_path),
                 "county_membership": str(county_path),

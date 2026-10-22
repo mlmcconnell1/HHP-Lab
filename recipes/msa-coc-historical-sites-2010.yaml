@@ -1,0 +1,31 @@
+# Historical geography comparison only; this does not replace the active study.
+# Definitions in effect in 2010 come from the December 2009 OMB update.
+version: 1
+name: msa_coc_historical_sites_2010
+description: >
+  Apply the existing whole-CoC containment and MSA population coverage rules
+  at 95 and 99 percent using 2010 CoC boundaries, 2010 Census block population,
+  and MSA definitions in effect in 2010. Source coverage and quarantined
+  historical geometries must be reported with the resulting site counts.
+output_root: /home/matt/HHP-Output
+universe:
+  years: [2010]
+targets:
+  - id: historical_sites_2010
+    geometry: {type: msa, source: census_msa_2010}
+    outputs: [msa_coc_sites]
+    msa_coc_sites:
+      crosswalk_path: data/curated/xwalks/msa_coc_xwalk__N2010@B2010xMcensus_msa_2010xC2010xK2010__basis-block_population.parquet
+      msa_universe_path: data/curated/msa/msa_definitions__census_msa_2010.parquet
+      coc_names_path: data/curated/coc_boundaries/coc__B2010.parquet
+      coc_boundary_vintage: 2010
+      msa_definition_version: census_msa_2010
+      county_vintage: 2010
+      block_vintage: 2010
+      decennial_vintage: 2010
+      thresholds: [0.95, 0.99]
+datasets: {}
+pipelines:
+  - id: describe_historical_sites
+    target: historical_sites_2010
+    steps: []
