@@ -181,3 +181,24 @@ All check artifacts are retained under `/home/matt/HHP-Output/site-boundary-hist
 - [840-row provisional panel](</home/matt/HHP-Output/site-boundary-history-audit/exploratory-without-sacramento/exploratory_site_year_panel.parquet>) with embedded input, membership, policy, and script provenance; CSV and constituent lineage accompany it.
 
 This is a saved exploratory diagnostic, not a locked results recipe or a fully geographically validated panel. No outcome-driven site selection was performed after examining these results.
+
+### Separate bed-increase and bed-decline checks — 2026-10-22
+
+At the owner's request, a second diagnostic keeps only shelter beds (ES+TH+SH, excluding PSH) and separates annual bed increases from annual declines. The same 60-site panel contains 341 increases, 357 declines, and 22 flat transitions. Flat transitions are excluded from both groups. Selection uses the observed bed-change sign before adjustment; unsheltered PIT changes can have either sign. Declines remain signed negative changes, not absolute magnitudes.
+
+Neither group shows a clear lead/lag association. Results below correlate annual changes in `log(1 + count)` after separately fitting site and calendar-year fixed effects within each group and lag. All samples include 60 sites, although their available years differ.
+
+| Bed-change group | Timing | Pairs | Pearson r | 95% site-bootstrap interval |
+| --- | --- | ---: | ---: | ---: |
+| Increases | Beds precede PIT by one year | 267 | 0.085 | −0.044 to 0.194 |
+| Increases | Same year | 341 | 0.084 | −0.003 to 0.189 |
+| Increases | PIT precedes beds by one year | 265 | −0.051 | −0.176 to 0.101 |
+| Declines | Beds precede PIT by one year | 317 | 0.003 | −0.139 to 0.139 |
+| Declines | Same year | 357 | −0.029 | −0.118 to 0.069 |
+| Declines | PIT precedes beds by one year | 313 | 0.006 | −0.134 to 0.146 |
+
+Both two-year directions also have intervals spanning zero in each group. Before 2020, the one-year bed-leading estimates are 0.096 for increases and 0.014 for declines. Leaving out each site in turn gives corresponding full-period ranges of 0.060–0.116 and −0.033–0.058. These conditional, range-restricted correlations do not establish causality, rule out effects, or constitute a formal test that increases and declines behave differently. The slightly positive increases-only same-year estimate is also uncertain; all ten exploratory intervals include zero and are not adjusted for multiple comparisons.
+
+Exact calendar joins preserve the earlier exclusion of 2021: no annual difference bridges the missing year, and no 2022 annual change is constructed. A two-year lag can span the omitted period when both annual changes are observed. Because sign selection makes the panels unbalanced, fixed effects use converged alternating projections rather than the balanced-panel demeaning shortcut. The 1,999 whole-site bootstrap draws (seed 20261022) refit fixed effects using site multiplicity weights. Every subgroup/lag projection was independently checked against explicit dummy-variable least squares, and weighted bootstrap correlations were checked against explicitly duplicated site samples. Sign counts and calendar matching pass assertions.
+
+Reproducible artifacts are in [split-bed-changes](</home/matt/HHP-Output/site-boundary-history-audit/exploratory-without-sacramento/split-bed-changes/>): `run_split_check.py`, `summary.json` (input/script hashes, methods, validation, all results), `correlations.csv`, and `paired_changes.csv`. Run the script from this repository with `uv run python`. The original panel, analysis, and geographic limitations remain unchanged.
