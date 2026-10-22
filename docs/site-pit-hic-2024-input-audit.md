@@ -1,5 +1,7 @@
 # 2024 PIT and HIC CoC input audit
 
+**Count-occurrence correction, 2026-10-22:** The earlier checks below used reported numeric PIT values without HUD's Count Types declarations. In the current 60-site sample, **129 of 840 site-years lack a complete observed unsheltered count**; only **508 of the previous 720 annual transitions** have observed unsheltered counts at both endpoints. Unsheltered and total-PIT longitudinal findings, including the PSH lead/lag findings, require an observed-only rerun before interpretation. Sheltered checks also need to exclude declared no-PIT-count years. Earlier artifacts remain intact as historical calculations. See the Count Types implementation and impact audit at the end of this note; follow-up `coclab-r0jjj` tracks the reruns.
+
 **Current longitudinal design:** On 2026-10-22 the study owner added a whole-Sacramento holdout for an exploratory check, retaining the CT-503, Salem and York holdouts. The current 99% universe has **60 sites and 77 frozen CoCs**, with **840 site-years for 2010–2024 excluding 2021**. Known merger operations are applied; remaining historical administrative continuity is an explicit exploratory assumption, not full geography clearance. The earlier 61-site design and cross-sectional runs below remain historical records. Results of the new check are at the end of this note.
 
 **Historical reconciliation update:** The Luna High review supports administrative count reconciliation for MA-505/MA-519 and stable Fall River scope, with older polygon residuals retained explicitly. The county review recommends stable administrative units for TX-603, HI-501, CA-613, and CA-501 with moderate confidence. Native HUD reports verify source-specific predecessor treatment for CA-601, CA-611, and FL-503; the saved partial v2 evidence remains bound to the earlier 61-site membership. CA-515's 2010–2018 source scope includes Nevada County, outside the frozen Placer footprint; the owner-selected whole-Sacramento holdout now removes that problem from the exploratory sample. The earlier coverage check establishes successor-row availability, not geographic completeness. See [the historical inventory and integration review](site-historical-reconciliation-inventory.md), [Massachusetts review](providence-historical-reconciliation.md), and [county review](site-boundary-remaining-geometries.md).
@@ -279,3 +281,49 @@ The two-year negative association is suggestive rather than causal evidence. Int
 The driver imports the original pooled and split estimators without changing those files. It uses the same 1,999 whole-site bootstrap replicates and seed 20261022. Exact calendar joins exclude 2021 and prevent any annual difference from bridging the omitted year; no 2022 annual change is constructed. Two-year lags can span the gap when both annual changes are observed. All ten split projections match explicit dummy-variable least squares, and frequency-weighted bootstrap correlations match explicitly duplicated site histories. Source hashes and prior estimator hashes are checked before execution.
 
 Artifacts are under [psh-unsheltered](</home/matt/HHP-Output/site-boundary-history-audit/exploratory-without-sacramento/psh-unsheltered/>): `run_psh_check.py`, the provenance-bearing `exploratory_site_year_panel.parquet`, source lineage, `summary.json` and `lead_lag_correlations.csv` for pooled checks, `split_summary.json`, `split_correlations.csv`, `split_paired_changes.csv`, `psh_provenance.json`, and [the lead/lag chart](</home/matt/HHP-Output/site-boundary-history-audit/exploratory-without-sacramento/psh-unsheltered/psh_lead_lag_changes.png>). The initial attempt is preserved under `retained-attempts/`; its numerical calculation completed but its chart step failed, and the corrected driver was rerun. Existing shelter, total-PIT, and sheltered-PIT outputs remain intact.
+
+### Count Types: source occurrence and carried-forward estimates — 2026-10-22
+
+The parser previously discarded HUD's Count Types column. Numeric availability therefore overstated current-year unsheltered observations. The [2024 AHAR Part 1](https://www.huduser.gov/portal/sites/default/files/pdf/2024-AHAR-Part-1.pdf), printed page xiii, describes carrying forward the previous year's unsheltered estimate where no count occurred, including 22 sheltered-only CoCs in both 2023 and 2024. Direct inspection of the cached P2024 workbook confirms 22 sheltered-only and 363 full-count rows in 2024. Source declarations, rather than zeroes, missing values or equality with last year's count, now determine occurrence.
+
+Curated CoC PIT rows retain all reported numbers and add these nullable fields:
+
+| Field | Meaning |
+| --- | --- |
+| `count_types` | Original HUD declaration, unchanged. Missing or unrecognized declarations remain unknown. |
+| `unsheltered_count_observed` | True for full or partial unsheltered counts; false for sheltered-only or `No YYYY PIT Count`; unknown without usable declarations. |
+| `unsheltered_count_carried_forward` | True when a declared non-count year contains a published unsheltered value under AHAR's carry-forward policy. False for observed counts or absent estimates. Unknown for sheltered-only numeric values in 2021 and for unknown declarations. This records the reporting policy, not an inference from equal values. |
+| `unsheltered_count_partial` | True for `Sheltered and Partial Unsheltered Count`. Partial observations are distinct from complete counts and from carry-forwards. |
+
+The exceptional 2021 workbook contains both partial counts and sheltered-only zeroes; those zeroes do not independently establish a reused estimate. HUD's [2021 count release](https://archives.hud.gov/news/2022/pr22-022.cfm) also distinguishes communities that actually conducted unsheltered counts. The study's existing 2021 exclusion remains in force. The P2024 workbook's 2007 sheet lacks Count Types; those rows have unknown flags rather than assumed observations.
+
+`hhplab.sources.hud.pit.observation.observed_pit_mask` selects complete observed unsheltered or total-PIT values using all three flags and value availability. For CoC sheltered outcomes, it accepts full, partial-unsheltered and sheltered-only declarations, but excludes declared no-PIT-count years and unknown declarations. Genuine observed zeroes remain eligible. Each annual PIT difference must have eligible observations at both exact calendar endpoints; missing years cannot be bridged. Lead/lag checks must likewise validate the endpoints of the PIT change used in each pair.
+
+CoC panels and identity recipe resampling retain the raw declarations and flags. Native whole-CoC metro and fractional MSA PIT aggregates preserve reported sums, require all contributing members for observed status, and mark carry-forward or partial status if any constituent has it. Their `count_types` is a JSON map from CoC ID to the original declaration. The whole-CoC site-year builder marks unsheltered/total outcomes `source_limited` when any required source count is unobserved, partial or unknown; its analysis aggregate is null and its diagnostics identify the affected frozen CoCs. Source-level reported numbers remain intact. Boundary compatibility checks remain separate.
+
+The three existing curated CoC vintages P2020, P2024 and P2025, plus the annual P2024@B2024 CoC table, were refreshed from cached workbooks. Every `(pit_year, coc_id)` key and all three reported count measures match the original files exactly, across 5,457, 6,884, 7,431 and 385 rows respectively. Parser provenance records the Count Types policy version, reference and flag inventories. The refresh manifest additionally pins workbook and output hashes. All original PIT files were copied before refresh, and the four replaced originals were also retained separately; no original was deleted.
+
+The existing fractional MSA outputs and earlier analysis panels were not overwritten. They predate these fields and require a source-vintage-aware rebuild; their existing provenance does not identify the cumulative PIT workbook vintage used. Do not infer observed status from those older numeric-only artifacts. General recipe aggregation outside the native PIT rollups also needs explicit observation-metadata handling before being used for observed-only analysis. Bead `coclab-xpk4w` tracks that rebuild and propagation work.
+
+For the current frozen 60-site/77-CoC universe, the P2024 declaration audit uses the previously reconciled `pit_source_id` in every lineage row, consuming retrospective preaggregates once. Source-declared complete unsheltered site-years are:
+
+| Year | Complete observed sites, out of 60 |
+| --- | ---: |
+| 2010 | 31 |
+| 2011 | 60 |
+| 2012 | 31 |
+| 2013 | 60 |
+| 2014 | 37 |
+| 2015 | 60 |
+| 2016 | 46 |
+| 2017 | 60 |
+| 2018 | 49 |
+| 2019 | 60 |
+| 2020 | 50 |
+| 2022 | 59 |
+| 2023 | 54 |
+| 2024 | 54 |
+
+This leaves 711 complete observed site-years and 508 exact annual PIT changes. Membership remains unchanged; observation availability varies by year. These are workbook-declared observations, not independent validation of constituent count quality inside retrospective preaggregates. No correlations were rerun in this correction. Reruns must accommodate the resulting unbalanced sample, refit site/year effects within each lag and sign subset, and validate their estimators against explicit dummy-variable least squares and duplicated-site bootstrap samples. Balanced-panel demeaning cannot simply be reused after masking.
+
+[Refresh and impact artifacts](</home/matt/HHP-Output/pit-count-types-audit/20261022/>) include `manifest.json`, `frozen-site-impact.json`, `frozen-site-coc-count-types.csv`, `frozen-site-year-observation-status.csv`, staged refreshed files and the preserved originals. Bead `coclab-z98aw` implements the correction; `coclab-r0jjj` tracks observed-only longitudinal reruns.

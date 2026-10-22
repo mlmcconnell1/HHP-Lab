@@ -29,6 +29,12 @@ from hhplab.recipe.executor.panel_policies import Acs1PolicyApplier, collect_con
 from hhplab.recipe.loader import RecipeLoadError, load_recipe
 from hhplab.recipe.manifest import read_manifest
 from hhplab.recipe.recipe_schema import PanelPolicy
+from hhplab.sources.hud.pit.observation import (
+    COUNT_TYPES_FULL,
+    COUNT_TYPES_SHELTERED_ONLY,
+    PIT_BOOLEAN_OBSERVATION_COLUMNS,
+    with_pit_count_metadata,
+)
 
 # ---------------------------------------------------------------------------
 # ZORI recipe and fixture helpers
@@ -732,6 +738,26 @@ class TestHicPanelRecipe:
         assert panel.loc[panel["coc_id"] == "COC2", "hic_total_units"].item() == 80
         assert panel.loc[panel["coc_id"] == "COC1", "hic_es_year_round_beds"].item() == 40
         assert panel.loc[panel["coc_id"] == "COC2", "hic_psh_year_round_beds"].item() == 135
+
+
+def test_recipe_preserves_pit_count_types_when_only_counts_are_requested(tmp_path: Path):
+    _setup_zori_fixtures(tmp_path)
+    pit_path = tmp_path / "data" / "pit.parquet"
+    pit = pd.read_parquet(pit_path)
+    pit["pit_unsheltered"] = pit["pit_total"]
+    pit["count_types"] = [COUNT_TYPES_FULL, COUNT_TYPES_SHELTERED_ONLY] * 2
+    pit = with_pit_count_metadata(pit)
+    pit.to_parquet(pit_path, index=False)
+
+    results = execute_recipe(load_recipe(_zori_recipe_dict()), project_root=tmp_path)
+
+    assert results[0].success
+    panel = pd.read_parquet(_find_panel_output(tmp_path)).sort_values(["year", "geo_id"])
+    assert panel.count_types.tolist() == pit.count_types.tolist()
+    assert panel.pit_total.tolist() == pit.pit_total.tolist()
+    for column in PIT_BOOLEAN_OBSERVATION_COLUMNS:
+        assert panel[column].tolist() == pit[column].tolist()
+        assert str(panel[column].dtype) == "boolean"
 
 
 class TestZoriPanelPolicy:

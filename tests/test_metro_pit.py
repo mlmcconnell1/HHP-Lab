@@ -13,6 +13,7 @@ from hhplab.geographies.gf_metro.metro_definitions import (
     build_coc_membership_df,
 )
 from hhplab.sources.hud.pit import aggregate_pit_to_metro
+from hhplab.sources.hud.pit.observation import COUNT_TYPES_FULL, COUNT_TYPES_SHELTERED_ONLY
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -49,6 +50,18 @@ def synthetic_pit(all_coc_ids):
 
 
 class TestBasicAggregation:
+    def test_carried_constituent_marks_sum_without_altering_reported_count(self):
+        membership = pd.DataFrame({"metro_id": ["GF01", "GF01"], "coc_id": ["CA-500", "CA-501"]})
+        source = pd.DataFrame({
+            "coc_id": ["CA-500", "CA-501"], "pit_year": [2024, 2024],
+            "pit_total": [10, 10], "pit_unsheltered": [5, 5],
+            "count_types": [COUNT_TYPES_FULL, COUNT_TYPES_SHELTERED_ONLY],
+        })
+        result = aggregate_pit_to_metro(source, coc_membership_df=membership)
+        assert result.iloc[0].pit_unsheltered == 10
+        assert not result.iloc[0].unsheltered_count_observed
+        assert result.iloc[0].unsheltered_count_carried_forward
+
     def test_output_has_all_metros(self, synthetic_pit):
         result = aggregate_pit_to_metro(synthetic_pit)
         assert result["metro_id"].nunique() == METRO_COUNT

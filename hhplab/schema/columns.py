@@ -636,12 +636,20 @@ COC_URBAN_AREA_DETAIL_COLUMNS: tuple[str, ...] = (
     "source",
 )
 
+PIT_OBSERVATION_COLUMNS: tuple[str, ...] = (
+    "count_types",
+    "unsheltered_count_observed",
+    "unsheltered_count_carried_forward",
+    "unsheltered_count_partial",
+)
+
 PIT_CANONICAL_COLUMNS: list[str] = [
     "pit_year",
     "coc_id",
     "pit_total",
     "pit_sheltered",
     "pit_unsheltered",
+    *PIT_OBSERVATION_COLUMNS,
     "data_source",
     "source_ref",
     "ingested_at",
@@ -896,6 +904,7 @@ COC_PANEL_COLUMNS: list[str] = [
     "pit_total",
     "pit_sheltered",
     "pit_unsheltered",
+    *PIT_OBSERVATION_COLUMNS,
     "boundary_vintage_used",
     "acs5_vintage_used",
     "tract_vintage_used",
@@ -922,6 +931,7 @@ METRO_PANEL_COLUMNS: list[str] = [
     "pit_total",
     "pit_sheltered",
     "pit_unsheltered",
+    *PIT_OBSERVATION_COLUMNS,
     "definition_version_used",
     "acs5_vintage_used",
     "tract_vintage_used",
@@ -960,6 +970,7 @@ MSA_PANEL_COLUMNS: list[str] = [
     "pit_total",
     "pit_sheltered",
     "pit_unsheltered",
+    *PIT_OBSERVATION_COLUMNS,
     "definition_version_used",
     "acs5_vintage_used",
     "tract_vintage_used",
@@ -990,6 +1001,7 @@ MSA_COC_PANEL_COLUMNS: list[str] = [
     "pit_total",
     "pit_sheltered",
     "pit_unsheltered",
+    *PIT_OBSERVATION_COLUMNS,
     "coc_population",
     "ranking_population_source",
     "ranking_reference_year",

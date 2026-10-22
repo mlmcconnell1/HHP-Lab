@@ -8,6 +8,11 @@ import pandas as pd
 import pytest
 
 from hhplab.sources.hud.pit import aggregate_pit_to_msa, save_msa_pit
+from hhplab.sources.hud.pit.observation import (
+    COUNT_TYPES_FULL,
+    COUNT_TYPES_SHELTERED_ONLY,
+    with_pit_count_metadata,
+)
 from hhplab.storage.provenance import read_provenance
 
 CROSSWALK_ROWS = [
@@ -83,6 +88,23 @@ def coc_pit() -> pd.DataFrame:
 
 
 class TestAggregatePitToMsa:
+    @pytest.mark.parametrize("year_dtype", ["int64", "string"])
+    def test_carried_constituent_marks_sum_without_changing_reported_counts(
+        self, coc_pit: pd.DataFrame, msa_crosswalk: pd.DataFrame, year_dtype: str
+    ):
+        source = coc_pit.assign(count_types=COUNT_TYPES_FULL)
+        source.loc[source.coc_id.eq("CO-200"), "count_types"] = COUNT_TYPES_SHELTERED_ONLY
+        source = with_pit_count_metadata(source)
+        source["pit_year"] = source["pit_year"].astype(year_dtype)
+        result = aggregate_pit_to_msa(source, msa_crosswalk)
+        row = result[result.msa_id.eq("35620") & result.year.eq(2020)].iloc[0]
+        assert row.pit_unsheltered == 60
+        assert not row.unsheltered_count_observed
+        assert row.unsheltered_count_carried_forward
+        assert json.loads(row.count_types) == {
+            "CO-100": COUNT_TYPES_FULL, "CO-200": COUNT_TYPES_SHELTERED_ONLY,
+        }
+
     def test_output_columns(self, coc_pit: pd.DataFrame, msa_crosswalk: pd.DataFrame):
         result = aggregate_pit_to_msa(coc_pit, msa_crosswalk)
         assert "msa_id" in result.columns

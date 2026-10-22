@@ -41,6 +41,7 @@ from hhplab.recipe.probes import get_weighted_transform_requirements
 from hhplab.schema.columns import (
     ACS1_IMPUTATION_FLAG_COLUMNS,
     ACS1_IMPUTATION_LINEAGE_COLUMNS,
+    PIT_OBSERVATION_COLUMNS,
 )
 from hhplab.sources.census.acs.sae import (
     CONTRACT_RENT_BINS,
@@ -429,7 +430,7 @@ def _resample_identity(
 
     passthrough_cols = [
         column
-        for column in _ACS1_IMPUTATION_PASSTHROUGH_COLUMNS
+        for column in (*_ACS1_IMPUTATION_PASSTHROUGH_COLUMNS, *PIT_OBSERVATION_COLUMNS)
         if column in df.columns and column not in task.measures
     ]
     cols = [geo_col] + task.measures + passthrough_cols

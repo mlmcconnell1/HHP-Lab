@@ -84,6 +84,7 @@ from hhplab.schema.columns import (
     ACS1_MEASURE_COLUMNS,
     COC_PANEL_COLUMNS,
     HIC_PANEL_MEASURE_COLUMNS,
+    PIT_OBSERVATION_COLUMNS,
     POPULATION_DENSITY_COLUMN,
     TOTAL_POPULATION,
 )
@@ -237,7 +238,7 @@ def _load_pit_from_raw_vintage(
 
         # Select relevant columns
         result_cols = ["coc_id", "pit_total"]
-        for col in ["pit_sheltered", "pit_unsheltered"]:
+        for col in ["pit_sheltered", "pit_unsheltered", *PIT_OBSERVATION_COLUMNS]:
             if col in df.columns:
                 result_cols.append(col)
 
@@ -332,7 +333,7 @@ def _load_pit_for_year(
                 raise ValueError(f"Metro PIT file {candidates[0]} is missing '{geo_col}' column.")
 
         result_cols = [geo_col, "pit_total"]
-        for col in ["pit_sheltered", "pit_unsheltered"]:
+        for col in ["pit_sheltered", "pit_unsheltered", *PIT_OBSERVATION_COLUMNS]:
             if col in df.columns:
                 result_cols.append(col)
         df = df[result_cols].copy()
@@ -404,7 +405,7 @@ def _load_pit_for_year(
 
     # Select and rename columns as needed
     result_cols = ["coc_id", "pit_total"]
-    for col in ["pit_sheltered", "pit_unsheltered"]:
+    for col in ["pit_sheltered", "pit_unsheltered", *PIT_OBSERVATION_COLUMNS]:
         if col in df.columns:
             result_cols.append(col)
 

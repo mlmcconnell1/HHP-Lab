@@ -10,6 +10,10 @@ Canonical PIT Schema
 - pit_total (int): Total persons experiencing homelessness
 - pit_sheltered (int, nullable): Sheltered count
 - pit_unsheltered (int, nullable): Unsheltered count
+- count_types (str, nullable): Original HUD count declaration
+- unsheltered_count_observed (bool, nullable): Full or partial count occurred
+- unsheltered_count_carried_forward (bool, nullable): Published non-count estimate
+- unsheltered_count_partial (bool, nullable): Only a partial unsheltered count occurred
 - data_source (str): Source identifier (e.g., 'hud_exchange')
 - source_ref (str): URL or dataset identifier
 - ingested_at (datetime, UTC): Timestamp of ingestion
@@ -39,6 +43,12 @@ import pyarrow as pa
 import pyarrow.parquet as pq
 
 from hhplab.schema.columns import PIT_CANONICAL_COLUMNS
+from hhplab.sources.hud.pit.observation import (
+    COUNT_TYPES_POLICY_REF,
+    COUNT_TYPES_POLICY_VERSION,
+    PIT_BOOLEAN_OBSERVATION_COLUMNS,
+    with_pit_count_metadata,
+)
 from hhplab.storage.paths import curated_dir
 
 logger = logging.getLogger(__name__)
@@ -416,6 +426,9 @@ def parse_pit_file(
         "pit_unsheltered",
     ]
     unsheltered_col = _find_column(df, unsheltered_candidates)
+    count_types_col = _find_column(
+        df, [f"count types, {year}", "count types", "count_types", "count type", "count_type"]
+    )
 
     if not total_col:
         raise ValueError(
@@ -510,6 +523,7 @@ def parse_pit_file(
                 "pit_total": pit_total,
                 "pit_sheltered": pit_sheltered,
                 "pit_unsheltered": pit_unsheltered,
+                "count_types": row[count_types_col] if count_types_col else pd.NA,
                 "data_source": source,
                 "source_ref": source_ref or str(file_path),
                 "ingested_at": ingested_at,
@@ -517,7 +531,7 @@ def parse_pit_file(
             }
         )
 
-    result = pd.DataFrame(result_rows)
+    result = with_pit_count_metadata(pd.DataFrame(result_rows, columns=CANONICAL_COLUMNS))
 
     # Check for duplicates — preserve info for QA before dropping
     duplicates = result[result.duplicated(subset=["coc_id"], keep=False)]
@@ -592,7 +606,7 @@ def write_pit_parquet(
         raise ValueError(f"Missing required columns: {missing}")
 
     # Ensure proper dtypes
-    df = df.copy()
+    df = with_pit_count_metadata(df)
     df["pit_year"] = df["pit_year"].astype(int)
     df["pit_total"] = df["pit_total"].astype(int)
     df["coc_id"] = df["coc_id"].astype(str)
@@ -621,6 +635,23 @@ def write_pit_parquet(
         "ingested_at": ingested_at.isoformat()
         if hasattr(ingested_at, "isoformat")
         else str(ingested_at),
+        "count_types_policy": {
+            "version": COUNT_TYPES_POLICY_VERSION,
+            "source": COUNT_TYPES_POLICY_REF,
+            "reported_counts_preserved": True,
+            "missing_metadata": "unknown nullable flags; never inferred from numeric patterns",
+            "partial_counts": "observed=True, partial=True; excluded by observed_pit_mask",
+            "sheltered_only_2021": "carry-forward status unknown when a value is present",
+            "raw_count_types": df["count_types"].value_counts(dropna=True).to_dict(),
+            "flag_counts": {
+                column: {
+                    "true": int(df[column].eq(True).sum()),
+                    "false": int(df[column].eq(False).sum()),
+                    "unknown": int(df[column].isna().sum()),
+                }
+                for column in PIT_BOOLEAN_OBSERVATION_COLUMNS
+            },
+        },
     }
 
     # Add parse statistics if provided

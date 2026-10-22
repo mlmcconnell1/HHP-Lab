@@ -17,10 +17,16 @@ from hhplab.geographies.coc.coc_validate import validate_coc_boundary_compatibil
 from hhplab.recipe.executor.core import ExecutorError
 from hhplab.recipe.executor.msa_coc_panel import (
     SiteYearSourceBinding,
+    _coc_measures_for_year,
+    _FrameRecord,
     assemble_site_year_panel,
     site_year_panel_columns,
 )
 from hhplab.schema.columns import HIC_PANEL_MEASURE_COLUMNS
+from hhplab.sources.hud.pit.observation import (
+    COUNT_TYPES_SHELTERED_ONLY,
+    with_pit_count_metadata,
+)
 
 ARTIFACT_ID = "overlap_samples"
 THRESHOLD = 0.95
@@ -172,6 +178,7 @@ def _source_panels():
         ],
         columns=["coc_id", "year", PIT_MEASURE, PIT_SHELTERED, PIT_UNSHELTERED],
     )
+    pit["count_types"] = "Sheltered and Unsheltered Count"
     hic = pd.DataFrame(
         [
             ("CO-1", 2020, 11),
@@ -293,6 +300,7 @@ def test_v2_preaggregated_pit_and_hic_predecessor_sum_have_distinct_operations()
         [("MA-505", 2020, 76, 50, 26)],
         columns=["coc_id", "year", PIT_MEASURE, PIT_SHELTERED, PIT_UNSHELTERED],
     )
+    pit["count_types"] = "Sheltered and Unsheltered Count"
     hic = pd.DataFrame(
         [("MA-505", 2020, 300), ("MA-519", 2020, 378)],
         columns=["coc_id", "year", HIC_MEASURE],
@@ -317,6 +325,7 @@ def test_v2_missing_hic_predecessor_prevents_partial_sum():
         [("MA-505", 2020, 76, 50, 26)],
         columns=["coc_id", "year", PIT_MEASURE, PIT_SHELTERED, PIT_UNSHELTERED],
     )
+    pit["count_types"] = "Sheltered and Unsheltered Count"
     hic = pd.DataFrame(
         [("MA-505", 2020, 300)],
         columns=["coc_id", "year", HIC_MEASURE],
@@ -460,3 +469,52 @@ def test_nullable_output_preserves_large_integer_totals_exactly():
 
     assert int(row_2020[PIT_MEASURE]) == 2**53 + 1
     assert str(result.panel[PIT_MEASURE].dtype) == "Int64"
+
+
+@pytest.mark.parametrize(
+    ("declaration", "diagnostic"),
+    [
+        ("Sheltered-Only Count", "unobserved_count_coc_ids"),
+        ("Sheltered and Partial Unsheltered Count", "partial_count_coc_ids"),
+        (None, "unknown_count_type_coc_ids"),
+        ("No 2020 PIT Count", "unobserved_count_coc_ids"),
+    ],
+    ids=["carried", "partial", "unknown", "no-count"],
+)
+def test_unsheltered_and_total_require_source_declared_complete_counts(declaration, diagnostic):
+    sources = _source_panels()
+    sources["pit_coc"].loc[sources["pit_coc"].coc_id.eq("CO-2-OLD"), "count_types"] = declaration
+    original = sources["pit_coc"].copy(deep=True)
+    result = _assemble(source_panels=sources)
+    row = result.panel.loc[result.panel.year.eq(2020)].iloc[0]
+    assert pd.isna(row[PIT_UNSHELTERED])
+    assert pd.isna(row[PIT_MEASURE])
+    assert row[f"{PIT_UNSHELTERED}__status"] == "source_limited"
+    assert row[f"{PIT_MEASURE}__status"] == "source_limited"
+    assert row[f"{PIT_UNSHELTERED}__{diagnostic}"] == ["CO-2"]
+    if declaration in {"Sheltered-Only Count", "Sheltered and Partial Unsheltered Count"}:
+        assert row[PIT_SHELTERED] == 6
+        assert row[f"{PIT_SHELTERED}__status"] == "complete"
+    else:
+        assert pd.isna(row[PIT_SHELTERED])
+    pd.testing.assert_frame_equal(sources["pit_coc"], original)
+
+
+def test_msa_coc_measure_selection_preserves_nonnumeric_count_metadata():
+    source = with_pit_count_metadata(pd.DataFrame({
+        "coc_id": ["CO-1"],
+        "year": [2020],
+        "pit_total": [10],
+        "pit_unsheltered": [5],
+        "count_types": [COUNT_TYPES_SHELTERED_ONLY],
+    }))
+    record = _FrameRecord(
+        dataset_id="pit", source_token="pit", geo_type="coc", year=2020, frame=source
+    )
+
+    selected = _coc_measures_for_year([record], year=2020)
+
+    assert selected.count_types.tolist() == [COUNT_TYPES_SHELTERED_ONLY]
+    assert selected.unsheltered_count_observed.tolist() == [False]
+    assert selected.unsheltered_count_carried_forward.tolist() == [True]
+    assert str(selected.unsheltered_count_observed.dtype) == "boolean"

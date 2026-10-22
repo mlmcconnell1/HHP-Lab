@@ -20,7 +20,18 @@ from hhplab.recipe.executor.core import ExecutionContext, ExecutorError
 from hhplab.recipe.planner import ExecutionPlan
 from hhplab.recipe.recipe_schema import ContainmentSpec
 from hhplab.recipe.schema_common import GeometryRef, expand_year_spec
-from hhplab.schema.columns import HIC_PANEL_MEASURE_COLUMNS, MSA_COC_PANEL_COLUMNS
+from hhplab.schema.columns import (
+    HIC_PANEL_MEASURE_COLUMNS,
+    MSA_COC_PANEL_COLUMNS,
+    PIT_OBSERVATION_COLUMNS,
+)
+from hhplab.sources.hud.pit.observation import (
+    COUNT_TYPES_FULL,
+    COUNT_TYPES_PARTIAL,
+    COUNT_TYPES_SHELTERED_ONLY,
+    observed_pit_mask,
+    with_pit_count_metadata,
+)
 
 SITE_YEAR_DIAGNOSTIC_SUFFIXES = (
     "expected_coc_count",
@@ -28,6 +39,9 @@ SITE_YEAR_DIAGNOSTIC_SUFFIXES = (
     "missing_coc_ids",
     "unknown_boundary_coc_ids",
     "incompatible_boundary_coc_ids",
+    "unobserved_count_coc_ids",
+    "partial_count_coc_ids",
+    "unknown_count_type_coc_ids",
     "status",
 )
 SITE_YEAR_STATUSES = frozenset(
@@ -177,9 +191,13 @@ def assemble_site_year_panel(
                 source_lookup = source_lookups[panel_id]
                 for measure in binding.measures:
                     observed_cocs: set[str] = set()
+                    available_cocs: set[str] = set()
                     missing_cocs: set[str] = set()
                     unknown_cocs: set[str] = set()
                     incompatible_cocs: set[str] = set()
+                    unobserved_count_cocs: set[str] = set()
+                    partial_count_cocs: set[str] = set()
+                    unknown_count_type_cocs: set[str] = set()
                     values: list[int] = []
 
                     for coc_id in coc_ids:
@@ -205,12 +223,52 @@ def assemble_site_year_panel(
                             )
                             for source_coc_id in source_coc_ids
                         ]
+                        count_observed = True
+                        if outcome_name == "pit":
+                            source_rows = [
+                                source_lookup[(source_coc_id, year)]
+                                for source_coc_id in source_coc_ids
+                                if (source_coc_id, year) in source_lookup
+                            ]
+                            for source_row in source_rows:
+                                declaration = source_row.get("count_types", pd.NA)
+                                if pd.isna(declaration) or declaration not in {
+                                    COUNT_TYPES_FULL, COUNT_TYPES_PARTIAL,
+                                    COUNT_TYPES_SHELTERED_ONLY,
+                                }:
+                                    # Explicit no-count labels are known non-observations;
+                                    # unsupported/absent declarations remain unknown.
+                                    observed_flag = source_row.get(
+                                        "unsheltered_count_observed", pd.NA
+                                    )
+                                    if pd.isna(observed_flag):
+                                        unknown_count_type_cocs.add(coc_id)
+                                if (
+                                    measure in PIT_SITE_YEAR_LIMITED_MEASURES
+                                    and not pd.isna(source_row.get("unsheltered_count_partial"))
+                                    and bool(source_row.get("unsheltered_count_partial"))
+                                ):
+                                    partial_count_cocs.add(coc_id)
+                                source_observed = bool(
+                                    observed_pit_mask(
+                                        pd.DataFrame([source_row]), measure, require_value=False
+                                    ).iloc[0]
+                                )
+                                if not source_observed:
+                                    count_observed = False
+                                    observed_flag = source_row.get(
+                                        "unsheltered_count_observed", pd.NA
+                                    )
+                                    if not pd.isna(observed_flag) and not bool(observed_flag):
+                                        unobserved_count_cocs.add(coc_id)
                         if not constituent_values or any(
                             value is None for value in constituent_values
                         ):
                             missing_cocs.add(coc_id)
                         else:
-                            observed_cocs.add(coc_id)
+                            available_cocs.add(coc_id)
+                            if count_observed:
+                                observed_cocs.add(coc_id)
                             if compatibility.status in {"compatible", "mapped", "reconciled"}:
                                 if compatibility.count_operation == "sum":
                                     values.append(sum(constituent_values))
@@ -221,9 +279,11 @@ def assemble_site_year_panel(
                         outcome_name == "pit"
                         and year == 2021
                         and measure in PIT_SITE_YEAR_LIMITED_MEASURES
+                    ) or bool(
+                        unobserved_count_cocs or partial_count_cocs or unknown_count_type_cocs
                     )
                     complete = (
-                        len(observed_cocs) == len(coc_ids)
+                        len(available_cocs) == len(coc_ids)
                         and not unknown_cocs
                         and not incompatible_cocs
                     )
@@ -243,6 +303,11 @@ def assemble_site_year_panel(
                         incompatible_cocs
                     )
                     row[f"{measure}__status"] = status
+                    row[f"{measure}__unobserved_count_coc_ids"] = sorted(unobserved_count_cocs)
+                    row[f"{measure}__partial_count_coc_ids"] = sorted(partial_count_cocs)
+                    row[f"{measure}__unknown_count_type_coc_ids"] = sorted(
+                        unknown_count_type_cocs
+                    )
             rows.append(row)
 
     columns = site_year_panel_columns(measures)
@@ -262,7 +327,11 @@ def assemble_site_year_panel(
         raise ExecutorError("Site-year aggregation produced duplicate (msa_id, year) keys.")
     provenance = {
         "site_year_panel": {
-            "schema_version": "site_year_panel/1",
+            "schema_version": "site_year_panel/2",
+            "pit_observation_policy": (
+                "Require source-declared complete current-year counts; totals also "
+                "require observed unsheltered counts. Missing metadata fails closed."
+            ),
             "artifact_id": artifact_id,
             "threshold": float(threshold),
             "membership_identity": membership_identity,
@@ -389,7 +458,11 @@ def _site_year_source_lookup(
             f"Site-year source panel '{panel_id}' is missing required columns {missing_columns}."
         )
     lookup: dict[tuple[str, int], dict[str, object]] = {}
-    for row in frame.loc[:, ["coc_id", "year", *required_measures]].to_dict(orient="records"):
+    selected_columns = ["coc_id", "year", *required_measures]
+    if "pit_unsheltered" in frame and "pit_unsheltered" not in selected_columns:
+        selected_columns.append("pit_unsheltered")
+    selected_columns.extend(column for column in PIT_OBSERVATION_COLUMNS if column in frame)
+    for row in frame.loc[:, selected_columns].to_dict(orient="records"):
         coc_value = row["coc_id"]
         if pd.isna(coc_value) or not str(coc_value).strip():
             raise ExecutorError(f"Site-year source panel '{panel_id}' has a null or empty coc_id.")
@@ -422,7 +495,12 @@ def _site_year_source_lookup(
             raise ExecutorError(
                 f"Site-year source panel '{panel_id}' has duplicate normalized key {key!r}."
             )
-        lookup[key] = {measure: row[measure] for measure in required_measures}
+        lookup[key] = {
+            column: row[column] for column in selected_columns if column not in {"coc_id", "year"}
+        }
+        if any(measure.startswith("pit_") for measure in required_measures):
+            metadata = with_pit_count_metadata(pd.DataFrame([{**row, "year": normalized_year}]))
+            lookup[key].update(metadata[list(PIT_OBSERVATION_COLUMNS)].iloc[0].to_dict())
     return lookup
 
 
@@ -822,6 +900,12 @@ def _coc_measures_for_year(records: list[_FrameRecord], *, year: int) -> pd.Data
     result = merged[["coc_id", "year"]].copy()
     for column in ("pit_total", "pit_sheltered", "pit_unsheltered"):
         result[column] = _first_available(merged, [column])
+    for column in PIT_OBSERVATION_COLUMNS:
+        dtype = "string" if column == "count_types" else "boolean"
+        result[column] = (
+            merged[column].astype(dtype) if column in merged
+            else pd.Series(pd.NA, index=merged.index, dtype=dtype)
+        )
     result["coc_population"] = _first_available(
         merged,
         [

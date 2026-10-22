@@ -63,6 +63,7 @@ from hhplab.recipe.recipe_schema import (
 )
 from hhplab.recipe.schema_common import GeometryRef, expand_year_spec
 from hhplab.schema.columns import (
+    PIT_OBSERVATION_COLUMNS,
     POPULATION_DENSITY_COLUMN,
     TOTAL_POPULATION,
 )
@@ -265,6 +266,7 @@ _RECIPE_COC_COLUMN_ORDER: list[str] = [
     "pit_total",
     "pit_sheltered",
     "pit_unsheltered",
+    *PIT_OBSERVATION_COLUMNS,
     "boundary_vintage_used",
     "acs5_vintage_used",
     "tract_vintage_used",
@@ -297,6 +299,7 @@ _RECIPE_METRO_COLUMN_ORDER: list[str] = [
     "pit_total",
     "pit_sheltered",
     "pit_unsheltered",
+    *PIT_OBSERVATION_COLUMNS,
     "definition_version_used",
     "profile",
     "profile_definition_version",
@@ -347,6 +350,7 @@ _RECIPE_MSA_COLUMN_ORDER: list[str] = [
     "pit_total",
     "pit_sheltered",
     "pit_unsheltered",
+    *PIT_OBSERVATION_COLUMNS,
     "definition_version_used",
     "acs5_vintage_used",
     "tract_vintage_used",

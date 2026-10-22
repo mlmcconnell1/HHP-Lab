@@ -78,6 +78,10 @@ _PANEL_DTYPE_SPEC: dict[str, str | type] = {
     "pit_total": "int",
     "pit_sheltered": "Int64",
     "pit_unsheltered": "Int64",
+    "count_types": "string",
+    "unsheltered_count_observed": "boolean",
+    "unsheltered_count_carried_forward": "boolean",
+    "unsheltered_count_partial": "boolean",
     # Vintage metadata
     "boundary_vintage_used": "str",
     "definition_version_used": "str",

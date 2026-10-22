@@ -228,6 +228,10 @@ HIC_EXPANDED_SCHEMA_TRUTH_TABLE = (
 )
 
 MSA_COC_PANEL_COMPLETE_ROW = {
+    "count_types": "Sheltered and Unsheltered Count",
+    "unsheltered_count_observed": True,
+    "unsheltered_count_carried_forward": False,
+    "unsheltered_count_partial": False,
     "msa_id": "35620",
     "coc_id": "NY-600",
     "year": 2024,
@@ -1345,6 +1349,10 @@ def test_validate_schema_contract_json_reports_warnings_without_failing(tmp_path
             "pit_total": [10],
             "pit_sheltered": [8],
             "pit_unsheltered": [2],
+            "count_types": ["Sheltered and Unsheltered Count"],
+            "unsheltered_count_observed": [True],
+            "unsheltered_count_carried_forward": [False],
+            "unsheltered_count_partial": [False],
             "boundary_vintage_used": ["2024"],
             "acs5_vintage_used": ["2023"],
             "tract_vintage_used": ["2020"],
@@ -1395,6 +1403,10 @@ def test_validate_schema_contract_can_promote_warnings_to_errors(tmp_path) -> No
             "pit_total": [10],
             "pit_sheltered": [8],
             "pit_unsheltered": [2],
+            "count_types": ["Sheltered and Unsheltered Count"],
+            "unsheltered_count_observed": [True],
+            "unsheltered_count_carried_forward": [False],
+            "unsheltered_count_partial": [False],
             "boundary_vintage_used": ["2024"],
             "acs5_vintage_used": ["2023"],
             "tract_vintage_used": ["2020"],

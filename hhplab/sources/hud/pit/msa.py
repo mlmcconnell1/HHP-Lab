@@ -8,6 +8,11 @@ import pandas as pd
 
 from hhplab.geographies.analysis import MSA_ID_COL
 from hhplab.geographies.msa import aggregate_coc_to_msa_fractional_rollup
+from hhplab.schema.columns import PIT_OBSERVATION_COLUMNS
+from hhplab.sources.hud.pit.observation import (
+    PIT_BOOLEAN_OBSERVATION_COLUMNS,
+    aggregate_pit_count_metadata,
+)
 from hhplab.storage.paths import curated_dir
 from hhplab.storage.provenance import ProvenanceBlock, write_parquet_with_provenance
 
@@ -18,6 +23,7 @@ MSA_PIT_COLUMNS: tuple[str, ...] = (
     "pit_total",
     "pit_sheltered",
     "pit_unsheltered",
+    *PIT_OBSERVATION_COLUMNS,
     "covered_coc_count",
     "expected_coc_count",
     "allocation_share_sum",
@@ -139,6 +145,23 @@ def aggregate_pit_to_msa(
     for optional_column in ("pit_sheltered", "pit_unsheltered"):
         if optional_column not in rollup.columns:
             rollup[optional_column] = pd.NA
+    positive_membership = crosswalk.loc[
+        pd.to_numeric(crosswalk["allocation_share"], errors="raise").gt(0),
+        ["coc_id", "msa_id"],
+    ].drop_duplicates()
+    positive_membership = positive_membership.astype({"coc_id": str, "msa_id": str})
+    metadata_years = pd.to_numeric(df["year"], errors="raise")
+    metadata_cocs = df["coc_id"].astype(str)
+    metadata_rows = []
+    for row in rollup.itertuples(index=False):
+        members = positive_membership.loc[
+            positive_membership.msa_id.eq(row.msa_id), "coc_id"
+        ]
+        contributing = df.loc[metadata_years.eq(row.year) & metadata_cocs.isin(members)]
+        metadata_rows.append(
+            aggregate_pit_count_metadata(contributing, expected_coc_count=len(members))
+        )
+    metadata = pd.DataFrame(metadata_rows, index=rollup.index, columns=PIT_OBSERVATION_COLUMNS)
     result_df = pd.DataFrame(
         {
             "msa_id": rollup["msa_id"],
@@ -147,6 +170,7 @@ def aggregate_pit_to_msa(
             "pit_total": rollup["pit_total"],
             "pit_sheltered": rollup["pit_sheltered"],
             "pit_unsheltered": rollup["pit_unsheltered"],
+            **{column: metadata[column] for column in PIT_OBSERVATION_COLUMNS},
             "covered_coc_count": rollup["covered_coc_count"],
             "expected_coc_count": rollup["coc_count"],
             "allocation_share_sum": rollup["allocation_share_sum"],
@@ -171,6 +195,9 @@ def aggregate_pit_to_msa(
 
     for col in ("pit_total", "pit_sheltered", "pit_unsheltered"):
         result_df[col] = result_df[col].astype("Float64")
+    result_df["count_types"] = result_df["count_types"].astype("string")
+    for column in PIT_BOOLEAN_OBSERVATION_COLUMNS:
+        result_df[column] = result_df[column].astype("boolean")
     result_df["covered_coc_count"] = result_df["covered_coc_count"].astype(int)
     result_df["expected_coc_count"] = result_df["expected_coc_count"].astype(int)
     result_df["allocation_share_sum"] = result_df["allocation_share_sum"].astype(float)

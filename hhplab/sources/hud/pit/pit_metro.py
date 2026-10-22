@@ -21,6 +21,10 @@ from hhplab.geographies.gf_metro.metro_definitions import (
     DEFINITION_VERSION,
     build_coc_membership_df,
 )
+from hhplab.sources.hud.pit.observation import (
+    PIT_BOOLEAN_OBSERVATION_COLUMNS,
+    aggregate_pit_count_metadata,
+)
 
 
 def aggregate_pit_to_metro(
@@ -117,6 +121,9 @@ def aggregate_pit_to_metro(
                         "pit_total": None,
                         "pit_sheltered": None,
                         "pit_unsheltered": None,
+                        **aggregate_pit_count_metadata(
+                            metro_pit, expected_coc_count=n_expected
+                        ),
                         "coc_count": 0,
                         "coc_expected": n_expected,
                         "coc_coverage_ratio": 0.0,
@@ -147,6 +154,7 @@ def aggregate_pit_to_metro(
                     "pit_total": int(pit_total),
                     "pit_sheltered": pit_sheltered,
                     "pit_unsheltered": pit_unsheltered,
+                    **aggregate_pit_count_metadata(metro_pit, expected_coc_count=n_expected),
                     "coc_count": n_found,
                     "coc_expected": n_expected,
                     "coc_coverage_ratio": coverage,
@@ -163,6 +171,10 @@ def aggregate_pit_to_metro(
     for col in ("pit_total", "pit_sheltered", "pit_unsheltered"):
         if col in result_df.columns:
             result_df[col] = result_df[col].astype("Int64")
+    if not result_df.empty:
+        result_df["count_types"] = result_df["count_types"].astype("string")
+        for column in PIT_BOOLEAN_OBSERVATION_COLUMNS:
+            result_df[column] = result_df[column].astype("boolean")
 
     result_df = result_df.sort_values(["metro_id", "year"]).reset_index(drop=True)
 
