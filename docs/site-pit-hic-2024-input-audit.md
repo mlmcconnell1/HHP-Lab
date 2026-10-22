@@ -240,3 +240,42 @@ Same-year associations are positive in both groups, with nominal 95% intervals e
 The stronger same-year relationship is consistent with shelter capacity and sheltered occupancy moving together; this diagnostic does not distinguish mechanisms or establish causality. Geography remains provisional, selection on bed-change sign restricts the range, and the exploratory intervals are not corrected for multiple comparisons.
 
 The unchanged split estimator again uses annual log1p changes, exact calendar joins, within-subset site/year fixed effects, and 1,999 whole-site bootstrap replicates with seed 20261022. The driver converts nullable sheltered-derived values to dense floats for numerical linear algebra without changing values. All ten projections match dummy-variable least squares; bootstrap frequency weights match explicitly duplicated site samples. [Sheltered-check artifacts](</home/matt/HHP-Output/site-boundary-history-audit/exploratory-without-sacramento/sheltered-pit-bed-changes/>) include `run_sheltered_check.py`, `sheltered_pit_provenance.json`, `summary.json`, `correlations.csv`, and `paired_changes.csv`; earlier outputs and the input panel are preserved.
+
+### PSH beds versus unsheltered homelessness — 2026-10-22
+
+The owner requested a PSH lead/lag check on the same site universe. This substitutes HIC `hic_psh_year_round_beds` for shelter beds and retains unsheltered P2024 PIT counts, the 60 sites/77 frozen CoCs, membership identity `d9cb7f511c9b8d4d212a90bff4b854cf5c021dd0c50e956c6219b1cbe1e660ec`, and 2010–2024 excluding 2021. All 840 PSH site-year totals are finite nonnegative integers. Their unsheltered counts exactly match the earlier shelter diagnostic. HIC predecessor IDs and source-specific merger rules are identical; an independent exploded-source aggregation reproduces every PSH site-year total.
+
+The primary check correlates annual changes in `log(1 + count)` after removing site and paired-year fixed effects. Positive lag means the PSH change precedes the PIT change. All pooled samples include 60 sites.
+
+| Timing | Pairs | Pearson r | 95% site-bootstrap interval |
+| --- | ---: | ---: | ---: |
+| PSH changes precede unsheltered changes by two years | 480 | −0.094 | −0.192 to −0.014 |
+| PSH changes precede unsheltered changes by one year | 600 | 0.064 | −0.031 to 0.155 |
+| Same-year changes | 720 | 0.015 | −0.058 to 0.101 |
+| Unsheltered changes precede PSH changes by one year | 600 | 0.019 | −0.065 to 0.097 |
+| Unsheltered changes precede PSH changes by two years | 480 | −0.069 | −0.198 to 0.069 |
+
+The pooled two-year PSH-leading association is small and negative, with a nominal interval excluding zero. Its pre-2020 point estimate is −0.116; leaving out each site in turn yields −0.118 to −0.067. Same-year and one-year intervals include zero. These are correlations between changes, not estimates of people housed per additional PSH bed.
+
+There are 437 PSH increases, 235 declines, and 48 flat annual transitions. As in the earlier diagnostics, the separate sign checks select on the observed bed-change sign before adjustment and keep declines signed. Their fixed effects are refitted within each subgroup and lag; flat transitions are excluded from both sign groups.
+
+| PSH-change group | Timing | Pairs | Contributing sites | Pearson r | 95% site-bootstrap interval |
+| --- | --- | ---: | ---: | ---: | ---: |
+| Increases | PSH precedes PIT by two years | 301 | 60 | −0.129 | −0.274 to −0.011 |
+| Increases | PSH precedes PIT by one year | 377 | 60 | 0.049 | −0.035 to 0.155 |
+| Increases | Same year | 437 | 60 | −0.062 | −0.211 to 0.058 |
+| Increases | PIT precedes PSH by one year | 356 | 60 | 0.078 | −0.041 to 0.191 |
+| Increases | PIT precedes PSH by two years | 286 | 60 | −0.102 | −0.208 to 0.001 |
+| Declines | PSH precedes PIT by two years | 145 | 54 | −0.119 | −0.297 to 0.159 |
+| Declines | PSH precedes PIT by one year | 183 | 57 | 0.077 | −0.291 to 0.329 |
+| Declines | Same year | 235 | 59 | 0.143 | −0.008 to 0.307 |
+| Declines | PIT precedes PSH by one year | 202 | 57 | 0.208 | 0.010 to 0.327 |
+| Declines | PIT precedes PSH by two years | 159 | 56 | −0.296 | −0.534 to 0.027 |
+
+The increases-only two-year PSH-leading point estimate is −0.169 before 2020, and its leave-one-site-out range is −0.179 to −0.098. The declines-only two-year interval is wide and includes zero. Declines also show a positive nominal association when unsheltered changes precede PSH changes by one year, so the exploratory results do not establish a single direction of response. These sign-restricted estimates are not a formal test of asymmetry or differences between groups.
+
+The two-year negative association is suggestive rather than causal evidence. Intervals are not corrected for the multiple lags, transforms, and subgroups examined. Housing-market changes, capacity responding to need, changes in program classification, and PIT measurement can influence these associations; the diagnostic does not separately identify those mechanisms. HIC measures PSH bed capacity, not placements or utilization. Historical geography retains the earlier provisional status.
+
+The driver imports the original pooled and split estimators without changing those files. It uses the same 1,999 whole-site bootstrap replicates and seed 20261022. Exact calendar joins exclude 2021 and prevent any annual difference from bridging the omitted year; no 2022 annual change is constructed. Two-year lags can span the gap when both annual changes are observed. All ten split projections match explicit dummy-variable least squares, and frequency-weighted bootstrap correlations match explicitly duplicated site histories. Source hashes and prior estimator hashes are checked before execution.
+
+Artifacts are under [psh-unsheltered](</home/matt/HHP-Output/site-boundary-history-audit/exploratory-without-sacramento/psh-unsheltered/>): `run_psh_check.py`, the provenance-bearing `exploratory_site_year_panel.parquet`, source lineage, `summary.json` and `lead_lag_correlations.csv` for pooled checks, `split_summary.json`, `split_correlations.csv`, `split_paired_changes.csv`, `psh_provenance.json`, and [the lead/lag chart](</home/matt/HHP-Output/site-boundary-history-audit/exploratory-without-sacramento/psh-unsheltered/psh_lead_lag_changes.png>). The initial attempt is preserved under `retained-attempts/`; its numerical calculation completed but its chart step failed, and the corrected driver was rerun. Existing shelter, total-PIT, and sheltered-PIT outputs remain intact.
