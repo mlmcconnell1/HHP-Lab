@@ -202,3 +202,22 @@ Both two-year directions also have intervals spanning zero in each group. Before
 Exact calendar joins preserve the earlier exclusion of 2021: no annual difference bridges the missing year, and no 2022 annual change is constructed. A two-year lag can span the omitted period when both annual changes are observed. Because sign selection makes the panels unbalanced, fixed effects use converged alternating projections rather than the balanced-panel demeaning shortcut. The 1,999 whole-site bootstrap draws (seed 20261022) refit fixed effects using site multiplicity weights. Every subgroup/lag projection was independently checked against explicit dummy-variable least squares, and weighted bootstrap correlations were checked against explicitly duplicated site samples. Sign counts and calendar matching pass assertions.
 
 Reproducible artifacts are in [split-bed-changes](</home/matt/HHP-Output/site-boundary-history-audit/exploratory-without-sacramento/split-bed-changes/>): `run_split_check.py`, `summary.json` (input/script hashes, methods, validation, all results), `correlations.csv`, and `paired_changes.csv`. Run the script from this repository with `uv run python`. The original panel, analysis, and geographic limitations remain unchanged.
+
+### Total homelessness follow-up — 2026-10-22
+
+The owner requested the same split using total homelessness (sheltered plus unsheltered). This changes only the PIT outcome to `pit_total`: shelter HIC remains ES+TH+SH, the same 60 sites and 2010–2024 window excluding 2021 apply, and bed-change selection remains 341 increases, 357 declines, and 22 excluded flat transitions. P2024 totals are summed once per frozen member using the existing lineage. Every selected source row and every one of the 840 site-year totals satisfies `pit_total = pit_sheltered + pit_unsheltered`; the newly aggregated unsheltered counts exactly reproduce the earlier panel.
+
+| Bed-change group | Timing | Pairs | Pearson r | 95% site-bootstrap interval |
+| --- | --- | ---: | ---: | ---: |
+| Increases | Beds precede PIT by one year | 267 | 0.023 | −0.137 to 0.194 |
+| Increases | Same year | 341 | 0.259 | 0.134 to 0.385 |
+| Increases | PIT precedes beds by one year | 265 | −0.013 | −0.169 to 0.164 |
+| Declines | Beds precede PIT by one year | 317 | −0.023 | −0.195 to 0.133 |
+| Declines | Same year | 357 | 0.152 | 0.022 to 0.276 |
+| Declines | PIT precedes beds by one year | 313 | −0.015 | −0.169 to 0.156 |
+
+Total homelessness shows a positive same-year association in both groups, with nominal 95% intervals excluding zero. All one- and two-year lead/lag intervals include zero. Increases-only and declines-only same-year coefficients before 2020 are 0.236 and 0.165; leaving out each site in turn gives full-period ranges 0.232–0.285 and 0.127–0.191. Within the declines subset, bed changes remain signed: the positive coefficient means more negative bed changes tend to accompany more negative (or less positive) total-PIT changes after adjustment, not that every bed decline coincides with declining homelessness.
+
+These are conditional correlations of annual log1p changes, not causal effects or formal tests of differences between outcomes or bed-change groups. Including sheltered people can create a closer same-year association with shelter capacity and occupancy; this check cannot distinguish that explanation from other mechanisms. Intervals are not adjusted for the multiple exploratory comparisons, and historical geography remains provisional.
+
+The follow-up imports the unchanged split-check estimator and uses identical calendar joins, within-subset fixed effects, 1,999 site-bootstrap draws, and seed. All ten fixed-effect projections again match dummy-variable least squares, and bootstrap weights match explicitly duplicated site samples. Artifacts in [total-pit-bed-changes](</home/matt/HHP-Output/site-boundary-history-audit/exploratory-without-sacramento/total-pit-bed-changes/>) include `run_total_check.py`, the provenance-bearing total-PIT panel, `total_pit_provenance.json` with source and script hashes, `summary.json`, `correlations.csv`, and `paired_changes.csv`. Earlier outputs are preserved.
