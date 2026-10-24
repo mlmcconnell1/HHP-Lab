@@ -1,4 +1,4 @@
-"""ACS1 gross rent or ZORI versus observed unsheltered PIT in the frozen study.
+"""ACS1 gross rent or ZORI versus observed PIT outcomes in the frozen study.
 
 Run with ``uv run python scripts/analyze_observed_site_rent_longitudinal.py --json``.
 Inputs and earlier results are read-only; a populated output directory is refused.
@@ -31,6 +31,12 @@ DEFAULT_PARENT = Path(
 DEFAULT_OUTPUT = Path("/home/matt/HHP-Output/site-rent-unsheltered-longitudinal/20261024/run-02")
 DEFAULT_ZORI_OUTPUT = Path(
     "/home/matt/HHP-Output/site-zori-unsheltered-longitudinal/20261024/run-02"
+)
+DEFAULT_TOTAL_OUTPUT = Path(
+    "/home/matt/HHP-Output/site-rent-total-pit-longitudinal/20261024/run-01"
+)
+DEFAULT_ZORI_TOTAL_OUTPUT = Path(
+    "/home/matt/HHP-Output/site-zori-total-pit-longitudinal/20261024/run-01"
 )
 ZORI_PATH = ROOT / "data/curated/zori/zori__county__Z2026.parquet"
 ZORI_RAW_PATH = ROOT / "data/raw/zori/zori__county__2026-03-04.csv"
@@ -85,6 +91,20 @@ def prepare_output(path: Path) -> None:
     if path.exists() and any(path.iterdir()):
         raise ValueError(f"Output directory is populated: {path}. Choose a fresh --output-dir.")
     path.mkdir(parents=True, exist_ok=True)
+
+
+def observed_outcome_rows(panel: pd.DataFrame, measure: str) -> pd.DataFrame:
+    """Total PIT needs both components observed, with an exact count identity."""
+    flag = HELPER.observed_column(measure)
+    eligible = panel[flag].fillna(False).astype(bool)
+    if measure == "pit_total":
+        eligible &= panel.unsheltered_observed.fillna(False).astype(bool)
+        eligible &= panel.sheltered_observed.fillna(False).astype(bool)
+        identity = panel.pit_total.eq(panel.pit_unsheltered + panel.pit_sheltered)
+        if (eligible & ~identity.fillna(False)).any():
+            raise ValueError(
+                "Observed total PIT differs from its components; inspect parent counts.")
+    return panel.loc[eligible].copy()
 
 
 def assemble_panel(base: pd.DataFrame, rents: pd.DataFrame) -> pd.DataFrame:
@@ -210,15 +230,15 @@ def read_inputs(parent_dir: Path, acs_dir: Path):
 
 def run_checks(
     panel: pd.DataFrame, *, replicates: int, rent_measure: str = RENT,
-    available_column: str = "acs_rent_available",
+    available_column: str = "acs_rent_available", outcome_measure: str = OUTCOME,
 ):
     rng = np.random.default_rng(SEED)
     results, pair_frames = [], []
-    observed = panel.loc[panel.unsheltered_observed.fillna(False)].copy()
+    observed = observed_outcome_rows(panel, outcome_measure)
     available = panel.loc[panel[available_column].fillna(False)].copy()
     for analysis, changes in [("annual_changes_fe", True), ("log_levels_fe", False)]:
         predictor = analysis_series(available, rent_measure, log1p=False, changes=changes)
-        outcome = analysis_series(observed, OUTCOME, log1p=True, changes=changes)
+        outcome = analysis_series(observed, outcome_measure, log1p=True, changes=changes)
         for lag in LAGS:
             all_pairs = paired_series(predictor, outcome, lag)
             for period in ("full", "pre2020"):
@@ -394,6 +414,9 @@ def run_zori(args: argparse.Namespace) -> None:
     """Compare ZORI on available support and both rent measures on identical pairs."""
     prepare_output(args.output_dir)
     acs_panel, inputs, inventory = read_inputs(args.parent_dir, args.acs_dir)
+    outcome_measure = f"pit_{args.pit_outcome}"
+    outcome_label = args.pit_outcome
+    observation_flag = HELPER.observed_column(outcome_measure)
     monthly = pd.read_parquet(ZORI_PATH)
     metadata = pq.read_schema(ZORI_PATH).metadata or {}
     zori_provenance = json.loads(metadata.get(
@@ -427,7 +450,8 @@ def run_zori(args: argparse.Namespace) -> None:
         "Fixed 2020 PEP population weights, 2023 MSA county membership, minimum coverage 90%.",
         "The population-weighted proxy differs from Zillow's independently estimated metro ZORI.",
         "Calendar-year average Y-1 aligns to January PIT Y; positive lag adds calendar years.",
-        "Primary: annual delta log(ZORI) versus delta log1p(unsheltered), lag 0, site/year FE.",
+        f"Primary: delta log(ZORI) versus delta log1p({outcome_label}), lag 0, site/year FE.",
+        "Total PIT requires both components observed and total = sheltered + unsheltered.",
         "Levels, additional lags and pre-2020 checks are secondary; no causal claim.",
         "Fully absorbed short-window comparisons are undefined, not zero, with no usable interval.",
         "The frozen 60-site / 77-CoC membership and four existing exclusions remain unchanged.",
@@ -440,10 +464,11 @@ def run_zori(args: argparse.Namespace) -> None:
         "Exploratory percentile intervals are unadjusted across 60 comparisons.",
         "Site and metro rent footprints differ; historical geography remains provisional.",
         "ZORI and ACS cover different rental populations; ACS survey error is not propagated.",
-        "No PSH adjustment in this rent-versus-unsheltered diagnostic.",
+        f"No PSH adjustment in this rent-versus-{outcome_label} diagnostic.",
     ]
     plan = {
         "membership_identity": HELPER.MEMBERSHIP_IDENTITY, "rent_source": "zori",
+        "pit_measure": outcome_measure, "pit_observation_flag": observation_flag,
         "notes": notes, "primary_test": "zori_available/annual_changes_fe/full/lag=0",
         "calendar_years": calendar_years, "lags": list(LAGS), "periods": ["full", "pre2020"],
         "samples": ["zori_available", "zori_common", "acs1_common"], "seed": SEED,
@@ -481,7 +506,7 @@ def run_zori(args: argparse.Namespace) -> None:
     panel["common_rent_available"] = panel.zori_available & panel.acs_rent_available
     provenance = ProvenanceBlock(
         geo_type="msa", definition_version="census_msa_2023", boundary_vintage="2024",
-        extra={"purpose": "Observed unsheltered PIT versus ZORI, with matched ACS comparison",
+        extra={"purpose": f"Observed {outcome_label} PIT versus ZORI, matched ACS comparison",
                "membership_identity": HELPER.MEMBERSHIP_IDENTITY, "inputs": inputs,
                "analysis_plan_sha256": HELPER.sha256(plan_path), "notes": notes},
     )
@@ -492,6 +517,7 @@ def run_zori(args: argparse.Namespace) -> None:
                                   provenance)
     county_year.to_csv(args.output_dir / "zori_county_year_inventory.csv", index=False)
     panel[["msa_id", "msa_name", "year", "acs_year", "unsheltered_observed",
+           "sheltered_observed", "total_observed",
            "acs_rent_available", "zori_available", "common_rent_available",
            "zori_coverage_ratio"]].to_csv(args.output_dir / "site_year_coverage.csv", index=False)
     (args.output_dir / "acs_source_inventory.json").write_text(
@@ -505,10 +531,10 @@ def run_zori(args: argparse.Namespace) -> None:
         print(f"Estimating {sample}", file=sys.stderr, flush=True)
         results, pairs = run_checks(
             panel, replicates=args.bootstrap_replicates, rent_measure=measure,
-            available_column=availability,
+            available_column=availability, outcome_measure=outcome_measure,
         )
-        all_results.append(results.assign(sample=sample))
-        all_pairs.append(pairs.assign(sample=sample))
+        all_results.append(results.assign(sample=sample, pit_measure=outcome_measure))
+        all_pairs.append(pairs.assign(sample=sample, pit_measure=outcome_measure))
     results = pd.concat(all_results, ignore_index=True)
     pairs = pd.concat(all_pairs, ignore_index=True)
     key = ["analysis", "period", "lag", "msa_id", "aligned_rent_year", "outcome_year"]
@@ -526,10 +552,10 @@ def run_zori(args: argparse.Namespace) -> None:
     ).to_csv(args.output_dir / "pair_counts.csv", index=False)
     plot_results(
         results.loc[results["sample"].eq("zori_available")], args.output_dir,
-        title="ZORI asking rents versus observed unsheltered PIT",
+        title=f"ZORI asking rents versus observed {outcome_label} PIT",
         period_label=f"{start_year + 1}–{end_year + 1}, excluding 2021",
         source_label="ZORI calendar mean", example="ZORI2015→2016 versus PIT2016→2017",
-        basename="zori_unsheltered_lead_lag",
+        basename=f"zori_{outcome_label}_lead_lag",
     )
     for path, digest in inputs.items():
         if HELPER.sha256(path) != digest:
@@ -539,6 +565,7 @@ def run_zori(args: argparse.Namespace) -> None:
         "pit_years": sorted(panel.year.unique().tolist()),
         "available_zori_site_years": int(panel.zori_available.sum()),
         "observed_unsheltered_site_years": int(panel.unsheltered_observed.sum()),
+        "observed_outcome_site_years": len(observed_outcome_rows(panel, outcome_measure)),
         "common_pairs_identical": True, "results": results.to_dict("records"),
         "artifact_sha256": {path.name: HELPER.sha256(path)
                             for path in sorted(args.output_dir.iterdir()) if path.is_file()},
@@ -559,6 +586,7 @@ def main() -> None:
     parser.add_argument("--parent-dir", type=Path, default=DEFAULT_PARENT)
     parser.add_argument("--acs-dir", type=Path, default=ROOT / "data/curated/acs")
     parser.add_argument("--rent-source", choices=("acs1", "zori"), default="acs1")
+    parser.add_argument("--pit-outcome", choices=("unsheltered", "total"), default="unsheltered")
     parser.add_argument("--output-dir", type=Path)
     parser.add_argument("--bootstrap-replicates", type=int, default=BOOTSTRAPS)
     parser.add_argument("--json", action="store_true")
@@ -567,14 +595,27 @@ def main() -> None:
     if args.bootstrap_replicates < 199:
         parser.error("Use at least 199 bootstrap replicates; the reviewed default is 1999.")
     if args.output_dir is None:
-        args.output_dir = DEFAULT_ZORI_OUTPUT if args.rent_source == "zori" else DEFAULT_OUTPUT
+        if args.pit_outcome == "total":
+            args.output_dir = (
+                DEFAULT_ZORI_TOTAL_OUTPUT if args.rent_source == "zori" else DEFAULT_TOTAL_OUTPUT
+            )
+        else:
+            args.output_dir = DEFAULT_ZORI_OUTPUT if args.rent_source == "zori" else DEFAULT_OUTPUT
     if args.rent_source == "zori":
         run_zori(args)
         return
     prepare_output(args.output_dir)
     panel, inputs, inventory = read_inputs(args.parent_dir, args.acs_dir)
+    outcome_measure = f"pit_{args.pit_outcome}"
+    observation_flag = HELPER.observed_column(outcome_measure)
+    notes = list(NOTES)
+    if args.pit_outcome == "total":
+        notes = [note.replace("unsheltered", "total") for note in notes]
+        notes.append(
+            "Total PIT needs both components observed and total = sheltered + unsheltered.")
     plan = {
-        "membership_identity": HELPER.MEMBERSHIP_IDENTITY, "notes": NOTES,
+        "membership_identity": HELPER.MEMBERSHIP_IDENTITY, "notes": notes,
+        "pit_measure": outcome_measure, "pit_observation_flag": observation_flag,
         "primary_test": "annual_changes_fe/full/lag=0", "lags": list(LAGS),
         "periods": ["full", "pre2020"], "seed": SEED,
         "bootstrap_replicates": args.bootstrap_replicates, "inputs": inputs,
@@ -587,20 +628,27 @@ def main() -> None:
     shutil.copyfile(HELPER_PATH, args.output_dir / "estimator_script.py")
     provenance = ProvenanceBlock(
         geo_type="msa", definition_version="census_msa_2023", boundary_vintage="2024",
-        extra={"purpose": "Observed unsheltered PIT versus native metro ACS1 gross rent",
+        extra={"purpose": f"Observed {args.pit_outcome} PIT versus native metro ACS1 gross rent",
                "membership_identity": HELPER.MEMBERSHIP_IDENTITY,
                "inputs": inputs, "analysis_plan_sha256": HELPER.sha256(plan_path),
-               "notes": NOTES},
+               "notes": notes},
     )
     write_parquet_with_provenance(panel[PANEL_COLUMNS], args.output_dir / "site_year_panel.parquet",
                                   provenance)
     coverage = panel[["msa_id", "msa_name", "year", "acs_year", "unsheltered_observed",
+                      "sheltered_observed", "total_observed",
                       "acs_rent_available", "acs_cbsa_code"]].copy()
-    coverage["eligible_level_pair"] = coverage.unsheltered_observed & coverage.acs_rent_available
+    coverage["eligible_level_pair"] = (
+        coverage[observation_flag] & coverage.acs_rent_available
+    )
     coverage.to_csv(args.output_dir / "site_year_coverage.csv", index=False)
     (args.output_dir / "acs_source_inventory.json").write_text(
         json.dumps(inventory, indent=2, allow_nan=False) + "\n")
-    results, pairs = run_checks(panel, replicates=args.bootstrap_replicates)
+    results, pairs = run_checks(
+        panel, replicates=args.bootstrap_replicates, outcome_measure=outcome_measure,
+    )
+    results["pit_measure"] = outcome_measure
+    pairs["pit_measure"] = outcome_measure
     if not results.bootstrap_interval_defined.all():
         raise AssertionError("Some intervals have too few defined bootstrap draws; inspect output.")
     if not results.bootstrap_frequency_matches_duplicated_sample.all():
@@ -611,7 +659,11 @@ def main() -> None:
         n_pairs=("msa_id", "size"), n_sites=("msa_id", "nunique"),
     )
     counts.to_csv(args.output_dir / "pair_counts.csv", index=False)
-    plot_results(results, args.output_dir)
+    plot_results(
+        results, args.output_dir,
+        title=f"ACS 1-year gross rent (including utilities) versus {args.pit_outcome} PIT",
+        basename=f"rent_{args.pit_outcome}_lead_lag",
+    )
     for path, digest in inputs.items():
         if HELPER.sha256(path) != digest:
             raise AssertionError(f"Input changed during analysis: {path}")
@@ -622,6 +674,7 @@ def main() -> None:
     summary = {
         **plan, "frozen_sites": panel.msa_id.nunique(), "reported_site_years": len(panel),
         "observed_unsheltered_site_years": int(panel.unsheltered_observed.sum()),
+        "observed_outcome_site_years": len(observed_outcome_rows(panel, outcome_measure)),
         "available_rent_site_years": int(panel.acs_rent_available.sum()),
         "eligible_level_site_years": int(coverage.eligible_level_pair.sum()),
         "missing_rent_site_years": coverage.loc[~coverage.acs_rent_available].to_dict("records"),

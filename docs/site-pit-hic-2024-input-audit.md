@@ -465,3 +465,41 @@ A separate review reproduced **7,946 county-month values directly from the raw C
 The [existing rent driver](../scripts/analyze_observed_site_rent_longitudinal.py) now accepts `--rent-source zori`; use a fresh `--output-dir`, `--json`, and `--non-interactive`. [Reviewed run-02 artifacts](</home/matt/HHP-Output/site-zori-unsheltered-longitudinal/20261024/run-02/>) include the plan, source/coverage inventories, provenance-bearing site and regional panels, all results and pairs, driver/estimator/rollup snapshots, manifest, and independent review. The interrupted first execution is retained separately; it exposed the need to report fully absorbed short-window comparisons explicitly.
 
 The [reviewed graph](</home/matt/HHP-Output/site-zori-unsheltered-longitudinal/20261024/run-02/graphs/reviewed/zori_unsheltered_lead_lag.png>) ([SVG](</home/matt/HHP-Output/site-zori-unsheltered-longitudinal/20261024/run-02/graphs/reviewed/zori_unsheltered_lead_lag.svg>)) was rendered from the saved estimates. Its plot manifest pins the numerical result, analysis manifest, current plot-script snapshot, and image hashes. A heading-only variable-shadowing fix was applied after estimation; the independent review confirms the statistical code's syntax tree is unchanged. Earlier figures and all prior ACS, shelter, and PSH results are retained.
+
+### ZORI versus total homelessness — 2026-10-24
+
+The total-PIT rerun changes the outcome to **sheltered plus unsheltered homelessness**, retaining the ZORI construction, original site universe, 2016–2024 PIT period excluding 2021, timing alignment, site/year effects, lags, and bootstrap method above. Boston (MSA 14460 / MA-500) and New York City (MSA 35620 / NY-600) remain absent; they were already outside the selected 99% universe, so their explicit exclusion removes no observations.
+
+Total PIT is eligible only when its total, sheltered, and unsheltered observation flags are all true, and the reported total equals the sum of the components. Annual differences require eligibility at both exact calendar endpoints. All 480 study rows satisfy the reported count identity, and total and unsheltered eligibility agree here. The panels, ZORI rollups, rent values, site/year pair keys, and sample sizes therefore match the previous unsheltered analysis exactly. Only the outcome changes; **log(1+total)** is calculated from summed headcounts, not from a sum of component logs.
+
+Annual-change results on all qualifying ZORI observations, with nominal 95% whole-site bootstrap intervals:
+
+| Lag | Pairs / sites | Total-PIT r [95% interval] | Previous unsheltered r [95% interval] |
+| --- | ---: | --- | --- |
+| −2 | 70 / 38 | 0.194 [−0.212, 0.559] | −0.064 [−0.446, 0.297] |
+| −1 | 149 / 48 | 0.230 [0.032, 0.416] | 0.152 [−0.098, 0.384] |
+| 0 — primary | 218 / 48 | **0.213 [−0.020, 0.410]** | 0.100 [−0.122, 0.332] |
+| +1 | 137 / 42 | **0.042 [−0.154, 0.200]** | 0.189 [0.046, 0.316] |
+| +2 | 63 / 34 | −0.225 [−0.593, 0.199] | −0.021 [−0.311, 0.275] |
+
+Positive lag retains the preceding-year rent alignment: lag 0 pairs ZORI2015→2016 with PIT2016→2017, and lag +1 pairs that rent change with PIT2017→2018. The primary total-PIT point estimate is more positive than its unsheltered counterpart, but its interval includes zero. The earlier one-year-leading unsheltered association does not appear in the total-PIT estimate. This is a descriptive comparison of point estimates and intervals, not a formal test that the outcome correlations differ. Log changes also prevent interpreting the difference as a headcount flow between sheltered and unsheltered states.
+
+The positive annual reverse-timing estimate at lag −1 means the results do not identify a unique direction of response. The two-year-forward annual comparison contains only two outcome years, with a wide interval. Pre-2020 annual estimates are also uncertain: lag 0 is **0.070 [−0.205, 0.304]** on 96 pairs across 38 sites, and lag +1 is **0.415 [−0.061, 0.703]** on 61 pairs across 31 sites. Extreme pre-2020 annual lags remain fully absorbed by fixed effects and are undefined rather than zero.
+
+Adjusted log-level models show modest positive associations at some forward timings:
+
+| Lag | Pairs / sites | Total-PIT r [95% interval] |
+| --- | ---: | --- |
+| 0 | 338 / 55 | 0.182 [−0.014, 0.355] |
+| +1 | 246 / 53 | **0.229 [0.021, 0.424]** |
+| +2 | 202 / 49 | **0.199 [0.007, 0.368]** |
+
+Pre-2020 levels at lag 0 and +1 also have nominal intervals above zero; lag +2 does not. Level associations may retain regional trends that differencing removes. These secondary comparisons do not establish a causal effect or a stable delay, and their intervals are unadjusted across the expanded exploratory series.
+
+The matched ACS comparison remains inconclusive. On identical primary observations (213 pairs / 47 sites), total-PIT r is **0.211 [−0.030, 0.406]** for ZORI and **−0.028 [−0.176, 0.135]** for ACS1 gross rent. At lag +1 (134 pairs / 41 sites), the estimates are **0.040 [−0.147, 0.208]** and **−0.009 [−0.249, 0.191]**, respectively. Differences between the rent measures were not formally tested.
+
+**Interpretation:** total homelessness shows some positive association with ZORI in level models and a positive but uncertain primary annual estimate. It does not reproduce the one-year-forward annual signal found for unsheltered homelessness. The mix of forward, reverse, and specification-dependent results warrants caution about assigning a particular response time or mechanism. No PSH adjustment is included.
+
+The [rent driver](../scripts/analyze_observed_site_rent_longitudinal.py) now supports `--pit-outcome total`, including an explicit component-observation and count-identity guard. Reproduce with `--rent-source zori --pit-outcome total --json --non-interactive --output-dir <fresh-directory>`. It uses the same 1,999 whole-site bootstrap replicates and seed 20261024. All 54 estimable rows have 1,999 defined draws and no solver, degeneracy, or bootstrap-validation failures; six short-window sensitivity rows remain undefined. The relevant estimator, rent, and metro-ZORI tests pass: **93 tests passed**, with Ruff clean and curated-layout validation passing.
+
+[Reviewed artifacts](</home/matt/HHP-Output/site-zori-total-pit-longitudinal/20261024/run-01/>) include the plan, panel with provenance, all results and pairs, source/coverage inventories, script snapshots, manifest, `total_vs_unsheltered_comparison.csv`, and `independent_review.json`. The independent review reconstructs outcomes directly from the parent sheltered and unsheltered components, checks every transformed endpoint and fixed-effect point estimate, verifies identical pairing and rent values against the prior analysis, and pins input/output hashes. The [graph](</home/matt/HHP-Output/site-zori-total-pit-longitudinal/20261024/run-01/zori_total_lead_lag.png>) ([SVG](</home/matt/HHP-Output/site-zori-total-pit-longitudinal/20261024/run-01/zori_total_lead_lag.svg>)) shows annual changes, adjusted levels, intervals, and full-period sample counts; it was visually reviewed.

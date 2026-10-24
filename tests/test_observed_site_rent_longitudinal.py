@@ -56,6 +56,17 @@ SHORT_STUDY_ROWS = [
      "zori_available": True, "unsheltered_observed": True}
     for site in range(5) for t, year in enumerate(SHORT_STUDY_YEARS)
 ]
+TOTAL_FLAG_CASES = [
+    (True, True, True, True),
+    (False, True, True, False),
+    (True, False, True, False),
+    (True, True, False, False),
+    (None, True, True, False),
+    (True, None, True, False),
+]
+OBSERVED_UNSHELTERED_COUNT = 3
+OBSERVED_SHELTERED_COUNT = 7
+OBSERVED_TOTAL_COUNT = OBSERVED_UNSHELTERED_COUNT + OBSERVED_SHELTERED_COUNT
 
 
 @pytest.fixture
@@ -238,3 +249,69 @@ def test_short_pre2020_extreme_lags_are_undefined_instead_of_roundoff_correlatio
     assert not extreme.bootstrap_interval_defined.any()
     assert extreme.undefined_reason.str.contains("No residual variation").all()
     assert not pairs.empty
+
+
+@pytest.mark.parametrize(
+    ("unsheltered", "sheltered", "total", "eligible"), TOTAL_FLAG_CASES,
+    ids=["all-observed", "unsheltered-carried", "sheltered-unobserved",
+         "total-unobserved", "unsheltered-unknown", "sheltered-unknown"],
+)
+def test_total_outcome_requires_both_components_observed(unsheltered, sheltered, total, eligible):
+    panel = pd.DataFrame({
+        "msa_id": ["site"], "year": [2016],
+        "pit_unsheltered": [OBSERVED_UNSHELTERED_COUNT],
+        "pit_sheltered": [OBSERVED_SHELTERED_COUNT], "pit_total": [OBSERVED_TOTAL_COUNT],
+        "unsheltered_observed": pd.Series([unsheltered], dtype="boolean"),
+        "sheltered_observed": pd.Series([sheltered], dtype="boolean"),
+        "total_observed": pd.Series([total], dtype="boolean"),
+    })
+
+    selected = ANALYSIS.observed_outcome_rows(panel, "pit_total")
+
+    assert len(selected) == int(eligible)
+    pd.testing.assert_series_equal(
+        panel.pit_total, pd.Series([OBSERVED_TOTAL_COUNT], name="pit_total"))
+
+
+def test_observed_total_arithmetic_mismatch_fails_closed():
+    panel = pd.DataFrame({
+        "pit_unsheltered": [OBSERVED_UNSHELTERED_COUNT],
+        "pit_sheltered": [OBSERVED_SHELTERED_COUNT], "pit_total": [OBSERVED_TOTAL_COUNT + 1],
+        "unsheltered_observed": [True], "sheltered_observed": [True], "total_observed": [True],
+    })
+
+    with pytest.raises(ValueError, match="differs from its components"):
+        ANALYSIS.observed_outcome_rows(panel, "pit_total")
+
+
+@pytest.fixture(scope="module")
+def total_diagnostic():
+    panel = pd.DataFrame(SHORT_STUDY_ROWS)
+    panel["pit_sheltered"] = 100 + 2 * panel.msa_id.astype(int) + (panel.year - 2016) ** 2
+    panel["pit_total"] = panel.pit_unsheltered + panel.pit_sheltered
+    panel["sheltered_observed"] = True
+    panel["total_observed"] = True
+    results, pairs = ANALYSIS.run_checks(
+        panel, replicates=19, rent_measure="zori", available_column="zori_available",
+        outcome_measure="pit_total",
+    )
+    return panel, results, pairs
+
+
+@pytest.mark.parametrize("analysis", ["annual_changes_fe", "log_levels_fe"])
+def test_total_diagnostic_uses_total_counts_and_transforms(total_diagnostic, analysis):
+    panel, results, pairs = total_diagnostic
+    selected = pairs.loc[pairs.analysis.eq(analysis)].copy()
+    counts = panel[["msa_id", "year", "pit_total"]].rename(columns={"year": "outcome_year"})
+    selected = selected.merge(counts, on=["msa_id", "outcome_year"], validate="many_to_one")
+
+    np.testing.assert_allclose(selected.pit_current_raw, selected.pit_total)
+    expected = np.log1p(selected.pit_total)
+    if analysis == "annual_changes_fe":
+        previous = counts.rename(columns={"pit_total": "previous_total"}).copy()
+        previous.outcome_year += 1
+        selected = selected.merge(previous, on=["msa_id", "outcome_year"], validate="many_to_one")
+        np.testing.assert_allclose(selected.pit_previous_raw, selected.previous_total)
+        expected = np.log1p(selected.pit_total) - np.log1p(selected.previous_total)
+    np.testing.assert_allclose(selected.pit_value, expected)
+    assert results.loc[results.primary, "point_estimate_defined"].all()
