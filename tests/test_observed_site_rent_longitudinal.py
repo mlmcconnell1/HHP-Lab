@@ -3,6 +3,12 @@
 Fixture truth table: PIT2010 matches ACS2009; PIT2011 has no matching ACS2010;
 PIT2012 matches ACS2011 even though its PIT observation is ineligible. Missing
 rent never drops a frozen row, and rent predictors do not require observed PIT.
+
+ZORI truth table: county 01005 has only 11 months in 2015, so regions requiring
+it have no valid 2015 value but can enter in 2016. County 01007 has no source
+observations in any year and is outside fixed support. Coverage uses all member
+weights. A 90% covered site passes; incomplete region-years fail. Every usable
+regional value contains the same counties with the same relative weights.
 """
 
 import importlib.util
@@ -22,6 +28,46 @@ SPEC.loader.exec_module(ANALYSIS)
 BASE_YEARS = [2010, 2011, 2012]
 ACS_YEARS = [2009, 2011]
 ACS_RENTS = [700, 900]
+ZORI_YEARS = [2015, 2016]
+ZORI_FIXTURE_RENTS = {
+    ("01001", 2015): 1000., ("01001", 2016): 1100.,
+    ("01003", 2015): 2000., ("01003", 2016): 2200.,
+    ("01005", 2015): 5000., ("01005", 2016): 5500.,
+}
+ZORI_MONTHLY_ROWS = [
+    {"geo_id": county, "date": f"{year}-{month:02d}-01", "zori": rent}
+    for (county, year), rent in ZORI_FIXTURE_RENTS.items()
+    for month in range(1, 13)
+    if not (county == "01005" and year == 2015 and month == 1)
+]
+ZORI_COUNTY_WEIGHTS = {"01001": 90., "01003": 10., "01005": 90., "01007": 10.}
+ZORI_MEMBERS = [
+    ("single", "01001"),
+    ("two", "01001"), ("two", "01003"),
+    ("low", "01003"), ("low", "01005"),
+    ("edge", "01001"), ("edge", "01007"),
+    ("none", "01005"),
+]
+SHORT_STUDY_YEARS = [2016, 2017, 2018, 2019, 2020, 2022, 2023, 2024]
+SHORT_STUDY_ROWS = [
+    {"msa_id": str(site), "year": year,
+     "zori": 1000 * (1 + .11 * site + .03 * t + .01 * site * t + .002 * t * t * site),
+     "pit_unsheltered": 10 + 7 * site + 2 * t + site * t * t,
+     "zori_available": True, "unsheltered_observed": True}
+    for site in range(5) for t, year in enumerate(SHORT_STUDY_YEARS)
+]
+
+
+@pytest.fixture
+def zori_inputs():
+    monthly = pd.DataFrame(ZORI_MONTHLY_ROWS)
+    population = pd.DataFrame({
+        "county_fips": list(ZORI_COUNTY_WEIGHTS),
+        "population": list(ZORI_COUNTY_WEIGHTS.values()),
+        "year": ANALYSIS.ZORI_WEIGHT_YEAR,
+    })
+    membership = pd.DataFrame(ZORI_MEMBERS, columns=["msa_id", "county_fips"])
+    return monthly, population, membership
 
 
 @pytest.mark.parametrize("rent_dtype", ["float64", "Int64"])
@@ -129,3 +175,66 @@ def test_populated_output_refused_without_changing_existing_file(tmp_path):
         ANALYSIS.prepare_output(tmp_path)
 
     assert original.read_text() == "retain original"
+
+
+@pytest.mark.parametrize(
+    ("year", "msa", "expected_coverage", "expected_counties", "eligible"),
+    [(2015, "single", 1., 1, True), (2016, "single", 1., 1, True),
+     (2015, "two", 1., 2, True), (2016, "two", 1., 2, True),
+     (2015, "edge", .9, 1, True), (2016, "edge", .9, 1, True),
+     (2015, "low", .1, 1, False), (2016, "low", 1., 2, True),
+     (2015, "none", 0., 0, False), (2016, "none", 1., 1, True)],
+)
+def test_zori_fixed_support_coverage_and_weighted_means(
+    zori_inputs, year, msa, expected_coverage, expected_counties, eligible,
+):
+    rolled, inventory = ANALYSIS.build_zori_annual(*zori_inputs, ZORI_YEARS)
+    actual = rolled.loc[rolled.msa_id.eq(msa) & rolled.year.eq(year)].iloc[0]
+
+    assert actual.coverage_ratio == pytest.approx(expected_coverage)
+    assert actual.county_count == expected_counties
+    assert pd.notna(actual.zori_coc) == eligible
+    if eligible:
+        member_ids = {county for metro, county in ZORI_MEMBERS if metro == msa}
+        supported = {county for county, _ in ZORI_FIXTURE_RENTS}
+        eligible_counties = member_ids & supported
+        expected = sum(
+            ZORI_FIXTURE_RENTS[(county, year)] * ZORI_COUNTY_WEIGHTS[county]
+            for county in eligible_counties
+        ) / sum(ZORI_COUNTY_WEIGHTS[county] for county in eligible_counties)
+        assert actual.zori_coc == pytest.approx(expected)
+    incomplete = inventory.loc[inventory.county_fips.eq("01005")]
+    assert incomplete.month_count.tolist() == [11, 12]
+    assert incomplete.fixed_support_member.tolist() == [True, True]
+
+
+@pytest.mark.parametrize("problem", ["duplicate-month", "missing-weight", "invalid-weight"])
+def test_zori_bad_source_or_unknown_denominator_fails_closed(zori_inputs, problem):
+    monthly, population, membership = zori_inputs
+    if problem == "duplicate-month":
+        monthly = pd.concat([monthly, monthly.iloc[[0]]], ignore_index=True)
+    elif problem == "missing-weight":
+        population = population.loc[population.county_fips.ne("01007")].copy()
+    else:
+        population.loc[population.county_fips.eq("01001"), "population"] = 0
+
+    with pytest.raises(ValueError, match="Duplicate|Missing or invalid"):
+        ANALYSIS.build_zori_annual(monthly, population, membership, ZORI_YEARS)
+
+
+def test_short_pre2020_extreme_lags_are_undefined_instead_of_roundoff_correlations():
+    results, pairs = ANALYSIS.run_checks(
+        pd.DataFrame(SHORT_STUDY_ROWS), replicates=19,
+        rent_measure="zori", available_column="zori_available",
+    )
+    extreme = results.loc[
+        results.analysis.eq("annual_changes_fe") & results.period.eq("pre2020")
+        & results.lag.abs().eq(2)
+    ]
+
+    assert len(extreme) == 2
+    assert not extreme.point_estimate_defined.any()
+    assert extreme.pearson_r.isna().all()
+    assert not extreme.bootstrap_interval_defined.any()
+    assert extreme.undefined_reason.str.contains("No residual variation").all()
+    assert not pairs.empty

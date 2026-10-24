@@ -420,3 +420,48 @@ The [driver](../scripts/analyze_observed_site_rent_longitudinal.py) reuses the r
 The reviewed artifacts are in [run-02](</home/matt/HHP-Output/site-rent-unsheltered-longitudinal/20261024/run-02/>): `analysis_plan.json`, `site_year_panel.parquet` with embedded provenance, `longitudinal_results.csv`, `paired_observations.csv`, `pair_counts.csv`, coverage and ACS-source inventories, exact driver/estimator snapshots, `manifest.json`, and `independent_review.json`. The preliminary `run-01` remains intact; a nullable missing-rent flag in its coverage diagnostics was corrected to explicit false in run-02, with all numerical estimates and intervals unchanged.
 
 The [lead/lag graph](</home/matt/HHP-Output/site-rent-unsheltered-longitudinal/20261024/run-02/rent_unsheltered_lead_lag.png>) ([SVG](</home/matt/HHP-Output/site-rent-unsheltered-longitudinal/20261024/run-02/rent_unsheltered_lead_lag.svg>)) shows annual changes and adjusted levels, their intervals, and full-period sample counts. It was rendered directly from the saved results and visually reviewed. Existing shelter and PSH artifacts remain intact.
+
+### ZORI versus observed unsheltered PIT, with matched ACS comparisons — 2026-10-24
+
+The ZORI diagnostic uses **Zillow Economic Research's county All Homes smoothed monthly asking-rent series**, from the cached March 4, 2026 release. The original CSV's SHA-256 matches both the curated county rows and their source provenance. The analysis does not use the cached MSA ZORI artifacts: the retained 2015–2026 balanced artifact contains no usable values and lacks complete input references; bead **coclab-w1hvx** tracks its audit.
+
+For timing comparable to ACS, a calendar-year ZORI mean in **Y−1** is aligned with January PIT in **Y**. The overlap therefore covers **2015–2023 rent data and 2016–2024 PIT**, excluding 2021. Annual changes begin in 2017. At lag 0, ZORI2015→2016 pairs with PIT2016→2017; at lag +1, that same rent growth pairs with PIT2017→2018. Positive lag is an additional delay beyond the preceding-calendar-year alignment. This is not a comparison of January ZORI with January PIT.
+
+Each county/calendar year needs **12 distinct finite, positive monthly values**. A fixed county support is selected for each MSA: member counties having at least one complete year within the requested period. Every usable regional year must contain **all** counties in that support. Incomplete region-years remain missing, so county entry or exit cannot masquerade as a rent change. Relative weights are fixed to **2020 county population from PEP vintage 2020**, using 2023 MSA county membership. The core package's annual ZORI aggregator supplies the population-weighted mean and coverage diagnostics; an additional complete-support guard enforces constant composition. At least 90% of full-MSA population must be covered, following the package's default ZORI coverage threshold. Actual coverage of usable study site-years is at least **99.42%**.
+
+This produces a regional proxy from county ZORI, rather than Zillow's independently estimated native metro index. It is also a different concept from ACS gross rent including utilities. The frozen **60-site/77-CoC membership** is retained; 57 sites have at least one usable ZORI year. Bend, El Centro, and Lynchburg have no qualifying regional years under these measurement rules. They remain in the universe and coverage inventory. The prior Bridgeport, Salem, York, and Sacramento exclusions remain in force. Of 480 study site-years, **379** have usable ZORI and **338** also have an eligible observed unsheltered count. The primary annual comparison contains **218 pairs across 48 represented sites**.
+
+The analysis plan records a primary **lag-0 Δlog(ZORI) versus Δlog(1+unsheltered PIT)** correlation with site and outcome-year effects. Secondary checks cover lags −2 through +2, adjusted log levels, and pre-2020 restrictions. Rent predictors do not require observed PIT at their own aligned year. Exact adjacent endpoints are required for every annual change, with no gap bridging or imputation.
+
+ZORI annual-change results on all available qualifying observations, with nominal 95% whole-site bootstrap intervals:
+
+| Lag | Full-period pairs / sites | Full-period r [95% interval] | Pre-2020 r [95% interval] |
+| --- | ---: | --- | --- |
+| −2 | 70 / 38 | −0.064 [−0.446, 0.297] | Undefined after fixed effects |
+| −1 | 149 / 48 | 0.152 [−0.098, 0.384] | −0.113 [−0.378, 0.131] |
+| 0 — primary | 218 / 48 | **0.100 [−0.122, 0.332]** | −0.039 [−0.306, 0.236] |
+| +1 | 137 / 42 | **0.189 [0.046, 0.316]** | 0.212 [−0.064, 0.425] |
+| +2 | 63 / 34 | −0.021 [−0.311, 0.275] | Undefined after fixed effects |
+
+The one-year-leading point estimate remains positive when any single represented site is omitted: **0.153 to 0.210**. Its pre-2020 point estimate is similar, but the interval is wider and includes zero; that sensitivity has only 61 pairs across 31 represented sites. The primary pre-2020 comparison has 96 pairs across 38 sites. For the extreme pre-2020 annual lags, every site has at most one matched observation, so site effects absorb all variation. Those correlations and intervals are **undefined**, not zero. The graph omits their sensitivity markers.
+
+Adjusted log-level results for ZORI are also inconclusive: all full-period and pre-2020 level intervals include zero. At lag 0, full-period r is **0.122 [−0.040, 0.279]**, and at lag +1 it is **0.136 [−0.054, 0.314]**. The full grid and lag-specific sample counts are saved in the numerical artifacts.
+
+To separate source changes from sample changes, ZORI and ACS1 gross rent are additionally estimated on **identical site/year pairs at each lag**, requiring both measures at every predictor endpoint before fitting effects:
+
+| Timing | Common pairs / sites | ZORI r [95% interval] | ACS1 gross rent r [95% interval] |
+| --- | ---: | --- | --- |
+| Lag 0 annual changes | 213 / 47 | 0.101 [−0.135, 0.331] | 0.100 [−0.057, 0.274] |
+| Lag +1 annual changes | 134 / 41 | **0.194 [0.050, 0.326]** | 0.015 [−0.219, 0.260] |
+
+The one-year signal is therefore present in ZORI on the common sample and is much weaker in ACS at that timing. This does **not** establish that the two correlations differ statistically; their difference was not formally tested. Nor is the common-sample result an independent replication of the available-sample result: the observations largely overlap.
+
+**Interpretation:** there is a modest positive, one-year-leading association worth following up: increases in market asking rents precede increases in unsheltered PIT in this specification. Same-year and two-year annual comparisons remain inconclusive, and the level specifications do not provide clear corroboration. The one-year result is a secondary, unadjusted comparison within a 60-row exploratory grid, with 54 estimable rows. It does not establish a causal rent effect or a reliably identified delay. The shorter period, missing monthly ZORI coverage, observation eligibility, and smaller samples limit precision. These results support retaining rent pressure as a candidate control when revisiting PSH; no PSH-adjusted estimate has been run here.
+
+Each estimable result uses **1,999 whole-site bootstrap draws**, seed 20261024, refitting effects each time. All 54 estimable rows have 1,999 defined draws and no solver, degeneracy, or bootstrap-validation failures. The six fully absorbed sensitivity rows have no defined interval. Direct dummy-variable least squares and explicitly duplicated-site bootstrap checks agree with the estimator.
+
+A separate review reproduced **7,946 county-month values directly from the raw CSV**, checked all 540 regional calendar-year rows against direct fixed-population weighted sums, and reconstructed every paired endpoint independently of the driver. It reproduced the 54 point estimates within **2.5 × 10⁻¹⁴**, verified the six undefined cases, confirmed that common-sample keys match exactly, checked all original input/output hashes, and confirmed PIT values and observation flags match the reviewed parent panel. Timing, coverage, fixed-composition, invalid-weight, and short-window degeneracy checks pass with the existing estimator and metro-ZORI tests: **84 tests passed**, with Ruff clean.
+
+The [existing rent driver](../scripts/analyze_observed_site_rent_longitudinal.py) now accepts `--rent-source zori`; use a fresh `--output-dir`, `--json`, and `--non-interactive`. [Reviewed run-02 artifacts](</home/matt/HHP-Output/site-zori-unsheltered-longitudinal/20261024/run-02/>) include the plan, source/coverage inventories, provenance-bearing site and regional panels, all results and pairs, driver/estimator/rollup snapshots, manifest, and independent review. The interrupted first execution is retained separately; it exposed the need to report fully absorbed short-window comparisons explicitly.
+
+The [reviewed graph](</home/matt/HHP-Output/site-zori-unsheltered-longitudinal/20261024/run-02/graphs/reviewed/zori_unsheltered_lead_lag.png>) ([SVG](</home/matt/HHP-Output/site-zori-unsheltered-longitudinal/20261024/run-02/graphs/reviewed/zori_unsheltered_lead_lag.svg>)) was rendered from the saved estimates. Its plot manifest pins the numerical result, analysis manifest, current plot-script snapshot, and image hashes. A heading-only variable-shadowing fix was applied after estimation; the independent review confirms the statistical code's syntax tree is unchanged. Earlier figures and all prior ACS, shelter, and PSH results are retained.
