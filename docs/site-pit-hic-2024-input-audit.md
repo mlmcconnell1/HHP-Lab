@@ -378,3 +378,45 @@ The graphs have also been regenerated from these reviewed observed-count results
 - [Shelter-bed increases and declines versus unsheltered, total and sheltered PIT](</home/matt/HHP-Output/site-boundary-history-audit/exploratory-without-sacramento/observed-counts/final-attempt-02/graphs/reviewed/shelter_lead_lag_changes.png>) ([SVG](</home/matt/HHP-Output/site-boundary-history-audit/exploratory-without-sacramento/observed-counts/final-attempt-02/graphs/reviewed/shelter_lead_lag_changes.svg>)).
 
 The [plotting driver](../scripts/plot_observed_site_pit_hic_longitudinal.py) validates the saved estimates against the reviewed analysis manifest and renders the 60 adjusted comparisons. Raw-level comparisons remain in the numerical results table. Use `--results-dir` and a fresh `--output-dir` with `--json` to regenerate figures. The graph directory contains a script snapshot, `plotted_estimates.csv` and `plot_manifest.json` recording source and output hashes. No statistical estimates were recalculated.
+
+### ACS1 gross rent versus observed unsheltered PIT — 2026-10-24
+
+The requested rent-only diagnostic retains the frozen **60-site/77-CoC universe**, 2010–2024 excluding 2021, and the reviewed source-observation flags. It uses **ACS 1-year median gross rent, B25064_001E**, including utilities, from the existing native-CBSA curated files. No PSH adjustment is performed in this check.
+
+ACS vintage **Y−1** is assigned to January PIT year **Y**. Thus the 2010 panel baseline uses ACS2009, and the first annual comparison pairs ACS2009→2010 rent growth with January2010→January2011 unsheltered growth. Annual changes begin in 2011 because 2010 is the PIT baseline. Positive lag k means the aligned rent observation/change precedes PIT by k additional calendar years. For example, lag +2 pairs ACS2009→2010 rent growth with PIT2012→2013 growth. Reverse lags are diagnostic, not prospective rent controls.
+
+The primary comparison is **Δlog(gross rent) versus Δlog(1+unsheltered PIT), lag 0**, after site and outcome-year effects. Secondary checks cover lags −2 through +2, log rent versus log(1+PIT) levels with the same effects, and a pre-2020 restriction requiring both aligned rent and PIT endpoints before 2020. The analysis plan was saved before estimation. No raw cross-sectional correlation or sign-restricted grid was added.
+
+All 840 reported PIT site-years and their flags remain unchanged. Rent is available for **814 site-years**, with **691** also having an eligible unsheltered observation. There are 54 matched rent sites at the 2010 baseline and 60 by 2024; 54 sites have rent matches in every included year. The primary annual comparison contains **492 pairs across 54 represented sites**, versus 508 PIT-only annual changes before matching rent coverage. A site represented by only one usable observation contributes no independent within-site variation after its fixed effect.
+
+Missing rent matches remain explicitly unavailable; no aliases are guessed, no median is apportioned or summed, and no source value is interpolated. Existing omissions affect Crestview, Kiryas Joel–Poughkeepsie–Newburgh, Los Angeles, North Port, Santa Maria–Santa Barbara, and Urban Honolulu in some early vintages. Kiryas Joel has a match only for ACS2023. Bead **coclab-p37ps** tracks the source-geography and historical-ID audit. A curated file's target definition label does not establish that its historical CBSA footprint has been harmonized. Native metro rent remains a proxy for the whole-CoC site, and geography retains its provisional status.
+
+Annual-change correlations, with nominal 95% whole-site bootstrap intervals:
+
+| Lag | Full-period pairs / sites | Full-period r [95% interval] | Pre-2020 pairs / sites | Pre-2020 r [95% interval] |
+| --- | ---: | --- | ---: | --- |
+| −2 | 298 / 52 | −0.102 [−0.235, 0.031] | 250 / 50 | −0.072 [−0.232, 0.088] |
+| −1 | 397 / 54 | −0.056 [−0.191, 0.074] | 297 / 52 | −0.130 [−0.264, 0.020] |
+| 0 — primary | 492 / 54 | **0.067 [−0.047, 0.161]** | 343 / 52 | 0.080 [−0.049, 0.180] |
+| +1 | 410 / 53 | −0.027 [−0.139, 0.111] | 313 / 51 | −0.045 [−0.193, 0.111] |
+| +2 | 333 / 52 | 0.079 [−0.113, 0.258] | 283 / 51 | 0.023 [−0.148, 0.180] |
+
+Adjusted log-level correlations, a secondary specification:
+
+| Lag | Full-period pairs / sites | Full-period r [95% interval] | Pre-2020 pairs / sites | Pre-2020 r [95% interval] |
+| --- | ---: | --- | ---: | --- |
+| −2 | 531 / 60 | 0.052 [−0.089, 0.191] | 374 / 59 | 0.047 [−0.090, 0.181] |
+| −1 | 591 / 60 | 0.118 [−0.023, 0.262] | 420 / 59 | 0.124 [−0.022, 0.269] |
+| 0 | 691 / 60 | 0.130 [−0.007, 0.260] | 476 / 59 | 0.156 [0.036, 0.286] |
+| +1 | 600 / 59 | 0.089 [−0.035, 0.220] | 444 / 59 | 0.160 [0.037, 0.283] |
+| +2 | 548 / 59 | 0.145 [0.006, 0.272] | 387 / 59 | 0.149 [0.032, 0.263] |
+
+**Interpretation:** annual rent increases show a small positive primary correlation with changes in unsheltered PIT, but its interval includes zero. Every annual-change interval includes zero, including the pre-2020 checks. Some adjusted level comparisons show a modest positive association, especially before 2020; the full-period +2 interval only narrowly excludes zero. This is suggestive of a relationship in how levels evolve, rather than a clear year-to-year pattern. Level models can retain differing regional trends that annual differences remove, and the matched samples also differ. These correlations are not elasticities or causal effects, and the secondary intervals are unadjusted across the 20 comparisons.
+
+ACS gross rent measures incumbent households' housing costs and can respond differently from asking rents. Its annual medians contain sampling and composition changes. The whole-site bootstrap captures variation across sampled regional histories, not a separate propagation of ACS survey margins of error. Year effects absorb common national nominal growth; they do not resolve region-specific confounding. The result does not establish that rent pressure is irrelevant or that adding rent controls cannot change a PSH estimate.
+
+The [driver](../scripts/analyze_observed_site_rent_longitudinal.py) reuses the reviewed unbalanced fixed-effect estimator and refits effects in each of **1,999 whole-site bootstrap draws**, seed 20261024. All 20 results have 1,999 defined draws with no solver or degeneracy failures. Direct dummy-variable least squares and explicitly duplicated-site bootstrap checks agree with the estimator. A separate review reconstructs every paired endpoint directly from the original ACS and PIT inputs, verifies all point estimates and input/output hashes, and confirms the original PIT values and flags are unchanged. Focused timing, nullable coverage, genuine-zero, invalid-rent, and output-preservation tests pass alongside the existing estimator tests: **36 tests passed**, with Ruff clean.
+
+The reviewed artifacts are in [run-02](</home/matt/HHP-Output/site-rent-unsheltered-longitudinal/20261024/run-02/>): `analysis_plan.json`, `site_year_panel.parquet` with embedded provenance, `longitudinal_results.csv`, `paired_observations.csv`, `pair_counts.csv`, coverage and ACS-source inventories, exact driver/estimator snapshots, `manifest.json`, and `independent_review.json`. The preliminary `run-01` remains intact; a nullable missing-rent flag in its coverage diagnostics was corrected to explicit false in run-02, with all numerical estimates and intervals unchanged.
+
+The [lead/lag graph](</home/matt/HHP-Output/site-rent-unsheltered-longitudinal/20261024/run-02/rent_unsheltered_lead_lag.png>) ([SVG](</home/matt/HHP-Output/site-rent-unsheltered-longitudinal/20261024/run-02/rent_unsheltered_lead_lag.svg>)) shows annual changes and adjusted levels, their intervals, and full-period sample counts. It was rendered directly from the saved results and visually reviewed. Existing shelter and PSH artifacts remain intact.
