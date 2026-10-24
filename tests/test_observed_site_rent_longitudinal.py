@@ -67,6 +67,27 @@ TOTAL_FLAG_CASES = [
 OBSERVED_UNSHELTERED_COUNT = 3
 OBSERVED_SHELTERED_COUNT = 7
 OBSERVED_TOTAL_COUNT = OBSERVED_UNSHELTERED_COUNT + OBSERVED_SHELTERED_COUNT
+MULTI_COC_SOURCE_COUNTS = {
+    "CA-500": (2, 8), "CA-501": (3, 7), "FL-500": (4, 6),
+}
+MULTI_COC_MEMBERS = [("multi", "CA-500"), ("multi", "CA-501"), ("single", "FL-500")]
+
+
+@pytest.fixture
+def multi_coc_pit():
+    rows = [{
+        "coc_id": coc, "pit_year": 2016,
+        "pit_unsheltered": unsheltered, "pit_sheltered": sheltered,
+        "pit_total": unsheltered + sheltered,
+        "count_types": ("Sheltered-Only Count" if coc == "CA-501"
+                        else "Sheltered and Unsheltered Count"),
+        "unsheltered_count_observed": coc != "CA-501",
+        "unsheltered_count_carried_forward": coc == "CA-501",
+        "unsheltered_count_partial": False,
+    } for coc, (unsheltered, sheltered) in MULTI_COC_SOURCE_COUNTS.items()]
+    next_year = {**rows[0], "pit_year": 2017}
+    members = pd.DataFrame(MULTI_COC_MEMBERS, columns=["msa_id", "coc_id"])
+    return members, pd.DataFrame([*rows, next_year])
 
 
 @pytest.fixture
@@ -315,3 +336,39 @@ def test_total_diagnostic_uses_total_counts_and_transforms(total_diagnostic, ana
         expected = np.log1p(selected.pit_total) - np.log1p(selected.previous_total)
     np.testing.assert_allclose(selected.pit_value, expected)
     assert results.loc[results.primary, "point_estimate_defined"].all()
+
+
+def test_whole_coc_pit_aggregation_preserves_carried_values_but_masks_analysis(multi_coc_pit):
+    members, source = multi_coc_pit
+    names = {"multi": "Multiple CoCs", "single": "Single CoC"}
+
+    panel = ANALYSIS.aggregate_study_pit(members, names, source, [2016, 2017])
+    multi = panel.loc[panel.msa_id.eq("multi") & panel.year.eq(2016)].iloc[0]
+    missing = panel.loc[panel.msa_id.eq("multi") & panel.year.eq(2017)].iloc[0]
+    single = panel.loc[panel.msa_id.eq("single") & panel.year.eq(2016)].iloc[0]
+
+    expected_multi = sum(sum(MULTI_COC_SOURCE_COUNTS[coc]) for coc in ("CA-500", "CA-501"))
+    assert len(panel) == len(names) * 2
+    assert multi.pit_total == expected_multi
+    assert multi.reported_cocs == 2
+    assert not multi.unsheltered_observed and not multi.total_observed
+    assert multi.sheltered_observed
+    assert pd.isna(missing.pit_total)
+    assert not missing.unsheltered_observed and not missing.total_observed
+    assert single.pit_total == sum(MULTI_COC_SOURCE_COUNTS["FL-500"])
+    assert single.unsheltered_observed and single.total_observed
+
+
+@pytest.mark.parametrize("duplicate", ["membership", "source", "shared-coc"])
+def test_study_pit_rejects_duplicate_count_consumption(multi_coc_pit, duplicate):
+    members, source = multi_coc_pit
+    if duplicate == "membership":
+        members = pd.concat([members, members.iloc[[0]]], ignore_index=True)
+    elif duplicate == "source":
+        source = pd.concat([source, source.iloc[[0]]], ignore_index=True)
+    else:
+        extra = members.iloc[[0]].assign(msa_id="another")
+        members = pd.concat([members, extra], ignore_index=True)
+
+    with pytest.raises(ValueError, match="Duplicate|multiple sites"):
+        ANALYSIS.aggregate_study_pit(members, {}, source, [2016, 2017])

@@ -7,6 +7,7 @@ Inputs and earlier results are read-only; a populated output directory is refuse
 from __future__ import annotations
 
 import argparse
+import hashlib
 import importlib.util
 import json
 import shutil
@@ -17,6 +18,9 @@ import numpy as np
 import pandas as pd
 import pyarrow.parquet as pq
 
+from hhplab.recipe.executor.inputs import resolve_site_universe_files
+from hhplab.schema.results import canonical_bytes
+from hhplab.sources.hud.pit.observation import observed_pit_mask
 from hhplab.storage.provenance import ProvenanceBlock, write_parquet_with_provenance
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -51,8 +55,22 @@ BOOTSTRAPS = 1999
 LAGS = (-2, -1, 0, 1, 2)
 RENT = "median_gross_rent"
 OUTCOME = "pit_unsheltered"
+OVERLAP_SITES_DIR = Path("/home/matt/HHP-Output/msa_coc_overlap_sites_2024")
+STUDY_HOLDOUTS = {
+    "14860": "Bridgeport: CT-503 historical reporting scope",
+    "41420": "Salem: historical reporting under OR-505",
+    "49620": "York: historical reporting under PA-507",
+    "40900": "Sacramento: Placer/Nevada reporting change",
+    "14460": "Boston: owner-requested exclusion",
+    "35620": "New York: owner-requested exclusion",
+}
+PIT_PANEL_COLUMNS = [
+    "msa_id", "msa_name", "year", "pit_source_ids", "reported_cocs",
+    "pit_unsheltered", "pit_total", "pit_sheltered",
+    "unsheltered_observed", "total_observed", "sheltered_observed",
+]
 PANEL_COLUMNS = [
-    *HELPER.OBSERVED_PANEL_COLUMNS,
+    *PIT_PANEL_COLUMNS,
     "acs_year", RENT, "acs_rent_available", "acs_cbsa_code", "acs_metro_name",
     "acs_definition_version", "acs_source_ref", "acs_source_path", "acs_source_sha256",
 ]
@@ -168,7 +186,88 @@ def paired_series(predictor: pd.DataFrame, outcome: pd.DataFrame, lag: int) -> p
     return matched
 
 
-def read_inputs(parent_dir: Path, acs_dir: Path):
+def aggregate_study_pit(
+    memberships: pd.DataFrame, names: dict[str, str], pit: pd.DataFrame, years: list[int],
+) -> pd.DataFrame:
+    """Preserve reported whole-CoC sums; observation flags require every member."""
+    if memberships.duplicated(["msa_id", "coc_id"]).any():
+        raise ValueError("Duplicate study membership; inspect the selected overlap source.")
+    if memberships.coc_id.duplicated().any():
+        raise ValueError("A selected CoC belongs to multiple sites; counts would be duplicated.")
+    if pit.duplicated(["coc_id", "pit_year"]).any():
+        raise ValueError("Duplicate CoC/year PIT source; inspect the selected vintage.")
+    grid = pd.concat([memberships.assign(pit_year=year) for year in years], ignore_index=True)
+    source = grid.merge(pit, on=["coc_id", "pit_year"], how="left", validate="many_to_one")
+    for measure in HELPER.PIT_MEASURES:
+        source[f"{measure}_eligible"] = observed_pit_mask(source, measure).astype(bool)
+    rows = []
+    for (msa_id, year), group in source.groupby(["msa_id", "pit_year"], sort=True):
+        row = {
+            "msa_id": msa_id, "msa_name": names[msa_id], "year": int(year),
+            "pit_source_ids": "|".join(sorted(group.coc_id)), "reported_cocs": len(group),
+        }
+        for measure in HELPER.PIT_MEASURES:
+            row[measure] = group[measure].sum(min_count=len(group))
+            row[HELPER.observed_column(measure)] = bool(group[f"{measure}_eligible"].all())
+        row["total_observed"] &= row["unsheltered_observed"] & row["sheltered_observed"]
+        rows.append(row)
+    return pd.DataFrame(rows)[PIT_PANEL_COLUMNS]
+
+
+def read_overlap95_pit() -> tuple[pd.DataFrame, dict[str, str], dict]:
+    """Validate the existing 95% producer and apply the owner's whole-site holdouts."""
+    sites_path = OVERLAP_SITES_DIR / "msa_coc_sites__overlap_samples.parquet"
+    members_path = OVERLAP_SITES_DIR / "msa_coc_memberships__overlap_samples.parquet"
+    resolution = resolve_site_universe_files(
+        artifact_id="overlap_samples", threshold=.95,
+        sites_path=sites_path, memberships_path=members_path,
+    )
+    sites = pd.read_parquet(sites_path)
+    sites = sites.loc[sites.threshold.eq(.95) & sites.eligible
+                      & ~sites.msa_id.isin(STUDY_HOLDOUTS)].copy()
+    members = pd.read_parquet(members_path)
+    members = members.loc[
+        members.threshold.eq(.95) & members.site_eligible & members.msa_id.isin(sites.msa_id),
+        ["msa_id", "coc_id"],
+    ].sort_values(["msa_id", "coc_id"]).reset_index(drop=True)
+    payload = {
+        "schema_version": "exploratory_site_subset/1", "threshold": .95,
+        "producer_membership_identity": resolution.membership_identity,
+        "excluded_msa_ids": sorted(STUDY_HOLDOUTS),
+        "memberships": members.to_numpy().tolist(),
+    }
+    identity = hashlib.sha256(canonical_bytes(payload)).hexdigest()
+    selection = {
+        **payload, "membership_identity": identity,
+        "producer_resolution": resolution.to_dict(),
+        "frozen_sites": sites.msa_id.nunique(), "selected_cocs": members.coc_id.nunique(),
+        "site_names": dict(zip(sites.msa_id, sites.msa_name, strict=True)),
+        "holdout_reasons": STUDY_HOLDOUTS,
+        "geography_status": "Provisional; source occurrence is not historical boundary approval",
+    }
+    if len(sites) != 67 or len(members) != 86:
+        raise ValueError("95% selection changed from reviewed 67 sites / 86 CoCs; inspect inputs.")
+    pit = pd.read_parquet(HELPER.PIT_PATH)
+    panel = aggregate_study_pit(members, selection["site_names"], pit, list(HELPER.YEARS))
+    # Existing reconciled sites must retain their exact PIT source footprint and
+    # values. P2024 successor/preaggregated rows are consumed once, as before.
+    parent_path = DEFAULT_PARENT / "observed_site_year_panel.parquet"
+    if HELPER.sha256(parent_path) != PARENT_PANEL_SHA256:
+        raise ValueError("Reviewed 99% PIT baseline changed; inspect it before extending sites.")
+    prior = pd.read_parquet(parent_path)
+    shared = panel.loc[panel.msa_id.isin(prior.msa_id), PIT_PANEL_COLUMNS].reset_index(drop=True)
+    pd.testing.assert_frame_equal(shared, prior[PIT_PANEL_COLUMNS], check_dtype=False)
+    selection["shared_99pct_sites_unchanged"] = prior.msa_id.nunique()
+    selection["added_sites"] = sites.loc[
+        ~sites.msa_id.isin(prior.msa_id), ["msa_id", "msa_name"],
+    ].to_dict("records")
+    inputs = {str(path): HELPER.sha256(path) for path in resolution.paths}
+    inputs.update({str(HELPER.PIT_PATH): HELPER.sha256(HELPER.PIT_PATH),
+                   str(parent_path): HELPER.sha256(parent_path)})
+    return panel, inputs, selection
+
+
+def read_inputs(parent_dir: Path, acs_dir: Path, *, site_threshold: float = .99):
     parent_panel = parent_dir / "observed_site_year_panel.parquet"
     parent_manifest = parent_dir / "observed_longitudinal_manifest.json"
     for path, expected in [
@@ -184,6 +283,13 @@ def read_inputs(parent_dir: Path, acs_dir: Path):
         raise ValueError("Parent panel does not match the reviewed 60-site / 14-year universe")
     inputs = {str(parent_panel): HELPER.sha256(parent_panel),
               str(parent_manifest): HELPER.sha256(parent_manifest)}
+    selection = {
+        "threshold": .99, "membership_identity": HELPER.MEMBERSHIP_IDENTITY,
+        "frozen_sites": 60, "selected_cocs": 77, "holdout_reasons": STUDY_HOLDOUTS,
+    }
+    if site_threshold == .95:
+        base, additional_inputs, selection = read_overlap95_pit()
+        inputs.update(additional_inputs)
     inventory = []
     frames = []
     for year in sorted({year - 1 for year in HELPER.YEARS}):
@@ -225,7 +331,9 @@ def read_inputs(parent_dir: Path, acs_dir: Path):
             "acs_product": "acs1", "native_geo": "CBSA", "table": "B25064",
             "source_provenance": provenance,
         })
-    return assemble_panel(base, pd.concat(frames, ignore_index=True)), inputs, inventory
+    panel = assemble_panel(base, pd.concat(frames, ignore_index=True))
+    panel.attrs["study_selection"] = selection
+    return panel, inputs, inventory
 
 
 def run_checks(
@@ -294,6 +402,7 @@ def plot_results(
     period_label: str = "2010–2024, excluding 2021",
     source_label: str = "ACS vintage", example: str = "ACS2009→2010 versus PIT2010→2011",
     basename: str = "rent_unsheltered_lead_lag",
+    site_label: str = "Frozen 60-site / 77-CoC universe; available metro matches.",
 ) -> list[Path]:
     import matplotlib
 
@@ -337,7 +446,7 @@ def plot_results(
              f"{source_label} Y−1 aligns to January PIT year Y. "
              "Positive lag: rent leads beyond this alignment.\n"
              f"Lag 0: {example}. Observed PIT endpoints only.\n"
-             "Frozen 60-site / 77-CoC universe; available metro matches. "
+             f"{site_label} "
              "Provisional geography; exploratory intervals.",
              ha="center", va="bottom", fontsize=9)
     fig.tight_layout(rect=(0, .14, 1, .94))
@@ -413,7 +522,10 @@ def build_zori_annual(
 def run_zori(args: argparse.Namespace) -> None:
     """Compare ZORI on available support and both rent measures on identical pairs."""
     prepare_output(args.output_dir)
-    acs_panel, inputs, inventory = read_inputs(args.parent_dir, args.acs_dir)
+    acs_panel, inputs, inventory = read_inputs(
+        args.parent_dir, args.acs_dir, site_threshold=args.site_threshold,
+    )
+    selection = acs_panel.attrs["study_selection"]
     outcome_measure = f"pit_{args.pit_outcome}"
     outcome_label = args.pit_outcome
     observation_flag = HELPER.observed_column(outcome_measure)
@@ -454,7 +566,9 @@ def run_zori(args: argparse.Namespace) -> None:
         "Total PIT requires both components observed and total = sheltered + unsheltered.",
         "Levels, additional lags and pre-2020 checks are secondary; no causal claim.",
         "Fully absorbed short-window comparisons are undefined, not zero, with no usable interval.",
-        "The frozen 60-site / 77-CoC membership and four existing exclusions remain unchanged.",
+        f"{selection['frozen_sites']} sites / {selection['selected_cocs']} CoCs at "
+        f"{args.site_threshold:.0%} overlap, retaining all owner-directed holdouts.",
+        "Boston and New York remain excluded under the owner's earlier instruction.",
         "Study ends with PIT2024; 2021 is excluded and no annual changes bridge that gap.",
         "PIT differences require complete observed counts at both endpoints; real zeroes remain.",
         "Predictor rent changes do not require PIT observations in their own aligned year.",
@@ -467,7 +581,8 @@ def run_zori(args: argparse.Namespace) -> None:
         f"No PSH adjustment in this rent-versus-{outcome_label} diagnostic.",
     ]
     plan = {
-        "membership_identity": HELPER.MEMBERSHIP_IDENTITY, "rent_source": "zori",
+        "membership_identity": selection["membership_identity"], "rent_source": "zori",
+        "site_selection": selection,
         "pit_measure": outcome_measure, "pit_observation_flag": observation_flag,
         "notes": notes, "primary_test": "zori_available/annual_changes_fe/full/lag=0",
         "calendar_years": calendar_years, "lags": list(LAGS), "periods": ["full", "pre2020"],
@@ -497,7 +612,7 @@ def run_zori(args: argparse.Namespace) -> None:
     panel = acs_panel.loc[acs_panel.year.between(start_year + 1, end_year + 1)].merge(
         zori_rows[zori_columns], on=["msa_id", "year"], how="left", validate="one_to_one",
     )
-    if panel.msa_id.nunique() != 60:
+    if panel.msa_id.nunique() != selection["frozen_sites"]:
         raise AssertionError("ZORI join changed frozen membership")
     panel["zori"] = pd.to_numeric(panel.zori, errors="coerce")
     panel["zori_available"] = (
@@ -507,7 +622,7 @@ def run_zori(args: argparse.Namespace) -> None:
     provenance = ProvenanceBlock(
         geo_type="msa", definition_version="census_msa_2023", boundary_vintage="2024",
         extra={"purpose": f"Observed {outcome_label} PIT versus ZORI, matched ACS comparison",
-               "membership_identity": HELPER.MEMBERSHIP_IDENTITY, "inputs": inputs,
+               "membership_identity": selection["membership_identity"], "inputs": inputs,
                "analysis_plan_sha256": HELPER.sha256(plan_path), "notes": notes},
     )
     write_parquet_with_provenance(
@@ -522,6 +637,10 @@ def run_zori(args: argparse.Namespace) -> None:
            "zori_coverage_ratio"]].to_csv(args.output_dir / "site_year_coverage.csv", index=False)
     (args.output_dir / "acs_source_inventory.json").write_text(
         json.dumps(inventory, indent=2, allow_nan=False) + "\n")
+    if "memberships" in selection:
+        pd.DataFrame(selection["memberships"], columns=["msa_id", "coc_id"]).to_csv(
+            args.output_dir / "study_memberships.csv", index=False,
+        )
     all_results, all_pairs = [], []
     for sample, measure, availability in [
         ("zori_available", "zori", "zori_available"),
@@ -556,12 +675,14 @@ def run_zori(args: argparse.Namespace) -> None:
         period_label=f"{start_year + 1}–{end_year + 1}, excluding 2021",
         source_label="ZORI calendar mean", example="ZORI2015→2016 versus PIT2016→2017",
         basename=f"zori_{outcome_label}_lead_lag",
+        site_label=(f"{selection['frozen_sites']} sites / {selection['selected_cocs']} CoCs; "
+                    f"{args.site_threshold:.0%} overlap; owner holdouts retained."),
     )
     for path, digest in inputs.items():
         if HELPER.sha256(path) != digest:
             raise AssertionError(f"Input changed during analysis: {path}")
     summary = {
-        **plan, "frozen_sites": 60, "site_years": len(panel),
+        **plan, "frozen_sites": selection["frozen_sites"], "site_years": len(panel),
         "pit_years": sorted(panel.year.unique().tolist()),
         "available_zori_site_years": int(panel.zori_available.sum()),
         "observed_unsheltered_site_years": int(panel.unsheltered_observed.sum()),
@@ -587,6 +708,7 @@ def main() -> None:
     parser.add_argument("--acs-dir", type=Path, default=ROOT / "data/curated/acs")
     parser.add_argument("--rent-source", choices=("acs1", "zori"), default="acs1")
     parser.add_argument("--pit-outcome", choices=("unsheltered", "total"), default="unsheltered")
+    parser.add_argument("--site-threshold", type=float, choices=(.95, .99), default=.99)
     parser.add_argument("--output-dir", type=Path)
     parser.add_argument("--bootstrap-replicates", type=int, default=BOOTSTRAPS)
     parser.add_argument("--json", action="store_true")
@@ -595,7 +717,13 @@ def main() -> None:
     if args.bootstrap_replicates < 199:
         parser.error("Use at least 199 bootstrap replicates; the reviewed default is 1999.")
     if args.output_dir is None:
-        if args.pit_outcome == "total":
+        if args.site_threshold == .95:
+            args.output_dir = (
+                Path("/home/matt/HHP-Output")
+                / f"site-{args.rent_source}-overlap95-{args.pit_outcome}-longitudinal"
+                / "20261024/run-01"
+            )
+        elif args.pit_outcome == "total":
             args.output_dir = (
                 DEFAULT_ZORI_TOTAL_OUTPUT if args.rent_source == "zori" else DEFAULT_TOTAL_OUTPUT
             )
@@ -605,16 +733,23 @@ def main() -> None:
         run_zori(args)
         return
     prepare_output(args.output_dir)
-    panel, inputs, inventory = read_inputs(args.parent_dir, args.acs_dir)
+    panel, inputs, inventory = read_inputs(
+        args.parent_dir, args.acs_dir, site_threshold=args.site_threshold,
+    )
+    selection = panel.attrs["study_selection"]
     outcome_measure = f"pit_{args.pit_outcome}"
     observation_flag = HELPER.observed_column(outcome_measure)
     notes = list(NOTES)
+    if args.site_threshold != .99:
+        notes = [note.replace("60-site / 77-CoC", "67-site / 86-CoC") for note in notes]
+        notes.append("95% overlap sensitivity; Boston and New York holdouts remain in force.")
     if args.pit_outcome == "total":
         notes = [note.replace("unsheltered", "total") for note in notes]
         notes.append(
             "Total PIT needs both components observed and total = sheltered + unsheltered.")
     plan = {
-        "membership_identity": HELPER.MEMBERSHIP_IDENTITY, "notes": notes,
+        "membership_identity": selection["membership_identity"], "notes": notes,
+        "site_selection": selection,
         "pit_measure": outcome_measure, "pit_observation_flag": observation_flag,
         "primary_test": "annual_changes_fe/full/lag=0", "lags": list(LAGS),
         "periods": ["full", "pre2020"], "seed": SEED,
@@ -629,7 +764,7 @@ def main() -> None:
     provenance = ProvenanceBlock(
         geo_type="msa", definition_version="census_msa_2023", boundary_vintage="2024",
         extra={"purpose": f"Observed {args.pit_outcome} PIT versus native metro ACS1 gross rent",
-               "membership_identity": HELPER.MEMBERSHIP_IDENTITY,
+               "membership_identity": selection["membership_identity"],
                "inputs": inputs, "analysis_plan_sha256": HELPER.sha256(plan_path),
                "notes": notes},
     )
@@ -663,6 +798,8 @@ def main() -> None:
         results, args.output_dir,
         title=f"ACS 1-year gross rent (including utilities) versus {args.pit_outcome} PIT",
         basename=f"rent_{args.pit_outcome}_lead_lag",
+        site_label=(f"{selection['frozen_sites']} sites / {selection['selected_cocs']} CoCs; "
+                    f"{args.site_threshold:.0%} overlap; owner holdouts retained."),
     )
     for path, digest in inputs.items():
         if HELPER.sha256(path) != digest:
