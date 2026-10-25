@@ -91,6 +91,7 @@ def test_plan_preserves_source_bytes_and_is_deterministic() -> None:
         "diagnostics",
         "findings",
         "results",
+        "annotations",
     }
 
 

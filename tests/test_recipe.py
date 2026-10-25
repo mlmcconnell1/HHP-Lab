@@ -7660,9 +7660,8 @@ class TestRecipeCache:
         assert len(h) == 64
         assert h == _sha256_file(f)  # deterministic
 
-    def test_same_object_on_repeated_read(self, tmp_path: Path):
-        """read_parquet() returns the *same* internal object (identity) for
-        the cached DataFrame, though returned copies differ."""
+    def test_unchanged_content_reuses_one_cached_frame(self, tmp_path: Path):
+        """Repeated reads return independent copies without duplicating cache entries."""
         f = tmp_path / "data.parquet"
         pd.DataFrame({"a": [10, 20]}).to_parquet(f)
         cache = RecipeCache(enabled=True)
@@ -7671,13 +7670,12 @@ class TestRecipeCache:
         # Returned copies are equal but not the same Python object
         assert df1.equals(df2)
         assert df1 is not df2
-        # Underlying cached frame is the single stored object
-        key = str(f.resolve())
-        assert cache._frames[key] is cache._frames[key]
+        assert cache.cached_count == 1
+        df1.loc[0, "a"] = -1
+        assert cache.read_parquet(f).equals(df2)
 
-    def test_stale_read_after_file_changes(self, tmp_path: Path):
-        """Cache returns the *original* content when the underlying file
-        changes on disk — documenting the lack of TTL / invalidation."""
+    def test_changed_content_invalidates_cached_frame(self, tmp_path: Path):
+        """A changed artifact cannot silently reuse stale values or caveats."""
         f = tmp_path / "data.parquet"
         pd.DataFrame({"v": [1]}).to_parquet(f)
         cache = RecipeCache(enabled=True)
@@ -7687,9 +7685,8 @@ class TestRecipeCache:
         pd.DataFrame({"v": [999]}).to_parquet(f)
         df_after = cache.read_parquet(f)
 
-        # Cache still returns the stale (original) data
-        assert list(df_after["v"]) == [1]
-        assert df_original.equals(df_after)
+        assert list(df_after["v"]) == [999]
+        assert list(df_original["v"]) == [1]
         # A fresh, uncached read would see the new data
         assert list(pd.read_parquet(f)["v"]) == [999]
 

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import copy
 import hashlib
 import json
 import os
@@ -57,6 +58,7 @@ RESERVED_PATHS = {
     "recipe/execution.json",
     "recipe/lock.json",
     "measures.json",
+    "annotations.json",
     "withheld.json",
     "results/results.json",
     *RESULT_TABLE_PATHS.values(),
@@ -118,6 +120,7 @@ class BundlePayload:
     private: bool = False
     allow_unknown_aggregates: bool = False
     site_universes: Mapping[str, Mapping[str, Any]] = field(default_factory=dict)
+    annotations: Mapping[str, Any] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
@@ -279,8 +282,11 @@ class BundleWriter:
         included = set(plan["included"])
         withheld = list(plan["withheld"])
         report_allowed = "report/index.html" in included
+        safe_annotations = _distribution_safe_annotations(
+            payload.annotations, private=payload.private, withheld=withheld
+        )
 
-        self._write_payload_metadata(payload, included, written)
+        self._write_payload_metadata(payload, included, written, safe_annotations)
         allowed_table_rows: dict[str, Sequence[Mapping[str, Any]]] = {}
         for name, rows in payload.result_tables.items():
             path = RESULT_TABLE_PATHS[name]
@@ -404,7 +410,11 @@ class BundleWriter:
         )
 
     def _write_payload_metadata(
-        self, payload: BundlePayload, included: set[str], written: list[str]
+        self,
+        payload: BundlePayload,
+        included: set[str],
+        written: list[str],
+        annotations_json_document: dict[str, Any] | None = None,
     ) -> None:
         recipe_dir = self.bundle_dir / "recipe"
         recipe_dir.mkdir(parents=True, exist_ok=True)
@@ -415,6 +425,10 @@ class BundleWriter:
             ),
             "recipe/execution.json": canonical_bytes(_execution_mapping(payload, included)),
             "measures.json": canonical_bytes(payload.measures),
+            "annotations.json": canonical_bytes(
+                annotations_json_document
+                if annotations_json_document is not None else payload.annotations
+            ),
         }
         if payload.lock_document is not None:
             core_files["recipe/lock.json"] = payload.lock_document
@@ -491,6 +505,7 @@ def _planned_files(payload: BundlePayload) -> list[dict[str, Any]]:
         "recipe/resolved.json",
         "recipe/execution.json",
         "measures.json",
+        "annotations.json",
     }
     if payload.lock_document is not None:
         paths.add("recipe/lock.json")
@@ -505,7 +520,7 @@ def _planned_files(payload: BundlePayload) -> list[dict[str, Any]]:
         if artifact.path in paths:
             raise BundleError(f"duplicate bundle artifact path: {artifact.path!r}")
         paths.add(artifact.path)
-    if len(payload.artifacts) != len(paths) - (5 if payload.lock_document is not None else 4):
+    if len(payload.artifacts) != len(paths) - (6 if payload.lock_document is not None else 5):
         raise BundleError("bundle artifact paths must be unique")
 
     artifacts.extend(_result_table_lineages(payload).values())
@@ -527,6 +542,7 @@ def _planned_files(payload: BundlePayload) -> list[dict[str, Any]]:
             "recipe/resolved.json",
             "recipe/execution.json",
             "measures.json",
+            "annotations.json",
             "recipe/lock.json",
         )
         if path != "recipe/lock.json" or payload.lock_document is not None
@@ -590,6 +606,7 @@ def _validate_payload(payload: BundlePayload) -> None:
         ("plan", payload.plan),
         ("input_measures", payload.input_measures),
         ("measures", payload.measures),
+        ("annotations", payload.annotations),
         ("report_payload", payload.report_payload),
         ("diagnostics", payload.report_payload.get("diagnostics", {})),
         ("findings", payload.report_payload.get("findings", {})),
@@ -820,6 +837,67 @@ def _role_for_path(path: str) -> str:
     return "artifact"
 
 
+def _withheld_analysis_keys(
+    withheld: Sequence[Mapping[str, Any]],
+) -> tuple[set[str], bool]:
+    """Map withheld artifact paths to the analysis keys they cover."""
+    keys: set[str] = set()
+    all_withheld = False
+    for item in withheld:
+        path = item.get("path", "")
+        if path == "results/results.json":
+            all_withheld = True
+        elif path.startswith("samples/"):
+            keys.add(Path(path).stem)
+    return keys, all_withheld
+
+
+def _distribution_safe_annotations(
+    annotations: Mapping[str, Any],
+    *,
+    private: bool,
+    withheld: Sequence[Mapping[str, Any]],
+) -> dict[str, Any]:
+    """Apply the distribution/lineage policy to structured annotation payloads.
+
+    Private bundles keep the full payload. If any public material is withheld,
+    only explicitly authorized public explanations or a generic notice remain;
+    source-derived identities, prose, evidence and applicability are withheld.
+    """
+    safe = copy.deepcopy(dict(annotations or {}))
+    if private or not withheld:
+        return safe
+    # The prose, identifiers and evidence can all contain source-derived data.
+    # Author-approved public explanations are the sole exception. This coarse
+    # policy deliberately withholds applicability whenever any source is withheld.
+    active = safe.get("active_per_analysis")
+    applied = {
+        (item["id"], item["revision"])
+        for item in (
+            [record for entries in active.values() for record in entries]
+            if isinstance(active, Mapping) else safe.get("applied", [])
+        )
+    }
+    public_texts = sorted({
+        record["public_text"] for record in safe.get("records", [])
+        if record.get("public_text") and (record["id"], record["revision"]) in applied
+    })
+    message = (
+        "Source restrictions withhold data caveat details and applicability; "
+        "consult the private package before interpreting the results."
+    )
+    return {
+        "schema_version": 1, "distribution_status": "withheld",
+        "distribution_note": message,
+        "public_notes": [
+            {"id": f"public-note-{index}", "revision": 1,
+             "summary": "Data caveat", "text": value}
+            for index, value in enumerate(public_texts, 1)
+        ] or [{"id": "withheld-caveat-details", "revision": 1,
+               "summary": "Data caveat details withheld", "text": message}],
+    }
+
+
 def _statuses_with_distribution(
     statuses: StatusFields, *, private: bool, withheld: Sequence[Mapping[str, Any]]
 ) -> StatusFields:
@@ -842,6 +920,10 @@ def _full_report_payload(
     ).to_dict()
     report_payload["lock_status"] = payload.lock_status.to_dict()
     report_payload["private"] = payload.private
+    if not payload.private and withheld:
+        safe = _distribution_safe_annotations(payload.annotations, private=False, withheld=withheld)
+        report_payload["notes"] = safe["public_notes"]
+        report_payload["annotation_conflicts"] = []
     return report_payload
 
 
@@ -859,6 +941,8 @@ def _status_only_report_payload(
     )
     statuses = payload.statuses.to_dict()
     statuses["distribution_status"] = "private" if payload.private else "withheld"
+    notes = _full_report_payload(payload, withheld).get("notes", [])
+    limitations = ["Report values and claims are withheld by redistribution policy."]
     return {
         "recipe_id": payload.recipe_id,
         "title": payload.report_payload.get("title", payload.recipe_id),
@@ -869,9 +953,11 @@ def _status_only_report_payload(
         "findings": {},
         "exclusions": [],
         "errors": [],
-        "limitations": ["Report values and claims are withheld by redistribution policy."],
+        "limitations": limitations,
         "withheld": [{"path": item["path"]} for item in withheld],
         "private": payload.private,
+        "notes": notes,
+        "annotation_conflicts": [],
     }
 
 

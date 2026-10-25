@@ -133,6 +133,32 @@ def render_report(payload: Mapping[str, Any]) -> str:
         ("Withheld artifacts", "withheld"),
     ):
         body += f"<h2>{label}</h2><pre>{_escape(_display(payload.get(field, [])))}</pre>"
+    notes = payload.get("notes", [])
+    if notes or payload.get("annotation_conflicts"):
+        body += "<h2>Annotation notes</h2>"
+        for conflict in payload.get("annotation_conflicts", ()):
+            body += f"<pre>{_escape(_display(conflict))}</pre>"
+        for note in notes:
+            note_id = note.get("id")
+            revision = note.get("revision")
+            summary = note.get("summary") or f"Annotation {note_id}"
+            heading = f"{summary} ({note_id} r{revision})" if note_id is not None else summary
+            body += f"<h3>{_escape(heading)}</h3><ul>"
+            if note.get("category"):
+                body += f"<li>category: {_escape(_display(note['category']))}</li>"
+            if note.get("text"):
+                body += f"<li>{_escape(note['text'])}</li>"
+            if note.get("treatment"):
+                body += f"<li>treatment: {_escape(note['treatment'])}</li>"
+            if note.get("uncertainty"):
+                body += f"<li>uncertainty: {_escape(note['uncertainty'])}</li>"
+            if note.get("applicability_uncertainty"):
+                body += f"<li>{_escape(note['applicability_uncertainty'])}</li>"
+            if note.get("supersedes") is not None:
+                body += f"<li>supersedes: {_escape(_display(note['supersedes']))}</li>"
+            for item in note.get("evidence", ()):
+                body += f"<li>evidence: {_escape(_display(item))}</li>"
+            body += "</ul>"
     body += (
         "<h2>Verification</h2><p>Move the complete bundle directory as one unit. "
         "From its parent directory, run <code>hhplab results verify BUNDLE --json</code>. "
@@ -158,4 +184,29 @@ def render_readme(payload: Mapping[str, Any]) -> str:
             "Withheld inputs prevent full replay; inspect withheld.json for rebuild instructions.",
         ]
     )
+    notes = payload.get("notes", [])
+    if notes or payload.get("annotation_conflicts"):
+        lines.extend(["", "Notes"])
+        for conflict in payload.get("annotation_conflicts", ()):
+            lines.append(f"- CONFLICT: {_safe_text(_display(conflict))}")
+        for note in notes:
+            note_id = note.get("id")
+            revision = note.get("revision")
+            summary = _safe_text(note.get("summary") or f"Annotation {note_id}")
+            header = f"{summary} ({note_id} r{revision})" if note_id is not None else summary
+            lines.append(f"- {header}")
+            if note.get("category"):
+                lines.append(f"    category: {_safe_text(_display(note['category']))}")
+            if note.get("text"):
+                lines.append(f"    {_safe_text(note['text'])}")
+            if note.get("treatment"):
+                lines.append(f"    treatment: {_safe_text(note['treatment'])}")
+            if note.get("uncertainty"):
+                lines.append(f"    uncertainty: {_safe_text(note['uncertainty'])}")
+            if note.get("applicability_uncertainty"):
+                lines.append(f"    {_safe_text(note['applicability_uncertainty'])}")
+            if note.get("supersedes") is not None:
+                lines.append(f"    supersedes: {_safe_text(_display(note['supersedes']))}")
+            for item in note.get("evidence", ()):
+                lines.append(f"    evidence: {_safe_text(_display(item))}")
     return "\n".join(lines) + "\n"

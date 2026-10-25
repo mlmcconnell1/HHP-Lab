@@ -19,6 +19,18 @@ from pydantic import (
 
 from hhplab.recipe.recipe_schema import RecipeV1
 from hhplab.schema.columns import HIC_PANEL_MEASURE_COLUMNS
+from hhplab.schema.contracts import (
+    AnnotationEvidence as AnnotationEvidence,
+)
+from hhplab.schema.contracts import (
+    AnnotationScope as AnnotationScope,
+)
+from hhplab.schema.contracts import (
+    DataAnnotationSpec as DataAnnotationSpec,
+)
+from hhplab.schema.contracts import (
+    validate_annotation_revisions as _validate_annotation_supersedes_graph,
+)
 
 PIT_SITE_YEAR_MEASURE_COLUMNS = frozenset(
     {"pit_total", "pit_sheltered", "pit_unsheltered"}
@@ -671,6 +683,7 @@ class RecipeV2(RecipeV1):
     panels: dict[StrictStr, PanelBinding] = Field(min_length=1)
     parameters: dict[StrictStr, FiniteNumber | UnresolvedMarker] = Field(default_factory=dict)
     masks: list[MaskSpec] = Field(default_factory=list)
+    annotations: list[DataAnnotationSpec] = Field(default_factory=list)
     derive: list[DerivationSpec] = Field(default_factory=list)
     sample_groups: dict[StrictStr, SampleGroupSpec] = Field(default_factory=dict)
     analyses: list[AnalysisSpec] = Field(min_length=1)
@@ -698,6 +711,23 @@ class RecipeV2(RecipeV1):
             ids = [record.id for record in records]
             if len(set(ids)) != len(ids):
                 raise ValueError(f"{label} ids must be unique")
+
+        identity_keys = [(record.id, record.revision) for record in self.annotations]
+        if len(set(identity_keys)) != len(identity_keys):
+            raise ValueError("annotations must be unique per (id, revision)")
+        _validate_annotation_supersedes_graph(
+            [record.model_dump(mode="python") for record in self.annotations],
+            require_exists=False,
+        )
+
+        mask_ids = {mask.id for mask in self.masks}
+        for annotation in self.annotations:
+            for mask_id in annotation.applies_to_masks:
+                if mask_id not in mask_ids:
+                    raise ValueError(
+                        f"annotation {annotation.id!r} references unknown mask "
+                        f"{mask_id!r}"
+                    )
 
         pipeline_by_id = {pipeline.id: pipeline for pipeline in self.pipelines}
         panel_refs: set[tuple[str, str]] = set()

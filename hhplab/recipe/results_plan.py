@@ -250,6 +250,7 @@ class ResultsPlan:
     preflight_findings: tuple[PreflightFinding, ...]
     site_universe: Mapping[str, Any] | None = None
     site_year_boundary_compatibility: Any | None = None
+    annotations: tuple[Mapping[str, Any], ...] = ()
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "parameters", _deep_freeze(self.parameters))
@@ -257,6 +258,7 @@ class ResultsPlan:
         object.__setattr__(self, "component_hashes", _deep_freeze(self.component_hashes))
         if self.site_universe is not None:
             object.__setattr__(self, "site_universe", _deep_freeze(self.site_universe))
+        object.__setattr__(self, "annotations", _deep_freeze(self.annotations))
 
     @property
     def is_ready(self) -> bool:
@@ -274,6 +276,7 @@ class ResultsPlan:
                 key: list(value) for key, value in sorted(self.analysis_dependencies.items())
             },
             "component_hashes": _deep_thaw(self.component_hashes),
+            "annotations": [_deep_thaw(item) for item in self.annotations],
             "preflight_findings": [finding.to_dict() for finding in self.preflight_findings],
         }
         if self.site_universe is not None:
@@ -451,6 +454,10 @@ def plan_results(
     references = _resolve_references(recipe, plan_by_key, variants)
     dependencies = _build_dependencies(recipe, references, plan_by_key)
     components = _component_hashes(recipe, panels, analysis_plans, contexts)
+    annotation_records = [
+        spec.model_dump(mode="json", by_alias=True, exclude_none=True)
+        for spec in recipe.annotations
+    ]
     findings = _substitution_warnings(recipe)
     site_universe_data: dict[str, Any] | None = None
     site_year_boundary_compatibility = None
@@ -505,6 +512,7 @@ def plan_results(
         "references": [reference.to_dict() for reference in references],
         "analysis_dependencies": {key: list(value) for key, value in sorted(dependencies.items())},
         "component_hashes": components,
+        "annotations": annotation_records,
     }
     if site_universe_data is not None:
         payload["site_universe"] = site_universe_hash_data
@@ -525,6 +533,7 @@ def plan_results(
         preflight_findings=tuple(findings),
         site_universe=site_universe_data,
         site_year_boundary_compatibility=site_year_boundary_compatibility,
+        annotations=tuple(annotation_records),
     )
 
 
@@ -1915,5 +1924,6 @@ def _component_hashes(
             "diagnostics": [_json_model(item) for item in recipe.diagnostics],
             "findings": [_json_model(item) for item in recipe.findings],
             "results": _json_model(recipe.results),
+            "annotations": [_json_model(item) for item in recipe.annotations],
         }
     )

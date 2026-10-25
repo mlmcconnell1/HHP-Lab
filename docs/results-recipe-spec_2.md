@@ -212,6 +212,101 @@ semantics are incompatible (for example a `sum` of rates) and warns when the
 combination is merely questionable. Derived values are never re-aggregated
 across geographies.
 
+### 4.5 Annotations and annotation provenance
+
+Annotations describe a treatment actually applied to data or a limitation of
+that data. Geography/year matches alone never establish that a treatment occurred.
+The shared models and artifact contract live in `hhplab.schema.contracts`.
+Each immutable record has an `id`, positive integer `revision`, `summary`, `text`,
+and a closed category: `caveat`, `adjustment`, `geographic_approximation`,
+`source_substitution`, `measurement_change`, `exclusion`, or `other`. Optional
+fields include `treatment`, `uncertainty`, `evidence`, and `supersedes`.
+Evidence uses portable repository-relative POSIX doc references or credential-free
+HTTP(S) URLs, with optional exact SHA-256 digests. A doc reference is a locator;
+it does not claim that a copy of the evidence was bundled or its digest verified.
+
+Attach records at the authoritative preparation step. For example, after applying
+a documented adjustment, set `frame.attrs["annotations"] = [record]` and call
+`write_parquet_with_provenance`. The writer persists the annotation alongside
+source and geometry provenance and rejects inconsistent alternate metadata.
+An explicit `ProvenanceBlock(extra={"annotations": ...})` is also supported.
+`RecipeCache` restores embedded metadata and keys both cached frames and file
+identities by content SHA-256, including metadata-only changes at the same path.
+Retain the original artifact and write a new output for a new treatment.
+
+Bare lists are source declarations whose original selectors are evaluated on
+the source frame. Scope may constrain columns, years, geographies, and recipe
+panels; mask selectors intersect the row scope and the masks on each cell.
+Artifact-origin panel names do not restrict a renamed consuming recipe.
+Persisted transformed artifacts use this versioned contract:
+
+```json
+{
+  "schema_version": 1,
+  "records": [{"id": "example", "revision": 1, "summary": "Example caveat", "text": "Documented limitation."}],
+  "bindings": {"example#r1": {"columns": {"lag_count": [["14460", 2011]]}}},
+  "uncertain_ids": [],
+  "sources": {"example#r1": [{"sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "vintages": {"boundary_vintage": "2010"}}]}
+}
+```
+
+Every persisted identity needs an explicit binding or an uncertainty marker.
+Bindings associate each column with its own geography/year cells; an empty
+binding means no affected output cells. Definitions stay unchanged when columns
+are derived or projected. Source content identities and original vintages travel
+with derived artifacts, including through a second recipe. Unsupported versions,
+malformed containers, dangling identities, missing bound columns, and conflicting
+alternate metadata fail explicitly. Arbitrary external column renames require
+remapping bindings before reuse; recipe panel renaming needs no redeclaration.
+External DataFrame edits that retain original source bytes must be written as
+a new annotated artifact before reuse; the runner rejects inconsistent data/bytes.
+
+Results v2 propagates cell dependencies through supported derivations, including
+lagged and change baselines outside the final sample years, pooled analyses,
+sample predicates, causal exclusions, and frozen base membership. Unused columns
+on excluded rows and out-of-scope years do not introduce notes. Site-year
+aggregation maps consumed CoC cells onto the affected MSA/year/measure and its
+diagnostics. Where applicability is uncertain, it retains conservative candidate
+bindings and labels that uncertainty. An uncertainty marker without any bounded
+candidate cells conservatively applies to the consuming panel.
+
+Legacy v1 preparation joins, resampling, and generic aggregations do not yet
+preserve these bindings. Annotated inputs fail before those operations with
+instructions to use a saved annotated panel in results v2 or supported site-year
+assembly. This prevents an apparently clean output that silently lost a caveat.
+
+Same ID/revision plus identical content deduplicates with both origins retained.
+Different content under that identity is an error; create a new revision.
+Supersession must name an earlier existing revision of the same ID. A contributing
+revision is hidden from readable notes only when a contributing superseder covers
+its original selectors; unused or narrower superseders cannot erase it. Multiple
+remaining contributing revisions are visible with a scope/supersession notice.
+
+`annotations.json` records schema version, immutable definitions, per-analysis
+keys/counts, active revisions, original origins, effective panel bindings,
+uncertain applicability, and source identities. Reports and README files render
+deduplicated active notes automatically. Input artifacts retain their source
+declarations; derived and private sample artifacts persist effective contracts.
+Public sample artifacts omit detailed caveat metadata and refer to the package's
+policy-filtered `annotations.json`. Reusing a standalone public membership file
+as an analysis input requires restoring the original full panel/private lineage;
+the loader rejects that incomplete provenance rather than silently dropping notes.
+
+Public bundles with withheld material remove caveat text, evidence, identifiers,
+and applicability details. A record's optional `public_text` explicitly authorizes
+redistribution of that explanation and its applicability; otherwise a generic
+withholding notice remains. Private bundles retain full detail. Verification
+compares structured caveats and embedded derived/sample contracts against replay,
+so internally consistent checksum edits cannot conceal semantic changes. Missing
+replay inputs remain partial; details dependent on those inputs cannot be certified.
+
+The Boston/2010 synthetic acceptance fixture uses MSA 14460 and the four CoCs
+MA-510/513/516/518 plus their shared polygon. It records combined source counts
+without allocation inside the shared area. Its footnote retains the unverified
+collective coverage/deduplication limitation and makes no claim of national B2010
+completeness. This feature does not modify any live historical curated artifact.
+
+
 ## 5. The sample contract
 
 ### 5.1 Sample spec

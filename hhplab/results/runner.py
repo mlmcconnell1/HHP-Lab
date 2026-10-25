@@ -10,7 +10,7 @@ import platform
 import re
 import socket
 import uuid
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from dataclasses import replace
 from datetime import UTC, datetime
 from pathlib import Path
@@ -21,7 +21,13 @@ import pandas as pd
 
 from hhplab.analysis.inspection import _json_group_value
 from hhplab.analysis.sample import resolve_sample
-from hhplab.recipe.derive import apply_masks, derive_panel
+from hhplab.recipe.derive import (
+    annotation_identity_key,
+    apply_masks,
+    derive_panel,
+    extract_bindings_from_sidecar,
+    serialize_annotation_contract,
+)
 from hhplab.recipe.executor.analyses import execute_analysis
 from hhplab.recipe.executor.inputs import SiteUniverseResolution, resolve_site_universe_files
 from hhplab.recipe.executor.msa_coc_panel import (
@@ -29,7 +35,7 @@ from hhplab.recipe.executor.msa_coc_panel import (
     assemble_site_year_panel,
 )
 from hhplab.recipe.results_plan import ResultsPlanningError, plan_results
-from hhplab.recipe.schema_results import RecipeV2
+from hhplab.recipe.schema_results import RecipeV2, _validate_annotation_supersedes_graph
 from hhplab.results.bundle import BundleArtifact, BundlePayload, write_bundle
 from hhplab.results.diagnostics import column_identity, linear_identity
 from hhplab.results.lineage import (
@@ -40,6 +46,12 @@ from hhplab.results.lineage import (
     union_lineage,
 )
 from hhplab.results.recipe_findings import evaluate_findings
+from hhplab.schema.contracts import (
+    PUBLIC_SAMPLE_ANNOTATION_NOTICE,
+    annotation_source_identity,
+    frame_annotation_contract,
+    project_annotation_contract,
+)
 from hhplab.schema.redistribution import ArtifactScope
 from hhplab.schema.results import (
     BUNDLE_FORMAT_VERSION,
@@ -190,6 +202,7 @@ def replay_results(
             "references",
             "analysis_dependencies",
             "component_hashes",
+            "annotations",
         )
         if key in expected_plan
     }
@@ -202,7 +215,7 @@ def replay_results(
         site_hash_data["boundary_evidence"] = evidence
         plan_hash_payload["site_universe"] = site_hash_data
     plan_hash = hashlib.sha256(canonical_bytes(plan_hash_payload)).hexdigest()
-    expected_hash_keys = 9 if expected_plan.get("site_universe") is not None else 8
+    expected_hash_keys = 10 if expected_plan.get("site_universe") is not None else 9
     if len(plan_hash_payload) != expected_hash_keys or execution.get("spec_hash") != plan_hash:
         raise ValueError(
             "execution spec_hash does not match the canonical resolved plan"
@@ -238,7 +251,10 @@ def replay_results(
     measures_by_panel = execution.get("input_measures", {})
     if not isinstance(measures_by_panel, Mapping):
         measures_by_panel = {}
-    materialized_panel_frames = dict(panel_frames)
+    materialized_panel_frames = {
+        name: frame.copy(deep=True) if isinstance(frame, pd.DataFrame) else frame
+        for name, frame in panel_frames.items()
+    }
     site_panel_name = None
     missing_sources: list[str] = []
     source_panel_fingerprints: dict[str, str] = {}
@@ -286,18 +302,60 @@ def replay_results(
                 "site-year source panel(s) are unavailable: " + ", ".join(missing_sources)
             )
 
+    declared_annotations = [
+        spec.model_dump(mode="json", by_alias=True, exclude_none=True)
+        for spec in recipe.annotations
+    ]
+    effective_annotations: dict[str, dict[str, Any]] = {}
+    inherited_by_panel: dict[str, list[dict[str, Any]]] = {}
+    bindings_by_panel: dict[str, dict[str, dict[str, Any]]] = {}
+    uncertain_by_panel: dict[str, list[str]] = {}
     for panel_name, panel_plan in panels.items():
         frame = materialized_panel_frames.get(panel_name)
         if not isinstance(frame, pd.DataFrame):
             panel_errors[panel_name] = "panel input is missing or is not a DataFrame"
             continue
         try:
+            discovered, panel_bindings, panel_uncertain = _collect_origin_annotation_records(
+                frame
+            )
+            merged, origins, origin_sources = _merge_annotation_records(
+                declared_annotations, discovered
+            )
+            uncertain_keys = panel_uncertain
+            attachment_bindings = dict(panel_bindings)
+            for identity in uncertain_keys:
+                if attachment_bindings.get(identity, {}).get("columns"):
+                    continue  # A conservative candidate set is narrower than the whole panel.
+                attachment_bindings[identity] = {"columns": {
+                    column: [
+                        [geo.item() if hasattr(geo, "item") else geo, int(year)]
+                        for geo, year in zip(
+                            frame[panel_plan.geo_key], frame[panel_plan.time_key], strict=True
+                        )
+                    ]
+                    for column in frame.columns
+                    if column not in (panel_plan.geo_key, panel_plan.time_key)
+                }}
+            uncertain_by_panel[panel_name] = sorted(uncertain_keys)
+            inherited = [
+                record
+                for record in merged
+                if ANNOTATION_ORIGIN_ARTIFACT in origin_sources[
+                    f"{record['id']}#r{int(record.get('revision', 1))}"
+                ]
+            ]
+            if inherited:
+                inherited_by_panel[panel_name] = inherited
             state = apply_masks(
                 frame,
                 recipe.masks,
                 panel_name=panel_name,
                 geo_key=panel_plan.geo_key,
                 time_key=panel_plan.time_key,
+                annotations=merged or None,
+                annotation_bindings=attachment_bindings or None,
+                annotation_origin_flags=origins,
             )
             active_derivations = [
                 item
@@ -320,12 +378,60 @@ def replay_results(
             states[panel_name] = state
             derived[panel_name] = state["frame"]
             derived_measures[panel_name] = dict(state.get("measures", {}))
+            final_bindings = extract_bindings_from_sidecar(
+                state["annotation_provenance"], state["frame"],
+                geo_key=panel_plan.geo_key, time_key=panel_plan.time_key,
+            )
+            uncertain_keys = [identity for identity in uncertain_keys
+                              if final_bindings.get(identity, {}).get("columns")]
+            uncertain_by_panel[panel_name] = uncertain_keys
+            bindings_by_panel[panel_name] = final_bindings
+            origin_contract = frame_annotation_contract(frame)
+            annotation_sources = {
+                identity: list(entries)
+                for identity, entries in (origin_contract or {}).get("sources", {}).items()
+            }
+            if merged:
+                source_bytes = _panel_input_bytes(frame, dataset_type="results_input_panel")
+                digest = hashlib.sha256(source_bytes).hexdigest()
+                claimed = frame.attrs.get("results_content_sha256")
+                if claimed is not None and claimed != digest:
+                    raise ValueError(
+                        f"panel {panel_name!r} source content hash does not match bytes"
+                    )
+                frame.attrs["results_source_parquet_bytes"] = source_bytes
+                frame.attrs["results_content_sha256"] = digest
+                source = annotation_source_identity(
+                    digest, _parquet_provenance(source_bytes),
+                )
+                for identity, binding in final_bindings.items():
+                    if binding["columns"]:
+                        entries = annotation_sources.setdefault(identity, [])
+                        if source not in entries:
+                            entries.append(source)
+            effective_annotations[panel_name] = (
+                serialize_annotation_contract(
+                    merged, bindings=final_bindings, uncertain_ids=uncertain_keys,
+                    sources=annotation_sources,
+                ) if merged else None
+            )
         except Exception as exc:
             panel_errors[panel_name] = f"{type(exc).__name__}: {exc}"
+
+    global_discovered: list[tuple[str, dict[str, Any]]] = []
+    for panel_name, _panel_plan in panels.items():
+        frame = materialized_panel_frames.get(panel_name)
+        if isinstance(frame, pd.DataFrame):
+            discovered, _bindings, _uncertain = _collect_origin_annotation_records(frame)
+            global_discovered.extend(discovered)
+    global_records, global_origins, global_origin_sources = _merge_annotation_records(
+        declared_annotations, global_discovered
+    )
 
     analyses: dict[str, dict[str, Any]] = {}
     samples: dict[str, pd.DataFrame] = {}
     sample_results: dict[str, dict[str, Any]] = {}
+    annotations_by_key: dict[str, dict[str, Any]] = {}
     groups = {context.key: context for context in plan.group_contexts}
     for analysis_plan in plan.analyses:
         key = analysis_plan.result_key
@@ -384,11 +490,22 @@ def replay_results(
                 panel_state,
                 normalized,
                 mask_provenance=state["mask_provenance"],
+                annotation_provenance=state.get("annotation_provenance"),
                 base_membership=base,
             )
             sample_results[key] = resolved
+            annotations_by_key[key] = {
+                "keys": list(resolved["annotations"]["keys"]),
+                "counts": {
+                    f"{annotation_id}#r{revision}": count
+                    for (annotation_id, revision), count in resolved["annotations"][
+                        "counts"
+                    ].items()
+                },
+            }
             if analysis_plan.group_context_key is not None:
                 sample_results[analysis_plan.group_context_key] = resolved
+                annotations_by_key[analysis_plan.group_context_key] = annotations_by_key[key]
             samples[key] = resolved["membership"]
             outcome = execute_analysis(analysis_plan.to_dict(), resolved["resolved"])
         except Exception as exc:
@@ -437,7 +554,392 @@ def replay_results(
             source_panel_fingerprints if rebuilt.site_universe is not None else {}
         ),
         "sample_results": sample_results,
+        "annotations": _annotations_payload(
+            analyses,
+            annotations_by_key,
+            global_records,
+            global_origins,
+            inherited_by_panel,
+            global_origin_sources,
+            bindings_by_panel,
+            uncertain_by_panel,
+            {name: contract["sources"] for name, contract in effective_annotations.items()
+             if contract is not None},
+        ),
+        "effective_annotations": effective_annotations,
+        "inherited_annotations": inherited_by_panel,
+        "annotation_sidecars": {
+            name: state.get("annotation_provenance")
+            for name, state in states.items()
+            if isinstance(state, Mapping) and state.get("annotation_provenance") is not None
+        },
     }
+
+
+ANNOTATION_ORIGIN_DECLARED = "declared"
+ANNOTATION_ORIGIN_ARTIFACT = "artifact"
+
+
+def _normalize_annotation_record(record: Any) -> dict[str, Any]:
+    """Normalize an annotation record to canonical JSON shape, validating strictly."""
+    from hhplab.recipe.schema_results import DataAnnotationSpec
+
+    if isinstance(record, DataAnnotationSpec):
+        return record.model_dump(mode="json", by_alias=True, exclude_none=True)
+    if not isinstance(record, Mapping):
+        raise ValueError(
+            f"annotation record must be a mapping, got {type(record).__name__}"
+        )
+    try:
+        spec = DataAnnotationSpec.model_validate(dict(record))
+    except Exception as exc:
+        raise ValueError(f"invalid annotation record: {exc}") from exc
+    return spec.model_dump(mode="json", by_alias=True, exclude_none=True)
+
+
+def _collect_origin_annotation_records(
+    frame: pd.DataFrame,
+) -> tuple[list[tuple[str, dict[str, Any]]], dict[str, dict[str, Any]], list[str]]:
+    """Discover data-origin annotation records persisted in a panel artifact.
+
+    Lookup order: ``results_panel_provenance.extra.annotations`` then
+    ``results_panel_provenance.annotations`` (both forms written by bundle
+    producers), then a direct ``frame.attrs["annotations"]`` container used by
+    injected panel frames. Containers use the versioned serialization contract
+    (``list`` legacy record definitions or a v1 contract dict with records,
+    concrete bindings, and uncertain identity keys). Present containers of any
+    other shape, or simultaneously-present alternate containers, are rejected
+    with an actionable error — never silently ignored.
+    """
+    contract = frame_annotation_contract(frame)
+    if contract is None:
+        return [], {}, []
+    return (
+        [(ANNOTATION_ORIGIN_ARTIFACT, record) for record in contract["records"]],
+        contract["bindings"], contract["uncertain_ids"],
+    )
+
+
+def _annotation_identity(record: Mapping[str, Any]) -> tuple[str, int]:
+    return (str(record.get("id")), int(record.get("revision", 1)))
+
+
+def _canonical_annotation(record: Mapping[str, Any]) -> str:
+    """Deterministic canonical form for identity comparison."""
+    return json.dumps(record, sort_keys=True, separators=(",", ":"), default=str)
+
+
+class AnnotationMergeConflictError(ValueError):
+    """Raised when the same annotation identity maps to different content."""
+
+
+def _merge_annotation_records(
+    declared: Sequence[Any],
+    discovered: Sequence[tuple[str, dict[str, Any]]],
+) -> tuple[list[dict[str, Any]], dict[str, str], dict[str, list[str]]]:
+    """Merge declared and inherited annotation records under immutable identity.
+
+    Records sharing an ``id``/``revision`` must have identical canonical
+    content; identical content deduplicates with truthful origins. Different
+    content for the same identity is an actionable conflict (a changed
+    definition requires an explicit new revision) — never a silent in-place
+    override. Returns ``(merged, origins, origin_sources)``.
+    """
+    entries: dict[tuple[str, int], dict[str, Any]] = {}
+    for record in declared:
+        rec = _normalize_annotation_record(record)
+        key = _annotation_identity(rec)
+        if key not in entries:
+            entries[key] = {"canonical": _canonical_annotation(rec), "origins": set()}
+            entries[key]["record"] = rec
+        elif entries[key]["canonical"] != _canonical_annotation(rec):
+            raise AnnotationMergeConflictError(
+                "annotation identity is declared with different content than "
+                "already registered; a changed definition requires an explicit "
+                "new revision, not an in-place override"
+            )
+        entries[key]["origins"].add(ANNOTATION_ORIGIN_DECLARED)
+    for origin_label, record in discovered:
+        rec = _normalize_annotation_record(record)
+        key = _annotation_identity(rec)
+        if key not in entries:
+            entries[key] = {"canonical": _canonical_annotation(rec), "origins": set()}
+            entries[key]["record"] = rec
+        elif entries[key]["canonical"] != _canonical_annotation(rec):
+            raise AnnotationMergeConflictError(
+                "annotation identity from artifact origin conflicts with "
+                "existing content; a changed definition requires an explicit "
+                "new revision, not an in-place override"
+            )
+        entries[key]["origins"].add(origin_label)
+
+    merged = [dict(entry["record"]) for entry in entries.values()]
+    origins: dict[str, str] = {}
+    origin_sources: dict[str, list[str]] = {}
+    for key, entry in entries.items():
+        identity = f"{key[0]}#r{key[1]}"
+        sources = sorted(entry["origins"])
+        origin_sources[identity] = sources
+        origins[identity] = (
+            ANNOTATION_ORIGIN_DECLARED
+            if ANNOTATION_ORIGIN_DECLARED in sources
+            else sources[0]
+        )
+    merged.sort(key=_annotation_identity)
+    _validate_annotation_supersedes_graph(merged)
+    return merged, origins, origin_sources
+
+
+def _iter_annotation_keys(entry: Mapping[str, Any]):
+    """Yield (id, revision) pairs from a per-analysis key entry.
+
+    Keys may be ``(id, revision)`` tuples (raw sample resolution) or dicts
+    (serialized ``per_analysis`` view).
+    """
+    for item in entry.get("keys", ()):
+        if isinstance(item, Mapping):
+            yield str(item.get("id")), int(item.get("revision", 1))
+        else:
+            yield str(item[0]), int(item[1])
+
+
+def _annotation_scope_covers(newer, older):
+    """Prove selector coverage before hiding an older contributing revision."""
+    new_scope, old_scope = newer.get("scope", {}), older.get("scope", {})
+    for axis in ("panels", "columns", "years"):
+        new_values, old_values = new_scope.get(axis, []), old_scope.get(axis, [])
+        if new_values and (not old_values or not set(old_values) <= set(new_values)):
+            return False
+    new_geo = (new_scope.get("geographies") or {}).get("include")
+    old_geo = (old_scope.get("geographies") or {}).get("include")
+    if new_geo is not None and (old_geo is None or not set(old_geo) <= set(new_geo)):
+        return False
+    new_masks, old_masks = newer.get("applies_to_masks", []), older.get("applies_to_masks", [])
+    return not new_masks or bool(old_masks and set(old_masks) <= set(new_masks))
+
+
+def _active_identities_by_key(
+    annotations_by_key: Mapping[str, Any],
+    records: Sequence[Mapping[str, Any]],
+) -> dict[str, list[tuple[str, int]]]:
+    """Resolve supersession per applied analysis key.
+
+    A revision is suppressed in a key only when a *higher* revision of the
+    same id that explicitly supersedes it is itself applied in that same key.
+    Unrelated superseders never hide contributing inherited evidence.
+    """
+    record_index = {
+        (str(record.get("id")), int(record.get("revision", 1))): record
+        for record in records
+    }
+    by_id: dict[str, dict[int, set[str]]] = {}
+    for key, entry in annotations_by_key.items():
+        for annotation_id, revision in _iter_annotation_keys(entry):
+            by_id.setdefault(str(annotation_id), {}).setdefault(int(revision), set()).add(key)
+    active_by_key: dict[str, list[tuple[str, int]]] = {}
+    for key, entry in annotations_by_key.items():
+        active: list[tuple[str, int]] = []
+        for annotation_id, revision in _iter_annotation_keys(entry):
+            annotation_id = str(annotation_id)
+            revision = int(revision)
+            covered = False
+            for other_revision in by_id.get(annotation_id, {}):
+                if other_revision <= revision or key not in by_id[annotation_id][other_revision]:
+                    continue
+                superseder = record_index.get((annotation_id, other_revision))
+                older = record_index[(annotation_id, revision)]
+                if superseder is not None and not _annotation_scope_covers(superseder, older):
+                    continue
+                while superseder is not None and superseder.get("supersedes") is not None:
+                    target = superseder["supersedes"]
+                    if target == revision:
+                        covered = True
+                        break
+                    superseder = record_index.get((annotation_id, target))
+                if covered:
+                    break
+            if not covered:
+                active.append((annotation_id, revision))
+        active.sort(key=lambda item: (item[0], item[1]))
+        active_by_key[key] = active
+    return active_by_key
+
+
+def _annotations_payload(
+    analyses,
+    annotations_by_key,
+    records,
+    origins,
+    inherited_by_panel,
+    origin_sources,
+    bindings_by_panel,
+    uncertain_by_panel,
+    sources_by_panel,
+):
+    """Aggregate annotation records and per-analysis applied keys for a replay."""
+    ordered = sorted(records, key=_annotation_identity)
+    applied: set[tuple[str, int]] = set()
+    for entry in annotations_by_key.values():
+        for annotation_id, revision in _iter_annotation_keys(entry):
+            applied.add((str(annotation_id), int(revision)))
+    active_by_key = _active_identities_by_key(annotations_by_key, ordered)
+    conflicts = []
+    conflict_seen: dict[tuple[str, tuple[int, ...]], int] = {}
+    for key, active in active_by_key.items():
+        by_id_active: dict[str, list[int]] = {}
+        for annotation_id, revision in active:
+            by_id_active.setdefault(annotation_id, []).append(revision)
+        for annotation_id, revisions in by_id_active.items():
+            if len(revisions) < 2:
+                continue
+            revisions = sorted(set(revisions))
+            seen_key = (annotation_id, tuple(revisions))
+            if seen_key in conflict_seen:
+                conflicts[conflict_seen[seen_key]]["analyses"].append(key)
+                continue
+            conflict_seen[seen_key] = len(conflicts)
+            conflicts.append(
+                {
+                    "id": annotation_id,
+                    "revisions": revisions,
+                    "analyses": [key],
+                    "message": (
+                        f"annotation {annotation_id!r} has multiple contributing revisions "
+                        f"{revisions}; inspect their scopes and supersession coverage"
+                    ),
+                }
+            )
+    conflicts.sort(key=lambda item: (item["id"], tuple(item["revisions"])))
+    applied_list = sorted(applied, key=lambda item: (item[0], item[1]))
+    unused = [
+        {"id": annotation_id, "revision": revision}
+        for annotation_id, revision in sorted(
+            (_annotation_identity(item) for item in ordered),
+            key=lambda item: (item[0], item[1]),
+        )
+        if (str(annotation_id), int(revision)) not in applied
+    ]
+    inherited = sorted(
+        (
+            {
+                "panel": panel,
+                "id": record.get("id"),
+                "revision": record.get("revision"),
+            }
+            for panel, panel_records in inherited_by_panel.items()
+            for record in panel_records
+        ),
+        key=lambda item: (item["panel"], str(item["id"]), int(item["revision"])),
+    )
+    unapplied_inherited = []
+    for panel, panel_records in inherited_by_panel.items():
+        for record in panel_records:
+            identity = f"{record['id']}#r{int(record.get('revision', 1))}"
+            binding = bindings_by_panel.get(panel, {}).get(identity)
+            if binding is not None:
+                continue
+            unapplied_inherited.append(
+                {
+                    "panel": panel,
+                    "id": record.get("id"),
+                    "revision": record.get("revision"),
+                    "reason": (
+                        "uncertain_applicability"
+                        if identity in uncertain_by_panel.get(panel, [])
+                        else "no_persisted_binding"
+                    ),
+                }
+            )
+    unapplied_inherited.sort(
+        key=lambda item: (item["panel"], str(item["id"]), int(item["revision"]))
+    )
+    return {
+        "schema_version": 1,
+        "records": ordered,
+        "per_analysis": {
+            key: {
+                "keys": [
+                    {"id": annotation_id, "revision": revision}
+                    for annotation_id, revision in _iter_annotation_keys(entry)
+                ],
+                "counts": dict(entry["counts"]),
+            }
+            for key, entry in sorted(annotations_by_key.items())
+        },
+        "applied": [
+            {"id": annotation_id, "revision": revision}
+            for annotation_id, revision in applied_list
+        ],
+        "active_per_analysis": {
+            key: [{"id": annotation_id, "revision": revision} for annotation_id, revision in active]
+            for key, active in sorted(active_by_key.items())
+        },
+        "unused": unused,
+        "conflicts": conflicts,
+        "origins": dict(sorted(origins.items())),
+        "origin_sources": {
+            key: list(value) for key, value in sorted(origin_sources.items())
+        },
+        "inherited": inherited,
+        "unapplied_inherited": unapplied_inherited,
+        "uncertain_by_panel": uncertain_by_panel,
+        "bindings_by_panel": bindings_by_panel,
+        "sources_by_panel": sources_by_panel,
+    }
+
+
+def _report_notes(records, annotations_by_key, uncertain_ids=()):
+    """Build portable note records for active per-key annotation revisions.
+
+    Supersession is resolved per applied analysis key so an unrelated
+    superseding revision never hides contributing inherited evidence; the note
+    for a revision is kept as long as it is active in at least one key.
+    """
+    notes = []
+    index = {
+        (str(record.get("id")), int(record.get("revision", 1))): record
+        for record in records
+    }
+    if isinstance(annotations_by_key, Mapping) and annotations_by_key:
+        active_by_key = _active_identities_by_key(annotations_by_key, records)
+        active: set[tuple[str, int]] = set()
+        for active_list in active_by_key.values():
+            active.update(active_list)
+        analyses_by_identity: dict[tuple[str, int], list[str]] = {}
+        for analysis_key, active_list in active_by_key.items():
+            for identity in active_list:
+                analyses_by_identity.setdefault(identity, []).append(analysis_key)
+    else:
+        active = {
+            (str(item.get("id")), int(item.get("revision", 1)))
+            for item in annotations_by_key or ()
+        }
+        analyses_by_identity = {}
+    for key in sorted(active, key=lambda item: (item[0], item[1])):
+        record = index.get(key)
+        if record is None:
+            continue
+        note = {
+            "id": record.get("id"),
+            "revision": record.get("revision"),
+            "category": record.get("category"),
+            "summary": record.get("summary"),
+            "text": record.get("text"),
+            "public_text": record.get("public_text"),
+            "treatment": record.get("treatment"),
+            "uncertainty": record.get("uncertainty"),
+            "supersedes": record.get("supersedes"),
+            "evidence": [dict(item) for item in record.get("evidence", ())],
+        }
+        analyses = sorted(analyses_by_identity.get(key, []))
+        if analyses:
+            note["analyses"] = analyses
+        if annotation_identity_key(*key) in uncertain_ids:
+            note["applicability_uncertainty"] = (
+                "Applicability is conservative after an aggregation or unsupported scope mapping."
+            )
+        notes.append(note)
+    return notes
 
 
 def run_results(
@@ -768,6 +1270,13 @@ def _write_failure_bundle(
                 "derived_measures": {},
                 "panel_errors": {},
                 "sample_results": {},
+                "annotations": {
+                    "records": [],
+                    "per_analysis": {},
+                    "applied": [],
+                    "unused": [],
+                    "conflicts": [],
+                },
             }
             try:
                 empty["diagnostics"] = _evaluate_diagnostics(
@@ -1074,11 +1583,41 @@ def _validate_site_source_panel_provenance(panel_name, frame, site_plan):
             )
 
 
+def _parquet_provenance(contents):
+    import pyarrow as pa
+    import pyarrow.parquet as pq
+
+    metadata = pq.read_metadata(pa.BufferReader(contents)).metadata or {}
+    return json.loads(metadata[PROVENANCE_KEY]) if PROVENANCE_KEY in metadata else {}
+
+
 def _panel_input_bytes(frame, *, dataset_type):
     existing = frame.attrs.get("results_source_parquet_bytes")
+    contract = frame_annotation_contract(frame)
     if isinstance(existing, bytes):
+        probe = pd.DataFrame()
+        probe.attrs["results_panel_provenance"] = _parquet_provenance(existing)
+        if frame_annotation_contract(probe) != contract:
+            raise ValueError(
+                "panel annotations differ from original bytes; write a new annotated artifact"
+            )
+        if contract is not None:
+            from io import BytesIO
+
+            original = pd.read_parquet(BytesIO(existing))
+            if not frame.reset_index(drop=True).equals(original.reset_index(drop=True)):
+                raise ValueError(
+                    "annotated source DataFrame changed after reading its source bytes; "
+                    "write a new annotated artifact with updated provenance before reuse"
+                )
         return existing
-    provenance = frame.attrs.get("results_panel_provenance")
+    provenance = dict(frame.attrs.get("results_panel_provenance", {}))
+    if contract is not None:
+        provenance.pop("annotations", None)
+        provenance["extra"] = {
+            **provenance.get("extra", {}),
+            "annotations": contract["records"] if contract["schema_version"] == 0 else contract,
+        }
     return _parquet_bytes(frame, dataset_type=dataset_type, provenance=provenance)
 
 
@@ -1415,12 +1954,7 @@ def _bundle_payload(
         frame = frames.get(panel_plan.name)
         if frame is None:
             continue
-        source_bytes = frame.attrs.get("results_source_parquet_bytes")
-        contents = (
-            source_bytes
-            if isinstance(source_bytes, bytes)
-            else _parquet_bytes(frame, dataset_type="results_input_panel")
-        )
+        contents = _panel_input_bytes(frame, dataset_type="results_input_panel")
         digest = hashlib.sha256(contents).hexdigest()
         claimed_digest = frame.attrs.get("results_content_sha256")
         if claimed_digest is not None and claimed_digest != digest:
@@ -1484,21 +2018,59 @@ def _bundle_payload(
         output = frame[[panel_plan.geo_key, panel_plan.time_key, *derived_names]].copy()
         path = f"derived/{panel_plan.name}.parquet"
         sources = union_lineage(derived_names, lineage)
+        base_contract = replay.get("effective_annotations", {}).get(panel_plan.name)
+        if isinstance(base_contract, Mapping):
+            derived_contract = project_annotation_contract(base_contract, output.columns.tolist())
+            provenance_extra = {"annotations": derived_contract}
+        else:
+            provenance_extra = None
         artifacts.append(
             BundleArtifact(
                 path,
-                _parquet_bytes(output, dataset_type="results_derived_panel"),
+                _parquet_bytes(
+                    output,
+                    dataset_type="results_derived_panel",
+                    provenance=provenance_extra,
+                ),
                 "derived",
                 ArtifactLineage(path, sources, ArtifactScope.ROW_LEVEL),
             )
         )
 
+    def _sample_annotation_contract(key: str, membership: pd.DataFrame) -> dict[str, Any] | None:
+        analysis_plan = next(item for item in plan.analyses if item.result_key == key)
+        panel_name = analysis_plan.panel_name
+        base = replay.get("effective_annotations", {}).get(panel_name)
+        if not isinstance(base, Mapping):
+            return None
+        identities = {
+            annotation_identity_key(item["id"], item["revision"])
+            for item in replay["annotations"]["per_analysis"].get(key, {}).get("keys", [])
+        }
+        # A sample is a membership artifact, not a copy of the measurement
+        # columns. Retain the contributing caveats conservatively rather than
+        # inventing bindings to measurement columns absent from this artifact.
+        return serialize_annotation_contract(
+            base["records"], uncertain_ids=sorted(identities), sources=base.get("sources", {}),
+        )
+
     for key, membership in replay["samples"].items():
         path = f"samples/{key}.parquet"
+        sample_contract = (
+            _sample_annotation_contract(key, membership) if private else None
+        )
+        sample_provenance = (
+            {"annotations": sample_contract} if sample_contract is not None
+            else {"annotation_status": PUBLIC_SAMPLE_ANNOTATION_NOTICE} if not private else None
+        )
         artifacts.append(
             BundleArtifact(
                 path,
-                _parquet_bytes(membership, dataset_type="results_sample"),
+                _parquet_bytes(
+                    membership,
+                    dataset_type="results_sample",
+                    provenance=sample_provenance,
+                ),
                 "sample",
                 ArtifactLineage(path, (), ArtifactScope.SAMPLE),
             )
@@ -1598,6 +2170,29 @@ def _bundle_payload(
         ],
         "limitations": [],
         "withheld": [],
+        "notes": _report_notes(
+            replay.get("annotations", {}).get("records", ()),
+            replay.get("annotations", {}).get("per_analysis", {}),
+            {
+                identity for identities in replay.get("annotations", {})
+                .get("uncertain_by_panel", {}).values() for identity in identities
+            },
+        ),
+        "annotation_conflicts": list(
+            replay.get("annotations", {}).get("conflicts", ())
+        ),
+        "declared_annotations": list(
+            replay.get("annotations", {}).get("records", ())
+        ),
+        "inherited_annotations": [
+            {
+                "panel": panel,
+                "id": record.get("id"),
+                "revision": record.get("revision"),
+            }
+            for panel, records in replay.get("inherited_annotations", {}).items()
+            for record in records
+        ],
     }
     measures = {
         "bundle_format_version": BUNDLE_FORMAT_VERSION,
@@ -1642,6 +2237,7 @@ def _bundle_payload(
         private=private,
         allow_unknown_aggregates=allow_unknown_aggregates,
         site_universes=site_universes,
+        annotations=replay.get("annotations", {}),
     )
     return payload, content_hashes
 
@@ -1718,14 +2314,14 @@ def _parquet_bytes(frame, *, dataset_type, provenance=None):
 
     table = pa.Table.from_pandas(frame, preserve_index=False)
     metadata = dict(table.schema.metadata or {})
-    extra = {"dataset_type": dataset_type, "row_count": len(frame)}
-    if isinstance(provenance, Mapping):
-        extra.update(provenance)
-    metadata[PROVENANCE_KEY] = (
-        ProvenanceBlock(extra=extra)
-        .to_json()
-        .encode("utf-8")
-    )
+    block = ProvenanceBlock.from_dict(dict(provenance)) if provenance else ProvenanceBlock()
+    block.extra.update({"dataset_type": dataset_type, "row_count": len(frame)})
+    document = block.to_dict()
+    # Results timestamps belong to the manifest. Do not let wall-clock time
+    # change the scientific identity of generated/injected panel content.
+    if not provenance or "created_at" not in provenance:
+        document.pop("created_at", None)
+    metadata[PROVENANCE_KEY] = json.dumps(document, sort_keys=True).encode("utf-8")
     stream = pa.BufferOutputStream()
     pq.write_table(
         table.replace_schema_metadata(metadata), stream, compression="snappy"

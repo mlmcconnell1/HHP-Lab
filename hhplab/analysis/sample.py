@@ -38,6 +38,7 @@ def resolve_sample(
     plan: Mapping[str, Any],
     *,
     mask_provenance: pd.DataFrame | None = None,
+    annotation_provenance: pd.DataFrame | None = None,
     base_membership: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Resolve a normalized analysis or sample-group context over a full panel.
@@ -46,6 +47,11 @@ def resolve_sample(
     names, panel identity, ordered required and numeric columns, the normalized
     sample mapping, fixed-effect dimensions, and sample-source identifiers.
     This module deliberately has no dependency on RecipeV2 schema classes.
+
+    ``annotation_provenance`` is the sidecar of versioned (``id``,
+    ``revision``) adjustment/caveat keys built by mask/derive stages; the
+    result reports the ordered, deduplicated union of keys attached to the
+    rows and columns actually used by the sample.
 
     The return value contains a ``ResolvedSampleFrame`` for included rows and a
     full-panel ``membership`` DataFrame with keys, ``included``, ``reason``, and
@@ -120,6 +126,35 @@ def resolve_sample(
         geo_key=geo_key,
         time_key=time_key,
     )
+    annotation_masks = _validate_annotation_provenance(annotation_provenance, panel)
+    annotation_dependencies = set()
+    for position, (included, reason) in enumerate(decisions):
+        if included:
+            columns = needed
+        elif reason and reason.startswith(("masked:", "missing:", "nonfinite:")):
+            columns = [reason.split(":", 1)[1]]
+        elif reason == "invalid_weight":
+            columns = weights
+        elif reason == "singleton_fe":
+            columns = fixed_effects
+        elif reason == "geography_excluded":
+            allowed = (sample.get("geographies") or {}).get("include")
+            columns = normalized["predicate_columns"] if (
+                allowed is None or panel[geo_key].iat[position] in allowed
+            ) else []
+        else:
+            columns = []
+        for column in columns:
+            for key in _annotation_cell_keys(annotation_masks, column, position):
+                annotation_dependencies.add((
+                    panel[geo_key].iat[position], int(panel[time_key].iat[position]), column, key,
+                ))
+    if base_membership is not None:
+        annotation_dependencies.update(
+            base_membership.get("annotations", {}).get("dependencies", ())
+        )
+    annotation_counts = Counter(dependency[3] for dependency in annotation_dependencies)
+    annotation_keys = tuple(sorted(annotation_counts))
     exclusions = Counter(reason for included, reason in decisions if not included)
     return {
         "resolved": resolved,
@@ -139,6 +174,11 @@ def resolve_sample(
         "n_included": len(included_positions),
         "n_excluded": len(panel) - len(included_positions),
         "exclusions": dict(sorted(exclusions.items())),
+        "annotations": {
+            "keys": annotation_keys,
+            "counts": dict(sorted(annotation_counts.items())),
+            "dependencies": tuple(sorted(annotation_dependencies, key=repr)),
+        },
     }
 
 
@@ -490,6 +530,59 @@ def _validate_mask_provenance(masks: pd.DataFrame | None, panel: pd.DataFrame) -
                     "must be a tuple of non-empty mask IDs"
                 )
     return masks
+
+
+def _validate_annotation_provenance(
+    annotations: pd.DataFrame | None, panel: pd.DataFrame
+) -> pd.DataFrame:
+    if annotations is None:
+        return pd.DataFrame(
+            {column: [()] * len(panel) for column in panel.columns}, index=panel.index
+        )
+    if not isinstance(annotations, pd.DataFrame):
+        raise SampleResolutionError("annotation_provenance must be a DataFrame")
+    if not annotations.index.equals(panel.index) or not annotations.columns.equals(panel.columns):
+        raise SampleResolutionError(
+            "annotation_provenance rows and columns must exactly match the full panel"
+        )
+    for column in annotations.columns:
+        for position, raw in enumerate(annotations[column].array):
+            value = _python_scalar(raw)
+            if not isinstance(value, tuple) or any(
+                not isinstance(item, tuple)
+                or len(item) != 2
+                or not isinstance(item[0], str)
+                or not item[0]
+                or not isinstance(item[1], int)
+                or isinstance(item[1], bool)
+                or item[1] < 1
+                for item in value
+            ):
+                raise SampleResolutionError(
+                    f"annotation provenance for {column!r} at row position {position} "
+                    "must be a tuple of (id, revision)"
+                )
+    return annotations
+
+
+def _annotation_cell_keys(
+    annotations: pd.DataFrame, column: str, position: int
+) -> tuple[tuple[str, int], ...]:
+    value = _python_scalar(annotations[column].iat[position])
+    if isinstance(value, tuple) and all(
+        isinstance(item, tuple)
+        and len(item) == 2
+        and isinstance(item[0], str)
+        and isinstance(item[1], int)
+        for item in value
+    ):
+        return value
+    if value is None or value is pd.NA:
+        return ()
+    raise SampleResolutionError(
+        f"annotation provenance for {column!r} at row position {position} "
+        "must be a tuple of (id, revision)"
+    )
 
 
 def _validate_panel(panel: pd.DataFrame, *, geo_key: str, time_key: str) -> None:

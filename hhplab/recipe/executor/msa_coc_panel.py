@@ -25,6 +25,14 @@ from hhplab.schema.columns import (
     MSA_COC_PANEL_COLUMNS,
     PIT_OBSERVATION_COLUMNS,
 )
+from hhplab.schema.contracts import (
+    annotation_identity_key,
+    annotation_source_identity,
+    annotations_for_source_cell,
+    frame_annotation_contract,
+    serialize_annotation_contract,
+    uncertain_annotation_contract,
+)
 from hhplab.sources.hud.pit.observation import (
     COUNT_TYPES_FULL,
     COUNT_TYPES_PARTIAL,
@@ -85,6 +93,33 @@ def site_year_panel_columns(measures: Sequence[str]) -> tuple[str, ...]:
         columns.append(measure)
         columns.extend(f"{measure}__{suffix}" for suffix in SITE_YEAR_DIAGNOSTIC_SUFFIXES)
     return tuple(columns)
+
+
+def _bind_site_year_annotations(
+    contract, source_ids, source_columns, *, year, msa_id, measure, outcome_name,
+    output_bindings, uncertain_output_annotations,
+):
+    """Map consumed source cells onto a measure family of the output row."""
+    dependency_columns = [measure]
+    if outcome_name == "pit":
+        dependency_columns.extend((*PIT_OBSERVATION_COLUMNS, "count_types", "pit_unsheltered"))
+    target_columns = [
+        measure, *(f"{measure}__{suffix}" for suffix in SITE_YEAR_DIAGNOSTIC_SUFFIXES)
+    ]
+    for source_id in source_ids:
+        for source_column in dependency_columns:
+            if source_column not in source_columns:
+                continue
+            for identity, uncertain in annotations_for_source_cell(
+                contract, source_id, year, source_column,
+            ):
+                if uncertain:
+                    uncertain_output_annotations.add(identity)
+                bound = output_bindings.setdefault(identity, {"columns": {}})
+                for target_column in target_columns:
+                    cells = bound["columns"].setdefault(target_column, [])
+                    if [msa_id, year] not in cells:
+                        cells.append([msa_id, year])
 
 
 def assemble_site_year_panel(
@@ -176,6 +211,12 @@ def assemble_site_year_panel(
 
     site_ids = tuple(sorted(set(sites_by_coc.values())))
     rows: list[dict[str, object]] = []
+    consumed_keys: dict[str, set[tuple[str, int]]] = {panel_id: set() for panel_id in panel_ids}
+    annotation_contracts = {
+        panel_id: frame_annotation_contract(source_panels[panel_id]) for panel_id in panel_ids
+    }
+    output_bindings: dict[str, dict[str, Any]] = {}
+    uncertain_output_annotations: set[str] = set()
     for msa_id in site_ids:
         coc_ids = tuple(
             sorted(
@@ -223,6 +264,18 @@ def assemble_site_year_panel(
                             )
                             for source_coc_id in source_coc_ids
                         ]
+                        consumed_keys[panel_id].update(
+                            (source_id, year) for source_id in source_coc_ids
+                        )
+                        _bind_site_year_annotations(
+                            annotation_contracts[panel_id],
+                            [source_id for source_id in source_coc_ids
+                             if (source_id, year) in source_lookup],
+                            source_panels[panel_id].columns, year=year, msa_id=msa_id,
+                            measure=measure, outcome_name=outcome_name,
+                            output_bindings=output_bindings,
+                            uncertain_output_annotations=uncertain_output_annotations,
+                        )
                         count_observed = True
                         if outcome_name == "pit":
                             source_rows = [
@@ -360,6 +413,37 @@ def assemble_site_year_panel(
             "row_count": len(panel),
         }
     }
+    annotation_inputs = []
+    for panel_id in panel_ids:
+        source = source_panels[panel_id]
+        used = [
+            (str(coc_id).strip(), int(year)) in consumed_keys[panel_id]
+            for coc_id, year in zip(source["coc_id"], source["year"], strict=True)
+        ]
+        annotation_inputs.append(source.loc[used].copy())
+    source_annotations = uncertain_annotation_contract(annotation_inputs)
+    if source_annotations is not None:
+        lineage = dict(source_annotations["sources"])
+        for panel_id in panel_ids:
+            source = source_panels[panel_id]
+            contract = frame_annotation_contract(source)
+            if contract is None:
+                continue
+            identity = annotation_source_identity(
+                source_panel_fingerprints[panel_id],
+                source.attrs.get("results_panel_provenance", {}),
+            )
+            for record in contract["records"]:
+                key = annotation_identity_key(record["id"], record["revision"])
+                entries = lineage.setdefault(key, [])
+                if identity not in entries:
+                    entries.append(identity)
+        source_annotations = serialize_annotation_contract(
+            source_annotations["records"], bindings=output_bindings,
+            uncertain_ids=sorted(uncertain_output_annotations), sources=lineage,
+        )
+        provenance.setdefault("extra", {})["annotations"] = source_annotations
+        panel.attrs["results_panel_provenance"] = provenance
     return SiteYearPanelAssembly(panel=panel, provenance=provenance)
 
 

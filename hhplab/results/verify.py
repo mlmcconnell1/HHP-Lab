@@ -15,11 +15,16 @@ from typing import Any
 
 import pandas as pd
 
+from hhplab.recipe.derive import parse_annotation_contract, serialize_annotation_contract
+from hhplab.results.bundle import _distribution_safe_annotations
+from hhplab.schema.contracts import PUBLIC_SAMPLE_ANNOTATION_NOTICE, project_annotation_contract
 from hhplab.schema.results import RESULT_TABLE_SCHEMAS, ResultsManifest, Tolerance
+from hhplab.storage.provenance import read_provenance
 
 REPLAYER = Callable[
     [Mapping[str, Any], Mapping[str, Any], Mapping[str, pd.DataFrame]], Mapping[str, Any]
 ]
+_ZERO_TOLERANCE = Tolerance(atol=0.0, rtol=0.0)
 _RESULT_TABLES = (
     "regression_estimates",
     "regression_fit",
@@ -884,6 +889,15 @@ def _compare_replay(
         unavailable_paths,
         exclusions.panels,
     )
+    _compare_annotations_artifact(
+        root, replayed, manifest, unavailable_paths, differences, exclusions
+    )
+    _compare_derived_annotation_contracts(
+        root, execution, replayed, unavailable_paths, differences
+    )
+    _compare_sample_annotation_contracts(
+        root, resolved, execution, replayed, manifest, unavailable_paths, differences
+    )
     plan = resolved.get("plan", {})
     panel_plans = plan.get("panels", ()) if isinstance(plan, Mapping) else ()
     replay_inputs = replayed.get("input_panels", {})
@@ -914,6 +928,187 @@ def _compare_replay(
                     differences,
                 )
     return differences
+
+
+def _read_parquet_provenance(root: Path, relative_path: str) -> dict[str, Any] | None:
+    """Read embedded provenance of a bundled parquet artifact."""
+    path = root / relative_path
+    if not path.is_file():
+        return None
+    provenance = read_provenance(path)
+    return provenance.to_dict() if provenance is not None else None
+
+
+def _normalize_annotation_contract(value: Any) -> dict[str, Any] | None:
+    """Normalize a persisted annotation container to the canonical v1 contract."""
+    if value is None:
+        return None
+    parsed = parse_annotation_contract(value)
+    return serialize_annotation_contract(
+        parsed["records"],
+        bindings=parsed["bindings"],
+        uncertain_ids=parsed["uncertain_ids"],
+        sources=parsed.get("sources", {}),
+    )
+
+
+def _compare_annotations_artifact(
+    root: Path,
+    replay: Mapping[str, Any],
+    manifest: ResultsManifest,
+    unavailable_paths: set[str],
+    differences: list[dict[str, Any]],
+    exclusions: _DependencyExclusions | None = None,
+) -> None:
+    """Semantically compare the versioned annotation artifact against replay.
+
+    Metadata-only edits to ``annotations.json`` (or to embedded panel
+    contracts) change the bundled payload without touching the manifest; this
+    comparison recomputes the expected payload from the replay and fails
+    reproducibility when the semantic content differs. Public (safe-filtered)
+    bundles are compared against the same distribution-safe view of the
+    replayed payload.
+
+    Only the scientifically replayable slice is compared: per-analysis
+    membership for analyses whose bundled inputs are unavailable (excluded)
+    cannot be reproduced offline, so those ``per_analysis`` entries are
+    removed from both sides before comparison — while definitional records,
+    provenance, and membership for available analyses stay strict.
+    """
+    relative_path = "annotations.json"
+    if relative_path in unavailable_paths:
+        return
+    path = root / relative_path
+    expected = replay.get("annotations", {})
+    if not path.is_file():
+        if not expected:
+            # Legacy/synthetic bundles with no annotation payload at all have
+            # nothing to compare; absence on both sides is not a difference.
+            return
+        differences.append({"path": relative_path, "reason": "missing_copy"})
+        return
+    actual = _read_json(path)
+    if exclusions is not None:
+        expected = _restrict_annotations_to_replayable(expected, exclusions)
+        actual = _restrict_annotations_to_replayable(actual, exclusions)
+    if not manifest.private:
+        withheld = _read_optional_json(root / "withheld.json") or {}
+        expected = _distribution_safe_annotations(expected, private=False,
+                                                  withheld=withheld.get("withheld", []))
+        if exclusions is not None and exclusions.analyses:
+            # Source-derived public explanations cannot be replayed if their
+            # authoritative inputs are withheld. Availability already marks
+            # verification partial. Validate the public wrapper, not hidden lineage.
+            if isinstance(actual, Mapping) and actual.get("distribution_status") == "withheld":
+                actual = dict(actual)
+                expected = dict(expected)
+                actual.pop("public_notes", None)
+                expected.pop("public_notes", None)
+    _compare_at(expected, actual, relative_path, _ZERO_TOLERANCE, differences)
+
+
+def _restrict_annotations_to_replayable(
+    annotations: Any, exclusions: _DependencyExclusions
+) -> Any:
+    """Drop per-analysis membership for analyses that cannot be replayed.
+
+    ``per_analysis`` entries are keyed by analysis result key (``analysis@variant``).
+    Analyses whose inputs are unavailable offline are excluded via
+    ``exclusions.analyses``; their membership cannot be reproduced from the
+    bundle and is therefore not compared. All other content is compared
+    strictly.
+    """
+    if not isinstance(annotations, Mapping):
+        return annotations
+    restricted = dict(annotations)
+    for field in ("per_analysis", "active_per_analysis"):
+        per_analysis = restricted.get(field)
+        if isinstance(per_analysis, Mapping) and exclusions.analyses:
+            restricted[field] = {
+                key: value for key, value in per_analysis.items() if key not in exclusions.analyses
+            }
+    return restricted
+
+
+def _compare_derived_annotation_contracts(
+    root: Path,
+    execution: Mapping[str, Any],
+    replay: Mapping[str, Any],
+    unavailable_paths: set[str],
+    differences: list[dict[str, Any]],
+) -> None:
+    """Compare embedded derived-panel annotation contracts against replay output."""
+    derived_paths = execution.get("derived", {})
+    if not isinstance(derived_paths, Mapping):
+        return
+    effective = replay.get("effective_annotations", {})
+    if not isinstance(effective, Mapping):
+        return
+    for panel_name, relative_path in sorted(derived_paths.items()):
+        if not isinstance(relative_path, str) or relative_path in unavailable_paths:
+            continue
+        expected_contract = effective.get(panel_name)
+        if isinstance(expected_contract, Mapping):
+            expected_contract = project_annotation_contract(
+                expected_contract, pd.read_parquet(root / relative_path).columns.tolist()
+            )
+        try:
+            embedded_provenance = _read_parquet_provenance(root, relative_path)
+            embedded_extra = embedded_provenance.get("extra", {}) if embedded_provenance else {}
+            actual_contract = _normalize_annotation_contract(embedded_extra.get("annotations"))
+            expected_normalized = _normalize_annotation_contract(expected_contract)
+        except (ValueError, TypeError) as exc:
+            differences.append({
+                "path": relative_path, "reason": f"invalid_annotation_contract: {exc}",
+            })
+            continue
+        if actual_contract != expected_normalized:
+            differences.append(
+                {
+                    "path": relative_path,
+                    "reason": "annotation_contract_differs",
+                    "expected": expected_normalized,
+                    "actual": actual_contract,
+                }
+            )
+
+
+def _compare_sample_annotation_contracts(
+    root, resolved, execution, replay, manifest, unavailable_paths, differences,
+):
+    panel_by_analysis = {
+        item["result_key"]: item["panel_name"]
+        for item in resolved.get("plan", {}).get("analyses", [])
+    }
+    for key, relative in execution.get("samples", {}).items():
+        if not (root / relative).is_file():
+            continue
+        expected = None
+        base = replay.get("effective_annotations", {}).get(panel_by_analysis.get(key))
+        if manifest.private and isinstance(base, Mapping):
+            entry = replay.get("annotations", {}).get("per_analysis", {}).get(key, {})
+            expected = serialize_annotation_contract(
+                base["records"], uncertain_ids=[
+                    f"{item['id']}#r{item['revision']}" for item in entry.get("keys", [])
+                ],
+                sources=base.get("sources", {}),
+            )
+        try:
+            provenance = _read_parquet_provenance(root, relative) or {}
+            actual = _normalize_annotation_contract(provenance.get("extra", {}).get("annotations"))
+            if "effective_annotations" in replay:
+                expected_notice = PUBLIC_SAMPLE_ANNOTATION_NOTICE if not manifest.private else None
+                if provenance.get("extra", {}).get("annotation_status") != expected_notice:
+                    differences.append({"path": relative, "reason": "annotation_notice_differs"})
+        except (ValueError, TypeError) as exc:
+            differences.append({"path": relative, "reason": f"invalid_annotation_contract: {exc}"})
+            continue
+        if manifest.private and (
+            relative in unavailable_paths or key not in replay.get("samples", {})
+        ):
+            continue
+        if actual != expected:
+            differences.append({"path": relative, "reason": "sample_annotation_contract_differs"})
 
 
 def _compare_json_artifact(

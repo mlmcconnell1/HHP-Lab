@@ -30,7 +30,7 @@ from __future__ import annotations
 
 import json
 import logging
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass, field, replace
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -40,6 +40,7 @@ import pyarrow as pa
 import pyarrow.parquet as pq
 
 from hhplab._version import __version__
+from hhplab.schema.contracts import frame_annotation_contract, parse_annotation_contract
 
 logger = logging.getLogger(__name__)
 
@@ -155,6 +156,13 @@ class ProvenanceBlock:
             "extra",
         }
         kwargs = {k: v for k, v in data.items() if k in known_fields}
+        extra = data.get("extra", {})
+        if "annotations" in data or (isinstance(extra, dict) and "annotations" in extra):
+            probe = pd.DataFrame()
+            probe.attrs["results_panel_provenance"] = data
+            frame_annotation_contract(probe)
+        if isinstance(extra, dict):
+            kwargs["extra"] = dict(extra)
         # Put unknown fields into extra
         unknown = {k: v for k, v in data.items() if k not in known_fields}
         if unknown:
@@ -240,6 +248,25 @@ def write_parquet_with_provenance(
     """
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
+
+    inherited = frame_annotation_contract(df)
+    explicit = (
+        parse_annotation_contract(provenance.extra["annotations"])
+        if "annotations" in provenance.extra else None
+    )
+    if inherited is not None and explicit is not None and inherited != explicit:
+        raise ValueError(
+            "output provenance conflicts with frame annotations; preserve immutable records"
+        )
+    contract = inherited if inherited is not None else explicit
+    if contract is not None:
+        for binding in contract["bindings"].values():
+            if set(binding["columns"]) - set(df.columns):
+                raise ValueError(
+                    "annotated columns were removed/renamed; remap explicit bindings first"
+                )
+        container = contract["records"] if contract["schema_version"] == 0 else contract
+        provenance = replace(provenance, extra={**provenance.extra, "annotations": container})
 
     # Convert DataFrame to PyArrow Table
     table = pa.Table.from_pandas(df, preserve_index=False)

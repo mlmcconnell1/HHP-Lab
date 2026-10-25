@@ -345,7 +345,7 @@ def _execute_resample(
             effective_geometry=task.effective_geometry,
             input_path=task.input_path,
         )
-        df = ctx.cache.read_parquet(input_file)
+        df = ctx.cache.read_parquet(input_file, reject_annotations=True)
     except (FileNotFoundError, OSError, pa.ArrowInvalid) as exc:
         return StepResult(
             step_kind="resample",
@@ -356,7 +356,7 @@ def _execute_resample(
                 f"failed to read {task.input_path}: {exc}"
             ),
         )
-    except ExecutorError as exc:
+    except (ExecutorError, ValueError) as exc:
         return StepResult(
             step_kind="resample",
             detail=detail,
@@ -488,7 +488,7 @@ def _execute_resample(
                     ),
                 )
             try:
-                xwalk = ctx.cache.read_parquet(xwalk_path)
+                xwalk = ctx.cache.read_parquet(xwalk_path, reject_annotations=True)
                 xwalk = _attach_dynamic_pop_share(
                     xwalk=xwalk,
                     task=task,

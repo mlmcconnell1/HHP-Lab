@@ -768,7 +768,7 @@ def _load_support_dataset_for_year(
         effective_geometry=resolved.effective_geometry,
         input_path=resolved.path,
     )
-    df = ctx.cache.read_parquet(input_file)
+    df = ctx.cache.read_parquet(input_file, reject_annotations=True)
     identity = ctx.cache.file_identity(input_file)
     root, rel_path = _classify_path(input_file, ctx)
     ctx.consumed_assets.append(AssetRecord(

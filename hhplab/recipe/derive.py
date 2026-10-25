@@ -7,8 +7,19 @@ import numbers
 from collections.abc import Mapping, Sequence
 from typing import Any
 
+import numpy as np
 import pandas as pd
 from pydantic import BaseModel
+
+from hhplab.schema.contracts import (
+    annotation_identity_key as _annotation_identity_key,
+)
+from hhplab.schema.contracts import (
+    parse_annotation_contract as _parse_annotation_contract,
+)
+from hhplab.schema.contracts import (
+    serialize_annotation_contract as _serialize_annotation_contract,
+)
 
 
 class DerivationError(ValueError):
@@ -27,18 +38,26 @@ def apply_masks(
     panel_name: str,
     geo_key: str,
     time_key: str,
+    annotations: Sequence[Mapping[str, Any] | BaseModel] | None = None,
+    annotation_bindings: Mapping[str, Any] | None = None,
+    annotation_origin_flags: Mapping[str, str] | None = None,
 ) -> dict[str, Any]:
     """Apply cell masks without changing row identity or conflating null and NaN.
 
     The returned mapping contains the copied ``frame``, a same-index
     ``mask_provenance`` frame whose cells are tuples of mask IDs, a same-index
-    ``value_reasons`` frame, and ``mask_definitions`` for audit detail.
+    ``value_reasons`` frame, ``mask_definitions`` for audit detail, and an
+    ``annotation_provenance`` sidecar populated from ``annotations`` (versioned
+    adjustment/caveat records scoped to panels, columns, years, geographies,
+    and/or applied masks). ``annotation_bindings`` carries persisted concrete
+    applicability bindings for inherited records.
     """
     _validate_panel(frame, geo_key=geo_key, time_key=time_key)
     result = frame.copy(deep=True)
     provenance = _empty_provenance(result)
     reasons = _empty_reasons(result)
     definitions: dict[str, dict[str, Any]] = {}
+    annotation_provenance = _empty_annotations(result)
 
     seen_ids: set[str] = set()
     for raw_mask in masks:
@@ -116,11 +135,24 @@ def apply_masks(
             "geographies": geography,
         }
 
+    if annotations is not None:
+        annotation_provenance = attach_annotations(
+            annotation_provenance,
+            annotations,
+            frame=result,
+            panel_name=panel_name,
+            geo_key=geo_key,
+            time_key=time_key,
+            mask_provenance=provenance,
+            bindings=annotation_bindings,
+            origin_flags=annotation_origin_flags,
+        )
     return {
         "frame": result,
         "mask_provenance": provenance,
         "value_reasons": reasons,
         "mask_definitions": definitions,
+        "annotation_provenance": annotation_provenance,
         "measures": {},
     }
 
@@ -166,6 +198,7 @@ def derive_panel(
     result = frame.copy(deep=True)
     provenance = state["mask_provenance"].copy(deep=True)
     reasons = state["value_reasons"].copy(deep=True)
+    annotations = state["annotation_provenance"].copy(deep=True)
     calendar = _calendar_index(result, geo_key=geo_key, time_key=time_key)
     for spec in order:
         output = spec["id"]
@@ -179,13 +212,15 @@ def derive_panel(
         values: list[Any] = []
         mask_values: list[tuple[str, ...]] = []
         reason_values: list[str | None] = []
+        annotation_values: list[tuple[tuple[str, int], ...]] = []
         for position in range(len(result)):
-            value, mask_ids, reason = _evaluate_cell(
+            value, mask_ids, reason, annotation_keys = _evaluate_cell(
                 spec,
                 position,
                 result,
                 provenance,
                 reasons,
+                annotations,
                 calendar,
                 geo_key=geo_key,
                 time_key=time_key,
@@ -194,14 +229,17 @@ def derive_panel(
             values.append(value)
             mask_values.append(mask_ids)
             reason_values.append(reason)
+            annotation_values.append(annotation_keys)
         result[output] = pd.Series(values, index=result.index, dtype=object)
         provenance[output] = pd.Series(mask_values, index=result.index, dtype=object)
         reasons[output] = pd.Series(reason_values, index=result.index, dtype=object)
+        annotations[output] = pd.Series(annotation_values, index=result.index, dtype=object)
         metadata[output] = measure
 
     state["frame"] = result
     state["mask_provenance"] = provenance
     state["value_reasons"] = reasons
+    state["annotation_provenance"] = annotations
     state["measures"] = {
         spec["id"]: {
             "definition": spec,
@@ -246,6 +284,317 @@ def _empty_reasons(frame: pd.DataFrame) -> pd.DataFrame:
     )
 
 
+def _empty_annotations(frame: pd.DataFrame) -> pd.DataFrame:
+    return pd.DataFrame(
+        {column: pd.Series([()] * len(frame), index=frame.index, dtype=object) for column in frame},
+        index=frame.index,
+    )
+
+
+def annotation_identity_key(annotation_id: Any, revision: Any) -> str:
+    """Canonical identity key for an annotation record: ``<id>#r<rev>``."""
+    return _annotation_identity_key(annotation_id, revision)
+
+
+def parse_annotation_contract(value: Any) -> dict[str, Any]:
+    """Use the shared strict artifact contract from ``hhplab.schema.contracts``."""
+    return _parse_annotation_contract(value)
+
+
+_ANNOTATION_KEYS = frozenset(
+    {
+        "id",
+        "revision",
+        "category",
+        "summary",
+        "text",
+        "public_text",
+        "treatment",
+        "uncertainty",
+        "evidence",
+        "scope",
+        "applies_to_masks",
+        "supersedes",
+    }
+)
+
+
+def serialize_annotation_contract(
+    records: Sequence[Mapping[str, Any]],
+    *,
+    bindings: Mapping[str, Any] | None = None,
+    uncertain_ids: Sequence[str] = (),
+    sources: Mapping[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Serialize annotation records plus effective bindings under the v1 contract.
+
+    Bindings map each column to its own concrete cells. Definitions and
+    source content identities remain separate from transformed applicability.
+    """
+    return _serialize_annotation_contract(
+        records, bindings=bindings, uncertain_ids=uncertain_ids, sources=sources,
+    )
+
+
+def extract_bindings_from_sidecar(
+    sidecar: pd.DataFrame,
+    frame: pd.DataFrame,
+    *,
+    geo_key: str,
+    time_key: str,
+    key_columns: Sequence[str] = (),
+) -> dict[str, dict[str, Any]]:
+    """Derive concrete applicability bindings from an annotation sidecar.
+
+    For every record key present in ``sidecar``, collect the target columns
+    and the concrete ``(geo_value, year)`` cells that carry it in ``frame``.
+    The results are what persistence writes so later reuse can attach the same
+    record without re-evaluating selectors against transformed names.
+    """
+    skip = set(key_columns) | {geo_key, time_key}
+    bindings: dict[str, dict[str, Any]] = {}
+    geo_values = frame[geo_key].to_numpy(dtype=object)
+    time_values = frame[time_key].to_numpy(dtype=object)
+    for column in sidecar.columns:
+        if column in skip:
+            continue
+        cells = sidecar[column].to_numpy(dtype=object)
+        for position, cell in enumerate(cells):
+            if not isinstance(cell, tuple) or not cell:
+                continue
+            for key in cell:
+                identity = annotation_identity_key(key[0], key[1])
+                geo = geo_values[position]
+                if isinstance(geo, np.generic):
+                    geo = geo.item()
+                entry = bindings.setdefault(identity, {"columns": {}})
+                bound_cells = entry["columns"].setdefault(column, [])
+                pair = [geo, int(time_values[position])]
+                if pair not in bound_cells:
+                    bound_cells.append(pair)
+    return bindings
+
+
+def _annotation_keys(
+    annotations: pd.DataFrame, column: str, position: int
+) -> tuple[tuple[str, int], ...]:
+    value = annotations[column].iat[position]
+    if isinstance(value, tuple) and all(
+        isinstance(item, tuple)
+        and len(item) == 2
+        and isinstance(item[0], str)
+        and type(item[1]) is int and item[1] > 0
+        for item in value
+    ):
+        return value
+    if value is None or value is pd.NA:
+        return ()
+    raise DerivationError(
+        f"annotation provenance for {column!r} must contain tuples of (id, revision)"
+    )
+
+
+def attach_annotations(
+    annotations: pd.DataFrame,
+    specs: Sequence[Mapping[str, Any] | BaseModel],
+    *,
+    frame: pd.DataFrame,
+    panel_name: str,
+    geo_key: str,
+    time_key: str,
+    mask_provenance: pd.DataFrame | None = None,
+    bindings: Mapping[str, Any] | None = None,
+    origin_flags: Mapping[str, str] | None = None,
+) -> pd.DataFrame:
+    """Attach versioned annotation keys to matching panel cells.
+
+    Scoping selects rows by ``years``/``geographies`` (evaluated against the
+    **source** ``frame`` key columns, never against the sidecar itself) or by
+    which masks already apply (``applies_to_masks``), then columns by
+    ``scope.columns`` (empty means every non-key column). Values are never
+    modified; only the sidecar is written, so annotations survive derivations
+    and sampling like mask provenance while leaving cells finite.
+
+    ``bindings`` maps identity keys to persisted concrete applicability
+    bindings (per-column explicit cells) discovered from an artifact; when a
+    binding exists for a record it is attached directly from the recorded
+    cells without re-evaluating selectors against possibly-renamed columns.
+    Missing binding columns are a hard error — unknown bindings never silently
+    disappear. ``origin_flags`` lets callers mark inherited (artifact) records
+    so selector-based legacy fallback is auditable.
+    """
+    result = annotations.copy(deep=True)
+    if not isinstance(frame, pd.DataFrame):
+        raise DerivationError("attach_annotations requires a source frame for scoping")
+    if not frame.index.equals(result.index):
+        raise DerivationError("annotation sidecar index must match the source frame index")
+    missing_keys = [key for key in (geo_key, time_key) if key not in frame.columns]
+    if missing_keys:
+        raise DerivationError(f"annotation scoping keys missing from source frame: {missing_keys}")
+    seen: set[tuple[str, int]] = set()
+    identity_set: set[str] = set()
+    for raw_spec in specs:
+        spec = _as_mapping(raw_spec, context="annotation")
+        unknown_keys = sorted(set(spec) - _ANNOTATION_KEYS)
+        if unknown_keys:
+            raise DerivationError(f"annotation has unsupported keys: {unknown_keys}")
+        annotation_id = _required_string(spec, "id", context="annotation")
+        revision = spec.get("revision", 1)
+        if (
+            not isinstance(revision, numbers.Integral)
+            or isinstance(revision, bool)
+            or revision < 1
+        ):
+            raise DerivationError(
+                f"annotation {annotation_id!r} revision must be a "
+                "positive integer"
+            )
+        key = (annotation_id, int(revision))
+        if key in seen:
+            raise DerivationError(f"duplicate annotation record {key!r}")
+        seen.add(key)
+        identity_set.add(annotation_identity_key(annotation_id, revision))
+
+    for raw_spec in specs:
+        spec = _as_mapping(raw_spec, context="annotation")
+        annotation_id = _required_string(spec, "id", context="annotation")
+        revision = spec.get("revision", 1)
+        target = spec.get("supersedes")
+        if target is not None:
+            target_key = annotation_identity_key(annotation_id, target)
+            if target_key not in identity_set:
+                raise DerivationError(
+                    f"annotation {annotation_id!r} revision {revision} supersedes "
+                    f"revision {target}, which is not declared in this batch; "
+                    "declare the superseded revision explicitly"
+                )
+        key = (annotation_id, int(revision))
+        binding_identity = annotation_identity_key(annotation_id, revision)
+        binding = (bindings or {}).get(binding_identity)
+
+        scope = _as_mapping(spec.get("scope", {}), context=f"annotation {annotation_id!r}.scope")
+        panels = scope.get("panels", [])
+        if not _is_string_list(panels):
+            raise DerivationError(
+                f"annotation {annotation_id!r} scope.panels must be a "
+                "list of strings"
+            )
+        inherited = (origin_flags or {}).get(binding_identity) == "artifact"
+        if binding is None and not inherited and panels and panel_name not in panels:
+            continue
+
+        if binding is not None:
+            binding_columns = binding["columns"]
+            unknown_columns = sorted(set(binding_columns) - set(result.columns))
+            if unknown_columns:
+                raise DerivationError(
+                    f"inherited annotation {binding_identity!r} references unknown "
+                    f"columns on reuse: {unknown_columns}; the consuming frame "
+                    "must retain the annotated columns"
+                )
+            geo_values = frame[geo_key].to_numpy(dtype=object)
+            time_values = frame[time_key].to_numpy(dtype=object)
+            for column, cells in binding_columns.items():
+                positions: set[int] = set()
+                for cell in cells:
+                    geo_value, year_value = cell
+                    mask = (geo_values == geo_value) & (time_values == year_value)
+                    positions.update(np.flatnonzero(mask).tolist())
+                target_positions = sorted(positions)
+                values = result[column].to_numpy(dtype=object, copy=True)
+                for position in target_positions:
+                    existing = values[position]
+                    if isinstance(existing, tuple):
+                        values[position] = tuple(dict.fromkeys((*existing, key)))
+                    else:
+                        values[position] = (key,)
+                result[column] = pd.Series(values, index=result.index, dtype=object)
+            continue
+
+        applies_to_masks = spec.get("applies_to_masks", [])
+        if not _is_string_list(applies_to_masks):
+            raise DerivationError(
+                f"annotation {annotation_id!r} applies_to_masks must be a list of strings"
+            )
+        columns = scope.get("columns", [])
+        if not _is_string_list(columns):
+            raise DerivationError(
+                f"annotation {annotation_id!r} scope.columns must be a "
+                "list of strings"
+            )
+        if columns:
+            unknown_columns = sorted(set(columns) - set(result.columns))
+            if unknown_columns:
+                raise DerivationError(
+                    f"annotation {annotation_id!r} references unknown columns: {unknown_columns}"
+                )
+        target_columns = (
+            list(columns)
+            if columns
+            else [column for column in result.columns if column not in (geo_key, time_key)]
+        )
+
+        years = scope.get("years", [])
+        if any(
+            isinstance(year, bool) or not isinstance(year, numbers.Integral) for year in years
+        ):
+            raise DerivationError(f"annotation {annotation_id!r} scope.years must be integers")
+        geography = scope.get("geographies")
+        if geography is not None:
+            geography = _as_mapping(
+                geography, context=f"annotation {annotation_id!r}.scope.geographies"
+            )
+            unsupported_geography_keys = sorted(set(geography) - {"include"})
+            if unsupported_geography_keys:
+                raise DerivationError(
+                    f"annotation {annotation_id!r}.scope.geographies has unsupported keys: "
+                    f"{unsupported_geography_keys}"
+                )
+            include = geography.get("include")
+            if include is not None and not _is_string_list(include):
+                raise DerivationError(
+                    f"annotation {annotation_id!r} geography include must be a list of strings"
+                )
+
+        if applies_to_masks:
+            if mask_provenance is None:
+                raise DerivationError("applies_to_masks requires mask provenance")
+            if inherited:
+                known_masks = {
+                    mask_id for column in mask_provenance
+                    for cell in mask_provenance[column] for mask_id in cell
+                }
+                if set(applies_to_masks) - known_masks:
+                    raise DerivationError(
+                        "inherited mask-scoped annotations need persisted cell bindings; "
+                        "write a bound source artifact before reuse"
+                    )
+        selection = pd.Series(True, index=result.index)
+        if years:
+            selection &= frame[time_key].isin({int(year) for year in years})
+        if geography is not None:
+            include = geography.get("include")
+            if include is not None:
+                selection &= frame[geo_key].isin(include)
+        positions = [position for position, selected in enumerate(selection.to_numpy()) if selected]
+
+        for column in target_columns:
+            values = result[column].to_numpy(dtype=object, copy=True)
+            for position in positions:
+                if applies_to_masks and not set(applies_to_masks).intersection(
+                    _mask_ids(mask_provenance, column, position)
+                ):
+                    continue
+                existing = values[position]
+                if isinstance(existing, tuple):
+                    values[position] = tuple(dict.fromkeys((*existing, key)))
+                else:
+                    values[position] = (key,)
+            result[column] = pd.Series(values, index=result.index, dtype=object)
+
+    return result
+
+
 def _normalize_panel_state(panel: pd.DataFrame | Mapping[str, Any]) -> dict[str, Any]:
     if isinstance(panel, pd.DataFrame):
         frame = panel.copy(deep=True)
@@ -254,6 +603,7 @@ def _normalize_panel_state(panel: pd.DataFrame | Mapping[str, Any]) -> dict[str,
             "mask_provenance": _empty_provenance(frame),
             "value_reasons": _empty_reasons(frame),
             "mask_definitions": {},
+            "annotation_provenance": _empty_annotations(frame),
             "measures": {},
         }
     if not isinstance(panel, Mapping) or not isinstance(panel.get("frame"), pd.DataFrame):
@@ -261,15 +611,21 @@ def _normalize_panel_state(panel: pd.DataFrame | Mapping[str, Any]) -> dict[str,
     frame = panel["frame"].copy(deep=True)
     provenance = panel.get("mask_provenance", _empty_provenance(frame)).copy(deep=True)
     reasons = panel.get("value_reasons", _empty_reasons(frame)).copy(deep=True)
+    annotations = panel.get("annotation_provenance", _empty_annotations(frame)).copy(deep=True)
     if not provenance.index.equals(frame.index) or not reasons.index.equals(frame.index):
         raise DerivationError("panel provenance and reason rows must match frame rows and order")
+    if not annotations.index.equals(frame.index):
+        raise DerivationError("panel annotation rows must match frame rows and order")
     if not provenance.columns.equals(frame.columns) or not reasons.columns.equals(frame.columns):
         raise DerivationError("panel provenance and reason columns must match panel columns")
+    if not annotations.columns.equals(frame.columns):
+        raise DerivationError("panel annotation columns must match panel columns")
     return {
         "frame": frame,
         "mask_provenance": provenance,
         "value_reasons": reasons,
         "mask_definitions": dict(panel.get("mask_definitions", {})),
+        "annotation_provenance": annotations,
         "measures": dict(panel.get("measures", {})),
     }
 
@@ -530,9 +886,10 @@ def _null_from_inputs(
     inputs: Sequence[tuple[str, int]],
     provenance: pd.DataFrame,
     reasons: pd.DataFrame,
+    annotations: pd.DataFrame,
     *,
     default_reason: str,
-) -> tuple[Any, tuple[str, ...], str]:
+) -> tuple[Any, tuple[str, ...], str, tuple[tuple[str, int], ...]]:
     mask_ids = tuple(
         dict.fromkeys(
             mask_id
@@ -541,7 +898,7 @@ def _null_from_inputs(
         )
     )
     if mask_ids:
-        return pd.NA, mask_ids, f"masked:{output}"
+        return pd.NA, mask_ids, f"masked:{output}", ()
     inherited = next(
         (
             source_reason
@@ -550,7 +907,14 @@ def _null_from_inputs(
         ),
         None,
     )
-    return pd.NA, (), inherited or default_reason
+    annotation_keys = tuple(
+        dict.fromkeys(
+            key
+            for column, position in inputs
+            for key in _annotation_keys(annotations, column, position)
+        )
+    )
+    return pd.NA, (), inherited or default_reason, annotation_keys
 
 
 def _evaluate_cell(
@@ -559,12 +923,13 @@ def _evaluate_cell(
     frame: pd.DataFrame,
     provenance: pd.DataFrame,
     reasons: pd.DataFrame,
+    annotations: pd.DataFrame,
     calendar: Mapping[tuple[Any, int], int],
     *,
     geo_key: str,
     time_key: str,
     parameters: Mapping[str, Any],
-) -> tuple[Any, tuple[str, ...], str | None]:
+) -> tuple[Any, tuple[str, ...], str | None, tuple[tuple[str, int], ...]]:
     output = spec["id"]
     op = spec["op"]
     row_inputs: list[tuple[str, int]] = [(column, position) for column in _inputs(spec)]
@@ -575,19 +940,28 @@ def _evaluate_cell(
         if prior_position is None:
             missing_inputs = [(spec["of"], position)] if op != "lag" else []
             if missing_inputs:
-                value, mask_ids, reason = _null_from_inputs(
+                value, mask_ids, reason, null_annotation_keys = _null_from_inputs(
                     output,
                     missing_inputs,
                     provenance,
                     reasons,
+                    annotations,
                     default_reason=f"missing_baseline:{spec['of']}",
                 )
                 if mask_ids or reason != f"missing_baseline:{spec['of']}":
-                    return value, mask_ids, reason
-            return pd.NA, (), f"missing_baseline:{spec['of']}"
+                    return value, mask_ids, reason, ()
+            return pd.NA, (), f"missing_baseline:{spec['of']}", ()
         row_inputs = [(spec["of"], prior_position)]
         if op in {"diff", "growth"}:
             row_inputs.insert(0, (spec["of"], position))
+
+    annotation_keys = tuple(
+        dict.fromkeys(
+            key
+            for column, row_position in row_inputs
+            for key in _annotation_keys(annotations, column, row_position)
+        )
+    )
 
     values = [
         (column, row_position, frame[column].iat[row_position])
@@ -602,6 +976,7 @@ def _evaluate_cell(
                 [(column, row_position) for column, row_position, _value in values],
                 provenance,
                 reasons,
+                annotations,
                 default_reason=f"missing_input:{values[0][0]}",
             )
         values = available
@@ -612,6 +987,7 @@ def _evaluate_cell(
             nulls,
             provenance,
             reasons,
+            annotations,
             default_reason=f"missing_input:{nulls[0][0]}",
         )
 
@@ -629,12 +1005,12 @@ def _evaluate_cell(
             if denominator == 0:
                 if spec.get("zero_den", "null") == "error":
                     raise DerivationError(f"derivation {output!r} encountered a zero denominator")
-                return pd.NA, (), "domain:zero_denominator"
+                return pd.NA, (), "domain:zero_denominator", ()
             result = numerator / denominator
         elif op == "per_capita":
             numerator, population = operands
             if population <= 0:
-                return pd.NA, (), "domain:nonpositive_population"
+                return pd.NA, (), "domain:nonpositive_population", ()
             scale = _resolve_numeric(spec["scale"], parameters, context=f"{output}.scale")
             result = numerator / population * scale
         elif op == "lag":
@@ -645,23 +1021,23 @@ def _evaluate_cell(
             current, baseline = operands
             if spec["kind"] == "pct":
                 if baseline == 0:
-                    return pd.NA, (), "domain:zero_growth_baseline"
+                    return pd.NA, (), "domain:zero_growth_baseline", ()
                 result = current / baseline - 1
             else:
                 if current <= 0 or baseline <= 0:
-                    return pd.NA, (), "domain:nonpositive_growth_endpoint"
+                    return pd.NA, (), "domain:nonpositive_growth_endpoint", ()
                 result = math.log(current) - math.log(baseline)
         elif op == "log":
             value = operands[0] + _resolve_numeric(
                 spec.get("offset", 0), parameters, context=f"{output}.offset"
             )
             if value <= 0:
-                return pd.NA, (), "domain:log_nonpositive"
+                return pd.NA, (), "domain:log_nonpositive", ()
             result = math.log(value)
         elif op == "indicator":
             value = operands[0]
             if not _is_finite(value):
-                return value, (), None
+                return value, (), None, annotation_keys
             if "in" in spec:
                 # RecipeV2's closed model restricts membership values to finite
                 # numeric literals or numeric parameter references.
@@ -681,8 +1057,8 @@ def _evaluate_cell(
         else:
             raise DerivationError(f"unsupported derivation op {op!r}")
     except OverflowError:
-        return pd.NA, (), "domain:nonfinite_arithmetic"
+        return pd.NA, (), "domain:nonfinite_arithmetic", ()
 
     if all_finite and not _is_finite(result):
-        return pd.NA, (), "domain:nonfinite_arithmetic"
-    return result, (), None
+        return pd.NA, (), "domain:nonfinite_arithmetic", ()
+    return result, (), None, annotation_keys

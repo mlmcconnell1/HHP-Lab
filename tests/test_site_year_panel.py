@@ -518,3 +518,53 @@ def test_msa_coc_measure_selection_preserves_nonnumeric_count_metadata():
     assert selected.unsheltered_count_observed.tolist() == [False]
     assert selected.unsheltered_count_carried_forward.tolist() == [True]
     assert str(selected.unsheltered_count_observed.dtype) == "boolean"
+
+
+ANNOTATED_SOURCE_FINGERPRINTS = {"pit_coc": "a" * 64, "hic_coc": "b" * 64}
+
+
+def test_source_caveats_survive_aggregation_with_exact_msa_year_bindings():
+    from hhplab.schema.contracts import frame_annotation_contract
+
+    sources = _source_panels()
+    note = {"id": "source-count-caveat", "revision": 1, "summary": "Source caveat",
+            "text": "Source count coverage is uncertain.",
+            "scope": {"columns": [PIT_MEASURE], "years": [2020],
+                      "geographies": {"include": ["CO-1"]}}}
+    sources["pit_coc"].attrs["annotations"] = [note]
+    result = _assemble(
+        source_panels=sources, source_panel_fingerprints=ANNOTATED_SOURCE_FINGERPRINTS,
+    )
+    contract = frame_annotation_contract(result.panel)
+    assert contract["uncertain_ids"] == []
+    assert contract["bindings"]["source-count-caveat#r1"]["columns"][PIT_MEASURE] == [
+        ["MSA-A", 2020]
+    ]
+    assert contract["sources"]["source-count-caveat#r1"][0]["sha256"] == (
+        ANNOTATED_SOURCE_FINGERPRINTS["pit_coc"]
+    )
+    assert result.panel.loc[result.panel.year == 2020, PIT_MEASURE].item() == 12
+    assert result.provenance["extra"]["annotations"] == contract
+
+
+def test_unconsumed_source_caveat_does_not_claim_aggregate_applicability():
+    from hhplab.schema.contracts import frame_annotation_contract
+
+    sources = _source_panels()
+    note = {"id": "outside-year", "summary": "Outside year", "text": "Not consumed.",
+            "scope": {"years": [1999]}}
+    sources["pit_coc"].attrs["annotations"] = [note]
+    contract = frame_annotation_contract(_assemble(
+        source_panels=sources, source_panel_fingerprints=ANNOTATED_SOURCE_FINGERPRINTS,
+    ).panel)
+    assert contract["uncertain_ids"] == []
+    assert contract["bindings"] == {"outside-year#r1": {"columns": {}}}
+
+
+def test_conflicting_source_caveats_never_silently_deduplicate():
+    sources = _source_panels()
+    note = {"id": "conflict", "summary": "Source", "text": "Original"}
+    sources["pit_coc"].attrs["annotations"] = [note]
+    sources["hic_coc"].attrs["annotations"] = [{**note, "text": "Different"}]
+    with pytest.raises(ValueError, match="conflict"):
+        _assemble(source_panels=sources)
