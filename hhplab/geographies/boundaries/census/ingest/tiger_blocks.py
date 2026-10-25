@@ -34,6 +34,14 @@ BLOCK_GEOMETRY_STATE_FIPS_2010 = tuple(
     state for state in STATE_FIPS_CODES if state not in {"60", "66", "69", "78"}
 )
 
+# Parquet schema-metadata key recording the SHA-256 of the exact raw ZIP bytes
+# that produced a normalized state part. Stored in metadata, never as a column,
+# so the public block schema is unchanged. Parts without this key (legacy) are
+# untrusted and are never reused.
+PART_RAW_SHA256_KEY = b"hhplab_part_raw_sha256"
+
+_HEX_DIGITS = frozenset("0123456789abcdefABCDEF")
+
 
 def _block_zip_name(year: int, state_fips: str) -> str:
     """Return the Census ZIP filename for one state's tabulation blocks."""
@@ -185,19 +193,101 @@ def _state_part_path(parts_dir: Path, state_fips: str) -> Path:
     return parts_dir / f"state_fips={state_fips}.parquet"
 
 
-def _state_part_matches_source(path: Path, year: int) -> bool:
-    """Check whether a cached part records the expected TIGER source URL."""
+def _state_part_raw_sha256(path: Path) -> str | None:
+    """Return the raw ZIP SHA-256 recorded in a part's Parquet metadata.
+
+    Malformed values (undecodable, or not a 64-character hex digest) are
+    treated as absent so they are never trusted or used in filenames.
+    """
+    try:
+        metadata = pq.read_metadata(path).metadata or {}
+    except (OSError, ValueError):
+        return None
+    value = metadata.get(PART_RAW_SHA256_KEY)
+    if value is None:
+        return None
+    try:
+        decoded = value.decode("utf-8")
+    except UnicodeDecodeError:
+        return None
+    if len(decoded) != 64 or any(ch not in _HEX_DIGITS for ch in decoded):
+        return None
+    return decoded
+
+
+def _preserve_stale_state_part(part_path: Path) -> Path | None:
+    """Retain an existing part before a fresh build replaces it.
+
+    Retained copies are named by the SHA-256 of the full part file bytes, so
+    every distinct part version is preserved even when multiple versions share
+    the same recorded raw ZIP hash (e.g. repeated force rebuilds). Existing
+    retained copies are reused only when their bytes are identical; otherwise a
+    collision-safe suffixed copy is created. Retained copies are never
+    overwritten, so prior files are preserved and never deleted.
+    """
+    if not part_path.exists():
+        return None
+    # Preservation must succeed before callers can replace the current part.
+    # State files can be large, so hash and compare them with bounded reads.
+    with part_path.open("rb") as source:
+        digest = hashlib.file_digest(source, "sha256").hexdigest()
+    candidate_index = 1
+    while True:
+        if candidate_index == 1:
+            candidate = part_path.with_name(f"{part_path.name}.sha256_{digest}")
+        else:
+            candidate = part_path.with_name(
+                f"{part_path.name}.sha256_{digest}_v{candidate_index}"
+            )
+        if not candidate.exists():
+            shutil.copy2(part_path, candidate)
+            return candidate
+        if _state_parts_have_same_bytes(part_path, candidate):
+            return candidate
+        candidate_index += 1
+
+
+def _state_parts_have_same_bytes(source_path: Path, retained_path: Path) -> bool:
+    with source_path.open("rb") as source, retained_path.open("rb") as retained:
+        for chunk in iter(lambda: source.read(1024 * 1024), b""):
+            if retained.read(len(chunk)) != chunk:
+                return False
+        return retained.read(1) == b""
+
+
+def _state_part_matches_source(path: Path, year: int, raw_zip_path: Path) -> bool:
+    """Check whether a cached part matches the current raw ZIP content.
+
+    A part is reusable only when it records the expected TIGER source URL AND
+    the SHA-256 of the raw ZIP bytes currently on disk. A changed raw ZIP at
+    the same URL therefore fails this check and forces a rebuild. Parts
+    without a recorded hash (legacy) are untrusted and never reused.
+    """
     try:
         source_refs = pq.read_table(path, columns=["source_ref"])["source_ref"].unique()
+        recorded_sha256 = _state_part_raw_sha256(path)
     except (KeyError, OSError, ValueError):
         return False
-    return source_refs.to_pylist() == [_block_url(year, "*")]
+    if recorded_sha256 is None:
+        return False
+    try:
+        current_sha256 = hashlib.sha256(raw_zip_path.read_bytes()).hexdigest()
+    except OSError:
+        return False
+    return source_refs.to_pylist() == [_block_url(year, "*")] and recorded_sha256 == current_sha256
 
 
-def _write_state_part(gdf: gpd.GeoDataFrame, path: Path) -> Path:
+def _write_state_part(gdf: gpd.GeoDataFrame, path: Path, raw_sha256: str) -> Path:
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp_path = path.with_suffix(path.suffix + ".tmp")
     gdf.to_parquet(tmp_path, index=False)
+    table = pq.read_table(tmp_path)
+    metadata = {
+        **(table.schema.metadata or {}),
+        PART_RAW_SHA256_KEY: raw_sha256.encode("utf-8"),
+    }
+    table = table.replace_schema_metadata(metadata)
+    pq.write_table(table, tmp_path)
     tmp_path.replace(path)
     return path
 
@@ -239,8 +329,9 @@ def _stream_state_block_parts(
     force: bool = False,
 ) -> tuple[str, int, list[Path], list[str], dict[str, int]]:
     """Write one normalized GeoParquet part per state and return provenance inputs."""
-    if force and parts_dir.exists():
-        shutil.rmtree(parts_dir)
+    # Non-destructive retention: never delete the parts directory, including
+    # under --force. Force only prevents reuse; existing parts are preserved
+    # before any replacement.
     parts_dir.mkdir(parents=True, exist_ok=True)
 
     content_hasher = hashlib.sha256()
@@ -260,12 +351,15 @@ def _stream_state_block_parts(
                 part_path.exists()
                 and raw_zip_path.exists()
                 and not force
-                and _state_part_matches_source(part_path, year)
+                and _state_part_matches_source(part_path, year, raw_zip_path)
             ):
                 row_counts[state_fips] = pq.read_metadata(part_path).num_rows
                 raw_content = raw_zip_path.read_bytes()
                 raw_paths.append(raw_zip_path)
             else:
+                # Retain the existing part before a fresh build replaces it.
+                if part_path.exists():
+                    _preserve_stale_state_part(part_path)
                 with tempfile.TemporaryDirectory(dir=parts_dir) as tmpdir:
                     gdf, raw_content, raw_path_value = _fetch_or_load_state_blocks(
                         client,
@@ -280,7 +374,11 @@ def _stream_state_block_parts(
                     continue
 
                 normalized = normalize_block_geometry(gdf, year)
-                _write_state_part(normalized, part_path)
+                _write_state_part(
+                    normalized,
+                    part_path,
+                    raw_sha256=hashlib.sha256(raw_content).hexdigest(),
+                )
                 row_counts[state_fips] = len(normalized)
                 raw_paths.append(raw_path_value or raw_zip_path)
 
@@ -322,6 +420,10 @@ def _write_parts_to_geoparquet(
                     **(table.schema.metadata or {}),
                     PROVENANCE_KEY: provenance.to_json().encode("utf-8"),
                 }
+                # Per-state part metadata (e.g. a first-state raw ZIP hash) must
+                # not leak into the national assembled artifact; the final
+                # provenance block remains authoritative.
+                metadata.pop(PART_RAW_SHA256_KEY, None)
                 schema = table.schema.with_metadata(metadata)
                 writer = pq.ParquetWriter(tmp_path, schema)
             if schema is None:

@@ -13,6 +13,7 @@ import pytest
 from shapely.geometry import box
 from typer.testing import CliRunner
 
+from hhplab.artifacts.curated.policy import validate_curated_layout
 from hhplab.cli.generate.msa_xwalk import _concat_block_population_state_shards, generate_msa_xwalk
 from hhplab.cli.main import app
 from hhplab.geographies.msa.crosswalk import (
@@ -770,3 +771,118 @@ def test_generate_msa_xwalk_json_surfaces_empty_membership_join_warning(
     assert "none matched the MSA county membership artifact" in payload["warning"]
     assert "Tried county_fips: 36061." in payload["warning"]
     assert "MSA counties by msa_id: 99999=[01001]." in payload["warning"]
+
+
+BLOCK_POPULATION_ARGS = [
+    "generate",
+    "msa-xwalk",
+    "--boundary",
+    "2025",
+    "--counties",
+    "2023",
+    "--allocation-basis",
+    "block_population",
+    "--blocks",
+    "2020",
+    "--decennial",
+    "2020",
+    "--json",
+]
+
+
+def _setup_block_population_generate(monkeypatch, tmp_path: Path) -> None:
+    _write_test_inputs(tmp_path)
+    _write_block_population_inputs(tmp_path)
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(
+        "hhplab.cli.generate.msa_xwalk.list_boundaries",
+        lambda: [_boundary_registry_entry(tmp_path)],
+    )
+    monkeypatch.setattr(
+        "hhplab.cli.generate.msa_xwalk.latest_vintage",
+        lambda: "2025",
+    )
+
+
+def test_generate_msa_xwalk_block_population_shards_use_raw_cache_and_curated_stays_valid(
+    monkeypatch,
+    tmp_path: Path,
+):
+    """State shards live under the raw cache; curated layout stays valid without cleanup."""
+    _setup_block_population_generate(monkeypatch, tmp_path)
+
+    result = runner.invoke(app, BLOCK_POPULATION_ARGS, catch_exceptions=False)
+
+    assert result.exit_code == 0
+    payload = json.loads(result.stdout)
+    assert payload["status"] == "ok"
+    assert payload["state_sharded"] is True
+
+    artifact_stem = Path(payload["artifact"]).stem
+    expected_shard_dir = (
+        tmp_path
+        / "data"
+        / "raw"
+        / "msa_xwalk_state_shards"
+        / f"{artifact_stem}__state_shards"
+    )
+    assert Path(payload["state_shard_dir"]) == expected_shard_dir
+    shard_file = expected_shard_dir / f"{artifact_stem}__state-36.parquet"
+    assert shard_file.exists()
+
+    # The legacy nested location under curated/xwalks must not be recreated.
+    legacy_location = (
+        tmp_path
+        / "data"
+        / "curated"
+        / "xwalks"
+        / f"{artifact_stem}__state_shards"
+    )
+    assert not legacy_location.exists()
+
+    # Curated layout validates while shard files remain retained (no cleanup needed).
+    violations = validate_curated_layout(tmp_path / "data" / "curated")
+    assert violations == []
+    assert shard_file.exists()
+
+
+def test_generate_msa_xwalk_reuse_shards_reads_from_raw_cache(
+    monkeypatch,
+    tmp_path: Path,
+):
+    """--reuse-shards reads the retained shards from the raw cache location."""
+    _setup_block_population_generate(monkeypatch, tmp_path)
+
+    first = runner.invoke(app, BLOCK_POPULATION_ARGS, catch_exceptions=False)
+    assert first.exit_code == 0
+    first_payload = json.loads(first.stdout)
+    shard_dir = Path(first_payload["state_shard_dir"])
+    artifact_stem = Path(first_payload["artifact"]).stem
+    shard_file = shard_dir / f"{artifact_stem}__state-36.parquet"
+    assert shard_file.exists()
+    original_shard = pd.read_parquet(shard_file)
+
+    shard_reads: list[Path] = []
+    original_pd_read = pd.read_parquet
+
+    def tracking_read(path, *args, **kwargs):
+        if str(path).startswith(str(shard_dir)):
+            shard_reads.append(Path(path))
+        return original_pd_read(path, *args, **kwargs)
+
+    monkeypatch.setattr("hhplab.cli.generate.msa_xwalk.pd.read_parquet", tracking_read)
+
+    second = runner.invoke(
+        app,
+        [*BLOCK_POPULATION_ARGS, "--force", "--reuse-shards"],
+        catch_exceptions=False,
+    )
+    assert second.exit_code == 0
+    second_payload = json.loads(second.stdout)
+    assert second_payload["reused_state_shards"] is True
+    assert second_payload["rows"] == 1
+    assert second_payload["artifact"] == first_payload["artifact"]
+
+    # The shard file is actually reused from the raw cache location.
+    assert shard_reads == [shard_file]
+    assert pd.read_parquet(shard_file).equals(original_shard)

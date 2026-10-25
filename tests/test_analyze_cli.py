@@ -10,6 +10,7 @@ import pandas as pd
 import pytest
 from typer.testing import CliRunner
 
+from hhplab.analysis.analyze import AnalysisError, lagged_associations_panel
 from hhplab.artifacts.naming.naming import (
     analysis_manifest_filename,
     analysis_manifest_path,
@@ -103,6 +104,27 @@ def _saturated_panel_fixture(path: Path) -> Path:
     )
     df.to_parquet(path)
     return path
+
+
+def _invoke_lagged(panel: Path, *, outcome: str, predictors: str, lags: str, output: Path):
+    return runner.invoke(
+        app,
+        [
+            "analyze",
+            "lagged",
+            "--panel",
+            str(panel),
+            "--outcome",
+            outcome,
+            "--predictors",
+            predictors,
+            "--lags",
+            lags,
+            "--output",
+            str(output),
+            "--json",
+        ],
+    )
 
 
 class TestAnalyzeCli:
@@ -659,6 +681,219 @@ class TestAnalyzeCli:
         assert payload["analysis_type"] == "lagged"
         assert payload["association_count"] == 4
         assert set(pd.read_parquet(output)["lag"]) == {1, 2}
+
+    def test_lagged_year_gap_aligns_by_calendar_year(self, tmp_path: Path):
+        """Excluding 2021 must not pair 2020 with 2022 as lag 1; lag 2 pairs them."""
+        panel = tmp_path / "panel.parquet"
+        pd.DataFrame(
+            {
+                "geo_id": ["A", "A", "A", "B", "B", "B"],
+                "year": [2020, 2022, 2023, 2020, 2021, 2022],
+                "pit_total": [100.0, 200.0, 300.0, 50.0, 150.0, 250.0],
+                "median_gross_rent": [10.0, 20.0, 30.0, 25.0, 15.0, 5.0],
+            }
+        ).to_parquet(panel)
+        output = tmp_path / "lagged.parquet"
+
+        result = _invoke_lagged(
+            panel, outcome="pit_total", predictors="median_gross_rent", lags="1,2", output=output
+        )
+        assert result.exit_code == 0
+
+        table = pd.read_parquet(output).set_index("lag")
+        # Lag 1 pairs A:2023->2022 and B:2021->2020, 2022->2021 (3 pairs);
+        # A:2022 has no 2021 predictor because 2021 is excluded.
+        assert table.loc[1, "n"] == 3
+        # Lag 2 pairs A:2022->2020 and B:2022->2020 (2 pairs), perfectly positive.
+        assert table.loc[2, "n"] == 2
+        assert table.loc[2, "correlation"] == pytest.approx(1.0)
+
+    @pytest.mark.parametrize(
+        ("panel_df", "lags", "expected_pairs"),
+        [
+            pytest.param(
+                pd.DataFrame(
+                    {
+                        "geo_id": ["A", "A", "A", "A", "B", "B", "B", "B"],
+                        "year": [2020, 2021, 2022, 2023] * 2,
+                        "pit_total": [10.0, 12.0, 14.0, 15.0, 20.0, 19.0, 18.0, 17.0],
+                        "median_gross_rent": [
+                            900.0,
+                            950.0,
+                            1000.0,
+                            1040.0,
+                            1100.0,
+                            1125.0,
+                            1150.0,
+                            1175.0,
+                        ],
+                    }
+                ),
+                [1, 2],
+                {1: 6, 2: 4},
+                id="contiguous-multiple-entities",
+            ),
+            pytest.param(
+                pd.DataFrame(
+                    {
+                        "geo_id": ["A", "A", "A"],
+                        "year": [2020, 2022, 2023],
+                        "pit_total": [100.0, 200.0, 300.0],
+                        "median_gross_rent": [10.0, 20.0, 30.0],
+                    }
+                ),
+                [1, 2],
+                {1: 1, 2: 1},
+                id="year-gap-single-entity",
+            ),
+        ],
+    )
+    def test_lagged_pair_counts_follow_exact_calendar_alignment(
+        self,
+        tmp_path: Path,
+        panel_df: pd.DataFrame,
+        lags: list[int],
+        expected_pairs: dict[int, int],
+    ):
+        panel = tmp_path / "panel.parquet"
+        panel_df.to_parquet(panel)
+        output = tmp_path / "lagged.parquet"
+
+        result = _invoke_lagged(
+            panel,
+            outcome="pit_total",
+            predictors="median_gross_rent",
+            lags=",".join(str(lag) for lag in lags),
+            output=output,
+        )
+        assert result.exit_code == 0
+
+        table = pd.read_parquet(output).set_index("lag")
+        for lag, expected_n in expected_pairs.items():
+            assert table.loc[lag, "n"] == expected_n
+
+    def test_lagged_rejects_duplicate_entity_year_keys(self, tmp_path: Path):
+        panel = tmp_path / "panel.parquet"
+        pd.DataFrame(
+            {
+                "geo_id": ["A", "A", "A", "B", "B"],
+                "year": [2020, 2021, 2021, 2020, 2021],
+                "pit_total": [10.0, 12.0, 13.0, 20.0, 22.0],
+                "median_gross_rent": [900.0, 950.0, 960.0, 1100.0, 1125.0],
+            }
+        ).to_parquet(panel)
+        output = tmp_path / "lagged.parquet"
+
+        result = _invoke_lagged(
+            panel, outcome="pit_total", predictors="median_gross_rent", lags="1", output=output
+        )
+        assert result.exit_code != 0
+        assert "duplicate geo_id/year keys" in result.output
+        assert "Aggregate or deduplicate" in result.output
+
+    @pytest.mark.parametrize(
+        ("year_values", "message"),
+        [
+            pytest.param(["2020", "twenty-one", "2022"], "year column", id="non-numeric-years"),
+            pytest.param([2020.0, 2021.5, 2022.0], "year column", id="fractional-years"),
+            pytest.param([2020.0, None, 2022.0], "year column", id="null-year"),
+        ],
+    )
+    def test_lagged_rejects_invalid_year_keys(
+        self, tmp_path: Path, year_values: list, message: str
+    ):
+        panel = tmp_path / "panel.parquet"
+        pd.DataFrame(
+            {
+                "geo_id": ["A", "A", "A"],
+                "year": year_values,
+                "pit_total": [10.0, 12.0, 14.0],
+                "median_gross_rent": [900.0, 950.0, 1000.0],
+            }
+        ).to_parquet(panel)
+
+        with pytest.raises(AnalysisError, match=message):
+            lagged_associations_panel(
+                panel, outcome="pit_total", predictors=["median_gross_rent"], lags=[1]
+            )
+
+    @pytest.mark.parametrize(
+        ("index_values", "year_values", "geo_id_values", "message"),
+        [
+            pytest.param(
+                ["first", "second", "third"],
+                ["2020", "bad", "2022"],
+                ["A", "B", "C"],
+                "year column",
+                id="invalid-year-string-index",
+            ),
+            pytest.param(
+                [10, 20, 30],
+                [2020.0, 2021.5, 2022.0],
+                ["A", "B", "C"],
+                "year column",
+                id="invalid-year-offset-index",
+            ),
+            pytest.param(
+                ["first", "second", "third"],
+                [2020, 2021, 2022],
+                [None, "B", "C"],
+                "entity column",
+                id="invalid-entity-string-index",
+            ),
+            pytest.param(
+                [10, 20, 30],
+                [2020, 2021, 2022],
+                [None, "B", "C"],
+                "entity column",
+                id="invalid-entity-offset-index",
+            ),
+        ],
+    )
+    def test_lagged_rejects_invalid_keys_with_nondefault_index(
+        self,
+        tmp_path: Path,
+        index_values: list,
+        year_values: list,
+        geo_id_values: list,
+        message: str,
+    ):
+        panel = tmp_path / "panel.parquet"
+        pd.DataFrame(
+            {
+                "geo_id": geo_id_values,
+                "year": year_values,
+                "pit_total": [10.0, 12.0, 14.0],
+                "median_gross_rent": [900.0, 950.0, 1000.0],
+            },
+            index=index_values,
+        ).to_parquet(panel)
+
+        with pytest.raises(AnalysisError, match=message):
+            lagged_associations_panel(
+                panel, outcome="pit_total", predictors=["median_gross_rent"], lags=[1]
+            )
+
+    def test_lagged_valid_nondefault_index_panel(self, tmp_path: Path):
+        panel = tmp_path / "panel.parquet"
+        pd.DataFrame(
+            {
+                "geo_id": ["A", "A", "B", "B"],
+                "year": [2020, 2021, 2020, 2021],
+                "pit_total": [100.0, 200.0, 50.0, 250.0],
+                "median_gross_rent": [10.0, 20.0, 25.0, 15.0],
+            },
+            index=["a", "b", "c", "d"],
+        ).to_parquet(panel)
+        output = tmp_path / "lagged.parquet"
+
+        result = _invoke_lagged(
+            panel, outcome="pit_total", predictors="median_gross_rent", lags="1", output=output
+        )
+        assert result.exit_code == 0
+        table = pd.read_parquet(output)
+        assert table.loc[0, "n"] == 2
+        assert table.loc[0, "correlation"] == pytest.approx(1.0)
 
     def test_ledger_list_and_show_expose_analysis_manifests(self, tmp_path: Path):
         panel = _panel_fixture(tmp_path / "panel.parquet")

@@ -1,5 +1,8 @@
 """Tests for TIGER tract ingest URL and schema resolution."""
 
+import hashlib
+from pathlib import Path
+
 import geopandas as gpd
 import httpx
 import pyarrow as pa
@@ -11,13 +14,18 @@ from typer.testing import CliRunner
 from hhplab.cli.main import app
 from hhplab.geographies.boundaries.census.ingest import tiger_blocks
 from hhplab.geographies.boundaries.census.ingest.tiger_blocks import (
+    PART_RAW_SHA256_KEY,
     STATE_DOWNLOAD_ATTEMPTS,
     _block_geometry_parts_dir,
     _block_url,
     _block_zip_name,
     _download_state_blocks,
+    _preserve_stale_state_part,
+    _state_part_matches_source,
     _state_part_path,
+    _state_part_raw_sha256,
     _stream_state_block_parts,
+    _write_state_part,
     download_block_geometry,
     get_block_geometry_output_path,
     normalize_block_geometry,
@@ -37,7 +45,7 @@ from hhplab.geographies.boundaries.census.ingest.urban_areas import (
     save_urban_areas,
     urban_area_source,
 )
-from hhplab.storage.provenance import read_provenance
+from hhplab.storage.provenance import PROVENANCE_KEY, read_provenance
 
 runner = CliRunner()
 
@@ -495,16 +503,16 @@ def test_download_state_blocks_returns_missing_for_404_without_retry(
 
 
 def test_stream_state_block_parts_resumes_completed_parts(monkeypatch, tmp_path) -> None:
-    """Retries skip state parts that already have the matching raw ZIP."""
+    """Retries skip state parts that already match the current raw ZIP bytes."""
     raw_root = tmp_path / "raw"
     raw_zip = raw_root / "tiger" / "2020" / "blocks" / "tl_2020_01_tabblock20.zip"
     raw_zip.parent.mkdir(parents=True)
-    raw_zip.write_bytes(b"raw-01")
+    raw_bytes = b"raw-01"
+    raw_zip.write_bytes(raw_bytes)
     parts_dir = _block_geometry_parts_dir(2020, tmp_path)
     _write_path = _state_part_path(parts_dir, "01")
     normalized = normalize_block_geometry(_raw_block_gdf("01", "1234"), 2020)
-    _write_path.parent.mkdir(parents=True)
-    normalized.to_parquet(_write_path, index=False)
+    _write_state_part(normalized, _write_path, hashlib.sha256(raw_bytes).hexdigest())
 
     def fail_fetch_or_load_state_blocks(*args, **kwargs):
         raise AssertionError("completed state should not be fetched again")
@@ -514,17 +522,357 @@ def test_stream_state_block_parts_resumes_completed_parts(monkeypatch, tmp_path)
         fail_fetch_or_load_state_blocks,
     )
 
-    _digest, content_size, raw_paths, missing, row_counts = _stream_state_block_parts(
+    digest, content_size, raw_paths, missing, row_counts = _stream_state_block_parts(
         2020,
         parts_dir=parts_dir,
         state_fips_codes=("01",),
         raw_root=raw_root,
     )
 
-    assert content_size == len(b"raw-01")
+    assert content_size == len(raw_bytes)
+    assert digest == hashlib.sha256(raw_bytes).hexdigest()
     assert raw_paths == [raw_zip]
     assert missing == []
     assert row_counts == {"01": 1}
+    # Reuse kept the parsed geometry and the recorded raw-byte hash untouched.
+    reused = gpd.read_parquet(_write_path)
+    assert reused.loc[0, "block_geoid"] == normalized.loc[0, "block_geoid"]
+    assert _state_part_raw_sha256(_write_path) == hashlib.sha256(raw_bytes).hexdigest()
+
+
+def test_stream_state_block_parts_rebuilds_on_raw_zip_change_at_same_url(
+    monkeypatch,
+    tmp_path,
+) -> None:
+    """A changed raw ZIP at the same URL must rebuild, not reuse stale geometry."""
+    raw_root = tmp_path / "raw"
+    raw_zip = raw_root / "tiger" / "2020" / "blocks" / "tl_2020_01_tabblock20.zip"
+    raw_zip.parent.mkdir(parents=True)
+    first_bytes = b"raw-01-first"
+    raw_zip.write_bytes(first_bytes)
+    parts_dir = _block_geometry_parts_dir(2020, tmp_path)
+    part_path = _state_part_path(parts_dir, "01")
+    first_normalized = normalize_block_geometry(_raw_block_gdf("01", "1234"), 2020)
+    _write_state_part(first_normalized, part_path, hashlib.sha256(first_bytes).hexdigest())
+
+    second_bytes = b"raw-01-second"
+    raw_zip.write_bytes(second_bytes)
+    second_gdf = _raw_block_gdf("01", "9999")
+    calls: list[tuple[int, str]] = []
+
+    def fake_fetch_or_load_state_blocks(client, *, year, state_fips, tmpdir, raw_root, force):
+        calls.append((year, state_fips))
+        return second_gdf, second_bytes, raw_zip
+
+    monkeypatch.setattr(
+        "hhplab.geographies.boundaries.census.ingest.tiger_blocks._fetch_or_load_state_blocks",
+        fake_fetch_or_load_state_blocks,
+    )
+
+    digest, content_size, raw_paths, missing, row_counts = _stream_state_block_parts(
+        2020,
+        parts_dir=parts_dir,
+        state_fips_codes=("01",),
+        raw_root=raw_root,
+    )
+
+    assert calls == [(2020, "01")]
+    assert content_size == len(second_bytes)
+    assert digest == hashlib.sha256(second_bytes).hexdigest()
+    assert raw_paths == [raw_zip]
+    assert missing == []
+    assert row_counts == {"01": 1}
+    rebuilt = gpd.read_parquet(part_path)
+    assert rebuilt.loc[0, "block_geoid"] == "010010901019999"
+    assert _state_part_raw_sha256(part_path) == hashlib.sha256(second_bytes).hexdigest()
+    # The previous geometry part was preserved, not deleted.
+    retained_geoids = [
+        gpd.read_parquet(path).loc[0, "block_geoid"]
+        for path in parts_dir.glob(f"{part_path.name}.sha256_*")
+    ]
+    assert retained_geoids == [first_normalized.loc[0, "block_geoid"]]
+
+
+def test_stream_state_block_parts_rebuilds_legacy_part_without_hash(
+    monkeypatch,
+    tmp_path,
+) -> None:
+    """Parts recorded before content hashing existed are untrusted and rebuilt."""
+    raw_root = tmp_path / "raw"
+    raw_zip = raw_root / "tiger" / "2020" / "blocks" / "tl_2020_01_tabblock20.zip"
+    raw_zip.parent.mkdir(parents=True)
+    raw_bytes = b"raw-01"
+    raw_zip.write_bytes(raw_bytes)
+    parts_dir = _block_geometry_parts_dir(2020, tmp_path)
+    part_path = _state_part_path(parts_dir, "01")
+    legacy_normalized = normalize_block_geometry(_raw_block_gdf("01", "1234"), 2020)
+    part_path.parent.mkdir(parents=True)
+    legacy_normalized.to_parquet(part_path, index=False)
+
+    calls: list[str] = []
+
+    def fake_fetch_or_load_state_blocks(client, *, year, state_fips, tmpdir, raw_root, force):
+        calls.append(state_fips)
+        return _raw_block_gdf(state_fips, "5678"), raw_bytes, raw_zip
+
+    monkeypatch.setattr(
+        "hhplab.geographies.boundaries.census.ingest.tiger_blocks._fetch_or_load_state_blocks",
+        fake_fetch_or_load_state_blocks,
+    )
+
+    _stream_state_block_parts(
+        2020,
+        parts_dir=parts_dir,
+        state_fips_codes=("01",),
+        raw_root=raw_root,
+    )
+
+    assert calls == ["01"]
+    rebuilt = gpd.read_parquet(part_path)
+    assert rebuilt.loc[0, "block_geoid"] == "010010901015678"
+    assert _state_part_raw_sha256(part_path) == hashlib.sha256(raw_bytes).hexdigest()
+    # The legacy part (which had no recorded hash) was preserved, not deleted.
+    retained_geoids = [
+        gpd.read_parquet(path).loc[0, "block_geoid"]
+        for path in parts_dir.glob(f"{part_path.name}.sha256_*")
+    ]
+    assert retained_geoids == [legacy_normalized.loc[0, "block_geoid"]]
+
+
+def test_stream_state_block_parts_force_retains_parts_dir_and_preserves_parts(
+    monkeypatch,
+    tmp_path,
+) -> None:
+    """Force rebuilds parts without deleting the parts directory or prior parts."""
+    raw_root = tmp_path / "raw"
+    raw_zip = raw_root / "tiger" / "2020" / "blocks" / "tl_2020_01_tabblock20.zip"
+    raw_zip.parent.mkdir(parents=True)
+    raw_bytes = b"raw-01"
+    raw_zip.write_bytes(raw_bytes)
+    parts_dir = _block_geometry_parts_dir(2020, tmp_path)
+    part_path = _state_part_path(parts_dir, "01")
+    first_normalized = normalize_block_geometry(_raw_block_gdf("01", "1234"), 2020)
+    _write_state_part(first_normalized, part_path, hashlib.sha256(raw_bytes).hexdigest())
+    unrelated = parts_dir / "unrelated.park"
+    unrelated.write_bytes(b"keep-me")
+
+    def fake_fetch_or_load_state_blocks(client, *, year, state_fips, tmpdir, raw_root, force):
+        return _raw_block_gdf(state_fips, "4321"), raw_bytes, raw_zip
+
+    monkeypatch.setattr(
+        "hhplab.geographies.boundaries.census.ingest.tiger_blocks._fetch_or_load_state_blocks",
+        fake_fetch_or_load_state_blocks,
+    )
+
+    _stream_state_block_parts(
+        2020,
+        parts_dir=parts_dir,
+        state_fips_codes=("01",),
+        raw_root=raw_root,
+        force=True,
+    )
+
+    assert unrelated.exists()
+    assert part_path.exists()
+    rebuilt = gpd.read_parquet(part_path)
+    assert rebuilt.loc[0, "block_geoid"] == "010010901014321"
+    assert _state_part_raw_sha256(part_path) == hashlib.sha256(raw_bytes).hexdigest()
+    retained_geoids = [
+        gpd.read_parquet(path).loc[0, "block_geoid"]
+        for path in parts_dir.glob(f"{part_path.name}.sha256_*")
+    ]
+    assert retained_geoids == [first_normalized.loc[0, "block_geoid"]]
+
+
+def test_state_part_matches_source_binds_to_raw_content_hash(tmp_path) -> None:
+    """Part reuse requires both the source URL and the current raw byte hash."""
+    raw_zip = tmp_path / "raw.zip"
+    raw_bytes = b"raw-bytes"
+    raw_zip.write_bytes(raw_bytes)
+    hash_hex = hashlib.sha256(raw_bytes).hexdigest()
+    part_path = tmp_path / "part.parquet"
+    normalized = normalize_block_geometry(_raw_block_gdf("01", "1234"), 2020)
+
+    _write_state_part(normalized, part_path, hash_hex)
+    assert _state_part_matches_source(part_path, 2020, raw_zip) is True
+
+    raw_zip.write_bytes(b"different-bytes")
+    assert _state_part_matches_source(part_path, 2020, raw_zip) is False
+
+    raw_zip.write_bytes(raw_bytes)
+    legacy = tmp_path / "legacy.parquet"
+    normalized.to_parquet(legacy, index=False)
+    assert _state_part_matches_source(legacy, 2020, raw_zip) is False
+
+
+def test_preserve_stale_state_part_keeps_distinct_versions_with_same_raw_hash(
+    tmp_path,
+) -> None:
+    """Every distinct part version is retained even when raw hashes are identical."""
+    part_path = tmp_path / "state_fips=01.parquet"
+    raw_hash = hashlib.sha256(b"same-raw").hexdigest()
+    retained_paths = []
+    for suffix in ("1234", "2345", "3456"):
+        normalized = normalize_block_geometry(_raw_block_gdf("01", suffix), 2020)
+        _write_state_part(normalized, part_path, raw_hash)
+        retained_paths.append(_preserve_stale_state_part(part_path))
+
+    assert len({path.name for path in retained_paths}) == 3
+    geoids = {gpd.read_parquet(path).loc[0, "block_geoid"] for path in retained_paths}
+    assert geoids == {"010010901011234", "010010901012345", "010010901013456"}
+    # Re-preserving the current part reuses its identical retained copy.
+    assert _preserve_stale_state_part(part_path) == retained_paths[-1]
+
+
+def test_preserve_stale_state_part_keeps_distinct_legacy_parts(tmp_path) -> None:
+    """Distinct legacy parts (no recorded hash) are all retained, none lost."""
+    part_path = tmp_path / "state_fips=01.parquet"
+    first = normalize_block_geometry(_raw_block_gdf("01", "1234"), 2020)
+    first.to_parquet(part_path, index=False)
+    first_retained = _preserve_stale_state_part(part_path)
+
+    second = normalize_block_geometry(_raw_block_gdf("01", "2345"), 2020)
+    second.to_parquet(part_path, index=False)
+    second_retained = _preserve_stale_state_part(part_path)
+
+    assert first_retained != second_retained
+    assert first_retained.exists()
+    assert second_retained.exists()
+    assert (
+        gpd.read_parquet(first_retained).loc[0, "block_geoid"] == "010010901011234"
+    )
+    assert (
+        gpd.read_parquet(second_retained).loc[0, "block_geoid"] == "010010901012345"
+    )
+
+
+def test_preserve_stale_state_part_keeps_conflicting_retained_file(tmp_path) -> None:
+    part_path = tmp_path / "state_fips=01.parquet"
+    normalized = normalize_block_geometry(_raw_block_gdf("01", "1234"), 2020)
+    _write_state_part(normalized, part_path, hashlib.sha256(b"raw").hexdigest())
+    original_bytes = part_path.read_bytes()
+    digest = hashlib.sha256(original_bytes).hexdigest()
+    conflicting_path = part_path.with_name(f"{part_path.name}.sha256_{digest}")
+    conflicting_bytes = b"unrelated retained bytes"
+    conflicting_path.write_bytes(conflicting_bytes)
+
+    retained = _preserve_stale_state_part(part_path)
+
+    assert retained != conflicting_path
+    assert retained.read_bytes() == original_bytes
+    assert conflicting_path.read_bytes() == conflicting_bytes
+
+
+def test_stream_state_block_parts_stops_if_preservation_fails(monkeypatch, tmp_path) -> None:
+    parts_dir = tmp_path / "parts"
+    part_path = _state_part_path(parts_dir, "01")
+    normalized = normalize_block_geometry(_raw_block_gdf("01", "1234"), 2020)
+    _write_state_part(normalized, part_path, hashlib.sha256(b"raw").hexdigest())
+    original_bytes = part_path.read_bytes()
+    original_open = Path.open
+
+    def refuse_part_read(path, *args, **kwargs):
+        if path == part_path:
+            raise PermissionError("Cannot read existing state part for preservation")
+        return original_open(path, *args, **kwargs)
+
+    def unexpected_fetch(*args, **kwargs):
+        pytest.fail("A rebuild must not start until the existing part is preserved")
+
+    with monkeypatch.context() as blocked:
+        blocked.setattr(Path, "open", refuse_part_read)
+        blocked.setattr(tiger_blocks, "_fetch_or_load_state_blocks", unexpected_fetch)
+        with pytest.raises(PermissionError, match="for preservation"):
+            _stream_state_block_parts(
+                2020,
+                parts_dir=parts_dir,
+                state_fips_codes=("01",),
+                raw_root=tmp_path / "raw",
+                force=True,
+            )
+
+    assert part_path.read_bytes() == original_bytes
+
+
+def test_state_part_raw_sha256_rejects_malformed_metadata(tmp_path) -> None:
+    """Malformed recorded hashes are untrusted and never crash or name files."""
+    part_path = tmp_path / "part.parquet"
+    normalized = normalize_block_geometry(_raw_block_gdf("01", "1234"), 2020)
+    raw_zip = tmp_path / "raw.zip"
+    raw_zip.write_bytes(b"raw")
+
+    _write_state_part(normalized, part_path, hashlib.sha256(b"raw").hexdigest())
+    assert _state_part_matches_source(part_path, 2020, raw_zip) is True
+    well_formed = _state_part_raw_sha256(part_path)
+    assert well_formed == hashlib.sha256(b"raw").hexdigest()
+
+    # Undecodable bytes in the metadata key.
+    table = pq.read_table(part_path)
+    bad_meta = dict(table.schema.metadata or {})
+    bad_meta[PART_RAW_SHA256_KEY] = b"\xff\xfe\x00"
+    table = table.replace_schema_metadata(bad_meta)
+    pq.write_table(table, part_path)
+    assert _state_part_raw_sha256(part_path) is None
+    assert _state_part_matches_source(part_path, 2020, raw_zip) is False
+
+    # Valid UTF-8 that is not a 64-character hex digest.
+    table = pq.read_table(part_path)
+    bad_meta = dict(table.schema.metadata or {})
+    bad_meta[PART_RAW_SHA256_KEY] = b"not-a-hex-digest"
+    table = table.replace_schema_metadata(bad_meta)
+    pq.write_table(table, part_path)
+    assert _state_part_raw_sha256(part_path) is None
+    assert _state_part_matches_source(part_path, 2020, raw_zip) is False
+
+
+def test_stream_state_block_parts_rebuilds_part_with_malformed_hash_metadata(
+    monkeypatch,
+    tmp_path,
+) -> None:
+    """Malformed part hash metadata triggers a safe, preserving rebuild."""
+    raw_root = tmp_path / "raw"
+    raw_zip = raw_root / "tiger" / "2020" / "blocks" / "tl_2020_01_tabblock20.zip"
+    raw_zip.parent.mkdir(parents=True)
+    raw_bytes = b"raw-01"
+    raw_zip.write_bytes(raw_bytes)
+    parts_dir = _block_geometry_parts_dir(2020, tmp_path)
+    part_path = _state_part_path(parts_dir, "01")
+    normalized = normalize_block_geometry(_raw_block_gdf("01", "1234"), 2020)
+    _write_state_part(normalized, part_path, hashlib.sha256(raw_bytes).hexdigest())
+    table = pq.read_table(part_path)
+    bad_meta = dict(table.schema.metadata or {})
+    bad_meta[PART_RAW_SHA256_KEY] = b"\xff\xfe"
+    table = table.replace_schema_metadata(bad_meta)
+    pq.write_table(table, part_path)
+
+    calls: list[str] = []
+
+    def fake_fetch_or_load_state_blocks(client, *, year, state_fips, tmpdir, raw_root, force):
+        calls.append(state_fips)
+        return _raw_block_gdf(state_fips, "5678"), raw_bytes, raw_zip
+
+    monkeypatch.setattr(
+        "hhplab.geographies.boundaries.census.ingest.tiger_blocks._fetch_or_load_state_blocks",
+        fake_fetch_or_load_state_blocks,
+    )
+
+    _stream_state_block_parts(
+        2020,
+        parts_dir=parts_dir,
+        state_fips_codes=("01",),
+        raw_root=raw_root,
+    )
+
+    assert calls == ["01"]
+    rebuilt = gpd.read_parquet(part_path)
+    assert rebuilt.loc[0, "block_geoid"] == "010010901015678"
+    assert _state_part_raw_sha256(part_path) == hashlib.sha256(raw_bytes).hexdigest()
+    # The malformed-metadata part was preserved under its full content hash.
+    retained_geoids = [
+        gpd.read_parquet(path).loc[0, "block_geoid"]
+        for path in parts_dir.glob(f"{part_path.name}.sha256_*")
+    ]
+    assert "010010901011234" in retained_geoids
 
 
 def test_save_block_geometry_from_parts_streams_final_geoparquet(tmp_path) -> None:
@@ -534,8 +882,11 @@ def test_save_block_geometry_from_parts_streams_final_geoparquet(tmp_path) -> No
     for state_fips in ("01", "02"):
         part_path = _state_part_path(parts_dir, state_fips)
         normalized = normalize_block_geometry(_raw_block_gdf(state_fips, "1234"), 2020)
-        part_path.parent.mkdir(parents=True, exist_ok=True)
-        normalized.to_parquet(part_path, index=False)
+        _write_state_part(
+            normalized,
+            part_path,
+            hashlib.sha256(f"raw-{state_fips}".encode()).hexdigest(),
+        )
         part_paths.append(part_path)
 
     output_path = save_block_geometry_from_parts(
@@ -555,6 +906,20 @@ def test_save_block_geometry_from_parts_streams_final_geoparquet(tmp_path) -> No
     assert provenance is not None
     assert provenance.extra["content_sha256"] == "abc123"
     assert provenance.extra["part_paths"] == [str(path) for path in part_paths]
+    # Per-state raw-byte hashes must not leak into the national artifact; the
+    # final provenance block remains the authoritative aggregate record.
+    output_metadata = pq.read_metadata(output_path).metadata or {}
+    assert PART_RAW_SHA256_KEY not in output_metadata
+    assert PROVENANCE_KEY in output_metadata
+    # Each part keeps its own raw-byte hash binding.
+    assert (
+        _state_part_raw_sha256(part_paths[0])
+        == hashlib.sha256(b"raw-01").hexdigest()
+    )
+    assert (
+        _state_part_raw_sha256(part_paths[1])
+        == hashlib.sha256(b"raw-02").hexdigest()
+    )
 
 
 def test_save_block_geometry_from_parts_rejects_empty_part_list(tmp_path) -> None:

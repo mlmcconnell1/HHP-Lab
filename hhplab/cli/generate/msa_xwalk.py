@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-import shutil
+from pathlib import Path
 from typing import Annotated, Literal
 
 import geopandas as gpd
@@ -19,6 +19,7 @@ from hhplab.artifacts.naming.naming import (
 from hhplab.geographies.coc.coc_io import resolve_curated_boundary_path
 from hhplab.geographies.msa.msa_definitions import DEFINITION_VERSION, DELINEATION_FILE_YEAR
 from hhplab.registry.boundary_registry import latest_vintage, list_boundaries
+from hhplab.storage.paths import raw_root
 
 
 def _resolve_boundary_vintage(boundary: str | None) -> str:
@@ -359,13 +360,17 @@ def generate_msa_xwalk(
     }
     if allocation_basis == "block_population" and state_shards:
         shard_dir = _state_shard_dir(output_path)
+        shard_pattern = f"{output_path.stem}__state-*.parquet"
         payload["state_sharded"] = True
         payload["state_shard_dir"] = str(shard_dir)
-        payload["state_shard_count"] = len(list(shard_dir.glob("*__state-*.parquet")))
+        payload["state_shard_count"] = len(list(shard_dir.glob(shard_pattern)))
         payload["failed_state_shards"] = []
         payload["reused_state_shards"] = bool(reuse_shards)
         if cleanup_shards and shard_dir.exists():
-            shutil.rmtree(shard_dir)
+            for stale_path in shard_dir.glob(shard_pattern):
+                stale_path.unlink()
+            if not any(shard_dir.iterdir()):
+                shard_dir.rmdir()
             payload["state_shards_cleaned"] = True
     warning = crosswalk.attrs.get("warning")
     if warning:
@@ -455,11 +460,27 @@ def _build_block_population_state_shards(
     return _concat_block_population_state_shards(shard_frames)
 
 
-def _state_shard_dir(output_path) -> object:
-    return output_path.parent / f"{output_path.stem}__state_shards"
+# State shards are deterministic, resumable intermediates for block-population
+# crosswalks. They are not curated artifacts, so they live under the raw
+# (non-curated) cache namespace `<asset_store>/raw/msa_xwalk_state_shards`,
+# one subdirectory per canonical artifact stem, instead of `data/curated/xwalks`,
+# whose folders must stay flat per the curated-layout policy. Legacy shard
+# directories previously written under `data/curated/xwalks/<stem>__state_shards/`
+# are intentionally left in place and are NOT migrated or removed by this code.
+STATE_SHARD_FAMILY_SUBDIR = "msa_xwalk_state_shards"
 
 
-def _state_shard_path(output_path, state_fips: str) -> object:
+def _state_shard_dir(output_path) -> Path:
+    """Return the raw-cache directory holding resumable state shards."""
+    return (
+        raw_root()
+        / STATE_SHARD_FAMILY_SUBDIR
+        / f"{output_path.stem}__state_shards"
+    )
+
+
+def _state_shard_path(output_path, state_fips: str) -> Path:
+    """Return the per-state shard file path for a canonical crosswalk artifact."""
     return _state_shard_dir(output_path) / f"{output_path.stem}__state-{state_fips}.parquet"
 
 
