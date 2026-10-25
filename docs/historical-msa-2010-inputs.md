@@ -79,3 +79,64 @@ The definition and membership artifact provenance records the workbook SHA-256, 
 ## Audit scope and validation
 
 The raw source files were downloaded from official Census/OMB URLs, hashed, parsed/inspected, and matched against the official Census TIGER documentation. The reproducible script completed successfully on 2026-10-22 and reported the counts above, 0 duplicate MSA/county pairs, 0 metro/micro code collisions, 0 missing MSA FIPS, and 0 TIGER assignment mismatches. Validation reported 36 worker-scoped and 55 root-scoped tests; the latest combined run passed 521 tests. The 2010 source inspection and artifact provenance checks also passed.
+
+## ACS1 coverage audit for the fixed July 2023 CBSA universe
+
+The downloaded Census evidence is retained at
+[`open-bead-audit-20261025/acs`](</home/matt/HHP-Output/open-bead-audit-20261025/acs>).
+The source hashes below were independently checked against these files.
+
+This audit separates observed rows in the cached `census_msa_2023` ACS1 artifacts from the historical Census delineations. A target-definition label in an artifact does not mean the estimate was tabulated for the July 2023 county composition. The ACS1 cache contains only `cbsa_code`, not the API's original CBSA code; therefore these rows show post-ingest output coverage, not all source geographies returned by each Census API response.
+
+### Cached artifact ID truth table
+
+Presence below means that the exact five-character CBSA ID is present in the local `acs1_metro__A{year}@Dcensusmsa2023.parquet` file. `—` means absent from that cached artifact. The 2020 row has no standard ACS1 artifact because Census did not release standard 2020 ACS 1-year estimates; it is not an ordinary missing-geography result.
+
+| ACS1 year | 18880 | 28880 | 31080 | 35840 | 42200 | 46520 |
+|---:|:---:|:---:|:---:|:---:|:---:|:---:|
+| 2009 | — | — | — | — | — | — |
+| 2010 | ✓ | — | — | ✓ | — | — |
+| 2011 | ✓ | — | — | ✓ | — | — |
+| 2012 | ✓ | — | ✓ | ✓ | — | — |
+| 2013 | ✓ | — | ✓ | ✓ | ✓ | ✓ |
+| 2014 | ✓ | — | ✓ | ✓ | ✓ | ✓ |
+| 2015 | ✓ | — | ✓ | ✓ | ✓ | ✓ |
+| 2016 | ✓ | — | ✓ | ✓ | ✓ | ✓ |
+| 2017 | ✓ | — | ✓ | ✓ | ✓ | ✓ |
+| 2018 | ✓ | — | ✓ | ✓ | ✓ | ✓ |
+| 2019 | ✓ | — | ✓ | ✓ | ✓ | ✓ |
+| 2020 | n/a | n/a | n/a | n/a | n/a | n/a |
+| 2021 | ✓ | — | ✓ | ✓ | ✓ | ✓ |
+| 2022 | ✓ | — | ✓ | ✓ | ✓ | ✓ |
+| 2023 | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+
+The audited local files were read from `/home/matt/Data/hhplab/curated/acs/`. Their row counts were 372 (2009), 373 (2010-2011), 375 (2012), 382 (2013-2015), 383 (2016-2018), 385 (2019), 385 (2021-2022), and 393 (2023). The 2020 artifact was absent. Census states that standard 2020 ACS1 estimates were not released; experimental estimates are not available through the API and are not a substitute for standard metro estimates ([2020 ACS1 release notice](https://www.census.gov/data/developers/data-sets/acs-1year/2020.html)).
+
+### What the historical delineations establish
+
+The official Census December 2009, February 2013, September 2018, 2020, and July 2023 component lists and Census's `Metro Area History from 1950 to 2020` show these IDs do not all describe an unchanged metro. The history workbook records component transfers and area status/title changes, while the component lists provide vintage-specific CBSA codes and county membership. Census explains that delineations change between decennial standards and that the July 2023 delineation applies the 2020 standards ([delineation overview](https://www.census.gov/programs-surveys/metro-micro/about/delineation-files.html), [historical delineation files](https://www.census.gov/geographies/reference-files/time-series/demo/metro-micro/historical-delineation-files.html), [July 2023 component list](https://www2.census.gov/programs-surveys/metro-micro/geographies/reference-files/2023/delineation-files/list1_2023.xlsx)).
+
+| July 2023 CBSA | 2009 official delineation | February 2013 official delineation | Historical evidence and implication |
+|---|---|---|---|
+| `18880` Crestview-Fort Walton Beach-Destin, FL | `18880`; Okaloosa County only | `18880`; Okaloosa and Walton Counties | Census history records Walton County as added in February 2013. The 2009 source area exists under the same ID, despite the cached 2009 artifact lacking the row; it does not have the July 2023 county composition. The cached 2010-2012 ID match also cannot establish the later two-county footprint. |
+| `28880` Kiryas Joel-Poughkeepsie-Newburgh, NY | `39100` Poughkeepsie-Newburgh-Middletown; Dutchess and Orange Counties | Not a separate CBSA; both counties are in New York-Newark-Jersey City MSA `35620` | Census history records the two counties transferring into the New York MSA in February 2013, then transferring back to a separate Poughkeepsie-Newburgh-Middletown MSA in September 2018. The September 2018 and 2020 lists both identify the separate two-county area as `39100`; the July 2023 list gives it the target ID `28880`. Do not alias New York's encompassing MSA to `28880` for 2013-2017; the small area was not separately delineated then. For 2009-2012 and 2018-2022, verify each ACS release's source code and exact component membership before considering a year-limited identity alias. |
+| `31080` Los Angeles-Long Beach-Anaheim, CA | `31100` Los Angeles-Long Beach-Santa Ana; Los Angeles and Orange Counties, with two metropolitan divisions | `31080`; Los Angeles and Orange Counties | The parent two-county MSA identity is represented in both lists, but its code changed and the 2009 file separately lists divisions `31084` and `42044`. The current alias registry maps `31100` to `31080` only for 2012; no 2009-2011 rule is currently declared. Confirm annual ACS source IDs and parent-level area definition before extending it. |
+| `35840` North Port-Bradenton-Sarasota, FL | `35840`; Manatee and Sarasota Counties | `35840`; the same two counties | The county composition in these delineation lists matches July 2023. The ID is present in the 2010-2012 cache but absent in 2009; the 2009 artifact absence is not explained by an absent CBSA definition. Verify raw ACS availability/ingest evidence before attributing that one-year hole to geography. |
+| `42200` Santa Maria-Santa Barbara, CA | `42060` Santa Barbara-Santa Maria-Goleta; Santa Barbara County | `42200` Santa Maria-Santa Barbara; Santa Barbara County | The county composition matches, while the CBSA code and title changed by February 2013. A historical code alias is a candidate only after confirming the source ID for each missing year and the release's metro-level ACS estimate. |
+| `46520` Urban Honolulu, HI | `26180` Honolulu; Honolulu County | `46520` Urban Honolulu; Honolulu County | The county composition matches, while the CBSA code and title changed by February 2013. A historical code alias is a candidate only after confirming the source ID for each missing year and the release's metro-level ACS estimate. |
+
+The July 2023 CBSA codes and membership above were parsed from the Census component workbook; the 2009 component facts were checked against the official Census 2009 historical text file; and the February 2013, September 2018, and 2020 facts against the official Census List 1 workbooks. The official Census history workbook records: Walton County added to Crestview in February 2013; Dutchess and Orange Counties transferred into the New York MSA in February 2013 and back out in September 2018; and the historical names for the affected areas. These are observed delineation facts, not evidence that any two ACS estimates are statistically or geographically interchangeable.
+
+### Ingest behavior and follow-up
+
+The ACS1 ingest in `hhplab/sources/census/acs/ingest/metro_acs1.py` stores the API geography as `source_cbsa_code`, calls `canonicalize_cbsa_code(code, year=vintage)`, then inner-joins to the requested target universe. The output schema omits `source_cbsa_code`; provenance records active alias rules and an alias-hit count, but not per-row source identities. The current alias table in `hhplab/geographies/gf_metro/metro_definitions.py` contains `31100` → `31080` for 2012 and `17460` → `17410` for 2012-2022. Unmatched API codes are dropped by the inner join, so an absent target row alone cannot distinguish an unavailable ACS estimate, an older code, a non-metro vintage, a different geography composition, or an ingest/mapping omission.
+
+Implementation follow-ups:
+
+1. Preserve or report raw source CBSA IDs and names for each ACS1 vintage in a read-only diagnostic, then compare against the official ACS API geography list/data for that release. Do not use an API key failure as evidence that a geography or estimate is absent.
+2. Check the 2009 `18880` and `35840` cached omissions against the original source response: both IDs are present in the December 2009 MSA delineation, and `35840` retains the same two counties through the July 2023 delineation. Do not rebuild or overwrite curated artifacts as part of this audit.
+3. Evaluate `31100` → `31080`, `42060` → `42200`, `26180` → `46520`, and (only in years when it is independently delineated with the same two counties) `39100` → `28880` as explicit year-bounded candidates. Validate exact source code, name, metro/micro status, and county membership per release first. For 2013-2017, `28880` has no separate metropolitan area to alias.
+4. Mark or exclude nonmatching area footprints from a fixed-2023-universe time comparison unless a separately reviewed county-level harmonization method exists. Same CBSA ID is not sufficient where membership changed, as with `18880`.
+5. After evidence is complete, update aliases only for a documented one-to-one identity match; retain the original source code in row-level provenance so every normalized value is auditable. Do not infer a match from target labels, names alone, or a single delineation snapshot.
+
+Fresh public evidence was downloaded read-only into `/tmp/hhplab-acs-coverage-coclab-p37ps-20261025/` and SHA-256 recorded: Census 2009 List 1 `list1_2009.txt` (`772341f31fd3943c35bbb728db354d9a079a049e70f016297fb54469f16a2767`); Census February 2013 List 1 `list1_2013.xls` (`1bb1d7ce747bcd72fc212bda806c28bb4b17d4cec72d1388770f2b0a6d06f5c0`); Census September 2018 List 1 `list1_Sep_2018.xls` (`22ba2e944ce1aa88b0bf0d09530d08f26c17a0bba7ae823290e7c4816316418c`); Census 2020 List 1 `list1_2020.xls` (`95b389487efcd818d71ba2a992e1edd43af93228e70c2a9634fd152acb345409`); Census `metro_area_history_1950_2020.xls` (`6e15ae6acb26372a7d2ce702abf9d0ba080a7e25a2e8c06533419a20d1e39c9c`); and Census July 2023 List 1 `list1_2023.xlsx` (`952c4b1e78acbb54e6ec9412434b7602fedacbf021736351a63c181bdb753629`). The Census ACS API query without an API key returned its “Missing Key” page, so no API-access result was used to infer geography coverage. No code, aliases, or curated artifact was changed in this audit.

@@ -2,11 +2,14 @@
 
 from __future__ import annotations
 
+import hashlib
+import shutil
 from pathlib import Path
 from typing import Annotated, Literal
 
 import geopandas as gpd
 import pandas as pd
+import pyarrow.parquet as pq
 import typer
 
 from hhplab.artifacts.naming.naming import (
@@ -14,12 +17,14 @@ from hhplab.artifacts.naming.naming import (
     county_path,
     msa_coc_block_population_xwalk_path,
     msa_coc_xwalk_path,
+    msa_county_membership_path,
     pl_block_population_path,
 )
 from hhplab.geographies.coc.coc_io import resolve_curated_boundary_path
 from hhplab.geographies.msa.msa_definitions import DEFINITION_VERSION, DELINEATION_FILE_YEAR
 from hhplab.registry.boundary_registry import latest_vintage, list_boundaries
 from hhplab.storage.paths import raw_root
+from hhplab.storage.provenance import ProvenanceBlock
 
 
 def _resolve_boundary_vintage(boundary: str | None) -> str:
@@ -197,6 +202,7 @@ def generate_msa_xwalk(
     county_geometry_path = county_path(counties)
     block_geometry_artifact = block_geometry_path(blocks)
     block_population_artifact = pl_block_population_path(decennial, blocks)
+    membership_path = msa_county_membership_path(definition_version)
 
     if not boundary_path.exists():
         message = (
@@ -261,12 +267,15 @@ def generate_msa_xwalk(
         county_gdf = gpd.read_parquet(county_geometry_path)
         if allocation_basis == "block_population":
             if state_shards:
-                crosswalk = _build_block_population_state_shards(
+                crosswalk, shard_stats = _build_block_population_state_shards(
                     coc_gdf,
                     county_gdf,
                     msa_membership,
                     block_geometry_artifact,
                     block_population_artifact,
+                    boundary_path=boundary_path,
+                    county_geometry_path=county_geometry_path,
+                    membership_path=membership_path,
                     boundary_vintage=resolved_boundary,
                     county_vintage=str(counties),
                     block_vintage=str(blocks),
@@ -363,9 +372,13 @@ def generate_msa_xwalk(
         shard_pattern = f"{output_path.stem}__state-*.parquet"
         payload["state_sharded"] = True
         payload["state_shard_dir"] = str(shard_dir)
-        payload["state_shard_count"] = len(list(shard_dir.glob(shard_pattern)))
+        payload["state_shard_count"] = shard_stats["built"] + shard_stats["reused"]
+        payload["state_shard_files_on_disk"] = len(list(shard_dir.glob(shard_pattern)))
         payload["failed_state_shards"] = []
-        payload["reused_state_shards"] = bool(reuse_shards)
+        payload["reused_state_shards"] = shard_stats["reused"] > 0
+        payload["state_shards_reused"] = shard_stats["reused"]
+        payload["state_shards_built"] = shard_stats["built"]
+        payload["state_shards_preserved"] = shard_stats["preserved"]
         if cleanup_shards and shard_dir.exists():
             for stale_path in shard_dir.glob(shard_pattern):
                 stale_path.unlink()
@@ -396,6 +409,9 @@ def _build_block_population_state_shards(
     block_geometry_artifact,
     block_population_artifact,
     *,
+    boundary_path,
+    county_geometry_path,
+    membership_path,
     boundary_vintage: str,
     county_vintage: str,
     block_vintage: str,
@@ -403,7 +419,7 @@ def _build_block_population_state_shards(
     definition_version: str,
     output_path,
     reuse_shards: bool,
-) -> pd.DataFrame:
+) -> tuple[pd.DataFrame, dict[str, int]]:
     from hhplab.geographies.msa.crosswalk import (
         COC_MSA_BLOCK_POPULATION_CROSSWALK_COLUMNS,
         build_coc_msa_block_population_crosswalk,
@@ -415,12 +431,48 @@ def _build_block_population_state_shards(
     shard_dir = _state_shard_dir(output_path)
     shard_dir.mkdir(parents=True, exist_ok=True)
 
+    fingerprints = _compute_shard_input_fingerprints(
+        coc_gdf=coc_gdf,
+        county_gdf=county_gdf,
+        boundary_path=boundary_path,
+        county_geometry_path=county_geometry_path,
+        membership_path=membership_path,
+        block_geometry_artifact=block_geometry_artifact,
+        block_population_artifact=block_population_artifact,
+    )
+    stats = {"reused": 0, "built": 0, "preserved": 0}
+
     shard_frames: list[pd.DataFrame] = []
     for state_fips in _state_fips_for_shards(counties, membership):
         shard_path = _state_shard_path(output_path, state_fips)
-        if reuse_shards and shard_path.exists():
-            shard = pd.read_parquet(shard_path)
-        else:
+        expected_identity = _shard_input_identity(
+            state_fips=state_fips,
+            fingerprints=fingerprints,
+            boundary_vintage=boundary_vintage,
+            county_vintage=county_vintage,
+            block_vintage=block_vintage,
+            decennial_vintage=decennial_vintage,
+            definition_version=definition_version,
+        )
+        reused = False
+        if (
+            reuse_shards
+            and shard_path.exists()
+            and _shard_identity_matches(shard_path, expected_identity)
+        ):
+            try:
+                shard = pd.read_parquet(shard_path)
+                stats["reused"] += 1
+                reused = True
+            except Exception:
+                # A matching identity cannot guarantee readable data pages (e.g.
+                # a truncated or corrupt shard file). Preserve and rebuild the
+                # shard instead of reusing it or crashing on the unreadable file.
+                reused = False
+        if not reused:
+            if shard_path.exists() and _preserve_stale_shard(shard_path):
+                stats["preserved"] += 1
+
             state_counties = counties[counties["county_fips"].str[:2] == state_fips].copy()
             state_membership = membership[
                 membership["county_fips"].isin(state_counties["county_fips"])
@@ -449,15 +501,19 @@ def _build_block_population_state_shards(
                 decennial_vintage=decennial_vintage,
                 definition_version=definition_version,
             )
-            shard.to_parquet(shard_path, index=False)
+            _write_state_shard_with_identity(shard, shard_path, expected_identity)
+            stats["built"] += 1
         if not shard.empty:
             shard = shard.copy()
             shard["_shard_state_fips"] = state_fips
             shard_frames.append(shard)
 
     if not shard_frames:
-        return pd.DataFrame(columns=list(COC_MSA_BLOCK_POPULATION_CROSSWALK_COLUMNS))
-    return _concat_block_population_state_shards(shard_frames)
+        return (
+            pd.DataFrame(columns=list(COC_MSA_BLOCK_POPULATION_CROSSWALK_COLUMNS)),
+            stats,
+        )
+    return _concat_block_population_state_shards(shard_frames), stats
 
 
 # State shards are deterministic, resumable intermediates for block-population
@@ -468,6 +524,11 @@ def _build_block_population_state_shards(
 # directories previously written under `data/curated/xwalks/<stem>__state_shards/`
 # are intentionally left in place and are NOT migrated or removed by this code.
 STATE_SHARD_FAMILY_SUBDIR = "msa_xwalk_state_shards"
+
+# Bump when the algorithm or shard schema changes so older shards are never
+# reused even when every input fingerprint matches.
+STATE_SHARD_IDENTITY_VERSION = "v1"
+STATE_SHARD_DATASET_TYPE = "msa_xwalk_state_shard"
 
 
 def _state_shard_dir(output_path) -> Path:
@@ -482,6 +543,172 @@ def _state_shard_dir(output_path) -> Path:
 def _state_shard_path(output_path, state_fips: str) -> Path:
     """Return the per-state shard file path for a canonical crosswalk artifact."""
     return _state_shard_dir(output_path) / f"{output_path.stem}__state-{state_fips}.parquet"
+
+
+def _stream_file_sha256(path: Path) -> str:
+    """Return the SHA-256 of a file's bytes using bounded streaming reads."""
+    with path.open("rb") as source:
+        return hashlib.file_digest(source, "sha256").hexdigest()
+
+
+def _same_file_bytes(left: Path, right: Path) -> bool:
+    """Compare two files byte-for-byte with bounded chunked reads."""
+    with left.open("rb") as lhs, right.open("rb") as rhs:
+        while True:
+            chunk = lhs.read(1024 * 1024)
+            if not chunk:
+                return rhs.read(1) == b""
+            if rhs.read(len(chunk)) != chunk:
+                return False
+
+
+def _preserve_stale_shard(shard_path: Path) -> Path | None:
+    """Retain an existing shard before a rebuild replaces it.
+
+    Retained copies are named by the SHA-256 of the full shard file bytes, so
+    every distinct shard version is preserved even when multiple builds write
+    different content to the same canonical path (e.g. repeated force
+    rebuilds). Existing retained copies are reused only when their bytes are
+    identical; otherwise a collision-safe suffixed copy is created. Retained
+    copies are never overwritten, so prior files are preserved and never
+    deleted.
+    """
+    if not shard_path.exists():
+        return None
+    with shard_path.open("rb") as source:
+        digest = hashlib.file_digest(source, "sha256").hexdigest()
+    candidate_index = 1
+    while True:
+        if candidate_index == 1:
+            candidate = shard_path.with_name(f"{shard_path.name}.sha256_{digest}")
+        else:
+            candidate = shard_path.with_name(
+                f"{shard_path.name}.sha256_{digest}_v{candidate_index}"
+            )
+        if not candidate.exists():
+            shutil.copy2(shard_path, candidate)
+            return candidate
+        if _same_file_bytes(shard_path, candidate):
+            return candidate
+        candidate_index += 1
+
+
+def _compute_shard_input_fingerprints(
+    *,
+    coc_gdf: gpd.GeoDataFrame,
+    county_gdf: gpd.GeoDataFrame,
+    boundary_path: Path,
+    county_geometry_path: Path,
+    membership_path: Path,
+    block_geometry_artifact: Path,
+    block_population_artifact: Path,
+) -> dict[str, dict[str, str]]:
+    """Fingerprint every shard input by exact source bytes plus explicit CRS.
+
+    National block geometry/population files are streamed once per run with
+    bounded reads; they are never materialized in memory. CRS is recorded
+    explicitly alongside the file hash because the projected interpretation of
+    the geometry is part of the computation.
+    """
+    return {
+        "coc_boundary": {
+            "sha256": _stream_file_sha256(boundary_path),
+            "crs": str(coc_gdf.crs),
+        },
+        "county_geometry": {
+            "sha256": _stream_file_sha256(county_geometry_path),
+            "crs": str(county_gdf.crs),
+        },
+        "msa_county_membership": {
+            "sha256": _stream_file_sha256(membership_path),
+        },
+        "block_geometry": {
+            "sha256": _stream_file_sha256(block_geometry_artifact),
+        },
+        "block_population": {
+            "sha256": _stream_file_sha256(block_population_artifact),
+        },
+    }
+
+
+def _shard_input_identity(
+    *,
+    state_fips: str,
+    fingerprints: dict[str, dict[str, str]],
+    boundary_vintage: str,
+    county_vintage: str,
+    block_vintage: str,
+    decennial_vintage: str,
+    definition_version: str,
+) -> dict[str, object]:
+    """Deterministic identity binding every input and parameter of a shard."""
+    return {
+        "identity_version": STATE_SHARD_IDENTITY_VERSION,
+        "state_fips": state_fips,
+        "inputs": fingerprints,
+        "parameters": {
+            "boundary_vintage": boundary_vintage,
+            "county_vintage": county_vintage,
+            "block_vintage": block_vintage,
+            "decennial_vintage": decennial_vintage,
+            "definition_version": definition_version,
+        },
+    }
+
+
+def _state_shard_provenance(identity: dict[str, object]) -> ProvenanceBlock:
+    return ProvenanceBlock(
+        boundary_vintage=str(identity["parameters"]["boundary_vintage"]),
+        county_vintage=str(identity["parameters"]["county_vintage"]),
+        definition_version=str(identity["parameters"]["definition_version"]),
+        weighting="block_population",
+        geo_type="msa",
+        extra={"dataset_type": STATE_SHARD_DATASET_TYPE, "identity": identity},
+    )
+
+
+def _write_state_shard_with_identity(
+    shard: pd.DataFrame,
+    shard_path: Path,
+    identity: dict[str, object],
+) -> Path:
+    from hhplab.storage.provenance import write_parquet_with_provenance
+
+    return write_parquet_with_provenance(
+        shard,
+        shard_path,
+        _state_shard_provenance(identity),
+    )
+
+
+def _shard_identity_matches(
+    shard_path: Path,
+    expected_identity: dict[str, object],
+) -> bool:
+    """Return True only when a shard's recorded identity is valid and current.
+
+    Missing, malformed, legacy (no provenance), or stale identities are never
+    trusted; any schema drift also forces a rebuild. Any read/parse failure is
+    treated as unusable so a corrupt shard is rebuilt rather than reused.
+    """
+    from hhplab.geographies.msa.crosswalk import (
+        COC_MSA_BLOCK_POPULATION_CROSSWALK_COLUMNS,
+    )
+    from hhplab.storage.provenance import read_provenance
+
+    try:
+        provenance = read_provenance(shard_path)
+        if provenance is None:
+            return False
+        extra = provenance.extra or {}
+        if extra.get("dataset_type") != STATE_SHARD_DATASET_TYPE:
+            return False
+        if extra.get("identity") != expected_identity:
+            return False
+        schema_columns = list(pq.read_schema(shard_path).names)
+    except Exception:
+        return False
+    return schema_columns == list(COC_MSA_BLOCK_POPULATION_CROSSWALK_COLUMNS)
 
 
 def _county_with_fips(county_gdf: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
