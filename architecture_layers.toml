@@ -158,7 +158,7 @@ plan = "results-recipe-v2"
 baseline_commit = "900a29f9891f949bef5aaae354f4055b01033497"
 intent_file = ".elements/elements.working-intent.jsonl"
 reconcile_request = ".elements/plans/results-recipe-v2.reconcile.json"
-final_pin = ".elements/plans/predecessor-reconciliation.pin-receipt.json"
+final_pin = ".elements/plans/pit-observation.pin-receipt.json"
 bead_map = ".elements/plans/results-recipe-v2.bead-map.jsonl"
 bead_export = ".beads/issues.jsonl"
 
@@ -209,6 +209,7 @@ bead_export = ".beads/issues.jsonl"
 "intent:results-v2:verify" = { path = "hhplab/results/verify.py", kind = "semantic/module", parent = "intent:results-v2:results", layer = "application", change = "new", bead = "coclab-ff6fp.21" }
 "intent:site-universe:input_resolver" = { path = "hhplab/recipe/executor/inputs.py", kind = "semantic/module", parent = "intent:results-v2:executor", layer = "application", change = "extend", bead = "coclab-ccwlh.2" }
 "intent:site-universe:site_year_aggregation" = { path = "hhplab/recipe/executor/msa_coc_panel.py", kind = "semantic/module", parent = "intent:results-v2:executor", layer = "application", change = "extend", bead = "coclab-ccwlh.4" }
+"intent:site-universe:pit_observation" = { path = "hhplab/sources/hud/pit/observation.py", kind = "semantic/module", parent = "intent:results-v2:sources", layer = "domain", change = "new", bead = "coclab-93aqk" }
 "intent:site-universe:coc_boundary_compatibility" = { path = "hhplab/geographies/coc/coc_validate.py", kind = "semantic/module", parent = "intent:results-v2:hhplab", layer = "domain", change = "extend", bead = "coclab-ccwlh.3" }
 "intent:site-universe:storage_config" = { path = "hhplab/storage/config.py", kind = "semantic/module", parent = "intent:results-v2:storage", layer = "infrastructure", change = "extend", bead = "coclab-ccwlh.6" }
 "intent:site-universe:recipe_output_root_schema" = { path = "hhplab/recipe/recipe_schema.py", kind = "semantic/module", parent = "intent:results-v2:recipe", layer = "application", change = "extend", bead = "coclab-ccwlh.6" }
@@ -234,7 +235,8 @@ bead_export = ".beads/issues.jsonl"
 "intent:results-v2:v2_schema" = ["hhplab.recipe.recipe_schema", "hhplab.schema"]
 "intent:results-v2:verify" = ["hhplab.schema", "hhplab.recipe", "hhplab.analysis", "hhplab.results", "hhplab.storage"]
 "intent:site-universe:input_resolver" = ["hhplab.recipe", "hhplab.schema", "hhplab.storage", "hhplab.artifacts.naming.naming"]
-"intent:site-universe:site_year_aggregation" = ["hhplab.recipe", "hhplab.analysis", "hhplab.schema", "hhplab.geographies.coc.coc_validate"]
+"intent:site-universe:site_year_aggregation" = ["hhplab.recipe", "hhplab.analysis", "hhplab.schema", "hhplab.geographies.coc.coc_validate", "hhplab.sources.hud.pit.observation"]
+"intent:site-universe:pit_observation" = ["hhplab.schema.columns"]
 "intent:site-universe:coc_boundary_compatibility" = ["hhplab.geographies.coc", "hhplab.schema"]
 "intent:site-universe:storage_config" = ["hhplab.storage"]
 "intent:site-universe:recipe_output_root_schema" = []
@@ -284,7 +286,8 @@ bead_export = ".beads/issues.jsonl"
 "intent:results-v2:v2_schema" = "RecipeV2 and closed result sections, parameters, capability validation and v1 build composition; no statistical algorithms."
 "intent:results-v2:verify" = "Integrity-first replay using bundled panels only, shared execution services without upstream build/ledger side effects, exact sample comparison and tolerance/status precedence."
 "intent:site-universe:input_resolver" = "Resolve and validate the paired site and membership tables, schema, artifact identity, explicit threshold, row uniqueness and fingerprints for RecipeV2 inputs."
-"intent:site-universe:site_year_aggregation" = "Aggregate complete site-year outcomes over frozen memberships using validated panel/year source-ID sets and single, preaggregated, or sum operations; prevent cross-site source reuse and double counts, and preserve explicit incomplete status without partial sums or allocation."
+"intent:site-universe:site_year_aggregation" = "Aggregate complete site-year outcomes over frozen memberships using validated panel/year source-ID sets and single, preaggregated, or sum operations; prevent cross-site source reuse and double counts, and preserve explicit incomplete status without partial sums or allocation. Consume the PIT observation module's source declarations and measure-specific eligibility predicates to emit source-limited statuses and member diagnostics without modifying reported source values."
+"intent:site-universe:pit_observation" = "Own source-declared PIT observation metadata and measure-specific eligibility predicates. Preserve reported values and constituent declarations, distinguish observed, carried-forward, partial and unknown counts, and require complete member coverage when aggregating metadata. Never infer observation from repeated numeric values or select study geography, research periods or estimator samples."
 "intent:site-universe:coc_boundary_compatibility" = "Own versioned, evidence-backed CoC boundary and count reconciliation for historical site-year use. Separate geometric equivalence from approved count reconciliation; require explicit source-ID sets, panel/year operations, count evidence and review approval for predecessor unions; never infer reconciliation from a persistent ID alone."
 "intent:site-universe:storage_config" = "Resolve one deterministic recipe output root across CLI, environment, recipe, repository, user and default configuration while keeping asset_store_root separate."
 "intent:site-universe:recipe_output_root_schema" = "Declare the shared RecipeV1 output_root field inherited by V2 while keeping site_universe input semantics V2-only."

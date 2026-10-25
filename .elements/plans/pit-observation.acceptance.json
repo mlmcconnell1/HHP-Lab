@@ -1,0 +1,400 @@
+{
+  "scope": "coclab-93aqk PIT observation intent amendment; not a Phase-1 release decision",
+  "reviewed_at": "2026-10-25T14:45:36.972489+00:00",
+  "prior_pin": {
+    "status": "pinned",
+    "pin_id": "intent-pin:0ba0bb3fa360b86c4e0069d03213022c229a0cd985dc3230f7270c36074bef4f",
+    "object_id": "intent-object:b0a21a5a5be7f33645a7aedc7c124fa7901605a864f6378cdfc446b345c8a5cf",
+    "view_witness": "sha256:8b067bc56464807ece8808ce8005b246e10e888dd3a2fb344d978f2c770dc202",
+    "pinned": true
+  },
+  "pin": {
+    "status": "pinned",
+    "pin_id": "intent-pin:f6d7abca68969cf3e812cf2cb13b1876ee3905afcfc70aa0d1feed42ce88bfb0",
+    "object_id": "intent-object:be854afd493f11e39c3d9fbd47591a518d102d7402e40fe7916a9006e91df313",
+    "view_witness": "sha256:e270d8155aab4a50ec7b651ab9dff0878d9e5b7912bcbcea701784e03e070e50",
+    "pinned": true
+  },
+  "source_witness": "sha256:c9eb1b148b19fdab2e42280eb8bd4ca23142a2f39a65ddbbc7de6ef1ca5177ff",
+  "view_witness": "sha256:e270d8155aab4a50ec7b651ab9dff0878d9e5b7912bcbcea701784e03e070e50",
+  "correspondence_count": 49,
+  "all_matched_exact": true,
+  "has_more": false,
+  "structure_findings": [],
+  "view_conflicts": 0,
+  "root_bindings": [
+    {
+      "intent_root_id": "intent:results-v2:hhplab",
+      "observed_root_id": "el:directory-hhplab-j7z92fqbqmck",
+      "confidence": "exact",
+      "source": "explicit"
+    }
+  ],
+  "review": {
+    "pit_observation": "Domain ownership verified against the source: pure declaration classification, nullable flags, measure-specific eligibility and complete-member metadata. Its only internal import is hhplab.schema.columns; it performs no research design, estimator execution or data acquisition.",
+    "site_year_aggregation": "Revision 5 retains the revision-4 identity, path, application layer, frozen membership and predecessor operations, and explicitly consumes source observation predicates to report source-limited outcomes independently of geography/count reconciliation.",
+    "dependencies": "Application-to-domain edge is explicit and narrow; no upward dependency exception changed and the architecture gates reject unplanned files, dependency drift and new scoped cycles.",
+    "fixture_correction": "Synthetic replay fixture now declares sheltered-only counts through COUNT_TYPES_SHELTERED_ONLY. Source values and expected replay results are unchanged; missing declaration cases remain covered separately by fail-closed regression tests.",
+    "production_code_changed": false
+  },
+  "checks": [
+    {
+      "scope": "PIT observation, site-year, policy, resampling, replay and longitudinal regressions",
+      "result": "171 passed in 77.98s (0:01:17)"
+    },
+    {
+      "scope": "Architecture layers and pinned intent conformance",
+      "result": "421 passed in 24.28s"
+    }
+  ],
+  "intent_validation": {
+    "valid": true,
+    "record_count": 49
+  },
+  "ruff": "tests/test_site_results_integration.py: all checks passed",
+  "checked_correspondences": [
+    {
+      "id": "intent:results-v2:analysis",
+      "revision": "revision:results-v2:analysis:2",
+      "path": "hhplab/analysis",
+      "finding": "matched",
+      "confidence": "exact"
+    },
+    {
+      "id": "intent:results-v2:analysis_contracts",
+      "revision": "revision:results-v2:analysis_contracts:1",
+      "path": "hhplab/analysis/contracts.py",
+      "finding": "matched",
+      "confidence": "exact"
+    },
+    {
+      "id": "intent:results-v2:analysis_dispatch",
+      "revision": "revision:results-v2:analysis_dispatch:3",
+      "path": "hhplab/recipe/executor/analyses.py",
+      "finding": "matched",
+      "confidence": "exact"
+    },
+    {
+      "id": "intent:results-v2:bands",
+      "revision": "revision:results-v2:bands:1",
+      "path": "hhplab/results/bands.py",
+      "finding": "matched",
+      "confidence": "exact"
+    },
+    {
+      "id": "intent:results-v2:build_cmds",
+      "revision": "revision:results-v2:build_cmds:2",
+      "path": "hhplab/cli/build_cmds",
+      "finding": "matched",
+      "confidence": "exact"
+    },
+    {
+      "id": "intent:results-v2:bundle",
+      "revision": "revision:results-v2:bundle:4",
+      "path": "hhplab/results/bundle.py",
+      "finding": "matched",
+      "confidence": "exact"
+    },
+    {
+      "id": "intent:results-v2:cli",
+      "revision": "revision:results-v2:cli:2",
+      "path": "hhplab/cli",
+      "finding": "matched",
+      "confidence": "exact"
+    },
+    {
+      "id": "intent:results-v2:cli_commands",
+      "revision": "revision:results-v2:cli_commands:1",
+      "path": "hhplab/cli/commands.py",
+      "finding": "matched",
+      "confidence": "exact"
+    },
+    {
+      "id": "intent:results-v2:cli_recipe",
+      "revision": "revision:results-v2:cli_recipe:3",
+      "path": "hhplab/cli/build_cmds/recipe.py",
+      "finding": "matched",
+      "confidence": "exact"
+    },
+    {
+      "id": "intent:results-v2:cli_results",
+      "revision": "revision:results-v2:cli_results:1",
+      "path": "hhplab/cli/results.py",
+      "finding": "matched",
+      "confidence": "exact"
+    },
+    {
+      "id": "intent:results-v2:correlation",
+      "revision": "revision:results-v2:correlation:1",
+      "path": "hhplab/analysis/correlation.py",
+      "finding": "matched",
+      "confidence": "exact"
+    },
+    {
+      "id": "intent:results-v2:covariate_catalog",
+      "revision": "revision:results-v2:covariate_catalog:1",
+      "path": "hhplab/covariates/catalog.py",
+      "finding": "matched",
+      "confidence": "exact"
+    },
+    {
+      "id": "intent:results-v2:covariates",
+      "revision": "revision:results-v2:covariates:2",
+      "path": "hhplab/covariates",
+      "finding": "matched",
+      "confidence": "exact"
+    },
+    {
+      "id": "intent:results-v2:derive",
+      "revision": "revision:results-v2:derive:1",
+      "path": "hhplab/recipe/derive.py",
+      "finding": "matched",
+      "confidence": "exact"
+    },
+    {
+      "id": "intent:results-v2:diagnostics",
+      "revision": "revision:results-v2:diagnostics:1",
+      "path": "hhplab/results/diagnostics.py",
+      "finding": "matched",
+      "confidence": "exact"
+    },
+    {
+      "id": "intent:results-v2:estimation",
+      "revision": "revision:results-v2:estimation:1",
+      "path": "hhplab/analysis/estimation.py",
+      "finding": "matched",
+      "confidence": "exact"
+    },
+    {
+      "id": "intent:results-v2:executor",
+      "revision": "revision:results-v2:executor:2",
+      "path": "hhplab/recipe/executor",
+      "finding": "matched",
+      "confidence": "exact"
+    },
+    {
+      "id": "intent:results-v2:hhplab",
+      "revision": "revision:results-v2:hhplab:2",
+      "path": "hhplab",
+      "finding": "matched",
+      "confidence": "exact"
+    },
+    {
+      "id": "intent:results-v2:inspection",
+      "revision": "revision:results-v2:inspection:1",
+      "path": "hhplab/analysis/inspection.py",
+      "finding": "matched",
+      "confidence": "exact"
+    },
+    {
+      "id": "intent:results-v2:ledger",
+      "revision": "revision:results-v2:ledger:1",
+      "path": "hhplab/storage/run_ledger.py",
+      "finding": "matched",
+      "confidence": "exact"
+    },
+    {
+      "id": "intent:results-v2:lineage",
+      "revision": "revision:results-v2:lineage:1",
+      "path": "hhplab/results/lineage.py",
+      "finding": "matched",
+      "confidence": "exact"
+    },
+    {
+      "id": "intent:results-v2:loader",
+      "revision": "revision:results-v2:loader:3",
+      "path": "hhplab/recipe/loader.py",
+      "finding": "matched",
+      "confidence": "exact"
+    },
+    {
+      "id": "intent:results-v2:model",
+      "revision": "revision:results-v2:model:1",
+      "path": "hhplab/analysis/model.py",
+      "finding": "matched",
+      "confidence": "exact"
+    },
+    {
+      "id": "intent:results-v2:readiness",
+      "revision": "revision:results-v2:readiness:1",
+      "path": "hhplab/analysis/readiness.py",
+      "finding": "matched",
+      "confidence": "exact"
+    },
+    {
+      "id": "intent:results-v2:recipe",
+      "revision": "revision:results-v2:recipe:2",
+      "path": "hhplab/recipe",
+      "finding": "matched",
+      "confidence": "exact"
+    },
+    {
+      "id": "intent:results-v2:recipe_findings",
+      "revision": "revision:results-v2:recipe_findings:1",
+      "path": "hhplab/results/recipe_findings.py",
+      "finding": "matched",
+      "confidence": "exact"
+    },
+    {
+      "id": "intent:results-v2:redistribution_contracts",
+      "revision": "revision:results-v2:redistribution_contracts:1",
+      "path": "hhplab/schema/redistribution.py",
+      "finding": "matched",
+      "confidence": "exact"
+    },
+    {
+      "id": "intent:results-v2:registry",
+      "revision": "revision:results-v2:registry:2",
+      "path": "hhplab/registry",
+      "finding": "matched",
+      "confidence": "exact"
+    },
+    {
+      "id": "intent:results-v2:regression",
+      "revision": "revision:results-v2:regression:1",
+      "path": "hhplab/analysis/regression.py",
+      "finding": "matched",
+      "confidence": "exact"
+    },
+    {
+      "id": "intent:results-v2:report",
+      "revision": "revision:results-v2:report:1",
+      "path": "hhplab/results/report.py",
+      "finding": "matched",
+      "confidence": "exact"
+    },
+    {
+      "id": "intent:results-v2:result_contracts",
+      "revision": "revision:results-v2:result_contracts:1",
+      "path": "hhplab/schema/results.py",
+      "finding": "matched",
+      "confidence": "exact"
+    },
+    {
+      "id": "intent:results-v2:result_planner",
+      "revision": "revision:results-v2:result_planner:4",
+      "path": "hhplab/recipe/results_plan.py",
+      "finding": "matched",
+      "confidence": "exact"
+    },
+    {
+      "id": "intent:results-v2:results",
+      "revision": "revision:results-v2:results:2",
+      "path": "hhplab/results",
+      "finding": "matched",
+      "confidence": "exact"
+    },
+    {
+      "id": "intent:results-v2:results_runner",
+      "revision": "revision:results-v2:results_runner:1",
+      "path": "hhplab/results/runner.py",
+      "finding": "matched",
+      "confidence": "exact"
+    },
+    {
+      "id": "intent:results-v2:samples",
+      "revision": "revision:results-v2:samples:1",
+      "path": "hhplab/analysis/sample.py",
+      "finding": "matched",
+      "confidence": "exact"
+    },
+    {
+      "id": "intent:results-v2:schema",
+      "revision": "revision:results-v2:schema:2",
+      "path": "hhplab/schema",
+      "finding": "matched",
+      "confidence": "exact"
+    },
+    {
+      "id": "intent:results-v2:source_coverage",
+      "revision": "revision:results-v2:source_coverage:1",
+      "path": "hhplab/sources/coverage.py",
+      "finding": "matched",
+      "confidence": "exact"
+    },
+    {
+      "id": "intent:results-v2:source_registry",
+      "revision": "revision:results-v2:source_registry:1",
+      "path": "hhplab/registry/source_registry.py",
+      "finding": "matched",
+      "confidence": "exact"
+    },
+    {
+      "id": "intent:results-v2:sources",
+      "revision": "revision:results-v2:sources:2",
+      "path": "hhplab/sources",
+      "finding": "matched",
+      "confidence": "exact"
+    },
+    {
+      "id": "intent:results-v2:stats",
+      "revision": "revision:results-v2:stats:1",
+      "path": "hhplab/analysis/stats.py",
+      "finding": "matched",
+      "confidence": "exact"
+    },
+    {
+      "id": "intent:results-v2:storage",
+      "revision": "revision:results-v2:storage:4",
+      "path": "hhplab/storage",
+      "finding": "matched",
+      "confidence": "exact"
+    },
+    {
+      "id": "intent:results-v2:v2_schema",
+      "revision": "revision:results-v2:v2_schema:3",
+      "path": "hhplab/recipe/schema_results.py",
+      "finding": "matched",
+      "confidence": "exact"
+    },
+    {
+      "id": "intent:results-v2:verify",
+      "revision": "revision:results-v2:verify:4",
+      "path": "hhplab/results/verify.py",
+      "finding": "matched",
+      "confidence": "exact"
+    },
+    {
+      "id": "intent:site-universe:coc_boundary_compatibility",
+      "revision": "revision:site-universe:coc_boundary_compatibility:3",
+      "path": "hhplab/geographies/coc/coc_validate.py",
+      "finding": "matched",
+      "confidence": "exact"
+    },
+    {
+      "id": "intent:site-universe:input_resolver",
+      "revision": "revision:site-universe:input_resolver:3",
+      "path": "hhplab/recipe/executor/inputs.py",
+      "finding": "matched",
+      "confidence": "exact"
+    },
+    {
+      "id": "intent:site-universe:pit_observation",
+      "revision": "revision:site-universe:pit_observation:1",
+      "path": "hhplab/sources/hud/pit/observation.py",
+      "finding": "matched",
+      "confidence": "exact"
+    },
+    {
+      "id": "intent:site-universe:recipe_output_root_schema",
+      "revision": "revision:site-universe:recipe_output_root_schema:1",
+      "path": "hhplab/recipe/recipe_schema.py",
+      "finding": "matched",
+      "confidence": "exact"
+    },
+    {
+      "id": "intent:site-universe:site_year_aggregation",
+      "revision": "revision:site-universe:site_year_aggregation:5",
+      "path": "hhplab/recipe/executor/msa_coc_panel.py",
+      "finding": "matched",
+      "confidence": "exact"
+    },
+    {
+      "id": "intent:site-universe:storage_config",
+      "revision": "revision:site-universe:storage_config:2",
+      "path": "hhplab/storage/config.py",
+      "finding": "matched",
+      "confidence": "exact"
+    }
+  ]
+}

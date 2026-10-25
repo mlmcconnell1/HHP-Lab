@@ -30,3 +30,4 @@
 {"key": "site-universe-boundaries", "id": "coclab-ccwlh.3", "depends_on": ["coclab-ccwlh.1"], "intent_ids": ["intent:site-universe:coc_boundary_compatibility"]}
 {"key": "site-universe-aggregation", "id": "coclab-ccwlh.4", "depends_on": ["coclab-ccwlh.1", "coclab-ccwlh.2", "coclab-ccwlh.3"], "intent_ids": ["intent:site-universe:site_year_aggregation"]}
 {"key": "site-universe-output-root", "id": "coclab-ccwlh.6", "depends_on": ["coclab-ccwlh.1"], "intent_ids": ["intent:site-universe:storage_config", "intent:site-universe:recipe_output_root_schema"]}
+{"key": "pit-observation-intent", "id": "coclab-93aqk", "depends_on": [], "intent_ids": ["intent:site-universe:pit_observation", "intent:site-universe:site_year_aggregation"]}

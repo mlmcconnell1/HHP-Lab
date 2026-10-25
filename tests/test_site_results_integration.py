@@ -3,6 +3,8 @@
 The fixture freezes three synthetic MSA sites at threshold 0.95, with one
 excluded candidate and one incomplete 2021 outcome. These values exercise the
 software contract only; they are not research parameters or empirical results.
+Each source row declares a sheltered-only count, so sheltered observations are
+eligible while no unsheltered observation is implied by the fixture.
 """
 
 from __future__ import annotations
@@ -29,6 +31,7 @@ from hhplab.schema.redistribution import (
     RedistributionStatus,
     SourceRedistribution,
 )
+from hhplab.sources.hud.pit.observation import COUNT_TYPES_SHELTERED_ONLY
 from hhplab.storage.provenance import ProvenanceBlock, write_parquet_with_provenance
 from hhplab.storage.run_ledger import RunLedger
 
@@ -263,6 +266,7 @@ def _outcome_panel() -> pd.DataFrame:
         OUTCOME_ROWS,
         columns=("coc_id", "year", "pit_sheltered", "hic_total_beds"),
     )
+    frame["count_types"] = COUNT_TYPES_SHELTERED_ONLY
     frame.attrs["results_panel_provenance"] = {"target_geometry": {"type": "coc", "vintage": 2024}}
     return frame
 
