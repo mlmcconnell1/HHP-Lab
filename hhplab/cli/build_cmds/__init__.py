@@ -12,6 +12,7 @@ from hhplab.cli.build_cmds.recipe import (
     recipe_provenance_cmd,
 )
 from hhplab.cli.build_cmds.results import build_result_cmd
+from hhplab.cli.build_cmds.right_to_shelter import build_right_to_shelter_cmd
 from hhplab.cli.build_cmds.urban_fraction import build_urban_fraction
 
 
@@ -22,6 +23,7 @@ def register_commands(app: typer.Typer) -> None:
     app.command("urban-fraction")(build_urban_fraction)
     app.command("prism-county")(build_prism_county)
     app.command("medsl-president-county")(build_medsl_president_county)
+    app.command("right-to-shelter")(build_right_to_shelter_cmd)
     app.command("recipe-plan")(recipe_plan_cmd)
     app.command("recipe-provenance")(recipe_provenance_cmd)
     app.command("recipe-export")(recipe_export_cmd)

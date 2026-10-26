@@ -1,0 +1,56 @@
+{
+  "scope": "coclab-gl6pz right-to-shelter intent registration; not a Phase-1 release decision",
+  "reviewed_at": "2026-10-26T01:52:15Z",
+  "prior_pin": {
+    "status": "pinned",
+    "pin_id": "intent-pin:f6d7abca68969cf3e812cf2cb13b1876ee3905afcfc70aa0d1feed42ce88bfb0",
+    "object_id": "intent-object:be854afd493f11e39c3d9fbd47591a518d102d7402e40fe7916a9006e91df313",
+    "view_witness": "sha256:e270d8155aab4a50ec7b651ab9dff0878d9e5b7912bcbcea701784e03e070e50",
+    "pinned": true
+  },
+  "pin": {
+    "status": "pinned",
+    "pin_id": "intent-pin:dd84ed6d21576a6c11591b3435284f01df98907b81cfecd7c78d867ddac0a6cb",
+    "object_id": "intent-object:171ded9ba477c3fb8a13adb73247a56d89aa21d942b24f6cd7b94c1872fbe8ef",
+    "view_witness": "sha256:5f6719c3f87ced8d9d62536f350ece0d976b209425d6785585033cb61152d3d6",
+    "pinned": true
+  },
+  "source_witness": "sha256:a0ef69b8d8dc09c605482b11fcaa2a1f38eb928265b06fe67bea6229d54bc775",
+  "view_witness": "sha256:5f6719c3f87ced8d9d62536f350ece0d976b209425d6785585033cb61152d3d6",
+  "correspondence_count": 51,
+  "all_matched_exact": true,
+  "has_more": false,
+  "structure_findings": [],
+  "view_conflicts": 0,
+  "root_bindings": [
+    {
+      "intent_root_id": "intent:results-v2:hhplab",
+      "observed_root_id": "el:directory-hhplab-j7z92fqbqmck",
+      "confidence": "exact",
+      "source": "explicit"
+    }
+  ],
+  "review": {
+    "right_to_shelter_source": "The domain module is registered at its existing path and domain layer with the approved schema, geography, storage, and naming dependency allowlist.",
+    "right_to_shelter_cli": "The CLI module is registered at its existing path and interface layer; its only internal dependency is the right-to-shelter source module.",
+    "plan_registration": "Both identities are owned by coclab-gl6pz in the results-recipe-v2 bead map. No upward dependency exceptions were added; earlier plan evidence and pins remain unchanged."
+  },
+  "checks": [
+    {
+      "scope": "Elements scaffold refresh",
+      "result": "passed; observations and scaffold fresh"
+    },
+    {
+      "scope": "Native working-intent validation",
+      "result": "valid; 51 records"
+    },
+    {
+      "scope": "Results architecture, architecture layers, and right-to-shelter tests",
+      "result": "450 passed in 33.37s"
+    }
+  ],
+  "intent_validation": {
+    "valid": true,
+    "record_count": 51
+  }
+}

@@ -124,6 +124,19 @@ CORE_SOURCE_COVERAGE_SPECS: dict[str, SourceCoverageSpec] = {
         last_year=None,
         notes="ZORI All Homes county monthly series begins in January 2015.",
     ),
+    "right_to_shelter": SourceCoverageSpec(
+        source_id="right_to_shelter",
+        provider="curated",
+        product="jurisdiction-year rights table",
+        native_geo="jurisdiction",
+        first_year=2007,
+        last_year=None,
+        notes=(
+            "The schema supports annual PIT-date coding from 2007 onward. Actual "
+            "jurisdiction-year availability depends on cited rows in the curated "
+            "table; no jurisdiction statuses are populated by this package."
+        ),
+    ),
 }
 
 

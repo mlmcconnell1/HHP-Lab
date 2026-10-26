@@ -53,6 +53,7 @@ CURATED_SUBDIRS: set[str] = {
     "vera",
     "sanctuary",
     "covariates",
+    "right_to_shelter",
 }
 
 # Cache namespaces may live next to curated assets during local development,
@@ -201,6 +202,15 @@ CANONICAL_PATTERNS: dict[str, list[re.Pattern[str]]] = {
         re.compile(r"^covariate__[a-z0-9_]+__Y\d{4}-(?:\d{4}|ongoing)\.parquet$"),
         re.compile(r"^covariate_pairs__[a-z0-9_]+__Y\d{4}-(?:\d{4}|ongoing)\.parquet$"),
         re.compile(r"^covariate_panel__[a-z0-9_]+__Y\d{4}-(?:\d{4}|ongoing)\.parquet$"),
+    ],
+    "right_to_shelter": [
+        re.compile(r"^right_to_shelter__jurisdiction_year\.csv$"),
+        re.compile(
+            r"^right_to_shelter__msa__Y\d{4}-\d{4}@M[\w-]+\.parquet$"
+        ),
+        re.compile(
+            r"^right_to_shelter__coc__Y\d{4}-\d{4}@B\d{4}\.parquet$"
+        ),
     ],
     "maps": [
         re.compile(r"^.+\.html$"),

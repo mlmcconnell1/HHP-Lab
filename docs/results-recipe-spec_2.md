@@ -955,7 +955,8 @@ authors: [Matt McConnell]
 #   pit_sheltered, pit_unsheltered, pit_total   (HUD PIT)
 #   hic_es_beds, hic_th_beds, hic_sh_beds        (HUD HIC, year-round beds)
 #   population (PEP), unemployment_rate (BLS LAUS), median_gross_rent (ACS)
-#   right_to_shelter                             (static 0/1 flag; §10.4)
+#   rts_single_adults, rts_families, rts_pregnant_people
+#                                                (jurisdiction-year; §10.4)
 # ----------------------------------------------------------------
 
 panels:
@@ -1214,7 +1215,23 @@ In Phase 1, adding this variant must fail at spec preflight with
 
 ### 10.4 Research inputs Matt supplies before locking
 
-1. The definition and source of the `right_to_shelter` flag.
+1. The definition and source of the `right_to_shelter` inputs. The curated
+   reference is coded by jurisdiction-year and separately for single adults,
+   families, and pregnant people. It records year-round strength, a separate
+   weather-only flag, citations, and effective/ended dates; the panel's 0/1
+   `rts_*` flags are derived under a selectable strict or broad coding rule.
+   Strict coding counts enforceable year-round status only. Broad coding counts
+   enforceable or conditional status, with weather-only protections included
+   only when explicitly selected. Each annual row records the status in force
+   on January 31, matching the late-January PIT reference date; a mid-year
+   change first affects the next year's row. The canonical input is
+   `data/curated/right_to_shelter/right_to_shelter__jurisdiction_year.csv`.
+   Each citation records its source type and redistribution status; secondary
+   citations require an explicit redistribution status.
+   Those flags are assigned to CBSA/MSA and CoC years using county population
+   weights, so mixed-jurisdiction units carry a covered-population share and a
+   geographic-approximation annotation. The example's
+   `right_to_shelter_source` remains unresolved until cited rows are supplied.
 2. `delta_theta`, `delta_slope`, `fit_threshold`, and `fit_floor`.
 3. The primary geography (CBSA is assumed) and the year range.
 4. The bed definition: ES + TH + SH year-round beds, excluding seasonal and

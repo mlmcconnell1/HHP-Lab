@@ -171,7 +171,9 @@ class TestListSourcesJson:
         assert payload["source_count"] == len(payload["sources"])
 
         by_id = {source["source_id"]: source for source in payload["sources"]}
-        assert set(by_id) == {"acs1", "acs5", "hic", "pep", "pit", "zori"}
+        assert set(by_id) == {
+            "acs1", "acs5", "hic", "pep", "pit", "right_to_shelter", "zori"
+        }
         assert by_id["pit"] == {
             "source_id": "pit",
             "provider": "hud",
@@ -216,6 +218,13 @@ class TestListSourcesJson:
         assert by_id["acs1"]["first_year"] == 2005
         assert by_id["pep"]["first_year"] == 2010
         assert by_id["zori"]["first_year"] == 2015
+        right_to_shelter = by_id["right_to_shelter"]
+        assert right_to_shelter["provider"] == "curated"
+        assert right_to_shelter["product"] == "jurisdiction-year rights table"
+        assert right_to_shelter["native_geo"] == "jurisdiction"
+        assert right_to_shelter["first_year"] == 2007
+        assert right_to_shelter["last_year"] is None
+        assert "depends on cited rows" in right_to_shelter["notes"]
 
 
 class TestListCensusJson:
