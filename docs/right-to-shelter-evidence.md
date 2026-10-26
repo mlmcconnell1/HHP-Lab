@@ -1,8 +1,9 @@
 # Right-to-shelter legal evidence and coverage plan
 
 Status: research evidence for `coclab-gl6pz`; candidate coding only. This is
-not a completed national legal inventory or an approved definition of the
-analysis flags.
+not a completed national legal inventory. Matt accepted a provisional
+none-elsewhere baseline on 2026-10-26, subject to revision after feedback;
+population/coding choices and listed-jurisdiction gaps remain separate.
 
 ## Study frame and coding conventions
 
@@ -27,8 +28,12 @@ The current source contract is a reviewed baseline plus dated exception
 intervals. A jurisdiction may be coded as baseline-none only for years that
 have actually been reviewed; an absent exception outside that scope is
 unknown, not no-right. The candidate jurisdictions below do not establish
-a nationwide baseline. There is no nationwide statement in this note that
-omitted jurisdictions lack rights or applicable shelter duties.
+a nationwide legal finding. Matt has now authorized treating unlisted
+jurisdictions as none provisionally for analysis, provided that the assumption
+travels with the results. This decision does not resolve explicit gaps inside
+listed jurisdictions. The canonical candidate files below still represent
+the earlier evidence-only coverage; full national inputs and joins remain to
+be built under the accepted assumption.
 
 ## Candidate jurisdictions
 
@@ -82,12 +87,33 @@ still capture the pre-Grants-Pass regime in **2024**; this is not a 2018–2023
 annual dummy. Review injunctions, prior precedent and mandate dates before
 claiming these decisions alone define the complete regional enforcement regime.
 
-The suggested “none everywhere else” remains a proposed closed-list analysis
-assumption, not a reviewed legal finding. National baseline-none coverage
-still requires evidence. The four original jurisdictions plus these additions
-do not establish exhaustive nationwide coverage, especially if administrative
-weather policies are included. Unreviewed places remain unknown in executable
-inputs; no national negative rows are generated from omission.
+### Accepted provisional baseline and output footnote
+
+On 2026-10-26 Matt accepted “none everywhere else” provisionally and will
+revisit that assumption if additional feedback identifies other policies.
+This supersedes the requirement to complete a nationwide negative legal
+inventory before using a closed-list baseline. It does not turn that assumption
+into a verified legal finding or resolve missing dates, population scope, or
+mapping for the listed candidates. Those gaps remain explicit.
+
+The example recipe now declares the versioned annotation
+`right-to-shelter-provisional-baseline#r1`, scoped to `right_to_shelter` on both
+panels, with an explicit `public_text` for public outputs. It explains the
+none-elsewhere assumption, decision date, possibility of revision, continued
+listed-jurisdiction qualifications, and distinction from capacity mandates.
+The existing results path carries applicable annotations into
+`annotations.json`, report data notes/footnotes and the bundle README,
+including analyses whose sample exclusion uses the annotated column. Base
+analyses that do not use that column need not display the footnote. Revision
+of the classification should increment the annotation revision and preserve
+the prior recipe/run identity.
+
+This recipe annotation is an immediate declaration of the research choice,
+not a completed national data build. When generating national source outputs,
+record the assumption in baseline provenance and attach an equivalent
+data-origin annotation to the generated RTS columns, so other recipes inherit
+it as well. Preserve it through the final classification derive/join alongside
+the existing subgroup, geography and weighting annotations.
 
 ### Strength coding is a research decision
 
@@ -114,12 +140,13 @@ summary; do not represent the summary as subgroup-level legal certainty.
 
 ## Baseline completeness and geographic assignment
 
-No evidence reviewed here supports a nationwide baseline-none declaration for
-2010–2024. Before a national MSA/CoC build can succeed, review each state and
-the District over its assigned interval, record supporting primary sources,
-and list unresolved jurisdiction-years as `unknown_gaps`. A reviewed absence
-must mean that a documented search/review found no applicable right in that
-scope; it cannot be inferred from a missing exception.
+No evidence reviewed here establishes nationwide absence of other rights for
+2010–2024. A national MSA/CoC build may instead use Matt's accepted provisional
+none-elsewhere assumption, explicitly versioned and annotated as described
+above. Enumerate its geography/time coverage and retain unresolved gaps in
+listed jurisdictions as `unknown_gaps`. Distinguish a documented legal review
+finding no applicable right from a negative classification made under the
+provisional research assumption.
 
 NYC is a substate exception within New York. For MSA/CoC assignment use dated
 county membership and explicit five-borough county membership, not CoC-ID

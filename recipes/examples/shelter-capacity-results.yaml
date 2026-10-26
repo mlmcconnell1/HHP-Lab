@@ -230,8 +230,36 @@ parameters:
   delta_slope: {unresolved: "Researcher-supplied positive slope equivalence margin."}
   fit_threshold: {unresolved: "Researcher-supplied minimum within R-squared."}
   fit_floor: {unresolved: "Researcher-supplied contradicted within R-squared floor."}
-  right_to_shelter_source: {unresolved: "Build dated legal exceptions plus a reviewed baseline for the study window; choose population/coding and mixed-geography rules and join generated flags to both panels. Four candidate jurisdictions do not establish national baseline completeness."}
+  right_to_shelter_source: {unresolved: "Build dated legal exceptions plus the researcher-accepted provisional none-elsewhere baseline for the study window; choose population/coding and mixed-geography rules and join generated flags to both panels. Preserve the provisional-baseline annotation and explicit gaps within listed candidate jurisdictions."}
   coc_unemployment_source: {unresolved: "Establish a supported CoC-native unemployment source or remove CoC unemployment analyses."}
+
+annotations:
+  - id: right-to-shelter-provisional-baseline
+    revision: 1
+    category: caveat
+    summary: Provisional right-to-shelter baseline
+    text: >-
+      Outside the jurisdictions listed in the right-to-shelter reference,
+      shelter-right status is provisionally coded as none by researcher decision
+      dated October 26, 2026. This is a working classification, not an exhaustive
+      nationwide legal review, and may be revised as additional evidence becomes
+      available. Listed jurisdictions retain their dated population-specific
+      qualifications and unresolved gaps. Capacity mandates are separate from
+      individual shelter rights.
+    public_text: >-
+      Outside the jurisdictions listed in the right-to-shelter reference,
+      shelter-right status is provisionally coded as none by researcher decision
+      dated October 26, 2026. This is a working classification, not an exhaustive
+      nationwide legal review, and may be revised as additional evidence becomes
+      available. Listed jurisdictions retain their dated population-specific
+      qualifications and unresolved gaps. Capacity mandates are separate from
+      individual shelter rights.
+    evidence:
+      - name: Right-to-shelter evidence and provisional baseline decision
+        ref: docs/right-to-shelter-evidence.md
+    scope:
+      panels: [cbsa, coc]
+      columns: [right_to_shelter]
 
 masks:
   - id: covid_unsheltered_2021

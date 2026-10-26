@@ -1220,7 +1220,11 @@ In Phase 1, adding this variant must fail at spec preflight with
    dated jurisdiction exceptions, separately for single adults, families,
    and pregnant people. The baseline defines the geographic and temporal scope
    within which absence of an applicable exception means `none`; unreviewed
-   scope and explicit unresolved gaps remain errors. Exceptions record
+   scope and explicit unresolved gaps remain errors. Matt accepted a provisional
+   `none` baseline for unlisted jurisdictions on 2026-10-26, subject to later
+   feedback. Label this as a researcher assumption, version its coverage, and
+   propagate the provisional-baseline caveat to results; it is not an exhaustive
+   legal review and does not resolve gaps inside listed jurisdictions. Exceptions record
    year-round strength, a separate weather-only flag, citations, subgroup
    qualifications, and effective/ended dates. Unchanged policies and negative
    baseline statuses do not require manually repeated annual rows. The panel's 0/1
@@ -1254,8 +1258,11 @@ In Phase 1, adding this variant must fail at spec preflight with
    Legal status is also separate from observed HIC capacity. The example's
    `right_to_shelter_source` remains unresolved until reviewed source coverage,
    mixed-geography treatment, selected population/coding rule, and panel join
-   cover the requested study window. The four candidate jurisdictions alone
-   do not establish national baseline completeness.
+   cover the requested study window. National completeness may use the accepted
+   provisional baseline, with its caveat preserved. The example declares
+   `right-to-shelter-provisional-baseline#r1` on the final classification column;
+   generated source outputs must also carry an equivalent data-origin annotation
+   on their RTS columns for reuse by other recipes.
 2. `delta_theta`, `delta_slope`, `fit_threshold`, and `fit_floor`.
 3. The primary geography (CBSA is assumed) and the year range.
 4. The bed definition: ES + TH + SH year-round beds, excluding seasonal and
