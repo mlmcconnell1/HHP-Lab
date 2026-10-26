@@ -209,7 +209,12 @@ parameters:
   delta_slope: {unresolved: "Researcher-supplied positive slope equivalence margin."}
   fit_threshold: {unresolved: "Researcher-supplied minimum within R-squared."}
   fit_floor: {unresolved: "Researcher-supplied contradicted within R-squared floor."}
-  right_to_shelter_source: {unresolved: "Build dated legal exceptions plus the researcher-accepted provisional none-elsewhere baseline for the study window; choose population/coding and mixed-geography rules and join generated flags to both panels. Preserve the provisional-baseline annotation and explicit gaps within listed candidate jurisdictions."}
+  # Researcher-approved 2026-10-26: broad year-round protection, weather excluded;
+  # any geographic coverage in any legal population excludes the geography-year.
+  # Common PEP resident weights: v2020 through 2020, v2024 for 2021-2024.
+  # Retain population flags/shares; majority >= 0.5 and weather inclusion are
+  # separate sensitivity checks. Shares describe geography, not eligibility.
+  right_to_shelter_source: {unresolved: "Build dated legal exceptions plus the researcher-accepted provisional none-elsewhere baseline for the study window; use broad coding, exclude weather-only, geography_rule any, and derive right_to_shelter as any of the three population flags before joining both panels. Preserve the provisional-baseline annotation and explicit listed-jurisdiction gaps. Use the approved PEP v2020/v2024 resident weights for mixed shares."}
   coc_unemployment_source: {unresolved: "Establish a supported CoC-native unemployment source or remove CoC unemployment analyses."}
 
 annotations:

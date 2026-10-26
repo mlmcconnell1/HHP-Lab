@@ -5,6 +5,17 @@ weights for describing how much of an MSA or CoC lies in jurisdictions with
 each coded legal status. It does not estimate which residents meet legal
 eligibility rules.
 
+Matt approved the recommendations on 2026-10-26: use common county resident
+population for all three legal populations, PEP v2020 for 2010–2020 and v2024
+for 2021–2024, accepting the July 1 versus January 31 timing approximation.
+The main exclusion uses any qualifying year-round geographic coverage in any
+of the three legal populations (`coding_rule=broad`, weather excluded,
+`geography_rule=any`). Retain separate population flags and covered shares.
+Majority coverage (share >= 0.5) and inclusion of weather-only protections
+are separate sensitivity checks. These choices govern the intended research
+run; reusable CLI/API defaults are unchanged, so builds must pass them
+explicitly.
+
 ## Scope and when weights are needed
 
 The linked shelter-capacity recipe has a 2010–2024 analysis window and builds
@@ -42,11 +53,11 @@ B01001, B11001, or B13016. Do not infer support from tables available at the
 Census API; a new measure would need registry and pipeline support first.
 
 PEP is the only currently native annual county-level source among these
-candidates. The proposed, still-pending source selection is v2020 for
+candidates. The approved source selection is v2020 for
 2010–2020 and v2024 for 2021–2024. This deliberately uses v2020 for the 2020
 overlap; the frozen Census MSA/CoC population-overlap geography rule is a
 separate decision and says nothing about which PEP vintage to choose. Preserve
-the eventual source selection and exact identities. PEP's July 1 reference
+the approved source selection and exact identities. PEP's July 1 reference
 and the RTS annual Jan. 31 reference are not identical, so disclose the timing
 approximation. The local v2020 file has 3,143 county FIPS per year; v2024 and
 v2025 have 3,144. A build must validate exact county-FIPS support for each
@@ -78,7 +89,7 @@ region IDs from 2020 onward. `load_pep_county()` resolves duplicate
 county/year keys to the latest vintage, but cannot deduplicate legacy and
 planning-region IDs because they are different keys. In the current local
 directory it returns both eight legacy and nine planning-region CT rows for
-2020; the legacy eight remain for 2010–2019. Under the pending candidate
+2020; the legacy eight remain for 2010–2019. Under the approved
 selection (v2020 through 2020, v2024 for 2021–2024), a C2023 / 2023 MSA output
 would need to:
 
@@ -210,7 +221,7 @@ Native PEP outputs name their count `population`; adopting them requires an
 explicit resident-population mapping and vintage policy rather than silently
 treating them as population-specific legal-eligibility counts. Do not run the
 build against a placeholder or incomplete mixed-county input. Use of a common
-PEP basis for real outputs remains pending Matt's methodological decision.
+PEP basis for real outputs was approved by Matt on 2026-10-26.
 
 The requested 2010–2024 CoC/metro outputs should be rebuilt after the
 baseline/exception coverage has been reviewed. At that point report the actual
@@ -219,23 +230,13 @@ along with exact homogeneous row counts. Do not treat the candidate NYC,
 rest-of-NY, Massachusetts, and DC exceptions as a complete national
 classification.
 
-## Choices for Matt
+## Approved research choices
 
-1. Approve or reject a common PEP resident-population weight for mixed
-   geography-years, explicitly labeling shares as geographic resident
-   coverage rather than legal-eligibility coverage.
-2. If approving it, confirm whether the candidate source selection is
-   acceptable (v2020 through 2020; v2024 for 2021–2024) and whether July 1
-   PEP values are acceptable for Jan. 31 status-year outputs. The frozen
-   Census MSA/CoC population-overlap geography selection remains independent.
-3. Confirm the mixed-geography classification rule/threshold independently of
-   this weight definition. The weight can supply a share, but the threshold
-   changes the flag and remains a research choice.
-
-Without these decisions, independently executable work is limited to
-homogeneous exact 0/1 outputs, complete-support validation design, and
-recording provenance/caveat requirements. No exact population-specific legal
-eligibility weights are currently supported.
+The common resident basis, explicit vintage partition and timing approximation
+are approved. The main exclusion uses any year-round coverage in any legal
+population. Majority coverage and weather inclusion remain sensitivity checks,
+as recorded at the beginning of this note. No exact population-specific legal
+eligibility weights are currently supported or inferred from this decision.
 
 ## Primary source references
 
@@ -250,10 +251,10 @@ The current local curated PEP directory contains v2020, v2024, and v2025
 files. `load_pep_county()` discovers all vintage files, sorts them newest-first,
 and lets the newest file win for duplicate county/year keys. A read-only check
 therefore found v2025 selected for 2020–2024 by default. The candidate policy
-below explicitly selects v2020 through 2020 and v2024 after 2020; it remains
-pending the user's review. The reproducible normalization names the chosen two
+below explicitly selects v2020 through 2020 and v2024 after 2020, as approved
+by the user. The reproducible normalization names the chosen two
 files and partitions years explicitly, so later default discovery cannot
-silently change this candidate artifact.
+silently change this artifact.
 
 The targeted Census MSA support audit used the plausible mixed-status
 areas raised in the current research: New York-Newark-Jersey City (`35620`),
@@ -292,23 +293,22 @@ The targeted MSA audit does not certify CoC county-fragment mappings. CoC
 shares use the existing intersection-area-over-county-area approximation and
 need a provenance caveat wherever a partial county intersection is used.
 
-The proposed canonical normalized input, only if the common PEP basis and
-candidate vintage policy are approved, is:
+The approved canonical normalized input is:
 
 ```text
 data/curated/right_to_shelter/right_to_shelter__county_weights__Y2010-2024__pep_v2020_v2024.parquet
 ```
 
-It would contain exactly `county_fips` (five-character string), `year`
+It contains exactly `county_fips` (five-character string), `year`
 (integer), and `resident_population` (nonnegative Census resident count), with
-one unique row per county/year. Its provenance should identify the population
-universe as all residents, the candidate selection rule (v2020 for 2010–2020;
+one unique row per county/year. Its provenance identifies the population
+universe as all residents, the approved selection rule (v2020 for 2010–2020;
 v2024 for 2021–2024), the July 1 PEP reference versus Jan. 31 RTS coding date,
 both curated source paths and their file-byte SHA-256 values, and the raw
 Census SHA-256 values retained in the native PEP `raw_sha256` column. The
 existing local files have no embedded provenance block, so do not assume
-`read_provenance()` returns one. It should also
-state that this is a common geographic population denominator, not an
+`read_provenance()` returns one. The normalized provenance also
+states that this is a common geographic population denominator, not an
 eligibility estimate. The later MSA/CoC mapping provenance should separately
 record county-FIPS completeness for the actual mixed cells and the CoC area
 allocation approximation. The curated-layout allowlist now recognizes this
@@ -317,7 +317,7 @@ canonical filename pattern.
 The existing native reader is
 `hhplab.sources.census.pep.pep_aggregate.load_pep_county(pep_path=...)`, which
 reads one curated PEP artifact and retains its vintage/raw identity columns.
-This unexecuted candidate snippet calls that reader for two explicit curated
+The normalization below calls that reader for two explicit curated
 paths. It does not use default discovery or fetch source data. It validates
 integral years, five-digit string FIPS, unique county/year keys, and finite,
 nonnegative integral populations before writing provenance. The selected
@@ -403,7 +403,8 @@ provenance = ProvenanceBlock(
         "population_universe": "all county residents; not legal eligibility",
         "source_reference_date": "July 1",
         "policy_reference_date": "January 31",
-        "candidate_vintage_policy": "v2020: 2010-2020; v2024: 2021-2024",
+        "approved_vintage_policy": "v2020: 2010-2020; v2024: 2021-2024",
+        "researcher_approval_date": "2026-10-26",
         "sources": source_identities,
     },
 )
@@ -417,8 +418,61 @@ Audited input identities at the time of this note:
 | `pep_county__v2020.parquet` | 34,573 rows; 2010–2020; 3,143 counties/year | `2bec7aaf86625b6e3e01213acf5d6c9a9284454ddcaf2c0ce2211cf543797469` |
 | `pep_county__v2024.parquet` | 15,720 rows; 2020–2024; 3,144 counties/year | `bd14769463e9e156c74be430b803d50ff5652c427937cf7421bd3d1e50ebccdf` |
 
-The common resident-population basis, the proposed choice of v2020 for the
-2020 overlap, and whether July 1 values are acceptable for Jan. 31 policy-year
-outputs remain review decisions. The frozen Census MSA/CoC population-overlap
-geography selection is independent of this PEP vintage choice. No new weight
-artifact or population-specific eligibility proxy is created by this note.
+The approved common basis estimates geographic coverage, without introducing
+a population-specific eligibility proxy. The frozen Census MSA/CoC overlap
+geography selection is independent of this PEP vintage choice. The artifact
+is external curated data; exact source identities above and the executable
+normalization preserve its construction in this repository.
+
+## Executed normalization and build check (2026-10-26)
+
+The normalization produced 47,149 rows for 2010–2024, with unique county/year
+keys, all requested years present, and positive resident counts throughout.
+The three-column schema and embedded approved vintage/source provenance were
+read back and validated. Output Parquet SHA-256:
+`01166afdd6464189e99d346edef705a1f30c8d426d5a05e18b202de37fdfdd50`.
+
+The full national native build was attempted with this input, broad coding,
+weather excluded, and geography rule `any`. It correctly refused unresolved
+single-adult scopes in Hennepin, NJ, NY's early years, MA and DC before writing
+national outputs. The weight decision does not resolve those legal gaps.
+The example recipe records the approved choices but retains its unresolved
+reference marker until real annual outputs can be joined.
+
+The persisted [membership and cell audit](right-to-shelter-weight-audit.json)
+uses the native Census MSA 2023 membership and native CoC 2024 / county 2023
+overlay. It records all membership allocations, source content identities,
+known mixed cells with denominators/shares and both classification flags,
+and unresolved cells by population and jurisdiction. It is an audit, not a
+completed all-population reference table.
+
+| Audit scope, 2010–2024 | MSA | CoC |
+|---|---:|---:|
+| Geographies | 393 | 387 |
+| Known homogeneous population cells | 16,908 | 15,957 |
+| Known mixed population cells, complete positive denominators | 60 | 0 |
+| Unresolved population cells | 717 | 1,458 |
+| Distinct geography-years with any unresolved population | 309 | 596 |
+| Unresolved geography-years missing county weight support | 0 | 0 |
+
+Cells here are geography × year × legal population. The 60 known mixed cells
+are family and pregnancy coverage in Boston (`14460`) and Providence (`39300`)
+for all 15 years. Boston's resident coverage ranges from 90.84% to 91.00%;
+Providence's ranges from 34.26% to 34.90%. Both receive flag 1 under the
+approved any-coverage rule. Providence receives flag 0 under the majority
+sensitivity, a difference in 30 population cells. Both MSAs still have
+unresolved single-adult coding; these audited shares do not bypass the native
+all-population builder's failure on that gap.
+
+Every county/year in each unresolved geography-year was also checked against
+the approved input; all are present with positive counts. Thus the current
+listed-jurisdiction gaps introduce no additional missing-weight dependency.
+Homogeneous rows avoid weights, including areas where nationwide membership
+and PEP county universes differ. A changed legal inventory or geography
+vintage requires rerunning support checks; this audit does not certify new
+mixed denominators outside its recorded inputs. No known mixed CoC cell is
+asserted while unresolved cells remain; zero in the table means zero among
+the legally resolved cells only.
+
+Audit JSON SHA-256:
+`b31701fb3eca610c1c19e28744da05568b2632f2a605c65faf1514155f767972`.
