@@ -26,7 +26,7 @@ criteria.
 The current source contract is a reviewed baseline plus dated exception
 intervals. A jurisdiction may be coded as baseline-none only for years that
 have actually been reviewed; an absent exception outside that scope is
-unknown, not no-right. The four candidate jurisdictions below do not establish
+unknown, not no-right. The candidate jurisdictions below do not establish
 a nationwide baseline. There is no nationwide statement in this note that
 omitted jurisdictions lack rights or applicable shelter duties.
 
@@ -38,6 +38,56 @@ omitted jurisdictions lack rights or applicable shelter duties.
 | New York State outside NYC | NY Social Services Law § 131 makes local social-services officials responsible for assistance and care to people residing or found in the district who need help, “insofar as funds are available”; it does not itself guarantee a particular shelter placement. [NYS Open Legislation, § 131](https://www.nysenate.gov/legislation/laws/SOS/131). § 131-v authorizes temporary emergency shelter for eligible homeless households in qualifying units, with monthly review and a six-month default limit (longer only under stated district determination); it is authorization for a particular program, not an unqualified bed entitlement. [NYS Open Legislation, § 131-v](https://www.nysenate.gov/legislation/laws/SOS/131-V). OTDA's [16-ADM-11, Temporary Housing Assistance: Consolidation and Clarification of Policy](https://otda.ny.gov/policy/directives/2016/ADM/16-ADM-11.pdf), is dated November 3, 2016 and describes locally administered assistance for individuals and families. New York's statewide cold-weather regulation, [18 NYCRR § 304.1](https://govt.westlaw.com/nycrr/Document/If0386b55f29f11e6848bebc42a960167?bhcp=1&contextData=%28sc.Default%29&transitionType=Default), was adopted effective March 15, 2017; it defines inclement winter weather as air temperature at or below 32°F including wind chill, and requires each district to take specified protective steps, including offering/directing people to appropriate sheltered facilities. The formal regulation's 2017 effective date does not establish whether identical local or statewide policies applied in earlier years. | Temporary housing aid is conditional and locally administered. The directive describes individuals and families, but this review has not established a distinct pregnant-person category. The general § 131 duty concerns public assistance and care, not expressly shelter. Code Blue is weather-only and covers people experiencing homelessness, but local forecasts, activation notices, facility availability, and local procedures are distinct from the policy's existence. OTDA's [22-ADM-09](https://otda.ny.gov/policy/directives/2022/ADM/22-ADM-09.pdf) gives district budgeting instructions for the 2022 directive. | Candidate conditional temporary-housing assistance and weather-only cold-weather protection from March 15, 2017, not a strict statewide year-round shelter entitlement. The artifact starts the evidenced assistance interval on 2016-11-03, which first affects the Jan. 31, 2017 reference date; the statewide Code Blue rule begins 2017-03-15, so it first affects Jan. 31, 2018. Earlier years remain an explicit unknown gap. Later directives/amendments, local variation, and subgroup eligibility need reconstruction. NYC must remain a separate substate jurisdiction. |
 | Massachusetts | Mass. Gen. Laws ch. 23B, § 30 provides, subject to appropriation, emergency housing assistance to needy families with children and a pregnant woman with no other children, including temporary shelter when the family has no feasible alternative housing. [Official current statute](https://malegislature.gov/Laws/GeneralLaws/PartI/TitleII/Chapter23b/Section30). The Oct. 31, 2023 capacity declaration under 760 CMR 67.10 was effective Nov. 1, 2023 through Feb. 28, 2024; the Commonwealth's program page confirms the declaration and that the guidance began Nov. 1, 2023. [Declaration](https://www.mass.gov/doc/declaration-emergency-assistance-family-shelter-1/download), [program page](https://www.mass.gov/orgs/emergency-assistance-ea-family-shelter). The declaration was later extended, but the period relevant to the 2024-01-31 PIT reference is the original declaration. | This is a family/pregnancy program, not a single-adult entitlement. Statutory and regulatory eligibility includes income/household and homelessness/alternative-housing tests. The October 2023 capacity rules prioritized eligible families and allowed a waitlist after capacity; that weakens any claim of guaranteed immediate placement for all otherwise eligible households. | Candidate conditional year-round family/pregnancy protection before Nov. 1, 2023 and conditional/capacity-limited status from Nov. 1, 2023. Exact 2010–2023 historical regulations, annual appropriations, eligibility changes, and enforceability must be reviewed before populating all years. The 2023 declaration is dated precisely, so it does not change Jan. 31, 2023 status; it does affect Jan. 31, 2024. The subsequent 2024 extension and later stay-limit law do not affect the 2024-01-31 reference, but would matter if the data window is extended. |
 | District of Columbia | D.C. Law 18-367, the Homeless Services Reform Amendment Act of 2010, became effective April 8, 2011 and amended D.C. Code § 4-753.01(c). Its text requires appropriate space for a homeless District resident who cannot access other housing when actual or forecast temperature (including wind chill) is below 32°F or temperature/heat index exceeds 95°F. It permits, but does not require, space for nonresidents and gives residents priority; low-barrier/severe-weather low-barrier shelters need not verify or prioritize residency. [Official enrolled law](https://code.dccouncil.gov/us/dc/council/laws/docs/18-367.pdf), [law history/effective date](https://code.dccouncil.gov/us/dc/council/laws/18-367), [current codification](https://code.dccouncil.gov/us/dc/council/code/sections/4-753.01). | This is a severe-weather, resident-prioritized duty, not a year-round general shelter entitlement. “Cannot access other housing arrangements” is statutorily constrained to living somewhere not intended as a residence or in a dangerous situation. Specific low-barrier exceptions and the resident definition matter. | Candidate weather-only status from Apr. 8, 2011; it is not in force on Jan. 31, 2011 under this amendment, and the prior 2005–2011 rule must be examined before assigning 2010 or 2011. Weather authority must not imply actual activation or count coverage as an all-resident right. No separately verified year-round family or single-adult entitlement is established by this provision. Check subsequent permanent amendments and historical code versions before finalizing 2012–2024 intervals. |
+
+### Additional candidates reviewed 2026-10-26
+
+Matt supplied these additional leads and proposed categories. The table below
+records the evidence and disposition; it does not assign an entire CoC or MSA
+the status of a city within it. Primary-source links are citations, not copied
+source documents; redistribution permission for their full contents has not
+been established.
+
+| Jurisdiction / rough CoC anchor | Category and dated evidence | Reference-table disposition |
+|---|---|---|
+| Hennepin County, Minnesota / MN-500 | **Policy-based family protection.** County [board action request 24-0119](https://hennepinmn.legistar.com/ViewReport.ashx?GID=953&GUID=E36B49B1-294B-43B8-8587-489BEEAFEBA6&ID=5676091&M=R&N=Text&Title=Legislation+Text) describes shelter-all for families with children since 2005 and overflow expansion in 2022–23. The county's [housing strategy](https://www.hennepincounty.gov/government/projects-initiatives/housing-and-homelessness/housing-stability-strategy) describes eligibility and children under 18. Its [January 14, 2022 bulletin](https://content.govdelivery.com/accounts/MNHENNE/bulletins/3017e5f) dates elimination of family self-pay to **2022-01-01**, explicitly leaving shelter-all unchanged. | Candidate `families_strength=conditional`, distinguished from statutory/court-enforced protection by administrative authority. Do not infer single-adult or pregnancy-alone eligibility. Adoption is evidenced to year precision only; retain 2005 without inventing a day. Not yet in executable inputs: reconstruct historical eligibility and use explicit Hennepin county membership (27053), not all Minnesota or the Minneapolis MSA. Fee removal is a separate access change, not the beginning of shelter-all. |
+| New Jersey / NJ-* | **Statutory weather planning/warming-center duty.** [P.L. 2017, c.68](https://pub.njleg.gov/bills/2016/PL17/68_.PDF) took effect **2017-05-11**. Original triggers were at most 25°F without precipitation, at most 32°F with precipitation, or wind chill at most 0°F for two hours. [P.L. 2019, c.427](https://pub.njleg.state.nj.us/Bills/2018/AL19/427_.HTM) took effect **2020-01-21**, changing the temperature trigger to at most 32°F regardless of precipitation. | Added two dated canonical weather-policy intervals; first affects the 2018 Jan31 row, threshold amendment affects 2020. The law requires county plans, coordination and warming centers for at-risk people, not a verified individual overnight bed guarantee. Earlier weather coverage and year-round rights remain unknown, so all-population RTS flag derivation still fails closed. County implementation/compliance is a separate unmeasured dimension; the supplied ACLU compliance lead remains unverified. |
+| Philadelphia / PA-500 | **Administrative cold-weather service.** A [dated city announcement](https://www.phila.gov/2024-01-18-mayor-parker-city-officials-announce-preparations-for-winter-storm/) documents activation on **2024-01-14**, enhanced outreach, warming space, and shelter access without ID during the alert. | Evidence of a specific activation, not the policy's adoption date or proof of an individual entitlement. Retain as an optional administrative-weather candidate pending historical policy and population review; no full-panel interval or RTS flag added. Ordinary shelter-first/low-barrier practice alone is excluded. |
+| Baltimore City / MD-501 | **Administrative winter shelter/Code Blue.** The city's [FY2025 winter shelter plan](https://homeless.baltimorecity.gov/sites/default/files/MOHS%20FY25_Winter%20Shelter%20%26%20Code%20Purple%20Plan%2011.7.2024.pdf) search extract distinguishes winter shelter declarations from health-department Code Blue alerts and retrospectively reports both for 2023–24. Full PDF retrieval failed in this review. | Research lead only. Do not equate a health alert with an enforceable bed guarantee or backfill the 2010–24 panel from a later plan. Retrieve historical plans, triggers and coverage before creating executable intervals. |
+| Delaware / DE-500 | **Administrative/nonprofit Code Purple**, rather than Code Blue. A [2022-01-10 state DHSS release](https://dhss.delaware.gov/newsroom/with-arrival-of-cold-snap-nonprofits-and-volunteers-are-opening-code-purple-sites-across-delaware/) describes nonprofit/volunteer activations varying by county/site and limited capacity. | Optional weather-service candidate; no statewide individual right established. Historical dates, site coverage and admission criteria remain unresolved. Do not turn this activation report into an all-population statewide weather entitlement. |
+| Los Angeles **city** / within CA-600 | **Capacity obligation.** The city's [May 31, 2024 CAO report](https://cityclerk.lacity.org/onlinedocs/2023/23-1022-s3_rpt_cao_5-31-24.pdf) identifies the **2022-06-14** Alliance settlement and a June 14, 2027 target for 12,915 housing/intervention units, based on 60% of the specified unsheltered population. It distinguishes targets from open/occupiable interventions. | Separate capacity-mandate candidate, beginning with the 2023 Jan31 reference row; do not set `rts_*` from a supply target. Retrieve the controlling settlement and amendments before final annual control coding. City coverage does not cover all CA-600 or the Los Angeles MSA, and the separate county settlement must not be conflated with the city's agreement. |
+| Sacramento **city** / within CA-503 | **Capacity/enforcement condition.** The [city's Measure O page](https://www.cityofsacramento.gov/city-manager/projects-and-programs/measureo) gives an effective date of **2022-12-23** and describes a limited, budget-conditioned city obligation. The notice-and-demand process begins **2023-06-21**, a distinct date. | Separate capacity/enforcement candidate, first affecting 2023 Jan31; not an individual shelter entitlement. Verify the ordinance and historical amendments before producing annual controls. The city is only part of CA-503 and the MSA; do not label either entire geography as covered. |
+
+The proposed reporting groups are broad year-round protection (NYC, with its
+existing eligibility caveats), family/pregnancy protection (Massachusetts),
+policy-based family protection (Hennepin), statutory weather duties (DC, NY,
+NJ), optional administrative weather services, and capacity/enforcement
+obligations. These are overlapping dimensions: NY, for example, has both
+conditional year-round assistance and weather rules. Preserve the existing
+population, strength, weather, authority and qualification fields rather than
+replace them with one mutually exclusive category. Administrative practices
+must remain distinguishable from statutory weather duties even if a future
+broad sensitivity analysis includes both.
+
+### Enforcement precedent excluded from shelter-right flags
+
+The case name is **Martin v. City of Boise**, not Martinez. The Ninth Circuit's
+[2018 opinion](https://cdn.ca9.uscourts.gov/datastore/opinions/2018/09/04/15-35845.pdf)
+was filed **2018-09-04**; the Supreme Court decided
+[*City of Grants Pass v. Johnson*](https://www.supremecourt.gov/opinions/23pdf/23-175_19m2.pdf)
+on **2024-06-28**, rejecting the relevant Eighth Amendment restriction on
+generally applicable camping penalties. Neither is entered as an individual
+shelter right. If separately modeled as an enforcement-regime control, the
+Jan31 convention would first capture the 2018 Martin decision in **2019** and
+still capture the pre-Grants-Pass regime in **2024**; this is not a 2018–2023
+annual dummy. Review injunctions, prior precedent and mandate dates before
+claiming these decisions alone define the complete regional enforcement regime.
+
+The suggested “none everywhere else” remains a proposed closed-list analysis
+assumption, not a reviewed legal finding. National baseline-none coverage
+still requires evidence. The four original jurisdictions plus these additions
+do not establish exhaustive nationwide coverage, especially if administrative
+weather policies are included. Unreviewed places remain unknown in executable
+inputs; no national negative rows are generated from omission.
 
 ### Strength coding is a research decision
 
@@ -176,9 +226,27 @@ unknown legal scope. They do not support a complete or national map.
 ```json
 {
   "schema_version": "1.0",
-  "baseline_version": "candidate-legal-review-2026-10-26",
+  "baseline_version": "candidate-legal-review-2026-10-26-expanded",
   "annual_reference_date": "01-31",
   "reviewed_coverage": [
+    {
+      "jurisdiction_id": "34",
+      "jurisdiction_type": "state",
+      "first_year": 2010,
+      "last_year": 2024,
+      "evidence": [
+        {
+          "citation": "https://pub.njleg.gov/bills/2016/PL17/68_.PDF — P.L. 2017, c.68, effective 2017-05-11",
+          "citation_source_type": "statute",
+          "citation_redistribution": "public"
+        },
+        {
+          "citation": "https://pub.njleg.state.nj.us/Bills/2018/AL19/427_.HTM — P.L. 2019, c.427, effective 2020-01-21",
+          "citation_source_type": "statute",
+          "citation_redistribution": "public"
+        }
+      ]
+    },
     {
       "jurisdiction_id": "NYC",
       "jurisdiction_type": "sub_state",
@@ -269,6 +337,13 @@ unknown legal scope. They do not support a complete or national map.
   ],
   "unknown_gaps": [
     {
+      "jurisdiction_id": "34",
+      "jurisdiction_type": "state",
+      "first_year": 2010,
+      "last_year": 2024,
+      "reason": "New Jersey Code Blue establishes a county planning and warming-center duty from 2017-05-11, amended 2020-01-21. Earlier weather protections and year-round rights for each population remain unreviewed; weather-policy presence does not establish an individual bed entitlement or county compliance."
+    },
+    {
       "jurisdiction_id": "36",
       "jurisdiction_type": "state",
       "first_year": 2010,
@@ -298,6 +373,8 @@ unknown legal scope. They do not support a complete or national map.
 
 ```csv
 exception_id,jurisdiction_id,jurisdiction_type,effective_date,ended_date,single_adults_strength,single_adults_weather_only,families_strength,families_weather_only,pregnant_people_strength,pregnant_people_weather_only,single_adults_qualification_scope,single_adults_qualification_summary,families_qualification_scope,families_qualification_summary,pregnant_people_qualification_scope,pregnant_people_qualification_summary,citation,citation_source_type,citation_redistribution
+nj-code-blue-2017-05-11-to-2020-01-20,34,state,2017-05-11,2020-01-20,none,true,none,true,none,true,subgroup,"At-risk people exposed outdoors or in poorly insulated settings; county alert plans and warming centers do not establish an individual bed entitlement. Year-round status is unknown.",subgroup,"At-risk family members may use weather services; no separate family entitlement is inferred.",subgroup,"At-risk pregnant people may use weather services; no separate pregnancy entitlement is inferred.","https://pub.njleg.gov/bills/2016/PL17/68_.PDF",statute,public
+nj-code-blue-threshold-amendment-2020-01-21,34,state,2020-01-21,,none,true,none,true,none,true,subgroup,"Code Blue threshold amended to 32 F or lower regardless of precipitation; the separate wind-chill trigger remains. County compliance and actual activation are not measured; year-round status is unknown.",subgroup,"At-risk family members may use weather services; no separate family entitlement is inferred.",subgroup,"At-risk pregnant people may use weather services; no separate pregnancy entitlement is inferred.","https://pub.njleg.gov/bills/2016/PL17/68_.PDF ; https://pub.njleg.state.nj.us/Bills/2018/AL19/427_.HTM",statute,public
 nyc-court-orders-through-2024-03-14,NYC,sub_state,2008-12-12,2024-03-14,enforceable,false,enforceable,false,enforceable,false,subgroup,"Callahan and Eldredge cover homeless men and women under the decree's class and eligibility terms; not an unconditional right for every individual.",subgroup,"Boston final judgment applies to eligible homeless families with children lacking alternate housing; adult families are not established by this source.",subgroup,"Pregnant women fall within Eldredge's covered class of homeless women subject to the decree's eligibility terms; the decision does not define a separate pregnancy rule or expand protection to every pregnant person regardless of class.","https://www.nycourts.gov/Reporter/3dseries/2009/2009_04302.htm ; https://www.nycourts.gov/courts/AD1/calendar/appsmots/2012/March/2012_03_20_dec.pdf ; https://www.nyc.gov/html/law/downloads/pdf/BOSTON%20FINAL%20JUDGMENT%209%2017%2008%20%20FINAL%20AT%20CITY%20HALL.pdf ; https://www.nycourts.gov/reporter/files/bv/81Misc3d.pdf",court_order,public_domain
 nyc-adult-new-arrival-modification-from-2024-03-15,NYC,sub_state,2024-03-15,,none,false,enforceable,false,none,false,unknown,"Court-entered Callahan stipulation on 2024-03-15 sets 30-day initial shelter (60 days for new arrivals under 23) and limits reapplication with exceptions. This affects a subset of single adults, while long-term residents retain Callahan protections; a single categorical strength does not describe both groups safely.",subgroup,"March 2024 stipulation applies only to adults seeking shelter and expressly does not affect families with children.",unknown,"The stipulation applies to adults; its effect on pregnant new arrivals cannot be represented separately without population-specific scope. Pregnancy-only classification remains uncertain.","https://www.coalitionforthehomeless.org/wp-content/uploads/2024/03/3152024Callahan.pdf ; https://www.nyc.gov/mayors-office/news/2024/03/mayor-adams-agreement-the-legal-aid-society-callahan-right-shelter",court_order,public_domain
 ny-state-temporary-housing-assistance-2016-11-03-to-2017-03-14,36,state,2016-11-03,2017-03-14,conditional,false,conditional,false,conditional,false,subgroup,"OTDA temporary housing assistance is locally administered and eligibility-based; this is a program-level candidate, not an unconditional bed entitlement.",subgroup,"Temporary housing assistance applies to qualifying individuals and families under assistance eligibility and local district rules.",subgroup,"Pregnant applicants are covered only if eligible under the individual/family temporary-assistance rules; no separate pregnancy entitlement is inferred.","https://otda.ny.gov/policy/directives/2016/ADM/16-ADM-11.pdf ; https://www.nysenate.gov/legislation/laws/SOS/131",administrative_directive,public
