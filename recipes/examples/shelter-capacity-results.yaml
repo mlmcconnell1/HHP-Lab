@@ -230,7 +230,7 @@ parameters:
   delta_slope: {unresolved: "Researcher-supplied positive slope equivalence margin."}
   fit_threshold: {unresolved: "Researcher-supplied minimum within R-squared."}
   fit_floor: {unresolved: "Researcher-supplied contradicted within R-squared floor."}
-  right_to_shelter_source: {unresolved: "Identify and validate a real source for the right-to-shelter classification."}
+  right_to_shelter_source: {unresolved: "Build dated legal exceptions plus a reviewed baseline for the study window; choose population/coding and mixed-geography rules and join generated flags to both panels. Four candidate jurisdictions do not establish national baseline completeness."}
   coc_unemployment_source: {unresolved: "Establish a supported CoC-native unemployment source or remove CoC unemployment analyses."}
 
 masks:

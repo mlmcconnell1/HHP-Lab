@@ -159,7 +159,7 @@ plan = "results-recipe-v2"
 baseline_commit = "900a29f9891f949bef5aaae354f4055b01033497"
 intent_file = ".elements/elements.working-intent.jsonl"
 reconcile_request = ".elements/plans/results-recipe-v2.reconcile.json"
-final_pin = ".elements/plans/right-to-shelter.pin-receipt.json"
+final_pin = ".elements/plans/right-to-shelter-rework.pin-receipt.json"
 bead_map = ".elements/plans/results-recipe-v2.bead-map.jsonl"
 bead_export = ".beads/issues.jsonl"
 
@@ -211,8 +211,8 @@ bead_export = ".beads/issues.jsonl"
 "intent:site-universe:input_resolver" = { path = "hhplab/recipe/executor/inputs.py", kind = "semantic/module", parent = "intent:results-v2:executor", layer = "application", change = "extend", bead = "coclab-ccwlh.2" }
 "intent:site-universe:site_year_aggregation" = { path = "hhplab/recipe/executor/msa_coc_panel.py", kind = "semantic/module", parent = "intent:results-v2:executor", layer = "application", change = "extend", bead = "coclab-ccwlh.4" }
 "intent:site-universe:pit_observation" = { path = "hhplab/sources/hud/pit/observation.py", kind = "semantic/module", parent = "intent:results-v2:sources", layer = "domain", change = "new", bead = "coclab-93aqk" }
-"intent:rts:source" = { path = "hhplab/sources/right_to_shelter.py", kind = "semantic/module", parent = "intent:results-v2:sources", layer = "domain", change = "new", bead = "coclab-gl6pz" }
-"intent:rts:cli" = { path = "hhplab/cli/build_cmds/right_to_shelter.py", kind = "semantic/module", parent = "intent:results-v2:build_cmds", layer = "interface", change = "new", bead = "coclab-gl6pz" }
+"intent:rts:source" = { path = "hhplab/sources/right_to_shelter.py", kind = "semantic/module", parent = "intent:results-v2:sources", layer = "domain", change = "modify", bead = "coclab-tj494" }
+"intent:rts:cli" = { path = "hhplab/cli/build_cmds/right_to_shelter.py", kind = "semantic/module", parent = "intent:results-v2:build_cmds", layer = "interface", change = "modify", bead = "coclab-tj494" }
 "intent:site-universe:coc_boundary_compatibility" = { path = "hhplab/geographies/coc/coc_validate.py", kind = "semantic/module", parent = "intent:results-v2:hhplab", layer = "domain", change = "extend", bead = "coclab-ccwlh.3" }
 "intent:site-universe:storage_config" = { path = "hhplab/storage/config.py", kind = "semantic/module", parent = "intent:results-v2:storage", layer = "infrastructure", change = "extend", bead = "coclab-ccwlh.6" }
 "intent:site-universe:recipe_output_root_schema" = { path = "hhplab/recipe/recipe_schema.py", kind = "semantic/module", parent = "intent:results-v2:recipe", layer = "application", change = "extend", bead = "coclab-ccwlh.6" }
@@ -293,8 +293,8 @@ bead_export = ".beads/issues.jsonl"
 "intent:site-universe:input_resolver" = "Resolve and validate the paired site and membership tables, schema, artifact identity, explicit threshold, row uniqueness and fingerprints for RecipeV2 inputs."
 "intent:site-universe:site_year_aggregation" = "Aggregate complete site-year outcomes over frozen memberships using validated panel/year source-ID sets and single, preaggregated, or sum operations; prevent cross-site source reuse and double counts, and preserve explicit incomplete status without partial sums or allocation. Consume the PIT observation module's source declarations and measure-specific eligibility predicates to emit source-limited statuses and member diagnostics without modifying reported source values."
 "intent:site-universe:pit_observation" = "Own source-declared PIT observation metadata and measure-specific eligibility predicates. Preserve reported values and constituent declarations, distinguish observed, carried-forward, partial and unknown counts, and require complete member coverage when aggregating metadata. Never infer observation from repeated numeric values or select study geography, research periods or estimator samples."
-"intent:rts:source" = "Define and validate the jurisdiction-year right-to-shelter table, derive strict or broad population flags, map to MSA and CoC years with population shares, annotate geographic approximation, and write provenance-bearing outputs."
-"intent:rts:cli" = "Expose right-to-shelter curated-table validation and MSA/CoC output generation through an actionable --json CLI command."
+"intent:rts:source" = "Validate a versioned reviewed baseline and cited jurisdiction policy exception intervals, expand annual reference-date statuses with explicit unknown gaps and subgroup qualifications, derive strict or broad population flags, map requested MSA and CoC years with weights only where mixed status requires them and complete county-year support, propagate caveats, and write exact input and coding provenance."
+"intent:rts:cli" = "Expose reviewed baseline and dated exception validation and requested-year MSA/CoC output generation with optional mixed-status weights, explicit coding and reference-date choices, and actionable --json diagnostics."
 "intent:site-universe:coc_boundary_compatibility" = "Own versioned, evidence-backed CoC boundary and count reconciliation for historical site-year use. Separate geometric equivalence from approved count reconciliation; require explicit source-ID sets, panel/year operations, count evidence and review approval for predecessor unions; never infer reconciliation from a persistent ID alone."
 "intent:site-universe:storage_config" = "Resolve one deterministic recipe output root across CLI, environment, recipe, repository, user and default configuration while keeping asset_store_root separate."
 "intent:site-universe:recipe_output_root_schema" = "Declare the shared RecipeV1 output_root field inherited by V2 while keeping site_universe input semantics V2-only."

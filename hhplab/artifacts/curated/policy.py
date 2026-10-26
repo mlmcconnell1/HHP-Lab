@@ -204,12 +204,15 @@ CANONICAL_PATTERNS: dict[str, list[re.Pattern[str]]] = {
         re.compile(r"^covariate_panel__[a-z0-9_]+__Y\d{4}-(?:\d{4}|ongoing)\.parquet$"),
     ],
     "right_to_shelter": [
+        re.compile(r"^right_to_shelter__baseline\.json$"),
+        re.compile(r"^right_to_shelter__exceptions\.csv$"),
+        # Recognize the retired annual source table if an older curated copy remains.
         re.compile(r"^right_to_shelter__jurisdiction_year\.csv$"),
         re.compile(
             r"^right_to_shelter__msa__Y\d{4}-\d{4}@M[\w-]+\.parquet$"
         ),
         re.compile(
-            r"^right_to_shelter__coc__Y\d{4}-\d{4}@B\d{4}\.parquet$"
+            r"^right_to_shelter__coc__Y\d{4}-\d{4}@B\d{4}(?:__S[a-f0-9]{12})?\.parquet$"
         ),
     ],
     "maps": [

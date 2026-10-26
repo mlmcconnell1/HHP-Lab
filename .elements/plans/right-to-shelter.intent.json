@@ -5,7 +5,7 @@
       "schema_version": "elements.intent-element/8.0",
       "record_type": "intent_element",
       "intent_element_id": "intent:rts:source",
-      "revision_id": "revision:rts:source:1",
+      "revision_id": "revision:rts:source:2",
       "lifecycle": "working",
       "project_id": "project:HHP-Lab",
       "parent_id": "intent:results-v2:sources",
@@ -19,7 +19,7 @@
       "tombstone": false,
       "content": {
         "acceptance_policy": "results-v2-architecture-conformance-v1",
-        "change": "new",
+        "change": "modify",
         "dependency_allowlist": [
           "hhplab.schema",
           "hhplab.geographies.msa",
@@ -30,16 +30,16 @@
         "layer": "domain",
         "phase": 1,
         "plan": "results-recipe-v2",
-        "responsibility": "Define and validate the jurisdiction-year right-to-shelter table, derive strict or broad population flags, map to MSA and CoC years with population shares, annotate geographic approximation, and write provenance-bearing outputs.",
+        "responsibility": "Validate a versioned reviewed baseline and cited jurisdiction policy exception intervals, expand annual reference-date statuses with explicit unknown gaps and subgroup qualifications, derive strict or broad population flags, map requested MSA and CoC years with weights only where mixed status requires them and complete county-year support, propagate caveats, and write exact input and coding provenance.",
         "source_spec": "docs/results-recipe-spec_2.md"
       },
-      "recorded_at": "2026-10-25T00:00:00Z"
+      "recorded_at": "2026-10-26T08:10:00Z"
     },
     {
       "schema_version": "elements.intent-element/8.0",
       "record_type": "intent_element",
       "intent_element_id": "intent:rts:cli",
-      "revision_id": "revision:rts:cli:1",
+      "revision_id": "revision:rts:cli:2",
       "lifecycle": "working",
       "project_id": "project:HHP-Lab",
       "parent_id": "intent:results-v2:build_cmds",
@@ -53,15 +53,15 @@
       "tombstone": false,
       "content": {
         "acceptance_policy": "results-v2-architecture-conformance-v1",
-        "change": "new",
+        "change": "modify",
         "dependency_allowlist": ["hhplab.sources.right_to_shelter"],
         "layer": "interface",
         "phase": 1,
         "plan": "results-recipe-v2",
-        "responsibility": "Expose right-to-shelter curated-table validation and MSA/CoC output generation through an actionable --json CLI command.",
+        "responsibility": "Expose reviewed baseline and dated exception validation and requested-year MSA/CoC output generation with optional mixed-status weights, explicit coding and reference-date choices, and actionable --json diagnostics.",
         "source_spec": "docs/results-recipe-spec_2.md"
       },
-      "recorded_at": "2026-10-25T00:00:00Z"
+      "recorded_at": "2026-10-26T08:10:00Z"
     }
   ]
 }

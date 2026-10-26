@@ -1216,22 +1216,46 @@ In Phase 1, adding this variant must fail at spec preflight with
 ### 10.4 Research inputs Matt supplies before locking
 
 1. The definition and source of the `right_to_shelter` inputs. The curated
-   reference is coded by jurisdiction-year and separately for single adults,
-   families, and pregnant people. It records year-round strength, a separate
-   weather-only flag, citations, and effective/ended dates; the panel's 0/1
+   reference consists of a versioned reviewed baseline plus a small table of
+   dated jurisdiction exceptions, separately for single adults, families,
+   and pregnant people. The baseline defines the geographic and temporal scope
+   within which absence of an applicable exception means `none`; unreviewed
+   scope and explicit unresolved gaps remain errors. Exceptions record
+   year-round strength, a separate weather-only flag, citations, subgroup
+   qualifications, and effective/ended dates. Unchanged policies and negative
+   baseline statuses do not require manually repeated annual rows. The panel's 0/1
    `rts_*` flags are derived under a selectable strict or broad coding rule.
    Strict coding counts enforceable year-round status only. Broad coding counts
    enforceable or conditional status, with weather-only protections included
-   only when explicitly selected. Each annual row records the status in force
-   on January 31, matching the late-January PIT reference date; a mid-year
-   change first affects the next year's row. The canonical input is
-   `data/curated/right_to_shelter/right_to_shelter__jurisdiction_year.csv`.
+   only when explicitly selected. Generated annual rows record the status in
+   force on January 31, an explicit convention approximating the late-January
+   PIT reference date; a mid-year change first affects the next year's row.
+   Policy intervals include both endpoints. The maintained inputs are
+   `data/curated/right_to_shelter/right_to_shelter__baseline.json` and
+   `data/curated/right_to_shelter/right_to_shelter__exceptions.csv`.
    Each citation records its source type and redistribution status; secondary
    citations require an explicit redistribution status.
-   Those flags are assigned to CBSA/MSA and CoC years using county population
-   weights, so mixed-jurisdiction units carry a covered-population share and a
-   geographic-approximation annotation. The example's
-   `right_to_shelter_source` remains unresolved until cited rows are supplied.
+   Generate complete outputs for an explicitly requested year range and
+   geography vintage. Explicit geography selections use a deterministic
+   `__S<selection-hash>` filename suffix so a subset cannot masquerade as a
+   complete-universe artifact. Existing output files are preserved. Homogeneous
+   geography-years have exact 0/1 flags and
+   geographic covered shares without population weights; mixed-status shares
+   require documented weights with complete county-year support. Such shares
+   describe residence in jurisdictions with the coded protection, not the
+   proportion of residents meeting household, income, residency or migration
+   eligibility rules. Preserve applicable geographic-approximation and subgroup
+   qualification annotations through results packages. A weather-triggered
+   policy's existence is separate from its activation on the actual PIT night.
+   CoC/county overlay uses equal-area EPSG:5070 coordinates and discards
+   microscopic intersections below `1e-8` of a county's area; this numerical
+   sliver tolerance is recorded in output provenance. Retained county fragments
+   use area allocation, which approximates their resident population.
+   Legal status is also separate from observed HIC capacity. The example's
+   `right_to_shelter_source` remains unresolved until reviewed source coverage,
+   mixed-geography treatment, selected population/coding rule, and panel join
+   cover the requested study window. The four candidate jurisdictions alone
+   do not establish national baseline completeness.
 2. `delta_theta`, `delta_slope`, `fit_threshold`, and `fit_floor`.
 3. The primary geography (CBSA is assumed) and the year range.
 4. The bed definition: ES + TH + SH year-round beds, excluding seasonal and

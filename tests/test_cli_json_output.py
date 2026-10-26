@@ -220,11 +220,11 @@ class TestListSourcesJson:
         assert by_id["zori"]["first_year"] == 2015
         right_to_shelter = by_id["right_to_shelter"]
         assert right_to_shelter["provider"] == "curated"
-        assert right_to_shelter["product"] == "jurisdiction-year rights table"
+        assert right_to_shelter["product"] == "reviewed baseline plus dated policy exceptions"
         assert right_to_shelter["native_geo"] == "jurisdiction"
         assert right_to_shelter["first_year"] == 2007
         assert right_to_shelter["last_year"] is None
-        assert "depends on cited rows" in right_to_shelter["notes"]
+        assert "depends on cited reviewed coverage" in right_to_shelter["notes"]
 
 
 class TestListCensusJson:

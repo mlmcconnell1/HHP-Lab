@@ -14,6 +14,7 @@ from hhplab.sources.right_to_shelter import (
     GEOGRAPHY_RULES,
     RightToShelterError,
     build_curated_outputs,
+    curated_baseline_path,
     curated_source_table_path,
 )
 
@@ -24,12 +25,13 @@ _JSON_OPTION = Annotated[
 
 
 def build_right_to_shelter_cmd(
-    county_population: Annotated[
-        Path,
-        typer.Option(
-            "--county-population",
-            help="CSV of county-year population weights for all three populations.",
-        ),
+    first_year: Annotated[
+        int,
+        typer.Option("--first-year", min=1900, max=2200, help="First requested annual year."),
+    ],
+    last_year: Annotated[
+        int,
+        typer.Option("--last-year", min=1900, max=2200, help="Last requested annual year."),
     ],
     coc_boundary_vintage: Annotated[
         str,
@@ -39,11 +41,35 @@ def build_right_to_shelter_cmd(
         str,
         typer.Option("--county-vintage", help="Curated TIGER county geometry vintage."),
     ],
-    source_table: Annotated[
+    county_population: Annotated[
         Path | None,
         typer.Option(
-            "--source-table",
-            help="Cited jurisdiction-year CSV; defaults to the canonical curated path.",
+            "--county-population",
+            help=(
+                "Optional county-year CSV/Parquet with resident_population or population-specific "
+                "weights; only mixed status needs complete support."
+            ),
+        ),
+    ] = None,
+    weight_definition: Annotated[
+        str | None,
+        typer.Option(
+            "--weight-definition",
+            help="Required when weights are supplied; identify population basis and vintage.",
+        ),
+    ] = None,
+    exceptions: Annotated[
+        Path | None,
+        typer.Option(
+            "--exceptions",
+            help="Cited policy-exception CSV; defaults to the canonical curated path.",
+        ),
+    ] = None,
+    baseline: Annotated[
+        Path | None,
+        typer.Option(
+            "--baseline",
+            help="Reviewed baseline JSON; defaults to the canonical curated path.",
         ),
     ] = None,
     data_root: Annotated[
@@ -79,9 +105,17 @@ def build_right_to_shelter_cmd(
         float,
         typer.Option("--majority-threshold", min=0.0, max=1.0),
     ] = 0.5,
+    msa_ids: Annotated[
+        list[str] | None,
+        typer.Option("--msa-id", help="Optional MSA ID selector; repeat to select several."),
+    ] = None,
+    coc_ids: Annotated[
+        list[str] | None,
+        typer.Option("--coc-id", help="Optional CoC ID selector; repeat to select several."),
+    ] = None,
     json_output: _JSON_OPTION = False,
 ) -> None:
-    """Build `right_to_shelter__msa` and `right_to_shelter__coc` outputs."""
+    """Build requested-year MSA and CoC outputs from reviewed policy inputs."""
     if coding_rule not in CODING_RULES:
         _emit_error(f"--coding-rule must be one of {CODING_RULES}.", json_output)
     if coding_rule == "strict" and include_weather_only:
@@ -92,9 +126,17 @@ def build_right_to_shelter_cmd(
         )
     if geography_rule not in GEOGRAPHY_RULES:
         _emit_error(f"--geography-rule must be one of {GEOGRAPHY_RULES}.", json_output)
+    if first_year > last_year:
+        _emit_error("--first-year must be less than or equal to --last-year.", json_output)
+    if msa_ids == [] or coc_ids == []:
+        _emit_error(
+            "Geography selectors cannot be empty; omit the option or pass at least one ID.",
+            json_output,
+        )
     try:
         outputs = build_curated_outputs(
-            source_table_path=source_table or curated_source_table_path(),
+            exceptions_path=exceptions or curated_source_table_path(data_root),
+            baseline_path=baseline or curated_baseline_path(data_root),
             county_population_path=county_population,
             data_root=data_root,
             msa_definition_version=msa_definition_version,
@@ -104,6 +146,11 @@ def build_right_to_shelter_cmd(
             include_weather_only=include_weather_only,
             geography_rule=geography_rule,
             majority_threshold=majority_threshold,
+            first_year=first_year,
+            last_year=last_year,
+            msa_ids=msa_ids,
+            coc_ids=coc_ids,
+            weight_definition=weight_definition,
         )
     except (FileNotFoundError, RightToShelterError, ValueError) as exc:
         _emit_error(str(exc), json_output)
@@ -114,6 +161,10 @@ def build_right_to_shelter_cmd(
         "include_weather_only": include_weather_only,
         "geography_rule": geography_rule,
         "majority_threshold": majority_threshold,
+        "first_year": first_year,
+        "last_year": last_year,
+        "msa_ids": msa_ids,
+        "coc_ids": coc_ids,
     }
     if json_output:
         typer.echo(json.dumps(payload, indent=2))

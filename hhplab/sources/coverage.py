@@ -127,14 +127,17 @@ CORE_SOURCE_COVERAGE_SPECS: dict[str, SourceCoverageSpec] = {
     "right_to_shelter": SourceCoverageSpec(
         source_id="right_to_shelter",
         provider="curated",
-        product="jurisdiction-year rights table",
+        product="reviewed baseline plus dated policy exceptions",
         native_geo="jurisdiction",
         first_year=2007,
         last_year=None,
         notes=(
-            "The schema supports annual PIT-date coding from 2007 onward. Actual "
-            "jurisdiction-year availability depends on cited rows in the curated "
-            "table; no jurisdiction statuses are populated by this package."
+            "Generated annual coding uses the January 31 reference date. Availability "
+            "is limited to explicitly listed, evidence-backed reviewed jurisdiction-year "
+            "coverage in the curated baseline; outside that scope and in explicit "
+            "population-specific unknown gaps, status is unresolved and depends on cited "
+            "reviewed coverage. No national "
+            "negative baseline is assumed."
         ),
     ),
 }

@@ -1,0 +1,35 @@
+{
+  "scope": "coclab-tj494 code rework; legal data and weighting research remain open",
+  "reviewed_at": "2026-10-26T08:41:05Z",
+  "source_witness": "sha256:342fd56f10b04d823dcb8dab5ce3d02a09e3ee687dfae0b947059810206f3951",
+  "view_witness": "sha256:b338b4c0c0f7dac871487cbcbe538a35a4f193ba53f3018a04d43f77f9617877",
+  "pin_id": "intent-pin:28354c013d37780fa894d12d73248585e1596127f2a88644d1aa963c56d138d5",
+  "previous_evidence": ".elements/plans/right-to-shelter.acceptance.json",
+  "reconciliation": ".elements/plans/right-to-shelter-rework.implementation-reconcile.json",
+  "preliminary_reconciliation": ".elements/plans/right-to-shelter-rework.reconcile.json",
+  "preliminary_note": "Earlier in-progress source evidence is preserved; only implementation-reconcile is final acceptance evidence.",
+  "correspondence_count": 51,
+  "all_matched_exact": true,
+  "has_more": false,
+  "view_conflicts": 0,
+  "structure_findings": [],
+  "review": {
+    "source": "Existing domain identity revision 2 owns reviewed baseline and dated exception validation, annual expansion, explicit unknown scope, population-specific coding, geography mapping, exact caveats and input provenance. No new production modules or layer/import exceptions were introduced.",
+    "cli": "Existing interface identity revision 2 exposes explicit years, baseline/exceptions, optional weights, scope selectors, coding rules and JSON diagnostics. Selected geographies receive distinct names and existing outputs are preserved.",
+    "observations": "All 51 rows and root bindings inspected, including revision 2 source and CLI candidate paths and witnesses. Python structural observations report partial extractor coverage, with exact matched candidates and a fresh current-source snapshot. Behavioral responsibilities were reviewed independently and tested; correspondence text alone is not semantic enforcement.",
+    "integration": "Three Luna High workers shared main with exclusive source/evidence ownership and no worker Git/tracker mutations. Codex root reviewed the implementation and fixed geometry integration, numerical slivers, mixed-only population requirements, annotation identity/bindings, orphan exceptions, subset names, retained outputs and provenance. A second read-only Luna High review's actionable findings were repaired by root."
+  },
+  "checks": [
+    {"scope": "Source, CLI JSON, results integration, annotations and provenance", "result": "171 passed"},
+    {"scope": "Architecture layers and results architecture gate", "result": "423 passed"},
+    {"scope": "Touched Python Ruff and git diff --check", "result": "passed"},
+    {"scope": "Native intent validation", "result": "valid; 51 records"},
+    {"scope": "Elements scaffold refresh and architecture-test freshness check", "result": "fresh"},
+    {"scope": "Curated layout", "result": "passed"},
+    {"scope": "Real NY-600/2024 mapping, B2025/C2023 WGS84 canonical inputs", "result": "No weights required; all three candidate policy flags and geographic shares equal 1, with three exact subgroup caveats. No national legal-data completeness claim."}
+  ],
+  "outstanding": {
+    "coclab-gl6pz": "Provisional evidence-backed inputs and tracked snapshots exist, with explicit historical/population gaps; national baseline review, final research coding and complete panel integration remain unresolved.",
+    "coclab-e0ezj": "Native PEP inventory and FIPS support audit complete; common resident-population weighting and vintage policy remain pending Matt's methodological decision. No eligibility proxies were adopted."
+  }
+}
