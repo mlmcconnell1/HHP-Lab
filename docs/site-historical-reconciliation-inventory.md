@@ -16,6 +16,8 @@ The comparison uses the actual archived polygons, reprojected to EPSG:6933, and 
 
 ## Additional merger scope risks
 
+**Annual GIS comparison update, 2026-10-26:** [The full 2010–2017 comparison report](historical-coc-archive-availability.md#annual-shape-comparisons-2026-10-26) now measures 2,844 same-ID transitions after conservative derived cleanup. In the selected 60-site/77-CoC cohort, fixed-2020 block checks cover all 51 source changes of at least 1 km². Beyond the three already reviewed merger transitions, 27 comparisons across 14 CoCs involve at least 10,000 area-allocated residents. Some changes are almost spatially reversed in later source vintages. The remaining work is source/count-scope interpretation and whole-MSA union checks, not reacquiring the 2010–2017 state files; see `coclab-t6ywr.13`. No new merger rule, count adjustment, or site exclusion follows from the polygon screen.
+
 The case-specific findings below are superseded where resolved by the integration review at the end of this note. The original screening table is retained to show why native-source verification was necessary.
 
 The PIT workbook `CoC Mergers` sheet lists four selected successor IDs beyond the separately handled MA-505 case:

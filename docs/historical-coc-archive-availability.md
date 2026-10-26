@@ -41,7 +41,62 @@ The [retained run](</home/matt/Data/hhplab/raw/hud_exchange/acquisition_runs/202
 
 Independent verification checks every ZIP hash and CRC, compares every extracted file byte hash with both its ZIP member and receipt, verifies the 448 unique jurisdiction/year attempts and all state/DC successes, and checks the script hash and inventory counts. The resulting `verified-inventory.json` additionally lists adjacent-year ID additions/removals, repeated ID claims, and compound/invalid feature review queues. These are source-inventory differences, not evidence by themselves of mergers or count-jurisdiction changes.
 
-Next work is to normalize the official annual sources into separate derived artifacts, resolve duplicate/compound assignments, record any geometry repairs, and compare equal-area shapes and population sensitivity year over year. The Stanford and FY17 mirror investigations below remain useful provenance comparisons, but acquiring official state files no longer depends on resolving those mirrors.
+Annual derived cleanup, shape comparisons, and selected-study population sensitivity are now completed below. Remaining work is interpretation of populated source differences and reporting scope, including shared-jurisdiction allocations. The Stanford and FY17 mirror investigations remain useful provenance comparisons, but using the directly acquired official state files does not depend on resolving those mirrors.
+
+## Annual shape comparisons, 2026-10-26
+
+The owner requested adjacent-year comparisons of the acquired series. The [retained comparison run](</home/matt/HHP-Output/historical-site-selection/annual-shape-comparison-20261026/run-02>) covers **2010→2011 through 2016→2017**, with **2,844 same-ID comparisons** and **85 ID appearance/disappearance events**. It is a national source-geometry diagnostic, not a complete 2010–2024 panel or a finding that PIT/HIC reporting jurisdictions changed. IDs are compared literally; predecessor unions are not silently substituted into this raw same-ID screen.
+
+### Conservative derived cleanup
+
+Eight derived GeoParquet files are retained under `normalized/coc__B<year>.parquet`, in EPSG:4326 with native provenance. These are external diagnostic artifacts; no curated file or registry was replaced. All **3,305 ordinary feature records** were retained. One Massachusetts shared-jurisdiction source layer per year was withheld, including 2013/2014 layers whose filenames say shared jurisdiction while their DBF attribute names only MA-510. The individually supplied CoC polygons remain present; the extra shared area is not assigned to each named ID. No other repeated ordinary IDs remained after this quarantine.
+
+The package's `fix_geometry` and `ensure_polygon_type` helpers repaired **122 invalid source feature records** on derived geometries. The largest absolute relative area change in native coordinates was **1.99×10⁻¹¹**; no additional repairs were needed after WGS84 transformation or projection to the measurement CRS. Original source bytes, raw geometry hashes and validity reasons remain in the acquisition receipts. Repair/type/area details and quarantined source paths are in `normalization-<year>.json` and `normalization-summary.json`. No simplification or coordinate snapping was applied to the normalized annual artifacts.
+
+### Comparison method and national totals
+
+Measurements use EPSG:6933 and retain old/new area, removed/added area, symmetric difference divided by union, exact topological equality, source-repair flags, and part counts. Added/removed IDs are separate records rather than zero-area comparisons. A **1% of union plus 1 km²** flag prioritizes large source changes; it is not a compatibility or exclusion rule. Most years' shapes are technically unequal, including many very small differences, so exact inequality alone is not interpreted as a substantive change.
+
+| Adjacent years | Common IDs compared | Differences ≥1 km² | Differences ≥1% and ≥1 km² | Same flag within the selected 77 CoCs |
+| --- | ---: | ---: | ---: | ---: |
+| 2010→2011 | 427 | 16 | 15 | 1 |
+| 2011→2012 | 420 | 107 | 26 | 6 |
+| 2012→2013 | 407 | 86 | 33 | 7 |
+| 2013→2014 | 410 | 38 | 1 | 0 |
+| 2014→2015 | 394 | 88 | 38 | 9 |
+| 2015→2016 | 393 | 71 | 12 | 0 |
+| 2016→2017 | 393 | 32 | 6 | 0 |
+
+Seven nearly coincident 2010→2011 comparisons failed the initial floating-point area-balance check. Their measurement overlays were retried on an explicit fixed precision grid: six at 1 mm and WV-501 at 1 cm. Raw measurements and `overlay_grid_m` are retained alongside the resulting metrics. All seven are outside the selected 77-CoC cohort. The annual source artifacts remain unsnapped. All final rows pass area-balance checks; these numerical treatments do not confer reporting compatibility.
+
+### Selected-study population sensitivity and source questions
+
+The selected-cohort annotations use the existing **60-site/77-CoC** membership, not a new site selection. The accepted source polygons contain 76 of those IDs in 2010–2013 and all 77 in 2014–2017. The missing IDs are **CA-524 in 2010–2012** and **FL-602 in 2013**. These gaps remain explicit; source counts with the same identifier do not supply a missing polygon.
+
+The fixed-2020 Census block method was applied to **all 51 selected-CoC same-ID changes of at least 1 km²**, regardless of their percentage of total area. This covers 28 distinct CoCs and therefore also checks populated fragments whose relative area is small. All intersecting US counties are included, all population joins are one-to-one with no missing counts, and block geometry/population are held fixed across boundary years. Uniform area allocation includes water; geometric-centroid assignment is retained as an alternative. Percentages in the population output use the later source footprint's allocated population, not the full MSA or frozen B2024 denominator. Gross estimates sum removed and added population and are not observed resident or homeless-person movements.
+
+Of the 51 comparisons, **14 have gross allocated population below 1,000**, seven are between 1,000 and 10,000, and 30 are at least 10,000. Three of the large comparisons are the already reviewed San Diego, Ventura, and Polk merger transitions; the existing count-reconciliation rules remain unchanged. The other 27 large comparison rows involve 14 CoCs and warrant source/count-scope review. These thresholds organize review rather than approve or exclude observations.
+
+| Selected source change requiring further interpretation | Source polygon finding | Fixed-2020 gross population allocated to changed fragments |
+| --- | --- | ---: |
+| MA-504, 2011→2012 | Springfield city-sized source polygon expands to the named Hampden County scope; 94.78% symmetric difference relative to union | 309,964 |
+| CA-524, 2014→2015 | Yuba/Sutter source footprint expands; 51.42% symmetric difference relative to union | 81,575 |
+| CA-511, 2012→2013 | Stockton/San Joaquin source gains a populated fragment despite a relatively small area share | 66,349 |
+| CA-514, 2011→2012 | Fresno/Madera source loses a populated fragment; a similar population estimate is regained in 2014→2015 | 112,365 |
+| MI-514, 2011→2012 | Battle Creek/Calhoun source loses a populated interior area; a similar estimate is regained in 2014→2015 | 52,703 |
+| NC-506, 2011→2012 | Wilmington-area source loses a populated fragment; a similar estimate is regained in 2012→2013 | 113,994 |
+
+Additional large or repeated populated changes occur in FL-504, FL-505, FL-513, FL-601, FL-605, FL-606, WA-500, and WA-504. The full joined `review-queue.csv`/Parquet records names, MSA membership, area and population metrics, and the three reviewed merger transitions. `reversal-checks.json` tests whether opposite-signed population changes also concern the same spatial fragments: nine pairs match at more than 99.8% intersection-over-union. Repeated removals and restorations motivate a source-consistency check; they do not prove that the actual count jurisdiction contracted and expanded. CoC-level transfers may also cancel within a multi-CoC MSA, so whole-site unions must be checked before changing site outcomes or eligibility. Follow-up source/count-scope reconciliation is tracked in `coclab-t6ywr.13`; the quantitative comparison work is `coclab-t6ywr.12`.
+
+These populated differences are substantially larger than the four small-perimeter cases and the Massachusetts predecessor-union/Fall River residuals previously reviewed. The small-fragment assumption is not extended automatically to them. No PIT/HIC values, source-specific merger operations, cohort membership, or historical compatibility records were changed.
+
+### Artifacts, visualization and validation
+
+The [four-panel map](</home/matt/HHP-Output/historical-site-selection/annual-shape-comparison-20261026/run-02/selected-shape-changes.png>) shows Springfield/Hampden expansion, Yuba/Sutter expansion, and populated interior removals in Fresno/Madera and Battle Creek/Calhoun. Panel scales are independent; the map shows source polygons, not established PIT/HIC coverage.
+
+The retained run contains `comparisons.csv`/provenance Parquet, `id-events.csv`/provenance Parquet, `summary.json`, normalized annual GeoParquets, per-year repair/quarantine audits, `review-queue.csv`/provenance Parquet, and `population-sensitivity/` with all 51 estimates, block-level details, embedded provenance and validation. Scripts are retained in the parent directory. The exact normalization-stage source is preserved in `normalization-script-snapshot.json`; current comparison-stage source hashes and input hashes are embedded in output provenance. Use the comparison script's `--output-dir <fresh-directory>` to reproduce without overwriting retained outputs. The population and plotting scripts explicitly target the retained `run-02` directory and refuse to overwrite completed outputs.
+
+Independent validation read back all annual files and checked unique IDs, geometry validity, CRS, output hashes, quarantine/repair accounting and embedded provenance. It reconciled every comparison/event against annual ID sets, verified area sums, fractions and closure for all 2,844 rows, and recomputed the five largest selected differences with a separate symmetric-difference overlay. The 51 population results were independently reconstructed from block rows, including added/removed/gross/net allocations, centroid totals, loose touched-block ceilings and population closure. The validation JSONs retain these results. No production package code was changed; validation concerns the actual data artifacts rather than an unrelated package test suite.
 
 ## Earlier bounded survey (2026-10-22)
 
@@ -114,7 +169,7 @@ The download script performs the 19 representative HUD state/year downloads, dow
 
 ## Earlier acquisition recommendation and remaining work
 
-The state/DC manifest and full official state-file acquisition recommended below were completed in the 2026-10-26 run. The list is retained as the original survey recommendation. Remaining work is annual normalization/comparison (`coclab-t6ywr.12`), the 2010 jurisdiction/compound-feature questions (`coclab-t6ywr.8`), and optional mirror vintage/provenance reconciliation (`coclab-t6ywr.9`). Missing exact territory endpoints remain explicit; their absence is not silently filled. Acquisition completion does not certify the native CoC roster or PIT/HIC jurisdiction in any year.
+The state/DC manifest, full official state-file acquisition, annual diagnostic normalization and quantitative comparisons were completed in the 2026-10-26 runs. The list is retained as the original survey recommendation. Remaining work is populated source-change/count-scope review (`coclab-t6ywr.13`), the 2010 jurisdiction/compound-feature questions (`coclab-t6ywr.8`), and optional mirror vintage/provenance reconciliation (`coclab-t6ywr.9`). Missing exact territory endpoints remain explicit; their absence is not silently filled. Completed acquisition and comparison do not certify the native CoC roster or PIT/HIC jurisdiction in any year.
 
 1. Build a complete annual manifest from HUD's state/territory roster for 2011–2017, then probe each expected endpoint with HEAD before downloading. Record missing, renamed, and zero-size responses distinctly. The present state sample cannot serve as that manifest.
 2. Acquire the full per-state set in bounded annual batches, initially 2011–2012 (legacy individual-CoC layout), then 2013–2017. Preserve original ZIPs, HTTP final URLs, retrieval timestamps, and SHA-256 hashes; inspect extracted shapefile fields and coordinate reference systems before ingestion.
