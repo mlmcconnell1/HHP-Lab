@@ -270,10 +270,15 @@ diagnostics. Where applicability is uncertain, it retains conservative candidate
 bindings and labels that uncertainty. An uncertainty marker without any bounded
 candidate cells conservatively applies to the consuming panel.
 
-Legacy v1 preparation joins, resampling, and generic aggregations do not yet
-preserve these bindings. Annotated inputs fail before those operations with
-instructions to use a saved annotated panel in results v2 or supported site-year
-assembly. This prevents an apparently clean output that silently lost a caveat.
+Legacy v1 preparation now preserves immutable records, exact bindings and
+source identities through identity resampling, point-in-time row filtering,
+joins, population-column aliases, panel projections/aliases and persistence.
+Prepared outputs can enter results v2 without redeclaring their annotations.
+Annotated aggregate/allocate resampling, calendar mean/median, interpolation,
+and lagged source-year reassignment still fail explicitly until their exact
+contributors or year mapping are supported. Crosswalk/support inputs also
+retain their fail-closed guards. Use a saved annotated panel or supported
+site-year assembly for those cases; never remove annotations to bypass a guard.
 
 Same ID/revision plus identical content deduplicates with both origins retained.
 Different content under that identity is an error; create a new revision.
@@ -1250,6 +1255,14 @@ In Phase 1, adding this variant must fail at spec preflight with
    Policy intervals include both endpoints. The maintained inputs are
    `data/curated/right_to_shelter/right_to_shelter__baseline.json` and
    `data/curated/right_to_shelter/right_to_shelter__exceptions.csv`.
+   Prebuilt tables can be declared as `provider: hhplab`,
+   `product: right_to_shelter`, `version: 1`, with `path` or `file_set`,
+   explicit annual coverage, `year_column: year`, `geo_column: geo_id`, and
+   the matching Census MSA definition or CoC boundary vintage. Identity
+   resampling followed by a geography/year join retains their data-origin
+   annotations. This adapter does not choose the population/classification
+   rule, build missing source data, or make an MSA identical to its overlap
+   site's selected CoC union.
    Each citation records its source type and redistribution status; secondary
    citations require an explicit redistribution status.
    Generate complete outputs for an explicitly requested year range and

@@ -1,0 +1,17 @@
+{
+  "schema_version": "elements.working-intent.import.request/1.0",
+  "elements": [{
+    "schema_version": "elements.intent-element/8.0", "record_type": "intent_element",
+    "intent_element_id": "intent:metro:laus_ingest", "revision_id": "revision:metro:laus_ingest:2",
+    "lifecycle": "working", "project_id": "project:HHP-Lab", "parent_id": "intent:results-v2:sources",
+    "explicit_root": false, "kind": "semantic/module", "observed_kind": "file", "name": "ingest",
+    "repo_relative_path": "hhplab/sources/bls/laus/ingest.py", "language": "python", "scope": {}, "tombstone": false,
+    "recorded_at": "2026-10-26T11:49:17Z",
+    "content": {
+      "acceptance_policy": "results-v2-architecture-conformance-v1", "change": "modify",
+      "dependency_allowlist": ["hhplab.artifacts.naming", "hhplab.geographies.gf_metro", "hhplab.sources.bls", "hhplab.storage"],
+      "layer": "domain", "phase": 1, "plan": "results-recipe-v2", "source_spec": "docs/results-recipe-spec_2.md",
+      "responsibility": "Ingest and persist annual BLS LAUS metro measures with canonical Census metro coverage by default, explicit Glynn/Fox subset support only when requested, documented BLS batching and exact source/definition provenance; do not select overlap cohorts or allocate CoC outcomes."
+    }
+  }]
+}

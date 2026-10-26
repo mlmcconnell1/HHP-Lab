@@ -32,3 +32,7 @@
 {"key": "site-universe-output-root", "id": "coclab-ccwlh.6", "depends_on": ["coclab-ccwlh.1"], "intent_ids": ["intent:site-universe:storage_config", "intent:site-universe:recipe_output_root_schema"]}
 {"key": "pit-observation-intent", "id": "coclab-93aqk", "depends_on": [], "intent_ids": ["intent:site-universe:pit_observation", "intent:site-universe:site_year_aggregation"]}
 {"key": "right-to-shelter", "id": "coclab-tj494", "depends_on": [], "intent_ids": ["intent:rts:source", "intent:rts:cli"]}
+{"key": "right-to-shelter-substate", "id": "coclab-8rlun", "depends_on": [], "intent_ids": ["intent:rts:source", "intent:rts:cli"]}
+{"key": "preparation-annotations", "id": "coclab-fjyum", "depends_on": [], "intent_ids": ["intent:preparation:annotations", "intent:results-v2:executor", "intent:site-universe:input_resolver"]}
+{"key": "canonical-metro-laus-defaults", "id": "coclab-j30ik", "depends_on": [], "intent_ids": ["intent:metro:laus_ingest"]}
+{"key": "reference-table-joins", "id": "coclab-gl6pz", "depends_on": [], "intent_ids": ["intent:preparation:reference_adapters"]}

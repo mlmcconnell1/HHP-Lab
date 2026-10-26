@@ -1,0 +1,74 @@
+{
+  "schema_version": "elements.working-intent.import.request/1.0",
+  "elements": [
+    {
+      "schema_version": "elements.intent-element/8.0", "record_type": "intent_element",
+      "intent_element_id": "intent:rts:source", "revision_id": "revision:rts:source:3",
+      "lifecycle": "working", "project_id": "project:HHP-Lab", "parent_id": "intent:results-v2:sources",
+      "explicit_root": false, "kind": "semantic/module", "observed_kind": "file", "name": "right_to_shelter",
+      "repo_relative_path": "hhplab/sources/right_to_shelter.py", "language": "python", "scope": {}, "tombstone": false,
+      "recorded_at": "2026-10-26T11:40:00Z",
+      "content": {
+        "acceptance_policy": "results-v2-architecture-conformance-v1", "change": "modify",
+        "dependency_allowlist": ["hhplab.schema", "hhplab.geographies.msa", "hhplab.geographies.coc", "hhplab.storage", "hhplab.artifacts.naming.naming"],
+        "layer": "domain", "phase": 1, "plan": "results-recipe-v2", "source_spec": "docs/results-recipe-spec_2.md",
+        "responsibility": "Validate versioned evidence or explicitly provisional baseline coverage and dated jurisdiction policy exceptions, expand January-reference statuses with unknown gaps and qualifications, derive strict or broad population flags, map requested MSA and CoC years using validated additive substate county overrides retaining NYC and complete optional mixed-status weights, propagate provisional-baseline and geographic/subgroup caveats, and record exact input, membership and coding provenance."
+      }
+    },
+    {
+      "schema_version": "elements.intent-element/8.0", "record_type": "intent_element",
+      "intent_element_id": "intent:rts:cli", "revision_id": "revision:rts:cli:3",
+      "lifecycle": "working", "project_id": "project:HHP-Lab", "parent_id": "intent:results-v2:build_cmds",
+      "explicit_root": false, "kind": "semantic/module", "observed_kind": "file", "name": "right_to_shelter",
+      "repo_relative_path": "hhplab/cli/build_cmds/right_to_shelter.py", "language": "python", "scope": {}, "tombstone": false,
+      "recorded_at": "2026-10-26T11:40:00Z",
+      "content": {
+        "acceptance_policy": "results-v2-architecture-conformance-v1", "change": "modify",
+        "dependency_allowlist": ["hhplab.sources.right_to_shelter"], "layer": "interface", "phase": 1,
+        "plan": "results-recipe-v2", "source_spec": "docs/results-recipe-spec_2.md",
+        "responsibility": "Expose dated exceptions and explicit baseline coverage, optional validated substate county membership and mixed-status weights, requested MSA/CoC years and coding choices with actionable JSON diagnostics; do not infer unsupported legal classifications."
+      }
+    },
+    {
+      "schema_version": "elements.intent-element/8.0", "record_type": "intent_element",
+      "intent_element_id": "intent:results-v2:executor", "revision_id": "revision:results-v2:executor:3",
+      "lifecycle": "working", "project_id": "project:HHP-Lab", "parent_id": "intent:results-v2:recipe",
+      "explicit_root": false, "kind": "semantic/package", "observed_kind": "directory", "name": "executor",
+      "repo_relative_path": "hhplab/recipe/executor", "scope": {}, "tombstone": false, "recorded_at": "2026-10-26T11:40:00Z",
+      "content": {
+        "acceptance_policy": "results-v2-architecture-conformance-v1", "change": "extend", "dependency_allowlist": [],
+        "correspondence_note": "Semantic Python package anchored to its observed directory; package locators use package_path rather than repo_relative_path.",
+        "layer": "application", "phase": 1, "plan": "results-recipe-v2", "source_spec": "docs/results-recipe-spec_2.md",
+        "responsibility": "Dispatch build and analysis tasks and preserve annotation contracts through supported preparation, joins and persistence; reject operations without defensible dependency bindings; no estimators or result decision rules in executor."
+      }
+    },
+    {
+      "schema_version": "elements.intent-element/8.0", "record_type": "intent_element",
+      "intent_element_id": "intent:site-universe:input_resolver", "revision_id": "revision:site-universe:input_resolver:4",
+      "lifecycle": "working", "project_id": "project:HHP-Lab", "parent_id": "intent:results-v2:executor",
+      "explicit_root": false, "kind": "semantic/module", "observed_kind": "file", "name": "input_resolver",
+      "repo_relative_path": "hhplab/recipe/executor/inputs.py", "language": "python", "scope": {}, "tombstone": false,
+      "recorded_at": "2026-10-26T11:40:00Z",
+      "content": {
+        "acceptance_policy": "results-v2-architecture-conformance-v1", "change": "extend",
+        "dependency_allowlist": ["hhplab.recipe", "hhplab.schema", "hhplab.storage", "hhplab.artifacts.naming.naming"],
+        "layer": "application", "phase": 1, "plan": "results-recipe-v2", "source_spec": "docs/recipe-site-universe-contract.md",
+        "responsibility": "Resolve paired site and membership tables, schema, artifact identity, explicit thresholds and fingerprints; load preparation inputs with immutable source annotation identities and preserve or reject temporal/geography transformations according to known cell dependencies."
+      }
+    },
+    {
+      "schema_version": "elements.intent-element/8.0", "record_type": "intent_element",
+      "intent_element_id": "intent:preparation:annotations", "revision_id": "revision:preparation:annotations:1",
+      "lifecycle": "working", "project_id": "project:HHP-Lab", "parent_id": "intent:results-v2:executor",
+      "explicit_root": false, "kind": "semantic/module", "observed_kind": "file", "name": "annotations",
+      "repo_relative_path": "hhplab/recipe/executor/annotations.py", "language": "python", "scope": {}, "tombstone": false,
+      "recorded_at": "2026-10-26T11:40:00Z",
+      "content": {
+        "acceptance_policy": "results-v2-architecture-conformance-v1", "change": "new",
+        "dependency_allowlist": ["hhplab.schema", "hhplab.storage"], "layer": "application", "phase": 1,
+        "plan": "results-recipe-v2", "source_spec": "docs/results-recipe-spec_2.md",
+        "responsibility": "Preserve immutable annotation records, exact cell bindings and source identities through known preparation dependencies, key/column renames, row filters, joins and supported aggregation; detect conflicts and fail closed when dependency mapping is unsupported; keep statistical analysis and public distribution decisions with their existing owners."
+      }
+    }
+  ]
+}

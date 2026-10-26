@@ -31,9 +31,11 @@ unknown, not no-right. The candidate jurisdictions below do not establish
 a nationwide legal finding. Matt has now authorized treating unlisted
 jurisdictions as none provisionally for analysis, provided that the assumption
 travels with the results. This decision does not resolve explicit gaps inside
-listed jurisdictions. The canonical candidate files below still represent
-the earlier evidence-only coverage; full national inputs and joins remain to
-be built under the accepted assumption.
+listed jurisdictions. The canonical baseline now explicitly enumerates the
+50 states, DC and five territories for 2010–2024, with provisional-none basis
+outside the original candidate jurisdictions. NYC and Hennepin have explicit
+county scopes. Listed-jurisdiction unknown gaps remain authoritative, so this
+expanded baseline alone does not certify a complete national output or join.
 
 ## Candidate jurisdictions
 
@@ -108,12 +110,48 @@ analyses that do not use that column need not display the footnote. Revision
 of the classification should increment the annotation revision and preserve
 the prior recipe/run identity.
 
-This recipe annotation is an immediate declaration of the research choice,
-not a completed national data build. When generating national source outputs,
-record the assumption in baseline provenance and attach an equivalent
-data-origin annotation to the generated RTS columns, so other recipes inherit
-it as well. Preserve it through the final classification derive/join alongside
-the existing subgroup, geography and weighting annotations.
+This recipe annotation declares the research choice. The source now also
+supports an explicit `provisional_baseline` annotation and per-coverage
+`basis: provisional_none`; affected mapped RTS flags and covered shares inherit
+that data-origin caveat, so other recipes can retain it without redeclaration.
+Active exception rows do not inherit a default-absence basis. Preserve these
+contracts through the final classification derive/join alongside the existing
+subgroup, geography and weighting annotations. This is not a completed
+national data build while listed-jurisdiction gaps remain.
+
+### Follow-up historical source review (2026-10-26)
+
+The source-data worker verified that New York's pre-2016 framework is not
+simply absent: [94 ADM-20, updated in 1996](https://otda.ny.gov/policy/directives/1994/ADM/94_ADM-20_updated96.pdf)
+and [96 ADM-20](https://otda.ny.gov/policy/directives/1996/ADM/96_ADM-20.pdf)
+describe eligibility-based temporary housing assistance to individuals and
+families. They are leads for replacing the early-year unknown with dated
+conditional coverage, not authority to backdate the 2016 directive. New
+York's [Executive Order 151 in the January 27, 2016 State Register](https://dos.ny.gov/january-27-2016vol-xxxviii-issue-4-book-1-2)
+states an effective date of January 5, 2016 for statewide cold-weather
+protective steps. Thus the 2017 regulation is not the beginning of all
+statewide weather policy. The current exception CSV still reflects the
+earlier, narrower verified intervals; reconstruct their transitions before
+claiming that its early weather flags are complete.
+
+The [original DC 2005 Act](https://code.dccouncil.gov/us/dc/council/laws/docs/16-35.pdf)
+already requires space in severe weather in §7(c), while §28 disclaims an
+entitlement to other Continuum services under that Act. The [official law
+history](https://code.dccouncil.gov/us/dc/council/laws/16-35) gives an effective
+date of October 22, 2005. This supports an earlier weather interval than the
+2011 amendment presently recorded, subject to reconstructing the intervening
+versions and eligibility changes. It does not establish the absence of every
+independent protection. The explicit DC unknown gap remains until the source
+intervals are revised and reviewed.
+
+Hennepin's official retrospective history establishes a family policy before
+the 2010 study start, so a documented study-window clip need not invent an
+exact 2005 adoption day. Historical eligibility and the treatment of
+pregnancy-alone/single-adult populations still require an explicit coding
+decision. Massachusetts' family/pregnancy EA program likewise does not alone
+prove absence of all independent single-adult duties. These listed-population
+uncertainties have not been converted to zeros by the provisional
+none-elsewhere decision.
 
 ### Strength coding is a research decision
 
@@ -258,12 +296,94 @@ unknown legal scope. They do not support a complete or national map.
 
 ### `right_to_shelter__baseline.json`
 
+The companion `right_to_shelter__substate_counties.csv` is additive to the
+built-in NYC five-borough assignment. Its exact contents are:
+
+```text
+jurisdiction_id,jurisdiction_type,county_fips
+HENNEPIN,sub_state,27053
+```
+
+The county assignment makes Hennepin's explicit unknown gap authoritative;
+it does not by itself finalize the family-policy coding or create a statewide
+Minnesota shelter right.
+
 ```json
 {
   "schema_version": "1.0",
-  "baseline_version": "candidate-legal-review-2026-10-26-expanded",
+  "baseline_version": "provisional-national-baseline-2026-10-26",
   "annual_reference_date": "01-31",
+  "provisional_baseline": {
+    "id": "right-to-shelter-provisional-source-baseline",
+    "revision": 1,
+    "category": "caveat",
+    "summary": "Provisional absence of unlisted shelter protections",
+    "text": "Outside the listed policy exceptions, jurisdictions are provisionally coded none under the researcher decision of October 26, 2026. This is a working classification, not an exhaustive legal review, and may be revised after feedback. Explicit unresolved gaps within listed jurisdictions remain unknown. Covered shares describe geographic policy coverage, not individual eligibility.",
+    "public_text": "Outside the listed policy exceptions, jurisdictions are provisionally coded none under the researcher decision of October 26, 2026. This working classification may be revised after feedback and is not an exhaustive legal review. Explicit listed-jurisdiction gaps remain unknown; geographic shares do not measure legal eligibility.",
+    "evidence": [{"name": "Researcher baseline decision and source caveats", "ref": "docs/right-to-shelter-evidence.md"}],
+    "scope": {"columns": ["rts_single_adults", "rts_families", "rts_pregnant_people", "rts_single_adults_population_share", "rts_families_population_share", "rts_pregnant_people_population_share"]}
+  },
   "reviewed_coverage": [
+    {
+      "jurisdiction_id": "HENNEPIN",
+      "jurisdiction_type": "sub_state",
+      "county_fips": ["27053"],
+      "first_year": 2010,
+      "last_year": 2024,
+      "evidence": [{"citation": "Hennepin County board action request 24-0119: shelter-all family policy since 2005; docs/right-to-shelter-evidence.md", "citation_source_type": "administrative_directive", "citation_redistribution": "public"}]
+    },
+    {"jurisdiction_id": "01", "jurisdiction_type": "state", "first_year": 2010, "last_year": 2024, "basis": "provisional_none", "evidence": [{"citation": "Researcher decision 2026-10-26: provisional none outside listed policy exceptions; docs/right-to-shelter-evidence.md", "citation_source_type": "secondary", "citation_redistribution": "public"}]},
+    {"jurisdiction_id": "02", "jurisdiction_type": "state", "first_year": 2010, "last_year": 2024, "basis": "provisional_none", "evidence": [{"citation": "Researcher decision 2026-10-26: provisional none outside listed policy exceptions; docs/right-to-shelter-evidence.md", "citation_source_type": "secondary", "citation_redistribution": "public"}]},
+    {"jurisdiction_id": "04", "jurisdiction_type": "state", "first_year": 2010, "last_year": 2024, "basis": "provisional_none", "evidence": [{"citation": "Researcher decision 2026-10-26: provisional none outside listed policy exceptions; docs/right-to-shelter-evidence.md", "citation_source_type": "secondary", "citation_redistribution": "public"}]},
+    {"jurisdiction_id": "05", "jurisdiction_type": "state", "first_year": 2010, "last_year": 2024, "basis": "provisional_none", "evidence": [{"citation": "Researcher decision 2026-10-26: provisional none outside listed policy exceptions; docs/right-to-shelter-evidence.md", "citation_source_type": "secondary", "citation_redistribution": "public"}]},
+    {"jurisdiction_id": "06", "jurisdiction_type": "state", "first_year": 2010, "last_year": 2024, "basis": "provisional_none", "evidence": [{"citation": "Researcher decision 2026-10-26: provisional none outside listed policy exceptions; docs/right-to-shelter-evidence.md", "citation_source_type": "secondary", "citation_redistribution": "public"}]},
+    {"jurisdiction_id": "08", "jurisdiction_type": "state", "first_year": 2010, "last_year": 2024, "basis": "provisional_none", "evidence": [{"citation": "Researcher decision 2026-10-26: provisional none outside listed policy exceptions; docs/right-to-shelter-evidence.md", "citation_source_type": "secondary", "citation_redistribution": "public"}]},
+    {"jurisdiction_id": "09", "jurisdiction_type": "state", "first_year": 2010, "last_year": 2024, "basis": "provisional_none", "evidence": [{"citation": "Researcher decision 2026-10-26: provisional none outside listed policy exceptions; docs/right-to-shelter-evidence.md", "citation_source_type": "secondary", "citation_redistribution": "public"}]},
+    {"jurisdiction_id": "10", "jurisdiction_type": "state", "first_year": 2010, "last_year": 2024, "basis": "provisional_none", "evidence": [{"citation": "Researcher decision 2026-10-26: provisional none outside listed policy exceptions; docs/right-to-shelter-evidence.md", "citation_source_type": "secondary", "citation_redistribution": "public"}]},
+    {"jurisdiction_id": "12", "jurisdiction_type": "state", "first_year": 2010, "last_year": 2024, "basis": "provisional_none", "evidence": [{"citation": "Researcher decision 2026-10-26: provisional none outside listed policy exceptions; docs/right-to-shelter-evidence.md", "citation_source_type": "secondary", "citation_redistribution": "public"}]},
+    {"jurisdiction_id": "13", "jurisdiction_type": "state", "first_year": 2010, "last_year": 2024, "basis": "provisional_none", "evidence": [{"citation": "Researcher decision 2026-10-26: provisional none outside listed policy exceptions; docs/right-to-shelter-evidence.md", "citation_source_type": "secondary", "citation_redistribution": "public"}]},
+    {"jurisdiction_id": "15", "jurisdiction_type": "state", "first_year": 2010, "last_year": 2024, "basis": "provisional_none", "evidence": [{"citation": "Researcher decision 2026-10-26: provisional none outside listed policy exceptions; docs/right-to-shelter-evidence.md", "citation_source_type": "secondary", "citation_redistribution": "public"}]},
+    {"jurisdiction_id": "16", "jurisdiction_type": "state", "first_year": 2010, "last_year": 2024, "basis": "provisional_none", "evidence": [{"citation": "Researcher decision 2026-10-26: provisional none outside listed policy exceptions; docs/right-to-shelter-evidence.md", "citation_source_type": "secondary", "citation_redistribution": "public"}]},
+    {"jurisdiction_id": "17", "jurisdiction_type": "state", "first_year": 2010, "last_year": 2024, "basis": "provisional_none", "evidence": [{"citation": "Researcher decision 2026-10-26: provisional none outside listed policy exceptions; docs/right-to-shelter-evidence.md", "citation_source_type": "secondary", "citation_redistribution": "public"}]},
+    {"jurisdiction_id": "18", "jurisdiction_type": "state", "first_year": 2010, "last_year": 2024, "basis": "provisional_none", "evidence": [{"citation": "Researcher decision 2026-10-26: provisional none outside listed policy exceptions; docs/right-to-shelter-evidence.md", "citation_source_type": "secondary", "citation_redistribution": "public"}]},
+    {"jurisdiction_id": "19", "jurisdiction_type": "state", "first_year": 2010, "last_year": 2024, "basis": "provisional_none", "evidence": [{"citation": "Researcher decision 2026-10-26: provisional none outside listed policy exceptions; docs/right-to-shelter-evidence.md", "citation_source_type": "secondary", "citation_redistribution": "public"}]},
+    {"jurisdiction_id": "20", "jurisdiction_type": "state", "first_year": 2010, "last_year": 2024, "basis": "provisional_none", "evidence": [{"citation": "Researcher decision 2026-10-26: provisional none outside listed policy exceptions; docs/right-to-shelter-evidence.md", "citation_source_type": "secondary", "citation_redistribution": "public"}]},
+    {"jurisdiction_id": "21", "jurisdiction_type": "state", "first_year": 2010, "last_year": 2024, "basis": "provisional_none", "evidence": [{"citation": "Researcher decision 2026-10-26: provisional none outside listed policy exceptions; docs/right-to-shelter-evidence.md", "citation_source_type": "secondary", "citation_redistribution": "public"}]},
+    {"jurisdiction_id": "22", "jurisdiction_type": "state", "first_year": 2010, "last_year": 2024, "basis": "provisional_none", "evidence": [{"citation": "Researcher decision 2026-10-26: provisional none outside listed policy exceptions; docs/right-to-shelter-evidence.md", "citation_source_type": "secondary", "citation_redistribution": "public"}]},
+    {"jurisdiction_id": "23", "jurisdiction_type": "state", "first_year": 2010, "last_year": 2024, "basis": "provisional_none", "evidence": [{"citation": "Researcher decision 2026-10-26: provisional none outside listed policy exceptions; docs/right-to-shelter-evidence.md", "citation_source_type": "secondary", "citation_redistribution": "public"}]},
+    {"jurisdiction_id": "24", "jurisdiction_type": "state", "first_year": 2010, "last_year": 2024, "basis": "provisional_none", "evidence": [{"citation": "Researcher decision 2026-10-26: provisional none outside listed policy exceptions; docs/right-to-shelter-evidence.md", "citation_source_type": "secondary", "citation_redistribution": "public"}]},
+    {"jurisdiction_id": "26", "jurisdiction_type": "state", "first_year": 2010, "last_year": 2024, "basis": "provisional_none", "evidence": [{"citation": "Researcher decision 2026-10-26: provisional none outside listed policy exceptions; docs/right-to-shelter-evidence.md", "citation_source_type": "secondary", "citation_redistribution": "public"}]},
+    {"jurisdiction_id": "27", "jurisdiction_type": "state", "first_year": 2010, "last_year": 2024, "basis": "provisional_none", "evidence": [{"citation": "Researcher decision 2026-10-26: provisional none outside listed policy exceptions; docs/right-to-shelter-evidence.md", "citation_source_type": "secondary", "citation_redistribution": "public"}]},
+    {"jurisdiction_id": "28", "jurisdiction_type": "state", "first_year": 2010, "last_year": 2024, "basis": "provisional_none", "evidence": [{"citation": "Researcher decision 2026-10-26: provisional none outside listed policy exceptions; docs/right-to-shelter-evidence.md", "citation_source_type": "secondary", "citation_redistribution": "public"}]},
+    {"jurisdiction_id": "29", "jurisdiction_type": "state", "first_year": 2010, "last_year": 2024, "basis": "provisional_none", "evidence": [{"citation": "Researcher decision 2026-10-26: provisional none outside listed policy exceptions; docs/right-to-shelter-evidence.md", "citation_source_type": "secondary", "citation_redistribution": "public"}]},
+    {"jurisdiction_id": "30", "jurisdiction_type": "state", "first_year": 2010, "last_year": 2024, "basis": "provisional_none", "evidence": [{"citation": "Researcher decision 2026-10-26: provisional none outside listed policy exceptions; docs/right-to-shelter-evidence.md", "citation_source_type": "secondary", "citation_redistribution": "public"}]},
+    {"jurisdiction_id": "31", "jurisdiction_type": "state", "first_year": 2010, "last_year": 2024, "basis": "provisional_none", "evidence": [{"citation": "Researcher decision 2026-10-26: provisional none outside listed policy exceptions; docs/right-to-shelter-evidence.md", "citation_source_type": "secondary", "citation_redistribution": "public"}]},
+    {"jurisdiction_id": "32", "jurisdiction_type": "state", "first_year": 2010, "last_year": 2024, "basis": "provisional_none", "evidence": [{"citation": "Researcher decision 2026-10-26: provisional none outside listed policy exceptions; docs/right-to-shelter-evidence.md", "citation_source_type": "secondary", "citation_redistribution": "public"}]},
+    {"jurisdiction_id": "33", "jurisdiction_type": "state", "first_year": 2010, "last_year": 2024, "basis": "provisional_none", "evidence": [{"citation": "Researcher decision 2026-10-26: provisional none outside listed policy exceptions; docs/right-to-shelter-evidence.md", "citation_source_type": "secondary", "citation_redistribution": "public"}]},
+    {"jurisdiction_id": "35", "jurisdiction_type": "state", "first_year": 2010, "last_year": 2024, "basis": "provisional_none", "evidence": [{"citation": "Researcher decision 2026-10-26: provisional none outside listed policy exceptions; docs/right-to-shelter-evidence.md", "citation_source_type": "secondary", "citation_redistribution": "public"}]},
+    {"jurisdiction_id": "37", "jurisdiction_type": "state", "first_year": 2010, "last_year": 2024, "basis": "provisional_none", "evidence": [{"citation": "Researcher decision 2026-10-26: provisional none outside listed policy exceptions; docs/right-to-shelter-evidence.md", "citation_source_type": "secondary", "citation_redistribution": "public"}]},
+    {"jurisdiction_id": "38", "jurisdiction_type": "state", "first_year": 2010, "last_year": 2024, "basis": "provisional_none", "evidence": [{"citation": "Researcher decision 2026-10-26: provisional none outside listed policy exceptions; docs/right-to-shelter-evidence.md", "citation_source_type": "secondary", "citation_redistribution": "public"}]},
+    {"jurisdiction_id": "39", "jurisdiction_type": "state", "first_year": 2010, "last_year": 2024, "basis": "provisional_none", "evidence": [{"citation": "Researcher decision 2026-10-26: provisional none outside listed policy exceptions; docs/right-to-shelter-evidence.md", "citation_source_type": "secondary", "citation_redistribution": "public"}]},
+    {"jurisdiction_id": "40", "jurisdiction_type": "state", "first_year": 2010, "last_year": 2024, "basis": "provisional_none", "evidence": [{"citation": "Researcher decision 2026-10-26: provisional none outside listed policy exceptions; docs/right-to-shelter-evidence.md", "citation_source_type": "secondary", "citation_redistribution": "public"}]},
+    {"jurisdiction_id": "41", "jurisdiction_type": "state", "first_year": 2010, "last_year": 2024, "basis": "provisional_none", "evidence": [{"citation": "Researcher decision 2026-10-26: provisional none outside listed policy exceptions; docs/right-to-shelter-evidence.md", "citation_source_type": "secondary", "citation_redistribution": "public"}]},
+    {"jurisdiction_id": "42", "jurisdiction_type": "state", "first_year": 2010, "last_year": 2024, "basis": "provisional_none", "evidence": [{"citation": "Researcher decision 2026-10-26: provisional none outside listed policy exceptions; docs/right-to-shelter-evidence.md", "citation_source_type": "secondary", "citation_redistribution": "public"}]},
+    {"jurisdiction_id": "44", "jurisdiction_type": "state", "first_year": 2010, "last_year": 2024, "basis": "provisional_none", "evidence": [{"citation": "Researcher decision 2026-10-26: provisional none outside listed policy exceptions; docs/right-to-shelter-evidence.md", "citation_source_type": "secondary", "citation_redistribution": "public"}]},
+    {"jurisdiction_id": "45", "jurisdiction_type": "state", "first_year": 2010, "last_year": 2024, "basis": "provisional_none", "evidence": [{"citation": "Researcher decision 2026-10-26: provisional none outside listed policy exceptions; docs/right-to-shelter-evidence.md", "citation_source_type": "secondary", "citation_redistribution": "public"}]},
+    {"jurisdiction_id": "46", "jurisdiction_type": "state", "first_year": 2010, "last_year": 2024, "basis": "provisional_none", "evidence": [{"citation": "Researcher decision 2026-10-26: provisional none outside listed policy exceptions; docs/right-to-shelter-evidence.md", "citation_source_type": "secondary", "citation_redistribution": "public"}]},
+    {"jurisdiction_id": "47", "jurisdiction_type": "state", "first_year": 2010, "last_year": 2024, "basis": "provisional_none", "evidence": [{"citation": "Researcher decision 2026-10-26: provisional none outside listed policy exceptions; docs/right-to-shelter-evidence.md", "citation_source_type": "secondary", "citation_redistribution": "public"}]},
+    {"jurisdiction_id": "48", "jurisdiction_type": "state", "first_year": 2010, "last_year": 2024, "basis": "provisional_none", "evidence": [{"citation": "Researcher decision 2026-10-26: provisional none outside listed policy exceptions; docs/right-to-shelter-evidence.md", "citation_source_type": "secondary", "citation_redistribution": "public"}]},
+    {"jurisdiction_id": "49", "jurisdiction_type": "state", "first_year": 2010, "last_year": 2024, "basis": "provisional_none", "evidence": [{"citation": "Researcher decision 2026-10-26: provisional none outside listed policy exceptions; docs/right-to-shelter-evidence.md", "citation_source_type": "secondary", "citation_redistribution": "public"}]},
+    {"jurisdiction_id": "50", "jurisdiction_type": "state", "first_year": 2010, "last_year": 2024, "basis": "provisional_none", "evidence": [{"citation": "Researcher decision 2026-10-26: provisional none outside listed policy exceptions; docs/right-to-shelter-evidence.md", "citation_source_type": "secondary", "citation_redistribution": "public"}]},
+    {"jurisdiction_id": "51", "jurisdiction_type": "state", "first_year": 2010, "last_year": 2024, "basis": "provisional_none", "evidence": [{"citation": "Researcher decision 2026-10-26: provisional none outside listed policy exceptions; docs/right-to-shelter-evidence.md", "citation_source_type": "secondary", "citation_redistribution": "public"}]},
+    {"jurisdiction_id": "53", "jurisdiction_type": "state", "first_year": 2010, "last_year": 2024, "basis": "provisional_none", "evidence": [{"citation": "Researcher decision 2026-10-26: provisional none outside listed policy exceptions; docs/right-to-shelter-evidence.md", "citation_source_type": "secondary", "citation_redistribution": "public"}]},
+    {"jurisdiction_id": "54", "jurisdiction_type": "state", "first_year": 2010, "last_year": 2024, "basis": "provisional_none", "evidence": [{"citation": "Researcher decision 2026-10-26: provisional none outside listed policy exceptions; docs/right-to-shelter-evidence.md", "citation_source_type": "secondary", "citation_redistribution": "public"}]},
+    {"jurisdiction_id": "55", "jurisdiction_type": "state", "first_year": 2010, "last_year": 2024, "basis": "provisional_none", "evidence": [{"citation": "Researcher decision 2026-10-26: provisional none outside listed policy exceptions; docs/right-to-shelter-evidence.md", "citation_source_type": "secondary", "citation_redistribution": "public"}]},
+    {"jurisdiction_id": "56", "jurisdiction_type": "state", "first_year": 2010, "last_year": 2024, "basis": "provisional_none", "evidence": [{"citation": "Researcher decision 2026-10-26: provisional none outside listed policy exceptions; docs/right-to-shelter-evidence.md", "citation_source_type": "secondary", "citation_redistribution": "public"}]},
+    {"jurisdiction_id": "60", "jurisdiction_type": "state", "first_year": 2010, "last_year": 2024, "basis": "provisional_none", "evidence": [{"citation": "Researcher decision 2026-10-26: provisional none outside listed policy exceptions; docs/right-to-shelter-evidence.md", "citation_source_type": "secondary", "citation_redistribution": "public"}]},
+    {"jurisdiction_id": "66", "jurisdiction_type": "state", "first_year": 2010, "last_year": 2024, "basis": "provisional_none", "evidence": [{"citation": "Researcher decision 2026-10-26: provisional none outside listed policy exceptions; docs/right-to-shelter-evidence.md", "citation_source_type": "secondary", "citation_redistribution": "public"}]},
+    {"jurisdiction_id": "69", "jurisdiction_type": "state", "first_year": 2010, "last_year": 2024, "basis": "provisional_none", "evidence": [{"citation": "Researcher decision 2026-10-26: provisional none outside listed policy exceptions; docs/right-to-shelter-evidence.md", "citation_source_type": "secondary", "citation_redistribution": "public"}]},
+    {"jurisdiction_id": "72", "jurisdiction_type": "state", "first_year": 2010, "last_year": 2024, "basis": "provisional_none", "evidence": [{"citation": "Researcher decision 2026-10-26: provisional none outside listed policy exceptions; docs/right-to-shelter-evidence.md", "citation_source_type": "secondary", "citation_redistribution": "public"}]},
+    {"jurisdiction_id": "78", "jurisdiction_type": "state", "first_year": 2010, "last_year": 2024, "basis": "provisional_none", "evidence": [{"citation": "Researcher decision 2026-10-26: provisional none outside listed policy exceptions; docs/right-to-shelter-evidence.md", "citation_source_type": "secondary", "citation_redistribution": "public"}]},
     {
       "jurisdiction_id": "34",
       "jurisdiction_type": "state",
@@ -285,6 +405,7 @@ unknown legal scope. They do not support a complete or national map.
     {
       "jurisdiction_id": "NYC",
       "jurisdiction_type": "sub_state",
+      "county_fips": ["36005", "36047", "36061", "36081", "36085"],
       "first_year": 2010,
       "last_year": 2024,
       "evidence": [
@@ -371,6 +492,13 @@ unknown legal scope. They do not support a complete or national map.
     }
   ],
   "unknown_gaps": [
+    {
+      "jurisdiction_id": "HENNEPIN",
+      "jurisdiction_type": "sub_state",
+      "first_year": 2010,
+      "last_year": 2024,
+      "reason": "Family shelter-all policy is evidenced since 2005, but dated historical eligibility and population-specific coding are not finalized. Explicit county scope prevents fallback to the provisional Minnesota none baseline."
+    },
     {
       "jurisdiction_id": "34",
       "jurisdiction_type": "state",

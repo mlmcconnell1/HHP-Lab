@@ -37,6 +37,10 @@ from hhplab.panel.finalize import (
     ZORI_PROVENANCE_COLUMNS,
     finalize_panel,
 )
+from hhplab.recipe.executor.annotations import (
+    frame_column_map,
+    propagate_annotations,
+)
 from hhplab.recipe.executor.core import (
     ExecutionContext,
     ExecutorError,
@@ -1592,6 +1596,40 @@ def assemble_panel(
             detail=f"{step_kind}",
             success=False,
             error=str(exc),
+        )
+
+    annotation_geo_column = {
+        "coc": "coc_id",
+        "metro": "metro_id",
+        "msa": "msa_id",
+    }.get(target_geo_type, "geo_id")
+    annotation_geo_column = aliases.get(annotation_geo_column, annotation_geo_column)
+    annotation_column_aliases = {
+        "total_beds": "hic_total_beds",
+        "total_units": "hic_total_units",
+        **aliases,
+    }
+    try:
+        panel = propagate_annotations(
+            panel,
+            [
+                (frame, frame_column_map(
+                    frame, panel, aliases=annotation_column_aliases,
+                ))
+                for frame in frames
+            ],
+            output_geo_column=(
+                annotation_geo_column
+                if annotation_geo_column in panel.columns
+                else "geo_id"
+            ),
+        )
+    except ValueError as exc:
+        return StepResult(
+            step_kind=step_kind,
+            detail=f"{step_kind}",
+            success=False,
+            error=f"Cannot preserve annotated bindings through panel assembly: {exc}",
         )
 
     return AssembledPanel(

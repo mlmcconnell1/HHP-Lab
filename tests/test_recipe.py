@@ -1800,6 +1800,7 @@ class TestDefaultAdapters:
         products = dataset_registry.registered_products()
         assert ("hud", "pit") in products
         assert ("hhplab", "msa_pit_rollup") in products
+        assert ("hhplab", "right_to_shelter") in products
         assert ("census", "acs5") in products
         assert ("census", "acs5_contract_rent_bins") in products
         assert ("census", "acs5_household_income_bins") in products
@@ -1950,6 +1951,202 @@ class TestDefaultAdapters:
         )
         diags = _validate_hhplab_msa_pit_rollup(spec)
         assert any(d.level == "error" and "path or file_set" in d.message for d in diags)
+
+    def test_hhplab_right_to_shelter_accepts_canonical_msa_and_coc_artifacts(self):
+        from hhplab.recipe.default_dataset_adapters import _validate_hhplab_right_to_shelter
+
+        msa = DatasetSpec(
+            provider="hhplab", product="right_to_shelter", version=1,
+            native_geometry=GeometryRef(type="msa", source="census_msa_2023"),
+            path="data/curated/right_to_shelter/msa.parquet",
+            years={"range": "2020-2021"},
+            year_column="year", geo_column="geo_id",
+        )
+        coc = DatasetSpec(
+            provider="hhplab", product="right_to_shelter", version=1,
+            native_geometry=GeometryRef(type="coc", vintage=2024),
+            path="data/curated/right_to_shelter/coc.parquet",
+            years={"range": "2020-2021"},
+            year_column="year", geo_column="geo_id",
+        )
+
+        assert _validate_hhplab_right_to_shelter(msa) == []
+        assert _validate_hhplab_right_to_shelter(coc) == []
+
+    @pytest.mark.parametrize(
+        ("changes", "expected"),
+        [
+            ({"version": 2}, "unsupported version"),
+            ({"path": None}, "path or file_set is required"),
+            ({"year_column": None}, "year_column must be explicitly"),
+            ({"geo_column": None}, "geo_column must be explicitly"),
+            ({"native_geometry": GeometryRef(type="msa")}, "census_msa_2010"),
+            ({"native_geometry": GeometryRef(type="coc")}, "boundary vintage explicitly"),
+            ({"native_geometry": GeometryRef(type="county", vintage=2020)}, "must be 'msa'"),
+            ({"years": None}, "requires explicit years coverage"),
+        ],
+        ids=["version", "materialized-input", "year-key", "geo-key", "msa-definition",
+             "coc-vintage", "wrong-geometry", "years-required"],
+    )
+    def test_hhplab_right_to_shelter_rejects_incomplete_identity_contract(
+        self, changes: dict, expected: str,
+    ):
+        from hhplab.recipe.default_dataset_adapters import _validate_hhplab_right_to_shelter
+
+        values = {
+            "provider": "hhplab", "product": "right_to_shelter", "version": 1,
+            "native_geometry": GeometryRef(type="msa", source="census_msa_2023"),
+            "path": "data/curated/right_to_shelter/msa.parquet",
+            "years": {"range": "2020-2021"},
+            "year_column": "year", "geo_column": "geo_id",
+        }
+        values.update(changes)
+        diagnostics = _validate_hhplab_right_to_shelter(DatasetSpec(**values))
+
+        assert any(d.level == "error" and expected in d.message for d in diagnostics)
+
+    @pytest.mark.parametrize(
+        ("geometry", "params", "expected"),
+        [
+            (GeometryRef(type="msa", source="census_msa_2023"),
+             {"msa_definition_version": "census_msa_2010"}, "must match the Census"),
+            (GeometryRef(type="coc", vintage=2024),
+             {"coc_boundary_vintage": 2023}, "must match the native CoC"),
+            (GeometryRef(type="msa", source="census_msa_2023"),
+             {"msa_definition_version": ["census_msa_2023"]}, "must match the Census"),
+            (GeometryRef(type="coc", vintage=2024),
+             {"coc_boundary_vintage": {"year": 2024}}, "must match the native CoC"),
+        ],
+        ids=["msa-definition-conflict", "coc-vintage-conflict", "malformed-msa-param",
+             "malformed-coc-param"],
+    )
+    def test_hhplab_right_to_shelter_rejects_build_geometry_conflicts(
+        self, geometry: GeometryRef, params: dict, expected: str,
+    ):
+        from hhplab.recipe.default_dataset_adapters import _validate_hhplab_right_to_shelter
+
+        spec = DatasetSpec(
+            provider="hhplab", product="right_to_shelter", version=1,
+            native_geometry=geometry, path="data/rts.parquet",
+            years={"range": "2020-2021"}, year_column="year", geo_column="geo_id",
+            params=params,
+        )
+
+        diagnostics = _validate_hhplab_right_to_shelter(spec)
+
+        assert any(d.level == "error" and expected in d.message for d in diagnostics)
+
+    def test_hhplab_right_to_shelter_file_set_geometry_matches_native_identity(self):
+        from hhplab.recipe.default_dataset_adapters import _validate_hhplab_right_to_shelter
+
+        spec = DatasetSpec(
+            provider="hhplab", product="right_to_shelter", version=1,
+            native_geometry=GeometryRef(type="msa", source="census_msa_2023"),
+            file_set={
+                "path_template": "data/rts-{year}.parquet",
+                "segments": [{
+                    "years": {"range": "2020-2021"},
+                    "geometry": {"type": "msa", "source": "census_msa_2010"},
+                }],
+            },
+            year_column="year", geo_column="geo_id",
+        )
+
+        diagnostics = _validate_hhplab_right_to_shelter(spec)
+
+        assert any(
+            d.level == "error" and "file_set segment 0 geometry must match" in d.message
+            for d in diagnostics
+        )
+
+    def test_hhplab_right_to_shelter_identity_join_preserves_data_origin_caveat(
+        self, tmp_path: Path,
+    ):
+        from hhplab.recipe.executor import _execute_join
+        from hhplab.schema.contracts import frame_annotation_contract
+        from hhplab.sources.right_to_shelter import (
+            JURISDICTION_SOURCE_COLUMNS,
+            map_jurisdiction_years,
+            write_mapping_with_provenance,
+        )
+
+        status = {
+            "jurisdiction_id": "01", "jurisdiction_type": "state", "year": 2020,
+            "citation": "Synthetic cited baseline", "citation_source_type": "statute",
+            "citation_redistribution": "public_domain", "effective_date": "2020-01-01",
+            "ended_date": "",
+        }
+        for population in ("single_adults", "families", "pregnant_people"):
+            status[f"{population}_strength"] = "none"
+            status[f"{population}_weather_only"] = False
+        source = pd.DataFrame([status], columns=JURISDICTION_SOURCE_COLUMNS)
+        source["baseline_basis"] = "provisional_none"
+        source.attrs["provisional_baseline"] = {
+            "id": "right-to-shelter-provisional-baseline", "revision": 1,
+            "category": "caveat", "summary": "Provisional baseline",
+            "text": "Status outside reviewed exceptions is provisionally none.",
+            "public_text": "Status outside reviewed exceptions is provisionally none.",
+        }
+        mapped = map_jurisdiction_years(
+            source, pd.DataFrame({"geo_id": ["10180"], "county_fips": ["01001"]}),
+        )
+        rts_path = tmp_path / "data" / "rts.parquet"
+        rts_path.parent.mkdir(parents=True)
+        write_mapping_with_provenance(
+            mapped, rts_path, geography="msa", coding_rule="strict",
+            include_weather_only=False, geography_rule="majority", boundary_vintage="msa",
+            membership_vintage="census_msa_2023",
+        )
+        population_path = tmp_path / "data" / "population.parquet"
+        pd.DataFrame({
+            "geo_id": ["10180"], "year": [2020], "total_population": [100],
+        }).to_parquet(population_path)
+        recipe = RecipeV1.model_validate({
+            "version": 1, "name": "rts-identity-join",
+            "universe": {"years": [2020]},
+            "targets": [{"id": "msa_panel", "geometry": {
+                "type": "msa", "source": "census_msa_2023",
+            }}],
+            "datasets": {
+                "rts": {
+                    "provider": "hhplab", "product": "right_to_shelter", "version": 1,
+                    "native_geometry": {"type": "msa", "source": "census_msa_2023"},
+                    "path": "data/rts.parquet", "years": {"years": [2020]},
+                    "year_column": "year", "geo_column": "geo_id",
+                },
+                "population": {
+                    "provider": "fixture", "product": "population", "version": 1,
+                    "native_geometry": {"type": "msa", "source": "census_msa_2023"},
+                    "path": "data/population.parquet", "year_column": "year",
+                    "geo_column": "geo_id",
+                },
+            },
+            "pipelines": [{
+                "id": "main", "target": "msa_panel", "steps": [
+                    {"kind": "resample", "dataset": "rts",
+                     "to_geometry": {"type": "msa", "source": "census_msa_2023"},
+                     "method": "identity",
+                     "measures": ["rts_single_adults", "rts_single_adults_population_share"]},
+                    {"kind": "resample", "dataset": "population",
+                     "to_geometry": {"type": "msa", "source": "census_msa_2023"},
+                     "method": "identity", "measures": ["total_population"]},
+                    {"kind": "join", "datasets": ["rts", "population"]},
+                ],
+            }],
+        })
+        plan = resolve_plan(recipe, "main")
+        context = ExecutionContext(project_root=tmp_path, recipe=recipe)
+
+        assert _execute_resample(plan.resample_tasks[0], context).success
+        assert _execute_resample(plan.resample_tasks[1], context).success
+        assert _execute_join(plan.join_tasks[0], context).success
+        joined = context.intermediates[("__joined__", 2020)]
+        contract = frame_annotation_contract(joined)
+        binding = contract["bindings"]["right-to-shelter-provisional-baseline#r1"]["columns"]
+
+        assert joined.loc[0, "rts_single_adults"] == 0
+        assert binding["rts_single_adults"] == [["10180", 2020]]
+        assert binding["rts_single_adults_population_share"] == [["10180", 2020]]
 
     def test_census_acs5_contract_rent_bins_valid_with_path(self):
         from hhplab.recipe.default_dataset_adapters import (

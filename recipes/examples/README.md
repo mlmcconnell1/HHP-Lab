@@ -153,6 +153,15 @@ analysis variant executable. In particular, `coc_geography` and
 synthetic CoC frames in the offline acceptance fixture as evidence that real
 CoC LAUS or right-to-shelter inputs exist.
 
+Prebuilt RTS tables now have a native `hhplab/right_to_shelter` dataset
+adapter. Declare an exact source path/file set, year coverage, canonical
+`geo_id`/`year` columns, and matching Census MSA or dated CoC geometry; use
+identity resampling and a geography/year join. Their source caveats survive
+the supported v1 preparation path into v2 output notes without redeclaration.
+Annotated aggregation, interpolation and source-year reassignment remain
+explicitly unsupported. The real national RTS artifact is still pending the
+remaining coding/weight choices and listed-jurisdiction source gaps.
+
 Run the offline RecipeV2 integration acceptance suite with:
 
 ```bash

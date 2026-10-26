@@ -33,6 +33,9 @@ from hhplab.geographies.gf_metro.metro_definitions import (
     METRO_CBSA_MAPPING,
     METRO_STATE_FIPS,
 )
+from hhplab.geographies.gf_metro.metro_definitions import (
+    DEFINITION_VERSION as GLYNN_FOX_DEFINITION_VERSION,
+)
 from hhplab.panel.conformance import (
     ACS1_MEASURE_COLUMNS,
     ACS_MEASURE_COLUMNS,
@@ -53,6 +56,7 @@ from hhplab.sources.bls.laus.ingest import (
     fetch_laus_annual_averages,
     ingest_laus_metro,
 )
+from hhplab.storage.provenance import read_provenance
 
 # ---------------------------------------------------------------------------
 # Series ID contract tests  (coclab-7isb.1)
@@ -173,29 +177,29 @@ class TestLausSeriesIds:
 
 
 class TestMetroSeriesMap:
-    def test_all_25_metros_present(self):
-        mapping = _build_metro_series_map()
+    def test_all_25_glynn_fox_metros_present(self):
+        mapping = _build_metro_series_map(GLYNN_FOX_DEFINITION_VERSION)
         assert len(mapping) == 25
         for gf_id in [f"GF{i:02d}" for i in range(1, 26)]:
             assert gf_id in mapping
 
     def test_each_metro_has_four_measures(self):
-        mapping = _build_metro_series_map()
+        mapping = _build_metro_series_map(GLYNN_FOX_DEFINITION_VERSION)
         for metro_id, series in mapping.items():
             assert set(series) == set(LAUS_MEASURE_CODES), f"Metro {metro_id} missing measures"
 
     def test_series_ids_are_unique(self):
-        mapping = _build_metro_series_map()
+        mapping = _build_metro_series_map(GLYNN_FOX_DEFINITION_VERSION)
         all_ids = [sid for series in mapping.values() for sid in series.values()]
         assert len(all_ids) == len(set(all_ids)), "Duplicate series IDs found"
 
     def test_total_series_count(self):
-        mapping = _build_metro_series_map()
+        mapping = _build_metro_series_map(GLYNN_FOX_DEFINITION_VERSION)
         total = sum(len(v) for v in mapping.values())
         assert total == 25 * 4  # 25 metros × 4 measures
 
     def test_new_york_series_ids_in_map(self):
-        mapping = _build_metro_series_map()
+        mapping = _build_metro_series_map(GLYNN_FOX_DEFINITION_VERSION)
         assert mapping["GF01"]["unemployment_rate"] == NY_SERIES_IDS["unemployment_rate"]
 
     def test_glynn_fox_targets_use_profile_ids_without_duplicate_metro_columns(self):
@@ -217,7 +221,25 @@ class TestMetroSeriesMap:
         assert set(mapping) == {"31080", "35620"}
         assert mapping["31080"]["unemployment_rate"] == "LAUMT063108000000003"
 
+    def test_omitted_definition_defaults_to_canonical_universe(self, monkeypatch):
+        targets = build_canonical_metro_targets_fixture()
+        monkeypatch.setattr(
+            "hhplab.sources.bls.laus.ingest.read_metro_universe",
+            lambda definition_version, base_dir=None: targets[
+                ["metro_id", "cbsa_code", "metro_name"]
+            ],
+        )
+
+        mapping = _build_metro_series_map()
+
+        assert set(mapping) == {"31080", "35620"}
+        assert mapping["31080"]["unemployment_rate"] == "LAUMT063108000000003"
+
     def test_laus_defaults_to_canonical_metro_universe(self):
+        assert (
+            inspect.signature(ingest_laus_metro).parameters["definition_version"].default
+            == CANONICAL_UNIVERSE_DEFINITION_VERSION
+        )
         assert (
             inspect.signature(ingest_laus_metro_cli).parameters["definition_version"].default
             == CANONICAL_UNIVERSE_DEFINITION_VERSION
@@ -537,7 +559,11 @@ def _mock_ingest(tmp_path: Path, year: int) -> Path:
 
     with patch("hhplab.sources.bls.laus.ingest.httpx.Client") as mock_client:
         mock_client.return_value.__enter__.return_value.post = mock_post
-        return ingest_laus_metro(year=year, project_root=tmp_path)
+        return ingest_laus_metro(
+            year=year,
+            definition_version=GLYNN_FOX_DEFINITION_VERSION,
+            project_root=tmp_path,
+        )
 
 
 class TestIngestLausMetro:
@@ -607,6 +633,40 @@ class TestIngestLausMetro:
         assert list(df["metro_id"]) == ["31080", "35620"]
         assert list(df["cbsa_code"]) == ["31080", "35620"]
 
+    def test_omitted_definition_defaults_to_canonical_universe(self, tmp_path, monkeypatch):
+        targets = build_canonical_metro_targets_fixture()
+        response = _make_bls_response_for_targets(targets, year=2023)
+
+        def _read_metro_universe(definition_version, base_dir=None):
+            assert definition_version == CANONICAL_UNIVERSE_DEFINITION_VERSION
+            return targets[["metro_id", "cbsa_code", "metro_name"]]
+
+        monkeypatch.setattr(
+            "hhplab.sources.bls.laus.ingest.read_metro_universe",
+            _read_metro_universe,
+        )
+
+        with patch("hhplab.sources.bls.laus.ingest.httpx.Client") as mock_client:
+            mock_post = mock_client.return_value.__enter__.return_value.post
+            mock_post.return_value.json.return_value = response
+            mock_post.return_value.raise_for_status.return_value = None
+
+            path = ingest_laus_metro(year=2023, project_root=tmp_path)
+
+        df = pd.read_parquet(path)
+        assert path == laus_metro_path(
+            2023,
+            CANONICAL_UNIVERSE_DEFINITION_VERSION,
+            base_dir=tmp_path / "data",
+        )
+        assert list(df["metro_id"]) == ["31080", "35620"]
+        assert list(df["cbsa_code"]) == ["31080", "35620"]
+        assert set(df["definition_version"]) == {CANONICAL_UNIVERSE_DEFINITION_VERSION}
+        provenance = read_provenance(path)
+        assert provenance is not None
+        assert provenance.definition_version == CANONICAL_UNIVERSE_DEFINITION_VERSION
+        assert provenance.extra["cbsa_mapping_version"] == CANONICAL_UNIVERSE_DEFINITION_VERSION
+
     def test_data_source_column(self, tmp_path):
         path = _mock_ingest(tmp_path, 2023)
         df = pd.read_parquet(path)
@@ -631,7 +691,11 @@ class TestIngestLausMetro:
             mock_post.return_value.raise_for_status.return_value = None
 
             with pytest.raises(ValueError, match="metro\\(s\\) have no data for any measure"):
-                ingest_laus_metro(year=2023, project_root=tmp_path)
+                ingest_laus_metro(
+                    year=2023,
+                    definition_version=GLYNN_FOX_DEFINITION_VERSION,
+                    project_root=tmp_path,
+                )
 
     def test_raises_on_partial_metro_data(self, tmp_path):
         """Ingest must fail fast when the API returns data for only some metros.
@@ -645,7 +709,7 @@ class TestIngestLausMetro:
         from hhplab.sources.bls.laus.ingest import _build_metro_series_map
 
         # Build values for only the first 13 metros (sorted order)
-        metro_series = _build_metro_series_map()
+        metro_series = _build_metro_series_map(GLYNN_FOX_DEFINITION_VERSION)
         partial_metro_ids = sorted(metro_series)[:13]
         partial_values: dict[str, float] = {}
         for mid in partial_metro_ids:
@@ -657,7 +721,11 @@ class TestIngestLausMetro:
 
         with patch("hhplab.sources.bls.laus.ingest.fetch_laus_annual_averages", _partial_fetch):
             with pytest.raises(ValueError, match="metro\\(s\\) have no data for any measure"):
-                ingest_laus_metro(year=2023, project_root=tmp_path)
+                ingest_laus_metro(
+                    year=2023,
+                    definition_version=GLYNN_FOX_DEFINITION_VERSION,
+                    project_root=tmp_path,
+                )
 
     def test_raises_on_single_missing_measure(self, tmp_path):
         """Ingest must fail when one measure is missing across all metros (coclab-q3uz).
@@ -674,7 +742,7 @@ class TestIngestLausMetro:
         from hhplab.sources.bls.laus.ingest import _build_metro_series_map
 
         # Collect series IDs for every measure except unemployment_rate
-        metro_series = _build_metro_series_map()
+        metro_series = _build_metro_series_map(GLYNN_FOX_DEFINITION_VERSION)
         rate_measure = "unemployment_rate"
         LAUS_MEASURE_CODES[rate_measure]
         non_rate_values: dict[str, float] = {}
@@ -688,7 +756,11 @@ class TestIngestLausMetro:
 
         with patch("hhplab.sources.bls.laus.ingest.fetch_laus_annual_averages", _no_rate_fetch):
             with pytest.raises(ValueError, match="unemployment_rate"):
-                ingest_laus_metro(year=2023, project_root=tmp_path)
+                ingest_laus_metro(
+                    year=2023,
+                    definition_version=GLYNN_FOX_DEFINITION_VERSION,
+                    project_root=tmp_path,
+                )
 
     def test_raises_on_partial_measure_for_one_metro(self, tmp_path):
         """Ingest must fail when one metro is missing just one measure (coclab-q3uz).
@@ -704,7 +776,7 @@ class TestIngestLausMetro:
         """
         from hhplab.sources.bls.laus.ingest import _build_metro_series_map
 
-        metro_series = _build_metro_series_map()
+        metro_series = _build_metro_series_map(GLYNN_FOX_DEFINITION_VERSION)
         skip_metro = sorted(metro_series)[0]  # GF01
         skip_measure = "unemployment_rate"
 
@@ -721,7 +793,11 @@ class TestIngestLausMetro:
 
         with patch("hhplab.sources.bls.laus.ingest.fetch_laus_annual_averages", _one_missing_fetch):
             with pytest.raises(ValueError, match="partial measure data"):
-                ingest_laus_metro(year=2023, project_root=tmp_path)
+                ingest_laus_metro(
+                    year=2023,
+                    definition_version=GLYNN_FOX_DEFINITION_VERSION,
+                    project_root=tmp_path,
+                )
 
 
 # ---------------------------------------------------------------------------

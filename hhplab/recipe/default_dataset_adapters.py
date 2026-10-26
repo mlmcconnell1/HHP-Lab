@@ -12,6 +12,8 @@ from hhplab.schema import (
     ACS1_IMPUTATION_REQUIRED_ACS5_SUPPORT_COLUMNS,
 )
 
+_RIGHT_TO_SHELTER_MSA_DEFINITIONS = {"census_msa_2010", "census_msa_2023"}
+
 
 def _uses_materialized_artifact(spec: DatasetSpec) -> bool:
     """Whether the recipe points at a concrete on-disk artifact."""
@@ -148,6 +150,137 @@ def _validate_hhplab_msa_pit_rollup(spec: DatasetSpec) -> list[ValidationDiagnos
                 "adapter validates pre-materialized rollup artifacts.",
             )
         )
+    return diags
+
+
+def _validate_hhplab_right_to_shelter(spec: DatasetSpec) -> list[ValidationDiagnostic]:
+    """Validate a prebuilt, exact-geometry right-to-shelter reference table."""
+    diags: list[ValidationDiagnostic] = []
+    if spec.version != 1:
+        diags.append(ValidationDiagnostic(
+            "error",
+            f"hhplab/right_to_shelter: unsupported version {spec.version}; expected 1.",
+        ))
+    if spec.path is not None and spec.file_set is not None:
+        diags.append(ValidationDiagnostic(
+            "error",
+            "hhplab/right_to_shelter: specify either path or file_set, not both, so the "
+            "source artifact identity is unambiguous.",
+        ))
+    if spec.path is not None and spec.years is None:
+        diags.append(ValidationDiagnostic(
+            "error",
+            "hhplab/right_to_shelter: static path requires explicit years coverage; the "
+            "reference table is annual and preflight must know the full build interval.",
+        ))
+    if not _uses_materialized_artifact(spec):
+        diags.append(ValidationDiagnostic(
+            "error",
+            "hhplab/right_to_shelter: path or file_set is required because this adapter "
+            "loads a prebuilt, cited MSA-year or CoC-year reference table. Build it with "
+            "`hhplab build right-to-shelter` before recipe execution.",
+        ))
+    if spec.year_column != "year":
+        diags.append(ValidationDiagnostic(
+            "error",
+            "hhplab/right_to_shelter: year_column must be explicitly set to 'year' so the "
+            "annual legal status joins on the correct year.",
+        ))
+    if spec.geo_column != "geo_id":
+        diags.append(ValidationDiagnostic(
+            "error",
+            "hhplab/right_to_shelter: geo_column must be explicitly set to 'geo_id' so the "
+            "prebuilt reference joins by the canonical geography ID.",
+        ))
+
+    geometries = [("native_geometry", spec.native_geometry)]
+    if spec.file_set is not None:
+        geometries.extend(
+            (f"file_set segment {index}", segment.geometry)
+            for index, segment in enumerate(spec.file_set.segments)
+        )
+        native_identity = (
+            spec.native_geometry.type, spec.native_geometry.vintage,
+            spec.native_geometry.source, spec.native_geometry.subset_profile,
+            spec.native_geometry.subset_profile_definition_version,
+        )
+        for index, segment in enumerate(spec.file_set.segments):
+            segment_identity = (
+                segment.geometry.type, segment.geometry.vintage, segment.geometry.source,
+                segment.geometry.subset_profile,
+                segment.geometry.subset_profile_definition_version,
+            )
+            if segment_identity != native_identity:
+                diags.append(ValidationDiagnostic(
+                    "error",
+                    f"hhplab/right_to_shelter: file_set segment {index} geometry must match "
+                    "native_geometry exactly so identity resampling keeps the same Census "
+                    "universe and keys.",
+                ))
+    for label, geometry in geometries:
+        if geometry.type == "coc":
+            if geometry.vintage is None:
+                diags.append(ValidationDiagnostic(
+                    "error",
+                    f"hhplab/right_to_shelter: {label} CoC geometry must set its boundary "
+                    "vintage explicitly.",
+                ))
+        elif geometry.type in {"msa", "metro"}:
+            if geometry.source not in _RIGHT_TO_SHELTER_MSA_DEFINITIONS:
+                diags.append(ValidationDiagnostic(
+                    "error",
+                    f"hhplab/right_to_shelter: {label} {geometry.type} geometry must set "
+                    "source to 'census_msa_2010' or 'census_msa_2023'; this reference table "
+                    "uses a Census MSA definition.",
+                ))
+            if geometry.subset_profile is not None:
+                diags.append(ValidationDiagnostic(
+                    "error",
+                    f"hhplab/right_to_shelter: {label} cannot use a metro subset profile; "
+                    "the table must match the canonical Census MSA universe.",
+                ))
+        else:
+            diags.append(ValidationDiagnostic(
+                "error",
+                f"hhplab/right_to_shelter: {label} geometry must be 'msa', 'metro', or 'coc'; "
+                f"got '{geometry.type}'.",
+            ))
+    known_params = {
+        "msa_definition_version", "county_vintage", "coc_boundary_vintage",
+        "substate_county_membership",
+    }
+    unknown = set(spec.params) - known_params
+    if unknown:
+        diags.append(ValidationDiagnostic(
+            "warning",
+            f"hhplab/right_to_shelter: unrecognized params {sorted(unknown)}.",
+        ))
+    requested_msa_definition = spec.params.get("msa_definition_version")
+    native_msa_definitions = {
+        geometry.source for _, geometry in geometries if geometry.type in {"msa", "metro"}
+    }
+    if (requested_msa_definition is not None and native_msa_definitions
+            and str(requested_msa_definition) not in {
+                str(value) for value in native_msa_definitions
+            }):
+        diags.append(ValidationDiagnostic(
+            "error",
+            "hhplab/right_to_shelter: params.msa_definition_version must match the Census "
+            f"native geometry source {sorted(str(item) for item in native_msa_definitions)}.",
+        ))
+    requested_coc_vintage = spec.params.get("coc_boundary_vintage")
+    native_coc_vintages = {
+        geometry.vintage for _, geometry in geometries if geometry.type == "coc"
+    }
+    if (requested_coc_vintage is not None and native_coc_vintages
+            and str(requested_coc_vintage) not in {
+                str(value) for value in native_coc_vintages
+            }):
+        diags.append(ValidationDiagnostic(
+            "error",
+            "hhplab/right_to_shelter: params.coc_boundary_vintage must match the native CoC "
+            f"geometry vintage {sorted(str(item) for item in native_coc_vintages)}.",
+        ))
     return diags
 
 
@@ -828,6 +961,7 @@ def _validate_bls_cpi_u(spec: DatasetSpec) -> list[ValidationDiagnostic]:
 def register_dataset_defaults(registry: DatasetAdapterRegistry) -> None:
     """Register built-in dataset adapters."""
     registry.register("hhplab", "msa_pit_rollup", _validate_hhplab_msa_pit_rollup)
+    registry.register("hhplab", "right_to_shelter", _validate_hhplab_right_to_shelter)
     registry.register("hud", "pit", _validate_hud_pit)
     registry.register("hud", "hic", _validate_hud_hic)
     registry.register("census", "acs5", _validate_census_acs5)

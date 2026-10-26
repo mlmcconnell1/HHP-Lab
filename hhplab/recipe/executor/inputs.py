@@ -22,6 +22,12 @@ import pandas as pd
 import pyarrow as pa
 import pyarrow.parquet as pq
 
+from hhplab.recipe.executor.annotations import (
+    frame_column_map,
+    has_annotations,
+    propagate_annotations,
+    resolve_annotation_geo_column,
+)
 from hhplab.recipe.executor.core import (
     ExecutionContext,
     ExecutorError,
@@ -579,8 +585,40 @@ def _apply_temporal_filter(
     year: int,
     dataset_id: str,
     year_column: str | None = None,
+    geo_column: str | None = None,
 ) -> pd.DataFrame:
     """Apply a temporal filter to a DataFrame before resampling."""
+    if has_annotations(df) and filt.method in {
+        "calendar_mean", "calendar_median", "interpolate_to_month",
+    }:
+        raise ExecutorError(
+            f"Temporal filter for '{dataset_id}': annotated inputs cannot use "
+            f"{filt.method!r} until exact source contributors are mapped. "
+            "Use point_in_time filtering or prepare the annotated panel upstream."
+        )
+
+    def rebind(filtered: pd.DataFrame) -> pd.DataFrame:
+        if not has_annotations(df):
+            return filtered
+        source_geo = resolve_annotation_geo_column(df, geo_column)
+        if source_geo is None:
+            raise ExecutorError(
+                f"Temporal filter for '{dataset_id}': annotated input needs an explicit "
+                "geography key to rebind exact cells."
+            )
+        source_year = year_column if year_column in df.columns else "year"
+        output_year = source_year if source_year in filtered.columns else "year"
+        if source_year not in df.columns or output_year not in filtered.columns:
+            raise ExecutorError(
+                f"Temporal filter for '{dataset_id}': annotated input needs a retained "
+                "geography/year key to rebind exact cells."
+            )
+        return propagate_annotations(
+            filtered,
+            [(df, frame_column_map(df, filtered), source_geo, source_year)],
+            output_geo_column=source_geo,
+            year_column=output_year,
+        )
     col = filt.column
     if col not in df.columns:
         raise ExecutorError(
@@ -599,7 +637,7 @@ def _apply_temporal_filter(
                 )
             if "year" not in filtered.columns:
                 filtered["year"] = filtered[col].dt.year
-            return filtered.drop(columns=[col])
+            return rebind(filtered.drop(columns=[col]))
         else:
             filtered = df[series == filt.month]
             if filtered.empty:
@@ -607,7 +645,7 @@ def _apply_temporal_filter(
                     f"Temporal filter for '{dataset_id}' year {year}: "
                     f"no rows where {col}=={filt.month}."
                 )
-            return filtered.drop(columns=[col])
+            return rebind(filtered.drop(columns=[col]))
     elif filt.method in ("calendar_mean", "calendar_median"):
         # Group by identifier columns and preserve year keys when present.
         numeric = set(df.select_dtypes("number").columns)
@@ -661,7 +699,7 @@ def _apply_temporal_filter(
             if "year" not in df.columns:
                 df = df.copy()
                 df["year"] = df[col].dt.year
-            return df.drop(columns=[col])
+            return rebind(df.drop(columns=[col]))
 
         # Determine the interpolation fraction and direction.
         # months_forward = distance (in months) from the prior source observation
@@ -789,6 +827,7 @@ def _load_support_dataset_for_year(
             year,
             dataset_id,
             year_column=ds.year_column,
+            geo_column=ds.geo_column,
         )
 
     year_col = _resolve_year_column(df, ds.year_column)

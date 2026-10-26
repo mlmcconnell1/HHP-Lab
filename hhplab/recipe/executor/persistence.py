@@ -71,6 +71,7 @@ from hhplab.recipe.manifest import AssetRecord, write_manifest
 from hhplab.recipe.planner import ExecutionPlan
 from hhplab.recipe.recipe_schema import ContainmentSpec, MsaFractionalRollupSpec
 from hhplab.recipe.schema_common import expand_year_spec
+from hhplab.schema.contracts import frame_annotation_contract
 from hhplab.storage.config import load_config
 from hhplab.storage.provenance import ProvenanceBlock, write_parquet_with_provenance
 
@@ -207,6 +208,9 @@ def persist_outputs(
     except ValueError:
         output_rel = str(output_file)
     provenance = _build_provenance(ctx.recipe, plan.pipeline_id, ctx)
+    annotations = frame_annotation_contract(panel)
+    if annotations is not None:
+        provenance.setdefault("extra", {})["annotations"] = annotations
     provenance["target_geometry"] = {
         "type": target_geo_type,
         **(

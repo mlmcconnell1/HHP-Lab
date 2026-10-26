@@ -65,6 +65,16 @@ def build_right_to_shelter_cmd(
             help="Cited policy-exception CSV; defaults to the canonical curated path.",
         ),
     ] = None,
+    substate_county_membership: Annotated[
+        Path | None,
+        typer.Option(
+            "--substate-county-membership",
+            help=(
+                "Optional additive CSV with jurisdiction_id,jurisdiction_type,county_fips; "
+                "default NYC borough assignments remain active."
+            ),
+        ),
+    ] = None,
     baseline: Annotated[
         Path | None,
         typer.Option(
@@ -151,6 +161,7 @@ def build_right_to_shelter_cmd(
             msa_ids=msa_ids,
             coc_ids=coc_ids,
             weight_definition=weight_definition,
+            substate_county_membership_path=substate_county_membership,
         )
     except (FileNotFoundError, RightToShelterError, ValueError) as exc:
         _emit_error(str(exc), json_output)
@@ -165,6 +176,9 @@ def build_right_to_shelter_cmd(
         "last_year": last_year,
         "msa_ids": msa_ids,
         "coc_ids": coc_ids,
+        "substate_county_membership": (
+            str(substate_county_membership) if substate_county_membership else None
+        ),
     }
     if json_output:
         typer.echo(json.dumps(payload, indent=2))

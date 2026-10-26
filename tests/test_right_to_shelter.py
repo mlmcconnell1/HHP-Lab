@@ -40,6 +40,7 @@ from hhplab.sources.right_to_shelter import (
     validate_jurisdiction_source_table,
     validate_policy_baseline,
     validate_policy_exceptions,
+    validate_substate_county_membership,
     write_mapping_with_provenance,
 )
 from hhplab.storage.provenance import read_provenance
@@ -439,6 +440,122 @@ def test_nyc_substate_override_differs_from_rest_of_new_york() -> None:
     assert broad.loc[0, "rts_single_adults_population_share"] == pytest.approx(1.0)
 
 
+def test_additive_hennepin_assignment_keeps_default_nyc_and_separates_mn_county() -> None:
+    hen_stage = source_row("MN-27053", YEAR_2020, strengths={
+        "single_adults": "none", "families": "conditional", "pregnant_people": "none",
+    })
+    hen_stage["jurisdiction_type"] = "sub_state"
+    statuses = status_frame([
+        source_row("27", YEAR_2020), hen_stage,
+        source_row("36", YEAR_2020),
+        source_row("NYC", YEAR_2020, strengths={
+            "single_adults": "enforceable", "families": "none", "pregnant_people": "none",
+        }),
+    ])
+    membership = pd.DataFrame({
+        "geo_id": ["mpls", "mpls", "new-york", "new-york"],
+        "county_fips": ["27053", "27037", "36061", "36001"],
+    })
+    weights = population_frame([
+        ("27053", YEAR_2020, 70, 70, 70), ("27037", YEAR_2020, 30, 30, 30),
+        ("36061", YEAR_2020, 80, 80, 80), ("36001", YEAR_2020, 20, 20, 20),
+    ])
+    extra = pd.DataFrame({
+        "jurisdiction_id": ["MN-27053"],
+        "jurisdiction_type": ["sub_state"],
+        "county_fips": ["27053"],
+    })
+
+    mapped = map_jurisdiction_years(
+        statuses, membership, weights, coding_rule="broad",
+        substate_county_membership=extra,
+    ).set_index("geo_id")
+
+    assert mapped.loc["mpls", "rts_families_population_share"] == pytest.approx(0.7)
+    assert mapped.loc["mpls", "rts_families"] == 1
+    assert mapped.loc["new-york", "rts_single_adults_population_share"] == pytest.approx(0.8)
+
+
+@pytest.mark.parametrize(
+    "rows",
+    [
+        [("MN-27053", "sub_state", "27053"), ("MN-27054", "sub_state", "27053")],
+        [("MN-27053", "sub_state", "2705")],
+        [("MN-27053", "state", "27053")],
+        [("MN-27053", "sub_state", "36061")],
+    ],
+    ids=["overlapping-county", "noncanonical-fips", "wrong-jurisdiction-type", "nyc-reassignment"],
+)
+def test_substate_membership_rejects_overlap_and_noncanonical_rows(rows: list[tuple]) -> None:
+    membership = pd.DataFrame(rows, columns=[
+        "jurisdiction_id", "jurisdiction_type", "county_fips",
+    ])
+
+    with pytest.raises(RightToShelterError):
+        validate_substate_county_membership(membership)
+
+
+def test_scoped_substate_policy_cannot_fall_back_to_statewide_assignment() -> None:
+    baseline = copy.deepcopy(SYNTHETIC_BASELINE)
+    substate = {
+        "jurisdiction_id": "MN-27053", "jurisdiction_type": "sub_state",
+        "first_year": YEAR_2020, "last_year": YEAR_2020, "county_fips": ["27053"],
+        "evidence": [{"citation": SYNTHETIC_CITATION}],
+    }
+    baseline["reviewed_coverage"].append(substate)
+    source = expand_policy_intervals(
+        baseline, pd.DataFrame(columns=EXCEPTION_COLUMNS), YEAR_2020, YEAR_2020,
+    )
+    membership = pd.DataFrame({"geo_id": ["mpls"], "county_fips": ["27053"]})
+
+    with pytest.raises(RightToShelterError, match="assignment is missing"):
+        map_jurisdiction_years(source, membership)
+
+
+def test_unrelated_substate_missing_year_does_not_block_selected_geography() -> None:
+    state = source_row("01", YEAR_2021)
+    substate = source_row("HENNEPIN", YEAR_2020)
+    substate["jurisdiction_type"] = "sub_state"
+    state["baseline_county_fips"] = None
+    substate["baseline_county_fips"] = ["27053"]
+    membership = pd.DataFrame({"geo_id": ["selected"], "county_fips": ["01001"]})
+    overrides = pd.DataFrame({
+        "jurisdiction_id": ["HENNEPIN"], "jurisdiction_type": ["sub_state"],
+        "county_fips": ["27053"],
+    })
+
+    mapped = map_jurisdiction_years(
+        pd.DataFrame([state, substate]), membership,
+        substate_county_membership=overrides, requested_years=(YEAR_2021, YEAR_2021),
+    )
+
+    assert mapped["geo_id"].tolist() == ["selected"]
+    assert mapped["rts_single_adults"].tolist() == [0]
+
+
+def test_direct_mapper_rejects_substate_assignment_outside_scoped_county() -> None:
+    baseline = copy.deepcopy(SYNTHETIC_BASELINE)
+    baseline["reviewed_coverage"].append({
+        "jurisdiction_id": "MN-27053", "jurisdiction_type": "sub_state",
+        "first_year": YEAR_2020, "last_year": YEAR_2020, "county_fips": ["27053"],
+        "evidence": [{"citation": SYNTHETIC_CITATION}],
+    })
+    source = expand_policy_intervals(
+        baseline, pd.DataFrame(columns=EXCEPTION_COLUMNS), YEAR_2020, YEAR_2020,
+    )
+    wrong_assignment = pd.DataFrame({
+        "jurisdiction_id": ["MN-27053"],
+        "jurisdiction_type": ["sub_state"],
+        "county_fips": ["27037"],
+    })
+    membership = pd.DataFrame({"geo_id": ["outside"], "county_fips": ["27037"]})
+
+    with pytest.raises(RightToShelterError, match="outside the reviewed county_fips scope"):
+        map_jurisdiction_years(
+            source, membership, substate_county_membership=wrong_assignment,
+        )
+
+
 def test_coc_year_mapping_uses_projected_county_intersections() -> None:
     coc_geometries = GeoDataFrame(
         {"coc_id": ["synthetic-coc"]},
@@ -735,6 +852,35 @@ def test_baseline_rejects_unmappable_state_or_fractional_year(invalid_change: di
         validate_policy_baseline(baseline)
 
 
+@pytest.mark.parametrize(
+    "annotation_change",
+    [
+        {"id": None},
+        {"public_text": None},
+        {"revision": True},
+        {"revision": "1"},
+        {"unexpected": "ignored fields are forbidden"},
+        {"scope": {"unknown": "invalid scope field"}},
+    ],
+    ids=["null-id", "public-text-required", "boolean-revision", "string-revision",
+         "extra-field", "invalid-scope"],
+)
+def test_baseline_annotation_uses_strict_data_annotation_contract(
+    annotation_change: dict,
+) -> None:
+    baseline = copy.deepcopy(SYNTHETIC_BASELINE)
+    baseline["provisional_baseline"] = {
+        "id": "right-to-shelter-provisional-baseline", "revision": 1,
+        "category": "caveat", "summary": "Provisional none baseline",
+        "text": "Unlisted status is provisionally coded as none.",
+        "public_text": "Unlisted status is provisionally coded as none.",
+    }
+    baseline["provisional_baseline"].update(annotation_change)
+
+    with pytest.raises(RightToShelterError, match="provisional_baseline"):
+        validate_policy_baseline(baseline)
+
+
 def test_open_ended_exception_cannot_hide_later_conflicting_interval() -> None:
     exceptions = pd.DataFrame([
         exception_row(effective_date="2020-01-01"),
@@ -856,6 +1002,50 @@ def test_orphan_exceptions_cannot_silently_become_baseline_none(change: dict) ->
         )
 
 
+def test_provisional_baseline_annotation_binds_generated_flags_and_shares() -> None:
+    baseline = copy.deepcopy(SYNTHETIC_BASELINE)
+    baseline["reviewed_coverage"][0]["basis"] = "provisional_none"
+    baseline["provisional_baseline"] = {
+        "id": "right-to-shelter-provisional-baseline", "revision": 1,
+        "category": "caveat", "summary": "Provisional none baseline",
+        "text": "Unlisted status is provisionally coded as none.",
+        "public_text": "Unlisted status is provisionally coded as none.",
+    }
+    source = expand_policy_intervals(
+        baseline, pd.DataFrame(columns=EXCEPTION_COLUMNS), YEAR_2020, YEAR_2020,
+    )
+    mapped = map_jurisdiction_years(
+        source, pd.DataFrame({"geo_id": ["one"], "county_fips": ["01001"]}),
+    )
+
+    contract = mapped.attrs["annotations"]
+    binding = contract["bindings"]["right-to-shelter-provisional-baseline#r1"]["columns"]
+    assert binding["rts_single_adults"] == [["one", YEAR_2020]]
+    assert binding["rts_single_adults_population_share"] == [["one", YEAR_2020]]
+
+
+def test_active_policy_exception_is_not_attributed_to_provisional_absence() -> None:
+    baseline = copy.deepcopy(SYNTHETIC_BASELINE)
+    baseline["reviewed_coverage"][0]["basis"] = "provisional_none"
+    baseline["provisional_baseline"] = {
+        "id": "right-to-shelter-provisional-baseline", "revision": 1,
+        "category": "caveat", "summary": "Provisional none baseline",
+        "text": "Unlisted status is provisionally coded as none.",
+        "public_text": "Unlisted status is provisionally coded as none.",
+    }
+    exception = exception_row(effective_date="2020-01-01", strength="enforceable")
+    source = expand_policy_intervals(
+        baseline, pd.DataFrame([exception]), YEAR_2020, YEAR_2020,
+    )
+    mapped = map_jurisdiction_years(
+        source, pd.DataFrame({"geo_id": ["one"], "county_fips": ["01001"]}),
+    )
+
+    assert "right-to-shelter-provisional-baseline#r1" not in mapped.attrs[
+        "annotations"
+    ]["bindings"]
+
+
 def test_subset_outputs_have_distinct_order_independent_names() -> None:
     complete = mapping_output_path("coc", YEAR_2020, YEAR_2021, 2025)
     subset = mapping_output_path(
@@ -918,6 +1108,144 @@ def test_cli_json_error_tells_operator_how_to_add_source_rows(tmp_path: Path) ->
     assert result.exit_code == 1
     assert payload["status"] == "error"
     assert "Add cited intervals" in payload["error"]
+
+
+def test_cli_accepts_explicit_substate_membership_option_and_validates_csv(tmp_path: Path) -> None:
+    source_dir = tmp_path / "curated" / "right_to_shelter"
+    source_dir.mkdir(parents=True)
+    (source_dir / "right_to_shelter__baseline.json").write_text(
+        json.dumps(SYNTHETIC_BASELINE), encoding="utf-8",
+    )
+    pd.DataFrame(columns=EXCEPTION_COLUMNS).to_csv(
+        source_dir / "right_to_shelter__exceptions.csv", index=False,
+    )
+    membership_path = tmp_path / "substate.csv"
+    pd.DataFrame({
+        "jurisdiction_id": ["MN-27053"],
+        "jurisdiction_type": ["sub_state"],
+        "county_fips": ["2705"],
+    }).to_csv(membership_path, index=False)
+    runner = CliRunner()
+
+    result = runner.invoke(app, [
+        "build", "right-to-shelter",
+        "--first-year", str(YEAR_2020), "--last-year", str(YEAR_2020),
+        "--coc-boundary-vintage", "synthetic", "--county-vintage", "synthetic",
+        "--msa-definition-version", "synthetic", "--data-root", str(tmp_path),
+        "--substate-county-membership", str(membership_path), "--json",
+    ])
+
+    payload = json.loads(result.output)
+    assert result.exit_code == 1
+    assert payload["status"] == "error"
+    assert "canonical five-digit FIPS" in payload["error"]
+
+
+def test_curated_build_uses_hennepin_csv_and_preserves_nyc_membership(tmp_path: Path) -> None:
+    source_dir = tmp_path / "curated" / "right_to_shelter"
+    source_dir.mkdir(parents=True)
+    baseline = copy.deepcopy(SYNTHETIC_BASELINE)
+    baseline["reviewed_coverage"] = [
+        {
+            "jurisdiction_id": "27", "jurisdiction_type": "state",
+            "first_year": YEAR_2020, "last_year": YEAR_2020,
+            "evidence": [{"citation": SYNTHETIC_CITATION}],
+        },
+        {
+            "jurisdiction_id": "36", "jurisdiction_type": "state",
+            "first_year": YEAR_2020, "last_year": YEAR_2020,
+            "evidence": [{"citation": SYNTHETIC_CITATION}],
+        },
+        {
+            "jurisdiction_id": "MN-27053", "jurisdiction_type": "sub_state",
+            "county_fips": ["27053"], "first_year": YEAR_2020, "last_year": YEAR_2020,
+            "evidence": [{"citation": SYNTHETIC_CITATION}],
+        },
+        {
+            "jurisdiction_id": "NYC", "jurisdiction_type": "sub_state",
+            "county_fips": ["36005", "36047", "36061", "36081", "36085"],
+            "first_year": YEAR_2020, "last_year": YEAR_2020,
+            "evidence": [{"citation": SYNTHETIC_CITATION}],
+        },
+    ]
+    (source_dir / "right_to_shelter__baseline.json").write_text(
+        json.dumps(baseline), encoding="utf-8",
+    )
+    hen_exception = exception_row(effective_date="2020-01-01", strength="none")
+    hen_exception.update(
+        exception_id="hennepin-2020", jurisdiction_id="MN-27053",
+        jurisdiction_type="sub_state", families_strength="enforceable",
+    )
+    nyc_exception = exception_row(effective_date="2020-01-01", strength="none")
+    nyc_exception.update(
+        exception_id="nyc-2020", jurisdiction_id="NYC", jurisdiction_type="sub_state",
+        single_adults_strength="enforceable",
+    )
+    pd.DataFrame([hen_exception, nyc_exception], columns=EXCEPTION_COLUMNS).to_csv(
+        source_dir / "right_to_shelter__exceptions.csv", index=False,
+    )
+    membership_path = tmp_path / "hennepin-membership.csv"
+    pd.DataFrame({
+        "jurisdiction_id": ["MN-27053"],
+        "jurisdiction_type": ["sub_state"],
+        "county_fips": ["27053"],
+    }).to_csv(membership_path, index=False)
+    msa_membership = pd.DataFrame({
+        "msa_id": ["minneapolis", "minneapolis", "new-york", "new-york"],
+        "county_fips": ["27053", "27037", "36061", "36001"],
+    })
+    msa_path = msa_county_membership_path("synthetic", tmp_path)
+    msa_path.parent.mkdir(parents=True)
+    msa_membership.to_parquet(msa_path)
+    county_file = county_path(2020, tmp_path)
+    county_file.parent.mkdir(parents=True)
+    county_squares = [
+        Polygon([(0, 0), (1, 0), (1, 1), (0, 1)]),
+        Polygon([(1, 0), (2, 0), (2, 1), (1, 1)]),
+    ]
+    GeoDataFrame({"geoid": ["27053", "27037"]}, geometry=county_squares,
+                 crs="EPSG:5070").to_crs("EPSG:4326").to_parquet(county_file)
+    coc_path = tmp_path / "curated" / "coc_boundaries" / "coc__B2020.parquet"
+    coc_path.parent.mkdir(parents=True)
+    GeoDataFrame(
+        {"coc_id": ["minneapolis-coc"]},
+        geometry=[Polygon([(0, 0), (2, 0), (2, 1), (0, 1)])],
+        crs="EPSG:5070",
+    ).to_crs("EPSG:4326").to_parquet(coc_path)
+    weights_path = tmp_path / "county-population.csv"
+    population_frame([
+        ("27053", YEAR_2020, 70, 70, 70), ("27037", YEAR_2020, 30, 30, 30),
+        ("36061", YEAR_2020, 80, 80, 80), ("36001", YEAR_2020, 20, 20, 20),
+    ]).to_csv(weights_path, index=False)
+
+    outputs = build_curated_outputs(
+        data_root=tmp_path, first_year=YEAR_2020, last_year=YEAR_2020,
+        msa_definition_version="synthetic", coc_boundary_vintage="2020",
+        county_vintage="2020", county_population_path=weights_path,
+        weight_definition="synthetic county population 2020", coding_rule="strict",
+        msa_ids=["minneapolis", "new-york"],
+        substate_county_membership_path=membership_path,
+    )
+
+    msa = pd.read_parquet(outputs["msa"]).set_index("geo_id")
+    assert msa.loc["minneapolis", "rts_families_population_share"] == pytest.approx(0.7)
+    assert msa.loc["new-york", "rts_single_adults_population_share"] == pytest.approx(0.8)
+    provenance = read_provenance(outputs["msa"]).extra
+    assert provenance["substate_county_membership_mode"] == "additive_with_default_nyc"
+    assert provenance["substate_county_membership_input_sha256"] == hashlib.sha256(
+        membership_path.read_bytes()
+    ).hexdigest()
+    effective_membership = provenance["substate_county_membership"]
+    nyc_counties = {
+        row["county_fips"] for row in effective_membership
+        if row["jurisdiction_id"] == "NYC"
+    }
+    assert nyc_counties == {"36005", "36047", "36061", "36081", "36085"}
+    coc = pd.read_parquet(outputs["coc"])
+    assert coc.loc[0, "rts_families_population_share"] == pytest.approx(0.7)
+    assert read_provenance(outputs["coc"]).extra[
+        "substate_county_membership_input_sha256"
+    ] == provenance["substate_county_membership_input_sha256"]
 
 
 @pytest.mark.parametrize(

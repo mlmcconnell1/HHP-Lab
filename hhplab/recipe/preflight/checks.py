@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+import shlex
 from pathlib import Path
 
 import pandas as pd
@@ -605,6 +606,42 @@ def _dataset_remediation(ds_id: str, ds, *, years: list[int] | None = None) -> R
                 "for every requested panel year."
             ),
             command="hhplab ingest laus-metro --year <year>",
+        )
+
+    if provider == "hhplab" and product == "right_to_shelter":
+        declared_years = expand_year_spec(ds.years) if ds.years is not None else (years or [])
+        requested_years = sorted(set(declared_years))
+        first_year = str(requested_years[0]) if requested_years else "<first-year>"
+        last_year = str(requested_years[-1]) if requested_years else "<last-year>"
+        geometry = ds.native_geometry
+        msa_definition = ds.params.get("msa_definition_version") or (
+            geometry.source if geometry.type in {"msa", "metro"} else "census_msa_2023"
+        )
+        coc_vintage = ds.params.get("coc_boundary_vintage") or (
+            geometry.vintage if geometry.type == "coc" else "<coc-boundary-vintage>"
+        )
+        county_vintage = ds.params.get("county_vintage") or "<county-vintage>"
+        command_arguments = [
+            "hhplab", "build", "right-to-shelter",
+            "--first-year", first_year,
+            "--last-year", last_year,
+            "--msa-definition-version", str(msa_definition),
+            "--coc-boundary-vintage", str(coc_vintage),
+            "--county-vintage", str(county_vintage),
+        ]
+        substate_membership = ds.params.get("substate_county_membership")
+        if substate_membership:
+            command_arguments.extend([
+                "--substate-county-membership", str(substate_membership),
+            ])
+        command = shlex.join(command_arguments)
+        return Remediation(
+            hint=(
+                f"Build the cited, year-coded right-to-shelter reference for dataset '{ds_id}' "
+                "from the reviewed baseline and exception inputs, then point path/file_set "
+                "at the generated MSA or CoC artifact."
+            ),
+            command=command,
         )
 
     if provider == "prism" and product == "temperature":

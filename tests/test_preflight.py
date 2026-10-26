@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import shlex
 from pathlib import Path
 
 import pandas as pd
@@ -390,6 +391,60 @@ def test_prism_missing_dataset_remediation_uses_prism_commands(tmp_path: Path) -
         "hhplab build prism-county --variable tmin --year 2024 --month 1 "
         "--county-vintage 2023"
     )
+
+
+def test_right_to_shelter_missing_dataset_remediation_builds_reference_table(
+    tmp_path: Path,
+) -> None:
+    recipe = load_recipe({
+        "version": 1, "name": "rts-reference-preflight",
+        "universe": {"range": "2020-2021"},
+        "targets": [{"id": "msa_panel", "geometry": {
+            "type": "msa", "source": "census_msa_2023",
+        }}],
+        "datasets": {
+            "right_to_shelter": {
+                "provider": "hhplab", "product": "right_to_shelter", "version": 1,
+                "native_geometry": {"type": "msa", "source": "census_msa_2023"},
+                "path": "data/curated/right_to_shelter/msa-missing.parquet",
+                "years": {"range": "2020-2021"},
+                "year_column": "year", "geo_column": "geo_id",
+                "params": {
+                    "coc_boundary_vintage": 2024,
+                    "county_vintage": 2023,
+                    "substate_county_membership": (
+                        "data/curated/right to shelter/O'Hare $(echo nope); `literal`.csv"
+                    ),
+                },
+            },
+        },
+        "pipelines": [{
+            "id": "main", "target": "msa_panel", "steps": [{
+                "kind": "resample", "dataset": "right_to_shelter",
+                "to_geometry": {"type": "msa", "source": "census_msa_2023"},
+                "method": "identity", "measures": ["rts_families"],
+            }],
+        }],
+    })
+
+    report = run_preflight(recipe, project_root=tmp_path)
+    findings = [
+        finding for finding in report.findings
+        if finding.kind == FindingKind.MISSING_DATASET
+        and finding.dataset_id == "right_to_shelter"
+    ]
+
+    assert len(findings) == 1
+    assert findings[0].remediation is not None
+    assert shlex.split(findings[0].remediation.command) == [
+        "hhplab", "build", "right-to-shelter",
+        "--first-year", "2020", "--last-year", "2021",
+        "--msa-definition-version", "census_msa_2023",
+        "--coc-boundary-vintage", "2024", "--county-vintage", "2023",
+        "--substate-county-membership",
+        "data/curated/right to shelter/O'Hare $(echo nope); `literal`.csv",
+    ]
+    assert "reviewed baseline and exception inputs" in findings[0].remediation.hint
 
 
 def test_medsl_president_default_path_resolves_to_canonical_artifact() -> None:

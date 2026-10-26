@@ -37,9 +37,10 @@ Rate limits (BLS API v2)
 - 25 series IDs per request maximum (anonymous); 50 with a registration key
 - 20-year window per request maximum
 
-With 25 metros × 4 measures = 100 series IDs, this module issues four
-anonymous requests of 25 series each, or two requests of 50 when a
-registration key is provided.
+Request count depends on the selected definition's metro universe. The
+canonical Census universe may vary by definition version; each metro has four
+series. Glynn/Fox is an explicit 25-metro profile (100 series), which requires
+four anonymous requests of 25 or two registered requests of 50.
 """
 
 from __future__ import annotations
@@ -183,7 +184,7 @@ def _load_metro_targets(
 
 
 def _build_metro_series_map(
-    definition_version: str = GLYNN_FOX_DEFINITION_VERSION,
+    definition_version: str = CANONICAL_UNIVERSE_DEFINITION_VERSION,
     *,
     base_dir: Path | None = None,
 ) -> dict[str, dict[str, str]]:
@@ -310,7 +311,7 @@ def fetch_laus_annual_averages(
 
 def ingest_laus_metro(
     year: int,
-    definition_version: str = GLYNN_FOX_DEFINITION_VERSION,
+    definition_version: str = CANONICAL_UNIVERSE_DEFINITION_VERSION,
     project_root: Path | None = None,
     api_key: str | None = None,
 ) -> Path:
@@ -322,7 +323,7 @@ def ingest_laus_metro(
         Reference year (e.g., 2023).  BLS LAUS annual averages are
         typically released a few months after the reference year ends.
     definition_version : str
-        Metro definition version (default: legacy Glynn/Fox subset profile).
+        Metro definition version (default: canonical Census MSA universe).
     project_root : Path, optional
         Project root for output path resolution. Defaults to current directory.
     api_key : str, optional

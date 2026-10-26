@@ -16,6 +16,13 @@ import typer
 from hhplab.geographies.coc.ct_planning_regions import CT_LEGACY_COUNTY_VINTAGE
 from hhplab.recipe.cache import RecipeCache
 from hhplab.recipe.executor import population as population_execution
+from hhplab.recipe.executor.annotations import (
+    frame_column_map,
+    has_annotations,
+    propagate_annotations,
+    renamed_column_map,
+    resolve_annotation_geo_column,
+)
 from hhplab.recipe.executor.core import (
     ExecutionContext,
     ExecutorError,
@@ -345,7 +352,7 @@ def _execute_resample(
             effective_geometry=task.effective_geometry,
             input_path=task.input_path,
         )
-        df = ctx.cache.read_parquet(input_file, reject_annotations=True)
+        df = ctx.cache.read_parquet(input_file)
     except (FileNotFoundError, OSError, pa.ArrowInvalid) as exc:
         return StepResult(
             step_kind="resample",
@@ -388,8 +395,9 @@ def _execute_resample(
                 task.year,
                 task.dataset_id,
                 year_column=task.year_column,
+                geo_column=task.geo_column,
             )
-        except ExecutorError as exc:
+        except (ExecutorError, ValueError) as exc:
             return StepResult(
                 step_kind="resample",
                 detail=detail,
@@ -398,6 +406,18 @@ def _execute_resample(
             )
 
     source_df = df.copy()
+
+    if task.method != "identity" and has_annotations(df):
+        return StepResult(
+            step_kind="resample",
+            detail=detail,
+            success=False,
+            error=(
+                f"Dataset '{task.dataset_id}' year {task.year}: annotated input cannot use "
+                f"{task.method!r} resampling until exact source contributors are mapped. "
+                "Use identity resampling or prepare the annotated artifact upstream."
+            ),
+        )
 
     # Filter to the target year if the dataset has a year column
     year_col = _resolve_year_column(df, task.year_column)
@@ -455,6 +475,22 @@ def _execute_resample(
                 )
         else:
             df = filtered_df
+        if has_annotations(df):
+            source_years = pd.to_numeric(
+                df["year"] if "year" in df.columns else df[year_col],
+                errors="coerce",
+            )
+            if source_years.isna().any() or not source_years.eq(task.year).all():
+                return StepResult(
+                    step_kind="resample",
+                    detail=detail,
+                    success=False,
+                    error=(
+                        f"Dataset '{task.dataset_id}' year {task.year}: annotated input "
+                        "would change its source year keys. Materialize an explicit "
+                        "annotation year mapping before applying a lag or year reassignment."
+                    ),
+                )
         df = df.copy()
         df["year"] = task.year
 
@@ -463,6 +499,23 @@ def _execute_resample(
     try:
         if task.method == "identity":
             result_df = _resample_identity(df, task)
+            source_geo = (
+                resolve_annotation_geo_column(df, task.geo_column)
+                if has_annotations(df)
+                else _resolve_geo_column(df, task.geo_column)
+            )
+            if source_geo is None:
+                raise ValueError(
+                    "annotated identity resampling requires a resolved source geography key"
+                )
+            source_columns = frame_column_map(df, result_df)
+            if source_geo in df.columns and "geo_id" in result_df.columns:
+                source_columns[source_geo] = "geo_id"
+            result_df = propagate_annotations(
+                result_df,
+                [(df, source_columns, source_geo, "year")],
+                output_geo_column="geo_id",
+            )
         elif task.method in ("aggregate", "allocate"):
             # Load crosswalk
             if task.transform_id is None:
@@ -604,7 +657,7 @@ def _execute_resample(
                 success=False,
                 error=f"Unknown resample method '{task.method}'.",
             )
-    except ExecutorError as exc:
+    except (ExecutorError, ValueError) as exc:
         return StepResult(
             step_kind="resample",
             detail=detail,
@@ -613,11 +666,21 @@ def _execute_resample(
             notes=step_notes,
         )
     try:
+        before_population_normalization = result_df
         result_df = _normalize_recipe_population_measure(
             result_df,
             task=task,
             ctx=ctx,
         )
+        if has_annotations(before_population_normalization):
+            result_df = propagate_annotations(
+                result_df,
+                [(before_population_normalization, frame_column_map(
+                    before_population_normalization,
+                    result_df,
+                    aliases={"population": "total_population"},
+                ))],
+            )
     except ValueError as exc:
         return StepResult(
             step_kind="resample",
@@ -643,7 +706,14 @@ def _execute_resample(
             for measure in [*task.measures, *derived_output_cols]
             if measure in result_df.columns
         }
+        original_result = result_df
         result_df = result_df.rename(columns=rename_cols)
+        result_df = propagate_annotations(
+            result_df,
+            [(original_result, frame_column_map(
+                original_result, result_df, aliases=rename_cols,
+            ))],
+        )
         if intermediate_key in ctx.intermediates:
             merge_keys = [
                 key
@@ -662,10 +732,19 @@ def _execute_resample(
                     ),
                     notes=step_notes,
                 )
-            result_df = ctx.intermediates[intermediate_key].merge(
-                result_df,
+            prior = ctx.intermediates[intermediate_key]
+            current = result_df
+            result_df = prior.merge(
+                current,
                 on=merge_keys,
                 how="outer",
+            )
+            result_df = propagate_annotations(
+                result_df,
+                [
+                    (prior, frame_column_map(prior, result_df, suffix="_x")),
+                    (current, frame_column_map(current, result_df, suffix="_y")),
+                ],
             )
     ctx.intermediates[intermediate_key] = result_df
     return StepResult(
@@ -711,7 +790,23 @@ def _execute_join(
             success=False,
             error="No datasets to join.",
         )
+    original_frames = list(frames)
     frames = _rename_conflicting_population_columns(frames, task.datasets, ctx)
+    try:
+        frames = [
+            propagate_annotations(
+                renamed,
+                [(original, renamed_column_map(original, renamed))],
+            )
+            for original, renamed in zip(original_frames, frames, strict=True)
+        ]
+    except ValueError as exc:
+        return StepResult(
+            step_kind="join",
+            detail=detail,
+            success=False,
+            error=f"Cannot preserve annotated bindings through population aliases: {exc}",
+        )
 
     # Use the available join keys that exist in all frames
     join_keys = [k for k in task.join_on if all(k in f.columns for f in frames)]
@@ -727,8 +822,30 @@ def _execute_join(
 
     # Progressive outer join
     merged = frames[0]
+    source_maps: list[tuple[pd.DataFrame, dict[str, str]]] = [
+        (frames[0], {column: column for column in frames[0].columns})
+    ]
     for frame in frames[1:]:
+        overlap = (set(merged.columns) & set(frame.columns)) - set(join_keys)
         merged = merged.merge(frame, on=join_keys, how="outer")
+        for _source, column_map in source_maps:
+            for source_column, output_column in column_map.items():
+                if output_column in overlap:
+                    column_map[source_column] = f"{output_column}_x"
+        right_map = {
+            column: f"{column}_y" if column in overlap else column
+            for column in frame.columns
+        }
+        source_maps.append((frame, right_map))
+    try:
+        merged = propagate_annotations(merged, source_maps)
+    except ValueError as exc:
+        return StepResult(
+            step_kind="join",
+            detail=detail,
+            success=False,
+            error=f"Cannot preserve annotated bindings through join: {exc}",
+        )
 
     ctx.intermediates[("__joined__", task.year)] = merged
     return StepResult(step_kind="join", detail=detail, success=True)

@@ -1,0 +1,44 @@
+{
+  "schema_version": "hhplab.architecture-review-evidence/1.0",
+  "status": "engineering_review_complete_with_explicit_research_gaps",
+  "source_snapshot_witness": "sha256:af4c2ce4f3a1c3de3d53e28a7367c876d11af156a468b81b39ea6e6b2366a96d",
+  "intent_view_witness": "sha256:dd08214444baca99c7aa40cac42797aed0ef13132a6e54f3fe71e1c4f1c1e8b9",
+  "final_pin_receipt": ".elements/plans/reference-joins.pin-receipt.json",
+  "reconciliation": {
+    "artifact": ".elements/plans/reference-joins.implementation-reconcile.json",
+    "reviewed_rows": 54,
+    "matched_exact": 54,
+    "has_more": false,
+    "view_conflicts": 0
+  },
+  "review_process": {
+    "model": "gpt-6-luna",
+    "reasoning_effort": "high",
+    "workers": 3,
+    "shared_main": true,
+    "worker_git_or_tracker_mutations": false,
+    "workflow": "First handoff reviewed by root, issues returned for one worker revision, second handoff reviewed and remaining issues fixed by root. Workers paused for combined validation."
+  },
+  "validation": {
+    "distinct_relevant_tests_passed": 1357,
+    "architecture_tests_passed": 424,
+    "rts_tests_passed": 77,
+    "laus_tests_passed": 101,
+    "compiler_check": "compileall passed for changed implementation",
+    "ruff": "passed",
+    "curated_layout": "passed",
+    "input_snapshots": "match canonical external baseline and exception CSV",
+    "provisional_baseline": {"state_equivalents": 56, "substates": 2, "annual_rows": 870, "unknown_gap_intervals": 5},
+    "real_smoke": "Denver MSA 19740 and CO-503, 2010-2024, B2024/C2023, no weights: 15 rows per scoped artifact with source caveat preserved",
+    "negative_smoke": "Boston 2024 rejected unresolved single-adult scope rather than converting it to zero",
+    "weight_normalization": "47,149 validated candidate county/year rows in dry-run; no weight artifact written"
+  },
+  "closed_beads": ["coclab-8rlun", "coclab-j30ik"],
+  "remaining": [
+    "Researcher choice of resident-population weights/vintage policy and any-versus-majority classification",
+    "Listed-jurisdiction historical/eligibility gaps and final national RTS outputs",
+    "Frozen overlap-site outcome, MSA covariate and RTS assembly and real recipe source resolution",
+    "Annotated generic aggregate/allocate, temporal aggregation/interpolation and explicit source-year mapping",
+    "Real-run source coverage and researcher-supplied scientific numeric inputs"
+  ]
+}

@@ -17,10 +17,12 @@ from __future__ import annotations
 import hashlib
 import json
 import math
+import re
 from pathlib import Path
 from typing import Literal
 
 import pandas as pd
+from pydantic import ValidationError
 
 from hhplab.geographies.msa.msa_definitions import (
     DEFINITION_VERSION as DEFAULT_MSA_DEFINITION_VERSION,
@@ -93,6 +95,9 @@ DEFAULT_SUBSTATE_COUNTY_MEMBERSHIP = pd.DataFrame(
      "jurisdiction_type": ["sub_state"] * len(NYC_COUNTY_FIPS),
      "county_fips": list(NYC_COUNTY_FIPS)}
 )
+SUBSTATE_COUNTY_MEMBERSHIP_COLUMNS = (
+    "jurisdiction_id", "jurisdiction_type", "county_fips",
+)
 
 RTS_ANNOTATION_ID = "right-to-shelter-geographic-approximation"
 RTS_QUALIFICATION_ANNOTATION_ID = "right-to-shelter-subgroup-qualification"
@@ -113,6 +118,21 @@ def curated_baseline_path(data_root: Path | str | None = None) -> Path:
     """Return the canonical reviewed-baseline JSON path."""
     root = Path("data") if data_root is None else Path(data_root)
     return root / "curated" / "right_to_shelter" / BASELINE_FILENAME
+
+
+def load_substate_county_membership(path: Path | str) -> pd.DataFrame:
+    """Load explicit additive county-to-substate assignments from canonical CSV."""
+    membership_path = Path(path)
+    try:
+        frame = pd.read_csv(membership_path, dtype={"county_fips": "string"})
+    except FileNotFoundError:
+        raise
+    except (OSError, pd.errors.ParserError, UnicodeDecodeError) as exc:
+        raise RightToShelterError(
+            f"Could not read substate county membership at {membership_path}: {exc}. "
+            f"Provide CSV columns {SUBSTATE_COUNTY_MEMBERSHIP_COLUMNS}."
+        ) from exc
+    return validate_substate_county_membership(frame, include_default=False)
 
 
 def load_policy_baseline(path: Path | str | None = None) -> dict[str, object]:
@@ -160,6 +180,27 @@ def _validate_baseline_interval(row: object, label: str) -> dict[str, object]:
     result = dict(row)
     result.update(jurisdiction_id=jurisdiction_id, jurisdiction_type=jurisdiction_type,
                   first_year=first_year, last_year=last_year)
+    if label == "reviewed_coverage":
+        basis = row.get("basis", "reviewed")
+        if basis not in {"reviewed", "provisional_none"}:
+            raise RightToShelterError(
+                "Reviewed coverage basis must be 'reviewed' or 'provisional_none'."
+            )
+        result["basis"] = basis
+        county_fips = row.get("county_fips")
+        if jurisdiction_type == "sub_state":
+            if county_fips is not None:
+                if (not isinstance(county_fips, list) or not county_fips
+                        or not all(isinstance(value, str) and re.fullmatch(r"[0-9]{5}", value)
+                                   for value in county_fips)
+                        or len(set(county_fips)) != len(county_fips)):
+                    raise RightToShelterError(
+                        "Substate reviewed_coverage county_fips must be a unique list of "
+                        "canonical five-digit FIPS strings."
+                    )
+                result["county_fips"] = list(county_fips)
+        elif county_fips is not None:
+            raise RightToShelterError("State reviewed_coverage cannot specify county_fips.")
     if label == "reviewed_coverage":
         evidence = row.get("evidence")
         if not isinstance(evidence, list) or not evidence:
@@ -225,9 +266,39 @@ def validate_policy_baseline(baseline: dict[str, object]) -> dict[str, object]:
                          for year in range(row["first_year"], row["last_year"] + 1)}
         if not set(range(gap["first_year"], gap["last_year"] + 1)) <= covered_years:
             raise RightToShelterError(f"Unknown gap {key} is outside reviewed_coverage.")
+    provisional = baseline.get("provisional_baseline")
+    normalized_provisional = None
+    if provisional is not None:
+        if not isinstance(provisional, dict):
+            raise RightToShelterError(
+                "provisional_baseline must be a valid data-annotation record."
+            )
+        try:
+            annotation = DataAnnotationSpec.model_validate(provisional)
+        except ValidationError as exc:
+            raise RightToShelterError(
+                "Invalid provisional_baseline annotation metadata; correct its DataAnnotationSpec "
+                f"fields: {exc}"
+            ) from exc
+        if annotation.category != "caveat" or not annotation.public_text:
+            raise RightToShelterError(
+                "provisional_baseline must use category='caveat' and include public_text."
+            )
+        normalized_provisional = annotation.model_dump(
+            mode="json", exclude_none=True,
+        )
+    provisional_rows = [row for row in normalized_coverage
+                        if row.get("basis", "reviewed") == "provisional_none"]
+    if provisional_rows and provisional is None:
+        raise RightToShelterError(
+            "Coverage marked basis='provisional_none' needs top-level provisional_baseline "
+            "annotation metadata."
+        )
     result = dict(baseline)
     result["reviewed_coverage"] = normalized_coverage
     result["unknown_gaps"] = normalized_gaps
+    if normalized_provisional is not None:
+        result["provisional_baseline"] = normalized_provisional
     return result
 
 
@@ -380,6 +451,8 @@ def expand_policy_intervals(
                 "jurisdiction_id": key[1],
                 "jurisdiction_type": key[0],
                 "year": year,
+                "baseline_basis": scope.get("basis", "reviewed"),
+                "baseline_county_fips": scope.get("county_fips"),
                 "citation": evidence["citation"],
                 "citation_source_type": evidence.get("citation_source_type", "secondary"),
                 "citation_redistribution": evidence.get("citation_redistribution", "unknown"),
@@ -404,6 +477,7 @@ def expand_policy_intervals(
                 exception = active.iloc[0]
                 row.update(exception.to_dict())
                 row["year"] = year
+                row["baseline_basis"] = "reviewed"
             # Baseline uncertainty is authoritative and cannot be overridden by
             # a policy exception record that happens to contain a placeholder.
             for gap in gaps:
@@ -419,7 +493,9 @@ def expand_policy_intervals(
             "Extend reviewed_coverage with cited evidence."
         )
     expanded = pd.DataFrame(rows)
-    return validate_jurisdiction_source_table(expanded)
+    result = validate_jurisdiction_source_table(expanded)
+    result.attrs["provisional_baseline"] = baseline.get("provisional_baseline")
+    return result
 
 
 def mapping_output_path(
@@ -480,6 +556,8 @@ def validate_jurisdiction_source_table(frame: pd.DataFrame) -> pd.DataFrame:
         )
     extra_columns = [column for column in (
         "exception_id",
+        "baseline_basis",
+        "baseline_county_fips",
         *(f"{population}_qualification_scope" for population in POPULATIONS),
         *(f"{population}_qualification_summary" for population in POPULATIONS),
     ) if column in frame.columns]
@@ -596,7 +674,10 @@ def validate_jurisdiction_source_table(frame: pd.DataFrame) -> pd.DataFrame:
             "Annual jurisdiction rows must be in force on January 31; invalid rows "
             f"{list(result.index[invalid])}."
         )
-    return result.reset_index(drop=True)
+    attrs = dict(frame.attrs)
+    validated = result.reset_index(drop=True)
+    validated.attrs.update(attrs)
+    return validated
 
 
 def _normalize_boolean(values: pd.Series, column: str) -> pd.Series:
@@ -729,6 +810,7 @@ def map_jurisdiction_years(
         raise RightToShelterError("majority_threshold must be between 0 and 1.")
     source = validate_jurisdiction_source_table(source_table)
     membership = _validate_geography_membership(geography_county_membership)
+    provisional_annotation = source_table.attrs.get("provisional_baseline")
     resident_weights = county_population is not None and "resident_population" in county_population
     if county_population is None:
         population = None
@@ -754,16 +836,19 @@ def map_jurisdiction_years(
         raise RightToShelterError(
             "Requested years must contain valid years from 1900 through 2200."
         )
-    overrides = (DEFAULT_SUBSTATE_COUNTY_MEMBERSHIP if substate_county_membership is None
-                 else substate_county_membership.copy())
-    required_override = {"jurisdiction_id", "jurisdiction_type", "county_fips"}
-    if required_override - set(overrides.columns):
-        raise RightToShelterError(
-            "substate_county_membership needs jurisdiction_id, jurisdiction_type, and county_fips."
+    explicit_substate_membership = validate_substate_county_membership(
+        substate_county_membership, include_default=False
+    )
+    overrides = validate_substate_county_membership(
+        explicit_substate_membership, include_default=True
+    )
+    if "baseline_county_fips" in source and not explicit_substate_membership.empty:
+        _validate_substate_membership_against_source(
+            explicit_substate_membership.loc[
+                explicit_substate_membership["county_fips"].isin(membership["county_fips"])
+            ],
+            source, years,
         )
-    overrides["county_fips"] = overrides["county_fips"].astype(str).str.zfill(5)
-    if overrides["county_fips"].duplicated().any():
-        raise RightToShelterError("A county may map to only one sub-state jurisdiction.")
 
     counties = membership.assign(_join_key=1).merge(
         pd.DataFrame({"year": years, "_join_key": 1}), on="_join_key"
@@ -777,6 +862,8 @@ def map_jurisdiction_years(
     counties["jurisdiction_id"] = counties["substate_jurisdiction_id"].fillna(
         counties["jurisdiction_id"]
     )
+    if "baseline_county_fips" in source:
+        _validate_scoped_substate_assignments(source, membership, overrides, years)
     if population is not None:
         counties = counties.merge(
             population, on=["county_fips", "year"], how="left", validate="many_to_one"
@@ -793,7 +880,9 @@ def map_jurisdiction_years(
         f"{population}_qualification_scope", f"{population}_qualification_summary"
     ) if column in relevant_source]
     source_flags = relevant_source[["jurisdiction_id", "year", *JURISDICTION_FLAG_COLUMNS,
-                           *source_extra]]
+                           *source_extra,
+                           *(column for column in ("baseline_basis", "baseline_county_fips")
+                             if column in relevant_source)]]
     joined = counties.merge(
         source_flags, on=["jurisdiction_id", "year"], how="left", validate="many_to_one",
         indicator=True,
@@ -812,8 +901,13 @@ def map_jurisdiction_years(
     output_rows: list[dict[str, object]] = []
     qualifications: dict[tuple[str, str], set[tuple[str, int]]] = {}
     resident_weight_cells: dict[str, list[list[object]]] = {}
+    provisional_cells: dict[str, list[list[object]]] = {}
     for (geo_id, year), group in joined.groupby(["geo_id", "year"], sort=True):
         row: dict[str, object] = {"geo_id": str(geo_id), "year": int(year)}
+        uses_provisional_baseline = (
+            "baseline_basis" in group
+            and group["baseline_basis"].eq("provisional_none").any()
+        )
         for population_name, flag_column, weight_column, share_column in zip(
             POPULATIONS, JURISDICTION_FLAG_COLUMNS,
             COUNTY_POPULATION_COLUMNS[2:], POPULATION_SHARE_COLUMNS, strict=True,
@@ -859,6 +953,9 @@ def map_jurisdiction_years(
             row[flag_column] = int(share > 0) if geography_rule == "any" else int(
                 share >= majority_threshold
             )
+            if uses_provisional_baseline:
+                for column in (flag_column, share_column):
+                    provisional_cells.setdefault(column, []).append([str(geo_id), int(year)])
         output_rows.append(row)
 
     result = pd.DataFrame(output_rows, columns=MAPPING_COLUMNS)
@@ -872,7 +969,164 @@ def map_jurisdiction_years(
     ]
     result.attrs["rts_resident_weight_cells"] = resident_weight_cells
     result.attrs["annotations"] = _geographic_approximation_contract(result)
+    if provisional_annotation is not None and provisional_cells:
+        _attach_provisional_baseline_annotation(
+            result, provisional_annotation, provisional_cells
+        )
     return result
+
+
+def _validate_scoped_substate_assignments(
+    source: pd.DataFrame,
+    membership: pd.DataFrame,
+    overrides: pd.DataFrame,
+    years: list[int],
+) -> None:
+    """Fail if baseline substate scopes are omitted or not explicitly assigned."""
+    substate_rows = source.loc[
+        source["jurisdiction_type"].eq("sub_state")
+        & source["year"].isin(years)
+    ]
+    if substate_rows.empty:
+        return
+    selected_counties = set(membership["county_fips"].astype(str))
+    for _, row in substate_rows.iterrows():
+        scoped = row.get("baseline_county_fips")
+        if scoped is None or (isinstance(scoped, float) and math.isnan(scoped)):
+            raise RightToShelterError(
+                f"Substate jurisdiction {row['jurisdiction_id']} in {row['year']} has no "
+                "county_fips scope in reviewed baseline metadata. Add its explicit county "
+                "scope before a national geography build."
+            )
+        relevant = selected_counties.intersection(scoped)
+        if not relevant:
+            continue
+        assigned = set(overrides.loc[
+            overrides["jurisdiction_id"].eq(row["jurisdiction_id"]), "county_fips"
+        ].astype(str))
+        missing = sorted(relevant - assigned)
+        if missing:
+            raise RightToShelterError(
+                f"Substate jurisdiction {row['jurisdiction_id']} intersects selected "
+                f"geography but county assignment is missing for {missing}; provide explicit "
+                "substate county membership so those counties do not fall back to statewide status."
+            )
+
+
+def _validate_substate_membership_against_source(
+    membership: pd.DataFrame,
+    source: pd.DataFrame,
+    requested_years: list[int],
+) -> None:
+    """Ensure every supplied county assignment has matching dated source coverage."""
+    years = set(requested_years)
+    for assignment in membership.to_dict("records"):
+        jurisdiction_id = assignment["jurisdiction_id"]
+        rows = source.loc[
+            source["jurisdiction_type"].eq("sub_state")
+            & source["jurisdiction_id"].eq(jurisdiction_id)
+            & source["year"].isin(years)
+        ]
+        covered_years = set(rows["year"].astype(int))
+        missing_years = sorted(years - covered_years)
+        if missing_years:
+            raise RightToShelterError(
+                f"Substate membership for {jurisdiction_id} has no reviewed source rows for "
+                f"years {missing_years}; add dated source coverage before assigning counties."
+            )
+        if "baseline_county_fips" in rows:
+            for _, source_row in rows.iterrows():
+                scope = source_row["baseline_county_fips"]
+                if scope is None or (isinstance(scope, float) and math.isnan(scope)):
+                    raise RightToShelterError(
+                        f"Substate source {jurisdiction_id} has no explicit county_fips scope."
+                    )
+                if assignment["county_fips"] not in scope:
+                    raise RightToShelterError(
+                        f"County {assignment['county_fips']} is outside the reviewed county_fips "
+                        f"scope for substate jurisdiction {jurisdiction_id}."
+                    )
+
+
+def _attach_provisional_baseline_annotation(
+    frame: pd.DataFrame,
+    metadata: dict[str, object],
+    cells_by_column: dict[str, list[list[object]]],
+) -> None:
+    """Bind the accepted provisional-baseline caveat to every affected RTS cell."""
+    annotation = DataAnnotationSpec(**metadata).model_dump(mode="json", exclude_none=True)
+    contract = frame.attrs.get("annotations", serialize_annotation_contract([]))
+    contract = dict(contract)
+    records = list(contract.get("records", []))
+    bindings = dict(contract.get("bindings", {}))
+    records.append(annotation)
+    identity = f"{annotation['id']}#r{annotation['revision']}"
+    bindings[identity] = {"columns": cells_by_column}
+    frame.attrs["annotations"] = serialize_annotation_contract(records, bindings=bindings)
+
+
+def validate_substate_county_membership(
+    frame: pd.DataFrame | None,
+    *,
+    include_default: bool = True,
+) -> pd.DataFrame:
+    """Validate additive county-to-substate assignments and retain NYC by default."""
+    if frame is None:
+        supplied = pd.DataFrame(columns=SUBSTATE_COUNTY_MEMBERSHIP_COLUMNS)
+    else:
+        missing = set(SUBSTATE_COUNTY_MEMBERSHIP_COLUMNS) - set(frame.columns)
+        if missing:
+            raise RightToShelterError(
+                "substate_county_membership needs jurisdiction_id, jurisdiction_type, "
+                "and county_fips columns."
+            )
+        supplied = frame.loc[:, SUBSTATE_COUNTY_MEMBERSHIP_COLUMNS].copy()
+    if not supplied.empty:
+        for column in SUBSTATE_COUNTY_MEMBERSHIP_COLUMNS:
+            supplied[column] = supplied[column].astype("string").str.strip()
+            if supplied[column].isna().any() or supplied[column].eq("").any():
+                raise RightToShelterError(
+                    f"Substate county membership requires nonempty {column} values."
+                )
+        supplied["county_fips"] = supplied["county_fips"].astype("string")
+        if not supplied["county_fips"].str.fullmatch(r"[0-9]{5}").all():
+            raise RightToShelterError(
+                "Substate county_fips values must be canonical five-digit FIPS strings; "
+                "do not omit leading zeroes or include punctuation."
+            )
+        if not supplied["jurisdiction_type"].eq("sub_state").all():
+            raise RightToShelterError(
+                "Explicit county membership jurisdiction_type must be 'sub_state'."
+            )
+        if supplied["county_fips"].duplicated().any():
+            duplicated = sorted(supplied.loc[
+                supplied["county_fips"].duplicated(keep=False), "county_fips"
+            ].unique())
+            raise RightToShelterError(
+                "A county may map to only one sub-state jurisdiction; duplicate FIPS: "
+                f"{duplicated}."
+            )
+    defaults = (DEFAULT_SUBSTATE_COUNTY_MEMBERSHIP.copy() if include_default
+                else pd.DataFrame(columns=SUBSTATE_COUNTY_MEMBERSHIP_COLUMNS))
+    if supplied.empty:
+        return defaults.reset_index(drop=True)
+    default_by_county = defaults.set_index("county_fips")["jurisdiction_id"].to_dict()
+    conflicts = [
+        row for row in supplied.to_dict("records")
+        if row["county_fips"] in default_by_county
+        and row["jurisdiction_id"] != default_by_county[row["county_fips"]]
+    ]
+    if conflicts:
+        raise RightToShelterError(
+            "Explicit substate membership cannot reassign default NYC counties; "
+            f"conflicting rows: {conflicts}."
+        )
+    additional = supplied.loc[~supplied["county_fips"].isin(defaults["county_fips"])]
+    if additional.empty:
+        return defaults.reset_index(drop=True)
+    if defaults.empty:
+        return additional.reset_index(drop=True)
+    return pd.concat([defaults, additional], ignore_index=True).reset_index(drop=True)
 
 
 def map_msa_years(
@@ -1130,6 +1384,7 @@ def build_curated_outputs(
     msa_ids: list[str] | None = None,
     coc_ids: list[str] | None = None,
     weight_definition: str | None = None,
+    substate_county_membership_path: Path | str | None = None,
 ) -> dict[str, Path]:
     """Build requested-year outputs from reviewed baseline and exception inputs."""
     from hhplab.artifacts.naming.naming import county_path, msa_county_membership_path
@@ -1148,6 +1403,10 @@ def build_curated_outputs(
             curated_source_table_path(data_root) if exceptions_path is None else exceptions_path
         ),
         first_year, last_year,
+    )
+    substate_membership = (
+        None if substate_county_membership_path is None
+        else load_substate_county_membership(substate_county_membership_path)
     )
     county_population = None
     if county_population_path is not None:
@@ -1183,6 +1442,7 @@ def build_curated_outputs(
         source, msa_membership, county_population,
         coding_rule=coding_rule, include_weather_only=include_weather_only,
         geography_rule=geography_rule, majority_threshold=majority_threshold,
+        substate_county_membership=substate_membership,
         requested_years=(first_year, last_year),
     )
     coc_path = resolve_curated_boundary_path(coc_boundary_vintage, data_root)
@@ -1201,6 +1461,7 @@ def build_curated_outputs(
         source, coc_geometry, county_geometry, county_population,
         coding_rule=coding_rule, include_weather_only=include_weather_only,
         geography_rule=geography_rule, majority_threshold=majority_threshold,
+        substate_county_membership=substate_membership,
         requested_years=(first_year, last_year),
     )
 
@@ -1239,6 +1500,10 @@ def build_curated_outputs(
         "county_overlay_crs": "EPSG:5070",
         "county_overlay_minimum_share": COUNTY_OVERLAY_SLIVER_SHARE,
         "geography_inputs": {},
+        "substate_county_membership": (
+            validate_substate_county_membership(substate_membership).to_dict("records")
+        ),
+        "substate_county_membership_mode": "additive_with_default_nyc",
     }
     for name, path in (
         ("msa_county_membership", msa_county_membership_path(msa_definition_version, data_root)),
@@ -1252,6 +1517,12 @@ def build_curated_outputs(
         weight_file = Path(county_population_path)
         input_ids["weight_input_path"] = str(weight_file)
         input_ids["weight_input_sha256"] = hashlib.sha256(weight_file.read_bytes()).hexdigest()
+    if substate_county_membership_path is not None:
+        membership_file = Path(substate_county_membership_path)
+        input_ids["substate_county_membership_input_path"] = str(membership_file)
+        input_ids["substate_county_membership_input_sha256"] = hashlib.sha256(
+            membership_file.read_bytes()
+        ).hexdigest()
     write_mapping_with_provenance(
         msa, msa_output, geography="msa", coding_rule=coding_rule,
         include_weather_only=include_weather_only, geography_rule=geography_rule,

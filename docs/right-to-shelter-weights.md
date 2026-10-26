@@ -11,9 +11,10 @@ The linked shelter-capacity recipe has a 2010–2024 analysis window and builds
 both CoC and metro panels (`recipes/examples/shelter-capacity-results.yaml`).
 Right-to-shelter outputs are generated for an explicitly requested range and
 geography membership/boundary vintage. Until the reviewed baseline and dated
-exceptions are complete, the actual mixed-status geography-years cannot be
-enumerated: doing so now would confuse unreviewed/unknown jurisdiction status
-with a known absence of a right.
+exceptions are complete, the full set of mixed-status geography-years cannot
+be enumerated: Matt has accepted the versioned provisional none-elsewhere
+baseline, but unresolved listed-jurisdiction gaps remain unknown rather than
+known absences of rights.
 
 For a requested geography-year, if every member county has the same coded
 status, the flag and its covered share are exactly 0 or 1. That row needs no
@@ -41,16 +42,17 @@ B01001, B11001, or B13016. Do not infer support from tables available at the
 Census API; a new measure would need registry and pipeline support first.
 
 PEP is the only currently native annual county-level source among these
-candidates. Existing files cover the linked 2010–2024 panel, but are split
-across vintages at 2020. If using PEP, record that break explicitly (v2020 for
-2010–2019; one selected series for 2020–2024), or choose and ingest a reviewed
-consistent vintage/source plan. PEP's July 1 reference and the RTS annual
-January 31 reference are not identical; disclose the timing approximation.
-The local v2020 file has 3,143 county FIPS per year; v2024 and v2025 have
-3,144. A build must validate the exact county-FIPS support required by each
-mixed geography-year against the selected PEP vintage and its corresponding
-membership vintage, rather than presuming the annual county universe is
-identical across vintages.
+candidates. The proposed, still-pending source selection is v2020 for
+2010–2020 and v2024 for 2021–2024. This deliberately uses v2020 for the 2020
+overlap; the frozen Census MSA/CoC population-overlap geography rule is a
+separate decision and says nothing about which PEP vintage to choose. Preserve
+the eventual source selection and exact identities. PEP's July 1 reference
+and the RTS annual Jan. 31 reference are not identical, so disclose the timing
+approximation. The local v2020 file has 3,143 county FIPS per year; v2024 and
+v2025 have 3,144. A build must validate exact county-FIPS support for each
+mixed geography-year against the selected PEP vintage and matching membership
+vintage, rather than assuming the county universe is identical across
+vintages.
 
 ## County-FIPS reconciliation is required
 
@@ -76,14 +78,17 @@ region IDs from 2020 onward. `load_pep_county()` resolves duplicate
 county/year keys to the latest vintage, but cannot deduplicate legacy and
 planning-region IDs because they are different keys. In the current local
 directory it returns both eight legacy and nine planning-region CT rows for
-2020; the legacy eight remain for 2010–2019. For a C2023 / 2023 MSA output,
-the reviewed bridge therefore needs to:
+2020; the legacy eight remain for 2010–2019. Under the pending candidate
+selection (v2020 through 2020, v2024 for 2021–2024), a C2023 / 2023 MSA output
+would need to:
 
-1. For 2010–2019, allocate each legacy-county population estimate among the
+1. For 2010–2020, allocate each legacy-county population estimate among the
    nine planning regions using the existing CT geometry overlay and the
    crosswalk's `legacy_share` (intersection area / legacy-county area).
-2. For 2020–2024, use the selected latest-vintage planning-region estimates
-   and exclude the legacy 2020 rows so Connecticut is not double counted.
+2. For 2021–2024, use the selected v2024 planning-region estimates. If the
+   overlap-year source choice later uses the v2024 estimate for 2020 instead,
+   use those planning-region rows and exclude the v2020 legacy rows in that
+   year; never include both representations in one denominator.
 3. Compare the resulting five-digit county FIPS against the full required
    county membership for every year; reject missing or duplicate support.
 
@@ -219,9 +224,10 @@ classification.
 1. Approve or reject a common PEP resident-population weight for mixed
    geography-years, explicitly labeling shares as geographic resident
    coverage rather than legal-eligibility coverage.
-2. If approving it, choose one source vintage policy across 2010–2024 (including
-   treatment of the overlapping 2020 estimates) and confirm whether July 1 PEP
-   values are acceptable for January 31 status-year outputs.
+2. If approving it, confirm whether the candidate source selection is
+   acceptable (v2020 through 2020; v2024 for 2021–2024) and whether July 1
+   PEP values are acceptable for Jan. 31 status-year outputs. The frozen
+   Census MSA/CoC population-overlap geography selection remains independent.
 3. Confirm the mixed-geography classification rule/threshold independently of
    this weight definition. The weight can supply a share, but the threshold
    changes the flag and remains a research choice.
@@ -237,3 +243,182 @@ eligibility weights are currently supported.
 - [Census Bureau ACS5 B11001 table](https://api.census.gov/data/2022/acs/acs5/groups/B11001.html): household-type table, with households as the universe.
 - [Census Bureau ACS5 B13016 table](https://api.census.gov/data/2020/acs/acs5/groups/B13016.html): women aged 15–50 who had a birth in the past 12 months.
 - [Census Bureau ACS B01001 table](https://api.census.gov/data/2024/acs/acs1/groups/B01001.html): sex-by-age detail, including age categories from which adult counts can be derived.
+
+## Follow-up audit and normalization plan (2026-10-26)
+
+The current local curated PEP directory contains v2020, v2024, and v2025
+files. `load_pep_county()` discovers all vintage files, sorts them newest-first,
+and lets the newest file win for duplicate county/year keys. A read-only check
+therefore found v2025 selected for 2020–2024 by default. The candidate policy
+below explicitly selects v2020 through 2020 and v2024 after 2020; it remains
+pending the user's review. The reproducible normalization names the chosen two
+files and partitions years explicitly, so later default discovery cannot
+silently change this candidate artifact.
+
+The targeted Census MSA support audit used the plausible mixed-status
+areas raised in the current research: New York-Newark-Jersey City (`35620`),
+Minneapolis-St. Paul-Bloomington (`33460`), Boston (`14460`), Providence-Warwick
+(`39300`), and Washington-Arlington-Alexandria (`47900`). All county FIPS in
+those five MSA memberships have records in the proposed v2020/v2024 inputs for
+each applicable study year. Their county sets include respectively 22, 15, 7,
+6, and 23 counties. The exact local input is
+`data/curated/msa/msa_county_membership__census_msa_2023.parquet` (SHA-256
+`08d4614b045460d72840de9319e4f224ebff72795307d075f403e31e47f03578`). The
+five county lists are recorded below so the support audit can be reproduced.
+The New York MSA membership does not include Connecticut; Hennepin's MSA, the
+two identified Massachusetts-border MSAs, and the DC MSA also have complete
+PEP county-row presence. This establishes row availability, not that any
+specific status/coding choice makes a given geography-year mixed, nor that the
+values form a valid positive denominator.
+
+| MSA ID | County FIPS in audited membership | County/year rows present under v2020 (2010–2020) and v2024 (2021–2024) |
+|---|---|---:|
+| 35620 | `34003, 34013, 34017, 34019, 34023, 34025, 34027, 34029, 34031, 34035, 34037, 34039, 36005, 36047, 36059, 36061, 36079, 36081, 36085, 36087, 36103, 36119` | 22/22 each year |
+| 33460 | `27003, 27019, 27025, 27037, 27053, 27059, 27079, 27095, 27123, 27139, 27141, 27163, 27171, 55093, 55109` | 15/15 each year |
+| 14460 | `25009, 25017, 25021, 25023, 25025, 33015, 33017` | 7/7 each year |
+| 39300 | `25005, 44001, 44003, 44005, 44007, 44009` | 6/6 each year |
+| 47900 | `11001, 24017, 24021, 24031, 24033, 51013, 51043, 51047, 51059, 51061, 51107, 51153, 51157, 51177, 51179, 51187, 51510, 51600, 51610, 51630, 51683, 51685, 54037` | 23/23 each year |
+
+For contrast, a full-membership audit remains broader than the likely mixed
+denominators: the 2023 MSA membership includes seven Connecticut planning-region
+FIPS that are absent from v2020 in 2010–2020 and 66 Puerto Rico municipios
+absent from all local PEP vintages. A historical 2010 MSA definition also
+contains FIPS `51515`, absent from PEP. These are not missing resident counts
+to replace with zero. They require a relevant county concordance, a known
+homogeneous status that avoids weights, or a fail-closed diagnostic if such a
+county enters a mixed denominator. Puerto Rico's provisional none-elsewhere
+status is a research assumption; it does not make a weight value available.
+The targeted MSA audit does not certify CoC county-fragment mappings. CoC
+shares use the existing intersection-area-over-county-area approximation and
+need a provenance caveat wherever a partial county intersection is used.
+
+The proposed canonical normalized input, only if the common PEP basis and
+candidate vintage policy are approved, is:
+
+```text
+data/curated/right_to_shelter/right_to_shelter__county_weights__Y2010-2024__pep_v2020_v2024.parquet
+```
+
+It would contain exactly `county_fips` (five-character string), `year`
+(integer), and `resident_population` (nonnegative Census resident count), with
+one unique row per county/year. Its provenance should identify the population
+universe as all residents, the candidate selection rule (v2020 for 2010–2020;
+v2024 for 2021–2024), the July 1 PEP reference versus Jan. 31 RTS coding date,
+both curated source paths and their file-byte SHA-256 values, and the raw
+Census SHA-256 values retained in the native PEP `raw_sha256` column. The
+existing local files have no embedded provenance block, so do not assume
+`read_provenance()` returns one. It should also
+state that this is a common geographic population denominator, not an
+eligibility estimate. The later MSA/CoC mapping provenance should separately
+record county-FIPS completeness for the actual mixed cells and the CoC area
+allocation approximation. The curated-layout allowlist now recognizes this
+canonical filename pattern.
+
+The existing native reader is
+`hhplab.sources.census.pep.pep_aggregate.load_pep_county(pep_path=...)`, which
+reads one curated PEP artifact and retains its vintage/raw identity columns.
+This unexecuted candidate snippet calls that reader for two explicit curated
+paths. It does not use default discovery or fetch source data. It validates
+integral years, five-digit string FIPS, unique county/year keys, and finite,
+nonnegative integral populations before writing provenance. The selected
+normalized rows must still be checked against the actual mixed county/year
+denominator pairs before mapping. Complete row presence alone is not enough:
+each mixed denominator after any county allocation must be positive. The
+mapping code rejects missing or nonpositive mixed denominators.
+
+```python
+from hashlib import sha256
+from pathlib import Path
+
+import numpy as np
+import pandas as pd
+
+from hhplab.sources.census.pep.pep_aggregate import load_pep_county
+from hhplab.storage.provenance import (
+    ProvenanceBlock,
+    write_parquet_with_provenance,
+)
+
+source_specs = (
+    (Path("data/curated/pep/pep_county__v2020.parquet"), 2010, 2020),
+    (Path("data/curated/pep/pep_county__v2024.parquet"), 2021, 2024),
+)
+pieces = []
+source_identities = []
+for path, first_year, last_year in source_specs:
+    pep = load_pep_county(pep_path=path)
+    years = pd.to_numeric(pep["year"], errors="coerce")
+    if years.isna().any() or not years.eq(years.round()).all():
+        raise ValueError(f"Non-integral PEP year in {path}")
+    pep["year"] = years.astype("int64")
+
+    fips = pep["county_fips"].astype("string")
+    if fips.isna().any() or not fips.str.fullmatch(r"[0-9]{5}").all():
+        raise ValueError(f"County FIPS must be five-digit strings in {path}")
+    pep["county_fips"] = fips
+
+    population = pd.to_numeric(pep["population"], errors="coerce")
+    if (population.isna().any() or not np.isfinite(population).all()
+            or population.lt(0).any() or not population.eq(population.round()).all()):
+        raise ValueError(f"PEP population must be finite, nonnegative integers in {path}")
+    pep["resident_population"] = population.astype("int64")
+
+    selected = pep.loc[
+        pep["year"].between(first_year, last_year),
+        ["county_fips", "year", "resident_population"],
+    ].copy()
+    if selected.empty or selected["year"].min() != first_year or selected["year"].max() != last_year:
+        raise ValueError(f"Selected PEP years do not cover {first_year}-{last_year}: {path}")
+    if set(selected["year"].unique()) != set(range(first_year, last_year + 1)):
+        raise ValueError(f"Missing a selected year in {first_year}-{last_year}: {path}")
+    pieces.append(selected)
+
+    raw_hashes = pep["raw_sha256"].dropna().astype(str).unique().tolist()
+    if not raw_hashes or any(len(value) != 64 for value in raw_hashes):
+        raise ValueError(f"Missing native raw Census SHA-256 identity in {path}")
+    source_identities.append({
+        "path": str(path),
+        "selected_years": [first_year, last_year],
+        "parquet_sha256": sha256(path.read_bytes()).hexdigest(),
+        "raw_sha256": sorted(raw_hashes),
+        "vintages": sorted(int(value) for value in pep["vintage"].unique()),
+    })
+
+weights = pd.concat(pieces, ignore_index=True)
+if weights.duplicated(["county_fips", "year"]).any():
+    raise ValueError("Duplicate county/year PEP weight rows")
+weights = weights.sort_values(["county_fips", "year"]).reset_index(drop=True)
+
+output_path = Path(
+    "data/curated/right_to_shelter/"
+    "right_to_shelter__county_weights__Y2010-2024__pep_v2020_v2024.parquet"
+)
+if output_path.exists():
+    raise FileExistsError(f"Refusing to overwrite existing artifact: {output_path}")
+provenance = ProvenanceBlock(
+    geo_type="county",
+    weighting="resident_population",
+    extra={
+        "dataset_type": "right_to_shelter_county_resident_weights",
+        "population_universe": "all county residents; not legal eligibility",
+        "source_reference_date": "July 1",
+        "policy_reference_date": "January 31",
+        "candidate_vintage_policy": "v2020: 2010-2020; v2024: 2021-2024",
+        "sources": source_identities,
+    },
+)
+write_parquet_with_provenance(weights, output_path, provenance)
+```
+
+Audited input identities at the time of this note:
+
+| Curated file | Rows and years | SHA-256 of Parquet bytes |
+|---|---:|---|
+| `pep_county__v2020.parquet` | 34,573 rows; 2010–2020; 3,143 counties/year | `2bec7aaf86625b6e3e01213acf5d6c9a9284454ddcaf2c0ce2211cf543797469` |
+| `pep_county__v2024.parquet` | 15,720 rows; 2020–2024; 3,144 counties/year | `bd14769463e9e156c74be430b803d50ff5652c427937cf7421bd3d1e50ebccdf` |
+
+The common resident-population basis, the proposed choice of v2020 for the
+2020 overlap, and whether July 1 values are acceptable for Jan. 31 policy-year
+outputs remain review decisions. The frozen Census MSA/CoC population-overlap
+geography selection is independent of this PEP vintage choice. No new weight
+artifact or population-specific eligibility proxy is created by this note.
