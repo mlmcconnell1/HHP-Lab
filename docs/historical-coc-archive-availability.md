@@ -1,6 +1,51 @@
-# Public historical CoC boundary archive availability, 2011–2017
+# Public historical CoC boundary archive availability, 2010–2017
 
-Survey run: 2026-10-22. This is a bounded availability inventory, not a census of every possible archive or every state/year file. It covers years 2011–2017; the 2010 check is tracked separately, and 2019–2024 copies are already archived elsewhere in this project.
+## Full official acquisition, 2026-10-26
+
+The owner authorized acquisition of the complete official state/DC/territory archive series. **All 51 state/DC archives were acquired for every year 2011–2017.** Previously audited 2010 ZIPs were also staged into the same asset-store layout. This supersedes the earlier sample-only acquisition status below. It establishes complete state/DC endpoint acquisition, not completeness or correctness of every year's CoC polygons or reporting jurisdictions.
+
+The run attempted all 56 jurisdiction endpoints in each of eight years (448 attempts). It acquired **433 ZIPs**: 408 state/DC files plus 25 territory files. GU, PR, and VI succeeded in every year; MP succeeded in 2017 and returned 404 for 2010–2016; AS returned 404 in every year. These are results for the exact tested URLs, not evidence that no other historical source exists. There were no request failures or incomplete layer inventories in the finished run. Existing 2010 and survey ZIPs were reused only after checking their earlier manifested URL and SHA-256; the remaining sources were fetched directly from HUD. Existing source and extracted files were never overwritten.
+
+| Year | State/DC ZIPs | Territory ZIPs | Source feature records | Unique IDs in native attributes | Invalid non-null features | Compound-ID features |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| 2010 | 51 | 3 | 442 | 441 | 11 | 1 |
+| 2011 | 51 | 3 | 431 | 430 | 13 | 1 |
+| 2012 | 51 | 3 | 422 | 421 | 15 | 1 |
+| 2013 | 51 | 3 | 411 | 410 | 19 | 0 |
+| 2014 | 51 | 3 | 413 | 412 | 19 | 0 |
+| 2015 | 51 | 3 | 399 | 398 | 14 | 1 |
+| 2016 | 51 | 3 | 398 | 397 | 16 | 1 |
+| 2017 | 51 | 4 | 397 | 396 | 15 | 1 |
+
+Counts include territories. There are no null or empty geometries. Compound-ID features are separate source records whose attributes name several CoCs; their component IDs may also have individual source records. Unique IDs therefore are not a count of approved, disjoint national CoCs. The existing 2010 roster discrepancies remain unresolved. The raw Massachusetts compound layers occur in 2010, 2011, 2012, 2015, 2016, and 2017 and require explicit treatment before normalization. Geometry validity is assessed in each layer's native CRS, with reasons and WKB hashes retained; no repair or curated ingest was performed.
+
+The compressed originals total **464,199,066 bytes (464.2 MB)**, including the previously acquired 2010 set. Extracted file contents total **883,592,263 bytes (883.6 MB)**, for about 1.35 GB combined before manifests and filesystem overhead. The 2011–2017 ZIPs alone total 397,117,870 bytes.
+
+Canonical raw storage uses the configured asset root, currently `/home/matt/Data/hhplab` (the repository's `data` symlink):
+
+```text
+raw/hud_exchange/<year>/
+  per_state/<ST>/
+    CoC_GIS_State_Shapefile_<ST>_<year>.zip
+    CoC_GIS_State_Shapefile_<ST>_<year>_<sha256-prefix>/
+      <original archive member paths>
+  manifest__<run-id>.json
+raw/hud_exchange/acquisition_runs/<run-id>/
+  scope.json
+  <year>_<ST>.json
+  summary.json
+  verified-inventory.json
+```
+
+The [retained run](</home/matt/Data/hhplab/raw/hud_exchange/acquisition_runs/20261026T191510281426Z>) includes per-source requested/final URLs and HTTP metadata for new downloads, or explicit lineage to an earlier verified download; source SHA-256/size and ZIP CRC checks; every extracted member's hash/size; layer CRS, raw IDs and filename IDs; and feature geometry diagnostics. Immutable year manifests link to these receipts. The [acquisition script](</home/matt/HHP-Output/historical-site-selection/archive-survey/acquire_state_archive_series.py>) uses the package's configured raw-root helper, six workers, and bounded transient-request retries. Run from the repository with `PYTHONPATH=. .venv/bin/python <script> --json`. Every invocation creates a new receipt run and verifies existing extracted bytes before reuse. Source files are preserved; it does not silently repair shapes, assign compound polygons, or replace curated boundaries.
+
+Independent verification checks every ZIP hash and CRC, compares every extracted file byte hash with both its ZIP member and receipt, verifies the 448 unique jurisdiction/year attempts and all state/DC successes, and checks the script hash and inventory counts. The resulting `verified-inventory.json` additionally lists adjacent-year ID additions/removals, repeated ID claims, and compound/invalid feature review queues. These are source-inventory differences, not evidence by themselves of mergers or count-jurisdiction changes.
+
+Next work is to normalize the official annual sources into separate derived artifacts, resolve duplicate/compound assignments, record any geometry repairs, and compare equal-area shapes and population sensitivity year over year. The Stanford and FY17 mirror investigations below remain useful provenance comparisons, but acquiring official state files no longer depends on resolving those mirrors.
+
+## Earlier bounded survey (2026-10-22)
+
+The following records the initial sample-only survey and its follow-up national-copy audits. It is preserved as the acquisition trail and is superseded by the full official acquisition above where it describes current collection coverage. The 2019–2024 national copies are archived separately.
 
 ## Findings
 
@@ -67,7 +112,9 @@ python3 /home/matt/HHP-Output/historical-site-selection/archive-survey/survey_ar
 
 The download script performs the 19 representative HUD state/year downloads, downloads the two national copies, and runs four HEAD-only legacy-path probes. It writes `source_matrix.csv` and `source_matrix.json`; downloaded samples and national files are kept under `downloads/`. The matrix includes UTC probe time, response URL/status, advertised and observed sizes, SHA-256, ZIP entry and `.shp` counts, and each ZIP member name. ZIP CRC checks passed for all 20 downloaded ZIPs. The separate `inspect_historical_geometry.py` script reads the Stanford FlatGeobuf and the GDB layer directly from its ZIP using repository `uv` dependencies (`geopandas` 1.1.2, `pyogrio` 0.12.1, Shapely 2.1.2); it writes `geometry_inspection.json` and makes no repairs. Re-running the download script fetches the same fixed sample; existing files are reused only when their bytes match the current response, and the script refuses to overwrite a differing existing download.
 
-## Acquisition recommendation and open work
+## Earlier acquisition recommendation and remaining work
+
+The state/DC manifest and full official state-file acquisition recommended below were completed in the 2026-10-26 run. The list is retained as the original survey recommendation. Remaining work is annual normalization/comparison (`coclab-t6ywr.12`), the 2010 jurisdiction/compound-feature questions (`coclab-t6ywr.8`), and optional mirror vintage/provenance reconciliation (`coclab-t6ywr.9`). Missing exact territory endpoints remain explicit; their absence is not silently filled. Acquisition completion does not certify the native CoC roster or PIT/HIC jurisdiction in any year.
 
 1. Build a complete annual manifest from HUD's state/territory roster for 2011–2017, then probe each expected endpoint with HEAD before downloading. Record missing, renamed, and zero-size responses distinctly. The present state sample cannot serve as that manifest.
 2. Acquire the full per-state set in bounded annual batches, initially 2011–2012 (legacy individual-CoC layout), then 2013–2017. Preserve original ZIPs, HTTP final URLs, retrieval timestamps, and SHA-256 hashes; inspect extracted shapefile fields and coordinate reference systems before ingestion.
