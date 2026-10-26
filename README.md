@@ -21,6 +21,14 @@ profile (`glynn_fox` / `glynn_fox_v1`) over that universe. The `msa` surface
 remains separate and uses the same official delineations keyed explicitly as
 MSAs / CBSAs.
 
+For general metro research, default to frozen Census MSA/CoC
+population-overlap sites and aggregate whole-CoC PIT/HIC outcomes using the
+saved memberships. Keep MSA-native covariates keyed to the same Census
+delineation and disclose the remaining footprint mismatch. Restrict the
+Glynn/Fox geography/subset to analyses directly examining or reproducing
+Glynn/Fox. Fractional CoC-to-MSA allocation is an explicit alternative method,
+not the default overlap-site design.
+
 Full operational documentation lives in [HHP-Lab-manual/HHP-Lab-Manual.md](HHP-Lab-manual/HHP-Lab-Manual.md).
 
 ## What HHP-Lab Does
@@ -244,7 +252,7 @@ For new metro recipes:
   canonical metro universe.
 - Add `subset_profile: glynn_fox` and
   `subset_profile_definition_version: glynn_fox_v1` when you want the
-  historical 25-metro Glynn/Fox slice.
+  historical 25-metro slice for analysis directly examining Glynn/Fox.
 - Treat legacy `geometry: { type: metro, source: glynn_fox_v1 }` as a
   compatibility shim. Runtime execution resolves it through the canonical metro
   universe plus the Glynn/Fox subset profile, but contributors should prefer

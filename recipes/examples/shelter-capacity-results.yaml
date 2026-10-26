@@ -4,14 +4,14 @@ title: Shelter capacity and the PIT count
 authors: [Matt McConnell]
 universe: {range: "2010-2024"}
 
-# These build pipelines point to supported source adapters. The CBSA panel has
-# LAUS only for 2015–2023; the CoC panel has PIT and HIC but no CoC-native LAUS.
-# The CoC unemployment and right-to-shelter requirements therefore remain
-# research/source constraints even though the available CoC panel build is
-# described here.
+# Default metro design: frozen Census MSA/CoC population-overlap sites with
+# whole-CoC PIT/HIC sums. Glynn/Fox is reserved for direct Glynn/Fox analyses.
+# The pipelines below build CoC outcomes and Census-MSA covariates separately;
+# the final overlap-site/covariate/RTS join remains explicitly unresolved.
+# LAUS/PEP/ACS5 currently cover 2015–2023; no CoC-native LAUS is supplied.
 targets:
   - id: cbsa
-    geometry: {type: metro, source: glynn_fox_v1}
+    geometry: {type: metro, source: census_msa_2023}
     outputs: [panel, diagnostics]
     panel_policy:
       laus: {include: true}
@@ -84,14 +84,14 @@ datasets:
     provider: bls
     product: laus
     version: 1
-    native_geometry: {type: metro, source: glynn_fox_v1}
+    native_geometry: {type: metro, source: census_msa_2023}
     year_column: year
     geo_column: metro_id
     file_set:
-      path_template: "data/curated/laus/laus_metro__A{year}@Dglynnfoxv1.parquet"
+      path_template: "data/curated/laus/laus_metro__A{year}@Dcensusmsa2023.parquet"
       segments:
         - years: "2015-2023"
-          geometry: {type: metro, source: glynn_fox_v1}
+          geometry: {type: metro, source: census_msa_2023}
           constants: {}
   acs_tract:
     provider: census
@@ -112,15 +112,10 @@ datasets:
           year_offsets: {acs_end: -1}
 
 transforms:
-  - id: coc_to_metro
-    type: crosswalk
-    from: {type: coc, vintage: 2025, source: hud_exchange}
-    to: {type: metro, source: glynn_fox_v1}
-    spec: {weighting: {scheme: area}}
   - id: county_to_metro
     type: crosswalk
     from: {type: county, vintage: 2020, source: tiger}
-    to: {type: metro, source: glynn_fox_v1}
+    to: {type: metro, source: census_msa_2023}
     spec:
       weighting:
         scheme: population
@@ -129,12 +124,12 @@ transforms:
   - id: tract_to_metro_2020
     type: crosswalk
     from: {type: tract, vintage: 2020}
-    to: {type: metro, source: glynn_fox_v1}
+    to: {type: metro, source: census_msa_2023}
     spec: {weighting: {scheme: area}}
   - id: tract_to_metro_2010
     type: crosswalk
     from: {type: tract, vintage: 2010}
-    to: {type: metro, source: glynn_fox_v1}
+    to: {type: metro, source: census_msa_2023}
     spec: {weighting: {scheme: area}}
 
 pipelines:
@@ -157,37 +152,21 @@ pipelines:
       - join:
           datasets: [pit, hic]
           join_on: [geo_id, year]
-  - id: build_cbsa_panel
+  - id: build_msa_covariates
     target: cbsa
     steps:
       - materialize:
-          transforms: [coc_to_metro, county_to_metro, tract_to_metro_2010, tract_to_metro_2020]
-      - resample:
-          dataset: pit
-          to_geometry: {type: metro, source: glynn_fox_v1}
-          method: aggregate
-          via: coc_to_metro
-          measures: [pit_total, pit_sheltered, pit_unsheltered]
-          aggregation: sum
-      - resample:
-          dataset: hic
-          to_geometry: {type: metro, source: glynn_fox_v1}
-          method: aggregate
-          via: coc_to_metro
-          measures:
-            hic_es_year_round_beds: {aggregation: sum}
-            hic_th_year_round_beds: {aggregation: sum}
-            hic_sh_year_round_beds: {aggregation: sum}
+          transforms: [county_to_metro, tract_to_metro_2010, tract_to_metro_2020]
       - resample:
           dataset: pep_county
-          to_geometry: {type: metro, source: glynn_fox_v1}
+          to_geometry: {type: metro, source: census_msa_2023}
           method: aggregate
           via: county_to_metro
           measures: [population]
           aggregation: sum
       - resample:
           dataset: acs_tract
-          to_geometry: {type: metro, source: glynn_fox_v1}
+          to_geometry: {type: metro, source: census_msa_2023}
           method: aggregate
           via: auto
           measures:
@@ -198,7 +177,7 @@ pipelines:
             median_gross_rent: {aggregation: weighted_mean}
       - resample:
           dataset: laus_metro
-          to_geometry: {type: metro, source: glynn_fox_v1}
+          to_geometry: {type: metro, source: census_msa_2023}
           method: identity
           measures:
             labor_force: {aggregation: sum}
@@ -206,7 +185,7 @@ pipelines:
             unemployed: {aggregation: sum}
             unemployment_rate: {aggregation: mean}
       - join:
-          datasets: [pit, hic, pep_county, acs_tract, laus_metro]
+          datasets: [pep_county, acs_tract, laus_metro]
           join_on: [geo_id, year]
 
 filters:
@@ -217,8 +196,8 @@ filters:
     month: 1
 panels:
   cbsa:
-    ref: {pipeline: build_cbsa_panel, output: panel}
-    geo_key: geo_id
+    ref: {unresolved: "Assemble the frozen population-overlap MSA site-year panel from whole-CoC PIT/HIC outcomes, boundary-compatibility evidence, Census-MSA covariates and RTS flags. Use saved site-universe memberships; do not fractionally allocate PIT/HIC or apply the Glynn/Fox subset."}
+    geo_key: msa_id
     time_key: year
   coc:
     ref: {pipeline: build_coc_panel, output: panel}

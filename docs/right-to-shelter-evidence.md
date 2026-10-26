@@ -158,6 +158,14 @@ multi-jurisdiction geographies need a documented classification rule and
 population weights where the rule requires them. Covered geographic share is
 not eligible-person share.
 
+Matt's 2026-10-26 geography decision sets Census MSA/CoC population-overlap
+sites as the default metro research approach; Glynn/Fox is restricted to
+analysis directly dealing with Glynn/Fox. For the shelter-capacity recipe,
+join RTS classifications and MSA-native covariates by the same Census MSA
+ID/year to the frozen overlap-site panel. Whole-CoC outcome footprints can
+differ from MSA legal-policy/covariate footprints; preserve that caveat rather
+than relabeling the selected CoC union as exactly the MSA.
+
 The maintained source should follow the agreed compact contract:
 
 - `right_to_shelter__baseline.json`: versioned annual reference date,

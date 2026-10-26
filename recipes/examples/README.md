@@ -128,13 +128,18 @@ CoC boundary comparability remains a separate check before using outcomes.
 from §10 of `docs/results-recipe-spec_2.md`, including canonical HUD HIC
 columns (`hic_es_year_round_beds`, `hic_th_year_round_beds`, and
 `hic_sh_year_round_beds`), 2010 baselines, the 2021 mask, annual and biennial
-changes, and the planned variants. It includes real CBSA and CoC build
-pipeline references assembled from the supported Glynn/Fox LAUS and HUD
-PIT/HIC source recipes. Its four numerical research parameters, the
+changes, and the planned variants. The default metro design is the frozen
+Census MSA/CoC population-overlap site structure: select whole CoCs from saved
+memberships and sum their PIT/HIC counts, rather than fractionally allocate
+those outcomes into MSAs. Supporting pipelines build Census-MSA covariates
+and CoC PIT/HIC outcomes separately. The main `cbsa` analysis panel remains
+explicitly unresolved until the overlap-site outcomes, compatible historical
+boundaries, MSA covariates and RTS flags are joined on MSA ID/year. Its four numerical research parameters, the
 right-to-shelter source, and the CoC unemployment source remain explicit
 unresolved recipe values; no research margins or source decisions have been
 invented. Those source markers continue to block lock and run even if the
-numerical parameters are supplied.
+numerical parameters are supplied. The previous fractional PIT/HIC metro
+pipeline and implicit Glynn/Fox subset have been removed from this example.
 
 The CBSA LAUS, PEP, and ACS5 inputs currently cover panel years 2015–2023,
 while the study range is 2010–2024. ACS tract vintages follow the ACS data
@@ -217,15 +222,21 @@ Run the offline RecipeV2 integration acceptance suite with:
 
 ## Geography Notes
 
-- Use `metro` for the project's metro analysis surface.
+- Default general metro research to the saved Census MSA/CoC population-overlap
+  site universe and whole-CoC outcome aggregation; use the `site_year` recipe
+  examples above for this contract. Match MSA-native covariates by MSA ID/year
+  and retain boundary-compatibility evidence and footprint caveats.
+- `metro` is the project's canonical metro data surface; choosing that type
+  alone does not implement overlap-site selection or whole-CoC aggregation.
 - For new recipes, use `geometry: { type: metro, source: census_msa_2023 }`
   when you want the full canonical metro universe.
 - Add `subset_profile: glynn_fox` and
   `subset_profile_definition_version: glynn_fox_v1` when you want the
-  historical 25-metro Glynn/Fox subset over that universe.
+  historical 25-metro subset for analysis directly examining Glynn/Fox.
 - Existing examples that still say `source: glynn_fox_v1` are compatibility
   examples. Runtime execution resolves them through the canonical metro
-  universe plus the Glynn/Fox subset profile.
+  universe plus the Glynn/Fox subset profile. Reserve these examples for direct
+  Glynn/Fox analysis; they do not define the default research cohort.
 - Use `msa` for official Census delineations keyed by `msa_id` / CBSA code.
 - Map targets use the same geometry ids plus a `map_spec.layers[*].selector_ids`
   list. CoC layers need curated CoC boundaries, MSA layers need

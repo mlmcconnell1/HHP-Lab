@@ -93,7 +93,7 @@ SYNTHETIC_RECIPE = {
     "authors": ["HHP-Lab test fixture"],
     "universe": {"range": "2010-2024"},
     "targets": [
-        {"id": "cbsa", "geometry": {"type": "metro", "source": "glynn_fox_v1"}},
+        {"id": "cbsa", "geometry": {"type": "metro", "source": "census_msa_2023"}},
         {"id": "coc", "geometry": {"type": "coc", "vintage": 2025}},
     ],
     "datasets": {},
@@ -401,6 +401,7 @@ def test_real_example_has_supported_build_refs_and_keeps_research_inputs_unresol
 
     unresolved = {path for path, _description in example.unresolved_values()}
     assert unresolved == {
+        "recipe.panels.cbsa.ref",
         "recipe.parameters.delta_theta",
         "recipe.parameters.delta_slope",
         "recipe.parameters.fit_threshold",
@@ -409,10 +410,17 @@ def test_real_example_has_supported_build_refs_and_keeps_research_inputs_unresol
         "recipe.parameters.coc_unemployment_source",
     }
     assert {pipeline.id for pipeline in example.pipelines} == {
-        "build_cbsa_panel",
+        "build_msa_covariates",
         "build_coc_panel",
     }
-    assert example.panels["cbsa"].ref.pipeline == "build_cbsa_panel"
+    assert example.panels["cbsa"].geo_key == "msa_id"
+    assert example.targets[0].geometry.source == "census_msa_2023"
+    assert all(transform.id != "coc_to_metro" for transform in example.transforms)
+    covariates = next(p for p in example.pipelines if p.id == "build_msa_covariates")
+    assert all(
+        step.kind != "resample" or step.dataset not in {"pit", "hic"}
+        for step in covariates.steps
+    )
     assert example.panels["coc"].ref.pipeline == "build_coc_panel"
     assert "laus_metro" in example.datasets
     assert example.datasets["laus_metro"].file_set.segments[0].years.range == "2015-2023"
@@ -454,6 +462,7 @@ def test_real_example_source_choices_block_lock_and_run_after_numeric_parameters
     recipe_path.write_text(yaml.safe_dump(recipe_data, sort_keys=False), encoding="utf-8")
 
     expected_source_paths = {
+        "recipe.panels.cbsa.ref",
         "recipe.parameters.right_to_shelter_source",
         "recipe.parameters.coc_unemployment_source",
     }

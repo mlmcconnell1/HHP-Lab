@@ -944,6 +944,19 @@ gives β_total = β_sheltered + θ exactly. That identity is a declared diagnost
 
 ### 10.2 Recipe
 
+Default metro geography (Matt, 2026-10-26) is the frozen Census MSA/CoC
+population-overlap site structure, with whole-CoC PIT/HIC sums. Glynn/Fox
+geography/subsetting is reserved for analyses directly examining Glynn/Fox.
+MSA-native covariates and RTS classifications must use the declared Census
+delineation and be joined by MSA ID/year. This does not make the selected CoC
+union identical to the MSA; retain the overlap/mismatch caveat and historical
+boundary evidence. Fractional CoC outcome allocation is a distinct optional
+method, not this default. The executable example leaves the main panel
+unresolved until the overlap-site/covariate/RTS assembly is implemented; its
+separate supporting pipelines are not a substitute for that assembly. This
+decision alone does not choose a new overlap threshold or override existing
+explicitly frozen study cohorts.
+
 ```yaml
 version: 2
 id: shelter-capacity-substitution
@@ -960,7 +973,7 @@ authors: [Matt McConnell]
 # ----------------------------------------------------------------
 
 panels:
-  cbsa: {ref: {unresolved: "Implementer: reference to the CBSA panel output"}}
+  cbsa: {ref: {unresolved: "Implementer: frozen MSA overlap-site whole-CoC outcomes joined to MSA covariates and RTS by msa_id/year"}}
   coc:  {ref: {unresolved: "Implementer: reference to the CoC panel output"}}
 
 parameters:
@@ -1264,7 +1277,9 @@ In Phase 1, adding this variant must fail at spec preflight with
    generated source outputs must also carry an equivalent data-origin annotation
    on their RTS columns for reuse by other recipes.
 2. `delta_theta`, `delta_slope`, `fit_threshold`, and `fit_floor`.
-3. The primary geography (CBSA is assumed) and the year range.
+3. The frozen Census MSA/CoC overlap-site cohort, threshold, historical
+   boundary compatibility and year range. MSA overlap is the default metro
+   design; Glynn/Fox is reserved for direct Glynn/Fox analysis.
 4. The bed definition: ES + TH + SH year-round beds, excluding seasonal and
    overflow beds, is assumed.
 
