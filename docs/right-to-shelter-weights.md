@@ -476,3 +476,28 @@ the legally resolved cells only.
 
 Audit JSON SHA-256:
 `b31701fb3eca610c1c19e28744da05568b2632f2a605c65faf1514155f767972`.
+
+## Finalized reference build after baseline extension
+
+The audit above records the earlier, deliberately incomplete legal inventory.
+Matt subsequently approved provisional none for populations outside identified
+protections within listed jurisdictions. Historical NY/DC intervals and
+Hennepin family coding were finalized in the evidence document; the previous
+2010–2024 unknown scopes are resolved under that explicit inventory convention.
+
+The native broad/year-round/any build produced 5,895 MSA-year rows (393 MSAs)
+and 5,805 CoC-year rows (387 B2024 CoCs), with separate population flags and
+covered shares for all 15 years. Year-round qualifying protection occurs in
+21 MSAs and 36 CoCs. The canonical filenames are
+`right_to_shelter__msa__Y2010-2024@Mcensus_msa_2023.parquet` and
+`right_to_shelter__coc__Y2010-2024@B2024.parquet` under the curated RTS directory.
+All carry native provenance, policy qualifications and source-baseline caveats.
+
+Separate sensitivity artifacts are preserved under
+`/home/matt/HHP-Output/right-to-shelter-sensitivities/20261026/`:
+majority classification changes 45 MSA population flags and no CoC flags;
+including weather changes 150 MSA and 381 CoC population flags. These are
+population-cell differences from the main coding, not numbers of distinct
+geographies. Sensitivities reuse the native county memberships after verifying
+the original geometry/membership hashes, with bounded numerical area-share
+roundoff clamped to 1; material over-allocation still fails.

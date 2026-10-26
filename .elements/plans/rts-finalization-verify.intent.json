@@ -1,0 +1,38 @@
+{
+  "schema_version": "elements.intent-element/8.0",
+  "record_type": "intent_element",
+  "intent_element_id": "intent:results-v2:verify",
+  "revision_id": "revision:results-v2:verify:5",
+  "lifecycle": "working",
+  "project_id": "project:HHP-Lab",
+  "parent_id": "intent:results-v2:results",
+  "explicit_root": false,
+  "kind": "semantic/module",
+  "observed_kind": "file",
+  "name": "verify",
+  "repo_relative_path": "hhplab/results/verify.py",
+  "language": "python",
+  "scope": {},
+  "tombstone": false,
+  "content": {
+    "acceptance_policy": "results-v2-architecture-conformance-v1",
+    "change": "new",
+    "dependency_allowlist": [
+      "hhplab.schema",
+      "hhplab.recipe",
+      "hhplab.analysis",
+      "hhplab.results",
+      "hhplab.storage"
+    ],
+    "extension_specs": [
+      "docs/recipe-site-universe-contract.md"
+    ],
+    "layer": "application",
+    "phase": 1,
+    "plan": "results-recipe-v2",
+    "responsibility": "Integrity-first bundled-input replay using shared execution services without upstream build or ledger side effects; include explicit auxiliary MSA/year site-panel dependencies and fingerprints when detecting withheld inputs; preserve exact sample comparison and tolerance/status precedence.",
+    "source_spec": "docs/results-recipe-spec_2.md",
+    "revision_reason": "coclab-gl6pz: account for auxiliary MSA RTS and covariate sources in bundled replay dependencies"
+  },
+  "recorded_at": "2026-10-26T14:35:00Z"
+}

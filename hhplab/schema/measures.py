@@ -823,6 +823,30 @@ HIC_PANEL_MEASURE_DICTIONARY: tuple[PanelMeasureDictionaryEntry, ...] = tuple(
     if str(spec["column"]) in HIC_PANEL_MEASURE_COLUMNS
 )
 
+RIGHT_TO_SHELTER_FLAG_COLUMNS = (
+    "rts_single_adults", "rts_families", "rts_pregnant_people",
+)
+RIGHT_TO_SHELTER_PANEL_MEASURE_DICTIONARY = tuple(
+    _entry(
+        column,
+        "Presence of qualifying protection under the explicit legal and geographic coding rule."
+        if not column.endswith("_share") else
+        "Resident-population share in jurisdictions with qualifying protection.",
+        "1" if column in RIGHT_TO_SHELTER_FLAG_COLUMNS else "share",
+        "curated", "right_to_shelter", "jurisdiction", 2010, "control",
+        "Provisional inventory; geographic coverage does not estimate legal eligibility.",
+        "Indicators may be summed across the three policy populations within a row; "
+        "do not interpret that sum as persons or an allocated geographic count.",
+        last_year=2024,
+    )
+    for column in (
+        *RIGHT_TO_SHELTER_FLAG_COLUMNS,
+        *(f"{column}_population_share" for column in RIGHT_TO_SHELTER_FLAG_COLUMNS),
+    )
+)
+EXTENSIVE_ANALYSIS_UNITS = frozenset({"persons", "beds", "units"})
+RATE_ANALYSIS_UNITS = frozenset({"ratio", "share"})
+
 _PANEL_MEASURE_DICTIONARY_CANDIDATES: tuple[PanelMeasureDictionaryEntry, ...] = (
     *PIT_PANEL_MEASURE_DICTIONARY,
     *ACS5_PANEL_MEASURE_DICTIONARY,
@@ -833,6 +857,7 @@ _PANEL_MEASURE_DICTIONARY_CANDIDATES: tuple[PanelMeasureDictionaryEntry, ...] = 
     *ZORI_PANEL_MEASURE_DICTIONARY,
     *SAE_PANEL_MEASURE_DICTIONARY,
     *HIC_PANEL_MEASURE_DICTIONARY,
+    *RIGHT_TO_SHELTER_PANEL_MEASURE_DICTIONARY,
 )
 
 PANEL_MEASURE_DICTIONARY: tuple[PanelMeasureDictionaryEntry, ...] = tuple(
@@ -866,3 +891,23 @@ def resolve_panel_measure_entry(
 def panel_measure_dictionary() -> list[dict[str, object]]:
     """Return the canonical machine-readable panel measure dictionary."""
     return [entry.to_dict() for entry in PANEL_MEASURE_DICTIONARY]
+
+
+def analysis_measure_metadata(
+    column: str, *, panel_columns: list[str] | None = None,
+) -> dict[str, object] | None:
+    """Resolve derivation metadata only for registered, unambiguous units."""
+    entry = resolve_panel_measure_entry(column, panel_columns=panel_columns)
+    if entry is None or entry.units in {"category", "varies"}:
+        return None
+    if column in RIGHT_TO_SHELTER_FLAG_COLUMNS or entry.units in EXTENSIVE_ANALYSIS_UNITS:
+        semantics = "extensive"
+    elif entry.units in RATE_ANALYSIS_UNITS:
+        semantics = "rate"
+    else:
+        semantics = "intensive"
+    return {
+        "units": entry.units,
+        "aggregation_semantics": semantics,
+        "source_lineage": [column],
+    }

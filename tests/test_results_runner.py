@@ -662,3 +662,73 @@ def test_run_start_ledger_failure_prevents_build(tmp_path, monkeypatch):
 
     assert not built
     assert not (tmp_path / "results").exists()
+
+
+@pytest.mark.parametrize(
+    ("column", "units", "semantics"),
+    [
+        ("rts_single_adults", "1", "extensive"),
+        ("rts_families", "1", "extensive"),
+        ("rts_pregnant_people_population_share", "share", "rate"),
+        ("pit_total", "persons", "extensive"),
+        ("hic_es_year_round_beds", "beds", "extensive"),
+        ("median_gross_rent", "nominal_usd_per_month", "intensive"),
+    ],
+)
+def test_native_registered_measures_without_dataframe_attrs(column, units, semantics):
+    from hhplab.results.runner import _input_measures
+
+    frame = pd.DataFrame({column: [0, 1]})
+    metadata = _input_measures({"native": frame})["native"][column]
+
+    assert metadata == {
+        "units": units, "aggregation_semantics": semantics, "source_lineage": [column],
+    }
+
+
+def test_native_measure_resolution_preserves_explicit_units_and_rejects_unknown_guess():
+    from hhplab.results.runner import _input_measures
+
+    explicit = {
+        "units": "custom_people", "aggregation_semantics": "intensive",
+        "source_lineage": ["explicit_source"],
+    }
+    frame = pd.DataFrame({"pit_total": [1], "custom_numeric": [2]})
+    frame.attrs["measures"] = {"pit_total": explicit}
+
+    metadata = _input_measures({"native": frame})["native"]
+
+    assert metadata["pit_total"] == explicit
+    assert "custom_numeric" not in metadata
+
+
+def test_source_identity_preserves_arrow_nulls_and_nonfinite_values():
+    import pyarrow as pa
+
+    from hhplab.results.runner import _frame_values_equal
+
+    native = pa.table({"value": pa.array([None, float("nan"), 1.0], from_pandas=False)})
+    frame = native.to_pandas(types_mapper=pd.ArrowDtype)
+
+    assert _frame_values_equal(frame, frame.copy())
+    changed = pa.table(
+        {"value": pa.array([float("nan"), None, 1.0], from_pandas=False)}
+    ).to_pandas(types_mapper=pd.ArrowDtype)
+    assert not _frame_values_equal(frame, changed)
+    assert not _frame_values_equal(pd.DataFrame({"value": [1]}), pd.DataFrame({"value": [1.0]}))
+
+
+def test_numerical_view_uses_storage_nulls_and_retains_original_source_representation():
+    from hhplab.results.runner import _panel_value_frame, _parquet_bytes
+
+    frame = pd.DataFrame({"value": [None, 1.0]})
+    original_dtype = frame["value"].dtype
+    source = _parquet_bytes(frame, dataset_type="results_input_panel")
+    frame.attrs["results_source_parquet_bytes"] = source
+
+    values = _panel_value_frame(frame)
+
+    assert values.loc[0, "value"] is pd.NA
+    assert frame["value"].dtype == original_dtype
+    assert frame.attrs["results_source_parquet_bytes"] == source
+    assert values.attrs == {}

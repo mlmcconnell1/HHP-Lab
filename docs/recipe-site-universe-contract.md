@@ -159,6 +159,29 @@ Threshold sensitivity must use separate result recipes or runs and separately na
 
 ## Evidence and implementation gates
 
+### Native MSA/year covariate joins
+
+`panels.<name>.site_year.covariates` optionally attaches named native MSA/year
+panels after whole-CoC aggregation. Each binding selects `panel`, `columns`,
+and boolean `require_match` (default true). Source panels must have `msa_id`
+and `year` keys and the same canonical Census MSA definition as the frozen
+producer. Subset profiles, duplicate/null/padded keys, duplicate bindings,
+and columns colliding with outcomes, diagnostics or keys are rejected.
+
+Required matches fail on missing source rows; optional unmatched rows remain
+null. This does not allocate or alter PIT/HIC outcomes, choose a threshold,
+or establish historical boundary compatibility. Exact source identities and
+annotations travel through the identity join, including zero-valued RTS flags
+used in sample predicates. Auxiliary sources are bundled and included in
+portable replay dependencies. The shelter-capacity example requires complete
+RTS matches while retaining its narrower demographic/labor coverage explicitly.
+
+Native result derivations recover missing measure metadata only from the
+canonical measure dictionary; explicit caller metadata takes precedence.
+Unknown custom columns still require declared units and semantics. RTS
+indicators can be summed within a row to count qualifying policy populations;
+that sum is neither an eligible-person count nor an allocated geographic total.
+
 The current producer contract and runtime evidence are in `hhplab/geographies/msa/coverage.py`, `hhplab/recipe/executor/persistence.py`, `hhplab/recipe/executor/manifest.py`, `hhplab/recipe/recipe_schema.py`, `hhplab/recipe/schema_results.py`, `hhplab/recipe/results_plan.py`, `hhplab/recipe/preflight/checks.py`, `hhplab/recipe/executor/msa_coc_panel.py`, `hhplab/recipe/executor/analyses.py`, `hhplab/analysis/correlation.py`, `hhplab/results/runner.py`, `hhplab/results/bundle.py` and `hhplab/results/verify.py`. PIT/HIC measure whitelists are in `hhplab/schema/columns.py`; PIT quality cautions are in `hhplab/schema/measures.py`, and the existing 2021 PIT mask precedent is in `docs/results-recipe-spec-old_1.md`. Existing producer coverage is exercised in `tests/test_msa_coverage.py` and `tests/test_recipe.py`.
 
 Before implementation, Elements must pin the exact anchors, dependencies and ownership table. After implementation, refresh/check observations, reconcile each changed responsibility to the pinned intent, and run the focused schema/planner/preflight/aggregation/lifecycle tests and architecture gates. A mismatch requires code repair or a versioned intent revision with preserved prior evidence; it is not resolved by waiving reconciliation.

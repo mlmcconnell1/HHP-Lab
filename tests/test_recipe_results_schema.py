@@ -101,15 +101,13 @@ def test_phase_one_spec_example_loads_with_unresolved_items_available_to_preflig
     )
     assert match is not None
     data = yaml.safe_load(match.group(1))
-    data.update(V2_BUILD_BASE_FIELDS)
-
     recipe = load_recipe(data)
 
     assert isinstance(recipe, RecipeV2)
     assert recipe.id == "shelter-capacity-substitution"
     assert len(recipe.analyses) == 6
-    assert len(recipe.derive) == 15
-    assert len(recipe.unresolved_values()) == 6
+    assert len(recipe.derive) == 23
+    assert len(recipe.unresolved_values()) == 5
 
 
 @pytest.mark.parametrize("version", [True, False])

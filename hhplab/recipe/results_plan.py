@@ -600,7 +600,7 @@ def _resolve_panels(
     targets = {target.id: target for target in recipe.targets}
     pipelines = {pipeline.id: pipeline for pipeline in recipe.pipelines}
     result: list[PanelPlan] = []
-    for name, binding in recipe.panels.items():
+    for name, binding in sorted(recipe.panels.items()):
         if binding.site_year is not None:
             if universe_resolution is None:
                 _raise(
@@ -629,7 +629,8 @@ def _resolve_panels(
                     panel_identity=identity,
                     build_spec_hash=build_hash,
                     declared_vintages={
-                        "coc_boundary_vintage": universe_resolution.boundary_vintage
+                        "coc_boundary_vintage": universe_resolution.boundary_vintage,
+                        "msa_definition_version": universe_resolution.msa_definition_version,
                     },
                     source_ids=(universe_resolution.artifact_id,),
                 )
@@ -756,6 +757,28 @@ def _resolve_site_year_contract(
         for year in years:
             source_vintages[(source_binding.panel, year)] = vintage
 
+    for binding in derived.covariates:
+        source_panel = recipe.panels[binding.panel]
+        assert source_panel.ref is not None and hasattr(source_panel.ref, "pipeline")
+        pipeline = pipelines[source_panel.ref.pipeline]
+        target = targets[pipeline.target]
+        geometry = target.geometry
+        definition_version = (
+            geometry.source
+            if geometry.type == "msa"
+            else geometry.resolved_metro_definition_version()
+        )
+        if definition_version != resolution.msa_definition_version:
+            _raise(
+                f"site_year covariate panel {binding.panel!r} MSA definition "
+                f"{definition_version!r} does not match frozen site-universe definition "
+                f"{resolution.msa_definition_version!r}",
+                hint=(
+                    "Use a canonical native MSA panel with the same Census MSA definition "
+                    "as the frozen site-universe producer."
+                ),
+            )
+
     evidence_path_text = derived.boundary_evidence.path
     if boundary_evidence_payload is None:
         evidence_path = Path(evidence_path_text).expanduser()
@@ -800,6 +823,30 @@ def _resolve_site_year_contract(
             ),
         )
     payload = resolution.to_dict()
+    payload["msa_definition_version"] = resolution.msa_definition_version
+    source_panel_bindings: dict[str, dict[str, Any]] = {}
+    for outcome_name, binding in (
+        ("pit", derived.outcomes.pit),
+        ("hic", derived.outcomes.hic),
+    ):
+        record = source_panel_bindings.setdefault(
+            binding.panel, {"roles": [], "columns": [], "require_match": True}
+        )
+        if outcome_name not in record["roles"]:
+            record["roles"].append(outcome_name)
+        record["columns"].extend(
+            column for column in binding.measures if column not in record["columns"]
+        )
+    for binding in derived.covariates:
+        record = source_panel_bindings.setdefault(
+            binding.panel, {"roles": [], "columns": [], "require_match": binding.require_match}
+        )
+        record["roles"].append("covariate")
+        record["columns"].extend(
+            column for column in binding.columns if column not in record["columns"]
+        )
+        record["require_match"] = binding.require_match
+    payload["site_year_source_panels"] = source_panel_bindings
     payload["boundary_evidence"] = {
         "path": evidence_path_text,
         "fingerprint": validation.evidence_fingerprint,

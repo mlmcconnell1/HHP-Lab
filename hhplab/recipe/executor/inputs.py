@@ -60,6 +60,7 @@ class SiteUniverseResolution:
     artifact_id: str
     threshold: float
     schema_version: str
+    msa_definition_version: str
     boundary_vintage: str
     membership_identity: str
     selected_msa_ids: tuple[str, ...]
@@ -75,6 +76,7 @@ class SiteUniverseResolution:
             "artifact_id": self.artifact_id,
             "threshold": self.threshold,
             "schema_version": self.schema_version,
+            "msa_definition_version": self.msa_definition_version,
             "boundary_vintage": self.boundary_vintage,
             "membership_identity": self.membership_identity,
             "selected_msa_ids": list(self.selected_msa_ids),
@@ -133,6 +135,10 @@ def resolve_site_universe_files(
         boundary_vintage = str(parameters["coc_boundary_vintage"])
         if not boundary_vintage:
             raise ValueError("producer summary has an empty CoC boundary vintage")
+        msa_definition_version = parameters.get("msa_definition_version")
+        if not isinstance(msa_definition_version, str) or not msa_definition_version.strip():
+            raise ValueError("producer summary has no canonical MSA definition version")
+        msa_definition_version = msa_definition_version.strip()
         frames: list[pd.DataFrame] = []
         provenance_blocks: list[dict[str, Any]] = []
         for path, contents in zip(paths[:2], file_bytes[:2], strict=True):
@@ -229,6 +235,7 @@ def resolve_site_universe_files(
             artifact_id=artifact_id,
             threshold=threshold,
             schema_version="msa_coc_sites/1",
+            msa_definition_version=msa_definition_version,
             boundary_vintage=boundary_vintage,
             membership_identity=membership_identity,
             selected_msa_ids=eligible_ids,

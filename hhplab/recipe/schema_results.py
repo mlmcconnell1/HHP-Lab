@@ -10,6 +10,7 @@ from pydantic import (
     BaseModel,
     ConfigDict,
     Field,
+    StrictBool,
     StrictFloat,
     StrictInt,
     StrictStr,
@@ -154,16 +155,37 @@ class SiteYearOutcomes(ClosedModel):
         return self
 
 
+class SiteYearCovariateBinding(ClosedModel):
+    """One native MSA/year panel joined onto each frozen site-year row."""
+
+    panel: StrictStr = Field(min_length=1)
+    columns: list[StrictStr] = Field(min_length=1)
+    require_match: StrictBool = True
+
+    @field_validator("columns")
+    @classmethod
+    def validate_unique_columns(cls, values: list[str]) -> list[str]:
+        normalized = [value.strip() for value in values]
+        if any(not value for value in normalized):
+            raise ValueError("site_year covariate column names must be non-empty")
+        if len(set(normalized)) != len(normalized):
+            raise ValueError("site_year covariate columns must be unique")
+        if {"msa_id", "year"}.intersection(normalized):
+            raise ValueError("site_year covariate columns cannot select join keys")
+        return normalized
+
+
 class BoundaryEvidenceBinding(ClosedModel):
     path: StrictStr = Field(min_length=1)
 
 
 class SiteYearPanelBinding(ClosedModel):
-    """Derived site-year panel sourced from frozen memberships and PIT/HIC panels."""
+    """Derived panel from frozen memberships, CoC outcomes, and MSA covariates."""
 
     universe: Literal["site_universe"] = "site_universe"
     boundary_evidence: BoundaryEvidenceBinding
     outcomes: SiteYearOutcomes
+    covariates: list[SiteYearCovariateBinding] = Field(default_factory=list)
 
 
 class PanelBinding(ClosedModel):
@@ -796,6 +818,70 @@ class RecipeV2(RecipeV1):
                         f"site_year {source_name} source panel {binding.panel!r} "
                         "must target CoC geometry"
                     )
+            covariate_panels: set[str] = set()
+            for binding in panel.site_year.covariates:
+                source = self.panels.get(binding.panel)
+                if source is None or source.site_year is not None:
+                    raise ValueError(
+                        f"site_year covariate source references unknown or derived panel "
+                        f"{binding.panel!r}"
+                    )
+                if isinstance(source.ref, UnresolvedMarker) or source.ref is None:
+                    raise ValueError(
+                        f"site_year covariate source panel {binding.panel!r} is unresolved"
+                    )
+                if binding.panel in covariate_panels:
+                    raise ValueError(
+                        f"site_year covariate panel {binding.panel!r} may be bound only once"
+                    )
+                covariate_panels.add(binding.panel)
+                if source.geo_key != "msa_id" or source.time_key != "year":
+                    raise ValueError(
+                        f"site_year covariate source panel {binding.panel!r} requires "
+                        "geo_key=msa_id and time_key=year"
+                    )
+                source_pipeline = pipeline_by_id[source.ref.pipeline]
+                source_target = next(
+                    target for target in self.targets if target.id == source_pipeline.target
+                )
+                geometry = source_target.geometry
+                if (
+                    geometry.type not in {"msa", "metro"}
+                    or geometry.subset_profile is not None
+                    or geometry.subset_profile_definition_version is not None
+                ):
+                    raise ValueError(
+                        f"site_year covariate source panel {binding.panel!r} must target a "
+                        "canonical MSA geometry without a subset profile"
+                    )
+                if geometry.type == "msa" and not geometry.source:
+                    raise ValueError(
+                        f"site_year covariate source panel {binding.panel!r} must declare its "
+                        "canonical MSA definition in target geometry.source"
+                    )
+            reserved_columns = {"msa_id", "year"}
+            for outcome in (panel.site_year.outcomes.pit, panel.site_year.outcomes.hic):
+                reserved_columns.update(outcome.measures)
+                for measure in outcome.measures:
+                    reserved_columns.update(
+                        f"{measure}__{suffix}"
+                        for suffix in (
+                            "expected_coc_count", "observed_coc_count", "missing_coc_ids",
+                            "unknown_boundary_coc_ids", "incompatible_boundary_coc_ids",
+                            "unobserved_count_coc_ids", "partial_count_coc_ids",
+                            "unknown_count_type_coc_ids", "status",
+                        )
+                    )
+            selected_covariates: set[str] = set()
+            for binding in panel.site_year.covariates:
+                collisions = selected_covariates.intersection(binding.columns)
+                collisions.update(reserved_columns.intersection(binding.columns))
+                if collisions:
+                    raise ValueError(
+                        "site_year covariate columns collide with output columns: "
+                        f"{sorted(collisions)}"
+                    )
+                selected_covariates.update(binding.columns)
         analysis_ids = {analysis.id for analysis in self.analyses}
         variant_ids = {variant.id for variant in self.variants}
         group_ids = set(self.sample_groups)

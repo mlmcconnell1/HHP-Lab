@@ -160,11 +160,12 @@ plan = "results-recipe-v2"
 baseline_commit = "900a29f9891f949bef5aaae354f4055b01033497"
 intent_file = ".elements/elements.working-intent.jsonl"
 reconcile_request = ".elements/plans/results-recipe-v2.reconcile.json"
-final_pin = ".elements/plans/reference-joins.pin-receipt.json"
+final_pin = ".elements/plans/rts-finalization-measures.pin-receipt.json"
 bead_map = ".elements/plans/results-recipe-v2.bead-map.jsonl"
 bead_export = ".beads/issues.jsonl"
 
 [results_v2.elements]
+"intent:results-v2:measure_registry" = { path = "hhplab/schema/measures.py", kind = "semantic/module", parent = "intent:results-v2:schema", layer = "contracts", change = "extend", bead = "coclab-vzash" }
 # id = { path, kind, parent, layer, change, bead }
 "intent:results-v2:hhplab" = { path = "hhplab", kind = "semantic/package", parent = "", layer = "contracts", change = "retain", bead = "" }
 "intent:results-v2:schema" = { path = "hhplab/schema", kind = "semantic/package", parent = "intent:results-v2:hhplab", layer = "contracts", change = "extend", bead = "" }
@@ -222,6 +223,7 @@ bead_export = ".beads/issues.jsonl"
 "intent:site-universe:recipe_output_root_schema" = { path = "hhplab/recipe/recipe_schema.py", kind = "semantic/module", parent = "intent:results-v2:recipe", layer = "application", change = "extend", bead = "coclab-ccwlh.6" }
 
 [results_v2.import_prefixes]
+"intent:results-v2:measure_registry" = ["hhplab.schema.columns"]
 # Newly introduced modules may import only from these declared hhplab prefixes.
 "intent:results-v2:analysis_dispatch" = ["hhplab.analysis", "hhplab.schema", "hhplab.recipe.results_plan"]
 "intent:results-v2:bands" = ["hhplab.schema"]
@@ -254,6 +256,7 @@ bead_export = ".beads/issues.jsonl"
 "intent:site-universe:recipe_output_root_schema" = []
 
 [results_v2.responsibilities]
+"intent:results-v2:measure_registry" = "Own canonical measure definitions and data dictionary, including population-specific RTS policy indicators/shares and a pure registered-unit resolver for result derivation metadata; no data loading, eligibility inference or analysis execution."
 "intent:results-v2:hhplab" = "Scoped root for results recipe implementation; not a replacement for whole-codebase legacy intent."
 "intent:results-v2:schema" = "Retain canonical schema ownership and passive facade; new results functionality follows architecture_layers.toml."
 "intent:results-v2:storage" = "Retain canonical storage ownership and passive facade; new results functionality follows architecture_layers.toml."
@@ -289,18 +292,18 @@ bead_export = ".beads/issues.jsonl"
 "intent:results-v2:regression" = "Resolved-frame regression API; compatibility wrapper for path API; sample invariant, inference and result contracts."
 "intent:results-v2:report" = "Offline HTML/CSV and README rendering from structured result payloads; four statuses and failures first; no estimation."
 "intent:results-v2:result_contracts" = "Versioned bundle, result, status, sample and findings wire contracts; dependency-free of application modules."
-"intent:results-v2:result_planner" = "Resolve panel refs, overrides, substitutions, groups, dependency graph, component identities and static preflight; numerical readiness delegated."
-"intent:results-v2:results_runner" = "Own end-to-end lifecycle: build, masks/derive, samples, readiness, dispatch, diagnostics/findings, bundle and ledger; failure scope controls independent progress."
+"intent:results-v2:result_planner" = "Resolve panel references, overrides, substitutions, groups, dependency graph, component identities and static preflight, including explicit site-year auxiliary panel dependencies and key contracts; delegate numerical readiness."
+"intent:results-v2:results_runner" = "Own end-to-end build, masks/derive, samples, readiness, dispatch, findings, bundle and ledger lifecycle; materialize frozen whole-CoC site outcomes then attach explicitly declared MSA/year auxiliary panels with source fingerprints, strict keys, match policy and exact annotation propagation. Restore missing native measure metadata only from registered canonical contracts while preserving explicit caller declarations; apply the same registry resolver to newly assembled site panels."
 "intent:results-v2:samples" = "Resolve exact membership and ordered exclusions, group unions, iterative removals and inference-only base reuse; readiness owns numerical validation."
 "intent:results-v2:source_coverage" = "Expose core source metadata and redistribution declarations using shared contracts."
 "intent:results-v2:source_registry" = "Store source redistribution metadata using shared contracts without importing domain catalog or application."
 "intent:results-v2:stats" = "Classical, HC1, CR1 corrections and consistent t-based intervals/p-values; no recipe dependencies."
-"intent:results-v2:v2_schema" = "RecipeV2 and closed result sections, parameters, capability validation and v1 build composition; no statistical algorithms."
-"intent:results-v2:verify" = "Integrity-first replay using bundled panels only, shared execution services without upstream build/ledger side effects, exact sample comparison and tolerance/status precedence."
-"intent:site-universe:input_resolver" = "Resolve paired site and membership tables, schema, artifact identity, explicit thresholds and fingerprints; load preparation inputs with immutable source annotation identities and preserve or reject temporal/geography transformations according to known cell dependencies."
-"intent:site-universe:site_year_aggregation" = "Aggregate complete site-year outcomes over frozen memberships using validated panel/year source-ID sets and single, preaggregated, or sum operations; prevent cross-site source reuse and double counts, and preserve explicit incomplete status without partial sums or allocation. Consume the PIT observation module's source declarations and measure-specific eligibility predicates to emit source-limited statuses and member diagnostics without modifying reported source values."
+"intent:results-v2:v2_schema" = "Validate RecipeV2 closed sections and build composition, including explicit MSA/year auxiliary panel bindings with selected columns and required-match policy for frozen whole-CoC site-year outcomes; no statistical algorithms."
+"intent:results-v2:verify" = "Integrity-first bundled-input replay using shared execution services without upstream build or ledger side effects; include explicit auxiliary MSA/year site-panel dependencies and fingerprints when detecting withheld inputs; preserve exact sample comparison and tolerance/status precedence."
+"intent:site-universe:input_resolver" = "Resolve paired site/membership inputs, schema and exact source identities including validated Census MSA definition version, thresholds and fingerprints; load preparation inputs with immutable source annotations and preserve or reject temporal/geography transforms by known cell dependencies."
+"intent:site-universe:site_year_aggregation" = "Aggregate complete site-year additive PIT/HIC outcomes over frozen whole-CoC memberships with boundary and source-observation evidence, preventing cross-site source reuse and partial sums; support identity-preserving auxiliary MSA/year column joins with strict keys, selected columns, match policy and exact annotation propagation; preserve source-limited statuses and member diagnostics without allocation or changing reported source values."
 "intent:site-universe:pit_observation" = "Own source-declared PIT observation metadata and measure-specific eligibility predicates. Preserve reported values and constituent declarations, distinguish observed, carried-forward, partial and unknown counts, and require complete member coverage when aggregating metadata. Never infer observation from repeated numeric values or select study geography, research periods or estimator samples."
-"intent:rts:source" = "Validate versioned evidence or explicitly provisional baseline coverage and dated jurisdiction policy exceptions, expand January-reference statuses with unknown gaps and qualifications, derive strict or broad population flags, map requested MSA and CoC years using validated additive substate county overrides retaining NYC and complete optional mixed-status weights, propagate provisional-baseline and geographic/subgroup caveats, and record exact input, membership and coding provenance."
+"intent:rts:source" = "Validate versioned evidence or explicitly provisional population-specific baseline coverage and dated jurisdiction exceptions, expand January-reference statuses with unknown gaps and qualifications, retain independent population-level baseline attribution when an exception covers only some populations, map requested MSA and CoC years with complete optional mixed-status resident weights, propagate exact provisional, geographic and subgroup caveats, and record content/membership/coding provenance."
 "intent:rts:cli" = "Expose dated exceptions and explicit baseline coverage, optional validated substate county membership and mixed-status weights, requested MSA/CoC years and coding choices with actionable JSON diagnostics; do not infer unsupported legal classifications."
 "intent:preparation:annotations" = "Preserve immutable annotation records, exact cell bindings and source identities through known preparation dependencies, key/column renames, row filters, joins and supported aggregation; detect conflicts and fail closed when dependency mapping is unsupported; keep statistical analysis and public distribution decisions with their existing owners."
 "intent:metro:laus_ingest" = "Ingest and persist annual BLS LAUS metro measures with canonical Census metro coverage by default, explicit Glynn/Fox subset support only when requested, documented BLS batching and exact source/definition provenance; do not select overlap cohorts or allocate CoC outcomes."

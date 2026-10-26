@@ -129,15 +129,15 @@ CORE_SOURCE_COVERAGE_SPECS: dict[str, SourceCoverageSpec] = {
         provider="curated",
         product="reviewed baseline plus dated policy exceptions",
         native_geo="jurisdiction",
-        first_year=2007,
-        last_year=None,
+        first_year=2010,
+        last_year=2024,
         notes=(
             "Generated annual coding uses the January 31 reference date. Availability "
-            "is limited to explicitly listed, evidence-backed reviewed jurisdiction-year "
-            "coverage in the curated baseline; outside that scope and in explicit "
-            "population-specific unknown gaps, status is unresolved and depends on cited "
-            "reviewed coverage. No national "
-            "negative baseline is assumed."
+            "is limited to the versioned baseline's explicit jurisdiction/year coverage. "
+            "The 2010-2024 research baseline provisionally codes no identified qualifying "
+            "protection outside listed exceptions, including uncovered populations within "
+            "listed jurisdictions, by researcher decision. This is not an exhaustive legal "
+            "review. Explicit policy uncertainties remain unknown and fail closed."
         ),
     ),
 }

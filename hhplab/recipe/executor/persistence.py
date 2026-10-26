@@ -198,7 +198,9 @@ def persist_outputs(
         include_laus=conformance_flags.include_laus,
         enforce_schema_contract=True,
     )
-    conformance_report = run_conformance(panel, panel_request)
+    # These checks inspect values only. Pandas otherwise deep-copies the full
+    # annotation bindings into every group/column view during validation.
+    conformance_report = run_conformance(pd.DataFrame(panel, copy=False), panel_request)
     if not ctx.quiet:
         print(conformance_report.summary(), file=sys.stderr)
 

@@ -37,6 +37,7 @@ GEOGRAPHY_RULES = ("majority", "any")
 # Independent HUD/TIGER reprojections can create microscopic boundary slivers.
 # Ignore less than one hundred-millionth of a county; retain real fragments.
 COUNTY_OVERLAY_SLIVER_SHARE = 1e-8
+COUNTY_OVERLAY_ROUNDOFF_TOLERANCE = 1e-10
 SOURCE_TYPES = {"statute", "regulation", "administrative_directive", "court_order", "secondary"}
 REDISTRIBUTION_STATUSES = {
     "public_domain", "public", "permission_required", "unknown", "not_applicable"
@@ -73,6 +74,9 @@ EXCEPTION_COLUMNS = (
 BASELINE_FILENAME = "right_to_shelter__baseline.json"
 EXCEPTIONS_FILENAME = "right_to_shelter__exceptions.csv"
 JURISDICTION_FLAG_COLUMNS = tuple(f"rts_{population}" for population in POPULATIONS)
+POPULATION_BASELINE_COLUMNS = tuple(
+    f"{population}_baseline_basis" for population in POPULATIONS
+)
 POPULATION_SHARE_COLUMNS = tuple(
     f"rts_{population}_population_share" for population in POPULATIONS
 )
@@ -461,6 +465,7 @@ def expand_policy_intervals(
             }
             for population in POPULATIONS:
                 row[f"{population}_strength"] = "none"
+                row[f"{population}_baseline_basis"] = scope.get("basis", "reviewed")
                 row[f"{population}_weather_only"] = False
                 row[f"{population}_qualification_scope"] = "all"
                 row[f"{population}_qualification_summary"] = ""
@@ -478,6 +483,12 @@ def expand_policy_intervals(
                 row.update(exception.to_dict())
                 row["year"] = year
                 row["baseline_basis"] = "reviewed"
+                # An exception for one population does not establish absence
+                # of unlisted protections for the other populations. Preserve
+                # the approved negative-baseline assumption for those cells.
+                for population in POPULATIONS:
+                    if row[f"{population}_strength"] != "none":
+                        row[f"{population}_baseline_basis"] = "reviewed"
             # Baseline uncertainty is authoritative and cannot be overridden by
             # a policy exception record that happens to contain a placeholder.
             for gap in gaps:
@@ -558,12 +569,20 @@ def validate_jurisdiction_source_table(frame: pd.DataFrame) -> pd.DataFrame:
         "exception_id",
         "baseline_basis",
         "baseline_county_fips",
+        *POPULATION_BASELINE_COLUMNS,
         *(f"{population}_qualification_scope" for population in POPULATIONS),
         *(f"{population}_qualification_summary" for population in POPULATIONS),
     ) if column in frame.columns]
     result = frame.loc[:, [*JURISDICTION_SOURCE_COLUMNS, *extra_columns]].copy()
     if result.empty:
         return result
+
+    for column in POPULATION_BASELINE_COLUMNS:
+        if column in result and not result[column].isin(("reviewed", "provisional_none")).all():
+            raise RightToShelterError(
+                f"{column} must be reviewed or provisional_none; preserve the population's "
+                "baseline attribution when applying policy exceptions."
+            )
 
     for column in ("jurisdiction_id", "jurisdiction_type", "citation"):
         result[column] = result[column].astype("string").str.strip()
@@ -780,6 +799,12 @@ def build_coc_county_membership(
         columns={coc_id_column: "geo_id", county_id_column: "county_fips"}
     )[["geo_id", "county_fips", "allocation_share"]]
     result["county_fips"] = result["county_fips"].astype(str).str.zfill(5)
+    if result["allocation_share"].gt(1 + COUNTY_OVERLAY_ROUNDOFF_TOLERANCE).any():
+        raise RightToShelterError(
+            "CoC/county intersection exceeds the county area beyond numerical roundoff; "
+            "check the source geometries before mapping resident population."
+        )
+    result["allocation_share"] = result["allocation_share"].clip(upper=1.0)
     return result.loc[
         result["allocation_share"] >= COUNTY_OVERLAY_SLIVER_SHARE
     ].reset_index(drop=True)
@@ -882,6 +907,8 @@ def map_jurisdiction_years(
     source_flags = relevant_source[["jurisdiction_id", "year", *JURISDICTION_FLAG_COLUMNS,
                            *source_extra,
                            *(column for column in ("baseline_basis", "baseline_county_fips")
+                             if column in relevant_source),
+                           *(column for column in POPULATION_BASELINE_COLUMNS
                              if column in relevant_source)]]
     joined = counties.merge(
         source_flags, on=["jurisdiction_id", "year"], how="left", validate="many_to_one",
@@ -904,14 +931,17 @@ def map_jurisdiction_years(
     provisional_cells: dict[str, list[list[object]]] = {}
     for (geo_id, year), group in joined.groupby(["geo_id", "year"], sort=True):
         row: dict[str, object] = {"geo_id": str(geo_id), "year": int(year)}
-        uses_provisional_baseline = (
-            "baseline_basis" in group
-            and group["baseline_basis"].eq("provisional_none").any()
-        )
         for population_name, flag_column, weight_column, share_column in zip(
             POPULATIONS, JURISDICTION_FLAG_COLUMNS,
             COUNTY_POPULATION_COLUMNS[2:], POPULATION_SHARE_COLUMNS, strict=True,
         ):
+            population_basis = f"{population_name}_baseline_basis"
+            basis_column = (population_basis if population_basis in group
+                            else "baseline_basis")
+            uses_provisional_baseline = (
+                basis_column in group
+                and group[basis_column].eq("provisional_none").any()
+            )
             scope_column = f"{population_name}_qualification_scope"
             if scope_column in group and group[scope_column].eq("subgroup").any():
                 summary_column = f"{population_name}_qualification_summary"

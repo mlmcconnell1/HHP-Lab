@@ -1,0 +1,70 @@
+{
+  "schema_version": "elements.working-intent.import.request/1.0",
+  "elements": [
+    {
+      "schema_version": "elements.intent-element/8.0",
+      "record_type": "intent_element",
+      "intent_element_id": "intent:results-v2:results_runner",
+      "revision_id": "revision:results-v2:results_runner:3",
+      "lifecycle": "working",
+      "project_id": "project:HHP-Lab",
+      "parent_id": "intent:results-v2:results",
+      "explicit_root": false,
+      "kind": "semantic/module",
+      "observed_kind": "file",
+      "name": "results_runner",
+      "repo_relative_path": "hhplab/results/runner.py",
+      "language": "python",
+      "scope": {},
+      "tombstone": false,
+      "content": {
+        "acceptance_policy": "results-v2-architecture-conformance-v1",
+        "change": "new",
+        "dependency_allowlist": [
+          "hhplab.recipe",
+          "hhplab.analysis",
+          "hhplab.results",
+          "hhplab.storage",
+          "hhplab.schema"
+        ],
+        "layer": "application",
+        "phase": 1,
+        "plan": "results-recipe-v2",
+        "responsibility": "Own end-to-end build, masks/derive, samples, readiness, dispatch, findings, bundle and ledger lifecycle; materialize frozen whole-CoC site outcomes then attach explicitly declared MSA/year auxiliary panels with source fingerprints, strict keys, match policy and exact annotation propagation. Restore missing native measure metadata only from registered canonical contracts while preserving explicit caller declarations; apply the same registry resolver to newly assembled site panels.",
+        "revision_reason": "coclab-vzash: native source panels must support approved RTS composite and endpoint derives",
+        "source_spec": "docs/results-recipe-spec_2.md"
+      },
+      "recorded_at": "2026-10-26T14:55:12.792176+00:00"
+    },
+    {
+      "schema_version": "elements.intent-element/8.0",
+      "record_type": "intent_element",
+      "intent_element_id": "intent:results-v2:measure_registry",
+      "revision_id": "revision:results-v2:measure_registry:1",
+      "lifecycle": "working",
+      "project_id": "project:HHP-Lab",
+      "parent_id": "intent:results-v2:schema",
+      "explicit_root": false,
+      "kind": "semantic/module",
+      "observed_kind": "file",
+      "name": "measures",
+      "repo_relative_path": "hhplab/schema/measures.py",
+      "language": "python",
+      "scope": {},
+      "tombstone": false,
+      "recorded_at": "2026-10-26T14:55:12.792176+00:00",
+      "content": {
+        "acceptance_policy": "results-v2-architecture-conformance-v1",
+        "change": "extend",
+        "dependency_allowlist": [
+          "hhplab.schema.columns"
+        ],
+        "layer": "contracts",
+        "phase": 1,
+        "plan": "results-recipe-v2",
+        "source_spec": "docs/results-recipe-spec_2.md",
+        "responsibility": "Own canonical measure definitions and data dictionary, including population-specific RTS policy indicators/shares and a pure registered-unit resolver for result derivation metadata; no data loading, eligibility inference or analysis execution."
+      }
+    }
+  ]
+}

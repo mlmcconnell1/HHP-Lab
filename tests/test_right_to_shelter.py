@@ -1046,6 +1046,116 @@ def test_active_policy_exception_is_not_attributed_to_provisional_absence() -> N
     ]["bindings"]
 
 
+def test_family_exception_retains_provisional_baseline_for_uncovered_populations() -> None:
+    baseline = copy.deepcopy(SYNTHETIC_BASELINE)
+    baseline["reviewed_coverage"][0]["basis"] = "provisional_none"
+    baseline["provisional_baseline"] = {
+        "id": "synthetic-population-baseline", "revision": 1,
+        "category": "caveat", "summary": "Provisional negative inventory",
+        "text": "No identified qualifying protection is provisionally none.",
+        "public_text": "No identified qualifying protection is provisionally none.",
+    }
+    exception = exception_row(effective_date="2020-01-01", strength="none")
+    exception["families_strength"] = "conditional"
+    source = expand_policy_intervals(
+        baseline, pd.DataFrame([exception]), YEAR_2020, YEAR_2020,
+    )
+    mapped = map_jurisdiction_years(
+        source, pd.DataFrame({"geo_id": ["one"], "county_fips": ["01001"]}),
+        coding_rule="broad",
+    )
+
+    assert mapped.loc[0, "rts_families"] == 1
+    assert mapped.loc[0, "rts_single_adults"] == 0
+    binding = mapped.attrs["annotations"]["bindings"][
+        "synthetic-population-baseline#r1"
+    ]["columns"]
+    assert set(binding) == {
+        "rts_single_adults", "rts_single_adults_population_share",
+        "rts_pregnant_people", "rts_pregnant_people_population_share",
+    }
+    assert binding["rts_single_adults"] == [["one", YEAR_2020]]
+
+
+@pytest.mark.parametrize("population", POPULATIONS)
+def test_invalid_population_baseline_attribution_is_rejected(population: str) -> None:
+    source = status_frame([source_row("01", YEAR_2020)])
+    source[f"{population}_baseline_basis"] = "unreviewed"
+
+    with pytest.raises(RightToShelterError, match="baseline_basis must be"):
+        validate_jurisdiction_source_table(source)
+
+
+@pytest.mark.parametrize(
+    ("excess", "valid"), [(1e-12, True), (0.01, False)],
+    ids=["roundoff-clamped", "material-excess-rejected"],
+)
+def test_overlay_share_roundoff_is_bounded(monkeypatch, excess: float, valid: bool) -> None:
+    import geopandas as gpd
+
+    square = Polygon([(0, 0), (1, 0), (1, 1), (0, 1)])
+    counties = GeoDataFrame({"geoid": ["01001"]}, geometry=[square], crs="EPSG:5070")
+    cocs = GeoDataFrame({"coc_id": ["one"]}, geometry=[square], crs="EPSG:5070")
+    intersection = GeoDataFrame(
+        {"coc_id": ["one"], "geoid": ["01001"], "_county_area": [1.0]},
+        geometry=[Polygon([(0, 0), (1 + excess, 0), (1 + excess, 1), (0, 1)])],
+        crs="EPSG:5070",
+    )
+    monkeypatch.setattr(gpd, "overlay", lambda *args, **kwargs: intersection.copy())
+
+    if valid:
+        membership = build_coc_county_membership(cocs, counties)
+        assert membership.loc[0, "allocation_share"] == 1.0
+    else:
+        with pytest.raises(RightToShelterError, match="beyond numerical roundoff"):
+            build_coc_county_membership(cocs, counties)
+
+
+@pytest.fixture(scope="module")
+def reviewed_snapshot_flags() -> pd.DataFrame:
+    evidence = (Path(__file__).parents[1] / "docs/right-to-shelter-evidence.md").read_text()
+    baseline_text = evidence.split("### `right_to_shelter__baseline.json`", 1)[1]
+    baseline = json.loads(baseline_text.split("```json\n", 1)[1].split("```", 1)[0])
+    exception_text = evidence.split("### `right_to_shelter__exceptions.csv`", 1)[1]
+    from io import StringIO
+
+    exceptions = pd.read_csv(
+        StringIO(exception_text.split("```csv\n", 1)[1].split("```", 1)[0]),
+        dtype={"jurisdiction_id": "string"},
+    )
+    return derive_rts_flags(
+        expand_policy_intervals(baseline, exceptions, 2010, 2024), coding_rule="broad",
+    ).set_index(["jurisdiction_id", "year"])
+
+
+@pytest.mark.parametrize(
+    ("jurisdiction", "year", "flags", "weather"),
+    [
+        ("NYC", 2010, (1, 1, 1), False),
+        ("NYC", 2024, (1, 1, 1), False),
+        ("36", 2010, (1, 1, 1), False),
+        ("36", 2015, (1, 1, 1), False),
+        ("36", 2016, (1, 1, 1), True),
+        ("36", 2017, (1, 1, 1), True),
+        ("11", 2010, (0, 0, 0), True),
+        ("11", 2012, (0, 0, 0), True),
+        ("34", 2017, (0, 0, 0), False),
+        ("34", 2018, (0, 0, 0), True),
+        ("25", 2024, (0, 1, 1), False),
+        ("HENNEPIN", 2010, (0, 1, 0), False),
+        ("HENNEPIN", 2024, (0, 1, 0), False),
+        ("08", 2024, (0, 0, 0), False),
+    ],
+)
+def test_reviewed_input_snapshot_january_policy_truth_table(
+    reviewed_snapshot_flags, jurisdiction, year, flags, weather,
+) -> None:
+    row = reviewed_snapshot_flags.loc[(jurisdiction, year)]
+
+    assert tuple(int(row[column]) for column in JURISDICTION_FLAG_COLUMNS) == flags
+    assert bool(row["single_adults_weather_only"]) == weather
+
+
 def test_subset_outputs_have_distinct_order_independent_names() -> None:
     complete = mapping_output_path("coc", YEAR_2020, YEAR_2021, 2025)
     subset = mapping_output_path(
@@ -1082,8 +1192,11 @@ def test_source_coverage_is_registered_with_dynamic_availability_note() -> None:
     spec = CORE_SOURCE_COVERAGE_SPECS["right_to_shelter"]
 
     assert spec.native_geo == "jurisdiction"
-    assert "depends on cited reviewed coverage" in spec.notes
-    assert spec.first_year == 2007
+    assert "versioned baseline's explicit jurisdiction/year coverage" in spec.notes
+    assert "including uncovered populations" in spec.notes
+    assert "Explicit policy uncertainties remain unknown" in spec.notes
+    assert spec.first_year == 2010
+    assert spec.last_year == 2024
 
 
 def test_cli_json_error_tells_operator_how_to_add_source_rows(tmp_path: Path) -> None:

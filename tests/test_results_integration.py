@@ -134,6 +134,60 @@ SYNTHETIC_RECIPE = {
             "require_all": True,
         },
         {
+            "id": "right_to_shelter_population_count",
+            "op": "sum",
+            "of": ["rts_single_adults", "rts_families", "rts_pregnant_people"],
+            "require_all": True,
+        },
+        {
+            "id": "right_to_shelter",
+            "op": "indicator",
+            "of": "right_to_shelter_population_count",
+            "gte": 1,
+        },
+        {
+            "id": "lag_right_to_shelter_population_count_1y",
+            "op": "lag",
+            "of": "right_to_shelter_population_count",
+            "years": 1,
+        },
+        {
+            "id": "right_to_shelter_endpoint_count_1y",
+            "op": "sum",
+            "of": [
+                "right_to_shelter_population_count",
+                "lag_right_to_shelter_population_count_1y",
+            ],
+            "require_all": True,
+        },
+        {
+            "id": "right_to_shelter_either_endpoint_1y",
+            "op": "indicator",
+            "of": "right_to_shelter_endpoint_count_1y",
+            "gte": 1,
+        },
+        {
+            "id": "lag_right_to_shelter_population_count_2y",
+            "op": "lag",
+            "of": "right_to_shelter_population_count",
+            "years": 2,
+        },
+        {
+            "id": "right_to_shelter_endpoint_count_2y",
+            "op": "sum",
+            "of": [
+                "right_to_shelter_population_count",
+                "lag_right_to_shelter_population_count_2y",
+            ],
+            "require_all": True,
+        },
+        {
+            "id": "right_to_shelter_either_endpoint_2y",
+            "op": "indicator",
+            "of": "right_to_shelter_endpoint_count_2y",
+            "gte": 1,
+        },
+        {
             "id": "utilization",
             "op": "ratio",
             "num": "pit_sheltered",
@@ -259,9 +313,39 @@ SYNTHETIC_RECIPE = {
         },
         {
             "id": "no_right_to_shelter",
-            "applies_to": ["levels_fit", "subst_fe", "subst_fd", "sheltered_fd", "total_fd"],
+            "applies_to": ["levels_fit", "subst_fe"],
             "override": {
-                "sample.geographies": {"exclude": {"column": "right_to_shelter", "equals": 1}}
+                "sample.geographies": {"exclude": {"column": "right_to_shelter", "equals": 1}},
+                "sample.require": ["right_to_shelter"],
+            },
+        },
+        {
+            "id": "no_right_to_shelter_fd",
+            "applies_to": ["subst_fd", "sheltered_fd", "total_fd"],
+            "override": {
+                "sample.geographies": {
+                    "exclude": {"column": "right_to_shelter_either_endpoint_1y", "equals": 1}
+                },
+                "sample.require": ["right_to_shelter_either_endpoint_1y"],
+            },
+        },
+        {
+            "id": "no_right_to_shelter_odd_years_fd",
+            "applies_to": ["subst_fd", "sheltered_fd", "total_fd"],
+            "override": {
+                "sample.years": {"from": 2013, "to": 2023, "step": 2},
+                "sample.geographies": {
+                    "exclude": {"column": "right_to_shelter_either_endpoint_2y", "equals": 1}
+                },
+                "sample.require": ["right_to_shelter_either_endpoint_2y"],
+            },
+            "substitute": {
+                "d_beds": "d2_beds",
+                "d_sheltered": "d2_sheltered",
+                "d_unsheltered": "d2_unsheltered",
+                "d_total": "d2_total",
+                "d_population": "d2_population",
+                "d_unemployment": "d2_unemployment",
             },
         },
         {
@@ -371,7 +455,13 @@ def _panel_frame(*, inconsistent_total: bool = False) -> pd.DataFrame:
                         + 13 * (geo_index + 1) * math.cos(0.3 * elapsed)
                         + 3 * geo_index**2 * math.sin(0.5 * elapsed)
                     ),
-                    "right_to_shelter": int(geo_id == RIGHT_TO_SHELTER_GEOGRAPHY),
+                    "rts_single_adults": int(
+                        geo_id == RIGHT_TO_SHELTER_GEOGRAPHY and year == 2011
+                    ),
+                    "rts_families": int(
+                        geo_id == RIGHT_TO_SHELTER_GEOGRAPHY and year == 2014
+                    ),
+                    "rts_pregnant_people": 0,
                 }
             )
     frame = pd.DataFrame.from_records(records)
@@ -390,30 +480,47 @@ def _panel_frame(*, inconsistent_total: bool = False) -> pd.DataFrame:
             ("hic_sh_year_round_beds", "beds", "extensive"),
             ("population", "persons", "extensive"),
             ("unemployment_rate", "percent", "intensive"),
+            ("rts_single_adults", "1", "extensive"),
+            ("rts_families", "1", "extensive"),
+            ("rts_pregnant_people", "1", "extensive"),
         )
     }
     return frame
 
 
-def test_real_example_has_supported_build_refs_and_keeps_research_inputs_unresolved():
+def test_real_example_has_supported_build_refs_and_keeps_research_inputs_unresolved(tmp_path):
+    from hhplab.recipe.executor import _resolve_panel_output_file
+
     example_path = Path(__file__).parents[1] / "recipes/examples/shelter-capacity-results.yaml"
     example = load_recipe(example_path)
 
     unresolved = {path for path, _description in example.unresolved_values()}
     assert unresolved == {
-        "recipe.panels.cbsa.ref",
         "recipe.parameters.delta_theta",
         "recipe.parameters.delta_slope",
         "recipe.parameters.fit_threshold",
         "recipe.parameters.fit_floor",
-        "recipe.parameters.right_to_shelter_source",
         "recipe.parameters.coc_unemployment_source",
     }
     assert {pipeline.id for pipeline in example.pipelines} == {
         "build_msa_covariates",
         "build_coc_panel",
+        "build_msa_rts",
     }
     assert example.panels["cbsa"].geo_key == "msa_id"
+    assert example.panels["cbsa"].site_year is not None
+    assert example.site_universe.threshold == 0.99
+    assert {binding.panel for binding in example.panels["cbsa"].site_year.covariates} == {
+        "msa_rts", "msa_covariates",
+    }
+    rts_binding = next(
+        binding for binding in example.panels["cbsa"].site_year.covariates
+        if binding.panel == "msa_rts"
+    )
+    assert rts_binding.require_match is True
+    assert set(rts_binding.columns) >= {
+        "rts_single_adults", "rts_families", "rts_pregnant_people",
+    }
     assert example.targets[0].geometry.source == "census_msa_2023"
     assert all(transform.id != "coc_to_metro" for transform in example.transforms)
     covariates = next(p for p in example.pipelines if p.id == "build_msa_covariates")
@@ -422,6 +529,13 @@ def test_real_example_has_supported_build_refs_and_keeps_research_inputs_unresol
         for step in covariates.steps
     )
     assert example.panels["coc"].ref.pipeline == "build_coc_panel"
+    coc_target = next(target for target in example.targets if target.id == "coc")
+    assert "count_types" in coc_target.panel_policy.output_columns
+    output_paths = [
+        _resolve_panel_output_file(example, pipeline.id, tmp_path)
+        for pipeline in example.pipelines
+    ]
+    assert len(set(output_paths)) == len(output_paths)
     assert "laus_metro" in example.datasets
     assert example.datasets["laus_metro"].file_set.segments[0].years.range == "2015-2023"
     bed_inputs = next(item.of for item in example.derive if item.id == "beds_shelter")
@@ -462,8 +576,6 @@ def test_real_example_source_choices_block_lock_and_run_after_numeric_parameters
     recipe_path.write_text(yaml.safe_dump(recipe_data, sort_keys=False), encoding="utf-8")
 
     expected_source_paths = {
-        "recipe.panels.cbsa.ref",
-        "recipe.parameters.right_to_shelter_source",
         "recipe.parameters.coc_unemployment_source",
     }
     result = RUNNER.invoke(
@@ -542,7 +654,9 @@ def test_synthetic_replay_accounts_for_every_analysis_variant_and_diagnostic_tru
         "base": "pass",
         "odd_years_fe": "not_applicable",
         "odd_years_fd": "pass",
-        "no_right_to_shelter": "pass",
+        "no_right_to_shelter": "not_applicable",
+        "no_right_to_shelter_fd": "pass",
+        "no_right_to_shelter_odd_years_fd": "pass",
         "coc_geography": "pass",
         "pop_weighted": "pass",
         "lagged_beds": "pass",
@@ -586,6 +700,34 @@ def test_synthetic_replay_accounts_for_every_analysis_variant_and_diagnostic_tru
         )
     }
     assert actual_biennial_truth == BIENNIAL_FD_TRUTH
+
+    level_rts_membership = replay["samples"]["levels_fit@no_right_to_shelter"].set_index(
+        ["geo_id", "year"]
+    )
+    assert level_rts_membership.loc[(RIGHT_TO_SHELTER_GEOGRAPHY, 2011), "reason"] == (
+        "geography_excluded"
+    )
+    assert level_rts_membership.loc[(RIGHT_TO_SHELTER_GEOGRAPHY, 2012), "included"]
+
+    annual_rts_membership = replay["samples"]["subst_fd@no_right_to_shelter_fd"].set_index(
+        ["geo_id", "year"]
+    )
+    for year in (2011, 2012, 2014, 2015):
+        assert annual_rts_membership.loc[
+            (RIGHT_TO_SHELTER_GEOGRAPHY, year), "reason"
+        ] == "geography_excluded"
+    assert annual_rts_membership.loc[(RIGHT_TO_SHELTER_GEOGRAPHY, 2013), "included"]
+    assert annual_rts_membership.loc[("g0", 2011), "included"]
+
+    biennial_rts_membership = replay[
+        "samples"]["subst_fd@no_right_to_shelter_odd_years_fd"].set_index(
+            ["geo_id", "year"]
+        )
+    assert biennial_rts_membership.loc[
+        (RIGHT_TO_SHELTER_GEOGRAPHY, 2013), "reason"
+    ] == "geography_excluded"
+    assert biennial_rts_membership.loc[(RIGHT_TO_SHELTER_GEOGRAPHY, 2015), "included"]
+    assert biennial_rts_membership.loc[("g0", 2013), "included"]
     assert "subst_fd@hc1" in replay["analyses"]
     assert replay["analyses"]["subst_fd@hc1"]["sample_source"] == "fd_main@base"
 

@@ -1,0 +1,78 @@
+{
+  "schema_version": "hhplab.architecture-review-evidence/1.0",
+  "status": "reference_build_and_joins_complete",
+  "bead": "coclab-gl6pz",
+  "final_pin_receipt": ".elements/plans/rts-finalization-measures.pin-receipt.json",
+  "reconciliation": {
+    "path": ".elements/plans/rts-finalization.reviewed-reconcile.json",
+    "reviewed_rows": 55,
+    "matched_exact": 55,
+    "has_more": false,
+    "view_conflicts": 0,
+    "view_witness": "sha256:a4bc15996e86eb7c9bafffdd138942e18677b040daeaaa200ee341d89feb937f"
+  },
+  "review_process": "Three Luna High worker assignments; root first review, one worker revision, root final repairs; exclusive shared-main ownership and no worker Git/tracker mutations.",
+  "validation": {
+    "functional_tests_passed": 729,
+    "architecture_tests_passed": 424,
+    "ruff": "pass",
+    "compileall": "pass",
+    "curated_layout": "pass",
+    "canonical_input_snapshots": "exact match",
+    "native_reference_rows": {
+      "msa": 5895,
+      "coc": 5805
+    },
+    "matched_join_rows": {
+      "msa": 5895,
+      "coc": 5805
+    },
+    "unmapped_historical_coc_rows": 393,
+    "frozen_site_rows": 960,
+    "frozen_sites": 64,
+    "observed_2024_unsheltered_sites": 56
+  },
+  "real_reference_checks": {
+    "private": {
+      "path": "/home/matt/HHP-Output/right-to-shelter-reference-check/20261026/run-02/results/right-to-shelter-reference-check/ae8192d189b6437bb600ab2f40805d93",
+      "execution": "complete",
+      "integrity": "pass",
+      "reproducibility": "pass",
+      "differences": 0
+    },
+    "public": {
+      "path": "/home/matt/HHP-Output/right-to-shelter-reference-check/20261026/public/results/right-to-shelter-reference-check/754f96cff7064ff788518c0be669e03c",
+      "execution": "complete",
+      "integrity": "pass",
+      "reproducibility": "partial",
+      "reason": "source/site-universe inputs intentionally withheld under existing redistribution policy",
+      "differences": 0,
+      "public_notes_in_report_and_readme": true
+    }
+  },
+  "artifacts": {
+    "right_to_shelter__baseline.json": {
+      "path": "data/curated/right_to_shelter/right_to_shelter__baseline.json",
+      "sha256": "c01d376c9dadfa06a406654f91dd6c47cee4e5c8d33db685108eff25060113aa"
+    },
+    "right_to_shelter__exceptions.csv": {
+      "path": "data/curated/right_to_shelter/right_to_shelter__exceptions.csv",
+      "sha256": "56f6e33333e05eeb3640a456aa7e5a2447d09ee961de3995017de6830fd765c7"
+    },
+    "right_to_shelter__msa__Y2010-2024@Mcensus_msa_2023.parquet": {
+      "path": "data/curated/right_to_shelter/right_to_shelter__msa__Y2010-2024@Mcensus_msa_2023.parquet",
+      "sha256": "cd7506b2921a62f7759193ed1ee1954937d6b09c9638b43b6f8e549e60b3f003"
+    },
+    "right_to_shelter__coc__Y2010-2024@B2024.parquet": {
+      "path": "data/curated/right_to_shelter/right_to_shelter__coc__Y2010-2024@B2024.parquet",
+      "sha256": "6e0344dc119637dbb7d09265b299cfef965dcf59f6415195368ba07f42ee55e9"
+    }
+  },
+  "remaining_scientific_run_work": [
+    "Researcher numerical equivalence/fit parameters",
+    "CoC-native unemployment and full covariate availability",
+    "Historical outcome boundary compatibility before2024 for the frozen cohort"
+  ],
+  "scientific_run_bead": "coclab-ff6fp.24",
+  "scientific_locked_run_claimed": false
+}

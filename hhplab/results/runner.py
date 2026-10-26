@@ -31,6 +31,7 @@ from hhplab.recipe.derive import (
 from hhplab.recipe.executor.analyses import execute_analysis
 from hhplab.recipe.executor.inputs import SiteUniverseResolution, resolve_site_universe_files
 from hhplab.recipe.executor.msa_coc_panel import (
+    SiteYearCovariateBinding,
     SiteYearSourceBinding,
     assemble_site_year_panel,
 )
@@ -52,6 +53,7 @@ from hhplab.schema.contracts import (
     frame_annotation_contract,
     project_annotation_contract,
 )
+from hhplab.schema.measures import analysis_measure_metadata
 from hhplab.schema.redistribution import ArtifactScope
 from hhplab.schema.results import (
     BUNDLE_FORMAT_VERSION,
@@ -222,7 +224,11 @@ def replay_results(
         )
     if expected_plan.get("recipe_id") != recipe.id:
         raise ValueError("resolved plan recipe_id does not match RecipeV2")
-    if expected_plan.get("panels") != [panel.to_dict() for panel in rebuilt.panels]:
+    expected_panels = expected_plan.get("panels", ())
+    actual_panels = [panel.to_dict() for panel in rebuilt.panels]
+    if sorted(expected_panels, key=lambda item: item["name"]) != sorted(
+        actual_panels, key=lambda item: item["name"]
+    ):
         raise ValueError("resolved plan panel identities do not match RecipeV2")
     rebuilt_dict = rebuilt.to_dict()
     if _recipe_plan_projection(expected_plan) != _recipe_plan_projection(rebuilt_dict):
@@ -270,6 +276,7 @@ def replay_results(
         required_sources = {
             site_binding.outcomes.pit.panel,
             site_binding.outcomes.hic.panel,
+            *(binding.panel for binding in site_binding.covariates),
         }
         missing_sources = sorted(
             name
@@ -348,7 +355,10 @@ def replay_results(
             if inherited:
                 inherited_by_panel[panel_name] = inherited
             state = apply_masks(
-                frame,
+                # Applicability is already explicit in the arguments below.
+                # Keep the original annotated source for bundling; numerical
+                # views must not copy its full provenance into every cell.
+                _panel_value_frame(frame),
                 recipe.masks,
                 panel_name=panel_name,
                 geo_key=panel_plan.geo_key,
@@ -363,7 +373,7 @@ def replay_results(
                 if not item.panels or panel_name in item.panels
             ]
             metadata = measures_by_panel.get(
-                panel_name, frame.attrs.get("measures", {})
+                panel_name, _input_measures({panel_name: frame})[panel_name]
             )
             if active_derivations:
                 state = derive_panel(
@@ -1501,14 +1511,30 @@ def _assemble_site_year_panel(recipe, plan, frames):
         name: SiteYearSourceBinding(panel=binding.panel, measures=tuple(binding.measures))
         for name, binding in source_bindings.items()
     }
-    source_names = tuple(dict.fromkeys(binding.panel for binding in outcomes.values()))
+    covariates = tuple(
+        SiteYearCovariateBinding(
+            panel=binding.panel,
+            columns=tuple(binding.columns),
+            require_match=binding.require_match,
+        )
+        for binding in site_spec.covariates
+    )
+    source_names = tuple(
+        dict.fromkeys(
+            (*[binding.panel for binding in outcomes.values()],
+             *[binding.panel for binding in covariates])
+        )
+    )
     source_panels = {}
     fingerprints = {}
     for name in source_names:
         frame = frames.get(name)
         if not isinstance(frame, pd.DataFrame):
             raise ValueError(f"site-year source panel {name!r} is unavailable")
-        _validate_site_source_panel_provenance(name, frame, plan_site)
+        if name in {binding.panel for binding in outcomes.values()}:
+            _validate_site_source_panel_provenance(name, frame, plan_site)
+        else:
+            _validate_site_covariate_provenance(name, frame, plan_site)
         source_bytes = _panel_input_bytes(frame, dataset_type="results_input_panel")
         digest = hashlib.sha256(source_bytes).hexdigest()
         claimed = frame.attrs.get("results_content_sha256")
@@ -1526,6 +1552,7 @@ def _assemble_site_year_panel(recipe, plan, frames):
         requested_years=tuple(int(year) for year in plan_site["requested_years"]),
         source_panels=source_panels,
         outcome_bindings=outcomes,
+        covariate_bindings=covariates,
         boundary_compatibility=boundary_validation,
         artifact_id=str(plan_site["artifact_id"]),
         threshold=float(plan_site["threshold"]),
@@ -1534,6 +1561,43 @@ def _assemble_site_year_panel(recipe, plan, frames):
         source_panel_fingerprints=fingerprints,
     )
     return assembly, fingerprints
+
+
+def _validate_site_covariate_provenance(panel_name, frame, site_plan):
+    provenance = frame.attrs.get("results_panel_provenance")
+    if not isinstance(provenance, Mapping):
+        raise ValueError(
+            f"site-year covariate panel {panel_name!r} lacks embedded HHP-Lab provenance"
+        )
+    extra = provenance.get("extra", {})
+    target = provenance.get("target_geometry")
+    if not isinstance(target, Mapping) and isinstance(extra, Mapping):
+        target = extra.get("target_geometry")
+    target = target if isinstance(target, Mapping) else {}
+    geometry_type = target.get("type") or provenance.get("geo_type")
+    definition_version = (
+        target.get("source")
+        or provenance.get("definition_version")
+        or (extra.get("msa_definition_version") if isinstance(extra, Mapping) else None)
+    )
+    subset_profile = target.get("subset_profile")
+    subset_profile_version = target.get("subset_profile_definition_version")
+    if geometry_type not in {"msa", "metro"}:
+        raise ValueError(
+            f"site-year covariate panel {panel_name!r} provenance must identify native "
+            "MSA geometry"
+        )
+    if subset_profile is not None or subset_profile_version is not None:
+        raise ValueError(
+            f"site-year covariate panel {panel_name!r} cannot use an MSA subset profile"
+        )
+    expected = site_plan.get("msa_definition_version")
+    if not isinstance(expected, str) or definition_version != expected:
+        raise ValueError(
+            f"site-year covariate panel {panel_name!r} MSA definition "
+            f"{definition_version!r} does not match frozen site-universe definition "
+            f"{expected!r}"
+        )
 
 
 def _validate_site_source_panel_provenance(panel_name, frame, site_plan):
@@ -1601,15 +1665,18 @@ def _panel_input_bytes(frame, *, dataset_type):
             raise ValueError(
                 "panel annotations differ from original bytes; write a new annotated artifact"
             )
-        if contract is not None:
-            from io import BytesIO
+        from io import BytesIO
 
-            original = pd.read_parquet(BytesIO(existing))
-            if not frame.reset_index(drop=True).equals(original.reset_index(drop=True)):
-                raise ValueError(
-                    "annotated source DataFrame changed after reading its source bytes; "
-                    "write a new annotated artifact with updated provenance before reuse"
-                )
+        original = pd.read_parquet(BytesIO(existing))
+        matches = _frame_values_equal(frame, original)
+        if not matches:
+            original = pd.read_parquet(BytesIO(existing), dtype_backend="pyarrow")
+            matches = _frame_values_equal(frame, original)
+        if not matches:
+            raise ValueError(
+                "annotated source DataFrame changed after reading its source bytes; "
+                "write a new annotated artifact with updated provenance before reuse"
+            )
         return existing
     provenance = dict(frame.attrs.get("results_panel_provenance", {}))
     if contract is not None:
@@ -1619,6 +1686,54 @@ def _panel_input_bytes(frame, *, dataset_type):
             "annotations": contract["records"] if contract["schema_version"] == 0 else contract,
         }
     return _parquet_bytes(frame, dataset_type=dataset_type, provenance=provenance)
+
+
+def _panel_value_frame(frame: pd.DataFrame) -> pd.DataFrame:
+    """Preserve physical storage nulls without changing source byte identities."""
+    from io import BytesIO
+
+    if isinstance(frame.attrs.get("results_source_parquet_bytes"), bytes):
+        source = _panel_input_bytes(frame, dataset_type="results_input_panel")
+        values = pd.read_parquet(BytesIO(source), dtype_backend="pyarrow")
+        values.attrs.clear()
+        return values
+    return pd.DataFrame(frame, copy=False)
+
+
+def _frame_values_equal(left: pd.DataFrame, right: pd.DataFrame) -> bool:
+    """Compare logical Arrow types/nulls, then normalized exact cell values."""
+    import pyarrow as pa
+
+    if list(left.columns) != list(right.columns) or len(left) != len(right):
+        return False
+    left_table = pa.Table.from_pandas(pd.DataFrame(left, copy=False), preserve_index=False)
+    right_table = pa.Table.from_pandas(pd.DataFrame(right, copy=False), preserve_index=False)
+    if not left_table.schema.equals(right_table.schema, check_metadata=False):
+        return False
+    for column in left.columns:
+        if not left_table[column].is_null().equals(right_table[column].is_null()):
+            return False
+    normalized_left = left_table.to_pandas(ignore_metadata=True)
+    normalized_right = right_table.to_pandas(ignore_metadata=True)
+    for column in left.columns:
+        if normalized_left[column].dtype != object:
+            continue
+        normalized_left[column] = normalized_left[column].map(_roundtrip_list_value)
+        normalized_right[column] = normalized_right[column].map(_roundtrip_list_value)
+    return normalized_left.equals(normalized_right)
+
+
+def _roundtrip_list_value(value):
+    """Normalize only list/ndarray values that Parquet reads back differently."""
+    if isinstance(value, list):
+        return tuple(_roundtrip_list_value(item) for item in value)
+    if (
+        type(value).__name__ == "ndarray"
+        and hasattr(value, "tolist")
+        and getattr(value, "ndim", 0) > 0
+    ):
+        return tuple(_roundtrip_list_value(item) for item in value.tolist())
+    return value
 
 
 def _runtime_plan(value, rebuilt, plan_hash):
@@ -1875,7 +1990,18 @@ def _receipt_matches(receipt, *, panel_path, build_spec_hash, content_sha256):
 
 
 def _input_measures(frames):
-    return {name: frame.attrs.get("measures", {}) for name, frame in frames.items()}
+    resolved = {}
+    for name, frame in frames.items():
+        explicit = frame.attrs.get("measures", {})
+        metadata = dict(explicit) if isinstance(explicit, Mapping) else {}
+        for column in frame.columns:
+            if column in metadata:
+                continue
+            registered = analysis_measure_metadata(column, panel_columns=list(frame.columns))
+            if registered is not None:
+                metadata[column] = registered
+        resolved[name] = metadata
+    return resolved
 
 
 def _status_fields(replay, *, run_failed, private):
@@ -1984,6 +2110,12 @@ def _bundle_payload(
                 panel_binding.site_year.outcomes.hic,
             )
         }
+        site_source_names.update(
+            binding.panel
+            for panel_binding in recipe.panels.values()
+            if panel_binding.site_year is not None
+            for binding in panel_binding.site_year.covariates
+        )
         if panel_plan.name in recipe.results.include_panels or panel_plan.name in site_source_names:
             path = f"panels/{panel_plan.name}.parquet"
             artifacts.append(

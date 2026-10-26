@@ -212,6 +212,20 @@ def propagate_annotations(
     for frame, contract, column_map, geo_column, source_year_column in contracts:
         if geo_column is None:
             continue
+        exact_matches: dict[tuple[str, Any, int], list[tuple[str, bool]]] = {}
+        global_matches: list[tuple[str, bool]] = []
+        if contract["schema_version"] == 1:
+            for record in contract["records"]:
+                identity = annotation_identity_key(record["id"], record["revision"])
+                uncertain = identity in contract["uncertain_ids"]
+                columns = contract["bindings"].get(identity, {"columns": {}})["columns"]
+                if uncertain and not columns:
+                    global_matches.append((identity, True))
+                for column, cells in columns.items():
+                    for geography, year in cells:
+                        exact_matches.setdefault((column, geography, year), []).append(
+                            (identity, uncertain)
+                        )
         for source_column, output_column in column_map.items():
             if source_column not in frame.columns or output_column not in output.columns:
                 continue
@@ -224,9 +238,13 @@ def propagate_annotations(
                 cell = (geography, year_value)
                 if cell not in output_cells:
                     continue
-                for identity, uncertain in annotations_for_source_cell(
-                    contract, geography, year_value, source_column,
-                ):
+                matches = (
+                    [*exact_matches.get((source_column, geography, year_value), ()),
+                     *global_matches]
+                    if contract["schema_version"] == 1 else
+                    annotations_for_source_cell(contract, geography, year_value, source_column)
+                )
+                for identity, uncertain in matches:
                     cells = bindings[identity].setdefault(output_column, [])
                     encoded = [geography.item() if hasattr(geography, "item") else geography,
                                year_value]

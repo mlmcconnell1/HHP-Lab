@@ -495,6 +495,13 @@ def _dependency_exclusions(
                 for value in outcomes.values()
                 if isinstance(value, Mapping) and isinstance(value.get("panel"), str)
             }
+            covariates = site_year.get("covariates", ())
+            if isinstance(covariates, Sequence) and not isinstance(covariates, str | bytes):
+                source_names.update(
+                    value.get("panel")
+                    for value in covariates
+                    if isinstance(value, Mapping) and isinstance(value.get("panel"), str)
+                )
             site_source_dependencies[panel_name] = source_names
     for panel_name, sources in site_source_dependencies.items():
         if sources & unavailable_panels:

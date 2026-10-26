@@ -1,0 +1,182 @@
+{
+  "schema_version": "elements.working-intent.import.request/1.0",
+  "elements": [
+    {
+      "schema_version": "elements.intent-element/8.0",
+      "record_type": "intent_element",
+      "intent_element_id": "intent:results-v2:result_planner",
+      "revision_id": "revision:results-v2:result_planner:5",
+      "lifecycle": "working",
+      "project_id": "project:HHP-Lab",
+      "parent_id": "intent:results-v2:recipe",
+      "explicit_root": false,
+      "kind": "semantic/module",
+      "observed_kind": "file",
+      "name": "result_planner",
+      "repo_relative_path": "hhplab/recipe/results_plan.py",
+      "language": "python",
+      "scope": {},
+      "tombstone": false,
+      "content": {
+        "acceptance_policy": "results-v2-architecture-conformance-v1",
+        "change": "new",
+        "dependency_allowlist": [
+          "hhplab.recipe",
+          "hhplab.schema",
+          "hhplab.results.bands",
+          "hhplab.geographies.coc.coc_validate"
+        ],
+        "extension_specs": [
+          "docs/recipe-site-universe-contract.md"
+        ],
+        "layer": "application",
+        "phase": 1,
+        "plan": "results-recipe-v2",
+        "responsibility": "Resolve panel references, overrides, substitutions, groups, dependency graph, component identities and static preflight, including explicit site-year auxiliary panel dependencies and key contracts; delegate numerical readiness.",
+        "source_spec": "docs/results-recipe-spec_2.md",
+        "revision_reason": "coclab-gl6pz approved provisional population baseline and exact frozen-site reference joins"
+      },
+      "recorded_at": "2026-10-26T15:00:00Z"
+    },
+    {
+      "schema_version": "elements.intent-element/8.0",
+      "record_type": "intent_element",
+      "intent_element_id": "intent:results-v2:results_runner",
+      "revision_id": "revision:results-v2:results_runner:2",
+      "lifecycle": "working",
+      "project_id": "project:HHP-Lab",
+      "parent_id": "intent:results-v2:results",
+      "explicit_root": false,
+      "kind": "semantic/module",
+      "observed_kind": "file",
+      "name": "results_runner",
+      "repo_relative_path": "hhplab/results/runner.py",
+      "language": "python",
+      "scope": {},
+      "tombstone": false,
+      "content": {
+        "acceptance_policy": "results-v2-architecture-conformance-v1",
+        "change": "new",
+        "dependency_allowlist": [
+          "hhplab.recipe",
+          "hhplab.analysis",
+          "hhplab.results",
+          "hhplab.storage",
+          "hhplab.schema"
+        ],
+        "layer": "application",
+        "phase": 1,
+        "plan": "results-recipe-v2",
+        "responsibility": "Own end-to-end build, masks/derive, samples, readiness, dispatch, findings, bundle and ledger lifecycle; materialize frozen whole-CoC site outcomes then attach explicitly declared MSA/year auxiliary panels with source fingerprints, strict keys, match policy and exact annotation propagation.",
+        "source_spec": "docs/results-recipe-spec_2.md",
+        "revision_reason": "coclab-gl6pz approved provisional population baseline and exact frozen-site reference joins"
+      },
+      "recorded_at": "2026-10-26T15:00:00Z"
+    },
+    {
+      "schema_version": "elements.intent-element/8.0",
+      "record_type": "intent_element",
+      "intent_element_id": "intent:results-v2:v2_schema",
+      "revision_id": "revision:results-v2:v2_schema:4",
+      "lifecycle": "working",
+      "project_id": "project:HHP-Lab",
+      "parent_id": "intent:results-v2:recipe",
+      "explicit_root": false,
+      "kind": "semantic/module",
+      "observed_kind": "file",
+      "name": "v2_schema",
+      "repo_relative_path": "hhplab/recipe/schema_results.py",
+      "language": "python",
+      "scope": {},
+      "tombstone": false,
+      "content": {
+        "acceptance_policy": "results-v2-architecture-conformance-v1",
+        "change": "new",
+        "dependency_allowlist": [
+          "hhplab.recipe.recipe_schema",
+          "hhplab.schema"
+        ],
+        "extension_specs": [
+          "docs/recipe-site-universe-contract.md"
+        ],
+        "layer": "application",
+        "phase": 1,
+        "plan": "results-recipe-v2",
+        "responsibility": "Validate RecipeV2 closed sections and build composition, including explicit MSA/year auxiliary panel bindings with selected columns and required-match policy for frozen whole-CoC site-year outcomes; no statistical algorithms.",
+        "source_spec": "docs/results-recipe-spec_2.md",
+        "revision_reason": "coclab-gl6pz approved provisional population baseline and exact frozen-site reference joins"
+      },
+      "recorded_at": "2026-10-26T15:00:00Z"
+    },
+    {
+      "schema_version": "elements.intent-element/8.0",
+      "record_type": "intent_element",
+      "intent_element_id": "intent:rts:source",
+      "revision_id": "revision:rts:source:4",
+      "lifecycle": "working",
+      "project_id": "project:HHP-Lab",
+      "parent_id": "intent:results-v2:sources",
+      "explicit_root": false,
+      "kind": "semantic/module",
+      "observed_kind": "file",
+      "name": "right_to_shelter",
+      "repo_relative_path": "hhplab/sources/right_to_shelter.py",
+      "language": "python",
+      "scope": {},
+      "tombstone": false,
+      "content": {
+        "acceptance_policy": "results-v2-architecture-conformance-v1",
+        "change": "modify",
+        "dependency_allowlist": [
+          "hhplab.schema",
+          "hhplab.geographies.msa",
+          "hhplab.geographies.coc",
+          "hhplab.storage",
+          "hhplab.artifacts.naming.naming"
+        ],
+        "layer": "domain",
+        "phase": 1,
+        "plan": "results-recipe-v2",
+        "responsibility": "Validate versioned evidence or explicitly provisional population-specific baseline coverage and dated jurisdiction exceptions, expand January-reference statuses with unknown gaps and qualifications, retain independent population-level baseline attribution when an exception covers only some populations, map requested MSA and CoC years with complete optional mixed-status resident weights, propagate exact provisional, geographic and subgroup caveats, and record content/membership/coding provenance.",
+        "source_spec": "docs/results-recipe-spec_2.md",
+        "revision_reason": "coclab-gl6pz approved provisional population baseline and exact frozen-site reference joins"
+      },
+      "recorded_at": "2026-10-26T15:00:00Z"
+    },
+    {
+      "schema_version": "elements.intent-element/8.0",
+      "record_type": "intent_element",
+      "intent_element_id": "intent:site-universe:site_year_aggregation",
+      "revision_id": "revision:site-universe:site_year_aggregation:6",
+      "lifecycle": "working",
+      "project_id": "project:HHP-Lab",
+      "parent_id": "intent:results-v2:executor",
+      "explicit_root": false,
+      "kind": "semantic/module",
+      "observed_kind": "file",
+      "name": "site_year_aggregation",
+      "repo_relative_path": "hhplab/recipe/executor/msa_coc_panel.py",
+      "language": "python",
+      "scope": {},
+      "tombstone": false,
+      "content": {
+        "acceptance_policy": "results-v2-architecture-conformance-v1",
+        "change": "extend",
+        "dependency_allowlist": [
+          "hhplab.recipe",
+          "hhplab.analysis",
+          "hhplab.schema",
+          "hhplab.geographies.coc.coc_validate",
+          "hhplab.sources.hud.pit.observation"
+        ],
+        "layer": "application",
+        "phase": 1,
+        "plan": "results-recipe-v2",
+        "responsibility": "Aggregate complete site-year additive PIT/HIC outcomes over frozen whole-CoC memberships with boundary and source-observation evidence, preventing cross-site source reuse and partial sums; support identity-preserving auxiliary MSA/year column joins with strict keys, selected columns, match policy and exact annotation propagation; preserve source-limited statuses and member diagnostics without allocation or changing reported source values.",
+        "revision_reason": "coclab-gl6pz approved provisional population baseline and exact frozen-site reference joins",
+        "source_spec": "docs/recipe-site-universe-contract.md"
+      },
+      "recorded_at": "2026-10-26T15:00:00Z"
+    }
+  ]
+}

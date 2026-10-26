@@ -6,8 +6,10 @@ universe: {range: "2010-2024"}
 
 # Default metro design: frozen Census MSA/CoC population-overlap sites with
 # whole-CoC PIT/HIC sums. Glynn/Fox is reserved for direct Glynn/Fox analyses.
-# The pipelines below build CoC outcomes and Census-MSA covariates separately;
-# the final overlap-site/covariate/RTS join remains explicitly unresolved.
+# The pipelines build CoC outcomes, Census-MSA covariates and RTS references;
+# the site-year binding joins them without allocating CoC outcomes.
+# Only 2024 boundary compatibility is reviewed for this frozen cohort;
+# earlier outcome cells remain explicitly unknown pending historical evidence.
 # LAUS/PEP/ACS5 currently cover 2015–2023; no CoC-native LAUS is supplied.
 targets:
   - id: cbsa
@@ -15,15 +17,15 @@ targets:
     outputs: [panel, diagnostics]
     panel_policy:
       laus: {include: true}
-      column_aliases:
-        total_population: total_population_acs5
-        adult_population: adult_population_acs5
-        population_below_poverty: population_below_poverty_acs5
-        median_household_income: median_household_income_acs5
-        median_gross_rent: median_gross_rent_acs5
-        population: pep_population
+      column_aliases: {geo_id: msa_id}
+      output_columns: [msa_id, metro_id, year, population, labor_force, employed, unemployed, unemployment_rate, median_gross_rent]
+  - id: msa-rts
+    geometry: {type: msa, source: census_msa_2023}
+    outputs: [panel]
+    panel_policy:
+      output_columns: [msa_id, year, rts_single_adults, rts_families, rts_pregnant_people, rts_single_adults_population_share, rts_families_population_share, rts_pregnant_people_population_share]
   - id: coc
-    geometry: {type: coc, vintage: 2025, source: hud_exchange}
+    geometry: {type: coc, vintage: 2024, source: hud_exchange}
     outputs: [panel]
     panel_policy:
       output_columns:
@@ -33,11 +35,38 @@ targets:
         - pit_total
         - pit_sheltered
         - pit_unsheltered
+        - count_types
         - hic_es_year_round_beds
         - hic_th_year_round_beds
         - hic_sh_year_round_beds
+        - rts_single_adults
+        - rts_families
+        - rts_pregnant_people
+        - rts_single_adults_population_share
+        - rts_families_population_share
+        - rts_pregnant_people_population_share
 
 datasets:
+  rts_msa:
+    provider: hhplab
+    product: right_to_shelter
+    version: 1
+    native_geometry: {type: metro, source: census_msa_2023}
+    years: "2010-2024"
+    year_column: year
+    geo_column: geo_id
+    params: {msa_definition_version: census_msa_2023}
+    path: data/curated/right_to_shelter/right_to_shelter__msa__Y2010-2024@Mcensus_msa_2023.parquet
+  rts_coc:
+    provider: hhplab
+    product: right_to_shelter
+    version: 1
+    native_geometry: {type: coc, vintage: 2024, source: hud_exchange}
+    years: "2010-2024"
+    year_column: year
+    geo_column: geo_id
+    params: {coc_boundary_vintage: 2024}
+    path: data/curated/right_to_shelter/right_to_shelter__coc__Y2010-2024@B2024.parquet
   pit:
     provider: hud
     product: pit
@@ -138,19 +167,35 @@ pipelines:
     steps:
       - resample:
           dataset: pit
-          to_geometry: {type: coc, vintage: 2025, source: hud_exchange}
+          to_geometry: {type: coc, vintage: 2024, source: hud_exchange}
           method: identity
           measures: [pit_total, pit_sheltered, pit_unsheltered]
       - resample:
           dataset: hic
-          to_geometry: {type: coc, vintage: 2025, source: hud_exchange}
+          to_geometry: {type: coc, vintage: 2024, source: hud_exchange}
           method: identity
           measures:
             - hic_es_year_round_beds
             - hic_th_year_round_beds
             - hic_sh_year_round_beds
+      - resample:
+          dataset: rts_coc
+          to_geometry: {type: coc, vintage: 2024, source: hud_exchange}
+          method: identity
+          measures: [rts_single_adults, rts_families, rts_pregnant_people, rts_single_adults_population_share, rts_families_population_share, rts_pregnant_people_population_share]
       - join:
-          datasets: [pit, hic]
+          datasets: [pit, hic, rts_coc]
+          join_on: [geo_id, year]
+  - id: build_msa_rts
+    target: msa-rts
+    steps:
+      - resample:
+          dataset: rts_msa
+          to_geometry: {type: metro, source: census_msa_2023}
+          method: identity
+          measures: [rts_single_adults, rts_families, rts_pregnant_people, rts_single_adults_population_share, rts_families_population_share, rts_pregnant_people_population_share]
+      - join:
+          datasets: [rts_msa]
           join_on: [geo_id, year]
   - id: build_msa_covariates
     target: cbsa
@@ -196,13 +241,42 @@ filters:
     month: 1
 panels:
   cbsa:
-    ref: {unresolved: "Assemble the frozen population-overlap MSA site-year panel from whole-CoC PIT/HIC outcomes, boundary-compatibility evidence, Census-MSA covariates and RTS flags. Use saved site-universe memberships; do not fractionally allocate PIT/HIC or apply the Glynn/Fox subset."}
+    geo_key: msa_id
+    time_key: year
+    site_year:
+      universe: site_universe
+      boundary_evidence:
+        path: ../site-inputs/coc-boundary-compatibility-shelter-capacity.json
+      outcomes:
+        pit: {panel: coc, measures: [pit_total, pit_sheltered, pit_unsheltered]}
+        hic: {panel: coc, measures: [hic_es_year_round_beds, hic_th_year_round_beds, hic_sh_year_round_beds]}
+      covariates:
+        - panel: msa_rts
+          columns: [rts_single_adults, rts_families, rts_pregnant_people, rts_single_adults_population_share, rts_families_population_share, rts_pregnant_people_population_share]
+          require_match: true
+        - panel: msa_covariates
+          columns: [population, labor_force, employed, unemployed, unemployment_rate, median_gross_rent]
+          require_match: false
+  msa_rts:
+    ref: {pipeline: build_msa_rts, output: panel}
+    geo_key: msa_id
+    time_key: year
+  msa_covariates:
+    ref: {pipeline: build_msa_covariates, output: panel}
     geo_key: msa_id
     time_key: year
   coc:
     ref: {pipeline: build_coc_panel, output: panel}
     geo_key: coc_id
     time_key: year
+
+site_universe:
+  source:
+    artifact_id: overlap_samples
+    sites_path: ../../../../HHP-Output/msa_coc_overlap_sites_2024/msa_coc_sites__overlap_samples.parquet
+    memberships_path: ../../../../HHP-Output/msa_coc_overlap_sites_2024/msa_coc_memberships__overlap_samples.parquet
+  threshold: 0.99
+  site_key: msa_id
 
 parameters:
   delta_theta: {unresolved: "Researcher-supplied equivalence margin; require 0 < delta_theta < 0.5."}
@@ -214,36 +288,10 @@ parameters:
   # Common PEP resident weights: v2020 through 2020, v2024 for 2021-2024.
   # Retain population flags/shares; majority >= 0.5 and weather inclusion are
   # separate sensitivity checks. Shares describe geography, not eligibility.
-  right_to_shelter_source: {unresolved: "Build dated legal exceptions plus the researcher-accepted provisional none-elsewhere baseline for the study window; use broad coding, exclude weather-only, geography_rule any, and derive right_to_shelter as any of the three population flags before joining both panels. Preserve the provisional-baseline annotation and explicit listed-jurisdiction gaps. Use the approved PEP v2020/v2024 resident weights for mixed shares."}
   coc_unemployment_source: {unresolved: "Establish a supported CoC-native unemployment source or remove CoC unemployment analyses."}
 
-annotations:
-  - id: right-to-shelter-provisional-baseline
-    revision: 1
-    category: caveat
-    summary: Provisional right-to-shelter baseline
-    text: >-
-      Outside the jurisdictions listed in the right-to-shelter reference,
-      shelter-right status is provisionally coded as none by researcher decision
-      dated October 26, 2026. This is a working classification, not an exhaustive
-      nationwide legal review, and may be revised as additional evidence becomes
-      available. Listed jurisdictions retain their dated population-specific
-      qualifications and unresolved gaps. Capacity mandates are separate from
-      individual shelter rights.
-    public_text: >-
-      Outside the jurisdictions listed in the right-to-shelter reference,
-      shelter-right status is provisionally coded as none by researcher decision
-      dated October 26, 2026. This is a working classification, not an exhaustive
-      nationwide legal review, and may be revised as additional evidence becomes
-      available. Listed jurisdictions retain their dated population-specific
-      qualifications and unresolved gaps. Capacity mandates are separate from
-      individual shelter rights.
-    evidence:
-      - name: Right-to-shelter evidence and provisional baseline decision
-        ref: docs/right-to-shelter-evidence.md
-    scope:
-      panels: [cbsa, coc]
-      columns: [right_to_shelter]
+# Source annotations are inherited from both RTS artifacts. Derivation carries
+# their exact dependencies into combined and lagged exclusion predicates.
 
 masks:
   - id: covid_unsheltered_2021
@@ -254,23 +302,56 @@ masks:
 
 derive:
   - id: beds_shelter
+    panels: [cbsa, coc]
     op: sum
     of: [hic_es_year_round_beds, hic_th_year_round_beds, hic_sh_year_round_beds]
     require_all: true
-  - {id: utilization, op: ratio, num: pit_sheltered, den: beds_shelter, zero_den: "null"}
-  - {id: d_beds, op: diff, of: beds_shelter, years: 1}
-  - {id: d_sheltered, op: diff, of: pit_sheltered, years: 1}
-  - {id: d_unsheltered, op: diff, of: pit_unsheltered, years: 1}
-  - {id: d_total, op: diff, of: pit_total, years: 1}
-  - {id: d_population, op: diff, of: population, years: 1}
-  - {id: d_unemployment, op: diff, of: unemployment_rate, years: 1}
-  - {id: lag_d_beds, op: lag, of: d_beds, years: 1}
-  - {id: d2_beds, op: diff, of: beds_shelter, years: 2}
-  - {id: d2_sheltered, op: diff, of: pit_sheltered, years: 2}
-  - {id: d2_unsheltered, op: diff, of: pit_unsheltered, years: 2}
-  - {id: d2_total, op: diff, of: pit_total, years: 2}
-  - {id: d2_population, op: diff, of: population, years: 2}
-  - {id: d2_unemployment, op: diff, of: unemployment_rate, years: 2}
+  - id: right_to_shelter_population_count
+    panels: [cbsa, coc]
+    op: sum
+    of: [rts_single_adults, rts_families, rts_pregnant_people]
+    require_all: true
+  - id: right_to_shelter
+    panels: [cbsa, coc]
+    op: indicator
+    of: right_to_shelter_population_count
+    gte: 1
+  - {id: lag_right_to_shelter_population_count_1y, panels: [cbsa, coc], op: lag, of: right_to_shelter_population_count, years: 1}
+  - id: right_to_shelter_endpoint_count_1y
+    panels: [cbsa, coc]
+    op: sum
+    of: [right_to_shelter_population_count, lag_right_to_shelter_population_count_1y]
+    require_all: true
+  - id: right_to_shelter_either_endpoint_1y
+    panels: [cbsa, coc]
+    op: indicator
+    of: right_to_shelter_endpoint_count_1y
+    gte: 1
+  - {id: lag_right_to_shelter_population_count_2y, panels: [cbsa, coc], op: lag, of: right_to_shelter_population_count, years: 2}
+  - id: right_to_shelter_endpoint_count_2y
+    panels: [cbsa, coc]
+    op: sum
+    of: [right_to_shelter_population_count, lag_right_to_shelter_population_count_2y]
+    require_all: true
+  - id: right_to_shelter_either_endpoint_2y
+    panels: [cbsa, coc]
+    op: indicator
+    of: right_to_shelter_endpoint_count_2y
+    gte: 1
+  - {id: utilization, panels: [cbsa, coc], op: ratio, num: pit_sheltered, den: beds_shelter, zero_den: "null"}
+  - {id: d_beds, panels: [cbsa, coc], op: diff, of: beds_shelter, years: 1}
+  - {id: d_sheltered, panels: [cbsa, coc], op: diff, of: pit_sheltered, years: 1}
+  - {id: d_unsheltered, panels: [cbsa, coc], op: diff, of: pit_unsheltered, years: 1}
+  - {id: d_total, panels: [cbsa, coc], op: diff, of: pit_total, years: 1}
+  - {id: d_population, panels: [cbsa, coc], op: diff, of: population, years: 1}
+  - {id: d_unemployment, panels: [cbsa, coc], op: diff, of: unemployment_rate, years: 1}
+  - {id: lag_d_beds, panels: [cbsa, coc], op: lag, of: d_beds, years: 1}
+  - {id: d2_beds, panels: [cbsa, coc], op: diff, of: beds_shelter, years: 2}
+  - {id: d2_sheltered, panels: [cbsa, coc], op: diff, of: pit_sheltered, years: 2}
+  - {id: d2_unsheltered, panels: [cbsa, coc], op: diff, of: pit_unsheltered, years: 2}
+  - {id: d2_total, panels: [cbsa, coc], op: diff, of: pit_total, years: 2}
+  - {id: d2_population, panels: [cbsa, coc], op: diff, of: population, years: 2}
+  - {id: d2_unemployment, panels: [cbsa, coc], op: diff, of: unemployment_rate, years: 2}
 
 sample_groups:
   fd_main:
@@ -345,8 +426,30 @@ variants:
       d_population: d2_population
       d_unemployment: d2_unemployment
   - id: no_right_to_shelter
-    applies_to: [levels_fit, subst_fe, subst_fd, sheltered_fd, total_fd]
-    override: {sample.geographies: {exclude: {column: right_to_shelter, equals: 1}}}
+    applies_to: [levels_fit, subst_fe]
+    override:
+      sample.geographies: {exclude: {column: right_to_shelter, equals: 1}}
+      sample.require: [right_to_shelter]
+  - id: no_right_to_shelter_fd
+    applies_to: [subst_fd, sheltered_fd, total_fd]
+    override:
+      sample.geographies:
+        exclude: {column: right_to_shelter_either_endpoint_1y, equals: 1}
+      sample.require: [right_to_shelter_either_endpoint_1y]
+  - id: no_right_to_shelter_odd_years_fd
+    applies_to: [subst_fd, sheltered_fd, total_fd]
+    override:
+      sample.years: {from: 2013, to: 2023, step: 2}
+      sample.geographies:
+        exclude: {column: right_to_shelter_either_endpoint_2y, equals: 1}
+      sample.require: [right_to_shelter_either_endpoint_2y]
+    substitute:
+      d_beds: d2_beds
+      d_sheltered: d2_sheltered
+      d_unsheltered: d2_unsheltered
+      d_total: d2_total
+      d_population: d2_population
+      d_unemployment: d2_unemployment
   - id: coc_geography
     applies_to: [levels_fit, subst_fe, subst_fd, sheltered_fd, total_fd]
     override: {input: panels.coc}

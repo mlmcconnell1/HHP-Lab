@@ -79,6 +79,15 @@ class SiteYearSourceBinding:
 
 
 @dataclass(frozen=True)
+class SiteYearCovariateBinding:
+    """One native MSA/year input and its explicitly selected columns."""
+
+    panel: str
+    columns: tuple[str, ...]
+    require_match: bool = True
+
+
+@dataclass(frozen=True)
 class SiteYearPanelAssembly:
     """Site-year result and the lineage needed by result persistence."""
 
@@ -128,6 +137,7 @@ def assemble_site_year_panel(
     requested_years: Sequence[int],
     source_panels: Mapping[str, pd.DataFrame],
     outcome_bindings: Mapping[str, SiteYearSourceBinding],
+    covariate_bindings: Sequence[SiteYearCovariateBinding] = (),
     boundary_compatibility: BoundaryCompatibilityValidation,
     artifact_id: str,
     threshold: float,
@@ -143,6 +153,7 @@ def assemble_site_year_panel(
     sites_by_coc = _validate_site_year_memberships(frozen_memberships)
     years = _validate_site_year_years(requested_years)
     bindings = _normalize_site_year_bindings(outcome_bindings)
+    covariates = _normalize_site_year_covariates(covariate_bindings)
     if not bindings:
         raise ExecutorError("site-year aggregation needs at least one outcome binding.")
     measures = tuple(
@@ -152,6 +163,14 @@ def assemble_site_year_panel(
     )
     if len(set(measures)) != len(measures):
         raise ExecutorError("site-year outcome measure names must be unique across bindings.")
+    output_names = set(site_year_panel_columns(measures))
+    for binding in covariates:
+        collisions = output_names.intersection(binding.columns)
+        if collisions:
+            raise ExecutorError(
+                f"Site-year covariate columns collide with output columns: {sorted(collisions)}."
+            )
+        output_names.update(binding.columns)
 
     frozen_vintage = str(frozen_boundary_vintage).strip()
     if not frozen_vintage:
@@ -166,7 +185,9 @@ def assemble_site_year_panel(
             "Boundary compatibility evidence does not match the selected site-universe identity."
         )
 
-    panel_ids = tuple(dict.fromkeys(binding.panel for binding in bindings.values()))
+    outcome_panel_ids = tuple(dict.fromkeys(binding.panel for binding in bindings.values()))
+    covariate_panel_ids = tuple(dict.fromkeys(binding.panel for binding in covariates))
+    panel_ids = tuple(dict.fromkeys((*outcome_panel_ids, *covariate_panel_ids)))
     missing_panels = sorted(set(panel_ids) - set(source_panels))
     if missing_panels:
         raise ExecutorError(
@@ -199,11 +220,11 @@ def assemble_site_year_panel(
                 for measure in binding.measures
             ),
         )
-        for panel_id in panel_ids
+        for panel_id in outcome_panel_ids
     }
     evidence = _index_site_year_boundary_evidence(
         boundary_compatibility,
-        panel_ids=panel_ids,
+        panel_ids=outcome_panel_ids,
         coc_ids=tuple(sites_by_coc),
         years=years,
         sites_by_coc=sites_by_coc,
@@ -211,7 +232,9 @@ def assemble_site_year_panel(
 
     site_ids = tuple(sorted(set(sites_by_coc.values())))
     rows: list[dict[str, object]] = []
-    consumed_keys: dict[str, set[tuple[str, int]]] = {panel_id: set() for panel_id in panel_ids}
+    consumed_keys: dict[str, set[tuple[str, int]]] = {
+        panel_id: set() for panel_id in outcome_panel_ids
+    }
     annotation_contracts = {
         panel_id: frame_annotation_contract(source_panels[panel_id]) for panel_id in panel_ids
     }
@@ -378,6 +401,46 @@ def assemble_site_year_panel(
             ) from exc
     if panel.duplicated(["msa_id", "year"]).any():
         raise ExecutorError("Site-year aggregation produced duplicate (msa_id, year) keys.")
+    covariate_used_rows: dict[str, set[tuple[str, int]]] = {}
+    for binding in covariates:
+        lookup = _site_year_covariate_lookup(binding, source_panels[binding.panel])
+        output_keys = tuple(
+            (str(msa_id), int(year))
+            for msa_id, year in zip(panel["msa_id"], panel["year"], strict=True)
+        )
+        missing = [key for key in output_keys if key not in lookup]
+        if binding.require_match and missing:
+            raise ExecutorError(
+                f"Site-year covariate panel '{binding.panel}' is missing {len(missing)} "
+                f"required (msa_id, year) matches; examples: {missing[:5]!r}."
+            )
+        covariate_used_rows[binding.panel] = set()
+        for column in binding.columns:
+            values = [lookup.get(key, {}).get(column, pd.NA) for key in output_keys]
+            source_dtype = source_panels[binding.panel][column].dtype
+            dtype = source_dtype if not missing else "object"
+            panel[column] = pd.Series(
+                values,
+                index=panel.index,
+                dtype=dtype,
+            )
+        contract = annotation_contracts[binding.panel]
+        for key in output_keys:
+            if key not in lookup:
+                continue
+            covariate_used_rows[binding.panel].add(key)
+            if contract is None:
+                continue
+            for column in binding.columns:
+                for identity, uncertain in annotations_for_source_cell(
+                    contract, key[0], key[1], column
+                ):
+                    if uncertain:
+                        uncertain_output_annotations.add(identity)
+                    output = output_bindings.setdefault(identity, {"columns": {}})
+                    cells = output["columns"].setdefault(column, [])
+                    if list(key) not in cells:
+                        cells.append(list(key))
     provenance = {
         "site_year_panel": {
             "schema_version": "site_year_panel/2",
@@ -401,9 +464,23 @@ def assemble_site_year_panel(
                         if binding.panel == panel_id
                         for measure in binding.measures
                     ],
+                    "columns": [
+                        column
+                        for binding in covariates
+                        if binding.panel == panel_id
+                        for column in binding.columns
+                    ],
                 }
                 for panel_id in panel_ids
             },
+            "covariates": [
+                {
+                    "panel": binding.panel,
+                    "columns": list(binding.columns),
+                    "require_match": binding.require_match,
+                }
+                for binding in covariates
+            ],
             "boundary_evidence": {
                 "evidence_id": boundary_compatibility.evidence_id,
                 "fingerprint": boundary_compatibility.evidence_fingerprint,
@@ -414,13 +491,17 @@ def assemble_site_year_panel(
         }
     }
     annotation_inputs = []
-    for panel_id in panel_ids:
+    for panel_id in outcome_panel_ids:
         source = source_panels[panel_id]
         used = [
             (str(coc_id).strip(), int(year)) in consumed_keys[panel_id]
             for coc_id, year in zip(source["coc_id"], source["year"], strict=True)
         ]
         annotation_inputs.append(source.loc[used].copy())
+    for panel_id, used_keys in covariate_used_rows.items():
+        source = source_panels[panel_id]
+        source_keys = _site_year_covariate_source_keys(panel_id, source)
+        annotation_inputs.append(source.loc[[key in used_keys for key in source_keys]].copy())
     source_annotations = uncertain_annotation_contract(annotation_inputs)
     if source_annotations is not None:
         lineage = dict(source_annotations["sources"])
@@ -527,6 +608,140 @@ def _normalize_site_year_bindings(
             panel=panel.strip(), measures=normalized_measures
         )
     return normalized
+
+
+def _normalize_site_year_covariates(
+    bindings: Sequence[SiteYearCovariateBinding],
+) -> tuple[SiteYearCovariateBinding, ...]:
+    if not isinstance(bindings, Sequence) or isinstance(bindings, str | bytes):
+        raise ExecutorError("Site-year covariate bindings must be a list.")
+    normalized: list[SiteYearCovariateBinding] = []
+    seen_panels: set[str] = set()
+    seen_columns: set[str] = set()
+    for raw in bindings:
+        if isinstance(raw, Mapping):
+            panel = raw.get("panel")
+            columns = raw.get("columns")
+            require_match = raw.get("require_match", True)
+        else:
+            panel = getattr(raw, "panel", None)
+            columns = getattr(raw, "columns", None)
+            require_match = getattr(raw, "require_match", True)
+        if not isinstance(panel, str) or not panel.strip():
+            raise ExecutorError("site-year covariate binding needs a panel name.")
+        panel = panel.strip()
+        if panel in seen_panels:
+            raise ExecutorError(f"site-year covariate panel {panel!r} may be bound only once.")
+        if not isinstance(columns, Sequence) or isinstance(columns, str | bytes) or not columns:
+            raise ExecutorError(f"site-year covariate panel {panel!r} needs explicit columns.")
+        if any(not isinstance(column, str) for column in columns):
+            raise ExecutorError(
+                f"site-year covariate panel {panel!r} selected columns must be strings."
+            )
+        normalized_columns = tuple(column.strip() for column in columns)
+        if any(not column for column in normalized_columns):
+            raise ExecutorError("site-year covariate column names must be non-empty.")
+        if len(set(normalized_columns)) != len(normalized_columns):
+            raise ExecutorError(
+                f"site-year covariate panel {panel!r} has duplicate selected columns."
+            )
+        collisions = seen_columns.intersection(normalized_columns)
+        if collisions:
+            raise ExecutorError(
+                f"site-year covariate columns are selected more than once: {sorted(collisions)}."
+            )
+        if not isinstance(require_match, bool):
+            raise ExecutorError(
+                f"site-year covariate panel {panel!r} require_match must be boolean."
+            )
+        normalized.append(
+            SiteYearCovariateBinding(
+                panel=panel,
+                columns=normalized_columns,
+                require_match=require_match,
+            )
+        )
+        seen_panels.add(panel)
+        seen_columns.update(normalized_columns)
+    return tuple(normalized)
+
+
+def _site_year_covariate_source_keys(
+    panel_id: str,
+    frame: pd.DataFrame,
+) -> list[tuple[str, int]]:
+    required = {"msa_id", "year"}
+    missing = sorted(required - set(frame.columns))
+    if missing:
+        raise ExecutorError(
+            f"Site-year covariate source panel '{panel_id}' is missing key columns {missing}."
+        )
+    keys: list[tuple[str, int]] = []
+    seen: set[tuple[str, int]] = set()
+    for msa_value, year_value in zip(frame["msa_id"], frame["year"], strict=True):
+        if not isinstance(msa_value, str) or not msa_value.strip():
+            raise ExecutorError(
+                f"Site-year covariate panel '{panel_id}' has a null or empty msa_id key."
+            )
+        msa_id = msa_value.strip()
+        if msa_id != msa_value:
+            raise ExecutorError(
+                f"Site-year covariate panel '{panel_id}' msa_id keys cannot contain "
+                "leading or trailing whitespace."
+            )
+        try:
+            numeric_year = pd.to_numeric(year_value, errors="raise")
+        except (TypeError, ValueError) as exc:
+            raise ExecutorError(
+                f"Site-year covariate panel '{panel_id}' has invalid year key {year_value!r}."
+            ) from exc
+        if isinstance(numeric_year, bool) or pd.isna(numeric_year):
+            raise ExecutorError(
+                f"Site-year covariate panel '{panel_id}' has invalid year key {year_value!r}."
+            )
+        if isinstance(numeric_year, Integral):
+            year = int(numeric_year)
+        elif isinstance(numeric_year, Real) and math.isfinite(float(numeric_year)):
+            if not float(numeric_year).is_integer():
+                raise ExecutorError(
+                    f"Site-year covariate panel '{panel_id}' has non-integer year key "
+                    f"{year_value!r}."
+                )
+            year = int(numeric_year)
+        else:
+            raise ExecutorError(
+                f"Site-year covariate panel '{panel_id}' has invalid year key {year_value!r}."
+            )
+        key = (msa_id, year)
+        if key in seen:
+            raise ExecutorError(
+                f"Site-year covariate panel '{panel_id}' has duplicate normalized key {key!r}."
+            )
+        keys.append(key)
+        seen.add(key)
+    return keys
+
+
+def _site_year_covariate_lookup(
+    binding: SiteYearCovariateBinding,
+    frame: pd.DataFrame,
+) -> dict[tuple[str, int], dict[str, object]]:
+    required = {"msa_id", "year", *binding.columns}
+    missing = sorted(required - set(frame.columns))
+    if missing:
+        raise ExecutorError(
+            f"Site-year covariate panel '{binding.panel}' is missing required columns "
+            f"{missing}."
+        )
+    keys = _site_year_covariate_source_keys(binding.panel, frame)
+    return {
+        key: {column: value for column, value in row.items() if column in binding.columns}
+        for key, row in zip(
+            keys,
+            frame.loc[:, list(binding.columns)].to_dict(orient="records"),
+            strict=True,
+        )
+    }
 
 
 def _site_year_source_lookup(
