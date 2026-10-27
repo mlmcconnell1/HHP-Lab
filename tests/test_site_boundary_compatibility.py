@@ -19,6 +19,7 @@ from hhplab.geographies.coc.coc_validate import (
     BoundaryCompatibilityError,
     validate_coc_boundary_compatibility,
 )
+from hhplab.schema.contracts import DataAnnotationSpec
 
 ARTIFACT_ID = "overlap_samples"
 THRESHOLD = 0.95
@@ -57,6 +58,68 @@ ADDITIONAL_MUNICIPAL_GIS_OVERRIDES = (
 FL606_MUNICIPAL_YEARS = (2012, 2013, 2014)
 FL606_PLACE_GEOIDS = ("1243083", "1247625")
 FL606_PRESERVED_NEIGHBORS = ("FL-604", "FL-517", "FL-603")
+WASHINGTON_DECISIONS_PATH = SITE_INPUTS / "coc-boundary-washington-decisions.json"
+WASHINGTON_NOTE_IDS = (
+    "hud-annual-wa500-wa503-cross-county-assignments",
+    "hud-annual-wa504-bothell-source-assignments",
+    "hud-annual-washington-2015-source-overlaps",
+)
+
+
+def test_marysville_repair_targets_the_two_year_city_gap():
+    with (SITE_INPUTS / "coc-boundary-municipal-omissions.csv").open(newline="") as stream:
+        matches = [row for row in csv.DictReader(stream) if row["coc_id"] == "WA-504"]
+    assert len(matches) == 1
+    rule = matches[0]
+    assert (rule["first_year"], rule["last_year"]) == ("2013", "2014")
+    assert (rule["place_vintage"], rule["place_geoids"]) == ("2010", "5343955")
+    assert (rule["bracket_before_year"], rule["bracket_after_year"]) == ("2012", "2015")
+    assert "Marysville" in rule["footnote"] and "GIS omission" in rule["footnote"]
+    assert "PIT/HIC counts are unchanged" in rule["footnote"]
+
+
+def test_washington_exception_removes_only_donor_covered_restoration():
+    policy = json.loads(WASHINGTON_DECISIONS_PATH.read_text())
+    assert policy["metro_id"] == "42660"
+    assert policy["metro_cocs"] == ["WA-500", "WA-503", "WA-504"]
+    exception = policy["restoration_exception"]
+    assert (exception["coc_id"], exception["year"], exception["donor_coc_id"]) == (
+        "WA-504", 2016, "WA-500",
+    )
+    assert exception["place_geoid"] == "5307380"
+    assert "Preserve original WA-504 coverage and all other restorations" in exception["selection"]
+    note = DataAnnotationSpec.model_validate(exception["annotation"])
+    assert note.scope.years == [2016] and note.scope.columns == ["geometry"]
+    assert "PIT/HIC counts are unchanged" in note.public_text
+
+
+@pytest.mark.parametrize("note_id", WASHINGTON_NOTE_IDS)
+def test_washington_source_caveats_have_portable_original_year_scopes(note_id):
+    policy = json.loads(WASHINGTON_DECISIONS_PATH.read_text())
+    note = next(item for item in policy["geometry_annotations"] if item["id"] == note_id)
+    parsed = DataAnnotationSpec.model_validate(note)
+    assert parsed.scope.columns == ["geometry"]
+    assert parsed.public_text and parsed.evidence
+    if note_id.endswith("2015-source-overlaps"):
+        assert parsed.scope.years == [2015]
+        assert parsed.scope.geographies.include == policy["metro_cocs"]
+    elif "wa500-wa503" in note_id:
+        assert parsed.scope.years == list(range(2013, 2025))
+        assert parsed.scope.geographies.include == ["WA-500", "WA-503"]
+    else:
+        assert parsed.scope.years == [2013, 2014, 2015, 2016]
+        assert parsed.scope.geographies.include == ["WA-504"]
+
+
+def test_snohomish_count_method_note_is_separate_from_geometry_caveats():
+    policy = json.loads(WASHINGTON_DECISIONS_PATH.read_text())
+    note = DataAnnotationSpec.model_validate(policy["count_method_annotation"])
+    assert note.category == "measurement_change"
+    assert note.scope.columns == ["pit_total", "pit_sheltered"]
+    assert note.scope.years == list(range(2013, 2025))
+    assert note.scope.geographies.include == ["WA-504"]
+    assert note.evidence[0].kind == "url"
+    assert "HIC effects have not been quantified" in note.public_text
 
 
 def test_fl606_city_repair_preserves_separate_county_line_allocations():

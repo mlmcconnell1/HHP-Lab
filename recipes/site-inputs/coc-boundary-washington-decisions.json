@@ -1,0 +1,73 @@
+{
+  "schema_version": 1,
+  "decision_basis": "study_owner_decision",
+  "metro_id": "42660",
+  "metro_cocs": ["WA-500", "WA-503", "WA-504"],
+  "metro_geometry_treatment": "Use the MSA geometry or a deduplicated union when aggregating the three CoCs; retain published PIT/HIC counts without area-based reallocation.",
+  "restoration_exception": {
+    "coc_id": "WA-504",
+    "year": 2016,
+    "donor_coc_id": "WA-500",
+    "place_vintage": 2010,
+    "place_geoid": "5307380",
+    "selection": "Select original 2016 WA-504 restored-fragment polygon components with at least 1 square metre inside Census 2010 Bothell; remove only their previously added area covered by both original and current 2016 WA-500. Preserve original WA-504 coverage and all other restorations.",
+    "annotation": {
+      "id": "hud-annual-wa504-bothell-donor-exception",
+      "revision": 1,
+      "category": "geographic_approximation",
+      "summary": "WA-504 2016 Bothell restoration exception",
+      "text": "WA-504's automatic 2016 Bothell-area restoration is removed only where original WA-500 already covers the area. Other one-year restorations and original WA-504 coverage are retained. This owner-approved exception removes duplicate geography while preserving the combined Seattle metro footprint. Original GIS files and before-images are retained; PIT/HIC counts are unchanged.",
+      "public_text": "WA-504's automatic 2016 Bothell-area restoration is removed only where original WA-500 already covers the area. Other one-year restorations and original WA-504 coverage are retained. This owner-approved exception removes duplicate geography while preserving the combined Seattle metro footprint. Original GIS files and before-images are retained; PIT/HIC counts are unchanged.",
+      "treatment": "Remove only the previously added Bothell component already covered by the contemporaneous donor; retain other restorations.",
+      "uncertainty": "This is a geometry correction, not evidence of duplicate PIT/HIC reporting or verified individual-CoC count scope.",
+      "evidence": [{"name": "Approved Washington decisions", "ref": "docs/historical-coc-archive-availability.md#washington-city-allocations-2026-10-27", "kind": "doc"}],
+      "scope": {"columns": ["geometry"], "years": [2016], "geographies": {"include": ["WA-504"]}}
+    }
+  },
+  "geometry_annotations": [
+    {
+      "id": "hud-annual-wa500-wa503-cross-county-assignments",
+      "revision": 1,
+      "category": "caveat",
+      "summary": "King/Pierce cross-county municipal GIS assignments",
+      "text": "Original HUD polygons assign the King County portion of Milton to WA-503 and the Pierce County portion of Pacific to WA-500 in 2013–2014 and from 2016 onward; the 2015 polygons contain overlapping claims. These source assignments are retained by study-owner decision. The identified portions remain covered within the combined Seattle metro union. This does not independently establish how individual CoCs reported PIT/HIC counts; published counts are unchanged.",
+      "public_text": "Original HUD polygons assign the King County portion of Milton to WA-503 and the Pierce County portion of Pacific to WA-500 in 2013–2014 and from 2016 onward; the 2015 polygons contain overlapping claims. These source assignments are retained by study-owner decision. The identified portions remain covered within the combined Seattle metro union. This does not independently establish how individual CoCs reported PIT/HIC counts; published counts are unchanged.",
+      "treatment": "Retain source assignments, document the ambiguity and use MSA or union geometry for metro aggregation.",
+      "evidence": [{"name": "Washington allocation review", "ref": "docs/historical-coc-archive-availability.md#washington-city-allocations-2026-10-27", "kind": "doc"}],
+      "scope": {"columns": ["geometry"], "years": [2013, 2014, 2015, 2016, 2017, 2018, 2019, 2020, 2021, 2022, 2023, 2024], "geographies": {"include": ["WA-500", "WA-503"]}}
+    },
+    {
+      "id": "hud-annual-wa504-bothell-source-assignments",
+      "revision": 1,
+      "category": "caveat",
+      "summary": "Bothell assignment differs across Snohomish and King GIS polygons",
+      "text": "Original HUD polygons place most of Bothell's Snohomish County portion in WA-500 in 2013–2014 and 2016, overlap WA-500 and WA-504 in 2015, and return the portion to WA-504 from 2017. These source allocation patterns are retained, with the separately recorded 2016 restoration exception. They do not create a corresponding gap in the combined Seattle metro union and do not independently establish PIT/HIC reporting scope. Counts are unchanged.",
+      "public_text": "Original HUD polygons place most of Bothell's Snohomish County portion in WA-500 in 2013–2014 and 2016, overlap WA-500 and WA-504 in 2015, and return the portion to WA-504 from 2017. These source allocation patterns are retained, with the separately recorded 2016 restoration exception. They do not create a corresponding gap in the combined Seattle metro union and do not independently establish PIT/HIC reporting scope. Counts are unchanged.",
+      "treatment": "Document the source assignment rather than imposing a county-based count allocation.",
+      "evidence": [{"name": "Washington allocation review", "ref": "docs/historical-coc-archive-availability.md#washington-city-allocations-2026-10-27", "kind": "doc"}],
+      "scope": {"columns": ["geometry"], "years": [2013, 2014, 2015, 2016], "geographies": {"include": ["WA-504"]}}
+    },
+    {
+      "id": "hud-annual-washington-2015-source-overlaps",
+      "revision": 1,
+      "category": "caveat",
+      "summary": "Retained 2015 source overlaps in shared municipalities",
+      "text": "The original 2015 HUD polygons contain overlapping claims to the Snohomish portion of Bothell, King portion of Milton and Pierce portion of Pacific. These source overlaps are retained and footnoted by study-owner decision. Deduplicate geometry through a union for metro analysis. Overlapping GIS claims do not demonstrate duplicate PIT/HIC persons or beds, and no source counts are changed.",
+      "public_text": "The original 2015 HUD polygons contain overlapping claims to the Snohomish portion of Bothell, King portion of Milton and Pierce portion of Pacific. These source overlaps are retained and footnoted by study-owner decision. Deduplicate geometry through a union for metro analysis. Overlapping GIS claims do not demonstrate duplicate PIT/HIC persons or beds, and no source counts are changed.",
+      "treatment": "Retain the source geometry overlap with an explicit caveat; do not sum overlapping areas.",
+      "evidence": [{"name": "Washington allocation review", "ref": "docs/historical-coc-archive-availability.md#washington-city-allocations-2026-10-27", "kind": "doc"}],
+      "scope": {"columns": ["geometry"], "years": [2015], "geographies": {"include": ["WA-500", "WA-503", "WA-504"]}}
+    }
+  ],
+  "count_method_annotation": {
+    "id": "snohomish-pit-2013-housing-classification-break",
+    "revision": 1,
+    "category": "measurement_change",
+    "summary": "Snohomish 2013 sheltered-count classification break",
+    "text": "Snohomish County reports that 2013 HUD guidance reclassified project-based-voucher transitional housing as permanent housing, affecting reported homeless and sheltered counts. Levels from 2013 onward require caution when compared with earlier years. Retain published PIT/HIC values; do not attribute this count-method break to municipal GIS changes. Category-specific HIC effects have not been quantified here.",
+    "public_text": "Snohomish County reports that 2013 HUD guidance reclassified project-based-voucher transitional housing as permanent housing, affecting reported homeless and sheltered counts. Levels from 2013 onward require caution when compared with earlier years. Retain published PIT/HIC values; do not attribute this count-method break to municipal GIS changes. Category-specific HIC effects have not been quantified here.",
+    "treatment": "Retain source counts and disclose the cross-period measurement change.",
+    "evidence": [{"name": "Snohomish 2016 PIT report, printed page 19", "ref": "https://www.snohomishcountywa.gov/DocumentCenter/View/34385/2016-Point-In-Time-Report-PDF#page=20", "kind": "url"}],
+    "scope": {"columns": ["pit_total", "pit_sheltered"], "years": [2013, 2014, 2015, 2016, 2017, 2018, 2019, 2020, 2021, 2022, 2023, 2024], "geographies": {"include": ["WA-504"]}}
+  }
+}
