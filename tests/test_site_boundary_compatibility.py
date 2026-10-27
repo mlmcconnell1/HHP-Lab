@@ -46,6 +46,44 @@ CITY_OMISSION_OVERRIDE_YEARS = (2012, 2013, 2014)
 CITY_OMISSION_COUNTIES = {"MI-514": ("26025",), "CA-514": ("06019", "06039")}
 CITY_OMISSION_NAMES = {"MI-514": "Battle Creek", "CA-514": "Clovis"}
 CITY_OMISSION_CELLS = tuple(product(CITY_OMISSION_COUNTIES, CITY_OMISSION_OVERRIDE_YEARS))
+ADDITIONAL_MUNICIPAL_GIS_OVERRIDES = (
+    ("CA-511", 2010, 2012, ("06077",), ("Lodi",)),
+    ("FL-504", 2013, 2014, ("1254200",), ("Palm Coast",)),
+    ("FL-505", 2013, 2014, ("1224475",), ("Fort Walton Beach",)),
+    ("FL-513", 2013, 2014, ("1213150", "1271900"), ("Cocoa", "Titusville")),
+    ("FL-601", 2013, 2014, ("1276582",), ("Weston",)),
+    ("FL-605", 2013, 2014, ("1235875", "1275812"), ("Wellington", "Jupiter")),
+)
+
+
+@pytest.mark.parametrize(
+    "coc_id,first_year,last_year,geoids,places",
+    ADDITIONAL_MUNICIPAL_GIS_OVERRIDES,
+    ids=[case[0] for case in ADDITIONAL_MUNICIPAL_GIS_OVERRIDES],
+)
+def test_additional_municipal_gis_overrides_record_owner_scope(
+    coc_id, first_year, last_year, geoids, places,
+):
+    filename = (
+        "coc-boundary-county-overrides.csv" if coc_id == "CA-511"
+        else "coc-boundary-municipal-omissions.csv"
+    )
+    with (SITE_INPUTS / filename).open(newline="") as stream:
+        matches = [row for row in csv.DictReader(stream) if row["coc_id"] == coc_id]
+    assert len(matches) == 1
+    rule = matches[0]
+    assert (int(rule["first_year"]), int(rule["last_year"])) == (first_year, last_year)
+    geography = "county" if coc_id == "CA-511" else "place"
+    assert tuple(rule[f"{geography}_geoids"].split(";")) == geoids
+    assert rule[f"{geography}_vintage"] == "2010"
+    if coc_id != "CA-511":
+        assert (rule["bracket_before_year"], rule["bracket_after_year"]) == ("2012", "2015")
+        assert "preserving HUD's coastal-water extent" in rule["footnote"]
+    assert rule["decision_basis"] == "study_owner_decision"
+    assert all(place in rule["footnote"] for place in places)
+    assert "GIS error" in rule["footnote"]
+    assert "Original GIS files are retained; PIT/HIC counts are unchanged" in rule["footnote"]
+    assert rule["decision_ref"].endswith("#lodi-and-florida-gis-omissions-2026-10-27")
 
 
 @pytest.mark.parametrize(
