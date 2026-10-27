@@ -40,6 +40,25 @@ WESTERN_MASS_INCOMPATIBLE_YEARS = (2010, 2011, 2012)
 WESTERN_MASS_CELLS = tuple(
     product(WESTERN_MASS_COCS, WESTERN_MASS_OUTCOMES, WESTERN_MASS_INCOMPATIBLE_YEARS)
 )
+YUBA_SUTTER_OVERRIDE_YEARS = tuple(range(2010, 2015))
+YUBA_SUTTER_COUNTY_GEOIDS = ("06101", "06115")
+
+
+@pytest.mark.parametrize("year", YUBA_SUTTER_OVERRIDE_YEARS)
+def test_yuba_sutter_county_override_covers_pre2015_source_errors(year):
+    with (SITE_INPUTS / "coc-boundary-county-overrides.csv").open(newline="") as stream:
+        rules = [row for row in csv.DictReader(stream) if row["coc_id"] == "CA-524"]
+    assert len(rules) == 1
+    rule = rules[0]
+    interval = tuple(range(int(rule["first_year"]), int(rule["last_year"]) + 1))
+    assert interval == YUBA_SUTTER_OVERRIDE_YEARS
+    assert int(rule["first_year"]) <= year <= int(rule["last_year"])
+    assert tuple(rule["county_geoids"].split(";")) == YUBA_SUTTER_COUNTY_GEOIDS
+    assert rule["county_vintage"] == "2010"
+    assert rule["decision_basis"] == "study_owner_decision"
+    assert "2010–2012" in rule["footnote"] and "2013–2014" in rule["footnote"]
+    assert "GIS errors" in rule["footnote"]
+    assert "Original source files are retained" in rule["footnote"]
 
 
 @pytest.mark.parametrize(

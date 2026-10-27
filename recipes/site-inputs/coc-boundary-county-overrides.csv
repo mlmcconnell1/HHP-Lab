@@ -1,0 +1,2 @@
+coc_id,first_year,last_year,county_vintage,county_geoids,decision_basis,footnote,decision_ref
+CA-524,2010,2014,2010,06101;06115,study_owner_decision,"CA-524 is represented by Sutter and Yuba counties starting in 2010. The official 2010–2012 California GIS archives contain no CA-524 polygon, and the 2013–2014 polygons omit Yuba County. These are treated as GIS errors: the 2010 Census county union reconstructs the 2010–2014 footprint by study-owner decision. Original source files are retained.",docs/historical-coc-archive-availability.md#ca-524-county-reconstruction-2026-10-27
