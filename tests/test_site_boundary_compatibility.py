@@ -7,7 +7,11 @@ stable identifier is never accepted as compatibility evidence by itself.
 
 from __future__ import annotations
 
+import csv
+import json
 from copy import deepcopy
+from itertools import product
+from pathlib import Path
 
 import pytest
 
@@ -28,6 +32,75 @@ SOURCE_PANEL_VINTAGES = {
     ("hic_panel", 2020): "2020",
     ("hic_panel", 2021): "2021",
 }
+
+SITE_INPUTS = Path(__file__).resolve().parents[1] / "recipes" / "site-inputs"
+WESTERN_MASS_COCS = ("MA-504", "MA-507")
+WESTERN_MASS_OUTCOMES = ("pit", "hic")
+WESTERN_MASS_INCOMPATIBLE_YEARS = (2010, 2011, 2012)
+WESTERN_MASS_CELLS = tuple(
+    product(WESTERN_MASS_COCS, WESTERN_MASS_OUTCOMES, WESTERN_MASS_INCOMPATIBLE_YEARS)
+)
+
+
+@pytest.mark.parametrize(
+    "coc_id,outcome,year",
+    WESTERN_MASS_CELLS,
+    ids=[f"{coc}-{outcome}-{year}" for coc, outcome, year in WESTERN_MASS_CELLS],
+)
+def test_western_mass_owner_decision_flags_exact_historical_cells(coc_id, outcome, year):
+    with (SITE_INPUTS / "coc-count-geography-decisions.csv").open(newline="") as stream:
+        decisions = list(csv.DictReader(stream))
+    actual_cells = {
+        (row["coc_id"], panel, observation_year)
+        for row in decisions
+        for panel in row["outcomes"].split(";")
+        for observation_year in range(int(row["first_year"]), int(row["last_year"]) + 1)
+    }
+    assert actual_cells == set(WESTERN_MASS_CELLS)
+    matches = [row for row in decisions if row["coc_id"] == coc_id]
+    assert len(matches) == 1
+    decision = matches[0]
+    assert decision["status"] == "incompatible"
+    assert decision["decision_basis"] == "study_owner_decision"
+    assert decision["provisional_start_year"] == "2013"
+    assert "not established by primary sources" in decision["footnote"]
+    assert "does not certify compatibility from 2013 onward" in decision["footnote"]
+    assert "downstream study" in decision["revisit_condition"]
+
+
+def test_packaged_ma504_evidence_blocks_2010_2012_without_approving_2013():
+    payload = json.loads(
+        (SITE_INPUTS / "coc-boundary-compatibility-longitudinal-mergers.json").read_text()
+    )
+    # Project the packaged rows into a one-member validation fixture. This does
+    # not claim a different membership identity for the real longitudinal study.
+    payload["records"] = [
+        row for row in payload["records"] if row["frozen_coc_id"] == "MA-504"
+    ]
+    payload.update(artifact_id=ARTIFACT_ID, membership_identity=MEMBERSHIP_IDENTITY)
+    years = (*WESTERN_MASS_INCOMPATIBLE_YEARS, 2013)
+    panels = ("pit_p2024", "hic_annual")
+    result = validate_coc_boundary_compatibility(
+        payload,
+        artifact_id=ARTIFACT_ID,
+        threshold=payload["threshold"],
+        membership_identity=MEMBERSHIP_IDENTITY,
+        frozen_boundary_vintage="2024",
+        frozen_memberships=(("44140", "MA-504"),),
+        requested_years=years,
+        source_panel_vintages={
+            (panel, year): "2024" if panel == "pit_p2024" else str(year)
+            for panel, year in product(panels, years)
+        },
+    )
+    blocked = [
+        row for row in result.records if row.year in WESTERN_MASS_INCOMPATIBLE_YEARS
+    ]
+    assert len(blocked) == len(panels) * len(WESTERN_MASS_INCOMPATIBLE_YEARS)
+    assert {row.status for row in blocked} == {"incompatible"}
+    assert all(row.count_operation is None and not row.source_coc_ids for row in blocked)
+    assert all("not established by primary sources" in row.reason for row in blocked)
+    assert {row.status for row in result.records if row.year == 2013} == {"unknown"}
 
 COMPATIBLE_PIT_CO1_2020 = {
     "source_panel": "pit_panel",
