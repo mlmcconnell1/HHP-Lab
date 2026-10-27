@@ -54,6 +54,27 @@ ADDITIONAL_MUNICIPAL_GIS_OVERRIDES = (
     ("FL-601", 2013, 2014, ("1276582",), ("Weston",)),
     ("FL-605", 2013, 2014, ("1235875", "1275812"), ("Wellington", "Jupiter")),
 )
+FL606_MUNICIPAL_YEARS = (2012, 2013, 2014)
+FL606_PLACE_GEOIDS = ("1243083", "1247625")
+FL606_PRESERVED_NEIGHBORS = ("FL-604", "FL-517", "FL-603")
+
+
+def test_fl606_city_repair_preserves_separate_county_line_allocations():
+    with (SITE_INPUTS / "coc-boundary-municipal-omissions.csv").open(newline="") as stream:
+        matches = [row for row in csv.DictReader(stream) if row["coc_id"] == "FL-606"]
+    assert len(matches) == 1
+    rule = matches[0]
+    actual_years = tuple(range(int(rule["first_year"]), int(rule["last_year"]) + 1))
+    assert actual_years == FL606_MUNICIPAL_YEARS
+    assert tuple(rule["place_geoids"].split(";")) == FL606_PLACE_GEOIDS
+    assert rule["place_vintage"] == "2010"
+    assert (rule["bracket_before_year"], rule["bracket_after_year"]) == ("2011", "2015")
+    assert rule["decision_basis"] == "study_owner_decision"
+    assert "Naples and Marco Island" in rule["footnote"]
+    assert "GIS omissions" in rule["footnote"]
+    assert all(coc in rule["footnote"] for coc in FL606_PRESERVED_NEIGHBORS)
+    assert "Original GIS files are retained; PIT/HIC counts are unchanged" in rule["footnote"]
+    assert rule["decision_ref"].endswith("#fl-606-naples-and-marco-island-2026-10-27")
 
 
 @pytest.mark.parametrize(
