@@ -1,4 +1,56 @@
-# Public historical CoC boundary archive availability, 2010–2017
+# Public historical CoC boundary archive availability, 2010–2024
+
+## Full-period curation, 2026-10-27
+
+The owner's one-year-dropout rule has been applied to the **2010–2024** annual series. The [retained full-period run](</home/matt/HHP-Output/historical-site-selection/full-period-boundary-curation-20261027>) preserves source-only and corrected series, acquisition receipts, executable analysis scripts and their source snapshots, correction ledgers, native annotations, and separate comparison outputs. The earlier 2010–2017 results below remain the source-screen audit trail; their unresolved single-year gaps are superseded where corrected here.
+
+### Source completion
+
+Official national ZIPs supply 2019–2024. The tested national archive URLs for 2010–2018 returned 404, so the retained official state ZIPs supply 2010–2017 and a newly acquired state/DC/territory collection supplies 2018. These results concern the tested endpoints, not a claim that no other national copy exists. The [new acquisition run](</home/matt/Data/hhplab/raw/hud_exchange/acquisition_runs/20261027T003514960501Z>) records URLs, status, ZIP hashes, extracted member inventories and fallback receipts. Raw source bytes are preserved.
+
+The 2018 CA-520 state ZIP contains both a canonical CoC layer and a CDBG auxiliary layer. Applying the package's existing auxiliary-layer exclusion recovered the canonical CA-520 geometry without imputation. For the missing 2022 AL-505 and AR-508 national features, the corresponding state ZIPs were downloaded and checked; neither supplied the missing ID. Other isolated gaps were also absent from the acquired state sources. Massachusetts shared-jurisdiction layers remain quarantined rather than assigning their common area to every named CoC.
+
+The completed source-only screen contains **6,031 annual features, 5,556 same-ID adjacent-year comparisons, and 122 ID appearance/disappearance events**, covering all fourteen transitions from 2010→2011 through 2023→2024. Source diagnostics and receipts are under `source/`; they remain distinct from the owner-assumption corrections.
+
+### One-year correction rule and footnotes
+
+For an internal year Y, restore `(source[Y−1] ∩ source[Y+1]) − source[Y]`. A wholly missing ID uses the common area of its bracketing source years. Decisions use original source neighbors simultaneously: a correction cannot supply evidence for another correction. If the bracketing shapes differ, only their common area is restored. Multi-year omissions, continuing changes, endpoint changes, and temporary additions are retained for review. In particular, a loss lasting several years is not converted into several single-year repairs.
+
+Overlays use EPSG:6933 on a 1 cm grid. Components smaller than 1 m², or so thin that a 1 cm inward buffer removes their entire interior, are treated as numerical noise. Fixed-grid rounding can produce tiny excursions beyond an exact unsnapped bracket; these are measured in the ledger and checked against a 2 cm bracketing buffer. This numerical treatment does not establish reporting-jurisdiction compatibility.
+
+There are **1,650 corrected CoC/year cells**, mostly small boundary-edge harmonizations, including **26 restorations of at least 1 km²**. These are applications of the owner's assumption, not 1,650 independently verified source errors. Seven missing ID-years were reconstructed:
+
+| CoC | Year | Common bracketing area restored, km² |
+| --- | ---: | ---: |
+| FL-602 | 2013 | 1,852.890 |
+| NC-509 | 2015 | 2,950.942 |
+| NJ-512 | 2015 | 901.829 |
+| NY-501 | 2015 | 9,924.233 |
+| FL-500 | 2018 | 3,477.132 |
+| AL-505 | 2022 | 6,577.381 |
+| AR-508 | 2022 | 11,028.957 |
+
+The corrected series contains **6,038 annual features**. In the active 77-CoC study membership, every ID is present for 2013–2024; **CA-524 remains absent in 2010–2012**, a multi-year gap outside this rule. Material selected restorations include NC-506 in 2012, WA-504 in 2016, and FL-606 in 2019, as well as FL-602 and FL-500 above. The multi-year Fresno/Madera and Battle Creek losses and continuing Hampden and Yuba/Sutter expansions remain review cases.
+
+Each corrected geometry has an immutable native annotation identifying its CoC, original source year, restored area, bracketing evidence and owner assumption. The annotation explicitly does not claim independently verified PIT/HIC scope. The [correction ledger](</home/matt/HHP-Output/historical-site-selection/full-period-boundary-curation-20261027/corrected/curation-ledger.csv>) includes readable footnotes and hashes of all three source inputs. Native contracts bind notes to exact geometry/year cells and to affected metrics in derived comparisons; a correction for Y can affect comparison intervals ending in Y and Y+1 without changing the note's original source-year meaning. Review tables preserve those contracts. Existing frozen-boundary recipe outputs are not retroactively relabeled. Carrying these geometry notes through generated crosswalks into recipe measures requires explicit lineage/rebinding support; that separate integration has not been performed by this comparison run.
+
+### Curated storage and interpretation
+
+The annual series uses `curated/coc_boundaries/coc__BHUDAnnual_<year>.parquet`, registered as `HUDAnnual_<year>` with source `hud_exchange_annual_curated`. This qualified namespace makes annual inputs selectable without replacing the existing numeric boundary vintages or the frozen B2024 study reference. Publication canonicalizes nullable string columns across all fifteen files. The [publication manifest](</home/matt/HHP-Output/historical-site-selection/full-period-boundary-curation-20261027/corrected/published-series.json>) records paths, hashes, a registry before-image and verification that prior curated files and the default latest vintage were preserved. Curated-layout validation explicitly recognizes these annual filenames; crosswalk-to-recipe annotation integration is tracked separately in `coclab-y0rf8`.
+
+Remaining differences and overlaps introduced by restorations are review signals, not grounds for automatically clipping another CoC, changing counts or approving a longitudinal jurisdiction. Whole-MSA union checks remain necessary where a change transfers area between two members of one site. The corrected series does not allocate PIT/HIC by population, change merger arithmetic, alter the selected cohort, or certify disjoint national reporting jurisdictions. Continuing changes require individual review under `coclab-t6ywr.13`; shared-jurisdiction allocation remains separate work.
+
+The corrected screen contains **5,570 same-ID comparisons and 108 ID events**, with 907 differences of at least 1 km². Of these, 112 comparisons involve 57 selected CoCs, including the four already reviewed San Diego, Ventura, Polk and Providence merger transitions. The [priority review table](</home/matt/HHP-Output/historical-site-selection/full-period-boundary-curation-20261027/corrected/persistent-review.csv>) distinguishes changes continuing into the next curated annual geometry, unbracketed 2024 changes and residual cases. The [complete residual screen](</home/matt/HHP-Output/historical-site-selection/full-period-boundary-curation-20261027/corrected/all-remaining-changes.csv>) retains all 4,952 differences of at least 1 m²; the priority threshold does not approve smaller differences. These are transition counts, not counts of distinct substantive jurisdiction changes.
+
+The persistence check identifies 866 national priority comparisons continuing into the following year; 34 are unbracketed 2024 changes and seven lack the following ID. The [selected unresolved queue](</home/matt/HHP-Output/historical-site-selection/full-period-boundary-curation-20261027/corrected/selected-unresolved-review.csv>) contains **108 selected comparisons after removing the four reviewed merger transitions**. Native annotation bindings on persistence areas and review classifications include all three geometry dependencies, including the following year; definitions retain their original source-year scope. Filtered study outputs preserve these exact bindings.
+
+The [introduced-overlap audit](</home/matt/HHP-Output/historical-site-selection/full-period-boundary-curation-20261027/corrected/introduced-overlaps.csv>) records 2,294 CoC-pair/year intersections increasing by at least 1 m² relative to the source-only shapes, mostly small boundary effects. Five increases exceed 1 km²: AL-507/GA-505 in 2018 (1,676.218 km²), WA-500/WA-504 in 2016 (16.673 km²), IL-500/IL-502 in 2020 (8.295 km²), IL-500/IL-517 in 2016 (7.850 km²), and MI-500/MI-513 in 2019 (1.776 km²). The Washington pair involves selected members of the same Seattle MSA; its whole-site union should be checked before interpreting a count implication. The large Alabama/Georgia case is outside the selected study. Restoring a one-year loss does not resolve neighboring claims to that area; these intersections stay explicit rather than being silently clipped.
+
+### Verification
+
+The actual staged data passed checks of geometry validity, unique IDs, all 6,038 feature rows, all 1,650 exact annotation/year cells, preservation of unchanged geometry bytes, original-source bracketing support, all 26 material restored fragments, and selected-cohort coverage. Thirteen policy tests cover isolated holes and missing IDs, common-only restoration, multi-year losses, persistent changes, additions, endpoints and numerical noise. Another 174 package tests cover curated-layout policy, normalization and the boundary registry; Ruff lint and the actual curated-layout check pass. The optional formatter check reports pre-existing formatting differences in both touched package/test files, also present in their unmodified HEAD versions; no broad formatting rewrite was applied.
+
+Exact code snapshots preserve the staged endpoints' and other years' respective generation sources. Comparison outputs retain their precision model, measured area-closure error and tolerance; fixed-grid overlay closure is checked with a perimeter-scaled numerical budget. Published schemas match across all fifteen files, geometry bytes and annotation contracts match staging, and prior files, registry rows and the default latest vintage are preserved. See `corrected/curation-validation.json`, `publication-validation.json` and the comparison/review manifests in the retained run.
 
 ## Full official acquisition, 2026-10-26
 

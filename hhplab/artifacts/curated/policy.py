@@ -69,6 +69,8 @@ COC_BOUNDARY_TOKEN = r"B\d{4}(?:_non_pr)?"
 CANONICAL_PATTERNS: dict[str, list[re.Pattern[str]]] = {
     "coc_boundaries": [
         re.compile(rf"^coc__{COC_BOUNDARY_TOKEN}\.parquet$"),
+        # Qualified annual curation preserves the numeric/frozen boundary vintages.
+        re.compile(r"^coc__BHUDAnnual_\d{4}\.parquet$"),
         re.compile(r"^boundaries__B\d{4}\.parquet$"),  # legacy but recognised
     ],
     "tiger": [

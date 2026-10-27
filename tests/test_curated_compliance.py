@@ -133,6 +133,8 @@ class TestCanonicalFilenamesAccepted:
         [
             ("coc_boundaries", "coc__B2025.parquet"),
             ("coc_boundaries", "coc__B2020_non_pr.parquet"),
+            ("coc_boundaries", "coc__BHUDAnnual_2010.parquet"),
+            ("coc_boundaries", "coc__BHUDAnnual_2024.parquet"),
             ("coc_boundaries", "boundaries__B2024.parquet"),
             ("tiger", "tracts__T2023.parquet"),
             ("tiger", "counties__C2023.parquet"),
@@ -221,6 +223,9 @@ class TestCanonicalFilenamesAccepted:
         "subdir, bad_name",
         [
             ("coc_boundaries", "coc__B2020_non_contiguous.parquet"),
+            ("coc_boundaries", "coc__BHUDAnnual_24.parquet"),
+            ("coc_boundaries", "coc__BHUDAnnual_2024_extra.parquet"),
+            ("coc_boundaries", "coc__BUnknown_2024.parquet"),
             ("measures", "coc_urban_fraction__N2020@B2020_non_contiguousxU2020xK2020.parquet"),
         ],
     )
