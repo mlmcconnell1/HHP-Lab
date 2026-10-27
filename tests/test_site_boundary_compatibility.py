@@ -42,6 +42,29 @@ WESTERN_MASS_CELLS = tuple(
 )
 YUBA_SUTTER_OVERRIDE_YEARS = tuple(range(2010, 2015))
 YUBA_SUTTER_COUNTY_GEOIDS = ("06101", "06115")
+CITY_OMISSION_OVERRIDE_YEARS = (2012, 2013, 2014)
+CITY_OMISSION_COUNTIES = {"MI-514": ("26025",), "CA-514": ("06019", "06039")}
+CITY_OMISSION_NAMES = {"MI-514": "Battle Creek", "CA-514": "Clovis"}
+CITY_OMISSION_CELLS = tuple(product(CITY_OMISSION_COUNTIES, CITY_OMISSION_OVERRIDE_YEARS))
+
+
+@pytest.mark.parametrize(
+    "coc_id,year", CITY_OMISSION_CELLS,
+    ids=[f"{coc}-{year}" for coc, year in CITY_OMISSION_CELLS],
+)
+def test_city_omission_override_restores_complete_counties(coc_id, year):
+    with (SITE_INPUTS / "coc-boundary-county-overrides.csv").open(newline="") as stream:
+        selected = [row for row in csv.DictReader(stream) if row["coc_id"] == coc_id]
+    assert len(selected) == 1
+    rule = selected[0]
+    interval = tuple(range(int(rule["first_year"]), int(rule["last_year"]) + 1))
+    assert interval == CITY_OMISSION_OVERRIDE_YEARS and year in interval
+    assert tuple(rule["county_geoids"].split(";")) == CITY_OMISSION_COUNTIES[coc_id]
+    assert rule["county_vintage"] == "2010"
+    assert rule["decision_basis"] == "study_owner_decision"
+    assert CITY_OMISSION_NAMES[coc_id] in rule["footnote"]
+    assert "GIS error" in rule["footnote"]
+    assert "PIT/HIC counts are unchanged" in rule["footnote"]
 
 
 @pytest.mark.parametrize("year", YUBA_SUTTER_OVERRIDE_YEARS)
