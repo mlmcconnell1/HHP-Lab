@@ -2,6 +2,8 @@
 
 ## Current study frame
 
+**Casnovia owner decision, 2026-10-27:** retain existing MI-506/MI-516 source assignments with an explicit [count-scope and distinct-MSA footnote](historical-coc-archive-availability.md#casnovia-source-assignment-2026-10-27). The 2013 transfer and small later fringe are documented; no geometry, PIT/HIC count or membership allocation is changed. This resolves the provisional treatment of Casnovia; other perimeter and count-scope reviews remain open.
+
 **Washington owner decisions, 2026-10-27:** Marysville's 2013–2014 omission is repaired; the 2016 WA-504 Bothell restoration is removed only where original/current WA-500 already supplies coverage. Original city assignments and 2015 overlaps are retained with separate notes, preserving the metro union and source counts. See the [approved geometry and count-method caveats](historical-coc-archive-availability.md#washington-city-allocations-2026-10-27). Two previously suppressed source assignment transitions become visible in the comparison review; this is not a new metro coverage gap. Other restorations and county/perimeter cases remain separate.
 
 **FL-606 city-only exception, 2026-10-27:** The owner approved restoring Naples and Marco Island for 2012–2014 using their common original 2011/2015 HUD footprints within Census 2010 place boundaries. The native GIS-omission footnote explicitly retains county-line allocations to FL-604, FL-517 and FL-603. The residual 2011→2012 county-line change and later redraws remain separate review cases. See the [approved repair](historical-coc-archive-availability.md#fl-606-naples-and-marco-island-2026-10-27). Original archives and PIT/HIC counts are preserved.

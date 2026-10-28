@@ -1,0 +1,28 @@
+{
+  "schema_version": 1,
+  "decision_basis": "study_owner_decision",
+  "geometry_treatment": "Retain existing MI-506 and MI-516 geometry, including later perimeter differences; do not restore duplicate coverage.",
+  "count_treatment": "Retain published PIT/HIC counts without population or area allocation; a corresponding historical reporting transfer has not been established.",
+  "msa_assignments": {"MI-506": "24340", "MI-516": "34740"},
+  "membership_treatment": "Retain distinct MSAs and current study membership; do not combine these CoCs to cancel the boundary transfer.",
+  "revisit_condition": "Revisit if facility-level evidence or a local CoC jurisdiction record establishes a different count scope.",
+  "geometry_annotation": {
+    "id": "hud-annual-casnovia-cross-county-assignment",
+    "revision": 1,
+    "category": "caveat",
+    "summary": "Casnovia source assignment across distinct MSAs",
+    "text": "Original HUD GIS polygons assign Casnovia's Muskegon County portion to MI-516 through 2012 and predominantly to MI-506 from 2013 onward, with minor later perimeter differences. The approximately 1.319 km2 footprint contains 143 people in 2010 Census blocks (about 166 using 2020 blocks as sensitivity). This is retained as a source assignment by study-owner decision; a corresponding PIT/HIC reporting transfer has not been established. PIT/HIC counts and study membership are unchanged. The two CoCs belong to different MSAs, so this is not an offsetting within-site boundary change.",
+    "public_text": "Original HUD GIS polygons assign Casnovia's Muskegon County portion to MI-516 through 2012 and predominantly to MI-506 from 2013 onward, with minor later perimeter differences. The approximately 1.319 km2 footprint contains 143 people in 2010 Census blocks (about 166 using 2020 blocks as sensitivity). This is retained as a source assignment by study-owner decision; a corresponding PIT/HIC reporting transfer has not been established. PIT/HIC counts and study membership are unchanged. The two CoCs belong to different MSAs, so this is not an offsetting within-site boundary change.",
+    "treatment": "Retain the existing geometry and published counts with an explicit source-year caveat.",
+    "uncertainty": "Current CDBG/HOME program jurisdiction corroborates the possibility of whole-village assignments but does not establish historical CoC or PIT/HIC scope. No absence of shelters or encampments has been verified.",
+    "evidence": [
+      {"name": "Approved Casnovia decision and retained original-file review", "ref": "docs/historical-coc-archive-availability.md#casnovia-source-assignment-2026-10-27", "kind": "doc"},
+      {"name": "Kent County 2026–2030 draft Consolidated Plan, AP-50, page 160; program geography only", "ref": "https://www.kentcountymi.gov/DocumentCenter/View/9636/POSTED-DRAFT-2026-2030-Kent-County-Consolidated-Housing-and-Community-Development-Plan-PDF#page=160", "kind": "url"}
+    ],
+    "scope": {
+      "columns": ["geometry"],
+      "years": [2010, 2011, 2012, 2013, 2014, 2015, 2016, 2017, 2018, 2019, 2020, 2021, 2022, 2023, 2024],
+      "geographies": {"include": ["MI-506", "MI-516"]}
+    }
+  }
+}
