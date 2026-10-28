@@ -85,6 +85,12 @@ EARLIER_CA_CASES = (
     ("CA-606", 2020), ("CA-613", 2021), ("CA-600", 2022), ("CA-604", 2022),
     ("CA-609", 2022), ("CA-614", 2022),
 )
+EARLIER_FL_DECISIONS_PATH = SITE_INPUTS / "coc-boundary-earlier-fl-decisions.json"
+# Wedge history was verified from2010; other notes begin at transition baseline.
+EARLIER_FL_SCOPE_CASES = (
+    ("FL-500", 2014, 2013), ("FL-500", 2015, 2014),
+    ("FL-601", 2012, 2010), ("FL-605", 2012, 2010), ("FL-605", 2022, 2021),
+)
 
 
 @pytest.mark.parametrize(
@@ -166,6 +172,62 @@ def test_stanislaus_note_keeps_multiyear_absence_and_return_without_restoration(
     note = next(n for n in policy["geometry_annotations"] if n["id"] == "hud-annual-ca510-2018-intermediate-linework")
     assert "removed in 2018 remains absent through 2022, then returns in 2023" in note["text"]
     assert "not a one-year dropout and no automatic restoration is applied" in note["text"]
+
+
+@pytest.mark.parametrize(
+    "coc,transition_year,first_source_year", EARLIER_FL_SCOPE_CASES,
+    ids=[f"{coc}-{year}" for coc, year, _ in EARLIER_FL_SCOPE_CASES],
+)
+def test_earlier_fl_notes_have_verified_source_scopes(coc, transition_year, first_source_year):
+    policy = json.loads(EARLIER_FL_DECISIONS_PATH.read_text())
+    matches = [
+        n for n in policy["geometry_annotations"]
+        if n["scope"]["geographies"]["include"] == [coc]
+        and f"-{transition_year}-" in n["id"]
+    ]
+    assert len(matches) == 1
+    note = DataAnnotationSpec.model_validate({**policy["annotation_defaults"], **matches[0]})
+    assert note.scope.years == list(range(first_source_year, 2025))
+    assert note.scope.columns == ["geometry"]
+    assert note.evidence and note.uncertainty and note.revision == 1
+    assert "PIT/HIC" in note.text and "membership" in note.text
+    assert "Both population vintages use2020 water linework" in note.text
+    assert policy["publish_annotation_text"] is True
+
+
+def test_wedge_dates_and_classification_do_not_establish_count_scope():
+    policy = json.loads(EARLIER_FL_DECISIONS_PATH.read_text())
+    transfer = policy["county_transfer"]
+    assert transfer["legal_county_transfer_date"] == "2009-09-18"
+    assert transfer["first_observed_coc_polygon_reassignment_year"] == 2012
+    assert transfer["verified_prior_polygon_years"] == [2010, 2011]
+    assert transfer["pit_hic_reporting_scope_effective_date"] is None
+    matches = [d for d in policy["transition_decisions"] if d["classification"] == "county_transfer_associated_reassignment"]
+    assert {(d["coc_id"], d["new_year"]) for d in matches} == {("FL-601", 2012), ("FL-605", 2012)}
+    assert "without resident-population or area allocation" in policy["count_treatment"]
+
+
+def test_longboat_key_temporary_coverage_notes_keep_nonwater_and_count_caveats():
+    policy = json.loads(EARLIER_FL_DECISIONS_PATH.read_text())
+    notes = {n["id"]: n for n in policy["geometry_annotations"]}
+    addition = notes["hud-annual-fl500-2014-temporary-longboat-water"]["text"]
+    removal = notes["hud-annual-fl500-2015-longboat-water-return"]["text"]
+    assert "97.8%" in addition and "0.659 km2 mapped nonwater" in addition
+    assert "zero-land Census blocks with aggregate population11" in addition
+    assert "without automatic removal or restoration" in addition
+    assert "1049→1377→1198" in addition
+    assert "sampled2015–2016 and2021–2022" in removal
+    assert "Do not describe the whole2014 addition as persistent through2024" in removal
+
+
+def test_earlier_fl_catalog_has_exact_reviewed_transitions_and_note_links():
+    policy = json.loads(EARLIER_FL_DECISIONS_PATH.read_text())
+    notes = policy["geometry_annotations"]
+    decisions = policy["transition_decisions"]
+    assert len(notes) == len(decisions) == len(EARLIER_FL_SCOPE_CASES)
+    assert len({n["id"] for n in notes}) == len(notes)
+    assert {d["annotation_id"] for d in decisions} == {n["id"] for n in notes}
+    assert {(d["coc_id"], d["new_year"]) for d in decisions} == {(c, y) for c, y, _ in EARLIER_FL_SCOPE_CASES}
 
 
 def test_marysville_repair_targets_the_two_year_city_gap():
