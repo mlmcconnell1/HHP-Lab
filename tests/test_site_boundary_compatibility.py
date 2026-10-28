@@ -64,6 +64,53 @@ WASHINGTON_NOTE_IDS = (
     "hud-annual-wa504-bothell-source-assignments",
     "hud-annual-washington-2015-source-overlaps",
 )
+PERIMETER_DECISIONS_PATH = SITE_INPUTS / "coc-boundary-fl-ca-maintenance-decisions.json"
+PERIMETER_CORE_COCS = (
+    "FL-500", "FL-504", "FL-505", "FL-511", "FL-513", "FL-600", "FL-601",
+    "FL-602", "FL-603", "FL-605", "CA-502", "CA-504", "CA-505", "CA-507",
+    "CA-512", "CA-517", "CA-518", "CA-601", "CA-602", "CA-603", "CA-606", "CA-611",
+)
+PERIMETER_CONTEXT_COCS = ("CA-502", "CA-505", "CA-603", "CA-606", "CA-611")
+# Truth table: 2023 redraws bind baseline 2022 plus 2023/24; 2022 redraws
+# bind 2021 through 2024; the separate 2024 adjustment binds 2023/24 only.
+PERIMETER_SCOPE_CASES = (
+    *((coc, 2023, (2022, 2023, 2024)) for coc in PERIMETER_CORE_COCS),
+    *((coc, 2022, (2021, 2022, 2023, 2024)) for coc in PERIMETER_CONTEXT_COCS),
+    ("CA-601", 2024, (2023, 2024)),
+)
+
+
+@pytest.mark.parametrize(
+    "coc,transition_year,source_years", PERIMETER_SCOPE_CASES,
+    ids=[f"{coc}-{year}" for coc, year, _ in PERIMETER_SCOPE_CASES],
+)
+def test_perimeter_maintenance_notes_preserve_original_source_year_scope(
+    coc, transition_year, source_years,
+):
+    policy = json.loads(PERIMETER_DECISIONS_PATH.read_text())
+    matches = [
+        n for n in policy["geometry_annotations"]
+        if n["scope"]["geographies"]["include"] == [coc]
+        and f"-{transition_year}-" in n["id"]
+    ]
+    assert len(matches) == 1
+    note = DataAnnotationSpec.model_validate({**policy["annotation_defaults"], **matches[0]})
+    assert note.scope.years == list(source_years)
+    assert note.scope.columns == ["geometry"]
+    assert note.revision == 1 and note.category == "caveat"
+    assert note.evidence and note.uncertainty
+    assert "Published PIT/HIC" in note.text and "membership" in note.text
+    assert "count-scope transfer" in note.text
+    assert policy["publish_annotation_text"] is True
+
+
+def test_perimeter_catalog_has_exact_reviewed_cases_without_fl606_redefinition():
+    policy = json.loads(PERIMETER_DECISIONS_PATH.read_text())
+    notes = policy["geometry_annotations"]
+    assert len(notes) == len(PERIMETER_SCOPE_CASES)
+    assert len({note["id"] for note in notes}) == len(notes)
+    assert {c for note in notes for c in note["scope"]["geographies"]["include"]} == set(PERIMETER_CORE_COCS)
+    assert "Retain existing MSA memberships" in policy["membership_treatment"]
 
 
 def test_marysville_repair_targets_the_two_year_city_gap():
