@@ -1,0 +1,49 @@
+{
+  "schema_version": 1,
+  "decision_basis": "study_owner_decision",
+  "geometry_treatment": "Retain all existing annual FL-606 geometry, including the approved Naples/Marco Island 2012–2014 repair; treat remaining county-edge and coastal redraws as provisional cartographic maintenance.",
+  "count_treatment": "Retain published PIT/HIC without population or area allocation; a corresponding reporting-jurisdiction transfer has not been established.",
+  "msa_id": "34940",
+  "membership_treatment": "Retain the existing Naples/Collier MSA membership and frozen numeric boundaries.",
+  "revisit_condition": "Revisit if facility/encampment locations or contemporaneous CoC jurisdiction documentation contradict this provisional interpretation.",
+  "geometry_annotations": [
+    {
+      "id": "hud-annual-fl606-2012-county-edge-maintenance",
+      "revision": 1,
+      "category": "caveat",
+      "summary": "Retained FL-606 county-edge refinement in 2012",
+      "text": "FL-606's 2012 county-edge refinement removes about 8.94 km2 of older linework, predominantly Monroe/Hendry/Lee boundary pieces. It is retained as provisional cartographic maintenance by study-owner decision, separately from the approved Naples/Marco Island 2012–2014 GIS-omission repair. Small resident-population sensitivity does not establish PIT/HIC reporting scope or the absence of shelters or encampments. Published counts and study membership are unchanged.",
+      "public_text": "FL-606's 2012 county-edge refinement removes about 8.94 km2 of older linework, predominantly Monroe/Hendry/Lee boundary pieces. It is retained as provisional cartographic maintenance by study-owner decision, separately from the approved Naples/Marco Island 2012–2014 GIS-omission repair. Small resident-population sensitivity does not establish PIT/HIC reporting scope or the absence of shelters or encampments. Published counts and study membership are unchanged.",
+      "treatment": "Retain the older baseline and later source geometry, with the approved city repair preserved.",
+      "uncertainty": "The 2020 governance charter identifies Collier County as its geographic area but does not establish exact 2012 count scope. Population overlays are sensitivity estimates, not observed residential or homeless-person locations.",
+      "evidence": [{"name": "Approved FL-606 maintenance decision and retained research", "ref": "docs/historical-coc-archive-availability.md#fl-606-cartographic-maintenance-2026-10-28", "kind": "doc"}],
+      "scope": {"columns": ["geometry"], "years": [2010, 2011, 2012, 2013, 2014, 2015, 2016, 2017, 2018, 2019, 2020, 2021, 2022, 2023, 2024], "geographies": {"include": ["FL-606"]}}
+    },
+    {
+      "id": "hud-annual-fl606-2022-county-linework",
+      "revision": 1,
+      "category": "caveat",
+      "summary": "FL-606 2022 change follows updated Census county linework",
+      "text": "FL-606's 2021–2022 GIS change removes about 1.204 km2 and adds 1.128 km2. More than 99.98% of both sides matches the difference between Census 2010 and 2023 Collier County geometry. The source outlines are retained as provisional county-linework maintenance by study-owner decision; this does not establish a change in political or PIT/HIC reporting jurisdiction. Published counts and study membership are unchanged.",
+      "public_text": "FL-606's 2021–2022 GIS change removes about 1.204 km2 and adds 1.128 km2. More than 99.98% of both sides matches the difference between Census 2010 and 2023 Collier County geometry. The source outlines are retained as provisional county-linework maintenance by study-owner decision; this does not establish a change in political or PIT/HIC reporting jurisdiction. Published counts and study membership are unchanged.",
+      "treatment": "Retain the source outlines and document the updated county-linework correspondence.",
+      "evidence": [{"name": "Approved FL-606 maintenance decision and Census overlays", "ref": "docs/historical-coc-archive-availability.md#fl-606-cartographic-maintenance-2026-10-28", "kind": "doc"}],
+      "scope": {"columns": ["geometry"], "years": [2021, 2022, 2023, 2024], "geographies": {"include": ["FL-606"]}}
+    },
+    {
+      "id": "hud-annual-fl606-2023-coastal-redraw",
+      "revision": 1,
+      "category": "caveat",
+      "summary": "Retained FL-606 coastal water/island redraw in 2023",
+      "text": "FL-606's 2022–2023 GIS redraw removes about 37.44 km2 and adds 60.66 km2 along the coast and islands; it persists in 2024. Census 2020 area-water polygons classify about 94.7% of the removed footprint as water. Land-area population weighting indicates small resident-population sensitivity but does not locate homeless people or beds. The redraw is retained as provisional cartographic maintenance by study-owner decision. The PIT increase from 462 in 2022 to 703 in 2023 has not been established as a boundary-transfer effect. Published PIT/HIC counts, the approved city repair and study membership are unchanged.",
+      "public_text": "FL-606's 2022–2023 GIS redraw removes about 37.44 km2 and adds 60.66 km2 along the coast and islands; it persists in 2024. Census 2020 area-water polygons classify about 94.7% of the removed footprint as water. Land-area population weighting indicates small resident-population sensitivity but does not locate homeless people or beds. The redraw is retained as provisional cartographic maintenance by study-owner decision. The PIT increase from 462 in 2022 to 703 in 2023 has not been established as a boundary-transfer effect. Published PIT/HIC counts, the approved city repair and study membership are unchanged.",
+      "treatment": "Retain the baseline and continuing source redraw; preserve observed counts without geographic allocation.",
+      "uncertainty": "No primary source establishes a corresponding count-jurisdiction transfer, and no absence of shelters or encampments is asserted. Coastal block-centroid estimates are sensitive to mixed land/water geometry.",
+      "evidence": [
+        {"name": "Approved FL-606 maintenance decision and retained water/population overlays", "ref": "docs/historical-coc-archive-availability.md#fl-606-cartographic-maintenance-2026-10-28", "kind": "doc"},
+        {"name": "CoC Governance Charter approved January 2020, physical page 4; countywide context", "ref": "https://collierhomelesscoalition.org/wp-content/uploads/2020/01/CoC-Governance-Charter-Updated-Jan-2020.pdf#page=4", "kind": "url"}
+      ],
+      "scope": {"columns": ["geometry"], "years": [2022, 2023, 2024], "geographies": {"include": ["FL-606"]}}
+    }
+  ]
+}

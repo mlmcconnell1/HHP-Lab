@@ -18,6 +18,8 @@ The [membership-bound longitudinal evidence](../recipes/site-inputs/coc-boundary
 
 ## Boundary archive coverage
 
+**FL-606 maintenance decision, 2026-10-28:** retain county-edge refinements in 2012/2022 and the continuing 2023 coastal redraw with [original-year caveats](historical-coc-archive-availability.md#fl-606-cartographic-maintenance-2026-10-28), separately from the existing Naples/Marco repair. Source counts, shapes and MSA 34940 membership remain unchanged. The interpretation is provisional; small resident-population sensitivity does not establish homeless-person or bed locations.
+
 **Casnovia owner decision, 2026-10-27:** retain source assignments of the village's Muskegon portion from MI-516 to MI-506 in 2013, with later perimeter differences, and footnote unverified PIT/HIC reporting scope. The [decision](historical-coc-archive-availability.md#casnovia-source-assignment-2026-10-27) preserves geometry, counts and distinct Muskegon/Grand Rapids MSA membership. Resident population is sensitivity evidence, not a count allocation rule.
 
 **Washington curation decision, 2026-10-27:** The owner approved a Marysville-only repair for WA-504 in 2013–2014 and a donor-coverage exception to its 2016 Bothell restoration. The [decision and annotation catalog](historical-coc-archive-availability.md#washington-city-allocations-2026-10-27) retains source cross-county assignments and 2015 overlaps, adds exact source-year caveats and preserves the metro union. The separate Snohomish 2013 housing-classification note affects cross-period interpretation of sheltered/total PIT counts; no PIT/HIC observations are altered. Other restorations, source archives and unrelated geometries are preserved.

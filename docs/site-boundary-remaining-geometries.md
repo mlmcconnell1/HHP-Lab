@@ -2,6 +2,8 @@
 
 ## Current study frame
 
+**FL-606 maintenance decision, 2026-10-28:** the owner approved retaining the remaining 2012/2022 county-edge and 2023 coastal redraws as provisional GIS maintenance with [separate original-year footnotes](historical-coc-archive-availability.md#fl-606-cartographic-maintenance-2026-10-28). All geometry, the approved city repair, PIT/HIC and MSA membership are preserved. The three existing review transitions remain numerical signals with a documented treatment; this resolves their current provisional handling.
+
 **Casnovia owner decision, 2026-10-27:** retain existing MI-506/MI-516 source assignments with an explicit [count-scope and distinct-MSA footnote](historical-coc-archive-availability.md#casnovia-source-assignment-2026-10-27). The 2013 transfer and small later fringe are documented; no geometry, PIT/HIC count or membership allocation is changed. This resolves the provisional treatment of Casnovia; other perimeter and count-scope reviews remain open.
 
 **Washington owner decisions, 2026-10-27:** Marysville's 2013–2014 omission is repaired; the 2016 WA-504 Bothell restoration is removed only where original/current WA-500 already supplies coverage. Original city assignments and 2015 overlaps are retained with separate notes, preserving the metro union and source counts. See the [approved geometry and count-method caveats](historical-coc-archive-availability.md#washington-city-allocations-2026-10-27). Two previously suppressed source assignment transitions become visible in the comparison review; this is not a new metro coverage gap. Other restorations and county/perimeter cases remain separate.
