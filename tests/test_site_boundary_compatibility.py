@@ -78,6 +78,13 @@ PERIMETER_SCOPE_CASES = (
     *((coc, 2022, (2021, 2022, 2023, 2024)) for coc in PERIMETER_CONTEXT_COCS),
     ("CA-601", 2024, (2023, 2024)),
 )
+EARLIER_CA_DECISIONS_PATH = SITE_INPUTS / "coc-boundary-earlier-ca-maintenance-decisions.json"
+EARLIER_CA_CASES = (
+    ("CA-600", 2012), ("CA-604", 2012), ("CA-606", 2012), ("CA-607", 2012),
+    ("CA-609", 2012), ("CA-511", 2015), ("CA-510", 2018), ("CA-600", 2020),
+    ("CA-606", 2020), ("CA-613", 2021), ("CA-600", 2022), ("CA-604", 2022),
+    ("CA-609", 2022), ("CA-614", 2022),
+)
 
 
 @pytest.mark.parametrize(
@@ -111,6 +118,54 @@ def test_perimeter_catalog_has_exact_reviewed_cases_without_fl606_redefinition()
     assert len({note["id"] for note in notes}) == len(notes)
     assert {c for note in notes for c in note["scope"]["geographies"]["include"]} == set(PERIMETER_CORE_COCS)
     assert "Retain existing MSA memberships" in policy["membership_treatment"]
+
+
+@pytest.mark.parametrize(
+    "coc,transition_year", EARLIER_CA_CASES,
+    ids=[f"{coc}-{year}" for coc, year in EARLIER_CA_CASES],
+)
+def test_earlier_ca_notes_bind_baseline_through_following_refinements(coc, transition_year):
+    policy = json.loads(EARLIER_CA_DECISIONS_PATH.read_text())
+    matches = [
+        n for n in policy["geometry_annotations"]
+        if n["scope"]["geographies"]["include"] == [coc]
+        and f"-{transition_year}-" in n["id"]
+    ]
+    assert len(matches) == 1
+    note = DataAnnotationSpec.model_validate({**policy["annotation_defaults"], **matches[0]})
+    assert note.scope.years == list(range(transition_year - 1, 2025))
+    assert note.scope.columns == ["geometry"]
+    assert note.revision == 1 and note.category == "caveat"
+    assert note.evidence and note.uncertainty
+    assert "Published PIT/HIC and membership are retained" in note.text
+    assert "count-scope transfer" in note.text
+    assert policy["publish_annotation_text"] is True
+
+
+def test_earlier_ca_catalog_has_only_the_reviewed_transitions():
+    policy = json.loads(EARLIER_CA_DECISIONS_PATH.read_text())
+    notes = policy["geometry_annotations"]
+    assert len(notes) == len(EARLIER_CA_CASES)
+    assert len({note["id"] for note in notes}) == len(notes)
+    assert {c for n in notes for c in n["scope"]["geographies"]["include"]} == {c for c, _ in EARLIER_CA_CASES}
+    assert "no retrospective geometry repair" in policy["geometry_treatment"]
+    assert "without area or resident-population allocation" in policy["count_treatment"]
+
+
+def test_pasadena_note_keeps_individual_exposure_and_msa_cancellation_together():
+    policy = json.loads(EARLIER_CA_DECISIONS_PATH.read_text())
+    note = next(n for n in policy["geometry_annotations"] if n["id"] == "hud-annual-ca607-2012-municipal-maintenance")
+    assert "gross 0.85099%, net -0.24949%" in note["text"]
+    assert "Census 2010 and 2012" in note["text"]
+    assert "Almost all changed area cancels within the Los Angeles MSA union" in note["text"]
+    assert "separate pre-2012 Pasadena analysis" in note["text"]
+
+
+def test_stanislaus_note_keeps_multiyear_absence_and_return_without_restoration():
+    policy = json.loads(EARLIER_CA_DECISIONS_PATH.read_text())
+    note = next(n for n in policy["geometry_annotations"] if n["id"] == "hud-annual-ca510-2018-intermediate-linework")
+    assert "removed in 2018 remains absent through 2022, then returns in 2023" in note["text"]
+    assert "not a one-year dropout and no automatic restoration is applied" in note["text"]
 
 
 def test_marysville_repair_targets_the_two_year_city_gap():
