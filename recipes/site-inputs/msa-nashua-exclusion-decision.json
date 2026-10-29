@@ -1,0 +1,30 @@
+{
+  "schema_version": 1,
+  "decision_basis": "study_owner_decision",
+  "excluded_msa_ids": ["31700"],
+  "excluded_coc_members": ["NH-501", "NH-502"],
+  "years": [2010, 2011, 2012, 2013, 2014, 2015, 2016, 2017, 2018, 2019, 2020, 2022, 2023, 2024],
+  "treatment": "Exclude the whole Manchester-Nashua MSA from the primary longitudinal study, retaining previous holdouts and original source data. No population allocation of PIT/HIC and no replacement with the full Balance of State count.",
+  "revisit_condition": "Reconsider only if compatible historical county/town PIT and geographically identified HIC inventories support full-MSA coverage. The CoC records remain available for analyses using their documented service areas.",
+  "publish_annotation_text": true,
+  "annotation": {
+    "id": "msa31700-nashua-documented-coverage-exclusion",
+    "revision": 1,
+    "category": "exclusion",
+    "summary": "Manchester-Nashua excluded because documented CoC coverage is below the study threshold",
+    "text": "Manchester-Nashua MSA 31700 is excluded from the primary 2010-2024 study (2021 is excluded study-wide). The HUD NH-502 polygon covers Hillsborough County outside Manchester, but historical CoC applications, governance documents and a state CoC map describe Nashua and nine surrounding towns, with the remaining twenty county towns assigned to NH-500 Balance of State. The documented NH-501/NH-502 service areas cover 313,367 of 422,937 residents (74.1%, Census 2020), below both the 95% and 99% MSA coverage thresholds. Compatible historical PIT/HIC for the county's Balance of State portion have not been established; neither population allocation nor inclusion of the entire Balance of State count is appropriate. In 2018, county PIT was 715 versus 708 for the selected pair; that small residual does not establish other years' counts or HIC capacity. Exclusion reflects geographic coverage, not observed study outcomes. Original CoC data are retained; reconsideration requires compatible historical counts and inventories.",
+    "public_text": "Manchester-Nashua MSA 31700 is excluded from the primary 2010-2024 study (2021 is excluded study-wide). The HUD NH-502 polygon covers Hillsborough County outside Manchester, but historical CoC applications, governance documents and a state CoC map describe Nashua and nine surrounding towns, with the remaining twenty county towns assigned to NH-500 Balance of State. The documented NH-501/NH-502 service areas cover 313,367 of 422,937 residents (74.1%, Census 2020), below both the 95% and 99% MSA coverage thresholds. Compatible historical PIT/HIC for the county's Balance of State portion have not been established; neither population allocation nor inclusion of the entire Balance of State count is appropriate. In 2018, county PIT was 715 versus 708 for the selected pair; that small residual does not establish other years' counts or HIC capacity. Exclusion reflects geographic coverage, not observed study outcomes. Original CoC data are retained; reconsideration requires compatible historical counts and inventories.",
+    "treatment": "Whole-MSA primary-study exclusion; preserve source polygons, published PIT/HIC and previous study outputs.",
+    "uncertainty": "The 2024 application mentions twelve communities without identifying a revised territory. Exact annual HUD registration and project-level HIC allocations remain unverified. The 2018 PIT difference is an accounting residual, not a located shelter, a bed count or an allocation rule.",
+    "evidence": [
+      {"name": "Separate Nashua jurisdiction review and owner exclusion decision", "ref": "docs/historical-coc-archive-availability.md#nashua-exclusion-footnote-2026-10-29", "kind": "doc"},
+      {"name": "Greater Nashua 2023 Governance Charter, page 1", "ref": "http://nashua-coc.org/wp-content/uploads/2023-GNCoC-Governance-Charter-FD.pdf#page=1", "kind": "url"},
+      {"name": "State CoC boundary graphic hosted by Manchester CoC", "ref": "https://www.manchester-coc.org/what-is-a-coc", "kind": "url"},
+      {"name": "DHHS 2018 county PIT map in Dover meeting attachment, page 8", "ref": "https://www.dover.nh.gov/Assets/government/boards-commissions/city-council/homeless-task-force/minutes/tcmtf101818min_0.pdf#page=8", "kind": "url"}
+    ],
+    "scope": {
+      "years": [2010, 2011, 2012, 2013, 2014, 2015, 2016, 2017, 2018, 2019, 2020, 2022, 2023, 2024],
+      "geographies": {"include": ["31700"]}
+    }
+  }
+}

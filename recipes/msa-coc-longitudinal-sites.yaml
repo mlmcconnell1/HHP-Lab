@@ -1,16 +1,20 @@
 # Longitudinal study: 2010–2024, excluding 2021.
-# Owner-directed holdouts: CT-503, OR-504, PA-512, and Sacramento MSA 40900.
+# Owner-directed holdouts: CT-503, OR-504, PA-512, Sacramento MSA 40900,
+# and Manchester-Nashua MSA 31700. The latter's exclusion footnote is in
+# site-inputs/msa-nashua-exclusion-decision.json.
 # Each dependent MSA is excluded consistently across every study year.
 # This producer freezes the 2024 geography; years below are geometry production,
 # not the longitudinal outcome window.
 # Existing exploratory universes and result bundles remain historical records.
 version: 1
-name: msa_coc_longitudinal_2010_2024_exclude_sacramento_sites
+name: msa_coc_longitudinal_2010_2024_exclude_sacramento_nashua_sites
 description: >
   Freeze the 99 percent overlap sites for longitudinal PIT/HIC work,
   excluding Bridgeport-Stamford-Danbury (14860), Salem (41420),
-  York-Hanover (49620), and Sacramento (40900) by study-owner decision. Intended outcome window
-  is 2010-2024 excluding 2021. Historical boundary checks remain separate.
+  York-Hanover (49620), Sacramento (40900), and Manchester-Nashua (31700)
+  by study-owner decision. Documented Manchester-Nashua CoC coverage is 74.1%
+  of MSA population; see site-inputs/msa-nashua-exclusion-decision.json.
+  Intended outcome window is 2010-2024 excluding 2021. Historical boundary checks remain separate.
 output_root: /home/matt/HHP-Output
 universe:
   years: [2024]
@@ -20,7 +24,7 @@ targets:
     outputs: [msa_coc_sites]
     msa_coc_sites:
       crosswalk_path: data/curated/xwalks/msa_coc_xwalk__N2020@B2024xMcensus_msa_2023xC2023xK2020__basis-block_population.parquet
-      msa_universe_path: /home/matt/HHP-Output/msa_coc_longitudinal_sites_inputs/metro_universe__census_msa_2023__exclude_CT503_OR504_PA512_Sacramento.parquet
+      msa_universe_path: /home/matt/HHP-Output/msa_coc_longitudinal_sites_inputs/metro_universe__census_msa_2023__exclude_CT503_OR504_PA512_Sacramento_Nashua.parquet
       coc_names_path: data/curated/coc_boundaries/coc__B2024.parquet
       coc_boundary_vintage: 2024
       msa_definition_version: census_msa_2023
