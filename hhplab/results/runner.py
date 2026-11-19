@@ -1559,6 +1559,7 @@ def _assemble_site_year_panel(recipe, plan, frames):
         membership_identity=str(plan_site["membership_identity"]),
         frozen_boundary_vintage=str(plan_site["boundary_vintage"]),
         source_panel_fingerprints=fingerprints,
+        boundary_coverage_annotation=plan_site.get("boundary_coverage_annotation"),
     )
     return assembly, fingerprints
 

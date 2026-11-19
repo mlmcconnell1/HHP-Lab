@@ -22,9 +22,11 @@ import pandas as pd
 import pyarrow as pa
 import pyarrow.parquet as pq
 
+from hhplab.geographies.xwalks.boundary_annotations import B2010_COVERAGE_ANNOTATION
 from hhplab.recipe.executor.annotations import (
     frame_column_map,
     has_annotations,
+    is_b2010_coverage_contract,
     propagate_annotations,
     resolve_annotation_geo_column,
 )
@@ -49,6 +51,7 @@ from hhplab.recipe.recipe_schema import (
     TemporalFilter,
 )
 from hhplab.recipe.schema_common import expand_year_spec
+from hhplab.schema.contracts import annotation_identity_key, parse_annotation_contract
 
 _ACS_PATH_VINTAGE_RE = re.compile(r"__A(\d{4})")
 
@@ -70,6 +73,7 @@ class SiteUniverseResolution:
     paths: tuple[Path, Path, Path]
     fingerprints: tuple[str, str, str]
     manifest_fingerprint: str | None = None
+    boundary_coverage_annotation: dict[str, Any] | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -86,6 +90,8 @@ class SiteUniverseResolution:
             "paths": [str(path) for path in self.paths],
             "fingerprints": list(self.fingerprints),
             "manifest_fingerprint": self.manifest_fingerprint,
+            **({"boundary_coverage_annotation": self.boundary_coverage_annotation}
+               if self.boundary_coverage_annotation is not None else {}),
         }
 
 
@@ -168,6 +174,25 @@ def resolve_site_universe_files(
             provenance_blocks[1]
         ):
             raise ValueError("sites and memberships Parquet provenance blocks disagree")
+        coverage_annotation = None
+        raw_annotations = provenance_blocks[0]["extra"].get("annotations")
+        if raw_annotations is not None and boundary_vintage == "2010":
+            annotation = parse_annotation_contract(raw_annotations)
+            key = annotation_identity_key(B2010_COVERAGE_ANNOTATION, 1)
+            records = [record for record in annotation["records"]
+                       if annotation_identity_key(record["id"], record["revision"]) == key]
+            if records:
+                if parse_annotation_contract(summary.get("annotations")) != annotation:
+                    raise ValueError("site provenance coverage annotation disagrees with summary")
+                coverage_annotation = parse_annotation_contract({
+                    "schema_version": annotation["schema_version"],
+                    "records": records,
+                    "bindings": {key: annotation["bindings"][key]},
+                    "sources": {key: annotation["sources"].get(key, [])},
+                    "uncertain_ids": [key] if key in annotation["uncertain_ids"] else [],
+                })
+                if not is_b2010_coverage_contract(coverage_annotation):
+                    raise ValueError("invalid available-archive B2010 site coverage annotation")
         sites, memberships = frames
         required_sites = {"threshold", "msa_id", "eligible"}
         required_memberships = {"threshold", "msa_id", "coc_id", "site_eligible"}
@@ -244,6 +269,7 @@ def resolve_site_universe_files(
             excluded_site_count=int((~eligible_mask).sum()),
             paths=paths,
             fingerprints=fingerprints,
+            boundary_coverage_annotation=coverage_annotation,
         )
     except (OSError, KeyError, TypeError, ValueError, json.JSONDecodeError) as exc:
         raise ExecutorError(

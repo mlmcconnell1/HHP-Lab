@@ -9,7 +9,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from hhplab.geographies.xwalks.boundary_annotations import bind_annual_boundary_annotations
+from hhplab.geographies.xwalks.boundary_annotations import bind_boundary_annotations
 from hhplab.geographies.xwalks.tract import (
     add_population_weights,
     validate_population_shares,
@@ -55,7 +55,7 @@ def test_annual_geometry_note_survives_crosswalk_save(tmp_path):
         "area_share": [0.5, 0.7, 0.2],
         "county_area": [700, 800, 900],
     })
-    bind_annual_boundary_annotations(
+    bind_boundary_annotations(
         crosswalk, source, "HUDAnnual_2023", ("area_share", "intersection_area")
     )
     output = tmp_path / "crosswalk.parquet"

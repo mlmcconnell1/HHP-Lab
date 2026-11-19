@@ -17,11 +17,13 @@ from hhplab.geographies.coc.ct_planning_regions import CT_LEGACY_COUNTY_VINTAGE
 from hhplab.recipe.cache import RecipeCache
 from hhplab.recipe.executor import population as population_execution
 from hhplab.recipe.executor.annotations import (
+    bind_b2010_panel_coverage,
     frame_column_map,
     has_annotations,
     propagate_annotations,
     renamed_column_map,
     resolve_annotation_geo_column,
+    resolve_b2010_crosswalk_coverage,
 )
 from hhplab.recipe.executor.core import (
     ExecutionContext,
@@ -541,7 +543,13 @@ def _execute_resample(
                     ),
                 )
             try:
-                xwalk = ctx.cache.read_parquet(xwalk_path, reject_annotations=True)
+                xwalk = ctx.cache.read_parquet(
+                    xwalk_path, reject_annotations=task.method != "aggregate"
+                )
+                boundary_coverage = (
+                    resolve_b2010_crosswalk_coverage(xwalk, xwalk_path, ctx)
+                    if task.method == "aggregate" else None
+                )
                 xwalk = _attach_dynamic_pop_share(
                     xwalk=xwalk,
                     task=task,
@@ -648,6 +656,10 @@ def _execute_resample(
                                 year_value=task.year if "year" in df.columns else None,
                             )
                     result_df = _resample_aggregate(df, xwalk, task)
+                bind_b2010_panel_coverage(
+                    result_df, boundary_coverage, geo_column="geo_id",
+                    columns=[column for column in result_df if column not in {"geo_id", "year"}],
+                )
             else:
                 result_df = _resample_allocate(df, xwalk, task)
         else:

@@ -8,10 +8,18 @@ from the rows and columns that an operation actually retains.
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
+from pathlib import Path
 from typing import Any
 
 import pandas as pd
 
+from hhplab.artifacts.naming.naming import coc_base_path
+from hhplab.geographies.xwalks.boundary_annotations import (
+    B2010_COVERAGE_ANNOTATION,
+    read_b2010_boundary_coverage,
+)
+from hhplab.recipe.executor.core import ExecutionContext, _classify_path
+from hhplab.recipe.manifest import AssetRecord
 from hhplab.schema.contracts import (
     annotation_identity_key,
     annotation_source_identity,
@@ -19,6 +27,7 @@ from hhplab.schema.contracts import (
     frame_annotation_contract,
     serialize_annotation_contract,
 )
+from hhplab.storage.config import load_config
 
 _GEOGRAPHY_COLUMNS = (
     "geo_id", "coc_id", "msa_id", "metro_id", "county_fips", "tract_geoid",
@@ -128,6 +137,99 @@ def _set_output_contract(frame: pd.DataFrame, contract: Mapping[str, Any] | None
         frame.attrs.pop("annotations", None)
     else:
         frame.attrs["annotations"] = contract
+
+
+def is_b2010_coverage_contract(contract: Mapping[str, Any]) -> bool:
+    """Recognize the artifact-wide limitation, separate from pair-specific notes."""
+    key = annotation_identity_key(B2010_COVERAGE_ANNOTATION, 1)
+    return (
+        contract["schema_version"] == 1
+        and len(contract["records"]) == 1
+        and contract["records"][0]["id"] == B2010_COVERAGE_ANNOTATION
+        and contract["records"][0]["revision"] == 1
+        and contract["uncertain_ids"] == [key]
+        and contract["bindings"] == {key: {"columns": {}}}
+    )
+
+
+def resolve_b2010_crosswalk_coverage(
+    crosswalk: pd.DataFrame, path: Path, ctx: ExecutionContext
+) -> dict | None:
+    """Resolve a generated note or the verified registered boundary for older B2010 weights."""
+    provenance = crosswalk.attrs.get("results_panel_provenance", {})
+    contract = frame_annotation_contract(crosswalk)
+    if contract is not None and (
+        not is_b2010_coverage_contract(contract) or provenance.get("boundary_vintage") != "2010"
+    ):
+        raise ValueError(
+            f"Annotated crosswalk {path.name!r} requires contributor-aware bindings. "
+            "This aggregation supports the available-archive B2010 coverage note."
+        )
+    if provenance.get("boundary_vintage") != "2010":
+        return None
+    if contract is None:
+        config = ctx.storage_config or load_config(
+            project_root=ctx.project_root,
+            recipe_output_root=ctx.recipe.output_root,
+            recipe_base_dir=ctx.recipe.source_base_dir,
+        )
+        boundary_path = coc_base_path("2010", config.asset_store_root)
+        contract = read_b2010_boundary_coverage(boundary_path)
+        if contract is None:
+            return None
+        boundary = ctx.cache.file_identity(boundary_path)
+        root, rel = _classify_path(boundary_path, ctx)
+        ctx.consumed_assets.append(
+            AssetRecord(role="geometry", path=rel, sha256=boundary.sha256, size=boundary.size,
+                        root=root)
+        )
+
+    identity = ctx.cache.file_identity(path)
+    key = annotation_identity_key(B2010_COVERAGE_ANNOTATION, 1)
+    sources = list(contract["sources"].get(key, []))
+    crosswalk_source = annotation_source_identity(identity.sha256, provenance)
+    if crosswalk_source not in sources:
+        sources.append(crosswalk_source)
+    return serialize_annotation_contract(
+        contract["records"], uncertain_ids=[key], sources={key: sources}
+    )
+
+
+def bind_b2010_panel_coverage(
+    panel: pd.DataFrame, coverage: Mapping[str, Any] | None, *,
+    geo_column: str, columns: Sequence[str],
+) -> None:
+    """Bind the coverage caveat to the result cells derived using B2010 geography."""
+    if coverage is None or panel.empty:
+        return
+    if not is_b2010_coverage_contract(coverage):
+        raise ValueError("Expected the artifact-wide B2010 archive coverage annotation")
+    prior = frame_annotation_contract(panel) or serialize_annotation_contract([])
+    key = annotation_identity_key(B2010_COVERAGE_ANNOTATION, 1)
+    cells = {(geo, int(year)) for geo, year in zip(
+        panel[geo_column], panel["year"], strict=True
+    )}
+    if key in prior["bindings"]:
+        previous = prior["bindings"][key]["columns"]
+    else:
+        previous = {}
+    bindings = {column: list(existing) for column, existing in previous.items()}
+    for column in columns:
+        if column in panel:
+            bound_cells = cells.union(map(tuple, bindings.get(column, [])))
+            bindings[column] = [
+                list(cell) for cell in sorted(bound_cells, key=lambda cell: (str(cell[0]), cell[1]))
+            ]
+    sources = list(prior["sources"].get(key, []))
+    for entry in coverage["sources"].get(key, []):
+        if entry not in sources:
+            sources.append(entry)
+    _set_output_contract(panel, serialize_annotation_contract(
+        [*prior["records"], *coverage["records"]],
+        bindings={**prior["bindings"], key: {"columns": bindings}},
+        uncertain_ids=sorted({*prior["uncertain_ids"], key}),
+        sources={**prior["sources"], key: sources},
+    ))
 
 
 def propagate_annotations(

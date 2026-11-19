@@ -39,6 +39,8 @@ The extra Massachusetts shared-jurisdiction feature cannot defensibly be assigne
 
 The counts above are conditional on the available polygons. They are geographic exploration results and do not establish a longitudinal PIT/HIC sample with complete count histories.
 
+The study owner accepted the available archive as the national 2010 baseline on 2026-11-19. The coverage note `hud-b2010-available-archive-coverage#r1` travels with generated B2010 weights and historical site-selection artifacts. Recipe aggregation also reads the note from the registered B2010 boundary when reusing an older B2010 crosswalk. The note binds to derived panel columns and their output years, including outcomes calculated from frozen B2010 site membership. Its source scope remains the 2010 geometry. An independently joined measure does not inherit the note from a neighboring panel column. The note identifies an archive-wide limitation whose metro-level effects remain uncertain. Revisit individual metros and years when an output depends on resolving them.
+
 ## Artifacts and reproduction
 
 The committed recipe is [msa-coc-historical-sites-2010.yaml](../recipes/msa-coc-historical-sites-2010.yaml). From the repository root, after materializing the documented native inputs:
@@ -59,6 +61,8 @@ HHPLAB_NON_INTERACTIVE=1 uv run hhplab build recipe \
 The completed run used `--reuse-shards` only after checking the exact 52-state inventory, all source/part hashes, metadata, and missing-population checks. The native command trusts cached shards, so that verification is required before reuse. Its intermediate state directory was moved intact outside curated after assembly to satisfy curated-layout policy; no state files were deleted.
 
 Native site and CoC-membership Parquet/CSV files and their summary are under `/home/matt/HHP-Output/msa_coc_historical_sites_2010/`. The frozen comparison is under `/home/matt/HHP-Output/msa_coc_overlap_sites_2024/`.
+
+The [2026-11-19 output with the coverage note](</home/matt/HHP-Output/historical-site-selection/b2010-accepted-coverage-20261119/msa_coc_historical_sites_2010/msa_coc_summary__historical_sites_2010.json>) preserves the earlier eligibility tables and membership identities at both thresholds. Use this run or rebuild the recipe when supplying the historical site universe to a site-year panel.
 
 The retained comparison work is under `/home/matt/HHP-Output/historical-site-selection/`:
 

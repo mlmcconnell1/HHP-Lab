@@ -10,6 +10,11 @@ from types import SimpleNamespace
 import pandas as pd
 import pytest
 
+from hhplab.artifacts.naming.naming import coc_base_path
+from hhplab.geographies.xwalks.boundary_annotations import (
+    B2010_COVERAGE_ANNOTATION,
+    bind_boundary_annotations,
+)
 from hhplab.recipe.cache import RecipeCache
 from hhplab.recipe.executor import (
     ExecutionContext,
@@ -32,6 +37,7 @@ from hhplab.schema.contracts import (
     frame_annotation_contract,
     serialize_annotation_contract,
 )
+from hhplab.storage.config import StorageConfig
 from hhplab.storage.provenance import ProvenanceBlock, write_parquet_with_provenance
 
 # The retained fixture row has RTS=0: excluding RTS=1 keeps the row, but its
@@ -791,3 +797,71 @@ def test_annotated_aggregation_is_actionably_rejected(tmp_path: Path) -> None:
     )
     assert not result.success
     assert "exact source contributors are mapped" in result.error
+
+
+@pytest.mark.parametrize("annotated_crosswalk", [False, True], ids=["legacy", "generated"])
+def test_b2010_coverage_flows_from_weights_to_joined_panel(
+    tmp_path: Path, annotated_crosswalk: bool,
+) -> None:
+    asset_root = tmp_path / "data"
+    boundary_path = coc_base_path("2010", asset_root)
+    write_parquet_with_provenance(
+        pd.DataFrame({"coc_id": ["CO-1"]}), boundary_path,
+        ProvenanceBlock(boundary_vintage="2010", extra={
+            "coverage_status": "partial_unresolved", "coverage_reference": "native_2010_listing",
+        }),
+    )
+    xwalk_path = asset_root / "weights.parquet"
+    weights = pd.DataFrame({"county_fips": ["01001"], "coc_id": ["CO-1"], "area_share": [0.5]})
+    if annotated_crosswalk:
+        bind_boundary_annotations(weights, boundary_path, "2010", ("area_share",))
+    write_parquet_with_provenance(weights, xwalk_path, ProvenanceBlock(boundary_vintage="2010"))
+    pd.DataFrame({"county_fips": ["01001"], "year": [2012], "estimate": [12]}).to_parquet(
+        asset_root / "input.parquet"
+    )
+    recipe = load_recipe({
+        "version": 1,
+        "name": "b2010-coverage",
+        "universe": {"years": [2012]},
+        "targets": [{"id": "target", "geometry": {"type": "coc", "vintage": 2010}}],
+        "datasets": {"source": {
+            "provider": "fixture", "product": "estimate", "version": 1,
+            "native_geometry": {"type": "county"}, "years": "2012-2012",
+            "path": "data/input.parquet",
+        }},
+        "transforms": [{
+            "id": "weights", "type": "crosswalk", "from": {"type": "county"},
+            "to": {"type": "coc", "vintage": 2010}, "spec": {"weighting": {"scheme": "area"}},
+        }],
+        "pipelines": [{"id": "main", "target": "target", "steps": []}],
+    })
+    ctx = ExecutionContext(
+        project_root=tmp_path, recipe=recipe, quiet=True,
+        storage_config=StorageConfig(asset_store_root=asset_root, output_root=tmp_path / "output"),
+        transform_paths={"weights": xwalk_path},
+    )
+    result = _execute_resample(ResampleTask(
+        dataset_id="source", year=2012, input_path="data/input.parquet",
+        effective_geometry=GeometryRef(type="county"), method="aggregate", transform_id="weights",
+        to_geometry=GeometryRef(type="coc", vintage=2010), measures=["estimate"],
+    ), ctx)
+    assert result.success, result.error
+    ctx.intermediates[("control", 2012)] = pd.DataFrame({
+        "geo_id": ["CO-1", "CO-2"], "year": [2012, 2012], "control": [1, 2],
+    })
+    joined = _execute_join(JoinTask(datasets=["source", "control"], join_on=["geo_id", "year"],
+                                    year=2012), ctx)
+    assert joined.success, joined.error
+    panel = ctx.intermediates[("__joined__", 2012)]
+    panel_path = tmp_path / "panel.parquet"
+    write_parquet_with_provenance(panel, panel_path, ProvenanceBlock(geo_type="coc"))
+    loaded = RecipeCache().read_parquet(panel_path)
+    assert loaded.loc[loaded["geo_id"] == "CO-1", "estimate"].item() == 6
+    contract = frame_annotation_contract(loaded)
+    key = f"{B2010_COVERAGE_ANNOTATION}#r1"
+    assert contract["records"][0]["scope"]["years"] == [2010]
+    assert contract["uncertain_ids"] == [key]
+    assert contract["bindings"][key]["columns"] == {"estimate": [["CO-1", 2012]]}
+    assert {source["sha256"] for source in contract["sources"][key]} == {
+        hashlib.sha256(path.read_bytes()).hexdigest() for path in (xwalk_path, boundary_path)
+    }

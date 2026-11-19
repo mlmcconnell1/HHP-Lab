@@ -15,6 +15,7 @@ import pandas as pd
 from hhplab.geographies.coc.coc_validate import BoundaryCompatibilityValidation
 from hhplab.geographies.msa.selectors import select_top_msa_ids_by_population
 from hhplab.geographies.msa.unemployment import resolve_msa_unemployment
+from hhplab.recipe.executor.annotations import bind_b2010_panel_coverage
 from hhplab.recipe.executor.containment import build_msa_coc_membership
 from hhplab.recipe.executor.core import ExecutionContext, ExecutorError
 from hhplab.recipe.planner import ExecutionPlan
@@ -144,6 +145,7 @@ def assemble_site_year_panel(
     membership_identity: str,
     frozen_boundary_vintage: str | int,
     source_panel_fingerprints: Mapping[str, str],
+    boundary_coverage_annotation: Mapping[str, Any] | None = None,
 ) -> SiteYearPanelAssembly:
     """Build one complete-or-null row per frozen MSA site and requested year.
 
@@ -525,6 +527,17 @@ def assemble_site_year_panel(
         )
         provenance.setdefault("extra", {})["annotations"] = source_annotations
         panel.attrs["results_panel_provenance"] = provenance
+    if boundary_coverage_annotation is not None:
+        if frozen_vintage != "2010":
+            raise ExecutorError("Available-archive coverage requires frozen B2010 geography.")
+        bind_b2010_panel_coverage(
+            panel, boundary_coverage_annotation, geo_column="msa_id",
+            columns=site_year_panel_columns(measures)[2:],
+        )
+        coverage = frame_annotation_contract(panel)
+        if coverage is not None:
+            provenance.setdefault("extra", {})["annotations"] = coverage
+            panel.attrs["results_panel_provenance"] = provenance
     return SiteYearPanelAssembly(panel=panel, provenance=provenance)
 
 

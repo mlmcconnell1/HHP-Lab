@@ -14,6 +14,10 @@ import pandas as pd
 import pytest
 
 from hhplab.geographies.coc.coc_validate import validate_coc_boundary_compatibility
+from hhplab.geographies.xwalks.boundary_annotations import (
+    B2010_COVERAGE_ANNOTATION,
+    read_b2010_boundary_coverage,
+)
 from hhplab.recipe.executor.core import ExecutorError
 from hhplab.recipe.executor.msa_coc_panel import (
     SiteYearSourceBinding,
@@ -23,10 +27,12 @@ from hhplab.recipe.executor.msa_coc_panel import (
     site_year_panel_columns,
 )
 from hhplab.schema.columns import HIC_PANEL_MEASURE_COLUMNS
+from hhplab.schema.contracts import frame_annotation_contract
 from hhplab.sources.hud.pit.observation import (
     COUNT_TYPES_SHELTERED_ONLY,
     with_pit_count_metadata,
 )
+from hhplab.storage.provenance import ProvenanceBlock, write_parquet_with_provenance
 
 ARTIFACT_ID = "overlap_samples"
 THRESHOLD = 0.95
@@ -232,6 +238,38 @@ def test_aggregation_sums_exact_whole_coc_values_and_emits_canonical_schema():
         "schema_version": "coc_boundary_compatibility/1",
     }
     assert result.provenance["site_year_panel"]["row_count"] == 2
+
+
+def test_b2010_coverage_follows_frozen_membership_to_outcome_years(tmp_path):
+    boundary = tmp_path / "coc__B2010.parquet"
+    write_parquet_with_provenance(
+        pd.DataFrame({"coc_id": ["CO-1", "CO-2"]}), boundary,
+        ProvenanceBlock(boundary_vintage="2010", extra={
+            "coverage_status": "partial_unresolved", "coverage_reference": "native_2010_listing",
+        }),
+    )
+    payload = _compatibility_payload()
+    payload["frozen_boundary_vintage"] = "2010"
+    for row in payload["records"]:
+        row["frozen_boundary_vintage"] = "2010"
+    evidence = validate_coc_boundary_compatibility(
+        payload, artifact_id=ARTIFACT_ID, threshold=THRESHOLD,
+        membership_identity=MEMBERSHIP_IDENTITY, frozen_boundary_vintage="2010",
+        frozen_memberships=MEMBERSHIPS, requested_years=YEARS,
+        source_panel_vintages=SOURCE_PANEL_VINTAGES,
+    )
+    result = _assemble(
+        evidence=evidence, frozen_boundary_vintage="2010",
+        boundary_coverage_annotation=read_b2010_boundary_coverage(boundary),
+    )
+    pd.testing.assert_frame_equal(result.panel, _assemble().panel)
+    contract = frame_annotation_contract(result.panel)
+    assert contract == result.provenance["extra"]["annotations"]
+    key = f"{B2010_COVERAGE_ANNOTATION}#r1"
+    assert contract["records"][0]["scope"]["years"] == [2010]
+    assert contract["bindings"][key]["columns"] == {
+        column: [["MSA-A", year] for year in YEARS] for column in result.panel.columns[2:]
+    }
 
 
 def test_unknown_boundary_is_reported_even_when_a_frozen_id_row_exists():

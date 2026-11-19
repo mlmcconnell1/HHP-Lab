@@ -67,6 +67,10 @@ These MSA IDs are screening leads based on names/current county membership, not 
 
 The machine-readable acquisition evidence remains in `manifest.json`; normalized geometry, discrepancy lists, hashes, repair metadata, and coverage status are embedded in B2010 provenance.
 
+## Accepted national baseline — 2026-11-19
+
+Use the 441 available polygons as the national 2010 baseline with `partial_unresolved` coverage. The shared Massachusetts feature remains quarantined. Keep the candidate metro and reporting-year leads available for review if a specific output depends on them. The coverage finding alone does not establish a metro-year exclusion or justify reallocating counts. The downstream lineage rules are documented with the [2010 comparison](historical-site-selection-2010-comparison.md#unresolved-source-coverage).
+
 ## Follow-up source reconciliation — 2026-10-25
 
 The April 2010 listing is not a complete proxy for the HUD 2010 application-reporting series. The listing itself says it is based on CoCs registered in the 2009 process. HUD's [2010 Annual Homeless Assessment Report](https://www.huduser.gov/portal/sites/default/files/pdf/2010HomelessAssessmentReport.pdf) separately publishes a “2010 List of Continuums of Care” in Appendix C-1 (PDF pages 121–129), and HUD Exchange's individual 2010 HIC and PopSub profiles identify themselves as reports from the 2010 application. This establishes report/list identity for some IDs, not claimed geography or the correctness of any polygon.

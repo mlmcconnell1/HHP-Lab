@@ -38,9 +38,14 @@ from hhplab.geographies.msa.coverage import (
     save_msa_coc_coverage,
 )
 from hhplab.geographies.msa.crosswalk import aggregate_coc_to_msa_fractional_rollup
+from hhplab.geographies.xwalks.boundary_annotations import read_b2010_boundary_coverage
 from hhplab.panel.conformance import PanelRequest, run_conformance
 from hhplab.panel.panel_diagnostics import generate_diagnostics_report
 from hhplab.panel.zori_eligibility import summarize_zori_eligibility
+from hhplab.recipe.executor.annotations import (
+    bind_b2010_panel_coverage,
+    resolve_b2010_crosswalk_coverage,
+)
 from hhplab.recipe.executor.containment import build_containment_list
 from hhplab.recipe.executor.core import (
     ExecutionContext,
@@ -308,7 +313,8 @@ def persist_msa_fractional_rollup(
                 f"--counties {spec.county_vintage}` first."
             )
         _record_fractional_rollup_crosswalk_asset(ctx, xwalk_file)
-        xwalk = _read_parquet(xwalk_file, "MSA fractional rollup crosswalk")
+        xwalk = ctx.cache.read_parquet(xwalk_file)
+        coverage = resolve_b2010_crosswalk_coverage(xwalk, xwalk_file, ctx)
         rollup = aggregate_coc_to_msa_fractional_rollup(
             source,
             xwalk,
@@ -322,6 +328,10 @@ def persist_msa_fractional_rollup(
         )
         if spec.output_aliases:
             rollup = rollup.rename(columns=dict(spec.output_aliases))
+        bind_b2010_panel_coverage(
+            rollup, coverage, geo_column="msa_id",
+            columns=[column for column in rollup if column not in {"msa_id", "year", "geo_id"}],
+        )
 
         output_file = _resolve_panel_output_file(
             ctx.recipe,
@@ -377,6 +387,9 @@ def persist_msa_fractional_rollup(
         "source_label": spec.provenance.source_label,
         "row_count": len(rollup),
     }
+    annotations = frame_annotation_contract(rollup)
+    if annotations is not None:
+        provenance.setdefault("extra", {})["annotations"] = annotations
 
     table = pa.Table.from_pandas(rollup)
     metadata = table.schema.metadata or {}
@@ -753,10 +766,21 @@ def persist_msa_coc_sites(plan: ExecutionPlan, ctx: ExecutionContext) -> StepRes
         )
         if any(path in ctx._written_outputs for path in outputs.values()):
             raise ValueError("Site output collision; give each target a unique output identity.")
-        exclusions = _site_universe_exclusions(paths["msa_universe_path"])
-        exclusion_notes = [
+        site_metadata = _site_universe_exclusions(paths["msa_universe_path"])
+        coverage = (
+            read_b2010_boundary_coverage(paths["coc_names_path"])
+            if str(spec.coc_boundary_vintage) == "2010" else None
+        )
+        if coverage is not None:
+            existing = site_metadata.get("annotations", serialize_annotation_contract([]))
+            site_metadata["annotations"] = serialize_annotation_contract(
+                [*existing["records"], *coverage["records"]],
+                bindings=existing["bindings"], uncertain_ids=coverage["uncertain_ids"],
+                sources={**existing["sources"], **coverage["sources"]},
+            )
+        site_notes = [
             record["public_text"]
-            for record in exclusions.get("annotations", {}).get("records", [])
+            for record in site_metadata.get("annotations", {}).get("records", [])
             if record.get("public_text")
         ]
         provenance = ProvenanceBlock(
@@ -771,7 +795,7 @@ def persist_msa_coc_sites(plan: ExecutionPlan, ctx: ExecutionContext) -> StepRes
                     "Each whole CoC containment >= threshold; "
                     "their combined MSA coverage >= threshold."
                 ),
-                **exclusions,
+                **site_metadata,
             },
         )
         for kind, frame in (("sites", sites), ("memberships", members)):
@@ -787,10 +811,10 @@ def persist_msa_coc_sites(plan: ExecutionPlan, ctx: ExecutionContext) -> StepRes
                         "CoC types are provisional name-based labels, not eligibility criteria.",
                         "Population overlap does not establish outcome-count comparability.",
                         "Missing sites remain in the candidate denominator.",
-                        *exclusion_notes,
+                        *site_notes,
                     ],
                     "samples": summary,
-                    **exclusions,
+                    **site_metadata,
                 },
                 indent=2,
                 allow_nan=False,

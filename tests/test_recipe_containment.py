@@ -26,6 +26,7 @@ from hhplab.artifacts.naming.naming import (
     msa_coc_block_population_xwalk_path,
     msa_county_membership_path,
 )
+from hhplab.geographies.xwalks.boundary_annotations import B2010_COVERAGE_ANNOTATION
 from hhplab.recipe.executor import execute_recipe
 from hhplab.recipe.executor.containment import (
     ALBERS_EQUAL_AREA_CRS,
@@ -43,6 +44,7 @@ from hhplab.recipe.loader import load_recipe
 from hhplab.recipe.manifest import read_manifest
 from hhplab.recipe.recipe_schema import ContainmentSpec, MsaCocPanelSpec
 from hhplab.schema.columns import MSA_COC_PANEL_COLUMNS, MSA_FRACTIONAL_ROLLUP_COLUMNS
+from hhplab.storage.provenance import ProvenanceBlock, write_parquet_with_provenance
 
 CRS = ALBERS_EQUAL_AREA_CRS
 COUNTY_FIXTURES = {
@@ -887,10 +889,11 @@ def test_execute_recipe_persists_msa_coc_panel_output(tmp_path) -> None:
     assert provenance["msa_coc_panel"]["unemployment_source"] == "acs5"
 
 
-def test_execute_recipe_persists_msa_fractional_rollup_output(tmp_path) -> None:
+@pytest.mark.parametrize("boundary_vintage", [2025, 2010])
+def test_execute_recipe_persists_msa_fractional_rollup_output(tmp_path, boundary_vintage) -> None:
     pit_file = tmp_path / "data" / "pit.parquet"
     xwalk_file = msa_coc_block_population_xwalk_path(
-        2025,
+        boundary_vintage,
         "test_msa_v1",
         2023,
         2020,
@@ -908,7 +911,18 @@ def test_execute_recipe_persists_msa_fractional_rollup_output(tmp_path) -> None:
             "pit_unsheltered": [2.0, 2.0, 3.0, 3.0],
         }
     ).to_parquet(pit_file)
-    MSA_FRACTIONAL_ROLLUP_XWALK.to_parquet(xwalk_file)
+    weights = MSA_FRACTIONAL_ROLLUP_XWALK.assign(boundary_vintage=str(boundary_vintage))
+    write_parquet_with_provenance(
+        weights, xwalk_file, ProvenanceBlock(boundary_vintage=str(boundary_vintage)),
+    )
+    if boundary_vintage == 2010:
+        write_parquet_with_provenance(
+            weights[["coc_id"]].drop_duplicates(), coc_base_path("2010", tmp_path / "data"),
+            ProvenanceBlock(boundary_vintage="2010", extra={
+                "coverage_status": "partial_unresolved",
+                "coverage_reference": "native_2010_listing",
+            }),
+        )
 
     recipe = load_recipe(
         {
@@ -923,7 +937,7 @@ def test_execute_recipe_persists_msa_fractional_rollup_output(tmp_path) -> None:
                     "msa_fractional_rollup": {
                         "allocation_basis": "block_population",
                         "denominator_source": "pl_94_171_block_population",
-                        "coc_boundary_vintage": 2025,
+                        "coc_boundary_vintage": boundary_vintage,
                         "msa_definition_version": "test_msa_v1",
                         "county_vintage": 2023,
                         "block_vintage": 2020,
@@ -976,7 +990,7 @@ def test_execute_recipe_persists_msa_fractional_rollup_output(tmp_path) -> None:
                         {
                             "resample": {
                                 "dataset": "pit",
-                                "to_geometry": {"type": "coc", "vintage": 2025},
+                                "to_geometry": {"type": "coc", "vintage": boundary_vintage},
                                 "method": "identity",
                                 "measures": [
                                     "pit_total",
@@ -1000,7 +1014,7 @@ def test_execute_recipe_persists_msa_fractional_rollup_output(tmp_path) -> None:
     assert (
         panel_path.name
         == "panel__msa-rollup-januarypit__Y2020-2021__basis-block-population"
-        "@B2025xMtestmsav1xC2023xK2020xN2020.parquet"
+        f"@B{boundary_vintage}xMtestmsav1xC2023xK2020xN2020.parquet"
     )
     panel = pd.read_parquet(panel_path).sort_values(["msa_id", "year"]).reset_index(drop=True)
     assert list(panel.columns[: len(MSA_FRACTIONAL_ROLLUP_COLUMNS)]) == list(
@@ -1035,6 +1049,13 @@ def test_execute_recipe_persists_msa_fractional_rollup_output(tmp_path) -> None:
     assert rollup_provenance["output_id"] == "january_pit"
     assert rollup_provenance["source_label"] == "hud_pit_fractional_msa_rollup"
     assert rollup_provenance["row_count"] == 4
+    if boundary_vintage == 2010:
+        annotations = provenance["extra"]["annotations"]
+        key = f"{B2010_COVERAGE_ANNOTATION}#r1"
+        assert annotations["records"][0]["scope"]["years"] == [2010]
+        assert annotations["bindings"][key]["columns"]["msa_pit_total"] == (
+            panel[["msa_id", "year"]].values.tolist()
+        )
 
 
 def test_execute_recipe_target_selector_filters_panel_rows(tmp_path) -> None:
