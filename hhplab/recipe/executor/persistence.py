@@ -71,9 +71,18 @@ from hhplab.recipe.manifest import AssetRecord, write_manifest
 from hhplab.recipe.planner import ExecutionPlan
 from hhplab.recipe.recipe_schema import ContainmentSpec, MsaFractionalRollupSpec
 from hhplab.recipe.schema_common import expand_year_spec
-from hhplab.schema.contracts import frame_annotation_contract
+from hhplab.schema.contracts import (
+    annotation_identity_key,
+    frame_annotation_contract,
+    parse_annotation_contract,
+    serialize_annotation_contract,
+)
 from hhplab.storage.config import load_config
-from hhplab.storage.provenance import ProvenanceBlock, write_parquet_with_provenance
+from hhplab.storage.provenance import (
+    ProvenanceBlock,
+    read_provenance,
+    write_parquet_with_provenance,
+)
 
 
 def persist_outputs(
@@ -674,6 +683,35 @@ def persist_containment(
     return StepResult(step_kind="persist_containment", detail=detail, success=True)
 
 
+def _site_universe_exclusions(path: Path) -> dict:
+    """Carry artifact-level exclusion notes onto regenerated site artifacts."""
+    provenance = read_provenance(path)
+    if provenance is None:
+        return {}
+    raw = provenance.extra.get("annotations")
+    if raw is None:
+        return {}
+    source = parse_annotation_contract(raw)
+    records = []
+    keys = set()
+    for record in source["records"]:
+        key = annotation_identity_key(record["id"], record["revision"])
+        if record["category"] == "exclusion" and source["bindings"].get(key) == {"columns": {}}:
+            if key not in source["uncertain_ids"]:
+                records.append(record)
+                keys.add(key)
+    if not records:
+        return {}
+    extra = {
+        "annotations": serialize_annotation_contract(
+            records, sources={key: value for key, value in source["sources"].items() if key in keys}
+        )
+    }
+    if "study_exclusions" in provenance.extra:
+        extra["study_exclusions"] = provenance.extra["study_exclusions"]
+    return extra
+
+
 def persist_msa_coc_sites(plan: ExecutionPlan, ctx: ExecutionContext) -> StepResult:
     """Persist block-population sample tables and descriptive summary only."""
     try:
@@ -715,6 +753,12 @@ def persist_msa_coc_sites(plan: ExecutionPlan, ctx: ExecutionContext) -> StepRes
         )
         if any(path in ctx._written_outputs for path in outputs.values()):
             raise ValueError("Site output collision; give each target a unique output identity.")
+        exclusions = _site_universe_exclusions(paths["msa_universe_path"])
+        exclusion_notes = [
+            record["public_text"]
+            for record in exclusions.get("annotations", {}).get("records", [])
+            if record.get("public_text")
+        ]
         provenance = ProvenanceBlock(
             geo_type="msa",
             boundary_vintage=str(spec.coc_boundary_vintage),
@@ -727,6 +771,7 @@ def persist_msa_coc_sites(plan: ExecutionPlan, ctx: ExecutionContext) -> StepRes
                     "Each whole CoC containment >= threshold; "
                     "their combined MSA coverage >= threshold."
                 ),
+                **exclusions,
             },
         )
         for kind, frame in (("sites", sites), ("memberships", members)):
@@ -742,8 +787,10 @@ def persist_msa_coc_sites(plan: ExecutionPlan, ctx: ExecutionContext) -> StepRes
                         "CoC types are provisional name-based labels, not eligibility criteria.",
                         "Population overlap does not establish outcome-count comparability.",
                         "Missing sites remain in the candidate denominator.",
+                        *exclusion_notes,
                     ],
                     "samples": summary,
+                    **exclusions,
                 },
                 indent=2,
                 allow_nan=False,

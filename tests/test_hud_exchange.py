@@ -699,8 +699,10 @@ class TestPerStateFallbackCompleteness:
 
     def test_full_success_returns_path(self, tmp_path, monkeypatch):
         """If all states succeed, _download_per_state_shapefiles returns a path."""
+        attempted = []
 
         def fake_download_and_extract(url, sub_dir, filename):
+            attempted.append(sub_dir.name)
             shp_path = _create_test_shapefile(sub_dir)
             return shp_path, _ArchiveSource(url, "a" * 64, 123)
 
@@ -712,7 +714,8 @@ class TestPerStateFallbackCompleteness:
         result = _download_per_state_shapefiles("2020", tmp_path)
         assert result is not None
         assert result.path.exists()
-        assert len(result.archive_sources) == len(_HUD_STATE_ABBREVIATIONS)
+        assert len(result.archive_sources) == len(set(attempted)) == 56
+        assert {"AS", "GU", "MP", "PR", "VI", "DC"} <= set(attempted)
 
 
 # Helper functions for creating test data

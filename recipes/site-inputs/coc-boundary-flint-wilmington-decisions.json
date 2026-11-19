@@ -1,0 +1,46 @@
+{
+  "schema_version": 1,
+  "decision_basis": "study_owner_decision",
+  "geometry_treatment": "Retain the annual shapes and their existing corrections.",
+  "count_treatment": "Retain published PIT and HIC values and study membership.",
+  "annotation_defaults": {
+    "revision": 1,
+    "category": "caveat",
+    "uncertainty": "The 2020 Census block estimates describe resident exposure to the redraw. Shelter or encampment locations and any historical reporting transfer remain unverified.",
+    "evidence": [{"name": "Reviewed Flint and Wilmington boundary transitions", "ref": "docs/historical-coc-archive-availability.md#flint-and-wilmington-footnotes-2026-11-19", "kind": "doc"}]
+  },
+  "transitions": [
+    {
+      "coc_id": "MI-505",
+      "new_year": 2013,
+      "classification": "retained_cross_county_city_assignment",
+      "id": "hud-annual-mi505-2013-fenton-otter-lake",
+      "summary": "Flint adds portions of Fenton and Otter Lake in the 2013 GIS",
+      "text": "The 2013 Flint outline adds approximately 1.54 square kilometres, matching the out-of-Genesee County portions of Fenton and Otter Lake. Census 2020 blocks indicate approximately 393 residents in the changed footprint (0.097% of the fixed CoC population). Retain the year-specific source shapes and published counts. The PIT/HIC reporting transfer date remains unverified."
+    },
+    {
+      "coc_id": "NC-506",
+      "new_year": 2018,
+      "classification": "retained_county_linework",
+      "id": "hud-annual-nc506-2018-county-linework",
+      "summary": "Wilmington's 2018 county perimeter revision",
+      "text": "Wilmington's 2018 GIS revision changes about 7.28 square kilometres, with the largest gain on the Pender–Onslow edge. Land-weighted Census 2020 block exposure is about 77 residents (0.018% of the fixed CoC population). Retain the year-specific source shapes and published counts. A legal boundary or count reporting transfer date remains unverified."
+    },
+    {
+      "coc_id": "NC-506",
+      "new_year": 2019,
+      "classification": "retained_county_linework",
+      "id": "hud-annual-nc506-2019-county-linework",
+      "summary": "Wilmington's 2019 river and county perimeter revision",
+      "text": "Wilmington's 2019 GIS revision changes about 1.82 square kilometres along rivers and county edges, with land-weighted Census 2020 block exposure of about 29 residents (0.007% of the fixed CoC population). Retain the year-specific source shapes and published counts. The reporting extent of the changed strips remains unverified."
+    },
+    {
+      "coc_id": "NC-506",
+      "new_year": 2023,
+      "classification": "retained_shoreline_and_coastal_land",
+      "id": "hud-annual-nc506-2023-coastal-redraw",
+      "summary": "Wilmington's 2023 shoreline and coastal land revision",
+      "text": "Wilmington's 2023 redraw changes about 86.07 square kilometres across shoreline, rivers and coastal land. About 52% is mapped water. Land-weighted Census 2020 block exposure is approximately 1,234 residents (0.293% of the fixed CoC population). PIT rises from 347 to 558 while total HIC beds fall from 792 to 607. The connection between those changes and the geography remains unverified. Retain the year-specific source shapes and published counts."
+    }
+  ]
+}

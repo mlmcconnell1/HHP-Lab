@@ -57,10 +57,12 @@ HUD_EXCHANGE_STATE_SHAPEFILE_TEMPLATE = HUD_EXCHANGE_COC_STATE_SHAPEFILE_TEMPLAT
 
 # State/territory abbreviations used by HUD Exchange per-state shapefiles.
 # Covers all 50 states, DC, and the five populated US territories.
+_HUD_TERRITORY_ABBREVIATIONS = frozenset({"AS", "GU", "MP", "PR", "VI"})
 _HUD_STATE_ABBREVIATIONS = [
     "AK",
     "AL",
     "AR",
+    "AS",
     "AZ",
     "CA",
     "CO",
@@ -1166,7 +1168,7 @@ def ingest_hud_exchange_state_archives(
         raise ValueError("Expected an acquisition manifest with exactly 51 state/DC archives.")
     if not isinstance(territory_rows, list) or len(territory_rows) != 5:
         raise ValueError("Expected an acquisition manifest with territory archive attempts.")
-    expected_state_codes = set(_HUD_STATE_ABBREVIATIONS) - {"GU", "MP", "PR", "VI"}
+    expected_state_codes = set(_HUD_STATE_ABBREVIATIONS) - _HUD_TERRITORY_ABBREVIATIONS
     actual_state_codes = {str(row.get("code")) for row in state_rows}
     if actual_state_codes != expected_state_codes:
         raise ValueError(
@@ -1174,6 +1176,8 @@ def ingest_hud_exchange_state_archives(
             f"missing={sorted(expected_state_codes - actual_state_codes)}, "
             f"unexpected={sorted(actual_state_codes - expected_state_codes)}."
         )
+    if {str(row.get("code")) for row in territory_rows} != _HUD_TERRITORY_ABBREVIATIONS:
+        raise ValueError("The acquisition manifest must contain AS, GU, MP, PR and VI attempts.")
     unavailable_territories = [
         str(row["code"])
         for row in territory_rows

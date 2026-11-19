@@ -9,6 +9,7 @@ import geopandas as gpd
 import pandas as pd
 import typer
 
+from hhplab.geographies.xwalks.boundary_annotations import bind_annual_boundary_annotations
 from hhplab.geographies.xwalks.county import build_coc_county_crosswalk, save_county_crosswalk
 from hhplab.geographies.xwalks.diagnostics import (
     compute_crosswalk_diagnostics,
@@ -364,6 +365,9 @@ def build_xwalks(
                 auto_fetch=auto_fetch,
             )
 
+        bind_annual_boundary_annotations(
+            tract_xwalk, boundary_path, boundary, ("area_share", "intersection_area", "pop_share")
+        )
         # Save tract crosswalk
         tract_output = save_crosswalk(
             crosswalk=tract_xwalk,
@@ -427,6 +431,9 @@ def build_xwalks(
         boundary_vintage=boundary,
     )
 
+    bind_annual_boundary_annotations(
+        county_xwalk, boundary_path, boundary, ("area_share", "intersection_area", "coc_area")
+    )
     # Save county crosswalk
     county_output = save_county_crosswalk(
         crosswalk=county_xwalk,

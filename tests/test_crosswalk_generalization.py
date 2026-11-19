@@ -9,6 +9,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
+from hhplab.geographies.xwalks.boundary_annotations import bind_annual_boundary_annotations
 from hhplab.geographies.xwalks.tract import (
     add_population_weights,
     validate_population_shares,
@@ -19,6 +20,7 @@ from hhplab.measures.measures_diagnostics import (
     identify_problem_cocs,
     identify_problem_geos,
 )
+from hhplab.schema.contracts import serialize_annotation_contract
 from hhplab.sources.census.acs.acs_aggregate import aggregate_to_coc, aggregate_to_geo
 from hhplab.sources.census.pep.pep_aggregate import aggregate_pep_counties
 from hhplab.sources.zori.zori_aggregate import (
@@ -26,6 +28,42 @@ from hhplab.sources.zori.zori_aggregate import (
     compute_coc_county_weights,
     compute_geo_county_weights,
 )
+from hhplab.storage.provenance import (
+    ProvenanceBlock,
+    read_provenance,
+    write_parquet_with_provenance,
+)
+
+
+def test_annual_geometry_note_survives_crosswalk_save(tmp_path):
+    source = tmp_path / "coc__BHUDAnnual_2023.parquet"
+    note = {"id": "boundary-test", "revision": 1, "summary": "Boundary test", "text": "Test detail"}
+    identity = "boundary-test#r1"
+    contract = serialize_annotation_contract(
+        [note], bindings={identity: {"columns": {"geometry": [
+            ["WA-500", 2023], ["WA-503", 2022], ["WA-504", 2023],
+        ]}}}
+    )
+    source_provenance = ProvenanceBlock(
+        boundary_vintage="HUDAnnual_2023", extra={"annotations": contract}
+    )
+    write_parquet_with_provenance(
+        pd.DataFrame({"geometry": ["WA-500 shape", "WA-503 shape"]}), source, source_provenance
+    )
+    crosswalk = pd.DataFrame({
+        "coc_id": ["WA-500", "WA-500", "WA-503"],
+        "area_share": [0.5, 0.7, 0.2],
+        "county_area": [700, 800, 900],
+    })
+    bind_annual_boundary_annotations(
+        crosswalk, source, "HUDAnnual_2023", ("area_share", "intersection_area")
+    )
+    output = tmp_path / "crosswalk.parquet"
+    write_parquet_with_provenance(crosswalk, output, ProvenanceBlock())
+    propagated = read_provenance(output).extra["annotations"]
+    assert propagated["records"] == contract["records"]
+    assert propagated["bindings"] == {identity: {"columns": {"area_share": [["WA-500", 2023]]}}}
+    assert propagated["sources"][identity][0]["vintages"]["boundary_vintage"] == "HUDAnnual_2023"
 
 # ---------------------------------------------------------------------------
 # Fixtures: synthetic crosswalks and data with metro_id

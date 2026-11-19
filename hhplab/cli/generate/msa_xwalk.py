@@ -22,6 +22,7 @@ from hhplab.artifacts.naming.naming import (
 )
 from hhplab.geographies.coc.coc_io import resolve_curated_boundary_path
 from hhplab.geographies.msa.msa_definitions import DEFINITION_VERSION, DELINEATION_FILE_YEAR
+from hhplab.geographies.xwalks.boundary_annotations import bind_annual_boundary_annotations
 from hhplab.registry.boundary_registry import latest_vintage, list_boundaries
 from hhplab.storage.paths import raw_root
 from hhplab.storage.provenance import ProvenanceBlock
@@ -308,6 +309,17 @@ def generate_msa_xwalk(
                 county_vintage=str(counties),
                 definition_version=definition_version,
             )
+        bind_annual_boundary_annotations(
+            crosswalk, boundary_path, resolved_boundary,
+            (
+                "intersection_area", "allocation_share", "coc_area",
+                "intersecting_county_count", "intersecting_county_fips",
+                "intersection_population", "coc_population_denominator",
+                "coc_population_containment_share", "msa_population_coverage_share",
+                "coc_intersection_area", "block_count", "missing_population_block_count",
+                "zero_population_coc", "partial_coc_population_coverage",
+            ),
+        )
     except MemoryError as exc:
         message = (
             "Block-population MSA crosswalk generation ran out of memory. "
