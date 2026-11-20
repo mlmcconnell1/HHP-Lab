@@ -9,7 +9,10 @@ import geopandas as gpd
 import pandas as pd
 import typer
 
-from hhplab.geographies.xwalks.boundary_annotations import bind_boundary_annotations
+from hhplab.geographies.xwalks.boundary_annotations import (
+    bind_boundary_annotations,
+    bind_tract_mediated_annotations,
+)
 from hhplab.geographies.xwalks.county import build_coc_county_crosswalk, save_county_crosswalk
 from hhplab.geographies.xwalks.diagnostics import (
     compute_crosswalk_diagnostics,
@@ -558,6 +561,11 @@ def _build_tract_mediated_xwalk_cli(
             denominator_vintage=denominator_vintage,
             expected_county_fips=expected_county_fips,
             allow_incomplete_denominator_coverage=denominator_source == "decennial",
+        )
+        bind_tract_mediated_annotations(
+            crosswalk,
+            paths["tract_crosswalk"],
+            boundary,
         )
     except (ValueError, OSError) as exc:
         if json_output:

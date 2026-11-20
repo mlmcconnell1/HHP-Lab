@@ -28,6 +28,8 @@ from hhplab.geographies.coc.ct_planning_regions import (
     is_ct_legacy_county_fips,
     is_ct_planning_region_fips,
 )
+from hhplab.geographies.xwalks.boundary_annotations import bind_boundary_annotations
+from hhplab.recipe.cache import RecipeCache
 from hhplab.recipe.executor.core import ExecutorError, _get_transform
 from hhplab.recipe.recipe_schema import RecipeV1
 from hhplab.recipe.schema_common import GeometryRef
@@ -421,15 +423,16 @@ def _resolve_msa_transform_df(
             base_dir=data_root,
         )
         if cached_path.exists():
-            return pd.read_parquet(cached_path)
+            return RecipeCache(enabled=False).read_parquet(cached_path)
 
-        coc_boundaries = gpd.read_parquet(coc_base_path(boundary_vintage, data_root))
+        boundary_path = coc_base_path(boundary_vintage, data_root)
+        coc_boundaries = gpd.read_parquet(boundary_path)
         counties = gpd.read_parquet(county_path(county_vintage, data_root))
         membership = read_msa_county_membership(
             definition_version=definition_version,
             base_dir=data_root,
         )
-        return build_coc_msa_crosswalk(
+        xwalk = build_coc_msa_crosswalk(
             coc_boundaries,
             counties,
             membership,
@@ -437,6 +440,12 @@ def _resolve_msa_transform_df(
             county_vintage=county_vintage,
             definition_version=definition_version,
         )
+        bind_boundary_annotations(
+            xwalk, boundary_path, boundary_vintage,
+            ("intersection_area", "allocation_share", "coc_area",
+             "intersecting_county_count", "intersecting_county_fips"),
+        )
+        return xwalk
 
     raise ExecutorError(
         f"MSA transforms currently support tract, county, or coc bases; got '{base_ref.type}'."

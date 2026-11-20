@@ -270,15 +270,26 @@ diagnostics. Where applicability is uncertain, it retains conservative candidate
 bindings and labels that uncertainty. An uncertainty marker without any bounded
 candidate cells conservatively applies to the consuming panel.
 
-Legacy v1 preparation now preserves immutable records, exact bindings and
-source identities through identity resampling, point-in-time row filtering,
-joins, population-column aliases, panel projections/aliases and persistence.
-Prepared outputs can enter results v2 without redeclaring their annotations.
-Annotated aggregate/allocate resampling, calendar mean/median, interpolation,
-and lagged source-year reassignment still fail explicitly until their exact
-contributors or year mapping are supported. Crosswalk/support inputs also
-retain their fail-closed guards. Use a saved annotated panel or supported
-site-year assembly for those cases; never remove annotations to bypass a guard.
+Legacy v1 preparation preserves immutable records, exact bindings and source
+identities through identity resampling, point-in-time row filtering, joins,
+population-column aliases, panel projections/aliases and persistence. Prepared
+outputs can enter results v2 without redeclaring their annotations. A CoC
+geometry reference may use `vintage: HUDAnnual_YYYY`; ordinary numeric vintage
+spellings still normalize to integers, and qualified vintages are rejected on
+other geometry types. Validated annual HUD notes on crosswalks carry into
+CoC aggregates, CoC-to-MSA aggregates and MSA fractional rollups. Weighted
+measures use the contributing rows with positive weights and observed values.
+Ordinary means use the crosswalk to determine geographic membership. Weighted
+means use `pop_share` when present. Derived measures carry the bindings of
+the rows used for their inputs. Output bindings use the observation year,
+and source identities retain the geometry year. Independently sourced
+denominators stay outside those bindings. The tract-mediated county crosswalk
+generator preserves annual notes and the artifact-wide B2010 caveat in derived
+weight provenance. The decennial PEP recipe carries the selected population
+weight note into the resulting population estimate. Allocation, calendar
+mean and median, interpolation, and lagged source-year reassignment of
+annotated inputs remain unsupported. Crosswalk and support inputs retain
+fail-closed validation for annotation contracts outside these operations.
 
 Same ID/revision plus identical content deduplicates with both origins retained.
 Different content under that identity is an error; create a new revision.

@@ -37,13 +37,18 @@ from hhplab.geographies.msa.coverage import (
     build_msa_coc_sites,
     save_msa_coc_coverage,
 )
-from hhplab.geographies.msa.crosswalk import aggregate_coc_to_msa_fractional_rollup
+from hhplab.geographies.msa.crosswalk import (
+    _apply_fractional_rollup_thresholds,
+    _validate_fractional_rollup_crosswalk,
+    aggregate_coc_to_msa_fractional_rollup,
+)
 from hhplab.geographies.xwalks.boundary_annotations import read_b2010_boundary_coverage
 from hhplab.panel.conformance import PanelRequest, run_conformance
 from hhplab.panel.panel_diagnostics import generate_diagnostics_report
 from hhplab.panel.zori_eligibility import summarize_zori_eligibility
 from hhplab.recipe.executor.annotations import (
     bind_b2010_panel_coverage,
+    bind_crosswalk_aggregate_contributors,
     resolve_b2010_crosswalk_coverage,
 )
 from hhplab.recipe.executor.containment import build_containment_list
@@ -328,6 +333,35 @@ def persist_msa_fractional_rollup(
         )
         if spec.output_aliases:
             rollup = rollup.rename(columns=dict(spec.output_aliases))
+        if coverage is None and (contract := frame_annotation_contract(xwalk)) is not None:
+            pairs = _apply_fractional_rollup_thresholds(
+                _validate_fractional_rollup_crosswalk(xwalk),
+                min_coc_population_containment_share=spec.min_coc_population_containment_share,
+                min_msa_population_coverage_share=spec.min_msa_population_coverage_share,
+                min_allocation_share=spec.min_allocation_share,
+            )
+            positive = pairs.loc[
+                pd.to_numeric(pairs["allocation_share"], errors="coerce").gt(0),
+                ["coc_id", "msa_id"],
+            ].assign(coc_id=lambda frame: frame["coc_id"].astype(str))
+            source_rows = source.rename(columns={
+                spec.provenance.source_coc_id_column: "coc_id",
+                spec.provenance.source_year_column: "year",
+            }).assign(coc_id=lambda frame: frame["coc_id"].astype(str))
+            joined = source_rows.merge(positive, on="coc_id", how="inner")
+            joined["year"] = pd.to_numeric(joined["year"], errors="raise").astype(int)
+            bind_crosswalk_aggregate_contributors(
+                rollup,
+                contract,
+                {
+                    spec.output_aliases.get(measure, measure): (
+                        "allocation_share", joined.loc[joined[measure].notna()],
+                    )
+                    for measure in spec.additive_measure_columns
+                },
+                target_geo_column="msa_id",
+                output_geo_column="msa_id",
+            )
         bind_b2010_panel_coverage(
             rollup, coverage, geo_column="msa_id",
             columns=[column for column in rollup if column not in {"msa_id", "year", "geo_id"}],

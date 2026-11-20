@@ -6,9 +6,10 @@ do not need the full top-level ``RecipeV1`` model.
 
 from __future__ import annotations
 
+import re
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 
 class YearSpec(BaseModel):
@@ -91,9 +92,12 @@ class GeometryRef(BaseModel):
         description="Geometry type identifier (open set).",
         examples=["coc", "county", "state", "zcta"],
     )
-    vintage: int | None = Field(
+    vintage: int | str | None = Field(
         default=None,
-        description="Vintage year for geometry (if applicable).",
+        description=(
+            "Vintage year for geometry (if applicable); CoC geometry may use a "
+            "qualified HUDAnnual_YYYY source vintage."
+        ),
         examples=[2025, 2023, 2020],
     )
     source: str | None = Field(
@@ -117,6 +121,24 @@ class GeometryRef(BaseModel):
         ),
         examples=["glynn_fox_v1"],
     )
+
+    @field_validator("vintage", mode="before")
+    @classmethod
+    def _normalize_vintage(cls, value: Any) -> Any:
+        if isinstance(value, str) and value.isdigit():
+            return int(value)
+        return value
+
+    @model_validator(mode="after")
+    def _validate_qualified_vintage(self) -> GeometryRef:
+        if isinstance(self.vintage, str) and not (
+            self.type == "coc" and re.fullmatch(r"HUDAnnual_\d{4}", self.vintage)
+        ):
+            raise ValueError(
+                "qualified geometry vintages are supported only for CoC "
+                "geometry as HUDAnnual_YYYY"
+            )
+        return self
 
     def resolved_metro_definition_version(self) -> str | None:
         """Return the runtime metro-universe definition version.

@@ -9,6 +9,10 @@ from __future__ import annotations
 
 import pandas as pd
 
+from hhplab.recipe.executor.annotations import (
+    bind_crosswalk_aggregate_contributors,
+    is_b2010_coverage_contract,
+)
 from hhplab.recipe.executor.core import ExecutionContext, ExecutorError, _get_transform
 from hhplab.recipe.executor.inputs import _resolve_geo_column, _validate_columns
 from hhplab.recipe.executor.resample import (
@@ -17,6 +21,7 @@ from hhplab.recipe.executor.resample import (
 )
 from hhplab.recipe.planner import ResampleTask
 from hhplab.schema.columns import TOTAL_POPULATION
+from hhplab.schema.contracts import frame_annotation_contract
 from hhplab.schema.lineage import (
     PopulationLineage,
     PopulationMethod,
@@ -179,7 +184,7 @@ def resample_pep_decennial_tract_mediated_population(
     result = result[result["year"] == task.year].reset_index(drop=True)
     if target_col != "geo_id":
         result = result.rename(columns={target_col: "geo_id"})
-    return normalize_population_measure(
+    result = normalize_population_measure(
         result,
         source_column="population",
         lineage=PopulationLineage(
@@ -191,3 +196,19 @@ def resample_pep_decennial_tract_mediated_population(
             crosswalk_vintage=task.effective_geometry.vintage,
         ),
     )
+    contract = frame_annotation_contract(xwalk)
+    if contract is not None and not is_b2010_coverage_contract(contract):
+        source_counties = pep_df.loc[
+            pep_df["year"].eq(task.year) & pep_df["population"].notna(), "county_fips"
+        ]
+        weight = pd.to_numeric(xwalk["population_weight"], errors="coerce")
+        rows = xwalk.loc[
+            xwalk["county_fips"].isin(source_counties) & weight.gt(0), ["coc_id"],
+        ].assign(year=task.year)
+        result = bind_crosswalk_aggregate_contributors(
+            result,
+            contract,
+            {TOTAL_POPULATION: ("population_weight", rows)},
+            target_geo_column="coc_id",
+        )
+    return result

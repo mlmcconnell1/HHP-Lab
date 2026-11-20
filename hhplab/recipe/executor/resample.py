@@ -25,6 +25,10 @@ from hhplab.geographies.coc.ct_planning_regions import (
     is_ct_planning_region_fips,
     translate_weights_planning_to_legacy,
 )
+from hhplab.recipe.executor.annotations import (
+    bind_crosswalk_aggregate_contributors,
+    is_b2010_coverage_contract,
+)
 from hhplab.recipe.executor.core import (
     ExecutionContext,
     ExecutorError,
@@ -43,6 +47,7 @@ from hhplab.schema.columns import (
     ACS1_IMPUTATION_LINEAGE_COLUMNS,
     PIT_OBSERVATION_COLUMNS,
 )
+from hhplab.schema.contracts import frame_annotation_contract
 from hhplab.sources.census.acs.sae import (
     CONTRACT_RENT_BINS,
     CONTRACT_RENT_BINS_EARLY,
@@ -405,6 +410,8 @@ def _attach_dynamic_pop_share(
         enriched[population_field] / group_sum,
         np.nan,
     )
+    enriched.attrs = xwalk.attrs.copy()
+    enriched.attrs["dynamic_pop_share"] = True
     return enriched.drop(columns=[population_field])
 
 
@@ -678,10 +685,19 @@ def _resample_aggregate(
 
     # Detect the target geography column in the crosswalk
     target_col = _detect_xwalk_target_col(xwalk, xwalk_key)
+    xwalk_contract = frame_annotation_contract(xwalk)
+    annual_notes = (
+        xwalk_contract if xwalk_contract is not None
+        and not is_b2010_coverage_contract(xwalk_contract) else None
+    )
+    if annual_notes is not None and "coc_id" not in {xwalk_key, target_col}:
+        raise ExecutorError(
+            "Annual HUD crosswalk annotation bindings require CoC contributor IDs."
+        )
 
     # Merge dataset with crosswalk
     xwalk_cols = [target_col, xwalk_key, base_weight_col]
-    if "pop_share" in xwalk.columns:
+    if "pop_share" in xwalk.columns and base_weight_col != "pop_share":
         xwalk_cols.append("pop_share")
     merged = df.merge(
         xwalk[xwalk_cols],
@@ -849,6 +865,7 @@ def _resample_aggregate(
     if passthrough_part is not None:
         result_parts.append(passthrough_part)
 
+    pit_passthrough = None
     if has_pit_metadata and selected_pit_measures:
         pit_passthrough = _aggregate_pit_observation_passthrough(
             merged,
@@ -868,6 +885,70 @@ def _resample_aggregate(
     if target_col != "geo_id":
         result = result.rename(columns={target_col: "geo_id"})
     result["year"] = task.year
+    if annual_notes is not None:
+        pairs = list(dict.fromkeys(["coc_id", target_col]))
+        contributor_rows = merged[pairs].assign(year=task.year)
+        contributors = {}
+        for measure in task.measures:
+            agg = measure_aggs.get(measure, "sum")
+            contributor_weight = (
+                "pop_share" if agg == "weighted_mean" and has_pop_share
+                else base_weight_col
+            )
+            valid = merged[measure].notna()
+            if agg != "mean":
+                valid &= merged[contributor_weight].gt(0)
+            uses_membership = agg == "mean" or (
+                contributor_weight == "pop_share" and xwalk.attrs.get("dynamic_pop_share")
+            )
+            contributors[measure] = (
+                None if uses_membership else contributor_weight, contributor_rows.loc[valid],
+            )
+        weight = merged[base_weight_col].gt(0)
+        for output_name, config in derived_measures.items():
+            derived_type = config.get("type", "rate_from_weighted_counts")
+            if derived_type == "quantile_from_distribution":
+                total_column, bins = _distribution_total_and_bins(
+                    config, available_columns=set(merged.columns)
+                )
+                columns = [total_column, *[column for column, _, _ in bins]]
+                valid = weight & merged[columns].notna().any(axis=1)
+                entry = (base_weight_col, contributor_rows.loc[valid])
+                contributors[str(output_name)] = entry
+                diagnostic_output = config.get("diagnostic_output_column")
+                if diagnostic_output is not None:
+                    contributors[str(diagnostic_output)] = entry
+                continue
+            denominator = str(config["denominator_column"])
+            numerator_columns = config.get("source_numerator_columns")
+            numerator_column = config.get("source_numerator_column")
+            if numerator_columns is not None:
+                required = [denominator, *[str(column) for column in numerator_columns]]
+            elif numerator_column is not None:
+                required = [denominator, str(numerator_column)]
+            else:
+                required = [
+                    denominator,
+                    str(config["source_rate_column"]),
+                ]
+            valid = weight & merged[required].notna().all(axis=1)
+            entry = (base_weight_col, contributor_rows.loc[valid])
+            contributors[str(output_name)] = entry
+            numerator_output = config.get("numerator_output_column")
+            if numerator_output is not None:
+                contributors[str(numerator_output)] = entry
+        if pit_passthrough is not None:
+            expected = xwalk.loc[
+                pd.to_numeric(xwalk[base_weight_col], errors="coerce").gt(0), pairs,
+            ].assign(year=task.year)
+            for column in pit_passthrough.columns.drop(target_col):
+                contributors[column] = (base_weight_col, expected)
+        result = bind_crosswalk_aggregate_contributors(
+            result,
+            annual_notes,
+            contributors,
+            target_geo_column=target_col,
+        )
     return result
 
 

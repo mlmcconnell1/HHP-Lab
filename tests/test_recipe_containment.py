@@ -26,7 +26,10 @@ from hhplab.artifacts.naming.naming import (
     msa_coc_block_population_xwalk_path,
     msa_county_membership_path,
 )
-from hhplab.geographies.xwalks.boundary_annotations import B2010_COVERAGE_ANNOTATION
+from hhplab.geographies.xwalks.boundary_annotations import (
+    B2010_COVERAGE_ANNOTATION,
+    bind_boundary_annotations,
+)
 from hhplab.recipe.executor import execute_recipe
 from hhplab.recipe.executor.containment import (
     ALBERS_EQUAL_AREA_CRS,
@@ -44,6 +47,7 @@ from hhplab.recipe.loader import load_recipe
 from hhplab.recipe.manifest import read_manifest
 from hhplab.recipe.recipe_schema import ContainmentSpec, MsaCocPanelSpec
 from hhplab.schema.columns import MSA_COC_PANEL_COLUMNS, MSA_FRACTIONAL_ROLLUP_COLUMNS
+from hhplab.schema.contracts import serialize_annotation_contract
 from hhplab.storage.provenance import ProvenanceBlock, write_parquet_with_provenance
 
 CRS = ALBERS_EQUAL_AREA_CRS
@@ -889,7 +893,7 @@ def test_execute_recipe_persists_msa_coc_panel_output(tmp_path) -> None:
     assert provenance["msa_coc_panel"]["unemployment_source"] == "acs5"
 
 
-@pytest.mark.parametrize("boundary_vintage", [2025, 2010])
+@pytest.mark.parametrize("boundary_vintage", [2025, 2010, "HUDAnnual_2023"])
 def test_execute_recipe_persists_msa_fractional_rollup_output(tmp_path, boundary_vintage) -> None:
     pit_file = tmp_path / "data" / "pit.parquet"
     xwalk_file = msa_coc_block_population_xwalk_path(
@@ -912,6 +916,22 @@ def test_execute_recipe_persists_msa_fractional_rollup_output(tmp_path, boundary
         }
     ).to_parquet(pit_file)
     weights = MSA_FRACTIONAL_ROLLUP_XWALK.assign(boundary_vintage=str(boundary_vintage))
+    annual_note_id = "annual-msa-rollup-fixture"
+    if boundary_vintage == "HUDAnnual_2023":
+        boundary_path = coc_base_path(boundary_vintage, tmp_path / "data")
+        write_parquet_with_provenance(
+            pd.DataFrame({"coc_id": ["COC-A", "COC-B"], "geometry": ["a", "b"]}), boundary_path,
+            ProvenanceBlock(boundary_vintage=boundary_vintage, extra={
+                "annotations": serialize_annotation_contract([{
+                    "id": annual_note_id, "category": "caveat",
+                    "summary": "Annual CoC footprint", "text": "Annual CoC footprint changed.",
+                    "scope": {"columns": ["geometry"], "years": [2023]},
+                }], bindings={
+                    f"{annual_note_id}#r1": {"columns": {"geometry": [["COC-A", 2023]]}},
+                }),
+            }),
+        )
+        bind_boundary_annotations(weights, boundary_path, boundary_vintage, ("allocation_share",))
     write_parquet_with_provenance(
         weights, xwalk_file, ProvenanceBlock(boundary_vintage=str(boundary_vintage)),
     )
@@ -1056,6 +1076,13 @@ def test_execute_recipe_persists_msa_fractional_rollup_output(tmp_path, boundary
         assert annotations["bindings"][key]["columns"]["msa_pit_total"] == (
             panel[["msa_id", "year"]].values.tolist()
         )
+    elif boundary_vintage == "HUDAnnual_2023":
+        annotations = provenance["extra"]["annotations"]
+        assert annotations["records"][0]["scope"]["years"] == [2023]
+        assert annotations["bindings"][f"{annual_note_id}#r1"]["columns"] == {
+            measure: [["MSA-1", 2020], ["MSA-1", 2021]]
+            for measure in ("msa_pit_total", "msa_pit_sheltered", "pit_unsheltered")
+        }
 
 
 def test_execute_recipe_target_selector_filters_panel_rows(tmp_path) -> None:

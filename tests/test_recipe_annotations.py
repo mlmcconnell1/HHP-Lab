@@ -14,6 +14,11 @@ from hhplab.artifacts.naming.naming import coc_base_path
 from hhplab.geographies.xwalks.boundary_annotations import (
     B2010_COVERAGE_ANNOTATION,
     bind_boundary_annotations,
+    bind_tract_mediated_annotations,
+)
+from hhplab.geographies.xwalks.tract_mediated import (
+    build_tract_mediated_county_crosswalk,
+    save_tract_mediated_county_crosswalk,
 )
 from hhplab.recipe.cache import RecipeCache
 from hhplab.recipe.executor import (
@@ -24,6 +29,7 @@ from hhplab.recipe.executor import (
 )
 from hhplab.recipe.executor import panel as recipe_panel
 from hhplab.recipe.executor.annotations import (
+    bind_crosswalk_aggregate_contributors,
     frame_column_map,
     propagate_annotations,
 )
@@ -145,6 +151,36 @@ def test_join_projection_alias_and_persistence_retain_exact_bindings(tmp_path: P
     loaded = RecipeCache().read_parquet(output_path)
     persisted = frame_annotation_contract(loaded)
     assert persisted == contract
+
+
+def test_annual_crosswalk_annotation_maps_contributors_to_msa_years() -> None:
+    key = "hud-annual-wilmington-redraw#r1"
+    contract = serialize_annotation_contract(
+        [_record("hud-annual-wilmington-redraw", "allocation_share")],
+        bindings={key: {"columns": {
+            "allocation_share": [["NC-506", 2023]],
+        }}},
+    )
+    contributors = pd.DataFrame({
+        "coc_id": ["NC-506", "NC-500"],
+        "msa_id": ["48900", "48900"],
+        "year": [2019, 2020],
+    })
+    output = pd.DataFrame({
+        "msa_id": ["48900", "48900"],
+        "year": [2019, 2020],
+        "population": [10, 11],
+        "independent_denominator": [100, 101],
+    })
+    result = bind_crosswalk_aggregate_contributors(
+        output, contract,
+        {"population": ("allocation_share", contributors),
+         "independent_denominator": ("county_population", contributors)},
+        target_geo_column="msa_id", output_geo_column="msa_id",
+    )
+    assert frame_annotation_contract(result)["bindings"][key]["columns"] == {
+        "population": [["48900", 2019]],
+    }
 
 
 def test_v1_identity_and_join_output_is_readable_without_redeclaration(
@@ -864,4 +900,258 @@ def test_b2010_coverage_flows_from_weights_to_joined_panel(
     assert contract["bindings"][key]["columns"] == {"estimate": [["CO-1", 2012]]}
     assert {source["sha256"] for source in contract["sources"][key]} == {
         hashlib.sha256(path.read_bytes()).hexdigest() for path in (xwalk_path, boundary_path)
+    }
+
+
+def test_annual_hud_crosswalk_aggregates_and_persists_exact_contributors(
+    tmp_path: Path,
+) -> None:
+    boundary_vintage = "HUDAnnual_2023"
+    boundary_path = coc_base_path(boundary_vintage, tmp_path / "data")
+    key = "hud-annual-fixture#r1"
+    boundary = pd.DataFrame({"coc_id": ["NC-506"], "geometry": ["polygon"]})
+    write_parquet_with_provenance(
+        boundary,
+        boundary_path,
+        ProvenanceBlock(
+            boundary_vintage=boundary_vintage,
+            geo_type="coc",
+            extra={"annotations": serialize_annotation_contract(
+                [_record("hud-annual-fixture", "geometry")],
+                bindings={key: {"columns": {"geometry": [["NC-506", 2023]]}}},
+            )},
+        ),
+    )
+    xwalk_path = tmp_path / "data" / "weights.parquet"
+    weights = pd.DataFrame({
+        "county_fips": ["37001", "37003", "37005", "37007"],
+        "coc_id": ["NC-506", "NC-506", "NC-506", "NC-506"],
+        "area_share": [0.25, 0.75, 0.0, 0.5],
+        "pop_share": [0.9, 0.1, 0.0, 0.3],
+        "county_population": [100, 200, 300, 400],
+    })
+    bind_boundary_annotations(
+        weights, boundary_path, boundary_vintage,
+        ("area_share", "pop_share"),
+    )
+    write_parquet_with_provenance(
+        weights, xwalk_path, ProvenanceBlock(boundary_vintage=boundary_vintage)
+    )
+    input_path = tmp_path / "data" / "input.parquet"
+    pd.DataFrame({
+        "county_fips": ["37001", "37003", "37005", "37007"],
+        "year": [2019, 2019, 2019, 2019],
+        "estimate": [10.0, 30.0, 100.0, None],
+        "independent_denominator": [1.0, 2.0, 3.0, 4.0],
+    }).to_parquet(input_path)
+    recipe = load_recipe({
+        "version": 1,
+        "name": "annual-hud-crosswalk",
+        "universe": {"years": [2019]},
+        "targets": [{"id": "target", "geometry": {
+            "type": "coc", "vintage": boundary_vintage,
+        }}],
+        "datasets": {"source": {
+            "provider": "fixture", "product": "estimate", "version": 1,
+            "native_geometry": {"type": "county"}, "years": "2019-2019",
+            "path": "data/input.parquet",
+        }},
+        "transforms": [{
+            "id": "weights", "type": "crosswalk",
+            "from": {"type": "county"},
+            "to": {"type": "coc", "vintage": boundary_vintage},
+            "spec": {"weighting": {"scheme": "area"}},
+        }],
+        "pipelines": [{"id": "main", "target": "target", "steps": []}],
+    })
+    ctx = ExecutionContext(
+        project_root=tmp_path, recipe=recipe, quiet=True,
+        storage_config=StorageConfig(
+            asset_store_root=tmp_path / "data", output_root=tmp_path / "output",
+        ),
+        transform_paths={"weights": xwalk_path},
+    )
+    result = _execute_resample(ResampleTask(
+        dataset_id="source", year=2019, input_path="data/input.parquet",
+        effective_geometry=GeometryRef(type="county"), method="aggregate",
+        transform_id="weights", to_geometry=GeometryRef(
+            type="coc", vintage=boundary_vintage,
+        ), measures=["estimate"],
+    ), ctx)
+
+    assert result.success, result.error
+    panel = ctx.intermediates[("source", 2019)]
+    panel_path = tmp_path / "data" / "annual-panel.parquet"
+    write_parquet_with_provenance(panel, panel_path, ProvenanceBlock(geo_type="coc"))
+    loaded = RecipeCache().read_parquet(panel_path)
+    assert loaded["estimate"].item() == pytest.approx(25.0)
+    contract = frame_annotation_contract(loaded)
+    assert contract is not None
+    assert contract["bindings"][key]["columns"] == {"estimate": [["NC-506", 2019]]}
+    assert "independent_denominator" not in contract["bindings"][key]["columns"]
+    assert {source["sha256"] for source in contract["sources"][key]} == {
+        hashlib.sha256(path.read_bytes()).hexdigest()
+        for path in (boundary_path, xwalk_path)
+    }
+
+    report_recipe = load_recipe({
+        "version": 2, "id": "annual-geometry-report", "title": "Annual geometry report",
+        "authors": ["test"], "universe": {"years": [2019]},
+        "targets": [{"id": "target", "geometry": {"type": "coc", "vintage": boundary_vintage}}],
+        "datasets": {}, "pipelines": [{"id": "build", "target": "target", "steps": []}],
+        "panels": {"panel": {"ref": {"pipeline": "build", "output": "panel"},
+                             "geo_key": "geo_id", "time_key": "year"}},
+        "analyses": [{"id": "describe", "method": "descriptive", "input": "panels.panel",
+                      "sample": {}, "columns": ["estimate"], "stats": ["n", "mean"]}],
+        "results": {"bundle_dir": "results/{id}/{run_id}", "include_panels": ["panel"],
+                    "report": {"title": "Annual geometry report"}},
+    })
+    bundle = run_results(
+        report_recipe,
+        original_recipe_bytes=report_recipe.model_dump_json(by_alias=True, exclude_none=True)
+        .encode(),
+        outputs_root=tmp_path / "results",
+        panel_frames={"panel": loaded},
+        private=True,
+    )
+    report = Path(bundle["bundle_path"]) / "report" / "index.html"
+    assert "Caveat for geometry" in report.read_text()
+
+    weighted_ctx = ExecutionContext(
+        project_root=tmp_path, recipe=recipe, quiet=True,
+        storage_config=StorageConfig(
+            asset_store_root=tmp_path / "data", output_root=tmp_path / "output",
+        ),
+        transform_paths={"weights": xwalk_path},
+    )
+    weighted_result = _execute_resample(ResampleTask(
+        dataset_id="source", year=2019, input_path="data/input.parquet",
+        effective_geometry=GeometryRef(type="county"), method="aggregate",
+        transform_id="weights", to_geometry=GeometryRef(
+            type="coc", vintage=boundary_vintage,
+        ), measures=["estimate"], measure_aggregations={"estimate": "weighted_mean"},
+    ), weighted_ctx)
+    assert weighted_result.success, weighted_result.error
+    weighted_panel = weighted_ctx.intermediates[("source", 2019)]
+    assert weighted_panel["estimate"].item() == pytest.approx(12.0)
+    weighted_contract = frame_annotation_contract(weighted_panel)
+    assert weighted_contract is not None
+    assert weighted_contract["bindings"][key]["columns"] == {
+        "estimate": [["NC-506", 2019]],
+    }
+
+    bad_xwalk_path = tmp_path / "data" / "unverified-weights.parquet"
+    bad_weights = weights.copy()
+    bad_weights.attrs["annotations"] = serialize_annotation_contract(
+        [_record("unverified-annual-note", "area_share")],
+        bindings={"unverified-annual-note#r1": {"columns": {
+            "area_share": [["NC-506", 2023]],
+        }}},
+        sources={"unverified-annual-note#r1": [{
+            "sha256": hashlib.sha256(b"unverified").hexdigest(),
+            "vintages": {"boundary_vintage": boundary_vintage},
+        }]},
+    )
+    write_parquet_with_provenance(
+        bad_weights, bad_xwalk_path,
+        ProvenanceBlock(boundary_vintage=boundary_vintage),
+    )
+    bad_ctx = ExecutionContext(
+        project_root=tmp_path, recipe=recipe, quiet=True,
+        storage_config=StorageConfig(
+            asset_store_root=tmp_path / "data", output_root=tmp_path / "output",
+        ),
+        transform_paths={"weights": bad_xwalk_path},
+    )
+    rejected = _execute_resample(ResampleTask(
+        dataset_id="source", year=2019, input_path="data/input.parquet",
+        effective_geometry=GeometryRef(type="county"), method="aggregate",
+        transform_id="weights", to_geometry=GeometryRef(
+            type="coc", vintage=boundary_vintage,
+        ), measures=["estimate"],
+    ), bad_ctx)
+    assert not rejected.success
+    assert "no verified source identity" in rejected.error
+
+
+def test_geometry_ref_accepts_only_qualified_annual_coc_vintages() -> None:
+    assert GeometryRef(type="coc", vintage="2023").vintage == 2023
+    assert GeometryRef(type="coc", vintage="HUDAnnual_2023").vintage == "HUDAnnual_2023"
+    with pytest.raises(ValueError, match="only for CoC"):
+        GeometryRef(type="county", vintage="HUDAnnual_2023")
+
+
+@pytest.mark.parametrize("boundary_vintage", ["HUDAnnual_2023", "2010"])
+def test_tract_mediated_county_weights_preserve_boundary_annotations(
+    tmp_path: Path, boundary_vintage: str,
+) -> None:
+    boundary_path = coc_base_path(boundary_vintage, tmp_path / "data")
+    annual_key = "annual-tract-note#r1"
+    archive_key = f"{B2010_COVERAGE_ANNOTATION}#r1"
+    write_parquet_with_provenance(
+        pd.DataFrame({"coc_id": ["NC-506"], "geometry": ["polygon"]}),
+        boundary_path,
+        ProvenanceBlock(
+            boundary_vintage=boundary_vintage,
+            extra=(
+                {"coverage_status": "partial_unresolved",
+                 "coverage_reference": "native_2010_listing"}
+                if boundary_vintage == "2010" else
+                {"annotations": serialize_annotation_contract(
+                    [_record("annual-tract-note", "geometry")],
+                    bindings={annual_key: {"columns": {"geometry": [["NC-506", 2023]]}}},
+                )}
+            ),
+        ),
+    )
+    tract_path = tmp_path / "data" / "tract-xwalk.parquet"
+    tract_xwalk = pd.DataFrame({
+        "coc_id": ["NC-506"],
+        "tract_geoid": ["37001000100"],
+        "area_share": [0.5],
+        "intersection_area": [5.0],
+        "tract_area": [10.0],
+    })
+    bind_boundary_annotations(
+        tract_xwalk, boundary_path, boundary_vintage,
+        ("area_share", "intersection_area"),
+    )
+    write_parquet_with_provenance(
+        tract_xwalk,
+        tract_path,
+        ProvenanceBlock(boundary_vintage=boundary_vintage),
+    )
+    county_weights = build_tract_mediated_county_crosswalk(
+        tract_xwalk,
+        pd.DataFrame({
+            "tract_geoid": ["37001000100"],
+            "total_population": [100],
+            "total_households": [40],
+            "renter_households": [20],
+        }),
+        boundary_vintage=boundary_vintage,
+        county_vintage=2020,
+        tract_vintage=2020,
+        acs_vintage="2016-2020",
+    )
+    bind_tract_mediated_annotations(county_weights, tract_path, boundary_vintage)
+    output_path = save_tract_mediated_county_crosswalk(
+        county_weights,
+        boundary_vintage=boundary_vintage,
+        county_vintage=2020,
+        tract_vintage=2020,
+        acs_vintage="2016-2020",
+        output_dir=tmp_path / "data" / "xwalks",
+    )
+    loaded = RecipeCache().read_parquet(output_path)
+    contract = frame_annotation_contract(loaded)
+    assert contract is not None
+    key = archive_key if boundary_vintage == "2010" else annual_key
+    assert contract["bindings"][key]["columns"] == ({} if boundary_vintage == "2010" else {
+        column: [["NC-506", 2023]]
+        for family in ("area", "population", "household", "renter_household")
+        for column in (f"{family}_weight", f"{family}_denominator", f"geo_{family}_total")
+    })
+    assert hashlib.sha256(tract_path.read_bytes()).hexdigest() in {
+        source["sha256"] for source in contract["sources"][key]
     }

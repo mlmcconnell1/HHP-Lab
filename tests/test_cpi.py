@@ -10,7 +10,6 @@ Truth table for adjustment factors:
 
 from __future__ import annotations
 
-from types import SimpleNamespace
 from unittest.mock import patch
 
 import pandas as pd
@@ -19,6 +18,7 @@ import pytest
 from hhplab.artifacts.naming.naming import cpi_u_filename, cpi_u_path
 from hhplab.recipe.executor.core import ExecutionContext
 from hhplab.recipe.executor.panel import _apply_inflation_adjustment
+from hhplab.recipe.loader import load_recipe
 from hhplab.recipe.recipe_schema import InflationAdjustmentPolicy, PanelPolicy
 from hhplab.sources.bls.cpi.ingest import (
     CPI_U_ALL_ITEMS_SERIES_ID,
@@ -38,6 +38,23 @@ CPI_FIXTURE = pd.DataFrame(
         "ingested_at": ["2026-01-01T00:00:00+00:00"] * 3,
     }
 )
+
+
+@pytest.fixture
+def recipe(tmp_path):
+    """Minimal validated RecipeV1 used by executor context tests."""
+    return load_recipe(
+        {
+            "version": 1,
+            "name": "cpi-test-recipe",
+            "universe": {"range": "2020-2022"},
+            "targets": [
+                {"id": "target", "geometry": {"type": "coc", "vintage": 2025}}
+            ],
+            "datasets": {},
+        },
+        source_base_dir=tmp_path,
+    )
 
 
 def _mock_cpi_response():
@@ -99,7 +116,7 @@ def test_ingest_cpi_u_writes_canonical_artifact(tmp_path) -> None:
     assert list(written["year"]) == [2020, 2021, 2022]
 
 
-def test_recipe_inflation_adjustment_adds_base_year_dollar_columns(tmp_path) -> None:
+def test_recipe_inflation_adjustment_adds_base_year_dollar_columns(tmp_path, recipe) -> None:
     cpi_path = tmp_path / "data" / "curated" / "cpi" / cpi_u_filename()
     cpi_path.parent.mkdir(parents=True)
     CPI_FIXTURE.to_parquet(cpi_path)
@@ -119,7 +136,7 @@ def test_recipe_inflation_adjustment_adds_base_year_dollar_columns(tmp_path) -> 
     )
     ctx = ExecutionContext(
         project_root=tmp_path,
-        recipe=SimpleNamespace(datasets={}),  # type: ignore[arg-type]
+        recipe=recipe,
     )
 
     adjusted, summary = _apply_inflation_adjustment(panel, policy=policy, ctx=ctx)
@@ -139,7 +156,7 @@ def test_recipe_inflation_adjustment_adds_base_year_dollar_columns(tmp_path) -> 
     ]
 
 
-def test_recipe_inflation_adjustment_reports_missing_cpi_year(tmp_path) -> None:
+def test_recipe_inflation_adjustment_reports_missing_cpi_year(tmp_path, recipe) -> None:
     cpi_path = tmp_path / "data" / "curated" / "cpi" / cpi_u_filename()
     cpi_path.parent.mkdir(parents=True)
     CPI_FIXTURE[CPI_FIXTURE["year"] != 2020].to_parquet(cpi_path)
@@ -149,7 +166,7 @@ def test_recipe_inflation_adjustment_reports_missing_cpi_year(tmp_path) -> None:
     )
     ctx = ExecutionContext(
         project_root=tmp_path,
-        recipe=SimpleNamespace(datasets={}),  # type: ignore[arg-type]
+        recipe=recipe,
     )
 
     with pytest.raises(Exception, match="missing panel year"):

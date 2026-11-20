@@ -12,7 +12,7 @@ from hhplab.recipe.schema_common import GeometryRef
 def _validate_coc(ref: GeometryRef) -> list[ValidationDiagnostic]:
     """Validate a CoC geometry reference."""
     diags: list[ValidationDiagnostic] = []
-    if ref.vintage is not None and ref.vintage < 2000:
+    if isinstance(ref.vintage, int) and ref.vintage < 2000:
         diags.append(
             ValidationDiagnostic(
                 "warning", f"CoC vintage {ref.vintage} is unusually early."

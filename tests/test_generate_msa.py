@@ -13,7 +13,13 @@ runner = CliRunner()
 
 
 def test_generate_msa_json(monkeypatch, tmp_path: Path):
-    def fake_write_msa_artifacts(definition_version: str):
+    writer_call = {}
+
+    def fake_write_msa_artifacts(
+        definition_version: str, *, source_file: Path | None = None
+    ):
+        writer_call["definition_version"] = definition_version
+        writer_call["source_file"] = source_file
         defs = tmp_path / "data" / "curated" / "msa" / "msa_definitions__test.parquet"
         county = tmp_path / "data" / "curated" / "msa" / "msa_county_membership__test.parquet"
         defs.parent.mkdir(parents=True, exist_ok=True)
@@ -33,6 +39,10 @@ def test_generate_msa_json(monkeypatch, tmp_path: Path):
     assert payload["status"] == "ok"
     assert payload["definition_version"] == "census_msa_2023"
     assert payload["artifacts"]["definitions"].endswith("msa_definitions__test.parquet")
+    assert writer_call == {
+        "definition_version": "census_msa_2023",
+        "source_file": None,
+    }
 
 
 def test_generate_msa_json_rejects_existing_artifact_without_force(
@@ -44,7 +54,9 @@ def test_generate_msa_json_rejects_existing_artifact_without_force(
     existing.parent.mkdir(parents=True, exist_ok=True)
     existing.write_text("existing", encoding="utf-8")
 
-    def fail_write_msa_artifacts(definition_version: str):
+    def fail_write_msa_artifacts(
+        definition_version: str, *, source_file: Path | None = None
+    ):
         raise AssertionError("write_msa_artifacts should not run without --force")
 
     monkeypatch.setattr(
@@ -62,6 +74,8 @@ def test_generate_msa_json_rejects_existing_artifact_without_force(
 
 def test_generate_msa_force_allows_existing_artifact(monkeypatch, tmp_path: Path):
     monkeypatch.chdir(tmp_path)
+    source_file = tmp_path / "msa-source.xlsx"
+    source_file.write_text("source fixture", encoding="utf-8")
     existing_defs = (
         tmp_path / "data" / "curated" / "msa" / ("msa_definitions__census_msa_2023.parquet")
     )
@@ -71,7 +85,13 @@ def test_generate_msa_force_allows_existing_artifact(monkeypatch, tmp_path: Path
     existing_defs.parent.mkdir(parents=True, exist_ok=True)
     existing_defs.write_text("existing defs", encoding="utf-8")
 
-    def fake_write_msa_artifacts(definition_version: str):
+    writer_call = {}
+
+    def fake_write_msa_artifacts(
+        definition_version: str, *, source_file: Path | None = None
+    ):
+        writer_call["definition_version"] = definition_version
+        writer_call["source_file"] = source_file
         existing_defs.write_text("new defs", encoding="utf-8")
         existing_county.write_text("new county", encoding="utf-8")
         return existing_defs, existing_county
@@ -82,7 +102,7 @@ def test_generate_msa_force_allows_existing_artifact(monkeypatch, tmp_path: Path
 
     result = runner.invoke(
         app,
-        ["generate", "msa", "--json", "--force"],
+        ["generate", "msa", "--json", "--force", "--source-file", str(source_file)],
         catch_exceptions=False,
     )
 
@@ -91,3 +111,7 @@ def test_generate_msa_force_allows_existing_artifact(monkeypatch, tmp_path: Path
     assert payload["status"] == "ok"
     assert payload["artifacts"]["definitions"] == str(existing_defs)
     assert existing_defs.read_text(encoding="utf-8") == "new defs"
+    assert writer_call == {
+        "definition_version": "census_msa_2023",
+        "source_file": source_file,
+    }

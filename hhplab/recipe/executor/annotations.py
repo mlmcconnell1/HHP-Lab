@@ -7,6 +7,7 @@ from the rows and columns that an operation actually retains.
 
 from __future__ import annotations
 
+import re
 from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import Any
@@ -152,19 +153,79 @@ def is_b2010_coverage_contract(contract: Mapping[str, Any]) -> bool:
     )
 
 
+def validate_annual_crosswalk_contract(
+    crosswalk: pd.DataFrame, path: Path, ctx: ExecutionContext
+) -> dict[str, Any] | None:
+    """Accept only generated annual HUD crosswalk annotations with matching vintages."""
+    provenance = crosswalk.attrs.get("results_panel_provenance", {})
+    boundary_vintage = provenance.get("boundary_vintage")
+    match = re.fullmatch(r"HUDAnnual_(\d{4})", str(boundary_vintage))
+    contract = frame_annotation_contract(crosswalk)
+    if contract is None:
+        return None
+    if match is None:
+        raise ValueError(
+            f"Annotated crosswalk {path.name!r} requires a supported annual HUD geometry vintage."
+        )
+    geometry_year = int(match[1])
+    config = ctx.storage_config or load_config(
+        project_root=ctx.project_root,
+        recipe_output_root=ctx.recipe.output_root,
+        recipe_base_dir=ctx.recipe.source_base_dir,
+    )
+    boundary_path = coc_base_path(str(boundary_vintage), config.asset_store_root)
+    if not boundary_path.is_file():
+        raise ValueError(
+            f"Annotated crosswalk {path.name!r} requires registered source geometry "
+            f"{boundary_vintage}; ingest or restore {boundary_path}."
+        )
+    boundary_identity = ctx.cache.file_identity(boundary_path)
+    boundary_root, boundary_relative_path = _classify_path(boundary_path, ctx)
+    ctx.consumed_assets.append(AssetRecord(
+        role="geometry", path=boundary_relative_path, sha256=boundary_identity.sha256,
+        size=boundary_identity.size, root=boundary_root,
+    ))
+    crosswalk_identity = annotation_source_identity(
+        ctx.cache.file_identity(path).sha256, provenance,
+    )
+    for record in contract["records"]:
+        key = annotation_identity_key(record["id"], record.get("revision", 1))
+        sources = contract["sources"].get(key, [])
+        if not any(
+            source.get("sha256") == boundary_identity.sha256
+            and source.get("vintages", {}).get("boundary_vintage") == str(boundary_vintage)
+            for source in sources
+        ):
+            raise ValueError(
+                f"Annotated crosswalk {path.name!r} has no verified source identity for "
+                f"{boundary_vintage} on {key!r}."
+            )
+        for cells in contract["bindings"].get(key, {}).get("columns", {}).values():
+            if any(len(cell) != 2 or int(cell[1]) != geometry_year for cell in cells):
+                raise ValueError(
+                    f"Annotated crosswalk {path.name!r} binds {key!r} to a year "
+                    f"different from its {boundary_vintage} geometry vintage."
+                )
+        if crosswalk_identity not in sources:
+            contract["sources"].setdefault(key, []).append(crosswalk_identity)
+    _set_output_contract(crosswalk, serialize_annotation_contract(
+        contract["records"], bindings=contract["bindings"],
+        uncertain_ids=contract["uncertain_ids"], sources=contract["sources"],
+    ))
+    return contract
+
+
 def resolve_b2010_crosswalk_coverage(
     crosswalk: pd.DataFrame, path: Path, ctx: ExecutionContext
 ) -> dict | None:
     """Resolve a generated note or the verified registered boundary for older B2010 weights."""
     provenance = crosswalk.attrs.get("results_panel_provenance", {})
     contract = frame_annotation_contract(crosswalk)
-    if contract is not None and (
-        not is_b2010_coverage_contract(contract) or provenance.get("boundary_vintage") != "2010"
-    ):
-        raise ValueError(
-            f"Annotated crosswalk {path.name!r} requires contributor-aware bindings. "
-            "This aggregation supports the available-archive B2010 coverage note."
-        )
+    if contract is not None and provenance.get("boundary_vintage") != "2010":
+        validate_annual_crosswalk_contract(crosswalk, path, ctx)
+        return None
+    if contract is not None and not is_b2010_coverage_contract(contract):
+        raise ValueError(f"Annotated crosswalk {path.name!r} has unsupported annotation lineage.")
     if provenance.get("boundary_vintage") != "2010":
         return None
     if contract is None:
@@ -230,6 +291,45 @@ def bind_b2010_panel_coverage(
         uncertain_ids=sorted({*prior["uncertain_ids"], key}),
         sources={**prior["sources"], key: sources},
     ))
+
+
+def bind_crosswalk_aggregate_contributors(
+    output: pd.DataFrame,
+    contract: Mapping[str, Any],
+    contributors: Mapping[str, tuple[str | None, pd.DataFrame]],
+    *,
+    target_geo_column: str,
+    output_geo_column: str = "geo_id",
+) -> pd.DataFrame:
+    """Map CoC weight bindings onto actual contributor geography and year pairs."""
+    output_cells = set(output[[output_geo_column, "year"]].itertuples(index=False, name=None))
+    bindings: dict[str, dict] = {}
+    uncertain = set()
+    for key, binding in contract["bindings"].items():
+        weight_bindings = binding["columns"]
+        by_column = {}
+        for column, (weight_column, rows) in contributors.items():
+            if column not in output:
+                continue
+            scoped = (weight_bindings.values() if weight_column is None
+                      else [weight_bindings.get(weight_column, [])])
+            cocs = {str(coc) for group in scoped for coc, _ in group}
+            matching = rows.loc[rows["coc_id"].astype(str).isin(cocs)]
+            cells = output_cells.intersection(
+                matching[[target_geo_column, "year"]].itertuples(index=False, name=None)
+            )
+            if cells:
+                by_column[column] = [list(cell) for cell in sorted(cells)]
+        bindings[key] = {"columns": by_column}
+        if by_column and key in contract["uncertain_ids"]:
+            uncertain.add(key)
+    _set_output_contract(output, serialize_annotation_contract(
+        contract["records"],
+        bindings=bindings,
+        uncertain_ids=sorted(uncertain),
+        sources=contract["sources"],
+    ))
+    return output
 
 
 def propagate_annotations(

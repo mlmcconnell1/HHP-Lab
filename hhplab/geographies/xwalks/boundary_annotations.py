@@ -110,3 +110,62 @@ def bind_boundary_annotations(
     crosswalk.attrs["annotations"] = serialize_annotation_contract(
         source["records"], bindings=bindings, sources=sources, uncertain_ids=uncertain
     )
+
+
+def bind_tract_mediated_annotations(
+    crosswalk: pd.DataFrame,
+    tract_crosswalk_path: Path,
+    boundary_vintage: str,
+) -> None:
+    """Carry annual geometry bindings from tract weights to derived county weights."""
+    provenance = read_provenance(tract_crosswalk_path)
+    if provenance is None or "annotations" not in provenance.extra:
+        return
+    source = parse_annotation_contract(provenance.extra["annotations"])
+    source_identity = annotation_source_identity(
+        hash_file(tract_crosswalk_path)[0], provenance.to_dict()
+    )
+    if provenance.boundary_vintage == str(boundary_vintage) == "2010":
+        key = annotation_identity_key(B2010_COVERAGE_ANNOTATION, 1)
+        if (
+            source["uncertain_ids"] == [key]
+            and source["bindings"] == {key: {"columns": {}}}
+            and len(source["records"]) == 1
+        ):
+            entries = [*source["sources"].get(key, []), source_identity]
+            crosswalk.attrs["annotations"] = serialize_annotation_contract(
+                source["records"], uncertain_ids=[key], sources={key: entries},
+            )
+            return
+    match = re.fullmatch(r"HUDAnnual_(\d{4})", str(boundary_vintage))
+    if match is None or provenance.boundary_vintage != str(boundary_vintage):
+        raise ValueError("tract-mediated annotation source does not match the HUD annual vintage")
+    geometry_year = int(match[1])
+    cocs = set(crosswalk["coc_id"].dropna().astype(str))
+    bindings = {}
+    sources = {}
+    uncertain = []
+    for record in source["records"]:
+        key = annotation_identity_key(record["id"], record["revision"])
+        source_columns = source["bindings"].get(key, {}).get("columns", {})
+        derived_columns = {}
+        for family in ("area", "population", "household", "renter_household"):
+            tract_column = "intersection_area" if family == "area" else "area_share"
+            affected = {
+                (str(coc), geometry_year)
+                for coc, year in source_columns.get(tract_column, [])
+                if year == geometry_year and str(coc) in cocs
+            }
+            for column in (f"{family}_weight", f"{family}_denominator", f"geo_{family}_total"):
+                if affected and column in crosswalk and crosswalk[column].notna().any():
+                    derived_columns[column] = [list(cell) for cell in sorted(affected)]
+        bindings[key] = {"columns": derived_columns}
+        entries = list(source["sources"].get(key, []))
+        if source_identity not in entries:
+            entries.append(source_identity)
+        sources[key] = entries
+        if key in source["uncertain_ids"] or source["schema_version"] == 0:
+            uncertain.append(key)
+    crosswalk.attrs["annotations"] = serialize_annotation_contract(
+        source["records"], bindings=bindings, sources=sources, uncertain_ids=uncertain
+    )

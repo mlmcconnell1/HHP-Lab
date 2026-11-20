@@ -46,7 +46,7 @@ class TestTigerIngestCommand:
         mock_tracts.assert_not_called()
         mock_counties.assert_not_called()
 
-    def test_ingest_tiger_all_warns_when_skipping_non_2020_blocks(self, tmp_path):
+    def test_ingest_tiger_all_warns_when_skipping_unsupported_block_vintage(self, tmp_path):
         """Type all tells users when block geometry is skipped for unsupported years."""
         with runner.isolated_filesystem(temp_dir=tmp_path):
             tracts_path = Path("data/curated/tiger/tracts__T2022.parquet")
@@ -59,7 +59,8 @@ class TestTigerIngestCommand:
 
         assert result.exit_code == 0
         assert (
-            "Note: block geometry is only available for 2020; skipping blocks for year 2022."
+            "Note: block geometry is only available for 2010 and 2020; "
+            "skipping blocks for year 2022."
             in result.output
         )
         assert "Downloading TIGER tabulation blocks" not in result.output
