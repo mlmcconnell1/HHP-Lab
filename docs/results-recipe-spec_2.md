@@ -272,7 +272,15 @@ candidate cells conservatively applies to the consuming panel.
 
 Legacy v1 preparation preserves immutable records, exact bindings and source
 identities through identity resampling, point-in-time row filtering, joins,
-population-column aliases, panel projections/aliases and persistence. Prepared
+calendar mean and median filtering, population-column aliases, panel
+projections/aliases and persistence. Calendar interpolation binds each measure
+to the observed endpoints used, including the single-observation fallback.
+Identity resampling rebinds a verified ACS1 vintage from the previous calendar
+year to the panel year while retaining the original vintage and source hash.
+Sum, mean and weighted-mean aggregate resampling bind annotated source measures to
+the exact contributing source rows and output geography/year cells. Allocation
+resampling does the same for observed measures when the source year key is
+retained; allocation crosswalk annotations remain unsupported. Prepared
 outputs can enter results v2 without redeclaring their annotations. A CoC
 geometry reference may use `vintage: HUDAnnual_YYYY`; ordinary numeric vintage
 spellings still normalize to integers, and qualified vintages are rejected on
@@ -286,10 +294,12 @@ and source identities retain the geometry year. Independently sourced
 denominators stay outside those bindings. The tract-mediated county crosswalk
 generator preserves annual notes and the artifact-wide B2010 caveat in derived
 weight provenance. The decennial PEP recipe carries the selected population
-weight note into the resulting population estimate. Allocation, calendar
-mean and median, interpolation, and lagged source-year reassignment of
-annotated inputs remain unsupported. Crosswalk and support inputs retain
-fail-closed validation for annotation contracts outside these operations.
+weight note into the resulting population estimate. Annotated derived aggregate
+and allocation, ambiguous output keys, unsupported year reassignments, and
+source caveats on transformations such as the Connecticut county remap still
+raise an explicit error where exact dependencies are unavailable. Crosswalk and support
+inputs retain fail-closed validation for annotation contracts outside the
+validated annual HUD aggregate and B2010 coverage paths.
 
 Same ID/revision plus identical content deduplicates with both origins retained.
 Different content under that identity is an error; create a new revision.

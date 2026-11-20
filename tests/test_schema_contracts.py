@@ -981,7 +981,7 @@ def test_panel_measure_dictionary_json_shape_includes_required_semantics() -> No
     assert by_id["acs5:unemployment_rate"]["source_provider"] == "census"
 
 
-@pytest.mark.parametrize("source_id", ["acs5", "pep", "pit", "zori"])
+@pytest.mark.parametrize("source_id", ["acs5", "laus", "pep", "pit", "zori"])
 def test_core_source_coverage_matches_panel_measure_dictionary(source_id: str) -> None:
     spec = CORE_SOURCE_COVERAGE_SPECS[source_id]
     entries = [

@@ -37,7 +37,7 @@ from hhplab.sources.census.bps.census_bps_contract import (
     CENSUS_BPS_SOURCE_ID,
     CENSUS_BPS_SOURCE_PAGE,
 )
-from hhplab.sources.coverage import CENSUS_DATA_EVIDENCE
+from hhplab.sources.coverage import BLS_DATA_EVIDENCE, CENSUS_DATA_EVIDENCE
 from hhplab.sources.irs.irs_soi_contract import (
     IRS_SOI_COUNTY_MEASURE_COLUMNS,
     IRS_SOI_FIRST_YEAR,
@@ -82,12 +82,6 @@ from hhplab.sources.vera.incarceration_contract import (
     VERA_REQUIRED_CURATED_COLUMNS,
     VERA_SOURCE_PAGE,
     VERA_SOURCE_URL,
-)
-
-BLS_DATA_EVIDENCE = RedistributionEvidence(
-    "https://www.bls.gov/opub/copyright-information.htm",
-    "2026-10-20",
-    "Published BLS statistical data with BLS attribution; excludes images and trademarks.",
 )
 
 GeoType = Literal["county", "coc", "state", "msa"]

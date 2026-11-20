@@ -8,7 +8,7 @@ from the rows and columns that an operation actually retains.
 from __future__ import annotations
 
 import re
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from pathlib import Path
 from typing import Any
 
@@ -138,6 +138,68 @@ def _set_output_contract(frame: pd.DataFrame, contract: Mapping[str, Any] | None
         frame.attrs.pop("annotations", None)
     else:
         frame.attrs["annotations"] = contract
+
+
+def clear_frame_annotation_contract(frame: pd.DataFrame) -> None:
+    """Remove inherited annotation metadata before rebuilding output bindings."""
+    _set_output_contract(frame, None)
+
+
+def _annotation_matcher(
+    contract: Mapping[str, Any],
+) -> Callable[[Any, int, str], list[tuple[str, bool]]]:
+    """Index cell bindings once before matching the rows of a preparation step."""
+    if contract["schema_version"] == 0:
+        return lambda geography, year, column: annotations_for_source_cell(
+            contract, geography, year, column,
+        )
+
+    exact: dict[tuple[str, Any, int], list[tuple[str, bool]]] = {}
+    global_matches: list[tuple[str, bool]] = []
+    uncertain_ids = set(contract["uncertain_ids"])
+    for identity, binding in contract["bindings"].items():
+        uncertain = identity in uncertain_ids
+        if uncertain and not binding["columns"]:
+            global_matches.append((identity, True))
+        for column, cells in binding["columns"].items():
+            for geography, year in cells:
+                exact.setdefault((column, geography, year), []).append((identity, uncertain))
+    for identity in uncertain_ids - contract["bindings"].keys():
+        global_matches.append((identity, True))
+
+    def matches(geography: Any, year: int, column: str) -> list[tuple[str, bool]]:
+        return [*exact.get((column, geography, year), ()), *global_matches]
+
+    return matches
+
+
+def has_applicable_annotation_on_columns(
+    frame: pd.DataFrame,
+    columns: Sequence[str],
+    *,
+    geography_column: str,
+    year_column: str,
+) -> bool:
+    """Check whether any actual source cell is annotated on selected columns."""
+    contract = frame_annotation_contract(frame)
+    if contract is None:
+        return False
+    if geography_column not in frame or year_column not in frame:
+        raise ValueError("annotated source needs exact geography/year keys")
+    match_annotation = _annotation_matcher(contract)
+    for geography, year in zip(
+        frame[geography_column], frame[year_column], strict=True,
+    ):
+        if pd.isna(geography) or pd.isna(year):
+            continue
+        geography_value = geography.item() if hasattr(geography, "item") else geography
+        year_value = _integer_year(year, role="source")
+        if any(
+            match_annotation(geography_value, year_value, column)
+            for column in columns if column in frame.columns
+        ):
+            return True
+    return False
 
 
 def is_b2010_coverage_contract(contract: Mapping[str, Any]) -> bool:
@@ -332,6 +394,144 @@ def bind_crosswalk_aggregate_contributors(
     return output
 
 
+def bind_source_aggregate_contributors(
+    output: pd.DataFrame,
+    source: pd.DataFrame,
+    contributors: Mapping[str, tuple[str, pd.DataFrame]],
+    *,
+    source_geo_column: str,
+    source_year_column: str,
+    output_geo_column: str = "geo_id",
+    output_year_column: str = "year",
+    target_geo_column: str = "geo_id",
+    target_year_column: str = "year",
+) -> pd.DataFrame:
+    """Bind source caveats to output cells using actual contributing rows.
+
+    Each contributor frame has source and output geography/year columns. The
+    mapping key is the output measure and its value is the source measure plus
+    the exact rows consumed for that output measure.
+    """
+    contract = _source_contract(source, year_column=source_year_column)
+    if contract is None:
+        return output
+    source_geo = resolve_annotation_geo_column(source, source_geo_column)
+    if source_geo is None:
+        raise ValueError("annotated aggregation source has no resolved geography key")
+    current = frame_annotation_contract(output)
+    records: dict[str, dict[str, Any]] = {}
+    bindings: dict[str, dict[str, list[list[Any]]]] = {}
+    lineage: dict[str, list[dict[str, Any]]] = {}
+    uncertain: set[str] = set()
+
+    def add_contract(
+        value: Mapping[str, Any] | None,
+        *,
+        preserve_bindings: bool,
+        preserve_uncertain: bool,
+    ) -> None:
+        if value is None:
+            return
+        for record in value["records"]:
+            identity = annotation_identity_key(record["id"], record.get("revision", 1))
+            prior = records.get(identity)
+            if prior is not None and prior != record:
+                raise ValueError(
+                    f"conflicting annotation content for {identity!r}; use a new revision"
+                )
+            records[identity] = record
+            if preserve_bindings:
+                binding = value.get("bindings", {}).get(identity, {"columns": {}})
+                for column, cells in binding.get("columns", {}).items():
+                    target = bindings.setdefault(identity, {}).setdefault(column, [])
+                    for cell in cells:
+                        if cell not in target:
+                            target.append(cell)
+            if preserve_uncertain and identity in value.get("uncertain_ids", []):
+                uncertain.add(identity)
+            for entry in value.get("sources", {}).get(identity, []):
+                entries = lineage.setdefault(identity, [])
+                if entry not in entries:
+                    entries.append(entry)
+
+    add_contract(current, preserve_bindings=True, preserve_uncertain=True)
+    add_contract(contract, preserve_bindings=False, preserve_uncertain=False)
+    source_lineage = _source_lineage(source, contract)
+    for identity, entries in source_lineage.items():
+        target = lineage.setdefault(identity, [])
+        for entry in entries:
+            if entry not in target:
+                target.append(entry)
+
+    if not output.empty and {target_geo_column, target_year_column} - set(output.columns):
+        raise ValueError("annotated aggregate output needs exact geography/year keys")
+    output_cells = {
+        (
+            geography.item() if hasattr(geography, "item") else geography,
+            _integer_year(year, role="output"),
+        )
+        for geography, year in zip(
+            output[target_geo_column], output[target_year_column], strict=True,
+        )
+        if not pd.isna(geography) and not pd.isna(year)
+    } if (
+        target_geo_column in output.columns and target_year_column in output.columns
+    ) else set()
+    if not output.empty and not output_cells:
+        raise ValueError("annotated aggregate output needs exact geography/year keys")
+
+    match_annotation = _annotation_matcher(contract)
+    for output_column, (source_column, rows) in contributors.items():
+        if output_column not in output.columns:
+            continue
+        if source_column not in source.columns:
+            raise ValueError(f"annotated aggregation source is missing measure {source_column!r}")
+        required = {
+            source_geo_column, source_year_column,
+            output_geo_column, output_year_column,
+        }
+        if required - set(rows.columns):
+            raise ValueError("aggregate annotation contributors are missing exact cell keys")
+        for source_value, source_year, output_value, output_year in rows[
+                [source_geo_column, source_year_column, output_geo_column, output_year_column]
+            ].itertuples(index=False, name=None):
+            if (
+                pd.isna(source_value) or pd.isna(source_year)
+                or pd.isna(output_value) or pd.isna(output_year)
+            ):
+                continue
+            source_geography = (
+                source_value.item() if hasattr(source_value, "item") else source_value
+            )
+            source_year_value = _integer_year(source_year, role="source")
+            output_cell = (
+                output_value.item() if hasattr(output_value, "item") else output_value,
+                _integer_year(output_year, role="output"),
+            )
+            if output_cell not in output_cells:
+                raise ValueError(
+                    "aggregate annotation contributor maps outside the exact output cells"
+                )
+            matches = match_annotation(source_geography, source_year_value, source_column)
+            for identity, applies_uncertainly in matches:
+                if identity not in records:
+                    continue
+                encoded_output_cell = [output_cell[0], output_cell[1]]
+                cells = bindings.setdefault(identity, {}).setdefault(output_column, [])
+                if encoded_output_cell not in cells:
+                    cells.append(encoded_output_cell)
+                if applies_uncertainly:
+                    uncertain.add(identity)
+
+    _set_output_contract(output, serialize_annotation_contract(
+        list(records.values()),
+        bindings={identity: {"columns": columns} for identity, columns in bindings.items()},
+        uncertain_ids=sorted(uncertain),
+        sources=lineage,
+    ))
+    return output
+
+
 def propagate_annotations(
     output: pd.DataFrame,
     sources: Sequence[tuple],
@@ -414,20 +614,7 @@ def propagate_annotations(
     for frame, contract, column_map, geo_column, source_year_column in contracts:
         if geo_column is None:
             continue
-        exact_matches: dict[tuple[str, Any, int], list[tuple[str, bool]]] = {}
-        global_matches: list[tuple[str, bool]] = []
-        if contract["schema_version"] == 1:
-            for record in contract["records"]:
-                identity = annotation_identity_key(record["id"], record["revision"])
-                uncertain = identity in contract["uncertain_ids"]
-                columns = contract["bindings"].get(identity, {"columns": {}})["columns"]
-                if uncertain and not columns:
-                    global_matches.append((identity, True))
-                for column, cells in columns.items():
-                    for geography, year in cells:
-                        exact_matches.setdefault((column, geography, year), []).append(
-                            (identity, uncertain)
-                        )
+        match_annotation = _annotation_matcher(contract)
         for source_column, output_column in column_map.items():
             if source_column not in frame.columns or output_column not in output.columns:
                 continue
@@ -440,12 +627,7 @@ def propagate_annotations(
                 cell = (geography, year_value)
                 if cell not in output_cells:
                     continue
-                matches = (
-                    [*exact_matches.get((source_column, geography, year_value), ()),
-                     *global_matches]
-                    if contract["schema_version"] == 1 else
-                    annotations_for_source_cell(contract, geography, year_value, source_column)
-                )
+                matches = match_annotation(geography, year_value, source_column)
                 for identity, uncertain in matches:
                     cells = bindings[identity].setdefault(output_column, [])
                     encoded = [geography.item() if hasattr(geography, "item") else geography,
@@ -463,6 +645,29 @@ def propagate_annotations(
         sources=lineage,
     ))
     return output
+
+
+def reassign_annotation_year(
+    source: pd.DataFrame,
+    *,
+    geography_column: str,
+    source_year_column: str,
+    target_year: int,
+) -> pd.DataFrame:
+    """Move the bindings of a known single-vintage source to its panel year."""
+    rebound = propagate_annotations(
+        source.copy(),
+        [(source, frame_column_map(source, source), geography_column, source_year_column)],
+        output_geo_column=geography_column,
+        year_column=source_year_column,
+    )
+    contract = frame_annotation_contract(rebound)
+    if contract is not None:
+        for binding in contract["bindings"].values():
+            for column, cells in binding["columns"].items():
+                binding["columns"][column] = [[geography, target_year] for geography, _ in cells]
+        _set_output_contract(rebound, contract)
+    return rebound.assign(year=target_year)
 
 
 def frame_column_map(

@@ -23,7 +23,7 @@
 {"key": "cli", "id": "coclab-ff6fp.22", "depends_on": ["coclab-ff6fp.20", "coclab-ff6fp.21"], "intent_ids": ["intent:results-v2:cli_results", "intent:results-v2:cli_commands", "intent:results-v2:cli_recipe", "intent:results-v2:build_cmds"]}
 {"key": "fixture", "id": "coclab-ff6fp.23", "depends_on": ["coclab-ff6fp.22"], "intent_ids": ["intent:results-v2:v2_schema", "intent:results-v2:result_planner", "intent:results-v2:results_runner", "intent:results-v2:verify"]}
 {"key": "research", "id": "coclab-ff6fp.24", "depends_on": ["coclab-ff6fp.1"], "intent_ids": ["intent:results-v2:result_planner", "intent:results-v2:covariate_catalog", "intent:results-v2:source_coverage"]}
-{"key": "release", "id": "coclab-ff6fp.25", "depends_on": ["coclab-ff6fp.23", "coclab-ff6fp.24", "coclab-ff6fp.16", "coclab-ff6fp.2"], "intent_ids": ["intent:results-v2:hhplab", "intent:results-v2:schema", "intent:results-v2:storage", "intent:results-v2:recipe", "intent:results-v2:analysis", "intent:results-v2:results", "intent:results-v2:cli"]}
+{"key": "release", "id": "coclab-ff6fp.25", "depends_on": ["coclab-ff6fp.23", "coclab-ff6fp.24", "coclab-ff6fp.16", "coclab-ff6fp.2", "coclab-n3e28"], "intent_ids": ["intent:results-v2:hhplab", "intent:results-v2:schema", "intent:results-v2:storage", "intent:results-v2:recipe", "intent:results-v2:analysis", "intent:results-v2:results", "intent:results-v2:cli"]}
 {"key": "phase2", "id": "coclab-ga04o", "depends_on": ["coclab-ff6fp.25"], "intent_ids": ["intent:results-v2:hhplab", "intent:results-v2:analysis", "intent:results-v2:results", "intent:results-v2:recipe"]}
 {"key": "phase3", "id": "coclab-pjmfl", "depends_on": ["coclab-ga04o"], "intent_ids": ["intent:results-v2:hhplab", "intent:results-v2:analysis", "intent:results-v2:results", "intent:results-v2:recipe"]}
 {"key": "site-universe-inputs", "id": "coclab-ccwlh.2", "depends_on": ["coclab-ccwlh.1"], "intent_ids": ["intent:site-universe:input_resolver"]}
@@ -37,3 +37,4 @@
 {"key": "canonical-metro-laus-defaults", "id": "coclab-j30ik", "depends_on": [], "intent_ids": ["intent:metro:laus_ingest"]}
 {"key": "reference-table-joins", "id": "coclab-gl6pz", "depends_on": [], "intent_ids": ["intent:preparation:reference_adapters"]}
 {"key": "native-result-measure-metadata", "id": "coclab-vzash", "depends_on": [], "intent_ids": ["intent:results-v2:measure_registry"]}
+{"key": "boundary-annotation-ownership", "id": "coclab-n3e28", "depends_on": [], "intent_ids": ["intent:preparation:boundary_annotations", "intent:preparation:annotations", "intent:site-universe:input_resolver"]}

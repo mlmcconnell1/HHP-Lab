@@ -266,6 +266,16 @@ def aggregate_yearly_zori_to_msa(
     membership = membership[["msa_id", "county_fips"]].drop_duplicates().copy()
     membership["msa_id"] = membership["msa_id"].astype("string")
     membership["county_fips"] = membership["county_fips"].astype("string").str.zfill(5)
+    if membership.empty:
+        raise ValueError(
+            "MSA county membership contains no county rows. Regenerate the membership "
+            f"artifact for definition '{msa_definition_version}' before aggregating ZORI."
+        )
+    if membership[["msa_id", "county_fips"]].isna().any().any():
+        raise ValueError(
+            "MSA county membership contains missing geography IDs. Regenerate the "
+            f"membership artifact for definition '{msa_definition_version}'."
+        )
 
     zori = zori_yearly[["county_fips", "year", "zori"]].copy()
     zori["county_fips"] = zori["county_fips"].astype("string").str.zfill(5)

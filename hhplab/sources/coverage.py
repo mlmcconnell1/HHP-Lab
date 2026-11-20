@@ -17,6 +17,16 @@ CENSUS_DATA_EVIDENCE = RedistributionEvidence(
     "Public Census-produced statistical data only; "
     "excludes third-party products and restricted microdata.",
 )
+BLS_DATA_EVIDENCE = RedistributionEvidence(
+    "https://www.bls.gov/opub/copyright-information.htm",
+    "2026-10-20",
+    "Published BLS statistical data with BLS attribution; excludes images and trademarks.",
+)
+BLS_LAUS_EVIDENCE = RedistributionEvidence(
+    "https://www.bls.gov/lau/lauavail.htm",
+    "2026-11-20",
+    "BLS Local Area Unemployment Statistics published estimates, including annual metro data.",
+)
 HUD_COUNT_EVIDENCE = RedistributionEvidence(
     "https://www.hud.gov/sites/documents/webpubstandards.pdf",
     "2026-10-20",
@@ -113,6 +123,20 @@ CORE_SOURCE_COVERAGE_SPECS: dict[str, SourceCoverageSpec] = {
         notes=(
             "County postcensal estimates. Vintage 2020 covers 2010-2020; current "
             "postcensal vintages cover 2020 onward."
+        ),
+    ),
+    "laus": SourceCoverageSpec(
+        redistribution=PUBLIC_DATA_TERMS,
+        redistribution_evidence=(BLS_DATA_EVIDENCE, BLS_LAUS_EVIDENCE),
+        source_id="laus",
+        provider="bls",
+        product="laus",
+        native_geo="metro",
+        first_year=1990,
+        last_year=None,
+        notes=(
+            "Annual-average labor force and unemployment estimates. Most metro series "
+            "start in 1990; verify individual year, metro definition, and series availability."
         ),
     ),
     "zori": SourceCoverageSpec(

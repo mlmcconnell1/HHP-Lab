@@ -21,6 +21,7 @@ from hhplab.recipe.executor.annotations import (
     frame_column_map,
     has_annotations,
     propagate_annotations,
+    reassign_annotation_year,
     renamed_column_map,
     resolve_annotation_geo_column,
     resolve_b2010_crosswalk_coverage,
@@ -409,15 +410,16 @@ def _execute_resample(
 
     source_df = df.copy()
 
-    if task.method != "identity" and has_annotations(df):
+    if has_annotations(df) and task.method != "identity" and task.derived_measures:
         return StepResult(
             step_kind="resample",
             detail=detail,
             success=False,
             error=(
-                f"Dataset '{task.dataset_id}' year {task.year}: annotated input cannot use "
-                f"{task.method!r} resampling until exact source contributors are mapped. "
-                "Use identity resampling or prepare the annotated artifact upstream."
+                f"Dataset '{task.dataset_id}' year {task.year}: annotated {task.method!r} "
+                "resampling with derived measures is unsupported because exact source "
+                "dependencies for derived outputs are not mapped. Split the operation "
+                "or prepare the annotated derived artifact upstream."
             ),
         )
 
@@ -436,6 +438,7 @@ def _execute_resample(
             error=static_broadcast_error,
         )
     if year_col is not None:
+        resolved_vintage = None
         filtered_df = _filter_to_year(df, year_col, task.year)
         if filtered_df.empty:
             ds = ctx.recipe.datasets.get(task.dataset_id)
@@ -478,21 +481,42 @@ def _execute_resample(
         else:
             df = filtered_df
         if has_annotations(df):
+            source_year_col = "year" if "year" in df.columns else year_col
             source_years = pd.to_numeric(
-                df["year"] if "year" in df.columns else df[year_col],
+                df[source_year_col],
                 errors="coerce",
             )
             if source_years.isna().any() or not source_years.eq(task.year).all():
-                return StepResult(
-                    step_kind="resample",
-                    detail=detail,
-                    success=False,
-                    error=(
-                        f"Dataset '{task.dataset_id}' year {task.year}: annotated input "
-                        "would change its source year keys. Materialize an explicit "
-                        "annotation year mapping before applying a lag or year reassignment."
-                    ),
+                expected_vintage = task.year - 1
+                known_acs_lag = (
+                    task.method == "identity"
+                    and resolved_vintage == str(expected_vintage)
+                    and source_years.notna().all()
+                    and source_years.eq(expected_vintage).all()
                 )
+                if not known_acs_lag:
+                    return StepResult(
+                        step_kind="resample", detail=detail, success=False,
+                        error=(
+                            f"Dataset '{task.dataset_id}' year {task.year}: annotated input "
+                            "would change its source year keys. Materialize an explicit "
+                            "annotation year mapping before applying a lag or year reassignment."
+                        ),
+                    )
+                try:
+                    source_geo = resolve_annotation_geo_column(df, task.geo_column)
+                    if source_geo is None:
+                        raise ValueError("annotated ACS1 input requires a resolved geography key")
+                    df = reassign_annotation_year(
+                        df,
+                        geography_column=source_geo,
+                        source_year_column=source_year_col,
+                        target_year=task.year,
+                    )
+                except ValueError as exc:
+                    return StepResult(
+                        step_kind="resample", detail=detail, success=False, error=str(exc),
+                    )
         df = df.copy()
         df["year"] = task.year
 
@@ -513,9 +537,17 @@ def _execute_resample(
             source_columns = frame_column_map(df, result_df)
             if source_geo in df.columns and "geo_id" in result_df.columns:
                 source_columns[source_geo] = "geo_id"
+            annotation_sources = [(df, source_columns, source_geo, "year")]
+            for output_name, config in (task.derived_measures or {}).items():
+                required_columns = derived_measure_required_columns(
+                    config, available_columns=set(df.columns),
+                )
+                for destination in (output_name, config.get("diagnostic_output_column")):
+                    if destination is not None and destination in result_df.columns:
+                        aliases = {column: destination for column in required_columns}
+                        annotation_sources.append((df, aliases, source_geo, "year"))
             result_df = propagate_annotations(
-                result_df,
-                [(df, source_columns, source_geo, "year")],
+                result_df, annotation_sources,
                 output_geo_column="geo_id",
             )
         elif task.method in ("aggregate", "allocate"):
@@ -577,6 +609,12 @@ def _execute_resample(
 
             if task.method == "aggregate":
                 if _is_pep_decennial_tract_mediated_population_task(task, ctx):
+                    if has_annotations(df):
+                        raise ExecutorError(
+                            "Annotated source inputs cannot use the decennial PEP tract-mediated "
+                            "population transform until exact county-to-tract dependencies are "
+                            "mapped. Prepare the transformed population artifact upstream."
+                        )
                     result_df = _resample_pep_decennial_tract_mediated_population(
                         source_df,
                         xwalk,
@@ -600,6 +638,13 @@ def _execute_resample(
                             source_values=df[geo_col],
                             source_key="county_fips",
                         ):
+                            if has_annotations(df):
+                                raise ExecutorError(
+                                    "Annotated inputs cannot use the Connecticut planning-region "
+                                    "to legacy-county value remap because exact annotation "
+                                    "dependencies are not mapped. Prepare the remapped artifact "
+                                    "with annotations before recipe execution."
+                                )
                             if non_sum_measures:
                                 raise ExecutorError(
                                     f"Resample aggregate for '{task.dataset_id}' "

@@ -24,6 +24,8 @@ import pyarrow.parquet as pq
 
 from hhplab.geographies.xwalks.boundary_annotations import B2010_COVERAGE_ANNOTATION
 from hhplab.recipe.executor.annotations import (
+    bind_source_aggregate_contributors,
+    clear_frame_annotation_contract,
     frame_column_map,
     has_annotations,
     is_b2010_coverage_contract,
@@ -621,17 +623,10 @@ def _apply_temporal_filter(
     geo_column: str | None = None,
 ) -> pd.DataFrame:
     """Apply a temporal filter to a DataFrame before resampling."""
-    if has_annotations(df) and filt.method in {
-        "calendar_mean", "calendar_median", "interpolate_to_month",
-    }:
-        raise ExecutorError(
-            f"Temporal filter for '{dataset_id}': annotated inputs cannot use "
-            f"{filt.method!r} until exact source contributors are mapped. "
-            "Use point_in_time filtering or prepare the annotated panel upstream."
-        )
+    annotated = has_annotations(df)
 
     def rebind(filtered: pd.DataFrame) -> pd.DataFrame:
-        if not has_annotations(df):
+        if not annotated:
             return filtered
         source_geo = resolve_annotation_geo_column(df, geo_column)
         if source_geo is None:
@@ -645,6 +640,14 @@ def _apply_temporal_filter(
             raise ExecutorError(
                 f"Temporal filter for '{dataset_id}': annotated input needs a retained "
                 "geography/year key to rebind exact cells."
+            )
+        if filt.method in {"calendar_mean", "calendar_median"} and (
+            source_geo not in filtered.columns
+            or filtered.duplicated([source_geo, output_year]).any()
+        ):
+            raise ExecutorError(
+                f"Temporal filter for '{dataset_id}': annotated calendar aggregation "
+                "requires one output row per geography and year."
             )
         return propagate_annotations(
             filtered,
@@ -703,7 +706,8 @@ def _apply_temporal_filter(
                 f"after excluding temporal column '{col}'."
             )
         agg_func = "mean" if filt.method == "calendar_mean" else "median"
-        return df.groupby(group_cols, as_index=False)[measure_cols].agg(agg_func)
+        filtered = df.groupby(group_cols, as_index=False)[measure_cols].agg(agg_func)
+        return rebind(filtered)
     elif filt.method == "interpolate_to_month":
         # Linear interpolation between adjacent annual observations to estimate
         # a value at a target month.  E.g. PEP July→January: for year Y,
@@ -788,11 +792,41 @@ def _apply_temporal_filter(
             how="left",
         )
 
+        annotated_geo = resolve_annotation_geo_column(df, geo_column) if annotated else None
+        contributors = {}
+        if annotated:
+            if (
+                annotated_geo is None or annotated_geo not in geo_cols
+                or merged[[annotated_geo, yr_col]].isna().any().any()
+                or merged.duplicated([annotated_geo, yr_col]).any()
+                or {annotated_geo, yr_col} & {"__annotation_geo", "__annotation_year"}
+            ):
+                raise ExecutorError(
+                    f"Temporal filter for '{dataset_id}': annotated interpolation "
+                    "requires a retained geography key and one output row per geography and year."
+                )
+            current_year = merged[yr_col] + (target_month > source_month)
+            previous_year = current_year - 1
+            endpoints = merged[[annotated_geo, yr_col]].rename(columns={
+                annotated_geo: "__annotation_geo", yr_col: "__annotation_year",
+            })
+            current_rows = endpoints.assign(**{
+                annotated_geo: merged[annotated_geo], yr_col: current_year,
+            })
+            previous_rows = current_rows.assign(**{yr_col: previous_year})
+            contributors = {column: (column, current_rows) for column in (*geo_cols, yr_col)}
+
         for mcol in measure_cols:
             curr_vals = merged[mcol]
             prev_col = f"{mcol}_prev"
             if prev_col in merged.columns:
                 prev_vals = merged[prev_col]
+                if annotated_geo is not None:
+                    current_data = curr_vals.notna()
+                    contributors[mcol] = (mcol, pd.concat([
+                        current_rows.loc[current_data],
+                        previous_rows.loc[current_data & prev_vals.notna()],
+                    ]))
                 merged[mcol] = np.where(
                     prev_vals.notna(),
                     (1 - fraction) * prev_vals + fraction * curr_vals,
@@ -808,6 +842,14 @@ def _apply_temporal_filter(
         elif original_yr_dtype != result[yr_col].dtype:
             result[yr_col] = result[yr_col].astype(original_yr_dtype)
 
+        if annotated_geo is not None:
+            clear_frame_annotation_contract(result)
+            return bind_source_aggregate_contributors(
+                result, df, contributors,
+                source_geo_column=annotated_geo, source_year_column=yr_col,
+                output_geo_column="__annotation_geo", output_year_column="__annotation_year",
+                target_geo_column=annotated_geo, target_year_column=yr_col,
+            )
         return result
     else:
         raise ExecutorError(f"Unknown temporal filter method '{filt.method}'.")

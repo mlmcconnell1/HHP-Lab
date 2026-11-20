@@ -724,6 +724,50 @@ class TestYearlyMsaPopulationWeighted:
                 balanced_composition=True,
             )
 
+    def test_disjoint_county_support_keeps_rows_and_reports_zero_balanced_coverage(
+        self, msa_membership
+    ):
+        zori = pd.DataFrame(
+            {
+                "county_fips": ["99001", "99002"],
+                "year": [2020, 2021],
+                "zori": [1000.0, 1200.0],
+            }
+        )
+        population = pd.DataFrame(
+            {
+                "county_fips": ["99001", "99002"],
+                "year": [2020, 2021],
+                "population": [100.0, 300.0],
+            }
+        )
+
+        result = aggregate_yearly_zori_to_msa(
+            zori,
+            population,
+            county_membership_df=msa_membership,
+            years=[2020, 2021],
+            balanced_composition=True,
+        )
+
+        assert result["county_count"].tolist() == [0, 0]
+        assert result["zori_coc"].isna().all()
+        assert result["coverage_ratio"].tolist() == pytest.approx([0.0, 0.0])
+
+    def test_empty_membership_rejected_with_actionable_error(self, msa_population):
+        zori = pd.DataFrame(
+            {"county_fips": ["99001"], "year": [2020], "zori": [1000.0]}
+        )
+        empty_membership = pd.DataFrame(columns=["msa_id", "county_fips"])
+
+        with pytest.raises(ValueError, match="membership contains no county rows"):
+            aggregate_yearly_zori_to_msa(
+                zori,
+                msa_population,
+                county_membership_df=empty_membership,
+                years=[2020],
+            )
+
     def test_msa_zori_artifact_uses_native_zori_column(
         self, msa_membership, msa_population
     ):

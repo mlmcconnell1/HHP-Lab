@@ -225,6 +225,41 @@ def load_pep_county(
         logger.info(f"Loaded PEP data from {pep_path}: {len(df)} rows")
         return df
 
+    vintage_files = resolve_pep_county_paths(pep_dir=pep_dir)
+    return load_pep_county_inputs(vintage_files)
+
+
+def load_pep_county_inputs(pep_paths: list[Path | str]) -> pd.DataFrame:
+    """Load an already resolved set of PEP files in loader precedence order."""
+    paths = [Path(path) for path in pep_paths]
+    if not paths:
+        raise ValueError("At least one resolved PEP county input path is required.")
+
+    frames = [pd.read_parquet(path) for path in paths]
+    logger.info(
+        "Discovered PEP vintage files: %s",
+        ", ".join(path.name for path in paths),
+    )
+
+    if len(frames) == 1:
+        return frames[0]
+
+    # Concatenate and deduplicate; latest vintage takes precedence
+    df = pd.concat(frames, ignore_index=True)
+    df = df.drop_duplicates(subset=["county_fips", "year"], keep="first")
+    logger.info(f"Combined PEP data: {len(df)} rows")
+
+    return df
+
+
+def resolve_pep_county_paths(
+    pep_path: Path | str | None = None,
+    pep_dir: Path | str | None = None,
+) -> list[Path]:
+    """Resolve all PEP files used by :func:`load_pep_county` in load order."""
+    if pep_path is not None:
+        return [Path(pep_path)]
+
     if pep_dir is None:
         pep_dir = curated_dir("pep")
     else:
@@ -240,22 +275,7 @@ def load_pep_county(
 
     if not vintage_files:
         raise FileNotFoundError(f"PEP county data not found in {pep_dir}\nRun: hhplab ingest pep")
-
-    frames = [pd.read_parquet(f) for f in vintage_files]
-    logger.info(
-        "Discovered PEP vintage files: %s",
-        ", ".join(f.name for f in vintage_files),
-    )
-
-    if len(frames) == 1:
-        return frames[0]
-
-    # Concatenate and deduplicate; latest vintage takes precedence
-    df = pd.concat(frames, ignore_index=True)
-    df = df.drop_duplicates(subset=["county_fips", "year"], keep="first")
-    logger.info(f"Combined PEP data: {len(df)} rows")
-
-    return df
+    return vintage_files
 
 
 def get_output_path(

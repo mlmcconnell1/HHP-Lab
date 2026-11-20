@@ -48,9 +48,8 @@ The key aggregation detail is the balanced set calculation: a county is included
 
 No production rebuild is warranted from the currently available population inputs. The valid 2015–2025 counterpart already exists; the 2015–2026 request is not supported until the curated PEP county input includes 2026. No output path for a replacement 2015–2026 artifact is proposed because creating a correctly populated file is not currently possible.
 
-No code change is needed to prevent another full-year population gap from producing this artifact: the current aggregation guard rejects that case. Two hardening improvements remain useful but are not required to use the 2015–2025 counterpart:
+The MSA ZORI aggregation now records the resolved county ZORI path, known vintage, and SHA-256, plus each resolved PEP input path, known vintage, and SHA-256. This applies to explicit inputs and default discovery. The JSON result reports balanced county support: `available`, `partial`, or `empty`; an entirely unsupported balanced result is returned with status `empty_balanced_support` while retaining its diagnostic rows. Text output warns when support is empty or partial. Empty support for individual MSAs is listed separately so valid coverage for other MSAs remains available.
 
-1. Record the resolved county ZORI file and all resolved PEP input paths/vintages in aggregate provenance, including when paths were auto-discovered.
-2. Reject or prominently report a balanced aggregation with zero complete county support for every MSA, even when each requested year exists somewhere in the population input. This covers geography-level gaps that the current whole-year presence check cannot detect.
+The existing missing-population-year guard still rejects a year absent from the PEP data entirely. These diagnostics cover the distinct case where every requested year exists but counties have no complete balanced support. No retained artifact was overwritten as part of this code change.
 
 The related longitudinal diagnostics derive MSA-year ZORI from county data with explicit population and membership inputs. They do not consume either cached MSA artifact, and this audit did not modify their data or outputs.

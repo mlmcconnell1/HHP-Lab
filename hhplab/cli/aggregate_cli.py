@@ -2023,17 +2023,30 @@ def aggregate_zori(
             raise typer.Exit(2)
 
         try:
+            import hashlib
+            import re
+
             from hhplab.artifacts.naming.naming import (
                 msa_county_membership_path,
                 msa_zori_yearly_filename,
             )
-            from hhplab.sources.census.pep.pep_aggregate import load_pep_county
-            from hhplab.sources.zori.zori_aggregate import load_zori
+            from hhplab.sources.census.pep.pep_aggregate import (
+                load_pep_county_inputs,
+                resolve_pep_county_paths,
+            )
+            from hhplab.sources.zori.zori_aggregate import (
+                load_zori,
+                resolve_zori_path,
+            )
             from hhplab.sources.zori.zori_metro import (
                 aggregate_yearly_zori_to_msa,
                 to_msa_zori_yearly_artifact,
             )
-            from hhplab.storage.provenance import ProvenanceBlock, write_parquet_with_provenance
+            from hhplab.storage.provenance import (
+                ProvenanceBlock,
+                read_provenance,
+                write_parquet_with_provenance,
+            )
 
             membership_path = msa_county_membership_path(msa_definition_version)
             if not membership_path.exists():
@@ -2042,7 +2055,46 @@ def aggregate_zori(
                     f"{membership_path}. Run: hhplab generate msa --definition-version "
                     f"{msa_definition_version}"
                 )
-            zori_df = load_zori("county", zori_path=zori_path, output_dir=output_dir)
+            resolved_zori_path = resolve_zori_path(
+                "county", zori_path=zori_path, output_dir=output_dir
+            ).resolve()
+            pep_input_paths = [
+                path.resolve()
+                for path in resolve_pep_county_paths(pep_path=county_population_path)
+            ]
+
+            def file_sha256(path: Path) -> str:
+                with path.open("rb") as source_file:
+                    return hashlib.file_digest(source_file, "sha256").hexdigest()
+
+            def input_vintage(path: Path, metadata_key: str) -> str | None:
+                pattern = r"__v(\d{4})" if metadata_key == "vintage" else r"__Z(\d{4})"
+                match = re.search(pattern, path.name)
+                if match:
+                    return match.group(1)
+                source_provenance = read_provenance(path)
+                if source_provenance is None:
+                    return None
+                value = source_provenance.extra.get(metadata_key)
+                return None if value is None else str(value)
+
+            input_paths = [resolved_zori_path, *pep_input_paths]
+            initial_hashes = {path: file_sha256(path) for path in input_paths}
+            zori_input_identity = {
+                "path": str(resolved_zori_path),
+                "vintage": input_vintage(resolved_zori_path, "max_year"),
+                "sha256": initial_hashes[resolved_zori_path],
+            }
+            pep_input_identities = [
+                {
+                    "path": str(pep_input_path),
+                    "vintage": input_vintage(pep_input_path, "vintage"),
+                    "sha256": initial_hashes[pep_input_path],
+                }
+                for pep_input_path in pep_input_paths
+            ]
+
+            zori_df = load_zori("county", zori_path=resolved_zori_path, output_dir=output_dir)
             zori_df = zori_df.copy()
             zori_df["date"] = pd.to_datetime(zori_df["date"])
             zori_df["year"] = zori_df["date"].dt.year
@@ -2057,7 +2109,7 @@ def aggregate_zori(
                     .mean()
                     .rename(columns={"geo_id": "county_fips"})
                 )
-            county_population = load_pep_county(county_population_path)
+            county_population = load_pep_county_inputs(pep_input_paths)
             msa_zori = aggregate_yearly_zori_to_msa(
                 zori_yearly,
                 county_population,
@@ -2067,6 +2119,33 @@ def aggregate_zori(
                 balanced_composition=balanced_composition,
             )
             msa_zori_artifact = to_msa_zori_yearly_artifact(msa_zori)
+
+            changed_inputs = [
+                str(path)
+                for path in input_paths
+                if file_sha256(path) != initial_hashes[path]
+            ]
+            if changed_inputs:
+                raise RuntimeError(
+                    "A ZORI/PEP source changed while MSA aggregation was running; "
+                    "no output was written. Re-run after the inputs stop changing. "
+                    f"Changed input(s): {changed_inputs}"
+                )
+            support_by_msa = msa_zori.groupby("msa_id")["county_count"].sum()
+            empty_support_msa_ids = sorted(
+                support_by_msa[support_by_msa == 0].index.astype(str).tolist()
+            )
+            if not balanced_composition:
+                balanced_support_status = "not_applicable"
+            elif (
+                empty_support_msa_ids
+                and len(empty_support_msa_ids) == len(support_by_msa)
+            ):
+                balanced_support_status = "empty"
+            elif empty_support_msa_ids:
+                balanced_support_status = "partial"
+            else:
+                balanced_support_status = "available"
             output_dir.mkdir(parents=True, exist_ok=True)
             out_path = output_dir / msa_zori_yearly_filename(
                 parsed_years[0],
@@ -2091,7 +2170,11 @@ def aggregate_zori(
                     "county_population_path": (
                         str(county_population_path) if county_population_path else None
                     ),
-                    "zori_path": str(zori_path) if zori_path else None,
+                    "pep_input_identities": pep_input_identities,
+                    "zori_path": str(resolved_zori_path),
+                    "zori_input_identity": zori_input_identity,
+                    "balanced_support_status": balanced_support_status,
+                    "empty_support_msa_ids": empty_support_msa_ids,
                     "min_coverage_ratio": min_coverage_ratio,
                 },
             )
@@ -2123,7 +2206,9 @@ def aggregate_zori(
             typer.echo(
                 json.dumps(
                     {
-                        "status": "ok",
+                        "status": (
+                            "empty_balanced_support" if balanced_support_status == "empty" else "ok"
+                        ),
                         "alignment": align,
                         "target_geo": "msa",
                         "definition_version": msa_definition_version,
@@ -2135,10 +2220,24 @@ def aggregate_zori(
                         "non_null_zori_by_year": non_null_zori_by_year,
                         "min_coverage_ratio": min_coverage_ratio,
                         "balanced_composition": balanced_composition,
+                        "balanced_support_status": balanced_support_status,
+                        "empty_support_msa_ids": empty_support_msa_ids,
+                        "zori_input_identity": zori_input_identity,
+                        "pep_input_identities": pep_input_identities,
                     }
                 )
             )
         else:
+            if balanced_support_status == "empty":
+                typer.echo(
+                    "WARNING: Balanced county support is empty for every MSA. "
+                    "The output retains diagnostic rows, but no balanced ZORI values are usable."
+                )
+            elif balanced_support_status == "partial":
+                typer.echo(
+                    "WARNING: Balanced county support is empty for some MSAs: "
+                    f"{', '.join(empty_support_msa_ids)}. Other MSAs have contributing counties."
+                )
             typer.echo(f"MSA ZORI aggregation complete. Wrote: {out_path}")
         return
 

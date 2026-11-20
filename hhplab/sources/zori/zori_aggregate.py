@@ -177,25 +177,34 @@ def load_zori(
     FileNotFoundError
         If ZORI file does not exist in either location.
     """
-    if zori_path is not None:
-        path = Path(zori_path)
-    else:
-        path = discover_zori_ingest(geography, output_dir)
-        # Fall back to global curated directory if build-local path doesn't exist
-        if path is None and output_dir is not None:
-            path = discover_zori_ingest(geography, curated_dir("zori"))
-            if path is not None:
-                logger.info(f"ZORI not found in {output_dir}, using global {path}")
-
-    if path is None or not path.exists():
-        raise FileNotFoundError(
-            f"ZORI data file not found. Run 'hhplab ingest zori --geography {geography}' first."
-        )
+    path = resolve_zori_path(geography, zori_path=zori_path, output_dir=output_dir)
 
     logger.info(f"Loading ZORI data from {path}")
     df = pd.read_parquet(path)
     logger.info(f"Loaded {len(df)} ZORI records for {df['geo_id'].nunique()} geographies")
     return df
+
+
+def resolve_zori_path(
+    geography: str = "county",
+    *,
+    zori_path: Path | str | None = None,
+    output_dir: Path | str | None = None,
+) -> Path:
+    """Resolve the ZORI parquet path using the same rules as :func:`load_zori`."""
+    if zori_path is not None:
+        path = Path(zori_path)
+    else:
+        path = discover_zori_ingest(geography, output_dir)
+        if path is None and output_dir is not None:
+            path = discover_zori_ingest(geography, curated_dir("zori"))
+            if path is not None:
+                logger.info("ZORI not found in %s, using global %s", output_dir, path)
+    if path is None or not path.exists():
+        raise FileNotFoundError(
+            f"ZORI data file not found. Run 'hhplab ingest zori --geography {geography}' first."
+        )
+    return path
 
 
 def get_xwalk_path(

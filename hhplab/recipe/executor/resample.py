@@ -27,6 +27,9 @@ from hhplab.geographies.coc.ct_planning_regions import (
 )
 from hhplab.recipe.executor.annotations import (
     bind_crosswalk_aggregate_contributors,
+    bind_source_aggregate_contributors,
+    clear_frame_annotation_contract,
+    has_applicable_annotation_on_columns,
     is_b2010_coverage_contract,
 )
 from hhplab.recipe.executor.core import (
@@ -729,6 +732,37 @@ def _resample_aggregate(
                 f"unsupported aggregation for {unsupported}."
             )
 
+    source_year_col = None
+    if frame_annotation_contract(df) is not None:
+        source_year_col = next(
+            (column for column in (task.year_column, "year") if column in merged.columns),
+            None,
+        )
+        if source_year_col is None:
+            raise ExecutorError(
+                "Annotated aggregate input needs a retained source-year column."
+            )
+        acs_passthrough = [
+            column for column in _ACS1_IMPUTATION_PASSTHROUGH_COLUMNS
+            if column in merged.columns
+        ]
+        pit_passthrough = (
+            [*PIT_OBSERVATION_COLUMNS, PIT_SHELTERED_OBSERVED_COLUMN]
+            if has_pit_metadata and selected_pit_measures else []
+        )
+        for columns, operation in (
+            (acs_passthrough, "ACS1 imputation metadata"),
+            (pit_passthrough, "PIT observation metadata"),
+        ):
+            if columns and has_applicable_annotation_on_columns(
+                df, columns, geography_column=geo_col, year_column=source_year_col,
+            ):
+                raise ExecutorError(
+                    f"Annotated aggregate input has a caveat bound to {operation}; "
+                    "that passthrough operation does not yet map its exact source "
+                    "dependencies. Prepare the metadata with its annotations upstream."
+                )
+
     numeric_columns = list(dict.fromkeys([*task.measures, *derived_required_columns]))
 
     # Convert measures to float64 to handle nullable Pandas types (Int64, Float64)
@@ -885,6 +919,8 @@ def _resample_aggregate(
     if target_col != "geo_id":
         result = result.rename(columns={target_col: "geo_id"})
     result["year"] = task.year
+    if source_year_col is not None:
+        clear_frame_annotation_contract(result)
     if annual_notes is not None:
         pairs = list(dict.fromkeys(["coc_id", target_col]))
         contributor_rows = merged[pairs].assign(year=task.year)
@@ -949,6 +985,28 @@ def _resample_aggregate(
             contributors,
             target_geo_column=target_col,
         )
+    if source_year_col is not None:
+        source_contributors: dict[str, tuple[str, pd.DataFrame]] = {}
+        for measure in task.measures:
+            aggregation = measure_aggs.get(measure, "sum")
+            valid = merged[measure].notna()
+            weight_for_measure = (
+                "pop_share" if aggregation == "weighted_mean" and has_pop_share
+                else base_weight_col
+            )
+            if aggregation != "mean":
+                effective_weight = pd.to_numeric(merged[weight_for_measure], errors="coerce")
+                valid &= effective_weight.notna() & effective_weight.ne(0)
+            rows = merged.loc[valid, [geo_col, source_year_col, target_col]].copy()
+            rows["_output_year"] = task.year
+            rows = rows.rename(columns={target_col: "output_geo", "_output_year": "output_year"})
+            source_contributors[measure] = (measure, rows)
+        if source_contributors:
+            result = bind_source_aggregate_contributors(
+                result, df, source_contributors,
+                source_geo_column=geo_col, source_year_column=source_year_col,
+                output_geo_column="output_geo", output_year_column="output_year",
+            )
     return result
 
 
@@ -1015,4 +1073,33 @@ def _resample_allocate(
     result = merged[[target_key] + task.measures].copy()
     result = result.rename(columns={target_key: "geo_id"})
     result["year"] = task.year
+    if frame_annotation_contract(df) is not None:
+        if result.duplicated(["geo_id", "year"]).any():
+            raise ExecutorError(
+                "Annotated allocate resampling produced duplicate output geography/year cells; "
+                "the exact source dependencies cannot be represented unambiguously."
+            )
+        clear_frame_annotation_contract(result)
+        source_year_col = next(
+            (column for column in (task.year_column, "year") if column in merged.columns),
+            None,
+        )
+        if source_year_col is None:
+            raise ExecutorError(
+                "Annotated allocate input needs a retained source-year column so "
+                "exact contributing cells can be rebound."
+            )
+        source_contributors: dict[str, tuple[str, pd.DataFrame]] = {}
+        effective_weight = pd.to_numeric(merged[weight_col], errors="coerce")
+        for measure in task.measures:
+            valid = merged[measure].notna() & effective_weight.notna() & effective_weight.ne(0)
+            rows = merged.loc[valid, [geo_col, source_year_col, target_key]].copy()
+            rows["output_year"] = task.year
+            rows = rows.rename(columns={target_key: "output_geo"})
+            source_contributors[measure] = (measure, rows)
+        result = bind_source_aggregate_contributors(
+            result, df, source_contributors,
+            source_geo_column=geo_col, source_year_column=source_year_col,
+            output_geo_column="output_geo", output_year_column="output_year",
+        )
     return result

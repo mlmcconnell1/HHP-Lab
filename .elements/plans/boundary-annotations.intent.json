@@ -1,0 +1,92 @@
+{
+  "schema_version": "elements.working-intent.import.request/1.0",
+  "elements": [
+    {
+      "schema_version": "elements.intent-element/8.0",
+      "record_type": "intent_element",
+      "intent_element_id": "intent:preparation:boundary_annotations",
+      "revision_id": "revision:preparation:boundary_annotations:1",
+      "lifecycle": "working",
+      "project_id": "project:HHP-Lab",
+      "parent_id": "intent:results-v2:hhplab",
+      "explicit_root": false,
+      "kind": "semantic/module",
+      "observed_kind": "file",
+      "name": "boundary_annotations",
+      "repo_relative_path": "hhplab/geographies/xwalks/boundary_annotations.py",
+      "language": "python",
+      "scope": {},
+      "tombstone": false,
+      "recorded_at": "2026-11-20T08:10:20Z",
+      "content": {
+        "acceptance_policy": "results-v2-architecture-conformance-v1",
+        "change": "new",
+        "dependency_allowlist": ["hhplab.schema.contracts", "hhplab.storage.provenance", "hhplab.storage.raw_snapshot"],
+        "layer": "domain",
+        "phase": 1,
+        "plan": "results-recipe-v2",
+        "responsibility": "Read CoC boundary coverage and annual geometry annotations from exact source artifacts, preserve their identities and geometry vintage, and bind them to affected crosswalk weights without inferring outcome count scope.",
+        "revision_reason": "coclab-n3e28: record the domain owner for the crosswalk annotation implementation delivered under coclab-y0rf8",
+        "source_spec": "docs/results-recipe-spec_2.md"
+      }
+    },
+    {
+      "schema_version": "elements.intent-element/8.0",
+      "record_type": "intent_element",
+      "intent_element_id": "intent:preparation:annotations",
+      "revision_id": "revision:preparation:annotations:2",
+      "lifecycle": "working",
+      "project_id": "project:HHP-Lab",
+      "parent_id": "intent:results-v2:executor",
+      "explicit_root": false,
+      "kind": "semantic/module",
+      "observed_kind": "file",
+      "name": "annotations",
+      "repo_relative_path": "hhplab/recipe/executor/annotations.py",
+      "language": "python",
+      "scope": {},
+      "tombstone": false,
+      "recorded_at": "2026-11-20T08:10:20Z",
+      "content": {
+        "acceptance_policy": "results-v2-architecture-conformance-v1",
+        "change": "new",
+        "dependency_allowlist": ["hhplab.schema", "hhplab.storage", "hhplab.artifacts.naming.naming", "hhplab.geographies.xwalks.boundary_annotations", "hhplab.recipe.executor.core", "hhplab.recipe.manifest"],
+        "layer": "application",
+        "phase": 1,
+        "plan": "results-recipe-v2",
+        "responsibility": "Preserve immutable annotation records, exact cell bindings and source identities through known preparation dependencies, key/column renames, row filters, joins and supported aggregation; detect conflicts and fail closed when dependency mapping is unsupported; keep statistical analysis and public distribution decisions with their existing owners.",
+        "revision_reason": "coclab-n3e28: declare the exact boundary reader, canonical path resolver, execution context and manifest dependencies for recording the boundary evidence consumed during preparation",
+        "source_spec": "docs/results-recipe-spec_2.md"
+      }
+    },
+    {
+      "schema_version": "elements.intent-element/8.0",
+      "record_type": "intent_element",
+      "intent_element_id": "intent:site-universe:input_resolver",
+      "revision_id": "revision:site-universe:input_resolver:6",
+      "lifecycle": "working",
+      "project_id": "project:HHP-Lab",
+      "parent_id": "intent:results-v2:executor",
+      "explicit_root": false,
+      "kind": "semantic/module",
+      "observed_kind": "file",
+      "name": "input_resolver",
+      "repo_relative_path": "hhplab/recipe/executor/inputs.py",
+      "language": "python",
+      "scope": {},
+      "tombstone": false,
+      "recorded_at": "2026-11-20T08:10:20Z",
+      "content": {
+        "acceptance_policy": "results-v2-architecture-conformance-v1",
+        "change": "extend",
+        "dependency_allowlist": ["hhplab.recipe", "hhplab.schema", "hhplab.storage", "hhplab.artifacts.naming.naming", "hhplab.geographies.xwalks.boundary_annotations"],
+        "layer": "application",
+        "phase": 1,
+        "plan": "results-recipe-v2",
+        "responsibility": "Resolve paired site/membership inputs, schema and exact source identities including validated Census MSA definition version, thresholds and fingerprints; load preparation inputs with immutable source annotations and preserve or reject temporal/geography transforms by known cell dependencies.",
+        "revision_reason": "coclab-n3e28: declare the domain dependency for recognizing the conditional B2010 boundary coverage identity",
+        "source_spec": "docs/recipe-site-universe-contract.md"
+      }
+    }
+  ]
+}

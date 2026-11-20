@@ -506,6 +506,207 @@ def test_aggregate_pep_to_msa_materializes_canonical_outputs():
         assert provenance.extra["aggregation_method"] == "county_membership_sum"
 
 
+def test_aggregate_zori_msa_records_discovered_input_identities_and_empty_support():
+    import hashlib
+
+    from hhplab.artifacts.naming.naming import msa_zori_yearly_filename
+    from hhplab.storage.provenance import read_provenance
+
+    with runner.isolated_filesystem():
+        _create_fake_msa_membership("census_msa_2023")
+        pep_dir = Path("data/curated/pep")
+        zori_dir = Path("data/curated/zori")
+        pep_dir.mkdir(parents=True, exist_ok=True)
+        zori_dir.mkdir(parents=True, exist_ok=True)
+        pep_inputs = [
+            pep_dir / "pep_county__v2024.parquet",
+            pep_dir / "pep_county__v2025__y2021-2021.parquet",
+        ]
+        pd.DataFrame({"county_fips": ["01001"], "year": [2020], "population": [100.0]}).to_parquet(
+            pep_inputs[0], index=False
+        )
+        pd.DataFrame({"county_fips": ["01003"], "year": [2021], "population": [200.0]}).to_parquet(
+            pep_inputs[1], index=False
+        )
+        zori_path = zori_dir / "zori__county__Z2021.parquet"
+        pd.DataFrame(
+            {
+                "geo_type": ["county", "county"],
+                "geo_id": ["01001", "01003"],
+                "date": ["2020-01-01", "2021-01-01"],
+                "zori": [1000.0, 1200.0],
+            }
+        ).to_parquet(zori_path, index=False)
+
+        result = runner.invoke(
+            app,
+            [
+                "aggregate",
+                "zori",
+                "--target-geo",
+                "msa",
+                "--align",
+                "pit_january",
+                "--years",
+                "2020-2021",
+                "--json",
+            ],
+            catch_exceptions=False,
+        )
+
+        assert result.exit_code == 0, result.output
+        payload = json.loads(result.output.splitlines()[-1])
+        assert payload["status"] == "empty_balanced_support"
+        assert payload["balanced_support_status"] == "empty"
+        assert payload["empty_support_msa_ids"] == ["12345"]
+        assert payload["zori_input_identity"] == {
+            "path": str(zori_path.resolve()),
+            "vintage": "2021",
+            "sha256": hashlib.sha256(zori_path.read_bytes()).hexdigest(),
+        }
+        assert [item["path"] for item in payload["pep_input_identities"]] == [
+            str(pep_inputs[1].resolve()),
+            str(pep_inputs[0].resolve()),
+        ]
+        assert [item["vintage"] for item in payload["pep_input_identities"]] == [
+            "2025",
+            "2024",
+        ]
+        assert [item["sha256"] for item in payload["pep_input_identities"]] == [
+            hashlib.sha256(path.read_bytes()).hexdigest() for path in (pep_inputs[1], pep_inputs[0])
+        ]
+
+        output_path = Path(payload["output_path"])
+        assert output_path.name == msa_zori_yearly_filename(
+            2020, 2021, "census_msa_2023", "2023", "population", "pit_january"
+        )
+        output = pd.read_parquet(output_path)
+        assert output["zori"].isna().all()
+        provenance = read_provenance(output_path)
+        assert provenance.extra["zori_input_identity"] == payload["zori_input_identity"]
+        assert provenance.extra["pep_input_identities"] == payload["pep_input_identities"]
+        assert provenance.extra["balanced_support_status"] == "empty"
+
+        text_result = runner.invoke(
+            app,
+            [
+                "aggregate",
+                "zori",
+                "--target-geo",
+                "msa",
+                "--align",
+                "pit_january",
+                "--years",
+                "2020-2021",
+            ],
+            catch_exceptions=False,
+        )
+        assert text_result.exit_code == 0, text_result.output
+        assert "WARNING: Balanced county support is empty for every MSA" in text_result.output
+
+        from hhplab.sources.zori import zori_metro
+
+        original_aggregate = zori_metro.aggregate_yearly_zori_to_msa
+
+        def replace_input_after_rollup(*args, **kwargs):
+            rollup = original_aggregate(*args, **kwargs)
+            pep_inputs[0].write_bytes(b"replacement source bytes")
+            return rollup
+
+        existing_output_hash = hashlib.sha256(output_path.read_bytes()).hexdigest()
+        with patch.object(
+            zori_metro,
+            "aggregate_yearly_zori_to_msa",
+            side_effect=replace_input_after_rollup,
+        ):
+            changed_input_result = runner.invoke(
+                app,
+                [
+                    "aggregate",
+                    "zori",
+                    "--target-geo",
+                    "msa",
+                    "--align",
+                    "pit_january",
+                    "--years",
+                    "2020-2021",
+                    "--json",
+                ],
+                catch_exceptions=False,
+            )
+        assert changed_input_result.exit_code == 1
+        assert "source changed while MSA aggregation was running" in changed_input_result.output
+        assert hashlib.sha256(output_path.read_bytes()).hexdigest() == existing_output_hash
+
+
+def test_aggregate_zori_msa_preserves_usable_msa_when_another_has_empty_support():
+    with runner.isolated_filesystem():
+        from hhplab.artifacts.naming.naming import msa_county_membership_path
+
+        membership_path = msa_county_membership_path("census_msa_2023")
+        membership_path.parent.mkdir(parents=True, exist_ok=True)
+        pd.DataFrame(
+            {
+                "msa_id": ["12345", "12345", "67890"],
+                "county_fips": ["01001", "01003", "01005"],
+            }
+        ).to_parquet(membership_path, index=False)
+
+        pep_dir = Path("data/curated/pep")
+        zori_dir = Path("data/curated/zori")
+        pep_dir.mkdir(parents=True, exist_ok=True)
+        zori_dir.mkdir(parents=True, exist_ok=True)
+        explicit_pep_path = pep_dir / "custom__v2031.parquet"
+        pd.DataFrame(
+            {
+                "county_fips": ["01001", "01005", "01003", "01005"],
+                "year": [2020, 2020, 2021, 2021],
+                "population": [100.0, 50.0, 200.0, 50.0],
+            }
+        ).to_parquet(explicit_pep_path, index=False)
+        explicit_zori_path = zori_dir / "custom__Z2033.parquet"
+        pd.DataFrame(
+            {
+                "geo_type": ["county"] * 4,
+                "geo_id": ["01001", "01003", "01005", "01005"],
+                "date": ["2020-01-01", "2021-01-01", "2020-01-01", "2021-01-01"],
+                "zori": [1000.0, 1200.0, 800.0, 900.0],
+            }
+        ).to_parquet(explicit_zori_path, index=False)
+
+        result = runner.invoke(
+            app,
+            [
+                "aggregate",
+                "zori",
+                "--target-geo",
+                "msa",
+                "--align",
+                "pit_january",
+                "--years",
+                "2020-2021",
+                "--zori-path",
+                str(explicit_zori_path),
+                "--county-population-path",
+                str(explicit_pep_path),
+                "--json",
+            ],
+            catch_exceptions=False,
+        )
+
+        assert result.exit_code == 0, result.output
+        payload = json.loads(result.output.splitlines()[-1])
+        assert payload["status"] == "ok"
+        assert payload["balanced_support_status"] == "partial"
+        assert payload["empty_support_msa_ids"] == ["12345"]
+        assert payload["zori_input_identity"]["vintage"] == "2033"
+        assert payload["pep_input_identities"][0]["vintage"] == "2031"
+        output = pd.read_parquet(payload["output_path"]).set_index(["msa_id", "year"])
+        assert pd.isna(output.loc[("12345", 2020), "zori"])
+        assert output.loc[("67890", 2020), "zori"] == pytest.approx(800.0)
+        assert output.loc[("67890", 2021), "zori"] == pytest.approx(900.0)
+
+
 def test_derive_acs5_covariates_propagates_missing_non_native_component():
     df = pd.DataFrame(
         {

@@ -25,14 +25,18 @@ from hhplab.recipe.executor import (
     ExecutionContext,
     _execute_join,
     _execute_resample,
+    _resample_allocate,
+    derived_measure_required_columns,
     persistence,
 )
 from hhplab.recipe.executor import panel as recipe_panel
 from hhplab.recipe.executor.annotations import (
     bind_crosswalk_aggregate_contributors,
+    bind_source_aggregate_contributors,
     frame_column_map,
     propagate_annotations,
 )
+from hhplab.recipe.executor.core import ExecutorError
 from hhplab.recipe.executor.inputs import _apply_temporal_filter
 from hhplab.recipe.loader import load_recipe
 from hhplab.recipe.planner import ExecutionPlan, JoinTask, ResampleTask
@@ -752,8 +756,10 @@ def test_identity_resample_uses_resolved_custom_geography_and_year_keys(
     assert final_geo in assembled.panel.columns
 
 
-def test_annotated_lagged_source_cannot_silently_lose_year_bindings(tmp_path: Path) -> None:
-    source_year, panel_year = 2020, 2021
+@pytest.mark.parametrize("lag", [1, 2], ids=["acs-reference-year", "unreviewed-lag"])
+def test_annotated_acs1_lag_preserves_exact_year_bindings(tmp_path: Path, lag: int) -> None:
+    source_year = 2020
+    panel_year = source_year + lag
     frame = pd.DataFrame({
         "metro_id": ["35620"], "acs1_vintage": [source_year], "total_population": [100],
     })
@@ -775,6 +781,7 @@ def test_annotated_lagged_source_cannot_silently_lose_year_bindings(tmp_path: Pa
         }},
         "pipelines": [{"id": "main", "target": "target", "steps": []}],
     })
+    ctx = ExecutionContext(project_root=tmp_path, recipe=recipe, quiet=True)
     result = _execute_resample(
         ResampleTask(
             dataset_id="source", year=panel_year, input_path="data/source.parquet",
@@ -782,27 +789,64 @@ def test_annotated_lagged_source_cannot_silently_lose_year_bindings(tmp_path: Pa
             transform_id=None, to_geometry=GeometryRef(type="metro"),
             measures=["total_population"], year_column="acs1_vintage",
         ),
-        ExecutionContext(project_root=tmp_path, recipe=recipe, quiet=True),
+        ctx,
     )
-    assert not result.success
-    assert "annotation year mapping" in result.error
+    if lag == 2:
+        assert not result.success
+        assert "annotation year mapping" in result.error
+        return
+    assert result.success, result.error
+    prepared = ctx.intermediates[("source", panel_year)]
+    assert prepared["acs1_vintage"].tolist() == [source_year]
+    contract = frame_annotation_contract(prepared)
+    assert contract["bindings"]["lagged-source-note#r1"]["columns"] == {
+        "total_population": [["35620", panel_year]],
+    }
+    assert hashlib.sha256(path.read_bytes()).hexdigest() in {
+        entry["sha256"] for entry in contract["sources"]["lagged-source-note#r1"]
+    }
 
 
-def test_annotated_aggregation_is_actionably_rejected(tmp_path: Path) -> None:
+def test_annotated_aggregate_binds_exact_source_cells_and_persists(tmp_path: Path) -> None:
     input_path = tmp_path / "data" / "rts.parquet"
     frame = _annotated_frame(
-        geography="COC-1",
+        geography="01001",
         measure="pit_total",
         value=12,
         annotation_id="aggregate-note",
         annotation_column="pit_total",
         annotation_source="rts-source",
     )
+    frame = frame.rename(columns={"coc_id": "county_fips"})
+    frame = pd.concat([
+        frame,
+        pd.DataFrame({
+            "county_fips": ["01003", "01005"], "year": [2020, 2020],
+            "pit_total": [0.0, None],
+        }),
+    ], ignore_index=True)
+    frame.attrs["annotations"] = serialize_annotation_contract(
+        [
+            _record("aggregate-note", "pit_total"),
+            _record("zero-weight-note", "pit_total"),
+            _record("null-measure-note", "pit_total"),
+        ],
+        bindings={
+            "aggregate-note#r1": {"columns": {"pit_total": [["01001", 2020]]}},
+            "zero-weight-note#r1": {"columns": {"pit_total": [["01003", 2020]]}},
+            "null-measure-note#r1": {"columns": {"pit_total": [["01005", 2020]]}},
+        },
+    )
     write_parquet_with_provenance(frame, input_path, ProvenanceBlock(geo_type="county"))
+    xwalk_path = tmp_path / "data" / "county-to-coc.parquet"
+    pd.DataFrame({
+        "county_fips": ["01001", "01003", "01005"],
+        "coc_id": ["COC-1", "COC-1", "COC-1"], "area_share": [1.0, 0.0, 1.0],
+    }).to_parquet(xwalk_path)
     recipe = load_recipe(
         {
             "version": 1,
-            "name": "annotation-aggregate-rejection",
+            "name": "annotation-aggregate",
             "universe": {"range": "2020-2020"},
             "targets": [{"id": "target", "geometry": {"type": "coc"}}],
             "datasets": {
@@ -815,8 +859,17 @@ def test_annotated_aggregation_is_actionably_rejected(tmp_path: Path) -> None:
                     "path": "data/rts.parquet",
                 },
             },
+            "transforms": [{
+                "id": "county-to-coc", "type": "crosswalk",
+                "from": {"type": "county"}, "to": {"type": "coc"},
+                "spec": {"weighting": {"scheme": "area"}},
+            }],
             "pipelines": [{"id": "main", "target": "target", "steps": []}],
         }
+    )
+    ctx = ExecutionContext(
+        project_root=tmp_path, recipe=recipe, quiet=True,
+        transform_paths={"county-to-coc": xwalk_path},
     )
     result = _execute_resample(
         ResampleTask(
@@ -829,10 +882,278 @@ def test_annotated_aggregation_is_actionably_rejected(tmp_path: Path) -> None:
             to_geometry=GeometryRef(type="coc"),
             measures=["pit_total"],
         ),
-        ExecutionContext(project_root=tmp_path, recipe=recipe, quiet=True),
+        ctx,
     )
-    assert not result.success
-    assert "exact source contributors are mapped" in result.error
+    assert result.success, result.error
+    prepared = ctx.intermediates[("rts", 2020)]
+    contract = frame_annotation_contract(prepared)
+    assert contract is not None
+    assert contract["bindings"]["aggregate-note#r1"]["columns"] == {
+        "pit_total": [["COC-1", 2020]],
+    }
+    assert contract["bindings"]["zero-weight-note#r1"]["columns"] == {}
+    assert contract["bindings"]["null-measure-note#r1"]["columns"] == {}
+    assert hashlib.sha256(input_path.read_bytes()).hexdigest() in {
+        source["sha256"] for source in contract["sources"]["aggregate-note#r1"]
+    }
+    prepared_path = tmp_path / "data" / "prepared.parquet"
+    write_parquet_with_provenance(prepared, prepared_path, ProvenanceBlock(geo_type="coc"))
+    loaded = RecipeCache().read_parquet(prepared_path)
+    assert frame_annotation_contract(loaded) == contract
+    report_recipe = load_recipe({
+        "version": 2, "id": "v1-aggregate-report", "title": "v1 aggregate report",
+        "authors": ["test"], "universe": {"years": [2020]},
+        "targets": [{"id": "target", "geometry": {"type": "coc"}}],
+        "datasets": {}, "pipelines": [{"id": "build", "target": "target", "steps": []}],
+        "panels": {"panel": {"ref": {"pipeline": "build", "output": "panel"},
+                              "geo_key": "geo_id", "time_key": "year"}},
+        "analyses": [{"id": "describe", "method": "descriptive", "input": "panels.panel",
+                       "sample": {}, "columns": ["pit_total"], "stats": ["n", "mean"]}],
+        "results": {"bundle_dir": "results/{id}/{run_id}", "include_panels": ["panel"],
+                    "report": {"title": "v1 aggregate report"}},
+    })
+    bundle = run_results(
+        report_recipe,
+        original_recipe_bytes=report_recipe.model_dump_json(
+            by_alias=True, exclude_none=True,
+        ).encode(),
+        outputs_root=tmp_path / "results",
+        panel_frames={"panel": loaded},
+        private=True,
+    )
+    assert "Caveat for pit_total" in (
+        Path(bundle["bundle_path"]) / "report" / "index.html"
+    ).read_text()
+
+
+def test_annotated_allocate_binds_only_observed_positive_weight_cells() -> None:
+    source = _annotated_frame(
+        geography="14460", measure="population", value=25,
+        annotation_id="allocation-note", annotation_column="population",
+        annotation_source="allocation-source",
+    ).rename(columns={"coc_id": "geo_id"})
+    source["year"] = 2020
+    crosswalk = pd.DataFrame({
+        "msa_id": ["14460", "14460", "14460", "14500"],
+        "coc_id": ["COC-1", "COC-2", "COC-4", "COC-3"],
+        "area_share": [0.4, 0.6, 0.0, 1.0],
+    })
+    result = _resample_allocate(source, crosswalk, ResampleTask(
+        dataset_id="population", year=2020, input_path="population.parquet",
+        effective_geometry=GeometryRef(type="msa"), method="allocate",
+        transform_id="msa-to-coc", to_geometry=GeometryRef(type="coc"),
+        measures=["population"], geo_column="geo_id",
+    ))
+    contract = frame_annotation_contract(result)
+    assert contract is not None
+    assert contract["bindings"]["allocation-note#r1"]["columns"] == {
+        "population": [["COC-1", 2020], ["COC-2", 2020]],
+    }
+
+
+def test_annotated_allocate_rejects_duplicate_output_cells() -> None:
+    source = _annotated_frame(
+        geography="14460", measure="population", value=25,
+        annotation_id="allocation-note", annotation_column="population",
+        annotation_source="allocation-source",
+    ).rename(columns={"coc_id": "geo_id"})
+    source["year"] = 2020
+    crosswalk = pd.DataFrame({
+        "msa_id": ["14460", "14460"],
+        "coc_id": ["COC-1", "COC-1"],
+        "area_share": [0.4, 0.6],
+    })
+    with pytest.raises(ExecutorError, match="duplicate output geography/year"):
+        _resample_allocate(source, crosswalk, ResampleTask(
+            dataset_id="population", year=2020, input_path="population.parquet",
+            effective_geometry=GeometryRef(type="msa"), method="allocate",
+            transform_id="msa-to-coc", to_geometry=GeometryRef(type="coc"),
+            measures=["population"], geo_column="geo_id",
+        ))
+
+
+def test_annotated_identity_derived_measure_binds_actual_source_dependencies(
+    tmp_path: Path,
+) -> None:
+    config = {
+        "type": "quantile_from_distribution",
+        "distribution_family": "household_income",
+        "quantile": 0.25,
+        "diagnostic_output_column": "income_diagnostic",
+    }
+    source_columns = derived_measure_required_columns(
+        config, available_columns={"household_income_total"},
+    )
+    source = pd.DataFrame({
+        "coc_id": ["COC-1"], "year": [2020], "household_income_total": [100.0],
+        **{column: [0.0] for column in source_columns if column != "household_income_total"},
+    })
+    annotated_column = source_columns[1]
+    source[annotated_column] = 100.0
+    source.attrs["annotations"] = serialize_annotation_contract(
+        [_record("income-bin-note", annotated_column)],
+        bindings={"income-bin-note#r1": {"columns": {
+            annotated_column: [["COC-1", 2020]],
+        }}},
+    )
+    input_path = tmp_path / "data" / "income.parquet"
+    write_parquet_with_provenance(source, input_path, ProvenanceBlock(geo_type="coc"))
+    recipe = load_recipe({
+        "version": 1, "name": "identity-derived-note",
+        "universe": {"range": "2020-2020"},
+        "targets": [{"id": "target", "geometry": {"type": "coc"}}],
+        "datasets": {"income": {
+            "provider": "fixture", "product": "income", "version": 1,
+            "native_geometry": {"type": "coc"}, "years": "2020-2020",
+            "path": "data/income.parquet",
+        }},
+        "pipelines": [{"id": "main", "target": "target", "steps": []}],
+    })
+    ctx = ExecutionContext(project_root=tmp_path, recipe=recipe, quiet=True)
+    result = _execute_resample(ResampleTask(
+        dataset_id="income", year=2020, input_path="data/income.parquet",
+        effective_geometry=GeometryRef(type="coc"), method="identity",
+        transform_id=None, to_geometry=GeometryRef(type="coc"),
+        measures=["household_income_total"],
+        derived_measures={"bottom_quartile_income": config},
+    ), ctx)
+    assert result.success, result.error
+    contract = frame_annotation_contract(ctx.intermediates[("income", 2020)])
+    assert contract["bindings"]["income-bin-note#r1"]["columns"] == {
+        "bottom_quartile_income": [["COC-1", 2020]],
+        "income_diagnostic": [["COC-1", 2020]],
+    }
+
+
+def test_aggregate_contributors_resolve_legacy_and_bounded_uncertainty() -> None:
+    source = pd.DataFrame({
+        "county_fips": ["01001", "01003", "01005"],
+        "year": [2020, 2020, 2020],
+        "estimate": [10.0, 0.0, None],
+    })
+    global_note = _record("global-uncertainty", "estimate")
+    out_of_scope_note = _record("out-of-scope", "estimate")
+    source.attrs["annotations"] = serialize_annotation_contract(
+        [global_note, out_of_scope_note],
+        bindings={
+            "global-uncertainty#r1": {"columns": {}},
+            "out-of-scope#r1": {"columns": {
+                "estimate": [["01003", 2020], ["01005", 2020]],
+            }},
+        },
+        uncertain_ids=["global-uncertainty#r1", "out-of-scope#r1"],
+    )
+    output = pd.DataFrame({"geo_id": ["COC-1"], "year": [2020], "estimate": [10.0]})
+    contributors = pd.DataFrame({
+        "county_fips": ["01001"], "year": [2020],
+        "output_geo": ["COC-1"], "output_year": [2020],
+    })
+    rebound = bind_source_aggregate_contributors(
+        output, source, {"estimate": ("estimate", contributors)},
+        source_geo_column="county_fips", source_year_column="year",
+        output_geo_column="output_geo", output_year_column="output_year",
+    )
+    contract = frame_annotation_contract(rebound)
+    assert contract is not None
+    assert contract["bindings"]["global-uncertainty#r1"]["columns"] == {
+        "estimate": [["COC-1", 2020]],
+    }
+    assert contract["uncertain_ids"] == ["global-uncertainty#r1"]
+    assert contract["bindings"]["out-of-scope#r1"]["columns"] == {}
+
+
+def test_aggregate_contributors_map_legacy_scope_to_exact_cells() -> None:
+    source = pd.DataFrame({
+        "county_fips": ["01001"], "year": [2020], "estimate": [10.0],
+    })
+    source.attrs["annotations"] = [_record("legacy-note", "estimate")]
+    output = pd.DataFrame({"geo_id": ["COC-1"], "year": [2020], "estimate": [10.0]})
+    contributors = pd.DataFrame({
+        "county_fips": ["01001"], "year": [2020],
+        "output_geo": ["COC-1"], "output_year": [2020],
+    })
+    rebound = bind_source_aggregate_contributors(
+        output, source, {"estimate": ("estimate", contributors)},
+        source_geo_column="county_fips", source_year_column="year",
+        output_geo_column="output_geo", output_year_column="output_year",
+    )
+    contract = frame_annotation_contract(rebound)
+    assert contract["bindings"]["legacy-note#r1"]["columns"] == {
+        "estimate": [["COC-1", 2020]],
+    }
+    bad_contributors = contributors.assign(output_geo="COC-OTHER")
+    with pytest.raises(ValueError, match="outside the exact output cells"):
+        bind_source_aggregate_contributors(
+            pd.DataFrame({"geo_id": ["COC-1"], "year": [2020], "estimate": [10.0]}),
+            source,
+            {"estimate": ("estimate", bad_contributors)},
+            source_geo_column="county_fips", source_year_column="year",
+            output_geo_column="output_geo", output_year_column="output_year",
+        )
+
+
+@pytest.mark.parametrize(
+    ("method", "expected"),
+    [("calendar_mean", 15.0), ("calendar_median", 15.0)],
+    ids=["calendar-mean", "calendar-median"],
+)
+def test_annotated_calendar_aggregation_rebinds_exact_output_cells(method, expected) -> None:
+    source = pd.DataFrame({
+        "coc_id": ["COC-1", "COC-1"], "year": [2020, 2020],
+        "month": [1, 7], "estimate": [10.0, 20.0],
+    })
+    source.attrs["annotations"] = serialize_annotation_contract(
+        [_record("calendar-note", "estimate")],
+        bindings={"calendar-note#r1": {"columns": {
+            "estimate": [["COC-1", 2020]],
+        }}},
+    )
+    filtered = _apply_temporal_filter(
+        source, TemporalFilter(type="temporal", column="month", method=method),
+        2020, "calendar-source", geo_column="coc_id",
+    )
+    assert filtered["estimate"].item() == expected
+    contract = frame_annotation_contract(filtered)
+    assert contract["bindings"]["calendar-note#r1"]["columns"] == {
+        "estimate": [["COC-1", 2020]],
+    }
+
+
+@pytest.mark.parametrize(
+    ("month", "output_year", "expected"),
+    [(1, 2020, 15.0), (10, 2019, 12.5)],
+    ids=["previous-calendar-year", "following-calendar-year"],
+)
+def test_interpolation_binds_both_source_endpoints(month, output_year, expected) -> None:
+    source = pd.DataFrame({
+        "coc_id": ["COC-1", "COC-1", "COC-1"], "year": [2019, 2020, 2021],
+        "date": pd.to_datetime(["2019-07-01", "2020-07-01", "2021-07-01"]),
+        "estimate": [10.0, 20.0, None],
+    })
+    source.attrs["annotations"] = serialize_annotation_contract(
+        [_record("first-endpoint", "estimate"), _record("second-endpoint", "estimate")],
+        bindings={
+            "first-endpoint#r1": {"columns": {"estimate": [["COC-1", 2019]]}},
+            "second-endpoint#r1": {"columns": {"estimate": [["COC-1", 2020]]}},
+        },
+    )
+    filtered = _apply_temporal_filter(
+        source,
+        TemporalFilter(type="temporal", column="date", method="interpolate_to_month", month=month),
+        output_year, "interpolated-source", geo_column="coc_id",
+    )
+    estimates = filtered.set_index("year")["estimate"]
+    assert estimates[output_year] == expected
+    assert estimates[output_year - 1] == 10.0
+    assert pd.isna(estimates[output_year + 1])
+    contract = frame_annotation_contract(filtered)
+    first_bindings = contract["bindings"]["first-endpoint#r1"]["columns"]["estimate"]
+    assert {tuple(cell) for cell in first_bindings} == {
+        ("COC-1", output_year - 1), ("COC-1", output_year),
+    }
+    assert contract["bindings"]["second-endpoint#r1"]["columns"]["estimate"] == [
+        ["COC-1", output_year],
+    ]
 
 
 @pytest.mark.parametrize("annotated_crosswalk", [False, True], ids=["legacy", "generated"])

@@ -47,7 +47,8 @@ order = ["contracts", "infrastructure", "domain", "application", "interface"]
 "hhplab.artifacts.curated.schema" = "application"
 "hhplab.artifacts.naming.naming" = "contracts"
 "hhplab.artifacts.naming.covariates" = "contracts"
-"hhplab.diagnostics.coverage" = "application"
+# Reusable source-coverage summaries operate on frames supplied by callers.
+"hhplab.diagnostics.coverage" = "domain"
 "hhplab.diagnostics.status.status" = "application"
 "hhplab.diagnostics.status.contracts" = "application"
 "hhplab.diagnostics.status.geography" = "application"
@@ -92,10 +93,7 @@ order = ["contracts", "infrastructure", "domain", "application", "interface"]
 # Exact upward edges present when the policy was introduced. Remove entries as
 # ownership is corrected; new upward dependencies must never be added here merely
 # to make the quality gate pass.
-upward_edges = [
-  "hhplab.sources.census.pep.pep_diagnostics -> hhplab.diagnostics.coverage",
-  "hhplab.sources.zori.zori_diagnostics -> hhplab.diagnostics.coverage",
-]
+upward_edges = []
 
 [contracts.high_fan_in_modules]
 # Exact internal dependencies make ownership changes reviewable. High fan-in is
@@ -160,7 +158,7 @@ plan = "results-recipe-v2"
 baseline_commit = "900a29f9891f949bef5aaae354f4055b01033497"
 intent_file = ".elements/elements.working-intent.jsonl"
 reconcile_request = ".elements/plans/results-recipe-v2.reconcile.json"
-final_pin = ".elements/plans/rts-finalization-measures.pin-receipt.json"
+final_pin = ".elements/plans/boundary-annotations.pin-receipt.json"
 bead_map = ".elements/plans/results-recipe-v2.bead-map.jsonl"
 bead_export = ".beads/issues.jsonl"
 
@@ -216,6 +214,7 @@ bead_export = ".beads/issues.jsonl"
 "intent:rts:source" = { path = "hhplab/sources/right_to_shelter.py", kind = "semantic/module", parent = "intent:results-v2:sources", layer = "domain", change = "modify", bead = "coclab-8rlun" }
 "intent:rts:cli" = { path = "hhplab/cli/build_cmds/right_to_shelter.py", kind = "semantic/module", parent = "intent:results-v2:build_cmds", layer = "interface", change = "modify", bead = "coclab-8rlun" }
 "intent:preparation:annotations" = { path = "hhplab/recipe/executor/annotations.py", kind = "semantic/module", parent = "intent:results-v2:executor", layer = "application", change = "new", bead = "coclab-fjyum" }
+"intent:preparation:boundary_annotations" = { path = "hhplab/geographies/xwalks/boundary_annotations.py", kind = "semantic/module", parent = "intent:results-v2:hhplab", layer = "domain", change = "new", bead = "coclab-n3e28" }
 "intent:metro:laus_ingest" = { path = "hhplab/sources/bls/laus/ingest.py", kind = "semantic/module", parent = "intent:results-v2:sources", layer = "domain", change = "modify", bead = "coclab-j30ik" }
 "intent:preparation:reference_adapters" = { path = "hhplab/recipe/default_dataset_adapters.py", kind = "semantic/module", parent = "intent:results-v2:recipe", layer = "application", change = "extend", bead = "coclab-gl6pz" }
 "intent:site-universe:coc_boundary_compatibility" = { path = "hhplab/geographies/coc/coc_validate.py", kind = "semantic/module", parent = "intent:results-v2:hhplab", layer = "domain", change = "extend", bead = "coclab-ccwlh.3" }
@@ -243,12 +242,13 @@ bead_export = ".beads/issues.jsonl"
 "intent:results-v2:samples" = ["hhplab.schema", "hhplab.analysis.contracts"]
 "intent:results-v2:v2_schema" = ["hhplab.recipe.recipe_schema", "hhplab.schema"]
 "intent:results-v2:verify" = ["hhplab.schema", "hhplab.recipe", "hhplab.analysis", "hhplab.results", "hhplab.storage"]
-"intent:site-universe:input_resolver" = ["hhplab.recipe", "hhplab.schema", "hhplab.storage", "hhplab.artifacts.naming.naming"]
+"intent:site-universe:input_resolver" = ["hhplab.recipe", "hhplab.schema", "hhplab.storage", "hhplab.artifacts.naming.naming", "hhplab.geographies.xwalks.boundary_annotations"]
 "intent:site-universe:site_year_aggregation" = ["hhplab.recipe", "hhplab.analysis", "hhplab.schema", "hhplab.geographies.coc.coc_validate", "hhplab.sources.hud.pit.observation"]
 "intent:site-universe:pit_observation" = ["hhplab.schema.columns"]
 "intent:rts:source" = ["hhplab.schema", "hhplab.geographies.msa", "hhplab.geographies.coc", "hhplab.storage", "hhplab.artifacts.naming.naming"]
 "intent:rts:cli" = ["hhplab.sources.right_to_shelter"]
-"intent:preparation:annotations" = ["hhplab.schema", "hhplab.storage"]
+"intent:preparation:annotations" = ["hhplab.schema", "hhplab.storage", "hhplab.artifacts.naming.naming", "hhplab.geographies.xwalks.boundary_annotations", "hhplab.recipe.executor.core", "hhplab.recipe.manifest"]
+"intent:preparation:boundary_annotations" = ["hhplab.schema.contracts", "hhplab.storage.provenance", "hhplab.storage.raw_snapshot"]
 "intent:metro:laus_ingest" = ["hhplab.artifacts.naming", "hhplab.geographies.gf_metro", "hhplab.sources.bls", "hhplab.storage"]
 "intent:preparation:reference_adapters" = ["hhplab.recipe", "hhplab.schema"]
 "intent:site-universe:coc_boundary_compatibility" = ["hhplab.geographies.coc", "hhplab.schema"]
@@ -306,6 +306,7 @@ bead_export = ".beads/issues.jsonl"
 "intent:rts:source" = "Validate versioned evidence or explicitly provisional population-specific baseline coverage and dated jurisdiction exceptions, expand January-reference statuses with unknown gaps and qualifications, retain independent population-level baseline attribution when an exception covers only some populations, map requested MSA and CoC years with complete optional mixed-status resident weights, propagate exact provisional, geographic and subgroup caveats, and record content/membership/coding provenance."
 "intent:rts:cli" = "Expose dated exceptions and explicit baseline coverage, optional validated substate county membership and mixed-status weights, requested MSA/CoC years and coding choices with actionable JSON diagnostics; do not infer unsupported legal classifications."
 "intent:preparation:annotations" = "Preserve immutable annotation records, exact cell bindings and source identities through known preparation dependencies, key/column renames, row filters, joins and supported aggregation; detect conflicts and fail closed when dependency mapping is unsupported; keep statistical analysis and public distribution decisions with their existing owners."
+"intent:preparation:boundary_annotations" = "Read CoC boundary coverage and annual geometry annotations from exact source artifacts, preserve their identities and geometry vintage, and bind them to affected crosswalk weights without inferring outcome count scope."
 "intent:metro:laus_ingest" = "Ingest and persist annual BLS LAUS metro measures with canonical Census metro coverage by default, explicit Glynn/Fox subset support only when requested, documented BLS batching and exact source/definition provenance; do not select overlap cohorts or allocate CoC outcomes."
 "intent:preparation:reference_adapters" = "Validate and register built-in source dataset contracts including materialized right-to-shelter reference tables with explicit geography, keys and source version; require curated input paths and actionable preparation guidance without fetching data or selecting research classifications."
 "intent:site-universe:coc_boundary_compatibility" = "Own versioned, evidence-backed CoC boundary and count reconciliation for historical site-year use. Separate geometric equivalence from approved count reconciliation; require explicit source-ID sets, panel/year operations, count evidence and review approval for predecessor unions; never infer reconciliation from a persistent ID alone."

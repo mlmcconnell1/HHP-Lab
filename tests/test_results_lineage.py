@@ -149,7 +149,8 @@ def test_exact_product_declarations_and_explicit_ingestion_restrictions():
     )
     terms = declared_source_terms(("acs5", "census_unknown", "zori"), {"acs5": restricted})
     assert terms == {"acs5": RESTRICTED, "census_unknown": UNKNOWN_TERMS, "zori": UNKNOWN_TERMS}
-    assert declared_source_terms(("census/acs5", "census/unreviewed")) == {
+    assert declared_source_terms(("census/acs5", "bls/laus", "census/unreviewed")) == {
         "census/acs5": PUBLIC_DATA_TERMS,
+        "bls/laus": PUBLIC_DATA_TERMS,
         "census/unreviewed": UNKNOWN_TERMS,
     }
