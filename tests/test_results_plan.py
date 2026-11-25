@@ -3,12 +3,14 @@
 from __future__ import annotations
 
 import json
+from hashlib import sha256
 
 import pytest
 
 from hhplab.recipe.loader import load_recipe
 from hhplab.recipe.results_plan import ResultsPlanningError, plan_results
 from hhplab.recipe.schema_results import RecipeV2
+from hhplab.storage.run_ledger import RunLedger
 
 
 def _recipe(
@@ -502,6 +504,34 @@ def test_finding_and_diagnostic_references_resolve_base_terms() -> None:
     assert ("claim", "model@renamed", "x", "x2") in refs
     assert ("identity", "model@renamed", "x", "x2") in refs
     assert ("identity", "model@renamed", "z", "z") in refs
+
+
+def test_public_verdict_changes_only_the_findings_lock_component(tmp_path) -> None:
+    band = {"label": "positive", "ci_above": {"value": 0}}
+    finding = {
+        "id": "claim",
+        "claim": "The predictor matters",
+        "criteria_source": {"estimate": {"analysis": "model", "term": "x"}},
+    }
+    original = _plan(_recipe(findings=[{**finding, "bands": [band]}]))
+    ledger = RunLedger(tmp_path)
+    ledger.create_lock(
+        recipe_id=original.recipe_id,
+        recipe_sha256=sha256(original.original_recipe_bytes).hexdigest(),
+        components=original.component_hashes,
+        spec_hash=original.plan_sha256,
+    )
+
+    unset = _plan(_recipe(findings=[{**finding, "bands": [{**band, "public_verdict": None}]}]))
+    declared = _plan(_recipe(findings=[
+        {**finding, "bands": [{**band, "public_verdict": "supports_claim"}]}
+    ]))
+
+    assert unset.plan_sha256 == original.plan_sha256
+    assert ledger.compare_lock(unset.recipe_id, unset.component_hashes)["status"] == "matched"
+    changed = ledger.compare_lock(declared.recipe_id, declared.component_hashes)
+    assert changed["status"] == "modified"
+    assert changed["components"] == ["findings"]
 
 
 def test_finding_rejects_undefined_terms_and_unapplied_robustness_variant() -> None:

@@ -8,7 +8,12 @@ import pytest
 
 from hhplab.results.findings import finding_from_result
 from hhplab.results.recipe_findings import evaluate_finding, evaluate_findings
-from hhplab.schema.results import FindingRecord, FindingsPayload, RobustnessStatus
+from hhplab.schema.results import (
+    BUNDLE_FORMAT_VERSION,
+    FindingRecord,
+    FindingsPayload,
+    RobustnessStatus,
+)
 
 BASE_ESTIMATE = {
     "analysis": "model",
@@ -94,9 +99,24 @@ def test_findings_payload_is_versioned_and_preserves_independent_instances() -> 
 
     assert isinstance(payload, FindingsPayload)
     data = payload.to_dict()
-    assert data["bundle_format_version"] == "1.0"
+    assert data["bundle_format_version"] == BUNDLE_FORMAT_VERSION
     assert data["findings"][0]["base"]["label"] == "positive"
     assert data["findings"][0]["variants"]["robust"]["label"] == "positive"
+
+
+def test_public_verdict_remains_editorial_metadata_during_band_evaluation() -> None:
+    bands = [
+        {**FINDING["bands"][0], "public_verdict": "supports_claim"},
+        {**FINDING["bands"][1], "public_verdict": "no_meaningful_effect"},
+    ]
+    results = {"model@base": _result(), "model@robust": _result(VARIANT_ESTIMATE)}
+    plans = [{"result_key": "model@base"}, {"result_key": "model@robust"}]
+
+    original = evaluate_finding(FINDING, results, variant_plans=plans)
+    declared = evaluate_finding({**FINDING, "bands": bands}, results, variant_plans=plans)
+
+    assert declared == original
+    assert declared.base["label"] == "positive"
 
 
 @pytest.mark.parametrize(

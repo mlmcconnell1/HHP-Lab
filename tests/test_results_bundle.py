@@ -19,10 +19,18 @@ from hhplab.results.bundle import (
     BundlePayload,
     BundleWriter,
     read_bundle,
+    read_bundle_permissions,
 )
 from hhplab.results.lineage import ArtifactLineage
-from hhplab.schema.redistribution import ArtifactScope, SourceRedistribution
+from hhplab.schema.redistribution import (
+    ArtifactScope,
+    PermissionSource,
+    PermissionTermsOrigin,
+    RedistributionEvidence,
+    SourceRedistribution,
+)
 from hhplab.schema.results import (
+    LEGACY_BUNDLE_FORMAT_VERSION,
     AnalysisStatus,
     AnalysisStatusRecord,
     DiagnosticsStatus,
@@ -60,6 +68,8 @@ def test_empty_result_table_retains_canonical_types():
     assert table.schema.field("n_clusters").type == pa.int64()
     assert table.schema.field("absorbed").type == pa.list_(pa.string())
     assert table.to_pylist() == []
+    provenance = ProvenanceBlock.from_json(table.schema.metadata[PROVENANCE_KEY].decode())
+    assert provenance.extra["bundle_format_version"] == bundle_module.BUNDLE_FORMAT_VERSION
 
 
 RESULT_ROWS = {
@@ -146,6 +156,7 @@ def _parquet_bytes(frame: pd.DataFrame) -> bytes:
 def _payload(
     *,
     source_terms=None,
+    source_permissions=None,
     private=False,
     allow_unknown_aggregates=False,
 ) -> BundlePayload:
@@ -206,6 +217,7 @@ def _payload(
             for name in bundle_module.RESULT_TABLE_NAMES
         },
         source_terms=source_terms,
+        source_permissions=source_permissions or {},
         report_payload={
             "title": "Portable synthetic results",
             "analyses": {
@@ -256,12 +268,198 @@ def test_bundle_roundtrip_hashes_schemas_and_relative_replay_paths(tmp_path):
     assert loaded.execution["input_measures"]["cbsa"]["population"]["unit"] == "persons"
     assert loaded.execution["tolerance"] == {"atol": 1e-10, "rtol": 1e-9}
     assert loaded.result_tables == source.result_tables
+    assert loaded.permissions is not None
+    assert loaded.manifest_sha256 == result.manifest_sha256
+    assert loaded.measures == source.measures
+    assert loaded.annotations == source.annotations
+    assert "permissions.json" in {item["path"] for item in result.manifest.files}
+    assert (
+        loaded.permissions.sources["aggregate-source"].terms_origin
+        is PermissionTermsOrigin.DEFAULT_UNKNOWN
+    )
     resolved, execution, panel_frames = loaded.load_replay_inputs()
     assert resolved["recipe"]["id"] == "portable-demo"
     assert execution["spec_hash"] == HASH_A
     assert panel_frames["cbsa"].to_dict(orient="records") == [
         {"geo_id": "x", "year": 2020, "value": 7.0}
     ]
+
+
+def test_legacy_reader_accepts_bundles_without_permission_measure_or_annotation_docs(tmp_path):
+    current_root = tmp_path / "current"
+    current = BundleWriter(current_root).write(_payload())
+    omitted = {"permissions.json", "measures.json", "annotations.json"}
+    legacy_files = tuple(item for item in current.manifest.files if item["path"] not in omitted)
+    legacy_manifest = replace(
+        current.manifest,
+        bundle_format_version=LEGACY_BUNDLE_FORMAT_VERSION,
+        files=legacy_files,
+    )
+    legacy_root = tmp_path / "legacy"
+    legacy_root.mkdir()
+    for item in legacy_files:
+        source_path = current_root / item["path"]
+        target_path = legacy_root / item["path"]
+        target_path.parent.mkdir(parents=True, exist_ok=True)
+        target_path.write_bytes(source_path.read_bytes())
+    manifest_bytes = bundle_module.canonical_bytes(legacy_manifest.to_dict())
+    (legacy_root / "manifest.json").write_bytes(manifest_bytes)
+    manifest_sha256 = hashlib.sha256(manifest_bytes).hexdigest()
+    (legacy_root / "manifest.sha256").write_text(
+        f"{manifest_sha256}  manifest.json\n", encoding="utf-8"
+    )
+
+    loaded = read_bundle(legacy_root)
+
+    assert loaded.permissions is None
+    assert loaded.measures == {}
+    assert loaded.annotations == {}
+    assert loaded.manifest_sha256 == manifest_sha256
+
+
+def test_permissions_record_is_inventoried_and_binds_every_policy_artifact(tmp_path):
+    result = BundleWriter(tmp_path / "bundle").write(_payload())
+    loaded = read_bundle(tmp_path / "bundle")
+
+    assert loaded.permissions is not None
+    permission_paths = {item.path for item in loaded.permissions.artifacts}
+    assert "permissions.json" in permission_paths
+    assert "results/results.json" in permission_paths
+    assert "report/index.html" in permission_paths
+    report = next(
+        item for item in loaded.permissions.artifacts if item.path == "report/index.html"
+    )
+    assert "tables/coefficients.csv" in report.companions
+    assert loaded.permissions.sources["panel-source"].evidence == ()
+    assert (
+        loaded.permissions.sources["panel-source"].terms_origin
+        is PermissionTermsOrigin.DEFAULT_UNKNOWN
+    )
+    assert result.manifest_sha256 == loaded.manifest_sha256
+
+
+def test_permissions_artifact_path_is_reserved(tmp_path):
+    payload = _payload()
+    artifact = BundleArtifact(
+        "permissions.json",
+        b"{}",
+        "permission-override",
+        ArtifactLineage("permissions.json", ("aggregate-source",), ArtifactScope.AGGREGATE),
+    )
+    payload = replace(payload, artifacts=(*payload.artifacts, artifact))
+
+    with pytest.raises(BundleError, match="reserved by bundle format"):
+        BundleWriter(tmp_path / "bundle").write(payload)
+    assert not (tmp_path / "bundle").exists()
+
+
+def _permission_source(terms: SourceRedistribution) -> PermissionSource:
+    return PermissionSource(
+        terms.row_level,
+        terms.aggregate,
+        PermissionTermsOrigin.CATALOG,
+        (
+            RedistributionEvidence(
+                "https://example.org/terms", "2026-11-20", "synthetic test source"
+            ),
+        ),
+    )
+
+
+@pytest.mark.parametrize(
+    ("aggregate_terms", "expected_strict", "expected_written", "included"),
+    [
+        pytest.param(PUBLIC, "included", "included", True, id="eligible"),
+        pytest.param(AGGREGATE_RESTRICTED, "withheld", "withheld", False, id="denied"),
+    ],
+)
+def test_permissions_record_matches_eligible_and_denied_artifacts(
+    tmp_path, aggregate_terms, expected_strict, expected_written, included
+):
+    payload = _payload(
+        source_terms={"panel-source": PUBLIC, "aggregate-source": aggregate_terms},
+        source_permissions={
+            "panel-source": _permission_source(PUBLIC),
+            "aggregate-source": _permission_source(aggregate_terms),
+        },
+    )
+    result = BundleWriter(tmp_path / "bundle").write(payload)
+    loaded = read_bundle(tmp_path / "bundle")
+    estimate = next(
+        item
+        for item in loaded.permissions.artifacts
+        if item.path == "results/regression_estimates.parquet"
+    )
+
+    assert estimate.strict_disposition.value == expected_strict
+    assert estimate.written_disposition.value == expected_written
+    assert (estimate.path in {item["path"] for item in result.manifest.files}) is included
+    assert (
+        loaded.permissions.sources["aggregate-source"].terms_origin
+        is PermissionTermsOrigin.CATALOG
+    )
+    assert loaded.permissions.sources["aggregate-source"].evidence
+
+
+def test_permission_reader_rejects_missing_or_invalid_record(tmp_path):
+    result = BundleWriter(tmp_path / "bundle").write(_payload())
+    without_record = replace(
+        result.manifest,
+        files=tuple(item for item in result.manifest.files if item["path"] != "permissions.json"),
+    )
+    with pytest.raises(BundleError, match="requires exactly one inventoried permissions.json"):
+        read_bundle_permissions(tmp_path / "bundle", without_record)
+
+    permission_path = tmp_path / "bundle" / "permissions.json"
+    invalid_document = json.loads(permission_path.read_bytes())
+    invalid_document["schema_version"] = "permissions/unknown"
+    invalid_bytes = bundle_module.canonical_bytes(invalid_document)
+    permission_path.write_bytes(invalid_bytes)
+    updated_files = []
+    for item in result.manifest.files:
+        updated = dict(item)
+        if updated["path"] == "permissions.json":
+            updated["bytes"] = len(invalid_bytes)
+            updated["sha256"] = hashlib.sha256(invalid_bytes).hexdigest()
+        updated_files.append(updated)
+    invalid_manifest = replace(result.manifest, files=tuple(updated_files))
+    with pytest.raises(BundleError, match="invalid permissions.json"):
+        read_bundle_permissions(tmp_path / "bundle", invalid_manifest)
+
+
+def test_permission_reader_checks_private_flag_and_inventory_parent_coverage(tmp_path):
+    result = BundleWriter(tmp_path / "bundle").write(_payload(private=True))
+    wrong_private = replace(
+        result.manifest,
+        private=False,
+        statuses=replace(result.manifest.statuses, distribution_status=DistributionStatus.FULL),
+    )
+    with pytest.raises(BundleError, match="private flag does not match"):
+        read_bundle_permissions(tmp_path / "bundle", wrong_private)
+
+    orphan_record = {
+        "path": "orphan.txt",
+        "sha256": hashlib.sha256(b"").hexdigest(),
+        "bytes": 0,
+        "role": "artifact",
+    }
+    manifest_with_orphan = replace(
+        result.manifest, files=(*result.manifest.files, orphan_record)
+    )
+    with pytest.raises(BundleError, match="no artifact parent.*orphan.txt"):
+        read_bundle_permissions(tmp_path / "bundle", manifest_with_orphan)
+
+
+def test_conflicting_source_terms_fail_before_creating_bundle(tmp_path):
+    payload = _payload(
+        source_terms={"panel-source": PUBLIC, "aggregate-source": AGGREGATE_RESTRICTED},
+        source_permissions={"aggregate-source": _permission_source(PUBLIC)},
+    )
+    target = tmp_path / "bundle"
+
+    with pytest.raises(BundleError, match="source term mismatch for 'aggregate-source'"):
+        BundleWriter(target).write(payload)
+    assert not target.exists()
 
 
 def test_restricted_row_level_files_are_withheld_without_hiding_allowed_aggregates(tmp_path):
@@ -300,6 +498,19 @@ def test_denied_aggregate_data_never_reaches_json_or_html(tmp_path):
     assert "Withheld under source redistribution terms" in html
     assert result.manifest.statuses.distribution_status is DistributionStatus.WITHHELD
     assert result.withheld_paths
+    permissions = read_bundle(tmp_path / "bundle").permissions
+    status_report = next(
+        item for item in permissions.artifacts if item.path == "report/index.html"
+    )
+    assert status_report.scope is ArtifactScope.AGGREGATE
+    assert status_report.strict_disposition.value == "withheld"
+    assert status_report.written_disposition.value == "withheld"
+    assert "tables/coefficients.csv" in status_report.companions
+    withheld_paths = {
+        item["path"]
+        for item in read_bundle(tmp_path / "bundle").documents["withheld.json"]["withheld"]
+    }
+    assert "README.md" not in withheld_paths
 
 
 def test_unknown_aggregate_requires_override_and_private_includes_restricted_rows(tmp_path):
@@ -317,6 +528,14 @@ def test_unknown_aggregate_requires_override_and_private_includes_restricted_row
     assert "results/regression_estimates.parquet" in {
         item["path"] for item in allowed.manifest.files
     }
+    allowed_record = read_bundle(tmp_path / "override").permissions
+    allowed_estimate = next(
+        item
+        for item in allowed_record.artifacts
+        if item.path == "results/regression_estimates.parquet"
+    )
+    assert allowed_estimate.strict_disposition.value == "withheld"
+    assert allowed_estimate.written_disposition.value == "included"
 
     private = BundleWriter(tmp_path / "private").write(
         _payload(

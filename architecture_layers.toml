@@ -317,3 +317,40 @@ bead_export = ".beads/issues.jsonl"
 "hhplab.analysis" = ["hhplab.recipe", "hhplab.results", "hhplab.cli"]
 "hhplab.storage" = ["hhplab.panel", "hhplab.analysis", "hhplab.recipe", "hhplab.results", "hhplab.cli", "hhplab.sources", "hhplab.covariates", "hhplab.geographies", "hhplab.measures"]
 "hhplab.results.bands" = ["hhplab.recipe", "hhplab.results.runner", "hhplab.cli"]
+
+[results_publication]
+plan = "results-publication"
+reconcile_request = ".elements/plans/results-publication.reconcile.json"
+final_pin = ".elements/plans/results-publication.schema-dependency.pin-receipt.json"
+
+[results_publication.elements]
+"intent:results-publication:publication_schema" = { path = "hhplab/schema/publication.py", kind = "semantic/module", parent = "intent:results-v2:schema", layer = "contracts", change = "new", bead = "coclab-results-publication-qwqse.3" }
+"intent:results-publication:verdicts" = { path = "hhplab/results/verdicts.py", kind = "semantic/module", parent = "intent:results-v2:results", layer = "application", change = "new", bead = "coclab-results-publication-qwqse.3" }
+"intent:results-publication:placeholders" = { path = "hhplab/results/placeholders.py", kind = "semantic/module", parent = "intent:results-v2:results", layer = "application", change = "new", bead = "coclab-results-publication-qwqse.5" }
+"intent:results-publication:figures" = { path = "hhplab/results/figures.py", kind = "semantic/module", parent = "intent:results-v2:results", layer = "application", change = "new", bead = "coclab-results-publication-qwqse.6" }
+"intent:results-publication:publish" = { path = "hhplab/results/publish.py", kind = "semantic/module", parent = "intent:results-v2:results", layer = "application", change = "new", bead = "coclab-results-publication-qwqse.4" }
+
+[results_publication.import_prefixes]
+"intent:results-publication:publication_schema" = ["hhplab.schema.results"]
+"intent:results-publication:verdicts" = ["hhplab.schema", "hhplab.results.bands"]
+"intent:results-publication:placeholders" = ["hhplab.schema", "hhplab.results.bundle"]
+"intent:results-publication:figures" = ["hhplab.schema", "hhplab.analysis", "hhplab.results.bundle"]
+"intent:results-publication:publish" = ["hhplab.schema", "hhplab.results.bundle", "hhplab.results.verify", "hhplab.results.verdicts", "hhplab.results.placeholders", "hhplab.results.figures", "hhplab.storage"]
+
+[results_publication.extensions]
+"intent:results-v2:v2_schema" = { bead = "coclab-results-publication-qwqse.3", import_prefixes = ["hhplab.schema.publication"] }
+"intent:results-v2:recipe_findings" = { bead = "coclab-results-publication-qwqse.3", import_prefixes = [] }
+"intent:results-v2:redistribution_contracts" = { bead = "coclab-results-publication-qwqse.2", import_prefixes = [] }
+"intent:results-v2:result_contracts" = { bead = "coclab-results-publication-qwqse.2", import_prefixes = [] }
+"intent:results-v2:lineage" = { bead = "coclab-results-publication-qwqse.2", import_prefixes = [] }
+"intent:results-v2:bundle" = { bead = "coclab-results-publication-qwqse.2", import_prefixes = ["hhplab.schema.redistribution"] }
+"intent:results-v2:results_runner" = { bead = "coclab-results-publication-qwqse.2", import_prefixes = [] }
+"intent:results-v2:verify" = { bead = "coclab-results-publication-qwqse.2", import_prefixes = [] }
+"intent:results-v2:cli_results" = { bead = "coclab-results-publication-qwqse.7", import_prefixes = ["hhplab.results.publish"] }
+
+[results_publication.responsibilities]
+"intent:results-publication:publication_schema" = "Define strict source and package wire contracts for publication metadata, findings selection, figure choices, lifecycle/history, provenance and publish outcomes. Validate permanent slugs, closed vocabularies, and safe relative artifact names without I/O or bundle policy decisions."
+"intent:results-publication:verdicts" = "Map verified base finding evaluations and declared robustness variants to the closed public verdict vocabulary and display state, including mixed, inconclusive compatibility references, and unavailable-check explanations. Never infer verdicts from missing or ambiguous evaluations."
+"intent:results-publication:placeholders" = "Resolve only exact, cited finding and dependency result addresses from verified bundle documents and tables; apply the closed formatting vocabulary, context escaping, malformed-token errors, number lint and provenance recording. No filesystem writes or policy overrides."
+"intent:results-publication:figures" = "Render the Phase A estimate_plot SVG/CSV and variant_table from verified regression and finding records, with comparable scales, confidence intervals, alt text and redistribution decisions supplied by the publication gate. Reject unsupported figure kinds; no row-level plots or estimations."
+"intent:results-publication:publish" = "Orchestrate Phase A publication validation, verified BundleContents and permissions access, reproduction status, redistribution gate, lifecycle/history graph validation, package rendering and atomic destination activation; provide read-only publish-check/dry-run and deterministic publish-index. Fail closed before modifying the destination on any invalid source, bundle, permission, placeholder, path or transition."

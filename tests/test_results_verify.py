@@ -11,6 +11,7 @@ import pandas as pd
 import pytest
 
 from hhplab.results.verify import VerificationReport, verify_bundle
+from hhplab.schema.results import BUNDLE_FORMAT_VERSION, LEGACY_BUNDLE_FORMAT_VERSION
 
 SHA256_A = "a" * 64
 SHA256_B = "b" * 64
@@ -287,6 +288,56 @@ def test_changed_file_without_inventory_update_skips_replay(tmp_path) -> None:
     assert report.reproducibility == "not_run"
     assert report.exit_code == 1
     assert not called
+
+
+@pytest.mark.parametrize(
+    "permission_contents",
+    [
+        pytest.param(None, id="missing"),
+        pytest.param({"schema_version": "permissions/1"}, id="invalid"),
+    ],
+)
+def test_format_1_1_permission_record_is_required_for_integrity(
+    tmp_path, permission_contents
+) -> None:
+    bundle = _make_bundle(tmp_path / "bundle")
+    manifest_path = bundle / "manifest.json"
+    manifest = json.loads(manifest_path.read_bytes())
+    manifest["bundle_format_version"] = BUNDLE_FORMAT_VERSION
+    _write(manifest_path, _json_bytes(manifest))
+    if permission_contents is not None:
+        _write(bundle / "permissions.json", _json_bytes(permission_contents))
+    _refresh_inventory(bundle)
+
+    report = verify_bundle(bundle)
+
+    assert report.integrity == "fail"
+    assert report.reproducibility == "not_run"
+    assert report.exit_code == 1
+    assert report.errors[0].startswith("invalid_permissions:")
+
+
+def test_legacy_bundle_replays_current_versioned_findings_and_diagnostics(tmp_path) -> None:
+    bundle = _make_bundle(tmp_path / "bundle")
+    for kind in ("diagnostics", "findings"):
+        _write(
+            bundle / f"{kind}.json",
+            _json_bytes({"bundle_format_version": LEGACY_BUNDLE_FORMAT_VERSION, kind: []}),
+        )
+    _refresh_inventory(bundle)
+
+    def replay(resolved, execution, panels):
+        base = _replay()(resolved, execution, panels)
+        return {
+            **base,
+            "diagnostics": {"bundle_format_version": BUNDLE_FORMAT_VERSION, "diagnostics": []},
+            "findings": {"bundle_format_version": BUNDLE_FORMAT_VERSION, "findings": []},
+        }
+
+    report = verify_bundle(bundle, replay=replay, current_environment=ENVIRONMENT)
+
+    assert report.integrity == "pass"
+    assert report.reproducibility == "pass"
 
 
 def test_withheld_and_environment_reasons_combine_with_partial_precedence(tmp_path) -> None:

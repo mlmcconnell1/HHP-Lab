@@ -16,9 +16,19 @@ from typing import Any
 import pandas as pd
 
 from hhplab.recipe.derive import parse_annotation_contract, serialize_annotation_contract
-from hhplab.results.bundle import _distribution_safe_annotations
+from hhplab.results.bundle import (
+    BundleError,
+    _distribution_safe_annotations,
+    read_bundle_permissions,
+)
 from hhplab.schema.contracts import PUBLIC_SAMPLE_ANNOTATION_NOTICE, project_annotation_contract
-from hhplab.schema.results import RESULT_TABLE_SCHEMAS, ResultsManifest, Tolerance
+from hhplab.schema.results import (
+    BUNDLE_FORMAT_VERSION,
+    LEGACY_BUNDLE_FORMAT_VERSION,
+    RESULT_TABLE_SCHEMAS,
+    ResultsManifest,
+    Tolerance,
+)
 from hhplab.storage.provenance import read_provenance
 
 REPLAYER = Callable[
@@ -305,6 +315,11 @@ def _check_integrity(
     for relative in sorted(inventory.keys() - observed):
         if not any(error.startswith(f"file_unreadable:{relative}:") for error in errors):
             errors.append(f"missing_file:{relative}")
+    if not errors:
+        try:
+            read_bundle_permissions(root, manifest)
+        except BundleError as exc:
+            errors.append(f"invalid_permissions: {exc}")
     return errors, manifest, inventory
 
 
@@ -863,6 +878,7 @@ def _compare_replay(
         unavailable_paths,
         exclusions,
         "diagnostics",
+        bundle_format_version=manifest.bundle_format_version,
     )
     _compare_json_artifact(
         root,
@@ -873,6 +889,7 @@ def _compare_replay(
         unavailable_paths,
         exclusions,
         "findings",
+        bundle_format_version=manifest.bundle_format_version,
     )
     _compare_sample_artifacts(
         root,
@@ -1127,6 +1144,8 @@ def _compare_json_artifact(
     unavailable_paths: set[str],
     exclusions: _DependencyExclusions,
     kind: str,
+    *,
+    bundle_format_version: str,
 ) -> None:
     path = root / relative_path
     if relative_path in unavailable_paths:
@@ -1137,6 +1156,14 @@ def _compare_json_artifact(
         differences.append({"path": path.name, "reason": "missing_copy"})
     else:
         actual = _read_json(path)
+        if (
+            bundle_format_version == LEGACY_BUNDLE_FORMAT_VERSION
+            and isinstance(expected, Mapping)
+            and expected.get("bundle_format_version") == BUNDLE_FORMAT_VERSION
+        ):
+            # The replay engine emits the current wrapper version. Compare the
+            # unchanged payload against its legacy format's declared wrapper.
+            expected = {**expected, "bundle_format_version": bundle_format_version}
         if kind == "diagnostics":
             expected = _without_diagnostics(expected, exclusions.diagnostics)
             actual = _without_diagnostics(actual, exclusions.diagnostics)

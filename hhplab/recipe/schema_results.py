@@ -32,6 +32,7 @@ from hhplab.schema.contracts import (
 from hhplab.schema.contracts import (
     validate_annotation_revisions as _validate_annotation_supersedes_graph,
 )
+from hhplab.schema.publication import BandVerdict
 
 PIT_SITE_YEAR_MEASURE_COLUMNS = frozenset(
     {"pit_total", "pit_sheltered", "pit_unsheltered"}
@@ -613,6 +614,7 @@ class BandCondition(ClosedModel):
 
 class FindingBand(ClosedModel):
     label: StrictStr = Field(min_length=1)
+    public_verdict: BandVerdict | None = None
     equivalent_to: ValueMarginCondition | None = None
     ci_above: ValueMarginCondition | None = None
     ci_below: ValueMarginCondition | None = None

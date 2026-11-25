@@ -1,4 +1,4 @@
-"""Mandatory architecture gate for the results-recipe Phase-1 intent.
+"""Mandatory architecture gate for the results recipe and publication intent.
 
 For divergence, classify the exact intent ID, path, or edge as missing, moved,
 wrong-layer, unexpected, or dependency drift; inspect the cause; then repair
@@ -23,13 +23,18 @@ import pytest
 
 REPO_ROOT = Path(__file__).parents[1]
 POLICY_PATH = REPO_ROOT / "architecture_layers.toml"
-POLICY = tomllib.loads(POLICY_PATH.read_text(encoding="utf-8"))[
-    "results_v2"
-]
-ELEMENT_EXPECTATIONS: dict[str, dict[str, str]] = POLICY["elements"]
-IMPORT_PREFIXES: dict[str, list[str]] = POLICY["import_prefixes"]
+ARCHITECTURE = tomllib.loads(POLICY_PATH.read_text(encoding="utf-8"))
+POLICY = ARCHITECTURE["results_v2"]
+PUBLICATION_POLICY = ARCHITECTURE["results_publication"]
+ELEMENT_EXPECTATIONS: dict[str, dict[str, str]] = (
+    POLICY["elements"] | PUBLICATION_POLICY["elements"]
+)
+IMPORT_PREFIXES: dict[str, list[str]] = (
+    POLICY["import_prefixes"] | PUBLICATION_POLICY["import_prefixes"]
+)
+RESPONSIBILITIES = POLICY["responsibilities"] | PUBLICATION_POLICY["responsibilities"]
 FORBIDDEN_IMPORTS: dict[str, list[str]] = POLICY["forbidden_imports"]
-LAYER_ORDER = tuple(tomllib.loads(POLICY_PATH.read_text(encoding="utf-8"))["layers"]["order"])
+LAYER_ORDER = tuple(ARCHITECTURE["layers"]["order"])
 
 
 def _json_command(*args: str, timeout: int = 45) -> dict[str, Any]:
@@ -66,7 +71,7 @@ def _intent_records() -> dict[str, dict[str, Any]]:
     return {
         record["intent_element_id"]: record
         for record in _read_jsonl(path)
-        if record.get("content", {}).get("plan") == POLICY["plan"]
+        if record.get("content", {}).get("plan") in {POLICY["plan"], PUBLICATION_POLICY["plan"]}
     }
 
 
@@ -85,23 +90,6 @@ def _bead_statuses() -> dict[str, str]:
 
 def _is_unfinished(status: str | None) -> bool:
     return status in {"open", "in_progress", "blocked"}
-
-
-def _active_pending_ids(
-    expectations: dict[str, dict[str, str]],
-    statuses: dict[str, str],
-    *,
-    final_release: bool,
-) -> set[str]:
-    if final_release:
-        return set()
-    return {
-        intent_id
-        for intent_id, expected in expectations.items()
-        if expected["kind"] == "semantic/module"
-        and expected["change"] == "new"
-        and _is_unfinished(statuses.get(expected["bead"]))
-    }
 
 
 def _within(path: str, parent: str) -> bool:
@@ -317,7 +305,7 @@ def _gate_errors(
                 )
         if content.get("layer") not in LAYER_ORDER:
             errors.append(f"{intent_id} has an unknown architecture layer {content.get('layer')!r}")
-        expected_responsibility = POLICY["responsibilities"].get(intent_id)
+        expected_responsibility = RESPONSIBILITIES.get(intent_id)
         if content.get("responsibility") != expected_responsibility:
             errors.append(f"{intent_id} responsibility drifted from reviewed architecture policy")
         if expected["kind"] == "semantic/module" and expected["change"] == "new":
@@ -438,23 +426,30 @@ def _added_scoped_import_edges(import_graph: dict[str, set[str]]) -> set[tuple[s
     return added
 
 
-def _bead_state() -> tuple[dict[str, str], set[str], bool]:
+def _bead_state() -> set[str]:
     statuses = _bead_statuses()
     owners = _plan_bead_owners()
     errors = []
-    for intent_id, expected in ELEMENT_EXPECTATIONS.items():
+    for intent_id, expected in POLICY["elements"].items():
         bead_id = expected["bead"]
         if not bead_id:
             continue
         if bead_id not in owners.get(intent_id, set()):
             errors.append(f"{intent_id} bead mapping disagrees with the plan: {bead_id}")
-        if bead_id not in statuses:
-            errors.append(f"missing bead status for {bead_id}")
+    unfinished = {bead for bead, status in statuses.items() if _is_unfinished(status)}
+    for phase, release_bead in (
+        (POLICY, "coclab-ff6fp.25"),
+        (PUBLICATION_POLICY, "coclab-results-publication-qwqse.8"),
+    ):
+        for entry in phase["elements"].values():
+            bead_id = entry["bead"]
+            if bead_id and bead_id not in statuses:
+                errors.append(f"missing bead status for {bead_id}")
+            if statuses.get(release_bead) in {"in_progress", "closed"}:
+                unfinished.discard(bead_id)
     if errors:
         raise AssertionError("\n".join(errors))
-    release_status = statuses.get("coclab-ff6fp.25")
-    unfinished = {bead for bead, status in statuses.items() if _is_unfinished(status)}
-    return statuses, unfinished, release_status in {"in_progress", "closed"}
+    return unfinished
 
 
 @pytest.fixture(scope="module")
@@ -468,7 +463,7 @@ def architecture_evidence() -> dict[str, Any]:
         "--repo",
         ".",
         "--input",
-        POLICY["reconcile_request"],
+        PUBLICATION_POLICY["reconcile_request"],
     )
     return {"scaffold": config, "view": view, "reconcile": reconcile["report"]}
 
@@ -486,7 +481,8 @@ def test_results_intent_is_valid_fresh_and_fully_reconciled(
     reconcile = architecture_evidence["reconcile"]
     batch = reconcile["batch"]
     current_view = architecture_evidence["view"]["view"]["view_witness"]
-    final_pin = json.loads((REPO_ROOT / POLICY["final_pin"]).read_text(encoding="utf-8"))
+    pin_path = REPO_ROOT / PUBLICATION_POLICY["final_pin"]
+    final_pin = json.loads(pin_path.read_text(encoding="utf-8"))
     assert final_pin["pinned"] is True
     assert final_pin["view_witness"] == current_view
     assert reconcile["view_witness"] == current_view
@@ -511,7 +507,7 @@ def test_results_intent_is_valid_fresh_and_fully_reconciled(
 def test_results_architecture_matches_intent_and_import_policy(
     architecture_evidence: dict[str, Any],
 ) -> None:
-    statuses, unfinished, final_release = _bead_state()
+    unfinished = _bead_state()
     intent = _intent_records()
     correspondence = {
         row["intent_element_id"]: row
@@ -529,14 +525,30 @@ def test_results_architecture_matches_intent_and_import_policy(
         import_graph=import_graph,
         added_import_edges=added_import_edges,
         unfinished_beads=unfinished,
-        final_release=final_release,
         added_paths=added_paths,
     )
     assert errors == [], "\n".join(errors)
 
-    pending = _active_pending_ids(ELEMENT_EXPECTATIONS, statuses, final_release=final_release)
-    for intent_id in pending:
-        assert ELEMENT_EXPECTATIONS[intent_id]["change"] == "new"
+
+def test_publication_intent_assigns_existing_and_new_modules_to_implementation_beads() -> None:
+    intent = _intent_records()
+    statuses = _bead_statuses()
+    publication_scope = {
+        key: record["content"]["publication"]
+        for key, record in intent.items()
+        if "publication" in record["content"]
+    }
+    expected_scope = PUBLICATION_POLICY["elements"] | PUBLICATION_POLICY["extensions"]
+    assert set(publication_scope) == set(expected_scope)
+    for intent_id, expected in expected_scope.items():
+        publication = publication_scope[intent_id]
+        assert publication["plan_bead"] == "coclab-results-publication-qwqse.1"
+        assert publication["implementation_bead"] == expected["bead"]
+        owners = publication.get("implementation_ownership", [expected["bead"]])
+        assert owners[0] == expected["bead"]
+        assert set(owners) <= statuses.keys()
+        if "import_prefixes" in expected:
+            assert publication["dependency_allowlist"] == expected["import_prefixes"]
 
 
 @pytest.mark.parametrize(

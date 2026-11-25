@@ -20,7 +20,8 @@ from enum import StrEnum
 from pathlib import PurePosixPath, PureWindowsPath
 from typing import Any
 
-BUNDLE_FORMAT_VERSION = "1.0"
+LEGACY_BUNDLE_FORMAT_VERSION = "1.0"
+BUNDLE_FORMAT_VERSION = "1.1"
 RESULTS_SCHEMA_VERSION = "1.0"
 LEDGER_SCHEMA_VERSION = "1.0"
 SHA256_PATTERN = re.compile(r"^[0-9a-f]{64}$")
@@ -463,10 +464,7 @@ class ResultsManifest:
     bundle_format_version: str = BUNDLE_FORMAT_VERSION
 
     def __post_init__(self) -> None:
-        if self.bundle_format_version != BUNDLE_FORMAT_VERSION:
-            raise ResultContractError(
-                f"unsupported bundle format version: {self.bundle_format_version!r}"
-            )
+        _validate_payload_version(self.bundle_format_version)
         _require_string(self.recipe_id, name="recipe_id")
         _require_string(self.run_id, name="run_id")
         _validate_timestamp(self.created_at, name="created_at")
@@ -1214,7 +1212,7 @@ def _validate_finding_evaluation(value: Mapping[str, Any], *, context: str) -> N
 
 
 def _validate_payload_version(value: Any) -> None:
-    if value != BUNDLE_FORMAT_VERSION:
+    if value not in (LEGACY_BUNDLE_FORMAT_VERSION, BUNDLE_FORMAT_VERSION):
         raise ResultContractError(f"unsupported bundle format version: {value!r}")
 
 

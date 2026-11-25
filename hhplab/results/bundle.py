@@ -15,9 +15,16 @@ import pandas as pd
 import pyarrow as pa
 import pyarrow.parquet as pq
 
-from hhplab.results.lineage import ArtifactLineage, distribution_plan
-from hhplab.schema.redistribution import ArtifactScope, SourceRedistribution
+from hhplab.results.lineage import ArtifactLineage, distribution_plan, permission_record
+from hhplab.schema.redistribution import (
+    ArtifactScope,
+    PermissionRecord,
+    PermissionSource,
+    SourceRedistribution,
+)
 from hhplab.schema.results import (
+    BUNDLE_FORMAT_VERSION,
+    LEGACY_BUNDLE_FORMAT_VERSION,
     AnalysisStatusRecord,
     InputIdentity,
     LockStatus,
@@ -60,6 +67,7 @@ RESERVED_PATHS = {
     "measures.json",
     "annotations.json",
     "withheld.json",
+    "permissions.json",
     "results/results.json",
     *RESULT_TABLE_PATHS.values(),
     "diagnostics.json",
@@ -113,6 +121,7 @@ class BundlePayload:
     report_payload: Mapping[str, Any]
     report_tables: Mapping[str, Sequence[Mapping[str, Any]]]
     report_lineage: ArtifactLineage
+    source_permissions: Mapping[str, PermissionSource] = field(default_factory=dict)
     input_measures: Mapping[str, Any] = field(default_factory=dict)
     measures: Mapping[str, Any] = field(default_factory=dict)
     lock_document: bytes | None = None
@@ -144,6 +153,10 @@ class BundleContents:
     execution: Mapping[str, Any]
     result_tables: Mapping[str, list[dict[str, Any]]]
     documents: Mapping[str, Any]
+    permissions: PermissionRecord | None
+    manifest_sha256: str
+    measures: Mapping[str, Any]
+    annotations: Mapping[str, Any]
 
     def load_replay_inputs(
         self,
@@ -210,6 +223,9 @@ class BundleWriter:
 
     def _write_new(self, payload: BundlePayload, written: list[str]) -> BundleWriteResult:
         files = _planned_files(payload)
+        source_terms = dict(payload.source_terms)
+        for source_id, permission in payload.source_permissions.items():
+            source_terms.setdefault(source_id, permission.terms)
         supplied_report_lineage = payload.report_lineage
         if supplied_report_lineage.path != "report/index.html":
             raise BundleError("report lineage path must be report/index.html")
@@ -247,13 +263,15 @@ class BundleWriter:
             sources=report_lineage.sources,
             scope=report_lineage.scope,
             replay_dependencies=report_lineage.replay_dependencies,
-            companions=tuple(dict.fromkeys((*report_lineage.companions, *report_table_paths))),
+            companions=tuple(
+                dict.fromkeys((*report_lineage.companions, *report_table_paths, "README.md"))
+            ),
         )
         policy_artifacts = [item["lineage"] for item in files]
         policy_artifacts.append(report_lineage)
         initial_plan = distribution_plan(
             policy_artifacts,
-            payload.source_terms,
+            source_terms,
             private=payload.private,
             allow_unknown_aggregates=payload.allow_unknown_aggregates,
         )
@@ -275,18 +293,34 @@ class BundleWriter:
         policy_artifacts.append(results_json_lineage)
         plan = distribution_plan(
             policy_artifacts,
-            payload.source_terms,
+            source_terms,
             private=payload.private,
             allow_unknown_aggregates=payload.allow_unknown_aggregates,
         )
         included = set(plan["included"])
         withheld = list(plan["withheld"])
         report_allowed = "report/index.html" in included
+        # Record the distribution decision for the full report and its
+        # companions. When denied, their status-only replacements carry no
+        # result values and the permission record grants no reuse of them.
+        permissions = permission_record(
+            policy_artifacts,
+            payload.source_permissions,
+            private=payload.private,
+            allow_unknown_aggregates=payload.allow_unknown_aggregates,
+            fallback_terms=source_terms,
+        )
         safe_annotations = _distribution_safe_annotations(
             payload.annotations, private=payload.private, withheld=withheld
         )
 
-        self._write_payload_metadata(payload, included, written, safe_annotations)
+        self._write_payload_metadata(
+            payload,
+            included,
+            written,
+            safe_annotations,
+            canonical_bytes(permissions.to_dict()),
+        )
         allowed_table_rows: dict[str, Sequence[Mapping[str, Any]]] = {}
         for name, rows in payload.result_tables.items():
             path = RESULT_TABLE_PATHS[name]
@@ -335,7 +369,11 @@ class BundleWriter:
             # A restricted run still publishes a status-only report. It contains
             # no protected analysis values, so its path is included even when
             # the full report is withheld by lineage policy.
-            withheld = [item for item in withheld if item.get("path") != "report/index.html"]
+            withheld = [
+                item
+                for item in withheld
+                if item.get("path") not in {"report/index.html", "README.md"}
+            ]
             report_payload = _status_only_report_payload(payload, withheld)
             report_html = render_report(report_payload).encode("utf-8")
             _write_new_file(self.bundle_dir, "report/index.html", report_html)
@@ -415,7 +453,10 @@ class BundleWriter:
         included: set[str],
         written: list[str],
         annotations_json_document: dict[str, Any] | None = None,
+        permissions_json_document: bytes | None = None,
     ) -> None:
+        if permissions_json_document is None:
+            raise BundleError("bundle format 1.1 requires a permissions record")
         recipe_dir = self.bundle_dir / "recipe"
         recipe_dir.mkdir(parents=True, exist_ok=True)
         core_files = {
@@ -429,6 +470,7 @@ class BundleWriter:
                 annotations_json_document
                 if annotations_json_document is not None else payload.annotations
             ),
+            "permissions.json": permissions_json_document,
         }
         if payload.lock_document is not None:
             core_files["recipe/lock.json"] = payload.lock_document
@@ -451,6 +493,56 @@ def write_bundle(bundle_dir: Path | str, payload: BundlePayload) -> BundleWriteR
     return BundleWriter(bundle_dir).write(payload)
 
 
+def read_bundle_permissions(
+    root: Path | str,
+    manifest: ResultsManifest,
+) -> PermissionRecord | None:
+    """Read the verified permission record shared by bundle and verifier paths.
+
+    Legacy 1.0 bundles have no permission record and return ``None``. Current
+    1.1 bundles must inventory exactly one valid ``permissions.json`` entry.
+    """
+    bundle_root = Path(root)
+    if manifest.bundle_format_version == LEGACY_BUNDLE_FORMAT_VERSION:
+        return None
+    if manifest.bundle_format_version != BUNDLE_FORMAT_VERSION:
+        raise BundleError(
+            f"unsupported bundle format version: {manifest.bundle_format_version!r}"
+        )
+    records = [item for item in manifest.files if item.get("path") == "permissions.json"]
+    if len(records) != 1:
+        raise BundleError("bundle format 1.1 requires exactly one inventoried permissions.json")
+    contents = _verify_inventory_record(bundle_root, records[0])
+    try:
+        document = json.loads(contents)
+        if not isinstance(document, Mapping):
+            raise BundleError("permissions.json must contain a JSON object")
+        permissions = PermissionRecord.from_dict(document)
+        if permissions.private != manifest.private:
+            raise BundleError("permissions policy private flag does not match the bundle manifest")
+        missing_parents = [
+            record["path"]
+            for record in manifest.files
+            if not permissions.parents_for_path(record["path"])
+        ]
+        if missing_parents:
+            raise BundleError(
+                "permissions.json has no artifact parent for inventoried path(s): "
+                f"{sorted(missing_parents)}"
+            )
+        return permissions
+    except BundleError:
+        raise
+    except (
+        UnicodeDecodeError,
+        json.JSONDecodeError,
+        ResultContractError,
+        TypeError,
+        ValueError,
+    ) as exc:
+        raise BundleError(f"invalid permissions.json: {type(exc).__name__}: {exc}") from exc
+
+
 def read_bundle(bundle_dir: Path | str, *, verify: bool = True) -> BundleContents:
     """Read and validate a bundle using only paths relative to its root."""
     root = Path(bundle_dir)
@@ -471,6 +563,14 @@ def read_bundle(bundle_dir: Path | str, *, verify: bool = True) -> BundleContent
             raise BundleError("manifest.sha256 does not match manifest.json")
         if verify:
             _verify_inventory(root, manifest)
+        permissions = read_bundle_permissions(root, manifest)
+        require_phase_a_documents = manifest.bundle_format_version == BUNDLE_FORMAT_VERSION
+        measures = _read_inventoried_json(
+            root, manifest, "measures.json", required=require_phase_a_documents
+        )
+        annotations = _read_inventoried_json(
+            root, manifest, "annotations.json", required=require_phase_a_documents
+        )
         resolved_spec = _read_json(root, "recipe/resolved.json")
         execution = _read_json(root, "recipe/execution.json")
         results_path = root / "results/results.json"
@@ -492,7 +592,20 @@ def read_bundle(bundle_dir: Path | str, *, verify: bool = True) -> BundleContent
             candidate = root / path
             if candidate.is_file():
                 documents[path] = json.loads(candidate.read_bytes())
-        return BundleContents(root, manifest, resolved_spec, execution, tables, documents)
+        if permissions is not None:
+            documents["permissions.json"] = permissions.to_dict()
+        return BundleContents(
+            bundle_dir=root,
+            manifest=manifest,
+            resolved_spec=resolved_spec,
+            execution=execution,
+            result_tables=tables,
+            documents=documents,
+            permissions=permissions,
+            manifest_sha256=expected_manifest_digest,
+            measures=measures,
+            annotations=annotations,
+        )
     except BundleError:
         raise
     except (OSError, ValueError, TypeError, ResultContractError) as exc:
@@ -506,6 +619,7 @@ def _planned_files(payload: BundlePayload) -> list[dict[str, Any]]:
         "recipe/execution.json",
         "measures.json",
         "annotations.json",
+        "permissions.json",
     }
     if payload.lock_document is not None:
         paths.add("recipe/lock.json")
@@ -520,7 +634,7 @@ def _planned_files(payload: BundlePayload) -> list[dict[str, Any]]:
         if artifact.path in paths:
             raise BundleError(f"duplicate bundle artifact path: {artifact.path!r}")
         paths.add(artifact.path)
-    if len(payload.artifacts) != len(paths) - (6 if payload.lock_document is not None else 5):
+    if len(payload.artifacts) != len(paths) - (7 if payload.lock_document is not None else 6):
         raise BundleError("bundle artifact paths must be unique")
 
     artifacts.extend(_result_table_lineages(payload).values())
@@ -534,6 +648,7 @@ def _planned_files(payload: BundlePayload) -> list[dict[str, Any]]:
             ),
         )
     )
+    artifacts.append(ArtifactLineage("withheld.json", (), ArtifactScope.SAMPLE))
     artifacts.extend(item.lineage for item in payload.artifacts)
     artifacts.extend(
         ArtifactLineage(path, (), ArtifactScope.SAMPLE)
@@ -543,6 +658,7 @@ def _planned_files(payload: BundlePayload) -> list[dict[str, Any]]:
             "recipe/execution.json",
             "measures.json",
             "annotations.json",
+            "permissions.json",
             "recipe/lock.json",
         )
         if path != "recipe/lock.json" or payload.lock_document is not None
@@ -578,6 +694,30 @@ def _validate_payload(payload: BundlePayload) -> None:
         payload.allow_unknown_aggregates, bool
     ):
         raise BundleError("distribution overrides must be boolean")
+    if not isinstance(payload.source_terms, Mapping):
+        raise BundleError("source_terms must be a mapping")
+    if any(
+        not isinstance(source_id, str)
+        or not source_id
+        or not isinstance(terms, SourceRedistribution)
+        for source_id, terms in payload.source_terms.items()
+    ):
+        raise BundleError(
+            "source_terms must map non-empty source IDs to SourceRedistribution values"
+        )
+    if not isinstance(payload.source_permissions, Mapping) or any(
+        not isinstance(permission, PermissionSource)
+        for permission in payload.source_permissions.values()
+    ):
+        raise BundleError("source_permissions must map source IDs to PermissionSource values")
+    for source_id, permission in payload.source_permissions.items():
+        if not isinstance(source_id, str) or not source_id:
+            raise BundleError("source_permissions keys must be non-empty source IDs")
+        if (
+            source_id in payload.source_terms
+            and payload.source_terms[source_id] != permission.terms
+        ):
+            raise BundleError(f"source term mismatch for {source_id!r}")
     missing_tables = set(RESULT_TABLE_NAMES) - set(payload.result_tables)
     unknown_tables = set(payload.result_tables) - set(RESULT_TABLE_NAMES)
     if missing_tables or unknown_tables:
@@ -622,6 +762,7 @@ def _validate_payload(payload: BundlePayload) -> None:
     if not isinstance(payload.tolerance, Tolerance):
         raise BundleError("tolerance must be a Tolerance value")
     _validate_relative_path("recipe/original.yaml")
+    _planned_files(payload)
 
 
 def _validate_site_universe_payload(payload: BundlePayload) -> None:
@@ -712,7 +853,7 @@ def _result_table_parquet(name: str, rows: Sequence[Mapping[str, Any]]) -> bytes
     provenance = ProvenanceBlock(
         extra={
             "dataset_type": "results_bundle_table",
-            "bundle_format_version": "1.0",
+            "bundle_format_version": BUNDLE_FORMAT_VERSION,
             "table": name,
             "columns": list(columns),
             "row_count": len(rows),
@@ -740,12 +881,47 @@ def _verify_inventory(root: Path, manifest: ResultsManifest) -> None:
             f"missing={sorted(expected - actual)}, extra={sorted(actual - expected)}"
         )
     for record in manifest.files:
-        path = _contained_path(root, record["path"])
+        _verify_inventory_record(root, record)
+
+
+def _verify_inventory_record(root: Path, record: Mapping[str, Any]) -> bytes:
+    """Read one manifest-listed file and validate its exact inventory entry."""
+    relative_path = record.get("path")
+    if not isinstance(relative_path, str):
+        raise BundleError("bundle inventory record path must be a string")
+    path = _contained_path(root, relative_path)
+    try:
         contents = path.read_bytes()
-        if len(contents) != record["bytes"]:
-            raise BundleError(f"bundle file byte count mismatch: {record['path']}")
-        if hashlib.sha256(contents).hexdigest() != record["sha256"]:
-            raise BundleError(f"bundle file hash mismatch: {record['path']}")
+    except OSError as exc:
+        raise BundleError(f"bundle inventory file is missing: {relative_path}") from exc
+    if len(contents) != record.get("bytes"):
+        raise BundleError(f"bundle file byte count mismatch: {relative_path}")
+    if hashlib.sha256(contents).hexdigest() != record.get("sha256"):
+        raise BundleError(f"bundle file hash mismatch: {relative_path}")
+    return contents
+
+
+def _read_inventoried_json(
+    root: Path,
+    manifest: ResultsManifest,
+    relative_path: str,
+    *,
+    required: bool = True,
+) -> Mapping[str, Any]:
+    records = [item for item in manifest.files if item.get("path") == relative_path]
+    if not records and not required:
+        return {}
+    if len(records) != 1:
+        raise BundleError(f"bundle requires exactly one inventoried {relative_path}")
+    try:
+        document = json.loads(_verify_inventory_record(root, records[0]))
+    except BundleError:
+        raise
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise BundleError(f"invalid {relative_path}: {type(exc).__name__}: {exc}") from exc
+    if not isinstance(document, Mapping):
+        raise BundleError(f"{relative_path} must contain a JSON object")
+    return document
 
 
 def _reject_symlinks(root: Path) -> None:
@@ -826,7 +1002,14 @@ def _role_for_path(path: str) -> str:
         return "table"
     if path.startswith("recipe/"):
         return "recipe"
-    if path in {"diagnostics.json", "findings.json", "withheld.json", "measures.json"}:
+    if path in {
+        "diagnostics.json",
+        "findings.json",
+        "withheld.json",
+        "measures.json",
+        "annotations.json",
+        "permissions.json",
+    }:
         return "metadata"
     if path.startswith("environment/"):
         return "environment"

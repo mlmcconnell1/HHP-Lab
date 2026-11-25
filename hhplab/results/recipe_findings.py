@@ -242,8 +242,14 @@ def _evaluate_instance(
         references=references,
         planned_result_keys=planned_result_keys,
     )
+    bands = [
+        {key: value for key, value in band.items() if key != "public_verdict"}
+        if isinstance(band, Mapping) and "public_verdict" in band
+        else band
+        for band in declaration["bands"]
+    ]
     return evaluate_bands(
-        declaration["bands"],
+        bands,
         criteria,
         reference_values=declaration.get("reference_values", ()),
         otherwise=declaration.get("otherwise", "inconclusive"),

@@ -41,9 +41,9 @@ from hhplab.results.bundle import BundleArtifact, BundlePayload, write_bundle
 from hhplab.results.diagnostics import column_identity, linear_identity
 from hhplab.results.lineage import (
     ArtifactLineage,
-    declared_source_terms,
     derive_lineage,
     descriptive_scope,
+    resolve_permission_sources,
     union_lineage,
 )
 from hhplab.results.recipe_findings import evaluate_findings
@@ -2075,7 +2075,11 @@ def _bundle_payload(
     source_ids = {source for panel in plan.panels for source in panel.source_ids}
     if plan.site_universe is not None:
         source_ids.add(str(plan.site_universe["artifact_id"]))
-    source_terms = declared_source_terms(source_ids)
+    source_permissions = resolve_permission_sources(source_ids)
+    source_terms = {
+        source_id: permission.terms
+        for source_id, permission in source_permissions.items()
+    }
     content_hashes = {}
     for panel_plan in plan.panels:
         frame = frames.get(panel_plan.name)
@@ -2359,6 +2363,7 @@ def _bundle_payload(
         result_tables=result_tables,
         result_table_lineage=result_table_lineage,
         source_terms=source_terms,
+        source_permissions=source_permissions,
         report_payload=report_payload,
         report_tables=result_tables,
         report_lineage=ArtifactLineage(

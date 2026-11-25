@@ -8,13 +8,20 @@ from __future__ import annotations
 
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
+from typing import Any
 
 from hhplab.covariates.catalog import COVARIATE_SOURCE_SPECS
 from hhplab.registry.source_registry import SourceRegistryEntry
 from hhplab.schema.redistribution import (
+    SMALL_GROUP_THRESHOLD,
     UNKNOWN_TERMS,
     ArtifactDisposition,
     ArtifactScope,
+    PermissionArtifact,
+    PermissionRecord,
+    PermissionSource,
+    PermissionTermsOrigin,
+    RedistributionEvidence,
     SourceRedistribution,
     artifact_disposition,
     combine_source_terms,
@@ -32,26 +39,169 @@ def declared_source_terms(
     Missing registry terms do not override a reviewed product declaration.
     """
     entries = registry_entries or {}
-    terms = {}
-    for source_id in source_ids:
-        entry = entries.get(source_id)
-        if entry is not None and "redistribution" in entry.metadata:
-            terms[source_id] = entry.redistribution
+    return {
+        source_id: _resolve_source_declaration(source_id, entries)[0]
+        for source_id in source_ids
+    }
+
+
+def _resolve_source_declaration(
+    source_id: str,
+    registry_entries: Mapping[str, SourceRegistryEntry],
+    *,
+    include_evidence: bool = False,
+) -> tuple[SourceRedistribution, PermissionTermsOrigin, tuple[Any, ...]]:
+    """Select the single shared registry/catalog/default declaration branch."""
+    entry = registry_entries.get(source_id)
+    if entry is not None and "redistribution" in entry.metadata:
+        evidence = tuple(entry.redistribution_evidence) if include_evidence else ()
+        return entry.redistribution, PermissionTermsOrigin.REGISTRY, evidence
+
+    spec = CORE_SOURCE_COVERAGE_SPECS.get(source_id) or COVARIATE_SOURCE_SPECS.get(source_id)
+    if spec is not None:
+        evidence = tuple(spec.redistribution_evidence) if include_evidence else ()
+        return spec.redistribution, PermissionTermsOrigin.CATALOG, evidence
+
+    candidates = [
+        item
+        for item in (*CORE_SOURCE_COVERAGE_SPECS.values(), *COVARIATE_SOURCE_SPECS.values())
+        if source_id == f"{item.provider}/{item.product}"
+    ]
+    if candidates:
+        terms = combine_source_terms(
+            {str(index): item.redistribution for index, item in enumerate(candidates)}
+        )
+        evidence = (
+            tuple(
+                evidence
+                for item in candidates
+                for evidence in item.redistribution_evidence
+            )
+            if include_evidence
+            else ()
+        )
+        return terms, PermissionTermsOrigin.CATALOG, evidence
+    return UNKNOWN_TERMS, PermissionTermsOrigin.DEFAULT_UNKNOWN, ()
+
+
+def resolve_permission_sources(
+    source_ids: Iterable[str],
+    registry_entries: Mapping[str, SourceRegistryEntry] | None = None,
+    direct_terms: Mapping[str, SourceRedistribution] | None = None,
+) -> dict[str, PermissionSource]:
+    """Resolve terms and evidence for an exact set of source identities.
+
+    Bare direct terms retain their values for the written-disposition record,
+    but have default-unknown provenance and no evidence. They therefore never
+    establish publication permission by themselves.
+    """
+    entries = registry_entries or {}
+    direct = direct_terms or {}
+    resolved: dict[str, PermissionSource] = {}
+    requested = tuple(source_ids)
+    for source_id in requested:
+        if not isinstance(source_id, str) or not source_id.strip():
+            raise ResultContractError("source ids must be non-empty strings")
+    for source_id in sorted(set(requested)):
+        if source_id in direct:
+            terms = direct[source_id]
+            if not isinstance(terms, SourceRedistribution):
+                raise ResultContractError("direct source terms must be SourceRedistribution values")
+            resolved[source_id] = _permission_source(
+                terms, PermissionTermsOrigin.DEFAULT_UNKNOWN, ()
+            )
             continue
-        spec = CORE_SOURCE_COVERAGE_SPECS.get(source_id) or COVARIATE_SOURCE_SPECS.get(source_id)
-        if spec is None:
-            candidates = [
-                item
-                for item in (*CORE_SOURCE_COVERAGE_SPECS.values(), *COVARIATE_SOURCE_SPECS.values())
-                if source_id == f"{item.provider}/{item.product}"
-            ]
-            if candidates:
-                terms[source_id] = combine_source_terms(
-                    {str(i): item.redistribution for i, item in enumerate(candidates)}
+
+        terms, origin, evidence = _resolve_source_declaration(
+            source_id, entries, include_evidence=True
+        )
+        resolved[source_id] = _permission_source(
+            terms, origin, tuple(dict.fromkeys(_evidence_records(evidence)))
+        )
+    return resolved
+
+
+def permission_record(
+    artifacts: Iterable[ArtifactLineage],
+    source_permissions: Mapping[str, PermissionSource],
+    *,
+    private: bool = False,
+    allow_unknown_aggregates: bool = False,
+    fallback_terms: Mapping[str, SourceRedistribution] | None = None,
+) -> PermissionRecord:
+    """Freeze source terms, evidence and both distribution decisions."""
+    source_map = dict(source_permissions)
+    fallback = fallback_terms or {}
+    policy_artifacts: list[PermissionArtifact] = []
+    used_sources: set[str] = set()
+    for artifact in artifacts:
+        if not isinstance(artifact, ArtifactLineage):
+            raise ResultContractError("permission record artifacts must be ArtifactLineage values")
+        sources = tuple(sorted(set(artifact.sources))) or ("unknown-artifact",)
+        used_sources.update(sources)
+        for source_id in sources:
+            if source_id not in source_map:
+                terms = fallback.get(source_id, UNKNOWN_TERMS)
+                if not isinstance(terms, SourceRedistribution):
+                    raise ResultContractError(
+                        "fallback source terms must be SourceRedistribution values"
+                    )
+                source_map[source_id] = _permission_source(
+                    terms, PermissionTermsOrigin.DEFAULT_UNKNOWN, ()
                 )
-                continue
-        terms[source_id] = UNKNOWN_TERMS if spec is None else spec.redistribution
-    return terms
+        combined = combine_source_terms(
+            {source_id: source_map[source_id].terms for source_id in sources}
+        )
+        policy_artifacts.append(
+            PermissionArtifact(
+                path=artifact.path,
+                scope=artifact.scope,
+                sources=sources,
+                combined_terms=combined,
+                strict_disposition=artifact_disposition(
+                    combined,
+                    scope=artifact.scope,
+                    private=False,
+                    allow_unknown_aggregates=False,
+                ),
+                written_disposition=artifact_disposition(
+                    combined,
+                    scope=artifact.scope,
+                    private=private,
+                    allow_unknown_aggregates=allow_unknown_aggregates,
+                ),
+                companions=tuple(sorted(set(artifact.companions))),
+            )
+        )
+    exact_sources = {source_id: source_map[source_id] for source_id in sorted(used_sources)}
+    return PermissionRecord(
+        sources=exact_sources,
+        artifacts=tuple(sorted(policy_artifacts, key=lambda item: item.path)),
+        private=private,
+        allow_unknown_aggregates=allow_unknown_aggregates,
+    )
+
+
+def _permission_source(
+    terms: SourceRedistribution,
+    origin: PermissionTermsOrigin,
+    evidence: tuple[RedistributionEvidence, ...],
+) -> PermissionSource:
+    if not isinstance(terms, SourceRedistribution):
+        raise ResultContractError("resolved terms must be SourceRedistribution values")
+    return PermissionSource(terms.row_level, terms.aggregate, origin, evidence)
+
+
+def _evidence_records(values: Iterable[Any]) -> tuple[RedistributionEvidence, ...]:
+    evidence: list[RedistributionEvidence] = []
+    for value in values:
+        if isinstance(value, RedistributionEvidence):
+            evidence.append(value)
+        elif isinstance(value, Mapping):
+            evidence.append(RedistributionEvidence.from_dict(value))
+        else:
+            raise ResultContractError("source redistribution evidence has an invalid shape")
+    return tuple(evidence)
 
 
 def union_lineage(columns: Iterable[str], lineage: Mapping[str, Iterable[str]]) -> tuple[str, ...]:
@@ -101,7 +251,11 @@ def descriptive_scope(statistic: str, group_rows: int) -> ArtifactScope:
         "percentile",
     }
     sensitive = sensitive or statistic.startswith(("quantile_", "percentile_"))
-    return ArtifactScope.ROW_LEVEL if sensitive and group_rows < 10 else ArtifactScope.AGGREGATE
+    return (
+        ArtifactScope.ROW_LEVEL
+        if sensitive and group_rows < SMALL_GROUP_THRESHOLD
+        else ArtifactScope.AGGREGATE
+    )
 
 
 @dataclass(frozen=True)

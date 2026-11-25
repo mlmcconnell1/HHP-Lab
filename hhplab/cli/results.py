@@ -15,11 +15,18 @@ from hhplab.schema.results import canonical_json
 from hhplab.storage.config import load_config
 from hhplab.storage.run_ledger import RunLedger
 
-results_app = typer.Typer(help="Check, run, lock, inspect and verify reproducible results.")
+results_app = typer.Typer(help="Check, run, verify and publish reproducible results.")
 RecipeOption = Annotated[Path, typer.Option("--recipe", "-r", help="RecipeV2 YAML file.")]
 JsonOption = Annotated[bool, typer.Option("--json", help="Emit structured JSON.")]
 RootOption = Annotated[Path | None, typer.Option("--outputs-root", help="Results and ledger root.")]
 NonInteractive = Annotated[bool, typer.Option("--non-interactive", help="Run without prompts.")]
+PublicationOption = Annotated[Path, typer.Option("--publication", help="Publication YAML file.")]
+DestinationOption = Annotated[Path, typer.Option("--dest", help="Site content directory.")]
+PublicBundleOption = Annotated[Path | None, typer.Option("--public-bundle")]
+BundleOption = Annotated[Path | None, typer.Option("--bundle", help="Portable results bundle.")]
+StrictOption = Annotated[bool, typer.Option("--strict", help="Treat narrative lint as an error.")]
+SkipReproduceOption = Annotated[bool, typer.Option("--skip-reproduce")]
+ReplayFailureOption = Annotated[bool, typer.Option("--allow-reproducibility-failure")]
 
 
 def _load(path: Path):
@@ -170,3 +177,104 @@ def verify_cmd(
         _error(exc, use_json)
     _emit(report.to_dict(), use_json)
     raise typer.Exit(report.exit_code)
+
+
+def _publish_command(
+    publication: Path,
+    dest: Path,
+    use_json: bool,
+    *,
+    bundle: Path | None,
+    public_bundle: Path | None,
+    strict: bool,
+    skip_reproduce: bool,
+    allow_reproducibility_failure: bool,
+    dry_run: bool,
+) -> None:
+    from hhplab.results.publish import PublicationError, publish
+
+    try:
+        result = publish(
+            publication,
+            dest,
+            bundle=bundle,
+            public_bundle=public_bundle,
+            strict=strict,
+            skip_reproduce=skip_reproduce,
+            allow_reproducibility_failure=allow_reproducibility_failure,
+            dry_run=dry_run,
+        )
+    except (OSError, PublicationError) as exc:
+        _publication_error(exc, use_json)
+    _emit(result, use_json)
+
+
+def _publication_error(exc: Exception, use_json: bool) -> None:
+    _emit(
+        {
+            "status": "error",
+            "code": getattr(exc, "code", "publication_io_error"),
+            "error": (
+                "Could not access the publication source or destination."
+                if isinstance(exc, OSError) else str(exc)
+            ),
+            "findings": [],
+            "warnings": [],
+        },
+        use_json,
+    )
+    raise typer.Exit(2) from exc
+
+
+@results_app.command("publish")
+def publish_cmd(
+    publication: PublicationOption,
+    dest: DestinationOption,
+    bundle: BundleOption = None,
+    public_bundle: PublicBundleOption = None,
+    strict: StrictOption = False,
+    skip_reproduce: SkipReproduceOption = False,
+    allow_reproducibility_failure: ReplayFailureOption = False,
+    dry_run: Annotated[bool, typer.Option("--dry-run")] = False,
+    use_json: JsonOption = False,
+    non_interactive: NonInteractive = False,
+) -> None:
+    _publish_command(
+        publication, dest, use_json, bundle=bundle, public_bundle=public_bundle,
+        strict=strict, skip_reproduce=skip_reproduce,
+        allow_reproducibility_failure=allow_reproducibility_failure, dry_run=dry_run,
+    )
+
+
+@results_app.command("publish-check")
+def publish_check_cmd(
+    publication: PublicationOption,
+    dest: DestinationOption,
+    bundle: BundleOption = None,
+    public_bundle: PublicBundleOption = None,
+    strict: StrictOption = False,
+    skip_reproduce: SkipReproduceOption = False,
+    allow_reproducibility_failure: ReplayFailureOption = False,
+    use_json: JsonOption = False,
+    non_interactive: NonInteractive = False,
+) -> None:
+    _publish_command(
+        publication, dest, use_json, bundle=bundle, public_bundle=public_bundle,
+        strict=strict, skip_reproduce=skip_reproduce,
+        allow_reproducibility_failure=allow_reproducibility_failure, dry_run=True,
+    )
+
+
+@results_app.command("publish-index")
+def publish_index_cmd(
+    dest: DestinationOption,
+    use_json: JsonOption = False,
+    non_interactive: NonInteractive = False,
+) -> None:
+    from hhplab.results.publish import PublicationError, publish_index
+
+    try:
+        result = publish_index(dest)
+    except (OSError, PublicationError) as exc:
+        _publication_error(exc, use_json)
+    _emit(result, use_json)
