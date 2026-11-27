@@ -1,0 +1,564 @@
+msa_id,msa_name,first_year,last_year,frozen_coc_ids,working_scope_status,strict_boundary_subset,earlier_study_holdout,residual_scope_endpoints,scope_still_to_review,scope_review_question,unemployment_comparison,unemployment_month_count,count_method_change,count_method_evidence,pit_classification_flag,pit_count_sensitivity,bed_count_sensitivity,bed_count_sensitivity_evidence,targeted_review
+11460,"Ann Arbor, MI",2015,2016,MI-509,accepted_with_map_uncertainty,false,,MI-509/2015 | MI-509/2016,,,full_year,12,,,,,,,false
+11460,"Ann Arbor, MI",2016,2017,MI-509,accepted_with_map_uncertainty,false,,MI-509/2016 | MI-509/2017,,,full_year,12,,,,,,,false
+11460,"Ann Arbor, MI",2017,2018,MI-509,accepted_with_map_uncertainty,false,,MI-509/2017 | MI-509/2018,,,full_year,12,,,,,,,false
+11460,"Ann Arbor, MI",2018,2019,MI-509,accepted_with_map_uncertainty,false,,MI-509/2018 | MI-509/2019,,,full_year,12,,,,,,,false
+11460,"Ann Arbor, MI",2019,2020,MI-509,accepted_with_map_uncertainty,false,,MI-509/2019 | MI-509/2020,,,full_year,12,,,,,,,false
+11460,"Ann Arbor, MI",2022,2023,MI-509,accepted_on_prior_review,true,,,,,full_year,12,,,,,,,false
+11460,"Ann Arbor, MI",2023,2024,MI-509,accepted_on_prior_review,true,,,,,full_year,12,,,,,,,false
+11460,"Ann Arbor, MI",2024,2025,MI-509,accepted_with_map_uncertainty,false,,MI-509/2025,,,matched_months_excluding_october,11,,,,,Year-round beds fall from 392 to 346 while 119 seasonal beds appear in 2025. Test sensitivity to the shift between regular and seasonal capacity.,https://files.hudexchange.info/reports/published/CoC_HIC_CoC_MI-509-2024_MI_2024.pdf | https://files.hudexchange.info/reports/published/CoC_HIC_CoC_MI-509-2025_MI_2025.pdf,true
+12540,"Bakersfield-Delano, CA",2013,2014,CA-604,accepted_with_map_uncertainty,false,,CA-604/2013 | CA-604/2014,,,full_year,12,,,,,,,false
+12540,"Bakersfield-Delano, CA",2014,2015,CA-604,accepted_with_map_uncertainty,false,,CA-604/2014 | CA-604/2015,,,full_year,12,,,,,,,false
+12540,"Bakersfield-Delano, CA",2015,2016,CA-604,accepted_with_map_uncertainty,false,,CA-604/2015 | CA-604/2016,,,full_year,12,,,,,,,false
+12540,"Bakersfield-Delano, CA",2016,2017,CA-604,accepted_with_map_uncertainty,false,,CA-604/2016 | CA-604/2017,,,full_year,12,,,,,,,false
+12540,"Bakersfield-Delano, CA",2017,2018,CA-604,accepted_with_map_uncertainty,false,,CA-604/2017 | CA-604/2018,,,full_year,12,,,,,,,false
+12540,"Bakersfield-Delano, CA",2018,2019,CA-604,accepted_with_map_uncertainty,false,,CA-604/2018 | CA-604/2019,,,full_year,12,,,,,,,false
+12540,"Bakersfield-Delano, CA",2019,2020,CA-604,accepted_with_map_uncertainty,false,,CA-604/2019 | CA-604/2020,,,full_year,12,,,,,,,false
+12540,"Bakersfield-Delano, CA",2022,2023,CA-604,accepted_on_prior_review,true,,,,,full_year,12,,,,,,,false
+12540,"Bakersfield-Delano, CA",2023,2024,CA-604,accepted_on_prior_review,true,,,,,full_year,12,,,,,,,false
+12540,"Bakersfield-Delano, CA",2024,2025,CA-604,accepted_with_map_uncertainty,false,,CA-604/2025,,,matched_months_excluding_october,11,,,,,,,true
+12980,"Battle Creek, MI",2013,2014,MI-514,joint_review,false,,,MI-514/2013 | MI-514/2014,Unresolved larger geographic signal at 2014–2015.,full_year,12,,,,,,,false
+12980,"Battle Creek, MI",2014,2015,MI-514,joint_review,false,,MI-514/2015,MI-514/2014,Unresolved larger geographic signal at 2014–2015.,full_year,12,,,,,,,false
+12980,"Battle Creek, MI",2015,2016,MI-514,accepted_with_map_uncertainty,false,,MI-514/2015 | MI-514/2016,,,full_year,12,,,,,,,false
+12980,"Battle Creek, MI",2016,2017,MI-514,accepted_with_map_uncertainty,false,,MI-514/2016 | MI-514/2017,,,full_year,12,,,,,,,false
+12980,"Battle Creek, MI",2017,2018,MI-514,accepted_with_map_uncertainty,false,,MI-514/2017 | MI-514/2018,,,full_year,12,,,,,,,false
+12980,"Battle Creek, MI",2018,2019,MI-514,accepted_with_map_uncertainty,false,,MI-514/2018 | MI-514/2019,,,full_year,12,,,,,,,false
+12980,"Battle Creek, MI",2019,2020,MI-514,accepted_with_map_uncertainty,false,,MI-514/2019 | MI-514/2020,,,full_year,12,,,,,,,false
+12980,"Battle Creek, MI",2022,2023,MI-514,accepted_on_prior_review,true,,,,,full_year,12,,,,,,,false
+12980,"Battle Creek, MI",2023,2024,MI-514,accepted_on_prior_review,true,,,,,full_year,12,,,,,,,false
+12980,"Battle Creek, MI",2024,2025,MI-514,accepted_with_map_uncertainty,false,,MI-514/2025,,,matched_months_excluding_october,11,,,,,"The Battle Creek Homeless Shelter closed in May 2024, removing 58 year-round emergency beds. Transitional housing gained 29 beds, leaving a year-round decline from 267 to 238. Reported overflow/voucher beds rose from 2 to 26. Including them in the sensitivity check gives 269 to 264 beds, a decline of 5.",https://www.battlecreekmi.gov/DocumentCenter/View/15958/2025--2029-Consolidated-Plan---Final-Version---July-31-2025#page=80 | https://files.hudexchange.info/reports/published/CoC_HIC_CoC_MI-514-2024_MI_2024.pdf | https://files.hudexchange.info/reports/published/CoC_HIC_CoC_MI-514-2025_MI_2025.pdf,true
+13460,"Bend, OR",2010,2011,OR-503,accepted_with_map_uncertainty,false,,OR-503/2010 | OR-503/2011,,,full_year,12,,,,,,,false
+13460,"Bend, OR",2017,2018,OR-503,accepted_with_map_uncertainty,false,,OR-503/2017 | OR-503/2018,,,full_year,12,,,,,,,false
+13460,"Bend, OR",2018,2019,OR-503,accepted_with_map_uncertainty,false,,OR-503/2018 | OR-503/2019,,,full_year,12,,,,,,,false
+13460,"Bend, OR",2022,2023,OR-503,accepted_with_map_uncertainty,false,,OR-503/2022,,,full_year,12,,,,,,,false
+13460,"Bend, OR",2023,2024,OR-503,accepted_on_prior_review,true,,,,,full_year,12,,,,,,,false
+13460,"Bend, OR",2024,2025,OR-503,accepted_with_map_uncertainty,false,,OR-503/2025,,,matched_months_excluding_october,11,,,,,"In 2025, 91 overflow/voucher beds appear alongside 20 seasonal beds in both years, while year-round beds rise from 719 to 739. Test sensitivity to the extra temporary inventory.",https://files.hudexchange.info/reports/published/CoC_HIC_CoC_OR-503-2024_OR_2024.pdf | https://files.hudexchange.info/reports/published/CoC_HIC_CoC_OR-503-2025_OR_2025.pdf,true
+14860,"Bridgeport-Stamford-Danbury, CT",2022,2023,CT-503,joint_review,false,Bridgeport CT-503 reporting footprint,,CT-503/2022 | CT-503/2023,Bridgeport reporting towns around the Connecticut planning-region change | Earlier study holdout: Bridgeport CT-503 reporting footprint.,full_year,12,,,,,,,false
+14860,"Bridgeport-Stamford-Danbury, CT",2023,2024,CT-503,joint_review,false,Bridgeport CT-503 reporting footprint,,CT-503/2023 | CT-503/2024,Bridgeport reporting towns around the Connecticut planning-region change | Earlier study holdout: Bridgeport CT-503 reporting footprint.,full_year,12,,,,,,,false
+14860,"Bridgeport-Stamford-Danbury, CT",2024,2025,CT-503,joint_review,false,Bridgeport CT-503 reporting footprint,,CT-503/2024 | CT-503/2025,Bridgeport reporting towns around the Connecticut planning-region change | Earlier study holdout: Bridgeport CT-503 reporting footprint.,matched_months_excluding_october,11,,,,,,,false
+15980,"Cape Coral-Fort Myers, FL",2010,2011,FL-603,accepted_with_map_uncertainty,false,,FL-603/2010 | FL-603/2011,,,full_year,12,,,,,,,false
+15980,"Cape Coral-Fort Myers, FL",2011,2012,FL-603,accepted_with_map_uncertainty,false,,FL-603/2011 | FL-603/2012,,,full_year,12,,,,,,,false
+15980,"Cape Coral-Fort Myers, FL",2012,2013,FL-603,accepted_with_map_uncertainty,false,,FL-603/2012 | FL-603/2013,,,full_year,12,,,,,,,false
+15980,"Cape Coral-Fort Myers, FL",2013,2014,FL-603,accepted_with_map_uncertainty,false,,FL-603/2013 | FL-603/2014,,,full_year,12,,,,,,,false
+15980,"Cape Coral-Fort Myers, FL",2014,2015,FL-603,accepted_with_map_uncertainty,false,,FL-603/2014 | FL-603/2015,,,full_year,12,,,,,,,false
+15980,"Cape Coral-Fort Myers, FL",2015,2016,FL-603,accepted_with_map_uncertainty,false,,FL-603/2015 | FL-603/2016,,,full_year,12,,,,,,,false
+15980,"Cape Coral-Fort Myers, FL",2016,2017,FL-603,accepted_with_map_uncertainty,false,,FL-603/2016 | FL-603/2017,,,full_year,12,,,,,,,false
+15980,"Cape Coral-Fort Myers, FL",2017,2018,FL-603,accepted_with_map_uncertainty,false,,FL-603/2017 | FL-603/2018,,,full_year,12,,,,,,,false
+15980,"Cape Coral-Fort Myers, FL",2018,2019,FL-603,accepted_with_map_uncertainty,false,,FL-603/2018 | FL-603/2019,,,full_year,12,,,,,,,false
+15980,"Cape Coral-Fort Myers, FL",2019,2020,FL-603,accepted_with_map_uncertainty,false,,FL-603/2019 | FL-603/2020,,,full_year,12,,,,,,,false
+15980,"Cape Coral-Fort Myers, FL",2022,2023,FL-603,accepted_with_map_uncertainty,false,,FL-603/2022,,,full_year,12,,,,,,,false
+15980,"Cape Coral-Fort Myers, FL",2023,2024,FL-603,accepted_on_prior_review,true,,,,,full_year,12,,,,,,,false
+15980,"Cape Coral-Fort Myers, FL",2024,2025,FL-603,accepted_with_map_uncertainty,false,,FL-603/2025,,,matched_months_excluding_october,11,,,,,"Year-round beds fall from 336 to 300. A 72-bed triage line is absent in 2025, Rescue Mission falls from 76 to 29, and St. Matthew’s House appears with 65. Test sensitivity to the project inventory changes where coverage and actual capacity may differ. Under the approved same-facility assumption, assign the Fort Myers shelter to Lee using its published 65-bed entry and remove the corresponding 68-bed entry from the Collier working total.",https://files.hudexchange.info/reports/published/CoC_HIC_CoC_FL-603-2024_FL_2024.pdf | https://files.hudexchange.info/reports/published/CoC_HIC_CoC_FL-603-2025_FL_2025.pdf | https://files.hudexchange.info/reports/published/CoC_HIC_CoC_FL-606-2025_FL_2025.pdf | https://stmatthewshouse.org/wp-content/uploads/2026/01/1-SMH-FM-Shelter-Anniversary-release-FINAL1.6.26.pdf,true
+17020,"Chico, CA",2010,2011,CA-519,accepted_with_map_uncertainty,false,,CA-519/2010 | CA-519/2011,,,full_year,12,,,,,,,false
+17020,"Chico, CA",2022,2023,CA-519,accepted_with_map_uncertainty,false,,CA-519/2022 | CA-519/2023,,,full_year,12,,,,,,,false
+18880,"Crestview-Fort Walton Beach-Destin, FL",2010,2011,FL-505,accepted_with_map_uncertainty,false,,FL-505/2010 | FL-505/2011,,,full_year,12,,,,,,,false
+18880,"Crestview-Fort Walton Beach-Destin, FL",2011,2012,FL-505,accepted_with_map_uncertainty,false,,FL-505/2011 | FL-505/2012,,,full_year,12,,,,,,,false
+18880,"Crestview-Fort Walton Beach-Destin, FL",2012,2013,FL-505,accepted_with_map_uncertainty,false,,FL-505/2012 | FL-505/2013,,,full_year,12,,,,,,,false
+18880,"Crestview-Fort Walton Beach-Destin, FL",2015,2016,FL-505,accepted_with_map_uncertainty,false,,FL-505/2015 | FL-505/2016,,,full_year,12,,,,,,,false
+18880,"Crestview-Fort Walton Beach-Destin, FL",2016,2017,FL-505,accepted_with_map_uncertainty,false,,FL-505/2016 | FL-505/2017,,,full_year,12,,,,,,,false
+18880,"Crestview-Fort Walton Beach-Destin, FL",2017,2018,FL-505,accepted_with_map_uncertainty,false,,FL-505/2017 | FL-505/2018,,,full_year,12,,,,,,,false
+18880,"Crestview-Fort Walton Beach-Destin, FL",2018,2019,FL-505,accepted_with_map_uncertainty,false,,FL-505/2018 | FL-505/2019,,,full_year,12,,,,,,,false
+18880,"Crestview-Fort Walton Beach-Destin, FL",2019,2020,FL-505,accepted_with_map_uncertainty,false,,FL-505/2019 | FL-505/2020,,,full_year,12,,,,,,,false
+18880,"Crestview-Fort Walton Beach-Destin, FL",2022,2023,FL-505,accepted_with_map_uncertainty,false,,FL-505/2022,,,full_year,12,,,,,,,false
+18880,"Crestview-Fort Walton Beach-Destin, FL",2023,2024,FL-505,accepted_on_prior_review,true,,,,,full_year,12,,,,,,,false
+18880,"Crestview-Fort Walton Beach-Destin, FL",2024,2025,FL-505,accepted_with_map_uncertainty,false,,FL-505/2025,,,matched_months_excluding_october,11,,,,The CoC’s January 31 count gives 251 unsheltered (+1 from 2024); HUD’s January 24 report gives 241 (−9 from 2024). Use HUD’s figure in the source sensitivity fit.,"Caring and Sharing of South Walton has 22 year-round beds listed in 2024 and its line is absent in 2025, while Opportunity Place rises from 21 to 32. Test sensitivity to inventory coverage despite a small net decline of eight beds.",https://files.hudexchange.info/reports/published/CoC_HIC_CoC_FL-505-2024_FL_2024.pdf | https://files.hudexchange.info/reports/published/CoC_HIC_CoC_FL-505-2025_FL_2025.pdf,true
+19500,"Decatur, IL",2010,2011,IL-516,accepted_with_map_uncertainty,false,,IL-516/2010 | IL-516/2011,,,full_year,12,,,,,,,false
+19500,"Decatur, IL",2011,2012,IL-516,accepted_with_map_uncertainty,false,,IL-516/2011 | IL-516/2012,,,full_year,12,,,,,,,false
+19500,"Decatur, IL",2012,2013,IL-516,accepted_with_map_uncertainty,false,,IL-516/2012 | IL-516/2013,,,full_year,12,,,,,,,false
+19500,"Decatur, IL",2013,2014,IL-516,accepted_with_map_uncertainty,false,,IL-516/2013 | IL-516/2014,,,full_year,12,,,,,,,false
+19500,"Decatur, IL",2014,2015,IL-516,accepted_with_map_uncertainty,false,,IL-516/2014 | IL-516/2015,,,full_year,12,,,,,,,false
+19500,"Decatur, IL",2015,2016,IL-516,accepted_with_map_uncertainty,false,,IL-516/2015 | IL-516/2016,,,full_year,12,,,,,,,false
+19500,"Decatur, IL",2016,2017,IL-516,accepted_with_map_uncertainty,false,,IL-516/2016 | IL-516/2017,,,full_year,12,,,,,,,false
+19500,"Decatur, IL",2017,2018,IL-516,accepted_with_map_uncertainty,false,,IL-516/2017 | IL-516/2018,,,full_year,12,,,,,,,false
+19500,"Decatur, IL",2018,2019,IL-516,accepted_with_map_uncertainty,false,,IL-516/2018 | IL-516/2019,,,full_year,12,,,,,,,false
+19500,"Decatur, IL",2019,2020,IL-516,accepted_with_map_uncertainty,false,,IL-516/2019 | IL-516/2020,,,full_year,12,,,,,,,false
+19500,"Decatur, IL",2022,2023,IL-516,accepted_on_prior_review,true,,,,,full_year,12,,,,,,,false
+19500,"Decatur, IL",2023,2024,IL-516,accepted_on_prior_review,true,,,,,full_year,12,,,,,,,false
+19500,"Decatur, IL",2024,2025,IL-516,accepted_with_map_uncertainty,false,,IL-516/2025,,,matched_months_excluding_october,11,,,,,The CAPER lists emergency capacity of 83 and 92 compared with HUD emergency-only year-round figures of 73 and 79. HUD year-round emergency plus transitional beds are 96 and 105. Test the effect of the differing capacity definitions.,https://files.hudexchange.info/reports/published/CoC_HIC_CoC_IL-516-2024_IL_2024.pdf | https://files.hudexchange.info/reports/published/CoC_HIC_CoC_IL-516-2025_IL_2025.pdf | https://decaturil.gov/DocumentCenter/View/539231/2024-CAPER-Final,true
+19660,"Deltona-Daytona Beach-Ormond Beach, FL",2010,2011,FL-504,joint_review,false,,,FL-504/2010 | FL-504/2011,"Unresolved larger geographic signal at 2012–2013, 2014–2015.",full_year,12,,,,,,,false
+19660,"Deltona-Daytona Beach-Ormond Beach, FL",2011,2012,FL-504,joint_review,false,,,FL-504/2011 | FL-504/2012,"Unresolved larger geographic signal at 2012–2013, 2014–2015.",full_year,12,,,,,,,false
+19660,"Deltona-Daytona Beach-Ormond Beach, FL",2012,2013,FL-504,joint_review,false,,,FL-504/2012 | FL-504/2013,"Unresolved larger geographic signal at 2012–2013, 2014–2015. | Unresolved larger geographic signal at 2014–2015.",full_year,12,,,,,,,false
+19660,"Deltona-Daytona Beach-Ormond Beach, FL",2013,2014,FL-504,joint_review,false,,,FL-504/2013 | FL-504/2014,Unresolved larger geographic signal at 2014–2015.,full_year,12,,,,,,,false
+19660,"Deltona-Daytona Beach-Ormond Beach, FL",2014,2015,FL-504,joint_review,false,,FL-504/2015,FL-504/2014,Unresolved larger geographic signal at 2014–2015.,full_year,12,,,,,,,false
+19660,"Deltona-Daytona Beach-Ormond Beach, FL",2015,2016,FL-504,accepted_with_map_uncertainty,false,,FL-504/2015 | FL-504/2016,,,full_year,12,,,,,,,false
+19660,"Deltona-Daytona Beach-Ormond Beach, FL",2016,2017,FL-504,accepted_with_map_uncertainty,false,,FL-504/2016 | FL-504/2017,,,full_year,12,,,,,,,false
+19660,"Deltona-Daytona Beach-Ormond Beach, FL",2017,2018,FL-504,accepted_with_map_uncertainty,false,,FL-504/2017 | FL-504/2018,,,full_year,12,,,,,,,false
+19660,"Deltona-Daytona Beach-Ormond Beach, FL",2018,2019,FL-504,accepted_with_map_uncertainty,false,,FL-504/2018 | FL-504/2019,,,full_year,12,,,,,,,false
+19660,"Deltona-Daytona Beach-Ormond Beach, FL",2019,2020,FL-504,accepted_with_map_uncertainty,false,,FL-504/2019 | FL-504/2020,,,full_year,12,,,,,,,false
+19660,"Deltona-Daytona Beach-Ormond Beach, FL",2022,2023,FL-504,accepted_with_map_uncertainty,false,,FL-504/2022,,,full_year,12,,,,,,,false
+19660,"Deltona-Daytona Beach-Ormond Beach, FL",2023,2024,FL-504,accepted_on_prior_review,true,,,,,full_year,12,,,,,,,false
+19660,"Deltona-Daytona Beach-Ormond Beach, FL",2024,2025,FL-504,accepted_with_map_uncertainty,false,,FL-504/2025,,,matched_months_excluding_october,11,,,,,"First Step Shelter increased from 70 to 100 reported year-round beds, while the county’s earlier plan already described it as a 100-bed facility. The published totals are 502 and 572. Test a 2025 total of 542 as a sensitivity scenario to assess the 30-bed increase.",https://files.hudexchange.info/reports/published/CoC_HIC_CoC_FL-504-2024_FL_2024.pdf | https://files.hudexchange.info/reports/published/CoC_HIC_CoC_FL-504-2025_FL_2025.pdf | https://www.volusia.org/core/fileparse.php/5916/urlt/Final_FY_24.25_Annual_Action_Plan_and_Appendices_ADA.pdf,true
+20940,"El Centro, CA",2011,2012,CA-613,accepted_with_map_uncertainty,false,,CA-613/2011 | CA-613/2012,,,full_year,12,,,,,,,false
+20940,"El Centro, CA",2012,2013,CA-613,accepted_with_map_uncertainty,false,,CA-613/2012 | CA-613/2013,,,full_year,12,,,,,,,false
+20940,"El Centro, CA",2013,2014,CA-613,accepted_with_map_uncertainty,false,,CA-613/2013 | CA-613/2014,,,full_year,12,,,,,,,false
+20940,"El Centro, CA",2014,2015,CA-613,accepted_with_map_uncertainty,false,,CA-613/2014 | CA-613/2015,,,full_year,12,,,,,,,false
+20940,"El Centro, CA",2015,2016,CA-613,accepted_with_map_uncertainty,false,,CA-613/2015 | CA-613/2016,,,full_year,12,,,,,,,false
+20940,"El Centro, CA",2016,2017,CA-613,accepted_with_map_uncertainty,false,,CA-613/2016 | CA-613/2017,,,full_year,12,,,,,,,false
+20940,"El Centro, CA",2017,2018,CA-613,accepted_with_map_uncertainty,false,,CA-613/2017 | CA-613/2018,,,full_year,12,,,,,,,false
+20940,"El Centro, CA",2018,2019,CA-613,accepted_with_map_uncertainty,false,,CA-613/2018,,,full_year,12,,,,,,,false
+20940,"El Centro, CA",2019,2020,CA-613,accepted_on_prior_review,true,,,,,full_year,12,,,,,,,false
+20940,"El Centro, CA",2022,2023,CA-613,accepted_with_map_uncertainty,false,,CA-613/2022 | CA-613/2023,,,full_year,12,,,,,,,false
+20940,"El Centro, CA",2023,2024,CA-613,accepted_with_map_uncertainty,false,,CA-613/2023,,,full_year,12,,,,,,,false
+20940,"El Centro, CA",2024,2025,CA-613,accepted_on_prior_review,true,,,,,matched_months_excluding_october,11,,,,,,,false
+21340,"El Paso, TX",2015,2016,TX-603,accepted_with_map_uncertainty,false,,TX-603/2015 | TX-603/2016,,,full_year,12,,,,,,,false
+21340,"El Paso, TX",2016,2017,TX-603,accepted_with_map_uncertainty,false,,TX-603/2016 | TX-603/2017,,,full_year,12,,,,,,,false
+21340,"El Paso, TX",2019,2020,TX-603,accepted_with_map_uncertainty,false,,TX-603/2019 | TX-603/2020,,,full_year,12,,,,,,,false
+21340,"El Paso, TX",2022,2023,TX-603,accepted_with_map_uncertainty,false,,TX-603/2022 | TX-603/2023,,,full_year,12,,,,,,,false
+21340,"El Paso, TX",2023,2024,TX-603,accepted_with_map_uncertainty,false,,TX-603/2023,,,full_year,12,,,,,,,false
+21340,"El Paso, TX",2024,2025,TX-603,accepted_with_map_uncertainty,false,,TX-603/2025,,,matched_months_excluding_october,11,,,,,"Year-round beds fall from 1,268 to 1,007 as overflow/voucher inventory rises from 20 to 70. The 2024 inventory lists 130 transitional beds under Annunciation House and the 2025 inventory lists 54 emergency beds under that provider. Test sensitivity to classification and the other large changes at Sin Fronteras and the domestic violence shelter.",https://files.hudexchange.info/reports/published/CoC_HIC_CoC_TX-603-2024_TX_2024.pdf | https://files.hudexchange.info/reports/published/CoC_HIC_CoC_TX-603-2025_TX_2025.pdf,true
+21500,"Erie, PA",2010,2011,PA-605,accepted_with_map_uncertainty,false,,PA-605/2010 | PA-605/2011,,,full_year,12,,,,,,,false
+21500,"Erie, PA",2011,2012,PA-605,accepted_with_map_uncertainty,false,,PA-605/2011 | PA-605/2012,,,full_year,12,,,,,,,false
+21500,"Erie, PA",2012,2013,PA-605,accepted_with_map_uncertainty,false,,PA-605/2012 | PA-605/2013,,,full_year,12,,,,,,,false
+21500,"Erie, PA",2013,2014,PA-605,accepted_with_map_uncertainty,false,,PA-605/2013 | PA-605/2014,,,full_year,12,,,,,,,false
+21500,"Erie, PA",2014,2015,PA-605,accepted_with_map_uncertainty,false,,PA-605/2014 | PA-605/2015,,,full_year,12,,,,,,,false
+21500,"Erie, PA",2015,2016,PA-605,accepted_with_map_uncertainty,false,,PA-605/2015 | PA-605/2016,,,full_year,12,,,,,,,false
+21500,"Erie, PA",2016,2017,PA-605,accepted_with_map_uncertainty,false,,PA-605/2016 | PA-605/2017,,,full_year,12,,,,,,,false
+21500,"Erie, PA",2017,2018,PA-605,accepted_with_map_uncertainty,false,,PA-605/2017 | PA-605/2018,,,full_year,12,,,,,,,false
+21500,"Erie, PA",2018,2019,PA-605,accepted_with_map_uncertainty,false,,PA-605/2018 | PA-605/2019,,,full_year,12,,,,,,,false
+21500,"Erie, PA",2019,2020,PA-605,accepted_with_map_uncertainty,false,,PA-605/2019 | PA-605/2020,,,full_year,12,,,,,,,false
+21500,"Erie, PA",2022,2023,PA-605,accepted_with_map_uncertainty,false,,PA-605/2022,,,full_year,12,,,,,,,false
+21500,"Erie, PA",2023,2024,PA-605,accepted_on_prior_review,true,,,,,full_year,12,,,,,,,false
+21500,"Erie, PA",2024,2025,PA-605,accepted_with_map_uncertainty,false,,PA-605/2025,,,matched_months_excluding_october,11,"The 2025 CoC report documents improved count methodology, additional volunteers, and expanded street outreach.",https://www.endhomelessnesseriecountypa.org/_files/ugd/c40d10_2a863d1f401e4da2840635e9da7178d3.pdf,,,,,true
+21660,"Eugene-Springfield, OR",2010,2011,OR-500,accepted_with_map_uncertainty,false,,OR-500/2010 | OR-500/2011,,,full_year,12,,,,,,,false
+21660,"Eugene-Springfield, OR",2015,2016,OR-500,accepted_with_map_uncertainty,false,,OR-500/2015 | OR-500/2016,,,full_year,12,,,,,,,false
+21660,"Eugene-Springfield, OR",2016,2017,OR-500,accepted_with_map_uncertainty,false,,OR-500/2016 | OR-500/2017,,,full_year,12,,,,,,,false
+21660,"Eugene-Springfield, OR",2017,2018,OR-500,accepted_with_map_uncertainty,false,,OR-500/2017 | OR-500/2018,,,full_year,12,,,,,,,false
+21660,"Eugene-Springfield, OR",2018,2019,OR-500,accepted_with_map_uncertainty,false,,OR-500/2018 | OR-500/2019,,,full_year,12,,,,,,,false
+21660,"Eugene-Springfield, OR",2019,2020,OR-500,accepted_with_map_uncertainty,false,,OR-500/2019 | OR-500/2020,,,full_year,12,,,,,,,false
+21660,"Eugene-Springfield, OR",2022,2023,OR-500,accepted_with_map_uncertainty,false,,OR-500/2022,,,full_year,12,,,,,,,false
+21660,"Eugene-Springfield, OR",2023,2024,OR-500,accepted_on_prior_review,true,,,,,full_year,12,,,,,,,false
+21660,"Eugene-Springfield, OR",2024,2025,OR-500,accepted_with_map_uncertainty,false,,OR-500/2025,,,matched_months_excluding_october,11,Lane County narrowed the domestic-violence-survivor subgroup definition in 2025 to people actively fleeing. The reported overall unsheltered count uses the continuing Lane County method.,https://cdnsm5-hosted.civiclive.com/UserFiles/Servers/Server_3585797/File/Government/County%20Departments/Health%20and%20Human%20Services/Human%20Services/HMIS%20ServicePoint/HMIS%20Data%20Page/2025%20Lane%20County%20Point%20In%20Time%20Data%20FINAL.pdf,,,"Year-round beds fall from 1,205 to 1,154 while 101 seasonal and 465 overflow/voucher beds appear in 2025. Test sensitivity to the temporary inventory excluded from the year-round measure.",https://files.hudexchange.info/reports/published/CoC_HIC_CoC_OR-500-2024_OR_2024.pdf | https://files.hudexchange.info/reports/published/CoC_HIC_CoC_OR-500-2025_OR_2025.pdf | https://cdnsm5-hosted.civiclive.com/UserFiles/Servers/Server_3585797/File/Government/County%20Departments/Health%20and%20Human%20Services/Human%20Services/HMIS%20ServicePoint/HMIS%20Data%20Page/2025%20Lane%20County%20Point%20In%20Time%20Data%20FINAL.pdf,true
+22420,"Flint, MI",2010,2011,MI-505,accepted_with_map_uncertainty,false,,MI-505/2010 | MI-505/2011,,,full_year,12,,,,,,,false
+22420,"Flint, MI",2011,2012,MI-505,accepted_with_map_uncertainty,false,,MI-505/2011 | MI-505/2012,,,full_year,12,,,,,,,false
+22420,"Flint, MI",2012,2013,MI-505,accepted_with_map_uncertainty,false,,MI-505/2012 | MI-505/2013,,,full_year,12,,,,,,,false
+22420,"Flint, MI",2013,2014,MI-505,accepted_with_map_uncertainty,false,,MI-505/2013 | MI-505/2014,,,full_year,12,,,,,,,false
+22420,"Flint, MI",2014,2015,MI-505,accepted_with_map_uncertainty,false,,MI-505/2014 | MI-505/2015,,,full_year,12,,,,,,,false
+22420,"Flint, MI",2015,2016,MI-505,accepted_with_map_uncertainty,false,,MI-505/2015 | MI-505/2016,,,full_year,12,,,,,,,false
+22420,"Flint, MI",2016,2017,MI-505,accepted_with_map_uncertainty,false,,MI-505/2016 | MI-505/2017,,,full_year,12,,,,,,,false
+22420,"Flint, MI",2017,2018,MI-505,accepted_with_map_uncertainty,false,,MI-505/2017 | MI-505/2018,,,full_year,12,,,,,,,false
+22420,"Flint, MI",2018,2019,MI-505,accepted_with_map_uncertainty,false,,MI-505/2018 | MI-505/2019,,,full_year,12,,,,,,,false
+22420,"Flint, MI",2019,2020,MI-505,accepted_with_map_uncertainty,false,,MI-505/2019 | MI-505/2020,,,full_year,12,,,,,,,false
+22420,"Flint, MI",2022,2023,MI-505,accepted_on_prior_review,true,,,,,full_year,12,,,,,,,false
+22420,"Flint, MI",2023,2024,MI-505,accepted_on_prior_review,true,,,,,full_year,12,,,,,,,false
+22420,"Flint, MI",2024,2025,MI-505,accepted_with_map_uncertainty,false,,MI-505/2025,,,matched_months_excluding_october,11,,,,,Year-round emergency beds rise from 257 to 280 and transitional beds fall from 97 to 49 as project rows change. Overflow/voucher beds rise from 101 to 274. Test sensitivity to possible program recoding and the increased temporary inventory.,https://files.hudexchange.info/reports/published/CoC_HIC_CoC_MI-505-2024_MI_2024.pdf | https://files.hudexchange.info/reports/published/CoC_HIC_CoC_MI-505-2025_MI_2025.pdf,true
+23420,"Fresno, CA",2013,2014,CA-514,accepted_with_map_uncertainty,false,,CA-514/2013 | CA-514/2014,,,full_year,12,,,,,,,false
+23420,"Fresno, CA",2014,2015,CA-514,accepted_with_map_uncertainty,false,,CA-514/2014 | CA-514/2015,,,full_year,12,,,,,,,false
+23420,"Fresno, CA",2015,2016,CA-514,accepted_with_map_uncertainty,false,,CA-514/2015 | CA-514/2016,,,full_year,12,,,,,,,false
+23420,"Fresno, CA",2016,2017,CA-514,accepted_with_map_uncertainty,false,,CA-514/2016 | CA-514/2017,,,full_year,12,,,,,,,false
+23420,"Fresno, CA",2017,2018,CA-514,accepted_with_map_uncertainty,false,,CA-514/2017 | CA-514/2018,,,full_year,12,,,,,,,false
+23420,"Fresno, CA",2018,2019,CA-514,accepted_with_map_uncertainty,false,,CA-514/2018 | CA-514/2019,,,full_year,12,,,,,,,false
+23420,"Fresno, CA",2019,2020,CA-514,accepted_with_map_uncertainty,false,,CA-514/2019 | CA-514/2020,,,full_year,12,,,,,,,false
+23420,"Fresno, CA",2022,2023,CA-514,accepted_on_prior_review,true,,,,,full_year,12,,,,,,,false
+27060,"Ithaca, NY",2010,2011,NY-510,accepted_with_map_uncertainty,false,,NY-510/2010 | NY-510/2011,,,full_year,12,,,,,,,false
+27060,"Ithaca, NY",2013,2014,NY-510,accepted_with_map_uncertainty,false,,NY-510/2013 | NY-510/2014,,,full_year,12,,,,,,,false
+27060,"Ithaca, NY",2014,2015,NY-510,accepted_with_map_uncertainty,false,,NY-510/2014 | NY-510/2015,,,full_year,12,,,,,,,false
+27060,"Ithaca, NY",2015,2016,NY-510,accepted_with_map_uncertainty,false,,NY-510/2015 | NY-510/2016,,,full_year,12,,,,,,,false
+27060,"Ithaca, NY",2016,2017,NY-510,accepted_with_map_uncertainty,false,,NY-510/2016 | NY-510/2017,,,full_year,12,,,,,,,false
+27060,"Ithaca, NY",2017,2018,NY-510,accepted_with_map_uncertainty,false,,NY-510/2017 | NY-510/2018,,,full_year,12,,,,,,,false
+27060,"Ithaca, NY",2018,2019,NY-510,accepted_with_map_uncertainty,false,,NY-510/2018 | NY-510/2019,,,full_year,12,,,,,,,false
+27060,"Ithaca, NY",2019,2020,NY-510,accepted_with_map_uncertainty,false,,NY-510/2019 | NY-510/2020,,,full_year,12,,,,,,,false
+27060,"Ithaca, NY",2022,2023,NY-510,accepted_on_prior_review,true,,,,,full_year,12,,,,,,,false
+27060,"Ithaca, NY",2023,2024,NY-510,accepted_on_prior_review,true,,,,,full_year,12,,,,,,,false
+27060,"Ithaca, NY",2024,2025,NY-510,accepted_with_map_uncertainty,false,,NY-510/2025,,,matched_months_excluding_october,11,,,,,Year-round beds fall from 221 to 152 and 80 overflow beds appear in 2025. Saint John’s stopped shelter operations in November 2024 and the County took over shelter services and Code Blue. Test shelter capacity sensitivity across categories.,https://files.hudexchange.info/reports/published/CoC_HIC_CoC_NY-510-2024_NY_2024.pdf | https://files.hudexchange.info/reports/published/CoC_HIC_CoC_NY-510-2025_NY_2025.pdf | https://www.tompkinscountyny.gov/files/assets/county/v/1/whole-health-admin/documents/health-promotion/csb-agenda-amp-minutes/annual-lgu-csb-report-2024.pdf,true
+27100,"Jackson, MI",2017,2018,MI-517,accepted_with_map_uncertainty,false,,MI-517/2017 | MI-517/2018,,,full_year,12,,,,,,,false
+27100,"Jackson, MI",2018,2019,MI-517,accepted_with_map_uncertainty,false,,MI-517/2018 | MI-517/2019,,,full_year,12,,,,,,,false
+27100,"Jackson, MI",2019,2020,MI-517,accepted_with_map_uncertainty,false,,MI-517/2019 | MI-517/2020,,,full_year,12,,,,,,,false
+27100,"Jackson, MI",2022,2023,MI-517,accepted_on_prior_review,true,,,,,full_year,12,,,,,,,false
+27100,"Jackson, MI",2023,2024,MI-517,accepted_on_prior_review,true,,,,,full_year,12,,,,,,,false
+27100,"Jackson, MI",2024,2025,MI-517,accepted_with_map_uncertainty,false,,MI-517/2025,,,matched_months_excluding_october,11,,,,,"A non-HMIS emergency-shelter entry rises from 16 to 30 beds, accounting for 14 of the 15 net year-round beds added. Test sensitivity to whether the increase reflects reporting coverage or additional capacity.",https://files.hudexchange.info/reports/published/CoC_HIC_CoC_MI-517-2024_MI_2024.pdf | https://files.hudexchange.info/reports/published/CoC_HIC_CoC_MI-517-2025_MI_2025.pdf,true
+28020,"Kalamazoo-Portage, MI",2010,2011,MI-507,accepted_with_map_uncertainty,false,,MI-507/2010 | MI-507/2011,,,full_year,12,,,,,,,false
+28020,"Kalamazoo-Portage, MI",2011,2012,MI-507,accepted_with_map_uncertainty,false,,MI-507/2011 | MI-507/2012,,,full_year,12,,,,,,,false
+28020,"Kalamazoo-Portage, MI",2012,2013,MI-507,accepted_with_map_uncertainty,false,,MI-507/2012 | MI-507/2013,,,full_year,12,,,,,,,false
+28020,"Kalamazoo-Portage, MI",2013,2014,MI-507,accepted_with_map_uncertainty,false,,MI-507/2013 | MI-507/2014,,,full_year,12,,,,,,,false
+28020,"Kalamazoo-Portage, MI",2014,2015,MI-507,accepted_with_map_uncertainty,false,,MI-507/2014 | MI-507/2015,,,full_year,12,,,,,,,false
+28020,"Kalamazoo-Portage, MI",2017,2018,MI-507,accepted_with_map_uncertainty,false,,MI-507/2017 | MI-507/2018,,,full_year,12,,,,,,,false
+28020,"Kalamazoo-Portage, MI",2018,2019,MI-507,accepted_with_map_uncertainty,false,,MI-507/2018 | MI-507/2019,,,full_year,12,,,,,,,false
+28020,"Kalamazoo-Portage, MI",2019,2020,MI-507,accepted_with_map_uncertainty,false,,MI-507/2019 | MI-507/2020,,,full_year,12,,,,,,,false
+28020,"Kalamazoo-Portage, MI",2022,2023,MI-507,accepted_on_prior_review,true,,,,,full_year,12,,,,,,,false
+28020,"Kalamazoo-Portage, MI",2023,2024,MI-507,accepted_on_prior_review,true,,,,,full_year,12,,,,,,,false
+28020,"Kalamazoo-Portage, MI",2024,2025,MI-507,accepted_with_map_uncertainty,false,,MI-507/2025,,,matched_months_excluding_october,11,,,,,Year-round beds fall from 666 to 631 as 146 overflow/voucher beds appear. The CoC credits winter shelter and Heads in Beds for much of the sheltered count increase. Test sensitivity to the extra temporary beds.,https://files.hudexchange.info/reports/published/CoC_HIC_CoC_MI-507-2024_MI_2024.pdf | https://files.hudexchange.info/reports/published/CoC_HIC_CoC_MI-507-2025_MI_2025.pdf | https://kzoococ.org/wp-content/uploads/2025/07/Kalamazoo-County-2025-PIT-and-HIC-results.pdf,true
+28740,"Kingston, NY",2010,2011,NY-608,accepted_with_map_uncertainty,false,,NY-608/2010 | NY-608/2011,,,full_year,12,,,,,,,false
+28740,"Kingston, NY",2011,2012,NY-608,accepted_with_map_uncertainty,false,,NY-608/2011 | NY-608/2012,,,full_year,12,,,,,,,false
+28740,"Kingston, NY",2012,2013,NY-608,accepted_with_map_uncertainty,false,,NY-608/2012 | NY-608/2013,,,full_year,12,,,,,,,false
+28740,"Kingston, NY",2013,2014,NY-608,accepted_with_map_uncertainty,false,,NY-608/2013 | NY-608/2014,,,full_year,12,,,,,,,false
+28740,"Kingston, NY",2014,2015,NY-608,accepted_with_map_uncertainty,false,,NY-608/2014 | NY-608/2015,,,full_year,12,,,,,,,false
+28740,"Kingston, NY",2015,2016,NY-608,accepted_with_map_uncertainty,false,,NY-608/2015 | NY-608/2016,,,full_year,12,,,,,,,false
+28740,"Kingston, NY",2016,2017,NY-608,accepted_with_map_uncertainty,false,,NY-608/2016 | NY-608/2017,,,full_year,12,,,,,,,false
+28740,"Kingston, NY",2017,2018,NY-608,accepted_with_map_uncertainty,false,,NY-608/2017 | NY-608/2018,,,full_year,12,,,,,,,false
+28740,"Kingston, NY",2018,2019,NY-608,accepted_with_map_uncertainty,false,,NY-608/2018 | NY-608/2019,,,full_year,12,,,,,,,false
+28740,"Kingston, NY",2019,2020,NY-608,accepted_with_map_uncertainty,false,,NY-608/2019 | NY-608/2020,,,full_year,12,,,,,,,false
+28740,"Kingston, NY",2022,2023,NY-608,accepted_on_prior_review,true,,,,,full_year,12,,,,,,,false
+28740,"Kingston, NY",2023,2024,NY-608,accepted_on_prior_review,true,,,,,full_year,12,,,,,,,false
+28740,"Kingston, NY",2024,2025,NY-608,accepted_with_map_uncertainty,false,,NY-608/2025,,,matched_months_excluding_october,11,,,,,"The May memo reports 94 year-round beds for 2025, while the final HUD inventory reports 87. The memo identifies a prior overflow misclassification and a seasonal warming-center change. Test sensitivity to the seven-bed draft/final discrepancy.",https://files.hudexchange.info/reports/published/CoC_HIC_CoC_NY-608-2024_NY_2024.pdf | https://files.hudexchange.info/reports/published/CoC_HIC_CoC_NY-608-2025_NY_2025.pdf | https://caresny.org/wp-content/uploads/2025/05/2025-HIC-PIT-Memo-608.pdf,true
+28880,"Kiryas Joel-Poughkeepsie-Newburgh, NY",2010,2011,NY-601 | NY-602,accepted_with_map_uncertainty,false,,NY-601/2010 | NY-601/2011 | NY-602/2010 | NY-602/2011,,,full_year,12,,,,,,,false
+28880,"Kiryas Joel-Poughkeepsie-Newburgh, NY",2011,2012,NY-601 | NY-602,accepted_with_map_uncertainty,false,,NY-601/2011 | NY-601/2012 | NY-602/2011 | NY-602/2012,,,full_year,12,,,,,,,false
+28880,"Kiryas Joel-Poughkeepsie-Newburgh, NY",2012,2013,NY-601 | NY-602,accepted_with_map_uncertainty,false,,NY-601/2012 | NY-601/2013 | NY-602/2012 | NY-602/2013,,,full_year,12,,,,,,,false
+28880,"Kiryas Joel-Poughkeepsie-Newburgh, NY",2013,2014,NY-601 | NY-602,accepted_with_map_uncertainty,false,,NY-601/2013 | NY-601/2014 | NY-602/2013 | NY-602/2014,,,full_year,12,,,,,,,false
+28880,"Kiryas Joel-Poughkeepsie-Newburgh, NY",2014,2015,NY-601 | NY-602,accepted_with_map_uncertainty,false,,NY-601/2014 | NY-601/2015 | NY-602/2014 | NY-602/2015,,,full_year,12,,,,,,,false
+28880,"Kiryas Joel-Poughkeepsie-Newburgh, NY",2015,2016,NY-601 | NY-602,accepted_with_map_uncertainty,false,,NY-601/2015 | NY-601/2016 | NY-602/2015 | NY-602/2016,,,full_year,12,,,,,,,false
+28880,"Kiryas Joel-Poughkeepsie-Newburgh, NY",2016,2017,NY-601 | NY-602,accepted_with_map_uncertainty,false,,NY-601/2016 | NY-601/2017 | NY-602/2016 | NY-602/2017,,,full_year,12,,,,,,,false
+28880,"Kiryas Joel-Poughkeepsie-Newburgh, NY",2017,2018,NY-601 | NY-602,accepted_with_map_uncertainty,false,,NY-601/2017 | NY-601/2018 | NY-602/2017 | NY-602/2018,,,full_year,12,,,,,,,false
+28880,"Kiryas Joel-Poughkeepsie-Newburgh, NY",2018,2019,NY-601 | NY-602,accepted_with_map_uncertainty,false,,NY-601/2018 | NY-601/2019 | NY-602/2018 | NY-602/2019,,,full_year,12,,,,,,,false
+28880,"Kiryas Joel-Poughkeepsie-Newburgh, NY",2022,2023,NY-601 | NY-602,accepted_with_map_uncertainty,false,,NY-602/2022,,,full_year,12,,,,,,,false
+28880,"Kiryas Joel-Poughkeepsie-Newburgh, NY",2023,2024,NY-601 | NY-602,accepted_on_prior_review,true,,,,,full_year,12,,,,,,,false
+28880,"Kiryas Joel-Poughkeepsie-Newburgh, NY",2024,2025,NY-601 | NY-602,accepted_with_map_uncertainty,false,,NY-601/2025 | NY-602/2025,,,matched_months_excluding_october,11,,,,,"The Dutchess draft lists 583 year-round beds for 2025, versus 643 in final HUD, and describes corrections to prior project figures. Orange lists 339 then 556 overflow/voucher beds in the two years. Test sensitivity to the draft/final and temporary-inventory differences.",https://caresny.org/wp-content/uploads/2025/05/2025-HIC-PIT-Memo-601.pdf | https://files.hudexchange.info/reports/published/CoC_HIC_CoC_NY-601-2024_NY_2024.pdf | https://files.hudexchange.info/reports/published/CoC_HIC_CoC_NY-601-2025_NY_2025.pdf | https://files.hudexchange.info/reports/published/CoC_HIC_CoC_NY-602-2024_NY_2024.pdf | https://files.hudexchange.info/reports/published/CoC_HIC_CoC_NY-602-2025_NY_2025.pdf,true
+29460,"Lakeland-Winter Haven, FL",2010,2011,FL-503,accepted_on_prior_review,true,,,,,full_year,12,,,,,,,false
+29460,"Lakeland-Winter Haven, FL",2011,2012,FL-503,accepted_on_prior_review,true,,,,,full_year,12,,,,,,,false
+29460,"Lakeland-Winter Haven, FL",2012,2013,FL-503,accepted_on_prior_review,true,,,,,full_year,12,,,,,,,false
+29460,"Lakeland-Winter Haven, FL",2013,2014,FL-503,accepted_on_prior_review,true,,,,,full_year,12,,,,,,,false
+29460,"Lakeland-Winter Haven, FL",2014,2015,FL-503,accepted_on_prior_review,true,,,,,full_year,12,,,,,,,false
+29460,"Lakeland-Winter Haven, FL",2015,2016,FL-503,accepted_on_prior_review,true,,,,,full_year,12,,,,,,,false
+29460,"Lakeland-Winter Haven, FL",2016,2017,FL-503,accepted_on_prior_review,true,,,,,full_year,12,,,,,,,false
+29460,"Lakeland-Winter Haven, FL",2017,2018,FL-503,accepted_on_prior_review,true,,,,,full_year,12,,,,,,,false
+29460,"Lakeland-Winter Haven, FL",2018,2019,FL-503,accepted_on_prior_review,true,,,,,full_year,12,,,,,,,false
+29460,"Lakeland-Winter Haven, FL",2019,2020,FL-503,accepted_on_prior_review,true,,,,,full_year,12,,,,,,,false
+29460,"Lakeland-Winter Haven, FL",2022,2023,FL-503,accepted_on_prior_review,true,,,,,full_year,12,,,,,,,false
+29460,"Lakeland-Winter Haven, FL",2023,2024,FL-503,accepted_on_prior_review,true,,,,,full_year,12,,,,,,,false
+29460,"Lakeland-Winter Haven, FL",2024,2025,FL-503,accepted_on_prior_review,true,,,,,matched_months_excluding_october,11,,,,,,,false
+29540,"Lancaster, PA",2010,2011,PA-510,accepted_with_map_uncertainty,false,,PA-510/2010 | PA-510/2011,,,full_year,12,,,,,,,false
+29540,"Lancaster, PA",2011,2012,PA-510,accepted_with_map_uncertainty,false,,PA-510/2011 | PA-510/2012,,,full_year,12,,,,,,,false
+29540,"Lancaster, PA",2012,2013,PA-510,accepted_with_map_uncertainty,false,,PA-510/2012 | PA-510/2013,,,full_year,12,,,,,,,false
+29540,"Lancaster, PA",2013,2014,PA-510,accepted_with_map_uncertainty,false,,PA-510/2013 | PA-510/2014,,,full_year,12,,,,,,,false
+29540,"Lancaster, PA",2014,2015,PA-510,accepted_with_map_uncertainty,false,,PA-510/2014 | PA-510/2015,,,full_year,12,,,,,,,false
+29540,"Lancaster, PA",2015,2016,PA-510,accepted_with_map_uncertainty,false,,PA-510/2015 | PA-510/2016,,,full_year,12,,,,,,,false
+29540,"Lancaster, PA",2016,2017,PA-510,accepted_with_map_uncertainty,false,,PA-510/2016 | PA-510/2017,,,full_year,12,,,,,,,false
+29540,"Lancaster, PA",2017,2018,PA-510,accepted_with_map_uncertainty,false,,PA-510/2017 | PA-510/2018,,,full_year,12,,,,,,,false
+29540,"Lancaster, PA",2018,2019,PA-510,accepted_with_map_uncertainty,false,,PA-510/2018 | PA-510/2019,,,full_year,12,,,,,,,false
+29540,"Lancaster, PA",2019,2020,PA-510,accepted_with_map_uncertainty,false,,PA-510/2019 | PA-510/2020,,,full_year,12,,,,,,,false
+29540,"Lancaster, PA",2022,2023,PA-510,accepted_with_map_uncertainty,false,,PA-510/2022 | PA-510/2023,,,full_year,12,,,,,,,false
+29540,"Lancaster, PA",2023,2024,PA-510,accepted_with_map_uncertainty,false,,PA-510/2023,,,full_year,12,Unsheltered PIT moved from known locations to a census in 2024.,https://lchra.com/wp-content/uploads/2024/10/PA510-2024-NOFO-Consolidated-Application.pdf,,,,,false
+29540,"Lancaster, PA",2024,2025,PA-510,accepted_with_map_uncertainty,false,,PA-510/2025,,,matched_months_excluding_october,11,,,,,"The published year-round inventory falls from 605 to 432. The CoC reports 31 added Tenfold beds and temporary family-shelter closures, which only partly explain the HIC change. Test sensitivity to temporary capacity and project reporting.",https://files.hudexchange.info/reports/published/CoC_HIC_CoC_PA-510-2024_PA_2024.pdf | https://files.hudexchange.info/reports/published/CoC_HIC_CoC_PA-510-2025_PA_2025.pdf | https://lchra.com/wp-content/uploads/2025/04/Press-Release-2025-PIT-Data-Release.pdf,true
+29820,"Las Vegas-Henderson-North Las Vegas, NV",2013,2014,NV-500,accepted_with_map_uncertainty,false,,NV-500/2013 | NV-500/2014,,,full_year,12,,,,,,,false
+29820,"Las Vegas-Henderson-North Las Vegas, NV",2014,2015,NV-500,accepted_with_map_uncertainty,false,,NV-500/2014 | NV-500/2015,,,full_year,12,,,,,,,false
+29820,"Las Vegas-Henderson-North Las Vegas, NV",2015,2016,NV-500,accepted_with_map_uncertainty,false,,NV-500/2015 | NV-500/2016,,,full_year,12,,,,,,,false
+29820,"Las Vegas-Henderson-North Las Vegas, NV",2016,2017,NV-500,accepted_with_map_uncertainty,false,,NV-500/2016 | NV-500/2017,,,full_year,12,,,,,,,false
+29820,"Las Vegas-Henderson-North Las Vegas, NV",2017,2018,NV-500,accepted_with_map_uncertainty,false,,NV-500/2017 | NV-500/2018,,,full_year,12,,,,,,,false
+29820,"Las Vegas-Henderson-North Las Vegas, NV",2018,2019,NV-500,accepted_with_map_uncertainty,false,,NV-500/2018 | NV-500/2019,,,full_year,12,,,,,,,false
+29820,"Las Vegas-Henderson-North Las Vegas, NV",2019,2020,NV-500,accepted_with_map_uncertainty,false,,NV-500/2019 | NV-500/2020,,,full_year,12,,,,,,,false
+29820,"Las Vegas-Henderson-North Las Vegas, NV",2022,2023,NV-500,accepted_on_prior_review,true,,,,,full_year,12,,,,,,,false
+29820,"Las Vegas-Henderson-North Las Vegas, NV",2023,2024,NV-500,accepted_on_prior_review,true,,,,,full_year,12,,,,,,,false
+31340,"Lynchburg, VA",2011,2012,VA-508,accepted_with_map_uncertainty,false,,VA-508/2011 | VA-508/2012,,,full_year,12,,,,,,,false
+31340,"Lynchburg, VA",2012,2013,VA-508,accepted_with_map_uncertainty,false,,VA-508/2012 | VA-508/2013,,,full_year,12,,,,,,,false
+31340,"Lynchburg, VA",2013,2014,VA-508,accepted_with_map_uncertainty,false,,VA-508/2013 | VA-508/2014,,,full_year,12,,,,,,,false
+31340,"Lynchburg, VA",2014,2015,VA-508,accepted_with_map_uncertainty,false,,VA-508/2014 | VA-508/2015,,,full_year,12,,,,,,,false
+31340,"Lynchburg, VA",2015,2016,VA-508,accepted_with_map_uncertainty,false,,VA-508/2015 | VA-508/2016,,,full_year,12,,,,,,,false
+31340,"Lynchburg, VA",2016,2017,VA-508,accepted_with_map_uncertainty,false,,VA-508/2016 | VA-508/2017,,,full_year,12,,,,,,,false
+31340,"Lynchburg, VA",2017,2018,VA-508,accepted_with_map_uncertainty,false,,VA-508/2017 | VA-508/2018,,,full_year,12,,,,,,,false
+31340,"Lynchburg, VA",2018,2019,VA-508,accepted_with_map_uncertainty,false,,VA-508/2018 | VA-508/2019,,,full_year,12,,,,,,,false
+31340,"Lynchburg, VA",2019,2020,VA-508,accepted_with_map_uncertainty,false,,VA-508/2019 | VA-508/2020,,,full_year,12,,,,,,,false
+31340,"Lynchburg, VA",2022,2023,VA-508,accepted_on_prior_review,true,,,,,full_year,12,,,,,,,false
+31340,"Lynchburg, VA",2023,2024,VA-508,accepted_on_prior_review,true,,,,,full_year,12,,,,,,,false
+31340,"Lynchburg, VA",2024,2025,VA-508,accepted_with_map_uncertainty,false,,VA-508/2025,,,matched_months_excluding_october,11,,,,,"Year-round beds are 87 and 85, with 50 seasonal beds appearing in 2025. The city documents the new January warming shelter. Include capacity sensitivity for seasonal beds and the unusually large unsheltered change.",https://files.hudexchange.info/reports/published/CoC_HIC_CoC_VA-508-2024_VA_2024.pdf | https://files.hudexchange.info/reports/published/CoC_HIC_CoC_VA-508-2025_VA_2025.pdf | https://www.lynchburgva.gov/DocumentCenter/View/7330/Program-Year-2026-Fiscal-Year-2027-Annual-Action-Plan-Draft-42426?bidId=,true
+31700,"Manchester-Nashua, NH",2010,2011,NH-501 | NH-502,joint_review,false,Manchester–Nashua NH-502 reporting footprint,,NH-501/2010 | NH-501/2011 | NH-502/2010 | NH-502/2011,Unresolved larger geographic signal at 2017–2018. | Nashua frozen assignment and dated ten-town reporting jurisdiction | Earlier study holdout: Manchester–Nashua NH-502 reporting footprint.,full_year,12,,,,,,,false
+31700,"Manchester-Nashua, NH",2011,2012,NH-501 | NH-502,joint_review,false,Manchester–Nashua NH-502 reporting footprint,,NH-501/2011 | NH-501/2012 | NH-502/2011 | NH-502/2012,Unresolved larger geographic signal at 2017–2018. | Nashua frozen assignment and dated ten-town reporting jurisdiction | Earlier study holdout: Manchester–Nashua NH-502 reporting footprint.,full_year,12,,,,,,,false
+31700,"Manchester-Nashua, NH",2012,2013,NH-501 | NH-502,joint_review,false,Manchester–Nashua NH-502 reporting footprint,,NH-501/2012 | NH-501/2013 | NH-502/2012 | NH-502/2013,Unresolved larger geographic signal at 2017–2018. | Nashua frozen assignment and dated ten-town reporting jurisdiction | Earlier study holdout: Manchester–Nashua NH-502 reporting footprint.,full_year,12,,,,,,,false
+31700,"Manchester-Nashua, NH",2015,2016,NH-501 | NH-502,joint_review,false,Manchester–Nashua NH-502 reporting footprint,,NH-501/2015 | NH-501/2016 | NH-502/2015 | NH-502/2016,Unresolved larger geographic signal at 2017–2018. | Nashua frozen assignment and dated ten-town reporting jurisdiction | Earlier study holdout: Manchester–Nashua NH-502 reporting footprint.,full_year,12,,,,,,,false
+31700,"Manchester-Nashua, NH",2016,2017,NH-501 | NH-502,joint_review,false,Manchester–Nashua NH-502 reporting footprint,,NH-501/2016 | NH-501/2017 | NH-502/2016 | NH-502/2017,Unresolved larger geographic signal at 2017–2018. | Nashua frozen assignment and dated ten-town reporting jurisdiction | Earlier study holdout: Manchester–Nashua NH-502 reporting footprint.,full_year,12,,,,,,,false
+31700,"Manchester-Nashua, NH",2017,2018,NH-501 | NH-502,joint_review,false,Manchester–Nashua NH-502 reporting footprint,NH-501/2018,NH-501/2017 | NH-502/2017 | NH-502/2018,Unresolved larger geographic signal at 2017–2018. | Nashua frozen assignment and dated ten-town reporting jurisdiction | Earlier study holdout: Manchester–Nashua NH-502 reporting footprint.,full_year,12,,,,,,,false
+31700,"Manchester-Nashua, NH",2018,2019,NH-501 | NH-502,joint_review,false,Manchester–Nashua NH-502 reporting footprint,NH-501/2018 | NH-501/2019,NH-502/2018 | NH-502/2019,Nashua frozen assignment and dated ten-town reporting jurisdiction | Earlier study holdout: Manchester–Nashua NH-502 reporting footprint.,full_year,12,,,,,,,false
+31700,"Manchester-Nashua, NH",2019,2020,NH-501 | NH-502,joint_review,false,Manchester–Nashua NH-502 reporting footprint,NH-501/2019 | NH-501/2020,NH-502/2019 | NH-502/2020,Nashua frozen assignment and dated ten-town reporting jurisdiction | Earlier study holdout: Manchester–Nashua NH-502 reporting footprint.,full_year,12,,,,,,,false
+31700,"Manchester-Nashua, NH",2022,2023,NH-501 | NH-502,joint_review,false,Manchester–Nashua NH-502 reporting footprint,,NH-502/2022 | NH-502/2023,Nashua frozen assignment and dated ten-town reporting jurisdiction | Earlier study holdout: Manchester–Nashua NH-502 reporting footprint.,full_year,12,,,,,,,false
+31700,"Manchester-Nashua, NH",2023,2024,NH-501 | NH-502,joint_review,false,Manchester–Nashua NH-502 reporting footprint,,NH-502/2023,Nashua frozen assignment and dated ten-town reporting jurisdiction | Earlier study holdout: Manchester–Nashua NH-502 reporting footprint.,full_year,12,,,,,,,false
+31700,"Manchester-Nashua, NH",2024,2025,NH-501 | NH-502,joint_review,false,Manchester–Nashua NH-502 reporting footprint,,NH-501/2025 | NH-502/2025,A dated 2025 administrative reporting-scope reference is still needed. | Nashua frozen assignment and dated ten-town reporting jurisdiction | Earlier study holdout: Manchester–Nashua NH-502 reporting footprint.,matched_months_excluding_october,11,,,,,,,false
+32780,"Medford, OR",2010,2011,OR-502,accepted_with_map_uncertainty,false,,OR-502/2010 | OR-502/2011,,,full_year,12,,,,,,,false
+32780,"Medford, OR",2011,2012,OR-502,accepted_with_map_uncertainty,false,,OR-502/2011 | OR-502/2012,,,full_year,12,,,,,,,false
+32780,"Medford, OR",2012,2013,OR-502,accepted_with_map_uncertainty,false,,OR-502/2012 | OR-502/2013,,,full_year,12,,,,,,,false
+32780,"Medford, OR",2013,2014,OR-502,accepted_with_map_uncertainty,false,,OR-502/2013 | OR-502/2014,,,full_year,12,,,,,,,false
+32780,"Medford, OR",2014,2015,OR-502,accepted_with_map_uncertainty,false,,OR-502/2014 | OR-502/2015,,,full_year,12,,,,,,,false
+32780,"Medford, OR",2015,2016,OR-502,accepted_with_map_uncertainty,false,,OR-502/2015 | OR-502/2016,,,full_year,12,,,,,,,false
+32780,"Medford, OR",2016,2017,OR-502,accepted_with_map_uncertainty,false,,OR-502/2016 | OR-502/2017,,,full_year,12,,,,,,,false
+32780,"Medford, OR",2017,2018,OR-502,accepted_with_map_uncertainty,false,,OR-502/2017 | OR-502/2018,,,full_year,12,,,,,,,false
+32780,"Medford, OR",2018,2019,OR-502,accepted_with_map_uncertainty,false,,OR-502/2018 | OR-502/2019,,,full_year,12,,,,,,,false
+32780,"Medford, OR",2019,2020,OR-502,accepted_with_map_uncertainty,false,,OR-502/2019 | OR-502/2020,,,full_year,12,,,,,,,false
+32780,"Medford, OR",2022,2023,OR-502,accepted_with_map_uncertainty,false,,OR-502/2022 | OR-502/2023,,,full_year,12,,,,,,,false
+32900,"Merced, CA",2011,2012,CA-520,accepted_with_map_uncertainty,false,,CA-520/2011 | CA-520/2012,,,full_year,12,,,,,,,false
+32900,"Merced, CA",2012,2013,CA-520,accepted_with_map_uncertainty,false,,CA-520/2012 | CA-520/2013,,,full_year,12,,,,,,,false
+32900,"Merced, CA",2013,2014,CA-520,accepted_with_map_uncertainty,false,,CA-520/2013 | CA-520/2014,,,full_year,12,,,,,,,false
+32900,"Merced, CA",2014,2015,CA-520,accepted_with_map_uncertainty,false,,CA-520/2014 | CA-520/2015,,,full_year,12,,,,,,,false
+32900,"Merced, CA",2015,2016,CA-520,accepted_with_map_uncertainty,false,,CA-520/2015 | CA-520/2016,,,full_year,12,,,,,,,false
+32900,"Merced, CA",2016,2017,CA-520,accepted_with_map_uncertainty,false,,CA-520/2016 | CA-520/2017,,,full_year,12,,,,,,,false
+32900,"Merced, CA",2017,2018,CA-520,accepted_with_map_uncertainty,false,,CA-520/2017 | CA-520/2018,,,full_year,12,,,,,,,false
+32900,"Merced, CA",2018,2019,CA-520,accepted_with_map_uncertainty,false,,CA-520/2018 | CA-520/2019,,,full_year,12,,,,,,,false
+32900,"Merced, CA",2019,2020,CA-520,accepted_with_map_uncertainty,false,,CA-520/2019 | CA-520/2020,,,full_year,12,,,,,,,false
+32900,"Merced, CA",2022,2023,CA-520,accepted_on_prior_review,true,,,,,full_year,12,,,,,,,false
+32900,"Merced, CA",2023,2024,CA-520,accepted_on_prior_review,true,,,,,full_year,12,,,,,,,false
+32900,"Merced, CA",2024,2025,CA-520,accepted_with_map_uncertainty,false,,CA-520/2025,,,matched_months_excluding_october,11,,,,,,,true
+33100,"Miami-Fort Lauderdale-West Palm Beach, FL",2017,2018,FL-600 | FL-601 | FL-605,accepted_with_map_uncertainty,false,,FL-600/2017 | FL-600/2018 | FL-601/2017 | FL-601/2018 | FL-605/2017 | FL-605/2018,,,full_year,12,,,,,,,false
+33100,"Miami-Fort Lauderdale-West Palm Beach, FL",2018,2019,FL-600 | FL-601 | FL-605,accepted_with_map_uncertainty,false,,FL-600/2018 | FL-600/2019 | FL-601/2018 | FL-601/2019 | FL-605/2018 | FL-605/2019,,,full_year,12,,,,,,,false
+33100,"Miami-Fort Lauderdale-West Palm Beach, FL",2019,2020,FL-600 | FL-601 | FL-605,accepted_with_map_uncertainty,false,,FL-600/2019 | FL-600/2020 | FL-601/2019 | FL-601/2020 | FL-605/2019 | FL-605/2020,,,full_year,12,,,,,,,false
+33100,"Miami-Fort Lauderdale-West Palm Beach, FL",2022,2023,FL-600 | FL-601 | FL-605,accepted_with_map_uncertainty,false,,FL-600/2022 | FL-601/2022 | FL-601/2023 | FL-605/2022 | FL-605/2023,,,full_year,12,,,,,,,false
+33700,"Modesto, CA",2013,2014,CA-510,accepted_with_map_uncertainty,false,,CA-510/2013 | CA-510/2014,,,full_year,12,,,,,,,false
+33700,"Modesto, CA",2014,2015,CA-510,accepted_with_map_uncertainty,false,,CA-510/2014 | CA-510/2015,,,full_year,12,,,,,,,false
+33700,"Modesto, CA",2015,2016,CA-510,accepted_with_map_uncertainty,false,,CA-510/2015 | CA-510/2016,,,full_year,12,,,,,,,false
+33700,"Modesto, CA",2016,2017,CA-510,accepted_with_map_uncertainty,false,,CA-510/2016 | CA-510/2017,,,full_year,12,,,,,,,false
+33700,"Modesto, CA",2017,2018,CA-510,accepted_with_map_uncertainty,false,,CA-510/2017 | CA-510/2018,,,full_year,12,,,,,,,false
+33700,"Modesto, CA",2018,2019,CA-510,accepted_with_map_uncertainty,false,,CA-510/2018 | CA-510/2019,,,full_year,12,,,,,,,false
+33700,"Modesto, CA",2019,2020,CA-510,accepted_with_map_uncertainty,false,,CA-510/2019 | CA-510/2020,,,full_year,12,,,,,,,false
+33700,"Modesto, CA",2022,2023,CA-510,accepted_with_map_uncertainty,false,,CA-510/2022 | CA-510/2023,,,full_year,12,,,,,,,false
+33700,"Modesto, CA",2023,2024,CA-510,accepted_with_map_uncertainty,false,,CA-510/2023,,,full_year,12,,,,,,,false
+33700,"Modesto, CA",2024,2025,CA-510,accepted_with_map_uncertainty,false,,CA-510/2025,,,matched_months_excluding_october,11,,,,,"Year-round HIC decreases from 1,309 to 1,277 while reported seasonal/overflow/voucher beds rise from 3 to 111; the Warming Center no longer appears as the same year-round line. Test sensitivity to temporary beds and classification.",https://files.hudexchange.info/reports/published/CoC_HIC_CoC_CA-510-2024_CA_2024.pdf | https://files.hudexchange.info/reports/published/CoC_HIC_CoC_CA-510-2025_CA_2025.pdf,true
+33780,"Monroe, MI",2015,2016,MI-515,accepted_with_map_uncertainty,false,,MI-515/2015 | MI-515/2016,,,full_year,12,,,,,,,false
+33780,"Monroe, MI",2016,2017,MI-515,accepted_with_map_uncertainty,false,,MI-515/2016 | MI-515/2017,,,full_year,12,,,,,,,false
+33780,"Monroe, MI",2017,2018,MI-515,accepted_with_map_uncertainty,false,,MI-515/2017 | MI-515/2018,,,full_year,12,,,,,,,false
+33780,"Monroe, MI",2018,2019,MI-515,accepted_with_map_uncertainty,false,,MI-515/2018 | MI-515/2019,,,full_year,12,,,,,,,false
+33780,"Monroe, MI",2019,2020,MI-515,accepted_with_map_uncertainty,false,,MI-515/2019 | MI-515/2020,,,full_year,12,,,,,,,false
+33780,"Monroe, MI",2022,2023,MI-515,accepted_with_map_uncertainty,false,,MI-515/2022,,,full_year,12,,,,,,,false
+33780,"Monroe, MI",2023,2024,MI-515,accepted_on_prior_review,true,,,,,full_year,12,,,,,,,false
+33780,"Monroe, MI",2024,2025,MI-515,accepted_with_map_uncertainty,false,,MI-515/2025,,,matched_months_excluding_october,11,,,,,,,true
+34740,"Muskegon-Norton Shores, MI",2015,2016,MI-516,accepted_with_map_uncertainty,false,,MI-516/2015 | MI-516/2016,,,full_year,12,,,,,,,false
+34740,"Muskegon-Norton Shores, MI",2016,2017,MI-516,accepted_with_map_uncertainty,false,,MI-516/2016 | MI-516/2017,,,full_year,12,,,,,,,false
+34740,"Muskegon-Norton Shores, MI",2017,2018,MI-516,accepted_with_map_uncertainty,false,,MI-516/2017 | MI-516/2018,,,full_year,12,,,,,,,false
+34740,"Muskegon-Norton Shores, MI",2018,2019,MI-516,accepted_with_map_uncertainty,false,,MI-516/2018 | MI-516/2019,,,full_year,12,,,,,,,false
+34740,"Muskegon-Norton Shores, MI",2019,2020,MI-516,accepted_with_map_uncertainty,false,,MI-516/2019 | MI-516/2020,,,full_year,12,,,,,,,false
+34740,"Muskegon-Norton Shores, MI",2022,2023,MI-516,accepted_with_map_uncertainty,false,,MI-516/2022,,,full_year,12,,,,,,,false
+34740,"Muskegon-Norton Shores, MI",2023,2024,MI-516,accepted_on_prior_review,true,,,,,full_year,12,,,,,,,false
+34740,"Muskegon-Norton Shores, MI",2024,2025,MI-516,accepted_with_map_uncertainty,false,,MI-516/2025,,,matched_months_excluding_october,11,,,,,Year-round beds fall from 245 to 169. The 34-bed and 36-bed Every Woman’s Place entries disappear as unnamed non-HMIS entries of 20 and 35 beds appear. Test sensitivity to possible re-reporting or changes in available beds.,https://files.hudexchange.info/reports/published/CoC_HIC_CoC_MI-516-2024_MI_2024.pdf | https://files.hudexchange.info/reports/published/CoC_HIC_CoC_MI-516-2025_MI_2025.pdf,true
+34900,"Napa, CA",2013,2014,CA-517,accepted_with_map_uncertainty,false,,CA-517/2013 | CA-517/2014,,,full_year,12,,,,,,,false
+34900,"Napa, CA",2014,2015,CA-517,accepted_with_map_uncertainty,false,,CA-517/2014 | CA-517/2015,,,full_year,12,,,,,,,false
+34900,"Napa, CA",2015,2016,CA-517,accepted_with_map_uncertainty,false,,CA-517/2015 | CA-517/2016,,,full_year,12,,,,,,,false
+34900,"Napa, CA",2016,2017,CA-517,accepted_with_map_uncertainty,false,,CA-517/2016 | CA-517/2017,,,full_year,12,,,,,,,false
+34900,"Napa, CA",2017,2018,CA-517,accepted_with_map_uncertainty,false,,CA-517/2017 | CA-517/2018,,,full_year,12,,,,,,,false
+34900,"Napa, CA",2018,2019,CA-517,accepted_with_map_uncertainty,false,,CA-517/2018 | CA-517/2019,,,full_year,12,,,,,,,false
+34900,"Napa, CA",2019,2020,CA-517,accepted_with_map_uncertainty,false,,CA-517/2019 | CA-517/2020,,,full_year,12,,,,,,,false
+34900,"Napa, CA",2022,2023,CA-517,accepted_with_map_uncertainty,false,,CA-517/2022 | CA-517/2023,,,full_year,12,,,,,,,false
+34900,"Napa, CA",2023,2024,CA-517,accepted_with_map_uncertainty,false,,CA-517/2023,,,full_year,12,,,,,,,false
+34900,"Napa, CA",2024,2025,CA-517,accepted_with_map_uncertainty,false,,CA-517/2025,,,matched_months_excluding_october,11,,,,,Eleven transitional housing beds at Whistlestop Homes were listed in 2024 and the project line is absent in 2025. Test the effect of an 11-bed difference given uncertainty about project coverage.,https://files.hudexchange.info/reports/published/CoC_HIC_CoC_CA-517-2024_CA_2024.pdf | https://files.hudexchange.info/reports/published/CoC_HIC_CoC_CA-517-2025_CA_2025.pdf,true
+34940,"Naples-Marco Island, FL",2010,2011,FL-606,joint_review,false,,,FL-606/2010 | FL-606/2011,Unresolved larger geographic signal at 2014–2015.,full_year,12,,,,,,,false
+34940,"Naples-Marco Island, FL",2013,2014,FL-606,joint_review,false,,,FL-606/2013 | FL-606/2014,Unresolved larger geographic signal at 2014–2015.,full_year,12,,,,,,,false
+34940,"Naples-Marco Island, FL",2014,2015,FL-606,joint_review,false,,FL-606/2015,FL-606/2014,Unresolved larger geographic signal at 2014–2015.,full_year,12,,,,,,,false
+34940,"Naples-Marco Island, FL",2015,2016,FL-606,accepted_with_map_uncertainty,false,,FL-606/2015 | FL-606/2016,,,full_year,12,,,,,,,false
+34940,"Naples-Marco Island, FL",2016,2017,FL-606,accepted_with_map_uncertainty,false,,FL-606/2016 | FL-606/2017,,,full_year,12,,,,,,,false
+34940,"Naples-Marco Island, FL",2017,2018,FL-606,accepted_with_map_uncertainty,false,,FL-606/2017 | FL-606/2018,,,full_year,12,,,,,,,false
+34940,"Naples-Marco Island, FL",2018,2019,FL-606,accepted_with_map_uncertainty,false,,FL-606/2018 | FL-606/2019,,,full_year,12,,,,,,,false
+34940,"Naples-Marco Island, FL",2019,2020,FL-606,accepted_with_map_uncertainty,false,,FL-606/2019 | FL-606/2020,,,full_year,12,,,,,,,false
+34940,"Naples-Marco Island, FL",2022,2023,FL-606,accepted_with_map_uncertainty,false,,FL-606/2022,,,full_year,12,,,,,,,false
+34940,"Naples-Marco Island, FL",2023,2024,FL-606,accepted_on_prior_review,true,,,,,full_year,12,,,,,,,false
+34940,"Naples-Marco Island, FL",2024,2025,FL-606,accepted_with_map_uncertainty,false,,FL-606/2025,,,matched_months_excluding_october,11,,,,,The 68-bed St. Matthew’s House Lee entry in Collier’s report and the 65-bed St. Matthew’s House entry in Lee’s report represent the same Fort Myers facility. The working inventory assigns the facility to Lee and removes the 68-bed entry from Collier. The 2025 working total is 470 year-round beds. Test the published 538 as a sensitivity scenario.,https://files.hudexchange.info/reports/published/CoC_HIC_CoC_FL-606-2024_FL_2024.pdf | https://files.hudexchange.info/reports/published/CoC_HIC_CoC_FL-606-2025_FL_2025.pdf | https://files.hudexchange.info/reports/published/CoC_HIC_CoC_FL-603-2025_FL_2025.pdf | https://stmatthewshouse.org/wp-content/uploads/2026/01/1-SMH-FM-Shelter-Anniversary-release-FINAL1.6.26.pdf,true
+35840,"North Port-Bradenton-Sarasota, FL",2013,2014,FL-500,accepted_with_map_uncertainty,false,,FL-500/2013 | FL-500/2014,,,full_year,12,,,,,,,false
+35840,"North Port-Bradenton-Sarasota, FL",2014,2015,FL-500,accepted_with_map_uncertainty,false,,FL-500/2014 | FL-500/2015,,,full_year,12,,,,,,,false
+35840,"North Port-Bradenton-Sarasota, FL",2015,2016,FL-500,accepted_with_map_uncertainty,false,,FL-500/2015 | FL-500/2016,,,full_year,12,,,,,,,false
+35840,"North Port-Bradenton-Sarasota, FL",2016,2017,FL-500,accepted_with_map_uncertainty,false,,FL-500/2016 | FL-500/2017,,,full_year,12,,,,,,,false
+35840,"North Port-Bradenton-Sarasota, FL",2017,2018,FL-500,accepted_with_map_uncertainty,false,,FL-500/2017 | FL-500/2018,,,full_year,12,,,,,,,false
+35840,"North Port-Bradenton-Sarasota, FL",2018,2019,FL-500,accepted_with_map_uncertainty,false,,FL-500/2018 | FL-500/2019,,,full_year,12,,,,,,,false
+35840,"North Port-Bradenton-Sarasota, FL",2019,2020,FL-500,accepted_with_map_uncertainty,false,,FL-500/2019 | FL-500/2020,,,full_year,12,,,,,,,false
+35840,"North Port-Bradenton-Sarasota, FL",2022,2023,FL-500,accepted_with_map_uncertainty,false,,FL-500/2022,,,full_year,12,,,,,,,false
+35840,"North Port-Bradenton-Sarasota, FL",2023,2024,FL-500,accepted_on_prior_review,true,,,,,full_year,12,,,,,,,false
+35840,"North Port-Bradenton-Sarasota, FL",2024,2025,FL-500,accepted_with_map_uncertainty,false,,FL-500/2025,,,matched_months_excluding_october,11,,,,,HUD lists 811 year-round beds in 2024 and 633 in 2025. Two domestic violence shelter entries account for 64 of the 75 net emergency-shelter beds lost from the inventory. The extent of capacity change versus change in reporting remains uncertain.,https://files.hudexchange.info/reports/published/CoC_HIC_CoC_FL-500-2024_FL_2024.pdf | https://files.hudexchange.info/reports/published/CoC_HIC_CoC_FL-500-2025_FL_2025.pdf | https://www.mymanatee.org/docs/default-source/community-and-veterans-services-documents/community-development-documents/cdbg/2025-annual-action-plan-draft.pdf#page=50,true
+36100,"Ocala, FL",2013,2014,FL-514,accepted_with_map_uncertainty,false,,FL-514/2013 | FL-514/2014,,,full_year,12,,,,,,,false
+36100,"Ocala, FL",2014,2015,FL-514,accepted_with_map_uncertainty,false,,FL-514/2014 | FL-514/2015,,,full_year,12,,,,,,,false
+36100,"Ocala, FL",2017,2018,FL-514,accepted_with_map_uncertainty,false,,FL-514/2017 | FL-514/2018,,,full_year,12,,,,,,,false
+36100,"Ocala, FL",2018,2019,FL-514,accepted_with_map_uncertainty,false,,FL-514/2018 | FL-514/2019,,,full_year,12,,,,,,,false
+36100,"Ocala, FL",2019,2020,FL-514,accepted_with_map_uncertainty,false,,FL-514/2019 | FL-514/2020,,,full_year,12,,,,,,,false
+36100,"Ocala, FL",2022,2023,FL-514,accepted_on_prior_review,true,,,,,full_year,12,,,,,,,false
+36100,"Ocala, FL",2023,2024,FL-514,accepted_on_prior_review,true,,,,,full_year,12,,,,,,,false
+36100,"Ocala, FL",2024,2025,FL-514,accepted_with_map_uncertainty,false,,FL-514/2025,,,matched_months_excluding_october,11,,,,,,,true
+37100,"Oxnard-Thousand Oaks-Ventura, CA",2010,2011,CA-611,accepted_on_prior_review,true,,,,,full_year,12,,,,,,,false
+37100,"Oxnard-Thousand Oaks-Ventura, CA",2011,2012,CA-611,accepted_on_prior_review,true,,,,,full_year,12,,,,,,,false
+37100,"Oxnard-Thousand Oaks-Ventura, CA",2012,2013,CA-611,accepted_on_prior_review,true,,,,,full_year,12,,,,,,,false
+37100,"Oxnard-Thousand Oaks-Ventura, CA",2013,2014,CA-611,accepted_on_prior_review,true,,,,,full_year,12,,,,,,,false
+37100,"Oxnard-Thousand Oaks-Ventura, CA",2014,2015,CA-611,accepted_on_prior_review,true,,,,,full_year,12,,,,,,,false
+37100,"Oxnard-Thousand Oaks-Ventura, CA",2015,2016,CA-611,accepted_on_prior_review,true,,,,,full_year,12,,,,,,,false
+37100,"Oxnard-Thousand Oaks-Ventura, CA",2016,2017,CA-611,accepted_on_prior_review,true,,,,,full_year,12,,,,,,,false
+37100,"Oxnard-Thousand Oaks-Ventura, CA",2017,2018,CA-611,accepted_on_prior_review,true,,,,,full_year,12,,,,,,,false
+37100,"Oxnard-Thousand Oaks-Ventura, CA",2018,2019,CA-611,accepted_on_prior_review,true,,,,,full_year,12,,,,,,,false
+37100,"Oxnard-Thousand Oaks-Ventura, CA",2019,2020,CA-611,accepted_on_prior_review,true,,,,,full_year,12,,,,,,,false
+37100,"Oxnard-Thousand Oaks-Ventura, CA",2022,2023,CA-611,accepted_on_prior_review,true,,,,,full_year,12,,,,,,,false
+37100,"Oxnard-Thousand Oaks-Ventura, CA",2023,2024,CA-611,accepted_on_prior_review,true,,,,,full_year,12,,,,,,,false
+37100,"Oxnard-Thousand Oaks-Ventura, CA",2024,2025,CA-611,accepted_on_prior_review,true,,,,,matched_months_excluding_october,11,,,,,,,false
+37340,"Palm Bay-Melbourne-Titusville, FL",2011,2012,FL-513,joint_review,false,,,FL-513/2011 | FL-513/2012,"Unresolved larger geographic signal at 2012–2013, 2014–2015.",full_year,12,,,,,,,false
+37340,"Palm Bay-Melbourne-Titusville, FL",2012,2013,FL-513,joint_review,false,,,FL-513/2012 | FL-513/2013,"Unresolved larger geographic signal at 2012–2013, 2014–2015. | Unresolved larger geographic signal at 2014–2015.",full_year,12,,,,,,,false
+37340,"Palm Bay-Melbourne-Titusville, FL",2015,2016,FL-513,accepted_with_map_uncertainty,false,,FL-513/2015 | FL-513/2016,,,full_year,12,,,,,,,false
+37340,"Palm Bay-Melbourne-Titusville, FL",2016,2017,FL-513,accepted_with_map_uncertainty,false,,FL-513/2016 | FL-513/2017,,,full_year,12,,,,,,,false
+37340,"Palm Bay-Melbourne-Titusville, FL",2019,2020,FL-513,accepted_with_map_uncertainty,false,,FL-513/2019 | FL-513/2020,,,full_year,12,,,,,,,false
+37340,"Palm Bay-Melbourne-Titusville, FL",2022,2023,FL-513,accepted_with_map_uncertainty,false,,FL-513/2022,,,full_year,12,,,,,,,false
+37340,"Palm Bay-Melbourne-Titusville, FL",2023,2024,FL-513,accepted_on_prior_review,true,,,,,full_year,12,,,,,,,false
+37340,"Palm Bay-Melbourne-Titusville, FL",2024,2025,FL-513,accepted_with_map_uncertainty,false,,FL-513/2025,,,matched_months_excluding_october,11,,,pit-cold-night-shelter-fl-513-2025#r1,,,,true
+37860,"Pensacola-Ferry Pass-Brent, FL",2011,2012,FL-511,accepted_with_map_uncertainty,false,,FL-511/2011 | FL-511/2012,,,full_year,12,,,,,,,false
+37860,"Pensacola-Ferry Pass-Brent, FL",2012,2013,FL-511,accepted_with_map_uncertainty,false,,FL-511/2012 | FL-511/2013,,,full_year,12,,,,,,,false
+37860,"Pensacola-Ferry Pass-Brent, FL",2013,2014,FL-511,accepted_with_map_uncertainty,false,,FL-511/2013 | FL-511/2014,,,full_year,12,,,,,,,false
+37860,"Pensacola-Ferry Pass-Brent, FL",2014,2015,FL-511,accepted_with_map_uncertainty,false,,FL-511/2014 | FL-511/2015,,,full_year,12,,,,,,,false
+37860,"Pensacola-Ferry Pass-Brent, FL",2015,2016,FL-511,accepted_with_map_uncertainty,false,,FL-511/2015 | FL-511/2016,,,full_year,12,,,,,,,false
+37860,"Pensacola-Ferry Pass-Brent, FL",2016,2017,FL-511,accepted_with_map_uncertainty,false,,FL-511/2016 | FL-511/2017,,,full_year,12,,,,,,,false
+37860,"Pensacola-Ferry Pass-Brent, FL",2017,2018,FL-511,accepted_with_map_uncertainty,false,,FL-511/2017 | FL-511/2018,,,full_year,12,,,,,,,false
+37860,"Pensacola-Ferry Pass-Brent, FL",2018,2019,FL-511,accepted_with_map_uncertainty,false,,FL-511/2018 | FL-511/2019,,,full_year,12,,,,,,,false
+37860,"Pensacola-Ferry Pass-Brent, FL",2019,2020,FL-511,accepted_with_map_uncertainty,false,,FL-511/2019 | FL-511/2020,,,full_year,12,,,,,,,false
+37860,"Pensacola-Ferry Pass-Brent, FL",2022,2023,FL-511,accepted_with_map_uncertainty,false,,FL-511/2022,,,full_year,12,,,,,,,false
+37860,"Pensacola-Ferry Pass-Brent, FL",2023,2024,FL-511,accepted_on_prior_review,true,,,,,full_year,12,,,,,,,false
+37860,"Pensacola-Ferry Pass-Brent, FL",2024,2025,FL-511,accepted_with_map_uncertainty,false,,FL-511/2025,,,matched_months_excluding_october,11,Opening Doors and HUD document the February 26 count night and February 27 follow-up in 2025.,https://openingdoorsnwfl.org/web/assets/download/Point-in-Time-Count-2025-Community-Planning-Meeting-2025-02-04.pdf?4= | https://files.hudexchange.info/reports/published/CoC_PopSub_CoC_FL-511-2025_FL_2025.pdf,,,Year-round HIC increases from 601 to 696 around substantial REAP project changes and a change in family-bed inventory. Test sensitivity to project and timing differences.,https://files.hudexchange.info/reports/published/CoC_HIC_CoC_FL-511-2024_FL_2024.pdf | https://files.hudexchange.info/reports/published/CoC_HIC_CoC_FL-511-2025_FL_2025.pdf | https://openingdoorsnwfl.org/web/assets/download/Point-in-Time-Count-2025-Community-Planning-Meeting-2025-02-04.pdf?4=,true
+39300,"Providence-Warwick, RI-MA",2010,2011,MA-505 | MA-515 | RI-500,accepted_with_map_uncertainty,false,,RI-500/2010 | RI-500/2011,,,full_year,12,,,,,,,false
+39300,"Providence-Warwick, RI-MA",2011,2012,MA-505 | MA-515 | RI-500,accepted_with_map_uncertainty,false,,RI-500/2011 | RI-500/2012,,,full_year,12,,,,,,,false
+39300,"Providence-Warwick, RI-MA",2012,2013,MA-505 | MA-515 | RI-500,accepted_with_map_uncertainty,false,,RI-500/2012 | RI-500/2013,,,full_year,12,,,,,,,false
+39300,"Providence-Warwick, RI-MA",2013,2014,MA-505 | MA-515 | RI-500,accepted_with_map_uncertainty,false,,RI-500/2013 | RI-500/2014,,,full_year,12,,,,,,,false
+39300,"Providence-Warwick, RI-MA",2014,2015,MA-505 | MA-515 | RI-500,accepted_with_map_uncertainty,false,,RI-500/2014 | RI-500/2015,,,full_year,12,,,,,,,false
+39300,"Providence-Warwick, RI-MA",2015,2016,MA-505 | MA-515 | RI-500,accepted_with_map_uncertainty,false,,RI-500/2015 | RI-500/2016,,,full_year,12,,,,,,,false
+39300,"Providence-Warwick, RI-MA",2016,2017,MA-505 | MA-515 | RI-500,accepted_with_map_uncertainty,false,,RI-500/2016 | RI-500/2017,,,full_year,12,,,,,,,false
+39300,"Providence-Warwick, RI-MA",2017,2018,MA-505 | MA-515 | RI-500,accepted_with_map_uncertainty,false,,RI-500/2017 | RI-500/2018,,,full_year,12,,,,,,,false
+39300,"Providence-Warwick, RI-MA",2018,2019,MA-505 | MA-515 | RI-500,accepted_with_map_uncertainty,false,,RI-500/2018 | RI-500/2019,,,full_year,12,,,,,,,false
+39300,"Providence-Warwick, RI-MA",2019,2020,MA-505 | MA-515 | RI-500,accepted_with_map_uncertainty,false,,RI-500/2019 | RI-500/2020,,,full_year,12,,,,,,,false
+39300,"Providence-Warwick, RI-MA",2022,2023,MA-505 | MA-515 | RI-500,accepted_with_map_uncertainty,false,,RI-500/2022,,,full_year,12,,,,,,,false
+39300,"Providence-Warwick, RI-MA",2023,2024,MA-505 | MA-515 | RI-500,accepted_on_prior_review,true,,,,,full_year,12,,,,,,,false
+39300,"Providence-Warwick, RI-MA",2024,2025,MA-505 | MA-515 | RI-500,accepted_with_map_uncertainty,false,,MA-505/2025 | MA-515/2025 | RI-500/2025,,,matched_months_excluding_october,11,,,,,,,true
+39460,"Punta Gorda, FL",2010,2011,FL-602,accepted_with_map_uncertainty,false,,FL-602/2010 | FL-602/2011,,,full_year,12,,,,,,,false
+39460,"Punta Gorda, FL",2011,2012,FL-602,accepted_with_map_uncertainty,false,,FL-602/2011 | FL-602/2012,,,full_year,12,,,,,,,false
+39460,"Punta Gorda, FL",2012,2013,FL-602,accepted_with_map_uncertainty,false,,FL-602/2012 | FL-602/2013,,,full_year,12,,,,,,,false
+39460,"Punta Gorda, FL",2013,2014,FL-602,accepted_with_map_uncertainty,false,,FL-602/2013 | FL-602/2014,,,full_year,12,,,,,,,false
+39460,"Punta Gorda, FL",2014,2015,FL-602,accepted_with_map_uncertainty,false,,FL-602/2014 | FL-602/2015,,,full_year,12,,,,,,,false
+39460,"Punta Gorda, FL",2015,2016,FL-602,accepted_with_map_uncertainty,false,,FL-602/2015 | FL-602/2016,,,full_year,12,,,,,,,false
+39460,"Punta Gorda, FL",2016,2017,FL-602,accepted_with_map_uncertainty,false,,FL-602/2016 | FL-602/2017,,,full_year,12,,,,,,,false
+39460,"Punta Gorda, FL",2017,2018,FL-602,accepted_with_map_uncertainty,false,,FL-602/2017 | FL-602/2018,,,full_year,12,,,,,,,false
+39460,"Punta Gorda, FL",2018,2019,FL-602,accepted_with_map_uncertainty,false,,FL-602/2018 | FL-602/2019,,,full_year,12,,,,,,,false
+39460,"Punta Gorda, FL",2019,2020,FL-602,accepted_with_map_uncertainty,false,,FL-602/2019 | FL-602/2020,,,full_year,12,,,,,,,false
+39460,"Punta Gorda, FL",2022,2023,FL-602,accepted_with_map_uncertainty,false,,FL-602/2022,,,full_year,12,,,,,,,false
+39460,"Punta Gorda, FL",2023,2024,FL-602,accepted_on_prior_review,true,,,,,full_year,12,,,,,,,false
+39460,"Punta Gorda, FL",2024,2025,FL-602,accepted_with_map_uncertainty,false,,FL-602/2025,,,matched_months_excluding_october,11,,,,,"Year-round beds fall from 138 to 126 during provider changes. The 52-bed former Homeless Coalition entry is continued under Vincentian CARES, while the separate 53-bed COAD entry becomes 39. Test sensitivity to project changes in reported capacity.",https://files.hudexchange.info/reports/published/CoC_HIC_CoC_FL-602-2024_FL_2024.pdf | https://files.hudexchange.info/reports/published/CoC_HIC_CoC_FL-602-2025_FL_2025.pdf | https://www.vin.care/programs/homeless-services/charlotte-care-center/,true
+39540,"Racine-Mount Pleasant, WI",2010,2011,WI-502,joint_review,false,,,WI-502/2010 | WI-502/2011,Earlier Racine PIT operational exclusions require disposition.,full_year,12,,,,,,,false
+39540,"Racine-Mount Pleasant, WI",2011,2012,WI-502,joint_review,false,,,WI-502/2011 | WI-502/2012,Earlier Racine PIT operational exclusions require disposition.,full_year,12,,,,,,,false
+39540,"Racine-Mount Pleasant, WI",2012,2013,WI-502,joint_review,false,,,WI-502/2012 | WI-502/2013,Earlier Racine PIT operational exclusions require disposition.,full_year,12,,,,,,,false
+39540,"Racine-Mount Pleasant, WI",2013,2014,WI-502,joint_review,false,,,WI-502/2013 | WI-502/2014,Earlier Racine PIT operational exclusions require disposition.,full_year,12,,,,,,,false
+39540,"Racine-Mount Pleasant, WI",2014,2015,WI-502,joint_review,false,,,WI-502/2014 | WI-502/2015,Earlier Racine PIT operational exclusions require disposition.,full_year,12,,,,,,,false
+39540,"Racine-Mount Pleasant, WI",2015,2016,WI-502,joint_review,false,,,WI-502/2015 | WI-502/2016,Earlier Racine PIT operational exclusions require disposition.,full_year,12,,,,,,,false
+39540,"Racine-Mount Pleasant, WI",2016,2017,WI-502,joint_review,false,,,WI-502/2016 | WI-502/2017,Earlier Racine PIT operational exclusions require disposition.,full_year,12,,,,,,,false
+39540,"Racine-Mount Pleasant, WI",2017,2018,WI-502,joint_review,false,,,WI-502/2017,Earlier Racine PIT operational exclusions require disposition.,full_year,12,,,,,,,false
+39540,"Racine-Mount Pleasant, WI",2018,2019,WI-502,accepted_on_prior_review,true,,,,,full_year,12,,,,,,,false
+39540,"Racine-Mount Pleasant, WI",2019,2020,WI-502,accepted_on_prior_review,true,,,,,full_year,12,,,,,,,false
+39540,"Racine-Mount Pleasant, WI",2022,2023,WI-502,accepted_on_prior_review,true,,,,,full_year,12,,,,,,,false
+39540,"Racine-Mount Pleasant, WI",2023,2024,WI-502,accepted_on_prior_review,true,,,,,full_year,12,,,,,,,false
+39540,"Racine-Mount Pleasant, WI",2024,2025,WI-502,joint_review,false,,,WI-502/2025,A dated 2025 administrative reporting-scope reference is still needed.,matched_months_excluding_october,11,,,,,,,false
+39740,"Reading, PA",2010,2011,PA-506,accepted_with_map_uncertainty,false,,PA-506/2010 | PA-506/2011,,,full_year,12,,,,,,,false
+39740,"Reading, PA",2011,2012,PA-506,accepted_with_map_uncertainty,false,,PA-506/2011 | PA-506/2012,,,full_year,12,,,,,,,false
+39740,"Reading, PA",2012,2013,PA-506,accepted_with_map_uncertainty,false,,PA-506/2012 | PA-506/2013,,,full_year,12,,,,,,,false
+39740,"Reading, PA",2013,2014,PA-506,accepted_with_map_uncertainty,false,,PA-506/2013 | PA-506/2014,,,full_year,12,,,,,,,false
+39740,"Reading, PA",2014,2015,PA-506,accepted_with_map_uncertainty,false,,PA-506/2014 | PA-506/2015,,,full_year,12,,,,,,,false
+39740,"Reading, PA",2015,2016,PA-506,accepted_with_map_uncertainty,false,,PA-506/2015 | PA-506/2016,,,full_year,12,,,,,,,false
+39740,"Reading, PA",2016,2017,PA-506,accepted_with_map_uncertainty,false,,PA-506/2016 | PA-506/2017,,,full_year,12,,,,,,,false
+39740,"Reading, PA",2017,2018,PA-506,accepted_with_map_uncertainty,false,,PA-506/2017 | PA-506/2018,,,full_year,12,,,,,,,false
+39740,"Reading, PA",2018,2019,PA-506,accepted_with_map_uncertainty,false,,PA-506/2018 | PA-506/2019,,,full_year,12,,,,,,,false
+39740,"Reading, PA",2019,2020,PA-506,accepted_with_map_uncertainty,false,,PA-506/2019 | PA-506/2020,,,full_year,12,,,,,,,false
+39740,"Reading, PA",2022,2023,PA-506,accepted_on_prior_review,true,,,,,full_year,12,,,,,,,false
+39740,"Reading, PA",2023,2024,PA-506,accepted_on_prior_review,true,,,,,full_year,12,,,,,,,false
+39740,"Reading, PA",2024,2025,PA-506,accepted_with_map_uncertainty,false,,PA-506/2025,,,matched_months_excluding_october,11,,,,,,,true
+40140,"Riverside-San Bernardino-Ontario, CA",2015,2016,CA-608 | CA-609,accepted_with_map_uncertainty,false,,CA-608/2015 | CA-608/2016 | CA-609/2015 | CA-609/2016,,,full_year,12,,,,,,,false
+40140,"Riverside-San Bernardino-Ontario, CA",2016,2017,CA-608 | CA-609,accepted_with_map_uncertainty,false,,CA-608/2016 | CA-608/2017 | CA-609/2016 | CA-609/2017,,,full_year,12,,,,,,,false
+40140,"Riverside-San Bernardino-Ontario, CA",2017,2018,CA-608 | CA-609,accepted_with_map_uncertainty,false,,CA-608/2017 | CA-608/2018 | CA-609/2017 | CA-609/2018,,,full_year,12,,,,,,,false
+40140,"Riverside-San Bernardino-Ontario, CA",2018,2019,CA-608 | CA-609,accepted_with_map_uncertainty,false,,CA-608/2018 | CA-608/2019 | CA-609/2018 | CA-609/2019,,,full_year,12,,,,,,,false
+40140,"Riverside-San Bernardino-Ontario, CA",2019,2020,CA-608 | CA-609,accepted_with_map_uncertainty,false,,CA-608/2019 | CA-608/2020 | CA-609/2019 | CA-609/2020,,,full_year,12,,,,,,,false
+40140,"Riverside-San Bernardino-Ontario, CA",2022,2023,CA-608 | CA-609,accepted_with_map_uncertainty,false,,CA-608/2022 | CA-608/2023 | CA-609/2022 | CA-609/2023,,,full_year,12,,,,,,,false
+40980,"Saginaw, MI",2013,2014,MI-510,accepted_with_map_uncertainty,false,,MI-510/2013 | MI-510/2014,,,full_year,12,,,,,,,false
+40980,"Saginaw, MI",2014,2015,MI-510,accepted_with_map_uncertainty,false,,MI-510/2014 | MI-510/2015,,,full_year,12,,,,,,,false
+40980,"Saginaw, MI",2015,2016,MI-510,accepted_with_map_uncertainty,false,,MI-510/2015 | MI-510/2016,,,full_year,12,,,,,,,false
+40980,"Saginaw, MI",2016,2017,MI-510,accepted_with_map_uncertainty,false,,MI-510/2016 | MI-510/2017,,,full_year,12,,,,,,,false
+40980,"Saginaw, MI",2017,2018,MI-510,accepted_with_map_uncertainty,false,,MI-510/2017 | MI-510/2018,,,full_year,12,,,,,,,false
+40980,"Saginaw, MI",2018,2019,MI-510,accepted_with_map_uncertainty,false,,MI-510/2018 | MI-510/2019,,,full_year,12,,,,,,,false
+40980,"Saginaw, MI",2019,2020,MI-510,accepted_with_map_uncertainty,false,,MI-510/2019 | MI-510/2020,,,full_year,12,,,,,,,false
+40980,"Saginaw, MI",2022,2023,MI-510,accepted_on_prior_review,true,,,,,full_year,12,,,,,,,false
+40980,"Saginaw, MI",2023,2024,MI-510,accepted_on_prior_review,true,,,,,full_year,12,,,,,,,false
+40980,"Saginaw, MI",2024,2025,MI-510,accepted_with_map_uncertainty,false,,MI-510/2025,,,matched_months_excluding_october,11,,,,,,,true
+41420,"Salem, OR",2022,2023,OR-504,joint_review,false,Salem OR-504 historical balance-of-state reporting,,OR-504/2022 | OR-504/2023,The two countywide HUD submissions and local count evidence support 2022–23 as a standalone pair after OR-504 re-formed. Decide whether to lift the earlier explicit whole-Salem study holdout for these post-reformation years.,full_year,12,,,,,,,true
+41740,"San Diego-Chula Vista-Carlsbad, CA",2010,2011,CA-601,accepted_on_prior_review,true,,,,,full_year,12,,,,,,,false
+41740,"San Diego-Chula Vista-Carlsbad, CA",2011,2012,CA-601,accepted_on_prior_review,true,,,,,full_year,12,,,,,,,false
+41740,"San Diego-Chula Vista-Carlsbad, CA",2012,2013,CA-601,accepted_on_prior_review,true,,,,,full_year,12,,,,,,,false
+41740,"San Diego-Chula Vista-Carlsbad, CA",2013,2014,CA-601,accepted_on_prior_review,true,,,,,full_year,12,,,,,,,false
+41740,"San Diego-Chula Vista-Carlsbad, CA",2014,2015,CA-601,accepted_on_prior_review,true,,,,,full_year,12,,,,,,,false
+41740,"San Diego-Chula Vista-Carlsbad, CA",2015,2016,CA-601,accepted_on_prior_review,true,,,,,full_year,12,,,,,,,false
+41740,"San Diego-Chula Vista-Carlsbad, CA",2016,2017,CA-601,accepted_on_prior_review,true,,,,,full_year,12,,,,,,,false
+41740,"San Diego-Chula Vista-Carlsbad, CA",2017,2018,CA-601,accepted_on_prior_review,true,,,,,full_year,12,,,,,,,false
+41740,"San Diego-Chula Vista-Carlsbad, CA",2018,2019,CA-601,accepted_on_prior_review,true,,,,,full_year,12,,,,,,,false
+41740,"San Diego-Chula Vista-Carlsbad, CA",2019,2020,CA-601,accepted_on_prior_review,true,,,,,full_year,12,,,,,,,false
+41740,"San Diego-Chula Vista-Carlsbad, CA",2022,2023,CA-601,accepted_on_prior_review,true,,,,,full_year,12,,,,,,,false
+41740,"San Diego-Chula Vista-Carlsbad, CA",2023,2024,CA-601,accepted_on_prior_review,true,,,,,full_year,12,,,,,,,false
+41740,"San Diego-Chula Vista-Carlsbad, CA",2024,2025,CA-601,accepted_on_prior_review,true,,,,,matched_months_excluding_october,11,,,,,,,false
+42100,"Santa Cruz-Watsonville, CA",2022,2023,CA-508,accepted_with_map_uncertainty,false,,CA-508/2022,,,full_year,12,,,,,,,false
+42100,"Santa Cruz-Watsonville, CA",2023,2024,CA-508,accepted_on_prior_review,true,,,,,full_year,12,,,,,,,false
+42100,"Santa Cruz-Watsonville, CA",2024,2025,CA-508,accepted_with_map_uncertainty,false,,CA-508/2025,,,matched_months_excluding_october,11,,,,,"Year-round inventory falls from 430 to 415 amid project turnover. The 23-bed Salvation Army Watsonville entry is absent in 2025, and People First Armory appears with 60 beds. Test sensitivity to project coverage where continuity of listed projects is uncertain.",https://files.hudexchange.info/reports/published/CoC_HIC_CoC_CA-508-2024_CA_2024.pdf | https://files.hudexchange.info/reports/published/CoC_HIC_CoC_CA-508-2025_CA_2025.pdf,true
+42200,"Santa Maria-Santa Barbara, CA",2019,2020,CA-603,accepted_with_map_uncertainty,false,,CA-603/2019 | CA-603/2020,,,full_year,12,,,,,,,false
+42200,"Santa Maria-Santa Barbara, CA",2022,2023,CA-603,accepted_with_map_uncertainty,false,,CA-603/2022,,,full_year,12,,,,,,,false
+42200,"Santa Maria-Santa Barbara, CA",2023,2024,CA-603,accepted_on_prior_review,true,,,,,full_year,12,,,,,,,false
+42200,"Santa Maria-Santa Barbara, CA",2024,2025,CA-603,accepted_with_map_uncertainty,false,,CA-603/2025,,,matched_months_excluding_october,11,,,,,,,true
+42220,"Santa Rosa-Petaluma, CA",2015,2016,CA-504,accepted_with_map_uncertainty,false,,CA-504/2015 | CA-504/2016,,,full_year,12,,,,,,,false
+42220,"Santa Rosa-Petaluma, CA",2016,2017,CA-504,accepted_with_map_uncertainty,false,,CA-504/2016 | CA-504/2017,,,full_year,12,,,,,,,false
+42220,"Santa Rosa-Petaluma, CA",2017,2018,CA-504,accepted_with_map_uncertainty,false,,CA-504/2017 | CA-504/2018,,,full_year,12,,,,,,,false
+42220,"Santa Rosa-Petaluma, CA",2018,2019,CA-504,accepted_with_map_uncertainty,false,,CA-504/2018 | CA-504/2019,,,full_year,12,,,,,,,false
+42220,"Santa Rosa-Petaluma, CA",2019,2020,CA-504,accepted_with_map_uncertainty,false,,CA-504/2019 | CA-504/2020,,,full_year,12,,,,,,,false
+42220,"Santa Rosa-Petaluma, CA",2022,2023,CA-504,accepted_with_map_uncertainty,false,,CA-504/2022,,,full_year,12,,,,,,,false
+42220,"Santa Rosa-Petaluma, CA",2023,2024,CA-504,accepted_on_prior_review,true,,,,,full_year,12,,,,,,,false
+42220,"Santa Rosa-Petaluma, CA",2024,2025,CA-504,accepted_with_map_uncertainty,false,,CA-504/2025,,,matched_months_excluding_october,11,,,,,"Los Guilicos and Mickey Zane list 120 beds combined in 2024. Their 2025 corresponding Eliza’s Village and Mickey Zane lines list 80 combined, while county reports describe 90 and 60 places respectively. Test inventory sensitivity subject to actual count-night availability.",https://files.hudexchange.info/reports/published/CoC_HIC_CoC_CA-504-2024_CA_2024.pdf | https://files.hudexchange.info/reports/published/CoC_HIC_CoC_CA-504-2025_CA_2025.pdf | https://sonomacounty.gov/Main%20County%20Site/Administrative%20Support%20%26%20Fiscal%20Services/ACTTC/Documents/Audit/FY%2024-25/Contract%20Compliance%20Audit%20DHS%20SVdP.pdf | https://sonomacounty.gov/Main%20County%20Site/Administrative%20Support%20%26%20Fiscal%20Services/CAO/Documents/Projects/Arpa%20Reporting/2025-Recovery-Plan-Performance-Report-07292025-ADA-Remediated.pdf,true
+42660,"Seattle-Tacoma-Bellevue, WA",2010,2011,WA-500 | WA-503 | WA-504,joint_review,false,,WA-500/2010 | WA-500/2011 | WA-503/2010 | WA-503/2011,WA-504/2010 | WA-504/2011,"Unresolved larger geographic signal at 2012–2013, 2014–2015.",full_year,12,,,,,,,false
+42660,"Seattle-Tacoma-Bellevue, WA",2011,2012,WA-500 | WA-503 | WA-504,joint_review,false,,WA-500/2011 | WA-500/2012 | WA-503/2011 | WA-503/2012,WA-504/2011 | WA-504/2012,"Unresolved larger geographic signal at 2012–2013, 2014–2015.",full_year,12,,,,,,,false
+42660,"Seattle-Tacoma-Bellevue, WA",2012,2013,WA-500 | WA-503 | WA-504,joint_review,false,,WA-500/2012 | WA-500/2013 | WA-503/2012 | WA-503/2013,WA-504/2012 | WA-504/2013,"Unresolved larger geographic signal at 2012–2013, 2014–2015. | Unresolved larger geographic signal at 2014–2015.",full_year,12,,,,,,,false
+42660,"Seattle-Tacoma-Bellevue, WA",2015,2016,WA-500 | WA-503 | WA-504,accepted_with_map_uncertainty,false,,WA-500/2015 | WA-500/2016 | WA-503/2015 | WA-503/2016 | WA-504/2015 | WA-504/2016,,,full_year,12,,,,,,,false
+42660,"Seattle-Tacoma-Bellevue, WA",2016,2017,WA-500 | WA-503 | WA-504,accepted_with_map_uncertainty,false,,WA-500/2016 | WA-500/2017 | WA-503/2016 | WA-503/2017 | WA-504/2016 | WA-504/2017,,,full_year,12,,,,,,,false
+42660,"Seattle-Tacoma-Bellevue, WA",2017,2018,WA-500 | WA-503 | WA-504,accepted_with_map_uncertainty,false,,WA-500/2017 | WA-500/2018 | WA-503/2017 | WA-503/2018 | WA-504/2017 | WA-504/2018,,,full_year,12,,,,,,,false
+42660,"Seattle-Tacoma-Bellevue, WA",2018,2019,WA-500 | WA-503 | WA-504,accepted_with_map_uncertainty,false,,WA-500/2018 | WA-500/2019 | WA-503/2018 | WA-503/2019 | WA-504/2018 | WA-504/2019,,,full_year,12,,,,,,,false
+42660,"Seattle-Tacoma-Bellevue, WA",2019,2020,WA-500 | WA-503 | WA-504,accepted_with_map_uncertainty,false,,WA-500/2019 | WA-500/2020 | WA-503/2019 | WA-503/2020 | WA-504/2019 | WA-504/2020,,,full_year,12,,,,,,,false
+44140,"Springfield, MA",2013,2014,MA-504,accepted_with_map_uncertainty,false,,MA-504/2013 | MA-504/2014,,,full_year,12,,,,,,,false
+44140,"Springfield, MA",2014,2015,MA-504,accepted_with_map_uncertainty,false,,MA-504/2014 | MA-504/2015,,,full_year,12,,,,,,,false
+44140,"Springfield, MA",2015,2016,MA-504,accepted_with_map_uncertainty,false,,MA-504/2015 | MA-504/2016,,,full_year,12,,,,,,,false
+44140,"Springfield, MA",2016,2017,MA-504,accepted_with_map_uncertainty,false,,MA-504/2016 | MA-504/2017,,,full_year,12,,,,,,,false
+44140,"Springfield, MA",2017,2018,MA-504,accepted_with_map_uncertainty,false,,MA-504/2017 | MA-504/2018,,,full_year,12,,,,,,,false
+44140,"Springfield, MA",2018,2019,MA-504,accepted_with_map_uncertainty,false,,MA-504/2018 | MA-504/2019,,,full_year,12,,,,,,,false
+44140,"Springfield, MA",2019,2020,MA-504,accepted_with_map_uncertainty,false,,MA-504/2019 | MA-504/2020,,,full_year,12,,,,,,,false
+44140,"Springfield, MA",2022,2023,MA-504,accepted_on_prior_review,true,,,,,full_year,12,,,,,,,false
+44140,"Springfield, MA",2023,2024,MA-504,accepted_on_prior_review,true,,,,,full_year,12,,,,,,,false
+44140,"Springfield, MA",2024,2025,MA-504,accepted_with_map_uncertainty,false,,MA-504/2025,,,matched_months_excluding_october,11,,,,,"Year-round inventory falls from 3,436 to 2,376 as hotel project rows leave the inventory and 521 overflow/voucher plus 67 seasonal beds appear in 2025. Test sensitivity to changes in hotel capacity and reporting categories.",https://files.hudexchange.info/reports/published/CoC_HIC_CoC_MA-504-2024_MA_2024.pdf | https://files.hudexchange.info/reports/published/CoC_HIC_CoC_MA-504-2025_MA_2025.pdf | https://www.mass.gov/doc/notice-of-termination-of-state-of-emergency-0/download,true
+45940,"Trenton-Princeton, NJ",2010,2011,NJ-514,accepted_with_map_uncertainty,false,,NJ-514/2010 | NJ-514/2011,,,full_year,12,,,,,,,false
+45940,"Trenton-Princeton, NJ",2011,2012,NJ-514,accepted_with_map_uncertainty,false,,NJ-514/2011 | NJ-514/2012,,,full_year,12,,,,,,,false
+45940,"Trenton-Princeton, NJ",2012,2013,NJ-514,accepted_with_map_uncertainty,false,,NJ-514/2012 | NJ-514/2013,,,full_year,12,,,,,,,false
+45940,"Trenton-Princeton, NJ",2013,2014,NJ-514,accepted_with_map_uncertainty,false,,NJ-514/2013 | NJ-514/2014,,,full_year,12,,,,,,,false
+45940,"Trenton-Princeton, NJ",2014,2015,NJ-514,accepted_with_map_uncertainty,false,,NJ-514/2014 | NJ-514/2015,,,full_year,12,,,,,,,false
+45940,"Trenton-Princeton, NJ",2015,2016,NJ-514,accepted_with_map_uncertainty,false,,NJ-514/2015 | NJ-514/2016,,,full_year,12,,,,,,,false
+45940,"Trenton-Princeton, NJ",2016,2017,NJ-514,accepted_with_map_uncertainty,false,,NJ-514/2016 | NJ-514/2017,,,full_year,12,,,,,,,false
+45940,"Trenton-Princeton, NJ",2017,2018,NJ-514,accepted_with_map_uncertainty,false,,NJ-514/2017 | NJ-514/2018,,,full_year,12,,,,,,,false
+45940,"Trenton-Princeton, NJ",2018,2019,NJ-514,accepted_with_map_uncertainty,false,,NJ-514/2018 | NJ-514/2019,,,full_year,12,,,,,,,false
+45940,"Trenton-Princeton, NJ",2019,2020,NJ-514,accepted_with_map_uncertainty,false,,NJ-514/2019 | NJ-514/2020,,,full_year,12,,,,,,,false
+45940,"Trenton-Princeton, NJ",2022,2023,NJ-514,accepted_on_prior_review,true,,,,,full_year,12,,,,,,,false
+45940,"Trenton-Princeton, NJ",2023,2024,NJ-514,accepted_on_prior_review,true,,,,,full_year,12,,,,,,,false
+45940,"Trenton-Princeton, NJ",2024,2025,NJ-514,accepted_with_map_uncertainty,false,,NJ-514/2025,,,matched_months_excluding_october,11,The 2025 report documents a change in PIT classification for seated or recliner sleeping in shelter and Code Blue sites.,https://monarchhousing.org/wp-content/uploads/2025/07/PIT-Report-2025-Mercer.pdf,,,"Year-round beds fall from 494 to 479 while motel, Code Blue, and named shelter project entries change and voucher beds rise from 376 to 398. Test shelter inventory sensitivity if this pair is included.",https://files.hudexchange.info/reports/published/CoC_HIC_CoC_NJ-514-2024_NJ_2024.pdf | https://files.hudexchange.info/reports/published/CoC_HIC_CoC_NJ-514-2025_NJ_2025.pdf | https://monarchhousing.org/wp-content/uploads/2025/07/PIT-Report-2025-Mercer.pdf,true
+46520,"Urban Honolulu, HI",2010,2011,HI-501,accepted_with_map_uncertainty,false,,HI-501/2010 | HI-501/2011,,,full_year,12,,,,,,,false
+46520,"Urban Honolulu, HI",2011,2012,HI-501,accepted_with_map_uncertainty,false,,HI-501/2011 | HI-501/2012,,,full_year,12,,,,,,,false
+46520,"Urban Honolulu, HI",2012,2013,HI-501,accepted_with_map_uncertainty,false,,HI-501/2012 | HI-501/2013,,,full_year,12,,,,,,,false
+46520,"Urban Honolulu, HI",2013,2014,HI-501,accepted_with_map_uncertainty,false,,HI-501/2013 | HI-501/2014,,,full_year,12,,,,,,,false
+46520,"Urban Honolulu, HI",2014,2015,HI-501,accepted_with_map_uncertainty,false,,HI-501/2014 | HI-501/2015,,,full_year,12,,,,,,,false
+46520,"Urban Honolulu, HI",2015,2016,HI-501,accepted_with_map_uncertainty,false,,HI-501/2015 | HI-501/2016,,,full_year,12,,,,,,,false
+46520,"Urban Honolulu, HI",2016,2017,HI-501,accepted_with_map_uncertainty,false,,HI-501/2016 | HI-501/2017,,,full_year,12,,,,,,,false
+46520,"Urban Honolulu, HI",2017,2018,HI-501,accepted_with_map_uncertainty,false,,HI-501/2017 | HI-501/2018,,,full_year,12,,,,,,,false
+46520,"Urban Honolulu, HI",2018,2019,HI-501,accepted_with_map_uncertainty,false,,HI-501/2018 | HI-501/2019,,,full_year,12,,,,,,,false
+46520,"Urban Honolulu, HI",2019,2020,HI-501,accepted_with_map_uncertainty,false,,HI-501/2019 | HI-501/2020,,,full_year,12,,,,,,,false
+46520,"Urban Honolulu, HI",2022,2023,HI-501,accepted_with_map_uncertainty,false,,HI-501/2022,,,full_year,12,,,,,,,false
+46520,"Urban Honolulu, HI",2023,2024,HI-501,accepted_on_prior_review,true,,,,,full_year,12,,,,,,,false
+48900,"Wilmington, NC",2010,2011,NC-506,accepted_with_map_uncertainty,false,,NC-506/2010 | NC-506/2011,,,full_year,12,,,,,,,false
+48900,"Wilmington, NC",2011,2012,NC-506,accepted_with_map_uncertainty,false,,NC-506/2011 | NC-506/2012,,,full_year,12,,,,,,,false
+48900,"Wilmington, NC",2012,2013,NC-506,accepted_with_map_uncertainty,false,,NC-506/2012 | NC-506/2013,,,full_year,12,,,,,,,false
+48900,"Wilmington, NC",2013,2014,NC-506,accepted_with_map_uncertainty,false,,NC-506/2013 | NC-506/2014,,,full_year,12,,,,,,,false
+48900,"Wilmington, NC",2014,2015,NC-506,accepted_with_map_uncertainty,false,,NC-506/2014 | NC-506/2015,,,full_year,12,,,,,,,false
+48900,"Wilmington, NC",2015,2016,NC-506,accepted_with_map_uncertainty,false,,NC-506/2015 | NC-506/2016,,,full_year,12,,,,,,,false
+48900,"Wilmington, NC",2016,2017,NC-506,accepted_with_map_uncertainty,false,,NC-506/2016 | NC-506/2017,,,full_year,12,,,,,,,false
+48900,"Wilmington, NC",2017,2018,NC-506,accepted_with_map_uncertainty,false,,NC-506/2017 | NC-506/2018,,,full_year,12,,,,,,,false
+48900,"Wilmington, NC",2018,2019,NC-506,accepted_with_map_uncertainty,false,,NC-506/2018 | NC-506/2019,,,full_year,12,,,,,,,false
+48900,"Wilmington, NC",2019,2020,NC-506,accepted_with_map_uncertainty,false,,NC-506/2019 | NC-506/2020,,,full_year,12,,,,,,,false
+48900,"Wilmington, NC",2022,2023,NC-506,accepted_with_map_uncertainty,false,,NC-506/2022,,,full_year,12,,,,,,,false
+48900,"Wilmington, NC",2023,2024,NC-506,accepted_on_prior_review,true,,,,,full_year,12,,,,,,,false
+48900,"Wilmington, NC",2024,2025,NC-506,accepted_with_map_uncertainty,false,,NC-506/2025,,,matched_months_excluding_october,11,,,,,"The year-round inventory falls from 310 to 268, with provider and project entries changing. Retain the published values and test sensitivity to whether the difference reflects changes in coverage or available beds.",https://files.hudexchange.info/reports/published/CoC_HIC_CoC_NC-506-2024_NC_2024.pdf | https://files.hudexchange.info/reports/published/CoC_HIC_CoC_NC-506-2025_NC_2025.pdf | https://capefearcog.gov/wp-content/uploads/2025/08/2025-PIT-Summary.pdf,true
+49340,"Worcester, MA",2010,2011,MA-506,accepted_with_map_uncertainty,false,,MA-506/2010 | MA-506/2011,,,full_year,12,,,,,,,false
+49340,"Worcester, MA",2011,2012,MA-506,accepted_with_map_uncertainty,false,,MA-506/2011 | MA-506/2012,,,full_year,12,,,,,,,false
+49340,"Worcester, MA",2012,2013,MA-506,accepted_with_map_uncertainty,false,,MA-506/2012 | MA-506/2013,,,full_year,12,,,,,,,false
+49340,"Worcester, MA",2013,2014,MA-506,accepted_with_map_uncertainty,false,,MA-506/2013 | MA-506/2014,,,full_year,12,,,,,,,false
+49340,"Worcester, MA",2014,2015,MA-506,accepted_with_map_uncertainty,false,,MA-506/2014 | MA-506/2015,,,full_year,12,,,,,,,false
+49340,"Worcester, MA",2015,2016,MA-506,accepted_with_map_uncertainty,false,,MA-506/2015 | MA-506/2016,,,full_year,12,,,,,,,false
+49340,"Worcester, MA",2016,2017,MA-506,accepted_with_map_uncertainty,false,,MA-506/2016 | MA-506/2017,,,full_year,12,,,,,,,false
+49340,"Worcester, MA",2017,2018,MA-506,accepted_with_map_uncertainty,false,,MA-506/2017 | MA-506/2018,,,full_year,12,,,,,,,false
+49340,"Worcester, MA",2018,2019,MA-506,accepted_with_map_uncertainty,false,,MA-506/2018 | MA-506/2019,,,full_year,12,,,,,,,false
+49340,"Worcester, MA",2019,2020,MA-506,accepted_with_map_uncertainty,false,,MA-506/2019 | MA-506/2020,,,full_year,12,,,,,,,false
+49340,"Worcester, MA",2022,2023,MA-506,accepted_with_map_uncertainty,false,,MA-506/2022,,,full_year,12,,,,,,,false
+49340,"Worcester, MA",2023,2024,MA-506,accepted_on_prior_review,true,,,,,full_year,12,,,,,,,false
+49340,"Worcester, MA",2024,2025,MA-506,accepted_with_map_uncertainty,false,,MA-506/2025,,,matched_months_excluding_october,11,,,,,"The year-round inventory is 1,899 in both years, while seasonal and overflow/voucher beds together rise from 1 to 977. The temporary inventory warrants a separate count-night capacity sensitivity.",https://files.hudexchange.info/reports/published/CoC_HIC_CoC_MA-506-2024_MA_2024.pdf | https://files.hudexchange.info/reports/published/CoC_HIC_CoC_MA-506-2025_MA_2025.pdf,true
+49620,"York-Hanover, PA",2015,2016,PA-512,joint_review,false,York PA-512 historical predecessor footprint,,PA-512/2015 | PA-512/2016,York earlier whole-site holdout after the predecessor issue | Earlier study holdout: York PA-512 historical predecessor footprint.,full_year,12,,,,,,,false
+49620,"York-Hanover, PA",2016,2017,PA-512,joint_review,false,York PA-512 historical predecessor footprint,,PA-512/2016 | PA-512/2017,York earlier whole-site holdout after the predecessor issue | Earlier study holdout: York PA-512 historical predecessor footprint.,full_year,12,,,,,,,false
+49620,"York-Hanover, PA",2017,2018,PA-512,joint_review,false,York PA-512 historical predecessor footprint,,PA-512/2017 | PA-512/2018,York earlier whole-site holdout after the predecessor issue | Earlier study holdout: York PA-512 historical predecessor footprint.,full_year,12,,,,,,,false
+49620,"York-Hanover, PA",2018,2019,PA-512,joint_review,false,York PA-512 historical predecessor footprint,,PA-512/2018 | PA-512/2019,York earlier whole-site holdout after the predecessor issue | Earlier study holdout: York PA-512 historical predecessor footprint.,full_year,12,,,,,,,false
+49620,"York-Hanover, PA",2019,2020,PA-512,joint_review,false,York PA-512 historical predecessor footprint,,PA-512/2019 | PA-512/2020,York earlier whole-site holdout after the predecessor issue | Earlier study holdout: York PA-512 historical predecessor footprint.,full_year,12,,,,,,,false
+49620,"York-Hanover, PA",2022,2023,PA-512,joint_review,false,York PA-512 historical predecessor footprint,,PA-512/2022 | PA-512/2023,York earlier whole-site holdout after the predecessor issue | Earlier study holdout: York PA-512 historical predecessor footprint.,full_year,12,,,,,,,false
+49620,"York-Hanover, PA",2023,2024,PA-512,joint_review,false,York PA-512 historical predecessor footprint,,PA-512/2023,York earlier whole-site holdout after the predecessor issue | Earlier study holdout: York PA-512 historical predecessor footprint.,full_year,12,,,,,,,false
+49620,"York-Hanover, PA",2024,2025,PA-512,joint_review,false,York PA-512 historical predecessor footprint,,PA-512/2025,York earlier whole-site holdout after the predecessor issue | Earlier study holdout: York PA-512 historical predecessor footprint.,matched_months_excluding_october,11,,,,,,,false
+49700,"Yuba City, CA",2010,2011,CA-524,joint_review,false,,,CA-524/2010 | CA-524/2011,"Archive continuity gap at 2010–2011, 2011–2012, 2012–2013. Unresolved larger geographic signal at 2014–2015. | Archive continuity gap at 2011–2012, 2012–2013. Unresolved larger geographic signal at 2014–2015.",full_year,12,,,,,,,false
+49700,"Yuba City, CA",2011,2012,CA-524,joint_review,false,,,CA-524/2011 | CA-524/2012,"Archive continuity gap at 2011–2012, 2012–2013. Unresolved larger geographic signal at 2014–2015. | Archive continuity gap at 2012–2013. Unresolved larger geographic signal at 2014–2015.",full_year,12,,,,,,,false
+49700,"Yuba City, CA",2012,2013,CA-524,joint_review,false,,,CA-524/2012 | CA-524/2013,Archive continuity gap at 2012–2013. Unresolved larger geographic signal at 2014–2015. | Unresolved larger geographic signal at 2014–2015.,full_year,12,,,,,,,false

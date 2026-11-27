@@ -31,6 +31,9 @@ not the default overlap-site design.
 
 Full operational documentation lives in [HHP-Lab-manual/HHP-Lab-Manual.md](HHP-Lab-manual/HHP-Lab-Manual.md).
 
+The [shelter-capacity curation ledger](recipes/site-inputs/shelter-capacity-curation/README.md)
+records the CoC-by-CoC review, sample membership, and sources for the shelter-capacity study.
+
 ## What HHP-Lab Does
 
 - Ingests curated source data for CoC boundaries, Census geometry (TIGER, NHGIS, urban areas, blocks), ACS 5-year and 1-year estimates, PEP, PIT, HIC, ZORI, BLS labor-market series, and a registry of external covariate sources

@@ -1,0 +1,1161 @@
+[
+  {
+    "msa_id": "11460",
+    "first_year": 2024,
+    "last_year": 2025,
+    "decision": "accept",
+    "reason": "The dated 2025 HUD PIT and HIC identify the same Washtenaw County reporting area. The reported unsheltered count rises from 13 to 23.",
+    "members": {
+      "MI-509": {
+        "jurisdiction": "Washtenaw County",
+        "scope_ref": "https://files.hudexchange.info/reports/published/CoC_PopSub_CoC_MI-509-2025_MI_2025.pdf"
+      }
+    },
+    "sources": [
+      "https://files.hudexchange.info/reports/published/CoC_PopSub_CoC_MI-509-2025_MI_2025.pdf",
+      "https://www.whalliance.org/facts",
+      "https://files.hudexchange.info/reports/published/CoC_HIC_CoC_MI-509-2024_MI_2024.pdf",
+      "https://files.hudexchange.info/reports/published/CoC_HIC_CoC_MI-509-2025_MI_2025.pdf"
+    ],
+    "bed_count_sensitivity": {
+      "note": "Year-round beds fall from 392 to 346 while 119 seasonal beds appear in 2025. Test sensitivity to the shift between regular and seasonal capacity.",
+      "sources": [
+        "https://files.hudexchange.info/reports/published/CoC_HIC_CoC_MI-509-2024_MI_2024.pdf",
+        "https://files.hudexchange.info/reports/published/CoC_HIC_CoC_MI-509-2025_MI_2025.pdf"
+      ]
+    }
+  },
+  {
+    "msa_id": "12540",
+    "first_year": 2024,
+    "last_year": 2025,
+    "decision": "accept",
+    "reason": "Matt approved the pair. The local reports document Kern County coverage and follow-up in rural areas and Kern River encampments. The July 2025 revision agrees with HUD. Retain 1,663 to 1,398 unsheltered and 1,155 to 1,403 year-round beds.",
+    "members": {
+      "CA-604": {
+        "jurisdiction": "Kern County",
+        "scope_ref": "https://bkrhc.org/wp-content/uploads/2025/07/2025-PIT-Count-Report-Kern-County-_Updated-07.21.25.pdf"
+      }
+    },
+    "sources": [
+      "https://www.whitehouse.gov/wp-content/uploads/2023/07/OMB-Bulletin-23-01.pdf#page=44",
+      "https://bkrhc.org/wp-content/uploads/2023/07/2024-PIT-Count-Report-Kern-County.pdf#page=6",
+      "https://bkrhc.org/wp-content/uploads/2025/07/2025-PIT-Count-Report-Kern-County-_Updated-07.21.25.pdf#page=6",
+      "https://files.hudexchange.info/reports/published/CoC_PopSub_CoC_CA-604-2025_CA_2025.pdf",
+      "https://files.hudexchange.info/reports/published/CoC_HIC_CoC_CA-604-2024_CA_2024.pdf",
+      "https://files.hudexchange.info/reports/published/CoC_HIC_CoC_CA-604-2025_CA_2025.pdf"
+    ]
+  },
+  {
+    "msa_id": "12980",
+    "first_year": 2024,
+    "last_year": 2025,
+    "decision": "accept",
+    "reason": "Matt approved the 2024–25 pair with the shelter closure and temporary-bed sensitivity noted. The Calhoun County CoC report confirms the countywide reporting area and the published 29-to-37 unsheltered count.",
+    "members": {
+      "MI-514": {
+        "jurisdiction": "Calhoun County",
+        "scope_ref": "https://unitedforscmi.org/wp-content/uploads/2025/08/Calhoun-County-2025-PIT-and-HIC-results.pdf"
+      }
+    },
+    "sources": [
+      "https://unitedforscmi.org/wp-content/uploads/2025/08/Calhoun-County-2025-PIT-and-HIC-results.pdf",
+      "https://www.battlecreekmi.gov/DocumentCenter/View/15958/2025--2029-Consolidated-Plan---Final-Version---July-31-2025#page=80",
+      "https://files.hudexchange.info/reports/published/CoC_PopSub_CoC_MI-514-2025_MI_2025.pdf",
+      "https://files.hudexchange.info/reports/published/CoC_HIC_CoC_MI-514-2024_MI_2024.pdf",
+      "https://files.hudexchange.info/reports/published/CoC_HIC_CoC_MI-514-2025_MI_2025.pdf"
+    ],
+    "bed_count_sensitivity": {
+      "note": "The Battle Creek Homeless Shelter closed in May 2024, removing 58 year-round emergency beds. Transitional housing gained 29 beds, leaving a year-round decline from 267 to 238. Reported overflow/voucher beds rose from 2 to 26. Including them in the sensitivity check gives 269 to 264 beds, a decline of 5.",
+      "sources": [
+        "https://www.battlecreekmi.gov/DocumentCenter/View/15958/2025--2029-Consolidated-Plan---Final-Version---July-31-2025#page=80",
+        "https://files.hudexchange.info/reports/published/CoC_HIC_CoC_MI-514-2024_MI_2024.pdf",
+        "https://files.hudexchange.info/reports/published/CoC_HIC_CoC_MI-514-2025_MI_2025.pdf"
+      ]
+    }
+  },
+  {
+    "msa_id": "13460",
+    "first_year": 2024,
+    "last_year": 2025,
+    "decision": "accept",
+    "reason": "Central Oregon counted in the three frozen MSA counties, including outreach in Warm Springs. The regional count and HUD identify continuing OR-503 scope.",
+    "members": {
+      "OR-503": {
+        "jurisdiction": "Crook, Deschutes, and Jefferson counties",
+        "scope_ref": "https://cohomeless.org/what-we-do/point-in-time-count/"
+      }
+    },
+    "sources": [
+      "https://cohomeless.org/what-we-do/point-in-time-count/",
+      "https://www.oregon.gov/ohcs/for-providers/pages/continuum-of-care.aspx",
+      "https://files.hudexchange.info/reports/published/CoC_PopSub_CoC_OR-503-2025_OR_2025.pdf",
+      "https://files.hudexchange.info/reports/published/CoC_HIC_CoC_OR-503-2024_OR_2024.pdf",
+      "https://files.hudexchange.info/reports/published/CoC_HIC_CoC_OR-503-2025_OR_2025.pdf",
+      "https://bendoregon.gov/wp-content/uploads/2025/12/AHAC-4.10.24.pdf"
+    ],
+    "bed_count_sensitivity": {
+      "note": "In 2025, 91 overflow/voucher beds appear alongside 20 seasonal beds in both years, while year-round beds rise from 719 to 739. Test sensitivity to the extra temporary inventory.",
+      "sources": [
+        "https://files.hudexchange.info/reports/published/CoC_HIC_CoC_OR-503-2024_OR_2024.pdf",
+        "https://files.hudexchange.info/reports/published/CoC_HIC_CoC_OR-503-2025_OR_2025.pdf"
+      ]
+    }
+  },
+  {
+    "msa_id": "15980",
+    "first_year": 2024,
+    "last_year": 2025,
+    "decision": "accept",
+    "reason": "The State identifies the same Lee County catchment. The Lee County CoC’s final submission matches HUD at 646 unsheltered, resolving the State’s preliminary total of 596 unsheltered.",
+    "members": {
+      "FL-603": {
+        "jurisdiction": "Lee County",
+        "scope_ref": "https://www.myflfamilies.com/documents/64946.pdf"
+      }
+    },
+    "sources": [
+      "https://www.myflfamilies.com/documents/64946.pdf",
+      "https://swfl-coalition.org/lee-county/lee-county-impact/",
+      "https://files.hudexchange.info/reports/published/CoC_PopSub_CoC_FL-603-2025_FL_2025.pdf",
+      "https://files.hudexchange.info/reports/published/CoC_HIC_CoC_FL-603-2024_FL_2024.pdf",
+      "https://files.hudexchange.info/reports/published/CoC_HIC_CoC_FL-603-2025_FL_2025.pdf"
+    ],
+    "bed_count_sensitivity": {
+      "note": "Year-round beds fall from 336 to 300. A 72-bed triage line is absent in 2025, Rescue Mission falls from 76 to 29, and St. Matthew’s House appears with 65. Test sensitivity to the project inventory changes where coverage and actual capacity may differ. Under the approved same-facility assumption, assign the Fort Myers shelter to Lee using its published 65-bed entry and remove the corresponding 68-bed entry from the Collier working total.",
+      "sources": [
+        "https://files.hudexchange.info/reports/published/CoC_HIC_CoC_FL-603-2024_FL_2024.pdf",
+        "https://files.hudexchange.info/reports/published/CoC_HIC_CoC_FL-603-2025_FL_2025.pdf",
+        "https://files.hudexchange.info/reports/published/CoC_HIC_CoC_FL-606-2025_FL_2025.pdf",
+        "https://stmatthewshouse.org/wp-content/uploads/2026/01/1-SMH-FM-Shelter-Anniversary-release-FINAL1.6.26.pdf"
+      ]
+    }
+  },
+  {
+    "msa_id": "18880",
+    "first_year": 2024,
+    "last_year": 2025,
+    "decision": "accept",
+    "reason": "Matt approved the January 31 CoC count of 251 unsheltered people for the 2025 observation. The January 24 HUD report lists 241. Both sources report 250 in 2024. The audit flags the source difference and retains 241 as a sensitivity input.",
+    "members": {
+      "FL-505": {
+        "jurisdiction": "Okaloosa and Walton counties",
+        "scope_ref": "https://www.myflfamilies.com/documents/64946.pdf"
+      }
+    },
+    "sources": [
+      "https://www.myflfamilies.com/documents/64946.pdf",
+      "https://files.hudexchange.info/reports/published/CoC_PopSub_CoC_FL-505-2025_FL_2025.pdf",
+      "https://files.hudexchange.info/reports/published/CoC_HIC_CoC_FL-505-2024_FL_2024.pdf",
+      "https://files.hudexchange.info/reports/published/CoC_HIC_CoC_FL-505-2025_FL_2025.pdf",
+      "https://hhalliance.org/wp-content/uploads/2025/12/2025-Housing-Needs-Assessment-and-Analysis_Final-3.pdf",
+      "https://hhalliance.org/community-data/",
+      "https://files.hudexchange.info/reports/published/CoC_PopSub_CoC_FL-505-2024_FL_2024.pdf"
+    ],
+    "bed_count_sensitivity": {
+      "note": "Caring and Sharing of South Walton has 22 year-round beds listed in 2024 and its line is absent in 2025, while Opportunity Place rises from 21 to 32. Test sensitivity to inventory coverage despite a small net decline of eight beds.",
+      "sources": [
+        "https://files.hudexchange.info/reports/published/CoC_HIC_CoC_FL-505-2024_FL_2024.pdf",
+        "https://files.hudexchange.info/reports/published/CoC_HIC_CoC_FL-505-2025_FL_2025.pdf"
+      ]
+    },
+    "pit_count_override": {
+      "coc_id": "FL-505",
+      "year": 2025,
+      "count_date": "2025-01-31",
+      "pit_unsheltered": 251,
+      "pit_total": 402,
+      "hud_count_date": "2025-01-24",
+      "hud_pit_unsheltered": 241,
+      "hud_pit_total": 384,
+      "source_ref": "https://hhalliance.org/community-data/",
+      "count_date_ref": "https://hhalliance.org/wp-content/uploads/2025/12/2025-Housing-Needs-Assessment-and-Analysis_Final-3.pdf#page=8",
+      "hud_source_ref": "https://files.hudexchange.info/reports/published/CoC_PopSub_CoC_FL-505-2025_FL_2025.pdf",
+      "sensitivity_note": "The CoC’s January 31 count gives 251 unsheltered (+1 from 2024); HUD’s January 24 report gives 241 (−9 from 2024). Use HUD’s figure in the source sensitivity fit."
+    }
+  },
+  {
+    "msa_id": "19500",
+    "first_year": 2024,
+    "last_year": 2025,
+    "decision": "accept",
+    "reason": "The dated Decatur CAPER covers Macon County. Its January 2025 total of 156 agrees with HUD.",
+    "members": {
+      "IL-516": {
+        "jurisdiction": "Decatur and Macon County",
+        "scope_ref": "https://decaturil.gov/DocumentCenter/View/539231/2024-CAPER-Final"
+      }
+    },
+    "sources": [
+      "https://decaturil.gov/DocumentCenter/View/539231/2024-CAPER-Final",
+      "https://files.hudexchange.info/reports/published/CoC_PopSub_CoC_IL-516-2025_IL_2025.pdf",
+      "https://files.hudexchange.info/reports/published/CoC_HIC_CoC_IL-516-2024_IL_2024.pdf",
+      "https://files.hudexchange.info/reports/published/CoC_HIC_CoC_IL-516-2025_IL_2025.pdf"
+    ],
+    "bed_count_sensitivity": {
+      "note": "The CAPER lists emergency capacity of 83 and 92 compared with HUD emergency-only year-round figures of 73 and 79. HUD year-round emergency plus transitional beds are 96 and 105. Test the effect of the differing capacity definitions.",
+      "sources": [
+        "https://files.hudexchange.info/reports/published/CoC_HIC_CoC_IL-516-2024_IL_2024.pdf",
+        "https://files.hudexchange.info/reports/published/CoC_HIC_CoC_IL-516-2025_IL_2025.pdf",
+        "https://decaturil.gov/DocumentCenter/View/539231/2024-CAPER-Final"
+      ]
+    }
+  },
+  {
+    "msa_id": "19660",
+    "first_year": 2024,
+    "last_year": 2025,
+    "decision": "accept",
+    "reason": "Matt approved the 2024–25 pair with a First Step Shelter bed-count sensitivity flag. Volusia County’s plan confirms the Volusia and Flagler reporting area, and its 2025 unsheltered count of 676 agrees with HUD.",
+    "members": {
+      "FL-504": {
+        "jurisdiction": "Volusia and Flagler counties",
+        "scope_ref": "https://www.volusia.org/file/5916/Volusia_County_2025-2029_CP_and_2025_AAP_Appendices_ADA.pdf#page=49"
+      }
+    },
+    "sources": [
+      "https://www.volusia.org/file/5916/Volusia_County_2025-2029_CP_and_2025_AAP_Appendices_ADA.pdf#page=49",
+      "https://www.volusia.org/core/fileparse.php/5916/urlt/Final_FY_24.25_Annual_Action_Plan_and_Appendices_ADA.pdf",
+      "https://files.hudexchange.info/reports/published/CoC_PopSub_CoC_FL-504-2025_FL_2025.pdf",
+      "https://files.hudexchange.info/reports/published/CoC_HIC_CoC_FL-504-2024_FL_2024.pdf",
+      "https://files.hudexchange.info/reports/published/CoC_HIC_CoC_FL-504-2025_FL_2025.pdf",
+      "https://www.myflfamilies.com/documents/64946.pdf"
+    ],
+    "bed_count_sensitivity": {
+      "note": "First Step Shelter increased from 70 to 100 reported year-round beds, while the county’s earlier plan already described it as a 100-bed facility. The published totals are 502 and 572. Test a 2025 total of 542 as a sensitivity scenario to assess the 30-bed increase.",
+      "sources": [
+        "https://files.hudexchange.info/reports/published/CoC_HIC_CoC_FL-504-2024_FL_2024.pdf",
+        "https://files.hudexchange.info/reports/published/CoC_HIC_CoC_FL-504-2025_FL_2025.pdf",
+        "https://www.volusia.org/core/fileparse.php/5916/urlt/Final_FY_24.25_Annual_Action_Plan_and_Appendices_ADA.pdf"
+      ]
+    }
+  },
+  {
+    "msa_id": "21340",
+    "first_year": 2024,
+    "last_year": 2025,
+    "decision": "accept",
+    "reason": "The 2025 city plan and HUD reports support continuing TX-603 scope. The frozen El Paso MSA match is 99.63% by population and includes Hudspeth County in the MSA definition.",
+    "members": {
+      "TX-603": {
+        "jurisdiction": "El Paso city and county",
+        "scope_ref": "https://www.elpasotexas.gov/assets/Documents/CoEP/Community-Development/Forms-and-Notices/2024-NOFA/CITY-OF-EL-PASO-Consolidated-Plan-2025-2029.pdf"
+      }
+    },
+    "sources": [
+      "https://www.elpasotexas.gov/assets/Documents/CoEP/Community-Development/Forms-and-Notices/2024-NOFA/CITY-OF-EL-PASO-Consolidated-Plan-2025-2029.pdf",
+      "https://files.hudexchange.info/reports/published/CoC_PopSub_CoC_TX-603-2025_TX_2025.pdf",
+      "https://files.hudexchange.info/reports/published/CoC_HIC_CoC_TX-603-2024_TX_2024.pdf",
+      "https://files.hudexchange.info/reports/published/CoC_HIC_CoC_TX-603-2025_TX_2025.pdf"
+    ],
+    "bed_count_sensitivity": {
+      "note": "Year-round beds fall from 1,268 to 1,007 as overflow/voucher inventory rises from 20 to 70. The 2024 inventory lists 130 transitional beds under Annunciation House and the 2025 inventory lists 54 emergency beds under that provider. Test sensitivity to classification and the other large changes at Sin Fronteras and the domestic violence shelter.",
+      "sources": [
+        "https://files.hudexchange.info/reports/published/CoC_HIC_CoC_TX-603-2024_TX_2024.pdf",
+        "https://files.hudexchange.info/reports/published/CoC_HIC_CoC_TX-603-2025_TX_2025.pdf"
+      ]
+    }
+  },
+  {
+    "msa_id": "21500",
+    "first_year": 2024,
+    "last_year": 2025,
+    "decision": "accept",
+    "reason": "Matt approved Erie for the primary sample with a methodology flag. The CoC documents revised methodology, more volunteers, and expanded street outreach in 2025.",
+    "members": {
+      "PA-605": {
+        "jurisdiction": "Erie city and county",
+        "scope_ref": "https://www.endhomelessnesseriecountypa.org/_files/ugd/c40d10_2a863d1f401e4da2840635e9da7178d3.pdf"
+      }
+    },
+    "sources": [
+      "https://www.endhomelessnesseriecountypa.org/_files/ugd/c40d10_2a863d1f401e4da2840635e9da7178d3.pdf",
+      "https://files.hudexchange.info/reports/published/CoC_PopSub_CoC_PA-605-2025_PA_2025.pdf",
+      "https://files.hudexchange.info/reports/published/CoC_HIC_CoC_PA-605-2024_PA_2024.pdf",
+      "https://files.hudexchange.info/reports/published/CoC_HIC_CoC_PA-605-2025_PA_2025.pdf"
+    ],
+    "count_method": {
+      "note": "The 2025 CoC report documents improved count methodology, additional volunteers, and expanded street outreach.",
+      "sources": [
+        "https://www.endhomelessnesseriecountypa.org/_files/ugd/c40d10_2a863d1f401e4da2840635e9da7178d3.pdf"
+      ]
+    }
+  },
+  {
+    "msa_id": "21660",
+    "first_year": 2024,
+    "last_year": 2025,
+    "decision": "accept",
+    "reason": "Lane County confirms the same county and the same 2025 outcome as HUD. Its changes in HMIS and outreach preceded this pair.",
+    "members": {
+      "OR-500": {
+        "jurisdiction": "Lane County",
+        "scope_ref": "https://cdnsm5-hosted.civiclive.com/UserFiles/Servers/Server_3585797/File/Government/County%20Departments/Health%20and%20Human%20Services/Human%20Services/HMIS%20ServicePoint/HMIS%20Data%20Page/2025%20Lane%20County%20Point%20In%20Time%20Data%20FINAL.pdf"
+      }
+    },
+    "sources": [
+      "https://cdnsm5-hosted.civiclive.com/UserFiles/Servers/Server_3585797/File/Government/County%20Departments/Health%20and%20Human%20Services/Human%20Services/HMIS%20ServicePoint/HMIS%20Data%20Page/2025%20Lane%20County%20Point%20In%20Time%20Data%20FINAL.pdf",
+      "https://files.hudexchange.info/reports/published/CoC_PopSub_CoC_OR-500-2025_OR_2025.pdf",
+      "https://files.hudexchange.info/reports/published/CoC_HIC_CoC_OR-500-2024_OR_2024.pdf",
+      "https://files.hudexchange.info/reports/published/CoC_HIC_CoC_OR-500-2025_OR_2025.pdf"
+    ],
+    "bed_count_sensitivity": {
+      "note": "Year-round beds fall from 1,205 to 1,154 while 101 seasonal and 465 overflow/voucher beds appear in 2025. Test sensitivity to the temporary inventory excluded from the year-round measure.",
+      "sources": [
+        "https://files.hudexchange.info/reports/published/CoC_HIC_CoC_OR-500-2024_OR_2024.pdf",
+        "https://files.hudexchange.info/reports/published/CoC_HIC_CoC_OR-500-2025_OR_2025.pdf",
+        "https://cdnsm5-hosted.civiclive.com/UserFiles/Servers/Server_3585797/File/Government/County%20Departments/Health%20and%20Human%20Services/Human%20Services/HMIS%20ServicePoint/HMIS%20Data%20Page/2025%20Lane%20County%20Point%20In%20Time%20Data%20FINAL.pdf"
+      ]
+    },
+    "count_method": {
+      "note": "Lane County narrowed the domestic-violence-survivor subgroup definition in 2025 to people actively fleeing. The reported overall unsheltered count uses the continuing Lane County method.",
+      "sources": [
+        "https://cdnsm5-hosted.civiclive.com/UserFiles/Servers/Server_3585797/File/Government/County%20Departments/Health%20and%20Human%20Services/Human%20Services/HMIS%20ServicePoint/HMIS%20Data%20Page/2025%20Lane%20County%20Point%20In%20Time%20Data%20FINAL.pdf"
+      ]
+    }
+  },
+  {
+    "msa_id": "22420",
+    "first_year": 2024,
+    "last_year": 2025,
+    "decision": "accept",
+    "reason": "The 2025 federal reports identify the same Flint and Genesee County CoC. The historical Fenton and Otter Lake GIS caveat still applies to the frozen footprint.",
+    "members": {
+      "MI-505": {
+        "jurisdiction": "Flint and Genesee County",
+        "scope_ref": "https://files.hudexchange.info/reports/published/CoC_PopSub_CoC_MI-505-2025_MI_2025.pdf"
+      }
+    },
+    "sources": [
+      "https://files.hudexchange.info/reports/published/CoC_PopSub_CoC_MI-505-2025_MI_2025.pdf",
+      "https://files.hudexchange.info/reports/published/CoC_HIC_CoC_MI-505-2024_MI_2024.pdf",
+      "https://files.hudexchange.info/reports/published/CoC_HIC_CoC_MI-505-2025_MI_2025.pdf"
+    ],
+    "bed_count_sensitivity": {
+      "note": "Year-round emergency beds rise from 257 to 280 and transitional beds fall from 97 to 49 as project rows change. Overflow/voucher beds rise from 101 to 274. Test sensitivity to possible program recoding and the increased temporary inventory.",
+      "sources": [
+        "https://files.hudexchange.info/reports/published/CoC_HIC_CoC_MI-505-2024_MI_2024.pdf",
+        "https://files.hudexchange.info/reports/published/CoC_HIC_CoC_MI-505-2025_MI_2025.pdf"
+      ]
+    }
+  },
+  {
+    "msa_id": "27060",
+    "first_year": 2024,
+    "last_year": 2025,
+    "decision": "accept",
+    "reason": "The dated county report documents the Tompkins County shelter transition and HUD continues to report the same county. The local source documents a service and provider change.",
+    "members": {
+      "NY-510": {
+        "jurisdiction": "Ithaca and Tompkins County",
+        "scope_ref": "https://www.tompkinscountyny.gov/files/assets/county/v/1/whole-health-admin/documents/health-promotion/csb-agenda-amp-minutes/annual-lgu-csb-report-2024.pdf"
+      }
+    },
+    "sources": [
+      "https://www.tompkinscountyny.gov/files/assets/county/v/1/whole-health-admin/documents/health-promotion/csb-agenda-amp-minutes/annual-lgu-csb-report-2024.pdf",
+      "https://files.hudexchange.info/reports/published/CoC_PopSub_CoC_NY-510-2025_NY_2025.pdf",
+      "https://files.hudexchange.info/reports/published/CoC_HIC_CoC_NY-510-2024_NY_2024.pdf",
+      "https://files.hudexchange.info/reports/published/CoC_HIC_CoC_NY-510-2025_NY_2025.pdf"
+    ],
+    "bed_count_sensitivity": {
+      "note": "Year-round beds fall from 221 to 152 and 80 overflow beds appear in 2025. Saint John’s stopped shelter operations in November 2024 and the County took over shelter services and Code Blue. Test shelter capacity sensitivity across categories.",
+      "sources": [
+        "https://files.hudexchange.info/reports/published/CoC_HIC_CoC_NY-510-2024_NY_2024.pdf",
+        "https://files.hudexchange.info/reports/published/CoC_HIC_CoC_NY-510-2025_NY_2025.pdf",
+        "https://www.tompkinscountyny.gov/files/assets/county/v/1/whole-health-admin/documents/health-promotion/csb-agenda-amp-minutes/annual-lgu-csb-report-2024.pdf"
+      ]
+    }
+  },
+  {
+    "msa_id": "27100",
+    "first_year": 2024,
+    "last_year": 2025,
+    "decision": "accept",
+    "reason": "The 2025 federal reports identify the same Jackson city and county CoC.",
+    "members": {
+      "MI-517": {
+        "jurisdiction": "Jackson city and county",
+        "scope_ref": "https://files.hudexchange.info/reports/published/CoC_PopSub_CoC_MI-517-2025_MI_2025.pdf"
+      }
+    },
+    "sources": [
+      "https://files.hudexchange.info/reports/published/CoC_PopSub_CoC_MI-517-2025_MI_2025.pdf",
+      "https://files.hudexchange.info/reports/published/CoC_HIC_CoC_MI-517-2024_MI_2024.pdf",
+      "https://files.hudexchange.info/reports/published/CoC_HIC_CoC_MI-517-2025_MI_2025.pdf"
+    ],
+    "bed_count_sensitivity": {
+      "note": "A non-HMIS emergency-shelter entry rises from 16 to 30 beds, accounting for 14 of the 15 net year-round beds added. Test sensitivity to whether the increase reflects reporting coverage or additional capacity.",
+      "sources": [
+        "https://files.hudexchange.info/reports/published/CoC_HIC_CoC_MI-517-2024_MI_2024.pdf",
+        "https://files.hudexchange.info/reports/published/CoC_HIC_CoC_MI-517-2025_MI_2025.pdf"
+      ]
+    }
+  },
+  {
+    "msa_id": "28020",
+    "first_year": 2024,
+    "last_year": 2025,
+    "decision": "accept",
+    "reason": "The county 2025 PIT/HIC presentation and federal reports support continuing Kalamazoo County scope.",
+    "members": {
+      "MI-507": {
+        "jurisdiction": "Portage, Kalamazoo city, and Kalamazoo County",
+        "scope_ref": "https://kzoococ.org/wp-content/uploads/2025/07/Kalamazoo-County-2025-PIT-and-HIC-results.pdf"
+      }
+    },
+    "sources": [
+      "https://kzoococ.org/wp-content/uploads/2025/07/Kalamazoo-County-2025-PIT-and-HIC-results.pdf",
+      "https://files.hudexchange.info/reports/published/CoC_PopSub_CoC_MI-507-2025_MI_2025.pdf",
+      "https://files.hudexchange.info/reports/published/CoC_HIC_CoC_MI-507-2024_MI_2024.pdf",
+      "https://files.hudexchange.info/reports/published/CoC_HIC_CoC_MI-507-2025_MI_2025.pdf"
+    ],
+    "bed_count_sensitivity": {
+      "note": "Year-round beds fall from 666 to 631 as 146 overflow/voucher beds appear. The CoC credits winter shelter and Heads in Beds for much of the sheltered count increase. Test sensitivity to the extra temporary beds.",
+      "sources": [
+        "https://files.hudexchange.info/reports/published/CoC_HIC_CoC_MI-507-2024_MI_2024.pdf",
+        "https://files.hudexchange.info/reports/published/CoC_HIC_CoC_MI-507-2025_MI_2025.pdf",
+        "https://kzoococ.org/wp-content/uploads/2025/07/Kalamazoo-County-2025-PIT-and-HIC-results.pdf"
+      ]
+    }
+  },
+  {
+    "msa_id": "28740",
+    "first_year": 2024,
+    "last_year": 2025,
+    "decision": "accept",
+    "reason": "The dated CARES PIT/HIC memo and federal reports support Ulster County as the 2025 reporting area.",
+    "members": {
+      "NY-608": {
+        "jurisdiction": "Ulster County",
+        "scope_ref": "https://caresny.org/wp-content/uploads/2025/05/2025-HIC-PIT-Memo-608.pdf"
+      }
+    },
+    "sources": [
+      "https://caresny.org/wp-content/uploads/2025/05/2025-HIC-PIT-Memo-608.pdf",
+      "https://files.hudexchange.info/reports/published/CoC_PopSub_CoC_NY-608-2025_NY_2025.pdf",
+      "https://files.hudexchange.info/reports/published/CoC_HIC_CoC_NY-608-2024_NY_2024.pdf",
+      "https://files.hudexchange.info/reports/published/CoC_HIC_CoC_NY-608-2025_NY_2025.pdf"
+    ],
+    "bed_count_sensitivity": {
+      "note": "The May memo reports 94 year-round beds for 2025, while the final HUD inventory reports 87. The memo identifies a prior overflow misclassification and a seasonal warming-center change. Test sensitivity to the seven-bed draft/final discrepancy.",
+      "sources": [
+        "https://files.hudexchange.info/reports/published/CoC_HIC_CoC_NY-608-2024_NY_2024.pdf",
+        "https://files.hudexchange.info/reports/published/CoC_HIC_CoC_NY-608-2025_NY_2025.pdf",
+        "https://caresny.org/wp-content/uploads/2025/05/2025-HIC-PIT-Memo-608.pdf"
+      ]
+    }
+  },
+  {
+    "msa_id": "28880",
+    "first_year": 2024,
+    "last_year": 2025,
+    "decision": "accept",
+    "reason": "The dated Dutchess CoC memo and the county-named HUD submissions for both CoCs support the Orange and Dutchess frozen membership. Each constituent contributes one source row.",
+    "members": {
+      "NY-601": {
+        "jurisdiction": "Dutchess County",
+        "scope_ref": "https://caresny.org/wp-content/uploads/2025/05/2025-HIC-PIT-Memo-601.pdf"
+      },
+      "NY-602": {
+        "jurisdiction": "Orange County",
+        "scope_ref": "https://files.hudexchange.info/reports/published/CoC_PopSub_CoC_NY-602-2025_NY_2025.pdf"
+      }
+    },
+    "sources": [
+      "https://caresny.org/wp-content/uploads/2025/05/2025-HIC-PIT-Memo-601.pdf",
+      "https://files.hudexchange.info/reports/published/CoC_PopSub_CoC_NY-602-2025_NY_2025.pdf",
+      "https://files.hudexchange.info/reports/published/CoC_PopSub_CoC_NY-601-2025_NY_2025.pdf",
+      "https://files.hudexchange.info/reports/published/CoC_HIC_CoC_NY-601-2024_NY_2024.pdf",
+      "https://files.hudexchange.info/reports/published/CoC_HIC_CoC_NY-601-2025_NY_2025.pdf",
+      "https://files.hudexchange.info/reports/published/CoC_HIC_CoC_NY-602-2024_NY_2024.pdf",
+      "https://files.hudexchange.info/reports/published/CoC_HIC_CoC_NY-602-2025_NY_2025.pdf"
+    ],
+    "bed_count_sensitivity": {
+      "note": "The Dutchess draft lists 583 year-round beds for 2025, versus 643 in final HUD, and describes corrections to prior project figures. Orange lists 339 then 556 overflow/voucher beds in the two years. Test sensitivity to the draft/final and temporary-inventory differences.",
+      "sources": [
+        "https://caresny.org/wp-content/uploads/2025/05/2025-HIC-PIT-Memo-601.pdf",
+        "https://files.hudexchange.info/reports/published/CoC_HIC_CoC_NY-601-2024_NY_2024.pdf",
+        "https://files.hudexchange.info/reports/published/CoC_HIC_CoC_NY-601-2025_NY_2025.pdf",
+        "https://files.hudexchange.info/reports/published/CoC_HIC_CoC_NY-602-2024_NY_2024.pdf",
+        "https://files.hudexchange.info/reports/published/CoC_HIC_CoC_NY-602-2025_NY_2025.pdf"
+      ]
+    }
+  },
+  {
+    "msa_id": "29540",
+    "first_year": 2024,
+    "last_year": 2025,
+    "decision": "accept",
+    "reason": "The CoC documents countywide counting on January 22. It cites minus 4 °F weather as a likely factor in the reduction from 122 to 64 unsheltered. The earlier PIT methodology flag remains attached to the 2023–24 pair.",
+    "members": {
+      "PA-510": {
+        "jurisdiction": "Lancaster County",
+        "scope_ref": "https://lchra.com/wp-content/uploads/2025/04/Press-Release-2025-PIT-Data-Release.pdf"
+      }
+    },
+    "sources": [
+      "https://lchra.com/wp-content/uploads/2025/04/Press-Release-2025-PIT-Data-Release.pdf",
+      "https://files.hudexchange.info/reports/published/CoC_PopSub_CoC_PA-510-2025_PA_2025.pdf",
+      "https://files.hudexchange.info/reports/published/CoC_HIC_CoC_PA-510-2024_PA_2024.pdf",
+      "https://files.hudexchange.info/reports/published/CoC_HIC_CoC_PA-510-2025_PA_2025.pdf"
+    ],
+    "bed_count_sensitivity": {
+      "note": "The published year-round inventory falls from 605 to 432. The CoC reports 31 added Tenfold beds and temporary family-shelter closures, which only partly explain the HIC change. Test sensitivity to temporary capacity and project reporting.",
+      "sources": [
+        "https://files.hudexchange.info/reports/published/CoC_HIC_CoC_PA-510-2024_PA_2024.pdf",
+        "https://files.hudexchange.info/reports/published/CoC_HIC_CoC_PA-510-2025_PA_2025.pdf",
+        "https://lchra.com/wp-content/uploads/2025/04/Press-Release-2025-PIT-Data-Release.pdf"
+      ]
+    }
+  },
+  {
+    "msa_id": "31340",
+    "first_year": 2024,
+    "last_year": 2025,
+    "decision": "accept",
+    "reason": "The 2025 CoC plan confirms the five-jurisdiction reporting area. The unsheltered count falls from 73 to 16. The city documents a new winter shelter beginning in January 2025, which the year-round measure excludes.",
+    "members": {
+      "VA-508": {
+        "jurisdiction": "Lynchburg city and Amherst, Appomattox, Bedford, and Campbell counties",
+        "scope_ref": "https://static1.squarespace.com/static/5980d3fce58c621b60cca61f/t/67b4dfc8d9073e6b0d17cb83/1739907018943/2025-2027%2BStrategic%2BPlan%2BFINAL.pdf"
+      }
+    },
+    "sources": [
+      "https://static1.squarespace.com/static/5980d3fce58c621b60cca61f/t/67b4dfc8d9073e6b0d17cb83/1739907018943/2025-2027%2BStrategic%2BPlan%2BFINAL.pdf",
+      "https://www.lynchburgva.gov/DocumentCenter/View/7330/Program-Year-2026-Fiscal-Year-2027-Annual-Action-Plan-Draft-42426?bidId=",
+      "https://files.hudexchange.info/reports/published/CoC_PopSub_CoC_VA-508-2025_VA_2025.pdf",
+      "https://files.hudexchange.info/reports/published/CoC_HIC_CoC_VA-508-2024_VA_2024.pdf",
+      "https://files.hudexchange.info/reports/published/CoC_HIC_CoC_VA-508-2025_VA_2025.pdf",
+      "https://lynchburgva.gov/CivicAlerts.aspx?AID=428&ARC=744"
+    ],
+    "bed_count_sensitivity": {
+      "note": "Year-round beds are 87 and 85, with 50 seasonal beds appearing in 2025. The city documents the new January warming shelter. Include capacity sensitivity for seasonal beds and the unusually large unsheltered change.",
+      "sources": [
+        "https://files.hudexchange.info/reports/published/CoC_HIC_CoC_VA-508-2024_VA_2024.pdf",
+        "https://files.hudexchange.info/reports/published/CoC_HIC_CoC_VA-508-2025_VA_2025.pdf",
+        "https://www.lynchburgva.gov/DocumentCenter/View/7330/Program-Year-2026-Fiscal-Year-2027-Annual-Action-Plan-Draft-42426?bidId="
+      ]
+    }
+  },
+  {
+    "msa_id": "32900",
+    "first_year": 2024,
+    "last_year": 2025,
+    "decision": "accept",
+    "reason": "Local and federal 2025 reports document Merced County scope. HUD year-round inventory and PIT totals match the pinned inputs.",
+    "members": {
+      "CA-520": {
+        "jurisdiction": "Merced County",
+        "scope_ref": "https://flower-octahedron-p4n5.squarespace.com/pit-count"
+      }
+    },
+    "sources": [
+      "https://flower-octahedron-p4n5.squarespace.com/pit-count",
+      "https://files.hudexchange.info/reports/published/CoC_PopSub_CoC_CA-520-2025_CA_2025.pdf",
+      "https://files.hudexchange.info/reports/published/CoC_HIC_CoC_CA-520-2024_CA_2024.pdf",
+      "https://files.hudexchange.info/reports/published/CoC_HIC_CoC_CA-520-2025_CA_2025.pdf"
+    ]
+  },
+  {
+    "msa_id": "33700",
+    "first_year": 2024,
+    "last_year": 2025,
+    "decision": "accept",
+    "reason": "The countywide January count and HIC continue Stanislaus County scope.",
+    "members": {
+      "CA-510": {
+        "jurisdiction": "Stanislaus County",
+        "scope_ref": "https://csocstan.com/wp-content/uploads/2025/06/2025-PIT-Press-Release-FINAL-English.pdf"
+      }
+    },
+    "sources": [
+      "https://csocstan.com/wp-content/uploads/2025/06/2025-PIT-Press-Release-FINAL-English.pdf",
+      "https://files.hudexchange.info/reports/published/CoC_PopSub_CoC_CA-510-2025_CA_2025.pdf",
+      "https://files.hudexchange.info/reports/published/CoC_HIC_CoC_CA-510-2024_CA_2024.pdf",
+      "https://files.hudexchange.info/reports/published/CoC_HIC_CoC_CA-510-2025_CA_2025.pdf"
+    ],
+    "bed_count_sensitivity": {
+      "note": "Year-round HIC decreases from 1,309 to 1,277 while reported seasonal/overflow/voucher beds rise from 3 to 111; the Warming Center no longer appears as the same year-round line. Test sensitivity to temporary beds and classification.",
+      "sources": [
+        "https://files.hudexchange.info/reports/published/CoC_HIC_CoC_CA-510-2024_CA_2024.pdf",
+        "https://files.hudexchange.info/reports/published/CoC_HIC_CoC_CA-510-2025_CA_2025.pdf"
+      ]
+    }
+  },
+  {
+    "msa_id": "33780",
+    "first_year": 2024,
+    "last_year": 2025,
+    "decision": "accept",
+    "reason": "The same Monroe city and county CoC reports both years. The frozen sources identify both as observed sheltered and unsheltered counts, with zero people enumerated as unsheltered at both endpoints.",
+    "members": {
+      "MI-515": {
+        "jurisdiction": "Monroe city and county",
+        "scope_ref": "https://files.hudexchange.info/reports/published/CoC_PopSub_CoC_MI-515-2025_MI_2025.pdf"
+      }
+    },
+    "sources": [
+      "https://files.hudexchange.info/reports/published/CoC_PopSub_CoC_MI-515-2025_MI_2025.pdf",
+      "https://letsendhomelessness.org/point-in-time-count-thank-you/",
+      "https://files.hudexchange.info/reports/published/CoC_HIC_CoC_MI-515-2024_MI_2024.pdf",
+      "https://files.hudexchange.info/reports/published/CoC_HIC_CoC_MI-515-2025_MI_2025.pdf"
+    ]
+  },
+  {
+    "msa_id": "34740",
+    "first_year": 2024,
+    "last_year": 2025,
+    "decision": "accept",
+    "reason": "The 2025 notice documents a community-wide Muskegon County unsheltered count. The established Casnovia assignment caveat applies to the frozen reference.",
+    "members": {
+      "MI-516": {
+        "jurisdiction": "Muskegon County, including Muskegon and Norton Shores",
+        "scope_ref": "https://www.muskegon.org/muskegon-county-homeless-continuum-of-care-announces-annual-point-in-time-count/"
+      }
+    },
+    "sources": [
+      "https://www.muskegon.org/muskegon-county-homeless-continuum-of-care-announces-annual-point-in-time-count/",
+      "https://files.hudexchange.info/reports/published/CoC_PopSub_CoC_MI-516-2025_MI_2025.pdf",
+      "https://files.hudexchange.info/reports/published/CoC_HIC_CoC_MI-516-2024_MI_2024.pdf",
+      "https://files.hudexchange.info/reports/published/CoC_HIC_CoC_MI-516-2025_MI_2025.pdf"
+    ],
+    "bed_count_sensitivity": {
+      "note": "Year-round beds fall from 245 to 169. The 34-bed and 36-bed Every Woman’s Place entries disappear as unnamed non-HMIS entries of 20 and 35 beds appear. Test sensitivity to possible re-reporting or changes in available beds.",
+      "sources": [
+        "https://files.hudexchange.info/reports/published/CoC_HIC_CoC_MI-516-2024_MI_2024.pdf",
+        "https://files.hudexchange.info/reports/published/CoC_HIC_CoC_MI-516-2025_MI_2025.pdf"
+      ]
+    }
+  },
+  {
+    "msa_id": "34900",
+    "first_year": 2024,
+    "last_year": 2025,
+    "decision": "accept",
+    "reason": "Napa County’s 2025 release and HUD counts confirm continuing Napa County scope.",
+    "members": {
+      "CA-517": {
+        "jurisdiction": "Napa County",
+        "scope_ref": "https://www.napacounty.gov/DocumentCenter/View/29845/2025-Napa-City-County-CoC-PIT-Release?bidId="
+      }
+    },
+    "sources": [
+      "https://www.napacounty.gov/DocumentCenter/View/29845/2025-Napa-City-County-CoC-PIT-Release?bidId=",
+      "https://files.hudexchange.info/reports/published/CoC_PopSub_CoC_CA-517-2025_CA_2025.pdf",
+      "https://files.hudexchange.info/reports/published/CoC_HIC_CoC_CA-517-2024_CA_2024.pdf",
+      "https://files.hudexchange.info/reports/published/CoC_HIC_CoC_CA-517-2025_CA_2025.pdf"
+    ],
+    "bed_count_sensitivity": {
+      "note": "Eleven transitional housing beds at Whistlestop Homes were listed in 2024 and the project line is absent in 2025. Test the effect of an 11-bed difference given uncertainty about project coverage.",
+      "sources": [
+        "https://files.hudexchange.info/reports/published/CoC_HIC_CoC_CA-517-2024_CA_2024.pdf",
+        "https://files.hudexchange.info/reports/published/CoC_HIC_CoC_CA-517-2025_CA_2025.pdf"
+      ]
+    }
+  },
+  {
+    "msa_id": "34940",
+    "first_year": 2024,
+    "last_year": 2025,
+    "decision": "accept",
+    "reason": "Matt approved treating the two St. Matthew’s House entries as the same Fort Myers shelter. The reporting area is Collier County, and the working inventory removes the 68-bed Lee County entry from the published 2025 Collier total.",
+    "members": {
+      "FL-606": {
+        "jurisdiction": "Collier County",
+        "scope_ref": "https://www.myflfamilies.com/documents/64946.pdf"
+      }
+    },
+    "sources": [
+      "https://www.myflfamilies.com/documents/64946.pdf",
+      "https://collierhomelesscoalition.org/pit-count/",
+      "https://files.hudexchange.info/reports/published/CoC_PopSub_CoC_FL-606-2025_FL_2025.pdf",
+      "https://files.hudexchange.info/reports/published/CoC_HIC_CoC_FL-606-2024_FL_2024.pdf",
+      "https://files.hudexchange.info/reports/published/CoC_HIC_CoC_FL-606-2025_FL_2025.pdf",
+      "https://files.hudexchange.info/reports/published/CoC_HIC_CoC_FL-603-2025_FL_2025.pdf",
+      "https://stmatthewshouse.org/wp-content/uploads/2026/01/1-SMH-FM-Shelter-Anniversary-release-FINAL1.6.26.pdf"
+    ],
+    "bed_count_sensitivity": {
+      "note": "The 68-bed St. Matthew’s House Lee entry in Collier’s report and the 65-bed St. Matthew’s House entry in Lee’s report represent the same Fort Myers facility. The working inventory assigns the facility to Lee and removes the 68-bed entry from Collier. The 2025 working total is 470 year-round beds. Test the published 538 as a sensitivity scenario.",
+      "sources": [
+        "https://files.hudexchange.info/reports/published/CoC_HIC_CoC_FL-606-2024_FL_2024.pdf",
+        "https://files.hudexchange.info/reports/published/CoC_HIC_CoC_FL-606-2025_FL_2025.pdf",
+        "https://files.hudexchange.info/reports/published/CoC_HIC_CoC_FL-603-2025_FL_2025.pdf",
+        "https://stmatthewshouse.org/wp-content/uploads/2026/01/1-SMH-FM-Shelter-Anniversary-release-FINAL1.6.26.pdf"
+      ]
+    },
+    "hic_count_override": {
+      "coc_id": "FL-606",
+      "year": 2025,
+      "hud_shelter_beds": 538,
+      "shelter_beds": 470,
+      "excluded_project": "St. Matthew’s House Lee Emergency Shelter",
+      "excluded_project_beds": 68,
+      "companion_coc_id": "FL-603",
+      "companion_project_beds": 65,
+      "assumption": "The 68-bed St. Matthew’s House Lee entry in Collier’s report and the 65-bed St. Matthew’s House entry in Lee’s report represent the same Fort Myers facility. The working inventory assigns the facility to Lee and removes the 68-bed entry from Collier.",
+      "hud_source_ref": "https://files.hudexchange.info/reports/published/CoC_HIC_CoC_FL-606-2025_FL_2025.pdf",
+      "companion_source_ref": "https://files.hudexchange.info/reports/published/CoC_HIC_CoC_FL-603-2025_FL_2025.pdf",
+      "facility_source_ref": "https://stmatthewshouse.org/wp-content/uploads/2026/01/1-SMH-FM-Shelter-Anniversary-release-FINAL1.6.26.pdf"
+    }
+  },
+  {
+    "msa_id": "35840",
+    "first_year": 2024,
+    "last_year": 2025,
+    "decision": "accept",
+    "reason": "Matt approved the pair with a bed-count flag. The state report confirms Manatee and Sarasota counties as FL-500. Both years use their single published CoC rows. The unsheltered count is 654 to 525.",
+    "members": {
+      "FL-500": {
+        "jurisdiction": "Manatee and Sarasota counties",
+        "scope_ref": "https://www.myflfamilies.com/documents/64946.pdf"
+      }
+    },
+    "sources": [
+      "https://www.myflfamilies.com/documents/64946.pdf",
+      "https://files.hudexchange.info/reports/published/CoC_PopSub_CoC_FL-500-2025_FL_2025.pdf"
+    ],
+    "bed_count_sensitivity": {
+      "note": "Retain 811 to 633 year-round beds. HOPE Family Services listed 36 beds in 2024 and its entry is absent in 2025. Safe Place and Rape Crisis Center lists 33 then 5. Together these account for 64 of the 75 emergency beds lost. The records leave actual 2025 availability uncertain.",
+      "sources": [
+        "https://files.hudexchange.info/reports/published/CoC_HIC_CoC_FL-500-2024_FL_2024.pdf",
+        "https://files.hudexchange.info/reports/published/CoC_HIC_CoC_FL-500-2025_FL_2025.pdf",
+        "https://www.mymanatee.org/docs/default-source/community-and-veterans-services-documents/community-development-documents/cdbg/2025-annual-action-plan-draft.pdf#page=50"
+      ]
+    }
+  },
+  {
+    "msa_id": "36100",
+    "first_year": 2024,
+    "last_year": 2025,
+    "decision": "accept",
+    "reason": "The State and HUD agree on Marion County scope and 160 unsheltered. The county records a permanent CASA domestic violence shelter opening in November 2024 and the HIC shows 22 to 114 CASA beds, explaining 92 of the net 108-bed increase.",
+    "members": {
+      "FL-514": {
+        "jurisdiction": "Marion County",
+        "scope_ref": "https://www.myflfamilies.com/documents/64946.pdf"
+      }
+    },
+    "sources": [
+      "https://www.myflfamilies.com/documents/64946.pdf",
+      "https://marionfl.legistar.com/View.ashx?GUID=F3506070-42CB-4121-A2B7-951F99BC1B36&ID=13758829&M=F",
+      "https://www.marionfl.org/home/showpublisheddocument/26515/638670238782530000",
+      "https://files.hudexchange.info/reports/published/CoC_PopSub_CoC_FL-514-2025_FL_2025.pdf",
+      "https://files.hudexchange.info/reports/published/CoC_HIC_CoC_FL-514-2024_FL_2024.pdf",
+      "https://files.hudexchange.info/reports/published/CoC_HIC_CoC_FL-514-2025_FL_2025.pdf"
+    ]
+  },
+  {
+    "msa_id": "37340",
+    "first_year": 2024,
+    "last_year": 2025,
+    "decision": "accept",
+    "reason": "Matt approved retaining the published PIT figures under the rule of accepting a CoC’s cold-night shelter classification unless case-specific evidence warrants further review. Dated state and federal records support continuity of Brevard County reporting scope.",
+    "members": {
+      "FL-513": {
+        "jurisdiction": "Brevard County",
+        "scope_ref": "https://www.myflfamilies.com/documents/64946.pdf"
+      }
+    },
+    "sources": [
+      "https://www.myflfamilies.com/documents/64946.pdf",
+      "https://brevardhomelesscoalition.org/wp-content/uploads/2024/06/2024-PITC-HIC-Presentation.pdf",
+      "https://brevardhomelesscoalition.org/wp-content/uploads/2025/08/05.08.2025-CoC-Annual-Meeting-Final.pdf#page=54",
+      "https://www.brevardfl.gov/docs/default-source/publicmeetingdocuments/2025-05-19-together-in-partnership-meeting-minutes.pdf",
+      "https://files.hudexchange.info/reports/published/CoC_PopSub_CoC_FL-513-2024_FL_2024.pdf",
+      "https://files.hudexchange.info/reports/published/CoC_PopSub_CoC_FL-513-2025_FL_2025.pdf",
+      "https://files.hudexchange.info/reports/published/CoC_HIC_CoC_FL-513-2024_FL_2024.pdf",
+      "https://files.hudexchange.info/reports/published/CoC_HIC_CoC_FL-513-2025_FL_2025.pdf"
+    ],
+    "pit_classification_annotation": {
+      "id": "pit-cold-night-shelter-fl-513-2025",
+      "revision": 1,
+      "category": "caveat",
+      "summary": "Brevard’s 2025 PIT counted cold-night shelter guests as unsheltered",
+      "text": "Brevard CoC (FL-513) included 213 people who used temporary cold-night shelter in the published unsheltered count of 700 on January 23, 2025.",
+      "treatment": "The working inventory retains the published PIT classification and values.",
+      "uncertainty": "Brevard’s 2024 report leaves the treatment of cold-night shelter guests unclear. Revisit this classification when using the sheltered/unsheltered split in other analyses. Moving all 213 guests to the sheltered category would yield 487 unsheltered and 575 sheltered in 2025.",
+      "scope": {
+        "columns": [
+          "pit_sheltered",
+          "pit_unsheltered"
+        ],
+        "years": [
+          2025
+        ],
+        "geographies": {
+          "include": [
+            "FL-513"
+          ]
+        }
+      },
+      "evidence": [
+        {
+          "kind": "url",
+          "name": "Brevard CoC 2025 PIT results, page 54",
+          "ref": "https://brevardhomelesscoalition.org/wp-content/uploads/2025/08/05.08.2025-CoC-Annual-Meeting-Final.pdf#page=54"
+        },
+        {
+          "kind": "url",
+          "name": "Brevard County May 19, 2025 meeting minutes",
+          "ref": "https://www.brevardfl.gov/docs/default-source/publicmeetingdocuments/2025-05-19-together-in-partnership-meeting-minutes.pdf"
+        },
+        {
+          "kind": "url",
+          "name": "Brevard CoC 2024 PIT results",
+          "ref": "https://brevardhomelesscoalition.org/wp-content/uploads/2024/06/2024-PITC-HIC-Presentation.pdf"
+        },
+        {
+          "kind": "url",
+          "name": "HUD 2025 PIT report for FL-513",
+          "ref": "https://files.hudexchange.info/reports/published/CoC_PopSub_CoC_FL-513-2025_FL_2025.pdf"
+        }
+      ]
+    }
+  },
+  {
+    "msa_id": "37860",
+    "first_year": 2024,
+    "last_year": 2025,
+    "decision": "accept",
+    "reason": "Matt approved Pensacola for the primary sample. The 2025 count moved from January to February 26–27 after a snowstorm, as documented by the local CoC and HUD.",
+    "members": {
+      "FL-511": {
+        "jurisdiction": "Escambia and Santa Rosa counties",
+        "scope_ref": "https://www.myflfamilies.com/documents/64946.pdf"
+      }
+    },
+    "sources": [
+      "https://www.myflfamilies.com/documents/64946.pdf",
+      "https://openingdoorsnwfl.org/web/assets/download/Point-in-Time-Count-2025-Community-Planning-Meeting-2025-02-04.pdf?4=",
+      "https://files.hudexchange.info/reports/published/CoC_PopSub_CoC_FL-511-2025_FL_2025.pdf",
+      "https://files.hudexchange.info/reports/published/CoC_HIC_CoC_FL-511-2024_FL_2024.pdf",
+      "https://files.hudexchange.info/reports/published/CoC_HIC_CoC_FL-511-2025_FL_2025.pdf"
+    ],
+    "bed_count_sensitivity": {
+      "note": "Year-round HIC increases from 601 to 696 around substantial REAP project changes and a change in family-bed inventory. Test sensitivity to project and timing differences.",
+      "sources": [
+        "https://files.hudexchange.info/reports/published/CoC_HIC_CoC_FL-511-2024_FL_2024.pdf",
+        "https://files.hudexchange.info/reports/published/CoC_HIC_CoC_FL-511-2025_FL_2025.pdf",
+        "https://openingdoorsnwfl.org/web/assets/download/Point-in-Time-Count-2025-Community-Planning-Meeting-2025-02-04.pdf?4="
+      ]
+    },
+    "count_method": {
+      "note": "Opening Doors and HUD document the February 26 count night and February 27 follow-up in 2025.",
+      "sources": [
+        "https://openingdoorsnwfl.org/web/assets/download/Point-in-Time-Count-2025-Community-Planning-Meeting-2025-02-04.pdf?4=",
+        "https://files.hudexchange.info/reports/published/CoC_PopSub_CoC_FL-511-2025_FL_2025.pdf"
+      ]
+    }
+  },
+  {
+    "msa_id": "39300",
+    "first_year": 2024,
+    "last_year": 2025,
+    "decision": "accept",
+    "reason": "Matt approved the three documented 2025 reporting jurisdictions. The 2024 PIT and HIC each use the merged MA-505 row once. In 2025 each of MA-505, MA-515 and RI-500 contributes one row to each source. The published totals are 833 to 934 unsheltered and 3,389 to 3,323 year-round shelter beds.",
+    "members": {
+      "MA-505": {
+        "jurisdiction": "Bristol County except Fall River",
+        "scope_ref": "https://www.bristolcountycoc.com/2025-pit-and-hic-data-presentation/"
+      },
+      "MA-515": {
+        "jurisdiction": "City of Fall River",
+        "scope_ref": "https://www.bristolcountycoc.com/2025-pit-and-hic-data-presentation/"
+      },
+      "RI-500": {
+        "jurisdiction": "Rhode Island statewide",
+        "scope_ref": "https://rihomeless.org/newsletters/february-2025-newsletter/"
+      }
+    },
+    "sources": [
+      "docs/providence-historical-reconciliation.md",
+      "https://www.bristolcountycoc.com/2025-pit-and-hic-data-presentation/",
+      "https://rihomeless.org/newsletters/february-2025-newsletter/",
+      "https://files.hudexchange.info/reports/published/CoC_PopSub_CoC_MA-505-2025_MA_2025.pdf",
+      "https://files.hudexchange.info/reports/published/CoC_PopSub_CoC_MA-515-2025_MA_2025.pdf",
+      "https://files.hudexchange.info/reports/published/CoC_PopSub_CoC_RI-500-2025_RI_2025.pdf",
+      "https://files.hudexchange.info/reports/published/CoC_HIC_State_MA_2025.pdf",
+      "https://files.hudexchange.info/reports/published/CoC_HIC_State_RI_2025.pdf"
+    ]
+  },
+  {
+    "msa_id": "39460",
+    "first_year": 2024,
+    "last_year": 2025,
+    "decision": "accept",
+    "reason": "The State identifies Charlotte County for 2025. Its preliminary unsheltered figure is 211 and the HUD final is 202. Vincentian CARES documents continuity of the renamed Charlotte CARE Center.",
+    "members": {
+      "FL-602": {
+        "jurisdiction": "Charlotte County",
+        "scope_ref": "https://www.myflfamilies.com/documents/64946.pdf"
+      }
+    },
+    "sources": [
+      "https://www.myflfamilies.com/documents/64946.pdf",
+      "https://www.vin.care/programs/homeless-services/charlotte-care-center/",
+      "https://files.hudexchange.info/reports/published/CoC_PopSub_CoC_FL-602-2025_FL_2025.pdf",
+      "https://files.hudexchange.info/reports/published/CoC_HIC_CoC_FL-602-2024_FL_2024.pdf",
+      "https://files.hudexchange.info/reports/published/CoC_HIC_CoC_FL-602-2025_FL_2025.pdf"
+    ],
+    "bed_count_sensitivity": {
+      "note": "Year-round beds fall from 138 to 126 during provider changes. The 52-bed former Homeless Coalition entry is continued under Vincentian CARES, while the separate 53-bed COAD entry becomes 39. Test sensitivity to project changes in reported capacity.",
+      "sources": [
+        "https://files.hudexchange.info/reports/published/CoC_HIC_CoC_FL-602-2024_FL_2024.pdf",
+        "https://files.hudexchange.info/reports/published/CoC_HIC_CoC_FL-602-2025_FL_2025.pdf",
+        "https://www.vin.care/programs/homeless-services/charlotte-care-center/"
+      ]
+    }
+  },
+  {
+    "msa_id": "39740",
+    "first_year": 2024,
+    "last_year": 2025,
+    "decision": "accept",
+    "reason": "The CoC confirms the January 22 count covers all of Berks County. Its separate summer count is a different observation.",
+    "members": {
+      "PA-506": {
+        "jurisdiction": "Reading and Berks County",
+        "scope_ref": "https://bceh.org/wp-content/uploads/2025/08/PIT-Press-Release-2025-1.pdf"
+      }
+    },
+    "sources": [
+      "https://bceh.org/wp-content/uploads/2025/08/PIT-Press-Release-2025-1.pdf",
+      "https://files.hudexchange.info/reports/published/CoC_PopSub_CoC_PA-506-2025_PA_2025.pdf",
+      "https://files.hudexchange.info/reports/published/CoC_HIC_CoC_PA-506-2024_PA_2024.pdf",
+      "https://files.hudexchange.info/reports/published/CoC_HIC_CoC_PA-506-2025_PA_2025.pdf"
+    ]
+  },
+  {
+    "msa_id": "40980",
+    "first_year": 2024,
+    "last_year": 2025,
+    "decision": "accept",
+    "reason": "Local outreach records document the January 22 count. The 2025 HUD PIT and HIC continue to name Saginaw city and county.",
+    "members": {
+      "MI-510": {
+        "jurisdiction": "Saginaw city and county",
+        "scope_ref": "https://scchap.org/the-2020-point-in-time-count-is-upon-us/"
+      }
+    },
+    "sources": [
+      "https://scchap.org/the-2020-point-in-time-count-is-upon-us/",
+      "https://files.hudexchange.info/reports/published/CoC_PopSub_CoC_MI-510-2025_MI_2025.pdf",
+      "https://files.hudexchange.info/reports/published/CoC_HIC_CoC_MI-510-2024_MI_2024.pdf",
+      "https://files.hudexchange.info/reports/published/CoC_HIC_CoC_MI-510-2025_MI_2025.pdf"
+    ]
+  },
+  {
+    "msa_id": "41420",
+    "first_year": 2022,
+    "last_year": 2023,
+    "decision": "joint_review",
+    "reason": "The two countywide HUD submissions and local count evidence support 2022–23 as a standalone pair after OR-504 re-formed. Decide whether to lift the earlier explicit whole-Salem study holdout for these post-reformation years.",
+    "members": {
+      "OR-504": {
+        "jurisdiction": "Marion and Polk counties",
+        "scope_ref": "https://www.oregon.gov/lcd/Housing/Documents/Salem%20HPS%20and%20Staff%20Report.pdf"
+      }
+    },
+    "sources": [
+      "https://www.oregon.gov/lcd/Housing/Documents/Salem%20HPS%20and%20Staff%20Report.pdf",
+      "https://mwvhomelessalliance.org/point-in-time-count-tells-part-of-the-story/",
+      "https://files.hudexchange.info/reports/published/CoC_PopSub_CoC_OR-504-2022_OR_2022.pdf",
+      "https://files.hudexchange.info/reports/published/CoC_PopSub_CoC_OR-504-2023_OR_2023.pdf",
+      "https://files.hudexchange.info/reports/published/CoC_HIC_CoC_OR-504-2022_OR_2022.pdf",
+      "https://files.hudexchange.info/reports/published/CoC_HIC_CoC_OR-504-2023_OR_2023.pdf"
+    ]
+  },
+  {
+    "msa_id": "42100",
+    "first_year": 2024,
+    "last_year": 2025,
+    "decision": "accept",
+    "reason": "Both years document a countywide blitz, a sample survey, and a separate youth count. The general counts used approximately 100 and 85 volunteers, respectively. January 2025 local and HUD counts agree.",
+    "members": {
+      "CA-508": {
+        "jurisdiction": "Santa Cruz County",
+        "scope_ref": "https://housingforhealthpartnership.org/Portals/29/HAP/pdf/2025%20Santa%20Cruz%20County%20PIT%207.23.25.pdf"
+      }
+    },
+    "sources": [
+      "https://housingforhealthpartnership.org/Portals/29/HAP/pdf/2025%20Santa%20Cruz%20County%20PIT%207.23.25.pdf",
+      "https://housingforhealthpartnership.org/Portals/29/HAP/Providers/Data/Santa%20Cruz%20County%20PIT%20Report%20V5%20-%207.11.2024.pdf",
+      "https://files.hudexchange.info/reports/published/CoC_PopSub_CoC_CA-508-2025_CA_2025.pdf",
+      "https://files.hudexchange.info/reports/published/CoC_HIC_CoC_CA-508-2024_CA_2024.pdf",
+      "https://files.hudexchange.info/reports/published/CoC_HIC_CoC_CA-508-2025_CA_2025.pdf"
+    ],
+    "bed_count_sensitivity": {
+      "note": "Year-round inventory falls from 430 to 415 amid project turnover. The 23-bed Salvation Army Watsonville entry is absent in 2025, and People First Armory appears with 60 beds. Test sensitivity to project coverage where continuity of listed projects is uncertain.",
+      "sources": [
+        "https://files.hudexchange.info/reports/published/CoC_HIC_CoC_CA-508-2024_CA_2024.pdf",
+        "https://files.hudexchange.info/reports/published/CoC_HIC_CoC_CA-508-2025_CA_2025.pdf"
+      ]
+    }
+  },
+  {
+    "msa_id": "42200",
+    "first_year": 2024,
+    "last_year": 2025,
+    "decision": "accept",
+    "reason": "The countywide local report supports the same area. Local 2025 unsheltered plus vehicular count is 1,478 versus HUD’s 1,479, and the primary retains the pinned published count.",
+    "members": {
+      "CA-603": {
+        "jurisdiction": "Santa Barbara County",
+        "scope_ref": "https://santabarbara.legistar.com/View.ashx?GUID=3534996E-0B81-4D37-BCD4-0009545265D9&ID=13600371&M=F"
+      }
+    },
+    "sources": [
+      "https://santabarbara.legistar.com/View.ashx?GUID=3534996E-0B81-4D37-BCD4-0009545265D9&ID=13600371&M=F",
+      "https://www.cityofsantamaria.org/home/showpublisheddocument/32768/638938108164330000",
+      "https://files.hudexchange.info/reports/published/CoC_PopSub_CoC_CA-603-2025_CA_2025.pdf",
+      "https://files.hudexchange.info/reports/published/CoC_HIC_CoC_CA-603-2024_CA_2024.pdf",
+      "https://files.hudexchange.info/reports/published/CoC_HIC_CoC_CA-603-2025_CA_2025.pdf"
+    ]
+  },
+  {
+    "msa_id": "42220",
+    "first_year": 2024,
+    "last_year": 2025,
+    "decision": "accept",
+    "reason": "County records document countywide counting in both years and a similar method. The 2025 local count agrees with HUD.",
+    "members": {
+      "CA-504": {
+        "jurisdiction": "Sonoma County",
+        "scope_ref": "https://sonoma-county.legistar.com/LegislationDetail.aspx?GUID=C4EFC8E2-D72E-4BC4-9B18-23E73B065FA7&ID=7644710&Options=&Search="
+      }
+    },
+    "sources": [
+      "https://sonoma-county.legistar.com/LegislationDetail.aspx?GUID=C4EFC8E2-D72E-4BC4-9B18-23E73B065FA7&ID=7644710&Options=&Search=",
+      "https://files.hudexchange.info/reports/published/CoC_PopSub_CoC_CA-504-2025_CA_2025.pdf",
+      "https://files.hudexchange.info/reports/published/CoC_HIC_CoC_CA-504-2024_CA_2024.pdf",
+      "https://files.hudexchange.info/reports/published/CoC_HIC_CoC_CA-504-2025_CA_2025.pdf"
+    ],
+    "bed_count_sensitivity": {
+      "note": "Los Guilicos and Mickey Zane list 120 beds combined in 2024. Their 2025 corresponding Eliza’s Village and Mickey Zane lines list 80 combined, while county reports describe 90 and 60 places respectively. Test inventory sensitivity subject to actual count-night availability.",
+      "sources": [
+        "https://files.hudexchange.info/reports/published/CoC_HIC_CoC_CA-504-2024_CA_2024.pdf",
+        "https://files.hudexchange.info/reports/published/CoC_HIC_CoC_CA-504-2025_CA_2025.pdf",
+        "https://sonomacounty.gov/Main%20County%20Site/Administrative%20Support%20%26%20Fiscal%20Services/ACTTC/Documents/Audit/FY%2024-25/Contract%20Compliance%20Audit%20DHS%20SVdP.pdf",
+        "https://sonomacounty.gov/Main%20County%20Site/Administrative%20Support%20%26%20Fiscal%20Services/CAO/Documents/Projects/Arpa%20Reporting/2025-Recovery-Plan-Performance-Report-07292025-ADA-Remediated.pdf"
+      ]
+    }
+  },
+  {
+    "msa_id": "44140",
+    "first_year": 2024,
+    "last_year": 2025,
+    "decision": "accept",
+    "reason": "The 2025 dated local and federal records support the same Hampden County CoC. The historical Springfield-only exception applies to pre-2013 data.",
+    "members": {
+      "MA-504": {
+        "jurisdiction": "Springfield and Hampden County",
+        "scope_ref": "https://www.springfield-ma.gov/comm-dev/fileadmin/community_dev/Con_plan_2025-2029/DRAFT_CON_PLAN_4-10-25_Final.pdf"
+      }
+    },
+    "sources": [
+      "https://www.springfield-ma.gov/comm-dev/fileadmin/community_dev/Con_plan_2025-2029/DRAFT_CON_PLAN_4-10-25_Final.pdf",
+      "https://chd.org/2025/03/12/tracking-homelessness-a-morning-with-the-point-in-time-count/",
+      "https://files.hudexchange.info/reports/published/CoC_PopSub_CoC_MA-504-2025_MA_2025.pdf",
+      "https://files.hudexchange.info/reports/published/CoC_HIC_CoC_MA-504-2024_MA_2024.pdf",
+      "https://files.hudexchange.info/reports/published/CoC_HIC_CoC_MA-504-2025_MA_2025.pdf"
+    ],
+    "bed_count_sensitivity": {
+      "note": "Year-round inventory falls from 3,436 to 2,376 as hotel project rows leave the inventory and 521 overflow/voucher plus 67 seasonal beds appear in 2025. Test sensitivity to changes in hotel capacity and reporting categories.",
+      "sources": [
+        "https://files.hudexchange.info/reports/published/CoC_HIC_CoC_MA-504-2024_MA_2024.pdf",
+        "https://files.hudexchange.info/reports/published/CoC_HIC_CoC_MA-504-2025_MA_2025.pdf",
+        "https://www.mass.gov/doc/notice-of-termination-of-state-of-emergency-0/download"
+      ]
+    }
+  },
+  {
+    "msa_id": "45940",
+    "first_year": 2024,
+    "last_year": 2025,
+    "decision": "accept",
+    "reason": "Matt approved Trenton for the primary sample. Mercer’s 2025 report documents a change in classification for people sleeping on chairs or recliners in shelters and Code Blue sites.",
+    "members": {
+      "NJ-514": {
+        "jurisdiction": "Trenton and Mercer County",
+        "scope_ref": "https://monarchhousing.org/wp-content/uploads/2025/07/PIT-Report-2025-Mercer.pdf"
+      }
+    },
+    "sources": [
+      "https://monarchhousing.org/wp-content/uploads/2025/07/PIT-Report-2025-Mercer.pdf",
+      "https://files.hudexchange.info/reports/published/CoC_PopSub_CoC_NJ-514-2025_NJ_2025.pdf",
+      "https://files.hudexchange.info/reports/published/CoC_HIC_CoC_NJ-514-2024_NJ_2024.pdf",
+      "https://files.hudexchange.info/reports/published/CoC_HIC_CoC_NJ-514-2025_NJ_2025.pdf"
+    ],
+    "bed_count_sensitivity": {
+      "note": "Year-round beds fall from 494 to 479 while motel, Code Blue, and named shelter project entries change and voucher beds rise from 376 to 398. Test shelter inventory sensitivity if this pair is included.",
+      "sources": [
+        "https://files.hudexchange.info/reports/published/CoC_HIC_CoC_NJ-514-2024_NJ_2024.pdf",
+        "https://files.hudexchange.info/reports/published/CoC_HIC_CoC_NJ-514-2025_NJ_2025.pdf",
+        "https://monarchhousing.org/wp-content/uploads/2025/07/PIT-Report-2025-Mercer.pdf"
+      ]
+    },
+    "count_method": {
+      "note": "The 2025 report documents a change in PIT classification for seated or recliner sleeping in shelter and Code Blue sites.",
+      "sources": [
+        "https://monarchhousing.org/wp-content/uploads/2025/07/PIT-Report-2025-Mercer.pdf"
+      ]
+    }
+  },
+  {
+    "msa_id": "48900",
+    "first_year": 2024,
+    "last_year": 2025,
+    "decision": "accept",
+    "reason": "The 2025 Cape Fear official report matches HUD at 267 unsheltered and the same January count date. The established coastal scope qualification applies to the frozen 99% match.",
+    "members": {
+      "NC-506": {
+        "jurisdiction": "Cape Fear area of Brunswick, New Hanover, and Pender counties",
+        "scope_ref": "https://capefearcog.gov/wp-content/uploads/2025/08/2025-PIT-Summary.pdf"
+      }
+    },
+    "sources": [
+      "https://capefearcog.gov/wp-content/uploads/2025/08/2025-PIT-Summary.pdf",
+      "https://capefearcog.gov/homeless/homeless-data/",
+      "https://files.hudexchange.info/reports/published/CoC_PopSub_CoC_NC-506-2025_NC_2025.pdf",
+      "https://files.hudexchange.info/reports/published/CoC_HIC_CoC_NC-506-2024_NC_2024.pdf",
+      "https://files.hudexchange.info/reports/published/CoC_HIC_CoC_NC-506-2025_NC_2025.pdf"
+    ],
+    "bed_count_sensitivity": {
+      "note": "The year-round inventory falls from 310 to 268, with provider and project entries changing. Retain the published values and test sensitivity to whether the difference reflects changes in coverage or available beds.",
+      "sources": [
+        "https://files.hudexchange.info/reports/published/CoC_HIC_CoC_NC-506-2024_NC_2024.pdf",
+        "https://files.hudexchange.info/reports/published/CoC_HIC_CoC_NC-506-2025_NC_2025.pdf",
+        "https://capefearcog.gov/wp-content/uploads/2025/08/2025-PIT-Summary.pdf"
+      ]
+    }
+  },
+  {
+    "msa_id": "49340",
+    "first_year": 2024,
+    "last_year": 2025,
+    "decision": "accept",
+    "reason": "The 2025 federal PIT and HIC identify the same Worcester city and county CoC. The CoC-sourced January 2025 table matches HUD at 221 unsheltered. The documented survey workflow change took effect in 2024, and the CoC describes the same seven-day follow-up for its annual counts.",
+    "members": {
+      "MA-506": {
+        "jurisdiction": "Worcester city and county",
+        "scope_ref": "https://files.hudexchange.info/reports/published/CoC_PopSub_CoC_MA-506-2025_MA_2025.pdf"
+      }
+    },
+    "sources": [
+      "https://files.hudexchange.info/reports/published/CoC_PopSub_CoC_MA-506-2025_MA_2025.pdf",
+      "https://files.hudexchange.info/reports/published/CoC_HIC_CoC_MA-506-2024_MA_2024.pdf",
+      "https://files.hudexchange.info/reports/published/CoC_HIC_CoC_MA-506-2025_MA_2025.pdf",
+      "https://www.cmhaonline.org/pit-hic",
+      "https://www.wrrb.org/wp-content/uploads/2025/11/Almanac-2025-Final.pdf",
+      "https://static1.squarespace.com/static/5db9ec634801ce2109d10448/t/671bdcdbb64995276d10db10/1729879260150/FY2024%2BCoC-Approved%2BConsolidated%2BApplication.pdf",
+      "https://www.mass.gov/info-details/audit-of-the-executive-office-of-housing-and-livable-communities-emergency-shelter-overview-of-audited-entity"
+    ],
+    "bed_count_sensitivity": {
+      "note": "The year-round inventory is 1,899 in both years, while seasonal and overflow/voucher beds together rise from 1 to 977. The temporary inventory warrants a separate count-night capacity sensitivity.",
+      "sources": [
+        "https://files.hudexchange.info/reports/published/CoC_HIC_CoC_MA-506-2024_MA_2024.pdf",
+        "https://files.hudexchange.info/reports/published/CoC_HIC_CoC_MA-506-2025_MA_2025.pdf"
+      ]
+    }
+  }
+]

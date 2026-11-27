@@ -124,6 +124,9 @@ CoC boundary comparability remains a separate check before using outcomes.
 
 ## RecipeV2 Results Example
 
+The [shelter-capacity curation ledger](../site-inputs/shelter-capacity-curation/README.md)
+records the working sample's CoC-year decisions, pair membership, and data caveats.
+
 `shelter-capacity-results.yaml` records the shelter-capacity results workflow
 from §10 of `docs/results-recipe-spec_2.md`, including canonical HUD HIC
 columns (`hic_es_year_round_beds`, `hic_th_year_round_beds`, and

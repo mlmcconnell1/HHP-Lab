@@ -1,0 +1,633 @@
+{
+  "review_date": "2026-11-27",
+  "analysis": "subst_fd",
+  "first_pair": [
+    2010,
+    2011
+  ],
+  "last_pair_screened": [
+    2025,
+    2026
+  ],
+  "masked_pit_years": [
+    2021
+  ],
+  "cohort": {
+    "schema_version": "msa_coc_sites/1",
+    "artifact_id": "overlap_samples",
+    "threshold": 0.99,
+    "site_key": "msa_id",
+    "memberships": [
+      [
+        "11460",
+        "MI-509"
+      ],
+      [
+        "12540",
+        "CA-604"
+      ],
+      [
+        "12980",
+        "MI-514"
+      ],
+      [
+        "13460",
+        "OR-503"
+      ],
+      [
+        "14860",
+        "CT-503"
+      ],
+      [
+        "15980",
+        "FL-603"
+      ],
+      [
+        "17020",
+        "CA-519"
+      ],
+      [
+        "18880",
+        "FL-505"
+      ],
+      [
+        "19500",
+        "IL-516"
+      ],
+      [
+        "19660",
+        "FL-504"
+      ],
+      [
+        "20940",
+        "CA-613"
+      ],
+      [
+        "21340",
+        "TX-603"
+      ],
+      [
+        "21500",
+        "PA-605"
+      ],
+      [
+        "21660",
+        "OR-500"
+      ],
+      [
+        "22420",
+        "MI-505"
+      ],
+      [
+        "23420",
+        "CA-514"
+      ],
+      [
+        "27060",
+        "NY-510"
+      ],
+      [
+        "27100",
+        "MI-517"
+      ],
+      [
+        "28020",
+        "MI-507"
+      ],
+      [
+        "28740",
+        "NY-608"
+      ],
+      [
+        "28880",
+        "NY-601"
+      ],
+      [
+        "28880",
+        "NY-602"
+      ],
+      [
+        "29460",
+        "FL-503"
+      ],
+      [
+        "29540",
+        "PA-510"
+      ],
+      [
+        "29820",
+        "NV-500"
+      ],
+      [
+        "31080",
+        "CA-600"
+      ],
+      [
+        "31080",
+        "CA-602"
+      ],
+      [
+        "31080",
+        "CA-606"
+      ],
+      [
+        "31080",
+        "CA-607"
+      ],
+      [
+        "31080",
+        "CA-612"
+      ],
+      [
+        "31340",
+        "VA-508"
+      ],
+      [
+        "31700",
+        "NH-501"
+      ],
+      [
+        "31700",
+        "NH-502"
+      ],
+      [
+        "32780",
+        "OR-502"
+      ],
+      [
+        "32900",
+        "CA-520"
+      ],
+      [
+        "33100",
+        "FL-600"
+      ],
+      [
+        "33100",
+        "FL-601"
+      ],
+      [
+        "33100",
+        "FL-605"
+      ],
+      [
+        "33700",
+        "CA-510"
+      ],
+      [
+        "33780",
+        "MI-515"
+      ],
+      [
+        "34740",
+        "MI-516"
+      ],
+      [
+        "34900",
+        "CA-517"
+      ],
+      [
+        "34940",
+        "FL-606"
+      ],
+      [
+        "35840",
+        "FL-500"
+      ],
+      [
+        "36100",
+        "FL-514"
+      ],
+      [
+        "37100",
+        "CA-611"
+      ],
+      [
+        "37340",
+        "FL-513"
+      ],
+      [
+        "37860",
+        "FL-511"
+      ],
+      [
+        "39300",
+        "MA-505"
+      ],
+      [
+        "39300",
+        "MA-515"
+      ],
+      [
+        "39300",
+        "RI-500"
+      ],
+      [
+        "39460",
+        "FL-602"
+      ],
+      [
+        "39540",
+        "WI-502"
+      ],
+      [
+        "39740",
+        "PA-506"
+      ],
+      [
+        "40140",
+        "CA-608"
+      ],
+      [
+        "40140",
+        "CA-609"
+      ],
+      [
+        "40900",
+        "CA-503"
+      ],
+      [
+        "40900",
+        "CA-515"
+      ],
+      [
+        "40900",
+        "CA-521"
+      ],
+      [
+        "40900",
+        "CA-525"
+      ],
+      [
+        "40980",
+        "MI-510"
+      ],
+      [
+        "41420",
+        "OR-504"
+      ],
+      [
+        "41740",
+        "CA-601"
+      ],
+      [
+        "41860",
+        "CA-501"
+      ],
+      [
+        "41860",
+        "CA-502"
+      ],
+      [
+        "41860",
+        "CA-505"
+      ],
+      [
+        "41860",
+        "CA-507"
+      ],
+      [
+        "41860",
+        "CA-512"
+      ],
+      [
+        "42020",
+        "CA-614"
+      ],
+      [
+        "42100",
+        "CA-508"
+      ],
+      [
+        "42200",
+        "CA-603"
+      ],
+      [
+        "42220",
+        "CA-504"
+      ],
+      [
+        "42660",
+        "WA-500"
+      ],
+      [
+        "42660",
+        "WA-503"
+      ],
+      [
+        "42660",
+        "WA-504"
+      ],
+      [
+        "44140",
+        "MA-504"
+      ],
+      [
+        "44700",
+        "CA-511"
+      ],
+      [
+        "45940",
+        "NJ-514"
+      ],
+      [
+        "46520",
+        "HI-501"
+      ],
+      [
+        "46700",
+        "CA-518"
+      ],
+      [
+        "48900",
+        "NC-506"
+      ],
+      [
+        "49340",
+        "MA-506"
+      ],
+      [
+        "49620",
+        "PA-512"
+      ],
+      [
+        "49700",
+        "CA-524"
+      ]
+    ],
+    "membership_sha256": "a6f8f3e35c335d9c1877b2fff8fd6727d362fe89321f11dbfe2f80ef98f23338",
+    "msa_definition_version": "census_msa_2023",
+    "frozen_boundary_vintage": "2024"
+  },
+  "original_boundary_review": {
+    "evidence_id": "shelter-capacity-99-reporting-scope-20261127-palm-bay",
+    "evidence_fingerprint": "sha256:65c5291bb7baeb4a06d0c22013ee0a0396b7387e74ae75ce682baf65ac0f9a9d"
+  },
+  "sources": {
+    "hud_pit_hic": "https://www.huduser.gov/portal/datasets/ahar.html",
+    "hud_geography": "https://catalog.data.gov/dataset/continuum-of-care-coc-gis-tools",
+    "county_population_estimates": "https://www.census.gov/programs-surveys/popest/data/tables.html",
+    "census_msa_delineations": "https://www.census.gov/geographies/reference-files/time-series/demo/metro-micro/delineation-files.html",
+    "july_2009_county_population": {
+      "source": "https://www2.census.gov/programs-surveys/popest/datasets/2000-2010/intercensal/county/co-est00int-tot.csv",
+      "raw_sha256": "273e56203b61c2ccfb05a54c9b2b025b0521e3764b175469ca22bcad4b6ae8f6",
+      "retrieved_at_utc": "2026-11-26T19:14:21.262852+00:00"
+    },
+    "bls_metro_unemployment": {
+      "source": "https://api.bls.gov/publicAPI/v2/timeseries/data/",
+      "retrieved_at_utc": "2026-11-26T19:14:22.623998+00:00",
+      "annual_period": "M13",
+      "unemployment_rate_series_by_msa": {
+        "11460": [
+          "LAUMT261146000000003"
+        ],
+        "12540": [
+          "LAUMT061254000000003"
+        ],
+        "12980": [
+          "LAUMT261298000000003"
+        ],
+        "13460": [
+          "LAUMT411346000000003"
+        ],
+        "14860": [
+          "LAUMT091486000000003"
+        ],
+        "15980": [
+          "LAUMT121598000000003"
+        ],
+        "17020": [
+          "LAUMT061702000000003"
+        ],
+        "18880": [
+          "LAUMT121888000000003"
+        ],
+        "19500": [
+          "LAUMT171950000000003"
+        ],
+        "19660": [
+          "LAUMT121966000000003"
+        ],
+        "20940": [
+          "LAUMT062094000000003"
+        ],
+        "21340": [
+          "LAUMT482134000000003"
+        ],
+        "21500": [
+          "LAUMT422150000000003"
+        ],
+        "21660": [
+          "LAUMT412166000000003"
+        ],
+        "22420": [
+          "LAUMT262242000000003"
+        ],
+        "23420": [
+          "LAUMT062342000000003"
+        ],
+        "27060": [
+          "LAUMT362706000000003"
+        ],
+        "27100": [
+          "LAUMT262710000000003"
+        ],
+        "28020": [
+          "LAUMT262802000000003"
+        ],
+        "28740": [
+          "LAUMT362874000000003"
+        ],
+        "28880": [
+          "LAUMT362888000000003"
+        ],
+        "29460": [
+          "LAUMT122946000000003"
+        ],
+        "29540": [
+          "LAUMT422954000000003"
+        ],
+        "29820": [
+          "LAUMT322982000000003"
+        ],
+        "31080": [
+          "LAUMT063108000000003"
+        ],
+        "31340": [
+          "LAUMT513134000000003"
+        ],
+        "31700": [
+          "LAUMT333170000000003"
+        ],
+        "32780": [
+          "LAUMT413278000000003"
+        ],
+        "32900": [
+          "LAUMT063290000000003"
+        ],
+        "33100": [
+          "LAUMT123310000000003"
+        ],
+        "33700": [
+          "LAUMT063370000000003"
+        ],
+        "33780": [
+          "LAUMT263378000000003"
+        ],
+        "34740": [
+          "LAUMT263474000000003"
+        ],
+        "34900": [
+          "LAUMT063490000000003"
+        ],
+        "34940": [
+          "LAUMT123494000000003"
+        ],
+        "35840": [
+          "LAUMT123584000000003"
+        ],
+        "36100": [
+          "LAUMT123610000000003"
+        ],
+        "37100": [
+          "LAUMT063710000000003"
+        ],
+        "37340": [
+          "LAUMT123734000000003"
+        ],
+        "37860": [
+          "LAUMT123786000000003"
+        ],
+        "39300": [
+          "LAUMT443930000000003"
+        ],
+        "39460": [
+          "LAUMT123946000000003"
+        ],
+        "39540": [
+          "LAUMT553954000000003"
+        ],
+        "39740": [
+          "LAUMT423974000000003"
+        ],
+        "40140": [
+          "LAUMT064014000000003"
+        ],
+        "40900": [
+          "LAUMT064090000000003"
+        ],
+        "40980": [
+          "LAUMT264098000000003"
+        ],
+        "41420": [
+          "LAUMT414142000000003"
+        ],
+        "41740": [
+          "LAUMT064174000000003"
+        ],
+        "41860": [
+          "LAUMT064186000000003"
+        ],
+        "42020": [
+          "LAUMT064202000000003"
+        ],
+        "42100": [
+          "LAUMT064210000000003"
+        ],
+        "42200": [
+          "LAUMT064220000000003"
+        ],
+        "42220": [
+          "LAUMT064222000000003"
+        ],
+        "42660": [
+          "LAUMT534266000000003"
+        ],
+        "44140": [
+          "LAUMT254414000000003"
+        ],
+        "44700": [
+          "LAUMT064470000000003"
+        ],
+        "45940": [
+          "LAUMT344594000000003"
+        ],
+        "46520": [
+          "LAUMT154652000000003"
+        ],
+        "46700": [
+          "LAUMT064670000000003"
+        ],
+        "48900": [
+          "LAUMT374890000000003"
+        ],
+        "49340": [
+          "LAUMT254934000000003"
+        ],
+        "49620": [
+          "LAUMT424962000000003"
+        ],
+        "49700": [
+          "LAUMT064970000000003"
+        ]
+      },
+      "matched_months": {
+        "pair": [
+          2024,
+          2025
+        ],
+        "months": [
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          11,
+          12
+        ]
+      }
+    }
+  },
+  "working_inventory_input_sha256": {
+    "asset:historical-site-selection/full-period-boundary-curation-20261027/corrected/annual-comparisons.csv": "9f0872f771c6c16f924c55cfbcd2cc1030ffdcee571b4eca3b48cc4d405c96bf",
+    "asset:historical-site-selection/remaining-boundary-checks-20261119/current-cohort-dispositions.csv": "5af17b5eeda5913be925568ca14e9ed5129884bd8a5aa5da0b9a6f6f40312d42",
+    "asset:msa_coc_overlap_sites_2024/msa_coc_memberships__overlap_samples.parquet": "8d86dbde6b27715f57cf644336b441401089559c08bb2d29733abf4dffafc0e8",
+    "asset:msa_coc_overlap_sites_2024/msa_coc_sites__overlap_samples.parquet": "4b7467d828f503751234bce24120f4e6460070540add24736c149831410a1e80",
+    "asset:shelter-capacity-pair-audit-2010-2026-20261126/bls-metro-source-receipt.json": "1a186d9fed798c379ec3a47ef237cc3ada103fb80b513c800636388eb06c9a6b",
+    "asset:shelter-capacity-pair-audit-2010-2026-20261126/census-july-2009-source-receipt.json": "7890834cf9ce01c2e32e683ecc239278330657ea5c53037c4a3dad089337758f",
+    "asset:site-boundary-history-audit/archives/CoC_GIS_National_Boundary_2022.zip": "e96f8ec07750d623a75ccd20f92e072bfab6fba7f524054e09c31caeb5bc72f4",
+    "asset:site-boundary-history-audit/archives/CoC_GIS_National_Boundary_2023.zip": "502c5d1887c56ac2b5f4911acc7c4c1db8aa78aaee34fde3d5f663ea15befc2a",
+    "asset:site-boundary-history-audit/archives/CoC_GIS_National_Boundary_2024.zip": "e4010a3e9dc873ec99d3f13a7c76b460ec712745d0036ea4e23591e24bbd7d19",
+    "data/curated/coc_boundaries/coc__B2024.parquet": "93eec38a508d5faf9589edded506613851a14dd0112025314e5359e468f9d6ac",
+    "data/curated/hic/hic__H2010.parquet": "6caa5acc585bb8ffaef937ee419466d995fe3d483cc2010ae19bf623f995ba7a",
+    "data/curated/hic/hic__H2011.parquet": "5f02069df7ddc16e3cf6c09644ae872b6588d6aba4e2624b6050852bc4d923ac",
+    "data/curated/hic/hic__H2012.parquet": "36037ed38bfd2a56d27dc754f5f929b7c33f1f1df2fa65bf54a530ed57ceb3c2",
+    "data/curated/hic/hic__H2013.parquet": "1261c43de0a557d1bcf8dc7fc42b4378148e5d1f297f7bb8751a0f9a588156c2",
+    "data/curated/hic/hic__H2014.parquet": "bf29b0672304e789552b7cd474e2030bc25fa9ace055f31d0cb1ac2bc1c3900f",
+    "data/curated/hic/hic__H2015.parquet": "949c5a69b188c21e7e77414f0019ad9835df4b9fc9975dcc8846b761238a0d9b",
+    "data/curated/hic/hic__H2016.parquet": "320c237e3c44b029fc0d6132acea9cc22f0b8dedb9652e67224ae39d9e0dd017",
+    "data/curated/hic/hic__H2017.parquet": "477a47750bcad1e294d0ee9994ffb8798dc3dee7e96a270c70d66dda0878b12e",
+    "data/curated/hic/hic__H2018.parquet": "3d465ede1684679d9e541aee44f08ea725e03801d3632d153b5203325e531a68",
+    "data/curated/hic/hic__H2019.parquet": "a33e7d3b93f37e5c771132b93f99dc4a8eba7feefe966c3d65307daf44a45cbb",
+    "data/curated/hic/hic__H2020.parquet": "6792b3fd20a0278a02c7ba45a4c41d4c4a48707c940f5065e7f95ea52d710c4e",
+    "data/curated/hic/hic__H2021.parquet": "53a8f594e23527721b25941f7d137bd3d2b3c82b22c69df36b02bc1a0362b171",
+    "data/curated/hic/hic__H2022.parquet": "6ef9d31b72a1d3cd5e08f044b3e2726347a303e1e3ce8f9614d1d8a57f51701c",
+    "data/curated/hic/hic__H2023.parquet": "321308604cc2be619c478cb2886d752bf22b2c13de91447d21f5b658ca84c0d1",
+    "data/curated/hic/hic__H2024.parquet": "83893a382437aedb20a20696e90b4db2df56f992a2333e586828d95c855c9bf7",
+    "data/curated/hic/hic__H2025.parquet": "ba276c63c7b7894e738e5e51b7fa3f8d27f2ec204dd10cfe432aa859898fc806",
+    "data/curated/msa/msa_county_membership__census_msa_2023.parquet": "08d4614b045460d72840de9319e4f224ebff72795307d075f403e31e47f03578",
+    "data/curated/pep/pep_county__v2020.parquet": "2bec7aaf86625b6e3e01213acf5d6c9a9284454ddcaf2c0ce2211cf543797469",
+    "data/curated/pep/pep_county__v2024.parquet": "bd14769463e9e156c74be430b803d50ff5652c427937cf7421bd3d1e50ebccdf",
+    "data/curated/pep/pep_county__v2025__y2020-2025.parquet": "9c40389b4b23b9058169675e0a1089e8e9b14e3ffe1403b5ef907acd7f88ef05",
+    "data/curated/pit/pit_vintage__P2024.parquet": "82e4cfd288e346860d4be0b39eb4b8cc28913af593401141b5374ae6dbfce007",
+    "data/curated/pit/pit_vintage__P2025.parquet": "d8e1e190e19647f7d5eaa7ae8817e57a5ba200a99602ebd5aab631723e7e60ee",
+    "docs/providence-historical-reconciliation.md": "d8d42eb56a7459ef5bae8a5dabf40f444261f87d27bf72df1615207c94a58fe7",
+    "recipes/site-inputs/coc-boundary-compatibility-longitudinal-mergers.json": "1fd95a4994e5f472fa01856b7e158579bfb49324bed7a2f41cc2cbf75bb32cae",
+    "recipes/site-inputs/coc-boundary-compatibility-shelter-capacity.json": "28b0d845cda13ceb240ee4cf4d7386f88fcc27b20c82a47a74e06c44cdc6921e",
+    "recipes/site-inputs/coc-count-geography-decisions.csv": "097f48dc78550f40a791b600bc80833a9d38ca196dd88ccf15df1e18f60ae1ca"
+  }
+}
