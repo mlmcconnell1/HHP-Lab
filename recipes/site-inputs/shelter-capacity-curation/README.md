@@ -1,6 +1,6 @@
 # Shelter-capacity sample curation
 
-This is the November 28, 2026 working review for `subst_fd`, the primary first-difference analysis. It records **533 accepted, 13 excluded by study decision, and 17 open** adjacent-year pairs across 563 candidates. The 2024–25 transition has **46 accepted, one excluded, and one open**. The stricter boundary sensitivity subset contains **101** accepted pairs. The production example currently ends in 2024, and this ledger documents the extended working sample before a production model fit.
+This is the November 28, 2026 working review for `subst_fd`, the primary first-difference analysis. It records **533 accepted, 16 excluded by study decision, and 14 open** adjacent-year pairs across 563 candidates. All 48 candidates for 2024–25 are resolved, with **46 accepted and two excluded**. The stricter boundary sensitivity subset contains **101** accepted pairs. The production example currently ends in 2024, and this ledger documents the extended working sample before a production model fit.
 
 ## Find a decision
 
@@ -22,6 +22,7 @@ On an accepted York–Hanover pair, `earlier_study_holdout` preserves the histor
 | 39300 Providence–Warwick, 2024–25 | Use the merged MA-505 submission once in 2024 and one submission per member CoC in 2025. |
 | 35840 North Port–Bradenton–Sarasota, 2024–25 | Retain the published bed inventory and flag uncertainty in the domestic violence shelter entries. |
 | 12540 Bakersfield–Delano, 2024–25 | Accept Kern County scope and the July 2025 local count revision that agrees with HUD. |
+| 14860 Bridgeport–Stamford–Danbury, all three candidate pairs | Hold out the metro. The HUD map, state service network and CoC funding notice identify different areas. The towns and shelter projects included in the January counts remain unverified. |
 | 21500 Erie, 2024–25 | Accept with the documented change in enumeration methodology flagged. |
 | 37860 Pensacola–Ferry Pass–Brent and 45940 Trenton–Princeton, 2024–25 | Accept with the documented count timing and classification notes, respectively. |
 | 18880 Crestview–Fort Walton Beach–Destin, 2024–25 | Use the CoC's January 31, 2025 PIT figures. Keep HUD's January 24 figures for sensitivity. |

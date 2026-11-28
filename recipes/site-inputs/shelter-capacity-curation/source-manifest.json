@@ -13,6 +13,26 @@
     2021
   ],
   "confirmed_msa_holdouts": {
+    "14860": {
+      "msa_name": "Bridgeport–Stamford–Danbury, CT",
+      "decision_basis": "study_owner_decision",
+      "confirmed_on": "2026-11-28",
+      "scope": "all_candidate_pairs",
+      "review_note": "The frozen HUD map covers 99.91% of the metro population. The legacy Fairfield County footprint covers about 96.9% of the frozen metro, and the December 2025 funding notice names localities covering about 92.4%. The state's Fairfield service network covers the metro towns and also includes Roxbury. These are comparisons of the documented geographies. Actual count-night assignments remain uncertain, including the treatment of New Milford's seasonal shelter in 2025.",
+      "reason": "The HUD boundary and the documented service and funding areas differ. Town-level PIT assignments and the shelter projects included in the reported inventory remain unverified against the frozen metro.",
+      "revisit_condition": "Reconsider individual pairs once dated town-level PIT and project-level HIC assignments establish comparable reporting coverage of at least 99% of the frozen metro at both endpoints.",
+      "evidence": [
+        "docs/ct503-historical-reconciliation.md",
+        "https://files.hudexchange.info/reports/published/CoC_Dash_CoC_CT-503-2023_CT_2023.pdf",
+        "https://portal.ct.gov/-/media/dmhas/publications/can-brochures.pdf",
+        "https://portal.ct.gov/opm/-/media/opm/budget/2023_midterm/economic-report-of-the-gov-fy-2023-midterm.pdf",
+        "https://cthmis.com/wp-content/uploads/2025/08/PIT%202025%20Final%20Report%20-8.12.2025.pdf",
+        "https://odi.thehousingcollective.org/funding/nofa-nofo/2025-hud-coc-nofo",
+        "https://www.newmilford.org/filestorage/7526/19046/21991/22022/44028/Jan-Feb_2025_newsletter_FINAL.pdf",
+        "https://files.hudexchange.info/reports/published/CoC_HIC_CoC_CT-503-2025_CT_2025.pdf",
+        "https://files.hudexchange.info/reports/published/CoC_HIC_CoC_CT-505-2025_CT_2025.pdf"
+      ]
+    },
     "31700": {
       "msa_name": "Manchester–Nashua, NH",
       "decision_basis": "study_owner_decision",
