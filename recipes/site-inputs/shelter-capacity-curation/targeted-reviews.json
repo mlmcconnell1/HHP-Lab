@@ -1335,5 +1335,207 @@
         "https://files.hudexchange.info/reports/published/CoC_HIC_CoC_MA-506-2025_MA_2025.pdf"
       ]
     }
+  },
+  {
+    "msa_id": "49620",
+    "first_year": 2015,
+    "last_year": 2016,
+    "decision": "accept",
+    "supersedes_earlier_study_holdout": "York PA-512 historical predecessor footprint",
+    "reason": "York was already reporting as a standalone York County CoC. The HUD performance profile records the two January counts and the county confirms the single-county scope.",
+    "members": {
+      "PA-512": {
+        "jurisdiction": "York County",
+        "scope_ref": "https://www.ycpc.org/164/York-County-Coalition-on-Homelessness-YC",
+        "historical_scope_basis": "York resumed standalone countywide reporting in 2011. The study accepts the published PA-512 endpoint for the reviewed post-split pairs."
+      }
+    },
+    "sources": [
+      "https://www.ycpc.org/164/York-County-Coalition-on-Homelessness-YC",
+      "https://files.hudexchange.info/reports/published/CoC_Perf_CoC_PA-512-2019_PA_2019.pdf"
+    ]
+  },
+  {
+    "msa_id": "49620",
+    "first_year": 2016,
+    "last_year": 2017,
+    "decision": "accept",
+    "supersedes_earlier_study_holdout": "York PA-512 historical predecessor footprint",
+    "reason": "York was already reporting as a standalone York County CoC. The HUD performance profile records the two January counts and the county confirms the single-county scope.",
+    "members": {
+      "PA-512": {
+        "jurisdiction": "York County",
+        "scope_ref": "https://www.ycpc.org/164/York-County-Coalition-on-Homelessness-YC",
+        "historical_scope_basis": "York resumed standalone countywide reporting in 2011. The study accepts the published PA-512 endpoint for the reviewed post-split pairs."
+      }
+    },
+    "sources": [
+      "https://www.ycpc.org/164/York-County-Coalition-on-Homelessness-YC",
+      "https://files.hudexchange.info/reports/published/CoC_Perf_CoC_PA-512-2019_PA_2019.pdf"
+    ]
+  },
+  {
+    "msa_id": "49620",
+    "first_year": 2017,
+    "last_year": 2018,
+    "decision": "accept",
+    "supersedes_earlier_study_holdout": "York PA-512 historical predecessor footprint",
+    "reason": "York was already reporting as a standalone York County CoC. The HUD performance profile records the two January counts and the county describes the annual countywide count.",
+    "members": {
+      "PA-512": {
+        "jurisdiction": "York County",
+        "scope_ref": "https://www.ycpc.org/164/York-County-Coalition-on-Homelessness-YC",
+        "historical_scope_basis": "York resumed standalone countywide reporting in 2011. The study accepts the published PA-512 endpoint for the reviewed post-split pairs."
+      }
+    },
+    "sources": [
+      "https://www.ycpc.org/164/York-County-Coalition-on-Homelessness-YC",
+      "https://files.hudexchange.info/reports/published/CoC_Perf_CoC_PA-512-2019_PA_2019.pdf",
+      "https://www.pa.gov/content/dam/copapwp-pagov/en/dhs/documents/docs/block-grants/documents/fy-2019-20/block-grant-counties/FY%2019-20%20FINAL%20York%20County%20Human%20Services%20Plan.pdf"
+    ]
+  },
+  {
+    "msa_id": "49620",
+    "first_year": 2018,
+    "last_year": 2019,
+    "decision": "accept",
+    "supersedes_earlier_study_holdout": "York PA-512 historical predecessor footprint",
+    "reason": "York was already reporting as a standalone York County CoC. The HUD performance profile records the two January counts and the county describes the annual countywide count.",
+    "members": {
+      "PA-512": {
+        "jurisdiction": "York County",
+        "scope_ref": "https://www.ycpc.org/164/York-County-Coalition-on-Homelessness-YC",
+        "historical_scope_basis": "York resumed standalone countywide reporting in 2011. The study accepts the published PA-512 endpoint for the reviewed post-split pairs."
+      }
+    },
+    "sources": [
+      "https://www.ycpc.org/164/York-County-Coalition-on-Homelessness-YC",
+      "https://files.hudexchange.info/reports/published/CoC_Perf_CoC_PA-512-2019_PA_2019.pdf",
+      "https://www.pa.gov/content/dam/copapwp-pagov/en/dhs/documents/docs/block-grants/documents/fy-2019-20/block-grant-counties/FY%2019-20%20FINAL%20York%20County%20Human%20Services%20Plan.pdf"
+    ]
+  },
+  {
+    "msa_id": "49620",
+    "first_year": 2019,
+    "last_year": 2020,
+    "decision": "accept",
+    "supersedes_earlier_study_holdout": "York PA-512 historical predecessor footprint",
+    "reason": "The county reports both January unsheltered counts and dates the start of its formal street outreach team to later in 2020 during the pandemic. Accept both pre-pandemic counts with the overflow and voucher bed flag.",
+    "members": {
+      "PA-512": {
+        "jurisdiction": "York County",
+        "scope_ref": "https://www.ycpc.org/164/York-County-Coalition-on-Homelessness-YC",
+        "historical_scope_basis": "York resumed standalone countywide reporting in 2011. The study accepts the published PA-512 endpoint for the reviewed post-split pairs."
+      }
+    },
+    "sources": [
+      "https://www.ycpc.org/164/York-County-Coalition-on-Homelessness-YC",
+      "https://www.ycpc.org/DocumentCenter/View/327/York-County-2020-to-2024-Consolidated-Plan-PDF?bidId=#page=51",
+      "https://www.ycpc.org/DocumentCenter/View/327/York-County-2020-to-2024-Consolidated-Plan-PDF#page=130",
+      "https://files.hudexchange.info/reports/published/CoC_HIC_CoC_PA-512-2019_PA_2019.pdf",
+      "https://files.hudexchange.info/reports/published/CoC_HIC_CoC_PA-512-2020_PA_2020.pdf"
+    ],
+    "bed_count_sensitivity": {
+      "note": "Year-round beds decline from 379 to 370. Reported overflow and voucher beds decline from 68 to 6. Including those categories gives 447 to 376 beds for count-night sensitivity.",
+      "sources": [
+        "https://files.hudexchange.info/reports/published/CoC_HIC_CoC_PA-512-2019_PA_2019.pdf",
+        "https://files.hudexchange.info/reports/published/CoC_HIC_CoC_PA-512-2020_PA_2020.pdf"
+      ]
+    }
+  },
+  {
+    "msa_id": "49620",
+    "first_year": 2022,
+    "last_year": 2023,
+    "decision": "accept",
+    "supersedes_earlier_study_holdout": "York PA-512 historical predecessor footprint",
+    "reason": "The county confirms the 2022 count covers York County. The 2022 and 2023 HUD archive footprints are near-equivalent to the frozen footprint and reproduce the published PIT and HIC values.",
+    "members": {
+      "PA-512": {
+        "jurisdiction": "York County",
+        "scope_ref": "https://www.ycpc.org/164/York-County-Coalition-on-Homelessness-YC",
+        "historical_scope_basis": "York resumed standalone countywide reporting in 2011. The study accepts the published PA-512 endpoint for the reviewed post-split pairs."
+      }
+    },
+    "sources": [
+      "https://www.ycpc.org/164/York-County-Coalition-on-Homelessness-YC",
+      "https://www.ycpc.org/DocumentCenter/View/4925/York-County-HOME-ARP-Allocation-Plan-PDF",
+      "https://files.hudexchange.info/reports/published/CoC_PopSub_CoC_PA-512-2022_PA_2022.pdf",
+      "https://files.hudexchange.info/reports/published/CoC_PopSub_CoC_PA-512-2023_PA_2023.pdf",
+      "https://files.hudexchange.info/reports/published/CoC_HIC_CoC_PA-512-2022_PA_2022.pdf",
+      "https://files.hudexchange.info/reports/published/CoC_HIC_CoC_PA-512-2023_PA_2023.pdf"
+    ]
+  },
+  {
+    "msa_id": "49620",
+    "first_year": 2023,
+    "last_year": 2024,
+    "decision": "accept",
+    "supersedes_earlier_study_holdout": "York PA-512 historical predecessor footprint",
+    "reason": "The archived 2023 and 2024 HUD footprints agree at map precision. Accept the two published counts with a note on the timing of the dedicated youth count.",
+    "members": {
+      "PA-512": {
+        "jurisdiction": "York County",
+        "scope_ref": "https://www.ycpc.org/164/York-County-Coalition-on-Homelessness-YC",
+        "historical_scope_basis": "York resumed standalone countywide reporting in 2011. The study accepts the published PA-512 endpoint for the reviewed post-split pairs."
+      }
+    },
+    "sources": [
+      "https://www.ycpc.org/164/York-County-Coalition-on-Homelessness-YC",
+      "https://www.yorkcity.org/wp-content/uploads/2024/09/Final-Draft-York-2044.pdf",
+      "https://files.hudexchange.info/reports/published/CoC_PopSub_CoC_PA-512-2023_PA_2023.pdf",
+      "https://files.hudexchange.info/reports/published/CoC_PopSub_CoC_PA-512-2024_PA_2024.pdf",
+      "https://files.hudexchange.info/reports/published/CoC_HIC_CoC_PA-512-2023_PA_2023.pdf",
+      "https://files.hudexchange.info/reports/published/CoC_HIC_CoC_PA-512-2024_PA_2024.pdf"
+    ],
+    "count_method": {
+      "note": "York began implementing a youth-specific count in 2024. The first January count that incorporated it is unclear. HUD reports seven unsheltered unaccompanied youth in both 2023 and 2024. Retain published PIT counts and flag the timing caveat.",
+      "sources": [
+        "https://www.yorkcity.org/wp-content/uploads/2024/09/Final-Draft-York-2044.pdf",
+        "https://files.hudexchange.info/reports/published/CoC_PopSub_CoC_PA-512-2023_PA_2023.pdf#page=3",
+        "https://files.hudexchange.info/reports/published/CoC_PopSub_CoC_PA-512-2024_PA_2024.pdf#page=3"
+      ]
+    }
+  },
+  {
+    "msa_id": "49620",
+    "first_year": 2024,
+    "last_year": 2025,
+    "decision": "accept",
+    "supersedes_earlier_study_holdout": "York PA-512 historical predecessor footprint",
+    "reason": "The county's 2025 presentation and HUD agree at 79 unsheltered and 460 total. Both inventories list the Hanover Changing Lives Shelter. Retain the published 76 to 79 unsheltered and 341 to 366 year-round beds with the youth-count timing and seasonal-bed notes.",
+    "members": {
+      "PA-512": {
+        "jurisdiction": "York County",
+        "scope_ref": "https://nhm-pa.org/wp-content/uploads/2025-PIT-Data-Presentation.pdf#page=2"
+      }
+    },
+    "sources": [
+      "https://www.ycpc.org/164/York-County-Coalition-on-Homelessness-YC",
+      "https://www.ycpc.org/DocumentCenter/View/125/CoC-Governance-Charter-PDF",
+      "https://nhm-pa.org/wp-content/uploads/2025-PIT-Data-Presentation.pdf#page=2",
+      "https://nhm-pa.org/wp-content/uploads/2025-PIT-Data-Presentation.pdf#page=11",
+      "https://files.hudexchange.info/reports/published/CoC_PopSub_CoC_PA-512-2024_PA_2024.pdf",
+      "https://files.hudexchange.info/reports/published/CoC_PopSub_CoC_PA-512-2025_PA_2025.pdf",
+      "https://files.hudexchange.info/reports/published/CoC_HIC_CoC_PA-512-2024_PA_2024.pdf",
+      "https://files.hudexchange.info/reports/published/CoC_HIC_CoC_PA-512-2025_PA_2025.pdf",
+      "https://www.yorkcity.org/wp-content/uploads/2024/09/Final-Draft-York-2044.pdf"
+    ],
+    "count_method": {
+      "note": "York began implementing a youth-specific count in 2024. The first January count that incorporated it is unclear. HUD reports seven and eight unsheltered unaccompanied youth in 2024 and 2025. Retain published PIT counts and flag the timing caveat.",
+      "sources": [
+        "https://www.yorkcity.org/wp-content/uploads/2024/09/Final-Draft-York-2044.pdf",
+        "https://files.hudexchange.info/reports/published/CoC_PopSub_CoC_PA-512-2024_PA_2024.pdf#page=3",
+        "https://files.hudexchange.info/reports/published/CoC_PopSub_CoC_PA-512-2025_PA_2025.pdf#page=3"
+      ]
+    },
+    "bed_count_sensitivity": {
+      "note": "The local chart compares 239 emergency beds in 2024 with 365 in 2025 using different seasonal coverage. Retain HUD's consistent 341 to 366 year-round shelter beds. HUD separately reports 75 and 92 seasonal beds, for a count-night sensitivity of 416 to 458 beds.",
+      "sources": [
+        "https://nhm-pa.org/wp-content/uploads/2025-PIT-Data-Presentation.pdf#page=11",
+        "https://files.hudexchange.info/reports/published/CoC_HIC_CoC_PA-512-2024_PA_2024.pdf",
+        "https://files.hudexchange.info/reports/published/CoC_HIC_CoC_PA-512-2025_PA_2025.pdf"
+      ]
+    }
   }
 ]
