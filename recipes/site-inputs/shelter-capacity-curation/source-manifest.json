@@ -614,6 +614,7 @@
   },
   "working_inventory_input_sha256": {
     "asset:historical-site-selection/full-period-boundary-curation-20261027/corrected/annual-comparisons.csv": "9f0872f771c6c16f924c55cfbcd2cc1030ffdcee571b4eca3b48cc4d405c96bf",
+    "asset:historical-site-selection/lodi-florida-gis-correction-20261027/affected-comparisons.csv": "857799597927ca7d920bfefdceedc6faeae6bf260bcf3a91c5ef5f9472545cd0",
     "asset:historical-site-selection/remaining-boundary-checks-20261119/current-cohort-dispositions.csv": "5af17b5eeda5913be925568ca14e9ed5129884bd8a5aa5da0b9a6f6f40312d42",
     "asset:msa_coc_overlap_sites_2024/msa_coc_memberships__overlap_samples.parquet": "8d86dbde6b27715f57cf644336b441401089559c08bb2d29733abf4dffafc0e8",
     "asset:msa_coc_overlap_sites_2024/msa_coc_sites__overlap_samples.parquet": "4b7467d828f503751234bce24120f4e6460070540add24736c149831410a1e80",

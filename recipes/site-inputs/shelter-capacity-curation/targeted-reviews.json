@@ -203,6 +203,159 @@
   },
   {
     "msa_id": "19660",
+    "first_year": 2010,
+    "last_year": 2011,
+    "decision": "accept",
+    "reason": "The early map comparison supports continuity. Palm Coast's plan identifies the two-county CoC and documents local participation in the 2011 count.",
+    "members": {
+      "FL-504": {
+        "jurisdiction": "Volusia and Flagler counties",
+        "scope_ref": "docs/historical-coc-archive-availability.md#lodi-and-florida-gis-omissions-2026-10-27",
+        "historical_scope_basis": "The reviewed map restoration addresses the 2013–14 Palm Coast omission. Florida's contemporaneous county counts and the FL-504 submissions document continuing Volusia and Flagler scope."
+      }
+    },
+    "sources": [
+      "docs/historical-coc-archive-availability.md#lodi-and-florida-gis-omissions-2026-10-27",
+      "asset:historical-site-selection/lodi-florida-gis-correction-20261027/affected-comparisons.csv",
+      "https://www.pascohomelesscoalition.org/wp-content/uploads/2012/01/Council-on-Homelessness-2015-Report.pdf#page=30",
+      "https://docs.palmcoastgov.com/residents/nsp/cdbg/consolidated-plan-narrative.pdf",
+      "https://files.hudexchange.info/reports/published/CoC_PopSub_CoC_FL-504-2010_FL_2010.pdf",
+      "https://vfcchdb.duckdns.org/docs/reports/pit/2011%20PIT%20Report.pdf",
+      "https://vfcchdb.duckdns.org/docs/reports/housinginventorychartreports/2010HICReportPDF.pdf",
+      "https://vfcchdb.duckdns.org/docs/reports/housinginventorychartreports/2011HICReportPDF.pdf"
+    ],
+    "bed_count_sensitivity": {
+      "note": "The reported year-round total falls from 616 to 611. Seasonal beds are 33 in both years, with 33 overflow beds also reported in 2011. Adding the reported temporary categories gives 649 to 677 beds for sensitivity.",
+      "sources": [
+        "https://vfcchdb.duckdns.org/docs/reports/housinginventorychartreports/2010HICReportPDF.pdf",
+        "https://vfcchdb.duckdns.org/docs/reports/housinginventorychartreports/2011HICReportPDF.pdf"
+      ]
+    }
+  },
+  {
+    "msa_id": "19660",
+    "first_year": 2011,
+    "last_year": 2012,
+    "decision": "accept",
+    "reason": "The early map comparison supports continuity, and dated records show FL-504 reporting in Volusia and Flagler counties in both years.",
+    "members": {
+      "FL-504": {
+        "jurisdiction": "Volusia and Flagler counties",
+        "scope_ref": "docs/historical-coc-archive-availability.md#lodi-and-florida-gis-omissions-2026-10-27",
+        "historical_scope_basis": "The reviewed map restoration addresses the 2013–14 Palm Coast omission. Florida's contemporaneous county counts and the FL-504 submissions document continuing Volusia and Flagler scope."
+      }
+    },
+    "sources": [
+      "docs/historical-coc-archive-availability.md#lodi-and-florida-gis-omissions-2026-10-27",
+      "asset:historical-site-selection/lodi-florida-gis-correction-20261027/affected-comparisons.csv",
+      "https://www.pascohomelesscoalition.org/wp-content/uploads/2012/01/Council-on-Homelessness-2015-Report.pdf#page=30",
+      "https://docs.palmcoastgov.com/residents/nsp/cdbg/consolidated-plan-narrative.pdf",
+      "https://vfcchdb.duckdns.org/docs/reports/pit/2011%20PIT%20Report.pdf",
+      "https://vfcchdb.duckdns.org/docs/reports/pit/2012%20PIT%20Report.pdf",
+      "https://vfcchdb.duckdns.org/docs/reports/housinginventorychartreports/2011HICReportPDF.pdf",
+      "https://vfcchdb.duckdns.org/docs/reports/housinginventorychartreports/2012HICReportPDF.pdf"
+    ],
+    "bed_count_sensitivity": {
+      "note": "Year-round beds fall from 611 to 598. Seasonal and overflow beds together fall from 66 to 3 as reported. The count-night sensitivity is 677 to 601 beds.",
+      "sources": [
+        "https://vfcchdb.duckdns.org/docs/reports/housinginventorychartreports/2011HICReportPDF.pdf",
+        "https://vfcchdb.duckdns.org/docs/reports/housinginventorychartreports/2012HICReportPDF.pdf"
+      ]
+    }
+  },
+  {
+    "msa_id": "19660",
+    "first_year": 2012,
+    "last_year": 2013,
+    "decision": "accept",
+    "reason": "The approved Palm Coast correction reduces the map difference to 83 square meters. Flagler County has reported PIT counts at both endpoints. Accept the published totals with the subgroup reporting note.",
+    "members": {
+      "FL-504": {
+        "jurisdiction": "Volusia and Flagler counties",
+        "scope_ref": "docs/historical-coc-archive-availability.md#lodi-and-florida-gis-omissions-2026-10-27",
+        "historical_scope_basis": "The reviewed map restoration addresses the 2013–14 Palm Coast omission. Florida's contemporaneous county counts and the FL-504 submissions document continuing Volusia and Flagler scope."
+      }
+    },
+    "sources": [
+      "docs/historical-coc-archive-availability.md#lodi-and-florida-gis-omissions-2026-10-27",
+      "asset:historical-site-selection/lodi-florida-gis-correction-20261027/affected-comparisons.csv",
+      "https://www.pascohomelesscoalition.org/wp-content/uploads/2012/01/Council-on-Homelessness-2015-Report.pdf#page=30",
+      "https://vfcchdb.duckdns.org/docs/reports/pit/2012%20PIT%20Report.pdf",
+      "https://vfcchdb.duckdns.org/docs/reports/pit/2013%20PIT%20Report.pdf",
+      "https://vfcchdb.duckdns.org/docs/reports/housinginventorychartreports/2012HICReportPDF.pdf",
+      "https://vfcchdb.duckdns.org/docs/reports/housinginventorychartreports/2013HICReportPDF.pdf"
+    ],
+    "count_method": {
+      "note": "The 2012 CoC report records zero unsheltered people in families with children or in child-only households. The 2013 report records 57 across these groups. The extent of any change in fieldwork or reporting is unclear. Retain the published PIT totals.",
+      "sources": [
+        "https://vfcchdb.duckdns.org/docs/reports/pit/2012%20PIT%20Report.pdf",
+        "https://vfcchdb.duckdns.org/docs/reports/pit/2013%20PIT%20Report.pdf"
+      ]
+    },
+    "bed_count_sensitivity": {
+      "note": "Year-round beds rise from 598 to 647. Temporary beds rise from 3 overflow beds in 2012 to 46 seasonal beds in 2013. The count-night sensitivity is 601 to 693 beds.",
+      "sources": [
+        "https://vfcchdb.duckdns.org/docs/reports/housinginventorychartreports/2012HICReportPDF.pdf",
+        "https://vfcchdb.duckdns.org/docs/reports/housinginventorychartreports/2013HICReportPDF.pdf"
+      ]
+    }
+  },
+  {
+    "msa_id": "19660",
+    "first_year": 2013,
+    "last_year": 2014,
+    "decision": "accept",
+    "reason": "The approved Palm Coast reconstruction applies to both endpoints. Florida reports PIT counts for Flagler County in both years, and the CoC's inventory lists Flagler projects in both years.",
+    "members": {
+      "FL-504": {
+        "jurisdiction": "Volusia and Flagler counties",
+        "scope_ref": "docs/historical-coc-archive-availability.md#lodi-and-florida-gis-omissions-2026-10-27",
+        "historical_scope_basis": "The reviewed map restoration addresses the 2013–14 Palm Coast omission. Florida's contemporaneous county counts and the FL-504 submissions document continuing Volusia and Flagler scope."
+      }
+    },
+    "sources": [
+      "docs/historical-coc-archive-availability.md#lodi-and-florida-gis-omissions-2026-10-27",
+      "asset:historical-site-selection/lodi-florida-gis-correction-20261027/affected-comparisons.csv",
+      "https://www.pascohomelesscoalition.org/wp-content/uploads/2012/01/Council-on-Homelessness-2015-Report.pdf#page=30",
+      "https://vfcchdb.duckdns.org/docs/reports/pit/2013%20PIT%20Report.pdf",
+      "https://vfcchdb.duckdns.org/docs/reports/pit/2014%20Total%20Persons%20PIT%20Report.pdf",
+      "https://vfcchdb.duckdns.org/docs/reports/housinginventorychartreports/2013HICReportPDF.pdf",
+      "https://vfcchdb.duckdns.org/docs/reports/housinginventorychartreports/2014HICReportPDF.pdf"
+    ],
+    "bed_count_sensitivity": {
+      "note": "Year-round beds fall from 647 to 594. Seasonal beds rise from 46 to 187. The count-night sensitivity is 693 to 781 beds.",
+      "sources": [
+        "https://vfcchdb.duckdns.org/docs/reports/housinginventorychartreports/2013HICReportPDF.pdf",
+        "https://vfcchdb.duckdns.org/docs/reports/housinginventorychartreports/2014HICReportPDF.pdf"
+      ]
+    }
+  },
+  {
+    "msa_id": "19660",
+    "first_year": 2014,
+    "last_year": 2015,
+    "decision": "accept",
+    "reason": "The approved Palm Coast correction reduces the map difference to approximately 5,342 square meters. Flagler County is counted in both years. Seasonal beds are 187 in both years. Retain HUD's published 775 unsheltered for 2015. The local snapshot reports 777.",
+    "members": {
+      "FL-504": {
+        "jurisdiction": "Volusia and Flagler counties",
+        "scope_ref": "docs/historical-coc-archive-availability.md#lodi-and-florida-gis-omissions-2026-10-27",
+        "historical_scope_basis": "The reviewed map restoration addresses the 2013–14 Palm Coast omission. Florida's contemporaneous county counts and the FL-504 submissions document continuing Volusia and Flagler scope."
+      }
+    },
+    "sources": [
+      "docs/historical-coc-archive-availability.md#lodi-and-florida-gis-omissions-2026-10-27",
+      "asset:historical-site-selection/lodi-florida-gis-correction-20261027/affected-comparisons.csv",
+      "https://www.pascohomelesscoalition.org/wp-content/uploads/2012/01/Council-on-Homelessness-2015-Report.pdf#page=30",
+      "https://vfcchdb.duckdns.org/docs/reports/pit/2014%20Total%20Persons%20PIT%20Report.pdf",
+      "https://files.hudexchange.info/reports/published/CoC_PopSub_CoC_FL-504-2015_FL_2015.pdf",
+      "https://vfcchdb.duckdns.org/docs/reports/housinginventorychartreports/2014HICReportPDF.pdf",
+      "https://vfcchdb.duckdns.org/docs/reports/housinginventorychartreports/2015HICReportPDF.pdf",
+      "https://vfcchdb.duckdns.org/docs/reports/pit/2015%20Total%20Population%20PIT%20Report.pdf"
+    ]
+  },
+  {
+    "msa_id": "19660",
     "first_year": 2024,
     "last_year": 2025,
     "decision": "accept",
