@@ -18,13 +18,17 @@
       "decision_basis": "study_owner_decision",
       "confirmed_on": "2026-11-27",
       "scope": "all_candidate_pairs",
+      "review_note": "Confusing. The HUD polygon, documented service areas, and shelter reporting do not align.",
       "reason": "Documented CoC service areas cover 74.1% of the frozen MSA. Comparable PIT counts and HIC inventories for its Balance of State towns remain unverified.",
       "revisit_condition": "Reconsider individual pairs once dated evidence and compatible counts establish PIT and HIC coverage for at least 99% of the frozen MSA at both endpoints.",
       "evidence": [
         "recipes/site-inputs/msa-nashua-exclusion-decision.json",
         "docs/historical-coc-archive-availability.md#nashua-town-reference-crosswalks-2026-11-20",
         "https://www.nashuanh.gov/DocumentCenter/View/35701/FY-26-30-Con-Plan#page=8",
-        "https://files.hudexchange.info/reports/published/CoC_PopSub_CoC_NH-500-2025_NH_2025.pdf"
+        "https://files.hudexchange.info/reports/published/CoC_PopSub_CoC_NH-500-2025_NH_2025.pdf",
+        "https://files.hudexchange.info/reports/published/CoC_HIC_CoC_NH-500-2024_NH_2024.pdf#page=4",
+        "https://www.matsnh.org/about-mats",
+        "https://files.hudexchange.info/reports/published/CoC_HIC_CoC_NH-500-2025_NH_2025.pdf#page=4"
       ]
     }
   },

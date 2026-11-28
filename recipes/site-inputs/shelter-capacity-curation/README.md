@@ -26,10 +26,12 @@ The pair ledger's `targeted_review` field points to the matching `msa_id`, `firs
 | 12980 Battle Creek and 19660 Deltona–Daytona Beach–Ormond Beach, 2024–25 | Retain the published year-round inventory and flag the temporary beds in Battle Creek and the First Step Shelter entries in Deltona. |
 | 34940 Naples–Marco Island and 15980 Cape Coral–Fort Myers, 2024–25 | Assign the presumed duplicate St. Matthew's House facility to Lee using its 65-bed entry. Adjust Collier from 538 to 470 beds and keep 538 for sensitivity. |
 | 37340 Palm Bay–Melbourne–Titusville, 2024–25 | Retain the published PIT counts and flag the 213 cold-night shelter guests counted as unsheltered in Brevard in 2025. |
-| 31700 Manchester–Nashua, all 11 candidate pairs | Hold out the metro. The documented service areas cover 74.1% of its residents, and compatible PIT and HIC data for the Balance of State towns remain unverified. |
+| 31700 Manchester–Nashua, all 11 candidate pairs | Hold out the metro. Review note is “confusing.” The documented service areas cover 74.1% of its residents, and compatible PIT and HIC data for the Balance of State towns remain unverified. |
 | 41420 Salem, 2022–23 | Keep open pending disposition of the earlier whole-site holdout. |
 
 HUD's FY2025 preliminary funding figure for NH-502 is $762,649, exactly the sum of its Nashua and Hillsborough County geocode amounts. The funding figures identify the geographic codes used for the preliminary calculation. Assessing PIT and HIC coverage still requires the towns and projects behind the reported counts. [HUD FY2025 geographic code report](https://www.hud.gov/sites/default/files/CPD/documents/CoC/FY-2025-GeoCodes-PPRN-Report.pdf) · [HUD FY2025 renewal demand report](https://www.hud.gov/sites/dfiles/CPD/documents/CoC/FY25-CoC-Estimated-Annual-Renewal-Demand-Amount-Report.pdf)
+
+In 2024, NH-500 reported 11 year-round transitional beds at Monadnock Area Transitional Shelter in Peterborough, a town the frozen HUD map assigns to NH-502. The 2025 project reports leave that shelter's inventory treatment unresolved. [2024 NH-500 inventory](https://files.hudexchange.info/reports/published/CoC_HIC_CoC_NH-500-2024_NH_2024.pdf#page=4) · [Shelter provider](https://www.matsnh.org/about-mats) · [2025 NH-500 inventory](https://files.hudexchange.info/reports/published/CoC_HIC_CoC_NH-500-2025_NH_2025.pdf#page=4)
 
 ## Review rules
 
